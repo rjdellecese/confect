@@ -1,9 +1,9 @@
 import {
+  ArgsArray,
   DocumentByInfo,
   DocumentByName,
   Expression,
   FilterBuilder,
-  FunctionArgs,
   GenericDataModel,
   GenericDatabaseReader,
   GenericDatabaseWriter,
@@ -28,7 +28,7 @@ import {
   WithoutSystemFields,
 } from "convex/server";
 import { GenericId } from "convex/values";
-import { Effect, pipe } from "effect/index";
+import { Chunk, Effect, Option, Stream, identity, pipe } from "effect";
 
 type Rule<Ctx, D> = (ctx: Ctx, doc: D) => Promise<boolean>;
 
@@ -128,7 +128,6 @@ export const RowLevelSecurity = <RuleCtx, DataModel extends GenericDataModel>(
   };
 };
 
-type ArgsArray = [] | [FunctionArgs<any>];
 type Handler<Ctx, Args extends ArgsArray, Output> = (
   ctx: Ctx,
   ...args: Args
@@ -147,10 +146,30 @@ async function asyncFilter<T>(
   return arr.filter((_v, index) => results[index]);
 }
 
-interface EffectQuery<T extends GenericTableInfo> extends Omit<Query<T>, "collect" | "filter" | "order"> {
+interface EffectQuery<T extends GenericTableInfo>
+  extends Omit<
+    Query<T>,
+    "collect" | "filter" | "order" | "take" | "first" | "unique" | "paginate"
+  > {
   collect(): Effect.Effect<never, never, DocumentByInfo<T>[]>;
-  filter(predicate: (q: FilterBuilder<T>) => Expression<boolean>): EffectQuery<T>;
+  filter(
+    predicate: (q: FilterBuilder<T>) => Expression<boolean>
+  ): EffectQuery<T>;
   order(order: "asc" | "desc"): EffectQuery<T>;
+  take(n: number): Effect.Effect<never, never, DocumentByInfo<T>[]>;
+  first(): Effect.Effect<never, never, Option.Option<DocumentByInfo<T>>>;
+  unique(): Effect.Effect<
+    never,
+    NotUniqueError,
+    Option.Option<DocumentByInfo<T>>
+  >;
+  paginate(
+    paginationOpts: PaginationOptions
+  ): Effect.Effect<never, never, PaginationResult<DocumentByInfo<T>>>;
+}
+
+class NotUniqueError {
+  readonly _tag = "NotUniqueError";
 }
 
 class WrapQuery<T extends GenericTableInfo> implements EffectQuery<T> {
@@ -167,12 +186,17 @@ class WrapQuery<T extends GenericTableInfo> implements EffectQuery<T> {
   order(order: "asc" | "desc"): WrapQuery<T> {
     return new WrapQuery(this.q.order(order), this.p);
   }
-  async paginate(
+  paginate(
     paginationOpts: PaginationOptions
-  ): Promise<PaginationResult<DocumentByInfo<T>>> {
-    const result = await this.q.paginate(paginationOpts);
-    result.page = await asyncFilter(result.page, this.p);
-    return result;
+  ): Effect.Effect<never, never, PaginationResult<DocumentByInfo<T>>> {
+    // TODO: Perhaps it's better to raise an error here if the auth predicate ever returns false, rather than trying to filter out those results?
+    return pipe(
+      Effect.promise(() => this.q.paginate(paginationOpts)),
+      Effect.map((result) => ({
+        ...result,
+        page: result.page.filter(this.p),
+      }))
+    );
   }
   collect(): Effect.Effect<never, never, DocumentByInfo<T>[]> {
     return pipe(
@@ -182,32 +206,41 @@ class WrapQuery<T extends GenericTableInfo> implements EffectQuery<T> {
       )
     );
   }
-  async take(n: number): Promise<DocumentByInfo<T>[]> {
-    const results = [];
-    for await (const result of this) {
-      results.push(result);
-      if (results.length >= n) {
-        break;
-      }
-    }
-    return results;
+  take(n: number): Effect.Effect<never, never, DocumentByInfo<T>[]> {
+    return pipe(
+      // TODO: Should I memoize this, like the `iterator` property?
+      Stream.fromAsyncIterable(this, identity),
+      Stream.take(n),
+      Stream.runCollect,
+      Effect.map(
+        (chunk) => Chunk.toReadonlyArray(chunk) as DocumentByInfo<T>[]
+      ),
+      Effect.orDie
+    );
   }
-  async first(): Promise<DocumentByInfo<T> | null> {
-    for await (const result of this) {
-      return result;
-    }
-    return null;
+  first(): Effect.Effect<never, never, Option.Option<DocumentByInfo<T>>> {
+    return pipe(
+      Stream.fromAsyncIterable(this, identity),
+      Stream.runHead,
+      Effect.orDie
+    );
   }
-  async unique(): Promise<DocumentByInfo<T> | null> {
-    let uniqueResult = null;
-    for await (const result of this) {
-      if (uniqueResult === null) {
-        uniqueResult = result;
-      } else {
-        throw new Error("not unique");
-      }
-    }
-    return uniqueResult;
+  unique(): Effect.Effect<
+    never,
+    NotUniqueError,
+    Option.Option<DocumentByInfo<T>>
+  > {
+    return pipe(
+      Stream.fromAsyncIterable(this, identity),
+      Stream.take(2),
+      Stream.runCollect,
+      Effect.orDie,
+      Effect.flatMap((chunk) =>
+        Chunk.get(chunk, 1)
+          ? Effect.fail(new NotUniqueError())
+          : Effect.succeed(Chunk.get(chunk, 0))
+      )
+    );
   }
   [Symbol.asyncIterator](): AsyncIterator<DocumentByInfo<T>, any, undefined> {
     this.iterator = this.q[Symbol.asyncIterator]();
