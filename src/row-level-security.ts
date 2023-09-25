@@ -447,15 +447,34 @@ class WrapReader<Ctx, DataModel extends GenericDataModel>
   }
 }
 
+class InsertNotAllowedError {
+  readonly _tag = "InsertNotAllowedError";
+}
+
 interface EffectDatabaseWriter<DataModel extends GenericDataModel>
-  extends Omit<GenericDatabaseWriter<DataModel>, "query" | "get" | "delete"> {
-  query<TableName extends string>(
-    tableName: TableName
-  ): EffectQueryInitializer<NamedTableInfo<DataModel, TableName>>;
+  extends Omit<
+    GenericDatabaseWriter<DataModel>,
+    "query" | "get" | "delete" | "replace" | "patch" | "insert"
+  > {
+  insert<TableName extends string>(
+    table: TableName,
+    value: any
+  ): Effect.Effect<never, never, any>;
+  patch<TableName extends string>(
+    id: GenericId<TableName>,
+    value: Partial<any>
+  ): Effect.Effect<never, never, void>;
+  replace<TableName extends string>(
+    id: GenericId<TableName>,
+    value: any
+  ): Effect.Effect<never, never, void>;
+  delete(id: GenericId<string>): Effect.Effect<never, never, void>;
   get<TableName extends string>(
     id: GenericId<TableName>
   ): Effect.Effect<never, never, Option.Option<any>>;
-  delete(id: GenericId<string>): Effect.Effect<never, never, void>;
+  query<TableName extends string>(
+    tableName: TableName
+  ): EffectQueryInitializer<NamedTableInfo<DataModel, TableName>>;
 }
 
 class WrapWriter<Ctx, DataModel extends GenericDataModel>
@@ -492,17 +511,28 @@ class WrapWriter<Ctx, DataModel extends GenericDataModel>
   ): GenericId<TableName> | null {
     return this.db.normalizeId(tableName, id);
   }
-  async insert<TableName extends string>(
+  insert<TableName extends string>(
     table: TableName,
     value: any
-  ): Promise<any> {
-    if (
-      this.rules[table]?.insert &&
-      !(await this.rules[table]!.insert!(this.ctx, value))
-    ) {
-      throw new Error("insert access not allowed");
-    }
-    return await this.db.insert(table, value);
+  ): Effect.Effect<never, never, any> {
+    const doInsert = Effect.promise(() => this.db.insert(table, value));
+
+    return pipe(
+      this.rules[table]?.insert,
+      Option.fromNullable,
+      Option.match({
+        onSome: (rule) =>
+          pipe(
+            Effect.promise(() => rule(this.ctx, value)),
+            Effect.if({
+              onTrue: doInsert,
+              onFalse: Effect.fail(new InsertNotAllowedError()),
+            })
+          ),
+        onNone: () => doInsert,
+      }),
+      Effect.orDie
+    );
   }
   tableName<TableName extends string>(
     id: GenericId<TableName>
@@ -531,19 +561,23 @@ class WrapWriter<Ctx, DataModel extends GenericDataModel>
       throw new Error("write access not allowed");
     }
   }
-  async patch<TableName extends string>(
+  patch<TableName extends string>(
     id: GenericId<TableName>,
     value: Partial<any>
-  ): Promise<void> {
-    await this.checkAuth(id);
-    return await this.db.patch(id, value);
+  ): Effect.Effect<never, never, void> {
+    return pipe(
+      Effect.promise(() => this.checkAuth(id)),
+      Effect.flatMap(() => Effect.promise(() => this.db.patch(id, value)))
+    );
   }
-  async replace<TableName extends string>(
+  replace<TableName extends string>(
     id: GenericId<TableName>,
     value: any
-  ): Promise<void> {
-    await this.checkAuth(id);
-    return await this.db.replace(id, value);
+  ): Effect.Effect<never, never, void> {
+    return pipe(
+      Effect.promise(() => this.checkAuth(id)),
+      Effect.flatMap(() => Effect.promise(() => this.db.replace(id, value)))
+    );
   }
   delete(id: GenericId<string>): Effect.Effect<never, never, void> {
     return pipe(
