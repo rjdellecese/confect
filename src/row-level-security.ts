@@ -43,13 +43,44 @@ type Rule<Ctx, Doc> = (
   doc: Doc
 ) => Effect.Effect<never, never, boolean>;
 
-export type Rules<Ctx, DataModel extends GenericDataModel> = {
-  [T in TableNamesInDataModel<DataModel>]?: {
-    read?: Rule<Ctx, DocumentByName<DataModel, T>>;
-    modify?: Rule<Ctx, DocumentByName<DataModel, T>>;
-    insert?: Rule<Ctx, WithoutSystemFields<DocumentByName<DataModel, T>>>;
-  };
-};
+type TableRules<
+  Ctx,
+  DataModel extends GenericDataModel,
+  T extends TableNamesInDataModel<DataModel>,
+  Strict extends boolean,
+> = Strict extends true
+  ? {
+      read: Rule<Ctx, DocumentByName<DataModel, T>>;
+      modify: Rule<Ctx, DocumentByName<DataModel, T>>;
+      insert: Rule<Ctx, WithoutSystemFields<DocumentByName<DataModel, T>>>;
+    }
+  : {
+      read?: Rule<Ctx, DocumentByName<DataModel, T>>;
+      modify?: Rule<Ctx, DocumentByName<DataModel, T>>;
+      insert?: Rule<Ctx, WithoutSystemFields<DocumentByName<DataModel, T>>>;
+    };
+
+export type Rules<
+  Ctx,
+  DataModel extends GenericDataModel,
+  Strict extends boolean = false,
+> = Strict extends true
+  ? {
+      [T in TableNamesInDataModel<DataModel>]: TableRules<
+        Ctx,
+        DataModel,
+        T,
+        Strict
+      >;
+    }
+  : {
+      [T in TableNamesInDataModel<DataModel>]?: TableRules<
+        Ctx,
+        DataModel,
+        T,
+        Strict
+      >;
+    };
 
 /**
  * Apply row level security (RLS) to queries and mutations with the returned
@@ -148,12 +179,6 @@ type AuthPredicate<T extends GenericTableInfo> = (
   doc: DocumentByInfo<T>
 ) => Effect.Effect<never, never, boolean>;
 
-// TODO: Is this how it should work? Filtering rather than raising an error? I'm not so sure...
-const filter = <T>(
-  arr: T[],
-  predicate: (doc: T) => Effect.Effect<never, never, boolean>
-): Effect.Effect<never, never, T[]> => Effect.filter(arr, predicate);
-
 interface EffectQuery<T extends GenericTableInfo>
   extends AsyncIterable<DocumentByInfo<T>>,
     AsyncIterator<DocumentByInfo<T>> {
@@ -181,6 +206,10 @@ class NotUniqueError {
   readonly _tag = "NotUniqueError";
 }
 
+class ReadNotAllowedError {
+  readonly _tag = "ReadNotAllowedError";
+}
+
 class WrapQuery<T extends GenericTableInfo> implements EffectQuery<T> {
   q: Query<T>;
   p: AuthPredicate<T>;
@@ -195,22 +224,30 @@ class WrapQuery<T extends GenericTableInfo> implements EffectQuery<T> {
   order(order: "asc" | "desc"): WrapQuery<T> {
     return new WrapQuery(this.q.order(order), this.p);
   }
+  checkReadAuth(doc: DocumentByInfo<T>): Effect.Effect<never, never, void> {
+    return pipe(
+      this.p(doc),
+      Effect.if({
+        onTrue: Effect.unit,
+        onFalse: Effect.fail(new ReadNotAllowedError()),
+      }),
+      Effect.orDie
+    );
+  }
   paginate(
     paginationOpts: PaginationOptions
   ): Effect.Effect<never, never, PaginationResult<DocumentByInfo<T>>> {
-    // TODO: Perhaps it's better to raise an error here if the auth predicate ever returns false, rather than trying to filter out those results?
     return pipe(
       Effect.promise(() => this.q.paginate(paginationOpts)),
-      Effect.map((result) => ({
-        ...result,
-        page: result.page.filter(this.p),
-      }))
+      Effect.tap((result) => Effect.forEach(result.page, this.checkReadAuth)),
+      Effect.orDie
     );
   }
   collect(): Effect.Effect<never, never, DocumentByInfo<T>[]> {
     return pipe(
       Effect.promise(() => this.q.collect()),
-      Effect.flatMap((results) => filter(results, this.p))
+      Effect.tap((docs) => Effect.forEach(docs, this.checkReadAuth)),
+      Effect.orDie
     );
   }
   take(n: number): Effect.Effect<never, never, DocumentByInfo<T>[]> {
@@ -252,16 +289,20 @@ class WrapQuery<T extends GenericTableInfo> implements EffectQuery<T> {
     this.iterator = this.q[Symbol.asyncIterator]();
     return this;
   }
-  async next(): Promise<IteratorResult<any>> {
-    for (;;) {
-      const { value, done } = await this.iterator!.next();
-      if (value && (await this.p(value))) {
-        return { value, done };
-      }
-      if (done) {
-        return { value: null, done: true };
-      }
-    }
+  next(): Promise<IteratorResult<any>> {
+    return pipe(
+      Effect.promise(() => this.iterator!.next()),
+      Effect.tap(({ value, done }) =>
+        done
+          ? Effect.unit
+          : Effect.if(this.p(value), {
+              onTrue: Effect.unit,
+              onFalse: Effect.fail(new ReadNotAllowedError()),
+            })
+      ),
+      Effect.orDie,
+      Effect.runPromise
+    );
   }
   return() {
     return this.iterator!.return!();
@@ -401,7 +442,7 @@ class WrapReader<Ctx, DataModel extends GenericDataModel>
     return pipe(
       Object.keys(this.rules) as TableName[],
       ReadonlyArray.findFirst(
-        (tableName) => !!this.db.normalizeId(tableName, id)
+        (tableName) => this.db.normalizeId(tableName, id) !== null
       )
     );
   }
@@ -439,7 +480,7 @@ class WrapReader<Ctx, DataModel extends GenericDataModel>
                       this.predicate(tableName, doc),
                       Effect.if({
                         onTrue: Effect.succeed(Option.some(doc)),
-                        onFalse: Effect.succeed(Option.none()),
+                        onFalse: Effect.fail(new ReadNotAllowedError()),
                       })
                     ),
                   onNone: () => Effect.succeed(Option.none()),
@@ -448,7 +489,8 @@ class WrapReader<Ctx, DataModel extends GenericDataModel>
             onNone: () => Effect.succeed(Option.none()),
           })
         )
-      )
+      ),
+      Effect.orDie
     );
   }
 
@@ -463,6 +505,10 @@ class WrapReader<Ctx, DataModel extends GenericDataModel>
 
 class ModifyNotAllowedError {
   readonly _tag = "ModifyNotAllowedError";
+}
+
+class DocDoesNotExistError {
+  readonly _tag = "DocDoesNotExistError";
 }
 
 class InsertNotAllowedError {
@@ -527,12 +573,14 @@ class WrapWriter<Ctx, DataModel extends GenericDataModel>
     this.reader = new WrapReader(ctx, db, rules);
     this.rules = rules;
   }
+
   normalizeId<TableName extends TableNamesInDataModel<DataModel>>(
     tableName: TableName,
     id: string
   ): Option.Option<GenericId<TableName>> {
     return Option.fromNullable(this.db.normalizeId(tableName, id));
   }
+
   insert<TableName extends string>(
     table: TableName,
     value: any
@@ -556,11 +604,13 @@ class WrapWriter<Ctx, DataModel extends GenericDataModel>
       Effect.orDie
     );
   }
+
   tableName<TableName extends string>(
     id: GenericId<TableName>
   ): Option.Option<TableName> {
     return this.reader.tableName(id);
   }
+
   checkModifyAuth<TableName extends string>(
     id: GenericId<TableName>
   ): Effect.Effect<never, never, void> {
@@ -570,35 +620,40 @@ class WrapWriter<Ctx, DataModel extends GenericDataModel>
     // null even if the document exists.
     return pipe(
       this.get(id),
-      Effect.flatMap((optionDoc) =>
-        pipe(
-          optionDoc,
-          Option.match({
-            onSome: (doc) =>
-              pipe(
-                this.tableName(id),
-                Option.match({
-                  onSome: (tableName) =>
-                    pipe(
-                      this.modifyPredicate(tableName, doc),
-                      Effect.if({
-                        onTrue: Effect.unit,
-                        onFalse: Effect.fail(
-                          new Error("write access not allowed")
-                        ),
-                      })
-                    ),
-                  onNone: () => Effect.unit,
-                })
-              ),
-            onNone: () =>
-              Effect.fail(new Error("no read access or doc does not exist")),
-          })
-        )
+      Effect.flatMap(
+        (
+          optionDoc
+        ): Effect.Effect<
+          never,
+          ModifyNotAllowedError | DocDoesNotExistError,
+          void
+        > =>
+          pipe(
+            optionDoc,
+            Option.match({
+              onSome: (doc) =>
+                pipe(
+                  this.tableName(id),
+                  Option.match({
+                    onSome: (tableName) =>
+                      pipe(
+                        this.modifyPredicate(tableName, doc),
+                        Effect.if({
+                          onTrue: Effect.unit,
+                          onFalse: Effect.fail(new ModifyNotAllowedError()),
+                        })
+                      ),
+                    onNone: () => Effect.unit,
+                  })
+                ),
+              onNone: () => Effect.fail(new DocDoesNotExistError()),
+            })
+          )
       ),
       Effect.orDie
     );
   }
+
   patch<TableName extends string>(
     id: GenericId<TableName>,
     value: Partial<any>
@@ -608,6 +663,7 @@ class WrapWriter<Ctx, DataModel extends GenericDataModel>
       Effect.flatMap(() => Effect.promise(() => this.db.patch(id, value)))
     );
   }
+
   replace<TableName extends string>(
     id: GenericId<TableName>,
     value: any
@@ -617,17 +673,20 @@ class WrapWriter<Ctx, DataModel extends GenericDataModel>
       Effect.flatMap(() => Effect.promise(() => this.db.replace(id, value)))
     );
   }
+
   delete(id: GenericId<string>): Effect.Effect<never, never, void> {
     return pipe(
       this.checkModifyAuth(id),
       Effect.flatMap(() => Effect.promise(() => this.db.delete(id)))
     );
   }
+
   get<TableName extends string>(
     id: GenericId<TableName>
   ): Effect.Effect<never, never, Option.Option<any>> {
     return this.reader.get(id);
   }
+
   query<TableName extends string>(
     tableName: TableName
   ): EffectQueryInitializer<any> {
