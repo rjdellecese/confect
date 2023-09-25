@@ -38,7 +38,10 @@ import {
   Stream,
 } from "effect";
 
-type Rule<Ctx, D> = (ctx: Ctx, doc: D) => Promise<boolean>;
+type Rule<Ctx, Doc> = (
+  ctx: Ctx,
+  doc: Doc
+) => Effect.Effect<never, never, boolean>;
 
 export type Rules<Ctx, DataModel extends GenericDataModel> = {
   [T in TableNamesInDataModel<DataModel>]?: {
@@ -148,7 +151,7 @@ type AuthPredicate<T extends GenericTableInfo> = (
 // TODO: Is this how it should work? Filtering rather than raising an error? I'm not so sure...
 const filter = <T>(
   arr: T[],
-  predicate: (d: T) => Effect.Effect<never, never, boolean>
+  predicate: (doc: T) => Effect.Effect<never, never, boolean>
 ): Effect.Effect<never, never, T[]> => Effect.filter(arr, predicate);
 
 interface EffectQuery<T extends GenericTableInfo>
@@ -411,7 +414,7 @@ class WrapReader<Ctx, DataModel extends GenericDataModel>
       this.rules[tableName]?.read,
       Option.fromNullable,
       Option.match({
-        onSome: (rule) => Effect.promise(() => rule(this.ctx, doc)),
+        onSome: (rule) => rule(this.ctx, doc),
         onNone: () => Effect.succeed(true),
       })
     );
@@ -508,7 +511,7 @@ class WrapWriter<Ctx, DataModel extends GenericDataModel>
       this.rules[tableName]?.modify,
       Option.fromNullable,
       Option.match({
-        onSome: (rule) => Effect.promise(() => rule(this.ctx, doc)),
+        onSome: (rule) => rule(this.ctx, doc),
         onNone: () => Effect.succeed(true),
       })
     );
@@ -542,7 +545,7 @@ class WrapWriter<Ctx, DataModel extends GenericDataModel>
       Option.match({
         onSome: (rule) =>
           pipe(
-            Effect.promise(() => rule(this.ctx, value)),
+            rule(this.ctx, value),
             Effect.if({
               onTrue: doInsert,
               onFalse: Effect.fail(new InsertNotAllowedError()),
