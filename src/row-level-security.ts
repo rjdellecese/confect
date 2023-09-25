@@ -448,13 +448,14 @@ class WrapReader<Ctx, DataModel extends GenericDataModel>
 }
 
 interface EffectDatabaseWriter<DataModel extends GenericDataModel>
-  extends Omit<GenericDatabaseWriter<DataModel>, "query" | "get"> {
+  extends Omit<GenericDatabaseWriter<DataModel>, "query" | "get" | "delete"> {
   query<TableName extends string>(
     tableName: TableName
   ): EffectQueryInitializer<NamedTableInfo<DataModel, TableName>>;
   get<TableName extends string>(
     id: GenericId<TableName>
   ): Effect.Effect<never, never, Option.Option<any>>;
+  delete(id: GenericId<string>): Effect.Effect<never, never, void>;
 }
 
 class WrapWriter<Ctx, DataModel extends GenericDataModel>
@@ -544,9 +545,11 @@ class WrapWriter<Ctx, DataModel extends GenericDataModel>
     await this.checkAuth(id);
     return await this.db.replace(id, value);
   }
-  async delete(id: GenericId<string>): Promise<void> {
-    await this.checkAuth(id);
-    return await this.db.delete(id);
+  delete(id: GenericId<string>): Effect.Effect<never, never, void> {
+    return pipe(
+      Effect.promise(() => this.checkAuth(id)),
+      Effect.flatMap(() => Effect.promise(() => this.db.delete(id)))
+    );
   }
   get<TableName extends string>(
     id: GenericId<TableName>
