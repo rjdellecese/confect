@@ -147,15 +147,16 @@ async function asyncFilter<T>(
 }
 
 interface EffectQuery<T extends GenericTableInfo>
-  extends Omit<
-    Query<T>,
-    "collect" | "filter" | "order" | "take" | "first" | "unique" | "paginate"
-  > {
-  collect(): Effect.Effect<never, never, DocumentByInfo<T>[]>;
+  extends AsyncIterable<DocumentByInfo<T>>,
+    AsyncIterator<DocumentByInfo<T>> {
   filter(
     predicate: (q: FilterBuilder<T>) => Expression<boolean>
   ): EffectQuery<T>;
-  order(order: "asc" | "desc"): EffectQuery<T>;
+  order(order: "asc" | "desc"): EffectOrderedQuery<T>;
+  paginate(
+    paginationOpts: PaginationOptions
+  ): Effect.Effect<never, never, PaginationResult<DocumentByInfo<T>>>;
+  collect(): Effect.Effect<never, never, DocumentByInfo<T>[]>;
   take(n: number): Effect.Effect<never, never, DocumentByInfo<T>[]>;
   first(): Effect.Effect<never, never, Option.Option<DocumentByInfo<T>>>;
   unique(): Effect.Effect<
@@ -163,10 +164,10 @@ interface EffectQuery<T extends GenericTableInfo>
     NotUniqueError,
     Option.Option<DocumentByInfo<T>>
   >;
-  paginate(
-    paginationOpts: PaginationOptions
-  ): Effect.Effect<never, never, PaginationResult<DocumentByInfo<T>>>;
 }
+
+interface EffectOrderedQuery<T extends GenericTableInfo>
+  extends Omit<EffectQuery<T>, "order"> {}
 
 class NotUniqueError {
   readonly _tag = "NotUniqueError";
@@ -208,7 +209,6 @@ class WrapQuery<T extends GenericTableInfo> implements EffectQuery<T> {
   }
   take(n: number): Effect.Effect<never, never, DocumentByInfo<T>[]> {
     return pipe(
-      // TODO: Should I memoize this, like the `iterator` property?
       Stream.fromAsyncIterable(this, identity),
       Stream.take(n),
       Stream.runCollect,
@@ -262,8 +262,27 @@ class WrapQuery<T extends GenericTableInfo> implements EffectQuery<T> {
   }
 }
 
+interface EffectQueryInitializer<T extends GenericTableInfo>
+  extends EffectQuery<T> {
+  fullTableScan(): EffectQuery<T>;
+  withIndex<IndexName extends keyof Indexes<T>>(
+    indexName: IndexName,
+    indexRange?:
+      | ((
+          q: IndexRangeBuilder<DocumentByInfo<T>, NamedIndex<T, IndexName>, 0>
+        ) => IndexRange)
+      | undefined
+  ): EffectQuery<T>;
+  withSearchIndex<IndexName extends keyof SearchIndexes<T>>(
+    indexName: IndexName,
+    searchFilter: (
+      q: SearchFilterBuilder<DocumentByInfo<T>, NamedSearchIndex<T, IndexName>>
+    ) => SearchFilter
+  ): EffectOrderedQuery<T>;
+}
+
 class WrapQueryInitializer<T extends GenericTableInfo>
-  implements QueryInitializer<T>
+  implements EffectQueryInitializer<T>
 {
   q: QueryInitializer<T>;
   p: AuthPredicate<T>;
@@ -271,7 +290,7 @@ class WrapQueryInitializer<T extends GenericTableInfo>
     this.q = q;
     this.p = p;
   }
-  fullTableScan(): Query<T> {
+  fullTableScan(): EffectQuery<T> {
     return new WrapQuery(this.q.fullTableScan(), this.p);
   }
   withIndex<IndexName extends keyof Indexes<T>>(
@@ -281,7 +300,7 @@ class WrapQueryInitializer<T extends GenericTableInfo>
           q: IndexRangeBuilder<DocumentByInfo<T>, NamedIndex<T, IndexName>, 0>
         ) => IndexRange)
       | undefined
-  ): Query<T> {
+  ): EffectQuery<T> {
     return new WrapQuery(this.q.withIndex(indexName, indexRange), this.p);
   }
   withSearchIndex<IndexName extends keyof SearchIndexes<T>>(
@@ -289,7 +308,7 @@ class WrapQueryInitializer<T extends GenericTableInfo>
     searchFilter: (
       q: SearchFilterBuilder<DocumentByInfo<T>, NamedSearchIndex<T, IndexName>>
     ) => SearchFilter
-  ): OrderedQuery<T> {
+  ): EffectOrderedQuery<T> {
     return new WrapQuery(
       this.q.withSearchIndex(indexName, searchFilter),
       this.p
@@ -298,33 +317,47 @@ class WrapQueryInitializer<T extends GenericTableInfo>
   filter(predicate: (q: FilterBuilder<T>) => Expression<boolean>): this {
     return this.fullTableScan().filter(predicate) as this;
   }
-  order(order: "asc" | "desc"): OrderedQuery<T> {
+  order(order: "asc" | "desc"): EffectOrderedQuery<T> {
     return this.fullTableScan().order(order);
   }
-  async paginate(
+  paginate(
     paginationOpts: PaginationOptions
-  ): Promise<PaginationResult<DocumentByInfo<T>>> {
+  ): Effect.Effect<never, never, PaginationResult<DocumentByInfo<T>>> {
     return this.fullTableScan().paginate(paginationOpts);
   }
-  collect(): Promise<DocumentByInfo<T>[]> {
+  collect(): Effect.Effect<never, never, DocumentByInfo<T>[]> {
     return this.fullTableScan().collect();
   }
-  take(n: number): Promise<DocumentByInfo<T>[]> {
+  take(n: number): Effect.Effect<never, never, DocumentByInfo<T>[]> {
     return this.fullTableScan().take(n);
   }
-  first(): Promise<DocumentByInfo<T> | null> {
+  first(): Effect.Effect<never, never, Option.Option<DocumentByInfo<T>>> {
     return this.fullTableScan().first();
   }
-  unique(): Promise<DocumentByInfo<T> | null> {
+  unique(): Effect.Effect<
+    never,
+    NotUniqueError,
+    Option.Option<DocumentByInfo<T>>
+  > {
     return this.fullTableScan().unique();
   }
-  [Symbol.asyncIterator](): AsyncIterator<DocumentByInfo<T>, any, undefined> {
+  [Symbol.asyncIterator](): AsyncIterator<DocumentByInfo<T>> {
     return this.fullTableScan()[Symbol.asyncIterator]();
+  }
+  next() {
+    return this.fullTableScan().next();
   }
 }
 
+interface EffectDatabaseReader<DataModel extends GenericDataModel>
+  extends Omit<GenericDatabaseReader<DataModel>, "query"> {
+  query<TableName extends string>(
+    tableName: TableName
+  ): EffectQueryInitializer<NamedTableInfo<DataModel, TableName>>;
+}
+
 class WrapReader<Ctx, DataModel extends GenericDataModel>
-  implements GenericDatabaseReader<DataModel>
+  implements EffectDatabaseReader<DataModel>
 {
   ctx: Ctx;
   db: GenericDatabaseReader<DataModel>;
@@ -382,7 +415,7 @@ class WrapReader<Ctx, DataModel extends GenericDataModel>
 
   query<TableName extends string>(
     tableName: TableName
-  ): QueryInitializer<NamedTableInfo<DataModel, TableName>> {
+  ): EffectQueryInitializer<NamedTableInfo<DataModel, TableName>> {
     return new WrapQueryInitializer(
       this.db.query(tableName),
       async (d) => await this.predicate(tableName, d)
@@ -390,12 +423,19 @@ class WrapReader<Ctx, DataModel extends GenericDataModel>
   }
 }
 
+interface EffectDatabaseWriter<DataModel extends GenericDataModel>
+  extends Omit<GenericDatabaseWriter<DataModel>, "query"> {
+  query<TableName extends string>(
+    tableName: TableName
+  ): EffectQueryInitializer<NamedTableInfo<DataModel, TableName>>;
+}
+
 class WrapWriter<Ctx, DataModel extends GenericDataModel>
-  implements GenericDatabaseWriter<DataModel>
+  implements EffectDatabaseWriter<DataModel>
 {
   ctx: Ctx;
   db: GenericDatabaseWriter<DataModel>;
-  reader: GenericDatabaseReader<DataModel>;
+  reader: EffectDatabaseReader<DataModel>;
   rules: Rules<Ctx, DataModel>;
 
   async modifyPredicate<T extends GenericTableInfo>(
@@ -484,7 +524,9 @@ class WrapWriter<Ctx, DataModel extends GenericDataModel>
   get<TableName extends string>(id: GenericId<TableName>): Promise<any> {
     return this.reader.get(id);
   }
-  query<TableName extends string>(tableName: TableName): QueryInitializer<any> {
+  query<TableName extends string>(
+    tableName: TableName
+  ): EffectQueryInitializer<any> {
     return this.reader.query(tableName);
   }
 }
