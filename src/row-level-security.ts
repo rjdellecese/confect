@@ -350,10 +350,13 @@ class WrapQueryInitializer<T extends GenericTableInfo>
 }
 
 interface EffectDatabaseReader<DataModel extends GenericDataModel>
-  extends Omit<GenericDatabaseReader<DataModel>, "query"> {
+  extends Omit<GenericDatabaseReader<DataModel>, "query" | "get"> {
   query<TableName extends string>(
     tableName: TableName
   ): EffectQueryInitializer<NamedTableInfo<DataModel, TableName>>;
+  get<TableName extends string>(
+    id: GenericId<TableName>
+  ): Effect.Effect<never, never, Option.Option<any>>;
 }
 
 class WrapReader<Ctx, DataModel extends GenericDataModel>
@@ -401,16 +404,37 @@ class WrapReader<Ctx, DataModel extends GenericDataModel>
     return await this.rules[tableName]!.read!(this.ctx, doc);
   }
 
-  async get<TableName extends string>(id: GenericId<TableName>): Promise<any> {
-    const doc = await this.db.get(id);
-    if (doc) {
-      const tableName = this.tableName(id);
-      if (tableName && !(await this.predicate(tableName, doc))) {
-        return null;
-      }
-      return doc;
-    }
-    return null;
+  get<TableName extends string>(
+    id: GenericId<TableName>
+  ): Effect.Effect<never, never, Option.Option<any>> {
+    return pipe(
+      Effect.promise(() => this.db.get(id)),
+      Effect.flatMap((nullableDoc) =>
+        pipe(
+          nullableDoc,
+          Option.fromNullable,
+          Option.match({
+            onSome: (doc) =>
+              pipe(
+                this.tableName(id),
+                Option.fromNullable,
+                Option.match({
+                  onSome: (tableName) =>
+                    pipe(
+                      Effect.promise(() => this.predicate(tableName, doc)),
+                      Effect.if({
+                        onTrue: Effect.succeed(Option.some(doc)),
+                        onFalse: Effect.succeed(Option.none()),
+                      })
+                    ),
+                  onNone: () => Effect.succeed(Option.none()),
+                })
+              ),
+            onNone: () => Effect.succeed(Option.none()),
+          })
+        )
+      )
+    );
   }
 
   query<TableName extends string>(
@@ -424,10 +448,13 @@ class WrapReader<Ctx, DataModel extends GenericDataModel>
 }
 
 interface EffectDatabaseWriter<DataModel extends GenericDataModel>
-  extends Omit<GenericDatabaseWriter<DataModel>, "query"> {
+  extends Omit<GenericDatabaseWriter<DataModel>, "query" | "get"> {
   query<TableName extends string>(
     tableName: TableName
   ): EffectQueryInitializer<NamedTableInfo<DataModel, TableName>>;
+  get<TableName extends string>(
+    id: GenericId<TableName>
+  ): Effect.Effect<never, never, Option.Option<any>>;
 }
 
 class WrapWriter<Ctx, DataModel extends GenericDataModel>
@@ -491,7 +518,7 @@ class WrapWriter<Ctx, DataModel extends GenericDataModel>
     // an extra read; it's just populating the cache earlier.
     // Since we call `this.get`, read access controls apply and this may return
     // null even if the document exists.
-    const doc = await this.get(id);
+    const doc = await Effect.runPromise(this.get(id));
     if (doc === null) {
       throw new Error("no read access or doc does not exist");
     }
@@ -521,7 +548,9 @@ class WrapWriter<Ctx, DataModel extends GenericDataModel>
     await this.checkAuth(id);
     return await this.db.delete(id);
   }
-  get<TableName extends string>(id: GenericId<TableName>): Promise<any> {
+  get<TableName extends string>(
+    id: GenericId<TableName>
+  ): Effect.Effect<never, never, any> {
     return this.reader.get(id);
   }
   query<TableName extends string>(
