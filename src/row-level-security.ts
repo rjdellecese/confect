@@ -28,7 +28,15 @@ import {
   WithoutSystemFields,
 } from "convex/server";
 import { GenericId } from "convex/values";
-import { Chunk, Effect, Option, Stream, identity, pipe } from "effect";
+import {
+  Chunk,
+  Effect,
+  Option,
+  ReadonlyArray,
+  Stream,
+  identity,
+  pipe,
+} from "effect";
 
 type Rule<Ctx, D> = (ctx: Ctx, doc: D) => Promise<boolean>;
 
@@ -349,14 +357,17 @@ class WrapQueryInitializer<T extends GenericTableInfo>
   }
 }
 
-interface EffectDatabaseReader<DataModel extends GenericDataModel>
-  extends Omit<GenericDatabaseReader<DataModel>, "query" | "get"> {
+interface EffectDatabaseReader<DataModel extends GenericDataModel> {
   query<TableName extends string>(
     tableName: TableName
   ): EffectQueryInitializer<NamedTableInfo<DataModel, TableName>>;
   get<TableName extends string>(
     id: GenericId<TableName>
   ): Effect.Effect<never, never, Option.Option<any>>;
+  normalizeId<TableName extends TableNamesInDataModel<DataModel>>(
+    tableName: TableName,
+    id: string
+  ): Option.Option<GenericId<TableName>>;
 }
 
 class WrapReader<Ctx, DataModel extends GenericDataModel>
@@ -379,8 +390,8 @@ class WrapReader<Ctx, DataModel extends GenericDataModel>
   normalizeId<TableName extends TableNamesInDataModel<DataModel>>(
     tableName: TableName,
     id: string
-  ): GenericId<TableName> | null {
-    return this.db.normalizeId(tableName, id);
+  ): Option.Option<GenericId<TableName>> {
+    return Option.fromNullable(this.db.normalizeId(tableName, id));
   }
 
   tableName<TableName extends string>(
@@ -447,15 +458,19 @@ class WrapReader<Ctx, DataModel extends GenericDataModel>
   }
 }
 
+class ModifyNotAllowedError {
+  readonly _tag = "ModifyNotAllowedError";
+}
+
 class InsertNotAllowedError {
   readonly _tag = "InsertNotAllowedError";
 }
 
-interface EffectDatabaseWriter<DataModel extends GenericDataModel>
-  extends Omit<
-    GenericDatabaseWriter<DataModel>,
-    "query" | "get" | "delete" | "replace" | "patch" | "insert"
-  > {
+interface EffectDatabaseWriter<DataModel extends GenericDataModel> {
+  normalizeId<TableName extends TableNamesInDataModel<DataModel>>(
+    tableName: TableName,
+    id: string
+  ): Option.Option<GenericId<TableName>>;
   insert<TableName extends string>(
     table: TableName,
     value: any
@@ -485,14 +500,18 @@ class WrapWriter<Ctx, DataModel extends GenericDataModel>
   reader: EffectDatabaseReader<DataModel>;
   rules: Rules<Ctx, DataModel>;
 
-  async modifyPredicate<T extends GenericTableInfo>(
+  modifyPredicate<T extends GenericTableInfo>(
     tableName: string,
     doc: DocumentByInfo<T>
-  ): Promise<boolean> {
-    if (!this.rules[tableName]?.modify) {
-      return true;
-    }
-    return await this.rules[tableName]!.modify!(this.ctx, doc);
+  ): Effect.Effect<never, never, boolean> {
+    return pipe(
+      this.rules[tableName]?.modify,
+      Option.fromNullable,
+      Option.match({
+        onSome: (rule) => Effect.promise(() => rule(this.ctx, doc)),
+        onNone: () => Effect.succeed(true),
+      })
+    );
   }
 
   constructor(
@@ -508,8 +527,8 @@ class WrapWriter<Ctx, DataModel extends GenericDataModel>
   normalizeId<TableName extends TableNamesInDataModel<DataModel>>(
     tableName: TableName,
     id: string
-  ): GenericId<TableName> | null {
-    return this.db.normalizeId(tableName, id);
+  ): Option.Option<GenericId<TableName>> {
+    return Option.fromNullable(this.db.normalizeId(tableName, id));
   }
   insert<TableName extends string>(
     table: TableName,
@@ -536,37 +555,58 @@ class WrapWriter<Ctx, DataModel extends GenericDataModel>
   }
   tableName<TableName extends string>(
     id: GenericId<TableName>
-  ): TableName | null {
-    for (const tableName of Object.keys(this.rules)) {
-      if (this.db.normalizeId(tableName, id)) {
-        return tableName as TableName;
-      }
-    }
-    return null;
+  ): Option.Option<TableName> {
+    return pipe(
+      Object.keys(this.rules) as TableName[],
+      ReadonlyArray.findFirst(
+        (tableName) => !!this.db.normalizeId(tableName, id)
+      )
+    );
   }
-  async checkAuth<TableName extends string>(id: GenericId<TableName>) {
+  checkModifyAuth<TableName extends string>(
+    id: GenericId<TableName>
+  ): Effect.Effect<never, never, void> {
     // Note all writes already do a `db.get` internally, so this isn't
     // an extra read; it's just populating the cache earlier.
     // Since we call `this.get`, read access controls apply and this may return
     // null even if the document exists.
-    const doc = await Effect.runPromise(this.get(id));
-    if (doc === null) {
-      throw new Error("no read access or doc does not exist");
-    }
-    const tableName = this.tableName(id);
-    if (tableName === null) {
-      return;
-    }
-    if (!(await this.modifyPredicate(tableName, doc))) {
-      throw new Error("write access not allowed");
-    }
+    return pipe(
+      this.get(id),
+      Effect.flatMap((optionDoc) =>
+        pipe(
+          optionDoc,
+          Option.match({
+            onSome: (doc) =>
+              pipe(
+                this.tableName(id),
+                Option.match({
+                  onSome: (tableName) =>
+                    pipe(
+                      this.modifyPredicate(tableName, doc),
+                      Effect.if({
+                        onTrue: Effect.unit,
+                        onFalse: Effect.fail(
+                          new Error("write access not allowed")
+                        ),
+                      })
+                    ),
+                  onNone: () => Effect.unit,
+                })
+              ),
+            onNone: () =>
+              Effect.fail(new Error("no read access or doc does not exist")),
+          })
+        )
+      ),
+      Effect.orDie
+    );
   }
   patch<TableName extends string>(
     id: GenericId<TableName>,
     value: Partial<any>
   ): Effect.Effect<never, never, void> {
     return pipe(
-      Effect.promise(() => this.checkAuth(id)),
+      this.checkModifyAuth(id),
       Effect.flatMap(() => Effect.promise(() => this.db.patch(id, value)))
     );
   }
@@ -575,19 +615,19 @@ class WrapWriter<Ctx, DataModel extends GenericDataModel>
     value: any
   ): Effect.Effect<never, never, void> {
     return pipe(
-      Effect.promise(() => this.checkAuth(id)),
+      this.checkModifyAuth(id),
       Effect.flatMap(() => Effect.promise(() => this.db.replace(id, value)))
     );
   }
   delete(id: GenericId<string>): Effect.Effect<never, never, void> {
     return pipe(
-      Effect.promise(() => this.checkAuth(id)),
+      this.checkModifyAuth(id),
       Effect.flatMap(() => Effect.promise(() => this.db.delete(id)))
     );
   }
   get<TableName extends string>(
     id: GenericId<TableName>
-  ): Effect.Effect<never, never, any> {
+  ): Effect.Effect<never, never, Option.Option<any>> {
     return this.reader.get(id);
   }
   query<TableName extends string>(

@@ -23,10 +23,26 @@ module.exports = {
   },
   plugins: ["@typescript-eslint"],
   rules: {
+    // TODO: Extract common rules to a shared config
+    "no-shadow": "error",
+    "no-warning-comments": "warn",
+    "@typescript-eslint/no-unused-vars": "off",
+    "@typescript-eslint/no-explicit-any": "off",
+    "unused-imports/no-unused-imports": "warn",
+    "unused-imports/no-unused-vars": [
+      "warn",
+      {
+        vars: "all",
+        varsIgnorePattern: "^_",
+        args: "after-used",
+        argsIgnorePattern: "^_",
+      },
+    ],
+    "simple-import-sort/exports": "warn",
+    "simple-import-sort/imports": "warn",
     "linebreak-style": ["error", "unix"],
     quotes: ["error", "double"],
     semi: ["error", "always"],
-    "@typescript-eslint/no-explicit-any": "off",
     "@typescript-eslint/no-non-null-assertion": "off",
   },
 };
