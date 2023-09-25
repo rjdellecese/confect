@@ -21,7 +21,7 @@ module.exports = {
     ecmaVersion: "latest",
     sourceType: "module",
   },
-  plugins: ["@typescript-eslint"],
+  plugins: ["@typescript-eslint", "unused-imports", "simple-import-sort"],
   rules: {
     // TODO: Extract common rules to a shared config
     "no-shadow": "error",

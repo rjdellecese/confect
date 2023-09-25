@@ -4,15 +4,15 @@ import {
   DocumentByName,
   Expression,
   FilterBuilder,
-  GenericDataModel,
   GenericDatabaseReader,
   GenericDatabaseWriter,
+  GenericDataModel,
   GenericMutationCtx,
   GenericQueryCtx,
   GenericTableInfo,
+  Indexes,
   IndexRange,
   IndexRangeBuilder,
-  Indexes,
   NamedIndex,
   NamedSearchIndex,
   NamedTableInfo,
@@ -31,11 +31,11 @@ import { GenericId } from "convex/values";
 import {
   Chunk,
   Effect,
+  identity,
   Option,
+  pipe,
   ReadonlyArray,
   Stream,
-  identity,
-  pipe,
 } from "effect";
 
 type Rule<Ctx, D> = (ctx: Ctx, doc: D) => Promise<boolean>;
