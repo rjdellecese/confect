@@ -143,16 +143,13 @@ type Handler<Ctx, Args extends ArgsArray, Output> = (
 
 type AuthPredicate<T extends GenericTableInfo> = (
   doc: DocumentByInfo<T>
-) => Promise<boolean>;
+) => Effect.Effect<never, never, boolean>;
 
 // TODO: Is this how it should work? Filtering rather than raising an error? I'm not so sure...
-async function asyncFilter<T>(
+const filter = <T>(
   arr: T[],
-  predicate: (d: T) => Promise<boolean>
-): Promise<T[]> {
-  const results = await Promise.all(arr.map(predicate));
-  return arr.filter((_v, index) => results[index]);
-}
+  predicate: (d: T) => Effect.Effect<never, never, boolean>
+): Effect.Effect<never, never, T[]> => Effect.filter(arr, predicate);
 
 interface EffectQuery<T extends GenericTableInfo>
   extends AsyncIterable<DocumentByInfo<T>>,
@@ -210,9 +207,7 @@ class WrapQuery<T extends GenericTableInfo> implements EffectQuery<T> {
   collect(): Effect.Effect<never, never, DocumentByInfo<T>[]> {
     return pipe(
       Effect.promise(() => this.q.collect()),
-      Effect.flatMap((results) =>
-        Effect.promise(() => asyncFilter(results, this.p))
-      )
+      Effect.flatMap((results) => filter(results, this.p))
     );
   }
   take(n: number): Effect.Effect<never, never, DocumentByInfo<T>[]> {
@@ -368,6 +363,9 @@ interface EffectDatabaseReader<DataModel extends GenericDataModel> {
     tableName: TableName,
     id: string
   ): Option.Option<GenericId<TableName>>;
+  tableName<TableName extends string>(
+    id: GenericId<TableName>
+  ): Option.Option<TableName>;
 }
 
 class WrapReader<Ctx, DataModel extends GenericDataModel>
@@ -396,23 +394,27 @@ class WrapReader<Ctx, DataModel extends GenericDataModel>
 
   tableName<TableName extends string>(
     id: GenericId<TableName>
-  ): TableName | null {
-    for (const tableName of Object.keys(this.rules)) {
-      if (this.db.normalizeId(tableName, id)) {
-        return tableName as TableName;
-      }
-    }
-    return null;
+  ): Option.Option<TableName> {
+    return pipe(
+      Object.keys(this.rules) as TableName[],
+      ReadonlyArray.findFirst(
+        (tableName) => !!this.db.normalizeId(tableName, id)
+      )
+    );
   }
 
-  async predicate<T extends GenericTableInfo>(
+  predicate<T extends GenericTableInfo>(
     tableName: string,
     doc: DocumentByInfo<T>
-  ): Promise<boolean> {
-    if (!this.rules[tableName]?.read) {
-      return true;
-    }
-    return await this.rules[tableName]!.read!(this.ctx, doc);
+  ): Effect.Effect<never, never, boolean> {
+    return pipe(
+      this.rules[tableName]?.read,
+      Option.fromNullable,
+      Option.match({
+        onSome: (rule) => Effect.promise(() => rule(this.ctx, doc)),
+        onNone: () => Effect.succeed(true),
+      })
+    );
   }
 
   get<TableName extends string>(
@@ -428,11 +430,10 @@ class WrapReader<Ctx, DataModel extends GenericDataModel>
             onSome: (doc) =>
               pipe(
                 this.tableName(id),
-                Option.fromNullable,
                 Option.match({
                   onSome: (tableName) =>
                     pipe(
-                      Effect.promise(() => this.predicate(tableName, doc)),
+                      this.predicate(tableName, doc),
                       Effect.if({
                         onTrue: Effect.succeed(Option.some(doc)),
                         onFalse: Effect.succeed(Option.none()),
@@ -451,9 +452,8 @@ class WrapReader<Ctx, DataModel extends GenericDataModel>
   query<TableName extends string>(
     tableName: TableName
   ): EffectQueryInitializer<NamedTableInfo<DataModel, TableName>> {
-    return new WrapQueryInitializer(
-      this.db.query(tableName),
-      async (d) => await this.predicate(tableName, d)
+    return new WrapQueryInitializer(this.db.query(tableName), (doc) =>
+      this.predicate(tableName, doc)
     );
   }
 }
@@ -556,12 +556,7 @@ class WrapWriter<Ctx, DataModel extends GenericDataModel>
   tableName<TableName extends string>(
     id: GenericId<TableName>
   ): Option.Option<TableName> {
-    return pipe(
-      Object.keys(this.rules) as TableName[],
-      ReadonlyArray.findFirst(
-        (tableName) => !!this.db.normalizeId(tableName, id)
-      )
-    );
+    return this.reader.tableName(id);
   }
   checkModifyAuth<TableName extends string>(
     id: GenericId<TableName>
