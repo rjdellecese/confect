@@ -145,7 +145,7 @@ export const RowLevelSecurity = <RuleCtx, DataModel extends GenericDataModel>(
     Args extends ArgsArray,
     Output,
   >(
-    f: Handler<Ctx, Args, Output>
+    f: Handler<Ctx & { db: EffectDatabaseWriter<DataModel> }, Args, Output>
   ): Handler<Ctx, Args, Output> => {
     return ((ctx: any, ...args: any[]) => {
       const wrappedDb = new WrapWriter(ctx, ctx.db, rules);

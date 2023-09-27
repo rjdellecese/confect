@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "exactOptionalPropertyTypes": false,
+    "exactOptionalPropertyTypes": false
   },
   "exclude": ["node_modules", "dist", "convex"],
   "extends": ["@tsconfig/strictest/tsconfig", "@tsconfig/node18/tsconfig"]
