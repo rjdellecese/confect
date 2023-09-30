@@ -2,7 +2,6 @@
   "name": "effect-convex",
   "version": "0.0.1",
   "description": "",
-  "type": "module",
   "source": "src/index.ts",
   "main": "dist/main.js",
   "module": "dist/module.js",

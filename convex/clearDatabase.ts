@@ -1,8 +1,7 @@
 import { Effect, pipe } from "effect";
-import { MutationCtx, internalMutation, mutation } from "./_generated/server";
+
+import { mutation } from "./_generated/server";
 import schema from "./schema";
-import { RowLevelSecurity } from "../src/row-level-security";
-import { DataModel } from "./_generated/dataModel";
 
 export default mutation({
   args: {},

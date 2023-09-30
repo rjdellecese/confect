@@ -4,14 +4,15 @@ import dotenv from "dotenv";
 import { Config, Effect, pipe } from "effect";
 import path from "path";
 import { afterEach, beforeAll } from "vitest";
-import { api, internal } from "../convex/_generated/api.js";
+
+import { api } from "../convex/_generated/api";
 
 beforeAll(() => {
   execSync("pnpm exec convex dev --once");
 });
 
-afterEach(() => {
-  global.convexHttpClient.mutation(api["clearDatabase"].default);
+afterEach(async () => {
+  await global.convexHttpClient.mutation(api.clearDatabase.default);
 });
 
 declare global {
