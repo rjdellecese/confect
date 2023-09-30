@@ -14,6 +14,7 @@ import type {
   FilterApi,
   FunctionReference,
 } from "convex/server";
+import type * as clearDatabase from "../clearDatabase";
 import type * as insertUser from "../insertUser";
 
 /**
@@ -25,6 +26,7 @@ import type * as insertUser from "../insertUser";
  * ```
  */
 declare const fullApi: ApiFromModules<{
+  clearDatabase: typeof clearDatabase;
   insertUser: typeof insertUser;
 }>;
 export declare const api: FilterApi<

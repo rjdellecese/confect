@@ -1,9 +1,14 @@
+import { Effect } from "effect";
+
 import { RowLevelSecurity } from "../src/row-level-security";
-import { DataModel } from "./_generated/dataModel";
+import { DataModel, Id } from "./_generated/dataModel";
 import { mutation, MutationCtx } from "./_generated/server";
 
-export default mutation(
-  RowLevelSecurity<MutationCtx, DataModel>({}).withMutationRLS(({ db }) =>
-    db.insert("users", { name: "John Doe" })
-  )
-);
+export default mutation({
+  // RowLevelSecurity<DataModel>({}).withMutationRLS(
+  //   ({ db }): Promise<void> =>
+  //     Effect.runPromise(Effect.asUnit(db.insert("users", { name: "John Doe" })))
+  // )
+  args: {},
+  handler: async ({ db }) => db.insert("users", { name: "John Doe" }),
+});

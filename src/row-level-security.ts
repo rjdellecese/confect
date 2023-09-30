@@ -1,5 +1,6 @@
 import {
   ArgsArray,
+  Auth,
   DocumentByInfo,
   DocumentByName,
   Expression,
@@ -7,6 +8,7 @@ import {
   GenericDatabaseReader,
   GenericDatabaseWriter,
   GenericDataModel,
+  GenericDocument,
   GenericMutationCtx,
   GenericQueryCtx,
   GenericTableInfo,
@@ -21,9 +23,11 @@ import {
   PaginationResult,
   Query,
   QueryInitializer,
+  Scheduler,
   SearchFilter,
   SearchFilterBuilder,
   SearchIndexes,
+  StorageWriter,
   TableNamesInDataModel,
   WithoutSystemFields,
 } from "convex/server";
@@ -44,43 +48,51 @@ type Rule<Ctx, Doc> = (
 ) => Effect.Effect<never, never, boolean>;
 
 type TableRules<
-  Ctx,
   DataModel extends GenericDataModel,
   T extends TableNamesInDataModel<DataModel>,
   Strict extends boolean,
 > = Strict extends true
   ? {
-      read: Rule<Ctx, DocumentByName<DataModel, T>>;
-      modify: Rule<Ctx, DocumentByName<DataModel, T>>;
-      insert: Rule<Ctx, WithoutSystemFields<DocumentByName<DataModel, T>>>;
+      read: Rule<GenericQueryCtx<DataModel>, DocumentByName<DataModel, T>>;
+      modify: Rule<GenericMutationCtx<DataModel>, DocumentByName<DataModel, T>>;
+      insert: Rule<
+        GenericMutationCtx<DataModel>,
+        WithoutSystemFields<DocumentByName<DataModel, T>>
+      >;
     }
   : {
-      read?: Rule<Ctx, DocumentByName<DataModel, T>>;
-      modify?: Rule<Ctx, DocumentByName<DataModel, T>>;
-      insert?: Rule<Ctx, WithoutSystemFields<DocumentByName<DataModel, T>>>;
+      read?: Rule<GenericQueryCtx<DataModel>, DocumentByName<DataModel, T>>;
+      modify?: Rule<
+        GenericMutationCtx<DataModel>,
+        DocumentByName<DataModel, T>
+      >;
+      insert?: Rule<
+        GenericMutationCtx<DataModel>,
+        WithoutSystemFields<DocumentByName<DataModel, T>>
+      >;
     };
 
 export type Rules<
-  Ctx,
   DataModel extends GenericDataModel,
   Strict extends boolean = false,
 > = Strict extends true
   ? {
-      [T in TableNamesInDataModel<DataModel>]: TableRules<
-        Ctx,
-        DataModel,
-        T,
-        Strict
-      >;
+      [T in TableNamesInDataModel<DataModel>]: TableRules<DataModel, T, Strict>;
     }
   : {
       [T in TableNamesInDataModel<DataModel>]?: TableRules<
-        Ctx,
         DataModel,
         T,
         Strict
       >;
     };
+
+type EffectMutationCtx<DataModel extends GenericDataModel> = {
+  db: EffectDatabaseWriter<DataModel>;
+  auth: Auth;
+  storage: StorageWriter;
+  scheduler: Scheduler;
+};
 
 /**
  * Apply row level security (RLS) to queries and mutations with the returned
@@ -137,32 +149,28 @@ export type Rules<
  * `query` or `mutation` respectively.
  *  For each row read, modified, or inserted, the security rules are applied.
  */
-export const RowLevelSecurity = <RuleCtx, DataModel extends GenericDataModel>(
-  rules: Rules<RuleCtx, DataModel>
+export const RowLevelSecurity = <DataModel extends GenericDataModel>(
+  rules: Rules<DataModel>
 ) => {
-  const withMutationRLS = <
-    Ctx extends GenericMutationCtx<DataModel>,
-    Args extends ArgsArray,
-    Output,
-  >(
-    f: Handler<Ctx & { db: EffectDatabaseWriter<DataModel> }, Args, Output>
-  ): Handler<Ctx, Args, Output> => {
-    return ((ctx: any, ...args: any[]) => {
+  const withMutationRLS = <Args extends ArgsArray, Output>(
+    f: (ctx: EffectMutationCtx<DataModel>, ...args: Args) => Output
+  ): Handler<DataModel, GenericMutationCtx<DataModel>, Args, Output> => {
+    return ((ctx: GenericMutationCtx<DataModel>, ...args: Args) => {
       const wrappedDb = new WrapWriter(ctx, ctx.db, rules);
-      return (f as any)({ ...ctx, db: wrappedDb }, ...args);
-    }) as Handler<Ctx, Args, Output>;
+      return f({ ...ctx, db: wrappedDb }, ...args);
+    }) as Handler<DataModel, GenericMutationCtx<DataModel>, Args, Output>;
   };
   const withQueryRLS = <
     Ctx extends GenericQueryCtx<DataModel>,
     Args extends ArgsArray,
     Output,
   >(
-    f: Handler<Ctx, Args, Output>
-  ): Handler<Ctx, Args, Output> => {
+    f: Handler<DataModel, Ctx, Args, Output>
+  ): Handler<DataModel, Ctx, Args, Output> => {
     return ((ctx: any, ...args: any[]) => {
       const wrappedDb = new WrapReader(ctx, ctx.db, rules);
       return (f as any)({ ...ctx, db: wrappedDb }, ...args);
-    }) as Handler<Ctx, Args, Output>;
+    }) as Handler<DataModel, Ctx, Args, Output>;
   };
   return {
     withMutationRLS,
@@ -170,10 +178,12 @@ export const RowLevelSecurity = <RuleCtx, DataModel extends GenericDataModel>(
   };
 };
 
-type Handler<Ctx, Args extends ArgsArray, Output> = (
-  ctx: Ctx,
-  ...args: Args
-) => Output;
+type Handler<
+  DataModel extends GenericDataModel,
+  Ctx extends GenericQueryCtx<DataModel>,
+  Args extends ArgsArray,
+  Output,
+> = (ctx: Ctx, ...args: Args) => Output;
 
 type AuthPredicate<T extends GenericTableInfo> = (
   doc: DocumentByInfo<T>
@@ -402,7 +412,11 @@ interface EffectDatabaseReader<DataModel extends GenericDataModel> {
   ): EffectQueryInitializer<NamedTableInfo<DataModel, TableName>>;
   get<TableName extends string>(
     id: GenericId<TableName>
-  ): Effect.Effect<never, never, Option.Option<any>>;
+  ): Effect.Effect<
+    never,
+    never,
+    Option.Option<DocumentByName<DataModel, TableName>>
+  >;
   normalizeId<TableName extends TableNamesInDataModel<DataModel>>(
     tableName: TableName,
     id: string
@@ -412,17 +426,19 @@ interface EffectDatabaseReader<DataModel extends GenericDataModel> {
   ): Option.Option<TableName>;
 }
 
-class WrapReader<Ctx, DataModel extends GenericDataModel>
-  implements EffectDatabaseReader<DataModel>
+class WrapReader<
+  Ctx extends GenericQueryCtx<DataModel>,
+  DataModel extends GenericDataModel,
+> implements EffectDatabaseReader<DataModel>
 {
   ctx: Ctx;
   db: GenericDatabaseReader<DataModel>;
-  rules: Rules<Ctx, DataModel>;
+  rules: Rules<DataModel>;
 
   constructor(
     ctx: Ctx,
     db: GenericDatabaseReader<DataModel>,
-    rules: Rules<Ctx, DataModel>
+    rules: Rules<DataModel>
   ) {
     this.ctx = ctx;
     this.db = db;
@@ -463,7 +479,11 @@ class WrapReader<Ctx, DataModel extends GenericDataModel>
 
   get<TableName extends string>(
     id: GenericId<TableName>
-  ): Effect.Effect<never, never, Option.Option<any>> {
+  ): Effect.Effect<
+    never,
+    never,
+    Option.Option<DocumentByName<DataModel, TableName>>
+  > {
     return pipe(
       Effect.promise(() => this.db.get(id)),
       Effect.flatMap((nullableDoc) =>
@@ -522,32 +542,38 @@ interface EffectDatabaseWriter<DataModel extends GenericDataModel> {
   ): Option.Option<GenericId<TableName>>;
   insert<TableName extends string>(
     table: TableName,
-    value: any
-  ): Effect.Effect<never, never, any>;
+    value: WithoutSystemFields<DocumentByName<DataModel, TableName>>
+  ): Effect.Effect<never, never, GenericId<TableName>>;
   patch<TableName extends string>(
     id: GenericId<TableName>,
-    value: Partial<any>
+    value: Partial<DocumentByName<DataModel, TableName>>
   ): Effect.Effect<never, never, void>;
   replace<TableName extends string>(
     id: GenericId<TableName>,
-    value: any
+    value: WithOptionalSystemFields<DocumentByName<DataModel, TableName>>
   ): Effect.Effect<never, never, void>;
   delete(id: GenericId<string>): Effect.Effect<never, never, void>;
   get<TableName extends string>(
     id: GenericId<TableName>
-  ): Effect.Effect<never, never, Option.Option<any>>;
+  ): Effect.Effect<
+    never,
+    never,
+    Option.Option<DocumentByName<DataModel, TableName>>
+  >;
   query<TableName extends string>(
     tableName: TableName
   ): EffectQueryInitializer<NamedTableInfo<DataModel, TableName>>;
 }
 
-class WrapWriter<Ctx, DataModel extends GenericDataModel>
-  implements EffectDatabaseWriter<DataModel>
+class WrapWriter<
+  Ctx extends GenericMutationCtx<DataModel>,
+  DataModel extends GenericDataModel,
+> implements EffectDatabaseWriter<DataModel>
 {
   ctx: Ctx;
   db: GenericDatabaseWriter<DataModel>;
   reader: EffectDatabaseReader<DataModel>;
-  rules: Rules<Ctx, DataModel>;
+  rules: Rules<DataModel>;
 
   modifyPredicate<T extends GenericTableInfo>(
     tableName: string,
@@ -566,7 +592,7 @@ class WrapWriter<Ctx, DataModel extends GenericDataModel>
   constructor(
     ctx: Ctx,
     db: GenericDatabaseWriter<DataModel>,
-    rules: Rules<Ctx, DataModel>
+    rules: Rules<DataModel>
   ) {
     this.ctx = ctx;
     this.db = db;
@@ -583,8 +609,8 @@ class WrapWriter<Ctx, DataModel extends GenericDataModel>
 
   insert<TableName extends string>(
     table: TableName,
-    value: any
-  ): Effect.Effect<never, never, any> {
+    value: WithoutSystemFields<DocumentByName<DataModel, TableName>>
+  ): Effect.Effect<never, never, GenericId<TableName>> {
     const doInsert = Effect.promise(() => this.db.insert(table, value));
 
     return pipe(
@@ -656,7 +682,7 @@ class WrapWriter<Ctx, DataModel extends GenericDataModel>
 
   patch<TableName extends string>(
     id: GenericId<TableName>,
-    value: Partial<any>
+    value: Partial<DocumentByName<DataModel, TableName>>
   ): Effect.Effect<never, never, void> {
     return pipe(
       this.checkModifyAuth(id),
@@ -666,7 +692,7 @@ class WrapWriter<Ctx, DataModel extends GenericDataModel>
 
   replace<TableName extends string>(
     id: GenericId<TableName>,
-    value: any
+    value: WithOptionalSystemFields<DocumentByName<DataModel, TableName>>
   ): Effect.Effect<never, never, void> {
     return pipe(
       this.checkModifyAuth(id),
@@ -683,13 +709,37 @@ class WrapWriter<Ctx, DataModel extends GenericDataModel>
 
   get<TableName extends string>(
     id: GenericId<TableName>
-  ): Effect.Effect<never, never, Option.Option<any>> {
+  ): Effect.Effect<
+    never,
+    never,
+    Option.Option<DocumentByName<DataModel, TableName>>
+  > {
     return this.reader.get(id);
   }
 
   query<TableName extends string>(
     tableName: TableName
-  ): EffectQueryInitializer<any> {
+  ): EffectQueryInitializer<NamedTableInfo<DataModel, TableName>> {
     return this.reader.query(tableName);
   }
 }
+
+// NOTE: These types are copied from convex/src/server/system_fields.ts -- ideally they would be exposed!
+
+type WithOptionalSystemFields<Document extends GenericDocument> = Expand<
+  WithoutSystemFields<Document> &
+    Partial<Pick<Document, keyof SystemFields | "_id">>
+>;
+
+type SystemFields = {
+  _creationTime: number;
+};
+
+type Expand<ObjectType extends Record<any, any>> = ObjectType extends Record<
+  any,
+  any
+>
+  ? {
+      [Key in keyof ObjectType]: ObjectType[Key];
+    }
+  : never;
