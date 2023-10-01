@@ -15,7 +15,7 @@ import type {
   FunctionReference,
 } from "convex/server";
 import type * as clearDatabase from "../clearDatabase";
-import type * as insertUser from "../insertUser";
+import type * as rowLevelSecurity from "../rowLevelSecurity";
 
 /**
  * A utility for referencing Convex functions in your app's API.
@@ -27,7 +27,7 @@ import type * as insertUser from "../insertUser";
  */
 declare const fullApi: ApiFromModules<{
   clearDatabase: typeof clearDatabase;
-  insertUser: typeof insertUser;
+  rowLevelSecurity: typeof rowLevelSecurity;
 }>;
 export declare const api: FilterApi<
   typeof fullApi,

@@ -94,6 +94,13 @@ type EffectMutationCtx<DataModel extends GenericDataModel> = {
   scheduler: Scheduler;
 };
 
+type EffectQueryCtx<DataModel extends GenericDataModel> = {
+  db: EffectDatabaseReader<DataModel>;
+  auth: Auth;
+  storage: StorageWriter;
+  scheduler: Scheduler;
+};
+
 /**
  * Apply row level security (RLS) to queries and mutations with the returned
  * middleware functions.
@@ -160,17 +167,13 @@ export const RowLevelSecurity = <DataModel extends GenericDataModel>(
       return f({ ...ctx, db: wrappedDb }, ...args);
     }) as Handler<DataModel, GenericMutationCtx<DataModel>, Args, Output>;
   };
-  const withQueryRLS = <
-    Ctx extends GenericQueryCtx<DataModel>,
-    Args extends ArgsArray,
-    Output,
-  >(
-    f: Handler<DataModel, Ctx, Args, Output>
-  ): Handler<DataModel, Ctx, Args, Output> => {
+  const withQueryRLS = <Args extends ArgsArray, Output>(
+    f: (ctx: EffectQueryCtx<DataModel>, ...args: Args) => Output
+  ): Handler<DataModel, GenericQueryCtx<DataModel>, Args, Output> => {
     return ((ctx: any, ...args: any[]) => {
       const wrappedDb = new WrapReader(ctx, ctx.db, rules);
       return (f as any)({ ...ctx, db: wrappedDb }, ...args);
-    }) as Handler<DataModel, Ctx, Args, Output>;
+    }) as Handler<DataModel, GenericQueryCtx<DataModel>, Args, Output>;
   };
   return {
     withMutationRLS,
@@ -421,7 +424,7 @@ interface EffectDatabaseReader<DataModel extends GenericDataModel> {
     tableName: TableName,
     id: string
   ): Option.Option<GenericId<TableName>>;
-  tableName<TableName extends string>(
+  ruleForTableName<TableName extends string>(
     id: GenericId<TableName>
   ): Option.Option<TableName>;
 }
@@ -452,7 +455,7 @@ class WrapReader<
     return Option.fromNullable(this.db.normalizeId(tableName, id));
   }
 
-  tableName<TableName extends string>(
+  ruleForTableName<TableName extends string>(
     id: GenericId<TableName>
   ): Option.Option<TableName> {
     return pipe(
@@ -493,7 +496,7 @@ class WrapReader<
           Option.match({
             onSome: (doc) =>
               pipe(
-                this.tableName(id),
+                this.ruleForTableName(id),
                 Option.match({
                   onSome: (tableName) =>
                     pipe(
@@ -503,7 +506,7 @@ class WrapReader<
                         onFalse: Effect.fail(new ReadNotAllowedError()),
                       })
                     ),
-                  onNone: () => Effect.succeed(Option.none()),
+                  onNone: () => Effect.succeed(Option.some(doc)),
                 })
               ),
             onNone: () => Effect.succeed(Option.none()),
@@ -523,16 +526,16 @@ class WrapReader<
   }
 }
 
-class ModifyNotAllowedError {
-  readonly _tag = "ModifyNotAllowedError";
+class ModificationNotAllowedError {
+  readonly _tag = "ModificationNotAllowedError";
 }
 
 class DocDoesNotExistError {
   readonly _tag = "DocDoesNotExistError";
 }
 
-class InsertNotAllowedError {
-  readonly _tag = "InsertNotAllowedError";
+class InsertionNotAllowedError {
+  readonly _tag = "InsertionNotAllowedError";
 }
 
 interface EffectDatabaseWriter<DataModel extends GenericDataModel> {
@@ -622,7 +625,7 @@ class WrapWriter<
             rule(this.ctx, value),
             Effect.if({
               onTrue: doInsert,
-              onFalse: Effect.fail(new InsertNotAllowedError()),
+              onFalse: Effect.fail(new InsertionNotAllowedError()),
             })
           ),
         onNone: () => doInsert,
@@ -634,7 +637,7 @@ class WrapWriter<
   tableName<TableName extends string>(
     id: GenericId<TableName>
   ): Option.Option<TableName> {
-    return this.reader.tableName(id);
+    return this.reader.ruleForTableName(id);
   }
 
   checkModifyAuth<TableName extends string>(
@@ -651,7 +654,7 @@ class WrapWriter<
           optionDoc
         ): Effect.Effect<
           never,
-          ModifyNotAllowedError | DocDoesNotExistError,
+          ModificationNotAllowedError | DocDoesNotExistError,
           void
         > =>
           pipe(
@@ -666,7 +669,9 @@ class WrapWriter<
                         this.modifyPredicate(tableName, doc),
                         Effect.if({
                           onTrue: Effect.unit,
-                          onFalse: Effect.fail(new ModifyNotAllowedError()),
+                          onFalse: Effect.fail(
+                            new ModificationNotAllowedError()
+                          ),
                         })
                       ),
                     onNone: () => Effect.unit,
