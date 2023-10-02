@@ -13,6 +13,9 @@ dependencies:
     version: 2.0.0-next.34(@effect/data@0.18.6)(@effect/io@0.40.3)(@effect/match@0.35.2)(@effect/stm@0.24.0)(@effect/stream@0.36.1)
 
 devDependencies:
+  '@effect/schema':
+    specifier: ^0.39.2
+    version: 0.39.2(effect@2.0.0-next.34)
   '@jest/globals':
     specifier: ^29.7.0
     version: 29.7.0
@@ -411,7 +414,6 @@ packages:
 
   /@effect/data@0.18.6:
     resolution: {integrity: sha512-gfjorojxEJ0KKxwluZLoAsPv1kkHi7MV1vQDlibClfdtC9iY9JqkJo+BjWTKsU0zV4mW2inmTZQCF72KKbn2tQ==}
-    dev: false
 
   /@effect/io@0.40.3(@effect/data@0.18.6):
     resolution: {integrity: sha512-bnHBFq1XzXn94x2w5FcXZz3MbY7N3YrhiI2CrncJr3WcGRDc2rCYIpPupw0JQGFcJsoopTj1BNfBuBR5s4/RyA==}
@@ -419,7 +421,6 @@ packages:
       '@effect/data': ^0.18.5
     dependencies:
       '@effect/data': 0.18.6
-    dev: false
 
   /@effect/match@0.35.2(@effect/data@0.18.6):
     resolution: {integrity: sha512-2zZhWIdejX3xqbjormykBveHZTB/DBr/u/XBj5Ln6u2ShbMvoUykgVEscQLN3CsQeHDS14Vvr1DOvH0qeMILZQ==}
@@ -427,7 +428,15 @@ packages:
       '@effect/data': ^0.18.3
     dependencies:
       '@effect/data': 0.18.6
-    dev: false
+
+  /@effect/schema@0.39.2(effect@2.0.0-next.34):
+    resolution: {integrity: sha512-UolykyRtrg+JHflZBfHK2p+w8IgP8u6kSkTq9VIggure12/2CFvlib9vphw4fJCN8cRd3gZo4LevU4FfS+ZLxw==}
+    peerDependencies:
+      effect: ^2.0.0-next.39
+    dependencies:
+      effect: 2.0.0-next.34(@effect/data@0.18.6)(@effect/io@0.40.3)(@effect/match@0.35.2)(@effect/stm@0.24.0)(@effect/stream@0.36.1)
+      fast-check: 3.13.1
+    dev: true
 
   /@effect/stm@0.24.0(@effect/data@0.18.6)(@effect/io@0.40.3):
     resolution: {integrity: sha512-6L4zhy2lvkxn3jMG7dvZ4lKOmxSvaNBpkIT/ZOS6mad+B5/r8G3bKFe0C70aHwpQkxORd9LVmFr/f5MXLKZtfQ==}
@@ -437,7 +446,6 @@ packages:
     dependencies:
       '@effect/data': 0.18.6
       '@effect/io': 0.40.3(@effect/data@0.18.6)
-    dev: false
 
   /@effect/stream@0.36.1(@effect/data@0.18.6)(@effect/io@0.40.3):
     resolution: {integrity: sha512-gF/RzTBGgghCA+lcgYFkHW/ozozyOfx4hrGhKWspkjMXyc4B7p0E7dsHO14byTZtUD/JAXvrekvVX8uV7i8Zzw==}
@@ -447,7 +455,6 @@ packages:
     dependencies:
       '@effect/data': 0.18.6
       '@effect/io': 0.40.3(@effect/data@0.18.6)
-    dev: false
 
   /@esbuild/android-arm64@0.17.19:
     resolution: {integrity: sha512-KBMWvEZooR7+kzY0BtbTQn0OAYY7CsiydT63pVEaPtVYF0hXbUaOyZog37DKxK7NF3XacBJOpYT4adIJh+avxA==}
@@ -2095,7 +2102,6 @@ packages:
       '@effect/match': 0.35.2(@effect/data@0.18.6)
       '@effect/stm': 0.24.0(@effect/data@0.18.6)(@effect/io@0.40.3)
       '@effect/stream': 0.36.1(@effect/data@0.18.6)(@effect/io@0.40.3)
-    dev: false
 
   /electron-to-chromium@1.4.447:
     resolution: {integrity: sha512-sxX0LXh+uL41hSJsujAN86PjhrV/6c79XmpY0TvjZStV6VxIgarf8SRkUoUTuYmFcZQTemsoqo8qXOGw5npWfw==}
@@ -2356,6 +2362,13 @@ packages:
       jest-matcher-utils: 29.7.0
       jest-message-util: 29.7.0
       jest-util: 29.7.0
+    dev: true
+
+  /fast-check@3.13.1:
+    resolution: {integrity: sha512-Xp00tFuWd83i8rbG/4wU54qU+yINjQha7bXH2N4ARNTkyOimzHtUBJ5+htpdXk7RMaCOD/j2jxSjEt9u9ZPNeQ==}
+    engines: {node: '>=8.0.0'}
+    dependencies:
+      pure-rand: 6.0.3
     dev: true
 
   /fast-deep-equal@3.1.3:

@@ -237,29 +237,30 @@ class WrapQuery<T extends GenericTableInfo> implements EffectQuery<T> {
   order(order: "asc" | "desc"): WrapQuery<T> {
     return new WrapQuery(this.q.order(order), this.p);
   }
-  checkReadAuth(doc: DocumentByInfo<T>): Effect.Effect<never, never, void> {
-    return pipe(
-      this.p(doc),
-      Effect.if({
-        onTrue: Effect.unit,
-        onFalse: Effect.fail(new ReadNotAllowedError()),
-      }),
-      Effect.orDie
-    );
+  checkReadAuth() {
+    return (doc: DocumentByInfo<T>): Effect.Effect<never, never, void> =>
+      pipe(
+        this.p(doc),
+        Effect.if({
+          onTrue: Effect.unit,
+          onFalse: Effect.fail(new ReadNotAllowedError()),
+        }),
+        Effect.orDie
+      );
   }
   paginate(
     paginationOpts: PaginationOptions
   ): Effect.Effect<never, never, PaginationResult<DocumentByInfo<T>>> {
     return pipe(
       Effect.promise(() => this.q.paginate(paginationOpts)),
-      Effect.tap((result) => Effect.forEach(result.page, this.checkReadAuth)),
+      Effect.tap((result) => Effect.forEach(result.page, this.checkReadAuth())),
       Effect.orDie
     );
   }
   collect(): Effect.Effect<never, never, DocumentByInfo<T>[]> {
     return pipe(
       Effect.promise(() => this.q.collect()),
-      Effect.tap((docs) => Effect.forEach(docs, this.checkReadAuth)),
+      Effect.tap((docs) => Effect.forEach(docs, this.checkReadAuth())),
       Effect.orDie
     );
   }

@@ -28,6 +28,117 @@ describe("RowLevelSecurity", () => {
         ).rejects.toThrowError(/InsertionNotAllowedError/);
       });
     });
+
+    describe("paginate", () => {
+      test("paginate without rules constraints succeeds", async () => {
+        await global.convexHttpClient.mutation(
+          api.rowLevelSecurity.insertTwoUsersWithoutRulesConstraints
+        );
+
+        const usersCount = await global.convexHttpClient
+          .query(api.rowLevelSecurity.paginateUsersWithoutRuleConstraints)
+          .then((paginationResult) => paginationResult.page.length);
+
+        expect(usersCount).toStrictEqual(2);
+      });
+
+      test("paginate including disallowed row throws an error", async () => {
+        await global.convexHttpClient.mutation(
+          api.rowLevelSecurity.insertTwoUsersWithoutRulesConstraints
+        );
+
+        expect(
+          async () =>
+            await global.convexHttpClient.query(
+              api.rowLevelSecurity.paginateUsersWithRuleConstraints
+            )
+        ).rejects.toThrowError(/ReadNotAllowedError/);
+      });
+    });
+
+    describe("collect", () => {
+      test("collect without rules constraints succeeds", async () => {
+        await global.convexHttpClient.mutation(
+          api.rowLevelSecurity.insertTwoUsersWithoutRulesConstraints
+        );
+
+        const usersCount = await global.convexHttpClient
+          .query(api.rowLevelSecurity.collectUsersWithoutRuleConstraints)
+          .then((users) => users.length);
+
+        expect(usersCount).toStrictEqual(2);
+      });
+
+      test("collect including disallowed row throws an error", async () => {
+        await global.convexHttpClient.mutation(
+          api.rowLevelSecurity.insertTwoUsersWithoutRulesConstraints
+        );
+
+        expect(
+          async () =>
+            await global.convexHttpClient.query(
+              api.rowLevelSecurity.collectUsersWithRuleConstraints
+            )
+        ).rejects.toThrowError(/ReadNotAllowedError/);
+      });
+    });
+
+    describe("take", () => {
+      test("take without rules constraints succeeds", async () => {
+        await global.convexHttpClient.mutation(
+          api.rowLevelSecurity.insertTwoUsersWithoutRulesConstraints
+        );
+
+        const usersCount = await global.convexHttpClient
+          .query(api.rowLevelSecurity.takeUsersWithoutRuleConstraints)
+          .then((users) => users.length);
+
+        expect(usersCount).toStrictEqual(2);
+      });
+
+      test("take including disallowed row throws an error", async () => {
+        await global.convexHttpClient.mutation(
+          api.rowLevelSecurity.insertTwoUsersWithoutRulesConstraints
+        );
+
+        expect(
+          async () =>
+            await global.convexHttpClient.query(
+              api.rowLevelSecurity.takeUsersWithRuleConstraints
+            )
+        ).rejects.toThrowError(/ReadNotAllowedError/);
+      });
+    });
+
+    describe("first", () => {
+      test("first without rules constraints succeeds", async () => {
+        await global.convexHttpClient.mutation(
+          api.rowLevelSecurity.insertTwoUsersWithoutRulesConstraints
+        );
+
+        expect(
+          await global.convexHttpClient
+            .query(api.rowLevelSecurity.firstUsersWithoutRuleConstraints)
+            .then((optionUser) => {
+              console.log(optionUser);
+              return Option.isSome(optionUser);
+            })
+        ).toStrictEqual(true);
+      });
+
+      test("first including disallowed row throws an error", async () => {
+        await global.convexHttpClient.mutation(
+          api.rowLevelSecurity.insertTwoUsersWithoutRulesConstraints
+        );
+
+        expect(
+          async () =>
+            await global.convexHttpClient.query(
+              api.rowLevelSecurity.firstUsersWithRuleConstraints
+            )
+        ).rejects.toThrowError(/ReadNotAllowedError/);
+      });
+    });
   });
 
   describe("withMutationRLS", () => {
