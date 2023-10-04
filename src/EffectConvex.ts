@@ -313,19 +313,16 @@ class EffectDatabaseReaderImpl<
 {
   ctx: Ctx;
   db: GenericDatabaseReader<DataModel>;
-
   constructor(ctx: Ctx, db: GenericDatabaseReader<DataModel>) {
     this.ctx = ctx;
     this.db = db;
   }
-
   normalizeId<TableName extends TableNamesInDataModel<DataModel>>(
     tableName: TableName,
     id: string
   ): Option.Option<GenericId<TableName>> {
     return Option.fromNullable(this.db.normalizeId(tableName, id));
   }
-
   get<TableName extends string>(
     id: GenericId<TableName>
   ): Effect.Effect<
@@ -338,7 +335,6 @@ class EffectDatabaseReaderImpl<
       Effect.map(Option.fromNullable)
     );
   }
-
   query<TableName extends string>(
     tableName: TableName
   ): EffectQueryInitializer<NamedTableInfo<DataModel, TableName>> {
@@ -384,45 +380,38 @@ class EffectDatabaseWriterImpl<
   ctx: Ctx;
   db: GenericDatabaseWriter<DataModel>;
   reader: EffectDatabaseReader<DataModel>;
-
   constructor(ctx: Ctx, db: GenericDatabaseWriter<DataModel>) {
     this.ctx = ctx;
     this.db = db;
     this.reader = new EffectDatabaseReaderImpl(ctx, db);
   }
-
   normalizeId<TableName extends TableNamesInDataModel<DataModel>>(
     tableName: TableName,
     id: string
   ): Option.Option<GenericId<TableName>> {
     return Option.fromNullable(this.db.normalizeId(tableName, id));
   }
-
   insert<TableName extends string>(
     table: TableName,
     value: WithoutSystemFields<DocumentByName<DataModel, TableName>>
   ): Effect.Effect<never, never, GenericId<TableName>> {
     return Effect.promise(() => this.db.insert(table, value));
   }
-
   patch<TableName extends string>(
     id: GenericId<TableName>,
     value: Partial<DocumentByName<DataModel, TableName>>
   ): Effect.Effect<never, never, void> {
     return Effect.promise(() => this.db.patch(id, value));
   }
-
   replace<TableName extends string>(
     id: GenericId<TableName>,
     value: WithOptionalSystemFields<DocumentByName<DataModel, TableName>>
   ): Effect.Effect<never, never, void> {
     return Effect.promise(() => this.db.replace(id, value));
   }
-
   delete(id: GenericId<string>): Effect.Effect<never, never, void> {
     return Effect.promise(() => this.db.delete(id));
   }
-
   get<TableName extends string>(
     id: GenericId<TableName>
   ): Effect.Effect<
@@ -432,7 +421,6 @@ class EffectDatabaseWriterImpl<
   > {
     return this.reader.get(id);
   }
-
   query<TableName extends string>(
     tableName: TableName
   ): EffectQueryInitializer<NamedTableInfo<DataModel, TableName>> {
