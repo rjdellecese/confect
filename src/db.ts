@@ -1,6 +1,4 @@
 import {
-  ArgsArray,
-  Auth,
   DocumentByInfo,
   DocumentByName,
   Expression,
@@ -23,60 +21,14 @@ import {
   PaginationResult,
   Query,
   QueryInitializer,
-  Scheduler,
   SearchFilter,
   SearchFilterBuilder,
   SearchIndexes,
-  StorageWriter,
   TableNamesInDataModel,
   WithoutSystemFields,
 } from "convex/server";
 import { GenericId } from "convex/values";
 import { Chunk, Effect, identity, Option, pipe, Stream } from "effect";
-
-type EffectMutationCtx<DataModel extends GenericDataModel> = {
-  db: EffectDatabaseWriter<DataModel>;
-  auth: Auth;
-  storage: StorageWriter;
-  scheduler: Scheduler;
-};
-
-type EffectQueryCtx<DataModel extends GenericDataModel> = {
-  db: EffectDatabaseReader<DataModel>;
-  auth: Auth;
-  storage: StorageWriter;
-  scheduler: Scheduler;
-};
-
-export const EffectConvex = <DataModel extends GenericDataModel>() => {
-  const withEffectQuery = <Args extends ArgsArray, Output>(
-    f: (ctx: EffectMutationCtx<DataModel>, ...args: Args) => Output
-  ): Handler<DataModel, GenericMutationCtx<DataModel>, Args, Output> => {
-    return ((ctx: GenericMutationCtx<DataModel>, ...args: Args) => {
-      const wrappedDb = new EffectDatabaseWriterImpl(ctx, ctx.db);
-      return f({ ...ctx, db: wrappedDb }, ...args);
-    }) as Handler<DataModel, GenericMutationCtx<DataModel>, Args, Output>;
-  };
-  const withEffectMutation = <Args extends ArgsArray, Output>(
-    f: (ctx: EffectQueryCtx<DataModel>, ...args: Args) => Output
-  ): Handler<DataModel, GenericQueryCtx<DataModel>, Args, Output> => {
-    return ((ctx: any, ...args: any[]) => {
-      const wrappedDb = new EffectDatabaseReaderImpl(ctx, ctx.db);
-      return (f as any)({ ...ctx, db: wrappedDb }, ...args);
-    }) as Handler<DataModel, GenericQueryCtx<DataModel>, Args, Output>;
-  };
-  return {
-    withEffectQuery,
-    withEffectMutation,
-  };
-};
-
-type Handler<
-  DataModel extends GenericDataModel,
-  Ctx extends GenericQueryCtx<DataModel>,
-  Args extends ArgsArray,
-  Output,
-> = (ctx: Ctx, ...args: Args) => Output;
 
 interface EffectQuery<T extends GenericTableInfo> {
   filter(
@@ -234,7 +186,7 @@ class EffectQueryInitializerImpl<T extends GenericTableInfo>
   }
 }
 
-interface EffectDatabaseReader<DataModel extends GenericDataModel> {
+export interface EffectDatabaseReader<DataModel extends GenericDataModel> {
   query<TableName extends string>(
     tableName: TableName
   ): EffectQueryInitializer<NamedTableInfo<DataModel, TableName>>;
@@ -251,7 +203,7 @@ interface EffectDatabaseReader<DataModel extends GenericDataModel> {
   ): Option.Option<GenericId<TableName>>;
 }
 
-class EffectDatabaseReaderImpl<
+export class EffectDatabaseReaderImpl<
   Ctx extends GenericQueryCtx<DataModel>,
   DataModel extends GenericDataModel,
 > implements EffectDatabaseReader<DataModel>
@@ -287,7 +239,17 @@ class EffectDatabaseReaderImpl<
   }
 }
 
-interface EffectDatabaseWriter<DataModel extends GenericDataModel> {
+export interface EffectDatabaseWriter<DataModel extends GenericDataModel> {
+  query<TableName extends string>(
+    tableName: TableName
+  ): EffectQueryInitializer<NamedTableInfo<DataModel, TableName>>;
+  get<TableName extends string>(
+    id: GenericId<TableName>
+  ): Effect.Effect<
+    never,
+    never,
+    Option.Option<DocumentByName<DataModel, TableName>>
+  >;
   normalizeId<TableName extends TableNamesInDataModel<DataModel>>(
     tableName: TableName,
     id: string
@@ -305,19 +267,9 @@ interface EffectDatabaseWriter<DataModel extends GenericDataModel> {
     value: WithOptionalSystemFields<DocumentByName<DataModel, TableName>>
   ): Effect.Effect<never, never, void>;
   delete(id: GenericId<string>): Effect.Effect<never, never, void>;
-  get<TableName extends string>(
-    id: GenericId<TableName>
-  ): Effect.Effect<
-    never,
-    never,
-    Option.Option<DocumentByName<DataModel, TableName>>
-  >;
-  query<TableName extends string>(
-    tableName: TableName
-  ): EffectQueryInitializer<NamedTableInfo<DataModel, TableName>>;
 }
 
-class EffectDatabaseWriterImpl<
+export class EffectDatabaseWriterImpl<
   Ctx extends GenericMutationCtx<DataModel>,
   DataModel extends GenericDataModel,
 > implements EffectDatabaseWriter<DataModel>
@@ -329,6 +281,20 @@ class EffectDatabaseWriterImpl<
     this.ctx = ctx;
     this.db = db;
     this.reader = new EffectDatabaseReaderImpl(ctx, db);
+  }
+  query<TableName extends string>(
+    tableName: TableName
+  ): EffectQueryInitializer<NamedTableInfo<DataModel, TableName>> {
+    return this.reader.query(tableName);
+  }
+  get<TableName extends string>(
+    id: GenericId<TableName>
+  ): Effect.Effect<
+    never,
+    never,
+    Option.Option<DocumentByName<DataModel, TableName>>
+  > {
+    return this.reader.get(id);
   }
   normalizeId<TableName extends TableNamesInDataModel<DataModel>>(
     tableName: TableName,
@@ -356,20 +322,6 @@ class EffectDatabaseWriterImpl<
   }
   delete(id: GenericId<string>): Effect.Effect<never, never, void> {
     return Effect.promise(() => this.db.delete(id));
-  }
-  get<TableName extends string>(
-    id: GenericId<TableName>
-  ): Effect.Effect<
-    never,
-    never,
-    Option.Option<DocumentByName<DataModel, TableName>>
-  > {
-    return this.reader.get(id);
-  }
-  query<TableName extends string>(
-    tableName: TableName
-  ): EffectQueryInitializer<NamedTableInfo<DataModel, TableName>> {
-    return this.reader.query(tableName);
   }
 }
 
