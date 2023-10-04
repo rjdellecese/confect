@@ -48,62 +48,7 @@ type EffectQueryCtx<DataModel extends GenericDataModel> = {
   scheduler: Scheduler;
 };
 
-/**
- * Apply row level security (RLS) to queries and mutations with the returned
- * middleware functions.
- *
- * Example:
- * ```
- * // Defined in a common file so it can be used by all queries and mutations.
- * import { Auth } from "convex/server";
- * import { DataModel } from "./_generated/dataModel";
- * import { DatabaseReader } from "./_generated/server";
- * import { RowLevelSecurity } from "./rowLevelSecurity";
- *
- * export const {withMutationRLS} = RowLevelSecurity<{auth: Auth, db: DatabaseReader}, DataModel>(
- *  {
- *    cookies: {
- *      read: async ({auth}, cookie) => !cookie.eaten,
- *      modify: async ({auth, db}, cookie) => {
- *        const user = await getUser(auth, db);
- *        return user.isParent;  // only parents can reach the cookies.
- *      },
- *  }
- * );
- * // Mutation with row level security enabled.
- * export const eatCookie = mutation(withMutationRLS(
- *  async ({db}, {cookieId}) => {
- *   // throws "does not exist" error if cookie is already eaten or doesn't exist.
- *   // throws "write access" error if authorized user is not a parent.
- *   await db.patch(cookieId, {eaten: true});
- * }));
- * ```
- *
- * Notes:
- * * Rules may read any row in `db` -- rules do not apply recursively within the
- *   rule functions themselves.
- * * Tables with no rule default to full access.
- * * Middleware functions like `withUser` can be composed with RowLevelSecurity
- *   to cache fetches in `ctx`. e.g.
- * ```
- * const {withQueryRLS} = RowLevelSecurity<{user: Doc<"users">}, DataModel>(
- *  {
- *    cookies: async ({user}, cookie) => user.isParent,
- *  }
- * );
- * export default query(withUser(withRLS(...)));
- * ```
- *
- * @param rules - rule for each table, determining whether a row is accessible.
- *  - "read" rule says whether a document should be visible.
- *  - "modify" rule says whether to throw an error on `replace`, `patch`, and `delete`.
- *  - "insert" rule says whether to throw an error on `insert`.
- *
- * @returns Functions `withQueryRLS` and `withMutationRLS` to be passed to
- * `query` or `mutation` respectively.
- *  For each row read, modified, or inserted, the security rules are applied.
- */
-export const RowLevelSecurity = <DataModel extends GenericDataModel>() => {
+export const EffectConvex = <DataModel extends GenericDataModel>() => {
   const withEffectQuery = <Args extends ArgsArray, Output>(
     f: (ctx: EffectMutationCtx<DataModel>, ...args: Args) => Output
   ): Handler<DataModel, GenericMutationCtx<DataModel>, Args, Output> => {
