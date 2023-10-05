@@ -3,7 +3,6 @@ import {
   GenericDataModel,
   GenericMutationCtx,
   GenericQueryCtx,
-  Scheduler,
 } from "convex/server";
 
 import { EffectAuth, EffectAuthImpl } from "./auth";
@@ -13,6 +12,7 @@ import {
   EffectDatabaseWriter,
   EffectDatabaseWriterImpl,
 } from "./db";
+import { EffectScheduler, EffectSchedulerImpl } from "./scheduler";
 import {
   EffectStorageReader,
   EffectStorageReaderImpl,
@@ -24,14 +24,14 @@ type EffectMutationCtx<DataModel extends GenericDataModel> = {
   db: EffectDatabaseWriter<DataModel>;
   auth: EffectAuth;
   storage: EffectStorageWriter;
-  scheduler: Scheduler;
+  scheduler: EffectScheduler;
 };
 
 type EffectQueryCtx<DataModel extends GenericDataModel> = {
   db: EffectDatabaseReader<DataModel>;
   auth: EffectAuth;
   storage: EffectStorageReader;
-  scheduler: Scheduler;
+  scheduler: EffectScheduler;
 };
 
 export const EffectConvex = <DataModel extends GenericDataModel>() => {
@@ -42,8 +42,14 @@ export const EffectConvex = <DataModel extends GenericDataModel>() => {
       const wrappedDb = new EffectDatabaseWriterImpl(ctx, ctx.db);
       const wrappedAuth = new EffectAuthImpl(ctx.auth);
       const wrappedStorage = new EffectStorageWriterImpl(ctx.storage);
+      const wrappedScheduler = new EffectSchedulerImpl(ctx.scheduler);
       return f(
-        { ...ctx, db: wrappedDb, auth: wrappedAuth, storage: wrappedStorage },
+        {
+          db: wrappedDb,
+          auth: wrappedAuth,
+          storage: wrappedStorage,
+          scheduler: wrappedScheduler,
+        },
         ...args
       );
     }) as Handler<DataModel, GenericMutationCtx<DataModel>, Args, Output>;
@@ -55,8 +61,14 @@ export const EffectConvex = <DataModel extends GenericDataModel>() => {
       const wrappedDb = new EffectDatabaseReaderImpl(ctx, ctx.db);
       const wrappedAuth = new EffectAuthImpl(ctx.auth);
       const wrappedStorage = new EffectStorageReaderImpl(ctx.auth);
+      const wrappedScheduler = new EffectSchedulerImpl(ctx.scheduler);
       return (f as any)(
-        { ...ctx, db: wrappedDb, auth: wrappedAuth, storage: wrappedStorage },
+        {
+          db: wrappedDb,
+          auth: wrappedAuth,
+          storage: wrappedStorage,
+          scheduler: wrappedScheduler,
+        },
         ...args
       );
     }) as Handler<DataModel, GenericQueryCtx<DataModel>, Args, Output>;
