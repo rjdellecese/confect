@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
-    "exactOptionalPropertyTypes": false
+    "exactOptionalPropertyTypes": false,
+    "lib": ["ES2021", "DOM"]
   },
   "exclude": ["node_modules", "dist", "test/convex"],
   "extends": ["@tsconfig/strictest/tsconfig", "@tsconfig/node18/tsconfig"]
