@@ -1,42 +1,9 @@
+import * as Match from "@effect/match";
 import type * as AST from "@effect/schema/AST";
 import * as Schema from "@effect/schema/Schema";
 import type { Validator } from "convex/values";
 import { v } from "convex/values";
-import { Effect, Match, Option, pipe, ReadonlyArray } from "effect";
-
-class TopLevelObjectMayNotHaveIndexSignaturesError {
-  readonly _tag = "TopLevelObjectMayNotHaveIndexSignaturesError";
-}
-
-class TopLevelMustBeObjectError {
-  readonly _tag = "TopLevelMustBeObjectError";
-}
-
-class MultipleIndexSignaturesAreNotSupportedError {
-  readonly _tag = "MultipleIndexSignaturesAreNotSupportedError";
-}
-
-class UnsupportedPropertySignatureKeyTypeError {
-  readonly _tag = "UnsupportedEffectSchemaTypeError";
-  constructor(readonly keyType: string) {}
-}
-
-class UnsupportedIndexSignatureParameterTypeError {
-  readonly _tag = "UnsupportedIndexSignatureParameterTypeError";
-  constructor(readonly keyType: string) {}
-}
-
-class EmptyTupleIsNotSupportedError {
-  readonly _tag = "EmptyTupleIsNotSupportedError";
-}
-
-class UnsupportedEffectSchemaTypeError {
-  readonly _tag = "UnsupportedEffectSchemaTypeError";
-  constructor(readonly effectSchemaType: AST.AST["_tag"]) {}
-}
-
-const unsupportedEffectSchemaTypeError = ({ _tag }: AST.AST) =>
-  Effect.fail(new UnsupportedEffectSchemaTypeError(_tag));
+import { Effect, Option, pipe, ReadonlyArray } from "effect";
 
 export const args = <I, A = I>(
   schema: Schema.Schema<I, A>
@@ -222,6 +189,40 @@ const handleIndexSignature = ({ parameter, type }: AST.IndexSignature) =>
     : Effect.fail(
         new UnsupportedIndexSignatureParameterTypeError(parameter._tag)
       );
+
+class TopLevelObjectMayNotHaveIndexSignaturesError {
+  readonly _tag = "TopLevelObjectMayNotHaveIndexSignaturesError";
+}
+
+class TopLevelMustBeObjectError {
+  readonly _tag = "TopLevelMustBeObjectError";
+}
+
+class MultipleIndexSignaturesAreNotSupportedError {
+  readonly _tag = "MultipleIndexSignaturesAreNotSupportedError";
+}
+
+class UnsupportedPropertySignatureKeyTypeError {
+  readonly _tag = "UnsupportedEffectSchemaTypeError";
+  constructor(readonly keyType: string) {}
+}
+
+class UnsupportedIndexSignatureParameterTypeError {
+  readonly _tag = "UnsupportedIndexSignatureParameterTypeError";
+  constructor(readonly keyType: string) {}
+}
+
+class EmptyTupleIsNotSupportedError {
+  readonly _tag = "EmptyTupleIsNotSupportedError";
+}
+
+class UnsupportedEffectSchemaTypeError {
+  readonly _tag = "UnsupportedEffectSchemaTypeError";
+  constructor(readonly effectSchemaType: AST.AST["_tag"]) {}
+}
+
+const unsupportedEffectSchemaTypeError = ({ _tag }: AST.AST) =>
+  Effect.fail(new UnsupportedEffectSchemaTypeError(_tag));
 
 export default {
   args,
