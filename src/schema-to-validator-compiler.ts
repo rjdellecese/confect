@@ -5,8 +5,8 @@ import type { Validator } from "convex/values";
 import { v } from "convex/values";
 import { Effect, Option, pipe, ReadonlyArray } from "effect";
 
-export const args = <I, A = I>(
-  schema: Schema.Schema<I, A>
+export const args = <DatabaseValue, TypeScriptValue = DatabaseValue>(
+  schema: Schema.Schema<DatabaseValue, TypeScriptValue>
 ): Record<string, Validator<any, any, any>> => go(Schema.from(schema).ast);
 
 const go = (ast: AST.AST): Record<string, Validator<any, any, any>> =>

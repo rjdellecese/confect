@@ -29,76 +29,100 @@ import {
 import schemaToValidatorCompiler from "./schema-to-validator-compiler";
 
 export const Convex = <DataModel extends GenericDataModel>() => {
-  const query = <I extends DefaultFunctionArgs, A, O>({
+  const query = <
+    DatabaseValue extends DefaultFunctionArgs,
+    TypeScriptValue,
+    Output,
+  >({
     args,
     handler,
   }: {
-    args: Schema.Schema<I, A>;
+    args: Schema.Schema<DatabaseValue, TypeScriptValue>;
     handler: (
       ctx: EffectQueryCtx<DataModel>,
-      a: A
-    ) => Effect.Effect<never, never, O>;
-  }): RegisteredQuery<"public", I, Promise<O>> =>
+      a: TypeScriptValue
+    ) => Effect.Effect<never, never, Output>;
+  }): RegisteredQuery<"public", DatabaseValue, Promise<Output>> =>
     queryGeneric(effectQueryFunction({ args, handler }));
 
-  const internalQuery = <I extends DefaultFunctionArgs, A, O>({
+  const internalQuery = <
+    DatabaseValue extends DefaultFunctionArgs,
+    TypeScriptValue,
+    Output,
+  >({
     args,
     handler,
   }: {
-    args: Schema.Schema<I, A>;
+    args: Schema.Schema<DatabaseValue, TypeScriptValue>;
     handler: (
       ctx: EffectQueryCtx<DataModel>,
-      a: A
-    ) => Effect.Effect<never, never, O>;
-  }): RegisteredQuery<"internal", I, Promise<O>> =>
+      a: TypeScriptValue
+    ) => Effect.Effect<never, never, Output>;
+  }): RegisteredQuery<"internal", DatabaseValue, Promise<Output>> =>
     internalQueryGeneric(effectQueryFunction({ args, handler }));
 
-  const mutation = <I extends DefaultFunctionArgs, A, O>({
+  const mutation = <
+    DatabaseValue extends DefaultFunctionArgs,
+    TypeScriptValue,
+    Output,
+  >({
     args,
     handler,
   }: {
-    args: Schema.Schema<I, A>;
+    args: Schema.Schema<DatabaseValue, TypeScriptValue>;
     handler: (
       ctx: EffectMutationCtx<DataModel>,
-      a: A
-    ) => Effect.Effect<never, never, O>;
-  }): RegisteredMutation<"public", I, Promise<O>> =>
+      a: TypeScriptValue
+    ) => Effect.Effect<never, never, Output>;
+  }): RegisteredMutation<"public", DatabaseValue, Promise<Output>> =>
     mutationGeneric(effectMutationFunction({ args, handler }));
 
-  const internalMutation = <I extends DefaultFunctionArgs, A, O>({
+  const internalMutation = <
+    DatabaseValue extends DefaultFunctionArgs,
+    TypeScriptValue,
+    Output,
+  >({
     args,
     handler,
   }: {
-    args: Schema.Schema<I, A>;
+    args: Schema.Schema<DatabaseValue, TypeScriptValue>;
     handler: (
       ctx: EffectMutationCtx<DataModel>,
-      a: A
-    ) => Effect.Effect<never, never, O>;
-  }): RegisteredMutation<"internal", I, Promise<O>> =>
+      a: TypeScriptValue
+    ) => Effect.Effect<never, never, Output>;
+  }): RegisteredMutation<"internal", DatabaseValue, Promise<Output>> =>
     internalMutationGeneric(effectMutationFunction({ args, handler }));
 
-  const internalAction = <I extends DefaultFunctionArgs, A, O>({
+  const internalAction = <
+    DatabaseValue extends DefaultFunctionArgs,
+    TypeScriptValue,
+    Output,
+  >({
     args,
     handler,
   }: {
-    args: Schema.Schema<I, A>;
+    args: Schema.Schema<DatabaseValue, TypeScriptValue>;
     handler: (
       ctx: EffectActionCtx<DataModel>,
-      a: A
-    ) => Effect.Effect<never, never, O>;
-  }): RegisteredAction<"internal", I, Promise<O>> =>
+      a: TypeScriptValue
+    ) => Effect.Effect<never, never, Output>;
+  }): RegisteredAction<"internal", DatabaseValue, Promise<Output>> =>
     internalActionGeneric(effectActionFunction({ args, handler }));
 
-  const action = <I extends DefaultFunctionArgs, A, O>({
+  const action = <
+    DatabaseValue extends DefaultFunctionArgs,
+    TypeScriptValue,
+    Output,
+  >({
     args,
     handler,
   }: {
-    args: Schema.Schema<I, A>;
+    args: Schema.Schema<DatabaseValue, TypeScriptValue>;
     handler: (
       ctx: EffectActionCtx<DataModel>,
-      a: A
-    ) => Effect.Effect<never, never, O>;
-  }): RegisteredAction<"public", I, Promise<O>> =>
+      a: TypeScriptValue
+    ) => Effect.Effect<never, never, Output>;
+  }): RegisteredAction<"public", DatabaseValue, Promise<Output>> =>
     actionGeneric(effectActionFunction({ args, handler }));
 
   const httpAction = (
@@ -124,21 +148,24 @@ export const Convex = <DataModel extends GenericDataModel>() => {
 
 const effectQueryFunction = <
   DataModel extends GenericDataModel,
-  I extends DefaultFunctionArgs,
-  A,
-  O,
+  DatabaseValue extends DefaultFunctionArgs,
+  TypeScriptValue,
+  Output,
 >({
   args,
   handler,
 }: {
-  args: Schema.Schema<I, A>;
+  args: Schema.Schema<DatabaseValue, TypeScriptValue>;
   handler: (
     ctx: EffectQueryCtx<DataModel>,
-    a: A
-  ) => Effect.Effect<never, never, O>;
+    a: TypeScriptValue
+  ) => Effect.Effect<never, never, Output>;
 }) => ({
   args: schemaToValidatorCompiler.args(args),
-  handler: (ctx: GenericQueryCtx<DataModel>, actualArgs: I): Promise<O> =>
+  handler: (
+    ctx: GenericQueryCtx<DataModel>,
+    actualArgs: DatabaseValue
+  ): Promise<Output> =>
     pipe(
       actualArgs,
       Schema.decode(args),
@@ -152,21 +179,24 @@ const effectQueryFunction = <
 
 const effectMutationFunction = <
   DataModel extends GenericDataModel,
-  I extends DefaultFunctionArgs,
-  A,
-  O,
+  DatabaseValue extends DefaultFunctionArgs,
+  TypeScriptValue,
+  Output,
 >({
   args,
   handler,
 }: {
-  args: Schema.Schema<I, A>;
+  args: Schema.Schema<DatabaseValue, TypeScriptValue>;
   handler: (
     ctx: EffectMutationCtx<DataModel>,
-    a: A
-  ) => Effect.Effect<never, never, O>;
+    a: TypeScriptValue
+  ) => Effect.Effect<never, never, Output>;
 }) => ({
   args: schemaToValidatorCompiler.args(args),
-  handler: (ctx: GenericMutationCtx<DataModel>, actualArgs: I): Promise<O> =>
+  handler: (
+    ctx: GenericMutationCtx<DataModel>,
+    actualArgs: DatabaseValue
+  ): Promise<Output> =>
     pipe(
       actualArgs,
       Schema.decode(args),
@@ -180,21 +210,24 @@ const effectMutationFunction = <
 
 const effectActionFunction = <
   DataModel extends GenericDataModel,
-  I extends DefaultFunctionArgs,
-  A,
-  O,
+  DatabaseValue extends DefaultFunctionArgs,
+  TypeScriptValue,
+  Output,
 >({
   args,
   handler,
 }: {
-  args: Schema.Schema<I, A>;
+  args: Schema.Schema<DatabaseValue, TypeScriptValue>;
   handler: (
     ctx: EffectActionCtx<DataModel>,
-    a: A
-  ) => Effect.Effect<never, never, O>;
+    a: TypeScriptValue
+  ) => Effect.Effect<never, never, Output>;
 }) => ({
   args: schemaToValidatorCompiler.args(args),
-  handler: (ctx: GenericActionCtx<DataModel>, actualArgs: I): Promise<O> =>
+  handler: (
+    ctx: GenericActionCtx<DataModel>,
+    actualArgs: DatabaseValue
+  ): Promise<Output> =>
     pipe(
       actualArgs,
       Schema.decode(args),
