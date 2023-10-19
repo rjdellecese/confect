@@ -28,7 +28,7 @@ import {
 } from "./ctx";
 import schemaToValidatorCompiler from "./schema-to-validator-compiler";
 
-export const Convex = <DataModel extends GenericDataModel>() => {
+export const ConvexServer = <DataModel extends GenericDataModel>() => {
   const query = <
     DatabaseValue extends DefaultFunctionArgs,
     TypeScriptValue,
@@ -93,22 +93,6 @@ export const Convex = <DataModel extends GenericDataModel>() => {
   }): RegisteredMutation<"internal", DatabaseValue, Promise<Output>> =>
     internalMutationGeneric(effectMutationFunction({ args, handler }));
 
-  const internalAction = <
-    DatabaseValue extends DefaultFunctionArgs,
-    TypeScriptValue,
-    Output,
-  >({
-    args,
-    handler,
-  }: {
-    args: Schema.Schema<DatabaseValue, TypeScriptValue>;
-    handler: (
-      ctx: EffectActionCtx<DataModel>,
-      a: TypeScriptValue
-    ) => Effect.Effect<never, never, Output>;
-  }): RegisteredAction<"internal", DatabaseValue, Promise<Output>> =>
-    internalActionGeneric(effectActionFunction({ args, handler }));
-
   const action = <
     DatabaseValue extends DefaultFunctionArgs,
     TypeScriptValue,
@@ -124,6 +108,22 @@ export const Convex = <DataModel extends GenericDataModel>() => {
     ) => Effect.Effect<never, never, Output>;
   }): RegisteredAction<"public", DatabaseValue, Promise<Output>> =>
     actionGeneric(effectActionFunction({ args, handler }));
+
+  const internalAction = <
+    DatabaseValue extends DefaultFunctionArgs,
+    TypeScriptValue,
+    Output,
+  >({
+    args,
+    handler,
+  }: {
+    args: Schema.Schema<DatabaseValue, TypeScriptValue>;
+    handler: (
+      ctx: EffectActionCtx<DataModel>,
+      a: TypeScriptValue
+    ) => Effect.Effect<never, never, Output>;
+  }): RegisteredAction<"internal", DatabaseValue, Promise<Output>> =>
+    internalActionGeneric(effectActionFunction({ args, handler }));
 
   const httpAction = (
     handler: (

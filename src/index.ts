@@ -1,1 +1,1 @@
-export { Convex } from "./Convex";
+export { ConvexServer } from "./ConvexServer";
