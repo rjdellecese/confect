@@ -32,8 +32,6 @@ export interface EffectTableDefinition<
     DatabaseDocument,
     TypeScriptDocument,
     FieldPaths,
-    // Update `Indexes` to include the new index and use `Expand` to make the
-    // types look pretty in editors.
     Expand<
       Indexes &
         Record<
@@ -56,8 +54,6 @@ export interface EffectTableDefinition<
     TypeScriptDocument,
     FieldPaths,
     Indexes,
-    // Update `SearchIndexes` to include the new index and use `Expand` to make
-    // the types look pretty in editors.
     Expand<
       SearchIndexes &
         Record<
@@ -83,8 +79,6 @@ export interface EffectTableDefinition<
     FieldPaths,
     Indexes,
     SearchIndexes,
-    // Update `VectorIndexes` to include the new index and use `Expand` to make
-    // the types look pretty in editors.
     Expand<
       VectorIndexes &
         Record<
