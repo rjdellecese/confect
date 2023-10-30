@@ -15,7 +15,7 @@ import { pipe, ReadonlyRecord } from "effect";
 
 import schemaToValidatorCompiler from "./schema-to-validator-compiler";
 
-type GenericEffectSchema = Record<string, EffectTableDefinition>;
+type GenericEffectSchema = Record<string, EffectTableDefinition<any>>;
 
 export interface EffectSchemaDefinition<
   DatabaseSchema extends GenericSchema,
@@ -54,8 +54,8 @@ export const defineEffectSchema = <
   );
 
 export interface EffectTableDefinition<
-  DatabaseDocument extends GenericDocument = GenericDocument,
-  TypeScriptDocument = any,
+  DatabaseDocument extends GenericDocument,
+  TypeScriptDocument = DatabaseDocument,
   FieldPaths extends string = string,
   Indexes extends GenericTableIndexes = Record<string, never>,
   SearchIndexes extends GenericTableSearchIndexes = Record<string, never>,
