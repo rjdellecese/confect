@@ -302,21 +302,3 @@ interface VectorIndexConfig<
    */
   filterFields?: FilterFields[];
 }
-
-type Index = {
-  indexDescriptor: string;
-  fields: string[];
-};
-
-type SearchIndex = {
-  indexDescriptor: string;
-  searchField: string;
-  filterFields: string[];
-};
-
-type VectorIndex = {
-  indexDescriptor: string;
-  vectorField: string;
-  dimensions: number;
-  filterFields: string[];
-};
