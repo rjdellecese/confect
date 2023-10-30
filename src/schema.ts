@@ -1,21 +1,61 @@
 import * as Schema from "@effect/schema/Schema";
 import {
+  defineSchema,
   defineTable,
   GenericDocument,
+  GenericSchema,
   GenericTableIndexes,
   GenericTableSearchIndexes,
   GenericTableVectorIndexes,
+  SchemaDefinition,
   SearchIndexConfig,
   TableDefinition,
 } from "convex/server";
+import { pipe, ReadonlyRecord } from "effect";
 
 import schemaToValidatorCompiler from "./schema-to-validator-compiler";
 
-export type EffectSchemaDefinition = {};
+type GenericEffectSchema = Record<string, EffectTableDefinition>;
+
+export interface EffectSchemaDefinition<
+  DatabaseSchema extends GenericSchema,
+  TypeScriptSchema extends GenericEffectSchema,
+> {
+  effectSchema: TypeScriptSchema;
+  schemaDefinition: SchemaDefinition<DatabaseSchema, true>;
+}
+
+class EffectSchemaDefinitionImpl<
+  DatabaseSchema extends GenericSchema,
+  TypeScriptSchema extends GenericEffectSchema,
+> implements EffectSchemaDefinition<DatabaseSchema, TypeScriptSchema>
+{
+  effectSchema: TypeScriptSchema;
+  schemaDefinition: SchemaDefinition<DatabaseSchema, true>;
+
+  constructor(effectSchema: TypeScriptSchema) {
+    this.effectSchema = effectSchema;
+    this.schemaDefinition = pipe(
+      effectSchema,
+      ReadonlyRecord.map(({ tableDefinition }) => tableDefinition),
+      defineSchema
+    ) as SchemaDefinition<DatabaseSchema, true>;
+  }
+}
+
+export const defineEffectSchema = <
+  DatabaseSchema extends GenericSchema,
+  TypeScriptSchema extends GenericEffectSchema,
+>(
+  effectSchema: TypeScriptSchema
+) =>
+  new EffectSchemaDefinitionImpl<DatabaseSchema, TypeScriptSchema>(
+    effectSchema
+  );
 
 export interface EffectTableDefinition<
-  DatabaseDocument extends GenericDocument,
-  TypeScriptDocument,
+  DatabaseDocument extends GenericDocument = GenericDocument,
+  TypeScriptDocument = any,
   FieldPaths extends string = string,
   Indexes extends GenericTableIndexes = Record<string, never>,
   SearchIndexes extends GenericTableSearchIndexes = Record<string, never>,
@@ -91,6 +131,14 @@ export interface EffectTableDefinition<
         >
     >
   >;
+  tableDefinition: TableDefinition<
+    DatabaseDocument,
+    FieldPaths,
+    Indexes,
+    SearchIndexes,
+    VectorIndexes
+  >;
+  schema: Schema.Schema<DatabaseDocument, TypeScriptDocument>;
 }
 
 class EffectTableDefinitionImpl<
@@ -110,19 +158,18 @@ class EffectTableDefinitionImpl<
       VectorIndexes
     >
 {
-  private tableDefinition: TableDefinition<
+  tableDefinition: TableDefinition<
     DatabaseDocument,
     FieldPaths,
     Indexes,
     SearchIndexes,
     VectorIndexes
   >;
-  private schema: Schema.Schema<DatabaseDocument, TypeScriptDocument>;
+  schema: Schema.Schema<DatabaseDocument, TypeScriptDocument>;
 
   constructor(schema: Schema.Schema<DatabaseDocument, TypeScriptDocument>) {
     this.schema = schema;
-    // TODO: Need the proper compiler here
-    this.tableDefinition = defineTable(schemaToValidatorCompiler.args(schema));
+    this.tableDefinition = defineTable(schemaToValidatorCompiler.table(schema));
   }
 
   index<

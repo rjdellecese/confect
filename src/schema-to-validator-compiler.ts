@@ -1,15 +1,17 @@
 import * as Match from "@effect/match";
 import type * as AST from "@effect/schema/AST";
 import * as Schema from "@effect/schema/Schema";
-import type { Validator } from "convex/values";
+import type { PropertyValidators, Validator } from "convex/values";
 import { v } from "convex/values";
 import { Effect, Option, pipe, ReadonlyArray } from "effect";
 
-export const args = <DatabaseValue, TypeScriptValue = DatabaseValue>(
-  schema: Schema.Schema<DatabaseValue, TypeScriptValue>
-): Record<string, Validator<any, any, any>> => go(Schema.from(schema).ast);
+// Args
 
-const go = (ast: AST.AST): Record<string, Validator<any, any, any>> =>
+const args = <DatabaseValue, TypeScriptValue = DatabaseValue>(
+  schema: Schema.Schema<DatabaseValue, TypeScriptValue>
+): PropertyValidators => goTopArgs(Schema.from(schema).ast);
+
+const goTopArgs = (ast: AST.AST): PropertyValidators =>
   pipe(
     ast,
     Match.value,
@@ -22,11 +24,33 @@ const go = (ast: AST.AST): Record<string, Validator<any, any, any>> =>
     Effect.runSync
   );
 
-const goAgain = (ast: AST.AST): Validator<any, any, any> =>
+// Table
+
+const table = <DatabaseValue, TypeScriptValue = DatabaseValue>(
+  schema: Schema.Schema<DatabaseValue, TypeScriptValue>
+): Validator<Record<string, any>, false, any> =>
+  goTopTable(Schema.from(schema).ast);
+
+const goTopTable = (ast: AST.AST): Validator<Record<string, any>, false, any> =>
   pipe(
     ast,
     Match.value,
-    Match.tag("Declaration", ({ type }) => Effect.succeed(goAgain(type))),
+    Match.tag("TypeLiteral", ({ indexSignatures }) =>
+      ReadonlyArray.isEmptyReadonlyArray(indexSignatures)
+        ? Effect.succeed(go(ast))
+        : Effect.fail(new TopLevelObjectMayNotHaveIndexSignaturesError())
+    ),
+    Match.orElse(() => Effect.fail(new TopLevelMustBeObjectError())),
+    Effect.runSync
+  );
+
+// Helpers
+
+const go = (ast: AST.AST): Validator<any, any, any> =>
+  pipe(
+    ast,
+    Match.value,
+    Match.tag("Declaration", ({ type }) => Effect.succeed(go(type))),
     Match.tag("Literal", ({ literal }) =>
       pipe(
         literal,
@@ -49,20 +73,14 @@ const goAgain = (ast: AST.AST): Validator<any, any, any> =>
     Match.tag("BigIntKeyword", () => Effect.succeed(v.int64())),
     Match.tag("Union", ({ types: [first, second, ...rest] }) =>
       Effect.succeed(
-        v.union(
-          goAgain(first),
-          goAgain(second),
-          ...ReadonlyArray.map(rest, goAgain)
-        )
+        v.union(go(first), go(second), ...ReadonlyArray.map(rest, go))
       )
     ),
     Match.tag("TypeLiteral", (typeLiteral) => handleTypeLiteral(typeLiteral)),
     Match.tag("Tuple", ({ elements, rest }) => {
       const restValidator = pipe(
         rest,
-        Option.map((restHead) =>
-          pipe(restHead, ReadonlyArray.headNonEmpty, goAgain)
-        )
+        Option.map((restHead) => pipe(restHead, ReadonlyArray.headNonEmpty, go))
       );
 
       const [f, s, ...r] = elements;
@@ -71,7 +89,7 @@ const goAgain = (ast: AST.AST): Validator<any, any, any> =>
         type,
         isOptional,
       }: AST.Element): Validator<any, any, any> =>
-        isOptional ? v.optional(goAgain(type)) : goAgain(type);
+        isOptional ? v.optional(go(type)) : go(type);
 
       const arrayItemsValidator: Effect.Effect<
         never,
@@ -160,7 +178,7 @@ const handlePropertySignatures = (
           new UnsupportedPropertySignatureKeyTypeError(typeofName)
         );
       } else {
-        const validator = goAgain(type);
+        const validator = go(type);
 
         return Effect.succeed({
           propertyName: name,
@@ -185,7 +203,7 @@ const handlePropertySignatures = (
 
 const handleIndexSignature = ({ parameter, type }: AST.IndexSignature) =>
   parameter._tag === "StringKeyword"
-    ? Effect.succeed(v.record(v.string(), goAgain(type)))
+    ? Effect.succeed(v.record(v.string(), go(type)))
     : Effect.fail(
         new UnsupportedIndexSignatureParameterTypeError(parameter._tag)
       );
@@ -226,4 +244,5 @@ const unsupportedEffectSchemaTypeError = ({ _tag }: AST.AST) =>
 
 export default {
   args,
+  table,
 };
