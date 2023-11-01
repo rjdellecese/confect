@@ -1,9 +1,8 @@
-import * as Match from "@effect/match";
 import type * as AST from "@effect/schema/AST";
 import * as Schema from "@effect/schema/Schema";
 import type { PropertyValidators, Validator } from "convex/values";
 import { v } from "convex/values";
-import { Effect, Option, pipe, ReadonlyArray } from "effect";
+import { Effect, Match, Option, pipe, ReadonlyArray } from "effect";
 
 // Args
 
@@ -18,7 +17,7 @@ const goTopArgs = (ast: AST.AST): PropertyValidators =>
     Match.tag("TypeLiteral", ({ indexSignatures, propertySignatures }) =>
       ReadonlyArray.isEmptyReadonlyArray(indexSignatures)
         ? handlePropertySignatures(propertySignatures)
-        : Effect.fail(new TopLevelObjectMayNotHaveIndexSignaturesError())
+        : Effect.fail(new IndexSignaturesAreNotSupportedError())
     ),
     Match.orElse(() => Effect.fail(new TopLevelMustBeObjectError())),
     Effect.runSync
@@ -38,7 +37,7 @@ const goTopTable = (ast: AST.AST): Validator<Record<string, any>, false, any> =>
     Match.tag("TypeLiteral", ({ indexSignatures }) =>
       ReadonlyArray.isEmptyReadonlyArray(indexSignatures)
         ? Effect.succeed(go(ast))
-        : Effect.fail(new TopLevelObjectMayNotHaveIndexSignaturesError())
+        : Effect.fail(new IndexSignaturesAreNotSupportedError())
     ),
     Match.orElse(() => Effect.fail(new TopLevelMustBeObjectError())),
     Effect.runSync
@@ -156,12 +155,7 @@ const handleTypeLiteral = ({
           handlePropertySignatures,
           Effect.map(v.object)
         ),
-      onSome: (indexSignature) =>
-        pipe(
-          ReadonlyArray.length(indexSignatures) > 1
-            ? Effect.fail(new MultipleIndexSignaturesAreNotSupportedError())
-            : handleIndexSignature(indexSignature)
-        ),
+      onSome: () => Effect.fail(new IndexSignaturesAreNotSupportedError()),
     })
   );
 
@@ -201,32 +195,12 @@ const handlePropertySignatures = (
     )
   );
 
-const handleIndexSignature = ({ parameter, type }: AST.IndexSignature) =>
-  parameter._tag === "StringKeyword"
-    ? Effect.succeed(v.record(v.string(), go(type)))
-    : Effect.fail(
-        new UnsupportedIndexSignatureParameterTypeError(parameter._tag)
-      );
-
-class TopLevelObjectMayNotHaveIndexSignaturesError {
-  readonly _tag = "TopLevelObjectMayNotHaveIndexSignaturesError";
-}
-
 class TopLevelMustBeObjectError {
   readonly _tag = "TopLevelMustBeObjectError";
 }
 
-class MultipleIndexSignaturesAreNotSupportedError {
-  readonly _tag = "MultipleIndexSignaturesAreNotSupportedError";
-}
-
 class UnsupportedPropertySignatureKeyTypeError {
   readonly _tag = "UnsupportedEffectSchemaTypeError";
-  constructor(readonly keyType: string) {}
-}
-
-class UnsupportedIndexSignatureParameterTypeError {
-  readonly _tag = "UnsupportedIndexSignatureParameterTypeError";
   constructor(readonly keyType: string) {}
 }
 
@@ -237,6 +211,10 @@ class EmptyTupleIsNotSupportedError {
 class UnsupportedEffectSchemaTypeError {
   readonly _tag = "UnsupportedEffectSchemaTypeError";
   constructor(readonly effectSchemaType: AST.AST["_tag"]) {}
+}
+
+class IndexSignaturesAreNotSupportedError {
+  readonly _tag = "IndexSignaturesAreNotSupportedError";
 }
 
 const unsupportedEffectSchemaTypeError = ({ _tag }: AST.AST) =>
