@@ -15,7 +15,7 @@ import { pipe, ReadonlyRecord } from "effect";
 
 import schemaToValidatorCompiler from "./schema-to-validator-compiler";
 
-type GenericEffectSchema = Record<string, EffectTableDefinition<any>>;
+export type GenericEffectSchema = Record<string, EffectTableDefinition<any>>;
 
 export interface EffectSchemaDefinition<
   DatabaseSchema extends GenericSchema,

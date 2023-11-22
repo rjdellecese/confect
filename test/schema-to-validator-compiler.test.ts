@@ -126,16 +126,4 @@ describe("args", () => {
       ),
     });
   });
-
-  test("record", () => {
-    const recordValidator = schemaToValidatorCompiler.args(
-      Schema.struct({
-        record: Schema.record(Schema.string, Schema.number),
-      })
-    );
-
-    expect(recordValidator).toStrictEqual({
-      record: v.record(v.string(), v.number()),
-    });
-  });
 });

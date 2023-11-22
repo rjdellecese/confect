@@ -1,3 +1,4 @@
+import { Schema } from "@effect/schema";
 import {
   DocumentByInfo,
   DocumentByName,
@@ -30,66 +31,107 @@ import {
 import { GenericId } from "convex/values";
 import { Chunk, Effect, identity, Option, pipe, Stream } from "effect";
 
-interface EffectQuery<T extends GenericTableInfo> {
+interface EffectQuery<TableInfo extends GenericTableInfo, TypeScriptValue> {
   filter(
-    predicate: (q: FilterBuilder<T>) => Expression<boolean>
-  ): EffectQuery<T>;
-  order(order: "asc" | "desc"): EffectOrderedQuery<T>;
+    predicate: (q: FilterBuilder<TableInfo>) => Expression<boolean>
+  ): EffectQuery<TableInfo, TypeScriptValue>;
+  order(order: "asc" | "desc"): EffectOrderedQuery<TableInfo, TypeScriptValue>;
   paginate(
     paginationOpts: PaginationOptions
-  ): Effect.Effect<never, never, PaginationResult<DocumentByInfo<T>>>;
-  collect(): Effect.Effect<never, never, DocumentByInfo<T>[]>;
-  take(n: number): Effect.Effect<never, never, DocumentByInfo<T>[]>;
-  first(): Effect.Effect<never, never, Option.Option<DocumentByInfo<T>>>;
+  ): Effect.Effect<never, never, PaginationResult<TypeScriptValue>>;
+  collect(): Effect.Effect<never, never, TypeScriptValue[]>;
+  take(n: number): Effect.Effect<never, never, TypeScriptValue[]>;
+  first(): Effect.Effect<never, never, Option.Option<TypeScriptValue>>;
   unique(): Effect.Effect<
     never,
     NotUniqueError,
-    Option.Option<DocumentByInfo<T>>
+    Option.Option<TypeScriptValue>
   >;
-  stream(): Stream.Stream<never, never, DocumentByInfo<T>>;
+  stream(): Stream.Stream<never, never, TypeScriptValue>;
 }
 
-interface EffectOrderedQuery<T extends GenericTableInfo>
-  extends Omit<EffectQuery<T>, "order"> {}
+interface EffectOrderedQuery<
+  TableInfo extends GenericTableInfo,
+  TypeScriptValue,
+> extends Omit<EffectQuery<TableInfo, TypeScriptValue>, "order"> {}
 
 class NotUniqueError {
   readonly _tag = "NotUniqueError";
 }
 
-class EffectQueryImpl<T extends GenericTableInfo> implements EffectQuery<T> {
-  q: Query<T>;
-  constructor(q: Query<T> | OrderedQuery<T>) {
-    this.q = q as Query<T>;
+class EffectQueryImpl<TableInfo extends GenericTableInfo, TypeScriptValue>
+  implements EffectQuery<TableInfo, TypeScriptValue>
+{
+  q: Query<TableInfo>;
+  tableSchema: Schema.Schema<DocumentByInfo<TableInfo>, TypeScriptValue>;
+  constructor(
+    q: Query<TableInfo> | OrderedQuery<TableInfo>,
+    tableSchema: Schema.Schema<DocumentByInfo<TableInfo>, TypeScriptValue>
+  ) {
+    this.q = q as Query<TableInfo>;
+    this.tableSchema = tableSchema;
   }
-  filter(predicate: (q: FilterBuilder<T>) => Expression<boolean>): this {
-    return new EffectQueryImpl(this.q.filter(predicate)) as this;
+  filter(
+    predicate: (q: FilterBuilder<TableInfo>) => Expression<boolean>
+  ): this {
+    return new EffectQueryImpl(
+      this.q.filter(predicate),
+      this.tableSchema
+    ) as this;
   }
-  order(order: "asc" | "desc"): EffectQueryImpl<T> {
-    return new EffectQueryImpl(this.q.order(order));
+  order(order: "asc" | "desc"): EffectQueryImpl<TableInfo, TypeScriptValue> {
+    return new EffectQueryImpl(this.q.order(order), this.tableSchema);
   }
   paginate(
     paginationOpts: PaginationOptions
-  ): Effect.Effect<never, never, PaginationResult<DocumentByInfo<T>>> {
-    return Effect.promise(() => this.q.paginate(paginationOpts));
+  ): Effect.Effect<never, never, PaginationResult<TypeScriptValue>> {
+    return pipe(
+      Effect.Do,
+      Effect.bind("paginationResult", () =>
+        Effect.promise(() => this.q.paginate(paginationOpts))
+      ),
+      Effect.bind("parsedPage", ({ paginationResult }) =>
+        pipe(
+          paginationResult.page,
+          Effect.forEach((document) => Schema.parse(this.tableSchema)(document))
+        )
+      ),
+      Effect.map(
+        ({
+          paginationResult,
+          parsedPage,
+        }): PaginationResult<TypeScriptValue> => ({
+          ...paginationResult,
+          page: parsedPage,
+        })
+      ),
+      Effect.orDie
+    );
   }
-  collect(): Effect.Effect<never, never, DocumentByInfo<T>[]> {
-    return Effect.promise(() => this.q.collect());
+  collect(): Effect.Effect<never, never, TypeScriptValue[]> {
+    return pipe(
+      Effect.promise(() => this.q.collect()),
+      Effect.flatMap(
+        Effect.forEach((document) => Schema.parse(this.tableSchema)(document))
+      ),
+      Effect.orDie
+    );
   }
-  take(n: number): Effect.Effect<never, never, DocumentByInfo<T>[]> {
+  take(n: number): Effect.Effect<never, never, TypeScriptValue[]> {
     return pipe(
       this.stream(),
       Stream.take(n),
       Stream.runCollect,
-      Effect.map((chunk) => Chunk.toReadonlyArray(chunk) as DocumentByInfo<T>[])
+      Effect.map((chunk) => Chunk.toReadonlyArray(chunk) as TypeScriptValue[])
     );
   }
-  first(): Effect.Effect<never, never, Option.Option<DocumentByInfo<T>>> {
+  first(): Effect.Effect<never, never, Option.Option<TypeScriptValue>> {
     return pipe(this.stream(), Stream.runHead);
   }
   unique(): Effect.Effect<
     never,
     NotUniqueError,
-    Option.Option<DocumentByInfo<T>>
+    Option.Option<TypeScriptValue>
   > {
     return pipe(
       this.stream(),
@@ -102,86 +144,121 @@ class EffectQueryImpl<T extends GenericTableInfo> implements EffectQuery<T> {
       )
     );
   }
-  stream(): Stream.Stream<never, never, DocumentByInfo<T>> {
-    return pipe(Stream.fromAsyncIterable(this.q, identity), Stream.orDie);
+  stream(): Stream.Stream<never, never, TypeScriptValue> {
+    return pipe(
+      Stream.fromAsyncIterable(this.q, identity),
+      Stream.mapEffect((document) => Schema.parse(this.tableSchema)(document)),
+      Stream.orDie
+    );
   }
 }
 
-interface EffectQueryInitializer<T extends GenericTableInfo>
-  extends EffectQuery<T> {
-  fullTableScan(): EffectQuery<T>;
-  withIndex<IndexName extends keyof Indexes<T>>(
+interface EffectQueryInitializer<
+  TableInfo extends GenericTableInfo,
+  TypeScriptValue,
+> extends EffectQuery<TableInfo, TypeScriptValue> {
+  fullTableScan(): EffectQuery<TableInfo, TypeScriptValue>;
+  withIndex<IndexName extends keyof Indexes<TableInfo>>(
     indexName: IndexName,
     indexRange?:
       | ((
-          q: IndexRangeBuilder<DocumentByInfo<T>, NamedIndex<T, IndexName>, 0>
+          q: IndexRangeBuilder<
+            DocumentByInfo<TableInfo>,
+            NamedIndex<TableInfo, IndexName>,
+            0
+          >
         ) => IndexRange)
       | undefined
-  ): EffectQuery<T>;
-  withSearchIndex<IndexName extends keyof SearchIndexes<T>>(
+  ): EffectQuery<TableInfo, TypeScriptValue>;
+  withSearchIndex<IndexName extends keyof SearchIndexes<TableInfo>>(
     indexName: IndexName,
     searchFilter: (
-      q: SearchFilterBuilder<DocumentByInfo<T>, NamedSearchIndex<T, IndexName>>
+      q: SearchFilterBuilder<
+        DocumentByInfo<TableInfo>,
+        NamedSearchIndex<TableInfo, IndexName>
+      >
     ) => SearchFilter
-  ): EffectOrderedQuery<T>;
+  ): EffectOrderedQuery<TableInfo, TypeScriptValue>;
 }
 
-class EffectQueryInitializerImpl<T extends GenericTableInfo>
-  implements EffectQueryInitializer<T>
+class EffectQueryInitializerImpl<
+  TableInfo extends GenericTableInfo,
+  TypeScriptValue,
+> implements EffectQueryInitializer<TableInfo, TypeScriptValue>
 {
-  q: QueryInitializer<T>;
-  constructor(q: QueryInitializer<T>) {
+  q: QueryInitializer<TableInfo>;
+  tableSchema: Schema.Schema<DocumentByInfo<TableInfo>, TypeScriptValue>;
+  constructor(
+    q: QueryInitializer<TableInfo>,
+    tableSchema: Schema.Schema<DocumentByInfo<TableInfo>, TypeScriptValue>
+  ) {
     this.q = q;
+    this.tableSchema = tableSchema;
   }
-  fullTableScan(): EffectQuery<T> {
-    return new EffectQueryImpl(this.q.fullTableScan());
+  fullTableScan(): EffectQuery<TableInfo, TypeScriptValue> {
+    return new EffectQueryImpl(this.q.fullTableScan(), this.tableSchema);
   }
-  withIndex<IndexName extends keyof Indexes<T>>(
+  withIndex<IndexName extends keyof Indexes<TableInfo>>(
     indexName: IndexName,
     indexRange?:
       | ((
-          q: IndexRangeBuilder<DocumentByInfo<T>, NamedIndex<T, IndexName>, 0>
+          q: IndexRangeBuilder<
+            DocumentByInfo<TableInfo>,
+            NamedIndex<TableInfo, IndexName>,
+            0
+          >
         ) => IndexRange)
       | undefined
-  ): EffectQuery<T> {
-    return new EffectQueryImpl(this.q.withIndex(indexName, indexRange));
+  ): EffectQuery<TableInfo, TypeScriptValue> {
+    return new EffectQueryImpl(
+      this.q.withIndex(indexName, indexRange),
+      this.tableSchema
+    );
   }
-  withSearchIndex<IndexName extends keyof SearchIndexes<T>>(
+  withSearchIndex<IndexName extends keyof SearchIndexes<TableInfo>>(
     indexName: IndexName,
     searchFilter: (
-      q: SearchFilterBuilder<DocumentByInfo<T>, NamedSearchIndex<T, IndexName>>
+      q: SearchFilterBuilder<
+        DocumentByInfo<TableInfo>,
+        NamedSearchIndex<TableInfo, IndexName>
+      >
     ) => SearchFilter
-  ): EffectOrderedQuery<T> {
-    return new EffectQueryImpl(this.q.withSearchIndex(indexName, searchFilter));
+  ): EffectOrderedQuery<TableInfo, TypeScriptValue> {
+    return new EffectQueryImpl(
+      this.q.withSearchIndex(indexName, searchFilter),
+      this.tableSchema
+    );
   }
-  filter(predicate: (q: FilterBuilder<T>) => Expression<boolean>): this {
+  filter(
+    predicate: (q: FilterBuilder<TableInfo>) => Expression<boolean>
+  ): this {
     return this.fullTableScan().filter(predicate) as this;
   }
-  order(order: "asc" | "desc"): EffectOrderedQuery<T> {
+  order(order: "asc" | "desc"): EffectOrderedQuery<TableInfo, TypeScriptValue> {
     return this.fullTableScan().order(order);
   }
   paginate(
     paginationOpts: PaginationOptions
-  ): Effect.Effect<never, never, PaginationResult<DocumentByInfo<T>>> {
+  ): Effect.Effect<never, never, PaginationResult<TypeScriptValue>> {
     return this.fullTableScan().paginate(paginationOpts);
   }
-  collect(): Effect.Effect<never, never, DocumentByInfo<T>[]> {
+  collect(): Effect.Effect<never, never, TypeScriptValue[]> {
     return this.fullTableScan().collect();
   }
-  take(n: number): Effect.Effect<never, never, DocumentByInfo<T>[]> {
+  take(n: number): Effect.Effect<never, never, TypeScriptValue[]> {
     return this.fullTableScan().take(n);
   }
-  first(): Effect.Effect<never, never, Option.Option<DocumentByInfo<T>>> {
+  first(): Effect.Effect<never, never, Option.Option<TypeScriptValue>> {
     return this.fullTableScan().first();
   }
   unique(): Effect.Effect<
     never,
     NotUniqueError,
-    Option.Option<DocumentByInfo<T>>
+    Option.Option<TypeScriptValue>
   > {
     return this.fullTableScan().unique();
   }
-  stream(): Stream.Stream<never, never, DocumentByInfo<T>> {
+  stream(): Stream.Stream<never, never, TypeScriptValue> {
     return this.fullTableScan().stream();
   }
 }
