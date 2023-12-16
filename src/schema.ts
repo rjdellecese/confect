@@ -3,6 +3,7 @@ import {
   defineSchema,
   defineTable,
   GenericDocument,
+  GenericFieldPaths,
   GenericSchema,
   GenericTableIndexes,
   GenericTableSearchIndexes,
@@ -15,7 +16,10 @@ import { pipe, ReadonlyRecord } from "effect";
 
 import schemaToValidatorCompiler from "./schema-to-validator-compiler";
 
-export type GenericEffectSchema = Record<string, EffectTableDefinition<any>>;
+export type GenericEffectSchema = Record<
+  string,
+  EffectTableDefinition<any, any>
+>;
 
 export interface EffectSchemaDefinition<
   DatabaseSchema extends GenericSchema,
@@ -55,8 +59,8 @@ export const defineEffectSchema = <
 
 export interface EffectTableDefinition<
   DatabaseDocument extends GenericDocument,
-  TypeScriptDocument = DatabaseDocument,
-  FieldPaths extends string = string,
+  TypeScriptDocument,
+  FieldPaths extends GenericFieldPaths = string,
   Indexes extends GenericTableIndexes = Record<string, never>,
   SearchIndexes extends GenericTableSearchIndexes = Record<string, never>,
   VectorIndexes extends GenericTableVectorIndexes = Record<string, never>,
@@ -144,7 +148,7 @@ export interface EffectTableDefinition<
 class EffectTableDefinitionImpl<
   DatabaseDocument extends GenericDocument,
   TypeScriptDocument,
-  FieldPaths extends string = string,
+  FieldPaths extends GenericFieldPaths = string,
   Indexes extends GenericTableIndexes = Record<string, never>,
   SearchIndexes extends GenericTableSearchIndexes = Record<string, never>,
   VectorIndexes extends GenericTableVectorIndexes = Record<string, never>,

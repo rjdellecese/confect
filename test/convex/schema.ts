@@ -1,22 +1,11 @@
-// TODO
-// import { Schema } from "@effect/schema";
-import { defineSchema, defineTable } from "convex/server";
-import { v } from "convex/values";
+import { Schema } from "@effect/schema";
 
-// TODO
-// import { defineEffectSchema, defineEffectTable } from "../../src/schema";
+import { defineEffectSchema, defineEffectTable } from "../../src/schema";
 
-export default defineSchema({
-  notes: defineTable({
-    content: v.string(),
-  }),
-});
-
-// TODO
-// defineEffectSchema({
-//   notes: defineEffectTable(
-//     Schema.struct({
-//       content: Schema.string,
-//     })
-//   ),
-// });
+export default defineEffectSchema({
+  notes: defineEffectTable(
+    Schema.struct({
+      content: Schema.string,
+    })
+  ),
+}).schemaDefinition;
