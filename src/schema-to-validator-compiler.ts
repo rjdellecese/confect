@@ -100,22 +100,22 @@ const go = (ast: AST.AST): Validator<any, any, any> =>
             onSome: (validator) => Effect.succeed(validator),
           })
         : s === undefined
-        ? Option.match(restValidator, {
-            onNone: () => Effect.succeed(elementToValidator(f)),
-            onSome: (validator) =>
-              Effect.succeed(v.union(elementToValidator(f), validator)),
-          })
-        : Effect.succeed(
-            v.union(
-              elementToValidator(f),
-              elementToValidator(s),
-              ...ReadonlyArray.map(r, elementToValidator),
-              ...Option.match(restValidator, {
-                onSome: (validator) => [validator] as const,
-                onNone: () => [] as const,
-              })
-            )
-          );
+          ? Option.match(restValidator, {
+              onNone: () => Effect.succeed(elementToValidator(f)),
+              onSome: (validator) =>
+                Effect.succeed(v.union(elementToValidator(f), validator)),
+            })
+          : Effect.succeed(
+              v.union(
+                elementToValidator(f),
+                elementToValidator(s),
+                ...ReadonlyArray.map(r, elementToValidator),
+                ...Option.match(restValidator, {
+                  onSome: (validator) => [validator] as const,
+                  onNone: () => [] as const,
+                })
+              )
+            );
 
       return pipe(
         arrayItemsValidator,
@@ -132,7 +132,7 @@ const go = (ast: AST.AST): Validator<any, any, any> =>
       "Enums",
       "TemplateLiteral",
       "ObjectKeyword",
-      "Lazy",
+      "Suspend",
       "Transform",
       "Refinement",
       unsupportedEffectSchemaTypeError
