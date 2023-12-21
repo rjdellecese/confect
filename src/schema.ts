@@ -29,6 +29,8 @@ export interface EffectSchemaDefinition<
   schemaDefinition: SchemaDefinition<DatabaseSchema, true>;
 }
 
+// TODO: Need to produce proper type for Convex `SchemaDefinition` (`DatabaseSchema`)
+
 class EffectSchemaDefinitionImpl<
   DatabaseSchema extends GenericSchema,
   TypeScriptSchema extends GenericEffectSchema,
