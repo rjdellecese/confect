@@ -29,8 +29,6 @@ export interface EffectSchemaDefinition<
   schemaDefinition: SchemaDefinition<DatabaseSchema, true>;
 }
 
-// TODO: Need to produce proper type for Convex `SchemaDefinition` (`DatabaseSchema`)
-
 class EffectSchemaDefinitionImpl<
   DatabaseSchema extends GenericSchema,
   TypeScriptSchema extends GenericEffectSchema,
@@ -49,23 +47,32 @@ class EffectSchemaDefinitionImpl<
   }
 }
 
+type SchemaDefinitionFromEffectSchemaDefinition<
+  TypeScriptSchema extends GenericEffectSchema,
+> = Expand<{
+  [TableName in keyof TypeScriptSchema]: TypeScriptSchema[TableName]["tableDefinition"];
+}>;
+
 export const defineEffectSchema = <
-  DatabaseSchema extends GenericSchema,
   TypeScriptSchema extends GenericEffectSchema,
 >(
   effectSchema: TypeScriptSchema
 ) =>
-  new EffectSchemaDefinitionImpl<DatabaseSchema, TypeScriptSchema>(
-    effectSchema
-  );
+  new EffectSchemaDefinitionImpl<
+    SchemaDefinitionFromEffectSchemaDefinition<TypeScriptSchema>,
+    TypeScriptSchema
+  >(effectSchema);
 
 export interface EffectTableDefinition<
   DatabaseDocument extends GenericDocument,
   TypeScriptDocument,
   FieldPaths extends GenericFieldPaths = string,
-  Indexes extends GenericTableIndexes = Record<string, never>,
-  SearchIndexes extends GenericTableSearchIndexes = Record<string, never>,
-  VectorIndexes extends GenericTableVectorIndexes = Record<string, never>,
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  Indexes extends GenericTableIndexes = {},
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  SearchIndexes extends GenericTableSearchIndexes = {},
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  VectorIndexes extends GenericTableVectorIndexes = {},
 > {
   index<
     IndexName extends string,
@@ -151,9 +158,12 @@ class EffectTableDefinitionImpl<
   DatabaseDocument extends GenericDocument,
   TypeScriptDocument,
   FieldPaths extends GenericFieldPaths = string,
-  Indexes extends GenericTableIndexes = Record<string, never>,
-  SearchIndexes extends GenericTableSearchIndexes = Record<string, never>,
-  VectorIndexes extends GenericTableVectorIndexes = Record<string, never>,
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  Indexes extends GenericTableIndexes = {},
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  SearchIndexes extends GenericTableSearchIndexes = {},
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  VectorIndexes extends GenericTableVectorIndexes = {},
 > implements
     EffectTableDefinition<
       DatabaseDocument,

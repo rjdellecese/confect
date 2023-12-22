@@ -7,7 +7,7 @@ const effectSchema = defineEffectSchema({
     Schema.struct({
       content: Schema.string,
     })
-  ),
+  ).index("by_content", ["content"]),
 });
 
 const convexSchema = effectSchema.schemaDefinition;
