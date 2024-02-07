@@ -2,7 +2,7 @@ import { Schema } from "@effect/schema";
 
 import { defineEffectSchema, defineEffectTable } from "../../src/schema";
 
-const effectSchema = defineEffectSchema({
+export const effectSchema = defineEffectSchema({
   notes: defineEffectTable(
     Schema.struct({
       content: Schema.string,

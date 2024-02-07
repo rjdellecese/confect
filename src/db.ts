@@ -6,17 +6,14 @@ import {
   FilterBuilder,
   GenericDatabaseReader,
   GenericDatabaseWriter,
-  GenericDataModel,
   GenericDocument,
   GenericMutationCtx,
   GenericQueryCtx,
-  GenericTableInfo,
   Indexes,
   IndexRange,
   IndexRangeBuilder,
   NamedIndex,
   NamedSearchIndex,
-  NamedTableInfo,
   OrderedQuery,
   PaginationOptions,
   PaginationResult,
@@ -31,60 +28,91 @@ import {
 import { GenericId } from "convex/values";
 import { Chunk, Effect, identity, Option, pipe, Stream } from "effect";
 
-interface EffectQuery<TableInfo extends GenericTableInfo, TypeScriptValue> {
+import {
+  DataModelFromEffectDataModel,
+  GenericEffectDataModel,
+  GenericEffectTableInfo,
+  TableInfoFromEffectTableInfo,
+  TableNamesInEffectDataModel,
+} from "./schema";
+
+interface EffectQuery<EffectTableInfo extends GenericEffectTableInfo> {
   filter(
-    predicate: (q: FilterBuilder<TableInfo>) => Expression<boolean>
-  ): EffectQuery<TableInfo, TypeScriptValue>;
-  order(order: "asc" | "desc"): EffectOrderedQuery<TableInfo, TypeScriptValue>;
+    predicate: (
+      q: FilterBuilder<TableInfoFromEffectTableInfo<EffectTableInfo>>
+    ) => Expression<boolean>
+  ): EffectQuery<EffectTableInfo>;
+  order(order: "asc" | "desc"): EffectOrderedQuery<EffectTableInfo>;
   paginate(
     paginationOpts: PaginationOptions
-  ): Effect.Effect<never, never, PaginationResult<TypeScriptValue>>;
-  collect(): Effect.Effect<never, never, TypeScriptValue[]>;
-  take(n: number): Effect.Effect<never, never, TypeScriptValue[]>;
-  first(): Effect.Effect<never, never, Option.Option<TypeScriptValue>>;
+  ): Effect.Effect<
+    never,
+    never,
+    PaginationResult<EffectTableInfo["effectDocument"]>
+  >;
+  collect(): Effect.Effect<never, never, EffectTableInfo["effectDocument"][]>;
+  take(
+    n: number
+  ): Effect.Effect<never, never, EffectTableInfo["effectDocument"][]>;
+  first(): Effect.Effect<
+    never,
+    never,
+    Option.Option<EffectTableInfo["effectDocument"]>
+  >;
   unique(): Effect.Effect<
     never,
     NotUniqueError,
-    Option.Option<TypeScriptValue>
+    Option.Option<EffectTableInfo["effectDocument"]>
   >;
-  stream(): Stream.Stream<never, never, TypeScriptValue>;
+  stream(): Stream.Stream<never, never, EffectTableInfo["effectDocument"]>;
 }
 
-interface EffectOrderedQuery<
-  TableInfo extends GenericTableInfo,
-  TypeScriptValue,
-> extends Omit<EffectQuery<TableInfo, TypeScriptValue>, "order"> {}
+interface EffectOrderedQuery<EffectTableInfo extends GenericEffectTableInfo>
+  extends Omit<EffectQuery<EffectTableInfo>, "order"> {}
 
 class NotUniqueError {
   readonly _tag = "NotUniqueError";
 }
 
-class EffectQueryImpl<TableInfo extends GenericTableInfo, TypeScriptValue>
-  implements EffectQuery<TableInfo, TypeScriptValue>
+class EffectQueryImpl<EffectTableInfo extends GenericEffectTableInfo>
+  implements EffectQuery<EffectTableInfo>
 {
-  q: Query<TableInfo>;
-  tableSchema: Schema.Schema<DocumentByInfo<TableInfo>, TypeScriptValue>;
+  q: Query<TableInfoFromEffectTableInfo<EffectTableInfo>>;
+  tableSchema: Schema.Schema<
+    DocumentByInfo<TableInfoFromEffectTableInfo<EffectTableInfo>>
+  >;
   constructor(
-    q: Query<TableInfo> | OrderedQuery<TableInfo>,
-    tableSchema: Schema.Schema<DocumentByInfo<TableInfo>, TypeScriptValue>
+    q:
+      | Query<TableInfoFromEffectTableInfo<EffectTableInfo>>
+      | OrderedQuery<TableInfoFromEffectTableInfo<EffectTableInfo>>,
+    tableSchema: Schema.Schema<
+      EffectTableInfo["document"],
+      EffectTableInfo["effectDocument"]
+    >
   ) {
-    this.q = q as Query<TableInfo>;
+    this.q = q as Query<TableInfoFromEffectTableInfo<EffectTableInfo>>;
     this.tableSchema = tableSchema;
   }
   filter(
-    predicate: (q: FilterBuilder<TableInfo>) => Expression<boolean>
+    predicate: (
+      q: FilterBuilder<TableInfoFromEffectTableInfo<EffectTableInfo>>
+    ) => Expression<boolean>
   ): this {
     return new EffectQueryImpl(
       this.q.filter(predicate),
       this.tableSchema
     ) as this;
   }
-  order(order: "asc" | "desc"): EffectQueryImpl<TableInfo, TypeScriptValue> {
+  order(order: "asc" | "desc"): EffectQueryImpl<EffectTableInfo> {
     return new EffectQueryImpl(this.q.order(order), this.tableSchema);
   }
   paginate(
     paginationOpts: PaginationOptions
-  ): Effect.Effect<never, never, PaginationResult<TypeScriptValue>> {
+  ): Effect.Effect<
+    never,
+    never,
+    PaginationResult<EffectTableInfo["effectDocument"]>
+  > {
     return pipe(
       Effect.Do,
       Effect.bind("paginationResult", () =>
@@ -100,7 +128,7 @@ class EffectQueryImpl<TableInfo extends GenericTableInfo, TypeScriptValue>
         ({
           paginationResult,
           parsedPage,
-        }): PaginationResult<TypeScriptValue> => ({
+        }): PaginationResult<EffectTableInfo["effectDocument"]> => ({
           ...paginationResult,
           page: parsedPage,
         })
@@ -108,7 +136,7 @@ class EffectQueryImpl<TableInfo extends GenericTableInfo, TypeScriptValue>
       Effect.orDie
     );
   }
-  collect(): Effect.Effect<never, never, TypeScriptValue[]> {
+  collect(): Effect.Effect<never, never, EffectTableInfo["effectDocument"][]> {
     return pipe(
       Effect.promise(() => this.q.collect()),
       Effect.flatMap(
@@ -117,21 +145,30 @@ class EffectQueryImpl<TableInfo extends GenericTableInfo, TypeScriptValue>
       Effect.orDie
     );
   }
-  take(n: number): Effect.Effect<never, never, TypeScriptValue[]> {
+  take(
+    n: number
+  ): Effect.Effect<never, never, EffectTableInfo["effectDocument"][]> {
     return pipe(
       this.stream(),
       Stream.take(n),
       Stream.runCollect,
-      Effect.map((chunk) => Chunk.toReadonlyArray(chunk) as TypeScriptValue[])
+      Effect.map(
+        (chunk) =>
+          Chunk.toReadonlyArray(chunk) as EffectTableInfo["effectDocument"][]
+      )
     );
   }
-  first(): Effect.Effect<never, never, Option.Option<TypeScriptValue>> {
+  first(): Effect.Effect<
+    never,
+    never,
+    Option.Option<EffectTableInfo["effectDocument"]>
+  > {
     return pipe(this.stream(), Stream.runHead);
   }
   unique(): Effect.Effect<
     never,
     NotUniqueError,
-    Option.Option<TypeScriptValue>
+    Option.Option<EffectTableInfo["effectDocument"]>
   > {
     return pipe(
       this.stream(),
@@ -144,7 +181,7 @@ class EffectQueryImpl<TableInfo extends GenericTableInfo, TypeScriptValue>
       )
     );
   }
-  stream(): Stream.Stream<never, never, TypeScriptValue> {
+  stream(): Stream.Stream<never, never, EffectTableInfo["effectDocument"]> {
     return pipe(
       Stream.fromAsyncIterable(this.q, identity),
       Stream.mapEffect((document) => Schema.parse(this.tableSchema)(document)),
@@ -153,247 +190,318 @@ class EffectQueryImpl<TableInfo extends GenericTableInfo, TypeScriptValue>
   }
 }
 
-interface EffectQueryInitializer<
-  TableInfo extends GenericTableInfo,
-  TypeScriptValue,
-> extends EffectQuery<TableInfo, TypeScriptValue> {
-  fullTableScan(): EffectQuery<TableInfo, TypeScriptValue>;
-  withIndex<IndexName extends keyof Indexes<TableInfo>>(
+interface EffectQueryInitializer<EffectTableInfo extends GenericEffectTableInfo>
+  extends EffectQuery<EffectTableInfo> {
+  fullTableScan(): EffectQuery<EffectTableInfo>;
+  withIndex<
+    IndexName extends keyof Indexes<
+      TableInfoFromEffectTableInfo<EffectTableInfo>
+    >,
+  >(
     indexName: IndexName,
     indexRange?:
       | ((
           q: IndexRangeBuilder<
-            DocumentByInfo<TableInfo>,
-            NamedIndex<TableInfo, IndexName>,
+            DocumentByInfo<TableInfoFromEffectTableInfo<EffectTableInfo>>,
+            NamedIndex<
+              TableInfoFromEffectTableInfo<EffectTableInfo>,
+              IndexName
+            >,
             0
           >
         ) => IndexRange)
       | undefined
-  ): EffectQuery<TableInfo, TypeScriptValue>;
-  withSearchIndex<IndexName extends keyof SearchIndexes<TableInfo>>(
+  ): EffectQuery<EffectTableInfo>;
+  withSearchIndex<
+    IndexName extends keyof SearchIndexes<
+      TableInfoFromEffectTableInfo<EffectTableInfo>
+    >,
+  >(
     indexName: IndexName,
     searchFilter: (
       q: SearchFilterBuilder<
-        DocumentByInfo<TableInfo>,
-        NamedSearchIndex<TableInfo, IndexName>
+        DocumentByInfo<TableInfoFromEffectTableInfo<EffectTableInfo>>,
+        NamedSearchIndex<
+          TableInfoFromEffectTableInfo<EffectTableInfo>,
+          IndexName
+        >
       >
     ) => SearchFilter
-  ): EffectOrderedQuery<TableInfo, TypeScriptValue>;
+  ): EffectOrderedQuery<EffectTableInfo>;
 }
 
-class EffectQueryInitializerImpl<
-  TableInfo extends GenericTableInfo,
-  TypeScriptValue,
-> implements EffectQueryInitializer<TableInfo, TypeScriptValue>
+class EffectQueryInitializerImpl<EffectTableInfo extends GenericEffectTableInfo>
+  implements EffectQueryInitializer<EffectTableInfo>
 {
-  q: QueryInitializer<TableInfo>;
-  tableSchema: Schema.Schema<DocumentByInfo<TableInfo>, TypeScriptValue>;
+  q: QueryInitializer<TableInfoFromEffectTableInfo<EffectTableInfo>>;
+  tableSchema: Schema.Schema<
+    EffectTableInfo["document"],
+    EffectTableInfo["effectDocument"]
+  >;
   constructor(
-    q: QueryInitializer<TableInfo>,
-    tableSchema: Schema.Schema<DocumentByInfo<TableInfo>, TypeScriptValue>
+    q: QueryInitializer<TableInfoFromEffectTableInfo<EffectTableInfo>>,
+    tableSchema: Schema.Schema<
+      EffectTableInfo["document"],
+      EffectTableInfo["effectDocument"]
+    >
   ) {
     this.q = q;
     this.tableSchema = tableSchema;
   }
-  fullTableScan(): EffectQuery<TableInfo, TypeScriptValue> {
+  fullTableScan(): EffectQuery<EffectTableInfo> {
     return new EffectQueryImpl(this.q.fullTableScan(), this.tableSchema);
   }
-  withIndex<IndexName extends keyof Indexes<TableInfo>>(
+  withIndex<
+    IndexName extends keyof Indexes<
+      TableInfoFromEffectTableInfo<EffectTableInfo>
+    >,
+  >(
     indexName: IndexName,
     indexRange?:
       | ((
           q: IndexRangeBuilder<
-            DocumentByInfo<TableInfo>,
-            NamedIndex<TableInfo, IndexName>,
+            DocumentByInfo<TableInfoFromEffectTableInfo<EffectTableInfo>>,
+            NamedIndex<
+              TableInfoFromEffectTableInfo<EffectTableInfo>,
+              IndexName
+            >,
             0
           >
         ) => IndexRange)
       | undefined
-  ): EffectQuery<TableInfo, TypeScriptValue> {
+  ): EffectQuery<EffectTableInfo> {
     return new EffectQueryImpl(
       this.q.withIndex(indexName, indexRange),
       this.tableSchema
     );
   }
-  withSearchIndex<IndexName extends keyof SearchIndexes<TableInfo>>(
+  withSearchIndex<
+    IndexName extends keyof SearchIndexes<
+      TableInfoFromEffectTableInfo<EffectTableInfo>
+    >,
+  >(
     indexName: IndexName,
     searchFilter: (
       q: SearchFilterBuilder<
-        DocumentByInfo<TableInfo>,
-        NamedSearchIndex<TableInfo, IndexName>
+        EffectTableInfo["document"],
+        NamedSearchIndex<
+          TableInfoFromEffectTableInfo<EffectTableInfo>,
+          IndexName
+        >
       >
     ) => SearchFilter
-  ): EffectOrderedQuery<TableInfo, TypeScriptValue> {
+  ): EffectOrderedQuery<EffectTableInfo> {
     return new EffectQueryImpl(
       this.q.withSearchIndex(indexName, searchFilter),
       this.tableSchema
     );
   }
   filter(
-    predicate: (q: FilterBuilder<TableInfo>) => Expression<boolean>
+    predicate: (
+      q: FilterBuilder<TableInfoFromEffectTableInfo<EffectTableInfo>>
+    ) => Expression<boolean>
   ): this {
     return this.fullTableScan().filter(predicate) as this;
   }
-  order(order: "asc" | "desc"): EffectOrderedQuery<TableInfo, TypeScriptValue> {
+  order(order: "asc" | "desc"): EffectOrderedQuery<EffectTableInfo> {
     return this.fullTableScan().order(order);
   }
   paginate(
     paginationOpts: PaginationOptions
-  ): Effect.Effect<never, never, PaginationResult<TypeScriptValue>> {
+  ): Effect.Effect<
+    never,
+    never,
+    PaginationResult<EffectTableInfo["effectDocument"]>
+  > {
     return this.fullTableScan().paginate(paginationOpts);
   }
-  collect(): Effect.Effect<never, never, TypeScriptValue[]> {
+  collect(): Effect.Effect<never, never, EffectTableInfo["effectDocument"][]> {
     return this.fullTableScan().collect();
   }
-  take(n: number): Effect.Effect<never, never, TypeScriptValue[]> {
+  take(
+    n: number
+  ): Effect.Effect<never, never, EffectTableInfo["effectDocument"][]> {
     return this.fullTableScan().take(n);
   }
-  first(): Effect.Effect<never, never, Option.Option<TypeScriptValue>> {
+  first(): Effect.Effect<
+    never,
+    never,
+    Option.Option<EffectTableInfo["effectDocument"]>
+  > {
     return this.fullTableScan().first();
   }
   unique(): Effect.Effect<
     never,
     NotUniqueError,
-    Option.Option<TypeScriptValue>
+    Option.Option<EffectTableInfo["effectDocument"]>
   > {
     return this.fullTableScan().unique();
   }
-  stream(): Stream.Stream<never, never, TypeScriptValue> {
+  stream(): Stream.Stream<never, never, EffectTableInfo["effectDocument"]> {
     return this.fullTableScan().stream();
   }
 }
 
-export interface EffectDatabaseReader<DataModel extends GenericDataModel> {
-  query<TableName extends string>(
+type DatabaseSchemasFromEffectDataModel<
+  EffectDataModel extends GenericEffectDataModel,
+> = {
+  [TableName in keyof EffectDataModel]: Schema.Schema<
+    EffectDataModel[TableName]["document"],
+    EffectDataModel[TableName]["effectDocument"]
+  >;
+};
+
+export interface EffectDatabaseReader<
+  EffectDataModel extends GenericEffectDataModel,
+> {
+  query<TableName extends TableNamesInEffectDataModel<EffectDataModel>>(
     tableName: TableName
-  ): EffectQueryInitializer<NamedTableInfo<DataModel, TableName>>;
-  get<TableName extends string>(
+  ): EffectQueryInitializer<EffectDataModel[TableName]>;
+  get<TableName extends TableNamesInEffectDataModel<EffectDataModel>>(
     id: GenericId<TableName>
   ): Effect.Effect<
     never,
     never,
-    Option.Option<DocumentByName<DataModel, TableName>>
+    Option.Option<EffectDataModel[TableName]["effectDocument"]>
   >;
-  normalizeId<TableName extends TableNamesInDataModel<DataModel>>(
+  normalizeId<TableName extends TableNamesInEffectDataModel<EffectDataModel>>(
     tableName: TableName,
     id: string
   ): Option.Option<GenericId<TableName>>;
 }
 
 export class EffectDatabaseReaderImpl<
-  Ctx extends GenericQueryCtx<DataModel>,
-  DataModel extends GenericDataModel,
-> implements EffectDatabaseReader<DataModel>
+  Ctx extends GenericQueryCtx<DataModelFromEffectDataModel<EffectDataModel>>,
+  EffectDataModel extends GenericEffectDataModel,
+> implements EffectDatabaseReader<EffectDataModel>
 {
   ctx: Ctx;
-  db: GenericDatabaseReader<DataModel>;
-  constructor(ctx: Ctx, db: GenericDatabaseReader<DataModel>) {
+  db: GenericDatabaseReader<DataModelFromEffectDataModel<EffectDataModel>>;
+  databaseSchemas: DatabaseSchemasFromEffectDataModel<EffectDataModel>;
+  constructor(
+    ctx: Ctx,
+    db: GenericDatabaseReader<DataModelFromEffectDataModel<EffectDataModel>>,
+    databaseSchemas: DatabaseSchemasFromEffectDataModel<EffectDataModel>
+  ) {
     this.ctx = ctx;
     this.db = db;
+    this.databaseSchemas = databaseSchemas;
   }
-  normalizeId<TableName extends TableNamesInDataModel<DataModel>>(
+  normalizeId<TableName extends TableNamesInDataModel<EffectDataModel>>(
     tableName: TableName,
     id: string
   ): Option.Option<GenericId<TableName>> {
     return Option.fromNullable(this.db.normalizeId(tableName, id));
   }
-  get<TableName extends string>(
+  get<TableName extends TableNamesInEffectDataModel<EffectDataModel>>(
     id: GenericId<TableName>
   ): Effect.Effect<
     never,
     never,
-    Option.Option<DocumentByName<DataModel, TableName>>
+    Option.Option<DocumentByName<EffectDataModel, TableName>>
   > {
     return pipe(
       Effect.promise(() => this.db.get(id)),
       Effect.map(Option.fromNullable)
     );
   }
-  query<TableName extends string>(
+  query<TableName extends TableNamesInEffectDataModel<EffectDataModel>>(
     tableName: TableName
-  ): EffectQueryInitializer<NamedTableInfo<DataModel, TableName>> {
-    return new EffectQueryInitializerImpl(this.db.query(tableName));
+  ): EffectQueryInitializer<EffectDataModel[TableName]> {
+    return new EffectQueryInitializerImpl(
+      this.db.query(tableName),
+      this.databaseSchemas[tableName]
+    );
   }
 }
 
-export interface EffectDatabaseWriter<DataModel extends GenericDataModel> {
-  query<TableName extends string>(
+export interface EffectDatabaseWriter<
+  EffectDataModel extends GenericEffectDataModel,
+> {
+  query<TableName extends TableNamesInEffectDataModel<EffectDataModel>>(
     tableName: TableName
-  ): EffectQueryInitializer<NamedTableInfo<DataModel, TableName>>;
-  get<TableName extends string>(
+  ): EffectQueryInitializer<EffectDataModel[TableName]>;
+  get<TableName extends TableNamesInEffectDataModel<EffectDataModel>>(
     id: GenericId<TableName>
   ): Effect.Effect<
     never,
     never,
-    Option.Option<DocumentByName<DataModel, TableName>>
+    Option.Option<DocumentByName<EffectDataModel, TableName>>
   >;
-  normalizeId<TableName extends TableNamesInDataModel<DataModel>>(
+  normalizeId<TableName extends TableNamesInEffectDataModel<EffectDataModel>>(
     tableName: TableName,
     id: string
   ): Option.Option<GenericId<TableName>>;
-  insert<TableName extends string>(
+  insert<TableName extends TableNamesInEffectDataModel<EffectDataModel>>(
     table: TableName,
-    value: WithoutSystemFields<DocumentByName<DataModel, TableName>>
+    value: WithoutSystemFields<DocumentByName<EffectDataModel, TableName>>
   ): Effect.Effect<never, never, GenericId<TableName>>;
-  patch<TableName extends string>(
+  patch<TableName extends TableNamesInEffectDataModel<EffectDataModel>>(
     id: GenericId<TableName>,
-    value: Partial<DocumentByName<DataModel, TableName>>
+    value: Partial<DocumentByName<EffectDataModel, TableName>>
   ): Effect.Effect<never, never, void>;
-  replace<TableName extends string>(
+  replace<TableName extends TableNamesInEffectDataModel<EffectDataModel>>(
     id: GenericId<TableName>,
-    value: WithOptionalSystemFields<DocumentByName<DataModel, TableName>>
+    value: WithOptionalSystemFields<DocumentByName<EffectDataModel, TableName>>
   ): Effect.Effect<never, never, void>;
   delete(id: GenericId<string>): Effect.Effect<never, never, void>;
 }
 
 export class EffectDatabaseWriterImpl<
-  Ctx extends GenericMutationCtx<DataModel>,
-  DataModel extends GenericDataModel,
-> implements EffectDatabaseWriter<DataModel>
+  Ctx extends GenericMutationCtx<DataModelFromEffectDataModel<EffectDataModel>>,
+  EffectDataModel extends GenericEffectDataModel,
+> implements EffectDatabaseWriter<EffectDataModel>
 {
   ctx: Ctx;
-  db: GenericDatabaseWriter<DataModel>;
-  reader: EffectDatabaseReader<DataModel>;
-  constructor(ctx: Ctx, db: GenericDatabaseWriter<DataModel>) {
+  db: GenericDatabaseWriter<DataModelFromEffectDataModel<EffectDataModel>>;
+  databaseSchemas: DatabaseSchemasFromEffectDataModel<EffectDataModel>;
+  reader: EffectDatabaseReader<EffectDataModel>;
+  constructor(
+    ctx: Ctx,
+    db: GenericDatabaseWriter<DataModelFromEffectDataModel<EffectDataModel>>,
+    databaseSchemas: DatabaseSchemasFromEffectDataModel<EffectDataModel>
+  ) {
     this.ctx = ctx;
     this.db = db;
-    this.reader = new EffectDatabaseReaderImpl(ctx, db);
+    // TODO: Does this need to be an instance variable?
+    this.databaseSchemas = databaseSchemas;
+    this.reader = new EffectDatabaseReaderImpl(ctx, db, databaseSchemas);
   }
-  query<TableName extends string>(
+  query<TableName extends TableNamesInEffectDataModel<EffectDataModel>>(
     tableName: TableName
-  ): EffectQueryInitializer<NamedTableInfo<DataModel, TableName>> {
+  ): EffectQueryInitializer<EffectDataModel[TableName]> {
     return this.reader.query(tableName);
   }
-  get<TableName extends string>(
+  get<TableName extends TableNamesInEffectDataModel<EffectDataModel>>(
     id: GenericId<TableName>
   ): Effect.Effect<
     never,
     never,
-    Option.Option<DocumentByName<DataModel, TableName>>
+    Option.Option<DocumentByName<EffectDataModel, TableName>>
   > {
     return this.reader.get(id);
   }
-  normalizeId<TableName extends TableNamesInDataModel<DataModel>>(
+  normalizeId<TableName extends TableNamesInEffectDataModel<EffectDataModel>>(
     tableName: TableName,
     id: string
   ): Option.Option<GenericId<TableName>> {
     return Option.fromNullable(this.db.normalizeId(tableName, id));
   }
-  insert<TableName extends string>(
+  insert<TableName extends TableNamesInEffectDataModel<EffectDataModel>>(
     table: TableName,
-    value: WithoutSystemFields<DocumentByName<DataModel, TableName>>
+    value: WithoutSystemFields<DocumentByName<EffectDataModel, TableName>>
   ): Effect.Effect<never, never, GenericId<TableName>> {
     return Effect.promise(() => this.db.insert(table, value));
   }
-  patch<TableName extends string>(
+  patch<TableName extends TableNamesInEffectDataModel<EffectDataModel>>(
     id: GenericId<TableName>,
-    value: Partial<DocumentByName<DataModel, TableName>>
+    value: Partial<DocumentByName<EffectDataModel, TableName>>
   ): Effect.Effect<never, never, void> {
     return Effect.promise(() => this.db.patch(id, value));
   }
-  replace<TableName extends string>(
+  replace<TableName extends TableNamesInEffectDataModel<EffectDataModel>>(
     id: GenericId<TableName>,
-    value: WithOptionalSystemFields<DocumentByName<DataModel, TableName>>
+    value: WithOptionalSystemFields<DocumentByName<EffectDataModel, TableName>>
   ): Effect.Effect<never, never, void> {
     return Effect.promise(() => this.db.replace(id, value));
   }

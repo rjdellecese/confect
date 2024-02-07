@@ -22,6 +22,7 @@ import {
   EffectDatabaseWriterImpl,
 } from "./db";
 import { EffectScheduler, EffectSchedulerImpl } from "./scheduler";
+import { DataModelFromEffectDataModel, GenericEffectDataModel } from "./schema";
 import {
   EffectStorageReader,
   EffectStorageReaderImpl,
@@ -29,20 +30,21 @@ import {
   EffectStorageWriterImpl,
 } from "./storage";
 
-export type EffectMutationCtx<DataModel extends GenericDataModel> = {
-  db: EffectDatabaseWriter<DataModel>;
-  auth: EffectAuth;
-  storage: EffectStorageWriter;
-  scheduler: EffectScheduler;
-};
+export type EffectMutationCtx<EffectDataModel extends GenericEffectDataModel> =
+  {
+    db: EffectDatabaseWriter<EffectDataModel>;
+    auth: EffectAuth;
+    storage: EffectStorageWriter;
+    scheduler: EffectScheduler;
+  };
 
-export type EffectQueryCtx<DataModel extends GenericDataModel> = {
-  db: EffectDatabaseReader<DataModel>;
+export type EffectQueryCtx<EffectDataModel extends GenericEffectDataModel> = {
+  db: EffectDatabaseReader<EffectDataModel>;
   auth: EffectAuth;
   storage: EffectStorageReader;
 };
 
-export type EffectActionCtx<DataModel extends GenericDataModel> = {
+export type EffectActionCtx<EffectDataModel extends GenericEffectDataModel> = {
   runQuery<Query extends FunctionReference<"query", "public" | "internal">>(
     query: Query,
     ...args: OptionalRestArgs<Query>
@@ -61,13 +63,15 @@ export type EffectActionCtx<DataModel extends GenericDataModel> = {
   auth: EffectAuth;
   storage: EffectStorageWriter;
   vectorSearch<
-    TableName extends TableNamesInDataModel<DataModel>,
-    IndexName extends VectorIndexNames<NamedTableInfo<DataModel, TableName>>,
+    TableName extends TableNamesInDataModel<EffectDataModel>,
+    IndexName extends VectorIndexNames<
+      NamedTableInfo<EffectDataModel, TableName>
+    >,
   >(
     tableName: TableName,
     indexName: IndexName,
     query: Expand<
-      VectorSearchQuery<NamedTableInfo<DataModel, TableName>, IndexName>
+      VectorSearchQuery<NamedTableInfo<EffectDataModel, TableName>, IndexName>
     >
   ): Effect.Effect<
     never,
@@ -76,9 +80,11 @@ export type EffectActionCtx<DataModel extends GenericDataModel> = {
   >;
 };
 
-export const makeEffectQueryCtx = <DataModel extends GenericDataModel>(
-  ctx: GenericQueryCtx<DataModel>
-): EffectQueryCtx<DataModel> => ({
+export const makeEffectQueryCtx = <
+  EffectDataModel extends GenericEffectDataModel,
+>(
+  ctx: GenericQueryCtx<DataModelFromEffectDataModel<EffectDataModel>>
+): EffectQueryCtx<EffectDataModel> => ({
   db: new EffectDatabaseReaderImpl(ctx, ctx.db),
   auth: new EffectAuthImpl(ctx.auth),
   storage: new EffectStorageReaderImpl(ctx.storage),
@@ -93,9 +99,11 @@ export const makeEffectMutationCtx = <DataModel extends GenericDataModel>(
   scheduler: new EffectSchedulerImpl(ctx.scheduler),
 });
 
-export const makeEffectActionCtx = <DataModel extends GenericDataModel>(
-  ctx: GenericActionCtx<DataModel>
-): EffectActionCtx<DataModel> => ({
+export const makeEffectActionCtx = <
+  EffectDataModel extends GenericEffectDataModel,
+>(
+  ctx: GenericActionCtx<EffectDataModel>
+): EffectActionCtx<EffectDataModel> => ({
   runQuery: <Query extends FunctionReference<"query", "public" | "internal">>(
     query: Query,
     ...queryArgs: OptionalRestArgs<Query>
@@ -113,13 +121,15 @@ export const makeEffectActionCtx = <DataModel extends GenericDataModel>(
     ...actionArgs: OptionalRestArgs<Action>
   ) => Effect.promise(() => ctx.runAction(action, ...actionArgs)),
   vectorSearch: <
-    TableName extends TableNamesInDataModel<DataModel>,
-    IndexName extends VectorIndexNames<NamedTableInfo<DataModel, TableName>>,
+    TableName extends TableNamesInDataModel<EffectDataModel>,
+    IndexName extends VectorIndexNames<
+      NamedTableInfo<EffectDataModel, TableName>
+    >,
   >(
     tableName: TableName,
     indexName: IndexName,
     query: Expand<
-      VectorSearchQuery<NamedTableInfo<DataModel, TableName>, IndexName>
+      VectorSearchQuery<NamedTableInfo<EffectDataModel, TableName>, IndexName>
     >
   ) => Effect.promise(() => ctx.vectorSearch(tableName, indexName, query)),
   auth: new EffectAuthImpl(ctx.auth),

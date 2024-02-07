@@ -12,6 +12,7 @@ import {
   SearchIndexConfig,
   TableDefinition,
 } from "convex/server";
+import { GenericId } from "convex/values";
 import { pipe, ReadonlyRecord } from "effect";
 
 import schemaToValidatorCompiler from "./schema-to-validator-compiler";
@@ -65,7 +66,7 @@ export const defineEffectSchema = <
 
 export interface EffectTableDefinition<
   DatabaseDocument extends GenericDocument,
-  TypeScriptDocument,
+  TypeScriptDocument extends GenericEffectDocument,
   FieldPaths extends GenericFieldPaths = string,
   // eslint-disable-next-line @typescript-eslint/ban-types
   Indexes extends GenericTableIndexes = {},
@@ -156,7 +157,7 @@ export interface EffectTableDefinition<
 
 class EffectTableDefinitionImpl<
   DatabaseDocument extends GenericDocument,
-  TypeScriptDocument,
+  TypeScriptDocument extends GenericEffectDocument,
   FieldPaths extends GenericFieldPaths = string,
   // eslint-disable-next-line @typescript-eslint/ban-types
   Indexes extends GenericTableIndexes = {},
@@ -280,11 +281,78 @@ class EffectTableDefinitionImpl<
 
 export const defineEffectTable = <
   DatabaseDocument extends GenericDocument,
-  TypeScriptValue,
+  TypeScriptDocument extends GenericEffectDocument,
 >(
-  schema: Schema.Schema<DatabaseDocument, TypeScriptValue>
-): EffectTableDefinition<DatabaseDocument, TypeScriptValue> =>
+  schema: Schema.Schema<DatabaseDocument, TypeScriptDocument>
+): EffectTableDefinition<DatabaseDocument, TypeScriptDocument> =>
   new EffectTableDefinitionImpl(schema);
+
+// TODO: Put in `data-model.ts` module, to mirror how Convex organizes things?
+
+export type GenericEffectDocument = Record<string, any>;
+
+export type GenericEffectTableInfo = {
+  document: GenericDocument;
+  effectDocument: GenericEffectDocument;
+  fieldPaths: GenericFieldPaths;
+  indexes: GenericTableIndexes;
+  searchIndexes: GenericTableSearchIndexes;
+  vectorIndexes: GenericTableVectorIndexes;
+};
+
+// TODO: Type-level test?
+export type TableInfoFromEffectTableInfo<
+  EffectTableInfo extends GenericEffectTableInfo,
+> = {
+  document: EffectTableInfo["document"];
+  fieldPaths: EffectTableInfo["fieldPaths"];
+  indexes: EffectTableInfo["indexes"];
+  searchIndexes: EffectTableInfo["searchIndexes"];
+  vectorIndexes: EffectTableInfo["vectorIndexes"];
+};
+
+export type GenericEffectDataModel = Record<string, GenericEffectTableInfo>;
+
+// TODO: Type-level test?
+export type DataModelFromEffectDataModel<
+  EffectDataModel extends GenericEffectDataModel,
+> = {
+  [TableName in keyof EffectDataModel]: TableInfoFromEffectTableInfo<
+    EffectDataModel[TableName]
+  >;
+};
+
+export type TableNamesInEffectDataModel<
+  EffectDataModel extends GenericEffectDataModel,
+> = keyof EffectDataModel & string;
+
+export type TableNamesInEffectSchema<EffectSchema extends GenericEffectSchema> =
+  keyof EffectSchema & string;
+
+export type EffectDataModelFromEffectSchema<
+  EffectSchema extends GenericEffectSchema,
+> = {
+  [TableName in keyof EffectSchema &
+    string]: EffectSchema[TableName] extends EffectTableDefinition<
+    infer Document,
+    infer EffectDocument,
+    infer FieldPaths,
+    infer Indexes,
+    infer SearchIndexes,
+    infer VectorIndexes
+  >
+    ? {
+        // We've already added all of the system fields except for `_id`.
+        // Add that here.
+        document: Expand<IdField<TableName> & Document>;
+        effectDocument: Expand<IdField<TableName> & EffectDocument>;
+        fieldPaths: keyof IdField<TableName> | FieldPaths;
+        indexes: Expand<Indexes & SystemIndexes>;
+        searchIndexes: SearchIndexes;
+        vectorIndexes: VectorIndexes;
+      }
+    : never;
+};
 
 // NOTE: Remove if/when exposed
 
@@ -318,3 +386,15 @@ interface VectorIndexConfig<
    */
   filterFields?: FilterFields[];
 }
+
+export type IdField<TableName extends string> = {
+  _id: GenericId<TableName>;
+};
+
+export type SystemIndexes = {
+  // We have a system index `by_id` but developers should never have a use
+  // for querying it (`db.get(id)` is always simpler).
+  // by_id: ["_id"];
+
+  by_creation_time: ["_creationTime"];
+};
