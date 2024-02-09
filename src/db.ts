@@ -7,8 +7,6 @@ import {
   GenericDatabaseReader,
   GenericDatabaseWriter,
   GenericDocument,
-  GenericMutationCtx,
-  GenericQueryCtx,
   Indexes,
   IndexRange,
   IndexRangeBuilder,
@@ -26,11 +24,21 @@ import {
   WithoutSystemFields,
 } from "convex/server";
 import { GenericId } from "convex/values";
-import { Chunk, Effect, identity, Option, pipe, Stream } from "effect";
+import {
+  Chunk,
+  Effect,
+  identity,
+  Option,
+  pipe,
+  ReadonlyRecord,
+  Stream,
+} from "effect";
 
 import {
   DataModelFromEffectDataModel,
+  EffectDataModelFromEffectSchema,
   GenericEffectDataModel,
+  GenericEffectSchema,
   GenericEffectTableInfo,
   TableInfoFromEffectTableInfo,
   TableNamesInEffectDataModel,
@@ -342,7 +350,7 @@ class EffectQueryInitializerImpl<EffectTableInfo extends GenericEffectTableInfo>
   }
 }
 
-type DatabaseSchemasFromEffectDataModel<
+export type DatabaseSchemasFromEffectDataModel<
   EffectDataModel extends GenericEffectDataModel,
 > = {
   [TableName in keyof EffectDataModel]: Schema.Schema<
@@ -371,19 +379,15 @@ export interface EffectDatabaseReader<
 }
 
 export class EffectDatabaseReaderImpl<
-  Ctx extends GenericQueryCtx<DataModelFromEffectDataModel<EffectDataModel>>,
   EffectDataModel extends GenericEffectDataModel,
 > implements EffectDatabaseReader<EffectDataModel>
 {
-  ctx: Ctx;
   db: GenericDatabaseReader<DataModelFromEffectDataModel<EffectDataModel>>;
   databaseSchemas: DatabaseSchemasFromEffectDataModel<EffectDataModel>;
   constructor(
-    ctx: Ctx,
     db: GenericDatabaseReader<DataModelFromEffectDataModel<EffectDataModel>>,
     databaseSchemas: DatabaseSchemasFromEffectDataModel<EffectDataModel>
   ) {
-    this.ctx = ctx;
     this.db = db;
     this.databaseSchemas = databaseSchemas;
   }
@@ -448,24 +452,20 @@ export interface EffectDatabaseWriter<
 }
 
 export class EffectDatabaseWriterImpl<
-  Ctx extends GenericMutationCtx<DataModelFromEffectDataModel<EffectDataModel>>,
   EffectDataModel extends GenericEffectDataModel,
 > implements EffectDatabaseWriter<EffectDataModel>
 {
-  ctx: Ctx;
   db: GenericDatabaseWriter<DataModelFromEffectDataModel<EffectDataModel>>;
   databaseSchemas: DatabaseSchemasFromEffectDataModel<EffectDataModel>;
   reader: EffectDatabaseReader<EffectDataModel>;
   constructor(
-    ctx: Ctx,
     db: GenericDatabaseWriter<DataModelFromEffectDataModel<EffectDataModel>>,
     databaseSchemas: DatabaseSchemasFromEffectDataModel<EffectDataModel>
   ) {
-    this.ctx = ctx;
     this.db = db;
     // TODO: Does this need to be an instance variable?
     this.databaseSchemas = databaseSchemas;
-    this.reader = new EffectDatabaseReaderImpl(ctx, db, databaseSchemas);
+    this.reader = new EffectDatabaseReaderImpl(db, databaseSchemas);
   }
   query<TableName extends TableNamesInEffectDataModel<EffectDataModel>>(
     tableName: TableName
@@ -509,6 +509,18 @@ export class EffectDatabaseWriterImpl<
     return Effect.promise(() => this.db.delete(id));
   }
 }
+
+export const databaseSchemasFromEffectSchema = <
+  EffectSchema extends GenericEffectSchema,
+>(
+  effectSchema: EffectSchema
+) =>
+  ReadonlyRecord.map(
+    effectSchema,
+    ({ schema }) => schema
+  ) as DatabaseSchemasFromEffectDataModel<
+    EffectDataModelFromEffectSchema<EffectSchema>
+  >;
 
 // NOTE: These types are copied from convex/src/server/system_fields.ts -- ideally they would be exposed!
 

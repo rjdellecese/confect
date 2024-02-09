@@ -3,7 +3,6 @@ import {
   actionGeneric,
   DefaultFunctionArgs,
   GenericActionCtx,
-  GenericDataModel,
   GenericMutationCtx,
   GenericQueryCtx,
   httpActionGeneric,
@@ -27,8 +26,13 @@ import {
   makeEffectQueryCtx,
 } from "./ctx";
 import {
+  DatabaseSchemasFromEffectDataModel,
+  databaseSchemasFromEffectSchema,
+} from "./db";
+import {
   DataModelFromEffectDataModel,
   EffectDataModelFromEffectSchema,
+  GenericEffectDataModel,
   GenericEffectSchema,
 } from "./schema";
 import schemaToValidatorCompiler from "./schema-to-validator-compiler";
@@ -36,6 +40,8 @@ import schemaToValidatorCompiler from "./schema-to-validator-compiler";
 export const ConvexServer = <EffectSchema extends GenericEffectSchema>(
   effectSchema: EffectSchema
 ) => {
+  const databaseSchemas = databaseSchemasFromEffectSchema(effectSchema);
+
   const query = <
     DatabaseValue extends DefaultFunctionArgs,
     TypeScriptValue,
@@ -50,7 +56,7 @@ export const ConvexServer = <EffectSchema extends GenericEffectSchema>(
       a: TypeScriptValue
     ) => Effect.Effect<never, never, Output>;
   }): RegisteredQuery<"public", DatabaseValue, Promise<Output>> =>
-    queryGeneric(effectQueryFunction({ args, handler }));
+    queryGeneric(effectQueryFunction({ databaseSchemas, args, handler }));
 
   const internalQuery = <
     DatabaseValue extends DefaultFunctionArgs,
@@ -66,7 +72,9 @@ export const ConvexServer = <EffectSchema extends GenericEffectSchema>(
       a: TypeScriptValue
     ) => Effect.Effect<never, never, Output>;
   }): RegisteredQuery<"internal", DatabaseValue, Promise<Output>> =>
-    internalQueryGeneric(effectQueryFunction({ args, handler }));
+    internalQueryGeneric(
+      effectQueryFunction({ databaseSchemas, args, handler })
+    );
 
   const mutation = <
     DatabaseValue extends DefaultFunctionArgs,
@@ -82,7 +90,7 @@ export const ConvexServer = <EffectSchema extends GenericEffectSchema>(
       a: TypeScriptValue
     ) => Effect.Effect<never, never, Output>;
   }): RegisteredMutation<"public", DatabaseValue, Promise<Output>> =>
-    mutationGeneric(effectMutationFunction({ args, handler }));
+    mutationGeneric(effectMutationFunction({ databaseSchemas, args, handler }));
 
   const internalMutation = <
     DatabaseValue extends DefaultFunctionArgs,
@@ -98,7 +106,9 @@ export const ConvexServer = <EffectSchema extends GenericEffectSchema>(
       a: TypeScriptValue
     ) => Effect.Effect<never, never, Output>;
   }): RegisteredMutation<"internal", DatabaseValue, Promise<Output>> =>
-    internalMutationGeneric(effectMutationFunction({ args, handler }));
+    internalMutationGeneric(
+      effectMutationFunction({ databaseSchemas, args, handler })
+    );
 
   const action = <
     DatabaseValue extends DefaultFunctionArgs,
@@ -137,17 +147,8 @@ export const ConvexServer = <EffectSchema extends GenericEffectSchema>(
       ctx: EffectActionCtx<EffectDataModelFromEffectSchema<EffectSchema>>,
       request: Request
     ) => Effect.Effect<never, never, Response>
-  ) =>
-    httpActionGeneric(
-      (
-        ctx: GenericActionCtx<
-          DataModelFromEffectDataModel<
-            EffectDataModelFromEffectSchema<EffectSchema>
-          >
-        >,
-        request: Request
-      ) => Effect.runPromise(handler(makeEffectActionCtx(ctx), request))
-    );
+    // TODO
+  ) => httpActionGeneric(effectHttpActionFunction({ handler }));
 
   return {
     query,
@@ -161,23 +162,25 @@ export const ConvexServer = <EffectSchema extends GenericEffectSchema>(
 };
 
 const effectQueryFunction = <
-  DataModel extends GenericDataModel,
+  EffectDataModel extends GenericEffectDataModel,
   DatabaseValue extends DefaultFunctionArgs,
   TypeScriptValue,
   Output,
 >({
+  databaseSchemas,
   args,
   handler,
 }: {
+  databaseSchemas: DatabaseSchemasFromEffectDataModel<EffectDataModel>;
   args: Schema.Schema<DatabaseValue, TypeScriptValue>;
   handler: (
-    ctx: EffectQueryCtx<DataModel>,
+    ctx: EffectQueryCtx<EffectDataModel>,
     a: TypeScriptValue
   ) => Effect.Effect<never, never, Output>;
 }) => ({
   args: schemaToValidatorCompiler.args(args),
   handler: (
-    ctx: GenericQueryCtx<DataModel>,
+    ctx: GenericQueryCtx<DataModelFromEffectDataModel<EffectDataModel>>,
     actualArgs: DatabaseValue
   ): Promise<Output> =>
     pipe(
@@ -185,30 +188,32 @@ const effectQueryFunction = <
       Schema.decode(args),
       Effect.orDie,
       Effect.flatMap((decodedArgs) =>
-        handler(makeEffectQueryCtx(ctx), decodedArgs)
+        handler(makeEffectQueryCtx(ctx, databaseSchemas), decodedArgs)
       ),
       Effect.runPromise
     ),
 });
 
 const effectMutationFunction = <
-  DataModel extends GenericDataModel,
+  EffectDataModel extends GenericEffectDataModel,
   DatabaseValue extends DefaultFunctionArgs,
   TypeScriptValue,
   Output,
 >({
+  databaseSchemas,
   args,
   handler,
 }: {
+  databaseSchemas: DatabaseSchemasFromEffectDataModel<EffectDataModel>;
   args: Schema.Schema<DatabaseValue, TypeScriptValue>;
   handler: (
-    ctx: EffectMutationCtx<DataModel>,
+    ctx: EffectMutationCtx<EffectDataModel>,
     a: TypeScriptValue
   ) => Effect.Effect<never, never, Output>;
 }) => ({
   args: schemaToValidatorCompiler.args(args),
   handler: (
-    ctx: GenericMutationCtx<DataModel>,
+    ctx: GenericMutationCtx<DataModelFromEffectDataModel<EffectDataModel>>,
     actualArgs: DatabaseValue
   ): Promise<Output> =>
     pipe(
@@ -216,14 +221,14 @@ const effectMutationFunction = <
       Schema.decode(args),
       Effect.orDie,
       Effect.flatMap((decodedArgs) =>
-        handler(makeEffectMutationCtx(ctx), decodedArgs)
+        handler(makeEffectMutationCtx(ctx, databaseSchemas), decodedArgs)
       ),
       Effect.runPromise
     ),
 });
 
 const effectActionFunction = <
-  DataModel extends GenericDataModel,
+  EffectDataModel extends GenericEffectDataModel,
   DatabaseValue extends DefaultFunctionArgs,
   TypeScriptValue,
   Output,
@@ -233,13 +238,13 @@ const effectActionFunction = <
 }: {
   args: Schema.Schema<DatabaseValue, TypeScriptValue>;
   handler: (
-    ctx: EffectActionCtx<DataModel>,
+    ctx: EffectActionCtx<EffectDataModel>,
     a: TypeScriptValue
   ) => Effect.Effect<never, never, Output>;
 }) => ({
   args: schemaToValidatorCompiler.args(args),
   handler: (
-    ctx: GenericActionCtx<DataModel>,
+    ctx: GenericActionCtx<DataModelFromEffectDataModel<EffectDataModel>>,
     actualArgs: DatabaseValue
   ): Promise<Output> =>
     pipe(
@@ -250,5 +255,29 @@ const effectActionFunction = <
         handler(makeEffectActionCtx(ctx), decodedArgs)
       ),
       Effect.runPromise
+    ),
+});
+
+const effectHttpActionFunction = <
+  EffectDataModel extends GenericEffectDataModel,
+>({
+  handler,
+}: {
+  handler: (
+    ctx: EffectActionCtx<EffectDataModel>,
+    request: Request
+  ) => Effect.Effect<never, never, Response>;
+}) => ({
+  handler: (
+    ctx: GenericActionCtx<DataModelFromEffectDataModel<EffectDataModel>>,
+    request: Request
+  ): Promise<Response> =>
+    Effect.runPromise(
+      handler(
+        makeEffectActionCtx(
+          ctx as GenericActionCtx<DataModelFromEffectDataModel<EffectDataModel>>
+        ),
+        request
+      )
     ),
 });

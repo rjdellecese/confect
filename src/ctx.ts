@@ -2,7 +2,6 @@ import {
   FunctionReference,
   FunctionReturnType,
   GenericActionCtx,
-  GenericDataModel,
   GenericMutationCtx,
   GenericQueryCtx,
   NamedTableInfo,
@@ -16,6 +15,7 @@ import { Effect } from "effect";
 
 import { EffectAuth, EffectAuthImpl } from "./auth";
 import {
+  DatabaseSchemasFromEffectDataModel,
   EffectDatabaseReader,
   EffectDatabaseReaderImpl,
   EffectDatabaseWriter,
@@ -83,17 +83,21 @@ export type EffectActionCtx<EffectDataModel extends GenericEffectDataModel> = {
 export const makeEffectQueryCtx = <
   EffectDataModel extends GenericEffectDataModel,
 >(
-  ctx: GenericQueryCtx<DataModelFromEffectDataModel<EffectDataModel>>
+  ctx: GenericQueryCtx<DataModelFromEffectDataModel<EffectDataModel>>,
+  databaseSchemas: DatabaseSchemasFromEffectDataModel<EffectDataModel>
 ): EffectQueryCtx<EffectDataModel> => ({
-  db: new EffectDatabaseReaderImpl(ctx, ctx.db),
+  db: new EffectDatabaseReaderImpl(ctx.db, databaseSchemas),
   auth: new EffectAuthImpl(ctx.auth),
   storage: new EffectStorageReaderImpl(ctx.storage),
 });
 
-export const makeEffectMutationCtx = <DataModel extends GenericDataModel>(
-  ctx: GenericMutationCtx<DataModel>
-): EffectMutationCtx<DataModel> => ({
-  db: new EffectDatabaseWriterImpl(ctx, ctx.db),
+export const makeEffectMutationCtx = <
+  EffectDataModel extends GenericEffectDataModel,
+>(
+  ctx: GenericMutationCtx<DataModelFromEffectDataModel<EffectDataModel>>,
+  databaseSchemas: DatabaseSchemasFromEffectDataModel<EffectDataModel>
+): EffectMutationCtx<EffectDataModel> => ({
+  db: new EffectDatabaseWriterImpl(ctx.db, databaseSchemas),
   auth: new EffectAuthImpl(ctx.auth),
   storage: new EffectStorageWriterImpl(ctx.storage),
   scheduler: new EffectSchedulerImpl(ctx.scheduler),
@@ -102,7 +106,7 @@ export const makeEffectMutationCtx = <DataModel extends GenericDataModel>(
 export const makeEffectActionCtx = <
   EffectDataModel extends GenericEffectDataModel,
 >(
-  ctx: GenericActionCtx<EffectDataModel>
+  ctx: GenericActionCtx<DataModelFromEffectDataModel<EffectDataModel>>
 ): EffectActionCtx<EffectDataModel> => ({
   runQuery: <Query extends FunctionReference<"query", "public" | "internal">>(
     query: Query,
