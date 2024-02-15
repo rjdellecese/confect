@@ -23,10 +23,10 @@ declare global {
 if (!global.convexHttpClient) {
   global["convexHttpClient"] = pipe(
     Effect.sync(() =>
-      dotenv.config({ path: path.resolve(process.cwd(), ".env.local") })
+      dotenv.config({ path: path.resolve(process.cwd(), ".env.local") }),
     ),
-    Effect.flatMap(() => Effect.config(Config.string("CONVEX_URL"))),
+    Effect.flatMap(() => Config.string("CONVEX_URL")),
     Effect.map((convexUrl) => new ConvexHttpClient(convexUrl)),
-    Effect.runSync
+    Effect.runSync,
   );
 }

@@ -43,7 +43,7 @@ class EffectSchemaDefinitionImpl<
     this.schemaDefinition = pipe(
       effectSchema,
       ReadonlyRecord.map(({ tableDefinition }) => tableDefinition),
-      defineSchema
+      defineSchema,
     ) as SchemaDefinition<DatabaseSchema, true>;
   }
 }
@@ -57,7 +57,7 @@ type SchemaDefinitionFromEffectSchemaDefinition<
 export const defineEffectSchema = <
   TypeScriptSchema extends GenericEffectSchema,
 >(
-  effectSchema: TypeScriptSchema
+  effectSchema: TypeScriptSchema,
 ) =>
   new EffectSchemaDefinitionImpl<
     SchemaDefinitionFromEffectSchemaDefinition<TypeScriptSchema>,
@@ -81,7 +81,7 @@ export interface EffectTableDefinition<
     RestFieldPaths extends FieldPaths[],
   >(
     name: IndexName,
-    fields: [FirstFieldPath, ...RestFieldPaths]
+    fields: [FirstFieldPath, ...RestFieldPaths],
   ): EffectTableDefinition<
     DatabaseDocument,
     TypeScriptDocument,
@@ -102,7 +102,7 @@ export interface EffectTableDefinition<
     FilterFields extends FieldPaths = never,
   >(
     name: IndexName,
-    indexConfig: Expand<SearchIndexConfig<SearchField, FilterFields>>
+    indexConfig: Expand<SearchIndexConfig<SearchField, FilterFields>>,
   ): EffectTableDefinition<
     DatabaseDocument,
     TypeScriptDocument,
@@ -126,7 +126,7 @@ export interface EffectTableDefinition<
     FilterFields extends FieldPaths = never,
   >(
     name: IndexName,
-    indexConfig: Expand<VectorIndexConfig<VectorField, FilterFields>>
+    indexConfig: Expand<VectorIndexConfig<VectorField, FilterFields>>,
   ): EffectTableDefinition<
     DatabaseDocument,
     TypeScriptDocument,
@@ -152,7 +152,7 @@ export interface EffectTableDefinition<
     SearchIndexes,
     VectorIndexes
   >;
-  schema: Schema.Schema<DatabaseDocument, TypeScriptDocument>;
+  schema: Schema.Schema<TypeScriptDocument, DatabaseDocument>;
 }
 
 class EffectTableDefinitionImpl<
@@ -182,9 +182,9 @@ class EffectTableDefinitionImpl<
     SearchIndexes,
     VectorIndexes
   >;
-  schema: Schema.Schema<DatabaseDocument, TypeScriptDocument>;
+  schema: Schema.Schema<TypeScriptDocument, DatabaseDocument>;
 
-  constructor(schema: Schema.Schema<DatabaseDocument, TypeScriptDocument>) {
+  constructor(schema: Schema.Schema<TypeScriptDocument, DatabaseDocument>) {
     this.schema = schema;
     this.tableDefinition = defineTable(schemaToValidatorCompiler.table(schema));
   }
@@ -195,7 +195,7 @@ class EffectTableDefinitionImpl<
     RestFieldPaths extends FieldPaths[],
   >(
     name: IndexName,
-    fields: [FirstFieldPath, ...RestFieldPaths]
+    fields: [FirstFieldPath, ...RestFieldPaths],
   ): EffectTableDefinition<
     DatabaseDocument,
     TypeScriptDocument,
@@ -221,7 +221,7 @@ class EffectTableDefinitionImpl<
     FilterFields extends FieldPaths = never,
   >(
     name: IndexName,
-    indexConfig: Expand<SearchIndexConfig<SearchField, FilterFields>>
+    indexConfig: Expand<SearchIndexConfig<SearchField, FilterFields>>,
   ): EffectTableDefinition<
     DatabaseDocument,
     TypeScriptDocument,
@@ -254,7 +254,7 @@ class EffectTableDefinitionImpl<
       vectorField: VectorField;
       dimensions: number;
       filterFields?: FilterFields[] | undefined;
-    }
+    },
   ): EffectTableDefinition<
     DatabaseDocument,
     TypeScriptDocument,
@@ -283,7 +283,7 @@ export const defineEffectTable = <
   DatabaseDocument extends GenericDocument,
   TypeScriptDocument extends GenericEffectDocument,
 >(
-  schema: Schema.Schema<DatabaseDocument, TypeScriptDocument>
+  schema: Schema.Schema<TypeScriptDocument, DatabaseDocument>,
 ): EffectTableDefinition<DatabaseDocument, TypeScriptDocument> =>
   new EffectTableDefinitionImpl(schema);
 
@@ -356,14 +356,12 @@ export type EffectDataModelFromEffectSchema<
 
 // NOTE: Remove if/when exposed
 
-type Expand<ObjectType extends Record<any, any>> = ObjectType extends Record<
-  any,
-  any
->
-  ? {
-      [Key in keyof ObjectType]: ObjectType[Key];
-    }
-  : never;
+type Expand<ObjectType extends Record<any, any>> =
+  ObjectType extends Record<any, any>
+    ? {
+        [Key in keyof ObjectType]: ObjectType[Key];
+      }
+    : never;
 
 type IndexTiebreakerField = "_creationTime";
 

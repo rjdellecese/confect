@@ -10,12 +10,12 @@ export interface EffectScheduler {
     delayMs: number,
     functionReference: FuncRef,
     ...args: OptionalRestArgs<FuncRef>
-  ): Effect.Effect<never, never, void>;
+  ): Effect.Effect<void>;
   runAt<FuncRef extends SchedulableFunctionReference>(
     timestamp: number | Date,
     functionReference: FuncRef,
     ...args: OptionalRestArgs<FuncRef>
-  ): Effect.Effect<never, never, void>;
+  ): Effect.Effect<void>;
 }
 
 export class EffectSchedulerImpl implements EffectScheduler {
@@ -24,18 +24,18 @@ export class EffectSchedulerImpl implements EffectScheduler {
     delayMs: number,
     functionReference: FuncRef,
     ...args: OptionalRestArgs<FuncRef>
-  ): Effect.Effect<never, never, void> {
+  ): Effect.Effect<void> {
     return Effect.promise(() =>
-      this.scheduler.runAfter(delayMs, functionReference, ...args)
+      this.scheduler.runAfter(delayMs, functionReference, ...args),
     );
   }
   runAt<FuncRef extends SchedulableFunctionReference>(
     timestamp: number | Date,
     functionReference: FuncRef,
     ...args: OptionalRestArgs<FuncRef>
-  ): Effect.Effect<never, never, void> {
+  ): Effect.Effect<void> {
     return Effect.promise(() =>
-      this.scheduler.runAt(timestamp, functionReference, ...args)
+      this.scheduler.runAt(timestamp, functionReference, ...args),
     );
   }
 }

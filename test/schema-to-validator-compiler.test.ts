@@ -7,7 +7,7 @@ import schemaToValidatorCompiler from "../src/schema-to-validator-compiler";
 describe("args", () => {
   test("literal", () => {
     const literalValidator = schemaToValidatorCompiler.args(
-      Schema.struct({ literalString: Schema.literal("LiteralString") })
+      Schema.struct({ literalString: Schema.literal("LiteralString") }),
     );
 
     expect(literalValidator).toStrictEqual({
@@ -17,7 +17,7 @@ describe("args", () => {
 
   test("string", () => {
     const stringValidator = schemaToValidatorCompiler.args(
-      Schema.struct({ string: Schema.string })
+      Schema.struct({ string: Schema.string }),
     );
 
     expect(stringValidator).toStrictEqual({ string: v.string() });
@@ -25,7 +25,7 @@ describe("args", () => {
 
   test("number", () => {
     const numberValidator = schemaToValidatorCompiler.args(
-      Schema.struct({ number: Schema.number })
+      Schema.struct({ number: Schema.number }),
     );
 
     expect(numberValidator).toStrictEqual({ number: v.float64() });
@@ -33,7 +33,7 @@ describe("args", () => {
 
   test("empty", () => {
     const emptyObjectValidator = schemaToValidatorCompiler.args(
-      Schema.struct({})
+      Schema.struct({}),
     );
 
     expect(emptyObjectValidator).toStrictEqual({});
@@ -46,7 +46,7 @@ describe("args", () => {
           foo: Schema.string,
           bar: Schema.number,
         }),
-      })
+      }),
     );
 
     expect(objectValidator).toStrictEqual({
@@ -58,7 +58,7 @@ describe("args", () => {
     const objectValidator = schemaToValidatorCompiler.args(
       Schema.struct({
         foo: Schema.optional(Schema.number),
-      })
+      }),
     );
 
     expect(objectValidator).toStrictEqual({ foo: v.optional(v.float64()) });
@@ -72,15 +72,15 @@ describe("args", () => {
             Schema.string,
             Schema.number,
             Schema.boolean,
-            Schema.struct({})
-          )
+            Schema.struct({}),
+          ),
         ),
-      })
+      }),
     );
 
     expect(optionalStringValidator).toStrictEqual({
       union: v.optional(
-        v.union(v.string(), v.float64(), v.boolean(), v.object({}))
+        v.union(v.string(), v.float64(), v.boolean(), v.object({})),
       ),
     });
   });
@@ -89,7 +89,7 @@ describe("args", () => {
     const tupleValidator = schemaToValidatorCompiler.args(
       Schema.struct({
         tuple: Schema.tuple(Schema.string),
-      })
+      }),
     );
 
     expect(tupleValidator).toStrictEqual({
@@ -101,7 +101,7 @@ describe("args", () => {
     const tupleValidator = schemaToValidatorCompiler.args(
       Schema.struct({
         tuple: Schema.tuple(Schema.string, Schema.number),
-      })
+      }),
     );
 
     expect(tupleValidator).toStrictEqual({
@@ -115,14 +115,14 @@ describe("args", () => {
         tuple: Schema.tuple(
           Schema.string,
           Schema.number,
-          Schema.struct({ foo: Schema.string })
+          Schema.struct({ foo: Schema.string }),
         ),
-      })
+      }),
     );
 
     expect(tupleValidator).toStrictEqual({
       tuple: v.array(
-        v.union(v.string(), v.float64(), v.object({ foo: v.string() }))
+        v.union(v.string(), v.float64(), v.object({ foo: v.string() })),
       ),
     });
   });

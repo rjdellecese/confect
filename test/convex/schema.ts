@@ -6,7 +6,7 @@ export const effectSchema = defineEffectSchema({
   notes: defineEffectTable(
     Schema.struct({
       content: Schema.string,
-    })
+    }),
   ).index("by_content", ["content"]),
 });
 

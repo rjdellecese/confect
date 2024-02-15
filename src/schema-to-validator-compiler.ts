@@ -7,7 +7,7 @@ import { Effect, Match, Option, pipe, ReadonlyArray } from "effect";
 // Args
 
 const args = <DatabaseValue, TypeScriptValue = DatabaseValue>(
-  schema: Schema.Schema<DatabaseValue, TypeScriptValue>
+  schema: Schema.Schema<TypeScriptValue, DatabaseValue>,
 ): PropertyValidators => goTopArgs(Schema.from(schema).ast);
 
 const goTopArgs = (ast: AST.AST): PropertyValidators =>
@@ -17,16 +17,16 @@ const goTopArgs = (ast: AST.AST): PropertyValidators =>
     Match.tag("TypeLiteral", ({ indexSignatures, propertySignatures }) =>
       ReadonlyArray.isEmptyReadonlyArray(indexSignatures)
         ? handlePropertySignatures(propertySignatures)
-        : Effect.fail(new IndexSignaturesAreNotSupportedError())
+        : Effect.fail(new IndexSignaturesAreNotSupportedError()),
     ),
     Match.orElse(() => Effect.fail(new TopLevelMustBeObjectError())),
-    Effect.runSync
+    Effect.runSync,
   );
 
 // Table
 
 const table = <DatabaseValue, TypeScriptValue = DatabaseValue>(
-  schema: Schema.Schema<DatabaseValue, TypeScriptValue>
+  schema: Schema.Schema<TypeScriptValue, DatabaseValue>,
 ): Validator<Record<string, any>, false, any> =>
   goTopTable(Schema.from(schema).ast);
 
@@ -37,10 +37,10 @@ const goTopTable = (ast: AST.AST): Validator<Record<string, any>, false, any> =>
     Match.tag("TypeLiteral", ({ indexSignatures }) =>
       ReadonlyArray.isEmptyReadonlyArray(indexSignatures)
         ? Effect.succeed(go(ast))
-        : Effect.fail(new IndexSignaturesAreNotSupportedError())
+        : Effect.fail(new IndexSignaturesAreNotSupportedError()),
     ),
     Match.orElse(() => Effect.fail(new TopLevelMustBeObjectError())),
-    Effect.runSync
+    Effect.runSync,
   );
 
 // Helpers
@@ -49,7 +49,6 @@ const go = (ast: AST.AST): Validator<any, any, any> =>
   pipe(
     ast,
     Match.value,
-    Match.tag("Declaration", ({ type }) => Effect.succeed(go(type))),
     Match.tag("Literal", ({ literal }) =>
       pipe(
         literal,
@@ -59,12 +58,12 @@ const go = (ast: AST.AST): Validator<any, any, any> =>
           Match.number,
           Match.bigint,
           Match.boolean,
-          (l) => v.literal(l)
+          (l) => v.literal(l),
         ),
         Match.when(Match.null, () => v.null()),
         Match.exhaustive,
-        Effect.succeed
-      )
+        Effect.succeed,
+      ),
     ),
     Match.tag("BooleanKeyword", () => Effect.succeed(v.boolean())),
     Match.tag("StringKeyword", () => Effect.succeed(v.string())),
@@ -72,14 +71,16 @@ const go = (ast: AST.AST): Validator<any, any, any> =>
     Match.tag("BigIntKeyword", () => Effect.succeed(v.int64())),
     Match.tag("Union", ({ types: [first, second, ...rest] }) =>
       Effect.succeed(
-        v.union(go(first), go(second), ...ReadonlyArray.map(rest, go))
-      )
+        v.union(go(first), go(second), ...ReadonlyArray.map(rest, go)),
+      ),
     ),
     Match.tag("TypeLiteral", (typeLiteral) => handleTypeLiteral(typeLiteral)),
     Match.tag("Tuple", ({ elements, rest }) => {
       const restValidator = pipe(
         rest,
-        Option.map((restHead) => pipe(restHead, ReadonlyArray.headNonEmpty, go))
+        Option.map((restHead) =>
+          pipe(restHead, ReadonlyArray.headNonEmpty, go),
+        ),
       );
 
       const [f, s, ...r] = elements;
@@ -91,9 +92,8 @@ const go = (ast: AST.AST): Validator<any, any, any> =>
         isOptional ? v.optional(go(type)) : go(type);
 
       const arrayItemsValidator: Effect.Effect<
-        never,
-        EmptyTupleIsNotSupportedError,
-        Validator<any, any, any>
+        Validator<any, any, any>,
+        EmptyTupleIsNotSupportedError
       > = f === undefined
         ? Option.match(restValidator, {
             onNone: () => Effect.fail(new EmptyTupleIsNotSupportedError()),
@@ -113,17 +113,18 @@ const go = (ast: AST.AST): Validator<any, any, any> =>
                 ...Option.match(restValidator, {
                   onSome: (validator) => [validator] as const,
                   onNone: () => [] as const,
-                })
-              )
+                }),
+              ),
             );
 
       return pipe(
         arrayItemsValidator,
-        Effect.map((validator) => v.array(validator))
+        Effect.map((validator) => v.array(validator)),
       );
     }),
     Match.tag("UnknownKeyword", "AnyKeyword", () => Effect.succeed(v.any())),
     Match.tag(
+      "Declaration",
       "UniqueSymbol",
       "SymbolKeyword",
       "UndefinedKeyword",
@@ -135,10 +136,10 @@ const go = (ast: AST.AST): Validator<any, any, any> =>
       "Suspend",
       "Transform",
       "Refinement",
-      unsupportedEffectSchemaTypeError
+      unsupportedEffectSchemaTypeError,
     ),
     Match.exhaustive,
-    Effect.runSync
+    Effect.runSync,
   );
 
 const handleTypeLiteral = ({
@@ -153,14 +154,14 @@ const handleTypeLiteral = ({
         pipe(
           propertySignatures,
           handlePropertySignatures,
-          Effect.map(v.object)
+          Effect.map(v.object),
         ),
       onSome: () => Effect.fail(new IndexSignaturesAreNotSupportedError()),
-    })
+    }),
   );
 
 const handlePropertySignatures = (
-  propertySignatures: readonly AST.PropertySignature[]
+  propertySignatures: readonly AST.PropertySignature[],
 ) =>
   pipe(
     propertySignatures,
@@ -169,7 +170,7 @@ const handlePropertySignatures = (
 
       if (typeofName !== "string") {
         return Effect.fail(
-          new UnsupportedPropertySignatureKeyTypeError(typeofName)
+          new UnsupportedPropertySignatureKeyTypeError(typeofName),
         );
       } else {
         const validator = go(type);
@@ -188,11 +189,11 @@ const handlePropertySignatures = (
           (acc, { propertyName, validator }) => ({
             [propertyName]: validator,
             ...acc,
-          })
+          }),
         ),
-        Effect.succeed
-      )
-    )
+        Effect.succeed,
+      ),
+    ),
   );
 
 class TopLevelMustBeObjectError {

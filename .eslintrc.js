@@ -22,6 +22,7 @@ module.exports = {
     sourceType: "module",
   },
   plugins: ["@typescript-eslint", "unused-imports", "simple-import-sort"],
+  ignorePatterns: ["pnpm-lock.yaml"],
   rules: {
     // TODO: Extract common rules to a shared config
     "no-shadow": "error",
