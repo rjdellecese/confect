@@ -7,7 +7,7 @@ import schemaToValidatorCompiler from "~/src/schema-to-validator-compiler";
 describe("args", () => {
   test("literal", () => {
     const literalValidator = schemaToValidatorCompiler.args(
-      Schema.struct({ literalString: Schema.literal("LiteralString") }),
+      Schema.Struct({ literalString: Schema.Literal("LiteralString") })
     );
 
     expect(literalValidator).toStrictEqual({
@@ -17,7 +17,7 @@ describe("args", () => {
 
   test("string", () => {
     const stringValidator = schemaToValidatorCompiler.args(
-      Schema.struct({ string: Schema.string }),
+      Schema.Struct({ string: Schema.String })
     );
 
     expect(stringValidator).toStrictEqual({ string: v.string() });
@@ -25,7 +25,7 @@ describe("args", () => {
 
   test("number", () => {
     const numberValidator = schemaToValidatorCompiler.args(
-      Schema.struct({ number: Schema.number }),
+      Schema.Struct({ number: Schema.Number })
     );
 
     expect(numberValidator).toStrictEqual({ number: v.float64() });
@@ -33,7 +33,7 @@ describe("args", () => {
 
   test("empty", () => {
     const emptyObjectValidator = schemaToValidatorCompiler.args(
-      Schema.struct({}),
+      Schema.Struct({})
     );
 
     expect(emptyObjectValidator).toStrictEqual({});
@@ -41,12 +41,12 @@ describe("args", () => {
 
   test("simple object", () => {
     const objectValidator = schemaToValidatorCompiler.args(
-      Schema.struct({
-        simpleObject: Schema.struct({
-          foo: Schema.string,
-          bar: Schema.number,
+      Schema.Struct({
+        simpleObject: Schema.Struct({
+          foo: Schema.String,
+          bar: Schema.Number,
         }),
-      }),
+      })
     );
 
     expect(objectValidator).toStrictEqual({
@@ -56,9 +56,9 @@ describe("args", () => {
 
   test("object with optional field", () => {
     const objectValidator = schemaToValidatorCompiler.args(
-      Schema.struct({
-        foo: Schema.optional(Schema.number, { exact: true }),
-      }),
+      Schema.Struct({
+        foo: Schema.optional(Schema.Number, { exact: true }),
+      })
     );
 
     expect(objectValidator).toStrictEqual({ foo: v.optional(v.float64()) });
@@ -66,31 +66,31 @@ describe("args", () => {
 
   test("optional union with four elements", () => {
     const optionalStringValidator = schemaToValidatorCompiler.args(
-      Schema.struct({
+      Schema.Struct({
         union: Schema.optional(
-          Schema.union(
-            Schema.string,
-            Schema.number,
-            Schema.boolean,
-            Schema.struct({}),
+          Schema.Union(
+            Schema.String,
+            Schema.Number,
+            Schema.Boolean,
+            Schema.Struct({})
           ),
-          { exact: true },
+          { exact: true }
         ),
-      }),
+      })
     );
 
     expect(optionalStringValidator).toStrictEqual({
       union: v.optional(
-        v.union(v.string(), v.float64(), v.boolean(), v.object({})),
+        v.union(v.string(), v.float64(), v.boolean(), v.object({}))
       ),
     });
   });
 
   test("tuple with one element", () => {
     const tupleValidator = schemaToValidatorCompiler.args(
-      Schema.struct({
-        tuple: Schema.tuple(Schema.string),
-      }),
+      Schema.Struct({
+        tuple: Schema.Tuple(Schema.String),
+      })
     );
 
     expect(tupleValidator).toStrictEqual({
@@ -100,9 +100,9 @@ describe("args", () => {
 
   test("tuple with two elements", () => {
     const tupleValidator = schemaToValidatorCompiler.args(
-      Schema.struct({
-        tuple: Schema.tuple(Schema.string, Schema.number),
-      }),
+      Schema.Struct({
+        tuple: Schema.Tuple(Schema.String, Schema.Number),
+      })
     );
 
     expect(tupleValidator).toStrictEqual({
@@ -112,18 +112,18 @@ describe("args", () => {
 
   test("tuple with three elements", () => {
     const tupleValidator = schemaToValidatorCompiler.args(
-      Schema.struct({
-        tuple: Schema.tuple(
-          Schema.string,
-          Schema.number,
-          Schema.struct({ foo: Schema.string }),
+      Schema.Struct({
+        tuple: Schema.Tuple(
+          Schema.String,
+          Schema.Number,
+          Schema.Struct({ foo: Schema.String })
         ),
-      }),
+      })
     );
 
     expect(tupleValidator).toStrictEqual({
       tuple: v.array(
-        v.union(v.string(), v.float64(), v.object({ foo: v.string() })),
+        v.union(v.string(), v.float64(), v.object({ foo: v.string() }))
       ),
     });
   });

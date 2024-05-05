@@ -13,12 +13,12 @@ export default mutation({
           Effect.promise(() => db.query(tableName).collect()),
           Effect.flatMap((rows) =>
             Effect.forEach(rows, (row) =>
-              Effect.promise(() => db.delete(row._id)),
-            ),
-          ),
-        ),
+              Effect.promise(() => db.delete(row._id))
+            )
+          )
+        )
       ),
-      Effect.asUnit,
-      Effect.runPromise,
+      Effect.asVoid,
+      Effect.runPromise
     ),
 });

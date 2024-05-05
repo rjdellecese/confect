@@ -13,7 +13,7 @@ import {
   TableDefinition,
 } from "convex/server";
 import { GenericId } from "convex/values";
-import { pipe, ReadonlyRecord } from "effect";
+import { pipe, Record } from "effect";
 
 import schemaToValidatorCompiler from "~/src/schema-to-validator-compiler";
 
@@ -42,8 +42,8 @@ class EffectSchemaDefinitionImpl<
     this.effectSchema = effectSchema;
     this.schemaDefinition = pipe(
       effectSchema,
-      ReadonlyRecord.map(({ tableDefinition }) => tableDefinition),
-      defineSchema,
+      Record.map(({ tableDefinition }) => tableDefinition),
+      defineSchema
     ) as SchemaDefinition<DatabaseSchema, true>;
   }
 }
@@ -57,7 +57,7 @@ type SchemaDefinitionFromEffectSchemaDefinition<
 export const defineEffectSchema = <
   TypeScriptSchema extends GenericEffectSchema,
 >(
-  effectSchema: TypeScriptSchema,
+  effectSchema: TypeScriptSchema
 ) =>
   new EffectSchemaDefinitionImpl<
     SchemaDefinitionFromEffectSchemaDefinition<TypeScriptSchema>,
@@ -81,7 +81,7 @@ export interface EffectTableDefinition<
     RestFieldPaths extends FieldPaths[],
   >(
     name: IndexName,
-    fields: [FirstFieldPath, ...RestFieldPaths],
+    fields: [FirstFieldPath, ...RestFieldPaths]
   ): EffectTableDefinition<
     DatabaseDocument,
     TypeScriptDocument,
@@ -102,7 +102,7 @@ export interface EffectTableDefinition<
     FilterFields extends FieldPaths = never,
   >(
     name: IndexName,
-    indexConfig: Expand<SearchIndexConfig<SearchField, FilterFields>>,
+    indexConfig: Expand<SearchIndexConfig<SearchField, FilterFields>>
   ): EffectTableDefinition<
     DatabaseDocument,
     TypeScriptDocument,
@@ -126,7 +126,7 @@ export interface EffectTableDefinition<
     FilterFields extends FieldPaths = never,
   >(
     name: IndexName,
-    indexConfig: Expand<VectorIndexConfig<VectorField, FilterFields>>,
+    indexConfig: Expand<VectorIndexConfig<VectorField, FilterFields>>
   ): EffectTableDefinition<
     DatabaseDocument,
     TypeScriptDocument,
@@ -195,7 +195,7 @@ class EffectTableDefinitionImpl<
     RestFieldPaths extends FieldPaths[],
   >(
     name: IndexName,
-    fields: [FirstFieldPath, ...RestFieldPaths],
+    fields: [FirstFieldPath, ...RestFieldPaths]
   ): EffectTableDefinition<
     DatabaseDocument,
     TypeScriptDocument,
@@ -221,7 +221,7 @@ class EffectTableDefinitionImpl<
     FilterFields extends FieldPaths = never,
   >(
     name: IndexName,
-    indexConfig: Expand<SearchIndexConfig<SearchField, FilterFields>>,
+    indexConfig: Expand<SearchIndexConfig<SearchField, FilterFields>>
   ): EffectTableDefinition<
     DatabaseDocument,
     TypeScriptDocument,
@@ -254,7 +254,7 @@ class EffectTableDefinitionImpl<
       vectorField: VectorField;
       dimensions: number;
       filterFields?: FilterFields[] | undefined;
-    },
+    }
   ): EffectTableDefinition<
     DatabaseDocument,
     TypeScriptDocument,
@@ -283,7 +283,7 @@ export const defineEffectTable = <
   DatabaseDocument extends GenericDocument,
   TypeScriptDocument extends GenericEffectDocument,
 >(
-  schema: Schema.Schema<TypeScriptDocument, DatabaseDocument>,
+  schema: Schema.Schema<TypeScriptDocument, DatabaseDocument>
 ): EffectTableDefinition<DatabaseDocument, TypeScriptDocument> =>
   new EffectTableDefinitionImpl(schema);
 

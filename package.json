@@ -19,26 +19,26 @@
   "author": "RJ Dellecese",
   "license": "ISC",
   "devDependencies": {
-    "@effect/vitest": "^0.2.6",
+    "@effect/vitest": "^0.4.1",
     "@swc/jest": "^0.2.36",
     "@tsconfig/strictest": "2.0.5",
-    "@typescript-eslint/eslint-plugin": "7.6.0",
-    "@typescript-eslint/parser": "7.6.0",
-    "convex-test": "^0.0.7",
+    "@typescript-eslint/eslint-plugin": "7.8.0",
+    "@typescript-eslint/parser": "7.8.0",
+    "convex-test": "^0.0.14",
     "dotenv": "16.4.5",
     "eslint": "8.57.0",
     "eslint-plugin-no-relative-import-paths": "1.5.4",
-    "eslint-plugin-simple-import-sort": "12.0.0",
-    "eslint-plugin-unused-imports": "3.1.0",
+    "eslint-plugin-simple-import-sort": "12.1.0",
+    "eslint-plugin-unused-imports": "3.2.0",
     "prettier": "3.2.5",
     "typescript": "5.4.5",
-    "vite": "5.2.8",
+    "vite": "5.2.11",
     "vite-tsconfig-paths": "^4.3.2",
-    "vitest": "1.5.0"
+    "vitest": "1.6.0"
   },
   "dependencies": {
-    "@effect/schema": "0.64.20",
-    "convex": "1.11.0",
-    "effect": "2.4.18"
+    "@effect/schema": "0.66.14",
+    "convex": "1.11.3",
+    "effect": "3.1.2"
   }
 }

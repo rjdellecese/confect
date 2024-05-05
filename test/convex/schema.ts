@@ -4,9 +4,9 @@ import { defineEffectSchema, defineEffectTable } from "~/src/schema";
 
 export const effectSchema = defineEffectSchema({
   notes: defineEffectTable(
-    Schema.struct({
-      content: Schema.string,
-    }),
+    Schema.Struct({
+      content: Schema.String,
+    })
   ).index("by_content", ["content"]),
 });
 
