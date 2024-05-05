@@ -1,10 +1,8 @@
-import * as path from "node:path";
-
+import tsconfigPaths from "vite-tsconfig-paths";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-  // TODO
-  // plugins: [tsconfigPaths()],
+  plugins: [tsconfigPaths()],
   test: {
     poolOptions: {
       threads: {
@@ -12,8 +10,5 @@ export default defineConfig({
       },
     },
     setupFiles: "test/setup.ts",
-    alias: {
-      "~": path.resolve(__dirname),
-    },
   },
 });
