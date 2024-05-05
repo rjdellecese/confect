@@ -5,7 +5,7 @@ import { Config, Effect, pipe } from "effect";
 import path from "path";
 import { afterEach, beforeAll } from "vitest";
 
-import { api } from "./convex/_generated/api";
+import { api } from "~/test/convex/_generated/api";
 
 beforeAll(() => {
   execSync("pnpm exec convex dev --once", { stdio: "pipe" });

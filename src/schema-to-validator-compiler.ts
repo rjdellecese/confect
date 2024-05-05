@@ -8,7 +8,7 @@ import { Effect, Match, Option, pipe, ReadonlyArray } from "effect";
 
 const args = <DatabaseValue, TypeScriptValue = DatabaseValue>(
   schema: Schema.Schema<TypeScriptValue, DatabaseValue>,
-): PropertyValidators => goTopArgs(Schema.from(schema).ast);
+): PropertyValidators => goTopArgs(Schema.encodedSchema(schema).ast);
 
 const goTopArgs = (ast: AST.AST): PropertyValidators =>
   pipe(
@@ -28,7 +28,7 @@ const goTopArgs = (ast: AST.AST): PropertyValidators =>
 const table = <DatabaseValue, TypeScriptValue = DatabaseValue>(
   schema: Schema.Schema<TypeScriptValue, DatabaseValue>,
 ): Validator<Record<string, any>, false, any> =>
-  goTopTable(Schema.from(schema).ast);
+  goTopTable(Schema.encodedSchema(schema).ast);
 
 const goTopTable = (ast: AST.AST): Validator<Record<string, any>, false, any> =>
   pipe(
@@ -75,13 +75,8 @@ const go = (ast: AST.AST): Validator<any, any, any> =>
       ),
     ),
     Match.tag("TypeLiteral", (typeLiteral) => handleTypeLiteral(typeLiteral)),
-    Match.tag("Tuple", ({ elements, rest }) => {
-      const restValidator = pipe(
-        rest,
-        Option.map((restHead) =>
-          pipe(restHead, ReadonlyArray.headNonEmpty, go),
-        ),
-      );
+    Match.tag("TupleType", ({ elements, rest }) => {
+      const restValidator = pipe(rest, ReadonlyArray.head, Option.map(go));
 
       const [f, s, ...r] = elements;
 
@@ -134,7 +129,7 @@ const go = (ast: AST.AST): Validator<any, any, any> =>
       "TemplateLiteral",
       "ObjectKeyword",
       "Suspend",
-      "Transform",
+      "Transformation",
       "Refinement",
       unsupportedEffectSchemaTypeError,
     ),

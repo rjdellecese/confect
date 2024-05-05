@@ -7,6 +7,10 @@
     /* These settings are not required by Convex and can be modified. */
     "allowJs": true,
     "strict": true,
+    "baseUrl": "../../.",
+    "paths": {
+      "~/*": ["*"]
+    },
 
     /* These compiler options are required by Convex */
     "target": "ESNext",

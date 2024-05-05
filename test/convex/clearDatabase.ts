@@ -1,7 +1,7 @@
 import { Effect, pipe } from "effect";
 
-import { mutation } from "./_generated/server";
-import schema from "./schema";
+import { mutation } from "~/test/convex/_generated/server";
+import schema from "~/test/convex/schema";
 
 export default mutation({
   args: {},

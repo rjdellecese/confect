@@ -25,19 +25,19 @@ import {
   makeEffectActionCtx,
   makeEffectMutationCtx,
   makeEffectQueryCtx,
-} from "./ctx";
+} from "~/src/ctx";
 import {
   DatabaseSchemasFromEffectDataModel,
   databaseSchemasFromEffectSchema,
-} from "./db";
+} from "~/src/db";
 import {
   DataModelFromEffectDataModel,
   EffectDataModelFromEffectSchema,
   EffectSchemaDefinition,
   GenericEffectDataModel,
   GenericEffectSchema,
-} from "./schema";
-import schemaToValidatorCompiler from "./schema-to-validator-compiler";
+} from "~/src/schema";
+import schemaToValidatorCompiler from "~/src/schema-to-validator-compiler";
 
 export const ConvexServer = <
   DatabaseSchema extends GenericSchema,

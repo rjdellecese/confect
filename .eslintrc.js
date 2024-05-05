@@ -21,7 +21,12 @@ module.exports = {
     ecmaVersion: "latest",
     sourceType: "module",
   },
-  plugins: ["@typescript-eslint", "unused-imports", "simple-import-sort"],
+  plugins: [
+    "@typescript-eslint",
+    "unused-imports",
+    "simple-import-sort",
+    "no-relative-import-paths",
+  ],
   ignorePatterns: ["pnpm-lock.yaml"],
   rules: {
     // TODO: Extract common rules to a shared config
@@ -38,6 +43,10 @@ module.exports = {
         args: "after-used",
         argsIgnorePattern: "^_",
       },
+    ],
+    "no-relative-import-paths/no-relative-import-paths": [
+      "warn",
+      { rootDir: ".", prefix: "~", allowSameFolder: false },
     ],
     "simple-import-sort/exports": "warn",
     "simple-import-sort/imports": "warn",

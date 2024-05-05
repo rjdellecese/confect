@@ -1,8 +1,15 @@
 {
   "compilerOptions": {
     "exactOptionalPropertyTypes": false,
-    "lib": ["ES2021", "DOM"]
+    "lib": ["ESNext", "DOM"],
+    "target": "ESNext",
+    "moduleResolution": "NodeNext",
+    "module": "NodeNext",
+    "baseUrl": ".",
+    "paths": {
+      "~/*": ["*"]
+    }
   },
   "exclude": ["node_modules", "dist", "test/convex"],
-  "extends": ["@tsconfig/strictest/tsconfig", "@tsconfig/node18/tsconfig"]
+  "extends": ["@tsconfig/strictest/tsconfig"]
 }

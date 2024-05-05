@@ -15,7 +15,7 @@ import {
 import { GenericId } from "convex/values";
 import { pipe, ReadonlyRecord } from "effect";
 
-import schemaToValidatorCompiler from "./schema-to-validator-compiler";
+import schemaToValidatorCompiler from "~/src/schema-to-validator-compiler";
 
 export type GenericEffectSchema = Record<
   string,

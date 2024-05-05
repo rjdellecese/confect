@@ -1,4 +1,9 @@
 {
   "image": "mcr.microsoft.com/devcontainers/typescript-node:1-20-bullseye",
-  "postCreateCommand": "pnpm install"
+  "postCreateCommand": "pnpm install",
+  "customizations": {
+    "vscode": {
+      "extensions": ["YoavBls.pretty-ts-errors", "esbenp.prettier-vscode"]
+    }
+  }
 }

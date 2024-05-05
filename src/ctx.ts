@@ -13,22 +13,25 @@ import {
 import { GenericId } from "convex/values";
 import { Effect } from "effect";
 
-import { EffectAuth, EffectAuthImpl } from "./auth";
+import { EffectAuth, EffectAuthImpl } from "~/src/auth";
 import {
   DatabaseSchemasFromEffectDataModel,
   EffectDatabaseReader,
   EffectDatabaseReaderImpl,
   EffectDatabaseWriter,
   EffectDatabaseWriterImpl,
-} from "./db";
-import { EffectScheduler, EffectSchedulerImpl } from "./scheduler";
-import { DataModelFromEffectDataModel, GenericEffectDataModel } from "./schema";
+} from "~/src/db";
+import { EffectScheduler, EffectSchedulerImpl } from "~/src/scheduler";
+import {
+  DataModelFromEffectDataModel,
+  GenericEffectDataModel,
+} from "~/src/schema";
 import {
   EffectStorageReader,
   EffectStorageReaderImpl,
   EffectStorageWriter,
   EffectStorageWriterImpl,
-} from "./storage";
+} from "~/src/storage";
 
 export type EffectMutationCtx<EffectDataModel extends GenericEffectDataModel> =
   {

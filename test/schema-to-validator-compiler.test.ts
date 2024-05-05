@@ -2,7 +2,7 @@ import * as Schema from "@effect/schema/Schema";
 import { v } from "convex/values";
 import { describe, expect, test } from "vitest";
 
-import schemaToValidatorCompiler from "../src/schema-to-validator-compiler";
+import schemaToValidatorCompiler from "~/src/schema-to-validator-compiler";
 
 describe("args", () => {
   test("literal", () => {
@@ -57,7 +57,7 @@ describe("args", () => {
   test("object with optional field", () => {
     const objectValidator = schemaToValidatorCompiler.args(
       Schema.struct({
-        foo: Schema.optional(Schema.number),
+        foo: Schema.optional(Schema.number, { exact: true }),
       }),
     );
 
@@ -74,6 +74,7 @@ describe("args", () => {
             Schema.boolean,
             Schema.struct({}),
           ),
+          { exact: true },
         ),
       }),
     );

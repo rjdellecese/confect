@@ -1,6 +1,6 @@
 import { Schema } from "@effect/schema";
 
-import { defineEffectSchema, defineEffectTable } from "../../src/schema";
+import { defineEffectSchema, defineEffectTable } from "~/src/schema";
 
 export const effectSchema = defineEffectSchema({
   notes: defineEffectTable(

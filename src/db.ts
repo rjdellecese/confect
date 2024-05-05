@@ -42,7 +42,7 @@ import {
   GenericEffectTableInfo,
   TableInfoFromEffectTableInfo,
   TableNamesInEffectDataModel,
-} from "./schema";
+} from "~/src/schema";
 
 interface EffectQuery<EffectTableInfo extends GenericEffectTableInfo> {
   filter(
