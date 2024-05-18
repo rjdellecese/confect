@@ -8,6 +8,12 @@ export const effectSchema = defineEffectSchema({
       content: Schema.String,
     })
   ).index("by_content", ["content"]),
+  todos: defineEffectTable(
+    Schema.Struct({
+      content: Schema.String,
+      dueDate: Schema.DateFromNumber,
+    })
+  ).index("by_content", ["content"]),
 });
 
 const convexSchema = effectSchema.schemaDefinition;

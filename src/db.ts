@@ -26,6 +26,7 @@ import {
 import { GenericId } from "convex/values";
 import { Chunk, Effect, identity, Option, pipe, Record, Stream } from "effect";
 
+import { EffectDocumentByName } from "~/src/data-model";
 import {
   DataModelFromEffectDataModel,
   EffectDataModelFromEffectSchema,
@@ -319,8 +320,8 @@ export type DatabaseSchemasFromEffectDataModel<
   EffectDataModel extends GenericEffectDataModel,
 > = {
   [TableName in keyof EffectDataModel]: Schema.Schema<
-    EffectDataModel[TableName]["document"],
-    EffectDataModel[TableName]["effectDocument"]
+    EffectDataModel[TableName]["effectDocument"],
+    EffectDataModel[TableName]["document"]
   >;
 };
 
@@ -391,7 +392,7 @@ export interface EffectDatabaseWriter<
   ): Option.Option<GenericId<TableName>>;
   insert<TableName extends TableNamesInEffectDataModel<EffectDataModel>>(
     table: TableName,
-    value: WithoutSystemFields<DocumentByName<EffectDataModel, TableName>>
+    value: WithoutSystemFields<EffectDocumentByName<EffectDataModel, TableName>>
   ): Effect.Effect<GenericId<TableName>>;
   patch<TableName extends TableNamesInEffectDataModel<EffectDataModel>>(
     id: GenericId<TableName>,
@@ -438,9 +439,16 @@ export class EffectDatabaseWriterImpl<
   }
   insert<TableName extends TableNamesInEffectDataModel<EffectDataModel>>(
     table: TableName,
-    value: WithoutSystemFields<DocumentByName<EffectDataModel, TableName>>
+    value: WithoutSystemFields<EffectDocumentByName<EffectDataModel, TableName>>
   ): Effect.Effect<GenericId<TableName>> {
-    return Effect.promise(() => this.db.insert(table, value));
+    return pipe(
+      value,
+      Schema.encode(this.databaseSchemas[table]),
+      Effect.flatMap((encodedValue) =>
+        Effect.promise(() => this.db.insert(table, encodedValue))
+      ),
+      Effect.orDie
+    );
   }
   patch<TableName extends TableNamesInEffectDataModel<EffectDataModel>>(
     id: GenericId<TableName>,

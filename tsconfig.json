@@ -3,8 +3,8 @@
     "exactOptionalPropertyTypes": false,
     "lib": ["ESNext", "DOM"],
     "target": "ESNext",
-    "moduleResolution": "NodeNext",
-    "module": "NodeNext",
+    "moduleResolution": "Bundler",
+    "module": "ESNext",
     "baseUrl": ".",
     "paths": {
       "~/*": ["*"]

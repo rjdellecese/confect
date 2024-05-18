@@ -6,19 +6,19 @@ settings:
 
 dependencies:
   '@effect/schema':
-    specifier: 0.66.14
-    version: 0.66.14(effect@3.1.2)(fast-check@3.13.2)
+    specifier: 0.67.5
+    version: 0.67.5(effect@3.1.5)
   convex:
-    specifier: 1.11.3
-    version: 1.11.3
+    specifier: 1.12.0
+    version: 1.12.0
   effect:
-    specifier: 3.1.2
-    version: 3.1.2
+    specifier: 3.1.5
+    version: 3.1.5
 
 devDependencies:
   '@effect/vitest':
-    specifier: ^0.4.1
-    version: 0.4.1(effect@3.1.2)(vitest@1.6.0)
+    specifier: ^0.4.4
+    version: 0.4.4(effect@3.1.5)(vitest@1.6.0)
   '@swc/jest':
     specifier: ^0.2.36
     version: 0.2.36(@swc/core@1.4.1)
@@ -32,8 +32,8 @@ devDependencies:
     specifier: 7.8.0
     version: 7.8.0(eslint@8.57.0)(typescript@5.4.5)
   convex-test:
-    specifier: ^0.0.14
-    version: 0.0.14(convex@1.11.3)
+    specifier: ^0.0.16
+    version: 0.0.16(convex@1.12.0)
   dotenv:
     specifier: 16.4.5
     version: 16.4.5
@@ -72,23 +72,22 @@ packages:
     engines: {node: '>=0.10.0'}
     dev: true
 
-  /@effect/schema@0.66.14(effect@3.1.2)(fast-check@3.13.2):
-    resolution: {integrity: sha512-2Yc6gnXpcMmwQnbU2JUwDl0ckeOJmFZzteXn2jjVWuNi9PGv+jp2yK7jxv0pALcieuYwdR5tKkCRI7STuhEwfg==}
+  /@effect/schema@0.67.5(effect@3.1.5):
+    resolution: {integrity: sha512-RxlnCahk1rEmbosz0ZOb6mu3PTrf27+X+LQKeytFkDgUiNqQUyrLUUTMwh0BckPeRudeWpb7WKhpJvzJyG8uBw==}
     peerDependencies:
-      effect: ^3.1.2
-      fast-check: ^3.13.2
+      effect: ^3.1.5
     dependencies:
-      effect: 3.1.2
-      fast-check: 3.13.2
+      effect: 3.1.5
+      fast-check: 3.18.0
     dev: false
 
-  /@effect/vitest@0.4.1(effect@3.1.2)(vitest@1.6.0):
-    resolution: {integrity: sha512-7BCSTGwGH+E7EngceHVBwTurE/uL2qNtwgr5oYqXsZd4kmWd1ilrZZOmFwWCwDjMmhDRYGqdWSc6Ha4qJ6LxKA==}
+  /@effect/vitest@0.4.4(effect@3.1.5)(vitest@1.6.0):
+    resolution: {integrity: sha512-pdt/UsZnIOaZX9Vwi7f6kVa8/DizFE2eGSK7gQaeH0ua8oK/tOFQ++QiRrP4SDJUrDzimEhE0jwsqbeB8V5IXQ==}
     peerDependencies:
-      effect: ^3.1.2
+      effect: ^3.1.5
       vitest: ^1.4.0
     dependencies:
-      effect: 3.1.2
+      effect: 3.1.5
       vitest: 1.6.0
     dev: true
 
@@ -1197,16 +1196,16 @@ packages:
     resolution: {integrity: sha512-/Srv4dswyQNBfohGpz9o6Yb3Gz3SrUDqBH5rTuhGR7ahtlbYKnVxw2bCFMRljaA7EXHaXZ8wsHdodFvbkhKmqg==}
     dev: true
 
-  /convex-test@0.0.14(convex@1.11.3):
-    resolution: {integrity: sha512-NMbHSaKsAzDtx5TmemFe0HoqfHQRgGlkkLLLpOSAfCu+NKJr5hlW7p9cR8rAaCUVdnxefZrng8pjFfT4bs7tyQ==}
+  /convex-test@0.0.16(convex@1.12.0):
+    resolution: {integrity: sha512-K6uAFqyIbb5A0rBN9Wwk3u4R1lYqImnS4cO8FJkYdlz8gESW1/pO/ckhL4oowZF4eEKVPPzTztFjSJ835WXSbg==}
     peerDependencies:
       convex: ^1.10.0
     dependencies:
-      convex: 1.11.3
+      convex: 1.12.0
     dev: true
 
-  /convex@1.11.3:
-    resolution: {integrity: sha512-2aZ6WdXfT59TrWynPNE6jQ3DYhYMgy0vzoLPTJsY1CkNbOA+KFIb03l4vQsEQtRU5gpjFbPqnPFsIS23Zlv0bQ==}
+  /convex@1.12.0:
+    resolution: {integrity: sha512-N3WAkGEidECAsd7zkUG1tOIJSUZ9PShxiojkDk9Ha6V50A/iKR9D55LWh2zGKA37IgeUMbwvWx8NcDPO2YxaLA==}
     engines: {node: '>=16.15.1', npm: '>=7.0.0'}
     hasBin: true
     peerDependencies:
@@ -1287,8 +1286,8 @@ packages:
     engines: {node: '>=12'}
     dev: true
 
-  /effect@3.1.2:
-    resolution: {integrity: sha512-XakSWck6w6ROqKyEys0tKE9K6Gx2p8W/09u2ZTEZZrneO5Z3QEdPhXzWTyC73kD5zUvfJinZLVIas8I1xoHaTg==}
+  /effect@3.1.5:
+    resolution: {integrity: sha512-nTkW/ViRF8cXVMKjusYMVp7L1eqLwMZV7K6GHoqq3MD7NjPT/tJRVhY8d6z5Vam9kxgvRAzqwJKkaRpRVz1jTw==}
 
   /esbuild@0.17.19:
     resolution: {integrity: sha512-XQ0jAPFkK/u3LcVRcvVHQcTIqD6E2H1fvZMA5dQPSOWb3suUbWbfbRf94pjc0bNzRYLfIrDRQXr7X+LHIm5oHw==}
@@ -1501,11 +1500,11 @@ packages:
       strip-final-newline: 3.0.0
     dev: true
 
-  /fast-check@3.13.2:
-    resolution: {integrity: sha512-ouTiFyeMoqmNg253xqy4NSacr5sHxH6pZpLOaHgaAdgZxFWdtsfxExwolpveoAE9CJdV+WYjqErNGef6SqA5Mg==}
+  /fast-check@3.18.0:
+    resolution: {integrity: sha512-/951xaT0kA40w0GXRsZXEwSTE7LugjZtSA/8vPgFkiPQ8wNp8tRvqWuNDHBgLxJYXtsK11e/7Q4ObkKW5BdTFQ==}
     engines: {node: '>=8.0.0'}
     dependencies:
-      pure-rand: 6.0.3
+      pure-rand: 6.1.0
     dev: false
 
   /fast-deep-equal@3.1.3:
@@ -2010,8 +2009,8 @@ packages:
     engines: {node: '>=6'}
     dev: true
 
-  /pure-rand@6.0.3:
-    resolution: {integrity: sha512-KddyFewCsO0j3+np81IQ+SweXLDnDQTs5s67BOnrYmYe/yNmUhttQyGsYzy8yUnoljGAQ9sl38YB4vH8ur7Y+w==}
+  /pure-rand@6.1.0:
+    resolution: {integrity: sha512-bVWawvoZoBYpp6yIoQtQXHZjmz35RSVHnUOTefl8Vcjr8snTPY1wnpSPMWekcFwbxI6gtmT7rSYPFvz71ldiOA==}
     dev: false
 
   /queue-microtask@1.2.3:

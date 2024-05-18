@@ -19,12 +19,12 @@
   "author": "RJ Dellecese",
   "license": "ISC",
   "devDependencies": {
-    "@effect/vitest": "^0.4.1",
+    "@effect/vitest": "^0.4.4",
     "@swc/jest": "^0.2.36",
     "@tsconfig/strictest": "2.0.5",
     "@typescript-eslint/eslint-plugin": "7.8.0",
     "@typescript-eslint/parser": "7.8.0",
-    "convex-test": "^0.0.14",
+    "convex-test": "^0.0.16",
     "dotenv": "16.4.5",
     "eslint": "8.57.0",
     "eslint-plugin-no-relative-import-paths": "1.5.4",
@@ -37,8 +37,8 @@
     "vitest": "1.6.0"
   },
   "dependencies": {
-    "@effect/schema": "0.66.14",
-    "convex": "1.11.3",
-    "effect": "3.1.2"
+    "@effect/schema": "0.67.5",
+    "convex": "1.12.0",
+    "effect": "3.1.5"
   }
 }
