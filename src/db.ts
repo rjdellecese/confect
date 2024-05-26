@@ -2,12 +2,10 @@ import { Schema } from "@effect/schema";
 import {
   DocumentByInfo,
   DocumentByName,
-  Expand,
   Expression,
   FilterBuilder,
   GenericDatabaseReader,
   GenericDatabaseWriter,
-  GenericDocument,
   Indexes,
   IndexRange,
   IndexRangeBuilder,
@@ -22,6 +20,7 @@ import {
   SearchFilterBuilder,
   SearchIndexes,
   TableNamesInDataModel,
+  WithOptionalSystemFields,
   WithoutSystemFields,
 } from "convex/server";
 import { GenericId } from "convex/values";
@@ -479,14 +478,3 @@ export const databaseSchemasFromEffectSchema = <
   ) as DatabaseSchemasFromEffectDataModel<
     EffectDataModelFromEffectSchema<EffectSchema>
   >;
-
-// NOTE: These types are copied from convex/src/server/system_fields.ts -- ideally they would be exposed!
-
-type WithOptionalSystemFields<Document extends GenericDocument> = Expand<
-  WithoutSystemFields<Document> &
-    Partial<Pick<Document, keyof SystemFields | "_id">>
->;
-
-type SystemFields = {
-  _creationTime: number;
-};
