@@ -1,4 +1,5 @@
 import {
+  Expand,
   FunctionReference,
   FunctionReturnType,
   GenericActionCtx,
@@ -75,7 +76,7 @@ export type EffectActionCtx<EffectDataModel extends GenericEffectDataModel> = {
     indexName: IndexName,
     query: Expand<
       VectorSearchQuery<NamedTableInfo<EffectDataModel, TableName>, IndexName>
-    >,
+    >
   ): Effect.Effect<Array<{ _id: GenericId<TableName>; _score: number }>>;
 };
 
@@ -83,7 +84,7 @@ export const makeEffectQueryCtx = <
   EffectDataModel extends GenericEffectDataModel,
 >(
   ctx: GenericQueryCtx<DataModelFromEffectDataModel<EffectDataModel>>,
-  databaseSchemas: DatabaseSchemasFromEffectDataModel<EffectDataModel>,
+  databaseSchemas: DatabaseSchemasFromEffectDataModel<EffectDataModel>
 ): EffectQueryCtx<EffectDataModel> => ({
   db: new EffectDatabaseReaderImpl(ctx.db, databaseSchemas),
   auth: new EffectAuthImpl(ctx.auth),
@@ -94,7 +95,7 @@ export const makeEffectMutationCtx = <
   EffectDataModel extends GenericEffectDataModel,
 >(
   ctx: GenericMutationCtx<DataModelFromEffectDataModel<EffectDataModel>>,
-  databaseSchemas: DatabaseSchemasFromEffectDataModel<EffectDataModel>,
+  databaseSchemas: DatabaseSchemasFromEffectDataModel<EffectDataModel>
 ): EffectMutationCtx<EffectDataModel> => ({
   db: new EffectDatabaseWriterImpl(ctx.db, databaseSchemas),
   auth: new EffectAuthImpl(ctx.auth),
@@ -105,7 +106,7 @@ export const makeEffectMutationCtx = <
 export const makeEffectActionCtx = <
   EffectDataModel extends GenericEffectDataModel,
 >(
-  ctx: GenericActionCtx<DataModelFromEffectDataModel<EffectDataModel>>,
+  ctx: GenericActionCtx<DataModelFromEffectDataModel<EffectDataModel>>
 ): EffectActionCtx<EffectDataModel> => ({
   runQuery: <Query extends FunctionReference<"query", "public" | "internal">>(
     query: Query,
@@ -133,18 +134,9 @@ export const makeEffectActionCtx = <
     indexName: IndexName,
     query: Expand<
       VectorSearchQuery<NamedTableInfo<EffectDataModel, TableName>, IndexName>
-    >,
+    >
   ) => Effect.promise(() => ctx.vectorSearch(tableName, indexName, query)),
   auth: new EffectAuthImpl(ctx.auth),
   storage: new EffectStorageWriterImpl(ctx.storage),
   scheduler: new EffectSchedulerImpl(ctx.scheduler),
 });
-
-// NOTE: Remove if/when exposed
-
-type Expand<ObjectType extends Record<any, any>> =
-  ObjectType extends Record<any, any>
-    ? {
-        [Key in keyof ObjectType]: ObjectType[Key];
-      }
-    : never;

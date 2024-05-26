@@ -2,6 +2,7 @@ import * as Schema from "@effect/schema/Schema";
 import {
   defineSchema,
   defineTable,
+  Expand,
   GenericDocument,
   GenericFieldPaths,
   GenericSchema,
@@ -355,13 +356,6 @@ export type EffectDataModelFromEffectSchema<
 };
 
 // NOTE: Remove if/when exposed
-
-type Expand<ObjectType extends Record<any, any>> =
-  ObjectType extends Record<any, any>
-    ? {
-        [Key in keyof ObjectType]: ObjectType[Key];
-      }
-    : never;
 
 type IndexTiebreakerField = "_creationTime";
 

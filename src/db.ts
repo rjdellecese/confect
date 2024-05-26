@@ -2,6 +2,7 @@ import { Schema } from "@effect/schema";
 import {
   DocumentByInfo,
   DocumentByName,
+  Expand,
   Expression,
   FilterBuilder,
   GenericDatabaseReader,
@@ -489,10 +490,3 @@ type WithOptionalSystemFields<Document extends GenericDocument> = Expand<
 type SystemFields = {
   _creationTime: number;
 };
-
-type Expand<ObjectType extends Record<any, any>> =
-  ObjectType extends Record<any, any>
-    ? {
-        [Key in keyof ObjectType]: ObjectType[Key];
-      }
-    : never;
