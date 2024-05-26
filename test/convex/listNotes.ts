@@ -1,9 +1,9 @@
 import { Schema } from "@effect/schema";
 
-import { ConvexServer } from "~/src";
+import { ConfectFunctions } from "~/src";
 import * as schema from "~/test/convex/schema";
 
-export default ConvexServer(schema.effectSchema).query({
+export default ConfectFunctions(schema.confectSchema).query({
   args: Schema.Struct({}),
   handler: ({ db }) => db.query("notes").withIndex("by_content").collect(),
 });

@@ -445,8 +445,6 @@ export class EffectDatabaseWriterImpl<
       value,
       Schema.encode(this.databaseSchemas[table]),
       Effect.andThen((encodedValue) =>
-        // TODO: Not sure why this is erroring
-        // @ts-expect-error not sure
         Effect.promise(() => this.db.insert(table, encodedValue))
       ),
       Effect.orDie

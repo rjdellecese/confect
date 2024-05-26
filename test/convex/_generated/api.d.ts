@@ -14,7 +14,9 @@ import type {
   FilterApi,
   FunctionReference,
 } from "convex/server";
+import type * as basicSchemaOperations from "../basicSchemaOperations.js";
 import type * as clearDatabase from "../clearDatabase.js";
+import type * as confectFunctions from "../confectFunctions.js";
 import type * as insertNote from "../insertNote.js";
 import type * as insertTodo from "../insertTodo.js";
 import type * as listNotes from "../listNotes.js";
@@ -28,7 +30,9 @@ import type * as listNotes from "../listNotes.js";
  * ```
  */
 declare const fullApi: ApiFromModules<{
+  basicSchemaOperations: typeof basicSchemaOperations;
   clearDatabase: typeof clearDatabase;
+  confectFunctions: typeof confectFunctions;
   insertNote: typeof insertNote;
   insertTodo: typeof insertTodo;
   listNotes: typeof listNotes;

@@ -2,7 +2,12 @@ import { Schema } from "@effect/schema";
 
 import { defineEffectSchema, defineEffectTable } from "~/src/schema";
 
-export const effectSchema = defineEffectSchema({
+export const confectSchema = defineEffectSchema({
+  basicSchemaOperations: defineEffectTable(
+    Schema.Struct({
+      text: Schema.String,
+    })
+  ),
   notes: defineEffectTable(
     Schema.Struct({
       content: Schema.String,
@@ -16,6 +21,4 @@ export const effectSchema = defineEffectSchema({
   ).index("by_content", ["content"]),
 });
 
-const convexSchema = effectSchema.schemaDefinition;
-
-export default convexSchema;
+export default confectSchema.schemaDefinition;

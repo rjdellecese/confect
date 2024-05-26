@@ -6,7 +6,7 @@ import { Doc, Id } from "~/test/convex/_generated/dataModel";
 import { test } from "~/test/convex-effect-test";
 import { ConvexService } from "~/test/convex-service";
 
-test("notes are inserted and then retrieved", () =>
+test("are inserted and then retrieved", () =>
   Effect.gen(function* () {
     const c = yield* ConvexService;
 
