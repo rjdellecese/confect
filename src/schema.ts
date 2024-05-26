@@ -9,11 +9,14 @@ import {
   GenericTableIndexes,
   GenericTableSearchIndexes,
   GenericTableVectorIndexes,
+  IdField,
+  IndexTiebreakerField,
   SchemaDefinition,
   SearchIndexConfig,
+  SystemIndexes,
   TableDefinition,
+  VectorIndexConfig,
 } from "convex/server";
-import { GenericId } from "convex/values";
 import { pipe, Record } from "effect";
 
 import schemaToValidatorCompiler from "~/src/schema-to-validator-compiler";
@@ -353,40 +356,4 @@ export type EffectDataModelFromEffectSchema<
         vectorIndexes: VectorIndexes;
       }
     : never;
-};
-
-// NOTE: Remove if/when exposed
-
-type IndexTiebreakerField = "_creationTime";
-
-interface VectorIndexConfig<
-  VectorField extends string,
-  FilterFields extends string,
-> {
-  /**
-   * The field to index for vector search.
-   *
-   * This must be a field of type `v.array(v.float64())` (or a union)
-   */
-  vectorField: VectorField;
-  /**
-   * The length of the vectors indexed. This must be between 2 and 2048 inclusive.
-   */
-  dimensions: number;
-  /**
-   * Additional fields to index for fast filtering when running vector searches.
-   */
-  filterFields?: FilterFields[];
-}
-
-export type IdField<TableName extends string> = {
-  _id: GenericId<TableName>;
-};
-
-export type SystemIndexes = {
-  // We have a system index `by_id` but developers should never have a use
-  // for querying it (`db.get(id)` is always simpler).
-  // by_id: ["_id"];
-
-  by_creation_time: ["_creationTime"];
 };
