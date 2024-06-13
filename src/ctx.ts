@@ -16,7 +16,7 @@ import { Effect } from "effect";
 
 import { EffectAuth, EffectAuthImpl } from "~/src/auth";
 import {
-  DatabaseSchemasFromEffectDataModel,
+  DatabaseSchemasFromConfectDataModel,
   EffectDatabaseReader,
   EffectDatabaseReaderImpl,
   EffectDatabaseWriter,
@@ -24,8 +24,8 @@ import {
 } from "~/src/db";
 import { EffectScheduler, EffectSchedulerImpl } from "~/src/scheduler";
 import {
-  DataModelFromEffectDataModel,
-  GenericEffectDataModel,
+  DataModelFromConfectDataModel,
+  GenericConfectDataModel,
 } from "~/src/schema";
 import {
   EffectStorageReader,
@@ -34,7 +34,7 @@ import {
   EffectStorageWriterImpl,
 } from "~/src/storage";
 
-export type EffectMutationCtx<EffectDataModel extends GenericEffectDataModel> =
+export type EffectMutationCtx<EffectDataModel extends GenericConfectDataModel> =
   {
     db: EffectDatabaseWriter<EffectDataModel>;
     auth: EffectAuth;
@@ -42,13 +42,13 @@ export type EffectMutationCtx<EffectDataModel extends GenericEffectDataModel> =
     scheduler: EffectScheduler;
   };
 
-export type EffectQueryCtx<EffectDataModel extends GenericEffectDataModel> = {
+export type EffectQueryCtx<EffectDataModel extends GenericConfectDataModel> = {
   db: EffectDatabaseReader<EffectDataModel>;
   auth: EffectAuth;
   storage: EffectStorageReader;
 };
 
-export type EffectActionCtx<EffectDataModel extends GenericEffectDataModel> = {
+export type EffectActionCtx<EffectDataModel extends GenericConfectDataModel> = {
   runQuery<Query extends FunctionReference<"query", "public" | "internal">>(
     query: Query,
     ...args: OptionalRestArgs<Query>
@@ -81,10 +81,10 @@ export type EffectActionCtx<EffectDataModel extends GenericEffectDataModel> = {
 };
 
 export const makeEffectQueryCtx = <
-  EffectDataModel extends GenericEffectDataModel,
+  EffectDataModel extends GenericConfectDataModel,
 >(
-  ctx: GenericQueryCtx<DataModelFromEffectDataModel<EffectDataModel>>,
-  databaseSchemas: DatabaseSchemasFromEffectDataModel<EffectDataModel>
+  ctx: GenericQueryCtx<DataModelFromConfectDataModel<EffectDataModel>>,
+  databaseSchemas: DatabaseSchemasFromConfectDataModel<EffectDataModel>
 ): EffectQueryCtx<EffectDataModel> => ({
   db: new EffectDatabaseReaderImpl(ctx.db, databaseSchemas),
   auth: new EffectAuthImpl(ctx.auth),
@@ -92,10 +92,10 @@ export const makeEffectQueryCtx = <
 });
 
 export const makeEffectMutationCtx = <
-  EffectDataModel extends GenericEffectDataModel,
+  EffectDataModel extends GenericConfectDataModel,
 >(
-  ctx: GenericMutationCtx<DataModelFromEffectDataModel<EffectDataModel>>,
-  databaseSchemas: DatabaseSchemasFromEffectDataModel<EffectDataModel>
+  ctx: GenericMutationCtx<DataModelFromConfectDataModel<EffectDataModel>>,
+  databaseSchemas: DatabaseSchemasFromConfectDataModel<EffectDataModel>
 ): EffectMutationCtx<EffectDataModel> => ({
   db: new EffectDatabaseWriterImpl(ctx.db, databaseSchemas),
   auth: new EffectAuthImpl(ctx.auth),
@@ -104,9 +104,9 @@ export const makeEffectMutationCtx = <
 });
 
 export const makeEffectActionCtx = <
-  EffectDataModel extends GenericEffectDataModel,
+  EffectDataModel extends GenericConfectDataModel,
 >(
-  ctx: GenericActionCtx<DataModelFromEffectDataModel<EffectDataModel>>
+  ctx: GenericActionCtx<DataModelFromConfectDataModel<EffectDataModel>>
 ): EffectActionCtx<EffectDataModel> => ({
   runQuery: <Query extends FunctionReference<"query", "public" | "internal">>(
     query: Query,

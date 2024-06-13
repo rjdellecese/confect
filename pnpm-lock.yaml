@@ -6,25 +6,28 @@ settings:
 
 dependencies:
   '@effect/schema':
-    specifier: 0.67.5
-    version: 0.67.5(effect@3.1.5)
+    specifier: 0.67.22
+    version: 0.67.22(effect@3.3.1)
   convex:
-    specifier: 1.12.0
-    version: 1.12.0
+    specifier: 1.12.1
+    version: 1.12.1
   effect:
-    specifier: 3.1.5
-    version: 3.1.5
+    specifier: 3.3.1
+    version: 3.3.1
+  type-fest:
+    specifier: ^4.20.0
+    version: 4.20.0
 
 devDependencies:
   '@effect/platform':
-    specifier: ^0.53.8
-    version: 0.53.8(@effect/schema@0.67.5)(effect@3.1.5)
+    specifier: ^0.57.0
+    version: 0.57.0(@effect/schema@0.67.22)(effect@3.3.1)
   '@effect/platform-node':
-    specifier: ^0.49.8
-    version: 0.49.8(@effect/platform@0.53.8)(effect@3.1.5)
+    specifier: ^0.51.9
+    version: 0.51.9(@effect/platform@0.57.0)(effect@3.3.1)
   '@effect/vitest':
-    specifier: ^0.4.4
-    version: 0.4.4(effect@3.1.5)(vitest@1.6.0)
+    specifier: ^0.5.11
+    version: 0.5.11(effect@3.3.1)(vitest@1.6.0)
   '@swc/jest':
     specifier: ^0.2.36
     version: 0.2.36(@swc/core@1.4.1)
@@ -38,8 +41,8 @@ devDependencies:
     specifier: 7.8.0
     version: 7.8.0(eslint@8.57.0)(typescript@5.4.5)
   convex-test:
-    specifier: ^0.0.16
-    version: 0.0.16(convex@1.12.0)
+    specifier: ^0.0.21
+    version: 0.0.21(convex@1.12.1)
   dotenv:
     specifier: 16.4.5
     version: 16.4.5
@@ -56,17 +59,17 @@ devDependencies:
     specifier: 3.2.0
     version: 3.2.0(@typescript-eslint/eslint-plugin@7.8.0)(eslint@8.57.0)
   prettier:
-    specifier: 3.2.5
-    version: 3.2.5
+    specifier: 3.3.2
+    version: 3.3.2
   typescript:
     specifier: 5.4.5
     version: 5.4.5
   vite:
-    specifier: 5.2.11
-    version: 5.2.11
+    specifier: 5.2.13
+    version: 5.2.13
   vite-tsconfig-paths:
     specifier: ^4.3.2
-    version: 4.3.2(typescript@5.4.5)(vite@5.2.11)
+    version: 4.3.2(typescript@5.4.5)(vite@5.2.13)
   vitest:
     specifier: 1.6.0
     version: 1.6.0
@@ -78,63 +81,63 @@ packages:
     engines: {node: '>=0.10.0'}
     dev: true
 
-  /@effect/platform-node-shared@0.4.27(@effect/platform@0.53.8)(effect@3.1.5):
-    resolution: {integrity: sha512-IFWdYUecJKYisJAI4jDBSWcQY8dM/zIwc92ko6cyv7Tj+HAkrH6skZ1tRiojYjLv2rJVW77G+O/3owr0uXMILw==}
+  /@effect/platform-node-shared@0.6.9(@effect/platform@0.57.0)(effect@3.3.1):
+    resolution: {integrity: sha512-z6FlFbky/VDyrRYeA+Lme5a+/VnFOLhnc5ZSP5wKN59x5KLYy68+pcDFmQ5QKObeJqErgG3Qok+VSxVyf+Vorw==}
     peerDependencies:
-      '@effect/platform': ^0.53.8
-      effect: ^3.1.5
+      '@effect/platform': ^0.57.0
+      effect: ^3.3.1
     dependencies:
-      '@effect/platform': 0.53.8(@effect/schema@0.67.5)(effect@3.1.5)
+      '@effect/platform': 0.57.0(@effect/schema@0.67.22)(effect@3.3.1)
       '@parcel/watcher': 2.4.1
-      effect: 3.1.5
+      effect: 3.3.1
       multipasta: 0.2.1
     dev: true
 
-  /@effect/platform-node@0.49.8(@effect/platform@0.53.8)(effect@3.1.5):
-    resolution: {integrity: sha512-iANAOsFopX2Nq0X3fhMPr/f0x3vMYgaNKAS9jq7/SbxzZ7DYNFnf1oyOGAzZDTLggDJQW7Yfc6XIuJQEY/nWqQ==}
+  /@effect/platform-node@0.51.9(@effect/platform@0.57.0)(effect@3.3.1):
+    resolution: {integrity: sha512-1ZpSoS2UMurl/LnYQdT+41BzwO3NrUCsy7apQB5u8/YobYJygIXMrPSl7euBHipSqiAqMNE2EWDoJ+1xlTE9kQ==}
     peerDependencies:
-      '@effect/platform': ^0.53.8
-      effect: ^3.1.5
+      '@effect/platform': ^0.57.0
+      effect: ^3.3.1
     dependencies:
-      '@effect/platform': 0.53.8(@effect/schema@0.67.5)(effect@3.1.5)
-      '@effect/platform-node-shared': 0.4.27(@effect/platform@0.53.8)(effect@3.1.5)
-      effect: 3.1.5
+      '@effect/platform': 0.57.0(@effect/schema@0.67.22)(effect@3.3.1)
+      '@effect/platform-node-shared': 0.6.9(@effect/platform@0.57.0)(effect@3.3.1)
+      effect: 3.3.1
       mime: 3.0.0
-      undici: 6.17.0
+      undici: 6.18.2
       ws: 8.17.0
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
     dev: true
 
-  /@effect/platform@0.53.8(@effect/schema@0.67.5)(effect@3.1.5):
-    resolution: {integrity: sha512-TUn2oxFIOFH1ObdeCxtGA/8BYjUtdhppbw9IcYTHkAKXE8Y8DIjNCzgs+Z7k4Oj7ZD36uqTQvVQumlmTldHhfw==}
+  /@effect/platform@0.57.0(@effect/schema@0.67.22)(effect@3.3.1):
+    resolution: {integrity: sha512-rFp7LRcID1ekMXE2IisYl0JtYuzjfocOcts16bCKC5QG3jEtctly9/SG2NBclc9rpXwuuvycJ6VK4LepAJf8IA==}
     peerDependencies:
-      '@effect/schema': ^0.67.5
-      effect: ^3.1.5
+      '@effect/schema': ^0.67.22
+      effect: ^3.3.1
     dependencies:
-      '@effect/schema': 0.67.5(effect@3.1.5)
-      effect: 3.1.5
+      '@effect/schema': 0.67.22(effect@3.3.1)
+      effect: 3.3.1
       find-my-way-ts: 0.1.2
       multipasta: 0.2.1
       path-browserify: 1.0.1
     dev: true
 
-  /@effect/schema@0.67.5(effect@3.1.5):
-    resolution: {integrity: sha512-RxlnCahk1rEmbosz0ZOb6mu3PTrf27+X+LQKeytFkDgUiNqQUyrLUUTMwh0BckPeRudeWpb7WKhpJvzJyG8uBw==}
+  /@effect/schema@0.67.22(effect@3.3.1):
+    resolution: {integrity: sha512-TDPUYnxzQERxNh2JPtn1GeXDVFVpXLRvjaMCJX+AMokaB9u7+ipODcZybV0VmV0FDaTLLFqiXIIe7gWyYqQoVA==}
     peerDependencies:
-      effect: ^3.1.5
+      effect: ^3.3.1
     dependencies:
-      effect: 3.1.5
+      effect: 3.3.1
       fast-check: 3.18.0
 
-  /@effect/vitest@0.4.4(effect@3.1.5)(vitest@1.6.0):
-    resolution: {integrity: sha512-pdt/UsZnIOaZX9Vwi7f6kVa8/DizFE2eGSK7gQaeH0ua8oK/tOFQ++QiRrP4SDJUrDzimEhE0jwsqbeB8V5IXQ==}
+  /@effect/vitest@0.5.11(effect@3.3.1)(vitest@1.6.0):
+    resolution: {integrity: sha512-UdA9MZOEMEpumIOEnEPjH38yY/sJO2D7i7GGiRcVAsKnqpl/jZEB5Eizsnro+6F4c+ZN4PKevnuFhbYsIfhMWw==}
     peerDependencies:
-      effect: ^3.1.5
+      effect: ^3.3.1
       vitest: ^1.4.0
     dependencies:
-      effect: 3.1.5
+      effect: 3.3.1
       vitest: 1.6.0
     dev: true
 
@@ -1374,16 +1377,16 @@ packages:
     resolution: {integrity: sha512-/Srv4dswyQNBfohGpz9o6Yb3Gz3SrUDqBH5rTuhGR7ahtlbYKnVxw2bCFMRljaA7EXHaXZ8wsHdodFvbkhKmqg==}
     dev: true
 
-  /convex-test@0.0.16(convex@1.12.0):
-    resolution: {integrity: sha512-K6uAFqyIbb5A0rBN9Wwk3u4R1lYqImnS4cO8FJkYdlz8gESW1/pO/ckhL4oowZF4eEKVPPzTztFjSJ835WXSbg==}
+  /convex-test@0.0.21(convex@1.12.1):
+    resolution: {integrity: sha512-Wo21g77F4jpun3DqOK8kbVOFjYC5SkqcZQSZeQGW84sUaY6hloPqIR0rfyMwer/jiHEVzPBu/A9W6eu3dkKFxw==}
     peerDependencies:
-      convex: ^1.10.0
+      convex: ^1.12.1
     dependencies:
-      convex: 1.12.0
+      convex: 1.12.1
     dev: true
 
-  /convex@1.12.0:
-    resolution: {integrity: sha512-N3WAkGEidECAsd7zkUG1tOIJSUZ9PShxiojkDk9Ha6V50A/iKR9D55LWh2zGKA37IgeUMbwvWx8NcDPO2YxaLA==}
+  /convex@1.12.1:
+    resolution: {integrity: sha512-vZHVyyzlbXl/Vskq2GTADBzSHqFxC0THHCHHoNDBNdO/QKW50nyYwyCEmKoHjlnhuQGkfcvGYjz5uyKM0/sxVQ==}
     engines: {node: '>=16.15.1', npm: '>=7.0.0'}
     hasBin: true
     peerDependencies:
@@ -1470,8 +1473,8 @@ packages:
     engines: {node: '>=12'}
     dev: true
 
-  /effect@3.1.5:
-    resolution: {integrity: sha512-nTkW/ViRF8cXVMKjusYMVp7L1eqLwMZV7K6GHoqq3MD7NjPT/tJRVhY8d6z5Vam9kxgvRAzqwJKkaRpRVz1jTw==}
+  /effect@3.3.1:
+    resolution: {integrity: sha512-MP6W5NKSEgsQWgTZcLXTPu6sDjCO3Rqi9NFdYUBjlUZ1poCclLgzUerSVVnymE1oYBG1/7Ix82LpBp7EB5Lxmw==}
 
   /esbuild@0.17.19:
     resolution: {integrity: sha512-XQ0jAPFkK/u3LcVRcvVHQcTIqD6E2H1fvZMA5dQPSOWb3suUbWbfbRf94pjc0bNzRYLfIrDRQXr7X+LHIm5oHw==}
@@ -2213,6 +2216,12 @@ packages:
     engines: {node: '>=14'}
     hasBin: true
 
+  /prettier@3.3.2:
+    resolution: {integrity: sha512-rAVeHYMcv8ATV5d508CFdn+8/pHPpXeIid1DdrPwXnaAdH7cqjVbpJaT5eq4yRAFU/lsbwYwSF/n5iNrdJHPQA==}
+    engines: {node: '>=14'}
+    hasBin: true
+    dev: true
+
   /pretty-format@29.7.0:
     resolution: {integrity: sha512-Pdlw/oPxN+aXdmM9R00JVC9WVFoCLTKJvDVLgmJ+qAffBMxsV85l/Lu7sNx4zSzPyoL2euImuEwHhOXdEgNFZQ==}
     engines: {node: ^14.15.0 || ^16.10.0 || >=18.0.0}
@@ -2430,6 +2439,11 @@ packages:
     engines: {node: '>=10'}
     dev: true
 
+  /type-fest@4.20.0:
+    resolution: {integrity: sha512-MBh+PHUHHisjXf4tlx0CFWoMdjx8zCMLJHOjnV1prABYZFHqtFOyauCIK2/7w4oIfwkF8iNhLtnJEfVY2vn3iw==}
+    engines: {node: '>=16'}
+    dev: false
+
   /typescript@5.4.5:
     resolution: {integrity: sha512-vcI4UpRgg81oIRUFwR0WSIHKt11nJ7SAVlYNIu+QpqeyXP+gpQJy/Z4+F0aGxSE4MqwjyXvW/TzgkLAx2AGHwQ==}
     engines: {node: '>=14.17'}
@@ -2440,8 +2454,8 @@ packages:
     resolution: {integrity: sha512-bRn3CsoojyNStCZe0BG0Mt4Nr/4KF+rhFlnNXybgqt5pXHNFRlqinSoQaTrGyzE4X8aHplSb+TorH+COin9Yxw==}
     dev: true
 
-  /undici@6.17.0:
-    resolution: {integrity: sha512-fs13QiDjPIzJ7gFAOal9CSG0c92rT2xw6MuMUJ4H30Eg5GCauLWYCCZA1tInjd6M4y+JZjVCCFr9pFpbhcC64w==}
+  /undici@6.18.2:
+    resolution: {integrity: sha512-o/MQLTwRm9IVhOqhZ0NQ9oXax1ygPjw6Vs+Vq/4QRjbOAC3B1GCHy7TYxxbExKlb7bzDRzt9vBWU6BDz0RFfYg==}
     engines: {node: '>=18.17'}
     dev: true
 
@@ -2460,7 +2474,7 @@ packages:
       debug: 4.3.4
       pathe: 1.1.1
       picocolors: 1.0.0
-      vite: 5.2.11
+      vite: 5.2.13
     transitivePeerDependencies:
       - '@types/node'
       - less
@@ -2472,7 +2486,7 @@ packages:
       - terser
     dev: true
 
-  /vite-tsconfig-paths@4.3.2(typescript@5.4.5)(vite@5.2.11):
+  /vite-tsconfig-paths@4.3.2(typescript@5.4.5)(vite@5.2.13):
     resolution: {integrity: sha512-0Vd/a6po6Q+86rPlntHye7F31zA2URZMbH8M3saAZ/xR9QoGN/L21bxEGfXdWmFdNkqPpRdxFT7nmNe12e9/uA==}
     peerDependencies:
       vite: '*'
@@ -2483,14 +2497,14 @@ packages:
       debug: 4.3.4
       globrex: 0.1.2
       tsconfck: 3.0.3(typescript@5.4.5)
-      vite: 5.2.11
+      vite: 5.2.13
     transitivePeerDependencies:
       - supports-color
       - typescript
     dev: true
 
-  /vite@5.2.11:
-    resolution: {integrity: sha512-HndV31LWW05i1BLPMUCE1B9E9GFbOu1MbenhS58FuK6owSO5qHm7GiCotrNY1YE5rMeQSFBGmT5ZaLEjFizgiQ==}
+  /vite@5.2.13:
+    resolution: {integrity: sha512-SSq1noJfY9pR3I1TUENL3rQYDQCFqgD+lM6fTRAM8Nv6Lsg5hDLaXkjETVeBt+7vZBCMoibD+6IWnT2mJ+Zb/A==}
     engines: {node: ^18.0.0 || >=20.0.0}
     hasBin: true
     peerDependencies:
@@ -2566,7 +2580,7 @@ packages:
       strip-literal: 2.1.0
       tinybench: 2.5.1
       tinypool: 0.8.3
-      vite: 5.2.11
+      vite: 5.2.13
       vite-node: 1.6.0
       why-is-node-running: 2.2.2
     transitivePeerDependencies:

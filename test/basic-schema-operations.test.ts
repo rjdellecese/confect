@@ -36,6 +36,7 @@ test("todos are inserted and then retrieved", () =>
       c.mutation(api.insertTodo.default, {
         content,
         dueDate: dueDateMillis,
+        assignees: [],
       })
     );
 

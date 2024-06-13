@@ -1,1 +1,1 @@
-export { ConfectFunctions } from "./ConfectFunctions";
+export { confectServer } from "./server";

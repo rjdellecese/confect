@@ -18,59 +18,58 @@ import {
   VectorIndexConfig,
 } from "convex/server";
 import { pipe, Record } from "effect";
+import { ReadonlyDeep, WritableDeep } from "type-fest";
 
 import schemaToValidatorCompiler from "~/src/schema-to-validator-compiler";
 
-export type GenericEffectSchema = Record<
+export type GenericConfectSchema = Record<
   string,
-  EffectTableDefinition<any, any>
+  ConfectTableDefinition<any, any>
 >;
 
-export interface EffectSchemaDefinition<
-  DatabaseSchema extends GenericSchema,
-  TypeScriptSchema extends GenericEffectSchema,
+export interface ConfectSchemaDefinition<
+  ConvexSchema extends GenericSchema,
+  ConfectSchema extends GenericConfectSchema,
 > {
-  effectSchema: TypeScriptSchema;
-  schemaDefinition: SchemaDefinition<DatabaseSchema, true>;
+  confectSchema: ConfectSchema;
+  schemaDefinition: SchemaDefinition<ConvexSchema, true>;
 }
 
-class EffectSchemaDefinitionImpl<
-  DatabaseSchema extends GenericSchema,
-  TypeScriptSchema extends GenericEffectSchema,
-> implements EffectSchemaDefinition<DatabaseSchema, TypeScriptSchema>
+class ConfectSchemaDefinitionImpl<
+  ConvexSchema extends GenericSchema,
+  ConfectSchema extends GenericConfectSchema,
+> implements ConfectSchemaDefinition<ConvexSchema, ConfectSchema>
 {
-  effectSchema: TypeScriptSchema;
-  schemaDefinition: SchemaDefinition<DatabaseSchema, true>;
+  confectSchema: ConfectSchema;
+  schemaDefinition: SchemaDefinition<ConvexSchema, true>;
 
-  constructor(effectSchema: TypeScriptSchema) {
-    this.effectSchema = effectSchema;
+  constructor(effectSchema: ConfectSchema) {
+    this.confectSchema = effectSchema;
     this.schemaDefinition = pipe(
       effectSchema,
       Record.map(({ tableDefinition }) => tableDefinition),
       defineSchema
-    ) as SchemaDefinition<DatabaseSchema, true>;
+    ) as SchemaDefinition<ConvexSchema, true>;
   }
 }
 
-type SchemaDefinitionFromEffectSchemaDefinition<
-  TypeScriptSchema extends GenericEffectSchema,
+type SchemaDefinitionFromConfectSchemaDefinition<
+  ConfectSchema extends GenericConfectSchema,
 > = Expand<{
-  [TableName in keyof TypeScriptSchema]: TypeScriptSchema[TableName]["tableDefinition"];
+  [TableName in keyof ConfectSchema]: ConfectSchema[TableName]["tableDefinition"];
 }>;
 
-export const defineEffectSchema = <
-  TypeScriptSchema extends GenericEffectSchema,
->(
-  effectSchema: TypeScriptSchema
+export const defineConfectSchema = <ConfectSchema extends GenericConfectSchema>(
+  confectSchema: ConfectSchema
 ) =>
-  new EffectSchemaDefinitionImpl<
-    SchemaDefinitionFromEffectSchemaDefinition<TypeScriptSchema>,
-    TypeScriptSchema
-  >(effectSchema);
+  new ConfectSchemaDefinitionImpl<
+    SchemaDefinitionFromConfectSchemaDefinition<ConfectSchema>,
+    ConfectSchema
+  >(confectSchema);
 
-export interface EffectTableDefinition<
-  DatabaseDocument extends GenericDocument,
-  TypeScriptDocument extends GenericEffectDocument,
+export interface ConfectTableDefinition<
+  ConvexDocument extends ReadonlyDeep<GenericDocument>,
+  ConfectDocument extends GenericConfectDocument,
   FieldPaths extends GenericFieldPaths = string,
   // eslint-disable-next-line @typescript-eslint/ban-types
   Indexes extends GenericTableIndexes = {},
@@ -86,9 +85,9 @@ export interface EffectTableDefinition<
   >(
     name: IndexName,
     fields: [FirstFieldPath, ...RestFieldPaths]
-  ): EffectTableDefinition<
-    DatabaseDocument,
-    TypeScriptDocument,
+  ): ConfectTableDefinition<
+    ConvexDocument,
+    ConfectDocument,
     FieldPaths,
     Expand<
       Indexes &
@@ -107,9 +106,9 @@ export interface EffectTableDefinition<
   >(
     name: IndexName,
     indexConfig: Expand<SearchIndexConfig<SearchField, FilterFields>>
-  ): EffectTableDefinition<
-    DatabaseDocument,
-    TypeScriptDocument,
+  ): ConfectTableDefinition<
+    ConvexDocument,
+    ConfectDocument,
     FieldPaths,
     Indexes,
     Expand<
@@ -131,9 +130,9 @@ export interface EffectTableDefinition<
   >(
     name: IndexName,
     indexConfig: Expand<VectorIndexConfig<VectorField, FilterFields>>
-  ): EffectTableDefinition<
-    DatabaseDocument,
-    TypeScriptDocument,
+  ): ConfectTableDefinition<
+    ConvexDocument,
+    ConfectDocument,
     FieldPaths,
     Indexes,
     SearchIndexes,
@@ -150,18 +149,18 @@ export interface EffectTableDefinition<
     >
   >;
   tableDefinition: TableDefinition<
-    DatabaseDocument,
+    WritableDeep<ConvexDocument>,
     FieldPaths,
     Indexes,
     SearchIndexes,
     VectorIndexes
   >;
-  schema: Schema.Schema<TypeScriptDocument, DatabaseDocument>;
+  schema: Schema.Schema<ConfectDocument, ConvexDocument>;
 }
 
-class EffectTableDefinitionImpl<
-  DatabaseDocument extends GenericDocument,
-  TypeScriptDocument extends GenericEffectDocument,
+class ConfectTableDefinitionImpl<
+  ConvexDocument extends ReadonlyDeep<GenericDocument>,
+  ConfectDocument extends GenericConfectDocument,
   FieldPaths extends GenericFieldPaths = string,
   // eslint-disable-next-line @typescript-eslint/ban-types
   Indexes extends GenericTableIndexes = {},
@@ -170,9 +169,9 @@ class EffectTableDefinitionImpl<
   // eslint-disable-next-line @typescript-eslint/ban-types
   VectorIndexes extends GenericTableVectorIndexes = {},
 > implements
-    EffectTableDefinition<
-      DatabaseDocument,
-      TypeScriptDocument,
+    ConfectTableDefinition<
+      ConvexDocument,
+      ConfectDocument,
       FieldPaths,
       Indexes,
       SearchIndexes,
@@ -180,15 +179,15 @@ class EffectTableDefinitionImpl<
     >
 {
   tableDefinition: TableDefinition<
-    DatabaseDocument,
+    WritableDeep<ConvexDocument>,
     FieldPaths,
     Indexes,
     SearchIndexes,
     VectorIndexes
   >;
-  schema: Schema.Schema<TypeScriptDocument, DatabaseDocument>;
+  schema: Schema.Schema<ConfectDocument, ConvexDocument>;
 
-  constructor(schema: Schema.Schema<TypeScriptDocument, DatabaseDocument>) {
+  constructor(schema: Schema.Schema<ConfectDocument, ConvexDocument>) {
     this.schema = schema;
     this.tableDefinition = defineTable(schemaToValidatorCompiler.table(schema));
   }
@@ -200,9 +199,9 @@ class EffectTableDefinitionImpl<
   >(
     name: IndexName,
     fields: [FirstFieldPath, ...RestFieldPaths]
-  ): EffectTableDefinition<
-    DatabaseDocument,
-    TypeScriptDocument,
+  ): ConfectTableDefinition<
+    ConvexDocument,
+    ConfectDocument,
     FieldPaths,
     Expand<
       Indexes &
@@ -226,9 +225,9 @@ class EffectTableDefinitionImpl<
   >(
     name: IndexName,
     indexConfig: Expand<SearchIndexConfig<SearchField, FilterFields>>
-  ): EffectTableDefinition<
-    DatabaseDocument,
-    TypeScriptDocument,
+  ): ConfectTableDefinition<
+    ConvexDocument,
+    ConfectDocument,
     FieldPaths,
     Indexes,
     Expand<
@@ -259,9 +258,9 @@ class EffectTableDefinitionImpl<
       dimensions: number;
       filterFields?: FilterFields[] | undefined;
     }
-  ): EffectTableDefinition<
-    DatabaseDocument,
-    TypeScriptDocument,
+  ): ConfectTableDefinition<
+    ConvexDocument,
+    ConfectDocument,
     FieldPaths,
     Indexes,
     SearchIndexes,
@@ -283,21 +282,21 @@ class EffectTableDefinitionImpl<
   }
 }
 
-export const defineEffectTable = <
-  DatabaseDocument extends GenericDocument,
-  TypeScriptDocument extends GenericEffectDocument,
+export const defineConfectTable = <
+  ConvexDocument extends ReadonlyDeep<GenericDocument>,
+  ConfectDocument extends GenericConfectDocument,
 >(
-  schema: Schema.Schema<TypeScriptDocument, DatabaseDocument>
-): EffectTableDefinition<DatabaseDocument, TypeScriptDocument> =>
-  new EffectTableDefinitionImpl(schema);
+  schema: Schema.Schema<ConfectDocument, ConvexDocument>
+): ConfectTableDefinition<ConvexDocument, ConfectDocument> =>
+  new ConfectTableDefinitionImpl(schema);
 
 // TODO: Put in `data-model.ts` module, to mirror how Convex organizes things?
 
-export type GenericEffectDocument = Record<string, any>;
+export type GenericConfectDocument = Record<string, any>;
 
-export type GenericEffectTableInfo = {
+export type GenericConfectTableInfo = {
   document: GenericDocument;
-  effectDocument: GenericEffectDocument;
+  confectDocument: GenericConfectDocument;
   fieldPaths: GenericFieldPaths;
   indexes: GenericTableIndexes;
   searchIndexes: GenericTableSearchIndexes;
@@ -305,41 +304,42 @@ export type GenericEffectTableInfo = {
 };
 
 // TODO: Type-level test?
-export type TableInfoFromEffectTableInfo<
-  EffectTableInfo extends GenericEffectTableInfo,
+export type TableInfoFromConfectTableInfo<
+  ConfectTableInfo extends GenericConfectTableInfo,
 > = {
-  document: EffectTableInfo["document"];
-  fieldPaths: EffectTableInfo["fieldPaths"];
-  indexes: EffectTableInfo["indexes"];
-  searchIndexes: EffectTableInfo["searchIndexes"];
-  vectorIndexes: EffectTableInfo["vectorIndexes"];
+  document: ConfectTableInfo["document"];
+  fieldPaths: ConfectTableInfo["fieldPaths"];
+  indexes: ConfectTableInfo["indexes"];
+  searchIndexes: ConfectTableInfo["searchIndexes"];
+  vectorIndexes: ConfectTableInfo["vectorIndexes"];
 };
 
-export type GenericEffectDataModel = Record<string, GenericEffectTableInfo>;
+export type GenericConfectDataModel = Record<string, GenericConfectTableInfo>;
 
 // TODO: Type-level test?
-export type DataModelFromEffectDataModel<
-  EffectDataModel extends GenericEffectDataModel,
+export type DataModelFromConfectDataModel<
+  ConfectDataModel extends GenericConfectDataModel,
 > = {
-  [TableName in keyof EffectDataModel]: TableInfoFromEffectTableInfo<
-    EffectDataModel[TableName]
+  [TableName in keyof ConfectDataModel]: TableInfoFromConfectTableInfo<
+    ConfectDataModel[TableName]
   >;
 };
 
-export type TableNamesInEffectDataModel<
-  EffectDataModel extends GenericEffectDataModel,
-> = keyof EffectDataModel & string;
+export type TableNamesInConfectDataModel<
+  ConfectDataModel extends GenericConfectDataModel,
+> = keyof ConfectDataModel & string;
 
-export type TableNamesInEffectSchema<EffectSchema extends GenericEffectSchema> =
-  keyof EffectSchema & string;
+export type TableNamesInConfectSchema<
+  ConfectSchema extends GenericConfectSchema,
+> = keyof ConfectSchema & string;
 
-export type EffectDataModelFromEffectSchema<
-  EffectSchema extends GenericEffectSchema,
+export type ConfectDataModelFromEffectSchema<
+  ConfectSchema extends GenericConfectSchema,
 > = {
-  [TableName in keyof EffectSchema &
-    string]: EffectSchema[TableName] extends EffectTableDefinition<
+  [TableName in keyof ConfectSchema &
+    string]: ConfectSchema[TableName] extends ConfectTableDefinition<
     infer Document,
-    infer EffectDocument,
+    infer ConfectDocument,
     infer FieldPaths,
     infer Indexes,
     infer SearchIndexes,
@@ -348,8 +348,8 @@ export type EffectDataModelFromEffectSchema<
     ? {
         // We've already added all of the system fields except for `_id`.
         // Add that here.
-        document: Expand<IdField<TableName> & Document>;
-        effectDocument: Expand<IdField<TableName> & EffectDocument>;
+        document: Expand<IdField<TableName> & WritableDeep<Document>>;
+        confectDocument: Expand<IdField<TableName> & ConfectDocument>;
         fieldPaths: keyof IdField<TableName> | FieldPaths;
         indexes: Expand<Indexes & SystemIndexes>;
         searchIndexes: SearchIndexes;

@@ -1,22 +1,23 @@
 import { Schema } from "@effect/schema";
 
-import { defineEffectSchema, defineEffectTable } from "~/src/schema";
+import { defineConfectSchema, defineConfectTable } from "~/src/schema";
 
-export const confectSchema = defineEffectSchema({
-  basicSchemaOperations: defineEffectTable(
+export const confectSchema = defineConfectSchema({
+  basicSchemaOperations: defineConfectTable(
     Schema.Struct({
       text: Schema.String,
     })
   ),
-  notes: defineEffectTable(
+  notes: defineConfectTable(
     Schema.Struct({
       content: Schema.String,
     })
   ).index("by_content", ["content"]),
-  todos: defineEffectTable(
+  todos: defineConfectTable(
     Schema.Struct({
-      content: Schema.String,
+      content: Schema.NonEmpty,
       dueDate: Schema.DateFromNumber,
+      assignees: Schema.Array(Schema.NonEmpty).pipe(Schema.maxItems(10)),
     })
   ).index("by_content", ["content"]),
 });

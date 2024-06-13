@@ -1,9 +1,9 @@
 import {
-  GenericEffectDataModel,
-  TableNamesInEffectDataModel,
+  GenericConfectDataModel,
+  TableNamesInConfectDataModel,
 } from "~/src/schema";
 
-export type EffectDocumentByName<
-  EffectDataModel extends GenericEffectDataModel,
-  TableName extends TableNamesInEffectDataModel<EffectDataModel>,
-> = EffectDataModel[TableName]["effectDocument"];
+export type ConfectDocumentByName<
+  EffectDataModel extends GenericConfectDataModel,
+  TableName extends TableNamesInConfectDataModel<EffectDataModel>,
+> = EffectDataModel[TableName]["confectDocument"];

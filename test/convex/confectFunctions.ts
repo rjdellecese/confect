@@ -1,4 +1,4 @@
-import { ConfectFunctions } from "~/src";
+import { confectServer } from "~/src";
 import { confectSchema } from "~/test/convex/schema";
 
 export const {
@@ -9,4 +9,8 @@ export const {
   internalQuery,
   mutation,
   query,
-} = ConfectFunctions(confectSchema);
+  // TODO:
+  // QueryCtx,
+  // MutationCtx,
+  // ActionCtx,
+} = confectServer(confectSchema);
