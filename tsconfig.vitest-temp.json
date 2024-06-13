@@ -1,0 +1,42 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "allowUnusedLabels": false,
+    "allowUnreachableCode": false,
+    "exactOptionalPropertyTypes": false,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "isolatedModules": true,
+    "checkJs": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "lib": [
+      "ESNext",
+      "DOM"
+    ],
+    "target": "ESNext",
+    "moduleResolution": "Bundler",
+    "module": "ESNext",
+    "baseUrl": "./",
+    "paths": {
+      "~/*": [
+        "*"
+      ]
+    },
+    "emitDeclarationOnly": false,
+    "incremental": true,
+    "tsBuildInfoFile": "/workspaces/effect-convex/node_modules/.pnpm/vitest@1.6.0/node_modules/vitest/dist/vendor/tsconfig.tmp.tsbuildinfo"
+  },
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "_version": "2.0.0",
+  "exclude": [
+    "node_modules",
+    "dist",
+    "test/convex"
+  ]
+}

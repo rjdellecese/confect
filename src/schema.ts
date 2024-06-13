@@ -20,11 +20,17 @@ import {
 import { pipe, Record } from "effect";
 import { ReadonlyDeep, WritableDeep } from "type-fest";
 
+import { GenericConfectDocument } from "~/src/data-model";
 import schemaToValidatorCompiler from "~/src/schema-to-validator-compiler";
 
 export type GenericConfectSchema = Record<
   string,
   ConfectTableDefinition<any, any>
+>;
+
+export type GenericConfectSchemaDefinition = ConfectSchemaDefinition<
+  GenericSchema,
+  GenericConfectSchema
 >;
 
 export interface ConfectSchemaDefinition<
@@ -56,7 +62,8 @@ class ConfectSchemaDefinitionImpl<
 type SchemaDefinitionFromConfectSchemaDefinition<
   ConfectSchema extends GenericConfectSchema,
 > = Expand<{
-  [TableName in keyof ConfectSchema]: ConfectSchema[TableName]["tableDefinition"];
+  [TableName in keyof ConfectSchema &
+    string]: ConfectSchema[TableName]["tableDefinition"];
 }>;
 
 export const defineConfectSchema = <ConfectSchema extends GenericConfectSchema>(
@@ -78,6 +85,15 @@ export interface ConfectTableDefinition<
   // eslint-disable-next-line @typescript-eslint/ban-types
   VectorIndexes extends GenericTableVectorIndexes = {},
 > {
+  tableDefinition: TableDefinition<
+    WritableDeep<ConvexDocument>,
+    FieldPaths,
+    Indexes,
+    SearchIndexes,
+    VectorIndexes
+  >;
+  schema: Schema.Schema<ConfectDocument, ConvexDocument>;
+
   index<
     IndexName extends string,
     FirstFieldPath extends FieldPaths,
@@ -148,15 +164,17 @@ export interface ConfectTableDefinition<
         >
     >
   >;
-  tableDefinition: TableDefinition<
-    WritableDeep<ConvexDocument>,
-    FieldPaths,
-    Indexes,
-    SearchIndexes,
-    VectorIndexes
-  >;
-  schema: Schema.Schema<ConfectDocument, ConvexDocument>;
 }
+
+export type ConfectSchemaFromConfectSchemaDefinition<
+  ConfectSchemaDef extends GenericConfectSchemaDefinition,
+> =
+  ConfectSchemaDef extends ConfectSchemaDefinition<
+    infer _ConvexSchema,
+    infer ConfectSchema
+  >
+    ? ConfectSchema
+    : never;
 
 class ConfectTableDefinitionImpl<
   ConvexDocument extends ReadonlyDeep<GenericDocument>,
@@ -287,53 +305,24 @@ export const defineConfectTable = <
   ConfectDocument extends GenericConfectDocument,
 >(
   schema: Schema.Schema<ConfectDocument, ConvexDocument>
-): ConfectTableDefinition<ConvexDocument, ConfectDocument> =>
-  new ConfectTableDefinitionImpl(schema);
+): ConfectTableDefinition<
+  AddSystemFields<ConvexDocument>,
+  AddReadonlySystemFields<ConfectDocument>
+> => new ConfectTableDefinitionImpl(schema);
 
-// TODO: Put in `data-model.ts` module, to mirror how Convex organizes things?
-
-export type GenericConfectDocument = Record<string, any>;
-
-export type GenericConfectTableInfo = {
-  document: GenericDocument;
-  confectDocument: GenericConfectDocument;
-  fieldPaths: GenericFieldPaths;
-  indexes: GenericTableIndexes;
-  searchIndexes: GenericTableSearchIndexes;
-  vectorIndexes: GenericTableVectorIndexes;
+type AddSystemFields<Document> = Document & {
+  _creationTime: number;
 };
 
-// TODO: Type-level test?
-export type TableInfoFromConfectTableInfo<
-  ConfectTableInfo extends GenericConfectTableInfo,
-> = {
-  document: ConfectTableInfo["document"];
-  fieldPaths: ConfectTableInfo["fieldPaths"];
-  indexes: ConfectTableInfo["indexes"];
-  searchIndexes: ConfectTableInfo["searchIndexes"];
-  vectorIndexes: ConfectTableInfo["vectorIndexes"];
+type AddReadonlySystemFields<Document> = Document & {
+  readonly _creationTime: number;
 };
-
-export type GenericConfectDataModel = Record<string, GenericConfectTableInfo>;
-
-// TODO: Type-level test?
-export type DataModelFromConfectDataModel<
-  ConfectDataModel extends GenericConfectDataModel,
-> = {
-  [TableName in keyof ConfectDataModel]: TableInfoFromConfectTableInfo<
-    ConfectDataModel[TableName]
-  >;
-};
-
-export type TableNamesInConfectDataModel<
-  ConfectDataModel extends GenericConfectDataModel,
-> = keyof ConfectDataModel & string;
 
 export type TableNamesInConfectSchema<
   ConfectSchema extends GenericConfectSchema,
 > = keyof ConfectSchema & string;
 
-export type ConfectDataModelFromEffectSchema<
+export type ConfectDataModelFromConfectSchema<
   ConfectSchema extends GenericConfectSchema,
 > = {
   [TableName in keyof ConfectSchema &
@@ -357,3 +346,5 @@ export type ConfectDataModelFromEffectSchema<
       }
     : never;
 };
+
+// TODO: Type-level test that `ConfectDataModelFromEffectSchema` produces `ConfectDataModel`?

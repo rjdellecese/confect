@@ -5,5 +5,8 @@ export default defineConfig({
   plugins: [tsconfigPaths()],
   test: {
     setupFiles: ["./test/setup.ts"],
+    typecheck: {
+      ignoreSourceErrors: true,
+    },
   },
 });

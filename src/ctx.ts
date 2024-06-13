@@ -16,6 +16,10 @@ import { Effect } from "effect";
 
 import { EffectAuth, EffectAuthImpl } from "~/src/auth";
 import {
+  DataModelFromConfectDataModel,
+  GenericConfectDataModel,
+} from "~/src/data-model";
+import {
   DatabaseSchemasFromConfectDataModel,
   EffectDatabaseReader,
   EffectDatabaseReaderImpl,
@@ -23,10 +27,6 @@ import {
   EffectDatabaseWriterImpl,
 } from "~/src/db";
 import { EffectScheduler, EffectSchedulerImpl } from "~/src/scheduler";
-import {
-  DataModelFromConfectDataModel,
-  GenericConfectDataModel,
-} from "~/src/schema";
 import {
   EffectStorageReader,
   EffectStorageReaderImpl,

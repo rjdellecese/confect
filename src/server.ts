@@ -27,14 +27,16 @@ import {
   makeEffectQueryCtx,
 } from "~/src/ctx";
 import {
-  DatabaseSchemasFromConfectDataModel,
-  databaseSchemasFromEffectSchema,
-} from "~/src/db";
-import {
-  ConfectDataModelFromEffectSchema,
-  ConfectSchemaDefinition,
   DataModelFromConfectDataModel,
   GenericConfectDataModel,
+} from "~/src/data-model";
+import {
+  DatabaseSchemasFromConfectDataModel,
+  schemasFromConfectSchema,
+} from "~/src/db";
+import {
+  ConfectDataModelFromConfectSchema,
+  ConfectSchemaDefinition,
   GenericConfectSchema,
 } from "~/src/schema";
 import schemaToValidatorCompiler from "~/src/schema-to-validator-compiler";
@@ -48,7 +50,7 @@ export const confectServer = <
     TypeScriptSchema
   >
 ) => {
-  const databaseSchemas = databaseSchemasFromEffectSchema(
+  const databaseSchemas = schemasFromConfectSchema(
     effectSchemaDefinition.confectSchema
   );
 
@@ -62,7 +64,7 @@ export const confectServer = <
   }: {
     args: Schema.Schema<TypeScriptValue, DatabaseValue>;
     handler: (
-      ctx: EffectQueryCtx<ConfectDataModelFromEffectSchema<TypeScriptSchema>>,
+      ctx: EffectQueryCtx<ConfectDataModelFromConfectSchema<TypeScriptSchema>>,
       a: TypeScriptValue
     ) => Effect.Effect<Output>;
   }): RegisteredQuery<"public", DatabaseValue, Promise<Output>> =>
@@ -78,7 +80,7 @@ export const confectServer = <
   }: {
     args: Schema.Schema<TypeScriptValue, DatabaseValue>;
     handler: (
-      ctx: EffectQueryCtx<ConfectDataModelFromEffectSchema<TypeScriptSchema>>,
+      ctx: EffectQueryCtx<ConfectDataModelFromConfectSchema<TypeScriptSchema>>,
       a: TypeScriptValue
     ) => Effect.Effect<Output>;
   }): RegisteredQuery<"internal", DatabaseValue, Promise<Output>> =>
@@ -97,7 +99,7 @@ export const confectServer = <
     args: Schema.Schema<TypeScriptValue, DatabaseValue>;
     handler: (
       ctx: EffectMutationCtx<
-        ConfectDataModelFromEffectSchema<TypeScriptSchema>
+        ConfectDataModelFromConfectSchema<TypeScriptSchema>
       >,
       a: TypeScriptValue
     ) => Effect.Effect<Output>;
@@ -115,7 +117,7 @@ export const confectServer = <
     args: Schema.Schema<TypeScriptValue, DatabaseValue>;
     handler: (
       ctx: EffectMutationCtx<
-        ConfectDataModelFromEffectSchema<TypeScriptSchema>
+        ConfectDataModelFromConfectSchema<TypeScriptSchema>
       >,
       a: TypeScriptValue
     ) => Effect.Effect<Output>;
@@ -134,7 +136,7 @@ export const confectServer = <
   }: {
     args: Schema.Schema<TypeScriptValue, DatabaseValue>;
     handler: (
-      ctx: EffectActionCtx<ConfectDataModelFromEffectSchema<TypeScriptSchema>>,
+      ctx: EffectActionCtx<ConfectDataModelFromConfectSchema<TypeScriptSchema>>,
       a: TypeScriptValue
     ) => Effect.Effect<Output>;
   }): RegisteredAction<"public", DatabaseValue, Promise<Output>> =>
@@ -150,7 +152,7 @@ export const confectServer = <
   }: {
     args: Schema.Schema<TypeScriptValue, DatabaseValue>;
     handler: (
-      ctx: EffectActionCtx<ConfectDataModelFromEffectSchema<TypeScriptSchema>>,
+      ctx: EffectActionCtx<ConfectDataModelFromConfectSchema<TypeScriptSchema>>,
       a: TypeScriptValue
     ) => Effect.Effect<Output>;
   }): RegisteredAction<"internal", DatabaseValue, Promise<Output>> =>
@@ -158,7 +160,7 @@ export const confectServer = <
 
   const httpAction = (
     handler: (
-      ctx: EffectActionCtx<ConfectDataModelFromEffectSchema<TypeScriptSchema>>,
+      ctx: EffectActionCtx<ConfectDataModelFromConfectSchema<TypeScriptSchema>>,
       request: Request
     ) => Effect.Effect<Response>
     // @ts-expect-error `GenericActionCtx<GenericDataModel>` is not assignable to `GenericActionCtx<DataModelFromEffectDataModel<EffectDataModel>>`

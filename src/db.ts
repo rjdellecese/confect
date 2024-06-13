@@ -26,15 +26,17 @@ import {
 import { GenericId } from "convex/values";
 import { Chunk, Effect, identity, Option, pipe, Record, Stream } from "effect";
 
-import { ConfectDocumentByName } from "~/src/data-model";
 import {
-  ConfectDataModelFromEffectSchema,
+  ConfectDocumentByName,
   DataModelFromConfectDataModel,
   GenericConfectDataModel,
-  GenericConfectSchema,
   GenericConfectTableInfo,
   TableInfoFromConfectTableInfo,
   TableNamesInConfectDataModel,
+} from "~/src/data-model";
+import {
+  ConfectDataModelFromConfectSchema,
+  GenericConfectSchema,
 } from "~/src/schema";
 
 interface EffectQuery<EffectTableInfo extends GenericConfectTableInfo> {
@@ -321,7 +323,7 @@ class EffectQueryInitializerImpl<
 export type DatabaseSchemasFromConfectDataModel<
   ConfectDataModel extends GenericConfectDataModel,
 > = {
-  [TableName in keyof ConfectDataModel]: Schema.Schema<
+  [TableName in keyof ConfectDataModel & string]: Schema.Schema<
     ConfectDataModel[TableName]["confectDocument"],
     ConfectDataModel[TableName]["document"]
   >;
@@ -452,9 +454,21 @@ export class EffectDatabaseWriterImpl<
     return pipe(
       value,
       Schema.encode(this.databaseSchemas[table]),
-      Effect.flatMap((encodedValue) =>
-        // TODO: Is there a way around not casting this?
-        Effect.promise(() => this.db.insert(table, encodedValue as any))
+      Effect.flatMap(
+        (
+          encodedValue: WithoutSystemFields<
+            ConfectDataModel[TableName]["document"]
+          >
+        ) =>
+          Effect.promise(() =>
+            this.db.insert(
+              table,
+              // TODO: The system fields are the difference!
+              encodedValue as WithoutSystemFields<
+                ConfectDataModel[TableName]["document"]
+              >
+            )
+          )
       ),
       Effect.orDie
     );
@@ -476,14 +490,14 @@ export class EffectDatabaseWriterImpl<
   }
 }
 
-export const databaseSchemasFromEffectSchema = <
-  EffectSchema extends GenericConfectSchema,
+export const schemasFromConfectSchema = <
+  ConfectSchema extends GenericConfectSchema,
 >(
-  effectSchema: EffectSchema
+  effectSchema: ConfectSchema
 ) =>
   Record.map(
     effectSchema,
     ({ schema }) => schema
   ) as DatabaseSchemasFromConfectDataModel<
-    ConfectDataModelFromEffectSchema<EffectSchema>
+    ConfectDataModelFromConfectSchema<ConfectSchema>
   >;
