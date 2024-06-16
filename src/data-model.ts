@@ -1,22 +1,45 @@
 import {
+  Expand,
   GenericDocument,
   GenericFieldPaths,
   GenericTableIndexes,
   GenericTableSearchIndexes,
   GenericTableVectorIndexes,
+  IdField,
   SystemFields,
 } from "convex/server";
-import { GenericId, Value } from "convex/values";
+import { ReadonlyRecord } from "effect/Record";
+import { HasReadonlyKeys, HasWritableKeys } from "type-fest";
 
-export type GenericDocumentWithSystemFields = GenericDocument & {
-  _id: GenericId<string>;
-} & { [Key in SystemFields & string]: any } & { [Key: string]: Value };
+import { IsEntirelyReadonly, IsEntirelyWritable } from "~/src/type-utils";
 
-export type GenericConfectDocument = Record<string, any>;
+export type WithIdField<
+  Document extends GenericDocument | GenericConfectDocument,
+  TableName extends string,
+> =
+  IsEntirelyReadonly<Document> extends true
+    ? Expand<Readonly<IdField<TableName>> & Document>
+    : IsEntirelyWritable<Document> extends true
+      ? Expand<IdField<TableName> & Document>
+      : never;
 
-export type GenericConfectDocumentWithSystemFields = {
-  _id: GenericId<string>;
-} & { [Key in SystemFields & string]: any } & { [Key: string]: any };
+export type WithSystemFields<
+  Document extends GenericDocument | GenericConfectDocument,
+> =
+  HasReadonlyKeys<Document> extends true
+    ? HasWritableKeys<Document> extends false
+      ? Expand<Readonly<SystemFields> & Document>
+      : never
+    : HasWritableKeys<Document> extends true
+      ? Expand<SystemFields & Document>
+      : never;
+
+export type WithIdAndSystemFields<
+  Document extends GenericDocument | GenericConfectDocument,
+  TableName extends string,
+> = WithIdField<WithSystemFields<Document>, TableName>;
+
+export type GenericConfectDocument = ReadonlyRecord<string, any>;
 
 export type ConfectDocumentByName<
   ConfectDataModel extends GenericConfectDataModel,

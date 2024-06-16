@@ -21,7 +21,10 @@ import {
 import { pipe, Record } from "effect";
 import { ReadonlyDeep, WritableDeep } from "type-fest";
 
-import { GenericConfectDocument } from "~/src/data-model";
+import {
+  GenericConfectDocument,
+  WithIdAndSystemFields,
+} from "~/src/data-model";
 import schemaToValidatorCompiler from "~/src/schema-to-validator-compiler";
 
 export type GenericConfectSchema = Record<
@@ -334,12 +337,8 @@ export type ConfectDataModelFromConfectSchema<
     infer VectorIndexes
   >
     ? {
-        document: Expand<IdField<TableName> & SystemFields & Document>;
-        confectDocument: Expand<
-          ReadonlyDeep<IdField<TableName>> &
-            ReadonlyDeep<SystemFields> &
-            ConfectDocument
-        >;
+        document: WithIdAndSystemFields<Document, TableName>;
+        confectDocument: WithIdAndSystemFields<ConfectDocument, TableName>;
         fieldPaths: keyof IdField<TableName> | FieldPaths;
         indexes: Expand<Indexes & SystemIndexes>;
         searchIndexes: SearchIndexes;
