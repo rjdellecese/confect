@@ -33,7 +33,7 @@ import {
 import {
   DatabaseSchemasFromConfectDataModel,
   schemasFromConfectSchema,
-} from "~/src/db";
+} from "~/src/database";
 import {
   ConfectDataModelFromConfectSchema,
   ConfectSchemaDefinition,

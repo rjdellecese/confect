@@ -25,7 +25,7 @@ import {
   EffectDatabaseReaderImpl,
   EffectDatabaseWriter,
   EffectDatabaseWriterImpl,
-} from "~/src/db";
+} from "~/src/database";
 import { EffectScheduler, EffectSchedulerImpl } from "~/src/scheduler";
 import {
   EffectStorageReader,

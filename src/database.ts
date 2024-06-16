@@ -458,8 +458,6 @@ export class EffectDatabaseWriterImpl<
         Effect.promise(() =>
           this.db.insert(
             table,
-            // TODO: The system fields are the difference!
-            // encodedValue
             encodedValue as WithoutSystemFields<typeof encodedValue>
           )
         )
