@@ -454,21 +454,15 @@ export class EffectDatabaseWriterImpl<
     return pipe(
       value,
       Schema.encode(this.databaseSchemas[table]),
-      Effect.flatMap(
-        (
-          encodedValue: WithoutSystemFields<
-            ConfectDataModel[TableName]["document"]
-          >
-        ) =>
-          Effect.promise(() =>
-            this.db.insert(
-              table,
-              // TODO: The system fields are the difference!
-              encodedValue as WithoutSystemFields<
-                ConfectDataModel[TableName]["document"]
-              >
-            )
+      Effect.andThen((encodedValue) =>
+        Effect.promise(() =>
+          this.db.insert(
+            table,
+            // TODO: The system fields are the difference!
+            // encodedValue
+            encodedValue as WithoutSystemFields<typeof encodedValue>
           )
+        )
       ),
       Effect.orDie
     );

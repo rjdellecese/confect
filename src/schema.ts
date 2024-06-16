@@ -13,6 +13,7 @@ import {
   IndexTiebreakerField,
   SchemaDefinition,
   SearchIndexConfig,
+  SystemFields,
   SystemIndexes,
   TableDefinition,
   VectorIndexConfig,
@@ -75,7 +76,7 @@ export const defineConfectSchema = <ConfectSchema extends GenericConfectSchema>(
   >(confectSchema);
 
 export interface ConfectTableDefinition<
-  ConvexDocument extends ReadonlyDeep<GenericDocument>,
+  ConvexDocument extends GenericDocument,
   ConfectDocument extends GenericConfectDocument,
   FieldPaths extends GenericFieldPaths = string,
   // eslint-disable-next-line @typescript-eslint/ban-types
@@ -86,7 +87,7 @@ export interface ConfectTableDefinition<
   VectorIndexes extends GenericTableVectorIndexes = {},
 > {
   tableDefinition: TableDefinition<
-    WritableDeep<ConvexDocument>,
+    ConvexDocument,
     FieldPaths,
     Indexes,
     SearchIndexes,
@@ -177,7 +178,7 @@ export type ConfectSchemaFromConfectSchemaDefinition<
     : never;
 
 class ConfectTableDefinitionImpl<
-  ConvexDocument extends ReadonlyDeep<GenericDocument>,
+  ConvexDocument extends GenericDocument,
   ConfectDocument extends GenericConfectDocument,
   FieldPaths extends GenericFieldPaths = string,
   // eslint-disable-next-line @typescript-eslint/ban-types
@@ -197,7 +198,7 @@ class ConfectTableDefinitionImpl<
     >
 {
   tableDefinition: TableDefinition<
-    WritableDeep<ConvexDocument>,
+    Expand<ConvexDocument & SystemFields>,
     FieldPaths,
     Indexes,
     SearchIndexes,
@@ -300,23 +301,21 @@ class ConfectTableDefinitionImpl<
   }
 }
 
+// TODO: Convert the Schema to make all document mutable
+// TODO: System fields (except ID) are also added by the Convex lib here
 export const defineConfectTable = <
   ConvexDocument extends ReadonlyDeep<GenericDocument>,
   ConfectDocument extends GenericConfectDocument,
 >(
   schema: Schema.Schema<ConfectDocument, ConvexDocument>
-): ConfectTableDefinition<
-  AddSystemFields<ConvexDocument>,
-  AddReadonlySystemFields<ConfectDocument>
-> => new ConfectTableDefinitionImpl(schema);
-
-type AddSystemFields<Document> = Document & {
-  _creationTime: number;
-};
-
-type AddReadonlySystemFields<Document> = Document & {
-  readonly _creationTime: number;
-};
+): ConfectTableDefinition<WritableDeep<ConvexDocument>, ConfectDocument> =>
+  new ConfectTableDefinitionImpl(
+    // TODO: Is there a safer way to do this? If not, write lots of tests.
+    schema as unknown as Schema.Schema<
+      ConfectDocument,
+      WritableDeep<ConvexDocument>
+    >
+  );
 
 export type TableNamesInConfectSchema<
   ConfectSchema extends GenericConfectSchema,
@@ -335,10 +334,12 @@ export type ConfectDataModelFromConfectSchema<
     infer VectorIndexes
   >
     ? {
-        // We've already added all of the system fields except for `_id`.
-        // Add that here.
-        document: Expand<IdField<TableName> & WritableDeep<Document>>;
-        confectDocument: Expand<IdField<TableName> & ConfectDocument>;
+        document: Expand<IdField<TableName> & SystemFields & Document>;
+        confectDocument: Expand<
+          ReadonlyDeep<IdField<TableName>> &
+            ReadonlyDeep<SystemFields> &
+            ConfectDocument
+        >;
         fieldPaths: keyof IdField<TableName> | FieldPaths;
         indexes: Expand<Indexes & SystemIndexes>;
         searchIndexes: SearchIndexes;
@@ -348,3 +349,5 @@ export type ConfectDataModelFromConfectSchema<
 };
 
 // TODO: Type-level test that `ConfectDataModelFromEffectSchema` produces `ConfectDataModel`?
+
+// TODO: Add system tables (see https://github.com/get-convex/convex-js/blob/432247e28d67a36b165c0beea2c3b2629d7f87ee/src/server/schema.ts#L574-L598)

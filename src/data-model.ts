@@ -4,9 +4,19 @@ import {
   GenericTableIndexes,
   GenericTableSearchIndexes,
   GenericTableVectorIndexes,
+  SystemFields,
 } from "convex/server";
+import { GenericId, Value } from "convex/values";
+
+export type GenericDocumentWithSystemFields = GenericDocument & {
+  _id: GenericId<string>;
+} & { [Key in SystemFields & string]: any } & { [Key: string]: Value };
 
 export type GenericConfectDocument = Record<string, any>;
+
+export type GenericConfectDocumentWithSystemFields = {
+  _id: GenericId<string>;
+} & { [Key in SystemFields & string]: any } & { [Key: string]: any };
 
 export type ConfectDocumentByName<
   ConfectDataModel extends GenericConfectDataModel,
