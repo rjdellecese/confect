@@ -1,10 +1,13 @@
 import { Schema } from "@effect/schema";
+import { GenericDataModel, GenericTableInfo } from "convex/server";
 import { GenericId } from "convex/values";
 import { Brand } from "effect";
 import { describe, expectTypeOf, test } from "vitest";
 
 import {
+  DataModelFromConfectDataModel,
   GenericConfectDataModel,
+  TableInfoFromConfectTableInfo,
   WithIdAndSystemFields,
   WithIdField,
   WithSystemFields,
@@ -18,20 +21,19 @@ import {
 } from "~/src/schema";
 
 describe("ConfectDataModelFromConfectSchema", () => {
-  test("produces a well-formed type", () => {
-    const NoteSchema = Schema.Struct({
+  test("extends GenericConfectDataModel and equals correct document and confectDocument types", () => {
+    const TableSchema = Schema.Struct({
       content: Schema.String,
     });
-    const notesTableDefinition = defineConfectTable(NoteSchema);
-    const schemaDefinition = defineConfectSchema({
-      notes: notesTableDefinition,
+    const confectTableDefinition = defineConfectTable(TableSchema);
+    const confectSchemaDefinition = defineConfectSchema({
+      notes: confectTableDefinition,
     });
-    type ConfectSchemaDefinition = ConfectSchemaFromConfectSchemaDefinition<
-      typeof schemaDefinition
+    type ConfectSchema = ConfectSchemaFromConfectSchemaDefinition<
+      typeof confectSchemaDefinition
     >;
 
-    type ConfectDataModel =
-      ConfectDataModelFromConfectSchema<ConfectSchemaDefinition>;
+    type ConfectDataModel = ConfectDataModelFromConfectSchema<ConfectSchema>;
 
     expectTypeOf<ConfectDataModel>().toMatchTypeOf<GenericConfectDataModel>();
     expectTypeOf<ConfectDataModel["notes"]["document"]>().toEqualTypeOf<{
@@ -48,7 +50,7 @@ describe("ConfectDataModelFromConfectSchema", () => {
 });
 
 describe("ConfectSchemaFromConfectSchemaDefinition", () => {
-  test("matches GenericConfectSchema", () => {
+  test("extends GenericConfectSchema", () => {
     const NoteSchema = Schema.Struct({
       content: Schema.String,
     });
@@ -140,5 +142,46 @@ describe("WithIdAndSystemFields", () => {
       readonly name: User["name"];
       readonly age: User["age"];
     }>();
+  });
+});
+
+describe("TableInfoFromConfectTableInfo", () => {
+  test("extends GenericTableInfo", () => {
+    const TableSchema = Schema.Struct({
+      content: Schema.String,
+    });
+    const confectTableDefinition = defineConfectTable(TableSchema);
+    const confectSchemaDefinition = defineConfectSchema({
+      notes: confectTableDefinition,
+    });
+    type ConfectSchema = ConfectSchemaFromConfectSchemaDefinition<
+      typeof confectSchemaDefinition
+    >;
+    type ConfectDataModel = ConfectDataModelFromConfectSchema<ConfectSchema>;
+    type ConfectTableInfo = ConfectDataModel["notes"];
+
+    type TableInfo = TableInfoFromConfectTableInfo<ConfectTableInfo>;
+
+    expectTypeOf<TableInfo>().toMatchTypeOf<GenericTableInfo>();
+  });
+});
+
+describe("DataModelFromConfectDataModel", () => {
+  test("extends GenericDataModel", () => {
+    const TableSchema = Schema.Struct({
+      content: Schema.String,
+    });
+    const confectTableDefinition = defineConfectTable(TableSchema);
+    const confectSchemaDefinition = defineConfectSchema({
+      notes: confectTableDefinition,
+    });
+    type ConfectSchema = ConfectSchemaFromConfectSchemaDefinition<
+      typeof confectSchemaDefinition
+    >;
+    type ConfectDataModel = ConfectDataModelFromConfectSchema<ConfectSchema>;
+
+    type DataModel = DataModelFromConfectDataModel<ConfectDataModel>;
+
+    expectTypeOf<DataModel>().toMatchTypeOf<GenericDataModel>();
   });
 });

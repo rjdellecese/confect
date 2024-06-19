@@ -48,7 +48,6 @@ export type ConfectDocumentByName<
 
 export type GenericConfectDataModel = Record<string, GenericConfectTableInfo>;
 
-// TODO: Type-level test?
 export type DataModelFromConfectDataModel<
   ConfectDataModel extends GenericConfectDataModel,
 > = {
@@ -61,7 +60,6 @@ export type TableNamesInConfectDataModel<
   ConfectDataModel extends GenericConfectDataModel,
 > = keyof ConfectDataModel & string;
 
-// TODO: Type-level test?
 export type TableInfoFromConfectTableInfo<
   ConfectTableInfo extends GenericConfectTableInfo,
 > = {
