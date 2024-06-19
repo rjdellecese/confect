@@ -1,12 +1,16 @@
 import { effect } from "@effect/vitest";
 import { Effect, TestServices } from "effect";
 
-import { ConvexService, ConvexServiceTest } from "~/test/convex-service";
+import * as TestConvexService from "~/test/test-convex-service";
 
 type Name<A, E> = Parameters<typeof effect<E, A>>[0];
 type Self<A, E> = (
   ctx: Parameters<Parameters<typeof effect<E, A>>[1]>[0]
-) => Effect.Effect<E, A, TestServices.TestServices | ConvexService>;
+) => Effect.Effect<
+  E,
+  A,
+  TestServices.TestServices | TestConvexService.TestConvexService
+>;
 type Timeout<A, E> = Parameters<typeof effect<E, A>>[2];
 
 export const test = <A, E>(
@@ -23,7 +27,7 @@ export const test = <A, E>(
     Effect.Effect.Success<Eff>,
     Effect.Effect.Error<Eff>,
     TestServices.TestServices
-  > => self(ctx_).pipe(Effect.provide(ConvexServiceTest));
+  > => self(ctx_).pipe(Effect.provide(TestConvexService.layer));
 
   effect(name, self_, timeout);
 };
