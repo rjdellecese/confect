@@ -4,7 +4,6 @@ import {
   defineTable,
   Expand,
   GenericDocument,
-  GenericFieldPaths,
   GenericSchema,
   GenericTableIndexes,
   GenericTableSearchIndexes,
@@ -18,7 +17,9 @@ import {
   TableDefinition,
   VectorIndexConfig,
 } from "convex/server";
+import { Validator } from "convex/values";
 import { pipe, Record } from "effect";
+import { DeepMutable } from "effect/Types";
 import { ReadonlyDeep, WritableDeep } from "type-fest";
 
 import {
@@ -79,9 +80,7 @@ export const defineConfectSchema = <ConfectSchema extends GenericConfectSchema>(
   >(confectSchema);
 
 export interface ConfectTableDefinition<
-  ConvexDocument extends GenericDocument,
-  ConfectDocument extends GenericConfectDocument,
-  FieldPaths extends GenericFieldPaths = string,
+  TableSchema extends Schema.Schema<any, any>,
   // eslint-disable-next-line @typescript-eslint/ban-types
   Indexes extends GenericTableIndexes = {},
   // eslint-disable-next-line @typescript-eslint/ban-types
@@ -90,17 +89,16 @@ export interface ConfectTableDefinition<
   VectorIndexes extends GenericTableVectorIndexes = {},
 > {
   tableDefinition: TableDefinition<
-    ConvexDocument,
-    FieldPaths,
+    ValidatorFromTableSchema<TableSchema>,
     Indexes,
     SearchIndexes,
     VectorIndexes
   >;
-  schema: Schema.Schema<ConfectDocument, ConvexDocument>;
+  schema: TableSchema;
 
   index<
     IndexName extends string,
-    FirstFieldPath extends FieldPaths,
+    FirstFieldPath extends ExtractFieldPaths,
     RestFieldPaths extends FieldPaths[],
   >(
     name: IndexName,
@@ -181,9 +179,8 @@ export type ConfectSchemaFromConfectSchemaDefinition<
     : never;
 
 class ConfectTableDefinitionImpl<
-  ConvexDocument extends GenericDocument,
+  DocumentType extends Validator<any, any, any>,
   ConfectDocument extends GenericConfectDocument,
-  FieldPaths extends GenericFieldPaths = string,
   // eslint-disable-next-line @typescript-eslint/ban-types
   Indexes extends GenericTableIndexes = {},
   // eslint-disable-next-line @typescript-eslint/ban-types
@@ -192,17 +189,15 @@ class ConfectTableDefinitionImpl<
   VectorIndexes extends GenericTableVectorIndexes = {},
 > implements
     ConfectTableDefinition<
-      ConvexDocument,
+      DocumentType,
       ConfectDocument,
-      FieldPaths,
       Indexes,
       SearchIndexes,
       VectorIndexes
     >
 {
   tableDefinition: TableDefinition<
-    Expand<ConvexDocument & SystemFields>,
-    FieldPaths,
+    DocumentType,
     Indexes,
     SearchIndexes,
     VectorIndexes
@@ -311,7 +306,7 @@ export const defineConfectTable = <
   ConfectDocument extends GenericConfectDocument,
 >(
   schema: Schema.Schema<ConfectDocument, ConvexDocument>
-): ConfectTableDefinition<WritableDeep<ConvexDocument>, ConfectDocument> =>
+): ConfectTableDefinition<typeof schema> =>
   new ConfectTableDefinitionImpl(
     // TODO: Is there a safer way to do this? If not, write lots of tests.
     schema as unknown as Schema.Schema<
@@ -347,6 +342,46 @@ export type ConfectDataModelFromConfectSchema<
     : never;
 };
 
+export type ValidatorFromTableSchema<
+  TableSchema extends Schema.Schema<any, any>,
+> =
+  TableSchema extends Schema.Schema<
+    infer _ConfectDocument,
+    infer ConvexDocument
+  >
+    ? Validator<
+        DeepMutable<ConvexDocument>,
+        "required",
+        ExtractFieldPaths<DeepMutable<ConvexDocument>>
+      >
+    : never;
+
 // TODO: Type-level test that `ConfectDataModelFromEffectSchema` produces `ConfectDataModel`?
 
 // TODO: Add system tables (see https://github.com/get-convex/convex-js/blob/432247e28d67a36b165c0beea2c3b2629d7f87ee/src/server/schema.ts#L574-L598)
+
+// TODO: Vendored types:
+
+/**
+ * Extract all of the index field paths within a {@link Validator}.
+ *
+ * This is used within {@link defineTable}.
+ * @public
+ */
+type ExtractFieldPaths<T extends Validator<any, any, any>> =
+  // Add in the system fields available in index definitions.
+  // This should be everything except for `_id` because thats added to indexes
+  // automatically.
+  T["fieldPaths"] | keyof SystemFields;
+
+/**
+ * Extract the {@link GenericDocument} within a {@link Validator} and
+ * add on the system fields.
+ *
+ * This is used within {@link defineTable}.
+ * @public
+ */
+type ExtractDocument<T extends Validator<any, any, any>> =
+  // Add the system fields to `Value` (except `_id` because it depends on
+  //the table name) and trick TypeScript into expanding them.
+  Expand<SystemFields & T["type"]>;

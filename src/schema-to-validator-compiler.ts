@@ -27,10 +27,12 @@ const goTopArgs = (ast: AST.AST): PropertyValidators =>
 
 const table = <DatabaseValue, TypeScriptValue = DatabaseValue>(
   schema: Schema.Schema<TypeScriptValue, DatabaseValue>
-): Validator<Record<string, any>, false, any> =>
+): Validator<Record<string, any>, "required", any> =>
   goTopTable(Schema.encodedSchema(schema).ast);
 
-const goTopTable = (ast: AST.AST): Validator<Record<string, any>, false, any> =>
+const goTopTable = (
+  ast: AST.AST
+): Validator<Record<string, any>, "required", any> =>
   pipe(
     ast,
     Match.value,
