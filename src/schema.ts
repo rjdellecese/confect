@@ -78,6 +78,15 @@ export const defineConfectSchema = <ConfectSchema extends GenericConfectSchema>(
     ConfectSchema
   >(confectSchema);
 
+export type GenericConfectTableDefinition = ConfectTableDefinition<
+  any,
+  any,
+  any,
+  any,
+  any,
+  any
+>;
+
 export interface ConfectTableDefinition<
   ConvexDocument extends GenericDocument,
   ConfectDocument extends GenericConfectDocument,

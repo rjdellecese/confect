@@ -1,25 +1,8 @@
-import { Schema } from "@effect/schema";
-
-import { defineConfectSchema, defineConfectTable } from "~/src/schema";
+import { defineConfectSchema } from "~/src/schema";
+import * as basic_schema_operations from "~/test/convex/basic_schema_operations__schema";
 
 export const confectSchema = defineConfectSchema({
-  basicSchemaOperations: defineConfectTable(
-    Schema.Struct({
-      text: Schema.String,
-    })
-  ),
-  notes: defineConfectTable(
-    Schema.Struct({
-      content: Schema.String,
-    })
-  ).index("by_content", ["content"]),
-  todos: defineConfectTable(
-    Schema.Struct({
-      content: Schema.NonEmpty,
-      dueDate: Schema.DateFromNumber,
-      assignees: Schema.Array(Schema.NonEmpty).pipe(Schema.maxItems(10)),
-    })
-  ).index("by_content", ["content"]),
+  ...basic_schema_operations.schema.tables,
 });
 
 export default confectSchema.schemaDefinition;

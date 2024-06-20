@@ -1,40 +1,80 @@
 import { expect } from "@effect/vitest";
-import { Clock, Effect } from "effect";
+import { Effect } from "effect";
 
 import { api } from "~/test/convex/_generated/api";
-import { Doc, Id } from "~/test/convex/_generated/dataModel";
+import { Id } from "~/test/convex/_generated/dataModel";
+import { schema } from "~/test/convex/basic_schema_operations__schema";
 import { test } from "~/test/convex-effect-test";
 import { TestConvexService } from "~/test/test-convex-service";
 
-test("todos are inserted and then retrieved", () =>
+test("insert", () =>
   Effect.gen(function* () {
     const c = yield* TestConvexService;
 
-    const content = "Hello, world!";
+    const text = "Hello, world!";
 
-    yield* c.mutation(api.insertNote.default, {
-      content,
-    });
+    const noteId: Id<"basic_schema_operations__notes"> = yield* c.mutation(
+      api.basic_schema_operations.insert,
+      {
+        text,
+      }
+    );
 
-    const notes: Doc<"notes">[] = yield* c.query(api.listNotes.default, {});
+    const note = yield* c.run(({ db }) => db.get(noteId));
 
-    yield* Effect.succeed(expect(notes[0]?.["content"]).toEqual(content));
+    expect(note?.text).toEqual(text);
   }));
 
-test("JS dates are serialized and deserialized properly", () =>
+test("collect", () =>
   Effect.gen(function* () {
     const c = yield* TestConvexService;
 
-    const content = "Hello, world!";
-    const dueDateMillis = yield* Clock.currentTimeMillis;
+    const text = "Hello, world!";
 
-    const todoId: Id<"todos"> = yield* c.mutation(api.insertTodo.default, {
-      content,
-      dueDate: dueDateMillis,
-      assignees: [],
+    yield* c.run(({ db }) => db.insert(schema.tableName("notes"), { text }));
+
+    const notes = yield* c.query(api.basic_schema_operations.collect, {});
+
+    expect(notes.length).toEqual(1);
+    expect(notes[0]?.text).toEqual(text);
+  }));
+
+test("filter + first", () =>
+  Effect.gen(function* () {
+    const c = yield* TestConvexService;
+
+    const text1 = "Hello, Earth!";
+    const text2 = "Hello, Mars!";
+
+    yield* c.run(({ db }) =>
+      Promise.all([
+        db.insert(schema.tableName("notes"), { text: text1 }),
+        db.insert(schema.tableName("notes"), { text: text2 }),
+      ])
+    );
+
+    const note = yield* c.query(api.basic_schema_operations.filterFirst, {
+      text: text1,
     });
 
-    const todo = yield* c.run(({ db }) => db.get(todoId));
+    expect(note?.text).toEqual(text1);
+  }));
 
-    expect(todo?.dueDate).toEqual(dueDateMillis);
+test("withIndex + first", () =>
+  Effect.gen(function* () {
+    const c = yield* TestConvexService;
+
+    const text = "Hello, world!";
+
+    yield* c.run(({ db }) =>
+      db.insert(schema.tableName("notes"), {
+        text: text,
+      })
+    );
+
+    const note = yield* c.query(api.basic_schema_operations.withIndexFirst, {
+      text: text,
+    });
+
+    expect(note?.text).toEqual(text);
   }));
