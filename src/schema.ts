@@ -26,7 +26,7 @@ import {
   GenericConfectDocument,
   WithIdAndSystemFields,
 } from "~/src/data-model";
-import schemaToValidatorCompiler from "~/src/schema-to-validator-compiler";
+import * as schemaToValidatorCompiler from "~/src/schema-to-validator-compiler";
 
 export type GenericConfectSchema = Record<
   string,
@@ -78,6 +78,15 @@ export const defineConfectSchema = <ConfectSchema extends GenericConfectSchema>(
     SchemaDefinitionFromConfectSchemaDefinition<ConfectSchema>,
     ConfectSchema
   >(confectSchema);
+
+export type GenericConfectTableDefinition = ConfectTableDefinition<
+  any,
+  any,
+  any,
+  any,
+  any,
+  any
+>;
 
 export interface ConfectTableDefinition<
   TableSchema extends Schema.Schema<any, any>,

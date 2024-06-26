@@ -6,7 +6,6 @@ import {
   FunctionReturnType,
   GenericMutationCtx,
   OptionalRestArgs,
-  SchemaDefinition,
   StorageActionWriter,
 } from "convex/server";
 import { convexTest } from "convex-test";
@@ -14,9 +13,7 @@ import { Context, Effect, Layer, pipe } from "effect";
 
 import schema from "~/test/convex/schema";
 
-export interface TestConvexService<
-  SchemaDef extends SchemaDefinition<any, boolean>,
-> {
+export interface TestConvexService {
   query: <Query extends FunctionReference<"query", any>>(
     query: Query,
     ...args: OptionalRestArgs<Query>
@@ -31,7 +28,7 @@ export interface TestConvexService<
   ) => Effect.Effect<FunctionReturnType<Action>>;
   run: <Output>(
     func: (
-      ctx: GenericMutationCtx<DataModelFromSchemaDefinition<SchemaDef>> & {
+      ctx: GenericMutationCtx<DataModelFromSchemaDefinition<typeof schema>> & {
         storage: StorageActionWriter;
       }
     ) => Promise<Output>
@@ -46,25 +43,27 @@ export interface TestConvexService<
   ) => Effect.Effect<void>;
 }
 
-export const TestConvexService = Context.GenericTag<
-  TestConvexService<typeof schema>
->("@services/ConvexService");
-
-export const layer = pipe(
-  convexTest(schema, import.meta.glob("./**/!(*.*.*)*.*s")),
-  (testConvex): TestConvexService<typeof schema> => ({
-    query: (query, ...args) =>
-      Effect.promise(() => testConvex.query(query, ...args)),
-    mutation: (mutation, ...args) =>
-      Effect.promise(() => testConvex.mutation(mutation, ...args)),
-    action: (action, ...args) =>
-      Effect.promise(() => testConvex.action(action, ...args)),
-    run: (func) => Effect.promise(() => testConvex.run(func)),
-    fetch: (...args) => Effect.promise(() => testConvex.fetch(...args)),
-    finishInProgressScheduledFunctions: () =>
-      Effect.promise(() => testConvex.finishInProgressScheduledFunctions()),
-    finishAllScheduledFunctions: (...args) =>
-      Effect.promise(() => testConvex.finishAllScheduledFunctions(...args)),
-  }),
-  Layer.succeed(TestConvexService)
+export const TestConvexService = Context.GenericTag<TestConvexService>(
+  "@services/ConvexService"
 );
+
+// In theory it might be possible to also have a version of this which runs the tests on the local or cloud backends
+export const layer = Effect.sync(() =>
+  pipe(
+    convexTest(schema, import.meta.glob("./**/!(*.*.*)*.*s")),
+    (testConvex): TestConvexService => ({
+      query: (query, ...args) =>
+        Effect.promise(() => testConvex.query(query, ...args)),
+      mutation: (mutation, ...args) =>
+        Effect.promise(() => testConvex.mutation(mutation, ...args)),
+      action: (action, ...args) =>
+        Effect.promise(() => testConvex.action(action, ...args)),
+      run: (func) => Effect.promise(() => testConvex.run(func)),
+      fetch: (...args) => Effect.promise(() => testConvex.fetch(...args)),
+      finishInProgressScheduledFunctions: () =>
+        Effect.promise(() => testConvex.finishInProgressScheduledFunctions()),
+      finishAllScheduledFunctions: (...args) =>
+        Effect.promise(() => testConvex.finishAllScheduledFunctions(...args)),
+    })
+  )
+).pipe(Layer.effect(TestConvexService));

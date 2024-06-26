@@ -39,7 +39,7 @@ import {
   ConfectSchemaDefinition,
   GenericConfectSchema,
 } from "~/src/schema";
-import schemaToValidatorCompiler from "~/src/schema-to-validator-compiler";
+import * as schemaToValidatorCompiler from "~/src/schema-to-validator-compiler";
 
 export const confectServer = <
   DatabaseSchema extends GenericSchema,

@@ -1,12 +1,12 @@
-import type * as AST from "@effect/schema/AST";
+import { AST } from "@effect/schema";
 import * as Schema from "@effect/schema/Schema";
 import type { PropertyValidators, Validator } from "convex/values";
-import { v } from "convex/values";
-import { Array, Effect, Match, Option, pipe } from "effect";
+import { v, Value } from "convex/values";
+import { Array, Data, Effect, Match, Option, pipe } from "effect";
 
 // Args
 
-const args = <DatabaseValue, TypeScriptValue = DatabaseValue>(
+export const args = <DatabaseValue, TypeScriptValue = DatabaseValue>(
   schema: Schema.Schema<TypeScriptValue, DatabaseValue>
 ): PropertyValidators => goTopArgs(Schema.encodedSchema(schema).ast);
 
@@ -25,7 +25,7 @@ const goTopArgs = (ast: AST.AST): PropertyValidators =>
 
 // Table
 
-const table = <DatabaseValue, TypeScriptValue = DatabaseValue>(
+export const table = <DatabaseValue, TypeScriptValue = DatabaseValue>(
   schema: Schema.Schema<TypeScriptValue, DatabaseValue>
 ): Validator<Record<string, any>, "required", any> =>
   goTopTable(Schema.encodedSchema(schema).ast);
@@ -38,16 +38,16 @@ const goTopTable = (
     Match.value,
     Match.tag("TypeLiteral", ({ indexSignatures }) =>
       Array.isEmptyReadonlyArray(indexSignatures)
-        ? Effect.succeed(go(ast))
+        ? Effect.succeed(compile(ast))
         : Effect.fail(new IndexSignaturesAreNotSupportedError())
     ),
     Match.orElse(() => Effect.fail(new TopLevelMustBeObjectError())),
     Effect.runSync
   );
 
-// Helpers
+// Compiler
 
-const go = (ast: AST.AST): Validator<any, any, any> =>
+export const compile = (ast: AST.AST): Validator<any, any, any> =>
   pipe(
     ast,
     Match.value,
@@ -72,11 +72,13 @@ const go = (ast: AST.AST): Validator<any, any, any> =>
     Match.tag("NumberKeyword", () => Effect.succeed(v.float64())),
     Match.tag("BigIntKeyword", () => Effect.succeed(v.int64())),
     Match.tag("Union", ({ types: [first, second, ...rest] }) =>
-      Effect.succeed(v.union(go(first), go(second), ...Array.map(rest, go)))
+      Effect.succeed(
+        v.union(compile(first), compile(second), ...Array.map(rest, compile))
+      )
     ),
     Match.tag("TypeLiteral", (typeLiteral) => handleTypeLiteral(typeLiteral)),
     Match.tag("TupleType", ({ elements, rest }) => {
-      const restValidator = pipe(rest, Array.head, Option.map(go));
+      const restValidator = pipe(rest, Array.head, Option.map(compile));
 
       const [f, s, ...r] = elements;
 
@@ -84,7 +86,7 @@ const go = (ast: AST.AST): Validator<any, any, any> =>
         type,
         isOptional,
       }: AST.Element): Validator<any, any, any> =>
-        isOptional ? v.optional(go(type)) : go(type);
+        isOptional ? v.optional(compile(type)) : compile(type);
 
       const arrayItemsValidator: Effect.Effect<
         Validator<any, any, any>,
@@ -165,10 +167,10 @@ const handlePropertySignatures = (
 
       if (typeofName !== "string") {
         return Effect.fail(
-          new UnsupportedPropertySignatureKeyTypeError(typeofName)
+          new UnsupportedPropertySignatureKeyTypeError({ keyType: typeofName })
         );
       } else {
-        const validator = go(type);
+        const validator = compile(type);
 
         return Effect.succeed({
           propertyName: name,
@@ -191,32 +193,33 @@ const handlePropertySignatures = (
     )
   );
 
-class TopLevelMustBeObjectError {
-  readonly _tag = "TopLevelMustBeObjectError";
-}
+export type Compile<V extends Value> = Validator<V, any, any>;
 
-class UnsupportedPropertySignatureKeyTypeError {
-  readonly _tag = "UnsupportedEffectSchemaTypeError";
-  constructor(readonly keyType: string) {}
-}
+// Errors
 
-class EmptyTupleIsNotSupportedError {
-  readonly _tag = "EmptyTupleIsNotSupportedError";
-}
+class TopLevelMustBeObjectError extends Data.TaggedError(
+  "TopLevelMustBeObjectError"
+) {}
 
-class UnsupportedEffectSchemaTypeError {
-  readonly _tag = "UnsupportedEffectSchemaTypeError";
-  constructor(readonly effectSchemaType: AST.AST["_tag"]) {}
-}
+class UnsupportedPropertySignatureKeyTypeError extends Data.TaggedError(
+  "UnsupportedPropertySignatureKeyTypeError"
+)<{
+  readonly keyType: string;
+}> {}
 
-class IndexSignaturesAreNotSupportedError {
-  readonly _tag = "IndexSignaturesAreNotSupportedError";
-}
+class EmptyTupleIsNotSupportedError extends Data.TaggedError(
+  "EmptyTupleIsNotSupportedError"
+) {}
+
+class UnsupportedEffectSchemaTypeError extends Data.TaggedError(
+  "UnsupportedEffectSchemaTypeError"
+)<{
+  readonly effectSchemaType: AST.AST["_tag"];
+}> {}
+
+class IndexSignaturesAreNotSupportedError extends Data.TaggedError(
+  "IndexSignaturesAreNotSupportedError"
+) {}
 
 const unsupportedEffectSchemaTypeError = ({ _tag }: AST.AST) =>
-  Effect.fail(new UnsupportedEffectSchemaTypeError(_tag));
-
-export default {
-  args,
-  table,
-};
+  Effect.fail(new UnsupportedEffectSchemaTypeError({ effectSchemaType: _tag }));

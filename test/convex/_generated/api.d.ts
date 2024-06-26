@@ -14,12 +14,9 @@ import type {
   FilterApi,
   FunctionReference,
 } from "convex/server";
-import type * as basicSchemaOperations from "../basicSchemaOperations.js";
-import type * as clearDatabase from "../clearDatabase.js";
-import type * as confectFunctions from "../confectFunctions.js";
-import type * as insertNote from "../insertNote.js";
-import type * as insertTodo from "../insertTodo.js";
-import type * as listNotes from "../listNotes.js";
+import type * as basic_schema_operations from "../basic_schema_operations.js";
+import type * as basic_schema_operations__schema from "../basic_schema_operations__schema.js";
+import type * as confect_functions from "../confect_functions.js";
 
 /**
  * A utility for referencing Convex functions in your app's API.
@@ -30,12 +27,9 @@ import type * as listNotes from "../listNotes.js";
  * ```
  */
 declare const fullApi: ApiFromModules<{
-  basicSchemaOperations: typeof basicSchemaOperations;
-  clearDatabase: typeof clearDatabase;
-  confectFunctions: typeof confectFunctions;
-  insertNote: typeof insertNote;
-  insertTodo: typeof insertTodo;
-  listNotes: typeof listNotes;
+  basic_schema_operations: typeof basic_schema_operations;
+  basic_schema_operations__schema: typeof basic_schema_operations__schema;
+  confect_functions: typeof confect_functions;
 }>;
 export declare const api: FilterApi<
   typeof fullApi,
