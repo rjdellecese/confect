@@ -25,7 +25,7 @@ import {
   GenericConfectDocument,
   WithIdAndSystemFields,
 } from "~/src/data-model";
-import schemaToValidatorCompiler from "~/src/schema-to-validator-compiler";
+import * as schemaToValidatorCompiler from "~/src/schema-to-validator-compiler";
 
 export type GenericConfectSchema = Record<
   string,
