@@ -19,6 +19,7 @@
   "author": "RJ Dellecese",
   "license": "ISC",
   "devDependencies": {
+    "@arktype/util": "^0.0.51",
     "@effect/platform": "0.57.0",
     "@effect/platform-node": "0.51.9",
     "@effect/vitest": "0.5.11",

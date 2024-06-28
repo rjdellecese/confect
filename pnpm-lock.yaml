@@ -19,6 +19,9 @@ dependencies:
     version: 4.20.0
 
 devDependencies:
+  '@arktype/util':
+    specifier: ^0.0.51
+    version: 0.0.51
   '@effect/platform':
     specifier: 0.57.0
     version: 0.57.0(@effect/schema@0.67.22)(effect@3.3.1)
@@ -79,6 +82,10 @@ packages:
   /@aashutoshrathi/word-wrap@1.2.6:
     resolution: {integrity: sha512-1Yjs2SvM8TflER/OD3cOjhWWOZb58A2t7wpE2S9XfBYTiIl+XFhQG2bjy4Pu1I+EAlCNUzRDYDdFwFYUKvXcIA==}
     engines: {node: '>=0.10.0'}
+    dev: true
+
+  /@arktype/util@0.0.51:
+    resolution: {integrity: sha512-lukmZcbSVI27ZJ4uJA7ztCKM5OligUfdTrr0E6k+F0tzz9iSEcplS0KZbVD2WfrLL3HXNKBE6g/w3nhYMAMoqw==}
     dev: true
 
   /@effect/platform-node-shared@0.6.9(@effect/platform@0.57.0)(effect@3.3.1):

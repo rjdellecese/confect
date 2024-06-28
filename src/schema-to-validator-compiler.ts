@@ -1,8 +1,27 @@
+import { unionToTuple } from "@arktype/util";
 import { AST } from "@effect/schema";
 import * as Schema from "@effect/schema/Schema";
-import type { PropertyValidators, Validator } from "convex/values";
+import type {
+  GenericId,
+  OptionalProperty,
+  PropertyValidators,
+  Validator,
+  VArray,
+  VBoolean,
+  VBytes,
+  VFloat64,
+  VId,
+  VInt64,
+  VLiteral,
+  VNull,
+  VObject,
+  VOptional,
+  VString,
+  VUnion,
+} from "convex/values";
 import { v, Value } from "convex/values";
 import { Array, Data, Effect, Match, Option, pipe } from "effect";
+import { IsUnion } from "type-fest/source/internal";
 
 // Args
 
@@ -46,6 +65,122 @@ const goTopTable = (
   );
 
 // Compiler
+
+export type ValueToValidator<Vl extends Value> = [Vl] extends [never]
+  ? never
+  : [Vl] extends [Value]
+    ? Vl extends {
+        __tableName: infer TableName extends string;
+      }
+      ? VId<GenericId<TableName>>
+      : IsValueLiteral<Vl> extends true
+        ? VLiteral<Vl>
+        : Vl extends null
+          ? VNull<null>
+          : Vl extends number
+            ? VFloat64<number>
+            : Vl extends bigint
+              ? VInt64<bigint>
+              : Vl extends boolean
+                ? VBoolean<boolean>
+                : Vl extends string
+                  ? VString<string>
+                  : Vl extends ArrayBuffer
+                    ? VBytes<ArrayBuffer>
+                    : Vl extends Array<Value>
+                      ? ArrayValueToValidator<Vl>
+                      : Vl extends Record<string, Value | undefined>
+                        ? RecordValueToValidator<Vl>
+                        : IsUnion<Vl> extends true
+                          ? UnionValueToValidator<Vl>
+                          : never
+    : never;
+
+type ArrayValueToValidator<Vl extends Value[]> =
+  Vl extends Array<infer El extends Value>
+    ? ValueToValidator<El> extends infer Vd extends Validator<any>
+      ? VArray<El[], Vd>
+      : never
+    : never;
+
+type RecordValueToValidator<Vl extends Record<string, Value | undefined>> = {
+  [K in keyof Vl]-?: UndefinedOrValueToValidator<Vl[K]>;
+} extends infer VdRecord extends Record<string, any>
+  ? VObject<Vl, VdRecord>
+  : never;
+
+export type UndefinedOrValueToValidator<Vl extends Value | undefined> = [
+  Vl,
+] extends [Value]
+  ? ValueToValidator<Vl>
+  : Vl extends (infer Val extends Value) | undefined
+    ? ValueToValidator<Val> extends infer Vd extends Validator<
+        any,
+        OptionalProperty
+      >
+      ? VOptional<Vd>
+      : never
+    : never;
+
+type IsUnion_<T, U extends T = T> = T extends unknown
+  ? [U] extends [T]
+    ? false
+    : true
+  : never;
+
+// Examples of usage:
+type Test1 = IsUnion_<string>; // false
+type Test2 = IsUnion_<string | number>; // true
+type Test3 = IsUnion_<string | number | boolean>; // true
+type Test4 = IsUnion_<never>; // false
+type Test5 = IsUnion_<any>; // false (note: 'any' is not considered a union)
+type Test6 = IsUnion_<string | never>; // false (because 'string | never' simplifies to 'string')
+
+export type UnionValueToValidator<Vl extends Value> = [Vl] extends [Value]
+  ? IsUnion<Vl> extends true
+    ? unionToTuple<Vl> extends infer VlTuple extends Value[]
+      ? ValueTupleToValidatorTuple<VlTuple> extends infer VdTuple extends
+          Validator<any, "required", any>[]
+        ? VUnion<Vl, VdTuple>
+        : // VdTuple
+          "1"
+      : "2"
+    : "3"
+  : "4";
+
+type ValueTupleToValidatorTuple<VlTuple extends Value[]> = VlTuple extends [
+  infer Vl extends Value,
+  ...infer VlRest extends Value[],
+]
+  ? ValueToValidator<Vl> extends infer Vd extends Validator<any>
+    ? ValueTupleToValidatorTuple<VlRest> extends infer VdRest extends Validator<
+        any,
+        "required",
+        any
+      >[]
+      ? [Vd, ...VdRest]
+      : never
+    : never
+  : [];
+
+// https://stackoverflow.com/a/52806744
+export type IsValueLiteral<Vl extends Value> = [Vl] extends [never]
+  ? never
+  : [Vl] extends [string | number | bigint | boolean]
+    ? [string] extends [Vl]
+      ? false
+      : [number] extends [Vl]
+        ? false
+        : [boolean] extends [Vl]
+          ? false
+          : [bigint] extends [Vl]
+            ? false
+            : true
+    : false;
+
+export const compileEncoded = <A, I extends Value>(
+  schema: Schema.Schema<A, I>
+): ValueToValidator<I> => compile(Schema.encodedSchema(schema).ast);
 
 export const compile = (ast: AST.AST): Validator<any, any, any> =>
   pipe(
@@ -192,8 +327,6 @@ const handlePropertySignatures = (
       )
     )
   );
-
-export type Compile<V extends Value> = Validator<V, any, any>;
 
 // Errors
 
