@@ -3,6 +3,7 @@ import { AST } from "@effect/schema";
 import * as Schema from "@effect/schema/Schema";
 import type {
   GenericId,
+  OptionalProperty,
   PropertyValidators,
   Validator,
   VArray,
@@ -122,12 +123,13 @@ type RecordValueToValidator<Vl extends Record<string, Value | undefined>> = {
 export type UndefinedOrValueToValidator<Vl extends Value | undefined> =
   IncludesUndefined<Vl> extends true
     ? [Vl] extends [(infer Val extends Value) | undefined]
-      ? ValueToValidator<Val> extends infer Vd extends Validator<any>
+      ? ValueToValidator<Val> extends infer Vd extends Validator<
+          any,
+          OptionalProperty,
+          any
+        >
         ? VOptional<Vd>
-        : // TODO: Can this be simplified? I don't fully understand how this works/why it is necessary. Specifically, shouldn't the below `extends` work for a strict subset of the one above?
-          Val extends Record<string, Value | undefined>
-          ? VOptional<RecordValueToValidator<Val>>
-          : 1
+        : 1
       : 2
     : Vl extends Value
       ? ValueToValidator<Vl>
