@@ -3,7 +3,6 @@ import { AST } from "@effect/schema";
 import * as Schema from "@effect/schema/Schema";
 import type {
   GenericId,
-  OptionalProperty,
   PropertyValidators,
   Validator,
   VArray,
@@ -21,7 +20,6 @@ import type {
 } from "convex/values";
 import { v, Value } from "convex/values";
 import { Array, Data, Effect, Match, Option, pipe } from "effect";
-import { IsUnion } from "type-fest/source/internal";
 
 // Args
 
@@ -96,6 +94,18 @@ export type ValueToValidator<Vl extends Value> = [Vl] extends [never]
                           : never
     : never;
 
+// type Is<T> = T extends Record<string, Value | undefined> ? true : false
+type Is<T> = T extends {
+  [key: string]: Value | undefined;
+}
+  ? true
+  : false;
+
+type A = Is<{ foo?: string }>; // true
+type B = Is<{ foo: string }>; // true
+type C = Is<{ foo: string | undefined }>; // true
+type D = Is<{ foo?: string | undefined }>; // true
+
 type ArrayValueToValidator<Vl extends Value[]> =
   Vl extends Array<infer El extends Value>
     ? ValueToValidator<El> extends infer Vd extends Validator<any>
@@ -109,32 +119,37 @@ type RecordValueToValidator<Vl extends Record<string, Value | undefined>> = {
   ? VObject<Vl, VdRecord>
   : never;
 
-export type UndefinedOrValueToValidator<Vl extends Value | undefined> = [
-  Vl,
-] extends [Value]
-  ? ValueToValidator<Vl>
-  : Vl extends (infer Val extends Value) | undefined
-    ? ValueToValidator<Val> extends infer Vd extends Validator<
-        any,
-        OptionalProperty
-      >
-      ? VOptional<Vd>
-      : never
-    : never;
+export type UndefinedOrValueToValidator<Vl extends Value | undefined> =
+  IncludesUndefined<Vl> extends true
+    ? [Vl] extends [(infer Val extends Value) | undefined]
+      ? ValueToValidator<Val> extends infer Vd extends Validator<any>
+        ? VOptional<Vd>
+        : // TODO: Can this be simplified? I don't fully understand how this works/why it is necessary. Specifically, shouldn't the below `extends` work for a strict subset of the one above?
+          Val extends Record<string, Value | undefined>
+          ? VOptional<RecordValueToValidator<Val>>
+          : 1
+      : 2
+    : Vl extends Value
+      ? ValueToValidator<Vl>
+      : 3;
 
-type IsUnion_<T, U extends T = T> = T extends unknown
+type IncludesUndefined<Vl extends Value | undefined> = undefined extends Vl
+  ? true
+  : false;
+
+type IsUnion<T, U extends T = T> = T extends unknown
   ? [U] extends [T]
     ? false
     : true
   : never;
 
 // Examples of usage:
-type Test1 = IsUnion_<string>; // false
-type Test2 = IsUnion_<string | number>; // true
-type Test3 = IsUnion_<string | number | boolean>; // true
-type Test4 = IsUnion_<never>; // false
-type Test5 = IsUnion_<any>; // false (note: 'any' is not considered a union)
-type Test6 = IsUnion_<string | never>; // false (because 'string | never' simplifies to 'string')
+type Test1 = IsUnion<string>; // false
+type Test2 = IsUnion<string | number>; // true
+type Test3 = IsUnion<string | number | boolean>; // true
+type Test4 = IsUnion<never>; // false
+type Test5 = IsUnion<any>; // false (note: 'any' is not considered a union)
+type Test6 = IsUnion<string | never>; // false (because 'string | never' simplifies to 'string')
 
 export type UnionValueToValidator<Vl extends Value> = [Vl] extends [Value]
   ? IsUnion<Vl> extends true

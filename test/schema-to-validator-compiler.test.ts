@@ -265,6 +265,32 @@ describe("ValueToValidator", () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
+    test("{ foo: { bar?: number } }", () => {
+      const expectedValidator = v.object({
+        foo: v.object({ bar: v.optional(v.float64()) }),
+      });
+      type ExpectedValidator = typeof expectedValidator;
+
+      type CompiledValidator = ValueToValidator<{
+        foo: { bar?: number };
+      }>;
+
+      expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+    });
+
+    test("{ foo?: { bar: number } }", () => {
+      const expectedValidator = v.object({
+        foo: v.optional(v.object({ bar: v.float64() })),
+      });
+      type ExpectedValidator = typeof expectedValidator;
+
+      type CompiledValidator = ValueToValidator<{
+        foo?: { bar: number };
+      }>;
+
+      expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+    });
+
     test("{ foo?: string }", () => {
       const expectedValidator = v.object({
         foo: v.optional(v.string()),
