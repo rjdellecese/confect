@@ -13,3 +13,9 @@ export type IsEntirelyWritable<T extends object> =
       ? true
       : false
     : false;
+
+export type IsUnion<T, U extends T = T> = T extends unknown
+  ? [U] extends [T]
+    ? false
+    : true
+  : never;
