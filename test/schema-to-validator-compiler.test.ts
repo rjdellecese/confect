@@ -372,6 +372,7 @@ describe("ValueToValidator", () => {
       const expectedValidator = v.object({});
       type ExpectedValidator = typeof expectedValidator;
 
+      // eslint-disable-next-line @typescript-eslint/ban-types
       type CompiledValidator = ValueToValidator<{}>;
 
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();

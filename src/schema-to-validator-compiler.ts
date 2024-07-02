@@ -1,4 +1,3 @@
-import { unionToTuple } from "@arktype/util";
 import { AST } from "@effect/schema";
 import * as Schema from "@effect/schema/Schema";
 import type {
@@ -24,7 +23,7 @@ import { Array, Data, Effect, Match, Option, pipe } from "effect";
 import { ReadonlyRecord } from "effect/Record";
 import { DeepMutable } from "effect/Types";
 
-import { IsUnion } from "~/src/type-utils";
+import { IsUnion, IsValueLiteral, UnionToTuple } from "~/src/type-utils";
 
 // Args
 
@@ -151,7 +150,7 @@ type UnionValueToValidator<Vl extends ReadonlyOrMutableValue> = [Vl] extends [
   ReadonlyOrMutableValue,
 ]
   ? IsUnion<Vl> extends true
-    ? unionToTuple<Vl> extends infer VlTuple extends
+    ? UnionToTuple<Vl> extends infer VlTuple extends
         ReadonlyOrMutableArray<ReadonlyOrMutableValue>
       ? ValueTupleToValidatorTuple<VlTuple> extends infer VdTuple extends
           Validator<any, "required", any>[]
@@ -177,21 +176,6 @@ type ValueTupleToValidatorTuple<
       : never
     : never
   : [];
-
-// https://stackoverflow.com/a/52806744
-type IsValueLiteral<Vl extends ReadonlyOrMutableValue> = [Vl] extends [never]
-  ? never
-  : [Vl] extends [string | number | bigint | boolean]
-    ? [string] extends [Vl]
-      ? false
-      : [number] extends [Vl]
-        ? false
-        : [boolean] extends [Vl]
-          ? false
-          : [bigint] extends [Vl]
-            ? false
-            : true
-    : false;
 
 export const compileSchema = <A extends ReadonlyOrMutableValue>(
   schema: Schema.Schema<A>
