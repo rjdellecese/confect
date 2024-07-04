@@ -68,18 +68,29 @@ const goTopTable = (
 
 // Compiler
 
-type ReadonlyOrMutableValue =
-  | Value
-  | ReadonlyArray<Value>
-  | { readonly [key: string]: Value | undefined };
+export type ReadonlyOrMutableValue = Value | ReadonlyValue;
+
+export type ReadonlyValue =
+  | string
+  | number
+  | bigint
+  | boolean
+  | ArrayBuffer
+  | ReadonlyArrayValue
+  | ReadonlyRecordValue
+  | null;
 
 type ReadonlyOrMutableArray<T> = ReadonlyArray<T> | Array<T>;
 
 type ReadonlyOrMutableRecord<T> = ReadonlyRecord<string, T> | Record<string, T>;
 
-export type ValueToValidator<Vl extends ReadonlyOrMutableValue> = [Vl] extends [
-  never,
-]
+type ReadonlyArrayValue = readonly ReadonlyValue[];
+
+export type ReadonlyRecordValue = {
+  readonly [key: string]: ReadonlyValue | undefined;
+};
+
+export type ValueToValidator<Vl> = [Vl] extends [never]
   ? never
   : [Vl] extends [ReadonlyOrMutableValue]
     ? Vl extends {
@@ -177,12 +188,23 @@ type ValueTupleToValidatorTuple<
     : never
   : [];
 
-export const compileSchema = <A extends ReadonlyOrMutableValue>(
+export type TableSchemaToTableValidator<
+  TableSchema extends Schema.Schema<any>,
+> =
+  ValueToValidator<Schema.Schema.Encoded<TableSchema>> extends infer Vd extends
+    VObject<any, any, any>
+    ? Vd
+    : never;
+
+export const compileTableSchema = <A, I>(
+  tableSchema: Schema.Schema<A, I>
+): TableSchemaToTableValidator<typeof tableSchema> =>
+  compile(Schema.encodedSchema(tableSchema).ast) as any;
+
+export const compileSchema = <A extends ReadonlyValue>(
   schema: Schema.Schema<A>
-) =>
-  compile(schema.ast) as unknown as ValueToValidator<
-    Schema.Schema.Encoded<typeof schema>
-  >;
+): ValueToValidator<Schema.Schema.Encoded<typeof schema>> =>
+  compile(schema.ast) as any;
 
 export const compile = (ast: AST.AST): Validator<any, any, any> =>
   pipe(

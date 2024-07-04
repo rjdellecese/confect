@@ -71,8 +71,8 @@ export type TableInfoFromConfectTableInfo<
 };
 
 export type GenericConfectTableInfo = {
-  document: GenericDocument;
   confectDocument: GenericConfectDocument;
+  document: GenericDocument;
   fieldPaths: GenericFieldPaths;
   indexes: GenericTableIndexes;
   searchIndexes: GenericTableSearchIndexes;

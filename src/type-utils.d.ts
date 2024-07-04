@@ -1,5 +1,7 @@
 import { HasReadonlyKeys, HasWritableKeys } from "type-fest";
 
+import { ReadonlyOrMutableValue } from "~/src/schema-to-validator-compiler";
+
 export type IsEntirelyReadonly<T extends object> =
   HasReadonlyKeys<T> extends true
     ? HasWritableKeys<T> extends false

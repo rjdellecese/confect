@@ -5,6 +5,7 @@ import { describe, expect, expectTypeOf, test } from "vitest";
 import {
   compile,
   compileSchema,
+  compileTableSchema,
   ValueToValidator,
 } from "~/src/schema-to-validator-compiler";
 
@@ -158,7 +159,9 @@ describe("compileSchema", () => {
   test("object with optional field", () => {
     const expectedValidator = v.object({ foo: v.optional(v.string()) });
 
-    const schema = Schema.Struct({ foo: Schema.optional(Schema.String) });
+    const schema = Schema.Struct({
+      foo: Schema.optional(Schema.String, { exact: true }),
+    });
     const compiledValidator = compileSchema(schema);
 
     expect(compiledValidator).toStrictEqual(expectedValidator);
@@ -488,5 +491,39 @@ describe("ValueToValidator", () => {
 
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
+  });
+});
+
+describe("compileTableSchema", () => {
+  test("{ text: string }", () => {
+    const compiledValidator = compileTableSchema(
+      Schema.Struct({
+        text: Schema.String,
+      })
+    );
+
+    const expectedValidator = v.object({
+      text: v.string(),
+    });
+
+    expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
+    expect(compiledValidator).toStrictEqual(expectedValidator);
+  });
+
+  test("{ text: string, foo: { bar: number } }", () => {
+    const compiledValidator = compileTableSchema(
+      Schema.Struct({
+        text: Schema.String,
+        foo: Schema.Struct({ bar: Schema.Number }),
+      })
+    );
+
+    const expectedValidator = v.object({
+      text: v.string(),
+      foo: v.object({ bar: v.float64() }),
+    });
+
+    expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
+    expect(compiledValidator).toStrictEqual(expectedValidator);
   });
 });
