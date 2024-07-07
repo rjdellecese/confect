@@ -5,7 +5,7 @@ import {
 } from "convex/server";
 import { Effect } from "effect";
 
-export interface EffectScheduler {
+export interface ConfectScheduler {
   runAfter<FuncRef extends SchedulableFunctionReference>(
     delayMs: number,
     functionReference: FuncRef,
@@ -18,7 +18,7 @@ export interface EffectScheduler {
   ): Effect.Effect<void>;
 }
 
-export class EffectSchedulerImpl implements EffectScheduler {
+export class ConfectSchedulerImpl implements ConfectScheduler {
   constructor(private scheduler: Scheduler) {}
   runAfter<FuncRef extends SchedulableFunctionReference>(
     delayMs: number,
@@ -26,7 +26,7 @@ export class EffectSchedulerImpl implements EffectScheduler {
     ...args: OptionalRestArgs<FuncRef>
   ): Effect.Effect<void> {
     return Effect.promise(() =>
-      this.scheduler.runAfter(delayMs, functionReference, ...args),
+      this.scheduler.runAfter(delayMs, functionReference, ...args)
     );
   }
   runAt<FuncRef extends SchedulableFunctionReference>(
@@ -35,7 +35,7 @@ export class EffectSchedulerImpl implements EffectScheduler {
     ...args: OptionalRestArgs<FuncRef>
   ): Effect.Effect<void> {
     return Effect.promise(() =>
-      this.scheduler.runAt(timestamp, functionReference, ...args),
+      this.scheduler.runAt(timestamp, functionReference, ...args)
     );
   }
 }

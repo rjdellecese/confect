@@ -36,15 +36,15 @@ describe("ConfectDataModelFromConfectSchema", () => {
     type ConfectDataModel = ConfectDataModelFromConfectSchema<ConfectSchema>;
 
     expectTypeOf<ConfectDataModel>().toMatchTypeOf<GenericConfectDataModel>();
-    expectTypeOf<ConfectDataModel["notes"]["document"]>().toEqualTypeOf<{
-      _id: GenericId<"notes">;
-      _creationTime: number;
-      content: string;
-    }>();
     expectTypeOf<ConfectDataModel["notes"]["confectDocument"]>().toEqualTypeOf<{
       readonly _id: GenericId<"notes">;
       readonly _creationTime: number;
       readonly content: string;
+    }>();
+    expectTypeOf<ConfectDataModel["notes"]["convexDocument"]>().toEqualTypeOf<{
+      _id: GenericId<"notes">;
+      _creationTime: number;
+      content: string;
     }>();
   });
 });

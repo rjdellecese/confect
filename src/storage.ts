@@ -6,12 +6,12 @@ import {
 } from "convex/server";
 import { Effect } from "effect";
 
-export interface EffectStorageReader {
+export interface ConfectStorageReader {
   getUrl(storageId: StorageId): Effect.Effect<string | null>;
   getMetadata(storageId: StorageId): Effect.Effect<FileMetadata | null>;
 }
 
-export class EffectStorageReaderImpl implements EffectStorageReader {
+export class ConfectStorageReaderImpl implements ConfectStorageReader {
   constructor(private storageReader: StorageReader) {}
   getUrl(storageId: string): Effect.Effect<string | null> {
     return Effect.promise(() => this.storageReader.getUrl(storageId));
@@ -21,15 +21,15 @@ export class EffectStorageReaderImpl implements EffectStorageReader {
   }
 }
 
-export interface EffectStorageWriter extends EffectStorageReader {
+export interface ConfectStorageWriter extends ConfectStorageReader {
   generateUploadUrl(): Effect.Effect<string>;
   delete(storageId: StorageId): Effect.Effect<void>;
 }
 
-export class EffectStorageWriterImpl implements EffectStorageWriter {
-  private effectStorageReader: EffectStorageReader;
+export class ConfectStorageWriterImpl implements ConfectStorageWriter {
+  private effectStorageReader: ConfectStorageReader;
   constructor(private storageWriter: StorageWriter) {
-    this.effectStorageReader = new EffectStorageReaderImpl(storageWriter);
+    this.effectStorageReader = new ConfectStorageReaderImpl(storageWriter);
   }
   getUrl(storageId: string): Effect.Effect<string | null> {
     return this.effectStorageReader.getUrl(storageId);

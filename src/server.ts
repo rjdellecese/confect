@@ -19,9 +19,9 @@ import {
 import { Effect, pipe } from "effect";
 
 import {
-  EffectActionCtx,
-  EffectMutationCtx,
-  EffectQueryCtx,
+  ConfectActionCtx,
+  ConfectMutationCtx,
+  ConfectQueryCtx,
   makeEffectActionCtx,
   makeEffectMutationCtx,
   makeEffectQueryCtx,
@@ -64,7 +64,7 @@ export const confectServer = <
   }: {
     args: Schema.Schema<TypeScriptValue, DatabaseValue>;
     handler: (
-      ctx: EffectQueryCtx<ConfectDataModelFromConfectSchema<TypeScriptSchema>>,
+      ctx: ConfectQueryCtx<ConfectDataModelFromConfectSchema<TypeScriptSchema>>,
       a: TypeScriptValue
     ) => Effect.Effect<Output>;
   }): RegisteredQuery<"public", DatabaseValue, Promise<Output>> =>
@@ -80,7 +80,7 @@ export const confectServer = <
   }: {
     args: Schema.Schema<TypeScriptValue, DatabaseValue>;
     handler: (
-      ctx: EffectQueryCtx<ConfectDataModelFromConfectSchema<TypeScriptSchema>>,
+      ctx: ConfectQueryCtx<ConfectDataModelFromConfectSchema<TypeScriptSchema>>,
       a: TypeScriptValue
     ) => Effect.Effect<Output>;
   }): RegisteredQuery<"internal", DatabaseValue, Promise<Output>> =>
@@ -98,7 +98,7 @@ export const confectServer = <
   }: {
     args: Schema.Schema<TypeScriptValue, DatabaseValue>;
     handler: (
-      ctx: EffectMutationCtx<
+      ctx: ConfectMutationCtx<
         ConfectDataModelFromConfectSchema<TypeScriptSchema>
       >,
       a: TypeScriptValue
@@ -116,7 +116,7 @@ export const confectServer = <
   }: {
     args: Schema.Schema<TypeScriptValue, DatabaseValue>;
     handler: (
-      ctx: EffectMutationCtx<
+      ctx: ConfectMutationCtx<
         ConfectDataModelFromConfectSchema<TypeScriptSchema>
       >,
       a: TypeScriptValue
@@ -136,7 +136,9 @@ export const confectServer = <
   }: {
     args: Schema.Schema<TypeScriptValue, DatabaseValue>;
     handler: (
-      ctx: EffectActionCtx<ConfectDataModelFromConfectSchema<TypeScriptSchema>>,
+      ctx: ConfectActionCtx<
+        ConfectDataModelFromConfectSchema<TypeScriptSchema>
+      >,
       a: TypeScriptValue
     ) => Effect.Effect<Output>;
   }): RegisteredAction<"public", DatabaseValue, Promise<Output>> =>
@@ -152,7 +154,9 @@ export const confectServer = <
   }: {
     args: Schema.Schema<TypeScriptValue, DatabaseValue>;
     handler: (
-      ctx: EffectActionCtx<ConfectDataModelFromConfectSchema<TypeScriptSchema>>,
+      ctx: ConfectActionCtx<
+        ConfectDataModelFromConfectSchema<TypeScriptSchema>
+      >,
       a: TypeScriptValue
     ) => Effect.Effect<Output>;
   }): RegisteredAction<"internal", DatabaseValue, Promise<Output>> =>
@@ -160,7 +164,9 @@ export const confectServer = <
 
   const httpAction = (
     handler: (
-      ctx: EffectActionCtx<ConfectDataModelFromConfectSchema<TypeScriptSchema>>,
+      ctx: ConfectActionCtx<
+        ConfectDataModelFromConfectSchema<TypeScriptSchema>
+      >,
       request: Request
     ) => Effect.Effect<Response>
     // @ts-expect-error `GenericActionCtx<GenericDataModel>` is not assignable to `GenericActionCtx<DataModelFromEffectDataModel<EffectDataModel>>`
@@ -190,7 +196,7 @@ const effectQueryFunction = <
   databaseSchemas: DatabaseSchemasFromConfectDataModel<EffectDataModel>;
   args: Schema.Schema<TypeScriptValue, DatabaseValue>;
   handler: (
-    ctx: EffectQueryCtx<EffectDataModel>,
+    ctx: ConfectQueryCtx<EffectDataModel>,
     a: TypeScriptValue
   ) => Effect.Effect<Output>;
 }) => ({
@@ -223,7 +229,7 @@ const effectMutationFunction = <
   databaseSchemas: DatabaseSchemasFromConfectDataModel<EffectDataModel>;
   args: Schema.Schema<TypeScriptValue, DatabaseValue>;
   handler: (
-    ctx: EffectMutationCtx<EffectDataModel>,
+    ctx: ConfectMutationCtx<EffectDataModel>,
     a: TypeScriptValue
   ) => Effect.Effect<Output>;
 }) => ({
@@ -254,7 +260,7 @@ const effectActionFunction = <
 }: {
   args: Schema.Schema<TypeScriptValue, DatabaseValue>;
   handler: (
-    ctx: EffectActionCtx<EffectDataModel>,
+    ctx: ConfectActionCtx<EffectDataModel>,
     a: TypeScriptValue
   ) => Effect.Effect<Output>;
 }) => ({
@@ -280,7 +286,7 @@ const effectHttpActionFunction = <
   handler,
 }: {
   handler: (
-    ctx: EffectActionCtx<EffectDataModel>,
+    ctx: ConfectActionCtx<EffectDataModel>,
     request: Request
   ) => Effect.Effect<Response>;
 }) => ({

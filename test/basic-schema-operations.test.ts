@@ -31,7 +31,9 @@ test("collect", () =>
 
     const text = "Hello, world!";
 
-    yield* c.run(({ db }) => db.insert(schema.tableName("notes"), { text }));
+    yield* c.run(({ db }) =>
+      db.insert("basic_schema_operations__notes", { text })
+    );
 
     const notes = yield* c.query(api.basic_schema_operations.collect, {});
 

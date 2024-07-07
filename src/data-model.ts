@@ -1,3 +1,4 @@
+import { Schema } from "@effect/schema";
 import {
   Expand,
   GenericDocument,
@@ -11,6 +12,7 @@ import {
 import { ReadonlyRecord } from "effect/Record";
 import { HasReadonlyKeys, HasWritableKeys } from "type-fest";
 
+import { SchemaId } from "~/src/SchemaId";
 import { IsEntirelyReadonly, IsEntirelyWritable } from "~/src/type-utils";
 
 export type WithIdField<
@@ -39,6 +41,19 @@ export type WithIdAndSystemFields<
   TableName extends string,
 > = WithIdField<WithSystemFields<Document>, TableName>;
 
+export const extendWithIdAndSystemFields =
+  <TableName extends string>() =>
+  <A extends GenericConfectDocument, I extends GenericDocument>(
+    schema: Schema.Schema<A, I>
+  ) =>
+    Schema.extend(
+      schema,
+      Schema.Struct({
+        _id: SchemaId<TableName>(),
+        _creationTime: Schema.Number,
+      })
+    );
+
 export type GenericConfectDocument = ReadonlyRecord<string, any>;
 
 export type ConfectDocumentByName<
@@ -63,7 +78,7 @@ export type TableNamesInConfectDataModel<
 export type TableInfoFromConfectTableInfo<
   ConfectTableInfo extends GenericConfectTableInfo,
 > = {
-  document: ConfectTableInfo["document"];
+  document: ConfectTableInfo["convexDocument"];
   fieldPaths: ConfectTableInfo["fieldPaths"];
   indexes: ConfectTableInfo["indexes"];
   searchIndexes: ConfectTableInfo["searchIndexes"];
@@ -72,7 +87,7 @@ export type TableInfoFromConfectTableInfo<
 
 export type GenericConfectTableInfo = {
   confectDocument: GenericConfectDocument;
-  document: GenericDocument;
+  convexDocument: GenericDocument;
   fieldPaths: GenericFieldPaths;
   indexes: GenericTableIndexes;
   searchIndexes: GenericTableSearchIndexes;
