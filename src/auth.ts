@@ -10,7 +10,7 @@ export class ConfectAuthImpl implements ConfectAuth {
   getUserIdentity(): Effect.Effect<Option.Option<UserIdentity>> {
     return pipe(
       Effect.promise(() => this.auth.getUserIdentity()),
-      Effect.map(Option.fromNullable)
+      Effect.map(Option.fromNullable),
     );
   }
 }

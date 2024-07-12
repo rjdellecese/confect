@@ -8,7 +8,7 @@
   "types": "dist/types.d.ts",
   "scripts": {
     "start": "convex dev",
-    "lint": "tsc --noEmit && eslint . && prettier --check .",
+    "lint": "tsc --noEmit && eslint --max-warnings=0 . && prettier --check .",
     "test": "vitest --typecheck",
     "build": "vite build"
   },
@@ -44,5 +44,9 @@
     "convex": "1.13.0",
     "effect": "3.3.1",
     "type-fest": "4.20.0"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
   }
 }

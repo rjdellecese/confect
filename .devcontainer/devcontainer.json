@@ -1,9 +1,13 @@
 {
   "image": "mcr.microsoft.com/devcontainers/typescript-node:1-20-bullseye",
-  "postCreateCommand": "pnpm install",
+  "postCreateCommand": "pnpm_version=$(node -p 'require(`./package.json`).engines.pnpm') && npm install -g pnpm@$pnpm_version && pnpm install",
   "customizations": {
     "vscode": {
       "extensions": ["YoavBls.pretty-ts-errors", "esbenp.prettier-vscode"]
     }
+  },
+  "features": {
+    "ghcr.io/devcontainers-contrib/features/act:1": {},
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
   }
 }

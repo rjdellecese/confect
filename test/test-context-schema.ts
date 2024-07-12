@@ -7,14 +7,14 @@ const prefixTableNames = <
   Tables extends Record<string, GenericConfectTableDefinition>,
 >(
   prefix: Prefix,
-  tables: Tables
+  tables: Tables,
 ): Expand<PrefixedKeys<Prefix, Tables>> =>
   Object.entries(tables).reduce(
     (acc, [key, value]) => {
       acc[`${prefix}__${key}`] = value as any;
       return acc;
     },
-    {} as Expand<PrefixedKeys<Prefix, Tables>>
+    {} as Expand<PrefixedKeys<Prefix, Tables>>,
   );
 
 interface TestContextSchema<
@@ -23,7 +23,7 @@ interface TestContextSchema<
 > {
   readonly tables: Expand<PrefixedKeys<Prefix, Tables>>;
   tableName: (
-    tableName: keyof Tables & string
+    tableName: keyof Tables & string,
   ) => `${Prefix}__${typeof tableName}`;
 }
 
@@ -49,7 +49,7 @@ export const make = <
   Tables extends Record<string, GenericConfectTableDefinition>,
 >(
   prefix: Prefix,
-  tables: Tables
+  tables: Tables,
 ): TestContextSchema<Prefix, Tables> => {
   return new TextContextSchemaImpl(prefix, tables);
 };

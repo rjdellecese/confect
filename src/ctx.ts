@@ -90,7 +90,7 @@ export type ConfectActionCtx<ConfectDataModel extends GenericConfectDataModel> =
           >,
           IndexName
         >
-      >
+      >,
     ): Effect.Effect<Array<{ _id: GenericId<TableName>; _score: number }>>;
   };
 
@@ -98,7 +98,7 @@ export const makeConfectQueryCtx = <
   ConfectDataModel extends GenericConfectDataModel,
 >(
   ctx: GenericQueryCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
-  databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>
+  databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>,
 ): ConfectQueryCtx<ConfectDataModel> => ({
   db: new ConfectDatabaseReaderImpl(ctx.db, databaseSchemas),
   auth: new ConfectAuthImpl(ctx.auth),
@@ -109,7 +109,7 @@ export const makeConfectMutationCtx = <
   ConfectDataModel extends GenericConfectDataModel,
 >(
   ctx: GenericMutationCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
-  databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>
+  databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>,
 ): ConfectMutationCtx<ConfectDataModel> => ({
   db: new EffectDatabaseWriterImpl(ctx.db, databaseSchemas),
   auth: new ConfectAuthImpl(ctx.auth),
@@ -120,7 +120,7 @@ export const makeConfectMutationCtx = <
 export const makeConfectActionCtx = <
   ConfectDataModel extends GenericConfectDataModel,
 >(
-  ctx: GenericActionCtx<DataModelFromConfectDataModel<ConfectDataModel>>
+  ctx: GenericActionCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
 ): ConfectActionCtx<ConfectDataModel> => ({
   runQuery: <Query extends FunctionReference<"query", "public" | "internal">>(
     query: Query,
@@ -154,7 +154,7 @@ export const makeConfectActionCtx = <
         >,
         IndexName
       >
-    >
+    >,
   ) => Effect.promise(() => ctx.vectorSearch(tableName, indexName, query)),
   auth: new ConfectAuthImpl(ctx.auth),
   storage: new ConfectStorageWriterImpl(ctx.storage),

@@ -12,9 +12,9 @@ export const schema = make("basic_schema_operations", {
           role: Schema.Literal("admin", "user"),
           name: Schema.String,
         }),
-        { exact: true }
+        { exact: true },
       ),
-    })
+    }),
   )
     .index("by_text", ["text"])
     .index("by_role", ["author.role"]),

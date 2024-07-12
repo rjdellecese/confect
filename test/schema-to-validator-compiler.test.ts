@@ -90,13 +90,13 @@ describe("compile", () => {
       Schema.String,
       Schema.Number,
       Schema.Boolean,
-      Schema.Struct({})
+      Schema.Struct({}),
     );
     const validator = v.union(
       v.string(),
       v.float64(),
       v.boolean(),
-      v.object({})
+      v.object({}),
     );
     const compiledValidator = compile(Schema.encodedSchema(schema).ast);
 
@@ -122,7 +122,7 @@ describe("compile", () => {
   test("tuple with three elements", () => {
     const schema = Schema.Tuple(Schema.String, Schema.Number, Schema.Boolean);
     const expectedValidator = v.array(
-      v.union(v.string(), v.float64(), v.boolean())
+      v.union(v.string(), v.float64(), v.boolean()),
     );
     const compiledValidator = compile(Schema.encodedSchema(schema).ast);
 
@@ -541,7 +541,7 @@ describe("ValueToValidator", () => {
       const expectedValidator = v.union(
         v.string(),
         v.float64(),
-        v.array(v.boolean())
+        v.array(v.boolean()),
       );
       type ExpectedValidator = typeof expectedValidator;
 
@@ -557,7 +557,7 @@ describe("compileTableSchema", () => {
     const compiledValidator = compileTableSchema(
       Schema.Struct({
         text: Schema.String,
-      })
+      }),
     );
 
     const expectedValidator = v.object({
@@ -573,7 +573,7 @@ describe("compileTableSchema", () => {
       Schema.Struct({
         text: Schema.String,
         foo: Schema.Struct({ bar: Schema.Number }),
-      })
+      }),
     );
 
     const expectedValidator = v.object({

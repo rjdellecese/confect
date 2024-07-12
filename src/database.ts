@@ -47,14 +47,14 @@ interface ConfectQuery<
 > {
   filter(
     predicate: (
-      q: FilterBuilder<TableInfoFromConfectTableInfo<ConfectTableInfo>>
-    ) => Expression<boolean>
+      q: FilterBuilder<TableInfoFromConfectTableInfo<ConfectTableInfo>>,
+    ) => Expression<boolean>,
   ): ConfectQuery<ConfectTableInfo, TableName>;
   order(
-    order: "asc" | "desc"
+    order: "asc" | "desc",
   ): ConfectOrderedQuery<ConfectTableInfo, TableName>;
   paginate(
-    paginationOpts: PaginationOptions
+    paginationOpts: PaginationOptions,
   ): Effect.Effect<PaginationResult<ConfectTableInfo["confectDocument"]>>;
   collect(): Effect.Effect<ConfectTableInfo["confectDocument"][]>;
   take(n: number): Effect.Effect<ConfectTableInfo["confectDocument"][]>;
@@ -94,7 +94,7 @@ class ConfectQueryImpl<
       ConfectTableInfo["confectDocument"],
       Expand<ReadonlyDeep<ConfectTableInfo["convexDocument"]>>
     >,
-    tableName: TableName
+    tableName: TableName,
   ) {
     this.q = q as Query<TableInfoFromConfectTableInfo<ConfectTableInfo>>;
     this.tableSchema = tableSchema;
@@ -102,29 +102,29 @@ class ConfectQueryImpl<
   }
   filter(
     predicate: (
-      q: FilterBuilder<TableInfoFromConfectTableInfo<ConfectTableInfo>>
-    ) => Expression<boolean>
+      q: FilterBuilder<TableInfoFromConfectTableInfo<ConfectTableInfo>>,
+    ) => Expression<boolean>,
   ): this {
     return new ConfectQueryImpl(
       this.q.filter(predicate),
       this.tableSchema,
-      this.tableName
+      this.tableName,
     ) as this;
   }
   order(order: "asc" | "desc"): ConfectQueryImpl<ConfectTableInfo, TableName> {
     return new ConfectQueryImpl(
       this.q.order(order),
       this.tableSchema,
-      this.tableName
+      this.tableName,
     );
   }
   paginate(
-    paginationOpts: PaginationOptions
+    paginationOpts: PaginationOptions,
   ): Effect.Effect<PaginationResult<ConfectTableInfo["confectDocument"]>> {
     return pipe(
       Effect.Do,
       Effect.bind("paginationResult", () =>
-        Effect.promise(() => this.q.paginate(paginationOpts))
+        Effect.promise(() => this.q.paginate(paginationOpts)),
       ),
       Effect.bind(
         "parsedPage",
@@ -135,14 +135,14 @@ class ConfectQueryImpl<
               Schema.decode(this.tableSchema)(
                 document as Expand<
                   ReadonlyDeep<ConfectTableInfo["convexDocument"]>
-                >
-              )
-            )
+                >,
+              ),
+            ),
           ) as unknown as Effect.Effect<
             ConfectTableInfo["confectDocument"][],
             ParseResult.ParseIssue,
             never
-          >
+          >,
       ),
       Effect.map(({ paginationResult, parsedPage }) => ({
         page: parsedPage,
@@ -151,7 +151,7 @@ class ConfectQueryImpl<
         splitCursor: paginationResult.splitCursor,
         pageStatus: paginationResult.pageStatus,
       })),
-      Effect.orDie
+      Effect.orDie,
     );
   }
   collect(): Effect.Effect<ConfectTableInfo["confectDocument"][]> {
@@ -163,11 +163,11 @@ class ConfectQueryImpl<
             document as Expand<
               ReadonlyDeep<ConfectTableInfo["convexDocument"]>
             >,
-            Schema.decode(this.tableSchema)
-          )
-        )
+            Schema.decode(this.tableSchema),
+          ),
+        ),
       ),
-      Effect.orDie
+      Effect.orDie,
     );
   }
   take(n: number): Effect.Effect<ConfectTableInfo["confectDocument"][]> {
@@ -175,7 +175,7 @@ class ConfectQueryImpl<
       this.stream(),
       Stream.take(n),
       Stream.runCollect,
-      Effect.map((chunk) => Chunk.toArray(chunk))
+      Effect.map((chunk) => Chunk.toArray(chunk)),
     );
   }
   first(): Effect.Effect<Option.Option<ConfectTableInfo["confectDocument"]>> {
@@ -192,17 +192,17 @@ class ConfectQueryImpl<
       Effect.flatMap((chunk) =>
         Chunk.get(chunk, 1)
           ? Effect.fail(new NotUniqueError())
-          : Effect.succeed(Chunk.get(chunk, 0))
-      )
+          : Effect.succeed(Chunk.get(chunk, 0)),
+      ),
     );
   }
   stream(): Stream.Stream<ConfectTableInfo["confectDocument"]> {
     return pipe(
       Stream.fromAsyncIterable(this.q, identity),
       Stream.mapEffect((document) =>
-        Schema.decodeUnknown(this.tableSchema)(document)
+        Schema.decodeUnknown(this.tableSchema)(document),
       ),
-      Stream.orDie
+      Stream.orDie,
     );
   }
 }
@@ -227,9 +227,9 @@ interface ConfectQueryInitializer<
               IndexName
             >,
             0
-          >
+          >,
         ) => IndexRange)
-      | undefined
+      | undefined,
   ): ConfectQuery<ConfectTableInfo, TableName>;
   withSearchIndex<
     IndexName extends keyof SearchIndexes<
@@ -244,8 +244,8 @@ interface ConfectQueryInitializer<
           TableInfoFromConfectTableInfo<ConfectTableInfo>,
           IndexName
         >
-      >
-    ) => SearchFilter
+      >,
+    ) => SearchFilter,
   ): ConfectOrderedQuery<ConfectTableInfo, TableName>;
 }
 
@@ -266,7 +266,7 @@ class ConfectQueryInitializerImpl<
       ConfectTableInfo["confectDocument"],
       Expand<ReadonlyDeep<ConfectTableInfo["convexDocument"]>>
     >,
-    tableName: TableName
+    tableName: TableName,
   ) {
     this.q = q;
     this.tableSchema = tableSchema;
@@ -276,7 +276,7 @@ class ConfectQueryInitializerImpl<
     return new ConfectQueryImpl(
       this.q.fullTableScan(),
       this.tableSchema,
-      this.tableName
+      this.tableName,
     );
   }
   withIndex<
@@ -294,14 +294,14 @@ class ConfectQueryInitializerImpl<
               IndexName
             >,
             0
-          >
+          >,
         ) => IndexRange)
-      | undefined
+      | undefined,
   ): ConfectQuery<ConfectTableInfo, TableName> {
     return new ConfectQueryImpl(
       this.q.withIndex(indexName, indexRange),
       this.tableSchema,
-      this.tableName
+      this.tableName,
     );
   }
   withSearchIndex<
@@ -317,29 +317,29 @@ class ConfectQueryInitializerImpl<
           TableInfoFromConfectTableInfo<ConfectTableInfo>,
           IndexName
         >
-      >
-    ) => SearchFilter
+      >,
+    ) => SearchFilter,
   ): ConfectOrderedQuery<ConfectTableInfo, TableName> {
     return new ConfectQueryImpl(
       this.q.withSearchIndex(indexName, searchFilter),
       this.tableSchema,
-      this.tableName
+      this.tableName,
     );
   }
   filter(
     predicate: (
-      q: FilterBuilder<TableInfoFromConfectTableInfo<ConfectTableInfo>>
-    ) => Expression<boolean>
+      q: FilterBuilder<TableInfoFromConfectTableInfo<ConfectTableInfo>>,
+    ) => Expression<boolean>,
   ): this {
     return this.fullTableScan().filter(predicate) as this;
   }
   order(
-    order: "asc" | "desc"
+    order: "asc" | "desc",
   ): ConfectOrderedQuery<ConfectTableInfo, TableName> {
     return this.fullTableScan().order(order);
   }
   paginate(
-    paginationOpts: PaginationOptions
+    paginationOpts: PaginationOptions,
   ): Effect.Effect<PaginationResult<ConfectTableInfo["confectDocument"]>> {
     return this.fullTableScan().paginate(paginationOpts);
   }
@@ -376,16 +376,16 @@ export interface ConfectDatabaseReader<
   ConfectDataModel extends GenericConfectDataModel,
 > {
   query<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    tableName: TableName
+    tableName: TableName,
   ): ConfectQueryInitializer<ConfectDataModel[TableName], TableName>;
   get<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    id: GenericId<TableName>
+    id: GenericId<TableName>,
   ): Effect.Effect<
     Option.Option<ConfectDataModel[TableName]["confectDocument"]>
   >;
   normalizeId<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
     tableName: TableName,
-    id: string
+    id: string,
   ): Option.Option<GenericId<TableName>>;
 }
 
@@ -397,34 +397,34 @@ export class ConfectDatabaseReaderImpl<
   databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>;
   constructor(
     db: GenericDatabaseReader<DataModelFromConfectDataModel<ConfectDataModel>>,
-    databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>
+    databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>,
   ) {
     this.db = db;
     this.databaseSchemas = databaseSchemas;
   }
   normalizeId<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
     tableName: TableName,
-    id: string
+    id: string,
   ): Option.Option<GenericId<TableName>> {
     return Option.fromNullable(this.db.normalizeId(tableName, id));
   }
   get<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    id: GenericId<TableName>
+    id: GenericId<TableName>,
   ): Effect.Effect<
     Option.Option<ConfectDataModel[TableName]["confectDocument"]>
   > {
     return pipe(
       Effect.promise(() => this.db.get(id)),
-      Effect.map(Option.fromNullable)
+      Effect.map(Option.fromNullable),
     );
   }
   query<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    tableName: TableName
+    tableName: TableName,
   ): ConfectQueryInitializer<ConfectDataModel[TableName], TableName> {
     return new ConfectQueryInitializerImpl(
       this.db.query(tableName),
       this.databaseSchemas[tableName],
-      tableName
+      tableName,
     );
   }
 }
@@ -433,32 +433,32 @@ export interface ConfectDatabaseWriter<
   ConfectDataModel extends GenericConfectDataModel,
 > {
   query<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    tableName: TableName
+    tableName: TableName,
   ): ConfectQueryInitializer<ConfectDataModel[TableName], TableName>;
   get<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    id: GenericId<TableName>
+    id: GenericId<TableName>,
   ): Effect.Effect<
     Option.Option<ConfectDataModel[TableName]["confectDocument"]>
   >;
   normalizeId<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
     tableName: TableName,
-    id: string
+    id: string,
   ): Option.Option<GenericId<TableName>>;
   insert<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
     table: TableName,
     value: WithoutSystemFields<
       ConfectDocumentByName<ConfectDataModel, TableName>
-    >
+    >,
   ): Effect.Effect<GenericId<TableName>>;
   patch<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
     id: GenericId<TableName>,
-    value: Partial<ConfectDocumentByName<ConfectDataModel, TableName>>
+    value: Partial<ConfectDocumentByName<ConfectDataModel, TableName>>,
   ): Effect.Effect<void>;
   replace<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
     id: GenericId<TableName>,
     value: WithOptionalSystemFields<
       ConfectDocumentByName<ConfectDataModel, TableName>
-    >
+    >,
   ): Effect.Effect<void>;
   delete(id: GenericId<string>): Effect.Effect<void>;
 }
@@ -472,7 +472,7 @@ export class EffectDatabaseWriterImpl<
   reader: ConfectDatabaseReader<ConfectDataModel>;
   constructor(
     db: GenericDatabaseWriter<DataModelFromConfectDataModel<ConfectDataModel>>,
-    databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>
+    databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>,
   ) {
     this.db = db;
     // TODO: Does this need to be an instance variable?
@@ -480,12 +480,12 @@ export class EffectDatabaseWriterImpl<
     this.reader = new ConfectDatabaseReaderImpl(db, databaseSchemas);
   }
   query<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    tableName: TableName
+    tableName: TableName,
   ): ConfectQueryInitializer<ConfectDataModel[TableName], TableName> {
     return this.reader.query(tableName);
   }
   get<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    id: GenericId<TableName>
+    id: GenericId<TableName>,
   ): Effect.Effect<
     Option.Option<ConfectDataModel[TableName]["confectDocument"]>
   > {
@@ -493,7 +493,7 @@ export class EffectDatabaseWriterImpl<
   }
   normalizeId<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
     tableName: TableName,
-    id: string
+    id: string,
   ): Option.Option<GenericId<TableName>> {
     return Option.fromNullable(this.db.normalizeId(tableName, id));
   }
@@ -501,7 +501,7 @@ export class EffectDatabaseWriterImpl<
     table: TableName,
     value: WithoutSystemFields<
       ConfectDocumentByName<ConfectDataModel, TableName>
-    >
+    >,
   ): Effect.Effect<GenericId<TableName>> {
     return pipe(
       value,
@@ -519,16 +519,16 @@ export class EffectDatabaseWriterImpl<
                 >,
                 "_creationTime" | "_id"
               >
-            >
-          )
-        )
+            >,
+          ),
+        ),
       ),
-      Effect.orDie
+      Effect.orDie,
     );
   }
   patch<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
     id: GenericId<TableName>,
-    value: Partial<ConfectDocumentByName<ConfectDataModel, TableName>>
+    value: Partial<ConfectDocumentByName<ConfectDataModel, TableName>>,
   ): Effect.Effect<void> {
     return Effect.promise(() => this.db.patch(id, value));
   }
@@ -536,7 +536,7 @@ export class EffectDatabaseWriterImpl<
     id: GenericId<TableName>,
     value: WithOptionalSystemFields<
       ConfectDocumentByName<ConfectDataModel, TableName>
-    >
+    >,
   ): Effect.Effect<void> {
     return Effect.promise(() => this.db.replace(id, value));
   }
@@ -548,11 +548,11 @@ export class EffectDatabaseWriterImpl<
 export const schemasFromConfectSchema = <
   ConfectSchema extends GenericConfectSchema,
 >(
-  effectSchema: ConfectSchema
+  effectSchema: ConfectSchema,
 ) =>
   Record.map(
     effectSchema,
-    ({ tableSchema: schema }) => schema
+    ({ tableSchema: schema }) => schema,
   ) as DatabaseSchemasFromConfectDataModel<
     ConfectDataModelFromConfectSchema<ConfectSchema>
   >;

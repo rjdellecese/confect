@@ -30,21 +30,21 @@ export interface TestConvexService {
     func: (
       ctx: GenericMutationCtx<DataModelFromSchemaDefinition<typeof schema>> & {
         storage: StorageActionWriter;
-      }
-    ) => Promise<Output>
+      },
+    ) => Promise<Output>,
   ) => Effect.Effect<Output>;
   fetch: (
     pathQueryFragment: string,
-    init?: RequestInit
+    init?: RequestInit,
   ) => Effect.Effect<Response>;
   finishInProgressScheduledFunctions: () => Effect.Effect<void>;
   finishAllScheduledFunctions: (
-    advanceTimers: () => void
+    advanceTimers: () => void,
   ) => Effect.Effect<void>;
 }
 
 export const TestConvexService = Context.GenericTag<TestConvexService>(
-  "@services/ConvexService"
+  "@services/ConvexService",
 );
 
 // In theory it might be possible to also have a version of this which runs the tests on the local or cloud backends
@@ -64,6 +64,6 @@ export const layer = Effect.sync(() =>
         Effect.promise(() => testConvex.finishInProgressScheduledFunctions()),
       finishAllScheduledFunctions: (...args) =>
         Effect.promise(() => testConvex.finishAllScheduledFunctions(...args)),
-    })
-  )
+    }),
+  ),
 ).pipe(Layer.effect(TestConvexService));

@@ -20,7 +20,7 @@ export const extendWithIdAndSystemFields =
       Schema.Struct({
         _id: SchemaId<TableName>(),
         _creationTime: Schema.Number,
-      })
+      }),
     );
 
 export type GenericConfectDocument = ReadonlyRecord<string, any>;

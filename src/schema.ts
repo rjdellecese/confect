@@ -53,7 +53,7 @@ class ConfectSchemaDefinitionImpl<
     this.schemaDefinition = pipe(
       confectSchema,
       Record.map(({ tableDefinition }) => tableDefinition),
-      defineSchema
+      defineSchema,
     ) as SchemaDefinition<ConvexSchema, true>;
   }
 }
@@ -66,7 +66,7 @@ type SchemaDefinitionFromConfectSchemaDefinition<
 }>;
 
 export const defineConfectSchema = <ConfectSchema extends GenericConfectSchema>(
-  confectSchema: ConfectSchema
+  confectSchema: ConfectSchema,
 ): ConfectSchemaDefinitionImpl<
   SchemaDefinitionFromConfectSchemaDefinition<ConfectSchema>,
   ConfectSchema
@@ -108,7 +108,7 @@ export interface ConfectTableDefinition<
     RestFieldPaths extends ExtractFieldPaths<TableValidator>[],
   >(
     name: IndexName,
-    fields: [FirstFieldPath, ...RestFieldPaths]
+    fields: [FirstFieldPath, ...RestFieldPaths],
   ): ConfectTableDefinition<
     TableSchema,
     TableValidator,
@@ -128,7 +128,7 @@ export interface ConfectTableDefinition<
     FilterFields extends ExtractFieldPaths<TableValidator> = never,
   >(
     name: IndexName,
-    indexConfig: Expand<SearchIndexConfig<SearchField, FilterFields>>
+    indexConfig: Expand<SearchIndexConfig<SearchField, FilterFields>>,
   ): ConfectTableDefinition<
     TableSchema,
     TableValidator,
@@ -151,7 +151,7 @@ export interface ConfectTableDefinition<
     FilterFields extends ExtractFieldPaths<TableValidator> = never,
   >(
     name: IndexName,
-    indexConfig: Expand<VectorIndexConfig<VectorField, FilterFields>>
+    indexConfig: Expand<VectorIndexConfig<VectorField, FilterFields>>,
   ): ConfectTableDefinition<
     TableSchema,
     TableValidator,
@@ -218,7 +218,7 @@ class ConfectTableDefinitionImpl<
     RestFieldPaths extends ExtractFieldPaths<TableValidator>[],
   >(
     name: IndexName,
-    fields: [FirstFieldPath, ...RestFieldPaths]
+    fields: [FirstFieldPath, ...RestFieldPaths],
   ): ConfectTableDefinition<
     TableSchema,
     TableValidator,
@@ -243,7 +243,7 @@ class ConfectTableDefinitionImpl<
     FilterFields extends ExtractFieldPaths<TableValidator> = never,
   >(
     name: IndexName,
-    indexConfig: Expand<SearchIndexConfig<SearchField, FilterFields>>
+    indexConfig: Expand<SearchIndexConfig<SearchField, FilterFields>>,
   ): ConfectTableDefinition<
     TableSchema,
     TableValidator,
@@ -275,7 +275,7 @@ class ConfectTableDefinitionImpl<
       vectorField: VectorField;
       dimensions: number;
       filterFields?: FilterFields[] | undefined;
-    }
+    },
   ): ConfectTableDefinition<
     TableSchema,
     TableValidator,

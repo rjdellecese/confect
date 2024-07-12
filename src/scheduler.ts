@@ -26,7 +26,7 @@ export class ConfectSchedulerImpl implements ConfectScheduler {
     ...args: OptionalRestArgs<FuncRef>
   ): Effect.Effect<void> {
     return Effect.promise(() =>
-      this.scheduler.runAfter(delayMs, functionReference, ...args)
+      this.scheduler.runAfter(delayMs, functionReference, ...args),
     );
   }
   runAt<FuncRef extends SchedulableFunctionReference>(
@@ -35,7 +35,7 @@ export class ConfectSchedulerImpl implements ConfectScheduler {
     ...args: OptionalRestArgs<FuncRef>
   ): Effect.Effect<void> {
     return Effect.promise(() =>
-      this.scheduler.runAt(timestamp, functionReference, ...args)
+      this.scheduler.runAt(timestamp, functionReference, ...args),
     );
   }
 }

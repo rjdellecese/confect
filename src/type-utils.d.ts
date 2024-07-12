@@ -38,13 +38,13 @@ type _unionToTuple<t, result extends unknown[]> =
 
 type getLastBranch<t> =
   intersectUnion<t extends unknown ? (x: t) => void : never> extends (
-    x: infer branch
+    x: infer branch,
   ) => void
     ? branch
     : never;
 
 type intersectUnion<t> = (t extends unknown ? (_: t) => void : never) extends (
-  _: infer intersection
+  _: infer intersection,
 ) => void
   ? intersection
   : never;

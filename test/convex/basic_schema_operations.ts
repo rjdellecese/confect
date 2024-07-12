@@ -14,7 +14,7 @@ export const get = query({
   }),
   handler: (
     { db },
-    { id }
+    { id },
   ): Effect.Effect<Doc<"basic_schema_operations__notes"> | null> => {
     return db.get(id).pipe(Effect.map(Option.getOrNull));
   },
@@ -26,7 +26,7 @@ export const insert = mutation({
   }),
   handler: (
     { db },
-    { text }
+    { text },
   ): Effect.Effect<Id<"basic_schema_operations__notes">> => {
     return db.insert(schema.tableName("notes"), { text });
   },
@@ -45,7 +45,7 @@ export const filterFirst = query({
   }),
   handler: (
     { db },
-    { text }
+    { text },
   ): Effect.Effect<Doc<"basic_schema_operations__notes"> | null> => {
     return db
       .query(schema.tableName("notes"))
@@ -61,7 +61,7 @@ export const withIndexFirst = query({
   }),
   handler: (
     { db },
-    { text }
+    { text },
   ): Effect.Effect<Doc<"basic_schema_operations__notes"> | null> => {
     return db
       .query(schema.tableName("notes"))
