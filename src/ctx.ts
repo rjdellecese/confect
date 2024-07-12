@@ -7,107 +7,121 @@ import {
   GenericQueryCtx,
   NamedTableInfo,
   OptionalRestArgs,
-  TableNamesInDataModel,
   VectorIndexNames,
   VectorSearchQuery,
 } from "convex/server";
 import { GenericId } from "convex/values";
 import { Effect } from "effect";
 
-import { EffectAuth, EffectAuthImpl } from "~/src/auth";
+import { ConfectAuth, ConfectAuthImpl } from "~/src/auth";
 import {
   DataModelFromConfectDataModel,
   GenericConfectDataModel,
+  TableNamesInConfectDataModel,
 } from "~/src/data-model";
 import {
+  ConfectDatabaseReader,
+  ConfectDatabaseReaderImpl,
+  ConfectDatabaseWriter,
   DatabaseSchemasFromConfectDataModel,
-  EffectDatabaseReader,
-  EffectDatabaseReaderImpl,
-  EffectDatabaseWriter,
   EffectDatabaseWriterImpl,
 } from "~/src/database";
-import { EffectScheduler, EffectSchedulerImpl } from "~/src/scheduler";
+import { ConfectScheduler, ConfectSchedulerImpl } from "~/src/scheduler";
 import {
-  EffectStorageReader,
-  EffectStorageReaderImpl,
-  EffectStorageWriter,
-  EffectStorageWriterImpl,
+  ConfectStorageReader,
+  ConfectStorageReaderImpl,
+  ConfectStorageWriter,
+  ConfectStorageWriterImpl,
 } from "~/src/storage";
 
-export type EffectMutationCtx<EffectDataModel extends GenericConfectDataModel> =
+export type ConfectMutationCtx<
+  ConfectDataModel extends GenericConfectDataModel,
+> = {
+  db: ConfectDatabaseWriter<ConfectDataModel>;
+  auth: ConfectAuth;
+  storage: ConfectStorageWriter;
+  scheduler: ConfectScheduler;
+};
+
+export type ConfectQueryCtx<ConfectDataModel extends GenericConfectDataModel> =
   {
-    db: EffectDatabaseWriter<EffectDataModel>;
-    auth: EffectAuth;
-    storage: EffectStorageWriter;
-    scheduler: EffectScheduler;
+    db: ConfectDatabaseReader<ConfectDataModel>;
+    auth: ConfectAuth;
+    storage: ConfectStorageReader;
   };
 
-export type EffectQueryCtx<EffectDataModel extends GenericConfectDataModel> = {
-  db: EffectDatabaseReader<EffectDataModel>;
-  auth: EffectAuth;
-  storage: EffectStorageReader;
-};
+export type ConfectActionCtx<ConfectDataModel extends GenericConfectDataModel> =
+  {
+    runQuery<Query extends FunctionReference<"query", "public" | "internal">>(
+      query: Query,
+      ...args: OptionalRestArgs<Query>
+    ): Effect.Effect<FunctionReturnType<Query>>;
+    runMutation<
+      Mutation extends FunctionReference<"mutation", "public" | "internal">,
+    >(
+      mutation: Mutation,
+      ...args: OptionalRestArgs<Mutation>
+    ): Effect.Effect<FunctionReturnType<Mutation>>;
+    runAction<
+      Action extends FunctionReference<"action", "public" | "internal">,
+    >(
+      action: Action,
+      ...args: OptionalRestArgs<Action>
+    ): Effect.Effect<FunctionReturnType<Action>>;
+    scheduler: ConfectScheduler;
+    auth: ConfectAuth;
+    storage: ConfectStorageWriter;
+    vectorSearch<
+      TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+      IndexName extends VectorIndexNames<
+        NamedTableInfo<
+          DataModelFromConfectDataModel<ConfectDataModel>,
+          TableName
+        >
+      >,
+    >(
+      tableName: TableName,
+      indexName: IndexName,
+      query: Expand<
+        VectorSearchQuery<
+          NamedTableInfo<
+            DataModelFromConfectDataModel<ConfectDataModel>,
+            TableName
+          >,
+          IndexName
+        >
+      >,
+    ): Effect.Effect<Array<{ _id: GenericId<TableName>; _score: number }>>;
+  };
 
-export type EffectActionCtx<EffectDataModel extends GenericConfectDataModel> = {
-  runQuery<Query extends FunctionReference<"query", "public" | "internal">>(
-    query: Query,
-    ...args: OptionalRestArgs<Query>
-  ): Effect.Effect<FunctionReturnType<Query>>;
-  runMutation<
-    Mutation extends FunctionReference<"mutation", "public" | "internal">,
-  >(
-    mutation: Mutation,
-    ...args: OptionalRestArgs<Mutation>
-  ): Effect.Effect<FunctionReturnType<Mutation>>;
-  runAction<Action extends FunctionReference<"action", "public" | "internal">>(
-    action: Action,
-    ...args: OptionalRestArgs<Action>
-  ): Effect.Effect<FunctionReturnType<Action>>;
-  scheduler: EffectScheduler;
-  auth: EffectAuth;
-  storage: EffectStorageWriter;
-  vectorSearch<
-    TableName extends TableNamesInDataModel<EffectDataModel>,
-    IndexName extends VectorIndexNames<
-      NamedTableInfo<EffectDataModel, TableName>
-    >,
-  >(
-    tableName: TableName,
-    indexName: IndexName,
-    query: Expand<
-      VectorSearchQuery<NamedTableInfo<EffectDataModel, TableName>, IndexName>
-    >
-  ): Effect.Effect<Array<{ _id: GenericId<TableName>; _score: number }>>;
-};
-
-export const makeEffectQueryCtx = <
-  EffectDataModel extends GenericConfectDataModel,
+export const makeConfectQueryCtx = <
+  ConfectDataModel extends GenericConfectDataModel,
 >(
-  ctx: GenericQueryCtx<DataModelFromConfectDataModel<EffectDataModel>>,
-  databaseSchemas: DatabaseSchemasFromConfectDataModel<EffectDataModel>
-): EffectQueryCtx<EffectDataModel> => ({
-  db: new EffectDatabaseReaderImpl(ctx.db, databaseSchemas),
-  auth: new EffectAuthImpl(ctx.auth),
-  storage: new EffectStorageReaderImpl(ctx.storage),
+  ctx: GenericQueryCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
+  databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>,
+): ConfectQueryCtx<ConfectDataModel> => ({
+  db: new ConfectDatabaseReaderImpl(ctx.db, databaseSchemas),
+  auth: new ConfectAuthImpl(ctx.auth),
+  storage: new ConfectStorageReaderImpl(ctx.storage),
 });
 
-export const makeEffectMutationCtx = <
-  EffectDataModel extends GenericConfectDataModel,
+export const makeConfectMutationCtx = <
+  ConfectDataModel extends GenericConfectDataModel,
 >(
-  ctx: GenericMutationCtx<DataModelFromConfectDataModel<EffectDataModel>>,
-  databaseSchemas: DatabaseSchemasFromConfectDataModel<EffectDataModel>
-): EffectMutationCtx<EffectDataModel> => ({
+  ctx: GenericMutationCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
+  databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>,
+): ConfectMutationCtx<ConfectDataModel> => ({
   db: new EffectDatabaseWriterImpl(ctx.db, databaseSchemas),
-  auth: new EffectAuthImpl(ctx.auth),
-  storage: new EffectStorageWriterImpl(ctx.storage),
-  scheduler: new EffectSchedulerImpl(ctx.scheduler),
+  auth: new ConfectAuthImpl(ctx.auth),
+  storage: new ConfectStorageWriterImpl(ctx.storage),
+  scheduler: new ConfectSchedulerImpl(ctx.scheduler),
 });
 
-export const makeEffectActionCtx = <
-  EffectDataModel extends GenericConfectDataModel,
+export const makeConfectActionCtx = <
+  ConfectDataModel extends GenericConfectDataModel,
 >(
-  ctx: GenericActionCtx<DataModelFromConfectDataModel<EffectDataModel>>
-): EffectActionCtx<EffectDataModel> => ({
+  ctx: GenericActionCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
+): ConfectActionCtx<ConfectDataModel> => ({
   runQuery: <Query extends FunctionReference<"query", "public" | "internal">>(
     query: Query,
     ...queryArgs: OptionalRestArgs<Query>
@@ -125,18 +139,24 @@ export const makeEffectActionCtx = <
     ...actionArgs: OptionalRestArgs<Action>
   ) => Effect.promise(() => ctx.runAction(action, ...actionArgs)),
   vectorSearch: <
-    TableName extends TableNamesInDataModel<EffectDataModel>,
+    TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
     IndexName extends VectorIndexNames<
-      NamedTableInfo<EffectDataModel, TableName>
+      NamedTableInfo<DataModelFromConfectDataModel<ConfectDataModel>, TableName>
     >,
   >(
     tableName: TableName,
     indexName: IndexName,
     query: Expand<
-      VectorSearchQuery<NamedTableInfo<EffectDataModel, TableName>, IndexName>
-    >
+      VectorSearchQuery<
+        NamedTableInfo<
+          DataModelFromConfectDataModel<ConfectDataModel>,
+          TableName
+        >,
+        IndexName
+      >
+    >,
   ) => Effect.promise(() => ctx.vectorSearch(tableName, indexName, query)),
-  auth: new EffectAuthImpl(ctx.auth),
-  storage: new EffectStorageWriterImpl(ctx.storage),
-  scheduler: new EffectSchedulerImpl(ctx.scheduler),
+  auth: new ConfectAuthImpl(ctx.auth),
+  storage: new ConfectStorageWriterImpl(ctx.storage),
+  scheduler: new ConfectSchedulerImpl(ctx.scheduler),
 });

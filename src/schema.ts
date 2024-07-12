@@ -3,8 +3,6 @@ import {
   defineSchema,
   defineTable,
   Expand,
-  GenericDocument,
-  GenericFieldPaths,
   GenericSchema,
   GenericTableIndexes,
   GenericTableSearchIndexes,
@@ -18,18 +16,15 @@ import {
   TableDefinition,
   VectorIndexConfig,
 } from "convex/server";
+import { Validator } from "convex/values";
 import { pipe, Record } from "effect";
-import { ReadonlyDeep, WritableDeep } from "type-fest";
+import { ReadonlyDeep } from "type-fest";
 
-import {
-  GenericConfectDocument,
-  WithIdAndSystemFields,
-} from "~/src/data-model";
-import * as schemaToValidatorCompiler from "~/src/schema-to-validator-compiler";
+import { compileTableSchema } from "~/src/schema-to-validator-compiler";
 
 export type GenericConfectSchema = Record<
   string,
-  ConfectTableDefinition<any, any>
+  ConfectTableDefinition<any, any, any, any, any>
 >;
 
 export type GenericConfectSchemaDefinition = ConfectSchemaDefinition<
@@ -53,12 +48,12 @@ class ConfectSchemaDefinitionImpl<
   confectSchema: ConfectSchema;
   schemaDefinition: SchemaDefinition<ConvexSchema, true>;
 
-  constructor(effectSchema: ConfectSchema) {
-    this.confectSchema = effectSchema;
+  constructor(confectSchema: ConfectSchema) {
+    this.confectSchema = confectSchema;
     this.schemaDefinition = pipe(
-      effectSchema,
+      confectSchema,
       Record.map(({ tableDefinition }) => tableDefinition),
-      defineSchema
+      defineSchema,
     ) as SchemaDefinition<ConvexSchema, true>;
   }
 }
@@ -71,8 +66,11 @@ type SchemaDefinitionFromConfectSchemaDefinition<
 }>;
 
 export const defineConfectSchema = <ConfectSchema extends GenericConfectSchema>(
-  confectSchema: ConfectSchema
-) =>
+  confectSchema: ConfectSchema,
+): ConfectSchemaDefinitionImpl<
+  SchemaDefinitionFromConfectSchemaDefinition<ConfectSchema>,
+  ConfectSchema
+> =>
   new ConfectSchemaDefinitionImpl<
     SchemaDefinitionFromConfectSchemaDefinition<ConfectSchema>,
     ConfectSchema
@@ -83,14 +81,12 @@ export type GenericConfectTableDefinition = ConfectTableDefinition<
   any,
   any,
   any,
-  any,
   any
 >;
 
 export interface ConfectTableDefinition<
-  ConvexDocument extends GenericDocument,
-  ConfectDocument extends GenericConfectDocument,
-  FieldPaths extends GenericFieldPaths = string,
+  TableSchema extends Schema.Schema<any, any>,
+  TableValidator extends Validator<any, any, any>,
   // eslint-disable-next-line @typescript-eslint/ban-types
   Indexes extends GenericTableIndexes = {},
   // eslint-disable-next-line @typescript-eslint/ban-types
@@ -99,25 +95,23 @@ export interface ConfectTableDefinition<
   VectorIndexes extends GenericTableVectorIndexes = {},
 > {
   tableDefinition: TableDefinition<
-    ConvexDocument,
-    FieldPaths,
+    TableValidator,
     Indexes,
     SearchIndexes,
     VectorIndexes
   >;
-  schema: Schema.Schema<ConfectDocument, ConvexDocument>;
+  tableSchema: TableSchema;
 
   index<
     IndexName extends string,
-    FirstFieldPath extends FieldPaths,
-    RestFieldPaths extends FieldPaths[],
+    FirstFieldPath extends ExtractFieldPaths<TableValidator>,
+    RestFieldPaths extends ExtractFieldPaths<TableValidator>[],
   >(
     name: IndexName,
-    fields: [FirstFieldPath, ...RestFieldPaths]
+    fields: [FirstFieldPath, ...RestFieldPaths],
   ): ConfectTableDefinition<
-    ConvexDocument,
-    ConfectDocument,
-    FieldPaths,
+    TableSchema,
+    TableValidator,
     Expand<
       Indexes &
         Record<
@@ -130,15 +124,14 @@ export interface ConfectTableDefinition<
   >;
   searchIndex<
     IndexName extends string,
-    SearchField extends FieldPaths,
-    FilterFields extends FieldPaths = never,
+    SearchField extends ExtractFieldPaths<TableValidator>,
+    FilterFields extends ExtractFieldPaths<TableValidator> = never,
   >(
     name: IndexName,
-    indexConfig: Expand<SearchIndexConfig<SearchField, FilterFields>>
+    indexConfig: Expand<SearchIndexConfig<SearchField, FilterFields>>,
   ): ConfectTableDefinition<
-    ConvexDocument,
-    ConfectDocument,
-    FieldPaths,
+    TableSchema,
+    TableValidator,
     Indexes,
     Expand<
       SearchIndexes &
@@ -154,15 +147,14 @@ export interface ConfectTableDefinition<
   >;
   vectorIndex<
     IndexName extends string,
-    VectorField extends FieldPaths,
-    FilterFields extends FieldPaths = never,
+    VectorField extends ExtractFieldPaths<TableValidator>,
+    FilterFields extends ExtractFieldPaths<TableValidator> = never,
   >(
     name: IndexName,
-    indexConfig: Expand<VectorIndexConfig<VectorField, FilterFields>>
+    indexConfig: Expand<VectorIndexConfig<VectorField, FilterFields>>,
   ): ConfectTableDefinition<
-    ConvexDocument,
-    ConfectDocument,
-    FieldPaths,
+    TableSchema,
+    TableValidator,
     Indexes,
     SearchIndexes,
     Expand<
@@ -190,9 +182,8 @@ export type ConfectSchemaFromConfectSchemaDefinition<
     : never;
 
 class ConfectTableDefinitionImpl<
-  ConvexDocument extends GenericDocument,
-  ConfectDocument extends GenericConfectDocument,
-  FieldPaths extends GenericFieldPaths = string,
+  TableSchema extends Schema.Schema<any, any>,
+  TableValidator extends Validator<any, any, any>,
   // eslint-disable-next-line @typescript-eslint/ban-types
   Indexes extends GenericTableIndexes = {},
   // eslint-disable-next-line @typescript-eslint/ban-types
@@ -201,39 +192,36 @@ class ConfectTableDefinitionImpl<
   VectorIndexes extends GenericTableVectorIndexes = {},
 > implements
     ConfectTableDefinition<
-      ConvexDocument,
-      ConfectDocument,
-      FieldPaths,
+      TableSchema,
+      TableValidator,
       Indexes,
       SearchIndexes,
       VectorIndexes
     >
 {
+  tableSchema: TableSchema;
   tableDefinition: TableDefinition<
-    Expand<ConvexDocument & SystemFields>,
-    FieldPaths,
+    TableValidator,
     Indexes,
     SearchIndexes,
     VectorIndexes
   >;
-  schema: Schema.Schema<ConfectDocument, ConvexDocument>;
 
-  constructor(schema: Schema.Schema<ConfectDocument, ConvexDocument>) {
-    this.schema = schema;
-    this.tableDefinition = defineTable(schemaToValidatorCompiler.table(schema));
+  constructor(tableSchema: TableSchema, tableValidator: TableValidator) {
+    this.tableSchema = tableSchema;
+    this.tableDefinition = defineTable(tableValidator);
   }
 
   index<
     IndexName extends string,
-    FirstFieldPath extends FieldPaths,
-    RestFieldPaths extends FieldPaths[],
+    FirstFieldPath extends ExtractFieldPaths<TableValidator>,
+    RestFieldPaths extends ExtractFieldPaths<TableValidator>[],
   >(
     name: IndexName,
-    fields: [FirstFieldPath, ...RestFieldPaths]
+    fields: [FirstFieldPath, ...RestFieldPaths],
   ): ConfectTableDefinition<
-    ConvexDocument,
-    ConfectDocument,
-    FieldPaths,
+    TableSchema,
+    TableValidator,
     Expand<
       Indexes &
         Record<
@@ -251,15 +239,14 @@ class ConfectTableDefinitionImpl<
 
   searchIndex<
     IndexName extends string,
-    SearchField extends FieldPaths,
-    FilterFields extends FieldPaths = never,
+    SearchField extends ExtractFieldPaths<TableValidator>,
+    FilterFields extends ExtractFieldPaths<TableValidator> = never,
   >(
     name: IndexName,
-    indexConfig: Expand<SearchIndexConfig<SearchField, FilterFields>>
+    indexConfig: Expand<SearchIndexConfig<SearchField, FilterFields>>,
   ): ConfectTableDefinition<
-    ConvexDocument,
-    ConfectDocument,
-    FieldPaths,
+    TableSchema,
+    TableValidator,
     Indexes,
     Expand<
       SearchIndexes &
@@ -280,19 +267,18 @@ class ConfectTableDefinitionImpl<
 
   vectorIndex<
     IndexName extends string,
-    VectorField extends FieldPaths,
-    FilterFields extends FieldPaths = never,
+    VectorField extends ExtractFieldPaths<TableValidator>,
+    FilterFields extends ExtractFieldPaths<TableValidator> = never,
   >(
     name: IndexName,
     indexConfig: {
       vectorField: VectorField;
       dimensions: number;
       filterFields?: FilterFields[] | undefined;
-    }
+    },
   ): ConfectTableDefinition<
-    ConvexDocument,
-    ConfectDocument,
-    FieldPaths,
+    TableSchema,
+    TableValidator,
     Indexes,
     SearchIndexes,
     Expand<
@@ -313,21 +299,10 @@ class ConfectTableDefinitionImpl<
   }
 }
 
-// TODO: Convert the Schema to make all document mutable
-// TODO: System fields (except ID) are also added by the Convex lib here
-export const defineConfectTable = <
-  ConvexDocument extends ReadonlyDeep<GenericDocument>,
-  ConfectDocument extends GenericConfectDocument,
->(
-  schema: Schema.Schema<ConfectDocument, ConvexDocument>
-): ConfectTableDefinition<WritableDeep<ConvexDocument>, ConfectDocument> =>
-  new ConfectTableDefinitionImpl(
-    // TODO: Is there a safer way to do this? If not, write lots of tests.
-    schema as unknown as Schema.Schema<
-      ConfectDocument,
-      WritableDeep<ConvexDocument>
-    >
-  );
+export const defineConfectTable = <A, I>(tableSchema: Schema.Schema<A, I>) => {
+  const tableValidator = compileTableSchema(tableSchema);
+  return new ConfectTableDefinitionImpl(tableSchema, tableValidator);
+};
 
 export type TableNamesInConfectSchema<
   ConfectSchema extends GenericConfectSchema,
@@ -338,24 +313,63 @@ export type ConfectDataModelFromConfectSchema<
 > = {
   [TableName in keyof ConfectSchema &
     string]: ConfectSchema[TableName] extends ConfectTableDefinition<
-    infer Document,
-    infer ConfectDocument,
-    infer FieldPaths,
+    infer TableSchema,
+    infer TableValidator,
     infer Indexes,
     infer SearchIndexes,
     infer VectorIndexes
   >
-    ? {
-        document: WithIdAndSystemFields<Document, TableName>;
-        confectDocument: WithIdAndSystemFields<ConfectDocument, TableName>;
-        fieldPaths: keyof IdField<TableName> | FieldPaths;
-        indexes: Expand<Indexes & SystemIndexes>;
-        searchIndexes: SearchIndexes;
-        vectorIndexes: VectorIndexes;
-      }
+    ? TableSchema extends Schema.Schema<any, any>
+      ? {
+          confectDocument: ExtractConfectDocument<TableName, TableSchema>;
+          convexDocument: ExtractDocument<TableName, TableValidator>;
+          fieldPaths:
+            | keyof IdField<TableName>
+            | ExtractFieldPaths<TableValidator>;
+          indexes: Expand<Indexes & SystemIndexes>;
+          searchIndexes: SearchIndexes;
+          vectorIndexes: VectorIndexes;
+        }
+      : never
     : never;
 };
+
+type ExtractConfectDocument<
+  TableName extends string,
+  S extends Schema.Schema<any>,
+> = Expand<
+  ReadonlyDeep<IdField<TableName>> & ReadonlyDeep<SystemFields> & S["Type"]
+>;
 
 // TODO: Type-level test that `ConfectDataModelFromEffectSchema` produces `ConfectDataModel`?
 
 // TODO: Add system tables (see https://github.com/get-convex/convex-js/blob/432247e28d67a36b165c0beea2c3b2629d7f87ee/src/server/schema.ts#L574-L598)
+
+// TODO: Vendored types:
+
+/**
+ * Extract all of the index field paths within a {@link Validator}.
+ *
+ * This is used within {@link defineTable}.
+ * @public
+ */
+type ExtractFieldPaths<T extends Validator<any, any, any>> =
+  // Add in the system fields available in index definitions.
+  // This should be everything except for `_id` because thats added to indexes
+  // automatically.
+  T["fieldPaths"] | keyof SystemFields;
+
+/**
+ * Extract the {@link GenericDocument} within a {@link Validator} and
+ * add on the system fields.
+ *
+ * This is used within {@link defineTable}.
+ * @public
+ */
+type ExtractDocument<
+  TableName extends string,
+  T extends Validator<any, any, any>,
+> =
+  // Add the system fields to `Value` (except `_id` because it depends on
+  //the table name) and trick TypeScript into expanding them.
+  Expand<IdField<TableName> & SystemFields & T["type"]>;

@@ -6,7 +6,7 @@ export default defineConfig({
   test: {
     setupFiles: ["./test/setup.ts"],
     typecheck: {
-      ignoreSourceErrors: true,
+      include: ["**/*.{test,spec}.?(c|m)[jt]s?(x)"],
     },
   },
 });

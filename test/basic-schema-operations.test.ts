@@ -17,7 +17,7 @@ test("insert", () =>
       api.basic_schema_operations.insert,
       {
         text,
-      }
+      },
     );
 
     const note = yield* c.run(({ db }) => db.get(noteId));
@@ -31,7 +31,9 @@ test("collect", () =>
 
     const text = "Hello, world!";
 
-    yield* c.run(({ db }) => db.insert(schema.tableName("notes"), { text }));
+    yield* c.run(({ db }) =>
+      db.insert("basic_schema_operations__notes", { text }),
+    );
 
     const notes = yield* c.query(api.basic_schema_operations.collect, {});
 
@@ -50,7 +52,7 @@ test("filter + first", () =>
       Promise.all([
         db.insert(schema.tableName("notes"), { text: text1 }),
         db.insert(schema.tableName("notes"), { text: text2 }),
-      ])
+      ]),
     );
 
     const note = yield* c.query(api.basic_schema_operations.filterFirst, {
@@ -69,7 +71,7 @@ test("withIndex + first", () =>
     yield* c.run(({ db }) =>
       db.insert(schema.tableName("notes"), {
         text: text,
-      })
+      }),
     );
 
     const note = yield* c.query(api.basic_schema_operations.withIndexFirst, {

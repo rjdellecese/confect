@@ -14,6 +14,6 @@ beforeAll(() => {
     Effect.scoped,
     Effect.provide(NodeCommandExecutor.layer),
     Effect.provide(NodeFileSystem.layer),
-    Effect.runPromise
+    Effect.runPromise,
   );
 });
