@@ -29,7 +29,7 @@
     "convex-test": "0.0.22",
     "dotenv": "16.4.5",
     "eslint": "8.57.0",
-    "eslint-plugin-no-relative-import-paths": "1.5.4",
+    "eslint-plugin-no-relative-import-paths": "1.5.5",
     "eslint-plugin-simple-import-sort": "12.1.0",
     "eslint-plugin-unused-imports": "3.2.0",
     "prettier": "3.3.2",
