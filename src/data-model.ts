@@ -1,51 +1,20 @@
 import { Schema } from "@effect/schema";
 import {
-  Expand,
   GenericDocument,
   GenericFieldPaths,
   GenericTableIndexes,
   GenericTableSearchIndexes,
   GenericTableVectorIndexes,
-  IdField,
-  SystemFields,
 } from "convex/server";
 import { ReadonlyRecord } from "effect/Record";
-import { HasReadonlyKeys, HasWritableKeys } from "type-fest";
 
 import { SchemaId } from "~/src/SchemaId";
-import { IsEntirelyReadonly, IsEntirelyWritable } from "~/src/type-utils";
 
-export type WithIdField<
-  Document extends GenericDocument | GenericConfectDocument,
-  TableName extends string,
-> =
-  IsEntirelyReadonly<Document> extends true
-    ? Expand<Readonly<IdField<TableName>> & Document>
-    : IsEntirelyWritable<Document> extends true
-      ? Expand<IdField<TableName> & Document>
-      : never;
-
-export type WithSystemFields<
-  Document extends GenericDocument | GenericConfectDocument,
-> =
-  HasReadonlyKeys<Document> extends true
-    ? HasWritableKeys<Document> extends false
-      ? Expand<Readonly<SystemFields> & Document>
-      : never
-    : HasWritableKeys<Document> extends true
-      ? Expand<SystemFields & Document>
-      : never;
-
-export type WithIdAndSystemFields<
-  Document extends GenericDocument | GenericConfectDocument,
-  TableName extends string,
-> = WithIdField<WithSystemFields<Document>, TableName>;
+// TODO: Move more things into this file
 
 export const extendWithIdAndSystemFields =
   <TableName extends string>() =>
-  <A extends GenericConfectDocument, I extends GenericDocument>(
-    schema: Schema.Schema<A, I>
-  ) =>
+  <A extends GenericConfectDocument>(schema: Schema.Schema<A>) =>
     Schema.extend(
       schema,
       Schema.Struct({

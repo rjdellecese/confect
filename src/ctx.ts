@@ -94,30 +94,30 @@ export type ConfectActionCtx<ConfectDataModel extends GenericConfectDataModel> =
     ): Effect.Effect<Array<{ _id: GenericId<TableName>; _score: number }>>;
   };
 
-export const makeEffectQueryCtx = <
-  EffectDataModel extends GenericConfectDataModel,
+export const makeConfectQueryCtx = <
+  ConfectDataModel extends GenericConfectDataModel,
 >(
-  ctx: GenericQueryCtx<DataModelFromConfectDataModel<EffectDataModel>>,
-  databaseSchemas: DatabaseSchemasFromConfectDataModel<EffectDataModel>
-): ConfectQueryCtx<EffectDataModel> => ({
+  ctx: GenericQueryCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
+  databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>
+): ConfectQueryCtx<ConfectDataModel> => ({
   db: new ConfectDatabaseReaderImpl(ctx.db, databaseSchemas),
   auth: new ConfectAuthImpl(ctx.auth),
   storage: new ConfectStorageReaderImpl(ctx.storage),
 });
 
-export const makeEffectMutationCtx = <
-  EffectDataModel extends GenericConfectDataModel,
+export const makeConfectMutationCtx = <
+  ConfectDataModel extends GenericConfectDataModel,
 >(
-  ctx: GenericMutationCtx<DataModelFromConfectDataModel<EffectDataModel>>,
-  databaseSchemas: DatabaseSchemasFromConfectDataModel<EffectDataModel>
-): ConfectMutationCtx<EffectDataModel> => ({
+  ctx: GenericMutationCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
+  databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>
+): ConfectMutationCtx<ConfectDataModel> => ({
   db: new EffectDatabaseWriterImpl(ctx.db, databaseSchemas),
   auth: new ConfectAuthImpl(ctx.auth),
   storage: new ConfectStorageWriterImpl(ctx.storage),
   scheduler: new ConfectSchedulerImpl(ctx.scheduler),
 });
 
-export const makeEffectActionCtx = <
+export const makeConfectActionCtx = <
   ConfectDataModel extends GenericConfectDataModel,
 >(
   ctx: GenericActionCtx<DataModelFromConfectDataModel<ConfectDataModel>>

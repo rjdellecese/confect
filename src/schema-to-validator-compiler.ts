@@ -173,20 +173,35 @@ type UnionValueToValidator<Vl extends ReadonlyOrMutableValue> = [Vl] extends [
 
 type ValueTupleToValidatorTuple<
   VlTuple extends ReadonlyOrMutableArray<ReadonlyOrMutableValue>,
-> = VlTuple extends [
-  infer Vl extends ReadonlyOrMutableValue,
-  ...infer VlRest extends ReadonlyOrMutableArray<ReadonlyOrMutableValue>,
-]
-  ? ValueToValidator<Vl> extends infer Vd extends Validator<any, any, any>
-    ? ValueTupleToValidatorTuple<VlRest> extends infer VdRest extends Validator<
-        any,
-        "required",
-        any
-      >[]
-      ? [Vd, ...VdRest]
-      : never
+> = VlTuple extends
+  | [
+      true,
+      false,
+      ...infer VlRest extends ReadonlyOrMutableArray<ReadonlyOrMutableValue>,
+    ]
+  | [
+      false,
+      true,
+      ...infer VlRest extends ReadonlyOrMutableArray<ReadonlyOrMutableValue>,
+    ]
+  ? ValueTupleToValidatorTuple<VlRest> extends infer VdRest extends Validator<
+      any,
+      any,
+      any
+    >[]
+    ? [VBoolean<boolean>, ...VdRest]
     : never
-  : [];
+  : VlTuple extends [
+        infer Vl extends ReadonlyOrMutableValue,
+        ...infer VlRest extends ReadonlyOrMutableArray<ReadonlyOrMutableValue>,
+      ]
+    ? ValueToValidator<Vl> extends infer Vd extends Validator<any, any, any>
+      ? ValueTupleToValidatorTuple<VlRest> extends infer VdRest extends
+          Validator<any, "required", any>[]
+        ? [Vd, ...VdRest]
+        : never
+      : never
+    : [];
 
 export type TableSchemaToTableValidator<
   TableSchema extends Schema.Schema<any>,

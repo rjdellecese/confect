@@ -22,9 +22,9 @@ import {
   ConfectActionCtx,
   ConfectMutationCtx,
   ConfectQueryCtx,
-  makeEffectActionCtx,
-  makeEffectMutationCtx,
-  makeEffectQueryCtx,
+  makeConfectActionCtx,
+  makeConfectMutationCtx,
+  makeConfectQueryCtx,
 } from "~/src/ctx";
 import {
   DataModelFromConfectDataModel,
@@ -42,131 +42,118 @@ import {
 import * as schemaToValidatorCompiler from "~/src/schema-to-validator-compiler";
 
 export const confectServer = <
-  DatabaseSchema extends GenericSchema,
-  TypeScriptSchema extends GenericConfectSchema,
+  ConvexSchema extends GenericSchema,
+  ConfectSchema extends GenericConfectSchema,
 >(
-  effectSchemaDefinition: ConfectSchemaDefinition<
-    DatabaseSchema,
-    TypeScriptSchema
-  >
+  confectSchemaDefinition: ConfectSchemaDefinition<ConvexSchema, ConfectSchema>
 ) => {
   const databaseSchemas = schemasFromConfectSchema(
-    effectSchemaDefinition.confectSchema
+    confectSchemaDefinition.confectSchema
   );
 
   const query = <
-    DatabaseValue extends DefaultFunctionArgs,
-    TypeScriptValue,
+    ConvexValue extends DefaultFunctionArgs,
+    ConfectValue,
     Output,
   >({
     args,
     handler,
   }: {
-    args: Schema.Schema<TypeScriptValue, DatabaseValue>;
+    args: Schema.Schema<ConfectValue, ConvexValue>;
     handler: (
-      ctx: ConfectQueryCtx<ConfectDataModelFromConfectSchema<TypeScriptSchema>>,
-      a: TypeScriptValue
+      ctx: ConfectQueryCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>,
+      a: ConfectValue
     ) => Effect.Effect<Output>;
-  }): RegisteredQuery<"public", DatabaseValue, Promise<Output>> =>
-    queryGeneric(effectQueryFunction({ databaseSchemas, args, handler }));
+  }): RegisteredQuery<"public", ConvexValue, Promise<Output>> =>
+    queryGeneric(confectQueryFunction({ databaseSchemas, args, handler }));
 
   const internalQuery = <
-    DatabaseValue extends DefaultFunctionArgs,
-    TypeScriptValue,
+    ConvexValue extends DefaultFunctionArgs,
+    Confectvalue,
     Output,
   >({
     args,
     handler,
   }: {
-    args: Schema.Schema<TypeScriptValue, DatabaseValue>;
+    args: Schema.Schema<Confectvalue, ConvexValue>;
     handler: (
-      ctx: ConfectQueryCtx<ConfectDataModelFromConfectSchema<TypeScriptSchema>>,
-      a: TypeScriptValue
+      ctx: ConfectQueryCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>,
+      a: Confectvalue
     ) => Effect.Effect<Output>;
-  }): RegisteredQuery<"internal", DatabaseValue, Promise<Output>> =>
+  }): RegisteredQuery<"internal", ConvexValue, Promise<Output>> =>
     internalQueryGeneric(
-      effectQueryFunction({ databaseSchemas, args, handler })
+      confectQueryFunction({ databaseSchemas, args, handler })
     );
 
   const mutation = <
-    DatabaseValue extends DefaultFunctionArgs,
-    TypeScriptValue,
+    ConvexValue extends DefaultFunctionArgs,
+    ConfectValue,
     Output,
   >({
     args,
     handler,
   }: {
-    args: Schema.Schema<TypeScriptValue, DatabaseValue>;
+    args: Schema.Schema<ConfectValue, ConvexValue>;
     handler: (
-      ctx: ConfectMutationCtx<
-        ConfectDataModelFromConfectSchema<TypeScriptSchema>
-      >,
-      a: TypeScriptValue
+      ctx: ConfectMutationCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>,
+      a: ConfectValue
     ) => Effect.Effect<Output>;
-  }): RegisteredMutation<"public", DatabaseValue, Promise<Output>> =>
+  }): RegisteredMutation<"public", ConvexValue, Promise<Output>> =>
     mutationGeneric(effectMutationFunction({ databaseSchemas, args, handler }));
 
   const internalMutation = <
-    DatabaseValue extends DefaultFunctionArgs,
-    TypeScriptValue,
+    ConvexValue extends DefaultFunctionArgs,
+    ConfectValue,
     Output,
   >({
     args,
     handler,
   }: {
-    args: Schema.Schema<TypeScriptValue, DatabaseValue>;
+    args: Schema.Schema<ConfectValue, ConvexValue>;
     handler: (
-      ctx: ConfectMutationCtx<
-        ConfectDataModelFromConfectSchema<TypeScriptSchema>
-      >,
-      a: TypeScriptValue
+      ctx: ConfectMutationCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>,
+      a: ConfectValue
     ) => Effect.Effect<Output>;
-  }): RegisteredMutation<"internal", DatabaseValue, Promise<Output>> =>
+  }): RegisteredMutation<"internal", ConvexValue, Promise<Output>> =>
     internalMutationGeneric(
       effectMutationFunction({ databaseSchemas, args, handler })
     );
 
   const action = <
-    DatabaseValue extends DefaultFunctionArgs,
-    TypeScriptValue,
+    ConvexValue extends DefaultFunctionArgs,
+    ConfectValue,
     Output,
   >({
     args,
     handler,
   }: {
-    args: Schema.Schema<TypeScriptValue, DatabaseValue>;
+    args: Schema.Schema<ConfectValue, ConvexValue>;
     handler: (
-      ctx: ConfectActionCtx<
-        ConfectDataModelFromConfectSchema<TypeScriptSchema>
-      >,
-      a: TypeScriptValue
+      ctx: ConfectActionCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>,
+      a: ConfectValue
     ) => Effect.Effect<Output>;
-  }): RegisteredAction<"public", DatabaseValue, Promise<Output>> =>
+  }): RegisteredAction<"public", ConvexValue, Promise<Output>> =>
     actionGeneric(effectActionFunction({ args, handler }));
 
   const internalAction = <
-    DatabaseValue extends DefaultFunctionArgs,
-    TypeScriptValue,
+    ConvexValue extends DefaultFunctionArgs,
+    ConfectValue,
     Output,
   >({
     args,
     handler,
   }: {
-    args: Schema.Schema<TypeScriptValue, DatabaseValue>;
+    args: Schema.Schema<ConfectValue, ConvexValue>;
     handler: (
-      ctx: ConfectActionCtx<
-        ConfectDataModelFromConfectSchema<TypeScriptSchema>
-      >,
-      a: TypeScriptValue
+      ctx: ConfectActionCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>,
+      a: ConfectValue
     ) => Effect.Effect<Output>;
-  }): RegisteredAction<"internal", DatabaseValue, Promise<Output>> =>
+  }): RegisteredAction<"internal", ConvexValue, Promise<Output>> =>
     internalActionGeneric(effectActionFunction({ args, handler }));
 
   const httpAction = (
     handler: (
-      ctx: ConfectActionCtx<
-        ConfectDataModelFromConfectSchema<TypeScriptSchema>
-      >,
+      ctx: ConfectActionCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>,
       request: Request
     ) => Effect.Effect<Response>
     // @ts-expect-error `GenericActionCtx<GenericDataModel>` is not assignable to `GenericActionCtx<DataModelFromEffectDataModel<EffectDataModel>>`
@@ -183,116 +170,116 @@ export const confectServer = <
   };
 };
 
-const effectQueryFunction = <
-  EffectDataModel extends GenericConfectDataModel,
-  DatabaseValue extends DefaultFunctionArgs,
-  TypeScriptValue,
+const confectQueryFunction = <
+  ConfectDataModel extends GenericConfectDataModel,
+  ConvexValue extends DefaultFunctionArgs,
+  ConfectValue,
   Output,
 >({
   databaseSchemas,
   args,
   handler,
 }: {
-  databaseSchemas: DatabaseSchemasFromConfectDataModel<EffectDataModel>;
-  args: Schema.Schema<TypeScriptValue, DatabaseValue>;
+  databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>;
+  args: Schema.Schema<ConfectValue, ConvexValue>;
   handler: (
-    ctx: ConfectQueryCtx<EffectDataModel>,
-    a: TypeScriptValue
+    ctx: ConfectQueryCtx<ConfectDataModel>,
+    a: ConfectValue
   ) => Effect.Effect<Output>;
 }) => ({
   args: schemaToValidatorCompiler.args(args),
   handler: (
-    ctx: GenericQueryCtx<DataModelFromConfectDataModel<EffectDataModel>>,
-    actualArgs: DatabaseValue
+    ctx: GenericQueryCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
+    actualArgs: ConvexValue
   ): Promise<Output> =>
     pipe(
       actualArgs,
       Schema.decode(args),
       Effect.orDie,
       Effect.flatMap((decodedArgs) =>
-        handler(makeEffectQueryCtx(ctx, databaseSchemas), decodedArgs)
+        handler(makeConfectQueryCtx(ctx, databaseSchemas), decodedArgs)
       ),
       Effect.runPromise
     ),
 });
 
 const effectMutationFunction = <
-  EffectDataModel extends GenericConfectDataModel,
-  DatabaseValue extends DefaultFunctionArgs,
-  TypeScriptValue,
+  ConfectDataModel extends GenericConfectDataModel,
+  ConvexValue extends DefaultFunctionArgs,
+  ConfectValue,
   Output,
 >({
   databaseSchemas,
   args,
   handler,
 }: {
-  databaseSchemas: DatabaseSchemasFromConfectDataModel<EffectDataModel>;
-  args: Schema.Schema<TypeScriptValue, DatabaseValue>;
+  databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>;
+  args: Schema.Schema<ConfectValue, ConvexValue>;
   handler: (
-    ctx: ConfectMutationCtx<EffectDataModel>,
-    a: TypeScriptValue
+    ctx: ConfectMutationCtx<ConfectDataModel>,
+    a: ConfectValue
   ) => Effect.Effect<Output>;
 }) => ({
   args: schemaToValidatorCompiler.args(args),
   handler: (
-    ctx: GenericMutationCtx<DataModelFromConfectDataModel<EffectDataModel>>,
-    actualArgs: DatabaseValue
+    ctx: GenericMutationCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
+    actualArgs: ConvexValue
   ): Promise<Output> =>
     pipe(
       actualArgs,
       Schema.decode(args),
       Effect.orDie,
       Effect.flatMap((decodedArgs) =>
-        handler(makeEffectMutationCtx(ctx, databaseSchemas), decodedArgs)
+        handler(makeConfectMutationCtx(ctx, databaseSchemas), decodedArgs)
       ),
       Effect.runPromise
     ),
 });
 
 const effectActionFunction = <
-  EffectDataModel extends GenericConfectDataModel,
-  DatabaseValue extends DefaultFunctionArgs,
-  TypeScriptValue,
+  ConfectDataModel extends GenericConfectDataModel,
+  ConvexValue extends DefaultFunctionArgs,
+  ConfectValue,
   Output,
 >({
   args,
   handler,
 }: {
-  args: Schema.Schema<TypeScriptValue, DatabaseValue>;
+  args: Schema.Schema<ConfectValue, ConvexValue>;
   handler: (
-    ctx: ConfectActionCtx<EffectDataModel>,
-    a: TypeScriptValue
+    ctx: ConfectActionCtx<ConfectDataModel>,
+    a: ConfectValue
   ) => Effect.Effect<Output>;
 }) => ({
   args: schemaToValidatorCompiler.args(args),
   handler: (
-    ctx: GenericActionCtx<DataModelFromConfectDataModel<EffectDataModel>>,
-    actualArgs: DatabaseValue
+    ctx: GenericActionCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
+    actualArgs: ConvexValue
   ): Promise<Output> =>
     pipe(
       actualArgs,
       Schema.decode(args),
       Effect.orDie,
       Effect.flatMap((decodedArgs) =>
-        handler(makeEffectActionCtx(ctx), decodedArgs)
+        handler(makeConfectActionCtx(ctx), decodedArgs)
       ),
       Effect.runPromise
     ),
 });
 
 const effectHttpActionFunction = <
-  EffectDataModel extends GenericConfectDataModel,
+  ConfectDataModel extends GenericConfectDataModel,
 >({
   handler,
 }: {
   handler: (
-    ctx: ConfectActionCtx<EffectDataModel>,
+    ctx: ConfectActionCtx<ConfectDataModel>,
     request: Request
   ) => Effect.Effect<Response>;
 }) => ({
   handler: (
-    ctx: GenericActionCtx<DataModelFromConfectDataModel<EffectDataModel>>,
+    ctx: GenericActionCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
     request: Request
   ): Promise<Response> =>
-    Effect.runPromise(handler(makeEffectActionCtx(ctx), request)),
+    Effect.runPromise(handler(makeConfectActionCtx(ctx), request)),
 });

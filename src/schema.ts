@@ -18,8 +18,8 @@ import {
 } from "convex/server";
 import { Validator } from "convex/values";
 import { pipe, Record } from "effect";
+import { ReadonlyDeep } from "type-fest";
 
-import { WithIdAndSystemFields } from "~/src/data-model";
 import { compileTableSchema } from "~/src/schema-to-validator-compiler";
 
 export type GenericConfectSchema = Record<
@@ -67,7 +67,10 @@ type SchemaDefinitionFromConfectSchemaDefinition<
 
 export const defineConfectSchema = <ConfectSchema extends GenericConfectSchema>(
   confectSchema: ConfectSchema
-) =>
+): ConfectSchemaDefinitionImpl<
+  SchemaDefinitionFromConfectSchemaDefinition<ConfectSchema>,
+  ConfectSchema
+> =>
   new ConfectSchemaDefinitionImpl<
     SchemaDefinitionFromConfectSchemaDefinition<ConfectSchema>,
     ConfectSchema
@@ -318,10 +321,7 @@ export type ConfectDataModelFromConfectSchema<
   >
     ? TableSchema extends Schema.Schema<any, any>
       ? {
-          confectDocument: WithIdAndSystemFields<
-            Schema.Schema.Type<TableSchema>,
-            TableName
-          >;
+          confectDocument: ExtractConfectDocument<TableName, TableSchema>;
           convexDocument: ExtractDocument<TableName, TableValidator>;
           fieldPaths:
             | keyof IdField<TableName>
@@ -333,6 +333,13 @@ export type ConfectDataModelFromConfectSchema<
       : never
     : never;
 };
+
+type ExtractConfectDocument<
+  TableName extends string,
+  S extends Schema.Schema<any>,
+> = Expand<
+  ReadonlyDeep<IdField<TableName>> & ReadonlyDeep<SystemFields> & S["Type"]
+>;
 
 // TODO: Type-level test that `ConfectDataModelFromEffectSchema` produces `ConfectDataModel`?
 

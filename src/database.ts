@@ -1,6 +1,9 @@
 import { ParseResult, Schema } from "@effect/schema";
 import {
+  BetterOmit,
   DocumentByInfo,
+  DocumentByName,
+  Expand,
   Expression,
   FilterBuilder,
   GenericDatabaseReader,
@@ -80,7 +83,7 @@ class ConfectQueryImpl<
   q: Query<TableInfoFromConfectTableInfo<ConfectTableInfo>>;
   tableSchema: Schema.Schema<
     ConfectTableInfo["confectDocument"],
-    ReadonlyDeep<ConfectTableInfo["convexDocument"]>
+    Expand<ReadonlyDeep<ConfectTableInfo["convexDocument"]>>
   >;
   tableName: TableName;
   constructor(
@@ -89,7 +92,7 @@ class ConfectQueryImpl<
       | OrderedQuery<TableInfoFromConfectTableInfo<ConfectTableInfo>>,
     tableSchema: Schema.Schema<
       ConfectTableInfo["confectDocument"],
-      ReadonlyDeep<ConfectTableInfo["convexDocument"]>
+      Expand<ReadonlyDeep<ConfectTableInfo["convexDocument"]>>
     >,
     tableName: TableName
   ) {
@@ -130,7 +133,9 @@ class ConfectQueryImpl<
             paginationResult.page,
             Effect.forEach((document) =>
               Schema.decode(this.tableSchema)(
-                document as ReadonlyDeep<ConfectTableInfo["convexDocument"]>
+                document as Expand<
+                  ReadonlyDeep<ConfectTableInfo["convexDocument"]>
+                >
               )
             )
           ) as unknown as Effect.Effect<
@@ -155,7 +160,9 @@ class ConfectQueryImpl<
       Effect.flatMap(
         Effect.forEach((document) =>
           pipe(
-            document as ReadonlyDeep<ConfectTableInfo["convexDocument"]>,
+            document as Expand<
+              ReadonlyDeep<ConfectTableInfo["convexDocument"]>
+            >,
             Schema.decode(this.tableSchema)
           )
         )
@@ -250,14 +257,14 @@ class ConfectQueryInitializerImpl<
   q: QueryInitializer<TableInfoFromConfectTableInfo<ConfectTableInfo>>;
   tableSchema: Schema.Schema<
     ConfectTableInfo["confectDocument"],
-    ReadonlyDeep<ConfectTableInfo["convexDocument"]>
+    Expand<ReadonlyDeep<ConfectTableInfo["convexDocument"]>>
   >;
   tableName: TableName;
   constructor(
     q: QueryInitializer<TableInfoFromConfectTableInfo<ConfectTableInfo>>,
     tableSchema: Schema.Schema<
       ConfectTableInfo["confectDocument"],
-      ReadonlyDeep<ConfectTableInfo["convexDocument"]>
+      Expand<ReadonlyDeep<ConfectTableInfo["convexDocument"]>>
     >,
     tableName: TableName
   ) {
@@ -361,7 +368,7 @@ export type DatabaseSchemasFromConfectDataModel<
 > = {
   [TableName in keyof ConfectDataModel & string]: Schema.Schema<
     ConfectDataModel[TableName]["confectDocument"],
-    ReadonlyDeep<ConfectDataModel[TableName]["convexDocument"]>
+    Expand<ReadonlyDeep<ConfectDataModel[TableName]["convexDocument"]>>
   >;
 };
 
@@ -500,7 +507,21 @@ export class EffectDatabaseWriterImpl<
       value,
       Schema.encode(this.databaseSchemas[table]),
       Effect.andThen((encodedValue) =>
-        Effect.promise(() => this.db.insert(table, encodedValue))
+        Effect.promise(() =>
+          this.db.insert(
+            table,
+            // TODO: Look into this casting
+            encodedValue as Expand<
+              BetterOmit<
+                DocumentByName<
+                  DataModelFromConfectDataModel<ConfectDataModel>,
+                  TableName
+                >,
+                "_creationTime" | "_id"
+              >
+            >
+          )
+        )
       ),
       Effect.orDie
     );

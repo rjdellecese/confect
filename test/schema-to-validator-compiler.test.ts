@@ -1,5 +1,5 @@
 import { Schema } from "@effect/schema";
-import { GenericId, v } from "convex/values";
+import { GenericId, v, VBoolean, VString, VUnion } from "convex/values";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
 import {
@@ -10,88 +10,123 @@ import {
 } from "~/src/schema-to-validator-compiler";
 
 describe("compile", () => {
-  test.each([
-    {
-      name: "literal",
-      schema: Schema.Literal("LiteralString"),
-      validator: v.literal("LiteralString"),
-    },
-    {
-      name: "boolean",
-      schema: Schema.Boolean,
-      validator: v.boolean(),
-    },
-    {
-      name: "string",
-      schema: Schema.String,
-      validator: v.string(),
-    },
-    {
-      name: "number",
-      schema: Schema.Number,
-      validator: v.float64(),
-    },
-    {
-      name: "empty object",
-      schema: Schema.Struct({}),
-      validator: v.object({}),
-    },
-    {
-      name: "simple object",
-      schema: Schema.Struct({ foo: Schema.String, bar: Schema.Number }),
-      validator: v.object({ foo: v.string(), bar: v.float64() }),
-    },
-    {
-      name: "object with optional field",
-      schema: Schema.Struct({
-        foo: Schema.optional(Schema.String, { exact: true }),
-      }),
-      validator: v.object({ foo: v.optional(v.string()) }),
-    },
-    {
-      name: "nested objects",
-      schema: Schema.Struct({
-        foo: Schema.Struct({
-          bar: Schema.Struct({
-            baz: Schema.String,
-          }),
-        }),
-      }),
-      validator: v.object({
-        foo: v.object({ bar: v.object({ baz: v.string() }) }),
-      }),
-    },
-    {
-      name: "union with four elements",
-      schema: Schema.Union(
-        Schema.String,
-        Schema.Number,
-        Schema.Boolean,
-        Schema.Struct({})
-      ),
-      validator: v.union(v.string(), v.float64(), v.boolean(), v.object({})),
-    },
-    {
-      name: "tuple with one element",
-      schema: Schema.Tuple(Schema.String),
-      validator: v.array(v.string()),
-    },
-    {
-      name: "tuple with two elements",
-      schema: Schema.Tuple(Schema.String, Schema.Number),
-      validator: v.array(v.union(v.string(), v.float64())),
-    },
-    {
-      name: "tuple with three elements",
-      schema: Schema.Tuple(Schema.String, Schema.Number, Schema.Boolean),
-      validator: v.array(v.union(v.string(), v.float64(), v.boolean())),
-    },
-  ])("$name", ({ schema, validator }) => {
-    const compiledValidator = compile(
-      Schema.encodedSchema(schema as Schema.Schema<any, any, any>).ast
-    );
+  test("literal", () => {
+    const schema = Schema.Literal("LiteralString");
+    const validator = v.literal("LiteralString");
+    const compiledValidator = compile(Schema.encodedSchema(schema).ast);
 
     expect(compiledValidator).toStrictEqual(validator);
+  });
+
+  test("boolean", () => {
+    const schema = Schema.Boolean;
+    const validator = v.boolean();
+    const compiledValidator = compile(Schema.encodedSchema(schema).ast);
+
+    expect(compiledValidator).toStrictEqual(validator);
+  });
+
+  test("string", () => {
+    const schema = Schema.String;
+    const validator = v.string();
+    const compiledValidator = compile(Schema.encodedSchema(schema).ast);
+
+    expect(compiledValidator).toStrictEqual(validator);
+  });
+
+  test("number", () => {
+    const schema = Schema.Number;
+    const validator = v.float64();
+    const compiledValidator = compile(Schema.encodedSchema(schema).ast);
+
+    expect(compiledValidator).toStrictEqual(validator);
+  });
+
+  test("empty object", () => {
+    const schema = Schema.Struct({});
+    const validator = v.object({});
+    const compiledValidator = compile(Schema.encodedSchema(schema).ast);
+
+    expect(compiledValidator).toStrictEqual(validator);
+  });
+
+  test("simple object", () => {
+    const schema = Schema.Struct({ foo: Schema.String, bar: Schema.Number });
+    const validator = v.object({ foo: v.string(), bar: v.float64() });
+    const compiledValidator = compile(Schema.encodedSchema(schema).ast);
+
+    expect(compiledValidator).toStrictEqual(validator);
+  });
+
+  test("object with optional field", () => {
+    const schema = Schema.Struct({
+      foo: Schema.optional(Schema.String, { exact: true }),
+    });
+
+    const validator = v.object({ foo: v.optional(v.string()) });
+    const compiledValidator = compile(Schema.encodedSchema(schema).ast);
+
+    expect(compiledValidator).toStrictEqual(validator);
+  });
+
+  test("nested objects", () => {
+    const schema = Schema.Struct({
+      foo: Schema.Struct({
+        bar: Schema.Struct({
+          baz: Schema.String,
+        }),
+      }),
+    });
+    const validator = v.object({
+      foo: v.object({ bar: v.object({ baz: v.string() }) }),
+    });
+    const compiledValidator = compile(Schema.encodedSchema(schema).ast);
+
+    expect(compiledValidator).toStrictEqual(validator);
+  });
+
+  test("union with four elements", () => {
+    const schema = Schema.Union(
+      Schema.String,
+      Schema.Number,
+      Schema.Boolean,
+      Schema.Struct({})
+    );
+    const validator = v.union(
+      v.string(),
+      v.float64(),
+      v.boolean(),
+      v.object({})
+    );
+    const compiledValidator = compile(Schema.encodedSchema(schema).ast);
+
+    expect(compiledValidator).toStrictEqual(validator);
+  });
+
+  test("tuple with one element", () => {
+    const schema = Schema.Tuple(Schema.String);
+    const validator = v.array(v.string());
+    const compiledValidator = compile(Schema.encodedSchema(schema).ast);
+
+    expect(compiledValidator).toStrictEqual(validator);
+  });
+
+  test("tuple with two elements", () => {
+    const schema = Schema.Tuple(Schema.String, Schema.Number);
+    const validator = v.array(v.union(v.string(), v.float64()));
+    const compiledValidator = compile(Schema.encodedSchema(schema).ast);
+
+    expect(compiledValidator).toStrictEqual(validator);
+  });
+
+  test("tuple with three elements", () => {
+    const schema = Schema.Tuple(Schema.String, Schema.Number, Schema.Boolean);
+    const expectedValidator = v.array(
+      v.union(v.string(), v.float64(), v.boolean())
+    );
+    const compiledValidator = compile(Schema.encodedSchema(schema).ast);
+
+    expect(compiledValidator).toStrictEqual(expectedValidator);
   });
 });
 
@@ -182,27 +217,6 @@ describe("compileSchema", () => {
     expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
   });
 
-  test("union with four elements", () => {
-    const expectedValidator = v.union(
-      v.string(),
-      v.float64(),
-      // v.boolean()
-      v.object({ foo: v.string() })
-    );
-
-    const schema = Schema.Union(
-      Schema.String,
-      Schema.Number,
-      // Schema.Boolean
-      Schema.Struct({ foo: Schema.String })
-    );
-
-    const compiledValidator = compileSchema(Schema.encodedSchema(schema));
-
-    expect(compiledValidator).toStrictEqual(expectedValidator);
-    expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
-  });
-
   test("array", () => {
     const expectedValidator = v.array(v.string());
 
@@ -256,6 +270,50 @@ describe("ValueToValidator", () => {
     type CompiledValidator = ValueToValidator<boolean>;
 
     expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+  });
+
+  test("true | false", () => {
+    const expectedValidator = v.boolean();
+    type ExpectedValidator = typeof expectedValidator;
+
+    type CompiledValidator = ValueToValidator<true | false>;
+
+    expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+  });
+
+  test("true | false | string", () => {
+    const validator = v.union(v.boolean(), v.string());
+    type Validator = typeof validator;
+    type AnyPermutationOfValidator =
+      | VUnion<
+          string | boolean,
+          [VBoolean<boolean, "required">, VString<string, "required">],
+          "required",
+          never
+        >
+      | VUnion<
+          string | boolean,
+          [VString<string, "required">, VBoolean<boolean, "required">],
+          "required",
+          never
+        >
+      | VUnion<
+          boolean | string,
+          [VBoolean<boolean, "required">, VString<string, "required">],
+          "required",
+          never
+        >
+      | VUnion<
+          boolean | string,
+          [VString<string, "required">, VBoolean<boolean, "required">],
+          "required",
+          never
+        >;
+    expectTypeOf<Validator>().toMatchTypeOf<AnyPermutationOfValidator>();
+
+    type CompiledValidator = ValueToValidator<true | false | string>;
+
+    expectTypeOf<CompiledValidator>().toMatchTypeOf<AnyPermutationOfValidator>();
   });
 
   test("number", () => {
@@ -403,39 +461,28 @@ describe("ValueToValidator", () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
-    test("{ foo: { bar?: number } }", () => {
+    test("{ foo: { bar?: number | undefined } }", () => {
       const expectedValidator = v.object({
         foo: v.object({ bar: v.optional(v.float64()) }),
       });
       type ExpectedValidator = typeof expectedValidator;
 
       type CompiledValidator = ValueToValidator<{
-        foo: { bar?: number };
+        foo: { bar?: number | undefined };
       }>;
 
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
-    test("{ foo?: { bar: number } }", () => {
+    test("{ foo?: { bar: number } | undefined }", () => {
       const expectedValidator = v.object({
         foo: v.optional(v.object({ bar: v.float64() })),
       });
       type ExpectedValidator = typeof expectedValidator;
 
       type CompiledValidator = ValueToValidator<{
-        foo?: { bar: number };
+        foo?: { bar: number } | undefined;
       }>;
-
-      expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
-    });
-
-    test("{ foo?: string }", () => {
-      const expectedValidator = v.object({
-        foo: v.optional(v.string()),
-      });
-      type ExpectedValidator = typeof expectedValidator;
-
-      type CompiledValidator = ValueToValidator<{ foo?: string }>;
 
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
@@ -451,14 +498,25 @@ describe("ValueToValidator", () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
-    test("{ foo?: { bar?: number } }", () => {
+    test("{ foo?: string | undefined }", () => {
+      const expectedValidator = v.object({
+        foo: v.optional(v.string()),
+      });
+      type ExpectedValidator = typeof expectedValidator;
+
+      type CompiledValidator = ValueToValidator<{ foo?: string | undefined }>;
+
+      expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+    });
+
+    test("{ foo?: { bar?: number | undefined } | undefined }", () => {
       const expectedValidator = v.object({
         foo: v.optional(v.object({ bar: v.optional(v.float64()) })),
       });
       type ExpectedValidator = typeof expectedValidator;
 
       type CompiledValidator = ValueToValidator<{
-        foo?: { bar?: number };
+        foo?: { bar?: number | undefined } | undefined;
       }>;
 
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
