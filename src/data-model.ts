@@ -1,4 +1,3 @@
-import { Schema } from "@effect/schema";
 import {
   GenericDocument,
   GenericFieldPaths,
@@ -8,20 +7,7 @@ import {
 } from "convex/server";
 import { ReadonlyRecord } from "effect/Record";
 
-import { SchemaId } from "~/src/SchemaId";
-
 // TODO: Move more things into this file
-
-export const extendWithIdAndSystemFields =
-  <TableName extends string>() =>
-  <A extends GenericConfectDocument>(schema: Schema.Schema<A>) =>
-    Schema.extend(
-      schema,
-      Schema.Struct({
-        _id: SchemaId<TableName>(),
-        _creationTime: Schema.Number,
-      }),
-    );
 
 export type GenericConfectDocument = ReadonlyRecord<string, any>;
 

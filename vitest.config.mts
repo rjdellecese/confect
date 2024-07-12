@@ -5,8 +5,12 @@ export default defineConfig({
   plugins: [tsconfigPaths()],
   test: {
     setupFiles: ["./test/setup.ts"],
+    coverage: {
+      enabled: true,
+      thresholds: { "100": true },
+    },
     typecheck: {
-      include: ["**/*.{test,spec}.?(c|m)[jt]s?(x)"],
+      include: ["**/*.{test,spec}{-d,}.?(c|m)[jt]s?(x)"],
     },
   },
 });

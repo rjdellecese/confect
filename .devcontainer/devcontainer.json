@@ -3,7 +3,12 @@
   "postCreateCommand": "pnpm_version=$(node -p 'require(`./package.json`).engines.pnpm') && npm install -g pnpm@$pnpm_version && pnpm install",
   "customizations": {
     "vscode": {
-      "extensions": ["YoavBls.pretty-ts-errors", "esbenp.prettier-vscode"]
+      "extensions": [
+        "YoavBls.pretty-ts-errors",
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint",
+        "vitest.explorer"
+      ]
     }
   },
   "features": {

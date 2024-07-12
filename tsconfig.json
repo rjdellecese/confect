@@ -10,6 +10,6 @@
       "~/*": ["*"]
     }
   },
-  "exclude": ["node_modules", "dist", "test/convex"],
+  "exclude": ["coverage", "node_modules", "dist", "test/convex"],
   "extends": ["@tsconfig/strictest/tsconfig"]
 }
