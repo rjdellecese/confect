@@ -1,15 +1,15 @@
 {
-  "compilerOptions": {
-    "exactOptionalPropertyTypes": false,
-    "lib": ["ESNext", "DOM"],
-    "target": "ESNext",
-    "moduleResolution": "Bundler",
-    "module": "ESNext",
-    "baseUrl": ".",
-    "paths": {
-      "~/*": ["*"]
-    }
-  },
-  "exclude": ["coverage", "node_modules", "dist", "test/convex"],
-  "extends": ["@tsconfig/strictest/tsconfig"]
+	"compilerOptions": {
+		"exactOptionalPropertyTypes": false,
+		"lib": ["ESNext", "DOM"],
+		"target": "ESNext",
+		"moduleResolution": "Bundler",
+		"module": "ESNext",
+		"baseUrl": ".",
+		"paths": {
+			"~/*": ["*"]
+		}
+	},
+	"exclude": ["coverage", "node_modules", "dist", "test/convex"],
+	"extends": ["@tsconfig/strictest/tsconfig"]
 }

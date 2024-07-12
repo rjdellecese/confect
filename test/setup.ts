@@ -4,16 +4,16 @@ import { Effect } from "effect";
 import { beforeAll } from "vitest";
 
 beforeAll(() => {
-  Effect.gen(function* () {
-    const executor = yield* CommandExecutor.CommandExecutor;
+	Effect.gen(function* () {
+		const executor = yield* CommandExecutor.CommandExecutor;
 
-    const command = Command.make("pnpx", "convex codegen");
+		const command = Command.make("pnpx", "convex codegen");
 
-    yield* executor.start(command);
-  }).pipe(
-    Effect.scoped,
-    Effect.provide(NodeCommandExecutor.layer),
-    Effect.provide(NodeFileSystem.layer),
-    Effect.runPromise,
-  );
+		yield* executor.start(command);
+	}).pipe(
+		Effect.scoped,
+		Effect.provide(NodeCommandExecutor.layer),
+		Effect.provide(NodeFileSystem.layer),
+		Effect.runPromise,
+	);
 });

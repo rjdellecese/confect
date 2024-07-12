@@ -1,18 +1,21 @@
 {
-  "image": "mcr.microsoft.com/devcontainers/typescript-node:1-20-bullseye",
-  "postCreateCommand": "pnpm_version=$(node -p 'require(`./package.json`).engines.pnpm') && npm install -g pnpm@$pnpm_version && pnpm install",
-  "customizations": {
-    "vscode": {
-      "extensions": [
-        "YoavBls.pretty-ts-errors",
-        "esbenp.prettier-vscode",
-        "dbaeumer.vscode-eslint",
-        "vitest.explorer"
-      ]
-    }
-  },
-  "features": {
-    "ghcr.io/devcontainers-contrib/features/act:1": {},
-    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
-  }
+	"image": "mcr.microsoft.com/devcontainers/typescript-node:1-20-bullseye",
+	"postCreateCommand": "pnpm_version=$(node -p 'require(`./package.json`).engines.pnpm') && npm install -g pnpm@$pnpm_version && pnpm install",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"YoavBls.pretty-ts-errors",
+				"vitest.explorer",
+				"biomejs.biome"
+			],
+			"settings": {
+				"editor.defaultFormatter": "biomejs.biome",
+				"editor.formatOnSave": true
+			}
+		}
+	},
+	"features": {
+		"ghcr.io/devcontainers-contrib/features/act:1": {},
+		"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+	}
 }

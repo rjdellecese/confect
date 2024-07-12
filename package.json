@@ -1,52 +1,45 @@
 {
-  "name": "effect-convex",
-  "version": "0.0.1",
-  "description": "",
-  "source": "src/index.ts",
-  "main": "dist/main.js",
-  "module": "dist/module.js",
-  "types": "dist/types.d.ts",
-  "scripts": {
-    "start": "convex dev",
-    "lint": "tsc --noEmit && eslint --max-warnings=0 . && prettier --check .",
-    "test": "vitest --typecheck",
-    "build": "vite build"
-  },
-  "keywords": [
-    "effect",
-    "convex"
-  ],
-  "author": "RJ Dellecese",
-  "license": "ISC",
-  "devDependencies": {
-    "@effect/platform": "0.58.26",
-    "@effect/platform-node": "0.53.25",
-    "@effect/vitest": "0.6.6",
-    "@swc/jest": "0.2.36",
-    "@tsconfig/strictest": "2.0.5",
-    "@typescript-eslint/eslint-plugin": "7.16.0",
-    "@typescript-eslint/parser": "7.16.0",
-    "@vitest/coverage-v8": "^2.0.2",
-    "convex-test": "0.0.23",
-    "dotenv": "16.4.5",
-    "eslint": "9.6.0",
-    "eslint-plugin-no-relative-import-paths": "1.5.5",
-    "eslint-plugin-simple-import-sort": "12.1.1",
-    "eslint-plugin-unused-imports": "4.0.0",
-    "prettier": "3.3.2",
-    "typescript": "5.5.3",
-    "vite": "5.3.3",
-    "vite-tsconfig-paths": "4.3.2",
-    "vitest": "2.0.2"
-  },
-  "dependencies": {
-    "@effect/schema": "0.68.22",
-    "convex": "1.13.0",
-    "effect": "3.5.2",
-    "type-fest": "4.21.0"
-  },
-  "engines": {
-    "node": ">=20",
-    "pnpm": ">=9"
-  }
+	"name": "effect-convex",
+	"version": "0.0.1",
+	"description": "",
+	"source": "src/index.ts",
+	"main": "dist/main.js",
+	"module": "dist/module.js",
+	"types": "dist/types.d.ts",
+	"scripts": {
+		"start": "convex dev",
+		"lint": "biome ci",
+		"test": "vitest --typecheck",
+		"coverage": "vitest run --coverage",
+		"build": "vite build"
+	},
+	"keywords": ["effect", "convex"],
+	"author": "RJ Dellecese",
+	"license": "ISC",
+	"devDependencies": {
+		"@biomejs/biome": "1.8.3",
+		"@effect/platform": "0.58.26",
+		"@effect/platform-node": "0.53.25",
+		"@effect/vitest": "0.6.6",
+		"@swc/jest": "0.2.36",
+		"@tsconfig/strictest": "2.0.5",
+		"@vitest/coverage-v8": "^2.0.2",
+		"convex-test": "0.0.23",
+		"dotenv": "16.4.5",
+		"prettier": "3.3.2",
+		"typescript": "5.5.3",
+		"vite": "5.3.3",
+		"vite-tsconfig-paths": "4.3.2",
+		"vitest": "2.0.2"
+	},
+	"dependencies": {
+		"@effect/schema": "0.68.22",
+		"convex": "1.13.0",
+		"effect": "3.5.2",
+		"type-fest": "4.21.0"
+	},
+	"engines": {
+		"node": ">=20",
+		"pnpm": ">=9"
+	}
 }
