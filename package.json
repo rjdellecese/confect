@@ -24,7 +24,7 @@
     "@effect/vitest": "0.5.11",
     "@swc/jest": "0.2.36",
     "@tsconfig/strictest": "2.0.5",
-    "@typescript-eslint/eslint-plugin": "7.8.0",
+    "@typescript-eslint/eslint-plugin": "7.16.0",
     "@typescript-eslint/parser": "7.8.0",
     "convex-test": "0.0.22",
     "dotenv": "16.4.5",
