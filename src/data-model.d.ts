@@ -7,8 +7,6 @@ import type {
 } from "convex/server";
 import type { ReadonlyRecord } from "effect/Record";
 
-// TODO: Move more things into this file
-
 export type GenericConfectDocument = ReadonlyRecord<string, any>;
 
 export type ConfectDocumentByName<

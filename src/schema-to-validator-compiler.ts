@@ -59,7 +59,7 @@ const goTopTable = (
 		Match.value,
 		Match.tag("TypeLiteral", ({ indexSignatures }) =>
 			Array.isEmptyReadonlyArray(indexSignatures)
-				? Effect.succeed(compile(ast))
+				? Effect.succeed(compileAst(ast))
 				: Effect.fail(new IndexSignaturesAreNotSupportedError()),
 		),
 		Match.orElse(() => Effect.fail(new TopLevelMustBeObjectError())),
@@ -215,14 +215,14 @@ export type TableSchemaToTableValidator<
 export const compileTableSchema = <A, I>(
 	tableSchema: Schema.Schema<A, I>,
 ): TableSchemaToTableValidator<typeof tableSchema> =>
-	compile(Schema.encodedSchema(tableSchema).ast) as any;
+	compileAst(Schema.encodedSchema(tableSchema).ast) as any;
 
 export const compileSchema = <A extends ReadonlyValue>(
 	schema: Schema.Schema<A>,
 ): ValueToValidator<Schema.Schema.Encoded<typeof schema>> =>
-	compile(schema.ast) as any;
+	compileAst(schema.ast) as any;
 
-export const compile = (ast: AST.AST): Validator<any, any, any> =>
+export const compileAst = (ast: AST.AST): Validator<any, any, any> =>
 	pipe(
 		ast,
 		Match.value,
@@ -248,7 +248,11 @@ export const compile = (ast: AST.AST): Validator<any, any, any> =>
 		Match.tag("BigIntKeyword", () => Effect.succeed(v.int64())),
 		Match.tag("Union", ({ types: [first, second, ...rest] }) =>
 			Effect.succeed(
-				v.union(compile(first), compile(second), ...Array.map(rest, compile)),
+				v.union(
+					compileAst(first),
+					compileAst(second),
+					...Array.map(rest, compileAst),
+				),
 			),
 		),
 		Match.tag("TypeLiteral", (typeLiteral) => handleTypeLiteral(typeLiteral)),
@@ -256,7 +260,7 @@ export const compile = (ast: AST.AST): Validator<any, any, any> =>
 			const restValidator = pipe(
 				rest,
 				Array.head,
-				Option.map(({ type }) => compile(type)),
+				Option.map(({ type }) => compileAst(type)),
 			);
 
 			const [f, s, ...r] = elements;
@@ -265,7 +269,7 @@ export const compile = (ast: AST.AST): Validator<any, any, any> =>
 				type,
 				isOptional,
 			}: AST.OptionalType): Validator<any, any, any> =>
-				isOptional ? v.optional(compile(type)) : compile(type);
+				isOptional ? v.optional(compileAst(type)) : compileAst(type);
 
 			const arrayItemsValidator: Effect.Effect<
 				Validator<any, any, any>,
@@ -349,7 +353,7 @@ const handlePropertySignatures = (
 					new UnsupportedPropertySignatureKeyTypeError({ keyType: typeofName }),
 				);
 			} else {
-				const validator = compile(type);
+				const validator = compileAst(type);
 
 				return Effect.succeed({
 					propertyName: name,

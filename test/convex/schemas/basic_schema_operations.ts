@@ -1,7 +1,11 @@
 import { Schema } from "@effect/schema";
 
 import { defineConfectTable } from "~/src/schema";
-import { make } from "~/test/test-context-schema";
+import {
+	type FullTableName,
+	type TableNamesWithoutPrefix,
+	make,
+} from "~/test/test-context-schema";
 
 export const schema = make("basic_schema_operations", {
 	notes: defineConfectTable(
@@ -19,3 +23,8 @@ export const schema = make("basic_schema_operations", {
 		.index("by_text", ["text"])
 		.index("by_role", ["author.role"]),
 });
+
+export const tableName = schema.tableName;
+
+export type TableName<T extends TableNamesWithoutPrefix<typeof schema>> =
+	FullTableName<typeof schema, T>;

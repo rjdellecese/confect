@@ -10,16 +10,16 @@ import { describe, expect, expectTypeOf, test } from "vitest";
 
 import {
 	type ValueToValidator,
-	compile,
+	compileAst,
 	compileSchema,
 	compileTableSchema,
 } from "~/src/schema-to-validator-compiler";
 
-describe("compile", () => {
+describe("compileAst", () => {
 	test("literal", () => {
 		const schema = Schema.Literal("LiteralString");
 		const validator = v.literal("LiteralString");
-		const compiledValidator = compile(Schema.encodedSchema(schema).ast);
+		const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
 
 		expect(compiledValidator).toStrictEqual(validator);
 	});
@@ -27,7 +27,7 @@ describe("compile", () => {
 	test("boolean", () => {
 		const schema = Schema.Boolean;
 		const validator = v.boolean();
-		const compiledValidator = compile(Schema.encodedSchema(schema).ast);
+		const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
 
 		expect(compiledValidator).toStrictEqual(validator);
 	});
@@ -35,7 +35,7 @@ describe("compile", () => {
 	test("string", () => {
 		const schema = Schema.String;
 		const validator = v.string();
-		const compiledValidator = compile(Schema.encodedSchema(schema).ast);
+		const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
 
 		expect(compiledValidator).toStrictEqual(validator);
 	});
@@ -43,7 +43,7 @@ describe("compile", () => {
 	test("number", () => {
 		const schema = Schema.Number;
 		const validator = v.float64();
-		const compiledValidator = compile(Schema.encodedSchema(schema).ast);
+		const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
 
 		expect(compiledValidator).toStrictEqual(validator);
 	});
@@ -51,7 +51,7 @@ describe("compile", () => {
 	test("empty object", () => {
 		const schema = Schema.Struct({});
 		const validator = v.object({});
-		const compiledValidator = compile(Schema.encodedSchema(schema).ast);
+		const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
 
 		expect(compiledValidator).toStrictEqual(validator);
 	});
@@ -59,7 +59,7 @@ describe("compile", () => {
 	test("simple object", () => {
 		const schema = Schema.Struct({ foo: Schema.String, bar: Schema.Number });
 		const validator = v.object({ foo: v.string(), bar: v.float64() });
-		const compiledValidator = compile(Schema.encodedSchema(schema).ast);
+		const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
 
 		expect(compiledValidator).toStrictEqual(validator);
 	});
@@ -70,7 +70,7 @@ describe("compile", () => {
 		});
 
 		const validator = v.object({ foo: v.optional(v.string()) });
-		const compiledValidator = compile(Schema.encodedSchema(schema).ast);
+		const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
 
 		expect(compiledValidator).toStrictEqual(validator);
 	});
@@ -86,7 +86,7 @@ describe("compile", () => {
 		const validator = v.object({
 			foo: v.object({ bar: v.object({ baz: v.string() }) }),
 		});
-		const compiledValidator = compile(Schema.encodedSchema(schema).ast);
+		const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
 
 		expect(compiledValidator).toStrictEqual(validator);
 	});
@@ -104,7 +104,7 @@ describe("compile", () => {
 			v.boolean(),
 			v.object({}),
 		);
-		const compiledValidator = compile(Schema.encodedSchema(schema).ast);
+		const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
 
 		expect(compiledValidator).toStrictEqual(validator);
 	});
@@ -112,7 +112,7 @@ describe("compile", () => {
 	test("tuple with one element", () => {
 		const schema = Schema.Tuple(Schema.String);
 		const validator = v.array(v.string());
-		const compiledValidator = compile(Schema.encodedSchema(schema).ast);
+		const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
 
 		expect(compiledValidator).toStrictEqual(validator);
 	});
@@ -120,7 +120,7 @@ describe("compile", () => {
 	test("tuple with two elements", () => {
 		const schema = Schema.Tuple(Schema.String, Schema.Number);
 		const validator = v.array(v.union(v.string(), v.float64()));
-		const compiledValidator = compile(Schema.encodedSchema(schema).ast);
+		const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
 
 		expect(compiledValidator).toStrictEqual(validator);
 	});
@@ -130,7 +130,7 @@ describe("compile", () => {
 		const expectedValidator = v.array(
 			v.union(v.string(), v.float64(), v.boolean()),
 		);
-		const compiledValidator = compile(Schema.encodedSchema(schema).ast);
+		const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
 
 		expect(compiledValidator).toStrictEqual(expectedValidator);
 	});
@@ -290,6 +290,9 @@ describe("ValueToValidator", () => {
 	test("true | false | string", () => {
 		const validator = v.union(v.boolean(), v.string());
 		type Validator = typeof validator;
+
+		// The order of the union elements is not guaranteed, so we need to check
+		// that the compiled validator matches any permutation of the original validator.
 		type AnyPermutationOfValidator =
 			| VUnion<
 					string | boolean,

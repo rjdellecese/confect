@@ -23,6 +23,11 @@
 		}
 	},
 	"files": {
-		"ignore": ["coverage", "pnpm-lock.yaml", "test/convex/_generated"]
+		"ignore": [
+			".pnpm-store",
+			"coverage",
+			"pnpm-lock.yaml",
+			"test/convex/_generated"
+		]
 	}
 }

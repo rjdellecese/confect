@@ -9,7 +9,8 @@
 	"scripts": {
 		"start": "convex dev",
 		"lint": "biome ci",
-		"test": "vitest --typecheck",
+		"test": "vitest --run",
+		"typecheck": "vitest run --typecheck",
 		"coverage": "vitest run --coverage",
 		"build": "vite build"
 	},

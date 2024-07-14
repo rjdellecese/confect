@@ -25,7 +25,16 @@ import type {
 	WithoutSystemFields,
 } from "convex/server";
 import type { GenericId } from "convex/values";
-import { Chunk, Effect, Option, Record, Stream, identity, pipe } from "effect";
+import {
+	Chunk,
+	Data,
+	Effect,
+	Option,
+	Record,
+	Stream,
+	identity,
+	pipe,
+} from "effect";
 import type { ReadonlyDeep } from "type-fest";
 
 import type {
@@ -71,9 +80,7 @@ interface ConfectOrderedQuery<
 	TableName extends string,
 > extends Omit<ConfectQuery<ConfectTableInfo, TableName>, "order"> {}
 
-class NotUniqueError {
-	readonly _tag = "NotUniqueError";
-}
+export class NotUniqueError extends Data.TaggedError("NotUniqueError") {}
 
 class ConfectQueryImpl<
 	ConfectTableInfo extends GenericConfectTableInfo,
@@ -190,9 +197,14 @@ class ConfectQueryImpl<
 			Stream.take(2),
 			Stream.runCollect,
 			Effect.flatMap((chunk) =>
-				Chunk.get(chunk, 1)
-					? Effect.fail(new NotUniqueError())
-					: Effect.succeed(Chunk.get(chunk, 0)),
+				pipe(
+					chunk,
+					Chunk.get(1),
+					Option.match({
+						onSome: () => Effect.fail(new NotUniqueError()),
+						onNone: () => Effect.succeed(Chunk.get(chunk, 0)),
+					}),
+				),
 			),
 		);
 	}

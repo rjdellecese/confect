@@ -27,6 +27,18 @@ interface TestContextSchema<
 	) => `${Prefix}__${typeof tableName}`;
 }
 
+export type TableNamesWithoutPrefix<S extends TestContextSchema<any, any>> =
+	S extends TestContextSchema<infer _Prefix, infer Tables>
+		? keyof Tables & string
+		: never;
+
+export type FullTableName<
+	S extends TestContextSchema<any, any>,
+	TableName extends TableNamesWithoutPrefix<S>,
+> = S extends TestContextSchema<infer Prefix, infer _Tables>
+	? `${Prefix}__${TableName}`
+	: never;
+
 class TextContextSchemaImpl<
 	Prefix extends string,
 	Tables extends Record<string, GenericConfectTableDefinition>,
