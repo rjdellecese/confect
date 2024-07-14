@@ -1,5 +1,5 @@
 import { describe, expect } from "@effect/vitest";
-import { Array, Cause, Console, Effect, Exit, Option, pipe } from "effect";
+import { Array, Effect } from "effect";
 
 import { test } from "~/test/convex-effect-test";
 import { api } from "~/test/convex/_generated/api";

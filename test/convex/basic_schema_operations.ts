@@ -9,7 +9,6 @@ import {
 	type TableName,
 	schema,
 } from "~/test/convex/schemas/basic_schema_operations";
-import { NotUniqueError } from "../../src/database";
 
 export const tables = schema.tables;
 

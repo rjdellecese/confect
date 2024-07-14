@@ -8,7 +8,7 @@
 	"types": "dist/types.d.ts",
 	"scripts": {
 		"start": "convex dev",
-		"lint": "biome ci",
+		"lint": "biome ci --error-on-warnings",
 		"test": "vitest --run",
 		"typecheck": "vitest run --typecheck",
 		"coverage": "vitest run --coverage",

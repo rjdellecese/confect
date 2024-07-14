@@ -10,6 +10,9 @@
 			"complexity": {
 				"noForEach": "off"
 			},
+			"correctness": {
+				"noUnusedImports": "warn"
+			},
 			"performance": {
 				"noAccumulatingSpread": "off"
 			},
