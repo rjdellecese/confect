@@ -11,6 +11,7 @@ export const schema = make("basic_schema_operations", {
 	notes: defineConfectTable(
 		Schema.Struct({
 			text: Schema.String,
+			tag: Schema.optional(Schema.String, { exact: true }),
 			author: Schema.optional(
 				Schema.Struct({
 					role: Schema.Literal("admin", "user"),
@@ -21,7 +22,11 @@ export const schema = make("basic_schema_operations", {
 		}),
 	)
 		.index("by_text", ["text"])
-		.index("by_role", ["author.role"]),
+		.index("by_role", ["author.role"])
+		.searchIndex("search_text", {
+			searchField: "text",
+			filterFields: ["tag"],
+		}),
 });
 
 export const tableName = schema.tableName;

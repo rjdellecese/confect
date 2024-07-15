@@ -1,5 +1,5 @@
 import { Schema } from "@effect/schema";
-import { Effect, Option } from "effect";
+import { Array, Chunk, Effect, Option, pipe, Stream } from "effect";
 
 import type { PaginationResult } from "convex/server";
 import { SchemaId } from "~/src/SchemaId";
@@ -16,73 +16,60 @@ export const get = query({
 	args: Schema.Struct({
 		id: SchemaId<TableName<"notes">>(),
 	}),
-	handler: ({ db }, { id }): Effect.Effect<Doc<TableName<"notes">> | null> => {
-		return db.get(id).pipe(Effect.map(Option.getOrNull));
-	},
+	handler: ({ db }, { id }): Effect.Effect<Doc<TableName<"notes">> | null> =>
+		db.get(id).pipe(Effect.map(Option.getOrNull)),
 });
 
 export const insert = mutation({
 	args: Schema.Struct({
 		text: Schema.String,
 	}),
-	handler: ({ db }, { text }): Effect.Effect<Id<TableName<"notes">>> => {
-		return db.insert(schema.tableName("notes"), { text });
-	},
+	handler: ({ db }, { text }): Effect.Effect<Id<TableName<"notes">>> =>
+		db.insert(schema.tableName("notes"), { text }),
 });
 
 export const collect = query({
 	args: Schema.Struct({}),
-	handler: ({ db }): Effect.Effect<Doc<TableName<"notes">>[]> => {
-		return db.query(schema.tableName("notes")).collect();
-	},
+	handler: ({ db }): Effect.Effect<Doc<TableName<"notes">>[]> =>
+		db.query(schema.tableName("notes")).collect(),
 });
 
 export const filterFirst = query({
 	args: Schema.Struct({
 		text: Schema.String,
 	}),
-	handler: (
-		{ db },
-		{ text },
-	): Effect.Effect<Doc<TableName<"notes">> | null> => {
-		return db
+	handler: ({ db }, { text }): Effect.Effect<Doc<TableName<"notes">> | null> =>
+		db
 			.query(schema.tableName("notes"))
 			.filter((q) => q.eq(q.field("text"), text))
 			.first()
-			.pipe(Effect.map(Option.getOrNull));
-	},
+			.pipe(Effect.map(Option.getOrNull)),
 });
 
 export const withIndexFirst = query({
 	args: Schema.Struct({
 		text: Schema.String,
 	}),
-	handler: (
-		{ db },
-		{ text },
-	): Effect.Effect<Doc<TableName<"notes">> | null> => {
-		return db
+	handler: ({ db }, { text }): Effect.Effect<Doc<TableName<"notes">> | null> =>
+		db
 			.query(schema.tableName("notes"))
 			.withIndex("by_text", (q) => q.eq("text", text))
 			.first()
-			.pipe(Effect.map(Option.getOrNull));
-	},
+			.pipe(Effect.map(Option.getOrNull)),
 });
 
 export const orderDescCollect = query({
 	args: Schema.Struct({}),
-	handler: ({ db }): Effect.Effect<Doc<TableName<"notes">>[]> => {
-		return db.query(schema.tableName("notes")).order("desc").collect();
-	},
+	handler: ({ db }): Effect.Effect<Doc<TableName<"notes">>[]> =>
+		db.query(schema.tableName("notes")).order("desc").collect(),
 });
 
 export const take = query({
 	args: Schema.Struct({
 		n: Schema.Number,
 	}),
-	handler: ({ db }, { n }): Effect.Effect<Doc<TableName<"notes">>[]> => {
-		return db.query(schema.tableName("notes")).take(n);
-	},
+	handler: ({ db }, { n }): Effect.Effect<Doc<TableName<"notes">>[]> =>
+		db.query(schema.tableName("notes")).take(n),
 });
 
 export const paginate = query({
@@ -110,4 +97,42 @@ export const unique = query({
 				Effect.map(Option.getOrNull),
 				Effect.catchTag("NotUniqueError", ({ _tag }) => Effect.succeed(_tag)),
 			),
+});
+
+export const onlyFirst = query({
+	args: Schema.Struct({}),
+	handler: ({ db }): Effect.Effect<Doc<TableName<"notes">> | null> =>
+		db
+			.query(schema.tableName("notes"))
+			.first()
+			.pipe(Effect.map(Option.getOrNull)),
+});
+
+export const mapTextStream = query({
+	args: Schema.Struct({}),
+	handler: ({ db }): Effect.Effect<string[]> =>
+		Effect.gen(function* () {
+			const stream = db.query(schema.tableName("notes")).stream();
+			return yield* pipe(
+				stream,
+				Stream.map((note) => note.text),
+				Stream.runCollect,
+				Effect.map(Chunk.toArray),
+			);
+		}),
+});
+
+export const search = query({
+	args: Schema.Struct({
+		query: Schema.String,
+		tag: Schema.String,
+	}),
+	handler: ({ db }, { query, tag }): Effect.Effect<string[]> =>
+		db
+			.query(schema.tableName("notes"))
+			.withSearchIndex("search_text", (q) =>
+				q.search("text", query).eq("tag", tag),
+			)
+			.collect()
+			.pipe(Effect.map(Array.map((note) => note.text))),
 });

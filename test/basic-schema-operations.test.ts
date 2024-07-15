@@ -216,3 +216,72 @@ describe("unique", () => {
 			expect(note).toEqual(null);
 		}));
 });
+
+describe("only first", () => {
+	test("when one note exists", () =>
+		Effect.gen(function* () {
+			const c = yield* TestConvexService;
+
+			const text = "Hello, world!";
+
+			yield* c.run(({ db }) => db.insert(tableName("notes"), { text }));
+
+			const note = yield* c.query(api.basic_schema_operations.onlyFirst, {});
+
+			expect(note?.text).toEqual(text);
+		}));
+
+	test("when zero notes exist", () =>
+		Effect.gen(function* () {
+			const c = yield* TestConvexService;
+
+			const note = yield* c.query(api.basic_schema_operations.onlyFirst, {});
+
+			expect(note).toEqual(null);
+		}));
+});
+
+test("mapTextStream", () =>
+	Effect.gen(function* () {
+		const c = yield* TestConvexService;
+
+		const notesText = ["Note 1", "Note 2"];
+
+		yield* c.run(({ db }) =>
+			Promise.all(
+				Array.map(notesText, (text) => db.insert(tableName("notes"), { text })),
+			),
+		);
+
+		const notes = yield* c.query(api.basic_schema_operations.mapTextStream, {});
+
+		expect(notes).toEqual(notesText);
+	}));
+
+test("search", () =>
+	Effect.gen(function* () {
+		const c = yield* TestConvexService;
+
+		const text = "Hello, world!";
+
+		yield* c.run(({ db }) =>
+			Promise.all([
+				db.insert(tableName("notes"), {
+					text,
+					tag: "greeting",
+				}),
+				db.insert(tableName("notes"), {
+					text: "Mexican burrito recipe",
+					tag: "recipe",
+				}),
+			]),
+		);
+
+		const notes = yield* c.query(api.basic_schema_operations.search, {
+			query: "Hello",
+			tag: "greeting",
+		});
+
+		expect(notes.length).toEqual(1);
+		expect(notes[0]).toEqual(text);
+	}));

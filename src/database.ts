@@ -324,7 +324,7 @@ class ConfectQueryInitializerImpl<
 		indexName: IndexName,
 		searchFilter: (
 			q: SearchFilterBuilder<
-				ConfectTableInfo["confectDocument"],
+				DocumentByInfo<TableInfoFromConfectTableInfo<ConfectTableInfo>>,
 				NamedSearchIndex<
 					TableInfoFromConfectTableInfo<ConfectTableInfo>,
 					IndexName
