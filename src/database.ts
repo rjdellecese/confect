@@ -464,7 +464,9 @@ export interface ConfectDatabaseWriter<
 	): Effect.Effect<GenericId<TableName>>;
 	patch<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
 		id: GenericId<TableName>,
-		value: Partial<ConfectDocumentByName<ConfectDataModel, TableName>>,
+		value: Partial<
+			WithoutSystemFields<ConfectDocumentByName<ConfectDataModel, TableName>>
+		>,
 	): Effect.Effect<void>;
 	replace<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
 		id: GenericId<TableName>,
@@ -540,7 +542,9 @@ export class EffectDatabaseWriterImpl<
 	}
 	patch<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
 		id: GenericId<TableName>,
-		value: Partial<ConfectDocumentByName<ConfectDataModel, TableName>>,
+		value: Partial<
+			WithoutSystemFields<ConfectDocumentByName<ConfectDataModel, TableName>>
+		>,
 	): Effect.Effect<void> {
 		return Effect.promise(() => this.db.patch(id, value));
 	}

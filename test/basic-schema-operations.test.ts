@@ -1,5 +1,5 @@
 import { describe, expect } from "@effect/vitest";
-import { Array, Effect } from "effect";
+import { Array, Effect, Exit } from "effect";
 
 import { test } from "~/test/convex-effect-test";
 import { api } from "~/test/convex/_generated/api";
@@ -10,6 +10,40 @@ import {
 } from "~/test/convex/schemas/basic_schema_operations";
 import { TestConvexService } from "~/test/test-convex-service";
 import { NotUniqueError } from "../src/database";
+
+test("queryGet", () =>
+	Effect.gen(function* () {
+		const c = yield* TestConvexService;
+
+		const text = "Hello world!";
+
+		const noteId = yield* c.run(({ db }) =>
+			db.insert(tableName("notes"), { text }),
+		);
+
+		const note = yield* c.query(api.basic_schema_operations.queryGet, {
+			noteId,
+		});
+
+		expect(note?.text).toEqual(text);
+	}));
+
+test("mutationGet", () =>
+	Effect.gen(function* () {
+		const c = yield* TestConvexService;
+
+		const text = "Hello world!";
+
+		const noteId = yield* c.run(({ db }) =>
+			db.insert(tableName("notes"), { text }),
+		);
+
+		const note = yield* c.mutation(api.basic_schema_operations.mutationGet, {
+			noteId,
+		});
+
+		expect(note?.text).toEqual(text);
+	}));
 
 test("insert", () =>
 	Effect.gen(function* () {
@@ -29,7 +63,7 @@ test("insert", () =>
 		expect(note?.text).toEqual(text);
 	}));
 
-test("collect", () =>
+test("queryCollect", () =>
 	Effect.gen(function* () {
 		const c = yield* TestConvexService;
 
@@ -37,7 +71,24 @@ test("collect", () =>
 
 		yield* c.run(({ db }) => db.insert(tableName("notes"), { text }));
 
-		const notes = yield* c.query(api.basic_schema_operations.collect, {});
+		const notes = yield* c.query(api.basic_schema_operations.queryCollect, {});
+
+		expect(notes.length).toEqual(1);
+		expect(notes[0]?.text).toEqual(text);
+	}));
+
+test("mutationCollect", () =>
+	Effect.gen(function* () {
+		const c = yield* TestConvexService;
+
+		const text = "Hello, world!";
+
+		yield* c.run(({ db }) => db.insert(tableName("notes"), { text }));
+
+		const notes = yield* c.mutation(
+			api.basic_schema_operations.mutationCollect,
+			{},
+		);
 
 		expect(notes.length).toEqual(1);
 		expect(notes[0]?.text).toEqual(text);
@@ -284,4 +335,64 @@ test("search", () =>
 
 		expect(notes.length).toEqual(1);
 		expect(notes[0]).toEqual(text);
+	}));
+
+test("queryNormalizeId", () =>
+	Effect.gen(function* () {
+		const c = yield* TestConvexService;
+
+		const noteId = yield* c.run(({ db }) =>
+			db.insert(tableName("notes"), { text: "Hello world!" }),
+		);
+
+		const exit = yield* c
+			.query(api.basic_schema_operations.queryNormalizeId, {
+				noteId,
+			})
+			.pipe(Effect.exit);
+
+		expect(Exit.isSuccess(exit)).toBe(true);
+	}));
+
+test("mutationNormalizeId", () =>
+	Effect.gen(function* () {
+		const c = yield* TestConvexService;
+
+		const noteId = yield* c.run(({ db }) =>
+			db.insert(tableName("notes"), { text: "Hello world!" }),
+		);
+
+		const exit = yield* c
+			.mutation(api.basic_schema_operations.mutationNormalizeId, {
+				noteId,
+			})
+			.pipe(Effect.exit);
+
+		expect(Exit.isSuccess(exit)).toBe(true);
+	}));
+
+test("patch", () =>
+	Effect.gen(function* () {
+		const c = yield* TestConvexService;
+
+		const originalText = "Hello, Mars!";
+
+		const noteId = yield* c.run(({ db }) =>
+			db.insert(tableName("notes"), { text: originalText }),
+		);
+
+		const originalNote = yield* c.run(({ db }) => db.get(noteId));
+
+		expect(originalNote?.text).toEqual(originalText);
+
+		const updatedText = "Hello, world!";
+
+		yield* c.mutation(api.basic_schema_operations.patch, {
+			noteId,
+			text: updatedText,
+		});
+
+		const updatedNote = yield* c.run(({ db }) => db.get(noteId));
+
+		expect(updatedNote?.text).toEqual(updatedText);
 	}));

@@ -7,17 +7,32 @@ import type { Doc, Id } from "~/test/convex/_generated/dataModel";
 import { mutation, query } from "~/test/convex/confect_functions";
 import {
 	type TableName,
+	tableName,
 	schema,
 } from "~/test/convex/schemas/basic_schema_operations";
 
 export const tables = schema.tables;
 
-export const get = query({
+export const queryGet = query({
 	args: Schema.Struct({
-		id: SchemaId<TableName<"notes">>(),
+		noteId: SchemaId<TableName<"notes">>(),
 	}),
-	handler: ({ db }, { id }): Effect.Effect<Doc<TableName<"notes">> | null> =>
-		db.get(id).pipe(Effect.map(Option.getOrNull)),
+	handler: (
+		{ db },
+		{ noteId },
+	): Effect.Effect<Doc<TableName<"notes">> | null> =>
+		db.get(noteId).pipe(Effect.map(Option.getOrNull)),
+});
+
+export const mutationGet = mutation({
+	args: Schema.Struct({
+		noteId: SchemaId<TableName<"notes">>(),
+	}),
+	handler: (
+		{ db },
+		{ noteId },
+	): Effect.Effect<Doc<TableName<"notes">> | null> =>
+		db.get(noteId).pipe(Effect.map(Option.getOrNull)),
 });
 
 export const insert = mutation({
@@ -25,13 +40,19 @@ export const insert = mutation({
 		text: Schema.String,
 	}),
 	handler: ({ db }, { text }): Effect.Effect<Id<TableName<"notes">>> =>
-		db.insert(schema.tableName("notes"), { text }),
+		db.insert(tableName("notes"), { text }),
 });
 
-export const collect = query({
+export const queryCollect = query({
 	args: Schema.Struct({}),
 	handler: ({ db }): Effect.Effect<Doc<TableName<"notes">>[]> =>
-		db.query(schema.tableName("notes")).collect(),
+		db.query(tableName("notes")).collect(),
+});
+
+export const mutationCollect = mutation({
+	args: Schema.Struct({}),
+	handler: ({ db }): Effect.Effect<Doc<TableName<"notes">>[]> =>
+		db.query(tableName("notes")).collect(),
 });
 
 export const filterFirst = query({
@@ -40,7 +61,7 @@ export const filterFirst = query({
 	}),
 	handler: ({ db }, { text }): Effect.Effect<Doc<TableName<"notes">> | null> =>
 		db
-			.query(schema.tableName("notes"))
+			.query(tableName("notes"))
 			.filter((q) => q.eq(q.field("text"), text))
 			.first()
 			.pipe(Effect.map(Option.getOrNull)),
@@ -52,7 +73,7 @@ export const withIndexFirst = query({
 	}),
 	handler: ({ db }, { text }): Effect.Effect<Doc<TableName<"notes">> | null> =>
 		db
-			.query(schema.tableName("notes"))
+			.query(tableName("notes"))
 			.withIndex("by_text", (q) => q.eq("text", text))
 			.first()
 			.pipe(Effect.map(Option.getOrNull)),
@@ -61,7 +82,7 @@ export const withIndexFirst = query({
 export const orderDescCollect = query({
 	args: Schema.Struct({}),
 	handler: ({ db }): Effect.Effect<Doc<TableName<"notes">>[]> =>
-		db.query(schema.tableName("notes")).order("desc").collect(),
+		db.query(tableName("notes")).order("desc").collect(),
 });
 
 export const take = query({
@@ -69,7 +90,7 @@ export const take = query({
 		n: Schema.Number,
 	}),
 	handler: ({ db }, { n }): Effect.Effect<Doc<TableName<"notes">>[]> =>
-		db.query(schema.tableName("notes")).take(n),
+		db.query(tableName("notes")).take(n),
 });
 
 export const paginate = query({
@@ -81,7 +102,7 @@ export const paginate = query({
 		{ db },
 		{ cursor, numItems },
 	): Effect.Effect<PaginationResult<Doc<TableName<"notes">>>> => {
-		return db.query(schema.tableName("notes")).paginate({ cursor, numItems });
+		return db.query(tableName("notes")).paginate({ cursor, numItems });
 	},
 });
 
@@ -91,7 +112,7 @@ export const unique = query({
 		db,
 	}): Effect.Effect<Doc<TableName<"notes">> | null | "NotUniqueError"> =>
 		db
-			.query(schema.tableName("notes"))
+			.query(tableName("notes"))
 			.unique()
 			.pipe(
 				Effect.map(Option.getOrNull),
@@ -102,17 +123,14 @@ export const unique = query({
 export const onlyFirst = query({
 	args: Schema.Struct({}),
 	handler: ({ db }): Effect.Effect<Doc<TableName<"notes">> | null> =>
-		db
-			.query(schema.tableName("notes"))
-			.first()
-			.pipe(Effect.map(Option.getOrNull)),
+		db.query(tableName("notes")).first().pipe(Effect.map(Option.getOrNull)),
 });
 
 export const mapTextStream = query({
 	args: Schema.Struct({}),
 	handler: ({ db }): Effect.Effect<string[]> =>
 		Effect.gen(function* () {
-			const stream = db.query(schema.tableName("notes")).stream();
+			const stream = db.query(tableName("notes")).stream();
 			return yield* pipe(
 				stream,
 				Stream.map((note) => note.text),
@@ -129,10 +147,60 @@ export const search = query({
 	}),
 	handler: ({ db }, { query, tag }): Effect.Effect<string[]> =>
 		db
-			.query(schema.tableName("notes"))
+			.query(tableName("notes"))
 			.withSearchIndex("search_text", (q) =>
 				q.search("text", query).eq("tag", tag),
 			)
 			.collect()
 			.pipe(Effect.map(Array.map((note) => note.text))),
+});
+
+export const queryNormalizeId = query({
+	args: Schema.Struct({
+		noteId: SchemaId<TableName<"notes">>(),
+	}),
+	handler: ({ db }, { noteId }): Effect.Effect<Id<TableName<"notes">> | null> =>
+		pipe(
+			db.normalizeId(tableName("notes"), noteId),
+			Option.getOrNull,
+			Effect.succeed,
+		),
+});
+
+export const mutationNormalizeId = mutation({
+	args: Schema.Struct({
+		noteId: SchemaId<TableName<"notes">>(),
+	}),
+	handler: ({ db }, { noteId }): Effect.Effect<Id<TableName<"notes">> | null> =>
+		pipe(
+			db.normalizeId(tableName("notes"), noteId),
+			Option.getOrNull,
+			Effect.succeed,
+		),
+});
+
+const badPatch = mutation({
+	args: Schema.Struct({
+		noteId: SchemaId<TableName<"notes">>(),
+	}),
+	handler: ({ db }, { noteId }) =>
+		Effect.gen(function* () {
+			yield* db.patch(noteId, {
+				// @ts-expect-error: Should not be able to set `_id`
+				_id: noteId,
+			});
+
+			yield* db.patch(noteId, {
+				// @ts-expect-error: Should not be able to set `_id`
+				_creationTime: 0,
+			});
+		}),
+});
+
+export const patch = mutation({
+	args: Schema.Struct({
+		noteId: SchemaId<TableName<"notes">>(),
+		text: Schema.String,
+	}),
+	handler: ({ db }, { noteId, text }) => db.patch(noteId, { text }),
 });
