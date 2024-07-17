@@ -40,7 +40,7 @@ export const insert = mutation({
 		text: Schema.String,
 	}),
 	handler: ({ db }, { text }): Effect.Effect<Id<TableName<"notes">>> =>
-		db.insert(tableName("notes"), { text }),
+		db.insert(tableName("notes"), { text }).pipe(Effect.orDie),
 });
 
 export const queryCollect = query({
@@ -179,7 +179,7 @@ export const mutationNormalizeId = mutation({
 		),
 });
 
-const badPatch = mutation({
+const _badPatch = mutation({
 	args: Schema.Struct({
 		noteId: SchemaId<TableName<"notes">>(),
 	}),
@@ -194,13 +194,32 @@ const badPatch = mutation({
 				// @ts-expect-error: Should not be able to set `_id`
 				_creationTime: 0,
 			});
-		}),
+		}).pipe(Effect.orDie),
 });
 
 export const patch = mutation({
 	args: Schema.Struct({
 		noteId: SchemaId<TableName<"notes">>(),
+		fields: Schema.Struct({
+			// TODO: Better error messages for `Schema.optional` when `{ exact: true }` is not present
+			text: Schema.optional(Schema.String, { exact: true }),
+			author: Schema.optional(
+				Schema.Struct({
+					role: Schema.Literal("admin", "user"),
+					name: Schema.String,
+				}),
+				{ exact: true },
+			),
+		}),
+	}),
+	handler: ({ db }, { noteId, fields }) =>
+		db.patch(noteId, fields).pipe(Effect.orDie),
+});
+
+export const insertTooLongText = mutation({
+	args: Schema.Struct({
 		text: Schema.String,
 	}),
-	handler: ({ db }, { noteId, text }) => db.patch(noteId, { text }),
+	handler: ({ db }, { text }) =>
+		db.insert(tableName("notes"), { text }).pipe(Effect.orDie),
 });

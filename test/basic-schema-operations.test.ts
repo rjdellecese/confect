@@ -1,5 +1,5 @@
 import { describe, expect } from "@effect/vitest";
-import { Array, Effect, Exit } from "effect";
+import { Array, Effect, Exit, String } from "effect";
 
 import { test } from "~/test/convex-effect-test";
 import { api } from "~/test/convex/_generated/api";
@@ -389,10 +389,70 @@ test("patch", () =>
 
 		yield* c.mutation(api.basic_schema_operations.patch, {
 			noteId,
-			text: updatedText,
+			fields: { text: updatedText },
 		});
 
 		const updatedNote = yield* c.run(({ db }) => db.get(noteId));
 
 		expect(updatedNote?.text).toEqual(updatedText);
 	}));
+
+test("insertTooLongText", () =>
+	Effect.gen(function* () {
+		const c = yield* TestConvexService;
+
+		const tooLongText = String.repeat(101)("a");
+
+		const exit = yield* c
+			.mutation(api.basic_schema_operations.insertTooLongText, {
+				text: tooLongText,
+			})
+			.pipe(Effect.exit);
+
+		expect(Exit.isFailure(exit)).toBe(true);
+	}));
+
+describe("patch", () => {
+	test("invalid patch", () =>
+		Effect.gen(function* () {
+			const c = yield* TestConvexService;
+
+			const noteId = yield* c.run(({ db }) =>
+				db.insert(tableName("notes"), { text: "Hello, world!" }),
+			);
+
+			const tooLongText = String.repeat(101)("a");
+
+			const exit = yield* c
+				.mutation(api.basic_schema_operations.patch, {
+					noteId,
+					fields: {
+						text: tooLongText,
+					},
+				})
+				.pipe(Effect.exit);
+
+			// TODO: Check for exact failure, here and everywhere else `Exit.isFailure` is used
+			expect(Exit.isFailure(exit)).toBe(true);
+		}));
+
+	test("valid patch", () =>
+		Effect.gen(function* () {
+			const c = yield* TestConvexService;
+
+			const noteId = yield* c.run(({ db }) =>
+				db.insert(tableName("notes"), { text: "Hello, world!" }),
+			);
+
+			const author = { role: "user", name: "Joe" } as const;
+
+			yield* c.mutation(api.basic_schema_operations.patch, {
+				noteId,
+				fields: { author },
+			});
+
+			const patchedNote = yield* c.run(({ db }) => db.get(noteId));
+
+			expect(patchedNote?.author).toMatchObject(author);
+		}));
+});

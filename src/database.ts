@@ -26,6 +26,8 @@ import type {
 } from "convex/server";
 import type { GenericId } from "convex/values";
 import {
+	Array,
+	type Cause,
 	Chunk,
 	Data,
 	Effect,
@@ -414,6 +416,13 @@ export class ConfectDatabaseReaderImpl<
 		this.db = db;
 		this.databaseSchemas = databaseSchemas;
 	}
+	tableName(
+		id: GenericId<TableNamesInConfectDataModel<ConfectDataModel>>,
+	): Option.Option<TableNamesInConfectDataModel<ConfectDataModel>> {
+		return Array.findFirst(Record.keys(this.databaseSchemas), (tableName) =>
+			Option.isSome(this.normalizeId(tableName, id)),
+		);
+	}
 	normalizeId<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
 		tableName: TableName,
 		id: string,
@@ -461,13 +470,18 @@ export interface ConfectDatabaseWriter<
 		value: WithoutSystemFields<
 			ConfectDocumentByName<ConfectDataModel, TableName>
 		>,
-	): Effect.Effect<GenericId<TableName>>;
+	): Effect.Effect<GenericId<TableName>, ParseResult.ParseError>;
 	patch<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
 		id: GenericId<TableName>,
 		value: Partial<
 			WithoutSystemFields<ConfectDocumentByName<ConfectDataModel, TableName>>
 		>,
-	): Effect.Effect<void>;
+	): Effect.Effect<
+		void,
+		| ParseResult.ParseError
+		| Cause.NoSuchElementException
+		| InvalidIdProvidedForPatch
+	>;
 	replace<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
 		id: GenericId<TableName>,
 		value: WithOptionalSystemFields<
@@ -493,6 +507,13 @@ export class EffectDatabaseWriterImpl<
 		this.databaseSchemas = databaseSchemas;
 		this.reader = new ConfectDatabaseReaderImpl(db, databaseSchemas);
 	}
+	tableName(
+		id: GenericId<TableNamesInConfectDataModel<ConfectDataModel>>,
+	): Option.Option<TableNamesInConfectDataModel<ConfectDataModel>> {
+		return Array.findFirst(Record.keys(this.databaseSchemas), (tableName) =>
+			Option.isSome(this.normalizeId(tableName, id)),
+		);
+	}
 	query<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
 		tableName: TableName,
 	): ConfectQueryInitializer<ConfectDataModel[TableName], TableName> {
@@ -516,7 +537,7 @@ export class EffectDatabaseWriterImpl<
 		value: WithoutSystemFields<
 			ConfectDocumentByName<ConfectDataModel, TableName>
 		>,
-	): Effect.Effect<GenericId<TableName>> {
+	): Effect.Effect<GenericId<TableName>, ParseResult.ParseError> {
 		return pipe(
 			value,
 			Schema.encode(this.databaseSchemas[table]),
@@ -524,7 +545,7 @@ export class EffectDatabaseWriterImpl<
 				Effect.promise(() =>
 					this.db.insert(
 						table,
-						// TODO: Look into this casting
+						// TODO: Look into this casting. Can we make it better?
 						encodedValue as Expand<
 							BetterOmit<
 								DocumentByName<
@@ -537,7 +558,6 @@ export class EffectDatabaseWriterImpl<
 					),
 				),
 			),
-			Effect.orDie,
 		);
 	}
 	patch<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
@@ -545,8 +565,61 @@ export class EffectDatabaseWriterImpl<
 		value: Partial<
 			WithoutSystemFields<ConfectDocumentByName<ConfectDataModel, TableName>>
 		>,
-	): Effect.Effect<void> {
-		return Effect.promise(() => this.db.patch(id, value));
+	): Effect.Effect<
+		void,
+		| ParseResult.ParseError
+		| Cause.NoSuchElementException
+		| InvalidIdProvidedForPatch
+	> {
+		return pipe(
+			Effect.Do,
+			Effect.bind("tableName", () => this.tableName(id)),
+			Effect.let(
+				"tableSchema",
+				({ tableName }) => this.databaseSchemas[tableName],
+			),
+			Effect.bind("originalConvexDoc", () =>
+				Effect.promise(() => this.db.get(id)).pipe(
+					Effect.andThen(
+						(
+							doc: DocumentByName<
+								DataModelFromConfectDataModel<ConfectDataModel>,
+								TableName
+							> | null,
+						) =>
+							doc
+								? Effect.succeed(doc)
+								: Effect.fail(new InvalidIdProvidedForPatch()),
+					),
+				),
+			),
+			Effect.bind("originalConfectDoc", ({ tableSchema, originalConvexDoc }) =>
+				Schema.decodeUnknown(tableSchema)(originalConvexDoc),
+			),
+			Effect.bind("updatedConvexDoc", ({ tableSchema, originalConfectDoc }) =>
+				Schema.encodeUnknown(tableSchema)({
+					...originalConfectDoc,
+					...value,
+				}),
+			),
+			Effect.andThen(({ updatedConvexDoc }) =>
+				Effect.promise(() =>
+					this.db.replace(
+						id,
+						updatedConvexDoc as Expand<
+							BetterOmit<
+								DocumentByName<
+									DataModelFromConfectDataModel<ConfectDataModel>,
+									TableName
+								>,
+								"_creationTime" | "_id"
+							>
+						>,
+					),
+				),
+			),
+			Effect.asVoid,
+		);
 	}
 	replace<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
 		id: GenericId<TableName>,
@@ -554,6 +627,7 @@ export class EffectDatabaseWriterImpl<
 			ConfectDocumentByName<ConfectDataModel, TableName>
 		>,
 	): Effect.Effect<void> {
+		// TODO: Get, merge, and then encode.
 		return Effect.promise(() => this.db.replace(id, value));
 	}
 	delete(id: GenericId<string>): Effect.Effect<void> {
@@ -572,3 +646,7 @@ export const schemasFromConfectSchema = <
 	) as DatabaseSchemasFromConfectDataModel<
 		ConfectDataModelFromConfectSchema<ConfectSchema>
 	>;
+
+class InvalidIdProvidedForPatch extends Data.TaggedError(
+	"InvalidIdProvidedForPatch",
+) {}

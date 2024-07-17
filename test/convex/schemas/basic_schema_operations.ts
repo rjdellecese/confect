@@ -10,7 +10,7 @@ import {
 export const schema = make("basic_schema_operations", {
 	notes: defineConfectTable(
 		Schema.Struct({
-			text: Schema.String,
+			text: Schema.String.pipe(Schema.maxLength(100)),
 			tag: Schema.optional(Schema.String, { exact: true }),
 			author: Schema.optional(
 				Schema.Struct({
