@@ -455,4 +455,28 @@ describe("patch", () => {
 
 			expect(patchedNote?.author).toMatchObject(author);
 		}));
+
+	test("unset", () =>
+		Effect.gen(function* () {
+			const c = yield* TestConvexService;
+
+			const tag = "greeting";
+
+			const noteId = yield* c.run(({ db }) =>
+				db.insert(tableName("notes"), {
+					text: "Hello, world!",
+					tag,
+					author: { role: "user", name: "Joe" },
+				}),
+			);
+
+			yield* c.mutation(api.basic_schema_operations.deleteAuthorPatch, {
+				noteId,
+			});
+
+			const patchedNote = yield* c.run(({ db }) => db.get(noteId));
+
+			expect(patchedNote?.author).toEqual(undefined);
+			expect(patchedNote?.tag).toEqual(tag);
+		}));
 });

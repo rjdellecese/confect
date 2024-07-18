@@ -571,55 +571,54 @@ export class EffectDatabaseWriterImpl<
 		| Cause.NoSuchElementException
 		| InvalidIdProvidedForPatch
 	> {
-		return pipe(
-			Effect.Do,
-			Effect.bind("tableName", () => this.tableName(id)),
-			Effect.let(
-				"tableSchema",
-				({ tableName }) => this.databaseSchemas[tableName],
-			),
-			Effect.bind("originalConvexDoc", () =>
-				Effect.promise(() => this.db.get(id)).pipe(
-					Effect.andThen(
-						(
-							doc: DocumentByName<
+		return Effect.gen(this, function* () {
+			const tableName = yield* this.tableName(id);
+			const tableSchema = this.databaseSchemas[tableName];
+
+			const originalConvexDoc = yield* Effect.promise(() =>
+				this.db.get(id),
+			).pipe(
+				Effect.andThen(
+					(
+						doc: DocumentByName<
+							DataModelFromConfectDataModel<ConfectDataModel>,
+							TableName
+						> | null,
+					) =>
+						doc
+							? Effect.succeed(doc)
+							: Effect.fail(new InvalidIdProvidedForPatch()),
+				),
+			);
+
+			const originalConfectDoc =
+				yield* Schema.decodeUnknown(tableSchema)(originalConvexDoc);
+
+			const updatedConvexDoc = yield* pipe(
+				value,
+				Record.reduce(originalConfectDoc, (acc, value, key) =>
+					value === undefined
+						? Record.remove(acc, key)
+						: Record.set(acc, key, value),
+				),
+				Schema.encodeUnknown(tableSchema),
+			);
+
+			yield* Effect.promise(() =>
+				this.db.replace(
+					id,
+					updatedConvexDoc as Expand<
+						BetterOmit<
+							DocumentByName<
 								DataModelFromConfectDataModel<ConfectDataModel>,
 								TableName
-							> | null,
-						) =>
-							doc
-								? Effect.succeed(doc)
-								: Effect.fail(new InvalidIdProvidedForPatch()),
-					),
+							>,
+							"_creationTime" | "_id"
+						>
+					>,
 				),
-			),
-			Effect.bind("originalConfectDoc", ({ tableSchema, originalConvexDoc }) =>
-				Schema.decodeUnknown(tableSchema)(originalConvexDoc),
-			),
-			Effect.bind("updatedConvexDoc", ({ tableSchema, originalConfectDoc }) =>
-				Schema.encodeUnknown(tableSchema)({
-					...originalConfectDoc,
-					...value,
-				}),
-			),
-			Effect.andThen(({ updatedConvexDoc }) =>
-				Effect.promise(() =>
-					this.db.replace(
-						id,
-						updatedConvexDoc as Expand<
-							BetterOmit<
-								DocumentByName<
-									DataModelFromConfectDataModel<ConfectDataModel>,
-									TableName
-								>,
-								"_creationTime" | "_id"
-							>
-						>,
-					),
-				),
-			),
-			Effect.asVoid,
-		);
+			);
+		});
 	}
 	replace<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
 		id: GenericId<TableName>,
@@ -627,7 +626,6 @@ export class EffectDatabaseWriterImpl<
 			ConfectDocumentByName<ConfectDataModel, TableName>
 		>,
 	): Effect.Effect<void> {
-		// TODO: Get, merge, and then encode.
 		return Effect.promise(() => this.db.replace(id, value));
 	}
 	delete(id: GenericId<string>): Effect.Effect<void> {

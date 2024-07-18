@@ -1,5 +1,5 @@
 import { Schema } from "@effect/schema";
-import { Array, Chunk, Effect, Option, pipe, Stream } from "effect";
+import { Array, Chunk, Effect, Option, Stream, pipe } from "effect";
 
 import type { PaginationResult } from "convex/server";
 import { SchemaId } from "~/src/SchemaId";
@@ -7,8 +7,8 @@ import type { Doc, Id } from "~/test/convex/_generated/dataModel";
 import { mutation, query } from "~/test/convex/confect_functions";
 import {
 	type TableName,
-	tableName,
 	schema,
+	tableName,
 } from "~/test/convex/schemas/basic_schema_operations";
 
 export const tables = schema.tables;
@@ -214,6 +214,14 @@ export const patch = mutation({
 	}),
 	handler: ({ db }, { noteId, fields }) =>
 		db.patch(noteId, fields).pipe(Effect.orDie),
+});
+
+export const deleteAuthorPatch = mutation({
+	args: Schema.Struct({
+		noteId: SchemaId<TableName<"notes">>(),
+	}),
+	handler: ({ db }, { noteId }) =>
+		db.patch(noteId, { author: undefined }).pipe(Effect.orDie),
 });
 
 export const insertTooLongText = mutation({
