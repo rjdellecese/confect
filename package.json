@@ -24,13 +24,13 @@
 		"@effect/vitest": "0.6.6",
 		"@swc/jest": "0.2.36",
 		"@tsconfig/strictest": "2.0.5",
-		"@vitest/coverage-v8": "^2.0.2",
+		"@vitest/coverage-v8": "^2.0.3",
 		"convex-test": "0.0.23",
 		"dotenv": "16.4.5",
 		"typescript": "5.5.3",
 		"vite": "5.3.3",
 		"vite-tsconfig-paths": "4.3.2",
-		"vitest": "2.0.2"
+		"vitest": "2.0.3"
 	},
 	"dependencies": {
 		"@effect/schema": "0.68.22",
