@@ -252,3 +252,9 @@ export const deleteNote = mutation({
 	}),
 	handler: ({ db }, { noteId }): Effect.Effect<void> => db.delete(noteId),
 });
+
+export const isAuthenticated = query({
+	args: Schema.Struct({}),
+	handler: ({ auth }): Effect.Effect<boolean> =>
+		pipe(auth.getUserIdentity(), Effect.map(Option.isSome)),
+});

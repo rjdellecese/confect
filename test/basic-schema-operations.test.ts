@@ -475,8 +475,6 @@ describe("patch", () => {
 				})
 				.pipe(Effect.exit);
 
-			yield* Console.log((exit as any)?.cause?.defect);
-
 			expect(Exit.isFailure(exit)).toBe(true);
 		}));
 
@@ -564,5 +562,35 @@ describe("delete", () => {
 				.pipe(Effect.exit);
 
 			expect(Exit.isFailure(exit)).toBe(true);
+		}));
+});
+
+describe("authentication", () => {
+	test("when user is not authenticated", () =>
+		Effect.gen(function* () {
+			const c = yield* TestConvexService;
+
+			const isAuthenticated = yield* c.query(
+				api.basic_schema_operations.isAuthenticated,
+				{},
+			);
+
+			expect(isAuthenticated).toEqual(false);
+		}));
+
+	test("when user is authenticated", () =>
+		Effect.gen(function* () {
+			const c = yield* TestConvexService;
+
+			const asUser = c.withIdentity({
+				name: "Joe",
+			});
+
+			const isAuthenticated = yield* asUser.query(
+				api.basic_schema_operations.isAuthenticated,
+				{},
+			);
+
+			expect(isAuthenticated).toEqual(true);
 		}));
 });

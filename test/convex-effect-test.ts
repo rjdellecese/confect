@@ -9,7 +9,7 @@ type Self<A, E> = (
 ) => Effect.Effect<
 	E,
 	A,
-	TestServices.TestServices | TestConvexService.TestConvexService
+	TestServices.TestServices | TestConvexService.TestConvexServiceWithoutIdentity
 >;
 type Timeout<A, E> = Parameters<typeof effect<E, A>>[2];
 
