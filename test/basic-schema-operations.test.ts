@@ -268,7 +268,7 @@ describe("unique", () => {
 		}));
 });
 
-describe("only first", () => {
+describe("first without filters", () => {
 	test("when one note exists", () =>
 		Effect.gen(function* () {
 			const c = yield* TestConvexService;
@@ -292,7 +292,7 @@ describe("only first", () => {
 		}));
 });
 
-test("mapTextStream", () =>
+test("stream", () =>
 	Effect.gen(function* () {
 		const c = yield* TestConvexService;
 
@@ -337,39 +337,41 @@ test("search", () =>
 		expect(notes[0]).toEqual(text);
 	}));
 
-test("queryNormalizeId", () =>
-	Effect.gen(function* () {
-		const c = yield* TestConvexService;
+describe("normalizeId", () => {
+	test("query", () =>
+		Effect.gen(function* () {
+			const c = yield* TestConvexService;
 
-		const noteId = yield* c.run(({ db }) =>
-			db.insert(tableName("notes"), { text: "Hello world!" }),
-		);
+			const noteId = yield* c.run(({ db }) =>
+				db.insert(tableName("notes"), { text: "Hello world!" }),
+			);
 
-		const exit = yield* c
-			.query(api.basic_schema_operations.queryNormalizeId, {
-				noteId,
-			})
-			.pipe(Effect.exit);
+			const exit = yield* c
+				.query(api.basic_schema_operations.queryNormalizeId, {
+					noteId,
+				})
+				.pipe(Effect.exit);
 
-		expect(Exit.isSuccess(exit)).toBe(true);
-	}));
+			expect(Exit.isSuccess(exit)).toBe(true);
+		}));
 
-test("mutationNormalizeId", () =>
-	Effect.gen(function* () {
-		const c = yield* TestConvexService;
+	test("mutation", () =>
+		Effect.gen(function* () {
+			const c = yield* TestConvexService;
 
-		const noteId = yield* c.run(({ db }) =>
-			db.insert(tableName("notes"), { text: "Hello world!" }),
-		);
+			const noteId = yield* c.run(({ db }) =>
+				db.insert(tableName("notes"), { text: "Hello world!" }),
+			);
 
-		const exit = yield* c
-			.mutation(api.basic_schema_operations.mutationNormalizeId, {
-				noteId,
-			})
-			.pipe(Effect.exit);
+			const exit = yield* c
+				.mutation(api.basic_schema_operations.mutationNormalizeId, {
+					noteId,
+				})
+				.pipe(Effect.exit);
 
-		expect(Exit.isSuccess(exit)).toBe(true);
-	}));
+			expect(Exit.isSuccess(exit)).toBe(true);
+		}));
+});
 
 test("patch", () =>
 	Effect.gen(function* () {
@@ -397,7 +399,7 @@ test("patch", () =>
 		expect(updatedNote?.text).toEqual(updatedText);
 	}));
 
-test("insertTooLongText", () =>
+test("validation", () =>
 	Effect.gen(function* () {
 		const c = yield* TestConvexService;
 
@@ -503,31 +505,29 @@ describe("patch", () => {
 		}));
 });
 
-describe("replace", () => {
-	test("replace", () =>
-		Effect.gen(function* () {
-			const c = yield* TestConvexService;
+test("replace", () =>
+	Effect.gen(function* () {
+		const c = yield* TestConvexService;
 
-			const initialText = "Hello, Earth!";
-			const updatedText = "Hello, Mars!";
+		const initialText = "Hello, Earth!";
+		const updatedText = "Hello, Mars!";
 
-			const noteId = yield* c.run(({ db }) =>
-				db.insert(tableName("notes"), { text: initialText }),
-			);
-			const note = yield* c.run(({ db }) => db.get(noteId));
+		const noteId = yield* c.run(({ db }) =>
+			db.insert(tableName("notes"), { text: initialText }),
+		);
+		const note = yield* c.run(({ db }) => db.get(noteId));
 
-			const updatedNoteFields = { ...note, text: updatedText };
+		const updatedNoteFields = { ...note, text: updatedText };
 
-			yield* c.mutation(api.basic_schema_operations.replace, {
-				noteId,
-				fields: updatedNoteFields,
-			});
+		yield* c.mutation(api.basic_schema_operations.replace, {
+			noteId,
+			fields: updatedNoteFields,
+		});
 
-			const replacedNote = yield* c.run(({ db }) => db.get(noteId));
+		const replacedNote = yield* c.run(({ db }) => db.get(noteId));
 
-			expect(replacedNote?.text).toEqual(updatedText);
-		}));
-});
+		expect(replacedNote?.text).toEqual(updatedText);
+	}));
 
 describe("delete", () => {
 	test("doc exists", () =>
