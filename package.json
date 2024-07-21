@@ -14,10 +14,7 @@
 		"coverage": "vitest run --coverage",
 		"build": "vite build"
 	},
-	"keywords": [
-		"effect",
-		"convex"
-	],
+	"keywords": ["effect", "convex"],
 	"author": "RJ Dellecese",
 	"license": "ISC",
 	"devDependencies": {

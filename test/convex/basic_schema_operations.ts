@@ -179,7 +179,8 @@ export const mutationNormalizeId = mutation({
 		),
 });
 
-const _badPatch = mutation({
+// Exporting only to stop TypeScript from complaining.
+export const _badPatch = mutation({
 	args: Schema.Struct({
 		noteId: SchemaId<TableName<"notes">>(),
 	}),
@@ -191,7 +192,7 @@ const _badPatch = mutation({
 			});
 
 			yield* db.patch(noteId, {
-				// @ts-expect-error: Should not be able to set `_id`
+				// @ts-expect-error: Should not be able to set `_creationTime`
 				_creationTime: 0,
 			});
 		}).pipe(Effect.orDie),
