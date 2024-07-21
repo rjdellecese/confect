@@ -217,7 +217,7 @@ export const patch = mutation({
 		db.patch(noteId, fields).pipe(Effect.orDie),
 });
 
-export const deleteAuthorPatch = mutation({
+export const unsetAuthorPatch = mutation({
 	args: Schema.Struct({
 		noteId: SchemaId<TableName<"notes">>(),
 	}),
@@ -231,4 +231,24 @@ export const insertTooLongText = mutation({
 	}),
 	handler: ({ db }, { text }) =>
 		db.insert(tableName("notes"), { text }).pipe(Effect.orDie),
+});
+
+export const replace = mutation({
+	args: Schema.Struct({
+		noteId: SchemaId<TableName<"notes">>(),
+		fields: Schema.Struct({
+			_id: Schema.optional(SchemaId<TableName<"notes">>(), { exact: true }),
+			_creationTime: Schema.optional(Schema.Number, { exact: true }),
+			text: Schema.String,
+		}),
+	}),
+	handler: ({ db }, { noteId, fields }) =>
+		db.replace(noteId, fields).pipe(Effect.orDie),
+});
+
+export const deleteNote = mutation({
+	args: Schema.Struct({
+		noteId: SchemaId<TableName<"notes">>(),
+	}),
+	handler: ({ db }, { noteId }): Effect.Effect<void> => db.delete(noteId),
 });

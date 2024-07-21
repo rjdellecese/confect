@@ -1,5 +1,5 @@
 import { describe, expect } from "@effect/vitest";
-import { Array, Effect, Exit, String } from "effect";
+import { Array, Console, Effect, Exit, String } from "effect";
 
 import { test } from "~/test/convex-effect-test";
 import { api } from "~/test/convex/_generated/api";
@@ -456,6 +456,28 @@ describe("patch", () => {
 			expect(patchedNote?.author).toMatchObject(author);
 		}));
 
+	test("deleted doc", () =>
+		Effect.gen(function* () {
+			const c = yield* TestConvexService;
+
+			const noteId = yield* c.run(({ db }) =>
+				db.insert(tableName("notes"), { text: "Hello, world!" }),
+			);
+
+			yield* c.run(({ db }) => db.delete(noteId));
+
+			const exit = yield* c
+				.mutation(api.basic_schema_operations.patch, {
+					noteId,
+					fields: { text: "Hello, world!" },
+				})
+				.pipe(Effect.exit);
+
+			yield* Console.log((exit as any)?.cause?.defect);
+
+			expect(Exit.isFailure(exit)).toBe(true);
+		}));
+
 	test("unset", () =>
 		Effect.gen(function* () {
 			const c = yield* TestConvexService;
@@ -470,7 +492,7 @@ describe("patch", () => {
 				}),
 			);
 
-			yield* c.mutation(api.basic_schema_operations.deleteAuthorPatch, {
+			yield* c.mutation(api.basic_schema_operations.unsetAuthorPatch, {
 				noteId,
 			});
 
@@ -478,5 +500,69 @@ describe("patch", () => {
 
 			expect(patchedNote?.author).toEqual(undefined);
 			expect(patchedNote?.tag).toEqual(tag);
+		}));
+});
+
+describe("replace", () => {
+	test("replace", () =>
+		Effect.gen(function* () {
+			const c = yield* TestConvexService;
+
+			const initialText = "Hello, Earth!";
+			const updatedText = "Hello, Mars!";
+
+			const noteId = yield* c.run(({ db }) =>
+				db.insert(tableName("notes"), { text: initialText }),
+			);
+			const note = yield* c.run(({ db }) => db.get(noteId));
+
+			const updatedNoteFields = { ...note, text: updatedText };
+
+			yield* c.mutation(api.basic_schema_operations.replace, {
+				noteId,
+				fields: updatedNoteFields,
+			});
+
+			const replacedNote = yield* c.run(({ db }) => db.get(noteId));
+
+			expect(replacedNote?.text).toEqual(updatedText);
+		}));
+});
+
+describe("delete", () => {
+	test("doc exists", () =>
+		Effect.gen(function* () {
+			const c = yield* TestConvexService;
+
+			const noteId = yield* c.run(({ db }) =>
+				db.insert(tableName("notes"), { text: "Hello, world!" }),
+			);
+
+			yield* c.mutation(api.basic_schema_operations.deleteNote, {
+				noteId,
+			});
+
+			const gottenNote = yield* c.run(({ db }) => db.get(noteId));
+
+			expect(gottenNote).toEqual(null);
+		}));
+
+	test("doc doesn't exist", () =>
+		Effect.gen(function* () {
+			const c = yield* TestConvexService;
+
+			const noteId = yield* c.run(({ db }) =>
+				db.insert(tableName("notes"), { text: "Hello, world!" }),
+			);
+
+			yield* c.run(({ db }) => db.delete(noteId));
+
+			const exit = yield* c
+				.mutation(api.basic_schema_operations.deleteNote, {
+					noteId,
+				})
+				.pipe(Effect.exit);
+
+			expect(Exit.isFailure(exit)).toBe(true);
 		}));
 });

@@ -416,13 +416,6 @@ export class ConfectDatabaseReaderImpl<
 		this.db = db;
 		this.databaseSchemas = databaseSchemas;
 	}
-	tableName(
-		id: GenericId<TableNamesInConfectDataModel<ConfectDataModel>>,
-	): Option.Option<TableNamesInConfectDataModel<ConfectDataModel>> {
-		return Array.findFirst(Record.keys(this.databaseSchemas), (tableName) =>
-			Option.isSome(this.normalizeId(tableName, id)),
-		);
-	}
 	normalizeId<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
 		tableName: TableName,
 		id: string,
@@ -587,7 +580,8 @@ export class EffectDatabaseWriterImpl<
 					) =>
 						doc
 							? Effect.succeed(doc)
-							: Effect.fail(new InvalidIdProvidedForPatch()),
+							: // TODO: Should this be a failure or a defect?
+								Effect.fail(new InvalidIdProvidedForPatch()),
 				),
 			);
 
