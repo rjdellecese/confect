@@ -351,3 +351,35 @@ export const getVectorSearch = query({
 	handler: ({ db }, { noteId }) =>
 		db.get(noteId).pipe(Effect.map(Option.getOrNull)),
 });
+
+// Scheduler
+
+export const insertAfter = action({
+	args: Schema.Struct({
+		text: Schema.String,
+		millis: Schema.Number,
+	}),
+	handler: ({ scheduler }, { text, millis }): Effect.Effect<void> =>
+		scheduler.runAfter(millis, api.basic_schema_operations.scheduledInsert, {
+			text,
+		}),
+});
+
+export const scheduledInsert = mutation({
+	args: Schema.Struct({
+		text: Schema.String,
+	}),
+	handler: ({ db }, { text }): Effect.Effect<void> =>
+		db.insert(tableName("notes"), { text }).pipe(Effect.orDie),
+});
+
+export const insertAt = action({
+	args: Schema.Struct({
+		text: Schema.String,
+		timestamp: Schema.Number,
+	}),
+	handler: ({ scheduler }, { text, timestamp }): Effect.Effect<void> =>
+		scheduler.runAt(timestamp, api.basic_schema_operations.scheduledInsert, {
+			text,
+		}),
+});

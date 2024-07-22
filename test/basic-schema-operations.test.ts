@@ -1,4 +1,4 @@
-import { describe, expect } from "@effect/vitest";
+import { describe, expect, vi } from "@effect/vitest";
 import { Array, Effect, Exit, String } from "effect";
 
 import { test } from "~/test/convex-effect-test";
@@ -668,5 +668,64 @@ describe("actions", () => {
 					{ tag: "Art", text: "base" },
 				]);
 			}
+		}));
+});
+
+describe("scheduled functions", () => {
+	test("run after", () =>
+		Effect.gen(function* () {
+			const c = yield* TestConvexService;
+			yield* Effect.sync(() => vi.useFakeTimers());
+
+			const text = "Hello, world!";
+			const millis = 1_000;
+
+			yield* c.action(api.basic_schema_operations.insertAfter, {
+				text,
+				millis,
+			});
+
+			{
+				const note = yield* c.run(({ db }) =>
+					db.query(tableName("notes")).first(),
+				);
+
+				expect(note).toEqual(null);
+			}
+
+			yield* Effect.sync(() => vi.advanceTimersByTime(millis));
+			yield* c.finishInProgressScheduledFunctions();
+
+			{
+				const note = yield* c.run(({ db }) =>
+					db.query(tableName("notes")).first(),
+				);
+
+				expect(note?.text).toEqual(text);
+			}
+		}));
+
+	test("run at", () =>
+		Effect.gen(function* () {
+			const c = yield* TestConvexService;
+			yield* Effect.sync(() => vi.useFakeTimers());
+
+			const text = "Hello, world!";
+
+			const now = yield* Effect.sync(() => Date.now());
+			const timestamp = now + 1_000;
+
+			yield* c.action(api.basic_schema_operations.insertAt, {
+				text,
+				timestamp,
+			});
+
+			yield* c.finishAllScheduledFunctions(vi.runAllTimers);
+
+			const note = yield* c.run(({ db }) =>
+				db.query(tableName("notes")).first(),
+			);
+
+			expect(note?.text).toEqual(text);
 		}));
 });

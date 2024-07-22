@@ -20,6 +20,7 @@ export interface ConfectScheduler {
 
 export class ConfectSchedulerImpl implements ConfectScheduler {
 	constructor(private scheduler: Scheduler) {}
+
 	runAfter<FuncRef extends SchedulableFunctionReference>(
 		delayMs: number,
 		functionReference: FuncRef,
