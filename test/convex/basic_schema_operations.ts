@@ -4,12 +4,14 @@ import { Array, Chunk, Effect, Option, Stream, pipe } from "effect";
 import type { PaginationResult } from "convex/server";
 import { SchemaId } from "~/src/SchemaId";
 import type { Doc, Id } from "~/test/convex/_generated/dataModel";
-import { mutation, query } from "~/test/convex/confect_functions";
+import { mutation, query, action } from "~/test/convex/confect_functions";
 import {
 	type TableName,
 	schema,
 	tableName,
 } from "~/test/convex/schemas/basic_schema_operations";
+import { api } from "~/test/convex/_generated/api";
+import type { ReadonlyDeep } from "type-fest";
 
 export const tables = schema.tables;
 
@@ -20,7 +22,7 @@ export const queryGet = query({
 	handler: (
 		{ db },
 		{ noteId },
-	): Effect.Effect<Doc<TableName<"notes">> | null> =>
+	): Effect.Effect<ReadonlyDeep<Doc<TableName<"notes">>> | null> =>
 		db.get(noteId).pipe(Effect.map(Option.getOrNull)),
 });
 
@@ -31,7 +33,7 @@ export const mutationGet = mutation({
 	handler: (
 		{ db },
 		{ noteId },
-	): Effect.Effect<Doc<TableName<"notes">> | null> =>
+	): Effect.Effect<ReadonlyDeep<Doc<TableName<"notes">>> | null> =>
 		db.get(noteId).pipe(Effect.map(Option.getOrNull)),
 });
 
@@ -45,13 +47,13 @@ export const insert = mutation({
 
 export const queryCollect = query({
 	args: Schema.Struct({}),
-	handler: ({ db }): Effect.Effect<Doc<TableName<"notes">>[]> =>
+	handler: ({ db }): Effect.Effect<ReadonlyDeep<Doc<TableName<"notes">>>[]> =>
 		db.query(tableName("notes")).collect(),
 });
 
 export const mutationCollect = mutation({
 	args: Schema.Struct({}),
-	handler: ({ db }): Effect.Effect<Doc<TableName<"notes">>[]> =>
+	handler: ({ db }): Effect.Effect<ReadonlyDeep<Doc<TableName<"notes">>>[]> =>
 		db.query(tableName("notes")).collect(),
 });
 
@@ -59,7 +61,10 @@ export const filterFirst = query({
 	args: Schema.Struct({
 		text: Schema.String,
 	}),
-	handler: ({ db }, { text }): Effect.Effect<Doc<TableName<"notes">> | null> =>
+	handler: (
+		{ db },
+		{ text },
+	): Effect.Effect<ReadonlyDeep<Doc<TableName<"notes">>> | null> =>
 		db
 			.query(tableName("notes"))
 			.filter((q) => q.eq(q.field("text"), text))
@@ -71,7 +76,10 @@ export const withIndexFirst = query({
 	args: Schema.Struct({
 		text: Schema.String,
 	}),
-	handler: ({ db }, { text }): Effect.Effect<Doc<TableName<"notes">> | null> =>
+	handler: (
+		{ db },
+		{ text },
+	): Effect.Effect<ReadonlyDeep<Doc<TableName<"notes">>> | null> =>
 		db
 			.query(tableName("notes"))
 			.withIndex("by_text", (q) => q.eq("text", text))
@@ -81,7 +89,7 @@ export const withIndexFirst = query({
 
 export const orderDescCollect = query({
 	args: Schema.Struct({}),
-	handler: ({ db }): Effect.Effect<Doc<TableName<"notes">>[]> =>
+	handler: ({ db }): Effect.Effect<ReadonlyDeep<Doc<TableName<"notes">>>[]> =>
 		db.query(tableName("notes")).order("desc").collect(),
 });
 
@@ -89,7 +97,10 @@ export const take = query({
 	args: Schema.Struct({
 		n: Schema.Number,
 	}),
-	handler: ({ db }, { n }): Effect.Effect<Doc<TableName<"notes">>[]> =>
+	handler: (
+		{ db },
+		{ n },
+	): Effect.Effect<ReadonlyDeep<Doc<TableName<"notes">>>[]> =>
 		db.query(tableName("notes")).take(n),
 });
 
@@ -101,7 +112,7 @@ export const paginate = query({
 	handler: (
 		{ db },
 		{ cursor, numItems },
-	): Effect.Effect<PaginationResult<Doc<TableName<"notes">>>> => {
+	): Effect.Effect<PaginationResult<ReadonlyDeep<Doc<TableName<"notes">>>>> => {
 		return db.query(tableName("notes")).paginate({ cursor, numItems });
 	},
 });
@@ -110,7 +121,9 @@ export const unique = query({
 	args: Schema.Struct({}),
 	handler: ({
 		db,
-	}): Effect.Effect<Doc<TableName<"notes">> | null | "NotUniqueError"> =>
+	}): Effect.Effect<
+		ReadonlyDeep<Doc<TableName<"notes">>> | null | "NotUniqueError"
+	> =>
 		db
 			.query(tableName("notes"))
 			.unique()
@@ -122,7 +135,9 @@ export const unique = query({
 
 export const onlyFirst = query({
 	args: Schema.Struct({}),
-	handler: ({ db }): Effect.Effect<Doc<TableName<"notes">> | null> =>
+	handler: ({
+		db,
+	}): Effect.Effect<ReadonlyDeep<Doc<TableName<"notes">>> | null> =>
 		db.query(tableName("notes")).first().pipe(Effect.map(Option.getOrNull)),
 });
 
@@ -257,4 +272,82 @@ export const isAuthenticated = query({
 	args: Schema.Struct({}),
 	handler: ({ auth }): Effect.Effect<boolean> =>
 		pipe(auth.getUserIdentity(), Effect.map(Option.isSome)),
+});
+
+// Action
+
+export const actionQuery = query({
+	args: Schema.Struct({}),
+	handler: ({ db }): Effect.Effect<void> =>
+		db.query(tableName("notes")).collect(),
+});
+
+export const actionMutation = mutation({
+	args: Schema.Struct({}),
+	handler: ({ db }): Effect.Effect<void> =>
+		db.insert(tableName("notes"), { text: "Hello, world!" }).pipe(Effect.orDie),
+});
+
+export const runQueryAndMutation = action({
+	args: Schema.Struct({}),
+	handler: (ctx): Effect.Effect<void> =>
+		Effect.gen(function* () {
+			yield* ctx.runQuery(api.basic_schema_operations.actionQuery);
+			yield* ctx.runMutation(api.basic_schema_operations.actionMutation);
+		}),
+});
+
+export const actionWithAuthAndRunMethods = action({
+	args: Schema.Struct({}),
+	handler: (ctx): Effect.Effect<void> =>
+		Effect.gen(function* () {
+			yield* ctx.auth.getUserIdentity().pipe(
+				Effect.andThen(
+					Option.match({
+						onNone: () => Effect.die,
+						onSome: () => Effect.void,
+					}),
+				),
+			);
+
+			yield* ctx.runAction(api.basic_schema_operations.runQueryAndMutation);
+		}),
+});
+
+export const executeVectorSearch = action({
+	args: Schema.Struct({
+		vector: Schema.Array(Schema.Number),
+		tag: Schema.Union(Schema.String, Schema.Null),
+		limit: Schema.Number,
+	}),
+	handler: (
+		{ runQuery, vectorSearch },
+		{ vector, tag, limit },
+	): Effect.Effect<{ text: string; tag?: string }[]> =>
+		vectorSearch(tableName("notes"), "embedding", {
+			vector: vector as number[],
+			filter: tag === null ? undefined : (q) => q.eq("tag", tag),
+			limit,
+		}).pipe(
+			Effect.andThen(
+				Effect.forEach((vectorResult) =>
+					runQuery(api.basic_schema_operations.getVectorSearch, {
+						noteId: vectorResult._id,
+					}).pipe(
+						Effect.map(Option.fromNullable),
+						Effect.map(Option.getOrThrow),
+						Effect.map(({ text, tag }) => ({ text, tag })),
+					),
+				),
+			),
+			Effect.orDie,
+		),
+});
+
+export const getVectorSearch = query({
+	args: Schema.Struct({
+		noteId: SchemaId<TableName<"notes">>(),
+	}),
+	handler: ({ db }, { noteId }) =>
+		db.get(noteId).pipe(Effect.map(Option.getOrNull)),
 });

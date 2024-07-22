@@ -283,3 +283,5 @@ const effectHttpActionFunction = <
 	): Promise<Response> =>
 		Effect.runPromise(handler(makeConfectActionCtx(ctx), request)),
 });
+
+// TODO: Need `ConfectDoc<TableName>` type

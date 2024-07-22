@@ -1,5 +1,5 @@
 import { describe, expect } from "@effect/vitest";
-import { Array, Console, Effect, Exit, String } from "effect";
+import { Array, Effect, Exit, String } from "effect";
 
 import { test } from "~/test/convex-effect-test";
 import { api } from "~/test/convex/_generated/api";
@@ -592,5 +592,81 @@ describe("authentication", () => {
 			);
 
 			expect(isAuthenticated).toEqual(true);
+		}));
+});
+
+describe("actions", () => {
+	test("action with auth and run methods", () =>
+		Effect.gen(function* () {
+			const c = yield* TestConvexService;
+
+			const exit = yield* c
+				.action(api.basic_schema_operations.actionWithAuthAndRunMethods)
+				.pipe(Effect.exit);
+
+			expect(Exit.isSuccess(exit)).toBe(true);
+		}));
+
+	test("vector search", () =>
+		Effect.gen(function* () {
+			const c = yield* TestConvexService;
+
+			yield* c.run(({ db }) =>
+				Promise.all([
+					db.insert(tableName("notes"), {
+						tag: "Art",
+						text: "convex",
+						embedding: [1, 1, 1],
+					}),
+					db.insert(tableName("notes"), {
+						tag: "Sports",
+						text: "next",
+						embedding: [0, 0, 0],
+					}),
+					db.insert(tableName("notes"), {
+						tag: "Art",
+						text: "base",
+						embedding: [1, 1, 0],
+					}),
+					db.insert(tableName("notes"), {
+						tag: "Sports",
+						text: "rad",
+						embedding: [1, 1, 0],
+					}),
+				]),
+			);
+
+			{
+				const notes = yield* c.action(
+					api.basic_schema_operations.executeVectorSearch,
+					{
+						vector: [1, 1, 1],
+						tag: null,
+						limit: 3,
+					},
+				);
+
+				expect(notes).toMatchObject([
+					{ tag: "Art", text: "convex" },
+					{ tag: "Art", text: "base" },
+					{ tag: "Sports", text: "rad" },
+				]);
+			}
+
+			{
+				const notes = yield* c.action(
+					api.basic_schema_operations.executeVectorSearch,
+					{
+						vector: [1, 1, 1],
+						tag: "Art",
+						limit: 10,
+					},
+				);
+
+				expect(notes).toMatchObject([
+					{ tag: "Art", text: "convex" },
+					{ tag: "Art", text: "base" },
+				]);
+			}
 		}));
 });

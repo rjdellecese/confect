@@ -19,6 +19,9 @@ export const schema = make("basic_schema_operations", {
 				}),
 				{ exact: true },
 			),
+			embedding: Schema.optional(Schema.Array(Schema.Number), {
+				exact: true,
+			}),
 		}),
 	)
 		.index("by_text", ["text"])
@@ -26,6 +29,11 @@ export const schema = make("basic_schema_operations", {
 		.searchIndex("search_text", {
 			searchField: "text",
 			filterFields: ["tag"],
+		})
+		.vectorIndex("embedding", {
+			vectorField: "embedding",
+			filterFields: ["author.name", "tag"],
+			dimensions: 1536,
 		}),
 });
 
