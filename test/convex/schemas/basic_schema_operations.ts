@@ -26,7 +26,7 @@ export const schema = make("basic_schema_operations", {
 	)
 		.index("by_text", ["text"])
 		.index("by_role", ["author.role"])
-		.searchIndex("search_text", {
+		.searchIndex("text", {
 			searchField: "text",
 			filterFields: ["tag"],
 		})

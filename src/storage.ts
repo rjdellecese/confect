@@ -4,6 +4,7 @@ import type {
 	StorageReader,
 	StorageWriter,
 } from "convex/server";
+import type { GenericId } from "convex/values";
 import { Effect } from "effect";
 
 export interface ConfectStorageReader {
@@ -13,17 +14,19 @@ export interface ConfectStorageReader {
 
 export class ConfectStorageReaderImpl implements ConfectStorageReader {
 	constructor(private storageReader: StorageReader) {}
-	getUrl(storageId: string): Effect.Effect<string | null> {
+	getUrl(storageId: GenericId<"_storage">): Effect.Effect<string | null> {
 		return Effect.promise(() => this.storageReader.getUrl(storageId));
 	}
-	getMetadata(storageId: string): Effect.Effect<FileMetadata | null> {
+	getMetadata(
+		storageId: GenericId<"_storage">,
+	): Effect.Effect<FileMetadata | null> {
 		return Effect.promise(() => this.storageReader.getMetadata(storageId));
 	}
 }
 
 export interface ConfectStorageWriter extends ConfectStorageReader {
 	generateUploadUrl(): Effect.Effect<string>;
-	delete(storageId: StorageId): Effect.Effect<void>;
+	delete(storageId: GenericId<"_storage">): Effect.Effect<void>;
 }
 
 export class ConfectStorageWriterImpl implements ConfectStorageWriter {
@@ -31,16 +34,16 @@ export class ConfectStorageWriterImpl implements ConfectStorageWriter {
 	constructor(private storageWriter: StorageWriter) {
 		this.effectStorageReader = new ConfectStorageReaderImpl(storageWriter);
 	}
-	getUrl(storageId: string): Effect.Effect<string | null> {
+	getUrl(storageId: StorageId): Effect.Effect<string | null> {
 		return this.effectStorageReader.getUrl(storageId);
 	}
-	getMetadata(storageId: string): Effect.Effect<FileMetadata | null> {
+	getMetadata(storageId: StorageId): Effect.Effect<FileMetadata | null> {
 		return this.effectStorageReader.getMetadata(storageId);
 	}
 	generateUploadUrl(): Effect.Effect<string> {
 		return Effect.promise(() => this.storageWriter.generateUploadUrl());
 	}
-	delete(storageId: string): Effect.Effect<void> {
+	delete(storageId: StorageId): Effect.Effect<void> {
 		return Effect.promise(() => this.storageWriter.delete(storageId));
 	}
 }

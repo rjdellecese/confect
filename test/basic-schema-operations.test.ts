@@ -729,3 +729,16 @@ describe("scheduled functions", () => {
 			expect(note?.text).toEqual(text);
 		}));
 });
+
+test("http action", () =>
+	Effect.gen(function* () {
+		const c = yield* TestConvexService;
+
+		const response = yield* c.fetch("/get", { method: "GET" });
+
+		const text = yield* Effect.promise(() => response.text());
+		const status = response.status;
+
+		expect(text).toEqual("Hello, world!");
+		expect(status).toEqual(200);
+	}));

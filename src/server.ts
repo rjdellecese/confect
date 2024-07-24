@@ -5,6 +5,7 @@ import {
 	type GenericMutationCtx,
 	type GenericQueryCtx,
 	type GenericSchema,
+	type PublicHttpAction,
 	type RegisteredAction,
 	type RegisteredMutation,
 	type RegisteredQuery,
@@ -156,8 +157,9 @@ export const confectServer = <
 			ctx: ConfectActionCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>,
 			request: Request,
 		) => Effect.Effect<Response>,
-		// @ts-expect-error `GenericActionCtx<GenericDataModel>` is not assignable to `GenericActionCtx<DataModelFromEffectDataModel<EffectDataModel>>`
-	) => httpActionGeneric(effectHttpActionFunction({ handler }));
+	): PublicHttpAction =>
+		// @ts-expect-error
+		httpActionGeneric(effectHttpActionFunction({ handler }));
 
 	return {
 		query,
@@ -267,21 +269,19 @@ const effectActionFunction = <
 		),
 });
 
-const effectHttpActionFunction = <
-	ConfectDataModel extends GenericConfectDataModel,
->({
-	handler,
-}: {
-	handler: (
-		ctx: ConfectActionCtx<ConfectDataModel>,
-		request: Request,
-	) => Effect.Effect<Response>;
-}) => ({
-	handler: (
+const effectHttpActionFunction =
+	<ConfectDataModel extends GenericConfectDataModel>({
+		handler,
+	}: {
+		handler: (
+			ctx: ConfectActionCtx<ConfectDataModel>,
+			request: Request,
+		) => Effect.Effect<Response>;
+	}) =>
+	(
 		ctx: GenericActionCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
 		request: Request,
 	): Promise<Response> =>
-		Effect.runPromise(handler(makeConfectActionCtx(ctx), request)),
-});
+		Effect.runPromise(handler(makeConfectActionCtx(ctx), request));
 
 // TODO: Need `ConfectDoc<TableName>` type

@@ -2,16 +2,23 @@ import { Schema } from "@effect/schema";
 import { Array, Chunk, Effect, Option, Stream, pipe } from "effect";
 
 import type { PaginationResult } from "convex/server";
+import type { ReadonlyDeep } from "type-fest";
 import { SchemaId } from "~/src/SchemaId";
+import { api, internal } from "~/test/convex/_generated/api";
 import type { Doc, Id } from "~/test/convex/_generated/dataModel";
-import { mutation, query, action } from "~/test/convex/confect_functions";
+import {
+	action,
+	internalAction,
+	internalMutation,
+	internalQuery,
+	mutation,
+	query,
+} from "~/test/convex/confect_functions";
 import {
 	type TableName,
 	schema,
 	tableName,
 } from "~/test/convex/schemas/basic_schema_operations";
-import { api } from "~/test/convex/_generated/api";
-import type { ReadonlyDeep } from "type-fest";
 
 export const tables = schema.tables;
 
@@ -163,9 +170,7 @@ export const search = query({
 	handler: ({ db }, { query, tag }): Effect.Effect<string[]> =>
 		db
 			.query(tableName("notes"))
-			.withSearchIndex("search_text", (q) =>
-				q.search("text", query).eq("tag", tag),
-			)
+			.withSearchIndex("text", (q) => q.search("text", query).eq("tag", tag))
 			.collect()
 			.pipe(Effect.map(Array.map((note) => note.text))),
 });
@@ -276,24 +281,30 @@ export const isAuthenticated = query({
 
 // Action
 
-export const actionQuery = query({
+export const actionQuery = internalQuery({
 	args: Schema.Struct({}),
 	handler: ({ db }): Effect.Effect<void> =>
 		db.query(tableName("notes")).collect(),
 });
 
-export const actionMutation = mutation({
+export const actionMutation = internalMutation({
 	args: Schema.Struct({}),
 	handler: ({ db }): Effect.Effect<void> =>
 		db.insert(tableName("notes"), { text: "Hello, world!" }).pipe(Effect.orDie),
+});
+
+export const actionNoop = internalAction({
+	args: Schema.Struct({}),
+	handler: (_ctx) => Effect.void,
 });
 
 export const runQueryAndMutation = action({
 	args: Schema.Struct({}),
 	handler: (ctx): Effect.Effect<void> =>
 		Effect.gen(function* () {
-			yield* ctx.runQuery(api.basic_schema_operations.actionQuery);
-			yield* ctx.runMutation(api.basic_schema_operations.actionMutation);
+			yield* ctx.runQuery(internal.basic_schema_operations.actionQuery);
+			yield* ctx.runMutation(internal.basic_schema_operations.actionMutation);
+			yield* ctx.runAction(internal.basic_schema_operations.actionNoop);
 		}),
 });
 

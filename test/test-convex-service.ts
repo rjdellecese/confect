@@ -1,9 +1,9 @@
 /// <reference types="vite/client" />
 
 import {
-	convexTest,
 	type TestConvexForDataModel,
 	type TestConvexForDataModelAndIdentity,
+	convexTest,
 } from "convex-test";
 import type {
 	DataModelFromSchemaDefinition,
