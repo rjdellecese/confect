@@ -377,8 +377,10 @@ export const confectSystemSchema = defineConfectSchema({
 	),
 });
 
+type ConfectSystemSchema = typeof confectSystemSchema;
+
 export type ConfectSystemDataModel =
-	ConfectDataModelFromConfectSchemaDefinition<typeof confectSystemSchema>;
+	ConfectDataModelFromConfectSchemaDefinition<ConfectSystemSchema>;
 
 // TODO: Vendored types:
 
