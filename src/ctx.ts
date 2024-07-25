@@ -24,7 +24,7 @@ import {
 	ConfectDatabaseReaderImpl,
 	type ConfectDatabaseWriter,
 	type DatabaseSchemasFromConfectDataModel,
-	EffectDatabaseWriterImpl,
+	ConfectDatabaseWriterImpl,
 } from "~/src/database";
 import { type ConfectScheduler, ConfectSchedulerImpl } from "~/src/scheduler";
 import {
@@ -111,7 +111,7 @@ export const makeConfectMutationCtx = <
 	ctx: GenericMutationCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
 	databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>,
 ): ConfectMutationCtx<ConfectDataModel> => ({
-	db: new EffectDatabaseWriterImpl(ctx.db, databaseSchemas),
+	db: new ConfectDatabaseWriterImpl(ctx.db, databaseSchemas),
 	auth: new ConfectAuthImpl(ctx.auth),
 	storage: new ConfectStorageWriterImpl(ctx.storage),
 	scheduler: new ConfectSchedulerImpl(ctx.scheduler),

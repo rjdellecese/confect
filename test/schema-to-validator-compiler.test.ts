@@ -16,6 +16,14 @@ import {
 } from "~/src/schema-to-validator-compiler";
 
 describe("compileAst", () => {
+	test("any", () => {
+		const schema = Schema.Any;
+		const validator = v.any();
+		const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+
+		expect(compiledValidator).toStrictEqual(validator);
+	});
+
 	test("literal", () => {
 		const schema = Schema.Literal("LiteralString");
 		const validator = v.literal("LiteralString");
@@ -137,6 +145,15 @@ describe("compileAst", () => {
 });
 
 describe("compileSchema", () => {
+	test("any", () => {
+		const expectedValidator = v.any();
+
+		const schema = Schema.Any;
+		const compiledValidator = compileSchema(schema);
+
+		expect(compiledValidator).toStrictEqual(expectedValidator);
+	});
+
 	test("literal", () => {
 		const expectedValidator = v.literal("LiteralString");
 
@@ -245,6 +262,15 @@ describe("compileSchema", () => {
 });
 
 describe("ValueToValidator", () => {
+	test("any", () => {
+		const expectedValidator = v.any();
+		type ExpectedValidator = typeof expectedValidator;
+
+		type CompiledValidator = ValueToValidator<any>;
+
+		expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+	});
+
 	test("never", () => {
 		type CompiledValidator = ValueToValidator<never>;
 
@@ -435,6 +461,24 @@ describe("ValueToValidator", () => {
 
 			expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
 		});
+
+		test("any[]", () => {
+			const expectedValidator = v.array(v.any());
+			type ExpectedValidator = typeof expectedValidator;
+
+			type CompiledValidator = ValueToValidator<any[]>;
+
+			expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+		});
+
+		test("any[][]", () => {
+			const expectedValidator = v.array(v.array(v.any()));
+			type ExpectedValidator = typeof expectedValidator;
+
+			type CompiledValidator = ValueToValidator<any[][]>;
+
+			expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+		});
 	});
 
 	describe("object", () => {
@@ -540,6 +584,35 @@ describe("ValueToValidator", () => {
 			type CompiledValidator = ValueToValidator<{
 				foo?: { bar?: number | undefined } | undefined;
 			}>;
+
+			expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+		});
+
+		test("{ foo?: any }", () => {
+			const expectedValidator = v.object({ foo: v.optional(v.any()) });
+			type ExpectedValidator = typeof expectedValidator;
+
+			type CompiledValidator = ValueToValidator<{ foo?: any }>;
+
+			expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+		});
+
+		test("{ foo: any }", () => {
+			const expectedValidator = v.object({ foo: v.any() });
+			type ExpectedValidator = typeof expectedValidator;
+
+			type CompiledValidator = ValueToValidator<{ foo: any }>;
+
+			expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+		});
+
+		test("{ foo: { bar: any } }", () => {
+			const expectedValidator = v.object({
+				foo: v.object({ bar: v.array(v.any()) }),
+			});
+			type ExpectedValidator = typeof expectedValidator;
+
+			type CompiledValidator = ValueToValidator<{ foo: { bar: any[] } }>;
 
 			expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
 		});

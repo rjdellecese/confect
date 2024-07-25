@@ -21,6 +21,7 @@ import type {
 	SearchFilter,
 	SearchFilterBuilder,
 	SearchIndexes,
+	SystemDataModel,
 	WithOptionalSystemFields,
 	WithoutSystemFields,
 } from "convex/server";
@@ -47,9 +48,11 @@ import type {
 	TableInfoFromConfectTableInfo,
 	TableNamesInConfectDataModel,
 } from "~/src/data-model";
-import type {
-	ConfectDataModelFromConfectSchema,
-	GenericConfectSchema,
+import {
+	confectSystemSchema,
+	type ConfectDataModelFromConfectSchema,
+	type GenericConfectSchema,
+	type ConfectSystemDataModel,
 } from "~/src/schema";
 
 interface ConfectQuery<
@@ -388,6 +391,12 @@ export type DatabaseSchemasFromConfectDataModel<
 
 export interface ConfectDatabaseReader<
 	ConfectDataModel extends GenericConfectDataModel,
+> extends ConfectBaseDatabaseReader<ConfectDataModel> {
+	system(): ConfectBaseDatabaseReader<ConfectSystemDataModel>;
+}
+
+export interface ConfectBaseDatabaseReader<
+	ConfectDataModel extends GenericConfectDataModel,
 > {
 	query<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
 		tableName: TableName,
@@ -401,6 +410,46 @@ export interface ConfectDatabaseReader<
 		tableName: TableName,
 		id: string,
 	): Option.Option<GenericId<TableName>>;
+}
+
+export class ConfectBaseDatabaseReaderImpl<
+	ConfectDataModel extends GenericConfectDataModel,
+> implements ConfectBaseDatabaseReader<ConfectDataModel>
+{
+	db: GenericDatabaseReader<DataModelFromConfectDataModel<ConfectDataModel>>;
+	databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>;
+	constructor(
+		db: GenericDatabaseReader<DataModelFromConfectDataModel<ConfectDataModel>>,
+		databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>,
+	) {
+		this.db = db;
+		this.databaseSchemas = databaseSchemas;
+	}
+	normalizeId<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
+		tableName: TableName,
+		id: string,
+	): Option.Option<GenericId<TableName>> {
+		return Option.fromNullable(this.db.normalizeId(tableName, id));
+	}
+	get<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
+		id: GenericId<TableName>,
+	): Effect.Effect<
+		Option.Option<ConfectDataModel[TableName]["confectDocument"]>
+	> {
+		return pipe(
+			Effect.promise(() => this.db.get(id)),
+			Effect.map(Option.fromNullable),
+		);
+	}
+	query<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
+		tableName: TableName,
+	): ConfectQueryInitializer<ConfectDataModel[TableName], TableName> {
+		return new ConfectQueryInitializerImpl(
+			this.db.query(tableName),
+			this.databaseSchemas[tableName],
+			tableName,
+		);
+	}
 }
 
 export class ConfectDatabaseReaderImpl<
@@ -439,6 +488,12 @@ export class ConfectDatabaseReaderImpl<
 			this.db.query(tableName),
 			this.databaseSchemas[tableName],
 			tableName,
+		);
+	}
+	system(): ConfectBaseDatabaseReader<ConfectSystemDataModel> {
+		return new ConfectBaseDatabaseReaderImpl<ConfectSystemDataModel>(
+			this.db.system as GenericDatabaseReader<SystemDataModel>,
+			databaseSchemasFromConfectSchema(confectSystemSchema.confectSchema),
 		);
 	}
 }
@@ -484,7 +539,7 @@ export interface ConfectDatabaseWriter<
 	delete(id: GenericId<string>): Effect.Effect<void>;
 }
 
-export class EffectDatabaseWriterImpl<
+export class ConfectDatabaseWriterImpl<
 	ConfectDataModel extends GenericConfectDataModel,
 > implements ConfectDatabaseWriter<ConfectDataModel>
 {
@@ -627,14 +682,14 @@ export class EffectDatabaseWriterImpl<
 	}
 }
 
-export const schemasFromConfectSchema = <
+export const databaseSchemasFromConfectSchema = <
 	ConfectSchema extends GenericConfectSchema,
 >(
-	effectSchema: ConfectSchema,
+	confectSchema: ConfectSchema,
 ) =>
 	Record.map(
-		effectSchema,
-		({ tableSchema: schema }) => schema,
+		confectSchema,
+		({ tableSchema }) => tableSchema,
 	) as DatabaseSchemasFromConfectDataModel<
 		ConfectDataModelFromConfectSchema<ConfectSchema>
 	>;

@@ -33,7 +33,7 @@ import type {
 } from "~/src/data-model";
 import {
 	type DatabaseSchemasFromConfectDataModel,
-	schemasFromConfectSchema,
+	databaseSchemasFromConfectSchema,
 } from "~/src/database";
 import type {
 	ConfectDataModelFromConfectSchema,
@@ -48,7 +48,7 @@ export const confectServer = <
 >(
 	confectSchemaDefinition: ConfectSchemaDefinition<ConvexSchema, ConfectSchema>,
 ) => {
-	const databaseSchemas = schemasFromConfectSchema(
+	const databaseSchemas = databaseSchemasFromConfectSchema(
 		confectSchemaDefinition.confectSchema,
 	);
 

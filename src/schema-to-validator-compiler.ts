@@ -4,6 +4,7 @@ import type {
 	GenericId,
 	OptionalProperty,
 	PropertyValidators,
+	VAny,
 	VArray,
 	VBoolean,
 	VBytes,
@@ -21,9 +22,15 @@ import type {
 import { type Value, v } from "convex/values";
 import { Array, Data, Effect, Match, Option, pipe } from "effect";
 import type { ReadonlyRecord } from "effect/Record";
-import type { DeepMutable } from "effect/Types";
+import type { WritableDeep } from "type-fest";
 
-import type { IsUnion, IsValueLiteral, UnionToTuple } from "~/src/type-utils";
+import type {
+	IsAny,
+	IsOptional,
+	IsUnion,
+	IsValueLiteral,
+	UnionToTuple,
+} from "~/src/type-utils";
 
 // Args
 
@@ -92,49 +99,55 @@ export type ReadonlyRecordValue = {
 
 export type ValueToValidator<Vl> = [Vl] extends [never]
 	? never
-	: [Vl] extends [ReadonlyOrMutableValue]
-		? Vl extends {
-				__tableName: infer TableName extends string;
-			}
-			? VId<GenericId<TableName>>
-			: IsValueLiteral<Vl> extends true
-				? VLiteral<Vl>
-				: Vl extends null
-					? VNull<null>
-					: Vl extends number
-						? VFloat64<number>
-						: Vl extends bigint
-							? VInt64<bigint>
-							: Vl extends boolean
-								? VBoolean<boolean>
-								: Vl extends string
-									? VString<string>
-									: Vl extends ArrayBuffer
-										? VBytes<ArrayBuffer>
-										: Vl extends ReadonlyOrMutableArray<ReadonlyOrMutableValue>
-											? ArrayValueToValidator<Vl>
-											: Vl extends ReadonlyOrMutableRecord<ReadonlyOrMutableValue>
-												? RecordValueToValidator<Vl>
-												: IsUnion<Vl> extends true
-													? UnionValueToValidator<Vl>
-													: never
-		: never;
+	: IsAny<Vl> extends true
+		? VAny
+		: [Vl] extends [ReadonlyOrMutableValue]
+			? Vl extends {
+					__tableName: infer TableName extends string;
+				}
+				? VId<GenericId<TableName>>
+				: IsValueLiteral<Vl> extends true
+					? VLiteral<Vl>
+					: Vl extends null
+						? VNull
+						: Vl extends number
+							? VFloat64
+							: Vl extends bigint
+								? VInt64
+								: Vl extends boolean
+									? VBoolean
+									: Vl extends string
+										? VString
+										: Vl extends ArrayBuffer
+											? VBytes
+											: Vl extends ReadonlyOrMutableArray<ReadonlyOrMutableValue>
+												? ArrayValueToValidator<Vl>
+												: Vl extends ReadonlyOrMutableRecord<ReadonlyOrMutableValue>
+													? RecordValueToValidator<Vl>
+													: IsUnion<Vl> extends true
+														? UnionValueToValidator<Vl>
+														: never
+			: never;
 
 type ArrayValueToValidator<
 	Vl extends ReadonlyOrMutableArray<ReadonlyOrMutableValue>,
 > = Vl extends ReadonlyOrMutableArray<infer El extends ReadonlyOrMutableValue>
 	? ValueToValidator<El> extends infer Vd extends Validator<any, any, any>
-		? VArray<DeepMutable<El[]>, Vd>
+		? VArray<WritableDeep<El[]>, Vd>
 		: never
 	: never;
 
 type RecordValueToValidator<
 	Vl extends ReadonlyOrMutableRecord<ReadonlyOrMutableValue>,
 > = {
-	-readonly [K in keyof Vl]-?: UndefinedOrValueToValidator<Vl[K]>;
+	-readonly [K in keyof Vl]-?: IsAny<Vl[K]> extends true
+		? IsOptional<Vl, K> extends true
+			? VOptional<VAny>
+			: VAny
+		: UndefinedOrValueToValidator<Vl[K]>;
 } extends infer VdRecord extends Record<string, any>
 	? {
-			-readonly [K in keyof Vl]: DeepMutable<Vl[K]>;
+			-readonly [K in keyof Vl]: WritableDeep<Vl[K]>;
 		} extends infer VlRecord extends Record<string, any>
 		? VObject<VlRecord, VdRecord>
 		: never
@@ -165,7 +178,7 @@ type UnionValueToValidator<Vl extends ReadonlyOrMutableValue> = [Vl] extends [
 				ReadonlyOrMutableArray<ReadonlyOrMutableValue>
 			? ValueTupleToValidatorTuple<VlTuple> extends infer VdTuple extends
 					Validator<any, "required", any>[]
-				? VUnion<DeepMutable<Vl>, VdTuple>
+				? VUnion<WritableDeep<Vl>, VdTuple>
 				: never
 			: never
 		: never

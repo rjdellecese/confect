@@ -1,4 +1,4 @@
-import type * as Schema from "@effect/schema/Schema";
+import { Schema } from "@effect/schema";
 import {
 	type Expand,
 	type GenericSchema,
@@ -24,7 +24,7 @@ import { compileTableSchema } from "~/src/schema-to-validator-compiler";
 
 export type GenericConfectSchema = Record<
 	string,
-	ConfectTableDefinition<any, any, any, any, any>
+	GenericConfectTableDefinition
 >;
 
 export type GenericConfectSchemaDefinition = ConfectSchemaDefinition<
@@ -178,6 +178,15 @@ export type ConfectSchemaFromConfectSchemaDefinition<
 	infer ConfectSchema
 >
 	? ConfectSchema
+	: never;
+
+export type ConfectDataModelFromConfectSchemaDefinition<
+	ConfectSchemaDef extends GenericConfectSchemaDefinition,
+> = ConfectSchemaDef extends ConfectSchemaDefinition<
+	infer _ConvexSchema,
+	infer ConfectSchema
+>
+	? ConfectDataModelFromConfectSchema<ConfectSchema>
 	: never;
 
 class ConfectTableDefinitionImpl<
@@ -340,9 +349,36 @@ type ExtractConfectDocument<
 	ReadonlyDeep<IdField<TableName>> & ReadonlyDeep<SystemFields> & S["Type"]
 >;
 
-// TODO: Type-level test that `ConfectDataModelFromEffectSchema` produces `ConfectDataModel`?
+export const confectSystemSchema = defineConfectSchema({
+	_scheduled_functions: defineConfectTable(
+		Schema.Struct({
+			name: Schema.String,
+			args: Schema.Array(Schema.Any),
+			scheduledTime: Schema.Number,
+			completedTime: Schema.optional(Schema.Number, { exact: true }),
+			state: Schema.Union(
+				Schema.Struct({ kind: Schema.Literal("pending") }),
+				Schema.Struct({ kind: Schema.Literal("inProgress") }),
+				Schema.Struct({ kind: Schema.Literal("success") }),
+				Schema.Struct({
+					kind: Schema.Literal("failed"),
+					error: Schema.String,
+				}),
+				Schema.Struct({ kind: Schema.Literal("canceled") }),
+			),
+		}),
+	),
+	_storage: defineConfectTable(
+		Schema.Struct({
+			sha256: Schema.String,
+			size: Schema.Number,
+			contentType: Schema.optional(Schema.String, { exact: true }),
+		}),
+	),
+});
 
-// TODO: Add system tables (see https://github.com/get-convex/convex-js/blob/432247e28d67a36b165c0beea2c3b2629d7f87ee/src/server/schema.ts#L574-L598)
+export type ConfectSystemDataModel =
+	ConfectDataModelFromConfectSchemaDefinition<typeof confectSystemSchema>;
 
 // TODO: Vendored types:
 
