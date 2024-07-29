@@ -31,8 +31,8 @@ importers:
         specifier: 0.54.3
         version: 0.54.3(@effect/platform@0.59.2(@effect/schema@0.68.26(effect@3.5.6))(effect@3.5.6))(effect@3.5.6)
       '@effect/vitest':
-        specifier: 0.6.10
-        version: 0.6.10(effect@3.5.6)(vitest@2.0.3(@types/node@20.7.0))
+        specifier: 0.6.12
+        version: 0.6.12(effect@3.5.6)(vitest@2.0.3(@types/node@20.7.0))
       '@swc/jest':
         specifier: 0.2.36
         version: 0.2.36(@swc/core@1.4.1)
@@ -167,10 +167,10 @@ packages:
     peerDependencies:
       effect: ^3.5.6
 
-  '@effect/vitest@0.6.10':
-    resolution: {integrity: sha512-MAX/09F79ANnaEZolyyE/ie5LFdDiSJcvwVQm04lFfGQET0J40AHwa+1pC+sv2nOeyJrAdfsM41W05Rpq6NDMA==}
+  '@effect/vitest@0.6.12':
+    resolution: {integrity: sha512-sSrCOgbhP+94xd/hyxizMKepAF0jz5tkUiEnkl2CCyJndHYgi2TlMwdddtYcmQXZm2NuqsfyLCtFhJmVYsRpTw==}
     peerDependencies:
-      effect: ^3.5.6
+      effect: ^3.5.8
       vitest: ^1.4.0
 
   '@esbuild/aix-ppc64@0.21.5':
@@ -1698,7 +1698,7 @@ snapshots:
       effect: 3.5.6
       fast-check: 3.20.0
 
-  '@effect/vitest@0.6.10(effect@3.5.6)(vitest@2.0.3(@types/node@20.7.0))':
+  '@effect/vitest@0.6.12(effect@3.5.6)(vitest@2.0.3(@types/node@20.7.0))':
     dependencies:
       effect: 3.5.6
       vitest: 2.0.3(@types/node@20.7.0)

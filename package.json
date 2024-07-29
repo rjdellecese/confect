@@ -21,7 +21,7 @@
 		"@biomejs/biome": "1.8.3",
 		"@effect/platform": "0.59.2",
 		"@effect/platform-node": "0.54.3",
-		"@effect/vitest": "0.6.10",
+		"@effect/vitest": "0.6.12",
 		"@swc/jest": "0.2.36",
 		"@tsconfig/strictest": "2.0.5",
 		"@vitest/coverage-v8": "^2.0.3",
