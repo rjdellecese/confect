@@ -54,6 +54,7 @@ import {
 	type GenericConfectSchema,
 	type ConfectSystemDataModel,
 } from "~/src/schema";
+import { SchemaId } from "./SchemaId";
 
 interface ConfectQuery<
 	ConfectTableInfo extends GenericConfectTableInfo,
@@ -108,20 +109,30 @@ class ConfectQueryImpl<
 		>,
 		tableName: TableName,
 	) {
+		// TODO: Why assert here?
 		this.q = q as Query<TableInfoFromConfectTableInfo<ConfectTableInfo>>;
 		this.tableSchema = tableSchema;
 		this.tableName = tableName;
 	}
+	decode(document: ConfectTableInfo["convexDocument"]) {
+		return Schema.decodeUnknown(
+			extendWithSystemFields<TableName, typeof this.tableSchema>(
+				this.tableSchema,
+			),
+			{ onExcessProperty: "error" },
+		)(document);
+	}
+	// TODO: Private method for `Schema.decodeUnknown(extendWithSystemFields(this.tableSchema))`
 	filter(
 		predicate: (
 			q: FilterBuilder<TableInfoFromConfectTableInfo<ConfectTableInfo>>,
 		) => Expression<boolean>,
-	): this {
+	) {
 		return new ConfectQueryImpl(
 			this.q.filter(predicate),
 			this.tableSchema,
 			this.tableName,
-		) as this;
+		);
 	}
 	order(order: "asc" | "desc"): ConfectQueryImpl<ConfectTableInfo, TableName> {
 		return new ConfectQueryImpl(
@@ -138,23 +149,11 @@ class ConfectQueryImpl<
 			Effect.bind("paginationResult", () =>
 				Effect.promise(() => this.q.paginate(paginationOpts)),
 			),
-			Effect.bind(
-				"parsedPage",
-				({ paginationResult }) =>
-					pipe(
-						paginationResult.page,
-						Effect.forEach((document) =>
-							Schema.decode(this.tableSchema)(
-								document as Expand<
-									ReadonlyDeep<ConfectTableInfo["convexDocument"]>
-								>,
-							),
-						),
-					) as unknown as Effect.Effect<
-						ConfectTableInfo["confectDocument"][],
-						ParseResult.ParseIssue,
-						never
-					>,
+			Effect.bind("parsedPage", ({ paginationResult }) =>
+				pipe(
+					paginationResult.page,
+					Effect.forEach((document) => this.decode(document)),
+				),
 			),
 			Effect.map(({ paginationResult, parsedPage }) => ({
 				page: parsedPage,
@@ -166,19 +165,11 @@ class ConfectQueryImpl<
 			Effect.orDie,
 		);
 	}
+	// TODO: Can we implement collect with stream?
 	collect(): Effect.Effect<ConfectTableInfo["confectDocument"][]> {
 		return pipe(
 			Effect.promise(() => this.q.collect()),
-			Effect.flatMap(
-				Effect.forEach((document) =>
-					pipe(
-						document as Expand<
-							ReadonlyDeep<ConfectTableInfo["convexDocument"]>
-						>,
-						Schema.decode(this.tableSchema),
-					),
-				),
-			),
+			Effect.flatMap(Effect.forEach((document) => this.decode(document))),
 			Effect.orDie,
 		);
 	}
@@ -216,9 +207,7 @@ class ConfectQueryImpl<
 	stream(): Stream.Stream<ConfectTableInfo["confectDocument"]> {
 		return pipe(
 			Stream.fromAsyncIterable(this.q, identity),
-			Stream.mapEffect((document) =>
-				Schema.decodeUnknown(this.tableSchema)(document),
-			),
+			Stream.mapEffect((document) => this.decode(document)),
 			Stream.orDie,
 		);
 	}
@@ -347,8 +336,8 @@ class ConfectQueryInitializerImpl<
 		predicate: (
 			q: FilterBuilder<TableInfoFromConfectTableInfo<ConfectTableInfo>>,
 		) => Expression<boolean>,
-	): this {
-		return this.fullTableScan().filter(predicate) as this;
+	): ConfectQuery<ConfectTableInfo, TableName> {
+		return this.fullTableScan().filter(predicate);
 	}
 	order(
 		order: "asc" | "desc",
@@ -392,7 +381,7 @@ export type DatabaseSchemasFromConfectDataModel<
 export interface ConfectDatabaseReader<
 	ConfectDataModel extends GenericConfectDataModel,
 > extends ConfectBaseDatabaseReader<ConfectDataModel> {
-	system(): ConfectBaseDatabaseReader<ConfectSystemDataModel>;
+	system: ConfectBaseDatabaseReader<ConfectSystemDataModel>;
 }
 
 export interface ConfectBaseDatabaseReader<
@@ -458,12 +447,30 @@ export class ConfectDatabaseReaderImpl<
 {
 	db: GenericDatabaseReader<DataModelFromConfectDataModel<ConfectDataModel>>;
 	databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>;
+	system: ConfectBaseDatabaseReader<ConfectSystemDataModel>;
 	constructor(
 		db: GenericDatabaseReader<DataModelFromConfectDataModel<ConfectDataModel>>,
 		databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>,
 	) {
 		this.db = db;
 		this.databaseSchemas = databaseSchemas;
+		this.system = new ConfectBaseDatabaseReaderImpl<ConfectSystemDataModel>(
+			this.db.system as GenericDatabaseReader<SystemDataModel>,
+			databaseSchemasFromConfectSchema(confectSystemSchema.confectSchema),
+		);
+	}
+	tableName(
+		id: GenericId<TableNamesInConfectDataModel<ConfectDataModel>>,
+	): Option.Option<TableNamesInConfectDataModel<ConfectDataModel>> {
+		return Array.findFirst(Record.keys(this.databaseSchemas), (tableName) =>
+			Option.isSome(this.normalizeId(tableName, id)),
+		);
+	}
+	decode<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
+		tableName: TableName,
+		document: ConfectDataModel[TableName]["convexDocument"],
+	): ConfectDataModel[TableName]["confectDocument"] {
+		return Schema.decodeUnknownSync(this.databaseSchemas[tableName])(document);
 	}
 	normalizeId<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
 		tableName: TableName,
@@ -476,10 +483,16 @@ export class ConfectDatabaseReaderImpl<
 	): Effect.Effect<
 		Option.Option<ConfectDataModel[TableName]["confectDocument"]>
 	> {
-		return pipe(
-			Effect.promise(() => this.db.get(id)),
-			Effect.map(Option.fromNullable),
-		);
+		return Effect.gen(this, function* () {
+			const optionConvexDoc = yield* Effect.promise(() => this.db.get(id)).pipe(
+				Effect.map(Option.fromNullable),
+			);
+			const tableName = yield* this.tableName(id).pipe(Effect.orDie);
+			return pipe(
+				optionConvexDoc,
+				Option.map((convexDoc) => this.decode(tableName, convexDoc)),
+			);
+		});
 	}
 	query<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
 		tableName: TableName,
@@ -488,12 +501,6 @@ export class ConfectDatabaseReaderImpl<
 			this.db.query(tableName),
 			this.databaseSchemas[tableName],
 			tableName,
-		);
-	}
-	system(): ConfectBaseDatabaseReader<ConfectSystemDataModel> {
-		return new ConfectBaseDatabaseReaderImpl<ConfectSystemDataModel>(
-			this.db.system as GenericDatabaseReader<SystemDataModel>,
-			databaseSchemasFromConfectSchema(confectSystemSchema.confectSchema),
 		);
 	}
 }
@@ -551,7 +558,6 @@ export class ConfectDatabaseWriterImpl<
 		databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>,
 	) {
 		this.db = db;
-		// TODO: Does this need to be an instance variable?
 		this.databaseSchemas = databaseSchemas;
 		this.reader = new ConfectDatabaseReaderImpl(db, databaseSchemas);
 	}
@@ -697,3 +703,17 @@ export const databaseSchemasFromConfectSchema = <
 class InvalidIdProvidedForPatch extends Data.TaggedError(
 	"InvalidIdProvidedForPatch",
 ) {}
+
+const extendWithSystemFields = <
+	TableName extends string,
+	TableSchema extends Schema.Schema<any, any>,
+>(
+	schema: TableSchema,
+) =>
+	Schema.extend(
+		schema,
+		Schema.Struct({
+			_id: SchemaId<TableName>(),
+			_creationTime: Schema.Number,
+		}),
+	);

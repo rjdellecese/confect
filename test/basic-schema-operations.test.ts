@@ -1,5 +1,5 @@
 import { describe, expect, vi } from "@effect/vitest";
-import { Array, Effect, Exit, String } from "effect";
+import { Array, Effect, Exit, Order, String } from "effect";
 
 import { test } from "~/test/convex-effect-test";
 import { api } from "~/test/convex/_generated/api";
@@ -742,3 +742,49 @@ test("http action", () =>
 		expect(text).toEqual("Hello, world!");
 		expect(status).toEqual(200);
 	}));
+
+describe("system", () => {
+	test("normalizeId", () =>
+		Effect.gen(function* () {
+			const c = yield* TestConvexService;
+
+			const id = yield* c.run(({ storage }) => storage.store(new Blob()));
+			const normalizedId = yield* c.query(
+				api.basic_schema_operations.systemNormalizeId,
+				{ id },
+			);
+
+			expect(normalizedId).toEqual(id);
+		}));
+
+	test("get", () =>
+		Effect.gen(function* () {
+			const c = yield* TestConvexService;
+
+			const id = yield* c.run(({ storage }) => storage.store(new Blob()));
+			const storageDoc = yield* c.query(api.basic_schema_operations.systemGet, {
+				id,
+			});
+
+			expect(storageDoc?._id).toEqual(id);
+		}));
+
+	test("query", () =>
+		Effect.gen(function* () {
+			const c = yield* TestConvexService;
+
+			const ids = yield* c.run(({ storage }) =>
+				Promise.all([storage.store(new Blob()), storage.store(new Blob())]),
+			);
+			const storageDocs = yield* c.query(
+				api.basic_schema_operations.systemQuery,
+			);
+
+			const storageIds = Array.map(storageDocs, ({ _id }) => _id);
+
+			expect(storageDocs.length).toEqual(2);
+			expect(Array.sort(Order.string)(storageIds)).toEqual(
+				Array.sort(Order.string)(ids),
+			);
+		}));
+});

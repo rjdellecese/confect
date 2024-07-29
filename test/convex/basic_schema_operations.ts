@@ -394,3 +394,26 @@ export const insertAt = action({
 			text,
 		}),
 });
+
+export const systemNormalizeId = query({
+	args: Schema.Struct({
+		id: SchemaId<"_storage">(),
+	}),
+	handler: ({ db }, { id }): Effect.Effect<Id<"_storage"> | null> =>
+		db
+			.system
+			.normalizeId("_storage", id)
+			.pipe(Option.getOrNull, Effect.succeed),
+});
+
+export const systemGet = query({
+	args: Schema.Struct({
+		id: SchemaId<"_storage">(),
+	}),
+	handler: ({ db }, { id }) => db.system.get(id).pipe(Effect.map(Option.getOrNull)),
+});
+
+export const systemQuery = query({
+	args: Schema.Struct({}),
+	handler: ({ db }) => db.system.query("_storage").collect(),
+});
