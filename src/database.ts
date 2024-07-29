@@ -169,7 +169,7 @@ class ConfectQueryImpl<
 	collect(): Effect.Effect<ConfectTableInfo["confectDocument"][]> {
 		return pipe(
 			Effect.promise(() => this.q.collect()),
-			Effect.flatMap(Effect.forEach((document) => this.decode(document))),
+			Effect.andThen(Effect.forEach((document) => this.decode(document))),
 			Effect.orDie,
 		);
 	}
@@ -192,7 +192,7 @@ class ConfectQueryImpl<
 			this.stream(),
 			Stream.take(2),
 			Stream.runCollect,
-			Effect.flatMap((chunk) =>
+			Effect.andThen((chunk) =>
 				pipe(
 					chunk,
 					Chunk.get(1),

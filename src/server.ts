@@ -198,7 +198,7 @@ const confectQueryFunction = <
 			actualArgs,
 			Schema.decode(args),
 			Effect.orDie,
-			Effect.flatMap((decodedArgs) =>
+			Effect.andThen((decodedArgs) =>
 				handler(makeConfectQueryCtx(ctx, databaseSchemas), decodedArgs),
 			),
 			Effect.runPromise,
@@ -231,7 +231,7 @@ const effectMutationFunction = <
 			actualArgs,
 			Schema.decode(args),
 			Effect.orDie,
-			Effect.flatMap((decodedArgs) =>
+			Effect.andThen((decodedArgs) =>
 				handler(makeConfectMutationCtx(ctx, databaseSchemas), decodedArgs),
 			),
 			Effect.runPromise,
@@ -262,7 +262,7 @@ const effectActionFunction = <
 			actualArgs,
 			Schema.decode(args),
 			Effect.orDie,
-			Effect.flatMap((decodedArgs) =>
+			Effect.andThen((decodedArgs) =>
 				handler(makeConfectActionCtx(ctx), decodedArgs),
 			),
 			Effect.runPromise,

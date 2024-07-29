@@ -374,7 +374,7 @@ const handlePropertySignatures = (
 				});
 			}
 		}),
-		Effect.flatMap((propertyNamesWithValidators) =>
+		Effect.andThen((propertyNamesWithValidators) =>
 			pipe(
 				propertyNamesWithValidators,
 				Array.reduce(
