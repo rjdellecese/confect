@@ -8,6 +8,7 @@ import type {
 	FilterBuilder,
 	GenericDatabaseReader,
 	GenericDatabaseWriter,
+	GenericDocument,
 	IndexRange,
 	IndexRangeBuilder,
 	Indexes,
@@ -44,15 +45,16 @@ import type {
 	ConfectDocumentByName,
 	DataModelFromConfectDataModel,
 	GenericConfectDataModel,
+	GenericConfectDocument,
 	GenericConfectTableInfo,
 	TableInfoFromConfectTableInfo,
 	TableNamesInConfectDataModel,
 } from "~/src/data-model";
 import {
-	confectSystemSchema,
 	type ConfectDataModelFromConfectSchema,
-	type GenericConfectSchema,
 	type ConfectSystemDataModel,
+	type GenericConfectSchema,
+	confectSystemSchema,
 } from "~/src/schema";
 import { SchemaId } from "./SchemaId";
 
@@ -114,13 +116,10 @@ class ConfectQueryImpl<
 		this.tableSchema = tableSchema;
 		this.tableName = tableName;
 	}
-	decode(document: ConfectTableInfo["convexDocument"]) {
-		return Schema.decodeUnknown(
-			extendWithSystemFields<TableName, typeof this.tableSchema>(
-				this.tableSchema,
-			),
-			{ onExcessProperty: "error" },
-		)(document);
+	decode(
+		convexDocument: ConfectTableInfo["convexDocument"],
+	): ConfectTableInfo["confectDocument"] {
+		return decodeDocument(this.tableName, this.tableSchema, convexDocument);
 	}
 	// TODO: Private method for `Schema.decodeUnknown(extendWithSystemFields(this.tableSchema))`
 	filter(
@@ -149,10 +148,10 @@ class ConfectQueryImpl<
 			Effect.bind("paginationResult", () =>
 				Effect.promise(() => this.q.paginate(paginationOpts)),
 			),
-			Effect.bind("parsedPage", ({ paginationResult }) =>
+			Effect.let("parsedPage", ({ paginationResult }) =>
 				pipe(
 					paginationResult.page,
-					Effect.forEach((document) => this.decode(document)),
+					Array.map((document) => this.decode(document)),
 				),
 			),
 			Effect.map(({ paginationResult, parsedPage }) => ({
@@ -162,15 +161,13 @@ class ConfectQueryImpl<
 				splitCursor: paginationResult.splitCursor,
 				pageStatus: paginationResult.pageStatus,
 			})),
-			Effect.orDie,
 		);
 	}
 	// TODO: Can we implement collect with stream?
 	collect(): Effect.Effect<ConfectTableInfo["confectDocument"][]> {
 		return pipe(
 			Effect.promise(() => this.q.collect()),
-			Effect.andThen(Effect.forEach((document) => this.decode(document))),
-			Effect.orDie,
+			Effect.map(Array.map((document) => this.decode(document))),
 		);
 	}
 	take(n: number): Effect.Effect<ConfectTableInfo["confectDocument"][]> {
@@ -207,7 +204,7 @@ class ConfectQueryImpl<
 	stream(): Stream.Stream<ConfectTableInfo["confectDocument"]> {
 		return pipe(
 			Stream.fromAsyncIterable(this.q, identity),
-			Stream.mapEffect((document) => this.decode(document)),
+			Stream.map((document) => this.decode(document)),
 			Stream.orDie,
 		);
 	}
@@ -414,6 +411,23 @@ export class ConfectBaseDatabaseReaderImpl<
 		this.db = db;
 		this.databaseSchemas = databaseSchemas;
 	}
+	decode<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
+		tableName: TableName,
+		convexDocument: ConfectDataModel[TableName]["convexDocument"],
+	): ConfectDataModel[TableName]["confectDocument"] {
+		return decodeDocument(
+			tableName,
+			this.databaseSchemas[tableName],
+			convexDocument,
+		);
+	}
+	tableName(
+		id: GenericId<TableNamesInConfectDataModel<ConfectDataModel>>,
+	): Option.Option<TableNamesInConfectDataModel<ConfectDataModel>> {
+		return Array.findFirst(Record.keys(this.databaseSchemas), (tableName) =>
+			Option.isSome(this.normalizeId(tableName, id)),
+		);
+	}
 	normalizeId<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
 		tableName: TableName,
 		id: string,
@@ -425,10 +439,16 @@ export class ConfectBaseDatabaseReaderImpl<
 	): Effect.Effect<
 		Option.Option<ConfectDataModel[TableName]["confectDocument"]>
 	> {
-		return pipe(
-			Effect.promise(() => this.db.get(id)),
-			Effect.map(Option.fromNullable),
-		);
+		return Effect.gen(this, function* () {
+			const optionConvexDoc = yield* Effect.promise(() => this.db.get(id)).pipe(
+				Effect.map(Option.fromNullable),
+			);
+			const tableName = yield* this.tableName(id).pipe(Effect.orDie);
+			return pipe(
+				optionConvexDoc,
+				Option.map((convexDoc) => this.decode(tableName, convexDoc)),
+			);
+		});
 	}
 	query<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
 		tableName: TableName,
@@ -459,18 +479,22 @@ export class ConfectDatabaseReaderImpl<
 			databaseSchemasFromConfectSchema(confectSystemSchema.confectSchema),
 		);
 	}
+	decode<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
+		tableName: TableName,
+		convexDocument: ConfectDataModel[TableName]["convexDocument"],
+	): ConfectDataModel[TableName]["confectDocument"] {
+		return decodeDocument(
+			tableName,
+			this.databaseSchemas[tableName],
+			convexDocument,
+		);
+	}
 	tableName(
 		id: GenericId<TableNamesInConfectDataModel<ConfectDataModel>>,
 	): Option.Option<TableNamesInConfectDataModel<ConfectDataModel>> {
 		return Array.findFirst(Record.keys(this.databaseSchemas), (tableName) =>
 			Option.isSome(this.normalizeId(tableName, id)),
 		);
-	}
-	decode<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-		tableName: TableName,
-		document: ConfectDataModel[TableName]["convexDocument"],
-	): ConfectDataModel[TableName]["confectDocument"] {
-		return Schema.decodeUnknownSync(this.databaseSchemas[tableName])(document);
 	}
 	normalizeId<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
 		tableName: TableName,
@@ -708,12 +732,26 @@ const extendWithSystemFields = <
 	TableName extends string,
 	TableSchema extends Schema.Schema<any, any>,
 >(
+	_tableName: TableName,
 	schema: TableSchema,
 ) =>
 	Schema.extend(
 		schema,
-		Schema.Struct({
-			_id: SchemaId<TableName>(),
-			_creationTime: Schema.Number,
-		}),
+		Schema.Struct({ _id: SchemaId<TableName>(), _creationTime: Schema.Number }),
 	);
+
+const decodeDocument = <
+	TableName extends string,
+	ConvexDocument extends GenericDocument,
+	ConfectDocument extends GenericConfectDocument,
+>(
+	tableName: TableName,
+	tableSchema: Schema.Schema<
+		ConfectDocument,
+		Expand<ReadonlyDeep<ConvexDocument>>
+	>,
+	convexDocument: ConvexDocument,
+): ConfectDocument =>
+	Schema.decodeUnknownSync(extendWithSystemFields(tableName, tableSchema), {
+		onExcessProperty: "error",
+	})(convexDocument);

@@ -23,8 +23,8 @@ import {
 	type ConfectDatabaseReader,
 	ConfectDatabaseReaderImpl,
 	type ConfectDatabaseWriter,
-	type DatabaseSchemasFromConfectDataModel,
 	ConfectDatabaseWriterImpl,
+	type DatabaseSchemasFromConfectDataModel,
 } from "~/src/database";
 import { type ConfectScheduler, ConfectSchedulerImpl } from "~/src/scheduler";
 import {

@@ -400,8 +400,7 @@ export const systemNormalizeId = query({
 		id: SchemaId<"_storage">(),
 	}),
 	handler: ({ db }, { id }): Effect.Effect<Id<"_storage"> | null> =>
-		db
-			.system
+		db.system
 			.normalizeId("_storage", id)
 			.pipe(Option.getOrNull, Effect.succeed),
 });
@@ -410,7 +409,8 @@ export const systemGet = query({
 	args: Schema.Struct({
 		id: SchemaId<"_storage">(),
 	}),
-	handler: ({ db }, { id }) => db.system.get(id).pipe(Effect.map(Option.getOrNull)),
+	handler: ({ db }, { id }) =>
+		db.system.get(id).pipe(Effect.map(Option.getOrNull)),
 });
 
 export const systemQuery = query({
