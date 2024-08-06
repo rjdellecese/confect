@@ -6,6 +6,7 @@ import type {
 	Expand,
 	Expression,
 	FilterBuilder,
+	GenericDataModel,
 	GenericDatabaseReader,
 	GenericDatabaseWriter,
 	GenericDocument,
@@ -22,7 +23,6 @@ import type {
 	SearchFilter,
 	SearchFilterBuilder,
 	SearchIndexes,
-	SystemDataModel,
 	WithOptionalSystemFields,
 	WithoutSystemFields,
 } from "convex/server";
@@ -51,10 +51,10 @@ import type {
 	TableNamesInConfectDataModel,
 } from "~/src/data-model";
 import {
-	type ConfectDataModelFromConfectSchema,
-	type ConfectSystemDataModel,
-	type GenericConfectSchema,
 	confectSystemSchema,
+	type ConfectDataModelFromConfectSchema,
+	type GenericConfectSchema,
+	type ConfectSystemDataModel,
 } from "~/src/schema";
 import { SchemaId } from "./SchemaId";
 
@@ -402,10 +402,10 @@ export class ConfectBaseDatabaseReaderImpl<
 	ConfectDataModel extends GenericConfectDataModel,
 > implements ConfectBaseDatabaseReader<ConfectDataModel>
 {
-	db: GenericDatabaseReader<DataModelFromConfectDataModel<ConfectDataModel>>;
+	db: BaseDatabaseReader<DataModelFromConfectDataModel<ConfectDataModel>>;
 	databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>;
 	constructor(
-		db: GenericDatabaseReader<DataModelFromConfectDataModel<ConfectDataModel>>,
+		db: BaseDatabaseReader<DataModelFromConfectDataModel<ConfectDataModel>>,
 		databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>,
 	) {
 		this.db = db;
@@ -475,7 +475,7 @@ export class ConfectDatabaseReaderImpl<
 		this.db = db;
 		this.databaseSchemas = databaseSchemas;
 		this.system = new ConfectBaseDatabaseReaderImpl<ConfectSystemDataModel>(
-			this.db.system as GenericDatabaseReader<SystemDataModel>,
+			this.db.system,
 			databaseSchemasFromConfectSchema(confectSystemSchema.confectSchema),
 		);
 	}
@@ -755,3 +755,9 @@ const decodeDocument = <
 	Schema.decodeUnknownSync(extendWithSystemFields(tableName, tableSchema), {
 		onExcessProperty: "error",
 	})(convexDocument);
+
+// Would be better if this were exported from `convex/server`
+type BaseDatabaseReader<DataModel extends GenericDataModel> = Omit<
+	GenericDatabaseReader<DataModel>,
+	"system"
+>;
