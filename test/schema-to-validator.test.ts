@@ -14,7 +14,7 @@ import {
 	compileAst,
 	compileSchema,
 	compileTableSchema,
-} from "~/src/schema-to-validator-compiler";
+} from "~/src/schema-to-validator";
 
 describe(compileAst, () => {
 	test("any", () => {

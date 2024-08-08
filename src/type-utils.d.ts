@@ -1,4 +1,4 @@
-import type { ReadonlyOrMutableValue } from "~/src/schema-to-validator-compiler";
+import type { ReadonlyOrMutableValue } from "~/src/schema-to-validator";
 
 // biome-ignore lint/complexity/noBannedTypes:
 export type IsOptional<T, K extends keyof T> = {} extends Pick<T, K>

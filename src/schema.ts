@@ -20,7 +20,7 @@ import type { Validator } from "convex/values";
 import { Record, pipe } from "effect";
 import type { ReadonlyDeep } from "type-fest";
 
-import { compileTableSchema } from "~/src/schema-to-validator-compiler";
+import { compileTableSchema } from "~/src/schema-to-validator";
 
 export type GenericConfectSchema = Record<
 	string,
