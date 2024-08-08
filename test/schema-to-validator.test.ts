@@ -17,131 +17,171 @@ import {
 } from "~/src/schema-to-validator";
 
 describe(compileAst, () => {
-	test("any", () => {
-		const schema = Schema.Any;
-		const validator = v.any();
-		const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+	describe("allowed", () => {
+		test("any", () => {
+			const schema = Schema.Any;
+			const validator = v.any();
+			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
 
-		expect(compiledValidator).toStrictEqual(validator);
-	});
-
-	test("literal", () => {
-		const schema = Schema.Literal("LiteralString");
-		const validator = v.literal("LiteralString");
-		const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
-
-		expect(compiledValidator).toStrictEqual(validator);
-	});
-
-	test("boolean", () => {
-		const schema = Schema.Boolean;
-		const validator = v.boolean();
-		const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
-
-		expect(compiledValidator).toStrictEqual(validator);
-	});
-
-	test("string", () => {
-		const schema = Schema.String;
-		const validator = v.string();
-		const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
-
-		expect(compiledValidator).toStrictEqual(validator);
-	});
-
-	test("number", () => {
-		const schema = Schema.Number;
-		const validator = v.float64();
-		const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
-
-		expect(compiledValidator).toStrictEqual(validator);
-	});
-
-	test("empty object", () => {
-		const schema = Schema.Struct({});
-		const validator = v.object({});
-		const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
-
-		expect(compiledValidator).toStrictEqual(validator);
-	});
-
-	test("simple object", () => {
-		const schema = Schema.Struct({ foo: Schema.String, bar: Schema.Number });
-		const validator = v.object({ foo: v.string(), bar: v.float64() });
-		const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
-
-		expect(compiledValidator).toStrictEqual(validator);
-	});
-
-	test("object with optional field", () => {
-		const schema = Schema.Struct({
-			foo: Schema.optional(Schema.String, { exact: true }),
+			expect(compiledValidator).toStrictEqual(validator);
 		});
 
-		const validator = v.object({ foo: v.optional(v.string()) });
-		const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+		test("literal", () => {
+			const schema = Schema.Literal("LiteralString");
+			const validator = v.literal("LiteralString");
+			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
 
-		expect(compiledValidator).toStrictEqual(validator);
-	});
+			expect(compiledValidator).toStrictEqual(validator);
+		});
 
-	test("nested objects", () => {
-		const schema = Schema.Struct({
-			foo: Schema.Struct({
-				bar: Schema.Struct({
-					baz: Schema.String,
+		test("boolean", () => {
+			const schema = Schema.Boolean;
+			const validator = v.boolean();
+			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+
+			expect(compiledValidator).toStrictEqual(validator);
+		});
+
+		test("string", () => {
+			const schema = Schema.String;
+			const validator = v.string();
+			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+
+			expect(compiledValidator).toStrictEqual(validator);
+		});
+
+		test("number", () => {
+			const schema = Schema.Number;
+			const validator = v.float64();
+			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+
+			expect(compiledValidator).toStrictEqual(validator);
+		});
+
+		test("empty object", () => {
+			const schema = Schema.Struct({});
+			const validator = v.object({});
+			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+
+			expect(compiledValidator).toStrictEqual(validator);
+		});
+
+		test("simple object", () => {
+			const schema = Schema.Struct({ foo: Schema.String, bar: Schema.Number });
+			const validator = v.object({ foo: v.string(), bar: v.float64() });
+			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+
+			expect(compiledValidator).toStrictEqual(validator);
+		});
+
+		test("object with optional field", () => {
+			const schema = Schema.Struct({
+				foo: Schema.optional(Schema.String, { exact: true }),
+			});
+
+			const validator = v.object({ foo: v.optional(v.string()) });
+			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+
+			expect(compiledValidator).toStrictEqual(validator);
+		});
+
+		test("nested objects", () => {
+			const schema = Schema.Struct({
+				foo: Schema.Struct({
+					bar: Schema.Struct({
+						baz: Schema.String,
+					}),
 				}),
-			}),
+			});
+			const validator = v.object({
+				foo: v.object({ bar: v.object({ baz: v.string() }) }),
+			});
+			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+
+			expect(compiledValidator).toStrictEqual(validator);
 		});
-		const validator = v.object({
-			foo: v.object({ bar: v.object({ baz: v.string() }) }),
+
+		test("union with four elements", () => {
+			const schema = Schema.Union(
+				Schema.String,
+				Schema.Number,
+				Schema.Boolean,
+				Schema.Struct({}),
+			);
+			const validator = v.union(
+				v.string(),
+				v.float64(),
+				v.boolean(),
+				v.object({}),
+			);
+			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+
+			expect(compiledValidator).toStrictEqual(validator);
 		});
-		const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
 
-		expect(compiledValidator).toStrictEqual(validator);
+		test("tuple with one element", () => {
+			const schema = Schema.Tuple(Schema.String);
+			const validator = v.array(v.string());
+			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+
+			expect(compiledValidator).toStrictEqual(validator);
+		});
+
+		test("tuple with two elements", () => {
+			const schema = Schema.Tuple(Schema.String, Schema.Number);
+			const validator = v.array(v.union(v.string(), v.float64()));
+			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+
+			expect(compiledValidator).toStrictEqual(validator);
+		});
+
+		test("tuple with three elements", () => {
+			const schema = Schema.Tuple(Schema.String, Schema.Number, Schema.Boolean);
+			const expectedValidator = v.array(
+				v.union(v.string(), v.float64(), v.boolean()),
+			);
+			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+
+			expect(compiledValidator).toStrictEqual(expectedValidator);
+		});
 	});
 
-	test("union with four elements", () => {
-		const schema = Schema.Union(
-			Schema.String,
-			Schema.Number,
-			Schema.Boolean,
-			Schema.Struct({}),
-		);
-		const validator = v.union(
-			v.string(),
-			v.float64(),
-			v.boolean(),
-			v.object({}),
-		);
-		const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+	describe("disallowed", () => {
+		test("object with number keys", () => {
+			const schema = Schema.Struct({
+				1: Schema.String,
+				// biome-ignore lint/complexity/useSimpleNumberKeys: We want to ensure this fails
+				1_000: Schema.String,
+			});
 
-		expect(compiledValidator).toStrictEqual(validator);
-	});
+			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow();
+		});
 
-	test("tuple with one element", () => {
-		const schema = Schema.Tuple(Schema.String);
-		const validator = v.array(v.string());
-		const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+		test("object with symbol keys", () => {
+			const schema = Schema.Struct({
+				[Symbol("SymbolKey")]: Schema.Number,
+			});
 
-		expect(compiledValidator).toStrictEqual(validator);
-	});
+			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow();
+		});
 
-	test("tuple with two elements", () => {
-		const schema = Schema.Tuple(Schema.String, Schema.Number);
-		const validator = v.array(v.union(v.string(), v.float64()));
-		const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+		test("empty tuple", () => {
+			const schema = Schema.Tuple();
 
-		expect(compiledValidator).toStrictEqual(validator);
-	});
+			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow();
+		});
 
-	test("tuple with three elements", () => {
-		const schema = Schema.Tuple(Schema.String, Schema.Number, Schema.Boolean);
-		const expectedValidator = v.array(
-			v.union(v.string(), v.float64(), v.boolean()),
-		);
-		const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+		test("tuple with an optional element", () => {
+			const schema = Schema.Tuple(Schema.optionalElement(Schema.String));
 
-		expect(compiledValidator).toStrictEqual(expectedValidator);
+			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow();
+		});
+
+		test("unsupported keyword", () => {
+			const schema = Schema.Undefined;
+
+			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow();
+		});
 	});
 });
 

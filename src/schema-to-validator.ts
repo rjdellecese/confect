@@ -266,52 +266,48 @@ export const compileAst = (ast: AST.AST): Validator<any, any, any> =>
 			),
 		),
 		Match.tag("TypeLiteral", (typeLiteral) => handleTypeLiteral(typeLiteral)),
-		Match.tag("TupleType", ({ elements, rest }) => {
-			const restValidator = pipe(
-				rest,
-				Array.head,
-				Option.map(({ type }) => compileAst(type)),
-			);
+		Match.tag("TupleType", ({ elements, rest }) =>
+			Effect.gen(function* () {
+				const restValidator = pipe(
+					rest,
+					Array.head,
+					Option.map(({ type }) => compileAst(type)),
+				);
 
-			const [f, s, ...r] = elements;
+				const [f, s, ...r] = elements;
 
-			const elementToValidator = ({
-				type,
-				isOptional,
-			}: AST.OptionalType): Validator<any, any, any> =>
-				isOptional ? v.optional(compileAst(type)) : compileAst(type);
+				const elementToValidator = ({ type, isOptional }: AST.OptionalType) =>
+					Effect.if(isOptional, {
+						onTrue: () =>
+							Effect.fail(new OptionalTupleElementsAreNotSupportedError()),
+						onFalse: () => Effect.succeed(compileAst(type)),
+					});
 
-			const arrayItemsValidator: Effect.Effect<
-				Validator<any, any, any>,
-				EmptyTupleIsNotSupportedError
-			> = f === undefined
-				? Option.match(restValidator, {
-						onNone: () => Effect.fail(new EmptyTupleIsNotSupportedError()),
-						onSome: (validator) => Effect.succeed(validator),
-					})
-				: s === undefined
+				const arrayItemsValidator = yield* f === undefined
 					? Option.match(restValidator, {
-							onNone: () => Effect.succeed(elementToValidator(f)),
-							onSome: (validator) =>
-								Effect.succeed(v.union(elementToValidator(f), validator)),
+							onNone: () => Effect.fail(new EmptyTupleIsNotSupportedError()),
+							onSome: (validator) => Effect.succeed(validator),
 						})
-					: Effect.succeed(
-							v.union(
-								elementToValidator(f),
-								elementToValidator(s),
-								...Array.map(r, elementToValidator),
-								...Option.match(restValidator, {
-									onSome: (validator) => [validator] as const,
-									onNone: () => [] as const,
-								}),
-							),
-						);
+					: s === undefined
+						? elementToValidator(f)
+						: Effect.gen(function* () {
+								const firstValidator = yield* elementToValidator(f);
+								const secondValidator = yield* elementToValidator(s);
+								const restValidators = yield* Effect.forEach(
+									r,
+									elementToValidator,
+								);
 
-			return pipe(
-				arrayItemsValidator,
-				Effect.map((validator) => v.array(validator)),
-			);
-		}),
+								return v.union(
+									firstValidator,
+									secondValidator,
+									...restValidators,
+								);
+							});
+
+				return v.array(arrayItemsValidator);
+			}),
+		),
 		Match.tag("UnknownKeyword", "AnyKeyword", () => Effect.succeed(v.any())),
 		Match.tag(
 			"Declaration",
@@ -365,6 +361,11 @@ const handlePropertySignatures = (
 				return Effect.fail(
 					new UnsupportedPropertySignatureKeyTypeError({ keyType: typeofName }),
 				);
+				// This is necessary because somewhere, keys of number are being coerced to strings. But I don't know where...
+			} else if (!Number.isNaN(Number(name))) {
+				return Effect.fail(
+					new UnsupportedPropertySignatureKeyTypeError({ keyType: "number" }),
+				);
 			} else {
 				const validator = compileAst(type);
 
@@ -413,4 +414,8 @@ class UnsupportedEffectSchemaTypeError extends Data.TaggedError(
 
 class IndexSignaturesAreNotSupportedError extends Data.TaggedError(
 	"IndexSignaturesAreNotSupportedError",
+) {}
+
+class OptionalTupleElementsAreNotSupportedError extends Data.TaggedError(
+	"OptionalTupleElementsAreNotSupportedError",
 ) {}
