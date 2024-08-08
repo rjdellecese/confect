@@ -40,7 +40,7 @@ import type {
 	ConfectSchemaDefinition,
 	GenericConfectSchema,
 } from "~/src/schema";
-import * as schemaToValidatorCompiler from "~/src/schema-to-validator-compiler";
+import { compileArgsSchema } from "./schema-to-validator-compiler";
 
 export const confectServer = <
 	ConvexSchema extends GenericSchema,
@@ -189,7 +189,7 @@ const confectQueryFunction = <
 		a: ConfectValue,
 	) => Effect.Effect<Output>;
 }) => ({
-	args: schemaToValidatorCompiler.args(args),
+	args: compileArgsSchema(args),
 	handler: (
 		ctx: GenericQueryCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
 		actualArgs: ConvexValue,
@@ -222,7 +222,7 @@ const effectMutationFunction = <
 		a: ConfectValue,
 	) => Effect.Effect<Output>;
 }) => ({
-	args: schemaToValidatorCompiler.args(args),
+	args: compileArgsSchema(args),
 	handler: (
 		ctx: GenericMutationCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
 		actualArgs: ConvexValue,
@@ -253,7 +253,7 @@ const effectActionFunction = <
 		a: ConfectValue,
 	) => Effect.Effect<Output>;
 }) => ({
-	args: schemaToValidatorCompiler.args(args),
+	args: compileArgsSchema(args),
 	handler: (
 		ctx: GenericActionCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
 		actualArgs: ConvexValue,

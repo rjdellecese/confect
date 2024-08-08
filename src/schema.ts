@@ -307,7 +307,12 @@ class ConfectTableDefinitionImpl<
 	}
 }
 
-export const defineConfectTable = <A, I>(tableSchema: Schema.Schema<A, I>) => {
+export const defineConfectTable = <
+	S extends Schema.Schema.AnyNoContext,
+	Fields extends Schema.Struct.Fields,
+>(
+	tableSchema: S & Schema.Struct<Fields>,
+) => {
 	const tableValidator = compileTableSchema(tableSchema);
 	return new ConfectTableDefinitionImpl(tableSchema, tableValidator);
 };

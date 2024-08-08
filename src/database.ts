@@ -51,10 +51,10 @@ import type {
 	TableNamesInConfectDataModel,
 } from "~/src/data-model";
 import {
-	confectSystemSchema,
 	type ConfectDataModelFromConfectSchema,
-	type GenericConfectSchema,
 	type ConfectSystemDataModel,
+	type GenericConfectSchema,
+	confectSystemSchema,
 } from "~/src/schema";
 import { SchemaId } from "./SchemaId";
 

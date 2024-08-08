@@ -34,12 +34,12 @@ import type {
 
 // Args
 
-export const args = <DatabaseValue, TypeScriptValue = DatabaseValue>(
-	schema: Schema.Schema<TypeScriptValue, DatabaseValue>,
-): PropertyValidators => goTopArgs(Schema.encodedSchema(schema).ast);
+export const compileArgsSchema = <ConfectValue, ConvexValue>(
+	argsSchema: Schema.Schema<ConfectValue, ConvexValue>,
+): PropertyValidators => {
+	const ast = Schema.encodedSchema(argsSchema).ast;
 
-const goTopArgs = (ast: AST.AST): PropertyValidators =>
-	pipe(
+	return pipe(
 		ast,
 		Match.value,
 		Match.tag("TypeLiteral", ({ indexSignatures, propertySignatures }) =>
@@ -50,28 +50,37 @@ const goTopArgs = (ast: AST.AST): PropertyValidators =>
 		Match.orElse(() => Effect.fail(new TopLevelMustBeObjectError())),
 		Effect.runSync,
 	);
+};
 
 // Table
 
-export const table = <DatabaseValue, TypeScriptValue = DatabaseValue>(
-	schema: Schema.Schema<TypeScriptValue, DatabaseValue>,
-): Validator<Record<string, any>, "required", any> =>
-	goTopTable(Schema.encodedSchema(schema).ast);
+export type TableSchemaToTableValidator<
+	TableSchema extends Schema.Schema<any, any>,
+> = ValueToValidator<TableSchema["Encoded"]> extends infer Vd extends VObject<
+	any,
+	any,
+	any
+>
+	? Vd
+	: never;
 
-const goTopTable = (
-	ast: AST.AST,
-): Validator<Record<string, any>, "required", any> =>
-	pipe(
+export const compileTableSchema = <ConfectValue, ConvexValue>(
+	schema: Schema.Schema<ConfectValue, ConvexValue>,
+): TableSchemaToTableValidator<typeof schema> => {
+	const ast = Schema.encodedSchema(schema).ast;
+
+	return pipe(
 		ast,
 		Match.value,
 		Match.tag("TypeLiteral", ({ indexSignatures }) =>
 			Array.isEmptyReadonlyArray(indexSignatures)
-				? Effect.succeed(compileAst(ast))
+				? Effect.succeed(compileAst(ast) as any)
 				: Effect.fail(new IndexSignaturesAreNotSupportedError()),
 		),
 		Match.orElse(() => Effect.fail(new TopLevelMustBeObjectError())),
 		Effect.runSync,
 	);
+};
 
 // Compiler
 
@@ -137,21 +146,22 @@ type ArrayValueToValidator<
 		: never
 	: never;
 
-type RecordValueToValidator<
-	Vl extends ReadonlyOrMutableRecord<ReadonlyOrMutableValue>,
-> = {
-	-readonly [K in keyof Vl]-?: IsAny<Vl[K]> extends true
-		? IsOptional<Vl, K> extends true
-			? VOptional<VAny>
-			: VAny
-		: UndefinedOrValueToValidator<Vl[K]>;
-} extends infer VdRecord extends Record<string, any>
-	? {
-			-readonly [K in keyof Vl]: WritableDeep<Vl[K]>;
-		} extends infer VlRecord extends Record<string, any>
-		? VObject<VlRecord, VdRecord>
-		: never
-	: never;
+type RecordValueToValidator<Vl> =
+	Vl extends ReadonlyOrMutableRecord<ReadonlyOrMutableValue>
+		? {
+				-readonly [K in keyof Vl]-?: IsAny<Vl[K]> extends true
+					? IsOptional<Vl, K> extends true
+						? VOptional<VAny>
+						: VAny
+					: UndefinedOrValueToValidator<Vl[K]>;
+			} extends infer VdRecord extends Record<string, any>
+			? {
+					-readonly [K in keyof Vl]: WritableDeep<Vl[K]>;
+				} extends infer VlRecord extends Record<string, any>
+				? VObject<VlRecord, VdRecord>
+				: never
+			: never
+		: never;
 
 export type UndefinedOrValueToValidator<
 	Vl extends ReadonlyOrMutableValue | undefined,
@@ -216,19 +226,6 @@ type ValueTupleToValidatorTuple<
 				: never
 			: never
 		: [];
-
-export type TableSchemaToTableValidator<
-	TableSchema extends Schema.Schema<any>,
-> = ValueToValidator<
-	Schema.Schema.Encoded<TableSchema>
-> extends infer Vd extends VObject<any, any, any>
-	? Vd
-	: never;
-
-export const compileTableSchema = <A, I>(
-	tableSchema: Schema.Schema<A, I>,
-): TableSchemaToTableValidator<typeof tableSchema> =>
-	compileAst(Schema.encodedSchema(tableSchema).ast) as any;
 
 export const compileSchema = <A extends ReadonlyValue>(
 	schema: Schema.Schema<A>,
@@ -329,7 +326,10 @@ export const compileAst = (ast: AST.AST): Validator<any, any, any> =>
 			"Suspend",
 			"Transformation",
 			"Refinement",
-			unsupportedEffectSchemaTypeError,
+			({ _tag }) =>
+				Effect.fail(
+					new UnsupportedEffectSchemaTypeError({ effectSchemaType: _tag }),
+				),
 		),
 		Match.exhaustive,
 		Effect.runSync,
@@ -414,6 +414,3 @@ class UnsupportedEffectSchemaTypeError extends Data.TaggedError(
 class IndexSignaturesAreNotSupportedError extends Data.TaggedError(
 	"IndexSignaturesAreNotSupportedError",
 ) {}
-
-const unsupportedEffectSchemaTypeError = ({ _tag }: AST.AST) =>
-	Effect.fail(new UnsupportedEffectSchemaTypeError({ effectSchemaType: _tag }));

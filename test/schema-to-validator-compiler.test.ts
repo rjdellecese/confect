@@ -10,12 +10,13 @@ import { describe, expect, expectTypeOf, test } from "vitest";
 
 import {
 	type ValueToValidator,
+	compileArgsSchema,
 	compileAst,
 	compileSchema,
 	compileTableSchema,
 } from "~/src/schema-to-validator-compiler";
 
-describe("compileAst", () => {
+describe(compileAst, () => {
 	test("any", () => {
 		const schema = Schema.Any;
 		const validator = v.any();
@@ -144,7 +145,7 @@ describe("compileAst", () => {
 	});
 });
 
-describe("compileSchema", () => {
+describe(compileSchema, () => {
 	test("any", () => {
 		const expectedValidator = v.any();
 
@@ -634,36 +635,76 @@ describe("ValueToValidator", () => {
 	});
 });
 
-describe("compileTableSchema", () => {
-	test("{ text: string }", () => {
+describe(compileTableSchema, () => {
+	test("{ text: string, foo: { bar: number } }", () => {
 		const compiledValidator = compileTableSchema(
 			Schema.Struct({
-				text: Schema.String,
+				foo: Schema.String,
+				bar: Schema.optional(Schema.Struct({ bar: Schema.Number }), {
+					exact: true,
+				}),
 			}),
 		);
 
 		const expectedValidator = v.object({
-			text: v.string(),
+			foo: v.string(),
+			bar: v.optional(v.object({ bar: v.float64() })),
 		});
 
 		expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
 		expect(compiledValidator).toStrictEqual(expectedValidator);
 	});
 
-	test("{ text: string, foo: { bar: number } }", () => {
-		const compiledValidator = compileTableSchema(
-			Schema.Struct({
-				text: Schema.String,
-				foo: Schema.Struct({ bar: Schema.Number }),
-			}),
+	test("fails if provided Schema requires context", () => {
+		expectTypeOf<
+			Schema.Schema.AnyNoContext & Schema.Struct<any>
+		>().toMatchTypeOf<Parameters<typeof compileTableSchema>[0]>();
+
+		expectTypeOf<
+			Schema.Schema<any, any, "Dep"> & Schema.Struct<any>
+		>().not.toMatchTypeOf<Parameters<typeof compileTableSchema>[0]>();
+	});
+
+	test("fails if provided Schema contains index signatures", () => {
+		const structWithIndexSignatures = Schema.Struct(
+			{ foo: Schema.String },
+			{ key: Schema.String, value: Schema.String },
 		);
 
-		const expectedValidator = v.object({
-			text: v.string(),
-			foo: v.object({ bar: v.float64() }),
-		});
+		expect(() => compileTableSchema(structWithIndexSignatures)).toThrow();
+	});
 
-		expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
-		expect(compiledValidator).toStrictEqual(expectedValidator);
+	test("fails if provided Schema is not a Struct", () => {
+		expect(() => compileTableSchema(Schema.String)).toThrow();
+	});
+});
+
+describe(compileArgsSchema, () => {
+	test("extracts the wrapping schema and returns the object", () => {
+		const compiledArgsValidator = compileArgsSchema(
+			Schema.Struct({
+				foo: Schema.String,
+				bar: Schema.optional(Schema.Number, { exact: true }),
+			}),
+		);
+		const expectedArgsValidator = {
+			foo: v.string(),
+			bar: v.optional(v.number()),
+		};
+
+		expect(compiledArgsValidator).toStrictEqual(expectedArgsValidator);
+	});
+
+	test("fails if provided Schema contains index signatures", () => {
+		const structWithIndexSignatures = Schema.Struct(
+			{ foo: Schema.String },
+			{ key: Schema.String, value: Schema.String },
+		);
+
+		expect(() => compileArgsSchema(structWithIndexSignatures)).toThrow();
+	});
+
+	test("fails if provided Schema is not a Struct", () => {
+		expect(() => compileArgsSchema(Schema.String)).toThrow();
 	});
 });
