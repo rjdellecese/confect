@@ -417,3 +417,23 @@ export const systemQuery = query({
 	args: Schema.Struct({}),
 	handler: ({ db }) => db.system.query("_storage").collect(),
 });
+
+export const storageGetUrl = action({
+	args: Schema.Struct({
+		id: SchemaId<"_storage">(),
+	}),
+	handler: ({ storage }, { id }) =>
+		storage.getUrl(id).pipe(Effect.map(Option.getOrNull)),
+});
+
+export const storageGenerateUploadUrl = action({
+	args: Schema.Struct({}),
+	handler: ({ storage }) => storage.generateUploadUrl(),
+});
+
+export const storageDelete = action({
+	args: Schema.Struct({
+		id: SchemaId<"_storage">(),
+	}),
+	handler: ({ storage }, { id }) => storage.delete(id),
+});

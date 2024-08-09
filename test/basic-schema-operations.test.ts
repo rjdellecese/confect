@@ -11,7 +11,7 @@ import {
 import { TestConvexService } from "~/test/test-convex-service";
 import { NotUniqueError } from "../src/database";
 
-test("queryGet", () =>
+test("query get", () =>
 	Effect.gen(function* () {
 		const c = yield* TestConvexService;
 
@@ -28,7 +28,7 @@ test("queryGet", () =>
 		expect(note?.text).toEqual(text);
 	}));
 
-test("mutationGet", () =>
+test("mutation get", () =>
 	Effect.gen(function* () {
 		const c = yield* TestConvexService;
 
@@ -63,7 +63,7 @@ test("insert", () =>
 		expect(note?.text).toEqual(text);
 	}));
 
-test("queryCollect", () =>
+test("query collect", () =>
 	Effect.gen(function* () {
 		const c = yield* TestConvexService;
 
@@ -77,7 +77,7 @@ test("queryCollect", () =>
 		expect(notes[0]?.text).toEqual(text);
 	}));
 
-test("mutationCollect", () =>
+test("mutation collect", () =>
 	Effect.gen(function* () {
 		const c = yield* TestConvexService;
 
@@ -786,5 +786,44 @@ describe("system", () => {
 			expect(Array.sort(Order.string)(storageIds)).toEqual(
 				Array.sort(Order.string)(ids),
 			);
+		}));
+});
+
+const urlRegex = /https?:\/\/[^\s/$.?#].[^\s]*/;
+
+describe("storage", () => {
+	test("getUrl", () =>
+		Effect.gen(function* () {
+			const c = yield* TestConvexService;
+
+			const id = yield* c.run(({ storage }) => storage.store(new Blob()));
+			const url = yield* c.action(api.basic_schema_operations.storageGetUrl, {
+				id,
+			});
+
+			expect(url).toMatch(urlRegex);
+		}));
+
+	test("generateUploadUrl", () =>
+		Effect.gen(function* () {
+			const c = yield* TestConvexService;
+
+			const url = yield* c.action(
+				api.basic_schema_operations.storageGenerateUploadUrl,
+			);
+
+			expect(url).toMatch(urlRegex);
+		}));
+
+	test("storageDelete", () =>
+		Effect.gen(function* () {
+			const c = yield* TestConvexService;
+
+			const id = yield* c.run(({ storage }) => storage.store(new Blob()));
+			yield* c.action(api.basic_schema_operations.storageDelete, { id });
+
+			const storageDoc = yield* c.run(({ storage }) => storage.get(id));
+
+			expect(storageDoc).toEqual(null);
 		}));
 });

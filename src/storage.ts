@@ -1,26 +1,21 @@
-import type {
-	FileMetadata,
-	StorageId,
-	StorageReader,
-	StorageWriter,
-} from "convex/server";
+import type { StorageReader, StorageWriter } from "convex/server";
 import type { GenericId } from "convex/values";
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 
 export interface ConfectStorageReader {
-	getUrl(storageId: StorageId): Effect.Effect<string | null>;
-	getMetadata(storageId: StorageId): Effect.Effect<FileMetadata | null>;
+	getUrl(
+		storageId: GenericId<"_storage">,
+	): Effect.Effect<Option.Option<string>>;
 }
 
 export class ConfectStorageReaderImpl implements ConfectStorageReader {
 	constructor(private storageReader: StorageReader) {}
-	getUrl(storageId: GenericId<"_storage">): Effect.Effect<string | null> {
-		return Effect.promise(() => this.storageReader.getUrl(storageId));
-	}
-	getMetadata(
+	getUrl(
 		storageId: GenericId<"_storage">,
-	): Effect.Effect<FileMetadata | null> {
-		return Effect.promise(() => this.storageReader.getMetadata(storageId));
+	): Effect.Effect<Option.Option<string>> {
+		return Effect.promise(() => this.storageReader.getUrl(storageId)).pipe(
+			Effect.map(Option.fromNullable),
+		);
 	}
 }
 
@@ -30,20 +25,19 @@ export interface ConfectStorageWriter extends ConfectStorageReader {
 }
 
 export class ConfectStorageWriterImpl implements ConfectStorageWriter {
-	private effectStorageReader: ConfectStorageReader;
+	private confectStorageReader: ConfectStorageReader;
 	constructor(private storageWriter: StorageWriter) {
-		this.effectStorageReader = new ConfectStorageReaderImpl(storageWriter);
+		this.confectStorageReader = new ConfectStorageReaderImpl(storageWriter);
 	}
-	getUrl(storageId: StorageId): Effect.Effect<string | null> {
-		return this.effectStorageReader.getUrl(storageId);
-	}
-	getMetadata(storageId: StorageId): Effect.Effect<FileMetadata | null> {
-		return this.effectStorageReader.getMetadata(storageId);
+	getUrl(
+		storageId: GenericId<"_storage">,
+	): Effect.Effect<Option.Option<string>> {
+		return this.confectStorageReader.getUrl(storageId);
 	}
 	generateUploadUrl(): Effect.Effect<string> {
 		return Effect.promise(() => this.storageWriter.generateUploadUrl());
 	}
-	delete(storageId: StorageId): Effect.Effect<void> {
+	delete(storageId: GenericId<"_storage">): Effect.Effect<void> {
 		return Effect.promise(() => this.storageWriter.delete(storageId));
 	}
 }
