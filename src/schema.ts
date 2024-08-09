@@ -360,7 +360,7 @@ export const confectSystemSchema = defineConfectSchema({
 			name: Schema.String,
 			args: Schema.Array(Schema.Any),
 			scheduledTime: Schema.Number,
-			completedTime: Schema.optional(Schema.Number, { exact: true }),
+			completedTime: Schema.optionalWith(Schema.Number, { exact: true }),
 			state: Schema.Union(
 				Schema.Struct({ kind: Schema.Literal("pending") }),
 				Schema.Struct({ kind: Schema.Literal("inProgress") }),
@@ -377,7 +377,7 @@ export const confectSystemSchema = defineConfectSchema({
 		Schema.Struct({
 			sha256: Schema.String,
 			size: Schema.Number,
-			contentType: Schema.optional(Schema.String, { exact: true }),
+			contentType: Schema.optionalWith(Schema.String, { exact: true }),
 		}),
 	),
 });

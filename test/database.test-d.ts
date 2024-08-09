@@ -11,7 +11,7 @@ import { SchemaId } from "../src/SchemaId";
 test("DatabaseSchemasFromConfectDataModel", () => {
 	const notesSchemaFields = {
 		text: Schema.String,
-		tags: Schema.Array(Schema.String).pipe(Schema.optional()),
+		tags: Schema.Array(Schema.String).pipe(Schema.optional),
 	};
 	const confectSchema = {
 		notes: defineConfectTable(Schema.Struct(notesSchemaFields)),

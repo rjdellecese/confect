@@ -222,9 +222,9 @@ export const patch = mutation({
 	args: Schema.Struct({
 		noteId: SchemaId<TableName<"notes">>(),
 		fields: Schema.Struct({
-			// TODO: Better error messages for `Schema.optional` when `{ exact: true }` is not present
-			text: Schema.optional(Schema.String, { exact: true }),
-			author: Schema.optional(
+			// TODO: Better error messages for `Schema.optionalWith` when `{ exact: true }` is not present
+			text: Schema.optionalWith(Schema.String, { exact: true }),
+			author: Schema.optionalWith(
 				Schema.Struct({
 					role: Schema.Literal("admin", "user"),
 					name: Schema.String,
@@ -257,8 +257,8 @@ export const replace = mutation({
 	args: Schema.Struct({
 		noteId: SchemaId<TableName<"notes">>(),
 		fields: Schema.Struct({
-			_id: Schema.optional(SchemaId<TableName<"notes">>(), { exact: true }),
-			_creationTime: Schema.optional(Schema.Number, { exact: true }),
+			_id: Schema.optionalWith(SchemaId<TableName<"notes">>(), { exact: true }),
+			_creationTime: Schema.optionalWith(Schema.Number, { exact: true }),
 			text: Schema.String,
 		}),
 	}),

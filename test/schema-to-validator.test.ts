@@ -76,7 +76,7 @@ describe(compileAst, () => {
 
 		test("object with optional field", () => {
 			const schema = Schema.Struct({
-				foo: Schema.optional(Schema.String, { exact: true }),
+				foo: Schema.optionalWith(Schema.String, { exact: true }),
 			});
 
 			const validator = v.object({ foo: v.optional(v.string()) });
@@ -259,7 +259,7 @@ describe(compileSchema, () => {
 		const expectedValidator = v.object({ foo: v.optional(v.string()) });
 
 		const schema = Schema.Struct({
-			foo: Schema.optional(Schema.String, { exact: true }),
+			foo: Schema.optionalWith(Schema.String, { exact: true }),
 		});
 		const compiledValidator = compileSchema(schema);
 
@@ -680,7 +680,7 @@ describe(compileTableSchema, () => {
 		const compiledValidator = compileTableSchema(
 			Schema.Struct({
 				foo: Schema.String,
-				bar: Schema.optional(Schema.Struct({ bar: Schema.Number }), {
+				bar: Schema.optionalWith(Schema.Struct({ bar: Schema.Number }), {
 					exact: true,
 				}),
 			}),
@@ -724,7 +724,7 @@ describe(compileArgsSchema, () => {
 		const compiledArgsValidator = compileArgsSchema(
 			Schema.Struct({
 				foo: Schema.String,
-				bar: Schema.optional(Schema.Number, { exact: true }),
+				bar: Schema.optionalWith(Schema.Number, { exact: true }),
 			}),
 		);
 		const expectedArgsValidator = {
