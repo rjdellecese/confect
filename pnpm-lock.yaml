@@ -25,11 +25,11 @@ importers:
         specifier: 1.8.3
         version: 1.8.3
       '@effect/platform':
-        specifier: 0.61.6
-        version: 0.61.6(@effect/schema@0.70.3(effect@3.6.2))(effect@3.6.2)
+        specifier: 0.61.7
+        version: 0.61.7(@effect/schema@0.70.3(effect@3.6.2))(effect@3.6.2)
       '@effect/platform-node':
         specifier: 0.56.7
-        version: 0.56.7(@effect/platform@0.61.6(@effect/schema@0.70.3(effect@3.6.2))(effect@3.6.2))(effect@3.6.2)
+        version: 0.56.7(@effect/platform@0.61.7(@effect/schema@0.70.3(effect@3.6.2))(effect@3.6.2))(effect@3.6.2)
       '@effect/vitest':
         specifier: 0.8.3
         version: 0.8.3(effect@3.6.2)(vitest@2.0.5(@types/node@20.7.0))
@@ -152,8 +152,8 @@ packages:
       '@effect/platform': ^0.61.6
       effect: ^3.6.2
 
-  '@effect/platform@0.61.6':
-    resolution: {integrity: sha512-B84alXSJSBah98JYbQMwBZxZC/3h6YMZhLsetRk+Wt2t4AiRoawRqtdqZ+M56zE/h1MfK057XL++3mKN4tjbuA==}
+  '@effect/platform@0.61.7':
+    resolution: {integrity: sha512-FhOa/2B5Ma6Juqz3GRYfIdUq1FmDgz1p86UDtJSia4XwVETBP8FjXaKc1E2siiBwQbhAHSCJc6EcvWBq7r0DGw==}
     peerDependencies:
       '@effect/schema': ^0.70.3
       effect: ^3.6.2
@@ -1365,17 +1365,17 @@ snapshots:
   '@biomejs/cli-win32-x64@1.8.3':
     optional: true
 
-  '@effect/platform-node-shared@0.11.6(@effect/platform@0.61.6(@effect/schema@0.70.3(effect@3.6.2))(effect@3.6.2))(effect@3.6.2)':
+  '@effect/platform-node-shared@0.11.6(@effect/platform@0.61.7(@effect/schema@0.70.3(effect@3.6.2))(effect@3.6.2))(effect@3.6.2)':
     dependencies:
-      '@effect/platform': 0.61.6(@effect/schema@0.70.3(effect@3.6.2))(effect@3.6.2)
+      '@effect/platform': 0.61.7(@effect/schema@0.70.3(effect@3.6.2))(effect@3.6.2)
       '@parcel/watcher': 2.4.1
       effect: 3.6.2
       multipasta: 0.2.2
 
-  '@effect/platform-node@0.56.7(@effect/platform@0.61.6(@effect/schema@0.70.3(effect@3.6.2))(effect@3.6.2))(effect@3.6.2)':
+  '@effect/platform-node@0.56.7(@effect/platform@0.61.7(@effect/schema@0.70.3(effect@3.6.2))(effect@3.6.2))(effect@3.6.2)':
     dependencies:
-      '@effect/platform': 0.61.6(@effect/schema@0.70.3(effect@3.6.2))(effect@3.6.2)
-      '@effect/platform-node-shared': 0.11.6(@effect/platform@0.61.6(@effect/schema@0.70.3(effect@3.6.2))(effect@3.6.2))(effect@3.6.2)
+      '@effect/platform': 0.61.7(@effect/schema@0.70.3(effect@3.6.2))(effect@3.6.2)
+      '@effect/platform-node-shared': 0.11.6(@effect/platform@0.61.7(@effect/schema@0.70.3(effect@3.6.2))(effect@3.6.2))(effect@3.6.2)
       effect: 3.6.2
       mime: 3.0.0
       undici: 6.19.2
@@ -1384,7 +1384,7 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@effect/platform@0.61.6(@effect/schema@0.70.3(effect@3.6.2))(effect@3.6.2)':
+  '@effect/platform@0.61.7(@effect/schema@0.70.3(effect@3.6.2))(effect@3.6.2)':
     dependencies:
       '@effect/schema': 0.70.3(effect@3.6.2)
       effect: 3.6.2
