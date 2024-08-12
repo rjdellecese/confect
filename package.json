@@ -36,7 +36,8 @@
 	"dependencies": {
 		"@effect/schema": "0.70.3",
 		"convex": "1.14.0",
-		"effect": "3.6.2"
+		"effect": "3.6.2",
+		"type-fest": "4.24.0"
 	},
 	"engines": {
 		"node": ">=20",
