@@ -18,7 +18,6 @@ import {
 } from "convex/server";
 import type { Validator } from "convex/values";
 import { Record, pipe } from "effect";
-import type { ReadonlyDeep } from "type-fest";
 
 import { compileTableSchema } from "~/src/schema-to-validator";
 
@@ -351,7 +350,7 @@ type ExtractConfectDocument<
 	TableName extends string,
 	S extends Schema.Schema<any>,
 > = Expand<
-	ReadonlyDeep<IdField<TableName>> & ReadonlyDeep<SystemFields> & S["Type"]
+	Readonly<IdField<TableName>> & Readonly<SystemFields> & S["Type"]
 >;
 
 export const confectSystemSchema = defineConfectSchema({

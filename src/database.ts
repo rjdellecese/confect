@@ -39,7 +39,6 @@ import {
 	identity,
 	pipe,
 } from "effect";
-import type { ReadonlyDeep } from "type-fest";
 
 import type {
 	ConfectDocumentByName,
@@ -98,7 +97,7 @@ class ConfectQueryImpl<
 	q: Query<TableInfoFromConfectTableInfo<ConfectTableInfo>>;
 	tableSchema: Schema.Schema<
 		ConfectTableInfo["confectDocument"],
-		Expand<ReadonlyDeep<ConfectTableInfo["convexDocument"]>>
+		ConfectTableInfo["convexDocument"]
 	>;
 	tableName: TableName;
 	constructor(
@@ -107,7 +106,7 @@ class ConfectQueryImpl<
 			| OrderedQuery<TableInfoFromConfectTableInfo<ConfectTableInfo>>,
 		tableSchema: Schema.Schema<
 			ConfectTableInfo["confectDocument"],
-			Expand<ReadonlyDeep<ConfectTableInfo["convexDocument"]>>
+			ConfectTableInfo["convexDocument"]
 		>,
 		tableName: TableName,
 	) {
@@ -260,14 +259,14 @@ class ConfectQueryInitializerImpl<
 	q: QueryInitializer<TableInfoFromConfectTableInfo<ConfectTableInfo>>;
 	tableSchema: Schema.Schema<
 		ConfectTableInfo["confectDocument"],
-		Expand<ReadonlyDeep<ConfectTableInfo["convexDocument"]>>
+		ConfectTableInfo["convexDocument"]
 	>;
 	tableName: TableName;
 	constructor(
 		q: QueryInitializer<TableInfoFromConfectTableInfo<ConfectTableInfo>>,
 		tableSchema: Schema.Schema<
 			ConfectTableInfo["confectDocument"],
-			Expand<ReadonlyDeep<ConfectTableInfo["convexDocument"]>>
+			ConfectTableInfo["convexDocument"]
 		>,
 		tableName: TableName,
 	) {
@@ -371,7 +370,7 @@ export type DatabaseSchemasFromConfectDataModel<
 > = {
 	[TableName in keyof ConfectDataModel & string]: Schema.Schema<
 		ConfectDataModel[TableName]["confectDocument"],
-		Expand<ReadonlyDeep<ConfectDataModel[TableName]["convexDocument"]>>
+		ConfectDataModel[TableName]["convexDocument"]
 	>;
 };
 
@@ -748,7 +747,7 @@ const decodeDocument = <
 	tableName: TableName,
 	tableSchema: Schema.Schema<
 		ConfectDocument,
-		Expand<ReadonlyDeep<ConvexDocument>>
+		ConvexDocument
 	>,
 	convexDocument: ConvexDocument,
 ): ConfectDocument =>

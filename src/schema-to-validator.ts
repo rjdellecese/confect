@@ -19,12 +19,11 @@ import type {
 	VUnion,
 	Validator,
 } from "convex/values";
-import { type Value, v } from "convex/values";
+import { v } from "convex/values";
 import { Array, Data, Effect, Match, Option, pipe } from "effect";
-import type { ReadonlyRecord } from "effect/Record";
-import type { WritableDeep } from "type-fest";
 
 import type {
+	DeepMutable,
 	IsAny,
 	IsOptional,
 	IsUnion,
@@ -84,8 +83,6 @@ export const compileTableSchema = <ConfectValue, ConvexValue>(
 
 // Compiler
 
-export type ReadonlyOrMutableValue = Value | ReadonlyValue;
-
 export type ReadonlyValue =
 	| string
 	| number
@@ -95,10 +92,6 @@ export type ReadonlyValue =
 	| ReadonlyArrayValue
 	| ReadonlyRecordValue
 	| null;
-
-type ReadonlyOrMutableArray<T> = ReadonlyArray<T> | Array<T>;
-
-type ReadonlyOrMutableRecord<T> = ReadonlyRecord<string, T> | Record<string, T>;
 
 type ReadonlyArrayValue = readonly ReadonlyValue[];
 
@@ -110,7 +103,7 @@ export type ValueToValidator<Vl> = [Vl] extends [never]
 	? never
 	: IsAny<Vl> extends true
 		? VAny
-		: [Vl] extends [ReadonlyOrMutableValue]
+		: [Vl] extends [ReadonlyValue]
 			? Vl extends {
 					__tableName: infer TableName extends string;
 				}
@@ -129,45 +122,42 @@ export type ValueToValidator<Vl> = [Vl] extends [never]
 										? VString
 										: Vl extends ArrayBuffer
 											? VBytes
-											: Vl extends ReadonlyOrMutableArray<ReadonlyOrMutableValue>
+											: Vl extends ReadonlyArray<ReadonlyValue>
 												? ArrayValueToValidator<Vl>
-												: Vl extends ReadonlyOrMutableRecord<ReadonlyOrMutableValue>
+												: Vl extends ReadonlyRecordValue
 													? RecordValueToValidator<Vl>
 													: IsUnion<Vl> extends true
 														? UnionValueToValidator<Vl>
 														: never
 			: never;
 
-type ArrayValueToValidator<
-	Vl extends ReadonlyOrMutableArray<ReadonlyOrMutableValue>,
-> = Vl extends ReadonlyOrMutableArray<infer El extends ReadonlyOrMutableValue>
-	? ValueToValidator<El> extends infer Vd extends Validator<any, any, any>
-		? VArray<WritableDeep<El[]>, Vd>
-		: never
-	: never;
-
-type RecordValueToValidator<Vl> =
-	Vl extends ReadonlyOrMutableRecord<ReadonlyOrMutableValue>
-		? {
-				-readonly [K in keyof Vl]-?: IsAny<Vl[K]> extends true
-					? IsOptional<Vl, K> extends true
-						? VOptional<VAny>
-						: VAny
-					: UndefinedOrValueToValidator<Vl[K]>;
-			} extends infer VdRecord extends Record<string, any>
-			? {
-					-readonly [K in keyof Vl]: WritableDeep<Vl[K]>;
-				} extends infer VlRecord extends Record<string, any>
-				? VObject<VlRecord, VdRecord>
-				: never
+type ArrayValueToValidator<Vl extends ReadonlyArray<ReadonlyValue>> =
+	Vl extends ReadonlyArray<infer El extends ReadonlyValue>
+		? ValueToValidator<El> extends infer Vd extends Validator<any, any, any>
+			? VArray<DeepMutable<El[]>, Vd>
 			: never
 		: never;
 
-export type UndefinedOrValueToValidator<
-	Vl extends ReadonlyOrMutableValue | undefined,
-> = undefined extends Vl
-	? // biome-ignore format: This erroneously removes the below parentheses!
-		[Vl] extends [(infer Val extends ReadonlyOrMutableValue) | undefined]
+type RecordValueToValidator<Vl> = Vl extends ReadonlyRecordValue
+	? {
+			-readonly [K in keyof Vl]-?: IsAny<Vl[K]> extends true
+				? IsOptional<Vl, K> extends true
+					? VOptional<VAny>
+					: VAny
+				: UndefinedOrValueToValidator<Vl[K]>;
+		} extends infer VdRecord extends Record<string, any>
+		? {
+				-readonly [K in keyof Vl]: DeepMutable<Vl[K]>;
+			} extends infer VlRecord extends Record<string, any>
+			? VObject<VlRecord, VdRecord>
+			: never
+		: never
+	: never;
+
+export type UndefinedOrValueToValidator<Vl extends ReadonlyValue | undefined> =
+	undefined extends Vl
+		? // biome-ignore format: This erroneously removes the below parentheses!
+			[Vl] extends [(infer Val extends ReadonlyValue) | undefined]
     ? ValueToValidator<Val> extends infer Vd extends Validator<
         any,
         OptionalProperty,
@@ -176,56 +166,51 @@ export type UndefinedOrValueToValidator<
       ? VOptional<Vd>
       : never
     : never
-	: Vl extends ReadonlyOrMutableValue
-		? ValueToValidator<Vl>
-		: never;
+		: Vl extends ReadonlyValue
+			? ValueToValidator<Vl>
+			: never;
 
-type UnionValueToValidator<Vl extends ReadonlyOrMutableValue> = [Vl] extends [
-	ReadonlyOrMutableValue,
+type UnionValueToValidator<Vl extends ReadonlyValue> = [Vl] extends [
+	ReadonlyValue,
 ]
 	? IsUnion<Vl> extends true
 		? UnionToTuple<Vl> extends infer VlTuple extends
-				ReadonlyOrMutableArray<ReadonlyOrMutableValue>
+				ReadonlyArray<ReadonlyValue>
 			? ValueTupleToValidatorTuple<VlTuple> extends infer VdTuple extends
 					Validator<any, "required", any>[]
-				? VUnion<WritableDeep<Vl>, VdTuple>
+				? VUnion<DeepMutable<Vl>, VdTuple>
 				: never
 			: never
 		: never
 	: never;
 
-type ValueTupleToValidatorTuple<
-	VlTuple extends ReadonlyOrMutableArray<ReadonlyOrMutableValue>,
-> = VlTuple extends
-	| [
-			true,
-			false,
-			...infer VlRest extends ReadonlyOrMutableArray<ReadonlyOrMutableValue>,
-	  ]
-	| [
-			false,
-			true,
-			// biome-ignore lint/suspicious/noRedeclare:
-			...infer VlRest extends ReadonlyOrMutableArray<ReadonlyOrMutableValue>,
-	  ]
-	? ValueTupleToValidatorTuple<VlRest> extends infer VdRest extends Validator<
-			any,
-			any,
-			any
-		>[]
-		? [VBoolean<boolean>, ...VdRest]
-		: never
-	: VlTuple extends [
-				infer Vl extends ReadonlyOrMutableValue,
-				...infer VlRest extends ReadonlyOrMutableArray<ReadonlyOrMutableValue>,
-			]
-		? ValueToValidator<Vl> extends infer Vd extends Validator<any, any, any>
-			? ValueTupleToValidatorTuple<VlRest> extends infer VdRest extends
-					Validator<any, "required", any>[]
-				? [Vd, ...VdRest]
-				: never
+type ValueTupleToValidatorTuple<VlTuple extends ReadonlyArray<ReadonlyValue>> =
+	VlTuple extends
+		| [true, false, ...infer VlRest extends ReadonlyArray<ReadonlyValue>]
+		| [
+				false,
+				true,
+				// biome-ignore lint/suspicious/noRedeclare:
+				...infer VlRest extends ReadonlyArray<ReadonlyValue>,
+		  ]
+		? ValueTupleToValidatorTuple<VlRest> extends infer VdRest extends Validator<
+				any,
+				any,
+				any
+			>[]
+			? [VBoolean<boolean>, ...VdRest]
 			: never
-		: [];
+		: VlTuple extends [
+					infer Vl extends ReadonlyValue,
+					...infer VlRest extends ReadonlyArray<ReadonlyValue>,
+				]
+			? ValueToValidator<Vl> extends infer Vd extends Validator<any, any, any>
+				? ValueTupleToValidatorTuple<VlRest> extends infer VdRest extends
+						Validator<any, "required", any>[]
+					? [Vd, ...VdRest]
+					: never
+				: never
+			: [];
 
 export const compileSchema = <A extends ReadonlyValue>(
 	schema: Schema.Schema<A>,
