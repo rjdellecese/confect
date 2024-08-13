@@ -6,8 +6,14 @@ import type {
 	GenericTableVectorIndexes,
 } from "convex/server";
 import type { ReadonlyRecord } from "effect/Record";
+import type { ReadonlyValue } from "~/src/schema-to-validator";
 
 export type GenericConfectDocument = ReadonlyRecord<string, any>;
+
+export type GenericEncodedConfectDocument = ReadonlyRecord<
+	string,
+	ReadonlyValue
+>;
 
 export type ConfectDocumentByName<
 	ConfectDataModel extends GenericConfectDataModel,
@@ -40,7 +46,7 @@ export type TableInfoFromConfectTableInfo<
 
 export type GenericConfectTableInfo = {
 	confectDocument: GenericConfectDocument;
-	encodedConfectDocument: GenericConfectDocument;
+	encodedConfectDocument: GenericEncodedConfectDocument;
 	convexDocument: GenericDocument;
 	fieldPaths: GenericFieldPaths;
 	indexes: GenericTableIndexes;

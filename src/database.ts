@@ -9,7 +9,6 @@ import type {
 	GenericDataModel,
 	GenericDatabaseReader,
 	GenericDatabaseWriter,
-	GenericDocument,
 	IndexRange,
 	IndexRangeBuilder,
 	Indexes,
@@ -46,6 +45,7 @@ import type {
 	GenericConfectDataModel,
 	GenericConfectDocument,
 	GenericConfectTableInfo,
+	GenericEncodedConfectDocument,
 	TableInfoFromConfectTableInfo,
 	TableNamesInConfectDataModel,
 } from "~/src/data-model";
@@ -97,7 +97,7 @@ class ConfectQueryImpl<
 	q: Query<TableInfoFromConfectTableInfo<ConfectTableInfo>>;
 	tableSchema: Schema.Schema<
 		ConfectTableInfo["confectDocument"],
-		ConfectTableInfo["convexDocument"]
+		ConfectTableInfo["encodedConfectDocument"]
 	>;
 	tableName: TableName;
 	constructor(
@@ -106,7 +106,7 @@ class ConfectQueryImpl<
 			| OrderedQuery<TableInfoFromConfectTableInfo<ConfectTableInfo>>,
 		tableSchema: Schema.Schema<
 			ConfectTableInfo["confectDocument"],
-			ConfectTableInfo["convexDocument"]
+			ConfectTableInfo["encodedConfectDocument"]
 		>,
 		tableName: TableName,
 	) {
@@ -116,7 +116,7 @@ class ConfectQueryImpl<
 		this.tableName = tableName;
 	}
 	decode(
-		convexDocument: ConfectTableInfo["convexDocument"],
+		convexDocument: ConfectTableInfo["encodedConfectDocument"],
 	): ConfectTableInfo["confectDocument"] {
 		return decodeDocument(this.tableName, this.tableSchema, convexDocument);
 	}
@@ -259,14 +259,14 @@ class ConfectQueryInitializerImpl<
 	q: QueryInitializer<TableInfoFromConfectTableInfo<ConfectTableInfo>>;
 	tableSchema: Schema.Schema<
 		ConfectTableInfo["confectDocument"],
-		ConfectTableInfo["convexDocument"]
+		ConfectTableInfo["encodedConfectDocument"]
 	>;
 	tableName: TableName;
 	constructor(
 		q: QueryInitializer<TableInfoFromConfectTableInfo<ConfectTableInfo>>,
 		tableSchema: Schema.Schema<
 			ConfectTableInfo["confectDocument"],
-			ConfectTableInfo["convexDocument"]
+			ConfectTableInfo["encodedConfectDocument"]
 		>,
 		tableName: TableName,
 	) {
@@ -741,7 +741,7 @@ const extendWithSystemFields = <
 
 const decodeDocument = <
 	TableName extends string,
-	ConvexDocument extends GenericDocument,
+	ConvexDocument extends GenericEncodedConfectDocument,
 	ConfectDocument extends GenericConfectDocument,
 >(
 	tableName: TableName,
