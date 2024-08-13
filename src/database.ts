@@ -120,7 +120,6 @@ class ConfectQueryImpl<
 	): ConfectTableInfo["confectDocument"] {
 		return decodeDocument(this.tableName, this.tableSchema, convexDocument);
 	}
-	// TODO: Private method for `Schema.decodeUnknown(extendWithSystemFields(this.tableSchema))`
 	filter(
 		predicate: (
 			q: FilterBuilder<TableInfoFromConfectTableInfo<ConfectTableInfo>>,
@@ -412,7 +411,7 @@ export class ConfectBaseDatabaseReaderImpl<
 	}
 	decode<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
 		tableName: TableName,
-		convexDocument: ConfectDataModel[TableName]["convexDocument"],
+		convexDocument: ConfectDataModel[TableName]["encodedConfectDocument"],
 	): ConfectDataModel[TableName]["confectDocument"] {
 		return decodeDocument(
 			tableName,
@@ -480,7 +479,7 @@ export class ConfectDatabaseReaderImpl<
 	}
 	decode<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
 		tableName: TableName,
-		convexDocument: ConfectDataModel[TableName]["convexDocument"],
+		convexDocument: ConfectDataModel[TableName]["encodedConfectDocument"],
 	): ConfectDataModel[TableName]["confectDocument"] {
 		return decodeDocument(
 			tableName,
