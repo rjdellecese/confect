@@ -37,8 +37,11 @@ import {
 } from "~/src/database";
 import type {
 	ConfectDataModelFromConfectSchema,
+	ConfectDataModelFromConfectSchemaDefinition,
 	ConfectSchemaDefinition,
 	GenericConfectSchema,
+	GenericConfectSchemaDefinition,
+	TableNamesInConfectSchemaDefinition,
 } from "~/src/schema";
 import { compileArgsSchema } from "./schema-to-validator";
 
@@ -284,4 +287,12 @@ const effectHttpActionFunction =
 	): Promise<Response> =>
 		Effect.runPromise(handler(makeConfectActionCtx(ctx), request));
 
-// TODO: Need `ConfectDoc<TableName>` type
+// TODO:
+// QueryCtx,
+// MutationCtx,
+// ActionCtx,
+export type ConfectDoc<
+	ConfectSchemaDefinition extends GenericConfectSchemaDefinition,
+	TableName extends
+		TableNamesInConfectSchemaDefinition<ConfectSchemaDefinition>,
+> = ConfectDataModelFromConfectSchemaDefinition<ConfectSchemaDefinition>[TableName]["encodedConfectDocument"];

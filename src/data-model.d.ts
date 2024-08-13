@@ -40,6 +40,7 @@ export type TableInfoFromConfectTableInfo<
 
 export type GenericConfectTableInfo = {
 	confectDocument: GenericConfectDocument;
+	encodedConfectDocument: GenericConfectDocument;
 	convexDocument: GenericDocument;
 	fieldPaths: GenericFieldPaths;
 	indexes: GenericTableIndexes;

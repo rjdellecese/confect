@@ -182,6 +182,14 @@ describe(compileAst, () => {
 
 			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow();
 		});
+
+		test("unsupported declaration", () => {
+			class Klass {}
+
+			const schema = Schema.instanceOf(Klass);
+
+			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow();
+		});
 	});
 });
 
@@ -229,6 +237,16 @@ describe(compileSchema, () => {
 		const expectedValidator = v.float64();
 
 		const schema = Schema.Number;
+		const compiledValidator = compileSchema(schema);
+
+		expect(compiledValidator).toStrictEqual(expectedValidator);
+		expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
+	});
+
+	test("array buffer", () => {
+		const expectedValidator = v.bytes();
+
+		const schema = Schema.instanceOf(ArrayBuffer);
 		const compiledValidator = compileSchema(schema);
 
 		expect(compiledValidator).toStrictEqual(expectedValidator);

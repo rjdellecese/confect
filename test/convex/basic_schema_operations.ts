@@ -2,10 +2,9 @@ import { Schema } from "@effect/schema";
 import { Array, Chunk, Effect, Option, Stream, pipe } from "effect";
 
 import type { PaginationResult } from "convex/server";
-import type { ReadonlyDeep } from "type-fest";
 import { SchemaId } from "~/src/SchemaId";
 import { api, internal } from "~/test/convex/_generated/api";
-import type { Doc, Id } from "~/test/convex/_generated/dataModel";
+import type { Id } from "~/test/convex/_generated/dataModel";
 import {
 	action,
 	internalAction,
@@ -14,6 +13,7 @@ import {
 	mutation,
 	query,
 } from "~/test/convex/confect_functions";
+import type { ConfectDoc } from "~/test/convex/confect_functions";
 import {
 	type TableName,
 	schema,
@@ -29,7 +29,7 @@ export const queryGet = query({
 	handler: (
 		{ db },
 		{ noteId },
-	): Effect.Effect<ReadonlyDeep<Doc<TableName<"notes">>> | null> =>
+	): Effect.Effect<ConfectDoc<TableName<"notes">> | null> =>
 		db.get(noteId).pipe(Effect.map(Option.getOrNull)),
 });
 
@@ -40,7 +40,7 @@ export const mutationGet = mutation({
 	handler: (
 		{ db },
 		{ noteId },
-	): Effect.Effect<ReadonlyDeep<Doc<TableName<"notes">>> | null> =>
+	): Effect.Effect<ConfectDoc<TableName<"notes">> | null> =>
 		db.get(noteId).pipe(Effect.map(Option.getOrNull)),
 });
 
@@ -54,13 +54,13 @@ export const insert = mutation({
 
 export const queryCollect = query({
 	args: Schema.Struct({}),
-	handler: ({ db }): Effect.Effect<ReadonlyDeep<Doc<TableName<"notes">>>[]> =>
+	handler: ({ db }): Effect.Effect<ConfectDoc<TableName<"notes">>[]> =>
 		db.query(tableName("notes")).collect(),
 });
 
 export const mutationCollect = mutation({
 	args: Schema.Struct({}),
-	handler: ({ db }): Effect.Effect<ReadonlyDeep<Doc<TableName<"notes">>>[]> =>
+	handler: ({ db }): Effect.Effect<ConfectDoc<TableName<"notes">>[]> =>
 		db.query(tableName("notes")).collect(),
 });
 
@@ -71,7 +71,7 @@ export const filterFirst = query({
 	handler: (
 		{ db },
 		{ text },
-	): Effect.Effect<ReadonlyDeep<Doc<TableName<"notes">>> | null> =>
+	): Effect.Effect<ConfectDoc<TableName<"notes">> | null> =>
 		db
 			.query(tableName("notes"))
 			.filter((q) => q.eq(q.field("text"), text))
@@ -86,7 +86,7 @@ export const withIndexFirst = query({
 	handler: (
 		{ db },
 		{ text },
-	): Effect.Effect<ReadonlyDeep<Doc<TableName<"notes">>> | null> =>
+	): Effect.Effect<ConfectDoc<TableName<"notes">> | null> =>
 		db
 			.query(tableName("notes"))
 			.withIndex("by_text", (q) => q.eq("text", text))
@@ -96,7 +96,7 @@ export const withIndexFirst = query({
 
 export const orderDescCollect = query({
 	args: Schema.Struct({}),
-	handler: ({ db }): Effect.Effect<ReadonlyDeep<Doc<TableName<"notes">>>[]> =>
+	handler: ({ db }): Effect.Effect<ConfectDoc<TableName<"notes">>[]> =>
 		db.query(tableName("notes")).order("desc").collect(),
 });
 
@@ -104,10 +104,7 @@ export const take = query({
 	args: Schema.Struct({
 		n: Schema.Number,
 	}),
-	handler: (
-		{ db },
-		{ n },
-	): Effect.Effect<ReadonlyDeep<Doc<TableName<"notes">>>[]> =>
+	handler: ({ db }, { n }): Effect.Effect<ConfectDoc<TableName<"notes">>[]> =>
 		db.query(tableName("notes")).take(n),
 });
 
@@ -119,7 +116,7 @@ export const paginate = query({
 	handler: (
 		{ db },
 		{ cursor, numItems },
-	): Effect.Effect<PaginationResult<ReadonlyDeep<Doc<TableName<"notes">>>>> => {
+	): Effect.Effect<PaginationResult<ConfectDoc<TableName<"notes">>>> => {
 		return db.query(tableName("notes")).paginate({ cursor, numItems });
 	},
 });
@@ -128,9 +125,7 @@ export const unique = query({
 	args: Schema.Struct({}),
 	handler: ({
 		db,
-	}): Effect.Effect<
-		ReadonlyDeep<Doc<TableName<"notes">>> | null | "NotUniqueError"
-	> =>
+	}): Effect.Effect<ConfectDoc<TableName<"notes">> | null | "NotUniqueError"> =>
 		db
 			.query(tableName("notes"))
 			.unique()
@@ -142,9 +137,7 @@ export const unique = query({
 
 export const onlyFirst = query({
 	args: Schema.Struct({}),
-	handler: ({
-		db,
-	}): Effect.Effect<ReadonlyDeep<Doc<TableName<"notes">>> | null> =>
+	handler: ({ db }): Effect.Effect<ConfectDoc<TableName<"notes">> | null> =>
 		db.query(tableName("notes")).first().pipe(Effect.map(Option.getOrNull)),
 });
 

@@ -1,4 +1,4 @@
-import type { AST } from "@effect/schema";
+import type { AST, ParseResult } from "@effect/schema";
 import * as Schema from "@effect/schema/Schema";
 import type {
 	GenericId,
@@ -212,9 +212,9 @@ type ValueTupleToValidatorTuple<VlTuple extends ReadonlyArray<ReadonlyValue>> =
 				: never
 			: [];
 
-export const compileSchema = <A extends ReadonlyValue>(
-	schema: Schema.Schema<A>,
-): ValueToValidator<Schema.Schema.Encoded<typeof schema>> =>
+export const compileSchema = <T, E>(
+	schema: Schema.Schema<T, E>,
+): ValueToValidator<(typeof schema)["Encoded"]> =>
 	compileAst(schema.ast) as any;
 
 export const compileAst = (ast: AST.AST): Validator<any, any, any> =>
@@ -294,8 +294,23 @@ export const compileAst = (ast: AST.AST): Validator<any, any, any> =>
 			}),
 		),
 		Match.tag("UnknownKeyword", "AnyKeyword", () => Effect.succeed(v.any())),
+		Match.tag("Declaration", (declaration) =>
+			Effect.mapBoth(
+				declaration.decodeUnknown(...declaration.typeParameters)(
+					new ArrayBuffer(0),
+					{},
+					declaration,
+				) as Effect.Effect<ArrayBuffer, ParseResult.ParseIssue>,
+				{
+					onSuccess: () => v.bytes(),
+					onFailure: () =>
+						new UnsupportedEffectSchemaTypeError({
+							schemaType: declaration._tag,
+						}),
+				},
+			),
+		),
 		Match.tag(
-			"Declaration",
 			"UniqueSymbol",
 			"SymbolKeyword",
 			"UndefinedKeyword",
@@ -307,9 +322,11 @@ export const compileAst = (ast: AST.AST): Validator<any, any, any> =>
 			"Suspend",
 			"Transformation",
 			"Refinement",
-			({ _tag }) =>
+			() =>
 				Effect.fail(
-					new UnsupportedEffectSchemaTypeError({ effectSchemaType: _tag }),
+					new UnsupportedEffectSchemaTypeError({
+						schemaType: ast._tag,
+					}),
 				),
 		),
 		Match.exhaustive,
@@ -394,7 +411,7 @@ class EmptyTupleIsNotSupportedError extends Data.TaggedError(
 class UnsupportedEffectSchemaTypeError extends Data.TaggedError(
 	"UnsupportedEffectSchemaTypeError",
 )<{
-	readonly effectSchemaType: AST.AST["_tag"];
+	readonly schemaType: AST.AST["_tag"];
 }> {}
 
 class IndexSignaturesAreNotSupportedError extends Data.TaggedError(

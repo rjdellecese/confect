@@ -320,6 +320,10 @@ export type TableNamesInConfectSchema<
 	ConfectSchema extends GenericConfectSchema,
 > = keyof ConfectSchema & string;
 
+export type TableNamesInConfectSchemaDefinition<
+	ConfectSchemaDefinition extends GenericConfectSchemaDefinition,
+> = TableNamesInConfectSchema<ConfectSchemaDefinition["confectSchema"]>;
+
 export type ConfectDataModelFromConfectSchema<
 	ConfectSchema extends GenericConfectSchema,
 > = {
@@ -334,6 +338,11 @@ export type ConfectDataModelFromConfectSchema<
 		? TableSchema extends Schema.Schema<any, any>
 			? {
 					confectDocument: ExtractConfectDocument<TableName, TableSchema>;
+					// It's pretty hard to recursively make an arbitrary TS type readonly/mutable, so we capture both the readonly version of the `convexDocument` (which is the `encodedConfectDocument`) and the mutable version (`convexDocument`).
+					encodedConfectDocument: ExtractEncodedConfectDocument<
+						TableName,
+						TableSchema
+					>;
 					convexDocument: ExtractDocument<TableName, TableValidator>;
 					fieldPaths:
 						| keyof IdField<TableName>
@@ -348,9 +357,14 @@ export type ConfectDataModelFromConfectSchema<
 
 type ExtractConfectDocument<
 	TableName extends string,
-	S extends Schema.Schema<any>,
+	S extends Schema.Schema<any, any>,
+> = Expand<Readonly<IdField<TableName>> & Readonly<SystemFields> & S["Type"]>;
+
+type ExtractEncodedConfectDocument<
+	TableName extends string,
+	S extends Schema.Schema<any, any>,
 > = Expand<
-	Readonly<IdField<TableName>> & Readonly<SystemFields> & S["Type"]
+	Readonly<IdField<TableName>> & Readonly<SystemFields> & S["Encoded"]
 >;
 
 export const confectSystemSchema = defineConfectSchema({

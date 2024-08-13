@@ -370,7 +370,7 @@ export type DatabaseSchemasFromConfectDataModel<
 > = {
 	[TableName in keyof ConfectDataModel & string]: Schema.Schema<
 		ConfectDataModel[TableName]["confectDocument"],
-		ConfectDataModel[TableName]["convexDocument"]
+		ConfectDataModel[TableName]["encodedConfectDocument"]
 	>;
 };
 
@@ -745,10 +745,7 @@ const decodeDocument = <
 	ConfectDocument extends GenericConfectDocument,
 >(
 	tableName: TableName,
-	tableSchema: Schema.Schema<
-		ConfectDocument,
-		ConvexDocument
-	>,
+	tableSchema: Schema.Schema<ConfectDocument, ConvexDocument>,
 	convexDocument: ConvexDocument,
 ): ConfectDocument =>
 	Schema.decodeUnknownSync(extendWithSystemFields(tableName, tableSchema), {
