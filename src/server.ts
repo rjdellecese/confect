@@ -30,6 +30,7 @@ import {
 import type {
 	DataModelFromConfectDataModel,
 	GenericConfectDataModel,
+	TableNamesInConfectDataModel,
 } from "~/src/data-model";
 import {
 	type DatabaseSchemasFromConfectDataModel,
@@ -37,11 +38,8 @@ import {
 } from "~/src/database";
 import type {
 	ConfectDataModelFromConfectSchema,
-	ConfectDataModelFromConfectSchemaDefinition,
 	ConfectSchemaDefinition,
 	GenericConfectSchema,
-	GenericConfectSchemaDefinition,
-	TableNamesInConfectSchemaDefinition,
 } from "~/src/schema";
 import { compileArgsSchema } from "./schema-to-validator";
 
@@ -292,7 +290,6 @@ const effectHttpActionFunction =
 // MutationCtx,
 // ActionCtx,
 export type ConfectDoc<
-	ConfectSchemaDefinition extends GenericConfectSchemaDefinition,
-	TableName extends
-		TableNamesInConfectSchemaDefinition<ConfectSchemaDefinition>,
-> = ConfectDataModelFromConfectSchemaDefinition<ConfectSchemaDefinition>[TableName]["encodedConfectDocument"];
+	ConfectDataModel extends GenericConfectDataModel,
+	TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+> = ConfectDataModel[TableName]["encodedConfectDocument"];
