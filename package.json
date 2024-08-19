@@ -29,7 +29,7 @@
 		"convex-test": "0.0.28",
 		"dotenv": "16.4.5",
 		"typescript": "5.5.4",
-		"vite": "5.4.0",
+		"vite": "5.4.1",
 		"vite-tsconfig-paths": "5.0.1",
 		"vitest": "2.0.5"
 	},
