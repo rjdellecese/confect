@@ -35,7 +35,7 @@
 	},
 	"dependencies": {
 		"@effect/schema": "0.70.3",
-		"convex": "1.14.0",
+		"convex": "1.14.4",
 		"effect": "3.6.2"
 	},
 	"engines": {
