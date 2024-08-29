@@ -13,7 +13,7 @@
 		"test": "vitest --run",
 		"typecheck": "vitest run --typecheck",
 		"coverage": "vitest run --coverage",
-		"build": "vite build"
+		"build": "tsc"
 	},
 	"keywords": ["effect", "convex"],
 	"author": "RJ Dellecese",

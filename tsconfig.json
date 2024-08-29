@@ -6,6 +6,7 @@
 		"moduleResolution": "Bundler",
 		"module": "ESNext",
 		"baseUrl": ".",
+		"outDir": "dist",
 		"paths": {
 			"~/*": ["*"]
 		}
