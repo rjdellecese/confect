@@ -285,10 +285,6 @@ const effectHttpActionFunction =
 	): Promise<Response> =>
 		Effect.runPromise(handler(makeConfectActionCtx(ctx), request));
 
-// TODO:
-// QueryCtx,
-// MutationCtx,
-// ActionCtx,
 export type ConfectDoc<
 	ConfectDataModel extends GenericConfectDataModel,
 	TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
