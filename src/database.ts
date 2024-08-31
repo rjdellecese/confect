@@ -621,7 +621,6 @@ export class ConfectDatabaseWriterImpl<
 				Effect.promise(() =>
 					this.db.insert(
 						table,
-						// TODO: Look into this casting. Can we make it better?
 						encodedValue as Expand<
 							BetterOmit<
 								DocumentByName<
