@@ -434,7 +434,6 @@ describe("patch", () => {
 				})
 				.pipe(Effect.exit);
 
-			// TODO: Check for exact failure, here and everywhere else `Exit.isFailure` is used
 			expect(Exit.isFailure(exit)).toBe(true);
 		}));
 

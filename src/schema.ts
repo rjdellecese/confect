@@ -400,7 +400,7 @@ type ConfectSystemSchema = typeof confectSystemSchema;
 export type ConfectSystemDataModel =
 	ConfectDataModelFromConfectSchemaDefinition<ConfectSystemSchema>;
 
-// TODO: Vendored types:
+// Vendored types from convex-js, partially modified. Ideally we could use these directly. See https://github.com/get-convex/convex-js/pull/14
 
 /**
  * Extract all of the index field paths within a {@link Validator}.

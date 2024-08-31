@@ -215,7 +215,6 @@ export const patch = mutation({
 	args: Schema.Struct({
 		noteId: SchemaId<TableName<"notes">>(),
 		fields: Schema.Struct({
-			// TODO: Better error messages for `Schema.optionalWith` when `{ exact: true }` is not present
 			text: Schema.optionalWith(Schema.String, { exact: true }),
 			author: Schema.optionalWith(
 				Schema.Struct({

@@ -110,7 +110,7 @@ class ConfectQueryImpl<
 		>,
 		tableName: TableName,
 	) {
-		// TODO: Why assert here?
+		// This is some trickery, copied from convex-js. I suspect there's a better way.
 		this.q = q as Query<TableInfoFromConfectTableInfo<ConfectTableInfo>>;
 		this.tableSchema = tableSchema;
 		this.tableName = tableName;
@@ -161,7 +161,7 @@ class ConfectQueryImpl<
 			})),
 		);
 	}
-	// TODO: Can we implement collect with stream?
+	// It could be better to implement collect() with stream()
 	collect(): Effect.Effect<ConfectTableInfo["confectDocument"][]> {
 		return pipe(
 			Effect.promise(() => this.q.collect()),
@@ -553,12 +553,7 @@ export interface ConfectDatabaseWriter<
 		value: Partial<
 			WithoutSystemFields<ConfectDocumentByName<ConfectDataModel, TableName>>
 		>,
-	): Effect.Effect<
-		void,
-		| ParseResult.ParseError
-		| Cause.NoSuchElementException
-		| InvalidIdProvidedForPatch
-	>;
+	): Effect.Effect<void, ParseResult.ParseError | Cause.NoSuchElementException>;
 	replace<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
 		id: GenericId<TableName>,
 		value: WithOptionalSystemFields<
@@ -642,9 +637,7 @@ export class ConfectDatabaseWriterImpl<
 		>,
 	): Effect.Effect<
 		void,
-		| ParseResult.ParseError
-		| Cause.NoSuchElementException
-		| InvalidIdProvidedForPatch
+		ParseResult.ParseError | Cause.NoSuchElementException
 	> {
 		return Effect.gen(this, function* () {
 			const tableName = yield* this.tableName(id);
@@ -662,8 +655,7 @@ export class ConfectDatabaseWriterImpl<
 					) =>
 						doc
 							? Effect.succeed(doc)
-							: // TODO: Should this be a failure or a defect?
-								Effect.fail(new InvalidIdProvidedForPatch()),
+							: Effect.die(new InvalidIdProvidedForPatch()),
 				),
 			);
 

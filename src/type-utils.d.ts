@@ -53,7 +53,6 @@ export type DeepReadonly<T> = IsAny<T> extends true
 
 // Vendored from Arktype
 // https://github.com/arktypeio/arktype/blob/2e911d01a741ccee7a17e31ee144049817fabbb8/ark/util/unionToTuple.ts#L9
-// TODO: Write some tests still?
 export type UnionToTuple<t> = _unionToTuple<t, []> extends infer result
 	? conform<result, t[]>
 	: never;
