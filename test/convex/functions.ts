@@ -11,8 +11,8 @@ import {
 	internalQuery,
 	mutation,
 	query,
-} from "~/test/convex/confect_functions";
-import type { ConfectDoc } from "~/test/convex/confect_functions";
+} from "~/test/convex/confect";
+import type { ConfectDoc } from "~/test/convex/confect";
 import { confectTableSchemas } from "./schema";
 
 export const queryGet = query({

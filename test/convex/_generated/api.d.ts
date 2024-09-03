@@ -13,7 +13,7 @@ import type {
   FilterApi,
   FunctionReference,
 } from "convex/server";
-import type * as confect_functions from "../confect_functions.js";
+import type * as confect_functions from "../confect.js";
 import type * as functions from "../functions.js";
 import type * as http_get from "../http/get.js";
 import type * as http from "../http.js";
