@@ -6,7 +6,7 @@ import {
 	type ConfectDataModelFromConfectSchema,
 	defineConfectTable,
 } from "~/src/schema";
-import { SchemaId } from "../src/SchemaId";
+import { IdSchema } from "../src/schemas/IdSchema";
 
 test("DatabaseSchemasFromConfectDataModel", () => {
 	const notesSchemaFields = {
@@ -22,7 +22,7 @@ test("DatabaseSchemasFromConfectDataModel", () => {
 	type DatabaseSchemas = DatabaseSchemasFromConfectDataModel<ConfectDataModel>;
 
 	const notesDocumentSchema = Schema.Struct({
-		_id: SchemaId<"notes">(),
+		_id: IdSchema<"notes">(),
 		_creationTime: Schema.Number,
 		...notesSchemaFields,
 	});

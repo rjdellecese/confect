@@ -51,10 +51,16 @@ export const compileArgsSchema = <ConfectValue, ConvexValue>(
 	);
 };
 
+// Returns
+
+export const compileReturnsSchema = <ConfectValue, ConvexValue>(
+	schema: Schema.Schema<ConfectValue, ConvexValue>,
+): Validator<any, any, any> => compileAst(Schema.encodedSchema(schema).ast);
+
 // Table
 
 export type TableSchemaToTableValidator<
-	TableSchema extends Schema.Schema<any, any>,
+	TableSchema extends Schema.Schema.AnyNoContext,
 > = ValueToValidator<TableSchema["Encoded"]> extends infer Vd extends VObject<
 	any,
 	any,

@@ -41,7 +41,7 @@ import type {
 	ConfectSchemaDefinition,
 	GenericConfectSchema,
 } from "~/src/schema";
-import { compileArgsSchema } from "./schema-to-validator";
+import { compileArgsSchema, compileReturnsSchema } from "./schema-to-validator";
 
 export const confectServer = <
 	ConvexSchema extends GenericSchema,
@@ -54,37 +54,45 @@ export const confectServer = <
 	);
 
 	const query = <
-		ConvexValue extends DefaultFunctionArgs,
-		ConfectValue,
-		Output,
+		ConvexArgs extends DefaultFunctionArgs,
+		ConfectArgs,
+		ConvexReturns,
+		ConfectReturns,
 	>({
 		args,
+		returns,
 		handler,
 	}: {
-		args: Schema.Schema<ConfectValue, ConvexValue>;
+		args: Schema.Schema<ConfectArgs, ConvexArgs>;
+		returns: Schema.Schema<ConfectReturns, ConvexReturns>;
 		handler: (
 			ctx: ConfectQueryCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>,
-			a: ConfectValue,
-		) => Effect.Effect<Output>;
-	}): RegisteredQuery<"public", ConvexValue, Promise<Output>> =>
-		queryGeneric(confectQueryFunction({ databaseSchemas, args, handler }));
+			a: ConfectArgs,
+		) => Effect.Effect<ConvexReturns>;
+	}): RegisteredQuery<"public", ConvexArgs, Promise<ConvexReturns>> =>
+		queryGeneric(
+			confectQueryFunction({ databaseSchemas, args, returns, handler }),
+		);
 
 	const internalQuery = <
-		ConvexValue extends DefaultFunctionArgs,
-		Confectvalue,
-		Output,
+		ConvexArgs extends DefaultFunctionArgs,
+		ConfectArgs,
+		ConvexReturns,
+		ConfectReturns,
 	>({
 		args,
 		handler,
+		returns,
 	}: {
-		args: Schema.Schema<Confectvalue, ConvexValue>;
+		args: Schema.Schema<ConfectArgs, ConvexArgs>;
+		returns: Schema.Schema<ConfectReturns, ConvexReturns>;
 		handler: (
 			ctx: ConfectQueryCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>,
-			a: Confectvalue,
-		) => Effect.Effect<Output>;
-	}): RegisteredQuery<"internal", ConvexValue, Promise<Output>> =>
+			a: ConfectArgs,
+		) => Effect.Effect<ConvexReturns>;
+	}): RegisteredQuery<"internal", ConvexArgs, Promise<ConvexReturns>> =>
 		internalQueryGeneric(
-			confectQueryFunction({ databaseSchemas, args, handler }),
+			confectQueryFunction({ databaseSchemas, args, returns, handler }),
 		);
 
 	const mutation = <
@@ -175,32 +183,39 @@ export const confectServer = <
 
 const confectQueryFunction = <
 	ConfectDataModel extends GenericConfectDataModel,
-	ConvexValue extends DefaultFunctionArgs,
-	ConfectValue,
-	Output,
+	ConvexArgs extends DefaultFunctionArgs,
+	ConfectArgs,
+	ConvexReturns,
+	ConfectReturns,
 >({
 	databaseSchemas,
 	args,
+	returns,
 	handler,
 }: {
 	databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>;
-	args: Schema.Schema<ConfectValue, ConvexValue>;
+	args: Schema.Schema<ConfectArgs, ConvexArgs>;
+	returns: Schema.Schema<ConfectReturns, ConvexReturns>;
 	handler: (
 		ctx: ConfectQueryCtx<ConfectDataModel>,
-		a: ConfectValue,
-	) => Effect.Effect<Output>;
+		a: ConfectArgs,
+	) => Effect.Effect<ConvexReturns>;
 }) => ({
 	args: compileArgsSchema(args),
+	returns: compileReturnsSchema(returns),
 	handler: (
 		ctx: GenericQueryCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
-		actualArgs: ConvexValue,
-	): Promise<Output> =>
+		actualArgs: ConvexArgs,
+	): Promise<ConvexReturns> =>
 		pipe(
 			actualArgs,
 			Schema.decode(args),
 			Effect.orDie,
 			Effect.andThen((decodedArgs) =>
 				handler(makeConfectQueryCtx(ctx, databaseSchemas), decodedArgs),
+			),
+			Effect.andThen((convexReturns) =>
+				Schema.encodeUnknown(returns)(convexReturns),
 			),
 			Effect.runPromise,
 		),

@@ -20,6 +20,10 @@ import type { Validator } from "convex/values";
 import { Record, pipe } from "effect";
 
 import { compileTableSchema } from "~/src/schema-to-validator";
+import {
+	type ExtendWithSystemFields,
+	extendWithSystemFields,
+} from "./schemas/SystemFields";
 
 export type GenericConfectSchema = Record<
 	string,
@@ -399,6 +403,44 @@ type ConfectSystemSchema = typeof confectSystemSchema;
 
 export type ConfectSystemDataModel =
 	ConfectDataModelFromConfectSchemaDefinition<ConfectSystemSchema>;
+
+type TableSchemasFromConfectSchema<ConfectSchema extends GenericConfectSchema> =
+	Expand<
+		{
+			[TableName in keyof ConfectSchema & string]: {
+				withSystemFields: ExtendWithSystemFields<
+					TableName,
+					ConfectSchema[TableName]["tableSchema"]
+				>;
+				withoutSystemFields: ConfectSchema[TableName]["tableSchema"];
+			};
+		} & {
+			[TableName in keyof ConfectSystemSchema["confectSchema"] & string]: {
+				withSystemFields: ExtendWithSystemFields<
+					TableName,
+					ConfectSystemSchema["confectSchema"][TableName]["tableSchema"]
+				>;
+				withoutSystemFields: ConfectSystemSchema["confectSchema"][TableName]["tableSchema"];
+			};
+		}
+	>;
+
+export const tableSchemas = <ConfectSchema extends GenericConfectSchema>(
+	confectSchema: ConfectSchema,
+): TableSchemasFromConfectSchema<ConfectSchema> =>
+	({
+		...Record.map(confectSchema, ({ tableSchema }, tableName) => ({
+			withSystemFields: extendWithSystemFields(tableName, tableSchema),
+			withoutSystemFields: tableSchema,
+		})),
+		...Record.map(
+			confectSystemSchema.confectSchema,
+			({ tableSchema }, tableName) => ({
+				withSystemFields: extendWithSystemFields(tableName, tableSchema),
+				withoutSystemFields: tableSchema,
+			}),
+		),
+	}) as any;
 
 // Vendored types from convex-js, partially modified. Ideally we could use these directly. See https://github.com/get-convex/convex-js/pull/14
 

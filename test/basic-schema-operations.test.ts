@@ -25,7 +25,7 @@ test("query get", () =>
 			noteId,
 		});
 
-		expect(note?.text).toEqual(text);
+		expect(note).toMatchObject({ _tag: "Some", value: { text } });
 	}));
 
 test("mutation get", () =>
@@ -42,7 +42,7 @@ test("mutation get", () =>
 			noteId,
 		});
 
-		expect(note?.text).toEqual(text);
+		expect(note).toMatchObject({ text });
 	}));
 
 test("insert", () =>
@@ -112,7 +112,7 @@ test("filter + first", () =>
 			text: text1,
 		});
 
-		expect(note?.text).toEqual(text1);
+		expect(note).toMatchObject({ _tag: "Some", value: { text: text1 } });
 	}));
 
 test("withIndex + first", () =>
@@ -131,7 +131,7 @@ test("withIndex + first", () =>
 			text: text,
 		});
 
-		expect(note?.text).toEqual(text);
+		expect(note).toMatchObject({ _tag: "Some", value: { text } });
 	}));
 
 test("order desc + collect", () =>
@@ -218,12 +218,12 @@ test("paginate", () =>
 			api.basic_schema_operations.paginate,
 			{
 				cursor: paginationResult.continueCursor,
-				numItems: 5,
+				numItems: 4,
 			},
 		);
 
 		expect(paginationResult2.page.length).toEqual(4);
-		expect(paginationResult2.isDone).toEqual(true);
+		expect(paginationResult2.isDone).toEqual(false);
 	}));
 
 describe("unique", () => {
@@ -237,7 +237,10 @@ describe("unique", () => {
 
 			const note = yield* c.query(api.basic_schema_operations.unique, {});
 
-			expect(note).toMatchObject({ text: "Hello, world!" });
+			expect(note).toMatchObject({
+				_tag: "Some",
+				value: { text: "Hello, world!" },
+			});
 		}));
 
 	test("when more than two notes exist", () =>
@@ -264,7 +267,7 @@ describe("unique", () => {
 
 			const note = yield* c.query(api.basic_schema_operations.unique, {});
 
-			expect(note).toEqual(null);
+			expect(note).toMatchObject({ _tag: "None" });
 		}));
 });
 
@@ -279,7 +282,7 @@ describe("first without filters", () => {
 
 			const note = yield* c.query(api.basic_schema_operations.onlyFirst, {});
 
-			expect(note?.text).toEqual(text);
+			expect(note).toMatchObject({ _tag: "Some", value: { text } });
 		}));
 
 	test("when zero notes exist", () =>
@@ -288,7 +291,7 @@ describe("first without filters", () => {
 
 			const note = yield* c.query(api.basic_schema_operations.onlyFirst, {});
 
-			expect(note).toEqual(null);
+			expect(note).toEqual({ _tag: "None" });
 		}));
 });
 
@@ -753,7 +756,7 @@ describe("system", () => {
 				{ id },
 			);
 
-			expect(normalizedId).toEqual(id);
+			expect(normalizedId).toEqual({ _tag: "Some", value: id });
 		}));
 
 	test("get", () =>
@@ -765,7 +768,7 @@ describe("system", () => {
 				id,
 			});
 
-			expect(storageDoc?._id).toEqual(id);
+			expect(storageDoc).toMatchObject({ _tag: "Some", value: { _id: id } });
 		}));
 
 	test("query", () =>

@@ -1,8 +1,7 @@
 import { Schema } from "@effect/schema";
 import { Array, Chunk, Effect, Option, Stream, pipe } from "effect";
-
-import type { PaginationResult } from "convex/server";
-import { SchemaId } from "~/src/SchemaId";
+import * as PaginationResult from "~/src/schemas/PaginationResult";
+import { IdSchema } from "~/src/schemas/IdSchema";
 import { api, internal } from "~/test/convex/_generated/api";
 import type { Id } from "~/test/convex/_generated/dataModel";
 import {
@@ -19,23 +18,23 @@ import {
 	schema,
 	tableName,
 } from "~/test/convex/schemas/basic_schema_operations";
+import { confectTableSchemas } from "./schema";
 
 export const tables = schema.tables;
 
 export const queryGet = query({
 	args: Schema.Struct({
-		noteId: SchemaId<TableName<"notes">>(),
+		noteId: IdSchema<TableName<"notes">>(),
 	}),
-	handler: (
-		{ db },
-		{ noteId },
-	): Effect.Effect<ConfectDoc<TableName<"notes">> | null> =>
-		db.get(noteId).pipe(Effect.map(Option.getOrNull)),
+	returns: Schema.Option(
+		confectTableSchemas.basic_schema_operations__notes.withSystemFields,
+	),
+	handler: ({ db }, { noteId }) => db.get(noteId),
 });
 
 export const mutationGet = mutation({
 	args: Schema.Struct({
-		noteId: SchemaId<TableName<"notes">>(),
+		noteId: IdSchema<TableName<"notes">>(),
 	}),
 	handler: (
 		{ db },
@@ -54,8 +53,10 @@ export const insert = mutation({
 
 export const queryCollect = query({
 	args: Schema.Struct({}),
-	handler: ({ db }): Effect.Effect<ConfectDoc<TableName<"notes">>[]> =>
-		db.query(tableName("notes")).collect(),
+	returns: Schema.Array(
+		confectTableSchemas.basic_schema_operations__notes.withSystemFields,
+	),
+	handler: ({ db }) => db.query(tableName("notes")).collect(),
 });
 
 export const mutationCollect = mutation({
@@ -68,44 +69,46 @@ export const filterFirst = query({
 	args: Schema.Struct({
 		text: Schema.String,
 	}),
-	handler: (
-		{ db },
-		{ text },
-	): Effect.Effect<ConfectDoc<TableName<"notes">> | null> =>
+	returns: Schema.Option(
+		confectTableSchemas.basic_schema_operations__notes.withSystemFields,
+	),
+	handler: ({ db }, { text }) =>
 		db
 			.query(tableName("notes"))
 			.filter((q) => q.eq(q.field("text"), text))
-			.first()
-			.pipe(Effect.map(Option.getOrNull)),
+			.first(),
 });
 
 export const withIndexFirst = query({
 	args: Schema.Struct({
 		text: Schema.String,
 	}),
-	handler: (
-		{ db },
-		{ text },
-	): Effect.Effect<ConfectDoc<TableName<"notes">> | null> =>
+	returns: Schema.Option(
+		confectTableSchemas.basic_schema_operations__notes.withSystemFields,
+	),
+	handler: ({ db }, { text }) =>
 		db
 			.query(tableName("notes"))
 			.withIndex("by_text", (q) => q.eq("text", text))
-			.first()
-			.pipe(Effect.map(Option.getOrNull)),
+			.first(),
 });
 
 export const orderDescCollect = query({
 	args: Schema.Struct({}),
-	handler: ({ db }): Effect.Effect<ConfectDoc<TableName<"notes">>[]> =>
-		db.query(tableName("notes")).order("desc").collect(),
+	returns: Schema.Array(
+		confectTableSchemas.basic_schema_operations__notes.withSystemFields,
+	),
+	handler: ({ db }) => db.query(tableName("notes")).order("desc").collect(),
 });
 
 export const take = query({
 	args: Schema.Struct({
 		n: Schema.Number,
 	}),
-	handler: ({ db }, { n }): Effect.Effect<ConfectDoc<TableName<"notes">>[]> =>
-		db.query(tableName("notes")).take(n),
+	returns: Schema.Array(
+		confectTableSchemas.basic_schema_operations__notes.withSystemFields,
+	),
+	handler: ({ db }, { n }) => db.query(tableName("notes")).take(n),
 });
 
 export const paginate = query({
@@ -113,37 +116,42 @@ export const paginate = query({
 		cursor: Schema.Union(Schema.String, Schema.Null),
 		numItems: Schema.Number,
 	}),
-	handler: (
-		{ db },
-		{ cursor, numItems },
-	): Effect.Effect<PaginationResult<ConfectDoc<TableName<"notes">>>> => {
-		return db.query(tableName("notes")).paginate({ cursor, numItems });
-	},
+	returns: PaginationResult.PaginationResult(
+		confectTableSchemas.basic_schema_operations__notes.withSystemFields,
+	),
+	handler: ({ db }, { cursor, numItems }) =>
+		db.query(tableName("notes")).paginate({ cursor, numItems }),
 });
 
 export const unique = query({
 	args: Schema.Struct({}),
-	handler: ({
-		db,
-	}): Effect.Effect<ConfectDoc<TableName<"notes">> | null | "NotUniqueError"> =>
+	returns: Schema.Union(
+		Schema.Literal("NotUniqueError"),
+		Schema.Option(
+			confectTableSchemas.basic_schema_operations__notes.withSystemFields,
+		),
+	),
+	handler: ({ db }) =>
 		db
 			.query(tableName("notes"))
 			.unique()
 			.pipe(
-				Effect.map(Option.getOrNull),
 				Effect.catchTag("NotUniqueError", ({ _tag }) => Effect.succeed(_tag)),
 			),
 });
 
 export const onlyFirst = query({
 	args: Schema.Struct({}),
-	handler: ({ db }): Effect.Effect<ConfectDoc<TableName<"notes">> | null> =>
-		db.query(tableName("notes")).first().pipe(Effect.map(Option.getOrNull)),
+	returns: Schema.Option(
+		confectTableSchemas.basic_schema_operations__notes.withSystemFields,
+	),
+	handler: ({ db }) => db.query(tableName("notes")).first(),
 });
 
 export const mapTextStream = query({
 	args: Schema.Struct({}),
-	handler: ({ db }): Effect.Effect<string[]> =>
+	returns: Schema.Array(Schema.String),
+	handler: ({ db }) =>
 		Effect.gen(function* () {
 			const stream = db.query(tableName("notes")).stream();
 			return yield* pipe(
@@ -160,7 +168,8 @@ export const search = query({
 		query: Schema.String,
 		tag: Schema.String,
 	}),
-	handler: ({ db }, { query, tag }): Effect.Effect<string[]> =>
+	returns: Schema.Array(Schema.String),
+	handler: ({ db }, { query, tag }) =>
 		db
 			.query(tableName("notes"))
 			.withSearchIndex("text", (q) => q.search("text", query).eq("tag", tag))
@@ -170,19 +179,16 @@ export const search = query({
 
 export const queryNormalizeId = query({
 	args: Schema.Struct({
-		noteId: SchemaId<TableName<"notes">>(),
+		noteId: IdSchema<TableName<"notes">>(),
 	}),
-	handler: ({ db }, { noteId }): Effect.Effect<Id<TableName<"notes">> | null> =>
-		pipe(
-			db.normalizeId(tableName("notes"), noteId),
-			Option.getOrNull,
-			Effect.succeed,
-		),
+	returns: Schema.Option(IdSchema<TableName<"notes">>()),
+	handler: ({ db }, { noteId }) =>
+		Effect.succeed(db.normalizeId(tableName("notes"), noteId)),
 });
 
 export const mutationNormalizeId = mutation({
 	args: Schema.Struct({
-		noteId: SchemaId<TableName<"notes">>(),
+		noteId: IdSchema<TableName<"notes">>(),
 	}),
 	handler: ({ db }, { noteId }): Effect.Effect<Id<TableName<"notes">> | null> =>
 		pipe(
@@ -195,7 +201,7 @@ export const mutationNormalizeId = mutation({
 // Exporting only to stop TypeScript from complaining.
 export const _badPatch = mutation({
 	args: Schema.Struct({
-		noteId: SchemaId<TableName<"notes">>(),
+		noteId: IdSchema<TableName<"notes">>(),
 	}),
 	handler: ({ db }, { noteId }) =>
 		Effect.gen(function* () {
@@ -213,7 +219,7 @@ export const _badPatch = mutation({
 
 export const patch = mutation({
 	args: Schema.Struct({
-		noteId: SchemaId<TableName<"notes">>(),
+		noteId: IdSchema<TableName<"notes">>(),
 		fields: Schema.Struct({
 			text: Schema.optionalWith(Schema.String, { exact: true }),
 			author: Schema.optionalWith(
@@ -231,7 +237,7 @@ export const patch = mutation({
 
 export const unsetAuthorPatch = mutation({
 	args: Schema.Struct({
-		noteId: SchemaId<TableName<"notes">>(),
+		noteId: IdSchema<TableName<"notes">>(),
 	}),
 	handler: ({ db }, { noteId }) =>
 		db.patch(noteId, { author: undefined }).pipe(Effect.orDie),
@@ -247,9 +253,9 @@ export const insertTooLongText = mutation({
 
 export const replace = mutation({
 	args: Schema.Struct({
-		noteId: SchemaId<TableName<"notes">>(),
+		noteId: IdSchema<TableName<"notes">>(),
 		fields: Schema.Struct({
-			_id: Schema.optionalWith(SchemaId<TableName<"notes">>(), { exact: true }),
+			_id: Schema.optionalWith(IdSchema<TableName<"notes">>(), { exact: true }),
 			_creationTime: Schema.optionalWith(Schema.Number, { exact: true }),
 			text: Schema.String,
 		}),
@@ -260,14 +266,15 @@ export const replace = mutation({
 
 export const deleteNote = mutation({
 	args: Schema.Struct({
-		noteId: SchemaId<TableName<"notes">>(),
+		noteId: IdSchema<TableName<"notes">>(),
 	}),
 	handler: ({ db }, { noteId }): Effect.Effect<void> => db.delete(noteId),
 });
 
 export const isAuthenticated = query({
 	args: Schema.Struct({}),
-	handler: ({ auth }): Effect.Effect<boolean> =>
+	returns: Schema.Boolean,
+	handler: ({ auth }) =>
 		pipe(auth.getUserIdentity(), Effect.map(Option.isSome)),
 });
 
@@ -275,8 +282,9 @@ export const isAuthenticated = query({
 
 export const actionQuery = internalQuery({
 	args: Schema.Struct({}),
-	handler: ({ db }): Effect.Effect<void> =>
-		db.query(tableName("notes")).collect(),
+	returns: Schema.Null,
+	handler: ({ db }) =>
+		db.query(tableName("notes")).collect().pipe(Effect.as(null)),
 });
 
 export const actionMutation = internalMutation({
@@ -337,7 +345,14 @@ export const executeVectorSearch = action({
 					runQuery(api.basic_schema_operations.getVectorSearch, {
 						noteId: vectorResult._id,
 					}).pipe(
-						Effect.map(Option.fromNullable),
+						Effect.andThen(
+							Schema.decode(
+								Schema.Option(
+									confectTableSchemas.basic_schema_operations__notes
+										.withSystemFields,
+								),
+							),
+						),
 						Effect.map(Option.getOrThrow),
 						Effect.map(({ text, tag }) => ({ text, tag })),
 					),
@@ -349,10 +364,12 @@ export const executeVectorSearch = action({
 
 export const getVectorSearch = query({
 	args: Schema.Struct({
-		noteId: SchemaId<TableName<"notes">>(),
+		noteId: IdSchema<TableName<"notes">>(),
 	}),
-	handler: ({ db }, { noteId }) =>
-		db.get(noteId).pipe(Effect.map(Option.getOrNull)),
+	returns: Schema.Option(
+		confectTableSchemas.basic_schema_operations__notes.withSystemFields,
+	),
+	handler: ({ db }, { noteId }) => db.get(noteId),
 });
 
 // Scheduler
@@ -389,30 +406,30 @@ export const insertAt = action({
 
 export const systemNormalizeId = query({
 	args: Schema.Struct({
-		id: SchemaId<"_storage">(),
+		id: IdSchema<"_storage">(),
 	}),
-	handler: ({ db }, { id }): Effect.Effect<Id<"_storage"> | null> =>
-		db.system
-			.normalizeId("_storage", id)
-			.pipe(Option.getOrNull, Effect.succeed),
+	returns: Schema.Option(IdSchema<"_storage">()),
+	handler: ({ db }, { id }) =>
+		db.system.normalizeId("_storage", id).pipe(Effect.succeed),
 });
 
 export const systemGet = query({
 	args: Schema.Struct({
-		id: SchemaId<"_storage">(),
+		id: IdSchema<"_storage">(),
 	}),
-	handler: ({ db }, { id }) =>
-		db.system.get(id).pipe(Effect.map(Option.getOrNull)),
+	returns: Schema.Option(confectTableSchemas._storage.withSystemFields),
+	handler: ({ db }, { id }) => db.system.get(id),
 });
 
 export const systemQuery = query({
 	args: Schema.Struct({}),
+	returns: Schema.Array(confectTableSchemas._storage.withSystemFields),
 	handler: ({ db }) => db.system.query("_storage").collect(),
 });
 
 export const storageGetUrl = action({
 	args: Schema.Struct({
-		id: SchemaId<"_storage">(),
+		id: IdSchema<"_storage">(),
 	}),
 	handler: ({ storage }, { id }) =>
 		storage.getUrl(id).pipe(Effect.map(Option.getOrNull)),
@@ -425,7 +442,7 @@ export const storageGenerateUploadUrl = action({
 
 export const storageDelete = action({
 	args: Schema.Struct({
-		id: SchemaId<"_storage">(),
+		id: IdSchema<"_storage">(),
 	}),
 	handler: ({ storage }, { id }) => storage.delete(id),
 });

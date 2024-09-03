@@ -55,7 +55,7 @@ import {
 	type GenericConfectSchema,
 	confectSystemSchema,
 } from "~/src/schema";
-import { SchemaId } from "./SchemaId";
+import { extendWithSystemFields } from "./schemas/SystemFields";
 
 interface ConfectQuery<
 	ConfectTableInfo extends GenericConfectTableInfo,
@@ -156,8 +156,12 @@ class ConfectQueryImpl<
 				page: parsedPage,
 				isDone: paginationResult.isDone,
 				continueCursor: paginationResult.continueCursor,
-				splitCursor: paginationResult.splitCursor,
-				pageStatus: paginationResult.pageStatus,
+				...(paginationResult.splitCursor
+					? { splitCursor: paginationResult.splitCursor }
+					: {}),
+				...(paginationResult.pageStatus
+					? { pageStatus: paginationResult.pageStatus }
+					: {}),
 			})),
 		);
 	}
@@ -716,18 +720,6 @@ export const databaseSchemasFromConfectSchema = <
 class InvalidIdProvidedForPatch extends Data.TaggedError(
 	"InvalidIdProvidedForPatch",
 ) {}
-
-const extendWithSystemFields = <
-	TableName extends string,
-	TableSchema extends Schema.Schema<any, any>,
->(
-	_tableName: TableName,
-	schema: TableSchema,
-) =>
-	Schema.extend(
-		schema,
-		Schema.Struct({ _id: SchemaId<TableName>(), _creationTime: Schema.Number }),
-	);
 
 const decodeDocument = <
 	TableName extends string,
