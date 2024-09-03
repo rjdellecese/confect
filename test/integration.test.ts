@@ -4,10 +4,6 @@ import { Array, Effect, Exit, Order, String } from "effect";
 import { test } from "~/test/convex-effect-test";
 import { api } from "~/test/convex/_generated/api";
 import type { Id } from "~/test/convex/_generated/dataModel";
-import {
-	type TableName,
-	tableName,
-} from "~/test/convex/schemas/basic_schema_operations";
 import { TestConvexService } from "~/test/test-convex-service";
 import { NotUniqueError } from "../src/database";
 
@@ -17,11 +13,9 @@ test("query get", () =>
 
 		const text = "Hello world!";
 
-		const noteId = yield* c.run(({ db }) =>
-			db.insert(tableName("notes"), { text }),
-		);
+		const noteId = yield* c.run(({ db }) => db.insert("notes", { text }));
 
-		const note = yield* c.query(api.basic_schema_operations.queryGet, {
+		const note = yield* c.query(api.functions.queryGet, {
 			noteId,
 		});
 
@@ -34,11 +28,9 @@ test("mutation get", () =>
 
 		const text = "Hello world!";
 
-		const noteId = yield* c.run(({ db }) =>
-			db.insert(tableName("notes"), { text }),
-		);
+		const noteId = yield* c.run(({ db }) => db.insert("notes", { text }));
 
-		const note = yield* c.mutation(api.basic_schema_operations.mutationGet, {
+		const note = yield* c.mutation(api.functions.mutationGet, {
 			noteId,
 		});
 
@@ -51,12 +43,9 @@ test("insert", () =>
 
 		const text = "Hello, world!";
 
-		const noteId: Id<TableName<"notes">> = yield* c.mutation(
-			api.basic_schema_operations.insert,
-			{
-				text,
-			},
-		);
+		const noteId: Id<"notes"> = yield* c.mutation(api.functions.insert, {
+			text,
+		});
 
 		const note = yield* c.run(({ db }) => db.get(noteId));
 
@@ -69,9 +58,9 @@ test("query collect", () =>
 
 		const text = "Hello, world!";
 
-		yield* c.run(({ db }) => db.insert(tableName("notes"), { text }));
+		yield* c.run(({ db }) => db.insert("notes", { text }));
 
-		const notes = yield* c.query(api.basic_schema_operations.queryCollect, {});
+		const notes = yield* c.query(api.functions.queryCollect, {});
 
 		expect(notes.length).toEqual(1);
 		expect(notes[0]?.text).toEqual(text);
@@ -83,12 +72,9 @@ test("mutation collect", () =>
 
 		const text = "Hello, world!";
 
-		yield* c.run(({ db }) => db.insert(tableName("notes"), { text }));
+		yield* c.run(({ db }) => db.insert("notes", { text }));
 
-		const notes = yield* c.mutation(
-			api.basic_schema_operations.mutationCollect,
-			{},
-		);
+		const notes = yield* c.mutation(api.functions.mutationCollect, {});
 
 		expect(notes.length).toEqual(1);
 		expect(notes[0]?.text).toEqual(text);
@@ -103,12 +89,12 @@ test("filter + first", () =>
 
 		yield* c.run(({ db }) =>
 			Promise.all([
-				db.insert(tableName("notes"), { text: text1 }),
-				db.insert(tableName("notes"), { text: text2 }),
+				db.insert("notes", { text: text1 }),
+				db.insert("notes", { text: text2 }),
 			]),
 		);
 
-		const note = yield* c.query(api.basic_schema_operations.filterFirst, {
+		const note = yield* c.query(api.functions.filterFirst, {
 			text: text1,
 		});
 
@@ -122,12 +108,12 @@ test("withIndex + first", () =>
 		const text = "Hello, world!";
 
 		yield* c.run(({ db }) =>
-			db.insert(tableName("notes"), {
+			db.insert("notes", {
 				text: text,
 			}),
 		);
 
-		const note = yield* c.query(api.basic_schema_operations.withIndexFirst, {
+		const note = yield* c.query(api.functions.withIndexFirst, {
 			text: text,
 		});
 
@@ -145,16 +131,13 @@ test("order desc + collect", () =>
 		yield* c.run(({ db }) =>
 			Promise.all([
 				// Insert in reverse of desired sort order
-				db.insert(tableName("notes"), { text: thirdText }),
-				db.insert(tableName("notes"), { text: secondText }),
-				db.insert(tableName("notes"), { text: firstText }),
+				db.insert("notes", { text: thirdText }),
+				db.insert("notes", { text: secondText }),
+				db.insert("notes", { text: firstText }),
 			]),
 		);
 
-		const notes = yield* c.query(
-			api.basic_schema_operations.orderDescCollect,
-			{},
-		);
+		const notes = yield* c.query(api.functions.orderDescCollect, {});
 
 		expect(notes.length).toEqual(3);
 		expect(Array.map(notes, ({ text }) => text)).toStrictEqual([
@@ -171,18 +154,18 @@ test("take", () =>
 		yield* c.run(({ db }) =>
 			Promise.all(
 				Array.map(Array.range(1, 5), (n) =>
-					db.insert(tableName("notes"), { text: `Note ${n}` }),
+					db.insert("notes", { text: `Note ${n}` }),
 				),
 			),
 		);
 
-		const oneNote = yield* c.query(api.basic_schema_operations.take, {
+		const oneNote = yield* c.query(api.functions.take, {
 			n: 1,
 		});
-		const twoNotes = yield* c.query(api.basic_schema_operations.take, {
+		const twoNotes = yield* c.query(api.functions.take, {
 			n: 2,
 		});
-		const threeNotes = yield* c.query(api.basic_schema_operations.take, {
+		const threeNotes = yield* c.query(api.functions.take, {
 			n: 3,
 		});
 
@@ -198,29 +181,23 @@ test("paginate", () =>
 		yield* c.run(({ db }) =>
 			Promise.all(
 				Array.map(Array.range(1, 9), (n) =>
-					db.insert(tableName("notes"), { text: `Note ${n}` }),
+					db.insert("notes", { text: `Note ${n}` }),
 				),
 			),
 		);
 
-		const paginationResult = yield* c.query(
-			api.basic_schema_operations.paginate,
-			{
-				cursor: null,
-				numItems: 5,
-			},
-		);
+		const paginationResult = yield* c.query(api.functions.paginate, {
+			cursor: null,
+			numItems: 5,
+		});
 
 		expect(paginationResult.page.length).toEqual(5);
 		expect(paginationResult.isDone).toEqual(false);
 
-		const paginationResult2 = yield* c.query(
-			api.basic_schema_operations.paginate,
-			{
-				cursor: paginationResult.continueCursor,
-				numItems: 4,
-			},
-		);
+		const paginationResult2 = yield* c.query(api.functions.paginate, {
+			cursor: paginationResult.continueCursor,
+			numItems: 4,
+		});
 
 		expect(paginationResult2.page.length).toEqual(4);
 		expect(paginationResult2.isDone).toEqual(false);
@@ -231,11 +208,9 @@ describe("unique", () => {
 		Effect.gen(function* () {
 			const c = yield* TestConvexService;
 
-			yield* c.run(({ db }) =>
-				db.insert(tableName("notes"), { text: "Hello, world!" }),
-			);
+			yield* c.run(({ db }) => db.insert("notes", { text: "Hello, world!" }));
 
-			const note = yield* c.query(api.basic_schema_operations.unique, {});
+			const note = yield* c.query(api.functions.unique, {});
 
 			expect(note).toMatchObject({
 				_tag: "Some",
@@ -251,12 +226,12 @@ describe("unique", () => {
 
 			yield* c.run(({ db }) =>
 				Promise.all([
-					db.insert(tableName("notes"), { text }),
-					db.insert(tableName("notes"), { text }),
+					db.insert("notes", { text }),
+					db.insert("notes", { text }),
 				]),
 			);
 
-			const note = yield* c.query(api.basic_schema_operations.unique, {});
+			const note = yield* c.query(api.functions.unique, {});
 
 			expect(note).toEqual(new NotUniqueError()._tag);
 		}));
@@ -265,7 +240,7 @@ describe("unique", () => {
 		Effect.gen(function* () {
 			const c = yield* TestConvexService;
 
-			const note = yield* c.query(api.basic_schema_operations.unique, {});
+			const note = yield* c.query(api.functions.unique, {});
 
 			expect(note).toMatchObject({ _tag: "None" });
 		}));
@@ -278,9 +253,9 @@ describe("first without filters", () => {
 
 			const text = "Hello, world!";
 
-			yield* c.run(({ db }) => db.insert(tableName("notes"), { text }));
+			yield* c.run(({ db }) => db.insert("notes", { text }));
 
-			const note = yield* c.query(api.basic_schema_operations.onlyFirst, {});
+			const note = yield* c.query(api.functions.onlyFirst, {});
 
 			expect(note).toMatchObject({ _tag: "Some", value: { text } });
 		}));
@@ -289,7 +264,7 @@ describe("first without filters", () => {
 		Effect.gen(function* () {
 			const c = yield* TestConvexService;
 
-			const note = yield* c.query(api.basic_schema_operations.onlyFirst, {});
+			const note = yield* c.query(api.functions.onlyFirst, {});
 
 			expect(note).toEqual({ _tag: "None" });
 		}));
@@ -302,12 +277,10 @@ test("stream", () =>
 		const notesText = ["Note 1", "Note 2"];
 
 		yield* c.run(({ db }) =>
-			Promise.all(
-				Array.map(notesText, (text) => db.insert(tableName("notes"), { text })),
-			),
+			Promise.all(Array.map(notesText, (text) => db.insert("notes", { text }))),
 		);
 
-		const notes = yield* c.query(api.basic_schema_operations.mapTextStream, {});
+		const notes = yield* c.query(api.functions.mapTextStream, {});
 
 		expect(notes).toEqual(notesText);
 	}));
@@ -320,18 +293,18 @@ test("search", () =>
 
 		yield* c.run(({ db }) =>
 			Promise.all([
-				db.insert(tableName("notes"), {
+				db.insert("notes", {
 					text,
 					tag: "greeting",
 				}),
-				db.insert(tableName("notes"), {
+				db.insert("notes", {
 					text: "Mexican burrito recipe",
 					tag: "recipe",
 				}),
 			]),
 		);
 
-		const notes = yield* c.query(api.basic_schema_operations.search, {
+		const notes = yield* c.query(api.functions.search, {
 			query: "Hello",
 			tag: "greeting",
 		});
@@ -346,11 +319,11 @@ describe("normalizeId", () => {
 			const c = yield* TestConvexService;
 
 			const noteId = yield* c.run(({ db }) =>
-				db.insert(tableName("notes"), { text: "Hello world!" }),
+				db.insert("notes", { text: "Hello world!" }),
 			);
 
 			const exit = yield* c
-				.query(api.basic_schema_operations.queryNormalizeId, {
+				.query(api.functions.queryNormalizeId, {
 					noteId,
 				})
 				.pipe(Effect.exit);
@@ -363,11 +336,11 @@ describe("normalizeId", () => {
 			const c = yield* TestConvexService;
 
 			const noteId = yield* c.run(({ db }) =>
-				db.insert(tableName("notes"), { text: "Hello world!" }),
+				db.insert("notes", { text: "Hello world!" }),
 			);
 
 			const exit = yield* c
-				.mutation(api.basic_schema_operations.mutationNormalizeId, {
+				.mutation(api.functions.mutationNormalizeId, {
 					noteId,
 				})
 				.pipe(Effect.exit);
@@ -383,7 +356,7 @@ test("patch", () =>
 		const originalText = "Hello, Mars!";
 
 		const noteId = yield* c.run(({ db }) =>
-			db.insert(tableName("notes"), { text: originalText }),
+			db.insert("notes", { text: originalText }),
 		);
 
 		const originalNote = yield* c.run(({ db }) => db.get(noteId));
@@ -392,7 +365,7 @@ test("patch", () =>
 
 		const updatedText = "Hello, world!";
 
-		yield* c.mutation(api.basic_schema_operations.patch, {
+		yield* c.mutation(api.functions.patch, {
 			noteId,
 			fields: { text: updatedText },
 		});
@@ -409,7 +382,7 @@ test("validation", () =>
 		const tooLongText = String.repeat(101)("a");
 
 		const exit = yield* c
-			.mutation(api.basic_schema_operations.insertTooLongText, {
+			.mutation(api.functions.insertTooLongText, {
 				text: tooLongText,
 			})
 			.pipe(Effect.exit);
@@ -423,13 +396,13 @@ describe("patch", () => {
 			const c = yield* TestConvexService;
 
 			const noteId = yield* c.run(({ db }) =>
-				db.insert(tableName("notes"), { text: "Hello, world!" }),
+				db.insert("notes", { text: "Hello, world!" }),
 			);
 
 			const tooLongText = String.repeat(101)("a");
 
 			const exit = yield* c
-				.mutation(api.basic_schema_operations.patch, {
+				.mutation(api.functions.patch, {
 					noteId,
 					fields: {
 						text: tooLongText,
@@ -445,12 +418,12 @@ describe("patch", () => {
 			const c = yield* TestConvexService;
 
 			const noteId = yield* c.run(({ db }) =>
-				db.insert(tableName("notes"), { text: "Hello, world!" }),
+				db.insert("notes", { text: "Hello, world!" }),
 			);
 
 			const author = { role: "user", name: "Joe" } as const;
 
-			yield* c.mutation(api.basic_schema_operations.patch, {
+			yield* c.mutation(api.functions.patch, {
 				noteId,
 				fields: { author },
 			});
@@ -465,13 +438,13 @@ describe("patch", () => {
 			const c = yield* TestConvexService;
 
 			const noteId = yield* c.run(({ db }) =>
-				db.insert(tableName("notes"), { text: "Hello, world!" }),
+				db.insert("notes", { text: "Hello, world!" }),
 			);
 
 			yield* c.run(({ db }) => db.delete(noteId));
 
 			const exit = yield* c
-				.mutation(api.basic_schema_operations.patch, {
+				.mutation(api.functions.patch, {
 					noteId,
 					fields: { text: "Hello, world!" },
 				})
@@ -487,14 +460,14 @@ describe("patch", () => {
 			const tag = "greeting";
 
 			const noteId = yield* c.run(({ db }) =>
-				db.insert(tableName("notes"), {
+				db.insert("notes", {
 					text: "Hello, world!",
 					tag,
 					author: { role: "user", name: "Joe" },
 				}),
 			);
 
-			yield* c.mutation(api.basic_schema_operations.unsetAuthorPatch, {
+			yield* c.mutation(api.functions.unsetAuthorPatch, {
 				noteId,
 			});
 
@@ -513,13 +486,13 @@ test("replace", () =>
 		const updatedText = "Hello, Mars!";
 
 		const noteId = yield* c.run(({ db }) =>
-			db.insert(tableName("notes"), { text: initialText }),
+			db.insert("notes", { text: initialText }),
 		);
 		const note = yield* c.run(({ db }) => db.get(noteId));
 
 		const updatedNoteFields = { ...note, text: updatedText };
 
-		yield* c.mutation(api.basic_schema_operations.replace, {
+		yield* c.mutation(api.functions.replace, {
 			noteId,
 			fields: updatedNoteFields,
 		});
@@ -535,10 +508,10 @@ describe("delete", () => {
 			const c = yield* TestConvexService;
 
 			const noteId = yield* c.run(({ db }) =>
-				db.insert(tableName("notes"), { text: "Hello, world!" }),
+				db.insert("notes", { text: "Hello, world!" }),
 			);
 
-			yield* c.mutation(api.basic_schema_operations.deleteNote, {
+			yield* c.mutation(api.functions.deleteNote, {
 				noteId,
 			});
 
@@ -552,13 +525,13 @@ describe("delete", () => {
 			const c = yield* TestConvexService;
 
 			const noteId = yield* c.run(({ db }) =>
-				db.insert(tableName("notes"), { text: "Hello, world!" }),
+				db.insert("notes", { text: "Hello, world!" }),
 			);
 
 			yield* c.run(({ db }) => db.delete(noteId));
 
 			const exit = yield* c
-				.mutation(api.basic_schema_operations.deleteNote, {
+				.mutation(api.functions.deleteNote, {
 					noteId,
 				})
 				.pipe(Effect.exit);
@@ -572,10 +545,7 @@ describe("authentication", () => {
 		Effect.gen(function* () {
 			const c = yield* TestConvexService;
 
-			const isAuthenticated = yield* c.query(
-				api.basic_schema_operations.isAuthenticated,
-				{},
-			);
+			const isAuthenticated = yield* c.query(api.functions.isAuthenticated, {});
 
 			expect(isAuthenticated).toEqual(false);
 		}));
@@ -589,7 +559,7 @@ describe("authentication", () => {
 			});
 
 			const isAuthenticated = yield* asUser.query(
-				api.basic_schema_operations.isAuthenticated,
+				api.functions.isAuthenticated,
 				{},
 			);
 
@@ -603,7 +573,7 @@ describe("actions", () => {
 			const c = yield* TestConvexService;
 
 			const exit = yield* c
-				.action(api.basic_schema_operations.actionWithAuthAndRunMethods)
+				.action(api.functions.actionWithAuthAndRunMethods)
 				.pipe(Effect.exit);
 
 			expect(Exit.isSuccess(exit)).toBe(true);
@@ -615,22 +585,22 @@ describe("actions", () => {
 
 			yield* c.run(({ db }) =>
 				Promise.all([
-					db.insert(tableName("notes"), {
+					db.insert("notes", {
 						tag: "Art",
 						text: "convex",
 						embedding: [1, 1, 1],
 					}),
-					db.insert(tableName("notes"), {
+					db.insert("notes", {
 						tag: "Sports",
 						text: "next",
 						embedding: [0, 0, 0],
 					}),
-					db.insert(tableName("notes"), {
+					db.insert("notes", {
 						tag: "Art",
 						text: "base",
 						embedding: [1, 1, 0],
 					}),
-					db.insert(tableName("notes"), {
+					db.insert("notes", {
 						tag: "Sports",
 						text: "rad",
 						embedding: [1, 1, 0],
@@ -639,14 +609,11 @@ describe("actions", () => {
 			);
 
 			{
-				const notes = yield* c.action(
-					api.basic_schema_operations.executeVectorSearch,
-					{
-						vector: [1, 1, 1],
-						tag: null,
-						limit: 3,
-					},
-				);
+				const notes = yield* c.action(api.functions.executeVectorSearch, {
+					vector: [1, 1, 1],
+					tag: null,
+					limit: 3,
+				});
 
 				expect(notes).toMatchObject([
 					{ tag: "Art", text: "convex" },
@@ -656,14 +623,11 @@ describe("actions", () => {
 			}
 
 			{
-				const notes = yield* c.action(
-					api.basic_schema_operations.executeVectorSearch,
-					{
-						vector: [1, 1, 1],
-						tag: "Art",
-						limit: 10,
-					},
-				);
+				const notes = yield* c.action(api.functions.executeVectorSearch, {
+					vector: [1, 1, 1],
+					tag: "Art",
+					limit: 10,
+				});
 
 				expect(notes).toMatchObject([
 					{ tag: "Art", text: "convex" },
@@ -682,15 +646,13 @@ describe("scheduled functions", () => {
 			const text = "Hello, world!";
 			const millis = 1_000;
 
-			yield* c.action(api.basic_schema_operations.insertAfter, {
+			yield* c.action(api.functions.insertAfter, {
 				text,
 				millis,
 			});
 
 			{
-				const note = yield* c.run(({ db }) =>
-					db.query(tableName("notes")).first(),
-				);
+				const note = yield* c.run(({ db }) => db.query("notes").first());
 
 				expect(note).toEqual(null);
 			}
@@ -699,9 +661,7 @@ describe("scheduled functions", () => {
 			yield* c.finishInProgressScheduledFunctions();
 
 			{
-				const note = yield* c.run(({ db }) =>
-					db.query(tableName("notes")).first(),
-				);
+				const note = yield* c.run(({ db }) => db.query("notes").first());
 
 				expect(note?.text).toEqual(text);
 			}
@@ -717,16 +677,14 @@ describe("scheduled functions", () => {
 			const now = yield* Effect.sync(() => Date.now());
 			const timestamp = now + 1_000;
 
-			yield* c.action(api.basic_schema_operations.insertAt, {
+			yield* c.action(api.functions.insertAt, {
 				text,
 				timestamp,
 			});
 
 			yield* c.finishAllScheduledFunctions(vi.runAllTimers);
 
-			const note = yield* c.run(({ db }) =>
-				db.query(tableName("notes")).first(),
-			);
+			const note = yield* c.run(({ db }) => db.query("notes").first());
 
 			expect(note?.text).toEqual(text);
 		}));
@@ -751,10 +709,9 @@ describe("system", () => {
 			const c = yield* TestConvexService;
 
 			const id = yield* c.run(({ storage }) => storage.store(new Blob()));
-			const normalizedId = yield* c.query(
-				api.basic_schema_operations.systemNormalizeId,
-				{ id },
-			);
+			const normalizedId = yield* c.query(api.functions.systemNormalizeId, {
+				id,
+			});
 
 			expect(normalizedId).toEqual({ _tag: "Some", value: id });
 		}));
@@ -764,7 +721,7 @@ describe("system", () => {
 			const c = yield* TestConvexService;
 
 			const id = yield* c.run(({ storage }) => storage.store(new Blob()));
-			const storageDoc = yield* c.query(api.basic_schema_operations.systemGet, {
+			const storageDoc = yield* c.query(api.functions.systemGet, {
 				id,
 			});
 
@@ -778,9 +735,7 @@ describe("system", () => {
 			const ids = yield* c.run(({ storage }) =>
 				Promise.all([storage.store(new Blob()), storage.store(new Blob())]),
 			);
-			const storageDocs = yield* c.query(
-				api.basic_schema_operations.systemQuery,
-			);
+			const storageDocs = yield* c.query(api.functions.systemQuery);
 
 			const storageIds = Array.map(storageDocs, ({ _id }) => _id);
 
@@ -799,7 +754,7 @@ describe("storage", () => {
 			const c = yield* TestConvexService;
 
 			const id = yield* c.run(({ storage }) => storage.store(new Blob()));
-			const url = yield* c.action(api.basic_schema_operations.storageGetUrl, {
+			const url = yield* c.action(api.functions.storageGetUrl, {
 				id,
 			});
 
@@ -810,9 +765,7 @@ describe("storage", () => {
 		Effect.gen(function* () {
 			const c = yield* TestConvexService;
 
-			const url = yield* c.action(
-				api.basic_schema_operations.storageGenerateUploadUrl,
-			);
+			const url = yield* c.action(api.functions.storageGenerateUploadUrl);
 
 			expect(url).toMatch(urlRegex);
 		}));
@@ -822,7 +775,7 @@ describe("storage", () => {
 			const c = yield* TestConvexService;
 
 			const id = yield* c.run(({ storage }) => storage.store(new Blob()));
-			yield* c.action(api.basic_schema_operations.storageDelete, { id });
+			yield* c.action(api.functions.storageDelete, { id });
 
 			const storageDoc = yield* c.run(({ storage }) => storage.get(id));
 
