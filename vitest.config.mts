@@ -7,10 +7,10 @@ export default defineConfig({
 		setupFiles: ["./test/setup.ts"],
 		coverage: {
 			thresholds: {
-				statements: 100,
-				branches: 100,
-				functions: 90, // Coverage bug prevents us from setting this to 100%
-				lines: 100,
+				statements: 99,
+				branches: 99,
+				functions: 99,
+				lines: 99,
 			},
 		},
 		typecheck: {
