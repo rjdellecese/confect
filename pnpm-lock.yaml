@@ -12,8 +12,8 @@ importers:
         specifier: 0.70.3
         version: 0.70.3(effect@3.6.2)
       convex:
-        specifier: 1.14.0
-        version: 1.14.0
+        specifier: 1.15.0
+        version: 1.15.0
       effect:
         specifier: 3.6.2
         version: 3.6.2
@@ -41,7 +41,7 @@ importers:
         version: 2.0.5(vitest@2.0.5(@types/node@20.7.0))
       convex-test:
         specifier: 0.0.28
-        version: 0.0.28(convex@1.14.0)
+        version: 0.0.28(convex@1.15.0)
       dotenv:
         specifier: 16.4.5
         version: 16.4.5
@@ -818,8 +818,8 @@ packages:
     peerDependencies:
       convex: ^1.12.1
 
-  convex@1.14.0:
-    resolution: {integrity: sha512-dx0blWhpck8SOQwbnb6Y78CI2CpfuSlkgV+hLxNZb9eYLWN9U8ybNCFLf09BRI3umOFg0oRJO0qNN0Iu0IFWJw==}
+  convex@1.15.0:
+    resolution: {integrity: sha512-NTyr+4x3hhjzDwiQ18Rx7pfkkoZIWak3ERUd3ihWt1jQP4HVx+mqtU1B/q7ZkV5Xp4FLj3aJeck55wjc9im/bQ==}
     engines: {node: '>=18.0.0', npm: '>=7.0.0'}
     hasBin: true
     peerDependencies:
@@ -1855,11 +1855,11 @@ snapshots:
 
   color-name@1.1.4: {}
 
-  convex-test@0.0.28(convex@1.14.0):
+  convex-test@0.0.28(convex@1.15.0):
     dependencies:
-      convex: 1.14.0
+      convex: 1.15.0
 
-  convex@1.14.0:
+  convex@1.15.0:
     dependencies:
       esbuild: 0.17.19
       jwt-decode: 3.1.2
