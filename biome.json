@@ -30,6 +30,7 @@
 			".pnpm-store",
 			"coverage",
 			"dist",
+			"package.json",
 			"pnpm-lock.yaml",
 			"test/convex/_generated"
 		]
