@@ -1,11 +1,12 @@
 import { describe, expect, vi } from "@effect/vitest";
 import { Array, Effect, Exit, Order, String } from "effect";
 
+import { Schema } from "@effect/schema";
+import { NotUniqueError } from "~/src/database";
 import { test } from "~/test/convex-effect-test";
 import { api } from "~/test/convex/_generated/api";
 import type { Id } from "~/test/convex/_generated/dataModel";
 import { TestConvexService } from "~/test/test-convex-service";
-import { NotUniqueError } from "../src/database";
 
 test("query get", () =>
 	Effect.gen(function* () {
@@ -34,7 +35,7 @@ test("mutation get", () =>
 			noteId,
 		});
 
-		expect(note).toMatchObject({ text });
+		expect(note).toMatchObject({ value: { text } });
 	}));
 
 test("insert", () =>
@@ -754,9 +755,13 @@ describe("storage", () => {
 			const c = yield* TestConvexService;
 
 			const id = yield* c.run(({ storage }) => storage.store(new Blob()));
-			const url = yield* c.action(api.functions.storageGetUrl, {
+			const encodedOptionUrl = yield* c.action(api.functions.storageGetUrl, {
 				id,
 			});
+			const optionUrl = yield* Schema.decode(Schema.Option(Schema.String))(
+				encodedOptionUrl,
+			);
+			const url = yield* optionUrl;
 
 			expect(url).toMatch(urlRegex);
 		}));

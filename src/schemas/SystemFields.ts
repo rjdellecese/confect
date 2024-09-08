@@ -1,5 +1,5 @@
 import { Schema } from "@effect/schema";
-import { IdSchema } from "./IdSchema";
+import { IdSchema } from "~/src/schemas/IdSchema";
 
 export const SystemFields = <TableName extends string>() =>
 	Schema.Struct({

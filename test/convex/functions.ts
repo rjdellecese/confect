@@ -3,7 +3,6 @@ import { Array, Chunk, Effect, Option, Stream, pipe } from "effect";
 import { IdSchema } from "~/src/schemas/IdSchema";
 import * as PaginationResult from "~/src/schemas/PaginationResult";
 import { api, internal } from "~/test/convex/_generated/api";
-import type { Id } from "~/test/convex/_generated/dataModel";
 import {
 	action,
 	internalAction,
@@ -12,8 +11,7 @@ import {
 	mutation,
 	query,
 } from "~/test/convex/confect";
-import type { ConfectDoc } from "~/test/convex/confect";
-import { confectTableSchemas } from "./schema";
+import { confectTableSchemas } from "~/test/convex/schema";
 
 export const queryGet = query({
 	args: Schema.Struct({
@@ -27,15 +25,16 @@ export const mutationGet = mutation({
 	args: Schema.Struct({
 		noteId: IdSchema<"notes">(),
 	}),
-	handler: ({ db }, { noteId }): Effect.Effect<ConfectDoc<"notes"> | null> =>
-		db.get(noteId).pipe(Effect.map(Option.getOrNull)),
+	returns: Schema.Option(confectTableSchemas.notes.withSystemFields),
+	handler: ({ db }, { noteId }) => db.get(noteId),
 });
 
 export const insert = mutation({
 	args: Schema.Struct({
 		text: Schema.String,
 	}),
-	handler: ({ db }, { text }): Effect.Effect<Id<"notes">> =>
+	returns: IdSchema<"notes">(),
+	handler: ({ db }, { text }) =>
 		db.insert("notes", { text }).pipe(Effect.orDie),
 });
 
@@ -47,8 +46,8 @@ export const queryCollect = query({
 
 export const mutationCollect = mutation({
 	args: Schema.Struct({}),
-	handler: ({ db }): Effect.Effect<ConfectDoc<"notes">[]> =>
-		db.query("notes").collect(),
+	returns: Schema.Array(confectTableSchemas.notes.withSystemFields),
+	handler: ({ db }) => db.query("notes").collect(),
 });
 
 export const filterFirst = query({
@@ -164,8 +163,9 @@ export const mutationNormalizeId = mutation({
 	args: Schema.Struct({
 		noteId: IdSchema<"notes">(),
 	}),
-	handler: ({ db }, { noteId }): Effect.Effect<Id<"notes"> | null> =>
-		pipe(db.normalizeId("notes", noteId), Option.getOrNull, Effect.succeed),
+	returns: Schema.Option(IdSchema<"notes">()),
+	handler: ({ db }, { noteId }) =>
+		Effect.succeed(db.normalizeId("notes", noteId)),
 });
 
 // Exporting only to stop TypeScript from complaining.
@@ -173,6 +173,7 @@ export const _badPatch = mutation({
 	args: Schema.Struct({
 		noteId: IdSchema<"notes">(),
 	}),
+	returns: Schema.Null,
 	handler: ({ db }, { noteId }) =>
 		Effect.gen(function* () {
 			yield* db.patch(noteId, {
@@ -184,7 +185,7 @@ export const _badPatch = mutation({
 				// @ts-expect-error: Should not be able to set `_creationTime`
 				_creationTime: 0,
 			});
-		}).pipe(Effect.orDie),
+		}).pipe(Effect.as(null), Effect.orDie),
 });
 
 export const patch = mutation({
@@ -201,22 +202,25 @@ export const patch = mutation({
 			),
 		}),
 	}),
+	returns: Schema.Null,
 	handler: ({ db }, { noteId, fields }) =>
-		db.patch(noteId, fields).pipe(Effect.orDie),
+		db.patch(noteId, fields).pipe(Effect.as(null), Effect.orDie),
 });
 
 export const unsetAuthorPatch = mutation({
 	args: Schema.Struct({
 		noteId: IdSchema<"notes">(),
 	}),
+	returns: Schema.Null,
 	handler: ({ db }, { noteId }) =>
-		db.patch(noteId, { author: undefined }).pipe(Effect.orDie),
+		db.patch(noteId, { author: undefined }).pipe(Effect.as(null), Effect.orDie),
 });
 
 export const insertTooLongText = mutation({
 	args: Schema.Struct({
 		text: Schema.String,
 	}),
+	returns: IdSchema<"notes">(),
 	handler: ({ db }, { text }) =>
 		db.insert("notes", { text }).pipe(Effect.orDie),
 });
@@ -230,15 +234,18 @@ export const replace = mutation({
 			text: Schema.String,
 		}),
 	}),
+	returns: Schema.Null,
 	handler: ({ db }, { noteId, fields }) =>
-		db.replace(noteId, fields).pipe(Effect.orDie),
+		db.replace(noteId, fields).pipe(Effect.as(null), Effect.orDie),
 });
 
 export const deleteNote = mutation({
 	args: Schema.Struct({
 		noteId: IdSchema<"notes">(),
 	}),
-	handler: ({ db }, { noteId }): Effect.Effect<void> => db.delete(noteId),
+	returns: Schema.Null,
+	handler: ({ db }, { noteId }) =>
+		db.delete(noteId).pipe(Effect.as(null), Effect.orDie),
 });
 
 export const isAuthenticated = query({
@@ -258,28 +265,34 @@ export const actionQuery = internalQuery({
 
 export const actionMutation = internalMutation({
 	args: Schema.Struct({}),
-	handler: ({ db }): Effect.Effect<void> =>
+	returns: IdSchema<"notes">(),
+	handler: ({ db }) =>
 		db.insert("notes", { text: "Hello, world!" }).pipe(Effect.orDie),
 });
 
 export const actionNoop = internalAction({
 	args: Schema.Struct({}),
-	handler: (_ctx) => Effect.void,
+	returns: Schema.Null,
+	handler: (_ctx) => Effect.succeed(null),
 });
 
 export const runQueryAndMutation = action({
 	args: Schema.Struct({}),
-	handler: (ctx): Effect.Effect<void> =>
+	returns: Schema.Null,
+	handler: (ctx): Effect.Effect<null> =>
 		Effect.gen(function* () {
 			yield* ctx.runQuery(internal.functions.actionQuery);
 			yield* ctx.runMutation(internal.functions.actionMutation);
 			yield* ctx.runAction(internal.functions.actionNoop);
+
+			return null;
 		}),
 });
 
 export const actionWithAuthAndRunMethods = action({
 	args: Schema.Struct({}),
-	handler: (ctx): Effect.Effect<void> =>
+	returns: Schema.Null,
+	handler: (ctx): Effect.Effect<null> =>
 		Effect.gen(function* () {
 			yield* ctx.auth.getUserIdentity().pipe(
 				Effect.andThen(
@@ -291,6 +304,8 @@ export const actionWithAuthAndRunMethods = action({
 			);
 
 			yield* ctx.runAction(api.functions.runQueryAndMutation);
+
+			return null;
 		}),
 });
 
@@ -300,6 +315,12 @@ export const executeVectorSearch = action({
 		tag: Schema.Union(Schema.String, Schema.Null),
 		limit: Schema.Number,
 	}),
+	returns: Schema.Array(
+		Schema.Struct({
+			text: Schema.String,
+			tag: Schema.optionalWith(Schema.String, { exact: true }),
+		}),
+	),
 	handler: (
 		{ runQuery, vectorSearch },
 		{ vector, tag, limit },
@@ -343,18 +364,22 @@ export const insertAfter = action({
 		text: Schema.String,
 		millis: Schema.Number,
 	}),
-	handler: ({ scheduler }, { text, millis }): Effect.Effect<void> =>
-		scheduler.runAfter(millis, api.functions.scheduledInsert, {
-			text,
-		}),
+	returns: Schema.Null,
+	handler: ({ scheduler }, { text, millis }): Effect.Effect<null> =>
+		scheduler
+			.runAfter(millis, api.functions.scheduledInsert, {
+				text,
+			})
+			.pipe(Effect.as(null)),
 });
 
 export const scheduledInsert = mutation({
 	args: Schema.Struct({
 		text: Schema.String,
 	}),
-	handler: ({ db }, { text }): Effect.Effect<void> =>
-		db.insert("notes", { text }).pipe(Effect.orDie),
+	returns: Schema.Null,
+	handler: ({ db }, { text }): Effect.Effect<null> =>
+		db.insert("notes", { text }).pipe(Effect.as(null), Effect.orDie),
 });
 
 export const insertAt = action({
@@ -362,10 +387,13 @@ export const insertAt = action({
 		text: Schema.String,
 		timestamp: Schema.Number,
 	}),
-	handler: ({ scheduler }, { text, timestamp }): Effect.Effect<void> =>
-		scheduler.runAt(timestamp, api.functions.scheduledInsert, {
-			text,
-		}),
+	returns: Schema.Null,
+	handler: ({ scheduler }, { text, timestamp }): Effect.Effect<null> =>
+		scheduler
+			.runAt(timestamp, api.functions.scheduledInsert, {
+				text,
+			})
+			.pipe(Effect.as(null)),
 });
 
 export const systemNormalizeId = query({
@@ -395,12 +423,13 @@ export const storageGetUrl = action({
 	args: Schema.Struct({
 		id: IdSchema<"_storage">(),
 	}),
-	handler: ({ storage }, { id }) =>
-		storage.getUrl(id).pipe(Effect.map(Option.getOrNull)),
+	returns: Schema.Option(Schema.String),
+	handler: ({ storage }, { id }) => storage.getUrl(id),
 });
 
 export const storageGenerateUploadUrl = action({
 	args: Schema.Struct({}),
+	returns: Schema.String,
 	handler: ({ storage }) => storage.generateUploadUrl(),
 });
 
@@ -408,5 +437,6 @@ export const storageDelete = action({
 	args: Schema.Struct({
 		id: IdSchema<"_storage">(),
 	}),
-	handler: ({ storage }, { id }) => storage.delete(id),
+	returns: Schema.Null,
+	handler: ({ storage }, { id }) => storage.delete(id).pipe(Effect.as(null)),
 });

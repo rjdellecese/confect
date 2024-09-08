@@ -6,7 +6,7 @@ import {
 	type ConfectDataModelFromConfectSchema,
 	defineConfectTable,
 } from "~/src/schema";
-import { IdSchema } from "../src/schemas/IdSchema";
+import { IdSchema } from "~/src/schemas/IdSchema";
 
 test("DatabaseSchemasFromConfectDataModel", () => {
 	const notesSchemaFields = {

@@ -55,7 +55,7 @@ import {
 	type GenericConfectSchema,
 	confectSystemSchema,
 } from "~/src/schema";
-import { extendWithSystemFields } from "./schemas/SystemFields";
+import { extendWithSystemFields } from "~/src/schemas/SystemFields";
 
 interface ConfectQuery<
 	ConfectTableInfo extends GenericConfectTableInfo,
