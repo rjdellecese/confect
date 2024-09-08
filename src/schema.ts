@@ -13,8 +13,8 @@ import {
 	type SystemIndexes,
 	type TableDefinition,
 	type VectorIndexConfig,
-	defineSchema,
-	defineTable,
+	defineSchema as defineConvexSchema,
+	defineTable as defineConvexTable,
 } from "convex/server";
 import type { Validator } from "convex/values";
 import { Record, pipe } from "effect";
@@ -56,7 +56,7 @@ class ConfectSchemaDefinitionImpl<
 		this.schemaDefinition = pipe(
 			confectSchema,
 			Record.map(({ tableDefinition }) => tableDefinition),
-			defineSchema,
+			defineConvexSchema,
 		) as SchemaDefinition<ConvexSchema, true>;
 	}
 }
@@ -68,7 +68,7 @@ type SchemaDefinitionFromConfectSchemaDefinition<
 		string]: ConfectSchema[TableName]["tableDefinition"];
 }>;
 
-export const defineConfectSchema = <ConfectSchema extends GenericConfectSchema>(
+export const defineSchema = <ConfectSchema extends GenericConfectSchema>(
 	confectSchema: ConfectSchema,
 ): ConfectSchemaDefinitionImpl<
 	SchemaDefinitionFromConfectSchemaDefinition<ConfectSchema>,
@@ -220,7 +220,7 @@ class ConfectTableDefinitionImpl<
 
 	constructor(tableSchema: TableSchema, tableValidator: TableValidator) {
 		this.tableSchema = tableSchema;
-		this.tableDefinition = defineTable(tableValidator);
+		this.tableDefinition = defineConvexTable(tableValidator);
 	}
 
 	index<
@@ -310,7 +310,7 @@ class ConfectTableDefinitionImpl<
 	}
 }
 
-export const defineConfectTable = <
+export const defineTable = <
 	S extends Schema.Schema.AnyNoContext,
 	Fields extends Schema.Struct.Fields,
 >(
@@ -371,8 +371,8 @@ type ExtractEncodedConfectDocument<
 	Readonly<IdField<TableName>> & Readonly<SystemFields> & S["Encoded"]
 >;
 
-export const confectSystemSchema = defineConfectSchema({
-	_scheduled_functions: defineConfectTable(
+export const confectSystemSchema = defineSchema({
+	_scheduled_functions: defineTable(
 		Schema.Struct({
 			name: Schema.String,
 			args: Schema.Array(Schema.Any),
@@ -390,7 +390,7 @@ export const confectSystemSchema = defineConfectSchema({
 			),
 		}),
 	),
-	_storage: defineConfectTable(
+	_storage: defineTable(
 		Schema.Struct({
 			sha256: Schema.String,
 			size: Schema.Number,
@@ -447,7 +447,7 @@ export const tableSchemas = <ConfectSchema extends GenericConfectSchema>(
 /**
  * Extract all of the index field paths within a {@link Validator}.
  *
- * This is used within {@link defineTable}.
+ * This is used within {@link defineConvexTable}.
  * @public
  */
 type ExtractFieldPaths<T extends Validator<any, any, any>> =
@@ -460,7 +460,7 @@ type ExtractFieldPaths<T extends Validator<any, any, any>> =
  * Extract the {@link GenericDocument} within a {@link Validator} and
  * add on the system fields.
  *
- * This is used within {@link defineTable}.
+ * This is used within {@link defineConvexTable}.
  * @public
  */
 type ExtractDocument<

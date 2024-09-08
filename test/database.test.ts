@@ -2,11 +2,11 @@ import { Schema } from "@effect/schema";
 import { expectTypeOf, test } from "@effect/vitest";
 
 import type { DatabaseSchemasFromConfectDataModel } from "~/src/database";
+import * as confect from "~/src/index";
 import {
 	type ConfectDataModelFromConfectSchema,
-	defineConfectTable,
+	defineTable,
 } from "~/src/schema";
-import { IdSchema } from "~/src/schemas/IdSchema";
 
 test("DatabaseSchemasFromConfectDataModel", () => {
 	const notesSchemaFields = {
@@ -14,7 +14,7 @@ test("DatabaseSchemasFromConfectDataModel", () => {
 		tags: Schema.optionalWith(Schema.Array(Schema.String), { exact: true }),
 	};
 	const confectSchema = {
-		notes: defineConfectTable(Schema.Struct(notesSchemaFields)),
+		notes: defineTable(Schema.Struct(notesSchemaFields)),
 	};
 	type ConfectSchema = typeof confectSchema;
 	type ConfectDataModel = ConfectDataModelFromConfectSchema<ConfectSchema>;
@@ -22,7 +22,7 @@ test("DatabaseSchemasFromConfectDataModel", () => {
 	type DatabaseSchemas = DatabaseSchemasFromConfectDataModel<ConfectDataModel>;
 
 	const notesDocumentSchema = Schema.Struct({
-		_id: IdSchema<"notes">(),
+		_id: confect.schemas.Id.Id<"notes">(),
 		_creationTime: Schema.Number,
 		...notesSchemaFields,
 	});
