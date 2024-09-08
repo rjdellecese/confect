@@ -15,10 +15,7 @@
 		"build": "tsup src/index.ts --format cjs,esm --dts",
 		"release": "pnpm build && changeset publish"
 	},
-	"keywords": [
-		"effect",
-		"convex"
-	],
+	"keywords": ["effect", "convex"],
 	"author": "RJ Dellecese",
 	"license": "ISC",
 	"devDependencies": {
