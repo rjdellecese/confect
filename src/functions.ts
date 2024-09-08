@@ -1,4 +1,4 @@
-import * as Schema from "@effect/schema/Schema";
+import { Schema } from "@effect/schema";
 import {
 	type DefaultFunctionArgs,
 	type GenericActionCtx,
@@ -46,7 +46,7 @@ import {
 	compileReturnsSchema,
 } from "~/src/schema-to-validator";
 
-export const server = <
+export const make = <
 	ConvexSchema extends GenericSchema,
 	ConfectSchema extends GenericConfectSchema,
 >(

@@ -1,12 +1,5 @@
-import { server } from "~/src";
-import type {
-	ConfectActionCtx as GenericConfectActionCtx,
-	ConfectMutationCtx as GenericConfectMutationCtx,
-	ConfectQueryCtx as GenericConfectQueryCtx,
-} from "~/src/ctx";
 import type { TableNamesInConfectDataModel } from "~/src/data-model";
-import type { ConfectDataModelFromConfectSchemaDefinition } from "~/src/schema";
-import type { ConfectDoc as GenericConfectDoc } from "~/src/server";
+import * as confect from "~/src/index";
 import { confectSchema } from "~/test/convex/schema";
 
 // TODO: Generate this file!
@@ -19,19 +12,20 @@ export const {
 	internalQuery,
 	mutation,
 	query,
-} = server(confectSchema);
+} = confect.functions.make(confectSchema);
 
 type ConfectSchema = typeof confectSchema;
 
 type ConfectDataModel =
-	ConfectDataModelFromConfectSchemaDefinition<ConfectSchema>;
+	confect.schema.ConfectDataModelFromConfectSchemaDefinition<ConfectSchema>;
 
 export type ConfectDoc<
 	TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
-> = GenericConfectDoc<ConfectDataModel, TableName>;
+> = confect.functions.ConfectDoc<ConfectDataModel, TableName>;
 
-export type ConfectQueryCtx = GenericConfectQueryCtx<ConfectDataModel>;
+export type ConfectQueryCtx = confect.ctx.ConfectQueryCtx<ConfectDataModel>;
 
-export type ConfectMutationCtx = GenericConfectMutationCtx<ConfectDataModel>;
+export type ConfectMutationCtx =
+	confect.ctx.ConfectMutationCtx<ConfectDataModel>;
 
-export type ConfectActionCtx = GenericConfectActionCtx<ConfectDataModel>;
+export type ConfectActionCtx = confect.ctx.ConfectActionCtx<ConfectDataModel>;
