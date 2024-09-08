@@ -20,23 +20,23 @@
 	"license": "ISC",
 	"devDependencies": {
 		"@biomejs/biome": "1.8.3",
-		"@effect/platform": "0.61.6",
-		"@effect/platform-node": "0.56.7",
-		"@effect/vitest": "0.8.3",
+		"@effect/platform": "0.63.0",
+		"@effect/platform-node": "0.58.0",
+		"@effect/vitest": "0.9.0",
 		"@swc/jest": "0.2.36",
 		"@tsconfig/strictest": "2.0.5",
 		"@vitest/coverage-v8": "2.0.5",
 		"convex-test": "0.0.28",
 		"dotenv": "16.4.5",
 		"typescript": "5.5.4",
-		"vite": "5.4.0",
+		"vite": "5.4.2",
 		"vite-tsconfig-paths": "5.0.1",
 		"vitest": "2.0.5"
 	},
 	"dependencies": {
-		"@effect/schema": "0.70.3",
-		"convex": "1.14.0",
-		"effect": "3.6.2"
+		"@effect/schema": "0.72.0",
+		"convex": "1.15.0",
+		"effect": "3.7.0"
 	},
 	"engines": {
 		"node": ">=20",

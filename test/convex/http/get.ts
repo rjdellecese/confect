@@ -1,6 +1,6 @@
 import { Effect } from "effect";
-import { httpAction } from "../confect_functions";
+import { httpAction } from "~/test/convex/confect";
 
-export const get = httpAction(() => {
-	return Effect.succeed(new Response("Hello, world!", { status: 200 }));
-});
+export const get = httpAction(() =>
+	Effect.succeed(new Response("Hello, world!", { status: 200 })),
+);

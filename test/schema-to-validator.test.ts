@@ -85,6 +85,14 @@ describe(compileAst, () => {
 			expect(compiledValidator).toStrictEqual(validator);
 		});
 
+		test("object with optional field (exact)", () => {
+			const schema = Schema.Struct({
+				foo: Schema.optional(Schema.String),
+			});
+
+			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow();
+		});
+
 		test("nested objects", () => {
 			const schema = Schema.Struct({
 				foo: Schema.Struct({

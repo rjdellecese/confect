@@ -8,6 +8,7 @@ import type {
 	IsOptional,
 	IsUnion,
 	IsValueLiteral,
+	UnionToTuple,
 } from "~/src/type-utils";
 
 describe("IsOptional", () => {
@@ -223,5 +224,27 @@ describe("IsValueLiteral", () => {
 
 	test("bigint", () => {
 		expectTypeOf<IsValueLiteral<bigint>>().toEqualTypeOf<false>();
+	});
+});
+
+describe("UnionToTuple", () => {
+	test("never", () => {
+		expectTypeOf<UnionToTuple<never>>().toEqualTypeOf<[]>();
+	});
+
+	test("string | number", () => {
+		expectTypeOf<UnionToTuple<string | number>>().toEqualTypeOf<
+			[string, number]
+		>();
+	});
+
+	test("boolean", () => {
+		expectTypeOf<UnionToTuple<boolean>>().toEqualTypeOf<[false, true]>();
+	});
+
+	test("string | [number, boolean]", () => {
+		expectTypeOf<UnionToTuple<string | [number, boolean]>>().toEqualTypeOf<
+			[string, [number, boolean]]
+		>();
 	});
 });

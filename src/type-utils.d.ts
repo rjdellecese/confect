@@ -1,5 +1,3 @@
-import type { ReadonlyOrMutableValue } from "~/src/schema-to-validator";
-
 // biome-ignore lint/complexity/noBannedTypes:
 export type IsOptional<T, K extends keyof T> = {} extends Pick<T, K>
 	? true
@@ -15,9 +13,7 @@ export type IsUnion<T, U extends T = T> = T extends unknown
 	: never;
 
 // https://stackoverflow.com/a/52806744
-export type IsValueLiteral<Vl extends ReadonlyOrMutableValue> = [Vl] extends [
-	never,
-]
+export type IsValueLiteral<Vl> = [Vl] extends [never]
 	? never
 	: [Vl] extends [string | number | bigint | boolean]
 		? [string] extends [Vl]
@@ -53,7 +49,6 @@ export type DeepReadonly<T> = IsAny<T> extends true
 
 // Vendored from Arktype
 // https://github.com/arktypeio/arktype/blob/2e911d01a741ccee7a17e31ee144049817fabbb8/ark/util/unionToTuple.ts#L9
-// TODO: Write some tests still?
 export type UnionToTuple<t> = _unionToTuple<t, []> extends infer result
 	? conform<result, t[]>
 	: never;
