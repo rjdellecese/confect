@@ -23,7 +23,7 @@ import { compileTableSchema } from "~/src/schema-to-validator";
 import {
 	type ExtendWithSystemFields,
 	extendWithSystemFields,
-} from "./schemas/SystemFields";
+} from "~/src/schemas/SystemFields";
 
 export type GenericConfectSchema = Record<
 	string,

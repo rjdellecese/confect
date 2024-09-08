@@ -1,1 +1,1 @@
-export { confectServer } from "./server";
+export { server } from "~/src/server";
