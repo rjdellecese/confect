@@ -15,15 +15,18 @@
 		"build": "tsup src/index.ts --format cjs,esm --dts",
 		"release": "pnpm build && changeset publish"
 	},
-	"keywords": ["effect", "convex"],
+	"keywords": [
+		"effect",
+		"convex"
+	],
 	"author": "RJ Dellecese",
 	"license": "ISC",
 	"devDependencies": {
 		"@biomejs/biome": "1.8.3",
 		"@changesets/cli": "2.27.8",
-		"@effect/platform": "0.63.0",
-		"@effect/platform-node": "0.58.0",
-		"@effect/vitest": "0.9.0",
+		"@effect/platform": "0.64.0",
+		"@effect/platform-node": "0.59.0",
+		"@effect/vitest": "0.9.2",
 		"@swc/jest": "0.2.36",
 		"@tsconfig/strictest": "2.0.5",
 		"@vitest/coverage-v8": "2.0.5",
@@ -36,9 +39,9 @@
 		"vitest": "2.0.5"
 	},
 	"dependencies": {
-		"@effect/schema": "0.72.0",
+		"@effect/schema": "0.72.3",
 		"convex": "1.15.0",
-		"effect": "3.7.0"
+		"effect": "3.7.2"
 	},
 	"engines": {
 		"node": ">=20",
