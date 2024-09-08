@@ -20,6 +20,7 @@
 	"license": "ISC",
 	"devDependencies": {
 		"@biomejs/biome": "1.8.3",
+		"@changesets/cli": "2.27.8",
 		"@effect/platform": "0.63.0",
 		"@effect/platform-node": "0.58.0",
 		"@effect/vitest": "0.9.0",

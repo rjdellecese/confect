@@ -29,6 +29,7 @@
 		"ignore": [
 			".pnpm-store",
 			"coverage",
+			"dist",
 			"pnpm-lock.yaml",
 			"test/convex/_generated"
 		]
