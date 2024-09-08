@@ -197,11 +197,11 @@ test("paginate", () =>
 
 		const paginationResult2 = yield* c.query(api.functions.paginate, {
 			cursor: paginationResult.continueCursor,
-			numItems: 4,
+			numItems: 5,
 		});
 
 		expect(paginationResult2.page.length).toEqual(4);
-		expect(paginationResult2.isDone).toEqual(false);
+		expect(paginationResult2.isDone).toEqual(true);
 	}));
 
 describe("unique", () => {

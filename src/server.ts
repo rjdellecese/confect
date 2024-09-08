@@ -41,9 +41,12 @@ import type {
 	ConfectSchemaDefinition,
 	GenericConfectSchema,
 } from "~/src/schema";
-import { compileArgsSchema, compileReturnsSchema } from "./schema-to-validator";
+import {
+	compileArgsSchema,
+	compileReturnsSchema,
+} from "~/src/schema-to-validator";
 
-export const confectServer = <
+export const server = <
 	ConvexSchema extends GenericSchema,
 	ConfectSchema extends GenericConfectSchema,
 >(
