@@ -1,6 +1,6 @@
 {
 	"name": "@rjdellecese/confect",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"description": "Use Effect with Convex!",
 	"main": "dist/index.js",
 	"module": "dist/index.mjs",
@@ -15,7 +15,10 @@
 		"build": "tsup src/index.ts --format cjs,esm --dts",
 		"release": "pnpm build && changeset publish"
 	},
-	"keywords": ["effect", "convex"],
+	"keywords": [
+		"effect",
+		"convex"
+	],
 	"author": "RJ Dellecese",
 	"license": "ISC",
 	"devDependencies": {
