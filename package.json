@@ -2,14 +2,11 @@
 	"name": "@rjdellecese/confect",
 	"version": "0.0.3",
 	"description": "Use Effect with Convex!",
+	"source": "src/index.ts",
 	"main": "dist/index.js",
 	"module": "dist/index.mjs",
-	"source": "src/index.ts",
 	"types": "dist/index.d.ts",
-	"files": [
-		"src",
-		"dist"
-	],
+	"files": ["dist", "src"],
 	"scripts": {
 		"start": "convex dev",
 		"lint": "biome ci --error-on-warnings",
@@ -20,10 +17,7 @@
 		"build": "tsup src/index.ts --format cjs,esm --dts",
 		"release": "pnpm build && changeset publish"
 	},
-	"keywords": [
-		"effect",
-		"convex"
-	],
+	"keywords": ["effect", "convex"],
 	"author": "RJ Dellecese",
 	"license": "ISC",
 	"devDependencies": {
