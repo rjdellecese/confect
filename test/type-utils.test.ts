@@ -1,3 +1,4 @@
+import type { Brand } from "effect";
 import type { ReadonlyRecord } from "effect/Record";
 import { describe, expectTypeOf, test } from "vitest";
 
@@ -133,6 +134,15 @@ describe("DeepMutable", () => {
 		>().toEqualTypeOf<{
 			foo: { bar: number[] };
 		}>();
+	});
+
+	test("branded string", () => {
+		type BrandedString = number & Brand.Brand<"BrandedString">;
+
+		type Actual = DeepMutable<BrandedString>;
+		type Expected = BrandedString;
+
+		expectTypeOf<Actual>().toEqualTypeOf<Expected>();
 	});
 });
 

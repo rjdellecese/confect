@@ -241,6 +241,16 @@ describe(compileSchema, () => {
 		expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
 	});
 
+	test("branded string", () => {
+		const expectedValidator = v.string();
+
+		const schema = Schema.String.pipe(Schema.brand("BrandedString"));
+		const compiledValidator = compileSchema(schema);
+
+		expect(compiledValidator).toStrictEqual(expectedValidator);
+		expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
+	});
+
 	test("number", () => {
 		const expectedValidator = v.float64();
 

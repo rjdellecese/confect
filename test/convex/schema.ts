@@ -5,6 +5,9 @@ export const confectSchema = confect.schema.defineSchema({
 	notes: confect.schema
 		.defineTable(
 			Schema.Struct({
+				userId: Schema.optionalWith(confect.schemas.Id.Id<"users">(), {
+					exact: true,
+				}),
 				text: Schema.String.pipe(Schema.maxLength(100)),
 				tag: Schema.optionalWith(Schema.String, { exact: true }),
 				author: Schema.optionalWith(
@@ -30,6 +33,11 @@ export const confectSchema = confect.schema.defineSchema({
 			filterFields: ["author.name", "tag"],
 			dimensions: 1536,
 		}),
+	users: confect.schema.defineTable(
+		Schema.Struct({
+			username: Schema.String,
+		}),
+	),
 });
 
 export const confectTableSchemas = confect.schema.tableSchemas(
