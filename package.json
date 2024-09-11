@@ -1,6 +1,6 @@
 {
 	"name": "@rjdellecese/confect",
-	"version": "0.0.2",
+	"version": "0.0.3",
 	"description": "Use Effect with Convex!",
 	"main": "dist/index.js",
 	"module": "dist/index.mjs",
