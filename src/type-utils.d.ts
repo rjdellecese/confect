@@ -1,3 +1,4 @@
+import type { GenericId } from "convex/values";
 import type { Brand } from "effect";
 
 // biome-ignore lint/complexity/noBannedTypes:
@@ -31,7 +32,7 @@ export type IsValueLiteral<Vl> = [Vl] extends [never]
 
 export type DeepMutable<T> = IsAny<T> extends true
 	? any
-	: T extends Brand.Brand<any> | { __tableName: string }
+	: T extends Brand.Brand<any> | GenericId<any>
 		? T
 		: T extends ReadonlyMap<infer K, infer V>
 			? Map<DeepMutable<K>, DeepMutable<V>>
