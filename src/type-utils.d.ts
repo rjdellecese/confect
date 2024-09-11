@@ -1,3 +1,6 @@
+import type { GenericId } from "convex/values";
+import type { Brand } from "effect";
+
 // biome-ignore lint/complexity/noBannedTypes:
 export type IsOptional<T, K extends keyof T> = {} extends Pick<T, K>
 	? true
@@ -29,13 +32,15 @@ export type IsValueLiteral<Vl> = [Vl] extends [never]
 
 export type DeepMutable<T> = IsAny<T> extends true
 	? any
-	: T extends ReadonlyMap<infer K, infer V>
-		? Map<DeepMutable<K>, DeepMutable<V>>
-		: T extends ReadonlySet<infer V>
-			? Set<DeepMutable<V>>
-			: [keyof T] extends [never]
-				? T
-				: { -readonly [K in keyof T]: DeepMutable<T[K]> };
+	: T extends Brand.Brand<any> | GenericId<any>
+		? T
+		: T extends ReadonlyMap<infer K, infer V>
+			? Map<DeepMutable<K>, DeepMutable<V>>
+			: T extends ReadonlySet<infer V>
+				? Set<DeepMutable<V>>
+				: [keyof T] extends [never]
+					? T
+					: { -readonly [K in keyof T]: DeepMutable<T[K]> };
 
 export type DeepReadonly<T> = IsAny<T> extends true
 	? any
