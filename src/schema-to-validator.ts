@@ -1,5 +1,4 @@
-import type { AST, ParseResult } from "@effect/schema";
-import * as Schema from "@effect/schema/Schema";
+import { type AST, type ParseResult, Schema } from "@effect/schema";
 import type {
 	GenericId,
 	OptionalProperty,
