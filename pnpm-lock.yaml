@@ -9,59 +9,59 @@ importers:
   .:
     dependencies:
       '@effect/schema':
-        specifier: 0.72.3
+        specifier: ^0.72.3
         version: 0.72.3(effect@3.7.2)
       convex:
-        specifier: 1.15.0
+        specifier: ^1.15.0
         version: 1.15.0
       effect:
-        specifier: 3.7.2
+        specifier: ^3.7.2
         version: 3.7.2
     devDependencies:
       '@biomejs/biome':
-        specifier: 1.8.3
+        specifier: ^1.8.3
         version: 1.8.3
       '@changesets/cli':
-        specifier: 2.27.8
+        specifier: ^2.27.8
         version: 2.27.8
       '@effect/platform':
-        specifier: 0.64.0
+        specifier: ^0.64.0
         version: 0.64.0(@effect/schema@0.72.3(effect@3.7.2))(effect@3.7.2)
       '@effect/platform-node':
-        specifier: 0.59.0
+        specifier: ^0.59.0
         version: 0.59.0(@effect/platform@0.64.0(@effect/schema@0.72.3(effect@3.7.2))(effect@3.7.2))(effect@3.7.2)
       '@effect/vitest':
-        specifier: 0.9.2
+        specifier: ^0.9.2
         version: 0.9.2(effect@3.7.2)(vitest@2.0.5(@types/node@20.7.0))
       '@swc/jest':
-        specifier: 0.2.36
+        specifier: ^0.2.36
         version: 0.2.36(@swc/core@1.4.1)
       '@tsconfig/strictest':
-        specifier: 2.0.5
+        specifier: ^2.0.5
         version: 2.0.5
       '@vitest/coverage-v8':
-        specifier: 2.0.5
+        specifier: ^2.0.5
         version: 2.0.5(vitest@2.0.5(@types/node@20.7.0))
       convex-test:
-        specifier: 0.0.29
+        specifier: ^0.0.29
         version: 0.0.29(convex@1.15.0)
       dotenv:
-        specifier: 16.4.5
+        specifier: ^16.4.5
         version: 16.4.5
       tsup:
-        specifier: 8.2.4
+        specifier: ^8.2.4
         version: 8.2.4(@swc/core@1.4.1)(postcss@8.4.45)(typescript@5.6.2)
       typescript:
-        specifier: 5.6.2
+        specifier: ^5.6.2
         version: 5.6.2
       vite:
-        specifier: 5.4.3
+        specifier: ^5.4.3
         version: 5.4.3(@types/node@20.7.0)
       vite-tsconfig-paths:
-        specifier: 5.0.1
+        specifier: ^5.0.1
         version: 5.0.1(typescript@5.6.2)(vite@5.4.3(@types/node@20.7.0))
       vitest:
-        specifier: 2.0.5
+        specifier: ^2.0.5
         version: 2.0.5(@types/node@20.7.0)
 
 packages:
@@ -1567,9 +1567,6 @@ packages:
   pathval@2.0.0:
     resolution: {integrity: sha512-vE7JKRyES09KiunauX7nd2Q9/L7lhok4smP9RZTDeD4MVs72Dp2qNFVz39Nz5a0FVEW0BJR6C0DYrq6unoziZA==}
     engines: {node: '>= 14.16'}
-
-  picocolors@1.0.1:
-    resolution: {integrity: sha512-anP1Z8qwhkbmu7MFP5iTt+wQKXgwzf7zTyGlcdzabySa9vd0Xt392U0rVmz9poOaBj0uHJKyyo9/upk0HrEQew==}
 
   picocolors@1.1.0:
     resolution: {integrity: sha512-TQ92mBOW0l3LeMeyLV6mzy/kWr8lkd/hp3mTg7wYK7zJhuBStmGMBG0BdeDZS/dZx1IukaX6Bk11zcln25o1Aw==}
@@ -3289,8 +3286,6 @@ snapshots:
 
   pathval@2.0.0: {}
 
-  picocolors@1.0.1: {}
-
   picocolors@1.1.0: {}
 
   picomatch@2.3.1: {}
@@ -3506,7 +3501,7 @@ snapshots:
       execa: 5.1.1
       globby: 11.1.0
       joycon: 3.1.1
-      picocolors: 1.0.1
+      picocolors: 1.1.0
       postcss-load-config: 6.0.1(postcss@8.4.45)
       resolve-from: 5.0.0
       rollup: 4.21.2
