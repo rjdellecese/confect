@@ -4,9 +4,9 @@ import type {
 	ConfectQueryCtx as ConfectQueryCtxType,
 } from "~/src/ctx";
 import type { TableNamesInConfectDataModel } from "~/src/data-model";
-import { confectSchema } from "~/test/convex/schema";
-import { make, type ConfectDoc as ConfectDocType } from "~/src/functions";
+import { type ConfectDoc as ConfectDocType, make } from "~/src/functions";
 import type { ConfectDataModelFromConfectSchemaDefinition } from "~/src/schema";
+import { confectSchema } from "~/test/convex/schema";
 
 // TODO: Generate this file!
 
