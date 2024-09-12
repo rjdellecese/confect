@@ -1,6 +1,6 @@
 {
 	"name": "@rjdellecese/confect",
-	"version": "0.0.3",
+	"version": "0.0.4",
 	"description": "Use Effect with Convex!",
 	"repository": {
 		"type": "git",
@@ -81,7 +81,10 @@
 		"build": "tsup",
 		"release": "pnpm build && changeset publish"
 	},
-	"keywords": ["effect", "convex"],
+	"keywords": [
+		"effect",
+		"convex"
+	],
 	"author": "RJ Dellecese",
 	"license": "ISC",
 	"devDependencies": {
