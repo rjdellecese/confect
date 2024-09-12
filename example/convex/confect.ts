@@ -4,8 +4,8 @@ import type {
 	ConfectQueryCtx as ConfectQueryCtxType,
 } from "@rjdellecese/confect/ctx";
 import type {
-	TableNamesInConfectDataModel,
 	ConfectDoc as ConfectDocType,
+	TableNamesInConfectDataModel,
 } from "@rjdellecese/confect/data-model";
 import { makeFunctions } from "@rjdellecese/confect/functions";
 import type { ConfectDataModelFromConfectSchemaDefinition } from "@rjdellecese/confect/schema";
