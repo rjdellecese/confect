@@ -2,11 +2,11 @@ import { Schema } from "@effect/schema";
 import { expectTypeOf, test } from "@effect/vitest";
 
 import type { DatabaseSchemasFromConfectDataModel } from "~/src/database";
-import * as confect from "~/src/index";
 import {
 	type ConfectDataModelFromConfectSchema,
 	defineTable,
 } from "~/src/schema";
+import * as schemas from "~/src/schemas";
 
 test("DatabaseSchemasFromConfectDataModel", () => {
 	const notesSchemaFields = {
@@ -22,7 +22,7 @@ test("DatabaseSchemasFromConfectDataModel", () => {
 	type DatabaseSchemas = DatabaseSchemasFromConfectDataModel<ConfectDataModel>;
 
 	const notesDocumentSchema = Schema.Struct({
-		_id: confect.schemas.Id.Id<"notes">(),
+		_id: schemas.Id.Id<"notes">(),
 		_creationTime: Schema.Number,
 		...notesSchemaFields,
 	});
