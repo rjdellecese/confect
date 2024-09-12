@@ -1,5 +1,11 @@
 # @rjdellecese/confect
 
+## 0.0.4
+
+### Patch Changes
+
+- e789ec4: Improve building process/namespacing
+
 ## 0.0.3
 
 ### Patch Changes
