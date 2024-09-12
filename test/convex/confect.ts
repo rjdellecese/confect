@@ -1,11 +1,11 @@
-import type { TableNamesInConfectDataModel } from "~/src/data-model";
-import * as confect from "~/src/index";
-import { confectSchema } from "~/test/convex/schema";
 import type {
 	ConfectActionCtx as ConfectActionCtxType,
 	ConfectMutationCtx as ConfectMutationCtxType,
 	ConfectQueryCtx as ConfectQueryCtxType,
 } from "~/src/ctx";
+import type { TableNamesInConfectDataModel } from "~/src/data-model";
+import * as confect from "~/src/index";
+import { confectSchema } from "~/test/convex/schema";
 
 // TODO: Generate this file!
 
