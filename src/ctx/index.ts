@@ -1,5 +1,5 @@
-export {
-	type ConfectActionCtx,
-	type ConfectMutationCtx,
-	type ConfectQueryCtx,
+export type {
+	ConfectActionCtx,
+	ConfectMutationCtx,
+	ConfectQueryCtx,
 } from "~/src/ctx";
