@@ -30,7 +30,6 @@ import {
 import type {
 	DataModelFromConfectDataModel,
 	GenericConfectDataModel,
-	TableNamesInConfectDataModel,
 } from "~/src/data-model";
 import {
 	type DatabaseSchemasFromConfectDataModel,
@@ -46,7 +45,7 @@ import {
 	compileReturnsSchema,
 } from "~/src/schema-to-validator";
 
-export const make = <
+export const makeFunctions = <
 	ConvexSchema extends GenericSchema,
 	ConfectSchema extends GenericConfectSchema,
 >(
@@ -330,8 +329,3 @@ const confectHttpActionFunction =
 		request: Request,
 	): Promise<Response> =>
 		Effect.runPromise(handler(makeConfectActionCtx(ctx), request));
-
-export type ConfectDoc<
-	ConfectDataModel extends GenericConfectDataModel,
-	TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
-> = ConfectDataModel[TableName]["encodedConfectDocument"];

@@ -53,3 +53,8 @@ export type GenericConfectTableInfo = {
 	searchIndexes: GenericTableSearchIndexes;
 	vectorIndexes: GenericTableVectorIndexes;
 };
+
+export type ConfectDoc<
+	ConfectDataModel extends GenericConfectDataModel,
+	TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+> = ConfectDataModel[TableName]["encodedConfectDocument"];

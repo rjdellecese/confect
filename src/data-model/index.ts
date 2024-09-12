@@ -1,1 +1,4 @@
-export type { TableNamesInConfectDataModel } from "~/src/data-model";
+export type {
+	TableNamesInConfectDataModel,
+	ConfectDoc,
+} from "~/src/data-model";

@@ -1,1 +1,1 @@
-export { make, type ConfectDoc } from "~/src/functions";
+export { makeFunctions } from "~/src/functions";
