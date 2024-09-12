@@ -1,5 +1,5 @@
 import tsconfigPaths from "vite-tsconfig-paths";
-import { defineConfig } from "vitest/config";
+import { defineConfig, configDefaults } from "vitest/config";
 
 export default defineConfig({
 	plugins: [tsconfigPaths()],
@@ -12,6 +12,11 @@ export default defineConfig({
 				functions: 99,
 				lines: 99,
 			},
+			exclude: [
+				...(configDefaults.coverage?.exclude ?? []),
+				"example/**/*",
+				"src/**/index.ts",
+			],
 		},
 		typecheck: {
 			include: ["**/*.{test,spec}{-d,}.?(c|m)[jt]s?(x)"],
