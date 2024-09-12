@@ -1,5 +1,6 @@
 {
 	"compilerOptions": {
+		"importsNotUsedAsValues": "remove",
 		"exactOptionalPropertyTypes": false,
 		"lib": ["ESNext", "DOM"],
 		"target": "ESNext",
@@ -10,6 +11,6 @@
 			"~/*": ["*"]
 		}
 	},
-	"exclude": ["coverage", "node_modules", "dist", "test/convex"],
+	"exclude": ["coverage", "node_modules", "dist", "example", "test/convex"],
 	"extends": ["@tsconfig/strictest/tsconfig"]
 }

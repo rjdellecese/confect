@@ -1,11 +1,12 @@
 import { Schema } from "@effect/schema";
-import * as confect from "~/src/index";
+import * as schema from "~/src/schema";
+import * as schemas from "~/src/schemas";
 
-export const confectSchema = confect.schema.defineSchema({
-	notes: confect.schema
+export const confectSchema = schema.defineSchema({
+	notes: schema
 		.defineTable(
 			Schema.Struct({
-				userId: Schema.optionalWith(confect.schemas.Id.Id<"users">(), {
+				userId: Schema.optionalWith(schemas.Id.Id<"users">(), {
 					exact: true,
 				}),
 				text: Schema.String.pipe(Schema.maxLength(100)),
@@ -33,14 +34,14 @@ export const confectSchema = confect.schema.defineSchema({
 			filterFields: ["author.name", "tag"],
 			dimensions: 1536,
 		}),
-	users: confect.schema.defineTable(
+	users: schema.defineTable(
 		Schema.Struct({
 			username: Schema.String,
 		}),
 	),
 });
 
-export const confectTableSchemas = confect.schema.tableSchemas(
+export const confectTableSchemas = schema.tableSchemas(
 	confectSchema.confectSchema,
 );
 

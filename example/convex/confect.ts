@@ -2,13 +2,15 @@ import type {
 	ConfectActionCtx as ConfectActionCtxType,
 	ConfectMutationCtx as ConfectMutationCtxType,
 	ConfectQueryCtx as ConfectQueryCtxType,
-} from "~/src/ctx";
-import type { TableNamesInConfectDataModel } from "~/src/data-model";
-import { type ConfectDoc as ConfectDocType, make } from "~/src/functions";
-import type { ConfectDataModelFromConfectSchemaDefinition } from "~/src/schema";
-import { confectSchema } from "~/test/convex/schema";
+} from "@rjdellecese/confect/ctx";
+import type { TableNamesInConfectDataModel } from "@rjdellecese/confect/data-model";
+import {
+	type ConfectDoc as ConfectDocType,
+	make,
+} from "@rjdellecese/confect/functions";
+import type { ConfectDataModelFromConfectSchemaDefinition } from "@rjdellecese/confect/schema";
 
-// TODO: Generate this file!
+import { confectSchema } from "./schema";
 
 export const {
 	action,
