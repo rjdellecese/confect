@@ -11,8 +11,6 @@ import { makeFunctions } from "~/src/functions";
 import type { ConfectDataModelFromConfectSchemaDefinition } from "~/src/schema";
 import { confectSchema } from "~/test/convex/schema";
 
-// TODO: Generate this file!
-
 export const {
 	action,
 	httpAction,

@@ -10,7 +10,7 @@ import {
 	type ConfectDataModelFromConfectSchema,
 	type ConfectSystemDataModel,
 	confectSystemSchema,
-	defineTable,
+	defineConfectTable,
 	tableSchemas,
 } from "~/src/schema";
 import { extendWithSystemFields } from "../src/schemas/SystemFields";
@@ -21,7 +21,7 @@ describe("ConfectDataModelFromConfectSchema", () => {
 			content: Schema.String,
 		});
 
-		const notesTableDefinition = defineTable(NoteSchema);
+		const notesTableDefinition = defineConfectTable(NoteSchema);
 
 		type ConfectSchema = {
 			notes: typeof notesTableDefinition;
@@ -49,7 +49,7 @@ describe("tableSchemas", () => {
 		});
 
 		const confectTableSchemas = tableSchemas({
-			notes: defineTable(NoteSchema),
+			notes: defineConfectTable(NoteSchema),
 		});
 
 		type Actual = typeof confectTableSchemas;

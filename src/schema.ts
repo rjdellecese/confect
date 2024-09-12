@@ -68,7 +68,7 @@ type SchemaDefinitionFromConfectSchemaDefinition<
 		string]: ConfectSchema[TableName]["tableDefinition"];
 }>;
 
-export const defineSchema = <ConfectSchema extends GenericConfectSchema>(
+export const defineConfectSchema = <ConfectSchema extends GenericConfectSchema>(
 	confectSchema: ConfectSchema,
 ): ConfectSchemaDefinitionImpl<
 	SchemaDefinitionFromConfectSchemaDefinition<ConfectSchema>,
@@ -310,7 +310,7 @@ class ConfectTableDefinitionImpl<
 	}
 }
 
-export const defineTable = <
+export const defineConfectTable = <
 	S extends Schema.Schema.AnyNoContext,
 	Fields extends Schema.Struct.Fields,
 >(
@@ -371,8 +371,8 @@ type ExtractEncodedConfectDocument<
 	Readonly<IdField<TableName>> & Readonly<SystemFields> & S["Encoded"]
 >;
 
-export const confectSystemSchema = defineSchema({
-	_scheduled_functions: defineTable(
+export const confectSystemSchema = defineConfectSchema({
+	_scheduled_functions: defineConfectTable(
 		Schema.Struct({
 			name: Schema.String,
 			args: Schema.Array(Schema.Any),
@@ -390,7 +390,7 @@ export const confectSystemSchema = defineSchema({
 			),
 		}),
 	),
-	_storage: defineTable(
+	_storage: defineConfectTable(
 		Schema.Struct({
 			sha256: Schema.String,
 			size: Schema.Number,

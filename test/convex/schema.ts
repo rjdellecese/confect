@@ -2,9 +2,9 @@ import { Schema } from "@effect/schema";
 import * as schema from "~/src/schema";
 import * as schemas from "~/src/schemas";
 
-export const confectSchema = schema.defineSchema({
+export const confectSchema = schema.defineConfectSchema({
 	notes: schema
-		.defineTable(
+		.defineConfectTable(
 			Schema.Struct({
 				userId: Schema.optionalWith(schemas.Id.Id<"users">(), {
 					exact: true,
@@ -34,7 +34,7 @@ export const confectSchema = schema.defineSchema({
 			filterFields: ["author.name", "tag"],
 			dimensions: 1536,
 		}),
-	users: schema.defineTable(
+	users: schema.defineConfectTable(
 		Schema.Struct({
 			username: Schema.String,
 		}),
