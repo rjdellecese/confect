@@ -20,7 +20,7 @@ Confect is a library that deeply integrates the [Effect](https://effect.website)
 - Row-level security.
 - And more!
 
-## Getting started
+## Installation
 
 ```bash
 npm install @rjdellecese/confect
