@@ -1,5 +1,11 @@
 # @rjdellecese/confect
 
+## 0.0.5
+
+### Patch Changes
+
+- de76990: Add `LICENSE` and `README.md`
+
 ## 0.0.4
 
 ### Patch Changes
