@@ -8,10 +8,10 @@ Confect is a library that deeply integrates the [Effect](https://effect.website)
 
 ### Available today
 
-- Define your Convex database schema using Effect schemas. Confect will automatically translate your Effect schema definitions into their Convex validator equivalents.
+- Define your Convex database schema using Effect schemas.
 - Use Confect functions to automatically decode and encode your data according to your Effect schema definitions when reading from and writing to the database.
 - Write Convex function `args` and `returns` validators using Effect's Schema library.
-- Use Effectified versions of all of the Convex server APIs (`A | null` becomes `Option<A>`s, `Promise`s become `Effect`s, etc.).
+- Use Effectified versions of all of the Convex server APIs (`Promise`s become `Effect`s, `A | null` becomes `Option<A>`s, etc.).
 
 ### Coming soon
 
