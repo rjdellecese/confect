@@ -6,11 +6,17 @@
 			"extensions": [
 				"YoavBls.pretty-ts-errors",
 				"vitest.explorer",
-				"biomejs.biome"
+				"biomejs.biome",
+				"DavidAnson.vscode-markdownlint"
 			],
 			"settings": {
 				"editor.defaultFormatter": "biomejs.biome",
-				"editor.formatOnSave": true
+				"editor.formatOnSave": true,
+				"markdownlint.config": {
+					"MD010": {
+						"spaces_per_tab": 2
+					}
+				}
 			}
 		}
 	},
