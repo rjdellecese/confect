@@ -1,24 +1,26 @@
 # Confect 🧁
 
-Confect is a library that integrates **Con**vex with the Ef**fect** ecosystem.
+🚧 **This library is pre-1.0 and its API is not yet stable.** 🚧
+
+Confect is a library that deeply integrates the [Effect](https://effect.website) ecosystem with [Convex](https://convex.dev), unlocking a number of powerful new capabilities.
 
 ## Features
 
 ### Available today
 
-- Write your Convex schema using Effect's Schema library, and have it automatically translated into its Convex-validated equivalent.
-- Automatically enforce Schema constraints and transform your data as it's written to and read from the database.
-- Write Convex function args and returns validators using Effect's Schema library.
+- Define your Convex database schema using Effect schemas. Confect will automatically translate your Effect schema definitions into their Convex validator equivalents.
+- Use Confect functions to automatically decode and encode your data according to your Effect schema definitions when reading from and writing to the database.
+- Write Convex function `args` and `returns` validators using Effect's Schema library.
 - Use Effectified versions of all of the Convex server APIs (`A | null` becomes `Option<A>`s, `Promise`s become `Effect`s, etc.).
 
 ### Coming soon
 
-- Effect HTTP app integration, including auto-generated API documentation via Scalar.
+- Effect HTTP API integration, including auto-generated API documentation via Scalar.
 - Enhanced `db` APIs.
 - Row-level security.
 - And more!
 
-## Getting Started
+## Getting started
 
 ```bash
 npm install @rjdellecese/confect
@@ -34,7 +36,7 @@ pnpm add @rjdellecese/confect
 
 ## Usage
 
-### 1. Define your Convex schema using Effect's Schema library
+### 1. Define your Convex database schema using Effect schemas
 
 ```typescript
 import { Schema } from "@effect/schema";
@@ -89,7 +91,7 @@ export default confectSchema.schemaDefinition;
 
 ```
 
-### 2. Generate your Convex functions and types
+### 2. Generate your Convex function constructors and types
 
 ```typescript
 import type {
@@ -132,7 +134,7 @@ export type ConfectMutationCtx = ConfectMutationCtxType<ConfectDataModel>;
 export type ConfectActionCtx = ConfectActionCtxType<ConfectDataModel>;
 ```
 
-### 3. Use your generated Convex functions and types
+### 3. Write some Convex functions
 
 ```typescript
 import { Schema } from "@effect/schema";
