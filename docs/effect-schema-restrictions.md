@@ -1,0 +1,71 @@
+# Effect schema restrictions
+
+Not every Effect `Schema` is valid for use in Confect. Remember that an Effect `Schema` looks like this:
+
+```typescript
+type Schema<Type, Encoded, Context>
+```
+
+For `Schema`s used in Confect:
+
+* `Type` represents the value that you'll be operating on in your code. Any TypeScript type is permitted here.
+* `Encoded` represents the value that is stored in the database or provided as an argument/returned as a value in a Convex function. This must be a valid [Convex value](https://docs.convex.dev/database/types#convex-values).
+* `Context` is not currently supported. It should always be `never`.
+
+## Additional caveats
+
+### No-op returns from Convex functions
+
+Unlike with the vanilla APIs, Convex functions defined with Confect may not return `undefined` or `void`—use `null` (`Schema.Null` as the `returns` validator) instead. Convex coerces `undefined`/`void` returns to `null` anyways—this just makes that more explicit.
+
+{% code title="✅" %}
+```typescript
+export const myQuery = query({
+    args: Schema.Struct({}),
+    returns: Schema.Null,
+    handler: () => null,
+})
+```
+{% endcode %}
+
+{% code title="❌" %}
+```typescript
+export const myQuery = query({
+    args: Schema.Struct({}),
+    returns: Schema.Undefined,
+    handler: () => undefined,
+})
+```
+{% endcode %}
+
+{% code title="❌" %}
+```typescript
+export const myQuery = query({
+    args: Schema.Struct({}),
+    returns: Schema.Void,
+    handler: () => {},
+})
+```
+{% endcode %}
+
+### Optional object fields
+
+At the moment, optional object fields must use `Schema.optionalWith` with the `{ exact: true }` option. The plainer `Schema.optional` is not currently supported.
+
+This restriction will likely be lifted in the future.
+
+{% code title="✅" %}
+```typescript
+Schema.Struct({
+    foo: Schema.optionalWith(Schema.String, { exact: true })
+})
+```
+{% endcode %}
+
+{% code title="❌" %}
+```typescript
+Schema.Struct({
+    foo: Schema.optional(Schema.String)
+})
+```
+{% endcode %}
