@@ -19,7 +19,7 @@ pnpm add @rjdellecese/confect
 ### 1. Define your database schema
 
 {% hint style="info" %}
-Not every Effect `Schema` is valid for use in Confect. See [effect-schema-restrictions.md](effect-schema-restrictions.md "mention") for more information on what's permitted and what's not.
+Not every Effect `Schema` is valid for use in Confect. See [effect-schema-restrictions.md](effect-schema-restrictions.md "mention") for more information about what's permitted and what's not.
 {% endhint %}
 
 {% @github-files/github-code-block url="https://github.com/rjdellecese/confect/blob/main/example/convex/schema.ts" fullWidth="false" %}
