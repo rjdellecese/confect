@@ -16,6 +16,7 @@ Confect is a library that deeply integrates the [Effect](https://effect.website)
 ### Coming soon
 
 - Effect HTTP API integration, including auto-generated API documentation via Scalar.
+- Automatic decoding and encoding of args and return values for React client (`useQuery`, `useMutation`, etc.).
 - Enhanced `db` APIs.
 - Row-level security.
 - And more!

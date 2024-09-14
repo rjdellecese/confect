@@ -4,7 +4,7 @@ import { configDefaults, defineConfig } from "vitest/config";
 export default defineConfig({
 	plugins: [tsconfigPaths()],
 	test: {
-		setupFiles: ["./test/setup.ts"],
+		globalSetup: ["./test/setup.ts"],
 		coverage: {
 			thresholds: {
 				statements: 99,
