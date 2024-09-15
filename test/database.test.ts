@@ -4,7 +4,7 @@ import { expectTypeOf, test } from "@effect/vitest";
 import type { DatabaseSchemasFromConfectDataModel } from "~/src/database";
 import {
 	type ConfectDataModelFromConfectSchema,
-	defineConfectTable,
+	defineTable,
 } from "~/src/schema";
 import * as schemas from "~/src/schemas";
 
@@ -14,7 +14,7 @@ test("DatabaseSchemasFromConfectDataModel", () => {
 		tags: Schema.optionalWith(Schema.Array(Schema.String), { exact: true }),
 	};
 	const confectSchema = {
-		notes: defineConfectTable(Schema.Struct(notesSchemaFields)),
+		notes: defineTable(Schema.Struct(notesSchemaFields)),
 	};
 	type ConfectSchema = typeof confectSchema;
 	type ConfectDataModel = ConfectDataModelFromConfectSchema<ConfectSchema>;
