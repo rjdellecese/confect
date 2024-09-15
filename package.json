@@ -9,7 +9,7 @@
 	"bugs": {
 		"url": "https://github.com/rjdellecese/confect/issues"
 	},
-	"homepage": "https://github.com/rjdellecese/confect#readme",
+	"homepage": "https://rj-dellecese.gitbook.io/confect",
 	"sideEffects": false,
 	"type": "module",
 	"files": [
