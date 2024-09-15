@@ -1,12 +1,12 @@
 import { Schema } from "@effect/schema";
-import * as schemas from "@rjdellecese/confect/schemas";
+import { Id } from "@rjdellecese/confect/server";
 import { Effect } from "effect";
 import { mutation, query } from "./confect";
 import { confectTableSchemas } from "./schema";
 
 export const getNote = query({
 	args: Schema.Struct({
-		noteId: schemas.Id.Id<"notes">(),
+		noteId: Id.Id<"notes">(),
 	}),
 	returns: Schema.Option(confectTableSchemas.notes.withSystemFields),
 	handler: ({ db }, { noteId }) => db.get(noteId),
@@ -16,7 +16,7 @@ export const insertNote = mutation({
 	args: Schema.Struct({
 		text: Schema.String,
 	}),
-	returns: schemas.Id.Id<"notes">(),
+	returns: Id.Id<"notes">(),
 	handler: ({ db }, { text }) =>
 		db
 			.insert("notes", { text })

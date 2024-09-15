@@ -19,57 +19,26 @@
 		"LICENSE"
 	],
 	"exports": {
-		"./data-model": {
+		"./server": {
 			"import": {
-				"types": "./dist/data-model/index.d.ts",
-				"import": "./dist/data-model/index.js"
+				"types": "./dist/server/index.d.ts",
+				"import": "./dist/server/index.js"
 			},
 			"require": {
-				"types": "./dist/data-model/index.d.cts",
-				"require": "./dist/data-model/index.cjs"
+				"types": "./dist/server/index.d.cts",
+				"require": "./dist/server/index.cjs"
 			}
 		},
-		"./ctx": {
+		"./react": {
 			"import": {
-				"types": "./dist/ctx/index.d.ts",
-				"import": "./dist/ctx/index.js"
+				"types": "./dist/react/index.d.ts",
+				"import": "./dist/react/index.js"
 			},
 			"require": {
-				"types": "./dist/ctx/index.d.cts",
-				"require": "./dist/ctx/index.cjs"
+				"types": "./dist/react/index.d.cts",
+				"require": "./dist/react/index.cjs"
 			}
-		},
-		"./functions": {
-			"import": {
-				"types": "./dist/functions/index.d.ts",
-				"import": "./dist/functions/index.js"
-			},
-			"require": {
-				"types": "./dist/functions/index.d.cts",
-				"require": "./dist/functions/index.cjs"
-			}
-		},
-		"./schema": {
-			"import": {
-				"types": "./dist/schema/index.d.ts",
-				"import": "./dist/schema/index.js"
-			},
-			"require": {
-				"types": "./dist/schema/index.d.cts",
-				"require": "./dist/schema/index.cjs"
-			}
-		},
-		"./schemas": {
-			"import": {
-				"types": "./dist/schemas/index.d.ts",
-				"import": "./dist/schemas/index.js"
-			},
-			"require": {
-				"types": "./dist/schemas/index.d.cts",
-				"require": "./dist/schemas/index.cjs"
-			}
-		},
-		"./package.json": "./package.json"
+		}
 	},
 	"scripts": {
 		"start": "convex dev",

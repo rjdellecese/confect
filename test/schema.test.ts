@@ -5,15 +5,15 @@ import { describe, expectTypeOf, test } from "vitest";
 import type {
 	DataModelFromConfectDataModel,
 	GenericConfectDataModel,
-} from "~/src/data-model";
+} from "~/src/server/data-model";
 import {
 	type ConfectDataModelFromConfectSchema,
 	type ConfectSystemDataModel,
 	confectSystemSchema,
 	defineTable,
 	tableSchemas,
-} from "~/src/schema";
-import { extendWithSystemFields } from "../src/schemas/SystemFields";
+} from "~/src/server/schema";
+import { extendWithSystemFields } from "../src/server/schemas/SystemFields";
 
 describe("ConfectDataModelFromConfectSchema", () => {
 	test("produces a type which is assignable to GenericConfectDataModel", () => {

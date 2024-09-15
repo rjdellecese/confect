@@ -13,26 +13,29 @@ import type {
 import type { GenericId } from "convex/values";
 import { Effect } from "effect";
 
-import { type ConfectAuth, ConfectAuthImpl } from "~/src/auth";
+import { type ConfectAuth, ConfectAuthImpl } from "~/src/server/auth";
 import type {
 	DataModelFromConfectDataModel,
 	GenericConfectDataModel,
 	TableNamesInConfectDataModel,
-} from "~/src/data-model";
+} from "~/src/server/data-model";
 import {
 	type ConfectDatabaseReader,
 	ConfectDatabaseReaderImpl,
 	type ConfectDatabaseWriter,
 	ConfectDatabaseWriterImpl,
 	type DatabaseSchemasFromConfectDataModel,
-} from "~/src/database";
-import { type ConfectScheduler, ConfectSchedulerImpl } from "~/src/scheduler";
+} from "~/src/server/database";
+import {
+	type ConfectScheduler,
+	ConfectSchedulerImpl,
+} from "~/src/server/scheduler";
 import {
 	type ConfectStorageReader,
 	ConfectStorageReaderImpl,
 	type ConfectStorageWriter,
 	ConfectStorageWriterImpl,
-} from "~/src/storage";
+} from "~/src/server/storage";
 
 export type ConfectMutationCtx<
 	ConfectDataModel extends GenericConfectDataModel,

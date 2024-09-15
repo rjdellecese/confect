@@ -19,11 +19,11 @@ import {
 import type { Validator } from "convex/values";
 import { Record, pipe } from "effect";
 
-import { compileTableSchema } from "~/src/schema-to-validator";
+import { compileTableSchema } from "~/src/server/schema-to-validator";
 import {
 	type ExtendWithSystemFields,
 	extendWithSystemFields,
-} from "~/src/schemas/SystemFields";
+} from "~/src/server/schemas/SystemFields";
 
 export type GenericConfectSchema = Record<
 	string,

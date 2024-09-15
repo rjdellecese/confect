@@ -26,24 +26,24 @@ import {
 	makeConfectActionCtx,
 	makeConfectMutationCtx,
 	makeConfectQueryCtx,
-} from "~/src/ctx";
+} from "~/src/server/ctx";
 import type {
 	DataModelFromConfectDataModel,
 	GenericConfectDataModel,
-} from "~/src/data-model";
+} from "~/src/server/data-model";
 import {
 	type DatabaseSchemasFromConfectDataModel,
 	databaseSchemasFromConfectSchema,
-} from "~/src/database";
+} from "~/src/server/database";
 import type {
 	ConfectDataModelFromConfectSchema,
 	ConfectSchemaDefinition,
 	GenericConfectSchema,
-} from "~/src/schema";
+} from "~/src/server/schema";
 import {
 	compileArgsSchema,
 	compileReturnsSchema,
-} from "~/src/schema-to-validator";
+} from "~/src/server/schema-to-validator";
 
 export const makeFunctions = <
 	ConvexSchema extends GenericSchema,

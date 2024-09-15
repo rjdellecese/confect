@@ -1,13 +1,7 @@
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-	entry: [
-		"src/data-model/index.ts",
-		"src/ctx/index.ts",
-		"src/functions/index.ts",
-		"src/schema/index.ts",
-		"src/schemas/index.ts",
-	],
+	entry: ["src/server/index.ts", "src/react/index.ts"],
 	dts: true,
 	sourcemap: true,
 	clean: true,

@@ -48,14 +48,14 @@ import type {
 	GenericEncodedConfectDocument,
 	TableInfoFromConfectTableInfo,
 	TableNamesInConfectDataModel,
-} from "~/src/data-model";
+} from "~/src/server/data-model";
 import {
 	type ConfectDataModelFromConfectSchema,
 	type ConfectSystemDataModel,
 	type GenericConfectSchema,
 	confectSystemSchema,
-} from "~/src/schema";
-import { extendWithSystemFields } from "~/src/schemas/SystemFields";
+} from "~/src/server/schema";
+import { extendWithSystemFields } from "~/src/server/schemas/SystemFields";
 
 interface ConfectQuery<
 	ConfectTableInfo extends GenericConfectTableInfo,

@@ -1,14 +1,12 @@
-import type {
-	ConfectActionCtx as ConfectActionCtxType,
-	ConfectMutationCtx as ConfectMutationCtxType,
-	ConfectQueryCtx as ConfectQueryCtxType,
-} from "@rjdellecese/confect/ctx";
-import type {
-	ConfectDoc as ConfectDocType,
-	TableNamesInConfectDataModel,
-} from "@rjdellecese/confect/data-model";
-import { makeFunctions } from "@rjdellecese/confect/functions";
-import type { ConfectDataModelFromConfectSchemaDefinition } from "@rjdellecese/confect/schema";
+import {
+	type ConfectActionCtx as ConfectActionCtxType,
+	type ConfectMutationCtx as ConfectMutationCtxType,
+	type ConfectQueryCtx as ConfectQueryCtxType,
+	type ConfectDoc as ConfectDocType,
+	type TableNamesInConfectDataModel,
+	makeFunctions,
+	type ConfectDataModelFromConfectSchemaDefinition,
+} from "@rjdellecese/confect/server";
 
 import { confectSchema } from "./schema";
 
