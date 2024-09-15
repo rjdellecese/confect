@@ -1,5 +1,12 @@
 # @rjdellecese/confect
 
+## 0.0.6
+
+### Patch Changes
+
+- 5d622b9: `defineConfectSchema` -> `defineSchema`
+  `defineConfectTable` -> `defineTable`
+
 ## 0.0.5
 
 ### Patch Changes
