@@ -1,10 +1,7 @@
 import { Schema } from "@effect/schema";
-import { Effect } from "effect";
 import * as schemas from "@rjdellecese/confect/schemas";
-import {
-	mutation,
-	query,
-} from "./confect";
+import { Effect } from "effect";
+import { mutation, query } from "./confect";
 import { confectTableSchemas } from "./schema";
 
 export const getNote = query({
@@ -21,9 +18,9 @@ export const insertNote = mutation({
 	}),
 	returns: schemas.Id.Id<"notes">(),
 	handler: ({ db }, { text }) =>
-		db.insert("notes", { text }).pipe(
-			Effect.catchTag("ParseError", (e) => Effect.die(e)),
-		),
+		db
+			.insert("notes", { text })
+			.pipe(Effect.catchTag("ParseError", (e) => Effect.die(e))),
 });
 
 export const listNotes = query({
