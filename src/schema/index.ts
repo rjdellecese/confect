@@ -1,6 +1,6 @@
 export {
-	defineConfectSchema,
-	defineConfectTable,
+	defineSchema,
+	defineTable,
 	tableSchemas,
 	type ConfectDataModelFromConfectSchemaDefinition,
 } from "~/src/schema";

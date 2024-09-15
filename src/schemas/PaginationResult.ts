@@ -19,7 +19,3 @@ export const PaginationResult = <Doc extends Schema.Schema.AnyNoContext>(
 			{ exact: true },
 		),
 	}).pipe(Schema.mutable);
-
-export type PaginationResult<T> = Schema.Schema.Type<
-	typeof PaginationResult<Schema.Schema<T, any>>
->;
