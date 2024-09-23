@@ -1,10 +1,10 @@
 /// <reference types="vite/client" />
 
-import { useQuery, useMutation } from "@rjdellecese/confect/react";
-import { api } from "../convex/_generated/api";
+import { useMutation, useQuery } from "@rjdellecese/confect/react";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { Array, Effect, Option } from "effect";
 import { useState } from "react";
+import { api } from "../convex/_generated/api";
 import {
 	DeleteNoteArgs,
 	DeleteNoteResult,

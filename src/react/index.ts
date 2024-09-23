@@ -1,9 +1,9 @@
+import { Schema } from "@effect/schema";
 import {
-	useQuery as useConvexQuery,
 	useMutation as useConvexMutation,
+	useQuery as useConvexQuery,
 } from "convex/react";
 import type { FunctionReference } from "convex/server";
-import { Schema } from "@effect/schema";
 import { Effect, Option } from "effect";
 
 export const useQuery =

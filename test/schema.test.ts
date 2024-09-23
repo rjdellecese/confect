@@ -9,12 +9,12 @@ import type {
 import {
 	type ConfectDataModelFromConfectSchema,
 	type ConfectSystemDataModel,
-	confectSystemSchemaDefinition,
-	defineTable,
-	defineSchema,
-	type confectTableSchemas,
-	type confectSystemSchema,
 	type ConfectTableDefinition,
+	type confectSystemSchema,
+	confectSystemSchemaDefinition,
+	type confectTableSchemas,
+	defineSchema,
+	defineTable,
 } from "~/src/server/schema";
 import { extendWithSystemFields } from "../src/server/schemas/SystemFields";
 

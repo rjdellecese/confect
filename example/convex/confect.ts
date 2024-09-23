@@ -1,11 +1,11 @@
 import {
 	type ConfectActionCtx as ConfectActionCtxType,
+	type ConfectDataModelFromConfectSchemaDefinition,
+	type ConfectDoc as ConfectDocType,
 	type ConfectMutationCtx as ConfectMutationCtxType,
 	type ConfectQueryCtx as ConfectQueryCtxType,
-	type ConfectDoc as ConfectDocType,
 	type TableNamesInConfectDataModel,
 	makeFunctions,
-	type ConfectDataModelFromConfectSchemaDefinition,
 } from "@rjdellecese/confect/server";
 
 import { confectSchema } from "./schema";
