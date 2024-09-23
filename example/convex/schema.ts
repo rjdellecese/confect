@@ -1,10 +1,5 @@
 import { Schema } from "@effect/schema";
-import {
-	Id,
-	defineSchema,
-	defineTable,
-	tableSchemas,
-} from "@rjdellecese/confect/server";
+import { Id, defineSchema, defineTable } from "@rjdellecese/confect/server";
 
 export const confectSchema = defineSchema({
 	notes: defineTable(
@@ -44,6 +39,4 @@ export const confectSchema = defineSchema({
 	),
 });
 
-export const confectTableSchemas = tableSchemas(confectSchema.confectSchema);
-
-export default confectSchema.schemaDefinition;
+export default confectSchema.convexSchemaDefinition;

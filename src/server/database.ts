@@ -53,7 +53,7 @@ import {
 	type ConfectDataModelFromConfectSchema,
 	type ConfectSystemDataModel,
 	type GenericConfectSchema,
-	confectSystemSchema,
+	confectSystemSchemaDefinition,
 } from "~/src/server/schema";
 import { extendWithSystemFields } from "~/src/server/schemas/SystemFields";
 
@@ -478,7 +478,9 @@ export class ConfectDatabaseReaderImpl<
 		this.databaseSchemas = databaseSchemas;
 		this.system = new ConfectBaseDatabaseReaderImpl<ConfectSystemDataModel>(
 			this.db.system,
-			databaseSchemasFromConfectSchema(confectSystemSchema.confectSchema),
+			databaseSchemasFromConfectSchema(
+				confectSystemSchemaDefinition.confectSchema,
+			),
 		);
 	}
 	decode<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(

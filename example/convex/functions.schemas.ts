@@ -1,10 +1,10 @@
 import { Schema } from "@effect/schema";
 import { Id } from "@rjdellecese/confect/server";
-import { confectTableSchemas } from "./schema";
+import { confectSchema } from "./schema";
 
 export const ListNotesArgs = Schema.Struct({});
 export const ListNotesResult = Schema.Array(
-	confectTableSchemas.notes.withSystemFields,
+	confectSchema.tableSchemas.notes.withSystemFields,
 );
 
 export const InsertNoteArgs = Schema.Struct({

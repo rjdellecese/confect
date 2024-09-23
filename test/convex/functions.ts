@@ -11,13 +11,13 @@ import {
 	mutation,
 	query,
 } from "~/test/convex/confect";
-import { confectTableSchemas } from "~/test/convex/schema";
+import { confectSchema } from "~/test/convex/schema";
 
 export const queryGet = query({
 	args: Schema.Struct({
 		noteId: Id<"notes">(),
 	}),
-	returns: Schema.Option(confectTableSchemas.notes.withSystemFields),
+	returns: Schema.Option(confectSchema.tableSchemas.notes.withSystemFields),
 	handler: ({ db }, { noteId }) => db.get(noteId),
 });
 
@@ -25,7 +25,7 @@ export const mutationGet = mutation({
 	args: Schema.Struct({
 		noteId: Id<"notes">(),
 	}),
-	returns: Schema.Option(confectTableSchemas.notes.withSystemFields),
+	returns: Schema.Option(confectSchema.tableSchemas.notes.withSystemFields),
 	handler: ({ db }, { noteId }) => db.get(noteId),
 });
 
@@ -40,13 +40,13 @@ export const insert = mutation({
 
 export const queryCollect = query({
 	args: Schema.Struct({}),
-	returns: Schema.Array(confectTableSchemas.notes.withSystemFields),
+	returns: Schema.Array(confectSchema.tableSchemas.notes.withSystemFields),
 	handler: ({ db }) => db.query("notes").collect(),
 });
 
 export const mutationCollect = mutation({
 	args: Schema.Struct({}),
-	returns: Schema.Array(confectTableSchemas.notes.withSystemFields),
+	returns: Schema.Array(confectSchema.tableSchemas.notes.withSystemFields),
 	handler: ({ db }) => db.query("notes").collect(),
 });
 
@@ -54,7 +54,7 @@ export const filterFirst = query({
 	args: Schema.Struct({
 		text: Schema.String,
 	}),
-	returns: Schema.Option(confectTableSchemas.notes.withSystemFields),
+	returns: Schema.Option(confectSchema.tableSchemas.notes.withSystemFields),
 	handler: ({ db }, { text }) =>
 		db
 			.query("notes")
@@ -66,7 +66,7 @@ export const withIndexFirst = query({
 	args: Schema.Struct({
 		text: Schema.String,
 	}),
-	returns: Schema.Option(confectTableSchemas.notes.withSystemFields),
+	returns: Schema.Option(confectSchema.tableSchemas.notes.withSystemFields),
 	handler: ({ db }, { text }) =>
 		db
 			.query("notes")
@@ -76,7 +76,7 @@ export const withIndexFirst = query({
 
 export const orderDescCollect = query({
 	args: Schema.Struct({}),
-	returns: Schema.Array(confectTableSchemas.notes.withSystemFields),
+	returns: Schema.Array(confectSchema.tableSchemas.notes.withSystemFields),
 	handler: ({ db }) => db.query("notes").order("desc").collect(),
 });
 
@@ -84,7 +84,7 @@ export const take = query({
 	args: Schema.Struct({
 		n: Schema.Number,
 	}),
-	returns: Schema.Array(confectTableSchemas.notes.withSystemFields),
+	returns: Schema.Array(confectSchema.tableSchemas.notes.withSystemFields),
 	handler: ({ db }, { n }) => db.query("notes").take(n),
 });
 
@@ -93,7 +93,7 @@ export const paginate = query({
 		cursor: Schema.Union(Schema.String, Schema.Null),
 		numItems: Schema.Number,
 	}),
-	returns: PaginationResult(confectTableSchemas.notes.withSystemFields),
+	returns: PaginationResult(confectSchema.tableSchemas.notes.withSystemFields),
 	handler: ({ db }, { cursor, numItems }) =>
 		db.query("notes").paginate({ cursor, numItems }),
 });
@@ -102,7 +102,7 @@ export const unique = query({
 	args: Schema.Struct({}),
 	returns: Schema.Union(
 		Schema.Literal("NotUniqueError"),
-		Schema.Option(confectTableSchemas.notes.withSystemFields),
+		Schema.Option(confectSchema.tableSchemas.notes.withSystemFields),
 	),
 	handler: ({ db }) =>
 		db
@@ -115,7 +115,7 @@ export const unique = query({
 
 export const onlyFirst = query({
 	args: Schema.Struct({}),
-	returns: Schema.Option(confectTableSchemas.notes.withSystemFields),
+	returns: Schema.Option(confectSchema.tableSchemas.notes.withSystemFields),
 	handler: ({ db }) => db.query("notes").first(),
 });
 
@@ -337,7 +337,9 @@ export const executeVectorSearch = action({
 					}).pipe(
 						Effect.andThen(
 							Schema.decode(
-								Schema.Option(confectTableSchemas.notes.withSystemFields),
+								Schema.Option(
+									confectSchema.tableSchemas.notes.withSystemFields,
+								),
 							),
 						),
 						Effect.map(Option.getOrThrow),
@@ -353,7 +355,7 @@ export const getVectorSearch = query({
 	args: Schema.Struct({
 		noteId: Id<"notes">(),
 	}),
-	returns: Schema.Option(confectTableSchemas.notes.withSystemFields),
+	returns: Schema.Option(confectSchema.tableSchemas.notes.withSystemFields),
 	handler: ({ db }, { noteId }) => db.get(noteId),
 });
 
@@ -409,13 +411,13 @@ export const systemGet = query({
 	args: Schema.Struct({
 		id: Id<"_storage">(),
 	}),
-	returns: Schema.Option(confectTableSchemas._storage.withSystemFields),
+	returns: Schema.Option(confectSchema.tableSchemas._storage.withSystemFields),
 	handler: ({ db }, { id }) => db.system.get(id),
 });
 
 export const systemQuery = query({
 	args: Schema.Struct({}),
-	returns: Schema.Array(confectTableSchemas._storage.withSystemFields),
+	returns: Schema.Array(confectSchema.tableSchemas._storage.withSystemFields),
 	handler: ({ db }) => db.system.query("_storage").collect(),
 });
 

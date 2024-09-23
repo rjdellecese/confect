@@ -9,7 +9,7 @@ export const SystemFields = <TableName extends string>() =>
 
 export const extendWithSystemFields = <
 	TableName extends string,
-	TableSchema extends Schema.Schema<any, any>,
+	TableSchema extends Schema.Schema.AnyNoContext,
 >(
 	_tableName: TableName,
 	schema: TableSchema,
@@ -18,5 +18,5 @@ export const extendWithSystemFields = <
 
 export type ExtendWithSystemFields<
 	TableName extends string,
-	TableSchema extends Schema.Schema<any, any>,
+	TableSchema extends Schema.Schema.AnyNoContext,
 > = Schema.extend<TableSchema, ReturnType<typeof SystemFields<TableName>>>;

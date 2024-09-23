@@ -14,7 +14,6 @@ export { makeFunctions } from "~/src/server/functions";
 export {
 	defineSchema,
 	defineTable,
-	tableSchemas,
 	type ConfectDataModelFromConfectSchemaDefinition,
 } from "~/src/server/schema";
 
