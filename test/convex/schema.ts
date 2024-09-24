@@ -1,12 +1,12 @@
 import { Schema } from "@effect/schema";
-import * as schema from "~/src/schema";
-import * as schemas from "~/src/schemas";
+import * as schema from "~/src/server/schema";
+import { Id } from "~/src/server/schemas/Id";
 
 export const confectSchema = schema.defineSchema({
 	notes: schema
 		.defineTable(
 			Schema.Struct({
-				userId: Schema.optionalWith(schemas.Id.Id<"users">(), {
+				userId: Schema.optionalWith(Id<"users">(), {
 					exact: true,
 				}),
 				text: Schema.String.pipe(Schema.maxLength(100)),
@@ -41,8 +41,4 @@ export const confectSchema = schema.defineSchema({
 	),
 });
 
-export const confectTableSchemas = schema.tableSchemas(
-	confectSchema.confectSchema,
-);
-
-export default confectSchema.schemaDefinition;
+export default confectSchema.convexSchemaDefinition;

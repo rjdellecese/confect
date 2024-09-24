@@ -2,13 +2,13 @@ import type {
 	ConfectActionCtx as ConfectActionCtxType,
 	ConfectMutationCtx as ConfectMutationCtxType,
 	ConfectQueryCtx as ConfectQueryCtxType,
-} from "~/src/ctx";
+} from "~/src/server/ctx";
 import type {
 	ConfectDoc as ConfectDocType,
 	TableNamesInConfectDataModel,
-} from "~/src/data-model";
-import { makeFunctions } from "~/src/functions";
-import type { ConfectDataModelFromConfectSchemaDefinition } from "~/src/schema";
+} from "~/src/server/data-model";
+import { makeFunctions } from "~/src/server/functions";
+import type { ConfectDataModelFromConfectSchemaDefinition } from "~/src/server/schema";
 import { confectSchema } from "~/test/convex/schema";
 
 export const {

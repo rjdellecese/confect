@@ -14,7 +14,7 @@ import {
 	compileAst,
 	compileSchema,
 	compileTableSchema,
-} from "~/src/schema-to-validator";
+} from "~/src/server/schema-to-validator";
 
 describe(compileAst, () => {
 	describe("allowed", () => {

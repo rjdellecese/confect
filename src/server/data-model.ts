@@ -6,7 +6,7 @@ import type {
 	GenericTableVectorIndexes,
 } from "convex/server";
 import type { ReadonlyRecord } from "effect/Record";
-import type { ReadonlyValue } from "~/src/schema-to-validator";
+import type { ReadonlyValue } from "~/src/server/schema-to-validator";
 
 export type GenericConfectDocument = ReadonlyRecord<string, any>;
 

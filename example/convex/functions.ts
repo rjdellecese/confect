@@ -1,22 +1,17 @@
-import { Schema } from "@effect/schema";
-import * as schemas from "@rjdellecese/confect/schemas";
 import { Effect } from "effect";
 import { mutation, query } from "./confect";
-import { confectTableSchemas } from "./schema";
-
-export const getNote = query({
-	args: Schema.Struct({
-		noteId: schemas.Id.Id<"notes">(),
-	}),
-	returns: Schema.Option(confectTableSchemas.notes.withSystemFields),
-	handler: ({ db }, { noteId }) => db.get(noteId),
-});
+import {
+	DeleteNoteArgs,
+	DeleteNoteResult,
+	InsertNoteArgs,
+	InsertNoteResult,
+	ListNotesArgs,
+	ListNotesResult,
+} from "./functions.schemas";
 
 export const insertNote = mutation({
-	args: Schema.Struct({
-		text: Schema.String,
-	}),
-	returns: schemas.Id.Id<"notes">(),
+	args: InsertNoteArgs,
+	returns: InsertNoteResult,
 	handler: ({ db }, { text }) =>
 		db
 			.insert("notes", { text })
@@ -24,7 +19,13 @@ export const insertNote = mutation({
 });
 
 export const listNotes = query({
-	args: Schema.Struct({}),
-	returns: Schema.Array(confectTableSchemas.notes.withSystemFields),
-	handler: ({ db }) => db.query("notes").collect(),
+	args: ListNotesArgs,
+	returns: ListNotesResult,
+	handler: ({ db }) => db.query("notes").order("desc").collect(),
+});
+
+export const deleteNote = mutation({
+	args: DeleteNoteArgs,
+	returns: DeleteNoteResult,
+	handler: ({ db }, { noteId }) => db.delete(noteId).pipe(Effect.as(null)),
 });

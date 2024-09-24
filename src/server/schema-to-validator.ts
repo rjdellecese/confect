@@ -28,7 +28,7 @@ import type {
 	IsUnion,
 	IsValueLiteral,
 	UnionToTuple,
-} from "~/src/type-utils";
+} from "~/src/server/type-utils";
 
 // Args
 

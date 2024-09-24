@@ -5,15 +5,18 @@ import { describe, expectTypeOf, test } from "vitest";
 import type {
 	DataModelFromConfectDataModel,
 	GenericConfectDataModel,
-} from "~/src/data-model";
+} from "~/src/server/data-model";
 import {
 	type ConfectDataModelFromConfectSchema,
 	type ConfectSystemDataModel,
-	confectSystemSchema,
+	type ConfectTableDefinition,
+	type confectSystemSchema,
+	confectSystemSchemaDefinition,
+	type confectTableSchemas,
+	defineSchema,
 	defineTable,
-	tableSchemas,
-} from "~/src/schema";
-import { extendWithSystemFields } from "../src/schemas/SystemFields";
+} from "~/src/server/schema";
+import { extendWithSystemFields } from "../src/server/schemas/SystemFields";
 
 describe("ConfectDataModelFromConfectSchema", () => {
 	test("produces a type which is assignable to GenericConfectDataModel", () => {
@@ -48,9 +51,9 @@ describe("tableSchemas", () => {
 			content: Schema.String,
 		});
 
-		const confectTableSchemas = tableSchemas({
+		const confectTableSchemas = defineSchema({
 			notes: defineTable(NoteSchema),
-		});
+		}).tableSchemas;
 
 		type Actual = typeof confectTableSchemas;
 
@@ -62,22 +65,48 @@ describe("tableSchemas", () => {
 			_scheduled_functions: {
 				withSystemFields: extendWithSystemFields(
 					"_scheduled_functions",
-					confectSystemSchema.confectSchema._scheduled_functions.tableSchema,
+					confectSystemSchemaDefinition.confectSchema._scheduled_functions
+						.tableSchema,
 				),
 				withoutSystemFields:
-					confectSystemSchema.confectSchema._scheduled_functions.tableSchema,
+					confectSystemSchemaDefinition.confectSchema._scheduled_functions
+						.tableSchema,
 			},
 			_storage: {
 				withSystemFields: extendWithSystemFields(
 					"_storage",
-					confectSystemSchema.confectSchema._storage.tableSchema,
+					confectSystemSchemaDefinition.confectSchema._storage.tableSchema,
 				),
 				withoutSystemFields:
-					confectSystemSchema.confectSchema._storage.tableSchema,
+					confectSystemSchemaDefinition.confectSchema._storage.tableSchema,
 			},
 		};
 
 		type Expected = typeof expectedTableSchemas;
+
+		expectTypeOf<Actual>().toEqualTypeOf<Expected>();
+	});
+});
+
+describe("confectTableSchemas", () => {
+	test("matches confectSystemSchema", () => {
+		type ConfectTableSchemas = typeof confectTableSchemas;
+		type ConfectSystemSchema = typeof confectSystemSchema;
+
+		type ConfectTableSchemasFromConfectSystemSchema = {
+			[K in keyof ConfectSystemSchema]: ConfectSystemSchema[K] extends ConfectTableDefinition<
+				infer S,
+				any,
+				any,
+				any,
+				any
+			>
+				? S
+				: never;
+		};
+
+		type Actual = ConfectTableSchemas;
+		type Expected = ConfectTableSchemasFromConfectSystemSchema;
 
 		expectTypeOf<Actual>().toEqualTypeOf<Expected>();
 	});
