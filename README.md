@@ -7,4 +7,4 @@ Confect is a framework that deeply integrates Effect with Convex. It's more than
 * Write Convex function args and returns validators using Effect's schema library.
 * Use Effect-ified versions of all of the Convex server APIs (`Promises` become `Effect`s, `A | null`s becomes `Option<A>`s, etc.).
 
-Want to learn more? Read the [docs](https://rj-dellecese.gitbook.io/confect)!
+Want to learn more? Read the [docs](https://rjdellecese.gitbook.io/confect)!
