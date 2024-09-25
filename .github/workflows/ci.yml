@@ -39,5 +39,5 @@ jobs:
       - name: Lint
         run: pnpm run lint
 
-      - name: Run typechecking and tests with coverage
-        run: pnpm run typecheck && pnpm run coverage
+      - name: Run tests with typechecking and coverage
+        run: pnpm run test
