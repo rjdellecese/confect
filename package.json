@@ -44,9 +44,7 @@
 		"start": "convex dev",
 		"lint": "biome ci --error-on-warnings",
 		"fix": "biome check --write",
-		"test": "vitest --run",
-		"typecheck": "vitest run --typecheck",
-		"coverage": "vitest run --coverage",
+		"test": "vitest --run --typecheck --coverage",
 		"build": "tsup",
 		"release": "pnpm build && changeset publish"
 	},
