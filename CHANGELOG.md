@@ -1,5 +1,12 @@
 # @rjdellecese/confect
 
+## 0.0.7
+
+### Patch Changes
+
+- a688061: Bump deps
+- 1adc84e: Create new `server` and `react` modules, add new `tableSchemas` property to `ConfectSchemaDefinition`
+
 ## 0.0.6
 
 ### Patch Changes
