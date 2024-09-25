@@ -1,13 +1,15 @@
 /// <reference types="vite/client" />
 
-import { useMutation, useQuery } from "@rjdellecese/confect/react";
+import { useAction, useMutation, useQuery } from "@rjdellecese/confect/react";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { Array, Effect, Option } from "effect";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../convex/_generated/api";
 import {
 	DeleteNoteArgs,
 	DeleteNoteResult,
+	GetRandomArgs,
+	GetRandomResult,
 	InsertNoteArgs,
 	InsertNoteResult,
 	ListNotesArgs,
@@ -35,9 +37,35 @@ const Page = () => {
 		returns: InsertNoteResult,
 	});
 
+	const [randomNumber, setRandomNumber] = useState<number | null>(null);
+	const getRandom = useAction({
+		action: api.functions.getRandom,
+		args: GetRandomArgs,
+		returns: GetRandomResult,
+	});
+
+	const retrieveRandomNumber = () => {
+		getRandom({}).pipe(Effect.map(setRandomNumber), Effect.runPromise);
+	};
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: Initial render only
+	useEffect(() => {
+		retrieveRandomNumber();
+	}, []);
+
 	return (
 		<div>
 			<h1>Confect Example</h1>
+
+			<div>
+				Random number: {randomNumber ? randomNumber : "Loading…"}
+				<br />
+				<button type="button" onClick={retrieveRandomNumber}>
+					Get new random number
+				</button>
+			</div>
+
+			<br />
 
 			<textarea
 				rows={4}
@@ -55,7 +83,7 @@ const Page = () => {
 					)
 				}
 			>
-				Insert
+				Insert note
 			</button>
 
 			<NoteList />
@@ -89,7 +117,7 @@ const NoteList = () => {
 								deleteNote({ noteId: note._id }).pipe(Effect.runPromise)
 							}
 						>
-							Delete
+							Delete note
 						</button>
 					</li>
 				))}
