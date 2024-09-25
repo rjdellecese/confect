@@ -1,4 +1,4 @@
-# Effect schema restrictions
+# Schema restrictions
 
 Not every Effect `Schema` is valid for use in Confect. Remember that an Effect `Schema` looks like this:
 
@@ -23,7 +23,7 @@ Unlike with the vanilla APIs, Convex functions defined with Confect may not retu
 export const myQuery = query({
     args: Schema.Struct({}),
     returns: Schema.Null,
-    handler: () => null,
+    handler: () => Effect.succeed(null),
 })
 ```
 {% endcode %}
@@ -33,7 +33,7 @@ export const myQuery = query({
 export const myQuery = query({
     args: Schema.Struct({}),
     returns: Schema.Undefined,
-    handler: () => undefined,
+    handler: () => Effect.succeed(undefined),
 })
 ```
 {% endcode %}
@@ -43,7 +43,7 @@ export const myQuery = query({
 export const myQuery = query({
     args: Schema.Struct({}),
     returns: Schema.Void,
-    handler: () => {},
+    handler: () => Effect.void,
 })
 ```
 {% endcode %}
