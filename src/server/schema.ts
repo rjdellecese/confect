@@ -412,31 +412,8 @@ type ExtractEncodedConfectDocument<
 >;
 
 export const confectSystemSchema = {
-	_scheduled_functions: defineTable(
-		Schema.Struct({
-			name: Schema.String,
-			args: Schema.Array(Schema.Any),
-			scheduledTime: Schema.Number,
-			completedTime: Schema.optionalWith(Schema.Number, { exact: true }),
-			state: Schema.Union(
-				Schema.Struct({ kind: Schema.Literal("pending") }),
-				Schema.Struct({ kind: Schema.Literal("inProgress") }),
-				Schema.Struct({ kind: Schema.Literal("success") }),
-				Schema.Struct({
-					kind: Schema.Literal("failed"),
-					error: Schema.String,
-				}),
-				Schema.Struct({ kind: Schema.Literal("canceled") }),
-			),
-		}),
-	),
-	_storage: defineTable(
-		Schema.Struct({
-			sha256: Schema.String,
-			size: Schema.Number,
-			contentType: Schema.optionalWith(Schema.String, { exact: true }),
-		}),
-	),
+	_scheduled_functions: defineTable(confectTableSchemas._scheduled_functions),
+	_storage: defineTable(confectTableSchemas._storage),
 };
 
 export const confectSystemSchemaDefinition = defineSchema(confectSystemSchema);
