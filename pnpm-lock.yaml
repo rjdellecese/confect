@@ -31,8 +31,8 @@ importers:
         specifier: 0.61.3
         version: 0.61.3(@effect/platform@0.66.2(@effect/schema@0.74.1(effect@3.8.4))(effect@3.8.4))(effect@3.8.4)
       '@effect/vitest':
-        specifier: 0.10.4
-        version: 0.10.4(effect@3.8.4)(vitest@2.1.1(@types/node@20.7.0))
+        specifier: 0.10.5
+        version: 0.10.5(effect@3.8.4)(vitest@2.1.1(@types/node@20.7.0))
       '@swc/jest':
         specifier: 0.2.36
         version: 0.2.36(@swc/core@1.4.1)
@@ -225,8 +225,8 @@ packages:
     peerDependencies:
       effect: ^3.8.4
 
-  '@effect/vitest@0.10.4':
-    resolution: {integrity: sha512-Ac2w4AR7aUJcf70yrdrupy6Y5KvIlFMDqQAJwqqv0vWgKcn1SXqsqMqHVU7Eursmo3/D6EfyLBgPr20s7UNkSw==}
+  '@effect/vitest@0.10.5':
+    resolution: {integrity: sha512-rIzYdFRwF/caf3pjbnsdtEjG0HfZSWH8jFsmkDVkQBkTPVYtk41PEMNQCdotK8Gynv7YKpI2fybjDO3LVBPk5A==}
     peerDependencies:
       effect: ^3.8.4
       vitest: ^2.0.5
@@ -2348,7 +2348,7 @@ snapshots:
       effect: 3.8.4
       fast-check: 3.21.0
 
-  '@effect/vitest@0.10.4(effect@3.8.4)(vitest@2.1.1(@types/node@20.7.0))':
+  '@effect/vitest@0.10.5(effect@3.8.4)(vitest@2.1.1(@types/node@20.7.0))':
     dependencies:
       effect: 3.8.4
       vitest: 2.1.1(@types/node@20.7.0)

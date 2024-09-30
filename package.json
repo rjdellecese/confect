@@ -59,7 +59,7 @@
 		"@changesets/cli": "2.27.8",
 		"@effect/platform": "0.66.2",
 		"@effect/platform-node": "0.61.3",
-		"@effect/vitest": "0.10.4",
+		"@effect/vitest": "0.10.5",
 		"@swc/jest": "0.2.36",
 		"@tsconfig/strictest": "2.0.5",
 		"@vitest/coverage-v8": "2.1.1",
