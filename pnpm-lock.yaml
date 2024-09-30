@@ -13,7 +13,7 @@ importers:
         version: 0.74.1(effect@3.8.4)
       convex:
         specifier: ^1.16.2
-        version: 1.16.2
+        version: 1.16.3
       effect:
         specifier: ^3.8.4
         version: 3.8.4
@@ -44,7 +44,7 @@ importers:
         version: 2.1.1(vitest@2.1.1(@types/node@20.7.0))
       convex-test:
         specifier: 0.0.30
-        version: 0.0.30(convex@1.16.2)
+        version: 0.0.30(convex@1.16.3)
       dotenv:
         specifier: 16.4.5
         version: 16.4.5
@@ -1201,8 +1201,8 @@ packages:
     peerDependencies:
       convex: ^1.12.1
 
-  convex@1.16.2:
-    resolution: {integrity: sha512-pAUbOXJgTPnAKjWeA6aQXg5coNXO+c0yCI9iC6oZAvQrV7j18ozPOFNi6gWlR1+0MweLWPGV6Nup8Lc3kbpf7w==}
+  convex@1.16.3:
+    resolution: {integrity: sha512-HDmgBkkeBMraFW//kN5llNGS9NbDTVcYtSOHd6iPV67FZqPyBBgn5b9bv6ov5wyOJEvt+I6KIrL/mrbajQm6bQ==}
     engines: {node: '>=18.0.0', npm: '>=7.0.0'}
     hasBin: true
     peerDependencies:
@@ -3095,11 +3095,11 @@ snapshots:
 
   consola@3.2.3: {}
 
-  convex-test@0.0.30(convex@1.16.2):
+  convex-test@0.0.30(convex@1.16.3):
     dependencies:
-      convex: 1.16.2
+      convex: 1.16.3
 
-  convex@1.16.2:
+  convex@1.16.3:
     dependencies:
       esbuild: 0.23.0
       jwt-decode: 4.0.0
