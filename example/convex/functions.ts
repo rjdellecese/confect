@@ -3,6 +3,8 @@ import { action, mutation, query } from "./confect";
 import {
 	DeleteNoteArgs,
 	DeleteNoteResult,
+	GetFirstArgs,
+	GetFirstResult,
 	GetRandomArgs,
 	GetRandomResult,
 	InsertNoteArgs,
@@ -36,4 +38,10 @@ export const getRandom = action({
 	args: GetRandomArgs,
 	returns: GetRandomResult,
 	handler: () => Effect.succeed(Math.random()),
+});
+
+export const getFirst = query({
+	args: GetFirstArgs,
+	returns: GetFirstResult,
+	handler: ({ db }) => db.query("notes").first(),
 });

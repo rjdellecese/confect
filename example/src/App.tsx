@@ -1,8 +1,6 @@
-/// <reference types="vite/client" />
-
 import { useAction, useMutation, useQuery } from "@rjdellecese/confect/react";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
-import { Array, Effect, Option } from "effect";
+import { Array, Effect, Exit, Option } from "effect";
 import { useEffect, useState } from "react";
 import { api } from "../convex/_generated/api";
 import {
@@ -15,12 +13,11 @@ import {
 	ListNotesArgs,
 	ListNotesResult,
 } from "../convex/functions.schemas";
+import { FetchHttpClient, HttpApiClient } from "@effect/platform";
+import { Api } from "../convex/http/api";
 
 const App = () => {
-	const convexClient = new ConvexReactClient(
-		// biome-ignore lint/complexity/useLiteralKeys: TS error with literal key
-		import.meta.env["VITE_CONVEX_URL"],
-	);
+	const convexClient = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
 
 	return (
 		<ConvexProvider client={convexClient}>
@@ -87,6 +84,7 @@ const Page = () => {
 			</button>
 
 			<NoteList />
+			<HttpEndpoints />
 		</div>
 	);
 };
@@ -124,6 +122,48 @@ const NoteList = () => {
 			</ul>
 		),
 	});
+};
+
+const ApiClient = HttpApiClient.make(Api, {
+	baseUrl: import.meta.env.VITE_CONVEX_URL.replace(
+		"convex.cloud",
+		"convex.site",
+	),
+});
+
+const getFirst = ApiClient.pipe(
+	Effect.andThen((client) => client.group.getFirst()),
+	Effect.scoped,
+	Effect.provide(FetchHttpClient.layer),
+);
+
+const HttpEndpoints = () => {
+	const [getResponse, setGetResponse] = useState<Exit.Exit<any, any> | null>(
+		null,
+	);
+
+	return (
+		<div>
+			<button
+				type="button"
+				onClick={() =>
+					getFirst
+						.pipe(Effect.runPromiseExit)
+						.then((exit) => setGetResponse(exit))
+				}
+			>
+				Get
+			</button>
+			<p>
+				{getResponse
+					? Exit.match(getResponse, {
+							onSuccess: (value) => String(value),
+							onFailure: (error) => String(error),
+						})
+					: "No response yet"}
+			</p>
+		</div>
+	);
 };
 
 export default App;

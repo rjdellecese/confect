@@ -19,3 +19,8 @@ export const DeleteNoteResult = Schema.Null;
 
 export const GetRandomArgs = Schema.Struct({});
 export const GetRandomResult = Schema.Number;
+
+export const GetFirstArgs = Schema.Struct({});
+export const GetFirstResult = Schema.Option(
+	confectSchema.tableSchemas.notes.withSystemFields,
+);

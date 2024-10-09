@@ -697,11 +697,11 @@ test("http action", () =>
 
 		const response = yield* c.fetch("/get", { method: "GET" });
 
-		const text = yield* Effect.promise(() => response.text());
+		const jsonBody = yield* Effect.promise(() => response.json());
 		const status = response.status;
 
-		expect(text).toEqual("Hello, world!");
 		expect(status).toEqual(200);
+		expect(jsonBody).toEqual("Hello, world!");
 	}));
 
 describe("system", () => {
