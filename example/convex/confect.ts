@@ -12,7 +12,6 @@ import { confectSchema } from "./schema";
 
 export const {
 	action,
-	httpAction,
 	internalAction,
 	internalMutation,
 	internalQuery,
