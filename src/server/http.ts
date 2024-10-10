@@ -45,23 +45,32 @@ Object.defineProperty(Request.prototype, "signal", {
 
 // END MONKEY PATCH
 
-export class ConfectActionCtxService<
-	_ConfectDataModel extends GenericConfectDataModel = any,
-> extends Context.Tag("ConfectActionCtx")<
-	ConfectActionCtxService<any>,
+export class ConfectActionCtxService extends Context.Tag("ConfectActionCtx")<
+	ConfectActionCtxService,
 	ConfectActionCtx<any>
 >() {}
 
 type Middleware = (httpApp: HttpApp.Default) => HttpApp.Default<never, any>;
 
-const apiDocsHtml = (openApiSpecPath: string) => `<!doctype html>
+const apiDocsHtml = ({
+	pageTitle,
+	openApiSpecPath,
+}: { pageTitle: string; openApiSpecPath: string }) => `<!doctype html>
 <html>
   <head>
-    <title>Scalar API Reference</title>
+    <title>${pageTitle}</title>
     <meta charset="utf-8" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1" />
+		<style>
+			.darklight {
+				padding: 18px 24px !important;
+			}
+			.darklight-reference-promo {
+				display: none !important;
+			}
+		</style>
   </head>
   <body>
     <script id="api-reference" data-url="${openApiSpecPath}"></script>
@@ -74,7 +83,7 @@ const makeHandler =
 		apiLive: Layer.Layer<
 			HttpApi.HttpApi.Service,
 			never,
-			ConfectActionCtxService<ConfectDataModel>
+			ConfectActionCtxService
 		>,
 		middleware?: Middleware,
 	) =>
@@ -105,27 +114,12 @@ const makeHandler =
 		return webHandler(request);
 	};
 
-const makeHttpAction = <ConfectDataModel extends GenericConfectDataModel>(
-	apiLive: Layer.Layer<
-		HttpApi.HttpApi.Service,
-		never,
-		ConfectActionCtxService<ConfectDataModel>
-	>,
+const makeHttpAction = (
+	apiLive: Layer.Layer<HttpApi.HttpApi.Service, never, ConfectActionCtxService>,
 	middleware?: Middleware,
-) =>
-	httpActionGeneric(
-		makeHandler(
-			apiLive as Layer.Layer<
-				HttpApi.HttpApi.Service,
-				never,
-				ConfectActionCtxService<any>
-			>,
-			middleware,
-		),
-	);
+) => httpActionGeneric(makeHandler(apiLive, middleware));
 
 const makeHttpRouter = <
-	ConfectDataModel extends GenericConfectDataModel,
 	Groups extends HttpApiGroup.HttpApiGroup.Any,
 	Error,
 	ErrorR,
@@ -134,17 +128,15 @@ const makeHttpRouter = <
 	apiLive,
 	serverUrl,
 	openApiSpecPath = "/openapi",
+	apiDocsTitle = "API Reference",
 	apiDocsPath = "/docs",
 	middleware,
 }: {
 	api: HttpApi.HttpApi<Groups, Error, ErrorR>;
-	apiLive: Layer.Layer<
-		HttpApi.HttpApi.Service,
-		never,
-		ConfectActionCtxService<ConfectDataModel>
-	>;
+	apiLive: Layer.Layer<HttpApi.HttpApi.Service, never, ConfectActionCtxService>;
 	serverUrl?: string;
 	openApiSpecPath?: string;
+	apiDocsTitle?: string;
 	apiDocsPath?: string;
 	middleware?: Middleware;
 }): HttpRouter => {
@@ -205,9 +197,15 @@ const makeHttpRouter = <
 		method: "GET",
 		handler: httpActionGeneric(() =>
 			Promise.resolve(
-				new Response(apiDocsHtml(openApiSpecPath), {
-					headers: { "Content-Type": "text/html" },
-				}),
+				new Response(
+					apiDocsHtml({
+						pageTitle: apiDocsTitle,
+						openApiSpecPath,
+					}),
+					{
+						headers: { "Content-Type": "text/html" },
+					},
+				),
 			),
 		),
 	};

@@ -8,4 +8,5 @@ export default makeHttpRouter({
 	api: Api,
 	apiLive: ApiLive,
 	middleware: flow(HttpMiddleware.cors(), HttpMiddleware.logger),
+	apiDocsTitle: "Confect Example API Reference",
 });
