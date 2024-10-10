@@ -691,18 +691,47 @@ describe("scheduled functions", () => {
 		}));
 });
 
-test("http action", () =>
-	Effect.gen(function* () {
-		const c = yield* TestConvexService;
+describe("http", () => {
+	test("user-defined endpoint", () =>
+		Effect.gen(function* () {
+			const c = yield* TestConvexService;
 
-		const response = yield* c.fetch("/get", { method: "GET" });
+			const response = yield* c.fetch("/get", { method: "GET" });
 
-		const jsonBody = yield* Effect.promise(() => response.json());
-		const status = response.status;
+			const jsonBody = yield* Effect.promise(() => response.json());
+			const status = response.status;
 
-		expect(status).toEqual(200);
-		expect(jsonBody).toEqual("Hello, world!");
-	}));
+			expect(status).toEqual(200);
+			expect(jsonBody).toEqual("Hello, world!");
+		}));
+
+	test("openapi spec", () =>
+		Effect.gen(function* () {
+			const c = yield* TestConvexService;
+
+			const response = yield* c.fetch("/openapi", { method: "GET" });
+			const corsResponse = yield* c.fetch("/openapi", { method: "OPTIONS" });
+
+			const jsonBody = yield* Effect.promise(() => response.json());
+			const status = response.status;
+			const corsStatus = corsResponse.status;
+
+			expect(status).toEqual(200);
+			expect(jsonBody).toHaveProperty("openapi");
+			expect(corsStatus).toEqual(200);
+		}));
+
+	test("api docs", () =>
+		Effect.gen(function* () {
+			const c = yield* TestConvexService;
+
+			const response = yield* c.fetch("/docs", { method: "GET" });
+
+			const status = response.status;
+
+			expect(status).toEqual(200);
+		}));
+});
 
 describe("system", () => {
 	test("normalizeId", () =>

@@ -5,12 +5,10 @@ import {
 	type GenericMutationCtx,
 	type GenericQueryCtx,
 	type GenericSchema,
-	type PublicHttpAction,
 	type RegisteredAction,
 	type RegisteredMutation,
 	type RegisteredQuery,
 	actionGeneric,
-	httpActionGeneric,
 	internalActionGeneric,
 	internalMutationGeneric,
 	internalQueryGeneric,
@@ -177,15 +175,6 @@ export const makeFunctions = <
 	}): RegisteredAction<"internal", ConvexValue, Promise<ConvexReturns>> =>
 		internalActionGeneric(confectActionFunction({ args, returns, handler }));
 
-	const httpAction = (
-		handler: (
-			ctx: ConfectActionCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>,
-			request: Request,
-		) => Effect.Effect<Response>,
-	): PublicHttpAction =>
-		// @ts-expect-error
-		httpActionGeneric(confectHttpActionFunction({ handler }));
-
 	return {
 		query,
 		internalQuery,
@@ -193,7 +182,6 @@ export const makeFunctions = <
 		internalMutation,
 		action,
 		internalAction,
-		httpAction,
 	};
 };
 
@@ -314,18 +302,3 @@ const confectActionFunction = <
 			Effect.runPromise,
 		),
 });
-
-const confectHttpActionFunction =
-	<ConfectDataModel extends GenericConfectDataModel>({
-		handler,
-	}: {
-		handler: (
-			ctx: ConfectActionCtx<ConfectDataModel>,
-			request: Request,
-		) => Effect.Effect<Response>;
-	}) =>
-	(
-		ctx: GenericActionCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
-		request: Request,
-	): Promise<Response> =>
-		Effect.runPromise(handler(makeConfectActionCtx(ctx), request));

@@ -38,5 +38,4 @@ const ApiLive = HttpApiBuilder.api(Api).pipe(Layer.provide(ApiGroupLive));
 export default makeHttpRouter({
 	api: Api,
 	apiLive: ApiLive,
-	openApiSpecPath: "/openapi.json",
 });

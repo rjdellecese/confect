@@ -13,7 +13,6 @@ import { confectSchema } from "~/test/convex/schema";
 
 export const {
 	action,
-	httpAction,
 	internalAction,
 	internalMutation,
 	internalQuery,
