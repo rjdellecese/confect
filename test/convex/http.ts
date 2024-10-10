@@ -1,4 +1,3 @@
-import { Schema } from "@effect/schema";
 import {
 	HttpApi,
 	HttpApiBuilder,
@@ -6,6 +5,7 @@ import {
 	HttpApiGroup,
 	OpenApi,
 } from "@effect/platform";
+import { Schema } from "@effect/schema";
 
 import { Effect, Layer } from "effect";
 import { makeHttpRouter } from "~/src/server";

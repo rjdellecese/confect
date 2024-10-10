@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@effect/platform':
-        specifier: 0.68.0
-        version: 0.68.0(@effect/schema@0.75.2(effect@3.9.1))(effect@3.9.1)
+        specifier: 0.68.1
+        version: 0.68.1(@effect/schema@0.75.2(effect@3.9.1))(effect@3.9.1)
       '@effect/schema':
         specifier: 0.75.2
         version: 0.75.2(effect@3.9.1)
@@ -37,8 +37,8 @@ importers:
         specifier: 18.3.11
         version: 18.3.11
       '@types/react-dom':
-        specifier: 18.0.0
-        version: 18.0.0
+        specifier: 18.3.0
+        version: 18.3.0
       '@vitejs/plugin-react':
         specifier: 4.3.2
         version: 4.3.2(vite@5.4.8)
@@ -142,8 +142,8 @@ packages:
     resolution: {integrity: sha512-/l42B1qxpG6RdfYf343Uw1vmDjeNhneUXtzhojE7pDgfpEypmRhI6j1kr17XCVv4Cgl9HdAiQY2x0GwKm7rWCw==}
     engines: {node: '>=6.9.0'}
 
-  '@effect/platform@0.68.0':
-    resolution: {integrity: sha512-idK/xf5UwOkW3l4MqD+fkUxVgUiEn/0+cOhtns0XsnaJLtQq8eCyArMjp8pXcvRxjth4K06wdlbBcLsiIRuq0Q==}
+  '@effect/platform@0.68.1':
+    resolution: {integrity: sha512-eXYEnF0yqq1QpJVAx4Z4v/rYszHg/sT973XgUvj2UkaShcDBM1B2rN1pWRXx0RwjWWlqN0qDDVe2XkAf2u/xRw==}
     peerDependencies:
       '@effect/schema': ^0.75.2
       effect: ^3.9.1
@@ -555,8 +555,8 @@ packages:
   '@types/prop-types@15.7.12':
     resolution: {integrity: sha512-5zvhXYtRNRluoE/jAp4GVsSduVUzNWKkOZrCDBWYtE7biZywwdC2AcEzg+cSMLFRfVgeAFqpfNabiPjxFddV1Q==}
 
-  '@types/react-dom@18.0.0':
-    resolution: {integrity: sha512-49897Y0UiCGmxZqpC8Blrf6meL8QUla6eb+BBhn69dTXlmuOlzkfr7HHY/O8J25e1lTUMs+YYxSlVDAaGHCOLg==}
+  '@types/react-dom@18.3.0':
+    resolution: {integrity: sha512-EhwApuTmMBmXuFOikhQLIBUn6uFg81SwLMOAUgodJF14SOBOCMdU04gDoYi0WOJJHD144TL32z4yDqCW3dnkQg==}
 
   '@types/react@18.3.11':
     resolution: {integrity: sha512-r6QZ069rFTjrEYgFdOck1gK7FLVsgJE7tTz0pQBczlBNUhBNk0MQH4UbnFSwjpQLMkLzgqvBBa+qGpLje16eTQ==}
@@ -1032,7 +1032,7 @@ snapshots:
       '@babel/helper-validator-identifier': 7.24.7
       to-fast-properties: 2.0.0
 
-  '@effect/platform@0.68.0(@effect/schema@0.75.2(effect@3.9.1))(effect@3.9.1)':
+  '@effect/platform@0.68.1(@effect/schema@0.75.2(effect@3.9.1))(effect@3.9.1)':
     dependencies:
       '@effect/schema': 0.75.2(effect@3.9.1)
       effect: 3.9.1
@@ -1204,7 +1204,7 @@ snapshots:
 
   '@rjdellecese/confect@file:..(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
-      '@effect/platform': 0.68.0(@effect/schema@0.75.2(effect@3.9.1))(effect@3.9.1)
+      '@effect/platform': 0.68.1(@effect/schema@0.75.2(effect@3.9.1))(effect@3.9.1)
       '@effect/schema': 0.75.2(effect@3.9.1)
       convex: 1.16.4(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       effect: 3.9.1
@@ -1287,7 +1287,7 @@ snapshots:
 
   '@types/prop-types@15.7.12': {}
 
-  '@types/react-dom@18.0.0':
+  '@types/react-dom@18.3.0':
     dependencies:
       '@types/react': 18.3.11
 

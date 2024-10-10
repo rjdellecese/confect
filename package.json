@@ -57,7 +57,7 @@
 	"devDependencies": {
 		"@biomejs/biome": "1.9.3",
 		"@changesets/cli": "2.27.9",
-		"@effect/platform-node": "0.63.0",
+		"@effect/platform-node": "0.63.1",
 		"@effect/vitest": "0.12.0",
 		"@swc/jest": "0.2.36",
 		"@tsconfig/strictest": "2.0.5",
@@ -72,7 +72,7 @@
 		"vitest": "2.1.2"
 	},
 	"dependencies": {
-		"@effect/platform": "^0.68.0",
+		"@effect/platform": "^0.68.1",
 		"@effect/schema": "^0.75.2",
 		"convex": "^1.16.4",
 		"effect": "^3.9.1"

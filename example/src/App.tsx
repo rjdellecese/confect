@@ -1,3 +1,4 @@
+import { FetchHttpClient, HttpApiClient } from "@effect/platform";
 import { useAction, useMutation, useQuery } from "@rjdellecese/confect/react";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { Array, Effect, Exit, Option } from "effect";
@@ -13,7 +14,6 @@ import {
 	ListNotesArgs,
 	ListNotesResult,
 } from "../convex/functions.schemas";
-import { FetchHttpClient, HttpApiClient } from "@effect/platform";
 import { Api } from "../convex/http/api";
 
 const App = () => {
