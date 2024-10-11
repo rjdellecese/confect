@@ -55,26 +55,27 @@
 	"author": "RJ Dellecese",
 	"license": "ISC",
 	"devDependencies": {
-		"@biomejs/biome": "1.9.2",
-		"@changesets/cli": "2.27.8",
-		"@effect/platform": "0.66.2",
-		"@effect/platform-node": "0.61.3",
-		"@effect/vitest": "0.10.4",
+		"@biomejs/biome": "1.9.3",
+		"@changesets/cli": "2.27.9",
+		"@effect/platform-node": "0.63.1",
+		"@effect/vitest": "0.12.0",
 		"@swc/jest": "0.2.36",
 		"@tsconfig/strictest": "2.0.5",
-		"@vitest/coverage-v8": "2.1.1",
-		"convex-test": "0.0.30",
+		"@types/node": "^22.7.5",
+		"@vitest/coverage-v8": "2.1.2",
+		"convex-test": "0.0.31",
 		"dotenv": "16.4.5",
 		"tsup": "8.3.0",
-		"typescript": "5.6.2",
+		"typescript": "5.6.3",
 		"vite": "5.4.8",
 		"vite-tsconfig-paths": "5.0.1",
-		"vitest": "2.1.1"
+		"vitest": "2.1.2"
 	},
 	"dependencies": {
-		"@effect/schema": "^0.74.1",
-		"convex": "^1.16.2",
-		"effect": "^3.8.4"
+		"@effect/platform": "^0.68.1",
+		"@effect/schema": "^0.75.2",
+		"convex": "^1.16.4",
+		"effect": "^3.9.1"
 	},
 	"engines": {
 		"node": ">=20",
