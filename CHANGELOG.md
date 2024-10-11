@@ -1,5 +1,11 @@
 # @rjdellecese/confect
 
+## 0.0.8
+
+### Patch Changes
+
+- 3f68035: Add HTTP API integration from `@effect/platform` and update deps
+
 ## 0.0.7
 
 ### Patch Changes
