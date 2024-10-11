@@ -12,7 +12,11 @@ import { api } from "../_generated/api";
 import { GetFirstResult } from "../functions.schemas";
 import { confectSchema } from "../schema";
 
-class ApiGroup extends HttpApiGroup.make("group").pipe(
+class ApiGroup extends HttpApiGroup.make("notes").pipe(
+	OpenApi.annotate({
+		title: "Notes",
+		description: "Operations on notes.",
+	}),
 	HttpApiGroup.add(
 		HttpApiEndpoint.get("getFirst", "/get-first").pipe(
 			OpenApi.annotate({
@@ -25,9 +29,21 @@ class ApiGroup extends HttpApiGroup.make("group").pipe(
 	),
 ) {}
 
-export class Api extends HttpApi.empty.pipe(HttpApi.addGroup(ApiGroup)) {}
+export class Api extends HttpApi.empty.pipe(
+	OpenApi.annotate({
+		title: "Confect Example",
+		description: `
+An example API built with Confect and powered by [Scalar](https://github.com/scalar/scalar). 
 
-const ApiGroupLive = HttpApiBuilder.group(Api, "group", (handlers) =>
+# Learn More
+
+See Scalar's documentation on [markdown support](https://github.com/scalar/scalar/blob/main/documentation/markdown.md) and [OpenAPI spec extensions](https://github.com/scalar/scalar/blob/main/documentation/openapi.md).
+`,
+	}),
+	HttpApi.addGroup(ApiGroup),
+) {}
+
+const ApiGroupLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
 	handlers.pipe(
 		HttpApiBuilder.handle(
 			"getFirst",

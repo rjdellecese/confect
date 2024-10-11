@@ -132,7 +132,7 @@ const ApiClient = HttpApiClient.make(Api, {
 });
 
 const getFirst = ApiClient.pipe(
-	Effect.andThen((client) => client.group.getFirst()),
+	Effect.andThen((client) => client.notes.getFirst()),
 	Effect.scoped,
 	Effect.provide(FetchHttpClient.layer),
 );
@@ -152,13 +152,13 @@ const HttpEndpoints = () => {
 						.then((exit) => setGetResponse(exit))
 				}
 			>
-				Get
+				HTTP GET /notes/get-first
 			</button>
 			<p>
 				{getResponse
 					? Exit.match(getResponse, {
-							onSuccess: (value) => String(value),
-							onFailure: (error) => String(error),
+							onSuccess: (value) => JSON.stringify(value),
+							onFailure: (error) => JSON.stringify(error),
 						})
 					: "No response yet"}
 			</p>
