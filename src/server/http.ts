@@ -1,6 +1,6 @@
 import {
+	type HttpApi as EffectHttpApi,
 	FileSystem,
-	type HttpApi,
 	HttpApiBuilder,
 	type HttpApiGroup,
 	type HttpApp,
@@ -19,7 +19,15 @@ import {
 	httpActionGeneric,
 	httpRouter,
 } from "convex/server";
-import { Array, Context, Layer, ManagedRuntime } from "effect";
+import {
+	Array,
+	Context,
+	Layer,
+	ManagedRuntime,
+	Record,
+	String,
+	pipe,
+} from "effect";
 import { type ConfectActionCtx, makeConfectActionCtx } from "./ctx";
 import type {
 	DataModelFromConfectDataModel,
@@ -81,7 +89,7 @@ const apiDocsHtml = ({
 const makeHandler =
 	<ConfectDataModel extends GenericConfectDataModel>(
 		apiLive: Layer.Layer<
-			HttpApi.HttpApi.Service,
+			EffectHttpApi.HttpApi.Service,
 			never,
 			ConfectActionCtxService
 		>,
@@ -115,109 +123,158 @@ const makeHandler =
 	};
 
 const makeHttpAction = (
-	apiLive: Layer.Layer<HttpApi.HttpApi.Service, never, ConfectActionCtxService>,
+	apiLive: Layer.Layer<
+		EffectHttpApi.HttpApi.Service,
+		never,
+		ConfectActionCtxService
+	>,
 	middleware?: Middleware,
 ) => httpActionGeneric(makeHandler(apiLive, middleware));
+
+export type HttpApi<
+	Groups extends HttpApiGroup.HttpApiGroup.Any,
+	Error,
+	ErrorR,
+> = {
+	api: EffectHttpApi.HttpApi<Groups, Error, ErrorR>;
+	impl: Layer.Layer<
+		EffectHttpApi.HttpApi.Service,
+		never,
+		ConfectActionCtxService
+	>;
+	serverUrl?: string;
+	openApiSpecPath?: RoutePath;
+	apiDocsTitle?: string;
+	apiDocsPath?: RoutePath;
+	middleware?: Middleware;
+};
+
+export type RoutePath = `/${string}`;
+
+const mountEffectHttpApi =
+	<Groups extends HttpApiGroup.HttpApiGroup.Any, Error, ErrorR>({
+		pathPrefix,
+		api,
+		impl,
+		serverUrl,
+		openApiSpecPath = "/openapi",
+		apiDocsTitle = "API Reference",
+		apiDocsPath = "/docs",
+		middleware,
+	}: {
+		pathPrefix: RoutePath;
+		api: EffectHttpApi.HttpApi<Groups, Error, ErrorR>;
+		impl: Layer.Layer<
+			EffectHttpApi.HttpApi.Service,
+			never,
+			ConfectActionCtxService
+		>;
+		serverUrl?: string;
+		openApiSpecPath?: RoutePath;
+		apiDocsTitle?: string;
+		apiDocsPath?: RoutePath;
+		middleware?: Middleware;
+	}) =>
+	(convexHttpRouter: HttpRouter): HttpRouter => {
+		const prependPathPrefix = (path: RoutePath) =>
+			pathPrefix === "/" ? path : `${pathPrefix}${path}`;
+
+		// biome-ignore lint/complexity/useLiteralKeys:
+		const url = `${serverUrl ?? process.env["CONVEX_SITE_URL"]}${pathPrefix}`;
+
+		const handler = makeHttpAction(impl, middleware);
+
+		const routeSpecs: RouteSpec[] = [];
+
+		Array.forEach(ROUTABLE_HTTP_METHODS, (method) => {
+			const routeSpec: RouteSpecWithPathPrefix = {
+				pathPrefix: pathPrefix === "/" ? pathPrefix : `${pathPrefix}/`,
+				method,
+				handler,
+			};
+			routeSpecs.push(routeSpec);
+		});
+
+		const generatedOpenApiSpec = OpenApi.fromApi(api);
+
+		const openApiSpec = {
+			...generatedOpenApiSpec,
+			paths: Record.mapKeys(generatedOpenApiSpec.paths, (path) =>
+				String.replace(pathPrefix, "")(path),
+			),
+			servers: [{ url }],
+		};
+
+		const openApiRouteSpec: RouteSpecWithPath = {
+			path: prependPathPrefix(openApiSpecPath),
+			method: "GET",
+			handler: httpActionGeneric(() =>
+				Promise.resolve(
+					new Response(JSON.stringify(openApiSpec), {
+						headers: { "Content-Type": "application/json" },
+					}),
+				),
+			),
+		};
+		routeSpecs.push(openApiRouteSpec);
+
+		const openApiCorsRouteSpec: RouteSpecWithPath = {
+			path: prependPathPrefix(openApiSpecPath),
+			method: "OPTIONS",
+			handler: httpActionGeneric(() =>
+				Promise.resolve(
+					new Response(null, {
+						status: 200,
+						headers: {
+							"Access-Control-Allow-Origin": "*",
+							"Access-Control-Allow-Methods": "GET, OPTIONS",
+							"Access-Control-Allow-Headers": "Content-Type",
+						},
+					}),
+				),
+			),
+		};
+		routeSpecs.push(openApiCorsRouteSpec);
+
+		const apiDocsRouteSpec: RouteSpecWithPath = {
+			path: prependPathPrefix(apiDocsPath),
+			method: "GET",
+			handler: httpActionGeneric(() =>
+				Promise.resolve(
+					new Response(
+						apiDocsHtml({
+							pageTitle: apiDocsTitle,
+							openApiSpecPath: prependPathPrefix(openApiSpecPath),
+						}),
+						{
+							headers: { "Content-Type": "text/html" },
+						},
+					),
+				),
+			),
+		};
+		routeSpecs.push(apiDocsRouteSpec);
+
+		Array.forEach(routeSpecs, (routeSpec) => {
+			convexHttpRouter.route(routeSpec);
+		});
+
+		return convexHttpRouter;
+	};
 
 const makeHttpRouter = <
 	Groups extends HttpApiGroup.HttpApiGroup.Any,
 	Error,
 	ErrorR,
->({
-	api,
-	apiLive,
-	serverUrl,
-	openApiSpecPath = "/openapi",
-	apiDocsTitle = "API Reference",
-	apiDocsPath = "/docs",
-	middleware,
-}: {
-	api: HttpApi.HttpApi<Groups, Error, ErrorR>;
-	apiLive: Layer.Layer<HttpApi.HttpApi.Service, never, ConfectActionCtxService>;
-	serverUrl?: string;
-	openApiSpecPath?: string;
-	apiDocsTitle?: string;
-	apiDocsPath?: string;
-	middleware?: Middleware;
-}): HttpRouter => {
-	const handler = makeHttpAction(apiLive, middleware);
-
-	const routeSpecs: RouteSpec[] = [];
-
-	Array.forEach(ROUTABLE_HTTP_METHODS, (method) => {
-		const routeSpec: RouteSpecWithPathPrefix = {
-			pathPrefix: "/",
-			method,
-			handler,
-		};
-		routeSpecs.push(routeSpec);
-	});
-
-	const generatedOpenApiSpec = OpenApi.fromApi(api);
-
-	const openApiSpec = {
-		...generatedOpenApiSpec,
-		// biome-ignore lint/complexity/useLiteralKeys:
-		servers: [{ url: serverUrl ?? process.env["CONVEX_SITE_URL"] }],
-	};
-
-	const openApiRouteSpec: RouteSpecWithPath = {
-		path: openApiSpecPath,
-		method: "GET",
-		handler: httpActionGeneric(() =>
-			Promise.resolve(
-				new Response(JSON.stringify(openApiSpec), {
-					headers: { "Content-Type": "application/json" },
-				}),
-			),
+>(
+	httpApis: Record<RoutePath, HttpApi<Groups, Error, ErrorR>>,
+): HttpRouter =>
+	pipe(
+		httpApis,
+		Record.toEntries,
+		Array.reduce(httpRouter(), (convexHttpRouter, [pathPrefix, httpApi]) =>
+			mountEffectHttpApi({ pathPrefix, ...httpApi })(convexHttpRouter),
 		),
-	};
-	routeSpecs.push(openApiRouteSpec);
-
-	const openApiCorsRouteSpec: RouteSpecWithPath = {
-		path: openApiSpecPath,
-		method: "OPTIONS",
-		handler: httpActionGeneric(() =>
-			Promise.resolve(
-				new Response(null, {
-					status: 200,
-					headers: {
-						"Access-Control-Allow-Origin": "*",
-						"Access-Control-Allow-Methods": "GET, OPTIONS",
-						"Access-Control-Allow-Headers": "Content-Type",
-					},
-				}),
-			),
-		),
-	};
-	routeSpecs.push(openApiCorsRouteSpec);
-
-	const apiDocsRouteSpec: RouteSpecWithPath = {
-		path: apiDocsPath,
-		method: "GET",
-		handler: httpActionGeneric(() =>
-			Promise.resolve(
-				new Response(
-					apiDocsHtml({
-						pageTitle: apiDocsTitle,
-						openApiSpecPath,
-					}),
-					{
-						headers: { "Content-Type": "text/html" },
-					},
-				),
-			),
-		),
-	};
-	routeSpecs.push(apiDocsRouteSpec);
-
-	const convexHttpRouter = httpRouter();
-
-	Array.forEach(routeSpecs, (routeSpec) => {
-		convexHttpRouter.route(routeSpec);
-	});
-
-	return convexHttpRouter;
-};
+	);
 
 export { makeHttpRouter };

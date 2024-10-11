@@ -36,6 +36,12 @@ const ApiGroupLive = HttpApiBuilder.group(Api, "api", (handlers) =>
 const ApiLive = HttpApiBuilder.api(Api).pipe(Layer.provide(ApiGroupLive));
 
 export default makeHttpRouter({
-	api: Api,
-	apiLive: ApiLive,
+	"/": {
+		api: Api,
+		impl: ApiLive,
+	},
+	"/path-prefix": {
+		api: Api,
+		impl: ApiLive,
+	},
 });

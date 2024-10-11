@@ -27,6 +27,7 @@ class ApiGroup extends HttpApiGroup.make("notes").pipe(
 			),
 		),
 	),
+	HttpApiGroup.prefix("/path-prefix"),
 ) {}
 
 export class Api extends HttpApi.empty.pipe(

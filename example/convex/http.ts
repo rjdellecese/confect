@@ -5,8 +5,10 @@ import { flow } from "effect";
 import { Api, ApiLive } from "./http/api";
 
 export default makeHttpRouter({
-	api: Api,
-	apiLive: ApiLive,
-	middleware: flow(HttpMiddleware.cors(), HttpMiddleware.logger),
-	apiDocsTitle: "Confect Example API Reference",
+	"/path-prefix": {
+		api: Api,
+		impl: ApiLive,
+		middleware: flow(HttpMiddleware.cors(), HttpMiddleware.logger),
+		apiDocsTitle: "Confect Example API Reference",
+	},
 });
