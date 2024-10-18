@@ -1,9 +1,9 @@
 import { Schema } from "@effect/schema";
-import { describe, test, expectTypeOf, expect } from "vitest";
-import { extendWithSystemFields } from "~/src/server/schemas/SystemFields";
-import { Id } from "~/src/server/schemas/Id";
 import type { Expand } from "convex/server";
 import type { GenericId } from "convex/values";
+import { describe, expect, expectTypeOf, test } from "vitest";
+import { Id } from "~/src/server/schemas/Id";
+import { extendWithSystemFields } from "~/src/server/schemas/SystemFields";
 
 describe(extendWithSystemFields, () => {
 	test("extends a struct with system fields", () => {
