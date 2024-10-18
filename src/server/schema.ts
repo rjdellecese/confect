@@ -233,7 +233,7 @@ export type ConfectDataModelFromConfectSchemaDefinition<
 	: never;
 
 class ConfectTableDefinitionImpl<
-	TableSchema extends Schema.Schema<any, any>,
+	TableSchema extends Schema.Schema.AnyNoContext,
 	TableValidator extends Validator<any, any, any>,
 	// biome-ignore lint/complexity/noBannedTypes:
 	Indexes extends GenericTableIndexes = {},
@@ -350,11 +350,8 @@ class ConfectTableDefinitionImpl<
 	}
 }
 
-export const defineTable = <
-	S extends Schema.Schema.AnyNoContext,
-	Fields extends Schema.Struct.Fields,
->(
-	tableSchema: S & Schema.Struct<Fields>,
+export const defineTable = <TableSchema extends Schema.Schema.AnyNoContext>(
+	tableSchema: TableSchema,
 ) => {
 	const tableValidator = compileTableSchema(tableSchema);
 	return new ConfectTableDefinitionImpl(tableSchema, tableValidator);
