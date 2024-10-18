@@ -27,6 +27,7 @@ import type {
 	IsOptional,
 	IsUnion,
 	IsValueLiteral,
+	TypeError,
 	UnionToTuple,
 } from "~/src/server/type-utils";
 
@@ -60,17 +61,17 @@ export const compileReturnsSchema = <ConfectValue, ConvexValue>(
 
 export type TableSchemaToTableValidator<
 	TableSchema extends Schema.Schema.AnyNoContext,
-> = ValueToValidator<TableSchema["Encoded"]> extends infer Vd extends VObject<
-	any,
-	any,
-	any
->
+> = ValueToValidator<TableSchema["Encoded"]> extends infer Vd extends
+	| VObject<any, any, any, any>
+	| VUnion<any, any, any, any>
 	? Vd
 	: never;
 
-export const compileTableSchema = <ConfectValue, ConvexValue>(
-	schema: Schema.Schema<ConfectValue, ConvexValue>,
-): TableSchemaToTableValidator<typeof schema> => {
+export const compileTableSchema = <
+	TableSchema extends Schema.Schema.AnyNoContext,
+>(
+	schema: TableSchema,
+): TableSchemaToTableValidator<TableSchema> => {
 	const ast = Schema.encodedSchema(schema).ast;
 
 	return pipe(
@@ -81,7 +82,8 @@ export const compileTableSchema = <ConfectValue, ConvexValue>(
 				? Effect.succeed(compileAst(ast) as any)
 				: Effect.fail(new IndexSignaturesAreNotSupportedError()),
 		),
-		Match.orElse(() => Effect.fail(new TopLevelMustBeObjectError())),
+		Match.tag("Union", (ast) => Effect.succeed(compileAst(ast))),
+		Match.orElse(() => Effect.fail(new TopLevelMustBeObjectOrUnionError())),
 		Effect.runSync,
 	);
 };
@@ -133,8 +135,8 @@ export type ValueToValidator<Vl> = [Vl] extends [never]
 													? RecordValueToValidator<Vl>
 													: IsUnion<Vl> extends true
 														? UnionValueToValidator<Vl>
-														: never
-			: never;
+														: TypeError<"Unexpected value", Vl>
+			: TypeError<"Provided value is not a valid Convex value", Vl>;
 
 type ArrayValueToValidator<Vl extends ReadonlyArray<ReadonlyValue>> =
 	Vl extends ReadonlyArray<infer El extends ReadonlyValue>
@@ -184,10 +186,10 @@ type UnionValueToValidator<Vl extends ReadonlyValue> = [Vl] extends [
 			? ValueTupleToValidatorTuple<VlTuple> extends infer VdTuple extends
 					Validator<any, "required", any>[]
 				? VUnion<DeepMutable<Vl>, VdTuple>
-				: never
-			: never
-		: never
-	: never;
+				: TypeError<"Failed to convert value tuple to validator tuple">
+			: TypeError<"Failed to convert union to tuple">
+		: TypeError<"Expected a union of values, but got a single value instead">
+	: TypeError<"Provided value is not a valid Convex value">;
 
 type ValueTupleToValidatorTuple<VlTuple extends ReadonlyArray<ReadonlyValue>> =
 	VlTuple extends
@@ -401,6 +403,10 @@ const handlePropertySignatures = (
 
 class TopLevelMustBeObjectError extends Data.TaggedError(
 	"TopLevelMustBeObjectError",
+) {}
+
+class TopLevelMustBeObjectOrUnionError extends Data.TaggedError(
+	"TopLevelMustBeObjectOrUnionError",
 ) {}
 
 class UnsupportedPropertySignatureKeyTypeError extends Data.TaggedError(

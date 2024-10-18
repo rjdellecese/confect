@@ -712,7 +712,7 @@ describe("ValueToValidator", () => {
 });
 
 describe(compileTableSchema, () => {
-	test("{ text: string, foo: { bar: number } }", () => {
+	test("succeeds if provided Schema is a Struct", () => {
 		const compiledValidator = compileTableSchema(
 			Schema.Struct({
 				foo: Schema.String,
@@ -729,6 +729,23 @@ describe(compileTableSchema, () => {
 
 		expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
 		expect(compiledValidator).toStrictEqual(expectedValidator);
+	});
+
+	test("succeeds if provided Schema is a Union", () => {
+		const compiledValidator = compileTableSchema(
+			Schema.Union(Schema.String, Schema.Number),
+		);
+
+		const expectedValidator = v.union(v.string(), v.number());
+
+		expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
+		expect(compiledValidator).toStrictEqual(expectedValidator);
+	});
+
+	test("fails if provided Schema is neither a Struct nor a Union", () => {
+		const stringSchema = Schema.String;
+
+		expect(() => compileTableSchema(stringSchema)).toThrow();
 	});
 
 	test("fails if provided Schema requires context", () => {

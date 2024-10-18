@@ -52,8 +52,14 @@ export type DeepReadonly<T> = IsAny<T> extends true
 				? T
 				: { readonly [K in keyof T]: DeepReadonly<T[K]> };
 
-// Vendored from Arktype
+export type TypeError<Message extends string, T = never> = [Message, T];
+
+//////////////////////////////////
+// START: Vendored from Arktype //
+//////////////////////////////////
+
 // https://github.com/arktypeio/arktype/blob/2e911d01a741ccee7a17e31ee144049817fabbb8/ark/util/unionToTuple.ts#L9
+
 export type UnionToTuple<t> = _unionToTuple<t, []> extends infer result
 	? conform<result, t[]>
 	: never;
@@ -80,3 +86,7 @@ type intersectUnion<t> = (t extends unknown ? (_: t) => void : never) extends (
 	: never;
 
 type conform<t, base> = t extends base ? t : base;
+
+////////////////////////////////
+// END: Vendored from Arktype //
+////////////////////////////////

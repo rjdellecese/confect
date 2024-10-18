@@ -16,7 +16,7 @@ import {
 	defineSchema,
 	defineTable,
 } from "~/src/server/schema";
-import { extendWithSystemFields } from "../src/server/schemas/SystemFields";
+import { extendWithSystemFields } from "~/src/server/schemas/SystemFields";
 
 describe("ConfectDataModelFromConfectSchema", () => {
 	test("produces a type which is assignable to GenericConfectDataModel", () => {
@@ -58,28 +58,37 @@ describe("tableSchemas", () => {
 		type Actual = typeof confectTableSchemas;
 
 		const expectedTableSchemas = {
-			notes: {
-				withSystemFields: extendWithSystemFields("notes", NoteSchema),
-				withoutSystemFields: NoteSchema,
-			},
-			_scheduled_functions: {
-				withSystemFields: extendWithSystemFields(
-					"_scheduled_functions",
-					confectSystemSchemaDefinition.confectSchema._scheduled_functions
-						.tableSchema,
-				),
-				withoutSystemFields:
-					confectSystemSchemaDefinition.confectSchema._scheduled_functions
-						.tableSchema,
-			},
-			_storage: {
-				withSystemFields: extendWithSystemFields(
-					"_storage",
-					confectSystemSchemaDefinition.confectSchema._storage.tableSchema,
-				),
-				withoutSystemFields:
-					confectSystemSchemaDefinition.confectSchema._storage.tableSchema,
-			},
+			notes: schemaToTableSchemas("notes", NoteSchema),
+			...systemTableSchemas,
+		};
+
+		type Expected = typeof expectedTableSchemas;
+
+		expectTypeOf<Actual>().toEqualTypeOf<Expected>();
+	});
+
+	test("permits unions of structs", () => {
+		const NoteSchema = Schema.Struct({
+			content: Schema.String,
+		});
+
+		const ImageSchema = Schema.Struct({
+			url: Schema.String,
+		});
+
+		const ItemSchema = Schema.Union(NoteSchema, ImageSchema);
+
+		type ItemSchema = typeof ItemSchema;
+
+		const confectTableSchemas = defineSchema({
+			items: defineTable(ItemSchema),
+		}).tableSchemas;
+
+		type Actual = typeof confectTableSchemas;
+
+		const expectedTableSchemas = {
+			items: schemaToTableSchemas("items", ItemSchema),
+			...systemTableSchemas,
 		};
 
 		type Expected = typeof expectedTableSchemas;
@@ -111,3 +120,35 @@ describe("confectTableSchemas", () => {
 		expectTypeOf<Actual>().toEqualTypeOf<Expected>();
 	});
 });
+
+const schemaToTableSchemas = <
+	TableName extends string,
+	TableSchema extends Schema.Schema.AnyNoContext,
+>(
+	name: TableName,
+	schema: TableSchema,
+) => ({
+	withSystemFields: extendWithSystemFields(name, schema),
+	withoutSystemFields: schema,
+});
+
+const systemTableSchemas = {
+	_scheduled_functions: {
+		withSystemFields: extendWithSystemFields(
+			"_scheduled_functions",
+			confectSystemSchemaDefinition.confectSchema._scheduled_functions
+				.tableSchema,
+		),
+		withoutSystemFields:
+			confectSystemSchemaDefinition.confectSchema._scheduled_functions
+				.tableSchema,
+	},
+	_storage: {
+		withSystemFields: extendWithSystemFields(
+			"_storage",
+			confectSystemSchemaDefinition.confectSchema._storage.tableSchema,
+		),
+		withoutSystemFields:
+			confectSystemSchemaDefinition.confectSchema._storage.tableSchema,
+	},
+};
