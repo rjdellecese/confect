@@ -1,5 +1,11 @@
 # @rjdellecese/confect
 
+## 0.0.9
+
+### Patch Changes
+
+- 22a12b4: Support unions in table definition
+
 ## 0.0.8
 
 ### Patch Changes
