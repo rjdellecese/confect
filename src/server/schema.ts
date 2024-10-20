@@ -1,7 +1,6 @@
 import { Schema } from "@effect/schema";
 import {
 	type Expand,
-	type GenericSchema,
 	type GenericTableIndexes,
 	type GenericTableSearchIndexes,
 	type GenericTableVectorIndexes,
@@ -67,27 +66,28 @@ const tableSchemasFromConfectSchema = <
 
 export type GenericConfectSchema = Record<any, GenericConfectTableDefinition>;
 
-export type GenericConfectSchemaDefinition = ConfectSchemaDefinition<
-	GenericSchema,
-	GenericConfectSchema
->;
+export type GenericConfectSchemaDefinition =
+	ConfectSchemaDefinition<GenericConfectSchema>;
 
 export interface ConfectSchemaDefinition<
-	ConvexSchema extends GenericSchema,
 	ConfectSchema extends GenericConfectSchema,
 > {
 	confectSchema: ConfectSchema;
-	convexSchemaDefinition: SchemaDefinition<ConvexSchema, true>;
+	convexSchemaDefinition: SchemaDefinition<
+		SchemaDefinitionFromConfectSchemaDefinition<ConfectSchema>,
+		true
+	>;
 	tableSchemas: TableSchemasFromConfectSchema<ConfectSchema>;
 }
 
-class ConfectSchemaDefinitionImpl<
-	ConvexSchema extends GenericSchema,
-	ConfectSchema extends GenericConfectSchema,
-> implements ConfectSchemaDefinition<ConvexSchema, ConfectSchema>
+class ConfectSchemaDefinitionImpl<ConfectSchema extends GenericConfectSchema>
+	implements ConfectSchemaDefinition<ConfectSchema>
 {
 	confectSchema: ConfectSchema;
-	convexSchemaDefinition: SchemaDefinition<ConvexSchema, true>;
+	convexSchemaDefinition: SchemaDefinition<
+		SchemaDefinitionFromConfectSchemaDefinition<ConfectSchema>,
+		true
+	>;
 	tableSchemas: TableSchemasFromConfectSchema<ConfectSchema>;
 
 	constructor(confectSchema: ConfectSchema) {
@@ -96,7 +96,10 @@ class ConfectSchemaDefinitionImpl<
 			confectSchema,
 			Record.map(({ tableDefinition }) => tableDefinition),
 			defineConvexSchema,
-		) as SchemaDefinition<ConvexSchema, true>;
+		) as SchemaDefinition<
+			SchemaDefinitionFromConfectSchemaDefinition<ConfectSchema>,
+			true
+		>;
 		this.tableSchemas = tableSchemasFromConfectSchema(confectSchema);
 	}
 }
@@ -110,14 +113,8 @@ type SchemaDefinitionFromConfectSchemaDefinition<
 
 export const defineSchema = <ConfectSchema extends GenericConfectSchema>(
 	confectSchema: ConfectSchema,
-): ConfectSchemaDefinitionImpl<
-	SchemaDefinitionFromConfectSchemaDefinition<ConfectSchema>,
-	ConfectSchema
-> =>
-	new ConfectSchemaDefinitionImpl<
-		SchemaDefinitionFromConfectSchemaDefinition<ConfectSchema>,
-		ConfectSchema
-	>(confectSchema);
+): ConfectSchemaDefinition<ConfectSchema> =>
+	new ConfectSchemaDefinitionImpl<ConfectSchema>(confectSchema);
 
 export type GenericConfectTableDefinition = ConfectTableDefinition<
 	any,
@@ -216,19 +213,16 @@ export interface ConfectTableDefinition<
 
 export type ConfectSchemaFromConfectSchemaDefinition<
 	ConfectSchemaDef extends GenericConfectSchemaDefinition,
-> = ConfectSchemaDef extends ConfectSchemaDefinition<
-	infer _ConvexSchema,
-	infer ConfectSchema
->
+> = ConfectSchemaDef extends ConfectSchemaDefinition<infer ConfectSchema>
 	? ConfectSchema
 	: never;
 
+/**
+ * @ignore
+ */
 export type ConfectDataModelFromConfectSchemaDefinition<
 	ConfectSchemaDef extends GenericConfectSchemaDefinition,
-> = ConfectSchemaDef extends ConfectSchemaDefinition<
-	infer _ConvexSchema,
-	infer ConfectSchema
->
+> = ConfectSchemaDef extends ConfectSchemaDefinition<infer ConfectSchema>
 	? ConfectDataModelFromConfectSchema<ConfectSchema>
 	: never;
 

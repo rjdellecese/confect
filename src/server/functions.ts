@@ -4,7 +4,6 @@ import {
 	type GenericActionCtx,
 	type GenericMutationCtx,
 	type GenericQueryCtx,
-	type GenericSchema,
 	type RegisteredAction,
 	type RegisteredMutation,
 	type RegisteredQuery,
@@ -43,11 +42,8 @@ import {
 	compileReturnsSchema,
 } from "~/src/server/schema-to-validator";
 
-export const makeFunctions = <
-	ConvexSchema extends GenericSchema,
-	ConfectSchema extends GenericConfectSchema,
->(
-	confectSchemaDefinition: ConfectSchemaDefinition<ConvexSchema, ConfectSchema>,
+export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
+	confectSchemaDefinition: ConfectSchemaDefinition<ConfectSchema>,
 ) => {
 	const databaseSchemas = databaseSchemasFromConfectSchema(
 		confectSchemaDefinition.confectSchema,
