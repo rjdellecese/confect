@@ -20,7 +20,7 @@ Normally when using the Effect schema library,  it's recommended to set `exactOp
 
 To understand the implications of this, see [this explanation](https://effect.website/docs/guides/schema/introduction#understanding-exactoptionalpropertytypes) in the Effect docs.
 
-## Setup
+## Usage
 
 ### 1. Define your database schema
 
@@ -32,11 +32,11 @@ Not every Effect `Schema` is valid for use in Confect. See [schema-restrictions.
 
 ### 2. Generate your Convex function constructors and types.
 
-{% @github-files/github-code-block url="https://github.com/rjdellecese/confect/blob/main/example/convex/confect.ts" %}
+{% @github-files/github-code-block url="https://github.com/rjdellecese/confect/blob/main/example/convex/confect.ts" fullWidth="false" %}
 
 ### 3. Write some Convex functions!
 
-{% @github-files/github-code-block url="https://github.com/rjdellecese/confect/blob/main/example/convex/functions.ts" %}
+{% @github-files/github-code-block url="https://github.com/rjdellecese/confect/blob/main/example/convex/functions.ts" fullWidth="false" %}
 
 ## Example project
 

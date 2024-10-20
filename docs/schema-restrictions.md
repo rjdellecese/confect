@@ -50,7 +50,7 @@ export const myQuery = query({
 
 ### Optional object fields
 
-At the moment, optional object fields must use `Schema.optionalWith` with the `{ exact: true }` option. The plainer `Schema.optional` is not currently supported.
+At the moment, optional object fields must use `Schema.optionalWith` with the `{ exact: true }` option. The plainer `Schema.optional` is currently unsupported.
 
 This restriction will likely be lifted in the future.
 
