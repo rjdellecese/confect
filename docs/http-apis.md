@@ -2,6 +2,8 @@
 
 Confect allows you to use Effect to build your Convex HTTP API(s).
 
+## Usage
+
 ### 1. Define your HTTP API
 
 {% @github-files/github-code-block url="https://github.com/rjdellecese/confect/blob/main/example/convex/http/api.ts" fullWidth="false" %}
