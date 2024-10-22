@@ -10,10 +10,10 @@ export const ListNotesResult = Schema.Array(
 export const InsertNoteArgs = Schema.Struct({
 	text: Schema.String,
 });
-export const InsertNoteResult = Id.Id<"notes">();
+export const InsertNoteResult = Id.Id("notes");
 
 export const DeleteNoteArgs = Schema.Struct({
-	noteId: Id.Id<"notes">(),
+	noteId: Id.Id("notes"),
 });
 export const DeleteNoteResult = Schema.Null;
 
