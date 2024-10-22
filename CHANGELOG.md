@@ -1,5 +1,11 @@
 # @rjdellecese/confect
 
+## 0.0.10
+
+### Patch Changes
+
+- 34fb52e: Properly support Convex ID `Schema` to `Validator` compilation
+
 ## 0.0.9
 
 ### Patch Changes
