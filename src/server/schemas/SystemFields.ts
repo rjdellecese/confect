@@ -1,9 +1,9 @@
 import { Schema } from "@effect/schema";
 import { Id } from "~/src/server/schemas/Id";
 
-export const SystemFields = <TableName extends string>() =>
+export const SystemFields = <TableName extends string>(tableName: TableName) =>
 	Schema.Struct({
-		_id: Id<TableName>(),
+		_id: Id(tableName),
 		_creationTime: Schema.Number,
 	});
 
@@ -14,7 +14,7 @@ export const extendWithSystemFields = <
 	_tableName: TableName,
 	schema: TableSchema,
 ): ExtendWithSystemFields<TableName, TableSchema> =>
-	Schema.extend(schema, SystemFields<TableName>());
+	Schema.extend(schema, SystemFields(_tableName));
 
 export type ExtendWithSystemFields<
 	TableName extends string,

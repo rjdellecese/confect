@@ -21,6 +21,7 @@ import type {
 import { v } from "convex/values";
 import { Array, Data, Effect, Match, Option, pipe } from "effect";
 
+import * as Id from "~/src/server/schemas/Id";
 import type {
 	DeepMutable,
 	IsAny,
@@ -245,7 +246,14 @@ export const compileAst = (ast: AST.AST): Validator<any, any, any> =>
 			),
 		),
 		Match.tag("BooleanKeyword", () => Effect.succeed(v.boolean())),
-		Match.tag("StringKeyword", () => Effect.succeed(v.string())),
+		Match.tag("StringKeyword", (stringAst) =>
+			Id.tableName(stringAst).pipe(
+				Option.match({
+					onNone: () => Effect.succeed(v.string()),
+					onSome: (tableName) => Effect.succeed(v.id(tableName)),
+				}),
+			),
+		),
 		Match.tag("NumberKeyword", () => Effect.succeed(v.float64())),
 		Match.tag("BigIntKeyword", () => Effect.succeed(v.int64())),
 		Match.tag("Union", ({ types: [first, second, ...rest] }) =>
