@@ -10,16 +10,16 @@ importers:
     dependencies:
       '@effect/platform':
         specifier: ^0.68.1
-        version: 0.68.1(@effect/schema@0.75.2(effect@3.9.1))(effect@3.9.1)
+        version: 0.68.1(@effect/schema@0.75.2(effect@3.10.0))(effect@3.10.0)
       '@effect/schema':
         specifier: ^0.75.2
-        version: 0.75.2(effect@3.9.1)
+        version: 0.75.2(effect@3.10.0)
       convex:
         specifier: ^1.16.4
         version: 1.16.4
       effect:
         specifier: ^3.9.1
-        version: 3.9.1
+        version: 3.10.0
     devDependencies:
       '@biomejs/biome':
         specifier: 1.9.3
@@ -29,10 +29,10 @@ importers:
         version: 2.27.9
       '@effect/platform-node':
         specifier: 0.63.1
-        version: 0.63.1(@effect/platform@0.68.1(@effect/schema@0.75.2(effect@3.9.1))(effect@3.9.1))(effect@3.9.1)
+        version: 0.63.1(@effect/platform@0.68.1(@effect/schema@0.75.2(effect@3.10.0))(effect@3.10.0))(effect@3.10.0)
       '@effect/vitest':
         specifier: 0.12.0
-        version: 0.12.0(effect@3.9.1)(vitest@2.1.2(@types/node@22.7.5))
+        version: 0.12.0(effect@3.10.0)(vitest@2.1.2(@types/node@22.7.5))
       '@swc/jest':
         specifier: 0.2.36
         version: 0.2.36(@swc/core@1.4.1)
@@ -1260,8 +1260,8 @@ packages:
   eastasianwidth@0.2.0:
     resolution: {integrity: sha512-I88TYZWc9XiYHRQ4/3c5rjjfgkjhLyW2luGIheGERbNQ6OY7yTybanSpDXZa8y7VUP9YmDcYa+eyq4ca7iLqWA==}
 
-  effect@3.9.1:
-    resolution: {integrity: sha512-dxd+eiCqxOriBM12EQ6uIjn3cJpKIP7DfqafWTVEb45aMO157iEeDcO09SEdVSAy/OqpFlRF+4Lx7Hei1ipvOA==}
+  effect@3.10.0:
+    resolution: {integrity: sha512-J9rsJBXNHZxklJTbHriY8D9wIHhmvXDamExW4pPZ2kPNZ+XRfstXeHBqpXAIK+B42ASVbuDswAXyup5WHWK6jg==}
 
   emoji-regex@8.0.0:
     resolution: {integrity: sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==}
@@ -2318,18 +2318,18 @@ snapshots:
       human-id: 1.0.2
       prettier: 2.8.8
 
-  '@effect/platform-node-shared@0.18.1(@effect/platform@0.68.1(@effect/schema@0.75.2(effect@3.9.1))(effect@3.9.1))(effect@3.9.1)':
+  '@effect/platform-node-shared@0.18.1(@effect/platform@0.68.1(@effect/schema@0.75.2(effect@3.10.0))(effect@3.10.0))(effect@3.10.0)':
     dependencies:
-      '@effect/platform': 0.68.1(@effect/schema@0.75.2(effect@3.9.1))(effect@3.9.1)
+      '@effect/platform': 0.68.1(@effect/schema@0.75.2(effect@3.10.0))(effect@3.10.0)
       '@parcel/watcher': 2.4.1
-      effect: 3.9.1
+      effect: 3.10.0
       multipasta: 0.2.5
 
-  '@effect/platform-node@0.63.1(@effect/platform@0.68.1(@effect/schema@0.75.2(effect@3.9.1))(effect@3.9.1))(effect@3.9.1)':
+  '@effect/platform-node@0.63.1(@effect/platform@0.68.1(@effect/schema@0.75.2(effect@3.10.0))(effect@3.10.0))(effect@3.10.0)':
     dependencies:
-      '@effect/platform': 0.68.1(@effect/schema@0.75.2(effect@3.9.1))(effect@3.9.1)
-      '@effect/platform-node-shared': 0.18.1(@effect/platform@0.68.1(@effect/schema@0.75.2(effect@3.9.1))(effect@3.9.1))(effect@3.9.1)
-      effect: 3.9.1
+      '@effect/platform': 0.68.1(@effect/schema@0.75.2(effect@3.10.0))(effect@3.10.0)
+      '@effect/platform-node-shared': 0.18.1(@effect/platform@0.68.1(@effect/schema@0.75.2(effect@3.10.0))(effect@3.10.0))(effect@3.10.0)
+      effect: 3.10.0
       mime: 3.0.0
       undici: 6.19.8
       ws: 8.18.0
@@ -2337,21 +2337,21 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@effect/platform@0.68.1(@effect/schema@0.75.2(effect@3.9.1))(effect@3.9.1)':
+  '@effect/platform@0.68.1(@effect/schema@0.75.2(effect@3.10.0))(effect@3.10.0)':
     dependencies:
-      '@effect/schema': 0.75.2(effect@3.9.1)
-      effect: 3.9.1
+      '@effect/schema': 0.75.2(effect@3.10.0)
+      effect: 3.10.0
       find-my-way-ts: 0.1.5
       multipasta: 0.2.5
 
-  '@effect/schema@0.75.2(effect@3.9.1)':
+  '@effect/schema@0.75.2(effect@3.10.0)':
     dependencies:
-      effect: 3.9.1
+      effect: 3.10.0
       fast-check: 3.21.0
 
-  '@effect/vitest@0.12.0(effect@3.9.1)(vitest@2.1.2(@types/node@22.7.5))':
+  '@effect/vitest@0.12.0(effect@3.10.0)(vitest@2.1.2(@types/node@22.7.5))':
     dependencies:
-      effect: 3.9.1
+      effect: 3.10.0
       vitest: 2.1.2(@types/node@22.7.5)
 
   '@esbuild/aix-ppc64@0.21.5':
@@ -3136,7 +3136,9 @@ snapshots:
 
   eastasianwidth@0.2.0: {}
 
-  effect@3.9.1: {}
+  effect@3.10.0:
+    dependencies:
+      fast-check: 3.21.0
 
   emoji-regex@8.0.0: {}
 
