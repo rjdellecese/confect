@@ -22,7 +22,7 @@ test("DatabaseSchemasFromConfectDataModel", () => {
 	type DatabaseSchemas = DatabaseSchemasFromConfectDataModel<ConfectDataModel>;
 
 	const notesDocumentSchema = Schema.Struct({
-		_id: Id<"notes">(),
+		_id: Id("notes"),
 		_creationTime: Schema.Number,
 		...notesSchemaFields,
 	});

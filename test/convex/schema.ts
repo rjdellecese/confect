@@ -6,7 +6,7 @@ export const confectSchema = schema.defineSchema({
 	notes: schema
 		.defineTable(
 			Schema.Struct({
-				userId: Schema.optionalWith(Id<"users">(), {
+				userId: Schema.optionalWith(Id("users"), {
 					exact: true,
 				}),
 				text: Schema.String.pipe(Schema.maxLength(100)),

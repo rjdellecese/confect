@@ -15,7 +15,7 @@ describe(extendWithSystemFields, () => {
 
 		const Expected = Schema.Struct({
 			content: Schema.String,
-			_id: Id<"notes">(),
+			_id: Id("notes"),
 			_creationTime: Schema.Number,
 		});
 
@@ -57,12 +57,12 @@ describe(extendWithSystemFields, () => {
 		const Expected = Schema.Union(
 			Schema.Struct({
 				content: Schema.String,
-				_id: Id<"items">(),
+				_id: Id("items"),
 				_creationTime: Schema.Number,
 			}),
 			Schema.Struct({
 				url: Schema.String,
-				_id: Id<"items">(),
+				_id: Id("items"),
 				_creationTime: Schema.Number,
 			}),
 		);

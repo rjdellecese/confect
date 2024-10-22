@@ -15,6 +15,7 @@ import {
 	compileSchema,
 	compileTableSchema,
 } from "~/src/server/schema-to-validator";
+import { Id } from "../src/server";
 
 describe(compileAst, () => {
 	describe("allowed", () => {
@@ -219,6 +220,15 @@ describe(compileSchema, () => {
 
 		expect(compiledValidator).toStrictEqual(expectedValidator);
 		expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
+	});
+
+	test("id", () => {
+		const expectedValidator = v.id("users");
+
+		const schema = Id.Id("users");
+		const compiledValidator = compileSchema(schema);
+
+		expect(compiledValidator).toStrictEqual(expectedValidator);
 	});
 
 	test("boolean", () => {

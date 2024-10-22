@@ -15,7 +15,7 @@ import { confectSchema } from "~/test/convex/schema";
 
 export const queryGet = query({
 	args: Schema.Struct({
-		noteId: Id<"notes">(),
+		noteId: Id("notes"),
 	}),
 	returns: Schema.Option(confectSchema.tableSchemas.notes.withSystemFields),
 	handler: ({ db }, { noteId }) => db.get(noteId),
@@ -23,7 +23,7 @@ export const queryGet = query({
 
 export const mutationGet = mutation({
 	args: Schema.Struct({
-		noteId: Id<"notes">(),
+		noteId: Id("notes"),
 	}),
 	returns: Schema.Option(confectSchema.tableSchemas.notes.withSystemFields),
 	handler: ({ db }, { noteId }) => db.get(noteId),
@@ -33,7 +33,7 @@ export const insert = mutation({
 	args: Schema.Struct({
 		text: Schema.String,
 	}),
-	returns: Id<"notes">(),
+	returns: Id("notes"),
 	handler: ({ db }, { text }) =>
 		db.insert("notes", { text }).pipe(Effect.orDie),
 });
@@ -150,18 +150,18 @@ export const search = query({
 
 export const queryNormalizeId = query({
 	args: Schema.Struct({
-		noteId: Id<"notes">(),
+		noteId: Id("notes"),
 	}),
-	returns: Schema.Option(Id<"notes">()),
+	returns: Schema.Option(Id("notes")),
 	handler: ({ db }, { noteId }) =>
 		Effect.succeed(db.normalizeId("notes", noteId)),
 });
 
 export const mutationNormalizeId = mutation({
 	args: Schema.Struct({
-		noteId: Id<"notes">(),
+		noteId: Id("notes"),
 	}),
-	returns: Schema.Option(Id<"notes">()),
+	returns: Schema.Option(Id("notes")),
 	handler: ({ db }, { noteId }) =>
 		Effect.succeed(db.normalizeId("notes", noteId)),
 });
@@ -169,7 +169,7 @@ export const mutationNormalizeId = mutation({
 // Exporting only to stop TypeScript from complaining.
 export const _badPatch = mutation({
 	args: Schema.Struct({
-		noteId: Id<"notes">(),
+		noteId: Id("notes"),
 	}),
 	returns: Schema.Null,
 	handler: ({ db }, { noteId }) =>
@@ -188,7 +188,7 @@ export const _badPatch = mutation({
 
 export const patch = mutation({
 	args: Schema.Struct({
-		noteId: Id<"notes">(),
+		noteId: Id("notes"),
 		fields: Schema.Struct({
 			text: Schema.optionalWith(Schema.String, { exact: true }),
 			author: Schema.optionalWith(
@@ -207,7 +207,7 @@ export const patch = mutation({
 
 export const unsetAuthorPatch = mutation({
 	args: Schema.Struct({
-		noteId: Id<"notes">(),
+		noteId: Id("notes"),
 	}),
 	returns: Schema.Null,
 	handler: ({ db }, { noteId }) =>
@@ -218,16 +218,16 @@ export const insertTooLongText = mutation({
 	args: Schema.Struct({
 		text: Schema.String,
 	}),
-	returns: Id<"notes">(),
+	returns: Id("notes"),
 	handler: ({ db }, { text }) =>
 		db.insert("notes", { text }).pipe(Effect.orDie),
 });
 
 export const replace = mutation({
 	args: Schema.Struct({
-		noteId: Id<"notes">(),
+		noteId: Id("notes"),
 		fields: Schema.Struct({
-			_id: Schema.optionalWith(Id<"notes">(), {
+			_id: Schema.optionalWith(Id("notes"), {
 				exact: true,
 			}),
 			_creationTime: Schema.optionalWith(Schema.Number, { exact: true }),
@@ -241,7 +241,7 @@ export const replace = mutation({
 
 export const deleteNote = mutation({
 	args: Schema.Struct({
-		noteId: Id<"notes">(),
+		noteId: Id("notes"),
 	}),
 	returns: Schema.Null,
 	handler: ({ db }, { noteId }) =>
@@ -265,7 +265,7 @@ export const actionQuery = internalQuery({
 
 export const actionMutation = internalMutation({
 	args: Schema.Struct({}),
-	returns: Id<"notes">(),
+	returns: Id("notes"),
 	handler: ({ db }) =>
 		db.insert("notes", { text: "Hello, world!" }).pipe(Effect.orDie),
 });
@@ -353,7 +353,7 @@ export const executeVectorSearch = action({
 
 export const getVectorSearch = query({
 	args: Schema.Struct({
-		noteId: Id<"notes">(),
+		noteId: Id("notes"),
 	}),
 	returns: Schema.Option(confectSchema.tableSchemas.notes.withSystemFields),
 	handler: ({ db }, { noteId }) => db.get(noteId),
@@ -400,16 +400,16 @@ export const insertAt = action({
 
 export const systemNormalizeId = query({
 	args: Schema.Struct({
-		id: Id<"_storage">(),
+		id: Id("_storage"),
 	}),
-	returns: Schema.Option(Id<"_storage">()),
+	returns: Schema.Option(Id("_storage")),
 	handler: ({ db }, { id }) =>
 		db.system.normalizeId("_storage", id).pipe(Effect.succeed),
 });
 
 export const systemGet = query({
 	args: Schema.Struct({
-		id: Id<"_storage">(),
+		id: Id("_storage"),
 	}),
 	returns: Schema.Option(confectSchema.tableSchemas._storage.withSystemFields),
 	handler: ({ db }, { id }) => db.system.get(id),
@@ -423,7 +423,7 @@ export const systemQuery = query({
 
 export const storageGetUrl = action({
 	args: Schema.Struct({
-		id: Id<"_storage">(),
+		id: Id("_storage"),
 	}),
 	returns: Schema.Option(Schema.String),
 	handler: ({ storage }, { id }) => storage.getUrl(id),
@@ -437,7 +437,7 @@ export const storageGenerateUploadUrl = action({
 
 export const storageDelete = action({
 	args: Schema.Struct({
-		id: Id<"_storage">(),
+		id: Id("_storage"),
 	}),
 	returns: Schema.Null,
 	handler: ({ storage }, { id }) => storage.delete(id).pipe(Effect.as(null)),
