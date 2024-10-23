@@ -60,6 +60,8 @@ export class ConfectActionCtxService extends Context.Tag("ConfectActionCtx")<
 
 type Middleware = (httpApp: HttpApp.Default) => HttpApp.Default<never, any>;
 
+const scalarApiReferenceVersion = "1.25.48";
+
 const apiDocsHtml = ({
 	pageTitle,
 	openApiSpecPath,
@@ -82,7 +84,7 @@ const apiDocsHtml = ({
   </head>
   <body>
     <script id="api-reference" data-url="${openApiSpecPath}"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@${scalarApiReferenceVersion}"></script>
   </body>
 </html>`;
 
