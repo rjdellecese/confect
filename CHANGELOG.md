@@ -1,5 +1,13 @@
 # @rjdellecese/confect
 
+## 0.0.11
+
+### Patch Changes
+
+- 3b29bc7: Fix `@scalar/api-reference` version
+
+  Expose `HttpApi` type
+
 ## 0.0.10
 
 ### Patch Changes
