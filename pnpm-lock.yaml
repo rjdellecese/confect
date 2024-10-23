@@ -16,7 +16,7 @@ importers:
         version: 0.75.2(effect@3.9.1)
       convex:
         specifier: ^1.16.4
-        version: 1.16.4
+        version: 1.17.0
       effect:
         specifier: ^3.9.1
         version: 3.9.1
@@ -47,7 +47,7 @@ importers:
         version: 2.1.2(vitest@2.1.2(@types/node@22.7.5))
       convex-test:
         specifier: 0.0.31
-        version: 0.0.31(convex@1.16.4)
+        version: 0.0.31(convex@1.17.0)
       dotenv:
         specifier: 16.4.5
         version: 16.4.5
@@ -1201,8 +1201,8 @@ packages:
     peerDependencies:
       convex: ^1.12.1
 
-  convex@1.16.4:
-    resolution: {integrity: sha512-XJH3x/aFmiV/l64Mu0nGurA2ZALw+JY1nIcgy6FUDQGzbBY2EAWtV2/ajhl4KC5L3AjZshejUPVXIA18F6iAOw==}
+  convex@1.17.0:
+    resolution: {integrity: sha512-fNv5GYvkGYIUYbn8ANnJWabjVqbFoUfm8ExDxlWxeDZAuafPJmatVaQWHZ1k+oYD0pmnchrhmtmMV8mX7T0s9A==}
     engines: {node: '>=18.0.0', npm: '>=7.0.0'}
     hasBin: true
     peerDependencies:
@@ -1493,9 +1493,8 @@ packages:
   jsonfile@4.0.0:
     resolution: {integrity: sha512-m6F1R3z8jjlf2imQHS2Qez5sjKWQzbuuhuJ/FKYFRZvPE3PuHcSMVZzfsLhGVOkfd20obL5SWEBew5ShlquNxg==}
 
-  jwt-decode@4.0.0:
-    resolution: {integrity: sha512-+KJGIyHgkGuIq3IEBNftfhW/LfWhXUIY6OmyVWjliu5KH1y0fw7VQ8YndE2O4qZdMSd9SqbnC8GOcZEy0Om7sA==}
-    engines: {node: '>=18'}
+  jwt-decode@3.1.2:
+    resolution: {integrity: sha512-UfpWE/VZn0iP50d8cz9NrZLM9lSWhcJ+0Gt/nm4by88UL+J1SiKN8/5dkjMmbEzwL2CAe+67GsegCbIKtbp75A==}
 
   lilconfig@3.1.2:
     resolution: {integrity: sha512-eop+wDAvpItUys0FWkHIKeC9ybYrTGbU41U5K7+bttZZeohvnY7M9dZ5kB21GNWiFT2q1OoPTvncPCgSOVO5ow==}
@@ -3096,14 +3095,14 @@ snapshots:
 
   consola@3.2.3: {}
 
-  convex-test@0.0.31(convex@1.16.4):
+  convex-test@0.0.31(convex@1.17.0):
     dependencies:
-      convex: 1.16.4
+      convex: 1.17.0
 
-  convex@1.16.4:
+  convex@1.17.0:
     dependencies:
       esbuild: 0.23.0
-      jwt-decode: 4.0.0
+      jwt-decode: 3.1.2
       prettier: 3.2.5
 
   cross-spawn@5.1.0:
@@ -3437,7 +3436,7 @@ snapshots:
     optionalDependencies:
       graceful-fs: 4.2.11
 
-  jwt-decode@4.0.0: {}
+  jwt-decode@3.1.2: {}
 
   lilconfig@3.1.2: {}
 
