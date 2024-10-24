@@ -1,5 +1,11 @@
 # @rjdellecese/confect
 
+## 0.0.12
+
+### Patch Changes
+
+- 2ddd275: Upgrade deps, remove `@effect/schema` (Schema [has been merged](https://effect.website/blog/effect-3.10) into the main `effect` package)
+
 ## 0.0.11
 
 ### Patch Changes
