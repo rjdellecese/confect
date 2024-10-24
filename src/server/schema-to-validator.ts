@@ -173,16 +173,15 @@ type RecordValueToValidator<Vl> = Vl extends ReadonlyRecordValue
 
 export type UndefinedOrValueToValidator<Vl extends ReadonlyValue | undefined> =
 	undefined extends Vl
-		? // biome-ignore format: This erroneously removes the below parentheses!
-			[Vl] extends [(infer Val extends ReadonlyValue) | undefined]
-    ? ValueToValidator<Val> extends infer Vd extends Validator<
-        any,
-        OptionalProperty,
-        any
-      >
-      ? VOptional<Vd>
-      : never
-    : never
+		? [Vl] extends [(infer Val extends ReadonlyValue) | undefined]
+			? ValueToValidator<Val> extends infer Vd extends Validator<
+					any,
+					OptionalProperty,
+					any
+				>
+				? VOptional<Vd>
+				: never
+			: never
 		: Vl extends ReadonlyValue
 			? ValueToValidator<Vl>
 			: never;
