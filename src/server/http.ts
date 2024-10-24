@@ -1,14 +1,11 @@
 import {
 	type HttpApi as EffectHttpApi,
-	FileSystem,
 	HttpApiBuilder,
 	type HttpApiGroup,
 	type HttpApp,
+	HttpServer,
 	OpenApi,
-	Path,
 } from "@effect/platform";
-import * as Etag from "@effect/platform/Etag";
-import * as HttpPlatform from "@effect/platform/HttpPlatform";
 import {
 	type GenericActionCtx,
 	type HttpRouter,
@@ -19,15 +16,7 @@ import {
 	httpActionGeneric,
 	httpRouter,
 } from "convex/server";
-import {
-	Array,
-	Context,
-	Layer,
-	ManagedRuntime,
-	Record,
-	String,
-	pipe,
-} from "effect";
+import { Array, Context, Layer, Record, String, pipe } from "effect";
 import { type ConfectActionCtx, makeConfectActionCtx } from "./ctx";
 import type {
 	DataModelFromConfectDataModel,
@@ -90,18 +79,14 @@ const apiDocsHtml = ({
 
 const makeHandler =
 	<ConfectDataModel extends GenericConfectDataModel>(
-		apiLive: Layer.Layer<
-			EffectHttpApi.HttpApi.Service,
-			never,
-			ConfectActionCtxService
-		>,
+		apiLive: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtxService>,
 		middleware?: Middleware,
 	) =>
 	(
 		ctx: GenericActionCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
 		request: Request,
 	): Promise<Response> => {
-		const FsLive = FileSystem.layerNoop({});
+		// const FsLive = FileSystem.layerNoop({});
 
 		const ConfectActionCtxServiceLive = Layer.succeed(
 			ConfectActionCtxService,
@@ -110,26 +95,21 @@ const makeHandler =
 
 		const EnvLive = Layer.mergeAll(
 			apiLive.pipe(Layer.provide(ConfectActionCtxServiceLive)),
-			HttpApiBuilder.Router.Live,
-			HttpPlatform.layer.pipe(Layer.provide(FsLive)),
-			Etag.layerWeak,
-			FsLive,
-			Path.layer,
+			HttpServer.layerContext,
+			// HttpApiBuilder.Router.Live,
+			// HttpPlatform.layer.pipe(Layer.provide(FsLive)),
+			// Etag.layerWeak,
+			// FsLive,
+			// Path.layer,
 		);
 
-		const runtime = ManagedRuntime.make(EnvLive);
+		const { handler } = HttpApiBuilder.toWebHandler(EnvLive, { middleware });
 
-		const webHandler = HttpApiBuilder.toWebHandler(runtime, middleware);
-
-		return webHandler(request);
+		return handler(request);
 	};
 
 const makeHttpAction = (
-	apiLive: Layer.Layer<
-		EffectHttpApi.HttpApi.Service,
-		never,
-		ConfectActionCtxService
-	>,
+	apiLive: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtxService>,
 	middleware?: Middleware,
 ) => httpActionGeneric(makeHandler(apiLive, middleware));
 
@@ -139,11 +119,7 @@ export type HttpApi<
 	ErrorR,
 > = {
 	api: EffectHttpApi.HttpApi<Groups, Error, ErrorR>;
-	impl: Layer.Layer<
-		EffectHttpApi.HttpApi.Service,
-		never,
-		ConfectActionCtxService
-	>;
+	impl: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtxService>;
 	serverUrl?: string;
 	openApiSpecPath?: RoutePath;
 	apiDocsTitle?: string;
@@ -166,11 +142,7 @@ const mountEffectHttpApi =
 	}: {
 		pathPrefix: RoutePath;
 		api: EffectHttpApi.HttpApi<Groups, Error, ErrorR>;
-		impl: Layer.Layer<
-			EffectHttpApi.HttpApi.Service,
-			never,
-			ConfectActionCtxService
-		>;
+		impl: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtxService>;
 		serverUrl?: string;
 		openApiSpecPath?: RoutePath;
 		apiDocsTitle?: string;

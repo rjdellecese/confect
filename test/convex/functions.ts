@@ -1,5 +1,4 @@
-import { Schema } from "@effect/schema";
-import { Array, Chunk, Effect, Option, Stream, pipe } from "effect";
+import { Array, Chunk, Effect, Option, Schema, Stream, pipe } from "effect";
 import { Id } from "~/src/server/schemas/Id";
 import { PaginationResult } from "~/src/server/schemas/PaginationResult";
 import { api, internal } from "~/test/convex/_generated/api";

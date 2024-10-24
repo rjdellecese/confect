@@ -1,5 +1,5 @@
-import { Schema } from "@effect/schema";
 import { Id, defineSchema, defineTable } from "@rjdellecese/confect/server";
+import { Schema } from "effect";
 
 export const confectSchema = defineSchema({
 	notes: defineTable(

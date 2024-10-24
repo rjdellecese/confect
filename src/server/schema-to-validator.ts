@@ -1,4 +1,3 @@
-import { type AST, type ParseResult, Schema } from "@effect/schema";
 import type {
 	GenericId,
 	OptionalProperty,
@@ -19,7 +18,17 @@ import type {
 	Validator,
 } from "convex/values";
 import { v } from "convex/values";
-import { Array, Data, Effect, Match, Option, pipe } from "effect";
+import {
+	Array,
+	Data,
+	Effect,
+	Match,
+	Option,
+	type ParseResult,
+	Schema,
+	type SchemaAST,
+	pipe,
+} from "effect";
 
 import * as Id from "~/src/server/schemas/Id";
 import type {
@@ -225,7 +234,7 @@ export const compileSchema = <T, E>(
 ): ValueToValidator<(typeof schema)["Encoded"]> =>
 	compileAst(schema.ast) as any;
 
-export const compileAst = (ast: AST.AST): Validator<any, any, any> =>
+export const compileAst = (ast: SchemaAST.AST): Validator<any, any, any> =>
 	pipe(
 		ast,
 		Match.value,
@@ -276,7 +285,10 @@ export const compileAst = (ast: AST.AST): Validator<any, any, any> =>
 
 				const [f, s, ...r] = elements;
 
-				const elementToValidator = ({ type, isOptional }: AST.OptionalType) =>
+				const elementToValidator = ({
+					type,
+					isOptional,
+				}: SchemaAST.OptionalType) =>
 					Effect.if(isOptional, {
 						onTrue: () =>
 							Effect.fail(new OptionalTupleElementsAreNotSupportedError()),
@@ -351,7 +363,7 @@ export const compileAst = (ast: AST.AST): Validator<any, any, any> =>
 const handleTypeLiteral = ({
 	indexSignatures,
 	propertySignatures,
-}: AST.TypeLiteral) =>
+}: SchemaAST.TypeLiteral) =>
 	pipe(
 		indexSignatures,
 		Array.head,
@@ -367,7 +379,7 @@ const handleTypeLiteral = ({
 	);
 
 const handlePropertySignatures = (
-	propertySignatures: readonly AST.PropertySignature[],
+	propertySignatures: readonly SchemaAST.PropertySignature[],
 ) =>
 	pipe(
 		propertySignatures,
@@ -430,7 +442,7 @@ class EmptyTupleIsNotSupportedError extends Data.TaggedError(
 class UnsupportedEffectSchemaTypeError extends Data.TaggedError(
 	"UnsupportedEffectSchemaTypeError",
 )<{
-	readonly schemaType: AST.AST["_tag"];
+	readonly schemaType: SchemaAST.AST["_tag"];
 }> {}
 
 class IndexSignaturesAreNotSupportedError extends Data.TaggedError(

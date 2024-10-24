@@ -1,4 +1,4 @@
-import { Schema } from "@effect/schema";
+import { Schema } from "effect";
 
 export const PaginationResult = <Doc extends Schema.Schema.AnyNoContext>(
 	Doc: Doc,

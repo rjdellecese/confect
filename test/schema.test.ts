@@ -1,5 +1,5 @@
-import { Schema } from "@effect/schema";
 import type { SystemDataModel } from "convex/server";
+import { Schema } from "effect";
 import { describe, expectTypeOf, test } from "vitest";
 
 import type {

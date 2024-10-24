@@ -1,4 +1,4 @@
-import { Schema } from "@effect/schema";
+import { Schema } from "effect";
 import * as schema from "~/src/server/schema";
 import { Id } from "~/src/server/schemas/Id";
 

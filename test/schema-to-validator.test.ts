@@ -1,4 +1,3 @@
-import { Schema } from "@effect/schema";
 import {
 	type GenericId,
 	type VBoolean,
@@ -6,8 +5,10 @@ import {
 	type VUnion,
 	v,
 } from "convex/values";
+import { Schema } from "effect";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
+import { Id } from "~/src/server";
 import {
 	type ValueToValidator,
 	compileArgsSchema,
@@ -15,7 +16,6 @@ import {
 	compileSchema,
 	compileTableSchema,
 } from "~/src/server/schema-to-validator";
-import { Id } from "../src/server";
 
 describe(compileAst, () => {
 	describe("allowed", () => {

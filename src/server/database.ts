@@ -1,4 +1,3 @@
-import { type ParseResult, Schema } from "@effect/schema";
 import type {
 	BetterOmit,
 	DocumentByInfo,
@@ -33,7 +32,9 @@ import {
 	Data,
 	Effect,
 	Option,
+	type ParseResult,
 	Record,
+	Schema,
 	Stream,
 	identity,
 	pipe,

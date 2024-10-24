@@ -1,6 +1,5 @@
-import { AST, Schema } from "@effect/schema";
 import type { GenericId } from "convex/values";
-import type { Option } from "effect";
+import { type Option, Schema, SchemaAST } from "effect";
 
 const ConvexId = Symbol.for("ConvexId");
 
@@ -12,5 +11,6 @@ export const Id = <TableName extends string>(
 	) as unknown as Schema.Schema<GenericId<TableName>>;
 
 export const tableName = <TableName extends string>(
-	ast: AST.AST,
-): Option.Option<TableName> => AST.getAnnotation<TableName>(ConvexId)(ast);
+	ast: SchemaAST.AST,
+): Option.Option<TableName> =>
+	SchemaAST.getAnnotation<TableName>(ConvexId)(ast);

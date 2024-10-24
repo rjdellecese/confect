@@ -1,4 +1,4 @@
-import { Schema } from "@effect/schema";
+import { Schema } from "effect";
 import { Id } from "~/src/server/schemas/Id";
 
 export const SystemFields = <TableName extends string>(tableName: TableName) =>
