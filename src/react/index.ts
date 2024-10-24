@@ -1,11 +1,10 @@
-import { Schema } from "@effect/schema";
 import {
 	useAction as useConvexAction,
 	useMutation as useConvexMutation,
 	useQuery as useConvexQuery,
 } from "convex/react";
 import type { FunctionReference } from "convex/server";
-import { Effect, Option } from "effect";
+import { Effect, Option, Schema } from "effect";
 
 export const useQuery =
 	<Query extends FunctionReference<"query">, Args, Returns>({

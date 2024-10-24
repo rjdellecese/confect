@@ -1,7 +1,6 @@
 import { describe, expect, vi } from "@effect/vitest";
-import { Array, Effect, Exit, Order, String } from "effect";
+import { Array, Effect, Exit, Order, Schema, String } from "effect";
 
-import { Schema } from "@effect/schema";
 import { NotUniqueError } from "~/src/server/database";
 import { test } from "~/test/convex-effect-test";
 import { api } from "~/test/convex/_generated/api";

@@ -1,6 +1,6 @@
-import { Schema } from "@effect/schema";
 import type { Expand } from "convex/server";
 import type { GenericId } from "convex/values";
+import { Schema } from "effect";
 import { describe, expect, expectTypeOf, test } from "vitest";
 import { Id } from "~/src/server/schemas/Id";
 import { extendWithSystemFields } from "~/src/server/schemas/SystemFields";

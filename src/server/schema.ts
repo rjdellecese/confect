@@ -1,4 +1,3 @@
-import { Schema } from "@effect/schema";
 import {
 	type Expand,
 	type GenericSchema,
@@ -17,7 +16,7 @@ import {
 	defineTable as defineConvexTable,
 } from "convex/server";
 import type { Validator } from "convex/values";
-import { Record, pipe } from "effect";
+import { Record, Schema, pipe } from "effect";
 
 import { compileTableSchema } from "~/src/server/schema-to-validator";
 import {

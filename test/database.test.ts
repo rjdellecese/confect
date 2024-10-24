@@ -1,5 +1,5 @@
-import { Schema } from "@effect/schema";
 import { expectTypeOf, test } from "@effect/vitest";
+import { Schema } from "effect";
 
 import type { DatabaseSchemasFromConfectDataModel } from "~/src/server/database";
 import {

@@ -73,7 +73,6 @@
 	},
 	"dependencies": {
 		"@effect/platform": "^0.69.5",
-		"@effect/schema": "^0.75.5",
 		"convex": "^1.17.0",
 		"effect": "^3.10.1"
 	},

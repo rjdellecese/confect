@@ -1,4 +1,3 @@
-import { Schema } from "@effect/schema";
 import {
 	type DefaultFunctionArgs,
 	type GenericActionCtx,
@@ -15,7 +14,7 @@ import {
 	mutationGeneric,
 	queryGeneric,
 } from "convex/server";
-import { Effect, pipe } from "effect";
+import { Effect, Schema, pipe } from "effect";
 
 import {
 	type ConfectActionCtx,

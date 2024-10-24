@@ -1,5 +1,5 @@
-import { Schema } from "@effect/schema";
 import { Id } from "@rjdellecese/confect/server";
+import { Schema } from "effect";
 import { confectSchema } from "./schema";
 
 export const ListNotesArgs = Schema.Struct({});
