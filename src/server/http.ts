@@ -86,8 +86,6 @@ const makeHandler =
 		ctx: GenericActionCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
 		request: Request,
 	): Promise<Response> => {
-		// const FsLive = FileSystem.layerNoop({});
-
 		const ConfectActionCtxServiceLive = Layer.succeed(
 			ConfectActionCtxService,
 			makeConfectActionCtx(ctx),
@@ -96,11 +94,6 @@ const makeHandler =
 		const EnvLive = Layer.mergeAll(
 			apiLive.pipe(Layer.provide(ConfectActionCtxServiceLive)),
 			HttpServer.layerContext,
-			// HttpApiBuilder.Router.Live,
-			// HttpPlatform.layer.pipe(Layer.provide(FsLive)),
-			// Etag.layerWeak,
-			// FsLive,
-			// Path.layer,
 		);
 
 		const { handler } = HttpApiBuilder.toWebHandler(EnvLive, { middleware });
