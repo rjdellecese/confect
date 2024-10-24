@@ -40,7 +40,7 @@ describe("IsAny", () => {
 	});
 
 	test("{} = false", () => {
-		// biome-ignore lint/complexity/noBannedTypes: <explanation>
+		// biome-ignore lint/complexity/noBannedTypes:
 		expectTypeOf<IsAny<{}>>().toEqualTypeOf<false>();
 	});
 });
