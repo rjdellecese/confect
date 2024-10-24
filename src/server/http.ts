@@ -36,6 +36,10 @@ URL = class extends URL {
 	}
 };
 
+Object.defineProperty(Request.prototype, "signal", {
+	get: () => new AbortSignal(),
+});
+
 // END MONKEY PATCH
 
 export class ConfectActionCtxService extends Context.Tag("ConfectActionCtx")<
