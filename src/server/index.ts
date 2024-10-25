@@ -25,3 +25,5 @@ export {
 	type HttpApi,
 	makeHttpRouter,
 } from "~/src/server/http";
+
+export { compileSchema } from "~/src/server/schema-to-validator";
