@@ -1,5 +1,11 @@
 # @rjdellecese/confect
 
+## 0.0.14
+
+### Patch Changes
+
+- 21df7ec: Expose `compileSchema`. Use this to convert a `Schema<A, I>` to a `Validator<I>`.
+
 ## 0.0.13
 
 ### Patch Changes
