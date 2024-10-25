@@ -1,5 +1,11 @@
 # @rjdellecese/confect
 
+## 0.0.13
+
+### Patch Changes
+
+- 5f349a0: `convex`, `effect`, and `@effect/platform` are now peer dependencies
+
 ## 0.0.12
 
 ### Patch Changes
