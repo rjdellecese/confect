@@ -45,6 +45,7 @@
 		"lint": "biome ci --error-on-warnings",
 		"fix": "biome check --write",
 		"test": "vitest --run --typecheck --coverage",
+		"test:watch": "vitest --typecheck --coverage",
 		"build": "tsup",
 		"release": "pnpm build && changeset publish"
 	},
@@ -71,7 +72,8 @@
 		"vite-tsconfig-paths": "5.0.1",
 		"vitest": "2.1.3"
 	},
-	"dependencies": {
+	"dependencies": {},
+	"peerDependencies": {
 		"@effect/platform": "^0.69.5",
 		"convex": "^1.17.0",
 		"effect": "^3.10.1"
