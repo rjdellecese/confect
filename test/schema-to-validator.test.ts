@@ -381,6 +381,32 @@ describe(compileSchema, () => {
 		expect(compiledValidator).toStrictEqual(expectedValidator);
 		expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
 	});
+
+	describe("refinements", () => {
+		test("int", () => {
+			const expectedValidator = v.number();
+			type ExpectedValidator = typeof expectedValidator;
+
+			const compiledValidator = compileSchema(Schema.Int);
+			type CompiledValidator = typeof compiledValidator;
+
+			expect(compiledValidator).toStrictEqual(expectedValidator);
+			expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+		});
+
+		test("filter", () => {
+			const expectedValidator = v.string();
+			type ExpectedValidator = typeof expectedValidator;
+
+			const compiledValidator = compileSchema(
+				Schema.String.pipe(Schema.filter((s) => s.length > 1)),
+			);
+			type CompiledValidator = typeof compiledValidator;
+
+			expect(compiledValidator).toStrictEqual(expectedValidator);
+			expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+		});
+	});
 });
 
 describe("ValueToValidator", () => {

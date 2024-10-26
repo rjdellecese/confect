@@ -340,6 +340,7 @@ export const compileAst = (ast: SchemaAST.AST): Validator<any, any, any> =>
 				},
 			),
 		),
+		Match.tag("Refinement", ({ from }) => Effect.succeed(compileAst(from))),
 		Match.tag(
 			"UniqueSymbol",
 			"SymbolKeyword",
@@ -351,7 +352,6 @@ export const compileAst = (ast: SchemaAST.AST): Validator<any, any, any> =>
 			"ObjectKeyword",
 			"Suspend",
 			"Transformation",
-			"Refinement",
 			() =>
 				Effect.fail(
 					new UnsupportedSchemaTypeError({
