@@ -1,5 +1,11 @@
 # @rjdellecese/confect
 
+## 0.0.15
+
+### Patch Changes
+
+- 9e43859: Improve error reporting when schema compilation fails
+
 ## 0.0.14
 
 ### Patch Changes
