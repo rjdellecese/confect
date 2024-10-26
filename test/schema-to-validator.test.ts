@@ -10,6 +10,13 @@ import { describe, expect, expectTypeOf, test } from "vitest";
 
 import { Id } from "~/src/server";
 import {
+	EmptyTupleIsNotSupportedError,
+	IndexSignaturesAreNotSupportedError,
+	OptionalTupleElementsAreNotSupportedError,
+	TopLevelMustBeObjectError,
+	TopLevelMustBeObjectOrUnionError,
+	UnsupportedPropertySignatureKeyTypeError,
+	UnsupportedSchemaTypeError,
 	type ValueToValidator,
 	compileArgsSchema,
 	compileAst,
@@ -30,6 +37,14 @@ describe(compileAst, () => {
 		test("literal", () => {
 			const schema = Schema.Literal("LiteralString");
 			const validator = v.literal("LiteralString");
+			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+
+			expect(compiledValidator).toStrictEqual(validator);
+		});
+
+		test("literal union", () => {
+			const schema = Schema.Literal("LiteralString", 1);
+			const validator = v.union(v.literal("LiteralString"), v.literal(1));
 			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
 
 			expect(compiledValidator).toStrictEqual(validator);
@@ -91,7 +106,9 @@ describe(compileAst, () => {
 				foo: Schema.optional(Schema.String),
 			});
 
-			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow();
+			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow(
+				new UnsupportedSchemaTypeError({ schemaType: "UndefinedKeyword" }),
+			);
 		});
 
 		test("nested objects", () => {
@@ -157,39 +174,55 @@ describe(compileAst, () => {
 
 	describe("disallowed", () => {
 		test("object with number keys", () => {
+			const numberKey = 100;
+
 			const schema = Schema.Struct({
-				1: Schema.String,
-				// biome-ignore lint/complexity/useSimpleNumberKeys: We want to ensure this fails
-				1_000: Schema.String,
+				[numberKey]: Schema.String,
 			});
 
-			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow();
+			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow(
+				new UnsupportedPropertySignatureKeyTypeError({
+					propertyKey: numberKey,
+				}),
+			);
 		});
 
 		test("object with symbol keys", () => {
+			const symbolKey = Symbol("SymbolKey");
+
 			const schema = Schema.Struct({
-				[Symbol("SymbolKey")]: Schema.Number,
+				[symbolKey]: Schema.Number,
 			});
 
-			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow();
+			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow(
+				new UnsupportedPropertySignatureKeyTypeError({
+					propertyKey: symbolKey,
+				}),
+			);
 		});
 
 		test("empty tuple", () => {
 			const schema = Schema.Tuple();
 
-			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow();
+			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow(
+				new EmptyTupleIsNotSupportedError(),
+			);
 		});
 
 		test("tuple with an optional element", () => {
 			const schema = Schema.Tuple(Schema.optionalElement(Schema.String));
 
-			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow();
+			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow(
+				new OptionalTupleElementsAreNotSupportedError(),
+			);
 		});
 
 		test("unsupported keyword", () => {
 			const schema = Schema.Undefined;
 
-			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow();
+			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow(
+				new UnsupportedSchemaTypeError({ schemaType: "UndefinedKeyword" }),
+			);
 		});
 
 		test("unsupported declaration", () => {
@@ -197,7 +230,9 @@ describe(compileAst, () => {
 
 			const schema = Schema.instanceOf(Klass);
 
-			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow();
+			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow(
+				new UnsupportedSchemaTypeError({ schemaType: "Declaration" }),
+			);
 		});
 	});
 });
@@ -755,7 +790,9 @@ describe(compileTableSchema, () => {
 	test("fails if provided Schema is neither a Struct nor a Union", () => {
 		const stringSchema = Schema.String;
 
-		expect(() => compileTableSchema(stringSchema)).toThrow();
+		expect(() => compileTableSchema(stringSchema)).toThrow(
+			new TopLevelMustBeObjectOrUnionError(),
+		);
 	});
 
 	test("fails if provided Schema requires context", () => {
@@ -774,11 +811,15 @@ describe(compileTableSchema, () => {
 			{ key: Schema.String, value: Schema.String },
 		);
 
-		expect(() => compileTableSchema(structWithIndexSignatures)).toThrow();
+		expect(() => compileTableSchema(structWithIndexSignatures)).toThrow(
+			new IndexSignaturesAreNotSupportedError(),
+		);
 	});
 
-	test("fails if provided Schema is not a Struct", () => {
-		expect(() => compileTableSchema(Schema.String)).toThrow();
+	test("fails if provided Schema is not a Struct or a Union", () => {
+		expect(() => compileTableSchema(Schema.String)).toThrow(
+			new TopLevelMustBeObjectOrUnionError(),
+		);
 	});
 });
 
@@ -804,10 +845,14 @@ describe(compileArgsSchema, () => {
 			{ key: Schema.String, value: Schema.String },
 		);
 
-		expect(() => compileArgsSchema(structWithIndexSignatures)).toThrow();
+		expect(() => compileArgsSchema(structWithIndexSignatures)).toThrow(
+			new IndexSignaturesAreNotSupportedError(),
+		);
 	});
 
 	test("fails if provided Schema is not a Struct", () => {
-		expect(() => compileArgsSchema(Schema.String)).toThrow();
+		expect(() => compileArgsSchema(Schema.String)).toThrow(
+			new TopLevelMustBeObjectError(),
+		);
 	});
 });

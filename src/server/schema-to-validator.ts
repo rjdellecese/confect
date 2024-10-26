@@ -20,13 +20,17 @@ import type {
 import { v } from "convex/values";
 import {
 	Array,
+	Cause,
 	Data,
 	Effect,
+	Exit,
 	Match,
+	Number,
 	Option,
 	type ParseResult,
 	Schema,
 	type SchemaAST,
+	String,
 	pipe,
 } from "effect";
 
@@ -57,7 +61,7 @@ export const compileArgsSchema = <ConfectValue, ConvexValue>(
 				: Effect.fail(new IndexSignaturesAreNotSupportedError()),
 		),
 		Match.orElse(() => Effect.fail(new TopLevelMustBeObjectError())),
-		Effect.runSync,
+		runSyncThrow,
 	);
 };
 
@@ -94,7 +98,7 @@ export const compileTableSchema = <
 		),
 		Match.tag("Union", (ast) => Effect.succeed(compileAst(ast))),
 		Match.orElse(() => Effect.fail(new TopLevelMustBeObjectOrUnionError())),
-		Effect.runSync,
+		runSyncThrow,
 	);
 };
 
@@ -330,7 +334,7 @@ export const compileAst = (ast: SchemaAST.AST): Validator<any, any, any> =>
 				{
 					onSuccess: () => v.bytes(),
 					onFailure: () =>
-						new UnsupportedEffectSchemaTypeError({
+						new UnsupportedSchemaTypeError({
 							schemaType: declaration._tag,
 						}),
 				},
@@ -350,13 +354,13 @@ export const compileAst = (ast: SchemaAST.AST): Validator<any, any, any> =>
 			"Refinement",
 			() =>
 				Effect.fail(
-					new UnsupportedEffectSchemaTypeError({
+					new UnsupportedSchemaTypeError({
 						schemaType: ast._tag,
 					}),
 				),
 		),
 		Match.exhaustive,
-		Effect.runSync,
+		runSyncThrow,
 	);
 
 const handleTypeLiteral = ({
@@ -383,24 +387,28 @@ const handlePropertySignatures = (
 	pipe(
 		propertySignatures,
 		Effect.forEach(({ type, name, isOptional }) => {
-			const typeofName = typeof name;
+			if (String.isString(name)) {
+				// Somehow, somewhere, keys of type number are being coerced to strings…
+				return Option.match(Number.parse(name), {
+					onNone: () => {
+						const validator = compileAst(type);
 
-			if (typeofName !== "string") {
-				return Effect.fail(
-					new UnsupportedPropertySignatureKeyTypeError({ keyType: typeofName }),
-				);
-				// This is necessary because somewhere, keys of number are being coerced to strings. But I don't know where...
-			} else if (!Number.isNaN(Number(name))) {
-				return Effect.fail(
-					new UnsupportedPropertySignatureKeyTypeError({ keyType: "number" }),
-				);
-			} else {
-				const validator = compileAst(type);
-
-				return Effect.succeed({
-					propertyName: name,
-					validator: isOptional ? v.optional(validator) : validator,
+						return Effect.succeed({
+							propertyName: name,
+							validator: isOptional ? v.optional(validator) : validator,
+						});
+					},
+					onSome: (number) =>
+						Effect.fail(
+							new UnsupportedPropertySignatureKeyTypeError({
+								propertyKey: number,
+							}),
+						),
 				});
+			} else {
+				return Effect.fail(
+					new UnsupportedPropertySignatureKeyTypeError({ propertyKey: name }),
+				);
 			}
 		}),
 		Effect.andThen((propertyNamesWithValidators) =>
@@ -420,34 +428,70 @@ const handlePropertySignatures = (
 
 // Errors
 
-class TopLevelMustBeObjectError extends Data.TaggedError(
+const runSyncThrow = <A, E>(effect: Effect.Effect<A, E>) =>
+	pipe(
+		effect,
+		Effect.runSyncExit,
+		Exit.match({
+			onSuccess: (validator) => validator,
+			onFailure: (cause) => {
+				throw Cause.squash(cause);
+			},
+		}),
+	);
+
+export class TopLevelMustBeObjectError extends Data.TaggedError(
 	"TopLevelMustBeObjectError",
 ) {}
 
-class TopLevelMustBeObjectOrUnionError extends Data.TaggedError(
+export class TopLevelMustBeObjectOrUnionError extends Data.TaggedError(
 	"TopLevelMustBeObjectOrUnionError",
-) {}
+) {
+	override get message() {
+		return "Top level schema must be an object or a union";
+	}
+}
 
-class UnsupportedPropertySignatureKeyTypeError extends Data.TaggedError(
+export class UnsupportedPropertySignatureKeyTypeError extends Data.TaggedError(
 	"UnsupportedPropertySignatureKeyTypeError",
 )<{
-	readonly keyType: string;
-}> {}
+	readonly propertyKey: number | symbol;
+}> {
+	override get message() {
+		return `Unsupported property signature '${this.propertyKey.toString()}'. Property is of type '${typeof this.propertyKey}' but only 'string' properties are supported`;
+	}
+}
 
-class EmptyTupleIsNotSupportedError extends Data.TaggedError(
+export class EmptyTupleIsNotSupportedError extends Data.TaggedError(
 	"EmptyTupleIsNotSupportedError",
-) {}
+) {
+	override get message() {
+		return "Tuple must have at least one element";
+	}
+}
 
-class UnsupportedEffectSchemaTypeError extends Data.TaggedError(
-	"UnsupportedEffectSchemaTypeError",
+export class UnsupportedSchemaTypeError extends Data.TaggedError(
+	"UnsupportedSchemaTypeError",
 )<{
 	readonly schemaType: SchemaAST.AST["_tag"];
-}> {}
+}> {
+	override get message() {
+		return `Unsupported schema type '${this.schemaType}'`;
+	}
+}
 
-class IndexSignaturesAreNotSupportedError extends Data.TaggedError(
+export class IndexSignaturesAreNotSupportedError extends Data.TaggedError(
 	"IndexSignaturesAreNotSupportedError",
-) {}
+) {
+	override get message() {
+		return "Index signatures are not supported";
+	}
+}
 
-class OptionalTupleElementsAreNotSupportedError extends Data.TaggedError(
+export class OptionalTupleElementsAreNotSupportedError extends Data.TaggedError(
 	"OptionalTupleElementsAreNotSupportedError",
-) {}
+) {
+	override get message() {
+		return "Optional tuple elements are not supported";
+	}
+}
