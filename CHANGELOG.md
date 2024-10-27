@@ -1,5 +1,11 @@
 # @rjdellecese/confect
 
+## 0.0.16
+
+### Patch Changes
+
+- d7c5a10: Add support for refinements
+
 ## 0.0.15
 
 ### Patch Changes
