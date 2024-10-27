@@ -1,5 +1,11 @@
 # @rjdellecese/confect
 
+## 0.0.17
+
+### Patch Changes
+
+- ea92ea9: Scope monkey patches to HTTP router creation only, bump some deps
+
 ## 0.0.16
 
 ### Patch Changes
