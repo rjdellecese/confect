@@ -1,3 +1,4 @@
+import { effect } from "@effect/vitest";
 import {
 	type GenericId,
 	type VBoolean,
@@ -5,7 +6,7 @@ import {
 	type VUnion,
 	v,
 } from "convex/values";
-import { Schema } from "effect";
+import { Effect, Exit, Schema } from "effect";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
 import { Id } from "~/src/server";
@@ -26,214 +27,329 @@ import {
 
 describe(compileAst, () => {
 	describe("allowed", () => {
-		test("any", () => {
-			const schema = Schema.Any;
-			const validator = v.any();
-			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+		effect("any", () =>
+			Effect.gen(function* () {
+				const schema = Schema.Any;
+				const validator = v.any();
+				const compiledValidator = yield* compileAst(
+					Schema.encodedSchema(schema).ast,
+				);
 
-			expect(compiledValidator).toStrictEqual(validator);
-		});
+				expect(compiledValidator).toStrictEqual(validator);
+			}),
+		);
 
-		test("literal", () => {
-			const schema = Schema.Literal("LiteralString");
-			const validator = v.literal("LiteralString");
-			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+		effect("literal", () =>
+			Effect.gen(function* () {
+				const schema = Schema.Literal("LiteralString");
+				const validator = v.literal("LiteralString");
+				const compiledValidator = yield* compileAst(
+					Schema.encodedSchema(schema).ast,
+				);
 
-			expect(compiledValidator).toStrictEqual(validator);
-		});
+				expect(compiledValidator).toStrictEqual(validator);
+			}),
+		);
 
-		test("literal union", () => {
-			const schema = Schema.Literal("LiteralString", 1);
-			const validator = v.union(v.literal("LiteralString"), v.literal(1));
-			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+		effect("literal union", () =>
+			Effect.gen(function* () {
+				const schema = Schema.Literal("LiteralString", 1);
+				const validator = v.union(v.literal("LiteralString"), v.literal(1));
+				const compiledValidator = yield* compileAst(
+					Schema.encodedSchema(schema).ast,
+				);
 
-			expect(compiledValidator).toStrictEqual(validator);
-		});
+				expect(compiledValidator).toStrictEqual(validator);
+			}),
+		);
 
-		test("boolean", () => {
-			const schema = Schema.Boolean;
-			const validator = v.boolean();
-			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+		effect("boolean", () =>
+			Effect.gen(function* () {
+				const schema = Schema.Boolean;
+				const validator = v.boolean();
+				const compiledValidator = yield* compileAst(
+					Schema.encodedSchema(schema).ast,
+				);
 
-			expect(compiledValidator).toStrictEqual(validator);
-		});
+				expect(compiledValidator).toStrictEqual(validator);
+			}),
+		);
 
-		test("string", () => {
-			const schema = Schema.String;
-			const validator = v.string();
-			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+		effect("string", () =>
+			Effect.gen(function* () {
+				const schema = Schema.String;
+				const validator = v.string();
+				const compiledValidator = yield* compileAst(
+					Schema.encodedSchema(schema).ast,
+				);
 
-			expect(compiledValidator).toStrictEqual(validator);
-		});
+				expect(compiledValidator).toStrictEqual(validator);
+			}),
+		);
 
-		test("number", () => {
-			const schema = Schema.Number;
-			const validator = v.float64();
-			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+		effect("number", () =>
+			Effect.gen(function* () {
+				const schema = Schema.Number;
+				const validator = v.float64();
+				const compiledValidator = yield* compileAst(
+					Schema.encodedSchema(schema).ast,
+				);
 
-			expect(compiledValidator).toStrictEqual(validator);
-		});
+				expect(compiledValidator).toStrictEqual(validator);
+			}),
+		);
 
-		test("empty object", () => {
-			const schema = Schema.Struct({});
-			const validator = v.object({});
-			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+		effect("empty object", () =>
+			Effect.gen(function* () {
+				const schema = Schema.Struct({});
+				const validator = v.object({});
+				const compiledValidator = yield* compileAst(
+					Schema.encodedSchema(schema).ast,
+				);
 
-			expect(compiledValidator).toStrictEqual(validator);
-		});
+				expect(compiledValidator).toStrictEqual(validator);
+			}),
+		);
 
-		test("simple object", () => {
-			const schema = Schema.Struct({ foo: Schema.String, bar: Schema.Number });
-			const validator = v.object({ foo: v.string(), bar: v.float64() });
-			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+		effect("simple object", () =>
+			Effect.gen(function* () {
+				const schema = Schema.Struct({
+					foo: Schema.String,
+					bar: Schema.Number,
+				});
+				const validator = v.object({ foo: v.string(), bar: v.float64() });
+				const compiledValidator = yield* compileAst(
+					Schema.encodedSchema(schema).ast,
+				);
 
-			expect(compiledValidator).toStrictEqual(validator);
-		});
+				expect(compiledValidator).toStrictEqual(validator);
+			}),
+		);
 
-		test("object with optional field", () => {
-			const schema = Schema.Struct({
-				foo: Schema.optionalWith(Schema.String, { exact: true }),
-			});
+		effect("object with optional field", () =>
+			Effect.gen(function* () {
+				const schema = Schema.Struct({
+					foo: Schema.optionalWith(Schema.String, { exact: true }),
+				});
 
-			const validator = v.object({ foo: v.optional(v.string()) });
-			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+				const validator = v.object({ foo: v.optional(v.string()) });
+				const compiledValidator = yield* compileAst(
+					Schema.encodedSchema(schema).ast,
+				);
 
-			expect(compiledValidator).toStrictEqual(validator);
-		});
+				expect(compiledValidator).toStrictEqual(validator);
+			}),
+		);
 
-		test("object with optional field (exact)", () => {
-			const schema = Schema.Struct({
-				foo: Schema.optional(Schema.String),
-			});
+		effect("object with optional field (exact)", () =>
+			Effect.gen(function* () {
+				const schema = Schema.Struct({
+					foo: Schema.optional(Schema.String),
+				});
 
-			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow(
-				new UnsupportedSchemaTypeError({ schemaType: "UndefinedKeyword" }),
-			);
-		});
+				const exit = yield* Effect.exit(
+					compileAst(Schema.encodedSchema(schema).ast),
+				);
 
-		test("nested objects", () => {
-			const schema = Schema.Struct({
-				foo: Schema.Struct({
-					bar: Schema.Struct({
-						baz: Schema.String,
+				expect(exit).toStrictEqual(
+					Exit.fail(
+						new UnsupportedSchemaTypeError({ schemaType: "UndefinedKeyword" }),
+					),
+				);
+			}),
+		);
+
+		effect("nested objects", () =>
+			Effect.gen(function* () {
+				const schema = Schema.Struct({
+					foo: Schema.Struct({
+						bar: Schema.Struct({
+							baz: Schema.String,
+						}),
 					}),
-				}),
-			});
-			const validator = v.object({
-				foo: v.object({ bar: v.object({ baz: v.string() }) }),
-			});
-			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+				});
+				const validator = v.object({
+					foo: v.object({ bar: v.object({ baz: v.string() }) }),
+				});
+				const compiledValidator = yield* compileAst(
+					Schema.encodedSchema(schema).ast,
+				);
 
-			expect(compiledValidator).toStrictEqual(validator);
-		});
+				expect(compiledValidator).toStrictEqual(validator);
+			}),
+		);
 
-		test("union with four elements", () => {
-			const schema = Schema.Union(
-				Schema.String,
-				Schema.Number,
-				Schema.Boolean,
-				Schema.Struct({}),
-			);
-			const validator = v.union(
-				v.string(),
-				v.float64(),
-				v.boolean(),
-				v.object({}),
-			);
-			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+		effect("union with four elements", () =>
+			Effect.gen(function* () {
+				const schema = Schema.Union(
+					Schema.String,
+					Schema.Number,
+					Schema.Boolean,
+					Schema.Struct({}),
+				);
+				const validator = v.union(
+					v.string(),
+					v.float64(),
+					v.boolean(),
+					v.object({}),
+				);
+				const compiledValidator = yield* compileAst(
+					Schema.encodedSchema(schema).ast,
+				);
 
-			expect(compiledValidator).toStrictEqual(validator);
-		});
+				expect(compiledValidator).toStrictEqual(validator);
+			}),
+		);
 
-		test("tuple with one element", () => {
-			const schema = Schema.Tuple(Schema.String);
-			const validator = v.array(v.string());
-			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+		effect("tuple with one element", () =>
+			Effect.gen(function* () {
+				const schema = Schema.Tuple(Schema.String);
+				const validator = v.array(v.string());
+				const compiledValidator = yield* compileAst(
+					Schema.encodedSchema(schema).ast,
+				);
 
-			expect(compiledValidator).toStrictEqual(validator);
-		});
+				expect(compiledValidator).toStrictEqual(validator);
+			}),
+		);
 
-		test("tuple with two elements", () => {
-			const schema = Schema.Tuple(Schema.String, Schema.Number);
-			const validator = v.array(v.union(v.string(), v.float64()));
-			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+		effect("tuple with two elements", () =>
+			Effect.gen(function* () {
+				const schema = Schema.Tuple(Schema.String, Schema.Number);
+				const validator = v.array(v.union(v.string(), v.float64()));
+				const compiledValidator = yield* compileAst(
+					Schema.encodedSchema(schema).ast,
+				);
 
-			expect(compiledValidator).toStrictEqual(validator);
-		});
+				expect(compiledValidator).toStrictEqual(validator);
+			}),
+		);
 
-		test("tuple with three elements", () => {
-			const schema = Schema.Tuple(Schema.String, Schema.Number, Schema.Boolean);
-			const expectedValidator = v.array(
-				v.union(v.string(), v.float64(), v.boolean()),
-			);
-			const compiledValidator = compileAst(Schema.encodedSchema(schema).ast);
+		effect("tuple with three elements", () =>
+			Effect.gen(function* () {
+				const schema = Schema.Tuple(
+					Schema.String,
+					Schema.Number,
+					Schema.Boolean,
+				);
+				const expectedValidator = v.array(
+					v.union(v.string(), v.float64(), v.boolean()),
+				);
+				const compiledValidator = yield* compileAst(
+					Schema.encodedSchema(schema).ast,
+				);
 
-			expect(compiledValidator).toStrictEqual(expectedValidator);
-		});
+				expect(compiledValidator).toStrictEqual(expectedValidator);
+			}),
+		);
 	});
 
 	describe("disallowed", () => {
-		test("object with number keys", () => {
-			const numberKey = 100;
+		effect("object with number keys", () =>
+			Effect.gen(function* () {
+				const numberKey = 100;
 
-			const schema = Schema.Struct({
-				[numberKey]: Schema.String,
-			});
+				const schema = Schema.Struct({
+					[numberKey]: Schema.String,
+				});
 
-			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow(
-				new UnsupportedPropertySignatureKeyTypeError({
-					propertyKey: numberKey,
-				}),
-			);
-		});
+				const exit = yield* Effect.exit(
+					compileAst(Schema.encodedSchema(schema).ast),
+				);
 
-		test("object with symbol keys", () => {
-			const symbolKey = Symbol("SymbolKey");
+				expect(exit).toStrictEqual(
+					Exit.fail(
+						new UnsupportedPropertySignatureKeyTypeError({
+							propertyKey: numberKey,
+						}),
+					),
+				);
+			}),
+		);
 
-			const schema = Schema.Struct({
-				[symbolKey]: Schema.Number,
-			});
+		effect("object with symbol keys", () =>
+			Effect.gen(function* () {
+				const symbolKey = Symbol("SymbolKey");
 
-			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow(
-				new UnsupportedPropertySignatureKeyTypeError({
-					propertyKey: symbolKey,
-				}),
-			);
-		});
+				const schema = Schema.Struct({
+					[symbolKey]: Schema.Number,
+				});
 
-		test("empty tuple", () => {
-			const schema = Schema.Tuple();
+				const exit = yield* Effect.exit(
+					compileAst(Schema.encodedSchema(schema).ast),
+				);
 
-			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow(
-				new EmptyTupleIsNotSupportedError(),
-			);
-		});
+				expect(exit).toStrictEqual(
+					Exit.fail(
+						new UnsupportedPropertySignatureKeyTypeError({
+							propertyKey: symbolKey,
+						}),
+					),
+				);
+			}),
+		);
 
-		test("tuple with an optional element", () => {
-			const schema = Schema.Tuple(Schema.optionalElement(Schema.String));
+		effect("empty tuple", () =>
+			Effect.gen(function* () {
+				const schema = Schema.Tuple();
 
-			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow(
-				new OptionalTupleElementsAreNotSupportedError(),
-			);
-		});
+				const exit = yield* Effect.exit(
+					compileAst(Schema.encodedSchema(schema).ast),
+				);
 
-		test("unsupported keyword", () => {
-			const schema = Schema.Undefined;
+				expect(exit).toStrictEqual(
+					Exit.fail(new EmptyTupleIsNotSupportedError()),
+				);
+			}),
+		);
 
-			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow(
-				new UnsupportedSchemaTypeError({ schemaType: "UndefinedKeyword" }),
-			);
-		});
+		effect("tuple with an optional element", () =>
+			Effect.gen(function* () {
+				const schema = Schema.Tuple(Schema.optionalElement(Schema.String));
 
-		test("unsupported declaration", () => {
-			class Klass {}
+				const exit = yield* Effect.exit(
+					compileAst(Schema.encodedSchema(schema).ast),
+				);
 
-			const schema = Schema.instanceOf(Klass);
+				expect(exit).toStrictEqual(
+					Exit.fail(new OptionalTupleElementsAreNotSupportedError()),
+				);
+			}),
+		);
 
-			expect(() => compileAst(Schema.encodedSchema(schema).ast)).toThrow(
-				new UnsupportedSchemaTypeError({ schemaType: "Declaration" }),
-			);
-		});
+		effect("unsupported keyword", () =>
+			Effect.gen(function* () {
+				const schema = Schema.Undefined;
+
+				const exit = yield* Effect.exit(
+					compileAst(Schema.encodedSchema(schema).ast),
+				);
+
+				expect(exit).toStrictEqual(
+					Exit.fail(
+						new UnsupportedSchemaTypeError({ schemaType: "UndefinedKeyword" }),
+					),
+				);
+			}),
+		);
+
+		effect("unsupported declaration", () =>
+			Effect.gen(function* () {
+				class Klass {}
+
+				const schema = Schema.instanceOf(Klass);
+
+				const exit = yield* Effect.exit(
+					compileAst(Schema.encodedSchema(schema).ast),
+				);
+
+				expect(exit).toStrictEqual(
+					Exit.fail(
+						new UnsupportedSchemaTypeError({ schemaType: "Declaration" }),
+					),
+				);
+			}),
+		);
 	});
 });
 
