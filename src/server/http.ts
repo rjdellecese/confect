@@ -23,25 +23,6 @@ import type {
 	GenericConfectDataModel,
 } from "./data-model";
 
-// START MONKEY PATCH
-// These are necessary until the Convex runtime supports these APIs. See https://discord.com/channels/1019350475847499849/1281364098419785760
-
-// biome-ignore lint/suspicious/noGlobalAssign:
-URL = class extends URL {
-	override get username() {
-		return "";
-	}
-	override get password() {
-		return "";
-	}
-};
-
-Object.defineProperty(Request.prototype, "signal", {
-	get: () => new AbortSignal(),
-});
-
-// END MONKEY PATCH
-
 export class ConfectActionCtxService extends Context.Tag("ConfectActionCtx")<
 	ConfectActionCtxService,
 	ConfectActionCtx<any>
@@ -235,13 +216,37 @@ const makeHttpRouter = <
 	ErrorR,
 >(
 	httpApis: Record<RoutePath, HttpApi<Groups, Error, ErrorR>>,
-): HttpRouter =>
-	pipe(
+): HttpRouter => {
+	applyMonkeyPatches();
+
+	return pipe(
 		httpApis,
 		Record.toEntries,
 		Array.reduce(httpRouter(), (convexHttpRouter, [pathPrefix, httpApi]) =>
 			mountEffectHttpApi({ pathPrefix, ...httpApi })(convexHttpRouter),
 		),
 	);
+};
+
+const applyMonkeyPatches = () => {
+	// START MONKEY PATCH
+	// These are necessary until the Convex runtime supports these APIs. See https://discord.com/channels/1019350475847499849/1281364098419785760
+
+	// biome-ignore lint/suspicious/noGlobalAssign:
+	URL = class extends URL {
+		override get username() {
+			return "";
+		}
+		override get password() {
+			return "";
+		}
+	};
+
+	Object.defineProperty(Request.prototype, "signal", {
+		get: () => new AbortSignal(),
+	});
+
+	// END MONKEY PATCH
+};
 
 export { makeHttpRouter };

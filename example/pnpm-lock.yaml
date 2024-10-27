@@ -13,7 +13,7 @@ importers:
         version: 0.69.6(effect@3.10.2)
       '@rjdellecese/confect':
         specifier: file:../
-        version: file:..(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        version: file:..(@effect/platform@0.69.6(effect@3.10.2))(convex@1.17.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(effect@3.10.2)
       convex:
         specifier: 1.17.0
         version: 1.17.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -447,6 +447,10 @@ packages:
   '@rjdellecese/confect@file:..':
     resolution: {directory: .., type: directory}
     engines: {node: '>=20', pnpm: '>=9'}
+    peerDependencies:
+      '@effect/platform': ^0.69.5
+      convex: ^1.17.0
+      effect: ^3.10.1
 
   '@rollup/rollup-android-arm-eabi@4.21.3':
     resolution: {integrity: sha512-MmKSfaB9GX+zXl6E8z4koOr/xU63AMVleLEa64v7R0QF/ZloMs5vcD1sHgM64GXXS1csaJutG+ddtzcueI/BLg==}
@@ -1186,16 +1190,11 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.0
 
-  '@rjdellecese/confect@file:..(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+  '@rjdellecese/confect@file:..(@effect/platform@0.69.6(effect@3.10.2))(convex@1.17.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(effect@3.10.2)':
     dependencies:
       '@effect/platform': 0.69.6(effect@3.10.2)
       convex: 1.17.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       effect: 3.10.2
-    transitivePeerDependencies:
-      - '@auth0/auth0-react'
-      - '@clerk/clerk-react'
-      - react
-      - react-dom
 
   '@rollup/rollup-android-arm-eabi@4.21.3':
     optional: true
