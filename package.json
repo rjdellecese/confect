@@ -41,13 +41,14 @@
 		}
 	},
 	"scripts": {
-		"start": "convex dev",
-		"lint": "biome ci --error-on-warnings",
-		"fix": "biome check --write",
-		"test": "vitest --run --typecheck --coverage",
-		"test:watch": "vitest --typecheck --coverage",
 		"build": "tsup",
-		"release": "pnpm build && changeset publish"
+		"api-docs:serve": "concurrently --prefix-colors='white.bold.bgMagenta,white.bold.bgBlue' --prefix=' {name} ' --names='HTTP-SERVER,TYPEDOC' 'http-server docs' 'typedoc src/**/index.ts --watch --preserveWatchOutput'",
+		"fix": "biome check --write",
+		"lint": "biome ci --error-on-warnings",
+		"release": "pnpm build && changeset publish",
+		"start": "convex dev",
+		"test": "vitest --run --typecheck --coverage",
+		"test:watch": "vitest --typecheck --coverage"
 	},
 	"keywords": [
 		"effect",
@@ -64,6 +65,7 @@
 		"@tsconfig/strictest": "2.0.5",
 		"@types/node": "^22.8.1",
 		"@vitest/coverage-v8": "2.1.3",
+		"concurrently": "^9.0.1",
 		"convex-test": "0.0.33",
 		"dotenv": "16.4.5",
 		"http-server": "^14.1.1",
