@@ -80,5 +80,8 @@
 	"engines": {
 		"node": ">=20",
 		"pnpm": ">=9"
+	},
+	"dependencies": {
+		"@effect/cli": "^0.48.9"
 	}
 }
