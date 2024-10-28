@@ -1,4 +1,3 @@
-import { type AST, type ParseResult, Schema } from "@effect/schema";
 import type {
 	GenericId,
 	OptionalProperty,
@@ -19,8 +18,23 @@ import type {
 	Validator,
 } from "convex/values";
 import { v } from "convex/values";
-import { Array, Data, Effect, Match, Option, pipe } from "effect";
+import {
+	Array,
+	Cause,
+	Data,
+	Effect,
+	Exit,
+	Match,
+	Number,
+	Option,
+	type ParseResult,
+	Schema,
+	type SchemaAST,
+	String,
+	pipe,
+} from "effect";
 
+import * as Id from "~/src/server/schemas/Id";
 import type {
 	DeepMutable,
 	IsAny,
@@ -47,7 +61,7 @@ export const compileArgsSchema = <ConfectValue, ConvexValue>(
 				: Effect.fail(new IndexSignaturesAreNotSupportedError()),
 		),
 		Match.orElse(() => Effect.fail(new TopLevelMustBeObjectError())),
-		Effect.runSync,
+		runSyncThrow,
 	);
 };
 
@@ -55,7 +69,8 @@ export const compileArgsSchema = <ConfectValue, ConvexValue>(
 
 export const compileReturnsSchema = <ConfectValue, ConvexValue>(
 	schema: Schema.Schema<ConfectValue, ConvexValue>,
-): Validator<any, any, any> => compileAst(Schema.encodedSchema(schema).ast);
+): Validator<any, any, any> =>
+	runSyncThrow(compileAst(Schema.encodedSchema(schema).ast));
 
 // Table
 
@@ -79,12 +94,12 @@ export const compileTableSchema = <
 		Match.value,
 		Match.tag("TypeLiteral", ({ indexSignatures }) =>
 			Array.isEmptyReadonlyArray(indexSignatures)
-				? Effect.succeed(compileAst(ast) as any)
+				? (compileAst(ast) as Effect.Effect<any>)
 				: Effect.fail(new IndexSignaturesAreNotSupportedError()),
 		),
-		Match.tag("Union", (ast) => Effect.succeed(compileAst(ast))),
+		Match.tag("Union", (ast) => compileAst(ast)),
 		Match.orElse(() => Effect.fail(new TopLevelMustBeObjectOrUnionError())),
-		Effect.runSync,
+		runSyncThrow,
 	);
 };
 
@@ -163,16 +178,15 @@ type RecordValueToValidator<Vl> = Vl extends ReadonlyRecordValue
 
 export type UndefinedOrValueToValidator<Vl extends ReadonlyValue | undefined> =
 	undefined extends Vl
-		? // biome-ignore format: This erroneously removes the below parentheses!
-			[Vl] extends [(infer Val extends ReadonlyValue) | undefined]
-    ? ValueToValidator<Val> extends infer Vd extends Validator<
-        any,
-        OptionalProperty,
-        any
-      >
-      ? VOptional<Vd>
-      : never
-    : never
+		? [Vl] extends [(infer Val extends ReadonlyValue) | undefined]
+			? ValueToValidator<Val> extends infer Vd extends Validator<
+					any,
+					OptionalProperty,
+					any
+				>
+				? VOptional<Vd>
+				: never
+			: never
 		: Vl extends ReadonlyValue
 			? ValueToValidator<Vl>
 			: never;
@@ -222,9 +236,18 @@ type ValueTupleToValidatorTuple<VlTuple extends ReadonlyArray<ReadonlyValue>> =
 export const compileSchema = <T, E>(
 	schema: Schema.Schema<T, E>,
 ): ValueToValidator<(typeof schema)["Encoded"]> =>
-	compileAst(schema.ast) as any;
+	runSyncThrow(compileAst(schema.ast)) as any;
 
-export const compileAst = (ast: AST.AST): Validator<any, any, any> =>
+export const compileAst = (
+	ast: SchemaAST.AST,
+): Effect.Effect<
+	Validator<any, any, any>,
+	| UnsupportedSchemaTypeError
+	| UnsupportedPropertySignatureKeyTypeError
+	| IndexSignaturesAreNotSupportedError
+	| OptionalTupleElementsAreNotSupportedError
+	| EmptyTupleIsNotSupportedError
+> =>
 	pipe(
 		ast,
 		Match.value,
@@ -245,17 +268,24 @@ export const compileAst = (ast: AST.AST): Validator<any, any, any> =>
 			),
 		),
 		Match.tag("BooleanKeyword", () => Effect.succeed(v.boolean())),
-		Match.tag("StringKeyword", () => Effect.succeed(v.string())),
+		Match.tag("StringKeyword", (stringAst) =>
+			Id.tableName(stringAst).pipe(
+				Option.match({
+					onNone: () => Effect.succeed(v.string()),
+					onSome: (tableName) => Effect.succeed(v.id(tableName)),
+				}),
+			),
+		),
 		Match.tag("NumberKeyword", () => Effect.succeed(v.float64())),
 		Match.tag("BigIntKeyword", () => Effect.succeed(v.int64())),
 		Match.tag("Union", ({ types: [first, second, ...rest] }) =>
-			Effect.succeed(
-				v.union(
-					compileAst(first),
-					compileAst(second),
-					...Array.map(rest, compileAst),
-				),
-			),
+			Effect.gen(function* () {
+				const firstValidator = yield* compileAst(first);
+				const secondValidator = yield* compileAst(second);
+				const restValidators = yield* Effect.forEach(rest, compileAst);
+
+				return v.union(firstValidator, secondValidator, ...restValidators);
+			}),
 		),
 		Match.tag("TypeLiteral", (typeLiteral) => handleTypeLiteral(typeLiteral)),
 		Match.tag("TupleType", ({ elements, rest }) =>
@@ -264,22 +294,28 @@ export const compileAst = (ast: AST.AST): Validator<any, any, any> =>
 					rest,
 					Array.head,
 					Option.map(({ type }) => compileAst(type)),
+					Effect.flatten,
 				);
 
 				const [f, s, ...r] = elements;
 
-				const elementToValidator = ({ type, isOptional }: AST.OptionalType) =>
+				const elementToValidator = ({
+					type,
+					isOptional,
+				}: SchemaAST.OptionalType) =>
 					Effect.if(isOptional, {
 						onTrue: () =>
 							Effect.fail(new OptionalTupleElementsAreNotSupportedError()),
-						onFalse: () => Effect.succeed(compileAst(type)),
+						onFalse: () => compileAst(type),
 					});
 
 				const arrayItemsValidator = yield* f === undefined
-					? Option.match(restValidator, {
-							onNone: () => Effect.fail(new EmptyTupleIsNotSupportedError()),
-							onSome: (validator) => Effect.succeed(validator),
-						})
+					? pipe(
+							restValidator,
+							Effect.catchTag("NoSuchElementException", () =>
+								Effect.fail(new EmptyTupleIsNotSupportedError()),
+							),
+						)
 					: s === undefined
 						? elementToValidator(f)
 						: Effect.gen(function* () {
@@ -311,12 +347,13 @@ export const compileAst = (ast: AST.AST): Validator<any, any, any> =>
 				{
 					onSuccess: () => v.bytes(),
 					onFailure: () =>
-						new UnsupportedEffectSchemaTypeError({
+						new UnsupportedSchemaTypeError({
 							schemaType: declaration._tag,
 						}),
 				},
 			),
 		),
+		Match.tag("Refinement", ({ from }) => compileAst(from)),
 		Match.tag(
 			"UniqueSymbol",
 			"SymbolKeyword",
@@ -328,22 +365,20 @@ export const compileAst = (ast: AST.AST): Validator<any, any, any> =>
 			"ObjectKeyword",
 			"Suspend",
 			"Transformation",
-			"Refinement",
 			() =>
 				Effect.fail(
-					new UnsupportedEffectSchemaTypeError({
+					new UnsupportedSchemaTypeError({
 						schemaType: ast._tag,
 					}),
 				),
 		),
 		Match.exhaustive,
-		Effect.runSync,
 	);
 
 const handleTypeLiteral = ({
 	indexSignatures,
 	propertySignatures,
-}: AST.TypeLiteral) =>
+}: SchemaAST.TypeLiteral) =>
 	pipe(
 		indexSignatures,
 		Array.head,
@@ -359,29 +394,34 @@ const handleTypeLiteral = ({
 	);
 
 const handlePropertySignatures = (
-	propertySignatures: readonly AST.PropertySignature[],
+	propertySignatures: readonly SchemaAST.PropertySignature[],
 ) =>
 	pipe(
 		propertySignatures,
 		Effect.forEach(({ type, name, isOptional }) => {
-			const typeofName = typeof name;
+			if (String.isString(name)) {
+				// Somehow, somewhere, keys of type number are being coerced to strings…
+				return Option.match(Number.parse(name), {
+					onNone: () =>
+						Effect.gen(function* () {
+							const validator = yield* compileAst(type);
 
-			if (typeofName !== "string") {
-				return Effect.fail(
-					new UnsupportedPropertySignatureKeyTypeError({ keyType: typeofName }),
-				);
-				// This is necessary because somewhere, keys of number are being coerced to strings. But I don't know where...
-			} else if (!Number.isNaN(Number(name))) {
-				return Effect.fail(
-					new UnsupportedPropertySignatureKeyTypeError({ keyType: "number" }),
-				);
-			} else {
-				const validator = compileAst(type);
-
-				return Effect.succeed({
-					propertyName: name,
-					validator: isOptional ? v.optional(validator) : validator,
+							return {
+								propertyName: name,
+								validator: isOptional ? v.optional(validator) : validator,
+							};
+						}),
+					onSome: (number) =>
+						Effect.fail(
+							new UnsupportedPropertySignatureKeyTypeError({
+								propertyKey: number,
+							}),
+						),
 				});
+			} else {
+				return Effect.fail(
+					new UnsupportedPropertySignatureKeyTypeError({ propertyKey: name }),
+				);
 			}
 		}),
 		Effect.andThen((propertyNamesWithValidators) =>
@@ -401,34 +441,70 @@ const handlePropertySignatures = (
 
 // Errors
 
-class TopLevelMustBeObjectError extends Data.TaggedError(
+const runSyncThrow = <A, E>(effect: Effect.Effect<A, E>) =>
+	pipe(
+		effect,
+		Effect.runSyncExit,
+		Exit.match({
+			onSuccess: (validator) => validator,
+			onFailure: (cause) => {
+				throw Cause.squash(cause);
+			},
+		}),
+	);
+
+export class TopLevelMustBeObjectError extends Data.TaggedError(
 	"TopLevelMustBeObjectError",
 ) {}
 
-class TopLevelMustBeObjectOrUnionError extends Data.TaggedError(
+export class TopLevelMustBeObjectOrUnionError extends Data.TaggedError(
 	"TopLevelMustBeObjectOrUnionError",
-) {}
+) {
+	override get message() {
+		return "Top level schema must be an object or a union";
+	}
+}
 
-class UnsupportedPropertySignatureKeyTypeError extends Data.TaggedError(
+export class UnsupportedPropertySignatureKeyTypeError extends Data.TaggedError(
 	"UnsupportedPropertySignatureKeyTypeError",
 )<{
-	readonly keyType: string;
-}> {}
+	readonly propertyKey: number | symbol;
+}> {
+	override get message() {
+		return `Unsupported property signature '${this.propertyKey.toString()}'. Property is of type '${typeof this.propertyKey}' but only 'string' properties are supported`;
+	}
+}
 
-class EmptyTupleIsNotSupportedError extends Data.TaggedError(
+export class EmptyTupleIsNotSupportedError extends Data.TaggedError(
 	"EmptyTupleIsNotSupportedError",
-) {}
+) {
+	override get message() {
+		return "Tuple must have at least one element";
+	}
+}
 
-class UnsupportedEffectSchemaTypeError extends Data.TaggedError(
-	"UnsupportedEffectSchemaTypeError",
+export class UnsupportedSchemaTypeError extends Data.TaggedError(
+	"UnsupportedSchemaTypeError",
 )<{
-	readonly schemaType: AST.AST["_tag"];
-}> {}
+	readonly schemaType: SchemaAST.AST["_tag"];
+}> {
+	override get message() {
+		return `Unsupported schema type '${this.schemaType}'`;
+	}
+}
 
-class IndexSignaturesAreNotSupportedError extends Data.TaggedError(
+export class IndexSignaturesAreNotSupportedError extends Data.TaggedError(
 	"IndexSignaturesAreNotSupportedError",
-) {}
+) {
+	override get message() {
+		return "Index signatures are not supported";
+	}
+}
 
-class OptionalTupleElementsAreNotSupportedError extends Data.TaggedError(
+export class OptionalTupleElementsAreNotSupportedError extends Data.TaggedError(
 	"OptionalTupleElementsAreNotSupportedError",
-) {}
+) {
+	override get message() {
+		return "Optional tuple elements are not supported";
+	}
+}

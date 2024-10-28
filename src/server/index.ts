@@ -20,4 +20,10 @@ export {
 export * as Id from "~/src/server/schemas/Id";
 export * as PaginationResult from "~/src/server/schemas/PaginationResult";
 
-export { ConfectActionCtxService, makeHttpRouter } from "~/src/server/http";
+export {
+	ConfectActionCtxService,
+	type HttpApi,
+	makeHttpRouter,
+} from "~/src/server/http";
+
+export { compileSchema } from "~/src/server/schema-to-validator";

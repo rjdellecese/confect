@@ -1,10 +1,10 @@
-import { Schema } from "@effect/schema";
 import { Id, defineSchema, defineTable } from "@rjdellecese/confect/server";
+import { Schema } from "effect";
 
 export const confectSchema = defineSchema({
 	notes: defineTable(
 		Schema.Struct({
-			userId: Schema.optionalWith(Id.Id<"users">(), {
+			userId: Schema.optionalWith(Id.Id("users"), {
 				exact: true,
 			}),
 			text: Schema.String.pipe(Schema.maxLength(100)),

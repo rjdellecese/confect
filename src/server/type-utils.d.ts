@@ -6,8 +6,7 @@ export type IsOptional<T, K extends keyof T> = {} extends Pick<T, K>
 	? true
 	: false;
 
-// biome-ignore format: Removes disambiguating parens
-export type IsAny<T> = 0 extends (1 & T) ? true : false;
+export type IsAny<T> = 0 extends 1 & T ? true : false;
 
 export type IsUnion<T, U extends T = T> = T extends unknown
 	? [U] extends [T]

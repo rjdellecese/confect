@@ -1,5 +1,55 @@
 # @rjdellecese/confect
 
+## 0.0.17
+
+### Patch Changes
+
+- ea92ea9: Scope monkey patches to HTTP router creation only, bump some deps
+
+## 0.0.16
+
+### Patch Changes
+
+- d7c5a10: Add support for refinements
+
+## 0.0.15
+
+### Patch Changes
+
+- 9e43859: Improve error reporting when schema compilation fails
+
+## 0.0.14
+
+### Patch Changes
+
+- 21df7ec: Expose `compileSchema`. Use this to convert a `Schema<A, I>` to a `Validator<I>`.
+
+## 0.0.13
+
+### Patch Changes
+
+- 5f349a0: `convex`, `effect`, and `@effect/platform` are now peer dependencies
+
+## 0.0.12
+
+### Patch Changes
+
+- 2ddd275: Upgrade deps, remove `@effect/schema` (Schema [has been merged](https://effect.website/blog/effect-3.10) into the main `effect` package)
+
+## 0.0.11
+
+### Patch Changes
+
+- 3b29bc7: Fix `@scalar/api-reference` version
+
+  Expose `HttpApi` type
+
+## 0.0.10
+
+### Patch Changes
+
+- 34fb52e: Properly support Convex ID `Schema` to `Validator` compilation
+
 ## 0.0.9
 
 ### Patch Changes

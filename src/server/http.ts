@@ -1,14 +1,11 @@
 import {
 	type HttpApi as EffectHttpApi,
-	FileSystem,
 	HttpApiBuilder,
 	type HttpApiGroup,
 	type HttpApp,
+	HttpServer,
 	OpenApi,
-	Path,
 } from "@effect/platform";
-import * as Etag from "@effect/platform/Etag";
-import * as HttpPlatform from "@effect/platform/HttpPlatform";
 import {
 	type GenericActionCtx,
 	type HttpRouter,
@@ -19,39 +16,12 @@ import {
 	httpActionGeneric,
 	httpRouter,
 } from "convex/server";
-import {
-	Array,
-	Context,
-	Layer,
-	ManagedRuntime,
-	Record,
-	String,
-	pipe,
-} from "effect";
+import { Array, Context, Layer, Record, String, pipe } from "effect";
 import { type ConfectActionCtx, makeConfectActionCtx } from "./ctx";
 import type {
 	DataModelFromConfectDataModel,
 	GenericConfectDataModel,
 } from "./data-model";
-
-// START MONKEY PATCH
-// These are necessary until the Convex runtime supports these APIs. See https://discord.com/channels/1019350475847499849/1281364098419785760
-
-// biome-ignore lint/suspicious/noGlobalAssign:
-URL = class extends URL {
-	override get username() {
-		return "";
-	}
-	override get password() {
-		return "";
-	}
-};
-
-Object.defineProperty(Request.prototype, "signal", {
-	get: () => new AbortSignal(),
-});
-
-// END MONKEY PATCH
 
 export class ConfectActionCtxService extends Context.Tag("ConfectActionCtx")<
 	ConfectActionCtxService,
@@ -59,6 +29,8 @@ export class ConfectActionCtxService extends Context.Tag("ConfectActionCtx")<
 >() {}
 
 type Middleware = (httpApp: HttpApp.Default) => HttpApp.Default<never, any>;
+
+const scalarApiReferenceVersion = "1.25.48";
 
 const apiDocsHtml = ({
 	pageTitle,
@@ -82,25 +54,19 @@ const apiDocsHtml = ({
   </head>
   <body>
     <script id="api-reference" data-url="${openApiSpecPath}"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@${scalarApiReferenceVersion}"></script>
   </body>
 </html>`;
 
 const makeHandler =
 	<ConfectDataModel extends GenericConfectDataModel>(
-		apiLive: Layer.Layer<
-			EffectHttpApi.HttpApi.Service,
-			never,
-			ConfectActionCtxService
-		>,
+		apiLive: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtxService>,
 		middleware?: Middleware,
 	) =>
 	(
 		ctx: GenericActionCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
 		request: Request,
 	): Promise<Response> => {
-		const FsLive = FileSystem.layerNoop({});
-
 		const ConfectActionCtxServiceLive = Layer.succeed(
 			ConfectActionCtxService,
 			makeConfectActionCtx(ctx),
@@ -108,26 +74,16 @@ const makeHandler =
 
 		const EnvLive = Layer.mergeAll(
 			apiLive.pipe(Layer.provide(ConfectActionCtxServiceLive)),
-			HttpApiBuilder.Router.Live,
-			HttpPlatform.layer.pipe(Layer.provide(FsLive)),
-			Etag.layerWeak,
-			FsLive,
-			Path.layer,
+			HttpServer.layerContext,
 		);
 
-		const runtime = ManagedRuntime.make(EnvLive);
+		const { handler } = HttpApiBuilder.toWebHandler(EnvLive, { middleware });
 
-		const webHandler = HttpApiBuilder.toWebHandler(runtime, middleware);
-
-		return webHandler(request);
+		return handler(request);
 	};
 
 const makeHttpAction = (
-	apiLive: Layer.Layer<
-		EffectHttpApi.HttpApi.Service,
-		never,
-		ConfectActionCtxService
-	>,
+	apiLive: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtxService>,
 	middleware?: Middleware,
 ) => httpActionGeneric(makeHandler(apiLive, middleware));
 
@@ -137,11 +93,7 @@ export type HttpApi<
 	ErrorR,
 > = {
 	api: EffectHttpApi.HttpApi<Groups, Error, ErrorR>;
-	impl: Layer.Layer<
-		EffectHttpApi.HttpApi.Service,
-		never,
-		ConfectActionCtxService
-	>;
+	impl: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtxService>;
 	serverUrl?: string;
 	openApiSpecPath?: RoutePath;
 	apiDocsTitle?: string;
@@ -164,11 +116,7 @@ const mountEffectHttpApi =
 	}: {
 		pathPrefix: RoutePath;
 		api: EffectHttpApi.HttpApi<Groups, Error, ErrorR>;
-		impl: Layer.Layer<
-			EffectHttpApi.HttpApi.Service,
-			never,
-			ConfectActionCtxService
-		>;
+		impl: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtxService>;
 		serverUrl?: string;
 		openApiSpecPath?: RoutePath;
 		apiDocsTitle?: string;
@@ -268,13 +216,37 @@ const makeHttpRouter = <
 	ErrorR,
 >(
 	httpApis: Record<RoutePath, HttpApi<Groups, Error, ErrorR>>,
-): HttpRouter =>
-	pipe(
+): HttpRouter => {
+	applyMonkeyPatches();
+
+	return pipe(
 		httpApis,
 		Record.toEntries,
 		Array.reduce(httpRouter(), (convexHttpRouter, [pathPrefix, httpApi]) =>
 			mountEffectHttpApi({ pathPrefix, ...httpApi })(convexHttpRouter),
 		),
 	);
+};
+
+const applyMonkeyPatches = () => {
+	// START MONKEY PATCH
+	// These are necessary until the Convex runtime supports these APIs. See https://discord.com/channels/1019350475847499849/1281364098419785760
+
+	// biome-ignore lint/suspicious/noGlobalAssign:
+	URL = class extends URL {
+		override get username() {
+			return "";
+		}
+		override get password() {
+			return "";
+		}
+	};
+
+	Object.defineProperty(Request.prototype, "signal", {
+		get: () => new AbortSignal(),
+	});
+
+	// END MONKEY PATCH
+};
 
 export { makeHttpRouter };

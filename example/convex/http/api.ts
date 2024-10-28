@@ -5,68 +5,58 @@ import {
 	HttpApiGroup,
 	OpenApi,
 } from "@effect/platform";
-import { Schema } from "@effect/schema";
 import { ConfectActionCtxService } from "@rjdellecese/confect/server";
-import { Effect, Layer, Option } from "effect";
+import { Effect, Layer, Option, Schema } from "effect";
 import { api } from "../_generated/api";
 import { GetFirstResult } from "../functions.schemas";
 import { confectSchema } from "../schema";
 
-class ApiGroup extends HttpApiGroup.make("notes").pipe(
-	OpenApi.annotate({
-		title: "Notes",
-		description: "Operations on notes.",
-	}),
-	HttpApiGroup.add(
-		HttpApiEndpoint.get("getFirst", "/get-first").pipe(
-			OpenApi.annotate({
-				description: "Get the first note, if there is one.",
-			}),
-			HttpApiEndpoint.setSuccess(
+class ApiGroup extends HttpApiGroup.make("notes")
+	.add(
+		HttpApiEndpoint.get("getFirst", "/get-first")
+			.annotate(OpenApi.Description, "Get the first note, if there is one.")
+			.addSuccess(
 				Schema.NullOr(confectSchema.tableSchemas.notes.withSystemFields),
 			),
-		),
-	),
-	HttpApiGroup.prefix("/path-prefix"),
-) {}
+	)
+	.annotate(OpenApi.Title, "Notes")
+	.annotate(OpenApi.Description, "Operations on notes.")
+	.prefix("/path-prefix") {}
 
-export class Api extends HttpApi.empty.pipe(
-	OpenApi.annotate({
-		title: "Confect Example",
-		description: `
+export class Api extends HttpApi.empty
+	.annotate(OpenApi.Title, "Confect Example")
+	.annotate(
+		OpenApi.Description,
+		`
 An example API built with Confect and powered by [Scalar](https://github.com/scalar/scalar). 
 
 # Learn More
 
 See Scalar's documentation on [markdown support](https://github.com/scalar/scalar/blob/main/documentation/markdown.md) and [OpenAPI spec extensions](https://github.com/scalar/scalar/blob/main/documentation/openapi.md).
-`,
-	}),
-	HttpApi.addGroup(ApiGroup),
-) {}
+	`,
+	)
+	.add(ApiGroup) {}
 
 const ApiGroupLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
-	handlers.pipe(
-		HttpApiBuilder.handle(
-			"getFirst",
-			(): Effect.Effect<
-				| (typeof confectSchema.tableSchemas.notes.withSystemFields)["Type"]
-				| null,
-				never,
-				ConfectActionCtxService
-			> =>
-				Effect.gen(function* () {
-					const { runQuery } = yield* ConfectActionCtxService;
+	handlers.handle(
+		"getFirst",
+		(): Effect.Effect<
+			(typeof confectSchema.tableSchemas.notes.withSystemFields)["Type"] | null,
+			never,
+			ConfectActionCtxService
+		> =>
+			Effect.gen(function* () {
+				const { runQuery } = yield* ConfectActionCtxService;
 
-					const firstNote = yield* runQuery(api.functions.getFirst, {})
-						.pipe(
-							Effect.andThen(Schema.decode(GetFirstResult)),
-							Effect.map(Option.getOrNull),
-						)
-						.pipe(Effect.orDie);
+				const firstNote = yield* runQuery(api.functions.getFirst, {})
+					.pipe(
+						Effect.andThen(Schema.decode(GetFirstResult)),
+						Effect.map(Option.getOrNull),
+					)
+					.pipe(Effect.orDie);
 
-					return firstNote;
-				}),
-		),
+				return firstNote;
+			}),
 	),
 );
 
