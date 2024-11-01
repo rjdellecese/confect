@@ -1,5 +1,11 @@
 # @rjdellecese/confect
 
+## 0.0.18
+
+### Patch Changes
+
+- d36279d: Use new `@effect/platform` Scalar integration
+
 ## 0.0.17
 
 ### Patch Changes
