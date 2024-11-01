@@ -1,9 +1,9 @@
 import {
 	type HttpApi as EffectHttpApi,
+	type HttpRouter as EffectHttpRouter,
 	HttpApiBuilder,
 	HttpApiScalar,
 	type HttpApp,
-	type HttpRouter as EffectHttpRouter,
 	HttpServer,
 } from "@effect/platform";
 import {
