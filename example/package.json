@@ -5,17 +5,17 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "concurrently --restart-tries=-1 --prefix-colors='white.bold.bgCyan,white.bold.bgYellow' --prefix=' {name} ' --names='VITE,CONVEX' 'vite' 'convex dev'",
+    "start": "concurrently --restart-tries=-1 --prefix-colors='white.bold.bgCyan,white.bold.bgYellow' --prefix=' {name} ' --names='VITE,CONVEX' 'vite' 'convex dev --tail-logs'",
     "pnpm:devPreinstall": "[ -d node_modules ] && rm -r node_modules; cd .. && pnpm build"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@effect/platform": "0.69.6",
+    "@effect/platform": "0.69.13",
     "@rjdellecese/confect": "file:../",
     "convex": "1.17.0",
-    "effect": "3.10.2",
+    "effect": "3.10.8",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "vite": "5.4.10"

@@ -152,7 +152,7 @@ const HttpEndpoints = () => {
 						.then((exit) => setGetResponse(exit))
 				}
 			>
-				HTTP GET /path-prefix/notes/get-first
+				HTTP GET /path-prefix/get-first
 			</button>
 			<p>
 				{getResponse
