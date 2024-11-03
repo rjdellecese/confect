@@ -1,22 +1,20 @@
 import {
 	type HttpApi as EffectHttpApi,
+	type HttpRouter as EffectHttpRouter,
 	HttpApiBuilder,
-	type HttpApiGroup,
+	HttpApiScalar,
 	type HttpApp,
 	HttpServer,
-	OpenApi,
 } from "@effect/platform";
 import {
 	type GenericActionCtx,
 	type HttpRouter,
 	ROUTABLE_HTTP_METHODS,
-	type RouteSpec,
-	type RouteSpecWithPath,
 	type RouteSpecWithPathPrefix,
 	httpActionGeneric,
 	httpRouter,
 } from "convex/server";
-import { Array, Context, Layer, Record, String, pipe } from "effect";
+import { Array, Context, Layer, Record, pipe } from "effect";
 import { type ConfectActionCtx, makeConfectActionCtx } from "./ctx";
 import type {
 	DataModelFromConfectDataModel,
@@ -28,41 +26,27 @@ export class ConfectActionCtxService extends Context.Tag("ConfectActionCtx")<
 	ConfectActionCtx<any>
 >() {}
 
-type Middleware = (httpApp: HttpApp.Default) => HttpApp.Default<never, any>;
-
-const scalarApiReferenceVersion = "1.25.48";
-
-const apiDocsHtml = ({
-	pageTitle,
-	openApiSpecPath,
-}: { pageTitle: string; openApiSpecPath: string }) => `<!doctype html>
-<html>
-  <head>
-    <title>${pageTitle}</title>
-    <meta charset="utf-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1" />
-		<style>
-			.darklight {
-				padding: 18px 24px !important;
-			}
-			.darklight-reference-promo {
-				display: none !important;
-			}
-		</style>
-  </head>
-  <body>
-    <script id="api-reference" data-url="${openApiSpecPath}"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@${scalarApiReferenceVersion}"></script>
-  </body>
-</html>`;
+type Middleware = (
+	httpApp: HttpApp.Default,
+) => HttpApp.Default<
+	never,
+	| EffectHttpApi.Api
+	| HttpApiBuilder.Router
+	| EffectHttpRouter.HttpRouter.DefaultServices
+>;
 
 const makeHandler =
-	<ConfectDataModel extends GenericConfectDataModel>(
-		apiLive: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtxService>,
-		middleware?: Middleware,
-	) =>
+	<ConfectDataModel extends GenericConfectDataModel>({
+		pathPrefix,
+		apiLive,
+		middleware,
+		scalar,
+	}: {
+		pathPrefix: RoutePath;
+		apiLive: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtxService>;
+		middleware?: Middleware;
+		scalar?: HttpApiScalar.ScalarConfig;
+	}) =>
 	(
 		ctx: GenericActionCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
 		request: Request,
@@ -72,8 +56,22 @@ const makeHandler =
 			makeConfectActionCtx(ctx),
 		);
 
+		const ApiLive = apiLive.pipe(Layer.provide(ConfectActionCtxServiceLive));
+
+		const ApiDocsLive = HttpApiScalar.layer({
+			path: `${pathPrefix}docs`,
+			scalar: {
+				baseServerURL: `${
+					// biome-ignore lint/complexity/useLiteralKeys:
+					process.env["CONVEX_SITE_URL"]
+				}${pathPrefix}`,
+				...scalar,
+			},
+		}).pipe(Layer.provide(ApiLive));
+
 		const EnvLive = Layer.mergeAll(
-			apiLive.pipe(Layer.provide(ConfectActionCtxServiceLive)),
+			ApiLive,
+			ApiDocsLive,
 			HttpServer.layerContext,
 		);
 
@@ -82,148 +80,70 @@ const makeHandler =
 		return handler(request);
 	};
 
-const makeHttpAction = (
-	apiLive: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtxService>,
-	middleware?: Middleware,
-) => httpActionGeneric(makeHandler(apiLive, middleware));
-
-export type HttpApi<
-	Groups extends HttpApiGroup.HttpApiGroup.Any,
-	Error,
-	ErrorR,
-> = {
-	api: EffectHttpApi.HttpApi<Groups, Error, ErrorR>;
-	impl: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtxService>;
-	serverUrl?: string;
-	openApiSpecPath?: RoutePath;
-	apiDocsTitle?: string;
-	apiDocsPath?: RoutePath;
+const makeHttpAction = ({
+	pathPrefix,
+	apiLive,
+	middleware,
+	scalar,
+}: {
+	pathPrefix: RoutePath;
+	apiLive: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtxService>;
 	middleware?: Middleware;
+	scalar?: HttpApiScalar.ScalarConfig;
+}) =>
+	httpActionGeneric(makeHandler({ pathPrefix, apiLive, middleware, scalar }));
+
+export type HttpApi = {
+	apiLive: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtxService>;
+	middleware?: Middleware;
+	scalar?: HttpApiScalar.ScalarConfig;
 };
 
-export type RoutePath = `/${string}`;
+export type RoutePath = "/" | `/${string}/`;
 
 const mountEffectHttpApi =
-	<Groups extends HttpApiGroup.HttpApiGroup.Any, Error, ErrorR>({
+	({
 		pathPrefix,
-		api,
-		impl,
-		serverUrl,
-		openApiSpecPath = "/openapi",
-		apiDocsTitle = "API Reference",
-		apiDocsPath = "/docs",
+		apiLive,
 		middleware,
+		scalar,
 	}: {
 		pathPrefix: RoutePath;
-		api: EffectHttpApi.HttpApi<Groups, Error, ErrorR>;
-		impl: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtxService>;
-		serverUrl?: string;
-		openApiSpecPath?: RoutePath;
-		apiDocsTitle?: string;
-		apiDocsPath?: RoutePath;
+		apiLive: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtxService>;
 		middleware?: Middleware;
+		scalar?: HttpApiScalar.ScalarConfig;
 	}) =>
 	(convexHttpRouter: HttpRouter): HttpRouter => {
-		const prependPathPrefix = (path: RoutePath) =>
-			pathPrefix === "/" ? path : `${pathPrefix}${path}`;
-
-		// biome-ignore lint/complexity/useLiteralKeys:
-		const url = `${serverUrl ?? process.env["CONVEX_SITE_URL"]}${pathPrefix}`;
-
-		const handler = makeHttpAction(impl, middleware);
-
-		const routeSpecs: RouteSpec[] = [];
+		const handler = makeHttpAction({ pathPrefix, apiLive, middleware, scalar });
 
 		Array.forEach(ROUTABLE_HTTP_METHODS, (method) => {
 			const routeSpec: RouteSpecWithPathPrefix = {
-				pathPrefix: pathPrefix === "/" ? pathPrefix : `${pathPrefix}/`,
+				pathPrefix,
 				method,
 				handler,
 			};
-			routeSpecs.push(routeSpec);
-		});
-
-		const generatedOpenApiSpec = OpenApi.fromApi(api);
-
-		const openApiSpec = {
-			...generatedOpenApiSpec,
-			paths: Record.mapKeys(generatedOpenApiSpec.paths, (path) =>
-				String.replace(pathPrefix, "")(path),
-			),
-			servers: [{ url }],
-		};
-
-		const openApiRouteSpec: RouteSpecWithPath = {
-			path: prependPathPrefix(openApiSpecPath),
-			method: "GET",
-			handler: httpActionGeneric(() =>
-				Promise.resolve(
-					new Response(JSON.stringify(openApiSpec), {
-						headers: { "Content-Type": "application/json" },
-					}),
-				),
-			),
-		};
-		routeSpecs.push(openApiRouteSpec);
-
-		const openApiCorsRouteSpec: RouteSpecWithPath = {
-			path: prependPathPrefix(openApiSpecPath),
-			method: "OPTIONS",
-			handler: httpActionGeneric(() =>
-				Promise.resolve(
-					new Response(null, {
-						status: 200,
-						headers: {
-							"Access-Control-Allow-Origin": "*",
-							"Access-Control-Allow-Methods": "GET, OPTIONS",
-							"Access-Control-Allow-Headers": "Content-Type",
-						},
-					}),
-				),
-			),
-		};
-		routeSpecs.push(openApiCorsRouteSpec);
-
-		const apiDocsRouteSpec: RouteSpecWithPath = {
-			path: prependPathPrefix(apiDocsPath),
-			method: "GET",
-			handler: httpActionGeneric(() =>
-				Promise.resolve(
-					new Response(
-						apiDocsHtml({
-							pageTitle: apiDocsTitle,
-							openApiSpecPath: prependPathPrefix(openApiSpecPath),
-						}),
-						{
-							headers: { "Content-Type": "text/html" },
-						},
-					),
-				),
-			),
-		};
-		routeSpecs.push(apiDocsRouteSpec);
-
-		Array.forEach(routeSpecs, (routeSpec) => {
 			convexHttpRouter.route(routeSpec);
 		});
 
 		return convexHttpRouter;
 	};
 
-const makeHttpRouter = <
-	Groups extends HttpApiGroup.HttpApiGroup.Any,
-	Error,
-	ErrorR,
->(
-	httpApis: Record<RoutePath, HttpApi<Groups, Error, ErrorR>>,
-): HttpRouter => {
+type HttpApis = Partial<Record<RoutePath, HttpApi>>;
+
+const makeHttpRouter = (httpApis: HttpApis): HttpRouter => {
 	applyMonkeyPatches();
 
 	return pipe(
-		httpApis,
+		httpApis as Record<RoutePath, HttpApi>,
 		Record.toEntries,
-		Array.reduce(httpRouter(), (convexHttpRouter, [pathPrefix, httpApi]) =>
-			mountEffectHttpApi({ pathPrefix, ...httpApi })(convexHttpRouter),
+		Array.reduce(
+			httpRouter(),
+			(convexHttpRouter, [pathPrefix, { apiLive, middleware }]) =>
+				mountEffectHttpApi({
+					pathPrefix: pathPrefix as RoutePath,
+					apiLive,
+					middleware,
+				})(convexHttpRouter),
 		),
 	);
 };

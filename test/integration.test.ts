@@ -691,45 +691,57 @@ describe("scheduled functions", () => {
 });
 
 describe("http", () => {
-	test("user-defined endpoint", () =>
-		Effect.gen(function* () {
-			const c = yield* TestConvexService;
+	describe("/", () => {
+		test("user-defined endpoint", () =>
+			Effect.gen(function* () {
+				const c = yield* TestConvexService;
 
-			const response = yield* c.fetch("/get", { method: "GET" });
+				const response = yield* c.fetch("/get", { method: "GET" });
 
-			const jsonBody = yield* Effect.promise(() => response.json());
-			const status = response.status;
+				const jsonBody = yield* Effect.promise(() => response.json());
+				const status = response.status;
 
-			expect(status).toEqual(200);
-			expect(jsonBody).toEqual("Hello, world!");
-		}));
+				expect(status).toEqual(200);
+				expect(jsonBody).toEqual("Hello, world!");
+			}));
 
-	test("openapi spec", () =>
-		Effect.gen(function* () {
-			const c = yield* TestConvexService;
+		test("api docs", () =>
+			Effect.gen(function* () {
+				const c = yield* TestConvexService;
 
-			const response = yield* c.fetch("/openapi", { method: "GET" });
-			const corsResponse = yield* c.fetch("/openapi", { method: "OPTIONS" });
+				const response = yield* c.fetch("/docs", { method: "GET" });
 
-			const jsonBody = yield* Effect.promise(() => response.json());
-			const status = response.status;
-			const corsStatus = corsResponse.status;
+				const status = response.status;
 
-			expect(status).toEqual(200);
-			expect(jsonBody).toHaveProperty("openapi");
-			expect(corsStatus).toEqual(200);
-		}));
+				expect(status).toEqual(200);
+			}));
+	});
 
-	test("api docs", () =>
-		Effect.gen(function* () {
-			const c = yield* TestConvexService;
+	describe("/path-prefix", () => {
+		test("user-defined endpoint", () =>
+			Effect.gen(function* () {
+				const c = yield* TestConvexService;
 
-			const response = yield* c.fetch("/docs", { method: "GET" });
+				const response = yield* c.fetch("/path-prefix/get", { method: "GET" });
 
-			const status = response.status;
+				const jsonBody = yield* Effect.promise(() => response.json());
+				const status = response.status;
 
-			expect(status).toEqual(200);
-		}));
+				expect(status).toEqual(200);
+				expect(jsonBody).toEqual("Hello, world!");
+			}));
+
+		test("api docs", () =>
+			Effect.gen(function* () {
+				const c = yield* TestConvexService;
+
+				const response = yield* c.fetch("/path-prefix/docs", { method: "GET" });
+
+				const status = response.status;
+
+				expect(status).toEqual(200);
+			}));
+	});
 });
 
 describe("system", () => {
