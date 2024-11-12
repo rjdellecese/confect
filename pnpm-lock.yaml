@@ -43,8 +43,8 @@ importers:
         specifier: 2.1.4
         version: 2.1.4(vitest@2.1.4(@types/node@22.8.6))
       convex-test:
-        specifier: 0.0.33
-        version: 0.0.33(convex@1.17.0)
+        specifier: 0.0.34
+        version: 0.0.34(convex@1.17.0)
       dotenv:
         specifier: 16.4.5
         version: 16.4.5
@@ -1271,8 +1271,8 @@ packages:
     resolution: {integrity: sha512-I5qxpzLv+sJhTVEoLYNcTW+bThDCPsit0vLNKShZx6rLtpilNpmmeTPaeqJb9ZE9dV3DGaeby6Vuhrw38WjeyQ==}
     engines: {node: ^14.18.0 || >=16.10.0}
 
-  convex-test@0.0.33:
-    resolution: {integrity: sha512-UPhuHnXW84wOvZjwdtwfXqd4vsNchmjEJ2giO0BDCR+wIATHFoH/pzkh822GhE8ugrKddkxSxQjnGSt6nTnt5w==}
+  convex-test@0.0.34:
+    resolution: {integrity: sha512-srntn1drKy0Aa8zzatvJ10ZJFVpBYvLWQrhTibdfnslQqNdzQV5Ui4XKFtmrEmqw+DjmeJATgvZHbLzhP7Dh4w==}
     peerDependencies:
       convex: ^1.16.4
 
@@ -3172,7 +3172,7 @@ snapshots:
 
   consola@3.2.3: {}
 
-  convex-test@0.0.33(convex@1.17.0):
+  convex-test@0.0.34(convex@1.17.0):
     dependencies:
       convex: 1.17.0
 
