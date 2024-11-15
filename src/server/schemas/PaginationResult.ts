@@ -7,15 +7,12 @@ export const PaginationResult = <Doc extends Schema.Schema.AnyNoContext>(
 		page: Schema.Array(Doc).pipe(Schema.mutable),
 		isDone: Schema.Boolean,
 		continueCursor: Schema.String,
-		splitCursor: Schema.optionalWith(Schema.Union(Schema.String, Schema.Null), {
-			exact: true,
-		}),
-		pageStatus: Schema.optionalWith(
+		splitCursor: Schema.optional(Schema.Union(Schema.String, Schema.Null)),
+		pageStatus: Schema.optional(
 			Schema.Union(
 				Schema.Literal("SplitRecommended"),
 				Schema.Literal("SplitRequired"),
 				Schema.Null,
 			),
-			{ exact: true },
 		),
 	}).pipe(Schema.mutable);

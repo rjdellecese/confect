@@ -126,7 +126,7 @@ describe(compileAst, () => {
 			}),
 		);
 
-		effect("object with optional field", () =>
+		effect("object with optional field (exact)", () =>
 			Effect.gen(function* () {
 				const schema = Schema.Struct({
 					foo: Schema.optionalWith(Schema.String, { exact: true }),
@@ -141,21 +141,18 @@ describe(compileAst, () => {
 			}),
 		);
 
-		effect("object with optional field (exact)", () =>
+		effect("object with optional field", () =>
 			Effect.gen(function* () {
 				const schema = Schema.Struct({
 					foo: Schema.optional(Schema.String),
 				});
 
-				const exit = yield* Effect.exit(
-					compileAst(Schema.encodedSchema(schema).ast),
+				const validator = v.object({ foo: v.optional(v.string()) });
+				const compiledValidator = yield* compileAst(
+					Schema.encodedSchema(schema).ast,
 				);
 
-				expect(exit).toStrictEqual(
-					Exit.fail(
-						new UnsupportedSchemaTypeError({ schemaType: "UndefinedKeyword" }),
-					),
-				);
+				expect(compiledValidator).toStrictEqual(validator);
 			}),
 		);
 
@@ -284,6 +281,40 @@ describe(compileAst, () => {
 						new UnsupportedPropertySignatureKeyTypeError({
 							propertyKey: symbolKey,
 						}),
+					),
+				);
+			}),
+		);
+
+		effect("union of string and undefined", () =>
+			Effect.gen(function* () {
+				const schema = Schema.Union(Schema.String, Schema.Undefined);
+
+				const exit = yield* Effect.exit(
+					compileAst(Schema.encodedSchema(schema).ast),
+				);
+
+				expect(exit).toStrictEqual(
+					Exit.fail(
+						new UnsupportedSchemaTypeError({ schemaType: "UndefinedKeyword" }),
+					),
+				);
+			}),
+		);
+
+		effect("object with property of union of string and undefined", () =>
+			Effect.gen(function* () {
+				const schema = Schema.Struct({
+					foo: Schema.Union(Schema.String, Schema.Undefined),
+				});
+
+				const exit = yield* Effect.exit(
+					compileAst(Schema.encodedSchema(schema).ast),
+				);
+
+				expect(exit).toStrictEqual(
+					Exit.fail(
+						new UnsupportedSchemaTypeError({ schemaType: "UndefinedKeyword" }),
 					),
 				);
 			}),
@@ -456,7 +487,7 @@ describe(compileSchema, () => {
 		const expectedValidator = v.object({ foo: v.optional(v.string()) });
 
 		const schema = Schema.Struct({
-			foo: Schema.optionalWith(Schema.String, { exact: true }),
+			foo: Schema.optional(Schema.String),
 		});
 		const compiledValidator = compileSchema(schema);
 
@@ -903,9 +934,7 @@ describe(compileTableSchema, () => {
 		const compiledValidator = compileTableSchema(
 			Schema.Struct({
 				foo: Schema.String,
-				bar: Schema.optionalWith(Schema.Struct({ bar: Schema.Number }), {
-					exact: true,
-				}),
+				bar: Schema.optional(Schema.Struct({ bar: Schema.Number })),
 			}),
 		);
 
@@ -970,7 +999,7 @@ describe(compileArgsSchema, () => {
 		const compiledArgsValidator = compileArgsSchema(
 			Schema.Struct({
 				foo: Schema.String,
-				bar: Schema.optionalWith(Schema.Number, { exact: true }),
+				bar: Schema.optional(Schema.Number),
 			}),
 		);
 		const expectedArgsValidator = {

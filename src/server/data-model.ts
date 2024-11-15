@@ -54,6 +54,9 @@ export type GenericConfectTableInfo = {
 	vectorIndexes: GenericTableVectorIndexes;
 };
 
+/**
+ * The Confect document encoded for storage in Convex. This is the data as it is stored in the database.
+ */
 export type ConfectDoc<
 	ConfectDataModel extends GenericConfectDataModel,
 	TableName extends TableNamesInConfectDataModel<ConfectDataModel>,

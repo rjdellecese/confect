@@ -30,6 +30,7 @@
 			".pnpm-store",
 			".tsup",
 			"coverage",
+			"docs",
 			"dist",
 			"package.json",
 			"pnpm-lock.yaml",

@@ -29,10 +29,11 @@ import {
 	Option,
 	type ParseResult,
 	Schema,
-	type SchemaAST,
+	SchemaAST,
 	String,
 	pipe,
 } from "effect";
+import { not } from "effect/Predicate";
 
 import * as Id from "~/src/server/schemas/Id";
 import type {
@@ -55,9 +56,9 @@ export const compileArgsSchema = <ConfectValue, ConvexValue>(
 	return pipe(
 		ast,
 		Match.value,
-		Match.tag("TypeLiteral", ({ indexSignatures, propertySignatures }) =>
-			Array.isEmptyReadonlyArray(indexSignatures)
-				? handlePropertySignatures(propertySignatures)
+		Match.tag("TypeLiteral", (typeLiteralAst) =>
+			Array.isEmptyReadonlyArray(typeLiteralAst.indexSignatures)
+				? handlePropertySignatures(typeLiteralAst)
 				: Effect.fail(new IndexSignaturesAreNotSupportedError()),
 		),
 		Match.orElse(() => Effect.fail(new TopLevelMustBeObjectError())),
@@ -74,6 +75,9 @@ export const compileReturnsSchema = <ConfectValue, ConvexValue>(
 
 // Table
 
+/**
+ * Convert a table `Schema` to a table `Validator`.
+ */
 export type TableSchemaToTableValidator<
 	TableSchema extends Schema.Schema.AnyNoContext,
 > = ValueToValidator<TableSchema["Encoded"]> extends infer Vd extends
@@ -97,7 +101,7 @@ export const compileTableSchema = <
 				? (compileAst(ast) as Effect.Effect<any>)
 				: Effect.fail(new IndexSignaturesAreNotSupportedError()),
 		),
-		Match.tag("Union", (ast) => compileAst(ast)),
+		Match.tag("Union", (unionAst) => compileAst(unionAst)),
 		Match.orElse(() => Effect.fail(new TopLevelMustBeObjectOrUnionError())),
 		runSyncThrow,
 	);
@@ -240,6 +244,7 @@ export const compileSchema = <T, E>(
 
 export const compileAst = (
 	ast: SchemaAST.AST,
+	isOptionalPropertyOfTypeLiteral = false,
 ): Effect.Effect<
 	Validator<any, any, any>,
 	| UnsupportedSchemaTypeError
@@ -278,64 +283,13 @@ export const compileAst = (
 		),
 		Match.tag("NumberKeyword", () => Effect.succeed(v.float64())),
 		Match.tag("BigIntKeyword", () => Effect.succeed(v.int64())),
-		Match.tag("Union", ({ types: [first, second, ...rest] }) =>
-			Effect.gen(function* () {
-				const firstValidator = yield* compileAst(first);
-				const secondValidator = yield* compileAst(second);
-				const restValidators = yield* Effect.forEach(rest, compileAst);
-
-				return v.union(firstValidator, secondValidator, ...restValidators);
-			}),
+		Match.tag("Union", (unionAst) =>
+			handleUnion(unionAst, isOptionalPropertyOfTypeLiteral),
 		),
-		Match.tag("TypeLiteral", (typeLiteral) => handleTypeLiteral(typeLiteral)),
-		Match.tag("TupleType", ({ elements, rest }) =>
-			Effect.gen(function* () {
-				const restValidator = pipe(
-					rest,
-					Array.head,
-					Option.map(({ type }) => compileAst(type)),
-					Effect.flatten,
-				);
-
-				const [f, s, ...r] = elements;
-
-				const elementToValidator = ({
-					type,
-					isOptional,
-				}: SchemaAST.OptionalType) =>
-					Effect.if(isOptional, {
-						onTrue: () =>
-							Effect.fail(new OptionalTupleElementsAreNotSupportedError()),
-						onFalse: () => compileAst(type),
-					});
-
-				const arrayItemsValidator = yield* f === undefined
-					? pipe(
-							restValidator,
-							Effect.catchTag("NoSuchElementException", () =>
-								Effect.fail(new EmptyTupleIsNotSupportedError()),
-							),
-						)
-					: s === undefined
-						? elementToValidator(f)
-						: Effect.gen(function* () {
-								const firstValidator = yield* elementToValidator(f);
-								const secondValidator = yield* elementToValidator(s);
-								const restValidators = yield* Effect.forEach(
-									r,
-									elementToValidator,
-								);
-
-								return v.union(
-									firstValidator,
-									secondValidator,
-									...restValidators,
-								);
-							});
-
-				return v.array(arrayItemsValidator);
-			}),
+		Match.tag("TypeLiteral", (typeLiteralAst) =>
+			handleTypeLiteral(typeLiteralAst),
 		),
+		Match.tag("TupleType", (tupleTypeAst) => handleTupleType(tupleTypeAst)),
 		Match.tag("UnknownKeyword", "AnyKeyword", () => Effect.succeed(v.any())),
 		Match.tag("Declaration", (declaration) =>
 			Effect.mapBoth(
@@ -375,36 +329,94 @@ export const compileAst = (
 		Match.exhaustive,
 	);
 
-const handleTypeLiteral = ({
-	indexSignatures,
-	propertySignatures,
-}: SchemaAST.TypeLiteral) =>
+const handleUnion = (
+	{ types: [first, second, ...rest] }: SchemaAST.Union,
+	isOptionalPropertyOfTypeLiteral: boolean,
+) =>
+	Effect.gen(function* () {
+		const validatorEffects = isOptionalPropertyOfTypeLiteral
+			? Array.filterMap([first, second, ...rest], (type) =>
+					not(SchemaAST.isUndefinedKeyword)(type)
+						? Option.some(compileAst(type))
+						: Option.none(),
+				)
+			: Array.map([first, second, ...rest], (type) => compileAst(type));
+
+		const [firstValidator, secondValidator, ...restValidators] =
+			yield* Effect.all(validatorEffects);
+
+		/* v8 ignore start */
+		if (firstValidator === undefined) {
+			return yield* Effect.dieMessage(
+				"First validator of union is undefined; this should be impossible.",
+			);
+			/* v8 ignore stop */
+		} else if (secondValidator === undefined) {
+			return firstValidator;
+		} else {
+			return v.union(firstValidator, secondValidator, ...restValidators);
+		}
+	});
+
+const handleTypeLiteral = (typeLiteralAst: SchemaAST.TypeLiteral) =>
 	pipe(
-		indexSignatures,
+		typeLiteralAst.indexSignatures,
 		Array.head,
 		Option.match({
 			onNone: () =>
-				pipe(
-					propertySignatures,
-					handlePropertySignatures,
-					Effect.map(v.object),
-				),
+				pipe(handlePropertySignatures(typeLiteralAst), Effect.map(v.object)),
 			onSome: () => Effect.fail(new IndexSignaturesAreNotSupportedError()),
 		}),
 	);
 
-const handlePropertySignatures = (
-	propertySignatures: readonly SchemaAST.PropertySignature[],
-) =>
+const handleTupleType = ({ elements, rest }: SchemaAST.TupleType) =>
+	Effect.gen(function* () {
+		const restValidator = pipe(
+			rest,
+			Array.head,
+			Option.map(({ type }) => compileAst(type)),
+			Effect.flatten,
+		);
+
+		const [f, s, ...r] = elements;
+
+		const elementToValidator = ({ type, isOptional }: SchemaAST.OptionalType) =>
+			Effect.if(isOptional, {
+				onTrue: () =>
+					Effect.fail(new OptionalTupleElementsAreNotSupportedError()),
+				onFalse: () => compileAst(type),
+			});
+
+		const arrayItemsValidator = yield* f === undefined
+			? pipe(
+					restValidator,
+					Effect.catchTag("NoSuchElementException", () =>
+						Effect.fail(new EmptyTupleIsNotSupportedError()),
+					),
+				)
+			: s === undefined
+				? elementToValidator(f)
+				: Effect.gen(function* () {
+						const firstValidator = yield* elementToValidator(f);
+						const secondValidator = yield* elementToValidator(s);
+						const restValidators = yield* Effect.forEach(r, elementToValidator);
+
+						return v.union(firstValidator, secondValidator, ...restValidators);
+					});
+
+		return v.array(arrayItemsValidator);
+	});
+
+const handlePropertySignatures = (typeLiteralAst: SchemaAST.TypeLiteral) =>
 	pipe(
-		propertySignatures,
+		typeLiteralAst.propertySignatures,
 		Effect.forEach(({ type, name, isOptional }) => {
 			if (String.isString(name)) {
 				// Somehow, somewhere, keys of type number are being coerced to strings…
 				return Option.match(Number.parse(name), {
 					onNone: () =>
 						Effect.gen(function* () {
-							const validator = yield* compileAst(type);
+							const validator = yield* compileAst(type, isOptional);
 
 							return {
 								propertyName: name,

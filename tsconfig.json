@@ -11,6 +11,13 @@
 			"~/*": ["*"]
 		}
 	},
-	"exclude": ["coverage", "node_modules", "dist", "example", "test/convex"],
+	"exclude": [
+		"coverage",
+		"dist",
+		"docs",
+		"example",
+		"node_modules",
+		"test/convex"
+	],
 	"extends": ["@tsconfig/strictest/tsconfig"]
 }

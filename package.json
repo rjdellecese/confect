@@ -41,13 +41,14 @@
 		}
 	},
 	"scripts": {
-		"start": "convex dev",
-		"lint": "biome ci --error-on-warnings",
-		"fix": "biome check --write",
-		"test": "vitest --run --typecheck --coverage",
-		"test:watch": "vitest --typecheck --coverage",
 		"build": "tsup",
-		"release": "pnpm build && changeset publish"
+		"check-types": "pnpm build && attw --pack --profile=node16",
+		"fix": "biome check --write",
+		"lint": "biome ci --error-on-warnings",
+		"release": "pnpm build && changeset publish",
+		"start": "convex dev",
+		"test": "vitest --run --typecheck --coverage",
+		"test:watch": "vitest --typecheck --coverage"
 	},
 	"keywords": [
 		"effect",
@@ -56,6 +57,7 @@
 	"author": "RJ Dellecese",
 	"license": "ISC",
 	"devDependencies": {
+		"@arethetypeswrong/cli": "^0.17.0",
 		"@biomejs/biome": "1.9.4",
 		"@changesets/cli": "2.27.9",
 		"@effect/platform-node": "0.64.14",

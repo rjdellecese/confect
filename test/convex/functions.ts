@@ -189,13 +189,12 @@ export const patch = mutation({
 	args: Schema.Struct({
 		noteId: Id("notes"),
 		fields: Schema.Struct({
-			text: Schema.optionalWith(Schema.String, { exact: true }),
-			author: Schema.optionalWith(
+			text: Schema.optional(Schema.String),
+			author: Schema.optional(
 				Schema.Struct({
 					role: Schema.Literal("admin", "user"),
 					name: Schema.String,
 				}),
-				{ exact: true },
 			),
 		}),
 	}),
@@ -226,10 +225,8 @@ export const replace = mutation({
 	args: Schema.Struct({
 		noteId: Id("notes"),
 		fields: Schema.Struct({
-			_id: Schema.optionalWith(Id("notes"), {
-				exact: true,
-			}),
-			_creationTime: Schema.optionalWith(Schema.Number, { exact: true }),
+			_id: Schema.optional(Id("notes")),
+			_creationTime: Schema.optional(Schema.Number),
 			text: Schema.String,
 		}),
 	}),
@@ -317,7 +314,7 @@ export const executeVectorSearch = action({
 	returns: Schema.Array(
 		Schema.Struct({
 			text: Schema.String,
-			tag: Schema.optionalWith(Schema.String, { exact: true }),
+			tag: Schema.optional(Schema.String),
 		}),
 	),
 	handler: (
