@@ -17,7 +17,10 @@ import {
 import type { Validator } from "convex/values";
 import { Record, Schema, pipe } from "effect";
 
-import { compileTableSchema } from "~/src/server/schema-to-validator";
+import {
+	compileTableSchema,
+	type TableSchemaToTableValidator,
+} from "~/src/server/schema-to-validator";
 import {
 	type ExtendWithSystemFields,
 	extendWithSystemFields,
@@ -63,8 +66,14 @@ const tableSchemasFromConfectSchema = <
 		})),
 	}) as any;
 
+/**
+ * A Confect schema is a record of table definitions.
+ */
 export type GenericConfectSchema = Record<any, GenericConfectTableDefinition>;
 
+/**
+ * A Confect schema definition tracks the Confect schema, its Convex schema definition, and all of its table schemas.
+ */
 export type GenericConfectSchemaDefinition =
 	ConfectSchemaDefinition<GenericConfectSchema>;
 
@@ -110,6 +119,9 @@ type SchemaDefinitionFromConfectSchemaDefinition<
 		string]: ConfectSchema[TableName]["tableDefinition"];
 }>;
 
+/**
+ * Define a Confect schema.
+ */
 export const defineSchema = <ConfectSchema extends GenericConfectSchema>(
 	confectSchema: ConfectSchema,
 ): ConfectSchemaDefinition<ConfectSchema> =>
@@ -125,7 +137,11 @@ export type GenericConfectTableDefinition = ConfectTableDefinition<
 
 export interface ConfectTableDefinition<
 	TableSchema extends Schema.Schema.AnyNoContext,
-	TableValidator extends Validator<any, any, any>,
+	TableValidator extends Validator<
+		any,
+		any,
+		any
+	> = TableSchemaToTableValidator<TableSchema>,
 	// biome-ignore lint/complexity/noBannedTypes:
 	Indexes extends GenericTableIndexes = {},
 	// biome-ignore lint/complexity/noBannedTypes:
@@ -227,7 +243,11 @@ export type ConfectDataModelFromConfectSchemaDefinition<
 
 class ConfectTableDefinitionImpl<
 	TableSchema extends Schema.Schema.AnyNoContext,
-	TableValidator extends Validator<any, any, any>,
+	TableValidator extends Validator<
+		any,
+		any,
+		any
+	> = TableSchemaToTableValidator<TableSchema>,
 	// biome-ignore lint/complexity/noBannedTypes:
 	Indexes extends GenericTableIndexes = {},
 	// biome-ignore lint/complexity/noBannedTypes:
@@ -343,11 +363,17 @@ class ConfectTableDefinitionImpl<
 	}
 }
 
+/**
+ * Define a Confect table.
+ */
 export const defineTable = <TableSchema extends Schema.Schema.AnyNoContext>(
 	tableSchema: TableSchema,
-) => {
+): ConfectTableDefinition<TableSchema> => {
 	const tableValidator = compileTableSchema(tableSchema);
-	return new ConfectTableDefinitionImpl(tableSchema, tableValidator);
+	return new ConfectTableDefinitionImpl(
+		tableSchema,
+		tableValidator,
+	) as ConfectTableDefinition<TableSchema>;
 };
 
 export type TableNamesInConfectSchema<
@@ -358,6 +384,9 @@ export type TableNamesInConfectSchemaDefinition<
 	ConfectSchemaDefinition extends GenericConfectSchemaDefinition,
 > = TableNamesInConfectSchema<ConfectSchemaDefinition["confectSchema"]>;
 
+/**
+ * Produce a Confect data model from a Confect schema.
+ */
 export type ConfectDataModelFromConfectSchema<
 	ConfectSchema extends GenericConfectSchema,
 > = {

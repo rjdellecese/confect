@@ -20,24 +20,14 @@
 	],
 	"exports": {
 		"./server": {
-			"import": {
-				"types": "./dist/server/index.d.ts",
-				"import": "./dist/server/index.js"
-			},
-			"require": {
-				"types": "./dist/server/index.d.cts",
-				"require": "./dist/server/index.cjs"
-			}
+			"types": "./dist/server/index.d.ts",
+			"import": "./dist/server/index.js",
+			"require": "./dist/server/index.cjs"
 		},
 		"./react": {
-			"import": {
-				"types": "./dist/react/index.d.ts",
-				"import": "./dist/react/index.js"
-			},
-			"require": {
-				"types": "./dist/react/index.d.cts",
-				"require": "./dist/react/index.cjs"
-			}
+			"types": "./dist/react/index.d.ts",
+			"import": "./dist/react/index.js",
+			"require": "./dist/react/index.cjs"
 		}
 	},
 	"scripts": {
