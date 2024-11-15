@@ -18,8 +18,8 @@ import type { Validator } from "convex/values";
 import { Record, Schema, pipe } from "effect";
 
 import {
-	compileTableSchema,
 	type TableSchemaToTableValidator,
+	compileTableSchema,
 } from "~/src/server/schema-to-validator";
 import {
 	type ExtendWithSystemFields,
