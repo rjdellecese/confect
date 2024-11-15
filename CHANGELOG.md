@@ -1,5 +1,12 @@
 # @rjdellecese/confect
 
+## 0.0.19
+
+### Patch Changes
+
+- 318e9bd: Add support for `Schema.optional(…)` (in addition to `Schema.optionalWith(…, { exact: true })`)
+- d01a04e: Upgrade deps
+
 ## 0.0.18
 
 ### Patch Changes
