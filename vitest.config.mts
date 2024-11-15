@@ -6,6 +6,7 @@ export default defineConfig({
 	test: {
 		globalSetup: ["./test/setup.ts"],
 		coverage: {
+			provider: "v8",
 			thresholds: {
 				statements: 99,
 				branches: 99,
