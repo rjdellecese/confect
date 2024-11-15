@@ -11,7 +11,7 @@ import { Id } from "~/src/server/schemas/Id";
 test("DatabaseSchemasFromConfectDataModel", () => {
 	const notesSchemaFields = {
 		text: Schema.String,
-		tags: Schema.optionalWith(Schema.Array(Schema.String), { exact: true }),
+		tags: Schema.optional(Schema.Array(Schema.String)),
 	};
 	const confectSchema = {
 		notes: defineTable(Schema.Struct(notesSchemaFields)),

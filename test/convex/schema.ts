@@ -6,21 +6,16 @@ export const confectSchema = schema.defineSchema({
 	notes: schema
 		.defineTable(
 			Schema.Struct({
-				userId: Schema.optionalWith(Id("users"), {
-					exact: true,
-				}),
+				userId: Schema.optional(Id("users")),
 				text: Schema.String.pipe(Schema.maxLength(100)),
-				tag: Schema.optionalWith(Schema.String, { exact: true }),
-				author: Schema.optionalWith(
+				tag: Schema.optional(Schema.String),
+				author: Schema.optional(
 					Schema.Struct({
 						role: Schema.Literal("admin", "user"),
 						name: Schema.String,
 					}),
-					{ exact: true },
 				),
-				embedding: Schema.optionalWith(Schema.Array(Schema.Number), {
-					exact: true,
-				}),
+				embedding: Schema.optional(Schema.Array(Schema.Number)),
 			}),
 		)
 		.index("by_text", ["text"])

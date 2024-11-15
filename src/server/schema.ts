@@ -31,7 +31,7 @@ export const confectTableSchemas = {
 		name: Schema.String,
 		args: Schema.Array(Schema.Any),
 		scheduledTime: Schema.Number,
-		completedTime: Schema.optionalWith(Schema.Number, { exact: true }),
+		completedTime: Schema.optional(Schema.Number),
 		state: Schema.Union(
 			Schema.Struct({ kind: Schema.Literal("pending") }),
 			Schema.Struct({ kind: Schema.Literal("inProgress") }),
@@ -46,7 +46,7 @@ export const confectTableSchemas = {
 	_storage: Schema.Struct({
 		sha256: Schema.String,
 		size: Schema.Number,
-		contentType: Schema.optionalWith(Schema.String, { exact: true }),
+		contentType: Schema.optional(Schema.String),
 	}),
 };
 
