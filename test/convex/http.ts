@@ -27,9 +27,9 @@ const ApiLive = HttpApiBuilder.api(Api).pipe(Layer.provide(ApiGroupLive));
 
 // path-prefix
 
-const ApiGroupPathPrefix = ApiGroup.prefix("/path-prefix");
-
-class ApiPathPrefix extends HttpApi.empty.add(ApiGroupPathPrefix) {}
+class ApiPathPrefix extends HttpApi.empty
+	.add(ApiGroup)
+	.prefix("/path-prefix") {}
 
 const ApiGroupPathPrefixLive = HttpApiBuilder.group(
 	ApiPathPrefix,

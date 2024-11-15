@@ -15,7 +15,6 @@ export default defineConfig({
 			},
 			exclude: [
 				...(configDefaults.coverage?.exclude ?? []),
-				"docs/**/*",
 				"example/**/*",
 				"src/**/index.ts",
 			],
