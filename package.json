@@ -20,18 +20,29 @@
 	],
 	"exports": {
 		"./server": {
-			"types": "./dist/server/index.d.ts",
-			"import": "./dist/server/index.js",
-			"require": "./dist/server/index.cjs"
+			"import": {
+				"types": "./dist/server/index.d.ts",
+				"import": "./dist/server/index.js"
+			},
+			"require": {
+				"types": "./dist/server/index.d.cts",
+				"require": "./dist/server/index.cjs"
+			}
 		},
 		"./react": {
-			"types": "./dist/react/index.d.ts",
-			"import": "./dist/react/index.js",
-			"require": "./dist/react/index.cjs"
+			"import": {
+				"types": "./dist/react/index.d.ts",
+				"import": "./dist/react/index.js"
+			},
+			"require": {
+				"types": "./dist/react/index.d.cts",
+				"require": "./dist/react/index.cjs"
+			}
 		}
 	},
 	"scripts": {
 		"build": "tsup",
+		"check-types": "pnpm build && attw --pack --profile=node16",
 		"fix": "biome check --write",
 		"lint": "biome ci --error-on-warnings",
 		"release": "pnpm build && changeset publish",
@@ -46,6 +57,7 @@
 	"author": "RJ Dellecese",
 	"license": "ISC",
 	"devDependencies": {
+		"@arethetypeswrong/cli": "^0.17.0",
 		"@biomejs/biome": "1.9.4",
 		"@changesets/cli": "2.27.9",
 		"@effect/platform-node": "0.64.14",
