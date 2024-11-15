@@ -20,8 +20,7 @@ class ApiGroup extends HttpApiGroup.make("notes")
 			),
 	)
 	.annotate(OpenApi.Title, "Notes")
-	.annotate(OpenApi.Description, "Operations on notes.")
-	.prefix("/path-prefix") {}
+	.annotate(OpenApi.Description, "Operations on notes.") {}
 
 export class Api extends HttpApi.empty
 	.annotate(OpenApi.Title, "Confect Example")
@@ -35,7 +34,8 @@ An example API built with Confect and powered by [Scalar](https://github.com/sca
 See Scalar's documentation on [markdown support](https://github.com/scalar/scalar/blob/main/documentation/markdown.md) and [OpenAPI spec extensions](https://github.com/scalar/scalar/blob/main/documentation/openapi.md).
 	`,
 	)
-	.add(ApiGroup) {}
+	.add(ApiGroup)
+	.prefix("/path-prefix") {}
 
 const ApiGroupLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
 	handlers.handle(
