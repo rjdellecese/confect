@@ -47,25 +47,3 @@ export const myQuery = query({
 })
 ```
 {% endcode %}
-
-### Optional object fields
-
-At the moment, optional object fields must use `Schema.optionalWith` with the `{ exact: true }` option. The plainer `Schema.optional` is currently unsupported.
-
-This restriction will likely be lifted in the future.
-
-{% code title="✅" %}
-```typescript
-Schema.Struct({
-    foo: Schema.optionalWith(Schema.String, { exact: true })
-})
-```
-{% endcode %}
-
-{% code title="❌" %}
-```typescript
-Schema.Struct({
-    foo: Schema.optional(Schema.String)
-})
-```
-{% endcode %}
