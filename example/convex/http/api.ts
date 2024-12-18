@@ -22,7 +22,7 @@ class ApiGroup extends HttpApiGroup.make("notes")
 	.annotate(OpenApi.Title, "Notes")
 	.annotate(OpenApi.Description, "Operations on notes.") {}
 
-export class Api extends HttpApi.empty
+export class Api extends HttpApi.make("Api")
 	.annotate(OpenApi.Title, "Confect Example")
 	.annotate(
 		OpenApi.Description,

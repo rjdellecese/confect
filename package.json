@@ -57,27 +57,27 @@
 	"author": "RJ Dellecese",
 	"license": "ISC",
 	"devDependencies": {
-		"@arethetypeswrong/cli": "^0.17.0",
+		"@arethetypeswrong/cli": "^0.17.1",
 		"@biomejs/biome": "1.9.4",
-		"@changesets/cli": "2.27.9",
-		"@effect/platform-node": "0.64.26",
-		"@effect/vitest": "0.13.15",
+		"@changesets/cli": "2.27.11",
+		"@effect/platform-node": "0.67.1",
+		"@effect/vitest": "0.14.8",
 		"@swc/jest": "0.2.37",
 		"@tsconfig/strictest": "2.0.5",
-		"@types/node": "^22.9.0",
-		"@vitest/coverage-v8": "2.1.5",
+		"@types/node": "^22.10.2",
+		"@vitest/coverage-v8": "2.1.8",
 		"convex-test": "0.0.34",
-		"dotenv": "16.4.5",
+		"dotenv": "16.4.7",
 		"tsup": "8.3.5",
-		"typescript": "5.6.3",
-		"vite": "5.4.11",
-		"vite-tsconfig-paths": "5.1.2",
-		"vitest": "2.1.5"
+		"typescript": "5.7.2",
+		"vite": "5.1.8",
+		"vite-tsconfig-paths": "5.1.4",
+		"vitest": "2.1.8"
 	},
 	"peerDependencies": {
-		"@effect/platform": "^0.69.24",
-		"convex": "^1.17.0",
-		"effect": "^3.10.15"
+		"@effect/platform": "^0.71.5",
+		"convex": "^1.17.4",
+		"effect": "^3.11.8"
 	},
 	"engines": {
 		"node": ">=20",

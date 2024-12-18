@@ -20,6 +20,7 @@ export const confectSchema = schema.defineSchema({
 		)
 		.index("by_text", ["text"])
 		.index("by_role", ["author.role"])
+		.index("by_name_and_role_and_text", ["author.name", "author.role", "text"])
 		.searchIndex("text", {
 			searchField: "text",
 			filterFields: ["tag"],

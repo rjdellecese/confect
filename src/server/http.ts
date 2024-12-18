@@ -149,7 +149,6 @@ const makeHttpRouter = (httpApis: HttpApis): HttpRouter => {
 };
 
 const applyMonkeyPatches = () => {
-	// START MONKEY PATCH
 	// These are necessary until the Convex runtime supports these APIs. See https://discord.com/channels/1019350475847499849/1281364098419785760
 
 	// biome-ignore lint/suspicious/noGlobalAssign:
@@ -165,8 +164,6 @@ const applyMonkeyPatches = () => {
 	Object.defineProperty(Request.prototype, "signal", {
 		get: () => new AbortSignal(),
 	});
-
-	// END MONKEY PATCH
 };
 
 export { makeHttpRouter };
