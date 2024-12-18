@@ -1,5 +1,11 @@
 # @rjdellecese/confect
 
+## 0.0.20
+
+### Patch Changes
+
+- b18a56d: Upgrade deps
+
 ## 0.0.19
 
 ### Patch Changes
