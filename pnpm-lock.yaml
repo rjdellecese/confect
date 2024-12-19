@@ -27,6 +27,9 @@ importers:
       '@changesets/cli':
         specifier: 2.27.11
         version: 2.27.11
+      '@changesets/config':
+        specifier: ^3.0.5
+        version: 3.0.5
       '@effect/platform-node':
         specifier: 0.67.1
         version: 0.67.1(@effect/platform@0.71.5(effect@3.11.8))(effect@3.11.8)
