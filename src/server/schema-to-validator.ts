@@ -467,7 +467,11 @@ const runSyncThrow = <A, E>(effect: Effect.Effect<A, E>) =>
 
 export class TopLevelMustBeObjectError extends Data.TaggedError(
 	"TopLevelMustBeObjectError",
-) {}
+) {
+	override get message() {
+		return "Top level schema must be an object";
+	}
+}
 
 export class TopLevelMustBeObjectOrUnionError extends Data.TaggedError(
 	"TopLevelMustBeObjectOrUnionError",
@@ -483,7 +487,7 @@ export class UnsupportedPropertySignatureKeyTypeError extends Data.TaggedError(
 	readonly propertyKey: number | symbol;
 }> {
 	override get message() {
-		return `Unsupported property signature '${this.propertyKey.toString()}'. Property is of type '${typeof this.propertyKey}' but only 'string' properties are supported`;
+		return `Unsupported property signature '${this.propertyKey.toString()}'. Property is of type '${typeof this.propertyKey}' but only 'string' properties are supported.`;
 	}
 }
 
