@@ -7,10 +7,10 @@ import type {
 	DeepReadonly,
 	IsAny,
 	IsOptional,
+	IsRecursive,
 	IsUnion,
 	IsValueLiteral,
 	UnionToTuple,
-	IsRecursive,
 } from "~/src/server/type-utils";
 
 describe("IsOptional", () => {
