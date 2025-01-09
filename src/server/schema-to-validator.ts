@@ -40,6 +40,7 @@ import type {
 	DeepMutable,
 	IsAny,
 	IsOptional,
+	IsRecursive,
 	IsUnion,
 	IsValueLiteral,
 	TypeError,
@@ -125,37 +126,39 @@ export type ReadonlyRecordValue = {
 	readonly [key: string]: ReadonlyValue | undefined;
 };
 
-export type ValueToValidator<Vl> = [Vl] extends [never]
-	? never
-	: IsAny<Vl> extends true
-		? VAny
-		: [Vl] extends [ReadonlyValue]
-			? Vl extends {
-					__tableName: infer TableName extends string;
-				}
-				? VId<GenericId<TableName>>
-				: IsValueLiteral<Vl> extends true
-					? VLiteral<Vl>
-					: Vl extends null
-						? VNull
-						: Vl extends number
-							? VFloat64
-							: Vl extends bigint
-								? VInt64
-								: Vl extends boolean
-									? VBoolean
-									: Vl extends string
-										? VString
-										: Vl extends ArrayBuffer
-											? VBytes
-											: Vl extends ReadonlyArray<ReadonlyValue>
-												? ArrayValueToValidator<Vl>
-												: Vl extends ReadonlyRecordValue
-													? RecordValueToValidator<Vl>
-													: IsUnion<Vl> extends true
-														? UnionValueToValidator<Vl>
-														: TypeError<"Unexpected value", Vl>
-			: TypeError<"Provided value is not a valid Convex value", Vl>;
+export type ValueToValidator<Vl> = IsRecursive<Vl> extends true
+	? VAny
+	: [Vl] extends [never]
+		? never
+		: IsAny<Vl> extends true
+			? VAny
+			: [Vl] extends [ReadonlyValue]
+				? Vl extends {
+						__tableName: infer TableName extends string;
+					}
+					? VId<GenericId<TableName>>
+					: IsValueLiteral<Vl> extends true
+						? VLiteral<Vl>
+						: Vl extends null
+							? VNull
+							: Vl extends number
+								? VFloat64
+								: Vl extends bigint
+									? VInt64
+									: Vl extends boolean
+										? VBoolean
+										: Vl extends string
+											? VString
+											: Vl extends ArrayBuffer
+												? VBytes
+												: Vl extends ReadonlyArray<ReadonlyValue>
+													? ArrayValueToValidator<Vl>
+													: Vl extends ReadonlyRecordValue
+														? RecordValueToValidator<Vl>
+														: IsUnion<Vl> extends true
+															? UnionValueToValidator<Vl>
+															: TypeError<"Unexpected value", Vl>
+				: TypeError<"Provided value is not a valid Convex value", Vl>;
 
 type ArrayValueToValidator<Vl extends ReadonlyArray<ReadonlyValue>> =
 	Vl extends ReadonlyArray<infer El extends ReadonlyValue>
@@ -242,6 +245,48 @@ export const compileSchema = <T, E>(
 ): ValueToValidator<(typeof schema)["Encoded"]> =>
 	runSyncThrow(compileAst(schema.ast)) as any;
 
+export const isRecursive = (ast: SchemaAST.AST): boolean =>
+	pipe(
+		ast,
+		Match.value,
+		Match.tag(
+			"Literal",
+			"BooleanKeyword",
+			"StringKeyword",
+			"NumberKeyword",
+			"BigIntKeyword",
+			"UnknownKeyword",
+			"AnyKeyword",
+			"Declaration",
+			"UniqueSymbol",
+			"SymbolKeyword",
+			"UndefinedKeyword",
+			"VoidKeyword",
+			"NeverKeyword",
+			"Enums",
+			"TemplateLiteral",
+			"ObjectKeyword",
+			"Transformation",
+			() => false,
+		),
+		Match.tag("Union", ({ types }) =>
+			Array.some(types, (type) => isRecursive(type)),
+		),
+		Match.tag("TypeLiteral", ({ propertySignatures }) =>
+			Array.some(propertySignatures, ({ type }) => isRecursive(type)),
+		),
+		Match.tag(
+			"TupleType",
+			({ elements: optionalElements, rest: elements }) =>
+				Array.some(optionalElements, (optionalElement) =>
+					isRecursive(optionalElement.type),
+				) || Array.some(elements, (element) => isRecursive(element.type)),
+		),
+		Match.tag("Refinement", ({ from }) => isRecursive(from)),
+		Match.tag("Suspend", () => true),
+		Match.exhaustive,
+	);
+
 export const compileAst = (
 	ast: SchemaAST.AST,
 	isOptionalPropertyOfTypeLiteral = false,
@@ -253,81 +298,85 @@ export const compileAst = (
 	| OptionalTupleElementsAreNotSupportedError
 	| EmptyTupleIsNotSupportedError
 > =>
-	pipe(
-		ast,
-		Match.value,
-		Match.tag("Literal", ({ literal }) =>
-			pipe(
-				literal,
+	isRecursive(ast)
+		? Effect.succeed(v.any())
+		: pipe(
+				ast,
 				Match.value,
-				Match.whenOr(
-					Match.string,
-					Match.number,
-					Match.bigint,
-					Match.boolean,
-					(l) => v.literal(l),
+				Match.tag("Literal", ({ literal }) =>
+					pipe(
+						literal,
+						Match.value,
+						Match.whenOr(
+							Match.string,
+							Match.number,
+							Match.bigint,
+							Match.boolean,
+							(l) => v.literal(l),
+						),
+						Match.when(Match.null, () => v.null()),
+						Match.exhaustive,
+						Effect.succeed,
+					),
 				),
-				Match.when(Match.null, () => v.null()),
-				Match.exhaustive,
-				Effect.succeed,
-			),
-		),
-		Match.tag("BooleanKeyword", () => Effect.succeed(v.boolean())),
-		Match.tag("StringKeyword", (stringAst) =>
-			Id.tableName(stringAst).pipe(
-				Option.match({
-					onNone: () => Effect.succeed(v.string()),
-					onSome: (tableName) => Effect.succeed(v.id(tableName)),
-				}),
-			),
-		),
-		Match.tag("NumberKeyword", () => Effect.succeed(v.float64())),
-		Match.tag("BigIntKeyword", () => Effect.succeed(v.int64())),
-		Match.tag("Union", (unionAst) =>
-			handleUnion(unionAst, isOptionalPropertyOfTypeLiteral),
-		),
-		Match.tag("TypeLiteral", (typeLiteralAst) =>
-			handleTypeLiteral(typeLiteralAst),
-		),
-		Match.tag("TupleType", (tupleTypeAst) => handleTupleType(tupleTypeAst)),
-		Match.tag("UnknownKeyword", "AnyKeyword", () => Effect.succeed(v.any())),
-		Match.tag("Declaration", (declaration) =>
-			Effect.mapBoth(
-				declaration.decodeUnknown(...declaration.typeParameters)(
-					new ArrayBuffer(0),
-					{},
-					declaration,
-				) as Effect.Effect<ArrayBuffer, ParseResult.ParseIssue>,
-				{
-					onSuccess: () => v.bytes(),
-					onFailure: () =>
-						new UnsupportedSchemaTypeError({
-							schemaType: declaration._tag,
+				Match.tag("BooleanKeyword", () => Effect.succeed(v.boolean())),
+				Match.tag("StringKeyword", (stringAst) =>
+					Id.tableName(stringAst).pipe(
+						Option.match({
+							onNone: () => Effect.succeed(v.string()),
+							onSome: (tableName) => Effect.succeed(v.id(tableName)),
 						}),
-				},
-			),
-		),
-		Match.tag("Refinement", ({ from }) => compileAst(from)),
-		Match.tag(
-			"UniqueSymbol",
-			"SymbolKeyword",
-			"UndefinedKeyword",
-			"VoidKeyword",
-			"NeverKeyword",
-			"Enums",
-			"TemplateLiteral",
-			"ObjectKeyword",
-			"Suspend",
-			"Transformation",
-			() =>
-				Effect.fail(
-					new UnsupportedSchemaTypeError({
-						schemaType: ast._tag,
-					}),
+					),
 				),
-		),
-		Match.exhaustive,
-	);
+				Match.tag("NumberKeyword", () => Effect.succeed(v.float64())),
+				Match.tag("BigIntKeyword", () => Effect.succeed(v.int64())),
+				Match.tag("Union", (unionAst) =>
+					handleUnion(unionAst, isOptionalPropertyOfTypeLiteral),
+				),
+				Match.tag("TypeLiteral", (typeLiteralAst) =>
+					handleTypeLiteral(typeLiteralAst),
+				),
+				Match.tag("TupleType", (tupleTypeAst) => handleTupleType(tupleTypeAst)),
+				Match.tag("UnknownKeyword", "AnyKeyword", () =>
+					Effect.succeed(v.any()),
+				),
+				Match.tag("Declaration", (declaration) =>
+					Effect.mapBoth(
+						declaration.decodeUnknown(...declaration.typeParameters)(
+							new ArrayBuffer(0),
+							{},
+							declaration,
+						) as Effect.Effect<ArrayBuffer, ParseResult.ParseIssue>,
+						{
+							onSuccess: () => v.bytes(),
+							onFailure: () =>
+								new UnsupportedSchemaTypeError({
+									schemaType: declaration._tag,
+								}),
+						},
+					),
+				),
+				Match.tag("Refinement", ({ from }) => compileAst(from)),
+				Match.tag("Suspend", () => Effect.succeed(v.any())),
+				Match.tag(
+					"UniqueSymbol",
+					"SymbolKeyword",
+					"UndefinedKeyword",
+					"VoidKeyword",
+					"NeverKeyword",
+					"Enums",
+					"TemplateLiteral",
+					"ObjectKeyword",
+					"Transformation",
+					() =>
+						Effect.fail(
+							new UnsupportedSchemaTypeError({
+								schemaType: ast._tag,
+							}),
+						),
+				),
+				Match.exhaustive,
+			);
 
 const handleUnion = (
 	{ types: [first, second, ...rest] }: SchemaAST.Union,

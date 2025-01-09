@@ -53,6 +53,28 @@ export type DeepReadonly<T> = IsAny<T> extends true
 
 export type TypeError<Message extends string, T = never> = [Message, T];
 
+export type IsRecursive<T> = true extends DetectCycle<T> ? true : false;
+
+type DetectCycle<T, Cache extends any[] = []> = IsAny<T> extends true
+	? false
+	: [T] extends [any]
+		? T extends Cache[number]
+			? true
+			: T extends Array<infer U>
+				? DetectCycle<U, [...Cache, T]>
+				: T extends Map<infer U, infer V>
+					? DetectCycle<V, [...Cache, T]>
+					: T extends Set<infer U>
+						? DetectCycle<U, [...Cache, T]>
+						: T extends object
+							? true extends {
+									[K in keyof T]: DetectCycle<T[K], [...Cache, T]>;
+								}[keyof T]
+								? true
+								: false
+							: false
+		: never;
+
 //////////////////////////////////
 // START: Vendored from Arktype //
 //////////////////////////////////

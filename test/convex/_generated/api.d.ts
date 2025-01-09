@@ -13,9 +13,8 @@ import type {
   FilterApi,
   FunctionReference,
 } from "convex/server";
-import type * as confect_functions from "../confect.js";
+import type * as confect from "../confect.js";
 import type * as functions from "../functions.js";
-import type * as http_get from "../http/get.js";
 import type * as http from "../http.js";
 
 /**
@@ -27,9 +26,8 @@ import type * as http from "../http.js";
  * ```
  */
 declare const fullApi: ApiFromModules<{
-  confect_functions: typeof confect_functions;
+  confect: typeof confect;
   functions: typeof functions;
-  "http/get": typeof http_get;
   http: typeof http;
 }>;
 export declare const api: FilterApi<

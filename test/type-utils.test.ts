@@ -10,6 +10,7 @@ import type {
 	IsUnion,
 	IsValueLiteral,
 	UnionToTuple,
+	IsRecursive,
 } from "~/src/server/type-utils";
 
 describe("IsOptional", () => {
@@ -234,6 +235,174 @@ describe("IsValueLiteral", () => {
 
 	test("bigint", () => {
 		expectTypeOf<IsValueLiteral<bigint>>().toEqualTypeOf<false>();
+	});
+});
+
+describe("IsRecursive", () => {
+	describe("recursive types", () => {
+		test("union", () => {
+			type RecursiveUnion = number | { next: RecursiveUnion };
+			expectTypeOf<IsRecursive<RecursiveUnion>>().toEqualTypeOf<true>();
+		});
+
+		test("array union", () => {
+			type RecursiveArrayUnion = number | RecursiveArrayUnion[];
+			expectTypeOf<IsRecursive<RecursiveArrayUnion>>().toEqualTypeOf<true>();
+		});
+
+		test("nested arrays with any", () => {
+			expectTypeOf<IsRecursive<any[][]>>().toEqualTypeOf<true>();
+		});
+
+		test("map", () => {
+			type RecursiveMap = Map<string, RecursiveMap>;
+			expectTypeOf<IsRecursive<RecursiveMap>>().toEqualTypeOf<true>();
+		});
+
+		test("set", () => {
+			type RecursiveSet = Set<number | RecursiveSet>;
+			expectTypeOf<IsRecursive<RecursiveSet>>().toEqualTypeOf<true>();
+		});
+
+		test("JSON value type", () => {
+			type JSONValue =
+				| string
+				| number
+				| boolean
+				| null
+				| JSONValue[]
+				| { [key: string]: JSONValue };
+			expectTypeOf<IsRecursive<JSONValue>>().toEqualTypeOf<true>();
+		});
+
+		test("nested union array type", () => {
+			type NestedUnionArray =
+				| number
+				| string
+				| NestedUnionArray[]
+				| { data: NestedUnionArray };
+			expectTypeOf<IsRecursive<NestedUnionArray>>().toEqualTypeOf<true>();
+		});
+
+		test("mutually recursive types", () => {
+			type TreeNode = {
+				children: TreeChildren;
+			};
+			type TreeChildren = TreeNode[];
+			expectTypeOf<IsRecursive<TreeNode>>().toEqualTypeOf<true>();
+		});
+
+		test("deeply nested recursive type", () => {
+			type DeepNest = {
+				a: {
+					b: {
+						c: DeepNest;
+					};
+				};
+			};
+			expectTypeOf<IsRecursive<DeepNest>>().toEqualTypeOf<true>();
+		});
+
+		test("recursive tuple type", () => {
+			type RecursiveTuple = [string, RecursiveTuple?];
+			expectTypeOf<IsRecursive<RecursiveTuple>>().toEqualTypeOf<true>();
+		});
+
+		test("recursive mapped type", () => {
+			type Recursive<T> = {
+				[K in keyof T]: T[K] | Recursive<T>;
+			};
+			type Test = Recursive<{ a: string; b: number }>;
+			expectTypeOf<IsRecursive<Test>>().toEqualTypeOf<true>();
+		});
+	});
+
+	describe("non-recursive types", () => {
+		test("simple union", () => {
+			type SimpleUnion = number | string;
+			expectTypeOf<IsRecursive<SimpleUnion>>().toEqualTypeOf<false>();
+		});
+
+		test("array union", () => {
+			type ArrayUnion = number | string[];
+			expectTypeOf<IsRecursive<ArrayUnion>>().toEqualTypeOf<false>();
+		});
+
+		test("primitive", () => {
+			expectTypeOf<IsRecursive<number>>().toEqualTypeOf<false>();
+		});
+
+		test("empty object", () => {
+			// biome-ignore lint/complexity/noBannedTypes: testing empty object type
+			type EmptyObject = {};
+			expectTypeOf<IsRecursive<EmptyObject>>().toEqualTypeOf<false>();
+		});
+
+		test("empty array", () => {
+			type EmptyArray = [];
+			expectTypeOf<IsRecursive<EmptyArray>>().toEqualTypeOf<false>();
+		});
+
+		test("any", () => {
+			expectTypeOf<IsRecursive<any>>().toEqualTypeOf<false>();
+		});
+
+		test("recursive with any", () => {
+			type RecursiveWithAny = any | { next: RecursiveWithAny };
+			expectTypeOf<IsRecursive<RecursiveWithAny>>().toEqualTypeOf<false>();
+		});
+
+		test("unknown", () => {
+			expectTypeOf<IsRecursive<unknown>>().toEqualTypeOf<false>();
+		});
+
+		test("never", () => {
+			expectTypeOf<IsRecursive<never>>().toEqualTypeOf<false>();
+		});
+
+		test("map", () => {
+			expectTypeOf<IsRecursive<Map<string, number>>>().toEqualTypeOf<false>();
+		});
+
+		test("set", () => {
+			expectTypeOf<IsRecursive<Set<number>>>().toEqualTypeOf<false>();
+		});
+
+		test("complex object", () => {
+			type Complex = {
+				a: string;
+				b: number[];
+				c: { d: boolean };
+				e: readonly [string, number];
+				f: Map<string, Set<number>>;
+			};
+			expectTypeOf<IsRecursive<Complex>>().toEqualTypeOf<false>();
+		});
+
+		test("type with generic parameter", () => {
+			type Generic<T> = {
+				value: T;
+				wrapped: { inner: T };
+			};
+			expectTypeOf<IsRecursive<Generic<string>>>().toEqualTypeOf<false>();
+		});
+
+		test("recursive with unknown", () => {
+			type RecursiveWithUnknown = unknown & { next: RecursiveWithUnknown };
+			expectTypeOf<IsRecursive<RecursiveWithUnknown>>().toEqualTypeOf<true>();
+		});
+
+		test("recursive with never", () => {
+			type RecursiveWithNever = never | { next: RecursiveWithNever };
+			expectTypeOf<IsRecursive<RecursiveWithNever>>().toEqualTypeOf<true>();
+		});
+
+		test("indirect recursion through multiple types", () => {
+			type A = { b: B };
+			type B = { c: C };
+			type C = { a: A };
+			expectTypeOf<IsRecursive<A>>().toEqualTypeOf<true>();
+		});
 	});
 });
 
