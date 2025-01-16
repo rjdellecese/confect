@@ -56,16 +56,16 @@ importers:
         version: 16.4.7
       tsup:
         specifier: 8.3.5
-        version: 8.3.5(@microsoft/api-extractor@7.47.8(@types/node@22.10.5))(@swc/core@1.4.1)(postcss@8.4.49)(typescript@5.7.2)(yaml@2.6.0)
+        version: 8.3.5(@microsoft/api-extractor@7.47.8(@types/node@22.10.5))(@swc/core@1.4.1)(postcss@8.4.49)(typescript@5.7.3)(yaml@2.6.0)
       typescript:
-        specifier: 5.7.2
-        version: 5.7.2
+        specifier: 5.7.3
+        version: 5.7.3
       vite:
         specifier: 5.1.8
         version: 5.1.8(@types/node@22.10.5)
       vite-tsconfig-paths:
         specifier: 5.1.4
-        version: 5.1.4(typescript@5.7.2)(vite@5.1.8(@types/node@22.10.5))
+        version: 5.1.4(typescript@5.7.3)(vite@5.1.8(@types/node@22.10.5))
       vitest:
         specifier: 2.1.8
         version: 2.1.8(@types/node@22.10.5)
@@ -2047,8 +2047,8 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
-  typescript@5.7.2:
-    resolution: {integrity: sha512-i5t66RHxDvVN40HfDd1PsEThGNnlMCMT3jMUuoh9/0TaqWevNontacunWyN02LA9/fIbEWlcHZcgTKb9QoaLfg==}
+  typescript@5.7.3:
+    resolution: {integrity: sha512-84MVSjMEHP+FQRPy3pX9sTVV/INIex71s9TL2Gm5FG/WG1SqXeKyZ0k7/blY/4FdOzI12CBy1vGc4og/eus0fw==}
     engines: {node: '>=14.17'}
     hasBin: true
 
@@ -3958,11 +3958,11 @@ snapshots:
 
   ts-interface-checker@0.1.13: {}
 
-  tsconfck@3.0.3(typescript@5.7.2):
+  tsconfck@3.0.3(typescript@5.7.3):
     optionalDependencies:
-      typescript: 5.7.2
+      typescript: 5.7.3
 
-  tsup@8.3.5(@microsoft/api-extractor@7.47.8(@types/node@22.10.5))(@swc/core@1.4.1)(postcss@8.4.49)(typescript@5.7.2)(yaml@2.6.0):
+  tsup@8.3.5(@microsoft/api-extractor@7.47.8(@types/node@22.10.5))(@swc/core@1.4.1)(postcss@8.4.49)(typescript@5.7.3)(yaml@2.6.0):
     dependencies:
       bundle-require: 5.0.0(esbuild@0.24.0)
       cac: 6.7.14
@@ -3984,7 +3984,7 @@ snapshots:
       '@microsoft/api-extractor': 7.47.8(@types/node@22.10.5)
       '@swc/core': 1.4.1
       postcss: 8.4.49
-      typescript: 5.7.2
+      typescript: 5.7.3
     transitivePeerDependencies:
       - jiti
       - supports-color
@@ -3996,7 +3996,7 @@ snapshots:
 
   typescript@5.6.1-rc: {}
 
-  typescript@5.7.2: {}
+  typescript@5.7.3: {}
 
   undici-types@6.20.0: {}
 
@@ -4030,11 +4030,11 @@ snapshots:
       - supports-color
       - terser
 
-  vite-tsconfig-paths@5.1.4(typescript@5.7.2)(vite@5.1.8(@types/node@22.10.5)):
+  vite-tsconfig-paths@5.1.4(typescript@5.7.3)(vite@5.1.8(@types/node@22.10.5)):
     dependencies:
       debug: 4.3.7
       globrex: 0.1.2
-      tsconfck: 3.0.3(typescript@5.7.2)
+      tsconfck: 3.0.3(typescript@5.7.3)
     optionalDependencies:
       vite: 5.1.8(@types/node@22.10.5)
     transitivePeerDependencies:
