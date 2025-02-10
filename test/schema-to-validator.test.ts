@@ -6,7 +6,7 @@ import {
 	type VUnion,
 	v,
 } from "convex/values";
-import { Effect, Exit, Schema } from "effect";
+import { Effect, Exit, identity, Schema } from "effect";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
 import { Id } from "~/src/server";
@@ -1223,11 +1223,18 @@ describe(compileTableSchema, () => {
 		);
 	});
 
-	test("fails if provided Schema is not a Struct or a Union", () => {
-		expect(() => compileTableSchema(Schema.String)).toThrow(
-			new TopLevelMustBeObjectOrUnionError(),
-		);
-	});
+	effect("fails if provided Schema is not a Struct or a Union", () =>
+		Effect.gen(function* () {
+			const exit = yield* Effect.try({
+				try: () => compileTableSchema(Schema.String),
+				catch: identity,
+			}).pipe(Effect.exit);
+
+			expect(exit).toStrictEqual(
+				Exit.fail(new TopLevelMustBeObjectOrUnionError()),
+			);
+		}),
+	);
 });
 
 describe(compileArgsSchema, () => {
@@ -1246,20 +1253,32 @@ describe(compileArgsSchema, () => {
 		expect(compiledArgsValidator).toStrictEqual(expectedArgsValidator);
 	});
 
-	test("fails if provided Schema contains index signatures", () => {
-		const structWithIndexSignatures = Schema.Struct(
-			{ foo: Schema.String },
-			{ key: Schema.String, value: Schema.String },
-		);
+	effect("fails if provided Schema contains index signatures", () =>
+		Effect.gen(function* () {
+			const structWithIndexSignatures = Schema.Struct(
+				{ foo: Schema.String },
+				{ key: Schema.String, value: Schema.String },
+			);
 
-		expect(() => compileArgsSchema(structWithIndexSignatures)).toThrow(
-			new IndexSignaturesAreNotSupportedError(),
-		);
-	});
+			const exit = yield* Effect.try({
+				try: () => compileArgsSchema(structWithIndexSignatures),
+				catch: identity,
+			}).pipe(Effect.exit);
 
-	test("fails if provided Schema is not a Struct", () => {
-		expect(() => compileArgsSchema(Schema.String)).toThrow(
-			new TopLevelMustBeObjectError(),
-		);
-	});
+			expect(exit).toStrictEqual(
+				Exit.fail(new IndexSignaturesAreNotSupportedError()),
+			);
+		}),
+	);
+
+	effect("fails if provided Schema is not a Struct", () =>
+		Effect.gen(function* () {
+			const exit = yield* Effect.try({
+				try: () => compileArgsSchema(Schema.String),
+				catch: identity,
+			}).pipe(Effect.exit);
+
+			expect(exit).toStrictEqual(Exit.fail(new TopLevelMustBeObjectError()));
+		}),
+	);
 });
