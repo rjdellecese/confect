@@ -1,5 +1,11 @@
 import { Effect } from "effect";
-import { action, mutation, query } from "./confect";
+import {
+	ConfectMutationCtx,
+	ConfectQueryCtx,
+	action,
+	mutation,
+	query,
+} from "./confect";
 import {
 	DeleteNoteArgs,
 	DeleteNoteResult,
@@ -16,22 +22,36 @@ import {
 export const insertNote = mutation({
 	args: InsertNoteArgs,
 	returns: InsertNoteResult,
-	handler: ({ db }, { text }) =>
-		db
-			.insert("notes", { text })
-			.pipe(Effect.catchTag("ParseError", (e) => Effect.die(e))),
+	handler: ({ text }) =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectMutationCtx;
+
+			return yield* db
+				.insert("notes", { text })
+				.pipe(Effect.catchTag("ParseError", (e) => Effect.die(e)));
+		}),
 });
 
 export const listNotes = query({
 	args: ListNotesArgs,
 	returns: ListNotesResult,
-	handler: ({ db }) => db.query("notes").order("desc").collect(),
+	handler: () =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectQueryCtx;
+
+			return yield* db.query("notes").order("desc").collect();
+		}),
 });
 
 export const deleteNote = mutation({
 	args: DeleteNoteArgs,
 	returns: DeleteNoteResult,
-	handler: ({ db }, { noteId }) => db.delete(noteId).pipe(Effect.as(null)),
+	handler: ({ noteId }) =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectMutationCtx;
+
+			return yield* db.delete(noteId).pipe(Effect.as(null));
+		}),
 });
 
 export const getRandom = action({
@@ -43,5 +63,10 @@ export const getRandom = action({
 export const getFirst = query({
 	args: GetFirstArgs,
 	returns: GetFirstResult,
-	handler: ({ db }) => db.query("notes").first(),
+	handler: () =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectQueryCtx;
+
+			return yield* db.query("notes").first();
+		}),
 });

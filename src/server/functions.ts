@@ -16,9 +16,9 @@ import {
 import { Effect, Schema, pipe } from "effect";
 
 import {
-	type ConfectActionCtx,
-	type ConfectMutationCtx,
-	type ConfectQueryCtx,
+	ConfectActionCtx,
+	ConfectMutationCtx,
+	ConfectQueryCtx,
 	makeConfectActionCtx,
 	makeConfectMutationCtx,
 	makeConfectQueryCtx,
@@ -61,9 +61,12 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
 		args: Schema.Schema<ConfectArgs, ConvexArgs>;
 		returns: Schema.Schema<ConfectReturns, ConvexReturns>;
 		handler: (
-			ctx: ConfectQueryCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>,
 			a: ConfectArgs,
-		) => Effect.Effect<ConvexReturns>;
+		) => Effect.Effect<
+			ConvexReturns,
+			never,
+			ConfectQueryCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>
+		>;
 	}): RegisteredQuery<"public", ConvexArgs, Promise<ConvexReturns>> =>
 		queryGeneric(
 			confectQueryFunction({ databaseSchemas, args, returns, handler }),
@@ -82,9 +85,12 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
 		args: Schema.Schema<ConfectArgs, ConvexArgs>;
 		returns: Schema.Schema<ConfectReturns, ConvexReturns>;
 		handler: (
-			ctx: ConfectQueryCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>,
 			a: ConfectArgs,
-		) => Effect.Effect<ConvexReturns>;
+		) => Effect.Effect<
+			ConvexReturns,
+			never,
+			ConfectQueryCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>
+		>;
 	}): RegisteredQuery<"internal", ConvexArgs, Promise<ConvexReturns>> =>
 		internalQueryGeneric(
 			confectQueryFunction({ databaseSchemas, args, returns, handler }),
@@ -103,9 +109,12 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
 		args: Schema.Schema<ConfectValue, ConvexValue>;
 		returns: Schema.Schema<ConfectReturns, ConvexReturns>;
 		handler: (
-			ctx: ConfectMutationCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>,
 			a: ConfectValue,
-		) => Effect.Effect<ConvexReturns>;
+		) => Effect.Effect<
+			ConvexReturns,
+			never,
+			ConfectMutationCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>
+		>;
 	}): RegisteredMutation<"public", ConvexValue, Promise<ConvexReturns>> =>
 		mutationGeneric(
 			confectMutationFunction({ databaseSchemas, args, returns, handler }),
@@ -124,9 +133,12 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
 		args: Schema.Schema<ConfectValue, ConvexValue>;
 		returns: Schema.Schema<ConfectReturns, ConvexReturns>;
 		handler: (
-			ctx: ConfectMutationCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>,
 			a: ConfectValue,
-		) => Effect.Effect<ConvexReturns>;
+		) => Effect.Effect<
+			ConvexReturns,
+			never,
+			ConfectMutationCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>
+		>;
 	}): RegisteredMutation<"internal", ConvexValue, Promise<ConvexReturns>> =>
 		internalMutationGeneric(
 			confectMutationFunction({ databaseSchemas, args, returns, handler }),
@@ -145,9 +157,12 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
 		args: Schema.Schema<ConfectValue, ConvexValue>;
 		returns: Schema.Schema<ConfectReturns, ConvexReturns>;
 		handler: (
-			ctx: ConfectActionCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>,
 			a: ConfectValue,
-		) => Effect.Effect<ConvexReturns>;
+		) => Effect.Effect<
+			ConvexReturns,
+			never,
+			ConfectActionCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>
+		>;
 	}): RegisteredAction<"public", ConvexValue, Promise<ConvexReturns>> =>
 		actionGeneric(confectActionFunction({ args, returns, handler }));
 
@@ -164,9 +179,12 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
 		args: Schema.Schema<ConfectValue, ConvexValue>;
 		returns: Schema.Schema<ConfectReturns, ConvexReturns>;
 		handler: (
-			ctx: ConfectActionCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>,
 			a: ConfectValue,
-		) => Effect.Effect<ConvexReturns>;
+		) => Effect.Effect<
+			ConvexReturns,
+			never,
+			ConfectActionCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>
+		>;
 	}): RegisteredAction<"internal", ConvexValue, Promise<ConvexReturns>> =>
 		internalActionGeneric(confectActionFunction({ args, returns, handler }));
 
@@ -196,9 +214,8 @@ const confectQueryFunction = <
 	args: Schema.Schema<ConfectArgs, ConvexArgs>;
 	returns: Schema.Schema<ConfectReturns, ConvexReturns>;
 	handler: (
-		ctx: ConfectQueryCtx<ConfectDataModel>,
 		a: ConfectArgs,
-	) => Effect.Effect<ConvexReturns>;
+	) => Effect.Effect<ConvexReturns, never, ConfectQueryCtx<ConfectDataModel>>;
 }) => ({
 	args: compileArgsSchema(args),
 	returns: compileReturnsSchema(returns),
@@ -211,7 +228,12 @@ const confectQueryFunction = <
 			Schema.decode(args),
 			Effect.orDie,
 			Effect.andThen((decodedArgs) =>
-				handler(makeConfectQueryCtx(ctx, databaseSchemas), decodedArgs),
+				handler(decodedArgs).pipe(
+					Effect.provideService(
+						ConfectQueryCtx<ConfectDataModel>(),
+						makeConfectQueryCtx(ctx, databaseSchemas),
+					),
+				),
 			),
 			Effect.andThen((convexReturns) =>
 				Schema.encodeUnknown(returns)(convexReturns),
@@ -236,9 +258,12 @@ const confectMutationFunction = <
 	args: Schema.Schema<ConfectValue, ConvexValue>;
 	returns: Schema.Schema<ConfectReturns, ConvexReturns>;
 	handler: (
-		ctx: ConfectMutationCtx<ConfectDataModel>,
 		a: ConfectValue,
-	) => Effect.Effect<ConvexReturns>;
+	) => Effect.Effect<
+		ConvexReturns,
+		never,
+		ConfectMutationCtx<ConfectDataModel>
+	>;
 }) => ({
 	args: compileArgsSchema(args),
 	returns: compileReturnsSchema(returns),
@@ -251,7 +276,12 @@ const confectMutationFunction = <
 			Schema.decode(args),
 			Effect.orDie,
 			Effect.andThen((decodedArgs) =>
-				handler(makeConfectMutationCtx(ctx, databaseSchemas), decodedArgs),
+				handler(decodedArgs).pipe(
+					Effect.provideService(
+						ConfectMutationCtx<ConfectDataModel>(),
+						makeConfectMutationCtx(ctx, databaseSchemas),
+					),
+				),
 			),
 			Effect.andThen((convexReturns) =>
 				Schema.encodeUnknown(returns)(convexReturns),
@@ -274,9 +304,8 @@ const confectActionFunction = <
 	args: Schema.Schema<ConfectValue, ConvexValue>;
 	returns: Schema.Schema<ConfectReturns, ConvexReturns>;
 	handler: (
-		ctx: ConfectActionCtx<ConfectDataModel>,
 		a: ConfectValue,
-	) => Effect.Effect<ConvexReturns>;
+	) => Effect.Effect<ConvexReturns, never, ConfectActionCtx<ConfectDataModel>>;
 }) => ({
 	args: compileArgsSchema(args),
 	returns: compileReturnsSchema(returns),
@@ -289,7 +318,12 @@ const confectActionFunction = <
 			Schema.decode(args),
 			Effect.orDie,
 			Effect.andThen((decodedArgs) =>
-				handler(makeConfectActionCtx(ctx), decodedArgs),
+				handler(decodedArgs).pipe(
+					Effect.provideService(
+						ConfectActionCtx<ConfectDataModel>(),
+						makeConfectActionCtx(ctx),
+					),
+				),
 			),
 			Effect.andThen((convexReturns) =>
 				Schema.encodeUnknown(returns)(convexReturns),

@@ -11,7 +11,7 @@ import type {
 	VectorSearchQuery,
 } from "convex/server";
 import type { GenericId } from "convex/values";
-import { Effect } from "effect";
+import { Context, Effect } from "effect";
 
 import { type ConfectAuth, ConfectAuthImpl } from "~/src/server/auth";
 import type {
@@ -46,12 +46,26 @@ export type ConfectMutationCtx<
 	scheduler: ConfectScheduler;
 };
 
+export const ConfectMutationCtx = <
+	ConfectDataModel extends GenericConfectDataModel,
+>() =>
+	Context.GenericTag<ConfectMutationCtx<ConfectDataModel>>(
+		"@rjdellecese/confect/ConfectMutationCtx",
+	);
+
 export type ConfectQueryCtx<ConfectDataModel extends GenericConfectDataModel> =
 	{
 		db: ConfectDatabaseReader<ConfectDataModel>;
 		auth: ConfectAuth;
 		storage: ConfectStorageReader;
 	};
+
+export const ConfectQueryCtx = <
+	ConfectDataModel extends GenericConfectDataModel,
+>() =>
+	Context.GenericTag<ConfectQueryCtx<ConfectDataModel>>(
+		"@rjdellecese/confect/ConfectQueryCtx",
+	);
 
 export type ConfectActionCtx<ConfectDataModel extends GenericConfectDataModel> =
 	{
@@ -96,6 +110,13 @@ export type ConfectActionCtx<ConfectDataModel extends GenericConfectDataModel> =
 			>,
 		): Effect.Effect<Array<{ _id: GenericId<TableName>; _score: number }>>;
 	};
+
+export const ConfectActionCtx = <
+	ConfectDataModel extends GenericConfectDataModel,
+>() =>
+	Context.GenericTag<ConfectActionCtx<ConfectDataModel>>(
+		"@rjdellecese/confect/ConfectActionCtx",
+	);
 
 export const makeConfectQueryCtx = <
 	ConfectDataModel extends GenericConfectDataModel,
