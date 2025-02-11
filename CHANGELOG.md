@@ -1,5 +1,12 @@
 # @rjdellecese/confect
 
+## 0.0.22
+
+### Patch Changes
+
+- b41db48: Allow Confect function handler Effects with non-empty error channels
+- 2d2f8f1: Provide Convex ctx objects as Effect services
+
 ## 0.0.21
 
 ### Patch Changes
