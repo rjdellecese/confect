@@ -26,9 +26,7 @@ export const insertNote = mutation({
 		Effect.gen(function* () {
 			const { db } = yield* ConfectMutationCtx;
 
-			return yield* db
-				.insert("notes", { text })
-				.pipe(Effect.catchTag("ParseError", (e) => Effect.die(e)));
+			return yield* db.insert("notes", { text });
 		}),
 });
 
