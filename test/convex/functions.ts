@@ -1,4 +1,13 @@
-import { Array, Chunk, Effect, Option, Schema, Stream, pipe } from "effect";
+import {
+	Array,
+	Chunk,
+	Effect,
+	Option,
+	type ParseResult,
+	Schema,
+	Stream,
+	pipe,
+} from "effect";
 import { Id } from "~/src/server/schemas/Id";
 import { PaginationResult } from "~/src/server/schemas/PaginationResult";
 import { api, internal } from "~/test/convex/_generated/api";
@@ -50,7 +59,7 @@ export const insert = mutation({
 		Effect.gen(function* () {
 			const { db } = yield* ConfectMutationCtx;
 
-			return yield* db.insert("notes", { text }).pipe(Effect.orDie);
+			return yield* db.insert("notes", { text });
 		}),
 });
 
@@ -257,7 +266,7 @@ export const _badPatch = mutation({
 				// @ts-expect-error: Should not be able to set `_creationTime`
 				_creationTime: 0,
 			});
-		}).pipe(Effect.as(null), Effect.orDie),
+		}).pipe(Effect.as(null)),
 });
 
 export const patch = mutation({
@@ -278,9 +287,7 @@ export const patch = mutation({
 		Effect.gen(function* () {
 			const { db } = yield* ConfectMutationCtx;
 
-			return yield* db
-				.patch(noteId, fields)
-				.pipe(Effect.as(null), Effect.orDie);
+			return yield* db.patch(noteId, fields).pipe(Effect.as(null));
 		}),
 });
 
@@ -295,7 +302,7 @@ export const unsetAuthorPatch = mutation({
 
 			return yield* db
 				.patch(noteId, { author: undefined })
-				.pipe(Effect.as(null), Effect.orDie);
+				.pipe(Effect.as(null));
 		}),
 });
 
@@ -308,7 +315,7 @@ export const insertTooLongText = mutation({
 		Effect.gen(function* () {
 			const { db } = yield* ConfectMutationCtx;
 
-			return yield* db.insert("notes", { text }).pipe(Effect.orDie);
+			return yield* db.insert("notes", { text });
 		}),
 });
 
@@ -326,9 +333,7 @@ export const replace = mutation({
 		Effect.gen(function* () {
 			const { db } = yield* ConfectMutationCtx;
 
-			return yield* db
-				.replace(noteId, fields)
-				.pipe(Effect.as(null), Effect.orDie);
+			return yield* db.replace(noteId, fields).pipe(Effect.as(null));
 		}),
 });
 
@@ -341,7 +346,7 @@ export const deleteNote = mutation({
 		Effect.gen(function* () {
 			const { db } = yield* ConfectMutationCtx;
 
-			return yield* db.delete(noteId).pipe(Effect.as(null), Effect.orDie);
+			return yield* db.delete(noteId).pipe(Effect.as(null));
 		}),
 });
 
@@ -376,9 +381,7 @@ export const actionMutation = internalMutation({
 		Effect.gen(function* () {
 			const { db } = yield* ConfectMutationCtx;
 
-			return yield* db
-				.insert("notes", { text: "Hello, world!" })
-				.pipe(Effect.orDie);
+			return yield* db.insert("notes", { text: "Hello, world!" });
 		}),
 });
 
@@ -443,7 +446,7 @@ export const executeVectorSearch = action({
 		limit,
 	}): Effect.Effect<
 		{ text: string; tag?: string }[],
-		never,
+		ParseResult.ParseError,
 		ConfectActionCtx
 	> =>
 		Effect.gen(function* () {
@@ -471,7 +474,6 @@ export const executeVectorSearch = action({
 						),
 					),
 				),
-				Effect.orDie,
 			);
 		}),
 });
@@ -514,13 +516,13 @@ export const scheduledInsert = mutation({
 		text: Schema.String,
 	}),
 	returns: Schema.Null,
-	handler: ({ text }): Effect.Effect<null, never, ConfectMutationCtx> =>
+	handler: ({
+		text,
+	}): Effect.Effect<null, ParseResult.ParseError, ConfectMutationCtx> =>
 		Effect.gen(function* () {
 			const { db } = yield* ConfectMutationCtx;
 
-			return yield* db
-				.insert("notes", { text })
-				.pipe(Effect.as(null), Effect.orDie);
+			return yield* db.insert("notes", { text }).pipe(Effect.as(null));
 		}),
 });
 

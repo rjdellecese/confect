@@ -5,6 +5,7 @@ import {
 	HttpApiGroup,
 	OpenApi,
 } from "@effect/platform";
+import type { HttpApiDecodeError } from "@effect/platform/HttpApiError";
 import { ConfectActionCtxService } from "@rjdellecese/confect/server";
 import { Effect, Layer, Option, Schema } from "effect";
 import { api } from "../_generated/api";
@@ -42,18 +43,17 @@ const ApiGroupLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
 		"getFirst",
 		(): Effect.Effect<
 			(typeof confectSchema.tableSchemas.notes.withSystemFields)["Type"] | null,
-			never,
+			HttpApiDecodeError,
 			ConfectActionCtxService
 		> =>
 			Effect.gen(function* () {
 				const { runQuery } = yield* ConfectActionCtxService;
 
-				const firstNote = yield* runQuery(api.functions.getFirst, {})
-					.pipe(
-						Effect.andThen(Schema.decode(GetFirstResult)),
-						Effect.map(Option.getOrNull),
-					)
-					.pipe(Effect.orDie);
+				const firstNote = yield* runQuery(api.functions.getFirst, {}).pipe(
+					Effect.andThen(Schema.decode(GetFirstResult)),
+					Effect.map(Option.getOrNull),
+					Effect.orDie,
+				);
 
 				return firstNote;
 			}),
