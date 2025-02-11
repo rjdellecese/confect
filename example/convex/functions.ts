@@ -1,5 +1,11 @@
 import { Effect } from "effect";
-import { action, ConfectQueryCtx, mutation, query } from "./confect";
+import {
+	action,
+	ConfectMutationCtx,
+	ConfectQueryCtx,
+	mutation,
+	query,
+} from "./confect";
 import {
 	DeleteNoteArgs,
 	DeleteNoteResult,
@@ -16,10 +22,14 @@ import {
 export const insertNote = mutation({
 	args: InsertNoteArgs,
 	returns: InsertNoteResult,
-	handler: ({ db }, { text }) =>
-		db
-			.insert("notes", { text })
-			.pipe(Effect.catchTag("ParseError", (e) => Effect.die(e))),
+	handler: ({ text }) =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectMutationCtx;
+
+			return yield* db
+				.insert("notes", { text })
+				.pipe(Effect.catchTag("ParseError", (e) => Effect.die(e)));
+		}),
 });
 
 export const listNotes = query({
@@ -36,7 +46,12 @@ export const listNotes = query({
 export const deleteNote = mutation({
 	args: DeleteNoteArgs,
 	returns: DeleteNoteResult,
-	handler: ({ db }, { noteId }) => db.delete(noteId).pipe(Effect.as(null)),
+	handler: ({ noteId }) =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectMutationCtx;
+
+			return yield* db.delete(noteId).pipe(Effect.as(null));
+		}),
 });
 
 export const getRandom = action({

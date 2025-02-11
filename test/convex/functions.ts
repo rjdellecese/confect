@@ -5,6 +5,7 @@ import { api, internal } from "~/test/convex/_generated/api";
 import {
 	action,
 	ConfectActionCtx,
+	ConfectMutationCtx,
 	ConfectQueryCtx,
 	internalAction,
 	internalMutation,
@@ -32,7 +33,12 @@ export const mutationGet = mutation({
 		noteId: Id("notes"),
 	}),
 	returns: Schema.Option(confectSchema.tableSchemas.notes.withSystemFields),
-	handler: ({ db }, { noteId }) => db.get(noteId),
+	handler: ({ noteId }) =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectMutationCtx;
+
+			return yield* db.get(noteId);
+		}),
 });
 
 export const insert = mutation({
@@ -40,8 +46,12 @@ export const insert = mutation({
 		text: Schema.String,
 	}),
 	returns: Id("notes"),
-	handler: ({ db }, { text }) =>
-		db.insert("notes", { text }).pipe(Effect.orDie),
+	handler: ({ text }) =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectMutationCtx;
+
+			return yield* db.insert("notes", { text }).pipe(Effect.orDie);
+		}),
 });
 
 export const queryCollect = query({
@@ -58,7 +68,12 @@ export const queryCollect = query({
 export const mutationCollect = mutation({
 	args: Schema.Struct({}),
 	returns: Schema.Array(confectSchema.tableSchemas.notes.withSystemFields),
-	handler: ({ db }) => db.query("notes").collect(),
+	handler: () =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectMutationCtx;
+
+			return yield* db.query("notes").collect();
+		}),
 });
 
 export const filterFirst = query({
@@ -215,8 +230,12 @@ export const mutationNormalizeId = mutation({
 		noteId: Id("notes"),
 	}),
 	returns: Schema.Option(Id("notes")),
-	handler: ({ db }, { noteId }) =>
-		Effect.succeed(db.normalizeId("notes", noteId)),
+	handler: ({ noteId }) =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectMutationCtx;
+
+			return db.normalizeId("notes", noteId);
+		}),
 });
 
 // Exporting only to stop TypeScript from complaining.
@@ -225,8 +244,10 @@ export const _badPatch = mutation({
 		noteId: Id("notes"),
 	}),
 	returns: Schema.Null,
-	handler: ({ db }, { noteId }) =>
+	handler: ({ noteId }) =>
 		Effect.gen(function* () {
+			const { db } = yield* ConfectMutationCtx;
+
 			yield* db.patch(noteId, {
 				// @ts-expect-error: Should not be able to set `_id`
 				_id: noteId,
@@ -253,8 +274,14 @@ export const patch = mutation({
 		}),
 	}),
 	returns: Schema.Null,
-	handler: ({ db }, { noteId, fields }) =>
-		db.patch(noteId, fields).pipe(Effect.as(null), Effect.orDie),
+	handler: ({ noteId, fields }) =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectMutationCtx;
+
+			return yield* db
+				.patch(noteId, fields)
+				.pipe(Effect.as(null), Effect.orDie);
+		}),
 });
 
 export const unsetAuthorPatch = mutation({
@@ -262,8 +289,14 @@ export const unsetAuthorPatch = mutation({
 		noteId: Id("notes"),
 	}),
 	returns: Schema.Null,
-	handler: ({ db }, { noteId }) =>
-		db.patch(noteId, { author: undefined }).pipe(Effect.as(null), Effect.orDie),
+	handler: ({ noteId }) =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectMutationCtx;
+
+			return yield* db
+				.patch(noteId, { author: undefined })
+				.pipe(Effect.as(null), Effect.orDie);
+		}),
 });
 
 export const insertTooLongText = mutation({
@@ -271,8 +304,12 @@ export const insertTooLongText = mutation({
 		text: Schema.String,
 	}),
 	returns: Id("notes"),
-	handler: ({ db }, { text }) =>
-		db.insert("notes", { text }).pipe(Effect.orDie),
+	handler: ({ text }) =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectMutationCtx;
+
+			return yield* db.insert("notes", { text }).pipe(Effect.orDie);
+		}),
 });
 
 export const replace = mutation({
@@ -285,8 +322,14 @@ export const replace = mutation({
 		}),
 	}),
 	returns: Schema.Null,
-	handler: ({ db }, { noteId, fields }) =>
-		db.replace(noteId, fields).pipe(Effect.as(null), Effect.orDie),
+	handler: ({ noteId, fields }) =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectMutationCtx;
+
+			return yield* db
+				.replace(noteId, fields)
+				.pipe(Effect.as(null), Effect.orDie);
+		}),
 });
 
 export const deleteNote = mutation({
@@ -294,8 +337,12 @@ export const deleteNote = mutation({
 		noteId: Id("notes"),
 	}),
 	returns: Schema.Null,
-	handler: ({ db }, { noteId }) =>
-		db.delete(noteId).pipe(Effect.as(null), Effect.orDie),
+	handler: ({ noteId }) =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectMutationCtx;
+
+			return yield* db.delete(noteId).pipe(Effect.as(null), Effect.orDie);
+		}),
 });
 
 export const isAuthenticated = query({
@@ -325,8 +372,14 @@ export const actionQuery = internalQuery({
 export const actionMutation = internalMutation({
 	args: Schema.Struct({}),
 	returns: Id("notes"),
-	handler: ({ db }) =>
-		db.insert("notes", { text: "Hello, world!" }).pipe(Effect.orDie),
+	handler: () =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectMutationCtx;
+
+			return yield* db
+				.insert("notes", { text: "Hello, world!" })
+				.pipe(Effect.orDie);
+		}),
 });
 
 export const actionNoop = internalAction({
@@ -338,11 +391,13 @@ export const actionNoop = internalAction({
 export const runQueryAndMutation = action({
 	args: Schema.Struct({}),
 	returns: Schema.Null,
-	handler: (ctx): Effect.Effect<null> =>
+	handler: (): Effect.Effect<null, never, ConfectActionCtx> =>
 		Effect.gen(function* () {
-			yield* ctx.runQuery(internal.functions.actionQuery);
-			yield* ctx.runMutation(internal.functions.actionMutation);
-			yield* ctx.runAction(internal.functions.actionNoop);
+			const { runQuery, runMutation, runAction } = yield* ConfectActionCtx;
+
+			yield* runQuery(internal.functions.actionQuery);
+			yield* runMutation(internal.functions.actionMutation);
+			yield* runAction(internal.functions.actionNoop);
 
 			return null;
 		}),
@@ -351,9 +406,11 @@ export const runQueryAndMutation = action({
 export const actionWithAuthAndRunMethods = action({
 	args: Schema.Struct({}),
 	returns: Schema.Null,
-	handler: (ctx): Effect.Effect<null> =>
+	handler: (): Effect.Effect<null, never, ConfectActionCtx> =>
 		Effect.gen(function* () {
-			yield* ctx.auth.getUserIdentity().pipe(
+			const { auth, runAction } = yield* ConfectActionCtx;
+
+			yield* auth.getUserIdentity().pipe(
 				Effect.andThen(
 					Option.match({
 						onNone: () => Effect.die,
@@ -362,7 +419,7 @@ export const actionWithAuthAndRunMethods = action({
 				),
 			);
 
-			yield* ctx.runAction(api.functions.runQueryAndMutation);
+			yield* runAction(api.functions.runQueryAndMutation);
 
 			return null;
 		}),
@@ -380,34 +437,43 @@ export const executeVectorSearch = action({
 			tag: Schema.optional(Schema.String),
 		}),
 	),
-	handler: (
-		{ runQuery, vectorSearch },
-		{ vector, tag, limit },
-	): Effect.Effect<{ text: string; tag?: string }[]> =>
-		vectorSearch("notes", "embedding", {
-			vector: vector as number[],
-			filter: tag === null ? undefined : (q) => q.eq("tag", tag),
-			limit,
-		}).pipe(
-			Effect.andThen(
-				Effect.forEach((vectorResult) =>
-					runQuery(api.functions.getVectorSearch, {
-						noteId: vectorResult._id,
-					}).pipe(
-						Effect.andThen(
-							Schema.decode(
-								Schema.Option(
-									confectSchema.tableSchemas.notes.withSystemFields,
+	handler: ({
+		vector,
+		tag,
+		limit,
+	}): Effect.Effect<
+		{ text: string; tag?: string }[],
+		never,
+		ConfectActionCtx
+	> =>
+		Effect.gen(function* () {
+			const { vectorSearch, runQuery } = yield* ConfectActionCtx;
+
+			return yield* vectorSearch("notes", "embedding", {
+				vector: vector as number[],
+				filter: tag === null ? undefined : (q) => q.eq("tag", tag),
+				limit,
+			}).pipe(
+				Effect.andThen(
+					Effect.forEach((vectorResult) =>
+						runQuery(api.functions.getVectorSearch, {
+							noteId: vectorResult._id,
+						}).pipe(
+							Effect.andThen(
+								Schema.decode(
+									Schema.Option(
+										confectSchema.tableSchemas.notes.withSystemFields,
+									),
 								),
 							),
+							Effect.map(Option.getOrThrow),
+							Effect.map(({ text, tag }) => ({ text, tag })),
 						),
-						Effect.map(Option.getOrThrow),
-						Effect.map(({ text, tag }) => ({ text, tag })),
 					),
 				),
-			),
-			Effect.orDie,
-		),
+				Effect.orDie,
+			);
+		}),
 });
 
 export const getVectorSearch = query({
@@ -431,12 +497,16 @@ export const insertAfter = action({
 		millis: Schema.Number,
 	}),
 	returns: Schema.Null,
-	handler: ({ scheduler }, { text, millis }): Effect.Effect<null> =>
-		scheduler
-			.runAfter(millis, api.functions.scheduledInsert, {
-				text,
-			})
-			.pipe(Effect.as(null)),
+	handler: ({ text, millis }): Effect.Effect<null, never, ConfectActionCtx> =>
+		Effect.gen(function* () {
+			const { scheduler } = yield* ConfectActionCtx;
+
+			return yield* scheduler
+				.runAfter(millis, api.functions.scheduledInsert, {
+					text,
+				})
+				.pipe(Effect.as(null));
+		}),
 });
 
 export const scheduledInsert = mutation({
@@ -444,8 +514,14 @@ export const scheduledInsert = mutation({
 		text: Schema.String,
 	}),
 	returns: Schema.Null,
-	handler: ({ db }, { text }): Effect.Effect<null> =>
-		db.insert("notes", { text }).pipe(Effect.as(null), Effect.orDie),
+	handler: ({ text }): Effect.Effect<null, never, ConfectMutationCtx> =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectMutationCtx;
+
+			return yield* db
+				.insert("notes", { text })
+				.pipe(Effect.as(null), Effect.orDie);
+		}),
 });
 
 export const insertAt = action({
@@ -454,12 +530,19 @@ export const insertAt = action({
 		timestamp: Schema.Number,
 	}),
 	returns: Schema.Null,
-	handler: ({ scheduler }, { text, timestamp }): Effect.Effect<null> =>
-		scheduler
-			.runAt(timestamp, api.functions.scheduledInsert, {
-				text,
-			})
-			.pipe(Effect.as(null)),
+	handler: ({
+		text,
+		timestamp,
+	}): Effect.Effect<null, never, ConfectActionCtx> =>
+		Effect.gen(function* () {
+			const { scheduler } = yield* ConfectActionCtx;
+
+			return yield* scheduler
+				.runAt(timestamp, api.functions.scheduledInsert, {
+					text,
+				})
+				.pipe(Effect.as(null));
+		}),
 });
 
 export const systemNormalizeId = query({
@@ -504,13 +587,25 @@ export const storageGetUrl = action({
 		id: Id("_storage"),
 	}),
 	returns: Schema.Option(Schema.String),
-	handler: ({ storage }, { id }) => storage.getUrl(id),
+	handler: ({
+		id,
+	}): Effect.Effect<Option.Option<string>, never, ConfectActionCtx> =>
+		Effect.gen(function* () {
+			const { storage } = yield* ConfectActionCtx;
+
+			return yield* storage.getUrl(id);
+		}),
 });
 
 export const storageGenerateUploadUrl = action({
 	args: Schema.Struct({}),
 	returns: Schema.String,
-	handler: ({ storage }) => storage.generateUploadUrl(),
+	handler: (): Effect.Effect<string, never, ConfectActionCtx> =>
+		Effect.gen(function* () {
+			const { storage } = yield* ConfectActionCtx;
+
+			return yield* storage.generateUploadUrl();
+		}),
 });
 
 export const storageDelete = action({
@@ -518,5 +613,10 @@ export const storageDelete = action({
 		id: Id("_storage"),
 	}),
 	returns: Schema.Null,
-	handler: ({ storage }, { id }) => storage.delete(id).pipe(Effect.as(null)),
+	handler: ({ id }): Effect.Effect<null, never, ConfectActionCtx> =>
+		Effect.gen(function* () {
+			const { storage } = yield* ConfectActionCtx;
+
+			return yield* storage.delete(id).pipe(Effect.as(null));
+		}),
 });
