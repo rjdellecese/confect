@@ -1,11 +1,11 @@
 import {
 	ConfectActionCtx as ConfectActionCtxService,
-	ConfectMutationCtx as ConfectMutationCtxService,
-	ConfectQueryCtx as ConfectQueryCtxService,
 	type ConfectActionCtx as ConfectActionCtxType,
 	type ConfectDataModelFromConfectSchemaDefinition,
 	type ConfectDoc as ConfectDocType,
+	ConfectMutationCtx as ConfectMutationCtxService,
 	type ConfectMutationCtx as ConfectMutationCtxType,
+	ConfectQueryCtx as ConfectQueryCtxService,
 	type ConfectQueryCtx as ConfectQueryCtxType,
 	type TableNamesInConfectDataModel,
 	makeFunctions,
