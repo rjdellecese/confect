@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { action, mutation, query } from "./confect";
+import { action, ConfectQueryCtx, mutation, query } from "./confect";
 import {
 	DeleteNoteArgs,
 	DeleteNoteResult,
@@ -25,7 +25,12 @@ export const insertNote = mutation({
 export const listNotes = query({
 	args: ListNotesArgs,
 	returns: ListNotesResult,
-	handler: ({ db }) => db.query("notes").order("desc").collect(),
+	handler: () =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectQueryCtx;
+
+			return yield* db.query("notes").order("desc").collect();
+		}),
 });
 
 export const deleteNote = mutation({
@@ -43,5 +48,10 @@ export const getRandom = action({
 export const getFirst = query({
 	args: GetFirstArgs,
 	returns: GetFirstResult,
-	handler: ({ db }) => db.query("notes").first(),
+	handler: () =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectQueryCtx;
+
+			return yield* db.query("notes").first();
+		}),
 });

@@ -4,6 +4,8 @@ import { PaginationResult } from "~/src/server/schemas/PaginationResult";
 import { api, internal } from "~/test/convex/_generated/api";
 import {
 	action,
+	ConfectActionCtx,
+	ConfectQueryCtx,
 	internalAction,
 	internalMutation,
 	internalQuery,
@@ -17,7 +19,12 @@ export const queryGet = query({
 		noteId: Id("notes"),
 	}),
 	returns: Schema.Option(confectSchema.tableSchemas.notes.withSystemFields),
-	handler: ({ db }, { noteId }) => db.get(noteId),
+	handler: ({ noteId }) =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectQueryCtx;
+
+			return yield* db.get(noteId);
+		}),
 });
 
 export const mutationGet = mutation({
@@ -40,7 +47,12 @@ export const insert = mutation({
 export const queryCollect = query({
 	args: Schema.Struct({}),
 	returns: Schema.Array(confectSchema.tableSchemas.notes.withSystemFields),
-	handler: ({ db }) => db.query("notes").collect(),
+	handler: () =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectQueryCtx;
+
+			return yield* db.query("notes").collect();
+		}),
 });
 
 export const mutationCollect = mutation({
@@ -54,11 +66,15 @@ export const filterFirst = query({
 		text: Schema.String,
 	}),
 	returns: Schema.Option(confectSchema.tableSchemas.notes.withSystemFields),
-	handler: ({ db }, { text }) =>
-		db
-			.query("notes")
-			.filter((q) => q.eq(q.field("text"), text))
-			.first(),
+	handler: ({ text }) =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectQueryCtx;
+
+			return yield* db
+				.query("notes")
+				.filter((q) => q.eq(q.field("text"), text))
+				.first();
+		}),
 });
 
 export const withIndexFirst = query({
@@ -66,17 +82,26 @@ export const withIndexFirst = query({
 		text: Schema.String,
 	}),
 	returns: Schema.Option(confectSchema.tableSchemas.notes.withSystemFields),
-	handler: ({ db }, { text }) =>
-		db
-			.query("notes")
-			.withIndex("by_text", (q) => q.eq("text", text))
-			.first(),
+	handler: ({ text }) =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectQueryCtx;
+
+			return yield* db
+				.query("notes")
+				.withIndex("by_text", (q) => q.eq("text", text))
+				.first();
+		}),
 });
 
 export const orderDescCollect = query({
 	args: Schema.Struct({}),
 	returns: Schema.Array(confectSchema.tableSchemas.notes.withSystemFields),
-	handler: ({ db }) => db.query("notes").order("desc").collect(),
+	handler: () =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectQueryCtx;
+
+			return yield* db.query("notes").order("desc").collect();
+		}),
 });
 
 export const take = query({
@@ -84,7 +109,12 @@ export const take = query({
 		n: Schema.Number,
 	}),
 	returns: Schema.Array(confectSchema.tableSchemas.notes.withSystemFields),
-	handler: ({ db }, { n }) => db.query("notes").take(n),
+	handler: ({ n }) =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectQueryCtx;
+
+			return yield* db.query("notes").take(n);
+		}),
 });
 
 export const paginate = query({
@@ -93,8 +123,12 @@ export const paginate = query({
 		numItems: Schema.Number,
 	}),
 	returns: PaginationResult(confectSchema.tableSchemas.notes.withSystemFields),
-	handler: ({ db }, { cursor, numItems }) =>
-		db.query("notes").paginate({ cursor, numItems }),
+	handler: ({ cursor, numItems }) =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectQueryCtx;
+
+			return yield* db.query("notes").paginate({ cursor, numItems });
+		}),
 });
 
 export const unique = query({
@@ -103,27 +137,39 @@ export const unique = query({
 		Schema.Literal("NotUniqueError"),
 		Schema.Option(confectSchema.tableSchemas.notes.withSystemFields),
 	),
-	handler: ({ db }) =>
-		db
-			.query("notes")
-			.unique()
-			.pipe(
-				Effect.catchTag("NotUniqueError", ({ _tag }) => Effect.succeed(_tag)),
-			),
+	handler: () =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectQueryCtx;
+
+			return yield* db
+				.query("notes")
+				.unique()
+				.pipe(
+					Effect.catchTag("NotUniqueError", ({ _tag }) => Effect.succeed(_tag)),
+				);
+		}),
 });
 
 export const onlyFirst = query({
 	args: Schema.Struct({}),
 	returns: Schema.Option(confectSchema.tableSchemas.notes.withSystemFields),
-	handler: ({ db }) => db.query("notes").first(),
+	handler: () =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectQueryCtx;
+
+			return yield* db.query("notes").first();
+		}),
 });
 
 export const mapTextStream = query({
 	args: Schema.Struct({}),
 	returns: Schema.Array(Schema.String),
-	handler: ({ db }) =>
+	handler: () =>
 		Effect.gen(function* () {
+			const { db } = yield* ConfectQueryCtx;
+
 			const stream = db.query("notes").stream();
+
 			return yield* pipe(
 				stream,
 				Stream.map((note) => note.text),
@@ -139,12 +185,16 @@ export const search = query({
 		tag: Schema.String,
 	}),
 	returns: Schema.Array(Schema.String),
-	handler: ({ db }, { query, tag }) =>
-		db
-			.query("notes")
-			.withSearchIndex("text", (q) => q.search("text", query).eq("tag", tag))
-			.collect()
-			.pipe(Effect.map(Array.map((note) => note.text))),
+	handler: ({ query, tag }) =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectQueryCtx;
+
+			return yield* db
+				.query("notes")
+				.withSearchIndex("text", (q) => q.search("text", query).eq("tag", tag))
+				.collect()
+				.pipe(Effect.map(Array.map((note) => note.text)));
+		}),
 });
 
 export const queryNormalizeId = query({
@@ -152,8 +202,12 @@ export const queryNormalizeId = query({
 		noteId: Id("notes"),
 	}),
 	returns: Schema.Option(Id("notes")),
-	handler: ({ db }, { noteId }) =>
-		Effect.succeed(db.normalizeId("notes", noteId)),
+	handler: ({ noteId }) =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectQueryCtx;
+
+			return db.normalizeId("notes", noteId);
+		}),
 });
 
 export const mutationNormalizeId = mutation({
@@ -247,8 +301,12 @@ export const deleteNote = mutation({
 export const isAuthenticated = query({
 	args: Schema.Struct({}),
 	returns: Schema.Boolean,
-	handler: ({ auth }) =>
-		pipe(auth.getUserIdentity(), Effect.map(Option.isSome)),
+	handler: () =>
+		Effect.gen(function* () {
+			const { auth } = yield* ConfectQueryCtx;
+
+			return yield* auth.getUserIdentity().pipe(Effect.map(Option.isSome));
+		}),
 });
 
 // Action
@@ -256,7 +314,12 @@ export const isAuthenticated = query({
 export const actionQuery = internalQuery({
 	args: Schema.Struct({}),
 	returns: Schema.Null,
-	handler: ({ db }) => db.query("notes").collect().pipe(Effect.as(null)),
+	handler: () =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectQueryCtx;
+
+			return yield* db.query("notes").collect().pipe(Effect.as(null));
+		}),
 });
 
 export const actionMutation = internalMutation({
@@ -352,7 +415,12 @@ export const getVectorSearch = query({
 		noteId: Id("notes"),
 	}),
 	returns: Schema.Option(confectSchema.tableSchemas.notes.withSystemFields),
-	handler: ({ db }, { noteId }) => db.get(noteId),
+	handler: ({ noteId }) =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectQueryCtx;
+
+			return yield* db.get(noteId);
+		}),
 });
 
 // Scheduler
@@ -399,8 +467,12 @@ export const systemNormalizeId = query({
 		id: Id("_storage"),
 	}),
 	returns: Schema.Option(Id("_storage")),
-	handler: ({ db }, { id }) =>
-		db.system.normalizeId("_storage", id).pipe(Effect.succeed),
+	handler: ({ id }) =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectQueryCtx;
+
+			return db.system.normalizeId("_storage", id);
+		}),
 });
 
 export const systemGet = query({
@@ -408,13 +480,23 @@ export const systemGet = query({
 		id: Id("_storage"),
 	}),
 	returns: Schema.Option(confectSchema.tableSchemas._storage.withSystemFields),
-	handler: ({ db }, { id }) => db.system.get(id),
+	handler: ({ id }) =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectQueryCtx;
+
+			return yield* db.system.get(id);
+		}),
 });
 
 export const systemQuery = query({
 	args: Schema.Struct({}),
 	returns: Schema.Array(confectSchema.tableSchemas._storage.withSystemFields),
-	handler: ({ db }) => db.system.query("_storage").collect(),
+	handler: () =>
+		Effect.gen(function* () {
+			const { db } = yield* ConfectQueryCtx;
+
+			return yield* db.system.query("_storage").collect();
+		}),
 });
 
 export const storageGetUrl = action({

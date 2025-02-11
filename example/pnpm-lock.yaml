@@ -469,7 +469,7 @@ packages:
     resolution: {directory: .., type: directory}
     engines: {node: '>=20', pnpm: '>=9'}
     peerDependencies:
-      '@effect/platform': ^0.71.5
+      '@effect/platform': ^0.75.4
       convex: ^1.17.4
       effect: ^3.12.10
 

@@ -18,7 +18,7 @@ import { Effect, Schema, pipe } from "effect";
 import {
 	type ConfectActionCtx,
 	type ConfectMutationCtx,
-	type ConfectQueryCtx,
+	ConfectQueryCtx,
 	makeConfectActionCtx,
 	makeConfectMutationCtx,
 	makeConfectQueryCtx,
@@ -61,9 +61,12 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
 		args: Schema.Schema<ConfectArgs, ConvexArgs>;
 		returns: Schema.Schema<ConfectReturns, ConvexReturns>;
 		handler: (
-			ctx: ConfectQueryCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>,
 			a: ConfectArgs,
-		) => Effect.Effect<ConvexReturns>;
+		) => Effect.Effect<
+			ConvexReturns,
+			never,
+			ConfectQueryCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>
+		>;
 	}): RegisteredQuery<"public", ConvexArgs, Promise<ConvexReturns>> =>
 		queryGeneric(
 			confectQueryFunction({ databaseSchemas, args, returns, handler }),
@@ -82,9 +85,12 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
 		args: Schema.Schema<ConfectArgs, ConvexArgs>;
 		returns: Schema.Schema<ConfectReturns, ConvexReturns>;
 		handler: (
-			ctx: ConfectQueryCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>,
 			a: ConfectArgs,
-		) => Effect.Effect<ConvexReturns>;
+		) => Effect.Effect<
+			ConvexReturns,
+			never,
+			ConfectQueryCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>
+		>;
 	}): RegisteredQuery<"internal", ConvexArgs, Promise<ConvexReturns>> =>
 		internalQueryGeneric(
 			confectQueryFunction({ databaseSchemas, args, returns, handler }),
@@ -196,9 +202,8 @@ const confectQueryFunction = <
 	args: Schema.Schema<ConfectArgs, ConvexArgs>;
 	returns: Schema.Schema<ConfectReturns, ConvexReturns>;
 	handler: (
-		ctx: ConfectQueryCtx<ConfectDataModel>,
 		a: ConfectArgs,
-	) => Effect.Effect<ConvexReturns>;
+	) => Effect.Effect<ConvexReturns, never, ConfectQueryCtx<ConfectDataModel>>;
 }) => ({
 	args: compileArgsSchema(args),
 	returns: compileReturnsSchema(returns),
@@ -211,7 +216,12 @@ const confectQueryFunction = <
 			Schema.decode(args),
 			Effect.orDie,
 			Effect.andThen((decodedArgs) =>
-				handler(makeConfectQueryCtx(ctx, databaseSchemas), decodedArgs),
+				handler(decodedArgs).pipe(
+					Effect.provideService(
+						ConfectQueryCtx<ConfectDataModel>(),
+						makeConfectQueryCtx(ctx, databaseSchemas),
+					),
+				),
 			),
 			Effect.andThen((convexReturns) =>
 				Schema.encodeUnknown(returns)(convexReturns),
