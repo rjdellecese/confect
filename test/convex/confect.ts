@@ -1,3 +1,5 @@
+import type { GenericId } from "convex/values";
+import type { SystemTableNames } from "convex/server";
 import {
 	ConfectActionCtx as ConfectActionCtxService,
 	type ConfectActionCtx as ConfectActionCtxType,
@@ -6,6 +8,7 @@ import {
 	ConfectQueryCtx as ConfectQueryCtxService,
 	type ConfectQueryCtx as ConfectQueryCtxType,
 } from "~/src/server/ctx";
+import { Id as ConfectId } from "~/src/server/schemas/Id";
 import type {
 	ConfectDoc as ConfectDocType,
 	TableNamesInConfectDataModel,
@@ -31,6 +34,20 @@ type ConfectDataModel =
 export type ConfectDoc<
 	TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
 > = ConfectDocType<ConfectDataModel, TableName>;
+
+export const Id = <
+	TableName extends
+		| TableNamesInConfectDataModel<ConfectDataModel>
+		| SystemTableNames,
+>(
+	tableName: TableName,
+) => ConfectId(tableName);
+
+export type Id<
+	TableName extends
+		| TableNamesInConfectDataModel<ConfectDataModel>
+		| SystemTableNames,
+> = GenericId<TableName>;
 
 export const ConfectQueryCtx = ConfectQueryCtxService<ConfectDataModel>();
 export type ConfectQueryCtx = ConfectQueryCtxType<ConfectDataModel>;
