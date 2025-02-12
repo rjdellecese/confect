@@ -1,5 +1,11 @@
 # @rjdellecese/confect
 
+## 0.0.24
+
+### Patch Changes
+
+- 34fd1f6: Only use and expose one `ConfectActionCtx`
+
 ## 0.0.23
 
 ### Patch Changes
