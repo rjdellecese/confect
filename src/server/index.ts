@@ -23,7 +23,6 @@ export * as Id from "~/src/server/schemas/Id";
 export * as PaginationResult from "~/src/server/schemas/PaginationResult";
 
 export {
-	ConfectActionCtxService,
 	type HttpApi,
 	makeHttpRouter,
 } from "~/src/server/http";

@@ -14,17 +14,12 @@ import {
 	httpActionGeneric,
 	httpRouter,
 } from "convex/server";
-import { Array, Context, Layer, Record, pipe } from "effect";
-import { type ConfectActionCtx, makeConfectActionCtx } from "./ctx";
+import { Array, Layer, Record, pipe } from "effect";
+import { ConfectActionCtx, makeConfectActionCtx } from "./ctx";
 import type {
 	DataModelFromConfectDataModel,
 	GenericConfectDataModel,
 } from "./data-model";
-
-export class ConfectActionCtxService extends Context.Tag("ConfectActionCtx")<
-	ConfectActionCtxService,
-	ConfectActionCtx<any>
->() {}
 
 type Middleware = (
 	httpApp: HttpApp.Default,
@@ -43,7 +38,7 @@ const makeHandler =
 		scalar,
 	}: {
 		pathPrefix: RoutePath;
-		apiLive: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtxService>;
+		apiLive: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtx<any>>;
 		middleware?: Middleware;
 		scalar?: HttpApiScalar.ScalarConfig;
 	}) =>
@@ -51,12 +46,12 @@ const makeHandler =
 		ctx: GenericActionCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
 		request: Request,
 	): Promise<Response> => {
-		const ConfectActionCtxServiceLive = Layer.succeed(
-			ConfectActionCtxService,
+		const ConfectActionCtxLive = Layer.succeed(
+			ConfectActionCtx<any>(),
 			makeConfectActionCtx(ctx),
 		);
 
-		const ApiLive = apiLive.pipe(Layer.provide(ConfectActionCtxServiceLive));
+		const ApiLive = apiLive.pipe(Layer.provide(ConfectActionCtxLive));
 
 		const ApiDocsLive = HttpApiScalar.layer({
 			path: `${pathPrefix}docs`,
@@ -87,14 +82,14 @@ const makeHttpAction = ({
 	scalar,
 }: {
 	pathPrefix: RoutePath;
-	apiLive: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtxService>;
+	apiLive: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtx<any>>;
 	middleware?: Middleware;
 	scalar?: HttpApiScalar.ScalarConfig;
 }) =>
 	httpActionGeneric(makeHandler({ pathPrefix, apiLive, middleware, scalar }));
 
 export type HttpApi = {
-	apiLive: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtxService>;
+	apiLive: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtx<any>>;
 	middleware?: Middleware;
 	scalar?: HttpApiScalar.ScalarConfig;
 };
@@ -109,7 +104,7 @@ const mountEffectHttpApi =
 		scalar,
 	}: {
 		pathPrefix: RoutePath;
-		apiLive: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtxService>;
+		apiLive: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtx<any>>;
 		middleware?: Middleware;
 		scalar?: HttpApiScalar.ScalarConfig;
 	}) =>
