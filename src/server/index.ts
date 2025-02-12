@@ -9,6 +9,8 @@ export type {
 	ConfectDoc,
 } from "~/src/server/data-model";
 
+export { NotUniqueError } from "~/src/server/database";
+
 export { makeFunctions } from "~/src/server/functions";
 
 export {
