@@ -5,12 +5,12 @@ import {
 	HttpApiGroup,
 	OpenApi,
 } from "@effect/platform";
+import type { HttpApiDecodeError } from "@effect/platform/HttpApiError";
 import { Effect, Layer, Option, Schema } from "effect";
 import { api } from "../_generated/api";
+import { ConfectActionCtx } from "../confect";
 import { GetFirstResult } from "../functions.schemas";
 import { confectSchema } from "../schema";
-import type { HttpApiDecodeError } from "@effect/platform/HttpApiError";
-import { ConfectActionCtx } from "../confect";
 
 class ApiGroup extends HttpApiGroup.make("notes")
 	.add(
