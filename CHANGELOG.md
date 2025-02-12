@@ -1,5 +1,11 @@
 # @rjdellecese/confect
 
+## 0.0.23
+
+### Patch Changes
+
+- f3e6487: Export `NotUniqueError`
+
 ## 0.0.22
 
 ### Patch Changes
