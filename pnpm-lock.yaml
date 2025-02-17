@@ -34,8 +34,8 @@ importers:
         specifier: 0.71.4
         version: 0.71.4(@effect/platform@0.75.4(effect@3.12.10))(effect@3.12.10)
       '@effect/vitest':
-        specifier: 0.17.6
-        version: 0.17.6(effect@3.12.10)(vitest@3.0.5(@types/node@22.13.1)(yaml@2.6.0))
+        specifier: 0.18.1
+        version: 0.18.1(effect@3.12.10)(vitest@3.0.5(@types/node@22.13.1)(yaml@2.6.0))
       '@swc/jest':
         specifier: 0.2.37
         version: 0.2.37(@swc/core@1.4.1)
@@ -242,10 +242,10 @@ packages:
     peerDependencies:
       effect: ^3.12.10
 
-  '@effect/vitest@0.17.6':
-    resolution: {integrity: sha512-UQXBaQ4+OeIm2n2jcCmxQcinDPvwRc5PS/sT4ZVTXC/tVFrhOlAe+JufdgVUxt7h9+ZConehywVdSG8H8LgRIQ==}
+  '@effect/vitest@0.18.1':
+    resolution: {integrity: sha512-aRAupCEnYIx2O6lBncw1SA/harBQEsdIgZ9dLhb2LmRnsw24pJZDq7gV5jkuMYY7fgPEgVEHTJv/GynUvM+5Nw==}
     peerDependencies:
-      effect: ^3.12.10
+      effect: ^3.13.1
       vitest: ^2.0.5
 
   '@esbuild/aix-ppc64@0.23.0':
@@ -2582,7 +2582,7 @@ snapshots:
       find-my-way-ts: 0.1.5
       multipasta: 0.2.5
 
-  '@effect/vitest@0.17.6(effect@3.12.10)(vitest@3.0.5(@types/node@22.13.1)(yaml@2.6.0))':
+  '@effect/vitest@0.18.1(effect@3.12.10)(vitest@3.0.5(@types/node@22.13.1)(yaml@2.6.0))':
     dependencies:
       effect: 3.12.10
       vitest: 3.0.5(@types/node@22.13.1)(yaml@2.6.0)

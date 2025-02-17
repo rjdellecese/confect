@@ -62,7 +62,7 @@
 		"@changesets/cli": "2.27.12",
 		"@changesets/config": "^3.0.5",
 		"@effect/platform-node": "0.71.4",
-		"@effect/vitest": "0.17.6",
+		"@effect/vitest": "0.18.1",
 		"@swc/jest": "0.2.37",
 		"@tsconfig/strictest": "2.0.5",
 		"@types/node": "^22.13.1",
