@@ -3,6 +3,9 @@
 	"organizeImports": {
 		"enabled": true
 	},
+	"formatter": {
+		"indentStyle": "space"
+	},
 	"linter": {
 		"enabled": true,
 		"rules": {
