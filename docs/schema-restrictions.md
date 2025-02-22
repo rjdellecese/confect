@@ -16,7 +16,7 @@ For `Schema`s used in Confect:
 
 ### No-op returns from Convex functions
 
-Unlike with the vanilla APIs, Convex functions defined with Confect may not return `undefined` or `void`—use `null` (`Schema.Null` as the `returns` validator) instead. Convex coerces `undefined`/`void` returns to `null` anyways—this just makes that more explicit.
+Unlike the vanilla APIs, Convex functions defined with Confect may not return `undefined` or `void`—use `null` (`Schema.Null` as the `returns` validator) instead. Convex coerces `undefined`/`void` returns to `null` anyways—this just makes that more explicit.
 
 {% code title="✅" %}
 ```typescript
