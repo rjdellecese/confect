@@ -21,9 +21,9 @@ Unlike the vanilla APIs, Convex functions defined with Confect may not return `u
 {% code title="✅" %}
 ```typescript
 export const myQuery = query({
-    args: Schema.Struct({}),
-    returns: Schema.Null,
-    handler: () => Effect.succeed(null),
+  args: Schema.Struct({}),
+  returns: Schema.Null,
+  handler: () => Effect.succeed(null),
 })
 ```
 {% endcode %}
@@ -31,9 +31,9 @@ export const myQuery = query({
 {% code title="❌" %}
 ```typescript
 export const myQuery = query({
-    args: Schema.Struct({}),
-    returns: Schema.Undefined,
-    handler: () => Effect.succeed(undefined),
+  args: Schema.Struct({}),
+  returns: Schema.Undefined,
+  handler: () => Effect.succeed(undefined),
 })
 ```
 {% endcode %}
@@ -41,9 +41,9 @@ export const myQuery = query({
 {% code title="❌" %}
 ```typescript
 export const myQuery = query({
-    args: Schema.Struct({}),
-    returns: Schema.Void,
-    handler: () => Effect.void,
+  args: Schema.Struct({}),
+  returns: Schema.Void,
+  handler: () => Effect.void,
 })
 ```
 {% endcode %}
