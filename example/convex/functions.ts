@@ -1,70 +1,70 @@
 import { Effect } from "effect";
 import {
-	ConfectMutationCtx,
-	ConfectQueryCtx,
-	action,
-	mutation,
-	query,
+  ConfectMutationCtx,
+  ConfectQueryCtx,
+  action,
+  mutation,
+  query,
 } from "./confect";
 import {
-	DeleteNoteArgs,
-	DeleteNoteResult,
-	GetFirstArgs,
-	GetFirstResult,
-	GetRandomArgs,
-	GetRandomResult,
-	InsertNoteArgs,
-	InsertNoteResult,
-	ListNotesArgs,
-	ListNotesResult,
+  DeleteNoteArgs,
+  DeleteNoteResult,
+  GetFirstArgs,
+  GetFirstResult,
+  GetRandomArgs,
+  GetRandomResult,
+  InsertNoteArgs,
+  InsertNoteResult,
+  ListNotesArgs,
+  ListNotesResult,
 } from "./functions.schemas";
 
 export const insertNote = mutation({
-	args: InsertNoteArgs,
-	returns: InsertNoteResult,
-	handler: ({ text }) =>
-		Effect.gen(function* () {
-			const { db } = yield* ConfectMutationCtx;
+  args: InsertNoteArgs,
+  returns: InsertNoteResult,
+  handler: ({ text }) =>
+    Effect.gen(function* () {
+      const { db } = yield* ConfectMutationCtx;
 
-			return yield* db.insert("notes", { text });
-		}),
+      return yield* db.insert("notes", { text });
+    }),
 });
 
 export const listNotes = query({
-	args: ListNotesArgs,
-	returns: ListNotesResult,
-	handler: () =>
-		Effect.gen(function* () {
-			const { db } = yield* ConfectQueryCtx;
+  args: ListNotesArgs,
+  returns: ListNotesResult,
+  handler: () =>
+    Effect.gen(function* () {
+      const { db } = yield* ConfectQueryCtx;
 
-			return yield* db.query("notes").order("desc").collect();
-		}),
+      return yield* db.query("notes").order("desc").collect();
+    }),
 });
 
 export const deleteNote = mutation({
-	args: DeleteNoteArgs,
-	returns: DeleteNoteResult,
-	handler: ({ noteId }) =>
-		Effect.gen(function* () {
-			const { db } = yield* ConfectMutationCtx;
+  args: DeleteNoteArgs,
+  returns: DeleteNoteResult,
+  handler: ({ noteId }) =>
+    Effect.gen(function* () {
+      const { db } = yield* ConfectMutationCtx;
 
-			return yield* db.delete(noteId).pipe(Effect.as(null));
-		}),
+      return yield* db.delete(noteId).pipe(Effect.as(null));
+    }),
 });
 
 export const getRandom = action({
-	args: GetRandomArgs,
-	returns: GetRandomResult,
-	handler: () => Effect.succeed(Math.random()),
+  args: GetRandomArgs,
+  returns: GetRandomResult,
+  handler: () => Effect.succeed(Math.random()),
 });
 
 export const getFirst = query({
-	args: GetFirstArgs,
-	returns: GetFirstResult,
-	handler: () =>
-		Effect.gen(function* () {
-			const { db } = yield* ConfectQueryCtx;
+  args: GetFirstArgs,
+  returns: GetFirstResult,
+  handler: () =>
+    Effect.gen(function* () {
+      const { db } = yield* ConfectQueryCtx;
 
-			return yield* db.query("notes").first();
-		}),
+      return yield* db.query("notes").first();
+    }),
 });
