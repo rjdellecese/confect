@@ -1,46 +1,46 @@
 {
-	"$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
-	"organizeImports": {
-		"enabled": true
-	},
-	"formatter": {
-		"indentStyle": "space"
-	},
-	"linter": {
-		"enabled": true,
-		"rules": {
-			"recommended": true,
-			"complexity": {
-				"noForEach": "off"
-			},
-			"correctness": {
-				"noUnusedImports": "warn"
-			},
-			"performance": {
-				"noAccumulatingSpread": "off"
-			},
-			"style": {
-				"noUselessElse": "off"
-			},
-			"suspicious": {
-				"noExplicitAny": "off",
-				"noShadowRestrictedNames": "off"
-			}
-		}
-	},
-	"files": {
-		"ignore": [
-			".pnpm-store",
-			".tsup",
-			"coverage",
-			"docs",
-			"dist",
-			"package.json",
-			"pnpm-lock.yaml",
-			"test/convex/_generated",
-			"example/convex/_generated",
-			"example/pnpm-lock.yaml",
-			"example/node_modules"
-		]
-	}
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "organizeImports": {
+    "enabled": true
+  },
+  "formatter": {
+    "indentStyle": "space"
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "complexity": {
+        "noForEach": "off"
+      },
+      "correctness": {
+        "noUnusedImports": "warn"
+      },
+      "performance": {
+        "noAccumulatingSpread": "off"
+      },
+      "style": {
+        "noUselessElse": "off"
+      },
+      "suspicious": {
+        "noExplicitAny": "off",
+        "noShadowRestrictedNames": "off"
+      }
+    }
+  },
+  "files": {
+    "ignore": [
+      ".pnpm-store",
+      ".tsup",
+      "coverage",
+      "docs",
+      "dist",
+      "package.json",
+      "pnpm-lock.yaml",
+      "test/convex/_generated",
+      "example/convex/_generated",
+      "example/pnpm-lock.yaml",
+      "example/node_modules"
+    ]
+  }
 }

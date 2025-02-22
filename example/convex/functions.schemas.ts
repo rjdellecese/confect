@@ -4,16 +4,16 @@ import { confectSchema } from "./schema";
 
 export const ListNotesArgs = Schema.Struct({});
 export const ListNotesResult = Schema.Array(
-	confectSchema.tableSchemas.notes.withSystemFields,
+  confectSchema.tableSchemas.notes.withSystemFields,
 );
 
 export const InsertNoteArgs = Schema.Struct({
-	text: Schema.String,
+  text: Schema.String,
 });
 export const InsertNoteResult = Id.Id("notes");
 
 export const DeleteNoteArgs = Schema.Struct({
-	noteId: Id.Id("notes"),
+  noteId: Id.Id("notes"),
 });
 export const DeleteNoteResult = Schema.Null;
 
@@ -22,5 +22,5 @@ export const GetRandomResult = Schema.Number;
 
 export const GetFirstArgs = Schema.Struct({});
 export const GetFirstResult = Schema.Option(
-	confectSchema.tableSchemas.notes.withSystemFields,
+  confectSchema.tableSchemas.notes.withSystemFields,
 );

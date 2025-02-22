@@ -5,8 +5,8 @@ import { flow } from "effect";
 import { ApiLive } from "./http/api";
 
 export default makeHttpRouter({
-	"/path-prefix/": {
-		apiLive: ApiLive,
-		middleware: flow(HttpMiddleware.cors(), HttpMiddleware.logger),
-	},
+  "/path-prefix/": {
+    apiLive: ApiLive,
+    middleware: flow(HttpMiddleware.cors(), HttpMiddleware.logger),
+  },
 });
