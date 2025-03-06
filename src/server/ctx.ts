@@ -37,6 +37,20 @@ import {
   ConfectStorageWriterImpl,
 } from "~/src/server/storage";
 
+export type ConfectQueryCtx<ConfectDataModel extends GenericConfectDataModel> =
+  {
+    db: ConfectDatabaseReader<ConfectDataModel>;
+    auth: ConfectAuth;
+    storage: ConfectStorageReader;
+  };
+
+export const ConfectQueryCtx = <
+  ConfectDataModel extends GenericConfectDataModel,
+>() =>
+  Context.GenericTag<ConfectQueryCtx<ConfectDataModel>>(
+    "@rjdellecese/confect/ConfectQueryCtx",
+  );
+
 export type ConfectMutationCtx<
   ConfectDataModel extends GenericConfectDataModel,
 > = {
@@ -51,20 +65,6 @@ export const ConfectMutationCtx = <
 >() =>
   Context.GenericTag<ConfectMutationCtx<ConfectDataModel>>(
     "@rjdellecese/confect/ConfectMutationCtx",
-  );
-
-export type ConfectQueryCtx<ConfectDataModel extends GenericConfectDataModel> =
-  {
-    db: ConfectDatabaseReader<ConfectDataModel>;
-    auth: ConfectAuth;
-    storage: ConfectStorageReader;
-  };
-
-export const ConfectQueryCtx = <
-  ConfectDataModel extends GenericConfectDataModel,
->() =>
-  Context.GenericTag<ConfectQueryCtx<ConfectDataModel>>(
-    "@rjdellecese/confect/ConfectQueryCtx",
   );
 
 export type ConfectActionCtx<ConfectDataModel extends GenericConfectDataModel> =
