@@ -1,5 +1,11 @@
 # @rjdellecese/confect
 
+## 0.0.25
+
+### Patch Changes
+
+- 7f0c3a1: Upgrade dependencies
+
 ## 0.0.24
 
 ### Patch Changes
