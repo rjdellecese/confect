@@ -10,16 +10,16 @@ importers:
     dependencies:
       '@effect/platform':
         specifier: 0.75.4
-        version: 0.75.4(effect@3.12.10)
+        version: 0.75.4(effect@3.14.1)
       '@rjdellecese/confect':
         specifier: file:../
-        version: file:..(@effect/platform@0.75.4(effect@3.12.10))(convex@1.19.0(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(effect@3.12.10)
+        version: file:..(@effect/platform@0.75.4(effect@3.14.1))(convex@1.19.0(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(effect@3.14.1)
       convex:
         specifier: 1.19.0
         version: 1.19.0(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       effect:
-        specifier: 3.12.10
-        version: 3.12.10
+        specifier: 3.14.1
+        version: 3.14.1
       react:
         specifier: 19.0.0
         version: 19.0.0
@@ -471,7 +471,7 @@ packages:
     peerDependencies:
       '@effect/platform': ^0.75.4
       convex: ^1.17.4
-      effect: ^3.12.10
+      effect: ^3.14.1
 
   '@rollup/rollup-android-arm-eabi@4.34.6':
     resolution: {integrity: sha512-+GcCXtOQoWuC7hhX1P00LqjjIiS/iOouHXhMdiDSnq/1DGTox4SpUvO52Xm+div6+106r+TcvOeo/cxvyEyTgg==}
@@ -567,6 +567,9 @@ packages:
     resolution: {integrity: sha512-0PVwmgzZ8+TZ9oGBmdZoQVXflbvuwzN/HRclujpl4N/q3i+y0lqLw8n1bXA8ru3sApDjlmONaNAuYr38y1Kr9w==}
     cpu: [x64]
     os: [win32]
+
+  '@standard-schema/spec@1.0.0':
+    resolution: {integrity: sha512-m2bOd0f2RT9k8QJx1JN85cZYyH1RqFBdlwtkSlf4tBDYLCiiZnv1fIIwacK6cqwXavOydf0NPToMQgpKq+dVlA==}
 
   '@types/babel__core@7.20.5':
     resolution: {integrity: sha512-qoQprZvz5wQFJwMDqeseRXWv3rqMvhgpbXFfVyWhbx9X47POIA6i/+dXefEmZKoAgOaTdaIgNSMqMIU61yRyzA==}
@@ -667,8 +670,8 @@ packages:
       supports-color:
         optional: true
 
-  effect@3.12.10:
-    resolution: {integrity: sha512-fGg3sEN+l1rffWJvXICBTqyyzpa4y1uNo3aI/JLezJDmDk0Qj/WHiy6wVe0cecdr0eFU0XkZcFu2TWpgV8kBiw==}
+  effect@3.14.1:
+    resolution: {integrity: sha512-YrE6KYUu8r+fF3/cvdM+SZRZRjarVGhfcJwQjP/YyMmF79fwE1Rf0nWqLZ9Xfw7a9njm5/wmrYP83RYt5WTTbQ==}
 
   electron-to-chromium@1.5.74:
     resolution: {integrity: sha512-ck3//9RC+6oss/1Bh9tiAVFy5vfSKbRHAFh7Z3/eTRkEqJeWgymloShB17Vg3Z4nmDNp35vAd1BZ6CMW4Wt6Iw==}
@@ -1040,9 +1043,9 @@ snapshots:
       '@babel/helper-string-parser': 7.25.9
       '@babel/helper-validator-identifier': 7.25.9
 
-  '@effect/platform@0.75.4(effect@3.12.10)':
+  '@effect/platform@0.75.4(effect@3.14.1)':
     dependencies:
-      effect: 3.12.10
+      effect: 3.14.1
       find-my-way-ts: 0.1.5
       multipasta: 0.2.5
 
@@ -1210,11 +1213,11 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.0
 
-  '@rjdellecese/confect@file:..(@effect/platform@0.75.4(effect@3.12.10))(convex@1.19.0(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(effect@3.12.10)':
+  '@rjdellecese/confect@file:..(@effect/platform@0.75.4(effect@3.14.1))(convex@1.19.0(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(effect@3.14.1)':
     dependencies:
-      '@effect/platform': 0.75.4(effect@3.12.10)
+      '@effect/platform': 0.75.4(effect@3.14.1)
       convex: 1.19.0(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
-      effect: 3.12.10
+      effect: 3.14.1
 
   '@rollup/rollup-android-arm-eabi@4.34.6':
     optional: true
@@ -1272,6 +1275,8 @@ snapshots:
 
   '@rollup/rollup-win32-x64-msvc@4.34.6':
     optional: true
+
+  '@standard-schema/spec@1.0.0': {}
 
   '@types/babel__core@7.20.5':
     dependencies:
@@ -1374,8 +1379,9 @@ snapshots:
     dependencies:
       ms: 2.1.3
 
-  effect@3.12.10:
+  effect@3.14.1:
     dependencies:
+      '@standard-schema/spec': 1.0.0
       fast-check: 3.23.2
 
   electron-to-chromium@1.5.74: {}

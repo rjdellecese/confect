@@ -1,6 +1,6 @@
 import { Command, CommandExecutor } from "@effect/platform";
 import { NodeCommandExecutor, NodeFileSystem } from "@effect/platform-node";
-import { Effect } from "effect";
+import { Effect, Layer } from "effect";
 
 export const setup = () =>
   Effect.gen(function* () {
@@ -11,8 +11,9 @@ export const setup = () =>
     yield* executor.start(command);
   }).pipe(
     Effect.scoped,
-    Effect.provide(NodeCommandExecutor.layer),
-    Effect.provide(NodeFileSystem.layer),
+    Effect.provide(
+      Layer.provide(NodeCommandExecutor.layer, NodeFileSystem.layer),
+    ),
     Effect.runPromise,
   );
 

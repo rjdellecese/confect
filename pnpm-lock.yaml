@@ -10,13 +10,13 @@ importers:
     dependencies:
       '@effect/platform':
         specifier: ^0.75.4
-        version: 0.75.4(effect@3.12.10)
+        version: 0.75.4(effect@3.14.1)
       convex:
         specifier: ^1.17.4
         version: 1.19.0
       effect:
-        specifier: ^3.12.10
-        version: 3.12.10
+        specifier: ^3.14.1
+        version: 3.14.1
     devDependencies:
       '@arethetypeswrong/cli':
         specifier: ^0.17.3
@@ -32,10 +32,10 @@ importers:
         version: 3.0.5
       '@effect/platform-node':
         specifier: 0.71.4
-        version: 0.71.4(@effect/platform@0.75.4(effect@3.12.10))(effect@3.12.10)
+        version: 0.71.4(@effect/platform@0.75.4(effect@3.14.1))(effect@3.14.1)
       '@effect/vitest':
         specifier: 0.17.6
-        version: 0.17.6(effect@3.12.10)(vitest@3.0.5(@types/node@22.13.1)(yaml@2.6.0))
+        version: 0.17.6(effect@3.14.1)(vitest@3.0.5(@types/node@22.13.1)(yaml@2.6.0))
       '@swc/jest':
         specifier: 0.2.37
         version: 0.2.37(@swc/core@1.4.1)
@@ -1049,6 +1049,9 @@ packages:
     resolution: {integrity: sha512-t09vSN3MdfsyCHoFcTRCH/iUtG7OJ0CsjzB8cjAmKc/va/kIgeDI/TxsigdncE/4be734m0cvIYwNaV4i2XqAw==}
     engines: {node: '>=10'}
 
+  '@standard-schema/spec@1.0.0':
+    resolution: {integrity: sha512-m2bOd0f2RT9k8QJx1JN85cZYyH1RqFBdlwtkSlf4tBDYLCiiZnv1fIIwacK6cqwXavOydf0NPToMQgpKq+dVlA==}
+
   '@swc/core-darwin-arm64@1.4.1':
     resolution: {integrity: sha512-ePyfx0348UbR4DOAW24TedeJbafnzha8liXFGuQ4bdXtEVXhLfPngprrxKrAddCuv42F9aTxydlF6+adD3FBhA==}
     engines: {node: '>=10'}
@@ -1427,8 +1430,8 @@ packages:
   eastasianwidth@0.2.0:
     resolution: {integrity: sha512-I88TYZWc9XiYHRQ4/3c5rjjfgkjhLyW2luGIheGERbNQ6OY7yTybanSpDXZa8y7VUP9YmDcYa+eyq4ca7iLqWA==}
 
-  effect@3.12.10:
-    resolution: {integrity: sha512-fGg3sEN+l1rffWJvXICBTqyyzpa4y1uNo3aI/JLezJDmDk0Qj/WHiy6wVe0cecdr0eFU0XkZcFu2TWpgV8kBiw==}
+  effect@3.14.1:
+    resolution: {integrity: sha512-YrE6KYUu8r+fF3/cvdM+SZRZRjarVGhfcJwQjP/YyMmF79fwE1Rf0nWqLZ9Xfw7a9njm5/wmrYP83RYt5WTTbQ==}
 
   emoji-regex@8.0.0:
     resolution: {integrity: sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==}
@@ -2557,18 +2560,18 @@ snapshots:
   '@colors/colors@1.5.0':
     optional: true
 
-  '@effect/platform-node-shared@0.25.4(@effect/platform@0.75.4(effect@3.12.10))(effect@3.12.10)':
+  '@effect/platform-node-shared@0.25.4(@effect/platform@0.75.4(effect@3.14.1))(effect@3.14.1)':
     dependencies:
-      '@effect/platform': 0.75.4(effect@3.12.10)
+      '@effect/platform': 0.75.4(effect@3.14.1)
       '@parcel/watcher': 2.4.1
-      effect: 3.12.10
+      effect: 3.14.1
       multipasta: 0.2.5
 
-  '@effect/platform-node@0.71.4(@effect/platform@0.75.4(effect@3.12.10))(effect@3.12.10)':
+  '@effect/platform-node@0.71.4(@effect/platform@0.75.4(effect@3.14.1))(effect@3.14.1)':
     dependencies:
-      '@effect/platform': 0.75.4(effect@3.12.10)
-      '@effect/platform-node-shared': 0.25.4(@effect/platform@0.75.4(effect@3.12.10))(effect@3.12.10)
-      effect: 3.12.10
+      '@effect/platform': 0.75.4(effect@3.14.1)
+      '@effect/platform-node-shared': 0.25.4(@effect/platform@0.75.4(effect@3.14.1))(effect@3.14.1)
+      effect: 3.14.1
       mime: 3.0.0
       undici: 7.1.1
       ws: 8.18.0
@@ -2576,15 +2579,15 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@effect/platform@0.75.4(effect@3.12.10)':
+  '@effect/platform@0.75.4(effect@3.14.1)':
     dependencies:
-      effect: 3.12.10
+      effect: 3.14.1
       find-my-way-ts: 0.1.5
       multipasta: 0.2.5
 
-  '@effect/vitest@0.17.6(effect@3.12.10)(vitest@3.0.5(@types/node@22.13.1)(yaml@2.6.0))':
+  '@effect/vitest@0.17.6(effect@3.14.1)(vitest@3.0.5(@types/node@22.13.1)(yaml@2.6.0))':
     dependencies:
-      effect: 3.12.10
+      effect: 3.14.1
       vitest: 3.0.5(@types/node@22.13.1)(yaml@2.6.0)
 
   '@esbuild/aix-ppc64@0.23.0':
@@ -3130,6 +3133,8 @@ snapshots:
 
   '@sindresorhus/is@4.6.0': {}
 
+  '@standard-schema/spec@1.0.0': {}
+
   '@swc/core-darwin-arm64@1.4.1':
     optional: true
 
@@ -3462,8 +3467,9 @@ snapshots:
 
   eastasianwidth@0.2.0: {}
 
-  effect@3.12.10:
+  effect@3.14.1:
     dependencies:
+      '@standard-schema/spec': 1.0.0
       fast-check: 3.23.2
 
   emoji-regex@8.0.0: {}
