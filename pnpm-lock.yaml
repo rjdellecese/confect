@@ -56,16 +56,16 @@ importers:
         version: 16.4.7
       tsup:
         specifier: 8.4.0
-        version: 8.4.0(@microsoft/api-extractor@7.47.8(@types/node@22.13.9))(@swc/core@1.4.1)(postcss@8.5.3)(typescript@5.8.2)(yaml@2.6.0)
+        version: 8.4.0(@microsoft/api-extractor@7.47.8(@types/node@22.13.9))(@swc/core@1.4.1)(postcss@8.5.3)(typescript@5.8.3)(yaml@2.6.0)
       typescript:
-        specifier: 5.8.2
-        version: 5.8.2
+        specifier: 5.8.3
+        version: 5.8.3
       vite:
         specifier: 6.2.0
         version: 6.2.0(@types/node@22.13.9)(yaml@2.6.0)
       vite-tsconfig-paths:
         specifier: 5.1.4
-        version: 5.1.4(typescript@5.8.2)(vite@6.2.0(@types/node@22.13.9)(yaml@2.6.0))
+        version: 5.1.4(typescript@5.8.3)(vite@6.2.0(@types/node@22.13.9)(yaml@2.6.0))
       vitest:
         specifier: 3.0.8
         version: 3.0.8(@types/node@22.13.9)(yaml@2.6.0)
@@ -853,8 +853,8 @@ packages:
     peerDependencies:
       '@swc/core': '*'
 
-  '@swc/types@0.1.17':
-    resolution: {integrity: sha512-V5gRru+aD8YVyCOMAjMpWR1Ui577DD5KSJsHP8RAxopAH22jFz6GZd/qxqjO6MJHQhcsjvjOFXyDhyLQUnMveQ==}
+  '@swc/types@0.1.21':
+    resolution: {integrity: sha512-2YEtj5HJVbKivud9N4bpPBAyZhj4S2Ipe5LkUG94alTpr7in/GU/EARgPAd3BwU+YOmFVJC2+kjqhGRi3r0ZpQ==}
 
   '@tsconfig/strictest@2.0.5':
     resolution: {integrity: sha512-ec4tjL2Rr0pkZ5hww65c+EEPYwxOi4Ryv+0MtjeaSQRJyq322Q27eOQiFbuNgw2hpL4hB1/W/HBGk3VKS43osg==}
@@ -1870,8 +1870,8 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
-  typescript@5.8.2:
-    resolution: {integrity: sha512-aJn6wq13/afZp/jT9QZmwEjDqqvSGp1VT5GVg+f/t6/oVyrgXM6BY1h9BRh/O5p3PlUPAe+WuiEZOmb/49RqoQ==}
+  typescript@5.8.3:
+    resolution: {integrity: sha512-p1diW6TqL9L07nNxvRMM7hMMw4c5XOo/1ibL4aAIGmSAt9slTE1Xgw5KWuof2uTOvCg9BY7ZRi+GaF+7sfgPeQ==}
     engines: {node: '>=14.17'}
     hasBin: true
 
@@ -2736,7 +2736,7 @@ snapshots:
   '@swc/core@1.4.1':
     dependencies:
       '@swc/counter': 0.1.3
-      '@swc/types': 0.1.17
+      '@swc/types': 0.1.21
     optionalDependencies:
       '@swc/core-darwin-arm64': 1.4.1
       '@swc/core-darwin-x64': 1.4.1
@@ -2758,7 +2758,7 @@ snapshots:
       '@swc/counter': 0.1.3
       jsonc-parser: 3.2.0
 
-  '@swc/types@0.1.17':
+  '@swc/types@0.1.21':
     dependencies:
       '@swc/counter': 0.1.3
 
@@ -3689,11 +3689,11 @@ snapshots:
 
   ts-interface-checker@0.1.13: {}
 
-  tsconfck@3.0.3(typescript@5.8.2):
+  tsconfck@3.0.3(typescript@5.8.3):
     optionalDependencies:
-      typescript: 5.8.2
+      typescript: 5.8.3
 
-  tsup@8.4.0(@microsoft/api-extractor@7.47.8(@types/node@22.13.9))(@swc/core@1.4.1)(postcss@8.5.3)(typescript@5.8.2)(yaml@2.6.0):
+  tsup@8.4.0(@microsoft/api-extractor@7.47.8(@types/node@22.13.9))(@swc/core@1.4.1)(postcss@8.5.3)(typescript@5.8.3)(yaml@2.6.0):
     dependencies:
       bundle-require: 5.1.0(esbuild@0.25.0)
       cac: 6.7.14
@@ -3715,7 +3715,7 @@ snapshots:
       '@microsoft/api-extractor': 7.47.8(@types/node@22.13.9)
       '@swc/core': 1.4.1
       postcss: 8.5.3
-      typescript: 5.8.2
+      typescript: 5.8.3
     transitivePeerDependencies:
       - jiti
       - supports-color
@@ -3727,7 +3727,7 @@ snapshots:
 
   typescript@5.6.1-rc: {}
 
-  typescript@5.8.2: {}
+  typescript@5.8.3: {}
 
   undici-types@6.20.0: {}
 
@@ -3765,11 +3765,11 @@ snapshots:
       - tsx
       - yaml
 
-  vite-tsconfig-paths@5.1.4(typescript@5.8.2)(vite@6.2.0(@types/node@22.13.9)(yaml@2.6.0)):
+  vite-tsconfig-paths@5.1.4(typescript@5.8.3)(vite@6.2.0(@types/node@22.13.9)(yaml@2.6.0)):
     dependencies:
       debug: 4.3.7
       globrex: 0.1.2
-      tsconfck: 3.0.3(typescript@5.8.2)
+      tsconfck: 3.0.3(typescript@5.8.3)
     optionalDependencies:
       vite: 6.2.0(@types/node@22.13.9)(yaml@2.6.0)
     transitivePeerDependencies:
