@@ -71,7 +71,7 @@
 		"dotenv": "16.4.7",
 		"tsup": "8.4.0",
 		"typescript": "5.8.2",
-		"vite": "6.2.0",
+		"vite": "6.3.2",
 		"vite-tsconfig-paths": "5.1.4",
 		"vitest": "3.0.8"
 	},
