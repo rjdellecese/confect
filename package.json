@@ -59,7 +59,7 @@
 	"devDependencies": {
 		"@arethetypeswrong/cli": "0.17.4",
 		"@biomejs/biome": "1.9.4",
-		"@changesets/cli": "2.28.1",
+		"@changesets/cli": "2.29.2",
 		"@changesets/config": "3.1.1",
 		"@effect/platform-node": "0.73.6",
 		"@effect/vitest": "0.19.4",
