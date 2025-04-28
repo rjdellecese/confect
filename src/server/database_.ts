@@ -180,7 +180,7 @@ type ConfectQuery<
   ConfectTableInfo extends GenericConfectTableInfo,
   TableName extends string,
 > = {
-  order: (
+  readonly order: (
     order: "asc" | "desc",
   ) => ConfectOrderedQuery<ConfectTableInfo, TableName>;
 };
@@ -205,11 +205,18 @@ type ConfectOrderedQuery<
   ConfectTableInfo extends GenericConfectTableInfo,
   _TableName extends string,
 > = {
-  unique: Effect.Effect<
+  readonly first: Effect.Effect<
+    ConfectTableInfo["confectDocument"],
+    DocumentDecodeError | NoDocumentsMatchQueryError
+  >;
+  readonly unique: Effect.Effect<
     ConfectTableInfo["confectDocument"],
     DocumentDecodeError | DocumentNotUniqueError | NoDocumentsMatchQueryError
   >;
-  stream: Stream.Stream<ConfectTableInfo["confectDocument"]>;
+  readonly stream: Stream.Stream<
+    ConfectTableInfo["confectDocument"],
+    DocumentDecodeError
+  >;
 };
 
 export class NoDocumentsMatchQueryError extends Schema.TaggedError<NoDocumentsMatchQueryError>(
@@ -244,39 +251,61 @@ const makeConfectOrderedQuery = <
   tableName: TableName,
   tableSchema: TableSchemaFromConfectTableInfo<ConfectTableInfo>,
 ): ConfectOrderedQuery<ConfectTableInfo, TableName> => {
-  const stream = pipe(
-    Stream.fromAsyncIterable(query, identity),
-    Stream.mapEffect(decode(tableName, tableSchema)),
+  type ConfectOrderedQueryFunction<
+    FunctionName extends keyof ConfectOrderedQuery<ConfectTableInfo, TableName>,
+  > = ConfectOrderedQuery<ConfectTableInfo, TableName>[FunctionName];
+
+  // TODO: Encoded variants for everything?
+  const streamEncoded = Stream.fromAsyncIterable(query, identity).pipe(
     Stream.orDie,
+  );
+
+  const stream: ConfectOrderedQueryFunction<"stream"> = pipe(
+    streamEncoded,
+    Stream.mapEffect(decode(tableName, tableSchema)),
+  );
+
+  const unique: ConfectOrderedQueryFunction<"unique"> = pipe(
+    stream,
+    Stream.take(2),
+    Stream.runCollect,
+    Effect.andThen((chunk) =>
+      Option.match(Chunk.get(chunk, 1), {
+        onSome: (doc) =>
+          new DocumentNotUniqueError({
+            id: (doc as GenericConfectDocumentWithSystemFields)._id,
+            tableName,
+          }),
+        onNone: () =>
+          Option.match(Chunk.get(chunk, 0), {
+            onSome: decode(tableName, tableSchema),
+            onNone: () =>
+              Effect.fail(
+                new NoDocumentsMatchQueryError({
+                  tableName,
+                }),
+              ),
+          }),
+      }),
+    ),
+  );
+
+  const first: ConfectOrderedQueryFunction<"first"> = pipe(
+    stream,
+    Stream.runHead,
+    Effect.andThen(
+      Option.getOrElse(() =>
+        Effect.fail(new NoDocumentsMatchQueryError({ tableName })),
+      ),
+    ),
+    (_) => _,
+    Effect.andThen(decode(tableName, tableSchema)),
   );
 
   return {
     stream,
-    // TODO: Add stream, use stream to implement
-    unique: pipe(
-      stream,
-      Stream.take(2),
-      Stream.runCollect,
-      Effect.andThen((chunk) =>
-        Option.match(Chunk.get(chunk, 1), {
-          onSome: (doc) =>
-            new DocumentNotUniqueError({
-              id: (doc as GenericConfectDocumentWithSystemFields)._id,
-              tableName,
-            }),
-          onNone: () =>
-            Option.match(Chunk.get(chunk, 0), {
-              onSome: decode(tableName, tableSchema),
-              onNone: () =>
-                Effect.fail(
-                  new NoDocumentsMatchQueryError({
-                    tableName,
-                  }),
-                ),
-            }),
-        }),
-      ),
-    ),
+    unique,
+    first,
   };
 };
 

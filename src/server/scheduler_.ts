@@ -7,13 +7,13 @@ import type {
 
 export class ConvexScheduler extends Effect.Tag(
   "@rjdellecese/confect/ConvexScheduler",
-)<ConvexScheduler, { readonly self: Scheduler }>() {}
+)<ConvexScheduler, Scheduler>() {}
 
 export class ConfectScheduler extends Effect.Service<ConfectScheduler>()(
   "@rjdellecese/confect/ConfectScheduler",
   {
     effect: Effect.gen(function* () {
-      const scheduler = yield* ConvexScheduler.self;
+      const scheduler = yield* ConvexScheduler;
 
       return {
         runAfter: <FuncRef extends SchedulableFunctionReference>(
