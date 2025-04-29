@@ -12,35 +12,33 @@ export class ConvexScheduler extends Effect.Tag(
 export class ConfectScheduler extends Effect.Service<ConfectScheduler>()(
   "@rjdellecese/confect/ConfectScheduler",
   {
-    effect: Effect.gen(function* () {
-      const scheduler = yield* ConvexScheduler;
+    succeed: {
+      runAfter: <FuncRef extends SchedulableFunctionReference>(
+        delay: Duration.Duration,
+        functionReference: FuncRef,
+        ...args: OptionalRestArgs<FuncRef>
+      ) =>
+        Effect.gen(function* () {
+          const delayMs = Duration.toMillis(delay);
 
-      return {
-        runAfter: <FuncRef extends SchedulableFunctionReference>(
-          delay: Duration.Duration,
-          functionReference: FuncRef,
-          ...args: OptionalRestArgs<FuncRef>
-        ) =>
-          Effect.gen(function* () {
-            const delayMs = Duration.toMillis(delay);
+          // TODO: Which errors might occur?
+          return ConvexScheduler.use(({ runAfter }) =>
+            runAfter(delayMs, functionReference, ...args),
+          );
+        }),
+      runAt: <FuncRef extends SchedulableFunctionReference>(
+        dateTime: DateTime.DateTime,
+        functionReference: FuncRef,
+        ...args: OptionalRestArgs<FuncRef>
+      ) =>
+        Effect.gen(function* () {
+          const timestamp = DateTime.toEpochMillis(dateTime);
 
-            return Effect.promise(() =>
-              scheduler.runAfter(delayMs, functionReference, ...args),
-            );
-          }),
-        runAt: <FuncRef extends SchedulableFunctionReference>(
-          dateTime: DateTime.DateTime,
-          functionReference: FuncRef,
-          ...args: OptionalRestArgs<FuncRef>
-        ) =>
-          Effect.gen(function* () {
-            const timestamp = DateTime.toEpochMillis(dateTime);
-
-            return Effect.promise(() =>
-              scheduler.runAt(timestamp, functionReference, ...args),
-            );
-          }),
-      };
-    }),
+          // TODO: Which errors might occur?
+          return ConvexScheduler.use(({ runAt }) =>
+            runAt(timestamp, functionReference, ...args),
+          );
+        }),
+    },
   },
 ) {}

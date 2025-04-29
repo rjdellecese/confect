@@ -294,12 +294,12 @@ const makeConfectOrderedQuery = <
     stream,
     Stream.runHead,
     Effect.andThen(
-      Option.getOrElse(() =>
-        Effect.fail(new NoDocumentsMatchQueryError({ tableName })),
-      ),
+      Option.match({
+        onNone: () =>
+          Effect.fail(new NoDocumentsMatchQueryError({ tableName })),
+        onSome: decode(tableName, tableSchema),
+      }),
     ),
-    (_) => _,
-    Effect.andThen(decode(tableName, tableSchema)),
   );
 
   return {

@@ -9,14 +9,11 @@ export class ConvexStorageReader extends Effect.Tag(
 export class ConfectStorageReader extends Effect.Service<ConfectStorageReader>()(
   "@rjdellecese/confect/ConfectStorageReader",
   {
-    effect: Effect.gen(function* () {
-      const storage = yield* ConvexStorageReader;
-
-      return {
-        getUrl: (storageId: GenericId<"_storage">) =>
-          Effect.promise(() => storage.getUrl(storageId)),
-      };
-    }),
+    succeed: {
+      getUrl: (storageId: GenericId<"_storage">) =>
+        // TODO: Which errors might occur?
+        ConvexStorageReader.use(({ getUrl }) => getUrl(storageId)),
+    },
   },
 ) {}
 
@@ -27,15 +24,15 @@ export class ConvexStorageWriter extends Effect.Tag(
 export class ConfectStorageWriter extends Effect.Service<ConfectStorageWriter>()(
   "@rjdellecese/confect/ConfectStorageWriter",
   {
-    effect: Effect.gen(function* () {
-      const storage = yield* ConvexStorageWriter;
-
-      return {
-        generateUploadUrl: Effect.promise(() => storage.generateUploadUrl()),
-        delete: (storageId: GenericId<"_storage">) =>
-          // TODO: Can this throw?
-          Effect.promise(() => storage.delete(storageId)),
-      };
-    }),
+    succeed: {
+      generateUploadUrl: () =>
+        // TODO: Which errors might occur?
+        ConvexStorageWriter.use(({ generateUploadUrl }) => generateUploadUrl()),
+      delete: (storageId: GenericId<"_storage">) =>
+        // TODO: Can this throw?
+        ConvexStorageWriter.use(({ delete: storageDelete }) =>
+          storageDelete(storageId),
+        ),
+    },
   },
 ) {}

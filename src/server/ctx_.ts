@@ -13,7 +13,7 @@ import type {
 import type { GenericId } from "convex/values";
 import { Context, Effect } from "effect";
 
-import type { ConfectAuth } from "~/src/server/auth_";
+import { type ConfectAuth, ConfectAuthImpl } from "~/src/server/auth";
 import type {
   DataModelFromConfectDataModel,
   GenericConfectDataModel,

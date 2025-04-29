@@ -10,7 +10,7 @@ export class ConfectAuth extends Effect.Service<ConfectAuth>()(
   "@rjdellecese/confect/ConfectAuth",
   {
     succeed: {
-      // TODO
+      // TODO: Which errors might occur?
       getUserIdentity: ConvexAuth.use(({ getUserIdentity }) =>
         getUserIdentity(),
       ),
