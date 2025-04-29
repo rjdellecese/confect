@@ -59,26 +59,26 @@
 	"devDependencies": {
 		"@arethetypeswrong/cli": "0.17.4",
 		"@biomejs/biome": "1.9.4",
-		"@changesets/cli": "2.28.1",
+		"@changesets/cli": "2.29.2",
 		"@changesets/config": "3.1.1",
-		"@effect/platform-node": "0.73.6",
-		"@effect/vitest": "0.19.4",
-		"@swc/jest": "0.2.37",
+		"@effect/platform-node": "0.77.3",
+		"@effect/vitest": "0.20.16",
+		"@swc/jest": "0.2.38",
 		"@tsconfig/strictest": "2.0.5",
-		"@types/node": "22.13.9",
-		"@vitest/coverage-v8": "3.0.8",
+		"@types/node": "22.15.3",
+		"@vitest/coverage-v8": "3.1.2",
 		"convex-test": "0.0.36",
-		"dotenv": "16.4.7",
+		"dotenv": "16.5.0",
 		"tsup": "8.4.0",
-		"typescript": "5.8.2",
-		"vite": "6.2.0",
+		"typescript": "5.8.3",
+		"vite": "6.3.3",
 		"vite-tsconfig-paths": "5.1.4",
-		"vitest": "3.0.8"
+		"vitest": "3.1.2"
 	},
 	"peerDependencies": {
-		"@effect/platform": "^0.77.6",
-		"convex": "^1.19.5",
-		"effect": "^3.13.6"
+		"@effect/platform": "^0.80.15",
+		"convex": "^1.23.0",
+		"effect": "^3.14.15"
 	},
 	"engines": {
 		"node": ">=20",
