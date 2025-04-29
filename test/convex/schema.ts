@@ -16,6 +16,7 @@ export const confectSchema = schema.defineSchema({
           }),
         ),
         embedding: Schema.optional(Schema.Array(Schema.Number)),
+        bigDecimal: Schema.optional(Schema.BigDecimal),
       }),
     )
     .index("by_text", ["text"])
