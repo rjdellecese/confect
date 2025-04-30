@@ -1,5 +1,18 @@
 # @rjdellecese/confect
 
+## 0.0.26
+
+### Patch Changes
+
+- bf3aef9: Fix incorrect returns validator types
+- e256ac2: Upgrade deps
+
+## 0.0.25
+
+### Patch Changes
+
+- 7f0c3a1: Upgrade dependencies
+
 ## 0.0.24
 
 ### Patch Changes
