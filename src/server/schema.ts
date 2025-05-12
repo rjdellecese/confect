@@ -26,6 +26,7 @@ import {
   extendWithSystemFields,
 } from "~/src/server/schemas/SystemFields";
 import type { GenericConfectDataModel } from "./data-model";
+import { NonEmptyArray } from "effect/Array";
 
 export const confectTableSchemas = {
   _scheduled_functions: Schema.Struct({
@@ -157,7 +158,9 @@ export interface ConfectTableDefinition<
     SearchIndexes,
     VectorIndexes
   >;
+
   tableSchema: TableSchema;
+  indexes: Indexes;
 
   index<
     IndexName extends string,
@@ -265,7 +268,6 @@ class ConfectTableDefinitionImpl<
       VectorIndexes
     >
 {
-  tableSchema: TableSchema;
   tableDefinition: TableDefinition<
     TableValidator,
     Indexes,
@@ -273,9 +275,18 @@ class ConfectTableDefinitionImpl<
     VectorIndexes
   >;
 
-  constructor(tableSchema: TableSchema, tableValidator: TableValidator) {
-    this.tableSchema = tableSchema;
+  tableSchema: TableSchema;
+  indexes: Indexes;
+
+  constructor(
+    tableSchema: TableSchema,
+    tableValidator: TableValidator,
+    indexes: Indexes = {} as Indexes,
+  ) {
     this.tableDefinition = defineConvexTable(tableValidator);
+
+    this.tableSchema = tableSchema;
+    this.indexes = indexes;
   }
 
   index<
@@ -299,8 +310,12 @@ class ConfectTableDefinitionImpl<
     VectorIndexes
   > {
     this.tableDefinition = this.tableDefinition.index(name, fields);
+    this.indexes = {
+      ...this.indexes,
+      [name]: fields,
+    };
 
-    return this;
+    return this as any;
   }
 
   searchIndex<

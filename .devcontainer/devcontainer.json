@@ -1,5 +1,5 @@
 {
-  "image": "mcr.microsoft.com/devcontainers/typescript-node:1-20-bullseye",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
   "postCreateCommand": "pnpm_version=$(node -p 'require(`./package.json`).engines.pnpm') && npm install -g pnpm@$pnpm_version && pnpm install",
   "customizations": {
     "vscode": {

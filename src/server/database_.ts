@@ -7,6 +7,14 @@ import type {
   IndexRange,
   Query,
   OrderedQuery,
+  DocumentByName,
+  FieldTypeFromFieldPath,
+  TableNamesInDataModel,
+  GenericDataModel,
+  GenericTableIndexes,
+  GenericDatabaseWriter,
+  BetterOmit,
+  Expand,
 } from "convex/server";
 import type { GenericId } from "convex/values";
 import {
@@ -22,6 +30,7 @@ import {
   Function,
   Chunk,
   Option,
+  Array,
 } from "effect";
 import type {
   ConfectDocumentByName,
@@ -35,6 +44,7 @@ import type {
 } from "./data-model";
 import type {
   ConfectDataModelFromConfectSchemaDefinition,
+  GenericConfectSchema,
   GenericConfectSchemaDefinition,
 } from "./schema";
 import { extendWithSystemFields } from "./schemas/SystemFields";
@@ -59,6 +69,20 @@ const makeConfectServices = <
       self: confectSchemaDefinition,
     }),
   );
+
+  // ConvexDatabaseWriter
+  const ConvexDatabaseWriter = Context.GenericTag<{
+    readonly self: GenericDatabaseWriter<ConvexDataModel>;
+  }>("@rjdellecese/confect/ConvexDatabaseWriter");
+  const ConvexDatabaseWriterLive = (
+    convexDatabaseWriter: GenericDatabaseWriter<ConvexDataModel>,
+  ) =>
+    Layer.succeed(
+      ConvexDatabaseWriter,
+      ConvexDatabaseWriter.of({
+        self: convexDatabaseWriter,
+      }),
+    );
 
   // ConvexDatabaseReader
   const ConvexDatabaseReader = Context.GenericTag<{
@@ -97,12 +121,85 @@ const makeConfectServices = <
           TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
         >(
           tableName: TableName,
-        ) =>
-          makeConfectQueryInitializer<ConfectDataModel, TableName>(
+        ) => {
+          const confectTableDefinition = confectDatabaseSchema.confectSchema[
+            tableName
+          ] as NonNullable<ConfectSchemaDefinition["confectSchema"][TableName]>;
+
+          return makeConfectQueryInitializer<
+            ConfectSchemaDefinition["confectSchema"],
+            ConfectDataModel,
+            TableName
+          >(tableName, convexDatabaseReader, confectTableDefinition);
+        },
+      });
+    }),
+  );
+
+  // ConfectDatabaseWriter
+  const ConfectDatabaseWriter = Context.GenericTag<{
+    readonly insert: <
+      TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+    >(
+      tableName: TableName,
+      document: WithoutSystemFields<
+        ConfectDocumentByName<ConfectDataModel, TableName>
+      >,
+    ) => Effect.Effect<GenericId<TableName>, DocumentEncodeError>;
+  }>("@rjdellecese/confect/ConfectDatabaseWriter");
+  type ConfectDatabaseWriter = typeof ConfectDatabaseWriter.Identifier;
+  const ConfectDatabaseWriterLive = Layer.effect(
+    ConfectDatabaseWriter,
+    Effect.gen(function* () {
+      type ConfectDatabaseWriterFunction<
+        FunctionName extends keyof ConfectDatabaseWriter,
+      > = ConfectDatabaseWriter[FunctionName];
+
+      const confectDatabaseSchema = yield* ConfectDatabaseSchemaDefinition.pipe(
+        Effect.map(({ self }) => self),
+      );
+      const convexDatabaseWriter = yield* ConvexDatabaseWriter.pipe(
+        Effect.map(({ self }) => self),
+      );
+
+      const insert: ConfectDatabaseWriterFunction<"insert"> = <
+        TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+      >(
+        tableName: TableName,
+        document: WithoutSystemFields<
+          ConfectDocumentByName<GenericConfectDataModel, TableName>
+        >,
+      ) =>
+        Effect.gen(function* () {
+          const confectTableDefinition = confectDatabaseSchema.confectSchema[
+            tableName
+          ] as NonNullable<ConfectSchemaDefinition["confectSchema"][TableName]>;
+
+          const encodedDocument = yield* encode(
             tableName,
-            convexDatabaseReader,
-            confectDatabaseSchema.confectSchema[tableName]?.tableSchema,
-          ),
+            confectTableDefinition.tableSchema,
+          )(document);
+
+          const id = yield* Effect.promise(() =>
+            convexDatabaseWriter.insert(
+              tableName,
+              encodedDocument as Expand<
+                BetterOmit<
+                  DocumentByName<
+                    DataModelFromConfectDataModel<ConfectDataModel>,
+                    TableName
+                  >,
+                  "_creationTime" | "_id"
+                >
+              >,
+            ),
+          );
+
+          return id;
+        });
+
+      return ConfectDatabaseWriter.of({
+        insert,
       });
     }),
   );
@@ -114,8 +211,28 @@ const makeConfectServices = <
     ConvexDatabaseReaderLive,
     ConfectDatabaseReader,
     ConfectDatabaseReaderLive,
+    ConvexDatabaseWriter,
+    ConvexDatabaseWriterLive,
+    ConfectDatabaseWriter,
+    ConfectDatabaseWriterLive,
   };
 };
+
+// Based on https://github.com/get-convex/convex-ents/blob/f1c6eda95569bdcd97efcc3431638b4260b004dc/src/shared.ts#L31-L44
+export type IndexFieldTypesForEq<
+  ConvexDataModel extends GenericDataModel,
+  Table extends TableNamesInDataModel<ConvexDataModel>,
+  T extends string[],
+> = Pop<{
+  [K in keyof T]: FieldTypeFromFieldPath<
+    DocumentByName<ConvexDataModel, Table>,
+    T[K]
+  >;
+}>;
+
+type Pop<T extends any[]> = T extends [...infer Rest, infer _Last]
+  ? Rest
+  : never;
 
 type ConfectQueryInitializer<
   ConfectDataModel extends GenericConfectDataModel,
@@ -125,7 +242,30 @@ type ConfectQueryInitializer<
     id: GenericId<TableName>,
   ) => Effect.Effect<
     ConfectDataModel[TableName]["confectDocument"],
-    DocumentNotFoundError | DocumentDecodeError
+    DocumentDecodeError | DocumentNotFoundError
+  >;
+  readonly getManyById: (
+    ids: GenericId<TableName>[],
+  ) => Effect.Effect<
+    ConfectDataModel[TableName]["confectDocument"][],
+    DocumentDecodeError | DocumentNotFoundError
+  >;
+  readonly getByIndex: <
+    IndexName extends keyof Indexes<
+      TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>
+    >,
+  >(
+    indexName: IndexName,
+    ...indexFieldValues: IndexFieldTypesForEq<
+      DataModelFromConfectDataModel<ConfectDataModel>,
+      TableName,
+      Indexes<
+        TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>
+      >[IndexName]
+    >
+  ) => Effect.Effect<
+    ConfectDataModel[TableName]["confectDocument"],
+    DocumentDecodeError | NoDocumentsMatchQueryError
   >;
   readonly withIndex: <
     IndexName extends keyof Indexes<
@@ -146,33 +286,81 @@ type ConfectQueryInitializer<
 };
 
 const makeConfectQueryInitializer = <
+  ConfectSchema extends GenericConfectSchema,
+  // TODO: Remove? Redundant?
   ConfectDataModel extends GenericConfectDataModel,
   TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
 >(
+  // TODO: Add error type for when ID is for the wrong table?
   tableName: TableName,
   convexDatabaseReader: GenericDatabaseReader<
     DataModelFromConfectDataModel<ConfectDataModel>
   >,
-  tableSchema: TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>,
+  confectTableDefinition: ConfectSchema[TableName],
 ): ConfectQueryInitializer<ConfectDataModel, TableName> => {
-  return {
-    getbyId: (id) => {
-      return pipe(
-        Effect.promise(() => convexDatabaseReader.get(id)),
-        Effect.andThen(
-          Either.fromNullable(
-            () => new DocumentNotFoundError({ tableName, id }),
-          ),
-        ),
-        Effect.andThen(decode(tableName, tableSchema)),
-      );
-    },
-    withIndex: (indexName, indexRange) =>
-      makeConfectQuery<ConfectDataModel[TableName], TableName>(
-        convexDatabaseReader.query(tableName).withIndex(indexName, indexRange),
-        tableName,
-        tableSchema,
+  type ConfectQueryFunction<
+    FunctionName extends keyof ConfectQueryInitializer<
+      ConfectDataModel,
+      TableName
+    >,
+  > = ConfectQueryInitializer<ConfectDataModel, TableName>[FunctionName];
+
+  const getbyId: ConfectQueryFunction<"getbyId"> = (id) =>
+    pipe(
+      Effect.promise(() => convexDatabaseReader.get(id)),
+      Effect.andThen(
+        Either.fromNullable(() => new DocumentNotFoundError({ tableName, id })),
       ),
+      Effect.andThen(decode(tableName, confectTableDefinition.tableSchema)),
+    );
+
+  const getManyById: ConfectQueryFunction<"getManyById"> = (ids) =>
+    Effect.forEach(ids, getbyId);
+
+  const getByIndex: ConfectQueryFunction<"getByIndex"> = (
+    indexName,
+    ...indexFieldValues
+  ) => {
+    const indexFields: GenericTableIndexes[keyof GenericTableIndexes] =
+      confectTableDefinition.indexes[indexName];
+
+    return pipe(
+      Effect.promise(() =>
+        convexDatabaseReader
+          .query(tableName)
+          .withIndex(indexName, (q) =>
+            Array.reduce(
+              indexFieldValues,
+              q,
+              (q_, v, i) => q_.eq(indexFields[i] as any, v as any) as any,
+            ),
+          )
+          .unique(),
+      ),
+      Effect.andThen(
+        Either.fromNullable(
+          () => new NoDocumentsMatchQueryError({ tableName }),
+        ),
+      ),
+      Effect.andThen(decode(tableName, confectTableDefinition.tableSchema)),
+    );
+  };
+
+  const withIndex: ConfectQueryFunction<"withIndex"> = (
+    indexName,
+    indexRange,
+  ) =>
+    makeConfectQuery<ConfectDataModel[TableName], TableName>(
+      convexDatabaseReader.query(tableName).withIndex(indexName, indexRange),
+      tableName,
+      confectTableDefinition.tableSchema,
+    );
+
+  return {
+    getbyId,
+    getManyById,
+    getByIndex,
+    withIndex,
   };
 };
 
@@ -255,7 +443,6 @@ const makeConfectOrderedQuery = <
     FunctionName extends keyof ConfectOrderedQuery<ConfectTableInfo, TableName>,
   > = ConfectOrderedQuery<ConfectTableInfo, TableName>[FunctionName];
 
-  // TODO: Encoded variants for everything?
   const streamEncoded = Stream.fromAsyncIterable(query, identity).pipe(
     Stream.orDie,
   );
@@ -309,62 +496,71 @@ const makeConfectOrderedQuery = <
   };
 };
 
-export class DocumentNotFoundError extends Schema.TaggedError<DocumentNotFoundError>(
-  "DocumentNotFoundError",
-)("DocumentNotFoundError", {
-  id: Schema.String,
-  tableName: Schema.String,
-}) {
-  override get message(): string {
-    return documentQueryMessage({
-      id: this.id,
-      tableName: this.tableName,
-      message: "not found",
-    });
-  }
-}
+const encode = Function.dual<
+  <
+    ConfectDataModel extends GenericConfectDataModel,
+    TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+  >(
+    tableName: TableName,
+    tableSchema: TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>,
+  ) => (
+    self: ConfectDataModel[TableName]["confectDocument"],
+  ) => Effect.Effect<
+    ConfectDataModel[TableName]["encodedConfectDocument"],
+    DocumentEncodeError
+  >,
+  <
+    ConfectDataModel extends GenericConfectDataModel,
+    TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+  >(
+    self: ConfectDataModel[TableName]["confectDocument"],
+    tableName: TableName,
+    tableSchema: TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>,
+  ) => Effect.Effect<
+    ConfectDataModel[TableName]["encodedConfectDocument"],
+    DocumentEncodeError
+  >
+>(
+  3,
+  <
+    ConfectDataModel extends GenericConfectDataModel,
+    TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+  >(
+    self: ConfectDataModel[TableName]["confectDocument"],
+    tableName: TableName,
+    tableSchema: TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>,
+  ): Effect.Effect<
+    ConfectDataModel[TableName]["encodedConfectDocument"],
+    DocumentEncodeError
+  > =>
+    Effect.gen(function* () {
+      const TableSchemaWithSystemFields = extendWithSystemFields(
+        tableName,
+        tableSchema,
+      );
 
-export class DocumentDecodeError extends Schema.TaggedError<DocumentDecodeError>(
-  "DocumentDecodeError",
-)("DocumentDecodeError", {
-  tableName: Schema.String,
-  id: Schema.String,
-  parseError: Schema.Array(Schema.ArrayFormatterIssue),
-}) {
-  override get message(): string {
-    return documentQueryMessage({
-      id: this.id,
-      tableName: this.tableName,
-      message: `could not be decoded:\n\n  ${this.parseError}`,
-    });
-  }
-}
+      const decodedDoc = self as (typeof TableSchemaWithSystemFields)["Type"];
 
-class ConfectDatabaseWriter extends Effect.Tag(
-  "@rjdellecese/confect/ConfectDatabaseWriter",
-)<
-  ConfectDatabaseWriter,
-  {
-    readonly insert: <
-      TableName extends TableNamesInConfectDataModel<GenericConfectDataModel>,
-    >(
-      tableName: TableName,
-      document: WithoutSystemFields<
-        ConfectDocumentByName<GenericConfectDataModel, TableName>
-      >,
-    ) => Effect.Effect<GenericId<TableName>>;
-  }
->() {}
+      const encodedDoc = yield* pipe(
+        decodedDoc,
+        Schema.encode(tableSchema),
+        Effect.catchTag("ParseError", (parseError) =>
+          Effect.gen(function* () {
+            const formattedParseError =
+              yield* ParseResult.ArrayFormatter.formatError(parseError);
 
-const documentQueryMessage = ({
-  id,
-  tableName,
-  message,
-}: {
-  id: string;
-  tableName: string;
-  message: string;
-}) => `Document with ID '${id}' in table '${tableName}' ${message}`;
+            return yield* new DocumentEncodeError({
+              tableName,
+              id: decodedDoc._id,
+              parseError: formattedParseError,
+            });
+          }),
+        ),
+      );
+
+      return encodedDoc;
+    }),
+);
 
 const decode = Function.dual<
   <
@@ -432,3 +628,60 @@ const decode = Function.dual<
       return decodedDoc;
     }),
 );
+
+export class DocumentNotFoundError extends Schema.TaggedError<DocumentNotFoundError>(
+  "DocumentNotFoundError",
+)("DocumentNotFoundError", {
+  id: Schema.String,
+  tableName: Schema.String,
+}) {
+  override get message(): string {
+    return documentQueryMessage({
+      id: this.id,
+      tableName: this.tableName,
+      message: "not found",
+    });
+  }
+}
+
+export class DocumentEncodeError extends Schema.TaggedError<DocumentEncodeError>(
+  "DocumentEncodeError",
+)("DocumentEncodeError", {
+  tableName: Schema.String,
+  id: Schema.String,
+  parseError: Schema.Array(Schema.ArrayFormatterIssue),
+}) {
+  override get message(): string {
+    return documentQueryMessage({
+      id: this.id,
+      tableName: this.tableName,
+      message: `could not be encoded:\n\n  ${this.parseError}`,
+    });
+  }
+}
+
+export class DocumentDecodeError extends Schema.TaggedError<DocumentDecodeError>(
+  "DocumentDecodeError",
+)("DocumentDecodeError", {
+  tableName: Schema.String,
+  id: Schema.String,
+  parseError: Schema.Array(Schema.ArrayFormatterIssue),
+}) {
+  override get message(): string {
+    return documentQueryMessage({
+      id: this.id,
+      tableName: this.tableName,
+      message: `could not be decoded:\n\n  ${this.parseError}`,
+    });
+  }
+}
+
+const documentQueryMessage = ({
+  id,
+  tableName,
+  message,
+}: {
+  id: string;
+  tableName: string;
+  message: string;
+}) => `Document with ID '${id}' in table '${tableName}' ${message}`;
