@@ -18,6 +18,11 @@ import type {
   SystemTableNames,
   PaginationResult,
   GenericDocument,
+  SearchIndexes,
+  SearchFilterBuilder,
+  DocumentByInfo,
+  NamedSearchIndex,
+  SearchFilter,
 } from "convex/server";
 import type { GenericId } from "convex/values";
 import {
@@ -389,6 +394,24 @@ type ConfectQueryInitializer<
       >,
     ) => IndexRange,
   ) => ConfectQuery<ConfectDataModel[TableName], TableName>;
+  withSearchIndex<
+    IndexName extends keyof SearchIndexes<
+      TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>
+    >,
+  >(
+    indexName: IndexName,
+    searchFilter: (
+      q: SearchFilterBuilder<
+        DocumentByInfo<
+          TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>
+        >,
+        NamedSearchIndex<
+          TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>,
+          IndexName
+        >
+      >,
+    ) => SearchFilter,
+  ): ConfectOrderedQuery<ConfectDataModel[TableName], TableName>;
   readonly first: () => Effect.Effect<
     ConfectDataModel[TableName]["confectDocument"],
     DocumentDecodeError | NoDocumentsMatchQueryError
@@ -501,6 +524,18 @@ const makeConfectQueryInitializer = <
       confectTableDefinition.tableSchema,
     );
 
+  const withSearchIndex: ConfectQueryFunction<"withSearchIndex"> = (
+    indexName,
+    searchFilter,
+  ) =>
+    makeConfectOrderedQuery<ConfectDataModel[TableName], TableName>(
+      convexDatabaseReader
+        .query(tableName)
+        .withSearchIndex(indexName, searchFilter),
+      tableName,
+      confectTableDefinition.tableSchema,
+    );
+
   const first: ConfectQueryFunction<"first"> = () =>
     pipe(
       stream(),
@@ -569,6 +604,7 @@ const makeConfectQueryInitializer = <
     getByIndex,
     stream,
     withIndex,
+    withSearchIndex,
     first,
     unique,
     take,

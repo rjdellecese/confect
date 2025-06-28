@@ -208,10 +208,10 @@ export const search = query({
   returns: Schema.Array(Schema.String),
   handler: ({ query, tag }) =>
     Effect.gen(function* () {
-      const { db } = yield* ConfectQueryCtx;
+      const reader = yield* ConfectDatabaseReader;
 
-      return yield* db
-        .query("notes")
+      return yield* reader
+        .table("notes")
         .withSearchIndex("text", (q) => q.search("text", query).eq("tag", tag))
         .collect()
         .pipe(Effect.map(Array.map((note) => note.text)));
