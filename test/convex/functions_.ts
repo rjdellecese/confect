@@ -89,22 +89,6 @@ export const mutationCollect = mutation({
     }),
 });
 
-export const filterFirst = query({
-  args: Schema.Struct({
-    text: Schema.String,
-  }),
-  returns: Schema.Option(confectSchema.tableSchemas.notes.withSystemFields),
-  handler: ({ text }) =>
-    Effect.gen(function* () {
-      const reader = yield* ConfectDatabaseReader;
-
-      return yield* reader
-        .table("notes")
-        .filter((q) => q.eq(q.field("text"), text))
-        .first();
-    }),
-});
-
 export const withIndexFirst = query({
   args: Schema.Struct({
     text: Schema.String,
@@ -154,9 +138,9 @@ export const paginate = query({
   returns: PaginationResult(confectSchema.tableSchemas.notes.withSystemFields),
   handler: ({ cursor, numItems }) =>
     Effect.gen(function* () {
-      const { db } = yield* ConfectQueryCtx;
+      const reader = yield* ConfectDatabaseReader;
 
-      return yield* db.query("notes").paginate({ cursor, numItems });
+      return yield* reader.table("notes").paginate({ cursor, numItems });
     }),
 });
 
@@ -231,32 +215,6 @@ export const search = query({
         .withSearchIndex("text", (q) => q.search("text", query).eq("tag", tag))
         .collect()
         .pipe(Effect.map(Array.map((note) => note.text)));
-    }),
-});
-
-export const queryNormalizeId = query({
-  args: Schema.Struct({
-    noteId: Id("notes"),
-  }),
-  returns: Schema.Option(Id("notes")),
-  handler: ({ noteId }) =>
-    Effect.gen(function* () {
-      const { db } = yield* ConfectQueryCtx;
-
-      return db.normalizeId("notes", noteId);
-    }),
-});
-
-export const mutationNormalizeId = mutation({
-  args: Schema.Struct({
-    noteId: Id("notes"),
-  }),
-  returns: Schema.Option(Id("notes")),
-  handler: ({ noteId }) =>
-    Effect.gen(function* () {
-      const { db } = yield* ConfectMutationCtx;
-
-      return db.normalizeId("notes", noteId);
     }),
 });
 

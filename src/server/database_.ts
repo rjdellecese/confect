@@ -15,6 +15,9 @@ import type {
   GenericDatabaseWriter,
   BetterOmit,
   Expand,
+  SystemTableNames,
+  PaginationResult,
+  GenericDocument,
 } from "convex/server";
 import type { GenericId } from "convex/values";
 import {
@@ -37,6 +40,7 @@ import type {
   ConfectDocumentByName,
   DataModelFromConfectDataModel,
   GenericConfectDataModel,
+  GenericConfectDocument,
   GenericConfectDocumentWithSystemFields,
   GenericConfectTableInfo,
   TableInfoFromConfectTableInfo,
@@ -121,7 +125,9 @@ export const makeConfectDatabaseServices = <
 
   const ConfectDatabaseReader = Context.GenericTag<{
     readonly table: <
-      TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+      TableName extends
+        | TableNamesInConfectDataModel<ConfectDataModel>
+        | SystemTableNames,
     >(
       tableName: TableName,
     ) => ConfectQueryInitializer<ConfectDataModel, TableName>;
@@ -404,6 +410,13 @@ type ConfectQueryInitializer<
   readonly order: (
     order: "asc" | "desc",
   ) => ConfectOrderedQuery<ConfectDataModel[TableName], TableName>;
+  readonly paginate: (options: {
+    cursor: string | null;
+    numItems: number;
+  }) => Effect.Effect<
+    PaginationResult<ConfectDataModel[TableName]["confectDocument"]>,
+    DocumentDecodeError
+  >;
 };
 
 const makeConfectQueryInitializer = <
@@ -545,6 +558,11 @@ const makeConfectQueryInitializer = <
       confectTableDefinition.tableSchema,
     );
 
+  const paginate: ConfectQueryFunction<"paginate"> = makePaginateFunction(
+    (options) => convexDatabaseReader.query(tableName).paginate(options),
+    decode(tableName, confectTableDefinition.tableSchema),
+  );
+
   return {
     getbyId,
     getManyById,
@@ -556,6 +574,7 @@ const makeConfectQueryInitializer = <
     take,
     collect,
     order,
+    paginate,
   };
 };
 
@@ -608,6 +627,13 @@ type ConfectOrderedQuery<
   >;
   readonly stream: () => Stream.Stream<
     ConfectTableInfo["confectDocument"],
+    DocumentDecodeError
+  >;
+  readonly paginate: (options: {
+    cursor: string | null;
+    numItems: number;
+  }) => Effect.Effect<
+    PaginationResult<ConfectTableInfo["confectDocument"]>,
     DocumentDecodeError
   >;
 };
@@ -705,12 +731,19 @@ const makeConfectOrderedQuery = <
   const collect: ConfectOrderedQueryFunction<"collect"> = () =>
     pipe(stream(), Stream.runCollect, Effect.map(Chunk.toReadonlyArray));
 
+  const paginate: ConfectOrderedQueryFunction<"paginate"> =
+    makePaginateFunction(
+      (options) => query.paginate(options),
+      decode(tableName, tableSchema),
+    );
+
   return {
     first,
     unique,
     take,
     collect,
     stream,
+    paginate,
   };
 };
 
@@ -903,3 +936,43 @@ const documentQueryMessage = ({
   tableName: string;
   message: string;
 }) => `Document with ID '${id}' in table '${tableName}' ${message}`;
+
+const makePaginateFunction =
+  <
+    ConfectDocument extends GenericConfectDocument,
+    ConvexDocument extends GenericDocument,
+  >(
+    getPaginationResult: (options: {
+      cursor: string | null;
+      numItems: number;
+    }) => Promise<PaginationResult<ConvexDocument>>,
+    decodeDocument: (
+      doc: ConvexDocument,
+    ) => Effect.Effect<ConfectDocument, DocumentDecodeError>,
+  ) =>
+  (options: {
+    cursor: string | null;
+    numItems: number;
+  }) =>
+    Effect.gen(function* () {
+      const paginationResult = yield* Effect.promise(() =>
+        getPaginationResult(options),
+      );
+
+      const parsedPage = yield* Effect.forEach(
+        paginationResult.page,
+        decodeDocument,
+      );
+
+      return {
+        page: parsedPage,
+        isDone: paginationResult.isDone,
+        continueCursor: paginationResult.continueCursor,
+        ...(paginationResult.splitCursor
+          ? { splitCursor: paginationResult.splitCursor }
+          : {}),
+        ...(paginationResult.pageStatus
+          ? { pageStatus: paginationResult.pageStatus }
+          : {}),
+      };
+    });
