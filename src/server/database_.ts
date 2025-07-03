@@ -193,6 +193,27 @@ export const makeConfectDatabaseServices = <
       void,
       DocumentNotFoundError | DocumentDecodeError | DocumentEncodeError
     >;
+    readonly replace: <
+      TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+    >(
+      tableName: TableName,
+      id: GenericId<TableName>,
+      value: WithoutSystemFields<
+        ConfectDocumentByName<ConfectDataModel, TableName>
+      >,
+    ) => Effect.Effect<
+      void,
+      DocumentNotFoundError | DocumentDecodeError | DocumentEncodeError
+    >;
+    readonly delete: <
+      TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+    >(
+      tableName: TableName,
+      id: GenericId<TableName>,
+    ) => Effect.Effect<
+      void,
+      DocumentNotFoundError | DocumentDecodeError | DocumentEncodeError
+    >;
   }>("@rjdellecese/confect/ConfectDatabaseWriter");
 
   type ConfectDatabaseWriter = typeof ConfectDatabaseWriter.Identifier;
@@ -300,9 +321,57 @@ export const makeConfectDatabaseServices = <
           );
         });
 
+      const replace: ConfectDatabaseWriterFunction<"replace"> = <
+        TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+      >(
+        tableName: TableName,
+        id: GenericId<TableName>,
+        value: WithoutSystemFields<
+          ConfectDocumentByName<ConfectDataModel, TableName>
+        >,
+      ) =>
+        Effect.gen(function* () {
+          const confectTableDefinition = confectDatabaseSchema.confectSchema[
+            tableName
+          ] as ConfectSchemaDefinition["confectSchema"][TableName];
+
+          const tableSchema =
+            confectTableDefinition.tableSchema as TableSchemaFromConfectTableInfo<
+              ConfectDataModel[TableName]
+            >;
+
+          const updatedEncodedDoc = yield* encode(
+            value,
+            tableName,
+            tableSchema,
+          );
+
+          yield* Effect.promise(() =>
+            convexDatabaseWriter.replace(
+              id,
+              updatedEncodedDoc as Expand<
+                BetterOmit<
+                  DocumentByName<
+                    DataModelFromConfectDataModel<ConfectDataModel>,
+                    TableName
+                  >,
+                  "_creationTime" | "_id"
+                >
+              >,
+            ),
+          );
+        });
+
+      const delete_: ConfectDatabaseWriterFunction<"delete"> = (
+        _tableName,
+        id,
+      ) => Effect.promise(() => convexDatabaseWriter.delete(id));
+
       return ConfectDatabaseWriter.of({
         insert,
         patch,
+        replace,
+        delete: delete_,
       });
     }),
   );

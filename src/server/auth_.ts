@@ -1,5 +1,5 @@
 import type { Auth } from "convex/server";
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 
 export class ConvexAuth extends Effect.Tag("@rjdellecese/confect/ConvexAuth")<
   ConvexAuth,
@@ -13,7 +13,7 @@ export class ConfectAuth extends Effect.Service<ConfectAuth>()(
       // TODO: Which errors might occur?
       getUserIdentity: ConvexAuth.use(({ getUserIdentity }) =>
         getUserIdentity(),
-      ),
+      ).pipe(Effect.map(Option.fromNullable)),
     },
   },
 ) {}

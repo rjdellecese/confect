@@ -61,6 +61,7 @@
 		"@biomejs/biome": "1.9.4",
 		"@changesets/cli": "2.29.2",
 		"@changesets/config": "3.1.1",
+		"@effect/language-service": "^0.23.3",
 		"@effect/platform-node": "0.77.3",
 		"@effect/vitest": "0.20.16",
 		"@swc/jest": "0.2.38",

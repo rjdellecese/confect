@@ -30,6 +30,9 @@ importers:
       '@changesets/config':
         specifier: 3.1.1
         version: 3.1.1
+      '@effect/language-service':
+        specifier: ^0.23.3
+        version: 0.23.3
       '@effect/platform-node':
         specifier: 0.77.3
         version: 0.77.3(@effect/cluster@0.30.3(@effect/platform@0.80.15(effect@3.14.15))(@effect/rpc@0.56.3(@effect/platform@0.80.15(effect@3.14.15))(effect@3.14.15))(@effect/sql@0.33.15(@effect/experimental@0.44.15(@effect/platform@0.80.15(effect@3.14.15))(effect@3.14.15))(@effect/platform@0.80.15(effect@3.14.15))(effect@3.14.15))(effect@3.14.15))(@effect/platform@0.80.15(effect@3.14.15))(@effect/rpc@0.56.3(@effect/platform@0.80.15(effect@3.14.15))(effect@3.14.15))(@effect/sql@0.33.15(@effect/experimental@0.44.15(@effect/platform@0.80.15(effect@3.14.15))(effect@3.14.15))(@effect/platform@0.80.15(effect@3.14.15))(effect@3.14.15))(effect@3.14.15)
@@ -248,6 +251,9 @@ packages:
         optional: true
       lmdb:
         optional: true
+
+  '@effect/language-service@0.23.3':
+    resolution: {integrity: sha512-yurF+FHd1HwM/3Mh7kQCea+z4wvbs2/NLPyk6FiEWA2sppRKv4Kp4luwfUqWqyd9/uyScWJcHX7WK1caLpx4Pw==}
 
   '@effect/platform-node-shared@0.31.3':
     resolution: {integrity: sha512-WxdC7IScL13r70eiQg9Bb1UBAPH98PGPutncvQWJtVHVHztKEEL1ARO/Gsah7Jcz2WrKKtQRBqO3P7WlQtYyWQ==}
@@ -2435,6 +2441,8 @@ snapshots:
       '@effect/platform': 0.80.15(effect@3.14.15)
       effect: 3.14.15
       uuid: 11.1.0
+
+  '@effect/language-service@0.23.3': {}
 
   '@effect/platform-node-shared@0.31.3(@effect/cluster@0.30.3(@effect/platform@0.80.15(effect@3.14.15))(@effect/rpc@0.56.3(@effect/platform@0.80.15(effect@3.14.15))(effect@3.14.15))(@effect/sql@0.33.15(@effect/experimental@0.44.15(@effect/platform@0.80.15(effect@3.14.15))(effect@3.14.15))(@effect/platform@0.80.15(effect@3.14.15))(effect@3.14.15))(effect@3.14.15))(@effect/platform@0.80.15(effect@3.14.15))(@effect/rpc@0.56.3(@effect/platform@0.80.15(effect@3.14.15))(effect@3.14.15))(@effect/sql@0.33.15(@effect/experimental@0.44.15(@effect/platform@0.80.15(effect@3.14.15))(effect@3.14.15))(@effect/platform@0.80.15(effect@3.14.15))(effect@3.14.15))(effect@3.14.15)':
     dependencies:

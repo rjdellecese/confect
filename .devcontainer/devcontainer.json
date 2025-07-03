@@ -7,7 +7,8 @@
         "YoavBls.pretty-ts-errors",
         "vitest.explorer",
         "biomejs.biome",
-        "DavidAnson.vscode-markdownlint"
+        "DavidAnson.vscode-markdownlint",
+        "effectful-tech.effect-vscode"
       ],
       "settings": {
         "editor.defaultFormatter": "biomejs.biome",
@@ -21,7 +22,6 @@
     }
   },
   "features": {
-    "ghcr.io/devcontainers-contrib/features/act:1": {},
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
     "ghcr.io/devcontainers/features/github-cli:1": {}
   }

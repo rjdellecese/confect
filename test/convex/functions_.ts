@@ -6,7 +6,6 @@ import {
   type ParseResult,
   Schema,
   Stream,
-  pipe,
 } from "effect";
 import { Id } from "~/src/server/schemas/Id";
 import { PaginationResult } from "~/src/server/schemas/PaginationResult";
@@ -21,6 +20,7 @@ import {
   mutation,
   query,
   ConfectDatabaseWriter,
+  ConfectAuth,
 } from "~/test/convex/confect_";
 import { confectSchema } from "~/test/convex/schema";
 import type {
@@ -306,9 +306,11 @@ export const replace = mutation({
   returns: Schema.Null,
   handler: ({ noteId, fields }) =>
     Effect.gen(function* () {
-      const { db } = yield* ConfectMutationCtx;
+      const writer = yield* ConfectDatabaseWriter;
 
-      return yield* db.replace(noteId, fields).pipe(Effect.as(null));
+      yield* writer.replace("notes", noteId, fields);
+
+      return null;
     }),
 });
 
@@ -319,9 +321,11 @@ export const deleteNote = mutation({
   returns: Schema.Null,
   handler: ({ noteId }) =>
     Effect.gen(function* () {
-      const { db } = yield* ConfectMutationCtx;
+      const writer = yield* ConfectDatabaseWriter;
 
-      return yield* db.delete(noteId).pipe(Effect.as(null));
+      yield* writer.delete("notes", noteId);
+
+      return null;
     }),
 });
 
@@ -330,9 +334,9 @@ export const isAuthenticated = query({
   returns: Schema.Boolean,
   handler: () =>
     Effect.gen(function* () {
-      const { auth } = yield* ConfectQueryCtx;
+      const auth = yield* ConfectAuth;
 
-      return yield* auth.getUserIdentity().pipe(Effect.map(Option.isSome));
+      return yield* auth.getUserIdentity.pipe(Effect.map(Option.isSome));
     }),
 });
 
@@ -343,9 +347,9 @@ export const actionQuery = internalQuery({
   returns: Schema.Null,
   handler: () =>
     Effect.gen(function* () {
-      const { db } = yield* ConfectQueryCtx;
+      const reader = yield* ConfectDatabaseReader;
 
-      return yield* db.query("notes").collect().pipe(Effect.as(null));
+      return yield* reader.table("notes").collect().pipe(Effect.as(null));
     }),
 });
 
@@ -354,9 +358,9 @@ export const actionMutation = internalMutation({
   returns: Id("notes"),
   handler: () =>
     Effect.gen(function* () {
-      const { db } = yield* ConfectMutationCtx;
+      const writer = yield* ConfectDatabaseWriter;
 
-      return yield* db.insert("notes", { text: "Hello, world!" });
+      return yield* writer.insert("notes", { text: "Hello, world!" });
     }),
 });
 
@@ -528,19 +532,6 @@ export const insertAt = action({
     }),
 });
 
-export const systemNormalizeId = query({
-  args: Schema.Struct({
-    id: Id("_storage"),
-  }),
-  returns: Schema.Option(Id("_storage")),
-  handler: ({ id }) =>
-    Effect.gen(function* () {
-      const { db } = yield* ConfectQueryCtx;
-
-      return db.system.normalizeId("_storage", id);
-    }),
-});
-
 export const systemGet = query({
   args: Schema.Struct({
     id: Id("_storage"),
@@ -550,7 +541,7 @@ export const systemGet = query({
     Effect.gen(function* () {
       const reader = yield* ConfectDatabaseReader;
 
-      return yield* db.system.get(id);
+      return yield* reader.system.get(id);
     }),
 });
 
@@ -559,9 +550,9 @@ export const systemQuery = query({
   returns: Schema.Array(confectSchema.tableSchemas._storage.withSystemFields),
   handler: () =>
     Effect.gen(function* () {
-      const { db } = yield* ConfectQueryCtx;
+      const reader = yield* ConfectDatabaseReader;
 
-      return yield* db.system.query("_storage").collect();
+      return yield* reader.system.query("_storage").collect();
     }),
 });
 

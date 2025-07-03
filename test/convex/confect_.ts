@@ -21,6 +21,10 @@ export const {
   ConfectDatabaseReader,
   ConvexDatabaseWriter,
   ConfectDatabaseWriter,
+  ConvexAuth,
+  ConfectAuth,
+  ConvexScheduler,
+  ConfectScheduler,
 } = makeFunctions(confectSchema);
 
 type ConfectSchema = typeof confectSchema;
