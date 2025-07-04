@@ -1,7 +1,8 @@
-dist/
-coverage/
-node_modules/
-tsconfig.vitest-temp.json
 .env.local
+.pnpm-store/
 .tsup
 .vscode/
+coverage/
+dist/
+node_modules/
+tsconfig.vitest-temp.json
