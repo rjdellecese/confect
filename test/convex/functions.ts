@@ -365,12 +365,12 @@ export const isAuthenticated = query({
 
 export const actionQuery = internalQuery({
   args: Schema.Struct({}),
-  returns: Schema.Null,
+  returns: Schema.Array(confectSchema.tableSchemas.notes.withSystemFields),
   handler: () =>
     Effect.gen(function* () {
       const { db } = yield* ConfectQueryCtx;
 
-      return yield* db.query("notes").collect().pipe(Effect.as(null));
+      return yield* db.query("notes").collect()
     }),
 });
 
@@ -390,6 +390,32 @@ export const actionNoop = internalAction({
   returns: Schema.Null,
   handler: (_ctx) => Effect.succeed(null),
 });
+
+const ReturnArray = Schema.Array(confectSchema.tableSchemas.notes.withSystemFields)
+export const runQueryOnly = query({
+  args: Schema.Struct({}),
+  returns: Schema.encodedSchema(ReturnArray),
+  handler: (): Effect.Effect<
+    typeof ReturnArray.Encoded,
+    never,
+    ConfectQueryCtx
+  > => Effect.gen(function* () {
+    const { runQuery } = yield* ConfectQueryCtx;
+    return yield* runQuery(internal.functions.actionQuery);
+  })
+});
+const ReturnMutation = Id("notes").Type
+export const runQueryAndMutationOnly = mutation({
+  args: Schema.Struct({}),
+  returns: Id("notes"),
+  handler: (): Effect.Effect<typeof ReturnMutation, never, ConfectMutationCtx> =>
+    Effect.gen(function* () {
+      const { runQuery, runMutation } = yield* ConfectMutationCtx;
+
+      yield* runQuery(internal.functions.actionQuery);
+      return yield* runMutation(internal.functions.actionMutation);;
+    }),
+})
 
 export const runQueryAndMutation = action({
   args: Schema.Struct({}),

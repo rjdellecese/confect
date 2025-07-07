@@ -40,6 +40,16 @@ import {
 export type ConfectMutationCtx<
   ConfectDataModel extends GenericConfectDataModel,
 > = {
+  runMutation<
+    Mutation extends FunctionReference<"mutation", "public" | "internal">,
+  >(
+    mutation: Mutation,
+    ...args: OptionalRestArgs<Mutation>
+  ): Effect.Effect<FunctionReturnType<Mutation>>;
+  runQuery<Query extends FunctionReference<"query", "public" | "internal">>(
+    query: Query,
+    ...args: OptionalRestArgs<Query>
+  ): Effect.Effect<FunctionReturnType<Query>>;
   db: ConfectDatabaseWriter<ConfectDataModel>;
   auth: ConfectAuth;
   storage: ConfectStorageWriter;
@@ -55,6 +65,10 @@ export const ConfectMutationCtx = <
 
 export type ConfectQueryCtx<ConfectDataModel extends GenericConfectDataModel> =
   {
+    runQuery<Query extends FunctionReference<"query", "public" | "internal">>(
+      query: Query,
+      ...args: OptionalRestArgs<Query>
+    ): Effect.Effect<FunctionReturnType<Query>>;
     db: ConfectDatabaseReader<ConfectDataModel>;
     auth: ConfectAuth;
     storage: ConfectStorageReader;
@@ -124,6 +138,10 @@ export const makeConfectQueryCtx = <
   ctx: GenericQueryCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
   databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>,
 ): ConfectQueryCtx<ConfectDataModel> => ({
+  runQuery: <Query extends FunctionReference<"query", "public" | "internal">>(
+    query: Query,
+    ...queryArgs: OptionalRestArgs<Query>
+  ) => Effect.promise(() => ctx.runQuery(query, ...queryArgs)),
   db: new ConfectDatabaseReaderImpl(ctx.db, databaseSchemas),
   auth: new ConfectAuthImpl(ctx.auth),
   storage: new ConfectStorageReaderImpl(ctx.storage),
@@ -135,6 +153,16 @@ export const makeConfectMutationCtx = <
   ctx: GenericMutationCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
   databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>,
 ): ConfectMutationCtx<ConfectDataModel> => ({
+  runMutation: <
+    Mutation extends FunctionReference<"mutation", "public" | "internal">,
+  >(
+    mutation: Mutation,
+    ...mutationArgs: OptionalRestArgs<Mutation>
+  ) => Effect.promise(() => ctx.runMutation(mutation, ...mutationArgs)),
+  runQuery: <Query extends FunctionReference<"query", "public" | "internal">>(
+    query: Query,
+    ...queryArgs: OptionalRestArgs<Query>
+  ) => Effect.promise(() => ctx.runQuery(query, ...queryArgs)),
   db: new ConfectDatabaseWriterImpl(ctx.db, databaseSchemas),
   auth: new ConfectAuthImpl(ctx.auth),
   storage: new ConfectStorageWriterImpl(ctx.storage),

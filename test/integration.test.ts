@@ -1,5 +1,6 @@
 import { describe, expect, vi } from "@effect/vitest";
 import { Array, Effect, Exit, Order, Schema, String } from "effect";
+import * as Option from "effect/Option";
 
 import { NotUniqueError } from "~/src/server/database";
 import { test } from "~/test/convex-effect-test";
@@ -146,7 +147,6 @@ test("order desc + collect", () =>
       thirdText,
     ]);
   }));
-
 test("take", () =>
   Effect.gen(function* () {
     const c = yield* TestConvexService;
@@ -567,6 +567,55 @@ describe("authentication", () => {
     }));
 });
 
+describe("queries", () => {
+  test("runQuery", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConvexService;
+
+      yield* Effect.all([
+        c.run(({ db }) => db.insert("notes", { text: "Hello, world!" })),
+        c.run(({ db }) => db.insert("notes", { text: "Hello, world!" }))
+      ])
+
+      const notes = yield* c.query(api.functions.runQueryOnly);
+
+      expect(notes).toMatchObject([
+        {
+          _id: '10000;notes',
+          text: 'Hello, world!'
+        },
+        {
+          _id: '10001;notes',
+          text: 'Hello, world!'
+        }
+      ]);
+    }),
+  );
+});
+
+describe("mutations", () => {
+  test("runQueryAndMutation", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConvexService;
+
+      yield* Effect.all([
+        c.run(({ db }) => db.insert("notes", { text: "Hello, world!" })),
+        c.run(({ db }) => db.insert("notes", { text: "Hello, world!" }))
+      ])
+
+      const noteId = yield* c.mutation(api.functions.runQueryAndMutationOnly);
+      const insertedNote = yield* c.query(api.functions.queryGet, { noteId });
+      const decodedNote = yield* Schema.decodeUnknownOption(Schema.Option(Schema.Any))(insertedNote);
+
+      //TODO: These methods dont return the Schema.Type but the Schema.Encoded version
+      expect(Option.getOrThrow(decodedNote)).toMatchObject({
+        _id: noteId,
+        text: 'Hello, world!'
+      });
+    }),
+  );
+});
+
 describe("actions", () => {
   test("action with auth and run methods", () =>
     Effect.gen(function* () {
@@ -827,3 +876,4 @@ describe("storage", () => {
       expect(storageDoc).toEqual(null);
     }));
 });
+
