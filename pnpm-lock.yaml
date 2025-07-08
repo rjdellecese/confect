@@ -52,8 +52,8 @@ importers:
         specifier: 0.0.36
         version: 0.0.36(convex@1.23.0)
       dotenv:
-        specifier: 16.5.0
-        version: 16.5.0
+        specifier: 17.0.1
+        version: 17.0.1
       tsup:
         specifier: 8.4.0
         version: 8.4.0(@microsoft/api-extractor@7.47.8(@types/node@22.15.3))(@swc/core@1.4.1)(postcss@8.5.3)(typescript@5.8.3)(yaml@2.6.0)
@@ -1275,8 +1275,8 @@ packages:
     resolution: {integrity: sha512-WkrWp9GR4KXfKGYzOLmTuGVi1UWFfws377n9cc55/tb6DuqyF6pcQ5AbiHEshaDpY9v6oaSr2XCDidGmMwdzIA==}
     engines: {node: '>=8'}
 
-  dotenv@16.5.0:
-    resolution: {integrity: sha512-m/C+AwOAr9/W1UOIZUo232ejMNnJAJtYQjUbHoNTBNTJSvqzzDh7vnrei3o3r3m9blf6ZoDkvcw0VmozNRFJxg==}
+  dotenv@17.0.1:
+    resolution: {integrity: sha512-GLjkduuAL7IMJg/ZnOPm9AnWKJ82mSE2tzXLaJ/6hD6DhwGfZaXG77oB8qbReyiczNxnbxQKyh0OE5mXq0bAHA==}
     engines: {node: '>=12'}
 
   eastasianwidth@0.2.0:
@@ -3266,7 +3266,7 @@ snapshots:
     dependencies:
       path-type: 4.0.0
 
-  dotenv@16.5.0: {}
+  dotenv@17.0.1: {}
 
   eastasianwidth@0.2.0: {}
 
