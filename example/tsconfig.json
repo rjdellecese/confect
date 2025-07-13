@@ -1,5 +1,11 @@
 {
   "compilerOptions": {
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        "transform": "@effect/language-service/transform"
+      }
+    ],
     "exactOptionalPropertyTypes": false,
     "lib": ["ESNext", "DOM"],
     "target": "ESNext",

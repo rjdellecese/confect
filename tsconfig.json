@@ -2,7 +2,8 @@
   "compilerOptions": {
     "plugins": [
       {
-        "name": "@effect/language-service"
+        "name": "@effect/language-service",
+        "transform": "@effect/language-service/transform"
       }
     ],
     "importsNotUsedAsValues": "remove",

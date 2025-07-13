@@ -15,11 +15,18 @@ import {
 } from "convex/server";
 import { Effect, Layer, Schema, pipe } from "effect";
 
-import { ConfectActionCtx, makeConfectActionCtx } from "~/src/server/ctx";
+import { ConfectAuth } from "~/src/server/auth_";
 import type {
   DataModelFromConfectDataModel,
   GenericConfectDataModel,
 } from "~/src/server/data-model";
+import { makeConfectDatabaseServices } from "~/src/server/database_";
+import {
+  ConfectActionRunner,
+  ConfectMutationRunner,
+  ConfectQueryRunner,
+} from "~/src/server/runners";
+import { ConfectScheduler } from "~/src/server/scheduler_";
 import type {
   ConfectDataModelFromConfectSchema,
   ConfectSchemaDefinition,
@@ -29,16 +36,11 @@ import {
   compileArgsSchema,
   compileReturnsSchema,
 } from "~/src/server/schema-to-validator";
-import { makeConfectDatabaseServices } from "~/src/server/database_";
-import { ConfectAuth, ConvexAuth } from "~/src/server/auth_";
-import { ConfectScheduler, ConvexScheduler } from "~/src/server/scheduler_";
 import {
+  ConfectStorageActionWriter,
   ConfectStorageReader,
   ConfectStorageWriter,
-  ConvexStorageReader,
-  ConvexStorageWriter,
-} from "./storage_";
-import { ConfectQueryRunner, ConvexQueryRunner } from "./query_runner";
+} from "~/src/server/storage_";
 
 export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
   confectSchemaDefinition: ConfectSchemaDefinition<ConfectSchema>,
@@ -61,8 +63,6 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
   type ConfectDatabaseReader = typeof ConfectDatabaseReader.Service;
   type ConvexDatabaseWriter = typeof ConvexDatabaseWriter.Service;
   type ConfectDatabaseWriter = typeof ConfectDatabaseWriter.Service;
-  type ConfectAuth = typeof ConfectAuth.Service;
-  type ConfectScheduler = typeof ConfectScheduler.Service;
 
   const query = <
     ConvexArgs extends DefaultFunctionArgs,
@@ -84,11 +84,8 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
       E,
       | ConvexDatabaseReader
       | ConfectDatabaseReader
-      | ConvexAuth
       | ConfectAuth
-      | ConvexStorageReader
       | ConfectStorageReader
-      | ConvexQueryRunner
       | ConfectQueryRunner
     >;
   }): RegisteredQuery<"public", ConvexArgs, Promise<ConvexReturns>> =>
@@ -114,11 +111,8 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
       E,
       | ConvexDatabaseReader
       | ConfectDatabaseReader
-      | ConvexAuth
       | ConfectAuth
-      | ConvexStorageReader
       | ConfectStorageReader
-      | ConvexQueryRunner
       | ConfectQueryRunner
     >;
   }): RegisteredQuery<"internal", ConvexArgs, Promise<ConvexReturns>> =>
@@ -144,11 +138,8 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
       E,
       | ConvexDatabaseReader
       | ConfectDatabaseReader
-      | ConvexAuth
       | ConfectAuth
-      | ConvexStorageReader
       | ConfectStorageReader
-      | ConvexQueryRunner
       | ConfectQueryRunner
     >;
   }) => ({
@@ -163,30 +154,17 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
         Schema.decode(args),
         Effect.orDie,
         Effect.andThen((decodedArgs) =>
-          handler(decodedArgs).pipe(
+          pipe(
+            handler(decodedArgs),
             Effect.provide(
-              ConfectDatabaseReaderLive.pipe(
-                Layer.provideMerge(ConvexDatabaseReaderLive(ctx.db)),
-                Layer.provide(ConfectDatabaseSchemaDefinitionLive),
-              ),
-            ),
-            Effect.provide(
-              ConfectAuth.Default.pipe(
-                Layer.provideMerge(Layer.succeed(ConvexAuth, ctx.auth)),
-              ),
-            ),
-            Effect.provide(
-              ConfectStorageReader.Default.pipe(
-                Layer.provideMerge(
-                  Layer.succeed(ConvexStorageReader, ctx.storage),
+              Layer.mergeAll(
+                ConfectDatabaseReaderLive.pipe(
+                  Layer.provideMerge(ConvexDatabaseReaderLive(ctx.db)),
+                  Layer.provide(ConfectDatabaseSchemaDefinitionLive),
                 ),
-              ),
-            ),
-            Effect.provide(
-              ConfectQueryRunner.Default.pipe(
-                Layer.provideMerge(
-                  Layer.succeed(ConvexQueryRunner, ctx.runQuery),
-                ),
+                ConfectAuth.layer(ctx.auth),
+                ConfectStorageReader.layer(ctx.storage),
+                ConfectQueryRunner.layer(ctx.runQuery),
               ),
             ),
           ),
@@ -220,16 +198,12 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
       | ConfectDatabaseReader
       | ConvexDatabaseWriter
       | ConfectDatabaseWriter
-      | ConvexAuth
       | ConfectAuth
-      | ConvexScheduler
       | ConfectScheduler
-      | ConvexStorageReader
       | ConfectStorageReader
-      | ConvexStorageWriter
       | ConfectStorageWriter
-      | ConvexQueryRunner
       | ConfectQueryRunner
+      | ConfectMutationRunner
     >;
   }): RegisteredMutation<"public", ConvexValue, Promise<ConvexReturns>> =>
     mutationGeneric(confectMutationFunction({ args, returns, handler }));
@@ -256,16 +230,12 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
       | ConfectDatabaseReader
       | ConvexDatabaseWriter
       | ConfectDatabaseWriter
-      | ConvexAuth
       | ConfectAuth
-      | ConvexScheduler
       | ConfectScheduler
-      | ConvexStorageReader
       | ConfectStorageReader
-      | ConvexStorageWriter
       | ConfectStorageWriter
-      | ConvexQueryRunner
       | ConfectQueryRunner
+      | ConfectMutationRunner
     >;
   }): RegisteredMutation<"internal", ConvexValue, Promise<ConvexReturns>> =>
     internalMutationGeneric(
@@ -294,16 +264,12 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
       | ConfectDatabaseReader
       | ConvexDatabaseWriter
       | ConfectDatabaseWriter
-      | ConvexAuth
       | ConfectAuth
-      | ConvexScheduler
       | ConfectScheduler
-      | ConvexStorageReader
       | ConfectStorageReader
-      | ConvexStorageWriter
       | ConfectStorageWriter
-      | ConvexQueryRunner
       | ConfectQueryRunner
+      | ConfectMutationRunner
     >;
   }) => ({
     args: compileArgsSchema(args),
@@ -317,50 +283,26 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
         Schema.decode(args),
         Effect.orDie,
         Effect.andThen((decodedArgs) =>
-          handler(decodedArgs).pipe(
+          pipe(
+            handler(decodedArgs),
             Effect.provide(
-              ConfectDatabaseWriterLive.pipe(
-                Layer.provideMerge(ConvexDatabaseWriterLive(ctx.db)),
-                Layer.provideMerge(
-                  ConfectDatabaseReaderLive.pipe(
-                    Layer.provideMerge(ConvexDatabaseReaderLive(ctx.db)),
-                    Layer.provide(ConfectDatabaseSchemaDefinitionLive),
+              Layer.mergeAll(
+                ConfectDatabaseWriterLive.pipe(
+                  Layer.provideMerge(ConvexDatabaseWriterLive(ctx.db)),
+                  Layer.provideMerge(
+                    ConfectDatabaseReaderLive.pipe(
+                      Layer.provideMerge(ConvexDatabaseReaderLive(ctx.db)),
+                      Layer.provide(ConfectDatabaseSchemaDefinitionLive),
+                    ),
                   ),
+                  Layer.provide(ConfectDatabaseSchemaDefinitionLive),
                 ),
-                Layer.provide(ConfectDatabaseSchemaDefinitionLive),
-              ),
-            ),
-            Effect.provide(
-              ConfectAuth.Default.pipe(
-                Layer.provideMerge(Layer.succeed(ConvexAuth, ctx.auth)),
-              ),
-            ),
-            Effect.provide(
-              ConfectScheduler.Default.pipe(
-                Layer.provideMerge(
-                  Layer.succeed(ConvexScheduler, ctx.scheduler),
-                ),
-              ),
-            ),
-            Effect.provide(
-              ConfectStorageReader.Default.pipe(
-                Layer.provideMerge(
-                  Layer.succeed(ConvexStorageReader, ctx.storage),
-                ),
-              ),
-            ),
-            Effect.provide(
-              ConfectStorageWriter.Default.pipe(
-                Layer.provideMerge(
-                  Layer.succeed(ConvexStorageWriter, ctx.storage),
-                ),
-              ),
-            ),
-            Effect.provide(
-              ConfectQueryRunner.Default.pipe(
-                Layer.provideMerge(
-                  Layer.succeed(ConvexQueryRunner, ctx.runQuery),
-                ),
+                ConfectAuth.layer(ctx.auth),
+                ConfectScheduler.layer(ctx.scheduler),
+                ConfectStorageReader.layer(ctx.storage),
+                ConfectStorageWriter.layer(ctx.storage),
+                ConfectQueryRunner.layer(ctx.runQuery),
+                ConfectMutationRunner.layer(ctx.runMutation),
               ),
             ),
           ),
@@ -390,7 +332,14 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
     ) => Effect.Effect<
       ConfectReturns,
       E,
-      ConfectActionCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>
+      | ConfectScheduler
+      | ConfectAuth
+      | ConfectStorageReader
+      | ConfectStorageWriter
+      | ConfectStorageActionWriter
+      | ConfectQueryRunner
+      | ConfectMutationRunner
+      | ConfectActionRunner
     >;
   }): RegisteredAction<"public", ConvexValue, Promise<ConvexReturns>> =>
     actionGeneric(confectActionFunction({ args, returns, handler }));
@@ -413,7 +362,14 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
     ) => Effect.Effect<
       ConfectReturns,
       E,
-      ConfectActionCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>
+      | ConfectScheduler
+      | ConfectAuth
+      | ConfectStorageReader
+      | ConfectStorageWriter
+      | ConfectStorageActionWriter
+      | ConfectQueryRunner
+      | ConfectMutationRunner
+      | ConfectActionRunner
     >;
   }): RegisteredAction<"internal", ConvexValue, Promise<ConvexReturns>> =>
     internalActionGeneric(confectActionFunction({ args, returns, handler }));
@@ -429,14 +385,14 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
     ConfectDatabaseReader,
     ConvexDatabaseWriter,
     ConfectDatabaseWriter,
-    ConvexAuth,
     ConfectAuth,
-    ConvexScheduler,
     ConfectScheduler,
-    ConvexStorageReader,
     ConfectStorageReader,
-    ConvexStorageWriter,
     ConfectStorageWriter,
+    ConfectStorageActionWriter,
+    ConfectQueryRunner,
+    ConfectMutationRunner,
+    ConfectActionRunner,
   };
 };
 
@@ -456,7 +412,18 @@ const confectActionFunction = <
   returns: Schema.Schema<ConfectReturns, ConvexReturns>;
   handler: (
     a: ConfectValue,
-  ) => Effect.Effect<ConfectReturns, E, ConfectActionCtx<ConfectDataModel>>;
+  ) => Effect.Effect<
+    ConfectReturns,
+    E,
+    | ConfectScheduler
+    | ConfectAuth
+    | ConfectStorageReader
+    | ConfectStorageWriter
+    | ConfectStorageActionWriter
+    | ConfectQueryRunner
+    | ConfectMutationRunner
+    | ConfectActionRunner
+  >;
 }) => ({
   args: compileArgsSchema(args),
   returns: compileReturnsSchema(returns),
@@ -469,10 +436,19 @@ const confectActionFunction = <
       Schema.decode(args),
       Effect.orDie,
       Effect.andThen((decodedArgs) =>
-        handler(decodedArgs).pipe(
-          Effect.provideService(
-            ConfectActionCtx<ConfectDataModel>(),
-            makeConfectActionCtx(ctx),
+        pipe(
+          handler(decodedArgs),
+          Effect.provide(
+            Layer.mergeAll(
+              ConfectScheduler.layer(ctx.scheduler),
+              ConfectAuth.layer(ctx.auth),
+              ConfectStorageReader.layer(ctx.storage),
+              ConfectStorageWriter.layer(ctx.storage),
+              ConfectStorageActionWriter.layer(ctx.storage),
+              ConfectQueryRunner.layer(ctx.runQuery),
+              ConfectMutationRunner.layer(ctx.runMutation),
+              ConfectActionRunner.layer(ctx.runAction),
+            ),
           ),
         ),
       ),

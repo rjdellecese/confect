@@ -5,6 +5,12 @@
    */
   "compilerOptions": {
     /* These settings are not required by Convex and can be modified. */
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        "transform": "@effect/language-service/transform"
+      }
+    ],
     "allowJs": true,
     "strict": true,
     "baseUrl": "../../.",

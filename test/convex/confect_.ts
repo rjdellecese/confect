@@ -21,10 +21,14 @@ export const {
   ConfectDatabaseReader,
   ConvexDatabaseWriter,
   ConfectDatabaseWriter,
-  ConvexAuth,
   ConfectAuth,
-  ConvexScheduler,
   ConfectScheduler,
+  ConfectStorageReader,
+  ConfectStorageWriter,
+  ConfectStorageActionWriter,
+  ConfectQueryRunner,
+  ConfectMutationRunner,
+  ConfectActionRunner,
 } = makeFunctions(confectSchema);
 
 type ConfectSchema = typeof confectSchema;
@@ -36,9 +40,22 @@ export type ConfectDoc<
   TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
 > = ConfectDocType<ConfectDataModel, TableName>;
 
-export type ConfectDatabaseWriter = typeof ConfectDatabaseWriter.Service;
+export type ConfectDatabaseWriter = typeof ConfectDatabaseWriter.Identifier;
 
-export type ConfectDatabaseReader = typeof ConfectDatabaseReader.Service;
+export type ConfectDatabaseReader = typeof ConfectDatabaseReader.Identifier;
 
 export const ConfectActionCtx = ConfectActionCtxService<ConfectDataModel>();
 export type ConfectActionCtx = ConfectActionCtxType<ConfectDataModel>;
+
+export type ConfectAuth = typeof ConfectAuth.Identifier;
+
+export type ConfectScheduler = typeof ConfectScheduler.Identifier;
+
+export type ConfectStorageReader = typeof ConfectStorageReader.Identifier;
+export type ConfectStorageWriter = typeof ConfectStorageWriter.Identifier;
+export type ConfectStorageActionWriter =
+  typeof ConfectStorageActionWriter.Identifier;
+
+export type ConfectQueryRunner = typeof ConfectQueryRunner.Identifier;
+export type ConfectMutationRunner = typeof ConfectMutationRunner.Identifier;
+export type ConfectActionRunner = typeof ConfectActionRunner.Identifier;
