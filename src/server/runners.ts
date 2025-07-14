@@ -40,7 +40,6 @@ const makeActionRunner = (runAction: GenericActionCtx<any>["runAction"]) => ({
     Effect.promise(() => runAction(action, ...args)),
 });
 
-// @effect-diagnostics-next-line leakingRequirements:off
 export class ConfectQueryRunner extends Effect.Tag(
   "@rjdellecese/confect/ConfectQueryRunner",
 )<ConfectQueryRunner, ReturnType<typeof makeQueryRunner>>() {
@@ -48,7 +47,6 @@ export class ConfectQueryRunner extends Effect.Tag(
     Layer.succeed(this, makeQueryRunner(runQuery));
 }
 
-// @effect-diagnostics-next-line leakingRequirements:off
 export class ConfectMutationRunner extends Effect.Tag(
   "@rjdellecese/confect/ConfectMutationRunner",
 )<ConfectMutationRunner, ReturnType<typeof makeMutationRunner>>() {
@@ -57,7 +55,6 @@ export class ConfectMutationRunner extends Effect.Tag(
   ) => Layer.succeed(this, makeMutationRunner(runMutation));
 }
 
-// @effect-diagnostics-next-line leakingRequirements:off
 export class ConfectActionRunner extends Effect.Tag(
   "@rjdellecese/confect/ConfectActionRunner",
 )<ConfectActionRunner, ReturnType<typeof makeActionRunner>>() {

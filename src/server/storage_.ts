@@ -34,7 +34,6 @@ const makeStorageActionWriter = (storageActionWriter: StorageActionWriter) => ({
     Effect.promise(() => storageActionWriter.store(blob, options)),
 });
 
-// @effect-diagnostics-next-line leakingRequirements:off
 export class ConfectStorageReader extends Effect.Tag(
   "@rjdellecese/confect/ConfectStorageReader",
 )<ConfectStorageReader, ReturnType<typeof makeStorageReader>>() {
@@ -42,7 +41,6 @@ export class ConfectStorageReader extends Effect.Tag(
     Layer.succeed(this, makeStorageReader(storageReader));
 }
 
-// @effect-diagnostics-next-line leakingRequirements:off
 export class ConfectStorageWriter extends Effect.Tag(
   "@rjdellecese/confect/ConfectStorageWriter",
 )<ConfectStorageWriter, ReturnType<typeof makeStorageWriter>>() {
@@ -50,7 +48,6 @@ export class ConfectStorageWriter extends Effect.Tag(
     Layer.succeed(this, makeStorageWriter(storageWriter));
 }
 
-// @effect-diagnostics-next-line leakingRequirements:off
 export class ConfectStorageActionWriter extends Effect.Tag(
   "@rjdellecese/confect/ConfectStorageActionWriter",
 )<ConfectStorageActionWriter, ReturnType<typeof makeStorageActionWriter>>() {

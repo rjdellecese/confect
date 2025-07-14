@@ -9,7 +9,6 @@ const make = (auth: Auth) => ({
     ),
 });
 
-// @effect-diagnostics-next-line leakingRequirements:off
 export class ConfectAuth extends Effect.Tag("@rjdellecese/confect/ConfectAuth")<
   ConfectAuth,
   ReturnType<typeof make>

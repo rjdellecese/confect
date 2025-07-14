@@ -32,7 +32,6 @@ const make = (scheduler: Scheduler) => ({
   },
 });
 
-// @effect-diagnostics-next-line leakingRequirements:off
 export class ConfectScheduler extends Effect.Tag(
   "@rjdellecese/confect/ConfectScheduler",
 )<ConfectScheduler, ReturnType<typeof make>>() {

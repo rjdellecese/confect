@@ -47,22 +47,11 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
 ) => {
   type ConfectDataModel = ConfectDataModelFromConfectSchema<ConfectSchema>;
 
-  const {
-    ConfectDatabaseSchemaDefinitionLive,
-    ConvexDatabaseReader,
-    ConvexDatabaseReaderLive,
-    ConfectDatabaseReader,
-    ConfectDatabaseReaderLive,
-    ConvexDatabaseWriter,
-    ConvexDatabaseWriterLive,
-    ConfectDatabaseWriter,
-    ConfectDatabaseWriterLive,
-  } = makeConfectDatabaseServices(confectSchemaDefinition);
+  const { ConfectDatabaseReader, ConfectDatabaseWriter } =
+    makeConfectDatabaseServices(confectSchemaDefinition);
 
-  type ConvexDatabaseReader = typeof ConvexDatabaseReader.Service;
-  type ConfectDatabaseReader = typeof ConfectDatabaseReader.Service;
-  type ConvexDatabaseWriter = typeof ConvexDatabaseWriter.Service;
-  type ConfectDatabaseWriter = typeof ConfectDatabaseWriter.Service;
+  type ConfectDatabaseReader = typeof ConfectDatabaseReader.Identifier;
+  type ConfectDatabaseWriter = typeof ConfectDatabaseWriter.Identifier;
 
   const query = <
     ConvexArgs extends DefaultFunctionArgs,
@@ -82,7 +71,6 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
     ) => Effect.Effect<
       ConfectReturns,
       E,
-      | ConvexDatabaseReader
       | ConfectDatabaseReader
       | ConfectAuth
       | ConfectStorageReader
@@ -109,7 +97,6 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
     ) => Effect.Effect<
       ConfectReturns,
       E,
-      | ConvexDatabaseReader
       | ConfectDatabaseReader
       | ConfectAuth
       | ConfectStorageReader
@@ -136,7 +123,6 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
     ) => Effect.Effect<
       ConfectReturns,
       E,
-      | ConvexDatabaseReader
       | ConfectDatabaseReader
       | ConfectAuth
       | ConfectStorageReader
@@ -158,10 +144,7 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
             handler(decodedArgs),
             Effect.provide(
               Layer.mergeAll(
-                ConfectDatabaseReaderLive.pipe(
-                  Layer.provideMerge(ConvexDatabaseReaderLive(ctx.db)),
-                  Layer.provide(ConfectDatabaseSchemaDefinitionLive),
-                ),
+                ConfectDatabaseReader.layer(ctx.db),
                 ConfectAuth.layer(ctx.auth),
                 ConfectStorageReader.layer(ctx.storage),
                 ConfectQueryRunner.layer(ctx.runQuery),
@@ -194,9 +177,7 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
     ) => Effect.Effect<
       ConfectReturns,
       E,
-      | ConvexDatabaseReader
       | ConfectDatabaseReader
-      | ConvexDatabaseWriter
       | ConfectDatabaseWriter
       | ConfectAuth
       | ConfectScheduler
@@ -226,9 +207,7 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
     ) => Effect.Effect<
       ConfectReturns,
       E,
-      | ConvexDatabaseReader
       | ConfectDatabaseReader
-      | ConvexDatabaseWriter
       | ConfectDatabaseWriter
       | ConfectAuth
       | ConfectScheduler
@@ -260,9 +239,7 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
     ) => Effect.Effect<
       ConfectReturns,
       E,
-      | ConvexDatabaseReader
       | ConfectDatabaseReader
-      | ConvexDatabaseWriter
       | ConfectDatabaseWriter
       | ConfectAuth
       | ConfectScheduler
@@ -287,16 +264,8 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
             handler(decodedArgs),
             Effect.provide(
               Layer.mergeAll(
-                ConfectDatabaseWriterLive.pipe(
-                  Layer.provideMerge(ConvexDatabaseWriterLive(ctx.db)),
-                  Layer.provideMerge(
-                    ConfectDatabaseReaderLive.pipe(
-                      Layer.provideMerge(ConvexDatabaseReaderLive(ctx.db)),
-                      Layer.provide(ConfectDatabaseSchemaDefinitionLive),
-                    ),
-                  ),
-                  Layer.provide(ConfectDatabaseSchemaDefinitionLive),
-                ),
+                ConfectDatabaseReader.layer(ctx.db),
+                ConfectDatabaseWriter.layer(ctx.db),
                 ConfectAuth.layer(ctx.auth),
                 ConfectScheduler.layer(ctx.scheduler),
                 ConfectStorageReader.layer(ctx.storage),
@@ -381,9 +350,7 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
     internalMutation,
     action,
     internalAction,
-    ConvexDatabaseReader,
     ConfectDatabaseReader,
-    ConvexDatabaseWriter,
     ConfectDatabaseWriter,
     ConfectAuth,
     ConfectScheduler,
