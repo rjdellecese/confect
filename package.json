@@ -68,7 +68,7 @@
 		"@types/node": "24.0.13",
 		"@vitest/coverage-v8": "3.1.2",
 		"convex-test": "0.0.36",
-		"dotenv": "16.5.0",
+		"dotenv": "17.2.0",
 		"tsup": "8.5.0",
 		"typescript": "5.8.3",
 		"vite": "6.3.3",
