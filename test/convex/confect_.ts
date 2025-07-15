@@ -15,14 +15,7 @@ export const {
   query,
   ConfectDatabaseReader,
   ConfectDatabaseWriter,
-  ConfectAuth,
-  ConfectScheduler,
-  ConfectStorageReader,
-  ConfectStorageWriter,
-  ConfectStorageActionWriter,
-  ConfectQueryRunner,
-  ConfectMutationRunner,
-  ConfectActionRunner,
+  ConfectVectorSearch,
 } = makeFunctions(confectSchema);
 
 type ConfectSchema = typeof confectSchema;
@@ -38,12 +31,17 @@ export type ConfectDoc<
 
 export type ConfectDatabaseReader = typeof ConfectDatabaseReader.Identifier;
 export type ConfectDatabaseWriter = typeof ConfectDatabaseWriter.Identifier;
-export type ConfectAuth = typeof ConfectAuth.Identifier;
-export type ConfectScheduler = typeof ConfectScheduler.Identifier;
-export type ConfectStorageReader = typeof ConfectStorageReader.Identifier;
-export type ConfectStorageWriter = typeof ConfectStorageWriter.Identifier;
-export type ConfectStorageActionWriter =
-  typeof ConfectStorageActionWriter.Identifier;
-export type ConfectQueryRunner = typeof ConfectQueryRunner.Identifier;
-export type ConfectMutationRunner = typeof ConfectMutationRunner.Identifier;
-export type ConfectActionRunner = typeof ConfectActionRunner.Identifier;
+export type ConfectVectorSearch = typeof ConfectVectorSearch.Identifier;
+
+export { ConfectAuth } from "~/src/server/auth_";
+export { ConfectScheduler } from "~/src/server/scheduler_";
+export {
+  ConfectStorageReader,
+  ConfectStorageWriter,
+  ConfectStorageActionWriter,
+} from "~/src/server/storage_";
+export {
+  ConfectQueryRunner,
+  ConfectMutationRunner,
+  ConfectActionRunner,
+} from "~/src/server/runners";

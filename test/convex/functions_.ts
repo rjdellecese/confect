@@ -15,7 +15,6 @@ import { Id } from "~/src/server/schemas/Id";
 import { PaginationResult } from "~/src/server/schemas/PaginationResult";
 import { api, internal } from "~/test/convex/_generated/api";
 import {
-  ConfectActionCtx,
   ConfectActionRunner,
   ConfectAuth,
   ConfectDatabaseReader,
@@ -25,6 +24,7 @@ import {
   ConfectScheduler,
   ConfectStorageReader,
   ConfectStorageWriter,
+  ConfectVectorSearch,
   action,
   internalAction,
   internalMutation,
@@ -442,7 +442,8 @@ export const executeVectorSearch = action({
     ConfectActionCtx
   > =>
     Effect.gen(function* () {
-      const { vectorSearch, runQuery } = yield* ConfectActionCtx;
+      const { vectorSearch } = yield* ConfectVectorSearch;
+      const { runQuery } = yield* ConfectQueryRunner;
 
       return yield* vectorSearch("notes", "embedding", {
         vector: vector as number[],

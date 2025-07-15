@@ -41,6 +41,7 @@ import {
   ConfectStorageReader,
   ConfectStorageWriter,
 } from "~/src/server/storage_";
+import { ConfectVectorSearch } from "~/src/server/vector-search";
 
 export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
   confectSchemaDefinition: ConfectSchemaDefinition<ConfectSchema>,
@@ -52,6 +53,8 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
 
   type ConfectDatabaseReader = typeof ConfectDatabaseReader.Identifier;
   type ConfectDatabaseWriter = typeof ConfectDatabaseWriter.Identifier;
+
+  type ConfectVectorSearch = typeof ConfectVectorSearch.Identifier;
 
   const query = <
     ConvexArgs extends DefaultFunctionArgs,
@@ -309,6 +312,7 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
       | ConfectQueryRunner
       | ConfectMutationRunner
       | ConfectActionRunner
+      | ConfectVectorSearch
     >;
   }): RegisteredAction<"public", ConvexValue, Promise<ConvexReturns>> =>
     actionGeneric(confectActionFunction({ args, returns, handler }));
@@ -339,6 +343,7 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
       | ConfectQueryRunner
       | ConfectMutationRunner
       | ConfectActionRunner
+      | ConfectVectorSearch
     >;
   }): RegisteredAction<"internal", ConvexValue, Promise<ConvexReturns>> =>
     internalActionGeneric(confectActionFunction({ args, returns, handler }));
@@ -352,14 +357,7 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
     internalAction,
     ConfectDatabaseReader,
     ConfectDatabaseWriter,
-    ConfectAuth,
-    ConfectScheduler,
-    ConfectStorageReader,
-    ConfectStorageWriter,
-    ConfectStorageActionWriter,
-    ConfectQueryRunner,
-    ConfectMutationRunner,
-    ConfectActionRunner,
+    ConfectVectorSearch,
   };
 };
 
@@ -390,6 +388,7 @@ const confectActionFunction = <
     | ConfectQueryRunner
     | ConfectMutationRunner
     | ConfectActionRunner
+    | ConfectVectorSearch
   >;
 }) => ({
   args: compileArgsSchema(args),
@@ -415,6 +414,7 @@ const confectActionFunction = <
               ConfectQueryRunner.layer(ctx.runQuery),
               ConfectMutationRunner.layer(ctx.runMutation),
               ConfectActionRunner.layer(ctx.runAction),
+              ConfectVectorSearch.layer(ctx.vectorSearch),
             ),
           ),
         ),
