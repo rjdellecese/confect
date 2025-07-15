@@ -1,3 +1,4 @@
 .env.local
-convex/_generated
-node_modules
+convex/_generated/
+node_modules/
+node-compile-cache/

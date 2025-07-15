@@ -1,4 +1,6 @@
 import {
+  defineSchema as defineConvexSchema,
+  defineTable as defineConvexTable,
   type Expand,
   type GenericTableIndexes,
   type GenericTableSearchIndexes,
@@ -11,15 +13,13 @@ import {
   type SystemIndexes,
   type TableDefinition,
   type VectorIndexConfig,
-  defineSchema as defineConvexSchema,
-  defineTable as defineConvexTable,
 } from "convex/server";
 import type { Validator } from "convex/values";
-import { Record, Schema, pipe } from "effect";
+import { pipe, Record, Schema } from "effect";
 
 import {
-  type TableSchemaToTableValidator,
   compileTableSchema,
+  type TableSchemaToTableValidator,
 } from "~/src/server/schema-to-validator";
 import {
   type ExtendWithSystemFields,
@@ -142,11 +142,8 @@ export interface ConfectTableDefinition<
     any,
     any
   > = TableSchemaToTableValidator<TableSchema>,
-  // biome-ignore lint/complexity/noBannedTypes:
   Indexes extends GenericTableIndexes = {},
-  // biome-ignore lint/complexity/noBannedTypes:
   SearchIndexes extends GenericTableSearchIndexes = {},
-  // biome-ignore lint/complexity/noBannedTypes:
   VectorIndexes extends GenericTableVectorIndexes = {},
 > {
   tableDefinition: TableDefinition<
@@ -248,11 +245,8 @@ class ConfectTableDefinitionImpl<
     any,
     any
   > = TableSchemaToTableValidator<TableSchema>,
-  // biome-ignore lint/complexity/noBannedTypes:
   Indexes extends GenericTableIndexes = {},
-  // biome-ignore lint/complexity/noBannedTypes:
   SearchIndexes extends GenericTableSearchIndexes = {},
-  // biome-ignore lint/complexity/noBannedTypes:
   VectorIndexes extends GenericTableVectorIndexes = {},
 > implements
     ConfectTableDefinition<
