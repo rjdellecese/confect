@@ -53,6 +53,11 @@ export type DeepReadonly<T> = IsAny<T> extends true
 
 export type TypeError<Message extends string, T = never> = [Message, T];
 
+export type TypeDefect<Message extends string, T = never> = TypeError<
+  `Unexpected type error:\n  ${Message}`,
+  T
+>;
+
 export type IsRecursive<T> = true extends DetectCycle<T> ? true : false;
 
 type DetectCycle<T, Cache extends any[] = []> = IsAny<T> extends true

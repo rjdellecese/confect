@@ -1,3 +1,5 @@
+import type { IdField, SystemFields as NonIdSystemFields } from "convex/server";
+import type { Expand } from "convex/server";
 import { Schema } from "effect";
 import { Id } from "~/src/server/schemas/Id";
 
@@ -29,3 +31,7 @@ export type ExtendWithSystemFields<
   TableName extends string,
   TableSchema extends Schema.Schema.AnyNoContext,
 > = Schema.extend<TableSchema, ReturnType<typeof SystemFields<TableName>>>;
+
+export type WithSystemFields<TableName extends string, Document> = Expand<
+  Readonly<IdField<TableName>> & Readonly<NonIdSystemFields> & Document
+>;

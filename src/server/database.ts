@@ -3,627 +3,146 @@ import type {
   DocumentByInfo,
   DocumentByName,
   Expand,
-  Expression,
-  FilterBuilder,
+  FieldTypeFromFieldPath,
   GenericDataModel,
   GenericDatabaseReader,
   GenericDatabaseWriter,
+  GenericDocument,
+  GenericTableIndexes,
   IndexRange,
   IndexRangeBuilder,
   Indexes,
   NamedIndex,
   NamedSearchIndex,
   OrderedQuery,
-  PaginationOptions,
   PaginationResult,
   Query,
-  QueryInitializer,
   SearchFilter,
   SearchFilterBuilder,
   SearchIndexes,
-  WithOptionalSystemFields,
+  SystemTableNames,
+  TableNamesInDataModel,
   WithoutSystemFields,
 } from "convex/server";
 import type { GenericId } from "convex/values";
 import {
   Array,
-  type Cause,
   Chunk,
-  Data,
   Effect,
+  Either,
+  Function,
+  Layer,
   Option,
-  type ParseResult,
+  ParseResult,
   Record,
   Schema,
   Stream,
   identity,
   pipe,
 } from "effect";
-
 import type {
   ConfectDocumentByName,
   DataModelFromConfectDataModel,
   GenericConfectDataModel,
   GenericConfectDocument,
+  GenericConfectDocumentWithSystemFields,
   GenericConfectTableInfo,
-  GenericEncodedConfectDocument,
   TableInfoFromConfectTableInfo,
   TableNamesInConfectDataModel,
-} from "~/src/server/data-model";
-import {
-  type ConfectDataModelFromConfectSchema,
-  type ConfectSystemDataModel,
-  type GenericConfectSchema,
-  confectSystemSchemaDefinition,
-} from "~/src/server/schema";
-import { extendWithSystemFields } from "~/src/server/schemas/SystemFields";
+  TableSchemaFromConfectTableInfo,
+} from "./data-model";
+import type {
+  ConfectDataModelFromConfectSchema,
+  ConfectDataModelFromConfectSchemaDefinition,
+  GenericConfectSchema,
+  GenericConfectSchemaDefinition,
+} from "./schema";
+import { extendWithSystemFields } from "./schemas/SystemFields";
 
-interface ConfectQuery<
-  ConfectTableInfo extends GenericConfectTableInfo,
-  TableName extends string,
-> {
-  filter(
-    predicate: (
-      q: FilterBuilder<TableInfoFromConfectTableInfo<ConfectTableInfo>>,
-    ) => Expression<boolean>,
-  ): ConfectQuery<ConfectTableInfo, TableName>;
-  order(
-    order: "asc" | "desc",
-  ): ConfectOrderedQuery<ConfectTableInfo, TableName>;
-  paginate(
-    paginationOpts: PaginationOptions,
-  ): Effect.Effect<PaginationResult<ConfectTableInfo["confectDocument"]>>;
-  collect(): Effect.Effect<ConfectTableInfo["confectDocument"][]>;
-  take(n: number): Effect.Effect<ConfectTableInfo["confectDocument"][]>;
-  first(): Effect.Effect<Option.Option<ConfectTableInfo["confectDocument"]>>;
-  unique(): Effect.Effect<
-    Option.Option<ConfectTableInfo["confectDocument"]>,
-    NotUniqueError
-  >;
-  stream(): Stream.Stream<ConfectTableInfo["confectDocument"]>;
-}
+export const makeConfectDatabaseServices = <
+  ConfectSchemaDefinition extends GenericConfectSchemaDefinition,
+>(
+  confectSchemaDefinition: ConfectSchemaDefinition,
+) => {
+  ///////////
+  // Types //
+  ///////////
 
-interface ConfectOrderedQuery<
-  ConfectTableInfo extends GenericConfectTableInfo,
-  TableName extends string,
-> extends Omit<ConfectQuery<ConfectTableInfo, TableName>, "order"> {}
+  type ConfectDataModel =
+    ConfectDataModelFromConfectSchemaDefinition<ConfectSchemaDefinition>;
 
-export class NotUniqueError extends Data.TaggedError("NotUniqueError") {}
+  type ConvexDataModel = DataModelFromConfectDataModel<ConfectDataModel>;
 
-class ConfectQueryImpl<
-  ConfectTableInfo extends GenericConfectTableInfo,
-  TableName extends string,
-> implements ConfectQuery<ConfectTableInfo, TableName>
-{
-  q: Query<TableInfoFromConfectTableInfo<ConfectTableInfo>>;
-  tableSchema: Schema.Schema<
-    ConfectTableInfo["confectDocument"],
-    ConfectTableInfo["encodedConfectDocument"]
-  >;
-  tableName: TableName;
-  constructor(
-    q:
-      | Query<TableInfoFromConfectTableInfo<ConfectTableInfo>>
-      | OrderedQuery<TableInfoFromConfectTableInfo<ConfectTableInfo>>,
-    tableSchema: Schema.Schema<
-      ConfectTableInfo["confectDocument"],
-      ConfectTableInfo["encodedConfectDocument"]
+  type ConfectSchema = ConfectSchemaDefinition["confectSchema"];
+
+  ///////////////////////////
+  // ConfectDatabaseReader //
+  ///////////////////////////
+
+  const makeConfectDatabaseReader = (
+    convexDatabaseReader: GenericDatabaseReader<
+      DataModelFromConfectDataModel<
+        ConfectDataModelFromConfectSchema<ConfectSchema>
+      >
     >,
-    tableName: TableName,
-  ) {
-    // This is some trickery, copied from convex-js. I suspect there's a better way.
-    this.q = q as Query<TableInfoFromConfectTableInfo<ConfectTableInfo>>;
-    this.tableSchema = tableSchema;
-    this.tableName = tableName;
-  }
-  decode(
-    convexDocument: ConfectTableInfo["encodedConfectDocument"],
-  ): ConfectTableInfo["confectDocument"] {
-    return decodeDocument(this.tableName, this.tableSchema, convexDocument);
-  }
-  filter(
-    predicate: (
-      q: FilterBuilder<TableInfoFromConfectTableInfo<ConfectTableInfo>>,
-    ) => Expression<boolean>,
-  ) {
-    return new ConfectQueryImpl(
-      this.q.filter(predicate),
-      this.tableSchema,
-      this.tableName,
-    );
-  }
-  order(order: "asc" | "desc"): ConfectQueryImpl<ConfectTableInfo, TableName> {
-    return new ConfectQueryImpl(
-      this.q.order(order),
-      this.tableSchema,
-      this.tableName,
-    );
-  }
-  paginate(
-    paginationOpts: PaginationOptions,
-  ): Effect.Effect<PaginationResult<ConfectTableInfo["confectDocument"]>> {
-    return pipe(
-      Effect.Do,
-      Effect.bind("paginationResult", () =>
-        Effect.promise(() => this.q.paginate(paginationOpts)),
-      ),
-      Effect.let("parsedPage", ({ paginationResult }) =>
-        pipe(
-          paginationResult.page,
-          Array.map((document) => this.decode(document)),
-        ),
-      ),
-      Effect.map(({ paginationResult, parsedPage }) => ({
-        page: parsedPage,
-        isDone: paginationResult.isDone,
-        continueCursor: paginationResult.continueCursor,
-        ...(paginationResult.splitCursor
-          ? { splitCursor: paginationResult.splitCursor }
-          : {}),
-        ...(paginationResult.pageStatus
-          ? { pageStatus: paginationResult.pageStatus }
-          : {}),
-      })),
-    );
-  }
-  // It could be better to implement collect() with stream()
-  collect(): Effect.Effect<ConfectTableInfo["confectDocument"][]> {
-    return pipe(
-      Effect.promise(() => this.q.collect()),
-      Effect.map(Array.map((document) => this.decode(document))),
-    );
-  }
-  take(n: number): Effect.Effect<ConfectTableInfo["confectDocument"][]> {
-    return pipe(
-      this.stream(),
-      Stream.take(n),
-      Stream.runCollect,
-      Effect.map((chunk) => Chunk.toArray(chunk)),
-    );
-  }
-  first(): Effect.Effect<Option.Option<ConfectTableInfo["confectDocument"]>> {
-    return pipe(this.stream(), Stream.runHead);
-  }
-  unique(): Effect.Effect<
-    Option.Option<ConfectTableInfo["confectDocument"]>,
-    NotUniqueError
-  > {
-    return pipe(
-      this.stream(),
-      Stream.take(2),
-      Stream.runCollect,
-      Effect.andThen((chunk) =>
-        pipe(
-          chunk,
-          Chunk.get(1),
-          Option.match({
-            onSome: () => Effect.fail(new NotUniqueError()),
-            onNone: () => Effect.succeed(Chunk.get(chunk, 0)),
-          }),
-        ),
-      ),
-    );
-  }
-  stream(): Stream.Stream<ConfectTableInfo["confectDocument"]> {
-    return pipe(
-      Stream.fromAsyncIterable(this.q, identity),
-      Stream.map((document) => this.decode(document)),
-      Stream.orDie,
-    );
-  }
-}
+  ) => ({
+    table: <TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
+      tableName: TableName,
+    ) => {
+      const confectTableDefinition = confectSchemaDefinition.confectSchema[
+        tableName
+      ] as NonNullable<ConfectSchema[TableName]>;
 
-interface ConfectQueryInitializer<
-  ConfectTableInfo extends GenericConfectTableInfo,
-  TableName extends string,
-> extends ConfectQuery<ConfectTableInfo, TableName> {
-  fullTableScan(): ConfectQuery<ConfectTableInfo, TableName>;
-  withIndex<
-    IndexName extends keyof Indexes<
-      TableInfoFromConfectTableInfo<ConfectTableInfo>
-    >,
-  >(
-    indexName: IndexName,
-    indexRange?:
-      | ((
-          q: IndexRangeBuilder<
-            DocumentByInfo<TableInfoFromConfectTableInfo<ConfectTableInfo>>,
-            NamedIndex<
-              TableInfoFromConfectTableInfo<ConfectTableInfo>,
-              IndexName
-            >,
-            0
-          >,
-        ) => IndexRange)
-      | undefined,
-  ): ConfectQuery<ConfectTableInfo, TableName>;
-  withSearchIndex<
-    IndexName extends keyof SearchIndexes<
-      TableInfoFromConfectTableInfo<ConfectTableInfo>
-    >,
-  >(
-    indexName: IndexName,
-    searchFilter: (
-      q: SearchFilterBuilder<
-        DocumentByInfo<TableInfoFromConfectTableInfo<ConfectTableInfo>>,
-        NamedSearchIndex<
-          TableInfoFromConfectTableInfo<ConfectTableInfo>,
-          IndexName
+      return makeConfectQueryInitializer<ConfectSchema, TableName>(
+        tableName,
+        convexDatabaseReader,
+        confectTableDefinition,
+      );
+    },
+  });
+
+  class ConfectDatabaseReader extends Effect.Tag(
+    "@rjdellecese/confect/ConfectDatabaseReader",
+  )<ConfectDatabaseReader, ReturnType<typeof makeConfectDatabaseReader>>() {
+    static readonly layer = (
+      convexDatabaseReader: GenericDatabaseReader<
+        DataModelFromConfectDataModel<
+          ConfectDataModelFromConfectSchema<ConfectSchema>
         >
       >,
-    ) => SearchFilter,
-  ): ConfectOrderedQuery<ConfectTableInfo, TableName>;
-}
+    ) => Layer.succeed(this, makeConfectDatabaseReader(convexDatabaseReader));
+  }
 
-class ConfectQueryInitializerImpl<
-  ConfectTableInfo extends GenericConfectTableInfo,
-  TableName extends string,
-> implements ConfectQueryInitializer<ConfectTableInfo, TableName>
-{
-  q: QueryInitializer<TableInfoFromConfectTableInfo<ConfectTableInfo>>;
-  tableSchema: Schema.Schema<
-    ConfectTableInfo["confectDocument"],
-    ConfectTableInfo["encodedConfectDocument"]
-  >;
-  tableName: TableName;
-  constructor(
-    q: QueryInitializer<TableInfoFromConfectTableInfo<ConfectTableInfo>>,
-    tableSchema: Schema.Schema<
-      ConfectTableInfo["confectDocument"],
-      ConfectTableInfo["encodedConfectDocument"]
-    >,
-    tableName: TableName,
-  ) {
-    this.q = q;
-    this.tableSchema = tableSchema;
-    this.tableName = tableName;
-  }
-  fullTableScan(): ConfectQuery<ConfectTableInfo, TableName> {
-    return new ConfectQueryImpl(
-      this.q.fullTableScan(),
-      this.tableSchema,
-      this.tableName,
-    );
-  }
-  withIndex<
-    IndexName extends keyof Indexes<
-      TableInfoFromConfectTableInfo<ConfectTableInfo>
-    >,
-  >(
-    indexName: IndexName,
-    indexRange?:
-      | ((
-          q: IndexRangeBuilder<
-            DocumentByInfo<TableInfoFromConfectTableInfo<ConfectTableInfo>>,
-            NamedIndex<
-              TableInfoFromConfectTableInfo<ConfectTableInfo>,
-              IndexName
-            >,
-            0
-          >,
-        ) => IndexRange)
-      | undefined,
-  ): ConfectQuery<ConfectTableInfo, TableName> {
-    return new ConfectQueryImpl(
-      this.q.withIndex(indexName, indexRange),
-      this.tableSchema,
-      this.tableName,
-    );
-  }
-  withSearchIndex<
-    IndexName extends keyof SearchIndexes<
-      TableInfoFromConfectTableInfo<ConfectTableInfo>
-    >,
-  >(
-    indexName: IndexName,
-    searchFilter: (
-      q: SearchFilterBuilder<
-        DocumentByInfo<TableInfoFromConfectTableInfo<ConfectTableInfo>>,
-        NamedSearchIndex<
-          TableInfoFromConfectTableInfo<ConfectTableInfo>,
-          IndexName
-        >
+  ///////////////////////////
+  // ConfectDatabaseWriter //
+  ///////////////////////////
+
+  const makeConfectDatabaseWriter = (
+    convexDatabaseWriter: GenericDatabaseWriter<ConvexDataModel>,
+  ) => {
+    const insert = <
+      TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+    >(
+      tableName: TableName,
+      document: WithoutSystemFields<
+        ConfectDocumentByName<ConfectDataModel, TableName>
       >,
-    ) => SearchFilter,
-  ): ConfectOrderedQuery<ConfectTableInfo, TableName> {
-    return new ConfectQueryImpl(
-      this.q.withSearchIndex(indexName, searchFilter),
-      this.tableSchema,
-      this.tableName,
-    );
-  }
-  filter(
-    predicate: (
-      q: FilterBuilder<TableInfoFromConfectTableInfo<ConfectTableInfo>>,
-    ) => Expression<boolean>,
-  ): ConfectQuery<ConfectTableInfo, TableName> {
-    return this.fullTableScan().filter(predicate);
-  }
-  order(
-    order: "asc" | "desc",
-  ): ConfectOrderedQuery<ConfectTableInfo, TableName> {
-    return this.fullTableScan().order(order);
-  }
-  paginate(
-    paginationOpts: PaginationOptions,
-  ): Effect.Effect<PaginationResult<ConfectTableInfo["confectDocument"]>> {
-    return this.fullTableScan().paginate(paginationOpts);
-  }
-  collect(): Effect.Effect<ConfectTableInfo["confectDocument"][]> {
-    return this.fullTableScan().collect();
-  }
-  take(n: number): Effect.Effect<ConfectTableInfo["confectDocument"][]> {
-    return this.fullTableScan().take(n);
-  }
-  first(): Effect.Effect<Option.Option<ConfectTableInfo["confectDocument"]>> {
-    return this.fullTableScan().first();
-  }
-  unique(): Effect.Effect<
-    Option.Option<ConfectTableInfo["confectDocument"]>,
-    NotUniqueError
-  > {
-    return this.fullTableScan().unique();
-  }
-  stream(): Stream.Stream<ConfectTableInfo["confectDocument"]> {
-    return this.fullTableScan().stream();
-  }
-}
+    ) =>
+      Effect.gen(function* () {
+        const confectTableDefinition = confectSchemaDefinition.confectSchema[
+          tableName
+        ] as NonNullable<ConfectSchemaDefinition["confectSchema"][TableName]>;
 
-export type DatabaseSchemasFromConfectDataModel<
-  ConfectDataModel extends GenericConfectDataModel,
-> = {
-  [TableName in keyof ConfectDataModel & string]: Schema.Schema<
-    ConfectDataModel[TableName]["confectDocument"],
-    ConfectDataModel[TableName]["encodedConfectDocument"]
-  >;
-};
+        const encodedDocument = yield* encode(
+          document,
+          tableName,
+          confectTableDefinition.tableSchema,
+        );
 
-export interface ConfectDatabaseReader<
-  ConfectDataModel extends GenericConfectDataModel,
-> extends ConfectBaseDatabaseReader<ConfectDataModel> {
-  system: ConfectBaseDatabaseReader<ConfectSystemDataModel>;
-}
-
-export interface ConfectBaseDatabaseReader<
-  ConfectDataModel extends GenericConfectDataModel,
-> {
-  query<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    tableName: TableName,
-  ): ConfectQueryInitializer<ConfectDataModel[TableName], TableName>;
-  get<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    id: GenericId<TableName>,
-  ): Effect.Effect<
-    Option.Option<ConfectDataModel[TableName]["confectDocument"]>
-  >;
-  normalizeId<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    tableName: TableName,
-    id: string,
-  ): Option.Option<GenericId<TableName>>;
-}
-
-export class ConfectBaseDatabaseReaderImpl<
-  ConfectDataModel extends GenericConfectDataModel,
-> implements ConfectBaseDatabaseReader<ConfectDataModel>
-{
-  db: BaseDatabaseReader<DataModelFromConfectDataModel<ConfectDataModel>>;
-  databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>;
-  constructor(
-    db: BaseDatabaseReader<DataModelFromConfectDataModel<ConfectDataModel>>,
-    databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>,
-  ) {
-    this.db = db;
-    this.databaseSchemas = databaseSchemas;
-  }
-  decode<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    tableName: TableName,
-    convexDocument: ConfectDataModel[TableName]["encodedConfectDocument"],
-  ): ConfectDataModel[TableName]["confectDocument"] {
-    return decodeDocument(
-      tableName,
-      this.databaseSchemas[tableName],
-      convexDocument,
-    );
-  }
-  tableName(
-    id: GenericId<TableNamesInConfectDataModel<ConfectDataModel>>,
-  ): Option.Option<TableNamesInConfectDataModel<ConfectDataModel>> {
-    return Array.findFirst(Record.keys(this.databaseSchemas), (tableName) =>
-      Option.isSome(this.normalizeId(tableName, id)),
-    );
-  }
-  normalizeId<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    tableName: TableName,
-    id: string,
-  ): Option.Option<GenericId<TableName>> {
-    return Option.fromNullable(this.db.normalizeId(tableName, id));
-  }
-  get<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    id: GenericId<TableName>,
-  ): Effect.Effect<
-    Option.Option<ConfectDataModel[TableName]["confectDocument"]>
-  > {
-    return Effect.gen(this, function* () {
-      const optionConvexDoc = yield* Effect.promise(() => this.db.get(id)).pipe(
-        Effect.map(Option.fromNullable),
-      );
-      const tableName = yield* this.tableName(id).pipe(Effect.orDie);
-      return pipe(
-        optionConvexDoc,
-        Option.map((convexDoc) => this.decode(tableName, convexDoc)),
-      );
-    });
-  }
-  query<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    tableName: TableName,
-  ): ConfectQueryInitializer<ConfectDataModel[TableName], TableName> {
-    return new ConfectQueryInitializerImpl(
-      this.db.query(tableName),
-      this.databaseSchemas[tableName],
-      tableName,
-    );
-  }
-}
-
-export class ConfectDatabaseReaderImpl<
-  ConfectDataModel extends GenericConfectDataModel,
-> implements ConfectDatabaseReader<ConfectDataModel>
-{
-  db: GenericDatabaseReader<DataModelFromConfectDataModel<ConfectDataModel>>;
-  databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>;
-  system: ConfectBaseDatabaseReader<ConfectSystemDataModel>;
-  constructor(
-    db: GenericDatabaseReader<DataModelFromConfectDataModel<ConfectDataModel>>,
-    databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>,
-  ) {
-    this.db = db;
-    this.databaseSchemas = databaseSchemas;
-    this.system = new ConfectBaseDatabaseReaderImpl<ConfectSystemDataModel>(
-      this.db.system,
-      databaseSchemasFromConfectSchema(
-        confectSystemSchemaDefinition.confectSchema,
-      ),
-    );
-  }
-  decode<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    tableName: TableName,
-    convexDocument: ConfectDataModel[TableName]["encodedConfectDocument"],
-  ): ConfectDataModel[TableName]["confectDocument"] {
-    return decodeDocument(
-      tableName,
-      this.databaseSchemas[tableName],
-      convexDocument,
-    );
-  }
-  tableName(
-    id: GenericId<TableNamesInConfectDataModel<ConfectDataModel>>,
-  ): Option.Option<TableNamesInConfectDataModel<ConfectDataModel>> {
-    return Array.findFirst(Record.keys(this.databaseSchemas), (tableName) =>
-      Option.isSome(this.normalizeId(tableName, id)),
-    );
-  }
-  normalizeId<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    tableName: TableName,
-    id: string,
-  ): Option.Option<GenericId<TableName>> {
-    return Option.fromNullable(this.db.normalizeId(tableName, id));
-  }
-  get<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    id: GenericId<TableName>,
-  ): Effect.Effect<
-    Option.Option<ConfectDataModel[TableName]["confectDocument"]>
-  > {
-    return Effect.gen(this, function* () {
-      const optionConvexDoc = yield* Effect.promise(() => this.db.get(id)).pipe(
-        Effect.map(Option.fromNullable),
-      );
-      const tableName = yield* this.tableName(id).pipe(Effect.orDie);
-      return pipe(
-        optionConvexDoc,
-        Option.map((convexDoc) => this.decode(tableName, convexDoc)),
-      );
-    });
-  }
-  query<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    tableName: TableName,
-  ): ConfectQueryInitializer<ConfectDataModel[TableName], TableName> {
-    return new ConfectQueryInitializerImpl(
-      this.db.query(tableName),
-      this.databaseSchemas[tableName],
-      tableName,
-    );
-  }
-}
-
-export interface ConfectDatabaseWriter<
-  ConfectDataModel extends GenericConfectDataModel,
-> {
-  query<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    tableName: TableName,
-  ): ConfectQueryInitializer<ConfectDataModel[TableName], TableName>;
-  get<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    id: GenericId<TableName>,
-  ): Effect.Effect<
-    Option.Option<ConfectDataModel[TableName]["confectDocument"]>
-  >;
-  normalizeId<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    tableName: TableName,
-    id: string,
-  ): Option.Option<GenericId<TableName>>;
-  insert<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    table: TableName,
-    value: WithoutSystemFields<
-      ConfectDocumentByName<ConfectDataModel, TableName>
-    >,
-  ): Effect.Effect<GenericId<TableName>, ParseResult.ParseError>;
-  patch<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    id: GenericId<TableName>,
-    value: Partial<
-      WithoutSystemFields<ConfectDocumentByName<ConfectDataModel, TableName>>
-    >,
-  ): Effect.Effect<void, ParseResult.ParseError | Cause.NoSuchElementException>;
-  replace<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    id: GenericId<TableName>,
-    value: WithOptionalSystemFields<
-      ConfectDocumentByName<ConfectDataModel, TableName>
-    >,
-  ): Effect.Effect<void>;
-  delete(id: GenericId<string>): Effect.Effect<void>;
-}
-
-export class ConfectDatabaseWriterImpl<
-  ConfectDataModel extends GenericConfectDataModel,
-> implements ConfectDatabaseWriter<ConfectDataModel>
-{
-  databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>;
-  db: GenericDatabaseWriter<DataModelFromConfectDataModel<ConfectDataModel>>;
-  reader: ConfectDatabaseReader<ConfectDataModel>;
-  constructor(
-    db: GenericDatabaseWriter<DataModelFromConfectDataModel<ConfectDataModel>>,
-    databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>,
-  ) {
-    this.db = db;
-    this.databaseSchemas = databaseSchemas;
-    this.reader = new ConfectDatabaseReaderImpl(db, databaseSchemas);
-  }
-  tableName(
-    id: GenericId<TableNamesInConfectDataModel<ConfectDataModel>>,
-  ): Option.Option<TableNamesInConfectDataModel<ConfectDataModel>> {
-    return Array.findFirst(Record.keys(this.databaseSchemas), (tableName) =>
-      Option.isSome(this.normalizeId(tableName, id)),
-    );
-  }
-  query<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    tableName: TableName,
-  ): ConfectQueryInitializer<ConfectDataModel[TableName], TableName> {
-    return this.reader.query(tableName);
-  }
-  get<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    id: GenericId<TableName>,
-  ): Effect.Effect<
-    Option.Option<ConfectDataModel[TableName]["confectDocument"]>
-  > {
-    return this.reader.get(id);
-  }
-  normalizeId<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    tableName: TableName,
-    id: string,
-  ): Option.Option<GenericId<TableName>> {
-    return Option.fromNullable(this.db.normalizeId(tableName, id));
-  }
-  insert<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    table: TableName,
-    value: WithoutSystemFields<
-      ConfectDocumentByName<ConfectDataModel, TableName>
-    >,
-  ): Effect.Effect<GenericId<TableName>, ParseResult.ParseError> {
-    return pipe(
-      value,
-      Schema.encode(this.databaseSchemas[table]),
-      Effect.andThen((encodedValue) =>
-        Effect.promise(() =>
-          this.db.insert(
-            table,
-            encodedValue as Expand<
+        const id = yield* Effect.promise(() =>
+          convexDatabaseWriter.insert(
+            tableName,
+            encodedDocument as Expand<
               BetterOmit<
                 DocumentByName<
                   DataModelFromConfectDataModel<ConfectDataModel>,
@@ -633,112 +152,838 @@ export class ConfectDatabaseWriterImpl<
               >
             >,
           ),
+        );
+
+        return id;
+      });
+
+    const patch = <
+      TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+    >(
+      tableName: TableName,
+      id: GenericId<TableName>,
+      patchedValues: Partial<
+        WithoutSystemFields<ConfectDocumentByName<ConfectDataModel, TableName>>
+      >,
+    ) =>
+      Effect.gen(function* () {
+        const confectTableDefinition = confectSchemaDefinition.confectSchema[
+          tableName
+        ] as ConfectSchemaDefinition["confectSchema"][TableName];
+
+        const tableSchema =
+          confectTableDefinition.tableSchema as TableSchemaFromConfectTableInfo<
+            ConfectDataModel[TableName]
+          >;
+
+        const originalDecodedDoc = yield* getById(
+          tableName,
+          convexDatabaseWriter,
+          confectTableDefinition,
+        )(id);
+
+        const updatedEncodedDoc = yield* pipe(
+          patchedValues,
+          Record.reduce(originalDecodedDoc, (acc, value, key) =>
+            value === undefined
+              ? Record.remove(acc, key)
+              : Record.set(acc, key, value),
+          ),
+          encode(tableName, tableSchema),
+        );
+
+        yield* Effect.promise(() =>
+          convexDatabaseWriter.replace(
+            id,
+            updatedEncodedDoc as Expand<
+              BetterOmit<
+                DocumentByName<
+                  DataModelFromConfectDataModel<ConfectDataModel>,
+                  TableName
+                >,
+                "_creationTime" | "_id"
+              >
+            >,
+          ),
+        );
+      });
+
+    const replace = <
+      TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+    >(
+      tableName: TableName,
+      id: GenericId<TableName>,
+      value: WithoutSystemFields<
+        ConfectDocumentByName<ConfectDataModel, TableName>
+      >,
+    ) =>
+      Effect.gen(function* () {
+        const confectTableDefinition = confectSchemaDefinition.confectSchema[
+          tableName
+        ] as ConfectSchemaDefinition["confectSchema"][TableName];
+
+        const tableSchema =
+          confectTableDefinition.tableSchema as TableSchemaFromConfectTableInfo<
+            ConfectDataModel[TableName]
+          >;
+
+        const updatedEncodedDoc = yield* encode(value, tableName, tableSchema);
+
+        yield* Effect.promise(() =>
+          convexDatabaseWriter.replace(
+            id,
+            updatedEncodedDoc as Expand<
+              BetterOmit<
+                DocumentByName<
+                  DataModelFromConfectDataModel<ConfectDataModel>,
+                  TableName
+                >,
+                "_creationTime" | "_id"
+              >
+            >,
+          ),
+        );
+      });
+
+    const delete_ = <
+      TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+    >(
+      _tableName: TableName,
+      id: GenericId<TableName>,
+    ) => Effect.promise(() => convexDatabaseWriter.delete(id));
+
+    return {
+      insert,
+      patch,
+      replace,
+      delete: delete_,
+    };
+  };
+
+  class ConfectDatabaseWriter extends Effect.Tag(
+    "@rjdellecese/confect/ConfectDatabaseWriter",
+  )<ConfectDatabaseWriter, ReturnType<typeof makeConfectDatabaseWriter>>() {
+    static readonly layer = (
+      convexDatabaseWriter: GenericDatabaseWriter<ConvexDataModel>,
+    ) => Layer.succeed(this, makeConfectDatabaseWriter(convexDatabaseWriter));
+  }
+
+  //////////////
+  // SERVICES //
+  //////////////
+
+  return {
+    ConfectDatabaseReader,
+    ConfectDatabaseWriter,
+  };
+};
+
+// Based on https://github.com/get-convex/convex-ents/blob/f1c6eda95569bdcd97efcc3431638b4260b004dc/src/shared.ts#L31-L44
+export type IndexFieldTypesForEq<
+  ConvexDataModel extends GenericDataModel,
+  Table extends TableNamesInDataModel<ConvexDataModel>,
+  T extends string[],
+> = Pop<{
+  [K in keyof T]: FieldTypeFromFieldPath<
+    DocumentByName<ConvexDataModel, Table>,
+    T[K]
+  >;
+}>;
+
+type Pop<T extends any[]> = T extends [...infer Rest, infer _Last]
+  ? Rest
+  : never;
+//
+
+type ConfectQueryInitializer<
+  ConfectDataModel extends GenericConfectDataModel,
+  TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+> = {
+  readonly getbyId: (
+    id: GenericId<TableName>,
+  ) => Effect.Effect<
+    ConfectDataModel[TableName]["confectDocument"],
+    DocumentDecodeError | DocumentNotFoundError
+  >;
+  readonly getManyById: (
+    ids: GenericId<TableName>[],
+  ) => Effect.Effect<
+    ConfectDataModel[TableName]["confectDocument"][],
+    DocumentDecodeError | DocumentNotFoundError
+  >;
+  readonly getByIndex: <
+    IndexName extends keyof Indexes<
+      TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>
+    >,
+  >(
+    indexName: IndexName,
+    ...indexFieldValues: IndexFieldTypesForEq<
+      DataModelFromConfectDataModel<ConfectDataModel>,
+      TableName,
+      Indexes<
+        TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>
+      >[IndexName]
+    >
+  ) => Effect.Effect<
+    ConfectDataModel[TableName]["confectDocument"],
+    DocumentDecodeError | NoDocumentsMatchQueryError
+  >;
+  readonly stream: () => Stream.Stream<
+    ConfectDataModel[TableName]["confectDocument"],
+    DocumentDecodeError
+  >;
+  readonly withIndex: <
+    IndexName extends keyof Indexes<
+      TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>
+    >,
+  >(
+    indexName: IndexName,
+    indexRange?: (
+      q: IndexRangeBuilder<
+        ConfectDataModel[TableName]["convexDocument"],
+        NamedIndex<
+          TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>,
+          IndexName
+        >
+      >,
+    ) => IndexRange,
+  ) => ConfectQuery<ConfectDataModel[TableName], TableName>;
+  withSearchIndex<
+    IndexName extends keyof SearchIndexes<
+      TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>
+    >,
+  >(
+    indexName: IndexName,
+    searchFilter: (
+      q: SearchFilterBuilder<
+        DocumentByInfo<
+          TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>
+        >,
+        NamedSearchIndex<
+          TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>,
+          IndexName
+        >
+      >,
+    ) => SearchFilter,
+  ): ConfectOrderedQuery<ConfectDataModel[TableName], TableName>;
+  readonly first: () => Effect.Effect<
+    ConfectDataModel[TableName]["confectDocument"],
+    DocumentDecodeError | NoDocumentsMatchQueryError
+  >;
+  readonly unique: () => Effect.Effect<
+    ConfectDataModel[TableName]["confectDocument"],
+    DocumentDecodeError | DocumentNotUniqueError | NoDocumentsMatchQueryError
+  >;
+  readonly take: (
+    n: number,
+  ) => Effect.Effect<
+    ReadonlyArray<ConfectDataModel[TableName]["confectDocument"]>,
+    DocumentDecodeError
+  >;
+  readonly collect: () => Effect.Effect<
+    ReadonlyArray<ConfectDataModel[TableName]["confectDocument"]>,
+    DocumentDecodeError
+  >;
+  readonly order: (
+    order: "asc" | "desc",
+  ) => ConfectOrderedQuery<ConfectDataModel[TableName], TableName>;
+  readonly paginate: (options: {
+    cursor: string | null;
+    numItems: number;
+  }) => Effect.Effect<
+    PaginationResult<ConfectDataModel[TableName]["confectDocument"]>,
+    DocumentDecodeError
+  >;
+};
+
+const makeConfectQueryInitializer = <
+  ConfectSchema extends GenericConfectSchema,
+  TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+  ConfectDataModel extends
+    GenericConfectDataModel = ConfectDataModelFromConfectSchema<ConfectSchema>,
+  ConvexDataModel extends GenericDataModel = DataModelFromConfectDataModel<
+    ConfectDataModelFromConfectSchema<ConfectSchema>
+  >,
+>(
+  // TODO: Add error type for when ID is for the wrong table?
+  tableName: TableName,
+  convexDatabaseReader: GenericDatabaseReader<ConvexDataModel>,
+  confectTableDefinition: ConfectSchema[TableName],
+): ConfectQueryInitializer<ConfectDataModel, TableName> => {
+  type ConfectQueryFunction<
+    FunctionName extends keyof ConfectQueryInitializer<
+      ConfectDataModel,
+      TableName
+    >,
+  > = ConfectQueryInitializer<ConfectDataModel, TableName>[FunctionName];
+
+  const getbyId: ConfectQueryFunction<"getbyId"> = getById(
+    tableName,
+    convexDatabaseReader,
+    confectTableDefinition,
+  );
+
+  const getManyById: ConfectQueryFunction<"getManyById"> = (ids) =>
+    Effect.forEach(ids, getbyId);
+
+  const getByIndex: ConfectQueryFunction<"getByIndex"> = (
+    indexName,
+    ...indexFieldValues
+  ) => {
+    const indexFields: GenericTableIndexes[keyof GenericTableIndexes] =
+      confectTableDefinition.indexes[indexName];
+
+    return pipe(
+      Effect.promise(() =>
+        convexDatabaseReader
+          .query(tableName)
+          .withIndex(indexName, (q) =>
+            Array.reduce(
+              indexFieldValues,
+              q,
+              (q_, v, i) => q_.eq(indexFields[i] as any, v as any) as any,
+            ),
+          )
+          .unique(),
+      ),
+      Effect.andThen(
+        Either.fromNullable(
+          () => new NoDocumentsMatchQueryError({ tableName }),
         ),
       ),
+      Effect.andThen(decode(tableName, confectTableDefinition.tableSchema)),
     );
-  }
-  patch<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    id: GenericId<TableName>,
-    value: Partial<
-      WithoutSystemFields<ConfectDocumentByName<ConfectDataModel, TableName>>
+  };
+
+  const streamEncoded = Stream.fromAsyncIterable(
+    convexDatabaseReader.query(tableName),
+    identity,
+  ).pipe(Stream.orDie);
+
+  const stream: ConfectQueryFunction<"stream"> = () =>
+    pipe(
+      streamEncoded,
+      Stream.mapEffect(decode(tableName, confectTableDefinition.tableSchema)),
+    );
+
+  const withIndex: ConfectQueryFunction<"withIndex"> = (
+    indexName,
+    indexRange,
+  ) =>
+    makeConfectQuery<ConfectDataModel[TableName], TableName>(
+      convexDatabaseReader.query(tableName).withIndex(indexName, indexRange),
+      tableName,
+      confectTableDefinition.tableSchema,
+    );
+
+  const withSearchIndex: ConfectQueryFunction<"withSearchIndex"> = (
+    indexName,
+    searchFilter,
+  ) =>
+    makeConfectOrderedQuery<ConfectDataModel[TableName], TableName>(
+      convexDatabaseReader
+        .query(tableName)
+        .withSearchIndex(indexName, searchFilter),
+      tableName,
+      confectTableDefinition.tableSchema,
+    );
+
+  const first: ConfectQueryFunction<"first"> = () =>
+    pipe(
+      stream(),
+      Stream.runHead,
+      Effect.andThen(
+        Option.match({
+          onNone: () =>
+            Effect.fail(new NoDocumentsMatchQueryError({ tableName })),
+          onSome: decode(tableName, confectTableDefinition.tableSchema),
+        }),
+      ),
+    );
+
+  const unique: ConfectQueryFunction<"unique"> = () =>
+    pipe(
+      stream(),
+      Stream.take(2),
+      Stream.runCollect,
+      Effect.andThen((chunk) =>
+        Option.match(Chunk.get(chunk, 1), {
+          onSome: (doc) =>
+            new DocumentNotUniqueError({
+              id: (doc as GenericConfectDocumentWithSystemFields)._id,
+              tableName,
+            }),
+          onNone: () =>
+            Option.match(Chunk.get(chunk, 0), {
+              onSome: decode(tableName, confectTableDefinition.tableSchema),
+              onNone: () =>
+                Effect.fail(
+                  new NoDocumentsMatchQueryError({
+                    tableName,
+                  }),
+                ),
+            }),
+        }),
+      ),
+    );
+
+  const take: ConfectQueryFunction<"take"> = (n: number) =>
+    pipe(
+      stream(),
+      Stream.take(n),
+      Stream.runCollect,
+      Effect.map((chunk) => Chunk.toReadonlyArray(chunk)),
+    );
+
+  const collect: ConfectQueryFunction<"collect"> = () =>
+    pipe(stream(), Stream.runCollect, Effect.map(Chunk.toReadonlyArray));
+
+  const order: ConfectQueryFunction<"order"> = (order: "asc" | "desc") =>
+    makeConfectOrderedQuery<ConfectDataModel[TableName], TableName>(
+      convexDatabaseReader.query(tableName).order(order),
+      tableName,
+      confectTableDefinition.tableSchema,
+    );
+
+  const paginate: ConfectQueryFunction<"paginate"> = makePaginateFunction(
+    (options) => convexDatabaseReader.query(tableName).paginate(options),
+    decode(tableName, confectTableDefinition.tableSchema),
+  );
+
+  return {
+    getbyId,
+    getManyById,
+    getByIndex,
+    stream,
+    withIndex,
+    withSearchIndex,
+    first,
+    unique,
+    take,
+    collect,
+    order,
+    paginate,
+  };
+};
+
+const getById =
+  <
+    ConfectSchema extends GenericConfectSchema,
+    TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+    ConfectDataModel extends
+      GenericConfectDataModel = ConfectDataModelFromConfectSchema<ConfectSchema>,
+    ConvexDataModel extends GenericDataModel = DataModelFromConfectDataModel<
+      ConfectDataModelFromConfectSchema<ConfectSchema>
     >,
-  ): Effect.Effect<
-    void,
-    ParseResult.ParseError | Cause.NoSuchElementException
-  > {
-    return Effect.gen(this, function* () {
-      const tableName = yield* this.tableName(id);
-      const tableSchema = this.databaseSchemas[tableName];
+  >(
+    tableName: TableName,
+    convexDatabaseReader: GenericDatabaseReader<ConvexDataModel>,
+    confectTableDefinition: ConfectSchema[TableName],
+  ) =>
+  (id: GenericId<TableName>) =>
+    pipe(
+      Effect.promise(() => convexDatabaseReader.get(id)),
+      Effect.andThen(
+        Either.fromNullable(() => new DocumentNotFoundError({ tableName, id })),
+      ),
+      Effect.andThen(decode(tableName, confectTableDefinition.tableSchema)),
+    );
 
-      const originalConvexDoc = yield* Effect.promise(() =>
-        this.db.get(id),
-      ).pipe(
-        Effect.andThen(
-          (
-            doc: DocumentByName<
-              DataModelFromConfectDataModel<ConfectDataModel>,
-              TableName
-            > | null,
-          ) =>
-            doc
-              ? Effect.succeed(doc)
-              : Effect.die(new InvalidIdProvidedForPatch()),
-        ),
-      );
+type ConfectQuery<
+  ConfectTableInfo extends GenericConfectTableInfo,
+  TableName extends string,
+> = {
+  readonly order: (
+    order: "asc" | "desc",
+  ) => ConfectOrderedQuery<ConfectTableInfo, TableName>;
+};
 
-      const originalConfectDoc =
-        yield* Schema.decodeUnknown(tableSchema)(originalConvexDoc);
+const makeConfectQuery = <
+  ConfectTableInfo extends GenericConfectTableInfo,
+  TableName extends string,
+>(
+  query: Query<TableInfoFromConfectTableInfo<ConfectTableInfo>>,
+  tableName: TableName,
+  tableSchema: TableSchemaFromConfectTableInfo<ConfectTableInfo>,
+): ConfectQuery<ConfectTableInfo, TableName> => ({
+  order: (order) =>
+    makeConfectOrderedQuery<ConfectTableInfo, TableName>(
+      query.order(order),
+      tableName,
+      tableSchema,
+    ),
+});
 
-      const updatedConvexDoc = yield* pipe(
-        value,
-        Record.reduce(originalConfectDoc, (acc, value, key) =>
-          value === undefined
-            ? Record.remove(acc, key)
-            : Record.set(acc, key, value),
-        ),
-        Schema.encodeUnknown(tableSchema),
-      );
+type ConfectOrderedQuery<
+  ConfectTableInfo extends GenericConfectTableInfo,
+  _TableName extends string,
+> = {
+  readonly first: () => Effect.Effect<
+    ConfectTableInfo["confectDocument"],
+    DocumentDecodeError | NoDocumentsMatchQueryError
+  >;
+  readonly unique: () => Effect.Effect<
+    ConfectTableInfo["confectDocument"],
+    DocumentDecodeError | DocumentNotUniqueError | NoDocumentsMatchQueryError
+  >;
+  readonly take: (
+    n: number,
+  ) => Effect.Effect<
+    ReadonlyArray<ConfectTableInfo["confectDocument"]>,
+    DocumentDecodeError
+  >;
+  readonly collect: () => Effect.Effect<
+    ReadonlyArray<ConfectTableInfo["confectDocument"]>,
+    DocumentDecodeError
+  >;
+  readonly stream: () => Stream.Stream<
+    ConfectTableInfo["confectDocument"],
+    DocumentDecodeError
+  >;
+  readonly paginate: (options: {
+    cursor: string | null;
+    numItems: number;
+  }) => Effect.Effect<
+    PaginationResult<ConfectTableInfo["confectDocument"]>,
+    DocumentDecodeError
+  >;
+};
 
-      yield* Effect.promise(() =>
-        this.db.replace(
-          id,
-          updatedConvexDoc as Expand<
-            BetterOmit<
-              DocumentByName<
-                DataModelFromConfectDataModel<ConfectDataModel>,
-                TableName
-              >,
-              "_creationTime" | "_id"
-            >
-          >,
-        ),
-      );
+export class NoDocumentsMatchQueryError extends Schema.TaggedError<NoDocumentsMatchQueryError>(
+  "NoDocumentsMatchQueryError",
+)("NoDocumentsMatchQueryError", {
+  tableName: Schema.String,
+}) {
+  override get message(): string {
+    return `No documents match query for table '${this.tableName}'`;
+  }
+}
+export class DocumentNotUniqueError extends Schema.TaggedError<DocumentNotUniqueError>(
+  "DocumentNotUniqueError",
+)("DocumentNotUniqueError", {
+  id: Schema.String,
+  tableName: Schema.String,
+}) {
+  override get message(): string {
+    return documentQueryMessage({
+      id: this.id,
+      tableName: this.tableName,
+      message: "is not unique",
     });
-  }
-  replace<TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
-    id: GenericId<TableName>,
-    value: WithOptionalSystemFields<
-      ConfectDocumentByName<ConfectDataModel, TableName>
-    >,
-  ): Effect.Effect<void> {
-    return Effect.promise(() => this.db.replace(id, value));
-  }
-  delete(id: GenericId<string>): Effect.Effect<void> {
-    return Effect.promise(() => this.db.delete(id));
   }
 }
 
-export const databaseSchemasFromConfectSchema = <
-  ConfectSchema extends GenericConfectSchema,
->(
-  confectSchema: ConfectSchema,
-) =>
-  Record.map(
-    confectSchema,
-    ({ tableSchema }) => tableSchema,
-  ) as DatabaseSchemasFromConfectDataModel<
-    ConfectDataModelFromConfectSchema<ConfectSchema>
-  >;
-
-class InvalidIdProvidedForPatch extends Data.TaggedError(
-  "InvalidIdProvidedForPatch",
-) {}
-
-const decodeDocument = <
+const makeConfectOrderedQuery = <
+  ConfectTableInfo extends GenericConfectTableInfo,
   TableName extends string,
-  ConvexDocument extends GenericEncodedConfectDocument,
-  ConfectDocument extends GenericConfectDocument,
 >(
+  query: OrderedQuery<TableInfoFromConfectTableInfo<ConfectTableInfo>>,
   tableName: TableName,
-  tableSchema: Schema.Schema<ConfectDocument, ConvexDocument>,
-  convexDocument: ConvexDocument,
-): ConfectDocument =>
-  Schema.decodeUnknownSync(extendWithSystemFields(tableName, tableSchema), {
-    onExcessProperty: "error",
-  })(convexDocument);
+  tableSchema: TableSchemaFromConfectTableInfo<ConfectTableInfo>,
+): ConfectOrderedQuery<ConfectTableInfo, TableName> => {
+  type ConfectOrderedQueryFunction<
+    FunctionName extends keyof ConfectOrderedQuery<ConfectTableInfo, TableName>,
+  > = ConfectOrderedQuery<ConfectTableInfo, TableName>[FunctionName];
 
-// Would be better if this were exported from `convex/server`
-type BaseDatabaseReader<DataModel extends GenericDataModel> = Omit<
-  GenericDatabaseReader<DataModel>,
-  "system"
->;
+  const streamEncoded = Stream.fromAsyncIterable(query, identity).pipe(
+    Stream.orDie,
+  );
+
+  const stream: ConfectOrderedQueryFunction<"stream"> = () =>
+    pipe(streamEncoded, Stream.mapEffect(decode(tableName, tableSchema)));
+
+  const unique: ConfectOrderedQueryFunction<"unique"> = () =>
+    pipe(
+      stream(),
+      Stream.take(2),
+      Stream.runCollect,
+      Effect.andThen((chunk) =>
+        Option.match(Chunk.get(chunk, 1), {
+          onSome: (doc) =>
+            new DocumentNotUniqueError({
+              id: (doc as GenericConfectDocumentWithSystemFields)._id,
+              tableName,
+            }),
+          onNone: () =>
+            Option.match(Chunk.get(chunk, 0), {
+              onSome: decode(tableName, tableSchema),
+              onNone: () =>
+                Effect.fail(
+                  new NoDocumentsMatchQueryError({
+                    tableName,
+                  }),
+                ),
+            }),
+        }),
+      ),
+    );
+
+  const first: ConfectOrderedQueryFunction<"first"> = () =>
+    pipe(
+      stream(),
+      Stream.runHead,
+      Effect.andThen(
+        Option.match({
+          onNone: () =>
+            Effect.fail(new NoDocumentsMatchQueryError({ tableName })),
+          onSome: decode(tableName, tableSchema),
+        }),
+      ),
+    );
+
+  const take: ConfectOrderedQueryFunction<"take"> = (n: number) =>
+    pipe(
+      stream(),
+      Stream.take(n),
+      Stream.runCollect,
+      Effect.map((chunk) => Chunk.toReadonlyArray(chunk)),
+    );
+
+  const collect: ConfectOrderedQueryFunction<"collect"> = () =>
+    pipe(stream(), Stream.runCollect, Effect.map(Chunk.toReadonlyArray));
+
+  const paginate: ConfectOrderedQueryFunction<"paginate"> =
+    makePaginateFunction(
+      (options) => query.paginate(options),
+      decode(tableName, tableSchema),
+    );
+
+  return {
+    first,
+    unique,
+    take,
+    collect,
+    stream,
+    paginate,
+  };
+};
+
+const encode = Function.dual<
+  <
+    ConfectDataModel extends GenericConfectDataModel,
+    TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+  >(
+    tableName: TableName,
+    tableSchema: TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>,
+  ) => (
+    self: ConfectDataModel[TableName]["confectDocument"],
+  ) => Effect.Effect<
+    ConfectDataModel[TableName]["encodedConfectDocument"],
+    DocumentEncodeError
+  >,
+  <
+    ConfectDataModel extends GenericConfectDataModel,
+    TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+  >(
+    self: ConfectDataModel[TableName]["confectDocument"],
+    tableName: TableName,
+    tableSchema: TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>,
+  ) => Effect.Effect<
+    ConfectDataModel[TableName]["encodedConfectDocument"],
+    DocumentEncodeError
+  >
+>(
+  3,
+  <
+    ConfectDataModel extends GenericConfectDataModel,
+    TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+  >(
+    self: ConfectDataModel[TableName]["confectDocument"],
+    tableName: TableName,
+    tableSchema: TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>,
+  ): Effect.Effect<
+    ConfectDataModel[TableName]["encodedConfectDocument"],
+    DocumentEncodeError
+  > =>
+    Effect.gen(function* () {
+      const TableSchemaWithSystemFields = extendWithSystemFields(
+        tableName,
+        tableSchema,
+      );
+
+      const decodedDoc = self as (typeof TableSchemaWithSystemFields)["Type"];
+
+      const encodedDoc = yield* pipe(
+        decodedDoc,
+        Schema.encode(tableSchema),
+        Effect.catchTag("ParseError", (parseError) =>
+          Effect.gen(function* () {
+            const formattedParseError =
+              yield* ParseResult.ArrayFormatter.formatError(parseError);
+
+            return yield* new DocumentEncodeError({
+              tableName,
+              id: decodedDoc._id,
+              parseError: formattedParseError,
+            });
+          }),
+        ),
+      );
+
+      return encodedDoc;
+    }),
+);
+
+const decode = Function.dual<
+  <
+    ConfectDataModel extends GenericConfectDataModel,
+    TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+  >(
+    tableName: TableName,
+    tableSchema: TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>,
+  ) => (
+    self: ConfectDataModel[TableName]["convexDocument"],
+  ) => Effect.Effect<
+    ConfectDataModel[TableName]["confectDocument"],
+    DocumentDecodeError
+  >,
+  <
+    ConfectDataModel extends GenericConfectDataModel,
+    TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+  >(
+    self: ConfectDataModel[TableName]["convexDocument"],
+    tableName: TableName,
+    tableSchema: TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>,
+  ) => Effect.Effect<
+    ConfectDataModel[TableName]["confectDocument"],
+    DocumentDecodeError
+  >
+>(
+  3,
+  <
+    ConfectDataModel extends GenericConfectDataModel,
+    TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+  >(
+    self: ConfectDataModel[TableName]["convexDocument"],
+    tableName: TableName,
+    tableSchema: TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>,
+  ): Effect.Effect<
+    ConfectDataModel[TableName]["confectDocument"],
+    DocumentDecodeError
+  > =>
+    Effect.gen(function* () {
+      const TableSchemaWithSystemFields = extendWithSystemFields(
+        tableName,
+        tableSchema,
+      );
+
+      const encodedDoc =
+        self as (typeof TableSchemaWithSystemFields)["Encoded"];
+
+      const decodedDoc = yield* pipe(
+        encodedDoc,
+        Schema.decode(tableSchema),
+        Effect.catchTag("ParseError", (parseError) =>
+          Effect.gen(function* () {
+            const formattedParseError =
+              yield* ParseResult.ArrayFormatter.formatError(parseError);
+
+            return yield* new DocumentDecodeError({
+              tableName,
+              id: encodedDoc._id,
+              parseError: formattedParseError,
+            });
+          }),
+        ),
+      );
+
+      return decodedDoc;
+    }),
+);
+
+export class DocumentNotFoundError extends Schema.TaggedError<DocumentNotFoundError>(
+  "DocumentNotFoundError",
+)("DocumentNotFoundError", {
+  id: Schema.String,
+  tableName: Schema.String,
+}) {
+  override get message(): string {
+    return documentQueryMessage({
+      id: this.id,
+      tableName: this.tableName,
+      message: "not found",
+    });
+  }
+}
+
+export class DocumentEncodeError extends Schema.TaggedError<DocumentEncodeError>(
+  "DocumentEncodeError",
+)("DocumentEncodeError", {
+  tableName: Schema.String,
+  id: Schema.String,
+  parseError: Schema.Array(Schema.ArrayFormatterIssue),
+}) {
+  override get message(): string {
+    return documentQueryMessage({
+      id: this.id,
+      tableName: this.tableName,
+      message: `could not be encoded:\n\n  ${this.parseError}`,
+    });
+  }
+}
+
+export class DocumentDecodeError extends Schema.TaggedError<DocumentDecodeError>(
+  "DocumentDecodeError",
+)("DocumentDecodeError", {
+  tableName: Schema.String,
+  id: Schema.String,
+  parseError: Schema.Array(Schema.ArrayFormatterIssue),
+}) {
+  override get message(): string {
+    return documentQueryMessage({
+      id: this.id,
+      tableName: this.tableName,
+      message: `could not be decoded:\n\n  ${this.parseError}`,
+    });
+  }
+}
+
+const documentQueryMessage = ({
+  id,
+  tableName,
+  message,
+}: {
+  id: string;
+  tableName: string;
+  message: string;
+}) => `Document with ID '${id}' in table '${tableName}' ${message}`;
+
+const makePaginateFunction =
+  <
+    ConfectDocument extends GenericConfectDocument,
+    ConvexDocument extends GenericDocument,
+  >(
+    getPaginationResult: (options: {
+      cursor: string | null;
+      numItems: number;
+    }) => Promise<PaginationResult<ConvexDocument>>,
+    decodeDocument: (
+      doc: ConvexDocument,
+    ) => Effect.Effect<ConfectDocument, DocumentDecodeError>,
+  ) =>
+  (options: {
+    cursor: string | null;
+    numItems: number;
+  }) =>
+    Effect.gen(function* () {
+      const paginationResult = yield* Effect.promise(() =>
+        getPaginationResult(options),
+      );
+
+      const parsedPage = yield* Effect.forEach(
+        paginationResult.page,
+        decodeDocument,
+      );
+
+      return {
+        page: parsedPage,
+        isDone: paginationResult.isDone,
+        continueCursor: paginationResult.continueCursor,
+        ...(paginationResult.splitCursor
+          ? { splitCursor: paginationResult.splitCursor }
+          : {}),
+        ...(paginationResult.pageStatus
+          ? { pageStatus: paginationResult.pageStatus }
+          : {}),
+      };
+    });

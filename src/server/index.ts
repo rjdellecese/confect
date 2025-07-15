@@ -1,15 +1,9 @@
-export {
-  ConfectActionCtx,
-  ConfectMutationCtx,
-  ConfectQueryCtx,
-} from "~/src/server/ctx";
-
 export type {
   TableNamesInConfectDataModel,
   ConfectDoc,
 } from "~/src/server/data-model";
 
-export { NotUniqueError } from "~/src/server/database";
+export { DocumentNotUniqueError } from "~/src/server/database";
 
 export { makeFunctions } from "~/src/server/functions";
 
