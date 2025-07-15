@@ -1,43 +1,56 @@
-import type { StorageReader, StorageWriter } from "convex/server";
+import type {
+  StorageActionWriter,
+  StorageReader,
+  StorageWriter,
+} from "convex/server";
 import type { GenericId } from "convex/values";
-import { Effect, Option } from "effect";
+import { Effect, Layer, Option } from "effect";
 
-export interface ConfectStorageReader {
-  getUrl(
-    storageId: GenericId<"_storage">,
-  ): Effect.Effect<Option.Option<string>>;
-}
-
-export class ConfectStorageReaderImpl implements ConfectStorageReader {
-  constructor(private storageReader: StorageReader) {}
-  getUrl(
-    storageId: GenericId<"_storage">,
-  ): Effect.Effect<Option.Option<string>> {
-    return Effect.promise(() => this.storageReader.getUrl(storageId)).pipe(
+const makeStorageReader = (storageReader: StorageReader) => ({
+  getUrl: (storageId: GenericId<"_storage">) =>
+    // TODO: Which errors might occur?
+    Effect.promise(() => storageReader.getUrl(storageId)).pipe(
       Effect.map(Option.fromNullable),
-    );
-  }
+    ),
+});
+
+const makeStorageWriter = (storageWriter: StorageWriter) => ({
+  generateUploadUrl: () =>
+    // TODO: Which errors might occur?
+    Effect.promise(() => storageWriter.generateUploadUrl()),
+  delete: (storageId: GenericId<"_storage">) =>
+    // TODO: Can this throw?
+    Effect.promise(() => storageWriter.delete(storageId)),
+});
+
+const makeStorageActionWriter = (storageActionWriter: StorageActionWriter) => ({
+  get: (storageId: GenericId<"_storage">) =>
+    // TODO: Which errors might occur?
+    Effect.promise(() => storageActionWriter.get(storageId)).pipe(
+      Effect.map(Option.fromNullable),
+    ),
+  store: (blob: Blob, options?: { sha256?: string }) =>
+    // TODO: Which errors might occur?
+    Effect.promise(() => storageActionWriter.store(blob, options)),
+});
+
+export class ConfectStorageReader extends Effect.Tag(
+  "@rjdellecese/confect/ConfectStorageReader",
+)<ConfectStorageReader, ReturnType<typeof makeStorageReader>>() {
+  static readonly layer = (storageReader: StorageReader) =>
+    Layer.succeed(this, makeStorageReader(storageReader));
 }
 
-export interface ConfectStorageWriter extends ConfectStorageReader {
-  generateUploadUrl(): Effect.Effect<string>;
-  delete(storageId: GenericId<"_storage">): Effect.Effect<void>;
+export class ConfectStorageWriter extends Effect.Tag(
+  "@rjdellecese/confect/ConfectStorageWriter",
+)<ConfectStorageWriter, ReturnType<typeof makeStorageWriter>>() {
+  static readonly layer = (storageWriter: StorageWriter) =>
+    Layer.succeed(this, makeStorageWriter(storageWriter));
 }
 
-export class ConfectStorageWriterImpl implements ConfectStorageWriter {
-  private confectStorageReader: ConfectStorageReader;
-  constructor(private storageWriter: StorageWriter) {
-    this.confectStorageReader = new ConfectStorageReaderImpl(storageWriter);
-  }
-  getUrl(
-    storageId: GenericId<"_storage">,
-  ): Effect.Effect<Option.Option<string>> {
-    return this.confectStorageReader.getUrl(storageId);
-  }
-  generateUploadUrl(): Effect.Effect<string> {
-    return Effect.promise(() => this.storageWriter.generateUploadUrl());
-  }
-  delete(storageId: GenericId<"_storage">): Effect.Effect<void> {
-    return Effect.promise(() => this.storageWriter.delete(storageId));
-  }
+export class ConfectStorageActionWriter extends Effect.Tag(
+  "@rjdellecese/confect/ConfectStorageActionWriter",
+)<ConfectStorageActionWriter, ReturnType<typeof makeStorageActionWriter>>() {
+  static readonly layer = (storageActionWriter: StorageActionWriter) =>
+    Layer.succeed(this, makeStorageActionWriter(storageActionWriter));
 }

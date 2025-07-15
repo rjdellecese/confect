@@ -1,11 +1,3 @@
-import {
-  ConfectActionCtx as ConfectActionCtxService,
-  type ConfectActionCtx as ConfectActionCtxType,
-  ConfectMutationCtx as ConfectMutationCtxService,
-  type ConfectMutationCtx as ConfectMutationCtxType,
-  ConfectQueryCtx as ConfectQueryCtxService,
-  type ConfectQueryCtx as ConfectQueryCtxType,
-} from "~/src/server/ctx";
 import type {
   ConfectDoc as ConfectDocType,
   TableNamesInConfectDataModel,
@@ -21,6 +13,9 @@ export const {
   internalQuery,
   mutation,
   query,
+  ConfectDatabaseReader,
+  ConfectDatabaseWriter,
+  ConfectVectorSearch,
 } = makeFunctions(confectSchema);
 
 type ConfectSchema = typeof confectSchema;
@@ -32,11 +27,21 @@ export type ConfectDoc<
   TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
 > = ConfectDocType<ConfectDataModel, TableName>;
 
-export const ConfectQueryCtx = ConfectQueryCtxService<ConfectDataModel>();
-export type ConfectQueryCtx = ConfectQueryCtxType<ConfectDataModel>;
+// Services
 
-export const ConfectMutationCtx = ConfectMutationCtxService<ConfectDataModel>();
-export type ConfectMutationCtx = ConfectMutationCtxType<ConfectDataModel>;
+export type ConfectDatabaseReader = typeof ConfectDatabaseReader.Identifier;
+export type ConfectDatabaseWriter = typeof ConfectDatabaseWriter.Identifier;
+export type ConfectVectorSearch = typeof ConfectVectorSearch.Identifier;
 
-export const ConfectActionCtx = ConfectActionCtxService<ConfectDataModel>();
-export type ConfectActionCtx = ConfectActionCtxType<ConfectDataModel>;
+export { ConfectAuth } from "~/src/server/auth";
+export { ConfectScheduler } from "~/src/server/scheduler";
+export {
+  ConfectStorageReader,
+  ConfectStorageWriter,
+  ConfectStorageActionWriter,
+} from "~/src/server/storage";
+export {
+  ConfectQueryRunner,
+  ConfectMutationRunner,
+  ConfectActionRunner,
+} from "~/src/server/runners";

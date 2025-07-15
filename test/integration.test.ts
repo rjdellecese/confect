@@ -1,11 +1,20 @@
 import { describe, expect, vi } from "@effect/vitest";
-import { Array, Effect, Exit, Order, Schema, String } from "effect";
+import {
+  Array,
+  DateTime,
+  Duration,
+  Effect,
+  Exit,
+  Order,
+  Schema,
+  String,
+} from "effect";
 
-import { NotUniqueError } from "~/src/server/database";
 import { test } from "~/test/convex-effect-test";
 import { api } from "~/test/convex/_generated/api";
 import type { Id } from "~/test/convex/_generated/dataModel";
 import { TestConvexService } from "~/test/test-convex-service";
+import { DocumentNotUniqueError } from "../src/server/database";
 
 test("query get", () =>
   Effect.gen(function* () {
@@ -233,7 +242,7 @@ describe("unique", () => {
 
       const note = yield* c.query(api.functions.unique, {});
 
-      expect(note).toEqual(new NotUniqueError()._tag);
+      expect(note).toEqual({ _tag: "None" });
     }));
 
   test("when zero notes exist", () =>
@@ -312,42 +321,6 @@ test("search", () =>
     expect(notes.length).toEqual(1);
     expect(notes[0]).toEqual(text);
   }));
-
-describe("normalizeId", () => {
-  test("query", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConvexService;
-
-      const noteId = yield* c.run(({ db }) =>
-        db.insert("notes", { text: "Hello world!" }),
-      );
-
-      const exit = yield* c
-        .query(api.functions.queryNormalizeId, {
-          noteId,
-        })
-        .pipe(Effect.exit);
-
-      expect(Exit.isSuccess(exit)).toBe(true);
-    }));
-
-  test("mutation", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConvexService;
-
-      const noteId = yield* c.run(({ db }) =>
-        db.insert("notes", { text: "Hello world!" }),
-      );
-
-      const exit = yield* c
-        .mutation(api.functions.mutationNormalizeId, {
-          noteId,
-        })
-        .pipe(Effect.exit);
-
-      expect(Exit.isSuccess(exit)).toBe(true);
-    }));
-});
 
 test("patch", () =>
   Effect.gen(function* () {
@@ -644,11 +617,15 @@ describe("scheduled functions", () => {
       yield* Effect.sync(() => vi.useFakeTimers());
 
       const text = "Hello, world!";
-      const millis = 1_000;
+      const millisDuration = Duration.millis(1_000);
+      const millisEncoded = yield* Schema.encode(Schema.Duration)(
+        millisDuration,
+      );
+      const millisNumber = Duration.toMillis(millisDuration);
 
       yield* c.action(api.functions.insertAfter, {
         text,
-        millis,
+        millis: millisEncoded,
       });
 
       {
@@ -657,7 +634,7 @@ describe("scheduled functions", () => {
         expect(note).toEqual(null);
       }
 
-      yield* Effect.sync(() => vi.advanceTimersByTime(millis));
+      yield* Effect.sync(() => vi.advanceTimersByTime(millisNumber));
       yield* c.finishInProgressScheduledFunctions();
 
       {
@@ -674,12 +651,15 @@ describe("scheduled functions", () => {
 
       const text = "Hello, world!";
 
-      const now = yield* Effect.sync(() => Date.now());
-      const timestamp = now + 1_000;
+      const now = yield* DateTime.now;
+      const timestamp = DateTime.addDuration(now, Duration.millis(1_000));
+      const timestampEncoded = yield* Schema.encode(Schema.DateTimeUtc)(
+        timestamp,
+      );
 
       yield* c.action(api.functions.insertAt, {
         text,
-        timestamp,
+        timestamp: timestampEncoded,
       });
 
       yield* c.finishAllScheduledFunctions(vi.runAllTimers);
@@ -745,18 +725,6 @@ describe("http", () => {
 });
 
 describe("system", () => {
-  test("normalizeId", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConvexService;
-
-      const id = yield* c.run(({ storage }) => storage.store(new Blob()));
-      const normalizedId = yield* c.query(api.functions.systemNormalizeId, {
-        id,
-      });
-
-      expect(normalizedId).toEqual({ _tag: "Some", value: id });
-    }));
-
   test("get", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
