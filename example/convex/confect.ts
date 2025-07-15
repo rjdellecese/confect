@@ -7,8 +7,8 @@ import {
   type ConfectMutationCtx as ConfectMutationCtxType,
   ConfectQueryCtx as ConfectQueryCtxService,
   type ConfectQueryCtx as ConfectQueryCtxType,
-  type TableNamesInConfectDataModel,
   makeFunctions,
+  type TableNamesInConfectDataModel,
 } from "@rjdellecese/confect/server";
 
 import { confectSchema } from "./schema";

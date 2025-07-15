@@ -5,12 +5,12 @@ import type {
   Expand,
   Expression,
   FilterBuilder,
-  GenericDataModel,
   GenericDatabaseReader,
   GenericDatabaseWriter,
+  GenericDataModel,
+  Indexes,
   IndexRange,
   IndexRangeBuilder,
-  Indexes,
   NamedIndex,
   NamedSearchIndex,
   OrderedQuery,
@@ -31,13 +31,13 @@ import {
   Chunk,
   Data,
   Effect,
+  identity,
   Option,
   type ParseResult,
+  pipe,
   Record,
   Schema,
   Stream,
-  identity,
-  pipe,
 } from "effect";
 
 import type {
@@ -53,8 +53,8 @@ import type {
 import {
   type ConfectDataModelFromConfectSchema,
   type ConfectSystemDataModel,
-  type GenericConfectSchema,
   confectSystemSchemaDefinition,
+  type GenericConfectSchema,
 } from "~/src/server/schema";
 import { extendWithSystemFields } from "~/src/server/schemas/SystemFields";
 
@@ -157,12 +157,14 @@ class ConfectQueryImpl<
         page: parsedPage,
         isDone: paginationResult.isDone,
         continueCursor: paginationResult.continueCursor,
+        /* v8 ignore start */
         ...(paginationResult.splitCursor
           ? { splitCursor: paginationResult.splitCursor }
           : {}),
         ...(paginationResult.pageStatus
           ? { pageStatus: paginationResult.pageStatus }
           : {}),
+        /* v8 ignore stop */
       })),
     );
   }

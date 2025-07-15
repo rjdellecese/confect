@@ -9,12 +9,12 @@ import {
 import {
   type GenericActionCtx,
   type HttpRouter,
-  ROUTABLE_HTTP_METHODS,
-  type RouteSpecWithPathPrefix,
   httpActionGeneric,
   httpRouter,
+  ROUTABLE_HTTP_METHODS,
+  type RouteSpecWithPathPrefix,
 } from "convex/server";
-import { Array, Layer, Record, pipe } from "effect";
+import { Array, Layer, pipe, Record } from "effect";
 import { ConfectActionCtx, makeConfectActionCtx } from "./ctx";
 import type {
   DataModelFromConfectDataModel,
@@ -57,7 +57,7 @@ const makeHandler =
       path: `${pathPrefix}docs`,
       scalar: {
         baseServerURL: `${
-          // biome-ignore lint/complexity/useLiteralKeys:
+          // biome-ignore lint/complexity/useLiteralKeys: TS says this must be accessed with a string literal
           process.env["CONVEX_SITE_URL"]
         }${pathPrefix}`,
         ...scalar,
@@ -146,7 +146,7 @@ const makeHttpRouter = (httpApis: HttpApis): HttpRouter => {
 const applyMonkeyPatches = () => {
   // These are necessary until the Convex runtime supports these APIs. See https://discord.com/channels/1019350475847499849/1281364098419785760
 
-  // biome-ignore lint/suspicious/noGlobalAssign:
+  // biome-ignore lint/suspicious/noGlobalAssign: See above note.
   URL = class extends URL {
     override get username() {
       return "";

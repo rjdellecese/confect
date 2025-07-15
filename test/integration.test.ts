@@ -2,9 +2,9 @@ import { describe, expect, vi } from "@effect/vitest";
 import { Array, Effect, Exit, Order, Schema, String } from "effect";
 
 import { NotUniqueError } from "~/src/server/database";
-import { test } from "~/test/convex-effect-test";
 import { api } from "~/test/convex/_generated/api";
 import type { Id } from "~/test/convex/_generated/dataModel";
+import { test } from "~/test/convex-effect-test";
 import { TestConvexService } from "~/test/test-convex-service";
 
 test("query get", () =>
