@@ -37,6 +37,7 @@ import {
   Record,
   Schema,
   Stream,
+  Struct,
 } from "effect";
 import { dual } from "effect/Function";
 import type {
@@ -50,11 +51,15 @@ import type {
   TableNamesInConfectDataModel,
   TableSchemaFromConfectTableInfo,
 } from "./data-model";
-import type {
-  ConfectDataModelFromConfectSchema,
-  ConfectDataModelFromConfectSchemaDefinition,
-  GenericConfectSchema,
-  GenericConfectSchemaDefinition,
+import {
+  type ConfectDataModelFromConfectSchema,
+  type ConfectDataModelFromConfectSchemaDefinition,
+  confectSystemSchema,
+  type ExtendWithConfectSystemSchema,
+  extendWithConfectSystemSchema,
+  type GenericConfectSchema,
+  type GenericConfectSchemaDefinition,
+  type TableNamesInConfectSchema,
 } from "./schema";
 import { extendWithSystemFields } from "./schemas/SystemFields";
 
@@ -78,6 +83,9 @@ export const makeConfectDatabaseServices = <
   // ConfectDatabaseReader //
   ///////////////////////////
 
+  type ConfectSchemaWithSystemTables =
+    ExtendWithConfectSystemSchema<ConfectSchema>;
+
   const makeConfectDatabaseReader = (
     convexDatabaseReader: GenericDatabaseReader<
       DataModelFromConfectDataModel<
@@ -85,18 +93,37 @@ export const makeConfectDatabaseServices = <
       >
     >,
   ) => ({
-    table: <TableName extends TableNamesInConfectDataModel<ConfectDataModel>>(
+    table: <
+      TableName extends
+        TableNamesInConfectSchema<ConfectSchemaWithSystemTables>,
+    >(
       tableName: TableName,
     ) => {
-      const confectTableDefinition = confectSchemaDefinition.confectSchema[
-        tableName
-      ] as NonNullable<ConfectSchema[TableName]>;
+      const confectTableDefinition = extendWithConfectSystemSchema(
+        confectSchemaDefinition.confectSchema,
+      )[tableName] as ConfectSchemaWithSystemTables[TableName];
 
-      return makeConfectQueryInitializer<ConfectSchema, TableName>(
-        tableName,
-        convexDatabaseReader,
-        confectTableDefinition,
-      );
+      const baseDatabaseReader: BaseDatabaseReader<
+        DataModelFromConfectDataModel<
+          ConfectDataModelFromConfectSchema<ConfectSchemaWithSystemTables>
+        >
+      > = Array.some(
+        Struct.keys(confectSystemSchema),
+        (systemTableName) => systemTableName === tableName,
+      )
+        ? {
+            get: convexDatabaseReader.system.get,
+            query: convexDatabaseReader.system.query,
+          }
+        : {
+            get: convexDatabaseReader.get,
+            query: convexDatabaseReader.query,
+          };
+
+      return makeConfectQueryInitializer<
+        ConfectSchemaWithSystemTables,
+        TableName
+      >(tableName, baseDatabaseReader, confectTableDefinition);
     },
   });
 
@@ -406,7 +433,7 @@ const makeConfectQueryInitializer = <
 >(
   // TODO: Add error type for when ID is for the wrong table?
   tableName: TableName,
-  convexDatabaseReader: GenericDatabaseReader<ConvexDataModel>,
+  convexDatabaseReader: BaseDatabaseReader<ConvexDataModel>,
   confectTableDefinition: ConfectSchema[TableName],
 ): ConfectQueryInitializer<ConfectDataModel, TableName> => {
   type ConfectQueryFunction<
@@ -576,12 +603,12 @@ const getById =
     >,
   >(
     tableName: TableName,
-    convexDatabaseReader: GenericDatabaseReader<ConvexDataModel>,
+    convexTableReader: BaseDatabaseReader<ConvexDataModel>,
     confectTableDefinition: ConfectSchema[TableName],
   ) =>
   (id: GenericId<TableName>) =>
     pipe(
-      Effect.promise(() => convexDatabaseReader.get(id)),
+      Effect.promise(() => convexTableReader.get(id)),
       Effect.andThen(
         Either.fromNullable(() => new DocumentNotFoundError({ tableName, id })),
       ),
@@ -983,3 +1010,9 @@ const makePaginateFunction =
           : {}),
       };
     });
+
+// Would prefer to use `BaseDatabaseReader` from the `convex` package, but it's not exported.
+type BaseDatabaseReader<DataModel extends GenericDataModel> = {
+  get: GenericDatabaseReader<DataModel>["get"];
+  query: GenericDatabaseReader<DataModel>["query"];
+};

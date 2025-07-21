@@ -27,7 +27,7 @@ import {
 } from "~/src/server/schemas/SystemFields";
 import type { GenericConfectDataModel } from "./data-model";
 
-export const confectTableSchemas = {
+export const confectSystemTableSchemas = {
   _scheduled_functions: Schema.Struct({
     name: Schema.String,
     args: Schema.Array(Schema.Any),
@@ -61,7 +61,7 @@ const tableSchemasFromConfectSchema = <
       withSystemFields: extendWithSystemFields(tableName, tableSchema),
       withoutSystemFields: tableSchema,
     })),
-    ...Record.map(confectTableSchemas, (tableSchema, tableName) => ({
+    ...Record.map(confectSystemTableSchemas, (tableSchema, tableName) => ({
       withSystemFields: extendWithSystemFields(tableName, tableSchema),
       withoutSystemFields: tableSchema,
     })),
@@ -444,16 +444,31 @@ type ExtractEncodedConfectDocument<
 >;
 
 export const confectSystemSchema = {
-  _scheduled_functions: defineTable(confectTableSchemas._scheduled_functions),
-  _storage: defineTable(confectTableSchemas._storage),
+  _scheduled_functions: defineTable(
+    confectSystemTableSchemas._scheduled_functions,
+  ),
+  _storage: defineTable(confectSystemTableSchemas._storage),
 };
+
+export type ConfectSystemSchema = typeof confectSystemSchema;
 
 export const confectSystemSchemaDefinition = defineSchema(confectSystemSchema);
 
-type ConfectSystemSchema = typeof confectSystemSchemaDefinition;
+type ConfectSystemSchemaDefinition = typeof confectSystemSchemaDefinition;
 
 export type ConfectSystemDataModel =
-  ConfectDataModelFromConfectSchemaDefinition<ConfectSystemSchema>;
+  ConfectDataModelFromConfectSchemaDefinition<ConfectSystemSchemaDefinition>;
+
+export const extendWithConfectSystemSchema = <
+  ConfectSchema extends GenericConfectSchema,
+>(
+  confectSchema: ConfectSchema,
+): ExtendWithConfectSystemSchema<ConfectSchema> =>
+  ({ ...confectSchema, ...confectSystemSchema }) as any;
+
+export type ExtendWithConfectSystemSchema<
+  ConfectSchema extends GenericConfectSchema,
+> = Expand<ConfectSchema & ConfectSystemSchema>;
 
 type TableSchemasFromConfectSchema<ConfectSchema extends GenericConfectSchema> =
   Expand<
@@ -466,12 +481,12 @@ type TableSchemasFromConfectSchema<ConfectSchema extends GenericConfectSchema> =
         withoutSystemFields: ConfectSchema[TableName]["tableSchema"];
       };
     } & {
-      [TableName in keyof ConfectSystemSchema["confectSchema"]]: {
+      [TableName in keyof ConfectSystemSchemaDefinition["confectSchema"]]: {
         withSystemFields: ExtendWithSystemFields<
           TableName,
-          ConfectSystemSchema["confectSchema"][TableName]["tableSchema"]
+          ConfectSystemSchemaDefinition["confectSchema"][TableName]["tableSchema"]
         >;
-        withoutSystemFields: ConfectSystemSchema["confectSchema"][TableName]["tableSchema"];
+        withoutSystemFields: ConfectSystemSchemaDefinition["confectSchema"][TableName]["tableSchema"];
       };
     }
   >;

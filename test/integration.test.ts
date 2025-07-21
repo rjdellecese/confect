@@ -711,7 +711,7 @@ describe("system", () => {
         id,
       });
 
-      expect(storageDoc).toMatchObject({ _tag: "Some", value: { _id: id } });
+      expect(storageDoc).toMatchObject({ _id: id });
     }));
 
   test("query", () =>

@@ -547,12 +547,12 @@ export const systemGet = query({
   args: Schema.Struct({
     id: Id("_storage"),
   }),
-  returns: Schema.Option(confectSchema.tableSchemas._storage.withSystemFields),
+  returns: confectSchema.tableSchemas._storage.withSystemFields,
   handler: ({ id }) =>
     Effect.gen(function* () {
       const reader = yield* ConfectDatabaseReader;
 
-      return yield* reader.system.get(id);
+      return yield* reader.table("_storage").getbyId(id);
     }),
 });
 
@@ -563,7 +563,7 @@ export const systemQuery = query({
     Effect.gen(function* () {
       const reader = yield* ConfectDatabaseReader;
 
-      return yield* reader.system.query("_storage").collect();
+      return yield* reader.table("_storage").collect();
     }),
 });
 

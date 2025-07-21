@@ -12,7 +12,7 @@ import {
   type ConfectTableDefinition,
   type confectSystemSchema,
   confectSystemSchemaDefinition,
-  type confectTableSchemas,
+  type confectSystemTableSchemas,
   defineSchema,
   defineTable,
 } from "~/src/server/schema";
@@ -97,7 +97,7 @@ describe("tableSchemas", () => {
 
 describe("confectTableSchemas", () => {
   test("matches confectSystemSchema", () => {
-    type ConfectTableSchemas = typeof confectTableSchemas;
+    type ConfectTableSchemas = typeof confectSystemTableSchemas;
     type ConfectSystemSchema = typeof confectSystemSchema;
 
     type ConfectTableSchemasFromConfectSystemSchema = {
