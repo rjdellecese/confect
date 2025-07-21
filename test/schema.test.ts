@@ -78,8 +78,6 @@ describe("tableSchemas", () => {
 
     const ItemSchema = Schema.Union(NoteSchema, ImageSchema);
 
-    type ItemSchema = typeof ItemSchema;
-
     const confectTableSchemas = defineSchema({
       items: defineTable(ItemSchema),
     }).tableSchemas;

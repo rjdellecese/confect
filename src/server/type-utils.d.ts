@@ -1,7 +1,6 @@
 import type { GenericId } from "convex/values";
 import type { Brand } from "effect";
 
-// biome-ignore lint/complexity/noBannedTypes:
 export type IsOptional<T, K extends keyof T> = {} extends Pick<T, K>
   ? true
   : false;
@@ -67,7 +66,7 @@ type DetectCycle<T, Cache extends any[] = []> = IsAny<T> extends true
       ? true
       : T extends Array<infer U>
         ? DetectCycle<U, [...Cache, T]>
-        : T extends Map<infer U, infer V>
+        : T extends Map<infer _U, infer V>
           ? DetectCycle<V, [...Cache, T]>
           : T extends Set<infer U>
             ? DetectCycle<U, [...Cache, T]>

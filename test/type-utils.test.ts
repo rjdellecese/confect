@@ -41,7 +41,6 @@ describe("IsAny", () => {
   });
 
   test("{} = false", () => {
-    // biome-ignore lint/complexity/noBannedTypes:
     expectTypeOf<IsAny<{}>>().toEqualTypeOf<false>();
   });
 });
@@ -333,7 +332,6 @@ describe("IsRecursive", () => {
     });
 
     test("empty object", () => {
-      // biome-ignore lint/complexity/noBannedTypes: testing empty object type
       type EmptyObject = {};
       expectTypeOf<IsRecursive<EmptyObject>>().toEqualTypeOf<false>();
     });

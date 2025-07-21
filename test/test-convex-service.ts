@@ -1,10 +1,5 @@
 /// <reference types="vite/client" />
 
-import {
-  type TestConvexForDataModel,
-  type TestConvexForDataModelAndIdentity,
-  convexTest,
-} from "convex-test";
 import type {
   DataModelFromSchemaDefinition,
   FunctionReference,
@@ -14,6 +9,11 @@ import type {
   StorageActionWriter,
   UserIdentity,
 } from "convex/server";
+import {
+  convexTest,
+  type TestConvexForDataModel,
+  type TestConvexForDataModelAndIdentity,
+} from "convex-test";
 import { Context, Effect, Layer, pipe } from "effect";
 
 import schema from "~/test/convex/schema";

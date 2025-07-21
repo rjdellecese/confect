@@ -1,8 +1,6 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
-  "organizeImports": {
-    "enabled": true
-  },
+  "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "formatter": {
     "indentStyle": "space"
   },
@@ -11,7 +9,8 @@
     "rules": {
       "recommended": true,
       "complexity": {
-        "noForEach": "off"
+        "noForEach": "off",
+        "noBannedTypes": "off"
       },
       "correctness": {
         "noUnusedImports": "warn"
@@ -29,18 +28,19 @@
     }
   },
   "files": {
-    "ignore": [
-      ".pnpm-store",
-      ".tsup",
-      "coverage",
-      "docs",
-      "dist",
-      "package.json",
-      "pnpm-lock.yaml",
-      "test/convex/_generated",
-      "example/convex/_generated",
-      "example/pnpm-lock.yaml",
-      "example/node_modules"
+    "includes": [
+      "**",
+      "!**/.pnpm-store",
+      "!**/.tsup",
+      "!**/coverage",
+      "!**/docs",
+      "!**/dist",
+      "!**/package.json",
+      "!**/pnpm-lock.yaml",
+      "!**/test/convex/_generated",
+      "!**/example/convex/_generated",
+      "!**/example/pnpm-lock.yaml",
+      "!**/example/node_modules"
     ]
   }
 }

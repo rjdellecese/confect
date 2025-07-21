@@ -11,9 +11,9 @@ import type {
 import {
   type ConfectDataModelFromConfectSchema,
   type ConfectSchemaFromConfectSchemaDefinition,
-  type GenericConfectSchema,
   defineSchema,
   defineTable,
+  type GenericConfectSchema,
 } from "~/src/server/schema";
 
 describe("ConfectDataModelFromConfectSchema", () => {

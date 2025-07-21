@@ -1,6 +1,6 @@
 {
 	"name": "@rjdellecese/confect",
-	"version": "0.0.26",
+	"version": "0.0.27",
 	"description": "Use Effect with Convex!",
 	"repository": {
 		"type": "git",
@@ -57,19 +57,22 @@
 	"author": "RJ Dellecese",
 	"license": "ISC",
 	"devDependencies": {
-		"@arethetypeswrong/cli": "0.17.4",
-		"@biomejs/biome": "1.9.4",
+		"@arethetypeswrong/cli": "0.18.2",
+		"@biomejs/biome": "2.1.1",
 		"@changesets/cli": "2.29.5",
 		"@changesets/config": "3.1.1",
-		"@effect/language-service": "0.24.2",
-		"@effect/platform-node": "0.89.5",
-		"@effect/vitest": "0.23.12",
-		"@swc/jest": "0.2.38",
+		"@effect/cluster": "0.42.0",
+		"@effect/experimental": "0.52.0",
+		"@effect/platform-node": "0.90.0",
+		"@effect/rpc": "0.65.0",
+		"@effect/sql": "0.41.0",
+		"@effect/vitest": "0.24.0",
+		"@swc/jest": "0.2.39",
 		"@tsconfig/strictest": "2.0.5",
-		"@types/node": "24.0.13",
+		"@types/node": "24.0.14",
 		"@vitest/coverage-v8": "3.2.4",
 		"convex-test": "0.0.38",
-		"dotenv": "16.5.0",
+		"dotenv": "17.2.0",
 		"tsup": "8.5.0",
 		"typescript": "5.8.3",
 		"vite": "7.0.4",
@@ -77,13 +80,9 @@
 		"vitest": "3.2.4"
 	},
 	"peerDependencies": {
-		"@effect/cluster": "^0.41.17",
-		"@effect/experimental": "^0.51.13",
-		"@effect/platform": "^0.87.12",
-		"@effect/rpc": "^0.64.13",
-		"@effect/sql": "^0.40.13",
-		"convex": "^1.23.0",
-		"effect": "^3.16.12"
+		"@effect/platform": "^0.88.0",
+		"convex": "^1.25.4",
+		"effect": "^3.16.13"
 	},
 	"engines": {
 		"node": ">=22",

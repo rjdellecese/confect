@@ -1,5 +1,11 @@
 # @rjdellecese/confect
 
+## 0.0.27
+
+### Patch Changes
+
+- 0772709: Upgrade deps
+
 ## 0.0.26
 
 ### Patch Changes

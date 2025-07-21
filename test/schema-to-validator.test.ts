@@ -6,11 +6,15 @@ import {
   type VUnion,
   v,
 } from "convex/values";
-import { Effect, Exit, Schema, identity } from "effect";
+import { Effect, Exit, identity, Schema } from "effect";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
 import { Id } from "~/src/server";
 import {
+  compileArgsSchema,
+  compileAst,
+  compileSchema,
+  compileTableSchema,
   EmptyTupleIsNotSupportedError,
   IndexSignaturesAreNotSupportedError,
   OptionalTupleElementsAreNotSupportedError,
@@ -19,10 +23,6 @@ import {
   UnsupportedPropertySignatureKeyTypeError,
   UnsupportedSchemaTypeError,
   type ValueToValidator,
-  compileArgsSchema,
-  compileAst,
-  compileSchema,
-  compileTableSchema,
 } from "~/src/server/schema-to-validator";
 
 describe(compileAst, () => {
@@ -965,7 +965,6 @@ describe("ValueToValidator", () => {
       const expectedValidator = v.object({});
       type ExpectedValidator = typeof expectedValidator;
 
-      // biome-ignore lint/complexity/noBannedTypes:
       type CompiledValidator = ValueToValidator<{}>;
 
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();

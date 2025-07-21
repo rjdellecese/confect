@@ -4,6 +4,7 @@ import {
   Effect,
   Option,
   type ParseResult,
+  pipe,
   Schema,
   Stream,
 } from "effect";

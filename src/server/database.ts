@@ -11,7 +11,6 @@ import type {
   GenericTableIndexes,
   IndexRange,
   IndexRangeBuilder,
-  Indexes,
   NamedIndex,
   NamedSearchIndex,
   OrderedQuery,
@@ -37,8 +36,6 @@ import {
   Record,
   Schema,
   Stream,
-  identity,
-  pipe,
 } from "effect";
 import type {
   ConfectDocumentByName,
@@ -961,10 +958,7 @@ const makePaginateFunction =
       doc: ConvexDocument,
     ) => Effect.Effect<ConfectDocument, DocumentDecodeError>,
   ) =>
-  (options: {
-    cursor: string | null;
-    numItems: number;
-  }) =>
+  (options: { cursor: string | null; numItems: number }) =>
     Effect.gen(function* () {
       const paginationResult = yield* Effect.promise(() =>
         getPaginationResult(options),

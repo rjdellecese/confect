@@ -1,4 +1,4 @@
-import { Id, defineSchema, defineTable } from "@rjdellecese/confect/server";
+import { defineSchema, defineTable, Id } from "@rjdellecese/confect/server";
 import { Schema } from "effect";
 
 type Tag = {
