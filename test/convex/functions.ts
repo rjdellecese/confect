@@ -4,7 +4,6 @@ import {
   Effect,
   Option,
   type ParseResult,
-  pipe,
   Schema,
   Stream,
 } from "effect";
@@ -16,6 +15,7 @@ import { Id } from "~/src/server/schemas/Id";
 import { PaginationResult } from "~/src/server/schemas/PaginationResult";
 import { api, internal } from "~/test/convex/_generated/api";
 import {
+  action,
   ConfectActionRunner,
   ConfectAuth,
   ConfectDatabaseReader,
@@ -26,7 +26,6 @@ import {
   ConfectStorageReader,
   ConfectStorageWriter,
   ConfectVectorSearch,
-  action,
   internalAction,
   internalMutation,
   internalQuery,
@@ -458,12 +457,9 @@ export const executeVectorSearch = action({
             }).pipe(
               Effect.andThen(
                 Schema.decode(
-                  Schema.Option(
-                    confectSchema.tableSchemas.notes.withSystemFields,
-                  ),
+                  confectSchema.tableSchemas.notes.withSystemFields,
                 ),
               ),
-              Effect.map(Option.getOrThrow),
               Effect.map(({ text, tag }) => ({ text, tag })),
             ),
           ),

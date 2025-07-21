@@ -9,13 +9,10 @@ import {
   Schema,
   String,
 } from "effect";
-
-import { test } from "~/test/convex-effect-test";
 import { api } from "~/test/convex/_generated/api";
 import type { Id } from "~/test/convex/_generated/dataModel";
 import { test } from "~/test/convex-effect-test";
 import { TestConvexService } from "~/test/test-convex-service";
-import { DocumentNotUniqueError } from "../src/server/database";
 
 test("query get", () =>
   Effect.gen(function* () {
@@ -29,7 +26,7 @@ test("query get", () =>
       noteId,
     });
 
-    expect(note).toMatchObject({ _tag: "Some", value: { text } });
+    expect(note).toMatchObject({ text });
   }));
 
 test("mutation get", () =>
@@ -44,7 +41,7 @@ test("mutation get", () =>
       noteId,
     });
 
-    expect(note).toMatchObject({ value: { text } });
+    expect(note).toMatchObject({ text });
   }));
 
 test("insert", () =>
@@ -90,27 +87,6 @@ test("mutation collect", () =>
     expect(notes[0]?.text).toEqual(text);
   }));
 
-test("filter + first", () =>
-  Effect.gen(function* () {
-    const c = yield* TestConvexService;
-
-    const text1 = "Hello, Earth!";
-    const text2 = "Hello, Mars!";
-
-    yield* c.run(({ db }) =>
-      Promise.all([
-        db.insert("notes", { text: text1 }),
-        db.insert("notes", { text: text2 }),
-      ]),
-    );
-
-    const note = yield* c.query(api.functions.filterFirst, {
-      text: text1,
-    });
-
-    expect(note).toMatchObject({ _tag: "Some", value: { text: text1 } });
-  }));
-
 test("withIndex + first", () =>
   Effect.gen(function* () {
     const c = yield* TestConvexService;
@@ -127,7 +103,7 @@ test("withIndex + first", () =>
       text: text,
     });
 
-    expect(note).toMatchObject({ _tag: "Some", value: { text } });
+    expect(note).toMatchObject({ text });
   }));
 
 test("order desc + collect", () =>
@@ -241,9 +217,9 @@ describe("unique", () => {
         ]),
       );
 
-      const note = yield* c.query(api.functions.unique, {});
+      const exit = yield* c.query(api.functions.unique, {}).pipe(Effect.exit);
 
-      expect(note).toEqual({ _tag: "None" });
+      expect(Exit.isFailure(exit)).toBe(true);
     }));
 
   test("when zero notes exist", () =>

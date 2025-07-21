@@ -1,9 +1,9 @@
 import type {
-  NamedTableInfo,
   Expand,
+  GenericActionCtx,
+  NamedTableInfo,
   VectorIndexNames,
   VectorSearchQuery,
-  GenericActionCtx,
 } from "convex/server";
 import { Effect, Layer } from "effect";
 import type {

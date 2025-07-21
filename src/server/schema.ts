@@ -15,7 +15,7 @@ import {
   type VectorIndexConfig,
 } from "convex/server";
 import type { GenericValidator, Validator } from "convex/values";
-import { Record, Schema, pipe } from "effect";
+import { pipe, Record, Schema } from "effect";
 
 import {
   compileTableSchema,
@@ -144,7 +144,6 @@ export interface ConfectTableDefinition<
   TableSchema extends Schema.Schema.AnyNoContext,
   TableValidator extends
     GenericValidator = TableSchemaToTableValidator<TableSchema>,
-  // biome-ignore lint/complexity/noBannedTypes:
   Indexes extends GenericTableIndexes = {},
   SearchIndexes extends GenericTableSearchIndexes = {},
   VectorIndexes extends GenericTableVectorIndexes = {},

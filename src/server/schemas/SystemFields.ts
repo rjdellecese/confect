@@ -1,5 +1,8 @@
-import type { IdField, SystemFields as NonIdSystemFields } from "convex/server";
-import type { Expand } from "convex/server";
+import type {
+  Expand,
+  IdField,
+  SystemFields as NonIdSystemFields,
+} from "convex/server";
 import { Schema } from "effect";
 import { Id } from "~/src/server/schemas/Id";
 

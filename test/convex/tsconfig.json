@@ -7,7 +7,7 @@
     /* These settings are not required by Convex and can be modified. */
     "plugins": [
       {
-        "name": "@effect/language-service",
+        "name": "@effect/language-service"
       }
     ],
     "allowJs": true,

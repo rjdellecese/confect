@@ -4,11 +4,12 @@ import type {
   DocumentByName,
   Expand,
   FieldTypeFromFieldPath,
-  GenericDataModel,
   GenericDatabaseReader,
   GenericDatabaseWriter,
+  GenericDataModel,
   GenericDocument,
   GenericTableIndexes,
+  Indexes,
   IndexRange,
   IndexRangeBuilder,
   NamedIndex,
@@ -19,7 +20,6 @@ import type {
   SearchFilter,
   SearchFilterBuilder,
   SearchIndexes,
-  SystemTableNames,
   TableNamesInDataModel,
   WithoutSystemFields,
 } from "convex/server";
@@ -29,14 +29,16 @@ import {
   Chunk,
   Effect,
   Either,
-  Function,
+  identity,
   Layer,
   Option,
   ParseResult,
+  pipe,
   Record,
   Schema,
   Stream,
 } from "effect";
+import { dual } from "effect/Function";
 import type {
   ConfectDocumentByName,
   DataModelFromConfectDataModel,
@@ -665,7 +667,7 @@ export class DocumentNotUniqueError extends Schema.TaggedError<DocumentNotUnique
     return documentQueryMessage({
       id: this.id,
       tableName: this.tableName,
-      message: "is not unique",
+      message: "is not unique in this query",
     });
   }
 }
@@ -755,7 +757,7 @@ const makeConfectOrderedQuery = <
   };
 };
 
-const encode = Function.dual<
+const encode = dual<
   <
     ConfectDataModel extends GenericConfectDataModel,
     TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
@@ -821,7 +823,7 @@ const encode = Function.dual<
     }),
 );
 
-const decode = Function.dual<
+const decode = dual<
   <
     ConfectDataModel extends GenericConfectDataModel,
     TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
@@ -869,7 +871,7 @@ const decode = Function.dual<
 
       const decodedDoc = yield* pipe(
         encodedDoc,
-        Schema.decode(tableSchema),
+        Schema.decode(TableSchemaWithSystemFields),
         Effect.catchTag("ParseError", (parseError) =>
           Effect.gen(function* () {
             const formattedParseError =

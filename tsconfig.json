@@ -2,7 +2,7 @@
   "compilerOptions": {
     "plugins": [
       {
-        "name": "@effect/language-service",
+        "name": "@effect/language-service"
       }
     ],
     "importsNotUsedAsValues": "remove",
