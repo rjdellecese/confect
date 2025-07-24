@@ -15,11 +15,17 @@ import {
   type RouteSpecWithPathPrefix,
 } from "convex/server";
 import { Array, Layer, pipe, Record } from "effect";
-import { ConfectActionCtx, makeConfectActionCtx } from "./ctx";
+import { ConfectAuth } from "./auth";
 import type {
   DataModelFromConfectDataModel,
   GenericConfectDataModel,
 } from "./data-model";
+import { ConfectScheduler } from "./scheduler";
+import {
+  ConfectStorageActionWriter,
+  ConfectStorageReader,
+  ConfectStorageWriter,
+} from "./storage";
 
 type Middleware = (
   httpApp: HttpApp.Default,
@@ -38,7 +44,15 @@ const makeHandler =
     scalar,
   }: {
     pathPrefix: RoutePath;
-    apiLive: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtx<any>>;
+    apiLive: Layer.Layer<
+      EffectHttpApi.Api,
+      never,
+      | ConfectScheduler
+      | ConfectAuth
+      | ConfectStorageReader
+      | ConfectStorageWriter
+      | ConfectStorageActionWriter
+    >;
     middleware?: Middleware;
     scalar?: HttpApiScalar.ScalarConfig;
   }) =>
@@ -46,12 +60,25 @@ const makeHandler =
     ctx: GenericActionCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
     request: Request,
   ): Promise<Response> => {
-    const ConfectActionCtxLive = Layer.succeed(
-      ConfectActionCtx<any>(),
-      makeConfectActionCtx(ctx),
+    const confectSchedularLayer = ConfectScheduler.layer(ctx.scheduler);
+    const confectAuthLayer = ConfectAuth.layer(ctx.auth);
+    const confectStorageReaderLayer = ConfectStorageReader.layer(ctx.storage);
+    const confectStorageWriterLayer = ConfectStorageWriter.layer(ctx.storage);
+    const confectStorageActionWriterLayer = ConfectStorageActionWriter.layer(
+      ctx.storage,
     );
 
-    const ApiLive = apiLive.pipe(Layer.provide(ConfectActionCtxLive));
+    const ApiLive = apiLive.pipe(
+      Layer.provide(
+        Layer.mergeAll(
+          confectSchedularLayer,
+          confectAuthLayer,
+          confectStorageReaderLayer,
+          confectStorageWriterLayer,
+          confectStorageActionWriterLayer,
+        ),
+      ),
+    );
 
     const ApiDocsLive = HttpApiScalar.layer({
       path: `${pathPrefix}docs`,
@@ -82,14 +109,30 @@ const makeHttpAction = ({
   scalar,
 }: {
   pathPrefix: RoutePath;
-  apiLive: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtx<any>>;
+  apiLive: Layer.Layer<
+    EffectHttpApi.Api,
+    never,
+    | ConfectScheduler
+    | ConfectAuth
+    | ConfectStorageReader
+    | ConfectStorageWriter
+    | ConfectStorageActionWriter
+  >;
   middleware?: Middleware;
   scalar?: HttpApiScalar.ScalarConfig;
 }) =>
   httpActionGeneric(makeHandler({ pathPrefix, apiLive, middleware, scalar }));
 
 export type HttpApi = {
-  apiLive: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtx<any>>;
+  apiLive: Layer.Layer<
+    EffectHttpApi.Api,
+    never,
+    | ConfectScheduler
+    | ConfectAuth
+    | ConfectStorageReader
+    | ConfectStorageWriter
+    | ConfectStorageActionWriter
+  >;
   middleware?: Middleware;
   scalar?: HttpApiScalar.ScalarConfig;
 };
@@ -104,7 +147,15 @@ const mountEffectHttpApi =
     scalar,
   }: {
     pathPrefix: RoutePath;
-    apiLive: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtx<any>>;
+    apiLive: Layer.Layer<
+      EffectHttpApi.Api,
+      never,
+      | ConfectScheduler
+      | ConfectAuth
+      | ConfectStorageReader
+      | ConfectStorageWriter
+      | ConfectStorageActionWriter
+    >;
     middleware?: Middleware;
     scalar?: HttpApiScalar.ScalarConfig;
   }) =>
