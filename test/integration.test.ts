@@ -14,7 +14,7 @@ import type { Id } from "~/test/convex/_generated/dataModel";
 import { test } from "~/test/convex-effect-test";
 import { TestConvexService } from "~/test/test-convex-service";
 
-test("query get", () =>
+test("query get by id", () =>
   Effect.gen(function* () {
     const c = yield* TestConvexService;
 
@@ -22,11 +22,99 @@ test("query get", () =>
 
     const noteId = yield* c.run(({ db }) => db.insert("notes", { text }));
 
-    const note = yield* c.query(api.functions.queryGet, {
+    const note = yield* c.query(api.functions.queryGetById, {
       noteId,
     });
 
     expect(note).toMatchObject({ text });
+  }));
+
+test("query get many by id", () =>
+  Effect.gen(function* () {
+    const c = yield* TestConvexService;
+
+    const text = "Hello world!";
+
+    const noteId1 = yield* c.run(({ db }) => db.insert("notes", { text }));
+    const noteId2 = yield* c.run(({ db }) => db.insert("notes", { text }));
+
+    const notes = yield* c.query(api.functions.queryGetManyById, {
+      noteIds: [noteId1, noteId2],
+    });
+
+    expect(notes.length).toEqual(2);
+    expect(notes[0]).toMatchObject({ text });
+    expect(notes[1]).toMatchObject({ text });
+  }));
+
+test("query get by index with one field", () =>
+  Effect.gen(function* () {
+    const c = yield* TestConvexService;
+
+    const text = "Hello world!";
+
+    const noteId = yield* c.run(({ db }) => db.insert("notes", { text }));
+
+    const note = yield* c.query(api.functions.queryGetByIndexOneField, {
+      text,
+    });
+
+    expect(note?._id).toEqual(noteId);
+  }));
+
+test("query get by index with three fields", () =>
+  Effect.gen(function* () {
+    const c = yield* TestConvexService;
+
+    const text = "Hello world!";
+    const name = "John";
+    const role = "admin";
+
+    const noteId = yield* c.run(({ db }) =>
+      db.insert("notes", {
+        text,
+        author: { name, role },
+      }),
+    );
+
+    const note = yield* c.query(api.functions.queryGetByIndexThreeFields, {
+      name,
+      role,
+      text,
+    });
+
+    expect(note?._id).toEqual(noteId);
+  }));
+
+test("query ordered unique", () =>
+  Effect.gen(function* () {
+    const c = yield* TestConvexService;
+
+    const noteId = yield* c.run(({ db }) =>
+      db.insert("notes", { text: "Hello, world!" }),
+    );
+
+    const note = yield* c.query(api.functions.queryOrderedUnique, {});
+
+    expect(note?._id).toEqual(noteId);
+  }));
+
+test("query ordered unique when not unique", () =>
+  Effect.gen(function* () {
+    const c = yield* TestConvexService;
+
+    yield* Effect.all(
+      Effect.replicate(
+        c.run(({ db }) => db.insert("notes", { text: "Hello, world!" })),
+        2,
+      ),
+    );
+
+    const exit = yield* c
+      .query(api.functions.queryOrderedUnique, {})
+      .pipe(Effect.exit);
+
+    expect(Exit.isFailure(exit)).toBe(true);
   }));
 
 test("mutation get", () =>

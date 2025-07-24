@@ -332,7 +332,7 @@ type ConfectQueryInitializer<
     DocumentDecodeError | DocumentNotFoundError
   >;
   readonly getManyById: (
-    ids: GenericId<TableName>[],
+    ids: readonly GenericId<TableName>[],
   ) => Effect.Effect<
     ConfectDataModel[TableName]["confectDocument"][],
     DocumentDecodeError | DocumentNotFoundError

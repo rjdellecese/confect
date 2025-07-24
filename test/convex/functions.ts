@@ -34,7 +34,7 @@ import {
 } from "~/test/convex/confect";
 import { confectSchema } from "~/test/convex/schema";
 
-export const queryGet = query({
+export const queryGetById = query({
   args: Schema.Struct({
     noteId: Id("notes"),
   }),
@@ -44,6 +44,56 @@ export const queryGet = query({
       const reader = yield* ConfectDatabaseReader;
 
       return yield* reader.table("notes").getbyId(noteId);
+    }),
+});
+
+export const queryGetManyById = query({
+  args: Schema.Struct({
+    noteIds: Schema.Array(Id("notes")),
+  }),
+  returns: Schema.Array(confectSchema.tableSchemas.notes.withSystemFields),
+  handler: ({ noteIds }) =>
+    Effect.gen(function* () {
+      const reader = yield* ConfectDatabaseReader;
+      return yield* reader.table("notes").getManyById(noteIds);
+    }),
+});
+
+export const queryOrderedUnique = query({
+  args: Schema.Struct({}),
+  returns: confectSchema.tableSchemas.notes.withSystemFields,
+  handler: () =>
+    Effect.gen(function* () {
+      const reader = yield* ConfectDatabaseReader;
+      return yield* reader.table("notes").order("desc").unique();
+    }),
+});
+
+export const queryGetByIndexOneField = query({
+  args: Schema.Struct({
+    text: Schema.String,
+  }),
+  returns: confectSchema.tableSchemas.notes.withSystemFields,
+  handler: ({ text }) =>
+    Effect.gen(function* () {
+      const reader = yield* ConfectDatabaseReader;
+      return yield* reader.table("notes").getByIndex("by_text", text);
+    }),
+});
+
+export const queryGetByIndexThreeFields = query({
+  args: Schema.Struct({
+    name: Schema.String,
+    role: Schema.Literal("admin", "user"),
+    text: Schema.String,
+  }),
+  returns: confectSchema.tableSchemas.notes.withSystemFields,
+  handler: ({ name, role, text }) =>
+    Effect.gen(function* () {
+      const reader = yield* ConfectDatabaseReader;
+      return yield* reader
+        .table("notes")
+        .getByIndex("by_name_and_role_and_text", name, role, text);
     }),
 });
 
