@@ -1,13 +1,20 @@
 import { describe, expect, vi } from "@effect/vitest";
-import { Array, Effect, Exit, Order, Schema, String } from "effect";
-
-import { NotUniqueError } from "~/src/server/database";
+import {
+  Array,
+  DateTime,
+  Duration,
+  Effect,
+  Exit,
+  Order,
+  Schema,
+  String,
+} from "effect";
 import { api } from "~/test/convex/_generated/api";
 import type { Id } from "~/test/convex/_generated/dataModel";
 import { test } from "~/test/convex-effect-test";
 import { TestConvexService } from "~/test/test-convex-service";
 
-test("query get", () =>
+test("query get by id", () =>
   Effect.gen(function* () {
     const c = yield* TestConvexService;
 
@@ -15,11 +22,99 @@ test("query get", () =>
 
     const noteId = yield* c.run(({ db }) => db.insert("notes", { text }));
 
-    const note = yield* c.query(api.functions.queryGet, {
+    const note = yield* c.query(api.functions.queryGetById, {
       noteId,
     });
 
-    expect(note).toMatchObject({ _tag: "Some", value: { text } });
+    expect(note).toMatchObject({ text });
+  }));
+
+test("query get many by id", () =>
+  Effect.gen(function* () {
+    const c = yield* TestConvexService;
+
+    const text = "Hello world!";
+
+    const noteId1 = yield* c.run(({ db }) => db.insert("notes", { text }));
+    const noteId2 = yield* c.run(({ db }) => db.insert("notes", { text }));
+
+    const notes = yield* c.query(api.functions.queryGetManyById, {
+      noteIds: [noteId1, noteId2],
+    });
+
+    expect(notes.length).toEqual(2);
+    expect(notes[0]).toMatchObject({ text });
+    expect(notes[1]).toMatchObject({ text });
+  }));
+
+test("query get by index with one field", () =>
+  Effect.gen(function* () {
+    const c = yield* TestConvexService;
+
+    const text = "Hello world!";
+
+    const noteId = yield* c.run(({ db }) => db.insert("notes", { text }));
+
+    const note = yield* c.query(api.functions.queryGetByIndexOneField, {
+      text,
+    });
+
+    expect(note?._id).toEqual(noteId);
+  }));
+
+test("query get by index with three fields", () =>
+  Effect.gen(function* () {
+    const c = yield* TestConvexService;
+
+    const text = "Hello world!";
+    const name = "John";
+    const role = "admin";
+
+    const noteId = yield* c.run(({ db }) =>
+      db.insert("notes", {
+        text,
+        author: { name, role },
+      }),
+    );
+
+    const note = yield* c.query(api.functions.queryGetByIndexThreeFields, {
+      name,
+      role,
+      text,
+    });
+
+    expect(note?._id).toEqual(noteId);
+  }));
+
+test("query ordered unique", () =>
+  Effect.gen(function* () {
+    const c = yield* TestConvexService;
+
+    const noteId = yield* c.run(({ db }) =>
+      db.insert("notes", { text: "Hello, world!" }),
+    );
+
+    const note = yield* c.query(api.functions.queryOrderedUnique, {});
+
+    expect(note?._id).toEqual(noteId);
+  }));
+
+test("query ordered unique when not unique", () =>
+  Effect.gen(function* () {
+    const c = yield* TestConvexService;
+
+    yield* Effect.all(
+      Effect.replicate(
+        c.run(({ db }) => db.insert("notes", { text: "Hello, world!" })),
+        2,
+      ),
+    );
+
+    const exit = yield* c
+      .query(api.functions.queryOrderedUnique, {})
+      .pipe(Effect.exit);
+
+    expect(Exit.isFailure(exit)).toBe(true);
   }));
 
 test("mutation get", () =>
@@ -34,7 +129,7 @@ test("mutation get", () =>
       noteId,
     });
 
-    expect(note).toMatchObject({ value: { text } });
+    expect(note).toMatchObject({ text });
   }));
 
 test("insert", () =>
@@ -80,27 +175,6 @@ test("mutation collect", () =>
     expect(notes[0]?.text).toEqual(text);
   }));
 
-test("filter + first", () =>
-  Effect.gen(function* () {
-    const c = yield* TestConvexService;
-
-    const text1 = "Hello, Earth!";
-    const text2 = "Hello, Mars!";
-
-    yield* c.run(({ db }) =>
-      Promise.all([
-        db.insert("notes", { text: text1 }),
-        db.insert("notes", { text: text2 }),
-      ]),
-    );
-
-    const note = yield* c.query(api.functions.filterFirst, {
-      text: text1,
-    });
-
-    expect(note).toMatchObject({ _tag: "Some", value: { text: text1 } });
-  }));
-
 test("withIndex + first", () =>
   Effect.gen(function* () {
     const c = yield* TestConvexService;
@@ -117,7 +191,7 @@ test("withIndex + first", () =>
       text: text,
     });
 
-    expect(note).toMatchObject({ _tag: "Some", value: { text } });
+    expect(note).toMatchObject({ text });
   }));
 
 test("order desc + collect", () =>
@@ -231,9 +305,9 @@ describe("unique", () => {
         ]),
       );
 
-      const note = yield* c.query(api.functions.unique, {});
+      const exit = yield* c.query(api.functions.unique, {}).pipe(Effect.exit);
 
-      expect(note).toEqual(new NotUniqueError()._tag);
+      expect(Exit.isFailure(exit)).toBe(true);
     }));
 
   test("when zero notes exist", () =>
@@ -312,42 +386,6 @@ test("search", () =>
     expect(notes.length).toEqual(1);
     expect(notes[0]).toEqual(text);
   }));
-
-describe("normalizeId", () => {
-  test("query", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConvexService;
-
-      const noteId = yield* c.run(({ db }) =>
-        db.insert("notes", { text: "Hello world!" }),
-      );
-
-      const exit = yield* c
-        .query(api.functions.queryNormalizeId, {
-          noteId,
-        })
-        .pipe(Effect.exit);
-
-      expect(Exit.isSuccess(exit)).toBe(true);
-    }));
-
-  test("mutation", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConvexService;
-
-      const noteId = yield* c.run(({ db }) =>
-        db.insert("notes", { text: "Hello world!" }),
-      );
-
-      const exit = yield* c
-        .mutation(api.functions.mutationNormalizeId, {
-          noteId,
-        })
-        .pipe(Effect.exit);
-
-      expect(Exit.isSuccess(exit)).toBe(true);
-    }));
-});
 
 test("patch", () =>
   Effect.gen(function* () {
@@ -644,11 +682,15 @@ describe("scheduled functions", () => {
       yield* Effect.sync(() => vi.useFakeTimers());
 
       const text = "Hello, world!";
-      const millis = 1_000;
+      const millisDuration = Duration.millis(1_000);
+      const millisEncoded = yield* Schema.encode(Schema.Duration)(
+        millisDuration,
+      );
+      const millisNumber = Duration.toMillis(millisDuration);
 
       yield* c.action(api.functions.insertAfter, {
         text,
-        millis,
+        millis: millisEncoded,
       });
 
       {
@@ -657,7 +699,7 @@ describe("scheduled functions", () => {
         expect(note).toEqual(null);
       }
 
-      yield* Effect.sync(() => vi.advanceTimersByTime(millis));
+      yield* Effect.sync(() => vi.advanceTimersByTime(millisNumber));
       yield* c.finishInProgressScheduledFunctions();
 
       {
@@ -674,12 +716,15 @@ describe("scheduled functions", () => {
 
       const text = "Hello, world!";
 
-      const now = yield* Effect.sync(() => Date.now());
-      const timestamp = now + 1_000;
+      const now = yield* DateTime.now;
+      const timestamp = DateTime.addDuration(now, Duration.millis(1_000));
+      const timestampEncoded = yield* Schema.encode(Schema.DateTimeUtc)(
+        timestamp,
+      );
 
       yield* c.action(api.functions.insertAt, {
         text,
-        timestamp,
+        timestamp: timestampEncoded,
       });
 
       yield* c.finishAllScheduledFunctions(vi.runAllTimers);
@@ -745,18 +790,6 @@ describe("http", () => {
 });
 
 describe("system", () => {
-  test("normalizeId", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConvexService;
-
-      const id = yield* c.run(({ storage }) => storage.store(new Blob()));
-      const normalizedId = yield* c.query(api.functions.systemNormalizeId, {
-        id,
-      });
-
-      expect(normalizedId).toEqual({ _tag: "Some", value: id });
-    }));
-
   test("get", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
@@ -766,7 +799,7 @@ describe("system", () => {
         id,
       });
 
-      expect(storageDoc).toMatchObject({ _tag: "Some", value: { _id: id } });
+      expect(storageDoc).toMatchObject({ _id: id });
     }));
 
   test("query", () =>

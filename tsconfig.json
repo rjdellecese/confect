@@ -1,5 +1,10 @@
 {
   "compilerOptions": {
+    "plugins": [
+      {
+        "name": "@effect/language-service"
+      }
+    ],
     "importsNotUsedAsValues": "remove",
     "exactOptionalPropertyTypes": false,
     "lib": ["ESNext", "DOM"],
