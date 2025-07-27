@@ -25,7 +25,7 @@ export const extendWithSystemFields = <
   tableName: TableName,
   schema: TableSchema,
 ): ExtendWithSystemFields<TableName, TableSchema> =>
-  Schema.extend(schema, SystemFields(tableName));
+  Schema.extend(SystemFields(tableName), schema);
 
 /**
  * Extend a table schema with Convex system fields at the type level.
@@ -33,7 +33,7 @@ export const extendWithSystemFields = <
 export type ExtendWithSystemFields<
   TableName extends string,
   TableSchema extends Schema.Schema.AnyNoContext,
-> = Schema.extend<TableSchema, ReturnType<typeof SystemFields<TableName>>>;
+> = Schema.extend<ReturnType<typeof SystemFields<TableName>>, TableSchema>;
 
 export type WithSystemFields<TableName extends string, Document> = Expand<
   Readonly<IdField<TableName>> & Readonly<NonIdSystemFields> & Document

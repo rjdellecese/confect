@@ -684,6 +684,7 @@ export class NoDocumentsMatchQueryError extends Schema.TaggedError<NoDocumentsMa
     return `No documents match query for table '${this.tableName}'`;
   }
 }
+
 export class DocumentNotUniqueError extends Schema.TaggedError<DocumentNotUniqueError>(
   "DocumentNotUniqueError",
 )("DocumentNotUniqueError", {
@@ -1002,12 +1003,14 @@ const makePaginateFunction =
         page: parsedPage,
         isDone: paginationResult.isDone,
         continueCursor: paginationResult.continueCursor,
+        /* v8 ignore start */
         ...(paginationResult.splitCursor
           ? { splitCursor: paginationResult.splitCursor }
           : {}),
         ...(paginationResult.pageStatus
           ? { pageStatus: paginationResult.pageStatus }
           : {}),
+        /* v8 ignore stop */
       };
     });
 

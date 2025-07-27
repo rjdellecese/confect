@@ -27,6 +27,6 @@
     "isolatedModules": true,
     "noEmit": true
   },
-  "include": ["./**/*"],
+  "include": ["./**/*", "integration/storage.test.ts"],
   "exclude": ["./_generated"]
 }

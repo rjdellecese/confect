@@ -63,6 +63,7 @@
 		"@changesets/config": "3.1.1",
 		"@effect/cluster": "0.44.0",
 		"@effect/experimental": "0.53.0",
+		"@effect/language-service": "^0.30.0",
 		"@effect/platform-node": "0.92.0",
 		"@effect/rpc": "0.66.0",
 		"@effect/sql": "0.43.0",

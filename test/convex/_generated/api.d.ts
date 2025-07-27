@@ -16,6 +16,9 @@ import type {
 import type * as confect from "../confect.js";
 import type * as functions from "../functions.js";
 import type * as http from "../http.js";
+import type * as integration_auth from "../integration/auth.js";
+import type * as integration_scheduler from "../integration/scheduler.js";
+import type * as integration_storage from "../integration/storage.js";
 
 /**
  * A utility for referencing Convex functions in your app's API.
@@ -29,6 +32,9 @@ declare const fullApi: ApiFromModules<{
   confect: typeof confect;
   functions: typeof functions;
   http: typeof http;
+  "integration/auth": typeof integration_auth;
+  "integration/scheduler": typeof integration_scheduler;
+  "integration/storage": typeof integration_storage;
 }>;
 export declare const api: FilterApi<
   typeof fullApi,

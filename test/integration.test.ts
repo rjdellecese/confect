@@ -1,14 +1,5 @@
-import { describe, expect, vi } from "@effect/vitest";
-import {
-  Array,
-  DateTime,
-  Duration,
-  Effect,
-  Exit,
-  Order,
-  Schema,
-  String,
-} from "effect";
+import { describe, expect } from "@effect/vitest";
+import { Array, Effect, Exit, Order, String } from "effect";
 import { api } from "~/test/convex/_generated/api";
 import type { Id } from "~/test/convex/_generated/dataModel";
 import { test } from "~/test/convex-effect-test";
@@ -115,6 +106,25 @@ test("query ordered unique when not unique", () =>
       .pipe(Effect.exit);
 
     expect(Exit.isFailure(exit)).toBe(true);
+  }));
+
+test("query ordered take", () =>
+  Effect.gen(function* () {
+    const c = yield* TestConvexService;
+
+    const text = "Hello, world!";
+
+    const noteId1 = yield* c.run(({ db }) => db.insert("notes", { text }));
+    const noteId2 = yield* c.run(({ db }) => db.insert("notes", { text }));
+
+    const notes = yield* c.query(api.functions.queryOrderedTake, {
+      n: 2,
+    });
+
+    expect(notes.length).toEqual(2);
+    expect(Array.map(notes, (n) => n._id)).toEqual(
+      expect.arrayContaining([noteId1, noteId2]),
+    );
   }));
 
 test("mutation get", () =>
@@ -578,45 +588,7 @@ describe("delete", () => {
     }));
 });
 
-describe("authentication", () => {
-  test("when user is not authenticated", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConvexService;
-
-      const isAuthenticated = yield* c.query(api.functions.isAuthenticated, {});
-
-      expect(isAuthenticated).toEqual(false);
-    }));
-
-  test("when user is authenticated", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConvexService;
-
-      const asUser = c.withIdentity({
-        name: "Joe",
-      });
-
-      const isAuthenticated = yield* asUser.query(
-        api.functions.isAuthenticated,
-        {},
-      );
-
-      expect(isAuthenticated).toEqual(true);
-    }));
-});
-
 describe("actions", () => {
-  test("action with auth and run methods", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConvexService;
-
-      const exit = yield* c
-        .action(api.functions.actionWithAuthAndRunMethods)
-        .pipe(Effect.exit);
-
-      expect(Exit.isSuccess(exit)).toBe(true);
-    }));
-
   test("vector search", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
@@ -672,66 +644,6 @@ describe("actions", () => {
           { tag: "Art", text: "base" },
         ]);
       }
-    }));
-});
-
-describe("scheduled functions", () => {
-  test("run after", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConvexService;
-      yield* Effect.sync(() => vi.useFakeTimers());
-
-      const text = "Hello, world!";
-      const millisDuration = Duration.millis(1_000);
-      const millisEncoded = yield* Schema.encode(Schema.Duration)(
-        millisDuration,
-      );
-      const millisNumber = Duration.toMillis(millisDuration);
-
-      yield* c.action(api.functions.insertAfter, {
-        text,
-        millis: millisEncoded,
-      });
-
-      {
-        const note = yield* c.run(({ db }) => db.query("notes").first());
-
-        expect(note).toEqual(null);
-      }
-
-      yield* Effect.sync(() => vi.advanceTimersByTime(millisNumber));
-      yield* c.finishInProgressScheduledFunctions();
-
-      {
-        const note = yield* c.run(({ db }) => db.query("notes").first());
-
-        expect(note?.text).toEqual(text);
-      }
-    }));
-
-  test("run at", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConvexService;
-      yield* Effect.sync(() => vi.useFakeTimers());
-
-      const text = "Hello, world!";
-
-      const now = yield* DateTime.now;
-      const timestamp = DateTime.addDuration(now, Duration.millis(1_000));
-      const timestampEncoded = yield* Schema.encode(Schema.DateTimeUtc)(
-        timestamp,
-      );
-
-      yield* c.action(api.functions.insertAt, {
-        text,
-        timestamp: timestampEncoded,
-      });
-
-      yield* c.finishAllScheduledFunctions(vi.runAllTimers);
-
-      const note = yield* c.run(({ db }) => db.query("notes").first());
-
-      expect(note?.text).toEqual(text);
     }));
 });
 
@@ -817,46 +729,5 @@ describe("system", () => {
       expect(Array.sort(Order.string)(storageIds)).toEqual(
         Array.sort(Order.string)(ids),
       );
-    }));
-});
-
-const urlRegex = /https?:\/\/[^\s/$.?#].[^\s]*/;
-
-describe("storage", () => {
-  test("getUrl", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConvexService;
-
-      const id = yield* c.run(({ storage }) => storage.store(new Blob()));
-      const encodedOptionUrl = yield* c.action(api.functions.storageGetUrl, {
-        id,
-      });
-      const optionUrl = yield* Schema.decode(Schema.Option(Schema.String))(
-        encodedOptionUrl,
-      );
-      const url = yield* optionUrl;
-
-      expect(url).toMatch(urlRegex);
-    }));
-
-  test("generateUploadUrl", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConvexService;
-
-      const url = yield* c.action(api.functions.storageGenerateUploadUrl);
-
-      expect(url).toMatch(urlRegex);
-    }));
-
-  test("storageDelete", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConvexService;
-
-      const id = yield* c.run(({ storage }) => storage.store(new Blob()));
-      yield* c.action(api.functions.storageDelete, { id });
-
-      const storageDoc = yield* c.run(({ storage }) => storage.get(id));
-
-      expect(storageDoc).toEqual(null);
     }));
 });
