@@ -35,6 +35,24 @@ const make = (scheduler: Scheduler) => ({
 export class ConfectScheduler extends Effect.Tag(
   "@rjdellecese/confect/ConfectScheduler",
 )<ConfectScheduler, ReturnType<typeof make>>() {
+  static readonly runAfter = <FuncRef extends SchedulableFunctionReference>(
+    delay: Duration.Duration,
+    functionReference: FuncRef,
+    ...args: OptionalRestArgs<FuncRef>
+  ) =>
+    Effect.andThen(this, (scheduler) =>
+      scheduler.runAfter(delay, functionReference, ...args),
+    );
+
+  static readonly runAt = <FuncRef extends SchedulableFunctionReference>(
+    dateTime: DateTime.DateTime,
+    functionReference: FuncRef,
+    ...args: OptionalRestArgs<FuncRef>
+  ) =>
+    Effect.andThen(this, (scheduler) =>
+      scheduler.runAt(dateTime, functionReference, ...args),
+    );
+
   static readonly layer = (scheduler: Scheduler) =>
     Layer.succeed(this, make(scheduler));
 }

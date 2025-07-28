@@ -12,23 +12,13 @@ export const confectStorageReaderGetUrl = action({
     id: Id("_storage"),
   }),
   returns: Schema.URL,
-  handler: ({ id }) =>
-    Effect.gen(function* () {
-      const storageReader = yield* ConfectStorageReader;
-
-      return yield* storageReader.getUrl(id);
-    }),
+  handler: ({ id }) => ConfectStorageReader.getUrl(id),
 });
 
 export const confectStorageWriterGenerateUploadUrl = action({
   args: Schema.Struct({}),
   returns: Schema.URL,
-  handler: () =>
-    Effect.gen(function* () {
-      const storage = yield* ConfectStorageWriter;
-
-      return yield* storage.generateUploadUrl();
-    }),
+  handler: () => ConfectStorageWriter.generateUploadUrl(),
 });
 
 export const confectStorageWriterDelete = action({
@@ -36,14 +26,7 @@ export const confectStorageWriterDelete = action({
     id: Id("_storage"),
   }),
   returns: Schema.Null,
-  handler: ({ id }) =>
-    Effect.gen(function* () {
-      const storage = yield* ConfectStorageWriter;
-
-      yield* storage.delete(id);
-
-      return null;
-    }),
+  handler: ({ id }) => ConfectStorageWriter.delete(id).pipe(Effect.as(null)),
 });
 
 export const confectStorageActionWriterGet = action({
@@ -52,13 +35,7 @@ export const confectStorageActionWriterGet = action({
   }),
   returns: Schema.NonNegative,
   handler: ({ id }) =>
-    Effect.gen(function* () {
-      const storageActionWriter = yield* ConfectStorageActionWriter;
-
-      const file = yield* storageActionWriter.get(id);
-
-      return file.size;
-    }),
+    ConfectStorageActionWriter.get(id).pipe(Effect.map((file) => file.size)),
 });
 
 export const confectStorageActionWriterStore = action({
@@ -72,11 +49,5 @@ export const confectStorageActionWriterStore = action({
   }),
   returns: Id("_storage"),
   handler: ({ text, options }) =>
-    Effect.gen(function* () {
-      const storageActionWriter = yield* ConfectStorageActionWriter;
-
-      const blob = new Blob([text]);
-
-      return yield* storageActionWriter.store(blob, options);
-    }),
+    ConfectStorageActionWriter.store(new Blob([text]), options),
 });

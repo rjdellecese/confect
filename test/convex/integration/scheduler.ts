@@ -19,9 +19,7 @@ export const insertAfter = action({
   returns: Schema.Null,
   handler: ({ text, millis }): Effect.Effect<null, never, ConfectScheduler> =>
     Effect.gen(function* () {
-      const scheduler = yield* ConfectScheduler;
-
-      yield* scheduler.runAfter(
+      yield* ConfectScheduler.runAfter(
         millis,
         api.integration.scheduler.scheduledInsert,
         {
@@ -65,9 +63,7 @@ export const insertAt = action({
     timestamp,
   }): Effect.Effect<null, never, ConfectScheduler> =>
     Effect.gen(function* () {
-      const scheduler = yield* ConfectScheduler;
-
-      yield* scheduler.runAt(
+      yield* ConfectScheduler.runAt(
         timestamp,
         api.integration.scheduler.scheduledInsert,
         {
