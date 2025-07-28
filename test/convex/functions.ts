@@ -9,25 +9,17 @@ import {
 } from "effect";
 import { Id } from "~/src/server/schemas/Id";
 import { PaginationResult } from "~/src/server/schemas/PaginationResult";
-import { api, internal } from "~/test/convex/_generated/api";
+import { api } from "~/test/convex/_generated/api";
 import {
   action,
-  ConfectActionRunner,
-  ConfectAuth,
   ConfectDatabaseReader,
   ConfectDatabaseWriter,
-  ConfectMutationRunner,
   ConfectQueryRunner,
   ConfectVectorSearch,
-  internalAction,
-  internalMutation,
-  internalQuery,
   mutation,
   query,
 } from "~/test/convex/confect";
 import { confectSchema } from "~/test/convex/schema";
-import type { NoUserIdentityFoundError } from "../../src/server/auth";
-import * as UserIdentity from "../../src/server/schemas/UserIdentity";
 
 export const queryGetById = query({
   args: Schema.Struct({
