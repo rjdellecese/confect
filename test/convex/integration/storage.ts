@@ -12,13 +12,23 @@ export const confectStorageReaderGetUrl = action({
     id: Id("_storage"),
   }),
   returns: Schema.URL,
-  handler: ({ id }) => ConfectStorageReader.getUrl(id),
+  handler: ({ id }) =>
+    Effect.gen(function* () {
+      const storageReader = yield* ConfectStorageReader;
+
+      return yield* storageReader.getUrl(id);
+    }),
 });
 
 export const confectStorageWriterGenerateUploadUrl = action({
   args: Schema.Struct({}),
   returns: Schema.URL,
-  handler: () => ConfectStorageWriter.generateUploadUrl(),
+  handler: () =>
+    Effect.gen(function* () {
+      const storage = yield* ConfectStorageWriter;
+
+      return yield* storage.generateUploadUrl();
+    }),
 });
 
 export const confectStorageWriterDelete = action({
@@ -26,7 +36,14 @@ export const confectStorageWriterDelete = action({
     id: Id("_storage"),
   }),
   returns: Schema.Null,
-  handler: ({ id }) => ConfectStorageWriter.delete(id).pipe(Effect.as(null)),
+  handler: ({ id }) =>
+    Effect.gen(function* () {
+      const storage = yield* ConfectStorageWriter;
+
+      yield* storage.delete(id);
+
+      return null;
+    }),
 });
 
 export const confectStorageActionWriterGet = action({
@@ -35,7 +52,13 @@ export const confectStorageActionWriterGet = action({
   }),
   returns: Schema.NonNegative,
   handler: ({ id }) =>
-    ConfectStorageActionWriter.get(id).pipe(Effect.map((file) => file.size)),
+    Effect.gen(function* () {
+      const storageActionWriter = yield* ConfectStorageActionWriter;
+
+      const file = yield* storageActionWriter.get(id);
+
+      return file.size;
+    }),
 });
 
 export const confectStorageActionWriterStore = action({
@@ -49,5 +72,11 @@ export const confectStorageActionWriterStore = action({
   }),
   returns: Id("_storage"),
   handler: ({ text, options }) =>
-    ConfectStorageActionWriter.store(new Blob([text]), options),
+    Effect.gen(function* () {
+      const storageActionWriter = yield* ConfectStorageActionWriter;
+
+      const blob = new Blob([text]);
+
+      return yield* storageActionWriter.store(blob, options);
+    }),
 });
