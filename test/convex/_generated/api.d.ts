@@ -17,6 +17,7 @@ import type * as confect from "../confect.js";
 import type * as functions from "../functions.js";
 import type * as http from "../http.js";
 import type * as integration_auth from "../integration/auth.js";
+import type * as integration_database from "../integration/database.js";
 import type * as integration_scheduler from "../integration/scheduler.js";
 import type * as integration_storage from "../integration/storage.js";
 
@@ -33,6 +34,7 @@ declare const fullApi: ApiFromModules<{
   functions: typeof functions;
   http: typeof http;
   "integration/auth": typeof integration_auth;
+  "integration/database": typeof integration_database;
   "integration/scheduler": typeof integration_scheduler;
   "integration/storage": typeof integration_storage;
 }>;

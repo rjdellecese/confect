@@ -374,7 +374,7 @@ type ConfectQueryInitializer<
       >,
     ) => IndexRange,
   ) => ConfectQuery<ConfectDataModel[TableName], TableName>;
-  withSearchIndex<
+  readonly withSearchIndex: <
     IndexName extends keyof SearchIndexes<
       TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>
     >,
@@ -391,7 +391,7 @@ type ConfectQueryInitializer<
         >
       >,
     ) => SearchFilter,
-  ): ConfectOrderedQuery<ConfectDataModel[TableName], TableName>;
+  ) => ConfectOrderedQuery<ConfectDataModel[TableName], TableName>;
   readonly first: () => Effect.Effect<
     ConfectDataModel[TableName]["confectDocument"],
     DocumentDecodeError | NoDocumentsMatchQueryError
