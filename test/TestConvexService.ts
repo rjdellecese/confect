@@ -67,49 +67,41 @@ class TestConvexServiceImplWithoutIdentity
     >,
   ) {}
 
-  query<Query extends FunctionReference<"query", any>>(
+  readonly query = <Query extends FunctionReference<"query", any>>(
     query: Query,
     ...args: OptionalRestArgs<Query>
-  ) {
-    return Effect.promise(() => this.testConvex.query(query, ...args));
-  }
-  mutation<Mutation extends FunctionReference<"mutation", any>>(
+  ) => Effect.promise(() => this.testConvex.query(query, ...args));
+
+  readonly mutation = <Mutation extends FunctionReference<"mutation", any>>(
     mutation: Mutation,
     ...args: OptionalRestArgs<Mutation>
-  ) {
-    return Effect.promise(() => this.testConvex.mutation(mutation, ...args));
-  }
-  action<Action extends FunctionReference<"action", any>>(
+  ) => Effect.promise(() => this.testConvex.mutation(mutation, ...args));
+
+  readonly action = <Action extends FunctionReference<"action", any>>(
     action: Action,
     ...args: OptionalRestArgs<Action>
-  ) {
-    return Effect.promise(() => this.testConvex.action(action, ...args));
-  }
-  run<Output>(
+  ) => Effect.promise(() => this.testConvex.action(action, ...args));
+
+  readonly run = <Output>(
     func: (
       ctx: GenericMutationCtx<DataModelFromSchemaDefinition<typeof schema>> & {
         storage: StorageActionWriter;
       },
     ) => Promise<Output>,
-  ) {
-    return Effect.promise(() => this.testConvex.run(func));
-  }
-  fetch<PathQueryFragment extends string>(
+  ) => Effect.promise(() => this.testConvex.run(func));
+
+  readonly fetch = <PathQueryFragment extends string>(
     pathQueryFragment: PathQueryFragment,
     init?: RequestInit,
-  ) {
-    return Effect.promise(() => this.testConvex.fetch(pathQueryFragment, init));
-  }
-  finishInProgressScheduledFunctions() {
-    return Effect.promise(() =>
-      this.testConvex.finishInProgressScheduledFunctions(),
-    );
-  }
-  finishAllScheduledFunctions(advanceTimers: () => void) {
-    return Effect.promise(() =>
+  ) => Effect.promise(() => this.testConvex.fetch(pathQueryFragment, init));
+
+  readonly finishInProgressScheduledFunctions = () =>
+    Effect.promise(() => this.testConvex.finishInProgressScheduledFunctions());
+
+  readonly finishAllScheduledFunctions = (advanceTimers: () => void) =>
+    Effect.promise(() =>
       this.testConvex.finishAllScheduledFunctions(advanceTimers),
     );
-  }
 }
 
 class TestConvexServiceImpl implements TestConvexService {
@@ -121,55 +113,46 @@ class TestConvexServiceImpl implements TestConvexService {
     this.testConvex = testConvex;
   }
 
-  withIdentity(userIdentity: Partial<UserIdentity>) {
-    return new TestConvexServiceImplWithoutIdentity(
+  readonly withIdentity = (userIdentity: Partial<UserIdentity>) =>
+    new TestConvexServiceImplWithoutIdentity(
       this.testConvex.withIdentity(userIdentity),
     );
-  }
 
-  query<Query extends FunctionReference<"query", any>>(
+  readonly query = <Query extends FunctionReference<"query", any>>(
     query: Query,
     ...args: OptionalRestArgs<Query>
-  ) {
-    return Effect.promise(() => this.testConvex.query(query, ...args));
-  }
-  mutation<Mutation extends FunctionReference<"mutation", any>>(
+  ) => Effect.promise(() => this.testConvex.query(query, ...args));
+
+  readonly mutation = <Mutation extends FunctionReference<"mutation", any>>(
     mutation: Mutation,
     ...args: OptionalRestArgs<Mutation>
-  ) {
-    return Effect.promise(() => this.testConvex.mutation(mutation, ...args));
-  }
-  action<Action extends FunctionReference<"action", any>>(
+  ) => Effect.promise(() => this.testConvex.mutation(mutation, ...args));
+
+  readonly action = <Action extends FunctionReference<"action", any>>(
     action: Action,
     ...args: OptionalRestArgs<Action>
-  ) {
-    return Effect.promise(() => this.testConvex.action(action, ...args));
-  }
-  run<Output>(
+  ) => Effect.promise(() => this.testConvex.action(action, ...args));
+
+  readonly run = <Output>(
     func: (
       ctx: GenericMutationCtx<DataModelFromSchemaDefinition<typeof schema>> & {
         storage: StorageActionWriter;
       },
     ) => Promise<Output>,
-  ) {
-    return Effect.promise(() => this.testConvex.run(func));
-  }
-  fetch<PathQueryFragment extends string>(
+  ) => Effect.promise(() => this.testConvex.run(func));
+
+  readonly fetch = <PathQueryFragment extends string>(
     pathQueryFragment: PathQueryFragment,
     init?: RequestInit,
-  ) {
-    return Effect.promise(() => this.testConvex.fetch(pathQueryFragment, init));
-  }
-  finishInProgressScheduledFunctions() {
-    return Effect.promise(() =>
-      this.testConvex.finishInProgressScheduledFunctions(),
-    );
-  }
-  finishAllScheduledFunctions(advanceTimers: () => void) {
-    return Effect.promise(() =>
+  ) => Effect.promise(() => this.testConvex.fetch(pathQueryFragment, init));
+
+  readonly finishInProgressScheduledFunctions = () =>
+    Effect.promise(() => this.testConvex.finishInProgressScheduledFunctions());
+
+  readonly finishAllScheduledFunctions = (advanceTimers: () => void) =>
+    Effect.promise(() =>
       this.testConvex.finishAllScheduledFunctions(advanceTimers),
     );
-  }
 }
 
 // In theory it might be possible to also have a version of this which runs the tests on the local or cloud backends
