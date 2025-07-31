@@ -15,6 +15,6 @@ export {
   defineSchema,
   defineTable,
 } from "~/src/server/schema";
-export { compileSchema } from "~/src/server/schema-to-validator";
+export { compileSchema } from "~/src/server/schema_to_validator";
 export * as Id from "~/src/server/schemas/Id";
 export * as PaginationResult from "~/src/server/schemas/PaginationResult";

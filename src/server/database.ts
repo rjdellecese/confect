@@ -484,15 +484,10 @@ const makeConfectQueryInitializer = <
       ) => OrderedQuery<NamedTableInfo<ConvexDataModel, TableName>>;
     } =
       indexRangeOrOrder === undefined
-        ? order === undefined
-          ? {
-              applyWithIndex: (q) => q.withIndex(indexName),
-              applyOrder: (q) => q.order("asc"),
-            }
-          : {
-              applyWithIndex: (q) => q.withIndex(indexName),
-              applyOrder: (q) => q.order(order),
-            }
+        ? {
+            applyWithIndex: (q) => q.withIndex(indexName),
+            applyOrder: (q) => q.order("asc"),
+          }
         : typeof indexRangeOrOrder === "function"
           ? order === undefined
             ? {

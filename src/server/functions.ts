@@ -35,13 +35,13 @@ import type {
 import {
   compileArgsSchema,
   compileReturnsSchema,
-} from "~/src/server/schema-to-validator";
+} from "~/src/server/schema_to_validator";
 import {
   ConfectStorageActionWriter,
   ConfectStorageReader,
   ConfectStorageWriter,
 } from "~/src/server/storage";
-import { ConfectVectorSearch } from "~/src/server/vector-search";
+import { ConfectVectorSearch } from "~/src/server/vector_search";
 
 export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
   confectSchemaDefinition: ConfectSchemaDefinition<ConfectSchema>,

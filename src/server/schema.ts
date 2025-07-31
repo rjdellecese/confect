@@ -20,7 +20,7 @@ import { pipe, Record, Schema } from "effect";
 import {
   compileTableSchema,
   type TableSchemaToTableValidator,
-} from "~/src/server/schema-to-validator";
+} from "~/src/server/schema_to_validator";
 import {
   type ExtendWithSystemFields,
   extendWithSystemFields,

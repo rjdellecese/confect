@@ -2,12 +2,12 @@ import { describe } from "@effect/vitest";
 import { assertEquals, assertFailure } from "@effect/vitest/utils";
 import { Cause, Effect, Runtime } from "effect";
 import { api } from "~/test/convex/_generated/api";
-import { test } from "~/test/convex-effect-test";
-import { TestConvexService } from "~/test/test-convex-service";
-import { NoUserIdentityFoundError } from "../../../src/server/auth";
+import { effect } from "~/test/convex_effect_test";
+import { TestConvexService } from "~/test/TestConvexService";
+import { NoUserIdentityFoundError } from "../src/server/auth";
 
 describe("authentication", () => {
-  test("when user is authenticated", () =>
+  effect("when user is authenticated", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
 
@@ -17,20 +17,18 @@ describe("authentication", () => {
         name,
       });
 
-      const userIdentity = yield* asUser.query(
-        api.integration.auth.getUserIdentity,
-        {},
-      );
+      const userIdentity = yield* asUser.query(api.auth.getUserIdentity, {});
 
       assertEquals(userIdentity.name, name);
-    }));
+    }),
+  );
 
-  test("when user is not authenticated", () =>
+  effect("when user is not authenticated", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
 
       const exit = yield* c
-        .query(api.integration.auth.getUserIdentity, {})
+        .query(api.auth.getUserIdentity, {})
         .pipe(Effect.exit);
 
       assertFailure(
@@ -39,5 +37,6 @@ describe("authentication", () => {
           Runtime.makeFiberFailure(Cause.fail(new NoUserIdentityFoundError())),
         ),
       );
-    }));
+    }),
+  );
 });

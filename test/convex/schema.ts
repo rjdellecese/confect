@@ -2,7 +2,7 @@ import { Schema } from "effect";
 import * as schema from "~/src/server/schema";
 import { Id } from "~/src/server/schemas/Id";
 
-export const confectSchema = schema.defineSchema({
+export const confectSchemaTables = {
   notes: schema
     .defineTable(
       Schema.Struct({
@@ -36,6 +36,8 @@ export const confectSchema = schema.defineSchema({
       username: Schema.String,
     }),
   ),
-});
+};
+
+export const confectSchema = schema.defineSchema(confectSchemaTables);
 
 export default confectSchema.convexSchemaDefinition;

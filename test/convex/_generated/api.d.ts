@@ -13,13 +13,14 @@ import type {
   FilterApi,
   FunctionReference,
 } from "convex/server";
+import type * as auth from "../auth.js";
 import type * as confect from "../confect.js";
-import type * as functions from "../functions.js";
+import type * as database from "../database.js";
 import type * as http from "../http.js";
-import type * as integration_auth from "../integration/auth.js";
-import type * as integration_database from "../integration/database.js";
-import type * as integration_scheduler from "../integration/scheduler.js";
-import type * as integration_storage from "../integration/storage.js";
+import type * as runners from "../runners.js";
+import type * as scheduler from "../scheduler.js";
+import type * as storage from "../storage.js";
+import type * as vector_search from "../vector_search.js";
 
 /**
  * A utility for referencing Convex functions in your app's API.
@@ -30,13 +31,14 @@ import type * as integration_storage from "../integration/storage.js";
  * ```
  */
 declare const fullApi: ApiFromModules<{
+  auth: typeof auth;
   confect: typeof confect;
-  functions: typeof functions;
+  database: typeof database;
   http: typeof http;
-  "integration/auth": typeof integration_auth;
-  "integration/database": typeof integration_database;
-  "integration/scheduler": typeof integration_scheduler;
-  "integration/storage": typeof integration_storage;
+  runners: typeof runners;
+  scheduler: typeof scheduler;
+  storage: typeof storage;
+  vector_search: typeof vector_search;
 }>;
 export declare const api: FilterApi<
   typeof fullApi,

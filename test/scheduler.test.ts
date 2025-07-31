@@ -2,11 +2,11 @@ import { describe, vi } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
 import { DateTime, Duration, Effect, Schema } from "effect";
 import { api } from "~/test/convex/_generated/api";
-import { test } from "~/test/convex-effect-test";
-import { TestConvexService } from "~/test/test-convex-service";
+import { effect } from "~/test/convex_effect_test";
+import { TestConvexService } from "~/test/TestConvexService";
 
 describe("ConfectScheduler", () => {
-  test("runAfter", () =>
+  effect("runAfter", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
       yield* Effect.sync(() => vi.useFakeTimers());
@@ -18,7 +18,7 @@ describe("ConfectScheduler", () => {
       );
       const millisNumber = Duration.toMillis(millisDuration);
 
-      yield* c.action(api.integration.scheduler.insertAfter, {
+      yield* c.action(api.scheduler.insertAfter, {
         text,
         millis: millisEncoded,
       });
@@ -37,9 +37,10 @@ describe("ConfectScheduler", () => {
 
         assertEquals(note?.text, text);
       }
-    }));
+    }),
+  );
 
-  test("runAt", () =>
+  effect("runAt", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
       yield* Effect.sync(() => vi.useFakeTimers());
@@ -52,7 +53,7 @@ describe("ConfectScheduler", () => {
         timestamp,
       );
 
-      yield* c.action(api.integration.scheduler.insertAt, {
+      yield* c.action(api.scheduler.insertAt, {
         text,
         timestamp: timestampEncoded,
       });
@@ -62,5 +63,6 @@ describe("ConfectScheduler", () => {
       const note = yield* c.run(({ db }) => db.query("notes").first());
 
       assertEquals(note?.text, text);
-    }));
+    }),
+  );
 });

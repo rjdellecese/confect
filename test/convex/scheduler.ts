@@ -21,13 +21,9 @@ export const insertAfter = action({
     Effect.gen(function* () {
       const scheduler = yield* ConfectScheduler;
 
-      yield* scheduler.runAfter(
-        millis,
-        api.integration.scheduler.scheduledInsert,
-        {
-          text,
-        },
-      );
+      yield* scheduler.runAfter(millis, api.scheduler.scheduledInsert, {
+        text,
+      });
 
       return null;
     }),
@@ -67,13 +63,9 @@ export const insertAt = action({
     Effect.gen(function* () {
       const scheduler = yield* ConfectScheduler;
 
-      yield* scheduler.runAt(
-        timestamp,
-        api.integration.scheduler.scheduledInsert,
-        {
-          text,
-        },
-      );
+      yield* scheduler.runAt(timestamp, api.scheduler.scheduledInsert, {
+        text,
+      });
 
       return null;
     }),

@@ -31,7 +31,7 @@ describe("ConfectDataModelFromConfectSchema", () => {
 
     type ConfectDataModel = ConfectDataModelFromConfectSchema<ConfectSchema>;
 
-    expectTypeOf<ConfectDataModel>().toMatchTypeOf<GenericConfectDataModel>();
+    expectTypeOf<ConfectDataModel>().toExtend<GenericConfectDataModel>();
     expectTypeOf<ConfectDataModel["notes"]["confectDocument"]>().toEqualTypeOf<{
       readonly _id: GenericId<"notes">;
       readonly _creationTime: number;
@@ -59,7 +59,7 @@ describe("ConfectSchemaFromConfectSchemaDefinition", () => {
       typeof schemaDefinition
     >;
 
-    expectTypeOf<ConfectSchema>().toMatchTypeOf<GenericConfectSchema>();
+    expectTypeOf<ConfectSchema>().toExtend<GenericConfectSchema>();
   });
 });
 
@@ -80,7 +80,7 @@ describe("TableInfoFromConfectTableInfo", () => {
 
     type TableInfo = TableInfoFromConfectTableInfo<ConfectTableInfo>;
 
-    expectTypeOf<TableInfo>().toMatchTypeOf<GenericTableInfo>();
+    expectTypeOf<TableInfo>().toExtend<GenericTableInfo>();
   });
 });
 
@@ -100,6 +100,6 @@ describe("DataModelFromConfectDataModel", () => {
 
     type DataModel = DataModelFromConfectDataModel<ConfectDataModel>;
 
-    expectTypeOf<DataModel>().toMatchTypeOf<GenericDataModel>();
+    expectTypeOf<DataModel>().toExtend<GenericDataModel>();
   });
 });

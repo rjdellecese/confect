@@ -6,19 +6,19 @@ import {
 } from "@effect/vitest/utils";
 import { Cause, Effect, Runtime, Schema } from "effect";
 import { api } from "~/test/convex/_generated/api";
-import { test } from "~/test/convex-effect-test";
-import { TestConvexService } from "~/test/test-convex-service";
-import { FileNotFoundError } from "../../../src/server/storage";
+import { effect } from "~/test/convex_effect_test";
+import { TestConvexService } from "~/test/TestConvexService";
+import { FileNotFoundError } from "../src/server/storage";
 
 describe("ConfectStorageReader", () => {
   describe("getUrl", () => {
-    test("when file exists", () =>
+    effect("when file exists", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
         const id = yield* c.run(({ storage }) => storage.store(new Blob()));
         const urlString = yield* c.action(
-          api.integration.storage.confectStorageReaderGetUrl,
+          api.storage.confectStorageReaderGetUrl,
           {
             id,
           },
@@ -26,9 +26,10 @@ describe("ConfectStorageReader", () => {
         const url = yield* Schema.decode(Schema.URL)(urlString);
 
         assertInstanceOf(url, URL);
-      }));
+      }),
+    );
 
-    test("when file no longer exists", () =>
+    effect("when file no longer exists", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
@@ -36,7 +37,7 @@ describe("ConfectStorageReader", () => {
         yield* c.run(({ storage }) => storage.delete(id));
 
         const exit = yield* c
-          .action(api.integration.storage.confectStorageReaderGetUrl, {
+          .action(api.storage.confectStorageReaderGetUrl, {
             id,
           })
           .pipe(Effect.exit);
@@ -47,39 +48,42 @@ describe("ConfectStorageReader", () => {
             Runtime.makeFiberFailure(Cause.fail(new FileNotFoundError({ id }))),
           ),
         );
-      }));
+      }),
+    );
   });
 });
 
 describe("ConfectStorageWriter", () => {
-  test("generateUploadUrl", () =>
+  effect("generateUploadUrl", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
 
       const urlString = yield* c.action(
-        api.integration.storage.confectStorageWriterGenerateUploadUrl,
+        api.storage.confectStorageWriterGenerateUploadUrl,
       );
       const url = yield* Schema.decode(Schema.URL)(urlString);
 
       assertInstanceOf(url, URL);
-    }));
+    }),
+  );
 
   describe("delete", () => {
-    test("when file exists", () =>
+    effect("when file exists", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
         const id = yield* c.run(({ storage }) => storage.store(new Blob()));
-        yield* c.action(api.integration.storage.confectStorageWriterDelete, {
+        yield* c.action(api.storage.confectStorageWriterDelete, {
           id,
         });
 
         const storageDoc = yield* c.run(({ storage }) => storage.get(id));
 
         assertEquals(storageDoc, null);
-      }));
+      }),
+    );
 
-    test("when file no longer exists", () =>
+    effect("when file no longer exists", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
@@ -87,7 +91,7 @@ describe("ConfectStorageWriter", () => {
         yield* c.run(({ storage }) => storage.delete(id));
 
         const exit = yield* c
-          .action(api.integration.storage.confectStorageWriterDelete, {
+          .action(api.storage.confectStorageWriterDelete, {
             id,
           })
           .pipe(Effect.exit);
@@ -98,13 +102,14 @@ describe("ConfectStorageWriter", () => {
             Runtime.makeFiberFailure(Cause.fail(new FileNotFoundError({ id }))),
           ),
         );
-      }));
+      }),
+    );
   });
 });
 
-describe("StorageActionWriter", () => {
+describe("ConfectStorageActionWriter", () => {
   describe("get", () => {
-    test("when file exists", () =>
+    effect("when file exists", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
@@ -112,16 +117,17 @@ describe("StorageActionWriter", () => {
         const id = yield* c.run(({ storage }) => storage.store(blob));
 
         const blobSize = yield* c.action(
-          api.integration.storage.confectStorageActionWriterGet,
+          api.storage.confectStorageActionWriterGet,
           {
             id,
           },
         );
 
         assertEquals(blobSize, blob.size);
-      }));
+      }),
+    );
 
-    test("when file no longer exists", () =>
+    effect("when file no longer exists", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
@@ -131,7 +137,7 @@ describe("StorageActionWriter", () => {
         yield* c.run(({ storage }) => storage.delete(id));
 
         const exit = yield* c
-          .action(api.integration.storage.confectStorageActionWriterGet, {
+          .action(api.storage.confectStorageActionWriterGet, {
             id,
           })
           .pipe(Effect.exit);
@@ -142,21 +148,19 @@ describe("StorageActionWriter", () => {
             Runtime.makeFiberFailure(Cause.fail(new FileNotFoundError({ id }))),
           ),
         );
-      }));
+      }),
+    );
   });
 
-  test("store", () =>
+  effect("store", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
 
       const text = "Hello, world!";
 
-      const id = yield* c.action(
-        api.integration.storage.confectStorageActionWriterStore,
-        {
-          text,
-        },
-      );
+      const id = yield* c.action(api.storage.confectStorageActionWriterStore, {
+        text,
+      });
 
       const blobText = yield* c.run(({ storage }) =>
         storage
@@ -165,5 +169,6 @@ describe("StorageActionWriter", () => {
       );
 
       assertEquals(blobText, text);
-    }));
+    }),
+  );
 });

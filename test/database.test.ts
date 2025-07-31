@@ -2,12 +2,12 @@ import { describe, vi } from "@effect/vitest";
 import { assertEquals, assertTrue } from "@effect/vitest/utils";
 import { Effect, Exit, Option, Schema, String } from "effect";
 import { api } from "~/test/convex/_generated/api";
-import { test } from "~/test/convex-effect-test";
-import { TestConvexService } from "~/test/test-convex-service";
-import { confectSchema } from "../schema";
+import { effect } from "~/test/convex_effect_test";
+import { TestConvexService } from "~/test/TestConvexService";
+import { confectSchema } from "./convex/schema";
 
 describe("ConfectDatabaseReader", () => {
-  test("getById", () =>
+  effect("getById", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
       yield* Effect.sync(() => vi.useFakeTimers());
@@ -16,14 +16,15 @@ describe("ConfectDatabaseReader", () => {
 
       const noteId = yield* c.run(({ db }) => db.insert("notes", { text }));
 
-      const note = yield* c.query(api.integration.database.getById, {
+      const note = yield* c.query(api.database.getById, {
         noteId,
       });
 
       assertEquals(note._id, noteId);
-    }));
+    }),
+  );
 
-  test("getByIndex", () =>
+  effect("getByIndex", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
 
@@ -38,16 +39,17 @@ describe("ConfectDatabaseReader", () => {
         }),
       );
 
-      const note = yield* c.query(api.integration.database.getByIndex, {
+      const note = yield* c.query(api.database.getByIndex, {
         name,
         role,
         text,
       });
 
       assertEquals(note._id, noteId);
-    }));
+    }),
+  );
 
-  test("first", () =>
+  effect("first", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
 
@@ -59,7 +61,7 @@ describe("ConfectDatabaseReader", () => {
       );
 
       const note = yield* c
-        .query(api.integration.database.first, {})
+        .query(api.database.first, {})
         .pipe(
           Effect.andThen(
             Schema.decode(
@@ -70,9 +72,10 @@ describe("ConfectDatabaseReader", () => {
         );
 
       assertEquals(note._id, noteId1);
-    }));
+    }),
+  );
 
-  test("take", () =>
+  effect("take", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
 
@@ -83,16 +86,17 @@ describe("ConfectDatabaseReader", () => {
         ]),
       );
 
-      const notes = yield* c.query(api.integration.database.take, {
+      const notes = yield* c.query(api.database.take, {
         n: 3,
       });
 
       assertEquals(notes.length, 2);
-      assertEquals(notes[0]._id, noteId1);
-      assertEquals(notes[1]._id, noteId2);
-    }));
+      assertEquals(notes[0]?._id, noteId1);
+      assertEquals(notes[1]?._id, noteId2);
+    }),
+  );
 
-  test("collect", () =>
+  effect("collect", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
 
@@ -103,14 +107,15 @@ describe("ConfectDatabaseReader", () => {
         ]),
       );
 
-      const notes = yield* c.query(api.integration.database.collect, {});
+      const notes = yield* c.query(api.database.collect, {});
 
       assertEquals(notes.length, 2);
-      assertEquals(notes[0]._id, noteId1);
-      assertEquals(notes[1]._id, noteId2);
-    }));
+      assertEquals(notes[0]?._id, noteId1);
+      assertEquals(notes[1]?._id, noteId2);
+    }),
+  );
 
-  test("paginate", () =>
+  effect("paginate", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
 
@@ -121,17 +126,18 @@ describe("ConfectDatabaseReader", () => {
         ]),
       );
 
-      const notes = yield* c.query(api.integration.database.paginate, {
+      const notes = yield* c.query(api.database.paginate, {
         cursor: null,
         numItems: 2,
       });
 
       assertEquals(notes.page.length, 2);
-      assertEquals(notes.page[0]._id, noteId1);
-      assertEquals(notes.page[1]._id, noteId2);
-    }));
+      assertEquals(notes.page[0]?._id, noteId1);
+      assertEquals(notes.page[1]?._id, noteId2);
+    }),
+  );
 
-  test("stream", () =>
+  effect("stream", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
 
@@ -143,17 +149,18 @@ describe("ConfectDatabaseReader", () => {
         ]),
       );
 
-      const notes = yield* c.query(api.integration.database.stream, {
+      const notes = yield* c.query(api.database.stream, {
         until: "2",
       });
 
       assertEquals(notes.length, 2);
-      assertEquals(notes[0]._id, noteId1);
-      assertEquals(notes[1]._id, noteId2);
-    }));
+      assertEquals(notes[0]?._id, noteId1);
+      assertEquals(notes[1]?._id, noteId2);
+    }),
+  );
 
   describe("withIndex", () => {
-    test("without query range without order", () =>
+    effect("without query range without order", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
@@ -166,15 +173,16 @@ describe("ConfectDatabaseReader", () => {
         );
 
         const notes = yield* c.query(
-          api.integration.database.withIndexWithQueryRangeWithOrder,
+          api.database.withIndexWithQueryRangeWithOrder,
         );
 
         assertEquals(notes.length, 2);
-        assertEquals(notes[0]._id, noteId1);
-        assertEquals(notes[1]._id, noteId2);
-      }));
+        assertEquals(notes[0]?._id, noteId1);
+        assertEquals(notes[1]?._id, noteId2);
+      }),
+    );
 
-    test("with query range without order", () =>
+    effect("with query range without order", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
@@ -187,18 +195,19 @@ describe("ConfectDatabaseReader", () => {
         );
 
         const notes = yield* c.query(
-          api.integration.database.withIndexWithQueryRangeWithoutOrder,
+          api.database.withIndexWithQueryRangeWithoutOrder,
           {
             text: "2",
           },
         );
 
         assertEquals(notes.length, 2);
-        assertEquals(notes[0]._id, noteId2);
-        assertEquals(notes[1]._id, noteId3);
-      }));
+        assertEquals(notes[0]?._id, noteId2);
+        assertEquals(notes[1]?._id, noteId3);
+      }),
+    );
 
-    test("with query range and order", () =>
+    effect("with query range and order", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
@@ -211,18 +220,19 @@ describe("ConfectDatabaseReader", () => {
         );
 
         const notes = yield* c.query(
-          api.integration.database.withIndexWithQueryRangeAndOrder,
+          api.database.withIndexWithQueryRangeAndOrder,
           {
             text: "1",
           },
         );
 
         assertEquals(notes.length, 2);
-        assertEquals(notes[0]._id, noteId3);
-        assertEquals(notes[1]._id, noteId2);
-      }));
+        assertEquals(notes[0]?._id, noteId3);
+        assertEquals(notes[1]?._id, noteId2);
+      }),
+    );
 
-    test("without query range with order", () =>
+    effect("without query range with order", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
@@ -235,15 +245,16 @@ describe("ConfectDatabaseReader", () => {
         );
 
         const notes = yield* c.query(
-          api.integration.database.withIndexWithoutQueryRangeWithOrder,
+          api.database.withIndexWithoutQueryRangeWithOrder,
         );
 
         assertEquals(notes.length, 2);
-        assertEquals(notes[0]._id, noteId3);
-        assertEquals(notes[1]._id, noteId2);
-      }));
+        assertEquals(notes[0]?._id, noteId3);
+        assertEquals(notes[1]?._id, noteId2);
+      }),
+    );
 
-    test("without query range without order", () =>
+    effect("without query range without order", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
@@ -256,15 +267,16 @@ describe("ConfectDatabaseReader", () => {
         );
 
         const notes = yield* c.query(
-          api.integration.database.withIndexWithoutQueryRangeWithoutOrder,
+          api.database.withIndexWithoutQueryRangeWithoutOrder,
         );
 
         assertEquals(notes.length, 2);
-        assertEquals(notes[0]._id, noteId1);
-        assertEquals(notes[1]._id, noteId2);
-      }));
+        assertEquals(notes[0]?._id, noteId1);
+        assertEquals(notes[1]?._id, noteId2);
+      }),
+    );
 
-    test("withSearchIndex", () =>
+    effect("withSearchIndex", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
@@ -276,16 +288,17 @@ describe("ConfectDatabaseReader", () => {
           ]),
         );
 
-        const notes = yield* c.query(api.integration.database.withSearchIndex, {
+        const notes = yield* c.query(api.database.withSearchIndex, {
           text: "blue",
         });
 
         assertEquals(notes.length, 1);
-        assertEquals(notes[0]._id, noteId2);
-      }));
+        assertEquals(notes[0]?._id, noteId2);
+      }),
+    );
 
     describe("system tables", () => {
-      test("get", () =>
+      effect("get", () =>
         Effect.gen(function* () {
           const c = yield* TestConvexService;
 
@@ -293,17 +306,15 @@ describe("ConfectDatabaseReader", () => {
             storage.store(new Blob(["Hello, world!"])),
           );
 
-          const storageDoc = yield* c.query(
-            api.integration.database.systemGet,
-            {
-              id: storageId,
-            },
-          );
+          const storageDoc = yield* c.query(api.database.systemGet, {
+            id: storageId,
+          });
 
           assertEquals(storageDoc._id, storageId);
-        }));
+        }),
+      );
 
-      test("query", () =>
+      effect("query", () =>
         Effect.gen(function* () {
           const c = yield* TestConvexService;
 
@@ -311,20 +322,19 @@ describe("ConfectDatabaseReader", () => {
             storage.store(new Blob(["Hello, world!"])),
           );
 
-          const storageDocs = yield* c.query(
-            api.integration.database.systemQuery,
-          );
+          const storageDocs = yield* c.query(api.database.systemQuery);
 
           assertEquals(storageDocs.length, 1);
-          assertEquals(storageDocs[0]._id, storageId);
-        }));
+          assertEquals(storageDocs[0]?._id, storageId);
+        }),
+      );
     });
   });
 });
 
 describe("ConfectDatabaseWriter", () => {
   describe("patch", () => {
-    test("when invalid", () =>
+    effect("when invalid", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
@@ -335,7 +345,7 @@ describe("ConfectDatabaseWriter", () => {
         const tooLongText = String.repeat(101)("a");
 
         const exit = yield* c
-          .mutation(api.integration.database.patch, {
+          .mutation(api.database.patch, {
             noteId,
             fields: {
               text: tooLongText,
@@ -344,9 +354,10 @@ describe("ConfectDatabaseWriter", () => {
           .pipe(Effect.exit);
 
         assertTrue(Exit.isFailure(exit));
-      }));
+      }),
+    );
 
-    test("when valid", () =>
+    effect("when valid", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
@@ -356,17 +367,19 @@ describe("ConfectDatabaseWriter", () => {
 
         const author = { role: "user", name: "Joe" } as const;
 
-        yield* c.mutation(api.integration.database.patch, {
+        yield* c.mutation(api.database.patch, {
           noteId,
           fields: { author },
         });
 
         const patchedNote = yield* c.run(({ db }) => db.get(noteId));
 
-        assertEquals(patchedNote?.author, author);
-      }));
+        assertEquals(patchedNote?.author?.name, author.name);
+        assertEquals(patchedNote?.author?.role, author.role);
+      }),
+    );
 
-    test("when document no longer exists", () =>
+    effect("when document no longer exists", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
@@ -377,16 +390,17 @@ describe("ConfectDatabaseWriter", () => {
         yield* c.run(({ db }) => db.delete(noteId));
 
         const exit = yield* c
-          .mutation(api.integration.database.patch, {
+          .mutation(api.database.patch, {
             noteId,
             fields: { text: "Hello, world!" },
           })
           .pipe(Effect.exit);
 
         assertTrue(Exit.isFailure(exit));
-      }));
+      }),
+    );
 
-    test("when unsetting a field", () =>
+    effect("when unsetting a field", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
@@ -400,7 +414,7 @@ describe("ConfectDatabaseWriter", () => {
           }),
         );
 
-        yield* c.mutation(api.integration.database.patchUnset, {
+        yield* c.mutation(api.database.patchUnset, {
           noteId,
         });
 
@@ -408,10 +422,11 @@ describe("ConfectDatabaseWriter", () => {
 
         assertEquals(patchedNote?.author, undefined);
         assertEquals(patchedNote?.tag, tag);
-      }));
+      }),
+    );
   });
 
-  test("replace", () =>
+  effect("replace", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
 
@@ -425,7 +440,7 @@ describe("ConfectDatabaseWriter", () => {
 
       const updatedNoteFields = { ...note, text: updatedText };
 
-      yield* c.mutation(api.integration.database.replace, {
+      yield* c.mutation(api.database.replace, {
         noteId,
         fields: updatedNoteFields,
       });
@@ -433,10 +448,11 @@ describe("ConfectDatabaseWriter", () => {
       const replacedNote = yield* c.run(({ db }) => db.get(noteId));
 
       assertEquals(replacedNote?.text, updatedText);
-    }));
+    }),
+  );
 
   describe("delete", () => {
-    test("when document exists", () =>
+    effect("when document exists", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
@@ -444,16 +460,17 @@ describe("ConfectDatabaseWriter", () => {
           db.insert("notes", { text: "Hello, world!" }),
         );
 
-        yield* c.mutation(api.integration.database.delete_, {
+        yield* c.mutation(api.database.delete_, {
           noteId,
         });
 
         const gottenNote = yield* c.run(({ db }) => db.get(noteId));
 
         assertEquals(gottenNote, null);
-      }));
+      }),
+    );
 
-    test("when document no longer exists", () =>
+    effect("when document no longer exists", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
@@ -464,12 +481,13 @@ describe("ConfectDatabaseWriter", () => {
         yield* c.run(({ db }) => db.delete(noteId));
 
         const exit = yield* c
-          .mutation(api.integration.database.delete_, {
+          .mutation(api.database.delete_, {
             noteId,
           })
           .pipe(Effect.exit);
 
         assertTrue(Exit.isFailure(exit));
-      }));
+      }),
+    );
   });
 });

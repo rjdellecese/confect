@@ -1,7 +1,6 @@
+import { describe, expectTypeOf, test } from "@effect/vitest";
 import type { SystemDataModel } from "convex/server";
 import { Schema } from "effect";
-import { describe, expectTypeOf, test } from "vitest";
-
 import type {
   DataModelFromConfectDataModel,
   GenericConfectDataModel,
@@ -32,7 +31,7 @@ describe("ConfectDataModelFromConfectSchema", () => {
 
     type ConfectDataModel = ConfectDataModelFromConfectSchema<ConfectSchema>;
 
-    expectTypeOf<ConfectDataModel>().toMatchTypeOf<GenericConfectDataModel>();
+    expectTypeOf<ConfectDataModel>().toExtend<GenericConfectDataModel>();
   });
 });
 

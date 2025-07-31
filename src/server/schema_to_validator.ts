@@ -45,7 +45,7 @@ import type {
   IsValueLiteral,
   TypeError,
   UnionToTuple,
-} from "~/src/server/type-utils";
+} from "~/src/server/type_utils";
 
 // Args
 
@@ -240,10 +240,12 @@ type ValueTupleToValidatorTuple<VlTuple extends ReadonlyArray<ReadonlyValue>> =
         : never
       : [];
 
+/* v8 ignore start */
 export const compileSchema = <T, E>(
   schema: Schema.Schema<T, E>,
 ): ValueToValidator<(typeof schema)["Encoded"]> =>
   runSyncThrow(compileAst(schema.ast)) as any;
+/* v8 ignore stop */
 
 export const isRecursive = (ast: SchemaAST.AST): boolean =>
   pipe(

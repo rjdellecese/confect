@@ -23,7 +23,7 @@ import {
   UnsupportedPropertySignatureKeyTypeError,
   UnsupportedSchemaTypeError,
   type ValueToValidator,
-} from "~/src/server/schema-to-validator";
+} from "~/src/server/schema_to_validator";
 
 describe(compileAst, () => {
   describe("allowed", () => {
@@ -668,7 +668,7 @@ describe(compileSchema, () => {
       type CompiledValidator = typeof compiledValidator;
 
       expect(compiledValidator).toStrictEqual(expectedValidator);
-      expectTypeOf<CompiledValidator>().toMatchTypeOf<ExpectedValidator>();
+      expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
     });
 
     test("object with required recursive field", () => {
@@ -685,7 +685,7 @@ describe(compileSchema, () => {
       type CompiledValidator = typeof compiledValidator;
 
       expect(compiledValidator).toStrictEqual(expectedValidator);
-      expectTypeOf<CompiledValidator>().toMatchTypeOf<ExpectedValidator>();
+      expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
     });
 
     test("array with recursive element", () => {
@@ -698,7 +698,7 @@ describe(compileSchema, () => {
       type CompiledValidator = typeof compiledValidator;
 
       expect(compiledValidator).toStrictEqual(expectedValidator);
-      expectTypeOf<CompiledValidator>().toMatchTypeOf<ExpectedValidator>();
+      expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
     });
 
     test("tuple with recursive element", () => {
@@ -714,7 +714,7 @@ describe(compileSchema, () => {
       type CompiledValidator = typeof compiledValidator;
 
       expect(compiledValidator).toStrictEqual(expectedValidator);
-      expectTypeOf<CompiledValidator>().toMatchTypeOf<ExpectedValidator>();
+      expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
     });
 
     test("union with recursive element", () => {
@@ -734,7 +734,7 @@ describe(compileSchema, () => {
       type CompiledValidator = typeof compiledValidator;
 
       expect(compiledValidator).toStrictEqual(expectedValidator);
-      expectTypeOf<CompiledValidator>().toMatchTypeOf<ExpectedValidator>();
+      expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
     });
   });
 });
@@ -822,11 +822,11 @@ describe("ValueToValidator", () => {
           "required",
           never
         >;
-    expectTypeOf<Validator>().toMatchTypeOf<AnyPermutationOfValidator>();
+    expectTypeOf<Validator>().toExtend<AnyPermutationOfValidator>();
 
     type CompiledValidator = ValueToValidator<true | false | string>;
 
-    expectTypeOf<CompiledValidator>().toMatchTypeOf<AnyPermutationOfValidator>();
+    expectTypeOf<CompiledValidator>().toExtend<AnyPermutationOfValidator>();
   });
 
   test("number", () => {
@@ -956,7 +956,7 @@ describe("ValueToValidator", () => {
       type NestedArray = (string | NestedArray)[];
       type CompiledValidator = ValueToValidator<NestedArray>;
 
-      expectTypeOf<CompiledValidator>().toMatchTypeOf<ExpectedValidator>();
+      expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
     });
   });
 
@@ -1202,13 +1202,13 @@ describe(compileTableSchema, () => {
   });
 
   test("fails if provided Schema requires context", () => {
-    expectTypeOf<
-      Schema.Schema.AnyNoContext & Schema.Struct<any>
-    >().toMatchTypeOf<Parameters<typeof compileTableSchema>[0]>();
+    expectTypeOf<Schema.Schema.AnyNoContext & Schema.Struct<any>>().toExtend<
+      Parameters<typeof compileTableSchema>[0]
+    >();
 
     expectTypeOf<
       Schema.Schema<any, any, "Dep"> & Schema.Struct<any>
-    >().not.toMatchTypeOf<Parameters<typeof compileTableSchema>[0]>();
+    >().not.toExtend<Parameters<typeof compileTableSchema>[0]>();
   });
 
   test("fails if provided Schema contains index signatures", () => {
