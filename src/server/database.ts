@@ -7,16 +7,17 @@ import type {
   GenericDatabaseReader,
   GenericDatabaseWriter,
   GenericDataModel,
-  GenericDocument,
   GenericTableIndexes,
   Indexes,
   IndexRange,
   IndexRangeBuilder,
   NamedIndex,
   NamedSearchIndex,
+  NamedTableInfo,
   OrderedQuery,
   PaginationResult,
   Query,
+  QueryInitializer,
   SearchFilter,
   SearchFilterBuilder,
   SearchIndexes,
@@ -31,7 +32,7 @@ import {
   Either,
   identity,
   Layer,
-  Option,
+  type Option,
   ParseResult,
   pipe,
   Record,
@@ -44,8 +45,6 @@ import type {
   ConfectDocumentByName,
   DataModelFromConfectDataModel,
   GenericConfectDataModel,
-  GenericConfectDocument,
-  GenericConfectDocumentWithSystemFields,
   GenericConfectTableInfo,
   TableInfoFromConfectTableInfo,
   TableNamesInConfectDataModel,
@@ -331,12 +330,6 @@ type ConfectQueryInitializer<
     ConfectDataModel[TableName]["confectDocument"],
     DocumentDecodeError | DocumentNotFoundError
   >;
-  readonly getManyById: (
-    ids: readonly GenericId<TableName>[],
-  ) => Effect.Effect<
-    ConfectDataModel[TableName]["confectDocument"][],
-    DocumentDecodeError | DocumentNotFoundError
-  >;
   readonly getByIndex: <
     IndexName extends keyof Indexes<
       TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>
@@ -354,26 +347,33 @@ type ConfectQueryInitializer<
     ConfectDataModel[TableName]["confectDocument"],
     DocumentDecodeError | NoDocumentsMatchQueryError
   >;
-  readonly stream: () => Stream.Stream<
-    ConfectDataModel[TableName]["confectDocument"],
-    DocumentDecodeError
-  >;
-  readonly withIndex: <
-    IndexName extends keyof Indexes<
-      TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>
-    >,
-  >(
-    indexName: IndexName,
-    indexRange?: (
-      q: IndexRangeBuilder<
-        ConfectDataModel[TableName]["convexDocument"],
-        NamedIndex<
-          TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>,
-          IndexName
-        >
+  readonly withIndex: {
+    <
+      IndexName extends keyof Indexes<
+        TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>
       >,
-    ) => IndexRange,
-  ) => ConfectQuery<ConfectDataModel[TableName], TableName>;
+    >(
+      indexName: IndexName,
+      indexRange?: (
+        q: IndexRangeBuilder<
+          ConfectDataModel[TableName]["convexDocument"],
+          NamedIndex<
+            TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>,
+            IndexName
+          >
+        >,
+      ) => IndexRange,
+      order?: "asc" | "desc",
+    ): ConfectOrderedQuery<ConfectDataModel[TableName], TableName>;
+    <
+      IndexName extends keyof Indexes<
+        TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>
+      >,
+    >(
+      indexName: IndexName,
+      order?: "asc" | "desc",
+    ): ConfectOrderedQuery<ConfectDataModel[TableName], TableName>;
+  };
   readonly withSearchIndex: <
     IndexName extends keyof SearchIndexes<
       TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>
@@ -392,34 +392,6 @@ type ConfectQueryInitializer<
       >,
     ) => SearchFilter,
   ) => ConfectOrderedQuery<ConfectDataModel[TableName], TableName>;
-  readonly first: () => Effect.Effect<
-    ConfectDataModel[TableName]["confectDocument"],
-    DocumentDecodeError | NoDocumentsMatchQueryError
-  >;
-  readonly unique: () => Effect.Effect<
-    ConfectDataModel[TableName]["confectDocument"],
-    DocumentDecodeError | DocumentNotUniqueError | NoDocumentsMatchQueryError
-  >;
-  readonly take: (
-    n: number,
-  ) => Effect.Effect<
-    ReadonlyArray<ConfectDataModel[TableName]["confectDocument"]>,
-    DocumentDecodeError
-  >;
-  readonly collect: () => Effect.Effect<
-    ReadonlyArray<ConfectDataModel[TableName]["confectDocument"]>,
-    DocumentDecodeError
-  >;
-  readonly order: (
-    order: "asc" | "desc",
-  ) => ConfectOrderedQuery<ConfectDataModel[TableName], TableName>;
-  readonly paginate: (options: {
-    cursor: string | null;
-    numItems: number;
-  }) => Effect.Effect<
-    PaginationResult<ConfectDataModel[TableName]["confectDocument"]>,
-    DocumentDecodeError
-  >;
 };
 
 const makeConfectQueryInitializer = <
@@ -448,9 +420,6 @@ const makeConfectQueryInitializer = <
     convexDatabaseReader,
     confectTableDefinition,
   );
-
-  const getManyById: ConfectQueryFunction<"getManyById"> = (ids) =>
-    Effect.forEach(ids, getbyId);
 
   const getByIndex: ConfectQueryFunction<"getByIndex"> = (
     indexName,
@@ -481,26 +450,78 @@ const makeConfectQueryInitializer = <
     );
   };
 
-  const streamEncoded = Stream.fromAsyncIterable(
-    convexDatabaseReader.query(tableName),
-    identity,
-  ).pipe(Stream.orDie);
+  const withIndex: ConfectQueryFunction<"withIndex"> = <
+    IndexName extends keyof Indexes<
+      TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>
+    >,
+  >(
+    indexName: IndexName,
+    indexRangeOrOrder?:
+      | ((
+          q: IndexRangeBuilder<
+            ConfectDataModel[TableName]["convexDocument"],
+            NamedIndex<
+              TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>,
+              IndexName
+            >
+          >,
+        ) => IndexRange)
+      | "asc"
+      | "desc",
+    order?: "asc" | "desc",
+  ) => {
+    const {
+      applyWithIndex,
+      applyOrder,
+    }: {
+      applyWithIndex: (
+        queryInitializer: QueryInitializer<
+          NamedTableInfo<ConvexDataModel, TableName>
+        >,
+      ) => Query<NamedTableInfo<ConvexDataModel, TableName>>;
+      applyOrder: (
+        query: Query<NamedTableInfo<ConvexDataModel, TableName>>,
+      ) => OrderedQuery<NamedTableInfo<ConvexDataModel, TableName>>;
+    } =
+      indexRangeOrOrder === undefined
+        ? order === undefined
+          ? {
+              applyWithIndex: (q) => q.withIndex(indexName),
+              applyOrder: (q) => q.order("asc"),
+            }
+          : {
+              applyWithIndex: (q) => q.withIndex(indexName),
+              applyOrder: (q) => q.order(order),
+            }
+        : typeof indexRangeOrOrder === "function"
+          ? order === undefined
+            ? {
+                applyWithIndex: (q) =>
+                  q.withIndex(indexName, indexRangeOrOrder),
+                applyOrder: (q) => q.order("asc"),
+              }
+            : {
+                applyWithIndex: (q) =>
+                  q.withIndex(indexName, indexRangeOrOrder),
+                applyOrder: (q) => q.order(order),
+              }
+          : {
+              applyWithIndex: (q) => q.withIndex(indexName),
+              applyOrder: (q) => q.order(indexRangeOrOrder),
+            };
 
-  const stream: ConfectQueryFunction<"stream"> = () =>
-    pipe(
-      streamEncoded,
-      Stream.mapEffect(decode(tableName, confectTableDefinition.tableSchema)),
+    const orderedQuery = pipe(
+      convexDatabaseReader.query(tableName),
+      applyWithIndex,
+      applyOrder,
     );
 
-  const withIndex: ConfectQueryFunction<"withIndex"> = (
-    indexName,
-    indexRange,
-  ) =>
-    makeConfectQuery<ConfectDataModel[TableName], TableName>(
-      convexDatabaseReader.query(tableName).withIndex(indexName, indexRange),
+    return makeConfectOrderedQuery<ConfectDataModel[TableName], TableName>(
+      orderedQuery,
       tableName,
       confectTableDefinition.tableSchema,
     );
+  };
 
   const withSearchIndex: ConfectQueryFunction<"withSearchIndex"> = (
     indexName,
@@ -514,81 +535,11 @@ const makeConfectQueryInitializer = <
       confectTableDefinition.tableSchema,
     );
 
-  const first: ConfectQueryFunction<"first"> = () =>
-    pipe(
-      stream(),
-      Stream.runHead,
-      Effect.andThen(
-        Option.match({
-          onNone: () =>
-            Effect.fail(new NoDocumentsMatchQueryError({ tableName })),
-          onSome: decode(tableName, confectTableDefinition.tableSchema),
-        }),
-      ),
-    );
-
-  const unique: ConfectQueryFunction<"unique"> = () =>
-    pipe(
-      stream(),
-      Stream.take(2),
-      Stream.runCollect,
-      Effect.andThen((chunk) =>
-        Option.match(Chunk.get(chunk, 1), {
-          onSome: (doc) =>
-            new DocumentNotUniqueError({
-              id: (doc as GenericConfectDocumentWithSystemFields)._id,
-              tableName,
-            }),
-          onNone: () =>
-            Option.match(Chunk.get(chunk, 0), {
-              onSome: decode(tableName, confectTableDefinition.tableSchema),
-              onNone: () =>
-                Effect.fail(
-                  new NoDocumentsMatchQueryError({
-                    tableName,
-                  }),
-                ),
-            }),
-        }),
-      ),
-    );
-
-  const take: ConfectQueryFunction<"take"> = (n: number) =>
-    pipe(
-      stream(),
-      Stream.take(n),
-      Stream.runCollect,
-      Effect.map((chunk) => Chunk.toReadonlyArray(chunk)),
-    );
-
-  const collect: ConfectQueryFunction<"collect"> = () =>
-    pipe(stream(), Stream.runCollect, Effect.map(Chunk.toReadonlyArray));
-
-  const order: ConfectQueryFunction<"order"> = (order: "asc" | "desc") =>
-    makeConfectOrderedQuery<ConfectDataModel[TableName], TableName>(
-      convexDatabaseReader.query(tableName).order(order),
-      tableName,
-      confectTableDefinition.tableSchema,
-    );
-
-  const paginate: ConfectQueryFunction<"paginate"> = makePaginateFunction(
-    (options) => convexDatabaseReader.query(tableName).paginate(options),
-    decode(tableName, confectTableDefinition.tableSchema),
-  );
-
   return {
     getbyId,
-    getManyById,
     getByIndex,
-    stream,
     withIndex,
     withSearchIndex,
-    first,
-    unique,
-    take,
-    collect,
-    order,
-    paginate,
   };
 };
 
@@ -615,42 +566,13 @@ const getById =
       Effect.andThen(decode(tableName, confectTableDefinition.tableSchema)),
     );
 
-type ConfectQuery<
-  ConfectTableInfo extends GenericConfectTableInfo,
-  TableName extends string,
-> = {
-  readonly order: (
-    order: "asc" | "desc",
-  ) => ConfectOrderedQuery<ConfectTableInfo, TableName>;
-};
-
-const makeConfectQuery = <
-  ConfectTableInfo extends GenericConfectTableInfo,
-  TableName extends string,
->(
-  query: Query<TableInfoFromConfectTableInfo<ConfectTableInfo>>,
-  tableName: TableName,
-  tableSchema: TableSchemaFromConfectTableInfo<ConfectTableInfo>,
-): ConfectQuery<ConfectTableInfo, TableName> => ({
-  order: (order) =>
-    makeConfectOrderedQuery<ConfectTableInfo, TableName>(
-      query.order(order),
-      tableName,
-      tableSchema,
-    ),
-});
-
 type ConfectOrderedQuery<
   ConfectTableInfo extends GenericConfectTableInfo,
   _TableName extends string,
 > = {
   readonly first: () => Effect.Effect<
-    ConfectTableInfo["confectDocument"],
-    DocumentDecodeError | NoDocumentsMatchQueryError
-  >;
-  readonly unique: () => Effect.Effect<
-    ConfectTableInfo["confectDocument"],
-    DocumentDecodeError | DocumentNotUniqueError | NoDocumentsMatchQueryError
+    Option.Option<ConfectTableInfo["confectDocument"]>,
+    DocumentDecodeError
   >;
   readonly take: (
     n: number,
@@ -719,44 +641,8 @@ const makeConfectOrderedQuery = <
   const stream: ConfectOrderedQueryFunction<"stream"> = () =>
     pipe(streamEncoded, Stream.mapEffect(decode(tableName, tableSchema)));
 
-  const unique: ConfectOrderedQueryFunction<"unique"> = () =>
-    pipe(
-      stream(),
-      Stream.take(2),
-      Stream.runCollect,
-      Effect.andThen((chunk) =>
-        Option.match(Chunk.get(chunk, 1), {
-          onSome: (doc) =>
-            new DocumentNotUniqueError({
-              id: (doc as GenericConfectDocumentWithSystemFields)._id,
-              tableName,
-            }),
-          onNone: () =>
-            Option.match(Chunk.get(chunk, 0), {
-              onSome: decode(tableName, tableSchema),
-              onNone: () =>
-                Effect.fail(
-                  new NoDocumentsMatchQueryError({
-                    tableName,
-                  }),
-                ),
-            }),
-        }),
-      ),
-    );
-
   const first: ConfectOrderedQueryFunction<"first"> = () =>
-    pipe(
-      stream(),
-      Stream.runHead,
-      Effect.andThen(
-        Option.match({
-          onNone: () =>
-            Effect.fail(new NoDocumentsMatchQueryError({ tableName })),
-          onSome: decode(tableName, tableSchema),
-        }),
-      ),
-    );
+    pipe(stream(), Stream.take(1), Stream.runHead);
 
   const take: ConfectOrderedQueryFunction<"take"> = (n: number) =>
     pipe(
@@ -769,19 +655,38 @@ const makeConfectOrderedQuery = <
   const collect: ConfectOrderedQueryFunction<"collect"> = () =>
     pipe(stream(), Stream.runCollect, Effect.map(Chunk.toReadonlyArray));
 
-  const paginate: ConfectOrderedQueryFunction<"paginate"> =
-    makePaginateFunction(
-      (options) => query.paginate(options),
-      decode(tableName, tableSchema),
-    );
+  const paginate: ConfectOrderedQueryFunction<"paginate"> = (options) =>
+    Effect.gen(function* () {
+      const paginationResult = yield* Effect.promise(() =>
+        query.paginate(options),
+      );
+
+      const parsedPage = yield* Effect.forEach(
+        paginationResult.page,
+        decode(tableName, tableSchema),
+      );
+
+      return {
+        page: parsedPage,
+        isDone: paginationResult.isDone,
+        continueCursor: paginationResult.continueCursor,
+        /* v8 ignore start */
+        ...(paginationResult.splitCursor
+          ? { splitCursor: paginationResult.splitCursor }
+          : {}),
+        ...(paginationResult.pageStatus
+          ? { pageStatus: paginationResult.pageStatus }
+          : {}),
+        /* v8 ignore stop */
+      };
+    });
 
   return {
     first,
-    unique,
     take,
     collect,
-    stream,
     paginate,
+    stream,
   };
 };
 
@@ -974,45 +879,6 @@ const documentQueryMessage = ({
   tableName: string;
   message: string;
 }) => `Document with ID '${id}' in table '${tableName}' ${message}`;
-
-const makePaginateFunction =
-  <
-    ConfectDocument extends GenericConfectDocument,
-    ConvexDocument extends GenericDocument,
-  >(
-    getPaginationResult: (options: {
-      cursor: string | null;
-      numItems: number;
-    }) => Promise<PaginationResult<ConvexDocument>>,
-    decodeDocument: (
-      doc: ConvexDocument,
-    ) => Effect.Effect<ConfectDocument, DocumentDecodeError>,
-  ) =>
-  (options: { cursor: string | null; numItems: number }) =>
-    Effect.gen(function* () {
-      const paginationResult = yield* Effect.promise(() =>
-        getPaginationResult(options),
-      );
-
-      const parsedPage = yield* Effect.forEach(
-        paginationResult.page,
-        decodeDocument,
-      );
-
-      return {
-        page: parsedPage,
-        isDone: paginationResult.isDone,
-        continueCursor: paginationResult.continueCursor,
-        /* v8 ignore start */
-        ...(paginationResult.splitCursor
-          ? { splitCursor: paginationResult.splitCursor }
-          : {}),
-        ...(paginationResult.pageStatus
-          ? { pageStatus: paginationResult.pageStatus }
-          : {}),
-        /* v8 ignore stop */
-      };
-    });
 
 // Would prefer to use `BaseDatabaseReader` from the `convex` package, but it's not exported.
 type BaseDatabaseReader<DataModel extends GenericDataModel> = {

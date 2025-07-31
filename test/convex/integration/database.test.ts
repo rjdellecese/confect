@@ -1,9 +1,10 @@
-import { assert, describe, expect, vi } from "@effect/vitest";
-import { assertEquals } from "@effect/vitest/utils";
-import { Array, Effect } from "effect";
+import { describe, vi } from "@effect/vitest";
+import { assertEquals, assertTrue } from "@effect/vitest/utils";
+import { Effect, Exit, Option, Schema, String } from "effect";
 import { api } from "~/test/convex/_generated/api";
 import { test } from "~/test/convex-effect-test";
 import { TestConvexService } from "~/test/test-convex-service";
+import { confectSchema } from "../schema";
 
 describe("ConfectDatabaseReader", () => {
   test("getById", () =>
@@ -15,35 +16,460 @@ describe("ConfectDatabaseReader", () => {
 
       const noteId = yield* c.run(({ db }) => db.insert("notes", { text }));
 
-      const note = yield* c.query(
-        api.integration.database.databaseReaderGetById,
-        {
-          noteId,
-        },
-      );
+      const note = yield* c.query(api.integration.database.getById, {
+        noteId,
+      });
 
       assertEquals(note._id, noteId);
     }));
 
-  test("getManyById", () =>
+  test("getByIndex", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
 
+      const name = "John Doe";
+      const role = "admin";
       const text = "Hello, world!";
 
-      const noteId1 = yield* c.run(({ db }) => db.insert("notes", { text }));
-      const noteId2 = yield* c.run(({ db }) => db.insert("notes", { text }));
-
-      const notes = yield* c.query(
-        api.integration.database.databaseReaderGetManyById,
-        {
-          noteIds: [noteId1, noteId2],
-        },
+      const noteId = yield* c.run(({ db }) =>
+        db.insert("notes", {
+          author: { name, role },
+          text,
+        }),
       );
 
-      assert.includeMembers(
-        Array.map(notes, ({ _id }) => _id),
-        [noteId1, noteId2],
-      );
+      const note = yield* c.query(api.integration.database.getByIndex, {
+        name,
+        role,
+        text,
+      });
+
+      assertEquals(note._id, noteId);
     }));
+
+  test("first", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConvexService;
+
+      const [noteId1, _noteId2] = yield* c.run(({ db }) =>
+        Promise.all([
+          db.insert("notes", { text: "1" }),
+          db.insert("notes", { text: "2" }),
+        ]),
+      );
+
+      const note = yield* c
+        .query(api.integration.database.first, {})
+        .pipe(
+          Effect.andThen(
+            Schema.decode(
+              Schema.Option(confectSchema.tableSchemas.notes.withSystemFields),
+            ),
+          ),
+          Effect.andThen(Option.getOrThrow),
+        );
+
+      assertEquals(note._id, noteId1);
+    }));
+
+  test("take", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConvexService;
+
+      const [noteId1, noteId2] = yield* c.run(({ db }) =>
+        Promise.all([
+          db.insert("notes", { text: "1" }),
+          db.insert("notes", { text: "2" }),
+        ]),
+      );
+
+      const notes = yield* c.query(api.integration.database.take, {
+        n: 3,
+      });
+
+      assertEquals(notes.length, 2);
+      assertEquals(notes[0]._id, noteId1);
+      assertEquals(notes[1]._id, noteId2);
+    }));
+
+  test("collect", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConvexService;
+
+      const [noteId1, noteId2] = yield* c.run(({ db }) =>
+        Promise.all([
+          db.insert("notes", { text: "1" }),
+          db.insert("notes", { text: "2" }),
+        ]),
+      );
+
+      const notes = yield* c.query(api.integration.database.collect, {});
+
+      assertEquals(notes.length, 2);
+      assertEquals(notes[0]._id, noteId1);
+      assertEquals(notes[1]._id, noteId2);
+    }));
+
+  test("paginate", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConvexService;
+
+      const [noteId1, noteId2] = yield* c.run(({ db }) =>
+        Promise.all([
+          db.insert("notes", { text: "1" }),
+          db.insert("notes", { text: "2" }),
+        ]),
+      );
+
+      const notes = yield* c.query(api.integration.database.paginate, {
+        cursor: null,
+        numItems: 2,
+      });
+
+      assertEquals(notes.page.length, 2);
+      assertEquals(notes.page[0]._id, noteId1);
+      assertEquals(notes.page[1]._id, noteId2);
+    }));
+
+  test("stream", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConvexService;
+
+      const [noteId1, noteId2] = yield* c.run(({ db }) =>
+        Promise.all([
+          db.insert("notes", { text: "1" }),
+          db.insert("notes", { text: "2" }),
+          db.insert("notes", { text: "3" }),
+        ]),
+      );
+
+      const notes = yield* c.query(api.integration.database.stream, {
+        until: "2",
+      });
+
+      assertEquals(notes.length, 2);
+      assertEquals(notes[0]._id, noteId1);
+      assertEquals(notes[1]._id, noteId2);
+    }));
+
+  describe("withIndex", () => {
+    test("without query range without order", () =>
+      Effect.gen(function* () {
+        const c = yield* TestConvexService;
+
+        const [noteId1, noteId2] = yield* c.run(({ db }) =>
+          Promise.all([
+            db.insert("notes", { text: "1" }),
+            db.insert("notes", { text: "2" }),
+            db.insert("notes", { text: "3" }),
+          ]),
+        );
+
+        const notes = yield* c.query(
+          api.integration.database.withIndexWithQueryRangeWithOrder,
+        );
+
+        assertEquals(notes.length, 2);
+        assertEquals(notes[0]._id, noteId1);
+        assertEquals(notes[1]._id, noteId2);
+      }));
+
+    test("with query range without order", () =>
+      Effect.gen(function* () {
+        const c = yield* TestConvexService;
+
+        const [_noteId1, noteId2, noteId3] = yield* c.run(({ db }) =>
+          Promise.all([
+            db.insert("notes", { text: "1" }),
+            db.insert("notes", { text: "2" }),
+            db.insert("notes", { text: "3" }),
+          ]),
+        );
+
+        const notes = yield* c.query(
+          api.integration.database.withIndexWithQueryRangeWithoutOrder,
+          {
+            text: "2",
+          },
+        );
+
+        assertEquals(notes.length, 2);
+        assertEquals(notes[0]._id, noteId2);
+        assertEquals(notes[1]._id, noteId3);
+      }));
+
+    test("with query range and order", () =>
+      Effect.gen(function* () {
+        const c = yield* TestConvexService;
+
+        const [_noteId1, noteId2, noteId3] = yield* c.run(({ db }) =>
+          Promise.all([
+            db.insert("notes", { text: "1" }),
+            db.insert("notes", { text: "2" }),
+            db.insert("notes", { text: "3" }),
+          ]),
+        );
+
+        const notes = yield* c.query(
+          api.integration.database.withIndexWithQueryRangeAndOrder,
+          {
+            text: "1",
+          },
+        );
+
+        assertEquals(notes.length, 2);
+        assertEquals(notes[0]._id, noteId3);
+        assertEquals(notes[1]._id, noteId2);
+      }));
+
+    test("without query range with order", () =>
+      Effect.gen(function* () {
+        const c = yield* TestConvexService;
+
+        const [_noteId1, noteId2, noteId3] = yield* c.run(({ db }) =>
+          Promise.all([
+            db.insert("notes", { text: "1" }),
+            db.insert("notes", { text: "2" }),
+            db.insert("notes", { text: "3" }),
+          ]),
+        );
+
+        const notes = yield* c.query(
+          api.integration.database.withIndexWithoutQueryRangeWithOrder,
+        );
+
+        assertEquals(notes.length, 2);
+        assertEquals(notes[0]._id, noteId3);
+        assertEquals(notes[1]._id, noteId2);
+      }));
+
+    test("without query range without order", () =>
+      Effect.gen(function* () {
+        const c = yield* TestConvexService;
+
+        const [noteId1, noteId2] = yield* c.run(({ db }) =>
+          Promise.all([
+            db.insert("notes", { text: "1" }),
+            db.insert("notes", { text: "2" }),
+            db.insert("notes", { text: "3" }),
+          ]),
+        );
+
+        const notes = yield* c.query(
+          api.integration.database.withIndexWithoutQueryRangeWithoutOrder,
+        );
+
+        assertEquals(notes.length, 2);
+        assertEquals(notes[0]._id, noteId1);
+        assertEquals(notes[1]._id, noteId2);
+      }));
+
+    test("withSearchIndex", () =>
+      Effect.gen(function* () {
+        const c = yield* TestConvexService;
+
+        const [_noteId1, noteId2] = yield* c.run(({ db }) =>
+          Promise.all([
+            db.insert("notes", { text: "Ocean blue" }),
+            db.insert("notes", { text: "Ocean blue", tag: "colors" }),
+            db.insert("notes", { text: "Sea green", tag: "colors" }),
+          ]),
+        );
+
+        const notes = yield* c.query(api.integration.database.withSearchIndex, {
+          text: "blue",
+        });
+
+        assertEquals(notes.length, 1);
+        assertEquals(notes[0]._id, noteId2);
+      }));
+
+    describe("system tables", () => {
+      test("get", () =>
+        Effect.gen(function* () {
+          const c = yield* TestConvexService;
+
+          const storageId = yield* c.run(({ storage }) =>
+            storage.store(new Blob(["Hello, world!"])),
+          );
+
+          const storageDoc = yield* c.query(
+            api.integration.database.systemGet,
+            {
+              id: storageId,
+            },
+          );
+
+          assertEquals(storageDoc._id, storageId);
+        }));
+
+      test("query", () =>
+        Effect.gen(function* () {
+          const c = yield* TestConvexService;
+
+          const storageId = yield* c.run(({ storage }) =>
+            storage.store(new Blob(["Hello, world!"])),
+          );
+
+          const storageDocs = yield* c.query(
+            api.integration.database.systemQuery,
+          );
+
+          assertEquals(storageDocs.length, 1);
+          assertEquals(storageDocs[0]._id, storageId);
+        }));
+    });
+  });
+});
+
+describe("ConfectDatabaseWriter", () => {
+  describe("patch", () => {
+    test("when invalid", () =>
+      Effect.gen(function* () {
+        const c = yield* TestConvexService;
+
+        const noteId = yield* c.run(({ db }) =>
+          db.insert("notes", { text: "Hello, world!" }),
+        );
+
+        const tooLongText = String.repeat(101)("a");
+
+        const exit = yield* c
+          .mutation(api.integration.database.patch, {
+            noteId,
+            fields: {
+              text: tooLongText,
+            },
+          })
+          .pipe(Effect.exit);
+
+        assertTrue(Exit.isFailure(exit));
+      }));
+
+    test("when valid", () =>
+      Effect.gen(function* () {
+        const c = yield* TestConvexService;
+
+        const noteId = yield* c.run(({ db }) =>
+          db.insert("notes", { text: "Hello, world!" }),
+        );
+
+        const author = { role: "user", name: "Joe" } as const;
+
+        yield* c.mutation(api.integration.database.patch, {
+          noteId,
+          fields: { author },
+        });
+
+        const patchedNote = yield* c.run(({ db }) => db.get(noteId));
+
+        assertEquals(patchedNote?.author, author);
+      }));
+
+    test("when document no longer exists", () =>
+      Effect.gen(function* () {
+        const c = yield* TestConvexService;
+
+        const noteId = yield* c.run(({ db }) =>
+          db.insert("notes", { text: "Hello, world!" }),
+        );
+
+        yield* c.run(({ db }) => db.delete(noteId));
+
+        const exit = yield* c
+          .mutation(api.integration.database.patch, {
+            noteId,
+            fields: { text: "Hello, world!" },
+          })
+          .pipe(Effect.exit);
+
+        assertTrue(Exit.isFailure(exit));
+      }));
+
+    test("when unsetting a field", () =>
+      Effect.gen(function* () {
+        const c = yield* TestConvexService;
+
+        const tag = "greeting";
+
+        const noteId = yield* c.run(({ db }) =>
+          db.insert("notes", {
+            text: "Hello, world!",
+            tag,
+            author: { role: "user", name: "Joe" },
+          }),
+        );
+
+        yield* c.mutation(api.integration.database.patchUnset, {
+          noteId,
+        });
+
+        const patchedNote = yield* c.run(({ db }) => db.get(noteId));
+
+        assertEquals(patchedNote?.author, undefined);
+        assertEquals(patchedNote?.tag, tag);
+      }));
+  });
+
+  test("replace", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConvexService;
+
+      const initialText = "Hello, Earth!";
+      const updatedText = "Hello, Mars!";
+
+      const noteId = yield* c.run(({ db }) =>
+        db.insert("notes", { text: initialText }),
+      );
+      const note = yield* c.run(({ db }) => db.get(noteId));
+
+      const updatedNoteFields = { ...note, text: updatedText };
+
+      yield* c.mutation(api.integration.database.replace, {
+        noteId,
+        fields: updatedNoteFields,
+      });
+
+      const replacedNote = yield* c.run(({ db }) => db.get(noteId));
+
+      assertEquals(replacedNote?.text, updatedText);
+    }));
+
+  describe("delete", () => {
+    test("when document exists", () =>
+      Effect.gen(function* () {
+        const c = yield* TestConvexService;
+
+        const noteId = yield* c.run(({ db }) =>
+          db.insert("notes", { text: "Hello, world!" }),
+        );
+
+        yield* c.mutation(api.integration.database.delete_, {
+          noteId,
+        });
+
+        const gottenNote = yield* c.run(({ db }) => db.get(noteId));
+
+        assertEquals(gottenNote, null);
+      }));
+
+    test("when document no longer exists", () =>
+      Effect.gen(function* () {
+        const c = yield* TestConvexService;
+
+        const noteId = yield* c.run(({ db }) =>
+          db.insert("notes", { text: "Hello, world!" }),
+        );
+
+        yield* c.run(({ db }) => db.delete(noteId));
+
+        const exit = yield* c
+          .mutation(api.integration.database.delete_, {
+            noteId,
+          })
+          .pipe(Effect.exit);
+
+        assertTrue(Exit.isFailure(exit));
+      }));
+  });
 });

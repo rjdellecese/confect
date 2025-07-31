@@ -1,27 +1,15 @@
-import {
-  Array,
-  Chunk,
-  Effect,
-  Option,
-  type ParseResult,
-  Schema,
-  Stream,
-} from "effect";
+import { Chunk, Effect, Schema, Stream } from "effect";
 import { Id } from "~/src/server/schemas/Id";
 import { PaginationResult } from "~/src/server/schemas/PaginationResult";
-import { api } from "~/test/convex/_generated/api";
 import {
-  action,
   ConfectDatabaseReader,
   ConfectDatabaseWriter,
-  ConfectQueryRunner,
-  ConfectVectorSearch,
   mutation,
   query,
 } from "~/test/convex/confect";
 import { confectSchema } from "~/test/convex/schema";
 
-export const databaseReaderGetById = query({
+export const getById = query({
   args: Schema.Struct({
     noteId: Id("notes"),
   }),
@@ -34,78 +22,7 @@ export const databaseReaderGetById = query({
     }),
 });
 
-export const databaseReaderGetManyById = query({
-  args: Schema.Struct({
-    noteIds: Schema.Array(Id("notes")),
-  }),
-  returns: Schema.Array(confectSchema.tableSchemas.notes.withSystemFields),
-  handler: ({ noteIds }) =>
-    Effect.gen(function* () {
-      const reader = yield* ConfectDatabaseReader;
-      return yield* reader.table("notes").getManyById(noteIds);
-    }),
-});
-
-export const queryGetById = query({
-  args: Schema.Struct({
-    noteId: Id("notes"),
-  }),
-  returns: confectSchema.tableSchemas.notes.withSystemFields,
-  handler: ({ noteId }) =>
-    Effect.gen(function* () {
-      const reader = yield* ConfectDatabaseReader;
-
-      return yield* reader.table("notes").getbyId(noteId);
-    }),
-});
-
-export const queryGetManyById = query({
-  args: Schema.Struct({
-    noteIds: Schema.Array(Id("notes")),
-  }),
-  returns: Schema.Array(confectSchema.tableSchemas.notes.withSystemFields),
-  handler: ({ noteIds }) =>
-    Effect.gen(function* () {
-      const reader = yield* ConfectDatabaseReader;
-      return yield* reader.table("notes").getManyById(noteIds);
-    }),
-});
-
-export const queryOrderedUnique = query({
-  args: Schema.Struct({}),
-  returns: confectSchema.tableSchemas.notes.withSystemFields,
-  handler: () =>
-    Effect.gen(function* () {
-      const reader = yield* ConfectDatabaseReader;
-      return yield* reader.table("notes").order("desc").unique();
-    }),
-});
-
-export const queryOrderedTake = query({
-  args: Schema.Struct({
-    n: Schema.Positive,
-  }),
-  returns: Schema.Array(confectSchema.tableSchemas.notes.withSystemFields),
-  handler: ({ n }) =>
-    Effect.gen(function* () {
-      const reader = yield* ConfectDatabaseReader;
-      return yield* reader.table("notes").order("desc").take(n);
-    }),
-});
-
-export const queryGetByIndexOneField = query({
-  args: Schema.Struct({
-    text: Schema.String,
-  }),
-  returns: confectSchema.tableSchemas.notes.withSystemFields,
-  handler: ({ text }) =>
-    Effect.gen(function* () {
-      const reader = yield* ConfectDatabaseReader;
-      return yield* reader.table("notes").getByIndex("by_text", text);
-    }),
-});
-
-export const queryGetByIndexThreeFields = query({
+export const getByIndex = query({
   args: Schema.Struct({
     name: Schema.String,
     role: Schema.Literal("admin", "user"),
@@ -115,85 +32,20 @@ export const queryGetByIndexThreeFields = query({
   handler: ({ name, role, text }) =>
     Effect.gen(function* () {
       const reader = yield* ConfectDatabaseReader;
+
       return yield* reader
         .table("notes")
         .getByIndex("by_name_and_role_and_text", name, role, text);
     }),
 });
 
-export const mutationGet = mutation({
-  args: Schema.Struct({
-    noteId: Id("notes"),
-  }),
-  returns: confectSchema.tableSchemas.notes.withSystemFields,
-  handler: ({ noteId }) =>
-    Effect.gen(function* () {
-      const reader = yield* ConfectDatabaseReader;
-
-      return yield* reader.table("notes").getbyId(noteId);
-    }),
-});
-
-export const insert = mutation({
-  args: Schema.Struct({
-    text: Schema.String,
-  }),
-  returns: Id("notes"),
-  handler: ({ text }) =>
-    Effect.gen(function* () {
-      const writer = yield* ConfectDatabaseWriter;
-
-      return yield* writer.insert("notes", { text });
-    }),
-});
-
-export const queryCollect = query({
+export const first = query({
   args: Schema.Struct({}),
-  returns: Schema.Array(confectSchema.tableSchemas.notes.withSystemFields),
+  returns: Schema.Option(confectSchema.tableSchemas.notes.withSystemFields),
   handler: () =>
     Effect.gen(function* () {
       const reader = yield* ConfectDatabaseReader;
-
-      return yield* reader.table("notes").collect();
-    }),
-});
-
-export const mutationCollect = mutation({
-  args: Schema.Struct({}),
-  returns: Schema.Array(confectSchema.tableSchemas.notes.withSystemFields),
-  handler: () =>
-    Effect.gen(function* () {
-      const reader = yield* ConfectDatabaseReader;
-
-      return yield* reader.table("notes").collect();
-    }),
-});
-
-export const withIndexFirst = query({
-  args: Schema.Struct({
-    text: Schema.String,
-  }),
-  returns: confectSchema.tableSchemas.notes.withSystemFields,
-  handler: ({ text }) =>
-    Effect.gen(function* () {
-      const reader = yield* ConfectDatabaseReader;
-
-      return yield* reader
-        .table("notes")
-        .withIndex("by_text", (q) => q.eq("text", text))
-        .order("desc")
-        .first();
-    }),
-});
-
-export const orderDescCollect = query({
-  args: Schema.Struct({}),
-  returns: Schema.Array(confectSchema.tableSchemas.notes.withSystemFields),
-  handler: () =>
-    Effect.gen(function* () {
-      const reader = yield* ConfectDatabaseReader;
-
-      return yield* reader.table("notes").order("desc").collect();
+      return yield* reader.table("notes").withIndex("by_text").first();
     }),
 });
 
@@ -206,7 +58,20 @@ export const take = query({
     Effect.gen(function* () {
       const reader = yield* ConfectDatabaseReader;
 
-      return yield* reader.table("notes").take(n);
+      return yield* reader.table("notes").withIndex("by_creation_time").take(n);
+    }),
+});
+
+export const collect = query({
+  args: Schema.Struct({}),
+  returns: Schema.Array(confectSchema.tableSchemas.notes.withSystemFields),
+  handler: () =>
+    Effect.gen(function* () {
+      const reader = yield* ConfectDatabaseReader;
+      return yield* reader
+        .table("notes")
+        .withIndex("by_creation_time")
+        .collect();
     }),
 });
 
@@ -220,81 +85,139 @@ export const paginate = query({
     Effect.gen(function* () {
       const reader = yield* ConfectDatabaseReader;
 
-      return yield* reader.table("notes").paginate({ cursor, numItems });
+      return yield* reader
+        .table("notes")
+        .withIndex("by_creation_time")
+        .paginate({ cursor, numItems });
     }),
 });
 
-export const unique = query({
-  args: Schema.Struct({}),
-  returns: Schema.Option(confectSchema.tableSchemas.notes.withSystemFields),
-  handler: () =>
+export const stream = query({
+  args: Schema.Struct({
+    until: Schema.NonEmptyString,
+  }),
+  returns: Schema.Array(confectSchema.tableSchemas.notes.withSystemFields),
+  handler: ({ until }) =>
     Effect.gen(function* () {
       const reader = yield* ConfectDatabaseReader;
 
       return yield* reader
         .table("notes")
-        .unique()
-        .pipe(
-          Effect.map(Option.some),
-          Effect.catchTag("NoDocumentsMatchQueryError", () =>
-            Effect.succeed(Option.none()),
-          ),
-        );
-    }),
-});
-
-export const onlyFirst = query({
-  args: Schema.Struct({}),
-  returns: Schema.Option(confectSchema.tableSchemas.notes.withSystemFields),
-  handler: () =>
-    Effect.gen(function* () {
-      const reader = yield* ConfectDatabaseReader;
-
-      return yield* reader
-        .table("notes")
-        .first()
-        .pipe(
-          Effect.map(Option.some),
-          Effect.catchTag("NoDocumentsMatchQueryError", () =>
-            Effect.succeed(Option.none()),
-          ),
-        );
-    }),
-});
-
-export const mapTextStream = query({
-  args: Schema.Struct({}),
-  returns: Schema.Array(Schema.String),
-  handler: () =>
-    Effect.gen(function* () {
-      const reader = yield* ConfectDatabaseReader;
-
-      return yield* reader
-        .table("notes")
+        .withIndex("by_creation_time")
         .stream()
         .pipe(
-          Stream.map((note) => note.text),
+          Stream.takeUntil(({ text }) => text === until),
           Stream.runCollect,
-          Effect.map(Chunk.toArray),
+          Effect.andThen(Chunk.toArray),
         );
     }),
 });
 
-export const search = query({
+export const withIndexWithQueryRangeWithOrder = query({
+  args: Schema.Struct({}),
+  returns: Schema.Array(confectSchema.tableSchemas.notes.withSystemFields),
+  handler: () =>
+    Effect.gen(function* () {
+      const reader = yield* ConfectDatabaseReader;
+
+      return yield* reader.table("notes").withIndex("by_text").take(2);
+    }),
+});
+
+export const withIndexWithQueryRangeWithoutOrder = query({
   args: Schema.Struct({
-    query: Schema.String,
-    tag: Schema.String,
+    text: Schema.NonEmptyString,
   }),
-  returns: Schema.Array(Schema.String),
-  handler: ({ query, tag }) =>
+  returns: Schema.Array(confectSchema.tableSchemas.notes.withSystemFields),
+  handler: ({ text }) =>
     Effect.gen(function* () {
       const reader = yield* ConfectDatabaseReader;
 
       return yield* reader
         .table("notes")
-        .withSearchIndex("text", (q) => q.search("text", query).eq("tag", tag))
-        .collect()
-        .pipe(Effect.map(Array.map((note) => note.text)));
+        .withIndex("by_text", (q) => q.gte("text", text))
+        .take(2);
+    }),
+});
+
+export const withIndexWithQueryRangeAndOrder = query({
+  args: Schema.Struct({
+    text: Schema.NonEmptyString,
+  }),
+  returns: Schema.Array(confectSchema.tableSchemas.notes.withSystemFields),
+  handler: ({ text }) =>
+    Effect.gen(function* () {
+      const reader = yield* ConfectDatabaseReader;
+
+      return yield* reader
+        .table("notes")
+        .withIndex("by_text", (q) => q.gte("text", text), "desc")
+        .take(2);
+    }),
+});
+
+export const withIndexWithoutQueryRangeWithOrder = query({
+  args: Schema.Struct({}),
+  returns: Schema.Array(confectSchema.tableSchemas.notes.withSystemFields),
+  handler: () =>
+    Effect.gen(function* () {
+      const reader = yield* ConfectDatabaseReader;
+
+      return yield* reader.table("notes").withIndex("by_text", "desc").take(2);
+    }),
+});
+
+export const withIndexWithoutQueryRangeWithoutOrder = query({
+  args: Schema.Struct({}),
+  returns: Schema.Array(confectSchema.tableSchemas.notes.withSystemFields),
+  handler: () =>
+    Effect.gen(function* () {
+      const reader = yield* ConfectDatabaseReader;
+      return yield* reader.table("notes").withIndex("by_text").take(2);
+    }),
+});
+
+export const withSearchIndex = query({
+  args: Schema.Struct({
+    text: Schema.String,
+  }),
+  returns: Schema.Array(confectSchema.tableSchemas.notes.withSystemFields),
+  handler: ({ text }) =>
+    Effect.gen(function* () {
+      const reader = yield* ConfectDatabaseReader;
+      return yield* reader
+        .table("notes")
+        .withSearchIndex("text", (q) =>
+          q.search("text", text).eq("tag", "colors"),
+        )
+        .collect();
+    }),
+});
+
+export const systemGet = query({
+  args: Schema.Struct({
+    id: Id("_storage"),
+  }),
+  returns: confectSchema.tableSchemas._storage.withSystemFields,
+  handler: ({ id }) =>
+    Effect.gen(function* () {
+      const reader = yield* ConfectDatabaseReader;
+
+      return yield* reader.table("_storage").getbyId(id);
+    }),
+});
+
+export const systemQuery = query({
+  args: Schema.Struct({}),
+  returns: Schema.Array(confectSchema.tableSchemas._storage.withSystemFields),
+  handler: () =>
+    Effect.gen(function* () {
+      const reader = yield* ConfectDatabaseReader;
+
+      return yield* reader
+        .table("_storage")
+        .withIndex("by_creation_time")
+        .collect();
     }),
 });
 
@@ -346,7 +269,7 @@ export const patch = mutation({
     }),
 });
 
-export const unsetAuthorPatch = mutation({
+export const patchUnset = mutation({
   args: Schema.Struct({
     noteId: Id("notes"),
   }),
@@ -394,7 +317,7 @@ export const replace = mutation({
     }),
 });
 
-export const deleteNote = mutation({
+export const delete_ = mutation({
   args: Schema.Struct({
     noteId: Id("notes"),
   }),
@@ -406,90 +329,5 @@ export const deleteNote = mutation({
       yield* writer.delete("notes", noteId);
 
       return null;
-    }),
-});
-
-export const executeVectorSearch = action({
-  args: Schema.Struct({
-    vector: Schema.Array(Schema.Number),
-    tag: Schema.Union(Schema.String, Schema.Null),
-    limit: Schema.Number,
-  }),
-  returns: Schema.Array(
-    Schema.Struct({
-      text: Schema.String,
-      tag: Schema.optional(Schema.String),
-    }),
-  ),
-  handler: ({
-    vector,
-    tag,
-    limit,
-  }): Effect.Effect<
-    { text: string; tag?: string }[],
-    ParseResult.ParseError,
-    ConfectVectorSearch | ConfectQueryRunner
-  > =>
-    Effect.gen(function* () {
-      const { vectorSearch } = yield* ConfectVectorSearch;
-      const { runQuery } = yield* ConfectQueryRunner;
-
-      return yield* vectorSearch("notes", "embedding", {
-        vector: vector as number[],
-        filter: tag === null ? undefined : (q) => q.eq("tag", tag),
-        limit,
-      }).pipe(
-        Effect.andThen(
-          Effect.forEach((vectorResult) =>
-            runQuery(api.functions.getVectorSearch, {
-              noteId: vectorResult._id,
-            }).pipe(
-              Effect.andThen(
-                Schema.decode(
-                  confectSchema.tableSchemas.notes.withSystemFields,
-                ),
-              ),
-              Effect.map(({ text, tag }) => ({ text, tag })),
-            ),
-          ),
-        ),
-      );
-    }),
-});
-
-export const getVectorSearch = query({
-  args: Schema.Struct({
-    noteId: Id("notes"),
-  }),
-  returns: confectSchema.tableSchemas.notes.withSystemFields,
-  handler: ({ noteId }) =>
-    Effect.gen(function* () {
-      const reader = yield* ConfectDatabaseReader;
-
-      return yield* reader.table("notes").getbyId(noteId);
-    }),
-});
-
-export const systemGet = query({
-  args: Schema.Struct({
-    id: Id("_storage"),
-  }),
-  returns: confectSchema.tableSchemas._storage.withSystemFields,
-  handler: ({ id }) =>
-    Effect.gen(function* () {
-      const reader = yield* ConfectDatabaseReader;
-
-      return yield* reader.table("_storage").getbyId(id);
-    }),
-});
-
-export const systemQuery = query({
-  args: Schema.Struct({}),
-  returns: Schema.Array(confectSchema.tableSchemas._storage.withSystemFields),
-  handler: () =>
-    Effect.gen(function* () {
-      const reader = yield* ConfectDatabaseReader;
-
-      return yield* reader.table("_storage").collect();
     }),
 });
