@@ -650,14 +650,19 @@ describe(compileSchema, () => {
     });
 
     test("record", () => {
-      const record = Schema.Record({
-        key: Schema.String,
-        value: Schema.String,
-      });
+      const expectedValidator = v.record(v.string(), v.number());
+      type ExpectedValidator = typeof expectedValidator;
 
-      expect(() => compileSchema(record)).toThrow(
-        new IndexSignaturesAreNotSupportedError(),
+      const compiledValidator = compileSchema(
+        Schema.Record({
+          key: Schema.String,
+          value: Schema.Number,
+        }),
       );
+      type CompiledValidator = typeof compiledValidator;
+
+      expect(compiledValidator).toStrictEqual(expectedValidator);
+      expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
   });
 });

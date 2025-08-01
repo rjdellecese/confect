@@ -14,6 +14,7 @@ import type {
   VNull,
   VObject,
   VOptional,
+  VRecord,
   VString,
   VUnion,
 } from "convex/values";
@@ -40,6 +41,7 @@ import type {
   DeepMutable,
   IsAny,
   IsOptional,
+  IsRecordType,
   IsRecursive,
   IsUnion,
   IsValueLiteral,
@@ -178,7 +180,9 @@ type RecordValueToValidator<Vl> = Vl extends ReadonlyRecordValue
     ? {
         -readonly [K in keyof Vl]: DeepMutable<Vl[K]>;
       } extends infer VlRecord extends Record<string, any>
-      ? VObject<VlRecord, VdRecord>
+      ? IsRecordType<VlRecord> extends true
+        ? VRecord<VlRecord, VString, VdRecord[keyof VdRecord]>
+        : VObject<VlRecord, VdRecord>
       : never
     : never
   : never;
@@ -414,7 +418,24 @@ const handleTypeLiteral = (typeLiteralAst: SchemaAST.TypeLiteral) =>
     Option.match({
       onNone: () =>
         Effect.map(handlePropertySignatures(typeLiteralAst), v.object),
-      onSome: () => Effect.fail(new IndexSignaturesAreNotSupportedError()),
+      onSome: ({ parameter, type }) =>
+        pipe(
+          typeLiteralAst.propertySignatures,
+          Array.head,
+          Option.match({
+            onNone: () =>
+              Effect.map(
+                Effect.all({
+                  parameter: compileAst(parameter),
+                  type: compileAst(type),
+                }),
+                ({ parameter, type }) => v.record(parameter, type),
+              ),
+            onSome: () =>
+              // TODO: Some are; be more specific and give more helpful diagnostic information
+              Effect.fail(new IndexSignaturesAreNotSupportedError()),
+          }),
+        ),
     }),
   );
 

@@ -7,6 +7,7 @@ import type {
   DeepReadonly,
   IsAny,
   IsOptional,
+  IsRecordType,
   IsRecursive,
   IsUnion,
   IsValueLiteral,
@@ -234,6 +235,188 @@ describe("IsValueLiteral", () => {
 
   test("bigint", () => {
     expectTypeOf<IsValueLiteral<bigint>>().toEqualTypeOf<false>();
+  });
+});
+
+describe("IsRecordType", () => {
+  describe("true for Record types", () => {
+    test("Record<string, number>", () => {
+      expectTypeOf<
+        IsRecordType<Record<string, number>>
+      >().toEqualTypeOf<true>();
+    });
+
+    test("Record<string, string>", () => {
+      expectTypeOf<
+        IsRecordType<Record<string, string>>
+      >().toEqualTypeOf<true>();
+    });
+
+    test("Record<string, boolean>", () => {
+      expectTypeOf<
+        IsRecordType<Record<string, boolean>>
+      >().toEqualTypeOf<true>();
+    });
+
+    test("Record<string, any>", () => {
+      expectTypeOf<IsRecordType<Record<string, any>>>().toEqualTypeOf<true>();
+    });
+
+    test("Record<string, unknown>", () => {
+      expectTypeOf<
+        IsRecordType<Record<string, unknown>>
+      >().toEqualTypeOf<true>();
+    });
+
+    test("Record<string, never>", () => {
+      expectTypeOf<IsRecordType<Record<string, never>>>().toEqualTypeOf<true>();
+    });
+
+    test("Record<string, { foo: string }>", () => {
+      expectTypeOf<
+        IsRecordType<Record<string, { foo: string }>>
+      >().toEqualTypeOf<true>();
+    });
+
+    test("Record<string, string | number>", () => {
+      expectTypeOf<
+        IsRecordType<Record<string, string | number>>
+      >().toEqualTypeOf<true>();
+    });
+
+    test("ReadonlyRecord<string, number>", () => {
+      expectTypeOf<
+        IsRecordType<ReadonlyRecord<string, number>>
+      >().toEqualTypeOf<true>();
+    });
+  });
+
+  describe("false for Object types", () => {
+    test("{ foo: string }", () => {
+      expectTypeOf<IsRecordType<{ foo: string }>>().toEqualTypeOf<false>();
+    });
+
+    test("{ foo: string; bar: number }", () => {
+      expectTypeOf<
+        IsRecordType<{ foo: string; bar: number }>
+      >().toEqualTypeOf<false>();
+    });
+
+    test("{ readonly foo: string }", () => {
+      expectTypeOf<
+        IsRecordType<{ readonly foo: string }>
+      >().toEqualTypeOf<false>();
+    });
+
+    test("{ foo?: string }", () => {
+      expectTypeOf<IsRecordType<{ foo?: string }>>().toEqualTypeOf<false>();
+    });
+
+    test("{ foo: string; bar?: number }", () => {
+      expectTypeOf<
+        IsRecordType<{ foo: string; bar?: number }>
+      >().toEqualTypeOf<false>();
+    });
+
+    test("{ [key: string]: string; foo: string }", () => {
+      expectTypeOf<
+        IsRecordType<{ [key: string]: string; foo: string }>
+      >().toEqualTypeOf<false>();
+    });
+
+    test("nested object", () => {
+      expectTypeOf<
+        IsRecordType<{ foo: { bar: string } }>
+      >().toEqualTypeOf<false>();
+    });
+  });
+
+  describe("false for non-object types", () => {
+    test("string", () => {
+      expectTypeOf<IsRecordType<string>>().toEqualTypeOf<false>();
+    });
+
+    test("number", () => {
+      expectTypeOf<IsRecordType<number>>().toEqualTypeOf<false>();
+    });
+
+    test("boolean", () => {
+      expectTypeOf<IsRecordType<boolean>>().toEqualTypeOf<false>();
+    });
+
+    test("null", () => {
+      expectTypeOf<IsRecordType<null>>().toEqualTypeOf<false>();
+    });
+
+    test("undefined", () => {
+      expectTypeOf<IsRecordType<undefined>>().toEqualTypeOf<false>();
+    });
+
+    test("any", () => {
+      expectTypeOf<IsRecordType<any>>().toEqualTypeOf<false>();
+    });
+
+    test("unknown", () => {
+      expectTypeOf<IsRecordType<unknown>>().toEqualTypeOf<false>();
+    });
+
+    test("never", () => {
+      expectTypeOf<IsRecordType<never>>().toEqualTypeOf<false>();
+    });
+
+    test("string[]", () => {
+      expectTypeOf<IsRecordType<string[]>>().toEqualTypeOf<false>();
+    });
+
+    test("Array<number>", () => {
+      expectTypeOf<IsRecordType<Array<number>>>().toEqualTypeOf<false>();
+    });
+
+    test("Map<string, number>", () => {
+      expectTypeOf<IsRecordType<Map<string, number>>>().toEqualTypeOf<false>();
+    });
+
+    test("Set<string>", () => {
+      expectTypeOf<IsRecordType<Set<string>>>().toEqualTypeOf<false>();
+    });
+
+    test("function", () => {
+      expectTypeOf<IsRecordType<() => void>>().toEqualTypeOf<false>();
+    });
+  });
+
+  describe("false for mixed value types", () => {
+    test("Record with mixed values should be false", () => {
+      type MixedRecord = { [key: string]: string } & { foo: number };
+      expectTypeOf<IsRecordType<MixedRecord>>().toEqualTypeOf<false>();
+    });
+
+    test("intersection with specific key", () => {
+      type IntersectionType = Record<string, string> & { specificKey: boolean };
+      expectTypeOf<IsRecordType<IntersectionType>>().toEqualTypeOf<false>();
+    });
+  });
+
+  describe("edge cases", () => {
+    test("empty object {}", () => {
+      expectTypeOf<IsRecordType<{}>>().toEqualTypeOf<false>();
+    });
+
+    test("Record<string, string> & { extraProp: number }", () => {
+      type IntersectedRecord = Record<string, string> & { extraProp: number };
+      expectTypeOf<IsRecordType<IntersectedRecord>>().toEqualTypeOf<false>();
+    });
+
+    test("union of Records", () => {
+      type UnionRecord = Record<string, string> | Record<string, number>;
+      expectTypeOf<IsRecordType<UnionRecord>>().toEqualTypeOf<false>();
+    });
+
+    test("Record with non-string keys should be false", () => {
+      expectTypeOf<
+        IsRecordType<Record<number, string>>
+      >().toEqualTypeOf<false>();
+    });
   });
 });
 
