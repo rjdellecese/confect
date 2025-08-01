@@ -1,18 +1,18 @@
 import { Effect, Schema } from "effect";
 import { internal } from "../convex/_generated/api";
 import {
-  action,
   ConfectActionRunner,
   ConfectMutationRunner,
   ConfectQueryRunner,
-  internalAction,
-  internalMutation,
-  internalQuery,
-  mutation,
-  query,
+  confectAction,
+  confectInternalAction,
+  confectInternalMutation,
+  confectInternalQuery,
+  confectMutation,
+  confectQuery,
 } from "../convex/confect";
 
-export const runInQuery = query({
+export const runInQuery = confectQuery({
   args: Schema.Struct({
     text: Schema.String,
   }),
@@ -27,7 +27,7 @@ export const runInQuery = query({
     }),
 });
 
-export const queryToRun = internalQuery({
+export const queryToRun = confectInternalQuery({
   args: Schema.Struct({
     text: Schema.String,
   }),
@@ -35,7 +35,7 @@ export const queryToRun = internalQuery({
   handler: ({ text }) => Effect.succeed(text),
 });
 
-export const runInMutation = mutation({
+export const runInMutation = confectMutation({
   args: Schema.Struct({
     text: Schema.String,
   }),
@@ -50,7 +50,7 @@ export const runInMutation = mutation({
     }),
 });
 
-export const mutationToRun = internalMutation({
+export const mutationToRun = confectInternalMutation({
   args: Schema.Struct({
     text: Schema.String,
   }),
@@ -58,7 +58,7 @@ export const mutationToRun = internalMutation({
   handler: ({ text }) => Effect.succeed(text),
 });
 
-export const runInAction = action({
+export const runInAction = confectAction({
   args: Schema.Struct({
     text: Schema.String,
   }),
@@ -73,7 +73,7 @@ export const runInAction = action({
     }),
 });
 
-export const actionToRun = internalAction({
+export const actionToRun = confectInternalAction({
   args: Schema.Struct({
     text: Schema.String,
   }),

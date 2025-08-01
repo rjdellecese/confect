@@ -1,53 +1,173 @@
 import { describe, vi } from "@effect/vitest";
-import { assertEquals, assertTrue } from "@effect/vitest/utils";
-import { Effect, Exit, Option, Schema, String } from "effect";
+import { assertEquals, assertFailure, assertTrue } from "@effect/vitest/utils";
+import { Cause, Effect, Exit, Option, Runtime, Schema, String } from "effect";
 import { api } from "~/test/convex/_generated/api";
 import { TestConvexService } from "~/test/TestConvexService";
 import { effect } from "~/test/test_utils";
 import { confectSchema } from "./convex/schema";
+import {
+  DocumentDecodeError,
+  GetByIdFailure,
+  GetByIndexFailure,
+} from "../src/server/database";
+import test from "node:test";
 
 describe("ConfectDatabaseReader", () => {
-  effect("getById", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConvexService;
-      yield* Effect.sync(() => vi.useFakeTimers());
+  describe("getById", () => {
+    effect("when document exists", () =>
+      Effect.gen(function* () {
+        const c = yield* TestConvexService;
+        yield* Effect.sync(() => vi.useFakeTimers());
 
-      const text = "Hello, world!";
+        const text = "Hello, world!";
 
-      const noteId = yield* c.run(({ db }) => db.insert("notes", { text }));
+        const noteId = yield* c.run(({ db }) => db.insert("notes", { text }));
 
-      const note = yield* c.query(api.database.getById, {
-        noteId,
-      });
+        const note = yield* c.query(api.database.getById, {
+          noteId,
+        });
 
-      assertEquals(note._id, noteId);
-    }),
-  );
+        assertEquals(note._id, noteId);
+      }),
+    );
 
-  effect("getByIndex", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConvexService;
+    effect("when document no longer exists", () =>
+      Effect.gen(function* () {
+        const c = yield* TestConvexService;
 
-      const name = "John Doe";
-      const role = "admin";
-      const text = "Hello, world!";
+        const noteId = yield* c.run(({ db }) =>
+          db.insert("notes", { text: "Hello, world!" }),
+        );
 
-      const noteId = yield* c.run(({ db }) =>
-        db.insert("notes", {
-          author: { name, role },
+        yield* c.run(({ db }) => db.delete(noteId));
+
+        const exit = yield* c
+          .query(api.database.getById, {
+            noteId,
+          })
+          .pipe(Effect.exit);
+
+        assertFailure(
+          exit,
+          Cause.die(
+            Runtime.makeFiberFailure(
+              Cause.fail(
+                new GetByIdFailure({
+                  id: noteId,
+                  tableName: "notes",
+                }),
+              ),
+            ),
+          ),
+        );
+      }),
+    );
+
+    effect("when document is invalid", () =>
+      Effect.gen(function* () {
+        const c = yield* TestConvexService;
+
+        const invalidText = String.repeat(101)("a");
+
+        const noteId = yield* c.run(({ db }) =>
+          db.insert("notes", { text: invalidText }),
+        );
+
+        const exit = yield* c
+          .query(api.database.getById, {
+            noteId,
+          })
+          .pipe(Effect.exit);
+
+        assertFailure(
+          exit,
+          Cause.die(
+            Runtime.makeFiberFailure(
+              Cause.fail(
+                new DocumentDecodeError({
+                  tableName: "notes",
+                  id: noteId,
+                  parseError: [
+                    {
+                      _tag: "Refinement",
+                      message: `Expected a string at most 100 character(s) long, actual "${invalidText}"`,
+                      path: ["text"],
+                    },
+                  ],
+                }),
+              ),
+            ),
+          ),
+        );
+      }),
+    );
+  });
+
+  describe("getByIndex", () => {
+    effect("when document exists", () =>
+      Effect.gen(function* () {
+        const c = yield* TestConvexService;
+
+        const name = "John Doe";
+        const role = "admin";
+        const text = "Hello, world!";
+
+        const noteId = yield* c.run(({ db }) =>
+          db.insert("notes", {
+            author: { name, role },
+            text,
+          }),
+        );
+
+        const note = yield* c.query(api.database.getByIndex, {
+          name,
+          role,
           text,
-        }),
-      );
+        });
 
-      const note = yield* c.query(api.database.getByIndex, {
-        name,
-        role,
-        text,
-      });
+        assertEquals(note._id, noteId);
+      }),
+    );
 
-      assertEquals(note._id, noteId);
-    }),
-  );
+    effect("when document no longer exists", () =>
+      Effect.gen(function* () {
+        const c = yield* TestConvexService;
+
+        const name = "John Doe";
+        const role = "admin";
+        const text = "Hello, world!";
+
+        const noteId = yield* c.run(({ db }) =>
+          db.insert("notes", { author: { name, role }, text }),
+        );
+
+        yield* c.run(({ db }) => db.delete(noteId));
+
+        const exit = yield* c
+          .query(api.database.getByIndex, {
+            name,
+            role,
+            text,
+          })
+          .pipe(Effect.exit);
+
+        assertFailure(
+          exit,
+          Cause.die(
+            Runtime.makeFiberFailure(
+              Cause.fail(
+                new GetByIndexFailure({
+                  tableName: "notes",
+                  indexName: "by_name_and_role_and_text",
+                  indexFieldValues: [name, role, text],
+                }),
+              ),
+            ),
+          ),
+        );
+      }),
+    );
+  });
 
   effect("first", () =>
     Effect.gen(function* () {

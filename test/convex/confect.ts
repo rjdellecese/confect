@@ -7,12 +7,12 @@ import type { ConfectDataModelFromConfectSchemaDefinition } from "~/src/server/s
 import { confectSchema } from "~/test/convex/schema";
 
 export const {
-  action,
-  internalAction,
-  internalMutation,
-  internalQuery,
-  mutation,
-  query,
+  confectQuery,
+  confectInternalQuery,
+  confectMutation,
+  confectInternalMutation,
+  confectAction,
+  confectInternalAction,
   ConfectDatabaseReader,
   ConfectDatabaseWriter,
   ConfectVectorSearch,

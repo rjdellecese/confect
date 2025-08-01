@@ -1,16 +1,16 @@
 import { Effect, type ParseResult, Schema } from "effect";
 import { api } from "~/test/convex/_generated/api";
 import {
-  action,
   ConfectDatabaseReader,
   ConfectQueryRunner,
   ConfectVectorSearch,
-  query,
+  confectAction,
+  confectQuery,
 } from "~/test/convex/confect";
 import { confectSchema } from "~/test/convex/schema";
 import { Id } from "../../src/server";
 
-export const vectorSearch = action({
+export const vectorSearch = confectAction({
   args: Schema.Struct({
     vector: Schema.Array(Schema.Number),
     tag: Schema.Union(Schema.String, Schema.Null),
@@ -58,7 +58,7 @@ export const vectorSearch = action({
     }),
 });
 
-export const get = query({
+export const get = confectQuery({
   args: Schema.Struct({
     noteId: Id.Id("notes"),
   }),

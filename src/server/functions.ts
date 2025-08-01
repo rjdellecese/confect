@@ -58,7 +58,7 @@ export const makeConfectFunctions = <
 
   type ConfectVectorSearch = typeof ConfectVectorSearch.Identifier;
 
-  const query = <
+  const confectQuery = <
     ConvexArgs extends DefaultFunctionArgs,
     ConfectArgs,
     ConvexReturns,
@@ -84,7 +84,7 @@ export const makeConfectFunctions = <
   }): RegisteredQuery<"public", ConvexArgs, Promise<ConvexReturns>> =>
     queryGeneric(confectQueryFunction({ args, returns, handler }));
 
-  const internalQuery = <
+  const confectInternalQuery = <
     ConvexArgs extends DefaultFunctionArgs,
     ConfectArgs,
     ConvexReturns,
@@ -164,7 +164,7 @@ export const makeConfectFunctions = <
       ),
   });
 
-  const mutation = <
+  const confectMutation = <
     ConvexValue extends DefaultFunctionArgs,
     ConfectValue,
     ConvexReturns,
@@ -194,7 +194,7 @@ export const makeConfectFunctions = <
   }): RegisteredMutation<"public", ConvexValue, Promise<ConvexReturns>> =>
     mutationGeneric(confectMutationFunction({ args, returns, handler }));
 
-  const internalMutation = <
+  const confectInternalMutation = <
     ConvexValue extends DefaultFunctionArgs,
     ConfectValue,
     ConvexReturns,
@@ -288,7 +288,7 @@ export const makeConfectFunctions = <
       ),
   });
 
-  const action = <
+  const confectAction = <
     ConvexValue extends DefaultFunctionArgs,
     ConfectValue,
     ConvexReturns,
@@ -319,7 +319,7 @@ export const makeConfectFunctions = <
   }): RegisteredAction<"public", ConvexValue, Promise<ConvexReturns>> =>
     actionGeneric(confectActionFunction({ args, returns, handler }));
 
-  const internalAction = <
+  const confectInternalAction = <
     ConvexValue extends DefaultFunctionArgs,
     ConfectValue,
     ConvexReturns,
@@ -351,12 +351,12 @@ export const makeConfectFunctions = <
     internalActionGeneric(confectActionFunction({ args, returns, handler }));
 
   return {
-    query,
-    internalQuery,
-    mutation,
-    internalMutation,
-    action,
-    internalAction,
+    confectQuery,
+    confectInternalQuery,
+    confectMutation,
+    confectInternalMutation,
+    confectAction,
+    confectInternalAction,
     ConfectDatabaseReader,
     ConfectDatabaseWriter,
     ConfectVectorSearch,

@@ -1,13 +1,13 @@
 import { Effect, Schema } from "effect";
 import { Id } from "~/src/server/schemas/Id";
 import {
-  action,
   ConfectStorageActionWriter,
   ConfectStorageReader,
   ConfectStorageWriter,
+  confectAction,
 } from "~/test/convex/confect";
 
-export const confectStorageReaderGetUrl = action({
+export const confectStorageReaderGetUrl = confectAction({
   args: Schema.Struct({
     id: Id("_storage"),
   }),
@@ -20,7 +20,7 @@ export const confectStorageReaderGetUrl = action({
     }),
 });
 
-export const confectStorageWriterGenerateUploadUrl = action({
+export const confectStorageWriterGenerateUploadUrl = confectAction({
   args: Schema.Struct({}),
   returns: Schema.URL,
   handler: () =>
@@ -31,7 +31,7 @@ export const confectStorageWriterGenerateUploadUrl = action({
     }),
 });
 
-export const confectStorageWriterDelete = action({
+export const confectStorageWriterDelete = confectAction({
   args: Schema.Struct({
     id: Id("_storage"),
   }),
@@ -46,7 +46,7 @@ export const confectStorageWriterDelete = action({
     }),
 });
 
-export const confectStorageActionWriterGet = action({
+export const confectStorageActionWriterGet = confectAction({
   args: Schema.Struct({
     id: Id("_storage"),
   }),
@@ -61,7 +61,7 @@ export const confectStorageActionWriterGet = action({
     }),
 });
 
-export const confectStorageActionWriterStore = action({
+export const confectStorageActionWriterStore = confectAction({
   args: Schema.Struct({
     text: Schema.String,
     options: Schema.optional(

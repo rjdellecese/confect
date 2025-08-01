@@ -5,13 +5,13 @@ import type {
 } from "~/src/server/database";
 import { api } from "~/test/convex/_generated/api";
 import {
-  action,
   ConfectDatabaseWriter,
   ConfectScheduler,
-  mutation,
+  confectAction,
+  confectMutation,
 } from "~/test/convex/confect";
 
-export const insertAfter = action({
+export const insertAfter = confectAction({
   args: Schema.Struct({
     text: Schema.String,
     millis: Schema.Duration,
@@ -29,7 +29,7 @@ export const insertAfter = action({
     }),
 });
 
-export const scheduledInsert = mutation({
+export const scheduledInsert = confectMutation({
   args: Schema.Struct({
     text: Schema.String,
   }),
@@ -50,7 +50,7 @@ export const scheduledInsert = mutation({
     }),
 });
 
-export const insertAt = action({
+export const insertAt = confectAction({
   args: Schema.Struct({
     text: Schema.String,
     timestamp: Schema.DateTimeUtc,

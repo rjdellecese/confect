@@ -4,12 +4,12 @@ import { PaginationResult } from "~/src/server/schemas/PaginationResult";
 import {
   ConfectDatabaseReader,
   ConfectDatabaseWriter,
-  mutation,
-  query,
+  confectMutation,
+  confectQuery,
 } from "~/test/convex/confect";
 import { confectSchema } from "~/test/convex/schema";
 
-export const getById = query({
+export const getById = confectQuery({
   args: Schema.Struct({
     noteId: Id("notes"),
   }),
@@ -22,7 +22,7 @@ export const getById = query({
     }),
 });
 
-export const getByIndex = query({
+export const getByIndex = confectQuery({
   args: Schema.Struct({
     name: Schema.String,
     role: Schema.Literal("admin", "user"),
@@ -39,7 +39,7 @@ export const getByIndex = query({
     }),
 });
 
-export const first = query({
+export const first = confectQuery({
   args: Schema.Struct({}),
   returns: Schema.Option(confectSchema.tableSchemas.notes.withSystemFields),
   handler: () =>
@@ -49,7 +49,7 @@ export const first = query({
     }),
 });
 
-export const take = query({
+export const take = confectQuery({
   args: Schema.Struct({
     n: Schema.Number,
   }),
@@ -62,7 +62,7 @@ export const take = query({
     }),
 });
 
-export const collect = query({
+export const collect = confectQuery({
   args: Schema.Struct({}),
   returns: Schema.Array(confectSchema.tableSchemas.notes.withSystemFields),
   handler: () =>
@@ -75,7 +75,7 @@ export const collect = query({
     }),
 });
 
-export const paginate = query({
+export const paginate = confectQuery({
   args: Schema.Struct({
     cursor: Schema.Union(Schema.String, Schema.Null),
     numItems: Schema.Number,
@@ -92,7 +92,7 @@ export const paginate = query({
     }),
 });
 
-export const stream = query({
+export const stream = confectQuery({
   args: Schema.Struct({
     until: Schema.NonEmptyString,
   }),
@@ -113,7 +113,7 @@ export const stream = query({
     }),
 });
 
-export const withIndexWithQueryRangeWithOrder = query({
+export const withIndexWithQueryRangeWithOrder = confectQuery({
   args: Schema.Struct({}),
   returns: Schema.Array(confectSchema.tableSchemas.notes.withSystemFields),
   handler: () =>
@@ -124,7 +124,7 @@ export const withIndexWithQueryRangeWithOrder = query({
     }),
 });
 
-export const withIndexWithQueryRangeWithoutOrder = query({
+export const withIndexWithQueryRangeWithoutOrder = confectQuery({
   args: Schema.Struct({
     text: Schema.NonEmptyString,
   }),
@@ -140,7 +140,7 @@ export const withIndexWithQueryRangeWithoutOrder = query({
     }),
 });
 
-export const withIndexWithQueryRangeAndOrder = query({
+export const withIndexWithQueryRangeAndOrder = confectQuery({
   args: Schema.Struct({
     text: Schema.NonEmptyString,
   }),
@@ -156,7 +156,7 @@ export const withIndexWithQueryRangeAndOrder = query({
     }),
 });
 
-export const withIndexWithoutQueryRangeWithOrder = query({
+export const withIndexWithoutQueryRangeWithOrder = confectQuery({
   args: Schema.Struct({}),
   returns: Schema.Array(confectSchema.tableSchemas.notes.withSystemFields),
   handler: () =>
@@ -167,7 +167,7 @@ export const withIndexWithoutQueryRangeWithOrder = query({
     }),
 });
 
-export const withIndexWithoutQueryRangeWithoutOrder = query({
+export const withIndexWithoutQueryRangeWithoutOrder = confectQuery({
   args: Schema.Struct({}),
   returns: Schema.Array(confectSchema.tableSchemas.notes.withSystemFields),
   handler: () =>
@@ -177,7 +177,7 @@ export const withIndexWithoutQueryRangeWithoutOrder = query({
     }),
 });
 
-export const withSearchIndex = query({
+export const withSearchIndex = confectQuery({
   args: Schema.Struct({
     text: Schema.String,
   }),
@@ -194,7 +194,7 @@ export const withSearchIndex = query({
     }),
 });
 
-export const systemGet = query({
+export const systemGet = confectQuery({
   args: Schema.Struct({
     id: Id("_storage"),
   }),
@@ -207,7 +207,7 @@ export const systemGet = query({
     }),
 });
 
-export const systemQuery = query({
+export const systemQuery = confectQuery({
   args: Schema.Struct({}),
   returns: Schema.Array(confectSchema.tableSchemas._storage.withSystemFields),
   handler: () =>
@@ -222,7 +222,7 @@ export const systemQuery = query({
 });
 
 // Exporting only to stop TypeScript from complaining.
-export const _badPatch = mutation({
+export const _badPatch = confectMutation({
   args: Schema.Struct({
     noteId: Id("notes"),
   }),
@@ -245,7 +245,7 @@ export const _badPatch = mutation({
     }),
 });
 
-export const patch = mutation({
+export const patch = confectMutation({
   args: Schema.Struct({
     noteId: Id("notes"),
     fields: Schema.Struct({
@@ -269,7 +269,7 @@ export const patch = mutation({
     }),
 });
 
-export const patchUnset = mutation({
+export const patchUnset = confectMutation({
   args: Schema.Struct({
     noteId: Id("notes"),
   }),
@@ -284,7 +284,7 @@ export const patchUnset = mutation({
     }),
 });
 
-export const insertTooLongText = mutation({
+export const insertTooLongText = confectMutation({
   args: Schema.Struct({
     text: Schema.String,
   }),
@@ -297,7 +297,7 @@ export const insertTooLongText = mutation({
     }),
 });
 
-export const replace = mutation({
+export const replace = confectMutation({
   args: Schema.Struct({
     noteId: Id("notes"),
     fields: Schema.Struct({
@@ -317,7 +317,7 @@ export const replace = mutation({
     }),
 });
 
-export const delete_ = mutation({
+export const delete_ = confectMutation({
   args: Schema.Struct({
     noteId: Id("notes"),
   }),
