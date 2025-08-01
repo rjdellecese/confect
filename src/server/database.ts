@@ -328,7 +328,7 @@ type ConfectQueryInitializer<
     id: GenericId<TableName>,
   ) => Effect.Effect<
     ConfectDataModel[TableName]["confectDocument"],
-    DocumentDecodeError | DocumentNotFoundError
+    DocumentDecodeError | GetByIdFailure
   >;
   readonly getByIndex: <
     IndexName extends keyof Indexes<
@@ -345,7 +345,7 @@ type ConfectQueryInitializer<
     >
   ) => Effect.Effect<
     ConfectDataModel[TableName]["confectDocument"],
-    DocumentDecodeError | NoDocumentsMatchQueryError
+    DocumentDecodeError | GetByIndexFailure
   >;
   readonly withIndex: {
     <
@@ -403,7 +403,6 @@ const makeConfectQueryInitializer = <
     ConfectDataModelFromConfectSchema<ConfectSchema>
   >,
 >(
-  // TODO: Add error type for when ID is for the wrong table?
   tableName: TableName,
   convexDatabaseReader: BaseDatabaseReader<ConvexDataModel>,
   confectTableDefinition: ConfectSchema[TableName],
@@ -443,7 +442,12 @@ const makeConfectQueryInitializer = <
       ),
       Effect.andThen(
         Either.fromNullable(
-          () => new NoDocumentsMatchQueryError({ tableName }),
+          () =>
+            new GetByIndexFailure({
+              tableName,
+              indexName: indexName as string,
+              indexFieldValues: indexFieldValues as string[],
+            }),
         ),
       ),
       Effect.andThen(decode(tableName, confectTableDefinition.tableSchema)),
@@ -549,14 +553,14 @@ const getById =
     >,
   >(
     tableName: TableName,
-    convexTableReader: BaseDatabaseReader<ConvexDataModel>,
+    convexDatabaseReader: BaseDatabaseReader<ConvexDataModel>,
     confectTableDefinition: ConfectSchema[TableName],
   ) =>
   (id: GenericId<TableName>) =>
     pipe(
-      Effect.promise(() => convexTableReader.get(id)),
+      Effect.promise(() => convexDatabaseReader.get(id)),
       Effect.andThen(
-        Either.fromNullable(() => new DocumentNotFoundError({ tableName, id })),
+        Either.fromNullable(() => new GetByIdFailure({ tableName, id })),
       ),
       Effect.andThen(decode(tableName, confectTableDefinition.tableSchema)),
     );
@@ -591,31 +595,6 @@ type ConfectOrderedQuery<
     DocumentDecodeError
   >;
 };
-
-export class NoDocumentsMatchQueryError extends Schema.TaggedError<NoDocumentsMatchQueryError>(
-  "NoDocumentsMatchQueryError",
-)("NoDocumentsMatchQueryError", {
-  tableName: Schema.String,
-}) {
-  override get message(): string {
-    return `No documents match query for table '${this.tableName}'`;
-  }
-}
-
-export class DocumentNotUniqueError extends Schema.TaggedError<DocumentNotUniqueError>(
-  "DocumentNotUniqueError",
-)("DocumentNotUniqueError", {
-  id: Schema.String,
-  tableName: Schema.String,
-}) {
-  override get message(): string {
-    return documentQueryMessage({
-      id: this.id,
-      tableName: this.tableName,
-      message: "is not unique in this query",
-    });
-  }
-}
 
 const makeConfectOrderedQuery = <
   ConfectTableInfo extends GenericConfectTableInfo,
@@ -684,6 +663,10 @@ const makeConfectOrderedQuery = <
     stream,
   };
 };
+
+/////////////////////////
+// Encoding & Decoding //
+/////////////////////////
 
 const encode = dual<
   <
@@ -818,14 +801,30 @@ const decode = dual<
     }),
 );
 
-export class DocumentNotFoundError extends Schema.TaggedError<DocumentNotFoundError>(
-  "DocumentNotFoundError",
-)("DocumentNotFoundError", {
+////////////
+// Errors //
+////////////
+
+export class GetByIndexFailure extends Schema.TaggedError<GetByIndexFailure>(
+  "GetByIndexFailure",
+)("GetByIndexFailure", {
+  tableName: Schema.String,
+  indexName: Schema.String,
+  indexFieldValues: Schema.Array(Schema.String),
+}) {
+  override get message(): string {
+    return `No documents found in table '${this.tableName}' with index '${this.indexName}' and field values '${this.indexFieldValues}'`;
+  }
+}
+
+export class GetByIdFailure extends Schema.TaggedError<GetByIdFailure>(
+  "GetByIdFailure",
+)("GetByIdFailure", {
   id: Schema.String,
   tableName: Schema.String,
 }) {
   override get message(): string {
-    return documentQueryMessage({
+    return documentErrorMessage({
       id: this.id,
       tableName: this.tableName,
       message: "not found",
@@ -841,7 +840,7 @@ export class DocumentEncodeError extends Schema.TaggedError<DocumentEncodeError>
   parseError: Schema.Array(Schema.ArrayFormatterIssue),
 }) {
   override get message(): string {
-    return documentQueryMessage({
+    return documentErrorMessage({
       id: this.id,
       tableName: this.tableName,
       message: `could not be encoded:\n\n  ${this.parseError}`,
@@ -857,7 +856,7 @@ export class DocumentDecodeError extends Schema.TaggedError<DocumentDecodeError>
   parseError: Schema.Array(Schema.ArrayFormatterIssue),
 }) {
   override get message(): string {
-    return documentQueryMessage({
+    return documentErrorMessage({
       id: this.id,
       tableName: this.tableName,
       message: `could not be decoded:\n\n  ${this.parseError}`,
@@ -865,7 +864,7 @@ export class DocumentDecodeError extends Schema.TaggedError<DocumentDecodeError>
   }
 }
 
-const documentQueryMessage = ({
+const documentErrorMessage = ({
   id,
   tableName,
   message,

@@ -2,8 +2,8 @@ import { describe, vi } from "@effect/vitest";
 import { assertEquals, assertTrue } from "@effect/vitest/utils";
 import { Effect, Exit, Option, Schema, String } from "effect";
 import { api } from "~/test/convex/_generated/api";
-import { effect } from "~/test/convex_effect_test";
 import { TestConvexService } from "~/test/TestConvexService";
+import { effect } from "~/test/test_utils";
 import { confectSchema } from "./convex/schema";
 
 describe("ConfectDatabaseReader", () => {

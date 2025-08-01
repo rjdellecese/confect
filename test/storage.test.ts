@@ -6,8 +6,8 @@ import {
 } from "@effect/vitest/utils";
 import { Cause, Effect, Runtime, Schema } from "effect";
 import { api } from "~/test/convex/_generated/api";
-import { effect } from "~/test/convex_effect_test";
 import { TestConvexService } from "~/test/TestConvexService";
+import { effect } from "~/test/test_utils";
 import { FileNotFoundError } from "../src/server/storage";
 
 describe("ConfectStorageReader", () => {

@@ -1,8 +1,8 @@
 import { assertSuccess } from "@effect/vitest/utils";
 import { Effect } from "effect";
 import { api } from "./convex/_generated/api";
-import { effect } from "./convex_effect_test";
 import { TestConvexService } from "./TestConvexService";
+import { effect } from "./test_utils";
 
 effect("ConfectQueryRunner", () =>
   Effect.gen(function* () {

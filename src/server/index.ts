@@ -3,8 +3,6 @@ export type {
   TableNamesInConfectDataModel,
 } from "~/src/server/data-model";
 
-export { DocumentNotUniqueError } from "~/src/server/database";
-
 export { makeFunctions } from "~/src/server/functions";
 export {
   type HttpApi,
