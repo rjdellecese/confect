@@ -86,13 +86,11 @@ describe("ConfectDatabaseReader", () => {
                 new DocumentDecodeError({
                   tableName: "notes",
                   id: noteId,
-                  parseError: [
-                    {
-                      _tag: "Refinement",
-                      message: `Expected a string at most 100 character(s) long, actual "${invalidText}"`,
-                      path: ["text"],
-                    },
-                  ],
+                  parseError: `{ readonly _id: string; readonly _creationTime: number; readonly userId?: string | undefined; readonly text: maxLength(100); readonly tag?: string | undefined; readonly author?: { readonly role: "admin" | "user"; readonly name: string } | undefined; readonly embedding?: ReadonlyArray<number> | undefined; readonly bigDecimal?: BigDecimal | undefined }
+└─ ["text"]
+   └─ maxLength(100)
+      └─ Predicate refinement failure
+         └─ Expected a string at most 100 character(s) long, actual "${invalidText}"`,
                 }),
               ),
             ),

@@ -17,7 +17,12 @@ import { Effect, Layer, pipe, Schema } from "effect";
 
 import { ConfectAuth } from "~/src/server/auth";
 import type { DataModelFromConfectDataModel } from "~/src/server/data_model";
-import { makeConfectDatabaseServices } from "~/src/server/database";
+import {
+  ConfectDatabaseReader as ConfectDatabaseReaderTag,
+  ConfectDatabaseWriter as ConfectDatabaseWriterTag,
+  confectDatabaseReaderLayer,
+  confectDatabaseWriterLayer,
+} from "~/src/server/database";
 import {
   ConfectActionRunner,
   ConfectMutationRunner,
@@ -48,9 +53,10 @@ export const makeConfectFunctions = <
 ) => {
   type ConfectDataModel = ConfectDataModelFromConfectSchema<ConfectSchema>;
 
-  const { ConfectDatabaseReader, ConfectDatabaseWriter } =
-    makeConfectDatabaseServices(confectSchemaDefinition);
-
+  const ConfectDatabaseReader =
+    ConfectDatabaseReaderTag<ConfectSchemaDefinition<ConfectSchema>>();
+  const ConfectDatabaseWriter =
+    ConfectDatabaseWriterTag<ConfectSchemaDefinition<ConfectSchema>>();
   type ConfectDatabaseReader = typeof ConfectDatabaseReader.Identifier;
   type ConfectDatabaseWriter = typeof ConfectDatabaseWriter.Identifier;
 
@@ -159,7 +165,9 @@ export const makeConfectFunctions = <
             handler(decodedArgs),
             Effect.provide(
               Layer.mergeAll(
-                ConfectDatabaseReader.layer(ctx.db),
+                confectDatabaseReaderLayer<
+                  ConfectSchemaDefinition<ConfectSchema>
+                >(confectSchemaDefinition)(ctx.db),
                 ConfectAuth.layer(ctx.auth),
                 ConfectStorageReader.layer(ctx.storage),
                 ConfectQueryRunner.layer(ctx.runQuery),
@@ -283,8 +291,12 @@ export const makeConfectFunctions = <
             handler(decodedArgs),
             Effect.provide(
               Layer.mergeAll(
-                ConfectDatabaseReader.layer(ctx.db),
-                ConfectDatabaseWriter.layer(ctx.db),
+                confectDatabaseReaderLayer<
+                  ConfectSchemaDefinition<ConfectSchema>
+                >(confectSchemaDefinition)(ctx.db),
+                confectDatabaseWriterLayer<
+                  ConfectSchemaDefinition<ConfectSchema>
+                >(confectSchemaDefinition)(ctx.db),
                 ConfectAuth.layer(ctx.auth),
                 ConfectScheduler.layer(ctx.scheduler),
                 ConfectStorageReader.layer(ctx.storage),
