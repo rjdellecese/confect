@@ -1,14 +1,7 @@
 import { describe, effect, expect, expectTypeOf, test } from "@effect/vitest";
-import {
-  type GenericId,
-  type VBoolean,
-  type VString,
-  type VUnion,
-  v,
-} from "convex/values";
+import { type VBoolean, type VString, type VUnion, v } from "convex/values";
 import { Effect, Exit, identity, Schema } from "effect";
 
-import { Id } from "~/src/server";
 import {
   compileArgsSchema,
   compileAst,
@@ -23,6 +16,7 @@ import {
   UnsupportedSchemaTypeError,
   type ValueToValidator,
 } from "~/src/server/schema_to_validator";
+import { GenericId } from "~/src/server/schemas/GenericId";
 
 describe(compileAst, () => {
   describe("allowed", () => {
@@ -502,7 +496,7 @@ describe(compileSchema, () => {
   test("id", () => {
     const expectedValidator = v.id("users");
 
-    const schema = Id.Id("users");
+    const schema = GenericId("users");
     const compiledValidator = compileSchema(schema);
 
     expect(compiledValidator).toStrictEqual(expectedValidator);

@@ -1,5 +1,5 @@
 import { Chunk, Effect, Schema, Stream } from "effect";
-import { Id } from "~/src/server/schemas/Id";
+import { GenericId } from "~/src/server/schemas/GenericId";
 import { PaginationResult } from "~/src/server/schemas/PaginationResult";
 import {
   ConfectDatabaseReader,
@@ -11,7 +11,7 @@ import { confectSchema } from "~/test/convex/schema";
 
 export const getById = confectQuery({
   args: Schema.Struct({
-    noteId: Id("notes"),
+    noteId: GenericId("notes"),
   }),
   returns: confectSchema.tableSchemas.notes.withSystemFields,
   handler: ({ noteId }) =>
@@ -196,7 +196,7 @@ export const withSearchIndex = confectQuery({
 
 export const systemGet = confectQuery({
   args: Schema.Struct({
-    id: Id("_storage"),
+    id: GenericId("_storage"),
   }),
   returns: confectSchema.tableSchemas._storage.withSystemFields,
   handler: ({ id }) =>
@@ -224,7 +224,7 @@ export const systemQuery = confectQuery({
 // Exporting only to stop TypeScript from complaining.
 export const _badPatch = confectMutation({
   args: Schema.Struct({
-    noteId: Id("notes"),
+    noteId: GenericId("notes"),
   }),
   returns: Schema.Null,
   handler: ({ noteId }) =>
@@ -247,7 +247,7 @@ export const _badPatch = confectMutation({
 
 export const patch = confectMutation({
   args: Schema.Struct({
-    noteId: Id("notes"),
+    noteId: GenericId("notes"),
     fields: Schema.Struct({
       text: Schema.optional(Schema.String),
       author: Schema.optional(
@@ -271,7 +271,7 @@ export const patch = confectMutation({
 
 export const patchUnset = confectMutation({
   args: Schema.Struct({
-    noteId: Id("notes"),
+    noteId: GenericId("notes"),
   }),
   returns: Schema.Null,
   handler: ({ noteId }) =>
@@ -288,7 +288,7 @@ export const insertTooLongText = confectMutation({
   args: Schema.Struct({
     text: Schema.String,
   }),
-  returns: Id("notes"),
+  returns: GenericId("notes"),
   handler: ({ text }) =>
     Effect.gen(function* () {
       const writer = yield* ConfectDatabaseWriter;
@@ -299,9 +299,9 @@ export const insertTooLongText = confectMutation({
 
 export const replace = confectMutation({
   args: Schema.Struct({
-    noteId: Id("notes"),
+    noteId: GenericId("notes"),
     fields: Schema.Struct({
-      _id: Schema.optional(Id("notes")),
+      _id: Schema.optional(GenericId("notes")),
       _creationTime: Schema.optional(Schema.Number),
       text: Schema.String,
     }),
@@ -319,7 +319,7 @@ export const replace = confectMutation({
 
 export const delete_ = confectMutation({
   args: Schema.Struct({
-    noteId: Id("notes"),
+    noteId: GenericId("notes"),
   }),
   returns: Schema.Null,
   handler: ({ noteId }) =>

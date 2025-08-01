@@ -2,17 +2,17 @@ import { Effect, Schema } from "effect";
 import { api } from "./_generated/api";
 import {
   ActionCtx,
-  ConfectId,
   confectAction,
   confectMutation,
   confectQuery,
+  Id,
   MutationCtx,
   QueryCtx,
 } from "./confect";
 
 export const get = confectQuery({
   args: Schema.Struct({
-    id: ConfectId("notes"),
+    id: Id("notes"),
   }),
   returns: Schema.Union(Schema.String, Schema.Null),
   handler: ({ id }) =>
@@ -29,7 +29,7 @@ export const insert = confectMutation({
   args: Schema.Struct({
     text: Schema.String,
   }),
-  returns: ConfectId("notes"),
+  returns: Id("notes"),
   handler: ({ text }) =>
     Effect.gen(function* () {
       const ctx = yield* MutationCtx;
@@ -46,7 +46,7 @@ export const insert = confectMutation({
 
 export const actionGet = confectAction({
   args: Schema.Struct({
-    id: ConfectId("notes"),
+    id: Id("notes"),
   }),
   returns: Schema.Union(Schema.String, Schema.Null),
   handler: ({ id }): Effect.Effect<string | null, never, ActionCtx> =>

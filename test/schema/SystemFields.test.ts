@@ -1,8 +1,7 @@
 import type { Expand } from "convex/server";
-import type { GenericId } from "convex/values";
 import { Schema } from "effect";
 import { describe, expect, expectTypeOf, test } from "vitest";
-import { Id } from "~/src/server/schemas/Id";
+import { GenericId } from "~/src/server/schemas/GenericId";
 import { extendWithSystemFields } from "~/src/server/schemas/SystemFields";
 
 describe(extendWithSystemFields, () => {
@@ -15,7 +14,7 @@ describe(extendWithSystemFields, () => {
 
     const Expected = Schema.Struct({
       content: Schema.String,
-      _id: Id("notes"),
+      _id: GenericId("notes"),
       _creationTime: Schema.Number,
     });
 
@@ -57,12 +56,12 @@ describe(extendWithSystemFields, () => {
     const Expected = Schema.Union(
       Schema.Struct({
         content: Schema.String,
-        _id: Id("items"),
+        _id: GenericId("items"),
         _creationTime: Schema.Number,
       }),
       Schema.Struct({
         url: Schema.String,
-        _id: Id("items"),
+        _id: GenericId("items"),
         _creationTime: Schema.Number,
       }),
     );

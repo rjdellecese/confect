@@ -8,7 +8,7 @@ import {
 import type { HttpApiDecodeError } from "@effect/platform/HttpApiError";
 import { Effect, Layer, Option, Schema } from "effect";
 import { api } from "../_generated/api";
-import { ConfectActionCtx } from "../confect";
+import { ConfectQueryRunner } from "../confect";
 import { GetFirstResult } from "../functions.schemas";
 import { confectSchema } from "../schema";
 
@@ -44,10 +44,11 @@ const ApiGroupLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
     (): Effect.Effect<
       (typeof confectSchema.tableSchemas.notes.withSystemFields)["Type"] | null,
       HttpApiDecodeError,
-      ConfectActionCtx
+      ConfectQueryRunner
     > =>
       Effect.gen(function* () {
-        const { runQuery } = yield* ConfectActionCtx;
+        // TODO: Don't require destructuring, service should return the run function directly
+        const { runQuery } = yield* ConfectQueryRunner;
 
         const firstNote = yield* runQuery(api.functions.getFirst, {}).pipe(
           Effect.andThen(Schema.decode(GetFirstResult)),

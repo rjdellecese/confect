@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect";
-import { Id } from "~/src/server/schemas/Id";
+import { GenericId } from "~/src/server/schemas/GenericId";
 import {
   ConfectStorageActionWriter,
   ConfectStorageReader,
@@ -9,7 +9,7 @@ import {
 
 export const confectStorageReaderGetUrl = confectAction({
   args: Schema.Struct({
-    id: Id("_storage"),
+    id: GenericId("_storage"),
   }),
   returns: Schema.URL,
   handler: ({ id }) =>
@@ -33,7 +33,7 @@ export const confectStorageWriterGenerateUploadUrl = confectAction({
 
 export const confectStorageWriterDelete = confectAction({
   args: Schema.Struct({
-    id: Id("_storage"),
+    id: GenericId("_storage"),
   }),
   returns: Schema.Null,
   handler: ({ id }) =>
@@ -48,7 +48,7 @@ export const confectStorageWriterDelete = confectAction({
 
 export const confectStorageActionWriterGet = confectAction({
   args: Schema.Struct({
-    id: Id("_storage"),
+    id: GenericId("_storage"),
   }),
   returns: Schema.NonNegative,
   handler: ({ id }) =>
@@ -70,7 +70,7 @@ export const confectStorageActionWriterStore = confectAction({
       }),
     ),
   }),
-  returns: Id("_storage"),
+  returns: GenericId("_storage"),
   handler: ({ text, options }) =>
     Effect.gen(function* () {
       const storageActionWriter = yield* ConfectStorageActionWriter;

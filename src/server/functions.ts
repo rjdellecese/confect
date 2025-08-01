@@ -15,36 +15,33 @@ import {
 } from "convex/server";
 import { Effect, Layer, pipe, Schema } from "effect";
 
-import { ConfectAuth } from "~/src/server/auth";
-import type { DataModelFromConfectDataModel } from "~/src/server/data_model";
+import { ConfectAuth } from "./auth";
+import { ConvexActionCtx, ConvexMutationCtx, ConvexQueryCtx } from "./ctx";
+import type { DataModelFromConfectDataModel } from "./data_model";
 import {
   ConfectDatabaseReader as ConfectDatabaseReaderTag,
   ConfectDatabaseWriter as ConfectDatabaseWriterTag,
   confectDatabaseReaderLayer,
   confectDatabaseWriterLayer,
-} from "~/src/server/database";
+} from "./database";
 import {
   ConfectActionRunner,
   ConfectMutationRunner,
   ConfectQueryRunner,
-} from "~/src/server/runners";
-import { ConfectScheduler } from "~/src/server/scheduler";
+} from "./runners";
+import { ConfectScheduler } from "./scheduler";
 import type {
   ConfectDataModelFromConfectSchema,
   ConfectSchemaDefinition,
   GenericConfectSchema,
-} from "~/src/server/schema";
-import {
-  compileArgsSchema,
-  compileReturnsSchema,
-} from "~/src/server/schema_to_validator";
+} from "./schema";
+import { compileArgsSchema, compileReturnsSchema } from "./schema_to_validator";
 import {
   ConfectStorageActionWriter,
   ConfectStorageReader,
   ConfectStorageWriter,
-} from "~/src/server/storage";
-import { ConfectVectorSearch } from "~/src/server/vector_search";
-import { ConvexActionCtx, ConvexMutationCtx, ConvexQueryCtx } from "./ctx";
+} from "./storage";
+import { ConfectVectorSearch } from "./vector_search";
 
 export const makeConfectFunctions = <
   ConfectSchema extends GenericConfectSchema,

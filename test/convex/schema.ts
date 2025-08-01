@@ -1,12 +1,12 @@
 import { Schema } from "effect";
 import * as schema from "~/src/server/schema";
-import { Id } from "~/src/server/schemas/Id";
+import { GenericId } from "~/src/server/schemas/GenericId";
 
 export const confectSchemaTables = {
   notes: schema
     .defineConfectTable(
       Schema.Struct({
-        userId: Schema.optional(Id("users")),
+        userId: Schema.optional(GenericId("users")),
         text: Schema.String.pipe(Schema.maxLength(100)),
         tag: Schema.optional(Schema.String),
         author: Schema.optional(

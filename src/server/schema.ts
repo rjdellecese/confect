@@ -16,16 +16,15 @@ import {
 } from "convex/server";
 import type { GenericValidator, Validator } from "convex/values";
 import { pipe, Record, Schema } from "effect";
-
+import type { GenericConfectDataModel } from "./data_model";
 import {
   compileTableSchema,
   type TableSchemaToTableValidator,
-} from "~/src/server/schema_to_validator";
+} from "./schema_to_validator";
 import {
   type ExtendWithSystemFields,
   extendWithSystemFields,
-} from "~/src/server/schemas/SystemFields";
-import type { GenericConfectDataModel } from "./data_model";
+} from "./schemas/SystemFields";
 
 export const confectSystemTableSchemas = {
   _scheduled_functions: Schema.Struct({

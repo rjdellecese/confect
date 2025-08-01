@@ -4,14 +4,14 @@ import type {
   SystemFields as NonIdSystemFields,
 } from "convex/server";
 import { Schema } from "effect";
-import { Id } from "~/src/server/schemas/Id";
+import { GenericId } from "./GenericId";
 
 /**
  * Produces a schema for Convex system fields.
  */
 export const SystemFields = <TableName extends string>(tableName: TableName) =>
   Schema.Struct({
-    _id: Id(tableName),
+    _id: GenericId(tableName),
     _creationTime: Schema.Number,
   });
 

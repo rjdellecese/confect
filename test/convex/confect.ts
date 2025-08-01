@@ -4,13 +4,13 @@ import {
   ConvexQueryCtx,
 } from "~/src/server/ctx";
 import type {
-  ConfectDoc as ConfectDocType,
+  GenericConfectDoc as ConfectDocType,
   DataModelFromConfectDataModel,
   TableNamesInConfectDataModel,
 } from "~/src/server/data_model";
 import { makeConfectFunctions } from "~/src/server/functions";
 import type { ConfectDataModelFromConfectSchemaDefinition } from "~/src/server/schema";
-import { Id } from "~/src/server/schemas/Id";
+import { GenericId } from "~/src/server/schemas/GenericId";
 import { confectSchema } from "~/test/convex/schema";
 
 export const {
@@ -37,8 +37,9 @@ export type ConfectDoc<TableName extends TableNames> = ConfectDocType<
   TableName
 >;
 
-export const ConfectId = <TableName extends TableNames>(tableName: TableName) =>
-  Id<TableName>(tableName);
+export const Id = <TableName extends TableNames>(tableName: TableName) =>
+  GenericId<TableName>(tableName);
+export type Id<TableName extends TableNames> = GenericId<TableName>;
 
 export type ConfectDatabaseReader = typeof ConfectDatabaseReader.Identifier;
 export type ConfectDatabaseWriter = typeof ConfectDatabaseWriter.Identifier;

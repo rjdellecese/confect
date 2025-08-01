@@ -8,7 +8,7 @@ import {
   confectQuery,
 } from "~/test/convex/confect";
 import { confectSchema } from "~/test/convex/schema";
-import { Id } from "../../src/server";
+import { GenericId } from "../../src/server";
 
 export const vectorSearch = confectAction({
   args: Schema.Struct({
@@ -60,7 +60,7 @@ export const vectorSearch = confectAction({
 
 export const get = confectQuery({
   args: Schema.Struct({
-    noteId: Id.Id("notes"),
+    noteId: GenericId("notes"),
   }),
   returns: confectSchema.tableSchemas.notes.withSystemFields,
   handler: ({ noteId }) =>

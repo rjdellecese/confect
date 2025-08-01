@@ -21,27 +21,27 @@
 	"exports": {
 		"./server": {
 			"import": {
-				"types": "./dist/server/index.d.ts",
+				"types": "./src/server/index.ts",
 				"import": "./dist/server/index.js"
 			},
 			"require": {
-				"types": "./dist/server/index.d.cts",
+				"types": "./src/server/index.ts",
 				"require": "./dist/server/index.cjs"
 			}
 		},
 		"./react": {
 			"import": {
-				"types": "./dist/react/index.d.ts",
+				"types": "./src/react/index.ts",
 				"import": "./dist/react/index.js"
 			},
 			"require": {
-				"types": "./dist/react/index.d.cts",
+				"types": "./src/react/index.ts",
 				"require": "./dist/react/index.cjs"
 			}
 		}
 	},
 	"scripts": {
-		"build": "tsup",
+		"build": "tsdown",
 		"check-types": "pnpm build && attw --pack --profile=node16",
 		"fix": "biome check --write",
 		"lint": "biome ci --error-on-warnings",
@@ -75,7 +75,7 @@
 		"@vitest/coverage-v8": "3.2.4",
 		"convex-test": "0.0.38",
 		"dotenv": "17.2.1",
-		"tsup": "8.5.0",
+		"tsdown": "0.13.1",
 		"typescript": "5.9.2",
 		"vite": "7.0.6",
 		"vite-tsconfig-paths": "5.1.4",

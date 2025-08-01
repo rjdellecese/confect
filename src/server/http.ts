@@ -18,6 +18,11 @@ import {
 import { Array, Layer, pipe, Record } from "effect";
 import { ConfectAuth } from "./auth";
 import { ConvexActionCtx } from "./ctx";
+import {
+  ConfectActionRunner,
+  ConfectMutationRunner,
+  ConfectQueryRunner,
+} from "./runners";
 import { ConfectScheduler } from "./scheduler";
 import {
   ConfectStorageActionWriter,
@@ -43,6 +48,9 @@ const makeHandler =
     apiLive: Layer.Layer<
       HttpApi.Api,
       never,
+      | ConfectQueryRunner
+      | ConfectMutationRunner
+      | ConfectActionRunner
       | ConfectScheduler
       | ConfectAuth
       | ConfectStorageReader
@@ -57,6 +65,9 @@ const makeHandler =
     const ApiLive = apiLive.pipe(
       Layer.provide(
         Layer.mergeAll(
+          ConfectQueryRunner.layer(ctx.runQuery),
+          ConfectMutationRunner.layer(ctx.runMutation),
+          ConfectActionRunner.layer(ctx.runAction),
           ConfectScheduler.layer(ctx.scheduler),
           ConfectAuth.layer(ctx.auth),
           ConfectStorageReader.layer(ctx.storage),
@@ -99,6 +110,9 @@ const makeHttpAction = <DataModel extends GenericDataModel>({
   apiLive: Layer.Layer<
     HttpApi.Api,
     never,
+    | ConfectQueryRunner
+    | ConfectMutationRunner
+    | ConfectActionRunner
     | ConfectScheduler
     | ConfectAuth
     | ConfectStorageReader
@@ -125,6 +139,9 @@ export type ConfectHttpApi = {
   apiLive: Layer.Layer<
     HttpApi.Api,
     never,
+    | ConfectQueryRunner
+    | ConfectMutationRunner
+    | ConfectActionRunner
     | ConfectScheduler
     | ConfectAuth
     | ConfectStorageReader
@@ -148,6 +165,9 @@ const mountEffectHttpApi =
     apiLive: Layer.Layer<
       HttpApi.Api,
       never,
+      | ConfectQueryRunner
+      | ConfectMutationRunner
+      | ConfectActionRunner
       | ConfectScheduler
       | ConfectAuth
       | ConfectStorageReader
