@@ -25,7 +25,7 @@ import {
   type ExtendWithSystemFields,
   extendWithSystemFields,
 } from "~/src/server/schemas/SystemFields";
-import type { GenericConfectDataModel } from "./data-model";
+import type { GenericConfectDataModel } from "./data_model";
 
 export const confectSystemTableSchemas = {
   _scheduled_functions: Schema.Struct({

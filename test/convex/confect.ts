@@ -1,7 +1,7 @@
 import type {
   ConfectDoc as ConfectDocType,
   TableNamesInConfectDataModel,
-} from "~/src/server/data-model";
+} from "~/src/server/data_model";
 import { makeConfectFunctions } from "~/src/server/functions";
 import type { ConfectDataModelFromConfectSchemaDefinition } from "~/src/server/schema";
 import { confectSchema } from "~/test/convex/schema";

@@ -1,4 +1,4 @@
-import { effect } from "@effect/vitest";
+import { describe, effect, expect, expectTypeOf, test } from "@effect/vitest";
 import {
   type GenericId,
   type VBoolean,
@@ -7,7 +7,6 @@ import {
   v,
 } from "convex/values";
 import { Effect, Exit, identity, Schema } from "effect";
-import { describe, expect, expectTypeOf, test } from "vitest";
 
 import { Id } from "~/src/server";
 import {
@@ -649,93 +648,102 @@ describe(compileSchema, () => {
       expect(compiledValidator).toStrictEqual(expectedValidator);
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
+
+    test("record", () => {
+      const record = Schema.Record({
+        key: Schema.String,
+        value: Schema.String,
+      });
+
+      expect(() => compileSchema(record)).toThrow(
+        new IndexSignaturesAreNotSupportedError(),
+      );
+    });
+  });
+});
+
+describe("suspend", () => {
+  test("object with optional recursive field", () => {
+    const expectedValidator = v.any();
+    type ExpectedValidator = typeof expectedValidator;
+
+    type foo = {
+      foo?: foo;
+    };
+    const Foo = Schema.Struct({
+      foo: Schema.suspend((): Schema.Schema<foo> => Foo).pipe(Schema.optional),
+    });
+    const compiledValidator = compileSchema(Foo);
+    type CompiledValidator = typeof compiledValidator;
+
+    expect(compiledValidator).toStrictEqual(expectedValidator);
+    expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
   });
 
-  describe("suspend", () => {
-    test("object with optional recursive field", () => {
-      const expectedValidator = v.any();
-      type ExpectedValidator = typeof expectedValidator;
+  test("object with required recursive field", () => {
+    const expectedValidator = v.any();
+    type ExpectedValidator = typeof expectedValidator;
 
-      type foo = {
-        foo?: foo;
-      };
-      const Foo = Schema.Struct({
-        foo: Schema.suspend((): Schema.Schema<foo> => Foo).pipe(
-          Schema.optional,
-        ),
-      });
-      const compiledValidator = compileSchema(Foo);
-      type CompiledValidator = typeof compiledValidator;
-
-      expect(compiledValidator).toStrictEqual(expectedValidator);
-      expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
+    type Foo = {
+      foo: Foo;
+    };
+    const Foo = Schema.Struct({
+      foo: Schema.suspend((): Schema.Schema<Foo> => Foo),
     });
+    const compiledValidator = compileSchema(Foo);
+    type CompiledValidator = typeof compiledValidator;
 
-    test("object with required recursive field", () => {
-      const expectedValidator = v.any();
-      type ExpectedValidator = typeof expectedValidator;
+    expect(compiledValidator).toStrictEqual(expectedValidator);
+    expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
+  });
 
-      type Foo = {
-        foo: Foo;
-      };
-      const Foo = Schema.Struct({
-        foo: Schema.suspend((): Schema.Schema<Foo> => Foo),
-      });
-      const compiledValidator = compileSchema(Foo);
-      type CompiledValidator = typeof compiledValidator;
+  test("array with recursive element", () => {
+    const expectedValidator = v.any();
+    type ExpectedValidator = typeof expectedValidator;
 
-      expect(compiledValidator).toStrictEqual(expectedValidator);
-      expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
-    });
+    type Foo = readonly Foo[];
+    const Foo = Schema.Array(Schema.suspend((): Schema.Schema<Foo> => Foo));
+    const compiledValidator = compileSchema(Foo);
+    type CompiledValidator = typeof compiledValidator;
 
-    test("array with recursive element", () => {
-      const expectedValidator = v.any();
-      type ExpectedValidator = typeof expectedValidator;
+    expect(compiledValidator).toStrictEqual(expectedValidator);
+    expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
+  });
 
-      type Foo = readonly Foo[];
-      const Foo = Schema.Array(Schema.suspend((): Schema.Schema<Foo> => Foo));
-      const compiledValidator = compileSchema(Foo);
-      type CompiledValidator = typeof compiledValidator;
+  test("tuple with recursive element", () => {
+    const expectedValidator = v.any();
+    type ExpectedValidator = typeof expectedValidator;
 
-      expect(compiledValidator).toStrictEqual(expectedValidator);
-      expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
-    });
+    type Foo = readonly [Foo, string];
+    const Foo = Schema.Tuple(
+      Schema.suspend((): Schema.Schema<Foo> => Foo),
+      Schema.String,
+    );
+    const compiledValidator = compileSchema(Foo);
+    type CompiledValidator = typeof compiledValidator;
 
-    test("tuple with recursive element", () => {
-      const expectedValidator = v.any();
-      type ExpectedValidator = typeof expectedValidator;
+    expect(compiledValidator).toStrictEqual(expectedValidator);
+    expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
+  });
 
-      type Foo = readonly [Foo, string];
-      const Foo = Schema.Tuple(
-        Schema.suspend((): Schema.Schema<Foo> => Foo),
-        Schema.String,
-      );
-      const compiledValidator = compileSchema(Foo);
-      type CompiledValidator = typeof compiledValidator;
+  test("union with recursive element", () => {
+    const expectedValidator = v.any();
+    type ExpectedValidator = typeof expectedValidator;
 
-      expect(compiledValidator).toStrictEqual(expectedValidator);
-      expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
-    });
+    type Foo = {
+      foos: readonly Foo[];
+    } | null;
+    const Foo = Schema.Union(
+      Schema.Struct({
+        foos: Schema.Array(Schema.suspend((): Schema.Schema<Foo> => Foo)),
+      }),
+      Schema.Null,
+    );
+    const compiledValidator = compileSchema(Foo);
+    type CompiledValidator = typeof compiledValidator;
 
-    test("union with recursive element", () => {
-      const expectedValidator = v.any();
-      type ExpectedValidator = typeof expectedValidator;
-
-      type Foo = {
-        foos: readonly Foo[];
-      } | null;
-      const Foo = Schema.Union(
-        Schema.Struct({
-          foos: Schema.Array(Schema.suspend((): Schema.Schema<Foo> => Foo)),
-        }),
-        Schema.Null,
-      );
-      const compiledValidator = compileSchema(Foo);
-      type CompiledValidator = typeof compiledValidator;
-
-      expect(compiledValidator).toStrictEqual(expectedValidator);
-      expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
-    });
+    expect(compiledValidator).toStrictEqual(expectedValidator);
+    expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
   });
 });
 

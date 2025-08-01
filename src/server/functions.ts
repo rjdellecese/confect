@@ -19,7 +19,7 @@ import { ConfectAuth } from "~/src/server/auth";
 import type {
   DataModelFromConfectDataModel,
   GenericConfectDataModel,
-} from "~/src/server/data-model";
+} from "~/src/server/data_model";
 import { makeConfectDatabaseServices } from "~/src/server/database";
 import {
   ConfectActionRunner,

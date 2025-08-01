@@ -4,13 +4,12 @@ import { Cause, Effect, Exit, Option, Runtime, Schema, String } from "effect";
 import { api } from "~/test/convex/_generated/api";
 import { TestConvexService } from "~/test/TestConvexService";
 import { effect } from "~/test/test_utils";
-import { confectSchema } from "./convex/schema";
 import {
   DocumentDecodeError,
   GetByIdFailure,
   GetByIndexFailure,
 } from "../src/server/database";
-import test from "node:test";
+import { confectSchema } from "./convex/schema";
 
 describe("ConfectDatabaseReader", () => {
   describe("getById", () => {

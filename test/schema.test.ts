@@ -4,7 +4,7 @@ import { Schema } from "effect";
 import type {
   DataModelFromConfectDataModel,
   GenericConfectDataModel,
-} from "~/src/server/data-model";
+} from "~/src/server/data_model";
 import {
   type ConfectDataModelFromConfectSchema,
   type ConfectSystemDataModel,

@@ -49,7 +49,7 @@ import type {
   TableInfoFromConfectTableInfo,
   TableNamesInConfectDataModel,
   TableSchemaFromConfectTableInfo,
-} from "./data-model";
+} from "./data_model";
 import {
   type ConfectDataModelFromConfectSchema,
   type ConfectDataModelFromConfectSchemaDefinition,

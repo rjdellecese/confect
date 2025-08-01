@@ -240,12 +240,10 @@ type ValueTupleToValidatorTuple<VlTuple extends ReadonlyArray<ReadonlyValue>> =
         : never
       : [];
 
-/* v8 ignore start */
 export const compileSchema = <T, E>(
   schema: Schema.Schema<T, E>,
 ): ValueToValidator<(typeof schema)["Encoded"]> =>
   runSyncThrow(compileAst(schema.ast)) as any;
-/* v8 ignore stop */
 
 export const isRecursive = (ast: SchemaAST.AST): boolean =>
   pipe(
@@ -415,7 +413,7 @@ const handleTypeLiteral = (typeLiteralAst: SchemaAST.TypeLiteral) =>
     Array.head,
     Option.match({
       onNone: () =>
-        pipe(handlePropertySignatures(typeLiteralAst), Effect.map(v.object)),
+        Effect.map(handlePropertySignatures(typeLiteralAst), v.object),
       onSome: () => Effect.fail(new IndexSignaturesAreNotSupportedError()),
     }),
   );

@@ -7,7 +7,7 @@ import type {
   DataModelFromConfectDataModel,
   GenericConfectDataModel,
   TableInfoFromConfectTableInfo,
-} from "~/src/server/data-model";
+} from "~/src/server/data_model";
 import {
   type ConfectDataModelFromConfectSchema,
   type ConfectSchemaFromConfectSchemaDefinition,

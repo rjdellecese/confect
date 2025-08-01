@@ -1,7 +1,7 @@
 export type {
   ConfectDoc,
   TableNamesInConfectDataModel,
-} from "~/src/server/data-model";
+} from "~/src/server/data_model";
 
 export { makeConfectFunctions } from "~/src/server/functions";
 export {

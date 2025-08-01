@@ -19,7 +19,7 @@ import { ConfectAuth } from "./auth";
 import type {
   DataModelFromConfectDataModel,
   GenericConfectDataModel,
-} from "./data-model";
+} from "./data_model";
 import { ConfectScheduler } from "./scheduler";
 import {
   ConfectStorageActionWriter,

@@ -10,7 +10,7 @@ import type {
   DataModelFromConfectDataModel,
   GenericConfectDataModel,
   TableNamesInConfectDataModel,
-} from "./data-model";
+} from "./data_model";
 
 type VectorSearch<ConfectDataModel extends GenericConfectDataModel> =
   GenericActionCtx<
