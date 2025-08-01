@@ -7,7 +7,7 @@ import {
 } from "@effect/platform";
 
 import { Effect, Layer, Schema } from "effect";
-import { makeHttpRouter } from "~/src/server";
+import { makeConvexHttpRouter } from "~/src/server";
 
 // root
 
@@ -52,7 +52,7 @@ const ApiPathPrefixLive = HttpApiBuilder.api(ApiPathPrefix).pipe(
 
 // router
 
-export default makeHttpRouter({
+export default makeConvexHttpRouter({
   "/": {
     apiLive: ApiLive,
   },

@@ -127,7 +127,7 @@ type SchemaDefinitionFromConfectSchemaDefinition<
 /**
  * Define a Confect schema.
  */
-export const defineSchema = <ConfectSchema extends GenericConfectSchema>(
+export const defineConfectSchema = <ConfectSchema extends GenericConfectSchema>(
   confectSchema: ConfectSchema,
 ): ConfectSchemaDefinition<ConfectSchema> =>
   new ConfectSchemaDefinitionImpl<ConfectSchema>(confectSchema);
@@ -376,7 +376,9 @@ class ConfectTableDefinitionImpl<
 /**
  * Define a Confect table.
  */
-export const defineTable = <TableSchema extends Schema.Schema.AnyNoContext>(
+export const defineConfectTable = <
+  TableSchema extends Schema.Schema.AnyNoContext,
+>(
   tableSchema: TableSchema,
 ): ConfectTableDefinition<TableSchema> => {
   const tableValidator = compileTableSchema(tableSchema);
@@ -444,15 +446,16 @@ type ExtractEncodedConfectDocument<
 >;
 
 export const confectSystemSchema = {
-  _scheduled_functions: defineTable(
+  _scheduled_functions: defineConfectTable(
     confectSystemTableSchemas._scheduled_functions,
   ),
-  _storage: defineTable(confectSystemTableSchemas._storage),
+  _storage: defineConfectTable(confectSystemTableSchemas._storage),
 };
 
 export type ConfectSystemSchema = typeof confectSystemSchema;
 
-export const confectSystemSchemaDefinition = defineSchema(confectSystemSchema);
+export const confectSystemSchemaDefinition =
+  defineConfectSchema(confectSystemSchema);
 
 type ConfectSystemSchemaDefinition = typeof confectSystemSchemaDefinition;
 

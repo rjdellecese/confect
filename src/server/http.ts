@@ -1,6 +1,6 @@
 import {
-  type HttpApi as EffectHttpApi,
-  type HttpRouter as EffectHttpRouter,
+  type HttpRouter,
+  type HttpApi,
   HttpApiBuilder,
   HttpApiScalar,
   type HttpApp,
@@ -8,7 +8,7 @@ import {
 } from "@effect/platform";
 import {
   type GenericActionCtx,
-  type HttpRouter,
+  type HttpRouter as ConvexHttpRouter,
   httpActionGeneric,
   httpRouter,
   ROUTABLE_HTTP_METHODS,
@@ -31,9 +31,7 @@ type Middleware = (
   httpApp: HttpApp.Default,
 ) => HttpApp.Default<
   never,
-  | EffectHttpApi.Api
-  | HttpApiBuilder.Router
-  | EffectHttpRouter.HttpRouter.DefaultServices
+  HttpApi.Api | HttpApiBuilder.Router | HttpRouter.HttpRouter.DefaultServices
 >;
 
 const makeHandler =
@@ -45,7 +43,7 @@ const makeHandler =
   }: {
     pathPrefix: RoutePath;
     apiLive: Layer.Layer<
-      EffectHttpApi.Api,
+      HttpApi.Api,
       never,
       | ConfectScheduler
       | ConfectAuth
@@ -110,7 +108,7 @@ const makeHttpAction = ({
 }: {
   pathPrefix: RoutePath;
   apiLive: Layer.Layer<
-    EffectHttpApi.Api,
+    HttpApi.Api,
     never,
     | ConfectScheduler
     | ConfectAuth
@@ -123,9 +121,9 @@ const makeHttpAction = ({
 }) =>
   httpActionGeneric(makeHandler({ pathPrefix, apiLive, middleware, scalar }));
 
-export type HttpApi = {
+export type ConfectHttpApi = {
   apiLive: Layer.Layer<
-    EffectHttpApi.Api,
+    HttpApi.Api,
     never,
     | ConfectScheduler
     | ConfectAuth
@@ -148,7 +146,7 @@ const mountEffectHttpApi =
   }: {
     pathPrefix: RoutePath;
     apiLive: Layer.Layer<
-      EffectHttpApi.Api,
+      HttpApi.Api,
       never,
       | ConfectScheduler
       | ConfectAuth
@@ -159,7 +157,7 @@ const mountEffectHttpApi =
     middleware?: Middleware;
     scalar?: HttpApiScalar.ScalarConfig;
   }) =>
-  (convexHttpRouter: HttpRouter): HttpRouter => {
+  (convexHttpRouter: ConvexHttpRouter): ConvexHttpRouter => {
     const handler = makeHttpAction({ pathPrefix, apiLive, middleware, scalar });
 
     Array.forEach(ROUTABLE_HTTP_METHODS, (method) => {
@@ -174,13 +172,15 @@ const mountEffectHttpApi =
     return convexHttpRouter;
   };
 
-type HttpApis = Partial<Record<RoutePath, HttpApi>>;
+type ConfectHttpApis = Partial<Record<RoutePath, ConfectHttpApi>>;
 
-const makeHttpRouter = (httpApis: HttpApis): HttpRouter => {
+export const makeConvexHttpRouter = (
+  confectHttpApis: ConfectHttpApis,
+): ConvexHttpRouter => {
   applyMonkeyPatches();
 
   return pipe(
-    httpApis as Record<RoutePath, HttpApi>,
+    confectHttpApis as Record<RoutePath, ConfectHttpApi>,
     Record.toEntries,
     Array.reduce(
       httpRouter(),
@@ -211,5 +211,3 @@ const applyMonkeyPatches = () => {
     get: () => new AbortSignal(),
   });
 };
-
-export { makeHttpRouter };

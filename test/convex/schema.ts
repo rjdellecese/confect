@@ -4,7 +4,7 @@ import { Id } from "~/src/server/schemas/Id";
 
 export const confectSchemaTables = {
   notes: schema
-    .defineTable(
+    .defineConfectTable(
       Schema.Struct({
         userId: Schema.optional(Id("users")),
         text: Schema.String.pipe(Schema.maxLength(100)),
@@ -31,13 +31,13 @@ export const confectSchemaTables = {
       filterFields: ["author.name", "tag"],
       dimensions: 1536,
     }),
-  users: schema.defineTable(
+  users: schema.defineConfectTable(
     Schema.Struct({
       username: Schema.String,
     }),
   ),
 };
 
-export const confectSchema = schema.defineSchema(confectSchemaTables);
+export const confectSchema = schema.defineConfectSchema(confectSchemaTables);
 
 export default confectSchema.convexSchemaDefinition;

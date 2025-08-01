@@ -3,15 +3,15 @@ export type {
   TableNamesInConfectDataModel,
 } from "~/src/server/data-model";
 
-export { makeFunctions } from "~/src/server/functions";
+export { makeConfectFunctions } from "~/src/server/functions";
 export {
-  type HttpApi,
-  makeHttpRouter,
+  type ConfectHttpApi,
+  makeConvexHttpRouter,
 } from "~/src/server/http";
 export {
   type ConfectDataModelFromConfectSchemaDefinition,
-  defineSchema,
-  defineTable,
+  defineConfectSchema,
+  defineConfectTable,
 } from "~/src/server/schema";
 export { compileSchema } from "~/src/server/schema_to_validator";
 export * as Id from "~/src/server/schemas/Id";

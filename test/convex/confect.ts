@@ -2,7 +2,7 @@ import type {
   ConfectDoc as ConfectDocType,
   TableNamesInConfectDataModel,
 } from "~/src/server/data-model";
-import { makeFunctions } from "~/src/server/functions";
+import { makeConfectFunctions } from "~/src/server/functions";
 import type { ConfectDataModelFromConfectSchemaDefinition } from "~/src/server/schema";
 import { confectSchema } from "~/test/convex/schema";
 
@@ -16,7 +16,7 @@ export const {
   ConfectDatabaseReader,
   ConfectDatabaseWriter,
   ConfectVectorSearch,
-} = makeFunctions(confectSchema);
+} = makeConfectFunctions(confectSchema);
 
 type ConfectSchema = typeof confectSchema;
 

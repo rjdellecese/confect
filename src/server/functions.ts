@@ -43,7 +43,9 @@ import {
 } from "~/src/server/storage";
 import { ConfectVectorSearch } from "~/src/server/vector_search";
 
-export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
+export const makeConfectFunctions = <
+  ConfectSchema extends GenericConfectSchema,
+>(
   confectSchemaDefinition: ConfectSchemaDefinition<ConfectSchema>,
 ) => {
   type ConfectDataModel = ConfectDataModelFromConfectSchema<ConfectSchema>;

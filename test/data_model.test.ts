@@ -11,8 +11,8 @@ import type {
 import {
   type ConfectDataModelFromConfectSchema,
   type ConfectSchemaFromConfectSchemaDefinition,
-  defineSchema,
-  defineTable,
+  defineConfectSchema,
+  defineConfectTable,
   type GenericConfectSchema,
 } from "~/src/server/schema";
 
@@ -21,8 +21,8 @@ describe("ConfectDataModelFromConfectSchema", () => {
     const TableSchema = Schema.Struct({
       content: Schema.String,
     });
-    const confectTableDefinition = defineTable(TableSchema);
-    const confectSchemaDefinition = defineSchema({
+    const confectTableDefinition = defineConfectTable(TableSchema);
+    const confectSchemaDefinition = defineConfectSchema({
       notes: confectTableDefinition,
     });
     type ConfectSchema = ConfectSchemaFromConfectSchemaDefinition<
@@ -50,8 +50,8 @@ describe("ConfectSchemaFromConfectSchemaDefinition", () => {
     const NoteSchema = Schema.Struct({
       content: Schema.String,
     });
-    const notesTableDefinition = defineTable(NoteSchema);
-    const schemaDefinition = defineSchema({
+    const notesTableDefinition = defineConfectTable(NoteSchema);
+    const schemaDefinition = defineConfectSchema({
       notes: notesTableDefinition,
     });
 
@@ -68,8 +68,8 @@ describe("TableInfoFromConfectTableInfo", () => {
     const TableSchema = Schema.Struct({
       content: Schema.String,
     });
-    const confectTableDefinition = defineTable(TableSchema);
-    const confectSchemaDefinition = defineSchema({
+    const confectTableDefinition = defineConfectTable(TableSchema);
+    const confectSchemaDefinition = defineConfectSchema({
       notes: confectTableDefinition,
     });
     type ConfectSchema = ConfectSchemaFromConfectSchemaDefinition<
@@ -89,8 +89,8 @@ describe("DataModelFromConfectDataModel", () => {
     const TableSchema = Schema.Struct({
       content: Schema.String,
     });
-    const confectTableDefinition = defineTable(TableSchema);
-    const confectSchemaDefinition = defineSchema({
+    const confectTableDefinition = defineConfectTable(TableSchema);
+    const confectSchemaDefinition = defineConfectSchema({
       notes: confectTableDefinition,
     });
     type ConfectSchema = ConfectSchemaFromConfectSchemaDefinition<

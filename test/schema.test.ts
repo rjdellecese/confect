@@ -12,8 +12,8 @@ import {
   type confectSystemSchema,
   confectSystemSchemaDefinition,
   type confectSystemTableSchemas,
-  defineSchema,
-  defineTable,
+  defineConfectSchema,
+  defineConfectTable,
 } from "~/src/server/schema";
 import { extendWithSystemFields } from "~/src/server/schemas/SystemFields";
 
@@ -23,7 +23,7 @@ describe("ConfectDataModelFromConfectSchema", () => {
       content: Schema.String,
     });
 
-    const notesTableDefinition = defineTable(NoteSchema);
+    const notesTableDefinition = defineConfectTable(NoteSchema);
 
     type ConfectSchema = {
       notes: typeof notesTableDefinition;
@@ -50,8 +50,8 @@ describe("tableSchemas", () => {
       content: Schema.String,
     });
 
-    const confectTableSchemas = defineSchema({
-      notes: defineTable(NoteSchema),
+    const confectTableSchemas = defineConfectSchema({
+      notes: defineConfectTable(NoteSchema),
     }).tableSchemas;
 
     type Actual = typeof confectTableSchemas;
@@ -77,8 +77,8 @@ describe("tableSchemas", () => {
 
     const ItemSchema = Schema.Union(NoteSchema, ImageSchema);
 
-    const confectTableSchemas = defineSchema({
-      items: defineTable(ItemSchema),
+    const confectTableSchemas = defineConfectSchema({
+      items: defineConfectTable(ItemSchema),
     }).tableSchemas;
 
     type Actual = typeof confectTableSchemas;
