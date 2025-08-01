@@ -15,6 +15,7 @@ import type {
 } from "convex/server";
 import type * as auth from "../auth.js";
 import type * as confect from "../confect.js";
+import type * as ctx from "../ctx.js";
 import type * as database from "../database.js";
 import type * as http from "../http.js";
 import type * as runners from "../runners.js";
@@ -33,6 +34,7 @@ import type * as vector_search from "../vector_search.js";
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   confect: typeof confect;
+  ctx: typeof ctx;
   database: typeof database;
   http: typeof http;
   runners: typeof runners;

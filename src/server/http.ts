@@ -9,6 +9,7 @@ import {
 import {
   type HttpRouter as ConvexHttpRouter,
   type GenericActionCtx,
+  type GenericDataModel,
   httpActionGeneric,
   httpRouter,
   ROUTABLE_HTTP_METHODS,
@@ -16,10 +17,7 @@ import {
 } from "convex/server";
 import { Array, Layer, pipe, Record } from "effect";
 import { ConfectAuth } from "./auth";
-import type {
-  DataModelFromConfectDataModel,
-  GenericConfectDataModel,
-} from "./data_model";
+import { ConvexActionCtx } from "./ctx";
 import { ConfectScheduler } from "./scheduler";
 import {
   ConfectStorageActionWriter,
@@ -35,7 +33,7 @@ type Middleware = (
 >;
 
 const makeHandler =
-  <ConfectDataModel extends GenericConfectDataModel>({
+  <DataModel extends GenericDataModel>({
     pathPrefix,
     apiLive,
     middleware,
@@ -50,30 +48,21 @@ const makeHandler =
       | ConfectStorageReader
       | ConfectStorageWriter
       | ConfectStorageActionWriter
+      | GenericActionCtx<DataModel>
     >;
     middleware?: Middleware;
     scalar?: HttpApiScalar.ScalarConfig;
   }) =>
-  (
-    ctx: GenericActionCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
-    request: Request,
-  ): Promise<Response> => {
-    const confectSchedularLayer = ConfectScheduler.layer(ctx.scheduler);
-    const confectAuthLayer = ConfectAuth.layer(ctx.auth);
-    const confectStorageReaderLayer = ConfectStorageReader.layer(ctx.storage);
-    const confectStorageWriterLayer = ConfectStorageWriter.layer(ctx.storage);
-    const confectStorageActionWriterLayer = ConfectStorageActionWriter.layer(
-      ctx.storage,
-    );
-
+  (ctx: GenericActionCtx<DataModel>, request: Request): Promise<Response> => {
     const ApiLive = apiLive.pipe(
       Layer.provide(
         Layer.mergeAll(
-          confectSchedularLayer,
-          confectAuthLayer,
-          confectStorageReaderLayer,
-          confectStorageWriterLayer,
-          confectStorageActionWriterLayer,
+          ConfectScheduler.layer(ctx.scheduler),
+          ConfectAuth.layer(ctx.auth),
+          ConfectStorageReader.layer(ctx.storage),
+          ConfectStorageWriter.layer(ctx.storage),
+          ConfectStorageActionWriter.layer(ctx.storage),
+          Layer.succeed(ConvexActionCtx<DataModel>(), ctx),
         ),
       ),
     );
@@ -100,7 +89,7 @@ const makeHandler =
     return handler(request);
   };
 
-const makeHttpAction = ({
+const makeHttpAction = <DataModel extends GenericDataModel>({
   pathPrefix,
   apiLive,
   middleware,
@@ -115,11 +104,22 @@ const makeHttpAction = ({
     | ConfectStorageReader
     | ConfectStorageWriter
     | ConfectStorageActionWriter
+    | GenericActionCtx<DataModel>
   >;
   middleware?: Middleware;
   scalar?: HttpApiScalar.ScalarConfig;
 }) =>
-  httpActionGeneric(makeHandler({ pathPrefix, apiLive, middleware, scalar }));
+  httpActionGeneric(
+    makeHandler<DataModel>({
+      pathPrefix,
+      apiLive,
+      middleware,
+      scalar,
+    }) as unknown as (
+      ctx: GenericActionCtx<GenericDataModel>,
+      request: Request,
+    ) => Promise<Response>,
+  );
 
 export type ConfectHttpApi = {
   apiLive: Layer.Layer<
@@ -138,7 +138,7 @@ export type ConfectHttpApi = {
 export type RoutePath = "/" | `/${string}/`;
 
 const mountEffectHttpApi =
-  ({
+  <DataModel extends GenericDataModel>({
     pathPrefix,
     apiLive,
     middleware,
@@ -153,12 +153,18 @@ const mountEffectHttpApi =
       | ConfectStorageReader
       | ConfectStorageWriter
       | ConfectStorageActionWriter
+      | GenericActionCtx<DataModel>
     >;
     middleware?: Middleware;
     scalar?: HttpApiScalar.ScalarConfig;
   }) =>
   (convexHttpRouter: ConvexHttpRouter): ConvexHttpRouter => {
-    const handler = makeHttpAction({ pathPrefix, apiLive, middleware, scalar });
+    const handler = makeHttpAction<DataModel>({
+      pathPrefix,
+      apiLive,
+      middleware,
+      scalar,
+    });
 
     Array.forEach(ROUTABLE_HTTP_METHODS, (method) => {
       const routeSpec: RouteSpecWithPathPrefix = {

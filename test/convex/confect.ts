@@ -1,9 +1,16 @@
+import {
+  ConvexActionCtx,
+  ConvexMutationCtx,
+  ConvexQueryCtx,
+} from "~/src/server/ctx";
 import type {
   ConfectDoc as ConfectDocType,
+  DataModelFromConfectDataModel,
   TableNamesInConfectDataModel,
 } from "~/src/server/data_model";
 import { makeConfectFunctions } from "~/src/server/functions";
 import type { ConfectDataModelFromConfectSchemaDefinition } from "~/src/server/schema";
+import { Id } from "~/src/server/schemas/Id";
 import { confectSchema } from "~/test/convex/schema";
 
 export const {
@@ -23,11 +30,15 @@ type ConfectSchema = typeof confectSchema;
 type ConfectDataModel =
   ConfectDataModelFromConfectSchemaDefinition<ConfectSchema>;
 
-export type ConfectDoc<
-  TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
-> = ConfectDocType<ConfectDataModel, TableName>;
+type TableNames = TableNamesInConfectDataModel<ConfectDataModel>;
 
-// Services
+export type ConfectDoc<TableName extends TableNames> = ConfectDocType<
+  ConfectDataModel,
+  TableName
+>;
+
+export const ConfectId = <TableName extends TableNames>(tableName: TableName) =>
+  Id<TableName>(tableName);
 
 export type ConfectDatabaseReader = typeof ConfectDatabaseReader.Identifier;
 export type ConfectDatabaseWriter = typeof ConfectDatabaseWriter.Identifier;
@@ -45,3 +56,12 @@ export {
   ConfectStorageReader,
   ConfectStorageWriter,
 } from "~/src/server/storage";
+
+type DataModel = DataModelFromConfectDataModel<ConfectDataModel>;
+
+export const QueryCtx = ConvexQueryCtx<DataModel>();
+export type QueryCtx = typeof QueryCtx.Identifier;
+export const MutationCtx = ConvexMutationCtx<DataModel>();
+export type MutationCtx = typeof MutationCtx.Identifier;
+export const ActionCtx = ConvexActionCtx<DataModel>();
+export type ActionCtx = typeof ActionCtx.Identifier;
