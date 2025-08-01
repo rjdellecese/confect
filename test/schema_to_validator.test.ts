@@ -649,20 +649,35 @@ describe(compileSchema, () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
-    test("record", () => {
-      const expectedValidator = v.record(v.string(), v.number());
-      type ExpectedValidator = typeof expectedValidator;
+    describe("record", () => {
+      test("simple record", () => {
+        const expectedValidator = v.record(v.string(), v.number());
+        type ExpectedValidator = typeof expectedValidator;
 
-      const compiledValidator = compileSchema(
-        Schema.Record({
-          key: Schema.String,
-          value: Schema.Number,
-        }),
-      );
-      type CompiledValidator = typeof compiledValidator;
+        const compiledValidator = compileSchema(
+          Schema.Record({
+            key: Schema.String,
+            value: Schema.Number,
+          }),
+        );
+        type CompiledValidator = typeof compiledValidator;
 
-      expect(compiledValidator).toStrictEqual(expectedValidator);
-      expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+        expect(compiledValidator).toStrictEqual(expectedValidator);
+        expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+      });
+
+      test("struct with index signatures", () => {
+        const schema = Schema.Struct(
+          {
+            foo: Schema.String,
+          },
+          { key: Schema.String, value: Schema.Number },
+        );
+
+        expect(() => compileSchema(schema)).toThrow(
+          new IndexSignaturesAreNotSupportedError(),
+        );
+      });
     });
   });
 });
