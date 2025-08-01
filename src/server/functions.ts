@@ -165,9 +165,7 @@ export const makeConfectFunctions = <
             handler(decodedArgs),
             Effect.provide(
               Layer.mergeAll(
-                confectDatabaseReaderLayer<
-                  ConfectSchemaDefinition<ConfectSchema>
-                >(confectSchemaDefinition)(ctx.db),
+                confectDatabaseReaderLayer(confectSchemaDefinition, ctx.db),
                 ConfectAuth.layer(ctx.auth),
                 ConfectStorageReader.layer(ctx.storage),
                 ConfectQueryRunner.layer(ctx.runQuery),
@@ -291,12 +289,8 @@ export const makeConfectFunctions = <
             handler(decodedArgs),
             Effect.provide(
               Layer.mergeAll(
-                confectDatabaseReaderLayer<
-                  ConfectSchemaDefinition<ConfectSchema>
-                >(confectSchemaDefinition)(ctx.db),
-                confectDatabaseWriterLayer<
-                  ConfectSchemaDefinition<ConfectSchema>
-                >(confectSchemaDefinition)(ctx.db),
+                confectDatabaseReaderLayer(confectSchemaDefinition, ctx.db),
+                confectDatabaseWriterLayer(confectSchemaDefinition, ctx.db),
                 ConfectAuth.layer(ctx.auth),
                 ConfectScheduler.layer(ctx.scheduler),
                 ConfectStorageReader.layer(ctx.storage),

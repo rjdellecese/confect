@@ -123,23 +123,22 @@ export const ConfectDatabaseReader = <
     ReturnType<typeof makeConfectDatabaseReader<ConfectSchemaDefinition>>
   >("@rjdellecese/confect/ConfectDatabaseReader");
 
-export const confectDatabaseReaderLayer =
-  <ConfectSchemaDefinition extends GenericConfectSchemaDefinition>(
-    confectSchemaDefinition: ConfectSchemaDefinition,
-  ) =>
-  (
-    convexDatabaseReader: GenericDatabaseReader<
-      DataModelFromConfectDataModel<
-        ConfectDataModelFromConfectSchema<
-          ConfectSchemaDefinition["confectSchema"]
-        >
+export const confectDatabaseReaderLayer = <
+  ConfectSchemaDefinition extends GenericConfectSchemaDefinition,
+>(
+  confectSchemaDefinition: ConfectSchemaDefinition,
+  convexDatabaseReader: GenericDatabaseReader<
+    DataModelFromConfectDataModel<
+      ConfectDataModelFromConfectSchema<
+        ConfectSchemaDefinition["confectSchema"]
       >
-    >,
-  ) =>
-    Layer.succeed(
-      ConfectDatabaseReader<ConfectSchemaDefinition>(),
-      makeConfectDatabaseReader(confectSchemaDefinition, convexDatabaseReader),
-    );
+    >
+  >,
+) =>
+  Layer.succeed(
+    ConfectDatabaseReader<ConfectSchemaDefinition>(),
+    makeConfectDatabaseReader(confectSchemaDefinition, convexDatabaseReader),
+  );
 
 const makeConfectDatabaseWriter = <
   ConfectSchemaDefinition extends GenericConfectSchemaDefinition,
@@ -303,23 +302,22 @@ export const ConfectDatabaseWriter = <
     ReturnType<typeof makeConfectDatabaseWriter<ConfectSchemaDefinition>>
   >("@rjdellecese/confect/ConfectDatabaseWriter");
 
-export const confectDatabaseWriterLayer =
-  <ConfectSchemaDefinition extends GenericConfectSchemaDefinition>(
-    confectSchemaDefinition: ConfectSchemaDefinition,
-  ) =>
-  (
-    convexDatabaseWriter: GenericDatabaseWriter<
-      DataModelFromConfectDataModel<
-        ConfectDataModelFromConfectSchema<
-          ConfectSchemaDefinition["confectSchema"]
-        >
+export const confectDatabaseWriterLayer = <
+  ConfectSchemaDefinition extends GenericConfectSchemaDefinition,
+>(
+  confectSchemaDefinition: ConfectSchemaDefinition,
+  convexDatabaseWriter: GenericDatabaseWriter<
+    DataModelFromConfectDataModel<
+      ConfectDataModelFromConfectSchema<
+        ConfectSchemaDefinition["confectSchema"]
       >
-    >,
-  ) =>
-    Layer.succeed(
-      ConfectDatabaseWriter<ConfectSchemaDefinition>(),
-      makeConfectDatabaseWriter(confectSchemaDefinition, convexDatabaseWriter),
-    );
+    >
+  >,
+) =>
+  Layer.succeed(
+    ConfectDatabaseWriter<ConfectSchemaDefinition>(),
+    makeConfectDatabaseWriter(confectSchemaDefinition, convexDatabaseWriter),
+  );
 
 // Based on https://github.com/get-convex/convex-ents/blob/f1c6eda95569bdcd97efcc3431638b4260b004dc/src/shared.ts#L31-L44
 export type IndexFieldTypesForEq<
