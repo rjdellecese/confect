@@ -21,21 +21,21 @@
 	"exports": {
 		"./server": {
 			"import": {
-				"types": "./src/server/index.ts",
+				"types": "./dist/server/index.d.ts",
 				"import": "./dist/server/index.js"
 			},
 			"require": {
-				"types": "./src/server/index.ts",
+				"types": "./dist/server/index.d.cts",
 				"require": "./dist/server/index.cjs"
 			}
 		},
 		"./react": {
 			"import": {
-				"types": "./src/react/index.ts",
+				"types": "./dist/react/index.d.ts",
 				"import": "./dist/react/index.js"
 			},
 			"require": {
-				"types": "./src/react/index.ts",
+				"types": "./dist/react/index.d.cts",
 				"require": "./dist/react/index.cjs"
 			}
 		}
