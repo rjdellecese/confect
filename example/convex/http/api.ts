@@ -47,8 +47,7 @@ const ApiGroupLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
       ConfectQueryRunner
     > =>
       Effect.gen(function* () {
-        // TODO: Don't require destructuring, service should return the run function directly
-        const { runQuery } = yield* ConfectQueryRunner;
+        const runQuery = yield* ConfectQueryRunner;
 
         const firstNote = yield* runQuery(api.functions.getFirst, {}).pipe(
           Effect.andThen(Schema.decode(GetFirstResult)),
