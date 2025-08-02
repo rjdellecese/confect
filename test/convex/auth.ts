@@ -1,6 +1,6 @@
 import { Effect, Schema } from "effect";
-import { ConfectAuth, confectQuery } from "./confect";
 import { UserIdentity } from "../../src/server/schemas/UserIdentity";
+import { ConfectAuth, confectQuery } from "./confect";
 
 export const getUserIdentity = confectQuery({
   args: Schema.Struct({}),
