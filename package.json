@@ -43,7 +43,7 @@
 	"scripts": {
 		"build": "tsdown",
 		"check-bundled-types": "pnpm build && attw --pack --profile=node16",
-		"typecheck-package": "tsc --noEmit --project tsconfig.json",
+		"typecheck": "tsc --noEmit --project tsconfig.json",
 		"fix": "biome check --write",
 		"lint": "biome ci --error-on-warnings",
 		"release": "pnpm build && changeset publish",

@@ -17,8 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/example-setup
-      - name: Typecheck example
-        run: pnpm run typecheck:vite
+      - run: pnpm run typecheck:vite
 
   typecheck-convex:
     runs-on: ubuntu-latest
@@ -28,8 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/example-setup
-      - name: Typecheck example
-        run: pnpm run typecheck:convex
+      - run: pnpm run typecheck:convex
 
   build-check:
     runs-on: ubuntu-latest
@@ -39,5 +37,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/example-setup
-      - name: Check example can be built
-        run: pnpm run build
+      - run: pnpm run build
