@@ -28,6 +28,25 @@ export type IsValueLiteral<Vl> = [Vl] extends [never]
             : true
     : false;
 
+/**
+ * Assumes record type with string keys.
+ */
+export type IsRecordType<T> = [T] extends [never]
+  ? false
+  : IsUnion<T> extends true
+    ? false
+    : T extends Record<string, infer V>
+      ? string extends keyof T
+        ? keyof T extends string
+          ? T extends Record<string, V>
+            ? Record<string, V> extends T
+              ? true
+              : false
+            : false
+          : false
+        : false
+      : false;
+
 export type DeepMutable<T> = IsAny<T> extends true
   ? any
   : T extends Brand.Brand<any> | GenericId<any>
@@ -51,6 +70,11 @@ export type DeepReadonly<T> = IsAny<T> extends true
         : { readonly [K in keyof T]: DeepReadonly<T[K]> };
 
 export type TypeError<Message extends string, T = never> = [Message, T];
+
+export type TypeDefect<Message extends string, T = never> = TypeError<
+  `Unexpected type error:\n  ${Message}`,
+  T
+>;
 
 export type IsRecursive<T> = true extends DetectCycle<T> ? true : false;
 

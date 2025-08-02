@@ -5,10 +5,15 @@ import type {
   GenericTableSearchIndexes,
   GenericTableVectorIndexes,
 } from "convex/server";
+import type { Schema } from "effect";
 import type { ReadonlyRecord } from "effect/Record";
-import type { ReadonlyValue } from "~/src/server/schema-to-validator";
+import type { ReadonlyValue } from "./schema_to_validator";
+import type { WithSystemFields } from "./schemas/SystemFields";
 
-export type GenericConfectDocument = ReadonlyRecord<string, any>;
+export type GenericConfectDocumentWithSystemFields = WithSystemFields<
+  string,
+  GenericConfectDoc<any, any>
+>;
 
 export type GenericEncodedConfectDocument = ReadonlyRecord<
   string,
@@ -45,7 +50,7 @@ export type TableInfoFromConfectTableInfo<
 };
 
 export type GenericConfectTableInfo = {
-  confectDocument: GenericConfectDocument;
+  confectDocument: GenericConfectDoc<any, any>;
   encodedConfectDocument: GenericEncodedConfectDocument;
   convexDocument: GenericDocument;
   fieldPaths: GenericFieldPaths;
@@ -54,10 +59,17 @@ export type GenericConfectTableInfo = {
   vectorIndexes: GenericTableVectorIndexes;
 };
 
+export type TableSchemaFromConfectTableInfo<
+  ConfectTableInfo extends GenericConfectTableInfo,
+> = Schema.Schema<
+  ConfectTableInfo["confectDocument"],
+  ConfectTableInfo["encodedConfectDocument"]
+>;
+
 /**
  * The Confect document encoded for storage in Convex. This is the data as it is stored in the database.
  */
-export type ConfectDoc<
+export type GenericConfectDoc<
   ConfectDataModel extends GenericConfectDataModel,
   TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
 > = ConfectDataModel[TableName]["encodedConfectDocument"];

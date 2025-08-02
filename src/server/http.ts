@@ -1,57 +1,85 @@
 import {
-  type HttpApi as EffectHttpApi,
-  type HttpRouter as EffectHttpRouter,
+  type HttpApi,
   HttpApiBuilder,
   HttpApiScalar,
   type HttpApp,
+  type HttpRouter,
   HttpServer,
 } from "@effect/platform";
 import {
+  type HttpRouter as ConvexHttpRouter,
   type GenericActionCtx,
-  type HttpRouter,
+  type GenericDataModel,
   httpActionGeneric,
   httpRouter,
   ROUTABLE_HTTP_METHODS,
   type RouteSpecWithPathPrefix,
 } from "convex/server";
 import { Array, Layer, pipe, Record } from "effect";
-import { ConfectActionCtx, makeConfectActionCtx } from "./ctx";
-import type {
-  DataModelFromConfectDataModel,
-  GenericConfectDataModel,
-} from "./data-model";
+import { ConfectAuth } from "./auth";
+import { ConvexActionCtx } from "./ctx";
+import {
+  type ConfectActionRunner,
+  type ConfectMutationRunner,
+  type ConfectQueryRunner,
+  confectActionRunnerLayer,
+  confectMutationRunnerLayer,
+  confectQueryRunnerLayer,
+} from "./runners";
+import { ConfectScheduler } from "./scheduler";
+import {
+  ConfectStorageActionWriter,
+  ConfectStorageReader,
+  ConfectStorageWriter,
+} from "./storage";
 
 type Middleware = (
   httpApp: HttpApp.Default,
 ) => HttpApp.Default<
   never,
-  | EffectHttpApi.Api
-  | HttpApiBuilder.Router
-  | EffectHttpRouter.HttpRouter.DefaultServices
+  HttpApi.Api | HttpApiBuilder.Router | HttpRouter.HttpRouter.DefaultServices
 >;
 
 const makeHandler =
-  <ConfectDataModel extends GenericConfectDataModel>({
+  <DataModel extends GenericDataModel>({
     pathPrefix,
     apiLive,
     middleware,
     scalar,
   }: {
     pathPrefix: RoutePath;
-    apiLive: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtx<any>>;
+    apiLive: Layer.Layer<
+      HttpApi.Api,
+      never,
+      | ConfectQueryRunner
+      | ConfectMutationRunner
+      | ConfectActionRunner
+      | ConfectScheduler
+      | ConfectAuth
+      | ConfectStorageReader
+      | ConfectStorageWriter
+      | ConfectStorageActionWriter
+      | GenericActionCtx<DataModel>
+    >;
     middleware?: Middleware;
     scalar?: HttpApiScalar.ScalarConfig;
   }) =>
-  (
-    ctx: GenericActionCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
-    request: Request,
-  ): Promise<Response> => {
-    const ConfectActionCtxLive = Layer.succeed(
-      ConfectActionCtx<any>(),
-      makeConfectActionCtx(ctx),
+  (ctx: GenericActionCtx<DataModel>, request: Request): Promise<Response> => {
+    const ApiLive = apiLive.pipe(
+      Layer.provide(
+        Layer.mergeAll(
+          confectQueryRunnerLayer(ctx.runQuery),
+          confectMutationRunnerLayer(ctx.runMutation),
+          confectActionRunnerLayer(ctx.runAction),
+          ConfectScheduler.layer(ctx.scheduler),
+          ConfectAuth.layer(ctx.auth),
+          ConfectStorageReader.layer(ctx.storage),
+          ConfectStorageWriter.layer(ctx.storage),
+          ConfectStorageActionWriter.layer(ctx.storage),
+          Layer.succeed(ConvexActionCtx<DataModel>(), ctx),
+        ),
+      ),
     );
-
-    const ApiLive = apiLive.pipe(Layer.provide(ConfectActionCtxLive));
 
     const ApiDocsLive = HttpApiScalar.layer({
       path: `${pathPrefix}docs`,
@@ -75,21 +103,54 @@ const makeHandler =
     return handler(request);
   };
 
-const makeHttpAction = ({
+const makeHttpAction = <DataModel extends GenericDataModel>({
   pathPrefix,
   apiLive,
   middleware,
   scalar,
 }: {
   pathPrefix: RoutePath;
-  apiLive: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtx<any>>;
+  apiLive: Layer.Layer<
+    HttpApi.Api,
+    never,
+    | ConfectQueryRunner
+    | ConfectMutationRunner
+    | ConfectActionRunner
+    | ConfectScheduler
+    | ConfectAuth
+    | ConfectStorageReader
+    | ConfectStorageWriter
+    | ConfectStorageActionWriter
+    | GenericActionCtx<DataModel>
+  >;
   middleware?: Middleware;
   scalar?: HttpApiScalar.ScalarConfig;
 }) =>
-  httpActionGeneric(makeHandler({ pathPrefix, apiLive, middleware, scalar }));
+  httpActionGeneric(
+    makeHandler<DataModel>({
+      pathPrefix,
+      apiLive,
+      middleware,
+      scalar,
+    }) as unknown as (
+      ctx: GenericActionCtx<GenericDataModel>,
+      request: Request,
+    ) => Promise<Response>,
+  );
 
-export type HttpApi = {
-  apiLive: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtx<any>>;
+export type ConfectHttpApi = {
+  apiLive: Layer.Layer<
+    HttpApi.Api,
+    never,
+    | ConfectQueryRunner
+    | ConfectMutationRunner
+    | ConfectActionRunner
+    | ConfectScheduler
+    | ConfectAuth
+    | ConfectStorageReader
+    | ConfectStorageWriter
+    | ConfectStorageActionWriter
+  >;
   middleware?: Middleware;
   scalar?: HttpApiScalar.ScalarConfig;
 };
@@ -97,19 +158,36 @@ export type HttpApi = {
 export type RoutePath = "/" | `/${string}/`;
 
 const mountEffectHttpApi =
-  ({
+  <DataModel extends GenericDataModel>({
     pathPrefix,
     apiLive,
     middleware,
     scalar,
   }: {
     pathPrefix: RoutePath;
-    apiLive: Layer.Layer<EffectHttpApi.Api, never, ConfectActionCtx<any>>;
+    apiLive: Layer.Layer<
+      HttpApi.Api,
+      never,
+      | ConfectQueryRunner
+      | ConfectMutationRunner
+      | ConfectActionRunner
+      | ConfectScheduler
+      | ConfectAuth
+      | ConfectStorageReader
+      | ConfectStorageWriter
+      | ConfectStorageActionWriter
+      | GenericActionCtx<DataModel>
+    >;
     middleware?: Middleware;
     scalar?: HttpApiScalar.ScalarConfig;
   }) =>
-  (convexHttpRouter: HttpRouter): HttpRouter => {
-    const handler = makeHttpAction({ pathPrefix, apiLive, middleware, scalar });
+  (convexHttpRouter: ConvexHttpRouter): ConvexHttpRouter => {
+    const handler = makeHttpAction<DataModel>({
+      pathPrefix,
+      apiLive,
+      middleware,
+      scalar,
+    });
 
     Array.forEach(ROUTABLE_HTTP_METHODS, (method) => {
       const routeSpec: RouteSpecWithPathPrefix = {
@@ -123,13 +201,15 @@ const mountEffectHttpApi =
     return convexHttpRouter;
   };
 
-type HttpApis = Partial<Record<RoutePath, HttpApi>>;
+type ConfectHttpApis = Partial<Record<RoutePath, ConfectHttpApi>>;
 
-const makeHttpRouter = (httpApis: HttpApis): HttpRouter => {
+export const makeConvexHttpRouter = (
+  confectHttpApis: ConfectHttpApis,
+): ConvexHttpRouter => {
   applyMonkeyPatches();
 
   return pipe(
-    httpApis as Record<RoutePath, HttpApi>,
+    confectHttpApis as Record<RoutePath, ConfectHttpApi>,
     Record.toEntries,
     Array.reduce(
       httpRouter(),
@@ -160,5 +240,3 @@ const applyMonkeyPatches = () => {
     get: () => new AbortSignal(),
   });
 };
-
-export { makeHttpRouter };

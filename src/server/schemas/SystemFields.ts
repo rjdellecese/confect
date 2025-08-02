@@ -1,12 +1,17 @@
+import type {
+  Expand,
+  IdField,
+  SystemFields as NonIdSystemFields,
+} from "convex/server";
 import { Schema } from "effect";
-import { Id } from "~/src/server/schemas/Id";
+import { GenericId } from "./GenericId";
 
 /**
  * Produces a schema for Convex system fields.
  */
 export const SystemFields = <TableName extends string>(tableName: TableName) =>
   Schema.Struct({
-    _id: Id(tableName),
+    _id: GenericId(tableName),
     _creationTime: Schema.Number,
   });
 
@@ -20,7 +25,7 @@ export const extendWithSystemFields = <
   tableName: TableName,
   schema: TableSchema,
 ): ExtendWithSystemFields<TableName, TableSchema> =>
-  Schema.extend(schema, SystemFields(tableName));
+  Schema.extend(SystemFields(tableName), schema);
 
 /**
  * Extend a table schema with Convex system fields at the type level.
@@ -28,4 +33,8 @@ export const extendWithSystemFields = <
 export type ExtendWithSystemFields<
   TableName extends string,
   TableSchema extends Schema.Schema.AnyNoContext,
-> = Schema.extend<TableSchema, ReturnType<typeof SystemFields<TableName>>>;
+> = Schema.extend<ReturnType<typeof SystemFields<TableName>>, TableSchema>;
+
+export type WithSystemFields<TableName extends string, Document> = Expand<
+  Readonly<IdField<TableName>> & Readonly<NonIdSystemFields> & Document
+>;

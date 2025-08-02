@@ -7,22 +7,22 @@ import type {
   DataModelFromConfectDataModel,
   GenericConfectDataModel,
   TableInfoFromConfectTableInfo,
-} from "~/src/server/data-model";
+} from "../src/server/data_model";
 import {
   type ConfectDataModelFromConfectSchema,
   type ConfectSchemaFromConfectSchemaDefinition,
-  defineSchema,
-  defineTable,
+  defineConfectSchema,
+  defineConfectTable,
   type GenericConfectSchema,
-} from "~/src/server/schema";
+} from "../src/server/schema";
 
 describe("ConfectDataModelFromConfectSchema", () => {
   test("extends GenericConfectDataModel and equals correct document and confectDocument types", () => {
     const TableSchema = Schema.Struct({
       content: Schema.String,
     });
-    const confectTableDefinition = defineTable(TableSchema);
-    const confectSchemaDefinition = defineSchema({
+    const confectTableDefinition = defineConfectTable(TableSchema);
+    const confectSchemaDefinition = defineConfectSchema({
       notes: confectTableDefinition,
     });
     type ConfectSchema = ConfectSchemaFromConfectSchemaDefinition<
@@ -31,7 +31,7 @@ describe("ConfectDataModelFromConfectSchema", () => {
 
     type ConfectDataModel = ConfectDataModelFromConfectSchema<ConfectSchema>;
 
-    expectTypeOf<ConfectDataModel>().toMatchTypeOf<GenericConfectDataModel>();
+    expectTypeOf<ConfectDataModel>().toExtend<GenericConfectDataModel>();
     expectTypeOf<ConfectDataModel["notes"]["confectDocument"]>().toEqualTypeOf<{
       readonly _id: GenericId<"notes">;
       readonly _creationTime: number;
@@ -50,8 +50,8 @@ describe("ConfectSchemaFromConfectSchemaDefinition", () => {
     const NoteSchema = Schema.Struct({
       content: Schema.String,
     });
-    const notesTableDefinition = defineTable(NoteSchema);
-    const schemaDefinition = defineSchema({
+    const notesTableDefinition = defineConfectTable(NoteSchema);
+    const schemaDefinition = defineConfectSchema({
       notes: notesTableDefinition,
     });
 
@@ -59,7 +59,7 @@ describe("ConfectSchemaFromConfectSchemaDefinition", () => {
       typeof schemaDefinition
     >;
 
-    expectTypeOf<ConfectSchema>().toMatchTypeOf<GenericConfectSchema>();
+    expectTypeOf<ConfectSchema>().toExtend<GenericConfectSchema>();
   });
 });
 
@@ -68,8 +68,8 @@ describe("TableInfoFromConfectTableInfo", () => {
     const TableSchema = Schema.Struct({
       content: Schema.String,
     });
-    const confectTableDefinition = defineTable(TableSchema);
-    const confectSchemaDefinition = defineSchema({
+    const confectTableDefinition = defineConfectTable(TableSchema);
+    const confectSchemaDefinition = defineConfectSchema({
       notes: confectTableDefinition,
     });
     type ConfectSchema = ConfectSchemaFromConfectSchemaDefinition<
@@ -80,7 +80,7 @@ describe("TableInfoFromConfectTableInfo", () => {
 
     type TableInfo = TableInfoFromConfectTableInfo<ConfectTableInfo>;
 
-    expectTypeOf<TableInfo>().toMatchTypeOf<GenericTableInfo>();
+    expectTypeOf<TableInfo>().toExtend<GenericTableInfo>();
   });
 });
 
@@ -89,8 +89,8 @@ describe("DataModelFromConfectDataModel", () => {
     const TableSchema = Schema.Struct({
       content: Schema.String,
     });
-    const confectTableDefinition = defineTable(TableSchema);
-    const confectSchemaDefinition = defineSchema({
+    const confectTableDefinition = defineConfectTable(TableSchema);
+    const confectSchemaDefinition = defineConfectSchema({
       notes: confectTableDefinition,
     });
     type ConfectSchema = ConfectSchemaFromConfectSchemaDefinition<
@@ -100,6 +100,6 @@ describe("DataModelFromConfectDataModel", () => {
 
     type DataModel = DataModelFromConfectDataModel<ConfectDataModel>;
 
-    expectTypeOf<DataModel>().toMatchTypeOf<GenericDataModel>();
+    expectTypeOf<DataModel>().toExtend<GenericDataModel>();
   });
 });

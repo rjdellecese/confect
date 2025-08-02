@@ -1,22 +1,21 @@
+import { describe, expectTypeOf, test } from "@effect/vitest";
 import type { SystemDataModel } from "convex/server";
 import { Schema } from "effect";
-import { describe, expectTypeOf, test } from "vitest";
-
 import type {
   DataModelFromConfectDataModel,
   GenericConfectDataModel,
-} from "~/src/server/data-model";
+} from "../src/server/data_model";
 import {
   type ConfectDataModelFromConfectSchema,
   type ConfectSystemDataModel,
   type ConfectTableDefinition,
   type confectSystemSchema,
   confectSystemSchemaDefinition,
-  type confectTableSchemas,
-  defineSchema,
-  defineTable,
-} from "~/src/server/schema";
-import { extendWithSystemFields } from "~/src/server/schemas/SystemFields";
+  type confectSystemTableSchemas,
+  defineConfectSchema,
+  defineConfectTable,
+} from "../src/server/schema";
+import { extendWithSystemFields } from "../src/server/schemas/SystemFields";
 
 describe("ConfectDataModelFromConfectSchema", () => {
   test("produces a type which is assignable to GenericConfectDataModel", () => {
@@ -24,7 +23,7 @@ describe("ConfectDataModelFromConfectSchema", () => {
       content: Schema.String,
     });
 
-    const notesTableDefinition = defineTable(NoteSchema);
+    const notesTableDefinition = defineConfectTable(NoteSchema);
 
     type ConfectSchema = {
       notes: typeof notesTableDefinition;
@@ -32,7 +31,7 @@ describe("ConfectDataModelFromConfectSchema", () => {
 
     type ConfectDataModel = ConfectDataModelFromConfectSchema<ConfectSchema>;
 
-    expectTypeOf<ConfectDataModel>().toMatchTypeOf<GenericConfectDataModel>();
+    expectTypeOf<ConfectDataModel>().toExtend<GenericConfectDataModel>();
   });
 });
 
@@ -51,8 +50,8 @@ describe("tableSchemas", () => {
       content: Schema.String,
     });
 
-    const confectTableSchemas = defineSchema({
-      notes: defineTable(NoteSchema),
+    const confectTableSchemas = defineConfectSchema({
+      notes: defineConfectTable(NoteSchema),
     }).tableSchemas;
 
     type Actual = typeof confectTableSchemas;
@@ -78,8 +77,8 @@ describe("tableSchemas", () => {
 
     const ItemSchema = Schema.Union(NoteSchema, ImageSchema);
 
-    const confectTableSchemas = defineSchema({
-      items: defineTable(ItemSchema),
+    const confectTableSchemas = defineConfectSchema({
+      items: defineConfectTable(ItemSchema),
     }).tableSchemas;
 
     type Actual = typeof confectTableSchemas;
@@ -97,7 +96,7 @@ describe("tableSchemas", () => {
 
 describe("confectTableSchemas", () => {
   test("matches confectSystemSchema", () => {
-    type ConfectTableSchemas = typeof confectTableSchemas;
+    type ConfectTableSchemas = typeof confectSystemTableSchemas;
     type ConfectSystemSchema = typeof confectSystemSchema;
 
     type ConfectTableSchemasFromConfectSystemSchema = {

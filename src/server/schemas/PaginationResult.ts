@@ -4,7 +4,7 @@ export const PaginationResult = <Doc extends Schema.Schema.AnyNoContext>(
   Doc: Doc,
 ) =>
   Schema.Struct({
-    page: Schema.Array(Doc).pipe(Schema.mutable),
+    page: Schema.Array(Doc),
     isDone: Schema.Boolean,
     continueCursor: Schema.String,
     splitCursor: Schema.optional(Schema.Union(Schema.String, Schema.Null)),
@@ -15,4 +15,4 @@ export const PaginationResult = <Doc extends Schema.Schema.AnyNoContext>(
         Schema.Null,
       ),
     ),
-  }).pipe(Schema.mutable);
+  });

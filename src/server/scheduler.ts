@@ -3,40 +3,38 @@ import type {
   SchedulableFunctionReference,
   Scheduler,
 } from "convex/server";
-import { Effect } from "effect";
+import { DateTime, Duration, Effect, Layer } from "effect";
 
-export interface ConfectScheduler {
-  runAfter<FuncRef extends SchedulableFunctionReference>(
-    delayMs: number,
+const make = (scheduler: Scheduler) => ({
+  runAfter: <FuncRef extends SchedulableFunctionReference>(
+    delay: Duration.Duration,
     functionReference: FuncRef,
     ...args: OptionalRestArgs<FuncRef>
-  ): Effect.Effect<void>;
-  runAt<FuncRef extends SchedulableFunctionReference>(
-    timestamp: number | Date,
-    functionReference: FuncRef,
-    ...args: OptionalRestArgs<FuncRef>
-  ): Effect.Effect<void>;
-}
+  ) => {
+    const delayMs = Duration.toMillis(delay);
 
-export class ConfectSchedulerImpl implements ConfectScheduler {
-  constructor(private scheduler: Scheduler) {}
-
-  runAfter<FuncRef extends SchedulableFunctionReference>(
-    delayMs: number,
-    functionReference: FuncRef,
-    ...args: OptionalRestArgs<FuncRef>
-  ): Effect.Effect<void> {
+    // TODO: Which errors might occur?
     return Effect.promise(() =>
-      this.scheduler.runAfter(delayMs, functionReference, ...args),
+      scheduler.runAfter(delayMs, functionReference, ...args),
     );
-  }
-  runAt<FuncRef extends SchedulableFunctionReference>(
-    timestamp: number | Date,
+  },
+  runAt: <FuncRef extends SchedulableFunctionReference>(
+    dateTime: DateTime.DateTime,
     functionReference: FuncRef,
     ...args: OptionalRestArgs<FuncRef>
-  ): Effect.Effect<void> {
+  ) => {
+    const timestamp = DateTime.toEpochMillis(dateTime);
+
+    // TODO: Which errors might occur?
     return Effect.promise(() =>
-      this.scheduler.runAt(timestamp, functionReference, ...args),
+      scheduler.runAt(timestamp, functionReference, ...args),
     );
-  }
+  },
+});
+
+export class ConfectScheduler extends Effect.Tag(
+  "@rjdellecese/confect/ConfectScheduler",
+)<ConfectScheduler, ReturnType<typeof make>>() {
+  static readonly layer = (scheduler: Scheduler) =>
+    Layer.succeed(this, make(scheduler));
 }

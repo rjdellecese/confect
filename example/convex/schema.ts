@@ -1,4 +1,8 @@
-import { defineSchema, defineTable, Id } from "@rjdellecese/confect/server";
+import {
+  defineConfectSchema,
+  defineConfectTable,
+  GenericId,
+} from "@rjdellecese/confect/server";
 import { Schema } from "effect";
 
 type Tag = {
@@ -11,10 +15,10 @@ const Tag = Schema.Struct({
   tags: Schema.Array(Schema.suspend((): Schema.Schema<Tag> => Tag)),
 });
 
-export const confectSchema = defineSchema({
-  notes: defineTable(
+export const confectSchema = defineConfectSchema({
+  notes: defineConfectTable(
     Schema.Struct({
-      userId: Schema.optional(Id.Id("users")),
+      userId: Schema.optional(GenericId("users")),
       text: Schema.String.pipe(Schema.maxLength(100)),
       tag: Schema.optional(Schema.String),
       author: Schema.optional(
@@ -37,12 +41,12 @@ export const confectSchema = defineSchema({
       filterFields: ["author.name", "tag"],
       dimensions: 1536,
     }),
-  users: defineTable(
+  users: defineConfectTable(
     Schema.Struct({
       username: Schema.String,
     }),
   ),
-  tags: defineTable(Tag),
+  tags: defineConfectTable(Tag),
 });
 
 export default confectSchema.convexSchemaDefinition;

@@ -1,15 +1,16 @@
 {
   "compilerOptions": {
+    "plugins": [
+      {
+        "name": "@effect/language-service"
+      }
+    ],
     "importsNotUsedAsValues": "remove",
     "exactOptionalPropertyTypes": false,
     "lib": ["ESNext", "DOM"],
     "target": "ESNext",
     "moduleResolution": "Bundler",
-    "module": "ESNext",
-    "baseUrl": ".",
-    "paths": {
-      "~/*": ["*"]
-    }
+    "module": "ESNext"
   },
   "exclude": [
     "coverage",

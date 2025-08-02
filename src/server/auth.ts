@@ -1,16 +1,33 @@
-import type { Auth, UserIdentity } from "convex/server";
-import { Effect, Option, pipe } from "effect";
+import type { Auth } from "convex/server";
+import { Effect, flow, Layer, Option, Schema } from "effect";
 
-export interface ConfectAuth {
-  getUserIdentity(): Effect.Effect<Option.Option<UserIdentity>>;
+const make = (auth: Auth) => ({
+  getUserIdentity:
+    // TODO: Which errors might occur?
+    Effect.promise(() => auth.getUserIdentity()).pipe(
+      Effect.andThen(
+        flow(
+          Option.fromNullable,
+          Option.match({
+            onNone: () => Effect.fail(new NoUserIdentityFoundError()),
+            onSome: Effect.succeed,
+          }),
+        ),
+      ),
+    ),
+});
+
+export class ConfectAuth extends Effect.Tag("@rjdellecese/confect/ConfectAuth")<
+  ConfectAuth,
+  ReturnType<typeof make>
+>() {
+  static readonly layer = (auth: Auth) => Layer.succeed(this, make(auth));
 }
 
-export class ConfectAuthImpl implements ConfectAuth {
-  constructor(private auth: Auth) {}
-  getUserIdentity(): Effect.Effect<Option.Option<UserIdentity>> {
-    return pipe(
-      Effect.promise(() => this.auth.getUserIdentity()),
-      Effect.map(Option.fromNullable),
-    );
+export class NoUserIdentityFoundError extends Schema.TaggedError<NoUserIdentityFoundError>(
+  "NoUserIdentityFoundError",
+)("NoUserIdentityFoundError", {}) {
+  override get message(): string {
+    return "No user identity found";
   }
 }

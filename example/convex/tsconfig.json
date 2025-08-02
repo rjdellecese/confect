@@ -23,14 +23,6 @@
     "isolatedModules": true,
     "noEmit": true
   },
-  "include": [
-    "./**/*",
-    "../storage.test.ts",
-    "../auth.test.ts",
-    "../database.test.ts",
-    "../http.test.ts",
-    "../scheduler.test.ts",
-    "../vector_search.test.ts"
-  ],
+  "include": ["./**/*"],
   "exclude": ["./_generated"]
 }

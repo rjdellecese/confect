@@ -1,10 +1,10 @@
 import { Effect } from "effect";
 import {
-  action,
-  ConfectMutationCtx,
-  ConfectQueryCtx,
-  mutation,
-  query,
+  ConfectDatabaseReader,
+  ConfectDatabaseWriter,
+  confectAction,
+  confectMutation,
+  confectQuery,
 } from "./confect";
 import {
   DeleteNoteArgs,
@@ -19,52 +19,57 @@ import {
   ListNotesResult,
 } from "./functions.schemas";
 
-export const insertNote = mutation({
+export const insertNote = confectMutation({
   args: InsertNoteArgs,
   returns: InsertNoteResult,
   handler: ({ text }) =>
     Effect.gen(function* () {
-      const { db } = yield* ConfectMutationCtx;
+      const writer = yield* ConfectDatabaseWriter;
 
-      return yield* db.insert("notes", { text });
+      return yield* writer.insert("notes", { text });
     }),
 });
 
-export const listNotes = query({
+export const listNotes = confectQuery({
   args: ListNotesArgs,
   returns: ListNotesResult,
   handler: () =>
     Effect.gen(function* () {
-      const { db } = yield* ConfectQueryCtx;
+      const reader = yield* ConfectDatabaseReader;
 
-      return yield* db.query("notes").order("desc").collect();
+      return yield* reader
+        .table("notes")
+        .withIndex("by_creation_time", "desc")
+        .collect();
     }),
 });
 
-export const deleteNote = mutation({
+export const deleteNote = confectMutation({
   args: DeleteNoteArgs,
   returns: DeleteNoteResult,
   handler: ({ noteId }) =>
     Effect.gen(function* () {
-      const { db } = yield* ConfectMutationCtx;
+      const writer = yield* ConfectDatabaseWriter;
 
-      return yield* db.delete(noteId).pipe(Effect.as(null));
+      yield* writer.delete("notes", noteId);
+
+      return null;
     }),
 });
 
-export const getRandom = action({
+export const getRandom = confectAction({
   args: GetRandomArgs,
   returns: GetRandomResult,
   handler: () => Effect.succeed(Math.random()),
 });
 
-export const getFirst = query({
+export const getFirst = confectQuery({
   args: GetFirstArgs,
   returns: GetFirstResult,
   handler: () =>
     Effect.gen(function* () {
-      const { db } = yield* ConfectQueryCtx;
+      const reader = yield* ConfectDatabaseReader;
 
-      return yield* db.query("notes").first();
+      return yield* reader.table("notes").withIndex("by_creation_time").first();
     }),
 });

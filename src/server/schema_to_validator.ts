@@ -1,5 +1,4 @@
 import type {
-  GenericId,
   OptionalProperty,
   PropertyValidators,
   VAny,
@@ -14,6 +13,7 @@ import type {
   VNull,
   VObject,
   VOptional,
+  VRecord,
   VString,
   VUnion,
 } from "convex/values";
@@ -28,24 +28,25 @@ import {
   Number,
   Option,
   type ParseResult,
+  Predicate,
   pipe,
   Schema,
   SchemaAST,
   String,
 } from "effect";
-import { not } from "effect/Predicate";
 
-import * as Id from "~/src/server/schemas/Id";
+import * as GenericId from "./schemas/GenericId";
 import type {
   DeepMutable,
   IsAny,
   IsOptional,
+  IsRecordType,
   IsRecursive,
   IsUnion,
   IsValueLiteral,
   TypeError,
   UnionToTuple,
-} from "~/src/server/type-utils";
+} from "./type_utils";
 
 // Args
 
@@ -136,7 +137,7 @@ export type ValueToValidator<Vl> = IsRecursive<Vl> extends true
         ? Vl extends {
             __tableName: infer TableName extends string;
           }
-          ? VId<GenericId<TableName>>
+          ? VId<GenericId.GenericId<TableName>>
           : IsValueLiteral<Vl> extends true
             ? VLiteral<Vl>
             : Vl extends null
@@ -178,7 +179,9 @@ type RecordValueToValidator<Vl> = Vl extends ReadonlyRecordValue
     ? {
         -readonly [K in keyof Vl]: DeepMutable<Vl[K]>;
       } extends infer VlRecord extends Record<string, any>
-      ? VObject<VlRecord, VdRecord>
+      ? IsRecordType<VlRecord> extends true
+        ? VRecord<VlRecord, VString, VdRecord[keyof VdRecord]>
+        : VObject<VlRecord, VdRecord>
       : never
     : never
   : never;
@@ -321,7 +324,7 @@ export const compileAst = (
         ),
         Match.tag("BooleanKeyword", () => Effect.succeed(v.boolean())),
         Match.tag("StringKeyword", (stringAst) =>
-          Id.tableName(stringAst).pipe(
+          GenericId.tableName(stringAst).pipe(
             Option.match({
               onNone: () => Effect.succeed(v.string()),
               onSome: (tableName) => Effect.succeed(v.id(tableName)),
@@ -385,7 +388,7 @@ const handleUnion = (
   Effect.gen(function* () {
     const validatorEffects = isOptionalPropertyOfTypeLiteral
       ? Array.filterMap([first, second, ...rest], (type) =>
-          not(SchemaAST.isUndefinedKeyword)(type)
+          Predicate.not(SchemaAST.isUndefinedKeyword)(type)
             ? Option.some(compileAst(type))
             : Option.none(),
         )
@@ -413,8 +416,25 @@ const handleTypeLiteral = (typeLiteralAst: SchemaAST.TypeLiteral) =>
     Array.head,
     Option.match({
       onNone: () =>
-        pipe(handlePropertySignatures(typeLiteralAst), Effect.map(v.object)),
-      onSome: () => Effect.fail(new IndexSignaturesAreNotSupportedError()),
+        Effect.map(handlePropertySignatures(typeLiteralAst), v.object),
+      onSome: ({ parameter, type }) =>
+        pipe(
+          typeLiteralAst.propertySignatures,
+          Array.head,
+          Option.match({
+            onNone: () =>
+              Effect.map(
+                Effect.all({
+                  parameter: compileAst(parameter),
+                  type: compileAst(type),
+                }),
+                ({ parameter, type }) => v.record(parameter, type),
+              ),
+            onSome: () =>
+              // TODO: Some are; be more specific and give more helpful diagnostic information
+              Effect.fail(new IndexSignaturesAreNotSupportedError()),
+          }),
+        ),
     }),
   );
 

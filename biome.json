@@ -13,7 +13,10 @@
         "noBannedTypes": "off"
       },
       "correctness": {
-        "noUnusedImports": "warn"
+        "noUnusedImports": {
+          "level": "warn",
+          "fix": "safe"
+        }
       },
       "performance": {
         "noAccumulatingSpread": "off"
