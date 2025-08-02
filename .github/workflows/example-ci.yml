@@ -1,0 +1,54 @@
+name: Example CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  typecheck-vite:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: example
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/example-setup.yml
+      - name: Typecheck example
+        run: pnpm run typecheck:vite
+
+  typecheck-convex:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: example
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/example-setup.yml
+      - name: Typecheck example
+        run: pnpm run typecheck:convex
+
+  build-check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: example
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/example-setup.yml
+      - name: Check example can be built
+        run: pnpm run build
+
+  convex-check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: example
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/example-setup.yml
+      - name: Check Convex functions compile
+        run: pnpm run convex-check

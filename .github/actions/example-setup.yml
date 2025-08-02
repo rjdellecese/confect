@@ -1,0 +1,27 @@
+name: "Setup Example"
+description: "Sets up Node.js and pnpm and installs npm dependencies for the example app"
+author: "Confect"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Get pnpm version from root package.json
+      id: pnpm-version
+      shell: bash
+      run: echo "pnpm_version=$(node -p 'require(`./package.json`).engines.pnpm')" >> $GITHUB_OUTPUT
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: ${{ steps.pnpm-version.outputs.pnpm_version }}
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: "package.json"
+        cache: "pnpm"
+
+    - name: Install example dependencies
+      run: pnpm install
+      shell: bash
+      working-directory: example
