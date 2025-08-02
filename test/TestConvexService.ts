@@ -16,7 +16,7 @@ import {
 } from "convex-test";
 import { Context, Effect, Layer, pipe } from "effect";
 
-import schema from "~/test/convex/schema";
+import schema from "./convex/schema";
 
 export type TestConvexServiceWithoutIdentity = {
   query: <Query extends FunctionReference<"query", any>>(

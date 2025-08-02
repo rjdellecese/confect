@@ -1,10 +1,10 @@
 import { describe } from "@effect/vitest";
 import { assertEquals, assertFailure } from "@effect/vitest/utils";
 import { Cause, Effect, Runtime } from "effect";
-import { api } from "~/test/convex/_generated/api";
-import { TestConvexService } from "~/test/TestConvexService";
-import { effect } from "~/test/test_utils";
 import { NoUserIdentityFoundError } from "../src/server/auth";
+import { api } from "./convex/_generated/api";
+import { TestConvexService } from "./TestConvexService";
+import { effect } from "./test_utils";
 
 describe("authentication", () => {
   effect("when user is authenticated", () =>

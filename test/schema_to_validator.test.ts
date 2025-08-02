@@ -15,8 +15,8 @@ import {
   UnsupportedPropertySignatureKeyTypeError,
   UnsupportedSchemaTypeError,
   type ValueToValidator,
-} from "~/src/server/schema_to_validator";
-import { GenericId } from "~/src/server/schemas/GenericId";
+} from "../src/server/schema_to_validator";
+import { GenericId } from "../src/server/schemas/GenericId";
 
 describe(compileAst, () => {
   describe("allowed", () => {

@@ -1,11 +1,11 @@
 import { Effect, Schema } from "effect";
-import { GenericId } from "~/src/server/schemas/GenericId";
+import { GenericId } from "../../src/server/schemas/GenericId";
 import {
   ConfectStorageActionWriter,
   ConfectStorageReader,
   ConfectStorageWriter,
   confectAction,
-} from "~/test/convex/confect";
+} from "./confect";
 
 export const confectStorageReaderGetUrl = confectAction({
   args: Schema.Struct({

@@ -19,7 +19,7 @@ export const runInQuery = confectQuery({
   returns: Schema.String,
   handler: ({ text }): Effect.Effect<string, never, ConfectQueryRunner> =>
     Effect.gen(function* () {
-      const { runQuery } = yield* ConfectQueryRunner;
+      const runQuery = yield* ConfectQueryRunner;
 
       return yield* runQuery(internal.runners.queryToRun, {
         text,
@@ -42,7 +42,7 @@ export const runInMutation = confectMutation({
   returns: Schema.String,
   handler: ({ text }): Effect.Effect<string, never, ConfectMutationRunner> =>
     Effect.gen(function* () {
-      const { runMutation } = yield* ConfectMutationRunner;
+      const runMutation = yield* ConfectMutationRunner;
 
       return yield* runMutation(internal.runners.mutationToRun, {
         text,
@@ -65,7 +65,7 @@ export const runInAction = confectAction({
   returns: Schema.String,
   handler: ({ text }): Effect.Effect<string, never, ConfectActionRunner> =>
     Effect.gen(function* () {
-      const { runAction } = yield* ConfectActionRunner;
+      const runAction = yield* ConfectActionRunner;
 
       return yield* runAction(internal.runners.actionToRun, {
         text,

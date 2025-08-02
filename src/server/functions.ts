@@ -25,9 +25,12 @@ import {
   confectDatabaseWriterLayer,
 } from "./database";
 import {
-  ConfectActionRunner,
-  ConfectMutationRunner,
-  ConfectQueryRunner,
+  type ConfectActionRunner,
+  type ConfectMutationRunner,
+  type ConfectQueryRunner,
+  confectActionRunnerLayer,
+  confectMutationRunnerLayer,
+  confectQueryRunnerLayer,
 } from "./runners";
 import { ConfectScheduler } from "./scheduler";
 import type {
@@ -41,7 +44,10 @@ import {
   ConfectStorageReader,
   ConfectStorageWriter,
 } from "./storage";
-import { ConfectVectorSearch } from "./vector_search";
+import {
+  type ConfectVectorSearch,
+  confectVectorSearchLayer,
+} from "./vector_search";
 
 export const makeConfectFunctions = <
   ConfectSchema extends GenericConfectSchema,
@@ -56,8 +62,6 @@ export const makeConfectFunctions = <
     ConfectDatabaseWriterTag<ConfectSchemaDefinition<ConfectSchema>>();
   type ConfectDatabaseReader = typeof ConfectDatabaseReader.Identifier;
   type ConfectDatabaseWriter = typeof ConfectDatabaseWriter.Identifier;
-
-  type ConfectVectorSearch = typeof ConfectVectorSearch.Identifier;
 
   type DataModel = DataModelFromConfectDataModel<ConfectDataModel>;
 
@@ -165,7 +169,7 @@ export const makeConfectFunctions = <
                 confectDatabaseReaderLayer(confectSchemaDefinition, ctx.db),
                 ConfectAuth.layer(ctx.auth),
                 ConfectStorageReader.layer(ctx.storage),
-                ConfectQueryRunner.layer(ctx.runQuery),
+                confectQueryRunnerLayer(ctx.runQuery),
                 Layer.succeed(QueryCtx, ctx),
               ),
             ),
@@ -292,8 +296,8 @@ export const makeConfectFunctions = <
                 ConfectScheduler.layer(ctx.scheduler),
                 ConfectStorageReader.layer(ctx.storage),
                 ConfectStorageWriter.layer(ctx.storage),
-                ConfectQueryRunner.layer(ctx.runQuery),
-                ConfectMutationRunner.layer(ctx.runMutation),
+                confectQueryRunnerLayer(ctx.runQuery),
+                confectMutationRunnerLayer(ctx.runMutation),
                 Layer.succeed(MutationCtx, ctx),
               ),
             ),
@@ -420,10 +424,10 @@ export const makeConfectFunctions = <
                 ConfectStorageReader.layer(ctx.storage),
                 ConfectStorageWriter.layer(ctx.storage),
                 ConfectStorageActionWriter.layer(ctx.storage),
-                ConfectQueryRunner.layer(ctx.runQuery),
-                ConfectMutationRunner.layer(ctx.runMutation),
-                ConfectActionRunner.layer(ctx.runAction),
-                ConfectVectorSearch.layer(ctx.vectorSearch),
+                confectQueryRunnerLayer(ctx.runQuery),
+                confectMutationRunnerLayer(ctx.runMutation),
+                confectActionRunnerLayer(ctx.runAction),
+                confectVectorSearchLayer(ctx.vectorSearch),
                 Layer.succeed(ActionCtx, ctx),
               ),
             ),
@@ -445,6 +449,5 @@ export const makeConfectFunctions = <
     confectInternalAction,
     ConfectDatabaseReader,
     ConfectDatabaseWriter,
-    ConfectVectorSearch,
   };
 };

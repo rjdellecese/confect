@@ -17,6 +17,7 @@ export default defineConfig({
         ...(configDefaults.coverage?.exclude ?? []),
         "example/**/*",
         "src/**/index.ts",
+        "tsdown.config.ts",
       ],
     },
     typecheck: {

@@ -2,14 +2,14 @@ import { Effect, Schema } from "effect";
 import type {
   DocumentDecodeError,
   DocumentEncodeError,
-} from "~/src/server/database";
-import { api } from "~/test/convex/_generated/api";
+} from "../../src/server/database";
+import { api } from "./_generated/api";
 import {
   ConfectDatabaseWriter,
   ConfectScheduler,
   confectAction,
   confectMutation,
-} from "~/test/convex/confect";
+} from "./confect";
 
 export const insertAfter = confectAction({
   args: Schema.Struct({

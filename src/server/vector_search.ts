@@ -5,7 +5,7 @@ import type {
   VectorIndexNames,
   VectorSearchQuery,
 } from "convex/server";
-import { Effect, Layer } from "effect";
+import { Context, Effect, Layer } from "effect";
 import type {
   DataModelFromConfectDataModel,
   GenericConfectDataModel,
@@ -17,10 +17,11 @@ type VectorSearch<ConfectDataModel extends GenericConfectDataModel> =
     DataModelFromConfectDataModel<ConfectDataModel>
   >["vectorSearch"];
 
-const make = <ConfectDataModel extends GenericConfectDataModel>(
-  vectorSearch: VectorSearch<ConfectDataModel>,
-) => ({
-  vectorSearch: <
+const make =
+  <ConfectDataModel extends GenericConfectDataModel>(
+    vectorSearch: VectorSearch<ConfectDataModel>,
+  ) =>
+  <
     TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
     IndexName extends VectorIndexNames<
       NamedTableInfo<DataModelFromConfectDataModel<ConfectDataModel>, TableName>
@@ -37,13 +38,16 @@ const make = <ConfectDataModel extends GenericConfectDataModel>(
         IndexName
       >
     >,
-  ) => Effect.promise(() => vectorSearch(tableName, indexName, query)),
-});
+  ) =>
+    Effect.promise(() => vectorSearch(tableName, indexName, query));
 
-export class ConfectVectorSearch extends Effect.Tag(
+export const ConfectVectorSearch = Context.GenericTag<ReturnType<typeof make>>(
   "@rjdellecese/confect/ConfectVectorSearch",
-)<ConfectVectorSearch, ReturnType<typeof make>>() {
-  static readonly layer = <ConfectDataModel extends GenericConfectDataModel>(
-    vectorSearch: VectorSearch<ConfectDataModel>,
-  ) => Layer.succeed(this, make(vectorSearch));
-}
+);
+export type ConfectVectorSearch = typeof ConfectVectorSearch.Identifier;
+
+export const confectVectorSearchLayer = <
+  ConfectDataModel extends GenericConfectDataModel,
+>(
+  vectorSearch: VectorSearch<ConfectDataModel>,
+) => Layer.succeed(ConfectVectorSearch, make(vectorSearch));

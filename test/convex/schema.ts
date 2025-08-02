@@ -1,6 +1,6 @@
 import { Schema } from "effect";
-import * as schema from "~/src/server/schema";
-import { GenericId } from "~/src/server/schemas/GenericId";
+import * as schema from "../../src/server/schema";
+import { GenericId } from "../../src/server/schemas/GenericId";
 
 export const confectSchemaTables = {
   notes: schema

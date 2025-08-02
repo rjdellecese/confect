@@ -7,7 +7,7 @@ import {
 } from "@effect/platform";
 
 import { Effect, Layer, Schema } from "effect";
-import { makeConvexHttpRouter } from "~/src/server";
+import { makeConvexHttpRouter } from "../../src/server";
 
 // root
 

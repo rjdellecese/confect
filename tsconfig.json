@@ -10,11 +10,7 @@
     "lib": ["ESNext", "DOM"],
     "target": "ESNext",
     "moduleResolution": "Bundler",
-    "module": "ESNext",
-    "baseUrl": ".",
-    "paths": {
-      "~/*": ["*"]
-    }
+    "module": "ESNext"
   },
   "exclude": [
     "coverage",

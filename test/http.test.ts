@@ -1,7 +1,7 @@
 import { describe, expect } from "@effect/vitest";
 import { Effect } from "effect";
-import { TestConvexService } from "~/test/TestConvexService";
-import { effect } from "~/test/test_utils";
+import { TestConvexService } from "./TestConvexService";
+import { effect } from "./test_utils";
 
 describe("http", () => {
   describe("/", () => {

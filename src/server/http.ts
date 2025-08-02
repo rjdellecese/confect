@@ -19,9 +19,12 @@ import { Array, Layer, pipe, Record } from "effect";
 import { ConfectAuth } from "./auth";
 import { ConvexActionCtx } from "./ctx";
 import {
-  ConfectActionRunner,
-  ConfectMutationRunner,
-  ConfectQueryRunner,
+  type ConfectActionRunner,
+  type ConfectMutationRunner,
+  type ConfectQueryRunner,
+  confectActionRunnerLayer,
+  confectMutationRunnerLayer,
+  confectQueryRunnerLayer,
 } from "./runners";
 import { ConfectScheduler } from "./scheduler";
 import {
@@ -65,9 +68,9 @@ const makeHandler =
     const ApiLive = apiLive.pipe(
       Layer.provide(
         Layer.mergeAll(
-          ConfectQueryRunner.layer(ctx.runQuery),
-          ConfectMutationRunner.layer(ctx.runMutation),
-          ConfectActionRunner.layer(ctx.runAction),
+          confectQueryRunnerLayer(ctx.runQuery),
+          confectMutationRunnerLayer(ctx.runMutation),
+          confectActionRunnerLayer(ctx.runAction),
           ConfectScheduler.layer(ctx.scheduler),
           ConfectAuth.layer(ctx.auth),
           ConfectStorageReader.layer(ctx.storage),

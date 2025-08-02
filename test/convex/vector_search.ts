@@ -1,14 +1,14 @@
 import { Effect, type ParseResult, Schema } from "effect";
-import { api } from "~/test/convex/_generated/api";
+import { GenericId } from "../../src/server";
+import { api } from "../convex/_generated/api";
 import {
   ConfectDatabaseReader,
   ConfectQueryRunner,
   ConfectVectorSearch,
   confectAction,
   confectQuery,
-} from "~/test/convex/confect";
-import { confectSchema } from "~/test/convex/schema";
-import { GenericId } from "../../src/server";
+} from "../convex/confect";
+import { confectSchema } from "../convex/schema";
 
 export const vectorSearch = confectAction({
   args: Schema.Struct({
@@ -32,8 +32,8 @@ export const vectorSearch = confectAction({
     ConfectVectorSearch | ConfectQueryRunner
   > =>
     Effect.gen(function* () {
-      const { vectorSearch } = yield* ConfectVectorSearch;
-      const { runQuery } = yield* ConfectQueryRunner;
+      const vectorSearch = yield* ConfectVectorSearch;
+      const runQuery = yield* ConfectQueryRunner;
 
       return yield* vectorSearch("notes", "embedding", {
         vector: vector as number[],

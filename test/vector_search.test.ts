@@ -1,8 +1,8 @@
 import { describe, expect } from "@effect/vitest";
 import { Effect } from "effect";
-import { api } from "~/test/convex/_generated/api";
-import { TestConvexService } from "~/test/TestConvexService";
-import { effect } from "~/test/test_utils";
+import { api } from "../test/convex/_generated/api";
+import { TestConvexService } from "../test/TestConvexService";
+import { effect } from "../test/test_utils";
 
 describe("ConfectVectorSearch", () => {
   effect("vectorSearch", () =>

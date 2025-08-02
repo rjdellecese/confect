@@ -5,59 +5,58 @@ import type {
   GenericQueryCtx,
   OptionalRestArgs,
 } from "convex/server";
-import { Effect, Layer } from "effect";
+import { Context, Effect, Layer } from "effect";
 
-const makeQueryRunner = (runQuery: GenericQueryCtx<any>["runQuery"]) => ({
-  runQuery: <Query extends FunctionReference<"query", "public" | "internal">>(
+const makeQueryRunner =
+  (runQuery: GenericQueryCtx<any>["runQuery"]) =>
+  <Query extends FunctionReference<"query", "public" | "internal">>(
     query: Query,
     ...args: OptionalRestArgs<Query>
   ) =>
     // TODO: Which errors might occur?
-    Effect.promise(() => runQuery(query, ...args)),
-});
+    Effect.promise(() => runQuery(query, ...args));
 
-const makeMutationRunner = (
-  runMutation: GenericMutationCtx<any>["runMutation"],
-) => ({
-  runMutation: <
-    Mutation extends FunctionReference<"mutation", "public" | "internal">,
-  >(
+const makeMutationRunner =
+  (runMutation: GenericMutationCtx<any>["runMutation"]) =>
+  <Mutation extends FunctionReference<"mutation", "public" | "internal">>(
     mutation: Mutation,
     ...args: OptionalRestArgs<Mutation>
   ) =>
     // TODO: Which errors might occur?
-    Effect.promise(() => runMutation(mutation, ...args)),
-});
+    Effect.promise(() => runMutation(mutation, ...args));
 
-const makeActionRunner = (runAction: GenericActionCtx<any>["runAction"]) => ({
-  runAction: <
-    Action extends FunctionReference<"action", "public" | "internal">,
-  >(
+const makeActionRunner =
+  (runAction: GenericActionCtx<any>["runAction"]) =>
+  <Action extends FunctionReference<"action", "public" | "internal">>(
     action: Action,
     ...args: OptionalRestArgs<Action>
   ) =>
     // TODO: Which errors might occur?
-    Effect.promise(() => runAction(action, ...args)),
-});
+    Effect.promise(() => runAction(action, ...args));
 
-export class ConfectQueryRunner extends Effect.Tag(
-  "@rjdellecese/confect/ConfectQueryRunner",
-)<ConfectQueryRunner, ReturnType<typeof makeQueryRunner>>() {
-  static readonly layer = (runQuery: GenericQueryCtx<any>["runQuery"]) =>
-    Layer.succeed(this, makeQueryRunner(runQuery));
-}
+export const ConfectQueryRunner = Context.GenericTag<
+  ReturnType<typeof makeQueryRunner>
+>("@rjdellecese/confect/ConfectQueryRunner");
+export type ConfectQueryRunner = typeof ConfectQueryRunner.Identifier;
 
-export class ConfectMutationRunner extends Effect.Tag(
-  "@rjdellecese/confect/ConfectMutationRunner",
-)<ConfectMutationRunner, ReturnType<typeof makeMutationRunner>>() {
-  static readonly layer = (
-    runMutation: GenericMutationCtx<any>["runMutation"],
-  ) => Layer.succeed(this, makeMutationRunner(runMutation));
-}
+export const confectQueryRunnerLayer = (
+  runQuery: GenericQueryCtx<any>["runQuery"],
+) => Layer.succeed(ConfectQueryRunner, makeQueryRunner(runQuery));
 
-export class ConfectActionRunner extends Effect.Tag(
-  "@rjdellecese/confect/ConfectActionRunner",
-)<ConfectActionRunner, ReturnType<typeof makeActionRunner>>() {
-  static readonly layer = (runAction: GenericActionCtx<any>["runAction"]) =>
-    Layer.succeed(this, makeActionRunner(runAction));
-}
+export const ConfectMutationRunner = Context.GenericTag<
+  ReturnType<typeof makeMutationRunner>
+>("@rjdellecese/confect/ConfectMutationRunner");
+export type ConfectMutationRunner = typeof ConfectMutationRunner.Identifier;
+
+export const confectMutationRunnerLayer = (
+  runMutation: GenericMutationCtx<any>["runMutation"],
+) => Layer.succeed(ConfectMutationRunner, makeMutationRunner(runMutation));
+
+export const ConfectActionRunner = Context.GenericTag<
+  ReturnType<typeof makeActionRunner>
+>("@rjdellecese/confect/ConfectActionRunner");
+export type ConfectActionRunner = typeof ConfectActionRunner.Identifier;
+
+export const confectActionRunnerLayer = (
+  runAction: GenericActionCtx<any>["runAction"],
+) => Layer.succeed(ConfectActionRunner, makeActionRunner(runAction));

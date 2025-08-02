@@ -1,9 +1,9 @@
 import { describe, vi } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
 import { DateTime, Duration, Effect, Schema } from "effect";
-import { api } from "~/test/convex/_generated/api";
-import { TestConvexService } from "~/test/TestConvexService";
-import { effect } from "~/test/test_utils";
+import { api } from "./convex/_generated/api";
+import { TestConvexService } from "./TestConvexService";
+import { effect } from "./test_utils";
 
 describe("ConfectScheduler", () => {
   effect("runAfter", () =>

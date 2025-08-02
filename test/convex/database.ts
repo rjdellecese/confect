@@ -1,13 +1,13 @@
 import { Chunk, Effect, Schema, Stream } from "effect";
-import { GenericId } from "~/src/server/schemas/GenericId";
-import { PaginationResult } from "~/src/server/schemas/PaginationResult";
+import { GenericId } from "../../src/server/schemas/GenericId";
+import { PaginationResult } from "../../src/server/schemas/PaginationResult";
 import {
   ConfectDatabaseReader,
   ConfectDatabaseWriter,
   confectMutation,
   confectQuery,
-} from "~/test/convex/confect";
-import { confectSchema } from "~/test/convex/schema";
+} from "./confect";
+import { confectSchema } from "./schema";
 
 export const getById = confectQuery({
   args: Schema.Struct({

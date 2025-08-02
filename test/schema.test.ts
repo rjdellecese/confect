@@ -4,7 +4,7 @@ import { Schema } from "effect";
 import type {
   DataModelFromConfectDataModel,
   GenericConfectDataModel,
-} from "~/src/server/data_model";
+} from "../src/server/data_model";
 import {
   type ConfectDataModelFromConfectSchema,
   type ConfectSystemDataModel,
@@ -14,8 +14,8 @@ import {
   type confectSystemTableSchemas,
   defineConfectSchema,
   defineConfectTable,
-} from "~/src/server/schema";
-import { extendWithSystemFields } from "~/src/server/schemas/SystemFields";
+} from "../src/server/schema";
+import { extendWithSystemFields } from "../src/server/schemas/SystemFields";
 
 describe("ConfectDataModelFromConfectSchema", () => {
   test("produces a type which is assignable to GenericConfectDataModel", () => {
