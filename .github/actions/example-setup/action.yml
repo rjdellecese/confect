@@ -1,4 +1,4 @@
-name: "Setup Example"
+name: "Setup (example)"
 description: "Sets up Node.js and pnpm and installs npm dependencies for the example app"
 author: "Confect"
 
