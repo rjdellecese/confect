@@ -13,26 +13,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/package-setup.yml
+      - uses: ./.github/actions/package-setup
       - run: pnpm run typecheck
 
   lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/package-setup.yml
+      - uses: ./.github/actions/package-setup
       - run: pnpm run lint
 
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/package-setup.yml
+      - uses: ./.github/actions/package-setup
       - run: pnpm run test
 
   check-bundled-types:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/package-setup.yml
+      - uses: ./.github/actions/package-setup
       - run: pnpm run check-types

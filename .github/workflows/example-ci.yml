@@ -16,7 +16,7 @@ jobs:
         working-directory: example
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/example-setup.yml
+      - uses: ./.github/actions/example-setup
       - name: Typecheck example
         run: pnpm run typecheck:vite
 
@@ -27,7 +27,7 @@ jobs:
         working-directory: example
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/example-setup.yml
+      - uses: ./.github/actions/example-setup
       - name: Typecheck example
         run: pnpm run typecheck:convex
 
@@ -38,17 +38,6 @@ jobs:
         working-directory: example
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/example-setup.yml
+      - uses: ./.github/actions/example-setup
       - name: Check example can be built
         run: pnpm run build
-
-  convex-check:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: example
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/example-setup.yml
-      - name: Check Convex functions compile
-        run: pnpm run convex-check
