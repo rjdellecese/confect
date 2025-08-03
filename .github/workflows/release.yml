@@ -35,7 +35,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Create release pull request
+      - name: Create release pull request or publish
         uses: changesets/action@v1
         with:
           publish: pnpm release

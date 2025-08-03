@@ -1,5 +1,5 @@
-name: "Monorepo Setup"
-description: "Sets up Node.js and pnpm and installs dependencies for the entire monorepo"
+name: "Confect Package Setup"
+description: "Sets up Node.js and pnpm for the confect package"
 author: "Confect"
 
 runs:
@@ -27,8 +27,4 @@ runs:
 
     - name: Generate Convex types (confect)
       run: pnpm --filter @rjdellecese/confect convex-codegen
-      shell: bash
-
-    - name: Generate Convex types (example)
-      run: pnpm --filter example convex-codegen
       shell: bash

@@ -1,0 +1,62 @@
+name: Confect Package
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/confect/**'
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/confect.yml'
+      - '.github/actions/confect-setup/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'packages/confect/**'
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/confect.yml'
+      - '.github/actions/confect-setup/**'
+
+jobs:
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/confect-setup
+      - run: pnpm --filter @rjdellecese/confect typecheck
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/confect-setup
+      - run: pnpm --filter @rjdellecese/confect lint
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/confect-setup
+      - run: pnpm --filter @rjdellecese/confect test
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/confect-setup
+      - run: pnpm --filter @rjdellecese/confect build
+
+  check-bundled-types:
+    name: Check Bundled Types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/confect-setup
+      - run: pnpm --filter @rjdellecese/confect check-bundled-types

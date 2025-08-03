@@ -1,11 +1,11 @@
-name: "Setup (example)"
-description: "Sets up Node.js and pnpm and installs npm dependencies for the example app"
+name: "Example App Setup"
+description: "Sets up Node.js and pnpm for the example app"
 author: "Confect"
 
 runs:
   using: "composite"
   steps:
-    - name: Get pnpm version from root package.json
+    - name: Get pnpm version from package.json
       id: pnpm-version
       shell: bash
       run: echo "pnpm_version=$(node -p 'require(`./package.json`).engines.pnpm')" >> $GITHUB_OUTPUT
@@ -21,11 +21,18 @@ runs:
         node-version-file: "package.json"
         cache: "pnpm"
 
-    - name: Install workspace dependencies
+    - name: Install dependencies
       run: pnpm install
       shell: bash
 
-    - name: Generate Convex types
-      run: pnpm run convex-codegen
+    - name: Build confect package (dependency)
+      run: pnpm --filter @rjdellecese/confect build
       shell: bash
-      working-directory: example
+
+    - name: Generate Convex types (confect)
+      run: pnpm --filter @rjdellecese/confect convex-codegen
+      shell: bash
+
+    - name: Generate Convex types (example)
+      run: pnpm --filter example convex-codegen
+      shell: bash
