@@ -3,7 +3,7 @@ import { NodeContext } from "@effect/platform-node";
 import { Effect } from "effect";
 
 export const setup = () =>
-  Command.make("pnpm", "convex", "codegen", "--typecheck=disable").pipe(
+  Command.make("pnpm", "convex", "codegen").pipe(
     Command.stdout("inherit"),
     Command.stderr("inherit"),
     Command.exitCode,

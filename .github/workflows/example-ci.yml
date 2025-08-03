@@ -9,7 +9,7 @@ on:
       - main
 
 jobs:
-  typecheck:
+  typecheck-vite:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -17,9 +17,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/example-setup
-      - run: pnpm run typecheck
+      - run: pnpm run typecheck:vite
 
-  build-check:
+  typecheck-convex:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: example
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/example-setup
+      - run: pnpm run typecheck:convex
+
+  build:
     runs-on: ubuntu-latest
     defaults:
       run:

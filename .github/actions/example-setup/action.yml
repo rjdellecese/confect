@@ -29,3 +29,8 @@ runs:
       run: pnpm install
       shell: bash
       working-directory: example
+
+    - name: Generate Convex types
+      run: pnpm run convex-codegen
+      shell: bash
+      working-directory: example

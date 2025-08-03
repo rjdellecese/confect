@@ -48,7 +48,6 @@
 		"lint": "biome ci --error-on-warnings",
 		"release": "pnpm build && changeset publish",
 		"start": "convex dev",
-		"postinstall": "pnpm convex codegen",
 		"test": "vitest --run --typecheck --coverage",
 		"test:watch": "vitest --typecheck --coverage"
 	},

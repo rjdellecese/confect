@@ -7,8 +7,9 @@
   "scripts": {
     "dev": "concurrently --restart-tries=-1 --prefix-colors='white.bold.bgCyan,white.bold.bgYellow' --prefix=' {name} ' --names='VITE,CONVEX' 'vite' 'convex dev --tail-logs'",
     "pnpm:devPreinstall": "[ -d node_modules ] && rm -r node_modules; cd .. && pnpm build",
-    "postinstall": "pnpm convex codegen",
-    "typecheck": "tsc --noEmit --project tsconfig.json",
+    "convex-codegen": "pnpm convex codegen",
+    "typecheck:vite": "tsc --noEmit --project tsconfig.json",
+    "typecheck:convex": "tsc --noEmit --project convex/tsconfig.json",
     "build": "vite build --mode development"
   },
   "keywords": [],
