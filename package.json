@@ -43,6 +43,7 @@
 	"scripts": {
 		"build": "tsdown",
 		"check-bundled-types": "pnpm build && attw --pack --profile=node16",
+		"convex-codegen": "pnpm convex codegen",
 		"typecheck": "tsc --noEmit --project tsconfig.json",
 		"fix": "biome check --write",
 		"lint": "biome ci --error-on-warnings",

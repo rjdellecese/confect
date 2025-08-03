@@ -24,3 +24,7 @@ runs:
     - name: Install dependencies
       run: pnpm install
       shell: bash
+
+    - name: Generate Convex types
+      run: pnpm run convex-codegen
+      shell: bash
