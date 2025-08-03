@@ -1,7 +1,6 @@
 .env.local
 .pnpm-store/
 .tsup
-.vscode/
 coverage/
 dist/
 node_modules/
