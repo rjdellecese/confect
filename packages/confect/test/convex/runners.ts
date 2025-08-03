@@ -1,5 +1,5 @@
-import { Effect, Schema } from 'effect';
-import { internal } from '../convex/_generated/api';
+import { Effect, Schema } from "effect";
+import { internal } from "../convex/_generated/api";
 import {
   ConfectActionRunner,
   ConfectMutationRunner,
@@ -10,7 +10,7 @@ import {
   confectInternalQuery,
   confectMutation,
   confectQuery,
-} from '../convex/confect';
+} from "../convex/confect";
 
 export const runInQuery = confectQuery({
   args: Schema.Struct({

@@ -8,26 +8,26 @@ import type {
   OptionalRestArgs,
   StorageActionWriter,
   UserIdentity,
-} from 'convex/server';
+} from "convex/server";
 import {
   convexTest,
   type TestConvexForDataModel,
   type TestConvexForDataModelAndIdentity,
-} from 'convex-test';
-import { Context, Effect, Layer, pipe } from 'effect';
+} from "convex-test";
+import { Context, Effect, Layer, pipe } from "effect";
 
-import schema from './convex/schema';
+import schema from "./convex/schema";
 
 export type TestConvexServiceWithoutIdentity = {
-  query: <Query extends FunctionReference<'query', any>>(
+  query: <Query extends FunctionReference<"query", any>>(
     query: Query,
     ...args: OptionalRestArgs<Query>
   ) => Effect.Effect<FunctionReturnType<Query>>;
-  mutation: <Mutation extends FunctionReference<'mutation', any>>(
+  mutation: <Mutation extends FunctionReference<"mutation", any>>(
     mutation: Mutation,
     ...args: OptionalRestArgs<Mutation>
   ) => Effect.Effect<FunctionReturnType<Mutation>>;
-  action: <Action extends FunctionReference<'action', any>>(
+  action: <Action extends FunctionReference<"action", any>>(
     action: Action,
     ...args: OptionalRestArgs<Action>
   ) => Effect.Effect<FunctionReturnType<Action>>;
@@ -55,7 +55,7 @@ export type TestConvexService = {
 } & TestConvexServiceWithoutIdentity;
 
 export const TestConvexService = Context.GenericTag<TestConvexService>(
-  '@rjdellecese/confect/TestConvexService',
+  "@rjdellecese/confect/TestConvexService",
 );
 
 class TestConvexServiceImplWithoutIdentity
@@ -67,17 +67,17 @@ class TestConvexServiceImplWithoutIdentity
     >,
   ) {}
 
-  readonly query = <Query extends FunctionReference<'query', any>>(
+  readonly query = <Query extends FunctionReference<"query", any>>(
     query: Query,
     ...args: OptionalRestArgs<Query>
   ) => Effect.promise(() => this.testConvex.query(query, ...args));
 
-  readonly mutation = <Mutation extends FunctionReference<'mutation', any>>(
+  readonly mutation = <Mutation extends FunctionReference<"mutation", any>>(
     mutation: Mutation,
     ...args: OptionalRestArgs<Mutation>
   ) => Effect.promise(() => this.testConvex.mutation(mutation, ...args));
 
-  readonly action = <Action extends FunctionReference<'action', any>>(
+  readonly action = <Action extends FunctionReference<"action", any>>(
     action: Action,
     ...args: OptionalRestArgs<Action>
   ) => Effect.promise(() => this.testConvex.action(action, ...args));
@@ -118,17 +118,17 @@ class TestConvexServiceImpl implements TestConvexService {
       this.testConvex.withIdentity(userIdentity),
     );
 
-  readonly query = <Query extends FunctionReference<'query', any>>(
+  readonly query = <Query extends FunctionReference<"query", any>>(
     query: Query,
     ...args: OptionalRestArgs<Query>
   ) => Effect.promise(() => this.testConvex.query(query, ...args));
 
-  readonly mutation = <Mutation extends FunctionReference<'mutation', any>>(
+  readonly mutation = <Mutation extends FunctionReference<"mutation", any>>(
     mutation: Mutation,
     ...args: OptionalRestArgs<Mutation>
   ) => Effect.promise(() => this.testConvex.mutation(mutation, ...args));
 
-  readonly action = <Action extends FunctionReference<'action', any>>(
+  readonly action = <Action extends FunctionReference<"action", any>>(
     action: Action,
     ...args: OptionalRestArgs<Action>
   ) => Effect.promise(() => this.testConvex.action(action, ...args));
@@ -158,7 +158,7 @@ class TestConvexServiceImpl implements TestConvexService {
 // In theory it might be possible to also have a version of this which runs the tests on the local or cloud backends
 export const layer = Effect.sync(() =>
   pipe(
-    convexTest(schema, import.meta.glob('./**/!(*.*.*)*.*s')),
+    convexTest(schema, import.meta.glob("./**/!(*.*.*)*.*s")),
     (testConvex): TestConvexService => new TestConvexServiceImpl(testConvex),
   ),
 ).pipe(Layer.effect(TestConvexService));

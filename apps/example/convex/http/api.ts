@@ -4,27 +4,27 @@ import {
   HttpApiEndpoint,
   HttpApiGroup,
   OpenApi,
-} from '@effect/platform';
-import type { HttpApiDecodeError } from '@effect/platform/HttpApiError';
-import { Effect, Layer, Option, Schema } from 'effect';
-import { api } from '../_generated/api';
-import { ConfectQueryRunner } from '../confect';
-import { GetFirstResult } from '../functions.schemas';
-import { confectSchema } from '../schema';
+} from "@effect/platform";
+import type { HttpApiDecodeError } from "@effect/platform/HttpApiError";
+import { Effect, Layer, Option, Schema } from "effect";
+import { api } from "../_generated/api";
+import { ConfectQueryRunner } from "../confect";
+import { GetFirstResult } from "../functions.schemas";
+import { confectSchema } from "../schema";
 
-class ApiGroup extends HttpApiGroup.make('notes')
+class ApiGroup extends HttpApiGroup.make("notes")
   .add(
-    HttpApiEndpoint.get('getFirst', '/get-first')
-      .annotate(OpenApi.Description, 'Get the first note, if there is one.')
+    HttpApiEndpoint.get("getFirst", "/get-first")
+      .annotate(OpenApi.Description, "Get the first note, if there is one.")
       .addSuccess(
         Schema.NullOr(confectSchema.tableSchemas.notes.withSystemFields),
       ),
   )
-  .annotate(OpenApi.Title, 'Notes')
-  .annotate(OpenApi.Description, 'Operations on notes.') {}
+  .annotate(OpenApi.Title, "Notes")
+  .annotate(OpenApi.Description, "Operations on notes.") {}
 
-export class Api extends HttpApi.make('Api')
-  .annotate(OpenApi.Title, 'Confect Example')
+export class Api extends HttpApi.make("Api")
+  .annotate(OpenApi.Title, "Confect Example")
   .annotate(
     OpenApi.Description,
     `
@@ -36,13 +36,13 @@ See Scalar's documentation on [markdown support](https://github.com/scalar/scala
 	`,
   )
   .add(ApiGroup)
-  .prefix('/path-prefix') {}
+  .prefix("/path-prefix") {}
 
-const ApiGroupLive = HttpApiBuilder.group(Api, 'notes', (handlers) =>
+const ApiGroupLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
   handlers.handle(
-    'getFirst',
+    "getFirst",
     (): Effect.Effect<
-      (typeof confectSchema.tableSchemas.notes.withSystemFields)['Type'] | null,
+      (typeof confectSchema.tableSchemas.notes.withSystemFields)["Type"] | null,
       HttpApiDecodeError,
       ConfectQueryRunner
     > =>

@@ -1,12 +1,12 @@
-import tsconfigPaths from 'vite-tsconfig-paths';
-import { configDefaults, defineConfig } from 'vitest/config';
+import tsconfigPaths from "vite-tsconfig-paths";
+import { configDefaults, defineConfig } from "vitest/config";
 
 export default defineConfig({
   plugins: [tsconfigPaths()],
   test: {
-    globalSetup: ['./test/setup.ts'],
+    globalSetup: ["./test/setup.ts"],
     coverage: {
-      provider: 'v8',
+      provider: "v8",
       thresholds: {
         statements: 100,
         branches: 100,
@@ -15,13 +15,13 @@ export default defineConfig({
       },
       exclude: [
         ...(configDefaults.coverage?.exclude ?? []),
-        'example/**/*',
-        'src/**/index.ts',
-        'tsdown.config.ts',
+        "example/**/*",
+        "src/**/index.ts",
+        "tsdown.config.ts",
       ],
     },
     typecheck: {
-      include: ['**/*.{test,spec}{-d,}.?(c|m)[jt]s?(x)'],
+      include: ["**/*.{test,spec}{-d,}.?(c|m)[jt]s?(x)"],
     },
   },
 });

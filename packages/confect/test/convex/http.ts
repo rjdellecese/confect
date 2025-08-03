@@ -4,46 +4,46 @@ import {
   HttpApiEndpoint,
   HttpApiGroup,
   OpenApi,
-} from '@effect/platform';
+} from "@effect/platform";
 
-import { Effect, Layer, Schema } from 'effect';
-import { makeConvexHttpRouter } from '../../src/server';
+import { Effect, Layer, Schema } from "effect";
+import { makeConvexHttpRouter } from "../../src/server";
 
 // root
 
-const ApiGroup = HttpApiGroup.make('apiGroup').add(
-  HttpApiEndpoint.get('get', '/get')
-    .addSuccess(Schema.Literal('Hello, world!'))
-    .annotate(OpenApi.Title, 'Get'),
+const ApiGroup = HttpApiGroup.make("apiGroup").add(
+  HttpApiEndpoint.get("get", "/get")
+    .addSuccess(Schema.Literal("Hello, world!"))
+    .annotate(OpenApi.Title, "Get"),
 );
 
-class Api extends HttpApi.make('Api').add(ApiGroup) {}
+class Api extends HttpApi.make("Api").add(ApiGroup) {}
 
-const ApiGroupLive = HttpApiBuilder.group(Api, 'apiGroup', (handlers) =>
-  handlers.handle('get', () => Effect.succeed('Hello, world!' as const)),
+const ApiGroupLive = HttpApiBuilder.group(Api, "apiGroup", (handlers) =>
+  handlers.handle("get", () => Effect.succeed("Hello, world!" as const)),
 );
 
 const ApiLive = HttpApiBuilder.api(Api).pipe(Layer.provide(ApiGroupLive));
 
 // path-prefix
 
-const ApiGroupPathPrefix = HttpApiGroup.make('apiGroupPathPrefix')
+const ApiGroupPathPrefix = HttpApiGroup.make("apiGroupPathPrefix")
   .add(
-    HttpApiEndpoint.get('get', '/get')
-      .addSuccess(Schema.Literal('Hello, world!'))
-      .annotate(OpenApi.Title, 'Get'),
+    HttpApiEndpoint.get("get", "/get")
+      .addSuccess(Schema.Literal("Hello, world!"))
+      .annotate(OpenApi.Title, "Get"),
   )
-  .prefix('/path-prefix');
+  .prefix("/path-prefix");
 
-class ApiPathPrefix extends HttpApi.make('ApiPathPrefix').add(
+class ApiPathPrefix extends HttpApi.make("ApiPathPrefix").add(
   ApiGroupPathPrefix,
 ) {}
 
 const ApiGroupPathPrefixLive = HttpApiBuilder.group(
   ApiPathPrefix,
-  'apiGroupPathPrefix',
+  "apiGroupPathPrefix",
   (handlers) =>
-    handlers.handle('get', () => Effect.succeed('Hello, world!' as const)),
+    handlers.handle("get", () => Effect.succeed("Hello, world!" as const)),
 );
 
 const ApiPathPrefixLive = HttpApiBuilder.api(ApiPathPrefix).pipe(
@@ -53,10 +53,10 @@ const ApiPathPrefixLive = HttpApiBuilder.api(ApiPathPrefix).pipe(
 // router
 
 export default makeConvexHttpRouter({
-  '/': {
+  "/": {
     apiLive: ApiLive,
   },
-  '/path-prefix/': {
+  "/path-prefix/": {
     apiLive: ApiPathPrefixLive,
   },
 });

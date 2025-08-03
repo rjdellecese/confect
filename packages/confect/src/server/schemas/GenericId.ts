@@ -1,7 +1,7 @@
-import type { GenericId as ConvexGenericId } from 'convex/values';
-import { type Option, Schema, SchemaAST } from 'effect';
+import type { GenericId as ConvexGenericId } from "convex/values";
+import { type Option, Schema, SchemaAST } from "effect";
 
-const ConvexId = Symbol.for('ConvexId');
+const ConvexId = Symbol.for("ConvexId");
 
 export const GenericId = <TableName extends string>(
   tableName: TableName,

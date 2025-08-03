@@ -1,17 +1,17 @@
-import { Schema } from 'effect';
-import * as schema from '../../src/server/schema';
-import { GenericId } from '../../src/server/schemas/GenericId';
+import { Schema } from "effect";
+import * as schema from "../../src/server/schema";
+import { GenericId } from "../../src/server/schemas/GenericId";
 
 export const confectSchemaTables = {
   notes: schema
     .defineConfectTable(
       Schema.Struct({
-        userId: Schema.optional(GenericId('users')),
+        userId: Schema.optional(GenericId("users")),
         text: Schema.String.pipe(Schema.maxLength(100)),
         tag: Schema.optional(Schema.String),
         author: Schema.optional(
           Schema.Struct({
-            role: Schema.Literal('admin', 'user'),
+            role: Schema.Literal("admin", "user"),
             name: Schema.String,
           }),
         ),
@@ -19,16 +19,16 @@ export const confectSchemaTables = {
         bigDecimal: Schema.optional(Schema.BigDecimal),
       }),
     )
-    .index('by_text', ['text'])
-    .index('by_role', ['author.role'])
-    .index('by_name_and_role_and_text', ['author.name', 'author.role', 'text'])
-    .searchIndex('text', {
-      searchField: 'text',
-      filterFields: ['tag'],
+    .index("by_text", ["text"])
+    .index("by_role", ["author.role"])
+    .index("by_name_and_role_and_text", ["author.name", "author.role", "text"])
+    .searchIndex("text", {
+      searchField: "text",
+      filterFields: ["tag"],
     })
-    .vectorIndex('embedding', {
-      vectorField: 'embedding',
-      filterFields: ['author.name', 'tag'],
+    .vectorIndex("embedding", {
+      vectorField: "embedding",
+      filterFields: ["author.name", "tag"],
       dimensions: 1536,
     }),
   users: schema.defineConfectTable(

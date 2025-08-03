@@ -1,26 +1,26 @@
-import { describe, vi } from '@effect/vitest';
-import { assertEquals, assertFailure, assertTrue } from '@effect/vitest/utils';
-import { Cause, Effect, Exit, Option, Runtime, Schema, String } from 'effect';
+import { describe, vi } from "@effect/vitest";
+import { assertEquals, assertFailure, assertTrue } from "@effect/vitest/utils";
+import { Cause, Effect, Exit, Option, Runtime, Schema, String } from "effect";
 import {
   DocumentDecodeError,
   GetByIdFailure,
   GetByIndexFailure,
-} from '../src/server/database';
-import { api } from './convex/_generated/api';
-import { confectSchema } from './convex/schema';
-import { TestConvexService } from './TestConvexService';
-import { effect } from './test_utils';
+} from "../src/server/database";
+import { api } from "./convex/_generated/api";
+import { confectSchema } from "./convex/schema";
+import { TestConvexService } from "./TestConvexService";
+import { effect } from "./test_utils";
 
-describe('ConfectDatabaseReader', () => {
-  describe('getById', () => {
-    effect('when document exists', () =>
+describe("ConfectDatabaseReader", () => {
+  describe("getById", () => {
+    effect("when document exists", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
         yield* Effect.sync(() => vi.useFakeTimers());
 
-        const text = 'Hello, world!';
+        const text = "Hello, world!";
 
-        const noteId = yield* c.run(({ db }) => db.insert('notes', { text }));
+        const noteId = yield* c.run(({ db }) => db.insert("notes", { text }));
 
         const note = yield* c.query(api.database.getById, {
           noteId,
@@ -30,12 +30,12 @@ describe('ConfectDatabaseReader', () => {
       }),
     );
 
-    effect('when document no longer exists', () =>
+    effect("when document no longer exists", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
         const noteId = yield* c.run(({ db }) =>
-          db.insert('notes', { text: 'Hello, world!' }),
+          db.insert("notes", { text: "Hello, world!" }),
         );
 
         yield* c.run(({ db }) => db.delete(noteId));
@@ -53,7 +53,7 @@ describe('ConfectDatabaseReader', () => {
               Cause.fail(
                 new GetByIdFailure({
                   id: noteId,
-                  tableName: 'notes',
+                  tableName: "notes",
                 }),
               ),
             ),
@@ -62,14 +62,14 @@ describe('ConfectDatabaseReader', () => {
       }),
     );
 
-    effect('when document is invalid', () =>
+    effect("when document is invalid", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
-        const invalidText = String.repeat(101)('a');
+        const invalidText = String.repeat(101)("a");
 
         const noteId = yield* c.run(({ db }) =>
-          db.insert('notes', { text: invalidText }),
+          db.insert("notes", { text: invalidText }),
         );
 
         const exit = yield* c
@@ -84,7 +84,7 @@ describe('ConfectDatabaseReader', () => {
             Runtime.makeFiberFailure(
               Cause.fail(
                 new DocumentDecodeError({
-                  tableName: 'notes',
+                  tableName: "notes",
                   id: noteId,
                   parseError: `{ readonly _id: string; readonly _creationTime: number; readonly userId?: string | undefined; readonly text: maxLength(100); readonly tag?: string | undefined; readonly author?: { readonly role: "admin" | "user"; readonly name: string } | undefined; readonly embedding?: ReadonlyArray<number> | undefined; readonly bigDecimal?: BigDecimal | undefined }
 └─ ["text"]
@@ -100,17 +100,17 @@ describe('ConfectDatabaseReader', () => {
     );
   });
 
-  describe('getByIndex', () => {
-    effect('when document exists', () =>
+  describe("getByIndex", () => {
+    effect("when document exists", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
-        const name = 'John Doe';
-        const role = 'admin';
-        const text = 'Hello, world!';
+        const name = "John Doe";
+        const role = "admin";
+        const text = "Hello, world!";
 
         const noteId = yield* c.run(({ db }) =>
-          db.insert('notes', {
+          db.insert("notes", {
             author: { name, role },
             text,
           }),
@@ -126,16 +126,16 @@ describe('ConfectDatabaseReader', () => {
       }),
     );
 
-    effect('when document no longer exists', () =>
+    effect("when document no longer exists", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
-        const name = 'John Doe';
-        const role = 'admin';
-        const text = 'Hello, world!';
+        const name = "John Doe";
+        const role = "admin";
+        const text = "Hello, world!";
 
         const noteId = yield* c.run(({ db }) =>
-          db.insert('notes', { author: { name, role }, text }),
+          db.insert("notes", { author: { name, role }, text }),
         );
 
         yield* c.run(({ db }) => db.delete(noteId));
@@ -154,8 +154,8 @@ describe('ConfectDatabaseReader', () => {
             Runtime.makeFiberFailure(
               Cause.fail(
                 new GetByIndexFailure({
-                  tableName: 'notes',
-                  indexName: 'by_name_and_role_and_text',
+                  tableName: "notes",
+                  indexName: "by_name_and_role_and_text",
                   indexFieldValues: [name, role, text],
                 }),
               ),
@@ -166,14 +166,14 @@ describe('ConfectDatabaseReader', () => {
     );
   });
 
-  effect('first', () =>
+  effect("first", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
 
       const [noteId1, _noteId2] = yield* c.run(({ db }) =>
         Promise.all([
-          db.insert('notes', { text: '1' }),
-          db.insert('notes', { text: '2' }),
+          db.insert("notes", { text: "1" }),
+          db.insert("notes", { text: "2" }),
         ]),
       );
 
@@ -192,14 +192,14 @@ describe('ConfectDatabaseReader', () => {
     }),
   );
 
-  effect('take', () =>
+  effect("take", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
 
       const [noteId1, noteId2] = yield* c.run(({ db }) =>
         Promise.all([
-          db.insert('notes', { text: '1' }),
-          db.insert('notes', { text: '2' }),
+          db.insert("notes", { text: "1" }),
+          db.insert("notes", { text: "2" }),
         ]),
       );
 
@@ -213,14 +213,14 @@ describe('ConfectDatabaseReader', () => {
     }),
   );
 
-  effect('collect', () =>
+  effect("collect", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
 
       const [noteId1, noteId2] = yield* c.run(({ db }) =>
         Promise.all([
-          db.insert('notes', { text: '1' }),
-          db.insert('notes', { text: '2' }),
+          db.insert("notes", { text: "1" }),
+          db.insert("notes", { text: "2" }),
         ]),
       );
 
@@ -232,14 +232,14 @@ describe('ConfectDatabaseReader', () => {
     }),
   );
 
-  effect('paginate', () =>
+  effect("paginate", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
 
       const [noteId1, noteId2] = yield* c.run(({ db }) =>
         Promise.all([
-          db.insert('notes', { text: '1' }),
-          db.insert('notes', { text: '2' }),
+          db.insert("notes", { text: "1" }),
+          db.insert("notes", { text: "2" }),
         ]),
       );
 
@@ -254,20 +254,20 @@ describe('ConfectDatabaseReader', () => {
     }),
   );
 
-  effect('stream', () =>
+  effect("stream", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
 
       const [noteId1, noteId2] = yield* c.run(({ db }) =>
         Promise.all([
-          db.insert('notes', { text: '1' }),
-          db.insert('notes', { text: '2' }),
-          db.insert('notes', { text: '3' }),
+          db.insert("notes", { text: "1" }),
+          db.insert("notes", { text: "2" }),
+          db.insert("notes", { text: "3" }),
         ]),
       );
 
       const notes = yield* c.query(api.database.stream, {
-        until: '2',
+        until: "2",
       });
 
       assertEquals(notes.length, 2);
@@ -276,16 +276,16 @@ describe('ConfectDatabaseReader', () => {
     }),
   );
 
-  describe('withIndex', () => {
-    effect('without query range without order', () =>
+  describe("withIndex", () => {
+    effect("without query range without order", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
         const [noteId1, noteId2] = yield* c.run(({ db }) =>
           Promise.all([
-            db.insert('notes', { text: '1' }),
-            db.insert('notes', { text: '2' }),
-            db.insert('notes', { text: '3' }),
+            db.insert("notes", { text: "1" }),
+            db.insert("notes", { text: "2" }),
+            db.insert("notes", { text: "3" }),
           ]),
         );
 
@@ -299,22 +299,22 @@ describe('ConfectDatabaseReader', () => {
       }),
     );
 
-    effect('with query range without order', () =>
+    effect("with query range without order", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
         const [_noteId1, noteId2, noteId3] = yield* c.run(({ db }) =>
           Promise.all([
-            db.insert('notes', { text: '1' }),
-            db.insert('notes', { text: '2' }),
-            db.insert('notes', { text: '3' }),
+            db.insert("notes", { text: "1" }),
+            db.insert("notes", { text: "2" }),
+            db.insert("notes", { text: "3" }),
           ]),
         );
 
         const notes = yield* c.query(
           api.database.withIndexWithQueryRangeWithoutOrder,
           {
-            text: '2',
+            text: "2",
           },
         );
 
@@ -324,22 +324,22 @@ describe('ConfectDatabaseReader', () => {
       }),
     );
 
-    effect('with query range and order', () =>
+    effect("with query range and order", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
         const [_noteId1, noteId2, noteId3] = yield* c.run(({ db }) =>
           Promise.all([
-            db.insert('notes', { text: '1' }),
-            db.insert('notes', { text: '2' }),
-            db.insert('notes', { text: '3' }),
+            db.insert("notes", { text: "1" }),
+            db.insert("notes", { text: "2" }),
+            db.insert("notes", { text: "3" }),
           ]),
         );
 
         const notes = yield* c.query(
           api.database.withIndexWithQueryRangeAndOrder,
           {
-            text: '1',
+            text: "1",
           },
         );
 
@@ -349,15 +349,15 @@ describe('ConfectDatabaseReader', () => {
       }),
     );
 
-    effect('without query range with order', () =>
+    effect("without query range with order", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
         const [_noteId1, noteId2, noteId3] = yield* c.run(({ db }) =>
           Promise.all([
-            db.insert('notes', { text: '1' }),
-            db.insert('notes', { text: '2' }),
-            db.insert('notes', { text: '3' }),
+            db.insert("notes", { text: "1" }),
+            db.insert("notes", { text: "2" }),
+            db.insert("notes", { text: "3" }),
           ]),
         );
 
@@ -371,15 +371,15 @@ describe('ConfectDatabaseReader', () => {
       }),
     );
 
-    effect('without query range without order', () =>
+    effect("without query range without order", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
         const [noteId1, noteId2] = yield* c.run(({ db }) =>
           Promise.all([
-            db.insert('notes', { text: '1' }),
-            db.insert('notes', { text: '2' }),
-            db.insert('notes', { text: '3' }),
+            db.insert("notes", { text: "1" }),
+            db.insert("notes", { text: "2" }),
+            db.insert("notes", { text: "3" }),
           ]),
         );
 
@@ -393,20 +393,20 @@ describe('ConfectDatabaseReader', () => {
       }),
     );
 
-    effect('withSearchIndex', () =>
+    effect("withSearchIndex", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
         const [_noteId1, noteId2] = yield* c.run(({ db }) =>
           Promise.all([
-            db.insert('notes', { text: 'Ocean blue' }),
-            db.insert('notes', { text: 'Ocean blue', tag: 'colors' }),
-            db.insert('notes', { text: 'Sea green', tag: 'colors' }),
+            db.insert("notes", { text: "Ocean blue" }),
+            db.insert("notes", { text: "Ocean blue", tag: "colors" }),
+            db.insert("notes", { text: "Sea green", tag: "colors" }),
           ]),
         );
 
         const notes = yield* c.query(api.database.withSearchIndex, {
-          text: 'blue',
+          text: "blue",
         });
 
         assertEquals(notes.length, 1);
@@ -414,13 +414,13 @@ describe('ConfectDatabaseReader', () => {
       }),
     );
 
-    describe('system tables', () => {
-      effect('get', () =>
+    describe("system tables", () => {
+      effect("get", () =>
         Effect.gen(function* () {
           const c = yield* TestConvexService;
 
           const storageId = yield* c.run(({ storage }) =>
-            storage.store(new Blob(['Hello, world!'])),
+            storage.store(new Blob(["Hello, world!"])),
           );
 
           const storageDoc = yield* c.query(api.database.systemGet, {
@@ -431,12 +431,12 @@ describe('ConfectDatabaseReader', () => {
         }),
       );
 
-      effect('query', () =>
+      effect("query", () =>
         Effect.gen(function* () {
           const c = yield* TestConvexService;
 
           const storageId = yield* c.run(({ storage }) =>
-            storage.store(new Blob(['Hello, world!'])),
+            storage.store(new Blob(["Hello, world!"])),
           );
 
           const storageDocs = yield* c.query(api.database.systemQuery);
@@ -449,17 +449,17 @@ describe('ConfectDatabaseReader', () => {
   });
 });
 
-describe('ConfectDatabaseWriter', () => {
-  describe('patch', () => {
-    effect('when invalid', () =>
+describe("ConfectDatabaseWriter", () => {
+  describe("patch", () => {
+    effect("when invalid", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
         const noteId = yield* c.run(({ db }) =>
-          db.insert('notes', { text: 'Hello, world!' }),
+          db.insert("notes", { text: "Hello, world!" }),
         );
 
-        const tooLongText = String.repeat(101)('a');
+        const tooLongText = String.repeat(101)("a");
 
         const exit = yield* c
           .mutation(api.database.patch, {
@@ -474,15 +474,15 @@ describe('ConfectDatabaseWriter', () => {
       }),
     );
 
-    effect('when valid', () =>
+    effect("when valid", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
         const noteId = yield* c.run(({ db }) =>
-          db.insert('notes', { text: 'Hello, world!' }),
+          db.insert("notes", { text: "Hello, world!" }),
         );
 
-        const author = { role: 'user', name: 'Joe' } as const;
+        const author = { role: "user", name: "Joe" } as const;
 
         yield* c.mutation(api.database.patch, {
           noteId,
@@ -496,12 +496,12 @@ describe('ConfectDatabaseWriter', () => {
       }),
     );
 
-    effect('when document no longer exists', () =>
+    effect("when document no longer exists", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
         const noteId = yield* c.run(({ db }) =>
-          db.insert('notes', { text: 'Hello, world!' }),
+          db.insert("notes", { text: "Hello, world!" }),
         );
 
         yield* c.run(({ db }) => db.delete(noteId));
@@ -509,7 +509,7 @@ describe('ConfectDatabaseWriter', () => {
         const exit = yield* c
           .mutation(api.database.patch, {
             noteId,
-            fields: { text: 'Hello, world!' },
+            fields: { text: "Hello, world!" },
           })
           .pipe(Effect.exit);
 
@@ -517,17 +517,17 @@ describe('ConfectDatabaseWriter', () => {
       }),
     );
 
-    effect('when unsetting a field', () =>
+    effect("when unsetting a field", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
-        const tag = 'greeting';
+        const tag = "greeting";
 
         const noteId = yield* c.run(({ db }) =>
-          db.insert('notes', {
-            text: 'Hello, world!',
+          db.insert("notes", {
+            text: "Hello, world!",
             tag,
-            author: { role: 'user', name: 'Joe' },
+            author: { role: "user", name: "Joe" },
           }),
         );
 
@@ -543,15 +543,15 @@ describe('ConfectDatabaseWriter', () => {
     );
   });
 
-  effect('replace', () =>
+  effect("replace", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
 
-      const initialText = 'Hello, Earth!';
-      const updatedText = 'Hello, Mars!';
+      const initialText = "Hello, Earth!";
+      const updatedText = "Hello, Mars!";
 
       const noteId = yield* c.run(({ db }) =>
-        db.insert('notes', { text: initialText }),
+        db.insert("notes", { text: initialText }),
       );
       const note = yield* c.run(({ db }) => db.get(noteId));
 
@@ -568,13 +568,13 @@ describe('ConfectDatabaseWriter', () => {
     }),
   );
 
-  describe('delete', () => {
-    effect('when document exists', () =>
+  describe("delete", () => {
+    effect("when document exists", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
         const noteId = yield* c.run(({ db }) =>
-          db.insert('notes', { text: 'Hello, world!' }),
+          db.insert("notes", { text: "Hello, world!" }),
         );
 
         yield* c.mutation(api.database.delete_, {
@@ -587,12 +587,12 @@ describe('ConfectDatabaseWriter', () => {
       }),
     );
 
-    effect('when document no longer exists', () =>
+    effect("when document no longer exists", () =>
       Effect.gen(function* () {
         const c = yield* TestConvexService;
 
         const noteId = yield* c.run(({ db }) =>
-          db.insert('notes', { text: 'Hello, world!' }),
+          db.insert("notes", { text: "Hello, world!" }),
         );
 
         yield* c.run(({ db }) => db.delete(noteId));

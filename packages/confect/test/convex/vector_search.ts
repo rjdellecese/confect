@@ -1,14 +1,14 @@
-import { Effect, type ParseResult, Schema } from 'effect';
-import { GenericId } from '../../src/server';
-import { api } from '../convex/_generated/api';
+import { Effect, type ParseResult, Schema } from "effect";
+import { GenericId } from "../../src/server";
+import { api } from "../convex/_generated/api";
 import {
   ConfectDatabaseReader,
   ConfectQueryRunner,
   ConfectVectorSearch,
   confectAction,
   confectQuery,
-} from '../convex/confect';
-import { confectSchema } from '../convex/schema';
+} from "../convex/confect";
+import { confectSchema } from "../convex/schema";
 
 export const vectorSearch = confectAction({
   args: Schema.Struct({
@@ -35,9 +35,9 @@ export const vectorSearch = confectAction({
       const vectorSearch = yield* ConfectVectorSearch;
       const runQuery = yield* ConfectQueryRunner;
 
-      return yield* vectorSearch('notes', 'embedding', {
+      return yield* vectorSearch("notes", "embedding", {
         vector: vector as number[],
-        filter: tag === null ? undefined : (q) => q.eq('tag', tag),
+        filter: tag === null ? undefined : (q) => q.eq("tag", tag),
         limit,
       }).pipe(
         Effect.andThen(
@@ -60,13 +60,13 @@ export const vectorSearch = confectAction({
 
 export const get = confectQuery({
   args: Schema.Struct({
-    noteId: GenericId('notes'),
+    noteId: GenericId("notes"),
   }),
   returns: confectSchema.tableSchemas.notes.withSystemFields,
   handler: ({ noteId }) =>
     Effect.gen(function* () {
       const reader = yield* ConfectDatabaseReader;
 
-      return yield* reader.table('notes').get(noteId);
+      return yield* reader.table("notes").get(noteId);
     }),
 });

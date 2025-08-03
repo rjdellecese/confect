@@ -1,10 +1,10 @@
-import { describe, expectTypeOf, test } from '@effect/vitest';
-import type { SystemDataModel } from 'convex/server';
-import { Schema } from 'effect';
+import { describe, expectTypeOf, test } from "@effect/vitest";
+import type { SystemDataModel } from "convex/server";
+import { Schema } from "effect";
 import type {
   DataModelFromConfectDataModel,
   GenericConfectDataModel,
-} from '../src/server/data_model';
+} from "../src/server/data_model";
 import {
   type ConfectDataModelFromConfectSchema,
   type ConfectSystemDataModel,
@@ -14,11 +14,11 @@ import {
   type confectSystemTableSchemas,
   defineConfectSchema,
   defineConfectTable,
-} from '../src/server/schema';
-import { extendWithSystemFields } from '../src/server/schemas/SystemFields';
+} from "../src/server/schema";
+import { extendWithSystemFields } from "../src/server/schemas/SystemFields";
 
-describe('ConfectDataModelFromConfectSchema', () => {
-  test('produces a type which is assignable to GenericConfectDataModel', () => {
+describe("ConfectDataModelFromConfectSchema", () => {
+  test("produces a type which is assignable to GenericConfectDataModel", () => {
     const NoteSchema = Schema.Struct({
       content: Schema.String,
     });
@@ -35,8 +35,8 @@ describe('ConfectDataModelFromConfectSchema', () => {
   });
 });
 
-describe('ConfectSystemDataModel', () => {
-  test('when converted to a Convex DataModel, is equivalent to SystemDataModel', () => {
+describe("ConfectSystemDataModel", () => {
+  test("when converted to a Convex DataModel, is equivalent to SystemDataModel", () => {
     type Actual = DataModelFromConfectDataModel<ConfectSystemDataModel>;
     type Expected = SystemDataModel;
 
@@ -44,8 +44,8 @@ describe('ConfectSystemDataModel', () => {
   });
 });
 
-describe('tableSchemas', () => {
-  test('extends the table schemas with system fields', () => {
+describe("tableSchemas", () => {
+  test("extends the table schemas with system fields", () => {
     const NoteSchema = Schema.Struct({
       content: Schema.String,
     });
@@ -57,7 +57,7 @@ describe('tableSchemas', () => {
     type Actual = typeof _confectTableSchemas;
 
     const _expectedTableSchemas = {
-      notes: schemaToTableSchemas('notes', NoteSchema),
+      notes: schemaToTableSchemas("notes", NoteSchema),
       ...systemTableSchemas,
     };
 
@@ -66,7 +66,7 @@ describe('tableSchemas', () => {
     expectTypeOf<Actual>().toEqualTypeOf<Expected>();
   });
 
-  test('permits unions of structs', () => {
+  test("permits unions of structs", () => {
     const NoteSchema = Schema.Struct({
       content: Schema.String,
     });
@@ -84,7 +84,7 @@ describe('tableSchemas', () => {
     type Actual = typeof _confectTableSchemas;
 
     const _expectedTableSchemas = {
-      items: schemaToTableSchemas('items', ItemSchema),
+      items: schemaToTableSchemas("items", ItemSchema),
       ...systemTableSchemas,
     };
 
@@ -94,8 +94,8 @@ describe('tableSchemas', () => {
   });
 });
 
-describe('confectTableSchemas', () => {
-  test('matches confectSystemSchema', () => {
+describe("confectTableSchemas", () => {
+  test("matches confectSystemSchema", () => {
     type ConfectTableSchemas = typeof confectSystemTableSchemas;
     type ConfectSystemSchema = typeof confectSystemSchema;
 
@@ -132,7 +132,7 @@ const schemaToTableSchemas = <
 const systemTableSchemas = {
   _scheduled_functions: {
     withSystemFields: extendWithSystemFields(
-      '_scheduled_functions',
+      "_scheduled_functions",
       confectSystemSchemaDefinition.confectSchema._scheduled_functions
         .tableSchema,
     ),
@@ -142,7 +142,7 @@ const systemTableSchemas = {
   },
   _storage: {
     withSystemFields: extendWithSystemFields(
-      '_storage',
+      "_storage",
       confectSystemSchemaDefinition.confectSchema._storage.tableSchema,
     ),
     withoutSystemFields:

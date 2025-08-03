@@ -2,19 +2,19 @@ import {
   useAction as useConvexAction,
   useMutation as useConvexMutation,
   useQuery as useConvexQuery,
-} from 'convex/react';
-import type { FunctionReference } from 'convex/server';
-import { Effect, Option, Schema } from 'effect';
+} from "convex/react";
+import type { FunctionReference } from "convex/server";
+import { Effect, Option, Schema } from "effect";
 
 export const useQuery =
-  <Query extends FunctionReference<'query'>, Args, Returns>({
+  <Query extends FunctionReference<"query">, Args, Returns>({
     query,
     args,
     returns,
   }: {
     query: Query;
-    args: Schema.Schema<Args, Query['_args']>;
-    returns: Schema.Schema<Returns, Query['_returnType']>;
+    args: Schema.Schema<Args, Query["_args"]>;
+    returns: Schema.Schema<Returns, Query["_returnType"]>;
   }) =>
   (actualArgs: Args): Option.Option<Returns> => {
     const encodedArgs = Schema.encodeSync(args)(actualArgs);
@@ -33,7 +33,7 @@ export const useQuery =
   };
 
 export const useMutation = <
-  Mutation extends FunctionReference<'mutation'>,
+  Mutation extends FunctionReference<"mutation">,
   Args,
   Returns,
 >({
@@ -42,8 +42,8 @@ export const useMutation = <
   returns,
 }: {
   mutation: Mutation;
-  args: Schema.Schema<Args, Mutation['_args']>;
-  returns: Schema.Schema<Returns, Mutation['_returnType']>;
+  args: Schema.Schema<Args, Mutation["_args"]>;
+  returns: Schema.Schema<Returns, Mutation["_returnType"]>;
 }) => {
   const actualMutation = useConvexMutation(mutation);
 
@@ -60,7 +60,7 @@ export const useMutation = <
 };
 
 export const useAction = <
-  Action extends FunctionReference<'action'>,
+  Action extends FunctionReference<"action">,
   Args,
   Returns,
 >({
@@ -69,8 +69,8 @@ export const useAction = <
   returns,
 }: {
   action: Action;
-  args: Schema.Schema<Args, Action['_args']>;
-  returns: Schema.Schema<Returns, Action['_returnType']>;
+  args: Schema.Schema<Args, Action["_args"]>;
+  returns: Schema.Schema<Returns, Action["_returnType"]>;
 }) => {
   const actualAction = useConvexAction(action);
 

@@ -4,18 +4,18 @@ import type {
   NamedTableInfo,
   VectorIndexNames,
   VectorSearchQuery,
-} from 'convex/server';
-import { Context, Effect, Layer } from 'effect';
+} from "convex/server";
+import { Context, Effect, Layer } from "effect";
 import type {
   DataModelFromConfectDataModel,
   GenericConfectDataModel,
   TableNamesInConfectDataModel,
-} from './data_model';
+} from "./data_model";
 
 type VectorSearch<ConfectDataModel extends GenericConfectDataModel> =
   GenericActionCtx<
     DataModelFromConfectDataModel<ConfectDataModel>
-  >['vectorSearch'];
+  >["vectorSearch"];
 
 const make =
   <ConfectDataModel extends GenericConfectDataModel>(
@@ -42,7 +42,7 @@ const make =
     Effect.promise(() => vectorSearch(tableName, indexName, query));
 
 export const ConfectVectorSearch = Context.GenericTag<ReturnType<typeof make>>(
-  '@rjdellecese/confect/ConfectVectorSearch',
+  "@rjdellecese/confect/ConfectVectorSearch",
 );
 export type ConfectVectorSearch = typeof ConfectVectorSearch.Identifier;
 

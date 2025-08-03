@@ -5,7 +5,7 @@ import {
   type HttpApp,
   type HttpRouter,
   HttpServer,
-} from '@effect/platform';
+} from "@effect/platform";
 import {
   type HttpRouter as ConvexHttpRouter,
   type GenericActionCtx,
@@ -14,10 +14,10 @@ import {
   httpRouter,
   ROUTABLE_HTTP_METHODS,
   type RouteSpecWithPathPrefix,
-} from 'convex/server';
-import { Array, Layer, pipe, Record } from 'effect';
-import { ConfectAuth } from './auth';
-import { ConvexActionCtx } from './ctx';
+} from "convex/server";
+import { Array, Layer, pipe, Record } from "effect";
+import { ConfectAuth } from "./auth";
+import { ConvexActionCtx } from "./ctx";
 import {
   type ConfectActionRunner,
   type ConfectMutationRunner,
@@ -25,13 +25,13 @@ import {
   confectActionRunnerLayer,
   confectMutationRunnerLayer,
   confectQueryRunnerLayer,
-} from './runners';
-import { ConfectScheduler } from './scheduler';
+} from "./runners";
+import { ConfectScheduler } from "./scheduler";
 import {
   ConfectStorageActionWriter,
   ConfectStorageReader,
   ConfectStorageWriter,
-} from './storage';
+} from "./storage";
 
 type Middleware = (
   httpApp: HttpApp.Default,
@@ -84,7 +84,7 @@ const makeHandler =
     const ApiDocsLive = HttpApiScalar.layer({
       path: `${pathPrefix}docs`,
       scalar: {
-        baseServerURL: `${process.env['CONVEX_SITE_URL']}${pathPrefix}`,
+        baseServerURL: `${process.env["CONVEX_SITE_URL"]}${pathPrefix}`,
         ...scalar,
       },
     }).pipe(Layer.provide(ApiLive));
@@ -152,7 +152,7 @@ export type ConfectHttpApi = {
   scalar?: HttpApiScalar.ScalarConfig;
 };
 
-export type RoutePath = '/' | `/${string}/`;
+export type RoutePath = "/" | `/${string}/`;
 
 const mountEffectHttpApi =
   <DataModel extends GenericDataModel>({
@@ -226,14 +226,14 @@ const applyMonkeyPatches = () => {
   // eslint-disable-next-line no-global-assign
   URL = class extends URL {
     override get username() {
-      return '';
+      return "";
     }
     override get password() {
-      return '';
+      return "";
     }
   };
 
-  Object.defineProperty(Request.prototype, 'signal', {
+  Object.defineProperty(Request.prototype, "signal", {
     get: () => new AbortSignal(),
   });
 };

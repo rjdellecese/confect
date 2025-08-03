@@ -1,6 +1,6 @@
-import { Schema } from 'effect';
-import { Id } from './confect';
-import { confectSchema } from './schema';
+import { Schema } from "effect";
+import { Id } from "./confect";
+import { confectSchema } from "./schema";
 
 export const ListNotesArgs = Schema.Struct({});
 export const ListNotesResult = Schema.Array(
@@ -10,10 +10,10 @@ export const ListNotesResult = Schema.Array(
 export const InsertNoteArgs = Schema.Struct({
   text: Schema.String,
 });
-export const InsertNoteResult = Id('notes');
+export const InsertNoteResult = Id("notes");
 
 export const DeleteNoteArgs = Schema.Struct({
-  noteId: Id('notes'),
+  noteId: Id("notes"),
 });
 export const DeleteNoteResult = Schema.Null;
 

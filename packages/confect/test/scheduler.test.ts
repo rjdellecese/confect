@@ -1,17 +1,17 @@
-import { describe, vi } from '@effect/vitest';
-import { assertEquals } from '@effect/vitest/utils';
-import { DateTime, Duration, Effect, Schema } from 'effect';
-import { api } from './convex/_generated/api';
-import { TestConvexService } from './TestConvexService';
-import { effect } from './test_utils';
+import { describe, vi } from "@effect/vitest";
+import { assertEquals } from "@effect/vitest/utils";
+import { DateTime, Duration, Effect, Schema } from "effect";
+import { api } from "./convex/_generated/api";
+import { TestConvexService } from "./TestConvexService";
+import { effect } from "./test_utils";
 
-describe('ConfectScheduler', () => {
-  effect('runAfter', () =>
+describe("ConfectScheduler", () => {
+  effect("runAfter", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
       yield* Effect.sync(() => vi.useFakeTimers());
 
-      const text = 'Hello, world!';
+      const text = "Hello, world!";
       const millisDuration = Duration.seconds(1);
       const millisEncoded = yield* Schema.encode(Schema.Duration)(
         millisDuration,
@@ -24,7 +24,7 @@ describe('ConfectScheduler', () => {
       });
 
       {
-        const note = yield* c.run(({ db }) => db.query('notes').first());
+        const note = yield* c.run(({ db }) => db.query("notes").first());
 
         assertEquals(note, null);
       }
@@ -33,19 +33,19 @@ describe('ConfectScheduler', () => {
       yield* c.finishInProgressScheduledFunctions();
 
       {
-        const note = yield* c.run(({ db }) => db.query('notes').first());
+        const note = yield* c.run(({ db }) => db.query("notes").first());
 
         assertEquals(note?.text, text);
       }
     }),
   );
 
-  effect('runAt', () =>
+  effect("runAt", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
       yield* Effect.sync(() => vi.useFakeTimers());
 
-      const text = 'Hello, world!';
+      const text = "Hello, world!";
 
       const now = yield* DateTime.now;
       const timestamp = DateTime.addDuration(now, Duration.seconds(1));
@@ -60,7 +60,7 @@ describe('ConfectScheduler', () => {
 
       yield* c.finishAllScheduledFunctions(vi.runAllTimers);
 
-      const note = yield* c.run(({ db }) => db.query('notes').first());
+      const note = yield* c.run(({ db }) => db.query("notes").first());
 
       assertEquals(note?.text, text);
     }),

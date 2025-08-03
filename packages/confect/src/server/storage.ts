@@ -2,12 +2,12 @@ import type {
   StorageActionWriter,
   StorageReader,
   StorageWriter,
-} from 'convex/server';
-import type { GenericId } from 'convex/values';
-import { Effect, flow, Layer, Option, pipe, Schema } from 'effect';
+} from "convex/server";
+import type { GenericId } from "convex/values";
+import { Effect, flow, Layer, Option, pipe, Schema } from "effect";
 
 const makeStorageReader = (storageReader: StorageReader) => ({
-  getUrl: (storageId: GenericId<'_storage'>) =>
+  getUrl: (storageId: GenericId<"_storage">) =>
     Effect.promise(() => storageReader.getUrl(storageId)).pipe(
       Effect.andThen(
         flow(
@@ -28,7 +28,7 @@ const makeStorageWriter = (storageWriter: StorageWriter) => ({
         pipe(url, Schema.decode(Schema.URL), Effect.orDie),
       ),
     ),
-  delete: (storageId: GenericId<'_storage'>) =>
+  delete: (storageId: GenericId<"_storage">) =>
     Effect.tryPromise({
       try: () => storageWriter.delete(storageId),
       catch: () => new FileNotFoundError({ id: storageId }),
@@ -36,7 +36,7 @@ const makeStorageWriter = (storageWriter: StorageWriter) => ({
 });
 
 const makeStorageActionWriter = (storageActionWriter: StorageActionWriter) => ({
-  get: (storageId: GenericId<'_storage'>) =>
+  get: (storageId: GenericId<"_storage">) =>
     Effect.promise(() => storageActionWriter.get(storageId)).pipe(
       Effect.andThen(
         flow(
@@ -54,29 +54,29 @@ const makeStorageActionWriter = (storageActionWriter: StorageActionWriter) => ({
 });
 
 export class ConfectStorageReader extends Effect.Tag(
-  '@rjdellecese/confect/ConfectStorageReader',
+  "@rjdellecese/confect/ConfectStorageReader",
 )<ConfectStorageReader, ReturnType<typeof makeStorageReader>>() {
   static readonly layer = (storageReader: StorageReader) =>
     Layer.succeed(this, makeStorageReader(storageReader));
 }
 
 export class ConfectStorageWriter extends Effect.Tag(
-  '@rjdellecese/confect/ConfectStorageWriter',
+  "@rjdellecese/confect/ConfectStorageWriter",
 )<ConfectStorageWriter, ReturnType<typeof makeStorageWriter>>() {
   static readonly layer = (storageWriter: StorageWriter) =>
     Layer.succeed(this, makeStorageWriter(storageWriter));
 }
 
 export class ConfectStorageActionWriter extends Effect.Tag(
-  '@rjdellecese/confect/ConfectStorageActionWriter',
+  "@rjdellecese/confect/ConfectStorageActionWriter",
 )<ConfectStorageActionWriter, ReturnType<typeof makeStorageActionWriter>>() {
   static readonly layer = (storageActionWriter: StorageActionWriter) =>
     Layer.succeed(this, makeStorageActionWriter(storageActionWriter));
 }
 
 export class FileNotFoundError extends Schema.TaggedError<FileNotFoundError>(
-  'FileNotFoundError',
-)('FileNotFoundError', {
+  "FileNotFoundError",
+)("FileNotFoundError", {
   id: Schema.String,
 }) {
   override get message(): string {

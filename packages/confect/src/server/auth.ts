@@ -1,5 +1,5 @@
-import type { Auth } from 'convex/server';
-import { Effect, flow, Layer, Option, Schema } from 'effect';
+import type { Auth } from "convex/server";
+import { Effect, flow, Layer, Option, Schema } from "effect";
 
 const make = (auth: Auth) => ({
   getUserIdentity:
@@ -17,7 +17,7 @@ const make = (auth: Auth) => ({
     ),
 });
 
-export class ConfectAuth extends Effect.Tag('@rjdellecese/confect/ConfectAuth')<
+export class ConfectAuth extends Effect.Tag("@rjdellecese/confect/ConfectAuth")<
   ConfectAuth,
   ReturnType<typeof make>
 >() {
@@ -25,9 +25,9 @@ export class ConfectAuth extends Effect.Tag('@rjdellecese/confect/ConfectAuth')<
 }
 
 export class NoUserIdentityFoundError extends Schema.TaggedError<NoUserIdentityFoundError>(
-  'NoUserIdentityFoundError',
-)('NoUserIdentityFoundError', {}) {
+  "NoUserIdentityFoundError",
+)("NoUserIdentityFoundError", {}) {
   override get message(): string {
-    return 'No user identity found';
+    return "No user identity found";
   }
 }

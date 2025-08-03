@@ -13,18 +13,18 @@ import {
   type SystemIndexes,
   type TableDefinition,
   type VectorIndexConfig,
-} from 'convex/server';
-import type { GenericValidator, Validator } from 'convex/values';
-import { pipe, Record, Schema } from 'effect';
-import type { GenericConfectDataModel } from './data_model';
+} from "convex/server";
+import type { GenericValidator, Validator } from "convex/values";
+import { pipe, Record, Schema } from "effect";
+import type { GenericConfectDataModel } from "./data_model";
 import {
   compileTableSchema,
   type TableSchemaToTableValidator,
-} from './schema_to_validator';
+} from "./schema_to_validator";
 import {
   type ExtendWithSystemFields,
   extendWithSystemFields,
-} from './schemas/SystemFields';
+} from "./schemas/SystemFields";
 
 export const confectSystemTableSchemas = {
   _scheduled_functions: Schema.Struct({
@@ -33,14 +33,14 @@ export const confectSystemTableSchemas = {
     scheduledTime: Schema.Number,
     completedTime: Schema.optional(Schema.Number),
     state: Schema.Union(
-      Schema.Struct({ kind: Schema.Literal('pending') }),
-      Schema.Struct({ kind: Schema.Literal('inProgress') }),
-      Schema.Struct({ kind: Schema.Literal('success') }),
+      Schema.Struct({ kind: Schema.Literal("pending") }),
+      Schema.Struct({ kind: Schema.Literal("inProgress") }),
+      Schema.Struct({ kind: Schema.Literal("success") }),
       Schema.Struct({
-        kind: Schema.Literal('failed'),
+        kind: Schema.Literal("failed"),
         error: Schema.String,
       }),
-      Schema.Struct({ kind: Schema.Literal('canceled') }),
+      Schema.Struct({ kind: Schema.Literal("canceled") }),
     ),
   }),
   _storage: Schema.Struct({
@@ -120,7 +120,7 @@ type SchemaDefinitionFromConfectSchemaDefinition<
   ConfectSchema extends GenericConfectSchema,
 > = Expand<{
   [TableName in keyof ConfectSchema &
-    string]: ConfectSchema[TableName]['tableDefinition'];
+    string]: ConfectSchema[TableName]["tableDefinition"];
 }>;
 
 /**
@@ -395,7 +395,7 @@ export type TableNamesInConfectSchema<
 
 export type TableNamesInConfectSchemaDefinition<
   ConfectSchemaDefinition extends GenericConfectSchemaDefinition,
-> = TableNamesInConfectSchema<ConfectSchemaDefinition['confectSchema']>;
+> = TableNamesInConfectSchema<ConfectSchemaDefinition["confectSchema"]>;
 
 /**
  * Produce a Confect data model from a Confect schema.
@@ -436,14 +436,14 @@ type ExtractConfectDocument<
   TableName extends string,
   TableSchema extends Schema.Schema.AnyNoContext,
 > = Expand<
-  Readonly<IdField<TableName>> & Readonly<SystemFields> & TableSchema['Type']
+  Readonly<IdField<TableName>> & Readonly<SystemFields> & TableSchema["Type"]
 >;
 
 type ExtractEncodedConfectDocument<
   TableName extends string,
   TableSchema extends Schema.Schema.AnyNoContext,
 > = Expand<
-  Readonly<IdField<TableName>> & Readonly<SystemFields> & TableSchema['Encoded']
+  Readonly<IdField<TableName>> & Readonly<SystemFields> & TableSchema["Encoded"]
 >;
 
 export const confectSystemSchema = {
@@ -480,17 +480,17 @@ type TableSchemasFromConfectSchema<ConfectSchema extends GenericConfectSchema> =
       [TableName in keyof ConfectSchema & string]: {
         withSystemFields: ExtendWithSystemFields<
           TableName,
-          ConfectSchema[TableName]['tableSchema']
+          ConfectSchema[TableName]["tableSchema"]
         >;
-        withoutSystemFields: ConfectSchema[TableName]['tableSchema'];
+        withoutSystemFields: ConfectSchema[TableName]["tableSchema"];
       };
     } & {
-      [TableName in keyof ConfectSystemSchemaDefinition['confectSchema']]: {
+      [TableName in keyof ConfectSystemSchemaDefinition["confectSchema"]]: {
         withSystemFields: ExtendWithSystemFields<
           TableName,
-          ConfectSystemSchemaDefinition['confectSchema'][TableName]['tableSchema']
+          ConfectSystemSchemaDefinition["confectSchema"][TableName]["tableSchema"]
         >;
-        withoutSystemFields: ConfectSystemSchemaDefinition['confectSchema'][TableName]['tableSchema'];
+        withoutSystemFields: ConfectSystemSchemaDefinition["confectSchema"][TableName]["tableSchema"];
       };
     }
   >;
@@ -499,8 +499,8 @@ export type TableSchemasFromConfectDataModel<
   ConfectDataModel extends GenericConfectDataModel,
 > = {
   [TableName in keyof ConfectDataModel & string]: Schema.Schema<
-    ConfectDataModel[TableName]['confectDocument'],
-    ConfectDataModel[TableName]['encodedConfectDocument']
+    ConfectDataModel[TableName]["confectDocument"],
+    ConfectDataModel[TableName]["encodedConfectDocument"]
   >;
 };
 
@@ -516,7 +516,7 @@ type ExtractFieldPaths<T extends Validator<any, any, any>> =
   // Add in the system fields available in index definitions.
   // This should be everything except for `_id` because thats added to indexes
   // automatically.
-  T['fieldPaths'] | keyof SystemFields;
+  T["fieldPaths"] | keyof SystemFields;
 
 /**
  * Extract the {@link GenericDocument} within a {@link Validator} and
@@ -528,4 +528,4 @@ type ExtractFieldPaths<T extends Validator<any, any, any>> =
 type ExtractDocument<
   TableName extends string,
   T extends Validator<any, any, any>,
-> = Expand<IdField<TableName> & SystemFields & T['type']>; //the table name) and trick TypeScript into expanding them. // Add the system fields to `Value` (except `_id` because it depends on
+> = Expand<IdField<TableName> & SystemFields & T["type"]>; //the table name) and trick TypeScript into expanding them. // Add the system fields to `Value` (except `_id` because it depends on

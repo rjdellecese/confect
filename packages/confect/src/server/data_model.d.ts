@@ -4,11 +4,11 @@ import type {
   GenericTableIndexes,
   GenericTableSearchIndexes,
   GenericTableVectorIndexes,
-} from 'convex/server';
-import type { Schema } from 'effect';
-import type { ReadonlyRecord } from 'effect/Record';
-import type { ReadonlyValue } from './schema_to_validator';
-import type { WithSystemFields } from './schemas/SystemFields';
+} from "convex/server";
+import type { Schema } from "effect";
+import type { ReadonlyRecord } from "effect/Record";
+import type { ReadonlyValue } from "./schema_to_validator";
+import type { WithSystemFields } from "./schemas/SystemFields";
 
 export type GenericConfectDocumentWithSystemFields = WithSystemFields<
   string,
@@ -23,7 +23,7 @@ export type GenericEncodedConfectDocument = ReadonlyRecord<
 export type ConfectDocumentByName<
   ConfectDataModel extends GenericConfectDataModel,
   TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
-> = ConfectDataModel[TableName]['confectDocument'];
+> = ConfectDataModel[TableName]["confectDocument"];
 
 export type GenericConfectDataModel = Record<string, GenericConfectTableInfo>;
 
@@ -42,11 +42,11 @@ export type TableNamesInConfectDataModel<
 export type TableInfoFromConfectTableInfo<
   ConfectTableInfo extends GenericConfectTableInfo,
 > = {
-  document: ConfectTableInfo['convexDocument'];
-  fieldPaths: ConfectTableInfo['fieldPaths'];
-  indexes: ConfectTableInfo['indexes'];
-  searchIndexes: ConfectTableInfo['searchIndexes'];
-  vectorIndexes: ConfectTableInfo['vectorIndexes'];
+  document: ConfectTableInfo["convexDocument"];
+  fieldPaths: ConfectTableInfo["fieldPaths"];
+  indexes: ConfectTableInfo["indexes"];
+  searchIndexes: ConfectTableInfo["searchIndexes"];
+  vectorIndexes: ConfectTableInfo["vectorIndexes"];
 };
 
 export type GenericConfectTableInfo = {
@@ -62,8 +62,8 @@ export type GenericConfectTableInfo = {
 export type TableSchemaFromConfectTableInfo<
   ConfectTableInfo extends GenericConfectTableInfo,
 > = Schema.Schema<
-  ConfectTableInfo['confectDocument'],
-  ConfectTableInfo['encodedConfectDocument']
+  ConfectTableInfo["confectDocument"],
+  ConfectTableInfo["encodedConfectDocument"]
 >;
 
 /**
@@ -72,4 +72,4 @@ export type TableSchemaFromConfectTableInfo<
 export type GenericConfectDoc<
   ConfectDataModel extends GenericConfectDataModel,
   TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
-> = ConfectDataModel[TableName]['encodedConfectDocument'];
+> = ConfectDataModel[TableName]["encodedConfectDocument"];

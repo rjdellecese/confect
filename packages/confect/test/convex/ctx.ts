@@ -1,5 +1,5 @@
-import { Effect, Schema } from 'effect';
-import { api } from './_generated/api';
+import { Effect, Schema } from "effect";
+import { api } from "./_generated/api";
 import {
   ActionCtx,
   confectAction,
@@ -8,11 +8,11 @@ import {
   Id,
   MutationCtx,
   QueryCtx,
-} from './confect';
+} from "./confect";
 
 export const get = confectQuery({
   args: Schema.Struct({
-    id: Id('notes'),
+    id: Id("notes"),
   }),
   returns: Schema.Union(Schema.String, Schema.Null),
   handler: ({ id }) =>
@@ -29,13 +29,13 @@ export const insert = confectMutation({
   args: Schema.Struct({
     text: Schema.String,
   }),
-  returns: Id('notes'),
+  returns: Id("notes"),
   handler: ({ text }) =>
     Effect.gen(function* () {
       const ctx = yield* MutationCtx;
 
       const id = yield* Effect.promise(() =>
-        ctx.db.insert('notes', {
+        ctx.db.insert("notes", {
           text,
         }),
       );
@@ -46,7 +46,7 @@ export const insert = confectMutation({
 
 export const actionGet = confectAction({
   args: Schema.Struct({
-    id: Id('notes'),
+    id: Id("notes"),
   }),
   returns: Schema.Union(Schema.String, Schema.Null),
   handler: ({ id }): Effect.Effect<string | null, never, ActionCtx> =>

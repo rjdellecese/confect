@@ -1,7 +1,7 @@
-import { effect as effect_ } from '@effect/vitest';
-import { Effect, type TestServices } from 'effect';
+import { effect as effect_ } from "@effect/vitest";
+import { Effect, type TestServices } from "effect";
 
-import * as TestConvexService from './TestConvexService';
+import * as TestConvexService from "./TestConvexService";
 
 type Name<A, E> = Parameters<typeof effect_<E, A>>[0];
 type Self<A, E> = (

@@ -1,20 +1,20 @@
-import type { Expand } from 'convex/server';
-import { Schema } from 'effect';
-import { describe, expect, expectTypeOf, test } from 'vitest';
-import { GenericId } from '../../src/server/schemas/GenericId';
-import { extendWithSystemFields } from '../../src/server/schemas/SystemFields';
+import type { Expand } from "convex/server";
+import { Schema } from "effect";
+import { describe, expect, expectTypeOf, test } from "vitest";
+import { GenericId } from "../../src/server/schemas/GenericId";
+import { extendWithSystemFields } from "../../src/server/schemas/SystemFields";
 
 describe(extendWithSystemFields, () => {
-  test('extends a struct with system fields', () => {
+  test("extends a struct with system fields", () => {
     const NoteSchema = Schema.Struct({
       content: Schema.String,
     });
 
-    const ExtendedNoteSchema = extendWithSystemFields('notes', NoteSchema);
+    const ExtendedNoteSchema = extendWithSystemFields("notes", NoteSchema);
 
     const Expected = Schema.Struct({
       content: Schema.String,
-      _id: GenericId('notes'),
+      _id: GenericId("notes"),
       _creationTime: Schema.Number,
     });
 
@@ -24,8 +24,8 @@ describe(extendWithSystemFields, () => {
     type Actual = typeof Actual;
 
     const extendedNote = {
-      content: 'Hello, world!',
-      _id: 'abc123' as GenericId<'notes'>,
+      content: "Hello, world!",
+      _id: "abc123" as GenericId<"notes">,
       _creationTime: 1234567890,
     };
 
@@ -34,13 +34,13 @@ describe(extendWithSystemFields, () => {
       Schema.decodeUnknownSync(Expected)(extendedNote),
     ).not.toThrow();
 
-    expectTypeOf<Expand<Actual['Encoded']>>().toEqualTypeOf<
-      Expected['Encoded']
+    expectTypeOf<Expand<Actual["Encoded"]>>().toEqualTypeOf<
+      Expected["Encoded"]
     >();
-    expectTypeOf<Expand<Actual['Type']>>().toEqualTypeOf<Expected['Type']>();
+    expectTypeOf<Expand<Actual["Type"]>>().toEqualTypeOf<Expected["Type"]>();
   });
 
-  test('extends a union of structs with system fields', () => {
+  test("extends a union of structs with system fields", () => {
     const NoteSchema = Schema.Struct({
       content: Schema.String,
     });
@@ -51,17 +51,17 @@ describe(extendWithSystemFields, () => {
 
     const ItemSchema = Schema.Union(NoteSchema, ImageSchema);
 
-    const ExtendedItemSchema = extendWithSystemFields('items', ItemSchema);
+    const ExtendedItemSchema = extendWithSystemFields("items", ItemSchema);
 
     const Expected = Schema.Union(
       Schema.Struct({
         content: Schema.String,
-        _id: GenericId('items'),
+        _id: GenericId("items"),
         _creationTime: Schema.Number,
       }),
       Schema.Struct({
         url: Schema.String,
-        _id: GenericId('items'),
+        _id: GenericId("items"),
         _creationTime: Schema.Number,
       }),
     );
@@ -72,8 +72,8 @@ describe(extendWithSystemFields, () => {
     type Actual = typeof Actual;
 
     const extendedNote = {
-      content: 'Hello, world!',
-      _id: 'abc123' as GenericId<'items'>,
+      content: "Hello, world!",
+      _id: "abc123" as GenericId<"items">,
       _creationTime: 1234567890,
     };
 
@@ -83,8 +83,8 @@ describe(extendWithSystemFields, () => {
     ).not.toThrow();
 
     const extendedImage = {
-      url: 'https://example.com/image.jpg',
-      _id: 'def456' as GenericId<'items'>,
+      url: "https://example.com/image.jpg",
+      _id: "def456" as GenericId<"items">,
       _creationTime: 1234567890,
     };
 
@@ -93,9 +93,9 @@ describe(extendWithSystemFields, () => {
       Schema.decodeUnknownSync(Expected)(extendedImage),
     ).not.toThrow();
 
-    expectTypeOf<Expand<Actual['Encoded']>>().toEqualTypeOf<
-      Expected['Encoded']
+    expectTypeOf<Expand<Actual["Encoded"]>>().toEqualTypeOf<
+      Expected["Encoded"]
     >();
-    expectTypeOf<Expand<Actual['Type']>>().toEqualTypeOf<Expected['Type']>();
+    expectTypeOf<Expand<Actual["Type"]>>().toEqualTypeOf<Expected["Type"]>();
   });
 });

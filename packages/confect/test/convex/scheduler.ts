@@ -1,15 +1,15 @@
-import { Effect, Schema } from 'effect';
+import { Effect, Schema } from "effect";
 import type {
   DocumentDecodeError,
   DocumentEncodeError,
-} from '../../src/server/database';
-import { api } from './_generated/api';
+} from "../../src/server/database";
+import { api } from "./_generated/api";
 import {
   ConfectDatabaseWriter,
   ConfectScheduler,
   confectAction,
   confectMutation,
-} from './confect';
+} from "./confect";
 
 export const insertAfter = confectAction({
   args: Schema.Struct({
@@ -44,7 +44,7 @@ export const scheduledInsert = confectMutation({
     Effect.gen(function* () {
       const writer = yield* ConfectDatabaseWriter;
 
-      yield* writer.insert('notes', { text });
+      yield* writer.insert("notes", { text });
 
       return null;
     }),

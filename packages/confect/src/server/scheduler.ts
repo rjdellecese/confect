@@ -2,8 +2,8 @@ import type {
   OptionalRestArgs,
   SchedulableFunctionReference,
   Scheduler,
-} from 'convex/server';
-import { DateTime, Duration, Effect, Layer } from 'effect';
+} from "convex/server";
+import { DateTime, Duration, Effect, Layer } from "effect";
 
 const make = (scheduler: Scheduler) => ({
   runAfter: <FuncRef extends SchedulableFunctionReference>(
@@ -33,7 +33,7 @@ const make = (scheduler: Scheduler) => ({
 });
 
 export class ConfectScheduler extends Effect.Tag(
-  '@rjdellecese/confect/ConfectScheduler',
+  "@rjdellecese/confect/ConfectScheduler",
 )<ConfectScheduler, ReturnType<typeof make>>() {
   static readonly layer = (scheduler: Scheduler) =>
     Layer.succeed(this, make(scheduler));

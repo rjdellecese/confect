@@ -1,4 +1,4 @@
-import { Schema } from 'effect';
+import { Schema } from "effect";
 
 export const PaginationResult = <Doc extends Schema.Schema.AnyNoContext>(
   Doc: Doc,
@@ -10,8 +10,8 @@ export const PaginationResult = <Doc extends Schema.Schema.AnyNoContext>(
     splitCursor: Schema.optional(Schema.Union(Schema.String, Schema.Null)),
     pageStatus: Schema.optional(
       Schema.Union(
-        Schema.Literal('SplitRecommended'),
-        Schema.Literal('SplitRequired'),
+        Schema.Literal("SplitRecommended"),
+        Schema.Literal("SplitRequired"),
         Schema.Null,
       ),
     ),

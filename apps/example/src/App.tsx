@@ -1,9 +1,9 @@
-import { FetchHttpClient, HttpApiClient } from '@effect/platform';
-import { useAction, useMutation, useQuery } from '@rjdellecese/confect/react';
-import { ConvexProvider, ConvexReactClient } from 'convex/react';
-import { Array, Effect, Exit, Option } from 'effect';
-import { useEffect, useState } from 'react';
-import { api } from '../convex/_generated/api';
+import { FetchHttpClient, HttpApiClient } from "@effect/platform";
+import { useAction, useMutation, useQuery } from "@rjdellecese/confect/react";
+import { ConvexProvider, ConvexReactClient } from "convex/react";
+import { Array, Effect, Exit, Option } from "effect";
+import { useEffect, useState } from "react";
+import { api } from "../convex/_generated/api";
 import {
   DeleteNoteArgs,
   DeleteNoteResult,
@@ -13,8 +13,8 @@ import {
   InsertNoteResult,
   ListNotesArgs,
   ListNotesResult,
-} from '../convex/functions.schemas';
-import { Api } from '../convex/http/api';
+} from "../convex/functions.schemas";
+import { Api } from "../convex/http/api";
 
 const App = () => {
   const convexClient = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
@@ -27,7 +27,7 @@ const App = () => {
 };
 
 const Page = () => {
-  const [note, setNote] = useState('');
+  const [note, setNote] = useState("");
   const insertNote = useMutation({
     mutation: api.functions.insertNote,
     args: InsertNoteArgs,
@@ -54,7 +54,7 @@ const Page = () => {
       <h1>Confect Example</h1>
 
       <div>
-        Random number: {randomNumber ? randomNumber : 'Loading…'}
+        Random number: {randomNumber ? randomNumber : "Loading…"}
         <br />
         <button type="button" onClick={retrieveRandomNumber}>
           Get new random number
@@ -74,7 +74,7 @@ const Page = () => {
         type="button"
         onClick={() =>
           insertNote({ text: note }).pipe(
-            Effect.andThen(() => setNote('')),
+            Effect.andThen(() => setNote("")),
             Effect.runPromise,
           )
         }
@@ -125,8 +125,8 @@ const NoteList = () => {
 
 const ApiClient = HttpApiClient.make(Api, {
   baseUrl: import.meta.env.VITE_CONVEX_URL.replace(
-    'convex.cloud',
-    'convex.site',
+    "convex.cloud",
+    "convex.site",
   ),
 });
 
@@ -137,6 +137,7 @@ const getFirst = ApiClient.pipe(
 );
 
 const HttpEndpoints = () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [getResponse, setGetResponse] = useState<Exit.Exit<any, any> | null>(
     null,
   );
@@ -159,7 +160,7 @@ const HttpEndpoints = () => {
               onSuccess: (value) => JSON.stringify(value),
               onFailure: (error) => JSON.stringify(error),
             })
-          : 'No response yet'}
+          : "No response yet"}
       </p>
     </div>
   );

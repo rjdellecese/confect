@@ -1,5 +1,5 @@
-import type { GenericId } from 'convex/values';
-import type { Brand } from 'effect';
+import type { GenericId } from "convex/values";
+import type { Brand } from "effect";
 
 export type IsOptional<T, K extends keyof T> =
   {} extends Pick<T, K> ? true : false;

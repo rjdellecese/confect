@@ -1,6 +1,6 @@
 // @ts-check
-import eslint from '@eslint/js';
-import tseslint from 'typescript-eslint';
+import eslint from "@eslint/js";
+import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   eslint.configs.recommended,
@@ -14,15 +14,15 @@ export default tseslint.config(
     },
   },
   {
-    files: ['**/*.ts', '**/*.tsx'],
+    files: ["**/*.ts", "**/*.tsx"],
     rules: {
-      '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-empty-object-type': 'off',
-      '@typescript-eslint/no-unused-vars': [
-        'warn',
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-empty-object-type": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
         {
-          argsIgnorePattern: '^_',
-          varsIgnorePattern: '^_',
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
           ignoreRestSiblings: true,
         },
       ],
@@ -30,12 +30,12 @@ export default tseslint.config(
   },
   {
     ignores: [
-      'dist/**',
-      'coverage/**',
-      'node_modules/**',
-      '.pnpm-store/**',
-      '.tsup/**',
-      'test/convex/_generated/**',
+      "dist/**",
+      "coverage/**",
+      "node_modules/**",
+      ".pnpm-store/**",
+      ".tsup/**",
+      "test/convex/_generated/**",
     ],
   },
 );

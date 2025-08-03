@@ -1,19 +1,19 @@
-import { describe } from '@effect/vitest';
-import { assertEquals } from '@effect/vitest/utils';
-import { Effect } from 'effect';
-import { api } from './convex/_generated/api';
-import { TestConvexService } from './TestConvexService';
-import { effect } from './test_utils';
+import { describe } from "@effect/vitest";
+import { assertEquals } from "@effect/vitest/utils";
+import { Effect } from "effect";
+import { api } from "./convex/_generated/api";
+import { TestConvexService } from "./TestConvexService";
+import { effect } from "./test_utils";
 
-describe('QueryCtx', () => {
-  effect('should get a note', () =>
+describe("QueryCtx", () => {
+  effect("should get a note", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
 
-      const text = 'Hello, world!';
+      const text = "Hello, world!";
 
       const noteId = yield* c.run(({ db }) =>
-        db.insert('notes', {
+        db.insert("notes", {
           text,
         }),
       );
@@ -27,12 +27,12 @@ describe('QueryCtx', () => {
   );
 });
 
-describe('MutationCtx', () => {
-  effect('should insert a note', () =>
+describe("MutationCtx", () => {
+  effect("should insert a note", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
 
-      const text = 'Hello, world!';
+      const text = "Hello, world!";
 
       const noteId = yield* c.mutation(api.ctx.insert, {
         text,
@@ -45,15 +45,15 @@ describe('MutationCtx', () => {
   );
 });
 
-describe('ActionCtx', () => {
-  effect('should insert a note', () =>
+describe("ActionCtx", () => {
+  effect("should insert a note", () =>
     Effect.gen(function* () {
       const c = yield* TestConvexService;
 
-      const text = 'Hello, world!';
+      const text = "Hello, world!";
 
       const noteId = yield* c.run(({ db }) =>
-        db.insert('notes', {
+        db.insert("notes", {
           text,
         }),
       );

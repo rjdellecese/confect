@@ -1,11 +1,11 @@
-import { Effect } from 'effect';
+import { Effect } from "effect";
 import {
   ConfectDatabaseReader,
   ConfectDatabaseWriter,
   confectAction,
   confectMutation,
   confectQuery,
-} from './confect';
+} from "./confect";
 import {
   DeleteNoteArgs,
   DeleteNoteResult,
@@ -17,7 +17,7 @@ import {
   InsertNoteResult,
   ListNotesArgs,
   ListNotesResult,
-} from './functions.schemas';
+} from "./functions.schemas";
 
 export const insertNote = confectMutation({
   args: InsertNoteArgs,
@@ -26,7 +26,7 @@ export const insertNote = confectMutation({
     Effect.gen(function* () {
       const writer = yield* ConfectDatabaseWriter;
 
-      return yield* writer.insert('notes', { text });
+      return yield* writer.insert("notes", { text });
     }),
 });
 
@@ -38,8 +38,8 @@ export const listNotes = confectQuery({
       const reader = yield* ConfectDatabaseReader;
 
       return yield* reader
-        .table('notes')
-        .index('by_creation_time', 'desc')
+        .table("notes")
+        .index("by_creation_time", "desc")
         .collect();
     }),
 });
@@ -51,7 +51,7 @@ export const deleteNote = confectMutation({
     Effect.gen(function* () {
       const writer = yield* ConfectDatabaseWriter;
 
-      yield* writer.delete('notes', noteId);
+      yield* writer.delete("notes", noteId);
 
       return null;
     }),
@@ -70,6 +70,6 @@ export const getFirst = confectQuery({
     Effect.gen(function* () {
       const reader = yield* ConfectDatabaseReader;
 
-      return yield* reader.table('notes').index('by_creation_time').first();
+      return yield* reader.table("notes").index("by_creation_time").first();
     }),
 });

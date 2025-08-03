@@ -1,6 +1,6 @@
-import { describe, effect, expect, expectTypeOf, test } from '@effect/vitest';
-import { type VBoolean, type VString, type VUnion, v } from 'convex/values';
-import { Effect, Exit, identity, Schema } from 'effect';
+import { describe, effect, expect, expectTypeOf, test } from "@effect/vitest";
+import { type VBoolean, type VString, type VUnion, v } from "convex/values";
+import { Effect, Exit, identity, Schema } from "effect";
 
 import {
   compileArgsSchema,
@@ -15,12 +15,12 @@ import {
   UnsupportedPropertySignatureKeyTypeError,
   UnsupportedSchemaTypeError,
   type ValueToValidator,
-} from '../src/server/schema_to_validator';
-import { GenericId } from '../src/server/schemas/GenericId';
+} from "../src/server/schema_to_validator";
+import { GenericId } from "../src/server/schemas/GenericId";
 
 describe(compileAst, () => {
-  describe('allowed', () => {
-    effect('any', () =>
+  describe("allowed", () => {
+    effect("any", () =>
       Effect.gen(function* () {
         const schema = Schema.Any;
         const validator = v.any();
@@ -32,10 +32,10 @@ describe(compileAst, () => {
       }),
     );
 
-    effect('literal', () =>
+    effect("literal", () =>
       Effect.gen(function* () {
-        const schema = Schema.Literal('LiteralString');
-        const validator = v.literal('LiteralString');
+        const schema = Schema.Literal("LiteralString");
+        const validator = v.literal("LiteralString");
         const compiledValidator = yield* compileAst(
           Schema.encodedSchema(schema).ast,
         );
@@ -44,10 +44,10 @@ describe(compileAst, () => {
       }),
     );
 
-    effect('literal union', () =>
+    effect("literal union", () =>
       Effect.gen(function* () {
-        const schema = Schema.Literal('LiteralString', 1);
-        const validator = v.union(v.literal('LiteralString'), v.literal(1));
+        const schema = Schema.Literal("LiteralString", 1);
+        const validator = v.union(v.literal("LiteralString"), v.literal(1));
         const compiledValidator = yield* compileAst(
           Schema.encodedSchema(schema).ast,
         );
@@ -56,7 +56,7 @@ describe(compileAst, () => {
       }),
     );
 
-    effect('boolean', () =>
+    effect("boolean", () =>
       Effect.gen(function* () {
         const schema = Schema.Boolean;
         const validator = v.boolean();
@@ -68,7 +68,7 @@ describe(compileAst, () => {
       }),
     );
 
-    effect('string', () =>
+    effect("string", () =>
       Effect.gen(function* () {
         const schema = Schema.String;
         const validator = v.string();
@@ -80,7 +80,7 @@ describe(compileAst, () => {
       }),
     );
 
-    effect('number', () =>
+    effect("number", () =>
       Effect.gen(function* () {
         const schema = Schema.Number;
         const validator = v.float64();
@@ -92,7 +92,7 @@ describe(compileAst, () => {
       }),
     );
 
-    effect('empty object', () =>
+    effect("empty object", () =>
       Effect.gen(function* () {
         const schema = Schema.Struct({});
         const validator = v.object({});
@@ -104,7 +104,7 @@ describe(compileAst, () => {
       }),
     );
 
-    effect('simple object', () =>
+    effect("simple object", () =>
       Effect.gen(function* () {
         const schema = Schema.Struct({
           foo: Schema.String,
@@ -119,7 +119,7 @@ describe(compileAst, () => {
       }),
     );
 
-    effect('object with optional field (exact)', () =>
+    effect("object with optional field (exact)", () =>
       Effect.gen(function* () {
         const schema = Schema.Struct({
           foo: Schema.optionalWith(Schema.String, { exact: true }),
@@ -134,7 +134,7 @@ describe(compileAst, () => {
       }),
     );
 
-    effect('object with optional field', () =>
+    effect("object with optional field", () =>
       Effect.gen(function* () {
         const schema = Schema.Struct({
           foo: Schema.optional(Schema.String),
@@ -149,7 +149,7 @@ describe(compileAst, () => {
       }),
     );
 
-    effect('nested objects', () =>
+    effect("nested objects", () =>
       Effect.gen(function* () {
         const schema = Schema.Struct({
           foo: Schema.Struct({
@@ -169,7 +169,7 @@ describe(compileAst, () => {
       }),
     );
 
-    effect('union with four elements', () =>
+    effect("union with four elements", () =>
       Effect.gen(function* () {
         const schema = Schema.Union(
           Schema.String,
@@ -191,7 +191,7 @@ describe(compileAst, () => {
       }),
     );
 
-    effect('tuple with one element', () =>
+    effect("tuple with one element", () =>
       Effect.gen(function* () {
         const schema = Schema.Tuple(Schema.String);
         const validator = v.array(v.string());
@@ -203,7 +203,7 @@ describe(compileAst, () => {
       }),
     );
 
-    effect('tuple with two elements', () =>
+    effect("tuple with two elements", () =>
       Effect.gen(function* () {
         const schema = Schema.Tuple(Schema.String, Schema.Number);
         const validator = v.array(v.union(v.string(), v.float64()));
@@ -215,7 +215,7 @@ describe(compileAst, () => {
       }),
     );
 
-    effect('tuple with three elements', () =>
+    effect("tuple with three elements", () =>
       Effect.gen(function* () {
         const schema = Schema.Tuple(
           Schema.String,
@@ -233,8 +233,8 @@ describe(compileAst, () => {
       }),
     );
 
-    describe('suspend', () => {
-      effect('object with optional recursive field', () =>
+    describe("suspend", () => {
+      effect("object with optional recursive field", () =>
         Effect.gen(function* () {
           type Foo = {
             foo?: Foo;
@@ -255,7 +255,7 @@ describe(compileAst, () => {
         }),
       );
 
-      effect('tuple with required recursive element', () =>
+      effect("tuple with required recursive element", () =>
         Effect.gen(function* () {
           type Foo = {
             foo: Foo;
@@ -273,7 +273,7 @@ describe(compileAst, () => {
         }),
       );
 
-      effect('array with recursive element', () =>
+      effect("array with recursive element", () =>
         Effect.gen(function* () {
           type Foo = readonly Foo[];
           const Foo = Schema.Array(
@@ -289,7 +289,7 @@ describe(compileAst, () => {
         }),
       );
 
-      effect('tuple with recursive element', () =>
+      effect("tuple with recursive element", () =>
         Effect.gen(function* () {
           type Foo = readonly [string, Foo];
           const Foo = Schema.Tuple(
@@ -306,7 +306,7 @@ describe(compileAst, () => {
         }),
       );
 
-      effect('union with recursive element', () =>
+      effect("union with recursive element", () =>
         Effect.gen(function* () {
           type Foo = {
             foos: readonly Foo[];
@@ -329,8 +329,8 @@ describe(compileAst, () => {
     });
   });
 
-  describe('disallowed', () => {
-    effect('object with number keys', () =>
+  describe("disallowed", () => {
+    effect("object with number keys", () =>
       Effect.gen(function* () {
         const numberKey = 100;
 
@@ -352,9 +352,9 @@ describe(compileAst, () => {
       }),
     );
 
-    effect('object with symbol keys', () =>
+    effect("object with symbol keys", () =>
       Effect.gen(function* () {
-        const symbolKey = Symbol('SymbolKey');
+        const symbolKey = Symbol("SymbolKey");
 
         const schema = Schema.Struct({
           [symbolKey]: Schema.Number,
@@ -374,7 +374,7 @@ describe(compileAst, () => {
       }),
     );
 
-    effect('union of string and undefined', () =>
+    effect("union of string and undefined", () =>
       Effect.gen(function* () {
         const schema = Schema.Union(Schema.String, Schema.Undefined);
 
@@ -384,13 +384,13 @@ describe(compileAst, () => {
 
         expect(exit).toStrictEqual(
           Exit.fail(
-            new UnsupportedSchemaTypeError({ schemaType: 'UndefinedKeyword' }),
+            new UnsupportedSchemaTypeError({ schemaType: "UndefinedKeyword" }),
           ),
         );
       }),
     );
 
-    effect('object with property of union of string and undefined', () =>
+    effect("object with property of union of string and undefined", () =>
       Effect.gen(function* () {
         const schema = Schema.Struct({
           foo: Schema.Union(Schema.String, Schema.Undefined),
@@ -402,13 +402,13 @@ describe(compileAst, () => {
 
         expect(exit).toStrictEqual(
           Exit.fail(
-            new UnsupportedSchemaTypeError({ schemaType: 'UndefinedKeyword' }),
+            new UnsupportedSchemaTypeError({ schemaType: "UndefinedKeyword" }),
           ),
         );
       }),
     );
 
-    effect('empty tuple', () =>
+    effect("empty tuple", () =>
       Effect.gen(function* () {
         const schema = Schema.Tuple();
 
@@ -422,7 +422,7 @@ describe(compileAst, () => {
       }),
     );
 
-    effect('tuple with an optional element', () =>
+    effect("tuple with an optional element", () =>
       Effect.gen(function* () {
         const schema = Schema.Tuple(Schema.optionalElement(Schema.String));
 
@@ -436,7 +436,7 @@ describe(compileAst, () => {
       }),
     );
 
-    effect('unsupported keyword', () =>
+    effect("unsupported keyword", () =>
       Effect.gen(function* () {
         const schema = Schema.Undefined;
 
@@ -446,13 +446,13 @@ describe(compileAst, () => {
 
         expect(exit).toStrictEqual(
           Exit.fail(
-            new UnsupportedSchemaTypeError({ schemaType: 'UndefinedKeyword' }),
+            new UnsupportedSchemaTypeError({ schemaType: "UndefinedKeyword" }),
           ),
         );
       }),
     );
 
-    effect('unsupported declaration', () =>
+    effect("unsupported declaration", () =>
       Effect.gen(function* () {
         class Klass {}
 
@@ -464,7 +464,7 @@ describe(compileAst, () => {
 
         expect(exit).toStrictEqual(
           Exit.fail(
-            new UnsupportedSchemaTypeError({ schemaType: 'Declaration' }),
+            new UnsupportedSchemaTypeError({ schemaType: "Declaration" }),
           ),
         );
       }),
@@ -473,7 +473,7 @@ describe(compileAst, () => {
 });
 
 describe(compileSchema, () => {
-  test('any', () => {
+  test("any", () => {
     const expectedValidator = v.any();
 
     const schema = Schema.Any;
@@ -483,26 +483,26 @@ describe(compileSchema, () => {
     expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
   });
 
-  test('literal', () => {
-    const expectedValidator = v.literal('LiteralString');
+  test("literal", () => {
+    const expectedValidator = v.literal("LiteralString");
 
-    const schema = Schema.Literal('LiteralString');
+    const schema = Schema.Literal("LiteralString");
     const compiledValidator = compileSchema(schema);
 
     expect(compiledValidator).toStrictEqual(expectedValidator);
     expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
   });
 
-  test('id', () => {
-    const expectedValidator = v.id('users');
+  test("id", () => {
+    const expectedValidator = v.id("users");
 
-    const schema = GenericId('users');
+    const schema = GenericId("users");
     const compiledValidator = compileSchema(schema);
 
     expect(compiledValidator).toStrictEqual(expectedValidator);
   });
 
-  test('boolean', () => {
+  test("boolean", () => {
     const expectedValidator = v.boolean();
 
     const schema = Schema.Boolean;
@@ -512,7 +512,7 @@ describe(compileSchema, () => {
     expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
   });
 
-  test('string', () => {
+  test("string", () => {
     const expectedValidator = v.string();
 
     const schema = Schema.String;
@@ -522,17 +522,17 @@ describe(compileSchema, () => {
     expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
   });
 
-  test('branded string', () => {
+  test("branded string", () => {
     const expectedValidator = v.string();
 
-    const schema = Schema.String.pipe(Schema.brand('BrandedString'));
+    const schema = Schema.String.pipe(Schema.brand("BrandedString"));
     const compiledValidator = compileSchema(schema);
 
     expect(compiledValidator).toStrictEqual(expectedValidator);
     expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
   });
 
-  test('number', () => {
+  test("number", () => {
     const expectedValidator = v.float64();
 
     const schema = Schema.Number;
@@ -542,7 +542,7 @@ describe(compileSchema, () => {
     expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
   });
 
-  test('array buffer', () => {
+  test("array buffer", () => {
     const expectedValidator = v.bytes();
 
     const schema = Schema.instanceOf(ArrayBuffer);
@@ -552,7 +552,7 @@ describe(compileSchema, () => {
     expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
   });
 
-  test('empty object', () => {
+  test("empty object", () => {
     const expectedValidator = v.object({});
 
     const schema = Schema.Struct({});
@@ -562,7 +562,7 @@ describe(compileSchema, () => {
     expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
   });
 
-  test('simple object', () => {
+  test("simple object", () => {
     const expectedValidator = v.object({ foo: v.string(), bar: v.float64() });
 
     const schema = Schema.Struct({ foo: Schema.String, bar: Schema.Number });
@@ -572,7 +572,7 @@ describe(compileSchema, () => {
     expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
   });
 
-  test('object with optional field', () => {
+  test("object with optional field", () => {
     const expectedValidator = v.object({ foo: v.optional(v.string()) });
 
     const schema = Schema.Struct({
@@ -584,7 +584,7 @@ describe(compileSchema, () => {
     expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
   });
 
-  test('nested objects', () => {
+  test("nested objects", () => {
     const expectedValidator = v.object({
       foo: v.object({ bar: v.object({ baz: v.string() }) }),
     });
@@ -598,7 +598,7 @@ describe(compileSchema, () => {
     expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
   });
 
-  test('array', () => {
+  test("array", () => {
     const expectedValidator = v.array(v.string());
 
     const schema = Schema.Array(Schema.String);
@@ -608,7 +608,7 @@ describe(compileSchema, () => {
     expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
   });
 
-  test('array of union', () => {
+  test("array of union", () => {
     const expectedValidator = v.array(v.union(v.string(), v.float64()));
 
     const schema = Schema.Array(Schema.Union(Schema.String, Schema.Number));
@@ -618,8 +618,8 @@ describe(compileSchema, () => {
     expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
   });
 
-  describe('refinements', () => {
-    test('int', () => {
+  describe("refinements", () => {
+    test("int", () => {
       const expectedValidator = v.number();
       type ExpectedValidator = typeof expectedValidator;
 
@@ -630,7 +630,7 @@ describe(compileSchema, () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
-    test('filter', () => {
+    test("filter", () => {
       const expectedValidator = v.string();
       type ExpectedValidator = typeof expectedValidator;
 
@@ -643,8 +643,8 @@ describe(compileSchema, () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
-    describe('record', () => {
-      test('simple record', () => {
+    describe("record", () => {
+      test("simple record", () => {
         const expectedValidator = v.record(v.string(), v.number());
         type ExpectedValidator = typeof expectedValidator;
 
@@ -660,7 +660,7 @@ describe(compileSchema, () => {
         expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
       });
 
-      test('struct with index signatures', () => {
+      test("struct with index signatures", () => {
         const schema = Schema.Struct(
           {
             foo: Schema.String,
@@ -676,8 +676,8 @@ describe(compileSchema, () => {
   });
 });
 
-describe('suspend', () => {
-  test('object with optional recursive field', () => {
+describe("suspend", () => {
+  test("object with optional recursive field", () => {
     const expectedValidator = v.any();
     type ExpectedValidator = typeof expectedValidator;
 
@@ -694,7 +694,7 @@ describe('suspend', () => {
     expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
   });
 
-  test('object with required recursive field', () => {
+  test("object with required recursive field", () => {
     const expectedValidator = v.any();
     type ExpectedValidator = typeof expectedValidator;
 
@@ -711,7 +711,7 @@ describe('suspend', () => {
     expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
   });
 
-  test('array with recursive element', () => {
+  test("array with recursive element", () => {
     const expectedValidator = v.any();
     type ExpectedValidator = typeof expectedValidator;
 
@@ -724,7 +724,7 @@ describe('suspend', () => {
     expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
   });
 
-  test('tuple with recursive element', () => {
+  test("tuple with recursive element", () => {
     const expectedValidator = v.any();
     type ExpectedValidator = typeof expectedValidator;
 
@@ -740,7 +740,7 @@ describe('suspend', () => {
     expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
   });
 
-  test('union with recursive element', () => {
+  test("union with recursive element", () => {
     const expectedValidator = v.any();
     type ExpectedValidator = typeof expectedValidator;
 
@@ -761,8 +761,8 @@ describe('suspend', () => {
   });
 });
 
-describe('ValueToValidator', () => {
-  test('any', () => {
+describe("ValueToValidator", () => {
+  test("any", () => {
     const _expectedValidator = v.any();
     type ExpectedValidator = typeof _expectedValidator;
 
@@ -771,22 +771,22 @@ describe('ValueToValidator', () => {
     expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
   });
 
-  test('never', () => {
+  test("never", () => {
     type CompiledValidator = ValueToValidator<never>;
 
     expectTypeOf<CompiledValidator>().toEqualTypeOf<never>();
   });
 
-  test('id', () => {
-    const _expectedValidator = v.id('users');
+  test("id", () => {
+    const _expectedValidator = v.id("users");
     type ExpectedValidator = typeof _expectedValidator;
 
-    type CompiledValidator = ValueToValidator<GenericId<'users'>>;
+    type CompiledValidator = ValueToValidator<GenericId<"users">>;
 
     expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
   });
 
-  test('null', () => {
+  test("null", () => {
     const _expectedValidator = v.null();
     type ExpectedValidator = typeof _expectedValidator;
 
@@ -795,7 +795,7 @@ describe('ValueToValidator', () => {
     expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
   });
 
-  test('boolean', () => {
+  test("boolean", () => {
     const _expectedValidator = v.boolean();
     type ExpectedValidator = typeof _expectedValidator;
 
@@ -804,7 +804,7 @@ describe('ValueToValidator', () => {
     expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
   });
 
-  test('true | false', () => {
+  test("true | false", () => {
     const _expectedValidator = v.boolean();
     type ExpectedValidator = typeof _expectedValidator;
 
@@ -813,7 +813,7 @@ describe('ValueToValidator', () => {
     expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
   });
 
-  test('true | false | string', () => {
+  test("true | false | string", () => {
     const _validator = v.union(v.boolean(), v.string());
     type Validator = typeof _validator;
 
@@ -822,26 +822,26 @@ describe('ValueToValidator', () => {
     type AnyPermutationOfValidator =
       | VUnion<
           string | boolean,
-          [VBoolean<boolean, 'required'>, VString<string, 'required'>],
-          'required',
+          [VBoolean<boolean, "required">, VString<string, "required">],
+          "required",
           never
         >
       | VUnion<
           string | boolean,
-          [VString<string, 'required'>, VBoolean<boolean, 'required'>],
-          'required',
+          [VString<string, "required">, VBoolean<boolean, "required">],
+          "required",
           never
         >
       | VUnion<
           boolean | string,
-          [VBoolean<boolean, 'required'>, VString<string, 'required'>],
-          'required',
+          [VBoolean<boolean, "required">, VString<string, "required">],
+          "required",
           never
         >
       | VUnion<
           boolean | string,
-          [VString<string, 'required'>, VBoolean<boolean, 'required'>],
-          'required',
+          [VString<string, "required">, VBoolean<boolean, "required">],
+          "required",
           never
         >;
     expectTypeOf<Validator>().toExtend<AnyPermutationOfValidator>();
@@ -851,7 +851,7 @@ describe('ValueToValidator', () => {
     expectTypeOf<CompiledValidator>().toExtend<AnyPermutationOfValidator>();
   });
 
-  test('number', () => {
+  test("number", () => {
     const _expectedValidator = v.float64();
     type ExpectedValidator = typeof _expectedValidator;
 
@@ -860,7 +860,7 @@ describe('ValueToValidator', () => {
     expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
   });
 
-  test('bigint', () => {
+  test("bigint", () => {
     const _expectedValidator = v.int64();
     type ExpectedValidator = typeof _expectedValidator;
 
@@ -869,7 +869,7 @@ describe('ValueToValidator', () => {
     expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
   });
 
-  test('string', () => {
+  test("string", () => {
     const _expectedValidator = v.string();
     type ExpectedValidator = typeof _expectedValidator;
 
@@ -878,7 +878,7 @@ describe('ValueToValidator', () => {
     expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
   });
 
-  test('bytes', () => {
+  test("bytes", () => {
     const _expectedValidator = v.bytes();
     type ExpectedValidator = typeof _expectedValidator;
 
@@ -887,17 +887,17 @@ describe('ValueToValidator', () => {
     expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
   });
 
-  describe('literal', () => {
-    test('string', () => {
-      const _expectedValidator = v.literal('foo');
+  describe("literal", () => {
+    test("string", () => {
+      const _expectedValidator = v.literal("foo");
       type ExpectedValidator = typeof _expectedValidator;
 
-      type CompiledValidator = ValueToValidator<'foo'>;
+      type CompiledValidator = ValueToValidator<"foo">;
 
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
-    test('number', () => {
+    test("number", () => {
       const _expectedValidator = v.literal(1);
       type ExpectedValidator = typeof _expectedValidator;
 
@@ -906,7 +906,7 @@ describe('ValueToValidator', () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
-    test('boolean', () => {
+    test("boolean", () => {
       const _expectedValidator = v.literal(true);
       type ExpectedValidator = typeof _expectedValidator;
 
@@ -915,7 +915,7 @@ describe('ValueToValidator', () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
-    test('bigint', () => {
+    test("bigint", () => {
       const _expectedValidator = v.literal(1n);
       type ExpectedValidator = typeof _expectedValidator;
 
@@ -925,8 +925,8 @@ describe('ValueToValidator', () => {
     });
   });
 
-  describe('array', () => {
-    test('string[]', () => {
+  describe("array", () => {
+    test("string[]", () => {
       const _expectedValidator = v.array(v.string());
       type ExpectedValidator = typeof _expectedValidator;
 
@@ -935,7 +935,7 @@ describe('ValueToValidator', () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
-    test('number[]', () => {
+    test("number[]", () => {
       const _expectedValidator = v.array(v.float64());
       type ExpectedValidator = typeof _expectedValidator;
 
@@ -945,15 +945,15 @@ describe('ValueToValidator', () => {
     });
 
     test("'foo'[]", () => {
-      const _expectedValidator = v.array(v.literal('foo'));
+      const _expectedValidator = v.array(v.literal("foo"));
       type ExpectedValidator = typeof _expectedValidator;
 
-      type CompiledValidator = ValueToValidator<'foo'[]>;
+      type CompiledValidator = ValueToValidator<"foo"[]>;
 
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
-    test('string[][]', () => {
+    test("string[][]", () => {
       const _expectedValidator = v.array(v.array(v.string()));
       type ExpectedValidator = typeof _expectedValidator;
 
@@ -962,7 +962,7 @@ describe('ValueToValidator', () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
-    test('any[]', () => {
+    test("any[]", () => {
       const _expectedValidator = v.array(v.any());
       type ExpectedValidator = typeof _expectedValidator;
 
@@ -971,7 +971,7 @@ describe('ValueToValidator', () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
-    test('type NestedArray = (string | NestedArray)[]', () => {
+    test("type NestedArray = (string | NestedArray)[]", () => {
       const _expectedValidator = v.any();
       type ExpectedValidator = typeof _expectedValidator;
 
@@ -982,8 +982,8 @@ describe('ValueToValidator', () => {
     });
   });
 
-  describe('object', () => {
-    test('{}', () => {
+  describe("object", () => {
+    test("{}", () => {
       const _expectedValidator = v.object({});
       type ExpectedValidator = typeof _expectedValidator;
 
@@ -992,7 +992,7 @@ describe('ValueToValidator', () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
-    test('{ foo: string }', () => {
+    test("{ foo: string }", () => {
       const _expectedValidator = v.object({ foo: v.string() });
       type ExpectedValidator = typeof _expectedValidator;
 
@@ -1001,7 +1001,7 @@ describe('ValueToValidator', () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
-    test('{ foo: { bar: number } }', () => {
+    test("{ foo: { bar: number } }", () => {
       const _expectedValidator = v.object({
         foo: v.object({ bar: v.float64() }),
       });
@@ -1014,7 +1014,7 @@ describe('ValueToValidator', () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
-    test('{ foo: { bar?: number | undefined } }', () => {
+    test("{ foo: { bar?: number | undefined } }", () => {
       const _expectedValidator = v.object({
         foo: v.object({ bar: v.optional(v.float64()) }),
       });
@@ -1027,7 +1027,7 @@ describe('ValueToValidator', () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
-    test('{ foo?: { bar: number } | undefined }', () => {
+    test("{ foo?: { bar: number } | undefined }", () => {
       const _expectedValidator = v.object({
         foo: v.optional(v.object({ bar: v.float64() })),
       });
@@ -1040,7 +1040,7 @@ describe('ValueToValidator', () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
-    test('{ foo?: string | undefined }', () => {
+    test("{ foo?: string | undefined }", () => {
       const _expectedValidator = v.object({
         foo: v.optional(v.string()),
       });
@@ -1051,7 +1051,7 @@ describe('ValueToValidator', () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
-    test('{ foo?: string | undefined }', () => {
+    test("{ foo?: string | undefined }", () => {
       const _expectedValidator = v.object({
         foo: v.optional(v.string()),
       });
@@ -1062,7 +1062,7 @@ describe('ValueToValidator', () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
-    test('{ foo?: { bar?: number | undefined } | undefined }', () => {
+    test("{ foo?: { bar?: number | undefined } | undefined }", () => {
       const _expectedValidator = v.object({
         foo: v.optional(v.object({ bar: v.optional(v.float64()) })),
       });
@@ -1075,7 +1075,7 @@ describe('ValueToValidator', () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
-    test('{ foo?: { bar?: number | undefined } | undefined }', () => {
+    test("{ foo?: { bar?: number | undefined } | undefined }", () => {
       const _expectedValidator = v.object({
         foo: v.optional(v.object({ bar: v.optional(v.float64()) })),
       });
@@ -1088,7 +1088,7 @@ describe('ValueToValidator', () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
-    test('{ foo?: any }', () => {
+    test("{ foo?: any }", () => {
       const _expectedValidator = v.object({ foo: v.optional(v.any()) });
       type ExpectedValidator = typeof _expectedValidator;
 
@@ -1097,7 +1097,7 @@ describe('ValueToValidator', () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
-    test('{ foo: any }', () => {
+    test("{ foo: any }", () => {
       const _expectedValidator = v.object({ foo: v.any() });
       type ExpectedValidator = typeof _expectedValidator;
 
@@ -1106,7 +1106,7 @@ describe('ValueToValidator', () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
-    test('{ foo: { bar: any } }', () => {
+    test("{ foo: { bar: any } }", () => {
       const _expectedValidator = v.object({
         foo: v.object({ bar: v.array(v.any()) }),
       });
@@ -1118,8 +1118,8 @@ describe('ValueToValidator', () => {
     });
   });
 
-  describe('union', () => {
-    test('string | number | boolean[]', () => {
+  describe("union", () => {
+    test("string | number | boolean[]", () => {
       const _expectedValidator = v.union(
         v.string(),
         v.float64(),
@@ -1133,8 +1133,8 @@ describe('ValueToValidator', () => {
     });
   });
 
-  describe('recursive', () => {
-    test('type Foo = { foo: Foo }', () => {
+  describe("recursive", () => {
+    test("type Foo = { foo: Foo }", () => {
       const _expectedValidator = v.any();
       type ExpectedValidator = typeof _expectedValidator;
 
@@ -1144,7 +1144,7 @@ describe('ValueToValidator', () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
-    test('type Foo = { foo?: Foo }', () => {
+    test("type Foo = { foo?: Foo }", () => {
       const _expectedValidator = v.any();
       type ExpectedValidator = typeof _expectedValidator;
 
@@ -1154,7 +1154,7 @@ describe('ValueToValidator', () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
-    test('type Foo = Foo[]', () => {
+    test("type Foo = Foo[]", () => {
       const _expectedValidator = v.any();
       type ExpectedValidator = typeof _expectedValidator;
 
@@ -1164,7 +1164,7 @@ describe('ValueToValidator', () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
-    test('type Foo = [string, Foo]', () => {
+    test("type Foo = [string, Foo]", () => {
       const _expectedValidator = v.any();
       type ExpectedValidator = typeof _expectedValidator;
 
@@ -1174,7 +1174,7 @@ describe('ValueToValidator', () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
-    test('type Foo = { foos: Foo[] } | null', () => {
+    test("type Foo = { foos: Foo[] } | null", () => {
       const _expectedValidator = v.any();
       type ExpectedValidator = typeof _expectedValidator;
 
@@ -1187,7 +1187,7 @@ describe('ValueToValidator', () => {
 });
 
 describe(compileTableSchema, () => {
-  test('succeeds if provided Schema is a Struct', () => {
+  test("succeeds if provided Schema is a Struct", () => {
     const compiledValidator = compileTableSchema(
       Schema.Struct({
         foo: Schema.String,
@@ -1204,7 +1204,7 @@ describe(compileTableSchema, () => {
     expect(compiledValidator).toStrictEqual(expectedValidator);
   });
 
-  test('succeeds if provided Schema is a Union', () => {
+  test("succeeds if provided Schema is a Union", () => {
     const compiledValidator = compileTableSchema(
       Schema.Union(Schema.String, Schema.Number),
     );
@@ -1215,7 +1215,7 @@ describe(compileTableSchema, () => {
     expect(compiledValidator).toStrictEqual(expectedValidator);
   });
 
-  test('fails if provided Schema is neither a Struct nor a Union', () => {
+  test("fails if provided Schema is neither a Struct nor a Union", () => {
     const stringSchema = Schema.String;
 
     expect(() => compileTableSchema(stringSchema)).toThrow(
@@ -1223,17 +1223,17 @@ describe(compileTableSchema, () => {
     );
   });
 
-  test('fails if provided Schema requires context', () => {
+  test("fails if provided Schema requires context", () => {
     expectTypeOf<Schema.Schema.AnyNoContext & Schema.Struct<any>>().toExtend<
       Parameters<typeof compileTableSchema>[0]
     >();
 
     expectTypeOf<
-      Schema.Schema<any, any, 'Dep'> & Schema.Struct<any>
+      Schema.Schema<any, any, "Dep"> & Schema.Struct<any>
     >().not.toExtend<Parameters<typeof compileTableSchema>[0]>();
   });
 
-  test('fails if provided Schema contains index signatures', () => {
+  test("fails if provided Schema contains index signatures", () => {
     const structWithIndexSignatures = Schema.Struct(
       { foo: Schema.String },
       { key: Schema.String, value: Schema.String },
@@ -1244,7 +1244,7 @@ describe(compileTableSchema, () => {
     );
   });
 
-  effect('fails if provided Schema is not a Struct or a Union', () =>
+  effect("fails if provided Schema is not a Struct or a Union", () =>
     Effect.gen(function* () {
       const exit = yield* Effect.try({
         try: () => compileTableSchema(Schema.String),
@@ -1259,7 +1259,7 @@ describe(compileTableSchema, () => {
 });
 
 describe(compileArgsSchema, () => {
-  test('extracts the wrapping schema and returns the object', () => {
+  test("extracts the wrapping schema and returns the object", () => {
     const compiledArgsValidator = compileArgsSchema(
       Schema.Struct({
         foo: Schema.String,
@@ -1274,7 +1274,7 @@ describe(compileArgsSchema, () => {
     expect(compiledArgsValidator).toStrictEqual(expectedArgsValidator);
   });
 
-  effect('fails if provided Schema contains index signatures', () =>
+  effect("fails if provided Schema contains index signatures", () =>
     Effect.gen(function* () {
       const structWithIndexSignatures = Schema.Struct(
         { foo: Schema.String },
@@ -1292,7 +1292,7 @@ describe(compileArgsSchema, () => {
     }),
   );
 
-  effect('fails if provided Schema is not a Struct', () =>
+  effect("fails if provided Schema is not a Struct", () =>
     Effect.gen(function* () {
       const exit = yield* Effect.try({
         try: () => compileArgsSchema(Schema.String),

@@ -2,9 +2,9 @@ import type {
   Expand,
   IdField,
   SystemFields as NonIdSystemFields,
-} from 'convex/server';
-import { Schema } from 'effect';
-import { GenericId } from './GenericId';
+} from "convex/server";
+import { Schema } from "effect";
+import { GenericId } from "./GenericId";
 
 /**
  * Produces a schema for Convex system fields.

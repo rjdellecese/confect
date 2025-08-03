@@ -8,9 +8,9 @@ import {
   GenericId,
   makeConfectFunctions,
   type TableNamesInConfectDataModel,
-} from '@rjdellecese/confect/server';
+} from "@rjdellecese/confect/server";
 
-import { confectSchema } from './schema';
+import { confectSchema } from "./schema";
 
 export const {
   confectQuery,
@@ -52,7 +52,7 @@ export {
   ConfectStorageReader,
   ConfectStorageWriter,
   ConfectVectorSearch,
-} from '@rjdellecese/confect/server';
+} from "@rjdellecese/confect/server";
 
 type DataModel = DataModelFromConfectDataModel<ConfectDataModel>;
 
