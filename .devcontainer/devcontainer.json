@@ -5,18 +5,20 @@
     "vscode": {
       "extensions": [
         "YoavBls.pretty-ts-errors",
-        "vitest.explorer",
-        "biomejs.biome",
-        "DavidAnson.vscode-markdownlint",
-        "effectful-tech.effect-vscode"
+        "dbaeumer.vscode-eslint",
+        "effectful-tech.effect-vscode",
+        "esbenp.prettier-vscode",
+        "unifiedjs.vscode-mdx",
+        "vitest.explorer"
       ],
       "settings": {
-        "editor.defaultFormatter": "biomejs.biome",
+        "typescript.tsdk": "node_modules/typescript/lib",
         "editor.formatOnSave": true,
-        "markdownlint.config": {
-          "MD010": {
-            "spaces_per_tab": 2
-          }
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "eslint.enable": true,
+        "editor.codeActionsOnSave": {
+          "source.fixAll.eslint": "explicit",
+          "source.organizeImports": "explicit"
         }
       }
     }

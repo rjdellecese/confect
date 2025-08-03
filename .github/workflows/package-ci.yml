@@ -1,4 +1,4 @@
-name: CI (package)
+name: CI (monorepo)
 
 on:
   push:
@@ -35,4 +35,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/package-setup
-      - run: pnpm run check-bundled-types
+      - run: pnpm --filter @rjdellecese/confect check-bundled-types

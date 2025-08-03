@@ -26,5 +26,5 @@ runs:
       shell: bash
 
     - name: Generate Convex types
-      run: pnpm run convex-codegen
+      run: pnpm --filter @rjdellecese/confect convex-codegen
       shell: bash

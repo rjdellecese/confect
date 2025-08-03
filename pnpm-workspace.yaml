@@ -1,0 +1,6 @@
+packages:
+  # Main npm packages
+  - 'packages/*'
+  
+  # Apps (documentation site, example app)
+  - 'apps/*'

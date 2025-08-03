@@ -21,14 +21,9 @@ runs:
         node-version-file: "package.json"
         cache: "pnpm"
 
-    - name: Install root dependencies
+    - name: Install workspace dependencies
       run: pnpm install
       shell: bash
-
-    - name: Install example dependencies
-      run: pnpm install
-      shell: bash
-      working-directory: example
 
     - name: Generate Convex types
       run: pnpm run convex-codegen
