@@ -39,7 +39,7 @@ export const listNotes = confectQuery({
 
       return yield* reader
         .table("notes")
-        .withIndex("by_creation_time", "desc")
+        .index("by_creation_time", "desc")
         .collect();
     }),
 });
@@ -70,6 +70,6 @@ export const getFirst = confectQuery({
     Effect.gen(function* () {
       const reader = yield* ConfectDatabaseReader;
 
-      return yield* reader.table("notes").withIndex("by_creation_time").first();
+      return yield* reader.table("notes").index("by_creation_time").first();
     }),
 });

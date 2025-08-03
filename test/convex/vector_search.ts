@@ -67,6 +67,6 @@ export const get = confectQuery({
     Effect.gen(function* () {
       const reader = yield* ConfectDatabaseReader;
 
-      return yield* reader.table("notes").getbyId(noteId);
+      return yield* reader.table("notes").get(noteId);
     }),
 });

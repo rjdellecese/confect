@@ -18,7 +18,7 @@ export const getById = confectQuery({
     Effect.gen(function* () {
       const reader = yield* ConfectDatabaseReader;
 
-      return yield* reader.table("notes").getbyId(noteId);
+      return yield* reader.table("notes").get(noteId);
     }),
 });
 
@@ -35,7 +35,7 @@ export const getByIndex = confectQuery({
 
       return yield* reader
         .table("notes")
-        .getByIndex("by_name_and_role_and_text", name, role, text);
+        .get("by_name_and_role_and_text", name, role, text);
     }),
 });
 
@@ -45,7 +45,7 @@ export const first = confectQuery({
   handler: () =>
     Effect.gen(function* () {
       const reader = yield* ConfectDatabaseReader;
-      return yield* reader.table("notes").withIndex("by_text").first();
+      return yield* reader.table("notes").index("by_text").first();
     }),
 });
 
@@ -58,7 +58,7 @@ export const take = confectQuery({
     Effect.gen(function* () {
       const reader = yield* ConfectDatabaseReader;
 
-      return yield* reader.table("notes").withIndex("by_creation_time").take(n);
+      return yield* reader.table("notes").index("by_creation_time").take(n);
     }),
 });
 
@@ -68,10 +68,7 @@ export const collect = confectQuery({
   handler: () =>
     Effect.gen(function* () {
       const reader = yield* ConfectDatabaseReader;
-      return yield* reader
-        .table("notes")
-        .withIndex("by_creation_time")
-        .collect();
+      return yield* reader.table("notes").index("by_creation_time").collect();
     }),
 });
 
@@ -87,7 +84,7 @@ export const paginate = confectQuery({
 
       return yield* reader
         .table("notes")
-        .withIndex("by_creation_time")
+        .index("by_creation_time")
         .paginate({ cursor, numItems });
     }),
 });
@@ -103,7 +100,7 @@ export const stream = confectQuery({
 
       return yield* reader
         .table("notes")
-        .withIndex("by_creation_time")
+        .index("by_creation_time")
         .stream()
         .pipe(
           Stream.takeUntil(({ text }) => text === until),
@@ -120,7 +117,7 @@ export const withIndexWithQueryRangeWithOrder = confectQuery({
     Effect.gen(function* () {
       const reader = yield* ConfectDatabaseReader;
 
-      return yield* reader.table("notes").withIndex("by_text").take(2);
+      return yield* reader.table("notes").index("by_text").take(2);
     }),
 });
 
@@ -135,7 +132,7 @@ export const withIndexWithQueryRangeWithoutOrder = confectQuery({
 
       return yield* reader
         .table("notes")
-        .withIndex("by_text", (q) => q.gte("text", text))
+        .index("by_text", (q) => q.gte("text", text))
         .take(2);
     }),
 });
@@ -151,7 +148,7 @@ export const withIndexWithQueryRangeAndOrder = confectQuery({
 
       return yield* reader
         .table("notes")
-        .withIndex("by_text", (q) => q.gte("text", text), "desc")
+        .index("by_text", (q) => q.gte("text", text), "desc")
         .take(2);
     }),
 });
@@ -163,7 +160,7 @@ export const withIndexWithoutQueryRangeWithOrder = confectQuery({
     Effect.gen(function* () {
       const reader = yield* ConfectDatabaseReader;
 
-      return yield* reader.table("notes").withIndex("by_text", "desc").take(2);
+      return yield* reader.table("notes").index("by_text", "desc").take(2);
     }),
 });
 
@@ -173,7 +170,7 @@ export const withIndexWithoutQueryRangeWithoutOrder = confectQuery({
   handler: () =>
     Effect.gen(function* () {
       const reader = yield* ConfectDatabaseReader;
-      return yield* reader.table("notes").withIndex("by_text").take(2);
+      return yield* reader.table("notes").index("by_text").take(2);
     }),
 });
 
@@ -187,9 +184,7 @@ export const withSearchIndex = confectQuery({
       const reader = yield* ConfectDatabaseReader;
       return yield* reader
         .table("notes")
-        .withSearchIndex("text", (q) =>
-          q.search("text", text).eq("tag", "colors"),
-        )
+        .search("text", (q) => q.search("text", text).eq("tag", "colors"))
         .collect();
     }),
 });
@@ -203,7 +198,7 @@ export const systemGet = confectQuery({
     Effect.gen(function* () {
       const reader = yield* ConfectDatabaseReader;
 
-      return yield* reader.table("_storage").getbyId(id);
+      return yield* reader.table("_storage").get(id);
     }),
 });
 
@@ -216,7 +211,7 @@ export const systemQuery = confectQuery({
 
       return yield* reader
         .table("_storage")
-        .withIndex("by_creation_time")
+        .index("by_creation_time")
         .collect();
     }),
 });
