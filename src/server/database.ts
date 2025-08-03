@@ -319,22 +319,20 @@ export const confectDatabaseWriterLayer = <
     makeConfectDatabaseWriter(confectSchemaDefinition, convexDatabaseWriter),
   );
 
-// Based on https://github.com/get-convex/convex-ents/blob/f1c6eda95569bdcd97efcc3431638b4260b004dc/src/shared.ts#L31-L44
-export type IndexFieldTypesForEq<
+type IndexFieldTypesForEq<
   ConvexDataModel extends GenericDataModel,
   Table extends TableNamesInDataModel<ConvexDataModel>,
   T extends string[],
-> = Pop<{
-  [K in keyof T]: FieldTypeFromFieldPath<
-    DocumentByName<ConvexDataModel, Table>,
-    T[K]
-  >;
-}>;
-
-type Pop<T extends any[]> = T extends [...infer Rest, infer _Last]
-  ? Rest
+> = T extends readonly [...infer Rest, any]
+  ? Rest extends readonly string[]
+    ? {
+        [K in keyof Rest]: FieldTypeFromFieldPath<
+          DocumentByName<ConvexDataModel, Table>,
+          Rest[K]
+        >;
+      }
+    : never
   : never;
-//
 
 type ConfectQueryInitializer<
   ConfectDataModel extends GenericConfectDataModel,
