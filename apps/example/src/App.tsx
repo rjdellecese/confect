@@ -11,8 +11,6 @@ import {
   GetRandomResult,
   InsertNoteArgs,
   InsertNoteResult,
-  ListNotesArgs,
-  ListNotesResult,
 } from "../convex/functions.schemas";
 import { Api } from "../convex/http/api";
 
@@ -89,11 +87,8 @@ const Page = () => {
 };
 
 const NoteList = () => {
-  const notes = useQuery({
-    query: api.functions.listNotes,
-    args: ListNotesArgs,
-    returns: ListNotesResult,
-  })({});
+  // new api - less verbose and less boilerplate
+  const notes = useQuery(api, "functions", "listNotes")({});
 
   const deleteNote = useMutation({
     mutation: api.functions.deleteNote,
