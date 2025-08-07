@@ -16,6 +16,7 @@
     "coverage",
     "dist",
     "docs",
+    "eslint.config.js",
     "example",
     "node_modules",
     "test/convex"
