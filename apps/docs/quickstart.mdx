@@ -38,8 +38,8 @@ To understand the implications of this, see [this explanation](https://effect.we
 
 <Note>
   Not every Effect `Schema` is valid for use in Confect. See
-  <a href="schema-restrictions">schema-restrictions</a> for more information
-  about what's permitted and what's not.
+  <a href="schema-restrictions">schema-restrictions</a> for more
+  information about what's permitted and what's not.
 </Note>
 
 ```ts convex/schema.ts expandable
@@ -70,10 +70,10 @@ export const confectSchema = defineConfectSchema({
         Schema.Struct({
           role: Schema.Literal("admin", "user"),
           name: Schema.String,
-        })
+        }),
       ),
       embedding: Schema.optional(Schema.Array(Schema.Number)),
-    })
+    }),
   )
     .index("by_text", ["text"])
     .index("by_role", ["author.role"])
@@ -89,7 +89,7 @@ export const confectSchema = defineConfectSchema({
   users: defineConfectTable(
     Schema.Struct({
       username: Schema.String,
-    })
+    }),
   ),
   tags: defineConfectTable(Tag),
 });
@@ -132,17 +132,18 @@ type ConfectDataModel =
 
 type TableNames = TableNamesInConfectDataModel<ConfectDataModel>;
 
-export type ConfectDoc<TableName extends TableNames> = GenericConfectDoc<
-  ConfectDataModel,
-  TableName
->;
+export type ConfectDoc<TableName extends TableNames> =
+  GenericConfectDoc<ConfectDataModel, TableName>;
 
-export const Id = <TableName extends TableNames>(tableName: TableName) =>
-  GenericId<TableName>(tableName);
+export const Id = <TableName extends TableNames>(
+  tableName: TableName,
+) => GenericId<TableName>(tableName);
 export type Id<TableName extends TableNames> = GenericId<TableName>;
 
-export type ConfectDatabaseReader = typeof ConfectDatabaseReader.Identifier;
-export type ConfectDatabaseWriter = typeof ConfectDatabaseWriter.Identifier;
+export type ConfectDatabaseReader =
+  typeof ConfectDatabaseReader.Identifier;
+export type ConfectDatabaseWriter =
+  typeof ConfectDatabaseWriter.Identifier;
 
 export {
   ConfectActionRunner,
@@ -241,7 +242,10 @@ export const getFirst = confectQuery({
     Effect.gen(function* () {
       const reader = yield* ConfectDatabaseReader;
 
-      return yield* reader.table("notes").index("by_creation_time").first();
+      return yield* reader
+        .table("notes")
+        .index("by_creation_time")
+        .first();
     }),
 });
 ```
