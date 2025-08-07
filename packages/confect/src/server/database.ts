@@ -322,7 +322,6 @@ export const confectDatabaseWriterLayer = <
     makeConfectDatabaseWriter(confectSchemaDefinition, convexDatabaseWriter),
   );
 
-// TODO: Put in type_utils.d.ts and test it
 type IndexFieldTypesForEq<
   ConvexDataModel extends GenericDataModel,
   Table extends TableNamesInDataModel<ConvexDataModel>,
