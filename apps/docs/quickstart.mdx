@@ -1,85 +1,251 @@
 ---
+icon: "rocket"
 title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+description: "Install the library and start using it in your project."
 ---
 
-## Get started in three steps
+## Installation
 
-Get your documentation site running locally and make your first customization.
+<CodeGroup>
 
-### Step 1: Set up your local environment
+```bash pnpm
+pnpm add @rjdellecese/confect
+```
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your
-    docs content if you didn't already have one. You can find a link to this
-    repository in your [dashboard](https://dashboard.mintlify.com). To clone the
-    repository locally so that you can make and preview changes to your docs,
-    follow the [Cloning a
-    repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository)
-    guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint` 2. Navigate to your docs
-    directory and run: `mint dev` 3. Open `http://localhost:3000` to see your
-    docs live!
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+```bash npm
+npm install @rjdellecese/confect
+```
 
-### Step 2: Deploy your changes
+```bash yarn
+yarn add @rjdellecese/confect
+```
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+</CodeGroup>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+<Info>
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
+`exactOptionalPropertyTypes`
 
-  </Accordion>
-</AccordionGroup>
+Normally when using the Effect schema library, it's recommended to set `exactOptionalPropertyTypes` in your `tsconfig.json` to `true`. However, this configuration is not supported by `convex-js` at the moment, so to use Confect, you must set it to `false` instead.
 
-### Step 3: Go live
+To understand the implications of this, see [this explanation](https://effect.website/docs/guides/schema/introduction#the-exactoptionalpropertytypes-option) in the Effect docs.
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes. 2. Your docs will update and be live in
-  moments!
-</Accordion>
+</Info>
 
-## Next steps
+## Usage
 
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+### 1. Define your database schema
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join
-  our [community](https://mintlify.com/community).
+  Not every Effect `Schema` is valid for use in Confect. See
+  <a href="schema-restrictions">schema-restrictions</a> for more information
+  about what's permitted and what's not.
 </Note>
+
+```ts convex/schema.ts expandable
+import {
+  defineConfectSchema,
+  defineConfectTable,
+  GenericId,
+} from "@rjdellecese/confect/server";
+import { Schema } from "effect";
+
+type Tag = {
+  readonly name: string;
+  readonly tags: readonly Tag[];
+};
+
+const Tag = Schema.Struct({
+  name: Schema.String,
+  tags: Schema.Array(Schema.suspend((): Schema.Schema<Tag> => Tag)),
+});
+
+export const confectSchema = defineConfectSchema({
+  notes: defineConfectTable(
+    Schema.Struct({
+      userId: Schema.optional(GenericId("users")),
+      text: Schema.String.pipe(Schema.maxLength(100)),
+      tag: Schema.optional(Schema.String),
+      author: Schema.optional(
+        Schema.Struct({
+          role: Schema.Literal("admin", "user"),
+          name: Schema.String,
+        })
+      ),
+      embedding: Schema.optional(Schema.Array(Schema.Number)),
+    })
+  )
+    .index("by_text", ["text"])
+    .index("by_role", ["author.role"])
+    .searchIndex("text", {
+      searchField: "text",
+      filterFields: ["tag"],
+    })
+    .vectorIndex("embedding", {
+      vectorField: "embedding",
+      filterFields: ["author.name", "tag"],
+      dimensions: 1536,
+    }),
+  users: defineConfectTable(
+    Schema.Struct({
+      username: Schema.String,
+    })
+  ),
+  tags: defineConfectTable(Tag),
+});
+
+export default confectSchema.convexSchemaDefinition;
+```
+
+### 2. Generate your Convex function constructors and types.
+
+```ts convex/confect.ts expandable
+import {
+  type ConfectDataModelFromConfectSchemaDefinition,
+  ConvexActionCtx,
+  ConvexMutationCtx,
+  ConvexQueryCtx,
+  type DataModelFromConfectDataModel,
+  type GenericConfectDoc,
+  GenericId,
+  makeConfectFunctions,
+  type TableNamesInConfectDataModel,
+} from "@rjdellecese/confect/server";
+
+import { confectSchema } from "./schema";
+
+export const {
+  confectQuery,
+  confectInternalQuery,
+  confectMutation,
+  confectInternalMutation,
+  confectAction,
+  confectInternalAction,
+  ConfectDatabaseReader,
+  ConfectDatabaseWriter,
+} = makeConfectFunctions(confectSchema);
+
+type ConfectSchemaDefinition = typeof confectSchema;
+
+type ConfectDataModel =
+  ConfectDataModelFromConfectSchemaDefinition<ConfectSchemaDefinition>;
+
+type TableNames = TableNamesInConfectDataModel<ConfectDataModel>;
+
+export type ConfectDoc<TableName extends TableNames> = GenericConfectDoc<
+  ConfectDataModel,
+  TableName
+>;
+
+export const Id = <TableName extends TableNames>(tableName: TableName) =>
+  GenericId<TableName>(tableName);
+export type Id<TableName extends TableNames> = GenericId<TableName>;
+
+export type ConfectDatabaseReader = typeof ConfectDatabaseReader.Identifier;
+export type ConfectDatabaseWriter = typeof ConfectDatabaseWriter.Identifier;
+
+export {
+  ConfectActionRunner,
+  ConfectAuth,
+  ConfectMutationRunner,
+  ConfectQueryRunner,
+  ConfectScheduler,
+  ConfectStorageActionWriter,
+  ConfectStorageReader,
+  ConfectStorageWriter,
+  ConfectVectorSearch,
+} from "@rjdellecese/confect/server";
+
+type DataModel = DataModelFromConfectDataModel<ConfectDataModel>;
+
+export const QueryCtx = ConvexQueryCtx<DataModel>();
+export type QueryCtx = typeof QueryCtx.Identifier;
+export const MutationCtx = ConvexMutationCtx<DataModel>();
+export type MutationCtx = typeof MutationCtx.Identifier;
+export const ActionCtx = ConvexActionCtx<DataModel>();
+export type ActionCtx = typeof ActionCtx.Identifier;
+```
+
+### 3. Write some Convex functions!
+
+```ts convex/functions.ts expandable
+import { Effect } from "effect";
+import {
+  ConfectDatabaseReader,
+  ConfectDatabaseWriter,
+  confectAction,
+  confectMutation,
+  confectQuery,
+} from "./confect";
+import {
+  DeleteNoteArgs,
+  DeleteNoteResult,
+  GetFirstArgs,
+  GetFirstResult,
+  GetRandomArgs,
+  GetRandomResult,
+  InsertNoteArgs,
+  InsertNoteResult,
+  ListNotesArgs,
+  ListNotesResult,
+} from "./functions.schemas";
+
+export const insertNote = confectMutation({
+  args: InsertNoteArgs,
+  returns: InsertNoteResult,
+  handler: ({ text }) =>
+    Effect.gen(function* () {
+      const writer = yield* ConfectDatabaseWriter;
+
+      return yield* writer.insert("notes", { text });
+    }),
+});
+
+export const listNotes = confectQuery({
+  args: ListNotesArgs,
+  returns: ListNotesResult,
+  handler: () =>
+    Effect.gen(function* () {
+      const reader = yield* ConfectDatabaseReader;
+
+      return yield* reader
+        .table("notes")
+        .index("by_creation_time", "desc")
+        .collect();
+    }),
+});
+
+export const deleteNote = confectMutation({
+  args: DeleteNoteArgs,
+  returns: DeleteNoteResult,
+  handler: ({ noteId }) =>
+    Effect.gen(function* () {
+      const writer = yield* ConfectDatabaseWriter;
+
+      yield* writer.delete("notes", noteId);
+
+      return null;
+    }),
+});
+
+export const getRandom = confectAction({
+  args: GetRandomArgs,
+  returns: GetRandomResult,
+  handler: () => Effect.succeed(Math.random()),
+});
+
+export const getFirst = confectQuery({
+  args: GetFirstArgs,
+  returns: GetFirstResult,
+  handler: () =>
+    Effect.gen(function* () {
+      const reader = yield* ConfectDatabaseReader;
+
+      return yield* reader.table("notes").index("by_creation_time").first();
+    }),
+});
+```
+
+## Example project
+
+The above files are pulled from a real example project. Check it out [here](https://github.com/rjdellecese/confect/tree/main/example).
