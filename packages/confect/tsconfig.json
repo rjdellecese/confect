@@ -14,7 +14,6 @@
     "moduleResolution": "Bundler",
     "module": "ESNext"
   },
-  "include": ["src"],
   "exclude": ["coverage", "dist", "node_modules", "test"],
   "extends": ["@tsconfig/strictest/tsconfig"]
 }
