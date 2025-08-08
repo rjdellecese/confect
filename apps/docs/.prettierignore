@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Mintlify build output
+.mintlify/
+
+# Generated files
+package-lock.json
+pnpm-lock.yaml
+
+# Binary files
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+*.pdf
+
+# Logs
+*.log

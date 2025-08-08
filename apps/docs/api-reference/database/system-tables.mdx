@@ -1,0 +1,17 @@
+---
+icon: "database"
+title: "System tables"
+---
+
+Unlike the vanilla Convex API, system tables (`_storage`, `_scheduled_functions`) are queryable using the exact same API as regular tables. These tables contain metadata for built-in Convex features, and are read-only.
+
+```ts
+reader.table("_storage").get(storageId);
+```
+
+```ts
+reader
+  .table("_scheduled_functions")
+  .index("by_creation_time", "desc")
+  .take(10);
+```
