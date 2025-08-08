@@ -9,6 +9,7 @@ import {
   compileTableSchema,
   EmptyTupleIsNotSupportedError,
   IndexSignaturesAreNotSupportedError,
+  MixedIndexAndPropertySignaturesAreNotSupportedError,
   OptionalTupleElementsAreNotSupportedError,
   TopLevelMustBeObjectError,
   TopLevelMustBeObjectOrUnionError,
@@ -669,7 +670,7 @@ describe(compileSchema, () => {
         );
 
         expect(() => compileSchema(schema)).toThrow(
-          new IndexSignaturesAreNotSupportedError(),
+          new MixedIndexAndPropertySignaturesAreNotSupportedError(),
         );
       });
     });

@@ -14,7 +14,7 @@ const make = (scheduler: Scheduler) => ({
     const delayMs = Duration.toMillis(delay);
 
     return Effect.promise(() =>
-      scheduler.runAfter(delayMs, functionReference, ...args)
+      scheduler.runAfter(delayMs, functionReference, ...args),
     );
   },
   runAt: <FuncRef extends SchedulableFunctionReference>(
@@ -25,13 +25,13 @@ const make = (scheduler: Scheduler) => ({
     const timestamp = DateTime.toEpochMillis(dateTime);
 
     return Effect.promise(() =>
-      scheduler.runAt(timestamp, functionReference, ...args)
+      scheduler.runAt(timestamp, functionReference, ...args),
     );
   },
 });
 
 export class ConfectScheduler extends Effect.Tag(
-  "@rjdellecese/confect/ConfectScheduler"
+  "@rjdellecese/confect/ConfectScheduler",
 )<ConfectScheduler, ReturnType<typeof make>>() {
   static readonly layer = (scheduler: Scheduler) =>
     Layer.succeed(this, make(scheduler));

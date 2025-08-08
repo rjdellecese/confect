@@ -12,7 +12,6 @@
 		"lint": "pnpm -r lint",
 		"fix": "pnpm -r fix",
 		"test": "pnpm -r test",
-		"test:watch": "pnpm -r test:watch",
 		"release": "pnpm build:confect && changeset publish",
 		"clean": "pnpm -r clean && rm -rf node_modules"
 	},

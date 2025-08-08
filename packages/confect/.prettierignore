@@ -1,7 +1,7 @@
-node_modules
-dist
-coverage
 .pnpm-store
 .tsup
-test/convex/_generated
+coverage
+dist
+node_modules
 pnpm-lock.yaml
+test/convex/_generated

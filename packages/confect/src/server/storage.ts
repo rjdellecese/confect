@@ -15,9 +15,9 @@ const makeStorageReader = (storageReader: StorageReader) => ({
           Option.match({
             onNone: () => Effect.fail(new FileNotFoundError({ id: storageId })),
             onSome: (doc) => pipe(doc, Schema.decode(Schema.URL), Effect.orDie),
-          })
-        )
-      )
+          }),
+        ),
+      ),
     ),
 });
 
@@ -25,8 +25,8 @@ const makeStorageWriter = (storageWriter: StorageWriter) => ({
   generateUploadUrl: () =>
     Effect.promise(() => storageWriter.generateUploadUrl()).pipe(
       Effect.andThen((url) =>
-        pipe(url, Schema.decode(Schema.URL), Effect.orDie)
-      )
+        pipe(url, Schema.decode(Schema.URL), Effect.orDie),
+      ),
     ),
   delete: (storageId: GenericId<"_storage">) =>
     Effect.tryPromise({
@@ -44,37 +44,37 @@ const makeStorageActionWriter = (storageActionWriter: StorageActionWriter) => ({
           Option.match({
             onNone: () => Effect.fail(new FileNotFoundError({ id: storageId })),
             onSome: Effect.succeed,
-          })
-        )
-      )
+          }),
+        ),
+      ),
     ),
   store: (blob: Blob, options?: { sha256?: string }) =>
     Effect.promise(() => storageActionWriter.store(blob, options)),
 });
 
 export class ConfectStorageReader extends Effect.Tag(
-  "@rjdellecese/confect/ConfectStorageReader"
+  "@rjdellecese/confect/ConfectStorageReader",
 )<ConfectStorageReader, ReturnType<typeof makeStorageReader>>() {
   static readonly layer = (storageReader: StorageReader) =>
     Layer.succeed(this, makeStorageReader(storageReader));
 }
 
 export class ConfectStorageWriter extends Effect.Tag(
-  "@rjdellecese/confect/ConfectStorageWriter"
+  "@rjdellecese/confect/ConfectStorageWriter",
 )<ConfectStorageWriter, ReturnType<typeof makeStorageWriter>>() {
   static readonly layer = (storageWriter: StorageWriter) =>
     Layer.succeed(this, makeStorageWriter(storageWriter));
 }
 
 export class ConfectStorageActionWriter extends Effect.Tag(
-  "@rjdellecese/confect/ConfectStorageActionWriter"
+  "@rjdellecese/confect/ConfectStorageActionWriter",
 )<ConfectStorageActionWriter, ReturnType<typeof makeStorageActionWriter>>() {
   static readonly layer = (storageActionWriter: StorageActionWriter) =>
     Layer.succeed(this, makeStorageActionWriter(storageActionWriter));
 }
 
 export class FileNotFoundError extends Schema.TaggedError<FileNotFoundError>(
-  "FileNotFoundError"
+  "FileNotFoundError",
 )("FileNotFoundError", {
   id: Schema.String,
 }) {

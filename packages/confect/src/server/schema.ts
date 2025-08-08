@@ -88,7 +88,6 @@ export interface ConfectSchemaDefinition<
     SchemaDefinitionFromConfectSchemaDefinition<ConfectSchema>,
     true
   >;
-  // TODO: Key everything on table schema names? Or else address the fact that Confect schemas are accessible from both `confectSchema` and `tableSchemas`, which seems like an opportunity to unite them somehow.
   tableSchemas: TableSchemasFromConfectSchema<ConfectSchema>;
 }
 
@@ -413,9 +412,8 @@ export type ConfectDataModelFromConfectSchema<
   >
     ? TableSchema extends Schema.Schema.AnyNoContext
       ? {
-          // TODO: Rename this to `confectDocumentType` and rename `encodedConfectDocument` to `confectDocumentEncoded`, for better symmetry.
-          confectDocument: ExtractConfectDocument<TableName, TableSchema>;
           // It's pretty hard to recursively make an arbitrary TS type readonly/mutable, so we capture both the readonly version of the `convexDocument` (which is the `encodedConfectDocument`) and the mutable version (`convexDocument`).
+          confectDocument: ExtractConfectDocument<TableName, TableSchema>;
           encodedConfectDocument: ExtractEncodedConfectDocument<
             TableName,
             TableSchema
