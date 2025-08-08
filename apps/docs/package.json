@@ -11,13 +11,6 @@
     "typecheck": "echo 'No TypeScript in docs'",
     "clean": "rm -rf .mintlify node_modules"
   },
-  "keywords": [
-    "docs",
-    "mintlify",
-    "confect",
-    "effect",
-    "convex"
-  ],
   "devDependencies": {
     "@eslint/js": "9.32.0",
     "@mintlify/scraping": "4.0.339",
