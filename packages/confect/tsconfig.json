@@ -6,6 +6,7 @@
       }
     ],
     "noEmit": true,
+    "skipLibCheck": true,
     "importsNotUsedAsValues": "remove",
     "exactOptionalPropertyTypes": false,
     "lib": ["ESNext", "DOM"],
