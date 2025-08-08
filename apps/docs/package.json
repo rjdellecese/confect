@@ -19,11 +19,12 @@
     "convex"
   ],
   "devDependencies": {
-    "@eslint/js": "9.17.0",
-    "@mintlify/scraping": "^4.0.325",
-    "eslint": "9.17.0",
+    "@eslint/js": "9.32.0",
+    "@mintlify/scraping": "4.0.339",
+    "eslint": "9.32.0",
     "eslint-plugin-mdx": "3.6.2",
-    "mintlify": "4.2.45",
-    "prettier": "3.6.2"
+    "mintlify": "4.2.60",
+    "prettier": "3.6.2",
+    "react": "19.1.1"
   }
 }
