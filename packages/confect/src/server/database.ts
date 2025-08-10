@@ -430,7 +430,7 @@ const makeConfectQueryInitializer = <
     ConfectDataModel,
     TableName
   >;
-  type ConfectQueryFunction<
+  type ConfectQueryInitializerFunction<
     FunctionName extends keyof ThisConfectQueryInitializer,
   > = ThisConfectQueryInitializer[FunctionName];
 
@@ -481,8 +481,8 @@ const makeConfectQueryInitializer = <
     );
   };
 
-  const get: ConfectQueryFunction<"get"> = ((
-    ...args: Parameters<ConfectQueryFunction<"get">>
+  const get: ConfectQueryInitializerFunction<"get"> = ((
+    ...args: Parameters<ConfectQueryInitializerFunction<"get">>
   ) => {
     if (args.length === 1) {
       const id = args[0] as GenericId<TableName>;
@@ -502,9 +502,9 @@ const makeConfectQueryInitializer = <
         indexFieldValues,
       );
     }
-  }) as ConfectQueryFunction<"get">;
+  }) as ConfectQueryInitializerFunction<"get">;
 
-  const index: ConfectQueryFunction<"index"> = <
+  const index: ConfectQueryInitializerFunction<"index"> = <
     IndexName extends keyof Indexes<
       TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>
     >,
@@ -572,7 +572,10 @@ const makeConfectQueryInitializer = <
     );
   };
 
-  const search: ConfectQueryFunction<"search"> = (indexName, searchFilter) =>
+  const search: ConfectQueryInitializerFunction<"search"> = (
+    indexName,
+    searchFilter,
+  ) =>
     makeConfectOrderedQuery<ConfectDataModel[TableName], TableName>(
       convexDatabaseReader
         .query(tableName)
