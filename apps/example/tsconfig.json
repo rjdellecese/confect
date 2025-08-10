@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "plugins": [
+      {
+        "name": "@effect/language-service"
+      }
+    ],
+    "exactOptionalPropertyTypes": false,
+    "lib": ["ESNext", "DOM"],
+    "types": ["node"],
+    "target": "ESNext",
+    "moduleResolution": "Bundler",
+    "module": "ESNext",
+    "baseUrl": ".",
+    "jsx": "react-jsx",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "~/*": ["*"]
+    }
+  },
+  "include": ["src/**/*", "env.d.ts"],
+  "exclude": ["node_modules", "convex/_generated"]
+}

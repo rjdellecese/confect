@@ -1,0 +1,80 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Confect 🧁",
+  "colors": {
+    "primary": "#BE185D",
+    "light": "#F9A8D4",
+    "dark": "#BE185D"
+  },
+  "background": {
+    "color": {
+      "light": "#FAFAF9",
+      "dark": "#1C1917"
+    }
+  },
+  "icons": {
+    "library": "lucide"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "global": {
+      "anchors": [
+        {
+          "icon": "layers",
+          "anchor": "Effect Docs",
+          "href": "https://effect.website/docs"
+        },
+        {
+          "icon": "database",
+          "anchor": "Convex Docs",
+          "href": "https://docs.convex.dev"
+        }
+      ]
+    },
+    "groups": [
+      {
+        "group": "Getting Started",
+        "pages": ["index", "quickstart", "schema-restrictions"]
+      },
+      {
+        "group": "Database",
+        "pages": [
+          "api-reference/database/reading",
+          "api-reference/database/writing",
+          "api-reference/database/system-tables"
+        ]
+      },
+      {
+        "group": "File storage",
+        "pages": ["api-reference/file-storage"]
+      }
+    ]
+  },
+  "navbar": {
+    "links": [
+      {
+        "icon": "github",
+        "label": "GitHub",
+        "href": "https://github.com/rjdellecese/confect"
+      },
+      {
+        "icon": "npm",
+        "label": "npm",
+        "href": "https://www.npmjs.com/package/@rjdellecese/confect"
+      }
+    ]
+  },
+  "contextual": {
+    "options": [
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "perplexity",
+      "mcp",
+      "cursor",
+      "vscode"
+    ]
+  }
+}

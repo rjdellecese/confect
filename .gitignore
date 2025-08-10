@@ -1,8 +1,9 @@
 .env.local
 .pnpm-store/
 .tsup
-.vscode/
 coverage/
 dist/
 node_modules/
+node-compile-cache/
+**/convex/_generated/
 tsconfig.vitest-temp.json
