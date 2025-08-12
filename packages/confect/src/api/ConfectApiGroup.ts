@@ -1,5 +1,5 @@
 import { Predicate, Record } from "effect";
-import * as ConfectApiQuery from "./ConfectApiQuery";
+import * as ConfectApiFunction from "./ConfectApiFunction";
 
 export const TypeId = Symbol.for("@rjdellecese/confect/ConfectApiGroup");
 
@@ -10,15 +10,15 @@ export const isConfectApiGroup = (u: unknown): u is ConfectApiGroup.Any =>
 
 export interface ConfectApiGroup<
   Name extends string,
-  Queries extends ConfectApiQuery.ConfectApiQuery.Any = never,
+  Functions extends ConfectApiFunction.ConfectApiFunction.Any = never,
 > {
   readonly [TypeId]: TypeId;
   readonly name: Name;
-  readonly queries: Record.ReadonlyRecord<string, Queries>;
+  readonly functions: Record.ReadonlyRecord<string, Functions>;
 
-  add<Query extends ConfectApiQuery.ConfectApiQuery.AnyWithProps>(
-    query: Query,
-  ): ConfectApiGroup<Name, Queries | Query>;
+  add<Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps>(
+    function_: Function
+  ): ConfectApiGroup<Name, Functions | Function>;
 }
 
 export declare namespace ConfectApiGroup {
@@ -27,48 +27,80 @@ export declare namespace ConfectApiGroup {
     readonly name: string;
   }
 
-  export interface AnyWithProps
-    extends ConfectApiGroup<
-      any,
-      ConfectApiQuery.ConfectApiQuery.AnyWithProps
-    > {}
+  export type AnyWithProps = ConfectApiGroup<
+    string,
+    ConfectApiFunction.ConfectApiFunction.AnyWithProps
+  >;
+
+  export type Name<Groups> =
+    Groups extends ConfectApiGroup<infer Name, any> ? Name : never;
+
+  export type Functions<Group extends Any> =
+    Group extends ConfectApiGroup<any, infer Functions> ? Functions : never;
+
+  export type WithName<Group, Name extends string> = Extract<
+    Group,
+    { readonly name: Name }
+  >;
+
+  export type HandlersFrom<
+    Function extends ConfectApiFunction.ConfectApiFunction.Any,
+  > = {
+    readonly [Current in Function as Current["name"]]: ConfectApiFunction.ConfectApiFunction.Handler<Current>;
+  };
+
+  export type ToService<ApiName extends string, Group> =
+    Group extends ConfectApiGroup<infer GroupName, infer _Functions>
+      ? ConfectApiGroupService<ApiName, GroupName>
+      : never;
 }
 
 const Proto = {
   [TypeId]: TypeId,
 
-  add<Query extends ConfectApiQuery.ConfectApiQuery.AnyWithProps>(
+  add<Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps>(
     this: ConfectApiGroup.AnyWithProps,
-    query: Query,
+    function_: Function
   ) {
     return makeProto({
       name: this.name,
-      queries: Record.set(this.queries, query.name, query),
+      functions: Record.set(this.functions, function_.name, function_),
     });
   },
 };
 
 const makeProto = <
   Name extends string,
-  Queries extends ConfectApiQuery.ConfectApiQuery.Any,
+  Functions extends ConfectApiFunction.ConfectApiFunction.Any,
 >({
   name,
-  queries,
+  functions,
 }: {
   name: Name;
-  queries: Record.ReadonlyRecord<string, Queries>;
-}): ConfectApiGroup<Name, Queries> =>
+  functions: Record.ReadonlyRecord<string, Functions>;
+}): ConfectApiGroup<Name, Functions> =>
   Object.assign(Object.create(Proto), {
     name,
-    queries,
+    functions: functions,
   });
 
-export const make = <const Name extends string>({
-  name,
-}: {
-  name: Name;
-}): ConfectApiGroup<Name> =>
+export const make = <const Name extends string>(
+  name: Name
+): ConfectApiGroup<Name> =>
   makeProto({
     name,
-    queries: Record.empty(),
+    functions: Record.empty(),
   });
+
+export interface ConfectApiGroupService<
+  ApiName extends string,
+  GroupName extends string,
+> {
+  readonly _: unique symbol;
+  readonly apiName: ApiName;
+  readonly groupName: GroupName;
+  readonly functions: Record.ReadonlyRecord<
+    string,
+    ConfectApiFunction.ConfectApiFunction.Any
+  >;
+}

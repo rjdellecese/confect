@@ -1,4 +1,4 @@
-import { Predicate, Record } from "effect";
+import { Context, Predicate, Record } from "effect";
 import * as ConfectApiGroup from "./ConfectApiGroup";
 
 export const TypeId = Symbol.for("@rjdellecese/confect/ConfectApi");
@@ -9,14 +9,16 @@ export const isConfectApi = (u: unknown): u is ConfectApi.Any =>
   Predicate.hasProperty(u, TypeId);
 
 export interface ConfectApi<
+  Name extends string,
   Groups extends ConfectApiGroup.ConfectApiGroup.Any = never,
 > {
   readonly [TypeId]: TypeId;
+  readonly name: Name;
   readonly groups: Record.ReadonlyRecord<string, Groups>;
 
   add<Group extends ConfectApiGroup.ConfectApiGroup.Any>(
-    group: Group,
-  ): ConfectApi<Groups | Group>;
+    group: Group
+  ): ConfectApi<Name, Groups | Group>;
 }
 
 export declare namespace ConfectApi {
@@ -25,7 +27,14 @@ export declare namespace ConfectApi {
   }
 
   export interface AnyWithProps
-    extends ConfectApi<ConfectApiGroup.ConfectApiGroup.AnyWithProps> {}
+    extends ConfectApi<string, ConfectApiGroup.ConfectApiGroup.AnyWithProps> {}
+
+  export class ConfectApiService extends Context.Tag(
+    "@rjdellecese/confect/ConfectApiService"
+  )<
+    ConfectApiService,
+    ConfectApi<string, ConfectApiGroup.ConfectApiGroup.AnyWithProps>
+  >() {}
 }
 
 const Proto = {
@@ -33,18 +42,26 @@ const Proto = {
 
   add<Group extends ConfectApiGroup.ConfectApiGroup.AnyWithProps>(
     this: ConfectApi.AnyWithProps,
-    group: Group,
+    group: Group
   ) {
     return makeProto({
+      name: this.name,
       groups: Record.set(this.groups, group.name, group),
     });
   },
 };
 
-const makeProto = <Groups extends ConfectApiGroup.ConfectApiGroup.Any>({
+const makeProto = <
+  const Name extends string,
+  Groups extends ConfectApiGroup.ConfectApiGroup.Any,
+>({
+  name,
   groups,
 }: {
+  name: Name;
   groups: Record.ReadonlyRecord<string, Groups>;
-}): ConfectApi<Groups> => Object.assign(Object.create(Proto), { groups });
+}): ConfectApi<Name, Groups> =>
+  Object.assign(Object.create(Proto), { name, groups });
 
-export const make = (): ConfectApi => makeProto({ groups: Record.empty() });
+export const make = <const Name extends string>(name: Name): ConfectApi<Name> =>
+  makeProto({ name, groups: Record.empty() });
