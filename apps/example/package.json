@@ -15,21 +15,21 @@
     "@effect/platform": "0.90.0",
     "@rjdellecese/confect": "workspace:*",
     "convex": "1.25.4",
-    "effect": "3.17.4",
+    "effect": "3.17.6",
     "react": "19.1.1",
     "react-dom": "19.1.1",
-    "vite": "7.0.6"
+    "vite": "7.1.1"
   },
   "devDependencies": {
-    "@eslint/js": "9.17.0",
-    "@types/node": "24.1.0",
+    "@eslint/js": "9.32.0",
+    "@types/node": "24.2.0",
     "@types/react": "19.1.9",
     "@types/react-dom": "19.1.7",
-    "@vitejs/plugin-react": "4.7.0",
+    "@vitejs/plugin-react": "5.0.0",
     "concurrently": "9.2.0",
-    "eslint": "9.17.0",
+    "eslint": "9.32.0",
     "prettier": "3.6.2",
     "typescript": "5.9.2",
-    "typescript-eslint": "8.20.0"
+    "typescript-eslint": "8.39.0"
   }
 }

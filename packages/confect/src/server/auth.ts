@@ -2,19 +2,17 @@ import type { Auth } from "convex/server";
 import { Effect, flow, Layer, Option, Schema } from "effect";
 
 const make = (auth: Auth) => ({
-  getUserIdentity:
-    // TODO: Which errors might occur?
-    Effect.promise(() => auth.getUserIdentity()).pipe(
-      Effect.andThen(
-        flow(
-          Option.fromNullable,
-          Option.match({
-            onNone: () => Effect.fail(new NoUserIdentityFoundError()),
-            onSome: Effect.succeed,
-          }),
-        ),
+  getUserIdentity: Effect.promise(() => auth.getUserIdentity()).pipe(
+    Effect.andThen(
+      flow(
+        Option.fromNullable,
+        Option.match({
+          onNone: () => Effect.fail(new NoUserIdentityFoundError()),
+          onSome: Effect.succeed,
+        }),
       ),
     ),
+  ),
 });
 
 export class ConfectAuth extends Effect.Tag("@rjdellecese/confect/ConfectAuth")<

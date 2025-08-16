@@ -1,3 +1,6 @@
+> [!WARNING]
+> Confect is pre-1.0 and its API is not yet stable.
+
 # Confect 🧁
 
 Confect is a framework that deeply integrates Effect with Convex. It's more than just Effect bindings! Confect allows you to:

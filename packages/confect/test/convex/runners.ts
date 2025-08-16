@@ -11,6 +11,7 @@ import {
   confectMutation,
   confectQuery,
 } from "../convex/confect";
+import { MutationRollback } from "../../src/server/runners";
 
 export const runInQuery = confectQuery({
   args: Schema.Struct({
@@ -40,7 +41,9 @@ export const runInMutation = confectMutation({
     text: Schema.String,
   }),
   returns: Schema.String,
-  handler: ({ text }): Effect.Effect<string, never, ConfectMutationRunner> =>
+  handler: ({
+    text,
+  }): Effect.Effect<string, MutationRollback, ConfectMutationRunner> =>
     Effect.gen(function* () {
       const runMutation = yield* ConfectMutationRunner;
 
@@ -56,6 +59,30 @@ export const mutationToRun = confectInternalMutation({
   }),
   returns: Schema.String,
   handler: ({ text }) => Effect.succeed(text),
+});
+
+export const failingRunInMutation = confectMutation({
+  args: Schema.Struct({ rollbackMessage: Schema.String }),
+  returns: Schema.String,
+  handler: ({
+    rollbackMessage,
+  }): Effect.Effect<string, MutationRollback, ConfectMutationRunner> =>
+    Effect.gen(function* () {
+      const runMutation = yield* ConfectMutationRunner;
+
+      return yield* runMutation(internal.runners.failingMutationToRun, {}).pipe(
+        Effect.catchTag("MutationRollback", () =>
+          Effect.succeed(rollbackMessage),
+        ),
+      );
+    }),
+});
+
+export const failingMutationToRun = confectInternalMutation({
+  args: Schema.Struct({}),
+  returns: Schema.String,
+  handler: (): Effect.Effect<string, MutationRollback, ConfectMutationRunner> =>
+    Effect.die(new Error()),
 });
 
 export const runInAction = confectAction({

@@ -1,11 +1,12 @@
-import type {
-  FunctionReference,
-  GenericActionCtx,
-  GenericMutationCtx,
-  GenericQueryCtx,
-  OptionalRestArgs,
+import {
+  getFunctionName,
+  type FunctionReference,
+  type GenericActionCtx,
+  type GenericMutationCtx,
+  type GenericQueryCtx,
+  type OptionalRestArgs,
 } from "convex/server";
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Layer, Schema } from "effect";
 
 const makeQueryRunner =
   (runQuery: GenericQueryCtx<any>["runQuery"]) =>
@@ -13,7 +14,6 @@ const makeQueryRunner =
     query: Query,
     ...args: OptionalRestArgs<Query>
   ) =>
-    // TODO: Which errors might occur?
     Effect.promise(() => runQuery(query, ...args));
 
 const makeMutationRunner =
@@ -22,8 +22,14 @@ const makeMutationRunner =
     mutation: Mutation,
     ...args: OptionalRestArgs<Mutation>
   ) =>
-    // TODO: Which errors might occur?
-    Effect.promise(() => runMutation(mutation, ...args));
+    Effect.tryPromise({
+      try: () => runMutation(mutation, ...args),
+      catch: (error) =>
+        new MutationRollback({
+          mutationName: getFunctionName(mutation),
+          error,
+        }),
+    });
 
 const makeActionRunner =
   (runAction: GenericActionCtx<any>["runAction"]) =>
@@ -31,7 +37,6 @@ const makeActionRunner =
     action: Action,
     ...args: OptionalRestArgs<Action>
   ) =>
-    // TODO: Which errors might occur?
     Effect.promise(() => runAction(action, ...args));
 
 export const ConfectQueryRunner = Context.GenericTag<
@@ -60,3 +65,16 @@ export type ConfectActionRunner = typeof ConfectActionRunner.Identifier;
 export const confectActionRunnerLayer = (
   runAction: GenericActionCtx<any>["runAction"],
 ) => Layer.succeed(ConfectActionRunner, makeActionRunner(runAction));
+
+export class MutationRollback extends Schema.TaggedError<MutationRollback>(
+  "MutationRollback",
+)("MutationRollback", {
+  mutationName: Schema.String,
+  error: Schema.Unknown,
+}) {
+  /* v8 ignore start */
+  override get message(): string {
+    return `Mutation ${this.mutationName} failed and was rolled back.\n\n${this.error}`;
+  }
+  /* v8 ignore stop */
+}

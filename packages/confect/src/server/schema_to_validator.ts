@@ -295,6 +295,7 @@ export const compileAst = (
   | UnsupportedSchemaTypeError
   | UnsupportedPropertySignatureKeyTypeError
   | IndexSignaturesAreNotSupportedError
+  | MixedIndexAndPropertySignaturesAreNotSupportedError
   | OptionalTupleElementsAreNotSupportedError
   | EmptyTupleIsNotSupportedError
 > =>
@@ -369,11 +370,9 @@ export const compileAst = (
           "ObjectKeyword",
           "Transformation",
           () =>
-            Effect.fail(
-              new UnsupportedSchemaTypeError({
-                schemaType: ast._tag,
-              }),
-            ),
+            new UnsupportedSchemaTypeError({
+              schemaType: ast._tag,
+            }),
         ),
         Match.exhaustive,
       );
@@ -428,8 +427,9 @@ const handleTypeLiteral = (typeLiteralAst: SchemaAST.TypeLiteral) =>
                 ({ parameter, type }) => v.record(parameter, type),
               ),
             onSome: () =>
-              // TODO: Some are; be more specific and give more helpful diagnostic information
-              Effect.fail(new IndexSignaturesAreNotSupportedError()),
+              Effect.fail(
+                new MixedIndexAndPropertySignaturesAreNotSupportedError(),
+              ),
           }),
         ),
     }),
@@ -591,6 +591,16 @@ export class IndexSignaturesAreNotSupportedError extends Data.TaggedError(
   /* v8 ignore start */
   override get message() {
     return "Index signatures are not supported";
+  }
+  /* v8 ignore stop */
+}
+
+export class MixedIndexAndPropertySignaturesAreNotSupportedError extends Data.TaggedError(
+  "MixedIndexAndPropertySignaturesAreNotSupportedError",
+) {
+  /* v8 ignore start */
+  override get message() {
+    return "Mixed index and property signatures are not supported";
   }
   /* v8 ignore stop */
 }

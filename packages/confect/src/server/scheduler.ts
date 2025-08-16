@@ -13,7 +13,6 @@ const make = (scheduler: Scheduler) => ({
   ) => {
     const delayMs = Duration.toMillis(delay);
 
-    // TODO: Which errors might occur?
     return Effect.promise(() =>
       scheduler.runAfter(delayMs, functionReference, ...args),
     );
@@ -25,7 +24,6 @@ const make = (scheduler: Scheduler) => ({
   ) => {
     const timestamp = DateTime.toEpochMillis(dateTime);
 
-    // TODO: Which errors might occur?
     return Effect.promise(() =>
       scheduler.runAt(timestamp, functionReference, ...args),
     );

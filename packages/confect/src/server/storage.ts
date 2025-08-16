@@ -49,7 +49,6 @@ const makeStorageActionWriter = (storageActionWriter: StorageActionWriter) => ({
       ),
     ),
   store: (blob: Blob, options?: { sha256?: string }) =>
-    // TODO: Which errors might occur?
     Effect.promise(() => storageActionWriter.store(blob, options)),
 });
 
