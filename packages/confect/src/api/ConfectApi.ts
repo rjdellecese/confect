@@ -1,4 +1,4 @@
-import { Context, Predicate, Record } from "effect";
+import { Predicate, Record } from "effect";
 import * as ConfectApiGroup from "./ConfectApiGroup";
 
 export const TypeId = Symbol.for("@rjdellecese/confect/ConfectApi");
@@ -28,13 +28,6 @@ export declare namespace ConfectApi {
 
   export interface AnyWithProps
     extends ConfectApi<string, ConfectApiGroup.ConfectApiGroup.AnyWithProps> {}
-
-  export class ConfectApiService extends Context.Tag(
-    "@rjdellecese/confect/ConfectApiService"
-  )<
-    ConfectApiService,
-    ConfectApi<string, ConfectApiGroup.ConfectApiGroup.AnyWithProps>
-  >() {}
 }
 
 const Proto = {

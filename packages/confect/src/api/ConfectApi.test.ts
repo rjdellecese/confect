@@ -20,7 +20,15 @@ const Group = ConfectApiGroup.make("Group")
     })
   );
 
-const Api = ConfectApi.make("Api").add(Group);
+const Group2 = ConfectApiGroup.make("Group2").add(
+  ConfectApiFunction.make({
+    name: "myFunction3",
+    args: Schema.Struct({ foo: Schema.Number }),
+    returns: Schema.String,
+  })
+);
+
+const Api = ConfectApi.make("Api").add(Group).add(Group2);
 
 const GroupLive = ConfectApiBuilder.group(Api, "Group", (handlers) =>
   handlers
@@ -28,4 +36,13 @@ const GroupLive = ConfectApiBuilder.group(Api, "Group", (handlers) =>
     .handle("myFunction2", (args) => `foo: ${args.foo}`)
 );
 
-const ApiLive = ConfectApiBuilder.api(Api).pipe(Layer.provide(GroupLive));
+const Group2Live = ConfectApiBuilder.group(Api, "Group2", (handlers) =>
+  handlers.handle("myFunction3", (args) => `foo: ${args.foo}`)
+);
+
+const ApiLive = ConfectApiBuilder.api(Api).pipe(
+  Layer.provide(GroupLive),
+  Layer.provide(Group2Live)
+);
+
+type Test = Layer.Layer.Context<typeof ApiLive>;

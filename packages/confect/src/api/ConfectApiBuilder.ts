@@ -1,4 +1,14 @@
-import { Chunk, Function, hole, Layer, Types } from "effect";
+import {
+  Array,
+  Chunk,
+  Context,
+  Function,
+  Layer,
+  Order,
+  pipe,
+  Record,
+  Types,
+} from "effect";
 import * as ConfectApi from "./ConfectApi";
 import * as ConfectApiFunction from "./ConfectApiFunction";
 import * as ConfectApiGroup from "./ConfectApiGroup";
@@ -18,10 +28,7 @@ export interface Handlers<
 
   handle<Name extends ConfectApiFunction.ConfectApiFunction.Name<Functions>>(
     name: Name,
-    handler: ConfectApiFunction.ConfectApiFunction.HandlerWithName<
-      Functions,
-      Name
-    >
+    handler: ConfectApiFunction.Handler.WithName<Functions, Name>
   ): Handlers<
     ConfectApiFunction.ConfectApiFunction.ExcludeName<Functions, Name>
   >;
@@ -30,7 +37,7 @@ export interface Handlers<
 export declare namespace Handlers {
   export interface Item {
     readonly function_: ConfectApiFunction.ConfectApiFunction.Any;
-    readonly handler: ConfectApiFunction.ConfectApiFunction.Handler<any>;
+    readonly handler: ConfectApiFunction.Handler.Any;
   }
 
   export type FromGroup<Group extends ConfectApiGroup.ConfectApiGroup.Any> =
@@ -52,7 +59,7 @@ const HandlersProto = {
   handle(
     this: Handlers<ConfectApiFunction.ConfectApiFunction.Any>,
     name: string,
-    handler: ConfectApiFunction.ConfectApiFunction.Handler<any>
+    handler: ConfectApiFunction.Handler.Any
   ) {
     const function_ = this.group.functions[name];
     return makeHandlers({
@@ -71,14 +78,14 @@ const makeHandlers = <
   group,
   handlers,
 }: {
-  readonly group: ConfectApiGroup.ConfectApiGroup.Any;
+  readonly group: ConfectApiGroup.ConfectApiGroup.AnyWithProps;
   readonly handlers: Chunk.Chunk<Handlers.Item>;
 }): Handlers<Functions> =>
   Object.assign(Object.create(HandlersProto), { group, handlers });
 
 export const group = <
   const ApiName extends string,
-  Groups extends ConfectApiGroup.ConfectApiGroup.Any,
+  Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
   const GroupName extends ConfectApiGroup.ConfectApiGroup.Name<Groups>,
   Return,
 >(
@@ -89,18 +96,37 @@ export const group = <
       ConfectApiGroup.ConfectApiGroup.WithName<Groups, GroupName>
     >
   ) => Handlers.ValidateReturn<Return>
-): Layer.Layer<ConfectApiGroup.ConfectApiGroupService<ApiName, GroupName>> => {
-  const group = api.groups[groupName]!;
+): Layer.Layer<
+  ConfectApiGroupService<
+    ApiName,
+    ConfectApiGroup.ConfectApiGroup.WithName<Groups, GroupName>
+  >
+> => {
+  const group = api.groups[
+    groupName
+  ]! as ConfectApiGroup.ConfectApiGroup.WithName<Groups, GroupName>;
   const handlers = Chunk.empty();
 
-  build(
-    makeHandlers({
+  return Layer.succeed(
+    ConfectApiGroupService<
+      ApiName,
+      ConfectApiGroup.ConfectApiGroup.WithName<Groups, GroupName>
+    >({
+      apiName: api.name,
       group,
-      handlers,
-    })
+    }),
+    {
+      apiName: api.name,
+      handlers: build(
+        makeHandlers({
+          group,
+          handlers,
+        })
+      ) as unknown as Handlers.FromGroup<
+        ConfectApiGroup.ConfectApiGroup.WithName<Groups, GroupName>
+      >,
+    }
   );
-
-  return hole();
 };
 
 export const api = <
@@ -109,7 +135,67 @@ export const api = <
 >(
   api: ConfectApi.ConfectApi<ApiName, Groups>
 ): Layer.Layer<
-  ConfectApi.ConfectApi.ConfectApiService,
+  ConfectApiService<ApiName, Groups>,
   never,
-  ConfectApiGroup.ConfectApiGroup.ToService<ApiName, Groups>
-> => Layer.succeed(ConfectApi.ConfectApi.ConfectApiService, api as any);
+  GroupToService<ApiName, Groups>
+> =>
+  Layer.succeed(ConfectApiService<ApiName, Groups>(api.name, api.groups), {
+    apiName: api.name,
+    groups: api.groups,
+  });
+
+export type GroupToService<ApiName extends string, Group> =
+  Group extends ConfectApiGroup.ConfectApiGroup<
+    infer _GroupName,
+    infer _Functions
+  >
+    ? ConfectApiGroupService<ApiName, Group>
+    : never;
+
+export interface ConfectApiGroupService<
+  ApiName extends string,
+  Group extends ConfectApiGroup.ConfectApiGroup.Any,
+> {
+  readonly apiName: ApiName;
+  readonly handlers: Handlers.FromGroup<Group>;
+}
+
+export const ConfectApiGroupService = <
+  ApiName extends string,
+  Group extends ConfectApiGroup.ConfectApiGroup.Any,
+>({
+  apiName,
+  group,
+}: {
+  apiName: string;
+  group: Group;
+}) =>
+  Context.GenericTag<ConfectApiGroupService<ApiName, Group>>(
+    `@rjdellecese/confect/ConfectApiGroupService/${apiName}/${group.name}`
+  );
+
+export interface ConfectApiService<
+  ApiName extends string,
+  Groups extends ConfectApiGroup.ConfectApiGroup.Any,
+> {
+  readonly apiName: ApiName;
+  readonly groups: Record.ReadonlyRecord<string, Groups>;
+}
+
+export const ConfectApiService = <
+  ApiName extends string,
+  Groups extends ConfectApiGroup.ConfectApiGroup.Any,
+>(
+  apiName: ApiName,
+  groups: Record.ReadonlyRecord<string, Groups>
+) => {
+  const groupNamesIdentifier = pipe(
+    Record.keys(groups),
+    Array.sort(Order.string),
+    Array.join("|")
+  );
+
+  return Context.GenericTag<ConfectApiService<ApiName, Groups>>(
+    `@rjdellecese/confect/ConfectApiService/${apiName}/${groupNamesIdentifier}`
+  );
+};

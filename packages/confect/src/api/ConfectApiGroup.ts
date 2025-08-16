@@ -46,13 +46,8 @@ export declare namespace ConfectApiGroup {
   export type HandlersFrom<
     Function extends ConfectApiFunction.ConfectApiFunction.Any,
   > = {
-    readonly [Current in Function as Current["name"]]: ConfectApiFunction.ConfectApiFunction.Handler<Current>;
+    readonly [Current in Function as Current["name"]]: ConfectApiFunction.Handler<Current>;
   };
-
-  export type ToService<ApiName extends string, Group> =
-    Group extends ConfectApiGroup<infer GroupName, infer _Functions>
-      ? ConfectApiGroupService<ApiName, GroupName>
-      : never;
 }
 
 const Proto = {
@@ -91,16 +86,3 @@ export const make = <const Name extends string>(
     name,
     functions: Record.empty(),
   });
-
-export interface ConfectApiGroupService<
-  ApiName extends string,
-  GroupName extends string,
-> {
-  readonly _: unique symbol;
-  readonly apiName: ApiName;
-  readonly groupName: GroupName;
-  readonly functions: Record.ReadonlyRecord<
-    string,
-    ConfectApiFunction.ConfectApiFunction.Any
-  >;
-}

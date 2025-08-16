@@ -47,15 +47,21 @@ export declare namespace ConfectApiFunction {
     Function,
     { readonly name: Name }
   >;
+}
 
-  export type Handler<Function extends Any> = (
-    args: Args<Function>["Type"]
-  ) => Returns<Function>["Type"] | Effect.Effect<Returns<Function>["Type"]>;
+export type Handler<Function extends ConfectApiFunction.Any> = (
+  args: ConfectApiFunction.Args<Function>["Type"]
+) =>
+  | ConfectApiFunction.Returns<Function>["Type"]
+  | Effect.Effect<ConfectApiFunction.Returns<Function>["Type"]>;
 
-  export type HandlerWithName<
-    Function extends Any,
+export declare namespace Handler {
+  export type WithName<
+    Function extends ConfectApiFunction.Any,
     Name extends string,
-  > = Handler<WithName<Function, Name>>;
+  > = Handler<ConfectApiFunction.WithName<Function, Name>>;
+
+  export type Any = Handler<ConfectApiFunction.Any>;
 }
 
 const Proto = {
