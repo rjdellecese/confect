@@ -13,6 +13,7 @@ import {
   type RegisteredMutation,
   type RegisteredQuery,
 } from "convex/server";
+import { ConvexError } from "convex/values";
 import { Effect, Layer, pipe, Schema } from "effect";
 
 import { ConfectAuth } from "./auth";
@@ -49,6 +50,30 @@ import {
   confectVectorSearchLayer,
 } from "./vector_search";
 
+/**
+ * Utility function to handle Effect errors and convert them to ConvexError
+ * This ensures that Effect errors are properly serialized and can be caught by the frontend
+ */
+const handleEffectError = (error: unknown): never => {
+  // Check if it's a tagged error from Effect Schema
+  if (error && typeof error === "object" && "_tag" in error) {
+    const taggedError = error as { _tag: string; message?: string };
+
+    // Create ConvexError with the tagged error data
+    const convexErrorData = {
+      _tag: taggedError._tag,
+      message: taggedError.message || "Unknown error",
+    };
+    throw new ConvexError(convexErrorData);
+  }
+
+  // For non-tagged errors, wrap them as generic errors
+  throw new ConvexError({
+    _tag: "UnknownError",
+    message: error instanceof Error ? error.message : "Unknown error occurred",
+  });
+};
+
 export const makeConfectFunctions = <
   ConfectSchema extends GenericConfectSchema,
 >(
@@ -77,46 +102,76 @@ export const makeConfectFunctions = <
     ConfectArgs,
     ConvexReturns,
     ConfectReturns,
-    E,
+    Errors extends
+      | Schema.Schema<any>
+      | typeof Schema.Never
+      | undefined = undefined,
   >({
     args,
     returns,
+    errors,
     handler,
   }: {
     args: Schema.Schema<ConfectArgs, ConvexArgs>;
     returns: Schema.Schema<ConfectReturns, ConvexReturns>;
+    errors?: Errors;
     handler: (
       a: ConfectArgs,
     ) => Effect.Effect<
       ConfectReturns,
-      E,
+      Errors extends Schema.Schema<any>
+        ? Schema.Schema.Type<Errors>
+        : Errors extends typeof Schema.Never
+          ? never
+          : never,
       | ConfectDatabaseReader
       | ConfectAuth
       | ConfectStorageReader
       | ConfectQueryRunner
       | QueryCtx
     >;
-  }): RegisteredQuery<"public", ConvexArgs, Promise<ConvexReturns>> =>
-    queryGeneric(confectQueryFunction({ args, returns, handler }));
+  }): RegisteredQuery<"public", ConvexArgs, Promise<ConvexReturns>> => {
+    const queryFunction = queryGeneric(
+      confectQueryFunction({ args, returns, errors, handler }),
+    );
+
+    // Add metadata for frontend access without affecting the type
+    (queryFunction as any)._confectMeta = {
+      args,
+      returns,
+      type: "query" as const,
+    };
+
+    return queryFunction;
+  };
 
   const confectInternalQuery = <
     ConvexArgs extends DefaultFunctionArgs,
     ConfectArgs,
     ConvexReturns,
     ConfectReturns,
-    E,
+    Errors extends
+      | Schema.Schema<any>
+      | typeof Schema.Never
+      | undefined = undefined,
   >({
     args,
     handler,
     returns,
+    errors,
   }: {
     args: Schema.Schema<ConfectArgs, ConvexArgs>;
     returns: Schema.Schema<ConfectReturns, ConvexReturns>;
+    errors?: Errors;
     handler: (
       a: ConfectArgs,
     ) => Effect.Effect<
       ConfectReturns,
-      E,
+      Errors extends Schema.Schema<any>
+        ? Schema.Schema.Type<Errors>
+        : Errors extends typeof Schema.Never
+          ? never
+          : never,
       | ConfectDatabaseReader
       | ConfectAuth
       | ConfectStorageReader
@@ -124,14 +179,19 @@ export const makeConfectFunctions = <
       | QueryCtx
     >;
   }): RegisteredQuery<"internal", ConvexArgs, Promise<ConvexReturns>> =>
-    internalQueryGeneric(confectQueryFunction({ args, returns, handler }));
+    internalQueryGeneric(
+      confectQueryFunction({ args, returns, errors, handler }),
+    );
 
   const confectQueryFunction = <
     ConvexArgs extends DefaultFunctionArgs,
     ConfectArgs,
     ConvexReturns,
     ConfectReturns,
-    E,
+    Errors extends
+      | Schema.Schema<any>
+      | typeof Schema.Never
+      | undefined = undefined,
   >({
     args,
     returns,
@@ -139,11 +199,16 @@ export const makeConfectFunctions = <
   }: {
     args: Schema.Schema<ConfectArgs, ConvexArgs>;
     returns: Schema.Schema<ConfectReturns, ConvexReturns>;
+    errors?: Errors;
     handler: (
       a: ConfectArgs,
     ) => Effect.Effect<
       ConfectReturns,
-      E,
+      Errors extends Schema.Schema<any>
+        ? Schema.Schema.Type<Errors>
+        : Errors extends typeof Schema.Never
+          ? never
+          : never,
       | ConfectDatabaseReader
       | ConfectAuth
       | ConfectStorageReader
@@ -178,6 +243,7 @@ export const makeConfectFunctions = <
         Effect.andThen((convexReturns) =>
           Schema.encodeUnknown(returns)(convexReturns),
         ),
+        Effect.catchAll((error) => Effect.sync(() => handleEffectError(error))),
         Effect.runPromise,
       ),
   });
@@ -187,19 +253,28 @@ export const makeConfectFunctions = <
     ConfectValue,
     ConvexReturns,
     ConfectReturns,
-    E,
+    Errors extends
+      | Schema.Schema<any>
+      | typeof Schema.Never
+      | undefined = undefined,
   >({
     args,
     returns,
+    errors,
     handler,
   }: {
     args: Schema.Schema<ConfectValue, ConvexValue>;
     returns: Schema.Schema<ConfectReturns, ConvexReturns>;
+    errors?: Errors;
     handler: (
       a: ConfectValue,
     ) => Effect.Effect<
       ConfectReturns,
-      E,
+      Errors extends Schema.Schema<any>
+        ? Schema.Schema.Type<Errors>
+        : Errors extends typeof Schema.Never
+          ? never
+          : never,
       | ConfectDatabaseReader
       | ConfectDatabaseWriter
       | ConfectAuth
@@ -210,27 +285,48 @@ export const makeConfectFunctions = <
       | ConfectMutationRunner
       | MutationCtx
     >;
-  }): RegisteredMutation<"public", ConvexValue, Promise<ConvexReturns>> =>
-    mutationGeneric(confectMutationFunction({ args, returns, handler }));
+  }): RegisteredMutation<"public", ConvexValue, Promise<ConvexReturns>> => {
+    const mutationFunction = mutationGeneric(
+      confectMutationFunction({ args, returns, errors, handler }),
+    );
+
+    // Add metadata for frontend access without affecting the type
+    (mutationFunction as any)._confectMeta = {
+      args,
+      returns,
+      type: "mutation" as const,
+    };
+
+    return mutationFunction;
+  };
 
   const confectInternalMutation = <
     ConvexValue extends DefaultFunctionArgs,
     ConfectValue,
     ConvexReturns,
     ConfectReturns,
-    E,
+    Errors extends
+      | Schema.Schema<any>
+      | typeof Schema.Never
+      | undefined = undefined,
   >({
     args,
     returns,
+    errors,
     handler,
   }: {
     args: Schema.Schema<ConfectValue, ConvexValue>;
     returns: Schema.Schema<ConfectReturns, ConvexReturns>;
+    errors?: Errors;
     handler: (
       a: ConfectValue,
     ) => Effect.Effect<
       ConfectReturns,
-      E,
+      Errors extends Schema.Schema<any>
+        ? Schema.Schema.Type<Errors>
+        : Errors extends typeof Schema.Never
+          ? never
+          : never,
       | ConfectDatabaseReader
       | ConfectDatabaseWriter
       | ConfectAuth
@@ -243,7 +339,7 @@ export const makeConfectFunctions = <
     >;
   }): RegisteredMutation<"internal", ConvexValue, Promise<ConvexReturns>> =>
     internalMutationGeneric(
-      confectMutationFunction({ args, returns, handler }),
+      confectMutationFunction({ args, returns, errors, handler }),
     );
 
   const confectMutationFunction = <
@@ -251,7 +347,10 @@ export const makeConfectFunctions = <
     ConfectArgs,
     ConvexReturns,
     ConfectReturns,
-    E,
+    Errors extends
+      | Schema.Schema<any>
+      | typeof Schema.Never
+      | undefined = undefined,
   >({
     args,
     returns,
@@ -259,11 +358,16 @@ export const makeConfectFunctions = <
   }: {
     args: Schema.Schema<ConfectArgs, ConvexArgs>;
     returns: Schema.Schema<ConfectReturns, ConvexReturns>;
+    errors?: Errors;
     handler: (
       a: ConfectArgs,
     ) => Effect.Effect<
       ConfectReturns,
-      E,
+      Errors extends Schema.Schema<any>
+        ? Schema.Schema.Type<Errors>
+        : Errors extends typeof Schema.Never
+          ? never
+          : never,
       | ConfectDatabaseReader
       | ConfectDatabaseWriter
       | ConfectAuth
@@ -306,6 +410,7 @@ export const makeConfectFunctions = <
         Effect.andThen((convexReturns) =>
           Schema.encodeUnknown(returns)(convexReturns),
         ),
+        Effect.catchAll((error) => Effect.sync(() => handleEffectError(error))),
         Effect.runPromise,
       ),
   });
@@ -315,19 +420,28 @@ export const makeConfectFunctions = <
     ConfectValue,
     ConvexReturns,
     ConfectReturns,
-    E,
+    Errors extends
+      | Schema.Schema<any>
+      | typeof Schema.Never
+      | undefined = undefined,
   >({
     args,
     returns,
+    errors,
     handler,
   }: {
     args: Schema.Schema<ConfectValue, ConvexValue>;
     returns: Schema.Schema<ConfectReturns, ConvexReturns>;
+    errors?: Errors;
     handler: (
       a: ConfectValue,
     ) => Effect.Effect<
       ConfectReturns,
-      E,
+      Errors extends Schema.Schema<any>
+        ? Schema.Schema.Type<Errors>
+        : Errors extends typeof Schema.Never
+          ? never
+          : never,
       | ConfectScheduler
       | ConfectAuth
       | ConfectStorageReader
@@ -339,27 +453,48 @@ export const makeConfectFunctions = <
       | ConfectVectorSearch
       | ActionCtx
     >;
-  }): RegisteredAction<"public", ConvexValue, Promise<ConvexReturns>> =>
-    actionGeneric(confectActionFunction({ args, returns, handler }));
+  }): RegisteredAction<"public", ConvexValue, Promise<ConvexReturns>> => {
+    const actionFunction = actionGeneric(
+      confectActionFunction({ args, returns, errors, handler }),
+    );
+
+    // Add metadata for frontend access without affecting the type
+    (actionFunction as any)._confectMeta = {
+      args,
+      returns,
+      type: "action" as const,
+    };
+
+    return actionFunction;
+  };
 
   const confectInternalAction = <
     ConvexValue extends DefaultFunctionArgs,
     ConfectValue,
     ConvexReturns,
     ConfectReturns,
-    E,
+    Errors extends
+      | Schema.Schema<any>
+      | typeof Schema.Never
+      | undefined = undefined,
   >({
     args,
     returns,
+    errors,
     handler,
   }: {
     args: Schema.Schema<ConfectValue, ConvexValue>;
     returns: Schema.Schema<ConfectReturns, ConvexReturns>;
+    errors?: Errors;
     handler: (
       a: ConfectValue,
     ) => Effect.Effect<
       ConfectReturns,
-      E,
+      Errors extends Schema.Schema<any>
+        ? Schema.Schema.Type<Errors>
+        : Errors extends typeof Schema.Never
+          ? never
+          : never,
       | ConfectScheduler
       | ConfectAuth
       | ConfectStorageReader
@@ -372,14 +507,19 @@ export const makeConfectFunctions = <
       | ActionCtx
     >;
   }): RegisteredAction<"internal", ConvexValue, Promise<ConvexReturns>> =>
-    internalActionGeneric(confectActionFunction({ args, returns, handler }));
+    internalActionGeneric(
+      confectActionFunction({ args, returns, errors, handler }),
+    );
 
   const confectActionFunction = <
     ConvexValue extends DefaultFunctionArgs,
     ConfectValue,
     ConvexReturns,
     ConfectReturns,
-    E,
+    Errors extends
+      | Schema.Schema<any>
+      | typeof Schema.Never
+      | undefined = undefined,
   >({
     args,
     returns,
@@ -387,11 +527,16 @@ export const makeConfectFunctions = <
   }: {
     args: Schema.Schema<ConfectValue, ConvexValue>;
     returns: Schema.Schema<ConfectReturns, ConvexReturns>;
+    errors?: Errors;
     handler: (
       a: ConfectValue,
     ) => Effect.Effect<
       ConfectReturns,
-      E,
+      Errors extends Schema.Schema<any>
+        ? Schema.Schema.Type<Errors>
+        : Errors extends typeof Schema.Never
+          ? never
+          : never,
       | ConfectScheduler
       | ConfectAuth
       | ConfectStorageReader
@@ -436,6 +581,7 @@ export const makeConfectFunctions = <
         Effect.andThen((convexReturns) =>
           Schema.encodeUnknown(returns)(convexReturns),
         ),
+        Effect.catchAll((error) => Effect.sync(() => handleEffectError(error))),
         Effect.runPromise,
       ),
   });

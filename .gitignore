@@ -7,3 +7,4 @@ node_modules/
 node-compile-cache/
 **/convex/_generated/
 tsconfig.vitest-temp.json
+**/bin/

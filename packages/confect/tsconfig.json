@@ -5,6 +5,7 @@
         "name": "@effect/language-service"
       }
     ],
+    "jsx": "preserve",
     "noEmit": true,
     "skipLibCheck": true,
     "importsNotUsedAsValues": "remove",
