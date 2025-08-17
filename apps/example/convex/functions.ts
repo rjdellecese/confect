@@ -18,29 +18,50 @@ import {
   ListNotesArgs,
   ListNotesResult,
 } from "./functions.schemas";
+import * as Schema from "effect/Schema";
+
+export class NotFoundError extends Schema.TaggedError<NotFoundError>('NotFoundError')('NotFoundError', {}) {
+  get message(): string {
+    return 'Not Found'
+  }
+}
+
 
 export const insertNote = confectMutation({
   args: InsertNoteArgs,
   returns: InsertNoteResult,
+  errors: NotFoundError,
   handler: ({ text }) =>
     Effect.gen(function* () {
       const writer = yield* ConfectDatabaseWriter;
 
-      return yield* writer.insert("notes", { text });
+      if (text.length > 100) {
+        return yield* Effect.fail(new NotFoundError());
+      }
+
+      return yield* writer.insert("notes", { text }).pipe(
+        Effect.orDie
+      );
     }),
 });
 
 export const listNotes = confectQuery({
   args: ListNotesArgs,
   returns: ListNotesResult,
+  errors: NotFoundError,
   handler: () =>
     Effect.gen(function* () {
       const reader = yield* ConfectDatabaseReader;
 
+      yield* Effect.log("listNotes");
+
       return yield* reader
         .table("notes")
         .index("by_creation_time", "desc")
-        .collect();
+        .collect().pipe(
+          Effect.catchTag('DocumentDecodeError', () => Effect.fail(new NotFoundError())), 
+          Effect.orDie,
+        );
     }),
 });
 
@@ -70,6 +91,8 @@ export const getFirst = confectQuery({
     Effect.gen(function* () {
       const reader = yield* ConfectDatabaseReader;
 
-      return yield* reader.table("notes").index("by_creation_time").first();
+      return yield* reader.table("notes").index("by_creation_time").first().pipe(
+        Effect.orDie,
+      );
     }),
 });

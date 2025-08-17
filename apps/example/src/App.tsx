@@ -1,164 +1,28 @@
-import { FetchHttpClient, HttpApiClient } from "@effect/platform";
-import { useAction, useMutation, useQuery } from "@rjdellecese/confect/react";
-import { ConvexProvider, ConvexReactClient } from "convex/react";
-import { Array, Effect, Exit, Option } from "effect";
-import { useEffect, useState } from "react";
-import { api } from "../convex/_generated/api";
-import {
-  DeleteNoteArgs,
-  DeleteNoteResult,
-  GetRandomArgs,
-  GetRandomResult,
-  InsertNoteArgs,
-  InsertNoteResult,
-} from "../convex/functions.schemas";
-import { Api } from "../convex/http/api";
+import { NavLink, Outlet } from "react-router";
 
 const App = () => {
-  const convexClient = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
 
   return (
-    <ConvexProvider client={convexClient}>
-      <Page />
-    </ConvexProvider>
-  );
-};
-
-const Page = () => {
-  const [note, setNote] = useState("");
-  const insertNote = useMutation({
-    mutation: api.functions.insertNote,
-    args: InsertNoteArgs,
-    returns: InsertNoteResult,
-  });
-
-  const [randomNumber, setRandomNumber] = useState<number | null>(null);
-  const getRandom = useAction({
-    action: api.functions.getRandom,
-    args: GetRandomArgs,
-    returns: GetRandomResult,
-  });
-
-  const retrieveRandomNumber = () => {
-    getRandom({}).pipe(Effect.map(setRandomNumber), Effect.runPromise);
-  };
-
-  useEffect(() => {
-    retrieveRandomNumber();
-  }, []);
-
-  return (
-    <div>
-      <h1>Confect Example</h1>
-
       <div>
-        Random number: {randomNumber ? randomNumber : "Loading…"}
-        <br />
-        <button type="button" onClick={retrieveRandomNumber}>
-          Get new random number
-        </button>
+        <h1>Confect</h1>
+        <nav>
+          <ul>
+            <li>
+              <NavLink to="/" end>
+                Effect Only Example
+              </NavLink>
+            </li>
+            <li>
+              <NavLink to="/effect-atom" end>
+                Effect Atom integration Example
+              </NavLink>
+            </li>
+          </ul>
+        </nav>
+        <Outlet />
       </div>
-
-      <br />
-
-      <textarea
-        rows={4}
-        cols={50}
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-      />
-      <br />
-      <button
-        type="button"
-        onClick={() =>
-          insertNote({ text: note }).pipe(
-            Effect.andThen(() => setNote("")),
-            Effect.runPromise,
-          )
-        }
-      >
-        Insert note
-      </button>
-
-      <NoteList />
-      <HttpEndpoints />
-    </div>
   );
 };
 
-const NoteList = () => {
-  // new api - less verbose and less boilerplate
-  const notes = useQuery(api, "functions", "listNotes")({});
-
-  const deleteNote = useMutation({
-    mutation: api.functions.deleteNote,
-    args: DeleteNoteArgs,
-    returns: DeleteNoteResult,
-  });
-
-  return Option.match(notes, {
-    onNone: () => <p>Loading…</p>,
-    onSome: (notes) => (
-      <ul>
-        {Array.map(notes, (note) => (
-          <li key={note._id}>
-            <p>{note.text}</p>
-            <button
-              type="button"
-              onClick={() =>
-                deleteNote({ noteId: note._id }).pipe(Effect.runPromise)
-              }
-            >
-              Delete note
-            </button>
-          </li>
-        ))}
-      </ul>
-    ),
-  });
-};
-
-const ApiClient = HttpApiClient.make(Api, {
-  baseUrl: import.meta.env.VITE_CONVEX_URL.replace(
-    "convex.cloud",
-    "convex.site",
-  ),
-});
-
-const getFirst = ApiClient.pipe(
-  Effect.andThen((client) => client.notes.getFirst()),
-  Effect.scoped,
-  Effect.provide(FetchHttpClient.layer),
-);
-
-const HttpEndpoints = () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [getResponse, setGetResponse] = useState<Exit.Exit<any, any> | null>(
-    null,
-  );
-
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={() =>
-          getFirst
-            .pipe(Effect.runPromiseExit)
-            .then((exit) => setGetResponse(exit))
-        }
-      >
-        HTTP GET /path-prefix/get-first
-      </button>
-      <p>
-        {getResponse
-          ? Exit.match(getResponse, {
-              onSuccess: (value) => JSON.stringify(value),
-              onFailure: (error) => JSON.stringify(error),
-            })
-          : "No response yet"}
-      </p>
-    </div>
-  );
-};
 
 export default App;
