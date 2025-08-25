@@ -5,6 +5,22 @@ import * as ConfectApi from "./ConfectApi";
 import * as ConfectApiFunctionPath from "./ConfectApiFunctionPath";
 import * as ConfectApiGroup from "./ConfectApiGroup";
 
+export type ConfectApiClient<
+  Api extends ConfectApi.ConfectApi<
+    string,
+    ConfectApiGroup.ConfectApiGroup.AnyWithProps
+  >,
+> = {
+  [GroupName in keyof Api["groups"]]: {
+    [FunctionName in keyof Api["groups"][GroupName]["functions"]]: (
+      args: Api["groups"][GroupName]["functions"][FunctionName]["arg"]["Type"]
+    ) => Effect.Effect<
+      Api["groups"][GroupName]["functions"][FunctionName]["returns"]["Type"],
+      ParseResult.ParseError
+    >;
+  };
+};
+
 export const make = <
   Api extends ConfectApi.ConfectApi<
     string,
@@ -13,7 +29,7 @@ export const make = <
 >(
   confectApi: Api,
   convexReactClient: ConvexReactClient
-): FunctionsFromApi<Api> =>
+): ConfectApiClient<Api> =>
   Record.map(confectApi.groups, (group) =>
     Record.map(
       group.functions,
@@ -38,19 +54,3 @@ export const make = <
         })
     )
   ) as any;
-
-type FunctionsFromApi<
-  Api extends ConfectApi.ConfectApi<
-    string,
-    ConfectApiGroup.ConfectApiGroup.AnyWithProps
-  >,
-> = {
-  [GroupName in keyof Api["groups"]]: {
-    [FunctionName in keyof Api["groups"][GroupName]["functions"]]: (
-      args: Api["groups"][GroupName]["functions"][FunctionName]["arg"]["Type"]
-    ) => Effect.Effect<
-      Api["groups"][GroupName]["functions"][FunctionName]["returns"]["Type"],
-      ParseResult.ParseError
-    >;
-  };
-};
