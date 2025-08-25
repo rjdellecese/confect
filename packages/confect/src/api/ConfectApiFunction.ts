@@ -15,8 +15,8 @@ export interface ConfectApiFunction<
 > {
   readonly [TypeId]: TypeId;
   readonly name: Name;
-  readonly argsSchema: Schema.Schema<Args, unknown>;
-  readonly returnsSchema: Schema.Schema<Returns, unknown>;
+  readonly arg: Args;
+  readonly returns: Returns;
 }
 
 export declare namespace ConfectApiFunction {

@@ -2,6 +2,7 @@ import {
   Array,
   Chunk,
   Context,
+  Effect,
   Function,
   Layer,
   Order,
@@ -139,10 +140,33 @@ export const api = <
   never,
   GroupToService<ApiName, Groups>
 > =>
-  Layer.succeed(ConfectApiService<ApiName, Groups>(api.name, api.groups), {
+  Layer.sync(ConfectApiService<ApiName, Groups>(api.name, api.groups), () => ({
     apiName: api.name,
-    groups: api.groups,
-  });
+    groupHandler: <
+      GroupName extends ConfectApiGroup.ConfectApiGroup.Name<Groups>,
+    >(
+      groupName: GroupName
+    ): Effect.Effect<
+      Handlers.FromGroup<
+        ConfectApiGroup.ConfectApiGroup.WithName<Groups, GroupName>
+      >
+    > =>
+      Effect.gen(function* () {
+        type Group = ConfectApiGroup.ConfectApiGroup.WithName<
+          Groups,
+          GroupName
+        >;
+
+        const group = api.groups[groupName]! as Group;
+
+        const groupService = yield* ConfectApiGroupService({
+          apiName: api.name,
+          group,
+        }) as unknown as Effect.Effect<ConfectApiGroupService<ApiName, Group>>;
+
+        return groupService.handlers;
+      }),
+  }));
 
 export type GroupToService<ApiName extends string, Group> =
   Group extends ConfectApiGroup.ConfectApiGroup<
@@ -179,7 +203,16 @@ export interface ConfectApiService<
   Groups extends ConfectApiGroup.ConfectApiGroup.Any,
 > {
   readonly apiName: ApiName;
-  readonly groups: Record.ReadonlyRecord<string, Groups>;
+
+  readonly groupHandler: <
+    GroupName extends ConfectApiGroup.ConfectApiGroup.Name<Groups>,
+  >(
+    groupName: GroupName
+  ) => Effect.Effect<
+    Handlers.FromGroup<
+      ConfectApiGroup.ConfectApiGroup.WithName<Groups, GroupName>
+    >
+  >;
 }
 
 export const ConfectApiService = <

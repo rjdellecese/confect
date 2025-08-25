@@ -14,7 +14,9 @@ export interface ConfectApi<
 > {
   readonly [TypeId]: TypeId;
   readonly name: Name;
-  readonly groups: Record.ReadonlyRecord<string, Groups>;
+  readonly groups: {
+    [GroupName in Groups["name"]]: Extract<Groups, { name: GroupName }>;
+  };
 
   add<Group extends ConfectApiGroup.ConfectApiGroup.Any>(
     group: Group

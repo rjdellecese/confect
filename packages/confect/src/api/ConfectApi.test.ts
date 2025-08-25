@@ -1,10 +1,12 @@
+import { ConvexReactClient } from "convex/react";
 import { Layer, Schema } from "effect";
 import * as ConfectApi from "./ConfectApi";
 import * as ConfectApiBuilder from "./ConfectApiBuilder";
+import * as ConfectApiClient from "./ConfectApiClient";
 import * as ConfectApiFunction from "./ConfectApiFunction";
 import * as ConfectApiGroup from "./ConfectApiGroup";
 
-const Group = ConfectApiGroup.make("Group")
+const Group = ConfectApiGroup.make("group")
   .add(
     ConfectApiFunction.make({
       name: "myFunction",
@@ -20,7 +22,7 @@ const Group = ConfectApiGroup.make("Group")
     })
   );
 
-const Group2 = ConfectApiGroup.make("Group2").add(
+const Group2 = ConfectApiGroup.make("group2").add(
   ConfectApiFunction.make({
     name: "myFunction3",
     args: Schema.Struct({ foo: Schema.Number }),
@@ -30,13 +32,13 @@ const Group2 = ConfectApiGroup.make("Group2").add(
 
 const Api = ConfectApi.make("Api").add(Group).add(Group2);
 
-const GroupLive = ConfectApiBuilder.group(Api, "Group", (handlers) =>
+const GroupLive = ConfectApiBuilder.group(Api, "group", (handlers) =>
   handlers
     .handle("myFunction", (args) => `foo: ${args.foo}`)
     .handle("myFunction2", (args) => `foo: ${args.foo}`)
 );
 
-const Group2Live = ConfectApiBuilder.group(Api, "Group2", (handlers) =>
+const Group2Live = ConfectApiBuilder.group(Api, "group2", (handlers) =>
   handlers.handle("myFunction3", (args) => `foo: ${args.foo}`)
 );
 
@@ -45,4 +47,9 @@ const ApiLive = ConfectApiBuilder.api(Api).pipe(
   Layer.provide(Group2Live)
 );
 
-type Test = Layer.Layer.Context<typeof ApiLive>;
+const client = ConfectApiClient.make(
+  Api,
+  new ConvexReactClient("http://localhost:3000")
+);
+
+const myFunctionResult = client.group.myFunction({ foo: 1 });

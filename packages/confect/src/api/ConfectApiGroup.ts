@@ -14,7 +14,12 @@ export interface ConfectApiGroup<
 > {
   readonly [TypeId]: TypeId;
   readonly name: Name;
-  readonly functions: Record.ReadonlyRecord<string, Functions>;
+  readonly functions: {
+    [FunctionName in Functions["name"]]: Extract<
+      Functions,
+      { readonly name: FunctionName }
+    >;
+  };
 
   add<Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps>(
     function_: Function

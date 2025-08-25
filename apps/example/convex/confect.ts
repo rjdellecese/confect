@@ -24,7 +24,6 @@ export const {
 } = makeConfectFunctions(confectSchema);
 
 type ConfectSchemaDefinition = typeof confectSchema;
-
 type ConfectDataModel =
   ConfectDataModelFromConfectSchemaDefinition<ConfectSchemaDefinition>;
 
