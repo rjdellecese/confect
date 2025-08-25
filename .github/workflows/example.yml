@@ -1,0 +1,48 @@
+name: Example App
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/example/**'
+      - 'packages/confect/**'  # Example depends on confect
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/example.yml'
+      - '.github/actions/example-setup/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'apps/example/**'
+      - 'packages/confect/**'  # Example depends on confect
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/example.yml'
+      - '.github/actions/example-setup/**'
+
+jobs:
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/example-setup
+      - run: pnpm --filter example typecheck
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/example-setup
+      - run: pnpm --filter example lint
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/example-setup
+      - run: pnpm --filter example build

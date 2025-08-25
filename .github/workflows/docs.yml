@@ -1,0 +1,46 @@
+name: Docs App
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/docs/**'
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/docs.yml'
+      - '.github/actions/docs-setup/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'apps/docs/**'
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/docs.yml'
+      - '.github/actions/docs-setup/**'
+
+jobs:
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/docs-setup
+      - run: pnpm --filter docs typecheck
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/docs-setup
+      - run: pnpm --filter docs lint
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/docs-setup
+      - run: pnpm --filter docs build
