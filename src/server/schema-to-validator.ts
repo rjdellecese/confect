@@ -158,7 +158,7 @@ export type ValueToValidator<Vl> = IsRecursive<Vl> extends true
                             : IsUnion<Vl> extends true
                               ? UnionValueToValidator<Vl>
                               : TypeError<"Unexpected value", Vl>
-        : TypeError<"Provided value is not a valid Convex value", Vl>;
+        : TypeError<"Not a valid Convex value", Vl>;
 
 type ArrayValueToValidator<Vl extends ReadonlyArray<ReadonlyValue>> =
   Vl extends ReadonlyArray<infer El extends ReadonlyValue>
@@ -185,14 +185,14 @@ type RecordValueToValidator<Vl> = Vl extends ReadonlyRecordValue
 
 export type UndefinedOrValueToValidator<Vl extends ReadonlyValue | undefined> =
   undefined extends Vl
-    ? [Vl] extends [(infer Val extends ReadonlyValue) | undefined]
+    ? Vl extends infer Val extends ReadonlyValue | undefined
       ? ValueToValidator<Val> extends infer Vd extends Validator<
           any,
           OptionalProperty,
           any
         >
         ? VOptional<Vd>
-        : never
+        : undefined
       : never
     : Vl extends ReadonlyValue
       ? ValueToValidator<Vl>
@@ -459,6 +459,7 @@ const handleTupleType = ({ elements, rest }: SchemaAST.TupleType) =>
 const handlePropertySignatures = (typeLiteralAst: SchemaAST.TypeLiteral) =>
   pipe(
     typeLiteralAst.propertySignatures,
+    // biome-ignore lint/suspicious/useIterableCallbackReturn: False positive.
     Effect.forEach(({ type, name, isOptional }) => {
       if (String.isString(name)) {
         // Somehow, somewhere, keys of type number are being coerced to strings…
@@ -541,7 +542,8 @@ export class UnsupportedPropertySignatureKeyTypeError extends Data.TaggedError(
 }> {
   /* v8 ignore start */
   override get message() {
-    return `Unsupported property signature '${this.propertyKey.toString()}'. Property is of type '${typeof this.propertyKey}' but only 'string' properties are supported.`;
+    return `Unsupported property signature '${this.propertyKey.toString()}'. Property is of type '${typeof this
+      .propertyKey}' but only 'string' properties are supported.`;
   }
   /* v8 ignore stop */
 }

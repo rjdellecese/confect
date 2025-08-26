@@ -458,6 +458,7 @@ export const executeVectorSearch = action({
         limit,
       }).pipe(
         Effect.andThen(
+          // biome-ignore lint/suspicious/useIterableCallbackReturn: False positive.
           Effect.forEach((vectorResult) =>
             runQuery(api.functions.getVectorSearch, {
               noteId: vectorResult._id,
