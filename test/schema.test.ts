@@ -32,7 +32,7 @@ describe("ConfectDataModelFromConfectSchema", () => {
 
     type ConfectDataModel = ConfectDataModelFromConfectSchema<ConfectSchema>;
 
-    expectTypeOf<ConfectDataModel>().toMatchTypeOf<GenericConfectDataModel>();
+    expectTypeOf<ConfectDataModel>().toExtend<GenericConfectDataModel>();
   });
 });
 
