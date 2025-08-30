@@ -1,5 +1,5 @@
 import { describe, effect, expect, expectTypeOf, test } from "@effect/vitest";
-import { type VBoolean, type VString, type VUnion, v } from "convex/values";
+import { v, type VBoolean, type VString, type VUnion } from "convex/values";
 import { Effect, Exit, identity, Schema } from "effect";
 
 import {
@@ -619,6 +619,18 @@ describe(compileSchema, () => {
     expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
   });
 
+  test("non-empty array", () => {
+    const expectedValidator = v.array(v.string());
+    type ExpectedValidator = typeof expectedValidator;
+
+    const schema = Schema.NonEmptyArray(Schema.String);
+    const compiledValidator = compileSchema(schema);
+    type CompiledValidator = typeof compiledValidator;
+
+    expect(compiledValidator).toStrictEqual(expectedValidator);
+    expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+  });
+
   describe("refinements", () => {
     test("int", () => {
       const expectedValidator = v.number();
@@ -978,6 +990,16 @@ describe("ValueToValidator", () => {
 
       type NestedArray = (string | NestedArray)[];
       type CompiledValidator = ValueToValidator<NestedArray>;
+
+      expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
+    });
+
+    test("type NonEmptyArray = readonly [string, ...string[]]", () => {
+      const _expectedValidator = v.array(v.string());
+      type ExpectedValidator = typeof _expectedValidator;
+
+      type NonEmptyArray = readonly [string, ...string[]];
+      type CompiledValidator = ValueToValidator<NonEmptyArray>;
 
       expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
     });
