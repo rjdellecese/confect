@@ -1,2 +1,5 @@
 
 .env.local
+
+# Confect generated types
+_generated-types/

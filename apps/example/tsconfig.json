@@ -22,6 +22,6 @@
       "~/*": ["*"]
     }
   },
-  "include": ["src/**/*", "env.d.ts"],
+  "include": ["src/**/*", "env.d.ts", "confect-generated-env.d.ts"],
   "exclude": ["node_modules", "convex/_generated"]
 }

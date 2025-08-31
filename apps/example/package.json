@@ -3,8 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently --restart-tries=1 --prefix-colors='white.bold.bgCyan,white.bold.bgYellow' --prefix=' {name} ' --names='VITE,CONVEX' 'vite' 'convex dev --tail-logs'",
+    "dev": "concurrently --restart-tries=1 --prefix-colors='white.bold.bgCyan,white.bold.bgYellow' --prefix=' {name} ' --names='VITE,CONVEX,CONFECT' 'vite' 'convex dev --tail-logs' 'pnpm confect:watch'",
     "convex-codegen": "pnpm convex codegen",
+    "confect:watch": "confect --watch",
     "typecheck": "tsc --noEmit --project tsconfig.json && tsc --noEmit --project convex/tsconfig.json",
     "build": "vite build --mode development",
     "lint": "prettier --check . && eslint . --max-warnings=0",
@@ -13,11 +14,14 @@
   },
   "dependencies": {
     "@effect/platform": "0.90.0",
+    "@effect-atom/atom": "0.1.5",
+    "@effect-atom/atom-react": "0.1.3",
     "@rjdellecese/confect": "workspace:*",
     "convex": "1.25.4",
     "effect": "3.17.6",
     "react": "19.1.1",
     "react-dom": "19.1.1",
+    "react-router": "^7.8.1",
     "vite": "7.1.1"
   },
   "devDependencies": {
@@ -31,5 +35,8 @@
     "prettier": "3.6.2",
     "typescript": "5.9.2",
     "typescript-eslint": "8.39.0"
+  },
+  "exports": {
+    "./confect-types": "./confect-generated-env.d.ts"
   }
 }
