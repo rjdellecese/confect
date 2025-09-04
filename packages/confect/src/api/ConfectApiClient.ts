@@ -13,7 +13,7 @@ export type ConfectApiClient<
 > = {
   [GroupName in keyof Api["groups"]]: {
     [FunctionName in keyof Api["groups"][GroupName]["functions"]]: (
-      args: Api["groups"][GroupName]["functions"][FunctionName]["arg"]["Type"]
+      args: Api["groups"][GroupName]["functions"][FunctionName]["args"]["Type"]
     ) => Effect.Effect<
       Api["groups"][GroupName]["functions"][FunctionName]["returns"]["Type"],
       ParseResult.ParseError
@@ -35,7 +35,7 @@ export const make = <
       group.functions,
       (function_) => (args: unknown) =>
         Effect.gen(function* () {
-          const encodedArgs = yield* Schema.encodeUnknown(function_.arg)(args);
+          const encodedArgs = yield* Schema.encodeUnknown(function_.args)(args);
 
           const path = ConfectApiFunctionPath.make(
             group.name,

@@ -48,7 +48,7 @@ const Proto = {
 
 const makeProto = <
   const Name extends string,
-  Groups extends ConfectApiGroup.ConfectApiGroup.Any,
+  Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
 >({
   name,
   groups,
@@ -56,7 +56,10 @@ const makeProto = <
   name: Name;
   groups: Record.ReadonlyRecord<string, Groups>;
 }): ConfectApi<Name, Groups> =>
-  Object.assign(Object.create(Proto), { name, groups });
+  Object.assign(Object.create(Proto), {
+    name,
+    groups,
+  });
 
 export const make = <const Name extends string>(name: Name): ConfectApi<Name> =>
   makeProto({ name, groups: Record.empty() });

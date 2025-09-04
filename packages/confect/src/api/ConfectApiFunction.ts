@@ -1,4 +1,13 @@
 import { Effect, Predicate, Schema } from "effect";
+import { ConfectStorageReader, ConvexQueryCtx } from "../server";
+import { ConfectAuth } from "../server/auth";
+import { ConfectDatabaseReader } from "../server/database";
+import { ConfectQueryRunner } from "../server/runners";
+import {
+  ConfectSchemaDefinition,
+  DataModelFromConfectSchema,
+  GenericConfectSchema,
+} from "../server/schema";
 
 export const TypeId = Symbol.for("@rjdellecese/confect/ConfectApiFunction");
 
@@ -15,53 +24,66 @@ export interface ConfectApiFunction<
 > {
   readonly [TypeId]: TypeId;
   readonly name: Name;
-  readonly arg: Args;
+  readonly args: Args;
   readonly returns: Returns;
 }
 
 export declare namespace ConfectApiFunction {
-  export interface Any {
-    readonly [TypeId]: TypeId;
-    readonly name: string;
-  }
+  export interface AnyWithProps
+    extends ConfectApiFunction<
+      string,
+      Schema.Schema.AnyNoContext,
+      Schema.Schema.AnyNoContext
+    > {}
 
-  export interface AnyWithProps extends ConfectApiFunction<any, any, any> {}
-
-  export type Name<Function extends Any> =
+  export type Name<Function extends AnyWithProps> =
     Function extends ConfectApiFunction<infer Name, any, any> ? Name : never;
 
-  export type Args<Function extends Any> =
+  export type Args<Function extends AnyWithProps> =
     Function extends ConfectApiFunction<any, infer Args, any> ? Args : never;
 
-  export type Returns<Function extends Any> =
+  export type Returns<Function extends AnyWithProps> =
     Function extends ConfectApiFunction<any, any, infer Returns>
       ? Returns
       : never;
 
-  export type WithName<Function extends Any, Name extends string> = Extract<
-    Function,
-    { readonly name: Name }
-  >;
+  export type WithName<
+    Function extends AnyWithProps,
+    Name extends string,
+  > = Extract<Function, { readonly name: Name }>;
 
-  export type ExcludeName<Function extends Any, Name extends string> = Exclude<
-    Function,
-    { readonly name: Name }
-  >;
+  export type ExcludeName<
+    Function extends AnyWithProps,
+    Name extends string,
+  > = Exclude<Function, { readonly name: Name }>;
 }
 
-export type Handler<Function extends ConfectApiFunction.Any> = (
+export type Handler<
+  ConfectSchema extends GenericConfectSchema,
+  Function extends ConfectApiFunction.AnyWithProps,
+> = (
   args: ConfectApiFunction.Args<Function>["Type"]
-) =>
-  | ConfectApiFunction.Returns<Function>["Type"]
-  | Effect.Effect<ConfectApiFunction.Returns<Function>["Type"]>;
+) => Effect.Effect<
+  ConfectApiFunction.Returns<Function>["Type"],
+  any,
+  | ConfectDatabaseReader<ConfectSchemaDefinition<ConfectSchema>>
+  | ConfectAuth
+  | ConfectStorageReader
+  | ConfectQueryRunner
+  | ConvexQueryCtx<DataModelFromConfectSchema<ConfectSchema>>
+>;
 
 export declare namespace Handler {
   export type WithName<
-    Function extends ConfectApiFunction.Any,
+    ConfectSchema extends GenericConfectSchema,
+    Function extends ConfectApiFunction.AnyWithProps,
     Name extends string,
-  > = Handler<ConfectApiFunction.WithName<Function, Name>>;
+  > = Handler<ConfectSchema, ConfectApiFunction.WithName<Function, Name>>;
 
-  export type Any = Handler<ConfectApiFunction.Any>;
+  export type Any = Handler<
+    GenericConfectSchema,
+    ConfectApiFunction.AnyWithProps
+  >;
 }
 
 const Proto = {
