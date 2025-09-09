@@ -1,8 +1,24 @@
 import { Effect, Predicate, Schema } from "effect";
-import { ConfectStorageReader, ConvexQueryCtx } from "../server";
+import {
+  ConfectScheduler,
+  ConfectStorageActionWriter,
+  ConfectStorageReader,
+  ConfectStorageWriter,
+  ConfectVectorSearch,
+  ConvexActionCtx,
+  ConvexMutationCtx,
+  ConvexQueryCtx,
+} from "../server";
 import { ConfectAuth } from "../server/auth";
-import { ConfectDatabaseReader } from "../server/database";
-import { ConfectQueryRunner } from "../server/runners";
+import {
+  ConfectDatabaseReader,
+  ConfectDatabaseWriter,
+} from "../server/database";
+import {
+  ConfectActionRunner,
+  ConfectMutationRunner,
+  ConfectQueryRunner,
+} from "../server/runners";
 import {
   ConfectSchemaDefinition,
   DataModelFromConfectSchema,
@@ -15,14 +31,16 @@ export type TypeId = typeof TypeId;
 
 export const isConfectApiFunction = (
   u: unknown
-): u is ConfectApiFunction<any, any, any> => Predicate.hasProperty(u, TypeId);
+): u is ConfectApiFunction.AnyWithProps => Predicate.hasProperty(u, TypeId);
 
 export interface ConfectApiFunction<
+  FunctionType_ extends FunctionType,
   Name extends string,
   Args extends Schema.Schema.AnyNoContext,
   Returns extends Schema.Schema.AnyNoContext,
 > {
   readonly [TypeId]: TypeId;
+  readonly functionType: FunctionType_;
   readonly name: Name;
   readonly args: Args;
   readonly returns: Returns;
@@ -31,19 +49,48 @@ export interface ConfectApiFunction<
 export declare namespace ConfectApiFunction {
   export interface AnyWithProps
     extends ConfectApiFunction<
+      FunctionType,
+      string,
+      Schema.Schema.AnyNoContext,
+      Schema.Schema.AnyNoContext
+    > {}
+
+  export interface AnyWithPropsWithFunctionType<
+    FunctionType_ extends FunctionType,
+  > extends ConfectApiFunction<
+      FunctionType_,
       string,
       Schema.Schema.AnyNoContext,
       Schema.Schema.AnyNoContext
     > {}
 
   export type Name<Function extends AnyWithProps> =
-    Function extends ConfectApiFunction<infer Name, any, any> ? Name : never;
+    Function extends ConfectApiFunction<
+      infer _FunctionType,
+      infer Name,
+      infer _Args,
+      infer _Returns
+    >
+      ? Name
+      : never;
 
   export type Args<Function extends AnyWithProps> =
-    Function extends ConfectApiFunction<any, infer Args, any> ? Args : never;
+    Function extends ConfectApiFunction<
+      infer _FunctionType,
+      infer _Name,
+      infer Args,
+      infer _Returns
+    >
+      ? Args
+      : never;
 
   export type Returns<Function extends AnyWithProps> =
-    Function extends ConfectApiFunction<any, any, infer Returns>
+    Function extends ConfectApiFunction<
+      infer _FunctionType,
+      infer _Name,
+      infer _Args,
+      infer Returns
+    >
       ? Returns
       : never;
 
@@ -51,6 +98,11 @@ export declare namespace ConfectApiFunction {
     Function extends AnyWithProps,
     Name extends string,
   > = Extract<Function, { readonly name: Name }>;
+
+  export type WithFunctionType<
+    Function extends AnyWithProps,
+    FunctionType_ extends FunctionType,
+  > = Extract<Function, { readonly functionType: FunctionType_ }>;
 
   export type ExcludeName<
     Function extends AnyWithProps,
@@ -61,11 +113,20 @@ export declare namespace ConfectApiFunction {
 export type Handler<
   ConfectSchema extends GenericConfectSchema,
   Function extends ConfectApiFunction.AnyWithProps,
-> = (
-  args: ConfectApiFunction.Args<Function>["Type"]
-) => Effect.Effect<
-  ConfectApiFunction.Returns<Function>["Type"],
-  any,
+> =
+  Function extends ConfectApiFunction.WithFunctionType<Function, "Query">
+    ? QueryHandler<ConfectSchema, Function>
+    : Function extends ConfectApiFunction.WithFunctionType<Function, "Mutation">
+      ? MutationHandler<ConfectSchema, Function>
+      : Function extends ConfectApiFunction.WithFunctionType<Function, "Action">
+        ? ActionHandler<ConfectSchema, Function>
+        : never;
+
+export type QueryHandler<
+  ConfectSchema extends GenericConfectSchema,
+  Function extends ConfectApiFunction.AnyWithPropsWithFunctionType<"Query">,
+> = BaseHandler<
+  Function,
   | ConfectDatabaseReader<ConfectSchemaDefinition<ConfectSchema>>
   | ConfectAuth
   | ConfectStorageReader
@@ -73,38 +134,87 @@ export type Handler<
   | ConvexQueryCtx<DataModelFromConfectSchema<ConfectSchema>>
 >;
 
+export type MutationHandler<
+  ConfectSchema extends GenericConfectSchema,
+  Function extends ConfectApiFunction.AnyWithPropsWithFunctionType<"Mutation">,
+> = BaseHandler<
+  Function,
+  | ConfectDatabaseReader<ConfectSchemaDefinition<ConfectSchema>>
+  | ConfectDatabaseWriter<ConfectSchemaDefinition<ConfectSchema>>
+  | ConfectAuth
+  | ConfectScheduler
+  | ConfectStorageReader
+  | ConfectStorageWriter
+  | ConfectQueryRunner
+  | ConfectMutationRunner
+  | ConvexMutationCtx<DataModelFromConfectSchema<ConfectSchema>>
+>;
+
+export type ActionHandler<
+  ConfectSchema extends GenericConfectSchema,
+  Function extends ConfectApiFunction.AnyWithPropsWithFunctionType<"Action">,
+> = BaseHandler<
+  Function,
+  | ConfectScheduler
+  | ConfectAuth
+  | ConfectStorageReader
+  | ConfectStorageWriter
+  | ConfectStorageActionWriter
+  | ConfectQueryRunner
+  | ConfectMutationRunner
+  | ConfectActionRunner
+  | ConfectVectorSearch
+  | ConvexActionCtx<DataModelFromConfectSchema<ConfectSchema>>
+>;
+
+type BaseHandler<
+  Function extends ConfectApiFunction.AnyWithProps,
+  Requirements,
+> = <E>(
+  args: ConfectApiFunction.Args<Function>["Type"]
+) => Effect.Effect<
+  ConfectApiFunction.Returns<Function>["Type"],
+  E,
+  Requirements
+>;
+
 export declare namespace Handler {
+  export type AnyWithProps = Handler<
+    GenericConfectSchema,
+    ConfectApiFunction.AnyWithProps
+  >;
+
   export type WithName<
     ConfectSchema extends GenericConfectSchema,
     Function extends ConfectApiFunction.AnyWithProps,
     Name extends string,
   > = Handler<ConfectSchema, ConfectApiFunction.WithName<Function, Name>>;
-
-  export type Any = Handler<
-    GenericConfectSchema,
-    ConfectApiFunction.AnyWithProps
-  >;
 }
 
 const Proto = {
   [TypeId]: TypeId,
 };
 
-export const make = <
-  const Name extends string,
-  Args extends Schema.Schema.AnyNoContext,
-  Returns extends Schema.Schema.AnyNoContext,
->({
-  name,
-  args,
-  returns,
-}: {
-  name: Name;
-  args: Args;
-  returns: Returns;
-}): ConfectApiFunction<Name, Args, Returns> =>
-  Object.assign(Object.create(Proto), {
+type FunctionType = "Query" | "Mutation" | "Action";
+
+export const make =
+  <FT extends FunctionType>(functionType: FT) =>
+  <
+    const Name extends string,
+    Args extends Schema.Schema.AnyNoContext,
+    Returns extends Schema.Schema.AnyNoContext,
+  >({
     name,
-    argsSchema: args,
-    returnsSchema: returns,
-  });
+    args,
+    returns,
+  }: {
+    name: Name;
+    args: Args;
+    returns: Returns;
+  }): ConfectApiFunction<FT, Name, Args, Returns> =>
+    Object.assign(Object.create(Proto), {
+      functionType,
+      name,
+      argsSchema: args,
+      returnsSchema: returns,
+    });

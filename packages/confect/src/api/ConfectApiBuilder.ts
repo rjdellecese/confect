@@ -74,7 +74,7 @@ const HandlersProto = {
       ConfectApiFunction.ConfectApiFunction.AnyWithProps
     >,
     name: string,
-    handler: ConfectApiFunction.Handler.Any
+    handler: ConfectApiFunction.Handler.AnyWithProps
   ) {
     const function_ = this.group.functions[name];
     return makeHandlers({

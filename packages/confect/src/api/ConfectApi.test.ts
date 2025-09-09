@@ -11,14 +11,14 @@ import * as ConfectApiWithDatabaseSchema from "./ConfectApiWithDatabaseSchema";
 
 const Group = ConfectApiGroup.make("group")
   .add(
-    ConfectApiFunction.make({
+    ConfectApiFunction.make("Query")({
       name: "myFunction",
       args: Schema.Struct({ foo: Schema.Number }),
       returns: Schema.String,
     })
   )
   .add(
-    ConfectApiFunction.make({
+    ConfectApiFunction.make("Query")({
       name: "myFunction2",
       args: Schema.Struct({ foo: Schema.Number }),
       returns: Schema.String,
@@ -26,7 +26,7 @@ const Group = ConfectApiGroup.make("group")
   );
 
 const Group2 = ConfectApiGroup.make("group2").add(
-  ConfectApiFunction.make({
+  ConfectApiFunction.make("Query")({
     name: "myFunction3",
     args: Schema.Struct({ foo: Schema.Number }),
     returns: Schema.String,

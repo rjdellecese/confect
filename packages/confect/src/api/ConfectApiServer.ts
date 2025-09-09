@@ -1,20 +1,47 @@
-import { GenericQueryCtx, queryGeneric, RegisteredQuery } from "convex/server";
+import {
+  actionGeneric,
+  DefaultFunctionArgs,
+  GenericActionCtx,
+  GenericMutationCtx,
+  GenericQueryCtx,
+  mutationGeneric,
+  queryGeneric,
+  RegisteredQuery,
+} from "convex/server";
 import {
   Array,
   Effect,
   hole,
   Layer,
+  Match,
   pipe,
   Record,
   Runtime,
   Schema,
-  Struct,
   Types,
 } from "effect";
-import { ConvexQueryCtx } from "../server";
+import {
+  ConfectScheduler,
+  ConfectVectorSearch,
+  ConvexActionCtx,
+  ConvexMutationCtx,
+  ConvexQueryCtx,
+} from "../server";
 import { ConfectAuth } from "../server/auth";
-import { confectDatabaseReaderLayer } from "../server/database";
-import { confectQueryRunnerLayer } from "../server/runners";
+import {
+  ConfectDatabaseReader,
+  confectDatabaseReaderLayer,
+  ConfectDatabaseWriter,
+  confectDatabaseWriterLayer,
+} from "../server/database";
+import {
+  ConfectActionRunner,
+  confectActionRunnerLayer,
+  ConfectMutationRunner,
+  confectMutationRunnerLayer,
+  ConfectQueryRunner,
+  confectQueryRunnerLayer,
+} from "../server/runners";
 import {
   ConfectSchemaDefinition,
   DataModelFromConfectSchema,
@@ -24,7 +51,12 @@ import {
   compileArgsSchema,
   compileReturnsSchema,
 } from "../server/schema_to_validator";
-import { ConfectStorageReader } from "../server/storage";
+import {
+  ConfectStorageActionWriter,
+  ConfectStorageReader,
+  ConfectStorageWriter,
+} from "../server/storage";
+import { confectVectorSearchLayer } from "../server/vector_search";
 import * as ConfectApiBuilder from "./ConfectApiBuilder";
 import * as ConfectApiGroup from "./ConfectApiGroup";
 import * as ConfectApiWithDatabaseSchema from "./ConfectApiWithDatabaseSchema";
@@ -34,32 +66,26 @@ export const TypeId = Symbol.for("@rjdellecese/confect/ConfectApiServer");
 export type TypeId = typeof TypeId;
 
 export type ConfectApiServer<
-  ConfectSchema extends GenericConfectSchema,
-  ApiName extends string,
   Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
 > = Types.Simplify<
   {
     readonly [TypeId]: TypeId;
-    readonly confectSchemaDefinition: ConfectSchemaDefinition<ConfectSchema>;
-    readonly apiName: ApiName;
   } & {
-    readonly functions: {
-      readonly [GroupName in Groups["name"]]: {
-        [FunctionName in keyof Extract<
+    readonly [GroupName in Groups["name"]]: {
+      [FunctionName in keyof Extract<
+        Groups,
+        { name: GroupName }
+      >["functions"]]: RegisteredQuery<
+        "public",
+        Extract<
           Groups,
           { name: GroupName }
-        >["functions"]]: RegisteredQuery<
-          "public",
-          Extract<
-            Groups,
-            { name: GroupName }
-          >["functions"][FunctionName]["args"]["Encoded"],
-          Extract<
-            Groups,
-            { name: GroupName }
-          >["functions"][FunctionName]["returns"]["Encoded"]
-        >;
-      };
+        >["functions"][FunctionName]["args"]["Encoded"],
+        Extract<
+          Groups,
+          { name: GroupName }
+        >["functions"][FunctionName]["returns"]["Encoded"]
+      >;
     };
   }
 >;
@@ -77,7 +103,7 @@ export const make = <
   apiServiceLayer: Layer.Layer<
     ConfectApiBuilder.ConfectApiService<ConfectSchema, ApiName, Groups>
   >
-): ConfectApiServer<ConfectSchema, ApiName, Groups> =>
+): ConfectApiServer<Groups> =>
   Effect.gen(function* () {
     const layerRuntime = yield* Layer.toRuntime(apiServiceLayer);
 
@@ -89,8 +115,6 @@ export const make = <
           apiWithDatabaseSchema.api.name,
           apiWithDatabaseSchema.api.groups
         );
-
-        const groupNames = Struct.keys(apiWithDatabaseSchema.api.groups);
 
         // TODO
         const a = Record.map(
@@ -107,65 +131,48 @@ export const make = <
                   groupHandler.handlers,
                   Array.map(
                     ({
-                      function_,
+                      function_: { functionType, name, args, returns },
                       handler,
-                    }): [
-                      string,
-                      RegisteredQuery<
-                        "public",
-                        (typeof function_.args)["Encoded"],
-                        (typeof function_.returns)["Encoded"]
-                      >,
-                    ] => {
-                      const name = function_.name;
-
-                      const argsValidator = compileArgsSchema(function_.args);
-                      const returnsValidator = compileReturnsSchema(
-                        function_.returns
-                      );
-                      const convexHandler = (
-                        ctx: GenericQueryCtx<
-                          DataModelFromConfectSchema<ConfectSchema>
-                        >,
-                        encodedArgs: (typeof function_.args)["Encoded"]
-                      ) =>
-                        Effect.gen(function* () {
-                          const decodedArgs = yield* Schema.decode(
-                            function_.args
-                          )(encodedArgs);
-
-                          const decodedReturns = yield* handler(decodedArgs);
-                          const encodedReturns = yield* Schema.encode(
-                            function_.returns
-                          )(decodedReturns);
-
-                          return encodedReturns;
-                        }).pipe(
-                          Effect.provide(
-                            Layer.mergeAll(
-                              confectDatabaseReaderLayer(
-                                apiWithDatabaseSchema.confectSchemaDefinition,
-                                ctx.db
-                              ),
-                              ConfectAuth.layer(ctx.auth),
-                              ConfectStorageReader.layer(ctx.storage),
-                              confectQueryRunnerLayer(ctx.runQuery),
-                              Layer.succeed(
-                                ConvexQueryCtx<
-                                  DataModelFromConfectSchema<ConfectSchema>
-                                >(),
-                                ctx
-                              )
+                    }) => {
+                      const registeredFunction = Match.value(functionType).pipe(
+                        Match.when("Query", () =>
+                          queryGeneric(
+                            confectQueryFunction(
+                              apiWithDatabaseSchema.confectSchemaDefinition,
+                              {
+                                args,
+                                returns,
+                                handler,
+                              }
                             )
-                          ),
-                          Effect.runPromise
-                        );
-
-                      const registeredFunction = queryGeneric({
-                        args: argsValidator,
-                        returns: returnsValidator,
-                        handler: convexHandler,
-                      });
+                          )
+                        ),
+                        Match.when("Mutation", () =>
+                          mutationGeneric(
+                            confectMutationFunction(
+                              apiWithDatabaseSchema.confectSchemaDefinition,
+                              {
+                                args,
+                                returns,
+                                handler,
+                              }
+                            )
+                          )
+                        ),
+                        Match.when("Action", () =>
+                          actionGeneric(
+                            confectActionFunction(
+                              apiWithDatabaseSchema.confectSchemaDefinition,
+                              {
+                                args,
+                                returns,
+                                handler,
+                              }
+                            )
+                          )
+                        ),
+                        Match.exhaustive
+                      );
 
                       return [name, registeredFunction] as const;
                     }
@@ -180,3 +187,210 @@ export const make = <
       })
     );
   }).pipe(Effect.scoped, Effect.runSync);
+
+const confectQueryFunction = <
+  ConfectSchema extends GenericConfectSchema,
+  ConvexArgs extends DefaultFunctionArgs,
+  ConfectArgs,
+  ConvexReturns,
+  ConfectReturns,
+  E,
+>(
+  confectSchemaDefinition: ConfectSchemaDefinition<ConfectSchema>,
+  {
+    args,
+    returns,
+    handler,
+  }: {
+    args: Schema.Schema<ConfectArgs, ConvexArgs>;
+    returns: Schema.Schema<ConfectReturns, ConvexReturns>;
+    handler: (
+      a: ConfectArgs
+    ) => Effect.Effect<
+      ConfectReturns,
+      E,
+      | ConfectDatabaseReader<ConfectSchemaDefinition<ConfectSchema>>
+      | ConfectAuth
+      | ConfectStorageReader
+      | ConfectQueryRunner
+      | ConvexQueryCtx<DataModelFromConfectSchema<ConfectSchema>>
+    >;
+  }
+) => ({
+  args: compileArgsSchema(args),
+  returns: compileReturnsSchema(returns),
+  handler: (
+    ctx: GenericQueryCtx<DataModelFromConfectSchema<ConfectSchema>>,
+    actualArgs: ConvexArgs
+  ): Promise<ConvexReturns> =>
+    pipe(
+      actualArgs,
+      Schema.decode(args),
+      Effect.orDie,
+      Effect.andThen((decodedArgs) =>
+        pipe(
+          handler(decodedArgs),
+          Effect.provide(
+            Layer.mergeAll(
+              confectDatabaseReaderLayer(confectSchemaDefinition, ctx.db),
+              ConfectAuth.layer(ctx.auth),
+              ConfectStorageReader.layer(ctx.storage),
+              confectQueryRunnerLayer(ctx.runQuery),
+              Layer.succeed(
+                ConvexQueryCtx<DataModelFromConfectSchema<ConfectSchema>>(),
+                ctx
+              )
+            )
+          )
+        )
+      ),
+      Effect.andThen((convexReturns) =>
+        Schema.encodeUnknown(returns)(convexReturns)
+      ),
+      Effect.runPromise
+    ),
+});
+
+const confectMutationFunction = <
+  ConfectSchema extends GenericConfectSchema,
+  ConvexArgs extends DefaultFunctionArgs,
+  ConfectArgs,
+  ConvexReturns,
+  ConfectReturns,
+  E,
+>(
+  confectSchemaDefinition: ConfectSchemaDefinition<ConfectSchema>,
+  {
+    args,
+    returns,
+    handler,
+  }: {
+    args: Schema.Schema<ConfectArgs, ConvexArgs>;
+    returns: Schema.Schema<ConfectReturns, ConvexReturns>;
+    handler: (
+      a: ConfectArgs
+    ) => Effect.Effect<
+      ConfectReturns,
+      E,
+      | ConfectDatabaseReader<ConfectSchemaDefinition<ConfectSchema>>
+      | ConfectDatabaseWriter<ConfectSchemaDefinition<ConfectSchema>>
+      | ConfectAuth
+      | ConfectScheduler
+      | ConfectStorageReader
+      | ConfectStorageWriter
+      | ConfectQueryRunner
+      | ConfectMutationRunner
+      | ConvexMutationCtx<DataModelFromConfectSchema<ConfectSchema>>
+    >;
+  }
+) => ({
+  args: compileArgsSchema(args),
+  returns: compileReturnsSchema(returns),
+  handler: (
+    ctx: GenericMutationCtx<DataModelFromConfectSchema<ConfectSchema>>,
+    actualArgs: ConvexArgs
+  ): Promise<ConvexReturns> =>
+    pipe(
+      actualArgs,
+      Schema.decode(args),
+      Effect.orDie,
+      Effect.andThen((decodedArgs) =>
+        pipe(
+          handler(decodedArgs),
+          Effect.provide(
+            Layer.mergeAll(
+              confectDatabaseReaderLayer(confectSchemaDefinition, ctx.db),
+              confectDatabaseWriterLayer(confectSchemaDefinition, ctx.db),
+              ConfectAuth.layer(ctx.auth),
+              ConfectScheduler.layer(ctx.scheduler),
+              ConfectStorageReader.layer(ctx.storage),
+              ConfectStorageWriter.layer(ctx.storage),
+              confectQueryRunnerLayer(ctx.runQuery),
+              confectMutationRunnerLayer(ctx.runMutation),
+              Layer.succeed(
+                ConvexMutationCtx<DataModelFromConfectSchema<ConfectSchema>>(),
+                ctx
+              )
+            )
+          )
+        )
+      ),
+      Effect.andThen((convexReturns) =>
+        Schema.encodeUnknown(returns)(convexReturns)
+      ),
+      Effect.runPromise
+    ),
+});
+
+const confectActionFunction = <
+  ConfectSchema extends GenericConfectSchema,
+  ConvexValue extends DefaultFunctionArgs,
+  ConfectValue,
+  ConvexReturns,
+  ConfectReturns,
+  E,
+>(
+  confectSchemaDefinition: ConfectSchemaDefinition<ConfectSchema>,
+  {
+    args,
+    returns,
+    handler,
+  }: {
+    args: Schema.Schema<ConfectValue, ConvexValue>;
+    returns: Schema.Schema<ConfectReturns, ConvexReturns>;
+    handler: (
+      a: ConfectValue
+    ) => Effect.Effect<
+      ConfectReturns,
+      E,
+      | ConfectScheduler
+      | ConfectAuth
+      | ConfectStorageReader
+      | ConfectStorageWriter
+      | ConfectStorageActionWriter
+      | ConfectQueryRunner
+      | ConfectMutationRunner
+      | ConfectActionRunner
+      | ConfectVectorSearch
+      | ConvexActionCtx<DataModelFromConfectSchema<ConfectSchema>>
+    >;
+  }
+) => ({
+  args: compileArgsSchema(args),
+  returns: compileReturnsSchema(returns),
+  handler: (
+    ctx: GenericActionCtx<DataModelFromConfectSchema<ConfectSchema>>,
+    actualArgs: ConvexValue
+  ): Promise<ConvexReturns> =>
+    pipe(
+      actualArgs,
+      Schema.decode(args),
+      Effect.orDie,
+      Effect.andThen((decodedArgs) =>
+        pipe(
+          handler(decodedArgs),
+          Effect.provide(
+            Layer.mergeAll(
+              ConfectScheduler.layer(ctx.scheduler),
+              ConfectAuth.layer(ctx.auth),
+              ConfectStorageReader.layer(ctx.storage),
+              ConfectStorageWriter.layer(ctx.storage),
+              ConfectStorageActionWriter.layer(ctx.storage),
+              confectQueryRunnerLayer(ctx.runQuery),
+              confectMutationRunnerLayer(ctx.runMutation),
+              confectActionRunnerLayer(ctx.runAction),
+              confectVectorSearchLayer(ctx.vectorSearch),
+              Layer.succeed(
+                ConvexActionCtx<DataModelFromConfectSchema<ConfectSchema>>(),
+                ctx
+              )
+            )
+          )
+        )
+      ),
+      Effect.andThen((convexReturns) =>
+        Schema.encodeUnknown(returns)(convexReturns)
+      ),
+      Effect.runPromise
+    ),
+});
