@@ -40,6 +40,7 @@ import {
 export type ConfectMutationCtx<
   ConfectDataModel extends GenericConfectDataModel,
 > = {
+  ctx: GenericMutationCtx<DataModelFromConfectDataModel<ConfectDataModel>>;
   db: ConfectDatabaseWriter<ConfectDataModel>;
   auth: ConfectAuth;
   storage: ConfectStorageWriter;
@@ -55,6 +56,7 @@ export const ConfectMutationCtx = <
 
 export type ConfectQueryCtx<ConfectDataModel extends GenericConfectDataModel> =
   {
+    ctx: GenericQueryCtx<DataModelFromConfectDataModel<ConfectDataModel>>;
     db: ConfectDatabaseReader<ConfectDataModel>;
     auth: ConfectAuth;
     storage: ConfectStorageReader;
@@ -85,6 +87,8 @@ export type ConfectActionCtx<ConfectDataModel extends GenericConfectDataModel> =
       action: Action,
       ...args: OptionalRestArgs<Action>
     ): Effect.Effect<FunctionReturnType<Action>>;
+
+    ctx: GenericActionCtx<DataModelFromConfectDataModel<ConfectDataModel>>;
     scheduler: ConfectScheduler;
     auth: ConfectAuth;
     storage: ConfectStorageWriter;
@@ -124,6 +128,7 @@ export const makeConfectQueryCtx = <
   ctx: GenericQueryCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
   databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>,
 ): ConfectQueryCtx<ConfectDataModel> => ({
+  ctx,
   db: new ConfectDatabaseReaderImpl(ctx.db, databaseSchemas),
   auth: new ConfectAuthImpl(ctx.auth),
   storage: new ConfectStorageReaderImpl(ctx.storage),
@@ -135,6 +140,7 @@ export const makeConfectMutationCtx = <
   ctx: GenericMutationCtx<DataModelFromConfectDataModel<ConfectDataModel>>,
   databaseSchemas: DatabaseSchemasFromConfectDataModel<ConfectDataModel>,
 ): ConfectMutationCtx<ConfectDataModel> => ({
+  ctx,
   db: new ConfectDatabaseWriterImpl(ctx.db, databaseSchemas),
   auth: new ConfectAuthImpl(ctx.auth),
   storage: new ConfectStorageWriterImpl(ctx.storage),
@@ -180,6 +186,7 @@ export const makeConfectActionCtx = <
       >
     >,
   ) => Effect.promise(() => ctx.vectorSearch(tableName, indexName, query)),
+  ctx,
   auth: new ConfectAuthImpl(ctx.auth),
   storage: new ConfectStorageWriterImpl(ctx.storage),
   scheduler: new ConfectSchedulerImpl(ctx.scheduler),
