@@ -12,6 +12,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@convex-dev/presence": "^0.1.5",
     "@effect/platform": "0.90.6",
     "@rjdellecese/confect": "file:../",
     "convex": "1.26.1",

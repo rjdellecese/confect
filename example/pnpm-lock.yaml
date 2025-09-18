@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@convex-dev/presence':
+        specifier: ^0.1.5
+        version: 0.1.5(convex@1.26.1(react@19.1.1))(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
       '@effect/platform':
         specifier: 0.90.6
         version: 0.90.6(effect@3.17.9)
@@ -143,6 +146,13 @@ packages:
   '@babel/types@7.28.2':
     resolution: {integrity: sha512-ruv7Ae4J5dUYULmeXw1gmb7rYRz57OWCPM57pHojnLq/3Z1CK2lNSLTCVjxVk1F/TZHwOZZrOWi0ur95BbLxNQ==}
     engines: {node: '>=6.9.0'}
+
+  '@convex-dev/presence@0.1.5':
+    resolution: {integrity: sha512-tHD03dLnP0bB4lHuXMVx64NkQqn/SR4dJakwkcOEsXZXFJsvoai/O0FcAnrd5KBYzbbt8GFZ7vxPdBO0l1CSUw==}
+    peerDependencies:
+      convex: '>=1.24.8 <1.35.0'
+      react: ~18.3.1 || ^19.0.0
+      react-dom: ~18.3.1 || ^19.0.0
 
   '@effect/platform@0.90.6':
     resolution: {integrity: sha512-aT7aLJR1+rYrSLdw5af2UZzwnWoAy8WmkTxTUD3pFY6vjFmh+8137RhbwKiWjIJBTm2DVyPXl1dx1kGg28xt6Q==}
@@ -939,6 +949,12 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 7.27.1
       '@babel/helper-validator-identifier': 7.27.1
+
+  '@convex-dev/presence@0.1.5(convex@1.26.1(react@19.1.1))(react-dom@19.1.1(react@19.1.1))(react@19.1.1)':
+    dependencies:
+      convex: 1.26.1(react@19.1.1)
+      react: 19.1.1
+      react-dom: 19.1.1(react@19.1.1)
 
   '@effect/platform@0.90.6(effect@3.17.9)':
     dependencies:
