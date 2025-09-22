@@ -106,7 +106,7 @@ export const group = <
   ConfectSchema extends GenericConfectSchema,
   const ApiName extends string,
   Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
-  const GroupName extends ConfectApiGroup.ConfectApiGroup.Name<Groups>,
+  const GroupPath extends ConfectApiGroup.ConfectApiGroup.Path<Groups>,
   Return,
 >(
   apiWithDatabaseSchema: ConfectApiWithDatabaseSchema.ConfectApiWithDatabaseSchema<
@@ -114,30 +114,38 @@ export const group = <
     ApiName,
     Groups
   >,
-  groupName: GroupName,
+  groupPath: GroupPath,
   build: (
     handlers: Handlers.FromGroup<
       ConfectSchema,
-      ConfectApiGroup.ConfectApiGroup.WithName<Groups, GroupName>
+      ConfectApiGroup.ConfectApiGroup.WithPath<Groups, GroupPath>
     >
   ) => Handlers.ValidateReturn<Return>
 ): Layer.Layer<
   ConfectApiGroupService<
     ConfectSchema,
     ApiName,
-    ConfectApiGroup.ConfectApiGroup.WithName<Groups, GroupName>
+    ConfectApiGroup.ConfectApiGroup.WithPath<Groups, GroupPath>
+  >,
+  ConfectApiGroupService<
+    ConfectSchema,
+    ApiName,
+    ConfectApiGroup.ConfectApiGroup.Groups<
+      ConfectApiGroup.ConfectApiGroup.WithPath<Groups, GroupPath>
+    >
   >
 > => {
+  // TODO
   const group = apiWithDatabaseSchema.api.groups[
-    groupName
-  ]! as ConfectApiGroup.ConfectApiGroup.WithName<Groups, GroupName>;
+    groupPath
+  ]! as ConfectApiGroup.ConfectApiGroup.WithPath<Groups, GroupPath>;
   const handlers = Chunk.empty();
 
   return Layer.succeed(
     ConfectApiGroupService<
       ConfectSchema,
       ApiName,
-      ConfectApiGroup.ConfectApiGroup.WithName<Groups, GroupName>
+      ConfectApiGroup.ConfectApiGroup.WithPath<Groups, GroupPath>
     >({
       apiName: apiWithDatabaseSchema.api.name,
       group,
@@ -151,7 +159,7 @@ export const group = <
         })
       ) as unknown as Handlers.FromGroup<
         ConfectSchema,
-        ConfectApiGroup.ConfectApiGroup.WithName<Groups, GroupName>
+        ConfectApiGroup.ConfectApiGroup.WithPath<Groups, GroupPath>
       >,
     }
   );
@@ -170,7 +178,7 @@ export const api = <
 ): Layer.Layer<
   ConfectApiService<ConfectSchema, ApiName, Groups>,
   never,
-  GroupToService<ConfectSchema, ApiName, Groups>
+  ConfectApiGroupService<ConfectSchema, ApiName, Groups>
 > =>
   Layer.sync(
     ConfectApiService<ConfectSchema, ApiName, Groups>(
@@ -209,14 +217,6 @@ export const api = <
         }),
     })
   );
-
-export type GroupToService<
-  ConfectSchema extends GenericConfectSchema,
-  ApiName extends string,
-  Group,
-> = Group extends ConfectApiGroup.ConfectApiGroup.AnyWithProps
-  ? ConfectApiGroupService<ConfectSchema, ApiName, Group>
-  : never;
 
 export interface ConfectApiGroupService<
   ConfectSchema extends GenericConfectSchema,

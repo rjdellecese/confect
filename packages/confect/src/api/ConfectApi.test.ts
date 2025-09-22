@@ -33,6 +33,20 @@ const Group2 = ConfectApiGroup.make("group2").add(
   })
 );
 
+const Group5 = ConfectApiGroup.make("group5");
+
+const Group3 = ConfectApiGroup.make("group3")
+  .add(
+    ConfectApiFunction.make("Query")({
+      name: "myFunction4",
+      args: Schema.Struct({ foo: Schema.Number }),
+      returns: Schema.String,
+    })
+  )
+  .addGroup(Group5);
+
+const Group4 = ConfectApiGroup.make("group4").addGroup(Group2).addGroup(Group3);
+
 const confectSchemaDefinition = defineConfectSchema({
   notes: defineConfectTable(
     Schema.Struct({
@@ -41,7 +55,7 @@ const confectSchemaDefinition = defineConfectSchema({
   ),
 });
 
-const Api = ConfectApi.make("Api").add(Group).add(Group2);
+const Api = ConfectApi.make("Api").add(Group).add(Group4);
 
 const ApiWithDatabaseSchema = ConfectApiWithDatabaseSchema.make(
   confectSchemaDefinition,
@@ -59,14 +73,27 @@ const GroupLive = ConfectApiBuilder.group(
 
 const Group2Live = ConfectApiBuilder.group(
   ApiWithDatabaseSchema,
-  "group2",
+  "group4.group2",
   (handlers) =>
     handlers.handle("myFunction3", (args) => Effect.succeed(`foo: ${args.foo}`))
 );
 
+const Group3Live = ConfectApiBuilder.group(
+  ApiWithDatabaseSchema,
+  "group4.group3",
+  (handlers) =>
+    handlers.handle("myFunction4", (args) => Effect.succeed(`foo: ${args.foo}`))
+);
+
+const Group4Live = ConfectApiBuilder.group(
+  ApiWithDatabaseSchema,
+  "group4",
+  (handlers) => handlers
+).pipe(Layer.provide(Group2Live), Layer.provide(Group3Live));
+
 const ApiLive = ConfectApiBuilder.api(ApiWithDatabaseSchema).pipe(
   Layer.provide(GroupLive),
-  Layer.provide(Group2Live)
+  Layer.provide(Group4Live)
 );
 
 const client = ConfectApiClient.make(
