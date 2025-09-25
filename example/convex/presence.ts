@@ -1,12 +1,11 @@
 import { Presence } from "@convex-dev/presence";
-import { v } from "convex/values";
 import { Effect, Schema } from "effect";
 import { components } from "./_generated/api.js";
 import {
-  ConfectQueryCtx,
-  query,
-  mutation,
   ConfectMutationCtx,
+  ConfectQueryCtx,
+  mutation,
+  query,
 } from "./confect";
 
 export const presence = new Presence(components.presence);
