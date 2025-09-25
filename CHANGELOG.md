@@ -1,5 +1,12 @@
 # @rjdellecese/confect
 
+## 0.0.30
+
+### Patch Changes
+
+- 5fb67ad: Bump deps
+- 0ccaab3: Expose original Convex context for component integrations
+
 ## 0.0.29
 
 ### Patch Changes
