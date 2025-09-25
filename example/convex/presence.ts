@@ -40,7 +40,7 @@ export const list = query({
       userId: Schema.String,
       online: Schema.Boolean,
       lastDisconnected: Schema.Number,
-    })
+    }),
   ),
   handler: ({ roomToken }) =>
     Effect.gen(function* () {
