@@ -3,16 +3,16 @@ import type {
   SchedulableFunctionReference,
   Scheduler,
 } from "convex/server";
-import { Effect } from "effect";
+import { DateTime, Duration, Effect } from "effect";
 
 export interface ConfectScheduler {
   runAfter<FuncRef extends SchedulableFunctionReference>(
-    delayMs: number,
+    delay: Duration.DurationInput,
     functionReference: FuncRef,
     ...args: OptionalRestArgs<FuncRef>
   ): Effect.Effect<void>;
   runAt<FuncRef extends SchedulableFunctionReference>(
-    timestamp: number | Date,
+    timestamp: number | Date | DateTime.DateTime,
     functionReference: FuncRef,
     ...args: OptionalRestArgs<FuncRef>
   ): Effect.Effect<void>;
@@ -22,21 +22,31 @@ export class ConfectSchedulerImpl implements ConfectScheduler {
   constructor(private scheduler: Scheduler) {}
 
   runAfter<FuncRef extends SchedulableFunctionReference>(
-    delayMs: number,
+    delay: Duration.DurationInput,
     functionReference: FuncRef,
     ...args: OptionalRestArgs<FuncRef>
   ): Effect.Effect<void> {
     return Effect.promise(() =>
-      this.scheduler.runAfter(delayMs, functionReference, ...args),
+      this.scheduler.runAfter(
+        Duration.toMillis(delay),
+        functionReference,
+        ...args,
+      ),
     );
   }
   runAt<FuncRef extends SchedulableFunctionReference>(
-    timestamp: number | Date,
+    timestamp: number | Date | DateTime.DateTime,
     functionReference: FuncRef,
     ...args: OptionalRestArgs<FuncRef>
   ): Effect.Effect<void> {
     return Effect.promise(() =>
-      this.scheduler.runAt(timestamp, functionReference, ...args),
+      this.scheduler.runAt(
+        DateTime.isDateTime(timestamp)
+          ? DateTime.toEpochMillis(timestamp)
+          : timestamp,
+        functionReference,
+        ...args,
+      ),
     );
   }
 }
