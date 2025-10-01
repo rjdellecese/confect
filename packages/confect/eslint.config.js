@@ -16,6 +16,7 @@ export default tseslint.config(
   {
     files: ["**/*.ts", "**/*.tsx"],
     rules: {
+      "no-warning-comments": "warn",
       "@typescript-eslint/no-namespace": "off",
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-empty-object-type": "off",
@@ -38,5 +39,5 @@ export default tseslint.config(
       ".tsup/**",
       "test/convex/_generated/**",
     ],
-  },
+  }
 );
