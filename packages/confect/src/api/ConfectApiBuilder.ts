@@ -127,7 +127,8 @@ export const group = <
     ApiName,
     ConfectApiGroup.ConfectApiGroup.WithPath<Groups, GroupPath>
   >,
-  ConfectApiGroupService<
+  never,
+  ConfectApiGroupService.FromGroups<
     ConfectSchema,
     ApiName,
     ConfectApiGroup.ConfectApiGroup.Groups<
@@ -178,7 +179,7 @@ export const api = <
 ): Layer.Layer<
   ConfectApiService<ConfectSchema, ApiName, Groups>,
   never,
-  ConfectApiGroupService<ConfectSchema, ApiName, Groups>
+  ConfectApiGroupService.FromGroups<ConfectSchema, ApiName, Groups>
 > =>
   Layer.sync(
     ConfectApiService<ConfectSchema, ApiName, Groups>(
@@ -242,6 +243,16 @@ export const ConfectApiGroupService = <
     `@rjdellecese/confect/ConfectApiGroupService/${apiName}/${group.name}`
   );
 
+export declare namespace ConfectApiGroupService {
+  export type FromGroups<
+    ConfectSchema extends GenericConfectSchema,
+    ApiName extends string,
+    Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
+  > = Groups extends never
+    ? never
+    : ConfectApiGroupService<ConfectSchema, ApiName, Groups>;
+}
+
 export interface ConfectApiService<
   ConfectSchema extends GenericConfectSchema,
   ApiName extends string,
@@ -249,16 +260,7 @@ export interface ConfectApiService<
 > {
   readonly apiName: ApiName;
 
-  readonly groupHandler: <
-    GroupName extends ConfectApiGroup.ConfectApiGroup.Name<Groups>,
-  >(
-    groupName: GroupName
-  ) => Effect.Effect<
-    Handlers.FromGroup<
-      ConfectSchema,
-      ConfectApiGroup.ConfectApiGroup.WithName<Groups, GroupName>
-    >
-  >;
+  readonly groups: Record.ReadonlyRecord<string, Groups>;
 }
 
 export const ConfectApiService = <
@@ -277,6 +279,7 @@ export const ConfectApiService = <
     Array.join("|")
   );
 
+  // TODO: Recurse
   const groupNamesIdentifier = pipe(
     Record.keys(groups),
     Array.sort(Order.string),

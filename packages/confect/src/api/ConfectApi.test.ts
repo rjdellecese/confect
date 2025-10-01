@@ -71,6 +71,10 @@ const GroupLive = ConfectApiBuilder.group(
       .handle("myFunction2", (args) => Effect.succeed(`foo: ${args.foo}`))
 );
 
+type GroupLiveSuccess = Layer.Layer.Success<typeof GroupLive>;
+type GroupLiveError = Layer.Layer.Error<typeof GroupLive>;
+type GroupLiveContext = Layer.Layer.Context<typeof GroupLive>;
+
 const Group2Live = ConfectApiBuilder.group(
   ApiWithDatabaseSchema,
   "group4.group2",
@@ -78,12 +82,30 @@ const Group2Live = ConfectApiBuilder.group(
     handlers.handle("myFunction3", (args) => Effect.succeed(`foo: ${args.foo}`))
 );
 
+type Group2LiveSuccess = Layer.Layer.Success<typeof Group2Live>;
+type Group2LiveError = Layer.Layer.Error<typeof Group2Live>;
+type Group2LiveContext = Layer.Layer.Context<typeof Group2Live>;
+
+const Group5Live = ConfectApiBuilder.group(
+  ApiWithDatabaseSchema,
+  "group4.group3.group5",
+  (handlers) => handlers
+);
+
+type Group5LiveSuccess = Layer.Layer.Success<typeof Group5Live>;
+type Group5LiveError = Layer.Layer.Error<typeof Group5Live>;
+type Group5LiveContext = Layer.Layer.Context<typeof Group5Live>;
+
 const Group3Live = ConfectApiBuilder.group(
   ApiWithDatabaseSchema,
   "group4.group3",
   (handlers) =>
     handlers.handle("myFunction4", (args) => Effect.succeed(`foo: ${args.foo}`))
-);
+).pipe(Layer.provide(Group5Live));
+
+type Group3LiveSuccess = Layer.Layer.Success<typeof Group3Live>;
+type Group3LiveError = Layer.Layer.Error<typeof Group3Live>;
+type Group3LiveContext = Layer.Layer.Context<typeof Group3Live>;
 
 const Group4Live = ConfectApiBuilder.group(
   ApiWithDatabaseSchema,
@@ -91,10 +113,18 @@ const Group4Live = ConfectApiBuilder.group(
   (handlers) => handlers
 ).pipe(Layer.provide(Group2Live), Layer.provide(Group3Live));
 
+type Group4LiveSuccess = Layer.Layer.Success<typeof Group4Live>;
+type Group4LiveError = Layer.Layer.Error<typeof Group4Live>;
+type Group4LiveContext = Layer.Layer.Context<typeof Group4Live>;
+
 const ApiLive = ConfectApiBuilder.api(ApiWithDatabaseSchema).pipe(
   Layer.provide(GroupLive),
   Layer.provide(Group4Live)
 );
+
+type ApiLiveSuccess = Layer.Layer.Success<typeof ApiLive>;
+type ApiLiveError = Layer.Layer.Error<typeof ApiLive>;
+type ApiLiveContext = Layer.Layer.Context<typeof ApiLive>;
 
 const client = ConfectApiClient.make(
   Api,

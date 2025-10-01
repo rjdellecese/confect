@@ -90,6 +90,9 @@ export type ConfectApiServer<
   }
 >;
 
+export declare namespace ConfectApiServer {
+}
+
 export const make = <
   ConfectSchema extends GenericConfectSchema,
   ApiName extends string,
