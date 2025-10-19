@@ -58,6 +58,7 @@ import {
 } from "../server/storage";
 import { confectVectorSearchLayer } from "../server/vector_search";
 import * as ConfectApiBuilder from "./ConfectApiBuilder";
+import { ConfectApiFunction } from "./ConfectApiFunction";
 import * as ConfectApiGroup from "./ConfectApiGroup";
 import * as ConfectApiWithDatabaseSchema from "./ConfectApiWithDatabaseSchema";
 
@@ -90,8 +91,7 @@ export type ConfectApiServer<
   }
 >;
 
-export declare namespace ConfectApiServer {
-}
+export declare namespace ConfectApiServer {}
 
 export const make = <
   ConfectSchema extends GenericConfectSchema,
@@ -128,10 +128,19 @@ export const make = <
           (group) =>
             Effect.runSync(
               Effect.gen(function* () {
-                const groupHandler = yield* api.groupHandler(group.name);
+                const { handlers } =
+                  yield* ConfectApiBuilder.ConfectApiGroupService(
+                    apiWithDatabaseSchema.api.name,
+                    group
+                  );
 
                 return pipe(
-                  groupHandler.handlers,
+                  handlers.items as ReadonlyArray<
+                    ConfectApiBuilder.Handlers.Item<
+                      ConfectSchema,
+                      ConfectApiFunction.AnyWithProps
+                    >
+                  >,
                   Array.map(
                     ({
                       function_: { functionType, name, args, returns },

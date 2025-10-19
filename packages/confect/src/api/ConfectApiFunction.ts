@@ -120,7 +120,7 @@ export type Handler<
       ? MutationHandler<ConfectSchema, Function>
       : Function extends ConfectApiFunction.WithFunctionType<Function, "Action">
         ? ActionHandler<ConfectSchema, Function>
-        : never;
+        : BaseHandler<Function, any>;
 
 export type QueryHandler<
   ConfectSchema extends GenericConfectSchema,

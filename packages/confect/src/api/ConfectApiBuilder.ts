@@ -2,12 +2,12 @@ import {
   Array,
   Chunk,
   Context,
-  Effect,
   Function,
   Layer,
   Order,
   pipe,
   Record,
+  Struct,
   Types,
 } from "effect";
 import {
@@ -30,7 +30,7 @@ export interface Handlers<
     _Functions: Types.Covariant<Functions>;
   };
   readonly group: ConfectApiGroup.ConfectApiGroup.AnyWithProps;
-  readonly handlers: ReadonlyArray<Handlers.Item<ConfectSchema, Functions>>;
+  readonly items: ReadonlyArray<Handlers.Item<ConfectSchema, Functions>>;
 
   handle<Name extends ConfectApiFunction.ConfectApiFunction.Name<Functions>>(
     name: Name,
@@ -80,7 +80,7 @@ const HandlersProto = {
     return makeHandlers({
       group: this.group,
       handlers: [
-        ...this.handlers,
+        ...this.items,
         {
           function_,
           handler,
@@ -181,42 +181,16 @@ export const api = <
   never,
   ConfectApiGroupService.FromGroups<ConfectSchema, ApiName, Groups>
 > =>
-  Layer.sync(
+  Layer.succeed(
     ConfectApiService<ConfectSchema, ApiName, Groups>(
       apiWithDatabaseSchema.confectSchemaDefinition,
       apiWithDatabaseSchema.api.name,
       apiWithDatabaseSchema.api.groups
     ),
-    () => ({
+    {
       apiName: apiWithDatabaseSchema.api.name,
-      groupHandler: <
-        GroupName extends ConfectApiGroup.ConfectApiGroup.Name<Groups>,
-      >(
-        groupName: GroupName
-      ): Effect.Effect<
-        Handlers.FromGroup<
-          ConfectSchema,
-          ConfectApiGroup.ConfectApiGroup.WithName<Groups, GroupName>
-        >
-      > =>
-        Effect.gen(function* () {
-          type Group = ConfectApiGroup.ConfectApiGroup.WithName<
-            Groups,
-            GroupName
-          >;
-
-          const group = apiWithDatabaseSchema.api.groups[groupName]! as Group;
-
-          const groupService = yield* ConfectApiGroupService({
-            apiName: apiWithDatabaseSchema.api.name,
-            group,
-          }) as unknown as Effect.Effect<
-            ConfectApiGroupService<ConfectSchema, ApiName, Group>
-          >;
-
-          return groupService.handlers;
-        }),
-    })
+      groups: apiWithDatabaseSchema.api.groups,
+    }
   );
 
 export interface ConfectApiGroupService<
@@ -260,7 +234,9 @@ export interface ConfectApiService<
 > {
   readonly apiName: ApiName;
 
-  readonly groups: Record.ReadonlyRecord<string, Groups>;
+  readonly groups: {
+    [GroupName in Groups["name"]]: Extract<Groups, { name: GroupName }>;
+  };
 }
 
 export const ConfectApiService = <
@@ -270,7 +246,9 @@ export const ConfectApiService = <
 >(
   confectSchemaDefinition: ConfectSchemaDefinition<ConfectSchema>,
   apiName: ApiName,
-  groups: Record.ReadonlyRecord<string, Groups>
+  groups: {
+    [GroupName in Groups["name"]]: Extract<Groups, { name: GroupName }>;
+  }
 ) => {
   const tableNamesIdentifier = pipe(
     confectSchemaDefinition.tableSchemas,
@@ -281,7 +259,7 @@ export const ConfectApiService = <
 
   // TODO: Recurse
   const groupNamesIdentifier = pipe(
-    Record.keys(groups),
+    Struct.keys(groups),
     Array.sort(Order.string),
     Array.join("|")
   );
