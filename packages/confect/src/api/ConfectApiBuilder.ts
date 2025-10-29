@@ -44,10 +44,10 @@ export interface Handlers<
 export declare namespace Handlers {
   export interface Item<
     ConfectSchema extends GenericConfectSchema,
-    Functions extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
+    Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
   > {
-    readonly function_: Functions;
-    readonly handler: ConfectApiFunction.Handler<ConfectSchema, Functions>;
+    readonly function_: Function;
+    readonly handler: ConfectApiFunction.Handler<ConfectSchema, Function>;
   }
 
   export type FromGroup<
@@ -137,9 +137,7 @@ export const group = <
   >
 > => {
   // TODO
-  const group = apiWithDatabaseSchema.api.groups[
-    groupPath
-  ]! as ConfectApiGroup.ConfectApiGroup.WithPath<Groups, GroupPath>;
+  const group = apiWithDatabaseSchema.api.groups[groupPath]!;
   const handlers = Chunk.empty();
 
   return Layer.succeed(
@@ -149,7 +147,10 @@ export const group = <
       ConfectApiGroup.ConfectApiGroup.WithPath<Groups, GroupPath>
     >({
       apiName: apiWithDatabaseSchema.api.name,
-      group,
+      group: group as ConfectApiGroup.ConfectApiGroup.WithPath<
+        Groups,
+        GroupPath
+      >,
     }),
     {
       apiName: apiWithDatabaseSchema.api.name,
@@ -214,6 +215,7 @@ export const ConfectApiGroupService = <
   group: Group;
 }) =>
   Context.GenericTag<ConfectApiGroupService<ConfectSchema, ApiName, Group>>(
+    // TODO: I think we need the full path here, ont just the group name
     `@rjdellecese/confect/ConfectApiGroupService/${apiName}/${group.name}`
   );
 
@@ -265,6 +267,7 @@ export const ConfectApiService = <
   );
 
   return Context.GenericTag<ConfectApiService<ConfectSchema, ApiName, Groups>>(
-    `@rjdellecese/confect/ConfectApiService/${tableNamesIdentifier}/${apiName}/${groupNamesIdentifier}`
+    // TODO: Maybe just `apiName` would suffice here?
+    `@rjdellecese/confect/ConfectApiServic/${tableNamesIdentifier}/${apiName}/${groupNamesIdentifier}`
   );
 };

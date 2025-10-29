@@ -10,14 +10,14 @@ import * as ConfectApiServer from "./ConfectApiServer";
 import * as ConfectApiWithDatabaseSchema from "./ConfectApiWithDatabaseSchema";
 
 const Group = ConfectApiGroup.make("group")
-  .add(
+  .addFunction(
     ConfectApiFunction.make("Query")({
       name: "myFunction",
       args: Schema.Struct({ foo: Schema.Number }),
       returns: Schema.String,
     })
   )
-  .add(
+  .addFunction(
     ConfectApiFunction.make("Query")({
       name: "myFunction2",
       args: Schema.Struct({ foo: Schema.Number }),
@@ -25,7 +25,7 @@ const Group = ConfectApiGroup.make("group")
     })
   );
 
-const Group2 = ConfectApiGroup.make("group2").add(
+const Group2 = ConfectApiGroup.make("group2").addFunction(
   ConfectApiFunction.make("Query")({
     name: "myFunction3",
     args: Schema.Struct({ foo: Schema.Number }),
@@ -36,7 +36,7 @@ const Group2 = ConfectApiGroup.make("group2").add(
 const Group5 = ConfectApiGroup.make("group5");
 
 const Group3 = ConfectApiGroup.make("group3")
-  .add(
+  .addFunction(
     ConfectApiFunction.make("Query")({
       name: "myFunction4",
       args: Schema.Struct({ foo: Schema.Number }),

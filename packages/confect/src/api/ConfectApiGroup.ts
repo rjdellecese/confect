@@ -27,8 +27,9 @@ export interface ConfectApiGroup<
     [GroupName in Groups["name"]]: Extract<Groups, { name: GroupName }>;
   };
 
-  // TODO: Rename to addFunction
-  add<Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps>(
+  addFunction<
+    Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
+  >(
     function_: Function
   ): ConfectApiGroup<ConfectSchema, Name, Functions | Function, Groups>;
 
@@ -132,11 +133,11 @@ export declare namespace ConfectApiGroup {
 
   export type HandlersFrom<
     ConfectSchema extends GenericConfectSchema,
-    Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
+    Functions extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
   > = {
-    readonly [Current in Function as Current["name"]]: ConfectApiFunction.Handler<
+    readonly [Function in Functions as Function["name"]]: ConfectApiFunction.Handler<
       ConfectSchema,
-      Current
+      Function
     >;
   };
 }
