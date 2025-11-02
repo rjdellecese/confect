@@ -1,3 +1,8 @@
+import {
+  RegisteredAction,
+  RegisteredMutation,
+  RegisteredQuery,
+} from "convex/server";
 import { Effect, Predicate, Schema } from "effect";
 import {
   ConfectScheduler,
@@ -34,13 +39,13 @@ export const isConfectApiFunction = (
 ): u is ConfectApiFunction.AnyWithProps => Predicate.hasProperty(u, TypeId);
 
 export interface ConfectApiFunction<
-  FunctionType_ extends FunctionType,
+  FunctionType extends ConfectApiFunction.FunctionType,
   Name extends string,
   Args extends Schema.Schema.AnyNoContext,
   Returns extends Schema.Schema.AnyNoContext,
 > {
   readonly [TypeId]: TypeId;
-  readonly functionType: FunctionType_;
+  readonly functionType: FunctionType;
   readonly name: Name;
   readonly args: Args;
   readonly returns: Returns;
@@ -63,6 +68,8 @@ export declare namespace ConfectApiFunction {
       Schema.Schema.AnyNoContext,
       Schema.Schema.AnyNoContext
     > {}
+
+  export type FunctionType = "Query" | "Mutation" | "Action";
 
   export type Name<Function extends AnyWithProps> =
     Function extends ConfectApiFunction<
@@ -108,6 +115,36 @@ export declare namespace ConfectApiFunction {
     Function extends AnyWithProps,
     Name extends string,
   > = Exclude<Function, { readonly name: Name }>;
+
+  export type IsQuery<Function extends AnyWithProps> =
+    Function extends WithFunctionType<Function, "Query"> ? true : false;
+
+  export type IsMutation<Function extends AnyWithProps> =
+    Function extends WithFunctionType<Function, "Mutation"> ? true : false;
+
+  export type IsAction<Function extends AnyWithProps> =
+    Function extends WithFunctionType<Function, "Action"> ? true : false;
+
+  export type ToRegisteredFunction<Function extends AnyWithProps> =
+    ConfectApiFunction.IsQuery<Function> extends true
+      ? RegisteredQuery<
+          "public",
+          ConfectApiFunction.Args<Function>["Encoded"],
+          Promise<ConfectApiFunction.Returns<Function>["Encoded"]>
+        >
+      : ConfectApiFunction.IsMutation<Function> extends true
+        ? RegisteredMutation<
+            "public",
+            ConfectApiFunction.Args<Function>["Encoded"],
+            Promise<ConfectApiFunction.Returns<Function>["Encoded"]>
+          >
+        : ConfectApiFunction.IsAction<Function> extends true
+          ? RegisteredAction<
+              "public",
+              ConfectApiFunction.Args<Function>["Encoded"],
+              Promise<ConfectApiFunction.Returns<Function>["Encoded"]>
+            >
+          : never;
 }
 
 export type Handler<
@@ -120,7 +157,8 @@ export type Handler<
       ? MutationHandler<ConfectSchema, Function>
       : Function extends ConfectApiFunction.WithFunctionType<Function, "Action">
         ? ActionHandler<ConfectSchema, Function>
-        : BaseHandler<Function, any>;
+        : // TODO: `never` instead?
+          BaseHandler<Function, any>;
 
 export type QueryHandler<
   ConfectSchema extends GenericConfectSchema,
@@ -195,10 +233,10 @@ const Proto = {
   [TypeId]: TypeId,
 };
 
-type FunctionType = "Query" | "Mutation" | "Action";
-
 export const make =
-  <FT extends FunctionType>(functionType: FT) =>
+  <FunctionType extends ConfectApiFunction.FunctionType>(
+    functionType: FunctionType
+  ) =>
   <
     const Name extends string,
     Args extends Schema.Schema.AnyNoContext,
@@ -211,7 +249,7 @@ export const make =
     name: Name;
     args: Args;
     returns: Returns;
-  }): ConfectApiFunction<FT, Name, Args, Returns> =>
+  }): ConfectApiFunction<FunctionType, Name, Args, Returns> =>
     Object.assign(Object.create(Proto), {
       functionType,
       name,

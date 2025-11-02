@@ -27,6 +27,7 @@ export interface ConfectApiGroup<
     [GroupName in Groups["name"]]: Extract<Groups, { name: GroupName }>;
   };
 
+  // TODO: `addQuery`, `addMutation`, `addAction`?
   addFunction<
     Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
   >(
@@ -145,10 +146,9 @@ export declare namespace ConfectApiGroup {
 const Proto = {
   [TypeId]: TypeId,
 
-  add<Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps>(
-    this: ConfectApiGroup.AnyWithProps,
-    function_: Function
-  ) {
+  addFunction<
+    Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
+  >(this: ConfectApiGroup.AnyWithProps, function_: Function) {
     return makeProto({
       name: this.name,
       functions: Record.set(this.functions, function_.name, function_),

@@ -30,6 +30,9 @@ export declare namespace ConfectApi {
 
   export interface AnyWithProps
     extends ConfectApi<string, ConfectApiGroup.ConfectApiGroup.AnyWithProps> {}
+
+  export type Groups<Api extends AnyWithProps> =
+    Api extends ConfectApi<infer _Name, infer Groups> ? Groups : never;
 }
 
 const Proto = {

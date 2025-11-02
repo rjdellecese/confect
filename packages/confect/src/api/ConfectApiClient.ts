@@ -5,6 +5,7 @@ import * as ConfectApi from "./ConfectApi";
 import * as ConfectApiFunctionPath from "./ConfectApiFunctionPath";
 import * as ConfectApiGroup from "./ConfectApiGroup";
 
+// TODO: Recurse.
 export type ConfectApiClient<
   Api extends ConfectApi.ConfectApi<
     string,

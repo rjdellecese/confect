@@ -9,7 +9,21 @@ import * as ConfectApiGroup from "./ConfectApiGroup";
 import * as ConfectApiServer from "./ConfectApiServer";
 import * as ConfectApiWithDatabaseSchema from "./ConfectApiWithDatabaseSchema";
 
-const Group = ConfectApiGroup.make("group")
+/*
+api
+├── groupA
+│   ├── myFunction
+│   └── myFunction2
+└── groupB
+    ├── groupBC
+    │   └── myFunction3
+    └── groupBD
+        ├── myFunction4
+        └── groupBDE
+            └── myFunction5
+*/
+
+const GroupA = ConfectApiGroup.make("groupA")
   .addFunction(
     ConfectApiFunction.make("Query")({
       name: "myFunction",
@@ -25,7 +39,7 @@ const Group = ConfectApiGroup.make("group")
     })
   );
 
-const Group2 = ConfectApiGroup.make("group2").addFunction(
+const GroupBC = ConfectApiGroup.make("groupBC").addFunction(
   ConfectApiFunction.make("Query")({
     name: "myFunction3",
     args: Schema.Struct({ foo: Schema.Number }),
@@ -33,9 +47,15 @@ const Group2 = ConfectApiGroup.make("group2").addFunction(
   })
 );
 
-const Group5 = ConfectApiGroup.make("group5");
+const GroupBDE = ConfectApiGroup.make("groupBDE").addFunction(
+  ConfectApiFunction.make("Query")({
+    name: "myFunction5",
+    args: Schema.Struct({}),
+    returns: Schema.String,
+  })
+);
 
-const Group3 = ConfectApiGroup.make("group3")
+const GroupBD = ConfectApiGroup.make("groupBD")
   .addFunction(
     ConfectApiFunction.make("Query")({
       name: "myFunction4",
@@ -43,9 +63,11 @@ const Group3 = ConfectApiGroup.make("group3")
       returns: Schema.String,
     })
   )
-  .addGroup(Group5);
+  .addGroup(GroupBDE);
 
-const Group4 = ConfectApiGroup.make("group4").addGroup(Group2).addGroup(Group3);
+const GroupB = ConfectApiGroup.make("groupB")
+  .addGroup(GroupBC)
+  .addGroup(GroupBD);
 
 const confectSchemaDefinition = defineConfectSchema({
   notes: defineConfectTable(
@@ -55,82 +77,66 @@ const confectSchemaDefinition = defineConfectSchema({
   ),
 });
 
-const Api = ConfectApi.make("Api").add(Group).add(Group4);
+const Api = ConfectApi.make("api").add(GroupA).add(GroupB);
+
+type ApiGroups = ConfectApi.ConfectApi.Groups<typeof Api>;
 
 const ApiWithDatabaseSchema = ConfectApiWithDatabaseSchema.make(
   confectSchemaDefinition,
   Api
 );
 
-const GroupLive = ConfectApiBuilder.group(
+const GroupALive = ConfectApiBuilder.group(
   ApiWithDatabaseSchema,
-  "group",
+  "groupA",
   (handlers) =>
     handlers
       .handle("myFunction", (args) => Effect.succeed(`foo: ${args.foo}`))
       .handle("myFunction2", (args) => Effect.succeed(`foo: ${args.foo}`))
 );
 
-type GroupLiveSuccess = Layer.Layer.Success<typeof GroupLive>;
-type GroupLiveError = Layer.Layer.Error<typeof GroupLive>;
-type GroupLiveContext = Layer.Layer.Context<typeof GroupLive>;
-
-const Group2Live = ConfectApiBuilder.group(
+const GroupBCLive = ConfectApiBuilder.group(
   ApiWithDatabaseSchema,
-  "group4.group2",
+  "groupB.groupBC",
   (handlers) =>
     handlers.handle("myFunction3", (args) => Effect.succeed(`foo: ${args.foo}`))
 );
 
-type Group2LiveSuccess = Layer.Layer.Success<typeof Group2Live>;
-type Group2LiveError = Layer.Layer.Error<typeof Group2Live>;
-type Group2LiveContext = Layer.Layer.Context<typeof Group2Live>;
-
-const Group5Live = ConfectApiBuilder.group(
+const GroupBDELive = ConfectApiBuilder.group(
   ApiWithDatabaseSchema,
-  "group4.group3.group5",
-  (handlers) => handlers
+  "groupB.groupBD.groupBDE",
+  (handlers) =>
+    handlers.handle("myFunction5", () => Effect.succeed("myFunction5"))
 );
 
-type Group5LiveSuccess = Layer.Layer.Success<typeof Group5Live>;
-type Group5LiveError = Layer.Layer.Error<typeof Group5Live>;
-type Group5LiveContext = Layer.Layer.Context<typeof Group5Live>;
-
-const Group3Live = ConfectApiBuilder.group(
+const GroupBDLive = ConfectApiBuilder.group(
   ApiWithDatabaseSchema,
-  "group4.group3",
+  "groupB.groupBD",
   (handlers) =>
     handlers.handle("myFunction4", (args) => Effect.succeed(`foo: ${args.foo}`))
-).pipe(Layer.provide(Group5Live));
+).pipe(Layer.provide(GroupBDELive));
 
-type Group3LiveSuccess = Layer.Layer.Success<typeof Group3Live>;
-type Group3LiveError = Layer.Layer.Error<typeof Group3Live>;
-type Group3LiveContext = Layer.Layer.Context<typeof Group3Live>;
-
-const Group4Live = ConfectApiBuilder.group(
+const GroupBLive = ConfectApiBuilder.group(
   ApiWithDatabaseSchema,
-  "group4",
+  "groupB",
   (handlers) => handlers
-).pipe(Layer.provide(Group2Live), Layer.provide(Group3Live));
+).pipe(Layer.provide(GroupBCLive), Layer.provide(GroupBDLive));
 
-type Group4LiveSuccess = Layer.Layer.Success<typeof Group4Live>;
-type Group4LiveError = Layer.Layer.Error<typeof Group4Live>;
-type Group4LiveContext = Layer.Layer.Context<typeof Group4Live>;
+const ApiLayer = ConfectApiBuilder.api(ApiWithDatabaseSchema);
+type ApiWithDatabaseSchemaContext = Layer.Layer.Context<typeof ApiLayer>;
 
 const ApiLive = ConfectApiBuilder.api(ApiWithDatabaseSchema).pipe(
-  Layer.provide(GroupLive),
-  Layer.provide(Group4Live)
+  Layer.provide(GroupALive),
+  Layer.provide(GroupBLive)
 );
-
-type ApiLiveSuccess = Layer.Layer.Success<typeof ApiLive>;
-type ApiLiveError = Layer.Layer.Error<typeof ApiLive>;
-type ApiLiveContext = Layer.Layer.Context<typeof ApiLive>;
 
 const client = ConfectApiClient.make(
   Api,
   new ConvexReactClient("http://localhost:3000")
 );
 
-const myFunctionResult = client.group.myFunction({ foo: 1 });
+const myFunctionResult = client.groupA.myFunction({ foo: 1 });
 
-const server = ConfectApiServer.make(ApiWithDatabaseSchema, ApiLive);
+const server = ConfectApiServer.make(ApiWithDatabaseSchema, ApiLive).pipe(
+  Effect.runPromise
+);
