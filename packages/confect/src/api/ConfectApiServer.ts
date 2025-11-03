@@ -8,7 +8,18 @@ import {
   queryGeneric,
   RegisteredQuery,
 } from "convex/server";
-import { Effect, hole, Layer, Match, pipe, Schema, Scope, Types } from "effect";
+import {
+  Array,
+  Effect,
+  Exit,
+  hole,
+  Layer,
+  Match,
+  pipe,
+  Schema,
+  Scope,
+  Types,
+} from "effect";
 import {
   ConfectScheduler,
   ConfectVectorSearch,
@@ -49,6 +60,7 @@ import { confectVectorSearchLayer } from "../server/vector_search";
 import * as ConfectApiBuilder from "./ConfectApiBuilder";
 import { ConfectApiFunction, Handler } from "./ConfectApiFunction";
 import * as ConfectApiGroup from "./ConfectApiGroup";
+import * as ConfectApiRegistry from "./ConfectApiRegistry";
 import * as ConfectApiWithDatabaseSchema from "./ConfectApiWithDatabaseSchema";
 
 export const TypeId = Symbol.for("@rjdellecese/confect/ConfectApiServer");
@@ -99,19 +111,23 @@ export const make = <
     ApiName,
     Groups
   >,
-  apiServiceLayer: Layer.Layer<
-    ConfectApiBuilder.ConfectApiService<ConfectSchema, ApiName, Groups>
-  >
+  apiServiceLayer: Layer.Layer<ConfectApiBuilder.ConfectApiServiceNew>
 ): Effect.Effect<ConfectApiServer<Groups>> =>
   Effect.gen(function* () {
     const scope = yield* Scope.make();
     const context = yield* Layer.buildWithScope(apiServiceLayer, scope);
 
-    context.unsafeMap;
-    console.dir(context, { depth: null, colors: true });
+    const registry = yield* ConfectApiRegistry.ConfectApiRegistry;
+    const values = yield* registry.entries();
+
+    const valuesArray = Array.fromIterable(values);
+    console.log("final state");
+    console.dir(valuesArray, { depth: null, colors: true });
+
+    yield* Scope.close(scope, Exit.void);
 
     return yield* Effect.succeed<any>(hole());
-  });
+  }).pipe(Effect.provide(ConfectApiRegistry.ConfectApiRegistry.Default));
 
 const makeRegisteredFunction = <
   ConfectApiWithDatabaseSchema extends

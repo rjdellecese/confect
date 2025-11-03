@@ -7,6 +7,7 @@ export declare namespace ConfectApiFunctionPath {
   export type Any = ConfectApiFunctionPath<string, string>;
 }
 
+// TODO
 export const make = <GroupName extends string, FunctionName extends string>(
   groupName: GroupName,
   functionName: FunctionName

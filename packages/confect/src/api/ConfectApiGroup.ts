@@ -188,6 +188,7 @@ const makeProto = <
     groups,
   });
 
+// TODO: Validate name (must be a valid JavaScript identifier)
 export const make = <
   ConfectSchema extends GenericConfectSchema,
   const Name extends string,

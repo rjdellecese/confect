@@ -79,8 +79,6 @@ const confectSchemaDefinition = defineConfectSchema({
 
 const Api = ConfectApi.make("api").add(GroupA).add(GroupB);
 
-type ApiGroups = ConfectApi.ConfectApi.Groups<typeof Api>;
-
 const ApiWithDatabaseSchema = ConfectApiWithDatabaseSchema.make(
   confectSchemaDefinition,
   Api
@@ -121,9 +119,6 @@ const GroupBLive = ConfectApiBuilder.group(
   "groupB",
   (handlers) => handlers
 ).pipe(Layer.provide(GroupBCLive), Layer.provide(GroupBDLive));
-
-const ApiLayer = ConfectApiBuilder.api(ApiWithDatabaseSchema);
-type ApiWithDatabaseSchemaContext = Layer.Layer.Context<typeof ApiLayer>;
 
 const ApiLive = ConfectApiBuilder.api(ApiWithDatabaseSchema).pipe(
   Layer.provide(GroupALive),

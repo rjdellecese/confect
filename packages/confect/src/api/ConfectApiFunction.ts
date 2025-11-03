@@ -233,6 +233,7 @@ const Proto = {
   [TypeId]: TypeId,
 };
 
+// TODO: Validate name (must be a valid JavaScript identifier)
 export const make =
   <FunctionType extends ConfectApiFunction.FunctionType>(
     functionType: FunctionType

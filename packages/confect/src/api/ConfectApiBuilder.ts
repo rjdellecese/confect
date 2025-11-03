@@ -1,6 +1,7 @@
 import {
   Array,
   Context,
+  Effect,
   Function,
   Layer,
   Order,
@@ -16,6 +17,7 @@ import {
 } from "../server/schema";
 import * as ConfectApiFunction from "./ConfectApiFunction";
 import * as ConfectApiGroup from "./ConfectApiGroup";
+import * as ConfectApiRegistry from "./ConfectApiRegistry";
 import * as ConfectApiWithDatabaseSchema from "./ConfectApiWithDatabaseSchema";
 
 export const HandlersTypeId = Symbol.for("@rjdellecese/confect/Handlers");
@@ -42,12 +44,31 @@ export interface Handlers<
 }
 
 export declare namespace Handlers {
+  export interface Any {
+    readonly [HandlersTypeId]: {
+      _Functions: Types.Covariant<ConfectApiFunction.ConfectApiFunction.AnyWithProps>;
+    };
+  }
+
+  export interface AnyWithProps
+    extends Handlers<
+      GenericConfectSchema,
+      ConfectApiFunction.ConfectApiFunction.AnyWithProps
+    > {}
+
   export interface Item<
     ConfectSchema extends GenericConfectSchema,
     Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
   > {
     readonly function_: Function;
     readonly handler: ConfectApiFunction.Handler<ConfectSchema, Function>;
+  }
+
+  export namespace Item {
+    export interface AnyWithProps {
+      readonly function_: ConfectApiFunction.ConfectApiFunction.AnyWithProps;
+      readonly handler: ConfectApiFunction.Handler.AnyWithProps;
+    }
   }
 
   export type FromGroup<
@@ -107,7 +128,7 @@ export const group = <
   const ApiName extends string,
   Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
   const GroupPath extends ConfectApiGroup.ConfectApiGroup.Path<Groups>,
-  Return,
+  Return extends Handlers.AnyWithProps,
 >(
   apiWithDatabaseSchema: ConfectApiWithDatabaseSchema.ConfectApiWithDatabaseSchema<
     ConfectSchema,
@@ -141,6 +162,7 @@ export const group = <
     "."
   );
 
+  // TODO: Move this implementation to a module for handling paths/group paths
   const group = Array.reduce(
     restGroupPathParts,
     apiWithDatabaseSchema.api.groups[
@@ -150,34 +172,28 @@ export const group = <
       currentGroup.groups[groupPathPart as keyof typeof currentGroup.groups]!
   );
 
-  const items: any[] = [];
+  const items = Array.empty();
 
-  return Layer.succeed(
-    ConfectApiGroupService<
-      ConfectSchema,
-      ApiName,
-      ConfectApiGroup.ConfectApiGroup.WithPath<Groups, GroupPath>
-    >({
-      apiName: apiWithDatabaseSchema.api.name,
-      group: group as ConfectApiGroup.ConfectApiGroup.WithPath<
-        Groups,
-        GroupPath
-      >,
-    }),
-    {
-      apiName: apiWithDatabaseSchema.api.name,
-      groupName: group.name,
-      handlers: build(
-        makeHandlers({
-          group,
-          items,
+  return Layer.scopedDiscard(
+    Effect.gen(function* () {
+      const registry = yield* ConfectApiRegistry.ConfectApiRegistry;
+
+      const handlers = build(
+        makeHandlers({ group, items })
+      ) as Handlers.AnyWithProps;
+
+      yield* Effect.forEach(handlers.items, (handlerItem) =>
+        Effect.gen(function* () {
+          const functionPath = Array.join(
+            [groupPath, handlerItem.function_.name],
+            "."
+          );
+
+          return yield* registry.add(functionPath, handlerItem);
         })
-      ) as unknown as Handlers.FromGroup<
-        ConfectSchema,
-        ConfectApiGroup.ConfectApiGroup.WithPath<Groups, GroupPath>
-      >,
-    }
-  );
+      );
+    })
+  ) as any;
 };
 
 export const api = <
@@ -191,20 +207,16 @@ export const api = <
     Groups
   >
 ): Layer.Layer<
-  ConfectApiService<ConfectSchema, ApiName, Groups>,
+  ConfectApiServiceNew,
   never,
   ConfectApiGroupService.FromGroups<ConfectSchema, ApiName, Groups>
 > =>
-  Layer.succeed(
-    ConfectApiService<ConfectSchema, ApiName, Groups>(
-      apiWithDatabaseSchema.confectSchemaDefinition,
-      apiWithDatabaseSchema.api.name,
-      apiWithDatabaseSchema.api.groups
-    ),
-    {
-      apiName: apiWithDatabaseSchema.api.name,
-      groups: apiWithDatabaseSchema.api.groups,
-    }
+  Layer.effect(
+    ConfectApiServiceNew,
+    Effect.map(Effect.context(), (context) => ({
+      apiWithDatabaseSchema,
+      context,
+    }))
   );
 
 export interface ConfectApiGroupService<
@@ -285,3 +297,13 @@ export const ConfectApiService = <
     `@rjdellecese/confect/ConfectApiService/${tableNamesIdentifier}/${apiName}/${groupNamesIdentifier}`
   );
 };
+
+export class ConfectApiServiceNew extends Context.Tag(
+  "@rjdellecese/confect/ConfectApiServiceNew"
+)<
+  ConfectApiServiceNew,
+  {
+    readonly apiWithDatabaseSchema: ConfectApiWithDatabaseSchema.ConfectApiWithDatabaseSchema.AnyWithProps;
+    readonly context: Context.Context<never>;
+  }
+>() {}
