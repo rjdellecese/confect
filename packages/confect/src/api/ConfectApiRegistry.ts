@@ -24,11 +24,7 @@ export class ConfectApiRegistry extends Effect.Service<ConfectApiRegistry>()(
           Ref.get(registeredFunctionsRef).pipe(
             Effect.map(HashMap.unsafeGet(functionPath))
           ),
-        entries: (): Effect.Effect<
-          IterableIterator<
-            [string, ConfectApiBuilder.Handlers.Item.AnyWithProps]
-          >
-        > => Ref.get(registeredFunctionsRef).pipe(Effect.map(HashMap.entries)),
+        registeredFunctions: Ref.get(registeredFunctionsRef),
       };
     }),
   }

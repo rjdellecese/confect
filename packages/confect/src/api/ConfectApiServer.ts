@@ -1,23 +1,24 @@
 import {
   actionGeneric,
   DefaultFunctionArgs,
+  FunctionVisibility,
   GenericActionCtx,
   GenericMutationCtx,
   GenericQueryCtx,
   mutationGeneric,
   queryGeneric,
+  RegisteredAction,
+  RegisteredMutation,
   RegisteredQuery,
 } from "convex/server";
 import {
-  Array,
   Effect,
-  Exit,
-  hole,
+  HashMap,
   Layer,
   Match,
   pipe,
+  Predicate,
   Schema,
-  Scope,
   Types,
 } from "effect";
 import {
@@ -58,89 +59,74 @@ import {
 } from "../server/storage";
 import { confectVectorSearchLayer } from "../server/vector_search";
 import * as ConfectApiBuilder from "./ConfectApiBuilder";
-import { ConfectApiFunction, Handler } from "./ConfectApiFunction";
-import * as ConfectApiGroup from "./ConfectApiGroup";
 import * as ConfectApiRegistry from "./ConfectApiRegistry";
 import * as ConfectApiWithDatabaseSchema from "./ConfectApiWithDatabaseSchema";
+
+type RegisteredFunction =
+  | RegisteredQuery<FunctionVisibility, DefaultFunctionArgs, any>
+  | RegisteredMutation<FunctionVisibility, DefaultFunctionArgs, any>
+  | RegisteredAction<FunctionVisibility, DefaultFunctionArgs, any>;
 
 export const TypeId = Symbol.for("@rjdellecese/confect/ConfectApiServer");
 
 export type TypeId = typeof TypeId;
 
+export const isConfectApiServer = (u: unknown): u is ConfectApiServer =>
+  Predicate.hasProperty(u, TypeId);
+
 // TODO: Recurse.
-export type ConfectApiServer<
-  Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
-> = Types.Simplify<
-  {
-    readonly [TypeId]: TypeId;
-  } & {
-    readonly [GroupName in Groups["name"]]: {
-      [FunctionName in keyof Extract<
-        Groups,
-        { name: GroupName }
-      >["functions"]]: RegisteredQuery<
-        "public",
-        Extract<
-          Groups,
-          { name: GroupName }
-        >["functions"][FunctionName]["args"]["Encoded"],
-        Extract<
-          Groups,
-          { name: GroupName }
-        >["functions"][FunctionName]["returns"]["Encoded"]
-      >;
-    };
-  }
->;
+export type ConfectApiServer = Types.Simplify<{
+  readonly [TypeId]: TypeId;
+  readonly convexApi: HashMap.HashMap<string, RegisteredFunction>;
+}>;
 
-/*
- * {
- *   "groupA.groupAB.functionA": SpecWithImpl
- * }
- *
- * { path: string; function: F}[]
- */
+const Proto = {
+  [TypeId]: TypeId,
+};
 
-export const make = <
-  ConfectSchema extends GenericConfectSchema,
-  ApiName extends string,
-  Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
->(
-  apiWithDatabaseSchema: ConfectApiWithDatabaseSchema.ConfectApiWithDatabaseSchema<
-    ConfectSchema,
-    ApiName,
-    Groups
-  >,
+const make_ = ({
+  convexApi,
+}: {
+  convexApi: HashMap.HashMap<string, RegisteredFunction>;
+}): ConfectApiServer =>
+  Object.assign(Object.create(Proto), {
+    convexApi,
+  });
+
+export const make = (
   apiServiceLayer: Layer.Layer<ConfectApiBuilder.ConfectApiServiceNew>
-): Effect.Effect<ConfectApiServer<Groups>> =>
+): Effect.Effect<ConfectApiServer> =>
   Effect.gen(function* () {
-    const scope = yield* Scope.make();
-    const context = yield* Layer.buildWithScope(apiServiceLayer, scope);
-
+    const { apiWithDatabaseSchema } =
+      yield* ConfectApiBuilder.ConfectApiServiceNew;
     const registry = yield* ConfectApiRegistry.ConfectApiRegistry;
-    const values = yield* registry.entries();
 
-    const valuesArray = Array.fromIterable(values);
-    console.log("final state");
-    console.dir(valuesArray, { depth: null, colors: true });
+    const registeredFunctions = yield* registry.registeredFunctions;
 
-    yield* Scope.close(scope, Exit.void);
+    const convexApi = HashMap.map(registeredFunctions, (handlerItem) =>
+      makeRegisteredFunction(apiWithDatabaseSchema, handlerItem)
+    );
 
-    return yield* Effect.succeed<any>(hole());
-  }).pipe(Effect.provide(ConfectApiRegistry.ConfectApiRegistry.Default));
+    const server = make_({
+      convexApi,
+    });
+
+    return yield* Effect.succeed(server);
+  }).pipe(
+    Effect.provide(
+      apiServiceLayer.pipe(
+        Layer.provideMerge(ConfectApiRegistry.ConfectApiRegistry.Default)
+      )
+    )
+  );
 
 const makeRegisteredFunction = <
   ConfectApiWithDatabaseSchema extends
     ConfectApiWithDatabaseSchema.ConfectApiWithDatabaseSchema.AnyWithProps,
-  Function extends ConfectApiFunction.AnyWithProps,
 >(
   apiWithDatabaseSchema: ConfectApiWithDatabaseSchema,
-  function_: Function,
-  handler: Handler<
-    ConfectApiWithDatabaseSchema.ConfectApiWithDatabaseSchema.ConfectSchema<ConfectApiWithDatabaseSchema>,
-    Function
-  >
-): ConfectApiFunction.ToRegisteredFunction<Function> =>
+  { function_, handler }: ConfectApiBuilder.Handlers.Item.AnyWithProps
+): RegisteredFunction =>
   Match.value(function_.functionType).pipe(
     Match.when("Query", () =>
       queryGeneric(
@@ -170,7 +156,7 @@ const makeRegisteredFunction = <
       )
     ),
     Match.exhaustive
-  ) as ConfectApiFunction.ToRegisteredFunction<Function>;
+  );
 
 const confectQueryFunction = <
   ConfectSchema extends GenericConfectSchema,

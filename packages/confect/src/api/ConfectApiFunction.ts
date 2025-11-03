@@ -254,6 +254,6 @@ export const make =
     Object.assign(Object.create(Proto), {
       functionType,
       name,
-      argsSchema: args,
-      returnsSchema: returns,
+      args,
+      returns,
     });

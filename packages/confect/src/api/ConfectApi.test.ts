@@ -132,6 +132,8 @@ const client = ConfectApiClient.make(
 
 const myFunctionResult = client.groupA.myFunction({ foo: 1 });
 
-const server = ConfectApiServer.make(ApiWithDatabaseSchema, ApiLive).pipe(
-  Effect.runPromise
-);
+const server = ConfectApiServer.make(ApiLive)
+  .pipe(Effect.runPromise)
+  .then((s) => {
+    console.log(s);
+  });
