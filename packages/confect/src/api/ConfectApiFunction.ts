@@ -1,8 +1,3 @@
-import {
-  RegisteredAction,
-  RegisteredMutation,
-  RegisteredQuery,
-} from "convex/server";
 import { Effect, Predicate, Schema } from "effect";
 import {
   ConfectScheduler,
@@ -40,12 +35,14 @@ export const isConfectApiFunction = (
 
 export interface ConfectApiFunction<
   FunctionType extends ConfectApiFunction.FunctionType,
+  FunctionVisibility extends ConfectApiFunction.FunctionVisibility,
   Name extends string,
   Args extends Schema.Schema.AnyNoContext,
   Returns extends Schema.Schema.AnyNoContext,
 > {
   readonly [TypeId]: TypeId;
   readonly functionType: FunctionType;
+  readonly functionVisibility: FunctionVisibility;
   readonly name: Name;
   readonly args: Args;
   readonly returns: Returns;
@@ -55,6 +52,7 @@ export declare namespace ConfectApiFunction {
   export interface AnyWithProps
     extends ConfectApiFunction<
       FunctionType,
+      FunctionVisibility,
       string,
       Schema.Schema.AnyNoContext,
       Schema.Schema.AnyNoContext
@@ -64,6 +62,7 @@ export declare namespace ConfectApiFunction {
     FunctionType_ extends FunctionType,
   > extends ConfectApiFunction<
       FunctionType_,
+      FunctionVisibility,
       string,
       Schema.Schema.AnyNoContext,
       Schema.Schema.AnyNoContext
@@ -71,9 +70,12 @@ export declare namespace ConfectApiFunction {
 
   export type FunctionType = "Query" | "Mutation" | "Action";
 
+  export type FunctionVisibility = "Public" | "Internal";
+
   export type Name<Function extends AnyWithProps> =
     Function extends ConfectApiFunction<
       infer _FunctionType,
+      infer _FunctionVisibility,
       infer Name,
       infer _Args,
       infer _Returns
@@ -84,6 +86,7 @@ export declare namespace ConfectApiFunction {
   export type Args<Function extends AnyWithProps> =
     Function extends ConfectApiFunction<
       infer _FunctionType,
+      infer _FunctionVisibility,
       infer _Name,
       infer Args,
       infer _Returns
@@ -94,6 +97,7 @@ export declare namespace ConfectApiFunction {
   export type Returns<Function extends AnyWithProps> =
     Function extends ConfectApiFunction<
       infer _FunctionType,
+      infer _FunctionVisibility,
       infer _Name,
       infer _Args,
       infer Returns
@@ -115,36 +119,6 @@ export declare namespace ConfectApiFunction {
     Function extends AnyWithProps,
     Name extends string,
   > = Exclude<Function, { readonly name: Name }>;
-
-  export type IsQuery<Function extends AnyWithProps> =
-    Function extends WithFunctionType<Function, "Query"> ? true : false;
-
-  export type IsMutation<Function extends AnyWithProps> =
-    Function extends WithFunctionType<Function, "Mutation"> ? true : false;
-
-  export type IsAction<Function extends AnyWithProps> =
-    Function extends WithFunctionType<Function, "Action"> ? true : false;
-
-  export type ToRegisteredFunction<Function extends AnyWithProps> =
-    ConfectApiFunction.IsQuery<Function> extends true
-      ? RegisteredQuery<
-          "public",
-          ConfectApiFunction.Args<Function>["Encoded"],
-          Promise<ConfectApiFunction.Returns<Function>["Encoded"]>
-        >
-      : ConfectApiFunction.IsMutation<Function> extends true
-        ? RegisteredMutation<
-            "public",
-            ConfectApiFunction.Args<Function>["Encoded"],
-            Promise<ConfectApiFunction.Returns<Function>["Encoded"]>
-          >
-        : ConfectApiFunction.IsAction<Function> extends true
-          ? RegisteredAction<
-              "public",
-              ConfectApiFunction.Args<Function>["Encoded"],
-              Promise<ConfectApiFunction.Returns<Function>["Encoded"]>
-            >
-          : never;
 }
 
 export type Handler<
@@ -157,8 +131,7 @@ export type Handler<
       ? MutationHandler<ConfectSchema, Function>
       : Function extends ConfectApiFunction.WithFunctionType<Function, "Action">
         ? ActionHandler<ConfectSchema, Function>
-        : // TODO: `never` instead?
-          BaseHandler<Function, any>;
+        : never;
 
 export type QueryHandler<
   ConfectSchema extends GenericConfectSchema,
@@ -205,16 +178,9 @@ export type ActionHandler<
   | ConvexActionCtx<DataModelFromConfectSchema<ConfectSchema>>
 >;
 
-type BaseHandler<
-  Function extends ConfectApiFunction.AnyWithProps,
-  Requirements,
-> = <E>(
+type BaseHandler<Function extends ConfectApiFunction.AnyWithProps, R> = (
   args: ConfectApiFunction.Args<Function>["Type"]
-) => Effect.Effect<
-  ConfectApiFunction.Returns<Function>["Type"],
-  E,
-  Requirements
->;
+) => Effect.Effect<ConfectApiFunction.Returns<Function>["Type"], never, R>;
 
 export declare namespace Handler {
   export type AnyWithProps = Handler<
@@ -234,9 +200,13 @@ const Proto = {
 };
 
 // TODO: Validate name (must be a valid JavaScript identifier)
-export const make =
-  <FunctionType extends ConfectApiFunction.FunctionType>(
-    functionType: FunctionType
+const make =
+  <
+    FunctionType extends ConfectApiFunction.FunctionType,
+    FunctionVisibility extends ConfectApiFunction.FunctionVisibility,
+  >(
+    functionType: FunctionType,
+    functionVisibility: FunctionVisibility
   ) =>
   <
     const Name extends string,
@@ -250,10 +220,26 @@ export const make =
     name: Name;
     args: Args;
     returns: Returns;
-  }): ConfectApiFunction<FunctionType, Name, Args, Returns> =>
+  }): ConfectApiFunction<
+    FunctionType,
+    FunctionVisibility,
+    Name,
+    Args,
+    Returns
+  > =>
     Object.assign(Object.create(Proto), {
       functionType,
+      functionVisibility,
       name,
       args,
       returns,
     });
+
+export const internalQuery = make("Query", "Internal");
+export const query = make("Query", "Public");
+
+export const internalMutation = make("Mutation", "Internal");
+export const mutation = make("Mutation", "Public");
+
+export const internalAction = make("Action", "Internal");
+export const action = make("Action", "Public");

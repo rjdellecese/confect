@@ -27,7 +27,6 @@ export interface ConfectApiGroup<
     [GroupName in Groups["name"]]: Extract<Groups, { name: GroupName }>;
   };
 
-  // TODO: `addQuery`, `addMutation`, `addAction`?
   addFunction<
     Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
   >(
@@ -131,16 +130,6 @@ export declare namespace ConfectApiGroup {
         : never
       : WithName<Group, Path>
     : never;
-
-  export type HandlersFrom<
-    ConfectSchema extends GenericConfectSchema,
-    Functions extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
-  > = {
-    readonly [Function in Functions as Function["name"]]: ConfectApiFunction.Handler<
-      ConfectSchema,
-      Function
-    >;
-  };
 }
 
 const Proto = {

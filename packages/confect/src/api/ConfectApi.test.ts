@@ -1,6 +1,10 @@
 import { ConvexReactClient } from "convex/react";
 import { Effect, Layer, Schema } from "effect";
 import { defineConfectSchema, defineConfectTable } from "../server";
+import {
+  ConfectDatabaseReader,
+  ConfectDatabaseWriter,
+} from "../server/database";
 import * as ConfectApi from "./ConfectApi";
 import * as ConfectApiBuilder from "./ConfectApiBuilder";
 import * as ConfectApiClient from "./ConfectApiClient";
@@ -10,29 +14,29 @@ import * as ConfectApiServer from "./ConfectApiServer";
 import * as ConfectApiWithDatabaseSchema from "./ConfectApiWithDatabaseSchema";
 
 /*
-api
-├── groupA
-│   ├── myFunction
-│   └── myFunction2
-└── groupB
-    ├── groupBC
-    │   └── myFunction3
-    └── groupBD
-        ├── myFunction4
-        └── groupBDE
-            └── myFunction5
-*/
+ * api
+ * ├── groupA
+ * │   ├── myFunction
+ * │   └── myFunction2
+ * └── groupB
+ *     ├── groupBC
+ *     │   └── myFunction3
+ *     └── groupBD
+ *         ├── myFunction4
+ *         └── groupBDE
+ *             └── myFunction5
+ */
 
 const GroupA = ConfectApiGroup.make("groupA")
   .addFunction(
-    ConfectApiFunction.make("Query")({
+    ConfectApiFunction.mutation({
       name: "myFunction",
       args: Schema.Struct({ foo: Schema.Number }),
       returns: Schema.String,
     })
   )
   .addFunction(
-    ConfectApiFunction.make("Query")({
+    ConfectApiFunction.query({
       name: "myFunction2",
       args: Schema.Struct({ foo: Schema.Number }),
       returns: Schema.String,
@@ -40,7 +44,7 @@ const GroupA = ConfectApiGroup.make("groupA")
   );
 
 const GroupBC = ConfectApiGroup.make("groupBC").addFunction(
-  ConfectApiFunction.make("Query")({
+  ConfectApiFunction.query({
     name: "myFunction3",
     args: Schema.Struct({ foo: Schema.Number }),
     returns: Schema.String,
@@ -48,7 +52,7 @@ const GroupBC = ConfectApiGroup.make("groupBC").addFunction(
 );
 
 const GroupBDE = ConfectApiGroup.make("groupBDE").addFunction(
-  ConfectApiFunction.make("Query")({
+  ConfectApiFunction.query({
     name: "myFunction5",
     args: Schema.Struct({}),
     returns: Schema.String,
@@ -57,7 +61,7 @@ const GroupBDE = ConfectApiGroup.make("groupBDE").addFunction(
 
 const GroupBD = ConfectApiGroup.make("groupBD")
   .addFunction(
-    ConfectApiFunction.make("Query")({
+    ConfectApiFunction.query({
       name: "myFunction4",
       args: Schema.Struct({ foo: Schema.Number }),
       returns: Schema.String,
@@ -77,6 +81,8 @@ const confectSchemaDefinition = defineConfectSchema({
   ),
 });
 
+type ConfectSchemaDefinition = typeof confectSchemaDefinition;
+
 const Api = ConfectApi.make("api").add(GroupA).add(GroupB);
 
 const ApiWithDatabaseSchema = ConfectApiWithDatabaseSchema.make(
@@ -89,7 +95,21 @@ const GroupALive = ConfectApiBuilder.group(
   "groupA",
   (handlers) =>
     handlers
-      .handle("myFunction", (args) => Effect.succeed(`foo: ${args.foo}`))
+      .handle("myFunction", (args) =>
+        Effect.gen(function* () {
+          const reader =
+            yield* ConfectDatabaseReader<ConfectSchemaDefinition>();
+          const writer =
+            yield* ConfectDatabaseWriter<ConfectSchemaDefinition>();
+
+          const a = yield* reader
+            .table("notes")
+            .index("by_id", "asc")
+            .collect();
+
+          return yield* Effect.succeed("test");
+        }).pipe(Effect.orDie)
+      )
       .handle("myFunction2", (args) => Effect.succeed(`foo: ${args.foo}`))
 );
 

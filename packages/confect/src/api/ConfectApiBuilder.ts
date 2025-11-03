@@ -1,20 +1,5 @@
-import {
-  Array,
-  Context,
-  Effect,
-  Function,
-  Layer,
-  Order,
-  pipe,
-  Record,
-  String,
-  Struct,
-  Types,
-} from "effect";
-import {
-  ConfectSchemaDefinition,
-  GenericConfectSchema,
-} from "../server/schema";
+import { Array, Context, Effect, Function, Layer, String, Types } from "effect";
+import { GenericConfectSchema } from "../server/schema";
 import * as ConfectApiFunction from "./ConfectApiFunction";
 import * as ConfectApiGroup from "./ConfectApiGroup";
 import * as ConfectApiRegistry from "./ConfectApiRegistry";
@@ -207,12 +192,12 @@ export const api = <
     Groups
   >
 ): Layer.Layer<
-  ConfectApiServiceNew,
+  ConfectApiService,
   never,
   ConfectApiGroupService.FromGroups<ConfectSchema, ApiName, Groups>
 > =>
   Layer.effect(
-    ConfectApiServiceNew,
+    ConfectApiService,
     Effect.map(Effect.context(), (context) => ({
       apiWithDatabaseSchema,
       context,
@@ -255,53 +240,10 @@ export declare namespace ConfectApiGroupService {
     : ConfectApiGroupService<ConfectSchema, ApiName, Groups>;
 }
 
-export interface ConfectApiService<
-  ConfectSchema extends GenericConfectSchema,
-  ApiName extends string,
-  Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
-> {
-  readonly apiName: ApiName;
-
-  readonly groups: {
-    [GroupName in Groups["name"]]: Extract<Groups, { name: GroupName }>;
-  };
-}
-
-export const ConfectApiService = <
-  ConfectSchema extends GenericConfectSchema,
-  ApiName extends string,
-  Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
->(
-  confectSchemaDefinition: ConfectSchemaDefinition<ConfectSchema>,
-  apiName: ApiName,
-  groups: {
-    [GroupName in Groups["name"]]: Extract<Groups, { name: GroupName }>;
-  }
-) => {
-  const tableNamesIdentifier = pipe(
-    confectSchemaDefinition.tableSchemas,
-    Record.keys,
-    Array.sort(Order.string),
-    Array.join("|")
-  );
-
-  // TODO: Recurse
-  const groupNamesIdentifier = pipe(
-    Struct.keys(groups),
-    Array.sort(Order.string),
-    Array.join("|")
-  );
-
-  return Context.GenericTag<ConfectApiService<ConfectSchema, ApiName, Groups>>(
-    // TODO: Maybe just `apiName` would suffice here?
-    `@rjdellecese/confect/ConfectApiService/${tableNamesIdentifier}/${apiName}/${groupNamesIdentifier}`
-  );
-};
-
-export class ConfectApiServiceNew extends Context.Tag(
-  "@rjdellecese/confect/ConfectApiServiceNew"
+export class ConfectApiService extends Context.Tag(
+  "@rjdellecese/confect/ConfectApiService"
 )<
-  ConfectApiServiceNew,
+  ConfectApiService,
   {
     readonly apiWithDatabaseSchema: ConfectApiWithDatabaseSchema.ConfectApiWithDatabaseSchema.AnyWithProps;
     readonly context: Context.Context<never>;

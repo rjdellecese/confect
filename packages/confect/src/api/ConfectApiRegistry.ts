@@ -18,12 +18,6 @@ export class ConfectApiRegistry extends Effect.Service<ConfectApiRegistry>()(
             registeredFunctionsRef,
             HashMap.set(functionPath, handlerItem)
           ),
-        unsafeGet: (
-          functionPath: string
-        ): Effect.Effect<ConfectApiBuilder.Handlers.Item.AnyWithProps> =>
-          Ref.get(registeredFunctionsRef).pipe(
-            Effect.map(HashMap.unsafeGet(functionPath))
-          ),
         registeredFunctions: Ref.get(registeredFunctionsRef),
       };
     }),

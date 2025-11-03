@@ -5,6 +5,9 @@ import {
   GenericActionCtx,
   GenericMutationCtx,
   GenericQueryCtx,
+  internalActionGeneric,
+  internalMutationGeneric,
+  internalQueryGeneric,
   mutationGeneric,
   queryGeneric,
   RegisteredAction,
@@ -94,11 +97,11 @@ const make_ = ({
   });
 
 export const make = (
-  apiServiceLayer: Layer.Layer<ConfectApiBuilder.ConfectApiServiceNew>
+  apiServiceLayer: Layer.Layer<ConfectApiBuilder.ConfectApiService>
 ): Effect.Effect<ConfectApiServer> =>
   Effect.gen(function* () {
     const { apiWithDatabaseSchema } =
-      yield* ConfectApiBuilder.ConfectApiServiceNew;
+      yield* ConfectApiBuilder.ConfectApiService;
     const registry = yield* ConfectApiRegistry.ConfectApiRegistry;
 
     const registeredFunctions = yield* registry.registeredFunctions;
@@ -128,33 +131,51 @@ const makeRegisteredFunction = <
   { function_, handler }: ConfectApiBuilder.Handlers.Item.AnyWithProps
 ): RegisteredFunction =>
   Match.value(function_.functionType).pipe(
-    Match.when("Query", () =>
-      queryGeneric(
+    Match.when("Query", () => {
+      const genericFunction = Match.value(function_.functionVisibility).pipe(
+        Match.when("Public", () => queryGeneric),
+        Match.when("Internal", () => internalQueryGeneric),
+        Match.exhaustive
+      );
+
+      return genericFunction(
         confectQueryFunction(apiWithDatabaseSchema.confectSchemaDefinition, {
           args: function_.args,
           returns: function_.returns,
           handler,
         })
-      )
-    ),
-    Match.when("Mutation", () =>
-      mutationGeneric(
+      );
+    }),
+    Match.when("Mutation", () => {
+      const genericFunction = Match.value(function_.functionVisibility).pipe(
+        Match.when("Public", () => mutationGeneric),
+        Match.when("Internal", () => internalMutationGeneric),
+        Match.exhaustive
+      );
+
+      return genericFunction(
         confectMutationFunction(apiWithDatabaseSchema.confectSchemaDefinition, {
           args: function_.args,
           returns: function_.returns,
           handler,
         })
-      )
-    ),
-    Match.when("Action", () =>
-      actionGeneric(
+      );
+    }),
+    Match.when("Action", () => {
+      const genericFunction = Match.value(function_.functionVisibility).pipe(
+        Match.when("Public", () => actionGeneric),
+        Match.when("Internal", () => internalActionGeneric),
+        Match.exhaustive
+      );
+
+      return genericFunction(
         confectActionFunction(apiWithDatabaseSchema.confectSchemaDefinition, {
           args: function_.args,
           returns: function_.returns,
           handler,
         })
-      )
-    ),
+      );
+    }),
     Match.exhaustive
   );
 
