@@ -112,7 +112,7 @@ export const group = <
   ConfectSchema extends GenericConfectSchema,
   const ApiName extends string,
   Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
-  const GroupPath extends ConfectApiGroup.ConfectApiGroup.Path<Groups>,
+  const GroupPath extends ConfectApiGroup.Path.All<Groups>,
   Return extends Handlers.AnyWithProps,
 >(
   api: ConfectApi.ConfectApi<ConfectSchema, ApiName, Groups>,
@@ -120,7 +120,7 @@ export const group = <
   build: (
     handlers: Handlers.FromGroup<
       ConfectSchema,
-      ConfectApiGroup.ConfectApiGroup.WithPath<Groups, GroupPath>
+      ConfectApiGroup.Path.GroupAt<Groups, GroupPath>
     >
   ) => Handlers.ValidateReturn<Return>
 ): Layer.Layer<
@@ -219,9 +219,9 @@ export declare namespace ConfectApiGroupService {
     GroupPath extends string,
     Group extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
   > =
-    ConfectApiGroup.ConfectApiGroup.SubGroupPathsFromGroupWithPath<
-      GroupPath,
-      Group
+    ConfectApiGroup.Path.SubGroupsAt<
+      Group,
+      GroupPath
     > extends infer SubGroupPaths
       ? SubGroupPaths extends string
         ? ConfectApiGroupService<ApiName, SubGroupPaths>

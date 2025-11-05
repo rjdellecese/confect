@@ -1,6 +1,7 @@
 import { Predicate, Record } from "effect";
 import { GenericConfectSchema } from "../server/schema";
 import * as ConfectApiFunction from "./ConfectApiFunction";
+import { validateJsIdentifier } from "./utils";
 
 export const TypeId = Symbol.for("@rjdellecese/confect/ConfectApiGroup");
 
@@ -60,21 +61,6 @@ export declare namespace ConfectApiGroup {
       ? Name
       : never;
 
-  // Recursively generates paths for a group and its nested groups.
-  // For a group with no subgroups, returns just the group name.
-  // For a group with subgroups, returns the group name plus all possible paths
-  // through its direct subgroups (not all groups in the union).
-  export type Path<Group extends Any> = [Groups<Group>] extends [never]
-    ? Name<Group>
-    : Name<Group> | PathFromGroups<Group, Groups<Group>>;
-
-  type PathFromGroups<
-    Parent extends Any,
-    Groups extends ConfectApiGroup.AnyWithProps,
-  > = Groups extends ConfectApiGroup.AnyWithProps
-    ? `${Name<Parent>}.${Path<Groups>}`
-    : never;
-
   export type Functions<Group extends Any> =
     Group extends ConfectApiGroup<
       infer _ConfectSchema,
@@ -111,6 +97,27 @@ export declare namespace ConfectApiGroup {
     Group,
     { readonly name: Name }
   >;
+}
+
+export declare namespace Path {
+  // Recursively generates paths for a group and its nested groups.
+  // For a group with no subgroups, returns just the group name.
+  // For a group with subgroups, returns the group name plus all possible paths
+  // through its direct subgroups (not all groups in the union).
+  export type All<Group extends ConfectApiGroup.Any> = [
+    ConfectApiGroup.Groups<Group>,
+  ] extends [never]
+    ? ConfectApiGroup.Name<Group>
+    :
+        | ConfectApiGroup.Name<Group>
+        | AllHelper<Group, ConfectApiGroup.Groups<Group>>;
+
+  type AllHelper<
+    Parent extends ConfectApiGroup.Any,
+    Groups extends ConfectApiGroup.AnyWithProps,
+  > = Groups extends ConfectApiGroup.AnyWithProps
+    ? `${ConfectApiGroup.Name<Parent>}.${All<Groups>}`
+    : never;
 
   /**
    * Recursively extracts the group at the given dot-separated path.
@@ -119,26 +126,24 @@ export declare namespace ConfectApiGroup {
    * Example:
    *   type G = WithPath<RootGroup, "group.subgroup">;
    */
-  export type WithPath<Group, Path extends string> = Group extends any
+  export type GroupAt<Group, Path extends string> = Group extends any
     ? Path extends `${infer Head}.${infer Tail}`
       ? Group extends { readonly name: Head }
         ? Group extends {
             readonly groups: Record.ReadonlyRecord<string, infer SubGroup>;
           }
-          ? WithPath<SubGroup, Tail>
+          ? GroupAt<SubGroup, Tail>
           : never
         : never
-      : WithName<Group, Path>
+      : ConfectApiGroup.WithName<Group, Path>
     : never;
 
-  export type SubGroupPathsFromGroupWithPath<
+  export type SubGroupsAt<
+    Group extends ConfectApiGroup.AnyWithProps,
     GroupPath extends string,
-    Group extends AnyWithProps,
   > =
-    ConfectApiGroup.Groups<
-      ConfectApiGroup.WithPath<Group, GroupPath>
-    > extends infer SubGroups
-      ? SubGroups extends AnyWithProps
+    ConfectApiGroup.Groups<GroupAt<Group, GroupPath>> extends infer SubGroups
+      ? SubGroups extends ConfectApiGroup.AnyWithProps
         ? `${GroupPath}.${SubGroups["name"]}`
         : never
       : never;
@@ -189,15 +194,17 @@ const makeProto = <
     groups,
   });
 
-// TODO: Validate name (must be a valid JavaScript identifier)
 export const make = <
   ConfectSchema extends GenericConfectSchema,
   const Name extends string,
 >(
   name: Name
-): ConfectApiGroup<ConfectSchema, Name> =>
-  makeProto({
+): ConfectApiGroup<ConfectSchema, Name> => {
+  validateJsIdentifier(name);
+
+  return makeProto({
     name,
     functions: Record.empty(),
     groups: Record.empty(),
   });
+};

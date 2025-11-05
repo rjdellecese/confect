@@ -24,6 +24,7 @@ import {
   DataModelFromConfectSchema,
   GenericConfectSchema,
 } from "../server/schema";
+import { validateJsIdentifier } from "./utils";
 
 export const TypeId = Symbol.for("@rjdellecese/confect/ConfectApiFunction");
 
@@ -58,9 +59,8 @@ export declare namespace ConfectApiFunction {
       Schema.Schema.AnyNoContext
     > {}
 
-  export interface AnyWithPropsWithFunctionType<
-    FunctionType_ extends FunctionType,
-  > extends ConfectApiFunction<
+  interface AnyWithPropsWithFunctionType<FunctionType_ extends FunctionType>
+    extends ConfectApiFunction<
       FunctionType_,
       FunctionVisibility,
       string,
@@ -199,7 +199,6 @@ const Proto = {
   [TypeId]: TypeId,
 };
 
-// TODO: Validate name (must be a valid JavaScript identifier)
 const make =
   <
     FunctionType extends ConfectApiFunction.FunctionType,
@@ -226,14 +225,17 @@ const make =
     Name,
     Args,
     Returns
-  > =>
-    Object.assign(Object.create(Proto), {
+  > => {
+    validateJsIdentifier(name);
+
+    return Object.assign(Object.create(Proto), {
       functionType,
       functionVisibility,
       name,
       args,
       returns,
     });
+  };
 
 export const internalQuery = make("Query", "Internal");
 export const query = make("Query", "Public");
