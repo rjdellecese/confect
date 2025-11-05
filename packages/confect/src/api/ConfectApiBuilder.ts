@@ -128,19 +128,9 @@ export const group = <
     >
   ) => Handlers.ValidateReturn<Return>
 ): Layer.Layer<
-  ConfectApiGroupService<
-    ConfectSchema,
-    ApiName,
-    ConfectApiGroup.ConfectApiGroup.WithPath<Groups, GroupPath>
-  >,
+  ConfectApiGroupService<ApiName, GroupPath>,
   never,
-  ConfectApiGroupService.FromGroups<
-    ConfectSchema,
-    ApiName,
-    ConfectApiGroup.ConfectApiGroup.Groups<
-      ConfectApiGroup.ConfectApiGroup.WithPath<Groups, GroupPath>
-    >
-  >
+  ConfectApiGroupService.FromGroupWithPath<ApiName, GroupPath, Groups>
 > => {
   const [firstGroupPathPart, ...restGroupPathParts] = String.split(
     groupPath,
@@ -194,7 +184,7 @@ export const api = <
 ): Layer.Layer<
   ConfectApiService,
   never,
-  ConfectApiGroupService.FromGroups<ConfectSchema, ApiName, Groups>
+  ConfectApiGroupService.FromGroups<ApiName, Groups>
 > =>
   Layer.effect(
     ConfectApiService,
@@ -205,39 +195,48 @@ export const api = <
   );
 
 export interface ConfectApiGroupService<
-  ConfectSchema extends GenericConfectSchema,
   ApiName extends string,
-  Group extends ConfectApiGroup.ConfectApiGroup.Any,
+  GroupPath extends string,
 > {
   readonly apiName: ApiName;
-  readonly groupName: Group["name"];
-  readonly handlers: Handlers.FromGroup<ConfectSchema, Group>;
+  readonly groupPath: GroupPath;
 }
 
 export const ConfectApiGroupService = <
-  ConfectSchema extends GenericConfectSchema,
   ApiName extends string,
-  Group extends ConfectApiGroup.ConfectApiGroup.Any,
+  GroupPath extends string,
 >({
   apiName,
-  group,
+  groupPath,
 }: {
   apiName: string;
-  group: Group;
+  groupPath: GroupPath;
 }) =>
-  Context.GenericTag<ConfectApiGroupService<ConfectSchema, ApiName, Group>>(
-    // TODO: I think we need the full path here, not just the group name
-    `@rjdellecese/confect/ConfectApiGroupService/${apiName}/${group.name}`
+  Context.GenericTag<ConfectApiGroupService<ApiName, GroupPath>>(
+    `@rjdellecese/confect/ConfectApiGroupService/${apiName}/${groupPath}`
   );
 
 export declare namespace ConfectApiGroupService {
   export type FromGroups<
-    ConfectSchema extends GenericConfectSchema,
     ApiName extends string,
     Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
   > = Groups extends never
     ? never
-    : ConfectApiGroupService<ConfectSchema, ApiName, Groups>;
+    : ConfectApiGroupService<ApiName, Groups["name"]>;
+
+  export type FromGroupWithPath<
+    ApiName extends string,
+    GroupPath extends string,
+    Group extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
+  > =
+    ConfectApiGroup.ConfectApiGroup.SubGroupPathsFromGroupWithPath<
+      GroupPath,
+      Group
+    > extends infer SubGroupPaths
+      ? SubGroupPaths extends string
+        ? ConfectApiGroupService<ApiName, SubGroupPaths>
+        : never
+      : never;
 }
 
 export class ConfectApiService extends Context.Tag(

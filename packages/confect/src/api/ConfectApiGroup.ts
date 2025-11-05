@@ -130,6 +130,18 @@ export declare namespace ConfectApiGroup {
         : never
       : WithName<Group, Path>
     : never;
+
+  export type SubGroupPathsFromGroupWithPath<
+    GroupPath extends string,
+    Group extends AnyWithProps,
+  > =
+    ConfectApiGroup.Groups<
+      ConfectApiGroup.WithPath<Group, GroupPath>
+    > extends infer SubGroups
+      ? SubGroups extends AnyWithProps
+        ? `${GroupPath}.${SubGroups["name"]}`
+        : never
+      : never;
 }
 
 const Proto = {
