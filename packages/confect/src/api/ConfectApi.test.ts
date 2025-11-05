@@ -11,7 +11,7 @@ import * as ConfectApiClient from "./ConfectApiClient";
 import * as ConfectApiFunction from "./ConfectApiFunction";
 import * as ConfectApiGroup from "./ConfectApiGroup";
 import * as ConfectApiServer from "./ConfectApiServer";
-import * as ConfectApiWithDatabaseSchema from "./ConfectApiWithDatabaseSchema";
+import * as ConfectApiSpec from "./ConfectApiSpec";
 
 /*
  * api
@@ -83,70 +83,53 @@ const confectSchemaDefinition = defineConfectSchema({
 
 type ConfectSchemaDefinition = typeof confectSchemaDefinition;
 
-const Api = ConfectApi.make("api").add(GroupA).add(GroupB);
+const Spec = ConfectApiSpec.make("api").add(GroupA).add(GroupB);
 
-const ApiWithDatabaseSchema = ConfectApiWithDatabaseSchema.make(
-  confectSchemaDefinition,
-  Api
+const Api = ConfectApi.make(confectSchemaDefinition, Spec);
+
+const GroupALive = ConfectApiBuilder.group(Api, "groupA", (handlers) =>
+  handlers
+    .handle("myFunction", (args) =>
+      Effect.gen(function* () {
+        const reader = yield* ConfectDatabaseReader<ConfectSchemaDefinition>();
+        const writer = yield* ConfectDatabaseWriter<ConfectSchemaDefinition>();
+
+        const a = yield* reader.table("notes").index("by_id", "asc").collect();
+
+        return yield* Effect.succeed("test");
+      }).pipe(Effect.orDie)
+    )
+    .handle("myFunction2", (args) => Effect.succeed(`foo: ${args.foo}`))
 );
 
-const GroupALive = ConfectApiBuilder.group(
-  ApiWithDatabaseSchema,
-  "groupA",
-  (handlers) =>
-    handlers
-      .handle("myFunction", (args) =>
-        Effect.gen(function* () {
-          const reader =
-            yield* ConfectDatabaseReader<ConfectSchemaDefinition>();
-          const writer =
-            yield* ConfectDatabaseWriter<ConfectSchemaDefinition>();
-
-          const a = yield* reader
-            .table("notes")
-            .index("by_id", "asc")
-            .collect();
-
-          return yield* Effect.succeed("test");
-        }).pipe(Effect.orDie)
-      )
-      .handle("myFunction2", (args) => Effect.succeed(`foo: ${args.foo}`))
-);
-
-const GroupBCLive = ConfectApiBuilder.group(
-  ApiWithDatabaseSchema,
-  "groupB.groupBC",
-  (handlers) =>
-    handlers.handle("myFunction3", (args) => Effect.succeed(`foo: ${args.foo}`))
+const GroupBCLive = ConfectApiBuilder.group(Api, "groupB.groupBC", (handlers) =>
+  handlers.handle("myFunction3", (args) => Effect.succeed(`foo: ${args.foo}`))
 );
 
 const GroupBDELive = ConfectApiBuilder.group(
-  ApiWithDatabaseSchema,
+  Api,
   "groupB.groupBD.groupBDE",
   (handlers) =>
     handlers.handle("myFunction5", () => Effect.succeed("myFunction5"))
 );
 
-const GroupBDLive = ConfectApiBuilder.group(
-  ApiWithDatabaseSchema,
-  "groupB.groupBD",
-  (handlers) =>
-    handlers.handle("myFunction4", (args) => Effect.succeed(`foo: ${args.foo}`))
+const GroupBDLive = ConfectApiBuilder.group(Api, "groupB.groupBD", (handlers) =>
+  handlers.handle("myFunction4", (args) => Effect.succeed(`foo: ${args.foo}`))
 ).pipe(Layer.provide(GroupBDELive));
 
 const GroupBLive = ConfectApiBuilder.group(
-  ApiWithDatabaseSchema,
+  Api,
   "groupB",
   (handlers) => handlers
 ).pipe(Layer.provide(GroupBCLive), Layer.provide(GroupBDLive));
 
-const ApiLive = ConfectApiBuilder.api(ApiWithDatabaseSchema).pipe(
+const ApiLive = ConfectApiBuilder.api(Api).pipe(
   Layer.provide(GroupALive),
   Layer.provide(GroupBLive)
 );
 
 const client = ConfectApiClient.make(
-  Api,
+  Spec,
   new ConvexReactClient("http://localhost:3000")
 );
 

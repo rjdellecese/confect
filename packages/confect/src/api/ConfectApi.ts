@@ -1,5 +1,10 @@
-import { Predicate, Record } from "effect";
+import { Predicate } from "effect";
+import {
+  ConfectSchemaDefinition,
+  GenericConfectSchema,
+} from "../server/schema";
 import * as ConfectApiGroup from "./ConfectApiGroup";
+import * as ConfectApiSpec from "./ConfectApiSpec";
 
 export const TypeId = Symbol.for("@rjdellecese/confect/ConfectApi");
 
@@ -8,19 +13,15 @@ export type TypeId = typeof TypeId;
 export const isConfectApi = (u: unknown): u is ConfectApi.Any =>
   Predicate.hasProperty(u, TypeId);
 
+// TODO: Rename this to ConfectApiScaffolding? Or something else?
 export interface ConfectApi<
+  ConfectSchema extends GenericConfectSchema,
   Name extends string,
-  Groups extends ConfectApiGroup.ConfectApiGroup.Any = never,
+  Groups extends ConfectApiGroup.ConfectApiGroup.Any,
 > {
   readonly [TypeId]: TypeId;
-  readonly name: Name;
-  readonly groups: {
-    [GroupName in Groups["name"]]: Extract<Groups, { name: GroupName }>;
-  };
-
-  add<Group extends ConfectApiGroup.ConfectApiGroup.Any>(
-    group: Group
-  ): ConfectApi<Name, Groups | Group>;
+  readonly spec: ConfectApiSpec.ConfectApiSpec<Name, Groups>;
+  readonly confectSchemaDefinition: ConfectSchemaDefinition<ConfectSchema>;
 }
 
 export declare namespace ConfectApi {
@@ -29,40 +30,42 @@ export declare namespace ConfectApi {
   }
 
   export interface AnyWithProps
-    extends ConfectApi<string, ConfectApiGroup.ConfectApiGroup.AnyWithProps> {}
+    extends ConfectApi<
+      GenericConfectSchema,
+      string,
+      ConfectApiGroup.ConfectApiGroup.AnyWithProps
+    > {}
 
-  export type Groups<Api extends AnyWithProps> =
-    Api extends ConfectApi<infer _Name, infer Groups> ? Groups : never;
+  export type ConfectSchema<ConfectApi extends AnyWithProps> =
+    ConfectApi["confectSchemaDefinition"]["confectSchema"];
 }
 
 const Proto = {
   [TypeId]: TypeId,
-
-  add<Group extends ConfectApiGroup.ConfectApiGroup.AnyWithProps>(
-    this: ConfectApi.AnyWithProps,
-    group: Group
-  ) {
-    return makeProto({
-      name: this.name,
-      groups: Record.set(this.groups, group.name, group),
-    });
-  },
 };
 
 const makeProto = <
+  ConfectSchema extends GenericConfectSchema,
   const Name extends string,
-  Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
+  Groups extends ConfectApiGroup.ConfectApiGroup.Any,
 >({
-  name,
-  groups,
+  confectSchemaDefinition,
+  spec,
 }: {
-  name: Name;
-  groups: Record.ReadonlyRecord<string, Groups>;
-}): ConfectApi<Name, Groups> =>
+  confectSchemaDefinition: ConfectSchemaDefinition<ConfectSchema>;
+  spec: ConfectApiSpec.ConfectApiSpec<Name, Groups>;
+}): ConfectApi<ConfectSchema, Name, Groups> =>
   Object.assign(Object.create(Proto), {
-    name,
-    groups,
+    confectSchemaDefinition,
+    spec,
   });
 
-export const make = <const Name extends string>(name: Name): ConfectApi<Name> =>
-  makeProto({ name, groups: Record.empty() });
+export const make = <
+  ConfectSchema extends GenericConfectSchema,
+  const Name extends string,
+  Groups extends ConfectApiGroup.ConfectApiGroup.Any,
+>(
+  confectSchemaDefinition: ConfectSchemaDefinition<ConfectSchema>,
+  spec: ConfectApiSpec.ConfectApiSpec<Name, Groups>
+): ConfectApi<ConfectSchema, Name, Groups> =>
+  makeProto({ confectSchemaDefinition, spec });

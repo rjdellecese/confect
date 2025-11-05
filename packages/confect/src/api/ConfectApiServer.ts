@@ -61,9 +61,9 @@ import {
   ConfectStorageWriter,
 } from "../server/storage";
 import { confectVectorSearchLayer } from "../server/vector_search";
+import * as ConfectApi from "./ConfectApi";
 import * as ConfectApiBuilder from "./ConfectApiBuilder";
 import * as ConfectApiRegistry from "./ConfectApiRegistry";
-import * as ConfectApiWithDatabaseSchema from "./ConfectApiWithDatabaseSchema";
 
 type RegisteredFunction =
   | RegisteredQuery<FunctionVisibility, DefaultFunctionArgs, any>
@@ -100,14 +100,13 @@ export const make = (
   apiServiceLayer: Layer.Layer<ConfectApiBuilder.ConfectApiService>
 ): Effect.Effect<ConfectApiServer> =>
   Effect.gen(function* () {
-    const { apiWithDatabaseSchema } =
-      yield* ConfectApiBuilder.ConfectApiService;
+    const { api } = yield* ConfectApiBuilder.ConfectApiService;
     const registry = yield* ConfectApiRegistry.ConfectApiRegistry;
 
     const registeredFunctions = yield* registry.registeredFunctions;
 
     const convexApi = HashMap.map(registeredFunctions, (handlerItem) =>
-      makeRegisteredFunction(apiWithDatabaseSchema, handlerItem)
+      makeRegisteredFunction(api, handlerItem)
     );
 
     const server = make_({
@@ -124,10 +123,9 @@ export const make = (
   );
 
 const makeRegisteredFunction = <
-  ConfectApiWithDatabaseSchema extends
-    ConfectApiWithDatabaseSchema.ConfectApiWithDatabaseSchema.AnyWithProps,
+  ConfectApi extends ConfectApi.ConfectApi.AnyWithProps,
 >(
-  apiWithDatabaseSchema: ConfectApiWithDatabaseSchema,
+  api: ConfectApi,
   { function_, handler }: ConfectApiBuilder.Handlers.Item.AnyWithProps
 ): RegisteredFunction =>
   Match.value(function_.functionType).pipe(
@@ -139,7 +137,7 @@ const makeRegisteredFunction = <
       );
 
       return genericFunction(
-        confectQueryFunction(apiWithDatabaseSchema.confectSchemaDefinition, {
+        confectQueryFunction(api.confectSchemaDefinition, {
           args: function_.args,
           returns: function_.returns,
           handler,
@@ -154,7 +152,7 @@ const makeRegisteredFunction = <
       );
 
       return genericFunction(
-        confectMutationFunction(apiWithDatabaseSchema.confectSchemaDefinition, {
+        confectMutationFunction(api.confectSchemaDefinition, {
           args: function_.args,
           returns: function_.returns,
           handler,
@@ -169,7 +167,7 @@ const makeRegisteredFunction = <
       );
 
       return genericFunction(
-        confectActionFunction(apiWithDatabaseSchema.confectSchemaDefinition, {
+        confectActionFunction(api.confectSchemaDefinition, {
           args: function_.args,
           returns: function_.returns,
           handler,

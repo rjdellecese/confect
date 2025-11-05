@@ -1,9 +1,9 @@
 import { Array, Context, Effect, Function, Layer, String, Types } from "effect";
 import { GenericConfectSchema } from "../server/schema";
+import * as ConfectApi from "./ConfectApi";
 import * as ConfectApiFunction from "./ConfectApiFunction";
 import * as ConfectApiGroup from "./ConfectApiGroup";
 import * as ConfectApiRegistry from "./ConfectApiRegistry";
-import * as ConfectApiWithDatabaseSchema from "./ConfectApiWithDatabaseSchema";
 
 export const HandlersTypeId = Symbol.for("@rjdellecese/confect/Handlers");
 
@@ -115,11 +115,7 @@ export const group = <
   const GroupPath extends ConfectApiGroup.ConfectApiGroup.Path<Groups>,
   Return extends Handlers.AnyWithProps,
 >(
-  apiWithDatabaseSchema: ConfectApiWithDatabaseSchema.ConfectApiWithDatabaseSchema<
-    ConfectSchema,
-    ApiName,
-    Groups
-  >,
+  api: ConfectApi.ConfectApi<ConfectSchema, ApiName, Groups>,
   groupPath: GroupPath,
   build: (
     handlers: Handlers.FromGroup<
@@ -140,9 +136,7 @@ export const group = <
   // TODO: Move this implementation to a module for handling paths/group paths
   const group = Array.reduce(
     restGroupPathParts,
-    apiWithDatabaseSchema.api.groups[
-      firstGroupPathPart as keyof typeof apiWithDatabaseSchema.api.groups
-    ]!,
+    api.spec.groups[firstGroupPathPart as keyof typeof api.spec.groups]!,
     (currentGroup, groupPathPart) =>
       currentGroup.groups[groupPathPart as keyof typeof currentGroup.groups]!
   );
@@ -176,11 +170,7 @@ export const api = <
   const ApiName extends string,
   Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
 >(
-  apiWithDatabaseSchema: ConfectApiWithDatabaseSchema.ConfectApiWithDatabaseSchema<
-    ConfectSchema,
-    ApiName,
-    Groups
-  >
+  api: ConfectApi.ConfectApi<ConfectSchema, ApiName, Groups>
 ): Layer.Layer<
   ConfectApiService,
   never,
@@ -189,7 +179,7 @@ export const api = <
   Layer.effect(
     ConfectApiService,
     Effect.map(Effect.context(), (context) => ({
-      apiWithDatabaseSchema,
+      api,
       context,
     }))
   );
@@ -244,7 +234,7 @@ export class ConfectApiService extends Context.Tag(
 )<
   ConfectApiService,
   {
-    readonly apiWithDatabaseSchema: ConfectApiWithDatabaseSchema.ConfectApiWithDatabaseSchema.AnyWithProps;
+    readonly api: ConfectApi.ConfectApi.AnyWithProps;
     readonly context: Context.Context<never>;
   }
 >() {}

@@ -1,13 +1,13 @@
 import { ConvexReactClient } from "convex/react";
 import { FunctionReference } from "convex/server";
 import { Effect, ParseResult, Record, Schema } from "effect";
-import * as ConfectApi from "./ConfectApi";
 import * as ConfectApiFunctionPath from "./ConfectApiFunctionPath";
 import * as ConfectApiGroup from "./ConfectApiGroup";
+import * as ConfectApi from "./ConfectApiSpec";
 
 // TODO: Recurse.
 export type ConfectApiClient<
-  Api extends ConfectApi.ConfectApi<
+  Api extends ConfectApi.ConfectApiSpec<
     string,
     ConfectApiGroup.ConfectApiGroup.AnyWithProps
   >,
@@ -23,7 +23,7 @@ export type ConfectApiClient<
 };
 
 export const make = <
-  Api extends ConfectApi.ConfectApi<
+  Api extends ConfectApi.ConfectApiSpec<
     string,
     ConfectApiGroup.ConfectApiGroup.AnyWithProps
   >,
