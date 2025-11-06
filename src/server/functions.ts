@@ -116,7 +116,8 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
     ) => Effect.Effect<
       ConfectReturns,
       E,
-      ConfectMutationCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>
+      | ConfectQueryCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>
+      | ConfectMutationCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>
     >;
   }): RegisteredMutation<"public", ConvexValue, Promise<ConvexReturns>> =>
     mutationGeneric(
@@ -267,7 +268,11 @@ const confectMutationFunction = <
   returns: Schema.Schema<ConfectReturns, ConvexReturns>;
   handler: (
     a: ConfectValue,
-  ) => Effect.Effect<ConfectReturns, E, ConfectMutationCtx<ConfectDataModel>>;
+  ) => Effect.Effect<
+    ConfectReturns,
+    E,
+    ConfectQueryCtx<ConfectDataModel> | ConfectMutationCtx<ConfectDataModel>
+  >;
 }) => ({
   args: compileArgsSchema(args),
   returns: compileReturnsSchema(returns),
@@ -281,6 +286,10 @@ const confectMutationFunction = <
       Effect.orDie,
       Effect.andThen((decodedArgs) =>
         handler(decodedArgs).pipe(
+          Effect.provideService(
+            ConfectQueryCtx<ConfectDataModel>(),
+            makeConfectQueryCtx(ctx, databaseSchemas),
+          ),
           Effect.provideService(
             ConfectMutationCtx<ConfectDataModel>(),
             makeConfectMutationCtx(ctx, databaseSchemas),
