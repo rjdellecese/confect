@@ -549,6 +549,16 @@ describe(compileSchema, () => {
     expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
   });
 
+  test("bigint", () => {
+    const expectedValidator = v.int64();
+
+    const schema = Schema.BigIntFromSelf;
+    const compiledValidator = compileSchema(schema);
+
+    expect(compiledValidator).toStrictEqual(expectedValidator);
+    expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
+  });
+
   test("array buffer", () => {
     const expectedValidator = v.bytes();
 

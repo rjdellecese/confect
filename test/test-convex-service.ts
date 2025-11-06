@@ -174,6 +174,7 @@ class TestConvexServiceImpl implements TestConvexService {
 
 // In theory it might be possible to also have a version of this which runs the tests on the local or cloud backends
 export const layer = Effect.sync(
+  /* v8 ignore next -- @preserve */
   () =>
     new TestConvexServiceImpl(
       convexTest(schema, import.meta.glob("./**/!(*.*.*)*.*s")),
