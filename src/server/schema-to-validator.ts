@@ -357,7 +357,12 @@ export const compileAst = (
           ),
         ),
         Match.tag("Refinement", ({ from }) => compileAst(from)),
-        Match.tag("Suspend", () => Effect.succeed(v.any())),
+        /* v8 ignore next -- @preserve */
+        Match.tag("Suspend", () =>
+          Effect.dieMessage(
+            "Suspended schema should have already been handled by recursion check; this should be impossible.",
+          ),
+        ),
         Match.tag(
           "UniqueSymbol",
           "SymbolKeyword",
@@ -391,15 +396,15 @@ const handleUnion = (
         )
       : Array.map([first, second, ...rest], (type) => compileAst(type));
 
+    /* v8 ignore next -- @preserve */
     const [firstValidator, secondValidator, ...restValidators] =
       yield* Effect.all(validatorEffects);
 
-    /* v8 ignore start */
+    /* v8 ignore if -- @preserve */
     if (firstValidator === undefined) {
       return yield* Effect.dieMessage(
         "First validator of union is undefined; this should be impossible.",
       );
-      /* v8 ignore stop */
     } else if (secondValidator === undefined) {
       return firstValidator;
     } else {
@@ -414,6 +419,7 @@ const handleTypeLiteral = (typeLiteralAst: SchemaAST.TypeLiteral) =>
     Option.match({
       onNone: () =>
         pipe(handlePropertySignatures(typeLiteralAst), Effect.map(v.object)),
+      /* v8 ignore next -- @preserve */
       onSome: () => Effect.fail(new IndexSignaturesAreNotSupportedError()),
     }),
   );
@@ -518,21 +524,19 @@ const runSyncThrow = <A, E>(effect: Effect.Effect<A, E>) =>
 export class TopLevelMustBeObjectError extends Data.TaggedError(
   "TopLevelMustBeObjectError",
 ) {
-  /* v8 ignore start */
+  /* v8 ignore next -- @preserve */
   override get message() {
     return "Top level schema must be an object";
   }
-  /* v8 ignore stop */
 }
 
 export class TopLevelMustBeObjectOrUnionError extends Data.TaggedError(
   "TopLevelMustBeObjectOrUnionError",
 ) {
-  /* v8 ignore start */
+  /* v8 ignore next -- @preserve */
   override get message() {
     return "Top level schema must be an object or a union";
   }
-  /* v8 ignore stop */
 }
 
 export class UnsupportedPropertySignatureKeyTypeError extends Data.TaggedError(
@@ -540,22 +544,20 @@ export class UnsupportedPropertySignatureKeyTypeError extends Data.TaggedError(
 )<{
   readonly propertyKey: number | symbol;
 }> {
-  /* v8 ignore start */
+  /* v8 ignore next -- @preserve */
   override get message() {
     return `Unsupported property signature '${this.propertyKey.toString()}'. Property is of type '${typeof this
       .propertyKey}' but only 'string' properties are supported.`;
   }
-  /* v8 ignore stop */
 }
 
 export class EmptyTupleIsNotSupportedError extends Data.TaggedError(
   "EmptyTupleIsNotSupportedError",
 ) {
-  /* v8 ignore start */
+  /* v8 ignore next -- @preserve */
   override get message() {
     return "Tuple must have at least one element";
   }
-  /* v8 ignore stop */
 }
 
 export class UnsupportedSchemaTypeError extends Data.TaggedError(
@@ -563,29 +565,26 @@ export class UnsupportedSchemaTypeError extends Data.TaggedError(
 )<{
   readonly schemaType: SchemaAST.AST["_tag"];
 }> {
-  /* v8 ignore start */
+  /* v8 ignore next -- @preserve */
   override get message() {
     return `Unsupported schema type '${this.schemaType}'`;
   }
-  /* v8 ignore stop */
 }
 
 export class IndexSignaturesAreNotSupportedError extends Data.TaggedError(
   "IndexSignaturesAreNotSupportedError",
 ) {
-  /* v8 ignore start */
+  /* v8 ignore next -- @preserve */
   override get message() {
     return "Index signatures are not supported";
   }
-  /* v8 ignore stop */
 }
 
 export class OptionalTupleElementsAreNotSupportedError extends Data.TaggedError(
   "OptionalTupleElementsAreNotSupportedError",
 ) {
-  /* v8 ignore start */
+  /* v8 ignore next -- @preserve */
   override get message() {
     return "Optional tuple elements are not supported";
   }
-  /* v8 ignore stop */
 }

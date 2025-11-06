@@ -157,14 +157,14 @@ class ConfectQueryImpl<
         page: parsedPage,
         isDone: paginationResult.isDone,
         continueCursor: paginationResult.continueCursor,
-        /* v8 ignore start */
+        /* v8 ignore next -- @preserve */
         ...(paginationResult.splitCursor
           ? { splitCursor: paginationResult.splitCursor }
           : {}),
+        /* v8 ignore next -- @preserve */
         ...(paginationResult.pageStatus
           ? { pageStatus: paginationResult.pageStatus }
           : {}),
-        /* v8 ignore stop */
       })),
     );
   }
