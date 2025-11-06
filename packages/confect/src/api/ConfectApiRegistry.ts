@@ -1,4 +1,4 @@
-import { Effect, HashMap, Ref } from "effect";
+import { Effect, Record, Ref } from "effect";
 import * as ConfectApiBuilder from "./ConfectApiBuilder";
 
 export class ConfectApiRegistry extends Effect.Service<ConfectApiRegistry>()(
@@ -6,7 +6,7 @@ export class ConfectApiRegistry extends Effect.Service<ConfectApiRegistry>()(
   {
     effect: Effect.gen(function* () {
       const registeredFunctionsRef = yield* Ref.make(
-        HashMap.empty<string, ConfectApiBuilder.Handlers.Item.AnyWithProps>()
+        Record.empty<string, ConfectApiBuilder.Handlers.Item.AnyWithProps>()
       );
 
       return {
@@ -16,7 +16,7 @@ export class ConfectApiRegistry extends Effect.Service<ConfectApiRegistry>()(
         ): Effect.Effect<void> =>
           Ref.getAndUpdate(
             registeredFunctionsRef,
-            HashMap.set(functionPath, handlerItem)
+            Record.set(functionPath, handlerItem)
           ),
         registeredFunctions: Ref.get(registeredFunctionsRef),
       };
