@@ -1,5 +1,11 @@
 # @rjdellecese/confect
 
+## 0.0.32
+
+### Patch Changes
+
+- d1ca9f9: Bump deps
+
 ## 0.0.31
 
 ### Patch Changes
