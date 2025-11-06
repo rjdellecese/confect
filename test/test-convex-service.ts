@@ -1,10 +1,5 @@
 /// <reference types="vite/client" />
 
-import {
-  convexTest,
-  type TestConvexForDataModel,
-  type TestConvexForDataModelAndIdentity,
-} from "convex-test";
 import type {
   DataModelFromSchemaDefinition,
   FunctionReference,
@@ -14,6 +9,11 @@ import type {
   StorageActionWriter,
   UserIdentity,
 } from "convex/server";
+import {
+  convexTest,
+  type TestConvexForDataModel,
+  type TestConvexForDataModelAndIdentity,
+} from "convex-test";
 import { Context, Effect, Layer } from "effect";
 
 import schema from "~/test/convex/schema";
@@ -35,27 +35,27 @@ export type TestConvexServiceWithoutIdentity = {
     func: (
       ctx: GenericMutationCtx<DataModelFromSchemaDefinition<typeof schema>> & {
         storage: StorageActionWriter;
-      }
-    ) => Promise<Output>
+      },
+    ) => Promise<Output>,
   ) => Effect.Effect<Output>;
   fetch: (
     pathQueryFragment: string,
-    init?: RequestInit
+    init?: RequestInit,
   ) => Effect.Effect<Response>;
   finishInProgressScheduledFunctions: () => Effect.Effect<void>;
   finishAllScheduledFunctions: (
-    advanceTimers: () => void
+    advanceTimers: () => void,
   ) => Effect.Effect<void>;
 };
 
 export type TestConvexService = {
   withIdentity: (
-    userIdentity: Partial<UserIdentity>
+    userIdentity: Partial<UserIdentity>,
   ) => TestConvexServiceWithoutIdentity;
 } & TestConvexServiceWithoutIdentity;
 
 export const TestConvexService = Context.GenericTag<TestConvexService>(
-  "@rjdellecese/confect/TestConvexService"
+  "@rjdellecese/confect/TestConvexService",
 );
 
 class TestConvexServiceImplWithoutIdentity
@@ -64,7 +64,7 @@ class TestConvexServiceImplWithoutIdentity
   constructor(
     private testConvex: TestConvexForDataModel<
       DataModelFromSchemaDefinition<typeof schema>
-    >
+    >,
   ) {}
 
   query<Query extends FunctionReference<"query", any>>(
@@ -89,25 +89,25 @@ class TestConvexServiceImplWithoutIdentity
     func: (
       ctx: GenericMutationCtx<DataModelFromSchemaDefinition<typeof schema>> & {
         storage: StorageActionWriter;
-      }
-    ) => Promise<Output>
+      },
+    ) => Promise<Output>,
   ) {
     return Effect.promise(() => this.testConvex.run(func));
   }
   fetch<PathQueryFragment extends string>(
     pathQueryFragment: PathQueryFragment,
-    init?: RequestInit
+    init?: RequestInit,
   ) {
     return Effect.promise(() => this.testConvex.fetch(pathQueryFragment, init));
   }
   finishInProgressScheduledFunctions() {
     return Effect.promise(() =>
-      this.testConvex.finishInProgressScheduledFunctions()
+      this.testConvex.finishInProgressScheduledFunctions(),
     );
   }
   finishAllScheduledFunctions(advanceTimers: () => void) {
     return Effect.promise(() =>
-      this.testConvex.finishAllScheduledFunctions(advanceTimers)
+      this.testConvex.finishAllScheduledFunctions(advanceTimers),
     );
   }
 }
@@ -116,14 +116,14 @@ class TestConvexServiceImpl implements TestConvexService {
   constructor(
     private testConvex: TestConvexForDataModelAndIdentity<
       DataModelFromSchemaDefinition<typeof schema>
-    >
+    >,
   ) {
     this.testConvex = testConvex;
   }
 
   withIdentity(userIdentity: Partial<UserIdentity>) {
     return new TestConvexServiceImplWithoutIdentity(
-      this.testConvex.withIdentity(userIdentity)
+      this.testConvex.withIdentity(userIdentity),
     );
   }
 
@@ -149,25 +149,25 @@ class TestConvexServiceImpl implements TestConvexService {
     func: (
       ctx: GenericMutationCtx<DataModelFromSchemaDefinition<typeof schema>> & {
         storage: StorageActionWriter;
-      }
-    ) => Promise<Output>
+      },
+    ) => Promise<Output>,
   ) {
     return Effect.promise(() => this.testConvex.run(func));
   }
   fetch<PathQueryFragment extends string>(
     pathQueryFragment: PathQueryFragment,
-    init?: RequestInit
+    init?: RequestInit,
   ) {
     return Effect.promise(() => this.testConvex.fetch(pathQueryFragment, init));
   }
   finishInProgressScheduledFunctions() {
     return Effect.promise(() =>
-      this.testConvex.finishInProgressScheduledFunctions()
+      this.testConvex.finishInProgressScheduledFunctions(),
     );
   }
   finishAllScheduledFunctions(advanceTimers: () => void) {
     return Effect.promise(() =>
-      this.testConvex.finishAllScheduledFunctions(advanceTimers)
+      this.testConvex.finishAllScheduledFunctions(advanceTimers),
     );
   }
 }
@@ -176,6 +176,6 @@ class TestConvexServiceImpl implements TestConvexService {
 export const layer = Effect.sync(
   () =>
     new TestConvexServiceImpl(
-      convexTest(schema, import.meta.glob("./**/!(*.*.*)*.*s"))
-    )
+      convexTest(schema, import.meta.glob("./**/!(*.*.*)*.*s")),
+    ),
 ).pipe(Layer.effect(TestConvexService));
