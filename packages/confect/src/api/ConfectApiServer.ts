@@ -16,11 +16,11 @@ import {
 } from "convex/server";
 import {
   Effect,
-  HashMap,
   Layer,
   Match,
   pipe,
   Predicate,
+  Record,
   Schema,
   Types,
 } from "effect";
@@ -80,7 +80,7 @@ export const isConfectApiServer = (u: unknown): u is ConfectApiServer =>
 // TODO: Recurse.
 export type ConfectApiServer = Types.Simplify<{
   readonly [TypeId]: TypeId;
-  readonly convexApi: HashMap.HashMap<string, RegisteredFunction>;
+  readonly convexApi: Record.ReadonlyRecord<string, RegisteredFunction>;
 }>;
 
 const Proto = {
@@ -90,7 +90,7 @@ const Proto = {
 const make_ = ({
   convexApi,
 }: {
-  convexApi: HashMap.HashMap<string, RegisteredFunction>;
+  convexApi: Record.ReadonlyRecord<string, RegisteredFunction>;
 }): ConfectApiServer =>
   Object.assign(Object.create(Proto), {
     convexApi,
@@ -105,7 +105,7 @@ export const make = (
 
     const registeredFunctions = yield* registry.registeredFunctions;
 
-    const convexApi = HashMap.map(registeredFunctions, (handlerItem) =>
+    const convexApi = Record.map(registeredFunctions, (handlerItem) =>
       makeRegisteredFunction(api, handlerItem)
     );
 
