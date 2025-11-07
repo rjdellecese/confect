@@ -12,6 +12,9 @@
   "homepage": "https://rj-dellecese.gitbook.io/confect",
   "sideEffects": false,
   "type": "module",
+  "bin": {
+    "confect": "./dist/cli/index.js"
+  },
   "files": [
     "src",
     "dist",
@@ -57,6 +60,9 @@
   ],
   "author": "RJ Dellecese",
   "license": "ISC",
+  "dependencies": {
+    "@effect/cli": "^0.72.0"
+  },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.2",
     "@effect/cluster": "0.46.3",
