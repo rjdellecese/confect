@@ -1,33 +1,32 @@
 {
-	"scripts": {
-		"build": "pnpm -r --filter='@rjdellecese/*' build",
-		"build:confect": "pnpm --filter @rjdellecese/confect build",
-		"build:docs": "pnpm --filter @rjdellecese/docs build",
-		"build:example": "pnpm --filter @rjdellecese/example build",
-		"dev": "pnpm -r --parallel dev",
-		"dev:confect": "pnpm --filter @rjdellecese/confect dev",
-		"dev:docs": "pnpm --filter @rjdellecese/docs dev",
-		"dev:example": "pnpm --filter @rjdellecese/example dev",
-		"typecheck": "pnpm -r typecheck",
-		"lint": "pnpm -r lint",
-		"fix": "pnpm -r fix",
-		"test": "pnpm -r test",
-		"release": "pnpm build:confect && changeset publish",
-		"clean": "pnpm -r clean && rm -rf node_modules"
-	},
-	"keywords": [
-		"effect",
-		"convex",
-		"monorepo"
-	],
-	"license": "ISC",
-	"devDependencies": {
-		"@changesets/cli": "2.29.5",
-		"@changesets/config": "3.1.1",
-		"typescript": "5.9.2"
-	},
-	"engines": {
-		"node": ">=20",
-		"pnpm": ">=10"
-	}
+  "scripts": {
+    "build": "pnpm -r --filter='@rjdellecese/*' build",
+    "build:confect": "pnpm --filter @rjdellecese/confect build",
+    "build:docs": "pnpm --filter @rjdellecese/docs build",
+    "build:example": "pnpm --filter @rjdellecese/example build",
+    "dev": "pnpm -r --parallel dev",
+    "dev:confect": "pnpm --filter @rjdellecese/confect dev",
+    "dev:docs": "pnpm --filter @rjdellecese/docs dev",
+    "dev:example": "pnpm --filter @rjdellecese/example dev",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "fix": "pnpm -r fix",
+    "test": "pnpm -r test",
+    "release": "pnpm build:confect && changeset publish",
+    "clean": "pnpm -r clean && rm -rf node_modules"
+  },
+  "keywords": [
+    "effect",
+    "convex"
+  ],
+  "license": "ISC",
+  "devDependencies": {
+    "@changesets/cli": "2.29.5",
+    "@changesets/config": "3.1.1",
+    "typescript": "5.9.2"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=10"
+  }
 }
