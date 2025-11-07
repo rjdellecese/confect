@@ -77,10 +77,12 @@ export type TypeId = typeof TypeId;
 export const isConfectApiServer = (u: unknown): u is ConfectApiServer =>
   Predicate.hasProperty(u, TypeId);
 
-// TODO: Recurse.
 export type ConfectApiServer = Types.Simplify<{
   readonly [TypeId]: TypeId;
-  readonly convexApi: Record.ReadonlyRecord<string, RegisteredFunction>;
+  readonly registeredFunctions: Record.ReadonlyRecord<
+    string,
+    RegisteredFunction
+  >;
 }>;
 
 const Proto = {
@@ -88,12 +90,12 @@ const Proto = {
 };
 
 const make_ = ({
-  convexApi,
+  registeredFunctions,
 }: {
-  convexApi: Record.ReadonlyRecord<string, RegisteredFunction>;
+  registeredFunctions: Record.ReadonlyRecord<string, RegisteredFunction>;
 }): ConfectApiServer =>
   Object.assign(Object.create(Proto), {
-    convexApi,
+    registeredFunctions,
   });
 
 export const make = (
@@ -103,14 +105,14 @@ export const make = (
     const { api } = yield* ConfectApiBuilder.ConfectApiService;
     const registry = yield* ConfectApiRegistry.ConfectApiRegistry;
 
-    const registeredFunctions = yield* registry.registeredFunctions;
+    const handlerItems = yield* registry.handlerItems;
 
-    const convexApi = Record.map(registeredFunctions, (handlerItem) =>
+    const registeredFunctions = Record.map(handlerItems, (handlerItem) =>
       makeRegisteredFunction(api, handlerItem)
     );
 
     const server = make_({
-      convexApi,
+      registeredFunctions,
     });
 
     return yield* Effect.succeed(server);

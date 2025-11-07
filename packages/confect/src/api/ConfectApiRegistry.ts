@@ -5,7 +5,7 @@ export class ConfectApiRegistry extends Effect.Service<ConfectApiRegistry>()(
   "@rjdellecese/confect/ConfectApiRegistry",
   {
     effect: Effect.gen(function* () {
-      const registeredFunctionsRef = yield* Ref.make(
+      const handlerItemsRef = yield* Ref.make(
         Record.empty<string, ConfectApiBuilder.Handlers.Item.AnyWithProps>()
       );
 
@@ -15,10 +15,10 @@ export class ConfectApiRegistry extends Effect.Service<ConfectApiRegistry>()(
           handlerItem: ConfectApiBuilder.Handlers.Item.AnyWithProps
         ): Effect.Effect<void> =>
           Ref.getAndUpdate(
-            registeredFunctionsRef,
+            handlerItemsRef,
             Record.set(functionPath, handlerItem)
           ),
-        registeredFunctions: Ref.get(registeredFunctionsRef),
+        handlerItems: Ref.get(handlerItemsRef),
       };
     }),
   }
