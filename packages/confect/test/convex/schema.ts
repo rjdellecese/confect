@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import * as schema from "../../src/server/schema";
+import * as schema from "../../src/server/ConfectSchema";
 import { GenericId } from "../../src/server/schemas/GenericId";
 
 export const confectSchemaTables = {
@@ -13,11 +13,11 @@ export const confectSchemaTables = {
           Schema.Struct({
             role: Schema.Literal("admin", "user"),
             name: Schema.String,
-          }),
+          })
         ),
         embedding: Schema.optional(Schema.Array(Schema.Number)),
         bigDecimal: Schema.optional(Schema.BigDecimal),
-      }),
+      })
     )
     .index("by_text", ["text"])
     .index("by_role", ["author.role"])
@@ -34,7 +34,7 @@ export const confectSchemaTables = {
   users: schema.defineConfectTable(
     Schema.Struct({
       username: Schema.String,
-    }),
+    })
   ),
 };
 

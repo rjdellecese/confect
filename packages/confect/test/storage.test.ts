@@ -5,10 +5,10 @@ import {
   assertInstanceOf,
 } from "@effect/vitest/utils";
 import { Cause, Effect, Runtime, Schema } from "effect";
-import { FileNotFoundError } from "../src/server/storage";
+import { FileNotFoundError } from "../src/server/ConfectStorage";
 import { api } from "./convex/_generated/api";
-import { TestConvexService } from "./TestConvexService";
 import { effect } from "./test_utils";
+import { TestConvexService } from "./TestConvexService";
 
 describe("ConfectStorageReader", () => {
   describe("getUrl", () => {
@@ -21,12 +21,12 @@ describe("ConfectStorageReader", () => {
           api.storage.confectStorageReaderGetUrl,
           {
             id,
-          },
+          }
         );
         const url = yield* Schema.decode(Schema.URL)(urlString);
 
         assertInstanceOf(url, URL);
-      }),
+      })
     );
 
     effect("when file no longer exists", () =>
@@ -45,10 +45,10 @@ describe("ConfectStorageReader", () => {
         assertFailure(
           exit,
           Cause.die(
-            Runtime.makeFiberFailure(Cause.fail(new FileNotFoundError({ id }))),
-          ),
+            Runtime.makeFiberFailure(Cause.fail(new FileNotFoundError({ id })))
+          )
         );
-      }),
+      })
     );
   });
 });
@@ -59,12 +59,12 @@ describe("ConfectStorageWriter", () => {
       const c = yield* TestConvexService;
 
       const urlString = yield* c.action(
-        api.storage.confectStorageWriterGenerateUploadUrl,
+        api.storage.confectStorageWriterGenerateUploadUrl
       );
       const url = yield* Schema.decode(Schema.URL)(urlString);
 
       assertInstanceOf(url, URL);
-    }),
+    })
   );
 
   describe("delete", () => {
@@ -80,7 +80,7 @@ describe("ConfectStorageWriter", () => {
         const storageDoc = yield* c.run(({ storage }) => storage.get(id));
 
         assertEquals(storageDoc, null);
-      }),
+      })
     );
 
     effect("when file no longer exists", () =>
@@ -99,10 +99,10 @@ describe("ConfectStorageWriter", () => {
         assertFailure(
           exit,
           Cause.die(
-            Runtime.makeFiberFailure(Cause.fail(new FileNotFoundError({ id }))),
-          ),
+            Runtime.makeFiberFailure(Cause.fail(new FileNotFoundError({ id })))
+          )
         );
-      }),
+      })
     );
   });
 });
@@ -120,11 +120,11 @@ describe("ConfectStorageActionWriter", () => {
           api.storage.confectStorageActionWriterGet,
           {
             id,
-          },
+          }
         );
 
         assertEquals(blobSize, blob.size);
-      }),
+      })
     );
 
     effect("when file no longer exists", () =>
@@ -145,10 +145,10 @@ describe("ConfectStorageActionWriter", () => {
         assertFailure(
           exit,
           Cause.die(
-            Runtime.makeFiberFailure(Cause.fail(new FileNotFoundError({ id }))),
-          ),
+            Runtime.makeFiberFailure(Cause.fail(new FileNotFoundError({ id })))
+          )
         );
-      }),
+      })
     );
   });
 
@@ -165,10 +165,10 @@ describe("ConfectStorageActionWriter", () => {
       const blobText = yield* c.run(({ storage }) =>
         storage
           .get(id)
-          .then((blob) => (blob ? blob.text() : Promise.resolve(null))),
+          .then((blob) => (blob ? blob.text() : Promise.resolve(null)))
       );
 
       assertEquals(blobText, text);
-    }),
+    })
   );
 });

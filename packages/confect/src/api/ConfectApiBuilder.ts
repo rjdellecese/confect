@@ -1,5 +1,5 @@
 import { Array, Context, Effect, Function, Layer, String, Types } from "effect";
-import { GenericConfectSchema } from "../server/schema";
+import { GenericConfectSchema } from "../server/ConfectSchema";
 import * as ConfectApi from "./ConfectApi";
 import * as ConfectApiFunction from "./ConfectApiFunction";
 import * as ConfectApiGroup from "./ConfectApiGroup";

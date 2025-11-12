@@ -1,13 +1,9 @@
-import { ConvexReactClient } from "convex/react";
 import { Effect, Layer, Schema } from "effect";
-import { defineConfectSchema, defineConfectTable } from "../server";
-import {
-  ConfectDatabaseReader,
-  ConfectDatabaseWriter,
-} from "../server/database";
+import * as ConfectDatabaseReader from "../server/ConfectDatabaseReader";
+import * as ConfectDatabaseWriter from "../server/ConfectDatabaseWriter";
+import * as ConfectSchema from "../server/ConfectSchema";
 import * as ConfectApi from "./ConfectApi";
 import * as ConfectApiBuilder from "./ConfectApiBuilder";
-import * as ConfectApiClient from "./ConfectApiClient";
 import * as ConfectApiFunction from "./ConfectApiFunction";
 import * as ConfectApiGroup from "./ConfectApiGroup";
 import * as ConfectApiServer from "./ConfectApiServer";
@@ -73,8 +69,8 @@ const GroupB = ConfectApiGroup.make("groupB")
   .addGroup(GroupBC)
   .addGroup(GroupBD);
 
-const confectSchemaDefinition = defineConfectSchema({
-  notes: defineConfectTable(
+const confectSchemaDefinition = ConfectSchema.defineConfectSchema({
+  notes: ConfectSchema.defineConfectTable(
     Schema.Struct({
       content: Schema.String,
     })
@@ -91,8 +87,10 @@ const GroupALive = ConfectApiBuilder.group(Api, "groupA", (handlers) =>
   handlers
     .handle("myFunction", (args) =>
       Effect.gen(function* () {
-        const reader = yield* ConfectDatabaseReader<ConfectSchemaDefinition>();
-        const writer = yield* ConfectDatabaseWriter<ConfectSchemaDefinition>();
+        const reader =
+          yield* ConfectDatabaseReader.ConfectDatabaseReader<ConfectSchemaDefinition>();
+        const writer =
+          yield* ConfectDatabaseWriter.ConfectDatabaseWriter<ConfectSchemaDefinition>();
 
         const a = yield* reader.table("notes").index("by_id", "asc").collect();
 
@@ -127,13 +125,6 @@ const ApiLive = ConfectApiBuilder.api(Api).pipe(
   Layer.provide(GroupALive),
   Layer.provide(GroupBLive)
 );
-
-const client = ConfectApiClient.make(
-  Spec,
-  new ConvexReactClient("http://localhost:3000")
-);
-
-const myFunctionResult = client.groupA.myFunction({ foo: 1 });
 
 const server = ConfectApiServer.make(ApiLive)
   .pipe(Effect.runPromise)

@@ -7,14 +7,14 @@ import type {
   DataModelFromConfectDataModel,
   GenericConfectDataModel,
   TableInfoFromConfectTableInfo,
-} from "../src/server/data_model";
+} from "../src/server/ConfectDataModel";
 import {
   type ConfectDataModelFromConfectSchema,
   type ConfectSchemaFromConfectSchemaDefinition,
   defineConfectSchema,
   defineConfectTable,
   type GenericConfectSchema,
-} from "../src/server/schema";
+} from "../src/server/ConfectSchema";
 
 describe("ConfectDataModelFromConfectSchema", () => {
   test("extends GenericConfectDataModel and equals correct document and confectDocument types", () => {

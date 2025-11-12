@@ -1,15 +1,15 @@
+import type {
+  GenericConfectDoc as ConfectDocType,
+  DataModelFromConfectDataModel,
+  TableNamesInConfectDataModel,
+} from "../../src/server/ConfectDataModel";
+import type { ConfectDataModelFromConfectSchemaDefinition } from "../../src/server/ConfectSchema";
 import {
   ConvexActionCtx,
   ConvexMutationCtx,
   ConvexQueryCtx,
 } from "../../src/server/ctx";
-import type {
-  GenericConfectDoc as ConfectDocType,
-  DataModelFromConfectDataModel,
-  TableNamesInConfectDataModel,
-} from "../../src/server/data_model";
 import { makeConfectFunctions } from "../../src/server/functions";
-import type { ConfectDataModelFromConfectSchemaDefinition } from "../../src/server/schema";
 import { GenericId } from "../../src/server/schemas/GenericId";
 import { confectSchema } from "../convex/schema";
 
@@ -43,19 +43,19 @@ export type Id<TableName extends TableNames> = GenericId<TableName>;
 export type ConfectDatabaseReader = typeof ConfectDatabaseReader.Identifier;
 export type ConfectDatabaseWriter = typeof ConfectDatabaseWriter.Identifier;
 
-export { ConfectAuth } from "../../src/server/auth";
+export { ConfectAuth } from "../../src/server/ConfectAuth";
+export { ConfectScheduler } from "../../src/server/ConfectScheduler";
+export {
+  ConfectStorageActionWriter,
+  ConfectStorageReader,
+  ConfectStorageWriter,
+} from "../../src/server/ConfectStorage";
+export { ConfectVectorSearch } from "../../src/server/ConfectVectorSearch";
 export {
   ConfectActionRunner,
   ConfectMutationRunner,
   ConfectQueryRunner,
 } from "../../src/server/runners";
-export { ConfectScheduler } from "../../src/server/scheduler";
-export {
-  ConfectStorageActionWriter,
-  ConfectStorageReader,
-  ConfectStorageWriter,
-} from "../../src/server/storage";
-export { ConfectVectorSearch } from "../../src/server/vector_search";
 
 type DataModel = DataModelFromConfectDataModel<ConfectDataModel>;
 

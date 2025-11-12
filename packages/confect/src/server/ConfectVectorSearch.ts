@@ -10,7 +10,7 @@ import type {
   DataModelFromConfectDataModel,
   GenericConfectDataModel,
   TableNamesInConfectDataModel,
-} from "./data_model";
+} from "./ConfectDataModel";
 
 type VectorSearch<ConfectDataModel extends GenericConfectDataModel> =
   GenericActionCtx<
@@ -19,7 +19,7 @@ type VectorSearch<ConfectDataModel extends GenericConfectDataModel> =
 
 const make =
   <ConfectDataModel extends GenericConfectDataModel>(
-    vectorSearch: VectorSearch<ConfectDataModel>,
+    vectorSearch: VectorSearch<ConfectDataModel>
   ) =>
   <
     TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
@@ -37,17 +37,15 @@ const make =
         >,
         IndexName
       >
-    >,
+    >
   ) =>
     Effect.promise(() => vectorSearch(tableName, indexName, query));
 
 export const ConfectVectorSearch = Context.GenericTag<ReturnType<typeof make>>(
-  "@rjdellecese/confect/ConfectVectorSearch",
+  "@rjdellecese/confect/ConfectVectorSearch"
 );
 export type ConfectVectorSearch = typeof ConfectVectorSearch.Identifier;
 
-export const confectVectorSearchLayer = <
-  ConfectDataModel extends GenericConfectDataModel,
->(
-  vectorSearch: VectorSearch<ConfectDataModel>,
+export const layer = <ConfectDataModel extends GenericConfectDataModel>(
+  vectorSearch: VectorSearch<ConfectDataModel>
 ) => Layer.succeed(ConfectVectorSearch, make(vectorSearch));

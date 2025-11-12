@@ -2,7 +2,7 @@ import { Predicate } from "effect";
 import {
   ConfectSchemaDefinition,
   GenericConfectSchema,
-} from "../server/schema";
+} from "../server/ConfectSchema";
 import * as ConfectApiGroup from "./ConfectApiGroup";
 import * as ConfectApiSpec from "./ConfectApiSpec";
 

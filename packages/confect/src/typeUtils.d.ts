@@ -1,3 +1,4 @@
+import { GenericDatabaseReader, GenericDataModel } from "convex/server";
 import type { GenericId } from "convex/values";
 import type { Brand } from "effect";
 
@@ -118,13 +119,13 @@ type _unionToTuple<t, result extends unknown[]> =
 
 type getLastBranch<t> =
   intersectUnion<t extends unknown ? (x: t) => void : never> extends (
-    x: infer branch,
+    x: infer branch
   ) => void
     ? branch
     : never;
 
 type intersectUnion<t> = (t extends unknown ? (_: t) => void : never) extends (
-  _: infer intersection,
+  _: infer intersection
 ) => void
   ? intersection
   : never;
@@ -134,3 +135,24 @@ type conform<t, base> = t extends base ? t : base;
 ////////////////////////////////
 // END: Vendored from Arktype //
 ////////////////////////////////
+
+type IndexFieldTypesForEq<
+  ConvexDataModel extends GenericDataModel,
+  Table extends TableNamesInDataModel<ConvexDataModel>,
+  T extends string[],
+> = T extends readonly [...infer Rest, any]
+  ? Rest extends readonly string[]
+    ? {
+        [K in keyof Rest]: FieldTypeFromFieldPath<
+          DocumentByName<ConvexDataModel, Table>,
+          Rest[K]
+        >;
+      }
+    : never
+  : never;
+
+// Would prefer to use `BaseDatabaseReader` from the `convex` package, but it's not exported.
+export type BaseDatabaseReader<DataModel extends GenericDataModel> = {
+  get: GenericDatabaseReader<DataModel>["get"];
+  query: GenericDatabaseReader<DataModel>["query"];
+};

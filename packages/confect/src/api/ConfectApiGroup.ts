@@ -1,7 +1,7 @@
 import { Predicate, Record } from "effect";
-import { GenericConfectSchema } from "../server/schema";
+import { GenericConfectSchema } from "../server/ConfectSchema";
+import { validateJsIdentifier } from "../utils";
 import * as ConfectApiFunction from "./ConfectApiFunction";
-import { validateJsIdentifier } from "./utils";
 
 export const TypeId = Symbol.for("@rjdellecese/confect/ConfectApiGroup");
 

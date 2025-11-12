@@ -7,7 +7,7 @@ import type {
 } from "convex/server";
 import type { Schema } from "effect";
 import type { ReadonlyRecord } from "effect/Record";
-import type { ReadonlyValue } from "./schema_to_validator";
+import type { ReadonlyValue } from "./SchemaToValidator";
 import type { WithSystemFields } from "./schemas/SystemFields";
 
 export type GenericConfectDocumentWithSystemFields = WithSystemFields<

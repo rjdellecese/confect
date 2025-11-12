@@ -1,30 +1,26 @@
 import { Effect, Predicate, Schema } from "effect";
-import {
-  ConfectScheduler,
-  ConfectStorageActionWriter,
-  ConfectStorageReader,
-  ConfectStorageWriter,
-  ConfectVectorSearch,
-  ConvexActionCtx,
-  ConvexMutationCtx,
-  ConvexQueryCtx,
-} from "../server";
-import { ConfectAuth } from "../server/auth";
-import {
-  ConfectDatabaseReader,
-  ConfectDatabaseWriter,
-} from "../server/database";
-import {
-  ConfectActionRunner,
-  ConfectMutationRunner,
-  ConfectQueryRunner,
-} from "../server/runners";
+import * as ConfectActionRunner from "../server/ConfectActionRunner";
+import * as ConfectAuth from "../server/ConfectAuth";
+import * as ConfectDatabaseReader from "../server/ConfectDatabaseReader";
+import * as ConfectDatabaseWriter from "../server/ConfectDatabaseWriter";
+import * as ConfectMutationRunner from "../server/ConfectMutationRunner";
+import * as ConfectQueryRunner from "../server/ConfectQueryRunner";
+import * as ConfectScheduler from "../server/ConfectScheduler";
 import {
   ConfectSchemaDefinition,
   DataModelFromConfectSchema,
   GenericConfectSchema,
-} from "../server/schema";
-import { validateJsIdentifier } from "./utils";
+} from "../server/ConfectSchema";
+import {
+  ConfectStorageActionWriter,
+  ConfectStorageReader,
+  ConfectStorageWriter,
+} from "../server/ConfectStorage";
+import * as ConfectVectorSearch from "../server/ConfectVectorSearch";
+import * as ConvexActionCtx from "../server/ConvexActionCtx";
+import * as ConvexMutationCtx from "../server/ConvexMutationCtx";
+import * as ConvexQueryCtx from "../server/ConvexQueryCtx";
+import { validateJsIdentifier } from "../utils";
 
 export const TypeId = Symbol.for("@rjdellecese/confect/ConfectApiFunction");
 
@@ -138,11 +134,13 @@ export type QueryHandler<
   Function extends ConfectApiFunction.AnyWithPropsWithFunctionType<"Query">,
 > = BaseHandler<
   Function,
-  | ConfectDatabaseReader<ConfectSchemaDefinition<ConfectSchema>>
-  | ConfectAuth
+  | ConfectDatabaseReader.ConfectDatabaseReader<
+      ConfectSchemaDefinition<ConfectSchema>
+    >
+  | ConfectAuth.ConfectAuth
   | ConfectStorageReader
-  | ConfectQueryRunner
-  | ConvexQueryCtx<DataModelFromConfectSchema<ConfectSchema>>
+  | ConfectQueryRunner.ConfectQueryRunner
+  | ConvexQueryCtx.ConvexQueryCtx<DataModelFromConfectSchema<ConfectSchema>>
 >;
 
 export type MutationHandler<
@@ -150,15 +148,21 @@ export type MutationHandler<
   Function extends ConfectApiFunction.AnyWithPropsWithFunctionType<"Mutation">,
 > = BaseHandler<
   Function,
-  | ConfectDatabaseReader<ConfectSchemaDefinition<ConfectSchema>>
-  | ConfectDatabaseWriter<ConfectSchemaDefinition<ConfectSchema>>
-  | ConfectAuth
-  | ConfectScheduler
+  | ConfectDatabaseReader.ConfectDatabaseReader<
+      ConfectSchemaDefinition<ConfectSchema>
+    >
+  | ConfectDatabaseWriter.ConfectDatabaseWriter<
+      ConfectSchemaDefinition<ConfectSchema>
+    >
+  | ConfectAuth.ConfectAuth
+  | ConfectScheduler.ConfectScheduler
   | ConfectStorageReader
   | ConfectStorageWriter
-  | ConfectQueryRunner
-  | ConfectMutationRunner
-  | ConvexMutationCtx<DataModelFromConfectSchema<ConfectSchema>>
+  | ConfectQueryRunner.ConfectQueryRunner
+  | ConfectMutationRunner.ConfectMutationRunner
+  | ConvexMutationCtx.ConvexMutationCtx<
+      DataModelFromConfectSchema<ConfectSchema>
+    >
 >;
 
 export type ActionHandler<
@@ -166,16 +170,16 @@ export type ActionHandler<
   Function extends ConfectApiFunction.AnyWithPropsWithFunctionType<"Action">,
 > = BaseHandler<
   Function,
-  | ConfectScheduler
-  | ConfectAuth
+  | ConfectScheduler.ConfectScheduler
+  | ConfectAuth.ConfectAuth
   | ConfectStorageReader
   | ConfectStorageWriter
   | ConfectStorageActionWriter
-  | ConfectQueryRunner
-  | ConfectMutationRunner
-  | ConfectActionRunner
-  | ConfectVectorSearch
-  | ConvexActionCtx<DataModelFromConfectSchema<ConfectSchema>>
+  | ConfectQueryRunner.ConfectQueryRunner
+  | ConfectMutationRunner.ConfectMutationRunner
+  | ConfectActionRunner.ConfectActionRunner
+  | ConfectVectorSearch.ConfectVectorSearch
+  | ConvexActionCtx.ConvexActionCtx<DataModelFromConfectSchema<ConfectSchema>>
 >;
 
 type BaseHandler<Function extends ConfectApiFunction.AnyWithProps, R> = (

@@ -1,10 +1,10 @@
 import { describe } from "@effect/vitest";
 import { assertEquals, assertFailure } from "@effect/vitest/utils";
 import { Cause, Effect, Runtime } from "effect";
-import { NoUserIdentityFoundError } from "../src/server/auth";
+import { NoUserIdentityFoundError } from "../src/server/ConfectAuth";
 import { api } from "./convex/_generated/api";
-import { TestConvexService } from "./TestConvexService";
 import { effect } from "./test_utils";
+import { TestConvexService } from "./TestConvexService";
 
 describe("authentication", () => {
   effect("when user is authenticated", () =>
@@ -20,7 +20,7 @@ describe("authentication", () => {
       const userIdentity = yield* asUser.query(api.auth.getUserIdentity, {});
 
       assertEquals(userIdentity.name, name);
-    }),
+    })
   );
 
   effect("when user is not authenticated", () =>
@@ -34,9 +34,9 @@ describe("authentication", () => {
       assertFailure(
         exit,
         Cause.die(
-          Runtime.makeFiberFailure(Cause.fail(new NoUserIdentityFoundError())),
-        ),
+          Runtime.makeFiberFailure(Cause.fail(new NoUserIdentityFoundError()))
+        )
       );
-    }),
+    })
   );
 });

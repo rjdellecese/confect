@@ -4,7 +4,7 @@ import { Schema } from "effect";
 import type {
   DataModelFromConfectDataModel,
   GenericConfectDataModel,
-} from "../src/server/data_model";
+} from "../src/server/ConfectDataModel";
 import {
   type ConfectDataModelFromConfectSchema,
   type ConfectSystemDataModel,
@@ -14,7 +14,7 @@ import {
   type confectSystemTableSchemas,
   defineConfectSchema,
   defineConfectTable,
-} from "../src/server/schema";
+} from "../src/server/ConfectSchema";
 import { extendWithSystemFields } from "../src/server/schemas/SystemFields";
 
 describe("ConfectDataModelFromConfectSchema", () => {
@@ -123,7 +123,7 @@ const schemaToTableSchemas = <
   TableSchema extends Schema.Schema.AnyNoContext,
 >(
   name: TableName,
-  schema: TableSchema,
+  schema: TableSchema
 ) => ({
   withSystemFields: extendWithSystemFields(name, schema),
   withoutSystemFields: schema,
@@ -134,7 +134,7 @@ const systemTableSchemas = {
     withSystemFields: extendWithSystemFields(
       "_scheduled_functions",
       confectSystemSchemaDefinition.confectSchema._scheduled_functions
-        .tableSchema,
+        .tableSchema
     ),
     withoutSystemFields:
       confectSystemSchemaDefinition.confectSchema._scheduled_functions
@@ -143,7 +143,7 @@ const systemTableSchemas = {
   _storage: {
     withSystemFields: extendWithSystemFields(
       "_storage",
-      confectSystemSchemaDefinition.confectSchema._storage.tableSchema,
+      confectSystemSchemaDefinition.confectSchema._storage.tableSchema
     ),
     withoutSystemFields:
       confectSystemSchemaDefinition.confectSchema._storage.tableSchema,

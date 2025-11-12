@@ -16,7 +16,7 @@ import {
   UnsupportedPropertySignatureKeyTypeError,
   UnsupportedSchemaTypeError,
   type ValueToValidator,
-} from "../src/server/schema_to_validator";
+} from "../src/server/SchemaToValidator";
 import { GenericId } from "../src/server/schemas/GenericId";
 
 describe(compileAst, () => {
@@ -26,11 +26,11 @@ describe(compileAst, () => {
         const schema = Schema.Any;
         const validator = v.any();
         const compiledValidator = yield* compileAst(
-          Schema.encodedSchema(schema).ast,
+          Schema.encodedSchema(schema).ast
         );
 
         expect(compiledValidator).toStrictEqual(validator);
-      }),
+      })
     );
 
     effect("literal", () =>
@@ -38,11 +38,11 @@ describe(compileAst, () => {
         const schema = Schema.Literal("LiteralString");
         const validator = v.literal("LiteralString");
         const compiledValidator = yield* compileAst(
-          Schema.encodedSchema(schema).ast,
+          Schema.encodedSchema(schema).ast
         );
 
         expect(compiledValidator).toStrictEqual(validator);
-      }),
+      })
     );
 
     effect("literal union", () =>
@@ -50,11 +50,11 @@ describe(compileAst, () => {
         const schema = Schema.Literal("LiteralString", 1);
         const validator = v.union(v.literal("LiteralString"), v.literal(1));
         const compiledValidator = yield* compileAst(
-          Schema.encodedSchema(schema).ast,
+          Schema.encodedSchema(schema).ast
         );
 
         expect(compiledValidator).toStrictEqual(validator);
-      }),
+      })
     );
 
     effect("boolean", () =>
@@ -62,11 +62,11 @@ describe(compileAst, () => {
         const schema = Schema.Boolean;
         const validator = v.boolean();
         const compiledValidator = yield* compileAst(
-          Schema.encodedSchema(schema).ast,
+          Schema.encodedSchema(schema).ast
         );
 
         expect(compiledValidator).toStrictEqual(validator);
-      }),
+      })
     );
 
     effect("string", () =>
@@ -74,11 +74,11 @@ describe(compileAst, () => {
         const schema = Schema.String;
         const validator = v.string();
         const compiledValidator = yield* compileAst(
-          Schema.encodedSchema(schema).ast,
+          Schema.encodedSchema(schema).ast
         );
 
         expect(compiledValidator).toStrictEqual(validator);
-      }),
+      })
     );
 
     effect("number", () =>
@@ -86,11 +86,11 @@ describe(compileAst, () => {
         const schema = Schema.Number;
         const validator = v.float64();
         const compiledValidator = yield* compileAst(
-          Schema.encodedSchema(schema).ast,
+          Schema.encodedSchema(schema).ast
         );
 
         expect(compiledValidator).toStrictEqual(validator);
-      }),
+      })
     );
 
     effect("empty object", () =>
@@ -98,11 +98,11 @@ describe(compileAst, () => {
         const schema = Schema.Struct({});
         const validator = v.object({});
         const compiledValidator = yield* compileAst(
-          Schema.encodedSchema(schema).ast,
+          Schema.encodedSchema(schema).ast
         );
 
         expect(compiledValidator).toStrictEqual(validator);
-      }),
+      })
     );
 
     effect("simple object", () =>
@@ -113,11 +113,11 @@ describe(compileAst, () => {
         });
         const validator = v.object({ foo: v.string(), bar: v.float64() });
         const compiledValidator = yield* compileAst(
-          Schema.encodedSchema(schema).ast,
+          Schema.encodedSchema(schema).ast
         );
 
         expect(compiledValidator).toStrictEqual(validator);
-      }),
+      })
     );
 
     effect("object with optional field (exact)", () =>
@@ -128,11 +128,11 @@ describe(compileAst, () => {
 
         const validator = v.object({ foo: v.optional(v.string()) });
         const compiledValidator = yield* compileAst(
-          Schema.encodedSchema(schema).ast,
+          Schema.encodedSchema(schema).ast
         );
 
         expect(compiledValidator).toStrictEqual(validator);
-      }),
+      })
     );
 
     effect("object with optional field", () =>
@@ -143,11 +143,11 @@ describe(compileAst, () => {
 
         const validator = v.object({ foo: v.optional(v.string()) });
         const compiledValidator = yield* compileAst(
-          Schema.encodedSchema(schema).ast,
+          Schema.encodedSchema(schema).ast
         );
 
         expect(compiledValidator).toStrictEqual(validator);
-      }),
+      })
     );
 
     effect("nested objects", () =>
@@ -163,11 +163,11 @@ describe(compileAst, () => {
           foo: v.object({ bar: v.object({ baz: v.string() }) }),
         });
         const compiledValidator = yield* compileAst(
-          Schema.encodedSchema(schema).ast,
+          Schema.encodedSchema(schema).ast
         );
 
         expect(compiledValidator).toStrictEqual(validator);
-      }),
+      })
     );
 
     effect("union with four elements", () =>
@@ -176,20 +176,20 @@ describe(compileAst, () => {
           Schema.String,
           Schema.Number,
           Schema.Boolean,
-          Schema.Struct({}),
+          Schema.Struct({})
         );
         const validator = v.union(
           v.string(),
           v.float64(),
           v.boolean(),
-          v.object({}),
+          v.object({})
         );
         const compiledValidator = yield* compileAst(
-          Schema.encodedSchema(schema).ast,
+          Schema.encodedSchema(schema).ast
         );
 
         expect(compiledValidator).toStrictEqual(validator);
-      }),
+      })
     );
 
     effect("tuple with one element", () =>
@@ -197,11 +197,11 @@ describe(compileAst, () => {
         const schema = Schema.Tuple(Schema.String);
         const validator = v.array(v.string());
         const compiledValidator = yield* compileAst(
-          Schema.encodedSchema(schema).ast,
+          Schema.encodedSchema(schema).ast
         );
 
         expect(compiledValidator).toStrictEqual(validator);
-      }),
+      })
     );
 
     effect("tuple with two elements", () =>
@@ -209,11 +209,11 @@ describe(compileAst, () => {
         const schema = Schema.Tuple(Schema.String, Schema.Number);
         const validator = v.array(v.union(v.string(), v.float64()));
         const compiledValidator = yield* compileAst(
-          Schema.encodedSchema(schema).ast,
+          Schema.encodedSchema(schema).ast
         );
 
         expect(compiledValidator).toStrictEqual(validator);
-      }),
+      })
     );
 
     effect("tuple with three elements", () =>
@@ -221,17 +221,17 @@ describe(compileAst, () => {
         const schema = Schema.Tuple(
           Schema.String,
           Schema.Number,
-          Schema.Boolean,
+          Schema.Boolean
         );
         const expectedValidator = v.array(
-          v.union(v.string(), v.float64(), v.boolean()),
+          v.union(v.string(), v.float64(), v.boolean())
         );
         const compiledValidator = yield* compileAst(
-          Schema.encodedSchema(schema).ast,
+          Schema.encodedSchema(schema).ast
         );
 
         expect(compiledValidator).toStrictEqual(expectedValidator);
-      }),
+      })
     );
 
     describe("suspend", () => {
@@ -243,17 +243,17 @@ describe(compileAst, () => {
 
           const Foo = Schema.Struct({
             foo: Schema.suspend((): Schema.Schema<Foo> => Foo).pipe(
-              Schema.optional,
+              Schema.optional
             ),
           });
 
           const expectedValidator = v.any();
           const compiledValidator = yield* compileAst(
-            Schema.encodedSchema(Foo).ast,
+            Schema.encodedSchema(Foo).ast
           );
 
           expect(compiledValidator).toStrictEqual(expectedValidator);
-        }),
+        })
       );
 
       effect("tuple with required recursive element", () =>
@@ -267,27 +267,27 @@ describe(compileAst, () => {
 
           const expectedValidator = v.any();
           const compiledValidator = yield* compileAst(
-            Schema.encodedSchema(Foo).ast,
+            Schema.encodedSchema(Foo).ast
           );
 
           expect(compiledValidator).toStrictEqual(expectedValidator);
-        }),
+        })
       );
 
       effect("array with recursive element", () =>
         Effect.gen(function* () {
           type Foo = readonly Foo[];
           const Foo = Schema.Array(
-            Schema.suspend((): Schema.Schema<Foo> => Foo),
+            Schema.suspend((): Schema.Schema<Foo> => Foo)
           );
 
           const expectedValidator = v.any();
           const compiledValidator = yield* compileAst(
-            Schema.encodedSchema(Foo).ast,
+            Schema.encodedSchema(Foo).ast
           );
 
           expect(compiledValidator).toStrictEqual(expectedValidator);
-        }),
+        })
       );
 
       effect("tuple with recursive element", () =>
@@ -295,16 +295,16 @@ describe(compileAst, () => {
           type Foo = readonly [string, Foo];
           const Foo = Schema.Tuple(
             Schema.String,
-            Schema.suspend((): Schema.Schema<Foo> => Foo),
+            Schema.suspend((): Schema.Schema<Foo> => Foo)
           );
 
           const expectedValidator = v.any();
           const compiledValidator = yield* compileAst(
-            Schema.encodedSchema(Foo).ast,
+            Schema.encodedSchema(Foo).ast
           );
 
           expect(compiledValidator).toStrictEqual(expectedValidator);
-        }),
+        })
       );
 
       effect("union with recursive element", () =>
@@ -316,16 +316,16 @@ describe(compileAst, () => {
             Schema.Struct({
               foos: Schema.Array(Schema.suspend((): Schema.Schema<Foo> => Foo)),
             }),
-            Schema.Null,
+            Schema.Null
           );
 
           const expectedValidator = v.any();
           const compiledValidator = yield* compileAst(
-            Schema.encodedSchema(Foo).ast,
+            Schema.encodedSchema(Foo).ast
           );
 
           expect(compiledValidator).toStrictEqual(expectedValidator);
-        }),
+        })
       );
     });
   });
@@ -340,17 +340,17 @@ describe(compileAst, () => {
         });
 
         const exit = yield* Effect.exit(
-          compileAst(Schema.encodedSchema(schema).ast),
+          compileAst(Schema.encodedSchema(schema).ast)
         );
 
         expect(exit).toStrictEqual(
           Exit.fail(
             new UnsupportedPropertySignatureKeyTypeError({
               propertyKey: numberKey,
-            }),
-          ),
+            })
+          )
         );
-      }),
+      })
     );
 
     effect("object with symbol keys", () =>
@@ -362,17 +362,17 @@ describe(compileAst, () => {
         });
 
         const exit = yield* Effect.exit(
-          compileAst(Schema.encodedSchema(schema).ast),
+          compileAst(Schema.encodedSchema(schema).ast)
         );
 
         expect(exit).toStrictEqual(
           Exit.fail(
             new UnsupportedPropertySignatureKeyTypeError({
               propertyKey: symbolKey,
-            }),
-          ),
+            })
+          )
         );
-      }),
+      })
     );
 
     effect("union of string and undefined", () =>
@@ -380,15 +380,15 @@ describe(compileAst, () => {
         const schema = Schema.Union(Schema.String, Schema.Undefined);
 
         const exit = yield* Effect.exit(
-          compileAst(Schema.encodedSchema(schema).ast),
+          compileAst(Schema.encodedSchema(schema).ast)
         );
 
         expect(exit).toStrictEqual(
           Exit.fail(
-            new UnsupportedSchemaTypeError({ schemaType: "UndefinedKeyword" }),
-          ),
+            new UnsupportedSchemaTypeError({ schemaType: "UndefinedKeyword" })
+          )
         );
-      }),
+      })
     );
 
     effect("object with property of union of string and undefined", () =>
@@ -398,15 +398,15 @@ describe(compileAst, () => {
         });
 
         const exit = yield* Effect.exit(
-          compileAst(Schema.encodedSchema(schema).ast),
+          compileAst(Schema.encodedSchema(schema).ast)
         );
 
         expect(exit).toStrictEqual(
           Exit.fail(
-            new UnsupportedSchemaTypeError({ schemaType: "UndefinedKeyword" }),
-          ),
+            new UnsupportedSchemaTypeError({ schemaType: "UndefinedKeyword" })
+          )
         );
-      }),
+      })
     );
 
     effect("empty tuple", () =>
@@ -414,13 +414,13 @@ describe(compileAst, () => {
         const schema = Schema.Tuple();
 
         const exit = yield* Effect.exit(
-          compileAst(Schema.encodedSchema(schema).ast),
+          compileAst(Schema.encodedSchema(schema).ast)
         );
 
         expect(exit).toStrictEqual(
-          Exit.fail(new EmptyTupleIsNotSupportedError()),
+          Exit.fail(new EmptyTupleIsNotSupportedError())
         );
-      }),
+      })
     );
 
     effect("tuple with an optional element", () =>
@@ -428,13 +428,13 @@ describe(compileAst, () => {
         const schema = Schema.Tuple(Schema.optionalElement(Schema.String));
 
         const exit = yield* Effect.exit(
-          compileAst(Schema.encodedSchema(schema).ast),
+          compileAst(Schema.encodedSchema(schema).ast)
         );
 
         expect(exit).toStrictEqual(
-          Exit.fail(new OptionalTupleElementsAreNotSupportedError()),
+          Exit.fail(new OptionalTupleElementsAreNotSupportedError())
         );
-      }),
+      })
     );
 
     effect("unsupported keyword", () =>
@@ -442,15 +442,15 @@ describe(compileAst, () => {
         const schema = Schema.Undefined;
 
         const exit = yield* Effect.exit(
-          compileAst(Schema.encodedSchema(schema).ast),
+          compileAst(Schema.encodedSchema(schema).ast)
         );
 
         expect(exit).toStrictEqual(
           Exit.fail(
-            new UnsupportedSchemaTypeError({ schemaType: "UndefinedKeyword" }),
-          ),
+            new UnsupportedSchemaTypeError({ schemaType: "UndefinedKeyword" })
+          )
         );
-      }),
+      })
     );
 
     effect("unsupported declaration", () =>
@@ -460,15 +460,15 @@ describe(compileAst, () => {
         const schema = Schema.instanceOf(Klass);
 
         const exit = yield* Effect.exit(
-          compileAst(Schema.encodedSchema(schema).ast),
+          compileAst(Schema.encodedSchema(schema).ast)
         );
 
         expect(exit).toStrictEqual(
           Exit.fail(
-            new UnsupportedSchemaTypeError({ schemaType: "Declaration" }),
-          ),
+            new UnsupportedSchemaTypeError({ schemaType: "Declaration" })
+          )
         );
-      }),
+      })
     );
   });
 });
@@ -648,7 +648,7 @@ describe(compileSchema, () => {
       type ExpectedValidator = typeof expectedValidator;
 
       const compiledValidator = compileSchema(
-        Schema.String.pipe(Schema.filter((s) => s.length > 1)),
+        Schema.String.pipe(Schema.filter((s) => s.length > 1))
       );
       type CompiledValidator = typeof compiledValidator;
 
@@ -665,7 +665,7 @@ describe(compileSchema, () => {
           Schema.Record({
             key: Schema.String,
             value: Schema.Number,
-          }),
+          })
         );
         type CompiledValidator = typeof compiledValidator;
 
@@ -678,11 +678,11 @@ describe(compileSchema, () => {
           {
             foo: Schema.String,
           },
-          { key: Schema.String, value: Schema.Number },
+          { key: Schema.String, value: Schema.Number }
         );
 
         expect(() => compileSchema(schema)).toThrow(
-          new MixedIndexAndPropertySignaturesAreNotSupportedError(),
+          new MixedIndexAndPropertySignaturesAreNotSupportedError()
         );
       });
     });
@@ -744,7 +744,7 @@ describe("suspend", () => {
     type Foo = readonly [Foo, string];
     const Foo = Schema.Tuple(
       Schema.suspend((): Schema.Schema<Foo> => Foo),
-      Schema.String,
+      Schema.String
     );
     const compiledValidator = compileSchema(Foo);
     type CompiledValidator = typeof compiledValidator;
@@ -764,7 +764,7 @@ describe("suspend", () => {
       Schema.Struct({
         foos: Schema.Array(Schema.suspend((): Schema.Schema<Foo> => Foo)),
       }),
-      Schema.Null,
+      Schema.Null
     );
     const compiledValidator = compileSchema(Foo);
     type CompiledValidator = typeof compiledValidator;
@@ -1146,7 +1146,7 @@ describe("ValueToValidator", () => {
       const _expectedValidator = v.union(
         v.string(),
         v.float64(),
-        v.array(v.boolean()),
+        v.array(v.boolean())
       );
       type ExpectedValidator = typeof _expectedValidator;
 
@@ -1215,7 +1215,7 @@ describe(compileTableSchema, () => {
       Schema.Struct({
         foo: Schema.String,
         bar: Schema.optional(Schema.Struct({ bar: Schema.Number })),
-      }),
+      })
     );
 
     const expectedValidator = v.object({
@@ -1229,7 +1229,7 @@ describe(compileTableSchema, () => {
 
   test("succeeds if provided Schema is a Union", () => {
     const compiledValidator = compileTableSchema(
-      Schema.Union(Schema.String, Schema.Number),
+      Schema.Union(Schema.String, Schema.Number)
     );
 
     const expectedValidator = v.union(v.string(), v.number());
@@ -1242,7 +1242,7 @@ describe(compileTableSchema, () => {
     const stringSchema = Schema.String;
 
     expect(() => compileTableSchema(stringSchema)).toThrow(
-      new TopLevelMustBeObjectOrUnionError(),
+      new TopLevelMustBeObjectOrUnionError()
     );
   });
 
@@ -1259,11 +1259,11 @@ describe(compileTableSchema, () => {
   test("fails if provided Schema contains index signatures", () => {
     const structWithIndexSignatures = Schema.Struct(
       { foo: Schema.String },
-      { key: Schema.String, value: Schema.String },
+      { key: Schema.String, value: Schema.String }
     );
 
     expect(() => compileTableSchema(structWithIndexSignatures)).toThrow(
-      new IndexSignaturesAreNotSupportedError(),
+      new IndexSignaturesAreNotSupportedError()
     );
   });
 
@@ -1275,9 +1275,9 @@ describe(compileTableSchema, () => {
       }).pipe(Effect.exit);
 
       expect(exit).toStrictEqual(
-        Exit.fail(new TopLevelMustBeObjectOrUnionError()),
+        Exit.fail(new TopLevelMustBeObjectOrUnionError())
       );
-    }),
+    })
   );
 });
 
@@ -1287,7 +1287,7 @@ describe(compileArgsSchema, () => {
       Schema.Struct({
         foo: Schema.String,
         bar: Schema.optional(Schema.Number),
-      }),
+      })
     );
     const expectedArgsValidator = {
       foo: v.string(),
@@ -1301,7 +1301,7 @@ describe(compileArgsSchema, () => {
     Effect.gen(function* () {
       const structWithIndexSignatures = Schema.Struct(
         { foo: Schema.String },
-        { key: Schema.String, value: Schema.String },
+        { key: Schema.String, value: Schema.String }
       );
 
       const exit = yield* Effect.try({
@@ -1310,9 +1310,9 @@ describe(compileArgsSchema, () => {
       }).pipe(Effect.exit);
 
       expect(exit).toStrictEqual(
-        Exit.fail(new IndexSignaturesAreNotSupportedError()),
+        Exit.fail(new IndexSignaturesAreNotSupportedError())
       );
-    }),
+    })
   );
 
   effect("fails if provided Schema is not a Struct", () =>
@@ -1323,6 +1323,6 @@ describe(compileArgsSchema, () => {
       }).pipe(Effect.exit);
 
       expect(exit).toStrictEqual(Exit.fail(new TopLevelMustBeObjectError()));
-    }),
+    })
   );
 });

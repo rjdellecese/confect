@@ -16,25 +16,20 @@ import {
   type RouteSpecWithPathPrefix,
 } from "convex/server";
 import { Array, Layer, pipe, Record } from "effect";
-import { ConfectAuth } from "./auth";
-import { ConvexActionCtx } from "./ctx";
-import {
-  type ConfectActionRunner,
-  type ConfectMutationRunner,
-  type ConfectQueryRunner,
-  confectActionRunnerLayer,
-  confectMutationRunnerLayer,
-  confectQueryRunnerLayer,
-} from "./runners";
-import { ConfectScheduler } from "./scheduler";
+import * as ConfectActionRunner from "./ConfectActionRunner";
+import * as ConfectAuth from "./ConfectAuth";
+import * as ConfectMutationRunner from "./ConfectMutationRunner";
+import * as ConfectQueryRunner from "./ConfectQueryRunner";
+import * as ConfectScheduler from "./ConfectScheduler";
 import {
   ConfectStorageActionWriter,
   ConfectStorageReader,
   ConfectStorageWriter,
-} from "./storage";
+} from "./ConfectStorage";
+import * as ConvexActionCtx from "./ConvexActionCtx";
 
 type Middleware = (
-  httpApp: HttpApp.Default,
+  httpApp: HttpApp.Default
 ) => HttpApp.Default<
   never,
   HttpApi.Api | HttpApiBuilder.Router | HttpRouter.HttpRouter.DefaultServices
@@ -51,11 +46,11 @@ const makeHandler =
     apiLive: Layer.Layer<
       HttpApi.Api,
       never,
-      | ConfectQueryRunner
-      | ConfectMutationRunner
-      | ConfectActionRunner
-      | ConfectScheduler
-      | ConfectAuth
+      | ConfectQueryRunner.ConfectQueryRunner
+      | ConfectMutationRunner.ConfectMutationRunner
+      | ConfectActionRunner.ConfectActionRunner
+      | ConfectScheduler.ConfectScheduler
+      | ConfectAuth.ConfectAuth
       | ConfectStorageReader
       | ConfectStorageWriter
       | ConfectStorageActionWriter
@@ -68,17 +63,17 @@ const makeHandler =
     const ApiLive = apiLive.pipe(
       Layer.provide(
         Layer.mergeAll(
-          confectQueryRunnerLayer(ctx.runQuery),
-          confectMutationRunnerLayer(ctx.runMutation),
-          confectActionRunnerLayer(ctx.runAction),
+          ConfectQueryRunner.layer(ctx.runQuery),
+          ConfectMutationRunner.layer(ctx.runMutation),
+          ConfectActionRunner.layer(ctx.runAction),
           ConfectScheduler.layer(ctx.scheduler),
           ConfectAuth.layer(ctx.auth),
           ConfectStorageReader.layer(ctx.storage),
           ConfectStorageWriter.layer(ctx.storage),
           ConfectStorageActionWriter.layer(ctx.storage),
-          Layer.succeed(ConvexActionCtx<DataModel>(), ctx),
-        ),
-      ),
+          Layer.succeed(ConvexActionCtx.ConvexActionCtx<DataModel>(), ctx)
+        )
+      )
     );
 
     const ApiDocsLive = HttpApiScalar.layer({
@@ -92,7 +87,7 @@ const makeHandler =
     const EnvLive = Layer.mergeAll(
       ApiLive,
       ApiDocsLive,
-      HttpServer.layerContext,
+      HttpServer.layerContext
     );
 
     const { handler } = HttpApiBuilder.toWebHandler(EnvLive, { middleware });
@@ -110,11 +105,11 @@ const makeHttpAction = <DataModel extends GenericDataModel>({
   apiLive: Layer.Layer<
     HttpApi.Api,
     never,
-    | ConfectQueryRunner
-    | ConfectMutationRunner
-    | ConfectActionRunner
-    | ConfectScheduler
-    | ConfectAuth
+    | ConfectQueryRunner.ConfectQueryRunner
+    | ConfectMutationRunner.ConfectMutationRunner
+    | ConfectActionRunner.ConfectActionRunner
+    | ConfectScheduler.ConfectScheduler
+    | ConfectAuth.ConfectAuth
     | ConfectStorageReader
     | ConfectStorageWriter
     | ConfectStorageActionWriter
@@ -131,19 +126,19 @@ const makeHttpAction = <DataModel extends GenericDataModel>({
       scalar,
     }) as unknown as (
       ctx: GenericActionCtx<GenericDataModel>,
-      request: Request,
-    ) => Promise<Response>,
+      request: Request
+    ) => Promise<Response>
   );
 
 export type ConfectHttpApi = {
   apiLive: Layer.Layer<
     HttpApi.Api,
     never,
-    | ConfectQueryRunner
-    | ConfectMutationRunner
-    | ConfectActionRunner
-    | ConfectScheduler
-    | ConfectAuth
+    | ConfectQueryRunner.ConfectQueryRunner
+    | ConfectMutationRunner.ConfectMutationRunner
+    | ConfectActionRunner.ConfectActionRunner
+    | ConfectScheduler.ConfectScheduler
+    | ConfectAuth.ConfectAuth
     | ConfectStorageReader
     | ConfectStorageWriter
     | ConfectStorageActionWriter
@@ -165,11 +160,11 @@ const mountEffectHttpApi =
     apiLive: Layer.Layer<
       HttpApi.Api,
       never,
-      | ConfectQueryRunner
-      | ConfectMutationRunner
-      | ConfectActionRunner
-      | ConfectScheduler
-      | ConfectAuth
+      | ConfectQueryRunner.ConfectQueryRunner
+      | ConfectMutationRunner.ConfectMutationRunner
+      | ConfectActionRunner.ConfectActionRunner
+      | ConfectScheduler.ConfectScheduler
+      | ConfectAuth.ConfectAuth
       | ConfectStorageReader
       | ConfectStorageWriter
       | ConfectStorageActionWriter
@@ -201,7 +196,7 @@ const mountEffectHttpApi =
 type ConfectHttpApis = Partial<Record<RoutePath, ConfectHttpApi>>;
 
 export const makeConvexHttpRouter = (
-  confectHttpApis: ConfectHttpApis,
+  confectHttpApis: ConfectHttpApis
 ): ConvexHttpRouter => {
   applyMonkeyPatches();
 
@@ -215,8 +210,8 @@ export const makeConvexHttpRouter = (
           pathPrefix: pathPrefix as RoutePath,
           apiLive,
           middleware,
-        })(convexHttpRouter),
-    ),
+        })(convexHttpRouter)
+    )
   );
 };
 

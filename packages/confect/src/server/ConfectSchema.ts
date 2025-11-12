@@ -19,15 +19,15 @@ import { pipe, Record, Schema } from "effect";
 import type {
   DataModelFromConfectDataModel,
   GenericConfectDataModel,
-} from "./data_model";
+} from "./ConfectDataModel";
 import {
   compileTableSchema,
   type TableSchemaToTableValidator,
-} from "./schema_to_validator";
+} from "./SchemaToValidator";
 import {
   type ExtendWithSystemFields,
   extendWithSystemFields,
-} from "./schemas/SystemFields";
+} from "./SystemFields";
 
 export const confectSystemTableSchemas = {
   _scheduled_functions: Schema.Struct({
