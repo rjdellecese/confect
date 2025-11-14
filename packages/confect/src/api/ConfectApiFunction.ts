@@ -66,7 +66,29 @@ export declare namespace ConfectApiFunction {
 
   export type FunctionType = "Query" | "Mutation" | "Action";
 
+  export type GetFunctionType<Function extends AnyWithProps> =
+    Function extends ConfectApiFunction<
+      infer FunctionType,
+      infer _FunctionVisibility,
+      infer _Name,
+      infer _Args,
+      infer _Returns
+    >
+      ? FunctionType
+      : never;
+
   export type FunctionVisibility = "Public" | "Internal";
+
+  export type GetFunctionVisibility<Function extends AnyWithProps> =
+    Function extends ConfectApiFunction<
+      infer _FunctionType,
+      infer FunctionVisibility,
+      infer _Name,
+      infer _Args,
+      infer _Returns
+    >
+      ? FunctionVisibility
+      : never;
 
   export type Name<Function extends AnyWithProps> =
     Function extends ConfectApiFunction<

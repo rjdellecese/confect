@@ -6,6 +6,7 @@ import * as ConfectApi from "./ConfectApi";
 import * as ConfectApiBuilder from "./ConfectApiBuilder";
 import * as ConfectApiFunction from "./ConfectApiFunction";
 import * as ConfectApiGroup from "./ConfectApiGroup";
+import * as ConfectApiRefs from "./ConfectApiRefs";
 import * as ConfectApiServer from "./ConfectApiServer";
 import * as ConfectApiSpec from "./ConfectApiSpec";
 
@@ -131,3 +132,9 @@ const server = ConfectApiServer.make(ApiLive)
   .then((s) => {
     console.log(s);
   });
+
+type Refs = ConfectApiRefs.ConfectApiRefs<typeof Spec>;
+
+const Refs = ConfectApiRefs.make(Spec);
+
+const a = Refs.groupB.groupBC.myFunction3;

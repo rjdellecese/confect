@@ -133,7 +133,7 @@ export const group = <
     "."
   );
 
-  // TODO: Move this implementation to a module for handling paths/group paths
+  // TODO: Move this implementation to a module for handling paths/group paths?
   const group = Array.reduce(
     restGroupPathParts,
     api.spec.groups[firstGroupPathPart as keyof typeof api.spec.groups]!,
@@ -151,17 +151,15 @@ export const group = <
         makeHandlers({ group, items })
       ) as Handlers.AnyWithProps;
 
-      yield* Effect.forEach(handlers.items, (handlerItem) =>
-        Effect.gen(function* () {
-          const functionPath = Array.join(
-            [groupPath, handlerItem.function_.name],
-            "."
-          );
-
-          return yield* registry.add(functionPath, handlerItem);
-        })
-      );
+      for (const handlerItem of handlers.items) {
+        const functionPath = Array.join(
+          [groupPath, handlerItem.function_.name],
+          "."
+        );
+        yield* registry.add(functionPath, handlerItem);
+      }
     })
+    // TODO: Maybe don't need to fake this after converting ConfectApiRegistry to use Context.Reference?
   ) as any;
 };
 

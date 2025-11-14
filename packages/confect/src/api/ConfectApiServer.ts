@@ -74,7 +74,7 @@ const Proto = {
   [TypeId]: TypeId,
 };
 
-const make_ = ({
+const makeProto = ({
   registeredFunctions,
 }: {
   registeredFunctions: Record.ReadonlyRecord<string, RegisteredFunction>;
@@ -96,7 +96,7 @@ export const make = (
       makeRegisteredFunction(api, handlerItem)
     );
 
-    const server = make_({
+    const server = makeProto({
       registeredFunctions,
     });
 

@@ -1,6 +1,7 @@
 import { Effect, Record, Ref } from "effect";
 import * as ConfectApiBuilder from "./ConfectApiBuilder";
 
+// TODO: Rewrite to be synchronous using Context.Reference
 export class ConfectApiRegistry extends Effect.Service<ConfectApiRegistry>()(
   "@rjdellecese/confect/ConfectApiRegistry",
   {
