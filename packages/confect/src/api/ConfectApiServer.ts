@@ -21,6 +21,7 @@ import {
   pipe,
   Predicate,
   Record,
+  Ref,
   Schema,
   Types,
 } from "effect";
@@ -90,7 +91,7 @@ export const make = (
     const { api } = yield* ConfectApiBuilder.ConfectApiService;
     const registry = yield* ConfectApiRegistry.ConfectApiRegistry;
 
-    const handlerItems = yield* registry.handlerItems;
+    const handlerItems = yield* Ref.get(registry);
 
     const registeredFunctions = Record.map(handlerItems, (handlerItem) =>
       makeRegisteredFunction(api, handlerItem)
@@ -101,13 +102,7 @@ export const make = (
     });
 
     return yield* Effect.succeed(server);
-  }).pipe(
-    Effect.provide(
-      apiServiceLayer.pipe(
-        Layer.provideMerge(ConfectApiRegistry.ConfectApiRegistry.Default)
-      )
-    )
-  );
+  }).pipe(Effect.provide(apiServiceLayer));
 
 const makeRegisteredFunction = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
   api: Api,

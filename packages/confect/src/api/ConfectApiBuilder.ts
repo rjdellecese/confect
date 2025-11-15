@@ -1,4 +1,14 @@
-import { Array, Context, Effect, Function, Layer, String, Types } from "effect";
+import {
+  Array,
+  Context,
+  Effect,
+  Function,
+  Layer,
+  Record,
+  Ref,
+  String,
+  Types,
+} from "effect";
 import { GenericConfectSchema } from "../server/ConfectSchema";
 import * as ConfectApi from "./ConfectApi";
 import * as ConfectApiFunction from "./ConfectApiFunction";
@@ -143,7 +153,13 @@ export const group = <
 
   const items = Array.empty();
 
-  return Layer.scopedDiscard(
+  const apiName = api.spec.name;
+
+  return Layer.effect(
+    ConfectApiGroupService<ApiName, GroupPath>({
+      apiName,
+      groupPath,
+    }),
     Effect.gen(function* () {
       const registry = yield* ConfectApiRegistry.ConfectApiRegistry;
 
@@ -156,11 +172,15 @@ export const group = <
           [groupPath, handlerItem.function_.name],
           "."
         );
-        yield* registry.add(functionPath, handlerItem);
+        yield* Ref.update(registry, Record.set(functionPath, handlerItem));
       }
+
+      return yield* Effect.succeed({
+        apiName,
+        groupPath,
+      });
     })
-    // TODO: Maybe don't need to fake this after converting ConfectApiRegistry to use Context.Reference?
-  ) as any;
+  );
 };
 
 export const api = <
