@@ -18,10 +18,14 @@ const greetCommand = Command.make("greet", { name: nameOption }, ({ name }) =>
   )
 ).pipe(Command.withDescription("A simple greeting command"));
 
+const generateCommand = Command.make("generate", {}, () =>
+  Console.log("This is a dummy Confect CLI command.")
+).pipe(Command.withDescription("Generate Convex functions from a Confect API"));
+
 // Define the main CLI application
 const cli = Command.make("confect").pipe(
   Command.withDescription("Confect CLI - Use Effect with Convex!"),
-  Command.withSubcommands([greetCommand])
+  Command.withSubcommands([greetCommand, generateCommand])
 );
 
 // Run the CLI

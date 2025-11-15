@@ -17,13 +17,13 @@ export {
   ConfectStorageWriter,
 } from "./ConfectStorage";
 export { ConfectVectorSearch } from "./ConfectVectorSearch";
-export { ConvexActionCtx, ConvexMutationCtx, ConvexQueryCtx } from "./ctx";
-export { makeConfectFunctions } from "./functions";
-export {
-  ConfectActionRunner,
-  ConfectMutationRunner,
-  ConfectQueryRunner,
-} from "./runners";
-export { GenericId } from "./schemas/GenericId";
-export { PaginationResult } from "./schemas/PaginationResult";
+// export { ConvexActionCtx, ConvexMutationCtx, ConvexQueryCtx } from "./ctx";
+// export { makeConfectFunctions } from "./functions";
+// export {
+//   ConfectActionRunner,
+//   ConfectMutationRunner,
+//   ConfectQueryRunner,
+// } from "./runners";
+// export { GenericId } from "./schemas/GenericId";
+// export { PaginationResult } from "./schemas/PaginationResult";
 export { compileSchema } from "./SchemaToValidator";
