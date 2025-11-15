@@ -42,8 +42,12 @@ export declare namespace ConfectApiRefs {
 }
 
 const HiddenFunction = Symbol.for("@rjdellecese/confect/HiddenFunction");
-
 type HiddenFunction = typeof HiddenFunction;
+
+const HiddenConvexFunctionName = Symbol.for(
+  "@rjdellecese/confect/HiddenConvexFunctionName"
+);
+type HiddenConvexFunctionName = typeof HiddenConvexFunctionName;
 
 export type ConfectApiRef<
   FunctionType extends ConfectApiFunction.ConfectApiFunction.FunctionType,
@@ -52,6 +56,7 @@ export type ConfectApiRef<
   Args,
   Returns,
 > = {
+  readonly [HiddenConvexFunctionName]: string;
   readonly [HiddenFunction]: ConfectApiFunction.ConfectApiFunction<
     FunctionType,
     FunctionVisibility,
@@ -68,6 +73,10 @@ const makeFunctionRef = <
   Args,
   Returns,
 >(
+  /**
+   * This is a Convex "function name" of the format "myGroupDir/myGroupMod:myFunc".
+   */
+  convexFunctionName: string,
   function_: ConfectApiFunction.ConfectApiFunction<
     FunctionType,
     FunctionVisibility,
@@ -77,33 +86,38 @@ const makeFunctionRef = <
   >
 ): ConfectApiRef<FunctionType, FunctionVisibility, Args, Returns> => ({
   [HiddenFunction]: function_,
+  [HiddenConvexFunctionName]: convexFunctionName,
 });
 
 export const make = <Spec extends ConfectApiSpec.ConfectApiSpec.AnyWithProps>(
   spec: Spec
-): ConfectApiRefs<Spec> => makeHelper(spec.groups);
+): Types.Simplify<ConfectApiRefs<Spec>> =>
+  makeHelper(spec.groups, null) as Types.Simplify<ConfectApiRefs<Spec>>;
 
 const makeHelper = (
   groups: Record.ReadonlyRecord<
     string,
     ConfectApiGroup.ConfectApiGroup.AnyWithProps
-  >
+  >,
+  groupPath: string | null
 ): ConfectApiRefs.AnyWithProps =>
   pipe(
     groups,
-    Record.map(
-      (group) =>
-        [
-          group.name,
-          Record.union(
-            makeHelper(group.groups),
-            Record.map(group.functions, makeFunctionRef),
-            (_subGroup, _function) => {
-              throw new Error(
-                `Group and function at same level have same name ('${_function[HiddenFunction].name})'`
-              );
-            }
-          ),
-        ] as const
-    )
+    Record.map((group) => {
+      const currentGroupPath = groupPath
+        ? `${groupPath}/${group.name}`
+        : group.name;
+
+      return Record.union(
+        makeHelper(group.groups, currentGroupPath),
+        Record.map(group.functions, (function_) =>
+          makeFunctionRef(`${currentGroupPath}:${function_.name}`, function_)
+        ),
+        (_subGroup, _function) => {
+          throw new Error(
+            `Group and function at same level have same name ('${_function[HiddenFunction].name})'`
+          );
+        }
+      );
+    })
   );

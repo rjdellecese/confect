@@ -133,8 +133,8 @@ const server = ConfectApiServer.make(ApiLive)
     console.log(s);
   });
 
-type Refs = ConfectApiRefs.ConfectApiRefs<typeof Spec>;
+const refs = ConfectApiRefs.make(Spec);
 
-const Refs = ConfectApiRefs.make(Spec);
+console.dir(refs, { depth: null, colors: true });
 
-const a = Refs.groupB.groupBC.myFunction3;
+const a = refs.groupB.groupBC.myFunction3;
