@@ -127,8 +127,8 @@ const ApiLive = ConfectApiBuilder.api(Api).pipe(
   Layer.provide(GroupBLive)
 );
 
-const server = ConfectApiServer.make(ApiLive)
-  .pipe(Effect.runPromise)
+const server = ConfectApiServer.make
+  .pipe(Effect.provide(ApiLive), Effect.runPromise)
   .then((s) => {
     console.log(s);
   });

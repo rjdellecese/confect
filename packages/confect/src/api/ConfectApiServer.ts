@@ -23,7 +23,6 @@ import {
   Record,
   Ref,
   Schema,
-  Types,
 } from "effect";
 import * as ConfectActionRunner from "../server/ConfectActionRunner";
 import * as ConfectAuth from "../server/ConfectAuth";
@@ -63,13 +62,13 @@ export type TypeId = typeof TypeId;
 export const isConfectApiServer = (u: unknown): u is ConfectApiServer =>
   Predicate.hasProperty(u, TypeId);
 
-export type ConfectApiServer = Types.Simplify<{
+export interface ConfectApiServer {
   readonly [TypeId]: TypeId;
   readonly registeredFunctions: Record.ReadonlyRecord<
     string,
     RegisteredFunction
   >;
-}>;
+}
 
 const Proto = {
   [TypeId]: TypeId,
@@ -84,25 +83,18 @@ const makeProto = ({
     registeredFunctions,
   });
 
-export const make = (
-  apiServiceLayer: Layer.Layer<ConfectApiBuilder.ConfectApiService>
-): Effect.Effect<ConfectApiServer> =>
-  Effect.gen(function* () {
-    const { api } = yield* ConfectApiBuilder.ConfectApiService;
-    const registry = yield* ConfectApiRegistry.ConfectApiRegistry;
+export const make = Effect.gen(function* () {
+  const { api } = yield* ConfectApiBuilder.ConfectApiService;
+  const registry = yield* ConfectApiRegistry.ConfectApiRegistry;
 
-    const handlerItems = yield* Ref.get(registry);
+  const handlerItems = yield* Ref.get(registry);
 
-    const registeredFunctions = Record.map(handlerItems, (handlerItem) =>
-      makeRegisteredFunction(api, handlerItem)
-    );
+  const registeredFunctions = Record.map(handlerItems, (handlerItem) =>
+    makeRegisteredFunction(api, handlerItem)
+  );
 
-    const server = makeProto({
-      registeredFunctions,
-    });
-
-    return yield* Effect.succeed(server);
-  }).pipe(Effect.provide(apiServiceLayer));
+  return makeProto({ registeredFunctions });
+});
 
 const makeRegisteredFunction = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
   api: Api,
