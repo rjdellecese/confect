@@ -13,7 +13,6 @@ export type TypeId = typeof TypeId;
 export const isConfectApi = (u: unknown): u is ConfectApi.Any =>
   Predicate.hasProperty(u, TypeId);
 
-// TODO: Rename this to ConfectApiScaffolding? Or something else?
 export interface ConfectApi<
   ConfectSchema extends GenericConfectSchema,
   Name extends string,
