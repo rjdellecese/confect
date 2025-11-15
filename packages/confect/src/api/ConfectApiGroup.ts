@@ -103,14 +103,15 @@ export declare namespace Path {
   // Recursively generates paths for a group and its nested groups.
   // For a group with no subgroups, returns just the group name.
   // For a group with subgroups, returns the group name plus all possible paths
-  // through its direct subgroups (not all groups in the union).
-  export type All<Group extends ConfectApiGroup.Any> = [
-    ConfectApiGroup.Groups<Group>,
-  ] extends [never]
-    ? ConfectApiGroup.Name<Group>
-    :
-        | ConfectApiGroup.Name<Group>
-        | AllHelper<Group, ConfectApiGroup.Groups<Group>>;
+  // through its direct subgroups. Properly distributes over union types to prevent
+  // cross-contamination of paths from different groups.
+  export type All<Group extends ConfectApiGroup.Any> = Group extends any
+    ? [ConfectApiGroup.Groups<Group>] extends [never]
+      ? ConfectApiGroup.Name<Group>
+      :
+          | ConfectApiGroup.Name<Group>
+          | AllHelper<Group, ConfectApiGroup.Groups<Group>>
+    : never;
 
   type AllHelper<
     Parent extends ConfectApiGroup.Any,
