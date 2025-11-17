@@ -74,7 +74,7 @@
     "@vitest/coverage-v8": "4.0.7",
     "convex-test": "0.0.38",
     "dotenv": "17.2.3",
-    "tsup": "8.5.0",
+    "tsup": "8.5.1",
     "typescript": "5.9.3",
     "vite": "7.2.1",
     "vite-tsconfig-paths": "5.1.4",
