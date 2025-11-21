@@ -28,7 +28,7 @@ export default defineConfig([
   }),
   createConfig({
     platform: "browser",
-    entry: ["src/react/**/*.ts"],
+    entry: ["src/react/index.ts"],
     clean: false,
   }),
   createConfig({ platform: "node", entry: ["src/cli/index.ts"], clean: false }),
