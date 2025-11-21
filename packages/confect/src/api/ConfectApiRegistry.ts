@@ -11,5 +11,5 @@ export class ConfectApiRegistry extends Context.Reference<ConfectApiRegistry>()(
   "@rjdellecese/confect/ConfectApiRegistry",
   {
     defaultValue: () => Ref.unsafeMake(Record.empty() as HandlerItemRegistry),
-  }
+  },
 ) {}

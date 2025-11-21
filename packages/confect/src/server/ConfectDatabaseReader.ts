@@ -1,6 +1,5 @@
 import type { GenericDatabaseReader } from "convex/server";
-import { Array, Context, Layer, Struct } from "effect";
-import type { BaseDatabaseReader } from "../typeUtils";
+import { Array, Context, Layer } from "effect";
 import type { DataModelFromConfectDataModel } from "./ConfectDataModel";
 import * as ConfectQueryInitializer from "./ConfectQueryInitializer";
 import type {
@@ -10,7 +9,7 @@ import type {
   TableNamesInConfectSchema,
 } from "./ConfectSchema";
 import {
-  confectSystemSchema,
+  confectSystemTableDefinitions,
   extendWithConfectSystemSchema,
 } from "./ConfectSchema";
 
@@ -38,17 +37,16 @@ export const make = <
     >(
       tableName: TableName,
     ) => {
-      const confectTableDefinition = extendWithConfectSystemSchema(
+      const extendedSchema = extendWithConfectSystemSchema(
         confectSchemaDefinition.confectSchema,
-      )[tableName] as ConfectSchemaWithSystemTables[TableName];
+      );
+      const confectTableDefinition = extendedSchema.find(
+        (def) => def.tableName === tableName,
+      )!;
 
-      const baseDatabaseReader: BaseDatabaseReader<
-        DataModelFromConfectDataModel<
-          ConfectDataModelFromConfectSchema<ConfectSchemaWithSystemTables>
-        >
-      > = Array.some(
-        Struct.keys(confectSystemSchema),
-        (systemTableName) => systemTableName === tableName,
+      const baseDatabaseReader = Array.some(
+        confectSystemTableDefinitions,
+        (systemTableDef) => systemTableDef.tableName === tableName,
       )
         ? {
             get: convexDatabaseReader.system.get,
@@ -59,10 +57,11 @@ export const make = <
             query: convexDatabaseReader.query,
           };
 
-      return ConfectQueryInitializer.make<
-        ConfectSchemaWithSystemTables,
-        TableName
-      >(tableName, baseDatabaseReader, confectTableDefinition);
+      return ConfectQueryInitializer.make(
+        tableName,
+        baseDatabaseReader,
+        confectTableDefinition,
+      );
     },
   };
 };

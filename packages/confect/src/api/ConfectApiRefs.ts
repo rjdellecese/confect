@@ -46,7 +46,7 @@ const HiddenFunction = Symbol.for("@rjdellecese/confect/HiddenFunction");
 type HiddenFunction = typeof HiddenFunction;
 
 const HiddenConvexFunctionName = Symbol.for(
-  "@rjdellecese/confect/HiddenConvexFunctionName"
+  "@rjdellecese/confect/HiddenConvexFunctionName",
 );
 type HiddenConvexFunctionName = typeof HiddenConvexFunctionName;
 
@@ -84,7 +84,7 @@ const makeFunctionRef = <
     string,
     Schema.Schema<Args, unknown>,
     Schema.Schema<Returns, unknown>
-  >
+  >,
 ): ConfectApiRef<FunctionType, FunctionVisibility, Args, Returns> => ({
   [HiddenFunction]: function_,
   [HiddenConvexFunctionName]: convexFunctionName,
@@ -97,7 +97,7 @@ export const getConvexFunctionName = <
   Args,
   Returns,
 >(
-  ref: ConfectApiRef<FunctionType, FunctionVisibility, Args, Returns>
+  ref: ConfectApiRef<FunctionType, FunctionVisibility, Args, Returns>,
 ): string => ref[HiddenConvexFunctionName];
 
 export const getFunction = <
@@ -107,7 +107,7 @@ export const getFunction = <
   Args,
   Returns,
 >(
-  ref: ConfectApiRef<FunctionType, FunctionVisibility, Args, Returns>
+  ref: ConfectApiRef<FunctionType, FunctionVisibility, Args, Returns>,
 ): ConfectApiFunction.ConfectApiFunction<
   FunctionType,
   FunctionVisibility,
@@ -117,7 +117,7 @@ export const getFunction = <
 > => ref[HiddenFunction];
 
 export const make = <Spec extends ConfectApiSpec.ConfectApiSpec.AnyWithProps>(
-  spec: Spec
+  spec: Spec,
 ): ConfectApiRefs<Spec> =>
   makeHelper(spec.groups, null) as ConfectApiRefs<Spec>;
 
@@ -126,7 +126,7 @@ const makeHelper = (
     string,
     ConfectApiGroup.ConfectApiGroup.AnyWithProps
   >,
-  groupPath: string | null
+  groupPath: string | null,
 ): ConfectApiRefs.AnyWithProps =>
   pipe(
     groups,
@@ -138,13 +138,13 @@ const makeHelper = (
       return Record.union(
         makeHelper(group.groups, currentGroupPath),
         Record.map(group.functions, (function_) =>
-          makeFunctionRef(`${currentGroupPath}:${function_.name}`, function_)
+          makeFunctionRef(`${currentGroupPath}:${function_.name}`, function_),
         ),
         (_subGroup, _function) => {
           throw new Error(
-            `Group and function at same level have same name ('${_function[HiddenFunction].name})'`
+            `Group and function at same level have same name ('${_function[HiddenFunction].name})'`,
           );
-        }
+        },
       );
-    })
+    }),
   );

@@ -15,8 +15,8 @@ import type {
 } from "./ConfectDataModel";
 import * as ConfectDocument from "./ConfectDocument";
 import * as ConfectQueryInitializer from "./ConfectQueryInitializer";
+import type { DataModelFromConfectSchemaDefinition } from "./ConfectSchema";
 import {
-  type ConfectDataModelFromConfectSchema,
   type ConfectDataModelFromConfectSchemaDefinition,
   type GenericConfectSchemaDefinition,
 } from "./ConfectSchema";
@@ -26,11 +26,7 @@ export const make = <
 >(
   confectSchemaDefinition: ConfectSchemaDefinition,
   convexDatabaseWriter: GenericDatabaseWriter<
-    DataModelFromConfectDataModel<
-      ConfectDataModelFromConfectSchema<
-        ConfectSchemaDefinition["confectSchema"]
-      >
-    >
+    DataModelFromConfectSchemaDefinition<ConfectSchemaDefinition>
   >,
 ) => {
   type ConfectDataModel =
@@ -45,9 +41,9 @@ export const make = <
     >,
   ) =>
     Effect.gen(function* () {
-      const confectTableDefinition = confectSchemaDefinition.confectSchema[
-        tableName
-      ] as NonNullable<ConfectSchemaDefinition["confectSchema"][TableName]>;
+      const confectTableDefinition = confectSchemaDefinition.confectSchema.find(
+        (def) => def.tableName === tableName,
+      )!;
 
       const encodedDocument = yield* ConfectDocument.encode(
         document,
@@ -83,9 +79,9 @@ export const make = <
     >,
   ) =>
     Effect.gen(function* () {
-      const confectTableDefinition = confectSchemaDefinition.confectSchema[
-        tableName
-      ] as ConfectSchemaDefinition["confectSchema"][TableName];
+      const confectTableDefinition = confectSchemaDefinition.confectSchema.find(
+        (def) => def.tableName === tableName,
+      )!;
 
       const tableSchema =
         confectTableDefinition.tableSchema as TableSchemaFromConfectTableInfo<
@@ -134,9 +130,9 @@ export const make = <
     >,
   ) =>
     Effect.gen(function* () {
-      const confectTableDefinition = confectSchemaDefinition.confectSchema[
-        tableName
-      ] as ConfectSchemaDefinition["confectSchema"][TableName];
+      const confectTableDefinition = confectSchemaDefinition.confectSchema.find(
+        (def) => def.tableName === tableName,
+      )!;
 
       const tableSchema =
         confectTableDefinition.tableSchema as TableSchemaFromConfectTableInfo<
@@ -198,11 +194,7 @@ export const layer = <
 >(
   confectSchemaDefinition: ConfectSchemaDefinition,
   convexDatabaseWriter: GenericDatabaseWriter<
-    DataModelFromConfectDataModel<
-      ConfectDataModelFromConfectSchema<
-        ConfectSchemaDefinition["confectSchema"]
-      >
-    >
+    DataModelFromConfectSchemaDefinition<ConfectSchemaDefinition>
   >,
 ) =>
   Layer.succeed(

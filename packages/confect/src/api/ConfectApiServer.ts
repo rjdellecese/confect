@@ -48,17 +48,17 @@ export type RegisteredFunction =
   | RegisteredAction<FunctionVisibility, DefaultFunctionArgs, any>;
 
 const isRegisteredQuery = (
-  u: unknown
+  u: unknown,
 ): u is RegisteredQuery<FunctionVisibility, DefaultFunctionArgs, any> =>
   Predicate.hasProperty(u, "isQuery") && u.isQuery === true;
 
 const isRegisteredMutation = (
-  u: unknown
+  u: unknown,
 ): u is RegisteredMutation<FunctionVisibility, DefaultFunctionArgs, any> =>
   Predicate.hasProperty(u, "isMutation") && u.isMutation === true;
 
 const isRegisteredAction = (
-  u: unknown
+  u: unknown,
 ): u is RegisteredAction<FunctionVisibility, DefaultFunctionArgs, any> =>
   Predicate.hasProperty(u, "isAction") && u.isAction === true;
 
@@ -103,7 +103,7 @@ export const make = Effect.gen(function* () {
     ConfectApiBuilder.Handlers.Item.AnyWithProps,
     RegisteredFunction
   >(handlerItems, ConfectApiBuilder.isHandlerItem, (handlerItem) =>
-    makeRegisteredFunction(api, handlerItem)
+    makeRegisteredFunction(api, handlerItem),
   );
 
   return makeProto({ registeredFunctions });
@@ -111,14 +111,14 @@ export const make = Effect.gen(function* () {
 
 const makeRegisteredFunction = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
   api: Api,
-  { function_, handler }: ConfectApiBuilder.Handlers.Item.AnyWithProps
+  { function_, handler }: ConfectApiBuilder.Handlers.Item.AnyWithProps,
 ): RegisteredFunction =>
   Match.value(function_.functionType).pipe(
     Match.when("Query", () => {
       const genericFunction = Match.value(function_.functionVisibility).pipe(
         Match.when("Public", () => queryGeneric),
         Match.when("Internal", () => internalQueryGeneric),
-        Match.exhaustive
+        Match.exhaustive,
       );
 
       return genericFunction(
@@ -126,14 +126,14 @@ const makeRegisteredFunction = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
           args: function_.args,
           returns: function_.returns,
           handler,
-        })
+        }),
       );
     }),
     Match.when("Mutation", () => {
       const genericFunction = Match.value(function_.functionVisibility).pipe(
         Match.when("Public", () => mutationGeneric),
         Match.when("Internal", () => internalMutationGeneric),
-        Match.exhaustive
+        Match.exhaustive,
       );
 
       return genericFunction(
@@ -141,14 +141,14 @@ const makeRegisteredFunction = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
           args: function_.args,
           returns: function_.returns,
           handler,
-        })
+        }),
       );
     }),
     Match.when("Action", () => {
       const genericFunction = Match.value(function_.functionVisibility).pipe(
         Match.when("Public", () => actionGeneric),
         Match.when("Internal", () => internalActionGeneric),
-        Match.exhaustive
+        Match.exhaustive,
       );
 
       return genericFunction(
@@ -156,10 +156,10 @@ const makeRegisteredFunction = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
           args: function_.args,
           returns: function_.returns,
           handler,
-        })
+        }),
       );
     }),
-    Match.exhaustive
+    Match.exhaustive,
   );
 
 const confectQueryFunction = <
@@ -179,7 +179,7 @@ const confectQueryFunction = <
     args: Schema.Schema<ConfectArgs, ConvexArgs>;
     returns: Schema.Schema<ConfectReturns, ConvexReturns>;
     handler: (
-      a: ConfectArgs
+      a: ConfectArgs,
     ) => Effect.Effect<
       ConfectReturns,
       E,
@@ -191,13 +191,13 @@ const confectQueryFunction = <
       | ConfectQueryRunner.ConfectQueryRunner
       | ConvexQueryCtx.ConvexQueryCtx<DataModelFromConfectSchema<ConfectSchema>>
     >;
-  }
+  },
 ) => ({
   args: SchemaToValidator.compileArgsSchema(args),
   returns: SchemaToValidator.compileReturnsSchema(returns),
   handler: (
     ctx: GenericQueryCtx<DataModelFromConfectSchema<ConfectSchema>>,
-    actualArgs: ConvexArgs
+    actualArgs: ConvexArgs,
   ): Promise<ConvexReturns> =>
     pipe(
       actualArgs,
@@ -216,16 +216,16 @@ const confectQueryFunction = <
                 ConvexQueryCtx.ConvexQueryCtx<
                   DataModelFromConfectSchema<ConfectSchema>
                 >(),
-                ctx
-              )
-            )
-          )
-        )
+                ctx,
+              ),
+            ),
+          ),
+        ),
       ),
       Effect.andThen((convexReturns) =>
-        Schema.encodeUnknown(returns)(convexReturns)
+        Schema.encodeUnknown(returns)(convexReturns),
       ),
-      Effect.runPromise
+      Effect.runPromise,
     ),
 });
 
@@ -246,7 +246,7 @@ const confectMutationFunction = <
     args: Schema.Schema<ConfectArgs, ConvexArgs>;
     returns: Schema.Schema<ConfectReturns, ConvexReturns>;
     handler: (
-      a: ConfectArgs
+      a: ConfectArgs,
     ) => Effect.Effect<
       ConfectReturns,
       E,
@@ -266,13 +266,13 @@ const confectMutationFunction = <
           DataModelFromConfectSchema<ConfectSchema>
         >
     >;
-  }
+  },
 ) => ({
   args: SchemaToValidator.compileArgsSchema(args),
   returns: SchemaToValidator.compileReturnsSchema(returns),
   handler: (
     ctx: GenericMutationCtx<DataModelFromConfectSchema<ConfectSchema>>,
-    actualArgs: ConvexArgs
+    actualArgs: ConvexArgs,
   ): Promise<ConvexReturns> =>
     pipe(
       actualArgs,
@@ -295,16 +295,16 @@ const confectMutationFunction = <
                 ConvexMutationCtx.ConvexMutationCtx<
                   DataModelFromConfectSchema<ConfectSchema>
                 >(),
-                ctx
-              )
-            )
-          )
-        )
+                ctx,
+              ),
+            ),
+          ),
+        ),
       ),
       Effect.andThen((convexReturns) =>
-        Schema.encodeUnknown(returns)(convexReturns)
+        Schema.encodeUnknown(returns)(convexReturns),
       ),
-      Effect.runPromise
+      Effect.runPromise,
     ),
 });
 
@@ -323,7 +323,7 @@ const confectActionFunction = <
   args: Schema.Schema<ConfectValue, ConvexValue>;
   returns: Schema.Schema<ConfectReturns, ConvexReturns>;
   handler: (
-    a: ConfectValue
+    a: ConfectValue,
   ) => Effect.Effect<
     ConfectReturns,
     E,
@@ -343,7 +343,7 @@ const confectActionFunction = <
   returns: SchemaToValidator.compileReturnsSchema(returns),
   handler: (
     ctx: GenericActionCtx<DataModelFromConfectSchema<ConfectSchema>>,
-    actualArgs: ConvexValue
+    actualArgs: ConvexValue,
   ): Promise<ConvexReturns> =>
     pipe(
       actualArgs,
@@ -367,15 +367,15 @@ const confectActionFunction = <
                 ConvexActionCtx.ConvexActionCtx<
                   DataModelFromConfectSchema<ConfectSchema>
                 >(),
-                ctx
-              )
-            )
-          )
-        )
+                ctx,
+              ),
+            ),
+          ),
+        ),
       ),
       Effect.andThen((convexReturns) =>
-        Schema.encodeUnknown(returns)(convexReturns)
+        Schema.encodeUnknown(returns)(convexReturns),
       ),
-      Effect.runPromise
+      Effect.runPromise,
     ),
 });

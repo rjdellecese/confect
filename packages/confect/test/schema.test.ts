@@ -9,13 +9,10 @@ import {
   type ConfectDataModelFromConfectSchema,
   type ConfectSystemDataModel,
   type ConfectTableDefinition,
-  type confectSystemSchema,
-  confectSystemSchemaDefinition,
+  type confectSystemTableDefinitions,
   type confectSystemTableSchemas,
-  defineConfectSchema,
   defineConfectTable,
 } from "../src/server/ConfectSchema";
-import { extendWithSystemFields } from "../src/server/schemas/SystemFields";
 
 describe("ConfectDataModelFromConfectSchema", () => {
   test("produces a type which is assignable to GenericConfectDataModel", () => {
@@ -23,11 +20,12 @@ describe("ConfectDataModelFromConfectSchema", () => {
       content: Schema.String,
     });
 
-    const _notesTableDefinition = defineConfectTable(NoteSchema);
+    const _notesTableDefinition = defineConfectTable({
+      name: "notes",
+      fields: NoteSchema,
+    });
 
-    type ConfectSchema = {
-      notes: typeof _notesTableDefinition;
-    };
+    type ConfectSchema = [typeof _notesTableDefinition];
 
     type ConfectDataModel = ConfectDataModelFromConfectSchema<ConfectSchema>;
 
@@ -44,63 +42,23 @@ describe("ConfectSystemDataModel", () => {
   });
 });
 
-describe("tableSchemas", () => {
-  test("extends the table schemas with system fields", () => {
-    const NoteSchema = Schema.Struct({
-      content: Schema.String,
-    });
-
-    const _confectTableSchemas = defineConfectSchema({
-      notes: defineConfectTable(NoteSchema),
-    }).tableSchemas;
-
-    type Actual = typeof _confectTableSchemas;
-
-    const _expectedTableSchemas = {
-      notes: schemaToTableSchemas("notes", NoteSchema),
-      ...systemTableSchemas,
-    };
-
-    type Expected = typeof _expectedTableSchemas;
-
-    expectTypeOf<Actual>().toEqualTypeOf<Expected>();
-  });
-
-  test("permits unions of structs", () => {
-    const NoteSchema = Schema.Struct({
-      content: Schema.String,
-    });
-
-    const ImageSchema = Schema.Struct({
-      url: Schema.String,
-    });
-
-    const ItemSchema = Schema.Union(NoteSchema, ImageSchema);
-
-    const _confectTableSchemas = defineConfectSchema({
-      items: defineConfectTable(ItemSchema),
-    }).tableSchemas;
-
-    type Actual = typeof _confectTableSchemas;
-
-    const _expectedTableSchemas = {
-      items: schemaToTableSchemas("items", ItemSchema),
-      ...systemTableSchemas,
-    };
-
-    type Expected = typeof _expectedTableSchemas;
-
-    expectTypeOf<Actual>().toEqualTypeOf<Expected>();
-  });
-});
-
 describe("confectTableSchemas", () => {
-  test("matches confectSystemSchema", () => {
+  test("matches confectSystemTableDefinitions", () => {
     type ConfectTableSchemas = typeof confectSystemTableSchemas;
-    type ConfectSystemSchema = typeof confectSystemSchema;
+    type ConfectSystemTableDefinitions = typeof confectSystemTableDefinitions;
 
-    type ConfectTableSchemasFromConfectSystemSchema = {
-      [K in keyof ConfectSystemSchema]: ConfectSystemSchema[K] extends ConfectTableDefinition<
+    type ConfectTableSchemasFromConfectSystemTableDefinitions = {
+      [K in ConfectSystemTableDefinitions[number] as K extends ConfectTableDefinition<
+        infer TableName,
+        any,
+        any,
+        any,
+        any,
+        any
+      >
+        ? TableName
+        : never]: K extends ConfectTableDefinition<
+        any,
         infer S,
         any,
         any,
@@ -112,40 +70,8 @@ describe("confectTableSchemas", () => {
     };
 
     type Actual = ConfectTableSchemas;
-    type Expected = ConfectTableSchemasFromConfectSystemSchema;
+    type Expected = ConfectTableSchemasFromConfectSystemTableDefinitions;
 
     expectTypeOf<Actual>().toEqualTypeOf<Expected>();
   });
 });
-
-const schemaToTableSchemas = <
-  TableName extends string,
-  TableSchema extends Schema.Schema.AnyNoContext,
->(
-  name: TableName,
-  schema: TableSchema,
-) => ({
-  withSystemFields: extendWithSystemFields(name, schema),
-  withoutSystemFields: schema,
-});
-
-const systemTableSchemas = {
-  _scheduled_functions: {
-    withSystemFields: extendWithSystemFields(
-      "_scheduled_functions",
-      confectSystemSchemaDefinition.confectSchema._scheduled_functions
-        .tableSchema,
-    ),
-    withoutSystemFields:
-      confectSystemSchemaDefinition.confectSchema._scheduled_functions
-        .tableSchema,
-  },
-  _storage: {
-    withSystemFields: extendWithSystemFields(
-      "_storage",
-      confectSystemSchemaDefinition.confectSchema._storage.tableSchema,
-    ),
-    withoutSystemFields:
-      confectSystemSchemaDefinition.confectSchema._storage.tableSchema,
-  },
-};

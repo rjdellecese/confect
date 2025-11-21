@@ -30,7 +30,11 @@ export interface Handlers<
 
   handle<Name extends ConfectApiFunction.ConfectApiFunction.Name<Functions>>(
     name: Name,
-    handler: ConfectApiFunction.Handler.WithName<ConfectSchema, Functions, Name>
+    handler: ConfectApiFunction.Handler.WithName<
+      ConfectSchema,
+      Functions,
+      Name
+    >,
   ): Handlers<
     ConfectSchema,
     ConfectApiFunction.ConfectApiFunction.ExcludeName<Functions, Name>
@@ -41,7 +45,7 @@ export const HandlerItemTypeId = Symbol.for("@rjdellecese/confect/HandlerItem");
 export type HandlerItemTypeId = typeof HandlerItemTypeId;
 
 export const isHandlerItem = (
-  value: unknown
+  value: unknown,
 ): value is Handlers.Item.AnyWithProps =>
   Predicate.hasProperty(value, HandlerItemTypeId);
 
@@ -114,7 +118,7 @@ const HandlersProto = {
       ConfectApiFunction.ConfectApiFunction.AnyWithProps
     >,
     name: string,
-    handler: ConfectApiFunction.Handler.AnyWithProps
+    handler: ConfectApiFunction.Handler.AnyWithProps,
   ) {
     const function_ = this.group.functions[name]!;
     return makeHandlers({
@@ -155,8 +159,8 @@ export const group = <
     handlers: Handlers.FromGroup<
       ConfectSchema,
       ConfectApiGroup.Path.GroupAt<Groups, GroupPath>
-    >
-  ) => Handlers.ValidateReturn<Return>
+    >,
+  ) => Handlers.ValidateReturn<Return>,
 ): Layer.Layer<
   ConfectApiGroupService<ApiName, GroupPath>,
   never,
@@ -170,7 +174,7 @@ export const group = <
     restGroupPathParts,
     api.spec.groups[firstGroupPathPart as keyof typeof api.spec.groups]!,
     (currentGroup, groupPathPart) =>
-      currentGroup.groups[groupPathPart as keyof typeof currentGroup.groups]!
+      currentGroup.groups[groupPathPart as keyof typeof currentGroup.groups]!,
   );
 
   const items = Array.empty();
@@ -186,7 +190,7 @@ export const group = <
       const registry = yield* ConfectApiRegistry.ConfectApiRegistry;
 
       const handlers = build(
-        makeHandlers({ group, items })
+        makeHandlers({ group, items }),
       ) as Handlers.AnyWithProps;
 
       for (const handlerItem of handlers.items) {
@@ -194,8 +198,8 @@ export const group = <
           setNestedProperty(
             handlerItemsRegistry,
             [...groupPathParts, handlerItem.function_.name],
-            handlerItem
-          )
+            handlerItem,
+          ),
         );
       }
 
@@ -203,14 +207,14 @@ export const group = <
         apiName,
         groupPath,
       });
-    })
+    }),
   );
 };
 
 const setNestedProperty = <T extends object>(
   obj: T,
   path: (keyof T)[],
-  value: T[keyof T]
+  value: T[keyof T],
 ): T => {
   if (path.length === 1) {
     return { ...obj, [path[0] as keyof T]: value };
@@ -222,7 +226,7 @@ const setNestedProperty = <T extends object>(
     [head as keyof T]: setNestedProperty(
       obj[head as keyof T] as any,
       tail,
-      value
+      value,
     ),
   };
 };
@@ -232,7 +236,7 @@ export const api = <
   const ApiName extends string,
   Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
 >(
-  api: ConfectApi.ConfectApi<ConfectSchema, ApiName, Groups>
+  api: ConfectApi.ConfectApi<ConfectSchema, ApiName, Groups>,
 ): Layer.Layer<
   ConfectApiService,
   never,
@@ -243,7 +247,7 @@ export const api = <
     Effect.map(Effect.context(), (context) => ({
       api,
       context,
-    }))
+    })),
   );
 
 export interface ConfectApiGroupService<
@@ -265,7 +269,7 @@ export const ConfectApiGroupService = <
   groupPath: GroupPath;
 }) =>
   Context.GenericTag<ConfectApiGroupService<ApiName, GroupPath>>(
-    `@rjdellecese/confect/ConfectApiGroupService/${apiName}/${groupPath}`
+    `@rjdellecese/confect/ConfectApiGroupService/${apiName}/${groupPath}`,
   );
 
 export declare namespace ConfectApiGroupService {
@@ -292,7 +296,7 @@ export declare namespace ConfectApiGroupService {
 }
 
 export class ConfectApiService extends Context.Tag(
-  "@rjdellecese/confect/ConfectApiService"
+  "@rjdellecese/confect/ConfectApiService",
 )<
   ConfectApiService,
   {

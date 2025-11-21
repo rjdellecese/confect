@@ -66,13 +66,13 @@ const isReservedKeyword = (identifier: string) =>
 export const validateJsIdentifier = (identifier: string) => {
   if (!matchesJsIdentifierPattern(identifier)) {
     throw new Error(
-      `Expected a valid JavaScript identifier, but received: "${identifier}". Valid identifiers must start with a letter, underscore, or dollar sign, and can only contain letters, numbers, underscores, or dollar signs.`
+      `Expected a valid JavaScript identifier, but received: "${identifier}". Valid identifiers must start with a letter, underscore, or dollar sign, and can only contain letters, numbers, underscores, or dollar signs.`,
     );
   }
 
   if (isReservedKeyword(identifier)) {
     throw new Error(
-      `Expected a valid JavaScript identifier, but received: "${identifier}". "${identifier}" is a reserved keyword.`
+      `Expected a valid JavaScript identifier, but received: "${identifier}". "${identifier}" is a reserved keyword.`,
     );
   }
 };
@@ -84,7 +84,7 @@ type NestedObject<T> = {
 export const mapLeaves = <T, U>(
   obj: NestedObject<T>,
   leafRefinement: Predicate.Refinement<unknown, T>,
-  f: (value: T) => U
+  f: (value: T) => U,
 ): NestedObject<U> => {
   const result: any = {};
 
@@ -105,7 +105,7 @@ const collectBranchLeaves = <T>(
   obj: NestedObject<T>,
   leafRefinement: Predicate.Refinement<unknown, T>,
   path: string[] = [],
-  branchLeaves: { path: string[]; values: Record<string, T> }[] = []
+  branchLeaves: { path: string[]; values: Record<string, T> }[] = [],
 ): { path: string[]; values: Record<string, T> }[] =>
   Array.flatMap(Record.keys(obj), (key) => {
     const value = obj[key];
@@ -120,7 +120,7 @@ const collectBranchLeaves = <T>(
         value as NestedObject<T>,
         leafRefinement,
         [...path, key],
-        [...branchLeaves, { path: [...path, key], values: leaves }]
+        [...branchLeaves, { path: [...path, key], values: leaves }],
       );
     } else {
       return branchLeaves;
@@ -133,7 +133,7 @@ export const forEachBranchLeaves = <T, A, E, R>(
   f: (branchLeaves: {
     path: string[];
     values: Record<string, T>;
-  }) => Effect.Effect<A, E, R>
+  }) => Effect.Effect<A, E, R>,
 ): Effect.Effect<void, E, R> => {
   const branchLeaves = collectBranchLeaves(obj, leafRefinement);
   return Effect.forEach(branchLeaves, f, {

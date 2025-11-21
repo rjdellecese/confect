@@ -24,6 +24,11 @@ import type {
   TableNamesInConfectDataModel,
 } from "./ConfectDataModel";
 import * as ConfectDocument from "./ConfectDocument";
+import type {
+  ConfectTableDefinitionFromConfectSchema,
+  DataModelFromConfectSchema,
+  TableNamesInConfectSchema,
+} from "./ConfectSchema";
 import {
   type ConfectDataModelFromConfectSchema,
   type GenericConfectSchema,
@@ -119,16 +124,18 @@ type ConfectQueryInitializer<
 
 export const make = <
   ConfectSchema extends GenericConfectSchema,
-  TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+  TableName extends TableNamesInConfectSchema<ConfectSchema>,
   ConfectDataModel extends
     GenericConfectDataModel = ConfectDataModelFromConfectSchema<ConfectSchema>,
-  ConvexDataModel extends GenericDataModel = DataModelFromConfectDataModel<
-    ConfectDataModelFromConfectSchema<ConfectSchema>
-  >,
+  ConvexDataModel extends
+    GenericDataModel = DataModelFromConfectSchema<ConfectSchema>,
 >(
   tableName: TableName,
   convexDatabaseReader: BaseDatabaseReader<ConvexDataModel>,
-  confectTableDefinition: ConfectSchema[TableName],
+  confectTableDefinition: ConfectTableDefinitionFromConfectSchema<
+    ConfectSchema,
+    TableName
+  >,
 ): ConfectQueryInitializer<ConfectDataModel, TableName> => {
   type ThisConfectQueryInitializer = ConfectQueryInitializer<
     ConfectDataModel,
@@ -300,16 +307,16 @@ export const make = <
 export const getById =
   <
     ConfectSchema extends GenericConfectSchema,
-    TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
-    ConfectDataModel extends
-      GenericConfectDataModel = ConfectDataModelFromConfectSchema<ConfectSchema>,
-    ConvexDataModel extends GenericDataModel = DataModelFromConfectDataModel<
-      ConfectDataModelFromConfectSchema<ConfectSchema>
-    >,
+    TableName extends TableNamesInConfectSchema<ConfectSchema>,
+    ConvexDataModel extends
+      GenericDataModel = DataModelFromConfectSchema<ConfectSchema>,
   >(
     tableName: TableName,
     convexDatabaseReader: BaseDatabaseReader<ConvexDataModel>,
-    confectTableDefinition: ConfectSchema[TableName],
+    confectTableDefinition: ConfectTableDefinitionFromConfectSchema<
+      ConfectSchema,
+      TableName
+    >,
   ) =>
   (id: GenericId<TableName>) =>
     pipe(
