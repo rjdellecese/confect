@@ -123,7 +123,7 @@ const schemaToTableSchemas = <
   TableSchema extends Schema.Schema.AnyNoContext,
 >(
   name: TableName,
-  schema: TableSchema
+  schema: TableSchema,
 ) => ({
   withSystemFields: extendWithSystemFields(name, schema),
   withoutSystemFields: schema,
@@ -134,7 +134,7 @@ const systemTableSchemas = {
     withSystemFields: extendWithSystemFields(
       "_scheduled_functions",
       confectSystemSchemaDefinition.confectSchema._scheduled_functions
-        .tableSchema
+        .tableSchema,
     ),
     withoutSystemFields:
       confectSystemSchemaDefinition.confectSchema._scheduled_functions
@@ -143,7 +143,7 @@ const systemTableSchemas = {
   _storage: {
     withSystemFields: extendWithSystemFields(
       "_storage",
-      confectSystemSchemaDefinition.confectSchema._storage.tableSchema
+      confectSystemSchemaDefinition.confectSchema._storage.tableSchema,
     ),
     withoutSystemFields:
       confectSystemSchemaDefinition.confectSchema._storage.tableSchema,

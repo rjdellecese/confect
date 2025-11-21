@@ -1,29 +1,21 @@
-export { ConfectAuth } from "./ConfectAuth";
-export type {
-  DataModelFromConfectDataModel,
-  GenericConfectDoc,
-  TableNamesInConfectDataModel,
-} from "./ConfectDataModel";
-export { makeConvexHttpRouter, type ConfectHttpApi } from "./ConfectHttpApi";
-export { ConfectScheduler } from "./ConfectScheduler";
-export {
-  defineConfectSchema,
-  defineConfectTable,
-  type ConfectDataModelFromConfectSchemaDefinition,
-} from "./ConfectSchema";
-export {
-  ConfectStorageActionWriter,
-  ConfectStorageReader,
-  ConfectStorageWriter,
-} from "./ConfectStorage";
-export { ConfectVectorSearch } from "./ConfectVectorSearch";
-// export { ConvexActionCtx, ConvexMutationCtx, ConvexQueryCtx } from "./ctx";
-// export { makeConfectFunctions } from "./functions";
-// export {
-//   ConfectActionRunner,
-//   ConfectMutationRunner,
-//   ConfectQueryRunner,
-// } from "./runners";
-// export { GenericId } from "./schemas/GenericId";
-// export { PaginationResult } from "./schemas/PaginationResult";
-export { compileSchema } from "./SchemaToValidator";
+export * as ConfectActionRunner from "./ConfectActionRunner";
+export * as ConfectAuth from "./ConfectAuth";
+export * as ConfectDatabaseReader from "./ConfectDatabaseReader";
+export * as ConfectDatabaseWriter from "./ConfectDatabaseWriter";
+export type * as ConfectDataModel from "./ConfectDataModel";
+export * as ConfectDocument from "./ConfectDocument";
+export * as ConfectHttpApi from "./ConfectHttpApi";
+export * as ConfectMutationRunner from "./ConfectMutationRunner";
+export * as ConfectQueryInitializer from "./ConfectQueryInitializer";
+export * as ConfectQueryRunner from "./ConfectQueryRunner";
+export * as ConfectScheduler from "./ConfectScheduler";
+export * as ConfectSchema from "./ConfectSchema";
+export * as ConfectStorage from "./ConfectStorage";
+export * as ConfectVectorSearch from "./ConfectVectorSearch";
+export * as ConvexActionCtx from "./ConvexActionCtx";
+export * as ConvexMutationCtx from "./ConvexMutationCtx";
+export * as ConvexQueryCtx from "./ConvexQueryCtx";
+export * as GenericId from "./GenericId";
+export * as PaginationResult from "./PaginationResult";
+export * as SchemaToValidator from "./SchemaToValidator";
+export * as SystemFields from "./SystemFields";

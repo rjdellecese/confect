@@ -15,7 +15,7 @@ import {
   type VectorIndexConfig,
 } from "convex/server";
 import type { GenericValidator, Validator } from "convex/values";
-import { pipe, Record, Schema } from "effect";
+import { pipe, Predicate, Record, Schema } from "effect";
 import type {
   DataModelFromConfectDataModel,
   GenericConfectDataModel,
@@ -94,9 +94,19 @@ export interface ConfectSchemaDefinition<
   tableSchemas: TableSchemasFromConfectSchema<ConfectSchema>;
 }
 
+export const TypeId = Symbol.for(
+  "@rjdellecese/confect/ConfectSchemaDefinition"
+);
+export type TypeId = typeof TypeId;
+
+export const isConfectSchemaDefinition = (
+  u: unknown
+): u is GenericConfectSchemaDefinition => Predicate.hasProperty(u, TypeId);
+
 class ConfectSchemaDefinitionImpl<ConfectSchema extends GenericConfectSchema>
   implements ConfectSchemaDefinition<ConfectSchema>
 {
+  readonly [TypeId]: TypeId = TypeId;
   confectSchema: ConfectSchema;
   convexSchemaDefinition: SchemaDefinition<
     SchemaDefinitionFromConfectSchemaDefinition<ConfectSchema>,

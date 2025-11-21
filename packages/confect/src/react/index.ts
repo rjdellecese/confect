@@ -25,7 +25,7 @@ export const useQuery =
       return Option.none();
     } else {
       const decodedReturns = Schema.decodeSync(returns)(
-        actualReturnsOrUndefined,
+        actualReturnsOrUndefined
       );
 
       return Option.some(decodedReturns);
@@ -52,7 +52,7 @@ export const useMutation = <
       const encodedArgs = yield* Schema.encode(args)(actualArgs);
 
       const actualReturns = yield* Effect.promise(() =>
-        actualMutation(encodedArgs),
+        actualMutation(encodedArgs)
       );
 
       return yield* Schema.decode(returns)(actualReturns);
@@ -79,7 +79,7 @@ export const useAction = <
       const encodedArgs = yield* Schema.encode(args)(actualArgs);
 
       const actualReturns = yield* Effect.promise(() =>
-        actualAction(encodedArgs),
+        actualAction(encodedArgs)
       );
 
       return yield* Schema.decode(returns)(actualReturns);

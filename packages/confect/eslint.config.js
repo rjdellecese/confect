@@ -1,22 +1,22 @@
 // @ts-check
 import eslint from "@eslint/js";
+import { defineConfig } from "eslint/config";
 import tseslint from "typescript-eslint";
 
-export default tseslint.config(
+export default defineConfig([
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    files: ["**/*.ts", "**/*.tsx"],
     languageOptions: {
       parserOptions: {
         projectService: true,
         tsconfigRootDir: import.meta.dirname,
       },
     },
-  },
-  {
-    files: ["**/*.ts", "**/*.tsx"],
     rules: {
       "no-warning-comments": "warn",
+      "@typescript-eslint/consistent-type-imports": "warn",
       "@typescript-eslint/no-namespace": "off",
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-empty-object-type": "off",
@@ -31,6 +31,10 @@ export default tseslint.config(
     },
   },
   {
+    files: ["**/*.js", "**/*.mjs"],
+    ...tseslint.configs.disableTypeChecked,
+  },
+  {
     ignores: [
       "dist/**",
       "coverage/**",
@@ -38,6 +42,7 @@ export default tseslint.config(
       ".pnpm-store/**",
       ".tsup/**",
       "test/convex/_generated/**",
+      "eslint.config.js",
     ],
-  }
-);
+  },
+]);

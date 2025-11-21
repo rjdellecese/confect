@@ -1,4 +1,4 @@
-import { GenericDatabaseReader, GenericDataModel } from "convex/server";
+import type { GenericDatabaseReader, GenericDataModel } from "convex/server";
 import type { GenericId } from "convex/values";
 import type { Brand } from "effect";
 
@@ -136,7 +136,7 @@ type conform<t, base> = t extends base ? t : base;
 // END: Vendored from Arktype //
 ////////////////////////////////
 
-type IndexFieldTypesForEq<
+export type IndexFieldTypesForEq<
   ConvexDataModel extends GenericDataModel,
   Table extends TableNamesInDataModel<ConvexDataModel>,
   T extends string[],

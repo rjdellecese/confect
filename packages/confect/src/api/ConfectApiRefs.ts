@@ -1,11 +1,12 @@
-import { pipe, Record, Schema, Types } from "effect";
-import * as ConfectApiFunction from "./ConfectApiFunction";
-import * as ConfectApiGroup from "./ConfectApiGroup";
-import * as ConfectApiSpec from "./ConfectApiSpec";
+import type { Schema, Types } from "effect";
+import { pipe, Record } from "effect";
+import type * as ConfectApiFunction from "./ConfectApiFunction";
+import type * as ConfectApiGroup from "./ConfectApiGroup";
+import type * as ConfectApiSpec from "./ConfectApiSpec";
 
 export type ConfectApiRefs<
   Spec extends ConfectApiSpec.ConfectApiSpec.AnyWithProps,
-> = Helper<ConfectApiSpec.ConfectApiSpec.Groups<Spec>>;
+> = Types.Simplify<Helper<ConfectApiSpec.ConfectApiSpec.Groups<Spec>>>;
 
 type Helper<Groups extends ConfectApiGroup.ConfectApiGroup.Any> = {
   [GroupName in ConfectApiGroup.ConfectApiGroup.Name<Groups>]: ConfectApiGroup.ConfectApiGroup.WithName<
@@ -89,10 +90,36 @@ const makeFunctionRef = <
   [HiddenConvexFunctionName]: convexFunctionName,
 });
 
+export const getConvexFunctionName = <
+  FunctionType extends ConfectApiFunction.ConfectApiFunction.FunctionType,
+  FunctionVisibility extends
+    ConfectApiFunction.ConfectApiFunction.FunctionVisibility,
+  Args,
+  Returns,
+>(
+  ref: ConfectApiRef<FunctionType, FunctionVisibility, Args, Returns>
+): string => ref[HiddenConvexFunctionName];
+
+export const getFunction = <
+  FunctionType extends ConfectApiFunction.ConfectApiFunction.FunctionType,
+  FunctionVisibility extends
+    ConfectApiFunction.ConfectApiFunction.FunctionVisibility,
+  Args,
+  Returns,
+>(
+  ref: ConfectApiRef<FunctionType, FunctionVisibility, Args, Returns>
+): ConfectApiFunction.ConfectApiFunction<
+  FunctionType,
+  FunctionVisibility,
+  string,
+  Schema.Schema<Args, unknown>,
+  Schema.Schema<Returns, unknown>
+> => ref[HiddenFunction];
+
 export const make = <Spec extends ConfectApiSpec.ConfectApiSpec.AnyWithProps>(
   spec: Spec
-): Types.Simplify<ConfectApiRefs<Spec>> =>
-  makeHelper(spec.groups, null) as Types.Simplify<ConfectApiRefs<Spec>>;
+): ConfectApiRefs<Spec> =>
+  makeHelper(spec.groups, null) as ConfectApiRefs<Spec>;
 
 const makeHelper = (
   groups: Record.ReadonlyRecord<

@@ -1,12 +1,15 @@
 import { Context, Record, Ref } from "effect";
-import * as ConfectApiBuilder from "./ConfectApiBuilder";
+import type * as ConfectApiBuilder from "./ConfectApiBuilder";
+
+export interface HandlerItemRegistry {
+  readonly [key: string]:
+    | ConfectApiBuilder.Handlers.Item.AnyWithProps
+    | HandlerItemRegistry;
+}
 
 export class ConfectApiRegistry extends Context.Reference<ConfectApiRegistry>()(
   "@rjdellecese/confect/ConfectApiRegistry",
   {
-    defaultValue: () =>
-      Ref.unsafeMake(
-        Record.empty<string, ConfectApiBuilder.Handlers.Item.AnyWithProps>()
-      ),
+    defaultValue: () => Ref.unsafeMake(Record.empty() as HandlerItemRegistry),
   }
 ) {}

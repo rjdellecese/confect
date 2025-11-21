@@ -1,10 +1,10 @@
 import { Predicate } from "effect";
-import {
+import type {
   ConfectSchemaDefinition,
   GenericConfectSchema,
 } from "../server/ConfectSchema";
-import * as ConfectApiGroup from "./ConfectApiGroup";
-import * as ConfectApiSpec from "./ConfectApiSpec";
+import type * as ConfectApiGroup from "./ConfectApiGroup";
+import type * as ConfectApiSpec from "./ConfectApiSpec";
 
 export const TypeId = Symbol.for("@rjdellecese/confect/ConfectApi");
 
@@ -65,6 +65,6 @@ export const make = <
   Groups extends ConfectApiGroup.ConfectApiGroup.Any,
 >(
   confectSchemaDefinition: ConfectSchemaDefinition<ConfectSchema>,
-  spec: ConfectApiSpec.ConfectApiSpec<Name, Groups>
+  spec: ConfectApiSpec.ConfectApiSpec<Name, Groups>,
 ): ConfectApi<ConfectSchema, Name, Groups> =>
   makeProto({ confectSchemaDefinition, spec });

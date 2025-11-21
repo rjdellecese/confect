@@ -30,14 +30,14 @@ const GroupA = ConfectApiGroup.make("groupA")
       name: "myFunction",
       args: Schema.Struct({ foo: Schema.Number }),
       returns: Schema.String,
-    })
+    }),
   )
   .addFunction(
     ConfectApiFunction.query({
       name: "myFunction2",
       args: Schema.Struct({ foo: Schema.Number }),
       returns: Schema.String,
-    })
+    }),
   );
 
 const GroupBC = ConfectApiGroup.make("groupBC").addFunction(
@@ -45,7 +45,7 @@ const GroupBC = ConfectApiGroup.make("groupBC").addFunction(
     name: "myFunction3",
     args: Schema.Struct({ foo: Schema.Number }),
     returns: Schema.String,
-  })
+  }),
 );
 
 const GroupBDE = ConfectApiGroup.make("groupBDE").addFunction(
@@ -53,7 +53,7 @@ const GroupBDE = ConfectApiGroup.make("groupBDE").addFunction(
     name: "myFunction5",
     args: Schema.Struct({}),
     returns: Schema.String,
-  })
+  }),
 );
 
 const GroupBD = ConfectApiGroup.make("groupBD")
@@ -62,7 +62,7 @@ const GroupBD = ConfectApiGroup.make("groupBD")
       name: "myFunction4",
       args: Schema.Struct({ foo: Schema.Number }),
       returns: Schema.String,
-    })
+    }),
   )
   .addGroup(GroupBDE);
 
@@ -74,7 +74,7 @@ const confectSchemaDefinition = ConfectSchema.defineConfectSchema({
   notes: ConfectSchema.defineConfectTable(
     Schema.Struct({
       content: Schema.String,
-    })
+    }),
   ),
 });
 
@@ -96,35 +96,35 @@ const GroupALive = ConfectApiBuilder.group(Api, "groupA", (handlers) =>
         const a = yield* reader.table("notes").index("by_id", "asc").collect();
 
         return yield* Effect.succeed("test");
-      }).pipe(Effect.orDie)
+      }).pipe(Effect.orDie),
     )
-    .handle("myFunction2", (args) => Effect.succeed(`foo: ${args.foo}`))
+    .handle("myFunction2", (args) => Effect.succeed(`foo: ${args.foo}`)),
 );
 
 const GroupBCLive = ConfectApiBuilder.group(Api, "groupB.groupBC", (handlers) =>
-  handlers.handle("myFunction3", (args) => Effect.succeed(`foo: ${args.foo}`))
+  handlers.handle("myFunction3", (args) => Effect.succeed(`foo: ${args.foo}`)),
 );
 
 const GroupBDELive = ConfectApiBuilder.group(
   Api,
   "groupB.groupBD.groupBDE",
   (handlers) =>
-    handlers.handle("myFunction5", () => Effect.succeed("myFunction5"))
+    handlers.handle("myFunction5", () => Effect.succeed("myFunction5")),
 );
 
 const GroupBDLive = ConfectApiBuilder.group(Api, "groupB.groupBD", (handlers) =>
-  handlers.handle("myFunction4", (args) => Effect.succeed(`foo: ${args.foo}`))
+  handlers.handle("myFunction4", (args) => Effect.succeed(`foo: ${args.foo}`)),
 ).pipe(Layer.provide(GroupBDELive));
 
 const GroupBLive = ConfectApiBuilder.group(
   Api,
   "groupB",
-  (handlers) => handlers
+  (handlers) => handlers,
 ).pipe(Layer.provide(GroupBCLive), Layer.provide(GroupBDLive));
 
 const ApiLive = ConfectApiBuilder.api(Api).pipe(
   Layer.provide(GroupALive),
-  Layer.provide(GroupBLive)
+  Layer.provide(GroupBLive),
 );
 
 const server = ConfectApiServer.make

@@ -1,8 +1,9 @@
 // @ts-check
 import eslint from "@eslint/js";
+import { defineConfig } from "eslint/config";
 import tseslint from "typescript-eslint";
 
-export default tseslint.config(
+export default defineConfig([
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -17,7 +18,6 @@ export default tseslint.config(
       },
     },
     rules: {
-      // Relax rules for example app
       "@typescript-eslint/no-unused-vars": [
         "warn",
         {
@@ -25,19 +25,16 @@ export default tseslint.config(
           varsIgnorePattern: "^_",
         },
       ],
-      // '@typescript-eslint/no-explicit-any': 'off',
-      // '@typescript-eslint/no-unsafe-assignment': 'off',
-      // '@typescript-eslint/no-unsafe-member-access': 'off',
-      // '@typescript-eslint/no-unsafe-call': 'off',
-      // '@typescript-eslint/no-unsafe-return': 'off',
-      // '@typescript-eslint/no-unsafe-argument': 'off',
     },
   },
   {
     files: ["**/*.js", "**/*.mjs", "vite.config.ts"],
     ...tseslint.configs.disableTypeChecked,
+    ignores: [
+      "dist/**",
+      "node_modules/**",
+      "convex/_generated/**",
+      "eslint.config.js",
+    ],
   },
-  {
-    ignores: ["dist/**", "node_modules/**", "convex/_generated/**"],
-  },
-);
+]);

@@ -12,9 +12,9 @@ export const decode = Function.dual<
     TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
   >(
     tableName: TableName,
-    tableSchema: TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>
+    tableSchema: TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>,
   ) => (
-    self: ConfectDataModel[TableName]["convexDocument"]
+    self: ConfectDataModel[TableName]["convexDocument"],
   ) => Effect.Effect<
     ConfectDataModel[TableName]["confectDocument"],
     DocumentDecodeError
@@ -25,7 +25,7 @@ export const decode = Function.dual<
   >(
     self: ConfectDataModel[TableName]["convexDocument"],
     tableName: TableName,
-    tableSchema: TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>
+    tableSchema: TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>,
   ) => Effect.Effect<
     ConfectDataModel[TableName]["confectDocument"],
     DocumentDecodeError
@@ -38,7 +38,7 @@ export const decode = Function.dual<
   >(
     self: ConfectDataModel[TableName]["convexDocument"],
     tableName: TableName,
-    tableSchema: TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>
+    tableSchema: TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>,
   ): Effect.Effect<
     ConfectDataModel[TableName]["confectDocument"],
     DocumentDecodeError
@@ -46,7 +46,7 @@ export const decode = Function.dual<
     Effect.gen(function* () {
       const TableSchemaWithSystemFields = SystemFields.extendWithSystemFields(
         tableName,
-        tableSchema
+        tableSchema,
       );
 
       const encodedDoc =
@@ -65,12 +65,12 @@ export const decode = Function.dual<
               id: encodedDoc._id,
               parseError: formattedParseError,
             });
-          })
-        )
+          }),
+        ),
       );
 
       return decodedDoc;
-    })
+    }),
 );
 
 export const encode = Function.dual<
@@ -79,9 +79,9 @@ export const encode = Function.dual<
     TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
   >(
     tableName: TableName,
-    tableSchema: TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>
+    tableSchema: TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>,
   ) => (
-    self: ConfectDataModel[TableName]["confectDocument"]
+    self: ConfectDataModel[TableName]["confectDocument"],
   ) => Effect.Effect<
     ConfectDataModel[TableName]["encodedConfectDocument"],
     DocumentEncodeError
@@ -92,7 +92,7 @@ export const encode = Function.dual<
   >(
     self: ConfectDataModel[TableName]["confectDocument"],
     tableName: TableName,
-    tableSchema: TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>
+    tableSchema: TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>,
   ) => Effect.Effect<
     ConfectDataModel[TableName]["encodedConfectDocument"],
     DocumentEncodeError
@@ -105,7 +105,7 @@ export const encode = Function.dual<
   >(
     self: ConfectDataModel[TableName]["confectDocument"],
     tableName: TableName,
-    tableSchema: TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>
+    tableSchema: TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>,
   ): Effect.Effect<
     ConfectDataModel[TableName]["encodedConfectDocument"],
     DocumentEncodeError
@@ -131,16 +131,16 @@ export const encode = Function.dual<
               id: decodedDoc._id,
               parseError: formattedParseError,
             });
-          })
-        )
+          }),
+        ),
       );
 
       return encodedDoc;
-    })
+    }),
 );
 
 export class DocumentDecodeError extends Schema.TaggedError<DocumentDecodeError>(
-  "DocumentDecodeError"
+  "DocumentDecodeError",
 )("DocumentDecodeError", {
   tableName: Schema.String,
   id: Schema.String,
@@ -156,7 +156,7 @@ export class DocumentDecodeError extends Schema.TaggedError<DocumentDecodeError>
 }
 
 export class DocumentEncodeError extends Schema.TaggedError<DocumentEncodeError>(
-  "DocumentEncodeError"
+  "DocumentEncodeError",
 )("DocumentEncodeError", {
   tableName: Schema.String,
   id: Schema.String,

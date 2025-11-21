@@ -8,7 +8,7 @@ import type {
 import type { Schema } from "effect";
 import type { ReadonlyRecord } from "effect/Record";
 import type { ReadonlyValue } from "./SchemaToValidator";
-import type { WithSystemFields } from "./schemas/SystemFields";
+import type { WithSystemFields } from "./SystemFields";
 
 export type GenericConfectDocumentWithSystemFields = WithSystemFields<
   string,

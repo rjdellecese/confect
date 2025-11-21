@@ -9,9 +9,9 @@ const make = (auth: Auth) => ({
         Option.match({
           onNone: () => Effect.fail(new NoUserIdentityFoundError()),
           onSome: Effect.succeed,
-        })
-      )
-    )
+        }),
+      ),
+    ),
   ),
 });
 
@@ -23,7 +23,7 @@ export class ConfectAuth extends Effect.Tag("@rjdellecese/confect/ConfectAuth")<
 export const layer = (auth: Auth) => Layer.succeed(ConfectAuth, make(auth));
 
 export class NoUserIdentityFoundError extends Schema.TaggedError<NoUserIdentityFoundError>(
-  "NoUserIdentityFoundError"
+  "NoUserIdentityFoundError",
 )("NoUserIdentityFoundError", {}) {
   override get message(): string {
     return "No user identity found";

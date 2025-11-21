@@ -12,24 +12,24 @@
     "clean": "rm -rf dist node_modules"
   },
   "dependencies": {
-    "@effect/platform": "0.90.0",
+    "@effect/platform": "0.93.2",
     "@rjdellecese/confect": "workspace:*",
-    "convex": "1.25.4",
-    "effect": "3.17.6",
-    "react": "19.1.1",
-    "react-dom": "19.1.1",
-    "vite": "7.1.1"
+    "convex": "1.29.1",
+    "effect": "3.19.3",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "vite": "7.2.2"
   },
   "devDependencies": {
-    "@eslint/js": "9.32.0",
-    "@types/node": "24.2.0",
-    "@types/react": "19.1.9",
-    "@types/react-dom": "19.1.7",
-    "@vitejs/plugin-react": "5.0.0",
-    "concurrently": "9.2.0",
-    "eslint": "9.32.0",
+    "@eslint/js": "9.39.1",
+    "@types/node": "24.10.1",
+    "@types/react": "19.2.5",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "5.1.1",
+    "concurrently": "9.2.1",
+    "eslint": "9.39.1",
     "prettier": "3.6.2",
-    "typescript": "5.9.2",
-    "typescript-eslint": "8.39.0"
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.46.4"
   }
 }

@@ -1,11 +1,34 @@
 import { defineConfig } from "tsdown";
 
-export default defineConfig({
-  entry: ["src/server/index.ts", "src/react/**/*.ts", "src/cli/index.ts"],
+const createConfig = ({
+  platform,
+  entry,
+  clean,
+}: {
+  platform: "neutral" | "node" | "browser";
+  entry: string[];
+  clean: boolean;
+}) => ({
+  entry,
+  platform,
+  clean,
   dts: {
     sourcemap: true,
   },
   sourcemap: true,
-  clean: true,
-  format: ["esm", "cjs"],
+  format: ["esm", "cjs"] as ("esm" | "cjs")[],
 });
+
+export default defineConfig([
+  createConfig({
+    platform: "neutral",
+    entry: ["src/server/index.ts", "src/api/index.ts"],
+    clean: true,
+  }),
+  createConfig({
+    platform: "browser",
+    entry: ["src/react/**/*.ts"],
+    clean: false,
+  }),
+  createConfig({ platform: "node", entry: ["src/cli/index.ts"], clean: false }),
+]);

@@ -29,7 +29,7 @@ import {
   type GenericConfectSchema,
 } from "./ConfectSchema";
 
-import { BaseDatabaseReader, IndexFieldTypesForEq } from "../typeUtils";
+import type { BaseDatabaseReader, IndexFieldTypesForEq } from "../typeUtils";
 import * as ConfectOrderedQuery from "./ConfectOrderedQuery";
 
 type ConfectQueryInitializer<
@@ -38,7 +38,7 @@ type ConfectQueryInitializer<
 > = {
   readonly get: {
     (
-      id: GenericId<TableName>
+      id: GenericId<TableName>,
     ): Effect.Effect<
       ConfectDataModel[TableName]["confectDocument"],
       ConfectDocument.DocumentDecodeError | GetByIdFailure
@@ -75,9 +75,9 @@ type ConfectQueryInitializer<
             TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>,
             IndexName
           >
-        >
+        >,
       ) => IndexRange,
-      order?: "asc" | "desc"
+      order?: "asc" | "desc",
     ): ConfectOrderedQuery.ConfectOrderedQuery<
       ConfectDataModel[TableName],
       TableName
@@ -88,7 +88,7 @@ type ConfectQueryInitializer<
       >,
     >(
       indexName: IndexName,
-      order?: "asc" | "desc"
+      order?: "asc" | "desc",
     ): ConfectOrderedQuery.ConfectOrderedQuery<
       ConfectDataModel[TableName],
       TableName
@@ -109,8 +109,8 @@ type ConfectQueryInitializer<
           TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>,
           IndexName
         >
-      >
-    ) => SearchFilter
+      >,
+    ) => SearchFilter,
   ) => ConfectOrderedQuery.ConfectOrderedQuery<
     ConfectDataModel[TableName],
     TableName
@@ -128,7 +128,7 @@ export const make = <
 >(
   tableName: TableName,
   convexDatabaseReader: BaseDatabaseReader<ConvexDataModel>,
-  confectTableDefinition: ConfectSchema[TableName]
+  confectTableDefinition: ConfectSchema[TableName],
 ): ConfectQueryInitializer<ConfectDataModel, TableName> => {
   type ThisConfectQueryInitializer = ConfectQueryInitializer<
     ConfectDataModel,
@@ -150,7 +150,7 @@ export const make = <
       Indexes<
         TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>
       >[IndexName]
-    >
+    >,
   ): Effect.Effect<
     ConfectDataModel[TableName]["confectDocument"],
     ConfectDocument.DocumentDecodeError | GetByIndexFailure
@@ -166,10 +166,10 @@ export const make = <
             Array.reduce(
               indexFieldValues,
               q,
-              (q_, v, i) => q_.eq(indexFields[i] as any, v as any) as any
-            )
+              (q_, v, i) => q_.eq(indexFields[i] as any, v as any) as any,
+            ),
           )
-          .unique()
+          .unique(),
       ),
       Effect.andThen(
         Either.fromNullable(
@@ -178,12 +178,12 @@ export const make = <
               tableName,
               indexName: indexName as string,
               indexFieldValues: indexFieldValues as string[],
-            })
-        )
+            }),
+        ),
       ),
       Effect.andThen(
-        ConfectDocument.decode(tableName, confectTableDefinition.tableSchema)
-      )
+        ConfectDocument.decode(tableName, confectTableDefinition.tableSchema),
+      ),
     );
   };
 
@@ -196,7 +196,7 @@ export const make = <
       return getById(
         tableName,
         convexDatabaseReader,
-        confectTableDefinition
+        confectTableDefinition,
       )(id);
     } else {
       const [indexName, ...indexFieldValues] = args;
@@ -205,7 +205,7 @@ export const make = <
         indexName as keyof Indexes<
           TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>
         >,
-        indexFieldValues
+        indexFieldValues,
       );
     }
   }) as ConfectQueryInitializerFunction<"get">;
@@ -224,11 +224,11 @@ export const make = <
               TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>,
               IndexName
             >
-          >
+          >,
         ) => IndexRange)
       | "asc"
       | "desc",
-    order?: "asc" | "desc"
+    order?: "asc" | "desc",
   ) => {
     const {
       applyWithIndex,
@@ -237,10 +237,10 @@ export const make = <
       applyWithIndex: (
         queryInitializer: QueryInitializer<
           NamedTableInfo<ConvexDataModel, TableName>
-        >
+        >,
       ) => Query<NamedTableInfo<ConvexDataModel, TableName>>;
       applyOrder: (
-        query: Query<NamedTableInfo<ConvexDataModel, TableName>>
+        query: Query<NamedTableInfo<ConvexDataModel, TableName>>,
       ) => OrderedQuery<NamedTableInfo<ConvexDataModel, TableName>>;
     } =
       indexRangeOrOrder === undefined
@@ -268,26 +268,26 @@ export const make = <
     const orderedQuery = pipe(
       convexDatabaseReader.query(tableName),
       applyWithIndex,
-      applyOrder
+      applyOrder,
     );
 
     return ConfectOrderedQuery.make<ConfectDataModel[TableName], TableName>(
       orderedQuery,
       tableName,
-      confectTableDefinition.tableSchema
+      confectTableDefinition.tableSchema,
     );
   };
 
   const search: ConfectQueryInitializerFunction<"search"> = (
     indexName,
-    searchFilter
+    searchFilter,
   ) =>
     ConfectOrderedQuery.make<ConfectDataModel[TableName], TableName>(
       convexDatabaseReader
         .query(tableName)
         .withSearchIndex(indexName, searchFilter),
       tableName,
-      confectTableDefinition.tableSchema
+      confectTableDefinition.tableSchema,
     );
 
   return {
@@ -309,21 +309,21 @@ export const getById =
   >(
     tableName: TableName,
     convexDatabaseReader: BaseDatabaseReader<ConvexDataModel>,
-    confectTableDefinition: ConfectSchema[TableName]
+    confectTableDefinition: ConfectSchema[TableName],
   ) =>
   (id: GenericId<TableName>) =>
     pipe(
       Effect.promise(() => convexDatabaseReader.get(id)),
       Effect.andThen(
-        Either.fromNullable(() => new GetByIdFailure({ tableName, id }))
+        Either.fromNullable(() => new GetByIdFailure({ tableName, id })),
       ),
       Effect.andThen(
-        ConfectDocument.decode(tableName, confectTableDefinition.tableSchema)
-      )
+        ConfectDocument.decode(tableName, confectTableDefinition.tableSchema),
+      ),
     );
 
 export class GetByIdFailure extends Schema.TaggedError<GetByIdFailure>(
-  "GetByIdFailure"
+  "GetByIdFailure",
 )("GetByIdFailure", {
   id: Schema.String,
   tableName: Schema.String,
@@ -338,7 +338,7 @@ export class GetByIdFailure extends Schema.TaggedError<GetByIdFailure>(
 }
 
 export class GetByIndexFailure extends Schema.TaggedError<GetByIndexFailure>(
-  "GetByIndexFailure"
+  "GetByIndexFailure",
 )("GetByIndexFailure", {
   tableName: Schema.String,
   indexName: Schema.String,

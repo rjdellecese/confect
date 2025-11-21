@@ -31,7 +31,7 @@ export const make = <
         ConfectSchemaDefinition["confectSchema"]
       >
     >
-  >
+  >,
 ) => {
   type ConfectDataModel =
     ConfectDataModelFromConfectSchemaDefinition<ConfectSchemaDefinition>;
@@ -42,7 +42,7 @@ export const make = <
     tableName: TableName,
     document: WithoutSystemFields<
       ConfectDocumentByName<ConfectDataModel, TableName>
-    >
+    >,
   ) =>
     Effect.gen(function* () {
       const confectTableDefinition = confectSchemaDefinition.confectSchema[
@@ -52,7 +52,7 @@ export const make = <
       const encodedDocument = yield* ConfectDocument.encode(
         document,
         tableName,
-        confectTableDefinition.tableSchema
+        confectTableDefinition.tableSchema,
       );
 
       const id = yield* Effect.promise(() =>
@@ -66,8 +66,8 @@ export const make = <
               >,
               "_creationTime" | "_id"
             >
-          >
-        )
+          >,
+        ),
       );
 
       return id;
@@ -80,7 +80,7 @@ export const make = <
     id: GenericId<TableName>,
     patchedValues: Partial<
       WithoutSystemFields<ConfectDocumentByName<ConfectDataModel, TableName>>
-    >
+    >,
   ) =>
     Effect.gen(function* () {
       const confectTableDefinition = confectSchemaDefinition.confectSchema[
@@ -95,7 +95,7 @@ export const make = <
       const originalDecodedDoc = yield* ConfectQueryInitializer.getById(
         tableName,
         convexDatabaseWriter,
-        confectTableDefinition
+        confectTableDefinition,
       )(id);
 
       const updatedEncodedDoc = yield* pipe(
@@ -103,9 +103,9 @@ export const make = <
         Record.reduce(originalDecodedDoc, (acc, value, key) =>
           value === undefined
             ? Record.remove(acc, key)
-            : Record.set(acc, key, value)
+            : Record.set(acc, key, value),
         ),
-        ConfectDocument.encode(tableName, tableSchema)
+        ConfectDocument.encode(tableName, tableSchema),
       );
 
       yield* Effect.promise(() =>
@@ -119,8 +119,8 @@ export const make = <
               >,
               "_creationTime" | "_id"
             >
-          >
-        )
+          >,
+        ),
       );
     });
 
@@ -131,7 +131,7 @@ export const make = <
     id: GenericId<TableName>,
     value: WithoutSystemFields<
       ConfectDocumentByName<ConfectDataModel, TableName>
-    >
+    >,
   ) =>
     Effect.gen(function* () {
       const confectTableDefinition = confectSchemaDefinition.confectSchema[
@@ -146,7 +146,7 @@ export const make = <
       const updatedEncodedDoc = yield* ConfectDocument.encode(
         value,
         tableName,
-        tableSchema
+        tableSchema,
       );
 
       yield* Effect.promise(() =>
@@ -160,8 +160,8 @@ export const make = <
               >,
               "_creationTime" | "_id"
             >
-          >
-        )
+          >,
+        ),
       );
     });
 
@@ -169,7 +169,7 @@ export const make = <
     TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
   >(
     _tableName: TableName,
-    id: GenericId<TableName>
+    id: GenericId<TableName>,
   ) => Effect.promise(() => convexDatabaseWriter.delete(id));
 
   return {
@@ -184,7 +184,7 @@ export const ConfectDatabaseWriter = <
   ConfectSchemaDefinition extends GenericConfectSchemaDefinition,
 >() =>
   Context.GenericTag<ReturnType<typeof make<ConfectSchemaDefinition>>>(
-    "@rjdellecese/confect/ConfectDatabaseWriter"
+    "@rjdellecese/confect/ConfectDatabaseWriter",
   );
 
 export type ConfectDatabaseWriter<
@@ -203,9 +203,9 @@ export const layer = <
         ConfectSchemaDefinition["confectSchema"]
       >
     >
-  >
+  >,
 ) =>
   Layer.succeed(
     ConfectDatabaseWriter<ConfectSchemaDefinition>(),
-    make(confectSchemaDefinition, convexDatabaseWriter)
+    make(confectSchemaDefinition, convexDatabaseWriter),
   );

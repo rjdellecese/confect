@@ -30,7 +30,7 @@ export const layer = (runMutation: GenericMutationCtx<any>["runMutation"]) =>
   Layer.succeed(ConfectMutationRunner, makeMutationRunner(runMutation));
 
 export class MutationRollback extends Schema.TaggedError<MutationRollback>(
-  "MutationRollback"
+  "MutationRollback",
 )("MutationRollback", {
   mutationName: Schema.String,
   error: Schema.Unknown,

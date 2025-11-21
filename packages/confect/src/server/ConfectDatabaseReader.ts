@@ -1,15 +1,17 @@
 import type { GenericDatabaseReader } from "convex/server";
 import { Array, Context, Layer, Struct } from "effect";
-import { BaseDatabaseReader } from "../typeUtils";
+import type { BaseDatabaseReader } from "../typeUtils";
 import type { DataModelFromConfectDataModel } from "./ConfectDataModel";
 import * as ConfectQueryInitializer from "./ConfectQueryInitializer";
+import type {
+  ConfectDataModelFromConfectSchema,
+  ExtendWithConfectSystemSchema,
+  GenericConfectSchemaDefinition,
+  TableNamesInConfectSchema,
+} from "./ConfectSchema";
 import {
-  type ConfectDataModelFromConfectSchema,
   confectSystemSchema,
-  type ExtendWithConfectSystemSchema,
   extendWithConfectSystemSchema,
-  type GenericConfectSchemaDefinition,
-  type TableNamesInConfectSchema,
 } from "./ConfectSchema";
 
 export const make = <
@@ -22,7 +24,7 @@ export const make = <
         ConfectSchemaDefinition["confectSchema"]
       >
     >
-  >
+  >,
 ) => {
   type ConfectSchema = ConfectSchemaDefinition["confectSchema"];
 
@@ -34,10 +36,10 @@ export const make = <
       TableName extends
         TableNamesInConfectSchema<ConfectSchemaWithSystemTables>,
     >(
-      tableName: TableName
+      tableName: TableName,
     ) => {
       const confectTableDefinition = extendWithConfectSystemSchema(
-        confectSchemaDefinition.confectSchema
+        confectSchemaDefinition.confectSchema,
       )[tableName] as ConfectSchemaWithSystemTables[TableName];
 
       const baseDatabaseReader: BaseDatabaseReader<
@@ -46,7 +48,7 @@ export const make = <
         >
       > = Array.some(
         Struct.keys(confectSystemSchema),
-        (systemTableName) => systemTableName === tableName
+        (systemTableName) => systemTableName === tableName,
       )
         ? {
             get: convexDatabaseReader.system.get,
@@ -69,7 +71,7 @@ export const ConfectDatabaseReader = <
   ConfectSchemaDefinition extends GenericConfectSchemaDefinition,
 >() =>
   Context.GenericTag<ReturnType<typeof make<ConfectSchemaDefinition>>>(
-    "@rjdellecese/confect/ConfectDatabaseReader"
+    "@rjdellecese/confect/ConfectDatabaseReader",
   );
 
 export type ConfectDatabaseReader<
@@ -88,9 +90,9 @@ export const layer = <
         ConfectSchemaDefinition["confectSchema"]
       >
     >
-  >
+  >,
 ) =>
   Layer.succeed(
     ConfectDatabaseReader<ConfectSchemaDefinition>(),
-    make(confectSchemaDefinition, convexDatabaseReader)
+    make(confectSchemaDefinition, convexDatabaseReader),
   );

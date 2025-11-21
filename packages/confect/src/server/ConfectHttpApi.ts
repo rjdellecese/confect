@@ -29,7 +29,7 @@ import {
 import * as ConvexActionCtx from "./ConvexActionCtx";
 
 type Middleware = (
-  httpApp: HttpApp.Default
+  httpApp: HttpApp.Default,
 ) => HttpApp.Default<
   never,
   HttpApi.Api | HttpApiBuilder.Router | HttpRouter.HttpRouter.DefaultServices
@@ -71,9 +71,9 @@ const makeHandler =
           ConfectStorageReader.layer(ctx.storage),
           ConfectStorageWriter.layer(ctx.storage),
           ConfectStorageActionWriter.layer(ctx.storage),
-          Layer.succeed(ConvexActionCtx.ConvexActionCtx<DataModel>(), ctx)
-        )
-      )
+          Layer.succeed(ConvexActionCtx.ConvexActionCtx<DataModel>(), ctx),
+        ),
+      ),
     );
 
     const ApiDocsLive = HttpApiScalar.layer({
@@ -87,7 +87,7 @@ const makeHandler =
     const EnvLive = Layer.mergeAll(
       ApiLive,
       ApiDocsLive,
-      HttpServer.layerContext
+      HttpServer.layerContext,
     );
 
     const { handler } = HttpApiBuilder.toWebHandler(EnvLive, { middleware });
@@ -126,8 +126,8 @@ const makeHttpAction = <DataModel extends GenericDataModel>({
       scalar,
     }) as unknown as (
       ctx: GenericActionCtx<GenericDataModel>,
-      request: Request
-    ) => Promise<Response>
+      request: Request,
+    ) => Promise<Response>,
   );
 
 export type ConfectHttpApi = {
@@ -196,7 +196,7 @@ const mountEffectHttpApi =
 type ConfectHttpApis = Partial<Record<RoutePath, ConfectHttpApi>>;
 
 export const makeConvexHttpRouter = (
-  confectHttpApis: ConfectHttpApis
+  confectHttpApis: ConfectHttpApis,
 ): ConvexHttpRouter => {
   applyMonkeyPatches();
 
@@ -210,8 +210,8 @@ export const makeConvexHttpRouter = (
           pathPrefix: pathPrefix as RoutePath,
           apiLive,
           middleware,
-        })(convexHttpRouter)
-    )
+        })(convexHttpRouter),
+    ),
   );
 };
 

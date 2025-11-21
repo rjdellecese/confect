@@ -81,8 +81,8 @@ export const failingRunInMutation = confectMutation({
 
       return yield* runMutation(internal.runners.failingMutationToRun, {}).pipe(
         Effect.catchTag("MutationRollback", () =>
-          Effect.succeed(rollbackMessage)
-        )
+          Effect.succeed(rollbackMessage),
+        ),
       );
     }),
 });

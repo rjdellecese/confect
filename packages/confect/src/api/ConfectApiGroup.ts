@@ -1,7 +1,7 @@
 import { Predicate, Record } from "effect";
-import { GenericConfectSchema } from "../server/ConfectSchema";
+import type { GenericConfectSchema } from "../server/ConfectSchema";
 import { validateJsIdentifier } from "../utils";
-import * as ConfectApiFunction from "./ConfectApiFunction";
+import type * as ConfectApiFunction from "./ConfectApiFunction";
 
 export const TypeId = Symbol.for("@rjdellecese/confect/ConfectApiGroup");
 
@@ -31,11 +31,11 @@ export interface ConfectApiGroup<
   addFunction<
     Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
   >(
-    function_: Function
+    function_: Function,
   ): ConfectApiGroup<ConfectSchema, Name, Functions | Function, Groups>;
 
   addGroup<Group extends ConfectApiGroup.AnyWithProps>(
-    group: Group
+    group: Group,
   ): ConfectApiGroup<ConfectSchema, Name, Functions, Groups | Group>;
 }
 
@@ -165,7 +165,7 @@ const Proto = {
 
   addGroup<Group extends ConfectApiGroup.AnyWithProps>(
     this: ConfectApiGroup.AnyWithProps,
-    group: Group
+    group: Group,
   ) {
     return makeProto({
       name: this.name,
@@ -199,7 +199,7 @@ export const make = <
   ConfectSchema extends GenericConfectSchema,
   const Name extends string,
 >(
-  name: Name
+  name: Name,
 ): ConfectApiGroup<ConfectSchema, Name> => {
   validateJsIdentifier(name);
 

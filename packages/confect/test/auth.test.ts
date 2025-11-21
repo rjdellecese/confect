@@ -20,7 +20,7 @@ describe("authentication", () => {
       const userIdentity = yield* asUser.query(api.auth.getUserIdentity, {});
 
       assertEquals(userIdentity.name, name);
-    })
+    }),
   );
 
   effect("when user is not authenticated", () =>
@@ -34,9 +34,9 @@ describe("authentication", () => {
       assertFailure(
         exit,
         Cause.die(
-          Runtime.makeFiberFailure(Cause.fail(new NoUserIdentityFoundError()))
-        )
+          Runtime.makeFiberFailure(Cause.fail(new NoUserIdentityFoundError())),
+        ),
       );
-    })
+    }),
   );
 });

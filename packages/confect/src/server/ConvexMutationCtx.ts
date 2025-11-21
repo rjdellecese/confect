@@ -3,7 +3,7 @@ import { Context } from "effect";
 
 export const ConvexMutationCtx = <DataModel extends GenericDataModel>() =>
   Context.GenericTag<GenericMutationCtx<DataModel>>(
-    "@rjdellecese/confect/ConvexMutationCtx"
+    "@rjdellecese/confect/ConvexMutationCtx",
   );
 
 export type ConvexMutationCtx<DataModel extends GenericDataModel> = ReturnType<

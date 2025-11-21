@@ -1,29 +1,20 @@
 import {
   actionGeneric,
-  DefaultFunctionArgs,
-  FunctionVisibility,
-  GenericActionCtx,
-  GenericMutationCtx,
-  GenericQueryCtx,
+  type DefaultFunctionArgs,
+  type FunctionVisibility,
+  type GenericActionCtx,
+  type GenericMutationCtx,
+  type GenericQueryCtx,
   internalActionGeneric,
   internalMutationGeneric,
   internalQueryGeneric,
   mutationGeneric,
   queryGeneric,
-  RegisteredAction,
-  RegisteredMutation,
-  RegisteredQuery,
+  type RegisteredAction,
+  type RegisteredMutation,
+  type RegisteredQuery,
 } from "convex/server";
-import {
-  Effect,
-  Layer,
-  Match,
-  pipe,
-  Predicate,
-  Record,
-  Ref,
-  Schema,
-} from "effect";
+import { Effect, Layer, Match, pipe, Predicate, Ref, Schema } from "effect";
 import * as ConfectActionRunner from "../server/ConfectActionRunner";
 import * as ConfectAuth from "../server/ConfectAuth";
 import * as ConfectDatabaseReader from "../server/ConfectDatabaseReader";
@@ -31,7 +22,7 @@ import * as ConfectDatabaseWriter from "../server/ConfectDatabaseWriter";
 import * as ConfectMutationRunner from "../server/ConfectMutationRunner";
 import * as ConfectQueryRunner from "../server/ConfectQueryRunner";
 import * as ConfectScheduler from "../server/ConfectScheduler";
-import {
+import type {
   ConfectSchemaDefinition,
   DataModelFromConfectSchema,
   GenericConfectSchema,
@@ -46,28 +37,47 @@ import * as ConvexActionCtx from "../server/ConvexActionCtx";
 import * as ConvexMutationCtx from "../server/ConvexMutationCtx";
 import * as ConvexQueryCtx from "../server/ConvexQueryCtx";
 import * as SchemaToValidator from "../server/SchemaToValidator";
-import * as ConfectApi from "./ConfectApi";
+import { mapLeaves } from "../utils";
+import type * as ConfectApi from "./ConfectApi";
 import * as ConfectApiBuilder from "./ConfectApiBuilder";
 import * as ConfectApiRegistry from "./ConfectApiRegistry";
 
-type RegisteredFunction =
+export type RegisteredFunction =
   | RegisteredQuery<FunctionVisibility, DefaultFunctionArgs, any>
   | RegisteredMutation<FunctionVisibility, DefaultFunctionArgs, any>
   | RegisteredAction<FunctionVisibility, DefaultFunctionArgs, any>;
 
-export const TypeId = Symbol.for("@rjdellecese/confect/ConfectApiServer");
+const isRegisteredQuery = (
+  u: unknown
+): u is RegisteredQuery<FunctionVisibility, DefaultFunctionArgs, any> =>
+  Predicate.hasProperty(u, "isQuery") && u.isQuery === true;
 
+const isRegisteredMutation = (
+  u: unknown
+): u is RegisteredMutation<FunctionVisibility, DefaultFunctionArgs, any> =>
+  Predicate.hasProperty(u, "isMutation") && u.isMutation === true;
+
+const isRegisteredAction = (
+  u: unknown
+): u is RegisteredAction<FunctionVisibility, DefaultFunctionArgs, any> =>
+  Predicate.hasProperty(u, "isAction") && u.isAction === true;
+
+export const isRegisteredFunction = (u: unknown): u is RegisteredFunction =>
+  isRegisteredQuery(u) || isRegisteredMutation(u) || isRegisteredAction(u);
+
+export const TypeId = Symbol.for("@rjdellecese/confect/ConfectApiServer");
 export type TypeId = typeof TypeId;
 
 export const isConfectApiServer = (u: unknown): u is ConfectApiServer =>
   Predicate.hasProperty(u, TypeId);
 
+export interface RegisteredFunctions {
+  readonly [key: string]: RegisteredFunction | RegisteredFunctions;
+}
+
 export interface ConfectApiServer {
   readonly [TypeId]: TypeId;
-  readonly registeredFunctions: Record.ReadonlyRecord<
-    string,
-    RegisteredFunction
-  >;
+  readonly registeredFunctions: RegisteredFunctions;
 }
 
 const Proto = {
@@ -77,7 +87,7 @@ const Proto = {
 const makeProto = ({
   registeredFunctions,
 }: {
-  registeredFunctions: Record.ReadonlyRecord<string, RegisteredFunction>;
+  registeredFunctions: RegisteredFunctions;
 }): ConfectApiServer =>
   Object.assign(Object.create(Proto), {
     registeredFunctions,
@@ -89,7 +99,10 @@ export const make = Effect.gen(function* () {
 
   const handlerItems = yield* Ref.get(registry);
 
-  const registeredFunctions = Record.map(handlerItems, (handlerItem) =>
+  const registeredFunctions = mapLeaves<
+    ConfectApiBuilder.Handlers.Item.AnyWithProps,
+    RegisteredFunction
+  >(handlerItems, ConfectApiBuilder.isHandlerItem, (handlerItem) =>
     makeRegisteredFunction(api, handlerItem)
   );
 

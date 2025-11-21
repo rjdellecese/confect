@@ -1,5 +1,5 @@
 import { Predicate, Record } from "effect";
-import * as ConfectApiGroup from "./ConfectApiGroup";
+import type * as ConfectApiGroup from "./ConfectApiGroup";
 
 export const TypeId = Symbol.for("@rjdellecese/confect/ConfectApi");
 
@@ -19,7 +19,7 @@ export interface ConfectApiSpec<
   };
 
   add<Group extends ConfectApiGroup.ConfectApiGroup.Any>(
-    group: Group
+    group: Group,
   ): ConfectApiSpec<Name, Groups | Group>;
 }
 
@@ -43,7 +43,7 @@ const Proto = {
 
   add<Group extends ConfectApiGroup.ConfectApiGroup.AnyWithProps>(
     this: ConfectApiSpec.AnyWithProps,
-    group: Group
+    group: Group,
   ) {
     return makeProto({
       name: this.name,
@@ -68,5 +68,5 @@ const makeProto = <
   });
 
 export const make = <const Name extends string>(
-  name: Name
+  name: Name,
 ): ConfectApiSpec<Name> => makeProto({ name, groups: Record.empty() });

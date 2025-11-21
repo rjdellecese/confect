@@ -1,22 +1,21 @@
+import type { Types } from "effect";
 import {
   Array,
   Context,
   Effect,
   Function,
   Layer,
-  Record,
+  Predicate,
   Ref,
   String,
-  Types,
 } from "effect";
-import { GenericConfectSchema } from "../server/ConfectSchema";
-import * as ConfectApi from "./ConfectApi";
-import * as ConfectApiFunction from "./ConfectApiFunction";
-import * as ConfectApiGroup from "./ConfectApiGroup";
+import type { GenericConfectSchema } from "../server/ConfectSchema";
+import type * as ConfectApi from "./ConfectApi";
+import type * as ConfectApiFunction from "./ConfectApiFunction";
+import type * as ConfectApiGroup from "./ConfectApiGroup";
 import * as ConfectApiRegistry from "./ConfectApiRegistry";
 
 export const HandlersTypeId = Symbol.for("@rjdellecese/confect/Handlers");
-
 export type HandlersTypeId = typeof HandlersTypeId;
 
 export interface Handlers<
@@ -38,6 +37,30 @@ export interface Handlers<
   >;
 }
 
+export const HandlerItemTypeId = Symbol.for("@rjdellecese/confect/HandlerItem");
+export type HandlerItemTypeId = typeof HandlerItemTypeId;
+
+export const isHandlerItem = (
+  value: unknown
+): value is Handlers.Item.AnyWithProps =>
+  Predicate.hasProperty(value, HandlerItemTypeId);
+
+const HandlerItemProto = {
+  [HandlerItemTypeId]: HandlerItemTypeId,
+};
+
+const makeHandlerItem = <
+  ConfectSchema extends GenericConfectSchema,
+  Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
+>({
+  function_,
+  handler,
+}: {
+  function_: Function;
+  handler: ConfectApiFunction.Handler<ConfectSchema, Function>;
+}): Handlers.Item<ConfectSchema, Function> =>
+  Object.assign(Object.create(HandlerItemProto), { function_, handler });
+
 export declare namespace Handlers {
   export interface Any {
     readonly [HandlersTypeId]: {
@@ -55,6 +78,7 @@ export declare namespace Handlers {
     ConfectSchema extends GenericConfectSchema,
     Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
   > {
+    readonly [HandlerItemTypeId]: HandlerItemTypeId;
     readonly function_: Function;
     readonly handler: ConfectApiFunction.Handler<ConfectSchema, Function>;
   }
@@ -92,16 +116,16 @@ const HandlersProto = {
     name: string,
     handler: ConfectApiFunction.Handler.AnyWithProps
   ) {
-    const function_ = this.group.functions[name];
+    const function_ = this.group.functions[name]!;
     return makeHandlers({
       group: this.group,
       items: [
         ...this.items,
-        {
+        makeHandlerItem({
           function_,
           handler,
-        },
-      ] as any,
+        }),
+      ],
     });
   },
 };
@@ -138,10 +162,8 @@ export const group = <
   never,
   ConfectApiGroupService.FromGroupWithPath<ApiName, GroupPath, Groups>
 > => {
-  const [firstGroupPathPart, ...restGroupPathParts] = String.split(
-    groupPath,
-    "."
-  );
+  const groupPathParts = String.split(groupPath, ".");
+  const [firstGroupPathPart, ...restGroupPathParts] = groupPathParts;
 
   // TODO: Move this implementation to a module for handling paths/group paths?
   const group = Array.reduce(
@@ -168,11 +190,13 @@ export const group = <
       ) as Handlers.AnyWithProps;
 
       for (const handlerItem of handlers.items) {
-        const functionPath = Array.join(
-          [groupPath, handlerItem.function_.name],
-          "."
+        yield* Ref.update(registry, (handlerItemsRegistry) =>
+          setNestedProperty(
+            handlerItemsRegistry,
+            [...groupPathParts, handlerItem.function_.name],
+            handlerItem
+          )
         );
-        yield* Ref.update(registry, Record.set(functionPath, handlerItem));
       }
 
       return yield* Effect.succeed({
@@ -181,6 +205,26 @@ export const group = <
       });
     })
   );
+};
+
+const setNestedProperty = <T extends object>(
+  obj: T,
+  path: (keyof T)[],
+  value: T[keyof T]
+): T => {
+  if (path.length === 1) {
+    return { ...obj, [path[0] as keyof T]: value };
+  }
+
+  const [head, ...tail] = path;
+  return {
+    ...obj,
+    [head as keyof T]: setNestedProperty(
+      obj[head as keyof T] as any,
+      tail,
+      value
+    ),
+  };
 };
 
 export const api = <

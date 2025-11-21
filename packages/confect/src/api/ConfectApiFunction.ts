@@ -1,25 +1,26 @@
-import { Effect, Predicate, Schema } from "effect";
-import * as ConfectActionRunner from "../server/ConfectActionRunner";
-import * as ConfectAuth from "../server/ConfectAuth";
-import * as ConfectDatabaseReader from "../server/ConfectDatabaseReader";
-import * as ConfectDatabaseWriter from "../server/ConfectDatabaseWriter";
-import * as ConfectMutationRunner from "../server/ConfectMutationRunner";
-import * as ConfectQueryRunner from "../server/ConfectQueryRunner";
-import * as ConfectScheduler from "../server/ConfectScheduler";
-import {
+import type { Effect, Schema } from "effect";
+import { Predicate } from "effect";
+import type * as ConfectActionRunner from "../server/ConfectActionRunner";
+import type * as ConfectAuth from "../server/ConfectAuth";
+import type * as ConfectDatabaseReader from "../server/ConfectDatabaseReader";
+import type * as ConfectDatabaseWriter from "../server/ConfectDatabaseWriter";
+import type * as ConfectMutationRunner from "../server/ConfectMutationRunner";
+import type * as ConfectQueryRunner from "../server/ConfectQueryRunner";
+import type * as ConfectScheduler from "../server/ConfectScheduler";
+import type {
   ConfectSchemaDefinition,
   DataModelFromConfectSchema,
   GenericConfectSchema,
 } from "../server/ConfectSchema";
-import {
+import type {
   ConfectStorageActionWriter,
   ConfectStorageReader,
   ConfectStorageWriter,
 } from "../server/ConfectStorage";
-import * as ConfectVectorSearch from "../server/ConfectVectorSearch";
-import * as ConvexActionCtx from "../server/ConvexActionCtx";
-import * as ConvexMutationCtx from "../server/ConvexMutationCtx";
-import * as ConvexQueryCtx from "../server/ConvexQueryCtx";
+import type * as ConfectVectorSearch from "../server/ConfectVectorSearch";
+import type * as ConvexActionCtx from "../server/ConvexActionCtx";
+import type * as ConvexMutationCtx from "../server/ConvexMutationCtx";
+import type * as ConvexQueryCtx from "../server/ConvexQueryCtx";
 import { validateJsIdentifier } from "../utils";
 
 export const TypeId = Symbol.for("@rjdellecese/confect/ConfectApiFunction");
@@ -27,7 +28,7 @@ export const TypeId = Symbol.for("@rjdellecese/confect/ConfectApiFunction");
 export type TypeId = typeof TypeId;
 
 export const isConfectApiFunction = (
-  u: unknown
+  u: unknown,
 ): u is ConfectApiFunction.AnyWithProps => Predicate.hasProperty(u, TypeId);
 
 export interface ConfectApiFunction<
@@ -205,7 +206,7 @@ export type ActionHandler<
 >;
 
 type BaseHandler<Function extends ConfectApiFunction.AnyWithProps, R> = (
-  args: ConfectApiFunction.Args<Function>["Type"]
+  args: ConfectApiFunction.Args<Function>["Type"],
 ) => Effect.Effect<ConfectApiFunction.Returns<Function>["Type"], never, R>;
 
 export declare namespace Handler {
@@ -231,7 +232,7 @@ const make =
     FunctionVisibility extends ConfectApiFunction.FunctionVisibility,
   >(
     functionType: FunctionType,
-    functionVisibility: FunctionVisibility
+    functionVisibility: FunctionVisibility,
   ) =>
   <
     const Name extends string,

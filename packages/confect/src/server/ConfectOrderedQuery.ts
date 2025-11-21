@@ -16,7 +16,7 @@ export type ConfectOrderedQuery<
     ConfectDocument.DocumentDecodeError
   >;
   readonly take: (
-    n: number
+    n: number,
   ) => Effect.Effect<
     ReadonlyArray<ConfectTableInfo["confectDocument"]>,
     ConfectDocument.DocumentDecodeError
@@ -44,20 +44,20 @@ export const make = <
 >(
   query: OrderedQuery<TableInfoFromConfectTableInfo<ConfectTableInfo>>,
   tableName: TableName,
-  tableSchema: TableSchemaFromConfectTableInfo<ConfectTableInfo>
+  tableSchema: TableSchemaFromConfectTableInfo<ConfectTableInfo>,
 ): ConfectOrderedQuery<ConfectTableInfo, TableName> => {
   type ConfectOrderedQueryFunction<
     FunctionName extends keyof ConfectOrderedQuery<ConfectTableInfo, TableName>,
   > = ConfectOrderedQuery<ConfectTableInfo, TableName>[FunctionName];
 
   const streamEncoded = Stream.fromAsyncIterable(query, identity).pipe(
-    Stream.orDie
+    Stream.orDie,
   );
 
   const stream: ConfectOrderedQueryFunction<"stream"> = () =>
     pipe(
       streamEncoded,
-      Stream.mapEffect(ConfectDocument.decode(tableName, tableSchema))
+      Stream.mapEffect(ConfectDocument.decode(tableName, tableSchema)),
     );
 
   const first: ConfectOrderedQueryFunction<"first"> = () =>
@@ -68,7 +68,7 @@ export const make = <
       stream(),
       Stream.take(n),
       Stream.runCollect,
-      Effect.map((chunk) => Chunk.toReadonlyArray(chunk))
+      Effect.map((chunk) => Chunk.toReadonlyArray(chunk)),
     );
 
   const collect: ConfectOrderedQueryFunction<"collect"> = () =>
@@ -77,12 +77,12 @@ export const make = <
   const paginate: ConfectOrderedQueryFunction<"paginate"> = (options) =>
     Effect.gen(function* () {
       const paginationResult = yield* Effect.promise(() =>
-        query.paginate(options)
+        query.paginate(options),
       );
 
       const parsedPage = yield* Effect.forEach(
         paginationResult.page,
-        ConfectDocument.decode(tableName, tableSchema)
+        ConfectDocument.decode(tableName, tableSchema),
       );
 
       return {
