@@ -255,6 +255,12 @@ export type ConfectDataModelFromConfectSchemaDefinition<
     ? ConfectDataModelFromConfectSchema<ConfectSchema>
     : never;
 
+export type DataModelFromConfectSchemaDefinition<
+  ConfectSchemaDef extends GenericConfectSchemaDefinition,
+> = DataModelFromConfectDataModel<
+  ConfectDataModelFromConfectSchemaDefinition<ConfectSchemaDef>
+>;
+
 export type DataModelFromConfectSchema<
   ConfectSchema extends GenericConfectSchema,
 > = DataModelFromConfectDataModel<

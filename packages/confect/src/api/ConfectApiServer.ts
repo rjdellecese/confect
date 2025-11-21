@@ -152,7 +152,7 @@ const makeRegisteredFunction = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
       );
 
       return genericFunction(
-        confectActionFunction(api.confectSchemaDefinition, {
+        confectActionFunction({
           args: function_.args,
           returns: function_.returns,
           handler,
@@ -315,35 +315,30 @@ const confectActionFunction = <
   ConvexReturns,
   ConfectReturns,
   E,
->(
-  confectSchemaDefinition: ConfectSchemaDefinition<ConfectSchema>,
-  {
-    args,
-    returns,
-    handler,
-  }: {
-    args: Schema.Schema<ConfectValue, ConvexValue>;
-    returns: Schema.Schema<ConfectReturns, ConvexReturns>;
-    handler: (
-      a: ConfectValue
-    ) => Effect.Effect<
-      ConfectReturns,
-      E,
-      | ConfectScheduler.ConfectScheduler
-      | ConfectAuth.ConfectAuth
-      | ConfectStorageReader
-      | ConfectStorageWriter
-      | ConfectStorageActionWriter
-      | ConfectQueryRunner.ConfectQueryRunner
-      | ConfectMutationRunner.ConfectMutationRunner
-      | ConfectActionRunner.ConfectActionRunner
-      | ConfectVectorSearch.ConfectVectorSearch
-      | ConvexActionCtx.ConvexActionCtx<
-          DataModelFromConfectSchema<ConfectSchema>
-        >
-    >;
-  }
-) => ({
+>({
+  args,
+  returns,
+  handler,
+}: {
+  args: Schema.Schema<ConfectValue, ConvexValue>;
+  returns: Schema.Schema<ConfectReturns, ConvexReturns>;
+  handler: (
+    a: ConfectValue
+  ) => Effect.Effect<
+    ConfectReturns,
+    E,
+    | ConfectScheduler.ConfectScheduler
+    | ConfectAuth.ConfectAuth
+    | ConfectStorageReader
+    | ConfectStorageWriter
+    | ConfectStorageActionWriter
+    | ConfectQueryRunner.ConfectQueryRunner
+    | ConfectMutationRunner.ConfectMutationRunner
+    | ConfectActionRunner.ConfectActionRunner
+    | ConfectVectorSearch.ConfectVectorSearch
+    | ConvexActionCtx.ConvexActionCtx<DataModelFromConfectSchema<ConfectSchema>>
+  >;
+}) => ({
   args: SchemaToValidator.compileArgsSchema(args),
   returns: SchemaToValidator.compileReturnsSchema(returns),
   handler: (

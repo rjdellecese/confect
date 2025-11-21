@@ -4,14 +4,13 @@ import { Command, Options } from "@effect/cli";
 import { FileSystem, Path } from "@effect/platform";
 import { NodeContext, NodeRuntime } from "@effect/platform-node";
 import type { PlatformError } from "@effect/platform/Error";
-import type { Options as CodeBlockWriterOptions } from "code-block-writer";
-import CodeBlockWriter_ from "code-block-writer";
 import { Array, Console, Effect, Option, Record, String } from "effect";
 import * as tsx from "tsx/esm/api";
 import packageJson from "../../package.json" with { type: "json" };
 import * as ConfectApiServer from "../api/ConfectApiServer";
 import * as ConfectSchema from "../server/ConfectSchema";
 import { forEachBranchLeaves } from "../utils";
+import { functions, schema, services } from "./templates";
 
 // Define a simple dummy command
 const nameOption = Options.text("name").pipe(
@@ -29,6 +28,7 @@ const greetCommand = Command.make("greet", { name: nameOption }, ({ name }) =>
 const generateCommand = Command.make("generate", {}, () =>
   Effect.gen(function* () {
     yield* generateSchema;
+    yield* generateServices;
 
     const path = yield* Path.Path;
 
@@ -100,8 +100,6 @@ const generateSchema = Effect.gen(function* () {
     })
   );
 
-  const codeBlockWriter = new CodeBlockWriter();
-
   const convexDir = path.join(cwd, "convex");
   const convexSchemaPath = path.join(convexDir, "schema.ts");
 
@@ -110,18 +108,11 @@ const generateSchema = Effect.gen(function* () {
     confectSchemaPath
   );
   const importPathWithoutExt = yield* removePathExtension(relativeImportPath);
+  const schemaContentsString = yield* schema({
+    schemaImportPath: importPathWithoutExt,
+  });
 
-  yield* codeBlockWriter.writeLine(
-    `import confectSchemaDefinition from "${importPathWithoutExt}";`
-  );
-  yield* codeBlockWriter.newLine();
-  yield* codeBlockWriter.writeLine(
-    `export default confectSchemaDefinition.convexSchemaDefinition;`
-  );
-
-  const schemaContents = new TextEncoder().encode(
-    yield* codeBlockWriter.toString()
-  );
+  const schemaContents = new TextEncoder().encode(schemaContentsString);
 
   yield* fs.writeFile(convexSchemaPath, schemaContents);
 });
@@ -149,28 +140,39 @@ const generateFunctionModule = ({
 
     const modulePath = path.join(directoryPath, `${mod}.ts`);
 
-    const codeBlockWriter = new CodeBlockWriter();
-
     const serverPath = path.join(".", "confect", "server.ts");
     const serverImportPath = yield* removePathExtension(
       path.relative(path.dirname(modulePath), serverPath)
     );
 
-    yield* codeBlockWriter.writeLine(
-      `import server from "${serverImportPath}";`
-    );
-    yield* codeBlockWriter.newLine();
-    for (const fn of fns) {
-      yield* codeBlockWriter.writeLine(
-        `export const ${fn} = ${Array.join(["server", "registeredFunctions", ...dirs, mod, fn], ".")};`
-      );
-    }
+    const functionsContentsString = yield* functions({
+      dirs,
+      mod,
+      fns,
+      serverImportPath,
+    });
 
-    const moduleContents = new TextEncoder().encode(
-      yield* codeBlockWriter.toString()
-    );
+    const moduleContents = new TextEncoder().encode(functionsContentsString);
     yield* fs.writeFile(modulePath, moduleContents);
   });
+
+const generateServices = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+
+  const servicesPath = path.join(".", "convex", "confect", "services.ts");
+  const schemaImportPath = path.relative(
+    path.dirname(servicesPath),
+    path.join(".", "confect", "schema")
+  );
+
+  const servicesContentsString = yield* services({
+    schemaImportPath,
+  });
+
+  const servicesContents = new TextEncoder().encode(servicesContentsString);
+  yield* fs.writeFile(servicesPath, servicesContents);
+});
 
 const removePathExtension = (pathStr: string) =>
   Effect.gen(function* () {
@@ -190,65 +192,3 @@ const main = Command.run(cli, {
 });
 
 main(process.argv).pipe(Effect.provide(NodeContext.layer), NodeRuntime.runMain);
-
-class CodeBlockWriter {
-  private readonly writer: CodeBlockWriter_;
-
-  constructor(opts?: Partial<CodeBlockWriterOptions>) {
-    this.writer = new CodeBlockWriter_(opts);
-  }
-
-  indent<E = never, R = never>(
-    eff: Effect.Effect<void, E, R>
-  ): Effect.Effect<void, E, R> {
-    return Effect.gen(this, function* () {
-      const indentationLevel = this.writer.getIndentationLevel();
-      this.writer.setIndentationLevel(indentationLevel + 1);
-      yield* eff;
-      this.writer.setIndentationLevel(indentationLevel);
-    });
-  }
-
-  writeLine<E = never, R = never>(line: string): Effect.Effect<void, E, R> {
-    return Effect.sync(() => {
-      this.writer.writeLine(line);
-    });
-  }
-
-  write<E = never, R = never>(text: string): Effect.Effect<void, E, R> {
-    return Effect.sync(() => {
-      this.writer.write(text);
-    });
-  }
-
-  quote<E = never, R = never>(text: string): Effect.Effect<void, E, R> {
-    return Effect.sync(() => {
-      this.writer.quote(text);
-    });
-  }
-
-  conditionalWriteLine<E = never, R = never>(
-    condition: boolean,
-    text: string
-  ): Effect.Effect<void, E, R> {
-    return Effect.sync(() => {
-      this.writer.conditionalWriteLine(condition, text);
-    });
-  }
-
-  newLine<E = never, R = never>(): Effect.Effect<void, E, R> {
-    return Effect.sync(() => {
-      this.writer.newLine();
-    });
-  }
-
-  blankLine<E = never, R = never>(): Effect.Effect<void, E, R> {
-    return Effect.sync(() => {
-      this.writer.blankLine();
-    });
-  }
-
-  toString<E = never, R = never>(): Effect.Effect<string, E, R> {
-    return Effect.sync(() => this.writer.toString());
-  }
-}

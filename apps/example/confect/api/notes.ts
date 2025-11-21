@@ -1,25 +1,23 @@
 import { ConfectApiBuilder } from "@rjdellecese/confect/api";
+import { Effect } from "effect";
 import {
   ConfectDatabaseReader,
   ConfectDatabaseWriter,
-} from "@rjdellecese/confect/server";
-import { Effect } from "effect";
+} from "../../convex/confect/services";
 import api from "../api";
 
 export default ConfectApiBuilder.group(api, "notes", (handlers) =>
   handlers
     .handle("insert", ({ text }) =>
       Effect.gen(function* () {
-        const writer =
-          yield* ConfectDatabaseWriter.ConfectDatabaseWriter<any>();
+        const writer = yield* ConfectDatabaseWriter;
 
         return yield* writer.insert("notes", { text });
       }).pipe(Effect.orDie)
     )
     .handle("list", () =>
       Effect.gen(function* () {
-        const reader =
-          yield* ConfectDatabaseReader.ConfectDatabaseReader<any>();
+        const reader = yield* ConfectDatabaseReader;
 
         return yield* reader
           .table("notes")
@@ -29,8 +27,7 @@ export default ConfectApiBuilder.group(api, "notes", (handlers) =>
     )
     .handle("delete_", ({ noteId }) =>
       Effect.gen(function* () {
-        const writer =
-          yield* ConfectDatabaseWriter.ConfectDatabaseWriter<any>();
+        const writer = yield* ConfectDatabaseWriter;
 
         yield* writer.delete("notes", noteId);
 
@@ -39,8 +36,7 @@ export default ConfectApiBuilder.group(api, "notes", (handlers) =>
     )
     .handle("getFirst", () =>
       Effect.gen(function* () {
-        const reader =
-          yield* ConfectDatabaseReader.ConfectDatabaseReader<any>();
+        const reader = yield* ConfectDatabaseReader;
 
         return yield* reader.table("notes").index("by_creation_time").first();
       }).pipe(Effect.orDie)

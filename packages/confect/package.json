@@ -13,7 +13,7 @@
   "sideEffects": false,
   "type": "module",
   "bin": {
-    "confect": "./dist/index.js"
+    "confect": "./dist/cli/index.mjs"
   },
   "files": [
     "src",
