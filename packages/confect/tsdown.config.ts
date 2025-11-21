@@ -1,3 +1,4 @@
+import type { UserConfig } from "tsdown";
 import { defineConfig } from "tsdown";
 
 const createConfig = ({
@@ -5,10 +6,10 @@ const createConfig = ({
   entry,
   clean,
 }: {
-  platform: "neutral" | "node" | "browser";
-  entry: string[];
-  clean: boolean;
-}) => ({
+  platform: UserConfig["platform"];
+  entry: UserConfig["entry"];
+  clean: UserConfig["clean"];
+}): UserConfig => ({
   entry,
   platform,
   clean,
@@ -16,7 +17,7 @@ const createConfig = ({
     sourcemap: true,
   },
   sourcemap: true,
-  format: ["esm", "cjs"] as ("esm" | "cjs")[],
+  format: ["esm", "cjs"],
 });
 
 export default defineConfig([
