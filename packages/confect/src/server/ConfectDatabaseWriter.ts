@@ -90,7 +90,7 @@ export const make = <
 
       const originalDecodedDoc = yield* ConfectQueryInitializer.getById(
         tableName,
-        convexDatabaseWriter,
+        convexDatabaseWriter as any,
         confectTableDefinition,
       )(id);
 
