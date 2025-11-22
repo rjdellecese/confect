@@ -1,6 +1,7 @@
 import { ConfectApiFunction, ConfectApiGroup } from "@rjdellecese/confect/api";
 import { GenericId } from "@rjdellecese/confect/server";
 import { Schema } from "effect";
+import { Note } from "../schema/note";
 
 export default ConfectApiGroup.make("notes")
   .addFunction(
@@ -8,26 +9,26 @@ export default ConfectApiGroup.make("notes")
       name: "insert",
       args: Schema.Struct({ text: Schema.String }),
       returns: GenericId.GenericId("notes"),
-    })
+    }),
   )
   .addFunction(
     ConfectApiFunction.query({
       name: "list",
       args: Schema.Struct({}),
-      returns: Schema.Array(GenericId.GenericId("notes")),
-    })
+      returns: Schema.Array(Note.doc),
+    }),
   )
   .addFunction(
     ConfectApiFunction.mutation({
       name: "delete_",
       args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
       returns: Schema.Null,
-    })
+    }),
   )
   .addFunction(
     ConfectApiFunction.query({
       name: "getFirst",
       args: Schema.Struct({}),
-      returns: Schema.Option(GenericId.GenericId("notes")),
-    })
+      returns: Schema.Option(Note.doc),
+    }),
   );

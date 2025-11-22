@@ -11,4 +11,7 @@ const TagSchema = Schema.Struct({
   tags: Schema.Array(Schema.suspend((): Schema.Schema<Tag> => TagSchema)),
 });
 
-export const Tag = ConfectSchema.defineConfectTable(TagSchema);
+export const Tag = ConfectSchema.defineConfectTable({
+  name: "tags",
+  fields: TagSchema,
+});

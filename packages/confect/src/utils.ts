@@ -113,9 +113,6 @@ const collectBranchLeaves = <T>(
     if (!leafRefinement(value) && typeof value === "object") {
       const leaves = Record.filter(value, leafRefinement) as Record<string, T>;
 
-      console.log("value", value);
-      console.log("leaves", leaves);
-
       return collectBranchLeaves(
         value as NestedObject<T>,
         leafRefinement,

@@ -4,6 +4,7 @@ import type { DataModelFromConfectDataModel } from "./ConfectDataModel";
 import * as ConfectQueryInitializer from "./ConfectQueryInitializer";
 import type {
   ConfectDataModelFromConfectSchema,
+  ConfectTableDefinitionFromConfectSchema,
   ExtendWithConfectSystemSchema,
   GenericConfectSchemaDefinition,
   TableNamesInConfectSchema,
@@ -25,28 +26,27 @@ export const make = <
     >
   >,
 ) => {
-  type ConfectSchema = ConfectSchemaDefinition["confectSchema"];
-
-  type ConfectSchemaWithSystemTables =
-    ExtendWithConfectSystemSchema<ConfectSchema>;
+  type ConfectSchema = ExtendWithConfectSystemSchema<
+    ConfectSchemaDefinition["confectSchema"]
+  >;
 
   return {
-    table: <
-      TableName extends
-        TableNamesInConfectSchema<ConfectSchemaWithSystemTables>,
-    >(
+    table: <TableName extends TableNamesInConfectSchema<ConfectSchema>>(
       tableName: TableName,
     ) => {
       const extendedSchema = extendWithConfectSystemSchema(
         confectSchemaDefinition.confectSchema,
       );
       const confectTableDefinition = extendedSchema.find(
-        (def) => def.tableName === tableName,
-      )!;
+        (def) => def.name === tableName,
+      ) as ConfectTableDefinitionFromConfectSchema<
+        ExtendWithConfectSystemSchema<ConfectSchema>,
+        TableName
+      >;
 
       const baseDatabaseReader = Array.some(
         confectSystemTableDefinitions,
-        (systemTableDef) => systemTableDef.tableName === tableName,
+        (systemTableDef) => systemTableDef.name === tableName,
       )
         ? {
             get: convexDatabaseReader.system.get,

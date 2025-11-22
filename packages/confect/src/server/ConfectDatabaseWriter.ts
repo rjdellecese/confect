@@ -42,13 +42,13 @@ export const make = <
   ) =>
     Effect.gen(function* () {
       const confectTableDefinition = confectSchemaDefinition.confectSchema.find(
-        (def) => def.tableName === tableName,
+        (def) => def.name === tableName,
       )!;
 
       const encodedDocument = yield* ConfectDocument.encode(
         document,
         tableName,
-        confectTableDefinition.tableSchema,
+        confectTableDefinition.fields,
       );
 
       const id = yield* Effect.promise(() =>
@@ -80,11 +80,11 @@ export const make = <
   ) =>
     Effect.gen(function* () {
       const confectTableDefinition = confectSchemaDefinition.confectSchema.find(
-        (def) => def.tableName === tableName,
+        (def) => def.name === tableName,
       )!;
 
       const tableSchema =
-        confectTableDefinition.tableSchema as TableSchemaFromConfectTableInfo<
+        confectTableDefinition.fields as TableSchemaFromConfectTableInfo<
           ConfectDataModel[TableName]
         >;
 
@@ -131,11 +131,11 @@ export const make = <
   ) =>
     Effect.gen(function* () {
       const confectTableDefinition = confectSchemaDefinition.confectSchema.find(
-        (def) => def.tableName === tableName,
+        (def) => def.name === tableName,
       )!;
 
       const tableSchema =
-        confectTableDefinition.tableSchema as TableSchemaFromConfectTableInfo<
+        confectTableDefinition.fields as TableSchemaFromConfectTableInfo<
           ConfectDataModel[TableName]
         >;
 

@@ -70,14 +70,14 @@ const GroupB = ConfectApiGroup.make("groupB")
   .addGroup(GroupBC)
   .addGroup(GroupBD);
 
-const confectSchemaDefinition = ConfectSchema.defineConfectSchema([
+const confectSchemaDefinition = ConfectSchema.defineConfectSchema(
   ConfectSchema.defineConfectTable({
     name: "notes",
     fields: Schema.Struct({
       content: Schema.String,
     }),
   }),
-]);
+);
 
 type ConfectSchemaDefinition = typeof confectSchemaDefinition;
 

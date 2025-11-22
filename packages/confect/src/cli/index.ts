@@ -16,13 +16,13 @@ import { functions, schema, services } from "./templates";
 const nameOption = Options.text("name").pipe(
   Options.withAlias("n"),
   Options.withDescription("Your name"),
-  Options.withDefault("World")
+  Options.withDefault("World"),
 );
 
 const greetCommand = Command.make("greet", { name: nameOption }, ({ name }) =>
   Console.log(`Hello, ${name}!`).pipe(
-    Effect.tap(() => Console.log("This is a dummy Confect CLI command."))
-  )
+    Effect.tap(() => Console.log("This is a dummy Confect CLI command.")),
+  ),
 ).pipe(Command.withDescription("A simple greeting command"));
 
 const generateCommand = Command.make("generate", {}, () =>
@@ -36,7 +36,7 @@ const generateCommand = Command.make("generate", {}, () =>
     const serverUrl = yield* path.toFileUrl(serverPath);
 
     const server = yield* Effect.promise(() =>
-      tsx.tsImport(serverUrl.href, import.meta.url)
+      tsx.tsImport(serverUrl.href, import.meta.url),
     ).pipe(
       Effect.andThen((serverModule) => {
         const defaultExport = serverModule.default;
@@ -44,7 +44,7 @@ const generateCommand = Command.make("generate", {}, () =>
         return ConfectApiServer.isConfectApiServer(defaultExport)
           ? Effect.succeed(defaultExport)
           : Effect.die("Invalid server module");
-      })
+      }),
     );
 
     yield* forEachBranchLeaves<
@@ -59,13 +59,13 @@ const generateCommand = Command.make("generate", {}, () =>
         Effect.gen(function* () {
           const mod = Array.head(path).pipe(
             Option.getOrThrowWith(
-              () => new Error("Missing module name in function path")
-            )
+              () => new Error("Missing module name in function path"),
+            ),
           );
           const dirs = Array.tail(path).pipe(
             Option.getOrThrowWith(
-              () => new Error("Missing directory names in function path")
-            )
+              () => new Error("Missing directory names in function path"),
+            ),
           );
           const fns = Record.keys(values);
 
@@ -74,9 +74,9 @@ const generateCommand = Command.make("generate", {}, () =>
             mod,
             fns,
           });
-        })
+        }),
     );
-  })
+  }),
 ).pipe(Command.withDescription("Generate Convex functions from a Confect API"));
 
 const generateSchema = Effect.gen(function* () {
@@ -89,7 +89,7 @@ const generateSchema = Effect.gen(function* () {
   const confectSchemaUrl = yield* path.toFileUrl(confectSchemaPath);
 
   const confectSchema = yield* Effect.promise(() =>
-    tsx.tsImport(confectSchemaUrl.href, import.meta.url)
+    tsx.tsImport(confectSchemaUrl.href, import.meta.url),
   ).pipe(
     Effect.andThen((schemaModule) => {
       const defaultExport = schemaModule.default;
@@ -97,7 +97,7 @@ const generateSchema = Effect.gen(function* () {
       return ConfectSchema.isConfectSchemaDefinition(defaultExport)
         ? Effect.succeed(defaultExport)
         : Effect.die("Invalid schema module");
-    })
+    }),
   );
 
   const convexDir = path.join(cwd, "convex");
@@ -105,7 +105,7 @@ const generateSchema = Effect.gen(function* () {
 
   const relativeImportPath = path.relative(
     path.dirname(convexSchemaPath),
-    confectSchemaPath
+    confectSchemaPath,
   );
   const importPathWithoutExt = yield* removePathExtension(relativeImportPath);
   const schemaContentsString = yield* schema({
@@ -142,7 +142,7 @@ const generateFunctionModule = ({
 
     const serverPath = path.join(".", "confect", "server.ts");
     const serverImportPath = yield* removePathExtension(
-      path.relative(path.dirname(modulePath), serverPath)
+      path.relative(path.dirname(modulePath), serverPath),
     );
 
     const functionsContentsString = yield* functions({
@@ -163,7 +163,7 @@ const generateServices = Effect.gen(function* () {
   const servicesPath = path.join(".", "convex", "confect", "services.ts");
   const schemaImportPath = path.relative(
     path.dirname(servicesPath),
-    path.join(".", "confect", "schema")
+    path.join(".", "confect", "schema"),
   );
 
   const servicesContentsString = yield* services({
@@ -183,7 +183,7 @@ const removePathExtension = (pathStr: string) =>
 
 const cli = Command.make("confect").pipe(
   Command.withDescription("Confect - Use Effect with Convex!"),
-  Command.withSubcommands([greetCommand, generateCommand])
+  Command.withSubcommands([greetCommand, generateCommand]),
 );
 
 const main = Command.run(cli, {

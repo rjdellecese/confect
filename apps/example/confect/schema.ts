@@ -3,8 +3,4 @@ import { Note } from "./schema/note";
 import { Tag } from "./schema/tag";
 import { User } from "./schema/user";
 
-export default ConfectSchema.defineConfectSchema({
-  notes: Note,
-  users: User,
-  tags: Tag,
-});
+export default ConfectSchema.defineConfectSchema(Note, User, Tag);

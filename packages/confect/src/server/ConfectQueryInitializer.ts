@@ -189,7 +189,7 @@ export const make = <
         ),
       ),
       Effect.andThen(
-        ConfectDocument.decode(tableName, confectTableDefinition.tableSchema),
+        ConfectDocument.decode(tableName, confectTableDefinition.fields),
       ),
     );
   };
@@ -281,7 +281,7 @@ export const make = <
     return ConfectOrderedQuery.make<ConfectDataModel[TableName], TableName>(
       orderedQuery,
       tableName,
-      confectTableDefinition.tableSchema,
+      confectTableDefinition.fields,
     );
   };
 
@@ -294,7 +294,7 @@ export const make = <
         .query(tableName)
         .withSearchIndex(indexName, searchFilter),
       tableName,
-      confectTableDefinition.tableSchema,
+      confectTableDefinition.fields,
     );
 
   return {
@@ -325,7 +325,7 @@ export const getById =
         Either.fromNullable(() => new GetByIdFailure({ tableName, id })),
       ),
       Effect.andThen(
-        ConfectDocument.decode(tableName, confectTableDefinition.tableSchema),
+        ConfectDocument.decode(tableName, confectTableDefinition.fields),
       ),
     );
 
