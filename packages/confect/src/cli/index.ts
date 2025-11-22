@@ -57,12 +57,12 @@ const generateCommand = Command.make("generate", {}, () =>
       ConfectApiServer.isRegisteredFunction,
       ({ path, values }) =>
         Effect.gen(function* () {
-          const mod = Array.head(path).pipe(
+          const mod = Array.last(path).pipe(
             Option.getOrThrowWith(
               () => new Error("Missing module name in function path"),
             ),
           );
-          const dirs = Array.tail(path).pipe(
+          const dirs = Array.init(path).pipe(
             Option.getOrThrowWith(
               () => new Error("Missing directory names in function path"),
             ),

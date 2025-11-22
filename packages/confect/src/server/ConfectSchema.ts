@@ -130,8 +130,8 @@ export interface ConfectTableDefinition<
 
   name: TableName;
 
-  fields: TableSchema;
-  doc: ExtendWithSystemFields<TableName, TableSchema>;
+  Fields: TableSchema;
+  Doc: ExtendWithSystemFields<TableName, TableSchema>;
 
   indexes: Indexes;
 
@@ -270,8 +270,8 @@ class ConfectTableDefinitionImpl<
   >;
 
   name: TableName;
-  fields: TableSchema;
-  doc: ExtendWithSystemFields<TableName, TableSchema>;
+  Fields: TableSchema;
+  Doc: ExtendWithSystemFields<TableName, TableSchema>;
   indexes: Indexes;
 
   constructor(
@@ -283,8 +283,8 @@ class ConfectTableDefinitionImpl<
     this.tableDefinition = defineConvexTable(tableValidator);
 
     this.name = tableName;
-    this.fields = fields;
-    this.doc = extendWithSystemFields(tableName, fields);
+    this.Fields = fields;
+    this.Doc = extendWithSystemFields(tableName, fields);
     this.indexes = indexes;
   }
 

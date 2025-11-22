@@ -1,9 +1,12 @@
 import { ConfectApiBuilder } from "@rjdellecese/confect/api";
 import { Effect } from "effect";
-import api from "../api";
+import { Api } from "../api";
 
-export default ConfectApiBuilder.group(api, "random", (handlers) =>
-  handlers.handle("getNumber", () =>
-    Effect.succeed(Math.random()).pipe(Effect.orDie),
-  ),
+export const Random = ConfectApiBuilder.group(
+  Api,
+  "groups.random",
+  (handlers) =>
+    handlers.handle("getNumber", () =>
+      Effect.succeed(Math.random()).pipe(Effect.orDie),
+    ),
 );

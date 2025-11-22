@@ -1,5 +1,5 @@
 import { ConfectApi } from "@rjdellecese/confect/api";
 import schema from "./schema";
-import spec from "./spec";
+import { Spec } from "./spec";
 
-export default ConfectApi.make(schema, spec);
+export const Api = ConfectApi.make(schema, Spec);

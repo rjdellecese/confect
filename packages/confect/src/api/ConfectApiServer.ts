@@ -72,7 +72,9 @@ export const isConfectApiServer = (u: unknown): u is ConfectApiServer =>
   Predicate.hasProperty(u, TypeId);
 
 export interface RegisteredFunctions {
-  readonly [key: string]: RegisteredFunction | RegisteredFunctions;
+  readonly [key: string]:
+    | (RegisteredFunction & RegisteredFunctions)
+    | RegisteredFunctions;
 }
 
 export interface ConfectApiServer {
@@ -104,7 +106,7 @@ export const make = Effect.gen(function* () {
     RegisteredFunction
   >(handlerItems, ConfectApiBuilder.isHandlerItem, (handlerItem) =>
     makeRegisteredFunction(api, handlerItem),
-  );
+  ) as RegisteredFunctions;
 
   return makeProto({ registeredFunctions });
 });

@@ -3,7 +3,7 @@ import { GenericId } from "@rjdellecese/confect/server";
 import { Schema } from "effect";
 import { Note } from "../schema/note";
 
-export default ConfectApiGroup.make("notes")
+export const Notes = ConfectApiGroup.make("notes")
   .addFunction(
     ConfectApiFunction.mutation({
       name: "insert",
@@ -15,7 +15,7 @@ export default ConfectApiGroup.make("notes")
     ConfectApiFunction.query({
       name: "list",
       args: Schema.Struct({}),
-      returns: Schema.Array(Note.doc),
+      returns: Schema.Array(Note.Doc),
     }),
   )
   .addFunction(
@@ -29,6 +29,6 @@ export default ConfectApiGroup.make("notes")
     ConfectApiFunction.query({
       name: "getFirst",
       args: Schema.Struct({}),
-      returns: Schema.Option(Note.doc),
+      returns: Schema.Option(Note.Doc),
     }),
   );

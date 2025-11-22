@@ -48,7 +48,7 @@ export const make = <
       const encodedDocument = yield* ConfectDocument.encode(
         document,
         tableName,
-        confectTableDefinition.fields,
+        confectTableDefinition.Fields,
       );
 
       const id = yield* Effect.promise(() =>
@@ -84,7 +84,7 @@ export const make = <
       )!;
 
       const tableSchema =
-        confectTableDefinition.fields as TableSchemaFromConfectTableInfo<
+        confectTableDefinition.Fields as TableSchemaFromConfectTableInfo<
           ConfectDataModel[TableName]
         >;
 
@@ -135,7 +135,7 @@ export const make = <
       )!;
 
       const tableSchema =
-        confectTableDefinition.fields as TableSchemaFromConfectTableInfo<
+        confectTableDefinition.Fields as TableSchemaFromConfectTableInfo<
           ConfectDataModel[TableName]
         >;
 

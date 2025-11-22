@@ -35,8 +35,8 @@ export declare namespace ConfectApi {
       ConfectApiGroup.ConfectApiGroup.AnyWithProps
     > {}
 
-  export type ConfectSchema<ConfectApi extends AnyWithProps> =
-    ConfectApi["confectSchemaDefinition"]["confectSchema"];
+  export type ConfectSchema<Api extends AnyWithProps> =
+    Api["confectSchemaDefinition"]["confectSchema"];
 }
 
 const Proto = {

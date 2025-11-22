@@ -1,12 +1,15 @@
 import { ConfectApiBuilder, ConfectApiServer } from "@rjdellecese/confect/api";
 import { Effect, Layer } from "effect";
-import api from "./api";
-import notes from "./api/notes";
-import random from "./api/random";
+import { Api } from "./api";
+import { Groups } from "./api/groups";
+import { Notes } from "./api/notes";
+import { Random } from "./api/random";
 
-export default await ConfectApiServer.make.pipe(
+export default ConfectApiServer.make.pipe(
   Effect.provide(
-    ConfectApiBuilder.api(api).pipe(Layer.provide(notes), Layer.provide(random))
+    ConfectApiBuilder.api(Api).pipe(
+      Layer.provide(Groups.pipe(Layer.provide(Notes), Layer.provide(Random))),
+    ),
   ),
-  Effect.runPromise
+  Effect.runSync,
 );

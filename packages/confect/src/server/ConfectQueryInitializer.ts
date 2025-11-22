@@ -1,6 +1,5 @@
 import type {
   DocumentByInfo,
-  GenericDataModel,
   GenericTableIndexes,
   Indexes,
   IndexRange,
@@ -125,18 +124,21 @@ type ConfectQueryInitializer<
 export const make = <
   ConfectSchema extends GenericConfectSchema,
   TableName extends TableNamesInConfectSchema<ConfectSchema>,
-  ConfectDataModel extends
-    GenericConfectDataModel = ConfectDataModelFromConfectSchema<ConfectSchema>,
-  ConvexDataModel extends
-    GenericDataModel = DataModelFromConfectSchema<ConfectSchema>,
 >(
   tableName: TableName,
-  convexDatabaseReader: BaseDatabaseReader<ConvexDataModel>,
+  convexDatabaseReader: BaseDatabaseReader<
+    DataModelFromConfectSchema<ConfectSchema>
+  >,
   confectTableDefinition: ConfectTableDefinitionFromConfectSchema<
     ConfectSchema,
     TableName
   >,
-): ConfectQueryInitializer<ConfectDataModel, TableName> => {
+): ConfectQueryInitializer<
+  ConfectDataModelFromConfectSchema<ConfectSchema>,
+  TableName
+> => {
+  type ConfectDataModel = ConfectDataModelFromConfectSchema<ConfectSchema>;
+  type ConvexDataModel = DataModelFromConfectSchema<ConfectSchema>;
   type ThisConfectQueryInitializer = ConfectQueryInitializer<
     ConfectDataModel,
     TableName
@@ -189,7 +191,7 @@ export const make = <
         ),
       ),
       Effect.andThen(
-        ConfectDocument.decode(tableName, confectTableDefinition.fields),
+        ConfectDocument.decode(tableName, confectTableDefinition.Fields),
       ),
     );
   };
@@ -281,7 +283,7 @@ export const make = <
     return ConfectOrderedQuery.make<ConfectDataModel[TableName], TableName>(
       orderedQuery,
       tableName,
-      confectTableDefinition.fields,
+      confectTableDefinition.Fields,
     );
   };
 
@@ -294,7 +296,7 @@ export const make = <
         .query(tableName)
         .withSearchIndex(indexName, searchFilter),
       tableName,
-      confectTableDefinition.fields,
+      confectTableDefinition.Fields,
     );
 
   return {
@@ -308,11 +310,11 @@ export const getById =
   <
     ConfectSchema extends GenericConfectSchema,
     TableName extends TableNamesInConfectSchema<ConfectSchema>,
-    ConvexDataModel extends
-      GenericDataModel = DataModelFromConfectSchema<ConfectSchema>,
   >(
     tableName: TableName,
-    convexDatabaseReader: BaseDatabaseReader<ConvexDataModel>,
+    convexDatabaseReader: BaseDatabaseReader<
+      DataModelFromConfectSchema<ConfectSchema>
+    >,
     confectTableDefinition: ConfectTableDefinitionFromConfectSchema<
       ConfectSchema,
       TableName
@@ -325,7 +327,7 @@ export const getById =
         Either.fromNullable(() => new GetByIdFailure({ tableName, id })),
       ),
       Effect.andThen(
-        ConfectDocument.decode(tableName, confectTableDefinition.fields),
+        ConfectDocument.decode(tableName, confectTableDefinition.Fields),
       ),
     );
 

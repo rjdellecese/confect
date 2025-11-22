@@ -10,6 +10,7 @@ import {
   String,
 } from "effect";
 import type { GenericConfectSchema } from "../server/ConfectSchema";
+import { setNestedProperty } from "../utils";
 import type * as ConfectApi from "./ConfectApi";
 import type * as ConfectApiFunction from "./ConfectApiFunction";
 import type * as ConfectApiGroup from "./ConfectApiGroup";
@@ -209,26 +210,6 @@ export const group = <
       });
     }),
   );
-};
-
-const setNestedProperty = <T extends object>(
-  obj: T,
-  path: (keyof T)[],
-  value: T[keyof T],
-): T => {
-  if (path.length === 1) {
-    return { ...obj, [path[0] as keyof T]: value };
-  }
-
-  const [head, ...tail] = path;
-  return {
-    ...obj,
-    [head as keyof T]: setNestedProperty(
-      obj[head as keyof T] as any,
-      tail,
-      value,
-    ),
-  };
 };
 
 export const api = <

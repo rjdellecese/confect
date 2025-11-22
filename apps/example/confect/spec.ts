@@ -1,5 +1,4 @@
 import { ConfectApiSpec } from "@rjdellecese/confect/api";
-import Notes from "./spec/notes";
-import Random from "./spec/random";
+import { Groups } from "./spec/groups";
 
-export default ConfectApiSpec.make("api").add(Notes).add(Random);
+export const Spec = ConfectApiSpec.make("api").add(Groups);

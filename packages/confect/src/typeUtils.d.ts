@@ -1,4 +1,10 @@
-import type { GenericDatabaseReader, GenericDataModel } from "convex/server";
+import type {
+  DocumentByName,
+  FieldTypeFromFieldPath,
+  GenericDatabaseReader,
+  GenericDataModel,
+  TableNamesInDataModel,
+} from "convex/server";
 import type { GenericId } from "convex/values";
 import type { Brand } from "effect";
 
