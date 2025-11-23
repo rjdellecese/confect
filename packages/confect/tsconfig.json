@@ -8,7 +8,7 @@
     "noEmit": true,
     "skipLibCheck": true,
     "importsNotUsedAsValues": "remove",
-    "exactOptionalPropertyTypes": false,
+    "exactOptionalPropertyTypes": true,
     "lib": ["ESNext", "DOM"],
     "target": "ESNext",
     "moduleResolution": "Bundler",

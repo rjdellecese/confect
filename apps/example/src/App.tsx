@@ -3,17 +3,7 @@ import { useAction, useMutation, useQuery } from "@rjdellecese/confect/react";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { Array, Effect, Exit, Option } from "effect";
 import { useEffect, useState } from "react";
-import { api } from "../convex/_generated/api";
-import {
-  DeleteNoteArgs,
-  DeleteNoteResult,
-  GetRandomArgs,
-  GetRandomResult,
-  InsertNoteArgs,
-  InsertNoteResult,
-  ListNotesArgs,
-  ListNotesResult,
-} from "../convex/functions.schemas";
+import refs from "../confect/refs";
 import { Api } from "../convex/http/api";
 
 const App = () => {
@@ -28,18 +18,10 @@ const App = () => {
 
 const Page = () => {
   const [note, setNote] = useState("");
-  const insertNote = useMutation({
-    mutation: api.functions.insertNote,
-    args: InsertNoteArgs,
-    returns: InsertNoteResult,
-  });
+  const insertNote = useMutation(refs.groups.notes.insert);
 
   const [randomNumber, setRandomNumber] = useState<number | null>(null);
-  const getRandom = useAction({
-    action: api.functions.getRandom,
-    args: GetRandomArgs,
-    returns: GetRandomResult,
-  });
+  const getRandom = useAction(refs.groups.random.getNumber);
 
   const retrieveRandomNumber = () => {
     getRandom({}).pipe(Effect.map(setRandomNumber), Effect.runPromise);
@@ -89,17 +71,9 @@ const Page = () => {
 };
 
 const NoteList = () => {
-  const notes = useQuery({
-    query: api.functions.listNotes,
-    args: ListNotesArgs,
-    returns: ListNotesResult,
-  })({});
+  const notes = useQuery(refs.groups.notes.list, {});
 
-  const deleteNote = useMutation({
-    mutation: api.functions.deleteNote,
-    args: DeleteNoteArgs,
-    returns: DeleteNoteResult,
-  });
+  const deleteNote = useMutation(refs.groups.notes.delete_);
 
   return Option.match(notes, {
     onNone: () => <p>Loading…</p>,

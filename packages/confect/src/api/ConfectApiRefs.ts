@@ -27,8 +27,8 @@ type Helper<Groups extends ConfectApiGroup.ConfectApiGroup.Any> = {
               ? ConfectApiRef<
                   ConfectApiFunction.ConfectApiFunction.GetFunctionType<Function>,
                   ConfectApiFunction.ConfectApiFunction.GetFunctionVisibility<Function>,
-                  ConfectApiFunction.ConfectApiFunction.Args<Function>["Type"],
-                  ConfectApiFunction.ConfectApiFunction.Returns<Function>["Type"]
+                  ConfectApiFunction.ConfectApiFunction.Args<Function>,
+                  ConfectApiFunction.ConfectApiFunction.Returns<Function>
                 >
               : never;
           }
@@ -42,37 +42,131 @@ export declare namespace ConfectApiRefs {
     extends ConfectApiRefs<ConfectApiSpec.ConfectApiSpec.AnyWithProps> {}
 }
 
-const HiddenFunction = Symbol.for("@rjdellecese/confect/HiddenFunction");
-type HiddenFunction = typeof HiddenFunction;
-
-const HiddenConvexFunctionName = Symbol.for(
-  "@rjdellecese/confect/HiddenConvexFunctionName",
-);
-type HiddenConvexFunctionName = typeof HiddenConvexFunctionName;
-
-export type ConfectApiRef<
-  FunctionType extends ConfectApiFunction.ConfectApiFunction.FunctionType,
-  FunctionVisibility extends
-    ConfectApiFunction.ConfectApiFunction.FunctionVisibility,
-  Args,
-  Returns,
-> = {
-  readonly [HiddenConvexFunctionName]: string;
-  readonly [HiddenFunction]: ConfectApiFunction.ConfectApiFunction<
-    FunctionType,
-    FunctionVisibility,
+const HiddenFunctionKey = Symbol.for("@rjdellecese/confect/HiddenFunctionKey");
+type HiddenFunctionKey = typeof HiddenFunctionKey;
+type HiddenFunction<Ref extends ConfectApiRef.Any> =
+  ConfectApiFunction.ConfectApiFunction<
+    ConfectApiRef.FunctionType<Ref>,
+    ConfectApiRef.FunctionVisibility<Ref>,
     string,
-    Schema.Schema<Args, unknown>,
-    Schema.Schema<Returns, unknown>
+    ConfectApiRef.Args<Ref>,
+    ConfectApiRef.Returns<Ref>
   >;
-};
 
-const makeFunctionRef = <
+export const getFunction = <
   FunctionType extends ConfectApiFunction.ConfectApiFunction.FunctionType,
   FunctionVisibility extends
     ConfectApiFunction.ConfectApiFunction.FunctionVisibility,
-  Args,
-  Returns,
+  Args extends Schema.Schema.AnyNoContext,
+  Returns extends Schema.Schema.AnyNoContext,
+  Ref extends ConfectApiRef<FunctionType, FunctionVisibility, Args, Returns>,
+>(
+  ref: Ref,
+): HiddenFunction<Ref> => (ref as any)[HiddenFunctionKey];
+
+const HiddenConvexFunctionNameKey = Symbol.for(
+  "@rjdellecese/confect/HiddenConvexFunctionNameKey",
+);
+type HiddenConvexFunctionNameKey = typeof HiddenConvexFunctionNameKey;
+type HiddenConvexFunctionName = string;
+
+export const getConvexFunctionName = <
+  FunctionType extends ConfectApiFunction.ConfectApiFunction.FunctionType,
+  FunctionVisibility extends
+    ConfectApiFunction.ConfectApiFunction.FunctionVisibility,
+  Args extends Schema.Schema.AnyNoContext,
+  Returns extends Schema.Schema.AnyNoContext,
+>(
+  ref: ConfectApiRef<FunctionType, FunctionVisibility, Args, Returns>,
+): HiddenConvexFunctionName => (ref as any)[HiddenConvexFunctionNameKey];
+
+export interface ConfectApiRef<
+  _FunctionType extends ConfectApiFunction.ConfectApiFunction.FunctionType,
+  _FunctionVisibility extends
+    ConfectApiFunction.ConfectApiFunction.FunctionVisibility,
+  _Args extends Schema.Schema.AnyNoContext,
+  _Returns extends Schema.Schema.AnyNoContext,
+> {
+  readonly _FunctionType?: _FunctionType;
+  readonly _FunctionVisibility?: _FunctionVisibility;
+  readonly _Args?: _Args;
+  readonly _Returns?: _Returns;
+}
+
+export declare namespace ConfectApiRef {
+  export interface Any extends ConfectApiRef<any, any, any, any> {}
+
+  export interface AnyPublicQuery
+    extends ConfectApiRef<
+      "Query",
+      "Public",
+      Schema.Schema.AnyNoContext,
+      Schema.Schema.AnyNoContext
+    > {}
+
+  export interface AnyPublicMutation
+    extends ConfectApiRef<
+      "Mutation",
+      "Public",
+      Schema.Schema.AnyNoContext,
+      Schema.Schema.AnyNoContext
+    > {}
+
+  export interface AnyPublicAction
+    extends ConfectApiRef<
+      "Action",
+      "Public",
+      Schema.Schema.AnyNoContext,
+      Schema.Schema.AnyNoContext
+    > {}
+
+  export type FunctionType<Ref> =
+    Ref extends ConfectApiRef<
+      infer FunctionType,
+      infer _FunctionVisibility,
+      infer _Args,
+      infer _Returns
+    >
+      ? FunctionType
+      : never;
+
+  export type FunctionVisibility<Ref> =
+    Ref extends ConfectApiRef<
+      infer _FunctionType,
+      infer FunctionVisibility,
+      infer _Args,
+      infer _Returns
+    >
+      ? FunctionVisibility
+      : never;
+
+  export type Args<Ref> =
+    Ref extends ConfectApiRef<
+      infer _FunctionType,
+      infer _FunctionVisibility,
+      infer Args,
+      infer _Returns
+    >
+      ? Args
+      : never;
+
+  export type Returns<Ref> =
+    Ref extends ConfectApiRef<
+      infer _FunctionType,
+      infer _FunctionVisibility,
+      infer _Args,
+      infer Returns
+    >
+      ? Returns
+      : never;
+}
+
+const makeRef = <
+  FunctionType extends ConfectApiFunction.ConfectApiFunction.FunctionType,
+  FunctionVisibility extends
+    ConfectApiFunction.ConfectApiFunction.FunctionVisibility,
+  Args extends Schema.Schema.AnyNoContext,
+  Returns extends Schema.Schema.AnyNoContext,
 >(
   /**
    * This is a Convex "function name" of the format "myGroupDir/myGroupMod:myFunc".
@@ -82,44 +176,19 @@ const makeFunctionRef = <
     FunctionType,
     FunctionVisibility,
     string,
-    Schema.Schema<Args, unknown>,
-    Schema.Schema<Returns, unknown>
+    Args,
+    Returns
   >,
-): ConfectApiRef<FunctionType, FunctionVisibility, Args, Returns> => ({
-  [HiddenFunction]: function_,
-  [HiddenConvexFunctionName]: convexFunctionName,
-});
-
-export const getConvexFunctionName = <
-  FunctionType extends ConfectApiFunction.ConfectApiFunction.FunctionType,
-  FunctionVisibility extends
-    ConfectApiFunction.ConfectApiFunction.FunctionVisibility,
-  Args,
-  Returns,
->(
-  ref: ConfectApiRef<FunctionType, FunctionVisibility, Args, Returns>,
-): string => ref[HiddenConvexFunctionName];
-
-export const getFunction = <
-  FunctionType extends ConfectApiFunction.ConfectApiFunction.FunctionType,
-  FunctionVisibility extends
-    ConfectApiFunction.ConfectApiFunction.FunctionVisibility,
-  Args,
-  Returns,
->(
-  ref: ConfectApiRef<FunctionType, FunctionVisibility, Args, Returns>,
-): ConfectApiFunction.ConfectApiFunction<
-  FunctionType,
-  FunctionVisibility,
-  string,
-  Schema.Schema<Args, unknown>,
-  Schema.Schema<Returns, unknown>
-> => ref[HiddenFunction];
+): ConfectApiRef<FunctionType, FunctionVisibility, Args, Returns> =>
+  ({
+    [HiddenFunctionKey]: function_,
+    [HiddenConvexFunctionNameKey]: convexFunctionName,
+  }) as ConfectApiRef<FunctionType, FunctionVisibility, Args, Returns>;
 
 export const make = <Spec extends ConfectApiSpec.ConfectApiSpec.AnyWithProps>(
   spec: Spec,
 ): ConfectApiRefs<Spec> =>
-  makeHelper(spec.groups, null) as ConfectApiRefs<Spec>;
+  makeHelper(spec.groups, "confect") as ConfectApiRefs<Spec>;
 
 const makeHelper = (
   groups: Record.ReadonlyRecord<
@@ -138,11 +207,11 @@ const makeHelper = (
       return Record.union(
         makeHelper(group.groups, currentGroupPath),
         Record.map(group.functions, (function_) =>
-          makeFunctionRef(`${currentGroupPath}:${function_.name}`, function_),
+          makeRef(`${currentGroupPath}:${function_.name}`, function_),
         ),
         (_subGroup, _function) => {
           throw new Error(
-            `Group and function at same level have same name ('${_function[HiddenFunction].name})'`,
+            `Group and function at same level have same name ('${getConvexFunctionName(_function)}')`,
           );
         },
       );
