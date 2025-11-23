@@ -1,17 +1,23 @@
-import {
-  type FunctionReference,
-  type GenericActionCtx,
-  type OptionalRestArgs,
-} from "convex/server";
-import { Context, Effect, Layer } from "effect";
+import { type GenericActionCtx } from "convex/server";
+import { Context, Effect, Layer, Schema } from "effect";
+import { ConfectApiRefs } from "../api";
 
 const makeActionRunner =
   (runAction: GenericActionCtx<any>["runAction"]) =>
-  <Action extends FunctionReference<"action", "public" | "internal">>(
+  <Action extends ConfectApiRefs.ConfectApiRef.AnyAction>(
     action: Action,
-    ...args: OptionalRestArgs<Action>
+    args: ConfectApiRefs.ConfectApiRef.Args<Action>["Type"],
   ) =>
-    Effect.promise(() => runAction(action, ...args));
+    Effect.gen(function* () {
+      const function_ = ConfectApiRefs.getFunction(action);
+      const functionName = ConfectApiRefs.getConvexFunctionName(action);
+
+      const encodedArgs = yield* Schema.encode(function_.args)(args);
+      const encodedReturns = yield* Effect.promise(() =>
+        runAction(functionName as any, encodedArgs),
+      );
+      return yield* Schema.decode(function_.returns)(encodedReturns);
+    });
 
 export const ConfectActionRunner = Context.GenericTag<
   ReturnType<typeof makeActionRunner>

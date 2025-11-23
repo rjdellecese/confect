@@ -1,17 +1,27 @@
-import {
-  type FunctionReference,
-  type GenericQueryCtx,
-  type OptionalRestArgs,
-} from "convex/server";
-import { Context, Effect, Layer } from "effect";
+import { type GenericQueryCtx } from "convex/server";
+import type { ParseResult } from "effect";
+import { Context, Effect, Layer, Schema } from "effect";
+import { ConfectApiRefs } from "../api";
 
 const makeQueryRunner =
   (runQuery: GenericQueryCtx<any>["runQuery"]) =>
-  <Query extends FunctionReference<"query", "public" | "internal">>(
+  <Query extends ConfectApiRefs.ConfectApiRef.AnyQuery>(
     query: Query,
-    ...args: OptionalRestArgs<Query>
-  ) =>
-    Effect.promise(() => runQuery(query, ...args));
+    args: ConfectApiRefs.ConfectApiRef.Args<Query>["Type"],
+  ): Effect.Effect<
+    ConfectApiRefs.ConfectApiRef.Returns<Query>["Type"],
+    ParseResult.ParseError
+  > =>
+    Effect.gen(function* () {
+      const function_ = ConfectApiRefs.getFunction(query);
+      const functionName = ConfectApiRefs.getConvexFunctionName(query);
+
+      const encodedArgs = yield* Schema.encode(function_.args)(args);
+      const encodedReturns = yield* Effect.promise(() =>
+        runQuery(functionName as any, encodedArgs),
+      );
+      return yield* Schema.decode(function_.returns)(encodedReturns);
+    });
 
 export const ConfectQueryRunner = Context.GenericTag<
   ReturnType<typeof makeQueryRunner>

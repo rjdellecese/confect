@@ -13,20 +13,20 @@ export const useQuery = <
   args: ConfectApiRefs.ConfectApiRef.Args<Query>["Type"],
 ): Option.Option<ConfectApiRefs.ConfectApiRef.Returns<Query>["Type"]> => {
   const function_ = ConfectApiRefs.getFunction(ref);
+  const functionName = ConfectApiRefs.getConvexFunctionName(ref);
 
   const encodedArgs = Schema.encodeSync(function_.args)(args);
 
-  const functionName = ConfectApiRefs.getConvexFunctionName(ref);
-  const actualReturnsOrUndefined = useConvexQuery(
+  const encodedReturnsOrUndefined = useConvexQuery(
     functionName as any,
     encodedArgs,
   );
 
-  if (actualReturnsOrUndefined === undefined) {
+  if (encodedReturnsOrUndefined === undefined) {
     return Option.none();
   } else {
     return Option.some(
-      Schema.decodeSync(function_.returns)(actualReturnsOrUndefined),
+      Schema.decodeSync(function_.returns)(encodedReturnsOrUndefined),
     );
   }
 };

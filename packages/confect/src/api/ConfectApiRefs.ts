@@ -96,6 +96,30 @@ export interface ConfectApiRef<
 export declare namespace ConfectApiRef {
   export interface Any extends ConfectApiRef<any, any, any, any> {}
 
+  export interface AnyQuery
+    extends ConfectApiRef<
+      "Query",
+      ConfectApiFunction.ConfectApiFunction.FunctionVisibility,
+      Schema.Schema.AnyNoContext,
+      Schema.Schema.AnyNoContext
+    > {}
+
+  export interface AnyMutation
+    extends ConfectApiRef<
+      "Query",
+      ConfectApiFunction.ConfectApiFunction.FunctionVisibility,
+      Schema.Schema.AnyNoContext,
+      Schema.Schema.AnyNoContext
+    > {}
+
+  export interface AnyAction
+    extends ConfectApiRef<
+      "Action",
+      ConfectApiFunction.ConfectApiFunction.FunctionVisibility,
+      Schema.Schema.AnyNoContext,
+      Schema.Schema.AnyNoContext
+    > {}
+
   export interface AnyPublicQuery
     extends ConfectApiRef<
       "Query",

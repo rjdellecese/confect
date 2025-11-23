@@ -5,8 +5,8 @@ import {
   HttpApiGroup,
   OpenApi,
 } from "@effect/platform";
-import type { HttpApiDecodeError } from "@effect/platform/HttpApiError";
 import { Effect, Layer, Schema } from "effect";
+import refs from "../../confect/refs";
 import { Note } from "../../confect/schema/note";
 import { ConfectQueryRunner } from "../confect/services";
 
@@ -14,7 +14,7 @@ class ApiGroup extends HttpApiGroup.make("notes")
   .add(
     HttpApiEndpoint.get("getFirst", "/get-first")
       .annotate(OpenApi.Description, "Get the first note, if there is one.")
-      .addSuccess(Schema.NullOr(Note.Doc)),
+      .addSuccess(Schema.Option(Note.Doc)),
   )
   .annotate(OpenApi.Title, "Notes")
   .annotate(OpenApi.Description, "Operations on notes.") {}
@@ -35,24 +35,14 @@ See Scalar's documentation on [markdown support](https://github.com/scalar/scala
   .prefix("/path-prefix") {}
 
 const ApiGroupLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
-  handlers.handle(
-    "getFirst",
-    (): Effect.Effect<
-      (typeof Note.Doc)["Type"] | null,
-      HttpApiDecodeError,
-      ConfectQueryRunner
-    > => Effect.succeed(null),
-    // Effect.gen(function* () {
-    //   const runQuery = yield* ConfectQueryRunner;
+  handlers.handle("getFirst", () =>
+    Effect.gen(function* () {
+      const runQuery = yield* ConfectQueryRunner;
 
-    //   const firstNote = yield* runQuery(api.functions.getFirst, {}).pipe(
-    //     Effect.andThen(Schema.decode(GetFirstResult)),
-    //     Effect.map(Option.getOrNull),
-    //     Effect.orDie,
-    //   );
+      const firstNote = yield* runQuery(refs.groups.notes.getFirst, {});
 
-    //   return firstNote;
-    // }),
+      return firstNote;
+    }).pipe(Effect.orDie),
   ),
 );
 

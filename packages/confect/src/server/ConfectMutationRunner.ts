@@ -1,24 +1,22 @@
-import {
-  getFunctionName,
-  type FunctionReference,
-  type GenericMutationCtx,
-  type OptionalRestArgs,
-} from "convex/server";
+import { type GenericMutationCtx } from "convex/server";
 import { Context, Effect, Layer, Schema } from "effect";
+import { ConfectApiRefs } from "../api";
 
 const makeMutationRunner =
   (runMutation: GenericMutationCtx<any>["runMutation"]) =>
-  <Mutation extends FunctionReference<"mutation", "public" | "internal">>(
+  <Mutation extends ConfectApiRefs.ConfectApiRef.AnyMutation>(
     mutation: Mutation,
-    ...args: OptionalRestArgs<Mutation>
+    args: ConfectApiRefs.ConfectApiRef.Args<Mutation>["Type"],
   ) =>
-    Effect.tryPromise({
-      try: () => runMutation(mutation, ...args),
-      catch: (error) =>
-        new MutationRollback({
-          mutationName: getFunctionName(mutation),
-          error,
-        }),
+    Effect.gen(function* () {
+      const function_ = ConfectApiRefs.getFunction(mutation);
+      const functionName = ConfectApiRefs.getConvexFunctionName(mutation);
+
+      const encodedArgs = yield* Schema.encode(function_.args)(args);
+      const encodedReturns = yield* Effect.promise(() =>
+        runMutation(functionName as any, encodedArgs),
+      );
+      return yield* Schema.decode(function_.returns)(encodedReturns);
     });
 
 export const ConfectMutationRunner = Context.GenericTag<
