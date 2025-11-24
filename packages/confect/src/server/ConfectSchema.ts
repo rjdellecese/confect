@@ -376,7 +376,13 @@ class ConfectTableDefinitionImpl<
         >
     >
   > {
-    this.tableDefinition = this.tableDefinition.vectorIndex(name, indexConfig);
+    this.tableDefinition = this.tableDefinition.vectorIndex(name, {
+      vectorField: indexConfig.vectorField,
+      dimensions: indexConfig.dimensions,
+      ...(indexConfig.filterFields
+        ? { filterFields: indexConfig.filterFields }
+        : {}),
+    });
 
     return this;
   }

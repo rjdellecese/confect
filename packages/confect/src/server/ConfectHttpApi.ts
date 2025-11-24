@@ -90,7 +90,10 @@ const makeHandler =
       HttpServer.layerContext,
     );
 
-    const { handler } = HttpApiBuilder.toWebHandler(EnvLive, { middleware });
+    const { handler } = HttpApiBuilder.toWebHandler(
+      EnvLive,
+      middleware ? { middleware } : {},
+    );
 
     return handler(request);
   };
@@ -122,8 +125,8 @@ const makeHttpAction = <DataModel extends GenericDataModel>({
     makeHandler<DataModel>({
       pathPrefix,
       apiLive,
-      middleware,
-      scalar,
+      ...(middleware ? { middleware } : {}),
+      ...(scalar ? { scalar } : {}),
     }) as unknown as (
       ctx: GenericActionCtx<GenericDataModel>,
       request: Request,
@@ -177,8 +180,8 @@ const mountEffectHttpApi =
     const handler = makeHttpAction<DataModel>({
       pathPrefix,
       apiLive,
-      middleware,
-      scalar,
+      ...(middleware ? { middleware } : {}),
+      ...(scalar ? { scalar } : {}),
     });
 
     Array.forEach(ROUTABLE_HTTP_METHODS, (method) => {
@@ -205,11 +208,12 @@ export const makeConvexHttpRouter = (
     Record.toEntries,
     Array.reduce(
       httpRouter(),
-      (convexHttpRouter, [pathPrefix, { apiLive, middleware }]) =>
+      (convexHttpRouter, [pathPrefix, { apiLive, middleware, scalar }]) =>
         mountEffectHttpApi({
           pathPrefix: pathPrefix as RoutePath,
           apiLive,
-          middleware,
+          ...(middleware ? { middleware } : {}),
+          ...(scalar ? { scalar } : {}),
         })(convexHttpRouter),
     ),
   );

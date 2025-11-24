@@ -7,10 +7,10 @@ const createConfig = ({
   clean,
   outDir,
 }: {
-  platform: UserConfig["platform"];
-  entry: UserConfig["entry"];
-  clean: UserConfig["clean"];
-  outDir: string;
+  platform: NonNullable<UserConfig["platform"]>;
+  entry: NonNullable<UserConfig["entry"]>;
+  clean: NonNullable<UserConfig["clean"]>;
+  outDir: NonNullable<UserConfig["outDir"]>;
 }): UserConfig => ({
   entry,
   platform,

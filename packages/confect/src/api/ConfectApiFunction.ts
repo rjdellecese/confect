@@ -65,7 +65,7 @@ export declare namespace ConfectApiFunction {
       Schema.Schema.AnyNoContext
     > {}
 
-  // TODO: Use type from convex-js
+  // TODO: Use type from convex-js?
   export type FunctionType = "Query" | "Mutation" | "Action";
 
   export type GetFunctionType<Function extends AnyWithProps> =
@@ -79,7 +79,7 @@ export declare namespace ConfectApiFunction {
       ? FunctionType
       : never;
 
-  // TODO: Use type from convex-js
+  // TODO: Use type from convex-js?
   export type FunctionVisibility = "Public" | "Internal";
 
   export type GetFunctionVisibility<Function extends AnyWithProps> =
