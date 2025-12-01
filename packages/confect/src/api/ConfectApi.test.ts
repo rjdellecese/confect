@@ -70,7 +70,7 @@ const GroupB = ConfectApiGroup.make("groupB")
   .addGroup(GroupBC)
   .addGroup(GroupBD);
 
-const confectSchemaDefinition = ConfectSchema.defineConfectSchema(
+const confectSchemaDefinition = ConfectSchema.make(
   ConfectSchema.defineConfectTable({
     name: "notes",
     fields: Schema.Struct({

@@ -10,7 +10,7 @@ import packageJson from "../../package.json" with { type: "json" };
 import * as ConfectApiServer from "../api/ConfectApiServer";
 import * as ConfectSchema from "../server/ConfectSchema";
 import { forEachBranchLeaves } from "../utils";
-import { functions, schema, services } from "./templates";
+import { functions, http, refs, schema, services } from "./templates";
 
 // Define a simple dummy command
 const nameOption = Options.text("name").pipe(
@@ -29,6 +29,8 @@ const generateCommand = Command.make("generate", {}, () =>
   Effect.gen(function* () {
     yield* generateSchema;
     yield* generateServices;
+    yield* generateHttp;
+    yield* generateRefs;
 
     const path = yield* Path.Path;
 
@@ -172,6 +174,50 @@ const generateServices = Effect.gen(function* () {
 
   const servicesContents = new TextEncoder().encode(servicesContentsString);
   yield* fs.writeFile(servicesPath, servicesContents);
+});
+
+const generateHttp = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+
+  const cwd = path.resolve(".");
+
+  const confectHttpPath = path.join(cwd, "confect", "http.ts");
+  const convexHttpPath = path.join(cwd, "convex", "http.ts");
+
+  const relativeImportPath = path.relative(
+    path.dirname(convexHttpPath),
+    confectHttpPath,
+  );
+  const importPathWithoutExt = yield* removePathExtension(relativeImportPath);
+  const httpContentsString = yield* http({
+    httpImportPath: importPathWithoutExt,
+  });
+
+  const httpContents = new TextEncoder().encode(httpContentsString);
+  yield* fs.writeFile(convexHttpPath, httpContents);
+});
+
+const generateRefs = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+
+  const cwd = path.resolve(".");
+
+  const confectSpecPath = path.join(cwd, "confect", "spec.ts");
+  const convexRefsPath = path.join(cwd, "convex", "confect", "refs.ts");
+
+  const relativeImportPath = path.relative(
+    path.dirname(convexRefsPath),
+    confectSpecPath,
+  );
+  const importPathWithoutExt = yield* removePathExtension(relativeImportPath);
+  const refsContentsString = yield* refs({
+    specImportPath: importPathWithoutExt,
+  });
+
+  const refsContents = new TextEncoder().encode(refsContentsString);
+  yield* fs.writeFile(convexRefsPath, refsContents);
 });
 
 const removePathExtension = (pathStr: string) =>

@@ -3,8 +3,8 @@ import { Effect } from "effect";
 import {
   ConfectDatabaseReader,
   ConfectDatabaseWriter,
-} from "../../convex/confect/services";
-import { Api } from "../api";
+} from "../../../convex/confect/services";
+import { Api } from "../../api";
 
 export const Notes = ConfectApiBuilder.group(Api, "groups.notes", (handlers) =>
   handlers
@@ -35,6 +35,13 @@ export const Notes = ConfectApiBuilder.group(Api, "groups.notes", (handlers) =>
       }).pipe(Effect.orDie),
     )
     .handle("getFirst", () =>
+      Effect.gen(function* () {
+        const reader = yield* ConfectDatabaseReader;
+
+        return yield* reader.table("notes").index("by_creation_time").first();
+      }).pipe(Effect.orDie),
+    )
+    .handle("internalGetFirst", () =>
       Effect.gen(function* () {
         const reader = yield* ConfectDatabaseReader;
 

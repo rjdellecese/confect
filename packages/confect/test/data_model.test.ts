@@ -11,9 +11,9 @@ import type {
 import {
   type ConfectDataModelFromConfectSchema,
   type ConfectSchemaFromConfectSchemaDefinition,
-  defineConfectSchema,
   defineConfectTable,
   type GenericConfectSchema,
+  make,
 } from "../src/server/ConfectSchema";
 
 describe("ConfectDataModelFromConfectSchema", () => {
@@ -25,9 +25,7 @@ describe("ConfectDataModelFromConfectSchema", () => {
       name: "notes",
       fields: TableSchema,
     });
-    const _confectSchemaDefinition = defineConfectSchema(
-      confectTableDefinition,
-    );
+    const _confectSchemaDefinition = make(confectTableDefinition);
     type ConfectSchema = ConfectSchemaFromConfectSchemaDefinition<
       typeof _confectSchemaDefinition
     >;
@@ -57,7 +55,7 @@ describe("ConfectSchemaFromConfectSchemaDefinition", () => {
       name: "notes",
       fields: NoteSchema,
     });
-    const _schemaDefinition = defineConfectSchema(notesTableDefinition);
+    const _schemaDefinition = make(notesTableDefinition);
 
     type ConfectSchema = ConfectSchemaFromConfectSchemaDefinition<
       typeof _schemaDefinition
@@ -76,9 +74,7 @@ describe("TableInfoFromConfectTableInfo", () => {
       name: "notes",
       fields: TableSchema,
     });
-    const _confectSchemaDefinition = defineConfectSchema(
-      confectTableDefinition,
-    );
+    const _confectSchemaDefinition = make(confectTableDefinition);
     type ConfectSchema = ConfectSchemaFromConfectSchemaDefinition<
       typeof _confectSchemaDefinition
     >;
@@ -100,9 +96,7 @@ describe("DataModelFromConfectDataModel", () => {
       name: "notes",
       fields: TableSchema,
     });
-    const _confectSchemaDefinition = defineConfectSchema(
-      confectTableDefinition,
-    );
+    const _confectSchemaDefinition = make(confectTableDefinition);
     type ConfectSchema = ConfectSchemaFromConfectSchemaDefinition<
       typeof _confectSchemaDefinition
     >;

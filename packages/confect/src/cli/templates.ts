@@ -42,6 +42,36 @@ export const schema = ({ schemaImportPath }: { schemaImportPath: string }) =>
     return yield* cbw.toString();
   });
 
+export const http = ({ httpImportPath }: { httpImportPath: string }) =>
+  Effect.gen(function* () {
+    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+
+    yield* cbw.writeLine(`import http from "${httpImportPath}";`);
+    yield* cbw.newLine();
+    yield* cbw.writeLine(`export default http;`);
+
+    return yield* cbw.toString();
+  });
+
+export const refs = ({ specImportPath }: { specImportPath: string }) =>
+  Effect.gen(function* () {
+    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+
+    yield* cbw.writeLine(
+      `import { ConfectApiRefs } from "@rjdellecese/confect/api";`,
+    );
+    yield* cbw.writeLine(`import spec from "${specImportPath}";`);
+    yield* cbw.blankLine();
+    yield* cbw.writeLine(`const refs = ConfectApiRefs.make(spec);`);
+    yield* cbw.blankLine();
+    yield* cbw.writeLine(`export const api = ConfectApiRefs.justPublic(refs);`);
+    yield* cbw.writeLine(
+      `export const internal = ConfectApiRefs.justInternal(refs);`,
+    );
+
+    return yield* cbw.toString();
+  });
+
 export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });

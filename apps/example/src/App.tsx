@@ -3,8 +3,8 @@ import { useAction, useMutation, useQuery } from "@rjdellecese/confect/react";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { Array, Effect, Exit, Option } from "effect";
 import { useEffect, useState } from "react";
-import refs from "../confect/refs";
-import { Api } from "../convex/http/api";
+import { Api } from "../confect/http/path-prefix";
+import { api } from "../convex/confect/refs";
 
 const App = () => {
   const convexClient = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
@@ -18,10 +18,10 @@ const App = () => {
 
 const Page = () => {
   const [note, setNote] = useState("");
-  const insertNote = useMutation(refs.groups.notes.insert);
+  const insertNote = useMutation(api.groups.notes.insert);
 
   const [randomNumber, setRandomNumber] = useState<number | null>(null);
-  const getRandom = useAction(refs.groups.random.getNumber);
+  const getRandom = useAction(api.groups.random.getNumber);
 
   const retrieveRandomNumber = () => {
     getRandom({}).pipe(Effect.map(setRandomNumber), Effect.runPromise);
@@ -71,9 +71,9 @@ const Page = () => {
 };
 
 const NoteList = () => {
-  const notes = useQuery(refs.groups.notes.list, {});
+  const notes = useQuery(api.groups.notes.list, {});
 
-  const deleteNote = useMutation(refs.groups.notes.delete_);
+  const deleteNote = useMutation(api.groups.notes.delete_);
 
   return Option.match(notes, {
     onNone: () => <p>Loading…</p>,

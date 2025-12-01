@@ -4,9 +4,9 @@ import { ConfectApiRefs } from "../api";
 
 const makeActionRunner =
   (runAction: GenericActionCtx<any>["runAction"]) =>
-  <Action extends ConfectApiRefs.ConfectApiRef.AnyAction>(
+  <Action extends ConfectApiRefs.Ref.AnyAction>(
     action: Action,
-    args: ConfectApiRefs.ConfectApiRef.Args<Action>["Type"],
+    args: ConfectApiRefs.Ref.Args<Action>["Type"],
   ) =>
     Effect.gen(function* () {
       const function_ = ConfectApiRefs.getFunction(action);

@@ -6,9 +6,9 @@ import {
   OpenApi,
 } from "@effect/platform";
 import { Effect, Layer, Schema } from "effect";
-import refs from "../../confect/refs";
 import { Note } from "../../confect/schema/note";
-import { ConfectQueryRunner } from "../confect/services";
+import { api } from "../../convex/confect/refs";
+import { ConfectQueryRunner } from "../../convex/confect/services";
 
 class ApiGroup extends HttpApiGroup.make("notes")
   .add(
@@ -39,7 +39,7 @@ const ApiGroupLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
     Effect.gen(function* () {
       const runQuery = yield* ConfectQueryRunner;
 
-      const firstNote = yield* runQuery(refs.groups.notes.getFirst, {});
+      const firstNote = yield* runQuery(api.groups.notes.getFirst, {});
 
       return firstNote;
     }).pipe(Effect.orDie),

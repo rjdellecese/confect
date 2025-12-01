@@ -1,7 +1,7 @@
 import { ConfectApiFunction, ConfectApiGroup } from "@rjdellecese/confect/api";
 import { GenericId } from "@rjdellecese/confect/server";
 import { Schema } from "effect";
-import { Note } from "../schema/note";
+import { Note } from "../../schema/note";
 
 export const Notes = ConfectApiGroup.make("notes")
   .addFunction(
@@ -28,6 +28,13 @@ export const Notes = ConfectApiGroup.make("notes")
   .addFunction(
     ConfectApiFunction.query({
       name: "getFirst",
+      args: Schema.Struct({}),
+      returns: Schema.Option(Note.Doc),
+    }),
+  )
+  .addFunction(
+    ConfectApiFunction.internalQuery({
+      name: "internalGetFirst",
       args: Schema.Struct({}),
       returns: Schema.Option(Note.Doc),
     }),

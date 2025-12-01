@@ -38,6 +38,6 @@ export const confectSchemaTables = {
   ),
 };
 
-export const confectSchema = schema.defineConfectSchema(confectSchemaTables);
+export const confectSchema = schema.make(confectSchemaTables);
 
 export default confectSchema.convexSchemaDefinition;

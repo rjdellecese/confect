@@ -198,9 +198,7 @@ const mountEffectHttpApi =
 
 type ConfectHttpApis = Partial<Record<RoutePath, ConfectHttpApi>>;
 
-export const makeConvexHttpRouter = (
-  confectHttpApis: ConfectHttpApis,
-): ConvexHttpRouter => {
+export const make = (confectHttpApis: ConfectHttpApis): ConvexHttpRouter => {
   applyMonkeyPatches();
 
   return pipe(

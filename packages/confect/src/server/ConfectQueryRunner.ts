@@ -5,11 +5,11 @@ import { ConfectApiRefs } from "../api";
 
 const makeQueryRunner =
   (runQuery: GenericQueryCtx<any>["runQuery"]) =>
-  <Query extends ConfectApiRefs.ConfectApiRef.AnyQuery>(
+  <Query extends ConfectApiRefs.Ref.AnyQuery>(
     query: Query,
-    args: ConfectApiRefs.ConfectApiRef.Args<Query>["Type"],
+    args: ConfectApiRefs.Ref.Args<Query>["Type"],
   ): Effect.Effect<
-    ConfectApiRefs.ConfectApiRef.Returns<Query>["Type"],
+    ConfectApiRefs.Ref.Returns<Query>["Type"],
     ParseResult.ParseError
   > =>
     Effect.gen(function* () {

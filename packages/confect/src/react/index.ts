@@ -6,12 +6,10 @@ import {
 import { Effect, Option, Schema } from "effect";
 import { ConfectApiRefs } from "../api";
 
-export const useQuery = <
-  Query extends ConfectApiRefs.ConfectApiRef.AnyPublicQuery,
->(
+export const useQuery = <Query extends ConfectApiRefs.Ref.AnyPublicQuery>(
   ref: Query,
-  args: ConfectApiRefs.ConfectApiRef.Args<Query>["Type"],
-): Option.Option<ConfectApiRefs.ConfectApiRef.Returns<Query>["Type"]> => {
+  args: ConfectApiRefs.Ref.Args<Query>["Type"],
+): Option.Option<ConfectApiRefs.Ref.Returns<Query>["Type"]> => {
   const function_ = ConfectApiRefs.getFunction(ref);
   const functionName = ConfectApiRefs.getConvexFunctionName(ref);
 
@@ -32,7 +30,7 @@ export const useQuery = <
 };
 
 export const useMutation = <
-  Mutation extends ConfectApiRefs.ConfectApiRef.AnyPublicMutation,
+  Mutation extends ConfectApiRefs.Ref.AnyPublicMutation,
 >(
   ref: Mutation,
 ) => {
@@ -41,8 +39,8 @@ export const useMutation = <
   const actualMutation = useConvexMutation(functionName as any);
 
   return (
-    args: ConfectApiRefs.ConfectApiRef.Args<Mutation>["Type"],
-  ): Effect.Effect<ConfectApiRefs.ConfectApiRef.Returns<Mutation>["Type"]> =>
+    args: ConfectApiRefs.Ref.Args<Mutation>["Type"],
+  ): Effect.Effect<ConfectApiRefs.Ref.Returns<Mutation>["Type"]> =>
     Effect.gen(function* () {
       const encodedArgs = yield* Schema.encode(function_.args)(args);
 
@@ -54,9 +52,7 @@ export const useMutation = <
     }).pipe(Effect.orDie);
 };
 
-export const useAction = <
-  Action extends ConfectApiRefs.ConfectApiRef.AnyPublicAction,
->(
+export const useAction = <Action extends ConfectApiRefs.Ref.AnyPublicAction>(
   ref: Action,
 ) => {
   const function_ = ConfectApiRefs.getFunction(ref);
@@ -64,8 +60,8 @@ export const useAction = <
   const actualAction = useConvexAction(functionName as any);
 
   return (
-    args: ConfectApiRefs.ConfectApiRef.Args<Action>["Type"],
-  ): Effect.Effect<ConfectApiRefs.ConfectApiRef.Returns<Action>["Type"]> =>
+    args: ConfectApiRefs.Ref.Args<Action>["Type"],
+  ): Effect.Effect<ConfectApiRefs.Ref.Returns<Action>["Type"]> =>
     Effect.gen(function* () {
       const encodedArgs = yield* Schema.encode(function_.args)(args);
 

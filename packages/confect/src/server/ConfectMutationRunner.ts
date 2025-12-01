@@ -4,9 +4,9 @@ import { ConfectApiRefs } from "../api";
 
 const makeMutationRunner =
   (runMutation: GenericMutationCtx<any>["runMutation"]) =>
-  <Mutation extends ConfectApiRefs.ConfectApiRef.AnyMutation>(
+  <Mutation extends ConfectApiRefs.Ref.AnyMutation>(
     mutation: Mutation,
-    args: ConfectApiRefs.ConfectApiRef.Args<Mutation>["Type"],
+    args: ConfectApiRefs.Ref.Args<Mutation>["Type"],
   ) =>
     Effect.gen(function* () {
       const function_ = ConfectApiRefs.getFunction(mutation);

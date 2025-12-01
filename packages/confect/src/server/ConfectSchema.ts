@@ -99,7 +99,7 @@ class ConfectSchemaDefinitionImpl<ConfectSchema extends GenericConfectSchema>
 /**
  * Define a Confect schema.
  */
-export const defineConfectSchema = <ConfectSchema extends GenericConfectSchema>(
+export const make = <ConfectSchema extends GenericConfectSchema>(
   ...confectSchema: ConfectSchema
 ): ConfectSchemaDefinition<ConfectSchema> =>
   new ConfectSchemaDefinitionImpl<ConfectSchema>(confectSchema);
@@ -487,7 +487,7 @@ export const confectSystemTableDefinitions = [
 
 export type ConfectSystemSchema = typeof confectSystemTableDefinitions;
 
-export const confectSystemSchemaDefinition = defineConfectSchema(
+export const confectSystemSchemaDefinition = make(
   ...confectSystemTableDefinitions,
 );
 

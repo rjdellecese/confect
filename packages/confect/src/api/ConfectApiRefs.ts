@@ -24,7 +24,7 @@ type Helper<Groups extends ConfectApiGroup.ConfectApiGroup.Any> = {
               FunctionName
             > extends infer Function extends
               ConfectApiFunction.ConfectApiFunction.AnyWithProps
-              ? ConfectApiRef<
+              ? Ref<
                   ConfectApiFunction.ConfectApiFunction.GetFunctionType<Function>,
                   ConfectApiFunction.ConfectApiFunction.GetFunctionVisibility<Function>,
                   ConfectApiFunction.ConfectApiFunction.Args<Function>,
@@ -37,6 +37,26 @@ type Helper<Groups extends ConfectApiGroup.ConfectApiGroup.Any> = {
     : never;
 };
 
+type FilterRefs<Refs, Predicate> = Types.Simplify<{
+  [K in keyof Refs as Refs[K] extends Predicate
+    ? K
+    : Refs[K] extends Ref.Any
+      ? never
+      : FilterRefs<Refs[K], Predicate> extends Record<string, never>
+        ? never
+        : K]: Refs[K] extends Predicate
+    ? Refs[K]
+    : FilterRefs<Refs[K], Predicate>;
+}>;
+
+export const justInternal = <Refs extends ConfectApiRefs.AnyWithProps>(
+  refs: Refs,
+): FilterRefs<Refs, Ref.AnyInternal> => refs as any;
+
+export const justPublic = <Refs extends ConfectApiRefs.AnyWithProps>(
+  refs: Refs,
+): FilterRefs<Refs, Ref.AnyPublic> => refs as any;
+
 export declare namespace ConfectApiRefs {
   export interface AnyWithProps
     extends ConfectApiRefs<ConfectApiSpec.ConfectApiSpec.AnyWithProps> {}
@@ -44,13 +64,13 @@ export declare namespace ConfectApiRefs {
 
 const HiddenFunctionKey = Symbol.for("@rjdellecese/confect/HiddenFunctionKey");
 type HiddenFunctionKey = typeof HiddenFunctionKey;
-type HiddenFunction<Ref extends ConfectApiRef.Any> =
+type HiddenFunction<Ref extends Ref.Any> =
   ConfectApiFunction.ConfectApiFunction<
-    ConfectApiRef.FunctionType<Ref>,
-    ConfectApiRef.FunctionVisibility<Ref>,
+    Ref.FunctionType<Ref>,
+    Ref.FunctionVisibility<Ref>,
     string,
-    ConfectApiRef.Args<Ref>,
-    ConfectApiRef.Returns<Ref>
+    Ref.Args<Ref>,
+    Ref.Returns<Ref>
   >;
 
 export const getFunction = <
@@ -59,10 +79,10 @@ export const getFunction = <
     ConfectApiFunction.ConfectApiFunction.FunctionVisibility,
   Args extends Schema.Schema.AnyNoContext,
   Returns extends Schema.Schema.AnyNoContext,
-  Ref extends ConfectApiRef<FunctionType, FunctionVisibility, Args, Returns>,
+  Ref_ extends Ref<FunctionType, FunctionVisibility, Args, Returns>,
 >(
-  ref: Ref,
-): HiddenFunction<Ref> => (ref as any)[HiddenFunctionKey];
+  ref: Ref_,
+): HiddenFunction<Ref_> => (ref as any)[HiddenFunctionKey];
 
 const HiddenConvexFunctionNameKey = Symbol.for(
   "@rjdellecese/confect/HiddenConvexFunctionNameKey",
@@ -77,10 +97,10 @@ export const getConvexFunctionName = <
   Args extends Schema.Schema.AnyNoContext,
   Returns extends Schema.Schema.AnyNoContext,
 >(
-  ref: ConfectApiRef<FunctionType, FunctionVisibility, Args, Returns>,
+  ref: Ref<FunctionType, FunctionVisibility, Args, Returns>,
 ): HiddenConvexFunctionName => (ref as any)[HiddenConvexFunctionNameKey];
 
-export interface ConfectApiRef<
+export interface Ref<
   _FunctionType extends ConfectApiFunction.ConfectApiFunction.FunctionType,
   _FunctionVisibility extends
     ConfectApiFunction.ConfectApiFunction.FunctionVisibility,
@@ -93,11 +113,15 @@ export interface ConfectApiRef<
   readonly _Returns?: _Returns;
 }
 
-export declare namespace ConfectApiRef {
-  export interface Any extends ConfectApiRef<any, any, any, any> {}
+export declare namespace Ref {
+  export interface Any extends Ref<any, any, any, any> {}
+
+  export interface AnyInternal extends Ref<any, "Internal", any, any> {}
+
+  export interface AnyPublic extends Ref<any, "Public", any, any> {}
 
   export interface AnyQuery
-    extends ConfectApiRef<
+    extends Ref<
       "Query",
       ConfectApiFunction.ConfectApiFunction.FunctionVisibility,
       Schema.Schema.AnyNoContext,
@@ -105,7 +129,7 @@ export declare namespace ConfectApiRef {
     > {}
 
   export interface AnyMutation
-    extends ConfectApiRef<
+    extends Ref<
       "Query",
       ConfectApiFunction.ConfectApiFunction.FunctionVisibility,
       Schema.Schema.AnyNoContext,
@@ -113,7 +137,7 @@ export declare namespace ConfectApiRef {
     > {}
 
   export interface AnyAction
-    extends ConfectApiRef<
+    extends Ref<
       "Action",
       ConfectApiFunction.ConfectApiFunction.FunctionVisibility,
       Schema.Schema.AnyNoContext,
@@ -121,7 +145,7 @@ export declare namespace ConfectApiRef {
     > {}
 
   export interface AnyPublicQuery
-    extends ConfectApiRef<
+    extends Ref<
       "Query",
       "Public",
       Schema.Schema.AnyNoContext,
@@ -129,7 +153,7 @@ export declare namespace ConfectApiRef {
     > {}
 
   export interface AnyPublicMutation
-    extends ConfectApiRef<
+    extends Ref<
       "Mutation",
       "Public",
       Schema.Schema.AnyNoContext,
@@ -137,15 +161,15 @@ export declare namespace ConfectApiRef {
     > {}
 
   export interface AnyPublicAction
-    extends ConfectApiRef<
+    extends Ref<
       "Action",
       "Public",
       Schema.Schema.AnyNoContext,
       Schema.Schema.AnyNoContext
     > {}
 
-  export type FunctionType<Ref> =
-    Ref extends ConfectApiRef<
+  export type FunctionType<Ref_> =
+    Ref_ extends Ref<
       infer FunctionType,
       infer _FunctionVisibility,
       infer _Args,
@@ -154,8 +178,8 @@ export declare namespace ConfectApiRef {
       ? FunctionType
       : never;
 
-  export type FunctionVisibility<Ref> =
-    Ref extends ConfectApiRef<
+  export type FunctionVisibility<Ref_> =
+    Ref_ extends Ref<
       infer _FunctionType,
       infer FunctionVisibility,
       infer _Args,
@@ -164,8 +188,8 @@ export declare namespace ConfectApiRef {
       ? FunctionVisibility
       : never;
 
-  export type Args<Ref> =
-    Ref extends ConfectApiRef<
+  export type Args<Ref_> =
+    Ref_ extends Ref<
       infer _FunctionType,
       infer _FunctionVisibility,
       infer Args,
@@ -174,8 +198,8 @@ export declare namespace ConfectApiRef {
       ? Args
       : never;
 
-  export type Returns<Ref> =
-    Ref extends ConfectApiRef<
+  export type Returns<Ref_> =
+    Ref_ extends Ref<
       infer _FunctionType,
       infer _FunctionVisibility,
       infer _Args,
@@ -203,11 +227,11 @@ const makeRef = <
     Args,
     Returns
   >,
-): ConfectApiRef<FunctionType, FunctionVisibility, Args, Returns> =>
+): Ref<FunctionType, FunctionVisibility, Args, Returns> =>
   ({
     [HiddenFunctionKey]: function_,
     [HiddenConvexFunctionNameKey]: convexFunctionName,
-  }) as ConfectApiRef<FunctionType, FunctionVisibility, Args, Returns>;
+  }) as Ref<FunctionType, FunctionVisibility, Args, Returns>;
 
 export const make = <Spec extends ConfectApiSpec.ConfectApiSpec.AnyWithProps>(
   spec: Spec,
