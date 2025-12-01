@@ -15,11 +15,10 @@ export const isConfectApi = (u: unknown): u is ConfectApi.Any =>
 
 export interface ConfectApi<
   ConfectSchema extends GenericConfectSchema,
-  Name extends string,
   Groups extends ConfectApiGroup.ConfectApiGroup.Any,
 > {
   readonly [TypeId]: TypeId;
-  readonly spec: ConfectApiSpec.ConfectApiSpec<Name, Groups>;
+  readonly spec: ConfectApiSpec.ConfectApiSpec<Groups>;
   readonly confectSchemaDefinition: ConfectSchemaDefinition<ConfectSchema>;
 }
 
@@ -31,7 +30,6 @@ export declare namespace ConfectApi {
   export interface AnyWithProps
     extends ConfectApi<
       GenericConfectSchema,
-      string,
       ConfectApiGroup.ConfectApiGroup.AnyWithProps
     > {}
 
@@ -45,15 +43,14 @@ const Proto = {
 
 const makeProto = <
   ConfectSchema extends GenericConfectSchema,
-  const Name extends string,
   Groups extends ConfectApiGroup.ConfectApiGroup.Any,
 >({
   confectSchemaDefinition,
   spec,
 }: {
   confectSchemaDefinition: ConfectSchemaDefinition<ConfectSchema>;
-  spec: ConfectApiSpec.ConfectApiSpec<Name, Groups>;
-}): ConfectApi<ConfectSchema, Name, Groups> =>
+  spec: ConfectApiSpec.ConfectApiSpec<Groups>;
+}): ConfectApi<ConfectSchema, Groups> =>
   Object.assign(Object.create(Proto), {
     confectSchemaDefinition,
     spec,
@@ -65,6 +62,6 @@ export const make = <
   Groups extends ConfectApiGroup.ConfectApiGroup.Any,
 >(
   confectSchemaDefinition: ConfectSchemaDefinition<ConfectSchema>,
-  spec: ConfectApiSpec.ConfectApiSpec<Name, Groups>,
-): ConfectApi<ConfectSchema, Name, Groups> =>
+  spec: ConfectApiSpec.ConfectApiSpec<Groups>,
+): ConfectApi<ConfectSchema, Groups> =>
   makeProto({ confectSchemaDefinition, spec });

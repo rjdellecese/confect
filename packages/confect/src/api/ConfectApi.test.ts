@@ -81,7 +81,7 @@ const confectSchemaDefinition = ConfectSchema.make(
 
 type ConfectSchemaDefinition = typeof confectSchemaDefinition;
 
-const Spec = ConfectApiSpec.make("api").add(GroupA).add(GroupB);
+const Spec = ConfectApiSpec.make().add(GroupA).add(GroupB);
 
 const Api = ConfectApi.make(confectSchemaDefinition, Spec);
 
