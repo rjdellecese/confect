@@ -7,60 +7,52 @@ import type {
 } from "convex/server";
 import type { GenericId } from "convex/values";
 import { Context, Effect, Layer, pipe, Record } from "effect";
+import type * as ConfectDataModel from "./ConfectDataModel";
 import type {
   ConfectDocumentByName,
-  DataModelFromConfectDataModel,
   TableNamesInConfectDataModel,
-  TableSchemaFromConfectTableInfo,
 } from "./ConfectDataModel";
 import * as ConfectDocument from "./ConfectDocument";
 import * as ConfectQueryInitializer from "./ConfectQueryInitializer";
-import type { DataModelFromConfectSchemaDefinition } from "./ConfectSchema";
-import {
-  type ConfectDataModelFromConfectSchemaDefinition,
-  type GenericConfectSchemaDefinition,
-} from "./ConfectSchema";
+import type * as ConfectSchema from "./ConfectSchema";
+import type * as ConfectTable from "./ConfectTable";
+import type * as ConfectTableInfo from "./ConfectTableInfo";
 
-export const make = <
-  ConfectSchemaDefinition extends GenericConfectSchemaDefinition,
->(
-  confectSchemaDefinition: ConfectSchemaDefinition,
+export const make = <S extends ConfectSchema.ConfectSchema.AnyWithProps>(
+  schema: S,
   convexDatabaseWriter: GenericDatabaseWriter<
-    DataModelFromConfectSchemaDefinition<ConfectSchemaDefinition>
+    ConfectSchema.DataModelFromConfectSchema<S>
   >,
 ) => {
-  type ConfectDataModel =
-    ConfectDataModelFromConfectSchemaDefinition<ConfectSchemaDefinition>;
+  type ConfectDataModel = ConfectDataModel.ConfectDataModel.FromSchema<S>;
 
   const insert = <
-    TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+    TableName extends
+      ConfectDataModel.ConfectDataModel.TableNames<ConfectDataModel>,
   >(
     tableName: TableName,
-    document: WithoutSystemFields<
+    document: ConfectDocument.ConfectDocument.WithoutSystemFields<
       ConfectDocumentByName<ConfectDataModel, TableName>
     >,
   ) =>
     Effect.gen(function* () {
-      const confectTableDefinition = confectSchemaDefinition.confectSchema.find(
-        (def) => def.name === tableName,
-      )!;
+      const confectTable = (
+        schema.tables as Record<string, ConfectTable.ConfectTable.AnyWithProps>
+      )[tableName]!;
 
       const encodedDocument = yield* ConfectDocument.encode(
         document,
         tableName,
-        confectTableDefinition.Fields,
+        confectTable.Fields,
       );
 
       const id = yield* Effect.promise(() =>
         convexDatabaseWriter.insert(
           tableName,
-          encodedDocument as Expand<
-            BetterOmit<
-              DocumentByName<
-                DataModelFromConfectDataModel<ConfectDataModel>,
-                TableName
-              >,
-              "_creationTime" | "_id"
+          encodedDocument as WithoutSystemFields<
+            DocumentByName<
+              ConfectDataModel.ConfectDataModel.DataModel<ConfectDataModel>,
+              TableName
             >
           >,
         ),
@@ -79,19 +71,22 @@ export const make = <
     >,
   ) =>
     Effect.gen(function* () {
-      const confectTableDefinition = confectSchemaDefinition.confectSchema.find(
-        (def) => def.name === tableName,
-      )!;
+      const confectTable = (
+        schema.tables as Record<string, ConfectTable.ConfectTable.AnyWithProps>
+      )[tableName]!;
 
       const tableSchema =
-        confectTableDefinition.Fields as TableSchemaFromConfectTableInfo<
-          ConfectDataModel[TableName]
+        confectTable.Fields as ConfectTableInfo.ConfectTableInfo.TableSchema<
+          ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+            ConfectDataModel,
+            TableName
+          >
         >;
 
       const originalDecodedDoc = yield* ConfectQueryInitializer.getById(
         tableName,
         convexDatabaseWriter as any,
-        confectTableDefinition,
+        confectTable,
       )(id);
 
       const updatedEncodedDoc = yield* pipe(
@@ -110,7 +105,7 @@ export const make = <
           updatedEncodedDoc as Expand<
             BetterOmit<
               DocumentByName<
-                DataModelFromConfectDataModel<ConfectDataModel>,
+                ConfectDataModel.ConfectDataModel.DataModel<ConfectDataModel>,
                 TableName
               >,
               "_creationTime" | "_id"
@@ -130,13 +125,16 @@ export const make = <
     >,
   ) =>
     Effect.gen(function* () {
-      const confectTableDefinition = confectSchemaDefinition.confectSchema.find(
-        (def) => def.name === tableName,
-      )!;
+      const confectTable = (
+        schema.tables as Record<string, ConfectTable.ConfectTable.AnyWithProps>
+      )[tableName]!;
 
       const tableSchema =
-        confectTableDefinition.Fields as TableSchemaFromConfectTableInfo<
-          ConfectDataModel[TableName]
+        confectTable.Fields as ConfectTableInfo.ConfectTableInfo.TableSchema<
+          ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+            ConfectDataModel,
+            TableName
+          >
         >;
 
       const updatedEncodedDoc = yield* ConfectDocument.encode(
@@ -151,7 +149,7 @@ export const make = <
           updatedEncodedDoc as Expand<
             BetterOmit<
               DocumentByName<
-                DataModelFromConfectDataModel<ConfectDataModel>,
+                ConfectDataModel.ConfectDataModel.DataModel<ConfectDataModel>,
                 TableName
               >,
               "_creationTime" | "_id"
@@ -177,27 +175,20 @@ export const make = <
 };
 
 export const ConfectDatabaseWriter = <
-  ConfectSchemaDefinition extends GenericConfectSchemaDefinition,
+  S extends ConfectSchema.ConfectSchema.AnyWithProps,
 >() =>
-  Context.GenericTag<ReturnType<typeof make<ConfectSchemaDefinition>>>(
+  Context.GenericTag<ReturnType<typeof make<S>>>(
     "@rjdellecese/confect/ConfectDatabaseWriter",
   );
 
 export type ConfectDatabaseWriter<
-  ConfectSchemaDefinition extends GenericConfectSchemaDefinition,
-> = ReturnType<
-  typeof ConfectDatabaseWriter<ConfectSchemaDefinition>
->["Service"];
+  S extends ConfectSchema.ConfectSchema.AnyWithProps,
+> = ReturnType<typeof ConfectDatabaseWriter<S>>["Service"];
 
-export const layer = <
-  ConfectSchemaDefinition extends GenericConfectSchemaDefinition,
->(
-  confectSchemaDefinition: ConfectSchemaDefinition,
+export const layer = <S extends ConfectSchema.ConfectSchema.AnyWithProps>(
+  schema: S,
   convexDatabaseWriter: GenericDatabaseWriter<
-    DataModelFromConfectSchemaDefinition<ConfectSchemaDefinition>
+    ConfectSchema.DataModelFromConfectSchema<S>
   >,
 ) =>
-  Layer.succeed(
-    ConfectDatabaseWriter<ConfectSchemaDefinition>(),
-    make(confectSchemaDefinition, convexDatabaseWriter),
-  );
+  Layer.succeed(ConfectDatabaseWriter<S>(), make(schema, convexDatabaseWriter));

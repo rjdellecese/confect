@@ -2,6 +2,7 @@ import { Effect, Layer, Schema } from "effect";
 import * as ConfectDatabaseReader from "../server/ConfectDatabaseReader";
 import * as ConfectDatabaseWriter from "../server/ConfectDatabaseWriter";
 import * as ConfectSchema from "../server/ConfectSchema";
+import * as ConfectTable from "../server/ConfectTable";
 import * as ConfectApi from "./ConfectApi";
 import * as ConfectApiBuilder from "./ConfectApiBuilder";
 import * as ConfectApiFunction from "./ConfectApiFunction";
@@ -70,8 +71,8 @@ const GroupB = ConfectApiGroup.make("groupB")
   .addGroup(GroupBC)
   .addGroup(GroupBD);
 
-const confectSchemaDefinition = ConfectSchema.make(
-  ConfectSchema.defineConfectTable({
+const confectSchema = ConfectSchema.make().addTable(
+  ConfectTable.make({
     name: "notes",
     fields: Schema.Struct({
       content: Schema.String,
@@ -79,22 +80,25 @@ const confectSchemaDefinition = ConfectSchema.make(
   }),
 );
 
-type ConfectSchemaDefinition = typeof confectSchemaDefinition;
+type MyConfectSchema = typeof confectSchema;
 
 const Spec = ConfectApiSpec.make().add(GroupA).add(GroupB);
 
-const Api = ConfectApi.make(confectSchemaDefinition, Spec);
+const Api = ConfectApi.make(confectSchema, Spec);
 
 const GroupALive = ConfectApiBuilder.group(Api, "groupA", (handlers) =>
   handlers
-    .handle("myFunction", (args) =>
+    .handle("myFunction", (_args) =>
       Effect.gen(function* () {
-        const reader =
-          yield* ConfectDatabaseReader.ConfectDatabaseReader<ConfectSchemaDefinition>();
-        const writer =
-          yield* ConfectDatabaseWriter.ConfectDatabaseWriter<ConfectSchemaDefinition>();
+        const _reader =
+          yield* ConfectDatabaseReader.ConfectDatabaseReader<MyConfectSchema>();
+        const _writer =
+          yield* ConfectDatabaseWriter.ConfectDatabaseWriter<MyConfectSchema>();
 
-        const a = yield* reader.table("notes").index("by_id", "asc").collect();
+        const _a = yield* _reader
+          .table("notes")
+          .index("by_id", "asc")
+          .collect();
 
         return yield* Effect.succeed("test");
       }).pipe(Effect.orDie),
@@ -128,7 +132,7 @@ const ApiLive = ConfectApiBuilder.api(Api).pipe(
   Layer.provide(GroupBLive),
 );
 
-const server = ConfectApiServer.make
+const _server = ConfectApiServer.make
   .pipe(Effect.provide(ApiLive), Effect.runPromise)
   .then((s) => {
     console.log(s);
@@ -138,4 +142,4 @@ const refs = ConfectApiRefs.make(Spec);
 
 console.dir(refs, { depth: null, colors: true });
 
-const a = refs.groupB.groupBC.myFunction3;
+const _a = refs.groupB.groupBC.myFunction3;

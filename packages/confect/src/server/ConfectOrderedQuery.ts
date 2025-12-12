@@ -1,14 +1,10 @@
 import type { OrderedQuery, PaginationResult } from "convex/server";
 import { Chunk, Effect, identity, type Option, pipe, Stream } from "effect";
-import type {
-  GenericConfectTableInfo,
-  TableInfoFromConfectTableInfo,
-  TableSchemaFromConfectTableInfo,
-} from "./ConfectDataModel";
 import * as ConfectDocument from "./ConfectDocument";
+import type * as ConfectTableInfo from "./ConfectTableInfo";
 
 export type ConfectOrderedQuery<
-  ConfectTableInfo extends GenericConfectTableInfo,
+  ConfectTableInfo extends ConfectTableInfo.ConfectTableInfo.AnyWithProps,
   _TableName extends string,
 > = {
   readonly first: () => Effect.Effect<
@@ -39,12 +35,14 @@ export type ConfectOrderedQuery<
 };
 
 export const make = <
-  ConfectTableInfo extends GenericConfectTableInfo,
+  ConfectTableInfo extends ConfectTableInfo.ConfectTableInfo.AnyWithProps,
   TableName extends string,
 >(
-  query: OrderedQuery<TableInfoFromConfectTableInfo<ConfectTableInfo>>,
+  query: OrderedQuery<
+    ConfectTableInfo.ConfectTableInfo.TableInfo<ConfectTableInfo>
+  >,
   tableName: TableName,
-  tableSchema: TableSchemaFromConfectTableInfo<ConfectTableInfo>,
+  tableSchema: ConfectTableInfo.ConfectTableInfo.TableSchema<ConfectTableInfo>,
 ): ConfectOrderedQuery<ConfectTableInfo, TableName> => {
   type ConfectOrderedQueryFunction<
     FunctionName extends keyof ConfectOrderedQuery<ConfectTableInfo, TableName>,

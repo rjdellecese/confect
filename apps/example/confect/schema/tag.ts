@@ -1,4 +1,4 @@
-import { ConfectSchema } from "@rjdellecese/confect";
+import { ConfectTable } from "@rjdellecese/confect";
 import { Schema } from "effect";
 
 type Tag = {
@@ -11,7 +11,7 @@ const TagSchema = Schema.Struct({
   tags: Schema.Array(Schema.suspend((): Schema.Schema<Tag> => TagSchema)),
 });
 
-export const Tag = ConfectSchema.defineConfectTable({
+export const Tag = ConfectTable.make({
   name: "tags",
   fields: TagSchema,
 });

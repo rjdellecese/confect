@@ -1,534 +1,165 @@
 import type { GenericSchema } from "convex/server";
 import {
   defineSchema as defineConvexSchema,
-  defineTable as defineConvexTable,
-  type Expand,
-  type GenericTableIndexes,
-  type GenericTableSearchIndexes,
-  type GenericTableVectorIndexes,
-  type IdField,
-  type IndexTiebreakerField,
   type SchemaDefinition,
-  type SearchIndexConfig,
-  type SystemFields,
-  type SystemIndexes,
-  type TableDefinition,
-  type VectorIndexConfig,
 } from "convex/server";
-import type { GenericValidator, Validator } from "convex/values";
-import { Array, pipe, Predicate, Record, Schema } from "effect";
+import { Array, pipe, Predicate, Record } from "effect";
 import type { DataModelFromConfectDataModel } from "./ConfectDataModel";
-import {
-  compileTableSchema,
-  type TableSchemaToTableValidator,
-} from "./SchemaToValidator";
-import type { ExtendWithSystemFields } from "./SystemFields";
-import { extendWithSystemFields } from "./SystemFields";
+import * as ConfectTable from "./ConfectTable";
+import type * as ConfectTableInfo from "./ConfectTableInfo";
 
-export const confectSystemTableSchemas = {
-  _scheduled_functions: Schema.Struct({
-    name: Schema.String,
-    args: Schema.Array(Schema.Any),
-    scheduledTime: Schema.Number,
-    completedTime: Schema.optional(Schema.Number),
-    state: Schema.Union(
-      Schema.Struct({ kind: Schema.Literal("pending") }),
-      Schema.Struct({ kind: Schema.Literal("inProgress") }),
-      Schema.Struct({ kind: Schema.Literal("success") }),
-      Schema.Struct({
-        kind: Schema.Literal("failed"),
-        error: Schema.String,
-      }),
-      Schema.Struct({ kind: Schema.Literal("canceled") }),
-    ),
-  }),
-  _storage: Schema.Struct({
-    sha256: Schema.String,
-    size: Schema.Number,
-    contentType: Schema.optional(Schema.String),
-  }),
-};
+export const TypeId = "@rjdellecese/confect/ConfectSchema";
+export type TypeId = typeof TypeId;
 
-/**
- * A Confect schema is an array of table definitions.
- */
-export type GenericConfectSchema = GenericConfectTableDefinition[];
+export const isConfectSchema = (u: unknown): u is ConfectSchema.Any =>
+  Predicate.hasProperty(u, TypeId);
 
 /**
  * A Confect schema definition tracks the Confect schema and its Convex schema definition.
  */
-export type GenericConfectSchemaDefinition =
-  ConfectSchemaDefinition<GenericConfectSchema>;
-
-export interface ConfectSchemaDefinition<
-  ConfectSchema extends GenericConfectSchema,
+export interface ConfectSchema<
+  Tables extends ConfectTable.ConfectTable.AnyWithProps = never,
 > {
-  confectSchema: ConfectSchema;
-  convexSchemaDefinition: SchemaDefinition<GenericSchema, true>;
+  readonly [TypeId]: TypeId;
+  readonly tables: {
+    [TableName in Tables["name"]]: Extract<
+      Tables,
+      { readonly name: TableName }
+    >;
+  };
+  readonly convexSchemaDefinition: SchemaDefinition<GenericSchema, true>;
+
+  /**
+   * Add a table definition to the schema.
+   */
+  addTable<Table extends ConfectTable.ConfectTable.AnyWithProps>(
+    table: Table,
+  ): ConfectSchema<Tables | Table>;
 }
 
-export const TypeId = Symbol.for(
-  "@rjdellecese/confect/ConfectSchemaDefinition",
-);
-export type TypeId = typeof TypeId;
-
-export const isConfectSchemaDefinition = (
-  u: unknown,
-): u is GenericConfectSchemaDefinition => Predicate.hasProperty(u, TypeId);
-
-class ConfectSchemaDefinitionImpl<ConfectSchema extends GenericConfectSchema>
-  implements ConfectSchemaDefinition<ConfectSchema>
-{
-  readonly [TypeId]: TypeId = TypeId;
-  confectSchema: ConfectSchema;
-  convexSchemaDefinition: SchemaDefinition<GenericSchema, true>;
-
-  constructor(confectSchema: ConfectSchema) {
-    this.confectSchema = confectSchema;
-    this.convexSchemaDefinition = pipe(
-      confectSchema,
-      Array.map(
-        ({ name, tableDefinition }) => [name, tableDefinition] as const,
-      ),
-      Record.fromEntries,
-      defineConvexSchema,
-    );
+export declare namespace ConfectSchema {
+  export interface Any {
+    readonly [TypeId]: TypeId;
   }
+
+  export interface AnyWithProps {
+    readonly [TypeId]: TypeId;
+    readonly tables: Record<string, ConfectTable.ConfectTable.AnyWithProps>;
+    readonly convexSchemaDefinition: SchemaDefinition<GenericSchema, true>;
+    addTable<Table extends ConfectTable.ConfectTable.AnyWithProps>(
+      table: Table,
+    ): AnyWithProps;
+  }
+
+  export type Tables<S extends AnyWithProps> =
+    S extends ConfectSchema<infer T> ? T : never;
+
+  export type TableNames<S extends AnyWithProps> =
+    ConfectTable.ConfectTable.Name<Tables<S>> & string;
+
+  export type TableWithName<
+    S extends AnyWithProps,
+    TableName extends TableNames<S>,
+  > = Extract<Tables<S>, { readonly name: TableName }>;
 }
+
+const Proto = {
+  [TypeId]: TypeId,
+
+  addTable<Table extends ConfectTable.ConfectTable.AnyWithProps>(
+    this: ConfectSchema<ConfectTable.ConfectTable.AnyWithProps>,
+    table: Table,
+  ) {
+    const tablesArray = Object.values(
+      this.tables,
+    ) as ConfectTable.ConfectTable.AnyWithProps[];
+    const newTablesArray = [...tablesArray, table];
+
+    return makeProto({
+      tables: Record.set(this.tables, table.name, table),
+      convexSchemaDefinition: pipe(
+        newTablesArray,
+        Array.map(
+          ({ name, tableDefinition }) => [name, tableDefinition] as const,
+        ),
+        Record.fromEntries,
+        defineConvexSchema,
+      ),
+    });
+  },
+};
+
+const makeProto = <Tables extends ConfectTable.ConfectTable.AnyWithProps>({
+  tables,
+  convexSchemaDefinition,
+}: {
+  tables: Record.ReadonlyRecord<string, Tables>;
+  convexSchemaDefinition: SchemaDefinition<GenericSchema, true>;
+}): ConfectSchema<Tables> =>
+  Object.assign(Object.create(Proto), {
+    tables,
+    convexSchemaDefinition,
+  });
 
 /**
- * Define a Confect schema.
+ * Create an empty Confect schema definition. Add tables incrementally via `addTable`.
  */
-export const make = <ConfectSchema extends GenericConfectSchema>(
-  ...confectSchema: ConfectSchema
-): ConfectSchemaDefinition<ConfectSchema> =>
-  new ConfectSchemaDefinitionImpl<ConfectSchema>(confectSchema);
+export const make = (): ConfectSchema<never> =>
+  makeProto({
+    tables: Record.empty(),
+    convexSchemaDefinition: defineConvexSchema({}),
+  });
 
-export type GenericConfectTableDefinition = ConfectTableDefinition<
-  any,
-  any,
-  any,
-  any,
-  any
->;
-
-export interface ConfectTableDefinition<
-  TableName extends string,
-  TableSchema extends Schema.Schema.AnyNoContext,
-  TableValidator extends
-    GenericValidator = TableSchemaToTableValidator<TableSchema>,
-  Indexes extends GenericTableIndexes = {},
-  SearchIndexes extends GenericTableSearchIndexes = {},
-  VectorIndexes extends GenericTableVectorIndexes = {},
-> {
-  tableDefinition: TableDefinition<
-    TableValidator,
-    Indexes,
-    SearchIndexes,
-    VectorIndexes
-  >;
-
-  name: TableName;
-
-  Fields: TableSchema;
-  Doc: ExtendWithSystemFields<TableName, TableSchema>;
-
-  indexes: Indexes;
-
-  index<
-    IndexName extends string,
-    FirstFieldPath extends ExtractFieldPaths<TableValidator>,
-    RestFieldPaths extends ExtractFieldPaths<TableValidator>[],
-  >(
-    name: IndexName,
-    fields: [FirstFieldPath, ...RestFieldPaths],
-  ): ConfectTableDefinition<
-    TableName,
-    TableSchema,
-    TableValidator,
-    Expand<
-      Indexes &
-        Record<
-          IndexName,
-          [FirstFieldPath, ...RestFieldPaths, IndexTiebreakerField]
-        >
-    >,
-    SearchIndexes,
-    VectorIndexes
-  >;
-  searchIndex<
-    IndexName extends string,
-    SearchField extends ExtractFieldPaths<TableValidator>,
-    FilterFields extends ExtractFieldPaths<TableValidator> = never,
-  >(
-    name: IndexName,
-    indexConfig: Expand<SearchIndexConfig<SearchField, FilterFields>>,
-  ): ConfectTableDefinition<
-    TableName,
-    TableSchema,
-    TableValidator,
-    Indexes,
-    Expand<
-      SearchIndexes &
-        Record<
-          IndexName,
-          {
-            searchField: SearchField;
-            filterFields: FilterFields;
-          }
-        >
-    >,
-    VectorIndexes
-  >;
-  vectorIndex<
-    IndexName extends string,
-    VectorField extends ExtractFieldPaths<TableValidator>,
-    FilterFields extends ExtractFieldPaths<TableValidator> = never,
-  >(
-    name: IndexName,
-    indexConfig: Expand<VectorIndexConfig<VectorField, FilterFields>>,
-  ): ConfectTableDefinition<
-    TableName,
-    TableSchema,
-    TableValidator,
-    Indexes,
-    SearchIndexes,
-    Expand<
-      VectorIndexes &
-        Record<
-          IndexName,
-          {
-            vectorField: VectorField;
-            dimensions: number;
-            filterFields: FilterFields;
-          }
-        >
-    >
-  >;
-}
-
-export type ConfectSchemaFromConfectSchemaDefinition<
-  ConfectSchemaDef extends GenericConfectSchemaDefinition,
-> =
-  ConfectSchemaDef extends ConfectSchemaDefinition<infer ConfectSchema>
-    ? ConfectSchema
-    : never;
+// -----------------------------------------------------------------------------
+// Type utilities
+// -----------------------------------------------------------------------------
 
 /**
  * @ignore
  */
-export type ConfectDataModelFromConfectSchemaDefinition<
-  ConfectSchemaDef extends GenericConfectSchemaDefinition,
-> =
-  ConfectSchemaDef extends ConfectSchemaDefinition<infer ConfectSchema>
-    ? ConfectDataModelFromConfectSchema<ConfectSchema>
-    : never;
-
-export type DataModelFromConfectSchemaDefinition<
-  ConfectSchemaDef extends GenericConfectSchemaDefinition,
-> = DataModelFromConfectDataModel<
-  ConfectDataModelFromConfectSchemaDefinition<ConfectSchemaDef>
->;
-
-export type DataModelFromConfectSchema<
-  ConfectSchema extends GenericConfectSchema,
-> = DataModelFromConfectDataModel<
-  ConfectDataModelFromConfectSchema<ConfectSchema>
->;
-
-export type ConfectTableDefinitionFromConfectSchema<
-  ConfectSchema extends GenericConfectSchema,
-  TableName extends TableNamesInConfectSchema<ConfectSchema>,
-> = Extract<ConfectSchema[number], { name: TableName }>;
-
-class ConfectTableDefinitionImpl<
-  TableName extends string,
-  TableSchema extends Schema.Schema.AnyNoContext,
-  TableValidator extends Validator<
-    any,
-    any,
-    any
-  > = TableSchemaToTableValidator<TableSchema>,
-  Indexes extends GenericTableIndexes = {},
-  SearchIndexes extends GenericTableSearchIndexes = {},
-  VectorIndexes extends GenericTableVectorIndexes = {},
-> implements
-    ConfectTableDefinition<
-      TableName,
-      TableSchema,
-      TableValidator,
-      Indexes,
-      SearchIndexes,
-      VectorIndexes
-    >
-{
-  tableDefinition: TableDefinition<
-    TableValidator,
-    Indexes,
-    SearchIndexes,
-    VectorIndexes
-  >;
-
-  name: TableName;
-  Fields: TableSchema;
-  Doc: ExtendWithSystemFields<TableName, TableSchema>;
-  indexes: Indexes;
-
-  constructor(
-    tableName: TableName,
-    fields: TableSchema,
-    tableValidator: TableValidator,
-    indexes: Indexes = {} as Indexes,
-  ) {
-    this.tableDefinition = defineConvexTable(tableValidator);
-
-    this.name = tableName;
-    this.Fields = fields;
-    this.Doc = extendWithSystemFields(tableName, fields);
-    this.indexes = indexes;
-  }
-
-  index<
-    IndexName extends string,
-    FirstFieldPath extends ExtractFieldPaths<TableValidator>,
-    RestFieldPaths extends ExtractFieldPaths<TableValidator>[],
-  >(
-    name: IndexName,
-    fields: [FirstFieldPath, ...RestFieldPaths],
-  ): ConfectTableDefinition<
-    TableName,
-    TableSchema,
-    TableValidator,
-    Expand<
-      Indexes &
-        Record<
-          IndexName,
-          [FirstFieldPath, ...RestFieldPaths, IndexTiebreakerField]
-        >
-    >,
-    SearchIndexes,
-    VectorIndexes
-  > {
-    this.tableDefinition = this.tableDefinition.index(name, fields);
-    this.indexes = {
-      ...this.indexes,
-      [name]: fields,
-    };
-
-    return this as any;
-  }
-
-  searchIndex<
-    IndexName extends string,
-    SearchField extends ExtractFieldPaths<TableValidator>,
-    FilterFields extends ExtractFieldPaths<TableValidator> = never,
-  >(
-    name: IndexName,
-    indexConfig: Expand<SearchIndexConfig<SearchField, FilterFields>>,
-  ): ConfectTableDefinition<
-    TableName,
-    TableSchema,
-    TableValidator,
-    Indexes,
-    Expand<
-      SearchIndexes &
-        Record<
-          IndexName,
-          {
-            searchField: SearchField;
-            filterFields: FilterFields;
-          }
-        >
-    >,
-    VectorIndexes
-  > {
-    this.tableDefinition = this.tableDefinition.searchIndex(name, indexConfig);
-
-    return this;
-  }
-
-  vectorIndex<
-    IndexName extends string,
-    VectorField extends ExtractFieldPaths<TableValidator>,
-    FilterFields extends ExtractFieldPaths<TableValidator> = never,
-  >(
-    name: IndexName,
-    indexConfig: {
-      vectorField: VectorField;
-      dimensions: number;
-      filterFields?: FilterFields[] | undefined;
-    },
-  ): ConfectTableDefinition<
-    TableName,
-    TableSchema,
-    TableValidator,
-    Indexes,
-    SearchIndexes,
-    Expand<
-      VectorIndexes &
-        Record<
-          IndexName,
-          {
-            vectorField: VectorField;
-            dimensions: number;
-            filterFields: FilterFields;
-          }
-        >
-    >
-  > {
-    this.tableDefinition = this.tableDefinition.vectorIndex(name, {
-      vectorField: indexConfig.vectorField,
-      dimensions: indexConfig.dimensions,
-      ...(indexConfig.filterFields
-        ? { filterFields: indexConfig.filterFields }
-        : {}),
-    });
-
-    return this;
-  }
-}
-
-/**
- * Define a Confect table.
- */
-export const defineConfectTable = <
-  TableName extends string,
-  TableSchema extends Schema.Schema.AnyNoContext,
->({
-  name,
-  fields,
-}: {
-  name: TableName;
-  fields: TableSchema;
-}): ConfectTableDefinition<TableName, TableSchema> => {
-  const tableValidator = compileTableSchema(fields);
-  return new ConfectTableDefinitionImpl(
-    name,
-    fields,
-    tableValidator,
-  ) as ConfectTableDefinition<TableName, TableSchema>;
-};
-
-export type TableNamesInConfectSchema<
-  ConfectSchema extends GenericConfectSchema,
-> = ConfectSchema[number]["name"] & string;
-
-export type TableNamesInConfectSchemaDefinition<
-  ConfectSchemaDefinition extends GenericConfectSchemaDefinition,
-> = TableNamesInConfectSchema<ConfectSchemaDefinition["confectSchema"]>;
-
-/**
- * Produce a Confect data model from a Confect schema.
- */
 export type ConfectDataModelFromConfectSchema<
-  ConfectSchema extends GenericConfectSchema,
-> = {
-  [K in ConfectSchema[number] as K extends ConfectTableDefinition<
-    infer TableName,
-    any,
-    any,
-    any,
-    any,
-    any
-  >
-    ? TableName
-    : never]: K extends ConfectTableDefinition<
-    infer TableName,
-    infer TableSchema,
-    infer TableValidator,
-    infer Indexes,
-    infer SearchIndexes,
-    infer VectorIndexes
-  >
-    ? TableSchema extends Schema.Schema.AnyNoContext
-      ? {
-          // It's pretty hard to recursively make an arbitrary TS type readonly/mutable, so we capture both the readonly version of the `convexDocument` (which is the `encodedConfectDocument`) and the mutable version (`convexDocument`).
-          confectDocument: ExtractConfectDocument<TableName, TableSchema>;
-          encodedConfectDocument: ExtractEncodedConfectDocument<
-            TableName,
-            TableSchema
-          >;
-          convexDocument: ExtractDocument<TableName, TableValidator>;
-          fieldPaths:
-            | keyof IdField<TableName>
-            | ExtractFieldPaths<TableValidator>;
-          indexes: Expand<Indexes & SystemIndexes>;
-          searchIndexes: SearchIndexes;
-          vectorIndexes: VectorIndexes;
-        }
-      : never
+  S extends ConfectSchema.AnyWithProps,
+> =
+  S extends ConfectSchema<infer Tables>
+    ? ConfectDataModelFromConfectTables<Tables>
     : never;
+
+export type DataModelFromConfectSchema<S extends ConfectSchema.AnyWithProps> =
+  DataModelFromConfectDataModel<ConfectDataModelFromConfectSchema<S>>;
+
+export type DataModelFromConfectTables<
+  Tables extends ConfectTable.ConfectTable.AnyWithProps,
+> = DataModelFromConfectDataModel<ConfectDataModelFromConfectTables<Tables>>;
+
+// TODO: Move to ConfectDataModel.d.ts module
+/**
+ * Produce a Confect data model from Confect tables.
+ */
+export type ConfectDataModelFromConfectTables<
+  Tables extends ConfectTable.ConfectTable.AnyWithProps,
+> = {
+  [Table in Tables as ConfectTable.ConfectTable.Name<Table>]: ConfectTableInfo.ConfectTableInfo<Table>;
 };
 
-type ExtractConfectDocument<
-  TableName extends string,
-  TableSchema extends Schema.Schema.AnyNoContext,
-> = Expand<
-  Readonly<IdField<TableName>> & Readonly<SystemFields> & TableSchema["Type"]
->;
+export const confectSystemSchema = make()
+  .addTable(ConfectTable.scheduledFunctionsTable)
+  .addTable(ConfectTable.storageTable);
 
-type ExtractEncodedConfectDocument<
-  TableName extends string,
-  TableSchema extends Schema.Schema.AnyNoContext,
-> = Expand<
-  Readonly<IdField<TableName>> & Readonly<SystemFields> & TableSchema["Encoded"]
->;
-
-export const confectSystemTableDefinitions = [
-  defineConfectTable({
-    name: "_scheduled_functions",
-    fields: confectSystemTableSchemas._scheduled_functions,
-  }),
-  defineConfectTable({
-    name: "_storage",
-    fields: confectSystemTableSchemas._storage,
-  }),
-];
-
-export type ConfectSystemSchema = typeof confectSystemTableDefinitions;
-
-export const confectSystemSchemaDefinition = make(
-  ...confectSystemTableDefinitions,
-);
-
-type ConfectSystemSchemaDefinition = typeof confectSystemSchemaDefinition;
+type ConfectSystemSchema = typeof confectSystemSchema;
 
 export type ConfectSystemDataModel =
-  ConfectDataModelFromConfectSchemaDefinition<ConfectSystemSchemaDefinition>;
+  ConfectDataModelFromConfectSchema<ConfectSystemSchema>;
 
-export const extendWithConfectSystemSchema = <
-  ConfectSchema extends GenericConfectSchema,
->(
-  confectSchema: ConfectSchema,
-): ExtendWithConfectSystemSchema<ConfectSchema> =>
-  [...confectSchema, ...confectSystemTableDefinitions] as any;
+export const extendWithConfectSystemTables = <
+  Tables extends ConfectTable.ConfectTable.AnyWithProps,
+>(tables: {
+  [K in Tables["name"]]: Extract<Tables, { readonly name: K }>;
+}): ExtendWithConfectSystemTables<Tables> =>
+  ({
+    ...tables,
+    ...ConfectTable.confectSystemTables,
+  }) as any;
 
-export type ExtendWithConfectSystemSchema<
-  ConfectSchema extends GenericConfectSchema,
-> = [...ConfectSchema, ...ConfectSystemSchema];
-
-// Vendored types from convex-js, partially modified. Ideally we could use these directly. See https://github.com/get-convex/convex-js/pull/14
-
-/**
- * Extract all of the index field paths within a {@link Validator}.
- *
- * This is used within {@link defineConvexTable}.
- * @public
- */
-type ExtractFieldPaths<T extends Validator<any, any, any>> =
-  // Add in the system fields available in index definitions.
-  // This should be everything except for `_id` because thats added to indexes
-  // automatically.
-  T["fieldPaths"] | keyof SystemFields;
-
-/**
- * Extract the {@link GenericDocument} within a {@link Validator} and
- * add on the system fields.
- *
- * This is used within {@link defineConvexTable}.
- * @public
- */
-type ExtractDocument<
-  TableName extends string,
-  T extends Validator<any, any, any>,
-> = Expand<IdField<TableName> & SystemFields & T["type"]>;
+export type ExtendWithConfectSystemTables<
+  Tables extends ConfectTable.ConfectTable.AnyWithProps,
+> = Tables | ConfectTable.ConfectSystemTables;

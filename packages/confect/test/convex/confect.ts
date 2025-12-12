@@ -3,7 +3,7 @@ import type {
   DataModelFromConfectDataModel,
   TableNamesInConfectDataModel,
 } from "../../src/server/ConfectDataModel";
-import type { ConfectDataModelFromConfectSchemaDefinition } from "../../src/server/ConfectSchema";
+import type { ConfectDataModelFromConfectSchemaD } from "../../src/server/ConfectSchema";
 import {
   ConvexActionCtx,
   ConvexMutationCtx,
@@ -26,8 +26,7 @@ export const {
 
 type ConfectSchema = typeof confectSchema;
 
-type ConfectDataModel =
-  ConfectDataModelFromConfectSchemaDefinition<ConfectSchema>;
+type ConfectDataModel = ConfectDataModelFromConfectSchema<ConfectSchema>;
 
 type TableNames = TableNamesInConfectDataModel<ConfectDataModel>;
 

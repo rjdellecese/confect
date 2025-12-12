@@ -11,6 +11,8 @@ export * as ConfectQueryRunner from "./ConfectQueryRunner";
 export * as ConfectScheduler from "./ConfectScheduler";
 export * as ConfectSchema from "./ConfectSchema";
 export * as ConfectStorage from "./ConfectStorage";
+export * as ConfectTable from "./ConfectTable";
+export type * as ConfectTableInfo from "./ConfectTableInfo";
 export * as ConfectVectorSearch from "./ConfectVectorSearch";
 export * as ConvexActionCtx from "./ConvexActionCtx";
 export * as ConvexMutationCtx from "./ConvexMutationCtx";

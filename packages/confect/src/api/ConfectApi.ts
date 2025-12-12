@@ -1,8 +1,7 @@
-import { Predicate } from "effect";
-import type {
-  ConfectSchemaDefinition,
-  GenericConfectSchema,
-} from "../server/ConfectSchema";
+import type { GenericSchema, SchemaDefinition } from "convex/server";
+import { defineSchema as defineConvexSchema } from "convex/server";
+import { pipe, Predicate, Record } from "effect";
+import type * as ConfectSchema from "../server/ConfectSchema";
 import type * as ConfectApiGroup from "./ConfectApiGroup";
 import type * as ConfectApiSpec from "./ConfectApiSpec";
 
@@ -14,12 +13,13 @@ export const isConfectApi = (u: unknown): u is ConfectApi.Any =>
   Predicate.hasProperty(u, TypeId);
 
 export interface ConfectApi<
-  ConfectSchema extends GenericConfectSchema,
+  ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
   Groups extends ConfectApiGroup.ConfectApiGroup.Any,
 > {
   readonly [TypeId]: TypeId;
   readonly spec: ConfectApiSpec.ConfectApiSpec<Groups>;
-  readonly confectSchemaDefinition: ConfectSchemaDefinition<ConfectSchema>;
+  readonly confectSchema: ConfectSchema_;
+  readonly convexSchemaDefinition: SchemaDefinition<GenericSchema, true>;
 }
 
 export declare namespace ConfectApi {
@@ -29,12 +29,11 @@ export declare namespace ConfectApi {
 
   export interface AnyWithProps
     extends ConfectApi<
-      GenericConfectSchema,
+      ConfectSchema.ConfectSchema.AnyWithProps,
       ConfectApiGroup.ConfectApiGroup.AnyWithProps
     > {}
 
-  export type ConfectSchema<Api extends AnyWithProps> =
-    Api["confectSchemaDefinition"]["confectSchema"];
+  export type ConfectSchema<Api extends AnyWithProps> = Api["confectSchema"];
 }
 
 const Proto = {
@@ -42,26 +41,29 @@ const Proto = {
 };
 
 const makeProto = <
-  ConfectSchema extends GenericConfectSchema,
+  ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
   Groups extends ConfectApiGroup.ConfectApiGroup.Any,
 >({
-  confectSchemaDefinition,
+  confectSchema,
   spec,
 }: {
-  confectSchemaDefinition: ConfectSchemaDefinition<ConfectSchema>;
+  confectSchema: ConfectSchema.ConfectSchema.AnyWithProps;
   spec: ConfectApiSpec.ConfectApiSpec<Groups>;
-}): ConfectApi<ConfectSchema, Groups> =>
+}): ConfectApi<ConfectSchema_, Groups> =>
   Object.assign(Object.create(Proto), {
-    confectSchemaDefinition,
     spec,
+    confectSchema,
+    convexSchemaDefinition: pipe(
+      confectSchema.tables,
+      Record.map(({ tableDefinition }) => tableDefinition),
+      defineConvexSchema,
+    ),
   });
 
 export const make = <
-  ConfectSchema extends GenericConfectSchema,
-  const Name extends string,
+  ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
   Groups extends ConfectApiGroup.ConfectApiGroup.Any,
 >(
-  confectSchemaDefinition: ConfectSchemaDefinition<ConfectSchema>,
+  confectSchema: ConfectSchema_,
   spec: ConfectApiSpec.ConfectApiSpec<Groups>,
-): ConfectApi<ConfectSchema, Groups> =>
-  makeProto({ confectSchemaDefinition, spec });
+): ConfectApi<ConfectSchema_, Groups> => makeProto({ spec, confectSchema });

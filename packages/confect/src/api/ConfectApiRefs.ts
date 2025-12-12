@@ -62,7 +62,7 @@ export declare namespace ConfectApiRefs {
     extends ConfectApiRefs<ConfectApiSpec.ConfectApiSpec.AnyWithProps> {}
 }
 
-const HiddenFunctionKey = Symbol.for("@rjdellecese/confect/HiddenFunctionKey");
+const HiddenFunctionKey = "@rjdellecese/confect/HiddenFunctionKey";
 type HiddenFunctionKey = typeof HiddenFunctionKey;
 type HiddenFunction<Ref extends Ref.Any> =
   ConfectApiFunction.ConfectApiFunction<
@@ -84,9 +84,8 @@ export const getFunction = <
   ref: Ref_,
 ): HiddenFunction<Ref_> => (ref as any)[HiddenFunctionKey];
 
-const HiddenConvexFunctionNameKey = Symbol.for(
-  "@rjdellecese/confect/HiddenConvexFunctionNameKey",
-);
+const HiddenConvexFunctionNameKey =
+  "@rjdellecese/confect/HiddenConvexFunctionNameKey";
 type HiddenConvexFunctionNameKey = typeof HiddenConvexFunctionNameKey;
 type HiddenConvexFunctionName = string;
 

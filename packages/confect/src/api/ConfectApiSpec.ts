@@ -1,8 +1,7 @@
 import { Predicate, Record } from "effect";
 import type * as ConfectApiGroup from "./ConfectApiGroup";
 
-export const TypeId = Symbol.for("@rjdellecese/confect/ConfectApi");
-
+export const TypeId = "@rjdellecese/confect/ConfectApiSpec";
 export type TypeId = typeof TypeId;
 
 export const isConfectApi = (u: unknown): u is ConfectApiSpec.Any =>

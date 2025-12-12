@@ -1,46 +1,86 @@
 import { Effect, Function, ParseResult, pipe, Schema } from "effect";
-import type {
-  GenericConfectDataModel,
-  TableNamesInConfectDataModel,
-  TableSchemaFromConfectTableInfo,
-} from "./ConfectDataModel";
+import type * as ConfectDataModel from "./ConfectDataModel";
+import type * as ConfectTableInfo from "./ConfectTableInfo";
 import * as SystemFields from "./SystemFields";
+
+export declare namespace ConfectDocument {
+  export type WithoutSystemFields<ConfectDocument> = Omit<
+    ConfectDocument,
+    "_creationTime" | "_id"
+  >;
+}
 
 export const decode = Function.dual<
   <
-    ConfectDataModel extends GenericConfectDataModel,
-    TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+    ConfectDataModel_ extends ConfectDataModel.ConfectDataModel.AnyWithProps,
+    TableName extends
+      ConfectDataModel.ConfectDataModel.TableNames<ConfectDataModel_>,
   >(
     tableName: TableName,
-    tableSchema: TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>,
+    tableSchema: ConfectTableInfo.ConfectTableInfo.TableSchema<
+      ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+        ConfectDataModel_,
+        TableName
+      >
+    >,
   ) => (
-    self: ConfectDataModel[TableName]["convexDocument"],
+    self: ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+      ConfectDataModel_,
+      TableName
+    >["convexDocument"],
   ) => Effect.Effect<
-    ConfectDataModel[TableName]["confectDocument"],
+    ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+      ConfectDataModel_,
+      TableName
+    >["confectDocument"],
     DocumentDecodeError
   >,
   <
-    ConfectDataModel extends GenericConfectDataModel,
-    TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+    ConfectDataModel extends ConfectDataModel.ConfectDataModel.AnyWithProps,
+    TableName extends
+      ConfectDataModel.ConfectDataModel.TableNames<ConfectDataModel>,
   >(
-    self: ConfectDataModel[TableName]["convexDocument"],
+    self: ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+      ConfectDataModel,
+      TableName
+    >["convexDocument"],
     tableName: TableName,
-    tableSchema: TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>,
+    tableSchema: ConfectTableInfo.ConfectTableInfo.TableSchema<
+      ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+        ConfectDataModel,
+        TableName
+      >
+    >,
   ) => Effect.Effect<
-    ConfectDataModel[TableName]["confectDocument"],
+    ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+      ConfectDataModel,
+      TableName
+    >["confectDocument"],
     DocumentDecodeError
   >
 >(
   3,
   <
-    ConfectDataModel extends GenericConfectDataModel,
-    TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+    ConfectDataModel_ extends ConfectDataModel.ConfectDataModel.AnyWithProps,
+    TableName extends
+      ConfectDataModel.ConfectDataModel.TableNames<ConfectDataModel_>,
   >(
-    self: ConfectDataModel[TableName]["convexDocument"],
+    self: ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+      ConfectDataModel_,
+      TableName
+    >["convexDocument"],
     tableName: TableName,
-    tableSchema: TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>,
+    tableSchema: ConfectTableInfo.ConfectTableInfo.TableSchema<
+      ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+        ConfectDataModel_,
+        TableName
+      >
+    >,
   ): Effect.Effect<
-    ConfectDataModel[TableName]["confectDocument"],
+    ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+      ConfectDataModel_,
+      TableName
+    >["confectDocument"],
     DocumentDecodeError
   > =>
     Effect.gen(function* () {
@@ -75,45 +115,86 @@ export const decode = Function.dual<
 
 export const encode = Function.dual<
   <
-    ConfectDataModel extends GenericConfectDataModel,
-    TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+    ConfectDataModel_ extends ConfectDataModel.ConfectDataModel.AnyWithProps,
+    TableName extends
+      ConfectDataModel.ConfectDataModel.TableNames<ConfectDataModel_>,
   >(
     tableName: TableName,
-    tableSchema: TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>,
+    tableSchema: ConfectTableInfo.ConfectTableInfo.TableSchema<
+      ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+        ConfectDataModel_,
+        TableName
+      >
+    >,
   ) => (
-    self: ConfectDataModel[TableName]["confectDocument"],
+    self: ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+      ConfectDataModel_,
+      TableName
+    >["confectDocument"],
   ) => Effect.Effect<
-    ConfectDataModel[TableName]["encodedConfectDocument"],
+    ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+      ConfectDataModel_,
+      TableName
+    >["encodedConfectDocument"],
     DocumentEncodeError
   >,
   <
-    ConfectDataModel extends GenericConfectDataModel,
-    TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+    ConfectDataModel_ extends ConfectDataModel.ConfectDataModel.AnyWithProps,
+    TableName extends
+      ConfectDataModel.ConfectDataModel.TableNames<ConfectDataModel_>,
   >(
-    self: ConfectDataModel[TableName]["confectDocument"],
+    self: ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+      ConfectDataModel_,
+      TableName
+    >["confectDocument"],
     tableName: TableName,
-    tableSchema: TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>,
+    tableSchema: ConfectTableInfo.ConfectTableInfo.TableSchema<
+      ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+        ConfectDataModel_,
+        TableName
+      >
+    >,
   ) => Effect.Effect<
-    ConfectDataModel[TableName]["encodedConfectDocument"],
+    ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+      ConfectDataModel_,
+      TableName
+    >["encodedConfectDocument"],
     DocumentEncodeError
   >
 >(
   3,
   <
-    ConfectDataModel extends GenericConfectDataModel,
-    TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+    ConfectDataModel_ extends ConfectDataModel.ConfectDataModel.AnyWithProps,
+    TableName extends
+      ConfectDataModel.ConfectDataModel.TableNames<ConfectDataModel_>,
   >(
-    self: ConfectDataModel[TableName]["confectDocument"],
+    self: ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+      ConfectDataModel_,
+      TableName
+    >["confectDocument"],
     tableName: TableName,
-    tableSchema: TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>,
+    tableSchema: ConfectTableInfo.ConfectTableInfo.TableSchema<
+      ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+        ConfectDataModel_,
+        TableName
+      >
+    >,
   ): Effect.Effect<
-    ConfectDataModel[TableName]["encodedConfectDocument"],
+    ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+      ConfectDataModel_,
+      TableName
+    >["encodedConfectDocument"],
     DocumentEncodeError
   > =>
     Effect.gen(function* () {
       type TableSchemaWithSystemFields = SystemFields.ExtendWithSystemFields<
         TableName,
-        TableSchemaFromConfectTableInfo<ConfectDataModel[TableName]>
+        ConfectTableInfo.ConfectTableInfo.TableSchema<
+          ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+            ConfectDataModel_,
+            TableName
+          >
+        >
       >;
 
       const decodedDoc = self as TableSchemaWithSystemFields["Type"];

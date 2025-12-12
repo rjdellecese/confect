@@ -1,0 +1,116 @@
+import type {
+  GenericDocument,
+  IdField,
+  SystemFields,
+  SystemIndexes,
+} from "convex/server";
+import type { Schema, Types } from "effect";
+import type * as ConfectTable from "./ConfectTable";
+
+export declare const TypeId: "@rjdellecese/confect/ConfectTableInfo";
+export type TypeId = typeof TypeId;
+
+export type ConfectTableInfo<
+  Table extends ConfectTable.ConfectTable.AnyWithProps,
+> =
+  Table extends ConfectTable.ConfectTable<
+    infer TableName,
+    infer TableSchema,
+    infer TableValidator,
+    infer Indexes,
+    infer SearchIndexes,
+    infer VectorIndexes
+  >
+    ? TableSchema extends Schema.Schema.AnyNoContext
+      ? {
+          // TODO: Should all of these fields be readonly?
+          readonly [TypeId]: TypeId;
+          // It's pretty hard to recursively make an arbitrary TS type readonly/mutable, so we capture both the readonly version of the `convexDocument` (which is the `encodedConfectDocument`) and the mutable version (`convexDocument`).
+          confectDocument: ExtractConfectDocument<TableName, TableSchema>;
+          encodedConfectDocument: ExtractEncodedConfectDocument<
+            TableName,
+            TableSchema
+          >;
+          convexDocument: ExtractDocument<TableName, TableValidator>;
+          fieldPaths:
+            | keyof IdField<TableName>
+            | ExtractFieldPaths<TableValidator>;
+          indexes: Types.Simplify<Indexes & SystemIndexes>;
+          searchIndexes: SearchIndexes;
+          vectorIndexes: VectorIndexes;
+        }
+      : never
+    : never;
+
+export declare namespace ConfectTableInfo {
+  export interface Any {
+    readonly [TypeId]: TypeId;
+  }
+
+  export interface AnyWithProps extends Any {
+    readonly confectDocument: GenericConfectDoc<any, any>;
+    readonly encodedConfectDocument: GenericEncodedConfectDocument;
+    readonly convexDocument: GenericDocument;
+    readonly fieldPaths: GenericFieldPaths;
+    readonly indexes: GenericTableIndexes;
+    readonly searchIndexes: GenericTableSearchIndexes;
+    readonly vectorIndexes: GenericTableVectorIndexes;
+  }
+
+  export type TableInfo<ConfectTableInfo extends AnyWithProps> = {
+    document: ConfectTableInfo["convexDocument"];
+    fieldPaths: ConfectTableInfo["fieldPaths"];
+    indexes: ConfectTableInfo["indexes"];
+    searchIndexes: ConfectTableInfo["searchIndexes"];
+    vectorIndexes: ConfectTableInfo["vectorIndexes"];
+  };
+
+  export type TableSchema<ConfectTableInfo extends AnyWithProps> =
+    Schema.Schema<
+      ConfectTableInfo["confectDocument"],
+      ConfectTableInfo["encodedConfectDocument"]
+    >;
+
+  export type ConfectDocument<ConfectTableInfo extends AnyWithProps> =
+    ConfectTableInfo["confectDocument"];
+}
+
+type ExtractConfectDocument<
+  TableName extends string,
+  TableSchema extends Schema.Schema.AnyNoContext,
+> = Types.Simplify<
+  Readonly<IdField<TableName>> & Readonly<SystemFields> & TableSchema["Type"]
+>;
+
+type ExtractEncodedConfectDocument<
+  TableName extends string,
+  TableSchema extends Schema.Schema.AnyNoContext,
+> = Types.Simplify<
+  Readonly<IdField<TableName>> & Readonly<SystemFields> & TableSchema["Encoded"]
+>;
+
+// Vendored types from convex-js, partially modified.
+// See https://github.com/get-convex/convex-js/pull/14
+
+type ExtractFieldPaths<T extends GenericValidator> =
+  | T["fieldPaths"]
+  | keyof SystemFields;
+
+type ExtractDocument<
+  const TableName extends string,
+  T extends GenericValidator,
+> =
+  Expand<IdField<TableName> & SystemFields & T["type"]> extends GenericDocument
+    ? Expand<IdField<TableName> & SystemFields & T["type"]>
+    : "Oops";
+
+// End of vendored types from convex-js, partially modified.
+
+export declare namespace ConfectTableInfo {
+  export interface Any {
+    readonly [TypeId]: TypeId;
+  }
+
+  export type AnyWithProps =
+    ConfectTableInfo<ConfectTable.ConfectTable.AnyWithProps>;
+}

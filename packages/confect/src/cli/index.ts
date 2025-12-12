@@ -90,13 +90,13 @@ const generateSchema = Effect.gen(function* () {
   const confectSchemaPath = path.join(cwd, "confect", "schema.ts");
   const confectSchemaUrl = yield* path.toFileUrl(confectSchemaPath);
 
-  const confectSchema = yield* Effect.promise(() =>
+  const _confectSchema = yield* Effect.promise(() =>
     tsx.tsImport(confectSchemaUrl.href, import.meta.url),
   ).pipe(
     Effect.andThen((schemaModule) => {
       const defaultExport = schemaModule.default;
 
-      return ConfectSchema.isConfectSchemaDefinition(defaultExport)
+      return ConfectSchema.isConfectSchema(defaultExport)
         ? Effect.succeed(defaultExport)
         : Effect.die("Invalid schema module");
     }),

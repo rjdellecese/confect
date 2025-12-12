@@ -6,25 +6,26 @@ import type {
   VectorSearchQuery,
 } from "convex/server";
 import { Context, Effect, Layer } from "effect";
-import type {
-  DataModelFromConfectDataModel,
-  GenericConfectDataModel,
-  TableNamesInConfectDataModel,
-} from "./ConfectDataModel";
+import type * as ConfectDataModel from "./ConfectDataModel";
+import type { TableNamesInConfectDataModel } from "./ConfectDataModel";
 
-type VectorSearch<ConfectDataModel extends GenericConfectDataModel> =
-  GenericActionCtx<
-    DataModelFromConfectDataModel<ConfectDataModel>
-  >["vectorSearch"];
+type VectorSearch<
+  ConfectDataModel extends ConfectDataModel.ConfectDataModel.AnyWithProps,
+> = GenericActionCtx<
+  ConfectDataModel.ConfectDataModel.DataModel<ConfectDataModel>
+>["vectorSearch"];
 
 const make =
-  <ConfectDataModel extends GenericConfectDataModel>(
-    vectorSearch: VectorSearch<ConfectDataModel>,
+  <ConfectDataModel_ extends ConfectDataModel.ConfectDataModel.AnyWithProps>(
+    vectorSearch: VectorSearch<ConfectDataModel_>,
   ) =>
   <
-    TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+    TableName extends TableNamesInConfectDataModel<ConfectDataModel_>,
     IndexName extends VectorIndexNames<
-      NamedTableInfo<DataModelFromConfectDataModel<ConfectDataModel>, TableName>
+      NamedTableInfo<
+        ConfectDataModel.ConfectDataModel.DataModel<ConfectDataModel_>,
+        TableName
+      >
     >,
   >(
     tableName: TableName,
@@ -32,7 +33,7 @@ const make =
     query: Expand<
       VectorSearchQuery<
         NamedTableInfo<
-          DataModelFromConfectDataModel<ConfectDataModel>,
+          ConfectDataModel.ConfectDataModel.DataModel<ConfectDataModel_>,
           TableName
         >,
         IndexName
@@ -46,6 +47,8 @@ export const ConfectVectorSearch = Context.GenericTag<ReturnType<typeof make>>(
 );
 export type ConfectVectorSearch = typeof ConfectVectorSearch.Identifier;
 
-export const layer = <ConfectDataModel extends GenericConfectDataModel>(
-  vectorSearch: VectorSearch<ConfectDataModel>,
+export const layer = <
+  ConfectDataModel_ extends ConfectDataModel.ConfectDataModel.AnyWithProps,
+>(
+  vectorSearch: VectorSearch<ConfectDataModel_>,
 ) => Layer.succeed(ConfectVectorSearch, make(vectorSearch));

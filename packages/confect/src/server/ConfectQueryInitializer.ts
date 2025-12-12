@@ -1,6 +1,7 @@
 import type {
   DocumentByInfo,
   GenericTableIndexes,
+  GenericTableInfo,
   Indexes,
   IndexRange,
   IndexRangeBuilder,
@@ -16,129 +17,91 @@ import type {
 } from "convex/server";
 import type { GenericId } from "convex/values";
 import { Array, Effect, Either, pipe, Schema } from "effect";
+import type { BaseDatabaseReader, IndexFieldTypesForEq } from "../typeUtils";
+import type * as ConfectDataModel from "./ConfectDataModel";
 import type {
-  DataModelFromConfectDataModel,
-  GenericConfectDataModel,
   TableInfoFromConfectTableInfo,
   TableNamesInConfectDataModel,
 } from "./ConfectDataModel";
 import * as ConfectDocument from "./ConfectDocument";
-import type {
-  ConfectTableDefinitionFromConfectSchema,
-  DataModelFromConfectSchema,
-  TableNamesInConfectSchema,
-} from "./ConfectSchema";
-import {
-  type ConfectDataModelFromConfectSchema,
-  type GenericConfectSchema,
-} from "./ConfectSchema";
-
-import type { BaseDatabaseReader, IndexFieldTypesForEq } from "../typeUtils";
 import * as ConfectOrderedQuery from "./ConfectOrderedQuery";
+import type { DataModelFromConfectTables } from "./ConfectSchema";
+import type * as ConfectTable from "./ConfectTable";
+import type * as ConfectTableInfo from "./ConfectTableInfo";
 
 type ConfectQueryInitializer<
-  ConfectDataModel extends GenericConfectDataModel,
+  ConfectDataModel extends ConfectDataModel.ConfectDataModel.AnyWithProps,
   TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+  _TableInfo extends
+    GenericTableInfo = ConfectDataModel.ConfectDataModel.TableInfoWithName<
+    ConfectDataModel,
+    TableName
+  >,
+  _ConfectTableInfo extends
+    ConfectTableInfo.ConfectTableInfo.AnyWithProps = ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+    ConfectDataModel,
+    TableName
+  >,
 > = {
   readonly get: {
     (
       id: GenericId<TableName>,
     ): Effect.Effect<
-      ConfectDataModel[TableName]["confectDocument"],
+      _ConfectTableInfo["confectDocument"],
       ConfectDocument.DocumentDecodeError | GetByIdFailure
     >;
-    <
-      IndexName extends keyof Indexes<
-        TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>
-      >,
-    >(
+    <IndexName extends keyof Indexes<_TableInfo>>(
       indexName: IndexName,
       ...indexFieldValues: IndexFieldTypesForEq<
-        DataModelFromConfectDataModel<ConfectDataModel>,
+        ConfectDataModel.ConfectDataModel.DataModel<ConfectDataModel>,
         TableName,
-        Indexes<
-          TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>
-        >[IndexName]
+        Indexes<_TableInfo>[IndexName]
       >
     ): Effect.Effect<
-      ConfectDataModel[TableName]["confectDocument"],
+      _ConfectTableInfo["confectDocument"],
       ConfectDocument.DocumentDecodeError | GetByIndexFailure
     >;
   };
   readonly index: {
-    <
-      IndexName extends keyof Indexes<
-        TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>
-      >,
-    >(
+    <IndexName extends keyof Indexes<_TableInfo>>(
       indexName: IndexName,
       indexRange?: (
         q: IndexRangeBuilder<
-          ConfectDataModel[TableName]["convexDocument"],
-          NamedIndex<
-            TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>,
-            IndexName
-          >
+          _ConfectTableInfo["convexDocument"],
+          NamedIndex<_TableInfo, IndexName>
         >,
       ) => IndexRange,
       order?: "asc" | "desc",
-    ): ConfectOrderedQuery.ConfectOrderedQuery<
-      ConfectDataModel[TableName],
-      TableName
-    >;
-    <
-      IndexName extends keyof Indexes<
-        TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>
-      >,
-    >(
+    ): ConfectOrderedQuery.ConfectOrderedQuery<_ConfectTableInfo, TableName>;
+    <IndexName extends keyof Indexes<_TableInfo>>(
       indexName: IndexName,
       order?: "asc" | "desc",
-    ): ConfectOrderedQuery.ConfectOrderedQuery<
-      ConfectDataModel[TableName],
-      TableName
-    >;
+    ): ConfectOrderedQuery.ConfectOrderedQuery<_ConfectTableInfo, TableName>;
   };
-  readonly search: <
-    IndexName extends keyof SearchIndexes<
-      TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>
-    >,
-  >(
+  readonly search: <IndexName extends keyof SearchIndexes<_TableInfo>>(
     indexName: IndexName,
     searchFilter: (
       q: SearchFilterBuilder<
-        DocumentByInfo<
-          TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>
-        >,
-        NamedSearchIndex<
-          TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>,
-          IndexName
-        >
+        DocumentByInfo<_TableInfo>,
+        NamedSearchIndex<_TableInfo, IndexName>
       >,
     ) => SearchFilter,
-  ) => ConfectOrderedQuery.ConfectOrderedQuery<
-    ConfectDataModel[TableName],
-    TableName
-  >;
+  ) => ConfectOrderedQuery.ConfectOrderedQuery<_ConfectTableInfo, TableName>;
 };
 
 export const make = <
-  ConfectSchema extends GenericConfectSchema,
-  TableName extends TableNamesInConfectSchema<ConfectSchema>,
+  Tables extends ConfectTable.ConfectTable.AnyWithProps,
+  TableName extends ConfectTable.ConfectTable.Name<Tables>,
 >(
   tableName: TableName,
-  convexDatabaseReader: BaseDatabaseReader<
-    DataModelFromConfectSchema<ConfectSchema>
-  >,
-  confectTableDefinition: ConfectTableDefinitionFromConfectSchema<
-    ConfectSchema,
-    TableName
-  >,
+  convexDatabaseReader: BaseDatabaseReader<DataModelFromConfectTables<Tables>>,
+  confectTable: ConfectTable.ConfectTable.WithName<Tables, TableName>,
 ): ConfectQueryInitializer<
-  ConfectDataModelFromConfectSchema<ConfectSchema>,
+  ConfectDataModel.ConfectDataModel<Tables>,
   TableName
 > => {
-  type ConfectDataModel = ConfectDataModelFromConfectSchema<ConfectSchema>;
-  type ConvexDataModel = DataModelFromConfectSchema<ConfectSchema>;
+  type ConfectDataModel = ConfectDataModel.ConfectDataModel<Tables>;
+  type ConvexDataModel = DataModelFromConfectTables<Tables>;
   type ThisConfectQueryInitializer = ConfectQueryInitializer<
     ConfectDataModel,
     TableName
@@ -154,7 +117,7 @@ export const make = <
   >(
     indexName: IndexName,
     indexFieldValues: IndexFieldTypesForEq<
-      DataModelFromConfectDataModel<ConfectDataModel>,
+      ConfectDataModel.ConfectDataModel.DataModel<ConfectDataModel>,
       TableName,
       Indexes<
         TableInfoFromConfectTableInfo<ConfectDataModel[TableName]>
@@ -164,8 +127,9 @@ export const make = <
     ConfectDataModel[TableName]["confectDocument"],
     ConfectDocument.DocumentDecodeError | GetByIndexFailure
   > => {
-    const indexFields: GenericTableIndexes[keyof GenericTableIndexes] =
-      confectTableDefinition.indexes[indexName];
+    const indexFields: GenericTableIndexes[keyof GenericTableIndexes] = (
+      confectTable.indexes as GenericTableIndexes
+    )[indexName as keyof GenericTableIndexes]!;
 
     return pipe(
       Effect.promise(() =>
@@ -190,9 +154,7 @@ export const make = <
             }),
         ),
       ),
-      Effect.andThen(
-        ConfectDocument.decode(tableName, confectTableDefinition.Fields),
-      ),
+      Effect.andThen(ConfectDocument.decode(tableName, confectTable.Fields)),
     );
   };
 
@@ -202,11 +164,7 @@ export const make = <
     if (args.length === 1) {
       const id = args[0] as GenericId<TableName>;
 
-      return getById(
-        tableName,
-        convexDatabaseReader,
-        confectTableDefinition,
-      )(id);
+      return getById(tableName, convexDatabaseReader, confectTable)(id);
     } else {
       const [indexName, ...indexFieldValues] = args;
 
@@ -283,7 +241,7 @@ export const make = <
     return ConfectOrderedQuery.make<ConfectDataModel[TableName], TableName>(
       orderedQuery,
       tableName,
-      confectTableDefinition.Fields,
+      confectTable.Fields,
     );
   };
 
@@ -296,7 +254,7 @@ export const make = <
         .query(tableName)
         .withSearchIndex(indexName, searchFilter),
       tableName,
-      confectTableDefinition.Fields,
+      confectTable.Fields,
     );
 
   return {
@@ -308,17 +266,14 @@ export const make = <
 
 export const getById =
   <
-    ConfectSchema extends GenericConfectSchema,
-    TableName extends TableNamesInConfectSchema<ConfectSchema>,
+    Tables extends ConfectTable.ConfectTable.AnyWithProps,
+    TableName extends ConfectTable.ConfectTable.Name<Tables>,
   >(
     tableName: TableName,
     convexDatabaseReader: BaseDatabaseReader<
-      DataModelFromConfectSchema<ConfectSchema>
+      DataModelFromConfectTables<Tables>
     >,
-    confectTableDefinition: ConfectTableDefinitionFromConfectSchema<
-      ConfectSchema,
-      TableName
-    >,
+    confectTable: ConfectTable.ConfectTable.WithName<Tables, TableName>,
   ) =>
   (id: GenericId<TableName>) =>
     pipe(
@@ -326,9 +281,7 @@ export const getById =
       Effect.andThen(
         Either.fromNullable(() => new GetByIdFailure({ tableName, id })),
       ),
-      Effect.andThen(
-        ConfectDocument.decode(tableName, confectTableDefinition.Fields),
-      ),
+      Effect.andThen(ConfectDocument.decode(tableName, confectTable.Fields)),
     );
 
 export class GetByIdFailure extends Schema.TaggedError<GetByIdFailure>(

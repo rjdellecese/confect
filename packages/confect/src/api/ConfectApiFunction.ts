@@ -7,11 +7,7 @@ import type * as ConfectDatabaseWriter from "../server/ConfectDatabaseWriter";
 import type * as ConfectMutationRunner from "../server/ConfectMutationRunner";
 import type * as ConfectQueryRunner from "../server/ConfectQueryRunner";
 import type * as ConfectScheduler from "../server/ConfectScheduler";
-import type {
-  ConfectSchemaDefinition,
-  DataModelFromConfectSchema,
-  GenericConfectSchema,
-} from "../server/ConfectSchema";
+import type * as ConfectSchema from "../server/ConfectSchema";
 import type {
   ConfectStorageActionWriter,
   ConfectStorageReader,
@@ -23,8 +19,7 @@ import type * as ConvexMutationCtx from "../server/ConvexMutationCtx";
 import type * as ConvexQueryCtx from "../server/ConvexQueryCtx";
 import { validateJsIdentifier } from "../utils";
 
-export const TypeId = Symbol.for("@rjdellecese/confect/ConfectApiFunction");
-
+export const TypeId = "@rjdellecese/confect/ConfectApiFunction";
 export type TypeId = typeof TypeId;
 
 export const isConfectApiFunction = (
@@ -143,42 +138,36 @@ export declare namespace ConfectApiFunction {
 }
 
 export type Handler<
-  ConfectSchema extends GenericConfectSchema,
+  S extends ConfectSchema.ConfectSchema.AnyWithProps,
   Function extends ConfectApiFunction.AnyWithProps,
 > =
   Function extends ConfectApiFunction.WithFunctionType<Function, "Query">
-    ? QueryHandler<ConfectSchema, Function>
+    ? QueryHandler<S, Function>
     : Function extends ConfectApiFunction.WithFunctionType<Function, "Mutation">
-      ? MutationHandler<ConfectSchema, Function>
+      ? MutationHandler<S, Function>
       : Function extends ConfectApiFunction.WithFunctionType<Function, "Action">
-        ? ActionHandler<ConfectSchema, Function>
+        ? ActionHandler<S, Function>
         : never;
 
 export type QueryHandler<
-  ConfectSchema extends GenericConfectSchema,
+  S extends ConfectSchema.ConfectSchema.AnyWithProps,
   Function extends ConfectApiFunction.AnyWithPropsWithFunctionType<"Query">,
 > = BaseHandler<
   Function,
-  | ConfectDatabaseReader.ConfectDatabaseReader<
-      ConfectSchemaDefinition<ConfectSchema>
-    >
+  | ConfectDatabaseReader.ConfectDatabaseReader<S>
   | ConfectAuth.ConfectAuth
   | ConfectStorageReader
   | ConfectQueryRunner.ConfectQueryRunner
-  | ConvexQueryCtx.ConvexQueryCtx<DataModelFromConfectSchema<ConfectSchema>>
+  | ConvexQueryCtx.ConvexQueryCtx<ConfectSchema.DataModelFromConfectSchema<S>>
 >;
 
 export type MutationHandler<
-  ConfectSchema extends GenericConfectSchema,
+  S extends ConfectSchema.ConfectSchema.AnyWithProps,
   Function extends ConfectApiFunction.AnyWithPropsWithFunctionType<"Mutation">,
 > = BaseHandler<
   Function,
-  | ConfectDatabaseReader.ConfectDatabaseReader<
-      ConfectSchemaDefinition<ConfectSchema>
-    >
-  | ConfectDatabaseWriter.ConfectDatabaseWriter<
-      ConfectSchemaDefinition<ConfectSchema>
-    >
+  | ConfectDatabaseReader.ConfectDatabaseReader<S>
+  | ConfectDatabaseWriter.ConfectDatabaseWriter<S>
   | ConfectAuth.ConfectAuth
   | ConfectScheduler.ConfectScheduler
   | ConfectStorageReader
@@ -186,12 +175,12 @@ export type MutationHandler<
   | ConfectQueryRunner.ConfectQueryRunner
   | ConfectMutationRunner.ConfectMutationRunner
   | ConvexMutationCtx.ConvexMutationCtx<
-      DataModelFromConfectSchema<ConfectSchema>
+      ConfectSchema.DataModelFromConfectSchema<S>
     >
 >;
 
 export type ActionHandler<
-  ConfectSchema extends GenericConfectSchema,
+  S extends ConfectSchema.ConfectSchema.AnyWithProps,
   Function extends ConfectApiFunction.AnyWithPropsWithFunctionType<"Action">,
 > = BaseHandler<
   Function,
@@ -204,7 +193,7 @@ export type ActionHandler<
   | ConfectMutationRunner.ConfectMutationRunner
   | ConfectActionRunner.ConfectActionRunner
   | ConfectVectorSearch.ConfectVectorSearch
-  | ConvexActionCtx.ConvexActionCtx<DataModelFromConfectSchema<ConfectSchema>>
+  | ConvexActionCtx.ConvexActionCtx<ConfectSchema.DataModelFromConfectSchema<S>>
 >;
 
 type BaseHandler<Function extends ConfectApiFunction.AnyWithProps, R> = (
@@ -213,15 +202,15 @@ type BaseHandler<Function extends ConfectApiFunction.AnyWithProps, R> = (
 
 export declare namespace Handler {
   export type AnyWithProps = Handler<
-    GenericConfectSchema,
+    ConfectSchema.ConfectSchema.AnyWithProps,
     ConfectApiFunction.AnyWithProps
   >;
 
   export type WithName<
-    ConfectSchema extends GenericConfectSchema,
+    S extends ConfectSchema.ConfectSchema.AnyWithProps,
     Function extends ConfectApiFunction.AnyWithProps,
     Name extends string,
-  > = Handler<ConfectSchema, ConfectApiFunction.WithName<Function, Name>>;
+  > = Handler<S, ConfectApiFunction.WithName<Function, Name>>;
 }
 
 const Proto = {

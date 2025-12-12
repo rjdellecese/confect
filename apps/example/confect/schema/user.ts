@@ -1,7 +1,7 @@
-import { ConfectSchema } from "@rjdellecese/confect/server";
+import { ConfectTable } from "@rjdellecese/confect/server";
 import { Schema } from "effect";
 
-export const User = ConfectSchema.defineConfectTable({
+export const User = ConfectTable.make({
   name: "users",
   fields: Schema.Struct({
     username: Schema.String,

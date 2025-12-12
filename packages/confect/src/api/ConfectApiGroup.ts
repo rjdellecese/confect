@@ -1,17 +1,14 @@
 import { Predicate, Record } from "effect";
-import type { GenericConfectSchema } from "../server/ConfectSchema";
 import { validateJsIdentifier } from "../utils";
 import type * as ConfectApiFunction from "./ConfectApiFunction";
 
-export const TypeId = Symbol.for("@rjdellecese/confect/ConfectApiGroup");
-
+export const TypeId = "@rjdellecese/confect/ConfectApiGroup";
 export type TypeId = typeof TypeId;
 
 export const isConfectApiGroup = (u: unknown): u is ConfectApiGroup.Any =>
   Predicate.hasProperty(u, TypeId);
 
 export interface ConfectApiGroup<
-  ConfectSchema extends GenericConfectSchema,
   Name extends string,
   Functions extends ConfectApiFunction.ConfectApiFunction.AnyWithProps = never,
   Groups extends ConfectApiGroup.AnyWithProps = never,
@@ -32,11 +29,11 @@ export interface ConfectApiGroup<
     Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
   >(
     function_: Function,
-  ): ConfectApiGroup<ConfectSchema, Name, Functions | Function, Groups>;
+  ): ConfectApiGroup<Name, Functions | Function, Groups>;
 
   addGroup<Group extends ConfectApiGroup.AnyWithProps>(
     group: Group,
-  ): ConfectApiGroup<ConfectSchema, Name, Functions, Groups | Group>;
+  ): ConfectApiGroup<Name, Functions, Groups | Group>;
 }
 
 export declare namespace ConfectApiGroup {
@@ -46,48 +43,27 @@ export declare namespace ConfectApiGroup {
   }
 
   export type AnyWithProps = ConfectApiGroup<
-    GenericConfectSchema,
     string,
     ConfectApiFunction.ConfectApiFunction.AnyWithProps
   >;
 
   export type Name<Group> =
-    Group extends ConfectApiGroup<
-      infer _ConfectSchema,
-      infer Name,
-      infer _Functions,
-      infer _Groups
-    >
+    Group extends ConfectApiGroup<infer Name, infer _Functions, infer _Groups>
       ? Name
       : never;
 
   export type Functions<Group extends Any> =
-    Group extends ConfectApiGroup<
-      infer _ConfectSchema,
-      infer _Name,
-      infer Functions,
-      infer _Groups
-    >
+    Group extends ConfectApiGroup<infer _Name, infer Functions, infer _Groups>
       ? Functions
       : never;
 
   export type Groups<Group extends Any> =
-    Group extends ConfectApiGroup<
-      infer _ConfectSchema,
-      infer _Name,
-      infer _Functions,
-      infer Groups
-    >
+    Group extends ConfectApiGroup<infer _Name, infer _Functions, infer Groups>
       ? Groups
       : never;
 
   export type GroupNames<Group extends Any> =
-    Group extends ConfectApiGroup<
-      infer _ConfectSchema,
-      infer _Name,
-      infer _Functions,
-      infer Groups
-    >
+    Group extends ConfectApiGroup<infer _Name, infer _Functions, infer Groups>
       ? Groups extends never
         ? never
         : Groups["name"]
@@ -176,7 +152,6 @@ const Proto = {
 };
 
 const makeProto = <
-  ConfectSchema extends GenericConfectSchema,
   Name extends string,
   Functions extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
   Groups extends ConfectApiGroup.AnyWithProps,
@@ -188,19 +163,16 @@ const makeProto = <
   name: Name;
   functions: Record.ReadonlyRecord<string, Functions>;
   groups: Record.ReadonlyRecord<string, Groups>;
-}): ConfectApiGroup<ConfectSchema, Name, Functions, Groups> =>
+}): ConfectApiGroup<Name, Functions, Groups> =>
   Object.assign(Object.create(Proto), {
     name,
     functions,
     groups,
   });
 
-export const make = <
-  ConfectSchema extends GenericConfectSchema,
-  const Name extends string,
->(
+export const make = <const Name extends string>(
   name: Name,
-): ConfectApiGroup<ConfectSchema, Name> => {
+): ConfectApiGroup<Name> => {
   validateJsIdentifier(name);
 
   return makeProto({

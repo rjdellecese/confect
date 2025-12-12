@@ -244,12 +244,13 @@ export const patch = confectMutation({
   args: Schema.Struct({
     noteId: GenericId("notes"),
     fields: Schema.Struct({
-      text: Schema.optional(Schema.String),
-      author: Schema.optional(
+      text: Schema.optionalWith(Schema.String, { exact: true }),
+      author: Schema.optionalWith(
         Schema.Struct({
           role: Schema.Literal("admin", "user"),
           name: Schema.String,
         }),
+        { exact: true },
       ),
     }),
   }),

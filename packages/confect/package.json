@@ -113,7 +113,7 @@
   },
   "peerDependencies": {
     "@effect/platform": "^0.93.2",
-    "convex": "^1.29.1",
+    "convex": "^1.30.0",
     "effect": "^3.19.3"
   },
   "engines": {
