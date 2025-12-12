@@ -1,0 +1,54 @@
+---
+icon: "hard-drive"
+title: "Storage"
+---
+
+## Reading
+
+The `ConfectStorageReader` service is used to retrieve the URLs of blobs in storage.
+
+```ts
+Effect.gen(function* () {
+  const reader = yield* ConfectStorageReader;
+
+  return yield* reader.getUrl(storageId);
+});
+```
+
+## Writing in mutations
+
+The `ConfectStorageWriter` service is used to write blobs to storage in mutations.
+
+```ts
+Effect.gen(function* () {
+  const storage = yield* ConfectStorageWriter;
+
+  // ...
+});
+```
+
+### Methods
+
+#### Generate an upload URL
+
+```ts
+storage.generateUploadUrl();
+```
+
+#### Delete a blob
+
+```ts
+storage.delete(storageId);
+```
+
+## Writing in actions
+
+The `ConfectStorageActionWriter` service is used to write blobs to storage in actions.
+
+```ts
+Effect.gen(function* () {
+  const storage = yield* ConfectStorageActionWriter;
+
+  return yield* storage.get(storageId);
+});
+```

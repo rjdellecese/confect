@@ -1,0 +1,16 @@
+---
+icon: "door-open"
+title: "Introduction"
+description: "What is Confect?"
+---
+
+<Warning>Confect is pre-1.0 and its API is not yet stable.</Warning>
+
+Confect is a framework that deeply integrates Effect with Convex. It's more than just Effect bindings\! Confect allows you to:
+
+- Define your Convex database schema using Effect schemas.
+- Use Confect functions to automatically decode and encode your data according to your Effect Schema definitions when reading from and writing to the database.
+- Write Convex function args and returns validators using Effect's Schema library.
+- Use Effect-ified versions of all of the Convex server APIs (`Promise`s become `Effect`s, `A | nulls` becomes `Option<A>`s, etc.).
+
+It's recommended that you have some familiarity with both Effect and Convex, including the vanilla `convex-js` APIs, before getting started with Confect.

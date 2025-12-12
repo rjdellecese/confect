@@ -1,0 +1,98 @@
+---
+icon: "rocket"
+title: "Quickstart"
+description: "Install the library and start using it in your project."
+---
+
+## Installation
+
+<CodeGroup>
+
+```bash pnpm
+pnpm add @rjdellecese/confect
+```
+
+```bash npm
+npm install @rjdellecese/confect
+```
+
+```bash yarn
+yarn add @rjdellecese/confect
+```
+
+</CodeGroup>
+
+## Usage
+
+<Steps>
+  <Step title="Define your database schema">
+    <Note>
+      Not every Effect `Schema` is valid for use in Confect. See
+      <a href="schema-restrictions">schema-restrictions</a> for more
+      information about what's permitted and what's not.
+    </Note>
+    ```ts confect/schema.ts expandable
+    import {
+      defineConfectSchema,
+      defineConfectTable,
+      GenericId,
+    } from "@rjdellecese/confect/server";
+    import { Schema } from "effect";
+
+    type Tag = {
+      readonly name: string;
+      readonly tags: readonly Tag[];
+    };
+
+    const Tag = Schema.Struct({
+      name: Schema.String,
+      tags: Schema.Array(Schema.suspend((): Schema.Schema<Tag> => Tag)),
+    });
+
+    export const confectSchema = defineConfectSchema({
+      notes: defineConfectTable(
+        Schema.Struct({
+          userId: Schema.optional(GenericId("users")),
+          text: Schema.String.pipe(Schema.maxLength(100)),
+          tag: Schema.optional(Schema.String),
+          author: Schema.optional(
+            Schema.Struct({
+              role: Schema.Literal("admin", "user"),
+              name: Schema.String,
+            }),
+          ),
+          embedding: Schema.optional(Schema.Array(Schema.Number)),
+        }),
+      )
+        .index("by_text", ["text"])
+        .index("by_role", ["author.role"])
+        .searchIndex("text", {
+          searchField: "text",
+          filterFields: ["tag"],
+        })
+        .vectorIndex("embedding", {
+          vectorField: "embedding",
+          filterFields: ["author.name", "tag"],
+          dimensions: 1536,
+        }),
+      users: defineConfectTable(
+        Schema.Struct({
+          username: Schema.String,
+        }),
+      ),
+      tags: defineConfectTable(Tag),
+    });
+
+    export default confectSchema.convexSchemaDefinition;
+    ```
+
+  </Step>
+  <Step title="Generate your Convex function constructors and types">
+    Two
+  </Step>
+  <Step title="Write some Convex functions!">Three</Step>
+</Steps>
+
+## Example project
+
+See a full, working example project [here](https://github.com/rjdellecese/confect/tree/main/apps/example).
