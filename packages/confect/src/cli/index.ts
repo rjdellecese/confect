@@ -7,7 +7,7 @@ import type { PlatformError } from "@effect/platform/Error";
 import { Array, Console, Effect, Option, Record, String } from "effect";
 import * as tsx from "tsx/esm/api";
 import packageJson from "../../package.json" with { type: "json" };
-import * as ConfectApiServer from "../api/ConfectApiServer";
+import * as ConfectApiServer from "../server/ConfectApiServer";
 import * as ConfectSchema from "../server/ConfectSchema";
 import { forEachBranchLeaves } from "../utils";
 import { functions, http, refs, schema, services } from "./templates";
@@ -57,19 +57,19 @@ const generateCommand = Command.make("generate", {}, () =>
     >(
       server.registeredFunctions,
       ConfectApiServer.isRegisteredFunction,
-      ({ path, values }) =>
+      (registeredFunction) =>
         Effect.gen(function* () {
-          const mod = Array.last(path).pipe(
+          const mod = Array.last(registeredFunction.path).pipe(
             Option.getOrThrowWith(
               () => new Error("Missing module name in function path"),
             ),
           );
-          const dirs = Array.init(path).pipe(
+          const dirs = Array.init(registeredFunction.path).pipe(
             Option.getOrThrowWith(
               () => new Error("Missing directory names in function path"),
             ),
           );
-          const fns = Record.keys(values);
+          const fns = Record.keys(registeredFunction.values);
 
           yield* generateFunctionModule({
             dirs,

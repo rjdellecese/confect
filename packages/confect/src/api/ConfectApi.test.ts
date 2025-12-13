@@ -4,11 +4,11 @@ import * as ConfectDatabaseWriter from "../server/ConfectDatabaseWriter";
 import * as ConfectSchema from "../server/ConfectSchema";
 import * as ConfectTable from "../server/ConfectTable";
 import * as ConfectApi from "./ConfectApi";
-import * as ConfectApiBuilder from "./ConfectApiBuilder";
+import * as ConfectApiBuilder from "../server/ConfectApiBuilder";
 import * as ConfectApiFunction from "./ConfectApiFunction";
 import * as ConfectApiGroup from "./ConfectApiGroup";
 import * as ConfectApiRefs from "./ConfectApiRefs";
-import * as ConfectApiServer from "./ConfectApiServer";
+import * as ConfectApiServer from "../server/ConfectApiServer";
 import * as ConfectApiSpec from "./ConfectApiSpec";
 
 /*

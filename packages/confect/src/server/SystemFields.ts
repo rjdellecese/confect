@@ -4,7 +4,7 @@ import type {
   SystemFields as NonIdSystemFields,
 } from "convex/server";
 import { Schema } from "effect";
-import { GenericId } from "./GenericId";
+import { GenericId } from "../api/GenericId";
 
 /**
  * Produces a schema for Convex system fields.

@@ -15,28 +15,28 @@ import {
   type RegisteredQuery,
 } from "convex/server";
 import { Effect, Layer, Match, pipe, Predicate, Ref, Schema } from "effect";
-import * as ConfectActionRunner from "../server/ConfectActionRunner";
-import * as ConfectAuth from "../server/ConfectAuth";
-import * as ConfectDatabaseReader from "../server/ConfectDatabaseReader";
-import * as ConfectDatabaseWriter from "../server/ConfectDatabaseWriter";
-import * as ConfectMutationRunner from "../server/ConfectMutationRunner";
-import * as ConfectQueryRunner from "../server/ConfectQueryRunner";
-import * as ConfectScheduler from "../server/ConfectScheduler";
-import * as ConfectSchema from "../server/ConfectSchema";
+import type * as ConfectApi from "../api/ConfectApi";
+import { mapLeaves } from "../utils";
+import * as ConfectActionRunner from "./ConfectActionRunner";
+import * as ConfectApiBuilder from "./ConfectApiBuilder";
+import * as ConfectApiRegistry from "./ConfectApiRegistry";
+import * as ConfectAuth from "./ConfectAuth";
+import * as ConfectDatabaseReader from "./ConfectDatabaseReader";
+import * as ConfectDatabaseWriter from "./ConfectDatabaseWriter";
+import * as ConfectMutationRunner from "./ConfectMutationRunner";
+import * as ConfectQueryRunner from "./ConfectQueryRunner";
+import * as ConfectScheduler from "./ConfectScheduler";
+import type * as ConfectSchema from "./ConfectSchema";
 import {
   ConfectStorageActionWriter,
   ConfectStorageReader,
   ConfectStorageWriter,
-} from "../server/ConfectStorage";
-import * as ConfectVectorSearch from "../server/ConfectVectorSearch";
-import * as ConvexActionCtx from "../server/ConvexActionCtx";
-import * as ConvexMutationCtx from "../server/ConvexMutationCtx";
-import * as ConvexQueryCtx from "../server/ConvexQueryCtx";
-import * as SchemaToValidator from "../server/SchemaToValidator";
-import { mapLeaves } from "../utils";
-import type * as ConfectApi from "./ConfectApi";
-import * as ConfectApiBuilder from "./ConfectApiBuilder";
-import * as ConfectApiRegistry from "./ConfectApiRegistry";
+} from "./ConfectStorage";
+import * as ConfectVectorSearch from "./ConfectVectorSearch";
+import * as ConvexActionCtx from "./ConvexActionCtx";
+import * as ConvexMutationCtx from "./ConvexMutationCtx";
+import * as ConvexQueryCtx from "./ConvexQueryCtx";
+import * as SchemaToValidator from "./SchemaToValidator";
 
 export type RegisteredFunction =
   | RegisteredQuery<FunctionVisibility, DefaultFunctionArgs, any>
@@ -120,7 +120,7 @@ const makeRegisteredFunction = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
       );
 
       return genericFunction(
-        confectQueryFunction(api.schema, {
+        confectQueryFunction(api.confectSchema, {
           args: function_.args,
           returns: function_.returns,
           handler,
@@ -135,7 +135,7 @@ const makeRegisteredFunction = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
       );
 
       return genericFunction(
-        confectMutationFunction(api.schema, {
+        confectMutationFunction(api.confectSchema, {
           args: function_.args,
           returns: function_.returns,
           handler,

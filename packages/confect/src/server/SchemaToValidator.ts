@@ -46,7 +46,7 @@ import type {
   TypeError,
   UnionToTuple,
 } from "../typeUtils";
-import * as GenericId from "./GenericId";
+import * as GenericId from "../api/GenericId";
 
 // Args
 

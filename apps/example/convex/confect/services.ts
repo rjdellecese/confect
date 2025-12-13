@@ -3,17 +3,17 @@ import {
   ConfectAuth as ConfectAuth_,
   ConfectDatabaseReader as ConfectDatabaseReader_,
   ConfectDatabaseWriter as ConfectDatabaseWriter_,
-  ConfectDataModel,
   ConfectMutationRunner as ConfectMutationRunner_,
   ConfectQueryRunner as ConfectQueryRunner_,
   ConfectScheduler as ConfectScheduler_,
+  ConfectSchema,
   ConfectStorage,
   ConfectVectorSearch as ConfectVectorSearch_,
   ConvexActionCtx as ConvexActionCtx_,
   ConvexMutationCtx as ConvexMutationCtx_,
   ConvexQueryCtx as ConvexQueryCtx_,
 } from "@rjdellecese/confect/server";
-import confectSchema from "../../confect/schema";
+import confectSchemaDefinition from "../../confect/schema";
 
 export const ConfectAuth = ConfectAuth_.ConfectAuth;
 export type ConfectAuth = typeof ConfectAuth.Identifier;
@@ -36,11 +36,15 @@ export const ConfectVectorSearch = ConfectVectorSearch_.ConfectVectorSearch;
 export type ConfectVectorSearch = typeof ConfectVectorSearch.Identifier;
 
 export const ConfectDatabaseReader =
-  ConfectDatabaseReader_.ConfectDatabaseReader<typeof confectSchema>();
+  ConfectDatabaseReader_.ConfectDatabaseReader<
+    typeof confectSchemaDefinition
+  >();
 export type ConfectDatabaseReader = typeof ConfectDatabaseReader.Identifier;
 
 export const ConfectDatabaseWriter =
-  ConfectDatabaseWriter_.ConfectDatabaseWriter<typeof confectSchema>();
+  ConfectDatabaseWriter_.ConfectDatabaseWriter<
+    typeof confectSchemaDefinition
+  >();
 export type ConfectDatabaseWriter = typeof ConfectDatabaseWriter.Identifier;
 
 export const ConfectQueryRunner = ConfectQueryRunner_.ConfectQueryRunner;
@@ -55,18 +59,24 @@ export type ConfectActionRunner = typeof ConfectActionRunner.Identifier;
 
 export const ConvexQueryCtx =
   ConvexQueryCtx_.ConvexQueryCtx<
-    ConfectDataModel.ConfectDataModel.FromSchema<typeof confectSchema>
+    ConfectSchema.DataModelFromConfectSchema<
+      typeof confectSchemaDefinition
+    >
   >();
 export type ConvexQueryCtx = typeof ConvexQueryCtx.Identifier;
 
 export const ConvexMutationCtx =
   ConvexMutationCtx_.ConvexMutationCtx<
-    ConfectDataModel.ConfectDataModel.FromSchema<typeof confectSchema>
+    ConfectSchema.DataModelFromConfectSchema<
+      typeof confectSchemaDefinition
+    >
   >();
 export type ConvexMutationCtx = typeof ConvexMutationCtx.Identifier;
 
 export const ConvexActionCtx =
   ConvexActionCtx_.ConvexActionCtx<
-    ConfectDataModel.ConfectDataModel.FromSchema<typeof confectSchema>
+    ConfectSchema.DataModelFromConfectSchema<
+      typeof confectSchemaDefinition
+    >
   >();
 export type ConvexActionCtx = typeof ConvexActionCtx.Identifier;

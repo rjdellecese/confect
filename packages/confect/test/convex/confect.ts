@@ -3,7 +3,7 @@ import type {
   DataModelFromConfectDataModel,
   TableNamesInConfectDataModel,
 } from "../../src/server/ConfectDataModel";
-import type { ConfectDataModelFromConfectSchemaD } from "../../src/server/ConfectSchema";
+import type { ConfectDataModelFromConfectSchema } from "../../src/server/ConfectSchema";
 import {
   ConvexActionCtx,
   ConvexMutationCtx,

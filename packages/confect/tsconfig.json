@@ -2,7 +2,10 @@
   "compilerOptions": {
     "plugins": [
       {
-        "name": "@effect/language-service"
+        "name": "@effect/language-service",
+        "diagnosticSeverity": {
+          "deterministicKeys": "error"
+        }
       }
     ],
     "noEmit": true,

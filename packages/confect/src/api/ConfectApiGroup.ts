@@ -48,30 +48,30 @@ export declare namespace ConfectApiGroup {
   >;
 
   export type Name<Group> =
-    Group extends ConfectApiGroup<infer Name, infer _Functions, infer _Groups>
-      ? Name
+    Group extends ConfectApiGroup<infer Name_, infer _Functions, infer _Groups>
+      ? Name_
       : never;
 
   export type Functions<Group extends Any> =
-    Group extends ConfectApiGroup<infer _Name, infer Functions, infer _Groups>
-      ? Functions
+    Group extends ConfectApiGroup<infer _Name, infer Functions_, infer _Groups>
+      ? Functions_
       : never;
 
   export type Groups<Group extends Any> =
-    Group extends ConfectApiGroup<infer _Name, infer _Functions, infer Groups>
-      ? Groups
+    Group extends ConfectApiGroup<infer _Name, infer _Functions, infer Groups_>
+      ? Groups_
       : never;
 
   export type GroupNames<Group extends Any> =
-    Group extends ConfectApiGroup<infer _Name, infer _Functions, infer Groups>
-      ? Groups extends never
+    Group extends ConfectApiGroup<infer _Name, infer _Functions, infer Groups_>
+      ? Groups_ extends never
         ? never
-        : Groups["name"]
+        : Groups_["name"]
       : never;
 
-  export type WithName<Group, Name extends string> = Extract<
+  export type WithName<Group, Name_ extends string> = Extract<
     Group,
-    { readonly name: Name }
+    { readonly name: Name_ }
   >;
 }
 

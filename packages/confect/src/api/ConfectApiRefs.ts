@@ -169,32 +169,32 @@ export declare namespace Ref {
 
   export type FunctionType<Ref_> =
     Ref_ extends Ref<
-      infer FunctionType,
+      infer FunctionType_,
       infer _FunctionVisibility,
       infer _Args,
       infer _Returns
     >
-      ? FunctionType
+      ? FunctionType_
       : never;
 
   export type FunctionVisibility<Ref_> =
     Ref_ extends Ref<
       infer _FunctionType,
-      infer FunctionVisibility,
+      infer FunctionVisibility_,
       infer _Args,
       infer _Returns
     >
-      ? FunctionVisibility
+      ? FunctionVisibility_
       : never;
 
   export type Args<Ref_> =
     Ref_ extends Ref<
       infer _FunctionType,
       infer _FunctionVisibility,
-      infer Args,
+      infer Args_,
       infer _Returns
     >
-      ? Args
+      ? Args_
       : never;
 
   export type Returns<Ref_> =
@@ -202,9 +202,9 @@ export declare namespace Ref {
       infer _FunctionType,
       infer _FunctionVisibility,
       infer _Args,
-      infer Returns
+      infer Returns_
     >
-      ? Returns
+      ? Returns_
       : never;
 }
 

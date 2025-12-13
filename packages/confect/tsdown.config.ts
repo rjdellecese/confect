@@ -38,9 +38,9 @@ export default defineConfig([
   }),
   createConfig({
     platform: "browser",
-    entry: ["src/react/index.ts"],
+    entry: ["src/client/index.ts"],
     clean: true,
-    outDir: "dist/react",
+    outDir: "dist/client",
   }),
   createConfig({
     platform: "node",

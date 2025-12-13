@@ -29,7 +29,7 @@ export declare namespace ConfectApiSpec {
     extends ConfectApiSpec<ConfectApiGroup.ConfectApiGroup.AnyWithProps> {}
 
   export type Groups<Spec extends AnyWithProps> =
-    Spec extends ConfectApiSpec<infer Groups> ? Groups : never;
+    Spec extends ConfectApiSpec<infer Groups_> ? Groups_ : never;
 }
 
 const Proto = {

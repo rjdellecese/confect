@@ -24,15 +24,15 @@ export const make = <S extends ConfectSchema.ConfectSchema.AnyWithProps>(
     ConfectSchema.DataModelFromConfectSchema<S>
   >,
 ) => {
-  type ConfectDataModel = ConfectDataModel.ConfectDataModel.FromSchema<S>;
+  type ConfectDataModel_ = ConfectDataModel.ConfectDataModel.FromSchema<S>;
 
   const insert = <
     TableName extends
-      ConfectDataModel.ConfectDataModel.TableNames<ConfectDataModel>,
+      ConfectDataModel.ConfectDataModel.TableNames<ConfectDataModel_>,
   >(
     tableName: TableName,
     document: ConfectDocument.ConfectDocument.WithoutSystemFields<
-      ConfectDocumentByName<ConfectDataModel, TableName>
+      ConfectDocumentByName<ConfectDataModel_, TableName>
     >,
   ) =>
     Effect.gen(function* () {
@@ -51,7 +51,7 @@ export const make = <S extends ConfectSchema.ConfectSchema.AnyWithProps>(
           tableName,
           encodedDocument as WithoutSystemFields<
             DocumentByName<
-              ConfectDataModel.ConfectDataModel.DataModel<ConfectDataModel>,
+              ConfectDataModel.ConfectDataModel.DataModel<ConfectDataModel_>,
               TableName
             >
           >,
@@ -62,12 +62,12 @@ export const make = <S extends ConfectSchema.ConfectSchema.AnyWithProps>(
     });
 
   const patch = <
-    TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+    TableName extends TableNamesInConfectDataModel<ConfectDataModel_>,
   >(
     tableName: TableName,
     id: GenericId<TableName>,
     patchedValues: Partial<
-      WithoutSystemFields<ConfectDocumentByName<ConfectDataModel, TableName>>
+      WithoutSystemFields<ConfectDocumentByName<ConfectDataModel_, TableName>>
     >,
   ) =>
     Effect.gen(function* () {
@@ -78,7 +78,7 @@ export const make = <S extends ConfectSchema.ConfectSchema.AnyWithProps>(
       const tableSchema =
         confectTable.Fields as ConfectTableInfo.ConfectTableInfo.TableSchema<
           ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
-            ConfectDataModel,
+            ConfectDataModel_,
             TableName
           >
         >;
@@ -105,7 +105,7 @@ export const make = <S extends ConfectSchema.ConfectSchema.AnyWithProps>(
           updatedEncodedDoc as Expand<
             BetterOmit<
               DocumentByName<
-                ConfectDataModel.ConfectDataModel.DataModel<ConfectDataModel>,
+                ConfectDataModel.ConfectDataModel.DataModel<ConfectDataModel_>,
                 TableName
               >,
               "_creationTime" | "_id"
@@ -116,12 +116,12 @@ export const make = <S extends ConfectSchema.ConfectSchema.AnyWithProps>(
     });
 
   const replace = <
-    TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+    TableName extends TableNamesInConfectDataModel<ConfectDataModel_>,
   >(
     tableName: TableName,
     id: GenericId<TableName>,
     value: WithoutSystemFields<
-      ConfectDocumentByName<ConfectDataModel, TableName>
+      ConfectDocumentByName<ConfectDataModel_, TableName>
     >,
   ) =>
     Effect.gen(function* () {
@@ -132,7 +132,7 @@ export const make = <S extends ConfectSchema.ConfectSchema.AnyWithProps>(
       const tableSchema =
         confectTable.Fields as ConfectTableInfo.ConfectTableInfo.TableSchema<
           ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
-            ConfectDataModel,
+            ConfectDataModel_,
             TableName
           >
         >;
@@ -149,7 +149,7 @@ export const make = <S extends ConfectSchema.ConfectSchema.AnyWithProps>(
           updatedEncodedDoc as Expand<
             BetterOmit<
               DocumentByName<
-                ConfectDataModel.ConfectDataModel.DataModel<ConfectDataModel>,
+                ConfectDataModel.ConfectDataModel.DataModel<ConfectDataModel_>,
                 TableName
               >,
               "_creationTime" | "_id"
@@ -160,7 +160,7 @@ export const make = <S extends ConfectSchema.ConfectSchema.AnyWithProps>(
     });
 
   const delete_ = <
-    TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
+    TableName extends TableNamesInConfectDataModel<ConfectDataModel_>,
   >(
     _tableName: TableName,
     id: GenericId<TableName>,

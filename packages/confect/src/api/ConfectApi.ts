@@ -33,6 +33,7 @@ export declare namespace ConfectApi {
       ConfectApiGroup.ConfectApiGroup.AnyWithProps
     > {}
 
+  // eslint-disable-next-line @typescript-eslint/no-shadow
   export type ConfectSchema<Api extends AnyWithProps> = Api["confectSchema"];
 }
 

@@ -2,7 +2,7 @@ import { describe, effect, expect, expectTypeOf, test } from "@effect/vitest";
 import { v, type VBoolean, type VString, type VUnion } from "convex/values";
 import { Effect, Exit, identity, Schema } from "effect";
 
-import { GenericId } from "../src/server/GenericId";
+import { GenericId } from "../src/api/GenericId";
 import {
   compileArgsSchema,
   compileAst,

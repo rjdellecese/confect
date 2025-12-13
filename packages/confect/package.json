@@ -52,14 +52,14 @@
         "default": "./dist/server/index.cjs"
       }
     },
-    "./react": {
+    "./client": {
       "import": {
-        "types": "./dist/react/index.d.ts",
-        "default": "./dist/react/index.js"
+        "types": "./dist/client/index.d.ts",
+        "default": "./dist/client/index.js"
       },
       "require": {
-        "types": "./dist/react/index.d.cts",
-        "default": "./dist/react/index.cjs"
+        "types": "./dist/client/index.d.cts",
+        "default": "./dist/client/index.cjs"
       }
     }
   },

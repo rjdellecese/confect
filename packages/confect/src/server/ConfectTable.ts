@@ -152,25 +152,25 @@ export declare namespace ConfectTable {
   export type TableSchema<Table extends AnyWithProps> =
     Table extends ConfectTable<
       infer _TableName,
-      infer TableSchema,
+      infer TableSchema_,
       infer _TableValidator,
       infer _Indexes,
       infer _SearchIndexes,
       infer _VectorIndexes
     >
-      ? TableSchema
+      ? TableSchema_
       : never;
 
   export type TableValidator<Table extends AnyWithProps> =
     Table extends ConfectTable<
       infer _TableName,
       infer _TableSchema,
-      infer TableValidator,
+      infer TableValidator_,
       infer _Indexes,
       infer _SearchIndexes,
       infer _VectorIndexes
     >
-      ? TableValidator
+      ? TableValidator_
       : never;
 
   export type Indexes<Table extends AnyWithProps> =
@@ -178,11 +178,11 @@ export declare namespace ConfectTable {
       infer _TableName,
       infer _TableSchema,
       infer _TableValidator,
-      infer Indexes,
+      infer Indexes_,
       infer _SearchIndexes,
       infer _VectorIndexes
     >
-      ? Indexes
+      ? Indexes_
       : never;
 
   export type SearchIndexes<Table extends AnyWithProps> =
@@ -191,10 +191,10 @@ export declare namespace ConfectTable {
       infer _TableSchema,
       infer _TableValidator,
       infer _Indexes,
-      infer SearchIndexes,
+      infer SearchIndexes_,
       infer _VectorIndexes
     >
-      ? SearchIndexes
+      ? SearchIndexes_
       : never;
 
   export type VectorIndexes<Table extends AnyWithProps> =
@@ -204,39 +204,39 @@ export declare namespace ConfectTable {
       infer _TableValidator,
       infer _Indexes,
       infer _SearchIndexes,
-      infer VectorIndexes
+      infer VectorIndexes_
     >
-      ? VectorIndexes
+      ? VectorIndexes_
       : never;
 
   export type Doc<Table extends AnyWithProps> =
     Table extends ConfectTable<
       infer TableName,
-      infer TableSchema,
+      infer TableSchema_,
       infer _TableValidator,
       infer _Indexes,
       infer _SearchIndexes,
       infer _VectorIndexes
     >
-      ? ExtendWithSystemFields<TableName, TableSchema>
+      ? ExtendWithSystemFields<TableName, TableSchema_>
       : never;
 
   export type Fields<Table extends AnyWithProps> =
     Table extends ConfectTable<
       infer _TableName,
-      infer TableSchema,
+      infer TableSchema_,
       infer _TableValidator,
       infer _Indexes,
       infer _SearchIndexes,
       infer _VectorIndexes
     >
-      ? TableSchema
+      ? TableSchema_
       : never;
 
   export type WithName<
     Table extends AnyWithProps,
-    Name extends string,
-  > = Extract<Table, { readonly name: Name }>;
+    Name_ extends string,
+  > = Extract<Table, { readonly name: Name_ }>;
 }
 
 const Proto = {

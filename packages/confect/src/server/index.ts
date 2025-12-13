@@ -1,3 +1,5 @@
+export * as GenericId from "../api/GenericId";
+export * as PaginationResult from "../api/PaginationResult";
 export * as ConfectActionRunner from "./ConfectActionRunner";
 export * as ConfectAuth from "./ConfectAuth";
 export * as ConfectDatabaseReader from "./ConfectDatabaseReader";
@@ -17,7 +19,5 @@ export * as ConfectVectorSearch from "./ConfectVectorSearch";
 export * as ConvexActionCtx from "./ConvexActionCtx";
 export * as ConvexMutationCtx from "./ConvexMutationCtx";
 export * as ConvexQueryCtx from "./ConvexQueryCtx";
-export * as GenericId from "./GenericId";
-export * as PaginationResult from "./PaginationResult";
 export * as SchemaToValidator from "./SchemaToValidator";
 export * as SystemFields from "./SystemFields";

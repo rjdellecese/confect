@@ -1,5 +1,5 @@
 import { FetchHttpClient, HttpApiClient } from "@effect/platform";
-import { useAction, useMutation, useQuery } from "@rjdellecese/confect/react";
+import { useAction, useMutation, useQuery } from "@rjdellecese/confect/client";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { Array, Effect, Exit, Option } from "effect";
 import { useEffect, useState } from "react";

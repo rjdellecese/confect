@@ -4,49 +4,52 @@ import * as ConfectDocument from "./ConfectDocument";
 import type * as ConfectTableInfo from "./ConfectTableInfo";
 
 export type ConfectOrderedQuery<
-  ConfectTableInfo extends ConfectTableInfo.ConfectTableInfo.AnyWithProps,
+  ConfectTableInfo_ extends ConfectTableInfo.ConfectTableInfo.AnyWithProps,
   _TableName extends string,
 > = {
   readonly first: () => Effect.Effect<
-    Option.Option<ConfectTableInfo["confectDocument"]>,
+    Option.Option<ConfectTableInfo_["confectDocument"]>,
     ConfectDocument.DocumentDecodeError
   >;
   readonly take: (
     n: number,
   ) => Effect.Effect<
-    ReadonlyArray<ConfectTableInfo["confectDocument"]>,
+    ReadonlyArray<ConfectTableInfo_["confectDocument"]>,
     ConfectDocument.DocumentDecodeError
   >;
   readonly collect: () => Effect.Effect<
-    ReadonlyArray<ConfectTableInfo["confectDocument"]>,
+    ReadonlyArray<ConfectTableInfo_["confectDocument"]>,
     ConfectDocument.DocumentDecodeError
   >;
   readonly stream: () => Stream.Stream<
-    ConfectTableInfo["confectDocument"],
+    ConfectTableInfo_["confectDocument"],
     ConfectDocument.DocumentDecodeError
   >;
   readonly paginate: (options: {
     cursor: string | null;
     numItems: number;
   }) => Effect.Effect<
-    PaginationResult<ConfectTableInfo["confectDocument"]>,
+    PaginationResult<ConfectTableInfo_["confectDocument"]>,
     ConfectDocument.DocumentDecodeError
   >;
 };
 
 export const make = <
-  ConfectTableInfo extends ConfectTableInfo.ConfectTableInfo.AnyWithProps,
+  ConfectTableInfo_ extends ConfectTableInfo.ConfectTableInfo.AnyWithProps,
   TableName extends string,
 >(
   query: OrderedQuery<
-    ConfectTableInfo.ConfectTableInfo.TableInfo<ConfectTableInfo>
+    ConfectTableInfo.ConfectTableInfo.TableInfo<ConfectTableInfo_>
   >,
   tableName: TableName,
-  tableSchema: ConfectTableInfo.ConfectTableInfo.TableSchema<ConfectTableInfo>,
-): ConfectOrderedQuery<ConfectTableInfo, TableName> => {
+  tableSchema: ConfectTableInfo.ConfectTableInfo.TableSchema<ConfectTableInfo_>,
+): ConfectOrderedQuery<ConfectTableInfo_, TableName> => {
   type ConfectOrderedQueryFunction<
-    FunctionName extends keyof ConfectOrderedQuery<ConfectTableInfo, TableName>,
-  > = ConfectOrderedQuery<ConfectTableInfo, TableName>[FunctionName];
+    FunctionName extends keyof ConfectOrderedQuery<
+      ConfectTableInfo_,
+      TableName
+    >,
+  > = ConfectOrderedQuery<ConfectTableInfo_, TableName>[FunctionName];
 
   const streamEncoded = Stream.fromAsyncIterable(query, identity).pipe(
     Stream.orDie,

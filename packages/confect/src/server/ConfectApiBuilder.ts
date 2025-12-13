@@ -9,11 +9,12 @@ import {
   Ref,
   String,
 } from "effect";
-import type * as ConfectSchema from "../server/ConfectSchema";
+import type * as ConfectApiFunctionHandler from "./ConfectApiFunctionHandler";
+import type * as ConfectSchema from "./ConfectSchema";
 import { setNestedProperty } from "../utils";
-import type * as ConfectApi from "./ConfectApi";
-import type * as ConfectApiFunction from "./ConfectApiFunction";
-import type * as ConfectApiGroup from "./ConfectApiGroup";
+import type * as ConfectApi from "../api/ConfectApi";
+import type * as ConfectApiFunction from "../api/ConfectApiFunction";
+import type * as ConfectApiGroup from "../api/ConfectApiGroup";
 import * as ConfectApiRegistry from "./ConfectApiRegistry";
 
 export const HandlersTypeId = "@rjdellecese/confect/Handlers";
@@ -31,7 +32,7 @@ export interface Handlers<
 
   handle<Name extends ConfectApiFunction.ConfectApiFunction.Name<Functions>>(
     name: Name,
-    handler: ConfectApiFunction.Handler.WithName<S, Functions, Name>,
+    handler: ConfectApiFunctionHandler.Handler.WithName<S, Functions, Name>,
   ): Handlers<
     S,
     ConfectApiFunction.ConfectApiFunction.ExcludeName<Functions, Name>
@@ -58,7 +59,7 @@ const makeHandlerItem = <
   handler,
 }: {
   function_: Function;
-  handler: ConfectApiFunction.Handler<S, Function>;
+  handler: ConfectApiFunctionHandler.Handler<S, Function>;
 }): Handlers.Item<S, Function> =>
   Object.assign(Object.create(HandlerItemProto), { function_, handler });
 
@@ -81,13 +82,13 @@ export declare namespace Handlers {
   > {
     readonly [HandlerItemTypeId]: HandlerItemTypeId;
     readonly function_: Function;
-    readonly handler: ConfectApiFunction.Handler<S, Function>;
+    readonly handler: ConfectApiFunctionHandler.Handler<S, Function>;
   }
 
   export namespace Item {
     export interface AnyWithProps {
       readonly function_: ConfectApiFunction.ConfectApiFunction.AnyWithProps;
-      readonly handler: ConfectApiFunction.Handler.AnyWithProps;
+      readonly handler: ConfectApiFunctionHandler.Handler.AnyWithProps;
     }
   }
 
@@ -112,7 +113,7 @@ const HandlersProto = {
   handle<S extends ConfectSchema.ConfectSchema.AnyWithProps>(
     this: Handlers<S, ConfectApiFunction.ConfectApiFunction.AnyWithProps>,
     name: string,
-    handler: ConfectApiFunction.Handler.AnyWithProps,
+    handler: ConfectApiFunctionHandler.Handler.AnyWithProps,
   ) {
     const function_ = this.group.functions[name]!;
     return makeHandlers({

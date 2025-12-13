@@ -1,22 +1,5 @@
-import type { Effect, Schema } from "effect";
+import type { Schema } from "effect";
 import { Predicate } from "effect";
-import type * as ConfectActionRunner from "../server/ConfectActionRunner";
-import type * as ConfectAuth from "../server/ConfectAuth";
-import type * as ConfectDatabaseReader from "../server/ConfectDatabaseReader";
-import type * as ConfectDatabaseWriter from "../server/ConfectDatabaseWriter";
-import type * as ConfectMutationRunner from "../server/ConfectMutationRunner";
-import type * as ConfectQueryRunner from "../server/ConfectQueryRunner";
-import type * as ConfectScheduler from "../server/ConfectScheduler";
-import type * as ConfectSchema from "../server/ConfectSchema";
-import type {
-  ConfectStorageActionWriter,
-  ConfectStorageReader,
-  ConfectStorageWriter,
-} from "../server/ConfectStorage";
-import type * as ConfectVectorSearch from "../server/ConfectVectorSearch";
-import type * as ConvexActionCtx from "../server/ConvexActionCtx";
-import type * as ConvexMutationCtx from "../server/ConvexMutationCtx";
-import type * as ConvexQueryCtx from "../server/ConvexQueryCtx";
 import { validateJsIdentifier } from "../utils";
 
 export const TypeId = "@rjdellecese/confect/ConfectApiFunction";
@@ -65,13 +48,13 @@ export declare namespace ConfectApiFunction {
 
   export type GetFunctionType<Function extends AnyWithProps> =
     Function extends ConfectApiFunction<
-      infer FunctionType,
+      infer FunctionType_,
       infer _FunctionVisibility,
       infer _Name,
       infer _Args,
       infer _Returns
     >
-      ? FunctionType
+      ? FunctionType_
       : never;
 
   // TODO: Use type from convex-js?
@@ -80,23 +63,23 @@ export declare namespace ConfectApiFunction {
   export type GetFunctionVisibility<Function extends AnyWithProps> =
     Function extends ConfectApiFunction<
       infer _FunctionType,
-      infer FunctionVisibility,
+      infer FunctionVisibility_,
       infer _Name,
       infer _Args,
       infer _Returns
     >
-      ? FunctionVisibility
+      ? FunctionVisibility_
       : never;
 
   export type Name<Function extends AnyWithProps> =
     Function extends ConfectApiFunction<
       infer _FunctionType,
       infer _FunctionVisibility,
-      infer Name,
+      infer Name_,
       infer _Args,
       infer _Returns
     >
-      ? Name
+      ? Name_
       : never;
 
   export type Args<Function extends AnyWithProps> =
@@ -104,10 +87,10 @@ export declare namespace ConfectApiFunction {
       infer _FunctionType,
       infer _FunctionVisibility,
       infer _Name,
-      infer Args,
+      infer Args_,
       infer _Returns
     >
-      ? Args
+      ? Args_
       : never;
 
   export type Returns<Function extends AnyWithProps> =
@@ -116,15 +99,15 @@ export declare namespace ConfectApiFunction {
       infer _FunctionVisibility,
       infer _Name,
       infer _Args,
-      infer Returns
+      infer Returns_
     >
-      ? Returns
+      ? Returns_
       : never;
 
   export type WithName<
     Function extends AnyWithProps,
-    Name extends string,
-  > = Extract<Function, { readonly name: Name }>;
+    Name_ extends string,
+  > = Extract<Function, { readonly name: Name_ }>;
 
   export type WithFunctionType<
     Function extends AnyWithProps,
@@ -133,84 +116,8 @@ export declare namespace ConfectApiFunction {
 
   export type ExcludeName<
     Function extends AnyWithProps,
-    Name extends string,
-  > = Exclude<Function, { readonly name: Name }>;
-}
-
-export type Handler<
-  S extends ConfectSchema.ConfectSchema.AnyWithProps,
-  Function extends ConfectApiFunction.AnyWithProps,
-> =
-  Function extends ConfectApiFunction.WithFunctionType<Function, "Query">
-    ? QueryHandler<S, Function>
-    : Function extends ConfectApiFunction.WithFunctionType<Function, "Mutation">
-      ? MutationHandler<S, Function>
-      : Function extends ConfectApiFunction.WithFunctionType<Function, "Action">
-        ? ActionHandler<S, Function>
-        : never;
-
-export type QueryHandler<
-  S extends ConfectSchema.ConfectSchema.AnyWithProps,
-  Function extends ConfectApiFunction.AnyWithPropsWithFunctionType<"Query">,
-> = BaseHandler<
-  Function,
-  | ConfectDatabaseReader.ConfectDatabaseReader<S>
-  | ConfectAuth.ConfectAuth
-  | ConfectStorageReader
-  | ConfectQueryRunner.ConfectQueryRunner
-  | ConvexQueryCtx.ConvexQueryCtx<ConfectSchema.DataModelFromConfectSchema<S>>
->;
-
-export type MutationHandler<
-  S extends ConfectSchema.ConfectSchema.AnyWithProps,
-  Function extends ConfectApiFunction.AnyWithPropsWithFunctionType<"Mutation">,
-> = BaseHandler<
-  Function,
-  | ConfectDatabaseReader.ConfectDatabaseReader<S>
-  | ConfectDatabaseWriter.ConfectDatabaseWriter<S>
-  | ConfectAuth.ConfectAuth
-  | ConfectScheduler.ConfectScheduler
-  | ConfectStorageReader
-  | ConfectStorageWriter
-  | ConfectQueryRunner.ConfectQueryRunner
-  | ConfectMutationRunner.ConfectMutationRunner
-  | ConvexMutationCtx.ConvexMutationCtx<
-      ConfectSchema.DataModelFromConfectSchema<S>
-    >
->;
-
-export type ActionHandler<
-  S extends ConfectSchema.ConfectSchema.AnyWithProps,
-  Function extends ConfectApiFunction.AnyWithPropsWithFunctionType<"Action">,
-> = BaseHandler<
-  Function,
-  | ConfectScheduler.ConfectScheduler
-  | ConfectAuth.ConfectAuth
-  | ConfectStorageReader
-  | ConfectStorageWriter
-  | ConfectStorageActionWriter
-  | ConfectQueryRunner.ConfectQueryRunner
-  | ConfectMutationRunner.ConfectMutationRunner
-  | ConfectActionRunner.ConfectActionRunner
-  | ConfectVectorSearch.ConfectVectorSearch
-  | ConvexActionCtx.ConvexActionCtx<ConfectSchema.DataModelFromConfectSchema<S>>
->;
-
-type BaseHandler<Function extends ConfectApiFunction.AnyWithProps, R> = (
-  args: ConfectApiFunction.Args<Function>["Type"],
-) => Effect.Effect<ConfectApiFunction.Returns<Function>["Type"], never, R>;
-
-export declare namespace Handler {
-  export type AnyWithProps = Handler<
-    ConfectSchema.ConfectSchema.AnyWithProps,
-    ConfectApiFunction.AnyWithProps
-  >;
-
-  export type WithName<
-    S extends ConfectSchema.ConfectSchema.AnyWithProps,
-    Function extends ConfectApiFunction.AnyWithProps,
-    Name extends string,
-  > = Handler<S, ConfectApiFunction.WithName<Function, Name>>;
+    Name_ extends string,
+  > = Exclude<Function, { readonly name: Name_ }>;
 }
 
 const Proto = {
