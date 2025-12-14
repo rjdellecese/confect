@@ -10,9 +10,9 @@ import type * as ConfectDataModel from "./ConfectDataModel";
 import type { TableNamesInConfectDataModel } from "./ConfectDataModel";
 
 type VectorSearch<
-  ConfectDataModel extends ConfectDataModel.ConfectDataModel.AnyWithProps,
+  ConfectDataModel_ extends ConfectDataModel.ConfectDataModel.AnyWithProps,
 > = GenericActionCtx<
-  ConfectDataModel.ConfectDataModel.DataModel<ConfectDataModel>
+  ConfectDataModel.ConfectDataModel.DataModel<ConfectDataModel_>
 >["vectorSearch"];
 
 const make =

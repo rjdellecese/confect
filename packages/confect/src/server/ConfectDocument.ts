@@ -36,24 +36,24 @@ export const decode = Function.dual<
     DocumentDecodeError
   >,
   <
-    ConfectDataModel extends ConfectDataModel.ConfectDataModel.AnyWithProps,
+    ConfectDataModel_ extends ConfectDataModel.ConfectDataModel.AnyWithProps,
     TableName extends
-      ConfectDataModel.ConfectDataModel.TableNames<ConfectDataModel>,
+      ConfectDataModel.ConfectDataModel.TableNames<ConfectDataModel_>,
   >(
     self: ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
-      ConfectDataModel,
+      ConfectDataModel_,
       TableName
     >["convexDocument"],
     tableName: TableName,
     tableSchema: ConfectTableInfo.ConfectTableInfo.TableSchema<
       ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
-        ConfectDataModel,
+        ConfectDataModel_,
         TableName
       >
     >,
   ) => Effect.Effect<
     ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
-      ConfectDataModel,
+      ConfectDataModel_,
       TableName
     >["confectDocument"],
     DocumentDecodeError

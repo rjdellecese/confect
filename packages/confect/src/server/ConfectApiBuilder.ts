@@ -13,7 +13,7 @@ import type * as ConfectApi from "../api/ConfectApi";
 import type * as ConfectApiFunction from "../api/ConfectApiFunction";
 import type * as ConfectApiGroup from "../api/ConfectApiGroup";
 import { setNestedProperty } from "../utils";
-import type * as ConfectApiFunctionHandler from "./ConfectApiFunctionHandler";
+import type * as ConfectApiHandler from "./ConfectApiHandler";
 import * as ConfectApiRegistry from "./ConfectApiRegistry";
 import type * as ConfectSchema from "./ConfectSchema";
 
@@ -21,20 +21,24 @@ export const HandlersTypeId = "@rjdellecese/confect/Handlers";
 export type HandlersTypeId = typeof HandlersTypeId;
 
 export interface Handlers<
-  S extends ConfectSchema.ConfectSchema.AnyWithProps,
+  ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
   Functions extends ConfectApiFunction.ConfectApiFunction.AnyWithProps = never,
 > {
   readonly [HandlersTypeId]: {
     _Functions: Types.Covariant<Functions>;
   };
   readonly group: ConfectApiGroup.ConfectApiGroup.AnyWithProps;
-  readonly items: ReadonlyArray<Handlers.Item<S, Functions>>;
+  readonly items: ReadonlyArray<Handlers.Item<ConfectSchema_, Functions>>;
 
   handle<Name extends ConfectApiFunction.ConfectApiFunction.Name<Functions>>(
     name: Name,
-    handler: ConfectApiFunctionHandler.Handler.WithName<S, Functions, Name>,
+    handler: ConfectApiHandler.ConfectApiHandler.WithName<
+      ConfectSchema_,
+      Functions,
+      Name
+    >,
   ): Handlers<
-    S,
+    ConfectSchema_,
     ConfectApiFunction.ConfectApiFunction.ExcludeName<Functions, Name>
   >;
 }
@@ -52,15 +56,15 @@ const HandlerItemProto = {
 };
 
 const makeHandlerItem = <
-  S extends ConfectSchema.ConfectSchema.AnyWithProps,
+  ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
   Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
 >({
   function_,
   handler,
 }: {
   function_: Function;
-  handler: ConfectApiFunctionHandler.Handler<S, Function>;
-}): Handlers.Item<S, Function> =>
+  handler: ConfectApiHandler.ConfectApiHandler<ConfectSchema_, Function>;
+}): Handlers.Item<ConfectSchema_, Function> =>
   Object.assign(Object.create(HandlerItemProto), { function_, handler });
 
 export declare namespace Handlers {
@@ -82,14 +86,14 @@ export declare namespace Handlers {
   > {
     readonly [HandlerItemTypeId]: HandlerItemTypeId;
     readonly function_: Function;
-    readonly handler: ConfectApiFunctionHandler.Handler<S, Function>;
+    readonly handler: ConfectApiHandler.ConfectApiHandler<S, Function>;
   }
 
   export namespace Item {
     // eslint-disable-next-line @typescript-eslint/no-shadow
     export interface AnyWithProps {
       readonly function_: ConfectApiFunction.ConfectApiFunction.AnyWithProps;
-      readonly handler: ConfectApiFunctionHandler.Handler.AnyWithProps;
+      readonly handler: ConfectApiHandler.ConfectApiHandler.AnyWithProps;
     }
   }
 
@@ -114,7 +118,7 @@ const HandlersProto = {
   handle<S extends ConfectSchema.ConfectSchema.AnyWithProps>(
     this: Handlers<S, ConfectApiFunction.ConfectApiFunction.AnyWithProps>,
     name: string,
-    handler: ConfectApiFunctionHandler.Handler.AnyWithProps,
+    handler: ConfectApiHandler.ConfectApiHandler.AnyWithProps,
   ) {
     const function_ = this.group.functions[name]!;
     return makeHandlers({
@@ -165,7 +169,7 @@ export const group = <
   const [firstGroupPathPart, ...restGroupPathParts] = groupPathParts;
 
   // TODO: Move this implementation to a module for handling paths/group paths?
-  const group = Array.reduce(
+  const group_ = Array.reduce(
     restGroupPathParts,
     api.spec.groups[firstGroupPathPart as keyof typeof api.spec.groups]!,
     (currentGroup, groupPathPart) =>
@@ -182,7 +186,7 @@ export const group = <
       const registry = yield* ConfectApiRegistry.ConfectApiRegistry;
 
       const handlers = build(
-        makeHandlers({ group, items }),
+        makeHandlers({ group: group_, items }),
       ) as Handlers.AnyWithProps;
 
       for (const handlerItem of handlers.items) {
@@ -250,7 +254,7 @@ export declare namespace ConfectApiGroupService {
 }
 
 export class ConfectApiService extends Context.Tag(
-  "@rjdellecese/confect/ConfectApiService",
+  "@rjdellecese/confect/server/ConfectApiBuilder/ConfectApiService",
 )<
   ConfectApiService,
   {

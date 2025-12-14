@@ -18,13 +18,16 @@ import type * as ConfectSchema from "./ConfectSchema";
 import type * as ConfectTable from "./ConfectTable";
 import type * as ConfectTableInfo from "./ConfectTableInfo";
 
-export const make = <S extends ConfectSchema.ConfectSchema.AnyWithProps>(
-  schema: S,
+export const make = <
+  ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
+>(
+  schema: ConfectSchema_,
   convexDatabaseWriter: GenericDatabaseWriter<
-    ConfectSchema.DataModelFromConfectSchema<S>
+    ConfectSchema.DataModelFromConfectSchema<ConfectSchema_>
   >,
 ) => {
-  type ConfectDataModel_ = ConfectDataModel.ConfectDataModel.FromSchema<S>;
+  type ConfectDataModel_ =
+    ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>;
 
   const insert = <
     TableName extends
@@ -175,20 +178,25 @@ export const make = <S extends ConfectSchema.ConfectSchema.AnyWithProps>(
 };
 
 export const ConfectDatabaseWriter = <
-  S extends ConfectSchema.ConfectSchema.AnyWithProps,
+  ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
 >() =>
-  Context.GenericTag<ReturnType<typeof make<S>>>(
+  Context.GenericTag<ReturnType<typeof make<ConfectSchema_>>>(
     "@rjdellecese/confect/ConfectDatabaseWriter",
   );
 
 export type ConfectDatabaseWriter<
-  S extends ConfectSchema.ConfectSchema.AnyWithProps,
-> = ReturnType<typeof ConfectDatabaseWriter<S>>["Service"];
+  ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
+> = ReturnType<typeof ConfectDatabaseWriter<ConfectSchema_>>["Service"];
 
-export const layer = <S extends ConfectSchema.ConfectSchema.AnyWithProps>(
-  schema: S,
+export const layer = <
+  ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
+>(
+  schema: ConfectSchema_,
   convexDatabaseWriter: GenericDatabaseWriter<
-    ConfectSchema.DataModelFromConfectSchema<S>
+    ConfectSchema.DataModelFromConfectSchema<ConfectSchema_>
   >,
 ) =>
-  Layer.succeed(ConfectDatabaseWriter<S>(), make(schema, convexDatabaseWriter));
+  Layer.succeed(
+    ConfectDatabaseWriter<ConfectSchema_>(),
+    make(schema, convexDatabaseWriter),
+  );

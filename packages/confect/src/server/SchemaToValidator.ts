@@ -35,6 +35,7 @@ import {
   String,
 } from "effect";
 
+import * as GenericId from "../api/GenericId";
 import type {
   DeepMutable,
   IsAny,
@@ -46,7 +47,6 @@ import type {
   TypeError,
   UnionToTuple,
 } from "../typeUtils";
-import * as GenericId from "../api/GenericId";
 
 // Args
 
@@ -421,10 +421,10 @@ const handleTypeLiteral = (typeLiteralAst: SchemaAST.TypeLiteral) =>
             onNone: () =>
               Effect.map(
                 Effect.all({
-                  parameter: compileAst(parameter),
-                  type: compileAst(type),
+                  parameter_: compileAst(parameter),
+                  type_: compileAst(type),
                 }),
-                ({ parameter, type }) => v.record(parameter, type),
+                ({ parameter_, type_ }) => v.record(parameter_, type_),
               ),
             onSome: () =>
               Effect.fail(

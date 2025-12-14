@@ -36,47 +36,48 @@ export declare namespace ConfectDataModel {
   export type AnyWithProps =
     ConfectDataModel<ConfectTable.ConfectTable.AnyWithProps>;
 
-  export type FromSchema<S extends ConfectSchema.ConfectSchema.AnyWithProps> =
-    ConfectDataModel<ConfectSchema.ConfectSchema.Tables<S>>;
+  export type FromSchema<
+    ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
+  > = ConfectDataModel<ConfectSchema.ConfectSchema.Tables<ConfectSchema_>>;
 
-  export type DataModel<ConfectDataModel extends AnyWithProps> = {
-    [TableName in TableNames<ConfectDataModel>]: ConfectTableInfo.ConfectTableInfo.TableInfo<
+  export type DataModel<ConfectDataModel_ extends AnyWithProps> = {
+    [TableName in TableNames<ConfectDataModel_>]: ConfectTableInfo.ConfectTableInfo.TableInfo<
       ConfectTableInfo.ConfectTableInfo<
-        TableWithName<ConfectDataModel, TableName>
+        TableWithName<ConfectDataModel_, TableName>
       >
     >;
   };
 
-  export type Tables<ConfectDataModel extends AnyWithProps> =
-    ConfectDataModel["tables"];
+  export type Tables<ConfectDataModel_ extends AnyWithProps> =
+    ConfectDataModel_["tables"];
 
-  export type TableNames<ConfectDataModel extends AnyWithProps> =
-    keyof Tables<ConfectDataModel> & string;
+  export type TableNames<ConfectDataModel_ extends AnyWithProps> =
+    keyof Tables<ConfectDataModel_> & string;
 
   export type TableWithName<
-    ConfectDataModel extends AnyWithProps,
-    TableName extends TableNames<ConfectDataModel>,
-  > = Tables<ConfectDataModel>[TableName];
+    ConfectDataModel_ extends AnyWithProps,
+    TableName extends TableNames<ConfectDataModel_>,
+  > = Tables<ConfectDataModel_>[TableName];
 
   export type ConfectTableInfoWithName<
-    ConfectDataModel extends AnyWithProps,
-    TableName extends TableNames<ConfectDataModel>,
+    ConfectDataModel_ extends AnyWithProps,
+    TableName extends TableNames<ConfectDataModel_>,
   > = ConfectTableInfo.ConfectTableInfo<
-    TableWithName<ConfectDataModel, TableName>
+    TableWithName<ConfectDataModel_, TableName>
   >;
 
   export type TableInfoWithName<
-    ConfectDataModel extends AnyWithProps,
-    TableName extends TableNames<ConfectDataModel>,
+    ConfectDataModel_ extends AnyWithProps,
+    TableName extends TableNames<ConfectDataModel_>,
   > = ConfectTableInfo.ConfectTableInfo.TableInfo<
-    ConfectTableInfoWithName<ConfectDataModel, TableName>
+    ConfectTableInfoWithName<ConfectDataModel_, TableName>
   >;
 
   export type ConfectDocumentWithName<
-    ConfectDataModel extends AnyWithProps,
-    TableName extends TableNames<ConfectDataModel>,
+    ConfectDataModel_ extends AnyWithProps,
+    TableName extends TableNames<ConfectDataModel_>,
   > = ConfectTableInfo.ConfectTableInfo.ConfectDocument<
-    TableWithName<ConfectDataModel, TableName>
+    TableWithName<ConfectDataModel_, TableName>
   >;
 }
 
@@ -91,34 +92,33 @@ export type GenericEncodedConfectDocument = ReadonlyRecord<
 >;
 
 export type ConfectDocumentByName<
-  ConfectDataModel extends ConfectDataModel.AnyWithProps,
-  TableName extends ConfectDataModel.TableNames<ConfectDataModel>,
+  ConfectDataModel_ extends ConfectDataModel.AnyWithProps,
+  TableName extends ConfectDataModel.TableNames<ConfectDataModel_>,
 > = ConfectTableInfo.ConfectTableInfo.ConfectDocument<
-  ConfectDataModel.ConfectTableInfoWithName<ConfectDataModel, TableName>
+  ConfectDataModel.ConfectTableInfoWithName<ConfectDataModel_, TableName>
 >;
 
 export type GenericConfectDataModel = Record<string, GenericConfectTableInfo>;
 
 export type DataModelFromConfectDataModel<
-  ConfectDataModel extends GenericConfectDataModel,
+  ConfectDataModel_ extends GenericConfectDataModel,
 > = {
-  [TableName in keyof ConfectDataModel & string]: TableInfoFromConfectTableInfo<
-    ConfectDataModel[TableName]
-  >;
+  [TableName in keyof ConfectDataModel_ &
+    string]: TableInfoFromConfectTableInfo<ConfectDataModel_[TableName]>;
 };
 
 export type TableNamesInConfectDataModel<
-  ConfectDataModel extends ConfectDataModel.AnyWithProps,
-> = keyof ConfectDataModel & string;
+  ConfectDataModel_ extends ConfectDataModel.AnyWithProps,
+> = keyof ConfectDataModel_ & string;
 
 export type TableInfoFromConfectTableInfo<
-  ConfectTableInfo extends GenericConfectTableInfo,
+  ConfectTableInfo_ extends GenericConfectTableInfo,
 > = {
-  document: ConfectTableInfo["convexDocument"];
-  fieldPaths: ConfectTableInfo["fieldPaths"];
-  indexes: ConfectTableInfo["indexes"];
-  searchIndexes: ConfectTableInfo["searchIndexes"];
-  vectorIndexes: ConfectTableInfo["vectorIndexes"];
+  document: ConfectTableInfo_["convexDocument"];
+  fieldPaths: ConfectTableInfo_["fieldPaths"];
+  indexes: ConfectTableInfo_["indexes"];
+  searchIndexes: ConfectTableInfo_["searchIndexes"];
+  vectorIndexes: ConfectTableInfo_["vectorIndexes"];
 };
 
 export type GenericConfectTableInfo = {
@@ -132,16 +132,16 @@ export type GenericConfectTableInfo = {
 };
 
 export type TableSchemaFromConfectTableInfo<
-  ConfectTableInfo extends GenericConfectTableInfo,
+  ConfectTableInfo_ extends GenericConfectTableInfo,
 > = Schema.Schema<
-  ConfectTableInfo["confectDocument"],
-  ConfectTableInfo["encodedConfectDocument"]
+  ConfectTableInfo_["confectDocument"],
+  ConfectTableInfo_["encodedConfectDocument"]
 >;
 
 /**
  * The Confect document encoded for storage in Convex. This is the data as it is stored in the database.
  */
 export type GenericConfectDoc<
-  ConfectDataModel extends GenericConfectDataModel,
-  TableName extends TableNamesInConfectDataModel<ConfectDataModel>,
-> = ConfectDataModel[TableName]["encodedConfectDocument"];
+  ConfectDataModel_ extends GenericConfectDataModel,
+  TableName extends TableNamesInConfectDataModel<ConfectDataModel_>,
+> = ConfectDataModel_[TableName]["encodedConfectDocument"];

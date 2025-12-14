@@ -51,16 +51,16 @@ export declare namespace ConfectSchema {
     ): AnyWithProps;
   }
 
-  export type Tables<S extends AnyWithProps> =
-    S extends ConfectSchema<infer T> ? T : never;
+  export type Tables<ConfectSchema_ extends AnyWithProps> =
+    ConfectSchema_ extends ConfectSchema<infer Tables_> ? Tables_ : never;
 
-  export type TableNames<S extends AnyWithProps> =
-    ConfectTable.ConfectTable.Name<Tables<S>> & string;
+  export type TableNames<ConfectSchema_ extends AnyWithProps> =
+    ConfectTable.ConfectTable.Name<Tables<ConfectSchema_>> & string;
 
   export type TableWithName<
-    S extends AnyWithProps,
-    TableName extends TableNames<S>,
-  > = Extract<Tables<S>, { readonly name: TableName }>;
+    ConfectSchema_ extends AnyWithProps,
+    TableName extends TableNames<ConfectSchema_>,
+  > = Extract<Tables<ConfectSchema_>, { readonly name: TableName }>;
 }
 
 const Proto = {
@@ -118,14 +118,17 @@ export const make = (): ConfectSchema<never> =>
  * @ignore
  */
 export type ConfectDataModelFromConfectSchema<
-  S extends ConfectSchema.AnyWithProps,
+  ConfectSchema_ extends ConfectSchema.AnyWithProps,
 > =
-  S extends ConfectSchema<infer Tables>
+  ConfectSchema_ extends ConfectSchema<infer Tables>
     ? ConfectDataModelFromConfectTables<Tables>
     : never;
 
-export type DataModelFromConfectSchema<S extends ConfectSchema.AnyWithProps> =
-  DataModelFromConfectDataModel<ConfectDataModelFromConfectSchema<S>>;
+export type DataModelFromConfectSchema<
+  ConfectSchema_ extends ConfectSchema.AnyWithProps,
+> = DataModelFromConfectDataModel<
+  ConfectDataModelFromConfectSchema<ConfectSchema_>
+>;
 
 export type DataModelFromConfectTables<
   Tables extends ConfectTable.ConfectTable.AnyWithProps,

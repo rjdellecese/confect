@@ -1,9 +1,11 @@
 import type {
+  Expand,
   GenericDocument,
   IdField,
   SystemFields,
   SystemIndexes,
 } from "convex/server";
+import type { GenericValidator } from "convex/values";
 import type { Schema, Types } from "effect";
 import type * as ConfectTable from "./ConfectTable";
 
@@ -47,15 +49,8 @@ export declare namespace ConfectTableInfo {
     readonly [TypeId]: TypeId;
   }
 
-  export interface AnyWithProps extends Any {
-    readonly confectDocument: GenericConfectDoc<any, any>;
-    readonly encodedConfectDocument: GenericEncodedConfectDocument;
-    readonly convexDocument: GenericDocument;
-    readonly fieldPaths: GenericFieldPaths;
-    readonly indexes: GenericTableIndexes;
-    readonly searchIndexes: GenericTableSearchIndexes;
-    readonly vectorIndexes: GenericTableVectorIndexes;
-  }
+  export type AnyWithProps =
+    ConfectTableInfo<ConfectTable.ConfectTable.AnyWithProps>;
 
   export type TableInfo<ConfectTableInfo extends AnyWithProps> = {
     document: ConfectTableInfo["convexDocument"];
@@ -96,21 +91,9 @@ type ExtractFieldPaths<T extends GenericValidator> =
   | T["fieldPaths"]
   | keyof SystemFields;
 
-type ExtractDocument<
-  const TableName extends string,
-  T extends GenericValidator,
-> =
+type ExtractDocument<TableName extends string, T extends GenericValidator> =
   Expand<IdField<TableName> & SystemFields & T["type"]> extends GenericDocument
     ? Expand<IdField<TableName> & SystemFields & T["type"]>
     : "Oops";
 
 // End of vendored types from convex-js, partially modified.
-
-export declare namespace ConfectTableInfo {
-  export interface Any {
-    readonly [TypeId]: TypeId;
-  }
-
-  export type AnyWithProps =
-    ConfectTableInfo<ConfectTable.ConfectTable.AnyWithProps>;
-}
