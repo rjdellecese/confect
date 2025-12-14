@@ -15,9 +15,9 @@ import {
   type RegisteredQuery,
 } from "convex/server";
 import { Effect, Layer, Match, pipe, Predicate, Ref, Schema } from "effect";
-import type * as ConfectApi from "../api/ConfectApi";
 import { mapLeaves } from "../utils";
 import * as ConfectActionRunner from "./ConfectActionRunner";
+import type * as ConfectApi from "./ConfectApi";
 import * as ConfectApiBuilder from "./ConfectApiBuilder";
 import * as ConfectApiRegistry from "./ConfectApiRegistry";
 import * as ConfectAuth from "./ConfectAuth";

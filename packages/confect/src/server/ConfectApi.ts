@@ -1,9 +1,9 @@
 import type { GenericSchema, SchemaDefinition } from "convex/server";
 import { defineSchema as defineConvexSchema } from "convex/server";
 import { pipe, Predicate, Record } from "effect";
-import type * as ConfectSchema from "../server/ConfectSchema";
-import type * as ConfectApiGroup from "./ConfectApiGroup";
-import type * as ConfectApiSpec from "./ConfectApiSpec";
+import type * as ConfectApiGroup from "../api/ConfectApiGroup";
+import type * as ConfectApiSpec from "../api/ConfectApiSpec";
+import type * as ConfectSchema from "./ConfectSchema";
 
 export const TypeId = "@rjdellecese/confect/ConfectApi";
 export type TypeId = typeof TypeId;

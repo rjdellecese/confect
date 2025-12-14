@@ -1,4 +1,4 @@
-import { ConfectApiBuilder } from "@rjdellecese/confect/api";
+import { ConfectApiBuilder } from "@rjdellecese/confect/server";
 import { Api } from "../api";
 
 export const Groups = ConfectApiBuilder.group(

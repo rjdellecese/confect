@@ -1,4 +1,4 @@
-import { ConfectApi } from "@rjdellecese/confect/api";
+import { ConfectApi } from "@rjdellecese/confect/server";
 import schema from "./schema";
 import spec from "./spec";
 

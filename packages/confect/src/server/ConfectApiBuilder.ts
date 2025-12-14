@@ -9,10 +9,10 @@ import {
   Ref,
   String,
 } from "effect";
-import type * as ConfectApi from "../api/ConfectApi";
 import type * as ConfectApiFunction from "../api/ConfectApiFunction";
 import type * as ConfectApiGroup from "../api/ConfectApiGroup";
 import { setNestedProperty } from "../utils";
+import type * as ConfectApi from "./ConfectApi";
 import type * as ConfectApiHandler from "./ConfectApiHandler";
 import * as ConfectApiRegistry from "./ConfectApiRegistry";
 import type * as ConfectSchema from "./ConfectSchema";
@@ -81,12 +81,15 @@ export declare namespace Handlers {
     > {}
 
   export interface Item<
-    S extends ConfectSchema.ConfectSchema.AnyWithProps,
+    ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
     Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
   > {
     readonly [HandlerItemTypeId]: HandlerItemTypeId;
     readonly function_: Function;
-    readonly handler: ConfectApiHandler.ConfectApiHandler<S, Function>;
+    readonly handler: ConfectApiHandler.ConfectApiHandler<
+      ConfectSchema_,
+      Function
+    >;
   }
 
   export namespace Item {
@@ -98,9 +101,12 @@ export declare namespace Handlers {
   }
 
   export type FromGroup<
-    S extends ConfectSchema.ConfectSchema.AnyWithProps,
+    ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
     Group extends ConfectApiGroup.ConfectApiGroup.Any,
-  > = Handlers<S, ConfectApiGroup.ConfectApiGroup.Functions<Group>>;
+  > = Handlers<
+    ConfectSchema_,
+    ConfectApiGroup.ConfectApiGroup.Functions<Group>
+  >;
 
   export type ValidateReturn<A> =
     A extends Handlers<infer _S, infer Functions>
@@ -115,8 +121,11 @@ const HandlersProto = {
     _Functions: Function.identity,
   },
 
-  handle<S extends ConfectSchema.ConfectSchema.AnyWithProps>(
-    this: Handlers<S, ConfectApiFunction.ConfectApiFunction.AnyWithProps>,
+  handle<ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps>(
+    this: Handlers<
+      ConfectSchema_,
+      ConfectApiFunction.ConfectApiFunction.AnyWithProps
+    >,
     name: string,
     handler: ConfectApiHandler.ConfectApiHandler.AnyWithProps,
   ) {
@@ -135,28 +144,28 @@ const HandlersProto = {
 };
 
 const makeHandlers = <
-  S extends ConfectSchema.ConfectSchema.AnyWithProps,
+  ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
   Functions extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
 >({
   group,
   items,
 }: {
   readonly group: ConfectApiGroup.ConfectApiGroup.AnyWithProps;
-  readonly items: ReadonlyArray<Handlers.Item<S, Functions>>;
-}): Handlers<S, Functions> =>
+  readonly items: ReadonlyArray<Handlers.Item<ConfectSchema_, Functions>>;
+}): Handlers<ConfectSchema_, Functions> =>
   Object.assign(Object.create(HandlersProto), { group, items });
 
 export const group = <
-  S extends ConfectSchema.ConfectSchema.AnyWithProps,
+  ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
   Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
   const GroupPath extends ConfectApiGroup.Path.All<Groups>,
   Return extends Handlers.AnyWithProps,
 >(
-  api: ConfectApi.ConfectApi<S, Groups>,
+  api: ConfectApi.ConfectApi<ConfectSchema_, Groups>,
   groupPath: GroupPath,
   build: (
     handlers: Handlers.FromGroup<
-      S,
+      ConfectSchema_,
       ConfectApiGroup.Path.GroupAt<Groups, GroupPath>
     >,
   ) => Handlers.ValidateReturn<Return>,

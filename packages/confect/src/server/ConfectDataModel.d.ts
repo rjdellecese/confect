@@ -109,7 +109,7 @@ export type DataModelFromConfectDataModel<
 
 export type TableNamesInConfectDataModel<
   ConfectDataModel_ extends ConfectDataModel.AnyWithProps,
-> = keyof ConfectDataModel_ & string;
+> = keyof ConfectDataModel_["tables"] & string;
 
 export type TableInfoFromConfectTableInfo<
   ConfectTableInfo_ extends GenericConfectTableInfo,

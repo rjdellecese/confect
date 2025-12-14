@@ -9,6 +9,9 @@
         }
       }
     ],
+    "declaration": true,
+    "declarationMap": true,
+    "isolatedDeclarations": false,
     "noEmit": true,
     "skipLibCheck": true,
     "importsNotUsedAsValues": "remove",

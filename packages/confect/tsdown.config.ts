@@ -20,6 +20,7 @@ const createConfig = ({
     sourcemap: true,
   },
   sourcemap: true,
+  unbundle: true,
   format: ["esm", "cjs"],
 });
 

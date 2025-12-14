@@ -1,4 +1,4 @@
-import { ConfectApiBuilder } from "@rjdellecese/confect/api";
+import { ConfectApiBuilder } from "@rjdellecese/confect/server";
 import { Effect } from "effect";
 import {
   ConfectDatabaseReader,
