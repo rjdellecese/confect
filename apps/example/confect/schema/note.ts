@@ -1,4 +1,5 @@
-import { ConfectTable, GenericId } from "@rjdellecese/confect/server";
+import { GenericId } from "@rjdellecese/confect/api";
+import { ConfectTable } from "@rjdellecese/confect/server";
 import { Schema } from "effect";
 
 export const Note = ConfectTable.make({

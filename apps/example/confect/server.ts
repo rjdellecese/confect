@@ -1,4 +1,7 @@
-import { ConfectApiBuilder, ConfectApiServer } from "@rjdellecese/confect/api";
+import {
+  ConfectApiBuilder,
+  ConfectApiServer,
+} from "@rjdellecese/confect/server";
 import { Effect, Layer } from "effect";
 import { Api } from "./api";
 import { Groups } from "./api/groups";

@@ -4,7 +4,8 @@
       {
         "name": "@effect/language-service",
         "diagnosticSeverity": {
-          "deterministicKeys": "error"
+          "deterministicKeys": "error",
+          "skipLeadingPath": ["packages/confect/src"]
         }
       }
     ],

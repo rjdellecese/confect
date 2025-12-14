@@ -5,8 +5,7 @@ import type * as ConfectSchema from "../server/ConfectSchema";
 import type * as ConfectApiGroup from "./ConfectApiGroup";
 import type * as ConfectApiSpec from "./ConfectApiSpec";
 
-export const TypeId = Symbol.for("@rjdellecese/confect/ConfectApi");
-
+export const TypeId = "@rjdellecese/confect/ConfectApi";
 export type TypeId = typeof TypeId;
 
 export const isConfectApi = (u: unknown): u is ConfectApi.Any =>
@@ -27,14 +26,22 @@ export declare namespace ConfectApi {
     readonly [TypeId]: TypeId;
   }
 
-  export interface AnyWithProps
-    extends ConfectApi<
-      ConfectSchema.ConfectSchema.AnyWithProps,
-      ConfectApiGroup.ConfectApiGroup.AnyWithProps
-    > {}
+  export interface AnyWithProps {
+    readonly [TypeId]: TypeId;
+    readonly spec: ConfectApiSpec.ConfectApiSpec.AnyWithProps;
+    readonly confectSchema: ConfectSchema.ConfectSchema.AnyWithProps;
+    readonly convexSchemaDefinition: SchemaDefinition<GenericSchema, true>;
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-shadow
   export type ConfectSchema<Api extends AnyWithProps> = Api["confectSchema"];
+
+  export type Groups<Api extends AnyWithProps> =
+    Api extends ConfectApi<infer _ConfectSchema, infer Groups_>
+      ? Groups_ extends ConfectApiGroup.ConfectApiGroup.AnyWithProps
+        ? Groups_
+        : never
+      : never;
 }
 
 const Proto = {

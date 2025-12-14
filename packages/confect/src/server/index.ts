@@ -1,6 +1,6 @@
-export * as GenericId from "../api/GenericId";
-export * as PaginationResult from "../api/PaginationResult";
 export * as ConfectActionRunner from "./ConfectActionRunner";
+export * as ConfectApiBuilder from "./ConfectApiBuilder";
+export * as ConfectApiServer from "./ConfectApiServer";
 export * as ConfectAuth from "./ConfectAuth";
 export * as ConfectDatabaseReader from "./ConfectDatabaseReader";
 export * as ConfectDatabaseWriter from "./ConfectDatabaseWriter";

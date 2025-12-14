@@ -25,8 +25,15 @@ export declare namespace ConfectApiSpec {
     readonly [TypeId]: TypeId;
   }
 
-  export interface AnyWithProps
-    extends ConfectApiSpec<ConfectApiGroup.ConfectApiGroup.AnyWithProps> {}
+  export interface AnyWithProps {
+    readonly [TypeId]: TypeId;
+    readonly groups: {
+      [x: string]: any;
+    };
+    add<Group extends ConfectApiGroup.ConfectApiGroup.Any>(
+      group: Group,
+    ): AnyWithProps;
+  }
 
   export type Groups<Spec extends AnyWithProps> =
     Spec extends ConfectApiSpec<infer Groups_> ? Groups_ : never;

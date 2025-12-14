@@ -9,13 +9,13 @@ import {
   Ref,
   String,
 } from "effect";
-import type * as ConfectApiFunctionHandler from "./ConfectApiFunctionHandler";
-import type * as ConfectSchema from "./ConfectSchema";
-import { setNestedProperty } from "../utils";
 import type * as ConfectApi from "../api/ConfectApi";
 import type * as ConfectApiFunction from "../api/ConfectApiFunction";
 import type * as ConfectApiGroup from "../api/ConfectApiGroup";
+import { setNestedProperty } from "../utils";
+import type * as ConfectApiFunctionHandler from "./ConfectApiFunctionHandler";
 import * as ConfectApiRegistry from "./ConfectApiRegistry";
+import type * as ConfectSchema from "./ConfectSchema";
 
 export const HandlersTypeId = "@rjdellecese/confect/Handlers";
 export type HandlersTypeId = typeof HandlersTypeId;
@@ -86,6 +86,7 @@ export declare namespace Handlers {
   }
 
   export namespace Item {
+    // eslint-disable-next-line @typescript-eslint/no-shadow
     export interface AnyWithProps {
       readonly function_: ConfectApiFunction.ConfectApiFunction.AnyWithProps;
       readonly handler: ConfectApiFunctionHandler.Handler.AnyWithProps;
@@ -201,20 +202,17 @@ export const group = <
   );
 };
 
-export const api = <
-  S extends ConfectSchema.ConfectSchema.AnyWithProps,
-  Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
->(
-  api: ConfectApi.ConfectApi<S, Groups>,
+export const api = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
+  api_: Api,
 ): Layer.Layer<
   ConfectApiService,
   never,
-  ConfectApiGroupService.FromGroups<Groups>
+  ConfectApiGroupService.FromGroups<ConfectApi.ConfectApi.Groups<Api>>
 > =>
   Layer.effect(
     ConfectApiService,
     Effect.map(Effect.context(), (context) => ({
-      api,
+      api: api_,
       context,
     })),
   );

@@ -11,7 +11,7 @@ export const isConfectApiGroup = (u: unknown): u is ConfectApiGroup.Any =>
 export interface ConfectApiGroup<
   Name extends string,
   Functions extends ConfectApiFunction.ConfectApiFunction.AnyWithProps = never,
-  Groups extends ConfectApiGroup.AnyWithProps = never,
+  Groups extends ConfectApiGroup.Any = never,
 > {
   readonly [TypeId]: TypeId;
   readonly name: Name;
@@ -31,7 +31,7 @@ export interface ConfectApiGroup<
     function_: Function,
   ): ConfectApiGroup<Name, Functions | Function, Groups>;
 
-  addGroup<Group extends ConfectApiGroup.AnyWithProps>(
+  addGroup<Group extends ConfectApiGroup.Any>(
     group: Group,
   ): ConfectApiGroup<Name, Functions, Groups | Group>;
 }
@@ -42,10 +42,22 @@ export declare namespace ConfectApiGroup {
     readonly name: string;
   }
 
-  export type AnyWithProps = ConfectApiGroup<
-    string,
-    ConfectApiFunction.ConfectApiFunction.AnyWithProps
-  >;
+  export interface AnyWithProps {
+    readonly [TypeId]: TypeId;
+    readonly name: string;
+    readonly functions: {
+      [x: string]: ConfectApiFunction.ConfectApiFunction.AnyWithProps;
+    };
+    readonly groups: {
+      [x: string]: any;
+    };
+    addFunction<
+      Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
+    >(
+      function_: Function,
+    ): AnyWithProps;
+    addGroup<Group extends Any>(group: Group): AnyWithProps;
+  }
 
   export type Name<Group> =
     Group extends ConfectApiGroup<infer Name_, infer _Functions, infer _Groups>
@@ -91,8 +103,8 @@ export declare namespace Path {
 
   type AllHelper<
     Parent extends ConfectApiGroup.Any,
-    Groups extends ConfectApiGroup.AnyWithProps,
-  > = Groups extends ConfectApiGroup.AnyWithProps
+    Groups extends ConfectApiGroup.Any,
+  > = Groups extends ConfectApiGroup.Any
     ? `${ConfectApiGroup.Name<Parent>}.${All<Groups>}`
     : never;
 
@@ -116,11 +128,11 @@ export declare namespace Path {
     : never;
 
   export type SubGroupsAt<
-    Group extends ConfectApiGroup.AnyWithProps,
+    Group extends ConfectApiGroup.Any,
     GroupPath extends string,
   > =
     ConfectApiGroup.Groups<GroupAt<Group, GroupPath>> extends infer SubGroups
-      ? SubGroups extends ConfectApiGroup.AnyWithProps
+      ? SubGroups extends ConfectApiGroup.Any
         ? `${GroupPath}.${SubGroups["name"]}`
         : never
       : never;
@@ -139,7 +151,7 @@ const Proto = {
     });
   },
 
-  addGroup<Group extends ConfectApiGroup.AnyWithProps>(
+  addGroup<Group extends ConfectApiGroup.Any>(
     this: ConfectApiGroup.AnyWithProps,
     group: Group,
   ) {
@@ -154,7 +166,7 @@ const Proto = {
 const makeProto = <
   Name extends string,
   Functions extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
-  Groups extends ConfectApiGroup.AnyWithProps,
+  Groups extends ConfectApiGroup.Any,
 >({
   name,
   functions,

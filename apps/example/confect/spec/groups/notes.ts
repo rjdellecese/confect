@@ -1,5 +1,8 @@
-import { ConfectApiFunction, ConfectApiGroup } from "@rjdellecese/confect/api";
-import { GenericId } from "@rjdellecese/confect/server";
+import {
+  ConfectApiFunction,
+  ConfectApiGroup,
+  GenericId,
+} from "@rjdellecese/confect/api";
 import { Schema } from "effect";
 import { Note } from "../../schema/note";
 
