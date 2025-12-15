@@ -52,22 +52,22 @@ export declare namespace ConfectTableInfo {
   export type AnyWithProps =
     ConfectTableInfo<ConfectTable.ConfectTable.AnyWithProps>;
 
-  export type TableInfo<ConfectTableInfo extends AnyWithProps> = {
-    document: ConfectTableInfo["convexDocument"];
-    fieldPaths: ConfectTableInfo["fieldPaths"];
-    indexes: ConfectTableInfo["indexes"];
-    searchIndexes: ConfectTableInfo["searchIndexes"];
-    vectorIndexes: ConfectTableInfo["vectorIndexes"];
+  export type TableInfo<ConfectTableInfo_ extends AnyWithProps> = {
+    document: ConfectTableInfo_["convexDocument"];
+    fieldPaths: ConfectTableInfo_["fieldPaths"];
+    indexes: ConfectTableInfo_["indexes"];
+    searchIndexes: ConfectTableInfo_["searchIndexes"];
+    vectorIndexes: ConfectTableInfo_["vectorIndexes"];
   };
 
-  export type TableSchema<ConfectTableInfo extends AnyWithProps> =
+  export type TableSchema<ConfectTableInfo_ extends AnyWithProps> =
     Schema.Schema<
-      ConfectTableInfo["confectDocument"],
-      ConfectTableInfo["encodedConfectDocument"]
+      ConfectTableInfo_["confectDocument"],
+      ConfectTableInfo_["encodedConfectDocument"]
     >;
 
-  export type ConfectDocument<ConfectTableInfo extends AnyWithProps> =
-    ConfectTableInfo["confectDocument"];
+  export type ConfectDocument<ConfectTableInfo_ extends AnyWithProps> =
+    ConfectTableInfo_["confectDocument"];
 }
 
 type ExtractConfectDocument<

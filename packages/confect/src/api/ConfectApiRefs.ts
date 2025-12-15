@@ -64,13 +64,13 @@ export declare namespace ConfectApiRefs {
 
 const HiddenFunctionKey = "@rjdellecese/confect/HiddenFunctionKey";
 type HiddenFunctionKey = typeof HiddenFunctionKey;
-type HiddenFunction<Ref extends Ref.Any> =
+type HiddenFunction<Ref_ extends Ref.Any> =
   ConfectApiFunction.ConfectApiFunction<
-    Ref.FunctionType<Ref>,
-    Ref.FunctionVisibility<Ref>,
+    Ref.FunctionType<Ref_>,
+    Ref.FunctionVisibility<Ref_>,
     string,
-    Ref.Args<Ref>,
-    Ref.Returns<Ref>
+    Ref.Args<Ref_>,
+    Ref.Returns<Ref_>
   >;
 
 export const getFunction = <

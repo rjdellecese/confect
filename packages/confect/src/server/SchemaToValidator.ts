@@ -35,7 +35,7 @@ import {
   String,
 } from "effect";
 
-import * as GenericId from "../api/GenericId";
+import { GenericId } from "@rjdellecese/confect/api";
 import type {
   DeepMutable,
   IsAny,

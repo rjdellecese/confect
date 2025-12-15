@@ -1,17 +1,17 @@
+import { GenericId } from "@rjdellecese/confect/api";
 import type {
   Expand,
   IdField,
   SystemFields as NonIdSystemFields,
 } from "convex/server";
 import { Schema } from "effect";
-import { GenericId } from "../api/GenericId";
 
 /**
  * Produces a schema for Convex system fields.
  */
 export const SystemFields = <TableName extends string>(tableName: TableName) =>
   Schema.Struct({
-    _id: GenericId(tableName),
+    _id: GenericId.GenericId(tableName),
     _creationTime: Schema.Number,
   });
 
