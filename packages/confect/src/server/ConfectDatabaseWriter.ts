@@ -8,10 +8,7 @@ import type {
 import type { GenericId } from "convex/values";
 import { Context, Effect, Layer, pipe, Record } from "effect";
 import type * as ConfectDataModel from "./ConfectDataModel";
-import type {
-  ConfectDocumentByName,
-  TableNamesInConfectDataModel,
-} from "./ConfectDataModel";
+import type { ConfectDocumentByName } from "./ConfectDataModel";
 import * as ConfectDocument from "./ConfectDocument";
 import * as ConfectQueryInitializer from "./ConfectQueryInitializer";
 import type * as ConfectSchema from "./ConfectSchema";
@@ -67,7 +64,8 @@ export const make = <
     });
 
   const patch = <
-    TableName extends TableNamesInConfectDataModel<ConfectDataModel_>,
+    TableName extends
+      ConfectDataModel.ConfectDataModel.TableNames<ConfectDataModel_>,
   >(
     tableName: TableName,
     id: GenericId<TableName>,
@@ -121,7 +119,8 @@ export const make = <
     });
 
   const replace = <
-    TableName extends TableNamesInConfectDataModel<ConfectDataModel_>,
+    TableName extends
+      ConfectDataModel.ConfectDataModel.TableNames<ConfectDataModel_>,
   >(
     tableName: TableName,
     id: GenericId<TableName>,
@@ -165,7 +164,8 @@ export const make = <
     });
 
   const delete_ = <
-    TableName extends TableNamesInConfectDataModel<ConfectDataModel_>,
+    TableName extends
+      ConfectDataModel.ConfectDataModel.TableNames<ConfectDataModel_>,
   >(
     _tableName: TableName,
     id: GenericId<TableName>,

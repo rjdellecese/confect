@@ -6,11 +6,13 @@ const createConfig = ({
   entry,
   clean,
   outDir,
+  external,
 }: {
   platform: NonNullable<UserConfig["platform"]>;
   entry: NonNullable<UserConfig["entry"]>;
   clean: NonNullable<UserConfig["clean"]>;
   outDir: NonNullable<UserConfig["outDir"]>;
+  external?: NonNullable<UserConfig["external"]>;
 }): UserConfig => ({
   entry,
   platform,
@@ -18,10 +20,12 @@ const createConfig = ({
   outDir,
   dts: {
     sourcemap: true,
+    resolver: "tsc",
   },
   sourcemap: true,
   unbundle: true,
   format: ["esm", "cjs"],
+  ...(external ? { external } : {}),
 });
 
 export default defineConfig([
@@ -30,6 +34,7 @@ export default defineConfig([
     entry: ["src/server/index.ts"],
     clean: true,
     outDir: "dist/server",
+    external: ["@rjdellecese/confect/api"],
   }),
   createConfig({
     platform: "neutral",
@@ -42,11 +47,13 @@ export default defineConfig([
     entry: ["src/client/index.ts"],
     clean: true,
     outDir: "dist/client",
+    external: ["@rjdellecese/confect/api"],
   }),
   createConfig({
     platform: "node",
     entry: ["src/cli/index.ts"],
     clean: true,
     outDir: "dist/cli",
+    external: ["@rjdellecese/confect/api"],
   }),
 ]);

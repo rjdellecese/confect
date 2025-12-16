@@ -7,7 +7,6 @@ import type {
 } from "convex/server";
 import { Context, Effect, Layer } from "effect";
 import type * as ConfectDataModel from "./ConfectDataModel";
-import type { TableNamesInConfectDataModel } from "./ConfectDataModel";
 
 type VectorSearch<
   ConfectDataModel_ extends ConfectDataModel.ConfectDataModel.AnyWithProps,
@@ -20,7 +19,8 @@ const make =
     vectorSearch: VectorSearch<ConfectDataModel_>,
   ) =>
   <
-    TableName extends TableNamesInConfectDataModel<ConfectDataModel_>,
+    TableName extends
+      ConfectDataModel.ConfectDataModel.TableNames<ConfectDataModel_>,
     IndexName extends VectorIndexNames<
       NamedTableInfo<
         ConfectDataModel.ConfectDataModel.DataModel<ConfectDataModel_>,

@@ -19,10 +19,7 @@ import type { GenericId } from "convex/values";
 import { Array, Effect, Either, pipe, Schema } from "effect";
 import type { BaseDatabaseReader, IndexFieldTypesForEq } from "../typeUtils";
 import type * as ConfectDataModel from "./ConfectDataModel";
-import type {
-  TableInfoFromConfectTableInfo,
-  TableNamesInConfectDataModel,
-} from "./ConfectDataModel";
+import type { TableInfoFromConfectTableInfo } from "./ConfectDataModel";
 import * as ConfectDocument from "./ConfectDocument";
 import * as ConfectOrderedQuery from "./ConfectOrderedQuery";
 import type * as ConfectTable from "./ConfectTable";
@@ -30,7 +27,8 @@ import type * as ConfectTableInfo from "./ConfectTableInfo";
 
 type ConfectQueryInitializer<
   ConfectDataModel_ extends ConfectDataModel.ConfectDataModel.AnyWithProps,
-  TableName extends TableNamesInConfectDataModel<ConfectDataModel_>,
+  TableName extends
+    ConfectDataModel.ConfectDataModel.TableNames<ConfectDataModel_>,
   _TableInfo extends
     GenericTableInfo = ConfectDataModel.ConfectDataModel.TableInfoWithName<
     ConfectDataModel_,

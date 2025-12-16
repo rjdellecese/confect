@@ -44,14 +44,13 @@ export declare namespace ConfectDataModel {
   > = ConfectDataModel<Tables_>;
 
   export type DataModel<ConfectDataModel_ extends AnyWithProps> = {
-    [TableName in TableNames<ConfectDataModel_>]: ConfectTableInfo.ConfectTableInfo.TableInfo<
-      ConfectTableInfo.ConfectTableInfo<
-        TableWithName<ConfectDataModel_, TableName>
-      >
+    [TableName_ in TableNames<ConfectDataModel_>]: TableInfoWithName<
+      ConfectDataModel_,
+      TableName_
     >;
   };
 
-  export type Tables<ConfectDataModel_ extends AnyWithProps> =
+  type Tables<ConfectDataModel_ extends AnyWithProps> =
     ConfectDataModel_["tables"];
 
   export type TableNames<ConfectDataModel_ extends AnyWithProps> =
@@ -93,17 +92,6 @@ export type ConfectDocumentByName<
 
 export type GenericConfectDataModel = Record<string, GenericConfectTableInfo>;
 
-export type DataModelFromConfectDataModel<
-  ConfectDataModel_ extends GenericConfectDataModel,
-> = {
-  [TableName in keyof ConfectDataModel_ &
-    string]: TableInfoFromConfectTableInfo<ConfectDataModel_[TableName]>;
-};
-
-export type TableNamesInConfectDataModel<
-  ConfectDataModel_ extends ConfectDataModel.AnyWithProps,
-> = keyof ConfectDataModel_["tables"] & string;
-
 export type TableInfoFromConfectTableInfo<
   ConfectTableInfo_ extends GenericConfectTableInfo,
 > = {
@@ -136,5 +124,5 @@ export type TableSchemaFromConfectTableInfo<
  */
 export type GenericConfectDoc<
   ConfectDataModel_ extends GenericConfectDataModel,
-  TableName extends TableNamesInConfectDataModel<ConfectDataModel_>,
+  TableName extends ConfectDataModel.TableNames<ConfectDataModel_>,
 > = ConfectDataModel_[TableName]["encodedConfectDocument"];
