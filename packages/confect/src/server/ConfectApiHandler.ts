@@ -4,6 +4,7 @@ import type * as ConfectActionRunner from "./ConfectActionRunner";
 import type * as ConfectAuth from "./ConfectAuth";
 import type * as ConfectDatabaseReader from "./ConfectDatabaseReader";
 import type * as ConfectDatabaseWriter from "./ConfectDatabaseWriter";
+import type * as ConfectDataModel from "./ConfectDataModel";
 import type * as ConfectMutationRunner from "./ConfectMutationRunner";
 import type * as ConfectQueryRunner from "./ConfectQueryRunner";
 import type * as ConfectScheduler from "./ConfectScheduler";
@@ -50,7 +51,9 @@ export type QueryHandler<
   | ConfectStorageReader
   | ConfectQueryRunner.ConfectQueryRunner
   | ConvexQueryCtx.ConvexQueryCtx<
-      ConfectSchema.DataModelFromConfectSchema<ConfectSchema_>
+      ConfectDataModel.ConfectDataModel.DataModel<
+        ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>
+      >
     >
 >;
 
@@ -69,7 +72,9 @@ export type MutationHandler<
   | ConfectQueryRunner.ConfectQueryRunner
   | ConfectMutationRunner.ConfectMutationRunner
   | ConvexMutationCtx.ConvexMutationCtx<
-      ConfectSchema.DataModelFromConfectSchema<ConfectSchema_>
+      ConfectDataModel.ConfectDataModel.DataModel<
+        ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>
+      >
     >
 >;
 
@@ -89,7 +94,9 @@ export type ActionHandler<
   | ConfectActionRunner.ConfectActionRunner
   | ConfectVectorSearch.ConfectVectorSearch
   | ConvexActionCtx.ConvexActionCtx<
-      ConfectSchema.DataModelFromConfectSchema<ConfectSchema_>
+      ConfectDataModel.ConfectDataModel.DataModel<
+        ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>
+      >
     >
 >;
 

@@ -1,13 +1,19 @@
 import { Effect, Function, ParseResult, pipe, Schema } from "effect";
+import type { ReadonlyRecord } from "effect/Record";
 import type * as ConfectDataModel from "./ConfectDataModel";
 import type * as ConfectTableInfo from "./ConfectTableInfo";
+import type { ReadonlyValue } from "./SchemaToValidator";
 import * as SystemFields from "./SystemFields";
 
+// TOD: Rename all `ConfectDocument` references to `ConfectDoc`
 export declare namespace ConfectDocument {
   export type WithoutSystemFields<ConfectDocument> = Omit<
     ConfectDocument,
     "_creationTime" | "_id"
   >;
+
+  // TODO: `AnyEncoded`
+  export type GenericEncoded = ReadonlyRecord<string, ReadonlyValue>;
 }
 
 export const decode = Function.dual<

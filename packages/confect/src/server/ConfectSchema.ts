@@ -4,9 +4,7 @@ import {
   type SchemaDefinition,
 } from "convex/server";
 import { Array, pipe, Predicate, Record } from "effect";
-import type { DataModelFromConfectDataModel } from "./ConfectDataModel";
 import * as ConfectTable from "./ConfectTable";
-import type * as ConfectTableInfo from "./ConfectTableInfo";
 
 export const TypeId = "@rjdellecese/confect/ConfectSchema";
 export type TypeId = typeof TypeId;
@@ -110,48 +108,11 @@ export const make = (): ConfectSchema<never> =>
     convexSchemaDefinition: defineConvexSchema({}),
   });
 
-// -----------------------------------------------------------------------------
-// Type utilities
-// -----------------------------------------------------------------------------
-
-/**
- * @ignore
- */
-export type ConfectDataModelFromConfectSchema<
-  ConfectSchema_ extends ConfectSchema.AnyWithProps,
-> =
-  ConfectSchema_ extends ConfectSchema<infer Tables>
-    ? ConfectDataModelFromConfectTables<Tables>
-    : never;
-
-export type DataModelFromConfectSchema<
-  ConfectSchema_ extends ConfectSchema.AnyWithProps,
-> = DataModelFromConfectDataModel<
-  ConfectDataModelFromConfectSchema<ConfectSchema_>
->;
-
-export type DataModelFromConfectTables<
-  Tables extends ConfectTable.ConfectTable.AnyWithProps,
-> = DataModelFromConfectDataModel<ConfectDataModelFromConfectTables<Tables>>;
-
-// TODO: Move to ConfectDataModel.d.ts module
-/**
- * Produce a Confect data model from Confect tables.
- */
-export type ConfectDataModelFromConfectTables<
-  Tables extends ConfectTable.ConfectTable.AnyWithProps,
-> = {
-  [Table in Tables as ConfectTable.ConfectTable.Name<Table>]: ConfectTableInfo.ConfectTableInfo<Table>;
-};
+// System tables
 
 export const confectSystemSchema = make()
   .addTable(ConfectTable.scheduledFunctionsTable)
   .addTable(ConfectTable.storageTable);
-
-type ConfectSystemSchema = typeof confectSystemSchema;
-
-export type ConfectSystemDataModel =
-  ConfectDataModelFromConfectSchema<ConfectSystemSchema>;
 
 export const extendWithConfectSystemTables = <
   Tables extends ConfectTable.ConfectTable.AnyWithProps,

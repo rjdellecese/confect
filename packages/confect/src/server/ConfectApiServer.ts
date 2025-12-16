@@ -23,6 +23,7 @@ import * as ConfectApiRegistry from "./ConfectApiRegistry";
 import * as ConfectAuth from "./ConfectAuth";
 import * as ConfectDatabaseReader from "./ConfectDatabaseReader";
 import * as ConfectDatabaseWriter from "./ConfectDatabaseWriter";
+import type * as ConfectDataModel from "./ConfectDataModel";
 import * as ConfectMutationRunner from "./ConfectMutationRunner";
 import * as ConfectQueryRunner from "./ConfectQueryRunner";
 import * as ConfectScheduler from "./ConfectScheduler";
@@ -161,14 +162,14 @@ const makeRegisteredFunction = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
   );
 
 const confectQueryFunction = <
-  S extends ConfectSchema.ConfectSchema.AnyWithProps,
+  ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
   ConvexArgs extends DefaultFunctionArgs,
   ConfectArgs,
   ConvexReturns,
   ConfectReturns,
   E,
 >(
-  schema: S,
+  schema: ConfectSchema_,
   {
     args,
     returns,
@@ -181,12 +182,14 @@ const confectQueryFunction = <
     ) => Effect.Effect<
       ConfectReturns,
       E,
-      | ConfectDatabaseReader.ConfectDatabaseReader<S>
+      | ConfectDatabaseReader.ConfectDatabaseReader<ConfectSchema_>
       | ConfectAuth.ConfectAuth
       | ConfectStorageReader
       | ConfectQueryRunner.ConfectQueryRunner
       | ConvexQueryCtx.ConvexQueryCtx<
-          ConfectSchema.DataModelFromConfectSchema<S>
+          ConfectDataModel.ConfectDataModel.DataModel<
+            ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>
+          >
         >
     >;
   },
@@ -194,7 +197,11 @@ const confectQueryFunction = <
   args: SchemaToValidator.compileArgsSchema(args),
   returns: SchemaToValidator.compileReturnsSchema(returns),
   handler: (
-    ctx: GenericQueryCtx<ConfectSchema.DataModelFromConfectSchema<S>>,
+    ctx: GenericQueryCtx<
+      ConfectDataModel.ConfectDataModel.DataModel<
+        ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>
+      >
+    >,
     actualArgs: ConvexArgs,
   ): Promise<ConvexReturns> =>
     pipe(
@@ -212,7 +219,9 @@ const confectQueryFunction = <
               ConfectQueryRunner.layer(ctx.runQuery),
               Layer.succeed(
                 ConvexQueryCtx.ConvexQueryCtx<
-                  ConfectSchema.DataModelFromConfectSchema<S>
+                  ConfectDataModel.ConfectDataModel.DataModel<
+                    ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>
+                  >
                 >(),
                 ctx,
               ),
@@ -228,14 +237,14 @@ const confectQueryFunction = <
 });
 
 const confectMutationFunction = <
-  S extends ConfectSchema.ConfectSchema.AnyWithProps,
+  ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
   ConvexArgs extends DefaultFunctionArgs,
   ConfectArgs,
   ConvexReturns,
   ConfectReturns,
   E,
 >(
-  schema: S,
+  schema: ConfectSchema_,
   {
     args,
     returns,
@@ -248,8 +257,8 @@ const confectMutationFunction = <
     ) => Effect.Effect<
       ConfectReturns,
       E,
-      | ConfectDatabaseReader.ConfectDatabaseReader<S>
-      | ConfectDatabaseWriter.ConfectDatabaseWriter<S>
+      | ConfectDatabaseReader.ConfectDatabaseReader<ConfectSchema_>
+      | ConfectDatabaseWriter.ConfectDatabaseWriter<ConfectSchema_>
       | ConfectAuth.ConfectAuth
       | ConfectScheduler.ConfectScheduler
       | ConfectStorageReader
@@ -257,7 +266,9 @@ const confectMutationFunction = <
       | ConfectQueryRunner.ConfectQueryRunner
       | ConfectMutationRunner.ConfectMutationRunner
       | ConvexMutationCtx.ConvexMutationCtx<
-          ConfectSchema.DataModelFromConfectSchema<S>
+          ConfectDataModel.ConfectDataModel.DataModel<
+            ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>
+          >
         >
     >;
   },
@@ -265,7 +276,11 @@ const confectMutationFunction = <
   args: SchemaToValidator.compileArgsSchema(args),
   returns: SchemaToValidator.compileReturnsSchema(returns),
   handler: (
-    ctx: GenericMutationCtx<ConfectSchema.DataModelFromConfectSchema<S>>,
+    ctx: GenericMutationCtx<
+      ConfectDataModel.ConfectDataModel.DataModel<
+        ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>
+      >
+    >,
     actualArgs: ConvexArgs,
   ): Promise<ConvexReturns> =>
     pipe(
@@ -287,7 +302,9 @@ const confectMutationFunction = <
               ConfectMutationRunner.layer(ctx.runMutation),
               Layer.succeed(
                 ConvexMutationCtx.ConvexMutationCtx<
-                  ConfectSchema.DataModelFromConfectSchema<S>
+                  ConfectDataModel.ConfectDataModel.DataModel<
+                    ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>
+                  >
                 >(),
                 ctx,
               ),
@@ -303,7 +320,7 @@ const confectMutationFunction = <
 });
 
 const confectActionFunction = <
-  S extends ConfectSchema.ConfectSchema.AnyWithProps,
+  ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
   ConvexValue extends DefaultFunctionArgs,
   ConfectValue,
   ConvexReturns,
@@ -331,14 +348,20 @@ const confectActionFunction = <
     | ConfectActionRunner.ConfectActionRunner
     | ConfectVectorSearch.ConfectVectorSearch
     | ConvexActionCtx.ConvexActionCtx<
-        ConfectSchema.DataModelFromConfectSchema<S>
+        ConfectDataModel.ConfectDataModel.DataModel<
+          ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>
+        >
       >
   >;
 }) => ({
   args: SchemaToValidator.compileArgsSchema(args),
   returns: SchemaToValidator.compileReturnsSchema(returns),
   handler: (
-    ctx: GenericActionCtx<ConfectSchema.DataModelFromConfectSchema<S>>,
+    ctx: GenericActionCtx<
+      ConfectDataModel.ConfectDataModel.DataModel<
+        ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>
+      >
+    >,
     actualArgs: ConvexValue,
   ): Promise<ConvexReturns> =>
     pipe(
@@ -361,7 +384,9 @@ const confectActionFunction = <
               ConfectVectorSearch.layer(ctx.vectorSearch),
               Layer.succeed(
                 ConvexActionCtx.ConvexActionCtx<
-                  ConfectSchema.DataModelFromConfectSchema<S>
+                  ConfectDataModel.ConfectDataModel.DataModel<
+                    ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>
+                  >
                 >(),
                 ctx,
               ),

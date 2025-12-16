@@ -23,7 +23,9 @@ export const make = <
 >(
   schema: ConfectSchema_,
   convexDatabaseWriter: GenericDatabaseWriter<
-    ConfectSchema.DataModelFromConfectSchema<ConfectSchema_>
+    ConfectDataModel.ConfectDataModel.DataModel<
+      ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>
+    >
   >,
 ) => {
   type ConfectDataModel_ =
@@ -193,7 +195,9 @@ export const layer = <
 >(
   schema: ConfectSchema_,
   convexDatabaseWriter: GenericDatabaseWriter<
-    ConfectSchema.DataModelFromConfectSchema<ConfectSchema_>
+    ConfectDataModel.ConfectDataModel.DataModel<
+      ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>
+    >
   >,
 ) =>
   Layer.succeed(

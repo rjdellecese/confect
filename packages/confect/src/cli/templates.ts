@@ -93,7 +93,7 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
         );
         yield* cbw.writeLine("ConfectQueryRunner as ConfectQueryRunner_,");
         yield* cbw.writeLine("ConfectScheduler as ConfectScheduler_,");
-        yield* cbw.writeLine("ConfectSchema,");
+        yield* cbw.writeLine("ConfectDataModel,");
         yield* cbw.writeLine("ConfectStorage,");
         yield* cbw.writeLine("ConfectVectorSearch as ConfectVectorSearch_,");
         yield* cbw.writeLine("ConvexActionCtx as ConvexActionCtx_,");
@@ -226,8 +226,20 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
         yield* cbw.writeLine("ConvexQueryCtx_.ConvexQueryCtx<");
         yield* cbw.indent(
           Effect.gen(function* () {
-            yield* cbw.writeLine("ConfectSchema.DataModelFromConfectSchema<");
-            yield* cbw.indent(cbw.writeLine("typeof confectSchemaDefinition"));
+            yield* cbw.writeLine(
+              "ConfectDataModel.ConfectDataModel.DataModel<",
+            );
+            yield* cbw.indent(
+              Effect.gen(function* () {
+                yield* cbw.writeLine(
+                  "ConfectDataModel.ConfectDataModel.FromSchema<",
+                );
+                yield* cbw.indent(
+                  cbw.writeLine("typeof confectSchemaDefinition"),
+                );
+                yield* cbw.writeLine(">");
+              }),
+            );
             yield* cbw.writeLine(">");
           }),
         );
@@ -246,8 +258,20 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
         yield* cbw.writeLine("ConvexMutationCtx_.ConvexMutationCtx<");
         yield* cbw.indent(
           Effect.gen(function* () {
-            yield* cbw.writeLine("ConfectSchema.DataModelFromConfectSchema<");
-            yield* cbw.indent(cbw.writeLine("typeof confectSchemaDefinition"));
+            yield* cbw.writeLine(
+              "ConfectDataModel.ConfectDataModel.DataModel<",
+            );
+            yield* cbw.indent(
+              Effect.gen(function* () {
+                yield* cbw.writeLine(
+                  "ConfectDataModel.ConfectDataModel.FromSchema<",
+                );
+                yield* cbw.indent(
+                  cbw.writeLine("typeof confectSchemaDefinition"),
+                );
+                yield* cbw.writeLine(">");
+              }),
+            );
             yield* cbw.writeLine(">");
           }),
         );
@@ -266,8 +290,20 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
         yield* cbw.writeLine("ConvexActionCtx_.ConvexActionCtx<");
         yield* cbw.indent(
           Effect.gen(function* () {
-            yield* cbw.writeLine("ConfectSchema.DataModelFromConfectSchema<");
-            yield* cbw.indent(cbw.writeLine("typeof confectSchemaDefinition"));
+            yield* cbw.writeLine(
+              "ConfectDataModel.ConfectDataModel.DataModel<",
+            );
+            yield* cbw.indent(
+              Effect.gen(function* () {
+                yield* cbw.writeLine(
+                  "ConfectDataModel.ConfectDataModel.FromSchema<",
+                );
+                yield* cbw.indent(
+                  cbw.writeLine("typeof confectSchemaDefinition"),
+                );
+                yield* cbw.writeLine(">");
+              }),
+            );
             yield* cbw.writeLine(">");
           }),
         );

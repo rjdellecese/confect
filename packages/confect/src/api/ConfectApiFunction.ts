@@ -29,7 +29,7 @@ export declare namespace ConfectApiFunction {
     extends ConfectApiFunction<
       FunctionType,
       FunctionVisibility,
-      string,
+      any,
       Schema.Schema.AnyNoContext,
       Schema.Schema.AnyNoContext
     > {}
@@ -38,7 +38,7 @@ export declare namespace ConfectApiFunction {
     extends ConfectApiFunction<
       FunctionType_,
       FunctionVisibility,
-      string,
+      any,
       Schema.Schema.AnyNoContext,
       Schema.Schema.AnyNoContext
     > {}

@@ -6,7 +6,7 @@ import {
   ConfectMutationRunner as ConfectMutationRunner_,
   ConfectQueryRunner as ConfectQueryRunner_,
   ConfectScheduler as ConfectScheduler_,
-  ConfectSchema,
+  ConfectDataModel,
   ConfectStorage,
   ConfectVectorSearch as ConfectVectorSearch_,
   ConvexActionCtx as ConvexActionCtx_,
@@ -59,18 +59,30 @@ export type ConfectActionRunner = typeof ConfectActionRunner.Identifier;
 
 export const ConvexQueryCtx =
   ConvexQueryCtx_.ConvexQueryCtx<
-    ConfectSchema.DataModelFromConfectSchema<typeof confectSchemaDefinition>
+    ConfectDataModel.ConfectDataModel.DataModel<
+      ConfectDataModel.ConfectDataModel.FromSchema<
+        typeof confectSchemaDefinition
+      >
+    >
   >();
 export type ConvexQueryCtx = typeof ConvexQueryCtx.Identifier;
 
 export const ConvexMutationCtx =
   ConvexMutationCtx_.ConvexMutationCtx<
-    ConfectSchema.DataModelFromConfectSchema<typeof confectSchemaDefinition>
+    ConfectDataModel.ConfectDataModel.DataModel<
+      ConfectDataModel.ConfectDataModel.FromSchema<
+        typeof confectSchemaDefinition
+      >
+    >
   >();
 export type ConvexMutationCtx = typeof ConvexMutationCtx.Identifier;
 
 export const ConvexActionCtx =
   ConvexActionCtx_.ConvexActionCtx<
-    ConfectSchema.DataModelFromConfectSchema<typeof confectSchemaDefinition>
+    ConfectDataModel.ConfectDataModel.DataModel<
+      ConfectDataModel.ConfectDataModel.FromSchema<
+        typeof confectSchemaDefinition
+      >
+    >
   >();
 export type ConvexActionCtx = typeof ConvexActionCtx.Identifier;

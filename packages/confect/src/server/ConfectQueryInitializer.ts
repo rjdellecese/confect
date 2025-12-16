@@ -25,7 +25,6 @@ import type {
 } from "./ConfectDataModel";
 import * as ConfectDocument from "./ConfectDocument";
 import * as ConfectOrderedQuery from "./ConfectOrderedQuery";
-import type { DataModelFromConfectTables } from "./ConfectSchema";
 import type * as ConfectTable from "./ConfectTable";
 import type * as ConfectTableInfo from "./ConfectTableInfo";
 
@@ -94,14 +93,19 @@ export const make = <
   TableName extends ConfectTable.ConfectTable.Name<Tables>,
 >(
   tableName: TableName,
-  convexDatabaseReader: BaseDatabaseReader<DataModelFromConfectTables<Tables>>,
+  convexDatabaseReader: BaseDatabaseReader<
+    ConfectDataModel.ConfectDataModel.DataModel<
+      ConfectDataModel.ConfectDataModel.FromTables<Tables>
+    >
+  >,
   confectTable: ConfectTable.ConfectTable.WithName<Tables, TableName>,
 ): ConfectQueryInitializer<
   ConfectDataModel.ConfectDataModel<Tables>,
   TableName
 > => {
   type ConfectDataModel_ = ConfectDataModel.ConfectDataModel<Tables>;
-  type ConvexDataModel = DataModelFromConfectTables<Tables>;
+  type ConvexDataModel =
+    ConfectDataModel.ConfectDataModel.DataModel<ConfectDataModel_>;
   type ThisConfectQueryInitializer = ConfectQueryInitializer<
     ConfectDataModel_,
     TableName
@@ -271,7 +275,9 @@ export const getById =
   >(
     tableName: TableName,
     convexDatabaseReader: BaseDatabaseReader<
-      DataModelFromConfectTables<Tables>
+      ConfectDataModel.ConfectDataModel.DataModel<
+        ConfectDataModel.ConfectDataModel.FromTables<Tables>
+      >
     >,
     confectTable: ConfectTable.ConfectTable.WithName<Tables, TableName>,
   ) =>

@@ -1,17 +1,22 @@
 import type { GenericDatabaseReader } from "convex/server";
 import { Array, Context, Layer } from "effect";
 import type { BaseDatabaseReader } from "../typeUtils";
+import type * as ConfectDataModel from "./ConfectDataModel";
 import * as ConfectQueryInitializer from "./ConfectQueryInitializer";
 import * as ConfectSchema from "./ConfectSchema";
 import * as ConfectTable from "./ConfectTable";
 
-export const make = <S extends ConfectSchema.ConfectSchema.AnyWithProps>(
-  schema: S,
+export const make = <
+  ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
+>(
+  schema: ConfectSchema_,
   convexDatabaseReader: GenericDatabaseReader<
-    ConfectSchema.DataModelFromConfectSchema<S>
+    ConfectDataModel.ConfectDataModel.DataModel<
+      ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>
+    >
   >,
 ) => {
-  type Tables = ConfectSchema.ConfectSchema.Tables<S>;
+  type Tables = ConfectSchema.ConfectSchema.Tables<ConfectSchema_>;
   type ExtendedTables = ConfectSchema.ExtendWithConfectSystemTables<Tables>;
   const extendedTables: ExtendedTables =
     ConfectSchema.extendWithConfectSystemTables(
@@ -38,12 +43,18 @@ export const make = <S extends ConfectSchema.ConfectSchema.AnyWithProps>(
             get: convexDatabaseReader.system.get,
             query: convexDatabaseReader.system.query,
           } as BaseDatabaseReader<
-            ConfectSchema.DataModelFromConfectTables<ConfectTable.ConfectSystemTables>
+            ConfectDataModel.ConfectDataModel.DataModel<
+              ConfectDataModel.ConfectDataModel.FromTables<ConfectTable.ConfectSystemTables>
+            >
           >)
         : ({
             get: convexDatabaseReader.get,
             query: convexDatabaseReader.query,
-          } as BaseDatabaseReader<ConfectSchema.DataModelFromConfectSchema<S>>);
+          } as BaseDatabaseReader<
+            ConfectDataModel.ConfectDataModel.DataModel<
+              ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>
+            >
+          >);
 
       return ConfectQueryInitializer.make<ExtendedTables, TableName>(
         tableName,
@@ -55,20 +66,27 @@ export const make = <S extends ConfectSchema.ConfectSchema.AnyWithProps>(
 };
 
 export const ConfectDatabaseReader = <
-  S extends ConfectSchema.ConfectSchema.AnyWithProps,
+  ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
 >() =>
-  Context.GenericTag<ReturnType<typeof make<S>>>(
+  Context.GenericTag<ReturnType<typeof make<ConfectSchema_>>>(
     "@rjdellecese/confect/ConfectDatabaseReader",
   );
 
 export type ConfectDatabaseReader<
-  S extends ConfectSchema.ConfectSchema.AnyWithProps,
-> = ReturnType<typeof ConfectDatabaseReader<S>>["Service"];
+  ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
+> = ReturnType<typeof ConfectDatabaseReader<ConfectSchema_>>["Service"];
 
-export const layer = <S extends ConfectSchema.ConfectSchema.AnyWithProps>(
-  schema: S,
+export const layer = <
+  ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
+>(
+  schema: ConfectSchema_,
   convexDatabaseReader: GenericDatabaseReader<
-    ConfectSchema.DataModelFromConfectSchema<S>
+    ConfectDataModel.ConfectDataModel.DataModel<
+      ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>
+    >
   >,
 ) =>
-  Layer.succeed(ConfectDatabaseReader<S>(), make(schema, convexDatabaseReader));
+  Layer.succeed(
+    ConfectDatabaseReader<ConfectSchema_>(),
+    make(schema, convexDatabaseReader),
+  );

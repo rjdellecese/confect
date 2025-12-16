@@ -6,12 +6,10 @@ import type {
   GenericTableVectorIndexes,
 } from "convex/server";
 import type { Schema } from "effect";
-import type { ReadonlyRecord } from "effect/Record";
+import type * as ConfectDocument from "./ConfectDocument";
 import type * as ConfectSchema from "./ConfectSchema";
 import type * as ConfectTable from "./ConfectTable";
 import type * as ConfectTableInfo from "./ConfectTableInfo";
-import type { ReadonlyValue } from "./SchemaToValidator";
-import type { WithSystemFields } from "./SystemFields";
 
 export declare const TypeId: "@rjdellecese/confect/ConfectDataModel";
 export type TypeId = typeof TypeId;
@@ -33,12 +31,17 @@ export declare namespace ConfectDataModel {
     readonly [TypeId]: TypeId;
   }
 
-  export type AnyWithProps =
-    ConfectDataModel<ConfectTable.ConfectTable.AnyWithProps>;
+  export interface AnyWithProps extends Any {
+    readonly tables: Record<string, ConfectTable.ConfectTable.AnyWithProps>;
+  }
 
   export type FromSchema<
     ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
   > = ConfectDataModel<ConfectSchema.ConfectSchema.Tables<ConfectSchema_>>;
+
+  export type FromTables<
+    Tables_ extends ConfectTable.ConfectTable.AnyWithProps,
+  > = ConfectDataModel<Tables_>;
 
   export type DataModel<ConfectDataModel_ extends AnyWithProps> = {
     [TableName in TableNames<ConfectDataModel_>]: ConfectTableInfo.ConfectTableInfo.TableInfo<
@@ -81,16 +84,6 @@ export declare namespace ConfectDataModel {
   >;
 }
 
-export type GenericConfectDocumentWithSystemFields = WithSystemFields<
-  string,
-  GenericConfectDoc<any, any>
->;
-
-export type GenericEncodedConfectDocument = ReadonlyRecord<
-  string,
-  ReadonlyValue
->;
-
 export type ConfectDocumentByName<
   ConfectDataModel_ extends ConfectDataModel.AnyWithProps,
   TableName extends ConfectDataModel.TableNames<ConfectDataModel_>,
@@ -123,7 +116,7 @@ export type TableInfoFromConfectTableInfo<
 
 export type GenericConfectTableInfo = {
   confectDocument: GenericConfectDoc<any, any>;
-  encodedConfectDocument: GenericEncodedConfectDocument;
+  encodedConfectDocument: ConfectDocument.ConfectDocument.GenericEncoded;
   convexDocument: GenericDocument;
   fieldPaths: GenericFieldPaths;
   indexes: GenericTableIndexes;
