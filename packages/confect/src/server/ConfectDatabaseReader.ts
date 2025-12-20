@@ -17,23 +17,20 @@ export const make = <
   >,
 ) => {
   type Tables = ConfectSchema.ConfectSchema.Tables<ConfectSchema_>;
-  type ExtendedTables = ConfectSchema.ExtendWithConfectSystemTables<Tables>;
-  const extendedTables: ExtendedTables =
-    ConfectSchema.extendWithConfectSystemTables(
-      schema.tables as {
-        [K in Tables["name"]]: Extract<Tables, { name: K }>;
-      },
-    );
+  type IncludedTables = ConfectSchema.IncludeConfectSystemTables<Tables>;
+  const extendedTables = ConfectSchema.extendWithConfectSystemTables(
+    schema.tables as ConfectTable.ConfectTable.TablesRecord<Tables>,
+  );
 
   return {
     table: <
-      const TableName extends ConfectTable.ConfectTable.Name<ExtendedTables>,
+      const TableName extends ConfectTable.ConfectTable.Name<IncludedTables>,
     >(
       tableName: TableName,
     ) => {
       const confectTable = Object.values(extendedTables).find(
         (def) => def.name === tableName,
-      );
+      ) as ConfectTable.ConfectTable.WithName<IncludedTables, TableName>;
 
       const baseDatabaseReader: BaseDatabaseReader<any> = Array.some(
         Object.values(ConfectTable.confectSystemTables),
@@ -56,7 +53,7 @@ export const make = <
             >
           >);
 
-      return ConfectQueryInitializer.make<ExtendedTables, TableName>(
+      return ConfectQueryInitializer.make<IncludedTables, TableName>(
         tableName,
         baseDatabaseReader,
         confectTable,

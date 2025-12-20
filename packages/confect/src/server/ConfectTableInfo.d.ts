@@ -1,12 +1,17 @@
 import type {
   Expand,
   GenericDocument,
+  GenericFieldPaths,
+  GenericTableIndexes,
+  GenericTableSearchIndexes,
+  GenericTableVectorIndexes,
   IdField,
   SystemFields,
   SystemIndexes,
 } from "convex/server";
 import type { GenericValidator } from "convex/values";
 import type { Schema, Types } from "effect";
+import type * as ConfectDocument_ from "./ConfectDocument";
 import type * as ConfectTable from "./ConfectTable";
 
 export declare const TypeId: "@rjdellecese/confect/ConfectTableInfo";
@@ -49,8 +54,15 @@ export declare namespace ConfectTableInfo {
     readonly [TypeId]: TypeId;
   }
 
-  export type AnyWithProps =
-    ConfectTableInfo<ConfectTable.ConfectTable.AnyWithProps>;
+  export interface AnyWithProps extends Any {
+    confectDocument: ConfectDocument_.ConfectDocument.Any;
+    encodedConfectDocument: ConfectDocument_.ConfectDocument.AnyEncoded;
+    convexDocument: GenericDocument;
+    fieldPaths: GenericFieldPaths;
+    indexes: GenericTableIndexes;
+    searchIndexes: GenericTableSearchIndexes;
+    vectorIndexes: GenericTableVectorIndexes;
+  }
 
   export type TableInfo<ConfectTableInfo_ extends AnyWithProps> = {
     document: ConfectTableInfo_["convexDocument"];

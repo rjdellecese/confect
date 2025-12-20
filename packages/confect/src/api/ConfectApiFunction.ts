@@ -25,6 +25,10 @@ export interface ConfectApiFunction<
 }
 
 export declare namespace ConfectApiFunction {
+  export interface Any {
+    readonly [TypeId]: TypeId;
+  }
+
   export interface AnyWithProps
     extends ConfectApiFunction<
       FunctionType,

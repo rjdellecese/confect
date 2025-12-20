@@ -12,7 +12,10 @@ export interface ConfectApiSpec<
 > {
   readonly [TypeId]: TypeId;
   readonly groups: {
-    [GroupName in Groups["name"]]: Extract<Groups, { name: GroupName }>;
+    [GroupName in ConfectApiGroup.ConfectApiGroup.Name<Groups>]: ConfectApiGroup.ConfectApiGroup.WithName<
+      Groups,
+      GroupName
+    >;
   };
 
   add<Group extends ConfectApiGroup.ConfectApiGroup.Any>(
@@ -23,38 +26,34 @@ export interface ConfectApiSpec<
 export declare namespace ConfectApiSpec {
   export interface Any {
     readonly [TypeId]: TypeId;
-  }
-
-  export interface AnyWithProps {
-    readonly [TypeId]: TypeId;
     readonly groups: {
-      [x: string]: any;
+      [key: string]: ConfectApiGroup.ConfectApiGroup.Any;
     };
-    add<Group extends ConfectApiGroup.ConfectApiGroup.Any>(
-      group: Group,
-    ): AnyWithProps;
   }
 
-  export type Groups<Spec extends AnyWithProps> =
-    Spec extends ConfectApiSpec<infer Groups_> ? Groups_ : never;
+  export type AnyWithProps =
+    ConfectApiSpec<ConfectApiGroup.ConfectApiGroup.Any>;
+
+  export type Groups<Spec extends Any> = Spec["groups"][keyof Spec["groups"]];
 }
 
 const Proto = {
   [TypeId]: TypeId,
 
-  add<Group extends ConfectApiGroup.ConfectApiGroup.AnyWithProps>(
+  add<Group extends ConfectApiGroup.ConfectApiGroup.Any>(
     this: ConfectApiSpec.AnyWithProps,
     group: Group,
   ) {
+    const group_ =
+      group as unknown as ConfectApiGroup.ConfectApiGroup.AnyWithProps;
+
     return makeProto({
-      groups: Record.set(this.groups, group.name, group),
+      groups: Record.set(this.groups, group_.name, group_),
     });
   },
 };
 
-const makeProto = <
-  Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
->({
+const makeProto = <Groups extends ConfectApiGroup.ConfectApiGroup.Any>({
   groups,
 }: {
   groups: Record.ReadonlyRecord<string, Groups>;

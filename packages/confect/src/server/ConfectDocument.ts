@@ -12,8 +12,8 @@ export declare namespace ConfectDocument {
     "_creationTime" | "_id"
   >;
 
-  // TODO: `AnyEncoded`
-  export type GenericEncoded = ReadonlyRecord<string, ReadonlyValue>;
+  export type Any = any;
+  export type AnyEncoded = ReadonlyRecord<string, ReadonlyValue>;
 }
 
 export const decode = Function.dual<

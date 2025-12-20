@@ -237,6 +237,10 @@ export declare namespace ConfectTable {
     Table extends AnyWithProps,
     Name_ extends string,
   > = Extract<Table, { readonly name: Name_ }>;
+
+  export type TablesRecord<Tables extends AnyWithProps> = {
+    readonly [TableName_ in Name<Tables>]: WithName<Tables, TableName_>;
+  };
 }
 
 const Proto = {

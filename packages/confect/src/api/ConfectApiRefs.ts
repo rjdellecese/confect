@@ -12,9 +12,9 @@ type Helper<Groups extends ConfectApiGroup.ConfectApiGroup.Any> = {
   [GroupName in ConfectApiGroup.ConfectApiGroup.Name<Groups>]: ConfectApiGroup.ConfectApiGroup.WithName<
     Groups,
     GroupName
-  > extends infer Group extends ConfectApiGroup.ConfectApiGroup.AnyWithProps
+  > extends infer Group extends ConfectApiGroup.ConfectApiGroup.Any
     ? ConfectApiGroup.ConfectApiGroup.Groups<Group> extends infer SubGroups extends
-        ConfectApiGroup.ConfectApiGroup.AnyWithProps
+        ConfectApiGroup.ConfectApiGroup.Any
       ? Types.Simplify<
           Helper<SubGroups> & {
             [FunctionName in ConfectApiFunction.ConfectApiFunction.Name<
@@ -238,14 +238,14 @@ export const make = <Spec extends ConfectApiSpec.ConfectApiSpec.AnyWithProps>(
   makeHelper(spec.groups, "confect") as ConfectApiRefs<Spec>;
 
 const makeHelper = (
-  groups: Record.ReadonlyRecord<
-    string,
-    ConfectApiGroup.ConfectApiGroup.AnyWithProps
-  >,
+  groups: Record.ReadonlyRecord<string, ConfectApiGroup.ConfectApiGroup.Any>,
   groupPath: string | null,
 ): ConfectApiRefs.AnyWithProps =>
   pipe(
-    groups,
+    groups as Record.ReadonlyRecord<
+      string,
+      ConfectApiGroup.ConfectApiGroup.AnyWithProps
+    >,
     Record.map((group) => {
       const currentGroupPath = groupPath
         ? `${groupPath}/${group.name}`

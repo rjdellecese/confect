@@ -6,7 +6,6 @@ import { describe, expectTypeOf, test } from "vitest";
 import type {
   DataModelFromConfectDataModel,
   GenericConfectDataModel,
-  TableInfoFromConfectTableInfo,
 } from "../src/server/ConfectDataModel";
 import {
   type ConfectDataModelFromConfectSchema,
@@ -15,6 +14,7 @@ import {
   type GenericConfectSchema,
   make,
 } from "../src/server/ConfectSchema";
+import type * as ConfectTableInfo from "../src/server/ConfectTableInfo";
 
 describe("ConfectDataModelFromConfectSchema", () => {
   test("extends GenericConfectDataModel and equals correct document and confectDocument types", () => {
@@ -65,7 +65,7 @@ describe("ConfectSchemaFromConfectSchemaDefinition", () => {
   });
 });
 
-describe("TableInfoFromConfectTableInfo", () => {
+describe("ConfectTableInfo.TableInfo", () => {
   test("extends GenericTableInfo", () => {
     const TableSchema = Schema.Struct({
       content: Schema.String,
@@ -79,9 +79,10 @@ describe("TableInfoFromConfectTableInfo", () => {
       typeof _confectSchemaDefinition
     >;
     type ConfectDataModel = ConfectDataModelFromConfectSchema<ConfectSchema>;
-    type ConfectTableInfo = ConfectDataModel["notes"];
+    type ConfectTableInfo_ = ConfectDataModel["notes"];
 
-    type TableInfo = TableInfoFromConfectTableInfo<ConfectTableInfo>;
+    type TableInfo =
+      ConfectTableInfo.ConfectTableInfo.TableInfo<ConfectTableInfo_>;
 
     expectTypeOf<TableInfo>().toExtend<GenericTableInfo>();
   });

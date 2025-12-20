@@ -19,12 +19,7 @@ export interface ConfectSchema<
   Tables extends ConfectTable.ConfectTable.AnyWithProps = never,
 > {
   readonly [TypeId]: TypeId;
-  readonly tables: {
-    [TableName in Tables["name"]]: Extract<
-      Tables,
-      { readonly name: TableName }
-    >;
-  };
+  readonly tables: ConfectTable.ConfectTable.TablesRecord<Tables>;
   readonly convexSchemaDefinition: SchemaDefinition<GenericSchema, true>;
 
   /**
@@ -116,14 +111,20 @@ export const confectSystemSchema = make()
 
 export const extendWithConfectSystemTables = <
   Tables extends ConfectTable.ConfectTable.AnyWithProps,
->(tables: {
-  [K in Tables["name"]]: Extract<Tables, { readonly name: K }>;
-}): ExtendWithConfectSystemTables<Tables> =>
+>(
+  tables: ConfectTable.ConfectTable.TablesRecord<Tables>,
+): ExtendWithConfectSystemTables<Tables> =>
   ({
     ...tables,
     ...ConfectTable.confectSystemTables,
-  }) as any;
+  }) as ExtendWithConfectSystemTables<Tables>;
 
 export type ExtendWithConfectSystemTables<
+  Tables extends ConfectTable.ConfectTable.AnyWithProps,
+> = ConfectTable.ConfectTable.TablesRecord<
+  Tables | ConfectTable.ConfectSystemTables
+>;
+
+export type IncludeConfectSystemTables<
   Tables extends ConfectTable.ConfectTable.AnyWithProps,
 > = Tables | ConfectTable.ConfectSystemTables;

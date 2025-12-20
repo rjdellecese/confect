@@ -158,33 +158,40 @@ const makeHandlers = <
   Object.assign(Object.create(HandlersProto), { group, items });
 
 export const group = <
-  ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
-  Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
-  const GroupPath extends ConfectApiGroup.Path.All<Groups>,
+  ConfectApi_ extends ConfectApi.ConfectApi.AnyWithProps,
+  const GroupPath extends ConfectApiGroup.Path.All<
+    ConfectApi.ConfectApi.Groups<ConfectApi_>
+  >,
   Return extends Handlers.AnyWithProps,
 >(
-  api: ConfectApi.ConfectApi<ConfectSchema_, Groups>,
+  confectApi: ConfectApi_,
   groupPath: GroupPath,
   build: (
     handlers: Handlers.FromGroup<
-      ConfectSchema_,
-      ConfectApiGroup.Path.GroupAt<Groups, GroupPath>
+      ConfectApi.ConfectApi.ConfectSchema<ConfectApi_>,
+      ConfectApiGroup.Path.GroupAt<
+        ConfectApi.ConfectApi.Groups<ConfectApi_>,
+        GroupPath
+      >
     >,
   ) => Handlers.ValidateReturn<Return>,
 ): Layer.Layer<
   ConfectApiGroupService<GroupPath>,
   never,
-  ConfectApiGroupService.FromGroupWithPath<GroupPath, Groups>
+  ConfectApiGroupService.FromGroupWithPath<
+    GroupPath,
+    ConfectApi.ConfectApi.Groups<ConfectApi_>
+  >
 > => {
   const groupPathParts = String.split(groupPath, ".");
   const [firstGroupPathPart, ...restGroupPathParts] = groupPathParts;
 
   // TODO: Move this implementation to a module for handling paths/group paths?
-  const group_ = Array.reduce(
+  const group_: ConfectApiGroup.ConfectApiGroup.AnyWithProps = Array.reduce(
     restGroupPathParts,
-    api.spec.groups[firstGroupPathPart as keyof typeof api.spec.groups]!,
-    (currentGroup, groupPathPart) =>
-      currentGroup.groups[groupPathPart as keyof typeof currentGroup.groups]!,
+    (confectApi as any).spec.groups[firstGroupPathPart as any]!,
+    (currentGroup: any, groupPathPart: any) =>
+      currentGroup.groups[groupPathPart],
   );
 
   const items = Array.empty();
@@ -217,12 +224,12 @@ export const group = <
   );
 };
 
-export const api = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
-  api_: Api,
+export const api = <ConfectApi_ extends ConfectApi.ConfectApi.AnyWithProps>(
+  api_: ConfectApi_,
 ): Layer.Layer<
   ConfectApiService,
   never,
-  ConfectApiGroupService.FromGroups<ConfectApi.ConfectApi.Groups<Api>>
+  ConfectApiGroupService.FromGroups<ConfectApi.ConfectApi.Groups<ConfectApi_>>
 > =>
   Layer.effect(
     ConfectApiService,
@@ -246,13 +253,16 @@ export const ConfectApiGroupService = <GroupPath extends string>({
   );
 
 export declare namespace ConfectApiGroupService {
-  export type FromGroups<
-    Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
-  > = Groups extends never ? never : ConfectApiGroupService<Groups["name"]>;
+  export type FromGroups<Groups extends ConfectApiGroup.ConfectApiGroup.Any> =
+    Groups extends never
+      ? never
+      : Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps
+        ? ConfectApiGroupService<ConfectApiGroup.ConfectApiGroup.Name<Groups>>
+        : never;
 
   export type FromGroupWithPath<
     GroupPath extends string,
-    Group extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
+    Group extends ConfectApiGroup.ConfectApiGroup.Any,
   > =
     ConfectApiGroup.Path.SubGroupsAt<
       Group,

@@ -19,7 +19,6 @@ import type { GenericId } from "convex/values";
 import { Array, Effect, Either, pipe, Schema } from "effect";
 import type { BaseDatabaseReader, IndexFieldTypesForEq } from "../typeUtils";
 import type * as ConfectDataModel from "./ConfectDataModel";
-import type { TableInfoFromConfectTableInfo } from "./ConfectDataModel";
 import * as ConfectDocument from "./ConfectDocument";
 import * as ConfectOrderedQuery from "./ConfectOrderedQuery";
 import type * as ConfectTable from "./ConfectTable";
@@ -114,7 +113,10 @@ export const make = <
 
   const getByIndex = <
     IndexName extends keyof Indexes<
-      TableInfoFromConfectTableInfo<ConfectDataModel_[TableName]>
+      ConfectDataModel.ConfectDataModel.TableInfoWithName<
+        ConfectDataModel_,
+        TableName
+      >
     >,
   >(
     indexName: IndexName,
@@ -122,11 +124,17 @@ export const make = <
       ConfectDataModel.ConfectDataModel.DataModel<ConfectDataModel_>,
       TableName,
       Indexes<
-        TableInfoFromConfectTableInfo<ConfectDataModel_[TableName]>
+        ConfectDataModel.ConfectDataModel.TableInfoWithName<
+          ConfectDataModel_,
+          TableName
+        >
       >[IndexName]
     >,
   ): Effect.Effect<
-    ConfectDataModel_[TableName]["confectDocument"],
+    ConfectDataModel.ConfectDataModel.ConfectDocumentWithName<
+      ConfectDataModel_,
+      TableName
+    >,
     ConfectDocument.DocumentDecodeError | GetByIndexFailure
   > => {
     const indexFields: GenericTableIndexes[keyof GenericTableIndexes] = (
@@ -172,7 +180,10 @@ export const make = <
 
       return getByIndex(
         indexName as keyof Indexes<
-          TableInfoFromConfectTableInfo<ConfectDataModel_[TableName]>
+          ConfectDataModel.ConfectDataModel.TableInfoWithName<
+            ConfectDataModel_,
+            TableName
+          >
         >,
         indexFieldValues,
       );
@@ -181,16 +192,25 @@ export const make = <
 
   const index: ConfectQueryInitializerFunction<"index"> = <
     IndexName extends keyof Indexes<
-      TableInfoFromConfectTableInfo<ConfectDataModel_[TableName]>
+      ConfectDataModel.ConfectDataModel.TableInfoWithName<
+        ConfectDataModel_,
+        TableName
+      >
     >,
   >(
     indexName: IndexName,
     indexRangeOrOrder?:
       | ((
           q: IndexRangeBuilder<
-            ConfectDataModel_[TableName]["convexDocument"],
+            ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+              ConfectDataModel_,
+              TableName
+            >["convexDocument"],
             NamedIndex<
-              TableInfoFromConfectTableInfo<ConfectDataModel_[TableName]>,
+              ConfectDataModel.ConfectDataModel.TableInfoWithName<
+                ConfectDataModel_,
+                TableName
+              >,
               IndexName
             >
           >,
@@ -240,18 +260,26 @@ export const make = <
       applyOrder,
     );
 
-    return ConfectOrderedQuery.make<ConfectDataModel_[TableName], TableName>(
-      orderedQuery,
-      tableName,
-      confectTable.Fields,
-    );
+    return ConfectOrderedQuery.make<
+      ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+        ConfectDataModel_,
+        TableName
+      >,
+      TableName
+    >(orderedQuery, tableName, confectTable.Fields);
   };
 
   const search: ConfectQueryInitializerFunction<"search"> = (
     indexName,
     searchFilter,
   ) =>
-    ConfectOrderedQuery.make<ConfectDataModel_[TableName], TableName>(
+    ConfectOrderedQuery.make<
+      ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+        ConfectDataModel_,
+        TableName
+      >,
+      TableName
+    >(
       convexDatabaseReader
         .query(tableName)
         .withSearchIndex(indexName, searchFilter),

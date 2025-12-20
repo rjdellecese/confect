@@ -84,7 +84,16 @@ type MyConfectSchema = typeof confectSchema;
 
 const Spec = ConfectApiSpec.make().add(GroupA).add(GroupB);
 
+type Spec = typeof Spec;
+
+type Groups = ConfectApiSpec.ConfectApiSpec.Groups<Spec>;
+type GroupNames = ConfectApiGroup.ConfectApiGroup.Name<Groups>;
+
 const Api = ConfectApi.make(confectSchema, Spec);
+
+type GroupPath = ConfectApiGroup.Path.All<
+  ConfectApiSpec.ConfectApiSpec.Groups<Spec>
+>;
 
 const GroupALive = ConfectApiBuilder.group(Api, "groupA", (handlers) =>
   handlers
