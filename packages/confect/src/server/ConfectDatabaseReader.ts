@@ -71,7 +71,7 @@ export const ConfectDatabaseReader = <
 
 export type ConfectDatabaseReader<
   ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
-> = ReturnType<typeof ConfectDatabaseReader<ConfectSchema_>>["Service"];
+> = ReturnType<typeof ConfectDatabaseReader<ConfectSchema_>>["Identifier"];
 
 export const layer = <
   ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,

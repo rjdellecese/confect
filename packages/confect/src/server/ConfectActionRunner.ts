@@ -21,7 +21,7 @@ const makeActionRunner =
 
 export const ConfectActionRunner = Context.GenericTag<
   ReturnType<typeof makeActionRunner>
->("@rjdellecese/confect/ConfectActionRunner");
+>("@rjdellecese/confect/server/ConfectActionRunner");
 export type ConfectActionRunner = typeof ConfectActionRunner.Identifier;
 
 export const layer = (runAction: GenericActionCtx<any>["runAction"]) =>

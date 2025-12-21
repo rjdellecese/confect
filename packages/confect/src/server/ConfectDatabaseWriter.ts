@@ -188,7 +188,7 @@ export const ConfectDatabaseWriter = <
 
 export type ConfectDatabaseWriter<
   ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
-> = ReturnType<typeof ConfectDatabaseWriter<ConfectSchema_>>["Service"];
+> = ReturnType<typeof ConfectDatabaseWriter<ConfectSchema_>>["Identifier"];
 
 export const layer = <
   ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,

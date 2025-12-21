@@ -8,4 +8,4 @@ export const ConvexQueryCtx = <DataModel extends GenericDataModel>() =>
 
 export type ConvexQueryCtx<DataModel extends GenericDataModel> = ReturnType<
   typeof ConvexQueryCtx<DataModel>
->["Service"];
+>["Identifier"];

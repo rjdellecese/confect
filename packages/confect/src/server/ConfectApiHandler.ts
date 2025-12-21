@@ -92,7 +92,9 @@ export type ActionHandler<
   | ConfectQueryRunner.ConfectQueryRunner
   | ConfectMutationRunner.ConfectMutationRunner
   | ConfectActionRunner.ConfectActionRunner
-  | ConfectVectorSearch.ConfectVectorSearch
+  | ConfectVectorSearch.ConfectVectorSearch<
+      ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>
+    >
   | ConvexActionCtx.ConvexActionCtx<
       ConfectDataModel.ConfectDataModel.DataModel<
         ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>

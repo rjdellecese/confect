@@ -7,9 +7,23 @@ import type {
 import { Schema } from "effect";
 
 /**
+ * Type alias for the SystemFields schema with explicit context.
+ */
+export type SystemFieldsSchema<TableName extends string> = Schema.Struct<{
+  _id: Schema.Schema<
+    GenericId.GenericId<TableName>,
+    GenericId.GenericId<TableName>,
+    never
+  >;
+  _creationTime: typeof Schema.Number;
+}>;
+
+/**
  * Produces a schema for Convex system fields.
  */
-export const SystemFields = <TableName extends string>(tableName: TableName) =>
+export const SystemFields = <TableName extends string>(
+  tableName: TableName,
+): SystemFieldsSchema<TableName> =>
   Schema.Struct({
     _id: GenericId.GenericId(tableName),
     _creationTime: Schema.Number,
@@ -33,7 +47,7 @@ export const extendWithSystemFields = <
 export type ExtendWithSystemFields<
   TableName extends string,
   TableSchema extends Schema.Schema.AnyNoContext,
-> = Schema.extend<ReturnType<typeof SystemFields<TableName>>, TableSchema>;
+> = Schema.extend<SystemFieldsSchema<TableName>, TableSchema>;
 
 export type WithSystemFields<TableName extends string, Document> = Expand<
   Readonly<IdField<TableName>> & Readonly<NonIdSystemFields> & Document

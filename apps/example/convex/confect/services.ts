@@ -3,10 +3,10 @@ import {
   ConfectAuth as ConfectAuth_,
   ConfectDatabaseReader as ConfectDatabaseReader_,
   ConfectDatabaseWriter as ConfectDatabaseWriter_,
+  ConfectDataModel,
   ConfectMutationRunner as ConfectMutationRunner_,
   ConfectQueryRunner as ConfectQueryRunner_,
   ConfectScheduler as ConfectScheduler_,
-  ConfectDataModel,
   ConfectStorage,
   ConfectVectorSearch as ConfectVectorSearch_,
   ConvexActionCtx as ConvexActionCtx_,
@@ -32,7 +32,10 @@ export const ConfectStorageActionWriter =
 export type ConfectStorageActionWriter =
   typeof ConfectStorageActionWriter.Identifier;
 
-export const ConfectVectorSearch = ConfectVectorSearch_.ConfectVectorSearch;
+export const ConfectVectorSearch =
+  ConfectVectorSearch_.ConfectVectorSearch<
+    ConfectDataModel.ConfectDataModel.FromSchema<typeof confectSchemaDefinition>
+  >();
 export type ConfectVectorSearch = typeof ConfectVectorSearch.Identifier;
 
 export const ConfectDatabaseReader =

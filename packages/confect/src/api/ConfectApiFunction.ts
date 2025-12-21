@@ -33,7 +33,7 @@ export declare namespace ConfectApiFunction {
     extends ConfectApiFunction<
       FunctionType,
       FunctionVisibility,
-      any,
+      string,
       Schema.Schema.AnyNoContext,
       Schema.Schema.AnyNoContext
     > {}
@@ -42,7 +42,7 @@ export declare namespace ConfectApiFunction {
     extends ConfectApiFunction<
       FunctionType_,
       FunctionVisibility,
-      any,
+      string,
       Schema.Schema.AnyNoContext,
       Schema.Schema.AnyNoContext
     > {}
@@ -51,62 +51,19 @@ export declare namespace ConfectApiFunction {
   export type FunctionType = "Query" | "Mutation" | "Action";
 
   export type GetFunctionType<Function extends AnyWithProps> =
-    Function extends ConfectApiFunction<
-      infer FunctionType_,
-      infer _FunctionVisibility,
-      infer _Name,
-      infer _Args,
-      infer _Returns
-    >
-      ? FunctionType_
-      : never;
+    Function["functionType"];
 
   // TODO: Use type from convex-js?
   export type FunctionVisibility = "Public" | "Internal";
 
   export type GetFunctionVisibility<Function extends AnyWithProps> =
-    Function extends ConfectApiFunction<
-      infer _FunctionType,
-      infer FunctionVisibility_,
-      infer _Name,
-      infer _Args,
-      infer _Returns
-    >
-      ? FunctionVisibility_
-      : never;
+    Function["functionVisibility"];
 
-  export type Name<Function extends AnyWithProps> =
-    Function extends ConfectApiFunction<
-      infer _FunctionType,
-      infer _FunctionVisibility,
-      infer Name_,
-      infer _Args,
-      infer _Returns
-    >
-      ? Name_
-      : never;
+  export type Name<Function extends AnyWithProps> = Function["name"];
 
-  export type Args<Function extends AnyWithProps> =
-    Function extends ConfectApiFunction<
-      infer _FunctionType,
-      infer _FunctionVisibility,
-      infer _Name,
-      infer Args_,
-      infer _Returns
-    >
-      ? Args_
-      : never;
+  export type Args<Function extends AnyWithProps> = Function["args"];
 
-  export type Returns<Function extends AnyWithProps> =
-    Function extends ConfectApiFunction<
-      infer _FunctionType,
-      infer _FunctionVisibility,
-      infer _Name,
-      infer _Args,
-      infer Returns_
-    >
-      ? Returns_
-      : never;
+  export type Returns<Function extends AnyWithProps> = Function["returns"];
 
   export type WithName<
     Function extends AnyWithProps,
@@ -120,7 +77,7 @@ export declare namespace ConfectApiFunction {
 
   export type ExcludeName<
     Function extends AnyWithProps,
-    Name_ extends string,
+    Name_ extends Name<Function>,
   > = Exclude<Function, { readonly name: Name_ }>;
 }
 

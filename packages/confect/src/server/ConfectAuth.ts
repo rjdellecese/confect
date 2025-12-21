@@ -15,10 +15,9 @@ const make = (auth: Auth) => ({
   ),
 });
 
-export class ConfectAuth extends Effect.Tag("@rjdellecese/confect/ConfectAuth")<
-  ConfectAuth,
-  ReturnType<typeof make>
->() {}
+export class ConfectAuth extends Effect.Tag(
+  "@rjdellecese/confect/server/ConfectAuth",
+)<ConfectAuth, ReturnType<typeof make>>() {}
 
 export const layer = (auth: Auth) => Layer.succeed(ConfectAuth, make(auth));
 

@@ -76,11 +76,15 @@ export declare namespace Handlers {
     };
   }
 
-  export interface AnyWithProps
-    extends Handlers<
-      ConfectSchema.ConfectSchema.AnyWithProps,
-      ConfectApiFunction.ConfectApiFunction.AnyWithProps
-    > {}
+  export interface AnyWithProps extends Any {
+    readonly group: ConfectApiGroup.ConfectApiGroup.AnyWithProps;
+    readonly items: ReadonlyArray<Handlers.Item.AnyWithProps>;
+
+    handle<Name extends string>(
+      name: Name,
+      handler: ConfectApiHandler.ConfectApiHandler.AnyWithProps,
+    ): AnyWithProps;
+  }
 
   export interface Item<
     ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
@@ -104,7 +108,7 @@ export declare namespace Handlers {
 
   export type FromGroup<
     ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
-    Group extends ConfectApiGroup.ConfectApiGroup.Any,
+    Group extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
   > = Handlers<
     ConfectSchema_,
     ConfectApiGroup.ConfectApiGroup.Functions<Group>
@@ -262,7 +266,7 @@ export declare namespace ConfectApiGroupService {
 
   export type FromGroupWithPath<
     GroupPath extends string,
-    Group extends ConfectApiGroup.ConfectApiGroup.Any,
+    Group extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
   > =
     ConfectApiGroup.Path.SubGroupsAt<
       Group,

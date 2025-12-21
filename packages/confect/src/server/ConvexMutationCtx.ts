@@ -8,4 +8,4 @@ export const ConvexMutationCtx = <DataModel extends GenericDataModel>() =>
 
 export type ConvexMutationCtx<DataModel extends GenericDataModel> = ReturnType<
   typeof ConvexMutationCtx<DataModel>
->["Service"];
+>["Identifier"];

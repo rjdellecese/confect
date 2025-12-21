@@ -31,7 +31,7 @@ const make = (scheduler: Scheduler) => ({
 });
 
 export class ConfectScheduler extends Effect.Tag(
-  "@rjdellecese/confect/ConfectScheduler",
+  "@rjdellecese/confect/server/ConfectScheduler",
 )<ConfectScheduler, ReturnType<typeof make>>() {}
 
 export const layer = (scheduler: Scheduler) =>

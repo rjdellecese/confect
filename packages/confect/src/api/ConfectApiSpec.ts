@@ -8,7 +8,7 @@ export const isConfectApi = (u: unknown): u is ConfectApiSpec.Any =>
   Predicate.hasProperty(u, TypeId);
 
 export interface ConfectApiSpec<
-  Groups extends ConfectApiGroup.ConfectApiGroup.Any = never,
+  Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps = never,
 > {
   readonly [TypeId]: TypeId;
   readonly groups: {
@@ -18,7 +18,7 @@ export interface ConfectApiSpec<
     >;
   };
 
-  add<Group extends ConfectApiGroup.ConfectApiGroup.Any>(
+  add<Group extends ConfectApiGroup.ConfectApiGroup.AnyWithProps>(
     group: Group,
   ): ConfectApiSpec<Groups | Group>;
 }
@@ -26,21 +26,25 @@ export interface ConfectApiSpec<
 export declare namespace ConfectApiSpec {
   export interface Any {
     readonly [TypeId]: TypeId;
-    readonly groups: {
-      [key: string]: ConfectApiGroup.ConfectApiGroup.Any;
-    };
   }
 
-  export type AnyWithProps =
-    ConfectApiSpec<ConfectApiGroup.ConfectApiGroup.Any>;
+  export interface AnyWithProps extends Any {
+    readonly groups: {
+      readonly [key: string]: ConfectApiGroup.ConfectApiGroup.AnyWithProps;
+    };
+    add<Group extends ConfectApiGroup.ConfectApiGroup.AnyWithProps>(
+      group: Group,
+    ): AnyWithProps;
+  }
 
-  export type Groups<Spec extends Any> = Spec["groups"][keyof Spec["groups"]];
+  export type Groups<Spec extends AnyWithProps> =
+    Spec["groups"][keyof Spec["groups"]];
 }
 
 const Proto = {
   [TypeId]: TypeId,
 
-  add<Group extends ConfectApiGroup.ConfectApiGroup.Any>(
+  add<Group extends ConfectApiGroup.ConfectApiGroup.AnyWithProps>(
     this: ConfectApiSpec.AnyWithProps,
     group: Group,
   ) {
@@ -53,7 +57,9 @@ const Proto = {
   },
 };
 
-const makeProto = <Groups extends ConfectApiGroup.ConfectApiGroup.Any>({
+const makeProto = <
+  Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
+>({
   groups,
 }: {
   groups: Record.ReadonlyRecord<string, Groups>;

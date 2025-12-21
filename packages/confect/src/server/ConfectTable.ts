@@ -146,7 +146,7 @@ export declare namespace ConfectTable {
       infer _SearchIndexes,
       infer _VectorIndexes
     >
-      ? TableName
+      ? TableName & string
       : never;
 
   export type TableSchema<Table extends AnyWithProps> =
@@ -236,7 +236,7 @@ export declare namespace ConfectTable {
   export type WithName<
     Table extends AnyWithProps,
     Name_ extends string,
-  > = Extract<Table, { readonly name: Name_ }>;
+  > = Table extends { readonly name: Name_ } ? Table : never;
 
   export type TablesRecord<Tables extends AnyWithProps> = {
     readonly [TableName_ in Name<Tables>]: WithName<Tables, TableName_>;

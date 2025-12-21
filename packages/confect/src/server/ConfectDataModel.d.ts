@@ -51,21 +51,25 @@ export declare namespace ConfectDataModel {
     ConfectDataModel_ extends AnyWithProps,
     TableName extends TableNames<ConfectDataModel_>,
   > = ConfectTableInfo.ConfectTableInfo<
-    TableWithName<ConfectDataModel_, TableName>
+    ConfectTable.ConfectTable.WithName<Tables<ConfectDataModel_>, TableName>
   >;
 
   export type TableInfoWithName<
     ConfectDataModel_ extends AnyWithProps,
     TableName extends TableNames<ConfectDataModel_>,
   > = ConfectTableInfo.ConfectTableInfo.TableInfo<
-    ConfectTableInfoWithName<ConfectDataModel_, TableName>
+    ConfectTableInfo.ConfectTableInfo<
+      ConfectTable.ConfectTable.WithName<Tables<ConfectDataModel_>, TableName>
+    >
   >;
 
   export type ConfectDocumentWithName<
     ConfectDataModel_ extends AnyWithProps,
     TableName extends TableNames<ConfectDataModel_>,
   > = ConfectTableInfo.ConfectTableInfo.ConfectDocument<
-    ConfectTableInfoWithName<ConfectDataModel_, TableName>
+    ConfectTableInfo.ConfectTableInfo<
+      ConfectTable.ConfectTable.WithName<Tables<ConfectDataModel_>, TableName>
+    >
   >;
 }
 

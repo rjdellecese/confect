@@ -8,13 +8,13 @@ export type ConfectApiRefs<
   Spec extends ConfectApiSpec.ConfectApiSpec.AnyWithProps,
 > = Types.Simplify<Helper<ConfectApiSpec.ConfectApiSpec.Groups<Spec>>>;
 
-type Helper<Groups extends ConfectApiGroup.ConfectApiGroup.Any> = {
+type Helper<Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps> = {
   [GroupName in ConfectApiGroup.ConfectApiGroup.Name<Groups>]: ConfectApiGroup.ConfectApiGroup.WithName<
     Groups,
     GroupName
-  > extends infer Group extends ConfectApiGroup.ConfectApiGroup.Any
+  > extends infer Group extends ConfectApiGroup.ConfectApiGroup.AnyWithProps
     ? ConfectApiGroup.ConfectApiGroup.Groups<Group> extends infer SubGroups extends
-        ConfectApiGroup.ConfectApiGroup.Any
+        ConfectApiGroup.ConfectApiGroup.AnyWithProps
       ? Types.Simplify<
           Helper<SubGroups> & {
             [FunctionName in ConfectApiFunction.ConfectApiFunction.Name<
@@ -58,8 +58,11 @@ export const justPublic = <Refs extends ConfectApiRefs.AnyWithProps>(
 ): FilterRefs<Refs, Ref.AnyPublic> => refs as any;
 
 export declare namespace ConfectApiRefs {
-  export interface AnyWithProps
-    extends ConfectApiRefs<ConfectApiSpec.ConfectApiSpec.AnyWithProps> {}
+  export type AnyWithProps =
+    | {
+        readonly [key: string]: ConfectApiRefs.AnyWithProps;
+      }
+    | Ref.Any;
 }
 
 const HiddenFunctionKey = "@rjdellecese/confect/HiddenFunctionKey";

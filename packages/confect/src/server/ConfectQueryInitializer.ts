@@ -1,5 +1,7 @@
 import type {
   DocumentByInfo,
+  GenericIndexFields,
+  GenericSearchIndexConfig,
   GenericTableIndexes,
   GenericTableInfo,
   Indexes,
@@ -51,7 +53,7 @@ type ConfectQueryInitializer<
       ...indexFieldValues: IndexFieldTypesForEq<
         ConfectDataModel.ConfectDataModel.DataModel<ConfectDataModel_>,
         TableName,
-        Indexes<_TableInfo>[IndexName]
+        Indexes<_TableInfo>[IndexName] & GenericIndexFields
       >
     ): Effect.Effect<
       _ConfectTableInfo["confectDocument"],
@@ -64,7 +66,7 @@ type ConfectQueryInitializer<
       indexRange?: (
         q: IndexRangeBuilder<
           _ConfectTableInfo["convexDocument"],
-          NamedIndex<_TableInfo, IndexName>
+          NamedIndex<_TableInfo, IndexName> & GenericIndexFields
         >,
       ) => IndexRange,
       order?: "asc" | "desc",
@@ -79,7 +81,7 @@ type ConfectQueryInitializer<
     searchFilter: (
       q: SearchFilterBuilder<
         DocumentByInfo<_TableInfo>,
-        NamedSearchIndex<_TableInfo, IndexName>
+        NamedSearchIndex<_TableInfo, IndexName> & GenericSearchIndexConfig
       >,
     ) => SearchFilter,
   ) => ConfectOrderedQuery.ConfectOrderedQuery<_ConfectTableInfo, TableName>;
@@ -98,14 +100,30 @@ export const make = <
   confectTable: ConfectTable.ConfectTable.WithName<Tables, TableName>,
 ): ConfectQueryInitializer<
   ConfectDataModel.ConfectDataModel<Tables>,
-  TableName
+  TableName,
+  ConfectDataModel.ConfectDataModel.TableInfoWithName<
+    ConfectDataModel.ConfectDataModel<Tables>,
+    TableName
+  >,
+  ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+    ConfectDataModel.ConfectDataModel<Tables>,
+    TableName
+  >
 > => {
   type ConfectDataModel_ = ConfectDataModel.ConfectDataModel<Tables>;
   type ConvexDataModel =
     ConfectDataModel.ConfectDataModel.DataModel<ConfectDataModel_>;
   type ThisConfectQueryInitializer = ConfectQueryInitializer<
     ConfectDataModel_,
-    TableName
+    TableName,
+    ConfectDataModel.ConfectDataModel.TableInfoWithName<
+      ConfectDataModel_,
+      TableName
+    >,
+    ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+      ConfectDataModel_,
+      TableName
+    >
   >;
   type ConfectQueryInitializerFunction<
     FunctionName extends keyof ThisConfectQueryInitializer,

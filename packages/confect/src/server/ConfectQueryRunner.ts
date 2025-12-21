@@ -3,7 +3,7 @@ import type { ParseResult } from "effect";
 import { Context, Effect, Layer, Schema } from "effect";
 import { ConfectApiRefs } from "../api";
 
-const makeQueryRunner =
+const make =
   (runQuery: GenericQueryCtx<any>["runQuery"]) =>
   <Query extends ConfectApiRefs.Ref.AnyQuery>(
     query: Query,
@@ -23,10 +23,10 @@ const makeQueryRunner =
       return yield* Schema.decode(function_.returns)(encodedReturns);
     });
 
-export const ConfectQueryRunner = Context.GenericTag<
-  ReturnType<typeof makeQueryRunner>
->("@rjdellecese/confect/ConfectQueryRunner");
+export const ConfectQueryRunner = Context.GenericTag<ReturnType<typeof make>>(
+  "@rjdellecese/confect/server/ConfectQueryRunner",
+);
 export type ConfectQueryRunner = typeof ConfectQueryRunner.Identifier;
 
 export const layer = (runQuery: GenericQueryCtx<any>["runQuery"]) =>
-  Layer.succeed(ConfectQueryRunner, makeQueryRunner(runQuery));
+  Layer.succeed(ConfectQueryRunner, make(runQuery));

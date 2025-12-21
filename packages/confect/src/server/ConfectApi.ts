@@ -12,7 +12,7 @@ export const isConfectApi = (u: unknown): u is ConfectApi.Any =>
 
 export interface ConfectApi<
   ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
-  ConfectApiSpec_ extends ConfectApiSpec.ConfectApiSpec.Any,
+  ConfectApiSpec_ extends ConfectApiSpec.ConfectApiSpec.AnyWithProps,
 > {
   readonly [TypeId]: TypeId;
   readonly spec: ConfectApiSpec_;
@@ -23,8 +23,6 @@ export interface ConfectApi<
 export declare namespace ConfectApi {
   export interface Any {
     readonly [TypeId]: TypeId;
-    readonly spec: ConfectApiSpec.ConfectApiSpec.Any;
-    readonly confectSchema: ConfectSchema.ConfectSchema.Any;
   }
 
   export interface AnyWithProps extends Any {
@@ -34,9 +32,9 @@ export declare namespace ConfectApi {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-shadow
-  export type ConfectSchema<Api extends Any> = Api["confectSchema"];
+  export type ConfectSchema<Api extends AnyWithProps> = Api["confectSchema"];
 
-  export type Groups<ConfectApi_ extends Any> =
+  export type Groups<ConfectApi_ extends AnyWithProps> =
     ConfectApiSpec.ConfectApiSpec.Groups<ConfectApi_["spec"]>;
 }
 
@@ -46,7 +44,7 @@ const Proto = {
 
 const makeProto = <
   ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
-  ConfectApiSpec_ extends ConfectApiSpec.ConfectApiSpec.Any,
+  ConfectApiSpec_ extends ConfectApiSpec.ConfectApiSpec.AnyWithProps,
 >({
   confectSchema,
   spec,
@@ -66,7 +64,7 @@ const makeProto = <
 
 export const make = <
   ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
-  ConfectApiSpec_ extends ConfectApiSpec.ConfectApiSpec.Any,
+  ConfectApiSpec_ extends ConfectApiSpec.ConfectApiSpec.AnyWithProps,
 >(
   confectSchema: ConfectSchema_,
   spec: ConfectApiSpec_,

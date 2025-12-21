@@ -11,7 +11,7 @@ export const isConfectApiGroup = (u: unknown): u is ConfectApiGroup.Any =>
 export interface ConfectApiGroup<
   Name extends string,
   Functions extends ConfectApiFunction.ConfectApiFunction.AnyWithProps = never,
-  Groups extends ConfectApiGroup.Any = never,
+  Groups extends ConfectApiGroup.AnyWithProps = never,
 > {
   readonly [TypeId]: TypeId;
   readonly name: Name;
@@ -34,7 +34,7 @@ export interface ConfectApiGroup<
     function_: Function,
   ): ConfectApiGroup<Name, Functions | Function, Groups>;
 
-  addGroup<Group extends ConfectApiGroup.Any>(
+  addGroup<Group extends ConfectApiGroup.AnyWithProps>(
     group: Group,
   ): ConfectApiGroup<Name, Functions, Groups | Group>;
 }
@@ -42,13 +42,6 @@ export interface ConfectApiGroup<
 export declare namespace ConfectApiGroup {
   export interface Any {
     readonly [TypeId]: TypeId;
-    readonly name: string;
-    readonly functions: {
-      [key: string]: ConfectApiFunction.ConfectApiFunction.Any;
-    };
-    readonly groups: {
-      [key: string]: Any;
-    };
   }
 
   export interface AnyWithProps extends Any {
@@ -63,26 +56,28 @@ export declare namespace ConfectApiGroup {
       Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
     >(
       function_: Function,
-    ): Any;
-    addGroup<Group extends Any>(group: Group): Any;
+    ): AnyWithProps;
+    addGroup<Group extends AnyWithProps>(group: Group): AnyWithProps;
   }
 
-  export type Name<Group extends Any> = Group["name"];
+  export type Name<Group extends AnyWithProps> = Group["name"];
 
-  export type Functions<Group extends Any> =
+  export type Functions<Group extends AnyWithProps> =
     Group["functions"][keyof Group["functions"]];
 
-  export type Groups<Group extends Any> =
+  export type Groups<Group extends AnyWithProps> =
     Group["groups"][keyof Group["groups"]];
 
-  export type GroupNames<Group extends Any> = [Groups<Group>] extends [never]
+  export type GroupNames<Group extends AnyWithProps> = [Groups<Group>] extends [
+    never,
+  ]
     ? never
     : Name<Groups<Group>>;
 
-  export type WithName<Group extends Any, Name_ extends string> = Extract<
-    Group,
-    { readonly name: Name_ }
-  >;
+  export type WithName<
+    Group extends AnyWithProps,
+    Name_ extends Name<Group>,
+  > = Extract<Group, { readonly name: Name_ }>;
 }
 
 export declare namespace Path {
@@ -92,7 +87,7 @@ export declare namespace Path {
   // through its direct subgroups. Properly distributes over union types to prevent
   // cross-contamination of paths from different groups.
   export type All<
-    Group extends ConfectApiGroup.Any,
+    Group extends ConfectApiGroup.AnyWithProps,
     Depth extends 1[] = [],
   > = Depth["length"] extends 15
     ? string
@@ -105,10 +100,10 @@ export declare namespace Path {
       : never;
 
   type AllHelper<
-    Parent extends ConfectApiGroup.Any,
-    Groups extends ConfectApiGroup.Any,
+    Parent extends ConfectApiGroup.AnyWithProps,
+    Groups extends ConfectApiGroup.AnyWithProps,
     Depth extends 1[] = [],
-  > = Groups extends ConfectApiGroup.Any
+  > = Groups extends ConfectApiGroup.AnyWithProps
     ? `${ConfectApiGroup.Name<Parent>}.${All<Groups, [...Depth, 1]>}`
     : never;
 
@@ -135,11 +130,11 @@ export declare namespace Path {
     : never;
 
   export type SubGroupsAt<
-    Group extends ConfectApiGroup.Any,
+    Group extends ConfectApiGroup.AnyWithProps,
     GroupPath extends string,
   > =
     ConfectApiGroup.Groups<GroupAt<Group, GroupPath>> extends infer SubGroups
-      ? SubGroups extends ConfectApiGroup.Any
+      ? SubGroups extends ConfectApiGroup.AnyWithProps
         ? `${GroupPath}.${ConfectApiGroup.Name<SubGroups>}`
         : never
       : never;
@@ -178,7 +173,7 @@ const Proto = {
 const makeProto = <
   Name extends string,
   Functions extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
-  Groups extends ConfectApiGroup.Any,
+  Groups extends ConfectApiGroup.AnyWithProps,
 >({
   name,
   functions,
