@@ -211,7 +211,7 @@ export const group = <
 
       const handlers = build(
         makeHandlers({ group: group_, items }),
-      ) as Handlers.AnyWithProps;
+      ) as unknown as Handlers.AnyWithProps;
 
       for (const handlerItem of handlers.items) {
         yield* Ref.update(registry, (handlerItemsRegistry) =>
