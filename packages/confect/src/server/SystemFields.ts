@@ -6,10 +6,7 @@ import type {
 } from "convex/server";
 import { Schema } from "effect";
 
-/**
- * Type alias for the SystemFields schema with explicit context.
- */
-export type SystemFieldsSchema<TableName extends string> = Schema.Struct<{
+type SystemFieldsSchema<TableName extends string> = Schema.Struct<{
   _id: Schema.Schema<
     GenericId.GenericId<TableName>,
     GenericId.GenericId<TableName>,
