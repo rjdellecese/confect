@@ -56,7 +56,7 @@ type EmbeddingsTable = typeof _embeddingsTable;
 
 describe("TypeId", () => {
   test("is the expected string literal", () => {
-    type Expected = "@rjdellecese/confect/server.ConfectTable";
+    type Expected = "@rjdellecese/confect/server/ConfectTable";
     expectTypeOf<ConfectTable.TypeId>().toEqualTypeOf<Expected>();
   });
 
