@@ -8,7 +8,7 @@ export interface HandlerItemRegistry {
 }
 
 export class ConfectApiRegistry extends Context.Reference<ConfectApiRegistry>()(
-  "@rjdellecese/confect/ConfectApiRegistry",
+  "@rjdellecese/confect/server/ConfectApiRegistry",
   {
     defaultValue: () => Ref.unsafeMake(Record.empty() as HandlerItemRegistry),
   },

@@ -3,7 +3,7 @@ import { Context } from "effect";
 
 export const ConvexQueryCtx = <DataModel extends GenericDataModel>() =>
   Context.GenericTag<GenericQueryCtx<DataModel>>(
-    "@rjdellecese/confect/ConvexQueryCtx",
+    "@rjdellecese/confect/server/ConvexQueryCtx",
   );
 
 export type ConvexQueryCtx<DataModel extends GenericDataModel> = ReturnType<

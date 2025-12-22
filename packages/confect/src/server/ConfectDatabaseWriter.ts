@@ -183,7 +183,7 @@ export const ConfectDatabaseWriter = <
   ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
 >() =>
   Context.GenericTag<ReturnType<typeof make<ConfectSchema_>>>(
-    "@rjdellecese/confect/ConfectDatabaseWriter",
+    "@rjdellecese/confect/server/ConfectDatabaseWriter",
   );
 
 export type ConfectDatabaseWriter<

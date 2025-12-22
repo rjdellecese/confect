@@ -48,7 +48,7 @@ type TestConfectDataModel =
 
 describe("TypeId", () => {
   test("is the expected string literal", () => {
-    type Expected = "@rjdellecese/confect/ConfectDataModel";
+    type Expected = "@rjdellecese/confect/server/ConfectDataModel";
     expectTypeOf<ConfectDataModel.TypeId>().toEqualTypeOf<Expected>();
   });
 });

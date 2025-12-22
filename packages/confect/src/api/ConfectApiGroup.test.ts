@@ -4,13 +4,13 @@ import * as ConfectApiGroup from "./ConfectApiGroup";
 describe("ConfectApiGroup.Path.All", () => {
   test("produces the correct group paths", () => {
     const _GroupA = ConfectApiGroup.make("groupA");
-
-    const _GroupBDE = ConfectApiGroup.make("groupBDE");
-    const _GroupBD = ConfectApiGroup.make("groupBD").addGroup(_GroupBDE);
-    const _GroupBC = ConfectApiGroup.make("groupBC");
     const _GroupB = ConfectApiGroup.make("groupB")
-      .addGroup(_GroupBC)
-      .addGroup(_GroupBD);
+      .addGroup(ConfectApiGroup.make("groupBC"))
+      .addGroup(
+        ConfectApiGroup.make("groupBD").addGroup(
+          ConfectApiGroup.make("groupBDE"),
+        ),
+      );
 
     type AllPaths = ConfectApiGroup.Path.All<typeof _GroupA | typeof _GroupB>;
 

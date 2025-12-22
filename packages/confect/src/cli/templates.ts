@@ -155,8 +155,17 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
     yield* cbw.blankLine();
 
     // ConfectVectorSearch
-    yield* cbw.writeLine(
-      "export const ConfectVectorSearch = ConfectVectorSearch_.ConfectVectorSearch;",
+    yield* cbw.writeLine("export const ConfectVectorSearch =");
+    yield* cbw.indent(
+      Effect.gen(function* () {
+        yield* cbw.writeLine("ConfectVectorSearch_.ConfectVectorSearch<");
+        yield* cbw.indent(
+          cbw.writeLine(
+            "ConfectDataModel.ConfectDataModel.FromSchema<typeof confectSchemaDefinition>",
+          ),
+        );
+        yield* cbw.writeLine(">();");
+      }),
     );
     yield* cbw.writeLine(
       "export type ConfectVectorSearch = typeof ConfectVectorSearch.Identifier;",

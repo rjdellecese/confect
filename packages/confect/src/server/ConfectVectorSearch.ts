@@ -15,44 +15,39 @@ type VectorSearch<
   ConfectDataModel.ConfectDataModel.DataModel<ConfectDataModel_>
 >["vectorSearch"];
 
-// Explicit type for the vector search function with string constraint to satisfy bundler
-type ConfectVectorSearchService<
-  ConfectDataModel_ extends ConfectDataModel.ConfectDataModel.AnyWithProps,
-> = <
-  TableName extends
-    ConfectDataModel.ConfectDataModel.TableNames<ConfectDataModel_>,
-  IndexName extends VectorIndexNames<
-    NamedTableInfo<
-      ConfectDataModel.ConfectDataModel.DataModel<ConfectDataModel_>,
-      TableName
-    >
-  >,
->(
-  tableName: TableName,
-  indexName: IndexName,
-  query: Expand<
-    VectorSearchQuery<
+export const make =
+  <ConfectDataModel_ extends ConfectDataModel.ConfectDataModel.AnyWithProps>(
+    vectorSearch: VectorSearch<ConfectDataModel_>,
+  ) =>
+  <
+    TableName extends
+      ConfectDataModel.ConfectDataModel.TableNames<ConfectDataModel_>,
+    IndexName extends VectorIndexNames<
       NamedTableInfo<
         ConfectDataModel.ConfectDataModel.DataModel<ConfectDataModel_>,
         TableName
-      >,
-      IndexName
-    >
-  >,
-) => Effect.Effect<Array<{ _id: GenericId<TableName>; _score: number }>>;
-
-const make =
-  <ConfectDataModel_ extends ConfectDataModel.ConfectDataModel.AnyWithProps>(
-    vectorSearch: VectorSearch<ConfectDataModel_>,
-  ): ConfectVectorSearchService<ConfectDataModel_> =>
-  (tableName, indexName, query) =>
+      >
+    >,
+  >(
+    tableName: TableName,
+    indexName: IndexName,
+    query: Expand<
+      VectorSearchQuery<
+        NamedTableInfo<
+          ConfectDataModel.ConfectDataModel.DataModel<ConfectDataModel_>,
+          TableName
+        >,
+        IndexName
+      >
+    >,
+  ): Effect.Effect<Array<{ _id: GenericId<TableName>; _score: number }>> =>
     Effect.promise(() => vectorSearch(tableName, indexName, query));
 
 export const ConfectVectorSearch = <
   ConfectDataModel_ extends ConfectDataModel.ConfectDataModel.AnyWithProps,
 >() =>
-  Context.GenericTag<ConfectVectorSearchService<ConfectDataModel_>>(
-    "@rjdellecese/confect/ConfectVectorSearch",
+  Context.GenericTag<ReturnType<typeof make<ConfectDataModel_>>>(
+    "@rjdellecese/confect/server/ConfectVectorSearch",
   );
 
 export type ConfectVectorSearch<

@@ -4,7 +4,7 @@ import { defineSchema as defineConvexSchema } from "convex/server";
 import { pipe, Predicate, Record } from "effect";
 import type * as ConfectSchema from "./ConfectSchema";
 
-export const TypeId = "@rjdellecese/confect/ConfectApi";
+export const TypeId = "@rjdellecese/confect/server/ConfectApi";
 export type TypeId = typeof TypeId;
 
 export const isConfectApi = (u: unknown): u is ConfectApi.Any =>

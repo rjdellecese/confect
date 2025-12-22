@@ -19,7 +19,8 @@ import type * as ConfectApiHandler from "./ConfectApiHandler";
 import * as ConfectApiRegistry from "./ConfectApiRegistry";
 import type * as ConfectSchema from "./ConfectSchema";
 
-export const HandlersTypeId = "@rjdellecese/confect/Handlers";
+export const HandlersTypeId =
+  "@rjdellecese/confect/server/ConfectApiBuilder/Handlers";
 export type HandlersTypeId = typeof HandlersTypeId;
 
 export interface Handlers<
@@ -45,7 +46,8 @@ export interface Handlers<
   >;
 }
 
-export const HandlerItemTypeId = "@rjdellecese/confect/HandlerItem";
+export const HandlerItemTypeId =
+  "@rjdellecese/confect/server/ConfectApiBuilder/HandlerItem";
 export type HandlerItemTypeId = typeof HandlerItemTypeId;
 
 export const isHandlerItem = (
@@ -253,7 +255,7 @@ export const ConfectApiGroupService = <GroupPath extends string>({
   groupPath: GroupPath;
 }) =>
   Context.GenericTag<ConfectApiGroupService<GroupPath>>(
-    `@rjdellecese/confect/ConfectApiGroupService/${groupPath}`,
+    `@rjdellecese/confect/server/ConfectApiGroupService/${groupPath}`,
   );
 
 export declare namespace ConfectApiGroupService {

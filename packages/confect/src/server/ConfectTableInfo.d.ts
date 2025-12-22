@@ -14,7 +14,7 @@ import type { Schema, Types } from "effect";
 import type * as ConfectDocument_ from "./ConfectDocument";
 import type * as ConfectTable from "./ConfectTable";
 
-export declare const TypeId: "@rjdellecese/confect/ConfectTableInfo";
+export declare const TypeId: "@rjdellecese/confect/server/ConfectTableInfo";
 export type TypeId = typeof TypeId;
 
 export type ConfectTableInfo<

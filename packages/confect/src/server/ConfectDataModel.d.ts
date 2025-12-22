@@ -2,7 +2,7 @@ import type * as ConfectSchema from "./ConfectSchema";
 import type * as ConfectTable from "./ConfectTable";
 import type * as ConfectTableInfo from "./ConfectTableInfo";
 
-export declare const TypeId: "@rjdellecese/confect/ConfectDataModel";
+export declare const TypeId: "@rjdellecese/confect/server/ConfectDataModel";
 export type TypeId = typeof TypeId;
 
 export interface ConfectDataModel<

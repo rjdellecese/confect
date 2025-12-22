@@ -19,7 +19,7 @@ import {
 import type { ExtendWithSystemFields } from "./SystemFields";
 import { extendWithSystemFields } from "./SystemFields";
 
-export const TypeId = "@rjdellecese/confect/ConfectTable";
+export const TypeId = "@rjdellecese/confect/server/ConfectTable";
 export type TypeId = typeof TypeId;
 
 export const isConfectTable = (u: unknown): u is ConfectTable.Any =>

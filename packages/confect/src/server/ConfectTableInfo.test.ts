@@ -41,7 +41,7 @@ type UsersTableInfo = ConfectTableInfo.ConfectTableInfo<UsersTable>;
 
 describe("TypeId", () => {
   test("is the expected string literal", () => {
-    type Expected = "@rjdellecese/confect/ConfectTableInfo";
+    type Expected = "@rjdellecese/confect/server/ConfectTableInfo";
     expectTypeOf<ConfectTableInfo.TypeId>().toEqualTypeOf<Expected>();
   });
 });

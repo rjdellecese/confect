@@ -1,5 +1,10 @@
 /// <reference types="vite/client" />
 
+import {
+  convexTest,
+  type TestConvexForDataModel,
+  type TestConvexForDataModelAndIdentity,
+} from "convex-test";
 import type {
   DataModelFromSchemaDefinition,
   FunctionReference,
@@ -9,11 +14,6 @@ import type {
   StorageActionWriter,
   UserIdentity,
 } from "convex/server";
-import {
-  convexTest,
-  type TestConvexForDataModel,
-  type TestConvexForDataModelAndIdentity,
-} from "convex-test";
 import { Context, Effect, Layer, pipe } from "effect";
 
 import schema from "./convex/schema";
@@ -55,7 +55,7 @@ export type TestConvexService = {
 } & TestConvexServiceWithoutIdentity;
 
 export const TestConvexService = Context.GenericTag<TestConvexService>(
-  "@rjdellecese/confect/TestConvexService",
+  "@rjdellecese/confect/test/TestConvexService",
 );
 
 class TestConvexServiceImplWithoutIdentity

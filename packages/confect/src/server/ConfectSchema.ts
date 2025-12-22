@@ -6,7 +6,7 @@ import {
 import { Array, pipe, Predicate, Record } from "effect";
 import * as ConfectTable from "./ConfectTable";
 
-export const TypeId = "@rjdellecese/confect/ConfectSchema";
+export const TypeId = "@rjdellecese/confect/server/ConfectSchema";
 export type TypeId = typeof TypeId;
 
 export const isConfectSchema = (u: unknown): u is ConfectSchema.Any =>

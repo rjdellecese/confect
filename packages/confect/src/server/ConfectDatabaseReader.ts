@@ -66,7 +66,7 @@ export const ConfectDatabaseReader = <
   ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
 >() =>
   Context.GenericTag<ReturnType<typeof make<ConfectSchema_>>>(
-    "@rjdellecese/confect/ConfectDatabaseReader",
+    "@rjdellecese/confect/server/ConfectDatabaseReader",
   );
 
 export type ConfectDatabaseReader<

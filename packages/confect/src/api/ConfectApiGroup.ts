@@ -2,7 +2,7 @@ import { Predicate, Record } from "effect";
 import { validateJsIdentifier } from "../utils";
 import type * as ConfectApiFunction from "./ConfectApiFunction";
 
-export const TypeId = "@rjdellecese/confect/ConfectApiGroup";
+export const TypeId = "@rjdellecese/confect/api/ConfectApiGroup";
 export type TypeId = typeof TypeId;
 
 export const isConfectApiGroup = (u: unknown): u is ConfectApiGroup.Any =>
@@ -44,6 +44,7 @@ export declare namespace ConfectApiGroup {
     readonly [TypeId]: TypeId;
   }
 
+  // TODO: Can we extend the `ConfectApiGroup` interface and remove these custom fields?
   export interface AnyWithProps extends Any {
     readonly name: string;
     readonly functions: {

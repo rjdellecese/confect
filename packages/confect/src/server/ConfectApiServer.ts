@@ -62,7 +62,7 @@ const isRegisteredAction = (
 export const isRegisteredFunction = (u: unknown): u is RegisteredFunction =>
   isRegisteredQuery(u) || isRegisteredMutation(u) || isRegisteredAction(u);
 
-export const TypeId = "@rjdellecese/confect/ConfectApiServer";
+export const TypeId = "@rjdellecese/confect/server/ConfectApiServer";
 export type TypeId = typeof TypeId;
 
 export const isConfectApiServer = (u: unknown): u is ConfectApiServer =>

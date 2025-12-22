@@ -39,12 +39,14 @@ type UsersTable = typeof usersTable;
 
 describe("TypeId", () => {
   test("is the expected string literal", () => {
-    type Expected = "@rjdellecese/confect/ConfectSchema";
+    type Expected = "@rjdellecese/confect/server/ConfectSchema";
     expectTypeOf<ConfectSchema.TypeId>().toEqualTypeOf<Expected>();
   });
 
   test("runtime value matches type", () => {
-    expect(ConfectSchema.TypeId).toBe("@rjdellecese/confect/ConfectSchema");
+    expect(ConfectSchema.TypeId).toBe(
+      "@rjdellecese/confect/server/ConfectSchema",
+    );
   });
 });
 
