@@ -1,9 +1,9 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Confect 🧁",
+  "name": "Confect",
   "colors": {
-    "primary": "#BE185D",
+    "primary": "#C026D3",
     "light": "#F9A8D4",
     "dark": "#BE185D"
   },
@@ -16,6 +16,7 @@
   "icons": {
     "library": "lucide"
   },
+  "logo": "/logo.svg",
   "favicon": "/favicon.svg",
   "navigation": {
     "global": {
@@ -35,19 +36,38 @@
     "groups": [
       {
         "group": "Getting Started",
-        "pages": ["index", "quickstart", "schema-restrictions"]
-      },
-      {
-        "group": "Database",
         "pages": [
-          "api-reference/database/reading",
-          "api-reference/database/writing",
-          "api-reference/database/system-tables"
+          "getting-started/introduction",
+          "getting-started/quickstart",
+          "getting-started/project-structure",
+          "getting-started/services",
+          "getting-started/schema-restrictions"
         ]
       },
       {
-        "group": "File storage",
-        "pages": ["api-reference/file-storage"]
+        "group": "Platform",
+        "pages": [
+          {
+            "icon": "square-function",
+            "group": "Functions",
+            "pages": ["platform/functions/overview"]
+          },
+          {
+            "icon": "database",
+            "group": "Database",
+            "pages": [
+              "platform/database/reading",
+              "platform/database/writing",
+              "platform/database/system-tables"
+            ]
+          },
+          "platform/http",
+          "platform/storage",
+          "platform/scheduling",
+          "platform/authentication",
+          "platform/search",
+          "platform/components"
+        ]
       }
     ]
   },
