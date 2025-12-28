@@ -29,7 +29,7 @@ import * as ConfectOrderedQuery from "./ConfectOrderedQuery";
 import type * as ConfectTable from "./ConfectTable";
 import type * as ConfectTableInfo from "./ConfectTableInfo";
 
-type ConfectQueryInitializer<
+export type ConfectQueryInitializer<
   ConfectDataModel_ extends ConfectDataModel.ConfectDataModel.AnyWithProps,
   TableName extends
     ConfectDataModel.ConfectDataModel.TableNames<ConfectDataModel_>,

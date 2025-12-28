@@ -6,6 +6,30 @@ import * as ConfectQueryInitializer from "./ConfectQueryInitializer";
 import * as ConfectSchema from "./ConfectSchema";
 import * as ConfectTable from "./ConfectTable";
 
+/**
+ * Explicit interface to avoid heavy type inference.
+ */
+export interface ConfectDatabaseReaderService<
+  ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
+> {
+  table: <
+    TableName extends ConfectTable.ConfectTable.Name<
+      ConfectSchema.IncludeConfectSystemTables<
+        ConfectSchema.ConfectSchema.Tables<ConfectSchema_>
+      >
+    >,
+  >(
+    tableName: TableName,
+  ) => ConfectQueryInitializer.ConfectQueryInitializer<
+    ConfectDataModel.ConfectDataModel<
+      ConfectSchema.IncludeConfectSystemTables<
+        ConfectSchema.ConfectSchema.Tables<ConfectSchema_>
+      >
+    >,
+    TableName
+  >;
+}
+
 export const make = <
   ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
 >(
@@ -15,7 +39,7 @@ export const make = <
       ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>
     >
   >,
-) => {
+): ConfectDatabaseReaderService<ConfectSchema_> => {
   type Tables = ConfectSchema.ConfectSchema.Tables<ConfectSchema_>;
   type IncludedTables = ConfectSchema.IncludeConfectSystemTables<Tables>;
   const extendedTables = ConfectSchema.extendWithConfectSystemTables(
