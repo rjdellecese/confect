@@ -1,3 +1,4 @@
+.direnv
 .env.local
 .pnpm-store/
 .tsup
