@@ -317,16 +317,13 @@ const makeRegisteredFunction = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
         ? queryGeneric
         : internalQueryGeneric;
 
-    // We must cast the handler here because TypeScript doesn't automatically
-    // narrow the `handler` property of the `Item` union when we check the
-    // `function_` property.
     return genericFunction(
       confectQueryFunction(api.confectSchema, {
         args: function_.args,
         returns: function_.returns,
         handler: handler as ConfectApiHandler.QueryHandler<
           Api["confectSchema"],
-          typeof function_
+          any
         >,
       }),
     );
@@ -344,7 +341,7 @@ const makeRegisteredFunction = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
         returns: function_.returns,
         handler: handler as ConfectApiHandler.MutationHandler<
           Api["confectSchema"],
-          typeof function_
+          any
         >,
       }),
     );
@@ -362,7 +359,7 @@ const makeRegisteredFunction = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
         returns: function_.returns,
         handler: handler as ConfectApiHandler.ActionHandler<
           Api["confectSchema"],
-          typeof function_
+          any
         >,
       }),
     );
