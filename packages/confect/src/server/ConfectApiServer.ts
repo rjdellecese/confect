@@ -1,7 +1,6 @@
 import {
   actionGeneric,
   type DefaultFunctionArgs,
-  type FunctionVisibility,
   type GenericActionCtx,
   type GenericMutationCtx,
   type GenericQueryCtx,
@@ -19,6 +18,7 @@ import { mapLeaves } from "../internal/utils";
 import * as ConfectActionRunner from "./ConfectActionRunner";
 import type * as ConfectApi from "./ConfectApi";
 import * as ConfectApiBuilder from "./ConfectApiBuilder";
+import type * as ConfectApiFunction from "../api/ConfectApiFunction";
 import * as ConfectApiRegistry from "./ConfectApiRegistry";
 import * as ConfectAuth from "./ConfectAuth";
 import * as ConfectDatabaseReader from "./ConfectDatabaseReader";
@@ -38,128 +38,32 @@ import * as ConvexActionCtx from "./ConvexActionCtx";
 import * as ConvexMutationCtx from "./ConvexMutationCtx";
 import * as ConvexQueryCtx from "./ConvexQueryCtx";
 import * as SchemaToValidator from "./SchemaToValidator";
+import type * as ConfectApiGroup from "../api/ConfectApiGroup";
+import type * as ConfectApiHandler from "./ConfectApiHandler";
+import type * as ConfectApiSpec from "../api/ConfectApiSpec";
 
 export type RegisteredFunction =
-  | RegisteredQuery<FunctionVisibility, DefaultFunctionArgs, any>
-  | RegisteredMutation<FunctionVisibility, DefaultFunctionArgs, any>
-  | RegisteredAction<FunctionVisibility, DefaultFunctionArgs, any>;
+  | RegisteredQuery<any, DefaultFunctionArgs, any>
+  | RegisteredMutation<any, DefaultFunctionArgs, any>
+  | RegisteredAction<any, DefaultFunctionArgs, any>;
 
 const isRegisteredQuery = (
   u: unknown,
-): u is RegisteredQuery<FunctionVisibility, DefaultFunctionArgs, any> =>
+): u is RegisteredQuery<any, DefaultFunctionArgs, any> =>
   Predicate.hasProperty(u, "isQuery") && u.isQuery === true;
 
 const isRegisteredMutation = (
   u: unknown,
-): u is RegisteredMutation<FunctionVisibility, DefaultFunctionArgs, any> =>
+): u is RegisteredMutation<any, DefaultFunctionArgs, any> =>
   Predicate.hasProperty(u, "isMutation") && u.isMutation === true;
 
 const isRegisteredAction = (
   u: unknown,
-): u is RegisteredAction<FunctionVisibility, DefaultFunctionArgs, any> =>
+): u is RegisteredAction<any, DefaultFunctionArgs, any> =>
   Predicate.hasProperty(u, "isAction") && u.isAction === true;
 
 export const isRegisteredFunction = (u: unknown): u is RegisteredFunction =>
   isRegisteredQuery(u) || isRegisteredMutation(u) || isRegisteredAction(u);
-
-export const TypeId = "@rjdellecese/confect/server/ConfectApiServer";
-export type TypeId = typeof TypeId;
-
-export const isConfectApiServer = (u: unknown): u is ConfectApiServer =>
-  Predicate.hasProperty(u, TypeId);
-
-export interface RegisteredFunctions {
-  readonly [key: string]:
-    | (RegisteredFunction & RegisteredFunctions)
-    | RegisteredFunctions;
-}
-
-export interface ConfectApiServer {
-  readonly [TypeId]: TypeId;
-  readonly registeredFunctions: RegisteredFunctions;
-}
-
-const Proto = {
-  [TypeId]: TypeId,
-};
-
-const makeProto = ({
-  registeredFunctions,
-}: {
-  registeredFunctions: RegisteredFunctions;
-}): ConfectApiServer =>
-  Object.assign(Object.create(Proto), {
-    registeredFunctions,
-  });
-
-export const make = Effect.gen(function* () {
-  const { api } = yield* ConfectApiBuilder.ConfectApiService;
-  const registry = yield* ConfectApiRegistry.ConfectApiRegistry;
-
-  const handlerItems = yield* Ref.get(registry);
-
-  const registeredFunctions = mapLeaves<
-    ConfectApiBuilder.Handlers.Item.AnyWithProps,
-    RegisteredFunction
-  >(handlerItems, ConfectApiBuilder.isHandlerItem, (handlerItem) =>
-    makeRegisteredFunction(api, handlerItem),
-  ) as RegisteredFunctions;
-
-  return makeProto({ registeredFunctions });
-});
-
-const makeRegisteredFunction = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
-  api: Api,
-  { function_, handler }: ConfectApiBuilder.Handlers.Item.AnyWithProps,
-): RegisteredFunction =>
-  Match.value(function_.functionType).pipe(
-    Match.when("Query", () => {
-      const genericFunction = Match.value(function_.functionVisibility).pipe(
-        Match.when("Public", () => queryGeneric),
-        Match.when("Internal", () => internalQueryGeneric),
-        Match.exhaustive,
-      );
-
-      return genericFunction(
-        confectQueryFunction(api.confectSchema, {
-          args: function_.args,
-          returns: function_.returns,
-          handler,
-        }),
-      );
-    }),
-    Match.when("Mutation", () => {
-      const genericFunction = Match.value(function_.functionVisibility).pipe(
-        Match.when("Public", () => mutationGeneric),
-        Match.when("Internal", () => internalMutationGeneric),
-        Match.exhaustive,
-      );
-
-      return genericFunction(
-        confectMutationFunction(api.confectSchema, {
-          args: function_.args,
-          returns: function_.returns,
-          handler,
-        }),
-      );
-    }),
-    Match.when("Action", () => {
-      const genericFunction = Match.value(function_.functionVisibility).pipe(
-        Match.when("Public", () => actionGeneric),
-        Match.when("Internal", () => internalActionGeneric),
-        Match.exhaustive,
-      );
-
-      return genericFunction(
-        confectActionFunction({
-          args: function_.args,
-          returns: function_.returns,
-          handler,
-        }),
-      );
-    }),
-    Match.exhaustive,
-  );
 
 const confectQueryFunction = <
   ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
@@ -402,3 +306,185 @@ const confectActionFunction = <
       Effect.runPromise,
     ),
 });
+
+const makeRegisteredFunction = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
+  api: Api,
+  { function_, handler }: ConfectApiBuilder.Handlers.Item.AnyWithProps,
+): RegisteredFunction => {
+  if (function_.functionType === "Query") {
+    const genericFunction =
+      function_.functionVisibility === "Public"
+        ? queryGeneric
+        : internalQueryGeneric;
+
+    // We must cast the handler here because TypeScript doesn't automatically
+    // narrow the `handler` property of the `Item` union when we check the
+    // `function_` property.
+    return genericFunction(
+      confectQueryFunction(api.confectSchema, {
+        args: function_.args,
+        returns: function_.returns,
+        handler: handler as ConfectApiHandler.QueryHandler<
+          Api["confectSchema"],
+          typeof function_
+        >,
+      }),
+    );
+  }
+
+  if (function_.functionType === "Mutation") {
+    const genericFunction =
+      function_.functionVisibility === "Public"
+        ? mutationGeneric
+        : internalMutationGeneric;
+
+    return genericFunction(
+      confectMutationFunction(api.confectSchema, {
+        args: function_.args,
+        returns: function_.returns,
+        handler: handler as ConfectApiHandler.MutationHandler<
+          Api["confectSchema"],
+          typeof function_
+        >,
+      }),
+    );
+  }
+
+  if (function_.functionType === "Action") {
+    const genericFunction =
+      function_.functionVisibility === "Public"
+        ? actionGeneric
+        : internalActionGeneric;
+
+    return genericFunction(
+      confectActionFunction({
+        args: function_.args,
+        returns: function_.returns,
+        handler: handler as ConfectApiHandler.ActionHandler<
+          Api["confectSchema"],
+          typeof function_
+        >,
+      }),
+    );
+  }
+
+  throw new Error(`Unknown function type: ${(function_ as any).functionType}`);
+};
+
+// -----------------------------------------------------------------------------
+// Main Class & Types
+// -----------------------------------------------------------------------------
+
+export const TypeId = "@rjdellecese/confect/server/ConfectApiServer";
+export type TypeId = typeof TypeId;
+
+export const isConfectApiServer = (u: unknown): u is ConfectApiServer =>
+  Predicate.hasProperty(u, TypeId);
+
+export interface RegisteredFunctions {
+  readonly [key: string]:
+    | (RegisteredFunction & RegisteredFunctions)
+    | RegisteredFunctions;
+}
+
+export type ServerApi<Spec extends ConfectApiSpec.ConfectApiSpec.AnyWithProps> =
+  Types.Simplify<Helper<ConfectApiSpec.ConfectApiSpec.Groups<Spec>>>;
+
+type Helper<Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps> = {
+  [GroupName in ConfectApiGroup.ConfectApiGroup.Name<Groups>]: ConfectApiGroup.ConfectApiGroup.WithName<
+    Groups,
+    GroupName
+  > extends infer Group extends ConfectApiGroup.ConfectApiGroup.AnyWithProps
+    ? ConfectApiGroup.ConfectApiGroup.Groups<Group> extends infer SubGroups extends
+        ConfectApiGroup.ConfectApiGroup.AnyWithProps
+      ? Types.Simplify<
+          Helper<SubGroups> & {
+            [FunctionName in ConfectApiFunction.ConfectApiFunction.Name<
+              ConfectApiGroup.ConfectApiGroup.Functions<Group>
+            >]: ConfectApiFunction.ConfectApiFunction.WithName<
+              ConfectApiGroup.ConfectApiGroup.Functions<Group>,
+              FunctionName
+            > extends infer Function extends
+              ConfectApiFunction.ConfectApiFunction.AnyWithProps
+              ? RegisteredFunctionFromConfectFunction<Function>
+              : never;
+          }
+        >
+      : {
+          [FunctionName in ConfectApiFunction.ConfectApiFunction.Name<
+            ConfectApiGroup.ConfectApiGroup.Functions<Group>
+          >]: ConfectApiFunction.ConfectApiFunction.WithName<
+            ConfectApiGroup.ConfectApiGroup.Functions<Group>,
+            FunctionName
+          > extends infer Function extends
+            ConfectApiFunction.ConfectApiFunction.AnyWithProps
+            ? RegisteredFunctionFromConfectFunction<Function>
+            : never;
+        }
+    : never;
+};
+
+type RegisteredFunctionFromConfectFunction<
+  Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
+> = Function["functionType"] extends "Query"
+  ? RegisteredQuery<
+      Lowercase<Function["functionVisibility"]>,
+      Function["args"]["Encoded"],
+      Promise<Function["returns"]["Encoded"]>
+    >
+  : Function["functionType"] extends "Mutation"
+    ? RegisteredMutation<
+        Lowercase<Function["functionVisibility"]>,
+        Function["args"]["Encoded"],
+        Promise<Function["returns"]["Encoded"]>
+      >
+    : Function["functionType"] extends "Action"
+      ? RegisteredAction<
+          Lowercase<Function["functionVisibility"]>,
+          Function["args"]["Encoded"],
+          Promise<Function["returns"]["Encoded"]>
+        >
+      : never;
+
+export interface ConfectApiServer<
+  Api extends
+    ConfectApi.ConfectApi.AnyWithProps = ConfectApi.ConfectApi.AnyWithProps,
+> {
+  readonly [TypeId]: TypeId;
+  readonly registeredFunctions: ServerApi<Api["spec"]>;
+}
+
+const Proto = {
+  [TypeId]: TypeId,
+};
+
+const makeProto = <Api extends ConfectApi.ConfectApi.AnyWithProps>({
+  registeredFunctions,
+}: {
+  registeredFunctions: RegisteredFunctions;
+}): ConfectApiServer<Api> =>
+  Object.assign(Object.create(Proto), {
+    registeredFunctions,
+  });
+
+export const make = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
+  _api: Api,
+) =>
+  Effect.gen(function* () {
+    const registry = yield* ConfectApiRegistry.ConfectApiRegistry;
+
+    const handlerItems = yield* Ref.get(registry);
+
+    // We still use the API from the service to build the implementations,
+    // but we use the passed 'api' for the generic return type.
+    const { api: apiFromService } = yield* ConfectApiBuilder.ConfectApiService;
+
+    const registeredFunctions = mapLeaves<
+      ConfectApiBuilder.Handlers.Item.AnyWithProps,
+      RegisteredFunction
+    >(handlerItems, ConfectApiBuilder.isHandlerItem, (handlerItem) =>
+      makeRegisteredFunction(apiFromService, handlerItem),
+    ) as RegisteredFunctions;
+
+    return makeProto<Api>({ registeredFunctions });
+  });

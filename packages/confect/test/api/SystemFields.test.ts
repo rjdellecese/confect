@@ -99,4 +99,3 @@ describe(extendWithSystemFields, () => {
     expectTypeOf<Expand<Actual["Type"]>>().toEqualTypeOf<Expected["Type"]>();
   });
 });
-

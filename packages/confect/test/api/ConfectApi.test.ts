@@ -152,4 +152,3 @@ const refs = ConfectApiRefs.make(Spec);
 console.dir(refs, { depth: null, colors: true });
 
 const _a = refs.groupB.groupBC.myFunction3;
-

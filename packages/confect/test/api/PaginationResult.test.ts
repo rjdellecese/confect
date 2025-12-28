@@ -10,4 +10,3 @@ test("PaginationResult encoded schema matches Convex type", () => {
 
   expectTypeOf<EncodedPaginationResult>().toExtend<EncodedPaginationResult>();
 });
-

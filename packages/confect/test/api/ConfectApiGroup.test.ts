@@ -28,4 +28,3 @@ describe("ConfectApiGroup.Path.All", () => {
     expectTypeOf<AllPaths>().not.toExtend<"groupB.groupA">();
   });
 });
-
