@@ -192,7 +192,6 @@ export const group = <
   const groupPathParts = String.split(groupPath, ".");
   const [firstGroupPathPart, ...restGroupPathParts] = groupPathParts;
 
-  // TODO: Move this implementation to a module for handling paths/group paths?
   const group_: ConfectApiGroup.ConfectApiGroup.AnyWithProps = Array.reduce(
     restGroupPathParts,
     (confectApi as any).spec.groups[firstGroupPathPart as any]!,

@@ -30,16 +30,8 @@ type ConfectQueryInitializer<
   ConfectDataModel_ extends ConfectDataModel.ConfectDataModel.AnyWithProps,
   TableName extends
     ConfectDataModel.ConfectDataModel.TableNames<ConfectDataModel_>,
-  _TableInfo extends
-    GenericTableInfo = ConfectDataModel.ConfectDataModel.TableInfoWithName<
-    ConfectDataModel_,
-    TableName
-  >,
-  _ConfectTableInfo extends
-    ConfectTableInfo.ConfectTableInfo.AnyWithProps = ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
-    ConfectDataModel_,
-    TableName
-  >,
+  _TableInfo extends GenericTableInfo,
+  _ConfectTableInfo extends ConfectTableInfo.ConfectTableInfo.AnyWithProps,
 > = {
   readonly get: {
     (

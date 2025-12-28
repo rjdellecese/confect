@@ -11,8 +11,6 @@ import { describe, expect, expectTypeOf, test } from "vitest";
 import * as ConfectTable from "./ConfectTable";
 import type { ExtendWithSystemFields } from "./SystemFields";
 
-// ----- Test Setup -----
-
 const NoteSchema = Schema.Struct({
   content: Schema.String,
   priority: Schema.Number,
@@ -51,8 +49,6 @@ const _embeddingsTable = ConfectTable.make({
 type NotesTable = typeof notesTable;
 type UsersTable = typeof usersTable;
 type EmbeddingsTable = typeof _embeddingsTable;
-
-// ----- Tests -----
 
 describe("TypeId", () => {
   test("is the expected string literal", () => {
@@ -169,18 +165,18 @@ describe("ConfectTable interface", () => {
 
 describe("ConfectTable.index", () => {
   test("adds index to the indexes record", () => {
-    const tableWithIndex = ConfectTable.make({
+    const _tableWithIndex = ConfectTable.make({
       name: "test",
       fields: Schema.Struct({ field1: Schema.String }),
     }).index("by_field1", ["field1"]);
 
     expectTypeOf<
-      (typeof tableWithIndex)["indexes"]["by_field1"]
+      (typeof _tableWithIndex)["indexes"]["by_field1"]
     >().toEqualTypeOf<["field1", "_creationTime"]>();
   });
 
   test("can chain multiple indexes", () => {
-    const tableWithIndexes = ConfectTable.make({
+    const _tableWithIndexes = ConfectTable.make({
       name: "test",
       fields: Schema.Struct({
         field1: Schema.String,
@@ -191,15 +187,15 @@ describe("ConfectTable.index", () => {
       .index("by_field2", ["field2"]);
 
     expectTypeOf<
-      (typeof tableWithIndexes)["indexes"]["by_field1"]
+      (typeof _tableWithIndexes)["indexes"]["by_field1"]
     >().toEqualTypeOf<["field1", "_creationTime"]>();
     expectTypeOf<
-      (typeof tableWithIndexes)["indexes"]["by_field2"]
+      (typeof _tableWithIndexes)["indexes"]["by_field2"]
     >().toEqualTypeOf<["field2", "_creationTime"]>();
   });
 
   test("supports compound indexes", () => {
-    const tableWithCompoundIndex = ConfectTable.make({
+    const _tableWithCompoundIndex = ConfectTable.make({
       name: "test",
       fields: Schema.Struct({
         field1: Schema.String,
@@ -208,18 +204,18 @@ describe("ConfectTable.index", () => {
     }).index("by_field1_and_field2", ["field1", "field2"]);
 
     expectTypeOf<
-      (typeof tableWithCompoundIndex)["indexes"]["by_field1_and_field2"]
+      (typeof _tableWithCompoundIndex)["indexes"]["by_field1_and_field2"]
     >().toEqualTypeOf<["field1", "field2", "_creationTime"]>();
   });
 
   test("supports indexing on system fields", () => {
-    const tableWithSystemFieldIndex = ConfectTable.make({
+    const _tableWithSystemFieldIndex = ConfectTable.make({
       name: "test",
       fields: Schema.Struct({ field1: Schema.String }),
     }).index("by_creation_time", ["_creationTime"]);
 
     expectTypeOf<
-      (typeof tableWithSystemFieldIndex)["indexes"]["by_creation_time"]
+      (typeof _tableWithSystemFieldIndex)["indexes"]["by_creation_time"]
     >().toEqualTypeOf<["_creationTime", "_creationTime"]>();
   });
 });
@@ -237,13 +233,12 @@ describe("ConfectTable.searchIndex", () => {
       filterFields: ["category"],
     });
 
-    // The return type should still be a ConfectTable
     expectTypeOf(tableWithSearch).toExtend<ConfectTable.ConfectTable.Any>();
     expect(tableWithSearch.name).toBe("test");
   });
 
   test("can be chained with index", () => {
-    const table = ConfectTable.make({
+    const _table = ConfectTable.make({
       name: "test",
       fields: Schema.Struct({
         content: Schema.String,
@@ -256,7 +251,7 @@ describe("ConfectTable.searchIndex", () => {
         filterFields: [],
       });
 
-    expectTypeOf<(typeof table)["indexes"]["by_category"]>().toEqualTypeOf<
+    expectTypeOf<(typeof _table)["indexes"]["by_category"]>().toEqualTypeOf<
       ["category", "_creationTime"]
     >();
   });
@@ -281,7 +276,7 @@ describe("ConfectTable.vectorIndex", () => {
   });
 
   test("can be chained with index and searchIndex", () => {
-    const table = ConfectTable.make({
+    const _table = ConfectTable.make({
       name: "test",
       fields: Schema.Struct({
         embedding: Schema.Array(Schema.Number),
@@ -299,7 +294,7 @@ describe("ConfectTable.vectorIndex", () => {
         dimensions: 1536,
       });
 
-    expectTypeOf<(typeof table)["indexes"]["by_category"]>().toEqualTypeOf<
+    expectTypeOf<(typeof _table)["indexes"]["by_category"]>().toEqualTypeOf<
       ["category", "_creationTime"]
     >();
   });
@@ -417,11 +412,11 @@ describe("ConfectTable.Indexes", () => {
   });
 
   test("extracts empty Indexes from table without indexes", () => {
-    const tableNoIndexes = ConfectTable.make({
+    const _tableNoIndexes = ConfectTable.make({
       name: "no_indexes",
       fields: Schema.Struct({ field: Schema.String }),
     });
-    type Indexes = ConfectTable.ConfectTable.Indexes<typeof tableNoIndexes>;
+    type Indexes = ConfectTable.ConfectTable.Indexes<typeof _tableNoIndexes>;
     expectTypeOf<Indexes>().toEqualTypeOf<{}>();
   });
 });
@@ -537,12 +532,12 @@ describe("make", () => {
 
   test("creates ConfectTable with correct Fields", () => {
     const fields = Schema.Struct({ field: Schema.String });
-    const table = ConfectTable.make({
+    const _table = ConfectTable.make({
       name: "test_table",
       fields,
     });
 
-    expectTypeOf<(typeof table)["Fields"]>().toEqualTypeOf<typeof fields>();
+    expectTypeOf<(typeof _table)["Fields"]>().toEqualTypeOf<typeof fields>();
   });
 
   test("creates ConfectTable with empty indexes", () => {

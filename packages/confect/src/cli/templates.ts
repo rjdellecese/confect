@@ -72,11 +72,20 @@ export const refs = ({ specImportPath }: { specImportPath: string }) =>
     return yield* cbw.toString();
   });
 
-export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
+export const services = ({
+  schemaImportPath,
+  test,
+}: {
+  schemaImportPath: string;
+  test?: boolean;
+}) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
     // Imports
+    yield* cbw.writeLine(
+      `import type { ConfectDataModel } from "${test ? "../../../src/server/index" : "@rjdellecese/confect/server"}";`,
+    );
     yield* cbw.writeLine("import {");
     yield* cbw.indent(
       Effect.gen(function* () {
@@ -93,7 +102,6 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
         );
         yield* cbw.writeLine("ConfectQueryRunner as ConfectQueryRunner_,");
         yield* cbw.writeLine("ConfectScheduler as ConfectScheduler_,");
-        yield* cbw.writeLine("ConfectDataModel,");
         yield* cbw.writeLine("ConfectStorage,");
         yield* cbw.writeLine("ConfectVectorSearch as ConfectVectorSearch_,");
         yield* cbw.writeLine("ConvexActionCtx as ConvexActionCtx_,");
@@ -101,9 +109,11 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
         yield* cbw.writeLine("ConvexQueryCtx as ConvexQueryCtx_,");
       }),
     );
-    yield* cbw.writeLine('} from "@rjdellecese/confect/server";');
     yield* cbw.writeLine(
-      `import confectSchemaDefinition from "${schemaImportPath}";`,
+      `} from "${test ? "../../../src/server/index" : "@rjdellecese/confect/server"}";`,
+    );
+    yield* cbw.writeLine(
+      `import type confectSchemaDefinition from "${schemaImportPath}";`,
     );
     yield* cbw.blankLine();
 

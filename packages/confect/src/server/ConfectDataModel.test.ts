@@ -13,8 +13,6 @@ import * as ConfectSchema from "./ConfectSchema";
 import * as ConfectTable from "./ConfectTable";
 import type * as ConfectTableInfo from "./ConfectTableInfo";
 
-// ----- Test Setup -----
-
 const NoteSchema = Schema.Struct({
   content: Schema.String,
   priority: Schema.Number,
@@ -43,8 +41,6 @@ const _confectSchema = ConfectSchema.make()
 type TestTables = typeof notesTable | typeof usersTable;
 type TestConfectDataModel =
   ConfectDataModel.ConfectDataModel.FromTables<TestTables>;
-
-// ----- Tests -----
 
 describe("TypeId", () => {
   test("is the expected string literal", () => {
@@ -298,7 +294,6 @@ describe("ConfectDataModel.ConfectDocumentWithName", () => {
 
 describe("ConfectDocumentByName", () => {
   test("extracts encoded confect document for table", () => {
-    // ConfectDocumentByName uses ConfectTableInfo.ConfectDocument internally
     type NotesTableInfo =
       ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
         TestConfectDataModel,
@@ -434,16 +429,12 @@ describe("ConfectTableInfo.TableSchema", () => {
 
 describe("GenericConfectDoc", () => {
   test("extracts encoded document from ConfectTableInfo", () => {
-    // GenericConfectDoc is designed for use with a DataModel that maps
-    // table names to ConfectTableInfo objects containing encodedConfectDocument
     type NotesTableInfo =
       ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
         TestConfectDataModel,
         "notes"
       >;
 
-    // The encodedConfectDocument should match the confectDocument in this case
-    // since the schema has no transformations
     expectTypeOf<NotesTableInfo["encodedConfectDocument"]>().toEqualTypeOf<{
       readonly _id: GenericId<"notes">;
       readonly _creationTime: number;
@@ -467,8 +458,6 @@ describe("GenericConfectDoc", () => {
     }>();
   });
 });
-
-// ----- Edge cases and complex scenarios -----
 
 describe("Edge cases", () => {
   test("table with optional fields", () => {

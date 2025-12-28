@@ -5,8 +5,6 @@ import { describe, expect, expectTypeOf, test } from "vitest";
 import * as ConfectSchema from "./ConfectSchema";
 import * as ConfectTable from "./ConfectTable";
 
-// ----- Test Setup -----
-
 const NoteSchema = Schema.Struct({
   content: Schema.String,
   priority: Schema.Number,
@@ -34,8 +32,6 @@ const confectSchema = ConfectSchema.make()
 type TestConfectSchema = typeof confectSchema;
 type NotesTable = typeof notesTable;
 type UsersTable = typeof usersTable;
-
-// ----- Tests -----
 
 describe("TypeId", () => {
   test("is the expected string literal", () => {
@@ -343,10 +339,9 @@ describe("extendWithConfectSystemTables", () => {
       users: usersTable,
     };
 
-    const extended = ConfectSchema.extendWithConfectSystemTables(tablesRecord);
+    const _extended = ConfectSchema.extendWithConfectSystemTables(tablesRecord);
 
-    // Return type should be a record, allowing type-safe property access
-    expectTypeOf<keyof typeof extended>().toEqualTypeOf<
+    expectTypeOf<keyof typeof _extended>().toEqualTypeOf<
       "notes" | "users" | "_scheduled_functions" | "_storage"
     >();
   });
@@ -358,15 +353,14 @@ describe("extendWithConfectSystemTables", () => {
       users: usersTable,
     };
 
-    const extended = ConfectSchema.extendWithConfectSystemTables(tablesRecord);
+    const _extended = ConfectSchema.extendWithConfectSystemTables(tablesRecord);
 
-    // Each property should have the correct table type
-    expectTypeOf<(typeof extended)["notes"]>().toEqualTypeOf<NotesTable>();
-    expectTypeOf<(typeof extended)["users"]>().toEqualTypeOf<UsersTable>();
-    expectTypeOf<(typeof extended)["_scheduled_functions"]>().toEqualTypeOf<
+    expectTypeOf<(typeof _extended)["notes"]>().toEqualTypeOf<NotesTable>();
+    expectTypeOf<(typeof _extended)["users"]>().toEqualTypeOf<UsersTable>();
+    expectTypeOf<(typeof _extended)["_scheduled_functions"]>().toEqualTypeOf<
       typeof ConfectTable.scheduledFunctionsTable
     >();
-    expectTypeOf<(typeof extended)["_storage"]>().toEqualTypeOf<
+    expectTypeOf<(typeof _extended)["_storage"]>().toEqualTypeOf<
       typeof ConfectTable.storageTable
     >();
   });
@@ -380,7 +374,6 @@ describe("extendWithConfectSystemTables", () => {
 
     const extended = ConfectSchema.extendWithConfectSystemTables(tablesRecord);
 
-    // Should be able to access system tables without casting to any
     expect(extended._scheduled_functions).toBe(
       ConfectTable.scheduledFunctionsTable,
     );
@@ -396,7 +389,6 @@ describe("extendWithConfectSystemTables", () => {
 
     const extended = ConfectSchema.extendWithConfectSystemTables(tablesRecord);
 
-    // Should be able to access original tables without casting to any
     expect(extended.notes).toBe(notesTable);
     expect(extended.users).toBe(usersTable);
   });
@@ -412,7 +404,6 @@ describe("extendWithConfectSystemTables", () => {
 
     const extended = ConfectSchema.extendWithConfectSystemTables(tablesRecord);
 
-    // The return type should be assignable to TablesRecord<ExtendedTables>
     expectTypeOf(extended).toExtend<
       ConfectTable.ConfectTable.TablesRecord<ExtendedTables>
     >();
@@ -424,7 +415,6 @@ describe("ExtendWithConfectSystemTables", () => {
     type TestTables = NotesTable | UsersTable;
     type Extended = ConfectSchema.ExtendWithConfectSystemTables<TestTables>;
 
-    // Should be a record with keys for all tables (original + system)
     expectTypeOf<keyof Extended>().toEqualTypeOf<
       "notes" | "users" | "_scheduled_functions" | "_storage"
     >();
@@ -455,8 +445,6 @@ describe("ExtendWithConfectSystemTables", () => {
     type ExtendedTablesUnion = TestTables | ConfectTable.ConfectSystemTables;
     type Extended = ConfectSchema.ExtendWithConfectSystemTables<TestTables>;
 
-    // ExtendWithConfectSystemTables should be equivalent to TablesRecord
-    // of the union of original tables + system tables
     expectTypeOf<Extended>().toEqualTypeOf<
       ConfectTable.ConfectTable.TablesRecord<ExtendedTablesUnion>
     >();
@@ -472,8 +460,6 @@ describe("ExtendWithConfectSystemTables", () => {
     expectTypeOf<Extended["notes"]>().toEqualTypeOf<NotesTable>();
   });
 });
-
-// ----- Edge cases and complex scenarios -----
 
 describe("Edge cases", () => {
   describe("schema with table with optional fields", () => {
@@ -646,9 +632,6 @@ describe("Edge cases", () => {
       type TableNames = ConfectSchema.ConfectSchema.TableNames<
         typeof emptySchema
       >;
-      // For empty schema, TableNames should be never since there are no tables
-      // However, due to implementation it might be string & string which simplifies to string
-      // Let's verify what we actually get
       expectTypeOf<TableNames>().toEqualTypeOf<never>();
     });
 
