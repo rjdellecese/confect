@@ -5,7 +5,6 @@ import {
   type GenericTableIndexes,
   type GenericTableSearchIndexes,
   type GenericTableVectorIndexes,
-  type IndexTiebreakerField,
   type SearchIndexConfig,
   type TableDefinition,
   type VectorIndexConfig,
@@ -59,13 +58,7 @@ export interface ConfectTable<
     TableName,
     TableSchema,
     TableValidator,
-    Expand<
-      Indexes &
-        Record<
-          IndexName,
-          [FirstFieldPath, ...RestFieldPaths, IndexTiebreakerField]
-        >
-    >,
+    Expand<Indexes & Record<IndexName, [FirstFieldPath, ...RestFieldPaths]>>,
     SearchIndexes,
     VectorIndexes
   >;
@@ -235,7 +228,11 @@ export declare namespace ConfectTable {
   export type WithName<
     Table extends AnyWithProps,
     Name_ extends string,
-  > = Table extends { readonly name: Name_ } ? Table : never;
+  > = Table extends {
+    readonly name: Name_;
+  }
+    ? Table
+    : never;
 
   export type TablesRecord<Tables extends AnyWithProps> = {
     readonly [TableName_ in Name<Tables>]: WithName<Tables, TableName_>;

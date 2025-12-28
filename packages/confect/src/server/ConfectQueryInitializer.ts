@@ -48,7 +48,7 @@ export type ConfectQueryInitializer<
       ...indexFieldValues: IndexFieldTypesForEq<
         ConfectDataModel.ConfectDataModel.DataModel<ConfectDataModel_>,
         TableName,
-        Indexes<_TableInfo>[IndexName] & GenericIndexFields
+        Indexes<_TableInfo>[IndexName]
       >
     ): Effect.Effect<
       _ConfectTableInfo["confectDocument"],
