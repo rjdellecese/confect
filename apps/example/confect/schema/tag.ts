@@ -1,7 +1,7 @@
 import { ConfectTable } from "@rjdellecese/confect";
 import { Schema } from "effect";
 
-type Tag = {
+export type Tag = {
   readonly name: string;
   readonly tags: readonly Tag[];
 };
