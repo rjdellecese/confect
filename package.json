@@ -58,35 +58,35 @@
   "license": "ISC",
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.2",
-    "@biomejs/biome": "2.3.4",
-    "@changesets/cli": "2.29.7",
-    "@changesets/config": "3.1.1",
-    "@effect/cluster": "0.52.5",
-    "@effect/experimental": "0.57.0",
-    "@effect/platform-node": "0.100.0",
-    "@effect/rpc": "0.72.1",
-    "@effect/sql": "0.48.0",
+    "@biomejs/biome": "2.3.10",
+    "@changesets/cli": "2.29.8",
+    "@changesets/config": "3.1.2",
+    "@effect/cluster": "0.56.0",
+    "@effect/experimental": "0.58.0",
+    "@effect/platform-node": "0.104.0",
+    "@effect/rpc": "0.73.0",
+    "@effect/sql": "0.49.0",
     "@effect/vitest": "0.27.0",
-    "@effect/workflow": "0.12.2",
+    "@effect/workflow": "0.16.0",
     "@swc/jest": "0.2.39",
-    "@tsconfig/strictest": "2.0.7",
-    "@types/node": "24.10.0",
-    "@vitest/coverage-v8": "4.0.7",
-    "convex-test": "0.0.38",
+    "@tsconfig/strictest": "2.0.8",
+    "@types/node": "25.0.3",
+    "@vitest/coverage-v8": "4.0.16",
+    "convex-test": "0.0.41",
     "dotenv": "17.2.3",
-    "tsup": "8.5.0",
+    "tsup": "8.5.1",
     "typescript": "5.9.3",
-    "vite": "7.2.1",
-    "vite-tsconfig-paths": "5.1.4",
-    "vitest": "4.0.7"
+    "vite": "7.3.0",
+    "vite-tsconfig-paths": "6.0.3",
+    "vitest": "4.0.16"
   },
   "peerDependencies": {
-    "@effect/platform": "^0.93.0",
-    "convex": "^1.28.2",
-    "effect": "^3.19.2"
+    "@effect/platform": "^0.94.0",
+    "convex": "^1.31.2",
+    "effect": "^3.19.13"
   },
   "engines": {
-    "node": ">=20",
+    "node": ">=22",
     "pnpm": ">=10"
   }
 }
