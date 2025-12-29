@@ -225,18 +225,20 @@ export interface ConfectTableDefinition<
 
 export type ConfectSchemaFromConfectSchemaDefinition<
   ConfectSchemaDef extends GenericConfectSchemaDefinition,
-> = ConfectSchemaDef extends ConfectSchemaDefinition<infer ConfectSchema>
-  ? ConfectSchema
-  : never;
+> =
+  ConfectSchemaDef extends ConfectSchemaDefinition<infer ConfectSchema>
+    ? ConfectSchema
+    : never;
 
 /**
  * @ignore
  */
 export type ConfectDataModelFromConfectSchemaDefinition<
   ConfectSchemaDef extends GenericConfectSchemaDefinition,
-> = ConfectSchemaDef extends ConfectSchemaDefinition<infer ConfectSchema>
-  ? ConfectDataModelFromConfectSchema<ConfectSchema>
-  : never;
+> =
+  ConfectSchemaDef extends ConfectSchemaDefinition<infer ConfectSchema>
+    ? ConfectDataModelFromConfectSchema<ConfectSchema>
+    : never;
 
 class ConfectTableDefinitionImpl<
   TableSchema extends Schema.Schema.AnyNoContext,
