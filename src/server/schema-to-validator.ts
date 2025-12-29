@@ -81,11 +81,12 @@ export const compileReturnsSchema = <ConfectValue, ConvexValue>(
  */
 export type TableSchemaToTableValidator<
   TableSchema extends Schema.Schema.AnyNoContext,
-> = ValueToValidator<TableSchema["Encoded"]> extends infer Vd extends
-  | VObject<any, any, any, any>
-  | VUnion<any, any, any, any>
-  ? Vd
-  : never;
+> =
+  ValueToValidator<TableSchema["Encoded"]> extends infer Vd extends
+    | VObject<any, any, any, any>
+    | VUnion<any, any, any, any>
+    ? Vd
+    : never;
 
 export const compileTableSchema = <
   TableSchema extends Schema.Schema.AnyNoContext,
@@ -126,39 +127,40 @@ export type ReadonlyRecordValue = {
   readonly [key: string]: ReadonlyValue | undefined;
 };
 
-export type ValueToValidator<Vl> = IsRecursive<Vl> extends true
-  ? VAny
-  : [Vl] extends [never]
-    ? never
-    : IsAny<Vl> extends true
-      ? VAny
-      : [Vl] extends [ReadonlyValue]
-        ? Vl extends {
-            __tableName: infer TableName extends string;
-          }
-          ? VId<GenericId<TableName>>
-          : IsValueLiteral<Vl> extends true
-            ? VLiteral<Vl>
-            : Vl extends null
-              ? VNull
-              : Vl extends number
-                ? VFloat64
-                : Vl extends bigint
-                  ? VInt64
-                  : Vl extends boolean
-                    ? VBoolean
-                    : Vl extends string
-                      ? VString
-                      : Vl extends ArrayBuffer
-                        ? VBytes
-                        : Vl extends ReadonlyArray<ReadonlyValue>
-                          ? ArrayValueToValidator<Vl>
-                          : Vl extends ReadonlyRecordValue
-                            ? RecordValueToValidator<Vl>
-                            : IsUnion<Vl> extends true
-                              ? UnionValueToValidator<Vl>
-                              : TypeError<"Unexpected value", Vl>
-        : TypeError<"Not a valid Convex value", Vl>;
+export type ValueToValidator<Vl> =
+  IsRecursive<Vl> extends true
+    ? VAny
+    : [Vl] extends [never]
+      ? never
+      : IsAny<Vl> extends true
+        ? VAny
+        : [Vl] extends [ReadonlyValue]
+          ? Vl extends {
+              __tableName: infer TableName extends string;
+            }
+            ? VId<GenericId<TableName>>
+            : IsValueLiteral<Vl> extends true
+              ? VLiteral<Vl>
+              : Vl extends null
+                ? VNull
+                : Vl extends number
+                  ? VFloat64
+                  : Vl extends bigint
+                    ? VInt64
+                    : Vl extends boolean
+                      ? VBoolean
+                      : Vl extends string
+                        ? VString
+                        : Vl extends ArrayBuffer
+                          ? VBytes
+                          : Vl extends ReadonlyArray<ReadonlyValue>
+                            ? ArrayValueToValidator<Vl>
+                            : Vl extends ReadonlyRecordValue
+                              ? RecordValueToValidator<Vl>
+                              : IsUnion<Vl> extends true
+                                ? UnionValueToValidator<Vl>
+                                : TypeError<"Unexpected value", Vl>
+          : TypeError<"Not a valid Convex value", Vl>;
 
 type ArrayValueToValidator<Vl extends ReadonlyArray<ReadonlyValue>> =
   Vl extends ReadonlyArray<infer El extends ReadonlyValue>
@@ -215,12 +217,7 @@ type UnionValueToValidator<Vl extends ReadonlyValue> = [Vl] extends [
 type ValueTupleToValidatorTuple<VlTuple extends ReadonlyArray<ReadonlyValue>> =
   VlTuple extends
     | [true, false, ...infer VlRest extends ReadonlyArray<ReadonlyValue>]
-    | [
-        false,
-        true,
-        // biome-ignore lint/suspicious/noRedeclare: This redeclare allows us to be more terse
-        ...infer VlRest extends ReadonlyArray<ReadonlyValue>,
-      ]
+    | [false, true, ...infer VlRest extends ReadonlyArray<ReadonlyValue>]
     ? ValueTupleToValidatorTuple<VlRest> extends infer VdRest extends Validator<
         any,
         any,
