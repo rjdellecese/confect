@@ -15,83 +15,6 @@ import type * as ConfectSchema from "./ConfectSchema";
 import type * as ConfectTable from "./ConfectTable";
 import type * as ConfectTableInfo from "./ConfectTableInfo";
 
-/**
- * Explicit interface to avoid heavy type inference.
- */
-export interface ConfectDatabaseWriterService<
-  ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
-> {
-  insert: <
-    TableName extends ConfectDataModel.ConfectDataModel.TableNames<
-      ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>
-    >,
-  >(
-    tableName: TableName,
-    document: ConfectDocument.ConfectDocument.WithoutSystemFields<
-      ConfectDocumentByName<
-        ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>,
-        TableName
-      >
-    >,
-  ) => Effect.Effect<
-    GenericId<TableName>,
-    ConfectDocument.DocumentEncodeError | unknown,
-    never
-  >;
-
-  patch: <
-    TableName extends ConfectDataModel.ConfectDataModel.TableNames<
-      ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>
-    >,
-  >(
-    tableName: TableName,
-    id: GenericId<TableName>,
-    patchedValues: Partial<
-      WithoutSystemFields<
-        ConfectDocumentByName<
-          ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>,
-          TableName
-        >
-      >
-    >,
-  ) => Effect.Effect<
-    void,
-    | ConfectDocument.DocumentDecodeError
-    | ConfectDocument.DocumentEncodeError
-    | ConfectQueryInitializer.GetByIdFailure
-    | unknown,
-    never
-  >;
-
-  replace: <
-    TableName extends ConfectDataModel.ConfectDataModel.TableNames<
-      ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>
-    >,
-  >(
-    tableName: TableName,
-    id: GenericId<TableName>,
-    value: WithoutSystemFields<
-      ConfectDocumentByName<
-        ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>,
-        TableName
-      >
-    >,
-  ) => Effect.Effect<
-    void,
-    ConfectDocument.DocumentEncodeError | unknown,
-    never
-  >;
-
-  delete: <
-    TableName extends ConfectDataModel.ConfectDataModel.TableNames<
-      ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>
-    >,
-  >(
-    tableName: TableName,
-    id: GenericId<TableName>,
-  ) => Effect.Effect<void, unknown, never>;
-}
-
 export const make = <
   ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
 >(
@@ -101,7 +24,7 @@ export const make = <
       ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>
     >
   >,
-): ConfectDatabaseWriterService<ConfectSchema_> => {
+) => {
   type ConfectDataModel_ =
     ConfectDataModel.ConfectDataModel.FromSchema<ConfectSchema_>;
 

@@ -13,7 +13,15 @@ import {
   type RegisteredMutation,
   type RegisteredQuery,
 } from "convex/server";
-import { Effect, Layer, Match, pipe, Predicate, Ref, Schema } from "effect";
+import {
+  type Types,
+  Effect,
+  Layer,
+  pipe,
+  Predicate,
+  Ref,
+  Schema,
+} from "effect";
 import { mapLeaves } from "../internal/utils";
 import * as ConfectActionRunner from "./ConfectActionRunner";
 import type * as ConfectApi from "./ConfectApi";
@@ -39,7 +47,6 @@ import * as ConvexMutationCtx from "./ConvexMutationCtx";
 import * as ConvexQueryCtx from "./ConvexQueryCtx";
 import * as SchemaToValidator from "./SchemaToValidator";
 import type * as ConfectApiGroup from "../api/ConfectApiGroup";
-import type * as ConfectApiHandler from "./ConfectApiHandler";
 import type * as ConfectApiSpec from "../api/ConfectApiSpec";
 
 export type RegisteredFunction =
@@ -130,10 +137,7 @@ const makeRegisteredFunction = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
       confectQueryFunction(api.confectSchema, {
         args: function_.args,
         returns: function_.returns,
-        handler: handler as ConfectApiHandler.QueryHandler<
-          Api["confectSchema"],
-          any
-        >,
+        handler: handler,
       }),
     );
   }
@@ -148,10 +152,7 @@ const makeRegisteredFunction = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
       confectMutationFunction(api.confectSchema, {
         args: function_.args,
         returns: function_.returns,
-        handler: handler as ConfectApiHandler.MutationHandler<
-          Api["confectSchema"],
-          any
-        >,
+        handler: handler,
       }),
     );
   }
@@ -166,10 +167,7 @@ const makeRegisteredFunction = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
       confectActionFunction({
         args: function_.args,
         returns: function_.returns,
-        handler: handler as ConfectApiHandler.ActionHandler<
-          Api["confectSchema"],
-          any
-        >,
+        handler: handler,
       }),
     );
   }
