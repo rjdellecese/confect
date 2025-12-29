@@ -26,7 +26,23 @@ export interface ConfectDatabaseReaderService<
         ConfectSchema.ConfectSchema.Tables<ConfectSchema_>
       >
     >,
-    TableName
+    TableName,
+    ConfectDataModel.ConfectDataModel.TableInfoWithName<
+      ConfectDataModel.ConfectDataModel<
+        ConfectSchema.IncludeConfectSystemTables<
+          ConfectSchema.ConfectSchema.Tables<ConfectSchema_>
+        >
+      >,
+      TableName
+    >,
+    ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+      ConfectDataModel.ConfectDataModel<
+        ConfectSchema.IncludeConfectSystemTables<
+          ConfectSchema.ConfectSchema.Tables<ConfectSchema_>
+        >
+      >,
+      TableName
+    >
   >;
 }
 
