@@ -465,22 +465,18 @@ const makeProto = <Api extends ConfectApi.ConfectApi.AnyWithProps>({
   });
 
 export const make = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
-  _api: Api,
+  api: Api,
 ) =>
   Effect.gen(function* () {
     const registry = yield* ConfectApiRegistry.ConfectApiRegistry;
 
     const handlerItems = yield* Ref.get(registry);
 
-    // We still use the API from the service to build the implementations,
-    // but we use the passed 'api' for the generic return type.
-    const { api: apiFromService } = yield* ConfectApiBuilder.ConfectApiService;
-
     const registeredFunctions = mapLeaves<
       ConfectApiBuilder.Handlers.Item.AnyWithProps,
       RegisteredFunction
     >(handlerItems, ConfectApiBuilder.isHandlerItem, (handlerItem) =>
-      makeRegisteredFunction(apiFromService, handlerItem),
+      makeRegisteredFunction(api, handlerItem),
     ) as RegisteredFunctions;
 
     return makeProto<Api>({ registeredFunctions });
