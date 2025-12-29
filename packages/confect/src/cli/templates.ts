@@ -58,7 +58,7 @@ export const refs = ({ specImportPath }: { specImportPath: string }) =>
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
     yield* cbw.writeLine(
-      `import { ConfectApiRefs } from "@rjdellecese/confect/api";`,
+      `import { ConfectApiRefs } from "@rjdellecese/confect";`,
     );
     yield* cbw.writeLine(`import spec from "${specImportPath}";`);
     yield* cbw.blankLine();
@@ -84,7 +84,7 @@ export const services = ({
 
     // Imports
     yield* cbw.writeLine(
-      `import type { ConfectDataModel } from "${test ? "../../../src/server/index" : "@rjdellecese/confect/server"}";`,
+      `import type { ConfectDataModel } from "${test ? "../../../src/index" : "@rjdellecese/confect"}";`,
     );
     yield* cbw.writeLine("import {");
     yield* cbw.indent(
@@ -110,7 +110,7 @@ export const services = ({
       }),
     );
     yield* cbw.writeLine(
-      `} from "${test ? "../../../src/server/index" : "@rjdellecese/confect/server"}";`,
+      `} from "${test ? "../../../src/index" : "@rjdellecese/confect"}";`,
     );
     yield* cbw.writeLine(
       `import type confectSchemaDefinition from "${schemaImportPath}";`,

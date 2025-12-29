@@ -1,4 +1,4 @@
-import { ConfectTable } from "@rjdellecese/confect/server";
+import { ConfectTable } from "@rjdellecese/confect";
 import { Schema } from "effect";
 
 export const User = ConfectTable.make({

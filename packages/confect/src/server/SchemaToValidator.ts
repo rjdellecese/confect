@@ -35,7 +35,7 @@ import {
   String,
 } from "effect";
 
-import { GenericId } from "@rjdellecese/confect/api";
+import * as GenericId from "../api/GenericId";
 import type {
   DeepMutable,
   IsAny,
@@ -46,7 +46,7 @@ import type {
   IsValueLiteral,
   TypeError,
   UnionToTuple,
-} from "../typeUtils";
+} from "../internal/typeUtils";
 
 // Args
 

@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 import { expectTypeOf, test } from "vitest";
-import { PaginationResult } from "./PaginationResult";
+import { PaginationResult } from "../api/PaginationResult";
 
 test("PaginationResult encoded schema matches Convex type", () => {
   const _paginationResult = PaginationResult(Schema.String);
@@ -10,3 +10,4 @@ test("PaginationResult encoded schema matches Convex type", () => {
 
   expectTypeOf<EncodedPaginationResult>().toExtend<EncodedPaginationResult>();
 });
+

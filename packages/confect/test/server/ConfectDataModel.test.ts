@@ -8,10 +8,10 @@ import type { GenericId } from "convex/values";
 import { Schema } from "effect";
 import { describe, expectTypeOf, test } from "vitest";
 
-import type * as ConfectDataModel from "./ConfectDataModel";
-import * as ConfectSchema from "./ConfectSchema";
-import * as ConfectTable from "./ConfectTable";
-import type * as ConfectTableInfo from "./ConfectTableInfo";
+import type * as ConfectDataModel from "../server/ConfectDataModel";
+import * as ConfectSchema from "../server/ConfectSchema";
+import * as ConfectTable from "../server/ConfectTable";
+import type * as ConfectTableInfo from "../server/ConfectTableInfo";
 
 const NoteSchema = Schema.Struct({
   content: Schema.String,
@@ -605,3 +605,4 @@ describe("Edge cases", () => {
     >();
   });
 });
+

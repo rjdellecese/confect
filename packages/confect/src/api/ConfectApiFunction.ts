@@ -1,6 +1,6 @@
 import type { Schema } from "effect";
 import { Predicate } from "effect";
-import { validateJsIdentifier } from "../utils";
+import { validateJsIdentifier } from "../internal/utils";
 
 export const TypeId = "@rjdellecese/confect/api/ConfectApiFunction";
 export type TypeId = typeof TypeId;

@@ -1,23 +1,22 @@
 import {
   defineTable as defineConvexTable,
+  type SystemFields as ConvexSystemFields,
   type Expand,
   type GenericTableIndexes,
   type GenericTableSearchIndexes,
   type GenericTableVectorIndexes,
   type IndexTiebreakerField,
   type SearchIndexConfig,
-  type SystemFields,
   type TableDefinition,
   type VectorIndexConfig,
 } from "convex/server";
 import type { GenericValidator, Validator } from "convex/values";
 import { Predicate, Schema } from "effect";
+import * as SystemFields from "../api/SystemFields";
 import {
   compileTableSchema,
   type TableSchemaToTableValidator,
 } from "./SchemaToValidator";
-import type { ExtendWithSystemFields } from "./SystemFields";
-import { extendWithSystemFields } from "./SystemFields";
 
 export const TypeId = "@rjdellecese/confect/server/ConfectTable";
 export type TypeId = typeof TypeId;
@@ -45,7 +44,7 @@ export interface ConfectTable<
   readonly name: TableName;
 
   readonly Fields: TableSchema;
-  readonly Doc: ExtendWithSystemFields<TableName, TableSchema>;
+  readonly Doc: SystemFields.ExtendWithSystemFields<TableName, TableSchema>;
 
   readonly indexes: Indexes;
 
@@ -218,7 +217,7 @@ export declare namespace ConfectTable {
       infer _SearchIndexes,
       infer _VectorIndexes
     >
-      ? ExtendWithSystemFields<TableName, TableSchema_>
+      ? SystemFields.ExtendWithSystemFields<TableName, TableSchema_>
       : never;
 
   export type Fields<Table extends AnyWithProps> =
@@ -322,7 +321,7 @@ const makeProto = <
 }: {
   name: TableName;
   Fields: TableSchema;
-  Doc: ExtendWithSystemFields<TableName, TableSchema>;
+  Doc: SystemFields.ExtendWithSystemFields<TableName, TableSchema>;
   tableDefinition: TableDefinition<
     TableValidator,
     Indexes,
@@ -365,7 +364,7 @@ export const make = <
   return makeProto({
     name,
     Fields: fields,
-    Doc: extendWithSystemFields(name, fields),
+    Doc: SystemFields.extendWithSystemFields(name, fields),
     tableDefinition,
     indexes: {},
   });
@@ -425,4 +424,4 @@ type ExtractFieldPaths<T extends Validator<any, any, any>> =
   // Add in the system fields available in index definitions.
   // This should be everything except for `_id` because thats added to indexes
   // automatically.
-  T["fieldPaths"] | keyof SystemFields;
+  T["fieldPaths"] | keyof ConvexSystemFields;

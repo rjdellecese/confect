@@ -1,4 +1,4 @@
-import type { ConfectApiFunction } from "@rjdellecese/confect/api";
+import type * as ConfectApiFunction from "../api/ConfectApiFunction";
 import type { Effect } from "effect";
 import type * as ConfectActionRunner from "./ConfectActionRunner";
 import type * as ConfectAuth from "./ConfectAuth";

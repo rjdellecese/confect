@@ -4,7 +4,7 @@ import {
   useQuery as useConvexQuery,
 } from "convex/react";
 import { Effect, Option, Schema } from "effect";
-import { ConfectApiRefs } from "../api";
+import * as ConfectApiRefs from "../api/ConfectApiRefs";
 
 export const useQuery = <Query extends ConfectApiRefs.Ref.AnyPublicQuery>(
   ref: Query,

@@ -3,16 +3,16 @@ import {
   ConfectAuth as ConfectAuth_,
   ConfectDatabaseReader as ConfectDatabaseReader_,
   ConfectDatabaseWriter as ConfectDatabaseWriter_,
+  ConfectDataModel,
   ConfectMutationRunner as ConfectMutationRunner_,
   ConfectQueryRunner as ConfectQueryRunner_,
   ConfectScheduler as ConfectScheduler_,
-  ConfectDataModel,
   ConfectStorage,
   ConfectVectorSearch as ConfectVectorSearch_,
   ConvexActionCtx as ConvexActionCtx_,
   ConvexMutationCtx as ConvexMutationCtx_,
   ConvexQueryCtx as ConvexQueryCtx_,
-} from "@rjdellecese/confect/server";
+} from "@rjdellecese/confect";
 import confectSchemaDefinition from "../../confect/schema";
 
 export const ConfectAuth = ConfectAuth_.ConfectAuth;

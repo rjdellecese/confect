@@ -1,5 +1,5 @@
 import { Predicate, Record } from "effect";
-import { validateJsIdentifier } from "../utils";
+import { validateJsIdentifier } from "../internal/utils";
 import type * as ConfectApiFunction from "./ConfectApiFunction";
 
 export const TypeId = "@rjdellecese/confect/api/ConfectApiGroup";

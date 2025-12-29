@@ -1,6 +1,6 @@
 import type { GenericDatabaseReader } from "convex/server";
 import { Array, Context, Layer } from "effect";
-import type { BaseDatabaseReader } from "../typeUtils";
+import type { BaseDatabaseReader } from "../internal/typeUtils";
 import type * as ConfectDataModel from "./ConfectDataModel";
 import * as ConfectQueryInitializer from "./ConfectQueryInitializer";
 import * as ConfectSchema from "./ConfectSchema";

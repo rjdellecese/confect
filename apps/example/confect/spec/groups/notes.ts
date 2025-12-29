@@ -2,7 +2,7 @@ import {
   ConfectApiFunction,
   ConfectApiGroup,
   GenericId,
-} from "@rjdellecese/confect/api";
+} from "@rjdellecese/confect";
 import { Schema } from "effect";
 import { Note } from "../../schema/note";
 

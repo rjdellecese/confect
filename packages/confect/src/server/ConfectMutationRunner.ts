@@ -1,6 +1,6 @@
 import { type GenericMutationCtx } from "convex/server";
 import { Context, Effect, Layer, Schema } from "effect";
-import { ConfectApiRefs } from "../api";
+import * as ConfectApiRefs from "../api/ConfectApiRefs";
 
 const makeMutationRunner =
   (runMutation: GenericMutationCtx<any>["runMutation"]) =>

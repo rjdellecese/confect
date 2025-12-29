@@ -1,7 +1,7 @@
 import { type GenericQueryCtx } from "convex/server";
 import type { ParseResult } from "effect";
 import { Context, Effect, Layer, Schema } from "effect";
-import { ConfectApiRefs } from "../api";
+import * as ConfectApiRefs from "../api/ConfectApiRefs";
 
 const make =
   (runQuery: GenericQueryCtx<any>["runQuery"]) =>

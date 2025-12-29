@@ -1,5 +1,5 @@
 import { describe, expectTypeOf, test } from "vitest";
-import * as ConfectApiGroup from "./ConfectApiGroup";
+import * as ConfectApiGroup from "../api/ConfectApiGroup";
 
 describe("ConfectApiGroup.Path.All", () => {
   test("produces the correct group paths", () => {
@@ -28,3 +28,4 @@ describe("ConfectApiGroup.Path.All", () => {
     expectTypeOf<AllPaths>().not.toExtend<"groupB.groupA">();
   });
 });
+

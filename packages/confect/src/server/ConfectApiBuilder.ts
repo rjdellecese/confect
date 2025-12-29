@@ -1,7 +1,5 @@
-import type {
-  ConfectApiFunction,
-  ConfectApiGroup,
-} from "@rjdellecese/confect/api";
+import type * as ConfectApiFunction from "../api/ConfectApiFunction";
+import type * as ConfectApiGroup from "../api/ConfectApiGroup";
 import type { Types } from "effect";
 import {
   Array,
@@ -13,7 +11,7 @@ import {
   Ref,
   String,
 } from "effect";
-import { setNestedProperty } from "../utils";
+import { setNestedProperty } from "../internal/utils";
 import type * as ConfectApi from "./ConfectApi";
 import type * as ConfectApiHandler from "./ConfectApiHandler";
 import * as ConfectApiRegistry from "./ConfectApiRegistry";

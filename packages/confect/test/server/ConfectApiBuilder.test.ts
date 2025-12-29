@@ -1,5 +1,5 @@
 import { describe, expectTypeOf, test } from "vitest";
-import type * as ConfectApiBuilder from "./ConfectApiBuilder";
+import type * as ConfectApiBuilder from "../server/ConfectApiBuilder";
 
 describe("ConfectApiBuilder", () => {
   describe("ConfectApiGroupService", () => {
@@ -21,3 +21,4 @@ describe("ConfectApiBuilder", () => {
     });
   });
 });
+

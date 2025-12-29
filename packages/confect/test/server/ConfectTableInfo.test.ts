@@ -3,8 +3,8 @@ import type { GenericId } from "convex/values";
 import { Schema } from "effect";
 import { describe, expectTypeOf, test } from "vitest";
 
-import * as ConfectTable from "./ConfectTable";
-import type * as ConfectTableInfo from "./ConfectTableInfo";
+import * as ConfectTable from "../server/ConfectTable";
+import type * as ConfectTableInfo from "../server/ConfectTableInfo";
 
 // ----- Test Setup -----
 
@@ -650,3 +650,4 @@ describe("Edge cases", () => {
     });
   });
 });
+

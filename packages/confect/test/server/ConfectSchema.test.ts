@@ -2,8 +2,8 @@ import type { GenericSchema, SchemaDefinition } from "convex/server";
 import { Schema } from "effect";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
-import * as ConfectSchema from "./ConfectSchema";
-import * as ConfectTable from "./ConfectTable";
+import * as ConfectSchema from "../server/ConfectSchema";
+import * as ConfectTable from "../server/ConfectTable";
 
 const NoteSchema = Schema.Struct({
   content: Schema.String,
@@ -659,3 +659,4 @@ describe("Edge cases", () => {
     });
   });
 });
+

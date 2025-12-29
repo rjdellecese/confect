@@ -8,8 +8,8 @@ import type { GenericValidator } from "convex/values";
 import { Schema } from "effect";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
-import * as ConfectTable from "./ConfectTable";
-import type { ExtendWithSystemFields } from "./SystemFields";
+import type { ExtendWithSystemFields } from "../api/SystemFields";
+import * as ConfectTable from "../server/ConfectTable";
 
 const NoteSchema = Schema.Struct({
   content: Schema.String,
@@ -750,3 +750,4 @@ describe("Edge cases", () => {
     });
   });
 });
+

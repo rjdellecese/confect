@@ -19,7 +19,10 @@ import type {
 } from "convex/server";
 import type { GenericId } from "convex/values";
 import { Array, Effect, Either, pipe, Schema } from "effect";
-import type { BaseDatabaseReader, IndexFieldTypesForEq } from "../typeUtils";
+import type {
+  BaseDatabaseReader,
+  IndexFieldTypesForEq,
+} from "../internal/typeUtils";
 import type * as ConfectDataModel from "./ConfectDataModel";
 import * as ConfectDocument from "./ConfectDocument";
 import * as ConfectOrderedQuery from "./ConfectOrderedQuery";

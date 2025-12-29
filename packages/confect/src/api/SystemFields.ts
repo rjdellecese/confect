@@ -1,10 +1,10 @@
-import { GenericId } from "@rjdellecese/confect/api";
 import type {
   Expand,
   IdField,
   SystemFields as NonIdSystemFields,
 } from "convex/server";
 import { Schema } from "effect";
+import * as GenericId from "./GenericId";
 
 type SystemFieldsSchema<TableName extends string> = Schema.Struct<{
   _id: Schema.Schema<

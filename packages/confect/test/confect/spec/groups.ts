@@ -1,4 +1,4 @@
-import { ConfectApiGroup } from "@rjdellecese/confect/api";
+import { ConfectApiGroup } from "@rjdellecese/confect";
 import { Notes } from "./groups/notes";
 import { Random } from "./groups/random";
 

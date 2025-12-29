@@ -14,7 +14,7 @@ import * as tsx from "tsx/esm/api";
 import packageJson from "../../package.json" with { type: "json" };
 import * as ConfectApiServer from "../server/ConfectApiServer";
 import * as ConfectSchema from "../server/ConfectSchema";
-import { forEachBranchLeaves } from "../utils";
+import { forEachBranchLeaves } from "../internal/utils";
 import { functions, http, refs, schema, services } from "./templates";
 
 const codegenCommand = Command.make("codegen", {}, () =>

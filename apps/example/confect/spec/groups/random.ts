@@ -1,4 +1,4 @@
-import { ConfectApiFunction, ConfectApiGroup } from "@rjdellecese/confect/api";
+import { ConfectApiFunction, ConfectApiGroup } from "@rjdellecese/confect";
 import { Schema } from "effect";
 
 export const Random = ConfectApiGroup.make("random").addFunction(

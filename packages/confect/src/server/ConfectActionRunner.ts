@@ -1,6 +1,6 @@
 import { type GenericActionCtx } from "convex/server";
 import { Context, Effect, Layer, Schema } from "effect";
-import { ConfectApiRefs } from "../api";
+import * as ConfectApiRefs from "../api/ConfectApiRefs";
 
 const makeActionRunner =
   (runAction: GenericActionCtx<any>["runAction"]) =>

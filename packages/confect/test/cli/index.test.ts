@@ -13,7 +13,7 @@ import {
 } from "effect";
 
 import { NodeContext, NodeFileSystem } from "@effect/platform-node";
-import { cli } from "./cli";
+import { cli } from "../../src/cli/cli";
 
 /**
  * Creates a mock Console that captures output for testing.

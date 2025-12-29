@@ -16,52 +16,17 @@
     "confect": "./dist/cli/index.mjs"
   },
   "files": [
-    "src",
-    "dist",
+    "CHANGELOG.md",
+    "LICENSE",
     "README.md",
-    "LICENSE"
+    "dist",
+    "package.json",
+    "src"
   ],
   "exports": {
-    ".": {
-      "import": {
-        "types": "./dist/server/index.d.ts",
-        "default": "./dist/server/index.js"
-      },
-      "require": {
-        "types": "./dist/server/index.d.cts",
-        "default": "./dist/server/index.cjs"
-      }
-    },
-    "./api": {
-      "import": {
-        "types": "./dist/api/index.d.ts",
-        "default": "./dist/api/index.js"
-      },
-      "require": {
-        "types": "./dist/api/index.d.cts",
-        "default": "./dist/api/index.cjs"
-      }
-    },
-    "./server": {
-      "import": {
-        "types": "./dist/server/index.d.ts",
-        "default": "./dist/server/index.js"
-      },
-      "require": {
-        "types": "./dist/server/index.d.cts",
-        "default": "./dist/server/index.cjs"
-      }
-    },
-    "./client": {
-      "import": {
-        "types": "./dist/client/index.d.ts",
-        "default": "./dist/client/index.js"
-      },
-      "require": {
-        "types": "./dist/client/index.d.cts",
-        "default": "./dist/client/index.cjs"
-      }
-    }
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts",
+    "./internal/*": null
   },
   "scripts": {
     "build": "tsdown",
@@ -114,7 +79,13 @@
   "peerDependencies": {
     "@effect/platform": "^0.93.2",
     "convex": "^1.30.0",
-    "effect": "^3.19.3"
+    "effect": "^3.19.3",
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=22",
