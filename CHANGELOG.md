@@ -1,5 +1,11 @@
 # @rjdellecese/confect
 
+## 0.0.33
+
+### Patch Changes
+
+- c40f8ed: Add `ConfectQueryCtx` to mutation context so that read-only helper functions are usable directly in both queries and mutations.
+
 ## 0.0.32
 
 ### Patch Changes
