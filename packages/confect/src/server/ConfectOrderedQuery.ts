@@ -1,7 +1,23 @@
-import type { OrderedQuery, PaginationResult } from "convex/server";
+import type {
+  PaginationResult,
+  FilterBuilder,
+  OrderedQuery,
+  Expression,
+} from "convex/server";
 import { Chunk, Effect, identity, type Option, pipe, Stream } from "effect";
 import * as ConfectDocument from "./ConfectDocument";
 import type * as ConfectTableInfo from "./ConfectTableInfo";
+
+export type ConfectFilterBuilder<
+  ConfectTableInfo_ extends ConfectTableInfo.ConfectTableInfo.AnyWithProps,
+> = Omit<FilterBuilder<ConfectTableInfo_["confectDocument"]>, "field"> & {
+  /*
+   * Overload 'field' to only accept valid paths from the table info
+   */
+  field<FieldPath extends ConfectTableInfo_["fieldPaths"]>(
+    fieldPath: FieldPath,
+  ): Expression<any>;
+};
 
 export type ConfectOrderedQuery<
   ConfectTableInfo_ extends ConfectTableInfo.ConfectTableInfo.AnyWithProps,
@@ -21,6 +37,9 @@ export type ConfectOrderedQuery<
     ReadonlyArray<ConfectTableInfo_["confectDocument"]>,
     ConfectDocument.DocumentDecodeError
   >;
+  readonly filter: (
+    predicate: (q: ConfectFilterBuilder<ConfectTableInfo_>) => any,
+  ) => ConfectOrderedQuery<ConfectTableInfo_, _TableName>;
   readonly stream: () => Stream.Stream<
     ConfectTableInfo_["confectDocument"],
     ConfectDocument.DocumentDecodeError
@@ -75,6 +94,9 @@ export const make = <
   const collect: ConfectOrderedQueryFunction<"collect"> = () =>
     pipe(stream(), Stream.runCollect, Effect.map(Chunk.toReadonlyArray));
 
+  const filter: ConfectOrderedQueryFunction<"filter"> = (predicate) =>
+    make(query.filter(predicate), tableName, tableSchema);
+
   const paginate: ConfectOrderedQueryFunction<"paginate"> = (options) =>
     Effect.gen(function* () {
       const paginationResult = yield* Effect.promise(() =>
@@ -105,6 +127,7 @@ export const make = <
     first,
     take,
     collect,
+    filter,
     paginate,
     stream,
   };
