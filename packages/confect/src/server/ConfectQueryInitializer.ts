@@ -1,7 +1,5 @@
 import type {
   DocumentByInfo,
-  GenericIndexFields,
-  GenericSearchIndexConfig,
   GenericTableIndexes,
   GenericTableInfo,
   Indexes,
@@ -48,7 +46,7 @@ type ConfectQueryInitializer<
       ...indexFieldValues: IndexFieldTypesForEq<
         ConfectDataModel.ConfectDataModel.DataModel<ConfectDataModel_>,
         TableName,
-        Indexes<_TableInfo>[IndexName] & GenericIndexFields
+        Indexes<_TableInfo>[IndexName]
       >
     ): Effect.Effect<
       _ConfectTableInfo["confectDocument"],
@@ -61,7 +59,7 @@ type ConfectQueryInitializer<
       indexRange?: (
         q: IndexRangeBuilder<
           _ConfectTableInfo["convexDocument"],
-          NamedIndex<_TableInfo, IndexName> & GenericIndexFields
+          NamedIndex<_TableInfo, IndexName>
         >,
       ) => IndexRange,
       order?: "asc" | "desc",
@@ -76,7 +74,7 @@ type ConfectQueryInitializer<
     searchFilter: (
       q: SearchFilterBuilder<
         DocumentByInfo<_TableInfo>,
-        NamedSearchIndex<_TableInfo, IndexName> & GenericSearchIndexConfig
+        NamedSearchIndex<_TableInfo, IndexName>
       >,
     ) => SearchFilter,
   ) => ConfectOrderedQuery.ConfectOrderedQuery<_ConfectTableInfo, TableName>;
