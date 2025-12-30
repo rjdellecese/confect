@@ -5,7 +5,6 @@ import {
   type GenericTableIndexes,
   type GenericTableSearchIndexes,
   type GenericTableVectorIndexes,
-  type IndexTiebreakerField,
   type SearchIndexConfig,
   type TableDefinition,
   type VectorIndexConfig,
@@ -59,13 +58,7 @@ export interface ConfectTable<
     TableName,
     TableSchema,
     TableValidator,
-    Expand<
-      Indexes &
-        Record<
-          IndexName,
-          [FirstFieldPath, ...RestFieldPaths, IndexTiebreakerField]
-        >
-    >,
+    Expand<Indexes & Record<IndexName, [FirstFieldPath, ...RestFieldPaths]>>,
     SearchIndexes,
     VectorIndexes
   >;

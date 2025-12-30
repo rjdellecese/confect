@@ -146,16 +146,12 @@ export type IndexFieldTypesForEq<
   ConvexDataModel extends GenericDataModel,
   Table extends TableNamesInDataModel<ConvexDataModel>,
   T extends string[],
-> = T extends readonly [...infer Rest, any]
-  ? Rest extends readonly string[]
-    ? {
-        [K in keyof Rest]: FieldTypeFromFieldPath<
-          DocumentByName<ConvexDataModel, Table>,
-          Rest[K]
-        >;
-      }
-    : never
-  : never;
+> = {
+  [K in keyof T]: FieldTypeFromFieldPath<
+    DocumentByName<ConvexDataModel, Table>,
+    T[K]
+  >;
+};
 
 // Would prefer to use `BaseDatabaseReader` from the `convex` package, but it's not exported.
 export type BaseDatabaseReader<DataModel extends GenericDataModel> = {
