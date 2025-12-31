@@ -15,7 +15,6 @@ import {
   type RegisteredQuery,
 } from "convex/server";
 import {
-  type Types,
   Effect,
   Layer,
   Match,
@@ -23,7 +22,11 @@ import {
   Predicate,
   Ref,
   Schema,
+  type Types,
 } from "effect";
+import type * as ConfectApiFunction from "../api/ConfectApiFunction";
+import type * as ConfectApiGroup from "../api/ConfectApiGroup";
+import type * as ConfectApiSpec from "../api/ConfectApiSpec";
 import { mapLeaves } from "../internal/utils";
 import * as ConfectActionRunner from "./ConfectActionRunner";
 import type * as ConfectApi from "./ConfectApi";
@@ -47,9 +50,6 @@ import * as ConvexActionCtx from "./ConvexActionCtx";
 import * as ConvexMutationCtx from "./ConvexMutationCtx";
 import * as ConvexQueryCtx from "./ConvexQueryCtx";
 import * as SchemaToValidator from "./SchemaToValidator";
-import type * as ConfectApiGroup from "../api/ConfectApiGroup";
-import type * as ConfectApiSpec from "../api/ConfectApiSpec";
-import type * as ConfectApiFunction from "../api/ConfectApiFunction";
 
 export type RegisteredFunction =
   | RegisteredQuery<FunctionVisibility, DefaultFunctionArgs, any>
@@ -77,7 +77,9 @@ export const isRegisteredFunction = (u: unknown): u is RegisteredFunction =>
 export const TypeId = "@rjdellecese/confect/server/ConfectApiServer";
 export type TypeId = typeof TypeId;
 
-export const isConfectApiServer = (u: unknown): u is ConfectApiServer =>
+export const isConfectApiServer = (
+  u: unknown,
+): u is ConfectApiServer<ConfectApi.ConfectApi.AnyWithProps> =>
   Predicate.hasProperty(u, TypeId);
 
 export type RegisteredFunctions<
@@ -87,8 +89,7 @@ export type RegisteredFunctions<
 >;
 
 export interface ConfectApiServer<
-  Api extends
-    ConfectApi.ConfectApi.AnyWithProps = ConfectApi.ConfectApi.AnyWithProps,
+  Api extends ConfectApi.ConfectApi.AnyWithProps,
 > {
   readonly [TypeId]: TypeId;
   readonly registeredFunctions: RegisteredFunctions<Api["spec"]>;
