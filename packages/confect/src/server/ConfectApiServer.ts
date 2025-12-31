@@ -25,7 +25,7 @@ import {
   type Types,
 } from "effect";
 import type * as ConfectApiFunction from "../api/ConfectApiFunction";
-import type * as ConfectApiGroup from "../api/ConfectApiGroup";
+import type * as ConfectApiGroupSpec from "../api/ConfectApiGroupSpec";
 import type * as ConfectApiSpec from "../api/ConfectApiSpec";
 import { mapLeaves } from "../internal/utils";
 import * as ConfectActionRunner from "./ConfectActionRunner";
@@ -426,20 +426,21 @@ export declare namespace RegisteredFunctions {
   }
 
   export type Helper<
-    Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
+    Groups extends ConfectApiGroupSpec.ConfectApiGroupSpec.AnyWithProps,
   > = {
-    [GroupName in ConfectApiGroup.ConfectApiGroup.Name<Groups>]: ConfectApiGroup.ConfectApiGroup.WithName<
+    [GroupName in ConfectApiGroupSpec.ConfectApiGroupSpec.Name<Groups>]: ConfectApiGroupSpec.ConfectApiGroupSpec.WithName<
       Groups,
       GroupName
-    > extends infer Group extends ConfectApiGroup.ConfectApiGroup.AnyWithProps
-      ? ConfectApiGroup.ConfectApiGroup.Groups<Group> extends infer SubGroups extends
-          ConfectApiGroup.ConfectApiGroup.AnyWithProps
+    > extends infer Group extends
+      ConfectApiGroupSpec.ConfectApiGroupSpec.AnyWithProps
+      ? ConfectApiGroupSpec.ConfectApiGroupSpec.Groups<Group> extends infer SubGroups extends
+          ConfectApiGroupSpec.ConfectApiGroupSpec.AnyWithProps
         ? Types.Simplify<
             Helper<SubGroups> & {
               [FunctionName in ConfectApiFunction.ConfectApiFunction.Name<
-                ConfectApiGroup.ConfectApiGroup.Functions<Group>
+                ConfectApiGroupSpec.ConfectApiGroupSpec.Functions<Group>
               >]: ConfectApiFunction.ConfectApiFunction.WithName<
-                ConfectApiGroup.ConfectApiGroup.Functions<Group>,
+                ConfectApiGroupSpec.ConfectApiGroupSpec.Functions<Group>,
                 FunctionName
               > extends infer Function extends
                 ConfectApiFunction.ConfectApiFunction.AnyWithProps
@@ -449,9 +450,9 @@ export declare namespace RegisteredFunctions {
           >
         : {
             [FunctionName in ConfectApiFunction.ConfectApiFunction.Name<
-              ConfectApiGroup.ConfectApiGroup.Functions<Group>
+              ConfectApiGroupSpec.ConfectApiGroupSpec.Functions<Group>
             >]: ConfectApiFunction.ConfectApiFunction.WithName<
-              ConfectApiGroup.ConfectApiGroup.Functions<Group>,
+              ConfectApiGroupSpec.ConfectApiGroupSpec.Functions<Group>,
               FunctionName
             > extends infer Function extends
               ConfectApiFunction.ConfectApiFunction.AnyWithProps

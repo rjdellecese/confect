@@ -1,7 +1,7 @@
-import { ConfectApiGroup } from "@rjdellecese/confect";
+import { ConfectApiGroupSpec } from "@rjdellecese/confect";
 import { Notes } from "./groups/notes";
 import { Random } from "./groups/random";
 
-export const Groups = ConfectApiGroup.make("groups")
+export const Groups = ConfectApiGroupSpec.make("groups")
   .addGroup(Notes)
   .addGroup(Random);

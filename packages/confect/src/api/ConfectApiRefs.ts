@@ -1,26 +1,29 @@
 import type { Schema, Types } from "effect";
 import { pipe, Record } from "effect";
 import type * as ConfectApiFunction from "./ConfectApiFunction";
-import type * as ConfectApiGroup from "./ConfectApiGroup";
+import type * as ConfectApiGroupSpec from "./ConfectApiGroupSpec";
 import type * as ConfectApiSpec from "./ConfectApiSpec";
 
 export type ConfectApiRefs<
   Spec extends ConfectApiSpec.ConfectApiSpec.AnyWithProps,
 > = Types.Simplify<Helper<ConfectApiSpec.ConfectApiSpec.Groups<Spec>>>;
 
-type Helper<Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps> = {
-  [GroupName in ConfectApiGroup.ConfectApiGroup.Name<Groups>]: ConfectApiGroup.ConfectApiGroup.WithName<
+type Helper<
+  Groups extends ConfectApiGroupSpec.ConfectApiGroupSpec.AnyWithProps,
+> = {
+  [GroupName in ConfectApiGroupSpec.ConfectApiGroupSpec.Name<Groups>]: ConfectApiGroupSpec.ConfectApiGroupSpec.WithName<
     Groups,
     GroupName
-  > extends infer Group extends ConfectApiGroup.ConfectApiGroup.AnyWithProps
-    ? ConfectApiGroup.ConfectApiGroup.Groups<Group> extends infer SubGroups extends
-        ConfectApiGroup.ConfectApiGroup.AnyWithProps
+  > extends infer Group extends
+    ConfectApiGroupSpec.ConfectApiGroupSpec.AnyWithProps
+    ? ConfectApiGroupSpec.ConfectApiGroupSpec.Groups<Group> extends infer SubGroups extends
+        ConfectApiGroupSpec.ConfectApiGroupSpec.AnyWithProps
       ? Types.Simplify<
           Helper<SubGroups> & {
             [FunctionName in ConfectApiFunction.ConfectApiFunction.Name<
-              ConfectApiGroup.ConfectApiGroup.Functions<Group>
+              ConfectApiGroupSpec.ConfectApiGroupSpec.Functions<Group>
             >]: ConfectApiFunction.ConfectApiFunction.WithName<
-              ConfectApiGroup.ConfectApiGroup.Functions<Group>,
+              ConfectApiGroupSpec.ConfectApiGroupSpec.Functions<Group>,
               FunctionName
             > extends infer Function extends
               ConfectApiFunction.ConfectApiFunction.AnyWithProps
@@ -240,13 +243,16 @@ export const make = <Spec extends ConfectApiSpec.ConfectApiSpec.AnyWithProps>(
 ): ConfectApiRefs<Spec> => makeHelper(spec.groups) as ConfectApiRefs<Spec>;
 
 const makeHelper = (
-  groups: Record.ReadonlyRecord<string, ConfectApiGroup.ConfectApiGroup.Any>,
+  groups: Record.ReadonlyRecord<
+    string,
+    ConfectApiGroupSpec.ConfectApiGroupSpec.Any
+  >,
   groupPath: string | null = null,
 ): ConfectApiRefs.AnyWithProps =>
   pipe(
     groups as Record.ReadonlyRecord<
       string,
-      ConfectApiGroup.ConfectApiGroup.AnyWithProps
+      ConfectApiGroupSpec.ConfectApiGroupSpec.AnyWithProps
     >,
     Record.map((group) => {
       const currentGroupPath = groupPath

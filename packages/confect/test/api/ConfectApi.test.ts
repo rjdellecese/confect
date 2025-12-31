@@ -1,15 +1,15 @@
 import { Effect, Layer, Schema } from "effect";
-import * as ConfectApi from "../server/ConfectApi";
-import * as ConfectApiBuilder from "../server/ConfectApiBuilder";
-import * as ConfectApiServer from "../server/ConfectApiServer";
-import * as ConfectDatabaseReader from "../server/ConfectDatabaseReader";
-import * as ConfectDatabaseWriter from "../server/ConfectDatabaseWriter";
-import * as ConfectSchema from "../server/ConfectSchema";
-import * as ConfectTable from "../server/ConfectTable";
-import * as ConfectApiFunction from "./ConfectApiFunction";
-import * as ConfectApiGroup from "./ConfectApiGroup";
-import * as ConfectApiRefs from "./ConfectApiRefs";
-import * as ConfectApiSpec from "./ConfectApiSpec";
+import * as ConfectApiFunction from "../../src/api/ConfectApiFunction";
+import * as ConfectApiGroupSpec from "../../src/api/ConfectApiGroupSpec";
+import * as ConfectApiRefs from "../../src/api/ConfectApiRefs";
+import * as ConfectApiSpec from "../../src/api/ConfectApiSpec";
+import * as ConfectApi from "../../src/server/ConfectApi";
+import * as ConfectApiBuilder from "../../src/server/ConfectApiBuilder";
+import * as ConfectApiServer from "../../src/server/ConfectApiServer";
+import * as ConfectDatabaseReader from "../../src/server/ConfectDatabaseReader";
+import * as ConfectDatabaseWriter from "../../src/server/ConfectDatabaseWriter";
+import * as ConfectSchema from "../../src/server/ConfectSchema";
+import * as ConfectTable from "../../src/server/ConfectTable";
 
 /*
  * api
@@ -25,7 +25,7 @@ import * as ConfectApiSpec from "./ConfectApiSpec";
  *             └── myFunction5
  */
 
-const GroupA = ConfectApiGroup.make("groupA")
+const GroupA = ConfectApiGroupSpec.make("groupA")
   .addFunction(
     ConfectApiFunction.mutation({
       name: "myFunction",
@@ -41,7 +41,7 @@ const GroupA = ConfectApiGroup.make("groupA")
     }),
   );
 
-const GroupBC = ConfectApiGroup.make("groupBC").addFunction(
+const GroupBC = ConfectApiGroupSpec.make("groupBC").addFunction(
   ConfectApiFunction.query({
     name: "myFunction3",
     args: Schema.Struct({ foo: Schema.Number }),
@@ -49,7 +49,7 @@ const GroupBC = ConfectApiGroup.make("groupBC").addFunction(
   }),
 );
 
-const GroupBDE = ConfectApiGroup.make("groupBDE").addFunction(
+const GroupBDE = ConfectApiGroupSpec.make("groupBDE").addFunction(
   ConfectApiFunction.query({
     name: "myFunction5",
     args: Schema.Struct({}),
@@ -57,7 +57,7 @@ const GroupBDE = ConfectApiGroup.make("groupBDE").addFunction(
   }),
 );
 
-const GroupBD = ConfectApiGroup.make("groupBD")
+const GroupBD = ConfectApiGroupSpec.make("groupBD")
   .addFunction(
     ConfectApiFunction.query({
       name: "myFunction4",
@@ -67,7 +67,7 @@ const GroupBD = ConfectApiGroup.make("groupBD")
   )
   .addGroup(GroupBDE);
 
-const GroupB = ConfectApiGroup.make("groupB")
+const GroupB = ConfectApiGroupSpec.make("groupB")
   .addGroup(GroupBC)
   .addGroup(GroupBD);
 
@@ -87,11 +87,11 @@ const Spec = ConfectApiSpec.make().add(GroupA).add(GroupB);
 type Spec = typeof Spec;
 
 type Groups = ConfectApiSpec.ConfectApiSpec.Groups<Spec>;
-type GroupNames = ConfectApiGroup.ConfectApiGroup.Name<Groups>;
+type GroupNames = ConfectApiGroupSpec.ConfectApiGroupSpec.Name<Groups>;
 
 const Api = ConfectApi.make(confectSchema, Spec);
 
-type GroupPath = ConfectApiGroup.Path.All<
+type GroupPath = ConfectApiGroupSpec.Path.All<
   ConfectApiSpec.ConfectApiSpec.Groups<Spec>
 >;
 
@@ -141,7 +141,7 @@ const ApiLive = ConfectApiBuilder.api(Api).pipe(
   Layer.provide(GroupBLive),
 );
 
-const _server = ConfectApiServer.make
+const _server = ConfectApiServer.make(Api)
   .pipe(Effect.provide(ApiLive), Effect.runPromise)
   .then((s) => {
     console.log(s);
@@ -152,4 +152,3 @@ const refs = ConfectApiRefs.make(Spec);
 console.dir(refs, { depth: null, colors: true });
 
 const _a = refs.groupB.groupBC.myFunction3;
-

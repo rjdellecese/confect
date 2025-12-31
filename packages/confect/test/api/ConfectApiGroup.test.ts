@@ -1,18 +1,18 @@
 import { describe, expectTypeOf, test } from "vitest";
-import * as ConfectApiGroup from "../api/ConfectApiGroup";
+import * as ConfectApiGroupSpec from "../api/ConfectApiGroupSpec";
 
-describe("ConfectApiGroup.Path.All", () => {
+describe("ConfectApiGroupSpec.Path.All", () => {
   test("produces the correct group paths", () => {
-    const _GroupA = ConfectApiGroup.make("groupA");
-    const _GroupB = ConfectApiGroup.make("groupB")
-      .addGroup(ConfectApiGroup.make("groupBC"))
+    const _GroupA = ConfectApiGroupSpec.make("groupA");
+    const _GroupB = ConfectApiGroupSpec.make("groupB")
+      .addGroup(ConfectApiGroupSpec.make("groupBC"))
       .addGroup(
-        ConfectApiGroup.make("groupBD").addGroup(
-          ConfectApiGroup.make("groupBDE"),
+        ConfectApiGroupSpec.make("groupBD").addGroup(
+          ConfectApiGroupSpec.make("groupBDE"),
         ),
       );
 
-    type AllPaths = ConfectApiGroup.Path.All<typeof _GroupA | typeof _GroupB>;
+    type AllPaths = ConfectApiGroupSpec.Path.All<typeof _GroupA | typeof _GroupB>;
 
     expectTypeOf<AllPaths>().toEqualTypeOf<
       | "groupA"

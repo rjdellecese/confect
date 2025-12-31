@@ -2,16 +2,16 @@ import { Predicate, Record } from "effect";
 import { validateJsIdentifier } from "../internal/utils";
 import type * as ConfectApiFunction from "./ConfectApiFunction";
 
-export const TypeId = "@rjdellecese/confect/api/ConfectApiGroup";
+export const TypeId = "@rjdellecese/confect/api/ConfectApiGroupSpec";
 export type TypeId = typeof TypeId;
 
-export const isConfectApiGroup = (u: unknown): u is ConfectApiGroup.Any =>
+export const isConfectApiGroupSpec = (u: unknown): u is ConfectApiGroupSpec.Any =>
   Predicate.hasProperty(u, TypeId);
 
-export interface ConfectApiGroup<
+export interface ConfectApiGroupSpec<
   Name extends string,
   Functions extends ConfectApiFunction.ConfectApiFunction.AnyWithProps = never,
-  Groups extends ConfectApiGroup.AnyWithProps = never,
+  Groups extends ConfectApiGroupSpec.AnyWithProps = never,
 > {
   readonly [TypeId]: TypeId;
   readonly name: Name;
@@ -22,7 +22,7 @@ export interface ConfectApiGroup<
     >;
   };
   readonly groups: {
-    [GroupName in ConfectApiGroup.Name<Groups>]: ConfectApiGroup.WithName<
+    [GroupName in ConfectApiGroupSpec.Name<Groups>]: ConfectApiGroupSpec.WithName<
       Groups,
       GroupName
     >;
@@ -32,19 +32,19 @@ export interface ConfectApiGroup<
     Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
   >(
     function_: Function,
-  ): ConfectApiGroup<Name, Functions | Function, Groups>;
+  ): ConfectApiGroupSpec<Name, Functions | Function, Groups>;
 
-  addGroup<Group extends ConfectApiGroup.AnyWithProps>(
+  addGroup<Group extends ConfectApiGroupSpec.AnyWithProps>(
     group: Group,
-  ): ConfectApiGroup<Name, Functions, Groups | Group>;
+  ): ConfectApiGroupSpec<Name, Functions, Groups | Group>;
 }
 
-export declare namespace ConfectApiGroup {
+export declare namespace ConfectApiGroupSpec {
   export interface Any {
     readonly [TypeId]: TypeId;
   }
 
-  // TODO: Can we extend the `ConfectApiGroup` interface and remove these custom fields?
+  // TODO: Can we extend the `ConfectApiGroupSpec` interface and remove these custom fields?
   export interface AnyWithProps extends Any {
     readonly name: string;
     readonly functions: {
@@ -88,24 +88,24 @@ export declare namespace Path {
   // through its direct subgroups. Properly distributes over union types to prevent
   // cross-contamination of paths from different groups.
   export type All<
-    Group extends ConfectApiGroup.AnyWithProps,
+    Group extends ConfectApiGroupSpec.AnyWithProps,
     Depth extends 1[] = [],
   > = Depth["length"] extends 15
     ? string
     : Group extends any
-      ? [ConfectApiGroup.Groups<Group>] extends [never]
-        ? ConfectApiGroup.Name<Group>
+      ? [ConfectApiGroupSpec.Groups<Group>] extends [never]
+        ? ConfectApiGroupSpec.Name<Group>
         :
-            | ConfectApiGroup.Name<Group>
-            | AllHelper<Group, ConfectApiGroup.Groups<Group>, Depth>
+            | ConfectApiGroupSpec.Name<Group>
+            | AllHelper<Group, ConfectApiGroupSpec.Groups<Group>, Depth>
       : never;
 
   type AllHelper<
-    Parent extends ConfectApiGroup.AnyWithProps,
-    Groups extends ConfectApiGroup.AnyWithProps,
+    Parent extends ConfectApiGroupSpec.AnyWithProps,
+    Groups extends ConfectApiGroupSpec.AnyWithProps,
     Depth extends 1[] = [],
-  > = Groups extends ConfectApiGroup.AnyWithProps
-    ? `${ConfectApiGroup.Name<Parent>}.${All<Groups, [...Depth, 1]>}`
+  > = Groups extends ConfectApiGroupSpec.AnyWithProps
+    ? `${ConfectApiGroupSpec.Name<Parent>}.${All<Groups, [...Depth, 1]>}`
     : never;
 
   /**
@@ -118,7 +118,7 @@ export declare namespace Path {
   export type GroupAt<
     Group,
     Path extends string,
-  > = Group extends ConfectApiGroup.AnyWithProps
+  > = Group extends ConfectApiGroupSpec.AnyWithProps
     ? Path extends `${infer Head}.${infer Tail}`
       ? Group extends { readonly name: Head }
         ? Group extends {
@@ -127,16 +127,16 @@ export declare namespace Path {
           ? GroupAt<SubGroup, Tail>
           : never
         : never
-      : ConfectApiGroup.WithName<Group, Path>
+      : ConfectApiGroupSpec.WithName<Group, Path>
     : never;
 
   export type SubGroupsAt<
-    Group extends ConfectApiGroup.AnyWithProps,
+    Group extends ConfectApiGroupSpec.AnyWithProps,
     GroupPath extends string,
   > =
-    ConfectApiGroup.Groups<GroupAt<Group, GroupPath>> extends infer SubGroups
-      ? SubGroups extends ConfectApiGroup.AnyWithProps
-        ? `${GroupPath}.${ConfectApiGroup.Name<SubGroups>}`
+    ConfectApiGroupSpec.Groups<GroupAt<Group, GroupPath>> extends infer SubGroups
+      ? SubGroups extends ConfectApiGroupSpec.AnyWithProps
+        ? `${GroupPath}.${ConfectApiGroupSpec.Name<SubGroups>}`
         : never
       : never;
 }
@@ -146,8 +146,8 @@ const Proto = {
 
   addFunction<
     Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
-  >(this: ConfectApiGroup.Any, function_: Function) {
-    const this_ = this as ConfectApiGroup.AnyWithProps;
+  >(this: ConfectApiGroupSpec.Any, function_: Function) {
+    const this_ = this as ConfectApiGroupSpec.AnyWithProps;
 
     return makeProto({
       name: this_.name,
@@ -156,12 +156,12 @@ const Proto = {
     });
   },
 
-  addGroup<Group extends ConfectApiGroup.Any>(
-    this: ConfectApiGroup.Any,
+  addGroup<Group extends ConfectApiGroupSpec.Any>(
+    this: ConfectApiGroupSpec.Any,
     group: Group,
   ) {
-    const this_ = this as ConfectApiGroup.AnyWithProps;
-    const group_ = group as unknown as ConfectApiGroup.AnyWithProps;
+    const this_ = this as ConfectApiGroupSpec.AnyWithProps;
+    const group_ = group as unknown as ConfectApiGroupSpec.AnyWithProps;
 
     return makeProto({
       name: this_.name,
@@ -174,7 +174,7 @@ const Proto = {
 const makeProto = <
   Name extends string,
   Functions extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
-  Groups extends ConfectApiGroup.AnyWithProps,
+  Groups extends ConfectApiGroupSpec.AnyWithProps,
 >({
   name,
   functions,
@@ -183,7 +183,7 @@ const makeProto = <
   name: Name;
   functions: Record.ReadonlyRecord<string, Functions>;
   groups: Record.ReadonlyRecord<string, Groups>;
-}): ConfectApiGroup<Name, Functions, Groups> =>
+}): ConfectApiGroupSpec<Name, Functions, Groups> =>
   Object.assign(Object.create(Proto), {
     name,
     functions,
@@ -192,7 +192,7 @@ const makeProto = <
 
 export const make = <const Name extends string>(
   name: Name,
-): ConfectApiGroup<Name> => {
+): ConfectApiGroupSpec<Name> => {
   validateJsIdentifier(name);
 
   return makeProto({

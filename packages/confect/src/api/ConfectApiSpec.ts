@@ -1,5 +1,5 @@
 import { Predicate, Record } from "effect";
-import type * as ConfectApiGroup from "./ConfectApiGroup";
+import type * as ConfectApiGroupSpec from "./ConfectApiGroupSpec";
 
 export const TypeId = "@rjdellecese/confect/api/ConfectApiSpec";
 export type TypeId = typeof TypeId;
@@ -8,17 +8,17 @@ export const isConfectApi = (u: unknown): u is ConfectApiSpec.Any =>
   Predicate.hasProperty(u, TypeId);
 
 export interface ConfectApiSpec<
-  Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps = never,
+  Groups extends ConfectApiGroupSpec.ConfectApiGroupSpec.AnyWithProps = never,
 > {
   readonly [TypeId]: TypeId;
   readonly groups: {
-    [GroupName in ConfectApiGroup.ConfectApiGroup.Name<Groups>]: ConfectApiGroup.ConfectApiGroup.WithName<
+    [GroupName in ConfectApiGroupSpec.ConfectApiGroupSpec.Name<Groups>]: ConfectApiGroupSpec.ConfectApiGroupSpec.WithName<
       Groups,
       GroupName
     >;
   };
 
-  add<Group extends ConfectApiGroup.ConfectApiGroup.AnyWithProps>(
+  add<Group extends ConfectApiGroupSpec.ConfectApiGroupSpec.AnyWithProps>(
     group: Group,
   ): ConfectApiSpec<Groups | Group>;
 }
@@ -31,9 +31,11 @@ export declare namespace ConfectApiSpec {
   // TODO: Can we extend the `ConfectApiSpec` interface and remove these custom fields?
   export interface AnyWithProps extends Any {
     readonly groups: {
-      readonly [key: string]: ConfectApiGroup.ConfectApiGroup.AnyWithProps;
+      readonly [
+        key: string
+      ]: ConfectApiGroupSpec.ConfectApiGroupSpec.AnyWithProps;
     };
-    add<Group extends ConfectApiGroup.ConfectApiGroup.AnyWithProps>(
+    add<Group extends ConfectApiGroupSpec.ConfectApiGroupSpec.AnyWithProps>(
       group: Group,
     ): AnyWithProps;
   }
@@ -45,12 +47,12 @@ export declare namespace ConfectApiSpec {
 const Proto = {
   [TypeId]: TypeId,
 
-  add<Group extends ConfectApiGroup.ConfectApiGroup.AnyWithProps>(
+  add<Group extends ConfectApiGroupSpec.ConfectApiGroupSpec.AnyWithProps>(
     this: ConfectApiSpec.AnyWithProps,
     group: Group,
   ) {
     const group_ =
-      group as unknown as ConfectApiGroup.ConfectApiGroup.AnyWithProps;
+      group as unknown as ConfectApiGroupSpec.ConfectApiGroupSpec.AnyWithProps;
 
     return makeProto({
       groups: Record.set(this.groups, group_.name, group_),
@@ -59,7 +61,7 @@ const Proto = {
 };
 
 const makeProto = <
-  Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
+  Groups extends ConfectApiGroupSpec.ConfectApiGroupSpec.AnyWithProps,
 >({
   groups,
 }: {

@@ -1,6 +1,6 @@
 // api
 export * as ConfectApiFunction from "./api/ConfectApiFunction";
-export * as ConfectApiGroup from "./api/ConfectApiGroup";
+export * as ConfectApiGroupSpec from "./api/ConfectApiGroupSpec";
 export * as ConfectApiRefs from "./api/ConfectApiRefs";
 export * as ConfectApiSpec from "./api/ConfectApiSpec";
 export * as GenericId from "./api/GenericId";

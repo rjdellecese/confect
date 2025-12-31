@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "effect docs": {
-      "command": "npx",
-      "args": ["-y", "effect-mcp@latest"]
+      "command": "pnpm",
+      "args": ["dlx", "effect-mcp@latest"]
     }
   }
 }

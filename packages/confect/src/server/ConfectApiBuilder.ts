@@ -1,5 +1,3 @@
-import type * as ConfectApiFunction from "../api/ConfectApiFunction";
-import type * as ConfectApiGroup from "../api/ConfectApiGroup";
 import type { Types } from "effect";
 import {
   Array,
@@ -11,6 +9,8 @@ import {
   Ref,
   String,
 } from "effect";
+import type * as ConfectApiFunction from "../api/ConfectApiFunction";
+import type * as ConfectApiGroupSpec from "../api/ConfectApiGroupSpec";
 import { setNestedProperty } from "../internal/utils";
 import type * as ConfectApi from "./ConfectApi";
 import type * as ConfectApiHandler from "./ConfectApiHandler";
@@ -28,7 +28,7 @@ export interface Handlers<
   readonly [HandlersTypeId]: {
     _Functions: Types.Covariant<Functions>;
   };
-  readonly group: ConfectApiGroup.ConfectApiGroup.AnyWithProps;
+  readonly group: ConfectApiGroupSpec.ConfectApiGroupSpec.AnyWithProps;
   readonly items: ReadonlyArray<Handlers.Item<ConfectSchema_, Functions>>;
 
   handle<Name extends ConfectApiFunction.ConfectApiFunction.Name<Functions>>(
@@ -77,7 +77,7 @@ export declare namespace Handlers {
   }
 
   export interface AnyWithProps extends Any {
-    readonly group: ConfectApiGroup.ConfectApiGroup.AnyWithProps;
+    readonly group: ConfectApiGroupSpec.ConfectApiGroupSpec.AnyWithProps;
     readonly items: ReadonlyArray<Handlers.Item.AnyWithProps>;
 
     handle<Name extends string>(
@@ -108,10 +108,10 @@ export declare namespace Handlers {
 
   export type FromGroup<
     ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
-    Group extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
+    Group extends ConfectApiGroupSpec.ConfectApiGroupSpec.AnyWithProps,
   > = Handlers<
     ConfectSchema_,
-    ConfectApiGroup.ConfectApiGroup.Functions<Group>
+    ConfectApiGroupSpec.ConfectApiGroupSpec.Functions<Group>
   >;
 
   export type ValidateReturn<A> =
@@ -156,14 +156,14 @@ const makeHandlers = <
   group,
   items,
 }: {
-  readonly group: ConfectApiGroup.ConfectApiGroup.AnyWithProps;
+  readonly group: ConfectApiGroupSpec.ConfectApiGroupSpec.AnyWithProps;
   readonly items: ReadonlyArray<Handlers.Item<ConfectSchema_, Functions>>;
 }): Handlers<ConfectSchema_, Functions> =>
   Object.assign(Object.create(HandlersProto), { group, items });
 
 export const group = <
   ConfectApi_ extends ConfectApi.ConfectApi.AnyWithProps,
-  const GroupPath extends ConfectApiGroup.Path.All<
+  const GroupPath extends ConfectApiGroupSpec.Path.All<
     ConfectApi.ConfectApi.Groups<ConfectApi_>
   >,
   Return extends Handlers.AnyWithProps,
@@ -173,7 +173,7 @@ export const group = <
   build: (
     handlers: Handlers.FromGroup<
       ConfectApi.ConfectApi.ConfectSchema<ConfectApi_>,
-      ConfectApiGroup.Path.GroupAt<
+      ConfectApiGroupSpec.Path.GroupAt<
         ConfectApi.ConfectApi.Groups<ConfectApi_>,
         GroupPath
       >
@@ -190,7 +190,7 @@ export const group = <
   const groupPathParts = String.split(groupPath, ".");
   const [firstGroupPathPart, ...restGroupPathParts] = groupPathParts;
 
-  const group_: ConfectApiGroup.ConfectApiGroup.AnyWithProps = Array.reduce(
+  const group_: ConfectApiGroupSpec.ConfectApiGroupSpec.AnyWithProps = Array.reduce(
     restGroupPathParts,
     (confectApi as any).spec.groups[firstGroupPathPart as any]!,
     (currentGroup: any, groupPathPart: any) =>
@@ -256,18 +256,18 @@ export const ConfectApiGroupService = <GroupPath extends string>({
   );
 
 export declare namespace ConfectApiGroupService {
-  export type FromGroups<Groups extends ConfectApiGroup.ConfectApiGroup.Any> =
+  export type FromGroups<Groups extends ConfectApiGroupSpec.ConfectApiGroupSpec.Any> =
     Groups extends never
       ? never
-      : Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps
-        ? ConfectApiGroupService<ConfectApiGroup.ConfectApiGroup.Name<Groups>>
+      : Groups extends ConfectApiGroupSpec.ConfectApiGroupSpec.AnyWithProps
+        ? ConfectApiGroupService<ConfectApiGroupSpec.ConfectApiGroupSpec.Name<Groups>>
         : never;
 
   export type FromGroupWithPath<
     GroupPath extends string,
-    Group extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
+    Group extends ConfectApiGroupSpec.ConfectApiGroupSpec.AnyWithProps,
   > =
-    ConfectApiGroup.Path.SubGroupsAt<
+    ConfectApiGroupSpec.Path.SubGroupsAt<
       Group,
       GroupPath
     > extends infer SubGroupPaths

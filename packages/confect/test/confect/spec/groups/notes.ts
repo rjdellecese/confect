@@ -1,12 +1,12 @@
 import {
   ConfectApiFunction,
-  ConfectApiGroup,
+  ConfectApiGroupSpec,
   GenericId,
 } from "@rjdellecese/confect";
 import { Schema } from "effect";
 import { Note } from "../../schema/note";
 
-export const Notes = ConfectApiGroup.make("notes")
+export const Notes = ConfectApiGroupSpec.make("notes")
   .addFunction(
     ConfectApiFunction.mutation({
       name: "insert",
