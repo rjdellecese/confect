@@ -3,8 +3,8 @@ import { useAction, useMutation, useQuery } from "@rjdellecese/confect";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { Array, Effect, Exit, Option } from "effect";
 import { useEffect, useState } from "react";
+import { api } from "../confect/_generated/refs";
 import { Api } from "../confect/http/path-prefix";
-import { api } from "../convex/confect/refs";
 
 const App = () => {
   const convexClient = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
