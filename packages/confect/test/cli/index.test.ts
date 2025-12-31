@@ -24,8 +24,8 @@ const setup = Effect.gen(function* () {
 
   yield* fs.copy(fixturesDirectory, tempDirectory);
 
-  if (!(yield* fs.exists(path.join(tempDirectory, "package-lock.json")))) {
-    yield* fs.remove(path.join(tempDirectory, "package-lock.json"));
+  if (!(yield* fs.exists(path.join(tempDirectory, "pnpm-lock.yaml")))) {
+    yield* fs.remove(path.join(tempDirectory, "pnpm-lock.yaml"));
   }
   if (!(yield* fs.exists(path.join(tempDirectory, "node_modules")))) {
     yield* fs.remove(path.join(tempDirectory, "node_modules"), {
@@ -44,15 +44,13 @@ const setup = Effect.gen(function* () {
   }
 
   expect(
-    yield* Command.make("npm", "link", packageDirectory).pipe(
-      Command.stdout("inherit"),
-      Command.stderr("inherit"),
-      Command.exitCode,
-    ),
-  ).toStrictEqual(0);
-
-  expect(
-    yield* Command.make("npm", "install").pipe(
+    yield* Command.make(
+      "pnpm",
+      "link",
+      "--config.confirmModulesPurge=false",
+      packageDirectory,
+    ).pipe(
+      Command.workingDirectory(tempDirectory),
       Command.stdout("inherit"),
       Command.stderr("inherit"),
       Command.exitCode,
@@ -106,7 +104,7 @@ layer(NodeContext.layer)("codegen", (it) => {
         yield* teardown;
       }),
     {
-      timeout: 30_000,
+      timeout: 60_000,
     },
   );
 });

@@ -4,9 +4,16 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@rjdellecese/confect': link:packages/confect
+
 importers:
 
   .:
+    dependencies:
+      '@rjdellecese/confect':
+        specifier: link:packages/confect
+        version: link:packages/confect
     devDependencies:
       '@changesets/cli':
         specifier: 2.29.7
@@ -48,7 +55,7 @@ importers:
         specifier: 0.93.2
         version: 0.93.2(effect@3.19.3)
       '@rjdellecese/confect':
-        specifier: workspace:*
+        specifier: link:../../packages/confect
         version: link:../../packages/confect
       convex:
         specifier: 1.29.1
