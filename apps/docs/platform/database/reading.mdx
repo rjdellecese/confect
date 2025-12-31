@@ -101,6 +101,14 @@ Collect all documents matching the query.
 reader.table("notes").index("by_creation_time").collect();
 ```
 
+#### First
+
+Retrieve the first document matching the query.
+
+```ts
+reader.table("notes").index("by_creation_time").first();
+```
+
 #### Take
 
 Take the first `n` documents matching the query.
