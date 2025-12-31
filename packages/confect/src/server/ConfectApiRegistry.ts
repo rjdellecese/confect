@@ -1,9 +1,9 @@
 import { Context, Record, Ref } from "effect";
-import type * as ConfectApiBuilder from "./ConfectApiBuilder";
+import type * as ConfectApiGroupImpl from "./ConfectApiGroupImpl";
 
 export interface HandlerItemRegistry {
   readonly [key: string]:
-    | ConfectApiBuilder.Handlers.Item.AnyWithProps
+    | ConfectApiGroupImpl.Handlers.Item.AnyWithProps
     | HandlerItemRegistry;
 }
 

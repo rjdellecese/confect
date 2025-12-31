@@ -1,6 +1,6 @@
 import { Context, Effect, Layer } from "effect";
 import type * as ConfectApi from "./ConfectApi";
-import type * as ConfectApiBuilder from "./ConfectApiBuilder";
+import type * as ConfectApiGroupImpl from "./ConfectApiGroupImpl";
 
 export class ConfectApiImpl extends Context.Tag(
   "@rjdellecese/confect/server/ConfectApiImpl",
@@ -17,7 +17,7 @@ export const make = <ConfectApi_ extends ConfectApi.ConfectApi.AnyWithProps>(
 ): Layer.Layer<
   ConfectApiImpl,
   never,
-  ConfectApiBuilder.ConfectApiGroupService.FromGroups<
+  ConfectApiGroupImpl.ConfectApiGroupImpl.FromGroups<
     ConfectApi.ConfectApi.Groups<ConfectApi_>
   >
 > =>

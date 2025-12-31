@@ -18,7 +18,7 @@ import * as ConfectApiRegistry from "./ConfectApiRegistry";
 import type * as ConfectSchema from "./ConfectSchema";
 
 export const HandlersTypeId =
-  "@rjdellecese/confect/server/ConfectApiBuilder/Handlers";
+  "@rjdellecese/confect/server/ConfectApiGroupImpl/Handlers";
 export type HandlersTypeId = typeof HandlersTypeId;
 
 export interface Handlers<
@@ -48,7 +48,7 @@ export interface Handlers<
 }
 
 export const HandlerItemTypeId =
-  "@rjdellecese/confect/server/ConfectApiBuilder/HandlerItem";
+  "@rjdellecese/confect/server/ConfectApiGroupImpl/HandlerItem";
 export type HandlerItemTypeId = typeof HandlerItemTypeId;
 
 export const isHandlerItem = (
@@ -89,6 +89,7 @@ export declare namespace Handlers {
     ): AnyWithProps;
   }
 
+  // TODO: `Rename to `ConfectApiFunctionImpl`?
   export interface Item<
     ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
     Function extends ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithProps,
@@ -164,7 +165,7 @@ const makeHandlers = <
 }): Handlers<ConfectSchema_, Functions> =>
   Object.assign(Object.create(HandlersProto), { group, items });
 
-export const group = <
+export const make = <
   ConfectApi_ extends ConfectApi.ConfectApi.AnyWithProps,
   const GroupPath extends ConfectApiGroupSpec.Path.All<
     ConfectApi.ConfectApi.Groups<ConfectApi_>
@@ -183,9 +184,9 @@ export const group = <
     >,
   ) => Handlers.ValidateReturn<Return>,
 ): Layer.Layer<
-  ConfectApiGroupService<GroupPath>,
+  ConfectApiGroupImpl<GroupPath>,
   never,
-  ConfectApiGroupService.FromGroupWithPath<
+  ConfectApiGroupImpl.FromGroupWithPath<
     GroupPath,
     ConfectApi.ConfectApi.Groups<ConfectApi_>
   >
@@ -204,7 +205,7 @@ export const group = <
   const items = Array.empty();
 
   return Layer.effect(
-    ConfectApiGroupService<GroupPath>({
+    ConfectApiGroupImpl<GroupPath>({
       groupPath,
     }),
     Effect.gen(function* () {
@@ -231,26 +232,26 @@ export const group = <
   );
 };
 
-export interface ConfectApiGroupService<GroupPath extends string> {
+export interface ConfectApiGroupImpl<GroupPath extends string> {
   readonly groupPath: GroupPath;
 }
 
-export const ConfectApiGroupService = <GroupPath extends string>({
+export const ConfectApiGroupImpl = <GroupPath extends string>({
   groupPath,
 }: {
   groupPath: GroupPath;
 }) =>
-  Context.GenericTag<ConfectApiGroupService<GroupPath>>(
-    `@rjdellecese/confect/server/ConfectApiGroupService/${groupPath}`,
+  Context.GenericTag<ConfectApiGroupImpl<GroupPath>>(
+    `@rjdellecese/confect/server/ConfectApiGroupImpl/${groupPath}`,
   );
 
-export declare namespace ConfectApiGroupService {
+export declare namespace ConfectApiGroupImpl {
   export type FromGroups<
     Groups extends ConfectApiGroupSpec.ConfectApiGroupSpec.Any,
   > = Groups extends never
     ? never
     : Groups extends ConfectApiGroupSpec.ConfectApiGroupSpec.AnyWithProps
-      ? ConfectApiGroupService<
+      ? ConfectApiGroupImpl<
           ConfectApiGroupSpec.ConfectApiGroupSpec.Name<Groups>
         >
       : never;
@@ -264,7 +265,7 @@ export declare namespace ConfectApiGroupService {
       GroupPath
     > extends infer SubGroupPaths
       ? SubGroupPaths extends string
-        ? ConfectApiGroupService<SubGroupPaths>
+        ? ConfectApiGroupImpl<SubGroupPaths>
         : never
       : never;
 }

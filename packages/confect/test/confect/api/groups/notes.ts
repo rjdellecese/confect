@@ -1,4 +1,4 @@
-import { ConfectApiBuilder } from "@rjdellecese/confect";
+import { ConfectApiGroupImpl } from "@rjdellecese/confect";
 import { Effect } from "effect";
 import {
   ConfectDatabaseReader,
@@ -6,7 +6,7 @@ import {
 } from "../../../convex/confect/services";
 import { Api } from "../../api";
 
-export const Notes = ConfectApiBuilder.group(Api, "groups.notes", (handlers) =>
+export const Notes = ConfectApiGroupImpl.make(Api, "groups.notes", (handlers) =>
   handlers
     .handle("insert", ({ text }) =>
       Effect.gen(function* () {

@@ -1,8 +1,8 @@
-import { ConfectApiBuilder } from "@rjdellecese/confect";
+import { ConfectApiGroupImpl } from "@rjdellecese/confect";
 import { Effect } from "effect";
 import Api from "../../_generated/api";
 
-export const Random = ConfectApiBuilder.group(
+export const Random = ConfectApiGroupImpl.make(
   Api,
   "groups.random",
   (handlers) =>

@@ -1,6 +1,6 @@
 export * as ConfectActionRunner from "./ConfectActionRunner";
 export * as ConfectApi from "./ConfectApi";
-export * as ConfectApiBuilder from "./ConfectApiBuilder";
+export * as ConfectApiGroupImpl from "./ConfectApiGroupImpl";
 export * as ConfectApiImpl from "./ConfectApiImpl";
 export * as ConfectApiServer from "./ConfectApiServer";
 export * as ConfectAuth from "./ConfectAuth";

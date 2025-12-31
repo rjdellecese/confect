@@ -1,4 +1,4 @@
-import { ConfectApiBuilder } from "@rjdellecese/confect";
+import { ConfectApiGroupImpl } from "@rjdellecese/confect";
 import { Effect } from "effect";
 // import {
 //   ConfectDatabaseReader,
@@ -6,7 +6,7 @@ import { Effect } from "effect";
 // } from "../../_generated/services";
 import api from "../_generated/api";
 
-export default ConfectApiBuilder.group(api, "notes", (handlers) =>
+export default ConfectApiGroupImpl.make(api, "notes", (handlers) =>
   handlers.handle("getContent", () =>
     // TODO
     Effect.gen(function* () {

@@ -4,7 +4,7 @@ import * as ConfectApiGroupSpec from "../../src/api/ConfectApiGroupSpec";
 import * as ConfectApiRefs from "../../src/api/ConfectApiRefs";
 import * as ConfectApiSpec from "../../src/api/ConfectApiSpec";
 import * as ConfectApi from "../../src/server/ConfectApi";
-import * as ConfectApiBuilder from "../../src/server/ConfectApiBuilder";
+import * as ConfectApiGroupImpl from "../../src/server/ConfectApiGroupImpl";
 import * as ConfectApiImpl from "../../src/server/ConfectApiImpl";
 import * as ConfectApiServer from "../../src/server/ConfectApiServer";
 import * as ConfectDatabaseReader from "../../src/server/ConfectDatabaseReader";
@@ -96,7 +96,7 @@ type GroupPath = ConfectApiGroupSpec.Path.All<
   ConfectApiSpec.ConfectApiSpec.Groups<Spec>
 >;
 
-const GroupALive = ConfectApiBuilder.group(Api, "groupA", (handlers) =>
+const GroupALive = ConfectApiGroupImpl.make(Api, "groupA", (handlers) =>
   handlers
     .handle("myFunction", (_args) =>
       Effect.gen(function* () {
@@ -116,22 +116,32 @@ const GroupALive = ConfectApiBuilder.group(Api, "groupA", (handlers) =>
     .handle("myFunction2", (args) => Effect.succeed(`foo: ${args.foo}`)),
 );
 
-const GroupBCLive = ConfectApiBuilder.group(Api, "groupB.groupBC", (handlers) =>
-  handlers.handle("myFunction3", (args) => Effect.succeed(`foo: ${args.foo}`)),
+const GroupBCLive = ConfectApiGroupImpl.make(
+  Api,
+  "groupB.groupBC",
+  (handlers) =>
+    handlers.handle("myFunction3", (args) =>
+      Effect.succeed(`foo: ${args.foo}`),
+    ),
 );
 
-const GroupBDELive = ConfectApiBuilder.group(
+const GroupBDELive = ConfectApiGroupImpl.make(
   Api,
   "groupB.groupBD.groupBDE",
   (handlers) =>
     handlers.handle("myFunction5", () => Effect.succeed("myFunction5")),
 );
 
-const GroupBDLive = ConfectApiBuilder.group(Api, "groupB.groupBD", (handlers) =>
-  handlers.handle("myFunction4", (args) => Effect.succeed(`foo: ${args.foo}`)),
+const GroupBDLive = ConfectApiGroupImpl.make(
+  Api,
+  "groupB.groupBD",
+  (handlers) =>
+    handlers.handle("myFunction4", (args) =>
+      Effect.succeed(`foo: ${args.foo}`),
+    ),
 ).pipe(Layer.provide(GroupBDELive));
 
-const GroupBLive = ConfectApiBuilder.group(
+const GroupBLive = ConfectApiGroupImpl.make(
   Api,
   "groupB",
   (handlers) => handlers,

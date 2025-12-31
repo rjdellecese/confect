@@ -30,7 +30,7 @@ import type * as ConfectApiSpec from "../api/ConfectApiSpec";
 import { mapLeaves } from "../internal/utils";
 import * as ConfectActionRunner from "./ConfectActionRunner";
 import type * as ConfectApi from "./ConfectApi";
-import * as ConfectApiBuilder from "./ConfectApiBuilder";
+import * as ConfectApiGroupImpl from "./ConfectApiGroupImpl";
 import * as ConfectApiRegistry from "./ConfectApiRegistry";
 import * as ConfectAuth from "./ConfectAuth";
 import * as ConfectDatabaseReader from "./ConfectDatabaseReader";
@@ -116,9 +116,9 @@ export const make = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
     const handlerItems = yield* Ref.get(registry);
 
     const registeredFunctions = mapLeaves<
-      ConfectApiBuilder.Handlers.Item.AnyWithProps,
+      ConfectApiGroupImpl.Handlers.Item.AnyWithProps,
       RegisteredFunction
-    >(handlerItems, ConfectApiBuilder.isHandlerItem, (handlerItem) =>
+    >(handlerItems, ConfectApiGroupImpl.isHandlerItem, (handlerItem) =>
       makeRegisteredFunction(api, handlerItem),
     ) as RegisteredFunctions<Api["spec"]>;
 
@@ -127,7 +127,7 @@ export const make = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
 
 const makeRegisteredFunction = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
   api: Api,
-  { function_, handler }: ConfectApiBuilder.Handlers.Item.AnyWithProps,
+  { function_, handler }: ConfectApiGroupImpl.Handlers.Item.AnyWithProps,
 ): RegisteredFunction =>
   Match.value(function_.functionType).pipe(
     Match.when("Query", () => {

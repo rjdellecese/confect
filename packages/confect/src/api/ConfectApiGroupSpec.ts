@@ -5,12 +5,14 @@ import type * as ConfectApiFunctionSpec from "./ConfectApiFunctionSpec";
 export const TypeId = "@rjdellecese/confect/api/ConfectApiGroupSpec";
 export type TypeId = typeof TypeId;
 
-export const isConfectApiGroupSpec = (u: unknown): u is ConfectApiGroupSpec.Any =>
-  Predicate.hasProperty(u, TypeId);
+export const isConfectApiGroupSpec = (
+  u: unknown,
+): u is ConfectApiGroupSpec.Any => Predicate.hasProperty(u, TypeId);
 
 export interface ConfectApiGroupSpec<
   Name extends string,
-  Functions extends ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithProps = never,
+  Functions extends
+    ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithProps = never,
   Groups extends ConfectApiGroupSpec.AnyWithProps = never,
 > {
   readonly [TypeId]: TypeId;
@@ -28,6 +30,7 @@ export interface ConfectApiGroupSpec<
     >;
   };
 
+  // TODO: `addQuery`, `addMutation`, `addAction`, etc.
   addFunction<
     Function extends ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithProps,
   >(
@@ -54,7 +57,8 @@ export declare namespace ConfectApiGroupSpec {
       [key: string]: AnyWithProps;
     };
     addFunction<
-      Function extends ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithProps,
+      Function extends
+        ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithProps,
     >(
       function_: Function,
     ): AnyWithProps;
@@ -134,7 +138,9 @@ export declare namespace Path {
     Group extends ConfectApiGroupSpec.AnyWithProps,
     GroupPath extends string,
   > =
-    ConfectApiGroupSpec.Groups<GroupAt<Group, GroupPath>> extends infer SubGroups
+    ConfectApiGroupSpec.Groups<
+      GroupAt<Group, GroupPath>
+    > extends infer SubGroups
       ? SubGroups extends ConfectApiGroupSpec.AnyWithProps
         ? `${GroupPath}.${ConfectApiGroupSpec.Name<SubGroups>}`
         : never

@@ -1,7 +1,7 @@
-import { ConfectApiBuilder } from "@rjdellecese/confect";
+import { ConfectApiGroupImpl } from "@rjdellecese/confect";
 import { Api } from "../api";
 
-export const Groups = ConfectApiBuilder.group(
+export const Groups = ConfectApiGroupImpl.make(
   Api,
   "groups",
   (handlers) => handlers,
