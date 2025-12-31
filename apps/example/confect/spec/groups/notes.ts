@@ -4,7 +4,7 @@ import {
   GenericId,
 } from "@rjdellecese/confect";
 import { Schema } from "effect";
-import { Note } from "../../schema/note";
+import { Note } from "../../tables/note";
 
 export const Notes = ConfectApiGroup.make("notes")
   .addFunction(

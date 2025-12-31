@@ -237,12 +237,11 @@ const makeRef = <
 
 export const make = <Spec extends ConfectApiSpec.ConfectApiSpec.AnyWithProps>(
   spec: Spec,
-): ConfectApiRefs<Spec> =>
-  makeHelper(spec.groups, "confect") as ConfectApiRefs<Spec>;
+): ConfectApiRefs<Spec> => makeHelper(spec.groups) as ConfectApiRefs<Spec>;
 
 const makeHelper = (
   groups: Record.ReadonlyRecord<string, ConfectApiGroup.ConfectApiGroup.Any>,
-  groupPath: string | null,
+  groupPath: string | null = null,
 ): ConfectApiRefs.AnyWithProps =>
   pipe(
     groups as Record.ReadonlyRecord<

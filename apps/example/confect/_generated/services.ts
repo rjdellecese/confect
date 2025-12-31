@@ -1,9 +1,9 @@
+import type { ConfectDataModel } from "@rjdellecese/confect";
 import {
   ConfectActionRunner as ConfectActionRunner_,
   ConfectAuth as ConfectAuth_,
   ConfectDatabaseReader as ConfectDatabaseReader_,
   ConfectDatabaseWriter as ConfectDatabaseWriter_,
-  ConfectDataModel,
   ConfectMutationRunner as ConfectMutationRunner_,
   ConfectQueryRunner as ConfectQueryRunner_,
   ConfectScheduler as ConfectScheduler_,
@@ -13,7 +13,7 @@ import {
   ConvexMutationCtx as ConvexMutationCtx_,
   ConvexQueryCtx as ConvexQueryCtx_,
 } from "@rjdellecese/confect";
-import confectSchemaDefinition from "../../confect/schema";
+import type confectSchemaDefinition from "../schema";
 
 export const ConfectAuth = ConfectAuth_.ConfectAuth;
 export type ConfectAuth = typeof ConfectAuth.Identifier;

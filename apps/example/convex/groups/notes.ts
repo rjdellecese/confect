@@ -1,4 +1,4 @@
-import server from "../../../confect/server";
+import server from "../../confect/server";
 
 export const insert = server.registeredFunctions.groups.notes.insert;
 export const list = server.registeredFunctions.groups.notes.list;

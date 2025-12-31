@@ -1,5 +1,5 @@
 import { ConfectApiRefs } from "@rjdellecese/confect";
-import spec from "../../confect/spec";
+import spec from "../spec";
 
 const refs = ConfectApiRefs.make(spec);
 
