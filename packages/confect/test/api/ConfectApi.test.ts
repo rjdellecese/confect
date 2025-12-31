@@ -1,5 +1,5 @@
 import { Effect, Layer, Schema } from "effect";
-import * as ConfectApiFunction from "../../src/api/ConfectApiFunction";
+import * as ConfectApiFunctionSpec from "../../src/api/ConfectApiFunctionSpec";
 import * as ConfectApiGroupSpec from "../../src/api/ConfectApiGroupSpec";
 import * as ConfectApiRefs from "../../src/api/ConfectApiRefs";
 import * as ConfectApiSpec from "../../src/api/ConfectApiSpec";
@@ -27,14 +27,14 @@ import * as ConfectTable from "../../src/server/ConfectTable";
 
 const GroupA = ConfectApiGroupSpec.make("groupA")
   .addFunction(
-    ConfectApiFunction.mutation({
+    ConfectApiFunctionSpec.mutation({
       name: "myFunction",
       args: Schema.Struct({ foo: Schema.Number }),
       returns: Schema.String,
     }),
   )
   .addFunction(
-    ConfectApiFunction.query({
+    ConfectApiFunctionSpec.query({
       name: "myFunction2",
       args: Schema.Struct({ foo: Schema.Number }),
       returns: Schema.String,
@@ -42,7 +42,7 @@ const GroupA = ConfectApiGroupSpec.make("groupA")
   );
 
 const GroupBC = ConfectApiGroupSpec.make("groupBC").addFunction(
-  ConfectApiFunction.query({
+  ConfectApiFunctionSpec.query({
     name: "myFunction3",
     args: Schema.Struct({ foo: Schema.Number }),
     returns: Schema.String,
@@ -50,7 +50,7 @@ const GroupBC = ConfectApiGroupSpec.make("groupBC").addFunction(
 );
 
 const GroupBDE = ConfectApiGroupSpec.make("groupBDE").addFunction(
-  ConfectApiFunction.query({
+  ConfectApiFunctionSpec.query({
     name: "myFunction5",
     args: Schema.Struct({}),
     returns: Schema.String,
@@ -59,7 +59,7 @@ const GroupBDE = ConfectApiGroupSpec.make("groupBDE").addFunction(
 
 const GroupBD = ConfectApiGroupSpec.make("groupBD")
   .addFunction(
-    ConfectApiFunction.query({
+    ConfectApiFunctionSpec.query({
       name: "myFunction4",
       args: Schema.Struct({ foo: Schema.Number }),
       returns: Schema.String,

@@ -1,4 +1,4 @@
-import type * as ConfectApiFunction from "../api/ConfectApiFunction";
+import type * as ConfectApiFunctionSpec from "../api/ConfectApiFunctionSpec";
 import type { Effect } from "effect";
 import type * as ConfectActionRunner from "./ConfectActionRunner";
 import type * as ConfectAuth from "./ConfectAuth";
@@ -21,19 +21,19 @@ import type * as ConvexQueryCtx from "./ConvexQueryCtx";
 
 export type ConfectApiHandler<
   ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
-  Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
+  Function extends ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithProps,
 > =
-  Function extends ConfectApiFunction.ConfectApiFunction.WithFunctionType<
+  Function extends ConfectApiFunctionSpec.ConfectApiFunctionSpec.WithFunctionType<
     Function,
     "Query"
   >
     ? QueryHandler<ConfectSchema_, Function>
-    : Function extends ConfectApiFunction.ConfectApiFunction.WithFunctionType<
+    : Function extends ConfectApiFunctionSpec.ConfectApiFunctionSpec.WithFunctionType<
           Function,
           "Mutation"
         >
       ? MutationHandler<ConfectSchema_, Function>
-      : Function extends ConfectApiFunction.ConfectApiFunction.WithFunctionType<
+      : Function extends ConfectApiFunctionSpec.ConfectApiFunctionSpec.WithFunctionType<
             Function,
             "Action"
           >
@@ -43,7 +43,7 @@ export type ConfectApiHandler<
 export type QueryHandler<
   ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
   Function extends
-    ConfectApiFunction.ConfectApiFunction.AnyWithPropsWithFunctionType<"Query">,
+    ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithPropsWithFunctionType<"Query">,
 > = BaseHandler<
   Function,
   | ConfectDatabaseReader.ConfectDatabaseReader<ConfectSchema_>
@@ -60,7 +60,7 @@ export type QueryHandler<
 export type MutationHandler<
   ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
   Function extends
-    ConfectApiFunction.ConfectApiFunction.AnyWithPropsWithFunctionType<"Mutation">,
+    ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithPropsWithFunctionType<"Mutation">,
 > = BaseHandler<
   Function,
   | ConfectDatabaseReader.ConfectDatabaseReader<ConfectSchema_>
@@ -81,7 +81,7 @@ export type MutationHandler<
 export type ActionHandler<
   ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
   Function extends
-    ConfectApiFunction.ConfectApiFunction.AnyWithPropsWithFunctionType<"Action">,
+    ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithPropsWithFunctionType<"Action">,
 > = BaseHandler<
   Function,
   | ConfectScheduler.ConfectScheduler
@@ -103,12 +103,12 @@ export type ActionHandler<
 >;
 
 type BaseHandler<
-  Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
+  Function extends ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithProps,
   R,
 > = (
-  args: ConfectApiFunction.ConfectApiFunction.Args<Function>["Type"],
+  args: ConfectApiFunctionSpec.ConfectApiFunctionSpec.Args<Function>["Type"],
 ) => Effect.Effect<
-  ConfectApiFunction.ConfectApiFunction.Returns<Function>["Type"],
+  ConfectApiFunctionSpec.ConfectApiFunctionSpec.Returns<Function>["Type"],
   never,
   R
 >;
@@ -116,15 +116,15 @@ type BaseHandler<
 export declare namespace ConfectApiHandler {
   export type AnyWithProps = ConfectApiHandler<
     ConfectSchema.ConfectSchema.AnyWithProps,
-    ConfectApiFunction.ConfectApiFunction.AnyWithProps
+    ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithProps
   >;
 
   export type WithName<
     ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
-    Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
+    Function extends ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithProps,
     Name extends string,
   > = ConfectApiHandler<
     ConfectSchema_,
-    ConfectApiFunction.ConfectApiFunction.WithName<Function, Name>
+    ConfectApiFunctionSpec.ConfectApiFunctionSpec.WithName<Function, Name>
   >;
 }

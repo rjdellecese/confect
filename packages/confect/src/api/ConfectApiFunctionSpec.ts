@@ -7,16 +7,16 @@ import type {
   RegisteredQuery,
 } from "convex/server";
 
-export const TypeId = "@rjdellecese/confect/api/ConfectApiFunction";
+export const TypeId = "@rjdellecese/confect/api/ConfectApiFunctionSpec";
 export type TypeId = typeof TypeId;
 
-export const isConfectApiFunction = (
+export const isConfectApiFunctionSpec = (
   u: unknown,
-): u is ConfectApiFunction.AnyWithProps => Predicate.hasProperty(u, TypeId);
+): u is ConfectApiFunctionSpec.AnyWithProps => Predicate.hasProperty(u, TypeId);
 
-export interface ConfectApiFunction<
-  FunctionType extends ConfectApiFunction.FunctionType,
-  FunctionVisibility extends ConfectApiFunction.FunctionVisibility,
+export interface ConfectApiFunctionSpec<
+  FunctionType extends ConfectApiFunctionSpec.FunctionType,
+  FunctionVisibility extends ConfectApiFunctionSpec.FunctionVisibility,
   Name extends string,
   Args extends Schema.Schema.AnyNoContext,
   Returns extends Schema.Schema.AnyNoContext,
@@ -29,13 +29,13 @@ export interface ConfectApiFunction<
   readonly returns: Returns;
 }
 
-export declare namespace ConfectApiFunction {
+export declare namespace ConfectApiFunctionSpec {
   export interface Any {
     readonly [TypeId]: TypeId;
   }
 
   export interface AnyWithProps
-    extends ConfectApiFunction<
+    extends ConfectApiFunctionSpec<
       FunctionType,
       FunctionVisibility,
       string,
@@ -44,7 +44,7 @@ export declare namespace ConfectApiFunction {
     > {}
 
   interface AnyWithPropsWithFunctionType<FunctionType_ extends FunctionType>
-    extends ConfectApiFunction<
+    extends ConfectApiFunctionSpec<
       FunctionType_,
       FunctionVisibility,
       string,
@@ -86,7 +86,7 @@ export declare namespace ConfectApiFunction {
   > = Exclude<Function, { readonly name: Name_ }>;
 
   export type RegisteredFunction<
-    Function extends ConfectApiFunction.AnyWithProps,
+    Function extends ConfectApiFunctionSpec.AnyWithProps,
   > = Function["functionType"] extends "Query"
     ? RegisteredQuery<
         Lowercase<GetFunctionVisibility<Function>>,
@@ -114,8 +114,8 @@ const Proto = {
 
 const make =
   <
-    FunctionType extends ConfectApiFunction.FunctionType,
-    FunctionVisibility extends ConfectApiFunction.FunctionVisibility,
+    FunctionType extends ConfectApiFunctionSpec.FunctionType,
+    FunctionVisibility extends ConfectApiFunctionSpec.FunctionVisibility,
   >(
     functionType: FunctionType,
     functionVisibility: FunctionVisibility,
@@ -132,7 +132,7 @@ const make =
     name: Name;
     args: Args;
     returns: Returns;
-  }): ConfectApiFunction<
+  }): ConfectApiFunctionSpec<
     FunctionType,
     FunctionVisibility,
     Name,

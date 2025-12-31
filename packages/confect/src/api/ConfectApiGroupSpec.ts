@@ -1,6 +1,6 @@
 import { Predicate, Record } from "effect";
 import { validateJsIdentifier } from "../internal/utils";
-import type * as ConfectApiFunction from "./ConfectApiFunction";
+import type * as ConfectApiFunctionSpec from "./ConfectApiFunctionSpec";
 
 export const TypeId = "@rjdellecese/confect/api/ConfectApiGroupSpec";
 export type TypeId = typeof TypeId;
@@ -10,13 +10,13 @@ export const isConfectApiGroupSpec = (u: unknown): u is ConfectApiGroupSpec.Any 
 
 export interface ConfectApiGroupSpec<
   Name extends string,
-  Functions extends ConfectApiFunction.ConfectApiFunction.AnyWithProps = never,
+  Functions extends ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithProps = never,
   Groups extends ConfectApiGroupSpec.AnyWithProps = never,
 > {
   readonly [TypeId]: TypeId;
   readonly name: Name;
   readonly functions: {
-    [FunctionName in ConfectApiFunction.ConfectApiFunction.Name<Functions>]: ConfectApiFunction.ConfectApiFunction.WithName<
+    [FunctionName in ConfectApiFunctionSpec.ConfectApiFunctionSpec.Name<Functions>]: ConfectApiFunctionSpec.ConfectApiFunctionSpec.WithName<
       Functions,
       FunctionName
     >;
@@ -29,7 +29,7 @@ export interface ConfectApiGroupSpec<
   };
 
   addFunction<
-    Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
+    Function extends ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithProps,
   >(
     function_: Function,
   ): ConfectApiGroupSpec<Name, Functions | Function, Groups>;
@@ -48,13 +48,13 @@ export declare namespace ConfectApiGroupSpec {
   export interface AnyWithProps extends Any {
     readonly name: string;
     readonly functions: {
-      [key: string]: ConfectApiFunction.ConfectApiFunction.AnyWithProps;
+      [key: string]: ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithProps;
     };
     readonly groups: {
       [key: string]: AnyWithProps;
     };
     addFunction<
-      Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
+      Function extends ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithProps,
     >(
       function_: Function,
     ): AnyWithProps;
@@ -145,7 +145,7 @@ const Proto = {
   [TypeId]: TypeId,
 
   addFunction<
-    Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
+    Function extends ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithProps,
   >(this: ConfectApiGroupSpec.Any, function_: Function) {
     const this_ = this as ConfectApiGroupSpec.AnyWithProps;
 
@@ -173,7 +173,7 @@ const Proto = {
 
 const makeProto = <
   Name extends string,
-  Functions extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
+  Functions extends ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithProps,
   Groups extends ConfectApiGroupSpec.AnyWithProps,
 >({
   name,

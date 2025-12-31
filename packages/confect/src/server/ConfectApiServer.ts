@@ -24,7 +24,7 @@ import {
   Schema,
   type Types,
 } from "effect";
-import type * as ConfectApiFunction from "../api/ConfectApiFunction";
+import type * as ConfectApiFunctionSpec from "../api/ConfectApiFunctionSpec";
 import type * as ConfectApiGroupSpec from "../api/ConfectApiGroupSpec";
 import type * as ConfectApiSpec from "../api/ConfectApiSpec";
 import { mapLeaves } from "../internal/utils";
@@ -437,26 +437,26 @@ export declare namespace RegisteredFunctions {
           ConfectApiGroupSpec.ConfectApiGroupSpec.AnyWithProps
         ? Types.Simplify<
             Helper<SubGroups> & {
-              [FunctionName in ConfectApiFunction.ConfectApiFunction.Name<
+              [FunctionName in ConfectApiFunctionSpec.ConfectApiFunctionSpec.Name<
                 ConfectApiGroupSpec.ConfectApiGroupSpec.Functions<Group>
-              >]: ConfectApiFunction.ConfectApiFunction.WithName<
+              >]: ConfectApiFunctionSpec.ConfectApiFunctionSpec.WithName<
                 ConfectApiGroupSpec.ConfectApiGroupSpec.Functions<Group>,
                 FunctionName
               > extends infer Function extends
-                ConfectApiFunction.ConfectApiFunction.AnyWithProps
-                ? ConfectApiFunction.ConfectApiFunction.RegisteredFunction<Function>
+                ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithProps
+                ? ConfectApiFunctionSpec.ConfectApiFunctionSpec.RegisteredFunction<Function>
                 : never;
             }
           >
         : {
-            [FunctionName in ConfectApiFunction.ConfectApiFunction.Name<
+            [FunctionName in ConfectApiFunctionSpec.ConfectApiFunctionSpec.Name<
               ConfectApiGroupSpec.ConfectApiGroupSpec.Functions<Group>
-            >]: ConfectApiFunction.ConfectApiFunction.WithName<
+            >]: ConfectApiFunctionSpec.ConfectApiFunctionSpec.WithName<
               ConfectApiGroupSpec.ConfectApiGroupSpec.Functions<Group>,
               FunctionName
             > extends infer Function extends
-              ConfectApiFunction.ConfectApiFunction.AnyWithProps
-              ? ConfectApiFunction.ConfectApiFunction.RegisteredFunction<Function>
+              ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithProps
+              ? ConfectApiFunctionSpec.ConfectApiFunctionSpec.RegisteredFunction<Function>
               : never;
           }
       : never;

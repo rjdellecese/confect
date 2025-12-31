@@ -1,5 +1,5 @@
 import {
-  ConfectApiFunction,
+  ConfectApiFunctionSpec,
   ConfectApiGroupSpec,
   GenericId,
 } from "@rjdellecese/confect";
@@ -8,35 +8,35 @@ import { Note } from "../../tables/note";
 
 export const Notes = ConfectApiGroupSpec.make("notes")
   .addFunction(
-    ConfectApiFunction.mutation({
+    ConfectApiFunctionSpec.mutation({
       name: "insert",
       args: Schema.Struct({ text: Schema.String }),
       returns: GenericId.GenericId("notes"),
     }),
   )
   .addFunction(
-    ConfectApiFunction.query({
+    ConfectApiFunctionSpec.query({
       name: "list",
       args: Schema.Struct({}),
       returns: Schema.Array(Note.Doc),
     }),
   )
   .addFunction(
-    ConfectApiFunction.mutation({
+    ConfectApiFunctionSpec.mutation({
       name: "delete_",
       args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
       returns: Schema.Null,
     }),
   )
   .addFunction(
-    ConfectApiFunction.query({
+    ConfectApiFunctionSpec.query({
       name: "getFirst",
       args: Schema.Struct({}),
       returns: Schema.Option(Note.Doc),
     }),
   )
   .addFunction(
-    ConfectApiFunction.internalQuery({
+    ConfectApiFunctionSpec.internalQuery({
       name: "internalGetFirst",
       args: Schema.Struct({}),
       returns: Schema.Option(Note.Doc),

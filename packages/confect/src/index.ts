@@ -1,5 +1,5 @@
 // api
-export * as ConfectApiFunction from "./api/ConfectApiFunction";
+export * as ConfectApiFunctionSpec from "./api/ConfectApiFunctionSpec";
 export * as ConfectApiGroupSpec from "./api/ConfectApiGroupSpec";
 export * as ConfectApiRefs from "./api/ConfectApiRefs";
 export * as ConfectApiSpec from "./api/ConfectApiSpec";

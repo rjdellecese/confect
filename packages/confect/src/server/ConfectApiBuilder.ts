@@ -9,7 +9,7 @@ import {
   Ref,
   String,
 } from "effect";
-import type * as ConfectApiFunction from "../api/ConfectApiFunction";
+import type * as ConfectApiFunctionSpec from "../api/ConfectApiFunctionSpec";
 import type * as ConfectApiGroupSpec from "../api/ConfectApiGroupSpec";
 import { setNestedProperty } from "../internal/utils";
 import type * as ConfectApi from "./ConfectApi";
@@ -23,7 +23,8 @@ export type HandlersTypeId = typeof HandlersTypeId;
 
 export interface Handlers<
   ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
-  Functions extends ConfectApiFunction.ConfectApiFunction.AnyWithProps = never,
+  Functions extends
+    ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithProps = never,
 > {
   readonly [HandlersTypeId]: {
     _Functions: Types.Covariant<Functions>;
@@ -31,7 +32,9 @@ export interface Handlers<
   readonly group: ConfectApiGroupSpec.ConfectApiGroupSpec.AnyWithProps;
   readonly items: ReadonlyArray<Handlers.Item<ConfectSchema_, Functions>>;
 
-  handle<Name extends ConfectApiFunction.ConfectApiFunction.Name<Functions>>(
+  handle<
+    Name extends ConfectApiFunctionSpec.ConfectApiFunctionSpec.Name<Functions>,
+  >(
     name: Name,
     handler: ConfectApiHandler.ConfectApiHandler.WithName<
       ConfectSchema_,
@@ -40,7 +43,7 @@ export interface Handlers<
     >,
   ): Handlers<
     ConfectSchema_,
-    ConfectApiFunction.ConfectApiFunction.ExcludeName<Functions, Name>
+    ConfectApiFunctionSpec.ConfectApiFunctionSpec.ExcludeName<Functions, Name>
   >;
 }
 
@@ -59,7 +62,7 @@ const HandlerItemProto = {
 
 const makeHandlerItem = <
   ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
-  Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
+  Function extends ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithProps,
 >({
   function_,
   handler,
@@ -72,7 +75,7 @@ const makeHandlerItem = <
 export declare namespace Handlers {
   export interface Any {
     readonly [HandlersTypeId]: {
-      _Functions: Types.Covariant<ConfectApiFunction.ConfectApiFunction.AnyWithProps>;
+      _Functions: Types.Covariant<ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithProps>;
     };
   }
 
@@ -88,7 +91,7 @@ export declare namespace Handlers {
 
   export interface Item<
     ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
-    Function extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
+    Function extends ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithProps,
   > {
     readonly [HandlerItemTypeId]: HandlerItemTypeId;
     readonly function_: Function;
@@ -101,7 +104,7 @@ export declare namespace Handlers {
   export namespace Item {
     // eslint-disable-next-line @typescript-eslint/no-shadow
     export interface AnyWithProps {
-      readonly function_: ConfectApiFunction.ConfectApiFunction.AnyWithProps;
+      readonly function_: ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithProps;
       readonly handler: ConfectApiHandler.ConfectApiHandler.AnyWithProps;
     }
   }
@@ -118,7 +121,7 @@ export declare namespace Handlers {
     A extends Handlers<infer _S, infer Functions>
       ? [Functions] extends [never]
         ? A
-        : `Function not handled: ${ConfectApiFunction.ConfectApiFunction.Name<Functions>}`
+        : `Function not handled: ${ConfectApiFunctionSpec.ConfectApiFunctionSpec.Name<Functions>}`
       : "Must return the implemented handlers";
 }
 
@@ -130,7 +133,7 @@ const HandlersProto = {
   handle<ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps>(
     this: Handlers<
       ConfectSchema_,
-      ConfectApiFunction.ConfectApiFunction.AnyWithProps
+      ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithProps
     >,
     name: string,
     handler: ConfectApiHandler.ConfectApiHandler.AnyWithProps,
@@ -151,7 +154,7 @@ const HandlersProto = {
 
 const makeHandlers = <
   ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
-  Functions extends ConfectApiFunction.ConfectApiFunction.AnyWithProps,
+  Functions extends ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithProps,
 >({
   group,
   items,
