@@ -1,19 +1,26 @@
 // @ts-check
-/// <reference types="node" />
 
 import eslint from "@eslint/js";
 import { defineConfig } from "eslint/config";
 import tseslint from "typescript-eslint";
 
 export default defineConfig([
-  eslint.configs.recommended,
-  ...tseslint.configs.recommended,
   {
-    files: ["**/*.{ts,tsx}"],
+    ignores: ["dist/**", "node_modules/**", "convex/_generated/**"],
+  },
+  {
+    extends: [eslint.configs.recommended, tseslint.configs.recommended],
     languageOptions: {
       parserOptions: {
         projectService: true,
         tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
+  {
+    files: ["**/*.{ts,tsx}"],
+    languageOptions: {
+      parserOptions: {
         ecmaFeatures: {
           jsx: true,
         },
@@ -30,13 +37,7 @@ export default defineConfig([
     },
   },
   {
-    files: ["**/*.js", "**/*.mjs", "vite.config.ts"],
-    ...tseslint.configs.disableTypeChecked,
-    ignores: [
-      "dist/**",
-      "node_modules/**",
-      "convex/_generated/**",
-      "eslint.config.js",
-    ],
+    files: ["**/*.js", "**/*.mjs", "vite.config.ts", "eslint.config.js"],
+    extends: [tseslint.configs.disableTypeChecked],
   },
 ]);
