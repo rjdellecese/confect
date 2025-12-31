@@ -231,21 +231,6 @@ export const group = <
   );
 };
 
-export const api = <ConfectApi_ extends ConfectApi.ConfectApi.AnyWithProps>(
-  api_: ConfectApi_,
-): Layer.Layer<
-  ConfectApiService,
-  never,
-  ConfectApiGroupService.FromGroups<ConfectApi.ConfectApi.Groups<ConfectApi_>>
-> =>
-  Layer.effect(
-    ConfectApiService,
-    Effect.map(Effect.context(), (context) => ({
-      api: api_,
-      context,
-    })),
-  );
-
 export interface ConfectApiGroupService<GroupPath extends string> {
   readonly groupPath: GroupPath;
 }
@@ -283,13 +268,3 @@ export declare namespace ConfectApiGroupService {
         : never
       : never;
 }
-
-export class ConfectApiService extends Context.Tag(
-  "@rjdellecese/confect/server/ConfectApiBuilder/ConfectApiService",
-)<
-  ConfectApiService,
-  {
-    readonly api: ConfectApi.ConfectApi.AnyWithProps;
-    readonly context: Context.Context<never>;
-  }
->() {}

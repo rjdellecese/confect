@@ -1,4 +1,4 @@
-import { ConfectApiBuilder, ConfectApiServer } from "@rjdellecese/confect";
+import { ConfectApiImpl, ConfectApiServer } from "@rjdellecese/confect";
 import { Effect, Layer } from "effect";
 import { Api } from "./api";
 import { Groups } from "./api/groups";
@@ -7,7 +7,7 @@ import { Random } from "./api/groups/random";
 
 export default ConfectApiServer.make(Api).pipe(
   Effect.provide(
-    ConfectApiBuilder.api(Api).pipe(
+    ConfectApiImpl.make(Api).pipe(
       Layer.provide(Groups.pipe(Layer.provide(Notes), Layer.provide(Random))),
     ),
   ),

@@ -5,6 +5,7 @@ import * as ConfectApiRefs from "../../src/api/ConfectApiRefs";
 import * as ConfectApiSpec from "../../src/api/ConfectApiSpec";
 import * as ConfectApi from "../../src/server/ConfectApi";
 import * as ConfectApiBuilder from "../../src/server/ConfectApiBuilder";
+import * as ConfectApiImpl from "../../src/server/ConfectApiImpl";
 import * as ConfectApiServer from "../../src/server/ConfectApiServer";
 import * as ConfectDatabaseReader from "../../src/server/ConfectDatabaseReader";
 import * as ConfectDatabaseWriter from "../../src/server/ConfectDatabaseWriter";
@@ -136,13 +137,13 @@ const GroupBLive = ConfectApiBuilder.group(
   (handlers) => handlers,
 ).pipe(Layer.provide(GroupBCLive), Layer.provide(GroupBDLive));
 
-const ApiLive = ConfectApiBuilder.api(Api).pipe(
+const ApiImpl = ConfectApiImpl.make(Api).pipe(
   Layer.provide(GroupALive),
   Layer.provide(GroupBLive),
 );
 
 const _server = ConfectApiServer.make(Api)
-  .pipe(Effect.provide(ApiLive), Effect.runPromise)
+  .pipe(Effect.provide(ApiImpl), Effect.runPromise)
   .then((s) => {
     console.log(s);
   });

@@ -12,6 +12,7 @@ export * as UserIdentity from "./api/UserIdentity";
 export * as ConfectActionRunner from "./server/ConfectActionRunner";
 export * as ConfectApi from "./server/ConfectApi";
 export * as ConfectApiBuilder from "./server/ConfectApiBuilder";
+export * as ConfectApiImpl from "./server/ConfectApiImpl";
 export * as ConfectApiServer from "./server/ConfectApiServer";
 export * as ConfectAuth from "./server/ConfectAuth";
 export * as ConfectDatabaseReader from "./server/ConfectDatabaseReader";
