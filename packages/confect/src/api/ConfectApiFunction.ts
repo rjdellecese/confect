@@ -1,6 +1,11 @@
 import type { Schema } from "effect";
 import { Predicate } from "effect";
 import { validateJsIdentifier } from "../internal/utils";
+import type {
+  RegisteredAction,
+  RegisteredMutation,
+  RegisteredQuery,
+} from "convex/server";
 
 export const TypeId = "@rjdellecese/confect/api/ConfectApiFunction";
 export type TypeId = typeof TypeId;
@@ -79,6 +84,28 @@ export declare namespace ConfectApiFunction {
     Function extends AnyWithProps,
     Name_ extends Name<Function>,
   > = Exclude<Function, { readonly name: Name_ }>;
+
+  export type RegisteredFunction<
+    Function extends ConfectApiFunction.AnyWithProps,
+  > = Function["functionType"] extends "Query"
+    ? RegisteredQuery<
+        Lowercase<GetFunctionVisibility<Function>>,
+        Args<Function>["Encoded"],
+        Promise<Returns<Function>["Encoded"]>
+      >
+    : Function["functionType"] extends "Mutation"
+      ? RegisteredMutation<
+          Lowercase<GetFunctionVisibility<Function>>,
+          Args<Function>["Encoded"],
+          Promise<Returns<Function>["Encoded"]>
+        >
+      : Function["functionType"] extends "Action"
+        ? RegisteredAction<
+            Lowercase<GetFunctionVisibility<Function>>,
+            Args<Function>["Encoded"],
+            Promise<Returns<Function>["Encoded"]>
+          >
+        : never;
 }
 
 const Proto = {

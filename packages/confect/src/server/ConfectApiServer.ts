@@ -14,7 +14,19 @@ import {
   type RegisteredMutation,
   type RegisteredQuery,
 } from "convex/server";
-import { Effect, Layer, Match, pipe, Predicate, Ref, Schema } from "effect";
+import {
+  Effect,
+  Layer,
+  Match,
+  pipe,
+  Predicate,
+  Ref,
+  Schema,
+  type Types,
+} from "effect";
+import type * as ConfectApiFunction from "../api/ConfectApiFunction";
+import type * as ConfectApiGroup from "../api/ConfectApiGroup";
+import type * as ConfectApiSpec from "../api/ConfectApiSpec";
 import { mapLeaves } from "../internal/utils";
 import * as ConfectActionRunner from "./ConfectActionRunner";
 import type * as ConfectApi from "./ConfectApi";
@@ -65,48 +77,53 @@ export const isRegisteredFunction = (u: unknown): u is RegisteredFunction =>
 export const TypeId = "@rjdellecese/confect/server/ConfectApiServer";
 export type TypeId = typeof TypeId;
 
-export const isConfectApiServer = (u: unknown): u is ConfectApiServer =>
+export const isConfectApiServer = (
+  u: unknown,
+): u is ConfectApiServer<ConfectApi.ConfectApi.AnyWithProps> =>
   Predicate.hasProperty(u, TypeId);
 
-export interface RegisteredFunctions {
-  readonly [key: string]:
-    | (RegisteredFunction & RegisteredFunctions)
-    | RegisteredFunctions;
-}
+export type RegisteredFunctions<
+  Spec extends ConfectApiSpec.ConfectApiSpec.AnyWithProps,
+> = Types.Simplify<
+  RegisteredFunctions.Helper<ConfectApiSpec.ConfectApiSpec.Groups<Spec>>
+>;
 
-export interface ConfectApiServer {
+export interface ConfectApiServer<
+  Api extends ConfectApi.ConfectApi.AnyWithProps,
+> {
   readonly [TypeId]: TypeId;
-  readonly registeredFunctions: RegisteredFunctions;
+  readonly registeredFunctions: RegisteredFunctions<Api["spec"]>;
 }
 
 const Proto = {
   [TypeId]: TypeId,
 };
 
-const makeProto = ({
+const makeProto = <Api extends ConfectApi.ConfectApi.AnyWithProps>({
   registeredFunctions,
 }: {
-  registeredFunctions: RegisteredFunctions;
-}): ConfectApiServer =>
+  registeredFunctions: RegisteredFunctions<Api["spec"]>;
+}): ConfectApiServer<Api> =>
   Object.assign(Object.create(Proto), {
     registeredFunctions,
   });
 
-export const make = Effect.gen(function* () {
-  const { api } = yield* ConfectApiBuilder.ConfectApiService;
-  const registry = yield* ConfectApiRegistry.ConfectApiRegistry;
+export const make = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
+  api: Api,
+) =>
+  Effect.gen(function* () {
+    const registry = yield* ConfectApiRegistry.ConfectApiRegistry;
+    const handlerItems = yield* Ref.get(registry);
 
-  const handlerItems = yield* Ref.get(registry);
+    const registeredFunctions = mapLeaves<
+      ConfectApiBuilder.Handlers.Item.AnyWithProps,
+      RegisteredFunction
+    >(handlerItems, ConfectApiBuilder.isHandlerItem, (handlerItem) =>
+      makeRegisteredFunction(api, handlerItem),
+    ) as RegisteredFunctions<Api["spec"]>;
 
-  const registeredFunctions = mapLeaves<
-    ConfectApiBuilder.Handlers.Item.AnyWithProps,
-    RegisteredFunction
-  >(handlerItems, ConfectApiBuilder.isHandlerItem, (handlerItem) =>
-    makeRegisteredFunction(api, handlerItem),
-  ) as RegisteredFunctions;
-
-  return makeProto({ registeredFunctions });
-});
+    return makeProto<Api>({ registeredFunctions });
+  });
 
 const makeRegisteredFunction = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
   api: Api,
@@ -402,3 +419,45 @@ const confectActionFunction = <
       Effect.runPromise,
     ),
 });
+
+export declare namespace RegisteredFunctions {
+  export interface AnyWithProps {
+    readonly [key: string]: RegisteredFunction | AnyWithProps;
+  }
+
+  export type Helper<
+    Groups extends ConfectApiGroup.ConfectApiGroup.AnyWithProps,
+  > = {
+    [GroupName in ConfectApiGroup.ConfectApiGroup.Name<Groups>]: ConfectApiGroup.ConfectApiGroup.WithName<
+      Groups,
+      GroupName
+    > extends infer Group extends ConfectApiGroup.ConfectApiGroup.AnyWithProps
+      ? ConfectApiGroup.ConfectApiGroup.Groups<Group> extends infer SubGroups extends
+          ConfectApiGroup.ConfectApiGroup.AnyWithProps
+        ? Types.Simplify<
+            Helper<SubGroups> & {
+              [FunctionName in ConfectApiFunction.ConfectApiFunction.Name<
+                ConfectApiGroup.ConfectApiGroup.Functions<Group>
+              >]: ConfectApiFunction.ConfectApiFunction.WithName<
+                ConfectApiGroup.ConfectApiGroup.Functions<Group>,
+                FunctionName
+              > extends infer Function extends
+                ConfectApiFunction.ConfectApiFunction.AnyWithProps
+                ? ConfectApiFunction.ConfectApiFunction.RegisteredFunction<Function>
+                : never;
+            }
+          >
+        : {
+            [FunctionName in ConfectApiFunction.ConfectApiFunction.Name<
+              ConfectApiGroup.ConfectApiGroup.Functions<Group>
+            >]: ConfectApiFunction.ConfectApiFunction.WithName<
+              ConfectApiGroup.ConfectApiGroup.Functions<Group>,
+              FunctionName
+            > extends infer Function extends
+              ConfectApiFunction.ConfectApiFunction.AnyWithProps
+              ? ConfectApiFunction.ConfectApiFunction.RegisteredFunction<Function>
+              : never;
+          }
+      : never;
+  };
+}

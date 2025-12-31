@@ -5,7 +5,7 @@ import { Groups } from "./impl/groups";
 import { Notes } from "./impl/groups/notes";
 import { Random } from "./impl/groups/random";
 
-export default ConfectApiServer.make.pipe(
+export default ConfectApiServer.make(Api).pipe(
   Effect.provide(
     ConfectApiBuilder.api(Api).pipe(
       Layer.provide(Groups.pipe(Layer.provide(Notes), Layer.provide(Random))),
