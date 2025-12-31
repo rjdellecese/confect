@@ -190,12 +190,13 @@ export const group = <
   const groupPathParts = String.split(groupPath, ".");
   const [firstGroupPathPart, ...restGroupPathParts] = groupPathParts;
 
-  const group_: ConfectApiGroupSpec.ConfectApiGroupSpec.AnyWithProps = Array.reduce(
-    restGroupPathParts,
-    (confectApi as any).spec.groups[firstGroupPathPart as any]!,
-    (currentGroup: any, groupPathPart: any) =>
-      currentGroup.groups[groupPathPart],
-  );
+  const group_: ConfectApiGroupSpec.ConfectApiGroupSpec.AnyWithProps =
+    Array.reduce(
+      restGroupPathParts,
+      (confectApi as any).spec.groups[firstGroupPathPart as any]!,
+      (currentGroup: any, groupPathPart: any) =>
+        currentGroup.groups[groupPathPart],
+    );
 
   const items = Array.empty();
 
@@ -256,12 +257,15 @@ export const ConfectApiGroupService = <GroupPath extends string>({
   );
 
 export declare namespace ConfectApiGroupService {
-  export type FromGroups<Groups extends ConfectApiGroupSpec.ConfectApiGroupSpec.Any> =
-    Groups extends never
-      ? never
-      : Groups extends ConfectApiGroupSpec.ConfectApiGroupSpec.AnyWithProps
-        ? ConfectApiGroupService<ConfectApiGroupSpec.ConfectApiGroupSpec.Name<Groups>>
-        : never;
+  export type FromGroups<
+    Groups extends ConfectApiGroupSpec.ConfectApiGroupSpec.Any,
+  > = Groups extends never
+    ? never
+    : Groups extends ConfectApiGroupSpec.ConfectApiGroupSpec.AnyWithProps
+      ? ConfectApiGroupService<
+          ConfectApiGroupSpec.ConfectApiGroupSpec.Name<Groups>
+        >
+      : never;
 
   export type FromGroupWithPath<
     GroupPath extends string,
