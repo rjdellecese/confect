@@ -11,6 +11,7 @@ export * as UserIdentity from "./api/UserIdentity";
 // server
 export * as ConfectActionRunner from "./server/ConfectActionRunner";
 export * as ConfectApi from "./server/ConfectApi";
+export * as ConfectApiFunctionImpl from "./server/ConfectApiFunctionImpl";
 export * as ConfectApiGroupImpl from "./server/ConfectApiGroupImpl";
 export * as ConfectApiImpl from "./server/ConfectApiImpl";
 export * as ConfectApiServer from "./server/ConfectApiServer";

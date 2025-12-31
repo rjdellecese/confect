@@ -13,7 +13,7 @@ import type * as ConfectApiFunctionSpec from "../api/ConfectApiFunctionSpec";
 import type * as ConfectApiGroupSpec from "../api/ConfectApiGroupSpec";
 import { setNestedProperty } from "../internal/utils";
 import type * as ConfectApi from "./ConfectApi";
-import type * as ConfectApiHandler from "./ConfectApiHandler";
+import type * as ConfectApiFunctionImpl from "./ConfectApiFunctionImpl";
 import * as ConfectApiRegistry from "./ConfectApiRegistry";
 import type * as ConfectSchema from "./ConfectSchema";
 
@@ -36,7 +36,7 @@ export interface Handlers<
     Name extends ConfectApiFunctionSpec.ConfectApiFunctionSpec.Name<Functions>,
   >(
     name: Name,
-    handler: ConfectApiHandler.ConfectApiHandler.WithName<
+    handler: ConfectApiFunctionImpl.ConfectApiFunctionImpl.WithName<
       ConfectSchema_,
       Functions,
       Name
@@ -68,7 +68,10 @@ const makeHandlerItem = <
   handler,
 }: {
   function_: Function;
-  handler: ConfectApiHandler.ConfectApiHandler<ConfectSchema_, Function>;
+  handler: ConfectApiFunctionImpl.ConfectApiFunctionImpl<
+    ConfectSchema_,
+    Function
+  >;
 }): Handlers.Item<ConfectSchema_, Function> =>
   Object.assign(Object.create(HandlerItemProto), { function_, handler });
 
@@ -85,18 +88,17 @@ export declare namespace Handlers {
 
     handle<Name extends string>(
       name: Name,
-      handler: ConfectApiHandler.ConfectApiHandler.AnyWithProps,
+      handler: ConfectApiFunctionImpl.ConfectApiFunctionImpl.AnyWithProps,
     ): AnyWithProps;
   }
 
-  // TODO: `Rename to `ConfectApiFunctionImpl`?
   export interface Item<
     ConfectSchema_ extends ConfectSchema.ConfectSchema.AnyWithProps,
     Function extends ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithProps,
   > {
     readonly [HandlerItemTypeId]: HandlerItemTypeId;
     readonly function_: Function;
-    readonly handler: ConfectApiHandler.ConfectApiHandler<
+    readonly handler: ConfectApiFunctionImpl.ConfectApiFunctionImpl<
       ConfectSchema_,
       Function
     >;
@@ -106,7 +108,7 @@ export declare namespace Handlers {
     // eslint-disable-next-line @typescript-eslint/no-shadow
     export interface AnyWithProps {
       readonly function_: ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithProps;
-      readonly handler: ConfectApiHandler.ConfectApiHandler.AnyWithProps;
+      readonly handler: ConfectApiFunctionImpl.ConfectApiFunctionImpl.AnyWithProps;
     }
   }
 
@@ -137,7 +139,7 @@ const HandlersProto = {
       ConfectApiFunctionSpec.ConfectApiFunctionSpec.AnyWithProps
     >,
     name: string,
-    handler: ConfectApiHandler.ConfectApiHandler.AnyWithProps,
+    handler: ConfectApiFunctionImpl.ConfectApiFunctionImpl.AnyWithProps,
   ) {
     const function_ = this.group.functions[name]!;
     return makeHandlers({
