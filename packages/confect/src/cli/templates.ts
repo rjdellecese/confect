@@ -72,6 +72,29 @@ export const refs = ({ specImportPath }: { specImportPath: string }) =>
     return yield* cbw.toString();
   });
 
+export const api = ({
+  schemaImportPath,
+  specImportPath,
+  test,
+}: {
+  schemaImportPath: string;
+  specImportPath: string;
+  test?: boolean;
+}) =>
+  Effect.gen(function* () {
+    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+
+    yield* cbw.writeLine(
+      `import { ConfectApi } from "${test ? "../../../src/index" : "@rjdellecese/confect"}";`,
+    );
+    yield* cbw.writeLine(`import schema from "${schemaImportPath}";`);
+    yield* cbw.writeLine(`import spec from "${specImportPath}";`);
+    yield* cbw.blankLine();
+    yield* cbw.writeLine(`export default ConfectApi.make(schema, spec);`);
+
+    return yield* cbw.toString();
+  });
+
 export const services = ({
   schemaImportPath,
   test,

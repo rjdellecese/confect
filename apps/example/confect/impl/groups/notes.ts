@@ -1,10 +1,10 @@
 import { ConfectApiBuilder } from "@rjdellecese/confect";
 import { Effect } from "effect";
+import Api from "../../_generated/api";
 import {
   ConfectDatabaseReader,
   ConfectDatabaseWriter,
-} from "../../../convex/confect/services";
-import { Api } from "../../api";
+} from "../../_generated/services";
 
 export const Notes = ConfectApiBuilder.group(Api, "groups.notes", (handlers) =>
   handlers

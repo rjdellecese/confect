@@ -6,9 +6,9 @@ import {
   OpenApi,
 } from "@effect/platform";
 import { Effect, Layer, Schema } from "effect";
-import { Note } from "../../confect/schema/note";
-import { api } from "../../convex/confect/refs";
-import { ConfectQueryRunner } from "../../convex/confect/services";
+import { api } from "../_generated/refs";
+import { ConfectQueryRunner } from "../_generated/services";
+import { Note } from "../tables/note";
 
 class ApiGroup extends HttpApiGroup.make("notes")
   .add(
