@@ -1,4 +1,4 @@
 import { Spec } from "@rjdellecese/confect";
-import { Groups } from "./spec/groups";
+import { groups } from "./spec/groups";
 
-export default Spec.make().add(Groups);
+export default Spec.make().add(groups);

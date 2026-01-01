@@ -1,5 +1,5 @@
 import { GroupSpec } from "@rjdellecese/confect";
-import { Notes } from "./groups/notes";
-import { Random } from "./groups/random";
+import { notes } from "./groups/notes";
+import { random } from "./groups/random";
 
-export const Groups = GroupSpec.make("groups").addGroup(Notes).addGroup(Random);
+export const groups = GroupSpec.make("groups").addGroup(notes).addGroup(random);

@@ -1,7 +1,7 @@
 import { DatabaseSchema } from "@rjdellecese/confect";
-import { Note } from "./tables/note";
-import { Tag } from "./tables/tag";
-import { User } from "./tables/user";
+import { Note } from "./tables/Note";
+import { Tag } from "./tables/Tag";
+import { User } from "./tables/User";
 
 export default DatabaseSchema.make()
   .addTable(Note)

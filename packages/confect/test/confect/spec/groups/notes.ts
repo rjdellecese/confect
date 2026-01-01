@@ -1,8 +1,8 @@
 import { FunctionSpec, GenericId, GroupSpec } from "@rjdellecese/confect";
 import { Schema } from "effect";
-import { Note } from "../../tables/note";
+import { Note } from "../../tables/Note";
 
-export const Notes = GroupSpec.make("notes")
+export const notes = GroupSpec.make("notes")
   .addFunction(
     FunctionSpec.mutation({
       name: "insert",

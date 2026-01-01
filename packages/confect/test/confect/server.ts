@@ -1,14 +1,14 @@
 import { Impl, Server } from "@rjdellecese/confect";
 import { Effect, Layer } from "effect";
 import { api } from "./api";
-import { Groups } from "./api/groups";
-import { Notes } from "./api/groups/notes";
-import { Random } from "./api/groups/random";
+import { groups } from "./impl/groups";
+import { notes } from "./impl/groups/notes";
+import { random } from "./impl/groups/random";
 
 export default Server.make(api).pipe(
   Effect.provide(
     Impl.make(api).pipe(
-      Layer.provide(Groups.pipe(Layer.provide(Notes), Layer.provide(Random))),
+      Layer.provide(groups.pipe(Layer.provide(notes), Layer.provide(random))),
     ),
   ),
   Effect.runSync,

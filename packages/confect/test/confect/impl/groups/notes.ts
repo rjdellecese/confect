@@ -6,7 +6,7 @@ import {
 } from "../../../convex/confect/services";
 import { api } from "../../api";
 
-const Insert = FunctionImpl.make(api, "groups.notes", "insert", ({ text }) =>
+const insert = FunctionImpl.make(api, "groups.notes", "insert", ({ text }) =>
   Effect.gen(function* () {
     const writer = yield* DatabaseWriter;
 
@@ -14,7 +14,7 @@ const Insert = FunctionImpl.make(api, "groups.notes", "insert", ({ text }) =>
   }).pipe(Effect.orDie),
 );
 
-const List = FunctionImpl.make(api, "groups.notes", "list", () =>
+const list = FunctionImpl.make(api, "groups.notes", "list", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
 
@@ -25,17 +25,21 @@ const List = FunctionImpl.make(api, "groups.notes", "list", () =>
   }).pipe(Effect.orDie),
 );
 
-const Delete = FunctionImpl.make(api, "groups.notes", "delete_", ({ noteId }) =>
-  Effect.gen(function* () {
-    const writer = yield* DatabaseWriter;
+const delete_ = FunctionImpl.make(
+  api,
+  "groups.notes",
+  "delete_",
+  ({ noteId }) =>
+    Effect.gen(function* () {
+      const writer = yield* DatabaseWriter;
 
-    yield* writer.delete("notes", noteId);
+      yield* writer.delete("notes", noteId);
 
-    return null;
-  }).pipe(Effect.orDie),
+      return null;
+    }).pipe(Effect.orDie),
 );
 
-const GetFirst = FunctionImpl.make(api, "groups.notes", "getFirst", () =>
+const getFirst = FunctionImpl.make(api, "groups.notes", "getFirst", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
 
@@ -43,7 +47,7 @@ const GetFirst = FunctionImpl.make(api, "groups.notes", "getFirst", () =>
   }).pipe(Effect.orDie),
 );
 
-const InternalGetFirst = FunctionImpl.make(
+const internalGetFirst = FunctionImpl.make(
   api,
   "groups.notes",
   "internalGetFirst",
@@ -55,10 +59,10 @@ const InternalGetFirst = FunctionImpl.make(
     }).pipe(Effect.orDie),
 );
 
-export const Notes = GroupImpl.make(api, "groups.notes").pipe(
-  Layer.provide(Insert),
-  Layer.provide(List),
-  Layer.provide(Delete),
-  Layer.provide(GetFirst),
-  Layer.provide(InternalGetFirst),
+export const notes = GroupImpl.make(api, "groups.notes").pipe(
+  Layer.provide(insert),
+  Layer.provide(list),
+  Layer.provide(delete_),
+  Layer.provide(getFirst),
+  Layer.provide(internalGetFirst),
 );
