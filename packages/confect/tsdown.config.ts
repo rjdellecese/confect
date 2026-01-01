@@ -17,7 +17,7 @@ const createConfig = ({
   dts: true,
   sourcemap: true,
   unbundle: true,
-  format: ["esm", "cjs"],
+  exports: true,
 });
 
 export default defineConfig([

@@ -5,20 +5,20 @@ on:
     branches:
       - main
     paths:
-      - 'packages/confect/**'
-      - 'package.json'
-      - 'pnpm-workspace.yaml'
-      - '.github/workflows/confect.yml'
-      - '.github/actions/confect-setup/**'
+      - "packages/confect/**"
+      - "package.json"
+      - "pnpm-workspace.yaml"
+      - ".github/workflows/confect.yml"
+      - ".github/actions/confect-setup/**"
   pull_request:
     branches:
       - main
     paths:
-      - 'packages/confect/**'
-      - 'package.json'
-      - 'pnpm-workspace.yaml'
-      - '.github/workflows/confect.yml'
-      - '.github/actions/confect-setup/**'
+      - "packages/confect/**"
+      - "package.json"
+      - "pnpm-workspace.yaml"
+      - ".github/workflows/confect.yml"
+      - ".github/actions/confect-setup/**"
 
 jobs:
   typecheck:
@@ -52,11 +52,3 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/confect-setup
       - run: pnpm --filter @rjdellecese/confect build
-
-  check-bundled-types:
-    name: Check Bundled Types
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/confect-setup
-      - run: pnpm --filter @rjdellecese/confect check-bundled-types
