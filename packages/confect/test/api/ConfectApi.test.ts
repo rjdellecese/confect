@@ -96,7 +96,7 @@ type GroupPath = ConfectApiGroupSpec.Path.All<
   ConfectApiSpec.ConfectApiSpec.Groups<Spec>
 >;
 
-const GroupALive = ConfectApiGroupImpl.make(Api, "groupA", (handlers) =>
+const GroupAImpl = ConfectApiGroupImpl.make(Api, "groupA", (handlers) =>
   handlers
     .handle("myFunction", (_args) =>
       Effect.gen(function* () {
@@ -116,7 +116,7 @@ const GroupALive = ConfectApiGroupImpl.make(Api, "groupA", (handlers) =>
     .handle("myFunction2", (args) => Effect.succeed(`foo: ${args.foo}`)),
 );
 
-const GroupBCLive = ConfectApiGroupImpl.make(
+const GroupBCImpl = ConfectApiGroupImpl.make(
   Api,
   "groupB.groupBC",
   (handlers) =>
@@ -125,31 +125,31 @@ const GroupBCLive = ConfectApiGroupImpl.make(
     ),
 );
 
-const GroupBDELive = ConfectApiGroupImpl.make(
+const GroupBDEImpl = ConfectApiGroupImpl.make(
   Api,
   "groupB.groupBD.groupBDE",
   (handlers) =>
     handlers.handle("myFunction5", () => Effect.succeed("myFunction5")),
 );
 
-const GroupBDLive = ConfectApiGroupImpl.make(
+const GroupBDImpl = ConfectApiGroupImpl.make(
   Api,
   "groupB.groupBD",
   (handlers) =>
     handlers.handle("myFunction4", (args) =>
       Effect.succeed(`foo: ${args.foo}`),
     ),
-).pipe(Layer.provide(GroupBDELive));
+).pipe(Layer.provide(GroupBDEImpl));
 
-const GroupBLive = ConfectApiGroupImpl.make(
+const GroupBImpl = ConfectApiGroupImpl.make(
   Api,
   "groupB",
   (handlers) => handlers,
-).pipe(Layer.provide(GroupBCLive), Layer.provide(GroupBDLive));
+).pipe(Layer.provide(GroupBCImpl), Layer.provide(GroupBDImpl));
 
 const ApiImpl = ConfectApiImpl.make(Api).pipe(
-  Layer.provide(GroupALive),
-  Layer.provide(GroupBLive),
+  Layer.provide(GroupAImpl),
+  Layer.provide(GroupBImpl),
 );
 
 const _server = ConfectApiServer.make(Api)
