@@ -11,4 +11,3 @@ test("UserIdentity encoded schema extends Convex type", () => {
 
   expectTypeOf<EncodedUserIdentity>().toExtend<ConvexUserIdentity>();
 });
-

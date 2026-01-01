@@ -1,7 +1,7 @@
 import { describe } from "@effect/vitest";
 import { assertEquals, assertFailure } from "@effect/vitest/utils";
 import { Cause, Effect, Runtime } from "effect";
-import { NoUserIdentityFoundError } from "../src/server/ConfectAuth";
+import { NoUserIdentityFoundError } from "../src/server/Auth";
 import { api } from "./convex/_generated/api";
 import { effect } from "./test_utils";
 import { TestConvexService } from "./TestConvexService";

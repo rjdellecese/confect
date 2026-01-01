@@ -1,6 +1,9 @@
 import { Effect } from "effect";
 import { describe, expect, test } from "vitest";
-import { forEachBranchLeaves, setNestedProperty } from "../../src/internal/utils";
+import {
+  forEachBranchLeaves,
+  setNestedProperty,
+} from "../../src/internal/utils";
 
 describe("setNestedProperty", () => {
   describe("single-level path", () => {

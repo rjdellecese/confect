@@ -1,42 +1,38 @@
-import {
-  ConfectApiFunctionSpec,
-  ConfectApiGroupSpec,
-  GenericId,
-} from "@rjdellecese/confect";
+import { FunctionSpec, GenericId, GroupSpec } from "@rjdellecese/confect";
 import { Schema } from "effect";
-import { Note } from "../../schema/note";
+import { Note } from "../../tables/note";
 
-export const Notes = ConfectApiGroupSpec.make("notes")
+export const Notes = GroupSpec.make("notes")
   .addFunction(
-    ConfectApiFunctionSpec.mutation({
+    FunctionSpec.mutation({
       name: "insert",
       args: Schema.Struct({ text: Schema.String }),
       returns: GenericId.GenericId("notes"),
     }),
   )
   .addFunction(
-    ConfectApiFunctionSpec.query({
+    FunctionSpec.query({
       name: "list",
       args: Schema.Struct({}),
       returns: Schema.Array(Note.Doc),
     }),
   )
   .addFunction(
-    ConfectApiFunctionSpec.mutation({
+    FunctionSpec.mutation({
       name: "delete_",
       args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
       returns: Schema.Null,
     }),
   )
   .addFunction(
-    ConfectApiFunctionSpec.query({
+    FunctionSpec.query({
       name: "getFirst",
       args: Schema.Struct({}),
       returns: Schema.Option(Note.Doc),
     }),
   )
   .addFunction(
-    ConfectApiFunctionSpec.internalQuery({
+    FunctionSpec.internalQuery({
       name: "internalGetFirst",
       args: Schema.Struct({}),
       returns: Schema.Option(Note.Doc),

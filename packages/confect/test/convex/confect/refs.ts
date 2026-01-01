@@ -1,7 +1,7 @@
-import { ConfectApiRefs } from "@rjdellecese/confect";
+import { Refs } from "@rjdellecese/confect";
 import spec from "../../confect/spec";
 
-const refs = ConfectApiRefs.make(spec);
+const refs = Refs.make(spec);
 
-export const api = ConfectApiRefs.justPublic(refs);
-export const internal = ConfectApiRefs.justInternal(refs);
+export const api = Refs.justPublic(refs);
+export const internal = Refs.justInternal(refs);

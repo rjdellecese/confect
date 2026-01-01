@@ -1,8 +1,8 @@
-import { ConfectApiFunctionSpec, ConfectApiGroupSpec } from "@rjdellecese/confect";
+import { FunctionSpec, GroupSpec } from "@rjdellecese/confect";
 import { Schema } from "effect";
 
-export const Random = ConfectApiGroupSpec.make("random").addFunction(
-  ConfectApiFunctionSpec.action({
+export const random = GroupSpec.make("random").addFunction(
+  FunctionSpec.action({
     name: "getNumber",
     args: Schema.Struct({}),
     returns: Schema.Number,

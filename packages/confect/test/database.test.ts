@@ -1,15 +1,15 @@
 import { describe, vi } from "@effect/vitest";
 import { assertEquals, assertFailure, assertTrue } from "@effect/vitest/utils";
 import { Cause, Effect, Exit, Option, Runtime, Schema, String } from "effect";
+import { DocumentDecodeError } from "../src/server/Document";
 import {
-  DocumentDecodeError,
   GetByIdFailure,
   GetByIndexFailure,
-} from "../src/server/database";
+} from "../src/server/QueryInitializer";
 import { api } from "./convex/_generated/api";
 import { confectSchema } from "./convex/schema";
-import { TestConvexService } from "./TestConvexService";
 import { effect } from "./test_utils";
+import { TestConvexService } from "./TestConvexService";
 
 describe("ConfectDatabaseReader", () => {
   describe("getById", () => {

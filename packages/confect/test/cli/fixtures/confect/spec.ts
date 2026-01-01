@@ -1,4 +1,4 @@
-import { ConfectApiSpec } from "@rjdellecese/confect";
+import { Spec } from "@rjdellecese/confect";
 import notes from "./spec/notes";
 
-export default ConfectApiSpec.make().add(notes);
+export default Spec.make().add(notes);

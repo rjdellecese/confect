@@ -1,11 +1,11 @@
 import { describe, expectTypeOf, test } from "vitest";
-import type * as ConfectApiGroupImpl from "../../src/server/ConfectApiGroupImpl";
+import type * as ConfectApiGroupImpl from "../../src/server/GroupImpl";
 
 describe("ConfectApiGroupImpl", () => {
   describe("ConfectApiGroupImpl", () => {
     test("is excludable", () => {
-      type GroupAService = ConfectApiGroupImpl.ConfectApiGroupImpl<"groupA">;
-      type GroupBService = ConfectApiGroupImpl.ConfectApiGroupImpl<"groupB">;
+      type GroupAService = ConfectApiGroupImpl.GroupImpl<"groupA">;
+      type GroupBService = ConfectApiGroupImpl.GroupImpl<"groupB">;
 
       type ExcludedGroupAService = Exclude<
         GroupAService | GroupBService,
@@ -21,4 +21,3 @@ describe("ConfectApiGroupImpl", () => {
     });
   });
 });
-

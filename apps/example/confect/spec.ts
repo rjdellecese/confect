@@ -1,4 +1,4 @@
-import { ConfectApiSpec } from "@rjdellecese/confect";
-import { Groups } from "./spec/groups";
+import { Spec } from "@rjdellecese/confect";
+import { groups } from "./spec/groups";
 
-export default ConfectApiSpec.make().add(Groups);
+export default Spec.make().add(groups);

@@ -1,29 +1,19 @@
-import {
-  ConfectApiFunctionImpl,
-  ConfectApiGroupImpl,
-} from "@rjdellecese/confect";
+import { FunctionImpl, GroupImpl } from "@rjdellecese/confect";
 import { Effect, Layer } from "effect";
 import Api from "../../_generated/api";
-import {
-  ConfectDatabaseReader,
-  ConfectDatabaseWriter,
-} from "../../_generated/services";
+import { DatabaseReader, DatabaseWriter } from "../../_generated/services";
 
-const Insert = ConfectApiFunctionImpl.make(
-  Api,
-  "groups.notes",
-  "insert",
-  ({ text }) =>
-    Effect.gen(function* () {
-      const writer = yield* ConfectDatabaseWriter;
+const insert = FunctionImpl.make(Api, "groups.notes", "insert", ({ text }) =>
+  Effect.gen(function* () {
+    const writer = yield* DatabaseWriter;
 
-      return yield* writer.insert("notes", { text });
-    }).pipe(Effect.orDie),
+    return yield* writer.insert("notes", { text });
+  }).pipe(Effect.orDie),
 );
 
-const List = ConfectApiFunctionImpl.make(Api, "groups.notes", "list", () =>
+const list = FunctionImpl.make(Api, "groups.notes", "list", () =>
   Effect.gen(function* () {
-    const reader = yield* ConfectDatabaseReader;
+    const reader = yield* DatabaseReader;
 
     return yield* reader
       .table("notes")
@@ -32,13 +22,13 @@ const List = ConfectApiFunctionImpl.make(Api, "groups.notes", "list", () =>
   }).pipe(Effect.orDie),
 );
 
-const Delete = ConfectApiFunctionImpl.make(
+const delete_ = FunctionImpl.make(
   Api,
   "groups.notes",
   "delete_",
   ({ noteId }) =>
     Effect.gen(function* () {
-      const writer = yield* ConfectDatabaseWriter;
+      const writer = yield* DatabaseWriter;
 
       yield* writer.delete("notes", noteId);
 
@@ -46,34 +36,30 @@ const Delete = ConfectApiFunctionImpl.make(
     }).pipe(Effect.orDie),
 );
 
-const GetFirst = ConfectApiFunctionImpl.make(
-  Api,
-  "groups.notes",
-  "getFirst",
-  () =>
-    Effect.gen(function* () {
-      const reader = yield* ConfectDatabaseReader;
+const getFirst = FunctionImpl.make(Api, "groups.notes", "getFirst", () =>
+  Effect.gen(function* () {
+    const reader = yield* DatabaseReader;
 
-      return yield* reader.table("notes").index("by_creation_time").first();
-    }).pipe(Effect.orDie),
+    return yield* reader.table("notes").index("by_creation_time").first();
+  }).pipe(Effect.orDie),
 );
 
-const InternalGetFirst = ConfectApiFunctionImpl.make(
+const internalGetFirst = FunctionImpl.make(
   Api,
   "groups.notes",
   "internalGetFirst",
   () =>
     Effect.gen(function* () {
-      const reader = yield* ConfectDatabaseReader;
+      const reader = yield* DatabaseReader;
 
       return yield* reader.table("notes").index("by_creation_time").first();
     }).pipe(Effect.orDie),
 );
 
-export const Notes = ConfectApiGroupImpl.make(Api, "groups.notes").pipe(
-  Layer.provide(Insert),
-  Layer.provide(List),
-  Layer.provide(Delete),
-  Layer.provide(GetFirst),
-  Layer.provide(InternalGetFirst),
+export const notes = GroupImpl.make(Api, "groups.notes").pipe(
+  Layer.provide(insert),
+  Layer.provide(list),
+  Layer.provide(delete_),
+  Layer.provide(getFirst),
+  Layer.provide(internalGetFirst),
 );

@@ -1,5 +1,5 @@
 import { describe, expectTypeOf, test } from "vitest";
-import * as ConfectApiGroupSpec from "../api/ConfectApiGroupSpec";
+import * as ConfectApiGroupSpec from "../../src/api/GroupSpec";
 
 describe("ConfectApiGroupSpec.Path.All", () => {
   test("produces the correct group paths", () => {
@@ -12,7 +12,9 @@ describe("ConfectApiGroupSpec.Path.All", () => {
         ),
       );
 
-    type AllPaths = ConfectApiGroupSpec.Path.All<typeof _GroupA | typeof _GroupB>;
+    type AllPaths = ConfectApiGroupSpec.Path.All<
+      typeof _GroupA | typeof _GroupB
+    >;
 
     expectTypeOf<AllPaths>().toEqualTypeOf<
       | "groupA"
@@ -28,4 +30,3 @@ describe("ConfectApiGroupSpec.Path.All", () => {
     expectTypeOf<AllPaths>().not.toExtend<"groupB.groupA">();
   });
 });
-

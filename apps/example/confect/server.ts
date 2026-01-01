@@ -1,14 +1,14 @@
-import { ConfectApiImpl, ConfectApiServer } from "@rjdellecese/confect";
+import { Impl, Server } from "@rjdellecese/confect";
 import { Effect, Layer } from "effect";
-import Api from "./_generated/api";
-import { Groups } from "./impl/groups";
-import { Notes } from "./impl/groups/notes";
-import { Random } from "./impl/groups/random";
+import api from "./_generated/api";
+import { groups } from "./impl/groups";
+import { notes } from "./impl/groups/notes";
+import { random } from "./impl/groups/random";
 
-export default ConfectApiServer.make(Api).pipe(
+export default Server.make(api).pipe(
   Effect.provide(
-    ConfectApiImpl.make(Api).pipe(
-      Layer.provide(Groups.pipe(Layer.provide(Notes), Layer.provide(Random))),
+    Impl.make(api).pipe(
+      Layer.provide(groups.pipe(Layer.provide(notes), Layer.provide(random))),
     ),
   ),
   Effect.runSync,

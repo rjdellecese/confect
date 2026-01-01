@@ -8,8 +8,8 @@ import type { GenericValidator } from "convex/values";
 import { Schema } from "effect";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
-import type { ExtendWithSystemFields } from "../api/SystemFields";
-import * as ConfectTable from "../server/ConfectTable";
+import type { ExtendWithSystemFields } from "../../src/api/SystemFields";
+import * as ConfectTable from "../../src/server/Table";
 
 const NoteSchema = Schema.Struct({
   content: Schema.String,
@@ -22,25 +22,19 @@ const UserSchema = Schema.Struct({
   active: Schema.Boolean,
 });
 
-const notesTable = ConfectTable.make({
-  name: "notes",
-  fields: NoteSchema,
-}).index("by_priority", ["priority"]);
+const notesTable = ConfectTable.make("notes", NoteSchema).index("by_priority", ["priority"]);
 
-const usersTable = ConfectTable.make({
-  name: "users",
-  fields: UserSchema,
-})
+const usersTable = ConfectTable.make("users", UserSchema)
   .index("by_username", ["username"])
   .searchIndex("search_email", { searchField: "email", filterFields: [] });
 
-const _embeddingsTable = ConfectTable.make({
-  name: "embeddings",
-  fields: Schema.Struct({
+const _embeddingsTable = ConfectTable.make(
+  "embeddings",
+  Schema.Struct({
     embedding: Schema.Array(Schema.Number),
     category: Schema.String,
   }),
-}).vectorIndex("by_embedding", {
+).vectorIndex("by_embedding", {
   vectorField: "embedding",
   dimensions: 1536,
   filterFields: ["category"],
@@ -52,35 +46,33 @@ type EmbeddingsTable = typeof _embeddingsTable;
 
 describe("TypeId", () => {
   test("is the expected string literal", () => {
-    type Expected = "@rjdellecese/confect/server/ConfectTable";
+    type Expected = "@rjdellecese/confect/server/Table";
     expectTypeOf<ConfectTable.TypeId>().toEqualTypeOf<Expected>();
   });
 
   test("runtime value matches type", () => {
-    expect(ConfectTable.TypeId).toBe(
-      "@rjdellecese/confect/server/ConfectTable",
-    );
+    expect(ConfectTable.TypeId).toBe("@rjdellecese/confect/server/Table");
   });
 });
 
 describe("isConfectTable", () => {
   test("returns true for ConfectTable instances", () => {
-    expect(ConfectTable.isConfectTable(notesTable)).toBe(true);
-    expect(ConfectTable.isConfectTable(usersTable)).toBe(true);
+    expect(ConfectTable.isTable(notesTable)).toBe(true);
+    expect(ConfectTable.isTable(usersTable)).toBe(true);
   });
 
   test("returns false for non-ConfectTable values", () => {
-    expect(ConfectTable.isConfectTable({})).toBe(false);
-    expect(ConfectTable.isConfectTable(null)).toBe(false);
-    expect(ConfectTable.isConfectTable(undefined)).toBe(false);
-    expect(ConfectTable.isConfectTable("string")).toBe(false);
-    expect(ConfectTable.isConfectTable(123)).toBe(false);
+    expect(ConfectTable.isTable({})).toBe(false);
+    expect(ConfectTable.isTable(null)).toBe(false);
+    expect(ConfectTable.isTable(undefined)).toBe(false);
+    expect(ConfectTable.isTable("string")).toBe(false);
+    expect(ConfectTable.isTable(123)).toBe(false);
   });
 
   test("is a type guard for ConfectTable.Any", () => {
     const maybeTable: unknown = notesTable;
-    if (ConfectTable.isConfectTable(maybeTable)) {
-      expectTypeOf(maybeTable).toExtend<ConfectTable.ConfectTable.Any>();
+    if (ConfectTable.isTable(maybeTable)) {
+      expectTypeOf(maybeTable).toExtend<ConfectTable.Table.Any>();
     }
   });
 });
@@ -165,10 +157,10 @@ describe("ConfectTable interface", () => {
 
 describe("ConfectTable.index", () => {
   test("adds index to the indexes record", () => {
-    const _tableWithIndex = ConfectTable.make({
-      name: "test",
-      fields: Schema.Struct({ field1: Schema.String }),
-    }).index("by_field1", ["field1"]);
+    const _tableWithIndex = ConfectTable.make(
+      "test",
+      Schema.Struct({ field1: Schema.String }),
+    ).index("by_field1", ["field1"]);
 
     expectTypeOf<
       (typeof _tableWithIndex)["indexes"]["by_field1"]
@@ -176,13 +168,13 @@ describe("ConfectTable.index", () => {
   });
 
   test("can chain multiple indexes", () => {
-    const _tableWithIndexes = ConfectTable.make({
-      name: "test",
-      fields: Schema.Struct({
+    const _tableWithIndexes = ConfectTable.make(
+      "test",
+      Schema.Struct({
         field1: Schema.String,
         field2: Schema.Number,
       }),
-    })
+    )
       .index("by_field1", ["field1"])
       .index("by_field2", ["field2"]);
 
@@ -195,13 +187,13 @@ describe("ConfectTable.index", () => {
   });
 
   test("supports compound indexes", () => {
-    const _tableWithCompoundIndex = ConfectTable.make({
-      name: "test",
-      fields: Schema.Struct({
+    const _tableWithCompoundIndex = ConfectTable.make(
+      "test",
+      Schema.Struct({
         field1: Schema.String,
         field2: Schema.Number,
       }),
-    }).index("by_field1_and_field2", ["field1", "field2"]);
+    ).index("by_field1_and_field2", ["field1", "field2"]);
 
     expectTypeOf<
       (typeof _tableWithCompoundIndex)["indexes"]["by_field1_and_field2"]
@@ -209,10 +201,10 @@ describe("ConfectTable.index", () => {
   });
 
   test("supports indexing on system fields", () => {
-    const _tableWithSystemFieldIndex = ConfectTable.make({
-      name: "test",
-      fields: Schema.Struct({ field1: Schema.String }),
-    }).index("by_creation_time", ["_creationTime"]);
+    const _tableWithSystemFieldIndex = ConfectTable.make(
+      "test",
+      Schema.Struct({ field1: Schema.String }),
+    ).index("by_creation_time", ["_creationTime"]);
 
     expectTypeOf<
       (typeof _tableWithSystemFieldIndex)["indexes"]["by_creation_time"]
@@ -222,29 +214,29 @@ describe("ConfectTable.index", () => {
 
 describe("ConfectTable.searchIndex", () => {
   test("adds search index to the table definition", () => {
-    const tableWithSearch = ConfectTable.make({
-      name: "test",
-      fields: Schema.Struct({
+    const tableWithSearch = ConfectTable.make(
+      "test",
+      Schema.Struct({
         content: Schema.String,
         category: Schema.String,
       }),
-    }).searchIndex("search_content", {
+    ).searchIndex("search_content", {
       searchField: "content",
       filterFields: ["category"],
     });
 
-    expectTypeOf(tableWithSearch).toExtend<ConfectTable.ConfectTable.Any>();
+    expectTypeOf(tableWithSearch).toExtend<ConfectTable.Table.Any>();
     expect(tableWithSearch.name).toBe("test");
   });
 
   test("can be chained with index", () => {
-    const _table = ConfectTable.make({
-      name: "test",
-      fields: Schema.Struct({
+    const _table = ConfectTable.make(
+      "test",
+      Schema.Struct({
         content: Schema.String,
         category: Schema.String,
       }),
-    })
+    )
       .index("by_category", ["category"])
       .searchIndex("search_content", {
         searchField: "content",
@@ -259,31 +251,31 @@ describe("ConfectTable.searchIndex", () => {
 
 describe("ConfectTable.vectorIndex", () => {
   test("adds vector index to the table definition", () => {
-    const tableWithVector = ConfectTable.make({
-      name: "test",
-      fields: Schema.Struct({
+    const tableWithVector = ConfectTable.make(
+      "test",
+      Schema.Struct({
         embedding: Schema.Array(Schema.Number),
         category: Schema.String,
       }),
-    }).vectorIndex("by_embedding", {
+    ).vectorIndex("by_embedding", {
       vectorField: "embedding",
       dimensions: 1536,
       filterFields: ["category"],
     });
 
-    expectTypeOf(tableWithVector).toExtend<ConfectTable.ConfectTable.Any>();
+    expectTypeOf(tableWithVector).toExtend<ConfectTable.Table.Any>();
     expect(tableWithVector.name).toBe("test");
   });
 
   test("can be chained with index and searchIndex", () => {
-    const _table = ConfectTable.make({
-      name: "test",
-      fields: Schema.Struct({
+    const _table = ConfectTable.make(
+      "test",
+      Schema.Struct({
         embedding: Schema.Array(Schema.Number),
         content: Schema.String,
         category: Schema.String,
       }),
-    })
+    )
       .index("by_category", ["category"])
       .searchIndex("search_content", {
         searchField: "content",
@@ -303,38 +295,38 @@ describe("ConfectTable.vectorIndex", () => {
 describe("ConfectTable.Any", () => {
   test("has TypeId property", () => {
     type TypeIdKey = typeof ConfectTable.TypeId;
-    type Any = ConfectTable.ConfectTable.Any;
+    type Any = ConfectTable.Table.Any;
     expectTypeOf<Any[TypeIdKey]>().toEqualTypeOf<typeof ConfectTable.TypeId>();
   });
 
   test("ConfectTable extends Any", () => {
-    expectTypeOf<NotesTable>().toExtend<ConfectTable.ConfectTable.Any>();
+    expectTypeOf<NotesTable>().toExtend<ConfectTable.Table.Any>();
   });
 
   test("UsersTable extends Any", () => {
-    expectTypeOf<UsersTable>().toExtend<ConfectTable.ConfectTable.Any>();
+    expectTypeOf<UsersTable>().toExtend<ConfectTable.Table.Any>();
   });
 });
 
 describe("ConfectTable.AnyWithProps", () => {
   test("extends Any", () => {
-    expectTypeOf<ConfectTable.ConfectTable.AnyWithProps>().toExtend<ConfectTable.ConfectTable.Any>();
+    expectTypeOf<ConfectTable.Table.AnyWithProps>().toExtend<ConfectTable.Table.Any>();
   });
 
   test("has name property", () => {
-    type AnyWithProps = ConfectTable.ConfectTable.AnyWithProps;
+    type AnyWithProps = ConfectTable.Table.AnyWithProps;
     expectTypeOf<AnyWithProps["name"]>().toExtend<string>();
   });
 
   test("has Fields property", () => {
-    type AnyWithProps = ConfectTable.ConfectTable.AnyWithProps;
+    type AnyWithProps = ConfectTable.Table.AnyWithProps;
     expectTypeOf<
       AnyWithProps["Fields"]
     >().toExtend<Schema.Schema.AnyNoContext>();
   });
 
   test("has tableDefinition property", () => {
-    type AnyWithProps = ConfectTable.ConfectTable.AnyWithProps;
+    type AnyWithProps = ConfectTable.Table.AnyWithProps;
     expectTypeOf<AnyWithProps["tableDefinition"]>().toExtend<
       TableDefinition<
         GenericValidator,
@@ -346,89 +338,89 @@ describe("ConfectTable.AnyWithProps", () => {
   });
 
   test("has indexes property", () => {
-    type AnyWithProps = ConfectTable.ConfectTable.AnyWithProps;
+    type AnyWithProps = ConfectTable.Table.AnyWithProps;
     expectTypeOf<AnyWithProps["indexes"]>().toExtend<GenericTableIndexes>();
   });
 
   test("ConfectTable extends AnyWithProps", () => {
-    expectTypeOf<NotesTable>().toExtend<ConfectTable.ConfectTable.AnyWithProps>();
+    expectTypeOf<NotesTable>().toExtend<ConfectTable.Table.AnyWithProps>();
   });
 });
 
 describe("ConfectTable.Name", () => {
   test("extracts table name from NotesTable", () => {
-    type Name = ConfectTable.ConfectTable.Name<NotesTable>;
+    type Name = ConfectTable.Table.Name<NotesTable>;
     expectTypeOf<Name>().toEqualTypeOf<"notes">();
   });
 
   test("extracts table name from UsersTable", () => {
-    type Name = ConfectTable.ConfectTable.Name<UsersTable>;
+    type Name = ConfectTable.Table.Name<UsersTable>;
     expectTypeOf<Name>().toEqualTypeOf<"users">();
   });
 
   test("extracts table name from EmbeddingsTable", () => {
-    type Name = ConfectTable.ConfectTable.Name<EmbeddingsTable>;
+    type Name = ConfectTable.Table.Name<EmbeddingsTable>;
     expectTypeOf<Name>().toEqualTypeOf<"embeddings">();
   });
 });
 
 describe("ConfectTable.TableSchema", () => {
   test("extracts TableSchema from NotesTable", () => {
-    type TableSchema = ConfectTable.ConfectTable.TableSchema<NotesTable>;
+    type TableSchema = ConfectTable.Table.TableSchema<NotesTable>;
     expectTypeOf<TableSchema>().toEqualTypeOf<typeof NoteSchema>();
   });
 
   test("extracts TableSchema from UsersTable", () => {
-    type TableSchema = ConfectTable.ConfectTable.TableSchema<UsersTable>;
+    type TableSchema = ConfectTable.Table.TableSchema<UsersTable>;
     expectTypeOf<TableSchema>().toEqualTypeOf<typeof UserSchema>();
   });
 });
 
 describe("ConfectTable.TableValidator", () => {
   test("extracts TableValidator from NotesTable", () => {
-    type TableValidator = ConfectTable.ConfectTable.TableValidator<NotesTable>;
+    type TableValidator = ConfectTable.Table.TableValidator<NotesTable>;
     expectTypeOf<TableValidator>().toExtend<GenericValidator>();
   });
 
   test("extracts TableValidator from UsersTable", () => {
-    type TableValidator = ConfectTable.ConfectTable.TableValidator<UsersTable>;
+    type TableValidator = ConfectTable.Table.TableValidator<UsersTable>;
     expectTypeOf<TableValidator>().toExtend<GenericValidator>();
   });
 });
 
 describe("ConfectTable.Indexes", () => {
   test("extracts Indexes from NotesTable", () => {
-    type Indexes = ConfectTable.ConfectTable.Indexes<NotesTable>;
+    type Indexes = ConfectTable.Table.Indexes<NotesTable>;
     expectTypeOf<Indexes>().toEqualTypeOf<{
       by_priority: ["priority", "_creationTime"];
     }>();
   });
 
   test("extracts Indexes from UsersTable", () => {
-    type Indexes = ConfectTable.ConfectTable.Indexes<UsersTable>;
+    type Indexes = ConfectTable.Table.Indexes<UsersTable>;
     expectTypeOf<Indexes>().toEqualTypeOf<{
       by_username: ["username", "_creationTime"];
     }>();
   });
 
   test("extracts empty Indexes from table without indexes", () => {
-    const _tableNoIndexes = ConfectTable.make({
-      name: "no_indexes",
-      fields: Schema.Struct({ field: Schema.String }),
-    });
-    type Indexes = ConfectTable.ConfectTable.Indexes<typeof _tableNoIndexes>;
+    const _tableNoIndexes = ConfectTable.make(
+      "no_indexes",
+      Schema.Struct({ field: Schema.String }),
+    );
+    type Indexes = ConfectTable.Table.Indexes<typeof _tableNoIndexes>;
     expectTypeOf<Indexes>().toEqualTypeOf<{}>();
   });
 });
 
 describe("ConfectTable.SearchIndexes", () => {
   test("extracts SearchIndexes from NotesTable (empty)", () => {
-    type SearchIndexes = ConfectTable.ConfectTable.SearchIndexes<NotesTable>;
+    type SearchIndexes = ConfectTable.Table.SearchIndexes<NotesTable>;
     expectTypeOf<SearchIndexes>().toEqualTypeOf<{}>();
   });
 
   test("extracts SearchIndexes from UsersTable", () => {
-    type SearchIndexes = ConfectTable.ConfectTable.SearchIndexes<UsersTable>;
+    type SearchIndexes = ConfectTable.Table.SearchIndexes<UsersTable>;
     expectTypeOf<SearchIndexes>().toEqualTypeOf<{
       search_email: {
         searchField: "email";
@@ -440,13 +432,12 @@ describe("ConfectTable.SearchIndexes", () => {
 
 describe("ConfectTable.VectorIndexes", () => {
   test("extracts VectorIndexes from NotesTable (empty)", () => {
-    type VectorIndexes = ConfectTable.ConfectTable.VectorIndexes<NotesTable>;
+    type VectorIndexes = ConfectTable.Table.VectorIndexes<NotesTable>;
     expectTypeOf<VectorIndexes>().toEqualTypeOf<{}>();
   });
 
   test("extracts VectorIndexes from EmbeddingsTable", () => {
-    type VectorIndexes =
-      ConfectTable.ConfectTable.VectorIndexes<EmbeddingsTable>;
+    type VectorIndexes = ConfectTable.Table.VectorIndexes<EmbeddingsTable>;
     expectTypeOf<VectorIndexes>().toEqualTypeOf<{
       by_embedding: {
         vectorField: "embedding";
@@ -459,14 +450,14 @@ describe("ConfectTable.VectorIndexes", () => {
 
 describe("ConfectTable.Doc", () => {
   test("extracts Doc type from NotesTable", () => {
-    type Doc = ConfectTable.ConfectTable.Doc<NotesTable>;
+    type Doc = ConfectTable.Table.Doc<NotesTable>;
     expectTypeOf<Doc>().toEqualTypeOf<
       ExtendWithSystemFields<"notes", typeof NoteSchema>
     >();
   });
 
   test("extracts Doc type from UsersTable", () => {
-    type Doc = ConfectTable.ConfectTable.Doc<UsersTable>;
+    type Doc = ConfectTable.Table.Doc<UsersTable>;
     expectTypeOf<Doc>().toEqualTypeOf<
       ExtendWithSystemFields<"users", typeof UserSchema>
     >();
@@ -475,12 +466,12 @@ describe("ConfectTable.Doc", () => {
 
 describe("ConfectTable.Fields", () => {
   test("extracts Fields from NotesTable", () => {
-    type Fields = ConfectTable.ConfectTable.Fields<NotesTable>;
+    type Fields = ConfectTable.Table.Fields<NotesTable>;
     expectTypeOf<Fields>().toEqualTypeOf<typeof NoteSchema>();
   });
 
   test("extracts Fields from UsersTable", () => {
-    type Fields = ConfectTable.ConfectTable.Fields<UsersTable>;
+    type Fields = ConfectTable.Table.Fields<UsersTable>;
     expectTypeOf<Fields>().toEqualTypeOf<typeof UserSchema>();
   });
 });
@@ -489,17 +480,17 @@ describe("ConfectTable.WithName", () => {
   type AllTables = NotesTable | UsersTable | EmbeddingsTable;
 
   test("extracts NotesTable by name", () => {
-    type Result = ConfectTable.ConfectTable.WithName<AllTables, "notes">;
+    type Result = ConfectTable.Table.WithName<AllTables, "notes">;
     expectTypeOf<Result>().toEqualTypeOf<NotesTable>();
   });
 
   test("extracts UsersTable by name", () => {
-    type Result = ConfectTable.ConfectTable.WithName<AllTables, "users">;
+    type Result = ConfectTable.Table.WithName<AllTables, "users">;
     expectTypeOf<Result>().toEqualTypeOf<UsersTable>();
   });
 
   test("extracts EmbeddingsTable by name", () => {
-    type Result = ConfectTable.ConfectTable.WithName<AllTables, "embeddings">;
+    type Result = ConfectTable.Table.WithName<AllTables, "embeddings">;
     expectTypeOf<Result>().toEqualTypeOf<EmbeddingsTable>();
   });
 });
@@ -508,12 +499,12 @@ describe("ConfectTable.TablesRecord", () => {
   type AllTables = NotesTable | UsersTable;
 
   test("creates record keyed by table name", () => {
-    type Record = ConfectTable.ConfectTable.TablesRecord<AllTables>;
+    type Record = ConfectTable.Table.TablesRecord<AllTables>;
     expectTypeOf<keyof Record>().toEqualTypeOf<"notes" | "users">();
   });
 
   test("record values are the correct tables", () => {
-    type Record = ConfectTable.ConfectTable.TablesRecord<AllTables>;
+    type Record = ConfectTable.Table.TablesRecord<AllTables>;
     expectTypeOf<Record["notes"]>().toEqualTypeOf<NotesTable>();
     expectTypeOf<Record["users"]>().toEqualTypeOf<UsersTable>();
   });
@@ -521,10 +512,10 @@ describe("ConfectTable.TablesRecord", () => {
 
 describe("make", () => {
   test("creates ConfectTable with correct name", () => {
-    const table = ConfectTable.make({
-      name: "test_table",
-      fields: Schema.Struct({ field: Schema.String }),
-    });
+    const table = ConfectTable.make(
+      "test_table",
+      Schema.Struct({ field: Schema.String }),
+    );
 
     expect(table.name).toBe("test_table");
     expectTypeOf<(typeof table)["name"]>().toEqualTypeOf<"test_table">();
@@ -532,30 +523,27 @@ describe("make", () => {
 
   test("creates ConfectTable with correct Fields", () => {
     const fields = Schema.Struct({ field: Schema.String });
-    const _table = ConfectTable.make({
-      name: "test_table",
-      fields,
-    });
+    const _table = ConfectTable.make("test_table", fields);
 
     expectTypeOf<(typeof _table)["Fields"]>().toEqualTypeOf<typeof fields>();
   });
 
   test("creates ConfectTable with empty indexes", () => {
-    const table = ConfectTable.make({
-      name: "test_table",
-      fields: Schema.Struct({ field: Schema.String }),
-    });
+    const table = ConfectTable.make(
+      "test_table",
+      Schema.Struct({ field: Schema.String }),
+    );
 
     expect(table.indexes).toEqual({});
   });
 
   test("returns a ConfectTable that passes isConfectTable", () => {
-    const table = ConfectTable.make({
-      name: "test_table",
-      fields: Schema.Struct({ field: Schema.String }),
-    });
+    const table = ConfectTable.make(
+      "test_table",
+      Schema.Struct({ field: Schema.String }),
+    );
 
-    expect(ConfectTable.isConfectTable(table)).toBe(true);
+    expect(ConfectTable.isTable(table)).toBe(true);
   });
 });
 
@@ -568,9 +556,9 @@ describe("System tables", () => {
     });
 
     test("is a ConfectTable", () => {
-      expect(
-        ConfectTable.isConfectTable(ConfectTable.scheduledFunctionsTable),
-      ).toBe(true);
+      expect(ConfectTable.isTable(ConfectTable.scheduledFunctionsTable)).toBe(
+        true,
+      );
     });
 
     test("has correct name type", () => {
@@ -586,7 +574,7 @@ describe("System tables", () => {
     });
 
     test("is a ConfectTable", () => {
-      expect(ConfectTable.isConfectTable(ConfectTable.storageTable)).toBe(true);
+      expect(ConfectTable.isTable(ConfectTable.storageTable)).toBe(true);
     });
 
     test("has correct name type", () => {
@@ -596,36 +584,36 @@ describe("System tables", () => {
     });
   });
 
-  describe("confectSystemTables", () => {
+  describe("systemTables", () => {
     test("contains _scheduled_functions", () => {
-      expect(ConfectTable.confectSystemTables._scheduled_functions).toBe(
+      expect(ConfectTable.systemTables._scheduled_functions).toBe(
         ConfectTable.scheduledFunctionsTable,
       );
     });
 
     test("contains _storage", () => {
-      expect(ConfectTable.confectSystemTables._storage).toBe(
+      expect(ConfectTable.systemTables._storage).toBe(
         ConfectTable.storageTable,
       );
     });
 
     test("has correct keys", () => {
-      expectTypeOf<
-        keyof typeof ConfectTable.confectSystemTables
-      >().toEqualTypeOf<"_scheduled_functions" | "_storage">();
+      expectTypeOf<keyof typeof ConfectTable.systemTables>().toEqualTypeOf<
+        "_scheduled_functions" | "_storage"
+      >();
     });
   });
 
   describe("ConfectSystemTables type", () => {
     test("is union of system tables", () => {
-      expectTypeOf<ConfectTable.ConfectSystemTables>().toEqualTypeOf<
+      expectTypeOf<ConfectTable.SystemTables>().toEqualTypeOf<
         | typeof ConfectTable.scheduledFunctionsTable
         | typeof ConfectTable.storageTable
       >();
     });
 
     test("extends ConfectTable.Any", () => {
-      expectTypeOf<ConfectTable.ConfectSystemTables>().toExtend<ConfectTable.ConfectTable.Any>();
+      expectTypeOf<ConfectTable.SystemTables>().toExtend<ConfectTable.Table.Any>();
     });
   });
 });
@@ -634,30 +622,30 @@ describe("System tables", () => {
 
 describe("Edge cases", () => {
   describe("table with optional fields", () => {
-    const tableWithOptional = ConfectTable.make({
-      name: "with_optional",
-      fields: Schema.Struct({
+    const tableWithOptional = ConfectTable.make(
+      "with_optional",
+      Schema.Struct({
         required: Schema.String,
         optional: Schema.optional(Schema.Number),
       }),
-    });
+    );
 
     test("creates table successfully", () => {
       expect(tableWithOptional.name).toBe("with_optional");
-      expect(ConfectTable.isConfectTable(tableWithOptional)).toBe(true);
+      expect(ConfectTable.isTable(tableWithOptional)).toBe(true);
     });
   });
 
   describe("table with nested struct", () => {
-    const tableWithNested = ConfectTable.make({
-      name: "with_nested",
-      fields: Schema.Struct({
+    const tableWithNested = ConfectTable.make(
+      "with_nested",
+      Schema.Struct({
         nested: Schema.Struct({
           inner: Schema.String,
           value: Schema.Number,
         }),
       }),
-    });
+    );
 
     test("creates table successfully", () => {
       expect(tableWithNested.name).toBe("with_nested");
@@ -665,13 +653,13 @@ describe("Edge cases", () => {
   });
 
   describe("table with array fields", () => {
-    const tableWithArray = ConfectTable.make({
-      name: "with_array",
-      fields: Schema.Struct({
+    const tableWithArray = ConfectTable.make(
+      "with_array",
+      Schema.Struct({
         items: Schema.Array(Schema.String),
         numbers: Schema.Array(Schema.Number),
       }),
-    });
+    );
 
     test("creates table successfully", () => {
       expect(tableWithArray.name).toBe("with_array");
@@ -679,16 +667,16 @@ describe("Edge cases", () => {
   });
 
   describe("table with union fields", () => {
-    const tableWithUnion = ConfectTable.make({
-      name: "with_union",
-      fields: Schema.Struct({
+    const tableWithUnion = ConfectTable.make(
+      "with_union",
+      Schema.Struct({
         status: Schema.Union(
           Schema.Literal("pending"),
           Schema.Literal("active"),
           Schema.Literal("completed"),
         ),
       }),
-    });
+    );
 
     test("creates table successfully", () => {
       expect(tableWithUnion.name).toBe("with_union");
@@ -696,15 +684,15 @@ describe("Edge cases", () => {
   });
 
   describe("chaining all index types", () => {
-    const fullTable = ConfectTable.make({
-      name: "full",
-      fields: Schema.Struct({
+    const fullTable = ConfectTable.make(
+      "full",
+      Schema.Struct({
         field1: Schema.String,
         field2: Schema.Number,
         embedding: Schema.Array(Schema.Number),
         searchable: Schema.String,
       }),
-    })
+    )
       .index("by_field1", ["field1"])
       .index("by_field2", ["field2"])
       .searchIndex("search", { searchField: "searchable", filterFields: [] })
@@ -723,15 +711,15 @@ describe("Edge cases", () => {
     });
 
     test("is still a ConfectTable", () => {
-      expect(ConfectTable.isConfectTable(fullTable)).toBe(true);
+      expect(ConfectTable.isTable(fullTable)).toBe(true);
     });
   });
 
   describe("preserves table identity through chaining", () => {
-    const baseTable = ConfectTable.make({
-      name: "base",
-      fields: Schema.Struct({ field: Schema.String }),
-    });
+    const baseTable = ConfectTable.make(
+      "base",
+      Schema.Struct({ field: Schema.String }),
+    );
 
     const withIndex = baseTable.index("by_field", ["field"]);
 
@@ -746,8 +734,7 @@ describe("Edge cases", () => {
     });
 
     test("chained table is a ConfectTable", () => {
-      expect(ConfectTable.isConfectTable(withIndex)).toBe(true);
+      expect(ConfectTable.isTable(withIndex)).toBe(true);
     });
   });
 });
-

@@ -5,7 +5,7 @@ import {
   assertInstanceOf,
 } from "@effect/vitest/utils";
 import { Cause, Effect, Runtime, Schema } from "effect";
-import { FileNotFoundError } from "../src/server/ConfectStorage";
+import { FileNotFoundError } from "../src/server/Storage";
 import { api } from "./convex/_generated/api";
 import { effect } from "./test_utils";
 import { TestConvexService } from "./TestConvexService";

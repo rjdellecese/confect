@@ -3,42 +3,39 @@ import type { GenericId } from "convex/values";
 import { Schema } from "effect";
 import { describe, expectTypeOf, test } from "vitest";
 
-import type {
-  DataModelFromConfectDataModel,
-  GenericConfectDataModel,
-} from "../src/server/ConfectDataModel";
-import {
-  type ConfectDataModelFromConfectSchema,
-  type ConfectSchemaFromConfectSchemaDefinition,
-  defineConfectTable,
-  type GenericConfectSchema,
-  make,
-} from "../src/server/ConfectSchema";
-import type * as ConfectTableInfo from "../src/server/ConfectTableInfo";
+import type * as DataModel from "../src/server/DataModel";
+import * as DatabaseSchema from "../src/server/DatabaseSchema";
+import * as Table from "../src/server/Table";
+import type * as TableInfo from "../src/server/TableInfo";
 
-describe("ConfectDataModelFromConfectSchema", () => {
-  test("extends GenericConfectDataModel and equals correct document and confectDocument types", () => {
+describe("DataModel.FromSchema", () => {
+  test("extends GenericConfectDataModel and equals correct document and document types", () => {
     const TableSchema = Schema.Struct({
       content: Schema.String,
     });
-    const confectTableDefinition = defineConfectTable({
-      name: "notes",
-      fields: TableSchema,
-    });
-    const _confectSchemaDefinition = make(confectTableDefinition);
-    type ConfectSchema = ConfectSchemaFromConfectSchemaDefinition<
-      typeof _confectSchemaDefinition
+    const confectTableDefinition = Table.make("notes", TableSchema);
+    const confectSchema = DatabaseSchema.make().addTable(confectTableDefinition);
+    type ConfectDataModel = DataModel.DataModel.FromSchema<
+      typeof confectSchema
     >;
 
-    type ConfectDataModel = ConfectDataModelFromConfectSchema<ConfectSchema>;
-
-    expectTypeOf<ConfectDataModel>().toExtend<GenericConfectDataModel>();
-    expectTypeOf<ConfectDataModel["notes"]["confectDocument"]>().toEqualTypeOf<{
+    expectTypeOf<ConfectDataModel>().toExtend<DataModel.DataModel.Any>();
+    expectTypeOf<
+      DataModel.DataModel.TableInfoWithName_<
+        ConfectDataModel,
+        "notes"
+      >["document"]
+    >().toEqualTypeOf<{
       readonly _id: GenericId<"notes">;
       readonly _creationTime: number;
       readonly content: string;
     }>();
-    expectTypeOf<ConfectDataModel["notes"]["convexDocument"]>().toEqualTypeOf<{
+    expectTypeOf<
+      DataModel.DataModel.TableInfoWithName_<
+        ConfectDataModel,
+        "notes"
+      >["convexDocument"]
+    >().toEqualTypeOf<{
       _id: GenericId<"notes">;
       _creationTime: number;
       content: string;
@@ -46,65 +43,52 @@ describe("ConfectDataModelFromConfectSchema", () => {
   });
 });
 
-describe("ConfectSchemaFromConfectSchemaDefinition", () => {
-  test("extends GenericConfectSchema", () => {
+describe("DatabaseSchema.Any", () => {
+  test("extends DatabaseSchema.Any", () => {
     const NoteSchema = Schema.Struct({
       content: Schema.String,
     });
-    const notesTableDefinition = defineConfectTable({
-      name: "notes",
-      fields: NoteSchema,
-    });
-    const _schemaDefinition = make(notesTableDefinition);
+    const notesTable = Table.make("notes", NoteSchema);
+    const confectSchema = DatabaseSchema.make().addTable(notesTable);
 
-    type ConfectSchema = ConfectSchemaFromConfectSchemaDefinition<
-      typeof _schemaDefinition
-    >;
-
-    expectTypeOf<ConfectSchema>().toExtend<GenericConfectSchema>();
+    expectTypeOf<typeof confectSchema>().toExtend<DatabaseSchema.DatabaseSchema.Any>();
   });
 });
 
-describe("ConfectTableInfo.TableInfo", () => {
+describe("TableInfo.TableInfo.TableInfo", () => {
   test("extends GenericTableInfo", () => {
     const TableSchema = Schema.Struct({
       content: Schema.String,
     });
-    const confectTableDefinition = defineConfectTable({
-      name: "notes",
-      fields: TableSchema,
-    });
-    const _confectSchemaDefinition = make(confectTableDefinition);
-    type ConfectSchema = ConfectSchemaFromConfectSchemaDefinition<
-      typeof _confectSchemaDefinition
+    const confectTableDefinition = Table.make("notes", TableSchema);
+    const confectSchema = DatabaseSchema.make().addTable(confectTableDefinition);
+    type ConfectDataModel = DataModel.DataModel.FromSchema<
+      typeof confectSchema
     >;
-    type ConfectDataModel = ConfectDataModelFromConfectSchema<ConfectSchema>;
-    type ConfectTableInfo_ = ConfectDataModel["notes"];
+    type TableInfo_ = DataModel.DataModel.TableInfoWithName_<
+      ConfectDataModel,
+      "notes"
+    >;
 
-    type TableInfo =
-      ConfectTableInfo.ConfectTableInfo.TableInfo<ConfectTableInfo_>;
+    type ConvexTableInfo = TableInfo.TableInfo.TableInfo<TableInfo_>;
 
-    expectTypeOf<TableInfo>().toExtend<GenericTableInfo>();
+    expectTypeOf<ConvexTableInfo>().toExtend<GenericTableInfo>();
   });
 });
 
-describe("DataModelFromConfectDataModel", () => {
+describe("DataModel.DataModel.ToConvex", () => {
   test("extends GenericDataModel", () => {
     const TableSchema = Schema.Struct({
       content: Schema.String,
     });
-    const confectTableDefinition = defineConfectTable({
-      name: "notes",
-      fields: TableSchema,
-    });
-    const _confectSchemaDefinition = make(confectTableDefinition);
-    type ConfectSchema = ConfectSchemaFromConfectSchemaDefinition<
-      typeof _confectSchemaDefinition
+    const confectTableDefinition = Table.make("notes", TableSchema);
+    const confectSchema = DatabaseSchema.make().addTable(confectTableDefinition);
+    type ConfectDataModel = DataModel.DataModel.FromSchema<
+      typeof confectSchema
     >;
-    type ConfectDataModel = ConfectDataModelFromConfectSchema<ConfectSchema>;
 
-    type DataModel = DataModelFromConfectDataModel<ConfectDataModel>;
+    type ConvexDataModel = DataModel.DataModel.ToConvex<ConfectDataModel>;
 
-    expectTypeOf<DataModel>().toExtend<GenericDataModel>();
+    expectTypeOf<ConvexDataModel>().toExtend<GenericDataModel>();
   });
 });

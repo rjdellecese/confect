@@ -4,14 +4,14 @@ import {
   useQuery as useConvexQuery,
 } from "convex/react";
 import { Effect, Option, Schema } from "effect";
-import * as ConfectApiRefs from "../api/ConfectApiRefs";
+import * as Refs from "../api/Refs";
 
-export const useQuery = <Query extends ConfectApiRefs.Ref.AnyPublicQuery>(
+export const useQuery = <Query extends Refs.Ref.AnyPublicQuery>(
   ref: Query,
-  args: ConfectApiRefs.Ref.Args<Query>["Type"],
-): Option.Option<ConfectApiRefs.Ref.Returns<Query>["Type"]> => {
-  const function_ = ConfectApiRefs.getFunction(ref);
-  const functionName = ConfectApiRefs.getConvexFunctionName(ref);
+  args: Refs.Ref.Args<Query>["Type"],
+): Option.Option<Refs.Ref.Returns<Query>["Type"]> => {
+  const function_ = Refs.getFunction(ref);
+  const functionName = Refs.getConvexFunctionName(ref);
 
   const encodedArgs = Schema.encodeSync(function_.args)(args);
 
@@ -29,18 +29,16 @@ export const useQuery = <Query extends ConfectApiRefs.Ref.AnyPublicQuery>(
   }
 };
 
-export const useMutation = <
-  Mutation extends ConfectApiRefs.Ref.AnyPublicMutation,
->(
+export const useMutation = <Mutation extends Refs.Ref.AnyPublicMutation>(
   ref: Mutation,
 ) => {
-  const function_ = ConfectApiRefs.getFunction(ref);
-  const functionName = ConfectApiRefs.getConvexFunctionName(ref);
+  const function_ = Refs.getFunction(ref);
+  const functionName = Refs.getConvexFunctionName(ref);
   const actualMutation = useConvexMutation(functionName as any);
 
   return (
-    args: ConfectApiRefs.Ref.Args<Mutation>["Type"],
-  ): Effect.Effect<ConfectApiRefs.Ref.Returns<Mutation>["Type"]> =>
+    args: Refs.Ref.Args<Mutation>["Type"],
+  ): Effect.Effect<Refs.Ref.Returns<Mutation>["Type"]> =>
     Effect.gen(function* () {
       const encodedArgs = yield* Schema.encode(function_.args)(args);
 
@@ -52,16 +50,16 @@ export const useMutation = <
     }).pipe(Effect.orDie);
 };
 
-export const useAction = <Action extends ConfectApiRefs.Ref.AnyPublicAction>(
+export const useAction = <Action extends Refs.Ref.AnyPublicAction>(
   ref: Action,
 ) => {
-  const function_ = ConfectApiRefs.getFunction(ref);
-  const functionName = ConfectApiRefs.getConvexFunctionName(ref);
+  const function_ = Refs.getFunction(ref);
+  const functionName = Refs.getConvexFunctionName(ref);
   const actualAction = useConvexAction(functionName as any);
 
   return (
-    args: ConfectApiRefs.Ref.Args<Action>["Type"],
-  ): Effect.Effect<ConfectApiRefs.Ref.Returns<Action>["Type"]> =>
+    args: Refs.Ref.Args<Action>["Type"],
+  ): Effect.Effect<Refs.Ref.Returns<Action>["Type"]> =>
     Effect.gen(function* () {
       const encodedArgs = yield* Schema.encode(function_.args)(args);
 

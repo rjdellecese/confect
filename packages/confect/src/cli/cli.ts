@@ -13,8 +13,8 @@ import {
 import * as tsx from "tsx/esm/api";
 import packageJson from "../../package.json" with { type: "json" };
 import { forEachBranchLeaves } from "../internal/utils";
-import * as ConfectApiServer from "../server/ConfectApiServer";
-import * as ConfectSchema from "../server/ConfectSchema";
+import * as Server from "../server/Server";
+import * as DatabaseSchema from "../server/DatabaseSchema";
 import * as templates from "./templates";
 
 const codegenCommand = Command.make("codegen", {}, () =>
@@ -104,20 +104,20 @@ const generateFunctions = ({
       Effect.andThen((serverModule) => {
         const defaultExport = serverModule.default;
 
-        return ConfectApiServer.isConfectApiServer(defaultExport)
+        return Server.isServer(defaultExport)
           ? Effect.succeed(defaultExport)
           : Effect.die("Invalid server module");
       }),
     );
 
     yield* forEachBranchLeaves<
-      ConfectApiServer.RegisteredFunction,
+      Server.RegisteredFunction,
       void,
       Error,
       FileSystem.FileSystem | Path.Path
     >(
       server.registeredFunctions,
-      ConfectApiServer.isRegisteredFunction,
+      Server.isRegisteredFunction,
       (registeredFunction) =>
         Effect.gen(function* () {
           const mod = Array.last(registeredFunction.path).pipe(
@@ -163,7 +163,7 @@ const generateSchema = ({
       Effect.andThen((schemaModule) => {
         const defaultExport = schemaModule.default;
 
-        return ConfectSchema.isConfectSchema(defaultExport)
+        return DatabaseSchema.isSchema(defaultExport)
           ? Effect.succeed(defaultExport)
           : Effect.die("Invalid schema module");
       }),

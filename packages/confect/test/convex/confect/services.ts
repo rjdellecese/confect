@@ -1,91 +1,78 @@
-import type { ConfectDataModel } from "../../../src/server/index";
+import type { DataModel } from "../../../src/server/index";
 import {
-  ConfectActionRunner as ConfectActionRunner_,
-  ConfectAuth as ConfectAuth_,
-  ConfectDatabaseReader as ConfectDatabaseReader_,
-  ConfectDatabaseWriter as ConfectDatabaseWriter_,
-  ConfectMutationRunner as ConfectMutationRunner_,
-  ConfectQueryRunner as ConfectQueryRunner_,
-  ConfectScheduler as ConfectScheduler_,
-  ConfectStorage,
-  ConfectVectorSearch as ConfectVectorSearch_,
-  ConvexActionCtx as ConvexActionCtx_,
-  ConvexMutationCtx as ConvexMutationCtx_,
-  ConvexQueryCtx as ConvexQueryCtx_,
+  ActionRunner as ActionRunner_,
+  Auth as Auth_,
+  DatabaseReader as DatabaseReader_,
+  DatabaseWriter as DatabaseWriter_,
+  MutationRunner as MutationRunner_,
+  QueryRunner as QueryRunner_,
+  Scheduler as Scheduler_,
+  Storage,
+  VectorSearch as VectorSearch_,
+  ActionCtx as ActionCtx_,
+  MutationCtx as MutationCtx_,
+  QueryCtx as QueryCtx_,
 } from "../../../src/server/index";
-import type confectSchemaDefinition from "../../confect/schema";
+import type schemaDefinition from "../../confect/schema";
 
-export const ConfectAuth = ConfectAuth_.ConfectAuth;
-export type ConfectAuth = typeof ConfectAuth.Identifier;
+export const Auth = Auth_.Auth;
+export type Auth = typeof Auth.Identifier;
 
-export const ConfectScheduler = ConfectScheduler_.ConfectScheduler;
-export type ConfectScheduler = typeof ConfectScheduler.Identifier;
+export const Scheduler = Scheduler_.Scheduler;
+export type Scheduler = typeof Scheduler.Identifier;
 
-export const ConfectStorageReader = ConfectStorage.ConfectStorageReader;
-export type ConfectStorageReader = typeof ConfectStorageReader.Identifier;
+export const StorageReader = Storage.StorageReader;
+export type StorageReader = typeof StorageReader.Identifier;
 
-export const ConfectStorageWriter = ConfectStorage.ConfectStorageWriter;
-export type ConfectStorageWriter = typeof ConfectStorageWriter.Identifier;
+export const StorageWriter = Storage.StorageWriter;
+export type StorageWriter = typeof StorageWriter.Identifier;
 
-export const ConfectStorageActionWriter =
-  ConfectStorage.ConfectStorageActionWriter;
-export type ConfectStorageActionWriter =
-  typeof ConfectStorageActionWriter.Identifier;
+export const StorageActionWriter = Storage.StorageActionWriter;
+export type StorageActionWriter = typeof StorageActionWriter.Identifier;
 
-export const ConfectVectorSearch =
-  ConfectVectorSearch_.ConfectVectorSearch<
-    ConfectDataModel.ConfectDataModel.FromSchema<typeof confectSchemaDefinition>
+export const VectorSearch =
+  VectorSearch_.VectorSearch<
+    DataModel.DataModel.FromSchema<typeof schemaDefinition>
   >();
-export type ConfectVectorSearch = typeof ConfectVectorSearch.Identifier;
+export type VectorSearch = typeof VectorSearch.Identifier;
 
-export const ConfectDatabaseReader =
-  ConfectDatabaseReader_.ConfectDatabaseReader<
-    typeof confectSchemaDefinition
-  >();
-export type ConfectDatabaseReader = typeof ConfectDatabaseReader.Identifier;
+export const DatabaseReader =
+  DatabaseReader_.DatabaseReader<typeof schemaDefinition>();
+export type DatabaseReader = typeof DatabaseReader.Identifier;
 
-export const ConfectDatabaseWriter =
-  ConfectDatabaseWriter_.ConfectDatabaseWriter<
-    typeof confectSchemaDefinition
-  >();
-export type ConfectDatabaseWriter = typeof ConfectDatabaseWriter.Identifier;
+export const DatabaseWriter =
+  DatabaseWriter_.DatabaseWriter<typeof schemaDefinition>();
+export type DatabaseWriter = typeof DatabaseWriter.Identifier;
 
-export const ConfectQueryRunner = ConfectQueryRunner_.ConfectQueryRunner;
-export type ConfectQueryRunner = typeof ConfectQueryRunner.Identifier;
+export const QueryRunner = QueryRunner_.QueryRunner;
+export type QueryRunner = typeof QueryRunner.Identifier;
 
-export const ConfectMutationRunner =
-  ConfectMutationRunner_.ConfectMutationRunner;
-export type ConfectMutationRunner = typeof ConfectMutationRunner.Identifier;
+export const MutationRunner = MutationRunner_.MutationRunner;
+export type MutationRunner = typeof MutationRunner.Identifier;
 
-export const ConfectActionRunner = ConfectActionRunner_.ConfectActionRunner;
-export type ConfectActionRunner = typeof ConfectActionRunner.Identifier;
+export const ActionRunner = ActionRunner_.ActionRunner;
+export type ActionRunner = typeof ActionRunner.Identifier;
 
-export const ConvexQueryCtx =
-  ConvexQueryCtx_.ConvexQueryCtx<
-    ConfectDataModel.ConfectDataModel.DataModel<
-      ConfectDataModel.ConfectDataModel.FromSchema<
-        typeof confectSchemaDefinition
-      >
+export const QueryCtx =
+  QueryCtx_.QueryCtx<
+    DataModel.DataModel.ToConvex<
+      DataModel.DataModel.FromSchema<typeof schemaDefinition>
     >
   >();
-export type ConvexQueryCtx = typeof ConvexQueryCtx.Identifier;
+export type QueryCtx = typeof QueryCtx.Identifier;
 
-export const ConvexMutationCtx =
-  ConvexMutationCtx_.ConvexMutationCtx<
-    ConfectDataModel.ConfectDataModel.DataModel<
-      ConfectDataModel.ConfectDataModel.FromSchema<
-        typeof confectSchemaDefinition
-      >
+export const MutationCtx =
+  MutationCtx_.MutationCtx<
+    DataModel.DataModel.ToConvex<
+      DataModel.DataModel.FromSchema<typeof schemaDefinition>
     >
   >();
-export type ConvexMutationCtx = typeof ConvexMutationCtx.Identifier;
+export type MutationCtx = typeof MutationCtx.Identifier;
 
-export const ConvexActionCtx =
-  ConvexActionCtx_.ConvexActionCtx<
-    ConfectDataModel.ConfectDataModel.DataModel<
-      ConfectDataModel.ConfectDataModel.FromSchema<
-        typeof confectSchemaDefinition
-      >
+export const ActionCtx =
+  ActionCtx_.ActionCtx<
+    DataModel.DataModel.ToConvex<
+      DataModel.DataModel.FromSchema<typeof schemaDefinition>
     >
   >();
-export type ConvexActionCtx = typeof ConvexActionCtx.Identifier;
+export type ActionCtx = typeof ActionCtx.Identifier;

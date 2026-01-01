@@ -2,8 +2,8 @@ import type { GenericSchema, SchemaDefinition } from "convex/server";
 import { Schema } from "effect";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
-import * as ConfectSchema from "../server/ConfectSchema";
-import * as ConfectTable from "../server/ConfectTable";
+import * as DatabaseSchema from "../../src/server/DatabaseSchema";
+import * as ConfectTable from "../../src/server/Table";
 
 const NoteSchema = Schema.Struct({
   content: Schema.String,
@@ -15,17 +15,11 @@ const UserSchema = Schema.Struct({
   email: Schema.String,
 });
 
-const notesTable = ConfectTable.make({
-  name: "notes",
-  fields: NoteSchema,
-}).index("by_priority", ["priority"]);
+const notesTable = ConfectTable.make("notes", NoteSchema).index("by_priority", ["priority"]);
 
-const usersTable = ConfectTable.make({
-  name: "users",
-  fields: UserSchema,
-});
+const usersTable = ConfectTable.make("users", UserSchema);
 
-const confectSchema = ConfectSchema.make()
+const confectSchema = DatabaseSchema.make()
   .addTable(notesTable)
   .addTable(usersTable);
 
@@ -35,43 +29,41 @@ type UsersTable = typeof usersTable;
 
 describe("TypeId", () => {
   test("is the expected string literal", () => {
-    type Expected = "@rjdellecese/confect/server/ConfectSchema";
-    expectTypeOf<ConfectSchema.TypeId>().toEqualTypeOf<Expected>();
+    type Expected = "@rjdellecese/confect/server/Schema";
+    expectTypeOf<DatabaseSchema.TypeId>().toEqualTypeOf<Expected>();
   });
 
   test("runtime value matches type", () => {
-    expect(ConfectSchema.TypeId).toBe(
-      "@rjdellecese/confect/server/ConfectSchema",
-    );
+    expect(DatabaseSchema.TypeId).toBe("@rjdellecese/confect/server/Schema");
   });
 });
 
 describe("isConfectSchema", () => {
   test("returns true for ConfectSchema instances", () => {
-    const schema = ConfectSchema.make();
-    expect(ConfectSchema.isConfectSchema(schema)).toBe(true);
+    const schema = DatabaseSchema.make();
+    expect(DatabaseSchema.isSchema(schema)).toBe(true);
   });
 
   test("returns true for schema with tables", () => {
-    expect(ConfectSchema.isConfectSchema(confectSchema)).toBe(true);
+    expect(DatabaseSchema.isSchema(confectSchema)).toBe(true);
   });
 
   test("returns false for non-ConfectSchema values", () => {
-    expect(ConfectSchema.isConfectSchema({})).toBe(false);
-    expect(ConfectSchema.isConfectSchema(null)).toBe(false);
-    expect(ConfectSchema.isConfectSchema(undefined)).toBe(false);
-    expect(ConfectSchema.isConfectSchema("string")).toBe(false);
-    expect(ConfectSchema.isConfectSchema(123)).toBe(false);
+    expect(DatabaseSchema.isSchema({})).toBe(false);
+    expect(DatabaseSchema.isSchema(null)).toBe(false);
+    expect(DatabaseSchema.isSchema(undefined)).toBe(false);
+    expect(DatabaseSchema.isSchema("string")).toBe(false);
+    expect(DatabaseSchema.isSchema(123)).toBe(false);
   });
 
   test("returns false for ConfectTable (similar structure but different TypeId)", () => {
-    expect(ConfectSchema.isConfectSchema(notesTable)).toBe(false);
+    expect(DatabaseSchema.isSchema(notesTable)).toBe(false);
   });
 
-  test("is a type guard for ConfectSchema.Any", () => {
+  test("is a type guard for DatabaseSchema.Any", () => {
     const maybeSchema: unknown = confectSchema;
-    if (ConfectSchema.isConfectSchema(maybeSchema)) {
-      expectTypeOf(maybeSchema).toExtend<ConfectSchema.ConfectSchema.Any>();
+    if (DatabaseSchema.isSchema(maybeSchema)) {
+      expectTypeOf(maybeSchema).toExtend<DatabaseSchema.DatabaseSchema.Any>();
     }
   });
 });
@@ -79,9 +71,9 @@ describe("isConfectSchema", () => {
 describe("ConfectSchema interface", () => {
   describe("TypeId property", () => {
     test("has TypeId property with correct value", () => {
-      type TypeIdKey = typeof ConfectSchema.TypeId;
+      type TypeIdKey = typeof DatabaseSchema.TypeId;
       expectTypeOf<TestConfectSchema[TypeIdKey]>().toEqualTypeOf<
-        typeof ConfectSchema.TypeId
+        typeof DatabaseSchema.TypeId
       >();
     });
   });
@@ -122,9 +114,9 @@ describe("ConfectSchema interface", () => {
   });
 });
 
-describe("ConfectSchema.addTable", () => {
+describe("DatabaseSchema.addTable", () => {
   test("adds table to the schema", () => {
-    const _schema = ConfectSchema.make();
+    const _schema = DatabaseSchema.make();
     const _schemaWithNotes = _schema.addTable(notesTable);
 
     expectTypeOf<
@@ -133,7 +125,7 @@ describe("ConfectSchema.addTable", () => {
   });
 
   test("can chain multiple addTable calls", () => {
-    const _schema = ConfectSchema.make()
+    const _schema = DatabaseSchema.make()
       .addTable(notesTable)
       .addTable(usersTable);
 
@@ -143,7 +135,7 @@ describe("ConfectSchema.addTable", () => {
   });
 
   test("runtime tables are accumulated", () => {
-    const schema = ConfectSchema.make();
+    const schema = DatabaseSchema.make();
     expect(Object.keys(schema.tables)).toEqual([]);
 
     const schemaWithNotes = schema.addTable(notesTable);
@@ -154,121 +146,113 @@ describe("ConfectSchema.addTable", () => {
   });
 
   test("returns a ConfectSchema that passes isConfectSchema", () => {
-    const schema = ConfectSchema.make().addTable(notesTable);
-    expect(ConfectSchema.isConfectSchema(schema)).toBe(true);
+    const schema = DatabaseSchema.make().addTable(notesTable);
+    expect(DatabaseSchema.isSchema(schema)).toBe(true);
   });
 
   test("preserves table references", () => {
-    const schema = ConfectSchema.make().addTable(notesTable);
+    const schema = DatabaseSchema.make().addTable(notesTable);
     expect(schema.tables.notes).toBe(notesTable);
   });
 });
 
-describe("ConfectSchema.Any", () => {
+describe("DatabaseSchema.Any", () => {
   test("has TypeId property", () => {
-    type TypeIdKey = typeof ConfectSchema.TypeId;
-    type Any = ConfectSchema.ConfectSchema.Any;
-    expectTypeOf<Any[TypeIdKey]>().toEqualTypeOf<typeof ConfectSchema.TypeId>();
+    type TypeIdKey = typeof DatabaseSchema.TypeId;
+    type Any = DatabaseSchema.DatabaseSchema.Any;
+    expectTypeOf<Any[TypeIdKey]>().toEqualTypeOf<typeof DatabaseSchema.TypeId>();
   });
 
   test("ConfectSchema extends Any", () => {
-    expectTypeOf<TestConfectSchema>().toExtend<ConfectSchema.ConfectSchema.Any>();
+    expectTypeOf<TestConfectSchema>().toExtend<DatabaseSchema.DatabaseSchema.Any>();
   });
 
   test("empty schema extends Any", () => {
-    const _emptySchema = ConfectSchema.make();
-    expectTypeOf<
-      typeof _emptySchema
-    >().toExtend<ConfectSchema.ConfectSchema.Any>();
+    const _emptySchema = DatabaseSchema.make();
+    expectTypeOf<typeof _emptySchema>().toExtend<DatabaseSchema.DatabaseSchema.Any>();
   });
 });
 
-describe("ConfectSchema.AnyWithProps", () => {
+describe("DatabaseSchema.AnyWithProps", () => {
   test("extends Any", () => {
-    expectTypeOf<ConfectSchema.ConfectSchema.AnyWithProps>().toExtend<ConfectSchema.ConfectSchema.Any>();
+    expectTypeOf<DatabaseSchema.DatabaseSchema.AnyWithProps>().toExtend<DatabaseSchema.DatabaseSchema.Any>();
   });
 
   test("has tables property as Record", () => {
-    type Tables = ConfectSchema.ConfectSchema.AnyWithProps["tables"];
+    type Tables = DatabaseSchema.DatabaseSchema.AnyWithProps["tables"];
     expectTypeOf<Tables>().toExtend<
-      Record<string, ConfectTable.ConfectTable.AnyWithProps>
+      Record<string, ConfectTable.Table.AnyWithProps>
     >();
   });
 
   test("has convexSchemaDefinition property", () => {
     type ConvexSchemaDef =
-      ConfectSchema.ConfectSchema.AnyWithProps["convexSchemaDefinition"];
+      DatabaseSchema.DatabaseSchema.AnyWithProps["convexSchemaDefinition"];
     expectTypeOf<ConvexSchemaDef>().toExtend<
       SchemaDefinition<GenericSchema, true>
     >();
   });
 
   test("has addTable method", () => {
-    type AddTable = ConfectSchema.ConfectSchema.AnyWithProps["addTable"];
+    type AddTable = DatabaseSchema.DatabaseSchema.AnyWithProps["addTable"];
     expectTypeOf<AddTable>().toBeFunction();
   });
 
   test("ConfectSchema extends AnyWithProps", () => {
-    expectTypeOf<TestConfectSchema>().toExtend<ConfectSchema.ConfectSchema.AnyWithProps>();
+    expectTypeOf<TestConfectSchema>().toExtend<DatabaseSchema.DatabaseSchema.AnyWithProps>();
   });
 });
 
-describe("ConfectSchema.Tables", () => {
+describe("DatabaseSchema.Tables", () => {
   test("extracts tables union from schema", () => {
-    type Tables = ConfectSchema.ConfectSchema.Tables<TestConfectSchema>;
+    type Tables = DatabaseSchema.DatabaseSchema.Tables<TestConfectSchema>;
     expectTypeOf<Tables>().toEqualTypeOf<NotesTable | UsersTable>();
   });
 
   test("single table schema returns that table", () => {
-    const _singleTableSchema = ConfectSchema.make().addTable(notesTable);
-    type Tables = ConfectSchema.ConfectSchema.Tables<typeof _singleTableSchema>;
+    const _singleTableSchema = DatabaseSchema.make().addTable(notesTable);
+    type Tables = DatabaseSchema.DatabaseSchema.Tables<typeof _singleTableSchema>;
     expectTypeOf<Tables>().toEqualTypeOf<NotesTable>();
   });
 });
 
-describe("ConfectSchema.TableNames", () => {
+describe("DatabaseSchema.TableNames", () => {
   test("extracts table names as union of string literals", () => {
-    type TableNames = ConfectSchema.ConfectSchema.TableNames<TestConfectSchema>;
+    type TableNames = DatabaseSchema.DatabaseSchema.TableNames<TestConfectSchema>;
     expectTypeOf<TableNames>().toEqualTypeOf<"notes" | "users">();
   });
 
   test("is a string type", () => {
-    type TableNames = ConfectSchema.ConfectSchema.TableNames<TestConfectSchema>;
+    type TableNames = DatabaseSchema.DatabaseSchema.TableNames<TestConfectSchema>;
     expectTypeOf<TableNames>().toExtend<string>();
   });
 
   test("single table schema has single name", () => {
-    const _singleTableSchema = ConfectSchema.make().addTable(notesTable);
-    type TableNames = ConfectSchema.ConfectSchema.TableNames<
+    const _singleTableSchema = DatabaseSchema.make().addTable(notesTable);
+    type TableNames = DatabaseSchema.DatabaseSchema.TableNames<
       typeof _singleTableSchema
     >;
     expectTypeOf<TableNames>().toEqualTypeOf<"notes">();
   });
 });
 
-describe("ConfectSchema.TableWithName", () => {
+describe("DatabaseSchema.TableWithName", () => {
   test("returns the correct table for notes", () => {
-    type Table = ConfectSchema.ConfectSchema.TableWithName<
-      TestConfectSchema,
-      "notes"
-    >;
+    type Table = DatabaseSchema.DatabaseSchema.TableWithName<TestConfectSchema, "notes">;
 
     expectTypeOf<Table["name"]>().toEqualTypeOf<"notes">();
     expectTypeOf<Table>().toEqualTypeOf<NotesTable>();
   });
 
   test("returns the correct table for users", () => {
-    type Table = ConfectSchema.ConfectSchema.TableWithName<
-      TestConfectSchema,
-      "users"
-    >;
+    type Table = DatabaseSchema.DatabaseSchema.TableWithName<TestConfectSchema, "users">;
 
     expectTypeOf<Table["name"]>().toEqualTypeOf<"users">();
     expectTypeOf<Table>().toEqualTypeOf<UsersTable>();
   });
 
   test("preserves table indexes", () => {
-    type NotesTableFromSchema = ConfectSchema.ConfectSchema.TableWithName<
+    type NotesTableFromSchema = DatabaseSchema.DatabaseSchema.TableWithName<
       TestConfectSchema,
       "notes"
     >;
@@ -281,49 +265,47 @@ describe("ConfectSchema.TableWithName", () => {
 
 describe("make", () => {
   test("creates empty ConfectSchema", () => {
-    const schema = ConfectSchema.make();
+    const schema = DatabaseSchema.make();
     expect(Object.keys(schema.tables)).toEqual([]);
   });
 
   test("returns a ConfectSchema that passes isConfectSchema", () => {
-    const schema = ConfectSchema.make();
-    expect(ConfectSchema.isConfectSchema(schema)).toBe(true);
+    const schema = DatabaseSchema.make();
+    expect(DatabaseSchema.isSchema(schema)).toBe(true);
   });
 
   test("has convexSchemaDefinition", () => {
-    const schema = ConfectSchema.make();
+    const schema = DatabaseSchema.make();
     expect(schema.convexSchemaDefinition).toBeDefined();
   });
 
   test("tables type is never for empty schema", () => {
-    const _schema = ConfectSchema.make();
-    type Tables = ConfectSchema.ConfectSchema.Tables<typeof _schema>;
+    const _schema = DatabaseSchema.make();
+    type Tables = DatabaseSchema.DatabaseSchema.Tables<typeof _schema>;
     expectTypeOf<Tables>().toEqualTypeOf<never>();
   });
 });
 
-describe("confectSystemSchema", () => {
+describe("systemSchema", () => {
   test("is a ConfectSchema", () => {
-    expect(
-      ConfectSchema.isConfectSchema(ConfectSchema.confectSystemSchema),
-    ).toBe(true);
+    expect(DatabaseSchema.isSchema(DatabaseSchema.systemSchema)).toBe(true);
   });
 
   test("contains _scheduled_functions table", () => {
-    expect(ConfectSchema.confectSystemSchema.tables._scheduled_functions).toBe(
+    expect(DatabaseSchema.systemSchema.tables._scheduled_functions).toBe(
       ConfectTable.scheduledFunctionsTable,
     );
   });
 
   test("contains _storage table", () => {
-    expect(ConfectSchema.confectSystemSchema.tables._storage).toBe(
+    expect(DatabaseSchema.systemSchema.tables._storage).toBe(
       ConfectTable.storageTable,
     );
   });
 
   test("has correct table names", () => {
-    type TableNames = ConfectSchema.ConfectSchema.TableNames<
-      typeof ConfectSchema.confectSystemSchema
+    type TableNames = DatabaseSchema.DatabaseSchema.TableNames<
+      typeof DatabaseSchema.systemSchema
     >;
     expectTypeOf<TableNames>().toEqualTypeOf<
       "_scheduled_functions" | "_storage"
@@ -331,15 +313,15 @@ describe("confectSystemSchema", () => {
   });
 });
 
-describe("extendWithConfectSystemTables", () => {
+describe("extendWithSystemTables", () => {
   test("return type is a record with original table names as keys", () => {
     type TestTables = NotesTable | UsersTable;
-    const tablesRecord: ConfectTable.ConfectTable.TablesRecord<TestTables> = {
+    const tablesRecord: ConfectTable.Table.TablesRecord<TestTables> = {
       notes: notesTable,
       users: usersTable,
     };
 
-    const _extended = ConfectSchema.extendWithConfectSystemTables(tablesRecord);
+    const _extended = DatabaseSchema.extendWithSystemTables(tablesRecord);
 
     expectTypeOf<keyof typeof _extended>().toEqualTypeOf<
       "notes" | "users" | "_scheduled_functions" | "_storage"
@@ -348,12 +330,12 @@ describe("extendWithConfectSystemTables", () => {
 
   test("return type has correct table types at each key", () => {
     type TestTables = NotesTable | UsersTable;
-    const tablesRecord: ConfectTable.ConfectTable.TablesRecord<TestTables> = {
+    const tablesRecord: ConfectTable.Table.TablesRecord<TestTables> = {
       notes: notesTable,
       users: usersTable,
     };
 
-    const _extended = ConfectSchema.extendWithConfectSystemTables(tablesRecord);
+    const _extended = DatabaseSchema.extendWithSystemTables(tablesRecord);
 
     expectTypeOf<(typeof _extended)["notes"]>().toEqualTypeOf<NotesTable>();
     expectTypeOf<(typeof _extended)["users"]>().toEqualTypeOf<UsersTable>();
@@ -367,12 +349,12 @@ describe("extendWithConfectSystemTables", () => {
 
   test("allows type-safe property access for system tables", () => {
     type TestTables = NotesTable | UsersTable;
-    const tablesRecord: ConfectTable.ConfectTable.TablesRecord<TestTables> = {
+    const tablesRecord: ConfectTable.Table.TablesRecord<TestTables> = {
       notes: notesTable,
       users: usersTable,
     };
 
-    const extended = ConfectSchema.extendWithConfectSystemTables(tablesRecord);
+    const extended = DatabaseSchema.extendWithSystemTables(tablesRecord);
 
     expect(extended._scheduled_functions).toBe(
       ConfectTable.scheduledFunctionsTable,
@@ -382,12 +364,12 @@ describe("extendWithConfectSystemTables", () => {
 
   test("allows type-safe property access for original tables", () => {
     type TestTables = NotesTable | UsersTable;
-    const tablesRecord: ConfectTable.ConfectTable.TablesRecord<TestTables> = {
+    const tablesRecord: ConfectTable.Table.TablesRecord<TestTables> = {
       notes: notesTable,
       users: usersTable,
     };
 
-    const extended = ConfectSchema.extendWithConfectSystemTables(tablesRecord);
+    const extended = DatabaseSchema.extendWithSystemTables(tablesRecord);
 
     expect(extended.notes).toBe(notesTable);
     expect(extended.users).toBe(usersTable);
@@ -395,25 +377,25 @@ describe("extendWithConfectSystemTables", () => {
 
   test("return type extends TablesRecord of extended tables union", () => {
     type TestTables = NotesTable | UsersTable;
-    type ExtendedTables = TestTables | ConfectTable.ConfectSystemTables;
+    type ExtendedTables = TestTables | ConfectTable.SystemTables;
 
-    const tablesRecord: ConfectTable.ConfectTable.TablesRecord<TestTables> = {
+    const tablesRecord: ConfectTable.Table.TablesRecord<TestTables> = {
       notes: notesTable,
       users: usersTable,
     };
 
-    const extended = ConfectSchema.extendWithConfectSystemTables(tablesRecord);
+    const extended = DatabaseSchema.extendWithSystemTables(tablesRecord);
 
     expectTypeOf(extended).toExtend<
-      ConfectTable.ConfectTable.TablesRecord<ExtendedTables>
+      ConfectTable.Table.TablesRecord<ExtendedTables>
     >();
   });
 });
 
-describe("ExtendWithConfectSystemTables", () => {
+describe("ExtendWithSystemTables", () => {
   test("is a record type with all table names as keys", () => {
     type TestTables = NotesTable | UsersTable;
-    type Extended = ConfectSchema.ExtendWithConfectSystemTables<TestTables>;
+    type Extended = DatabaseSchema.ExtendWithSystemTables<TestTables>;
 
     expectTypeOf<keyof Extended>().toEqualTypeOf<
       "notes" | "users" | "_scheduled_functions" | "_storage"
@@ -422,7 +404,7 @@ describe("ExtendWithConfectSystemTables", () => {
 
   test("maps original table names to their table types", () => {
     type TestTables = NotesTable | UsersTable;
-    type Extended = ConfectSchema.ExtendWithConfectSystemTables<TestTables>;
+    type Extended = DatabaseSchema.ExtendWithSystemTables<TestTables>;
 
     expectTypeOf<Extended["notes"]>().toEqualTypeOf<NotesTable>();
     expectTypeOf<Extended["users"]>().toEqualTypeOf<UsersTable>();
@@ -430,7 +412,7 @@ describe("ExtendWithConfectSystemTables", () => {
 
   test("maps system table names to their table types", () => {
     type TestTables = NotesTable | UsersTable;
-    type Extended = ConfectSchema.ExtendWithConfectSystemTables<TestTables>;
+    type Extended = DatabaseSchema.ExtendWithSystemTables<TestTables>;
 
     expectTypeOf<Extended["_scheduled_functions"]>().toEqualTypeOf<
       typeof ConfectTable.scheduledFunctionsTable
@@ -442,17 +424,17 @@ describe("ExtendWithConfectSystemTables", () => {
 
   test("is equivalent to TablesRecord of extended tables union", () => {
     type TestTables = NotesTable | UsersTable;
-    type ExtendedTablesUnion = TestTables | ConfectTable.ConfectSystemTables;
-    type Extended = ConfectSchema.ExtendWithConfectSystemTables<TestTables>;
+    type ExtendedTablesUnion = TestTables | ConfectTable.SystemTables;
+    type Extended = DatabaseSchema.ExtendWithSystemTables<TestTables>;
 
     expectTypeOf<Extended>().toEqualTypeOf<
-      ConfectTable.ConfectTable.TablesRecord<ExtendedTablesUnion>
+      ConfectTable.Table.TablesRecord<ExtendedTablesUnion>
     >();
   });
 
   test("works with single table input", () => {
     type TestTables = NotesTable;
-    type Extended = ConfectSchema.ExtendWithConfectSystemTables<TestTables>;
+    type Extended = DatabaseSchema.ExtendWithSystemTables<TestTables>;
 
     expectTypeOf<keyof Extended>().toEqualTypeOf<
       "notes" | "_scheduled_functions" | "_storage"
@@ -463,22 +445,22 @@ describe("ExtendWithConfectSystemTables", () => {
 
 describe("Edge cases", () => {
   describe("schema with table with optional fields", () => {
-    const tableWithOptional = ConfectTable.make({
-      name: "with_optional",
-      fields: Schema.Struct({
+    const tableWithOptional = ConfectTable.make(
+      "with_optional",
+      Schema.Struct({
         required: Schema.String,
         optional: Schema.optional(Schema.Number),
       }),
-    });
+    );
 
-    const schemaWithOptional = ConfectSchema.make().addTable(tableWithOptional);
+    const schemaWithOptional = DatabaseSchema.make().addTable(tableWithOptional);
 
     test("creates schema successfully", () => {
-      expect(ConfectSchema.isConfectSchema(schemaWithOptional)).toBe(true);
+      expect(DatabaseSchema.isSchema(schemaWithOptional)).toBe(true);
     });
 
     test("has correct table names", () => {
-      type TableNames = ConfectSchema.ConfectSchema.TableNames<
+      type TableNames = DatabaseSchema.DatabaseSchema.TableNames<
         typeof schemaWithOptional
       >;
       expectTypeOf<TableNames>().toEqualTypeOf<"with_optional">();
@@ -486,40 +468,40 @@ describe("Edge cases", () => {
   });
 
   describe("schema with table with nested struct", () => {
-    const tableWithNested = ConfectTable.make({
-      name: "with_nested",
-      fields: Schema.Struct({
+    const tableWithNested = ConfectTable.make(
+      "with_nested",
+      Schema.Struct({
         nested: Schema.Struct({
           inner: Schema.String,
           value: Schema.Number,
         }),
       }),
-    });
+    );
 
-    const schemaWithNested = ConfectSchema.make().addTable(tableWithNested);
+    const schemaWithNested = DatabaseSchema.make().addTable(tableWithNested);
 
     test("creates schema successfully", () => {
-      expect(ConfectSchema.isConfectSchema(schemaWithNested)).toBe(true);
+      expect(DatabaseSchema.isSchema(schemaWithNested)).toBe(true);
     });
   });
 
   describe("schema with table with multiple indexes", () => {
-    const tableWithIndexes = ConfectTable.make({
-      name: "indexed",
-      fields: Schema.Struct({
+    const tableWithIndexes = ConfectTable.make(
+      "indexed",
+      Schema.Struct({
         field1: Schema.String,
         field2: Schema.Number,
         field3: Schema.Boolean,
       }),
-    })
+    )
       .index("by_field1", ["field1"])
       .index("by_field2", ["field2"])
       .index("by_field1_and_field2", ["field1", "field2"]);
 
-    const _schemaWithIndexes = ConfectSchema.make().addTable(tableWithIndexes);
+    const _schemaWithIndexes = DatabaseSchema.make().addTable(tableWithIndexes);
 
     test("preserves indexes in schema table", () => {
-      type Table = ConfectSchema.ConfectSchema.TableWithName<
+      type Table = DatabaseSchema.DatabaseSchema.TableWithName<
         typeof _schemaWithIndexes,
         "indexed"
       >;
@@ -537,33 +519,19 @@ describe("Edge cases", () => {
   });
 
   describe("schema with many tables", () => {
-    const table1 = ConfectTable.make({
-      name: "table1",
-      fields: Schema.Struct({ a: Schema.String }),
-    });
-    const table2 = ConfectTable.make({
-      name: "table2",
-      fields: Schema.Struct({ b: Schema.Number }),
-    });
-    const table3 = ConfectTable.make({
-      name: "table3",
-      fields: Schema.Struct({ c: Schema.Boolean }),
-    });
-    const table4 = ConfectTable.make({
-      name: "table4",
-      fields: Schema.Struct({ d: Schema.Array(Schema.String) }),
-    });
+    const table1 = ConfectTable.make("table1", Schema.Struct({ a: Schema.String }));
+    const table2 = ConfectTable.make("table2", Schema.Struct({ b: Schema.Number }));
+    const table3 = ConfectTable.make("table3", Schema.Struct({ c: Schema.Boolean }));
+    const table4 = ConfectTable.make("table4", Schema.Struct({ d: Schema.Array(Schema.String) }));
 
-    const largeSchema = ConfectSchema.make()
+    const largeSchema = DatabaseSchema.make()
       .addTable(table1)
       .addTable(table2)
       .addTable(table3)
       .addTable(table4);
 
     test("contains all tables", () => {
-      type TableNames = ConfectSchema.ConfectSchema.TableNames<
-        typeof largeSchema
-      >;
+      type TableNames = DatabaseSchema.DatabaseSchema.TableNames<typeof largeSchema>;
       expectTypeOf<TableNames>().toEqualTypeOf<
         "table1" | "table2" | "table3" | "table4"
       >();
@@ -580,41 +548,39 @@ describe("Edge cases", () => {
   });
 
   describe("schema with search and vector indexes", () => {
-    const tableWithSearch = ConfectTable.make({
-      name: "searchable",
-      fields: Schema.Struct({
+    const tableWithSearch = ConfectTable.make(
+      "searchable",
+      Schema.Struct({
         content: Schema.String,
         category: Schema.String,
       }),
-    }).searchIndex("search_content", {
+    ).searchIndex("search_content", {
       searchField: "content",
       filterFields: ["category"],
     });
 
-    const tableWithVector = ConfectTable.make({
-      name: "vectorized",
-      fields: Schema.Struct({
+    const tableWithVector = ConfectTable.make(
+      "vectorized",
+      Schema.Struct({
         embedding: Schema.Array(Schema.Number),
         label: Schema.String,
       }),
-    }).vectorIndex("by_embedding", {
+    ).vectorIndex("by_embedding", {
       vectorField: "embedding",
       dimensions: 1536,
       filterFields: ["label"],
     });
 
-    const schemaWithAdvancedIndexes = ConfectSchema.make()
+    const schemaWithAdvancedIndexes = DatabaseSchema.make()
       .addTable(tableWithSearch)
       .addTable(tableWithVector);
 
     test("creates schema successfully", () => {
-      expect(ConfectSchema.isConfectSchema(schemaWithAdvancedIndexes)).toBe(
-        true,
-      );
+      expect(DatabaseSchema.isSchema(schemaWithAdvancedIndexes)).toBe(true);
     });
 
     test("has correct table names", () => {
-      type TableNames = ConfectSchema.ConfectSchema.TableNames<
+      type TableNames = DatabaseSchema.DatabaseSchema.TableNames<
         typeof schemaWithAdvancedIndexes
       >;
       expectTypeOf<TableNames>().toEqualTypeOf<"searchable" | "vectorized">();
@@ -622,34 +588,32 @@ describe("Edge cases", () => {
   });
 
   describe("empty schema behavior", () => {
-    const emptySchema = ConfectSchema.make();
+    const emptySchema = DatabaseSchema.make();
 
     test("tables record is empty", () => {
       expect(Object.keys(emptySchema.tables)).toHaveLength(0);
     });
 
     test("TableNames is never", () => {
-      type TableNames = ConfectSchema.ConfectSchema.TableNames<
-        typeof emptySchema
-      >;
+      type TableNames = DatabaseSchema.DatabaseSchema.TableNames<typeof emptySchema>;
       expectTypeOf<TableNames>().toEqualTypeOf<never>();
     });
 
     test("Tables is never", () => {
-      type Tables = ConfectSchema.ConfectSchema.Tables<typeof emptySchema>;
+      type Tables = DatabaseSchema.DatabaseSchema.Tables<typeof emptySchema>;
       expectTypeOf<Tables>().toEqualTypeOf<never>();
     });
   });
 
   describe("schema identity through chaining", () => {
-    const base = ConfectSchema.make();
+    const base = DatabaseSchema.make();
     const withNotes = base.addTable(notesTable);
     const withBoth = withNotes.addTable(usersTable);
 
     test("each step is a valid ConfectSchema", () => {
-      expect(ConfectSchema.isConfectSchema(base)).toBe(true);
-      expect(ConfectSchema.isConfectSchema(withNotes)).toBe(true);
-      expect(ConfectSchema.isConfectSchema(withBoth)).toBe(true);
+      expect(DatabaseSchema.isSchema(base)).toBe(true);
+      expect(DatabaseSchema.isSchema(withNotes)).toBe(true);
+      expect(DatabaseSchema.isSchema(withBoth)).toBe(true);
     });
 
     test("each step has progressively more tables", () => {
@@ -659,4 +623,3 @@ describe("Edge cases", () => {
     });
   });
 });
-

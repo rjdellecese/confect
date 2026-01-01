@@ -1,4 +1,4 @@
-import { ConfectApiGroupImpl } from "@rjdellecese/confect";
-import { Api } from "../api";
+import { GroupImpl } from "@rjdellecese/confect";
+import { api } from "../api";
 
-export const Groups = ConfectApiGroupImpl.make(Api, "groups");
+export const Groups = GroupImpl.make(api, "groups");

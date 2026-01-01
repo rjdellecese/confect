@@ -8,10 +8,10 @@ import type { GenericId } from "convex/values";
 import { Schema } from "effect";
 import { describe, expectTypeOf, test } from "vitest";
 
-import type * as ConfectDataModel from "../server/ConfectDataModel";
-import * as ConfectSchema from "../server/ConfectSchema";
-import * as ConfectTable from "../server/ConfectTable";
-import type * as ConfectTableInfo from "../server/ConfectTableInfo";
+import type * as ConfectDataModel from "../../src/server/DataModel";
+import * as DatabaseSchema from "../../src/server/DatabaseSchema";
+import * as ConfectTable from "../../src/server/Table";
+import type * as ConfectTableInfo from "../../src/server/TableInfo";
 
 const NoteSchema = Schema.Struct({
   content: Schema.String,
@@ -23,28 +23,21 @@ const UserSchema = Schema.Struct({
   email: Schema.String,
 });
 
-const notesTable = ConfectTable.make({
-  name: "notes",
-  fields: NoteSchema,
-}).index("by_priority", ["priority"]);
+const notesTable = ConfectTable.make("notes", NoteSchema).index("by_priority", ["priority"]);
 
-const usersTable = ConfectTable.make({
-  name: "users",
-  fields: UserSchema,
-});
+const usersTable = ConfectTable.make("users", UserSchema);
 
-const _confectSchema = ConfectSchema.make()
+const _confectSchema = DatabaseSchema.make()
   .addTable(notesTable)
   .addTable(usersTable);
 
 // Create type from tables directly using FromTables
 type TestTables = typeof notesTable | typeof usersTable;
-type TestConfectDataModel =
-  ConfectDataModel.ConfectDataModel.FromTables<TestTables>;
+type TestConfectDataModel = ConfectDataModel.DataModel.FromTables<TestTables>;
 
 describe("TypeId", () => {
   test("is the expected string literal", () => {
-    type Expected = "@rjdellecese/confect/server/ConfectDataModel";
+    type Expected = "@rjdellecese/confect/server/DataModel";
     expectTypeOf<ConfectDataModel.TypeId>().toEqualTypeOf<Expected>();
   });
 });
@@ -75,7 +68,7 @@ describe("ConfectDataModel", () => {
 
 describe("ConfectDataModel.Any", () => {
   test("has TypeId property", () => {
-    type TestAny = ConfectDataModel.ConfectDataModel.Any;
+    type TestAny = ConfectDataModel.DataModel.Any;
     type TypeIdKey = typeof ConfectDataModel.TypeId;
     expectTypeOf<TestAny[TypeIdKey]>().toEqualTypeOf<
       typeof ConfectDataModel.TypeId
@@ -83,34 +76,34 @@ describe("ConfectDataModel.Any", () => {
   });
 
   test("ConfectDataModel extends Any", () => {
-    expectTypeOf<TestConfectDataModel>().toExtend<ConfectDataModel.ConfectDataModel.Any>();
+    expectTypeOf<TestConfectDataModel>().toExtend<ConfectDataModel.DataModel.Any>();
   });
 });
 
 describe("ConfectDataModel.AnyWithProps", () => {
   test("extends Any", () => {
-    expectTypeOf<ConfectDataModel.ConfectDataModel.AnyWithProps>().toExtend<ConfectDataModel.ConfectDataModel.Any>();
+    expectTypeOf<ConfectDataModel.DataModel.AnyWithProps>().toExtend<ConfectDataModel.DataModel.Any>();
   });
 
   test("has tables property as Record", () => {
-    type Tables = ConfectDataModel.ConfectDataModel.AnyWithProps["tables"];
+    type Tables = ConfectDataModel.DataModel.AnyWithProps["tables"];
     expectTypeOf<Tables>().toExtend<
-      Record<string, ConfectTable.ConfectTable.AnyWithProps>
+      Record<string, ConfectTable.Table.AnyWithProps>
     >();
   });
 
   test("ConfectDataModel extends AnyWithProps", () => {
-    expectTypeOf<TestConfectDataModel>().toExtend<ConfectDataModel.ConfectDataModel.AnyWithProps>();
+    expectTypeOf<TestConfectDataModel>().toExtend<ConfectDataModel.DataModel.AnyWithProps>();
   });
 });
 
 describe("ConfectDataModel.FromSchema", () => {
   test("creates ConfectDataModel from ConfectSchema", () => {
-    type FromSchema = ConfectDataModel.ConfectDataModel.FromSchema<
+    type FromSchema = ConfectDataModel.DataModel.FromSchema<
       typeof _confectSchema
     >;
 
-    expectTypeOf<FromSchema>().toExtend<ConfectDataModel.ConfectDataModel.Any>();
+    expectTypeOf<FromSchema>().toExtend<ConfectDataModel.DataModel.Any>();
     expectTypeOf<keyof FromSchema["tables"]>().toEqualTypeOf<
       "notes" | "users"
     >();
@@ -119,9 +112,9 @@ describe("ConfectDataModel.FromSchema", () => {
 
 describe("ConfectDataModel.FromTables", () => {
   test("creates ConfectDataModel from Tables union", () => {
-    type FromTables = ConfectDataModel.ConfectDataModel.FromTables<TestTables>;
+    type FromTables = ConfectDataModel.DataModel.FromTables<TestTables>;
 
-    expectTypeOf<FromTables>().toExtend<ConfectDataModel.ConfectDataModel.Any>();
+    expectTypeOf<FromTables>().toExtend<ConfectDataModel.DataModel.Any>();
     expectTypeOf<keyof FromTables["tables"]>().toEqualTypeOf<
       "notes" | "users"
     >();
@@ -130,22 +123,19 @@ describe("ConfectDataModel.FromTables", () => {
 
 describe("ConfectDataModel.DataModel", () => {
   test("produces type extending GenericDataModel", () => {
-    type DataModel =
-      ConfectDataModel.ConfectDataModel.DataModel<TestConfectDataModel>;
+    type DataModel = ConfectDataModel.DataModel.ToConvex<TestConfectDataModel>;
 
     expectTypeOf<DataModel>().toExtend<GenericDataModel>();
   });
 
   test("has table keys matching original ConfectDataModel", () => {
-    type DataModel =
-      ConfectDataModel.ConfectDataModel.DataModel<TestConfectDataModel>;
+    type DataModel = ConfectDataModel.DataModel.ToConvex<TestConfectDataModel>;
 
     expectTypeOf<keyof DataModel>().toEqualTypeOf<"notes" | "users">();
   });
 
   test("table info extends GenericTableInfo", () => {
-    type DataModel =
-      ConfectDataModel.ConfectDataModel.DataModel<TestConfectDataModel>;
+    type DataModel = ConfectDataModel.DataModel.ToConvex<TestConfectDataModel>;
 
     expectTypeOf<DataModel["notes"]>().toExtend<GenericTableInfo>();
     expectTypeOf<DataModel["users"]>().toExtend<GenericTableInfo>();
@@ -155,14 +145,14 @@ describe("ConfectDataModel.DataModel", () => {
 describe("ConfectDataModel.TableNames", () => {
   test("extracts table names as union of string literals", () => {
     type TableNames =
-      ConfectDataModel.ConfectDataModel.TableNames<TestConfectDataModel>;
+      ConfectDataModel.DataModel.TableNames<TestConfectDataModel>;
 
     expectTypeOf<TableNames>().toEqualTypeOf<"notes" | "users">();
   });
 
   test("is a string type", () => {
     type TableNames =
-      ConfectDataModel.ConfectDataModel.TableNames<TestConfectDataModel>;
+      ConfectDataModel.DataModel.TableNames<TestConfectDataModel>;
 
     expectTypeOf<TableNames>().toExtend<string>();
   });
@@ -170,45 +160,43 @@ describe("ConfectDataModel.TableNames", () => {
 
 describe("ConfectDataModel.TableWithName", () => {
   test("returns the correct table for notes", () => {
-    type NotesTable = ConfectDataModel.ConfectDataModel.TableWithName<
+    type NotesTable = ConfectDataModel.DataModel.TableWithName<
       TestConfectDataModel,
       "notes"
     >;
 
     expectTypeOf<NotesTable["name"]>().toEqualTypeOf<"notes">();
-    expectTypeOf<NotesTable>().toExtend<ConfectTable.ConfectTable.AnyWithProps>();
+    expectTypeOf<NotesTable>().toExtend<ConfectTable.Table.AnyWithProps>();
   });
 
   test("returns the correct table for users", () => {
-    type UsersTable = ConfectDataModel.ConfectDataModel.TableWithName<
+    type UsersTable = ConfectDataModel.DataModel.TableWithName<
       TestConfectDataModel,
       "users"
     >;
 
     expectTypeOf<UsersTable["name"]>().toEqualTypeOf<"users">();
-    expectTypeOf<UsersTable>().toExtend<ConfectTable.ConfectTable.AnyWithProps>();
+    expectTypeOf<UsersTable>().toExtend<ConfectTable.Table.AnyWithProps>();
   });
 });
 
 describe("ConfectDataModel.ConfectTableInfoWithName", () => {
   test("returns ConfectTableInfo for notes table", () => {
-    type NotesTableInfo =
-      ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
-        TestConfectDataModel,
-        "notes"
-      >;
+    type NotesTableInfo = ConfectDataModel.DataModel.TableInfoWithName_<
+      TestConfectDataModel,
+      "notes"
+    >;
 
-    expectTypeOf<NotesTableInfo>().toExtend<ConfectTableInfo.ConfectTableInfo.AnyWithProps>();
+    expectTypeOf<NotesTableInfo>().toExtend<ConfectTableInfo.TableInfo.AnyWithProps>();
   });
 
-  test("has confectDocument with correct fields", () => {
-    type NotesTableInfo =
-      ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
-        TestConfectDataModel,
-        "notes"
-      >;
+  test("has document with correct fields", () => {
+    type NotesTableInfo = ConfectDataModel.DataModel.TableInfoWithName_<
+      TestConfectDataModel,
+      "notes"
+    >;
 
-    expectTypeOf<NotesTableInfo["confectDocument"]>().toEqualTypeOf<{
+    expectTypeOf<NotesTableInfo["document"]>().toEqualTypeOf<{
       readonly _id: GenericId<"notes">;
       readonly _creationTime: number;
       readonly content: string;
@@ -217,11 +205,10 @@ describe("ConfectDataModel.ConfectTableInfoWithName", () => {
   });
 
   test("has convexDocument with correct fields (mutable)", () => {
-    type NotesTableInfo =
-      ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
-        TestConfectDataModel,
-        "notes"
-      >;
+    type NotesTableInfo = ConfectDataModel.DataModel.TableInfoWithName_<
+      TestConfectDataModel,
+      "notes"
+    >;
 
     expectTypeOf<NotesTableInfo["convexDocument"]>().toEqualTypeOf<{
       _id: GenericId<"notes">;
@@ -232,11 +219,10 @@ describe("ConfectDataModel.ConfectTableInfoWithName", () => {
   });
 
   test("has indexes including system indexes and custom indexes", () => {
-    type NotesTableInfo =
-      ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
-        TestConfectDataModel,
-        "notes"
-      >;
+    type NotesTableInfo = ConfectDataModel.DataModel.TableInfoWithName_<
+      TestConfectDataModel,
+      "notes"
+    >;
 
     expectTypeOf<NotesTableInfo["indexes"]>().toExtend<SystemIndexes>();
     expectTypeOf<NotesTableInfo["indexes"]["by_priority"]>().toEqualTypeOf<
@@ -247,7 +233,7 @@ describe("ConfectDataModel.ConfectTableInfoWithName", () => {
 
 describe("ConfectDataModel.TableInfoWithName", () => {
   test("returns TableInfo compatible with Convex GenericTableInfo", () => {
-    type NotesTableInfo = ConfectDataModel.ConfectDataModel.TableInfoWithName<
+    type NotesTableInfo = ConfectDataModel.DataModel.TableInfoWithName<
       TestConfectDataModel,
       "notes"
     >;
@@ -256,7 +242,7 @@ describe("ConfectDataModel.TableInfoWithName", () => {
   });
 
   test("has document property with convex document type", () => {
-    type NotesTableInfo = ConfectDataModel.ConfectDataModel.TableInfoWithName<
+    type NotesTableInfo = ConfectDataModel.DataModel.TableInfoWithName<
       TestConfectDataModel,
       "notes"
     >;
@@ -274,14 +260,12 @@ describe("ConfectDataModel.ConfectDocumentWithName", () => {
   test("can extract document type via ConfectTableInfo", () => {
     // ConfectDocumentWithName uses ConfectTableInfo.ConfectDocument
     // We test via ConfectTableInfoWithName which correctly maps the table
-    type NotesTableInfo =
-      ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
-        TestConfectDataModel,
-        "notes"
-      >;
+    type NotesTableInfo = ConfectDataModel.DataModel.TableInfoWithName_<
+      TestConfectDataModel,
+      "notes"
+    >;
 
-    type Doc =
-      ConfectTableInfo.ConfectTableInfo.ConfectDocument<NotesTableInfo>;
+    type Doc = ConfectTableInfo.TableInfo.Document<NotesTableInfo>;
 
     expectTypeOf<Doc>().toEqualTypeOf<{
       readonly _id: GenericId<"notes">;
@@ -294,13 +278,12 @@ describe("ConfectDataModel.ConfectDocumentWithName", () => {
 
 describe("ConfectDocumentByName", () => {
   test("extracts encoded confect document for table", () => {
-    type NotesTableInfo =
-      ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
-        TestConfectDataModel,
-        "notes"
-      >;
+    type NotesTableInfo = ConfectDataModel.DataModel.TableInfoWithName_<
+      TestConfectDataModel,
+      "notes"
+    >;
 
-    type Doc = NotesTableInfo["confectDocument"];
+    type Doc = NotesTableInfo["document"];
 
     expectTypeOf<Doc>().toEqualTypeOf<{
       readonly _id: GenericId<"notes">;
@@ -313,25 +296,23 @@ describe("ConfectDocumentByName", () => {
 
 describe("ConfectTableInfo.TableInfo (via ConfectDataModel)", () => {
   test("converts ConfectTableInfo to Convex TableInfo structure", () => {
-    type NotesConfectTableInfo =
-      ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
-        TestConfectDataModel,
-        "notes"
-      >;
+    type NotesConfectTableInfo = ConfectDataModel.DataModel.TableInfoWithName_<
+      TestConfectDataModel,
+      "notes"
+    >;
     type TableInfo =
-      ConfectTableInfo.ConfectTableInfo.TableInfo<NotesConfectTableInfo>;
+      ConfectTableInfo.TableInfo.TableInfo<NotesConfectTableInfo>;
 
     expectTypeOf<TableInfo>().toExtend<GenericTableInfo>();
   });
 
   test("has document property from convexDocument", () => {
-    type NotesConfectTableInfo =
-      ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
-        TestConfectDataModel,
-        "notes"
-      >;
+    type NotesConfectTableInfo = ConfectDataModel.DataModel.TableInfoWithName_<
+      TestConfectDataModel,
+      "notes"
+    >;
     type TableInfo =
-      ConfectTableInfo.ConfectTableInfo.TableInfo<NotesConfectTableInfo>;
+      ConfectTableInfo.TableInfo.TableInfo<NotesConfectTableInfo>;
 
     expectTypeOf<TableInfo["document"]>().toEqualTypeOf<
       NotesConfectTableInfo["convexDocument"]
@@ -339,13 +320,12 @@ describe("ConfectTableInfo.TableInfo (via ConfectDataModel)", () => {
   });
 
   test("preserves fieldPaths", () => {
-    type NotesConfectTableInfo =
-      ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
-        TestConfectDataModel,
-        "notes"
-      >;
+    type NotesConfectTableInfo = ConfectDataModel.DataModel.TableInfoWithName_<
+      TestConfectDataModel,
+      "notes"
+    >;
     type TableInfo =
-      ConfectTableInfo.ConfectTableInfo.TableInfo<NotesConfectTableInfo>;
+      ConfectTableInfo.TableInfo.TableInfo<NotesConfectTableInfo>;
 
     expectTypeOf<TableInfo["fieldPaths"]>().toEqualTypeOf<
       NotesConfectTableInfo["fieldPaths"]
@@ -353,13 +333,12 @@ describe("ConfectTableInfo.TableInfo (via ConfectDataModel)", () => {
   });
 
   test("preserves indexes", () => {
-    type NotesConfectTableInfo =
-      ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
-        TestConfectDataModel,
-        "notes"
-      >;
+    type NotesConfectTableInfo = ConfectDataModel.DataModel.TableInfoWithName_<
+      TestConfectDataModel,
+      "notes"
+    >;
     type TableInfo =
-      ConfectTableInfo.ConfectTableInfo.TableInfo<NotesConfectTableInfo>;
+      ConfectTableInfo.TableInfo.TableInfo<NotesConfectTableInfo>;
 
     expectTypeOf<TableInfo["indexes"]>().toEqualTypeOf<
       NotesConfectTableInfo["indexes"]
@@ -368,58 +347,52 @@ describe("ConfectTableInfo.TableInfo (via ConfectDataModel)", () => {
 });
 
 describe("ConfectTableInfo.AnyWithProps", () => {
-  test("has confectDocument field", () => {
-    type Doc =
-      ConfectTableInfo.ConfectTableInfo.AnyWithProps["confectDocument"];
+  test("has document field", () => {
+    type Doc = ConfectTableInfo.TableInfo.AnyWithProps["document"];
     expectTypeOf<Doc>().toBeAny();
   });
 
-  test("has encodedConfectDocument as readonly record", () => {
+  test("has encodedDocument as readonly record", () => {
     type EncodedDoc =
-      ConfectTableInfo.ConfectTableInfo.AnyWithProps["encodedConfectDocument"];
+      ConfectTableInfo.TableInfo.AnyWithProps["encodedDocument"];
     expectTypeOf<EncodedDoc>().toExtend<Record<string, unknown>>();
   });
 
   test("has convexDocument as GenericDocument", () => {
-    type ConvexDoc =
-      ConfectTableInfo.ConfectTableInfo.AnyWithProps["convexDocument"];
+    type ConvexDoc = ConfectTableInfo.TableInfo.AnyWithProps["convexDocument"];
     expectTypeOf<ConvexDoc>().toExtend<GenericDocument>();
   });
 
   test("has fieldPaths property", () => {
-    type FieldPaths =
-      ConfectTableInfo.ConfectTableInfo.AnyWithProps["fieldPaths"];
+    type FieldPaths = ConfectTableInfo.TableInfo.AnyWithProps["fieldPaths"];
     expectTypeOf<FieldPaths>().toExtend<string>();
   });
 
   test("has indexes property", () => {
-    type Indexes = ConfectTableInfo.ConfectTableInfo.AnyWithProps["indexes"];
+    type Indexes = ConfectTableInfo.TableInfo.AnyWithProps["indexes"];
     expectTypeOf<Indexes>().toExtend<Record<string, unknown>>();
   });
 
   test("ConfectTableInfo extends AnyWithProps", () => {
-    type NotesTableInfo =
-      ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
-        TestConfectDataModel,
-        "notes"
-      >;
+    type NotesTableInfo = ConfectDataModel.DataModel.TableInfoWithName_<
+      TestConfectDataModel,
+      "notes"
+    >;
 
-    expectTypeOf<NotesTableInfo>().toExtend<ConfectTableInfo.ConfectTableInfo.AnyWithProps>();
+    expectTypeOf<NotesTableInfo>().toExtend<ConfectTableInfo.TableInfo.AnyWithProps>();
   });
 });
 
 describe("ConfectTableInfo.TableSchema", () => {
   test("produces Schema with correct Type and Encoded", () => {
-    type NotesTableInfo =
-      ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
-        TestConfectDataModel,
-        "notes"
-      >;
-    type TableSchema =
-      ConfectTableInfo.ConfectTableInfo.TableSchema<NotesTableInfo>;
+    type NotesTableInfo = ConfectDataModel.DataModel.TableInfoWithName_<
+      TestConfectDataModel,
+      "notes"
+    >;
+    type TableSchema = ConfectTableInfo.TableInfo.TableSchema<NotesTableInfo>;
 
-    type ExpectedType = NotesTableInfo["confectDocument"];
-    type ExpectedEncoded = NotesTableInfo["encodedConfectDocument"];
+    type ExpectedType = NotesTableInfo["document"];
+    type ExpectedEncoded = NotesTableInfo["encodedDocument"];
 
     expectTypeOf<TableSchema>().toExtend<
       Schema.Schema<ExpectedType, ExpectedEncoded>
@@ -429,13 +402,12 @@ describe("ConfectTableInfo.TableSchema", () => {
 
 describe("GenericConfectDoc", () => {
   test("extracts encoded document from ConfectTableInfo", () => {
-    type NotesTableInfo =
-      ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
-        TestConfectDataModel,
-        "notes"
-      >;
+    type NotesTableInfo = ConfectDataModel.DataModel.TableInfoWithName_<
+      TestConfectDataModel,
+      "notes"
+    >;
 
-    expectTypeOf<NotesTableInfo["encodedConfectDocument"]>().toEqualTypeOf<{
+    expectTypeOf<NotesTableInfo["encodedDocument"]>().toEqualTypeOf<{
       readonly _id: GenericId<"notes">;
       readonly _creationTime: number;
       readonly content: string;
@@ -444,13 +416,12 @@ describe("GenericConfectDoc", () => {
   });
 
   test("extracts encoded document for users table", () => {
-    type UsersTableInfo =
-      ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
-        TestConfectDataModel,
-        "users"
-      >;
+    type UsersTableInfo = ConfectDataModel.DataModel.TableInfoWithName_<
+      TestConfectDataModel,
+      "users"
+    >;
 
-    expectTypeOf<UsersTableInfo["encodedConfectDocument"]>().toEqualTypeOf<{
+    expectTypeOf<UsersTableInfo["encodedDocument"]>().toEqualTypeOf<{
       readonly _id: GenericId<"users">;
       readonly _creationTime: number;
       readonly username: string;
@@ -461,22 +432,22 @@ describe("GenericConfectDoc", () => {
 
 describe("Edge cases", () => {
   test("table with optional fields", () => {
-    const _TableWithOptional = ConfectTable.make({
-      name: "with_optional",
-      fields: Schema.Struct({
+    const _TableWithOptional = ConfectTable.make(
+      "with_optional",
+      Schema.Struct({
         required: Schema.String,
         optional: Schema.optional(Schema.Number),
       }),
-    });
+    );
 
     type Tables = typeof _TableWithOptional;
-    type DataModel = ConfectDataModel.ConfectDataModel.FromTables<Tables>;
-    type TableInfo = ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+    type DataModel = ConfectDataModel.DataModel.FromTables<Tables>;
+    type TableInfo = ConfectDataModel.DataModel.TableInfoWithName_<
       DataModel,
       "with_optional"
     >;
 
-    expectTypeOf<TableInfo["confectDocument"]>().toEqualTypeOf<{
+    expectTypeOf<TableInfo["document"]>().toEqualTypeOf<{
       readonly _id: GenericId<"with_optional">;
       readonly _creationTime: number;
       readonly required: string;
@@ -485,24 +456,24 @@ describe("Edge cases", () => {
   });
 
   test("table with nested struct fields", () => {
-    const _TableWithNested = ConfectTable.make({
-      name: "with_nested",
-      fields: Schema.Struct({
+    const _TableWithNested = ConfectTable.make(
+      "with_nested",
+      Schema.Struct({
         nested: Schema.Struct({
           inner: Schema.String,
           value: Schema.Number,
         }),
       }),
-    });
+    );
 
     type Tables = typeof _TableWithNested;
-    type DataModel = ConfectDataModel.ConfectDataModel.FromTables<Tables>;
-    type TableInfo = ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+    type DataModel = ConfectDataModel.DataModel.FromTables<Tables>;
+    type TableInfo = ConfectDataModel.DataModel.TableInfoWithName_<
       DataModel,
       "with_nested"
     >;
 
-    expectTypeOf<TableInfo["confectDocument"]>().toEqualTypeOf<{
+    expectTypeOf<TableInfo["document"]>().toEqualTypeOf<{
       readonly _id: GenericId<"with_nested">;
       readonly _creationTime: number;
       readonly nested: {
@@ -513,21 +484,21 @@ describe("Edge cases", () => {
   });
 
   test("table with array fields", () => {
-    const _TableWithArray = ConfectTable.make({
-      name: "with_array",
-      fields: Schema.Struct({
+    const _TableWithArray = ConfectTable.make(
+      "with_array",
+      Schema.Struct({
         items: Schema.Array(Schema.String),
       }),
-    });
+    );
 
     type Tables = typeof _TableWithArray;
-    type DataModel = ConfectDataModel.ConfectDataModel.FromTables<Tables>;
-    type TableInfo = ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+    type DataModel = ConfectDataModel.DataModel.FromTables<Tables>;
+    type TableInfo = ConfectDataModel.DataModel.TableInfoWithName_<
       DataModel,
       "with_array"
     >;
 
-    expectTypeOf<TableInfo["confectDocument"]>().toEqualTypeOf<{
+    expectTypeOf<TableInfo["document"]>().toEqualTypeOf<{
       readonly _id: GenericId<"with_array">;
       readonly _creationTime: number;
       readonly items: readonly string[];
@@ -535,25 +506,25 @@ describe("Edge cases", () => {
   });
 
   test("table with union fields", () => {
-    const _TableWithUnion = ConfectTable.make({
-      name: "with_union",
-      fields: Schema.Struct({
+    const _TableWithUnion = ConfectTable.make(
+      "with_union",
+      Schema.Struct({
         status: Schema.Union(
           Schema.Literal("pending"),
           Schema.Literal("active"),
           Schema.Literal("completed"),
         ),
       }),
-    });
+    );
 
     type Tables = typeof _TableWithUnion;
-    type DataModel = ConfectDataModel.ConfectDataModel.FromTables<Tables>;
-    type TableInfo = ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+    type DataModel = ConfectDataModel.DataModel.FromTables<Tables>;
+    type TableInfo = ConfectDataModel.DataModel.TableInfoWithName_<
       DataModel,
       "with_union"
     >;
 
-    expectTypeOf<TableInfo["confectDocument"]>().toEqualTypeOf<{
+    expectTypeOf<TableInfo["document"]>().toEqualTypeOf<{
       readonly _id: GenericId<"with_union">;
       readonly _creationTime: number;
       readonly status: "pending" | "active" | "completed";
@@ -561,35 +532,32 @@ describe("Edge cases", () => {
   });
 
   test("single table schema", () => {
-    const _SingleTable = ConfectTable.make({
-      name: "single",
-      fields: Schema.Struct({ value: Schema.String }),
-    });
+    const _SingleTable = ConfectTable.make("single", Schema.Struct({ value: Schema.String }));
 
     type Tables = typeof _SingleTable;
-    type DataModel = ConfectDataModel.ConfectDataModel.FromTables<Tables>;
+    type DataModel = ConfectDataModel.DataModel.FromTables<Tables>;
 
-    type TableNames = ConfectDataModel.ConfectDataModel.TableNames<DataModel>;
+    type TableNames = ConfectDataModel.DataModel.TableNames<DataModel>;
 
     expectTypeOf<TableNames>().toEqualTypeOf<"single">();
   });
 
   test("multiple indexes on table", () => {
-    const _TableWithIndexes = ConfectTable.make({
-      name: "indexed",
-      fields: Schema.Struct({
+    const _TableWithIndexes = ConfectTable.make(
+      "indexed",
+      Schema.Struct({
         field1: Schema.String,
         field2: Schema.Number,
         field3: Schema.Boolean,
       }),
-    })
+    )
       .index("by_field1", ["field1"])
       .index("by_field2", ["field2"])
       .index("by_field1_and_field2", ["field1", "field2"]);
 
     type Tables = typeof _TableWithIndexes;
-    type DataModel = ConfectDataModel.ConfectDataModel.FromTables<Tables>;
-    type TableInfo = ConfectDataModel.ConfectDataModel.ConfectTableInfoWithName<
+    type DataModel = ConfectDataModel.DataModel.FromTables<Tables>;
+    type TableInfo = ConfectDataModel.DataModel.TableInfoWithName_<
       DataModel,
       "indexed"
     >;
@@ -605,4 +573,3 @@ describe("Edge cases", () => {
     >();
   });
 });
-

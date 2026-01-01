@@ -31,12 +31,10 @@ export const schema = ({ schemaImportPath }: { schemaImportPath: string }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-    yield* cbw.writeLine(
-      `import confectSchemaDefinition from "${schemaImportPath}";`,
-    );
+    yield* cbw.writeLine(`import schemaDefinition from "${schemaImportPath}";`);
     yield* cbw.newLine();
     yield* cbw.writeLine(
-      `export default confectSchemaDefinition.convexSchemaDefinition;`,
+      `export default schemaDefinition.convexSchemaDefinition;`,
     );
 
     return yield* cbw.toString();
@@ -57,17 +55,13 @@ export const refs = ({ specImportPath }: { specImportPath: string }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-    yield* cbw.writeLine(
-      `import { ConfectApiRefs } from "@rjdellecese/confect";`,
-    );
+    yield* cbw.writeLine(`import { Refs } from "@rjdellecese/confect";`);
     yield* cbw.writeLine(`import spec from "${specImportPath}";`);
     yield* cbw.blankLine();
-    yield* cbw.writeLine(`const refs = ConfectApiRefs.make(spec);`);
+    yield* cbw.writeLine(`const refs = Refs.make(spec);`);
     yield* cbw.blankLine();
-    yield* cbw.writeLine(`export const api = ConfectApiRefs.justPublic(refs);`);
-    yield* cbw.writeLine(
-      `export const internal = ConfectApiRefs.justInternal(refs);`,
-    );
+    yield* cbw.writeLine(`export const api = Refs.justPublic(refs);`);
+    yield* cbw.writeLine(`export const internal = Refs.justInternal(refs);`);
 
     return yield* cbw.toString();
   });
@@ -85,12 +79,12 @@ export const api = ({
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
     yield* cbw.writeLine(
-      `import { ConfectApi } from "${test ? "../../../src/index" : "@rjdellecese/confect"}";`,
+      `import { Api } from "${test ? "../../../src/index" : "@rjdellecese/confect"}";`,
     );
     yield* cbw.writeLine(`import schema from "${schemaImportPath}";`);
     yield* cbw.writeLine(`import spec from "${specImportPath}";`);
     yield* cbw.blankLine();
-    yield* cbw.writeLine(`export default ConfectApi.make(schema, spec);`);
+    yield* cbw.writeLine(`export default Api.make(schema, spec);`);
 
     return yield* cbw.toString();
   });
@@ -107,178 +101,174 @@ export const services = ({
 
     // Imports
     yield* cbw.writeLine(
-      `import type { ConfectDataModel } from "${test ? "../../../src/index" : "@rjdellecese/confect"}";`,
+      `import type { DataModel } from "${test ? "../../../src/index" : "@rjdellecese/confect"}";`,
     );
     yield* cbw.writeLine("import {");
     yield* cbw.indent(
       Effect.gen(function* () {
-        yield* cbw.writeLine("ConfectActionRunner as ConfectActionRunner_,");
-        yield* cbw.writeLine("ConfectAuth as ConfectAuth_,");
-        yield* cbw.writeLine(
-          "ConfectDatabaseReader as ConfectDatabaseReader_,",
-        );
-        yield* cbw.writeLine(
-          "ConfectDatabaseWriter as ConfectDatabaseWriter_,",
-        );
-        yield* cbw.writeLine(
-          "ConfectMutationRunner as ConfectMutationRunner_,",
-        );
-        yield* cbw.writeLine("ConfectQueryRunner as ConfectQueryRunner_,");
-        yield* cbw.writeLine("ConfectScheduler as ConfectScheduler_,");
-        yield* cbw.writeLine("ConfectStorage,");
-        yield* cbw.writeLine("ConfectVectorSearch as ConfectVectorSearch_,");
-        yield* cbw.writeLine("ConvexActionCtx as ConvexActionCtx_,");
-        yield* cbw.writeLine("ConvexMutationCtx as ConvexMutationCtx_,");
-        yield* cbw.writeLine("ConvexQueryCtx as ConvexQueryCtx_,");
+        yield* cbw.writeLine("ActionRunner as ActionRunner_,");
+        yield* cbw.writeLine("Auth as Auth_,");
+        yield* cbw.writeLine("DatabaseReader as DatabaseReader_,");
+        yield* cbw.writeLine("DatabaseWriter as DatabaseWriter_,");
+        yield* cbw.writeLine("MutationRunner as MutationRunner_,");
+        yield* cbw.writeLine("QueryRunner as QueryRunner_,");
+        yield* cbw.writeLine("Scheduler as Scheduler_,");
+        yield* cbw.writeLine("Storage,");
+        yield* cbw.writeLine("VectorSearch as VectorSearch_,");
+        yield* cbw.writeLine("ActionCtx as ActionCtx_,");
+        yield* cbw.writeLine("MutationCtx as MutationCtx_,");
+        yield* cbw.writeLine("QueryCtx as QueryCtx_,");
       }),
     );
     yield* cbw.writeLine(
       `} from "${test ? "../../../src/index" : "@rjdellecese/confect"}";`,
     );
     yield* cbw.writeLine(
-      `import type confectSchemaDefinition from "${schemaImportPath}";`,
+      `import type schemaDefinition from "${schemaImportPath}";`,
     );
     yield* cbw.blankLine();
 
-    // ConfectAuth
+    // Auth
+    yield* cbw.writeLine("export const Auth = Auth_.Auth;");
+    yield* cbw.writeLine("export type Auth = typeof Auth.Identifier;");
+    yield* cbw.blankLine();
+
+    // Scheduler
+    yield* cbw.writeLine("export const Scheduler = Scheduler_.Scheduler;");
     yield* cbw.writeLine(
-      "export const ConfectAuth = ConfectAuth_.ConfectAuth;",
-    );
-    yield* cbw.writeLine(
-      "export type ConfectAuth = typeof ConfectAuth.Identifier;",
+      "export type Scheduler = typeof Scheduler.Identifier;",
     );
     yield* cbw.blankLine();
 
-    // ConfectScheduler
+    // StorageReader
+    yield* cbw.writeLine("export const StorageReader = Storage.StorageReader;");
     yield* cbw.writeLine(
-      "export const ConfectScheduler = ConfectScheduler_.ConfectScheduler;",
-    );
-    yield* cbw.writeLine(
-      "export type ConfectScheduler = typeof ConfectScheduler.Identifier;",
+      "export type StorageReader = typeof StorageReader.Identifier;",
     );
     yield* cbw.blankLine();
 
-    // ConfectStorageReader
+    // StorageWriter
+    yield* cbw.writeLine("export const StorageWriter = Storage.StorageWriter;");
     yield* cbw.writeLine(
-      "export const ConfectStorageReader = ConfectStorage.ConfectStorageReader;",
-    );
-    yield* cbw.writeLine(
-      "export type ConfectStorageReader = typeof ConfectStorageReader.Identifier;",
+      "export type StorageWriter = typeof StorageWriter.Identifier;",
     );
     yield* cbw.blankLine();
 
-    // ConfectStorageWriter
-    yield* cbw.writeLine(
-      "export const ConfectStorageWriter = ConfectStorage.ConfectStorageWriter;",
-    );
-    yield* cbw.writeLine(
-      "export type ConfectStorageWriter = typeof ConfectStorageWriter.Identifier;",
-    );
+    // StorageActionWriter
+    yield* cbw.writeLine("export const StorageActionWriter =");
+    yield* cbw.indent(cbw.writeLine("Storage.StorageActionWriter;"));
+    yield* cbw.writeLine("export type StorageActionWriter =");
+    yield* cbw.indent(cbw.writeLine("typeof StorageActionWriter.Identifier;"));
     yield* cbw.blankLine();
 
-    // ConfectStorageActionWriter
-    yield* cbw.writeLine("export const ConfectStorageActionWriter =");
-    yield* cbw.indent(
-      cbw.writeLine("ConfectStorage.ConfectStorageActionWriter;"),
-    );
-    yield* cbw.writeLine("export type ConfectStorageActionWriter =");
-    yield* cbw.indent(
-      cbw.writeLine("typeof ConfectStorageActionWriter.Identifier;"),
-    );
-    yield* cbw.blankLine();
-
-    // ConfectVectorSearch
-    yield* cbw.writeLine("export const ConfectVectorSearch =");
+    // VectorSearch
+    yield* cbw.writeLine("export const VectorSearch =");
     yield* cbw.indent(
       Effect.gen(function* () {
-        yield* cbw.writeLine("ConfectVectorSearch_.ConfectVectorSearch<");
+        yield* cbw.writeLine("VectorSearch_.VectorSearch<");
         yield* cbw.indent(
           cbw.writeLine(
-            "ConfectDataModel.ConfectDataModel.FromSchema<typeof confectSchemaDefinition>",
+            "DataModel.DataModel.FromSchema<typeof schemaDefinition>",
           ),
         );
         yield* cbw.writeLine(">();");
       }),
     );
     yield* cbw.writeLine(
-      "export type ConfectVectorSearch = typeof ConfectVectorSearch.Identifier;",
+      "export type VectorSearch = typeof VectorSearch.Identifier;",
     );
     yield* cbw.blankLine();
 
-    // ConfectDatabaseReader
-    yield* cbw.writeLine("export const ConfectDatabaseReader =");
+    // DatabaseReader
+    yield* cbw.writeLine("export const DatabaseReader =");
     yield* cbw.indent(
       Effect.gen(function* () {
-        yield* cbw.writeLine("ConfectDatabaseReader_.ConfectDatabaseReader<");
-        yield* cbw.indent(cbw.writeLine("typeof confectSchemaDefinition"));
+        yield* cbw.writeLine("DatabaseReader_.DatabaseReader<");
+        yield* cbw.indent(cbw.writeLine("typeof schemaDefinition"));
         yield* cbw.writeLine(">();");
       }),
     );
     yield* cbw.writeLine(
-      "export type ConfectDatabaseReader = typeof ConfectDatabaseReader.Identifier;",
+      "export type DatabaseReader = typeof DatabaseReader.Identifier;",
     );
     yield* cbw.blankLine();
 
-    // ConfectDatabaseWriter
-    yield* cbw.writeLine("export const ConfectDatabaseWriter =");
+    // DatabaseWriter
+    yield* cbw.writeLine("export const DatabaseWriter =");
     yield* cbw.indent(
       Effect.gen(function* () {
-        yield* cbw.writeLine("ConfectDatabaseWriter_.ConfectDatabaseWriter<");
-        yield* cbw.indent(cbw.writeLine("typeof confectSchemaDefinition"));
+        yield* cbw.writeLine("DatabaseWriter_.DatabaseWriter<");
+        yield* cbw.indent(cbw.writeLine("typeof schemaDefinition"));
         yield* cbw.writeLine(">();");
       }),
     );
     yield* cbw.writeLine(
-      "export type ConfectDatabaseWriter = typeof ConfectDatabaseWriter.Identifier;",
+      "export type DatabaseWriter = typeof DatabaseWriter.Identifier;",
     );
     yield* cbw.blankLine();
 
-    // ConfectQueryRunner
+    // QueryRunner
     yield* cbw.writeLine(
-      "export const ConfectQueryRunner = ConfectQueryRunner_.ConfectQueryRunner;",
+      "export const QueryRunner = QueryRunner_.QueryRunner;",
     );
     yield* cbw.writeLine(
-      "export type ConfectQueryRunner = typeof ConfectQueryRunner.Identifier;",
+      "export type QueryRunner = typeof QueryRunner.Identifier;",
     );
     yield* cbw.blankLine();
 
-    // ConfectMutationRunner
-    yield* cbw.writeLine("export const ConfectMutationRunner =");
-    yield* cbw.indent(
-      cbw.writeLine("ConfectMutationRunner_.ConfectMutationRunner;"),
-    );
+    // MutationRunner
+    yield* cbw.writeLine("export const MutationRunner =");
+    yield* cbw.indent(cbw.writeLine("MutationRunner_.MutationRunner;"));
     yield* cbw.writeLine(
-      "export type ConfectMutationRunner = typeof ConfectMutationRunner.Identifier;",
+      "export type MutationRunner = typeof MutationRunner.Identifier;",
     );
     yield* cbw.blankLine();
 
-    // ConfectActionRunner
+    // ActionRunner
     yield* cbw.writeLine(
-      "export const ConfectActionRunner = ConfectActionRunner_.ConfectActionRunner;",
+      "export const ActionRunner = ActionRunner_.ActionRunner;",
     );
     yield* cbw.writeLine(
-      "export type ConfectActionRunner = typeof ConfectActionRunner.Identifier;",
+      "export type ActionRunner = typeof ActionRunner.Identifier;",
     );
     yield* cbw.blankLine();
 
-    // ConvexQueryCtx
-    yield* cbw.writeLine("export const ConvexQueryCtx =");
+    // QueryCtx
+    yield* cbw.writeLine("export const QueryCtx =");
     yield* cbw.indent(
       Effect.gen(function* () {
-        yield* cbw.writeLine("ConvexQueryCtx_.ConvexQueryCtx<");
+        yield* cbw.writeLine("QueryCtx_.QueryCtx<");
         yield* cbw.indent(
           Effect.gen(function* () {
-            yield* cbw.writeLine(
-              "ConfectDataModel.ConfectDataModel.DataModel<",
-            );
+            yield* cbw.writeLine("DataModel.DataModel.ToConvex<");
             yield* cbw.indent(
               Effect.gen(function* () {
-                yield* cbw.writeLine(
-                  "ConfectDataModel.ConfectDataModel.FromSchema<",
-                );
-                yield* cbw.indent(
-                  cbw.writeLine("typeof confectSchemaDefinition"),
-                );
+                yield* cbw.writeLine("DataModel.DataModel.FromSchema<");
+                yield* cbw.indent(cbw.writeLine("typeof schemaDefinition"));
+                yield* cbw.writeLine(">");
+              }),
+            );
+            yield* cbw.writeLine(">");
+          }),
+        );
+        yield* cbw.writeLine(">();");
+      }),
+    );
+    yield* cbw.writeLine("export type QueryCtx = typeof QueryCtx.Identifier;");
+    yield* cbw.blankLine();
+
+    // MutationCtx
+    yield* cbw.writeLine("export const MutationCtx =");
+    yield* cbw.indent(
+      Effect.gen(function* () {
+        yield* cbw.writeLine("MutationCtx_.MutationCtx<");
+        yield* cbw.indent(
+          Effect.gen(function* () {
+            yield* cbw.writeLine("DataModel.DataModel.ToConvex<");
+            yield* cbw.indent(
+              Effect.gen(function* () {
+                yield* cbw.writeLine("DataModel.DataModel.FromSchema<");
+                yield* cbw.indent(cbw.writeLine("typeof schemaDefinition"));
                 yield* cbw.writeLine(">");
               }),
             );
@@ -289,28 +279,22 @@ export const services = ({
       }),
     );
     yield* cbw.writeLine(
-      "export type ConvexQueryCtx = typeof ConvexQueryCtx.Identifier;",
+      "export type MutationCtx = typeof MutationCtx.Identifier;",
     );
     yield* cbw.blankLine();
 
-    // ConvexMutationCtx
-    yield* cbw.writeLine("export const ConvexMutationCtx =");
+    // ActionCtx
+    yield* cbw.writeLine("export const ActionCtx =");
     yield* cbw.indent(
       Effect.gen(function* () {
-        yield* cbw.writeLine("ConvexMutationCtx_.ConvexMutationCtx<");
+        yield* cbw.writeLine("ActionCtx_.ActionCtx<");
         yield* cbw.indent(
           Effect.gen(function* () {
-            yield* cbw.writeLine(
-              "ConfectDataModel.ConfectDataModel.DataModel<",
-            );
+            yield* cbw.writeLine("DataModel.DataModel.ToConvex<");
             yield* cbw.indent(
               Effect.gen(function* () {
-                yield* cbw.writeLine(
-                  "ConfectDataModel.ConfectDataModel.FromSchema<",
-                );
-                yield* cbw.indent(
-                  cbw.writeLine("typeof confectSchemaDefinition"),
-                );
+                yield* cbw.writeLine("DataModel.DataModel.FromSchema<");
+                yield* cbw.indent(cbw.writeLine("typeof schemaDefinition"));
                 yield* cbw.writeLine(">");
               }),
             );
@@ -321,39 +305,7 @@ export const services = ({
       }),
     );
     yield* cbw.writeLine(
-      "export type ConvexMutationCtx = typeof ConvexMutationCtx.Identifier;",
-    );
-    yield* cbw.blankLine();
-
-    // ConvexActionCtx
-    yield* cbw.writeLine("export const ConvexActionCtx =");
-    yield* cbw.indent(
-      Effect.gen(function* () {
-        yield* cbw.writeLine("ConvexActionCtx_.ConvexActionCtx<");
-        yield* cbw.indent(
-          Effect.gen(function* () {
-            yield* cbw.writeLine(
-              "ConfectDataModel.ConfectDataModel.DataModel<",
-            );
-            yield* cbw.indent(
-              Effect.gen(function* () {
-                yield* cbw.writeLine(
-                  "ConfectDataModel.ConfectDataModel.FromSchema<",
-                );
-                yield* cbw.indent(
-                  cbw.writeLine("typeof confectSchemaDefinition"),
-                );
-                yield* cbw.writeLine(">");
-              }),
-            );
-            yield* cbw.writeLine(">");
-          }),
-        );
-        yield* cbw.writeLine(">();");
-      }),
-    );
-    yield* cbw.writeLine(
-      "export type ConvexActionCtx = typeof ConvexActionCtx.Identifier;",
+      "export type ActionCtx = typeof ActionCtx.Identifier;",
     );
 
     return yield* cbw.toString();

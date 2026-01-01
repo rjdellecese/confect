@@ -1,8 +1,8 @@
 import type { Expand } from "convex/server";
 import { Schema } from "effect";
 import { describe, expect, expectTypeOf, test } from "vitest";
-import { GenericId } from "../api/GenericId";
-import { extendWithSystemFields } from "../api/SystemFields";
+import { GenericId } from "../../src/api/GenericId";
+import { extendWithSystemFields } from "../../src/api/SystemFields";
 
 describe(extendWithSystemFields, () => {
   test("extends a struct with system fields", () => {
@@ -99,4 +99,3 @@ describe(extendWithSystemFields, () => {
     expectTypeOf<Expand<Actual["Type"]>>().toEqualTypeOf<Expected["Type"]>();
   });
 });
-

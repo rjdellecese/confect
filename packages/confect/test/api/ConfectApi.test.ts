@@ -1,17 +1,17 @@
 import { Effect, Layer, Schema } from "effect";
-import * as ConfectApiFunctionSpec from "../../src/api/ConfectApiFunctionSpec";
-import * as ConfectApiGroupSpec from "../../src/api/ConfectApiGroupSpec";
-import * as ConfectApiRefs from "../../src/api/ConfectApiRefs";
-import * as ConfectApiSpec from "../../src/api/ConfectApiSpec";
-import * as ConfectApi from "../../src/server/ConfectApi";
-import * as ConfectApiFunctionImpl from "../../src/server/ConfectApiFunctionImpl";
-import * as ConfectApiGroupImpl from "../../src/server/ConfectApiGroupImpl";
-import * as ConfectApiImpl from "../../src/server/ConfectApiImpl";
-import * as ConfectApiServer from "../../src/server/ConfectApiServer";
-import * as ConfectDatabaseReader from "../../src/server/ConfectDatabaseReader";
-import * as ConfectDatabaseWriter from "../../src/server/ConfectDatabaseWriter";
-import * as ConfectSchema from "../../src/server/ConfectSchema";
-import * as ConfectTable from "../../src/server/ConfectTable";
+import * as ConfectApiFunctionSpec from "../../src/api/FunctionSpec";
+import * as ConfectApiGroupSpec from "../../src/api/GroupSpec";
+import * as ConfectApiRefs from "../../src/api/Refs";
+import * as ConfectApiSpec from "../../src/api/Spec";
+import * as ConfectApi from "../../src/server/Api";
+import * as ConfectDatabaseReader from "../../src/server/DatabaseReader";
+import * as ConfectDatabaseWriter from "../../src/server/DatabaseWriter";
+import * as ConfectApiFunctionImpl from "../../src/server/FunctionImpl";
+import * as ConfectApiGroupImpl from "../../src/server/GroupImpl";
+import * as ConfectImpl from "../../src/server/Impl";
+import * as DatabaseSchema from "../../src/server/DatabaseSchema";
+import * as ConfectApiServer from "../../src/server/Server";
+import * as ConfectTable from "../../src/server/Table";
 
 /*
  * api
@@ -73,13 +73,13 @@ const GroupB = ConfectApiGroupSpec.make("groupB")
   .addGroup(GroupBC)
   .addGroup(GroupBD);
 
-const confectSchema = ConfectSchema.make().addTable(
-  ConfectTable.make({
-    name: "notes",
-    fields: Schema.Struct({
+const confectSchema = DatabaseSchema.make().addTable(
+  ConfectTable.make(
+    "notes",
+    Schema.Struct({
       content: Schema.String,
     }),
-  }),
+  ),
 );
 
 type MyConfectSchema = typeof confectSchema;
@@ -88,14 +88,12 @@ const Spec = ConfectApiSpec.make().add(GroupA).add(GroupB);
 
 type Spec = typeof Spec;
 
-type Groups = ConfectApiSpec.ConfectApiSpec.Groups<Spec>;
-type GroupNames = ConfectApiGroupSpec.ConfectApiGroupSpec.Name<Groups>;
+type Groups = ConfectApiSpec.Spec.Groups<Spec>;
+type GroupNames = ConfectApiGroupSpec.GroupSpec.Name<Groups>;
 
 const Api = ConfectApi.make(confectSchema, Spec);
 
-type GroupPath = ConfectApiGroupSpec.Path.All<
-  ConfectApiSpec.ConfectApiSpec.Groups<Spec>
->;
+type GroupPath = ConfectApiGroupSpec.Path.All<ConfectApiSpec.Spec.Groups<Spec>>;
 
 // GroupA function implementations
 const MyFunction = ConfectApiFunctionImpl.make(
@@ -105,9 +103,9 @@ const MyFunction = ConfectApiFunctionImpl.make(
   (_args) =>
     Effect.gen(function* () {
       const _reader =
-        yield* ConfectDatabaseReader.ConfectDatabaseReader<MyConfectSchema>();
+        yield* ConfectDatabaseReader.DatabaseReader<MyConfectSchema>();
       const _writer =
-        yield* ConfectDatabaseWriter.ConfectDatabaseWriter<MyConfectSchema>();
+        yield* ConfectDatabaseWriter.DatabaseWriter<MyConfectSchema>();
 
       const _a = yield* _reader.table("notes").index("by_id", "asc").collect();
 
@@ -171,13 +169,13 @@ const GroupBImpl = ConfectApiGroupImpl.make(Api, "groupB").pipe(
   Layer.provide(GroupBDImpl),
 );
 
-const ApiImpl = ConfectApiImpl.make(Api).pipe(
+const Impl = ConfectImpl.make(Api).pipe(
   Layer.provide(GroupAImpl),
   Layer.provide(GroupBImpl),
 );
 
 const _server = ConfectApiServer.make(Api)
-  .pipe(Effect.provide(ApiImpl), Effect.runPromise)
+  .pipe(Effect.provide(Impl), Effect.runPromise)
   .then((s) => {
     console.log(s);
   });

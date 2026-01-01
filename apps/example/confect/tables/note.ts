@@ -1,9 +1,9 @@
-import { ConfectTable, GenericId } from "@rjdellecese/confect";
+import { GenericId, Table } from "@rjdellecese/confect";
 import { Schema } from "effect";
 
-export const Note = ConfectTable.make({
-  name: "notes",
-  fields: Schema.Struct({
+export const Note = Table.make(
+  "notes",
+  Schema.Struct({
     userId: Schema.optionalWith(GenericId.GenericId("users"), { exact: true }),
     text: Schema.String.pipe(Schema.maxLength(100)),
     tag: Schema.optionalWith(Schema.String, { exact: true }),
@@ -18,7 +18,7 @@ export const Note = ConfectTable.make({
       exact: true,
     }),
   }),
-})
+)
   .index("by_text", ["text"])
   .index("by_role", ["author.role"])
   .searchIndex("text", {

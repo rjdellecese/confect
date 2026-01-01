@@ -7,8 +7,8 @@ import {
 } from "@effect/platform";
 import { Effect, Layer, Schema } from "effect";
 import { api } from "../_generated/refs";
-import { ConfectQueryRunner } from "../_generated/services";
-import { Note } from "../tables/note";
+import { QueryRunner } from "../_generated/services";
+import { Note } from "../tables/Note";
 
 class ApiGroup extends HttpApiGroup.make("notes")
   .add(
@@ -37,7 +37,7 @@ See Scalar's documentation on [markdown support](https://github.com/scalar/scala
 const ApiGroupLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
   handlers.handle("getFirst", () =>
     Effect.gen(function* () {
-      const runQuery = yield* ConfectQueryRunner;
+      const runQuery = yield* QueryRunner;
 
       const firstNote = yield* runQuery(api.groups.notes.getFirst, {});
 

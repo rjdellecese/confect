@@ -1,11 +1,11 @@
-import { ConfectSchema, ConfectTable } from "@rjdellecese/confect";
+import { DatabaseSchema, Table } from "@rjdellecese/confect";
 import { Schema } from "effect";
 
-const Note = ConfectTable.make({
-  name: "notes",
-  fields: Schema.Struct({
+const Note = Table.make(
+  "notes",
+  Schema.Struct({
     content: Schema.String,
   }),
-});
+);
 
-export default ConfectSchema.make().addTable(Note);
+export default DatabaseSchema.make().addTable(Note);
