@@ -1,4 +1,4 @@
 import { GroupImpl } from "@rjdellecese/confect";
-import Api from "../_generated/api";
+import api from "../_generated/api";
 
-export const groups = GroupImpl.make(Api, "groups");
+export const groups = GroupImpl.make(api, "groups");

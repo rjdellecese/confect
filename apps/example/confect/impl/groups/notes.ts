@@ -1,9 +1,9 @@
 import { FunctionImpl, GroupImpl } from "@rjdellecese/confect";
 import { Effect, Layer } from "effect";
-import Api from "../../_generated/api";
+import api from "../../_generated/api";
 import { DatabaseReader, DatabaseWriter } from "../../_generated/services";
 
-const insert = FunctionImpl.make(Api, "groups.notes", "insert", ({ text }) =>
+const insert = FunctionImpl.make(api, "groups.notes", "insert", ({ text }) =>
   Effect.gen(function* () {
     const writer = yield* DatabaseWriter;
 
@@ -11,7 +11,7 @@ const insert = FunctionImpl.make(Api, "groups.notes", "insert", ({ text }) =>
   }).pipe(Effect.orDie),
 );
 
-const list = FunctionImpl.make(Api, "groups.notes", "list", () =>
+const list = FunctionImpl.make(api, "groups.notes", "list", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
 
@@ -23,7 +23,7 @@ const list = FunctionImpl.make(Api, "groups.notes", "list", () =>
 );
 
 const delete_ = FunctionImpl.make(
-  Api,
+  api,
   "groups.notes",
   "delete_",
   ({ noteId }) =>
@@ -36,7 +36,7 @@ const delete_ = FunctionImpl.make(
     }).pipe(Effect.orDie),
 );
 
-const getFirst = FunctionImpl.make(Api, "groups.notes", "getFirst", () =>
+const getFirst = FunctionImpl.make(api, "groups.notes", "getFirst", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
 
@@ -45,7 +45,7 @@ const getFirst = FunctionImpl.make(Api, "groups.notes", "getFirst", () =>
 );
 
 const internalGetFirst = FunctionImpl.make(
-  Api,
+  api,
   "groups.notes",
   "internalGetFirst",
   () =>
@@ -56,7 +56,7 @@ const internalGetFirst = FunctionImpl.make(
     }).pipe(Effect.orDie),
 );
 
-export const notes = GroupImpl.make(Api, "groups.notes").pipe(
+export const notes = GroupImpl.make(api, "groups.notes").pipe(
   Layer.provide(insert),
   Layer.provide(list),
   Layer.provide(delete_),
