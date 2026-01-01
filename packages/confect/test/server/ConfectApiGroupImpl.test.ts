@@ -1,5 +1,5 @@
 import { describe, expectTypeOf, test } from "vitest";
-import type * as ConfectApiGroupImpl from "../server/ConfectApiGroupImpl";
+import type * as ConfectApiGroupImpl from "../../src/server/ConfectApiGroupImpl";
 
 describe("ConfectApiGroupImpl", () => {
   describe("ConfectApiGroupImpl", () => {

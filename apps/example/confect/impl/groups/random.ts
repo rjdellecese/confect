@@ -1,12 +1,17 @@
-import { ConfectApiGroupImpl } from "@rjdellecese/confect";
-import { Effect } from "effect";
+import {
+  ConfectApiFunctionImpl,
+  ConfectApiGroupImpl,
+} from "@rjdellecese/confect";
+import { Effect, Layer } from "effect";
 import Api from "../../_generated/api";
 
-export const Random = ConfectApiGroupImpl.make(
+const GetNumber = ConfectApiFunctionImpl.make(
   Api,
   "groups.random",
-  (handlers) =>
-    handlers.handle("getNumber", () =>
-      Effect.succeed(Math.random()).pipe(Effect.orDie),
-    ),
+  "getNumber",
+  () => Effect.succeed(Math.random()).pipe(Effect.orDie),
+);
+
+export const Random = ConfectApiGroupImpl.make(Api, "groups.random").pipe(
+  Layer.provide(GetNumber),
 );

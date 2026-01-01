@@ -4,6 +4,7 @@ import * as ConfectApiGroupSpec from "../../src/api/ConfectApiGroupSpec";
 import * as ConfectApiRefs from "../../src/api/ConfectApiRefs";
 import * as ConfectApiSpec from "../../src/api/ConfectApiSpec";
 import * as ConfectApi from "../../src/server/ConfectApi";
+import * as ConfectApiFunctionImpl from "../../src/server/ConfectApiFunctionImpl";
 import * as ConfectApiGroupImpl from "../../src/server/ConfectApiGroupImpl";
 import * as ConfectApiImpl from "../../src/server/ConfectApiImpl";
 import * as ConfectApiServer from "../../src/server/ConfectApiServer";
@@ -96,56 +97,79 @@ type GroupPath = ConfectApiGroupSpec.Path.All<
   ConfectApiSpec.ConfectApiSpec.Groups<Spec>
 >;
 
-const GroupAImpl = ConfectApiGroupImpl.make(Api, "groupA", (handlers) =>
-  handlers
-    .handle("myFunction", (_args) =>
-      Effect.gen(function* () {
-        const _reader =
-          yield* ConfectDatabaseReader.ConfectDatabaseReader<MyConfectSchema>();
-        const _writer =
-          yield* ConfectDatabaseWriter.ConfectDatabaseWriter<MyConfectSchema>();
+// GroupA function implementations
+const MyFunction = ConfectApiFunctionImpl.make(
+  Api,
+  "groupA",
+  "myFunction",
+  (_args) =>
+    Effect.gen(function* () {
+      const _reader =
+        yield* ConfectDatabaseReader.ConfectDatabaseReader<MyConfectSchema>();
+      const _writer =
+        yield* ConfectDatabaseWriter.ConfectDatabaseWriter<MyConfectSchema>();
 
-        const _a = yield* _reader
-          .table("notes")
-          .index("by_id", "asc")
-          .collect();
+      const _a = yield* _reader.table("notes").index("by_id", "asc").collect();
 
-        return yield* Effect.succeed("test");
-      }).pipe(Effect.orDie),
-    )
-    .handle("myFunction2", (args) => Effect.succeed(`foo: ${args.foo}`)),
+      return yield* Effect.succeed("test");
+    }).pipe(Effect.orDie),
 );
 
-const GroupBCImpl = ConfectApiGroupImpl.make(
+const MyFunction2 = ConfectApiFunctionImpl.make(
+  Api,
+  "groupA",
+  "myFunction2",
+  (args) => Effect.succeed(`foo: ${args.foo}`),
+);
+
+const GroupAImpl = ConfectApiGroupImpl.make(Api, "groupA").pipe(
+  Layer.provide(MyFunction),
+  Layer.provide(MyFunction2),
+);
+
+// GroupBC function implementations
+const MyFunction3 = ConfectApiFunctionImpl.make(
   Api,
   "groupB.groupBC",
-  (handlers) =>
-    handlers.handle("myFunction3", (args) =>
-      Effect.succeed(`foo: ${args.foo}`),
-    ),
+  "myFunction3",
+  (args) => Effect.succeed(`foo: ${args.foo}`),
+);
+
+const GroupBCImpl = ConfectApiGroupImpl.make(Api, "groupB.groupBC").pipe(
+  Layer.provide(MyFunction3),
+);
+
+// GroupBDE function implementations
+const MyFunction5 = ConfectApiFunctionImpl.make(
+  Api,
+  "groupB.groupBD.groupBDE",
+  "myFunction5",
+  () => Effect.succeed("myFunction5"),
 );
 
 const GroupBDEImpl = ConfectApiGroupImpl.make(
   Api,
   "groupB.groupBD.groupBDE",
-  (handlers) =>
-    handlers.handle("myFunction5", () => Effect.succeed("myFunction5")),
-);
+).pipe(Layer.provide(MyFunction5));
 
-const GroupBDImpl = ConfectApiGroupImpl.make(
+// GroupBD function implementations
+const MyFunction4 = ConfectApiFunctionImpl.make(
   Api,
   "groupB.groupBD",
-  (handlers) =>
-    handlers.handle("myFunction4", (args) =>
-      Effect.succeed(`foo: ${args.foo}`),
-    ),
-).pipe(Layer.provide(GroupBDEImpl));
+  "myFunction4",
+  (args) => Effect.succeed(`foo: ${args.foo}`),
+);
 
-const GroupBImpl = ConfectApiGroupImpl.make(
-  Api,
-  "groupB",
-  (handlers) => handlers,
-).pipe(Layer.provide(GroupBCImpl), Layer.provide(GroupBDImpl));
+const GroupBDImpl = ConfectApiGroupImpl.make(Api, "groupB.groupBD").pipe(
+  Layer.provide(MyFunction4),
+  Layer.provide(GroupBDEImpl),
+);
+
+// GroupB implementation (no direct functions, just subgroups)
+const GroupBImpl = ConfectApiGroupImpl.make(Api, "groupB").pipe(
+  Layer.provide(GroupBCImpl),
+  Layer.provide(GroupBDImpl),
+);
 
 const ApiImpl = ConfectApiImpl.make(Api).pipe(
   Layer.provide(GroupAImpl),

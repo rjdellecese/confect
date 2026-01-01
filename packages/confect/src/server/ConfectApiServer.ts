@@ -30,8 +30,8 @@ import type * as ConfectApiSpec from "../api/ConfectApiSpec";
 import { mapLeaves } from "../internal/utils";
 import * as ConfectActionRunner from "./ConfectActionRunner";
 import type * as ConfectApi from "./ConfectApi";
-import * as ConfectApiGroupImpl from "./ConfectApiGroupImpl";
 import * as ConfectApiRegistry from "./ConfectApiRegistry";
+import * as ConfectApiRegistryItem from "./ConfectApiRegistryItem";
 import * as ConfectAuth from "./ConfectAuth";
 import * as ConfectDatabaseReader from "./ConfectDatabaseReader";
 import * as ConfectDatabaseWriter from "./ConfectDatabaseWriter";
@@ -113,13 +113,15 @@ export const make = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
 ) =>
   Effect.gen(function* () {
     const registry = yield* ConfectApiRegistry.ConfectApiRegistry;
-    const handlerItems = yield* Ref.get(registry);
+    const functionImplItems = yield* Ref.get(registry);
 
     const registeredFunctions = mapLeaves<
-      ConfectApiGroupImpl.Handlers.Item.AnyWithProps,
+      ConfectApiRegistryItem.ConfectApiRegistryItem.AnyWithProps,
       RegisteredFunction
-    >(handlerItems, ConfectApiGroupImpl.isHandlerItem, (handlerItem) =>
-      makeRegisteredFunction(api, handlerItem),
+    >(
+      functionImplItems,
+      ConfectApiRegistryItem.isConfectApiRegistryItem,
+      (registryItem) => makeRegisteredFunction(api, registryItem),
     ) as RegisteredFunctions<Api["spec"]>;
 
     return makeProto<Api>({ registeredFunctions });
@@ -127,7 +129,10 @@ export const make = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
 
 const makeRegisteredFunction = <Api extends ConfectApi.ConfectApi.AnyWithProps>(
   api: Api,
-  { function_, handler }: ConfectApiGroupImpl.Handlers.Item.AnyWithProps,
+  {
+    function_,
+    handler,
+  }: ConfectApiRegistryItem.ConfectApiRegistryItem.AnyWithProps,
 ): RegisteredFunction =>
   Match.value(function_.functionType).pipe(
     Match.when("Query", () => {
