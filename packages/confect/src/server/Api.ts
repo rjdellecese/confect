@@ -7,51 +7,49 @@ import type * as DatabaseSchema from "./DatabaseSchema";
 export const TypeId = "@rjdellecese/confect/server/Api";
 export type TypeId = typeof TypeId;
 
-export const isApi = (u: unknown): u is Api.Any =>
-  Predicate.hasProperty(u, TypeId);
+export const isApi = (u: unknown): u is Any => Predicate.hasProperty(u, TypeId);
 
 export interface Api<
-  Schema_ extends DatabaseSchema.DatabaseSchema.AnyWithProps,
-  Spec_ extends Spec.Spec.AnyWithProps,
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+  Spec_ extends Spec.AnyWithProps,
 > {
   readonly [TypeId]: TypeId;
   readonly spec: Spec_;
-  readonly schema: Schema_;
+  // TODO: Rename to `databaseSchema`
+  readonly schema: DatabaseSchema_;
   readonly convexSchemaDefinition: SchemaDefinition<GenericSchema, true>;
 }
 
-export declare namespace Api {
-  export interface Any {
-    readonly [TypeId]: TypeId;
-  }
-
-  export interface AnyWithProps extends Any {
-    readonly spec: Spec.Spec.AnyWithProps;
-    readonly schema: DatabaseSchema.DatabaseSchema.AnyWithProps;
-    readonly convexSchemaDefinition: SchemaDefinition<GenericSchema, true>;
-  }
-
-  export type Schema<Api_ extends AnyWithProps> = Api_["schema"];
-
-  export type Groups<Api_ extends AnyWithProps> = Spec.Spec.Groups<
-    Api_["spec"]
-  >;
+export interface Any {
+  readonly [TypeId]: TypeId;
 }
+
+export interface AnyWithProps extends Any {
+  readonly spec: Spec.AnyWithProps;
+  // TODO: Rename to `databaseSchema`
+  readonly schema: DatabaseSchema.AnyWithProps;
+  readonly convexSchemaDefinition: SchemaDefinition<GenericSchema, true>;
+}
+
+export type Schema<Api_ extends AnyWithProps> = Api_["schema"];
+
+export type Groups<Api_ extends AnyWithProps> = Spec.Groups<Api_["spec"]>;
 
 const Proto = {
   [TypeId]: TypeId,
 };
 
 const makeProto = <
-  Schema_ extends DatabaseSchema.DatabaseSchema.AnyWithProps,
-  Spec_ extends Spec.Spec.AnyWithProps,
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+  Spec_ extends Spec.AnyWithProps,
 >({
+  // TODO: Rename to `databaseSchema`
   schema,
   spec,
 }: {
-  schema: DatabaseSchema.DatabaseSchema.AnyWithProps;
+  schema: DatabaseSchema.AnyWithProps;
   spec: Spec_;
-}): Api<Schema_, Spec_> =>
+}): Api<DatabaseSchema_, Spec_> =>
   Object.assign(Object.create(Proto), {
     schema,
     spec,
@@ -63,9 +61,9 @@ const makeProto = <
   });
 
 export const make = <
-  Schema_ extends DatabaseSchema.DatabaseSchema.AnyWithProps,
-  Spec_ extends Spec.Spec.AnyWithProps,
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+  Spec_ extends Spec.AnyWithProps,
 >(
-  schema: Schema_,
+  schema: DatabaseSchema_,
   spec: Spec_,
-): Api<Schema_, Spec_> => makeProto({ schema, spec });
+): Api<DatabaseSchema_, Spec_> => makeProto({ schema, spec });

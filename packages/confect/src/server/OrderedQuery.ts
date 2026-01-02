@@ -7,7 +7,7 @@ import * as Document from "./Document";
 import type * as TableInfo from "./TableInfo";
 
 export type OrderedQuery<
-  TableInfo_ extends TableInfo.TableInfo.AnyWithProps,
+  TableInfo_ extends TableInfo.AnyWithProps,
   _TableName extends string,
 > = {
   readonly first: () => Effect.Effect<
@@ -38,12 +38,12 @@ export type OrderedQuery<
 };
 
 export const make = <
-  TableInfo_ extends TableInfo.TableInfo.AnyWithProps,
+  TableInfo_ extends TableInfo.AnyWithProps,
   TableName extends string,
 >(
-  query: ConvexOrderedQuery<TableInfo.TableInfo.TableInfo<TableInfo_>>,
+  query: ConvexOrderedQuery<TableInfo.TableInfoTableInfo<TableInfo_>>,
   tableName: TableName,
-  tableSchema: TableInfo.TableInfo.TableSchema<TableInfo_>,
+  tableSchema: TableInfo.TableSchema<TableInfo_>,
 ): OrderedQuery<TableInfo_, TableName> => {
   type OrderedQueryFunction<
     FunctionName extends keyof OrderedQuery<TableInfo_, TableName>,

@@ -4,9 +4,9 @@ import * as Refs from "../api/Refs";
 
 const makeMutationRunner =
   (runMutation: GenericMutationCtx<any>["runMutation"]) =>
-  <Mutation extends Refs.Ref.AnyMutation>(
+  <Mutation extends Refs.AnyMutation>(
     mutation: Mutation,
-    args: Refs.Ref.Args<Mutation>["Type"],
+    args: Refs.Args<Mutation>["Type"],
   ) =>
     Effect.gen(function* () {
       const function_ = Refs.getFunction(mutation);

@@ -33,6 +33,7 @@ import * as ActionRunner from "./ActionRunner";
 import type * as Api from "./Api";
 import * as Auth from "./Auth";
 import * as DatabaseReader from "./DatabaseReader";
+import type * as DatabaseSchema from "./DatabaseSchema";
 import * as DatabaseWriter from "./DatabaseWriter";
 import type * as DataModel from "./DataModel";
 import * as MutationCtx from "./MutationCtx";
@@ -42,7 +43,6 @@ import * as QueryRunner from "./QueryRunner";
 import * as Registry from "./Registry";
 import * as RegistryItem from "./RegistryItem";
 import * as Scheduler from "./Scheduler";
-import type * as DatabaseSchema from "./DatabaseSchema";
 import * as SchemaToValidator from "./SchemaToValidator";
 import { StorageActionWriter, StorageReader, StorageWriter } from "./Storage";
 import * as VectorSearch from "./VectorSearch";
@@ -73,13 +73,13 @@ export const isRegisteredFunction = (u: unknown): u is RegisteredFunction =>
 export const TypeId = "@rjdellecese/confect/server/Server";
 export type TypeId = typeof TypeId;
 
-export const isServer = (u: unknown): u is Server<Api.Api.AnyWithProps> =>
+export const isServer = (u: unknown): u is Server<Api.AnyWithProps> =>
   Predicate.hasProperty(u, TypeId);
 
-export type RegisteredFunctions<Spec_ extends Spec.Spec.AnyWithProps> =
-  Types.Simplify<RegisteredFunctions.Helper<Spec.Spec.Groups<Spec_>>>;
+export type RegisteredFunctions<Spec_ extends Spec.AnyWithProps> =
+  Types.Simplify<RegisteredFunctionsHelper<Spec.Groups<Spec_>>>;
 
-export interface Server<Api_ extends Api.Api.AnyWithProps> {
+export interface Server<Api_ extends Api.AnyWithProps> {
   readonly [TypeId]: TypeId;
   readonly registeredFunctions: RegisteredFunctions<Api_["spec"]>;
 }
@@ -88,7 +88,7 @@ const Proto = {
   [TypeId]: TypeId,
 };
 
-const makeProto = <Api_ extends Api.Api.AnyWithProps>({
+const makeProto = <Api_ extends Api.AnyWithProps>({
   registeredFunctions,
 }: {
   registeredFunctions: RegisteredFunctions<Api_["spec"]>;
@@ -97,13 +97,13 @@ const makeProto = <Api_ extends Api.Api.AnyWithProps>({
     registeredFunctions,
   });
 
-export const make = <Api_ extends Api.Api.AnyWithProps>(api: Api_) =>
+export const make = <Api_ extends Api.AnyWithProps>(api: Api_) =>
   Effect.gen(function* () {
     const registry = yield* Registry.Registry;
     const functionImplItems = yield* Ref.get(registry);
 
     const registeredFunctions = mapLeaves<
-      RegistryItem.RegistryItem.AnyWithProps,
+      RegistryItem.AnyWithProps,
       RegisteredFunction
     >(functionImplItems, RegistryItem.isRegistryItem, (registryItem) =>
       makeRegisteredFunction(api, registryItem),
@@ -112,9 +112,9 @@ export const make = <Api_ extends Api.Api.AnyWithProps>(api: Api_) =>
     return makeProto<Api_>({ registeredFunctions });
   });
 
-const makeRegisteredFunction = <Api_ extends Api.Api.AnyWithProps>(
+const makeRegisteredFunction = <Api_ extends Api.AnyWithProps>(
   api: Api_,
-  { function_, handler }: RegistryItem.RegistryItem.AnyWithProps,
+  { function_, handler }: RegistryItem.AnyWithProps,
 ): RegisteredFunction =>
   Match.value(function_.functionType).pipe(
     Match.when("Query", () => {
@@ -166,7 +166,7 @@ const makeRegisteredFunction = <Api_ extends Api.Api.AnyWithProps>(
   );
 
 const queryFunction = <
-  Schema extends DatabaseSchema.DatabaseSchema.AnyWithProps,
+  Schema extends DatabaseSchema.AnyWithProps,
   ConvexArgs extends DefaultFunctionArgs,
   Args,
   ConvexReturns,
@@ -190,18 +190,14 @@ const queryFunction = <
       | Auth.Auth
       | StorageReader
       | QueryRunner.QueryRunner
-      | QueryCtx.QueryCtx<
-          DataModel.DataModel.ToConvex<DataModel.DataModel.FromSchema<Schema>>
-        >
+      | QueryCtx.QueryCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>
     >;
   },
 ) => ({
   args: SchemaToValidator.compileArgsSchema(args),
   returns: SchemaToValidator.compileReturnsSchema(returns),
   handler: (
-    ctx: GenericQueryCtx<
-      DataModel.DataModel.ToConvex<DataModel.DataModel.FromSchema<Schema>>
-    >,
+    ctx: GenericQueryCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
     actualArgs: ConvexArgs,
   ): Promise<ConvexReturns> =>
     pipe(
@@ -219,9 +215,7 @@ const queryFunction = <
               QueryRunner.layer(ctx.runQuery),
               Layer.succeed(
                 QueryCtx.QueryCtx<
-                  DataModel.DataModel.ToConvex<
-                    DataModel.DataModel.FromSchema<Schema>
-                  >
+                  DataModel.ToConvex<DataModel.FromSchema<Schema>>
                 >(),
                 ctx,
               ),
@@ -237,7 +231,7 @@ const queryFunction = <
 });
 
 const mutationFunction = <
-  Schema extends DatabaseSchema.DatabaseSchema.AnyWithProps,
+  Schema extends DatabaseSchema.AnyWithProps,
   ConvexArgs extends DefaultFunctionArgs,
   Args,
   ConvexReturns,
@@ -266,7 +260,7 @@ const mutationFunction = <
       | QueryRunner.QueryRunner
       | MutationRunner.MutationRunner
       | MutationCtx.MutationCtx<
-          DataModel.DataModel.ToConvex<DataModel.DataModel.FromSchema<Schema>>
+          DataModel.ToConvex<DataModel.FromSchema<Schema>>
         >
     >;
   },
@@ -274,9 +268,7 @@ const mutationFunction = <
   args: SchemaToValidator.compileArgsSchema(args),
   returns: SchemaToValidator.compileReturnsSchema(returns),
   handler: (
-    ctx: GenericMutationCtx<
-      DataModel.DataModel.ToConvex<DataModel.DataModel.FromSchema<Schema>>
-    >,
+    ctx: GenericMutationCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
     actualArgs: ConvexArgs,
   ): Promise<ConvexReturns> =>
     pipe(
@@ -298,9 +290,7 @@ const mutationFunction = <
               MutationRunner.layer(ctx.runMutation),
               Layer.succeed(
                 MutationCtx.MutationCtx<
-                  DataModel.DataModel.ToConvex<
-                    DataModel.DataModel.FromSchema<Schema>
-                  >
+                  DataModel.ToConvex<DataModel.FromSchema<Schema>>
                 >(),
                 ctx,
               ),
@@ -316,7 +306,7 @@ const mutationFunction = <
 });
 
 const actionFunction = <
-  Schema extends DatabaseSchema.DatabaseSchema.AnyWithProps,
+  Schema extends DatabaseSchema.AnyWithProps,
   ConvexValue extends DefaultFunctionArgs,
   Value,
   ConvexReturns,
@@ -342,18 +332,14 @@ const actionFunction = <
     | QueryRunner.QueryRunner
     | MutationRunner.MutationRunner
     | ActionRunner.ActionRunner
-    | VectorSearch.VectorSearch<DataModel.DataModel.FromSchema<Schema>>
-    | ActionCtx.ActionCtx<
-        DataModel.DataModel.ToConvex<DataModel.DataModel.FromSchema<Schema>>
-      >
+    | VectorSearch.VectorSearch<DataModel.FromSchema<Schema>>
+    | ActionCtx.ActionCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>
   >;
 }) => ({
   args: SchemaToValidator.compileArgsSchema(args),
   returns: SchemaToValidator.compileReturnsSchema(returns),
   handler: (
-    ctx: GenericActionCtx<
-      DataModel.DataModel.ToConvex<DataModel.DataModel.FromSchema<Schema>>
-    >,
+    ctx: GenericActionCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
     actualArgs: ConvexValue,
   ): Promise<ConvexReturns> =>
     pipe(
@@ -376,9 +362,7 @@ const actionFunction = <
               VectorSearch.layer(ctx.vectorSearch),
               Layer.succeed(
                 ActionCtx.ActionCtx<
-                  DataModel.DataModel.ToConvex<
-                    DataModel.DataModel.FromSchema<Schema>
-                  >
+                  DataModel.ToConvex<DataModel.FromSchema<Schema>>
                 >(),
                 ctx,
               ),
@@ -393,42 +377,38 @@ const actionFunction = <
     ),
 });
 
-export declare namespace RegisteredFunctions {
-  export interface AnyWithProps {
-    readonly [key: string]: RegisteredFunction | AnyWithProps;
-  }
+export interface RegisteredFunctionsAnyWithProps {
+  readonly [key: string]: RegisteredFunction | RegisteredFunctionsAnyWithProps;
+}
 
-  export type Helper<Groups extends GroupSpec.GroupSpec.AnyWithProps> = {
-    [GroupName in GroupSpec.GroupSpec.Name<Groups>]: GroupSpec.GroupSpec.WithName<
-      Groups,
-      GroupName
-    > extends infer Group extends GroupSpec.GroupSpec.AnyWithProps
-      ? GroupSpec.GroupSpec.Groups<Group> extends infer SubGroups extends
-          GroupSpec.GroupSpec.AnyWithProps
-        ? Types.Simplify<
-            Helper<SubGroups> & {
-              [FunctionName in FunctionSpec.FunctionSpec.Name<
-                GroupSpec.GroupSpec.Functions<Group>
-              >]: FunctionSpec.FunctionSpec.WithName<
-                GroupSpec.GroupSpec.Functions<Group>,
-                FunctionName
-              > extends infer Function extends
-                FunctionSpec.FunctionSpec.AnyWithProps
-                ? FunctionSpec.FunctionSpec.RegisteredFunction<Function>
-                : never;
-            }
-          >
-        : {
-            [FunctionName in FunctionSpec.FunctionSpec.Name<
-              GroupSpec.GroupSpec.Functions<Group>
-            >]: FunctionSpec.FunctionSpec.WithName<
-              GroupSpec.GroupSpec.Functions<Group>,
+export type RegisteredFunctionsHelper<Groups extends GroupSpec.AnyWithProps> = {
+  [GroupName in GroupSpec.Name<Groups>]: GroupSpec.WithName<
+    Groups,
+    GroupName
+  > extends infer Group extends GroupSpec.AnyWithProps
+    ? GroupSpec.Groups<Group> extends infer SubGroups extends
+        GroupSpec.AnyWithProps
+      ? Types.Simplify<
+          RegisteredFunctionsHelper<SubGroups> & {
+            [FunctionName in FunctionSpec.Name<
+              GroupSpec.Functions<Group>
+            >]: FunctionSpec.WithName<
+              GroupSpec.Functions<Group>,
               FunctionName
-            > extends infer Function extends
-              FunctionSpec.FunctionSpec.AnyWithProps
-              ? FunctionSpec.FunctionSpec.RegisteredFunction<Function>
+            > extends infer Function extends FunctionSpec.AnyWithProps
+              ? FunctionSpec.RegisteredFunction<Function>
               : never;
           }
-      : never;
-  };
-}
+        >
+      : {
+          [FunctionName in FunctionSpec.Name<
+            GroupSpec.Functions<Group>
+          >]: FunctionSpec.WithName<
+            GroupSpec.Functions<Group>,
+            FunctionName
+          > extends infer Function extends FunctionSpec.AnyWithProps
+            ? FunctionSpec.RegisteredFunction<Function>
+            : never;
+        }
+    : never;
+};

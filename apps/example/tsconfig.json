@@ -6,6 +6,7 @@
       }
     ],
     "exactOptionalPropertyTypes": true,
+    "composite": true,
     "lib": ["ESNext", "DOM"],
     "types": ["node"],
     "target": "ESNext",

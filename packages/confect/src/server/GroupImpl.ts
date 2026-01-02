@@ -25,16 +25,16 @@ export const GroupImpl = <GroupPath extends string>({
 // ============================================================================
 
 export const make = <
-  Api_ extends Api.Api.AnyWithProps,
-  const GroupPath extends GroupSpec.Path.All<Api.Api.Groups<Api_>>,
+  Api_ extends Api.AnyWithProps,
+  const GroupPath extends GroupSpec.All<Api.Groups<Api_>>,
 >(
   _api: Api_,
   groupPath: GroupPath,
 ): Layer.Layer<
   GroupImpl<GroupPath>,
   never,
-  | GroupImpl.FromGroupWithPath<GroupPath, Api.Api.Groups<Api_>>
-  | FunctionImpl.FunctionImpl.FromGroupAtPath<GroupPath, Api.Api.Groups<Api_>>
+  | FromGroupWithPath<GroupPath, Api.Groups<Api_>>
+  | FunctionImpl.FromGroupAtPath<GroupPath, Api.Groups<Api_>>
 > => {
   return Layer.effect(
     GroupImpl<GroupPath>({
@@ -52,8 +52,8 @@ export const make = <
   ) as Layer.Layer<
     GroupImpl<GroupPath>,
     never,
-    | GroupImpl.FromGroupWithPath<GroupPath, Api.Api.Groups<Api_>>
-    | FunctionImpl.FunctionImpl.FromGroupAtPath<GroupPath, Api.Api.Groups<Api_>>
+    | FromGroupWithPath<GroupPath, Api.Groups<Api_>>
+    | FunctionImpl.FromGroupAtPath<GroupPath, Api.Groups<Api_>>
   >;
 };
 
@@ -61,21 +61,18 @@ export const make = <
 // Namespace Types
 // ============================================================================
 
-export declare namespace GroupImpl {
-  export type FromGroups<Groups extends GroupSpec.GroupSpec.Any> =
-    Groups extends never
-      ? never
-      : Groups extends GroupSpec.GroupSpec.AnyWithProps
-        ? GroupImpl<GroupSpec.GroupSpec.Name<Groups>>
-        : never;
+export type FromGroups<Groups extends GroupSpec.Any> = Groups extends never
+  ? never
+  : Groups extends GroupSpec.AnyWithProps
+    ? GroupImpl<GroupSpec.Name<Groups>>
+    : never;
 
-  export type FromGroupWithPath<
-    GroupPath extends string,
-    Group extends GroupSpec.GroupSpec.AnyWithProps,
-  > =
-    GroupSpec.Path.SubGroupsAt<Group, GroupPath> extends infer SubGroupPaths
-      ? SubGroupPaths extends string
-        ? GroupImpl<SubGroupPaths>
-        : never
-      : never;
-}
+export type FromGroupWithPath<
+  GroupPath extends string,
+  Group extends GroupSpec.AnyWithProps,
+> =
+  GroupSpec.SubGroupsAt<Group, GroupPath> extends infer SubGroupPaths
+    ? SubGroupPaths extends string
+      ? GroupImpl<SubGroupPaths>
+      : never
+    : never;

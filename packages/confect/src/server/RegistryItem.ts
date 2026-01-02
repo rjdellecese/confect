@@ -5,6 +5,7 @@ import type * as ActionCtx from "./ActionCtx";
 import type * as ActionRunner from "./ActionRunner";
 import type * as Auth from "./Auth";
 import type * as DatabaseReader from "./DatabaseReader";
+import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as DatabaseWriter from "./DatabaseWriter";
 import type * as DataModel from "./DataModel";
 import type * as MutationCtx from "./MutationCtx";
@@ -12,7 +13,6 @@ import type * as MutationRunner from "./MutationRunner";
 import type * as QueryCtx from "./QueryCtx";
 import type * as QueryRunner from "./QueryRunner";
 import type * as Scheduler from "./Scheduler";
-import type * as DatabaseSchema from "./DatabaseSchema";
 import type {
   StorageActionWriter,
   StorageReader,
@@ -24,47 +24,45 @@ import type * as VectorSearch from "./VectorSearch";
 // Type Definitions for Function Implementation Handlers
 // ============================================================================
 
+// TODO: Move to `Handler` module (or similar)
+
 export type Handler<
-  Schema extends DatabaseSchema.DatabaseSchema.AnyWithProps,
-  Function extends FunctionSpec.FunctionSpec.AnyWithProps,
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+  FunctionSpec_ extends FunctionSpec.AnyWithProps,
 > =
-  Function extends FunctionSpec.FunctionSpec.WithFunctionType<Function, "Query">
-    ? QueryHandler<Schema, Function>
-    : Function extends FunctionSpec.FunctionSpec.WithFunctionType<
-          Function,
+  FunctionSpec_ extends FunctionSpec.WithFunctionType<FunctionSpec_, "Query">
+    ? QueryHandler<DatabaseSchema_, FunctionSpec_>
+    : FunctionSpec_ extends FunctionSpec.WithFunctionType<
+          FunctionSpec_,
           "Mutation"
         >
-      ? MutationHandler<Schema, Function>
-      : Function extends FunctionSpec.FunctionSpec.WithFunctionType<
-            Function,
+      ? MutationHandler<DatabaseSchema_, FunctionSpec_>
+      : FunctionSpec_ extends FunctionSpec.WithFunctionType<
+            FunctionSpec_,
             "Action"
           >
-        ? ActionHandler<Schema, Function>
+        ? ActionHandler<DatabaseSchema_, FunctionSpec_>
         : never;
 
 export type QueryHandler<
-  Schema extends DatabaseSchema.DatabaseSchema.AnyWithProps,
-  Function extends
-    FunctionSpec.FunctionSpec.AnyWithPropsWithFunctionType<"Query">,
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+  FunctionSpec_ extends FunctionSpec.AnyWithPropsWithFunctionType<"Query">,
 > = BaseHandler<
-  Function,
-  | DatabaseReader.DatabaseReader<Schema>
+  FunctionSpec_,
+  | DatabaseReader.DatabaseReader<DatabaseSchema_>
   | Auth.Auth
   | StorageReader
   | QueryRunner.QueryRunner
-  | QueryCtx.QueryCtx<
-      DataModel.DataModel.ToConvex<DataModel.DataModel.FromSchema<Schema>>
-    >
+  | QueryCtx.QueryCtx<DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>>
 >;
 
 export type MutationHandler<
-  Schema extends DatabaseSchema.DatabaseSchema.AnyWithProps,
-  Function extends
-    FunctionSpec.FunctionSpec.AnyWithPropsWithFunctionType<"Mutation">,
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+  FunctionSpec_ extends FunctionSpec.AnyWithPropsWithFunctionType<"Mutation">,
 > = BaseHandler<
-  Function,
-  | DatabaseReader.DatabaseReader<Schema>
-  | DatabaseWriter.DatabaseWriter<Schema>
+  FunctionSpec_,
+  | DatabaseReader.DatabaseReader<DatabaseSchema_>
+  | DatabaseWriter.DatabaseWriter<DatabaseSchema_>
   | Auth.Auth
   | Scheduler.Scheduler
   | StorageReader
@@ -72,16 +70,15 @@ export type MutationHandler<
   | QueryRunner.QueryRunner
   | MutationRunner.MutationRunner
   | MutationCtx.MutationCtx<
-      DataModel.DataModel.ToConvex<DataModel.DataModel.FromSchema<Schema>>
+      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
     >
 >;
 
 export type ActionHandler<
-  Schema extends DatabaseSchema.DatabaseSchema.AnyWithProps,
-  Function extends
-    FunctionSpec.FunctionSpec.AnyWithPropsWithFunctionType<"Action">,
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+  FunctionSpec_ extends FunctionSpec.AnyWithPropsWithFunctionType<"Action">,
 > = BaseHandler<
-  Function,
+  FunctionSpec_,
   | Scheduler.Scheduler
   | Auth.Auth
   | StorageReader
@@ -90,76 +87,72 @@ export type ActionHandler<
   | QueryRunner.QueryRunner
   | MutationRunner.MutationRunner
   | ActionRunner.ActionRunner
-  | VectorSearch.VectorSearch<DataModel.DataModel.FromSchema<Schema>>
+  | VectorSearch.VectorSearch<DataModel.FromSchema<DatabaseSchema_>>
   | ActionCtx.ActionCtx<
-      DataModel.DataModel.ToConvex<DataModel.DataModel.FromSchema<Schema>>
+      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
     >
 >;
 
-type BaseHandler<Function extends FunctionSpec.FunctionSpec.AnyWithProps, R> = (
-  args: FunctionSpec.FunctionSpec.Args<Function>["Type"],
-) => Effect.Effect<
-  FunctionSpec.FunctionSpec.Returns<Function>["Type"],
-  never,
-  R
+type BaseHandler<FunctionSpec_ extends FunctionSpec.AnyWithProps, R> = (
+  args: FunctionSpec.Args<FunctionSpec_>["Type"],
+) => Effect.Effect<FunctionSpec.Returns<FunctionSpec_>["Type"], never, R>;
+
+export type HandlerAnyWithProps = Handler<
+  DatabaseSchema.AnyWithProps,
+  FunctionSpec.AnyWithProps
 >;
 
-export declare namespace Handler {
-  export type AnyWithProps = Handler<
-    DatabaseSchema.DatabaseSchema.AnyWithProps,
-    FunctionSpec.FunctionSpec.AnyWithProps
-  >;
-
-  export type WithName<
-    Schema extends DatabaseSchema.DatabaseSchema.AnyWithProps,
-    Function extends FunctionSpec.FunctionSpec.AnyWithProps,
-    Name extends string,
-  > = Handler<Schema, FunctionSpec.FunctionSpec.WithName<Function, Name>>;
-}
+export type HandlerWithName<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+  FunctionSpec_ extends FunctionSpec.AnyWithProps,
+  FunctionName extends string,
+> = Handler<
+  DatabaseSchema_,
+  FunctionSpec.WithName<FunctionSpec_, FunctionName>
+>;
 
 // ============================================================================
 // RegistryItem - Registry Item
 // ============================================================================
 
-export const RegistryItemTypeId = "@rjdellecese/confect/server/RegistryItem";
-export type RegistryItemTypeId = typeof RegistryItemTypeId;
+export const TypeId = "@rjdellecese/confect/server/RegistryItem";
+export type TypeId = typeof TypeId;
 
-export const isRegistryItem = (
-  value: unknown,
-): value is RegistryItem.AnyWithProps =>
-  Predicate.hasProperty(value, RegistryItemTypeId);
+export const isRegistryItem = (value: unknown): value is AnyWithProps =>
+  Predicate.hasProperty(value, TypeId);
 
 const RegistryItemProto = {
-  [RegistryItemTypeId]: RegistryItemTypeId,
+  [TypeId]: TypeId,
 };
 
 export interface RegistryItem<
-  Schema extends DatabaseSchema.DatabaseSchema.AnyWithProps,
-  Function extends FunctionSpec.FunctionSpec.AnyWithProps,
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+  FunctionSpec_ extends FunctionSpec.AnyWithProps,
 > {
-  readonly [RegistryItemTypeId]: RegistryItemTypeId;
-  readonly function_: Function;
-  readonly handler: Handler<Schema, Function>;
+  readonly [TypeId]: TypeId;
+  // TODO: Rename to `functionSpec`
+  readonly function_: FunctionSpec_;
+  readonly handler: Handler<DatabaseSchema_, FunctionSpec_>;
 }
 
-export declare namespace RegistryItem {
-  export interface AnyWithProps {
-    readonly [RegistryItemTypeId]: RegistryItemTypeId;
-    readonly function_: FunctionSpec.FunctionSpec.AnyWithProps;
-    readonly handler: Handler.AnyWithProps;
-  }
+export interface AnyWithProps {
+  readonly [TypeId]: TypeId;
+  // TODO: Rename to `functionSpec`
+  readonly function_: FunctionSpec.AnyWithProps;
+  readonly handler: HandlerAnyWithProps;
 }
 
 export const make = <
-  Schema extends DatabaseSchema.DatabaseSchema.AnyWithProps,
-  Function extends FunctionSpec.FunctionSpec.AnyWithProps,
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+  FunctionSpec_ extends FunctionSpec.AnyWithProps,
 >({
+  // TODO: Rename to `functionSpec`
   function_,
   handler,
 }: {
-  function_: Function;
-  handler: Handler<Schema, Function>;
-}): RegistryItem<Schema, Function> =>
+  function_: FunctionSpec_;
+  handler: Handler<DatabaseSchema_, FunctionSpec_>;
+}): RegistryItem<DatabaseSchema_, FunctionSpec_> =>
   Object.assign(Object.create(RegistryItemProto), {
     function_,
     handler,

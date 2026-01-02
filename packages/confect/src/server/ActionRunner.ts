@@ -4,9 +4,9 @@ import * as Refs from "../api/Refs";
 
 const makeActionRunner =
   (runAction: GenericActionCtx<any>["runAction"]) =>
-  <Action extends Refs.Ref.AnyAction>(
+  <Action extends Refs.AnyAction>(
     action: Action,
-    args: Refs.Ref.Args<Action>["Type"],
+    args: Refs.Args<Action>["Type"],
   ) =>
     Effect.gen(function* () {
       const function_ = Refs.getFunction(action);

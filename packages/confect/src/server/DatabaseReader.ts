@@ -1,30 +1,30 @@
 import type { GenericDatabaseReader } from "convex/server";
 import { Array, Context, Layer } from "effect";
 import type { BaseDatabaseReader } from "../internal/typeUtils";
+import * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
 import * as QueryInitializer from "./QueryInitializer";
-import * as DatabaseSchema from "./DatabaseSchema";
 import * as Table from "./Table";
 
-export const make = <Schema extends DatabaseSchema.DatabaseSchema.AnyWithProps>(
-  schema: Schema,
+export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
+  databaseSchema: DatabaseSchema_,
   convexDatabaseReader: GenericDatabaseReader<
-    DataModel.DataModel.ToConvex<DataModel.DataModel.FromSchema<Schema>>
+    DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
   >,
 ) => {
-  type Tables = DatabaseSchema.DatabaseSchema.Tables<Schema>;
+  type Tables = DatabaseSchema.Tables<DatabaseSchema_>;
   type IncludedTables = DatabaseSchema.IncludeSystemTables<Tables>;
   const extendedTables = DatabaseSchema.extendWithSystemTables(
-    schema.tables as Table.Table.TablesRecord<Tables>,
+    databaseSchema.tables as Table.TablesRecord<Tables>,
   );
 
   return {
-    table: <const TableName extends Table.Table.Name<IncludedTables>>(
+    table: <const TableName extends Table.Name<IncludedTables>>(
       tableName: TableName,
     ) => {
       const table = Object.values(extendedTables).find(
         (def) => def.name === tableName,
-      ) as Table.Table.WithName<IncludedTables, TableName>;
+      ) as Table.WithName<IncludedTables, TableName>;
 
       const baseDatabaseReader: BaseDatabaseReader<any> = Array.some(
         Object.values(Table.systemTables),
@@ -34,15 +34,13 @@ export const make = <Schema extends DatabaseSchema.DatabaseSchema.AnyWithProps>(
             get: convexDatabaseReader.system.get,
             query: convexDatabaseReader.system.query,
           } as BaseDatabaseReader<
-            DataModel.DataModel.ToConvex<
-              DataModel.DataModel.FromTables<Table.SystemTables>
-            >
+            DataModel.ToConvex<DataModel.FromTables<Table.SystemTables>>
           >)
         : ({
             get: convexDatabaseReader.get,
             query: convexDatabaseReader.query,
           } as BaseDatabaseReader<
-            DataModel.DataModel.ToConvex<DataModel.DataModel.FromSchema<Schema>>
+            DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
           >);
 
       return QueryInitializer.make<IncludedTables, TableName>(
@@ -54,18 +52,24 @@ export const make = <Schema extends DatabaseSchema.DatabaseSchema.AnyWithProps>(
   };
 };
 
-export const DatabaseReader = <Schema extends DatabaseSchema.DatabaseSchema.AnyWithProps>() =>
-  Context.GenericTag<ReturnType<typeof make<Schema>>>(
+export const DatabaseReader = <
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+>() =>
+  Context.GenericTag<ReturnType<typeof make<DatabaseSchema_>>>(
     "@rjdellecese/confect/server/DatabaseReader",
   );
 
-export type DatabaseReader<Schema extends DatabaseSchema.DatabaseSchema.AnyWithProps> =
-  ReturnType<typeof DatabaseReader<Schema>>["Identifier"];
+export type DatabaseReader<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+> = ReturnType<typeof DatabaseReader<DatabaseSchema_>>["Identifier"];
 
-export const layer = <Schema extends DatabaseSchema.DatabaseSchema.AnyWithProps>(
-  schema: Schema,
+export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
+  databaseSchema: DatabaseSchema_,
   convexDatabaseReader: GenericDatabaseReader<
-    DataModel.DataModel.ToConvex<DataModel.DataModel.FromSchema<Schema>>
+    DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
   >,
 ) =>
-  Layer.succeed(DatabaseReader<Schema>(), make(schema, convexDatabaseReader));
+  Layer.succeed(
+    DatabaseReader<DatabaseSchema_>(),
+    make(databaseSchema, convexDatabaseReader),
+  );

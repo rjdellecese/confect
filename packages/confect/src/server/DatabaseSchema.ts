@@ -9,63 +9,57 @@ import * as Table from "./Table";
 export const TypeId = "@rjdellecese/confect/server/Schema";
 export type TypeId = typeof TypeId;
 
-export const isSchema = (u: unknown): u is DatabaseSchema.Any =>
+export const isSchema = (u: unknown): u is Any =>
   Predicate.hasProperty(u, TypeId);
 
 /**
  * A schema definition tracks the schema and its Convex schema definition.
  */
-export interface DatabaseSchema<
-  Tables extends Table.Table.AnyWithProps = never,
-> {
+export interface DatabaseSchema<Tables_ extends Table.AnyWithProps = never> {
   readonly [TypeId]: TypeId;
-  readonly tables: Table.Table.TablesRecord<Tables>;
+  readonly tables: Table.TablesRecord<Tables_>;
   readonly convexSchemaDefinition: SchemaDefinition<GenericSchema, true>;
 
   /**
    * Add a table definition to the schema.
    */
-  addTable<TableDef extends Table.Table.AnyWithProps>(
+  addTable<TableDef extends Table.AnyWithProps>(
     table: TableDef,
-  ): DatabaseSchema<Tables | TableDef>;
+  ): DatabaseSchema<Tables_ | TableDef>;
 }
 
-export declare namespace DatabaseSchema {
-  export interface Any {
-    readonly [TypeId]: TypeId;
-  }
-
-  export interface AnyWithProps {
-    readonly [TypeId]: TypeId;
-    readonly tables: Record<string, Table.Table.AnyWithProps>;
-    readonly convexSchemaDefinition: SchemaDefinition<GenericSchema, true>;
-    addTable<TableDef extends Table.Table.AnyWithProps>(
-      table: TableDef,
-    ): AnyWithProps;
-  }
-
-  export type Tables<S extends AnyWithProps> =
-    S extends DatabaseSchema<infer Tables_> ? Tables_ : never;
-
-  export type TableNames<S extends AnyWithProps> = Table.Table.Name<Tables<S>> &
-    string;
-
-  export type TableWithName<
-    S extends AnyWithProps,
-    TableName extends TableNames<S>,
-  > = Extract<Tables<S>, { readonly name: TableName }>;
+export interface Any {
+  readonly [TypeId]: TypeId;
 }
+
+export interface AnyWithProps {
+  readonly [TypeId]: TypeId;
+  readonly tables: Record<string, Table.AnyWithProps>;
+  readonly convexSchemaDefinition: SchemaDefinition<GenericSchema, true>;
+  addTable<TableDef extends Table.AnyWithProps>(table: TableDef): AnyWithProps;
+}
+
+export type Tables<DatabaseSchema_ extends AnyWithProps> =
+  DatabaseSchema_ extends DatabaseSchema<infer Tables_> ? Tables_ : never;
+
+export type TableNames<DatabaseSchema_ extends AnyWithProps> = Table.Name<
+  Tables<DatabaseSchema_>
+> &
+  string;
+
+export type TableWithName<
+  DatabaseSchema_ extends AnyWithProps,
+  TableName extends TableNames<DatabaseSchema_>,
+> = Extract<Tables<DatabaseSchema_>, { readonly name: TableName }>;
 
 const Proto = {
   [TypeId]: TypeId,
 
-  addTable<TableDef extends Table.Table.AnyWithProps>(
-    this: DatabaseSchema<Table.Table.AnyWithProps>,
+  addTable<TableDef extends Table.AnyWithProps>(
+    this: DatabaseSchema<Table.AnyWithProps>,
     table: TableDef,
   ) {
-    const tablesArray = Object.values(
-      this.tables,
-    ) as Table.Table.AnyWithProps[];
+    const tablesArray = Object.values(this.tables) as Table.AnyWithProps[];
     const newTablesArray = [...tablesArray, table];
 
     return makeProto({
@@ -82,13 +76,13 @@ const Proto = {
   },
 };
 
-const makeProto = <Tables extends Table.Table.AnyWithProps>({
+const makeProto = <Tables_ extends Table.AnyWithProps>({
   tables,
   convexSchemaDefinition,
 }: {
-  tables: Record.ReadonlyRecord<string, Tables>;
+  tables: Record.ReadonlyRecord<string, Tables_>;
   convexSchemaDefinition: SchemaDefinition<GenericSchema, true>;
-}): DatabaseSchema<Tables> =>
+}): DatabaseSchema<Tables_> =>
   Object.assign(Object.create(Proto), {
     tables,
     convexSchemaDefinition,
@@ -109,17 +103,17 @@ export const systemSchema = make()
   .addTable(Table.scheduledFunctionsTable)
   .addTable(Table.storageTable);
 
-export const extendWithSystemTables = <Tables extends Table.Table.AnyWithProps>(
-  tables: Table.Table.TablesRecord<Tables>,
+export const extendWithSystemTables = <Tables extends Table.AnyWithProps>(
+  tables: Table.TablesRecord<Tables>,
 ): ExtendWithSystemTables<Tables> =>
   ({
     ...tables,
     ...Table.systemTables,
   }) as ExtendWithSystemTables<Tables>;
 
-export type ExtendWithSystemTables<Tables extends Table.Table.AnyWithProps> =
-  Table.Table.TablesRecord<Tables | Table.SystemTables>;
+export type ExtendWithSystemTables<Tables extends Table.AnyWithProps> =
+  Table.TablesRecord<Tables | Table.SystemTables>;
 
-export type IncludeSystemTables<Tables extends Table.Table.AnyWithProps> =
+export type IncludeSystemTables<Tables extends Table.AnyWithProps> =
   | Tables
   | Table.SystemTables;

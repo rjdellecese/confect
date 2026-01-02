@@ -17,22 +17,22 @@ import type * as Table from "./Table";
 export declare const TypeId: "@rjdellecese/confect/server/TableInfo";
 export type TypeId = typeof TypeId;
 
-export type TableInfo<TableDef extends Table.Table.AnyWithProps> =
-  TableDef extends Table.Table<
+export type TableInfo<Table_ extends Table.AnyWithProps> =
+  Table_ extends Table.Table<
     infer TableName,
-    infer TableSchema,
+    infer TableSchema_,
     infer TableValidator,
     infer Indexes,
     infer SearchIndexes,
     infer VectorIndexes
   >
-    ? TableSchema extends Schema.Schema.AnyNoContext
+    ? TableSchema_ extends Schema.Schema.AnyNoContext
       ? {
           // TODO: Should all of these fields be readonly?
           readonly [TypeId]: TypeId;
           // It's pretty hard to recursively make an arbitrary TS type readonly/mutable, so we capture both the readonly version of the `convexDocument` (which is the `encodedDocument`) and the mutable version (`convexDocument`).
-          document: ExtractDocument_<TableName, TableSchema>;
-          encodedDocument: ExtractEncodedDocument<TableName, TableSchema>;
+          document: ExtractDocument_<TableName, TableSchema_>;
+          encodedDocument: ExtractEncodedDocument<TableName, TableSchema_>;
           convexDocument: ExtractConvexDocument<TableName, TableValidator>;
           fieldPaths:
             | keyof IdField<TableName>
@@ -44,50 +44,49 @@ export type TableInfo<TableDef extends Table.Table.AnyWithProps> =
       : never
     : never;
 
-export declare namespace TableInfo {
-  export interface Any {
-    readonly [TypeId]: TypeId;
-  }
-
-  export interface AnyWithProps extends Any {
-    document: Document_.Document.Any;
-    encodedDocument: Document_.Document.AnyEncoded;
-    convexDocument: GenericDocument;
-    fieldPaths: GenericFieldPaths;
-    indexes: GenericTableIndexes;
-    searchIndexes: GenericTableSearchIndexes;
-    vectorIndexes: GenericTableVectorIndexes;
-  }
-
-  export type TableInfo<TableInfo_ extends AnyWithProps> = {
-    document: TableInfo_["convexDocument"];
-    fieldPaths: TableInfo_["fieldPaths"];
-    indexes: TableInfo_["indexes"];
-    searchIndexes: TableInfo_["searchIndexes"];
-    vectorIndexes: TableInfo_["vectorIndexes"];
-  };
-
-  export type TableSchema<TableInfo_ extends AnyWithProps> = Schema.Schema<
-    TableInfo_["document"],
-    TableInfo_["encodedDocument"]
-  >;
-
-  export type Document<TableInfo_ extends AnyWithProps> =
-    TableInfo_["document"];
+export interface Any {
+  readonly [TypeId]: TypeId;
 }
+
+export interface AnyWithProps extends Any {
+  document: Document_.Any;
+  encodedDocument: Document_.AnyEncoded;
+  convexDocument: GenericDocument;
+  fieldPaths: GenericFieldPaths;
+  indexes: GenericTableIndexes;
+  searchIndexes: GenericTableSearchIndexes;
+  vectorIndexes: GenericTableVectorIndexes;
+}
+
+export type TableInfoTableInfo<TableInfo_ extends AnyWithProps> = {
+  document: TableInfo_["convexDocument"];
+  fieldPaths: TableInfo_["fieldPaths"];
+  indexes: TableInfo_["indexes"];
+  searchIndexes: TableInfo_["searchIndexes"];
+  vectorIndexes: TableInfo_["vectorIndexes"];
+};
+
+export type TableSchema<TableInfo_ extends AnyWithProps> = Schema.Schema<
+  TableInfo_["document"],
+  TableInfo_["encodedDocument"]
+>;
+
+export type Document<TableInfo_ extends AnyWithProps> = TableInfo_["document"];
 
 type ExtractDocument_<
   TableName extends string,
-  TableSchema extends Schema.Schema.AnyNoContext,
+  TableSchema_ extends Schema.Schema.AnyNoContext,
 > = Types.Simplify<
-  Readonly<IdField<TableName>> & Readonly<SystemFields> & TableSchema["Type"]
+  Readonly<IdField<TableName>> & Readonly<SystemFields> & TableSchema_["Type"]
 >;
 
 type ExtractEncodedDocument<
   TableName extends string,
-  TableSchema extends Schema.Schema.AnyNoContext,
+  TableSchema_ extends Schema.Schema.AnyNoContext,
 > = Types.Simplify<
-  Readonly<IdField<TableName>> & Readonly<SystemFields> & TableSchema["Encoded"]
+  Readonly<IdField<TableName>> &
+    Readonly<SystemFields> &
+    TableSchema_["Encoded"]
 >;
 
 // Vendored types from convex-js, partially modified.

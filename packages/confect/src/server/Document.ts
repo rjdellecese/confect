@@ -5,63 +5,52 @@ import type * as DataModel from "./DataModel";
 import type { ReadonlyValue } from "./SchemaToValidator";
 import type * as TableInfo from "./TableInfo";
 
-export declare namespace Document {
-  export type WithoutSystemFields<Doc> = Omit<Doc, "_creationTime" | "_id">;
+export type WithoutSystemFields<Doc> = Omit<Doc, "_creationTime" | "_id">;
 
-  export type Any = any;
-  export type AnyEncoded = ReadonlyRecord<string, ReadonlyValue>;
-}
+export type Any = any;
+export type AnyEncoded = ReadonlyRecord<string, ReadonlyValue>;
 
 export const decode = Function.dual<
   <
-    DataModel_ extends DataModel.DataModel.AnyWithProps,
-    TableName extends DataModel.DataModel.TableNames<DataModel_>,
+    DataModel_ extends DataModel.AnyWithProps,
+    TableName extends DataModel.TableNames<DataModel_>,
   >(
     tableName: TableName,
-    tableSchema: TableInfo.TableInfo.TableSchema<
-      DataModel.DataModel.TableInfoWithName_<DataModel_, TableName>
+    tableSchema: TableInfo.TableSchema<
+      DataModel.TableInfoWithName_<DataModel_, TableName>
     >,
   ) => (
-    self: DataModel.DataModel.TableInfoWithName_<
-      DataModel_,
-      TableName
-    >["convexDocument"],
+    self: DataModel.TableInfoWithName_<DataModel_, TableName>["convexDocument"],
   ) => Effect.Effect<
-    DataModel.DataModel.TableInfoWithName_<DataModel_, TableName>["document"],
+    DataModel.TableInfoWithName_<DataModel_, TableName>["document"],
     DocumentDecodeError
   >,
   <
-    DataModel_ extends DataModel.DataModel.AnyWithProps,
-    TableName extends DataModel.DataModel.TableNames<DataModel_>,
+    DataModel_ extends DataModel.AnyWithProps,
+    TableName extends DataModel.TableNames<DataModel_>,
   >(
-    self: DataModel.DataModel.TableInfoWithName_<
-      DataModel_,
-      TableName
-    >["convexDocument"],
+    self: DataModel.TableInfoWithName_<DataModel_, TableName>["convexDocument"],
     tableName: TableName,
-    tableSchema: TableInfo.TableInfo.TableSchema<
-      DataModel.DataModel.TableInfoWithName_<DataModel_, TableName>
+    tableSchema: TableInfo.TableSchema<
+      DataModel.TableInfoWithName_<DataModel_, TableName>
     >,
   ) => Effect.Effect<
-    DataModel.DataModel.TableInfoWithName_<DataModel_, TableName>["document"],
+    DataModel.TableInfoWithName_<DataModel_, TableName>["document"],
     DocumentDecodeError
   >
 >(
   3,
   <
-    DataModel_ extends DataModel.DataModel.AnyWithProps,
-    TableName extends DataModel.DataModel.TableNames<DataModel_>,
+    DataModel_ extends DataModel.AnyWithProps,
+    TableName extends DataModel.TableNames<DataModel_>,
   >(
-    self: DataModel.DataModel.TableInfoWithName_<
-      DataModel_,
-      TableName
-    >["convexDocument"],
+    self: DataModel.TableInfoWithName_<DataModel_, TableName>["convexDocument"],
     tableName: TableName,
-    tableSchema: TableInfo.TableInfo.TableSchema<
-      DataModel.DataModel.TableInfoWithName_<DataModel_, TableName>
+    tableSchema: TableInfo.TableSchema<
+      DataModel.TableInfoWithName_<DataModel_, TableName>
     >,
   ): Effect.Effect<
-    DataModel.DataModel.TableInfoWithName_<DataModel_, TableName>["document"],
+    DataModel.TableInfoWithName_<DataModel_, TableName>["document"],
     DocumentDecodeError
   > =>
     Effect.gen(function* () {
@@ -96,70 +85,52 @@ export const decode = Function.dual<
 
 export const encode = Function.dual<
   <
-    DataModel_ extends DataModel.DataModel.AnyWithProps,
-    TableName extends DataModel.DataModel.TableNames<DataModel_>,
+    DataModel_ extends DataModel.AnyWithProps,
+    TableName extends DataModel.TableNames<DataModel_>,
   >(
     tableName: TableName,
-    tableSchema: TableInfo.TableInfo.TableSchema<
-      DataModel.DataModel.TableInfoWithName_<DataModel_, TableName>
+    tableSchema: TableInfo.TableSchema<
+      DataModel.TableInfoWithName_<DataModel_, TableName>
     >,
   ) => (
-    self: DataModel.DataModel.TableInfoWithName_<
-      DataModel_,
-      TableName
-    >["document"],
+    self: DataModel.TableInfoWithName_<DataModel_, TableName>["document"],
   ) => Effect.Effect<
-    DataModel.DataModel.TableInfoWithName_<
-      DataModel_,
-      TableName
-    >["encodedDocument"],
+    DataModel.TableInfoWithName_<DataModel_, TableName>["encodedDocument"],
     DocumentEncodeError
   >,
   <
-    DataModel_ extends DataModel.DataModel.AnyWithProps,
-    TableName extends DataModel.DataModel.TableNames<DataModel_>,
+    DataModel_ extends DataModel.AnyWithProps,
+    TableName extends DataModel.TableNames<DataModel_>,
   >(
-    self: DataModel.DataModel.TableInfoWithName_<
-      DataModel_,
-      TableName
-    >["document"],
+    self: DataModel.TableInfoWithName_<DataModel_, TableName>["document"],
     tableName: TableName,
-    tableSchema: TableInfo.TableInfo.TableSchema<
-      DataModel.DataModel.TableInfoWithName_<DataModel_, TableName>
+    tableSchema: TableInfo.TableSchema<
+      DataModel.TableInfoWithName_<DataModel_, TableName>
     >,
   ) => Effect.Effect<
-    DataModel.DataModel.TableInfoWithName_<
-      DataModel_,
-      TableName
-    >["encodedDocument"],
+    DataModel.TableInfoWithName_<DataModel_, TableName>["encodedDocument"],
     DocumentEncodeError
   >
 >(
   3,
   <
-    DataModel_ extends DataModel.DataModel.AnyWithProps,
-    TableName extends DataModel.DataModel.TableNames<DataModel_>,
+    DataModel_ extends DataModel.AnyWithProps,
+    TableName extends DataModel.TableNames<DataModel_>,
   >(
-    self: DataModel.DataModel.TableInfoWithName_<
-      DataModel_,
-      TableName
-    >["document"],
+    self: DataModel.TableInfoWithName_<DataModel_, TableName>["document"],
     tableName: TableName,
-    tableSchema: TableInfo.TableInfo.TableSchema<
-      DataModel.DataModel.TableInfoWithName_<DataModel_, TableName>
+    tableSchema: TableInfo.TableSchema<
+      DataModel.TableInfoWithName_<DataModel_, TableName>
     >,
   ): Effect.Effect<
-    DataModel.DataModel.TableInfoWithName_<
-      DataModel_,
-      TableName
-    >["encodedDocument"],
+    DataModel.TableInfoWithName_<DataModel_, TableName>["encodedDocument"],
     DocumentEncodeError
   > =>
     Effect.gen(function* () {
       type TableSchemaWithSystemFields = SystemFields.ExtendWithSystemFields<
         TableName,
-        TableInfo.TableInfo.TableSchema<
-          DataModel.DataModel.TableInfoWithName_<DataModel_, TableName>
+        TableInfo.TableSchema<
+          DataModel.TableInfoWithName_<DataModel_, TableName>
         >
       >;
 

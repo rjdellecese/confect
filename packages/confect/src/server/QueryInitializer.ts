@@ -28,79 +28,79 @@ import type * as Table from "./Table";
 import type * as TableInfo from "./TableInfo";
 
 type QueryInitializer<
-  DataModel_ extends DataModel.DataModel.AnyWithProps,
-  TableName extends DataModel.DataModel.TableNames<DataModel_>,
-  _TableInfo extends GenericTableInfo,
-  _TableInfo_ extends TableInfo.TableInfo.AnyWithProps,
+  DataModel_ extends DataModel.AnyWithProps,
+  TableName extends DataModel.TableNames<DataModel_>,
+  _ConvexTableInfo extends GenericTableInfo,
+  _TableInfo extends TableInfo.AnyWithProps,
 > = {
   readonly get: {
     (
       id: GenericId<TableName>,
     ): Effect.Effect<
-      _TableInfo_["document"],
+      _TableInfo["document"],
       Document.DocumentDecodeError | GetByIdFailure
     >;
-    <IndexName extends keyof Indexes<_TableInfo>>(
+    <IndexName extends keyof Indexes<_ConvexTableInfo>>(
       indexName: IndexName,
       ...indexFieldValues: IndexFieldTypesForEq<
-        DataModel.DataModel.ToConvex<DataModel_>,
+        DataModel.ToConvex<DataModel_>,
         TableName,
-        Indexes<_TableInfo>[IndexName]
+        Indexes<_ConvexTableInfo>[IndexName]
       >
     ): Effect.Effect<
-      _TableInfo_["document"],
+      _TableInfo["document"],
       Document.DocumentDecodeError | GetByIndexFailure
     >;
   };
   readonly index: {
-    <IndexName extends keyof Indexes<_TableInfo>>(
+    <IndexName extends keyof Indexes<_ConvexTableInfo>>(
       indexName: IndexName,
       indexRange?: (
         q: IndexRangeBuilder<
-          _TableInfo_["convexDocument"],
-          NamedIndex<_TableInfo, IndexName>
+          _TableInfo["convexDocument"],
+          NamedIndex<_ConvexTableInfo, IndexName>
         >,
       ) => IndexRange,
       order?: "asc" | "desc",
-    ): OrderedQuery.OrderedQuery<_TableInfo_, TableName>;
-    <IndexName extends keyof Indexes<_TableInfo>>(
+    ): OrderedQuery.OrderedQuery<_TableInfo, TableName>;
+    <IndexName extends keyof Indexes<_ConvexTableInfo>>(
       indexName: IndexName,
       order?: "asc" | "desc",
-    ): OrderedQuery.OrderedQuery<_TableInfo_, TableName>;
+    ): OrderedQuery.OrderedQuery<_TableInfo, TableName>;
   };
-  readonly search: <IndexName extends keyof SearchIndexes<_TableInfo>>(
+  readonly search: <IndexName extends keyof SearchIndexes<_ConvexTableInfo>>(
     indexName: IndexName,
     searchFilter: (
       q: SearchFilterBuilder<
-        DocumentByInfo<_TableInfo>,
-        NamedSearchIndex<_TableInfo, IndexName>
+        DocumentByInfo<_ConvexTableInfo>,
+        NamedSearchIndex<_ConvexTableInfo, IndexName>
       >,
     ) => SearchFilter,
-  ) => OrderedQuery.OrderedQuery<_TableInfo_, TableName>;
+  ) => OrderedQuery.OrderedQuery<_TableInfo, TableName>;
 };
 
 export const make = <
-  Tables extends Table.Table.AnyWithProps,
-  TableName extends Table.Table.Name<Tables>,
+  Tables extends Table.AnyWithProps,
+  TableName extends Table.Name<Tables>,
 >(
   tableName: TableName,
   convexDatabaseReader: BaseDatabaseReader<
-    DataModel.DataModel.ToConvex<DataModel.DataModel.FromTables<Tables>>
+    DataModel.ToConvex<DataModel.FromTables<Tables>>
   >,
-  table: Table.Table.WithName<Tables, TableName>,
+  table: Table.WithName<Tables, TableName>,
 ): QueryInitializer<
   DataModel.DataModel<Tables>,
   TableName,
-  DataModel.DataModel.TableInfoWithName<DataModel.DataModel<Tables>, TableName>,
-  DataModel.DataModel.TableInfoWithName_<DataModel.DataModel<Tables>, TableName>
+  DataModel.TableInfoWithName<DataModel.DataModel<Tables>, TableName>,
+  DataModel.TableInfoWithName_<DataModel.DataModel<Tables>, TableName>
 > => {
   type DataModel_ = DataModel.DataModel<Tables>;
-  type ConvexDataModel_ = DataModel.DataModel.ToConvex<DataModel_>;
+  type ConvexDataModel_ = DataModel.ToConvex<DataModel_>;
   type ThisQueryInitializer = QueryInitializer<
     DataModel_,
     TableName,
-    DataModel.DataModel.TableInfoWithName<DataModel_, TableName>,
-    DataModel.DataModel.TableInfoWithName_<DataModel_, TableName>
+    DataModel.TableInfoWithName<DataModel_, TableName>,
+    DataModel.TableInfoWithName_<DataModel_, TableName>
   >;
   type QueryInitializerFunction<
     FunctionName extends keyof ThisQueryInitializer,
@@ -108,19 +108,17 @@ export const make = <
 
   const getByIndex = <
     IndexName extends keyof Indexes<
-      DataModel.DataModel.TableInfoWithName<DataModel_, TableName>
+      DataModel.TableInfoWithName<DataModel_, TableName>
     >,
   >(
     indexName: IndexName,
     indexFieldValues: IndexFieldTypesForEq<
-      DataModel.DataModel.ToConvex<DataModel_>,
+      DataModel.ToConvex<DataModel_>,
       TableName,
-      Indexes<
-        DataModel.DataModel.TableInfoWithName<DataModel_, TableName>
-      >[IndexName]
+      Indexes<DataModel.TableInfoWithName<DataModel_, TableName>>[IndexName]
     >,
   ): Effect.Effect<
-    DataModel.DataModel.DocumentWithName<DataModel_, TableName>,
+    DataModel.DocumentWithName<DataModel_, TableName>,
     Document.DocumentDecodeError | GetByIndexFailure
   > => {
     const indexFields: GenericTableIndexes[keyof GenericTableIndexes] = (
@@ -166,7 +164,7 @@ export const make = <
 
       return getByIndex(
         indexName as keyof Indexes<
-          DataModel.DataModel.TableInfoWithName<DataModel_, TableName>
+          DataModel.TableInfoWithName<DataModel_, TableName>
         >,
         indexFieldValues,
       );
@@ -175,19 +173,19 @@ export const make = <
 
   const index: QueryInitializerFunction<"index"> = <
     IndexName extends keyof Indexes<
-      DataModel.DataModel.TableInfoWithName<DataModel_, TableName>
+      DataModel.TableInfoWithName<DataModel_, TableName>
     >,
   >(
     indexName: IndexName,
     indexRangeOrOrder?:
       | ((
           q: IndexRangeBuilder<
-            DataModel.DataModel.TableInfoWithName_<
+            DataModel.TableInfoWithName_<
               DataModel_,
               TableName
             >["convexDocument"],
             NamedIndex<
-              DataModel.DataModel.TableInfoWithName<DataModel_, TableName>,
+              DataModel.TableInfoWithName<DataModel_, TableName>,
               IndexName
             >
           >,
@@ -238,7 +236,7 @@ export const make = <
     );
 
     return OrderedQuery.make<
-      DataModel.DataModel.TableInfoWithName_<DataModel_, TableName>,
+      DataModel.TableInfoWithName_<DataModel_, TableName>,
       TableName
     >(orderedQuery, tableName, table.Fields);
   };
@@ -248,7 +246,7 @@ export const make = <
     searchFilter,
   ) =>
     OrderedQuery.make<
-      DataModel.DataModel.TableInfoWithName_<DataModel_, TableName>,
+      DataModel.TableInfoWithName_<DataModel_, TableName>,
       TableName
     >(
       convexDatabaseReader
@@ -266,15 +264,12 @@ export const make = <
 };
 
 export const getById =
-  <
-    Tables extends Table.Table.AnyWithProps,
-    TableName extends Table.Table.Name<Tables>,
-  >(
+  <Tables extends Table.AnyWithProps, TableName extends Table.Name<Tables>>(
     tableName: TableName,
     convexDatabaseReader: BaseDatabaseReader<
-      DataModel.DataModel.ToConvex<DataModel.DataModel.FromTables<Tables>>
+      DataModel.ToConvex<DataModel.FromTables<Tables>>
     >,
-    table: Table.Table.WithName<Tables, TableName>,
+    table: Table.WithName<Tables, TableName>,
   ) =>
   (id: GenericId<TableName>) =>
     pipe(

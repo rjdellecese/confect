@@ -37,29 +37,25 @@ export const FunctionImpl = <
 // ============================================================================
 
 export const make = <
-  Api_ extends Api.Api.AnyWithProps,
-  const GroupPath extends GroupSpec.Path.All<Api.Api.Groups<Api_>>,
-  const FunctionName extends FunctionSpec.FunctionSpec.Name<
-    GroupSpec.GroupSpec.Functions<
-      GroupSpec.Path.GroupAt<Api.Api.Groups<Api_>, GroupPath>
-    >
+  Api_ extends Api.AnyWithProps,
+  const GroupPath extends GroupSpec.All<Api.Groups<Api_>>,
+  const FunctionName extends FunctionSpec.Name<
+    GroupSpec.Functions<GroupSpec.GroupAt<Api.Groups<Api_>, GroupPath>>
   >,
 >(
   api: Api_,
   groupPath: GroupPath,
   functionName: FunctionName,
-  handler: RegistryItem.Handler.WithName<
-    Api.Api.Schema<Api_>,
-    GroupSpec.GroupSpec.Functions<
-      GroupSpec.Path.GroupAt<Api.Api.Groups<Api_>, GroupPath>
-    >,
+  handler: RegistryItem.HandlerWithName<
+    Api.Schema<Api_>,
+    GroupSpec.Functions<GroupSpec.GroupAt<Api.Groups<Api_>, GroupPath>>,
     FunctionName
   >,
 ): Layer.Layer<FunctionImpl<GroupPath, FunctionName>> => {
   const groupPathParts = String.split(groupPath, ".");
   const [firstGroupPathPart, ...restGroupPathParts] = groupPathParts;
 
-  const group_: GroupSpec.GroupSpec.AnyWithProps = Array.reduce(
+  const group_: GroupSpec.AnyWithProps = Array.reduce(
     restGroupPathParts,
     (api as any).spec.groups[firstGroupPathPart as any]!,
     (currentGroup: any, groupPathPart: any) =>
@@ -82,7 +78,7 @@ export const make = <
           [...groupPathParts, functionName],
           RegistryItem.make({
             function_,
-            handler: handler as RegistryItem.Handler.AnyWithProps,
+            handler: handler as RegistryItem.HandlerAnyWithProps,
           }),
         ),
       );
@@ -99,30 +95,28 @@ export const make = <
 // Namespace Types
 // ============================================================================
 
-export declare namespace FunctionImpl {
-  /**
-   * Get the function implementation service type for a specific group path and function name.
-   */
-  export type ForGroupPathAndFunction<
-    GroupPath extends string,
-    FunctionName extends string,
-  > = FunctionImpl<GroupPath, FunctionName>;
+/**
+ * Get the function implementation service type for a specific group path and function name.
+ */
+export type ForGroupPathAndFunction<
+  GroupPath extends string,
+  FunctionName extends string,
+> = FunctionImpl<GroupPath, FunctionName>;
 
-  /**
-   * Get all function implementation services required for a group at a given path.
-   */
-  export type FromGroupAtPath<
-    GroupPath extends string,
-    Group extends GroupSpec.GroupSpec.AnyWithProps,
-  > =
-    GroupSpec.Path.GroupAt<Group, GroupPath> extends infer GroupAtPath extends
-      GroupSpec.GroupSpec.AnyWithProps
-      ? FunctionSpec.FunctionSpec.Name<
-          GroupSpec.GroupSpec.Functions<GroupAtPath>
-        > extends infer FunctionNames extends string
-        ? FunctionNames extends string
-          ? FunctionImpl<GroupPath, FunctionNames>
-          : never
+/**
+ * Get all function implementation services required for a group at a given path.
+ */
+export type FromGroupAtPath<
+  GroupPath extends string,
+  Group extends GroupSpec.AnyWithProps,
+> =
+  GroupSpec.GroupAt<Group, GroupPath> extends infer GroupAtPath extends
+    GroupSpec.AnyWithProps
+    ? FunctionSpec.Name<
+        GroupSpec.Functions<GroupAtPath>
+      > extends infer FunctionNames extends string
+      ? FunctionNames extends string
+        ? FunctionImpl<GroupPath, FunctionNames>
         : never
-      : never;
-}
+      : never
+    : never;

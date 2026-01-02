@@ -6,10 +6,10 @@ import {
 import { Effect, Option, Schema } from "effect";
 import * as Refs from "../api/Refs";
 
-export const useQuery = <Query extends Refs.Ref.AnyPublicQuery>(
+export const useQuery = <Query extends Refs.AnyPublicQuery>(
   ref: Query,
-  args: Refs.Ref.Args<Query>["Type"],
-): Option.Option<Refs.Ref.Returns<Query>["Type"]> => {
+  args: Refs.Args<Query>["Type"],
+): Option.Option<Refs.Returns<Query>["Type"]> => {
   const function_ = Refs.getFunction(ref);
   const functionName = Refs.getConvexFunctionName(ref);
 
@@ -29,7 +29,7 @@ export const useQuery = <Query extends Refs.Ref.AnyPublicQuery>(
   }
 };
 
-export const useMutation = <Mutation extends Refs.Ref.AnyPublicMutation>(
+export const useMutation = <Mutation extends Refs.AnyPublicMutation>(
   ref: Mutation,
 ) => {
   const function_ = Refs.getFunction(ref);
@@ -37,8 +37,8 @@ export const useMutation = <Mutation extends Refs.Ref.AnyPublicMutation>(
   const actualMutation = useConvexMutation(functionName as any);
 
   return (
-    args: Refs.Ref.Args<Mutation>["Type"],
-  ): Effect.Effect<Refs.Ref.Returns<Mutation>["Type"]> =>
+    args: Refs.Args<Mutation>["Type"],
+  ): Effect.Effect<Refs.Returns<Mutation>["Type"]> =>
     Effect.gen(function* () {
       const encodedArgs = yield* Schema.encode(function_.args)(args);
 
@@ -50,16 +50,14 @@ export const useMutation = <Mutation extends Refs.Ref.AnyPublicMutation>(
     }).pipe(Effect.orDie);
 };
 
-export const useAction = <Action extends Refs.Ref.AnyPublicAction>(
-  ref: Action,
-) => {
+export const useAction = <Action extends Refs.AnyPublicAction>(ref: Action) => {
   const function_ = Refs.getFunction(ref);
   const functionName = Refs.getConvexFunctionName(ref);
   const actualAction = useConvexAction(functionName as any);
 
   return (
-    args: Refs.Ref.Args<Action>["Type"],
-  ): Effect.Effect<Refs.Ref.Returns<Action>["Type"]> =>
+    args: Refs.Args<Action>["Type"],
+  ): Effect.Effect<Refs.Returns<Action>["Type"]> =>
     Effect.gen(function* () {
       const encodedArgs = yield* Schema.encode(function_.args)(args);
 

@@ -21,69 +21,69 @@ import {
 export const TypeId = "@rjdellecese/confect/server/Table";
 export type TypeId = typeof TypeId;
 
-export const isTable = (u: unknown): u is Table.Any =>
+export const isTable = (u: unknown): u is Any =>
   Predicate.hasProperty(u, TypeId);
 
 export interface Table<
-  TableName extends string,
-  TableSchema extends Schema.Schema.AnyNoContext,
-  TableValidator extends
-    GenericValidator = TableSchemaToTableValidator<TableSchema>,
-  Indexes extends GenericTableIndexes = {},
-  SearchIndexes extends GenericTableSearchIndexes = {},
-  VectorIndexes extends GenericTableVectorIndexes = {},
+  Name_ extends string,
+  TableSchema_ extends Schema.Schema.AnyNoContext,
+  TableValidator_ extends
+    GenericValidator = TableSchemaToTableValidator<TableSchema_>,
+  Indexes_ extends GenericTableIndexes = {},
+  SearchIndexes_ extends GenericTableSearchIndexes = {},
+  VectorIndexes_ extends GenericTableVectorIndexes = {},
 > {
   readonly [TypeId]: TypeId;
   readonly tableDefinition: TableDefinition<
-    TableValidator,
-    Indexes,
-    SearchIndexes,
-    VectorIndexes
+    TableValidator_,
+    Indexes_,
+    SearchIndexes_,
+    VectorIndexes_
   >;
 
-  readonly name: TableName;
+  readonly name: Name_;
 
-  readonly Fields: TableSchema;
-  readonly Doc: SystemFields.ExtendWithSystemFields<TableName, TableSchema>;
+  readonly Fields: TableSchema_;
+  readonly Doc: SystemFields.ExtendWithSystemFields<Name_, TableSchema_>;
 
-  readonly indexes: Indexes;
+  readonly indexes: Indexes_;
 
   index<
     IndexName extends string,
-    FirstFieldPath extends ExtractFieldPaths<TableValidator>,
-    RestFieldPaths extends ExtractFieldPaths<TableValidator>[],
+    FirstFieldPath extends ExtractFieldPaths<TableValidator_>,
+    RestFieldPaths extends ExtractFieldPaths<TableValidator_>[],
   >(
     name: IndexName,
     fields: [FirstFieldPath, ...RestFieldPaths],
   ): Table<
-    TableName,
-    TableSchema,
-    TableValidator,
+    Name_,
+    TableSchema_,
+    TableValidator_,
     Expand<
-      Indexes &
+      Indexes_ &
         Record<
           IndexName,
           [FirstFieldPath, ...RestFieldPaths, IndexTiebreakerField]
         >
     >,
-    SearchIndexes,
-    VectorIndexes
+    SearchIndexes_,
+    VectorIndexes_
   >;
 
   searchIndex<
     IndexName extends string,
-    SearchField extends ExtractFieldPaths<TableValidator>,
-    FilterFields extends ExtractFieldPaths<TableValidator> = never,
+    SearchField extends ExtractFieldPaths<TableValidator_>,
+    FilterFields extends ExtractFieldPaths<TableValidator_> = never,
   >(
     name: IndexName,
     indexConfig: Expand<SearchIndexConfig<SearchField, FilterFields>>,
   ): Table<
-    TableName,
-    TableSchema,
-    TableValidator,
-    Indexes,
+    Name_,
+    TableSchema_,
+    TableValidator_,
+    Indexes_,
     Expand<
-      SearchIndexes &
+      SearchIndexes_ &
         Record<
           IndexName,
           {
@@ -92,24 +92,24 @@ export interface Table<
           }
         >
     >,
-    VectorIndexes
+    VectorIndexes_
   >;
 
   vectorIndex<
     IndexName extends string,
-    VectorField extends ExtractFieldPaths<TableValidator>,
-    FilterFields extends ExtractFieldPaths<TableValidator> = never,
+    VectorField extends ExtractFieldPaths<TableValidator_>,
+    FilterFields extends ExtractFieldPaths<TableValidator_> = never,
   >(
     name: IndexName,
     indexConfig: Expand<VectorIndexConfig<VectorField, FilterFields>>,
   ): Table<
-    TableName,
-    TableSchema,
-    TableValidator,
-    Indexes,
-    SearchIndexes,
+    Name_,
+    TableSchema_,
+    TableValidator_,
+    Indexes_,
+    SearchIndexes_,
     Expand<
-      VectorIndexes &
+      VectorIndexes_ &
         Record<
           IndexName,
           {
@@ -122,125 +122,123 @@ export interface Table<
   >;
 }
 
-export declare namespace Table {
-  export interface Any {
-    readonly [TypeId]: TypeId;
-  }
-
-  export type AnyWithProps = Table<
-    any,
-    Schema.Schema.AnyNoContext,
-    GenericValidator,
-    GenericTableIndexes,
-    GenericTableSearchIndexes,
-    GenericTableVectorIndexes
-  >;
-
-  export type Name<TableDef extends AnyWithProps> =
-    TableDef extends Table<
-      infer TableName,
-      infer _TableSchema,
-      infer _TableValidator,
-      infer _Indexes,
-      infer _SearchIndexes,
-      infer _VectorIndexes
-    >
-      ? TableName & string
-      : never;
-
-  export type TableSchema<TableDef extends AnyWithProps> =
-    TableDef extends Table<
-      infer _TableName,
-      infer TableSchema_,
-      infer _TableValidator,
-      infer _Indexes,
-      infer _SearchIndexes,
-      infer _VectorIndexes
-    >
-      ? TableSchema_
-      : never;
-
-  export type TableValidator<TableDef extends AnyWithProps> =
-    TableDef extends Table<
-      infer _TableName,
-      infer _TableSchema,
-      infer TableValidator_,
-      infer _Indexes,
-      infer _SearchIndexes,
-      infer _VectorIndexes
-    >
-      ? TableValidator_
-      : never;
-
-  export type Indexes<TableDef extends AnyWithProps> =
-    TableDef extends Table<
-      infer _TableName,
-      infer _TableSchema,
-      infer _TableValidator,
-      infer Indexes_,
-      infer _SearchIndexes,
-      infer _VectorIndexes
-    >
-      ? Indexes_
-      : never;
-
-  export type SearchIndexes<TableDef extends AnyWithProps> =
-    TableDef extends Table<
-      infer _TableName,
-      infer _TableSchema,
-      infer _TableValidator,
-      infer _Indexes,
-      infer SearchIndexes_,
-      infer _VectorIndexes
-    >
-      ? SearchIndexes_
-      : never;
-
-  export type VectorIndexes<TableDef extends AnyWithProps> =
-    TableDef extends Table<
-      infer _TableName,
-      infer _TableSchema,
-      infer _TableValidator,
-      infer _Indexes,
-      infer _SearchIndexes,
-      infer VectorIndexes_
-    >
-      ? VectorIndexes_
-      : never;
-
-  export type Doc<TableDef extends AnyWithProps> =
-    TableDef extends Table<
-      infer TableName,
-      infer TableSchema_,
-      infer _TableValidator,
-      infer _Indexes,
-      infer _SearchIndexes,
-      infer _VectorIndexes
-    >
-      ? SystemFields.ExtendWithSystemFields<TableName, TableSchema_>
-      : never;
-
-  export type Fields<TableDef extends AnyWithProps> =
-    TableDef extends Table<
-      infer _TableName,
-      infer TableSchema_,
-      infer _TableValidator,
-      infer _Indexes,
-      infer _SearchIndexes,
-      infer _VectorIndexes
-    >
-      ? TableSchema_
-      : never;
-
-  export type WithName<
-    TableDef extends AnyWithProps,
-    Name_ extends string,
-  > = TableDef extends { readonly name: Name_ } ? TableDef : never;
-
-  export type TablesRecord<Tables extends AnyWithProps> = {
-    readonly [TableName_ in Name<Tables>]: WithName<Tables, TableName_>;
-  };
+export interface Any {
+  readonly [TypeId]: TypeId;
 }
+
+export type AnyWithProps = Table<
+  any,
+  Schema.Schema.AnyNoContext,
+  GenericValidator,
+  GenericTableIndexes,
+  GenericTableSearchIndexes,
+  GenericTableVectorIndexes
+>;
+
+export type Name<TableDef extends AnyWithProps> =
+  TableDef extends Table<
+    infer TableName,
+    infer _TableSchema,
+    infer _TableValidator,
+    infer _Indexes,
+    infer _SearchIndexes,
+    infer _VectorIndexes
+  >
+    ? TableName & string
+    : never;
+
+export type TableSchema<TableDef extends AnyWithProps> =
+  TableDef extends Table<
+    infer _TableName,
+    infer TableSchema_,
+    infer _TableValidator,
+    infer _Indexes,
+    infer _SearchIndexes,
+    infer _VectorIndexes
+  >
+    ? TableSchema_
+    : never;
+
+export type TableValidator<TableDef extends AnyWithProps> =
+  TableDef extends Table<
+    infer _TableName,
+    infer _TableSchema,
+    infer TableValidator_,
+    infer _Indexes,
+    infer _SearchIndexes,
+    infer _VectorIndexes
+  >
+    ? TableValidator_
+    : never;
+
+export type Indexes<TableDef extends AnyWithProps> =
+  TableDef extends Table<
+    infer _TableName,
+    infer _TableSchema,
+    infer _TableValidator,
+    infer Indexes_,
+    infer _SearchIndexes,
+    infer _VectorIndexes
+  >
+    ? Indexes_
+    : never;
+
+export type SearchIndexes<TableDef extends AnyWithProps> =
+  TableDef extends Table<
+    infer _TableName,
+    infer _TableSchema,
+    infer _TableValidator,
+    infer _Indexes,
+    infer SearchIndexes_,
+    infer _VectorIndexes
+  >
+    ? SearchIndexes_
+    : never;
+
+export type VectorIndexes<TableDef extends AnyWithProps> =
+  TableDef extends Table<
+    infer _TableName,
+    infer _TableSchema,
+    infer _TableValidator,
+    infer _Indexes,
+    infer _SearchIndexes,
+    infer VectorIndexes_
+  >
+    ? VectorIndexes_
+    : never;
+
+export type Doc<TableDef extends AnyWithProps> =
+  TableDef extends Table<
+    infer TableName,
+    infer TableSchema_,
+    infer _TableValidator,
+    infer _Indexes,
+    infer _SearchIndexes,
+    infer _VectorIndexes
+  >
+    ? SystemFields.ExtendWithSystemFields<TableName, TableSchema_>
+    : never;
+
+export type Fields<TableDef extends AnyWithProps> =
+  TableDef extends Table<
+    infer _TableName,
+    infer TableSchema_,
+    infer _TableValidator,
+    infer _Indexes,
+    infer _SearchIndexes,
+    infer _VectorIndexes
+  >
+    ? TableSchema_
+    : never;
+
+export type WithName<
+  TableDef extends AnyWithProps,
+  Name_ extends string,
+> = TableDef extends { readonly name: Name_ } ? TableDef : never;
+
+export type TablesRecord<Tables extends AnyWithProps> = {
+  readonly [TableName_ in Name<Tables>]: WithName<Tables, TableName_>;
+};
 
 const Proto = {
   [TypeId]: TypeId,
@@ -250,7 +248,7 @@ const Proto = {
     FirstFieldPath extends string,
     RestFieldPaths extends string[],
   >(
-    this: Table.AnyWithProps,
+    this: AnyWithProps,
     name: IndexName,
     fields: [FirstFieldPath, ...RestFieldPaths],
   ) {
@@ -267,7 +265,7 @@ const Proto = {
   },
 
   searchIndex<IndexName extends string, SearchField extends string>(
-    this: Table.AnyWithProps,
+    this: AnyWithProps,
     name: IndexName,
     indexConfig: SearchIndexConfig<SearchField, any>,
   ) {
@@ -281,7 +279,7 @@ const Proto = {
   },
 
   vectorIndex<IndexName extends string, VectorField extends string>(
-    this: Table.AnyWithProps,
+    this: AnyWithProps,
     name: IndexName,
     indexConfig: {
       vectorField: VectorField;
@@ -306,12 +304,12 @@ const Proto = {
 };
 
 const makeProto = <
-  TableName extends string,
-  TableSchema extends Schema.Schema.AnyNoContext,
-  TableValidator extends Validator<any, any, any>,
-  Indexes extends GenericTableIndexes,
-  SearchIndexes extends GenericTableSearchIndexes,
-  VectorIndexes extends GenericTableVectorIndexes,
+  Name_ extends string,
+  TableSchema_ extends Schema.Schema.AnyNoContext,
+  TableValidator_ extends Validator<any, any, any>,
+  Indexes_ extends GenericTableIndexes,
+  SearchIndexes_ extends GenericTableSearchIndexes,
+  VectorIndexes_ extends GenericTableVectorIndexes,
 >({
   name,
   Fields,
@@ -319,23 +317,23 @@ const makeProto = <
   tableDefinition,
   indexes,
 }: {
-  name: TableName;
-  Fields: TableSchema;
-  Doc: SystemFields.ExtendWithSystemFields<TableName, TableSchema>;
+  name: Name_;
+  Fields: TableSchema_;
+  Doc: SystemFields.ExtendWithSystemFields<Name_, TableSchema_>;
   tableDefinition: TableDefinition<
-    TableValidator,
-    Indexes,
-    SearchIndexes,
-    VectorIndexes
+    TableValidator_,
+    Indexes_,
+    SearchIndexes_,
+    VectorIndexes_
   >;
-  indexes: Indexes;
+  indexes: Indexes_;
 }): Table<
-  TableName,
-  TableSchema,
-  TableValidator,
-  Indexes,
-  SearchIndexes,
-  VectorIndexes
+  Name_,
+  TableSchema_,
+  TableValidator_,
+  Indexes_,
+  SearchIndexes_,
+  VectorIndexes_
 > =>
   Object.assign(Object.create(Proto), {
     name,
@@ -349,12 +347,12 @@ const makeProto = <
  * Create a table.
  */
 export const make = <
-  const TableName extends string,
-  TableSchema extends Schema.Schema.AnyNoContext,
+  const Name_ extends string,
+  TableSchema_ extends Schema.Schema.AnyNoContext,
 >(
-  name: TableName,
-  fields: TableSchema,
-): Table<TableName, TableSchema> => {
+  name: Name_,
+  fields: TableSchema_,
+): Table<Name_, TableSchema_> => {
   const tableValidator = compileTableSchema(fields);
   const tableDefinition = defineTable(tableValidator);
 

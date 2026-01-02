@@ -5,10 +5,10 @@ import * as Refs from "../api/Refs";
 
 const make =
   (runQuery: GenericQueryCtx<any>["runQuery"]) =>
-  <Query extends Refs.Ref.AnyQuery>(
+  <Query extends Refs.AnyQuery>(
     query: Query,
-    args: Refs.Ref.Args<Query>["Type"],
-  ): Effect.Effect<Refs.Ref.Returns<Query>["Type"], ParseResult.ParseError> =>
+    args: Refs.Args<Query>["Type"],
+  ): Effect.Effect<Refs.Returns<Query>["Type"], ParseResult.ParseError> =>
     Effect.gen(function* () {
       const function_ = Refs.getFunction(query);
       const functionName = Refs.getConvexFunctionName(query);

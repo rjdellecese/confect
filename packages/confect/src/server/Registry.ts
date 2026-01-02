@@ -2,9 +2,7 @@ import { Context, Ref } from "effect";
 import type * as RegistryItem from "./RegistryItem";
 
 export interface RegistryItems {
-  readonly [key: string]:
-    | RegistryItem.RegistryItem.AnyWithProps
-    | RegistryItems;
+  readonly [key: string]: RegistryItem.AnyWithProps | RegistryItems;
 }
 
 export class Registry extends Context.Reference<Registry>()(

@@ -167,9 +167,7 @@ export const services = ({
       Effect.gen(function* () {
         yield* cbw.writeLine("VectorSearch_.VectorSearch<");
         yield* cbw.indent(
-          cbw.writeLine(
-            "DataModel.DataModel.FromSchema<typeof schemaDefinition>",
-          ),
+          cbw.writeLine("DataModel.FromSchema<typeof schemaDefinition>"),
         );
         yield* cbw.writeLine(">();");
       }),
@@ -240,10 +238,10 @@ export const services = ({
         yield* cbw.writeLine("QueryCtx_.QueryCtx<");
         yield* cbw.indent(
           Effect.gen(function* () {
-            yield* cbw.writeLine("DataModel.DataModel.ToConvex<");
+            yield* cbw.writeLine("DataModel.ToConvex<");
             yield* cbw.indent(
               Effect.gen(function* () {
-                yield* cbw.writeLine("DataModel.DataModel.FromSchema<");
+                yield* cbw.writeLine("DataModel.FromSchema<");
                 yield* cbw.indent(cbw.writeLine("typeof schemaDefinition"));
                 yield* cbw.writeLine(">");
               }),
@@ -264,10 +262,10 @@ export const services = ({
         yield* cbw.writeLine("MutationCtx_.MutationCtx<");
         yield* cbw.indent(
           Effect.gen(function* () {
-            yield* cbw.writeLine("DataModel.DataModel.ToConvex<");
+            yield* cbw.writeLine("DataModel.ToConvex<");
             yield* cbw.indent(
               Effect.gen(function* () {
-                yield* cbw.writeLine("DataModel.DataModel.FromSchema<");
+                yield* cbw.writeLine("DataModel.FromSchema<");
                 yield* cbw.indent(cbw.writeLine("typeof schemaDefinition"));
                 yield* cbw.writeLine(">");
               }),
@@ -290,10 +288,10 @@ export const services = ({
         yield* cbw.writeLine("ActionCtx_.ActionCtx<");
         yield* cbw.indent(
           Effect.gen(function* () {
-            yield* cbw.writeLine("DataModel.DataModel.ToConvex<");
+            yield* cbw.writeLine("DataModel.ToConvex<");
             yield* cbw.indent(
               Effect.gen(function* () {
-                yield* cbw.writeLine("DataModel.DataModel.FromSchema<");
+                yield* cbw.writeLine("DataModel.FromSchema<");
                 yield* cbw.indent(cbw.writeLine("typeof schemaDefinition"));
                 yield* cbw.writeLine(">");
               }),
