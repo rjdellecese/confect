@@ -31,15 +31,21 @@ export type TableInfo<Table_ extends Table.AnyWithProps> =
           // TODO: Should all of these fields be readonly?
           readonly [TypeId]: TypeId;
           // It's pretty hard to recursively make an arbitrary TS type readonly/mutable, so we capture both the readonly version of the `convexDocument` (which is the `encodedDocument`) and the mutable version (`convexDocument`).
-          document: ExtractDocument_<TableName, TableSchema_>;
-          encodedDocument: ExtractEncodedDocument<TableName, TableSchema_>;
-          convexDocument: ExtractConvexDocument<TableName, TableValidator>;
-          fieldPaths:
+          readonly document: ExtractDocument_<TableName, TableSchema_>;
+          readonly encodedDocument: ExtractEncodedDocument<
+            TableName,
+            TableSchema_
+          >;
+          readonly convexDocument: ExtractConvexDocument<
+            TableName,
+            TableValidator
+          >;
+          readonly fieldPaths:
             | keyof IdField<TableName>
             | ExtractFieldPaths<TableValidator>;
-          indexes: Types.Simplify<Indexes & SystemIndexes>;
-          searchIndexes: SearchIndexes;
-          vectorIndexes: VectorIndexes;
+          readonly indexes: Types.Simplify<Indexes & SystemIndexes>;
+          readonly searchIndexes: SearchIndexes;
+          readonly vectorIndexes: VectorIndexes;
         }
       : never
     : never;
@@ -49,13 +55,13 @@ export interface Any {
 }
 
 export interface AnyWithProps extends Any {
-  document: Document_.Any;
-  encodedDocument: Document_.AnyEncoded;
-  convexDocument: GenericDocument;
-  fieldPaths: GenericFieldPaths;
-  indexes: GenericTableIndexes;
-  searchIndexes: GenericTableSearchIndexes;
-  vectorIndexes: GenericTableVectorIndexes;
+  readonly document: Document_.Any;
+  readonly encodedDocument: Document_.AnyEncoded;
+  readonly convexDocument: GenericDocument;
+  readonly fieldPaths: GenericFieldPaths;
+  readonly indexes: GenericTableIndexes;
+  readonly searchIndexes: GenericTableSearchIndexes;
+  readonly vectorIndexes: GenericTableVectorIndexes;
 }
 
 export type ConvexTableInfo<TableInfo_ extends AnyWithProps> = {
