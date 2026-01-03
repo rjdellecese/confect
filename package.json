@@ -1,21 +1,32 @@
 {
   "scripts": {
-    "build": "pnpm -r --filter='@rjdellecese/*' build",
-    "build:confect": "pnpm --filter @rjdellecese/confect build",
+    "build": "pnpm -r --filter='@confect/*' build",
+    "build:core": "pnpm --filter @confect/core build",
+    "build:server": "pnpm --filter @confect/server build",
+    "build:react": "pnpm --filter @confect/react build",
     "build:docs": "pnpm --filter docs build",
     "build:example": "pnpm --filter example build",
     "dev": "pnpm -r --parallel dev",
-    "dev:confect": "pnpm --filter @rjdellecese/confect dev",
+    "dev:core": "pnpm --filter @confect/core dev",
+    "dev:server": "pnpm --filter @confect/server dev",
+    "dev:react": "pnpm --filter @confect/react dev",
     "dev:docs": "pnpm --filter docs dev",
     "dev:example": "pnpm --filter example dev",
     "typecheck": "pnpm -r typecheck",
+    "typecheck:core": "pnpm --filter @confect/core typecheck",
+    "typecheck:server": "pnpm --filter @confect/server typecheck",
+    "typecheck:react": "pnpm --filter @confect/react typecheck",
+    "typecheck:docs": "pnpm --filter docs typecheck",
+    "typecheck:example": "pnpm --filter example typecheck",
     "lint": "pnpm -r lint",
-    "lint:confect": "pnpm --filter @rjdellecese/confect lint",
+    "lint:core": "pnpm --filter @confect/core lint",
+    "lint:server": "pnpm --filter @confect/server lint",
+    "lint:react": "pnpm --filter @confect/react lint",
     "lint:docs": "pnpm --filter docs lint",
     "lint:example": "pnpm --filter example lint",
     "fix": "pnpm -r fix",
     "test": "pnpm -r test",
-    "release": "pnpm build:confect && changeset publish",
+    "release": "pnpm build && changeset publish",
     "clean": "pnpm -r clean && rm -rf node_modules"
   },
   "keywords": [
@@ -33,6 +44,8 @@
     "pnpm": ">=10"
   },
   "dependencies": {
-    "@rjdellecese/confect": "link:packages/confect"
+    "@confect/core": "link:packages/core",
+    "@confect/server": "link:packages/server",
+    "@confect/react": "link:packages/react"
   }
 }

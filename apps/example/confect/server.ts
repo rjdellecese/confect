@@ -1,4 +1,4 @@
-import { Impl, Server } from "@rjdellecese/confect";
+import { Impl, Server } from "@confect/server";
 import { Effect, Layer } from "effect";
 import api from "./_generated/api";
 import { groups } from "./impl/groups";

@@ -13,7 +13,9 @@
   },
   "dependencies": {
     "@effect/platform": "0.93.2",
-    "@rjdellecese/confect": "workspace:*",
+    "@confect/core": "workspace:*",
+    "@confect/server": "workspace:*",
+    "@confect/react": "workspace:*",
     "convex": "1.29.1",
     "effect": "3.19.3",
     "react": "19.2.0",

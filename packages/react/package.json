@@ -1,0 +1,71 @@
+{
+  "name": "@confect/react",
+  "version": "0.0.28",
+  "description": "Confect React hooks",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rjdellecese/confect.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rjdellecese/confect/issues"
+  },
+  "homepage": "https://confect.rjdellecese.com",
+  "sideEffects": false,
+  "type": "module",
+  "files": [
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md",
+    "dist",
+    "package.json",
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit --project tsconfig.json",
+    "fix": "prettier --write . && eslint --fix . --max-warnings=0",
+    "lint": "prettier --check . && eslint . --max-warnings=0",
+    "clean": "rm -rf dist coverage node_modules"
+  },
+  "keywords": [
+    "effect",
+    "convex",
+    "react"
+  ],
+  "author": "RJ Dellecese",
+  "license": "ISC",
+  "dependencies": {
+    "@confect/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@effect/language-service": "0.56.0",
+    "@eslint/js": "9.39.1",
+    "@tsconfig/strictest": "2.0.8",
+    "@types/node": "24.10.1",
+    "eslint": "9.39.1",
+    "prettier": "3.6.2",
+    "tsdown": "0.16.4",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.46.4"
+  },
+  "peerDependencies": {
+    "@effect/platform": "^0.93.2",
+    "convex": "^1.30.0",
+    "effect": "^3.19.3",
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=10"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts"
+}

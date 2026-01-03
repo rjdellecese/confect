@@ -1,4 +1,4 @@
-import { DatabaseSchema } from "@rjdellecese/confect";
+import { DatabaseSchema } from "@confect/server";
 import { Note } from "./tables/Note";
 import { Tag } from "./tables/Tag";
 import { User } from "./tables/User";

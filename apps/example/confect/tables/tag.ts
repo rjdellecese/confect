@@ -1,4 +1,4 @@
-import { Table } from "@rjdellecese/confect";
+import { Table } from "@confect/server";
 import { Schema } from "effect";
 
 export type Tag = {

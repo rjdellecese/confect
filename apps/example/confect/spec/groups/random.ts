@@ -1,4 +1,4 @@
-import { FunctionSpec, GroupSpec } from "@rjdellecese/confect";
+import { FunctionSpec, GroupSpec } from "@confect/core";
 import { Schema } from "effect";
 
 export const random = GroupSpec.make("random").addFunction(

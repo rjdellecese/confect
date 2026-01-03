@@ -1,4 +1,5 @@
-import { GenericId, Table } from "@rjdellecese/confect";
+import { GenericId } from "@confect/core";
+import { Table } from "@confect/server";
 import { Schema } from "effect";
 
 export const Note = Table.make(

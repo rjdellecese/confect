@@ -3,4 +3,6 @@ packages:
   - apps/*
 
 overrides:
-  '@rjdellecese/confect': link:packages/confect
+  "@confect/core": link:packages/core
+  "@confect/server": link:packages/server
+  "@confect/react": link:packages/react

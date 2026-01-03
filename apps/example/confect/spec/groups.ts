@@ -1,4 +1,4 @@
-import { GroupSpec } from "@rjdellecese/confect";
+import { GroupSpec } from "@confect/core";
 import { notes } from "./groups/notes";
 import { random } from "./groups/random";
 

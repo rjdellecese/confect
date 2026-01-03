@@ -1,4 +1,4 @@
-import { FunctionImpl, GroupImpl } from "@rjdellecese/confect";
+import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Effect, Layer } from "effect";
 import api from "../../_generated/api";
 
