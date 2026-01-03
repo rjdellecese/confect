@@ -1,6 +1,6 @@
 {
   "name": "@confect/server",
-  "version": "0.0.28",
+  "version": "0.0.1",
   "description": "Confect server",
   "repository": {
     "type": "git",

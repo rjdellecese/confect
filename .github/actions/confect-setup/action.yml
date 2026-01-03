@@ -1,5 +1,5 @@
-name: "Confect Package Setup"
-description: "Sets up Node.js and pnpm for the confect package"
+name: "Confect Packages Setup"
+description: "Sets up Node.js and pnpm for the confect packages"
 author: "Confect"
 
 runs:
@@ -23,8 +23,4 @@ runs:
 
     - name: Install dependencies
       run: pnpm install
-      shell: bash
-
-    - name: Generate Convex types (confect)
-      run: pnpm --filter @rjdellecese/confect convex-codegen
       shell: bash

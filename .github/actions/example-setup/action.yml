@@ -25,12 +25,8 @@ runs:
       run: pnpm install
       shell: bash
 
-    - name: Build confect package (dependency)
-      run: pnpm --filter @rjdellecese/confect build
-      shell: bash
-
-    - name: Generate Convex types (confect)
-      run: pnpm --filter @rjdellecese/confect convex-codegen
+    - name: Build confect packages (dependencies)
+      run: pnpm --filter "@confect/*" build
       shell: bash
 
     - name: Generate Convex types (example)

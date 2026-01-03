@@ -1,6 +1,6 @@
 {
   "name": "@confect/react",
-  "version": "0.0.28",
+  "version": "0.0.1",
   "description": "Confect React hooks",
   "repository": {
     "type": "git",

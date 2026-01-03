@@ -1,11 +1,13 @@
-name: Confect Package
+name: Confect Packages
 
 on:
   push:
     branches:
       - main
     paths:
-      - "packages/confect/**"
+      - "packages/core/**"
+      - "packages/server/**"
+      - "packages/react/**"
       - "package.json"
       - "pnpm-workspace.yaml"
       - ".github/workflows/confect.yml"
@@ -14,7 +16,9 @@ on:
     branches:
       - main
     paths:
-      - "packages/confect/**"
+      - "packages/core/**"
+      - "packages/server/**"
+      - "packages/react/**"
       - "package.json"
       - "pnpm-workspace.yaml"
       - ".github/workflows/confect.yml"
@@ -24,18 +28,24 @@ jobs:
   typecheck:
     name: Type Check
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package: ["@confect/core", "@confect/server", "@confect/react"]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/confect-setup
-      - run: pnpm --filter @rjdellecese/confect typecheck
+      - run: pnpm --filter ${{ matrix.package }} typecheck
 
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package: ["@confect/core", "@confect/server", "@confect/react"]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/confect-setup
-      - run: pnpm --filter @rjdellecese/confect lint
+      - run: pnpm --filter ${{ matrix.package }} lint
 
   test:
     name: Test
@@ -43,12 +53,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/confect-setup
-      - run: pnpm --filter @rjdellecese/confect test
+      - run: pnpm --filter @confect/server test
 
   build:
     name: Build
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package: ["@confect/core", "@confect/server", "@confect/react"]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/confect-setup
-      - run: pnpm --filter @rjdellecese/confect build
+      - run: pnpm --filter ${{ matrix.package }} build
