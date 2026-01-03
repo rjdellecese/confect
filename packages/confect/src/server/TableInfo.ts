@@ -28,7 +28,6 @@ export type TableInfo<Table_ extends Table.AnyWithProps> =
   >
     ? TableSchema_ extends Schema.Schema.AnyNoContext
       ? {
-          // TODO: Should all of these fields be readonly?
           readonly [TypeId]: TypeId;
           // It's pretty hard to recursively make an arbitrary TS type readonly/mutable, so we capture both the readonly version of the `convexDocument` (which is the `encodedDocument`) and the mutable version (`convexDocument`).
           readonly document: ExtractDocument_<TableName, TableSchema_>;

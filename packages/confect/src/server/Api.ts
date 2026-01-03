@@ -15,8 +15,7 @@ export interface Api<
 > {
   readonly [TypeId]: TypeId;
   readonly spec: Spec_;
-  // TODO: Rename to `databaseSchema`
-  readonly schema: DatabaseSchema_;
+  readonly databaseSchema: DatabaseSchema_;
   readonly convexSchemaDefinition: SchemaDefinition<GenericSchema, true>;
 }
 
@@ -26,12 +25,11 @@ export interface Any {
 
 export interface AnyWithProps extends Any {
   readonly spec: Spec.AnyWithProps;
-  // TODO: Rename to `databaseSchema`
-  readonly schema: DatabaseSchema.AnyWithProps;
+  readonly databaseSchema: DatabaseSchema.AnyWithProps;
   readonly convexSchemaDefinition: SchemaDefinition<GenericSchema, true>;
 }
 
-export type Schema<Api_ extends AnyWithProps> = Api_["schema"];
+export type Schema<Api_ extends AnyWithProps> = Api_["databaseSchema"];
 
 export type Groups<Api_ extends AnyWithProps> = Spec.Groups<Api_["spec"]>;
 
@@ -43,18 +41,17 @@ const makeProto = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Spec_ extends Spec.AnyWithProps,
 >({
-  // TODO: Rename to `databaseSchema`
-  schema,
+  databaseSchema,
   spec,
 }: {
-  schema: DatabaseSchema.AnyWithProps;
+  databaseSchema: DatabaseSchema.AnyWithProps;
   spec: Spec_;
 }): Api<DatabaseSchema_, Spec_> =>
   Object.assign(Object.create(Proto), {
-    schema,
+    databaseSchema,
     spec,
     convexSchemaDefinition: pipe(
-      schema.tables,
+      databaseSchema.tables,
       Record.map(({ tableDefinition }) => tableDefinition),
       defineConvexSchema,
     ),
@@ -64,6 +61,6 @@ export const make = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Spec_ extends Spec.AnyWithProps,
 >(
-  schema: DatabaseSchema_,
+  databaseSchema: DatabaseSchema_,
   spec: Spec_,
-): Api<DatabaseSchema_, Spec_> => makeProto({ schema, spec });
+): Api<DatabaseSchema_, Spec_> => makeProto({ databaseSchema, spec });

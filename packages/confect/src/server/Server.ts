@@ -125,7 +125,7 @@ const makeRegisteredFunction = <Api_ extends Api.AnyWithProps>(
       );
 
       return genericFunction(
-        queryFunction(api.schema, {
+        queryFunction(api.databaseSchema, {
           args: function_.args,
           returns: function_.returns,
           handler,
@@ -140,7 +140,7 @@ const makeRegisteredFunction = <Api_ extends Api.AnyWithProps>(
       );
 
       return genericFunction(
-        mutationFunction(api.schema, {
+        mutationFunction(api.databaseSchema, {
           args: function_.args,
           returns: function_.returns,
           handler,
