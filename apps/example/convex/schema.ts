@@ -1,3 +1,3 @@
-import confectSchemaDefinition from "../confect/schema";
+import schemaDefinition from "../confect/schema";
 
-export default confectSchemaDefinition.convexSchemaDefinition;
+export default schemaDefinition.convexSchemaDefinition;

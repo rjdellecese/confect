@@ -52,7 +52,7 @@ export type TableInfoWithName_<
 export type TableInfoWithName<
   DataModel_ extends AnyWithProps,
   TableName extends TableNames<DataModel_>,
-> = TableInfo.TableInfoTableInfo<
+> = TableInfo.ConvexTableInfo<
   TableInfo.TableInfo<Table.WithName<Tables<DataModel_>, TableName>>
 >;
 

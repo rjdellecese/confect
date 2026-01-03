@@ -16,14 +16,14 @@ const createConfig = ({
   clean: true,
   dts: true,
   sourcemap: true,
+  format: ["esm"],
   unbundle: true,
-  exports: true,
 });
 
 export default defineConfig([
   createConfig({
     platform: "neutral",
-    entry: ["src/index.ts"],
+    entry: ["src/**/*.ts", "!src/cli/**"],
     outDir: "dist",
   }),
   createConfig({

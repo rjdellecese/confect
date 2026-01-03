@@ -103,17 +103,21 @@ export const systemSchema = make()
   .addTable(Table.scheduledFunctionsTable)
   .addTable(Table.storageTable);
 
-export const extendWithSystemTables = <Tables extends Table.AnyWithProps>(
-  tables: Table.TablesRecord<Tables>,
-): ExtendWithSystemTables<Tables> =>
+export const extendWithSystemTables = <Tables_ extends Table.AnyWithProps>(
+  tables: Table.TablesRecord<Tables_>,
+): ExtendWithSystemTables<Tables_> =>
   ({
     ...tables,
     ...Table.systemTables,
-  }) as ExtendWithSystemTables<Tables>;
+  }) as ExtendWithSystemTables<Tables_>;
 
-export type ExtendWithSystemTables<Tables extends Table.AnyWithProps> =
-  Table.TablesRecord<Tables | Table.SystemTables>;
+export type ExtendWithSystemTables<Tables_ extends Table.AnyWithProps> =
+  Table.TablesRecord<Tables_ | Table.SystemTables>;
 
-export type IncludeSystemTables<Tables extends Table.AnyWithProps> =
-  | Tables
-  | Table.SystemTables;
+export type IncludeSystemTables<Tables_ extends Table.AnyWithProps> =
+  | Tables_
+  | Table.SystemTables extends infer T
+  ? T extends Table.AnyWithProps
+    ? T
+    : never
+  : never;

@@ -1,6 +1,6 @@
 import type { GenericDatabaseReader } from "convex/server";
 import { Array, Context, Layer } from "effect";
-import type { BaseDatabaseReader } from "../internal/typeUtils";
+import type { BaseDatabaseReader } from "../api/Types";
 import * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
 import * as QueryInitializer from "./QueryInitializer";

@@ -12,7 +12,7 @@ import type {
   IsUnion,
   IsValueLiteral,
   UnionToTuple,
-} from "../../src/internal/typeUtils";
+} from "../../src/api/Types";
 
 describe("IsOptional", () => {
   test("{ foo?: any } = true", () => {

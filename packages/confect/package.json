@@ -24,8 +24,24 @@
     "src"
   ],
   "exports": {
-    ".": "./dist/index.js",
-    "./package.json": "./package.json"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./server/*": {
+      "types": "./dist/server/*.d.ts",
+      "default": "./dist/server/*.js"
+    },
+    "./api/*": {
+      "types": "./dist/api/*.d.ts",
+      "default": "./dist/api/*.js"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "default": "./dist/client/index.js"
+    },
+    "./package.json": "./package.json",
+    "./internal/*": null
   },
   "scripts": {
     "build": "tsdown",

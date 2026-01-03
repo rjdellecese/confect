@@ -58,7 +58,7 @@ export interface AnyWithProps extends Any {
   vectorIndexes: GenericTableVectorIndexes;
 }
 
-export type TableInfoTableInfo<TableInfo_ extends AnyWithProps> = {
+export type ConvexTableInfo<TableInfo_ extends AnyWithProps> = {
   document: TableInfo_["convexDocument"];
   fieldPaths: TableInfo_["fieldPaths"];
   indexes: TableInfo_["indexes"];

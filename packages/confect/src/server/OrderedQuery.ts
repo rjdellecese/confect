@@ -41,7 +41,7 @@ export const make = <
   TableInfo_ extends TableInfo.AnyWithProps,
   TableName extends string,
 >(
-  query: ConvexOrderedQuery<TableInfo.TableInfoTableInfo<TableInfo_>>,
+  query: ConvexOrderedQuery<TableInfo.ConvexTableInfo<TableInfo_>>,
   tableName: TableName,
   tableSchema: TableInfo.TableSchema<TableInfo_>,
 ): OrderedQuery<TableInfo_, TableName> => {

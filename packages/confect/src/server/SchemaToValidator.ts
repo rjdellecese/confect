@@ -46,7 +46,7 @@ import type {
   IsValueLiteral,
   TypeError,
   UnionToTuple,
-} from "../internal/typeUtils";
+} from "../api/Types";
 
 // Args
 
