@@ -69,18 +69,14 @@ export const refs = ({ specImportPath }: { specImportPath: string }) =>
 export const api = ({
   schemaImportPath,
   specImportPath,
-  test,
 }: {
   schemaImportPath: string;
   specImportPath: string;
-  test?: boolean;
 }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-    yield* cbw.writeLine(
-      `import { Api, DatabaseSchema } from "${test ? "../../../src/index" : "@confect/server"}";`,
-    );
+    yield* cbw.writeLine(`import { Api } from "@confect/server";`);
     yield* cbw.writeLine(`import schema from "${schemaImportPath}";`);
     yield* cbw.writeLine(`import spec from "${specImportPath}";`);
     yield* cbw.blankLine();
@@ -89,13 +85,7 @@ export const api = ({
     return yield* cbw.toString();
   });
 
-export const services = ({
-  schemaImportPath,
-  test,
-}: {
-  schemaImportPath: string;
-  test?: boolean;
-}) =>
+export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
@@ -119,9 +109,7 @@ export const services = ({
         yield* cbw.writeLine("VectorSearch as VectorSearch_,");
       }),
     );
-    yield* cbw.writeLine(
-      `} from "${test ? "../../../src/index" : "@confect/server"}";`,
-    );
+    yield* cbw.writeLine(`} from "@confect/server";`);
     yield* cbw.writeLine(
       `import type schemaDefinition from "${schemaImportPath}";`,
     );

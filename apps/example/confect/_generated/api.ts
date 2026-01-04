@@ -1,4 +1,4 @@
-import { Api, DatabaseSchema } from "@confect/server";
+import { Api } from "@confect/server";
 import schema from "../schema";
 import spec from "../spec";
 

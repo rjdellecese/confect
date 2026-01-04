@@ -1,23 +1,13 @@
 import { Command } from "@effect/cli";
 import { FileSystem, Path } from "@effect/platform";
-import {
-  Array,
-  Config,
-  Console,
-  Effect,
-  Option,
-  Record,
-  Schema,
-  String,
-} from "effect";
+import { Array, Console, Effect, Option, Record, Schema, String } from "effect";
 import * as tsx from "tsx/esm/api";
-import packageJson from "../../package.json" with { type: "json" };
-import { forEachBranchLeaves } from "../internal/utils";
-import * as Server from "../Server";
-import * as DatabaseSchema from "../DatabaseSchema";
-import * as templates from "./templates";
+import * as DatabaseSchema from "../../DatabaseSchema";
+import { forEachBranchLeaves } from "../../internal/utils";
+import * as Server from "../../Server";
+import * as templates from "../templates";
 
-const codegenCommand = Command.make("codegen", {}, () =>
+export const codegen = Command.make("codegen", {}, () =>
   Effect.gen(function* () {
     const projectRoot = yield* findProjectRoot;
     const confectDirectory = yield* findConfectDirectory({ projectRoot });
@@ -227,10 +217,6 @@ const generateServices = ({ confectDirectory }: { confectDirectory: string }) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
-    // TODO: Is this the right approach?
-    const test = yield* Config.boolean("CONFECT_TEST").pipe(
-      Config.withDefault(false),
-    );
 
     const confectGeneratedDirectory = path.join(confectDirectory, "_generated");
 
@@ -242,7 +228,6 @@ const generateServices = ({ confectDirectory }: { confectDirectory: string }) =>
 
     const servicesContentsString = yield* templates.services({
       schemaImportPath,
-      test,
     });
 
     const servicesContents = new TextEncoder().encode(servicesContentsString);
@@ -383,19 +368,3 @@ const findAndCreateConvexDirectory = ({
 
     return convexDirectory;
   });
-
-/**
- * The main CLI command with all subcommands.
- */
-export const confect = Command.make("confect").pipe(
-  Command.withDescription("Confect - Use Effect with Convex!"),
-  Command.withSubcommands([codegenCommand]),
-);
-
-/**
- * The CLI application runner.
- */
-export const cli = Command.run(confect, {
-  name: "Confect",
-  version: packageJson.version,
-});
