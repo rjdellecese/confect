@@ -26,4 +26,4 @@ export * as QueryCtx from "./QueryCtx";
 export * as Registry from "./Registry";
 export * as RegistryItem from "./RegistryItem";
 export * as SchemaToValidator from "./SchemaToValidator";
-
+export * as HttpClient from "./HttpClient";
