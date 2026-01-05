@@ -58,7 +58,7 @@
   "license": "ISC",
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.2",
-    "@biomejs/biome": "2.3.10",
+    "@biomejs/biome": "2.3.11",
     "@changesets/cli": "2.29.8",
     "@changesets/config": "3.1.2",
     "@effect/cluster": "0.56.0",
