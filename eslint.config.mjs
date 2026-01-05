@@ -44,6 +44,7 @@ export default [
       "@typescript-eslint/no-shadow": "warn",
     },
   },
+
   // apps/example
   {
     files: ["apps/example/**/*.{ts,tsx}"],
@@ -55,11 +56,13 @@ export default [
       },
     },
   },
+
   // apps/docs
   {
     ...mdx.flat,
     files: ["apps/docs/**/*.{md,mdx}"],
   },
+
   {
     files: [
       "**/*.js",
