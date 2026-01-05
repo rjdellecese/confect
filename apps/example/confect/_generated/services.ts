@@ -2,7 +2,7 @@ import {
   ActionCtx as ActionCtx_,
   ActionRunner as ActionRunner_,
   Auth as Auth_,
-  DataModel,
+  type DataModel,
   DatabaseReader as DatabaseReader_,
   DatabaseWriter as DatabaseWriter_,
   MutationCtx as MutationCtx_,

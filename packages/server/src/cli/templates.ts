@@ -110,7 +110,7 @@ export const services = ({
         yield* cbw.writeLine("ActionCtx as ActionCtx_,");
         yield* cbw.writeLine("ActionRunner as ActionRunner_,");
         yield* cbw.writeLine("Auth as Auth_,");
-        yield* cbw.writeLine("DataModel,");
+        yield* cbw.writeLine("type DataModel,");
         yield* cbw.writeLine("DatabaseReader as DatabaseReader_,");
         yield* cbw.writeLine("DatabaseWriter as DatabaseWriter_,");
         yield* cbw.writeLine("MutationCtx as MutationCtx_,");
