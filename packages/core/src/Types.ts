@@ -35,9 +35,9 @@ export type IsValueLiteral<Vl> = [Vl] extends [never]
     : false;
 
 /**
- * Assumes record type with string keys.
+ * Only checks for records with string keys.
  */
-export type IsRecordType<T> = [T] extends [never]
+export type IsRecord<T> = [T] extends [never]
   ? false
   : IsUnion<T> extends true
     ? false

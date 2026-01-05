@@ -3,7 +3,7 @@ import type * as Api from "./Api";
 import type { Groups as ApiGroups } from "./Api";
 import type * as GroupImpl from "./GroupImpl";
 
-export class Impl extends Context.Tag("@rjdellecese/confect/server/Impl")<
+export class Impl extends Context.Tag("@confect/server/Impl")<
   Impl,
   {
     readonly api: Api.AnyWithProps;

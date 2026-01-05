@@ -6,7 +6,7 @@ export interface RegistryItems {
 }
 
 export class Registry extends Context.Reference<Registry>()(
-  "@rjdellecese/confect/server/Registry",
+  "@confect/server/Registry",
   {
     defaultValue: () => Ref.unsafeMake<RegistryItems>({}),
   },

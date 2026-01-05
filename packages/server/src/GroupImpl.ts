@@ -17,7 +17,7 @@ export const GroupImpl = <GroupPath extends string>({
   groupPath: GroupPath;
 }) =>
   Context.GenericTag<GroupImpl<GroupPath>>(
-    `@rjdellecese/confect/server/GroupImpl/${groupPath}`,
+    `@confect/server/GroupImpl/${groupPath}`,
   );
 
 // ============================================================================

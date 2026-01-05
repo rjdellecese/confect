@@ -29,7 +29,7 @@ export const FunctionImpl = <
   functionName: FunctionName;
 }) =>
   Context.GenericTag<FunctionImpl<GroupPath, FunctionName>>(
-    `@rjdellecese/confect/server/FunctionImpl/${groupPath}/${functionName}`,
+    `@confect/server/FunctionImpl/${groupPath}/${functionName}`,
   );
 
 // ============================================================================

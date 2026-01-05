@@ -31,7 +31,7 @@ const make = (scheduler: ConvexScheduler) => ({
 });
 
 export const Scheduler = Context.GenericTag<ReturnType<typeof make>>(
-  "@rjdellecese/confect/server/Scheduler",
+  "@confect/server/Scheduler",
 );
 export type Scheduler = typeof Scheduler.Identifier;
 

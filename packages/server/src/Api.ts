@@ -4,7 +4,7 @@ import { pipe, Predicate, Record } from "effect";
 import type * as Spec from "@confect/core/Spec";
 import type * as DatabaseSchema from "./DatabaseSchema";
 
-export const TypeId = "@rjdellecese/confect/server/Api";
+export const TypeId = "@confect/server/Api";
 export type TypeId = typeof TypeId;
 
 export const isApi = (u: unknown): u is Any => Predicate.hasProperty(u, TypeId);

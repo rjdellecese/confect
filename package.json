@@ -26,6 +26,9 @@
     "lint:example": "pnpm --filter example lint",
     "fix": "pnpm -r fix",
     "test": "pnpm -r test",
+    "test:core": "pnpm --filter @confect/core test",
+    "test:server": "pnpm --filter @confect/server test",
+    "test:react": "pnpm --filter @confect/react test",
     "release": "pnpm build && changeset publish",
     "clean": "pnpm -r clean && rm -rf node_modules"
   },
@@ -37,7 +40,10 @@
   "devDependencies": {
     "@changesets/cli": "2.29.7",
     "@changesets/config": "3.1.1",
-    "typescript": "5.9.3"
+    "@eslint/js": "^9.39.2",
+    "eslint": "^9.39.2",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.46.4"
   },
   "engines": {
     "node": ">=22",
@@ -45,7 +51,7 @@
   },
   "dependencies": {
     "@confect/core": "link:packages/core",
-    "@confect/server": "link:packages/server",
-    "@confect/react": "link:packages/react"
+    "@confect/react": "link:packages/react",
+    "@confect/server": "link:packages/server"
   }
 }

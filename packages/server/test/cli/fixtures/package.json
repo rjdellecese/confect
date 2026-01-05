@@ -1,0 +1,13 @@
+{
+  "type": "module",
+  "dependencies": {
+    "@effect/platform": "0.93.2",
+    "@rjdellecese/confect": "*",
+    "convex": "1.29.1",
+    "effect": "3.19.3"
+  },
+  "devDependencies": {
+    "@types/node": "22.16.0",
+    "typescript": "5.9.3"
+  }
+}

@@ -56,7 +56,7 @@ export const DatabaseReader = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 >() =>
   Context.GenericTag<ReturnType<typeof make<DatabaseSchema_>>>(
-    "@rjdellecese/confect/server/DatabaseReader",
+    "@confect/server/DatabaseReader",
   );
 
 export type DatabaseReader<

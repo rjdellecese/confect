@@ -15,7 +15,7 @@ const make = (auth: ConvexAuth) => ({
   ),
 });
 
-export class Auth extends Effect.Tag("@rjdellecese/confect/server/Auth")<
+export class Auth extends Effect.Tag("@confect/server/Auth")<
   Auth,
   ReturnType<typeof make>
 >() {}

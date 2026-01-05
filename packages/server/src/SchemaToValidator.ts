@@ -1,5 +1,4 @@
 import type {
-  OptionalProperty,
   PropertyValidators,
   Validator,
   VAny,
@@ -179,7 +178,9 @@ type RecordValueToValidator<Vl> = Vl extends ReadonlyRecordValue
         : UndefinedOrValueToValidator<Vl[K]>;
     } extends infer VdRecord extends Record<string, any>
     ? {
-        -readonly [K in keyof Vl]: DeepMutable<Vl[K]>;
+        -readonly [K in keyof Vl]: undefined extends Vl[K]
+          ? DeepMutable<Exclude<Vl[K], undefined>>
+          : DeepMutable<Vl[K]>;
       } extends infer VlRecord extends Record<string, any>
       ? IsRecordType<VlRecord> extends true
         ? VRecord<VlRecord, VString, VdRecord[keyof VdRecord]>
@@ -193,7 +194,7 @@ export type UndefinedOrValueToValidator<Vl extends ReadonlyValue | undefined> =
     ? [Vl] extends [(infer Val extends ReadonlyValue) | undefined]
       ? ValueToValidator<Val> extends infer Vd extends Validator<
           any,
-          OptionalProperty,
+          "required",
           any
         >
         ? VOptional<Vd>

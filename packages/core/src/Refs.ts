@@ -96,6 +96,7 @@ export const getConvexFunctionName = <
   ref: Ref<FunctionType_, FunctionVisibility_, Args_, Returns_>,
 ): HiddenConvexFunctionName => (ref as any)[HiddenConvexFunctionNameKey];
 
+// TODO: Move `Ref` stuff into own module
 export interface Ref<
   _FunctionType extends FunctionSpec.FunctionType,
   _FunctionVisibility extends FunctionSpec.FunctionVisibility,
@@ -124,7 +125,7 @@ export interface AnyQuery
 
 export interface AnyMutation
   extends Ref<
-    "Query",
+    "Mutation",
     FunctionSpec.FunctionVisibility,
     Schema.Schema.AnyNoContext,
     Schema.Schema.AnyNoContext

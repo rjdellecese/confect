@@ -1,3 +1,4 @@
+import * as SystemFields from "@confect/core/SystemFields";
 import {
   defineTable,
   type SystemFields as ConvexSystemFields,
@@ -12,13 +13,12 @@ import {
 } from "convex/server";
 import type { GenericValidator, Validator } from "convex/values";
 import { Predicate, Schema } from "effect";
-import * as SystemFields from "@confect/core/SystemFields";
 import {
   compileTableSchema,
   type TableSchemaToTableValidator,
 } from "./SchemaToValidator";
 
-export const TypeId = "@rjdellecese/confect/server/Table";
+export const TypeId = "@confect/server/Table";
 export type TypeId = typeof TypeId;
 
 export const isTable = (u: unknown): u is Any =>

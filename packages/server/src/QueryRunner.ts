@@ -21,7 +21,7 @@ const make =
     });
 
 export const QueryRunner = Context.GenericTag<ReturnType<typeof make>>(
-  "@rjdellecese/confect/server/QueryRunner",
+  "@confect/server/QueryRunner",
 );
 export type QueryRunner = typeof QueryRunner.Identifier;
 

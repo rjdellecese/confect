@@ -37,6 +37,7 @@
   },
   "scripts": {
     "build": "tsdown",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "fix": "prettier --write . && eslint --fix . --max-warnings=0",
     "lint": "prettier --check . && eslint . --max-warnings=0",

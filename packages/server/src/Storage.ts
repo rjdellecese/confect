@@ -55,21 +55,21 @@ const makeStorageActionWriter = (
 });
 
 export class StorageReader extends Effect.Tag(
-  "@rjdellecese/confect/server/Storage/StorageReader",
+  "@confect/server/Storage/StorageReader",
 )<StorageReader, ReturnType<typeof makeStorageReader>>() {
   static readonly layer = (storageReader: ConvexStorageReader) =>
     Layer.succeed(this, makeStorageReader(storageReader));
 }
 
 export class StorageWriter extends Effect.Tag(
-  "@rjdellecese/confect/server/Storage/StorageWriter",
+  "@confect/server/Storage/StorageWriter",
 )<StorageWriter, ReturnType<typeof makeStorageWriter>>() {
   static readonly layer = (storageWriter: ConvexStorageWriter) =>
     Layer.succeed(this, makeStorageWriter(storageWriter));
 }
 
 export class StorageActionWriter extends Effect.Tag(
-  "@rjdellecese/confect/server/Storage/StorageActionWriter",
+  "@confect/server/Storage/StorageActionWriter",
 )<StorageActionWriter, ReturnType<typeof makeStorageActionWriter>>() {
   static readonly layer = (storageActionWriter: ConvexStorageActionWriter) =>
     Layer.succeed(this, makeStorageActionWriter(storageActionWriter));

@@ -21,7 +21,7 @@ const makeMutationRunner =
 
 export const MutationRunner = Context.GenericTag<
   ReturnType<typeof makeMutationRunner>
->("@rjdellecese/confect/server/MutationRunner");
+>("@confect/server/MutationRunner");
 export type MutationRunner = typeof MutationRunner.Identifier;
 
 export const layer = (runMutation: GenericMutationCtx<any>["runMutation"]) =>

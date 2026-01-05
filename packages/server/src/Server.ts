@@ -1,3 +1,6 @@
+import type * as FunctionSpec from "@confect/core/FunctionSpec";
+import type * as GroupSpec from "@confect/core/GroupSpec";
+import type * as Spec from "@confect/core/Spec";
 import {
   actionGeneric,
   type DefaultFunctionArgs,
@@ -24,10 +27,6 @@ import {
   Schema,
   type Types,
 } from "effect";
-import type * as FunctionSpec from "@confect/core/FunctionSpec";
-import type * as GroupSpec from "@confect/core/GroupSpec";
-import type * as Spec from "@confect/core/Spec";
-import { mapLeaves } from "./internal/utils";
 import * as ActionCtx from "./ActionCtx";
 import * as ActionRunner from "./ActionRunner";
 import type * as Api from "./Api";
@@ -36,6 +35,7 @@ import * as DatabaseReader from "./DatabaseReader";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import * as DatabaseWriter from "./DatabaseWriter";
 import type * as DataModel from "./DataModel";
+import { mapLeaves } from "./internal/utils";
 import * as MutationCtx from "./MutationCtx";
 import * as MutationRunner from "./MutationRunner";
 import * as QueryCtx from "./QueryCtx";
@@ -70,7 +70,7 @@ const isRegisteredAction = (
 export const isRegisteredFunction = (u: unknown): u is RegisteredFunction =>
   isRegisteredQuery(u) || isRegisteredMutation(u) || isRegisteredAction(u);
 
-export const TypeId = "@rjdellecese/confect/server/Server";
+export const TypeId = "@confect/server/Server";
 export type TypeId = typeof TypeId;
 
 export const isServer = (u: unknown): u is Server<Api.AnyWithProps> =>

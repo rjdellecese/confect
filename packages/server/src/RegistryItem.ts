@@ -115,7 +115,7 @@ export type HandlerWithName<
 // RegistryItem - Registry Item
 // ============================================================================
 
-export const TypeId = "@rjdellecese/confect/server/RegistryItem";
+export const TypeId = "@confect/server/RegistryItem";
 export type TypeId = typeof TypeId;
 
 export const isRegistryItem = (value: unknown): value is AnyWithProps =>

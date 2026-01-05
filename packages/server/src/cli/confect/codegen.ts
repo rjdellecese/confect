@@ -1,19 +1,33 @@
 import { Command } from "@effect/cli";
 import { FileSystem, Path } from "@effect/platform";
-import { Array, Console, Effect, Option, Record, Schema, String } from "effect";
+import {
+  Array,
+  Config,
+  Console,
+  Effect,
+  Option,
+  Record,
+  Schema,
+  String,
+} from "effect";
 import * as tsx from "tsx/esm/api";
 import * as DatabaseSchema from "../../DatabaseSchema";
 import { forEachBranchLeaves } from "../../internal/utils";
 import * as Server from "../../Server";
 import * as templates from "../templates";
 
+const isTest = Config.string("VITEST").pipe(
+  Config.map((value) => value === "true"),
+  Config.withDefault(false),
+);
+
 export const codegen = Command.make("codegen", {}, () =>
   Effect.gen(function* () {
     const projectRoot = yield* findProjectRoot;
-    const confectDirectory = yield* findConfectDirectory({ projectRoot });
     const convexDirectory = yield* findAndCreateConvexDirectory({
       projectRoot,
     });
+    const confectDirectory = yield* findConfectDirectory({ convexDirectory });
 
     yield* generateConfectGeneratedDirectory({ confectDirectory });
     yield* Effect.all(
@@ -34,6 +48,43 @@ export const codegen = Command.make("codegen", {}, () =>
     );
   }),
 ).pipe(Command.withDescription("Generate Convex functions from a Confect API"));
+
+const getTestImportPaths = ({
+  generatedFilePath,
+  confectDirectory,
+}: {
+  generatedFilePath: string;
+  confectDirectory: string;
+}) =>
+  Effect.gen(function* () {
+    const path = yield* Path.Path;
+
+    // From test/confect/_generated/ to src/
+    const serverSrcPath = path.join(confectDirectory, "..", "..", "src");
+    const confectServerImportPath = path.relative(
+      path.dirname(generatedFilePath),
+      serverSrcPath,
+    );
+
+    // From test/confect/_generated/ to ../../core/src/
+    const coreSrcPath = path.join(
+      confectDirectory,
+      "..",
+      "..",
+      "..",
+      "core",
+      "src",
+    );
+    const confectCoreImportPath = path.relative(
+      path.dirname(generatedFilePath),
+      coreSrcPath,
+    );
+
+    return {
+      confectServerImportPath,
+      confectCoreImportPath,
+    };
+  });
 
 const generateConfectGeneratedDirectory = ({
   confectDirectory,
@@ -57,19 +108,32 @@ const generateApi = ({ confectDirectory }: { confectDirectory: string }) =>
     const path = yield* Path.Path;
 
     const apiPath = path.join(confectDirectory, "_generated", "api.ts");
+
+    const schemaImportPath = yield* removePathExtension(
+      path.relative(
+        path.dirname(apiPath),
+        path.join(confectDirectory, "schema.ts"),
+      ),
+    );
+
+    const specImportPath = yield* removePathExtension(
+      path.relative(
+        path.dirname(apiPath),
+        path.join(confectDirectory, "spec.ts"),
+      ),
+    );
+
+    const importOverrides = (yield* isTest)
+      ? yield* getTestImportPaths({
+          generatedFilePath: apiPath,
+          confectDirectory,
+        })
+      : {};
+
     const apiContents = yield* templates.api({
-      schemaImportPath: yield* removePathExtension(
-        path.relative(
-          path.dirname(apiPath),
-          path.join(confectDirectory, "schema.ts"),
-        ),
-      ),
-      specImportPath: yield* removePathExtension(
-        path.relative(
-          path.dirname(apiPath),
-          path.join(confectDirectory, "spec.ts"),
-        ),
-      ),
+      schemaImportPath,
+      specImportPath,
+      ...importOverrides,
     });
 
     yield* fs.writeFileString(apiPath, apiContents);
@@ -226,8 +290,16 @@ const generateServices = ({ confectDirectory }: { confectDirectory: string }) =>
       path.join(confectDirectory, "schema"),
     );
 
+    const importOverrides = (yield* isTest)
+      ? yield* getTestImportPaths({
+          generatedFilePath: servicesPath,
+          confectDirectory,
+        })
+      : {};
+
     const servicesContentsString = yield* templates.services({
       schemaImportPath,
+      ...importOverrides,
     });
 
     const servicesContents = new TextEncoder().encode(servicesContentsString);
@@ -281,8 +353,17 @@ const generateRefs = ({ confectDirectory }: { confectDirectory: string }) =>
       confectSpecPath,
     );
     const importPathWithoutExt = yield* removePathExtension(relativeImportPath);
+
+    const importOverrides = (yield* isTest)
+      ? yield* getTestImportPaths({
+          generatedFilePath: refsPath,
+          confectDirectory,
+        })
+      : {};
+
     const refsContents = yield* templates.refs({
       specImportPath: importPathWithoutExt,
+      ...importOverrides,
     });
 
     yield* fs.writeFileString(refsPath, refsContents);
@@ -315,11 +396,15 @@ const findProjectRoot = Effect.gen(function* () {
   return Option.getOrElse(projectRoot, () => startDir);
 });
 
-const findConfectDirectory = ({ projectRoot }: { projectRoot: string }) =>
+const findConfectDirectory = ({
+  convexDirectory,
+}: {
+  convexDirectory: string;
+}) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
 
-    return path.join(projectRoot, "confect");
+    return path.join(convexDirectory, "..", "confect");
   });
 
 // Schema for `convex.json` configuration file

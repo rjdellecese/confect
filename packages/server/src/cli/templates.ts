@@ -51,11 +51,17 @@ export const http = ({ httpImportPath }: { httpImportPath: string }) =>
     return yield* cbw.toString();
   });
 
-export const refs = ({ specImportPath }: { specImportPath: string }) =>
+export const refs = ({
+  specImportPath,
+  confectCoreImportPath = "@confect/core",
+}: {
+  specImportPath: string;
+  confectCoreImportPath?: string;
+}) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-    yield* cbw.writeLine(`import { Refs } from "@confect/core";`);
+    yield* cbw.writeLine(`import { Refs } from "${confectCoreImportPath}";`);
     yield* cbw.writeLine(`import spec from "${specImportPath}";`);
     yield* cbw.blankLine();
     yield* cbw.writeLine(`const refs = Refs.make(spec);`);
@@ -69,14 +75,16 @@ export const refs = ({ specImportPath }: { specImportPath: string }) =>
 export const api = ({
   schemaImportPath,
   specImportPath,
+  confectServerImportPath = "@confect/server",
 }: {
   schemaImportPath: string;
   specImportPath: string;
+  confectServerImportPath?: string;
 }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-    yield* cbw.writeLine(`import { Api } from "@confect/server";`);
+    yield* cbw.writeLine(`import { Api } from "${confectServerImportPath}";`);
     yield* cbw.writeLine(`import schema from "${schemaImportPath}";`);
     yield* cbw.writeLine(`import spec from "${specImportPath}";`);
     yield* cbw.blankLine();
@@ -85,7 +93,13 @@ export const api = ({
     return yield* cbw.toString();
   });
 
-export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
+export const services = ({
+  schemaImportPath,
+  confectServerImportPath = "@confect/server",
+}: {
+  schemaImportPath: string;
+  confectServerImportPath?: string;
+}) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
@@ -98,7 +112,6 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
         yield* cbw.writeLine("Auth as Auth_,");
         yield* cbw.writeLine("DataModel,");
         yield* cbw.writeLine("DatabaseReader as DatabaseReader_,");
-        yield* cbw.writeLine("DatabaseSchema,");
         yield* cbw.writeLine("DatabaseWriter as DatabaseWriter_,");
         yield* cbw.writeLine("MutationCtx as MutationCtx_,");
         yield* cbw.writeLine("MutationRunner as MutationRunner_,");
@@ -109,7 +122,7 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
         yield* cbw.writeLine("VectorSearch as VectorSearch_,");
       }),
     );
-    yield* cbw.writeLine(`} from "@confect/server";`);
+    yield* cbw.writeLine(`} from "${confectServerImportPath}";`);
     yield* cbw.writeLine(
       `import type schemaDefinition from "${schemaImportPath}";`,
     );

@@ -6,7 +6,7 @@ import {
 import { Array, pipe, Predicate, Record } from "effect";
 import * as Table from "./Table";
 
-export const TypeId = "@rjdellecese/confect/server/DatabaseSchema";
+export const TypeId = "@confect/server/DatabaseSchema";
 export type TypeId = typeof TypeId;
 
 export const isSchema = (u: unknown): u is Any =>

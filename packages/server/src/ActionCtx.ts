@@ -3,7 +3,7 @@ import { Context } from "effect";
 
 export const ActionCtx = <DataModel extends GenericDataModel>() =>
   Context.GenericTag<GenericActionCtx<DataModel>>(
-    "@rjdellecese/confect/server/ActionCtx",
+    "@confect/server/ActionCtx",
   );
 
 export type ActionCtx<DataModel extends GenericDataModel> = ReturnType<
