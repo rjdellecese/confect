@@ -1,5 +1,11 @@
 # @rjdellecese/confect
 
+## 0.0.34
+
+### Patch Changes
+
+- fa436f8: Add missing `ConfectQueryCtx` Effect requirement for `internalMutation` handler
+
 ## 0.0.33
 
 ### Patch Changes
