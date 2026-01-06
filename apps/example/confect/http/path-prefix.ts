@@ -39,7 +39,7 @@ const ApiGroupLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
     Effect.gen(function* () {
       const runQuery = yield* QueryRunner;
 
-      const firstNote = yield* runQuery(api.groups.notes.getFirst, {});
+      const firstNote = yield* runQuery(api.notesAndRandom.notes.getFirst, {});
 
       return firstNote;
     }).pipe(Effect.orDie),

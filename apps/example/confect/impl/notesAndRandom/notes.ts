@@ -3,15 +3,19 @@ import { Effect, Layer } from "effect";
 import api from "../../_generated/api";
 import { DatabaseReader, DatabaseWriter } from "../../_generated/services";
 
-const insert = FunctionImpl.make(api, "groups.notes", "insert", ({ text }) =>
-  Effect.gen(function* () {
-    const writer = yield* DatabaseWriter;
+const insert = FunctionImpl.make(
+  api,
+  "notesAndRandom.notes",
+  "insert",
+  ({ text }) =>
+    Effect.gen(function* () {
+      const writer = yield* DatabaseWriter;
 
-    return yield* writer.insert("notes", { text });
-  }).pipe(Effect.orDie),
+      return yield* writer.insert("notes", { text });
+    }).pipe(Effect.orDie),
 );
 
-const list = FunctionImpl.make(api, "groups.notes", "list", () =>
+const list = FunctionImpl.make(api, "notesAndRandom.notes", "list", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
 
@@ -24,7 +28,7 @@ const list = FunctionImpl.make(api, "groups.notes", "list", () =>
 
 const delete_ = FunctionImpl.make(
   api,
-  "groups.notes",
+  "notesAndRandom.notes",
   "delete_",
   ({ noteId }) =>
     Effect.gen(function* () {
@@ -36,17 +40,21 @@ const delete_ = FunctionImpl.make(
     }).pipe(Effect.orDie),
 );
 
-const getFirst = FunctionImpl.make(api, "groups.notes", "getFirst", () =>
-  Effect.gen(function* () {
-    const reader = yield* DatabaseReader;
+const getFirst = FunctionImpl.make(
+  api,
+  "notesAndRandom.notes",
+  "getFirst",
+  () =>
+    Effect.gen(function* () {
+      const reader = yield* DatabaseReader;
 
-    return yield* reader.table("notes").index("by_creation_time").first();
-  }).pipe(Effect.orDie),
+      return yield* reader.table("notes").index("by_creation_time").first();
+    }).pipe(Effect.orDie),
 );
 
 const internalGetFirst = FunctionImpl.make(
   api,
-  "groups.notes",
+  "notesAndRandom.notes",
   "internalGetFirst",
   () =>
     Effect.gen(function* () {
@@ -56,7 +64,7 @@ const internalGetFirst = FunctionImpl.make(
     }).pipe(Effect.orDie),
 );
 
-export const notes = GroupImpl.make(api, "groups.notes").pipe(
+export const notes = GroupImpl.make(api, "notesAndRandom.notes").pipe(
   Layer.provide(insert),
   Layer.provide(list),
   Layer.provide(delete_),

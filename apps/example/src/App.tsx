@@ -1,5 +1,5 @@
-import { FetchHttpClient, HttpApiClient } from "@effect/platform";
 import { useAction, useMutation, useQuery } from "@confect/react";
+import { FetchHttpClient, HttpApiClient } from "@effect/platform";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { Array, Effect, Exit, Option } from "effect";
 import { useEffect, useState } from "react";
@@ -18,10 +18,10 @@ const App = () => {
 
 const Page = () => {
   const [note, setNote] = useState("");
-  const insertNote = useMutation(api.groups.notes.insert);
+  const insertNote = useMutation(api.notesAndRandom.notes.insert);
 
   const [randomNumber, setRandomNumber] = useState<number | null>(null);
-  const getRandom = useAction(api.groups.random.getNumber);
+  const getRandom = useAction(api.notesAndRandom.random.getNumber);
 
   const retrieveRandomNumber = () => {
     getRandom({}).pipe(Effect.map(setRandomNumber), Effect.runPromise);
@@ -71,11 +71,11 @@ const Page = () => {
 };
 
 const NoteList = () => {
-  const notes = useQuery(api.groups.notes.list, {});
+  const optionNotes = useQuery(api.notesAndRandom.notes.list, {});
 
-  const deleteNote = useMutation(api.groups.notes.delete_);
+  const deleteNote = useMutation(api.notesAndRandom.notes.delete_);
 
-  return Option.match(notes, {
+  return Option.match(optionNotes, {
     onNone: () => <p>Loading…</p>,
     onSome: (notes) => (
       <ul>
@@ -111,7 +111,6 @@ const getFirst = ApiClient.pipe(
 );
 
 const HttpEndpoints = () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [getResponse, setGetResponse] = useState<Exit.Exit<any, any> | null>(
     null,
   );

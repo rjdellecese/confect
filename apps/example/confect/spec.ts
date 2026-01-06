@@ -1,4 +1,4 @@
 import { Spec } from "@confect/core";
-import { groups } from "./spec/groups";
+import { notesAndRandom } from "./spec/notesAndRandom";
 
-export default Spec.make().add(groups);
+export default Spec.make().add(notesAndRandom);
