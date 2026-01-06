@@ -142,7 +142,8 @@ export const makeFunctions = <ConfectSchema extends GenericConfectSchema>(
     ) => Effect.Effect<
       ConfectReturns,
       E,
-      ConfectMutationCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>
+      | ConfectQueryCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>
+      | ConfectMutationCtx<ConfectDataModelFromConfectSchema<ConfectSchema>>
     >;
   }): RegisteredMutation<"internal", ConvexValue, Promise<ConvexReturns>> =>
     internalMutationGeneric(
