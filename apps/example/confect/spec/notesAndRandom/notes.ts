@@ -1,6 +1,6 @@
 import { FunctionSpec, GenericId, GroupSpec } from "@confect/core";
 import { Schema } from "effect";
-import { Note } from "../../tables/Note";
+import { Note } from "../../tables/note";
 
 export const notes = GroupSpec.make("notes")
   .addFunction(
