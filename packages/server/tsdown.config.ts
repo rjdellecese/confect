@@ -22,8 +22,8 @@ const createConfig = ({
 
 export default defineConfig([
   createConfig({
-    platform: "node",
-    entry: ["src/index.ts", "src/**/*.ts"],
+    platform: "neutral",
+    entry: ["src/index.ts", "src/**/*.ts", "!src/cli/**/*"],
     outDir: "dist",
   }),
   createConfig({
