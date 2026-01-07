@@ -39,7 +39,7 @@ import type {
   DeepMutable,
   IsAny,
   IsOptional,
-  IsRecordType,
+  IsRecord,
   IsRecursive,
   IsUnion,
   IsValueLiteral,
@@ -182,7 +182,7 @@ type RecordValueToValidator<Vl> = Vl extends ReadonlyRecordValue
           ? DeepMutable<Exclude<Vl[K], undefined>>
           : DeepMutable<Vl[K]>;
       } extends infer VlRecord extends Record<string, any>
-      ? IsRecordType<VlRecord> extends true
+      ? IsRecord<VlRecord> extends true
         ? VRecord<VlRecord, VString, VdRecord[keyof VdRecord]>
         : VObject<VlRecord, VdRecord>
       : never
