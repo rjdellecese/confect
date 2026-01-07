@@ -8,7 +8,7 @@ import {
 import { Effect, Layer, Schema } from "effect";
 import { api } from "../_generated/refs";
 import { QueryRunner } from "../_generated/services";
-import { Note } from "../tables/Note";
+import { Note } from "../tables/note";
 
 class ApiGroup extends HttpApiGroup.make("notes")
   .add(
