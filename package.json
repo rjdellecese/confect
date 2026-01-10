@@ -4,8 +4,6 @@
     "build:core": "pnpm --filter @confect/core build",
     "build:server": "pnpm --filter @confect/server build",
     "build:react": "pnpm --filter @confect/react build",
-    "build:docs": "pnpm --filter docs build",
-    "build:example": "pnpm --filter example build",
     "dev": "pnpm -r --parallel dev",
     "dev:core": "pnpm --filter @confect/core dev",
     "dev:server": "pnpm --filter @confect/server dev",
