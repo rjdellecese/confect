@@ -38,20 +38,8 @@ export interface Any {
   readonly [TypeId]: TypeId;
 }
 
-// TODO: Can we extend the `GroupSpec` interface and remove these custom fields?
-export interface AnyWithProps extends Any {
-  readonly name: string;
-  readonly functions: {
-    [key: string]: FunctionSpec.AnyWithProps;
-  };
-  readonly groups: {
-    [key: string]: AnyWithProps;
-  };
-  addFunction<Function extends FunctionSpec.AnyWithProps>(
-    function_: Function,
-  ): AnyWithProps;
-  addGroup<Group extends AnyWithProps>(group: Group): AnyWithProps;
-}
+export interface AnyWithProps
+  extends GroupSpec<string, FunctionSpec.AnyWithProps, AnyWithProps> {}
 
 export type Name<Group extends AnyWithProps> = Group["name"];
 
