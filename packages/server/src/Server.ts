@@ -230,6 +230,27 @@ const queryFunction = <
     ),
 });
 
+export const mutationLayer = <Schema extends DatabaseSchema.AnyWithProps>(
+  schema: Schema,
+  ctx: GenericMutationCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
+) =>
+  Layer.mergeAll(
+    DatabaseReader.layer(schema, ctx.db),
+    DatabaseWriter.layer(schema, ctx.db),
+    Auth.layer(ctx.auth),
+    Scheduler.layer(ctx.scheduler),
+    StorageReader.layer(ctx.storage),
+    StorageWriter.layer(ctx.storage),
+    QueryRunner.layer(ctx.runQuery),
+    MutationRunner.layer(ctx.runMutation),
+    Layer.succeed(
+      MutationCtx.MutationCtx<
+        DataModel.ToConvex<DataModel.FromSchema<Schema>>
+      >(),
+      ctx,
+    ),
+  );
+
 const mutationFunction = <
   Schema extends DatabaseSchema.AnyWithProps,
   ConvexArgs extends DefaultFunctionArgs,
@@ -276,27 +297,7 @@ const mutationFunction = <
       Schema.decode(args),
       Effect.orDie,
       Effect.andThen((decodedArgs) =>
-        pipe(
-          handler(decodedArgs),
-          Effect.provide(
-            Layer.mergeAll(
-              DatabaseReader.layer(schema, ctx.db),
-              DatabaseWriter.layer(schema, ctx.db),
-              Auth.layer(ctx.auth),
-              Scheduler.layer(ctx.scheduler),
-              StorageReader.layer(ctx.storage),
-              StorageWriter.layer(ctx.storage),
-              QueryRunner.layer(ctx.runQuery),
-              MutationRunner.layer(ctx.runMutation),
-              Layer.succeed(
-                MutationCtx.MutationCtx<
-                  DataModel.ToConvex<DataModel.FromSchema<Schema>>
-                >(),
-                ctx,
-              ),
-            ),
-          ),
-        ),
+        handler(decodedArgs).pipe(Effect.provide(mutationLayer(schema, ctx))),
       ),
       Effect.andThen((convexReturns) =>
         Schema.encodeUnknown(returns)(convexReturns),

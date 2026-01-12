@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-import { Refs } from "@confect/core";
+import { Ref } from "@confect/core";
 import {
   convexTest,
   type TestConvexForDataModel,
@@ -10,8 +10,9 @@ import type {
   DataModelFromSchemaDefinition,
   UserIdentity,
 } from "convex/server";
-import { Context, Effect, Layer, ParseResult, Schema } from "effect";
-import {
+import type { ParseResult } from "effect";
+import { Context, Effect, Layer, Schema } from "effect";
+import type {
   Auth,
   DatabaseReader,
   DatabaseWriter,
@@ -21,23 +22,24 @@ import {
   Scheduler,
   Storage,
 } from "../src/index";
+import { Server } from "../src/index";
 
 import confectSchema from "./confect/schema";
 import schema from "./convex/schema";
 
 export type TestConvexServiceWithoutIdentity = {
-  query: <QueryRef extends Refs.AnyQuery>(
+  query: <QueryRef extends Ref.AnyQuery>(
     queryRef: QueryRef,
-    args: Refs.Args<QueryRef>["Type"],
-  ) => Effect.Effect<Refs.Returns<QueryRef>["Type"], ParseResult.ParseError>;
-  mutation: <MutationRef extends Refs.AnyMutation>(
+    args: Ref.Args<QueryRef>["Type"],
+  ) => Effect.Effect<Ref.Returns<QueryRef>["Type"], ParseResult.ParseError>;
+  mutation: <MutationRef extends Ref.AnyMutation>(
     mutationRef: MutationRef,
-    args: Refs.Args<MutationRef>["Type"],
-  ) => Effect.Effect<Refs.Returns<MutationRef>["Type"], ParseResult.ParseError>;
-  action: <ActionRef extends Refs.AnyAction>(
+    args: Ref.Args<MutationRef>["Type"],
+  ) => Effect.Effect<Ref.Returns<MutationRef>["Type"], ParseResult.ParseError>;
+  action: <ActionRef extends Ref.AnyAction>(
     actionRef: ActionRef,
-    args: Refs.Args<ActionRef>["Type"],
-  ) => Effect.Effect<Refs.Returns<ActionRef>["Type"], ParseResult.ParseError>;
+    args: Ref.Args<ActionRef>["Type"],
+  ) => Effect.Effect<Ref.Returns<ActionRef>["Type"], ParseResult.ParseError>;
   run: <A, E>(
     effect: Effect.Effect<
       A,
@@ -82,13 +84,13 @@ class TestConvexServiceImplWithoutIdentity
     >,
   ) {}
 
-  readonly query = <QueryRef extends Refs.AnyQuery>(
+  readonly query = <QueryRef extends Ref.AnyQuery>(
     queryRef: QueryRef,
-    args: Refs.Args<QueryRef>["Type"],
-  ): Effect.Effect<Refs.Returns<QueryRef>["Type"], ParseResult.ParseError> =>
+    args: Ref.Args<QueryRef>["Type"],
+  ): Effect.Effect<Ref.Returns<QueryRef>["Type"], ParseResult.ParseError> =>
     Effect.gen(this, function* () {
-      const query = Refs.getFunction(queryRef);
-      const queryName = Refs.getConvexFunctionName(queryRef);
+      const query = Ref.getFunction(queryRef);
+      const queryName = Ref.getConvexFunctionName(queryRef);
 
       const encodedArgs = yield* Schema.encode(query.args)(args);
 
@@ -99,13 +101,13 @@ class TestConvexServiceImplWithoutIdentity
       return yield* Schema.decode(query.returns)(encodedReturns);
     });
 
-  readonly mutation = <MutationRef extends Refs.AnyMutation>(
+  readonly mutation = <MutationRef extends Ref.AnyMutation>(
     mutationRef: MutationRef,
-    args: Refs.Args<MutationRef>["Type"],
-  ): Effect.Effect<Refs.Returns<MutationRef>["Type"], ParseResult.ParseError> =>
+    args: Ref.Args<MutationRef>["Type"],
+  ): Effect.Effect<Ref.Returns<MutationRef>["Type"], ParseResult.ParseError> =>
     Effect.gen(this, function* () {
-      const mutation = Refs.getFunction(mutationRef);
-      const mutationName = Refs.getConvexFunctionName(mutationRef);
+      const mutation = Ref.getFunction(mutationRef);
+      const mutationName = Ref.getConvexFunctionName(mutationRef);
 
       const encodedArgs = yield* Schema.encode(mutation.args)(args);
 
@@ -116,13 +118,13 @@ class TestConvexServiceImplWithoutIdentity
       return yield* Schema.decode(mutation.returns)(encodedReturns);
     });
 
-  readonly action = <ActionRef extends Refs.AnyAction>(
+  readonly action = <ActionRef extends Ref.AnyAction>(
     actionRef: ActionRef,
-    args: Refs.Args<ActionRef>["Type"],
-  ): Effect.Effect<Refs.Returns<ActionRef>["Type"], ParseResult.ParseError> =>
+    args: Ref.Args<ActionRef>["Type"],
+  ): Effect.Effect<Ref.Returns<ActionRef>["Type"], ParseResult.ParseError> =>
     Effect.gen(this, function* () {
-      const action = Refs.getFunction(actionRef);
-      const actionName = Refs.getConvexFunctionName(actionRef);
+      const action = Ref.getFunction(actionRef);
+      const actionName = Ref.getConvexFunctionName(actionRef);
 
       const encodedArgs = yield* Schema.encode(action.args)(args);
 
@@ -151,25 +153,7 @@ class TestConvexServiceImplWithoutIdentity
     Effect.promise(() =>
       this.testConvex.run((mutationCtx) =>
         effect.pipe(
-          Effect.provide(
-            // TODO: Share with `Server` module?
-            Layer.mergeAll(
-              DatabaseReader.layer(confectSchema, mutationCtx.db),
-              DatabaseWriter.layer(confectSchema, mutationCtx.db),
-              Auth.layer(mutationCtx.auth),
-              Scheduler.layer(mutationCtx.scheduler),
-              Storage.StorageReader.layer(mutationCtx.storage),
-              Storage.StorageWriter.layer(mutationCtx.storage),
-              QueryRunner.layer(mutationCtx.runQuery),
-              MutationRunner.layer(mutationCtx.runMutation),
-              Layer.succeed(
-                MutationCtx.MutationCtx<
-                  DataModelFromSchemaDefinition<typeof schema>
-                >(),
-                mutationCtx,
-              ),
-            ),
-          ),
+          Effect.provide(Server.mutationLayer(confectSchema, mutationCtx)),
           Effect.runPromise,
         ),
       ),
@@ -207,19 +191,19 @@ class TestConvexServiceImpl implements TestConvexService {
       this.testConvex.withIdentity(userIdentity),
     );
 
-  readonly query = <QueryRef extends Refs.AnyQuery>(
+  readonly query = <QueryRef extends Ref.AnyQuery>(
     queryRef: QueryRef,
-    args: Refs.Args<QueryRef>["Type"],
+    args: Ref.Args<QueryRef>["Type"],
   ) => this.testConvexServiceImplWithoutIdentity.query(queryRef, args);
 
-  readonly mutation = <MutationRef extends Refs.AnyMutation>(
+  readonly mutation = <MutationRef extends Ref.AnyMutation>(
     mutationRef: MutationRef,
-    args: Refs.Args<MutationRef>["Type"],
+    args: Ref.Args<MutationRef>["Type"],
   ) => this.testConvexServiceImplWithoutIdentity.mutation(mutationRef, args);
 
-  readonly action = <ActionRef extends Refs.AnyAction>(
+  readonly action = <ActionRef extends Ref.AnyAction>(
     actionRef: ActionRef,
-    args: Refs.Args<ActionRef>["Type"],
+    args: Ref.Args<ActionRef>["Type"],
   ) => this.testConvexServiceImplWithoutIdentity.action(actionRef, args);
 
   readonly run = <A, E>(
