@@ -1,14 +1,11 @@
-import { Array, Context, Effect, Layer, Ref, String } from "effect";
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import type * as GroupSpec from "@confect/core/GroupSpec";
-import { setNestedProperty } from "./internal/utils";
+import { Array, Context, Effect, Layer, Ref, String } from "effect";
 import type * as Api from "./Api";
+import type * as Handler from "./Handler";
+import { setNestedProperty } from "./internal/utils";
 import * as Registry from "./Registry";
 import * as RegistryItem from "./RegistryItem";
-
-// ============================================================================
-// FunctionImpl Service Tag
-// ============================================================================
 
 export interface FunctionImpl<
   GroupPath extends string,
@@ -32,10 +29,6 @@ export const FunctionImpl = <
     `@confect/server/FunctionImpl/${groupPath}/${functionName}`,
   );
 
-// ============================================================================
-// make - Create Function Implementation Layer
-// ============================================================================
-
 export const make = <
   Api_ extends Api.AnyWithProps,
   const GroupPath extends GroupSpec.All<Api.Groups<Api_>>,
@@ -46,7 +39,7 @@ export const make = <
   api: Api_,
   groupPath: GroupPath,
   functionName: FunctionName,
-  handler: RegistryItem.HandlerWithName<
+  handler: Handler.WithName<
     Api.Schema<Api_>,
     GroupSpec.Functions<GroupSpec.GroupAt<Api.Groups<Api_>, GroupPath>>,
     FunctionName
@@ -78,7 +71,7 @@ export const make = <
           [...groupPathParts, functionName],
           RegistryItem.make({
             function_,
-            handler: handler as RegistryItem.HandlerAnyWithProps,
+            handler: handler as Handler.AnyWithProps,
           }),
         ),
       );
@@ -90,10 +83,6 @@ export const make = <
     }),
   );
 };
-
-// ============================================================================
-// Namespace Types
-// ============================================================================
 
 /**
  * Get the function implementation service type for a specific group path and function name.
