@@ -20,57 +20,6 @@ import type { GenericId as Id } from "convex/values";
  * ```
  */
 export declare const api: {
-  groups: {
-    notes: {
-      delete_: FunctionReference<
-        "mutation",
-        "public",
-        { noteId: Id<"notes"> },
-        null
-      >;
-      getFirst: FunctionReference<
-        "query",
-        "public",
-        {},
-        | { _tag: "None" }
-        | {
-            _tag: "Some";
-            value: {
-              _creationTime: number;
-              _id: Id<"notes">;
-              author?: { name: string; role: "admin" | "user" };
-              embedding?: Array<number>;
-              tag?: string;
-              text: string;
-              userId?: Id<"users">;
-            };
-          }
-      >;
-      insert: FunctionReference<
-        "mutation",
-        "public",
-        { text: string },
-        Id<"notes">
-      >;
-      list: FunctionReference<
-        "query",
-        "public",
-        {},
-        Array<{
-          _creationTime: number;
-          _id: Id<"notes">;
-          author?: { name: string; role: "admin" | "user" };
-          embedding?: Array<number>;
-          tag?: string;
-          text: string;
-          userId?: Id<"users">;
-        }>
-      >;
-    };
-    random: {
-      getNumber: FunctionReference<"action", "public", {}, number>;
-    };
-  };
   notesAndRandom: {
     notes: {
       delete_: FunctionReference<
@@ -133,28 +82,6 @@ export declare const api: {
  * ```
  */
 export declare const internal: {
-  groups: {
-    notes: {
-      internalGetFirst: FunctionReference<
-        "query",
-        "internal",
-        {},
-        | { _tag: "None" }
-        | {
-            _tag: "Some";
-            value: {
-              _creationTime: number;
-              _id: Id<"notes">;
-              author?: { name: string; role: "admin" | "user" };
-              embedding?: Array<number>;
-              tag?: string;
-              text: string;
-              userId?: Id<"users">;
-            };
-          }
-      >;
-    };
-  };
   notesAndRandom: {
     notes: {
       internalGetFirst: FunctionReference<
