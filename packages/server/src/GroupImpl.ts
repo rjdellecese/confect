@@ -1,6 +1,6 @@
 import type * as GroupPath from "@confect/core/GroupPath";
 import type * as GroupSpec from "@confect/core/GroupSpec";
-import { Context, Effect, Layer } from "effect";
+import { Context, Layer } from "effect";
 import type * as Api from "./Api";
 import type * as FunctionImpl from "./FunctionImpl";
 
@@ -28,28 +28,20 @@ export const make = <
   never,
   | FromGroupWithPath<GroupPath_, Api.Groups<Api_>>
   | FunctionImpl.FromGroupAtPath<GroupPath_, Api.Groups<Api_>>
-> => {
-  return Layer.effect(
+> =>
+  Layer.succeed(
     GroupImpl<GroupPath_>({
       groupPath,
     }),
-    // TODO: Is this effect necessary?
-    Effect.gen(function* () {
-      // Wait for all required subgroup and function implementations to be provided
-      // The Layer requirements ensure they exist before this effect runs
-      yield* Effect.void;
-
-      return {
-        groupPath,
-      };
-    }),
+    {
+      groupPath,
+    },
   ) as Layer.Layer<
     GroupImpl<GroupPath_>,
     never,
     | FromGroupWithPath<GroupPath_, Api.Groups<Api_>>
     | FunctionImpl.FromGroupAtPath<GroupPath_, Api.Groups<Api_>>
   >;
-};
 
 export type FromGroups<Groups extends GroupSpec.Any> = Groups extends never
   ? never
