@@ -1,16 +1,16 @@
+import * as Ref from "@confect/core/Ref";
 import { type GenericMutationCtx } from "convex/server";
 import { Context, Effect, Layer, Schema } from "effect";
-import * as Refs from "@confect/core/Refs";
 
 const makeMutationRunner =
   (runMutation: GenericMutationCtx<any>["runMutation"]) =>
-  <Mutation extends Refs.AnyMutation>(
+  <Mutation extends Ref.AnyMutation>(
     mutation: Mutation,
-    args: Refs.Args<Mutation>["Type"],
+    args: Ref.Args<Mutation>["Type"],
   ) =>
     Effect.gen(function* () {
-      const function_ = Refs.getFunction(mutation);
-      const functionName = Refs.getConvexFunctionName(mutation);
+      const function_ = Ref.getFunction(mutation);
+      const functionName = Ref.getConvexFunctionName(mutation);
 
       const encodedArgs = yield* Schema.encode(function_.args)(args);
       const encodedReturns = yield* Effect.promise(() =>

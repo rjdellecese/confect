@@ -1,16 +1,16 @@
+import * as Ref from "@confect/core/Ref";
 import { type GenericActionCtx } from "convex/server";
 import { Context, Effect, Layer, Schema } from "effect";
-import * as Refs from "@confect/core/Refs";
 
 const makeActionRunner =
   (runAction: GenericActionCtx<any>["runAction"]) =>
-  <Action extends Refs.AnyAction>(
+  <Action extends Ref.AnyAction>(
     action: Action,
-    args: Refs.Args<Action>["Type"],
+    args: Ref.Args<Action>["Type"],
   ) =>
     Effect.gen(function* () {
-      const function_ = Refs.getFunction(action);
-      const functionName = Refs.getConvexFunctionName(action);
+      const function_ = Ref.getFunction(action);
+      const functionName = Ref.getConvexFunctionName(action);
 
       const encodedArgs = yield* Schema.encode(function_.args)(args);
       const encodedReturns = yield* Effect.promise(() =>

@@ -1,17 +1,17 @@
+import * as Ref from "@confect/core/Ref";
 import { type GenericQueryCtx } from "convex/server";
 import type { ParseResult } from "effect";
 import { Context, Effect, Layer, Schema } from "effect";
-import * as Refs from "@confect/core/Refs";
 
 const make =
   (runQuery: GenericQueryCtx<any>["runQuery"]) =>
-  <Query extends Refs.AnyQuery>(
+  <Query extends Ref.AnyQuery>(
     query: Query,
-    args: Refs.Args<Query>["Type"],
-  ): Effect.Effect<Refs.Returns<Query>["Type"], ParseResult.ParseError> =>
+    args: Ref.Args<Query>["Type"],
+  ): Effect.Effect<Ref.Returns<Query>["Type"], ParseResult.ParseError> =>
     Effect.gen(function* () {
-      const function_ = Refs.getFunction(query);
-      const functionName = Refs.getConvexFunctionName(query);
+      const function_ = Ref.getFunction(query);
+      const functionName = Ref.getConvexFunctionName(query);
 
       const encodedArgs = yield* Schema.encode(function_.args)(args);
       const encodedReturns = yield* Effect.promise(() =>

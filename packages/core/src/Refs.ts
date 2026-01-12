@@ -1,8 +1,8 @@
-import type { FunctionType, FunctionVisibility } from "convex/server";
-import type { Schema, Types } from "effect";
+import type { Types } from "effect";
 import { pipe, Record } from "effect";
 import type * as FunctionSpec from "./FunctionSpec";
 import type * as GroupSpec from "./GroupSpec";
+import * as Ref from "./Ref";
 import type * as Spec from "./Spec";
 
 export type Refs<Spec_ extends Spec.AnyWithProps> = Types.Simplify<
@@ -24,7 +24,7 @@ type Helper<Groups extends GroupSpec.AnyWithProps> = {
               GroupSpec.Functions<Group>,
               FunctionName
             > extends infer Function extends FunctionSpec.AnyWithProps
-              ? Ref<
+              ? Ref.Ref<
                   FunctionSpec.GetFunctionType<Function>,
                   FunctionSpec.GetFunctionVisibility<Function>,
                   FunctionSpec.Args<Function>,
@@ -40,7 +40,7 @@ type Helper<Groups extends GroupSpec.AnyWithProps> = {
 type FilterRefs<Refs_, Predicate> = Types.Simplify<{
   [K in keyof Refs_ as Refs_[K] extends Predicate
     ? K
-    : Refs_[K] extends Any
+    : Refs_[K] extends Ref.Any
       ? never
       : FilterRefs<Refs_[K], Predicate> extends Record<string, never>
         ? never
@@ -51,181 +51,17 @@ type FilterRefs<Refs_, Predicate> = Types.Simplify<{
 
 export const justInternal = <Refs_ extends RefsAnyWithProps>(
   refs: Refs_,
-): FilterRefs<Refs_, AnyInternal> => refs as any;
+): FilterRefs<Refs_, Ref.AnyInternal> => refs as any;
 
 export const justPublic = <Refs_ extends RefsAnyWithProps>(
   refs: Refs_,
-): FilterRefs<Refs_, AnyPublic> => refs as any;
+): FilterRefs<Refs_, Ref.AnyPublic> => refs as any;
 
 export type RefsAnyWithProps =
   | {
       readonly [key: string]: RefsAnyWithProps;
     }
-  | Any;
-
-const HiddenFunctionKey = "@confect/core/api/HiddenFunctionKey";
-type HiddenFunctionKey = typeof HiddenFunctionKey;
-type HiddenFunction<Ref_ extends Any> = FunctionSpec.FunctionSpec<
-  GetFunctionType<Ref_>,
-  GetFunctionVisibility<Ref_>,
-  string,
-  Args<Ref_>,
-  Returns<Ref_>
->;
-
-export const getFunction = <
-  FunctionType_ extends FunctionType,
-  FunctionVisibility_ extends FunctionVisibility,
-  Args_ extends Schema.Schema.AnyNoContext,
-  Returns_ extends Schema.Schema.AnyNoContext,
-  Ref_ extends Ref<FunctionType_, FunctionVisibility_, Args_, Returns_>,
->(
-  ref: Ref_,
-): HiddenFunction<Ref_> => (ref as any)[HiddenFunctionKey];
-
-const HiddenConvexFunctionNameKey =
-  "@confect/core/api/HiddenConvexFunctionNameKey";
-type HiddenConvexFunctionNameKey = typeof HiddenConvexFunctionNameKey;
-type HiddenConvexFunctionName = string;
-
-export const getConvexFunctionName = <
-  FunctionType_ extends FunctionType,
-  FunctionVisibility_ extends FunctionVisibility,
-  Args_ extends Schema.Schema.AnyNoContext,
-  Returns_ extends Schema.Schema.AnyNoContext,
->(
-  ref: Ref<FunctionType_, FunctionVisibility_, Args_, Returns_>,
-): HiddenConvexFunctionName => (ref as any)[HiddenConvexFunctionNameKey];
-
-// TODO: Move `Ref` stuff into own module
-export interface Ref<
-  _FunctionType extends FunctionType,
-  _FunctionVisibility extends FunctionVisibility,
-  _Args extends Schema.Schema.AnyNoContext,
-  _Returns extends Schema.Schema.AnyNoContext,
-> {
-  readonly _FunctionType?: _FunctionType;
-  readonly _FunctionVisibility?: _FunctionVisibility;
-  readonly _Args?: _Args;
-  readonly _Returns?: _Returns;
-}
-
-export interface Any extends Ref<any, any, any, any> {}
-
-export interface AnyInternal extends Ref<any, "internal", any, any> {}
-
-export interface AnyPublic extends Ref<any, "public", any, any> {}
-
-export interface AnyQuery
-  extends Ref<
-    "query",
-    FunctionVisibility,
-    Schema.Schema.AnyNoContext,
-    Schema.Schema.AnyNoContext
-  > {}
-
-export interface AnyMutation
-  extends Ref<
-    "mutation",
-    FunctionVisibility,
-    Schema.Schema.AnyNoContext,
-    Schema.Schema.AnyNoContext
-  > {}
-
-export interface AnyAction
-  extends Ref<
-    "action",
-    FunctionVisibility,
-    Schema.Schema.AnyNoContext,
-    Schema.Schema.AnyNoContext
-  > {}
-
-export interface AnyPublicQuery
-  extends Ref<
-    "query",
-    "public",
-    Schema.Schema.AnyNoContext,
-    Schema.Schema.AnyNoContext
-  > {}
-
-export interface AnyPublicMutation
-  extends Ref<
-    "mutation",
-    "public",
-    Schema.Schema.AnyNoContext,
-    Schema.Schema.AnyNoContext
-  > {}
-
-export interface AnyPublicAction
-  extends Ref<
-    "action",
-    "public",
-    Schema.Schema.AnyNoContext,
-    Schema.Schema.AnyNoContext
-  > {}
-
-export type GetFunctionType<Ref_> =
-  Ref_ extends Ref<
-    infer FunctionType_,
-    infer _FunctionVisibility,
-    infer _Args,
-    infer _Returns
-  >
-    ? FunctionType_
-    : never;
-
-export type GetFunctionVisibility<Ref_> =
-  Ref_ extends Ref<
-    infer _FunctionType,
-    infer FunctionVisibility_,
-    infer _Args,
-    infer _Returns
-  >
-    ? FunctionVisibility_
-    : never;
-
-export type Args<Ref_> =
-  Ref_ extends Ref<
-    infer _FunctionType,
-    infer _FunctionVisibility,
-    infer Args_,
-    infer _Returns
-  >
-    ? Args_
-    : never;
-
-export type Returns<Ref_> =
-  Ref_ extends Ref<
-    infer _FunctionType,
-    infer _FunctionVisibility,
-    infer _Args,
-    infer Returns_
-  >
-    ? Returns_
-    : never;
-
-const makeRef = <
-  FunctionType_ extends FunctionType,
-  FunctionVisibility_ extends FunctionVisibility,
-  Args_ extends Schema.Schema.AnyNoContext,
-  Returns_ extends Schema.Schema.AnyNoContext,
->(
-  /**
-   * This is a Convex "function name" of the format "myGroupDir/myGroupMod:myFunc".
-   */
-  convexFunctionName: string,
-  function_: FunctionSpec.FunctionSpec<
-    FunctionType_,
-    FunctionVisibility_,
-    string,
-    Args_,
-    Returns_
-  >,
-): Ref<FunctionType_, FunctionVisibility_, Args_, Returns_> =>
-  ({
-    [HiddenFunctionKey]: function_,
-    [HiddenConvexFunctionNameKey]: convexFunctionName,
-  }) as Ref<FunctionType_, FunctionVisibility_, Args_, Returns_>;
+  | Ref.Any;
 
 export const make = <Spec_ extends Spec.AnyWithProps>(
   spec: Spec_,
@@ -245,11 +81,11 @@ const makeHelper = (
       return Record.union(
         makeHelper(group.groups, currentGroupPath),
         Record.map(group.functions, (function_) =>
-          makeRef(`${currentGroupPath}:${function_.name}`, function_),
+          Ref.make(`${currentGroupPath}:${function_.name}`, function_),
         ),
         (_subGroup, _function) => {
           throw new Error(
-            `Group and function at same level have same name ('${getConvexFunctionName(_function)}')`,
+            `Group and function at same level have same name ('${Ref.getConvexFunctionName(_function)}')`,
           );
         },
       );
