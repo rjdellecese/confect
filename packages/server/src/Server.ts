@@ -167,10 +167,10 @@ const makeRegisteredFunction = <Api_ extends Api.AnyWithProps>(
 
 const queryFunction = <
   Schema extends DatabaseSchema.AnyWithProps,
-  ConvexArgs extends DefaultFunctionArgs,
   Args,
-  ConvexReturns,
+  ConvexArgs extends DefaultFunctionArgs,
   Returns,
+  ConvexReturns,
   E,
 >(
   schema: Schema,
@@ -253,10 +253,10 @@ export const mutationLayer = <Schema extends DatabaseSchema.AnyWithProps>(
 
 const mutationFunction = <
   Schema extends DatabaseSchema.AnyWithProps,
-  ConvexArgs extends DefaultFunctionArgs,
   Args,
-  ConvexReturns,
+  ConvexArgs extends DefaultFunctionArgs,
   Returns,
+  ConvexReturns,
   E,
 >(
   schema: Schema,
@@ -308,20 +308,20 @@ const mutationFunction = <
 
 const actionFunction = <
   Schema extends DatabaseSchema.AnyWithProps,
-  ConvexValue extends DefaultFunctionArgs,
-  Value,
-  ConvexReturns,
+  Args,
+  ConvexArgs extends DefaultFunctionArgs,
   Returns,
+  ConvexReturns,
   E,
 >({
   args,
   returns,
   handler,
 }: {
-  args: Schema.Schema<Value, ConvexValue>;
+  args: Schema.Schema<Args, ConvexArgs>;
   returns: Schema.Schema<Returns, ConvexReturns>;
   handler: (
-    a: Value,
+    a: Args,
   ) => Effect.Effect<
     Returns,
     E,
@@ -341,7 +341,7 @@ const actionFunction = <
   returns: SchemaToValidator.compileReturnsSchema(returns),
   handler: (
     ctx: GenericActionCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
-    actualArgs: ConvexValue,
+    actualArgs: ConvexArgs,
   ): Promise<ConvexReturns> =>
     pipe(
       actualArgs,
@@ -382,7 +382,7 @@ export interface RegisteredFunctionsAnyWithProps {
   readonly [key: string]: RegisteredFunction | RegisteredFunctionsAnyWithProps;
 }
 
-export type RegisteredFunctionsHelper<Groups extends GroupSpec.AnyWithProps> = {
+type RegisteredFunctionsHelper<Groups extends GroupSpec.AnyWithProps> = {
   [GroupName in GroupSpec.Name<Groups>]: GroupSpec.WithName<
     Groups,
     GroupName
