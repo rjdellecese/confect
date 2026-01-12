@@ -1,4 +1,4 @@
-import type * as FunctionSpec from "@confect/core/FunctionSpec";
+import type { FunctionSpec } from "@confect/core";
 import type { Effect } from "effect";
 import type * as ActionCtx from "./ActionCtx";
 import type * as ActionRunner from "./ActionRunner";
@@ -23,23 +23,23 @@ export type Handler<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   FunctionSpec_ extends FunctionSpec.AnyWithProps,
 > =
-  FunctionSpec_ extends FunctionSpec.WithFunctionType<FunctionSpec_, "Query">
+  FunctionSpec_ extends FunctionSpec.WithFunctionType<FunctionSpec_, "query">
     ? Query<DatabaseSchema_, FunctionSpec_>
     : FunctionSpec_ extends FunctionSpec.WithFunctionType<
           FunctionSpec_,
-          "Mutation"
+          "mutation"
         >
       ? Mutation<DatabaseSchema_, FunctionSpec_>
       : FunctionSpec_ extends FunctionSpec.WithFunctionType<
             FunctionSpec_,
-            "Action"
+            "action"
           >
         ? Action<DatabaseSchema_, FunctionSpec_>
         : never;
 
 export type Query<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  FunctionSpec_ extends FunctionSpec.AnyWithPropsWithFunctionType<"Query">,
+  FunctionSpec_ extends FunctionSpec.AnyWithPropsWithFunctionType<"query">,
 > = Base<
   FunctionSpec_,
   | DatabaseReader.DatabaseReader<DatabaseSchema_>
@@ -51,7 +51,7 @@ export type Query<
 
 export type Mutation<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  FunctionSpec_ extends FunctionSpec.AnyWithPropsWithFunctionType<"Mutation">,
+  FunctionSpec_ extends FunctionSpec.AnyWithPropsWithFunctionType<"mutation">,
 > = Base<
   FunctionSpec_,
   | DatabaseReader.DatabaseReader<DatabaseSchema_>
@@ -69,7 +69,7 @@ export type Mutation<
 
 export type Action<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  FunctionSpec_ extends FunctionSpec.AnyWithPropsWithFunctionType<"Action">,
+  FunctionSpec_ extends FunctionSpec.AnyWithPropsWithFunctionType<"action">,
 > = Base<
   FunctionSpec_,
   | Scheduler.Scheduler

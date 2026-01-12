@@ -117,10 +117,10 @@ const makeRegisteredFunction = <Api_ extends Api.AnyWithProps>(
   { function_, handler }: RegistryItem.AnyWithProps,
 ): RegisteredFunction =>
   Match.value(function_.functionType).pipe(
-    Match.when("Query", () => {
+    Match.when("query", () => {
       const genericFunction = Match.value(function_.functionVisibility).pipe(
-        Match.when("Public", () => queryGeneric),
-        Match.when("Internal", () => internalQueryGeneric),
+        Match.when("public", () => queryGeneric),
+        Match.when("internal", () => internalQueryGeneric),
         Match.exhaustive,
       );
 
@@ -132,10 +132,10 @@ const makeRegisteredFunction = <Api_ extends Api.AnyWithProps>(
         }),
       );
     }),
-    Match.when("Mutation", () => {
+    Match.when("mutation", () => {
       const genericFunction = Match.value(function_.functionVisibility).pipe(
-        Match.when("Public", () => mutationGeneric),
-        Match.when("Internal", () => internalMutationGeneric),
+        Match.when("public", () => mutationGeneric),
+        Match.when("internal", () => internalMutationGeneric),
         Match.exhaustive,
       );
 
@@ -147,10 +147,10 @@ const makeRegisteredFunction = <Api_ extends Api.AnyWithProps>(
         }),
       );
     }),
-    Match.when("Action", () => {
+    Match.when("action", () => {
       const genericFunction = Match.value(function_.functionVisibility).pipe(
-        Match.when("Public", () => actionGeneric),
-        Match.when("Internal", () => internalActionGeneric),
+        Match.when("public", () => actionGeneric),
+        Match.when("internal", () => internalActionGeneric),
         Match.exhaustive,
       );
 

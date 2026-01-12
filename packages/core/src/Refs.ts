@@ -1,3 +1,4 @@
+import type { FunctionType, FunctionVisibility } from "convex/server";
 import type { Schema, Types } from "effect";
 import { pipe, Record } from "effect";
 import type * as FunctionSpec from "./FunctionSpec";
@@ -65,16 +66,16 @@ export type RefsAnyWithProps =
 const HiddenFunctionKey = "@confect/core/api/HiddenFunctionKey";
 type HiddenFunctionKey = typeof HiddenFunctionKey;
 type HiddenFunction<Ref_ extends Any> = FunctionSpec.FunctionSpec<
-  FunctionType<Ref_>,
-  FunctionVisibility<Ref_>,
+  GetFunctionType<Ref_>,
+  GetFunctionVisibility<Ref_>,
   string,
   Args<Ref_>,
   Returns<Ref_>
 >;
 
 export const getFunction = <
-  FunctionType_ extends FunctionSpec.FunctionType,
-  FunctionVisibility_ extends FunctionSpec.FunctionVisibility,
+  FunctionType_ extends FunctionType,
+  FunctionVisibility_ extends FunctionVisibility,
   Args_ extends Schema.Schema.AnyNoContext,
   Returns_ extends Schema.Schema.AnyNoContext,
   Ref_ extends Ref<FunctionType_, FunctionVisibility_, Args_, Returns_>,
@@ -88,8 +89,8 @@ type HiddenConvexFunctionNameKey = typeof HiddenConvexFunctionNameKey;
 type HiddenConvexFunctionName = string;
 
 export const getConvexFunctionName = <
-  FunctionType_ extends FunctionSpec.FunctionType,
-  FunctionVisibility_ extends FunctionSpec.FunctionVisibility,
+  FunctionType_ extends FunctionType,
+  FunctionVisibility_ extends FunctionVisibility,
   Args_ extends Schema.Schema.AnyNoContext,
   Returns_ extends Schema.Schema.AnyNoContext,
 >(
@@ -98,8 +99,8 @@ export const getConvexFunctionName = <
 
 // TODO: Move `Ref` stuff into own module
 export interface Ref<
-  _FunctionType extends FunctionSpec.FunctionType,
-  _FunctionVisibility extends FunctionSpec.FunctionVisibility,
+  _FunctionType extends FunctionType,
+  _FunctionVisibility extends FunctionVisibility,
   _Args extends Schema.Schema.AnyNoContext,
   _Returns extends Schema.Schema.AnyNoContext,
 > {
@@ -111,59 +112,59 @@ export interface Ref<
 
 export interface Any extends Ref<any, any, any, any> {}
 
-export interface AnyInternal extends Ref<any, "Internal", any, any> {}
+export interface AnyInternal extends Ref<any, "internal", any, any> {}
 
-export interface AnyPublic extends Ref<any, "Public", any, any> {}
+export interface AnyPublic extends Ref<any, "public", any, any> {}
 
 export interface AnyQuery
   extends Ref<
-    "Query",
-    FunctionSpec.FunctionVisibility,
+    "query",
+    FunctionVisibility,
     Schema.Schema.AnyNoContext,
     Schema.Schema.AnyNoContext
   > {}
 
 export interface AnyMutation
   extends Ref<
-    "Mutation",
-    FunctionSpec.FunctionVisibility,
+    "mutation",
+    FunctionVisibility,
     Schema.Schema.AnyNoContext,
     Schema.Schema.AnyNoContext
   > {}
 
 export interface AnyAction
   extends Ref<
-    "Action",
-    FunctionSpec.FunctionVisibility,
+    "action",
+    FunctionVisibility,
     Schema.Schema.AnyNoContext,
     Schema.Schema.AnyNoContext
   > {}
 
 export interface AnyPublicQuery
   extends Ref<
-    "Query",
-    "Public",
+    "query",
+    "public",
     Schema.Schema.AnyNoContext,
     Schema.Schema.AnyNoContext
   > {}
 
 export interface AnyPublicMutation
   extends Ref<
-    "Mutation",
-    "Public",
+    "mutation",
+    "public",
     Schema.Schema.AnyNoContext,
     Schema.Schema.AnyNoContext
   > {}
 
 export interface AnyPublicAction
   extends Ref<
-    "Action",
-    "Public",
+    "action",
+    "public",
     Schema.Schema.AnyNoContext,
     Schema.Schema.AnyNoContext
   > {}
 
-export type FunctionType<Ref_> =
+export type GetFunctionType<Ref_> =
   Ref_ extends Ref<
     infer FunctionType_,
     infer _FunctionVisibility,
@@ -173,7 +174,7 @@ export type FunctionType<Ref_> =
     ? FunctionType_
     : never;
 
-export type FunctionVisibility<Ref_> =
+export type GetFunctionVisibility<Ref_> =
   Ref_ extends Ref<
     infer _FunctionType,
     infer FunctionVisibility_,
@@ -204,8 +205,8 @@ export type Returns<Ref_> =
     : never;
 
 const makeRef = <
-  FunctionType_ extends FunctionSpec.FunctionType,
-  FunctionVisibility_ extends FunctionSpec.FunctionVisibility,
+  FunctionType_ extends FunctionType,
+  FunctionVisibility_ extends FunctionVisibility,
   Args_ extends Schema.Schema.AnyNoContext,
   Returns_ extends Schema.Schema.AnyNoContext,
 >(

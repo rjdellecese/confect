@@ -1,4 +1,6 @@
 import type {
+  FunctionType,
+  FunctionVisibility,
   RegisteredAction,
   RegisteredMutation,
   RegisteredQuery,
@@ -51,14 +53,8 @@ export interface AnyWithPropsWithFunctionType<
     Schema.Schema.AnyNoContext
   > {}
 
-// TODO: Use type from convex-js?
-export type FunctionType = "Query" | "Mutation" | "Action";
-
 export type GetFunctionType<Function extends AnyWithProps> =
   Function["functionType"];
-
-// TODO: Use type from convex-js?
-export type FunctionVisibility = "Public" | "Internal";
 
 export type GetFunctionVisibility<Function extends AnyWithProps> =
   Function["functionVisibility"];
@@ -147,13 +143,11 @@ const make =
     });
   };
 
-export const internalQuery = make("Query", "Internal");
-export const query = make("Query", "Public");
+export const internalQuery = make("query", "internal");
+export const query = make("query", "public");
 
-export const internalMutation = make("Mutation", "Internal");
-export const mutation = make("Mutation", "Public");
+export const internalMutation = make("mutation", "internal");
+export const mutation = make("mutation", "public");
 
-export const internalAction = make("Action", "Internal");
-export const action = make("Action", "Public");
-
-
+export const internalAction = make("action", "internal");
+export const action = make("action", "public");
