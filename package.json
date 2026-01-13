@@ -70,7 +70,7 @@
     "@effect/workflow": "0.16.0",
     "@swc/jest": "0.2.39",
     "@tsconfig/strictest": "2.0.8",
-    "@types/node": "25.0.3",
+    "@types/node": "25.0.7",
     "@vitest/coverage-v8": "4.0.16",
     "convex-test": "0.0.41",
     "dotenv": "17.2.3",
