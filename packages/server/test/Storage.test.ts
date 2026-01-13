@@ -5,7 +5,7 @@ import {
   assertInstanceOf,
 } from "@effect/vitest/utils";
 import { Cause, Effect, Runtime, Schema } from "effect";
-import { FileNotFoundError } from "../src/Storage";
+import { BlobNotFoundError } from "../src/Storage";
 import { api } from "./convex/_generated/api";
 import { effect } from "./test_utils";
 import { TestConvexService } from "./TestConvexService";
@@ -45,7 +45,7 @@ describe("ConfectStorageReader", () => {
         assertFailure(
           exit,
           Cause.die(
-            Runtime.makeFiberFailure(Cause.fail(new FileNotFoundError({ id }))),
+            Runtime.makeFiberFailure(Cause.fail(new BlobNotFoundError({ id }))),
           ),
         );
       }),
@@ -99,7 +99,7 @@ describe("ConfectStorageWriter", () => {
         assertFailure(
           exit,
           Cause.die(
-            Runtime.makeFiberFailure(Cause.fail(new FileNotFoundError({ id }))),
+            Runtime.makeFiberFailure(Cause.fail(new BlobNotFoundError({ id }))),
           ),
         );
       }),
@@ -145,7 +145,7 @@ describe("ConfectStorageActionWriter", () => {
         assertFailure(
           exit,
           Cause.die(
-            Runtime.makeFiberFailure(Cause.fail(new FileNotFoundError({ id }))),
+            Runtime.makeFiberFailure(Cause.fail(new BlobNotFoundError({ id }))),
           ),
         );
       }),

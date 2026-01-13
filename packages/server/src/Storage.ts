@@ -13,7 +13,7 @@ const makeStorageReader = (storageReader: ConvexStorageReader) => ({
         flow(
           Option.fromNullable,
           Option.match({
-            onNone: () => Effect.fail(new FileNotFoundError({ id: storageId })),
+            onNone: () => Effect.fail(new BlobNotFoundError({ id: storageId })),
             onSome: (doc) => pipe(doc, Schema.decode(Schema.URL), Effect.orDie),
           }),
         ),
@@ -31,7 +31,7 @@ const makeStorageWriter = (storageWriter: ConvexStorageWriter) => ({
   delete: (storageId: GenericId<"_storage">) =>
     Effect.tryPromise({
       try: () => storageWriter.delete(storageId),
-      catch: () => new FileNotFoundError({ id: storageId }),
+      catch: () => new BlobNotFoundError({ id: storageId }),
     }),
 });
 
@@ -44,7 +44,7 @@ const makeStorageActionWriter = (
         flow(
           Option.fromNullable,
           Option.match({
-            onNone: () => Effect.fail(new FileNotFoundError({ id: storageId })),
+            onNone: () => Effect.fail(new BlobNotFoundError({ id: storageId })),
             onSome: Effect.succeed,
           }),
         ),
@@ -75,9 +75,9 @@ export class StorageActionWriter extends Effect.Tag(
     Layer.succeed(this, makeStorageActionWriter(storageActionWriter));
 }
 
-export class FileNotFoundError extends Schema.TaggedError<FileNotFoundError>(
-  "FileNotFoundError",
-)("FileNotFoundError", {
+export class BlobNotFoundError extends Schema.TaggedError<BlobNotFoundError>(
+  "BlobNotFoundError",
+)("BlobNotFoundError", {
   id: Schema.String,
 }) {
   override get message(): string {
