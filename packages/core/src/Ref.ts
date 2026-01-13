@@ -131,6 +131,7 @@ export const make = <
     [HiddenConvexFunctionNameKey]: convexFunctionName,
   }) as Ref<FunctionType_, FunctionVisibility_, Args_, Returns_>;
 
+// TODO: Is this hidden stuff necessary/useful still?
 const HiddenFunctionKey = "@confect/core/api/HiddenFunctionKey";
 type HiddenFunctionKey = typeof HiddenFunctionKey;
 type HiddenFunction<Ref_ extends Any> = FunctionSpec.FunctionSpec<
