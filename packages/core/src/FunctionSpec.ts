@@ -81,21 +81,21 @@ export type ExcludeName<
 > = Exclude<Function, { readonly name: Name_ }>;
 
 export type RegisteredFunction<Function extends AnyWithProps> =
-  Function["functionType"] extends "Query"
+  Function["functionType"] extends "query"
     ? RegisteredQuery<
-        Lowercase<GetFunctionVisibility<Function>>,
+        GetFunctionVisibility<Function>,
         Args<Function>["Encoded"],
         Promise<Returns<Function>["Encoded"]>
       >
-    : Function["functionType"] extends "Mutation"
+    : Function["functionType"] extends "mutation"
       ? RegisteredMutation<
-          Lowercase<GetFunctionVisibility<Function>>,
+          GetFunctionVisibility<Function>,
           Args<Function>["Encoded"],
           Promise<Returns<Function>["Encoded"]>
         >
-      : Function["functionType"] extends "Action"
+      : Function["functionType"] extends "action"
         ? RegisteredAction<
-            Lowercase<GetFunctionVisibility<Function>>,
+            GetFunctionVisibility<Function>,
             Args<Function>["Encoded"],
             Promise<Returns<Function>["Encoded"]>
           >

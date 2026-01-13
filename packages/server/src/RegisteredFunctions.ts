@@ -35,6 +35,7 @@ import * as DatabaseReader from "./DatabaseReader";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import * as DatabaseWriter from "./DatabaseWriter";
 import type * as DataModel from "./DataModel";
+import * as Impl from "./Impl";
 import { mapLeaves } from "./internal/utils";
 import * as MutationCtx from "./MutationCtx";
 import * as MutationRunner from "./MutationRunner";
@@ -70,47 +71,72 @@ const isRegisteredAction = (
 export const isRegisteredFunction = (u: unknown): u is RegisteredFunction =>
   isRegisteredQuery(u) || isRegisteredMutation(u) || isRegisteredAction(u);
 
-export const TypeId = "@confect/server/Server";
-export type TypeId = typeof TypeId;
-
-export const isServer = (u: unknown): u is Server<Api.AnyWithProps> =>
-  Predicate.hasProperty(u, TypeId);
-
 export type RegisteredFunctions<Spec_ extends Spec.AnyWithProps> =
   Types.Simplify<RegisteredFunctionsHelper<Spec.Groups<Spec_>>>;
 
-export interface Server<Api_ extends Api.AnyWithProps> {
-  readonly [TypeId]: TypeId;
-  readonly registeredFunctions: RegisteredFunctions<Api_["spec"]>;
-}
-
-const Proto = {
-  [TypeId]: TypeId,
+type RegisteredFunctionsHelper<Groups extends GroupSpec.AnyWithProps> = {
+  [GroupName in GroupSpec.Name<Groups>]: GroupSpec.WithName<
+    Groups,
+    GroupName
+  > extends infer Group extends GroupSpec.AnyWithProps
+    ? GroupSpec.Groups<Group> extends infer SubGroups extends
+        GroupSpec.AnyWithProps
+      ? Types.Simplify<
+          RegisteredFunctionsHelper<SubGroups> & {
+            [FunctionName in FunctionSpec.Name<
+              GroupSpec.Functions<Group>
+            >]: FunctionSpec.WithName<
+              GroupSpec.Functions<Group>,
+              FunctionName
+            > extends infer Function extends FunctionSpec.AnyWithProps
+              ? FunctionSpec.RegisteredFunction<Function>
+              : never;
+          }
+        >
+      : {
+          [FunctionName in FunctionSpec.Name<
+            GroupSpec.Functions<Group>
+          >]: FunctionSpec.WithName<
+            GroupSpec.Functions<Group>,
+            FunctionName
+          > extends infer Function extends FunctionSpec.AnyWithProps
+            ? FunctionSpec.RegisteredFunction<Function>
+            : never;
+        }
+    : never;
 };
 
-const makeProto = <Api_ extends Api.AnyWithProps>({
-  registeredFunctions,
-}: {
-  registeredFunctions: RegisteredFunctions<Api_["spec"]>;
-}): Server<Api_> =>
-  Object.assign(Object.create(Proto), {
-    registeredFunctions,
-  });
+export interface AnyWithProps {
+  readonly [key: string]: RegisteredFunction | AnyWithProps;
+}
 
-export const make = <Api_ extends Api.AnyWithProps>(api: Api_) =>
+export const make = <Api_ extends Api.AnyWithProps>(
+  impl: Layer.Layer<Impl.Impl<Api_, "Finalized">>,
+) =>
   Effect.gen(function* () {
     const registry = yield* Registry.Registry;
     const functionImplItems = yield* Ref.get(registry);
+    const { api, finalizationStatus } = yield* Impl.Impl<Api_, "Finalized">();
 
-    const registeredFunctions = mapLeaves<
-      RegistryItem.AnyWithProps,
-      RegisteredFunction
-    >(functionImplItems, RegistryItem.isRegistryItem, (registryItem) =>
-      makeRegisteredFunction(api, registryItem),
-    ) as RegisteredFunctions<Api_["spec"]>;
-
-    return makeProto<Api_>({ registeredFunctions });
-  });
+    return yield* Match.value(
+      finalizationStatus as Impl.FinalizationStatus,
+    ).pipe(
+      Match.withReturnType<Effect.Effect<RegisteredFunctions<Api_["spec"]>>>(),
+      Match.when("Unfinalized", () =>
+        Effect.dieMessage("Impl is not finalized"),
+      ),
+      Match.when("Finalized", () =>
+        Effect.succeed(
+          mapLeaves<RegistryItem.AnyWithProps, RegisteredFunction>(
+            functionImplItems,
+            RegistryItem.isRegistryItem,
+            (registryItem) => makeRegisteredFunction(api, registryItem),
+          ) as RegisteredFunctions<Api_["spec"]>,
+        ),
+      ),
+      Match.exhaustive,
+    );
+  }).pipe(Effect.provide(impl), Effect.runSync);
 
 const makeRegisteredFunction = <Api_ extends Api.AnyWithProps>(
   api: Api_,
@@ -377,39 +403,3 @@ const actionFunction = <
       Effect.runPromise,
     ),
 });
-
-export interface RegisteredFunctionsAnyWithProps {
-  readonly [key: string]: RegisteredFunction | RegisteredFunctionsAnyWithProps;
-}
-
-type RegisteredFunctionsHelper<Groups extends GroupSpec.AnyWithProps> = {
-  [GroupName in GroupSpec.Name<Groups>]: GroupSpec.WithName<
-    Groups,
-    GroupName
-  > extends infer Group extends GroupSpec.AnyWithProps
-    ? GroupSpec.Groups<Group> extends infer SubGroups extends
-        GroupSpec.AnyWithProps
-      ? Types.Simplify<
-          RegisteredFunctionsHelper<SubGroups> & {
-            [FunctionName in FunctionSpec.Name<
-              GroupSpec.Functions<Group>
-            >]: FunctionSpec.WithName<
-              GroupSpec.Functions<Group>,
-              FunctionName
-            > extends infer Function extends FunctionSpec.AnyWithProps
-              ? FunctionSpec.RegisteredFunction<Function>
-              : never;
-          }
-        >
-      : {
-          [FunctionName in FunctionSpec.Name<
-            GroupSpec.Functions<Group>
-          >]: FunctionSpec.WithName<
-            GroupSpec.Functions<Group>,
-            FunctionName
-          > extends infer Function extends FunctionSpec.AnyWithProps
-            ? FunctionSpec.RegisteredFunction<Function>
-            : never;
-        }
-    : never;
-};

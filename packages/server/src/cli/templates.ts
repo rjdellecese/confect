@@ -6,21 +6,23 @@ export const functions = ({
   dirs,
   mod,
   fns,
-  serverImportPath,
+  registeredFunctionsImportPath,
 }: {
   dirs: string[];
   mod: string;
   fns: string[];
-  serverImportPath: string;
+  registeredFunctionsImportPath: string;
 }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-    yield* cbw.writeLine(`import server from "${serverImportPath}";`);
+    yield* cbw.writeLine(
+      `import registeredFunctions from "${registeredFunctionsImportPath}";`,
+    );
     yield* cbw.newLine();
     for (const fn of fns) {
       yield* cbw.writeLine(
-        `export const ${fn} = ${Array.join(["server", "registeredFunctions", ...dirs, mod, fn], ".")};`,
+        `export const ${fn} = registeredFunctions.${Array.join([...dirs, mod, fn], ".")};`,
       );
     }
 
@@ -89,6 +91,26 @@ export const api = ({
     yield* cbw.writeLine(`import spec from "${specImportPath}";`);
     yield* cbw.blankLine();
     yield* cbw.writeLine(`export default Api.make(schema, spec);`);
+
+    return yield* cbw.toString();
+  });
+
+export const registeredFunctions = ({
+  implImportPath,
+  confectServerImportPath = "@confect/server",
+}: {
+  implImportPath: string;
+  confectServerImportPath?: string;
+}) =>
+  Effect.gen(function* () {
+    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+
+    yield* cbw.writeLine(
+      `import { RegisteredFunctions } from "${confectServerImportPath}";`,
+    );
+    yield* cbw.writeLine(`import impl from "${implImportPath}";`);
+    yield* cbw.blankLine();
+    yield* cbw.writeLine(`export default RegisteredFunctions.make(impl);`);
 
     return yield* cbw.toString();
   });

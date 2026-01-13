@@ -13,9 +13,10 @@ import {
 import * as tsx from "tsx/esm/api";
 import * as DatabaseSchema from "../../DatabaseSchema";
 import { forEachBranchLeaves } from "../../internal/utils";
-import * as Server from "../../Server";
+import * as RegisteredFunctions from "../../RegisteredFunctions";
 import * as templates from "../templates";
 
+// TODO: Would this cause issues for users using Vitest who want to perform codegen as a part of their test setup process?
 const isTest = Config.string("VITEST").pipe(
   Config.map((value) => value === "true"),
   Config.withDefault(false),
@@ -34,6 +35,7 @@ export const codegen = Command.make("codegen", {}, () =>
       [
         generateApi({ confectDirectory }),
         generateRefs({ confectDirectory }),
+        generateRegisteredFunctions({ confectDirectory }),
         generateServices({ confectDirectory }),
       ],
       { concurrency: "unbounded" },
@@ -149,29 +151,32 @@ const generateFunctions = ({
   Effect.gen(function* () {
     const path = yield* Path.Path;
 
-    const serverPath = path.join(confectDirectory, "server.ts");
-    const serverUrl = yield* path.toFileUrl(serverPath);
+    const registeredFunctionsPath = path.join(
+      confectDirectory,
+      "_generated",
+      "registeredFunctions.ts",
+    );
+    const registeredFunctionsUrl = yield* path.toFileUrl(
+      registeredFunctionsPath,
+    );
 
-    const server = yield* Effect.promise(() =>
-      tsx.tsImport(serverUrl.href, import.meta.url),
+    const registeredFunctions = yield* Effect.promise(() =>
+      tsx.tsImport(registeredFunctionsUrl.href, import.meta.url),
     ).pipe(
-      Effect.andThen((serverModule) => {
-        const defaultExport = serverModule.default;
-
-        return Server.isServer(defaultExport)
-          ? Effect.succeed(defaultExport)
-          : Effect.die("Invalid server module");
-      }),
+      Effect.map(
+        (registeredFunctionsModule) =>
+          registeredFunctionsModule.default as RegisteredFunctions.AnyWithProps,
+      ),
     );
 
     yield* forEachBranchLeaves<
-      Server.RegisteredFunction,
+      RegisteredFunctions.RegisteredFunction,
       void,
       Error,
       FileSystem.FileSystem | Path.Path
     >(
-      server.registeredFunctions,
-      Server.isRegisteredFunction,
+      registeredFunctions,
+      RegisteredFunctions.isRegisteredFunction,
       (registeredFunction) =>
         Effect.gen(function* () {
           const mod = Array.last(registeredFunction.path).pipe(
@@ -261,16 +266,20 @@ const generateFunctionModule = ({
 
     const modulePath = path.join(directoryPath, `${mod}.ts`);
 
-    const serverPath = path.join(confectDirectory, "server.ts");
-    const serverImportPath = yield* removePathExtension(
-      path.relative(path.dirname(modulePath), serverPath),
+    const registeredFunctionsPath = path.join(
+      confectDirectory,
+      "_generated",
+      "registeredFunctions.ts",
+    );
+    const registeredFunctionsImportPath = yield* removePathExtension(
+      path.relative(path.dirname(modulePath), registeredFunctionsPath),
     );
 
     const functionsContentsString = yield* templates.functions({
       dirs,
       mod,
       fns,
-      serverImportPath,
+      registeredFunctionsImportPath,
     });
 
     const moduleContents = new TextEncoder().encode(functionsContentsString);
@@ -304,6 +313,46 @@ const generateServices = ({ confectDirectory }: { confectDirectory: string }) =>
 
     const servicesContents = new TextEncoder().encode(servicesContentsString);
     yield* fs.writeFile(servicesPath, servicesContents);
+  });
+
+const generateRegisteredFunctions = ({
+  confectDirectory,
+}: {
+  confectDirectory: string;
+}) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+
+    const confectGeneratedDirectory = path.join(confectDirectory, "_generated");
+
+    const registeredFunctionsPath = path.join(
+      confectGeneratedDirectory,
+      "registeredFunctions.ts",
+    );
+    const implImportPath = yield* removePathExtension(
+      path.relative(
+        path.dirname(registeredFunctionsPath),
+        path.join(confectDirectory, "impl.ts"),
+      ),
+    );
+
+    const importOverrides = (yield* isTest)
+      ? yield* getTestImportPaths({
+          generatedFilePath: registeredFunctionsPath,
+          confectDirectory,
+        })
+      : {};
+
+    const registeredFunctionsContents = yield* templates.registeredFunctions({
+      implImportPath,
+      ...importOverrides,
+    });
+
+    yield* fs.writeFileString(
+      registeredFunctionsPath,
+      registeredFunctionsContents,
+    );
   });
 
 const generateHttp = ({
