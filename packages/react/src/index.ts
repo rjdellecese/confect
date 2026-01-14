@@ -1,17 +1,17 @@
+import * as Ref from "@confect/core/Ref";
 import {
   useAction as useConvexAction,
   useMutation as useConvexMutation,
   useQuery as useConvexQuery,
 } from "convex/react";
 import { Effect, Option, Schema } from "effect";
-import * as Refs from "@confect/core/Refs";
 
-export const useQuery = <Query extends Refs.AnyPublicQuery>(
+export const useQuery = <Query extends Ref.AnyPublicQuery>(
   ref: Query,
-  args: Refs.Args<Query>["Type"],
-): Option.Option<Refs.Returns<Query>["Type"]> => {
-  const function_ = Refs.getFunction(ref);
-  const functionName = Refs.getConvexFunctionName(ref);
+  args: Ref.Args<Query>["Type"],
+): Option.Option<Ref.Returns<Query>["Type"]> => {
+  const function_ = Ref.getFunction(ref);
+  const functionName = Ref.getConvexFunctionName(ref);
 
   const encodedArgs = Schema.encodeSync(function_.args)(args);
 
@@ -29,16 +29,16 @@ export const useQuery = <Query extends Refs.AnyPublicQuery>(
   }
 };
 
-export const useMutation = <Mutation extends Refs.AnyPublicMutation>(
+export const useMutation = <Mutation extends Ref.AnyPublicMutation>(
   ref: Mutation,
 ) => {
-  const function_ = Refs.getFunction(ref);
-  const functionName = Refs.getConvexFunctionName(ref);
+  const function_ = Ref.getFunction(ref);
+  const functionName = Ref.getConvexFunctionName(ref);
   const actualMutation = useConvexMutation(functionName as any);
 
   return (
-    args: Refs.Args<Mutation>["Type"],
-  ): Effect.Effect<Refs.Returns<Mutation>["Type"]> =>
+    args: Ref.Args<Mutation>["Type"],
+  ): Effect.Effect<Ref.Returns<Mutation>["Type"]> =>
     Effect.gen(function* () {
       const encodedArgs = yield* Schema.encode(function_.args)(args);
 
@@ -50,14 +50,14 @@ export const useMutation = <Mutation extends Refs.AnyPublicMutation>(
     }).pipe(Effect.orDie);
 };
 
-export const useAction = <Action extends Refs.AnyPublicAction>(ref: Action) => {
-  const function_ = Refs.getFunction(ref);
-  const functionName = Refs.getConvexFunctionName(ref);
+export const useAction = <Action extends Ref.AnyPublicAction>(ref: Action) => {
+  const function_ = Ref.getFunction(ref);
+  const functionName = Ref.getConvexFunctionName(ref);
   const actualAction = useConvexAction(functionName as any);
 
   return (
-    args: Refs.Args<Action>["Type"],
-  ): Effect.Effect<Refs.Returns<Action>["Type"]> =>
+    args: Ref.Args<Action>["Type"],
+  ): Effect.Effect<Ref.Returns<Action>["Type"]> =>
     Effect.gen(function* () {
       const encodedArgs = yield* Schema.encode(function_.args)(args);
 
@@ -68,5 +68,3 @@ export const useAction = <Action extends Refs.AnyPublicAction>(ref: Action) => {
       return yield* Schema.decode(function_.returns)(actualReturns);
     }).pipe(Effect.orDie);
 };
-
-

@@ -1,7 +1,9 @@
 export * as FunctionSpec from "./FunctionSpec";
 export * as GenericId from "./GenericId";
+export * as GroupPath from "./GroupPath";
 export * as GroupSpec from "./GroupSpec";
 export * as PaginationResult from "./PaginationResult";
+export * as Ref from "./Ref";
 export * as Refs from "./Refs";
 export * as Spec from "./Spec";
 export * as SystemFields from "./SystemFields";

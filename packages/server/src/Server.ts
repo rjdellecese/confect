@@ -117,10 +117,10 @@ const makeRegisteredFunction = <Api_ extends Api.AnyWithProps>(
   { function_, handler }: RegistryItem.AnyWithProps,
 ): RegisteredFunction =>
   Match.value(function_.functionType).pipe(
-    Match.when("Query", () => {
+    Match.when("query", () => {
       const genericFunction = Match.value(function_.functionVisibility).pipe(
-        Match.when("Public", () => queryGeneric),
-        Match.when("Internal", () => internalQueryGeneric),
+        Match.when("public", () => queryGeneric),
+        Match.when("internal", () => internalQueryGeneric),
         Match.exhaustive,
       );
 
@@ -132,10 +132,10 @@ const makeRegisteredFunction = <Api_ extends Api.AnyWithProps>(
         }),
       );
     }),
-    Match.when("Mutation", () => {
+    Match.when("mutation", () => {
       const genericFunction = Match.value(function_.functionVisibility).pipe(
-        Match.when("Public", () => mutationGeneric),
-        Match.when("Internal", () => internalMutationGeneric),
+        Match.when("public", () => mutationGeneric),
+        Match.when("internal", () => internalMutationGeneric),
         Match.exhaustive,
       );
 
@@ -147,10 +147,10 @@ const makeRegisteredFunction = <Api_ extends Api.AnyWithProps>(
         }),
       );
     }),
-    Match.when("Action", () => {
+    Match.when("action", () => {
       const genericFunction = Match.value(function_.functionVisibility).pipe(
-        Match.when("Public", () => actionGeneric),
-        Match.when("Internal", () => internalActionGeneric),
+        Match.when("public", () => actionGeneric),
+        Match.when("internal", () => internalActionGeneric),
         Match.exhaustive,
       );
 
@@ -230,6 +230,27 @@ const queryFunction = <
     ),
 });
 
+export const mutationLayer = <Schema extends DatabaseSchema.AnyWithProps>(
+  schema: Schema,
+  ctx: GenericMutationCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
+) =>
+  Layer.mergeAll(
+    DatabaseReader.layer(schema, ctx.db),
+    DatabaseWriter.layer(schema, ctx.db),
+    Auth.layer(ctx.auth),
+    Scheduler.layer(ctx.scheduler),
+    StorageReader.layer(ctx.storage),
+    StorageWriter.layer(ctx.storage),
+    QueryRunner.layer(ctx.runQuery),
+    MutationRunner.layer(ctx.runMutation),
+    Layer.succeed(
+      MutationCtx.MutationCtx<
+        DataModel.ToConvex<DataModel.FromSchema<Schema>>
+      >(),
+      ctx,
+    ),
+  );
+
 const mutationFunction = <
   Schema extends DatabaseSchema.AnyWithProps,
   ConvexArgs extends DefaultFunctionArgs,
@@ -276,27 +297,7 @@ const mutationFunction = <
       Schema.decode(args),
       Effect.orDie,
       Effect.andThen((decodedArgs) =>
-        pipe(
-          handler(decodedArgs),
-          Effect.provide(
-            Layer.mergeAll(
-              DatabaseReader.layer(schema, ctx.db),
-              DatabaseWriter.layer(schema, ctx.db),
-              Auth.layer(ctx.auth),
-              Scheduler.layer(ctx.scheduler),
-              StorageReader.layer(ctx.storage),
-              StorageWriter.layer(ctx.storage),
-              QueryRunner.layer(ctx.runQuery),
-              MutationRunner.layer(ctx.runMutation),
-              Layer.succeed(
-                MutationCtx.MutationCtx<
-                  DataModel.ToConvex<DataModel.FromSchema<Schema>>
-                >(),
-                ctx,
-              ),
-            ),
-          ),
-        ),
+        handler(decodedArgs).pipe(Effect.provide(mutationLayer(schema, ctx))),
       ),
       Effect.andThen((convexReturns) =>
         Schema.encodeUnknown(returns)(convexReturns),

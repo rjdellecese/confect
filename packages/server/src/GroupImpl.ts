@@ -1,65 +1,47 @@
-import { Context, Effect, Layer } from "effect";
+import type * as GroupPath from "@confect/core/GroupPath";
 import type * as GroupSpec from "@confect/core/GroupSpec";
+import { Context, Layer } from "effect";
 import type * as Api from "./Api";
 import type * as FunctionImpl from "./FunctionImpl";
 
-// ============================================================================
-// GroupImpl Service Tag
-// ============================================================================
-
-export interface GroupImpl<GroupPath extends string> {
-  readonly groupPath: GroupPath;
+export interface GroupImpl<GroupPath_ extends string> {
+  readonly groupPath: GroupPath_;
 }
 
-export const GroupImpl = <GroupPath extends string>({
+export const GroupImpl = <GroupPath_ extends string>({
   groupPath,
 }: {
-  groupPath: GroupPath;
+  groupPath: GroupPath_;
 }) =>
-  Context.GenericTag<GroupImpl<GroupPath>>(
+  Context.GenericTag<GroupImpl<GroupPath_>>(
     `@confect/server/GroupImpl/${groupPath}`,
   );
 
-// ============================================================================
-// make - Create Group Implementation Layer
-// ============================================================================
-
 export const make = <
   Api_ extends Api.AnyWithProps,
-  const GroupPath extends GroupSpec.All<Api.Groups<Api_>>,
+  const GroupPath_ extends GroupPath.All<Api.Groups<Api_>>,
 >(
   _api: Api_,
-  groupPath: GroupPath,
+  groupPath: GroupPath_,
 ): Layer.Layer<
-  GroupImpl<GroupPath>,
+  GroupImpl<GroupPath_>,
   never,
-  | FromGroupWithPath<GroupPath, Api.Groups<Api_>>
-  | FunctionImpl.FromGroupAtPath<GroupPath, Api.Groups<Api_>>
-> => {
-  return Layer.effect(
-    GroupImpl<GroupPath>({
+  | FromGroupWithPath<GroupPath_, Api.Groups<Api_>>
+  | FunctionImpl.FromGroupAtPath<GroupPath_, Api.Groups<Api_>>
+> =>
+  Layer.succeed(
+    GroupImpl<GroupPath_>({
       groupPath,
     }),
-    Effect.gen(function* () {
-      // Wait for all required subgroup and function implementations to be provided
-      // The Layer requirements ensure they exist before this effect runs
-      yield* Effect.void;
-
-      return {
-        groupPath,
-      };
-    }),
+    {
+      groupPath,
+    },
   ) as Layer.Layer<
-    GroupImpl<GroupPath>,
+    GroupImpl<GroupPath_>,
     never,
-    | FromGroupWithPath<GroupPath, Api.Groups<Api_>>
-    | FunctionImpl.FromGroupAtPath<GroupPath, Api.Groups<Api_>>
+    | FromGroupWithPath<GroupPath_, Api.Groups<Api_>>
+    | FunctionImpl.FromGroupAtPath<GroupPath_, Api.Groups<Api_>>
   >;
-};
-
-// ============================================================================
-// Namespace Types
-// ============================================================================
 
 export type FromGroups<Groups extends GroupSpec.Any> = Groups extends never
   ? never
@@ -68,10 +50,10 @@ export type FromGroups<Groups extends GroupSpec.Any> = Groups extends never
     : never;
 
 export type FromGroupWithPath<
-  GroupPath extends string,
+  GroupPath_ extends string,
   Group extends GroupSpec.AnyWithProps,
 > =
-  GroupSpec.SubGroupsAt<Group, GroupPath> extends infer SubGroupPaths
+  GroupPath.SubGroupsAt<Group, GroupPath_> extends infer SubGroupPaths
     ? SubGroupPaths extends string
       ? GroupImpl<SubGroupPaths>
       : never

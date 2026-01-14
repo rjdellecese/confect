@@ -25,13 +25,7 @@ export interface Any {
   readonly [TypeId]: TypeId;
 }
 
-// TODO: Can we extend the `Spec` interface and remove these custom fields?
-export interface AnyWithProps extends Any {
-  readonly groups: {
-    readonly [key: string]: GroupSpec.AnyWithProps;
-  };
-  add<Group extends GroupSpec.AnyWithProps>(group: Group): AnyWithProps;
-}
+export interface AnyWithProps extends Spec<GroupSpec.AnyWithProps> {}
 
 export type Groups<Spec_ extends AnyWithProps> =
   Spec_["groups"][keyof Spec_["groups"]];

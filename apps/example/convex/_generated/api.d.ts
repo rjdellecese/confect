@@ -20,7 +20,7 @@ import type { GenericId as Id } from "convex/values";
  * ```
  */
 export declare const api: {
-  groups: {
+  notesAndRandom: {
     notes: {
       delete_: FunctionReference<
         "mutation",
@@ -82,7 +82,7 @@ export declare const api: {
  * ```
  */
 export declare const internal: {
-  groups: {
+  notesAndRandom: {
     notes: {
       internalGetFirst: FunctionReference<
         "query",

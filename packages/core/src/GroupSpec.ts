@@ -38,20 +38,8 @@ export interface Any {
   readonly [TypeId]: TypeId;
 }
 
-// TODO: Can we extend the `GroupSpec` interface and remove these custom fields?
-export interface AnyWithProps extends Any {
-  readonly name: string;
-  readonly functions: {
-    [key: string]: FunctionSpec.AnyWithProps;
-  };
-  readonly groups: {
-    [key: string]: AnyWithProps;
-  };
-  addFunction<Function extends FunctionSpec.AnyWithProps>(
-    function_: Function,
-  ): AnyWithProps;
-  addGroup<Group extends AnyWithProps>(group: Group): AnyWithProps;
-}
+export interface AnyWithProps
+  extends GroupSpec<string, FunctionSpec.AnyWithProps, AnyWithProps> {}
 
 export type Name<Group extends AnyWithProps> = Group["name"];
 
@@ -71,58 +59,6 @@ export type WithName<
   Group extends AnyWithProps,
   Name_ extends Name<Group>,
 > = Extract<Group, { readonly name: Name_ }>;
-
-// TODO: Move these types into their own `GroupPath` module
-
-// Recursively generates paths for a group and its nested groups.
-// For a group with no subgroups, returns just the group name.
-// For a group with subgroups, returns the group name plus all possible paths
-// through its direct subgroups. Properly distributes over union types to prevent
-// cross-contamination of paths from different groups.
-export type All<
-  Group extends AnyWithProps,
-  Depth extends 1[] = [],
-> = Depth["length"] extends 15
-  ? string
-  : Group extends any
-    ? [Groups<Group>] extends [never]
-      ? Name<Group>
-      : Name<Group> | AllHelper<Group, Groups<Group>, Depth>
-    : never;
-
-type AllHelper<
-  Parent extends AnyWithProps,
-  Groups_ extends AnyWithProps,
-  Depth extends 1[] = [],
-> = Groups_ extends AnyWithProps
-  ? `${Name<Parent>}.${All<Groups_, [...Depth, 1]>}`
-  : never;
-
-/**
- * Recursively extracts the group at the given dot-separated path.
- * Path must match the format defined in `Path` above, e.g. "group" or "group.subgroup".
- *
- * Example:
- *   type G = WithPath<RootGroup, "group.subgroup">;
- */
-export type GroupAt<Group, Path extends string> = Group extends AnyWithProps
-  ? Path extends `${infer Head}.${infer Tail}`
-    ? Group extends { readonly name: Head }
-      ? Group extends {
-          readonly groups: Record.ReadonlyRecord<string, infer SubGroup>;
-        }
-        ? GroupAt<SubGroup, Tail>
-        : never
-      : never
-    : WithName<Group, Path>
-  : never;
-
-export type SubGroupsAt<Group extends AnyWithProps, GroupPath extends string> =
-  Groups<GroupAt<Group, GroupPath>> extends infer SubGroups
-    ? SubGroups extends AnyWithProps
-      ? `${GroupPath}.${Name<SubGroups>}`
-      : never
-    : never;
 
 const Proto = {
   [TypeId]: TypeId,
