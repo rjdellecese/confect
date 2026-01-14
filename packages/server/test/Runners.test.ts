@@ -1,13 +1,13 @@
+import { describe } from "@effect/vitest";
 import { assertEquals, assertSuccess } from "@effect/vitest/utils";
 import { Effect } from "effect";
 import { api } from "./convex/_generated/api";
-import { TestConvexService } from "./TestConvexService";
-import { effect } from "./test_utils";
-import { describe } from "@effect/vitest";
+import { TestConfect } from "./TestConfect";
+import { effect } from "./testUtils";
 
 effect("ConfectQueryRunner", () =>
   Effect.gen(function* () {
-    const c = yield* TestConvexService;
+    const c = yield* TestConfect;
 
     const text = "Hello, world!";
 
@@ -22,7 +22,7 @@ effect("ConfectQueryRunner", () =>
 describe("ConfectMutationRunner", () => {
   effect("sub-mutation success", () =>
     Effect.gen(function* () {
-      const c = yield* TestConvexService;
+      const c = yield* TestConfect;
 
       const text = "Hello, world!";
 
@@ -36,7 +36,7 @@ describe("ConfectMutationRunner", () => {
 
   effect("sub-mutation failure", () =>
     Effect.gen(function* () {
-      const c = yield* TestConvexService;
+      const c = yield* TestConfect;
 
       const rollbackMessage = "Rolled back";
 
@@ -51,7 +51,7 @@ describe("ConfectMutationRunner", () => {
 
 effect("ConfectActionRunner", () =>
   Effect.gen(function* () {
-    const c = yield* TestConvexService;
+    const c = yield* TestConfect;
 
     const text = "Hello, world!";
 

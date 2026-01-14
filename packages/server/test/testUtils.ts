@@ -1,7 +1,7 @@
 import { effect as effect_ } from "@effect/vitest";
 import { Effect, type TestServices } from "effect";
 
-import * as TestConvexService from "./TestConvexService";
+import * as TestConvexService from "./TestConfect";
 
 type Name<A, E> = Parameters<typeof effect_<E, A>>[0];
 type Self<A, E> = (
@@ -9,7 +9,7 @@ type Self<A, E> = (
 ) => Effect.Effect<
   E,
   A,
-  TestServices.TestServices | TestConvexService.TestConvexService
+  TestServices.TestServices | TestConvexService.TestConfect
 >;
 type Timeout<A, E> = Parameters<typeof effect_<E, A>>[2];
 

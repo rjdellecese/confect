@@ -277,6 +277,17 @@ export const mutationLayer = <Schema extends DatabaseSchema.AnyWithProps>(
     ),
   );
 
+export type MutationServices<Schema extends DatabaseSchema.AnyWithProps> =
+  | DatabaseReader.DatabaseReader<Schema>
+  | DatabaseWriter.DatabaseWriter<Schema>
+  | Auth.Auth
+  | Scheduler.Scheduler
+  | StorageReader
+  | StorageWriter
+  | QueryRunner.QueryRunner
+  | MutationRunner.MutationRunner
+  | MutationCtx.MutationCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>;
+
 const mutationFunction = <
   Schema extends DatabaseSchema.AnyWithProps,
   Args,
@@ -293,23 +304,7 @@ const mutationFunction = <
   }: {
     args: Schema.Schema<Args, ConvexArgs>;
     returns: Schema.Schema<Returns, ConvexReturns>;
-    handler: (
-      a: Args,
-    ) => Effect.Effect<
-      Returns,
-      E,
-      | DatabaseReader.DatabaseReader<Schema>
-      | DatabaseWriter.DatabaseWriter<Schema>
-      | Auth.Auth
-      | Scheduler.Scheduler
-      | StorageReader
-      | StorageWriter
-      | QueryRunner.QueryRunner
-      | MutationRunner.MutationRunner
-      | MutationCtx.MutationCtx<
-          DataModel.ToConvex<DataModel.FromSchema<Schema>>
-        >
-    >;
+    handler: (a: Args) => Effect.Effect<Returns, E, MutationServices<Schema>>;
   },
 ) => ({
   args: SchemaToValidator.compileArgsSchema(args),

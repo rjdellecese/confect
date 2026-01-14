@@ -3,13 +3,13 @@ import { assertEquals } from "@effect/vitest/utils";
 import { Effect, Option } from "effect";
 import { api } from "./confect/_generated/refs";
 import { DatabaseWriter } from "./confect/_generated/services";
-import { effect } from "./test_utils";
-import { TestConvexService } from "./TestConvexService";
+import { TestConfect } from "./TestConfect";
+import { effect } from "./testUtils";
 
 describe("QueryCtx", () => {
   effect("should get a note", () =>
     Effect.gen(function* () {
-      const c = yield* TestConvexService;
+      const c = yield* TestConfect;
 
       const text = "Hello, world!";
 
@@ -35,17 +35,17 @@ describe("QueryCtx", () => {
 describe("MutationCtx", () => {
   effect("should insert a note", () =>
     Effect.gen(function* () {
-      const c = yield* TestConvexService;
+      const c = yield* TestConfect;
 
       const text = "Hello, world!";
 
-      const noteId = yield* c.mutation(api.groups.notes.insert, {
+      yield* c.mutation(api.groups.notes.insert, {
         text,
       });
 
       const note = yield* c
         .query(api.groups.notes.getFirst, {})
-        .pipe(Effect.map(Option.map((note) => note.text)));
+        .pipe(Effect.map(Option.map(({ text }) => text)));
 
       assertEquals(note, Option.some(text));
     }),
@@ -55,7 +55,7 @@ describe("MutationCtx", () => {
 describe("ActionCtx", () => {
   effect("should insert a note", () =>
     Effect.gen(function* () {
-      const c = yield* TestConvexService;
+      const c = yield* TestConfect;
 
       const randomNumber = yield* c.action(api.groups.random.getNumber, {});
 
