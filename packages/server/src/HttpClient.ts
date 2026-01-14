@@ -1,4 +1,4 @@
-import * as Refs from "@confect/core/Refs";
+import * as Ref from "@confect/core/Ref";
 import { ConvexHttpClient as ConvexHttpClient_ } from "convex/browser";
 import { Context, Effect, Layer, Schema } from "effect";
 
@@ -29,13 +29,13 @@ const make = (
       client.clearAuth();
     });
 
-  const query = <Query extends Refs.AnyQuery>(
+  const query = <Query extends Ref.AnyQuery>(
     ref: Query,
-    args: Refs.Args<Query>["Type"]
+    args: Ref.Args<Query>["Type"]
   ) =>
     Effect.gen(function* () {
-      const function_ = Refs.getFunction(ref);
-      const functionName = Refs.getConvexFunctionName(ref);
+      const function_ = Ref.getFunction(ref);
+      const functionName = Ref.getConvexFunctionName(ref);
 
       const encodedArgs = yield* Schema.encode(function_.args)(args);
 
@@ -47,13 +47,13 @@ const make = (
       return yield* Schema.decode(function_.returns)(encodedResult);
     });
 
-  const mutation = <Mutation extends Refs.AnyMutation>(
+  const mutation = <Mutation extends Ref.AnyMutation>(
     ref: Mutation,
-    args: Refs.Args<Mutation>["Type"]
+    args: Ref.Args<Mutation>["Type"]
   ) =>
     Effect.gen(function* () {
-      const function_ = Refs.getFunction(ref);
-      const functionName = Refs.getConvexFunctionName(ref);
+      const function_ = Ref.getFunction(ref);
+      const functionName = Ref.getConvexFunctionName(ref);
 
       const encodedArgs = yield* Schema.encode(function_.args)(args);
 
@@ -65,13 +65,13 @@ const make = (
       return yield* Schema.decode(function_.returns)(encodedResult);
     });
 
-  const action = <Action extends Refs.AnyAction>(
+  const action = <Action extends Ref.AnyAction>(
     ref: Action,
-    args: Refs.Args<Action>["Type"]
+    args: Ref.Args<Action>["Type"]
   ) =>
     Effect.gen(function* () {
-      const function_ = Refs.getFunction(ref);
-      const functionName = Refs.getConvexFunctionName(ref);
+      const function_ = Ref.getFunction(ref);
+      const functionName = Ref.getConvexFunctionName(ref);
 
       const encodedArgs = yield* Schema.encode(function_.args)(args);
 
