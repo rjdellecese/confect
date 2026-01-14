@@ -71,6 +71,7 @@ export default [
       "**/eslint.config.mjs",
       "**/vite.config.ts",
       "**/vitest.config.ts",
+      "**/vitest.shared.ts",
       "**/tsdown.config.ts",
     ],
     languageOptions: {

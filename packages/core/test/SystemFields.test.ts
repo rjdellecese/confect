@@ -2,15 +2,18 @@ import type { Expand } from "convex/server";
 import { Schema } from "effect";
 import { describe, expect, expectTypeOf, test } from "vitest";
 import { GenericId } from "../src/GenericId";
-import { extendWithSystemFields } from "../src/SystemFields";
+import * as SystemFields from "../src/SystemFields";
 
-describe(extendWithSystemFields, () => {
+describe("extendWithSystemFields", () => {
   test("extends a struct with system fields", () => {
     const NoteSchema = Schema.Struct({
       content: Schema.String,
     });
 
-    const ExtendedNoteSchema = extendWithSystemFields("notes", NoteSchema);
+    const ExtendedNoteSchema = SystemFields.extendWithSystemFields(
+      "notes",
+      NoteSchema,
+    );
 
     const Expected = Schema.Struct({
       content: Schema.String,
@@ -51,7 +54,10 @@ describe(extendWithSystemFields, () => {
 
     const ItemSchema = Schema.Union(NoteSchema, ImageSchema);
 
-    const ExtendedItemSchema = extendWithSystemFields("items", ItemSchema);
+    const ExtendedItemSchema = SystemFields.extendWithSystemFields(
+      "items",
+      ItemSchema,
+    );
 
     const Expected = Schema.Union(
       Schema.Struct({
