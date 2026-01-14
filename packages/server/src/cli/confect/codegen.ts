@@ -403,16 +403,8 @@ const generateRefs = ({ confectDirectory }: { confectDirectory: string }) =>
     );
     const importPathWithoutExt = yield* removePathExtension(relativeImportPath);
 
-    const importOverrides = (yield* isTest)
-      ? yield* getTestImportPaths({
-          generatedFilePath: refsPath,
-          confectDirectory,
-        })
-      : {};
-
     const refsContents = yield* templates.refs({
       specImportPath: importPathWithoutExt,
-      ...importOverrides,
     });
 
     yield* fs.writeFileString(refsPath, refsContents);

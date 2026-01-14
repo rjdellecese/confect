@@ -22,7 +22,7 @@ import type {
   Scheduler,
   Storage,
 } from "../src/index";
-import { Server } from "../src/index";
+import { RegisteredFunctions } from "../src/index";
 
 import confectSchema from "./confect/schema";
 import schema from "./convex/schema";
@@ -153,7 +153,9 @@ class TestConvexServiceImplWithoutIdentity
     Effect.promise(() =>
       this.testConvex.run((mutationCtx) =>
         effect.pipe(
-          Effect.provide(Server.mutationLayer(confectSchema, mutationCtx)),
+          Effect.provide(
+            RegisteredFunctions.mutationLayer(confectSchema, mutationCtx),
+          ),
           Effect.runPromise,
         ),
       ),

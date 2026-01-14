@@ -53,17 +53,11 @@ export const http = ({ httpImportPath }: { httpImportPath: string }) =>
     return yield* cbw.toString();
   });
 
-export const refs = ({
-  specImportPath,
-  confectCoreImportPath = "@confect/core",
-}: {
-  specImportPath: string;
-  confectCoreImportPath?: string;
-}) =>
+export const refs = ({ specImportPath }: { specImportPath: string }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-    yield* cbw.writeLine(`import { Refs } from "${confectCoreImportPath}";`);
+    yield* cbw.writeLine(`import { Refs } from "@confect/core";`);
     yield* cbw.writeLine(`import spec from "${specImportPath}";`);
     yield* cbw.blankLine();
     yield* cbw.writeLine(`const refs = Refs.make(spec);`);
