@@ -27,3 +27,4 @@ export * as Storage from "./Storage";
 export * as Table from "./Table";
 export * as TableInfo from "./TableInfo";
 export * as VectorSearch from "./VectorSearch";
+export * as HttpClient from "./HttpClient";
