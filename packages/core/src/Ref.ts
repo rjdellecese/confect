@@ -118,6 +118,7 @@ export const make = <
    * This is a Convex "function name" of the format "myGroupDir/myGroupMod:myFunc".
    */
   convexFunctionName: string,
+  // TODO: Pull out all of the fields from the function spec except the name (we don't need it because we already have the convex function name) and spread them here
   function_: FunctionSpec.FunctionSpec<
     FunctionType_,
     FunctionVisibility_,
