@@ -4,7 +4,7 @@ import { createConfig } from "../../tsdown.shared";
 export default defineConfig([
   createConfig({
     platform: "neutral",
-    entry: ["src/index.ts", "src/**/*.ts", "!src/cli/**/*"],
+    entry: ["src/**/*.ts", "!src/cli/**/*"],
     outDir: "dist",
   }),
   createConfig({
