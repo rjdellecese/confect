@@ -1,10 +1,10 @@
 import tsconfigPaths from "vite-tsconfig-paths";
-import { defineProject, mergeConfig } from "vitest/config";
+import { defineConfig, mergeConfig } from "vitest/config";
 import sharedConfig from "../../vitest.shared";
 
 export default mergeConfig(
   sharedConfig,
-  defineProject({
+  defineConfig({
     plugins: [tsconfigPaths()],
     test: {
       root: import.meta.dirname,

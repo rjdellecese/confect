@@ -12,7 +12,7 @@ import {
   Scheduler as Scheduler_,
   Storage,
   VectorSearch as VectorSearch_,
-} from "../../../src";
+} from "@confect/server";
 import type schemaDefinition from "../schema";
 
 export const Auth = Auth_.Auth;

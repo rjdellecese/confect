@@ -1,4 +1,4 @@
-import { Refs } from "@confect/server";
+import { Refs } from "@confect/core";
 import spec from "../spec";
 
 const refs = Refs.make(spec);

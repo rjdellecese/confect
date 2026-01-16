@@ -1,5 +1,5 @@
+import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Effect, Layer } from "effect";
-import { FunctionImpl, GroupImpl } from "../../../../src/index";
 import api from "../../_generated/api";
 import { DatabaseReader, DatabaseWriter } from "../../_generated/services";
 

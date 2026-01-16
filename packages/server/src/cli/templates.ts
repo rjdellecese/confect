@@ -71,16 +71,14 @@ export const refs = ({ specImportPath }: { specImportPath: string }) =>
 export const api = ({
   schemaImportPath,
   specImportPath,
-  confectServerImportPath = "@confect/server",
 }: {
   schemaImportPath: string;
   specImportPath: string;
-  confectServerImportPath?: string;
 }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-    yield* cbw.writeLine(`import { Api } from "${confectServerImportPath}";`);
+    yield* cbw.writeLine(`import { Api } from "@confect/server";`);
     yield* cbw.writeLine(`import schema from "${schemaImportPath}";`);
     yield* cbw.writeLine(`import spec from "${specImportPath}";`);
     yield* cbw.blankLine();
@@ -91,16 +89,14 @@ export const api = ({
 
 export const registeredFunctions = ({
   implImportPath,
-  confectServerImportPath = "@confect/server",
 }: {
   implImportPath: string;
-  confectServerImportPath?: string;
 }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
     yield* cbw.writeLine(
-      `import { RegisteredFunctions } from "${confectServerImportPath}";`,
+      `import { RegisteredFunctions } from "@confect/server";`,
     );
     yield* cbw.writeLine(`import impl from "${implImportPath}";`);
     yield* cbw.blankLine();
@@ -109,13 +105,7 @@ export const registeredFunctions = ({
     return yield* cbw.toString();
   });
 
-export const services = ({
-  schemaImportPath,
-  confectServerImportPath = "@confect/server",
-}: {
-  schemaImportPath: string;
-  confectServerImportPath?: string;
-}) =>
+export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
@@ -138,7 +128,7 @@ export const services = ({
         yield* cbw.writeLine("VectorSearch as VectorSearch_,");
       }),
     );
-    yield* cbw.writeLine(`} from "${confectServerImportPath}";`);
+    yield* cbw.writeLine(`} from "@confect/server";`);
     yield* cbw.writeLine(
       `import type schemaDefinition from "${schemaImportPath}";`,
     );

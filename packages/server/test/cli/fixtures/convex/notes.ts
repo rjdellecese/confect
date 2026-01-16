@@ -1,3 +1,3 @@
-import server from "../confect/server";
+import registeredFunctions from "../confect/_generated/registeredFunctions";
 
-export const getContent = server.registeredFunctions.notes.getContent;
+export const getContent = registeredFunctions.notes.getContent;

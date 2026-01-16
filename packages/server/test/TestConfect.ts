@@ -1,6 +1,17 @@
 /// <reference types="vite/client" />
 
 import { Ref } from "@confect/core";
+import type {
+  Auth,
+  DatabaseReader,
+  DatabaseWriter,
+  MutationCtx,
+  MutationRunner,
+  QueryRunner,
+  Scheduler,
+  Storage,
+} from "@confect/server";
+import { RegisteredFunctions } from "@confect/server";
 import {
   convexTest,
   type TestConvexForDataModel,
@@ -12,17 +23,6 @@ import type {
 } from "convex/server";
 import type { ParseResult } from "effect";
 import { Context, Effect, Layer, Schema } from "effect";
-import type {
-  Auth,
-  DatabaseReader,
-  DatabaseWriter,
-  MutationCtx,
-  MutationRunner,
-  QueryRunner,
-  Scheduler,
-  Storage,
-} from "../src/index";
-import { RegisteredFunctions } from "../src/index";
 
 import confectSchema from "./confect/schema";
 import schema from "./convex/schema";

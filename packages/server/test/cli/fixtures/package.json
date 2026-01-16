@@ -2,7 +2,6 @@
   "type": "module",
   "dependencies": {
     "@effect/platform": "0.93.2",
-    "@rjdellecese/confect": "*",
     "convex": "1.29.1",
     "effect": "3.19.3"
   },

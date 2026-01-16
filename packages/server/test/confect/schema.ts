@@ -1,4 +1,4 @@
-import { DatabaseSchema } from "../../src/index";
+import { DatabaseSchema } from "@confect/server";
 import { Notes } from "./tables/Notes";
 import { Tags } from "./tables/Tags";
 import { Users } from "./tables/Users";

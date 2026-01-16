@@ -5,7 +5,7 @@ import { api } from "./confect/_generated/refs";
 import { DatabaseWriter } from "./confect/_generated/services";
 import * as TestConfect from "./TestConfect";
 
-layer(TestConfect.layer)("QueryCtx", (it) => {
+layer(TestConfect.layer)("reading from the database", (it) => {
   it.effect("should get a note", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;

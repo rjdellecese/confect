@@ -9,13 +9,11 @@ const setup = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
 
-  const packageDirectory = process.cwd();
-  const fixturesDirectory = path.join(
-    packageDirectory,
-    "test",
-    "cli",
-    "fixtures",
-  );
+  // Use import.meta.dirname for reliable path resolution regardless of cwd
+  const testDir = import.meta.dirname;
+  const serverPackageDirectory = path.join(testDir, "..", "..");
+  const corePackageDirectory = path.join(serverPackageDirectory, "..", "core");
+  const fixturesDirectory = path.join(testDir, "fixtures");
   const tempDirectory = yield* fs.makeTempDirectory();
 
   yield* Effect.sync(() =>
@@ -43,12 +41,28 @@ const setup = Effect.gen(function* () {
     });
   }
 
+  // Link @confect/core
   expect(
     yield* Command.make(
       "pnpm",
       "link",
       "--config.confirmModulesPurge=false",
-      packageDirectory,
+      corePackageDirectory,
+    ).pipe(
+      Command.workingDirectory(tempDirectory),
+      Command.stdout("inherit"),
+      Command.stderr("inherit"),
+      Command.exitCode,
+    ),
+  ).toStrictEqual(0);
+
+  // Link @confect/server
+  expect(
+    yield* Command.make(
+      "pnpm",
+      "link",
+      "--config.confirmModulesPurge=false",
+      serverPackageDirectory,
     ).pipe(
       Command.workingDirectory(tempDirectory),
       Command.stdout("inherit"),

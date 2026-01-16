@@ -1,19 +1,19 @@
-import type { DataModel } from "@confect/server";
 import {
+  ActionCtx as ActionCtx_,
   ActionRunner as ActionRunner_,
   Auth as Auth_,
+  type DataModel,
   DatabaseReader as DatabaseReader_,
   DatabaseWriter as DatabaseWriter_,
+  MutationCtx as MutationCtx_,
   MutationRunner as MutationRunner_,
+  QueryCtx as QueryCtx_,
   QueryRunner as QueryRunner_,
   Scheduler as Scheduler_,
   Storage,
   VectorSearch as VectorSearch_,
-  ActionCtx as ActionCtx_,
-  MutationCtx as MutationCtx_,
-  QueryCtx as QueryCtx_,
 } from "@confect/server";
-import type confectSchemaDefinition from "../schema";
+import type schemaDefinition from "../schema";
 
 export const Auth = Auth_.Auth;
 export type Auth = typeof Auth.Identifier;
@@ -31,17 +31,15 @@ export const StorageActionWriter = Storage.StorageActionWriter;
 export type StorageActionWriter = typeof StorageActionWriter.Identifier;
 
 export const VectorSearch =
-  VectorSearch_.VectorSearch<
-    DataModel.DataModel.FromSchema<typeof confectSchemaDefinition>
-  >();
+  VectorSearch_.VectorSearch<DataModel.FromSchema<typeof schemaDefinition>>();
 export type VectorSearch = typeof VectorSearch.Identifier;
 
 export const DatabaseReader =
-  DatabaseReader_.DatabaseReader<typeof confectSchemaDefinition>();
+  DatabaseReader_.DatabaseReader<typeof schemaDefinition>();
 export type DatabaseReader = typeof DatabaseReader.Identifier;
 
 export const DatabaseWriter =
-  DatabaseWriter_.DatabaseWriter<typeof confectSchemaDefinition>();
+  DatabaseWriter_.DatabaseWriter<typeof schemaDefinition>();
 export type DatabaseWriter = typeof DatabaseWriter.Identifier;
 
 export const QueryRunner = QueryRunner_.QueryRunner;
@@ -55,24 +53,18 @@ export type ActionRunner = typeof ActionRunner.Identifier;
 
 export const QueryCtx =
   QueryCtx_.QueryCtx<
-    DataModel.DataModel.ToConvex<
-      DataModel.DataModel.FromSchema<typeof confectSchemaDefinition>
-    >
+    DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>
   >();
 export type QueryCtx = typeof QueryCtx.Identifier;
 
 export const MutationCtx =
   MutationCtx_.MutationCtx<
-    DataModel.DataModel.ToConvex<
-      DataModel.DataModel.FromSchema<typeof confectSchemaDefinition>
-    >
+    DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>
   >();
 export type MutationCtx = typeof MutationCtx.Identifier;
 
 export const ActionCtx =
   ActionCtx_.ActionCtx<
-    DataModel.DataModel.ToConvex<
-      DataModel.DataModel.FromSchema<typeof confectSchemaDefinition>
-    >
+    DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>
   >();
 export type ActionCtx = typeof ActionCtx.Identifier;

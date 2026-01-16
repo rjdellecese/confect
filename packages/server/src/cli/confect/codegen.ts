@@ -1,26 +1,11 @@
 import { Command } from "@effect/cli";
 import { FileSystem, Path } from "@effect/platform";
-import {
-  Array,
-  Config,
-  Console,
-  Effect,
-  Option,
-  Record,
-  Schema,
-  String,
-} from "effect";
+import { Array, Effect, Option, Record, Schema, String } from "effect";
 import * as tsx from "tsx/esm/api";
 import * as DatabaseSchema from "../../DatabaseSchema";
 import { forEachBranchLeaves } from "../../internal/utils";
 import * as RegisteredFunctions from "../../RegisteredFunctions";
 import * as templates from "../templates";
-
-// TODO: Would this cause issues for users using Vitest who want to perform codegen as a part of their test setup process?
-const isTest = Config.string("VITEST").pipe(
-  Config.map((value) => value === "true"),
-  Config.withDefault(false),
-);
 
 export const codegen = Command.make("codegen", {}, () =>
   Effect.gen(function* () {
@@ -49,44 +34,11 @@ export const codegen = Command.make("codegen", {}, () =>
       { concurrency: "unbounded" },
     );
   }),
-).pipe(Command.withDescription("Generate Convex functions from a Confect API"));
-
-const getTestImportPaths = ({
-  generatedFilePath,
-  confectDirectory,
-}: {
-  generatedFilePath: string;
-  confectDirectory: string;
-}) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
-
-    // From test/confect/_generated/ to src/
-    const serverSrcPath = path.join(confectDirectory, "..", "..", "src");
-    const confectServerImportPath = path.relative(
-      path.dirname(generatedFilePath),
-      serverSrcPath,
-    );
-
-    // From test/confect/_generated/ to ../../core/src/
-    const coreSrcPath = path.join(
-      confectDirectory,
-      "..",
-      "..",
-      "..",
-      "core",
-      "src",
-    );
-    const confectCoreImportPath = path.relative(
-      path.dirname(generatedFilePath),
-      coreSrcPath,
-    );
-
-    return {
-      confectServerImportPath,
-      confectCoreImportPath,
-    };
-  });
+).pipe(
+  Command.withDescription(
+    "Generate `confect/_generated` files and the contents of the `convex` directory",
+  ),
+);
 
 const generateConfectGeneratedDirectory = ({
   confectDirectory,
@@ -125,17 +77,9 @@ const generateApi = ({ confectDirectory }: { confectDirectory: string }) =>
       ),
     );
 
-    const importOverrides = (yield* isTest)
-      ? yield* getTestImportPaths({
-          generatedFilePath: apiPath,
-          confectDirectory,
-        })
-      : {};
-
     const apiContents = yield* templates.api({
       schemaImportPath,
       specImportPath,
-      ...importOverrides,
     });
 
     yield* fs.writeFileString(apiPath, apiContents);
@@ -299,16 +243,8 @@ const generateServices = ({ confectDirectory }: { confectDirectory: string }) =>
       path.join(confectDirectory, "schema"),
     );
 
-    const importOverrides = (yield* isTest)
-      ? yield* getTestImportPaths({
-          generatedFilePath: servicesPath,
-          confectDirectory,
-        })
-      : {};
-
     const servicesContentsString = yield* templates.services({
       schemaImportPath,
-      ...importOverrides,
     });
 
     const servicesContents = new TextEncoder().encode(servicesContentsString);
@@ -337,16 +273,8 @@ const generateRegisteredFunctions = ({
       ),
     );
 
-    const importOverrides = (yield* isTest)
-      ? yield* getTestImportPaths({
-          generatedFilePath: registeredFunctionsPath,
-          confectDirectory,
-        })
-      : {};
-
     const registeredFunctionsContents = yield* templates.registeredFunctions({
       implImportPath,
-      ...importOverrides,
     });
 
     yield* fs.writeFileString(
@@ -382,8 +310,6 @@ const generateHttp = ({
       });
 
       yield* fs.writeFileString(convexHttpPath, httpContents);
-    } else {
-      yield* Console.debug("No http.ts file found, skipping…");
     }
   });
 
@@ -448,8 +374,10 @@ const findConfectDirectory = ({
     return path.join(convexDirectory, "..", "confect");
   });
 
-// Schema for `convex.json` configuration file
-// See: https://docs.convex.dev/production/project-configuration
+/**
+ * Schema for `convex.json` configuration file.
+ * @see https://docs.convex.dev/production/project-configuration
+ */
 const ConvexJsonConfig = Schema.parseJson(
   Schema.Struct({
     functions: Schema.optional(Schema.String),
