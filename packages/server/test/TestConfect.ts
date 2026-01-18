@@ -22,12 +22,12 @@ import type {
   Scheduler,
   Storage,
 } from "../src/index";
-import { Server } from "../src/index";
+import { RegisteredFunctions } from "../src/index";
 
 import confectSchema from "./confect/schema";
 import schema from "./convex/schema";
 
-export type TestConvexServiceWithoutIdentity = {
+export type TestConfectWithoutIdentity = {
   query: <QueryRef extends Ref.AnyQuery>(
     queryRef: QueryRef,
     args: Ref.Args<QueryRef>["Type"],
@@ -44,15 +44,7 @@ export type TestConvexServiceWithoutIdentity = {
     effect: Effect.Effect<
       A,
       E,
-      | DatabaseReader.DatabaseReader<typeof confectSchema>
-      | DatabaseWriter.DatabaseWriter<typeof confectSchema>
-      | Auth.Auth
-      | Scheduler.Scheduler
-      | Storage.StorageReader
-      | Storage.StorageWriter
-      | QueryRunner.QueryRunner
-      | MutationRunner.MutationRunner
-      | MutationCtx.MutationCtx<DataModelFromSchemaDefinition<typeof schema>>
+      RegisteredFunctions.MutationServices<typeof confectSchema>
     >,
   ) => Effect.Effect<A, E>;
   fetch: (
@@ -65,19 +57,17 @@ export type TestConvexServiceWithoutIdentity = {
   ) => Effect.Effect<void>;
 };
 
-export type TestConvexService = {
+export type TestConfect = {
   withIdentity: (
     userIdentity: Partial<UserIdentity>,
-  ) => TestConvexServiceWithoutIdentity;
-} & TestConvexServiceWithoutIdentity;
+  ) => TestConfectWithoutIdentity;
+} & TestConfectWithoutIdentity;
 
-export const TestConvexService = Context.GenericTag<TestConvexService>(
-  "@rjdellecese/confect/test/TestConvexService",
+export const TestConfect = Context.GenericTag<TestConfect>(
+  "@rjdellecese/server/test/TestConfect",
 );
 
-class TestConvexServiceImplWithoutIdentity
-  implements TestConvexServiceWithoutIdentity
-{
+class TestConfectImplWithoutIdentity implements TestConfectWithoutIdentity {
   constructor(
     private testConvex: TestConvexForDataModel<
       DataModelFromSchemaDefinition<typeof schema>
@@ -139,21 +129,15 @@ class TestConvexServiceImplWithoutIdentity
     effect: Effect.Effect<
       A,
       E,
-      | DatabaseReader.DatabaseReader<typeof confectSchema>
-      | DatabaseWriter.DatabaseWriter<typeof confectSchema>
-      | Auth.Auth
-      | Scheduler.Scheduler
-      | Storage.StorageReader
-      | Storage.StorageWriter
-      | QueryRunner.QueryRunner
-      | MutationRunner.MutationRunner
-      | MutationCtx.MutationCtx<DataModelFromSchemaDefinition<typeof schema>>
+      RegisteredFunctions.MutationServices<typeof confectSchema>
     >,
   ) =>
     Effect.promise(() =>
       this.testConvex.run((mutationCtx) =>
         effect.pipe(
-          Effect.provide(Server.mutationLayer(confectSchema, mutationCtx)),
+          Effect.provide(
+            RegisteredFunctions.mutationLayer(confectSchema, mutationCtx),
+          ),
           Effect.runPromise,
         ),
       ),
@@ -173,8 +157,8 @@ class TestConvexServiceImplWithoutIdentity
     );
 }
 
-class TestConvexServiceImpl implements TestConvexService {
-  private readonly testConvexServiceImplWithoutIdentity: TestConvexServiceImplWithoutIdentity;
+class TestConfectImpl implements TestConfect {
+  private readonly testConfectImplWithoutIdentity: TestConfectImplWithoutIdentity;
 
   constructor(
     private testConvex: TestConvexForDataModelAndIdentity<
@@ -182,29 +166,30 @@ class TestConvexServiceImpl implements TestConvexService {
     >,
   ) {
     this.testConvex = testConvex;
-    this.testConvexServiceImplWithoutIdentity =
-      new TestConvexServiceImplWithoutIdentity(testConvex);
+    this.testConfectImplWithoutIdentity = new TestConfectImplWithoutIdentity(
+      testConvex,
+    );
   }
 
   readonly withIdentity = (userIdentity: Partial<UserIdentity>) =>
-    new TestConvexServiceImplWithoutIdentity(
+    new TestConfectImplWithoutIdentity(
       this.testConvex.withIdentity(userIdentity),
     );
 
   readonly query = <QueryRef extends Ref.AnyQuery>(
     queryRef: QueryRef,
     args: Ref.Args<QueryRef>["Type"],
-  ) => this.testConvexServiceImplWithoutIdentity.query(queryRef, args);
+  ) => this.testConfectImplWithoutIdentity.query(queryRef, args);
 
   readonly mutation = <MutationRef extends Ref.AnyMutation>(
     mutationRef: MutationRef,
     args: Ref.Args<MutationRef>["Type"],
-  ) => this.testConvexServiceImplWithoutIdentity.mutation(mutationRef, args);
+  ) => this.testConfectImplWithoutIdentity.mutation(mutationRef, args);
 
   readonly action = <ActionRef extends Ref.AnyAction>(
     actionRef: ActionRef,
     args: Ref.Args<ActionRef>["Type"],
-  ) => this.testConvexServiceImplWithoutIdentity.action(actionRef, args);
+  ) => this.testConfectImplWithoutIdentity.action(actionRef, args);
 
   readonly run = <A, E>(
     effect: Effect.Effect<
@@ -220,18 +205,18 @@ class TestConvexServiceImpl implements TestConvexService {
       | MutationRunner.MutationRunner
       | MutationCtx.MutationCtx<DataModelFromSchemaDefinition<typeof schema>>
     >,
-  ) => this.testConvexServiceImplWithoutIdentity.run(effect);
+  ) => this.testConfectImplWithoutIdentity.run(effect);
 
   readonly fetch = <PathQueryFragment extends string>(
     pathQueryFragment: PathQueryFragment,
     init?: RequestInit,
-  ) => this.testConvexServiceImplWithoutIdentity.fetch(pathQueryFragment, init);
+  ) => this.testConfectImplWithoutIdentity.fetch(pathQueryFragment, init);
 
   readonly finishInProgressScheduledFunctions = () =>
-    this.testConvexServiceImplWithoutIdentity.finishInProgressScheduledFunctions();
+    this.testConfectImplWithoutIdentity.finishInProgressScheduledFunctions();
 
   readonly finishAllScheduledFunctions = (advanceTimers: () => void) =>
-    this.testConvexServiceImplWithoutIdentity.finishAllScheduledFunctions(
+    this.testConfectImplWithoutIdentity.finishAllScheduledFunctions(
       advanceTimers,
     );
 }
@@ -239,7 +224,7 @@ class TestConvexServiceImpl implements TestConvexService {
 // In theory it might be possible to also have a version of this which runs the tests on the local or cloud backends
 export const layer = Effect.sync(
   () =>
-    new TestConvexServiceImpl(
+    new TestConfectImpl(
       convexTest(schema, import.meta.glob("./convex/**/!(*.*.*)*.*s")),
     ),
-).pipe(Layer.effect(TestConvexService));
+).pipe(Layer.effect(TestConfect));

@@ -3,13 +3,13 @@ import { assertEquals, assertFailure } from "@effect/vitest/utils";
 import { Cause, Effect, Runtime } from "effect";
 import { NoUserIdentityFoundError } from "../src/Auth";
 import { api } from "./confect/_generated/refs";
-import { effect } from "./test_utils";
-import { TestConvexService } from "./TestConvexService";
+import { TestConfect } from "./TestConfect";
+import { effect } from "./testUtils";
 
 describe("authentication", () => {
   effect("when user is authenticated", () =>
     Effect.gen(function* () {
-      const c = yield* TestConvexService;
+      const c = yield* TestConfect;
 
       const name = "Joe";
 
@@ -25,7 +25,7 @@ describe("authentication", () => {
 
   effect("when user is not authenticated", () =>
     Effect.gen(function* () {
-      const c = yield* TestConvexService;
+      const c = yield* TestConfect;
 
       const exit = yield* c
         .query(api.auth.getUserIdentity, {})

@@ -118,6 +118,7 @@ export const make = <
    * This is a Convex "function name" of the format "myGroupDir/myGroupMod:myFunc".
    */
   convexFunctionName: string,
+  // TODO: Pull out all of the fields from the function spec except the name (we don't need it because we already have the convex function name) and spread them here
   function_: FunctionSpec.FunctionSpec<
     FunctionType_,
     FunctionVisibility_,
@@ -131,6 +132,7 @@ export const make = <
     [HiddenConvexFunctionNameKey]: convexFunctionName,
   }) as Ref<FunctionType_, FunctionVisibility_, Args_, Returns_>;
 
+// TODO: Is this hidden stuff necessary/useful still?
 const HiddenFunctionKey = "@confect/core/api/HiddenFunctionKey";
 type HiddenFunctionKey = typeof HiddenFunctionKey;
 type HiddenFunction<Ref_ extends Any> = FunctionSpec.FunctionSpec<

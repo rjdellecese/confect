@@ -1,15 +1,14 @@
-import { describe, expect } from "@effect/vitest";
+import { expect, layer } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
 import { Effect, Option } from "effect";
 import { api } from "./confect/_generated/refs";
 import { DatabaseWriter } from "./confect/_generated/services";
-import { effect } from "./test_utils";
-import { TestConvexService } from "./TestConvexService";
+import * as TestConfect from "./TestConfect";
 
-describe("QueryCtx", () => {
-  effect("should get a note", () =>
+layer(TestConfect.layer)("QueryCtx", (it) => {
+  it.effect("should get a note", () =>
     Effect.gen(function* () {
-      const c = yield* TestConvexService;
+      const c = yield* TestConfect.TestConfect;
 
       const text = "Hello, world!";
 
@@ -32,30 +31,30 @@ describe("QueryCtx", () => {
   );
 });
 
-describe("MutationCtx", () => {
-  effect("should insert a note", () =>
+layer(TestConfect.layer)("MutationCtx", (it) => {
+  it.effect("should insert a note", () =>
     Effect.gen(function* () {
-      const c = yield* TestConvexService;
+      const c = yield* TestConfect.TestConfect;
 
       const text = "Hello, world!";
 
-      const noteId = yield* c.mutation(api.groups.notes.insert, {
+      yield* c.mutation(api.groups.notes.insert, {
         text,
       });
 
       const note = yield* c
         .query(api.groups.notes.getFirst, {})
-        .pipe(Effect.map(Option.map((note) => note.text)));
+        .pipe(Effect.map(Option.map((note_) => note_.text)));
 
       assertEquals(note, Option.some(text));
     }),
   );
 });
 
-describe("ActionCtx", () => {
-  effect("should insert a note", () =>
+layer(TestConfect.layer)("ActionCtx", (it) => {
+  it.effect("should insert a note", () =>
     Effect.gen(function* () {
-      const c = yield* TestConvexService;
+      const c = yield* TestConfect.TestConfect;
 
       const randomNumber = yield* c.action(api.groups.random.getNumber, {});
 

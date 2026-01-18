@@ -61,13 +61,21 @@
               "platform/database/system-tables"
             ]
           },
-          "platform/http",
+          "platform/http-api",
           "platform/storage",
           "platform/scheduling",
           "platform/authentication",
           "platform/search",
           "platform/components"
         ]
+      },
+      {
+        "group": "Clients",
+        "pages": ["clients/react", "clients/http"]
+      },
+      {
+        "group": "Guides",
+        "pages": ["guides/testing"]
       }
     ]
   },

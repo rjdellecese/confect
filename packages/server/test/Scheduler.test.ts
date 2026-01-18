@@ -2,13 +2,13 @@ import { describe, vi } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
 import { DateTime, Duration, Effect, Schema } from "effect";
 import { api } from "./convex/_generated/api";
-import { TestConvexService } from "./TestConvexService";
-import { effect } from "./test_utils";
+import { TestConfect } from "./TestConfect";
+import { effect } from "./testUtils";
 
 describe("ConfectScheduler", () => {
   effect("runAfter", () =>
     Effect.gen(function* () {
-      const c = yield* TestConvexService;
+      const c = yield* TestConfect;
       yield* Effect.sync(() => vi.useFakeTimers());
 
       const text = "Hello, world!";
@@ -42,7 +42,7 @@ describe("ConfectScheduler", () => {
 
   effect("runAt", () =>
     Effect.gen(function* () {
-      const c = yield* TestConvexService;
+      const c = yield* TestConfect;
       yield* Effect.sync(() => vi.useFakeTimers());
 
       const text = "Hello, world!";

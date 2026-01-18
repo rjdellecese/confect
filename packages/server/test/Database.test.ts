@@ -4,14 +4,14 @@ import { Cause, Effect, Exit, Option, Runtime, Schema, String } from "effect";
 import { DocumentDecodeError } from "../src/Document";
 import { GetByIdFailure, GetByIndexFailure } from "../src/QueryInitializer";
 import { api } from "./convex/_generated/api";
-import { effect } from "./test_utils";
-import { TestConvexService } from "./TestConvexService";
+import { TestConfect } from "./TestConfect";
+import { effect } from "./testUtils";
 
 describe("ConfectDatabaseReader", () => {
   describe("getById", () => {
     effect("when document exists", () =>
       Effect.gen(function* () {
-        const c = yield* TestConvexService;
+        const c = yield* TestConfect;
         yield* Effect.sync(() => vi.useFakeTimers());
 
         const text = "Hello, world!";
@@ -28,7 +28,7 @@ describe("ConfectDatabaseReader", () => {
 
     effect("when document no longer exists", () =>
       Effect.gen(function* () {
-        const c = yield* TestConvexService;
+        const c = yield* TestConfect;
 
         const noteId = yield* c.run(({ db }) =>
           db.insert("notes", { text: "Hello, world!" }),
@@ -60,7 +60,7 @@ describe("ConfectDatabaseReader", () => {
 
     effect("when document is invalid", () =>
       Effect.gen(function* () {
-        const c = yield* TestConvexService;
+        const c = yield* TestConfect;
 
         const invalidText = String.repeat(101)("a");
 
@@ -99,7 +99,7 @@ describe("ConfectDatabaseReader", () => {
   describe("getByIndex", () => {
     effect("when document exists", () =>
       Effect.gen(function* () {
-        const c = yield* TestConvexService;
+        const c = yield* TestConfect;
 
         const name = "John Doe";
         const role = "admin";
@@ -124,7 +124,7 @@ describe("ConfectDatabaseReader", () => {
 
     effect("when document no longer exists", () =>
       Effect.gen(function* () {
-        const c = yield* TestConvexService;
+        const c = yield* TestConfect;
 
         const name = "John Doe";
         const role = "admin";
@@ -164,7 +164,7 @@ describe("ConfectDatabaseReader", () => {
 
   effect("first", () =>
     Effect.gen(function* () {
-      const c = yield* TestConvexService;
+      const c = yield* TestConfect;
 
       const [noteId1, _noteId2] = yield* c.run(({ db }) =>
         Promise.all([
@@ -186,7 +186,7 @@ describe("ConfectDatabaseReader", () => {
 
   effect("take", () =>
     Effect.gen(function* () {
-      const c = yield* TestConvexService;
+      const c = yield* TestConfect;
 
       const [noteId1, noteId2] = yield* c.run(({ db }) =>
         Promise.all([
@@ -207,7 +207,7 @@ describe("ConfectDatabaseReader", () => {
 
   effect("collect", () =>
     Effect.gen(function* () {
-      const c = yield* TestConvexService;
+      const c = yield* TestConfect;
 
       const [noteId1, noteId2] = yield* c.run(({ db }) =>
         Promise.all([
@@ -226,7 +226,7 @@ describe("ConfectDatabaseReader", () => {
 
   effect("paginate", () =>
     Effect.gen(function* () {
-      const c = yield* TestConvexService;
+      const c = yield* TestConfect;
 
       const [noteId1, noteId2] = yield* c.run(({ db }) =>
         Promise.all([
@@ -248,7 +248,7 @@ describe("ConfectDatabaseReader", () => {
 
   effect("stream", () =>
     Effect.gen(function* () {
-      const c = yield* TestConvexService;
+      const c = yield* TestConfect;
 
       const [noteId1, noteId2] = yield* c.run(({ db }) =>
         Promise.all([
@@ -271,7 +271,7 @@ describe("ConfectDatabaseReader", () => {
   describe("withIndex", () => {
     effect("without query range without order", () =>
       Effect.gen(function* () {
-        const c = yield* TestConvexService;
+        const c = yield* TestConfect;
 
         const [noteId1, noteId2] = yield* c.run(({ db }) =>
           Promise.all([
@@ -293,7 +293,7 @@ describe("ConfectDatabaseReader", () => {
 
     effect("with query range without order", () =>
       Effect.gen(function* () {
-        const c = yield* TestConvexService;
+        const c = yield* TestConfect;
 
         const [_noteId1, noteId2, noteId3] = yield* c.run(({ db }) =>
           Promise.all([
@@ -318,7 +318,7 @@ describe("ConfectDatabaseReader", () => {
 
     effect("with query range and order", () =>
       Effect.gen(function* () {
-        const c = yield* TestConvexService;
+        const c = yield* TestConfect;
 
         const [_noteId1, noteId2, noteId3] = yield* c.run(({ db }) =>
           Promise.all([
@@ -343,7 +343,7 @@ describe("ConfectDatabaseReader", () => {
 
     effect("without query range with order", () =>
       Effect.gen(function* () {
-        const c = yield* TestConvexService;
+        const c = yield* TestConfect;
 
         const [_noteId1, noteId2, noteId3] = yield* c.run(({ db }) =>
           Promise.all([
@@ -365,7 +365,7 @@ describe("ConfectDatabaseReader", () => {
 
     effect("without query range without order", () =>
       Effect.gen(function* () {
-        const c = yield* TestConvexService;
+        const c = yield* TestConfect;
 
         const [noteId1, noteId2] = yield* c.run(({ db }) =>
           Promise.all([
@@ -387,7 +387,7 @@ describe("ConfectDatabaseReader", () => {
 
     effect("withSearchIndex", () =>
       Effect.gen(function* () {
-        const c = yield* TestConvexService;
+        const c = yield* TestConfect;
 
         const [_noteId1, noteId2] = yield* c.run(({ db }) =>
           Promise.all([
@@ -409,7 +409,7 @@ describe("ConfectDatabaseReader", () => {
     describe("system tables", () => {
       effect("get", () =>
         Effect.gen(function* () {
-          const c = yield* TestConvexService;
+          const c = yield* TestConfect;
 
           const storageId = yield* c.run(({ storage }) =>
             storage.store(new Blob(["Hello, world!"])),
@@ -425,7 +425,7 @@ describe("ConfectDatabaseReader", () => {
 
       effect("query", () =>
         Effect.gen(function* () {
-          const c = yield* TestConvexService;
+          const c = yield* TestConfect;
 
           const storageId = yield* c.run(({ storage }) =>
             storage.store(new Blob(["Hello, world!"])),
@@ -445,7 +445,7 @@ describe("ConfectDatabaseWriter", () => {
   describe("patch", () => {
     effect("when invalid", () =>
       Effect.gen(function* () {
-        const c = yield* TestConvexService;
+        const c = yield* TestConfect;
 
         const noteId = yield* c.run(({ db }) =>
           db.insert("notes", { text: "Hello, world!" }),
@@ -468,7 +468,7 @@ describe("ConfectDatabaseWriter", () => {
 
     effect("when valid", () =>
       Effect.gen(function* () {
-        const c = yield* TestConvexService;
+        const c = yield* TestConfect;
 
         const noteId = yield* c.run(({ db }) =>
           db.insert("notes", { text: "Hello, world!" }),
@@ -490,7 +490,7 @@ describe("ConfectDatabaseWriter", () => {
 
     effect("when document no longer exists", () =>
       Effect.gen(function* () {
-        const c = yield* TestConvexService;
+        const c = yield* TestConfect;
 
         const noteId = yield* c.run(({ db }) =>
           db.insert("notes", { text: "Hello, world!" }),
@@ -511,7 +511,7 @@ describe("ConfectDatabaseWriter", () => {
 
     effect("when unsetting a field", () =>
       Effect.gen(function* () {
-        const c = yield* TestConvexService;
+        const c = yield* TestConfect;
 
         const tag = "greeting";
 
@@ -537,7 +537,7 @@ describe("ConfectDatabaseWriter", () => {
 
   effect("replace", () =>
     Effect.gen(function* () {
-      const c = yield* TestConvexService;
+      const c = yield* TestConfect;
 
       const initialText = "Hello, Earth!";
       const updatedText = "Hello, Mars!";
@@ -563,7 +563,7 @@ describe("ConfectDatabaseWriter", () => {
   describe("delete", () => {
     effect("when document exists", () =>
       Effect.gen(function* () {
-        const c = yield* TestConvexService;
+        const c = yield* TestConfect;
 
         const noteId = yield* c.run(({ db }) =>
           db.insert("notes", { text: "Hello, world!" }),
@@ -581,7 +581,7 @@ describe("ConfectDatabaseWriter", () => {
 
     effect("when document no longer exists", () =>
       Effect.gen(function* () {
-        const c = yield* TestConvexService;
+        const c = yield* TestConfect;
 
         const noteId = yield* c.run(({ db }) =>
           db.insert("notes", { text: "Hello, world!" }),

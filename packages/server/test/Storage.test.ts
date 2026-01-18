@@ -5,16 +5,16 @@ import {
   assertInstanceOf,
 } from "@effect/vitest/utils";
 import { Cause, Effect, Runtime, Schema } from "effect";
-import { FileNotFoundError } from "../src/Storage";
+import { BlobNotFoundError } from "../src/Storage";
 import { api } from "./convex/_generated/api";
-import { effect } from "./test_utils";
-import { TestConvexService } from "./TestConvexService";
+import { TestConfect } from "./TestConfect";
+import { effect } from "./testUtils";
 
 describe("ConfectStorageReader", () => {
   describe("getUrl", () => {
     effect("when file exists", () =>
       Effect.gen(function* () {
-        const c = yield* TestConvexService;
+        const c = yield* TestConfect;
 
         const id = yield* c.run(({ storage }) => storage.store(new Blob()));
         const urlString = yield* c.action(
@@ -31,7 +31,7 @@ describe("ConfectStorageReader", () => {
 
     effect("when file no longer exists", () =>
       Effect.gen(function* () {
-        const c = yield* TestConvexService;
+        const c = yield* TestConfect;
 
         const id = yield* c.run(({ storage }) => storage.store(new Blob()));
         yield* c.run(({ storage }) => storage.delete(id));
@@ -45,7 +45,7 @@ describe("ConfectStorageReader", () => {
         assertFailure(
           exit,
           Cause.die(
-            Runtime.makeFiberFailure(Cause.fail(new FileNotFoundError({ id }))),
+            Runtime.makeFiberFailure(Cause.fail(new BlobNotFoundError({ id }))),
           ),
         );
       }),
@@ -56,7 +56,7 @@ describe("ConfectStorageReader", () => {
 describe("ConfectStorageWriter", () => {
   effect("generateUploadUrl", () =>
     Effect.gen(function* () {
-      const c = yield* TestConvexService;
+      const c = yield* TestConfect;
 
       const urlString = yield* c.action(
         api.storage.confectStorageWriterGenerateUploadUrl,
@@ -70,7 +70,7 @@ describe("ConfectStorageWriter", () => {
   describe("delete", () => {
     effect("when file exists", () =>
       Effect.gen(function* () {
-        const c = yield* TestConvexService;
+        const c = yield* TestConfect;
 
         const id = yield* c.run(({ storage }) => storage.store(new Blob()));
         yield* c.action(api.storage.confectStorageWriterDelete, {
@@ -85,7 +85,7 @@ describe("ConfectStorageWriter", () => {
 
     effect("when file no longer exists", () =>
       Effect.gen(function* () {
-        const c = yield* TestConvexService;
+        const c = yield* TestConfect;
 
         const id = yield* c.run(({ storage }) => storage.store(new Blob()));
         yield* c.run(({ storage }) => storage.delete(id));
@@ -99,7 +99,7 @@ describe("ConfectStorageWriter", () => {
         assertFailure(
           exit,
           Cause.die(
-            Runtime.makeFiberFailure(Cause.fail(new FileNotFoundError({ id }))),
+            Runtime.makeFiberFailure(Cause.fail(new BlobNotFoundError({ id }))),
           ),
         );
       }),
@@ -111,7 +111,7 @@ describe("ConfectStorageActionWriter", () => {
   describe("get", () => {
     effect("when file exists", () =>
       Effect.gen(function* () {
-        const c = yield* TestConvexService;
+        const c = yield* TestConfect;
 
         const blob = new Blob();
         const id = yield* c.run(({ storage }) => storage.store(blob));
@@ -129,7 +129,7 @@ describe("ConfectStorageActionWriter", () => {
 
     effect("when file no longer exists", () =>
       Effect.gen(function* () {
-        const c = yield* TestConvexService;
+        const c = yield* TestConfect;
 
         const blob = new Blob();
 
@@ -145,7 +145,7 @@ describe("ConfectStorageActionWriter", () => {
         assertFailure(
           exit,
           Cause.die(
-            Runtime.makeFiberFailure(Cause.fail(new FileNotFoundError({ id }))),
+            Runtime.makeFiberFailure(Cause.fail(new BlobNotFoundError({ id }))),
           ),
         );
       }),
@@ -154,7 +154,7 @@ describe("ConfectStorageActionWriter", () => {
 
   effect("store", () =>
     Effect.gen(function* () {
-      const c = yield* TestConvexService;
+      const c = yield* TestConfect;
 
       const text = "Hello, world!";
 

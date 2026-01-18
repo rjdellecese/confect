@@ -1,7 +1,7 @@
 import { Effect, Layer } from "effect";
 import { FunctionImpl, GroupImpl } from "../../../../src/index";
+import api from "../../_generated/api";
 import { DatabaseReader, DatabaseWriter } from "../../_generated/services";
-import { api } from "../../api";
 
 const insert = FunctionImpl.make(api, "groups.notes", "insert", ({ text }) =>
   Effect.gen(function* () {

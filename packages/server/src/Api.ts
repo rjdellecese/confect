@@ -1,7 +1,7 @@
+import type * as Spec from "@confect/core/Spec";
 import type { GenericSchema, SchemaDefinition } from "convex/server";
 import { defineSchema as defineConvexSchema } from "convex/server";
 import { pipe, Predicate, Record } from "effect";
-import type * as Spec from "@confect/core/Spec";
 import type * as DatabaseSchema from "./DatabaseSchema";
 
 export const TypeId = "@confect/server/Api";
@@ -23,11 +23,8 @@ export interface Any {
   readonly [TypeId]: TypeId;
 }
 
-export interface AnyWithProps extends Any {
-  readonly spec: Spec.AnyWithProps;
-  readonly databaseSchema: DatabaseSchema.AnyWithProps;
-  readonly convexSchemaDefinition: SchemaDefinition<GenericSchema, true>;
-}
+export interface AnyWithProps
+  extends Api<DatabaseSchema.AnyWithProps, Spec.AnyWithProps> {}
 
 export type Schema<Api_ extends AnyWithProps> = Api_["databaseSchema"];
 
