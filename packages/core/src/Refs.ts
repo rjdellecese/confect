@@ -42,9 +42,7 @@ type FilterRefs<Refs_, Predicate> = Types.Simplify<{
     ? K
     : Refs_[K] extends Ref.Any
       ? never
-      : FilterRefs<Refs_[K], Predicate> extends Record<string, never>
-        ? never
-        : K]: Refs_[K] extends Predicate
+      : K]: Refs_[K] extends Predicate
     ? Refs_[K]
     : FilterRefs<Refs_[K], Predicate>;
 }>;
