@@ -1,7 +1,6 @@
 /// <reference types="vite/client" />
 
 import { Ref } from "@confect/core";
-import { RegisteredFunctions } from "@confect/server";
 import {
   convexTest,
   type TestConvexForDataModel,
@@ -13,6 +12,7 @@ import type {
 } from "convex/server";
 import type { ParseResult } from "effect";
 import { Context, Effect, Layer, Schema } from "effect";
+import * as RegisteredFunctions from "../src/RegisteredFunctions";
 
 import confectSchema from "./confect/schema";
 import schema from "./convex/schema";
