@@ -86,7 +86,8 @@ export type TableSchemaToTableValidator<
     | VObject<any, any, any, any>
     | VUnion<any, any, any, any>
     ? Vd
-    : never;
+    : // TODO: Add type error message
+      never;
 
 export const compileTableSchema = <
   TableSchema extends Schema.Schema.AnyNoContext,
@@ -141,24 +142,24 @@ export type ValueToValidator<Vl> =
             ? VId<GenericId.GenericId<TableName>>
             : IsValueLiteral<Vl> extends true
               ? VLiteral<Vl>
-              : Vl extends null
+              : [Vl] extends [null]
                 ? VNull
-                : Vl extends number
-                  ? VFloat64
-                  : Vl extends bigint
-                    ? VInt64
-                    : Vl extends boolean
-                      ? VBoolean
-                      : Vl extends string
-                        ? VString
-                        : Vl extends ArrayBuffer
-                          ? VBytes
-                          : Vl extends ReadonlyArray<ReadonlyValue>
-                            ? ArrayValueToValidator<Vl>
-                            : Vl extends ReadonlyRecordValue
-                              ? RecordValueToValidator<Vl>
-                              : IsUnion<Vl> extends true
-                                ? UnionValueToValidator<Vl>
+                : [Vl] extends [boolean]
+                  ? VBoolean
+                  : IsUnion<Vl> extends true
+                    ? UnionValueToValidator<Vl>
+                    : [Vl] extends [number]
+                      ? VFloat64
+                      : [Vl] extends [bigint]
+                        ? VInt64
+                        : [Vl] extends [string]
+                          ? VString
+                          : [Vl] extends [ArrayBuffer]
+                            ? VBytes
+                            : Vl extends ReadonlyArray<ReadonlyValue>
+                              ? ArrayValueToValidator<Vl>
+                              : Vl extends ReadonlyRecordValue
+                                ? RecordValueToValidator<Vl>
                                 : TypeError<"Unexpected value", Vl>
           : TypeError<"Provided value is not a valid Convex value", Vl>;
 
@@ -200,7 +201,7 @@ export type UndefinedOrValueToValidator<Vl extends ReadonlyValue | undefined> =
         ? VOptional<Vd>
         : never
       : never
-    : Vl extends ReadonlyValue
+    : [Vl] extends [ReadonlyValue]
       ? ValueToValidator<Vl>
       : never;
 
@@ -243,6 +244,7 @@ type ValueTupleToValidatorTuple<VlTuple extends ReadonlyArray<ReadonlyValue>> =
 
 export const compileSchema = <T, E>(
   schema: Schema.Schema<T, E>,
+  // TODO: Can `ValueToValidator` here just accept `E` directly?
 ): ValueToValidator<(typeof schema)["Encoded"]> =>
   runSyncThrow(compileAst(schema.ast)) as any;
 

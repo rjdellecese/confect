@@ -27,6 +27,7 @@ export const isTable = (u: unknown): u is Any =>
 export interface Table<
   Name_ extends string,
   TableSchema_ extends Schema.Schema.AnyNoContext,
+  // TODO: Something is going wrong here
   TableValidator_ extends
     GenericValidator = TableSchemaToTableValidator<TableSchema_>,
   Indexes_ extends GenericTableIndexes = {},
@@ -349,19 +350,38 @@ const makeProto = <
 export const make = <
   const Name_ extends string,
   TableSchema_ extends Schema.Schema.AnyNoContext,
+  TableValidator_ extends
+    GenericValidator = TableSchemaToTableValidator<TableSchema_>,
+  Indexes_ extends GenericTableIndexes = {},
+  SearchIndexes_ extends GenericTableSearchIndexes = {},
+  VectorIndexes_ extends GenericTableVectorIndexes = {},
 >(
   name: Name_,
   fields: TableSchema_,
-): Table<Name_, TableSchema_> => {
-  const tableValidator = compileTableSchema(fields);
-  const tableDefinition = defineTable(tableValidator);
+): Table<
+  Name_,
+  TableSchema_,
+  TableValidator_,
+  Indexes_,
+  SearchIndexes_,
+  VectorIndexes_
+> => {
+  const tableValidator = compileTableSchema(fields) as any;
+  const tableDefinition = defineTable(tableValidator) as any;
 
-  return makeProto({
+  return makeProto<
+    Name_,
+    TableSchema_,
+    TableValidator_,
+    Indexes_,
+    SearchIndexes_,
+    VectorIndexes_
+  >({
     name,
     Fields: fields,
     Doc: SystemFields.extendWithSystemFields(name, fields),
     tableDefinition,
-    indexes: {},
+    indexes: {} as Indexes_,
   });
 };
 

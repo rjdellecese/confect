@@ -1,16 +1,6 @@
 /// <reference types="vite/client" />
 
 import { Ref } from "@confect/core";
-import type {
-  Auth,
-  DatabaseReader,
-  DatabaseWriter,
-  MutationCtx,
-  MutationRunner,
-  QueryRunner,
-  Scheduler,
-  Storage,
-} from "@confect/server";
 import { RegisteredFunctions } from "@confect/server";
 import {
   convexTest,
@@ -195,15 +185,7 @@ class TestConfectImpl implements TestConfect {
     effect: Effect.Effect<
       A,
       E,
-      | DatabaseReader.DatabaseReader<typeof confectSchema>
-      | DatabaseWriter.DatabaseWriter<typeof confectSchema>
-      | Auth.Auth
-      | Scheduler.Scheduler
-      | Storage.StorageReader
-      | Storage.StorageWriter
-      | QueryRunner.QueryRunner
-      | MutationRunner.MutationRunner
-      | MutationCtx.MutationCtx<DataModelFromSchemaDefinition<typeof schema>>
+      RegisteredFunctions.MutationServices<typeof confectSchema>
     >,
   ) => this.testConfectImplWithoutIdentity.run(effect);
 
