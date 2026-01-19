@@ -1,7 +1,7 @@
 {
-  "name": "@confect/server",
+  "name": "@confect/test",
   "version": "0.0.1",
-  "description": "Confect server",
+  "description": "Confect test utilities",
   "repository": {
     "type": "git",
     "url": "https://github.com/rjdellecese/confect.git"
@@ -12,9 +12,6 @@
   "homepage": "https://confect.rjdellecese.com",
   "sideEffects": false,
   "type": "module",
-  "bin": {
-    "confect": "./dist/cli/index.mjs"
-  },
   "files": [
     "CHANGELOG.md",
     "LICENSE",
@@ -37,7 +34,6 @@
   },
   "scripts": {
     "build": "tsdown",
-    "test": "vitest run",
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "fix": "prettier --write . && eslint --fix . --max-warnings=0",
     "lint": "prettier --check . && eslint . --max-warnings=0",
@@ -45,45 +41,29 @@
   },
   "keywords": [
     "effect",
-    "convex"
+    "convex",
+    "testing"
   ],
   "author": "RJ Dellecese",
   "license": "ISC",
   "dependencies": {
     "@confect/core": "workspace:*",
-    "@effect/cli": "^0.72.1",
-    "code-block-writer": "^13.0.3",
-    "tsx": "^4.19.2"
+    "@confect/server": "workspace:*"
   },
   "devDependencies": {
-    "@confect/test": "workspace:*",
-    "@effect/cluster": "0.52.9",
-    "@effect/experimental": "0.57.1",
     "@effect/language-service": "0.56.0",
-    "@effect/platform-node": "0.100.0",
-    "@effect/rpc": "0.72.1",
-    "@effect/sql": "0.48.0",
-    "@effect/vitest": "0.27.0",
-    "@effect/workflow": "^0.12.5",
     "@eslint/js": "9.39.1",
-    "@swc/jest": "0.2.39",
     "@tsconfig/strictest": "2.0.8",
     "@types/node": "24.10.1",
-    "@vitest/coverage-v8": "3.2.4",
-    "convex-test": "0.0.38",
-    "dotenv": "17.2.3",
     "eslint": "9.39.1",
     "prettier": "3.6.2",
     "tsdown": "0.16.4",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.46.4",
-    "vite": "7.2.2",
-    "vite-tsconfig-paths": "5.1.4",
-    "vitest": "3.2.4"
+    "typescript-eslint": "8.46.4"
   },
   "peerDependencies": {
-    "@effect/platform": "^0.93.2",
     "convex": "^1.30.0",
+    "convex-test": "^0.0.38",
     "effect": "^3.19.3"
   },
   "engines": {

@@ -6,3 +6,4 @@ overrides:
   "@confect/core": link:packages/core
   "@confect/server": link:packages/server
   "@confect/react": link:packages/react
+  "@confect/test": link:packages/test
