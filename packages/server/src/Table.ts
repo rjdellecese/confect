@@ -27,7 +27,6 @@ export const isTable = (u: unknown): u is Any =>
 export interface Table<
   Name_ extends string,
   TableSchema_ extends Schema.Schema.AnyNoContext,
-  // TODO: Something is going wrong here
   TableValidator_ extends
     GenericValidator = TableSchemaToTableValidator<TableSchema_>,
   Indexes_ extends GenericTableIndexes = {},
