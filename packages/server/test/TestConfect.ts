@@ -8,8 +8,6 @@ import schema from "./convex/schema";
 
 export const TestConfect = TestConfect_.TestConfect<typeof confectSchema>();
 
-export type TestConfect = TestConfect_.TestConfect<typeof confectSchema>;
-
 export const convexTest = convexTest_(
   schema,
   import.meta.glob("./convex/**/!(*.*.*)*.*s"),

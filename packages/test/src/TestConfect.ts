@@ -5,7 +5,8 @@ import type {
   TestConvexForDataModel,
   TestConvexForDataModelAndIdentity,
 } from "convex-test";
-import type { UserIdentity } from "convex/server";
+import type { GenericMutationCtx, UserIdentity } from "convex/server";
+import type { Value } from "convex/values";
 import type { ParseResult } from "effect";
 import { Context, Effect, Layer, Schema } from "effect";
 
@@ -24,13 +25,23 @@ export type TestConfectWithoutIdentity<
     actionRef: ActionRef,
     args: Ref.Args<ActionRef>["Type"],
   ) => Effect.Effect<Ref.Returns<ActionRef>["Type"], ParseResult.ParseError>;
-  run: <A, E>(
-    effect: Effect.Effect<
-      A,
-      E,
-      RegisteredFunctions.MutationServices<ConfectSchema>
-    >,
-  ) => Effect.Effect<A, E>;
+  run: {
+    <E>(
+      handler: Effect.Effect<
+        void,
+        E,
+        RegisteredFunctions.MutationServices<ConfectSchema>
+      >,
+    ): Effect.Effect<void>;
+    <A, B extends Value, E>(
+      handler: Effect.Effect<
+        A,
+        E,
+        RegisteredFunctions.MutationServices<ConfectSchema>
+      >,
+      returns: Schema.Schema<A, B>,
+    ): Effect.Effect<A, ParseResult.ParseError>;
+  };
   fetch: (
     pathQueryFragment: string,
     init?: RequestInit,
@@ -114,27 +125,50 @@ class TestConfectImplWithoutIdentity<
       return yield* Schema.decode(action.returns)(encodedReturns);
     });
 
-  readonly run = <A, E>(
-    effect: Effect.Effect<
+  readonly run: TestConfectWithoutIdentity<ConfectSchema>["run"] = (<
+    A,
+    B extends Value,
+    E,
+  >(
+    handler: Effect.Effect<
       A,
       E,
       RegisteredFunctions.MutationServices<ConfectSchema>
     >,
-  ): Effect.Effect<A, E> =>
-    Effect.async<A, E>((resume) => {
-      void this.testConvex.run(async (mutationCtx) => {
-        resume(
-          effect.pipe(
-            Effect.provide(
-              RegisteredFunctions.mutationLayer(
-                this.confectSchema,
-                mutationCtx,
+    returns?: Schema.Schema<A, B>,
+  ): Effect.Effect<void> | Effect.Effect<A, ParseResult.ParseError> => {
+    const makeMutationLayer = (
+      mutationCtx: GenericMutationCtx<
+        DataModel.ToConvex<DataModel.FromSchema<ConfectSchema>>
+      >,
+    ): Layer.Layer<RegisteredFunctions.MutationServices<ConfectSchema>> =>
+      RegisteredFunctions.mutationLayer(
+        this.confectSchema,
+        mutationCtx,
+      ) as Layer.Layer<RegisteredFunctions.MutationServices<ConfectSchema>>;
+
+    return returns === undefined
+      ? Effect.promise(() =>
+          this.testConvex.run((mutationCtx) =>
+            Effect.runPromise(
+              handler.pipe(
+                Effect.asVoid,
+                Effect.provide(makeMutationLayer(mutationCtx)),
               ),
             ),
           ),
-        );
-      });
-    });
+        )
+      : Effect.promise(() =>
+          this.testConvex.run((mutationCtx) =>
+            Effect.runPromise(
+              handler.pipe(
+                Effect.andThen(Schema.encode(returns)),
+                Effect.provide(makeMutationLayer(mutationCtx)),
+              ),
+            ),
+          ),
+        ).pipe(Effect.andThen(Schema.decode(returns)));
+  }) as TestConfectWithoutIdentity<ConfectSchema>["run"];
 
   readonly fetch = <PathQueryFragment extends string>(
     pathQueryFragment: PathQueryFragment,
@@ -189,13 +223,14 @@ class TestConfectImpl<ConfectSchema extends DatabaseSchema.AnyWithProps>
     args: Ref.Args<ActionRef>["Type"],
   ) => this.testConfectImplWithoutIdentity.action(actionRef, args);
 
-  readonly run = <A, E>(
-    effect: Effect.Effect<
-      A,
-      E,
-      RegisteredFunctions.MutationServices<ConfectSchema>
-    >,
-  ) => this.testConfectImplWithoutIdentity.run(effect);
+  readonly run: TestConfect<ConfectSchema>["run"] = ((
+    handler: any,
+    returns?: any,
+  ) =>
+    this.testConfectImplWithoutIdentity.run(
+      handler,
+      returns,
+    )) as TestConfect<ConfectSchema>["run"];
 
   readonly fetch = <PathQueryFragment extends string>(
     pathQueryFragment: PathQueryFragment,

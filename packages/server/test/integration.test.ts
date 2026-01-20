@@ -16,7 +16,7 @@ layer(TestConfect.layer)("reading from the database", (it) => {
         Effect.gen(function* () {
           const writer = yield* DatabaseWriter;
 
-          return yield* writer.insert("notes", {
+          yield* writer.insert("notes", {
             text,
           });
         }),

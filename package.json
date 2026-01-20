@@ -14,6 +14,7 @@
     "typecheck:core": "pnpm --filter @confect/core typecheck",
     "typecheck:server": "pnpm --filter @confect/server typecheck",
     "typecheck:react": "pnpm --filter @confect/react typecheck",
+    "typecheck:test": "pnpm --filter @confect/test typecheck",
     "typecheck:docs": "pnpm --filter docs typecheck",
     "typecheck:example": "pnpm --filter example typecheck",
     "lint": "pnpm -r lint",

@@ -38,5 +38,3 @@ export const setup = () =>
       yield* runCommand("pnpm", ["convex", "dev", "--local", "--once"]);
     }).pipe(Effect.ensuring(Effect.sync(() => process.chdir(originalCwd))));
   }).pipe(Effect.provide(NodeContext.layer), Effect.runPromise);
-
-export function teardown() {}

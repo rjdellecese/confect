@@ -9,7 +9,6 @@ const setup = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
 
-  // Use import.meta.dirname for reliable path resolution regardless of cwd
   const testDir = import.meta.dirname;
   const serverPackageDirectory = path.join(testDir, "..", "..");
   const corePackageDirectory = path.join(serverPackageDirectory, "..", "core");
@@ -41,7 +40,6 @@ const setup = Effect.gen(function* () {
     });
   }
 
-  // Link @confect/core
   expect(
     yield* Command.make(
       "pnpm",
@@ -56,7 +54,6 @@ const setup = Effect.gen(function* () {
     ),
   ).toStrictEqual(0);
 
-  // Link @confect/server
   expect(
     yield* Command.make(
       "pnpm",
