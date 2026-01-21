@@ -5,6 +5,7 @@ import type {
   TestConvexForDataModel,
   TestConvexForDataModelAndIdentity,
 } from "convex-test";
+import { convexTest } from "convex-test";
 import type { GenericMutationCtx, UserIdentity } from "convex/server";
 import type { Value } from "convex/values";
 import type { ParseResult } from "effect";
@@ -25,6 +26,7 @@ export type TestConfectWithoutIdentity<
     actionRef: ActionRef,
     args: Ref.Args<ActionRef>["Type"],
   ) => Effect.Effect<Ref.Returns<ActionRef>["Type"], ParseResult.ParseError>;
+  // TODO: Make this API better
   run: {
     <E>(
       handler: Effect.Effect<
@@ -246,12 +248,22 @@ class TestConfectImpl<ConfectSchema extends DatabaseSchema.AnyWithProps>
     );
 }
 
-export const layer = <ConfectSchema extends DatabaseSchema.AnyWithProps>(
-  confectSchema: ConfectSchema,
-  testConvex: TestConvexForDataModelAndIdentity<
-    DataModel.ToConvex<DataModel.FromSchema<ConfectSchema>>
-  >,
-): Layer.Layer<TestConfect<ConfectSchema>> =>
-  Effect.sync(() => new TestConfectImpl(confectSchema, testConvex)).pipe(
-    Layer.effect(TestConfect<ConfectSchema>()),
-  );
+export const layer =
+  <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
+    databaseSchema: DatabaseSchema_,
+    modules: Record<string, () => Promise<any>>,
+  ) =>
+  (): Layer.Layer<TestConfect<DatabaseSchema_>> =>
+    Layer.sync(
+      TestConfect<DatabaseSchema_>(),
+      () =>
+        new TestConfectImpl(
+          databaseSchema,
+          convexTest(
+            databaseSchema.convexSchemaDefinition,
+            modules,
+          ) as unknown as TestConvexForDataModelAndIdentity<
+            DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+          >,
+        ),
+    );

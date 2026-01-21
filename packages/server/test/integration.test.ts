@@ -1,64 +1,58 @@
-import { expect, layer } from "@effect/vitest";
+import { GenericId } from "@confect/core";
+import { describe, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
-import { Effect, Option } from "effect";
+import { Array, Effect } from "effect";
 import { api } from "./confect/_generated/refs";
 import { DatabaseWriter } from "./confect/_generated/services";
 import * as TestConfect from "./TestConfect";
 
-layer(TestConfect.layer)("reading from the database", (it) => {
-  it.effect("should get a note", () =>
+describe("DatabaseReader", () => {
+  it.effect("get", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
       const text = "Hello, world!";
+
+      const noteId = yield* c.run(
+        Effect.gen(function* () {
+          const writer = yield* DatabaseWriter;
+
+          return yield* writer.insert("notes", {
+            text,
+          });
+        }),
+        GenericId.GenericId("notes"),
+      );
+
+      const retrievedText = yield* c
+        .query(api.databaseReader.getNote, { noteId: noteId })
+        .pipe(Effect.map((note) => note.text));
+
+      assertEquals(retrievedText, text);
+    }).pipe(Effect.provide(TestConfect.layer())),
+  );
+
+  it.effect("collect", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
 
       yield* c.run(
         Effect.gen(function* () {
           const writer = yield* DatabaseWriter;
 
-          yield* writer.insert("notes", {
-            text,
-          });
+          yield* Effect.forEach(Array.range(1, 10), (i) =>
+            writer.insert("notes", {
+              text: `${i}`,
+            }),
+          );
         }),
       );
 
-      const retrievedText = yield* c
-        .query(api.groups.notes.getFirst, {})
-        .pipe(Effect.map(Option.map((note) => note.text)));
+      const notes = yield* c.query(api.databaseReader.listNotes, {});
 
-      assertEquals(retrievedText, Option.some(text));
-    }),
-  );
-});
-
-layer(TestConfect.layer)("MutationCtx", (it) => {
-  it.effect("should insert a note", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConfect.TestConfect;
-
-      const text = "Hello, world!";
-
-      yield* c.mutation(api.groups.notes.insert, {
-        text,
-      });
-
-      const note = yield* c
-        .query(api.groups.notes.getFirst, {})
-        .pipe(Effect.map(Option.map((note_) => note_.text)));
-
-      assertEquals(note, Option.some(text));
-    }),
-  );
-});
-
-layer(TestConfect.layer)("ActionCtx", (it) => {
-  it.effect("should insert a note", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConfect.TestConfect;
-
-      const randomNumber = yield* c.action(api.groups.random.getNumber, {});
-
-      expect(typeof randomNumber).toBe("number");
-    }),
+      assertEquals(notes.length, 10);
+      assertEquals(notes[0]?.text, "10");
+      assertEquals(notes[9]?.text, "1");
+    }).pipe(Effect.provide(TestConfect.layer())),
   );
 });

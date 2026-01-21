@@ -46,12 +46,7 @@ const setup = Effect.gen(function* () {
       "link",
       "--config.confirmModulesPurge=false",
       corePackageDirectory,
-    ).pipe(
-      Command.workingDirectory(tempDirectory),
-      Command.stdout("inherit"),
-      Command.stderr("inherit"),
-      Command.exitCode,
-    ),
+    ).pipe(Command.workingDirectory(tempDirectory), Command.exitCode),
   ).toStrictEqual(0);
 
   expect(
@@ -60,12 +55,7 @@ const setup = Effect.gen(function* () {
       "link",
       "--config.confirmModulesPurge=false",
       serverPackageDirectory,
-    ).pipe(
-      Command.workingDirectory(tempDirectory),
-      Command.stdout("inherit"),
-      Command.stderr("inherit"),
-      Command.exitCode,
-    ),
+    ).pipe(Command.workingDirectory(tempDirectory), Command.exitCode),
   ).toStrictEqual(0);
 
   return { tempDirectory };

@@ -24,5 +24,3 @@
   "exclude": ["coverage", "dist", "node_modules"],
   "extends": ["@tsconfig/strictest/tsconfig"]
 }
-
-
