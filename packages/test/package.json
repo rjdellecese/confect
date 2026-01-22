@@ -46,10 +46,6 @@
   ],
   "author": "RJ Dellecese",
   "license": "ISC",
-  "dependencies": {
-    "@confect/core": "workspace:*",
-    "@confect/server": "workspace:*"
-  },
   "devDependencies": {
     "@effect/language-service": "0.56.0",
     "@eslint/js": "9.39.1",
@@ -62,6 +58,8 @@
     "typescript-eslint": "8.46.4"
   },
   "peerDependencies": {
+    "@confect/core": "workspace:*",
+    "@confect/server": "workspace:*",
     "convex": "^1.30.0",
     "convex-test": "^0.0.38",
     "effect": "^3.19.3"

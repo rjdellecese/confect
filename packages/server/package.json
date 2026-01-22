@@ -50,7 +50,6 @@
   "author": "RJ Dellecese",
   "license": "ISC",
   "dependencies": {
-    "@confect/core": "workspace:*",
     "@effect/cli": "^0.72.1",
     "code-block-writer": "^13.0.3",
     "tsx": "^4.19.2"
@@ -82,6 +81,7 @@
     "vitest": "3.2.4"
   },
   "peerDependencies": {
+    "@confect/core": "workspace:*",
     "@effect/platform": "^0.93.2",
     "convex": "^1.30.0",
     "effect": "^3.19.3"
