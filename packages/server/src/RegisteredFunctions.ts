@@ -17,6 +17,9 @@ import {
   type RegisteredMutation,
   type RegisteredQuery,
 } from "convex/server";
+import type {
+  Record
+} from "effect";
 import {
   Effect,
   Layer,
@@ -36,7 +39,7 @@ import type * as DatabaseSchema from "./DatabaseSchema";
 import * as DatabaseWriter from "./DatabaseWriter";
 import type * as DataModel from "./DataModel";
 import * as Impl from "./Impl";
-import { mapLeaves } from "./internal/utils";
+import { forEachBranchLeaves, mapLeaves } from "./internal/utils";
 import * as MutationCtx from "./MutationCtx";
 import * as MutationRunner from "./MutationRunner";
 import * as QueryCtx from "./QueryCtx";
@@ -70,6 +73,21 @@ const isRegisteredAction = (
 
 export const isRegisteredFunction = (u: unknown): u is RegisteredFunction =>
   isRegisteredQuery(u) || isRegisteredMutation(u) || isRegisteredAction(u);
+
+export const reflect = <A, E, R>(
+  self: AnyWithProps,
+  options: {
+    readonly onModule: (options: {
+      readonly path: readonly string[];
+      readonly functions: Record.ReadonlyRecord<string, RegisteredFunction>;
+    }) => Effect.Effect<A, E, R>;
+  },
+): Effect.Effect<void, E, R> =>
+  forEachBranchLeaves<RegisteredFunction, A, E, R>(
+    self,
+    isRegisteredFunction,
+    ({ path, values }) => options.onModule({ path, functions: values }),
+  );
 
 export type RegisteredFunctions<Spec_ extends Spec.AnyWithProps> =
   Types.Simplify<RegisteredFunctionsHelper<Spec.Groups<Spec_>>>;

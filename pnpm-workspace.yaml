@@ -3,6 +3,7 @@ packages:
   - apps/*
 
 overrides:
+  "@confect/cli": link:packages/cli
   "@confect/core": link:packages/core
   "@confect/server": link:packages/server
   "@confect/react": link:packages/react

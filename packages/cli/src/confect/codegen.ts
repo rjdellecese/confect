@@ -1,10 +1,8 @@
 import { Command } from "@effect/cli";
 import { FileSystem, Path } from "@effect/platform";
+import { DatabaseSchema, RegisteredFunctions } from "@confect/server";
 import { Array, Effect, Option, Record, Schema, String } from "effect";
 import * as tsx from "tsx/esm/api";
-import * as DatabaseSchema from "../../DatabaseSchema";
-import { forEachBranchLeaves } from "../../internal/utils";
-import * as RegisteredFunctions from "../../RegisteredFunctions";
 import * as templates from "../templates";
 
 export const codegen = Command.make("codegen", {}, () =>
@@ -113,27 +111,20 @@ const generateFunctions = ({
       ),
     );
 
-    yield* forEachBranchLeaves<
-      RegisteredFunctions.RegisteredFunction,
-      void,
-      Error,
-      FileSystem.FileSystem | Path.Path
-    >(
-      registeredFunctions,
-      RegisteredFunctions.isRegisteredFunction,
-      (registeredFunction) =>
+    yield* RegisteredFunctions.reflect(registeredFunctions, {
+      onModule: ({ path: modulePath, functions }) =>
         Effect.gen(function* () {
-          const mod = Array.last(registeredFunction.path).pipe(
+          const mod = Array.last(modulePath).pipe(
             Option.getOrThrowWith(
               () => new Error("Missing module name in function path"),
             ),
           );
-          const dirs = Array.init(registeredFunction.path).pipe(
+          const dirs = Array.init(modulePath).pipe(
             Option.getOrThrowWith(
               () => new Error("Missing directory names in function path"),
             ),
           );
-          const fns = Record.keys(registeredFunction.values);
+          const fns = Record.keys(functions);
 
           yield* generateFunctionModule({
             confectDirectory,
@@ -143,7 +134,7 @@ const generateFunctions = ({
             fns,
           });
         }),
-    );
+    });
   });
 
 const generateSchema = ({

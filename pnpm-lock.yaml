@@ -5,6 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
+  '@confect/cli': link:packages/cli
   '@confect/core': link:packages/core
   '@confect/server': link:packages/server
   '@confect/react': link:packages/react
@@ -143,6 +144,73 @@ importers:
         specifier: 8.46.4
         version: 8.46.4(eslint@9.39.1(jiti@2.5.1))(typescript@5.9.3)
 
+  packages/cli:
+    dependencies:
+      '@confect/server':
+        specifier: link:../server
+        version: link:../server
+      '@effect/cli':
+        specifier: ^0.72.1
+        version: 0.72.1(@effect/platform@0.93.2(effect@3.19.3))(@effect/printer-ansi@0.47.0(@effect/typeclass@0.38.0(effect@3.19.3))(effect@3.19.3))(@effect/printer@0.47.0(@effect/typeclass@0.38.0(effect@3.19.3))(effect@3.19.3))(effect@3.19.3)
+      '@effect/platform':
+        specifier: ^0.93.2
+        version: 0.93.2(effect@3.19.3)
+      code-block-writer:
+        specifier: ^13.0.3
+        version: 13.0.3
+      effect:
+        specifier: ^3.19.3
+        version: 3.19.3
+      tsx:
+        specifier: ^4.19.2
+        version: 4.20.6
+    devDependencies:
+      '@effect/language-service':
+        specifier: 0.56.0
+        version: 0.56.0
+      '@effect/platform-node':
+        specifier: 0.100.0
+        version: 0.100.0(@effect/cluster@0.52.9(@effect/platform@0.93.2(effect@3.19.3))(@effect/rpc@0.72.1(@effect/platform@0.93.2(effect@3.19.3))(effect@3.19.3))(@effect/sql@0.48.0(@effect/experimental@0.57.1(@effect/platform@0.93.2(effect@3.19.3))(effect@3.19.3))(@effect/platform@0.93.2(effect@3.19.3))(effect@3.19.3))(@effect/workflow@0.12.5(@effect/experimental@0.57.1(@effect/platform@0.93.2(effect@3.19.3))(effect@3.19.3))(@effect/platform@0.93.2(effect@3.19.3))(@effect/rpc@0.72.1(@effect/platform@0.93.2(effect@3.19.3))(effect@3.19.3))(effect@3.19.3))(effect@3.19.3))(@effect/platform@0.93.2(effect@3.19.3))(@effect/rpc@0.72.1(@effect/platform@0.93.2(effect@3.19.3))(effect@3.19.3))(@effect/sql@0.48.0(@effect/experimental@0.57.1(@effect/platform@0.93.2(effect@3.19.3))(effect@3.19.3))(@effect/platform@0.93.2(effect@3.19.3))(effect@3.19.3))(effect@3.19.3)
+      '@effect/vitest':
+        specifier: 0.27.0
+        version: 0.27.0(effect@3.19.3)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@24.10.1)(jiti@2.5.1)(tsx@4.20.6)(yaml@2.6.0))
+      '@eslint/js':
+        specifier: 9.39.1
+        version: 9.39.1
+      '@tsconfig/strictest':
+        specifier: 2.0.8
+        version: 2.0.8
+      '@types/node':
+        specifier: 24.10.1
+        version: 24.10.1
+      '@vitest/coverage-v8':
+        specifier: 3.2.4
+        version: 3.2.4(vitest@3.2.4(@types/debug@4.1.12)(@types/node@24.10.1)(jiti@2.5.1)(tsx@4.20.6)(yaml@2.6.0))
+      eslint:
+        specifier: 9.39.1
+        version: 9.39.1(jiti@2.5.1)
+      prettier:
+        specifier: 3.6.2
+        version: 3.6.2
+      tsdown:
+        specifier: 0.16.4
+        version: 0.16.4(@arethetypeswrong/core@0.18.2)(ms@2.1.3)(synckit@0.11.11)(typescript@5.9.3)
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      typescript-eslint:
+        specifier: 8.46.4
+        version: 8.46.4(eslint@9.39.1(jiti@2.5.1))(typescript@5.9.3)
+      vite:
+        specifier: 7.2.2
+        version: 7.2.2(@types/node@24.10.1)(jiti@2.5.1)(tsx@4.20.6)(yaml@2.6.0)
+      vite-tsconfig-paths:
+        specifier: 5.1.4
+        version: 5.1.4(typescript@5.9.3)(vite@7.2.2(@types/node@24.10.1)(jiti@2.5.1)(tsx@4.20.6)(yaml@2.6.0))
+      vitest:
+        specifier: 3.2.4
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@24.10.1)(jiti@2.5.1)(tsx@4.20.6)(yaml@2.6.0)
+
   packages/core:
     dependencies:
       convex:
@@ -228,25 +296,19 @@ importers:
       '@confect/core':
         specifier: link:../core
         version: link:../core
-      '@effect/cli':
-        specifier: ^0.72.1
-        version: 0.72.1(@effect/platform@0.93.2(effect@3.19.3))(@effect/printer-ansi@0.47.0(@effect/typeclass@0.38.0(effect@3.19.3))(effect@3.19.3))(@effect/printer@0.47.0(@effect/typeclass@0.38.0(effect@3.19.3))(effect@3.19.3))(effect@3.19.3)
       '@effect/platform':
         specifier: ^0.93.2
         version: 0.93.2(effect@3.19.3)
-      code-block-writer:
-        specifier: ^13.0.3
-        version: 13.0.3
       convex:
         specifier: ^1.30.0
         version: 1.31.2(react@19.2.3)
       effect:
         specifier: ^3.19.3
         version: 3.19.3
-      tsx:
-        specifier: ^4.19.2
-        version: 4.20.6
     devDependencies:
+      '@confect/cli':
+        specifier: link:../cli
+        version: link:../cli
       '@confect/test':
         specifier: link:../test
         version: link:../test
@@ -8554,10 +8616,10 @@ snapshots:
       '@types/node': 24.10.1
     optional: true
 
-  '@typescript-eslint/eslint-plugin@8.46.4(@typescript-eslint/parser@8.46.4(eslint@9.39.2(jiti@2.5.1))(typescript@5.9.3))(eslint@9.39.1(jiti@2.5.1))(typescript@5.9.3)':
+  '@typescript-eslint/eslint-plugin@8.46.4(@typescript-eslint/parser@8.46.4(eslint@9.39.1(jiti@2.5.1))(typescript@5.9.3))(eslint@9.39.1(jiti@2.5.1))(typescript@5.9.3)':
     dependencies:
       '@eslint-community/regexpp': 4.12.1
-      '@typescript-eslint/parser': 8.46.4(eslint@9.39.2(jiti@2.5.1))(typescript@5.9.3)
+      '@typescript-eslint/parser': 8.46.4(eslint@9.39.1(jiti@2.5.1))(typescript@5.9.3)
       '@typescript-eslint/scope-manager': 8.46.4
       '@typescript-eslint/type-utils': 8.46.4(eslint@9.39.1(jiti@2.5.1))(typescript@5.9.3)
       '@typescript-eslint/utils': 8.46.4(eslint@9.39.1(jiti@2.5.1))(typescript@5.9.3)
@@ -13041,7 +13103,7 @@ snapshots:
 
   typescript-eslint@8.46.4(eslint@9.39.1(jiti@2.5.1))(typescript@5.9.3):
     dependencies:
-      '@typescript-eslint/eslint-plugin': 8.46.4(@typescript-eslint/parser@8.46.4(eslint@9.39.2(jiti@2.5.1))(typescript@5.9.3))(eslint@9.39.1(jiti@2.5.1))(typescript@5.9.3)
+      '@typescript-eslint/eslint-plugin': 8.46.4(@typescript-eslint/parser@8.46.4(eslint@9.39.1(jiti@2.5.1))(typescript@5.9.3))(eslint@9.39.1(jiti@2.5.1))(typescript@5.9.3)
       '@typescript-eslint/parser': 8.46.4(eslint@9.39.1(jiti@2.5.1))(typescript@5.9.3)
       '@typescript-eslint/typescript-estree': 8.46.4(typescript@5.9.3)
       '@typescript-eslint/utils': 8.46.4(eslint@9.39.1(jiti@2.5.1))(typescript@5.9.3)

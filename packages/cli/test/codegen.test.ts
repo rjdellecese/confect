@@ -3,15 +3,16 @@ import { expect, layer, vi } from "@effect/vitest";
 import { Effect, Exit } from "effect";
 
 import { NodeContext } from "@effect/platform-node";
-import { cliApp } from "../../src/cli/cliApp";
+import { cliApp } from "../src/cliApp";
 
 const setup = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
 
   const testDir = import.meta.dirname;
-  const serverPackageDirectory = path.join(testDir, "..", "..");
-  const corePackageDirectory = path.join(serverPackageDirectory, "..", "core");
+  const cliPackageDirectory = path.join(testDir, "..");
+  const serverPackageDirectory = path.join(cliPackageDirectory, "..", "server");
+  const corePackageDirectory = path.join(cliPackageDirectory, "..", "core");
   const fixturesDirectory = path.join(testDir, "fixtures");
   const tempDirectory = yield* fs.makeTempDirectory();
 
