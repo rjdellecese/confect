@@ -53,6 +53,39 @@ export const http = ({ httpImportPath }: { httpImportPath: string }) =>
     return yield* cbw.toString();
   });
 
+export const convexConfig = ({ appImportPath }: { appImportPath: string }) =>
+  Effect.gen(function* () {
+    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+
+    yield* cbw.writeLine(`import app from "${appImportPath}";`);
+    yield* cbw.newLine();
+    yield* cbw.writeLine(`export default app;`);
+
+    return yield* cbw.toString();
+  });
+
+export const crons = ({ cronsImportPath }: { cronsImportPath: string }) =>
+  Effect.gen(function* () {
+    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+
+    yield* cbw.writeLine(`import crons from "${cronsImportPath}";`);
+    yield* cbw.newLine();
+    yield* cbw.writeLine(`export default crons;`);
+
+    return yield* cbw.toString();
+  });
+
+export const authConfig = ({ authImportPath }: { authImportPath: string }) =>
+  Effect.gen(function* () {
+    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+
+    yield* cbw.writeLine(`import auth from "${authImportPath}";`);
+    yield* cbw.newLine();
+    yield* cbw.writeLine(`export default auth;`);
+
+    return yield* cbw.toString();
+  });
+
 export const refs = ({ specImportPath }: { specImportPath: string }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
