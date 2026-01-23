@@ -30,11 +30,6 @@ const setup = Effect.gen(function* () {
       recursive: true,
     });
   }
-  if (!(yield* fs.exists(path.join(tempDirectory, "convex")))) {
-    yield* fs.remove(path.join(tempDirectory, "convex"), {
-      recursive: true,
-    });
-  }
   if (!(yield* fs.exists(path.join(tempDirectory, "confect", "_generated")))) {
     yield* fs.remove(path.join(tempDirectory, "confect", "_generated"), {
       recursive: true,

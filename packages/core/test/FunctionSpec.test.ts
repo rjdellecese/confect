@@ -23,7 +23,7 @@ describe("make", () => {
         returns: Schema.String,
       }),
     ).toThrowErrorMatchingInlineSnapshot(
-      `[Error: Expected a valid JavaScript identifier, but received: "123". Valid identifiers must start with a letter, underscore, or dollar sign, and can only contain letters, numbers, underscores, or dollar signs.]`,
+      `[Error: Expected a valid Confect function identifier, but received: "123". Valid identifiers must start with a letter, underscore, or dollar sign, and can only contain letters, numbers, underscores, or dollar signs.]`,
     );
   });
 
@@ -35,7 +35,17 @@ describe("make", () => {
         returns: Schema.String,
       }),
     ).toThrowErrorMatchingInlineSnapshot(
-      `[Error: Expected a valid JavaScript identifier, but received: "if". "if" is a reserved keyword.]`,
+      `[Error: Expected a valid Confect function identifier, but received: "if". "if" is a reserved JavaScript identifier.]`,
     );
+  });
+
+  it("disallows reserved Convex file names as function names", () => {
+    expect(() =>
+      FunctionSpec.query({
+        name: "schema",
+        args: Schema.Struct({}),
+        returns: Schema.String,
+      }),
+    ).toThrowErrorMatchingInlineSnapshot(`[Error: Expected a valid Confect function identifier, but received: "schema". "schema" is a reserved Convex file name.]`);
   });
 });

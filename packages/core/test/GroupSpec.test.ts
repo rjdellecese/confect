@@ -12,13 +12,19 @@ describe("isGroupSpec", () => {
 describe("make", () => {
   it("disallows invalid JS identifiers as function names", () => {
     expect(() => GroupSpec.make("123")).toThrowErrorMatchingInlineSnapshot(
-      `[Error: Expected a valid JavaScript identifier, but received: "123". Valid identifiers must start with a letter, underscore, or dollar sign, and can only contain letters, numbers, underscores, or dollar signs.]`,
+      `[Error: Expected a valid Confect function identifier, but received: "123". Valid identifiers must start with a letter, underscore, or dollar sign, and can only contain letters, numbers, underscores, or dollar signs.]`,
     );
   });
 
   it("disallows reserved keywords as function names", () => {
     expect(() => GroupSpec.make("if")).toThrowErrorMatchingInlineSnapshot(
-      `[Error: Expected a valid JavaScript identifier, but received: "if". "if" is a reserved keyword.]`,
+      `[Error: Expected a valid Confect function identifier, but received: "if". "if" is a reserved JavaScript identifier.]`,
+    );
+  });
+
+  it("disallows reserved Convex file names as function names", () => {
+    expect(() => GroupSpec.make("schema")).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Expected a valid Confect function identifier, but received: "schema". "schema" is a reserved Convex file name.]`,
     );
   });
 });

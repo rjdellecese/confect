@@ -7,7 +7,7 @@ import type {
 } from "convex/server";
 import type { Schema } from "effect";
 import { Predicate } from "effect";
-import { validateJsIdentifier } from "./internal/utils";
+import { validateConfectFunctionIdentifier } from "./internal/utils";
 
 export const TypeId = "@confect/core/api/FunctionSpec";
 export type TypeId = typeof TypeId;
@@ -132,7 +132,7 @@ const make =
     Args_,
     Returns_
   > => {
-    validateJsIdentifier(name);
+    validateConfectFunctionIdentifier(name);
 
     return Object.assign(Object.create(Proto), {
       functionType,
