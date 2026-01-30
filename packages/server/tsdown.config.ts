@@ -1,15 +1,10 @@
 import { defineConfig } from "tsdown";
 import { createConfig } from "../../tsdown.shared";
 
-export default defineConfig([
+export default defineConfig(
   createConfig({
     platform: "neutral",
-    entry: ["src/**/*.ts", "!src/cli/**/*"],
+    entry: ["src/**/*.ts"],
     outDir: "dist",
   }),
-  createConfig({
-    platform: "node",
-    entry: ["src/cli/index.ts"],
-    outDir: "dist/cli",
-  }),
-]);
+);

@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        "diagnosticSeverity": {
+          "deterministicKeys": "error",
+          "skipLeadingPath": ["packages/cli/src"]
+        }
+      }
+    ],
+    "declaration": true,
+    "declarationMap": true,
+    "isolatedDeclarations": false,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "importsNotUsedAsValues": "remove",
+    "exactOptionalPropertyTypes": true,
+    "lib": ["ESNext", "DOM"],
+    "target": "ESNext",
+    "moduleResolution": "Bundler",
+    "module": "ESNext"
+  },
+  "exclude": ["coverage", "dist", "node_modules"],
+  "extends": ["@tsconfig/strictest/tsconfig"]
+}

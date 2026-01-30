@@ -53,7 +53,9 @@ describe("make", () => {
           }),
         ),
     );
-    expect(() => Refs.make(spec)).toThrowErrorMatchingInlineSnapshot(`[Error: Group and function at same level have same name ('notes:list')]`);
+    expect(() => Refs.make(spec)).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Group and function at same level have same name ('notes:list')]`,
+    );
   });
 });
 

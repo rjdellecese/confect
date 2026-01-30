@@ -85,5 +85,3 @@ export const setNestedProperty = <T extends object>(
     [key]: setNestedProperty((obj as any)[key] ?? {}, tail, value),
   };
 };
-
-

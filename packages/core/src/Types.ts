@@ -22,17 +22,19 @@ export type IsUnion<T, U extends T = T> = T extends unknown
 // https://stackoverflow.com/a/52806744
 export type IsValueLiteral<Vl> = [Vl] extends [never]
   ? never
-  : [Vl] extends [string | number | bigint | boolean]
-    ? [string] extends [Vl]
-      ? false
-      : [number] extends [Vl]
+  : IsUnion<Vl> extends true
+    ? false
+    : [Vl] extends [string | number | bigint | boolean]
+      ? [string] extends [Vl]
         ? false
-        : [boolean] extends [Vl]
+        : [number] extends [Vl]
           ? false
-          : [bigint] extends [Vl]
+          : [boolean] extends [Vl]
             ? false
-            : true
-    : false;
+            : [bigint] extends [Vl]
+              ? false
+              : true
+      : false;
 
 /**
  * Only checks for records with string keys.

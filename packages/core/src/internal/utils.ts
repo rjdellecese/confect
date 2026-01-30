@@ -1,4 +1,4 @@
-const RESERVED_KEYWORDS = new Set([
+const RESERVED_JS_IDENTIFIERS = new Set([
   // Reserved keywords
   "break",
   "case",
@@ -52,24 +52,35 @@ const RESERVED_KEYWORDS = new Set([
   "undefined",
 ]);
 
+const RESERVED_CONVEX_FILE_NAMES = new Set(["schema", "http", "crons"]);
+
 const jsIdentifierRegex = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
+
+const isReservedJsIdentifier = (identifier: string) =>
+  RESERVED_JS_IDENTIFIERS.has(identifier);
+
+const isReservedConvexFileName = (fileName: string) =>
+  RESERVED_CONVEX_FILE_NAMES.has(fileName);
 
 const matchesJsIdentifierPattern = (identifier: string) =>
   jsIdentifierRegex.test(identifier);
 
-const isReservedKeyword = (identifier: string) =>
-  RESERVED_KEYWORDS.has(identifier);
-
-export const validateJsIdentifier = (identifier: string) => {
+export const validateConfectFunctionIdentifier = (identifier: string) => {
   if (!matchesJsIdentifierPattern(identifier)) {
     throw new Error(
-      `Expected a valid JavaScript identifier, but received: "${identifier}". Valid identifiers must start with a letter, underscore, or dollar sign, and can only contain letters, numbers, underscores, or dollar signs.`,
+      `Expected a valid Confect function identifier, but received: "${identifier}". Valid identifiers must start with a letter, underscore, or dollar sign, and can only contain letters, numbers, underscores, or dollar signs.`,
     );
   }
 
-  if (isReservedKeyword(identifier)) {
+  if (isReservedJsIdentifier(identifier)) {
     throw new Error(
-      `Expected a valid JavaScript identifier, but received: "${identifier}". "${identifier}" is a reserved keyword.`,
+      `Expected a valid Confect function identifier, but received: "${identifier}". "${identifier}" is a reserved JavaScript identifier.`,
+    );
+  }
+
+  if (isReservedConvexFileName(identifier)) {
+    throw new Error(
+      `Expected a valid Confect function identifier, but received: "${identifier}". "${identifier}" is a reserved Convex file name.`,
     );
   }
 };

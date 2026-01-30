@@ -1,40 +1,30 @@
-import { Command } from "@effect/platform";
+import { Command, type CommandExecutor } from "@effect/platform";
 import { NodeContext } from "@effect/platform-node";
 import { Effect } from "effect";
+
+const runCommand = (
+  command: string,
+  args: string[],
+): Effect.Effect<void, never, CommandExecutor.CommandExecutor> =>
+  Command.make(command, ...args).pipe(
+    Command.exitCode,
+    Effect.andThen((exitCode) =>
+      exitCode !== 0
+        ? Effect.dieMessage(`${command} failed (exit code ${exitCode})`)
+        : Effect.void,
+    ),
+    Effect.orDie,
+  );
 
 export const setup = () =>
   Effect.gen(function* () {
     const originalCwd = process.cwd();
+    const testDir = import.meta.dirname;
 
     yield* Effect.gen(function* () {
-      process.chdir(import.meta.dirname);
+      process.chdir(testDir);
 
-      const confectCodegenExitCode = yield* Command.make(
-        "pnpm",
-        "confect",
-        "codegen",
-      ).pipe(Command.exitCode);
-
-      if (confectCodegenExitCode !== 0) {
-        return yield* Effect.fail(
-          `pnpm confect codegen failed with exit code ${confectCodegenExitCode}`,
-        );
-      }
-
-      const convexDevExitCode = yield* Command.make(
-        "pnpm",
-        "convex",
-        "dev",
-        "--local",
-        "--once",
-      ).pipe(Command.exitCode);
-
-      if (convexDevExitCode !== 0) {
-        return yield* Effect.fail(
-          `pnpm convex dev --once failed with exit code ${convexDevExitCode}`,
-        );
-      }
+      yield* runCommand("pnpm", ["confect", "codegen"]);
+      yield* runCommand("pnpm", ["convex", "dev", "--local", "--once"]);
     }).pipe(Effect.ensuring(Effect.sync(() => process.chdir(originalCwd))));
   }).pipe(Effect.provide(NodeContext.layer), Effect.runPromise);
-
-export function teardown() {}

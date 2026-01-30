@@ -72,7 +72,7 @@ export default [
       "**/vite.config.ts",
       "**/vitest.config.ts",
       "**/vitest.shared.ts",
-      "**/tsdown.config.ts",
+      "**/tsdown.shared.ts",
     ],
     languageOptions: {
       parserOptions: {

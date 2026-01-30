@@ -1,5 +1,5 @@
+import { Table } from "@confect/server";
 import { Schema } from "effect";
-import { Table } from "../../../src/index";
 
 export type Tags = {
   readonly name: string;
