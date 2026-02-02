@@ -17,6 +17,7 @@ import {
   Schema,
   Stream,
 } from "effect";
+import * as esbuild from "esbuild";
 import * as tsx from "tsx/esm/api";
 import * as FunctionPaths from "../FunctionPaths";
 import * as GroupPath from "../GroupPath";
@@ -28,10 +29,8 @@ import { removePathExtension } from "../utils";
 
 export const dev = Command.make("dev", {}, () =>
   Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-
     // TODO: Create a service which caches the locations of these values (and updates them when they change?)
-    const confectDirectory = yield* ConfectDirectory.get;
+    const specPath = yield* getSpecPath;
 
     // Ensure that all required Confect files are present and export the correct values before trying to do any codegen:
     // - schema.ts
@@ -48,8 +47,9 @@ export const dev = Command.make("dev", {}, () =>
      */
     const queue = yield* Queue.sliding<void>(1);
 
+    // Watch spec.ts and all its dependencies using esbuild's module graph tracking
     const producer = pipe(
-      fs.watch(confectDirectory, { recursive: true }),
+      watchSpec(specPath),
       Stream.debounce(Duration.millis(200)),
       Stream.runForEach(() => Queue.offer(queue, undefined)),
     );
@@ -108,72 +108,68 @@ export const dev = Command.make("dev", {}, () =>
           yield* Queue.take(queue);
 
           yield* Effect.logDebug("Reloading spec…");
-          yield* loadSpec
-            .pipe(
-              Effect.andThen(
-                Effect.fn(function* (spec: Spec.AnyWithProps) {
-                  yield* Effect.logDebug("Spec reloaded");
+          yield* loadSpec.pipe(
+            Effect.andThen(
+              Effect.fn(function* (spec: Spec.AnyWithProps) {
+                yield* Effect.logDebug("Spec reloaded");
 
-                  const currentFunctionPaths = yield* getCurrentFunctionPaths;
-                  const previousFunctionPaths =
-                    yield* Ref.get(functionPathsRef);
+                const currentFunctionPaths = yield* getCurrentFunctionPaths;
+                const previousFunctionPaths = yield* Ref.get(functionPathsRef);
 
-                  const { groupsRemoved, groupsAdded, groupsChanged } =
-                    FunctionPaths.diff(
-                      previousFunctionPaths,
-                      currentFunctionPaths,
-                    );
-                  yield* Effect.logDebug(
-                    `${HashSet.size(groupsRemoved)} groups removed:`,
-                  ).pipe(
-                    Effect.annotateLogs({
-                      groupsRemoved: Array.map(
-                        HashSet.toValues(groupsRemoved),
-                        (groupPath) => GroupPath.toString(groupPath),
-                      ),
-                    }),
+                const { groupsRemoved, groupsAdded, groupsChanged } =
+                  FunctionPaths.diff(
+                    previousFunctionPaths,
+                    currentFunctionPaths,
                   );
-                  yield* Effect.logDebug(
-                    `${HashSet.size(groupsAdded)} groups added`,
-                  ).pipe(
-                    Effect.annotateLogs({
-                      groupsAdded: Array.map(
-                        HashSet.toValues(groupsAdded),
-                        (groupPath) => GroupPath.toString(groupPath),
-                      ),
-                    }),
-                  );
-                  yield* Effect.logDebug(
-                    `${HashSet.size(groupsChanged)} groups changed`,
-                  ).pipe(
-                    Effect.annotateLogs({
-                      groupsChanged: Array.map(
-                        HashSet.toValues(groupsChanged),
-                        (groupPath) => GroupPath.toString(groupPath),
-                      ),
-                    }),
-                  );
+                yield* Effect.logDebug(
+                  `${HashSet.size(groupsRemoved)} groups removed:`,
+                ).pipe(
+                  Effect.annotateLogs({
+                    groupsRemoved: Array.map(
+                      HashSet.toValues(groupsRemoved),
+                      (groupPath) => GroupPath.toString(groupPath),
+                    ),
+                  }),
+                );
+                yield* Effect.logDebug(
+                  `${HashSet.size(groupsAdded)} groups added`,
+                ).pipe(
+                  Effect.annotateLogs({
+                    groupsAdded: Array.map(
+                      HashSet.toValues(groupsAdded),
+                      (groupPath) => GroupPath.toString(groupPath),
+                    ),
+                  }),
+                );
+                yield* Effect.logDebug(
+                  `${HashSet.size(groupsChanged)} groups changed`,
+                ).pipe(
+                  Effect.annotateLogs({
+                    groupsChanged: Array.map(
+                      HashSet.toValues(groupsChanged),
+                      (groupPath) => GroupPath.toString(groupPath),
+                    ),
+                  }),
+                );
 
-                  yield* removeGroups(groupsRemoved);
-                  yield* writeGroups(spec, groupsAdded);
-                  yield* writeGroups(spec, groupsChanged);
+                yield* removeGroups(groupsRemoved);
+                yield* writeGroups(spec, groupsAdded);
+                yield* writeGroups(spec, groupsChanged);
 
-                  yield* Ref.set(functionPathsRef, currentFunctionPaths);
-                }),
+                yield* Ref.set(functionPathsRef, currentFunctionPaths);
+              }),
+            ),
+            Effect.catchTag(
+              "SpecImportFailedError",
+              Function.constant(Effect.logDebug("Spec import failed")),
+            ),
+            Effect.catchTag(
+              "SpecFileDoesNotExportSpecError",
+              Function.constant(
+                Effect.logDebug("Spec file does not export spec"),
               ),
-            )
-            .pipe(
-              Effect.catchTag(
-                "SpecImportFailedError",
-                Function.constant(Effect.logDebug("Spec import failed")),
-              ),
-              Effect.catchTag(
-                "SpecFileDoesNotExportSpecError",
-                Function.constant(
-                  Effect.logDebug("Spec file does not export spec"),
-                ),
-              ),
-            );
+            ),
+          );
         }),
       );
     });
@@ -363,6 +359,63 @@ const getSpecPath = Effect.gen(function* () {
 
   return path.join(confectDirectory, "spec.ts");
 });
+
+const watchSpec = (specPath: string): Stream.Stream<void> =>
+  Stream.asyncPush(
+    (emit) =>
+      Effect.acquireRelease(
+        Effect.promise(async () => {
+          const ctx = await esbuild.context({
+            entryPoints: [specPath],
+            bundle: true,
+            write: false,
+            metafile: true,
+            platform: "node",
+            format: "esm",
+            logLevel: "silent",
+            external: [
+              "@confect/core",
+              "@confect/server",
+              "effect",
+              "@effect/*",
+            ],
+            plugins: [
+              {
+                name: "notify-rebuild",
+                setup(build) {
+                  build.onEnd((result) => {
+                    if (result.errors.length === 0) {
+                      emit.single();
+                    } else {
+                      esbuild
+                        .formatMessages(result.errors, {
+                          kind: "error",
+                          color: true,
+                          terminalWidth: 80,
+                        })
+                        .then((formattedMessages) => {
+                          for (const message of formattedMessages) {
+                            console.error(message);
+                          }
+                        });
+                    }
+                  });
+                },
+              },
+            ],
+          });
+
+          await ctx.watch();
+
+          return ctx;
+        }),
+        (ctx) =>
+          Effect.promise(() => ctx.dispose()).pipe(
+            Effect.tap(() => Effect.logDebug("esbuild watcher disposed")),
+          ),
+      ),
+    { bufferSize: 1, strategy: "sliding" },
+  );
 
 export class SpecFileDoesNotExportSpecError extends Schema.TaggedError<SpecFileDoesNotExportSpecError>(
   "SpecFileDoesNotExportSpecError",
