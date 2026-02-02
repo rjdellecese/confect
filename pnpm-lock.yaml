@@ -85,6 +85,9 @@ importers:
 
   apps/example:
     dependencies:
+      '@confect/cli':
+        specifier: link:../../packages/cli
+        version: link:../../packages/cli
       '@confect/core':
         specifier: link:../../packages/core
         version: link:../../packages/core
