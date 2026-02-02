@@ -4,7 +4,6 @@ import { Command } from "@effect/cli";
 import { FileSystem, Path } from "@effect/platform";
 import {
   Array,
-  Console,
   Duration,
   Effect,
   Function,
@@ -55,7 +54,6 @@ export const dev = Command.make("dev", {}, () =>
       Stream.runForEach(() => Queue.offer(queue, undefined)),
     );
 
-    yield* Console.debug("Performing initial group sync…");
     const initConsumer = Effect.iterate(
       Option.none<FunctionPaths.FunctionPaths>(),
       {
@@ -67,7 +65,7 @@ export const dev = Command.make("dev", {}, () =>
               "SpecImportFailedError",
               Function.constant(
                 Effect.gen(function* () {
-                  yield* Console.debug("Spec import failed");
+                  yield* Effect.logDebug("Spec import failed");
                   return yield* Effect.succeed(
                     Option.none<FunctionPaths.FunctionPaths>(),
                   );
@@ -78,7 +76,7 @@ export const dev = Command.make("dev", {}, () =>
               "SpecFileDoesNotExportSpecError",
               Function.constant(
                 Effect.gen(function* () {
-                  yield* Console.debug("Spec file does not export spec");
+                  yield* Effect.logDebug("Spec file does not export spec");
                   return yield* Effect.succeed(
                     Option.none<FunctionPaths.FunctionPaths>(),
                   );
@@ -106,15 +104,15 @@ export const dev = Command.make("dev", {}, () =>
 
       return yield* Effect.forever(
         Effect.gen(function* () {
-          yield* Console.debug("Running watch consumer…");
+          yield* Effect.logDebug("Running watch consumer…");
           yield* Queue.take(queue);
 
-          yield* Console.debug("Reloading spec…");
+          yield* Effect.logDebug("Reloading spec…");
           yield* loadSpec
             .pipe(
               Effect.andThen(
                 Effect.fn(function* (spec: Spec.AnyWithProps) {
-                  yield* Console.debug("Spec reloaded");
+                  yield* Effect.logDebug("Spec reloaded");
 
                   const currentFunctionPaths = yield* getCurrentFunctionPaths;
                   const previousFunctionPaths =
@@ -125,9 +123,36 @@ export const dev = Command.make("dev", {}, () =>
                       previousFunctionPaths,
                       currentFunctionPaths,
                     );
-                  yield* Console.debug(`Groups removed: ${groupsRemoved}`);
-                  yield* Console.debug(`Groups added: ${groupsAdded}`);
-                  yield* Console.debug(`Groups changed: ${groupsChanged}`);
+                  yield* Effect.logDebug(
+                    `${HashSet.size(groupsRemoved)} groups removed:`,
+                  ).pipe(
+                    Effect.annotateLogs({
+                      groupsRemoved: Array.map(
+                        HashSet.toValues(groupsRemoved),
+                        (groupPath) => GroupPath.toString(groupPath),
+                      ),
+                    }),
+                  );
+                  yield* Effect.logDebug(
+                    `${HashSet.size(groupsAdded)} groups added`,
+                  ).pipe(
+                    Effect.annotateLogs({
+                      groupsAdded: Array.map(
+                        HashSet.toValues(groupsAdded),
+                        (groupPath) => GroupPath.toString(groupPath),
+                      ),
+                    }),
+                  );
+                  yield* Effect.logDebug(
+                    `${HashSet.size(groupsChanged)} groups changed`,
+                  ).pipe(
+                    Effect.annotateLogs({
+                      groupsChanged: Array.map(
+                        HashSet.toValues(groupsChanged),
+                        (groupPath) => GroupPath.toString(groupPath),
+                      ),
+                    }),
+                  );
 
                   yield* removeGroups(groupsRemoved);
                   yield* writeGroups(spec, groupsAdded);
@@ -140,12 +165,12 @@ export const dev = Command.make("dev", {}, () =>
             .pipe(
               Effect.catchTag(
                 "SpecImportFailedError",
-                Function.constant(Console.debug("Spec import failed")),
+                Function.constant(Effect.logDebug("Spec import failed")),
               ),
               Effect.catchTag(
                 "SpecFileDoesNotExportSpecError",
                 Function.constant(
-                  Console.debug("Spec file does not export spec"),
+                  Effect.logDebug("Spec file does not export spec"),
                 ),
               ),
             );
@@ -231,10 +256,10 @@ const removeGroups = (groupPaths: GroupPaths.GroupPaths) =>
           const relativeModulePath = yield* GroupPath.modulePath(groupPath);
           const modulePath = path.join(convexDirectory, relativeModulePath);
 
-          yield* Console.debug(`Removing group '${relativeModulePath}'…`);
+          yield* Effect.logDebug(`Removing group '${relativeModulePath}'…`);
 
           yield* fs.remove(modulePath);
-          yield* Console.debug(`Group '${relativeModulePath}' removed`);
+          yield* Effect.logDebug(`Group '${relativeModulePath}' removed`);
         }),
       ),
     );
@@ -259,12 +284,12 @@ const writeGroups = (
         ),
       );
 
-      yield* Console.debug(`Generating group ${groupPath}…`);
+      yield* Effect.logDebug(`Generating group ${groupPath}…`);
       yield* generateGroupModule({
         groupPath,
         functions,
       });
-      yield* Console.debug(`Group ${groupPath} generated`);
+      yield* Effect.logDebug(`Group ${groupPath} generated`);
     }),
   );
 
@@ -341,11 +366,7 @@ const getSpecPath = Effect.gen(function* () {
 
 export class SpecFileDoesNotExportSpecError extends Schema.TaggedError<SpecFileDoesNotExportSpecError>(
   "SpecFileDoesNotExportSpecError",
-)("SpecFileDoesNotExportSpecError", {}) {
-  override get message(): string {
-    return "The spec.ts file does not export a Spec";
-  }
-}
+)("SpecFileDoesNotExportSpecError", {}) {}
 
 export class SpecImportFailedError extends Schema.TaggedError<SpecImportFailedError>(
   "SpecImportFailedError",

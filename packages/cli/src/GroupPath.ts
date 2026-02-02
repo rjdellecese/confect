@@ -2,7 +2,6 @@ import { type GroupSpec, type Spec } from "@confect/core";
 import { Path } from "@effect/platform";
 import {
   Array,
-  Console,
   Data,
   Effect,
   Option,
@@ -45,7 +44,7 @@ export const fromGroupModulePath = (groupModulePath: string) =>
         String.split(dir, path.sep),
         String.isNonEmpty,
       );
-      yield* Console.debug(Array.append(dirSegments, name));
+      yield* Effect.logDebug(Array.append(dirSegments, name));
       return make(Array.append(dirSegments, name));
     } else {
       return yield* Effect.fail(
@@ -103,6 +102,9 @@ const getGroupSpecHelper = (
         ),
     }),
   );
+
+export const toString = (groupPath: GroupPath) =>
+  Array.join(groupPath.pathSegments, ".");
 
 export class GroupModulePathIsNotATypeScriptFileError extends Schema.TaggedError<GroupModulePathIsNotATypeScriptFileError>(
   "GroupModulePathIsNotATypeScriptFileError",
