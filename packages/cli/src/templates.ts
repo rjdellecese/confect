@@ -3,7 +3,7 @@ import CodeBlockWriter_ from "code-block-writer";
 import { Array, Effect } from "effect";
 import type * as GroupPath from "./GroupPath";
 
-export const functions_ = ({
+export const functions = ({
   groupPath,
   functionNames,
   registeredFunctionsImportPath,
@@ -22,34 +22,6 @@ export const functions_ = ({
     for (const functionName of functionNames) {
       yield* cbw.writeLine(
         `export const ${functionName} = registeredFunctions.${Array.join([...groupPath.pathSegments, functionName], ".")};`,
-      );
-    }
-
-    return yield* cbw.toString();
-  });
-
-// TODO: Replace with functions_.
-export const functions = ({
-  dirs,
-  mod,
-  fns,
-  registeredFunctionsImportPath,
-}: {
-  dirs: string[];
-  mod: string;
-  fns: string[];
-  registeredFunctionsImportPath: string;
-}) =>
-  Effect.gen(function* () {
-    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
-
-    yield* cbw.writeLine(
-      `import registeredFunctions from "${registeredFunctionsImportPath}";`,
-    );
-    yield* cbw.newLine();
-    for (const fn of fns) {
-      yield* cbw.writeLine(
-        `export const ${fn} = registeredFunctions.${Array.join([...dirs, mod, fn], ".")};`,
       );
     }
 

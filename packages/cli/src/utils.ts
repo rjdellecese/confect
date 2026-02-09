@@ -112,7 +112,7 @@ export const generateGroupModule = ({
       path.relative(path.dirname(modulePath), registeredFunctionsPath),
     );
 
-    const functionsContentsString = yield* templates.functions_({
+    const functionsContentsString = yield* templates.functions({
       groupPath,
       functionNames,
       registeredFunctionsImportPath,
