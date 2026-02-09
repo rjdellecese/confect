@@ -4,7 +4,7 @@ import type * as GroupSpec from "./GroupSpec";
 export const TypeId = "@confect/core/api/Spec";
 export type TypeId = typeof TypeId;
 
-export const isSpec = (u: unknown): u is Any =>
+export const isSpec = (u: unknown): u is AnyWithProps =>
   Predicate.hasProperty(u, TypeId);
 
 export interface Spec<Groups_ extends GroupSpec.AnyWithProps = never> {
@@ -34,10 +34,8 @@ const Proto = {
   [TypeId]: TypeId,
 
   add<Group extends GroupSpec.AnyWithProps>(this: AnyWithProps, group: Group) {
-    const group_ = group as unknown as GroupSpec.AnyWithProps;
-
     return makeProto({
-      groups: Record.set(this.groups, group_.name, group_),
+      groups: Record.set(this.groups, group.name, group),
     });
   },
 };

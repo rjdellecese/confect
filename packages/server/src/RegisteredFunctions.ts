@@ -17,15 +17,11 @@ import {
   type RegisteredMutation,
   type RegisteredQuery,
 } from "convex/server";
-import type {
-  Record
-} from "effect";
 import {
   Effect,
   Layer,
   Match,
   pipe,
-  Predicate,
   Ref,
   Schema,
   type Types,
@@ -39,7 +35,7 @@ import type * as DatabaseSchema from "./DatabaseSchema";
 import * as DatabaseWriter from "./DatabaseWriter";
 import type * as DataModel from "./DataModel";
 import * as Impl from "./Impl";
-import { forEachBranchLeaves, mapLeaves } from "./internal/utils";
+import { mapLeaves } from "./internal/utils";
 import * as MutationCtx from "./MutationCtx";
 import * as MutationRunner from "./MutationRunner";
 import * as QueryCtx from "./QueryCtx";
@@ -55,39 +51,6 @@ export type RegisteredFunction =
   | RegisteredQuery<FunctionVisibility, DefaultFunctionArgs, any>
   | RegisteredMutation<FunctionVisibility, DefaultFunctionArgs, any>
   | RegisteredAction<FunctionVisibility, DefaultFunctionArgs, any>;
-
-const isRegisteredQuery = (
-  u: unknown,
-): u is RegisteredQuery<FunctionVisibility, DefaultFunctionArgs, any> =>
-  Predicate.hasProperty(u, "isQuery") && u.isQuery === true;
-
-const isRegisteredMutation = (
-  u: unknown,
-): u is RegisteredMutation<FunctionVisibility, DefaultFunctionArgs, any> =>
-  Predicate.hasProperty(u, "isMutation") && u.isMutation === true;
-
-const isRegisteredAction = (
-  u: unknown,
-): u is RegisteredAction<FunctionVisibility, DefaultFunctionArgs, any> =>
-  Predicate.hasProperty(u, "isAction") && u.isAction === true;
-
-export const isRegisteredFunction = (u: unknown): u is RegisteredFunction =>
-  isRegisteredQuery(u) || isRegisteredMutation(u) || isRegisteredAction(u);
-
-export const reflect = <A, E, R>(
-  self: AnyWithProps,
-  options: {
-    readonly onModule: (options: {
-      readonly path: readonly string[];
-      readonly functions: Record.ReadonlyRecord<string, RegisteredFunction>;
-    }) => Effect.Effect<A, E, R>;
-  },
-): Effect.Effect<void, E, R> =>
-  forEachBranchLeaves<RegisteredFunction, A, E, R>(
-    self,
-    isRegisteredFunction,
-    ({ path, values }) => options.onModule({ path, functions: values }),
-  );
 
 export type RegisteredFunctions<Spec_ extends Spec.AnyWithProps> =
   Types.Simplify<RegisteredFunctionsHelper<Spec.Groups<Spec_>>>;

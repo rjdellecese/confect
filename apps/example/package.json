@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@effect/platform": "0.93.2",
+    "@confect/cli": "workspace:*",
     "@confect/core": "workspace:*",
     "@confect/server": "workspace:*",
     "@confect/react": "workspace:*",

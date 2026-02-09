@@ -1,16 +1,15 @@
 import type { Options as CodeBlockWriterOptions } from "code-block-writer";
 import CodeBlockWriter_ from "code-block-writer";
 import { Array, Effect } from "effect";
+import type * as GroupPath from "./GroupPath";
 
 export const functions = ({
-  dirs,
-  mod,
-  fns,
+  groupPath,
+  functionNames,
   registeredFunctionsImportPath,
 }: {
-  dirs: string[];
-  mod: string;
-  fns: string[];
+  groupPath: GroupPath.GroupPath;
+  functionNames: string[];
   registeredFunctionsImportPath: string;
 }) =>
   Effect.gen(function* () {
@@ -20,9 +19,9 @@ export const functions = ({
       `import registeredFunctions from "${registeredFunctionsImportPath}";`,
     );
     yield* cbw.newLine();
-    for (const fn of fns) {
+    for (const functionName of functionNames) {
       yield* cbw.writeLine(
-        `export const ${fn} = registeredFunctions.${Array.join([...dirs, mod, fn], ".")};`,
+        `export const ${functionName} = registeredFunctions.${Array.join([...groupPath.pathSegments, functionName], ".")};`,
       );
     }
 
