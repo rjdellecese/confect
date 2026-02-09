@@ -278,3 +278,82 @@ export const writeGroups = (
       yield* Effect.logDebug(`Group ${groupPath} generated`);
     }),
   );
+
+const generateOptionalFile = (
+  confectFile: string,
+  convexFile: string,
+  generateContents: (importPath: string) => Effect.Effect<string>,
+) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const confectDirectory = yield* ConfectDirectory.get;
+    const convexDirectory = yield* ConvexDirectory.get;
+
+    const confectFilePath = path.join(confectDirectory, confectFile);
+
+    if (!(yield* fs.exists(confectFilePath))) {
+      return Option.none();
+    }
+
+    const convexFilePath = path.join(convexDirectory, convexFile);
+    const relativeImportPath = path.relative(
+      path.dirname(convexFilePath),
+      confectFilePath,
+    );
+    const importPathWithoutExt = yield* removePathExtension(relativeImportPath);
+    const contents = yield* generateContents(importPathWithoutExt);
+    const change = yield* writeFileString(convexFilePath, contents);
+    return Option.some({ change, convexFilePath });
+  });
+
+export const generateHttp = generateOptionalFile(
+  "http.ts",
+  "http.ts",
+  (importPath) => templates.http({ httpImportPath: importPath }),
+);
+
+export const generateConvexConfig = generateOptionalFile(
+  "app.ts",
+  "convex.config.ts",
+  (importPath) => templates.convexConfig({ appImportPath: importPath }),
+);
+
+export const generateCrons = generateOptionalFile(
+  "crons.ts",
+  "crons.ts",
+  (importPath) => templates.crons({ cronsImportPath: importPath }),
+);
+
+export const generateAuthConfig = generateOptionalFile(
+  "auth.ts",
+  "auth.config.ts",
+  (importPath) => templates.authConfig({ authImportPath: importPath }),
+);
+
+export const optionalFileConfigs = [
+  {
+    confectFile: "http.ts",
+    convexFile: "http.ts",
+    pendingKey: "httpDirty" as const,
+    generate: generateHttp,
+  },
+  {
+    confectFile: "app.ts",
+    convexFile: "convex.config.ts",
+    pendingKey: "appDirty" as const,
+    generate: generateConvexConfig,
+  },
+  {
+    confectFile: "crons.ts",
+    convexFile: "crons.ts",
+    pendingKey: "cronsDirty" as const,
+    generate: generateCrons,
+  },
+  {
+    confectFile: "auth.ts",
+    convexFile: "auth.config.ts",
+    pendingKey: "authDirty" as const,
+    generate: generateAuthConfig,
+  },
+];

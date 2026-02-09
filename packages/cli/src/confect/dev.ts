@@ -28,13 +28,7 @@ import { logCompleted, logFailed } from "../log";
 import { ConfectDirectory } from "../services/ConfectDirectory";
 import { ConvexDirectory } from "../services/ConvexDirectory";
 import { ProjectRoot } from "../services/ProjectRoot";
-import * as templates from "../templates";
-import {
-  removeGroups,
-  removePathExtension,
-  writeFileString,
-  writeGroups,
-} from "../utils";
+import { optionalFileConfigs, removeGroups, writeGroups } from "../utils";
 import { codegenHandler } from "./codegen";
 
 type Pending = {
@@ -518,78 +512,52 @@ export class SpecImportFailedError extends Schema.TaggedError<SpecImportFailedEr
   error: Schema.Unknown,
 }) {}
 
-const optionalFileConfigs = [
-  {
-    confectFile: "http.ts",
-    convexFile: "http.ts",
-    pendingKey: "httpDirty" as const,
-    generate: (importPath: string) =>
-      templates.http({ httpImportPath: importPath }),
-  },
-  {
-    confectFile: "app.ts",
-    convexFile: "convex.config.ts",
-    pendingKey: "appDirty" as const,
-    generate: (importPath: string) =>
-      templates.convexConfig({ appImportPath: importPath }),
-  },
-  {
-    confectFile: "crons.ts",
-    convexFile: "crons.ts",
-    pendingKey: "cronsDirty" as const,
-    generate: (importPath: string) =>
-      templates.crons({ cronsImportPath: importPath }),
-  },
-  {
-    confectFile: "auth.ts",
-    convexFile: "auth.config.ts",
-    pendingKey: "authDirty" as const,
-    generate: (importPath: string) =>
-      templates.authConfig({ authImportPath: importPath }),
-  },
-];
-
 const syncOptionalFile = (config: (typeof optionalFileConfigs)[number]) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const confectDirectory = yield* ConfectDirectory.get;
-    const convexDirectory = yield* ConvexDirectory.get;
+  pipe(
+    config.generate,
+    Effect.andThen(
+      Option.match({
+        onSome: ({ change, convexFilePath }) =>
+          Match.value(change).pipe(
+            Match.when("Unchanged", () => Effect.succeed(Option.none())),
+            Match.whenOr("Added", "Modified", (addedOrModified) =>
+              Effect.succeed(
+                Option.some(
+                  FileChange.OptionalFile({
+                    change: addedOrModified,
+                    filePath: convexFilePath,
+                  }),
+                ),
+              ),
+            ),
+            Match.exhaustive,
+          ),
+        onNone: () =>
+          Effect.gen(function* () {
+            const fs = yield* FileSystem.FileSystem;
+            const path = yield* Path.Path;
+            const convexDirectory = yield* ConvexDirectory.get;
+            const convexFilePath = path.join(
+              convexDirectory,
+              config.convexFile,
+            );
 
-    const confectFilePath = path.join(confectDirectory, config.confectFile);
-    const convexFilePath = path.join(convexDirectory, config.convexFile);
+            if (yield* fs.exists(convexFilePath)) {
+              yield* fs.remove(convexFilePath);
 
-    if (yield* fs.exists(confectFilePath)) {
-      const relativeImportPath = path.relative(
-        path.dirname(convexFilePath),
-        confectFilePath,
-      );
-      const importPathWithoutExt =
-        yield* removePathExtension(relativeImportPath);
-      const contents = yield* config.generate(importPathWithoutExt);
-
-      const result = yield* writeFileString(convexFilePath, contents);
-      return result === "Unchanged"
-        ? Option.none()
-        : Option.some(
-            FileChange.OptionalFile({
-              change: result,
-              filePath: convexFilePath,
-            }),
-          );
-    } else {
-      if (yield* fs.exists(convexFilePath)) {
-        yield* fs.remove(convexFilePath);
-        return Option.some(
-          FileChange.OptionalFile({
-            change: "Removed",
-            filePath: convexFilePath,
+              return Option.some(
+                FileChange.OptionalFile({
+                  change: "Removed",
+                  filePath: convexFilePath,
+                }),
+              );
+            } else {
+              return Option.none();
+            }
           }),
-        );
-      }
-      return Option.none();
-    }
-  });
+      }),
+    ),
+  );
 
 const confectDirectoryWatcher = (
   signal: Queue.Queue<void>,

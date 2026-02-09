@@ -2,14 +2,18 @@ import { Spec } from "@confect/core";
 import { DatabaseSchema } from "@confect/server";
 import { Command } from "@effect/cli";
 import { FileSystem, Path } from "@effect/platform";
-import { Effect } from "effect";
+import { Effect, Match, Option } from "effect";
 import * as tsx from "tsx/esm/api";
-import { logCompleted, logFileAdded } from "../log";
+import { logCompleted, logFileAdded, logFileModified } from "../log";
 import { ConfectDirectory } from "../services/ConfectDirectory";
 import { ConvexDirectory } from "../services/ConvexDirectory";
 import * as templates from "../templates";
 import {
+  generateAuthConfig,
+  generateConvexConfig,
+  generateCrons,
   generateFunctions,
+  generateHttp,
   removePathExtension,
   writeFileStringAndLog,
 } from "../utils";
@@ -35,10 +39,10 @@ export const codegenHandler = Effect.gen(function* () {
     [
       generateFunctionModules,
       generateSchema,
-      generateHttp,
-      generateConvexConfig,
-      generateCrons,
-      generateAuthConfig,
+      logGenerated(generateHttp),
+      logGenerated(generateConvexConfig),
+      logGenerated(generateCrons),
+      logGenerated(generateAuthConfig),
     ],
     { concurrency: "unbounded" },
   );
@@ -185,102 +189,6 @@ const generateRegisteredFunctions = Effect.gen(function* () {
   );
 });
 
-const generateHttp = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  const convexDirectory = yield* ConvexDirectory.get;
-
-  const confectHttpPath = path.join(confectDirectory, "http.ts");
-
-  if (yield* fs.exists(confectHttpPath)) {
-    const convexHttpPath = path.join(convexDirectory, "http.ts");
-
-    const relativeImportPath = path.relative(
-      path.dirname(convexHttpPath),
-      confectHttpPath,
-    );
-    const importPathWithoutExt = yield* removePathExtension(relativeImportPath);
-    const httpContents = yield* templates.http({
-      httpImportPath: importPathWithoutExt,
-    });
-
-    yield* writeFileStringAndLog(convexHttpPath, httpContents);
-  }
-});
-
-const generateConvexConfig = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  const convexDirectory = yield* ConvexDirectory.get;
-
-  const confectAppPath = path.join(confectDirectory, "app.ts");
-
-  if (yield* fs.exists(confectAppPath)) {
-    const convexConfigPath = path.join(convexDirectory, "convex.config.ts");
-
-    const relativeImportPath = path.relative(
-      path.dirname(convexConfigPath),
-      confectAppPath,
-    );
-    const importPathWithoutExt = yield* removePathExtension(relativeImportPath);
-    const convexConfigContents = yield* templates.convexConfig({
-      appImportPath: importPathWithoutExt,
-    });
-
-    yield* writeFileStringAndLog(convexConfigPath, convexConfigContents);
-  }
-});
-
-const generateCrons = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  const convexDirectory = yield* ConvexDirectory.get;
-
-  const confectCronsPath = path.join(confectDirectory, "crons.ts");
-
-  if (yield* fs.exists(confectCronsPath)) {
-    const convexCronsPath = path.join(convexDirectory, "crons.ts");
-
-    const relativeImportPath = path.relative(
-      path.dirname(convexCronsPath),
-      confectCronsPath,
-    );
-    const importPathWithoutExt = yield* removePathExtension(relativeImportPath);
-    const cronsContents = yield* templates.crons({
-      cronsImportPath: importPathWithoutExt,
-    });
-
-    yield* writeFileStringAndLog(convexCronsPath, cronsContents);
-  }
-});
-
-const generateAuthConfig = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  const convexDirectory = yield* ConvexDirectory.get;
-
-  const confectAuthPath = path.join(confectDirectory, "auth.ts");
-
-  if (yield* fs.exists(confectAuthPath)) {
-    const convexAuthConfigPath = path.join(convexDirectory, "auth.config.ts");
-
-    const relativeImportPath = path.relative(
-      path.dirname(convexAuthConfigPath),
-      confectAuthPath,
-    );
-    const importPathWithoutExt = yield* removePathExtension(relativeImportPath);
-    const authConfigContents = yield* templates.authConfig({
-      authImportPath: importPathWithoutExt,
-    });
-
-    yield* writeFileStringAndLog(convexAuthConfigPath, authConfigContents);
-  }
-});
-
 const generateRefs = Effect.gen(function* () {
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
@@ -302,3 +210,19 @@ const generateRefs = Effect.gen(function* () {
 
   yield* writeFileStringAndLog(refsPath, refsContents);
 });
+
+const logGenerated = (effect: typeof generateHttp) =>
+  effect.pipe(
+    Effect.tap(
+      Option.match({
+        onNone: () => Effect.void,
+        onSome: ({ change, convexFilePath }) =>
+          Match.value(change).pipe(
+            Match.when("Added", () => logFileAdded(convexFilePath)),
+            Match.when("Modified", () => logFileModified(convexFilePath)),
+            Match.when("Unchanged", () => Effect.void),
+            Match.exhaustive,
+          ),
+      }),
+    ),
+  );
