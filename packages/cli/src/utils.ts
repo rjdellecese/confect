@@ -330,30 +330,3 @@ export const generateAuthConfig = generateOptionalFile(
   "auth.config.ts",
   (importPath) => templates.authConfig({ authImportPath: importPath }),
 );
-
-export const optionalFileConfigs = [
-  {
-    confectFile: "http.ts",
-    convexFile: "http.ts",
-    pendingKey: "httpDirty" as const,
-    generate: generateHttp,
-  },
-  {
-    confectFile: "app.ts",
-    convexFile: "convex.config.ts",
-    pendingKey: "appDirty" as const,
-    generate: generateConvexConfig,
-  },
-  {
-    confectFile: "crons.ts",
-    convexFile: "crons.ts",
-    pendingKey: "cronsDirty" as const,
-    generate: generateCrons,
-  },
-  {
-    confectFile: "auth.ts",
-    convexFile: "auth.config.ts",
-    pendingKey: "authDirty" as const,
-    generate: generateAuthConfig,
-  },
-];

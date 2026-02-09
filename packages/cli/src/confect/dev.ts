@@ -19,6 +19,7 @@ import {
   Stream,
   String,
 } from "effect";
+import type { ReadonlyRecord } from "effect/Record";
 import * as esbuild from "esbuild";
 import * as tsx from "tsx/esm/api";
 import type * as FunctionPath from "../FunctionPath";
@@ -28,7 +29,14 @@ import { logCompleted, logFailed } from "../log";
 import { ConfectDirectory } from "../services/ConfectDirectory";
 import { ConvexDirectory } from "../services/ConvexDirectory";
 import { ProjectRoot } from "../services/ProjectRoot";
-import { optionalFileConfigs, removeGroups, writeGroups } from "../utils";
+import {
+  generateAuthConfig,
+  generateConvexConfig,
+  generateCrons,
+  generateHttp,
+  removeGroups,
+  writeGroups,
+} from "../utils";
 import { codegenHandler } from "./codegen";
 
 type Pending = {
@@ -322,21 +330,30 @@ const syncLoop = (
 
         const specChanges = Option.getOrElse(specResult, () => []);
 
-        const dirtyOptionalFileConfigs = Array.filter(
-          optionalFileConfigs,
-          ({ pendingKey }) => pending[pendingKey],
-        );
+        const dirtyOptionalFiles = [
+          ...(pending.httpDirty
+            ? [syncOptionalFile(generateHttp, "http.ts")]
+            : []),
+          ...(pending.appDirty
+            ? [syncOptionalFile(generateConvexConfig, "convex.config.ts")]
+            : []),
+          ...(pending.cronsDirty
+            ? [syncOptionalFile(generateCrons, "crons.ts")]
+            : []),
+          ...(pending.authDirty
+            ? [syncOptionalFile(generateAuthConfig, "auth.config.ts")]
+            : []),
+        ];
 
-        const optionalChanges: ReadonlyArray<FileChange> = yield* Effect.if(
-          Array.isNonEmptyReadonlyArray(dirtyOptionalFileConfigs),
-          {
-            onTrue: () =>
-              Effect.forEach(dirtyOptionalFileConfigs, syncOptionalFile, {
-                concurrency: "unbounded",
-              }).pipe(Effect.map(Array.getSomes)),
-            onFalse: () => Effect.succeed([]),
-          },
-        );
+        const optionalChanges: ReadonlyArray<FileChange> =
+          Array.isNonEmptyReadonlyArray(dirtyOptionalFiles)
+            ? yield* pipe(
+                Effect.all(dirtyOptionalFiles, {
+                  concurrency: "unbounded",
+                }),
+                Effect.map(Array.getSomes),
+              )
+            : [];
 
         yield* Ref.update(changesRef, (prev) => [
           ...prev,
@@ -512,9 +529,9 @@ export class SpecImportFailedError extends Schema.TaggedError<SpecImportFailedEr
   error: Schema.Unknown,
 }) {}
 
-const syncOptionalFile = (config: (typeof optionalFileConfigs)[number]) =>
+const syncOptionalFile = (generate: typeof generateHttp, convexFile: string) =>
   pipe(
-    config.generate,
+    generate,
     Effect.andThen(
       Option.match({
         onSome: ({ change, convexFilePath }) =>
@@ -537,10 +554,7 @@ const syncOptionalFile = (config: (typeof optionalFileConfigs)[number]) =>
             const fs = yield* FileSystem.FileSystem;
             const path = yield* Path.Path;
             const convexDirectory = yield* ConvexDirectory.get;
-            const convexFilePath = path.join(
-              convexDirectory,
-              config.convexFile,
-            );
+            const convexFilePath = path.join(convexDirectory, convexFile);
 
             if (yield* fs.exists(convexFilePath)) {
               yield* fs.remove(convexFilePath);
@@ -559,6 +573,13 @@ const syncOptionalFile = (config: (typeof optionalFileConfigs)[number]) =>
     ),
   );
 
+const optionalConfectFiles: ReadonlyRecord<string, keyof Pending> = {
+  "http.ts": "httpDirty",
+  "app.ts": "appDirty",
+  "crons.ts": "cronsDirty",
+  "auth.ts": "authDirty",
+};
+
 const confectDirectoryWatcher = (
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
@@ -571,13 +592,10 @@ const confectDirectoryWatcher = (
       fs.watch(confectDirectory),
       Stream.runForEach((event) =>
         pipe(
-          Array.findFirst(
-            optionalFileConfigs,
-            ({ confectFile }) => confectFile === event.path,
-          ),
+          Option.fromNullable(optionalConfectFiles[event.path]),
           Option.match({
             onNone: () => Effect.void,
-            onSome: ({ pendingKey }) =>
+            onSome: (pendingKey) =>
               pipe(
                 pendingRef,
                 Ref.update((pending) => ({
