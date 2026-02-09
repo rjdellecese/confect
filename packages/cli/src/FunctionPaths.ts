@@ -56,6 +56,8 @@ export const diff = (
   previousFunctions: FunctionPaths,
   currentFunctions: FunctionPaths,
 ): {
+  functionsAdded: FunctionPaths;
+  functionsRemoved: FunctionPaths;
   groupsRemoved: GroupPaths.GroupPaths;
   groupsAdded: GroupPaths.GroupPaths;
   groupsChanged: GroupPaths.GroupPaths;
@@ -92,6 +94,8 @@ export const diff = (
   );
 
   return {
+    functionsAdded,
+    functionsRemoved,
     groupsRemoved,
     groupsAdded,
     groupsChanged,

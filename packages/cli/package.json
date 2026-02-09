@@ -48,6 +48,8 @@
   "license": "ISC",
   "dependencies": {
     "@effect/cli": "^0.72.1",
+    "@effect/printer": "^0.47.0",
+    "@effect/printer-ansi": "^0.47.0",
     "code-block-writer": "^13.0.3",
     "esbuild": "^0.25.0",
     "tsx": "^4.19.2"

@@ -1,42 +1,49 @@
-import { DatabaseSchema, RegisteredFunctions } from "@confect/server";
+import { Spec } from "@confect/core";
+import { DatabaseSchema } from "@confect/server";
 import { Command } from "@effect/cli";
 import { FileSystem, Path } from "@effect/platform";
-import { Array, Effect, Option, Record } from "effect";
+import { Effect } from "effect";
 import * as tsx from "tsx/esm/api";
+import { logCompleted, logFileAdded } from "../log";
 import { ConfectDirectory } from "../services/ConfectDirectory";
 import { ConvexDirectory } from "../services/ConvexDirectory";
 import * as templates from "../templates";
-import { generateFunctionModule, removePathExtension } from "../utils";
+import {
+  generateFunctions,
+  removePathExtension,
+  writeFileStringAndLog,
+} from "../utils";
 
 export const codegen = Command.make("codegen", {}, () =>
   Effect.gen(function* () {
-    yield* generateConfectGeneratedDirectory;
-    yield* Effect.all(
-      [
-        generateApi,
-        generateRefs,
-        generateRegisteredFunctions,
-        generateServices,
-      ],
-      { concurrency: "unbounded" },
-    );
-    yield* Effect.all(
-      [
-        generateSchema,
-        generateFunctions,
-        generateHttp,
-        generateConvexConfig,
-        generateCrons,
-        generateAuthConfig,
-      ],
-      { concurrency: "unbounded" },
-    );
+    yield* codegenHandler;
+    yield* logCompleted("Generated files are up-to-date");
   }),
 ).pipe(
   Command.withDescription(
-    "Generate `confect/_generated` files and the contents of the `convex` directory",
+    "Generate `confect/_generated` files and the contents of the `convex` directory (except `tsconfig.json`)",
   ),
 );
+
+export const codegenHandler = Effect.gen(function* () {
+  yield* generateConfectGeneratedDirectory;
+  yield* Effect.all(
+    [generateApi, generateRefs, generateRegisteredFunctions, generateServices],
+    { concurrency: "unbounded" },
+  );
+  const [functionPaths] = yield* Effect.all(
+    [
+      generateFunctionModules,
+      generateSchema,
+      generateHttp,
+      generateConvexConfig,
+      generateCrons,
+      generateAuthConfig,
+    ],
+    { concurrency: "unbounded" },
+  );
+  return functionPaths;
+});
 
 const generateConfectGeneratedDirectory = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
@@ -47,11 +54,11 @@ const generateConfectGeneratedDirectory = Effect.gen(function* () {
     yield* fs.makeDirectory(path.join(confectDirectory, "_generated"), {
       recursive: true,
     });
+    yield* logFileAdded(path.join(confectDirectory, "_generated") + "/");
   }
 });
 
 const generateApi = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
 
@@ -76,58 +83,29 @@ const generateApi = Effect.gen(function* () {
     specImportPath,
   });
 
-  yield* fs.writeFileString(apiPath, apiContents);
+  yield* writeFileStringAndLog(apiPath, apiContents);
 });
 
-const generateFunctions = Effect.gen(function* () {
+const generateFunctionModules = Effect.gen(function* () {
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
-  const convexDirectory = yield* ConvexDirectory.get;
 
-  const registeredFunctionsPath = path.join(
-    confectDirectory,
-    "_generated",
-    "registeredFunctions.ts",
+  const specPath = path.join(confectDirectory, "spec.ts");
+  const specPathUrl = yield* path.toFileUrl(specPath);
+
+  const specModule = yield* Effect.promise(() =>
+    tsx.tsImport(specPathUrl.href, import.meta.url),
   );
-  const registeredFunctionsUrl = yield* path.toFileUrl(registeredFunctionsPath);
+  const spec = specModule.default;
 
-  const registeredFunctions = yield* Effect.promise(() =>
-    tsx.tsImport(registeredFunctionsUrl.href, import.meta.url),
-  ).pipe(
-    Effect.map(
-      (registeredFunctionsModule) =>
-        registeredFunctionsModule.default as RegisteredFunctions.AnyWithProps,
-    ),
-  );
+  if (!Spec.isSpec(spec)) {
+    return yield* Effect.die("spec.ts does not export a valid Spec");
+  }
 
-  yield* RegisteredFunctions.reflect(registeredFunctions, {
-    onModule: ({ path: modulePath, functions }) =>
-      Effect.gen(function* () {
-        const mod = Array.last(modulePath).pipe(
-          Option.getOrThrowWith(
-            () => new Error("Missing module name in function path"),
-          ),
-        );
-        const dirs = Array.init(modulePath).pipe(
-          Option.getOrThrowWith(
-            () => new Error("Missing directory names in function path"),
-          ),
-        );
-        const fns = Record.keys(functions);
-
-        yield* generateFunctionModule({
-          confectDirectory,
-          convexDirectory,
-          dirs,
-          mod,
-          fns,
-        });
-      }),
-  });
+  return yield* generateFunctions(spec);
 });
 
 const generateSchema = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
   const convexDirectory = yield* ConvexDirectory.get;
@@ -158,11 +136,10 @@ const generateSchema = Effect.gen(function* () {
     schemaImportPath: importPathWithoutExt,
   });
 
-  yield* fs.writeFileString(convexSchemaPath, schemaContents);
+  yield* writeFileStringAndLog(convexSchemaPath, schemaContents);
 });
 
 const generateServices = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
 
@@ -178,12 +155,10 @@ const generateServices = Effect.gen(function* () {
     schemaImportPath,
   });
 
-  const servicesContents = new TextEncoder().encode(servicesContentsString);
-  yield* fs.writeFile(servicesPath, servicesContents);
+  yield* writeFileStringAndLog(servicesPath, servicesContentsString);
 });
 
 const generateRegisteredFunctions = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
 
@@ -204,7 +179,7 @@ const generateRegisteredFunctions = Effect.gen(function* () {
     implImportPath,
   });
 
-  yield* fs.writeFileString(
+  yield* writeFileStringAndLog(
     registeredFunctionsPath,
     registeredFunctionsContents,
   );
@@ -230,7 +205,7 @@ const generateHttp = Effect.gen(function* () {
       httpImportPath: importPathWithoutExt,
     });
 
-    yield* fs.writeFileString(convexHttpPath, httpContents);
+    yield* writeFileStringAndLog(convexHttpPath, httpContents);
   }
 });
 
@@ -254,7 +229,7 @@ const generateConvexConfig = Effect.gen(function* () {
       appImportPath: importPathWithoutExt,
     });
 
-    yield* fs.writeFileString(convexConfigPath, convexConfigContents);
+    yield* writeFileStringAndLog(convexConfigPath, convexConfigContents);
   }
 });
 
@@ -278,7 +253,7 @@ const generateCrons = Effect.gen(function* () {
       cronsImportPath: importPathWithoutExt,
     });
 
-    yield* fs.writeFileString(convexCronsPath, cronsContents);
+    yield* writeFileStringAndLog(convexCronsPath, cronsContents);
   }
 });
 
@@ -302,12 +277,11 @@ const generateAuthConfig = Effect.gen(function* () {
       authImportPath: importPathWithoutExt,
     });
 
-    yield* fs.writeFileString(convexAuthConfigPath, authConfigContents);
+    yield* writeFileStringAndLog(convexAuthConfigPath, authConfigContents);
   }
 });
 
 const generateRefs = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
 
@@ -326,5 +300,5 @@ const generateRefs = Effect.gen(function* () {
     specImportPath: importPathWithoutExt,
   });
 
-  yield* fs.writeFileString(refsPath, refsContents);
+  yield* writeFileStringAndLog(refsPath, refsContents);
 });

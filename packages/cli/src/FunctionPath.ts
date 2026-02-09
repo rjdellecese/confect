@@ -20,3 +20,9 @@ export const groupPath = (functionPath: FunctionPath): GroupPath.GroupPath =>
  * Get the function name from a function path.
  */
 export const name = (functionPath: FunctionPath): string => functionPath.name;
+
+/**
+ * Get the function path as a string.
+ */
+export const toString = (functionPath: FunctionPath): string =>
+  `${GroupPath.toString(functionPath.groupPath)}.${functionPath.name}`;

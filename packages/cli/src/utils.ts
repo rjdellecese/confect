@@ -1,5 +1,22 @@
+import type { FunctionSpec, Spec } from "@confect/core";
 import { FileSystem, Path } from "@effect/platform";
-import { Array, Effect, Option, Schema, String } from "effect";
+import type { PlatformError } from "@effect/platform/Error";
+import {
+  Array,
+  Effect,
+  HashSet,
+  Option,
+  Order,
+  pipe,
+  Record,
+  String,
+} from "effect";
+import * as FunctionPaths from "./FunctionPaths";
+import * as GroupPath from "./GroupPath";
+import * as GroupPaths from "./GroupPaths";
+import { logFileAdded, logFileModified, logFileRemoved } from "./log";
+import { ConfectDirectory } from "./services/ConfectDirectory";
+import { ConvexDirectory } from "./services/ConvexDirectory";
 import * as templates from "./templates";
 
 export const removePathExtension = (pathStr: string) =>
@@ -7,6 +24,21 @@ export const removePathExtension = (pathStr: string) =>
     const path = yield* Path.Path;
 
     return String.slice(0, -path.extname(pathStr).length)(pathStr);
+  });
+
+export const writeFileStringAndLog = (filePath: string, contents: string) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    if (!(yield* fs.exists(filePath))) {
+      yield* fs.writeFileString(filePath, contents);
+      yield* logFileAdded(filePath);
+      return;
+    }
+    const existing = yield* fs.readFileString(filePath);
+    if (existing !== contents) {
+      yield* fs.writeFileString(filePath, contents);
+      yield* logFileModified(filePath);
+    }
   });
 
 export const findProjectRoot = Effect.gen(function* () {
@@ -29,90 +61,47 @@ export const findProjectRoot = Effect.gen(function* () {
   return Option.getOrElse(projectRoot, () => startDir);
 });
 
-export const findConfectDirectory = ({
-  convexDirectory,
-}: {
-  convexDirectory: string;
-}) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
+export type WriteChange = "Added" | "Modified" | "Unchanged";
 
-    return path.join(convexDirectory, "..", "confect");
-  });
-
-/**
- * Schema for `convex.json` configuration file.
- * @see https://docs.convex.dev/production/project-configuration
- */
-const ConvexJsonConfig = Schema.parseJson(
-  Schema.Struct({
-    functions: Schema.optional(Schema.String),
-  }),
-);
-
-// TODO: Only find, don't create. Tell the user to initialize the project using the Convex CLI (`convex dev`) if the `convex` directory doesn't exist.
-/**
- * Returns the path to the Convex directory and creates it if it doesn't exist.
- */
-export const findAndCreateConvexDirectory = ({
-  projectRoot,
-}: {
-  projectRoot: string;
-}) =>
+export const writeFileString = (
+  filePath: string,
+  contents: string,
+): Effect.Effect<WriteChange, PlatformError, FileSystem.FileSystem> =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
 
-    const defaultPath = path.join(projectRoot, "convex");
-
-    const convexJsonPath = path.join(projectRoot, "convex.json");
-
-    const convexDirectory = yield* Effect.if(fs.exists(convexJsonPath), {
-      onTrue: () =>
-        fs.readFileString(convexJsonPath).pipe(
-          Effect.andThen(Schema.decodeOption(ConvexJsonConfig)),
-          Effect.map((config) =>
-            Option.fromNullable(config.functions).pipe(
-              Option.map((functionsDir) =>
-                path.join(projectRoot, functionsDir),
-              ),
-            ),
-          ),
-          Effect.andThen(Option.getOrElse(() => defaultPath)),
-        ),
-      onFalse: () => Effect.succeed(defaultPath),
-    });
-
-    if (!(yield* fs.exists(convexDirectory))) {
-      yield* fs.makeDirectory(convexDirectory, { recursive: true });
+    if (!(yield* fs.exists(filePath))) {
+      yield* fs.writeFileString(filePath, contents);
+      return "Added";
     }
-
-    return convexDirectory;
+    const existing = yield* fs.readFileString(filePath);
+    if (existing !== contents) {
+      yield* fs.writeFileString(filePath, contents);
+      return "Modified";
+    }
+    return "Unchanged";
   });
 
-export const generateFunctionModule = ({
-  confectDirectory,
-  convexDirectory,
-  dirs,
-  mod,
-  fns,
+export const generateGroupModule = ({
+  groupPath,
+  functionNames,
 }: {
-  confectDirectory: string;
-  convexDirectory: string;
-  dirs: string[];
-  mod: string;
-  fns: string[];
+  groupPath: GroupPath.GroupPath;
+  functionNames: string[];
 }) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
+    const convexDirectory = yield* ConvexDirectory.get;
+    const confectDirectory = yield* ConfectDirectory.get;
 
-    const directoryPath = path.join(convexDirectory, ...dirs);
+    const relativeModulePath = yield* GroupPath.modulePath(groupPath);
+    const modulePath = path.join(convexDirectory, relativeModulePath);
+
+    const directoryPath = path.dirname(modulePath);
     if (!(yield* fs.exists(directoryPath))) {
       yield* fs.makeDirectory(directoryPath, { recursive: true });
     }
-
-    const modulePath = path.join(directoryPath, `${mod}.ts`);
 
     const registeredFunctionsPath = path.join(
       confectDirectory,
@@ -123,13 +112,169 @@ export const generateFunctionModule = ({
       path.relative(path.dirname(modulePath), registeredFunctionsPath),
     );
 
-    const functionsContentsString = yield* templates.functions({
-      dirs,
-      mod,
-      fns,
+    const functionsContentsString = yield* templates.functions_({
+      groupPath,
+      functionNames,
       registeredFunctionsImportPath,
     });
 
-    const moduleContents = new TextEncoder().encode(functionsContentsString);
-    yield* fs.writeFile(modulePath, moduleContents);
+    if (!(yield* fs.exists(modulePath))) {
+      yield* fs.writeFileString(modulePath, functionsContentsString);
+      return "Added" as const;
+    }
+    const existing = yield* fs.readFileString(modulePath);
+    if (existing !== functionsContentsString) {
+      yield* fs.writeFileString(modulePath, functionsContentsString);
+      return "Modified" as const;
+    }
+    return "Unchanged" as const;
   });
+
+const logGroupPaths = <R>(
+  groupPaths: GroupPaths.GroupPaths,
+  logFn: (fullPath: string) => Effect.Effect<void, never, R>,
+) =>
+  Effect.gen(function* () {
+    const path = yield* Path.Path;
+    const convexDirectory = yield* ConvexDirectory.get;
+
+    yield* Effect.forEach(groupPaths, (gp) =>
+      Effect.gen(function* () {
+        const relativeModulePath = yield* GroupPath.modulePath(gp);
+        yield* logFn(path.join(convexDirectory, relativeModulePath));
+      }),
+    );
+  });
+
+export const generateFunctions = (spec: Spec.AnyWithProps) =>
+  Effect.gen(function* () {
+    const path = yield* Path.Path;
+    const convexDirectory = yield* ConvexDirectory.get;
+
+    const groupPathsFromFs = yield* getGroupPathsFromFs;
+    const functionPaths = FunctionPaths.make(spec);
+    const groupPathsFromSpec = FunctionPaths.groupPaths(functionPaths);
+
+    const overlappingGroupPaths = GroupPaths.GroupPaths.make(
+      HashSet.intersection(groupPathsFromFs, groupPathsFromSpec),
+    );
+    yield* Effect.forEach(overlappingGroupPaths, (groupPath) =>
+      Effect.gen(function* () {
+        const group = yield* GroupPath.getGroupSpec(spec, groupPath);
+        const functionNames = pipe(
+          group.functions,
+          Record.values,
+          Array.sortBy(
+            Order.mapInput(
+              Order.string,
+              (fn: FunctionSpec.AnyWithProps) => fn.name,
+            ),
+          ),
+          Array.map((fn) => fn.name),
+        );
+        const result = yield* generateGroupModule({ groupPath, functionNames });
+        if (result === "Modified") {
+          const relativeModulePath = yield* GroupPath.modulePath(groupPath);
+          yield* logFileModified(
+            path.join(convexDirectory, relativeModulePath),
+          );
+        }
+      }),
+    );
+
+    const extinctGroupPaths = GroupPaths.GroupPaths.make(
+      HashSet.difference(groupPathsFromFs, groupPathsFromSpec),
+    );
+    yield* removeGroups(extinctGroupPaths);
+    yield* logGroupPaths(extinctGroupPaths, logFileRemoved);
+
+    const newGroupPaths = GroupPaths.GroupPaths.make(
+      HashSet.difference(groupPathsFromSpec, groupPathsFromFs),
+    );
+    yield* writeGroups(spec, newGroupPaths);
+    yield* logGroupPaths(newGroupPaths, logFileAdded);
+
+    return functionPaths;
+  });
+
+const getGroupPathsFromFs = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const convexDirectory = yield* ConvexDirectory.get;
+
+  const RESERVED_CONVEX_TS_FILE_NAMES = new Set([
+    "schema.ts",
+    "http.ts",
+    "crons.ts",
+    "auth.config.ts",
+    "convex.config.ts",
+  ]);
+
+  const allConvexPaths = yield* fs.readDirectory(convexDirectory, {
+    recursive: true,
+  });
+  const groupPathArray = yield* pipe(
+    allConvexPaths,
+    Array.filter(
+      (convexPath) =>
+        path.extname(convexPath) === ".ts" &&
+        !RESERVED_CONVEX_TS_FILE_NAMES.has(path.basename(convexPath)) &&
+        path.basename(path.dirname(convexPath)) !== "_generated",
+    ),
+    Effect.forEach((groupModulePath) =>
+      GroupPath.fromGroupModulePath(groupModulePath),
+    ),
+  );
+  return pipe(groupPathArray, HashSet.fromIterable, GroupPaths.GroupPaths.make);
+});
+
+export const removeGroups = (groupPaths: GroupPaths.GroupPaths) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const convexDirectory = yield* ConvexDirectory.get;
+
+    yield* Effect.all(
+      HashSet.map(groupPaths, (groupPath) =>
+        Effect.gen(function* () {
+          const relativeModulePath = yield* GroupPath.modulePath(groupPath);
+          const modulePath = path.join(convexDirectory, relativeModulePath);
+
+          yield* Effect.logDebug(`Removing group '${relativeModulePath}'...`);
+
+          yield* fs.remove(modulePath);
+          yield* Effect.logDebug(`Group '${relativeModulePath}' removed`);
+        }),
+      ),
+      { concurrency: "unbounded" },
+    );
+  });
+
+export const writeGroups = (
+  spec: Spec.AnyWithProps,
+  groupPaths: GroupPaths.GroupPaths,
+) =>
+  Effect.forEach(groupPaths, (groupPath) =>
+    Effect.gen(function* () {
+      const group = yield* GroupPath.getGroupSpec(spec, groupPath);
+
+      const functionNames = pipe(
+        group.functions,
+        Record.values,
+        Array.sortBy(
+          Order.mapInput(
+            Order.string,
+            (fn: FunctionSpec.AnyWithProps) => fn.name,
+          ),
+        ),
+        Array.map((fn) => fn.name),
+      );
+
+      yield* Effect.logDebug(`Generating group ${groupPath}...`);
+      yield* generateGroupModule({
+        groupPath,
+        functionNames,
+      });
+      yield* Effect.logDebug(`Group ${groupPath} generated`);
+    }),
+  );
