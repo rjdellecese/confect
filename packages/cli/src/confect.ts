@@ -7,7 +7,7 @@ import { ConvexDirectory } from "./services/ConvexDirectory";
 import { ProjectRoot } from "./services/ProjectRoot";
 
 export const confect = Command.make("confect").pipe(
-  Command.withDescription("Confect - Use Effect with Convex!"),
+  Command.withDescription("Generate and sync Confect files with Convex"),
   Command.withSubcommands([codegen, dev]),
   Command.provide(
     Layer.mergeAll(
