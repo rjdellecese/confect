@@ -39,7 +39,18 @@ import { codegenHandler } from "./codegen";
 
 type Pending = {
   readonly specDirty: boolean;
-  readonly optionalFilesDirty: boolean;
+  readonly httpDirty: boolean;
+  readonly appDirty: boolean;
+  readonly cronsDirty: boolean;
+  readonly authDirty: boolean;
+};
+
+const pendingInit: Pending = {
+  specDirty: false,
+  httpDirty: false,
+  appDirty: false,
+  cronsDirty: false,
+  authDirty: false,
 };
 
 type FileChange = Data.TaggedEnum<{
@@ -163,19 +174,8 @@ const logFunctionRemovedIndented = (functionPath: FunctionPath.FunctionPath) =>
 export const dev = Command.make("dev", {}, () =>
   Effect.gen(function* () {
     const initialFunctionPaths = yield* codegenHandler;
-    // TODO: Create a service which caches the locations of these values (and updates them when they change?)
 
-    // Ensure that all required Confect files are present and export the correct values before trying to do any codegen:
-    // - schema.ts
-    // - spec.ts
-    // - impl.ts
-    // For any other Confect files (like http.ts) which are optional, if they are present, still verify that they export the correct values.
-    // For optional Confect files which are not present, ensure their corresponding files in Convex are also not present. If they are, remove them.
-
-    const pendingRef = yield* Ref.make<Pending>({
-      specDirty: false,
-      optionalFilesDirty: false,
-    });
+    const pendingRef = yield* Ref.make<Pending>(pendingInit);
     const signal = yield* Queue.sliding<void>(1);
 
     yield* Effect.all(
@@ -203,10 +203,7 @@ const syncLoop = (
         yield* Effect.logDebug("Running sync loop...");
         yield* Queue.take(signal);
 
-        const pending = yield* Ref.getAndSet(pendingRef, {
-          specDirty: false,
-          optionalFilesDirty: false,
-        });
+        const pending = yield* Ref.getAndSet(pendingRef, pendingInit);
 
         const specResult: Option.Option<ReadonlyArray<FileChange>> =
           yield* Effect.if(pending.specDirty, {
@@ -331,11 +328,16 @@ const syncLoop = (
 
         const specChanges = Option.getOrElse(specResult, () => []);
 
+        const dirtyOptionalFileConfigs = Array.filter(
+          optionalFileConfigs,
+          ({ pendingKey }) => pending[pendingKey],
+        );
+
         const optionalChanges: ReadonlyArray<FileChange> = yield* Effect.if(
-          pending.optionalFilesDirty,
+          Array.isNonEmptyReadonlyArray(dirtyOptionalFileConfigs),
           {
             onTrue: () =>
-              Effect.forEach(optionalFileConfigs, syncOptionalFile, {
+              Effect.forEach(dirtyOptionalFileConfigs, syncOptionalFile, {
                 concurrency: "unbounded",
               }).pipe(Effect.map(Array.getSomes)),
             onFalse: () => Effect.succeed([]),
@@ -520,24 +522,28 @@ const optionalFileConfigs = [
   {
     confectFile: "http.ts",
     convexFile: "http.ts",
+    pendingKey: "httpDirty" as const,
     generate: (importPath: string) =>
       templates.http({ httpImportPath: importPath }),
   },
   {
     confectFile: "app.ts",
     convexFile: "convex.config.ts",
+    pendingKey: "appDirty" as const,
     generate: (importPath: string) =>
       templates.convexConfig({ appImportPath: importPath }),
   },
   {
     confectFile: "crons.ts",
     convexFile: "crons.ts",
+    pendingKey: "cronsDirty" as const,
     generate: (importPath: string) =>
       templates.crons({ cronsImportPath: importPath }),
   },
   {
     confectFile: "auth.ts",
     convexFile: "auth.config.ts",
+    pendingKey: "authDirty" as const,
     generate: (importPath: string) =>
       templates.authConfig({ authImportPath: importPath }),
   },
@@ -591,91 +597,28 @@ const confectDirectoryWatcher = (
 ) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
     const confectDirectory = yield* ConfectDirectory.get;
-
-    const implFileName = "impl.ts";
-    const schemaFileName = "schema.ts";
-
-    const implPath = path.join(confectDirectory, implFileName);
-    const schemaPath = path.join(confectDirectory, schemaFileName);
-
-    const requiredKeyToFileName = {
-      doesImplExist: implFileName,
-      doesSchemaExist: schemaFileName,
-    } satisfies Record<keyof RequiredConfectFiles, string>;
-
-    const initialDoesImplExist = yield* fs.exists(implPath);
-    const initialDoesSchemaExist = yield* fs.exists(schemaPath);
-
-    type RequiredConfectFiles = {
-      doesImplExist: boolean;
-      doesSchemaExist: boolean;
-    };
-
-    const requiredConfectFilesRef = yield* Ref.make<RequiredConfectFiles>({
-      doesImplExist: initialDoesImplExist,
-      doesSchemaExist: initialDoesSchemaExist,
-    });
-
-    const processRequiredConfectFile = (key: keyof RequiredConfectFiles) =>
-      Effect.gen(function* () {
-        const fileName = requiredKeyToFileName[key];
-        yield* Effect.logDebug(`Watching ${fileName}...`);
-
-        const doesExist = yield* fs.exists(
-          path.join(confectDirectory, fileName),
-        );
-        yield* Effect.logDebug(`${fileName} does exist: ${doesExist}`);
-        const didExist = (yield* Ref.get(requiredConfectFilesRef))[key];
-        yield* Effect.logDebug(`${fileName} did exist: ${didExist}`);
-
-        yield* Match.value({ doesExist, didExist }).pipe(
-          Match.when({ doesExist: true, didExist: false }, () =>
-            logCompleted(`Found ${fileName}`),
-          ),
-          Match.when({ doesExist: false, didExist: true }, () =>
-            logFailed(`Missing ${fileName}`),
-          ),
-          Match.whenOr(
-            { doesExist: true, didExist: true },
-            { doesExist: false, didExist: false },
-            () => Effect.void,
-          ),
-          Match.exhaustive,
-        );
-
-        yield* Ref.update(requiredConfectFilesRef, (current) => ({
-          ...current,
-          [key]: doesExist,
-        }));
-      });
 
     yield* pipe(
       fs.watch(confectDirectory),
       Stream.runForEach((event) =>
-        Match.value(event.path).pipe(
-          Match.when(implFileName, () =>
-            processRequiredConfectFile("doesImplExist"),
+        pipe(
+          Array.findFirst(
+            optionalFileConfigs,
+            ({ confectFile }) => confectFile === event.path,
           ),
-          Match.when(schemaFileName, () =>
-            processRequiredConfectFile("doesSchemaExist"),
-          ),
-          Match.when(
-            (eventPath) =>
-              Array.some(
-                optionalFileConfigs,
-                ({ confectFile }) => confectFile === eventPath,
+          Option.match({
+            onNone: () => Effect.void,
+            onSome: ({ pendingKey }) =>
+              pipe(
+                pendingRef,
+                Ref.update((pending) => ({
+                  ...pending,
+                  [pendingKey]: true,
+                })),
+                Effect.andThen(Queue.offer(signal, undefined)),
               ),
-            () =>
-              Ref.update(pendingRef, (pending) => ({
-                ...pending,
-                optionalFilesDirty: true,
-              })).pipe(Effect.andThen(Queue.offer(signal, undefined))),
-          ),
-          Match.orElse(() =>
-            Effect.logDebug(`Unknown file changed: ${event.path}`),
-          ),
+          }),
         ),
       ),
     );
