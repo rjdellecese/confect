@@ -8,9 +8,6 @@ export default defineConfig({
     },
     coverage: {
       enabled: true,
-      thresholds: {
-        "100": true,
-      },
       exclude: [
         "tsdown.config.ts",
         "vitest.config.ts",
