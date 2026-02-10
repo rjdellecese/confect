@@ -49,7 +49,10 @@ describe("FunctionPaths.make", () => {
     const result = FunctionPaths.make(spec);
 
     expect(
-      Equal.equals(result, HashSet.make(makeFunctionPath(["myGroup"], "myQuery"))),
+      Equal.equals(
+        result,
+        HashSet.make(makeFunctionPath(["myGroup"], "myQuery")),
+      ),
     ).toBe(true);
   });
 
@@ -181,7 +184,9 @@ describe("FunctionPaths.make", () => {
     expect(
       Equal.equals(
         result,
-        HashSet.make(makeFunctionPath(["level1", "level2", "level3"], "deepQuery")),
+        HashSet.make(
+          makeFunctionPath(["level1", "level2", "level3"], "deepQuery"),
+        ),
       ),
     ).toBe(true);
   });

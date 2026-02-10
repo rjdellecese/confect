@@ -1,4 +1,4 @@
-name: Docs App
+name: Docs
 
 on:
   push:

@@ -11,7 +11,10 @@ describe("GroupPath.getGroupSpec", () => {
   test("returns none for empty spec", () => {
     const spec = Spec.make();
 
-    const result = GroupPath.getGroupSpec(spec, makeGroupPathObj(["nonexistent"]));
+    const result = GroupPath.getGroupSpec(
+      spec,
+      makeGroupPathObj(["nonexistent"]),
+    );
 
     expect(Option.isNone(result)).toBe(true);
   });
@@ -19,7 +22,10 @@ describe("GroupPath.getGroupSpec", () => {
   test("returns none when group does not exist", () => {
     const spec = Spec.make().add(GroupSpec.make("myGroup"));
 
-    const result = GroupPath.getGroupSpec(spec, makeGroupPathObj(["nonexistent"]));
+    const result = GroupPath.getGroupSpec(
+      spec,
+      makeGroupPathObj(["nonexistent"]),
+    );
 
     expect(Option.isNone(result)).toBe(true);
   });
@@ -129,8 +135,14 @@ describe("GroupPath.getGroupSpec", () => {
     const posts = GroupSpec.make("posts");
     const spec = Spec.make().add(users).add(posts);
 
-    const usersResult = GroupPath.getGroupSpec(spec, makeGroupPathObj(["users"]));
-    const postsResult = GroupPath.getGroupSpec(spec, makeGroupPathObj(["posts"]));
+    const usersResult = GroupPath.getGroupSpec(
+      spec,
+      makeGroupPathObj(["users"]),
+    );
+    const postsResult = GroupPath.getGroupSpec(
+      spec,
+      makeGroupPathObj(["posts"]),
+    );
 
     expect(Option.isSome(usersResult)).toBe(true);
     expect(Option.getOrThrow(usersResult).name).toBe("users");

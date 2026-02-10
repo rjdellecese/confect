@@ -46,6 +46,8 @@ describe("make", () => {
         args: Schema.Struct({}),
         returns: Schema.String,
       }),
-    ).toThrowErrorMatchingInlineSnapshot(`[Error: Expected a valid Confect function identifier, but received: "schema". "schema" is a reserved Convex file name.]`);
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Expected a valid Confect function identifier, but received: "schema". "schema" is a reserved Convex file name.]`,
+    );
   });
 });
