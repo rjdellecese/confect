@@ -1,5 +1,11 @@
 # @rjdellecese/confect
 
+## 0.0.35
+
+### Patch Changes
+
+- 5d93334: Fix `ConfectDoc` type
+
 ## 0.0.34
 
 ### Patch Changes
