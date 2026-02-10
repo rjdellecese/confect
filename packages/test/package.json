@@ -37,6 +37,7 @@
     "dev": "tsdown --watch",
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "fix": "prettier --write . && eslint --fix . --max-warnings=0",
+    "format": "prettier --check .",
     "lint": "prettier --check . && eslint . --max-warnings=0",
     "clean": "rm -rf dist coverage node_modules"
   },

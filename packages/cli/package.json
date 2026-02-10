@@ -36,6 +36,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "fix": "prettier --write . && eslint --fix . --max-warnings=0",
+    "format": "prettier --check .",
     "lint": "prettier --check . && eslint . --max-warnings=0",
     "clean": "rm -rf dist coverage node_modules"
   },
@@ -72,6 +73,7 @@
     "vitest": "3.2.4"
   },
   "peerDependencies": {
+    "@confect/core": "workspace:*",
     "@confect/server": "workspace:*",
     "@effect/platform": "^0.93.2",
     "effect": "^3.19.3"

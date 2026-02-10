@@ -1,9 +1,9 @@
-name: Release
+name: Release v1
 
 on:
   push:
     branches:
-      - main
+      - v1
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -39,6 +39,7 @@ jobs:
         uses: changesets/action@v1
         with:
           publish: pnpm release
+          branch: v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

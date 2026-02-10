@@ -1,0 +1,119 @@
+name: Packages
+
+on:
+  push:
+    branches:
+      - main
+      - v1
+    paths:
+      - "packages/core/**"
+      - "packages/cli/**"
+      - "packages/server/**"
+      - "packages/react/**"
+      - "packages/test/**"
+      - "package.json"
+      - "pnpm-workspace.yaml"
+      - "vitest.config.ts"
+      - "vitest.shared.ts"
+      - ".github/workflows/confect.yml"
+      - ".github/actions/confect-setup/**"
+  pull_request:
+    branches:
+      - main
+      - v1
+    paths:
+      - "packages/core/**"
+      - "packages/cli/**"
+      - "packages/server/**"
+      - "packages/react/**"
+      - "packages/test/**"
+      - "package.json"
+      - "pnpm-workspace.yaml"
+      - "vitest.config.ts"
+      - "vitest.shared.ts"
+      - ".github/workflows/confect.yml"
+      - ".github/actions/confect-setup/**"
+
+jobs:
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package:
+          [
+            "@confect/cli",
+            "@confect/core",
+            "@confect/server",
+            "@confect/react",
+            "@confect/test",
+          ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/confect-setup
+      - run: pnpm --filter ${{ matrix.package }} format
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package:
+          [
+            "@confect/cli",
+            "@confect/core",
+            "@confect/server",
+            "@confect/react",
+            "@confect/test",
+          ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/confect-setup
+      - run: pnpm --filter ${{ matrix.package }} typecheck
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package:
+          [
+            "@confect/cli",
+            "@confect/core",
+            "@confect/server",
+            "@confect/react",
+            "@confect/test",
+          ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/confect-setup
+      - run: pnpm --filter ${{ matrix.package }} lint
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package: ["@confect/cli", "@confect/core", "@confect/server"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/confect-setup
+      - run: pnpm --filter ${{ matrix.package }} test
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package:
+          [
+            "@confect/cli",
+            "@confect/core",
+            "@confect/server",
+            "@confect/react",
+            "@confect/test",
+          ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/confect-setup
+      - run: pnpm --filter ${{ matrix.package }} build
