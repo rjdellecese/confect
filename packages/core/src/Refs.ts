@@ -5,72 +5,78 @@ import type * as GroupSpec from "./GroupSpec";
 import * as Ref from "./Ref";
 import type * as Spec from "./Spec";
 
-export type Refs<Spec_ extends Spec.AnyWithProps> = Types.Simplify<
-  Helper<Spec.Groups<Spec_>>
+export type Refs<
+  Spec_ extends Spec.AnyWithProps,
+  Predicate extends Ref.Any = Ref.Any,
+> = Types.Simplify<Helper<Spec.Groups<Spec_>, Predicate>>;
+
+type GroupRefs<
+  Group extends GroupSpec.AnyWithProps,
+  Predicate extends Ref.Any,
+> = Types.Simplify<
+  Helper<GroupSpec.Groups<Group>, Predicate> &
+    FilteredFunctions<GroupSpec.Functions<Group>, Predicate>
 >;
 
-type Helper<Groups extends GroupSpec.AnyWithProps> = {
-  [GroupName in GroupSpec.Name<Groups>]: GroupSpec.WithName<
-    Groups,
-    GroupName
-  > extends infer Group extends GroupSpec.AnyWithProps
-    ? GroupSpec.Groups<Group> extends infer SubGroups extends
-        GroupSpec.AnyWithProps
-      ? Types.Simplify<
-          Helper<SubGroups> & {
-            [FunctionName in FunctionSpec.Name<
-              GroupSpec.Functions<Group>
-            >]: FunctionSpec.WithName<
-              GroupSpec.Functions<Group>,
-              FunctionName
-            > extends infer Function extends FunctionSpec.AnyWithProps
-              ? Ref.Ref<
-                  FunctionSpec.GetFunctionType<Function>,
-                  FunctionSpec.GetFunctionVisibility<Function>,
-                  FunctionSpec.Args<Function>,
-                  FunctionSpec.Returns<Function>
-                >
-              : never;
-          }
-        >
+type FilteredFunctions<
+  Functions extends FunctionSpec.AnyWithProps,
+  Predicate extends Ref.Any,
+> = {
+  [Name in FunctionSpec.Name<Functions> as FunctionSpec.WithName<
+    Functions,
+    Name
+  > extends infer F extends FunctionSpec.AnyWithProps
+    ? Ref.FromFunctionSpec<F> extends Predicate
+      ? Name
       : never
+    : never]: FunctionSpec.WithName<Functions, Name> extends infer F extends
+    FunctionSpec.AnyWithProps
+    ? Ref.FromFunctionSpec<F>
     : never;
 };
 
-type FilterRefs<Refs_, Predicate> = Types.Simplify<{
-  [K in keyof Refs_ as Refs_[K] extends Predicate
-    ? K
-    : Refs_[K] extends Ref.Any
+type Helper<
+  Groups extends GroupSpec.AnyWithProps,
+  Predicate extends Ref.Any,
+> = {
+  [GroupName in GroupSpec.Name<Groups> as GroupSpec.WithName<
+    Groups,
+    GroupName
+  > extends infer Group extends GroupSpec.AnyWithProps
+    ? GroupRefs<Group, Predicate> extends Record<string, never>
       ? never
-      : FilterRefs<Refs_[K], Predicate> extends Record<string, never>
-        ? never
-        : K]: Refs_[K] extends Predicate
-    ? Refs_[K]
-    : FilterRefs<Refs_[K], Predicate>;
-}>;
+      : GroupName
+    : never]: GroupSpec.WithName<Groups, GroupName> extends infer Group extends
+    GroupSpec.AnyWithProps
+    ? GroupRefs<Group, Predicate>
+    : never;
+};
 
-export const justInternal = <Refs_ extends RefsAnyWithProps>(
-  refs: Refs_,
-): FilterRefs<Refs_, Ref.AnyInternal> => refs as any;
-
-export const justPublic = <Refs_ extends RefsAnyWithProps>(
-  refs: Refs_,
-): FilterRefs<Refs_, Ref.AnyPublic> => refs as any;
-
-export type RefsAnyWithProps =
+type Any =
   | {
-      readonly [key: string]: RefsAnyWithProps;
+      readonly [key: string]: Any;
     }
   | Ref.Any;
 
 export const make = <Spec_ extends Spec.AnyWithProps>(
   spec: Spec_,
-): Refs<Spec_> => makeHelper(spec.groups) as Refs<Spec_>;
+): {
+  all: Refs<Spec_>;
+  public: Refs<Spec_, Ref.AnyPublic>;
+  internal: Refs<Spec_, Ref.AnyInternal>;
+} => {
+  const refs = makeHelper(spec.groups);
+  return {
+    all: refs as Refs<Spec_>,
+    public: refs as Refs<Spec_, Ref.AnyPublic>,
+    internal: refs as Refs<Spec_, Ref.AnyInternal>,
+  };
+};
 
 const makeHelper = (
   groups: Record.ReadonlyRecord<string, GroupSpec.Any>,
   groupPath: string | null = null,
-): RefsAnyWithProps =>
+): Any =>
   pipe(
     groups as Record.ReadonlyRecord<string, GroupSpec.AnyWithProps>,
     Record.map((group) => {
