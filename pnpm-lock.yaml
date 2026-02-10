@@ -224,6 +224,9 @@ importers:
       '@effect/language-service':
         specifier: 0.56.0
         version: 0.56.0
+      '@effect/vitest':
+        specifier: 0.27.0
+        version: 0.27.0(effect@3.19.3)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@24.10.1)(jiti@2.5.1)(tsx@4.20.6)(yaml@2.6.0))
       '@eslint/js':
         specifier: 9.39.1
         version: 9.39.1
