@@ -33,7 +33,7 @@
     "./internal/*": null
   },
   "scripts": {
-    "build": "tsdown",
+    "build": "tsdown --config-loader unrun",
     "dev": "tsdown --watch",
     "test": "vitest run",
     "typecheck": "tsc --noEmit --project tsconfig.json",
