@@ -38,7 +38,7 @@
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "fix": "prettier --write . && eslint --fix . --max-warnings=0",
     "format": "prettier --check .",
-    "lint": "prettier --check . && eslint . --max-warnings=0",
+    "lint": "eslint . --max-warnings=0",
     "bench": "tsx test/Refs.bench.ts",
     "clean": "rm -rf dist coverage node_modules"
   },

@@ -7,7 +7,7 @@
     "build": "echo 'Docs built and deployed via Mintlify hosting - no local build needed'",
     "preview": "mintlify dev",
     "format": "prettier --check .",
-    "lint": "prettier --check . && eslint . --max-warnings=0",
+    "lint": "eslint . --max-warnings=0",
     "fix": "prettier --write . && eslint --fix . --max-warnings=0",
     "typecheck": "echo 'No TypeScript in docs'",
     "clean": "rm -rf .mintlify node_modules"
