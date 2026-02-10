@@ -20,7 +20,7 @@ describe("make", () => {
         }),
       ),
     );
-    const refs = Refs.make(spec);
+    const { all: refs } = Refs.make(spec);
 
     const actualRef = refs.notes.list;
     const expectedRef = Ref.make(
@@ -57,10 +57,8 @@ describe("make", () => {
       `[Error: Group and function at same level have same name ('notes:list')]`,
     );
   });
-});
 
-describe("justInternal", () => {
-  it("filters refs to only internal functions", () => {
+  it("filters internal refs to only internal functions", () => {
     const FnArgs = Schema.Struct({});
     const FnReturns = Schema.String;
 
@@ -81,8 +79,7 @@ describe("justInternal", () => {
           }),
         ),
     );
-    const refs = Refs.make(spec);
-    const internalRefs = Refs.justInternal(refs);
+    const { internal: internalRefs } = Refs.make(spec);
 
     expectTypeOf(internalRefs.notes.internalList).toEqualTypeOf<
       Ref.Ref<"query", "internal", typeof FnArgs, typeof FnReturns>
@@ -92,10 +89,43 @@ describe("justInternal", () => {
     // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     internalRefs.notes.publicList;
   });
-});
 
-describe("justPublic", () => {
-  it("filters refs to only public functions", () => {
+  it("filters out groups with no matching functions", () => {
+    const FnArgs = Schema.Struct({});
+    const FnReturns = Schema.String;
+
+    const spec = Spec.make()
+      .add(
+        GroupSpec.make("publicOnly").addFunction(
+          FunctionSpec.query({
+            name: "list",
+            args: FnArgs,
+            returns: FnReturns,
+          }),
+        ),
+      )
+      .add(
+        GroupSpec.make("internalOnly").addFunction(
+          FunctionSpec.internalQuery({
+            name: "list",
+            args: FnArgs,
+            returns: FnReturns,
+          }),
+        ),
+      );
+
+    const { internal: internalRefs } = Refs.make(spec);
+
+    expectTypeOf(internalRefs.internalOnly.list).toEqualTypeOf<
+      Ref.Ref<"query", "internal", typeof FnArgs, typeof FnReturns>
+    >();
+
+    // @ts-expect-error - publicOnly group should be filtered out entirely
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    internalRefs.publicOnly;
+  });
+
+  it("filters public refs to only public functions", () => {
     const FnArgs = Schema.Struct({});
     const FnReturns = Schema.String;
 
@@ -116,8 +146,7 @@ describe("justPublic", () => {
           }),
         ),
     );
-    const refs = Refs.make(spec);
-    const publicRefs = Refs.justPublic(refs);
+    const { public: publicRefs } = Refs.make(spec);
 
     expectTypeOf(publicRefs.notes.publicList).toEqualTypeOf<
       Ref.Ref<"query", "public", typeof FnArgs, typeof FnReturns>

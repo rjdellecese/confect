@@ -38,6 +38,7 @@
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "fix": "prettier --write . && eslint --fix . --max-warnings=0",
     "lint": "prettier --check . && eslint . --max-warnings=0",
+    "bench": "tsx test/Refs.bench.ts",
     "clean": "rm -rf dist coverage node_modules"
   },
   "keywords": [
@@ -47,6 +48,7 @@
   "author": "RJ Dellecese",
   "license": "ISC",
   "devDependencies": {
+    "@ark/attest": "^0.56.0",
     "@effect/language-service": "0.56.0",
     "@eslint/js": "9.39.1",
     "@tsconfig/strictest": "2.0.8",

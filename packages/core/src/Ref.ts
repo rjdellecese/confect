@@ -108,6 +108,13 @@ export type Returns<Ref_> =
     ? Returns_
     : never;
 
+export type FromFunctionSpec<F extends FunctionSpec.AnyWithProps> = Ref<
+  FunctionSpec.GetFunctionType<F>,
+  FunctionSpec.GetFunctionVisibility<F>,
+  FunctionSpec.Args<F>,
+  FunctionSpec.Returns<F>
+>;
+
 export const make = <
   FunctionType_ extends FunctionType,
   FunctionVisibility_ extends FunctionVisibility,
