@@ -8,5 +8,7 @@
     "@confect/server": "0.0.1",
     "@confect/test": "0.0.1"
   },
-  "changesets": []
+  "changesets": [
+    "cute-rules-jog"
+  ]
 }

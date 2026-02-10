@@ -1,6 +1,6 @@
 {
   "name": "@confect/cli",
-  "version": "0.0.1",
+  "version": "1.0.0-next.0",
   "description": "Confect CLI",
   "repository": {
     "type": "git",
