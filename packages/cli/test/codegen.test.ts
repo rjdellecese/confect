@@ -89,7 +89,7 @@ layer(NodeContext.layer)("codegen", (it) => {
           yield* fs.exists(path.join(tempDirectory, "convex", "notes.ts")),
         );
 
-        const exitCode = yield* Command.make("npx", "tsc").pipe(
+        const exitCode = yield* Command.make("pnpm", "exec", "tsc").pipe(
           Command.workingDirectory(tempDirectory),
           Command.stdout("inherit"),
           Command.stderr("inherit"),
