@@ -15,7 +15,7 @@ on:
       - "pnpm-workspace.yaml"
       - "vitest.config.ts"
       - "vitest.shared.ts"
-      - ".github/workflows/confect.yml"
+      - ".github/workflows/packages.yml"
       - ".github/actions/confect-setup/**"
   pull_request:
     branches:
@@ -31,7 +31,7 @@ on:
       - "pnpm-workspace.yaml"
       - "vitest.config.ts"
       - "vitest.shared.ts"
-      - ".github/workflows/confect.yml"
+      - ".github/workflows/packages.yml"
       - ".github/actions/confect-setup/**"
 
 jobs:

@@ -20,7 +20,8 @@ export default mergeConfig(
       ],
     },
     test: {
-      root: import.meta.dirname,
+      root: path.resolve(import.meta.dirname),
+      include: ["test/**/*.test.ts"],
       globalSetup: ["./test/setup.ts"],
     },
   }),
