@@ -94,11 +94,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        package: ["@confect/cli", "@confect/core", "@confect/server"]
+        package: [cli, core, server]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/confect-setup
-      - run: pnpm exec vitest run --project ${{ matrix.package }}
+      - run: cd packages/${{ matrix.package }} && pnpm test
 
   build:
     name: Build

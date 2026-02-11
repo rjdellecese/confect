@@ -35,6 +35,7 @@
   "scripts": {
     "build": "tsdown --config-loader unrun",
     "dev": "tsdown --watch",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "fix": "prettier --write . && eslint --fix . --max-warnings=0",
     "format": "prettier --check .",
