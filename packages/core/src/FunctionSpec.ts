@@ -7,7 +7,7 @@ import type {
 } from "convex/server";
 import type { Schema } from "effect";
 import { Predicate } from "effect";
-import { validateJsIdentifier } from "./internal/utils";
+import { validateConfectFunctionIdentifier } from "./internal/utils";
 
 export const TypeId = "@confect/core/api/FunctionSpec";
 export type TypeId = typeof TypeId;
@@ -34,24 +34,23 @@ export interface Any {
   readonly [TypeId]: TypeId;
 }
 
-export interface AnyWithProps
-  extends FunctionSpec<
-    FunctionType,
-    FunctionVisibility,
-    string,
-    Schema.Schema.AnyNoContext,
-    Schema.Schema.AnyNoContext
-  > {}
+export interface AnyWithProps extends FunctionSpec<
+  FunctionType,
+  FunctionVisibility,
+  string,
+  Schema.Schema.AnyNoContext,
+  Schema.Schema.AnyNoContext
+> {}
 
 export interface AnyWithPropsWithFunctionType<
   FunctionType_ extends FunctionType,
 > extends FunctionSpec<
-    FunctionType_,
-    FunctionVisibility,
-    string,
-    Schema.Schema.AnyNoContext,
-    Schema.Schema.AnyNoContext
-  > {}
+  FunctionType_,
+  FunctionVisibility,
+  string,
+  Schema.Schema.AnyNoContext,
+  Schema.Schema.AnyNoContext
+> {}
 
 export type GetFunctionType<Function extends AnyWithProps> =
   Function["functionType"];
@@ -81,21 +80,21 @@ export type ExcludeName<
 > = Exclude<Function, { readonly name: Name_ }>;
 
 export type RegisteredFunction<Function extends AnyWithProps> =
-  Function["functionType"] extends "Query"
+  Function["functionType"] extends "query"
     ? RegisteredQuery<
-        Lowercase<GetFunctionVisibility<Function>>,
+        GetFunctionVisibility<Function>,
         Args<Function>["Encoded"],
         Promise<Returns<Function>["Encoded"]>
       >
-    : Function["functionType"] extends "Mutation"
+    : Function["functionType"] extends "mutation"
       ? RegisteredMutation<
-          Lowercase<GetFunctionVisibility<Function>>,
+          GetFunctionVisibility<Function>,
           Args<Function>["Encoded"],
           Promise<Returns<Function>["Encoded"]>
         >
-      : Function["functionType"] extends "Action"
+      : Function["functionType"] extends "action"
         ? RegisteredAction<
-            Lowercase<GetFunctionVisibility<Function>>,
+            GetFunctionVisibility<Function>,
             Args<Function>["Encoded"],
             Promise<Returns<Function>["Encoded"]>
           >
@@ -132,7 +131,7 @@ const make =
     Args_,
     Returns_
   > => {
-    validateJsIdentifier(name);
+    validateConfectFunctionIdentifier(name);
 
     return Object.assign(Object.create(Proto), {
       functionType,

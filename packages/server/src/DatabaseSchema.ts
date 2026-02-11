@@ -1,4 +1,4 @@
-import type { GenericSchema } from "convex/server";
+import type { Expand, GenericSchema } from "convex/server";
 import {
   defineSchema as defineConvexSchema,
   type SchemaDefinition,
@@ -18,7 +18,10 @@ export const isSchema = (u: unknown): u is Any =>
 export interface DatabaseSchema<Tables_ extends Table.AnyWithProps = never> {
   readonly [TypeId]: TypeId;
   readonly tables: Table.TablesRecord<Tables_>;
-  readonly convexSchemaDefinition: SchemaDefinition<GenericSchema, true>;
+  readonly convexSchemaDefinition: SchemaDefinition<
+    ConvexDatabaseSchemaFromTables<Tables_>,
+    true
+  >;
 
   /**
    * Add a table definition to the schema.
@@ -96,6 +99,14 @@ export const make = (): DatabaseSchema<never> =>
     tables: Record.empty(),
     convexSchemaDefinition: defineConvexSchema({}),
   });
+
+export type ConvexDatabaseSchemaFromTables<Tables_ extends Table.AnyWithProps> =
+  Expand<{
+    [TableName in Table.Name<Tables_> & string]: Table.WithName<
+      Tables_,
+      TableName
+    >["tableDefinition"];
+  }>;
 
 // System tables
 

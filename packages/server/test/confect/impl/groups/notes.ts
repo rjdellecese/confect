@@ -1,13 +1,13 @@
+import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Effect, Layer } from "effect";
-import { FunctionImpl, GroupImpl } from "../../../../src/index";
+import api from "../../_generated/api";
 import { DatabaseReader, DatabaseWriter } from "../../_generated/services";
-import { api } from "../../api";
 
 const insert = FunctionImpl.make(api, "groups.notes", "insert", ({ text }) =>
   Effect.gen(function* () {
     const writer = yield* DatabaseWriter;
 
-    return yield* writer.insert("notes", { text });
+    return yield* writer.table("notes").insert({ text });
   }).pipe(Effect.orDie),
 );
 
@@ -30,7 +30,7 @@ const delete_ = FunctionImpl.make(
     Effect.gen(function* () {
       const writer = yield* DatabaseWriter;
 
-      yield* writer.delete("notes", noteId);
+      yield* writer.table("notes").delete(noteId);
 
       return null;
     }).pipe(Effect.orDie),

@@ -9,15 +9,23 @@ description: "Install the library and start using it in your project."
 <CodeGroup>
 
 ```bash pnpm
-pnpm add @rjdellecese/confect
+pnpm add convex @confect/core @confect/server @confect/cli @confect/react
 ```
 
 ```bash npm
-npm install @rjdellecese/confect
+npm install convex @confect/core @confect/server @confect/cli @confect/react
 ```
 
 ```bash yarn
-yarn add @rjdellecese/confect
+yarn add convex @confect/core @confect/server @confect/cli @confect/react
+```
+
+```bash bun
+bun add convex @confect/core @confect/server @confect/cli @confect/react
+```
+
+```bash deno
+deno add convex @confect/core @confect/server @confect/cli @confect/react
 ```
 
 </CodeGroup>
@@ -25,72 +33,225 @@ yarn add @rjdellecese/confect
 ## Usage
 
 <Steps>
+  <Step title="Set up your Convex dev deployment">
+    Run `convex dev` to set up your Convex dev deployment.
+  </Step>
+
   <Step title="Define your database schema">
     <Note>
       Not every Effect `Schema` is valid for use in Confect. See
       <a href="schema-restrictions">schema-restrictions</a> for more
       information about what's permitted and what's not.
     </Note>
-    ```ts confect/schema.ts expandable
-    import {
-      defineConfectSchema,
-      defineConfectTable,
-      GenericId,
-    } from "@rjdellecese/confect/server";
+
+    Define a table.
+
+    ```ts confect/tables/note.ts
+    import { Table } from "@confect/server";
     import { Schema } from "effect";
 
-    type Tag = {
-      readonly name: string;
-      readonly tags: readonly Tag[];
-    };
+    export const Note = Table.make(
+      "notes",
+      Schema.Struct({
+        text: Schema.String,
+      }),
+    );
+    ```
 
-    const Tag = Schema.Struct({
-      name: Schema.String,
-      tags: Schema.Array(Schema.suspend((): Schema.Schema<Tag> => Tag)),
-    });
+    And then add it to your database schema.
 
-    export const confectSchema = defineConfectSchema({
-      notes: defineConfectTable(
-        Schema.Struct({
-          userId: Schema.optional(GenericId("users")),
-          text: Schema.String.pipe(Schema.maxLength(100)),
-          tag: Schema.optional(Schema.String),
-          author: Schema.optional(
-            Schema.Struct({
-              role: Schema.Literal("admin", "user"),
-              name: Schema.String,
-            }),
-          ),
-          embedding: Schema.optional(Schema.Array(Schema.Number)),
-        }),
-      )
-        .index("by_text", ["text"])
-        .index("by_role", ["author.role"])
-        .searchIndex("text", {
-          searchField: "text",
-          filterFields: ["tag"],
-        })
-        .vectorIndex("embedding", {
-          vectorField: "embedding",
-          filterFields: ["author.name", "tag"],
-          dimensions: 1536,
-        }),
-      users: defineConfectTable(
-        Schema.Struct({
-          username: Schema.String,
-        }),
-      ),
-      tags: defineConfectTable(Tag),
-    });
+    ```ts confect/schema.ts
+    import { DatabaseSchema } from "@confect/server";
 
-    export default confectSchema.convexSchemaDefinition;
+    import { Note } from "./tables/note";
+
+    export default DatabaseSchema.make().addTable(Note);
     ```
 
   </Step>
-  <Step title="Generate your Convex function constructors and types">
-    Two
+
+  <Step title="Define your Confect API spec">
+    Create a `GroupSpec` and add some functions to it.
+
+    ```ts confect/spec/notes.ts
+    import { GroupSpec } from "@confect/core";
+    import { Schema } from "effect";
+
+    import { Notes } from "../tables/Notes";
+
+    export const notes = GroupSpec.make("notes")
+      .addFunction(
+        FunctionSpec.query({
+          name: "list",
+          args: Schema.Struct({}),
+          returns: Schema.Array(Note.Doc),
+        }),
+      )
+      .addFunction(
+        FunctionSpec.mutation({
+          name: "create",
+          args: Schema.Struct({ text: Schema.String }),
+          returns: Schema.Null,
+        }),
+      );
+    ```
+
+    Add the `GroupSpec` to your API's `Spec`.
+
+    ```ts confect/spec.ts
+    import { Spec } from "@confect/server";
+
+    import { notes } from "./spec/notes";
+
+    export default Spec.make().addGroup(notes);
+    ```
+
   </Step>
-  <Step title="Write some Convex functions!">Three</Step>
+
+  <Step title="Run the codegen command">
+    Generate your app's Confect API, services, and registered functions.
+
+    ```bash
+    confect codegen
+    ```
+
+  </Step>
+
+  <Step title="Implement your Confect functions">
+    Create a `GroupImpl` and implement its functions.
+
+    ```ts confect/impl/notes.ts
+    import { FunctionImpl, GroupImpl } from "@confect/server";
+    import { Effect, Layer } from "effect";
+
+    import api from "../_generated/api";
+    import { DatabaseReader, DatabaseWriter } from "../_generated/services";
+
+    const list = FunctionImpl.make(api, "notes", "list", () =>
+      Effect.gen(function* () {
+        const reader = yield* DatabaseReader;
+
+        return yield* reader
+          .table("notes")
+          .index("by_creation_time", "desc")
+          .collect();
+      }).pipe(Effect.orDie),
+    );
+
+    const create = FunctionImpl.make(api, "notes", "create", ({ text }) =>
+      Effect.gen(function* () {
+        const writer = yield* DatabaseWriter;
+
+        return yield* writer.table("notes").insert({ text });
+      }).pipe(Effect.orDie),
+    );
+
+    export const notes = GroupImpl.make(api, "notes").pipe(
+      Layer.provide(list),
+      Layer.provide(create),
+    );
+    ```
+
+    Add the `GroupImpl` to your API's `Impl`, and finalize it.
+
+    ```ts confect/impl.ts
+    import { Impl } from "@confect/server";
+    import { Layer } from "effect";
+
+    import api from "./_generated/api";
+    import { notes } from "./impl/notes";
+
+    export default Impl.make(api).pipe(
+      Layer.provide(notes),
+      Impl.finalize,
+    );
+    ```
+
+  </Step>
+
+  <Step title="Start your Confect app">
+    Run the `confect dev` command to generate your app's Convex functions.
+
+    ```bash
+    confect dev
+    ```
+
+    In another terminal, run the `convex dev` command to start your Convex dev deployment.
+
+    ```bash
+    convex dev
+    ```
+
+  </Step>
+
+  <Step title="Call your Confect functions from your React app">
+
+    Set up the Convex React client and provider.
+
+    ```tsx src/main.tsx
+    import { ConvexProvider, ConvexReactClient } from "convex/react";
+    import React from "react";
+    import ReactDOM from "react-dom/client";
+
+    import App from "./App";
+
+    const convexClient = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
+
+    ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+      <React.StrictMode>
+        <ConvexProvider client={convexClient}>
+          <App />
+        </ConvexProvider>
+      </React.StrictMode>,
+    );
+    ```
+
+    Use Confect's React hooks alongside your Confect public refs to call your Confect functions.
+
+    ```tsx src/App.tsx
+    import { useMutation, useQuery } from "@confect/react";
+    import { Array, Effect } from "effect";
+    import { useState } from "react";
+
+    import { public } from "../confect/_generated/refs";
+
+    const App = () => {
+      const notes = useQuery(public.notes.list, {});
+
+      const createNote = useMutation(public.notes.create);
+
+      const [note, setNote] = useState("");
+
+      return (
+        <div>
+          <ul>
+            {Array.map(notes, (note) => (
+              <li key={note._id}>{note.text}</li>
+            ))}
+          </ul>
+
+          <br />
+
+          <textarea
+            rows={4}
+            cols={50}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+          <br />
+          <button
+            onClick={() => createNote({ text: note }).then(() => setNote(""))}
+          >
+            Create note
+          </button>
+        </div>
+      );
+    };
+
+    export default App;
+    ```
+
+  </Step>
 </Steps>
 
 ## Example project

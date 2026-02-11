@@ -1,11 +1,12 @@
 import type { Record } from "effect";
 import type * as GroupSpec from "./GroupSpec";
 
-// Recursively generates paths for a group and its nested groups.
-// For a group with no subgroups, returns just the group name.
-// For a group with subgroups, returns the group name plus all possible paths
-// through its direct subgroups. Properly distributes over union types to prevent
-// cross-contamination of paths from different groups.
+/**
+ * Recursively generates paths for a group and its nested groups.
+ *
+ * - For a group with no subgroups, returns just the group name.
+ * - For a group with subgroups, returns the group name plus all possible paths through its direct subgroups.
+ */
 export type All<
   Group extends GroupSpec.AnyWithProps,
   Depth extends 1[] = [],
@@ -29,8 +30,10 @@ type AllHelper<
  * Recursively extracts the group at the given dot-separated path.
  * Path must match the format defined in `Path` above, e.g. "group" or "group.subgroup".
  *
- * Example:
- *   type G = WithPath<RootGroup, "group.subgroup">;
+ * @example
+ * ```ts
+ * type G = WithPath<RootGroup, "group.subgroup">;
+ * ```
  */
 export type GroupAt<
   Group,

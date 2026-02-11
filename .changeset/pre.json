@@ -1,0 +1,17 @@
+{
+  "mode": "pre",
+  "tag": "next",
+  "initialVersions": {
+    "@confect/cli": "0.0.1",
+    "@confect/core": "0.0.1",
+    "@confect/react": "0.0.1",
+    "@confect/server": "0.0.1",
+    "@confect/test": "0.0.1"
+  },
+  "changesets": [
+    "cute-rules-jog",
+    "mighty-icons-pick",
+    "polite-bags-tap",
+    "thirty-signs-wonder"
+  ]
+}

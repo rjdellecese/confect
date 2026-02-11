@@ -20,33 +20,27 @@ export type TypeId = typeof TypeId;
 export type TableInfo<Table_ extends Table.AnyWithProps> =
   Table_ extends Table.Table<
     infer TableName,
-    infer TableSchema_,
+    infer _TableSchema,
     infer TableValidator,
     infer Indexes,
     infer SearchIndexes,
     infer VectorIndexes
   >
-    ? TableSchema_ extends Schema.Schema.AnyNoContext
-      ? {
-          readonly [TypeId]: TypeId;
-          // It's pretty hard to recursively make an arbitrary TS type readonly/mutable, so we capture both the readonly version of the `convexDocument` (which is the `encodedDocument`) and the mutable version (`convexDocument`).
-          readonly document: ExtractDocument_<TableName, TableSchema_>;
-          readonly encodedDocument: ExtractEncodedDocument<
-            TableName,
-            TableSchema_
-          >;
-          readonly convexDocument: ExtractConvexDocument<
-            TableName,
-            TableValidator
-          >;
-          readonly fieldPaths:
-            | keyof IdField<TableName>
-            | ExtractFieldPaths<TableValidator>;
-          readonly indexes: Types.Simplify<Indexes & SystemIndexes>;
-          readonly searchIndexes: SearchIndexes;
-          readonly vectorIndexes: VectorIndexes;
-        }
-      : never
+    ? {
+        readonly [TypeId]: TypeId;
+        readonly document: Table_["Doc"]["Type"];
+        readonly encodedDocument: Table_["Doc"]["Encoded"];
+        readonly convexDocument: ExtractConvexDocument<
+          TableName,
+          TableValidator
+        >;
+        readonly fieldPaths:
+          | keyof IdField<TableName>
+          | ExtractFieldPaths<TableValidator>;
+        readonly indexes: Types.Simplify<Indexes & SystemIndexes>;
+        readonly searchIndexes: SearchIndexes;
+        readonly vectorIndexes: VectorIndexes;
+      }
     : never;
 
 export interface Any {
@@ -78,22 +72,6 @@ export type TableSchema<TableInfo_ extends AnyWithProps> = Schema.Schema<
 
 export type Document<TableInfo_ extends AnyWithProps> = TableInfo_["document"];
 
-type ExtractDocument_<
-  TableName extends string,
-  TableSchema_ extends Schema.Schema.AnyNoContext,
-> = Types.Simplify<
-  Readonly<IdField<TableName>> & Readonly<SystemFields> & TableSchema_["Type"]
->;
-
-type ExtractEncodedDocument<
-  TableName extends string,
-  TableSchema_ extends Schema.Schema.AnyNoContext,
-> = Types.Simplify<
-  Readonly<IdField<TableName>> &
-    Readonly<SystemFields> &
-    TableSchema_["Encoded"]
->;
-
 // Vendored types from convex-js, partially modified.
 // See https://github.com/get-convex/convex-js/pull/14
 
@@ -107,6 +85,6 @@ type ExtractConvexDocument<
 > =
   Expand<IdField<TableName> & SystemFields & T["type"]> extends GenericDocument
     ? Expand<IdField<TableName> & SystemFields & T["type"]>
-    : "Oops";
+    : never;
 
 // End of vendored types from convex-js, partially modified.

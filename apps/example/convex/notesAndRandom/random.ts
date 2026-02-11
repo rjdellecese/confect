@@ -1,3 +1,3 @@
-import server from "../../confect/server";
+import registeredFunctions from "../../confect/_generated/registeredFunctions";
 
-export const getNumber = server.registeredFunctions.notesAndRandom.random.getNumber;
+export const getNumber = registeredFunctions.notesAndRandom.random.getNumber;

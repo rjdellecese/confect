@@ -1,6 +1,6 @@
 import { Predicate, Record } from "effect";
 import type * as FunctionSpec from "./FunctionSpec";
-import { validateJsIdentifier } from "./internal/utils";
+import { validateConfectFunctionIdentifier } from "./internal/utils";
 
 export const TypeId = "@confect/core/api/GroupSpec";
 export type TypeId = typeof TypeId;
@@ -38,8 +38,11 @@ export interface Any {
   readonly [TypeId]: TypeId;
 }
 
-export interface AnyWithProps
-  extends GroupSpec<string, FunctionSpec.AnyWithProps, AnyWithProps> {}
+export interface AnyWithProps extends GroupSpec<
+  string,
+  FunctionSpec.AnyWithProps,
+  AnyWithProps
+> {}
 
 export type Name<Group extends AnyWithProps> = Group["name"];
 
@@ -110,7 +113,7 @@ const makeProto = <
 export const make = <const Name_ extends string>(
   name: Name_,
 ): GroupSpec<Name_> => {
-  validateJsIdentifier(name);
+  validateConfectFunctionIdentifier(name);
 
   return makeProto({
     name,

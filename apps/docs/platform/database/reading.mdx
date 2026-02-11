@@ -1,7 +1,7 @@
 ---
 icon: "book-open-text"
 title: "Reading"
-description: "Retrieve documents from the database"
+description: "Retrieve documents from the database."
 ---
 
 The `ConfectDatabaseReader` service is used to read documents from the database.
@@ -43,13 +43,13 @@ reader.table("users").get("by_name_and_age", "John Doe", 21);
 
 ### Indexes
 
-Every query must specify either a database index or a search index.
+Every query must specify either a standard index or a search index.
 
-#### Database indexes
+#### Standard indexes
 
-Database indexes are what you'll use most of the time. There are two default database indexes, which exist for every table: `by_creation_time` and `by_id`. The rest are defined in your schema.
+Standard indexes are what you'll use most of the time. There are two default standard indexes, which exist for every table: `by_creation_time` and `by_id`. The rest are defined in your schema.
 
-Database indexes determine both the sort order of the results and which fields may be filtered on. Fields must be filtered in the order they are defined in the index.
+Standard indexes determine both the sort order of the results and which fields may be filtered on. Fields must be filtered in the order they are defined in the index.
 
 Order is ascending by default, but can be specified in the final argument to the `index` method.
 

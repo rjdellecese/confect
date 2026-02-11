@@ -20,53 +20,47 @@ export interface AnyInternal extends Ref<any, "internal", any, any> {}
 
 export interface AnyPublic extends Ref<any, "public", any, any> {}
 
-export interface AnyQuery
-  extends Ref<
-    "query",
-    FunctionVisibility,
-    Schema.Schema.AnyNoContext,
-    Schema.Schema.AnyNoContext
-  > {}
+export interface AnyQuery extends Ref<
+  "query",
+  FunctionVisibility,
+  Schema.Schema.AnyNoContext,
+  Schema.Schema.AnyNoContext
+> {}
 
-export interface AnyMutation
-  extends Ref<
-    "mutation",
-    FunctionVisibility,
-    Schema.Schema.AnyNoContext,
-    Schema.Schema.AnyNoContext
-  > {}
+export interface AnyMutation extends Ref<
+  "mutation",
+  FunctionVisibility,
+  Schema.Schema.AnyNoContext,
+  Schema.Schema.AnyNoContext
+> {}
 
-export interface AnyAction
-  extends Ref<
-    "action",
-    FunctionVisibility,
-    Schema.Schema.AnyNoContext,
-    Schema.Schema.AnyNoContext
-  > {}
+export interface AnyAction extends Ref<
+  "action",
+  FunctionVisibility,
+  Schema.Schema.AnyNoContext,
+  Schema.Schema.AnyNoContext
+> {}
 
-export interface AnyPublicQuery
-  extends Ref<
-    "query",
-    "public",
-    Schema.Schema.AnyNoContext,
-    Schema.Schema.AnyNoContext
-  > {}
+export interface AnyPublicQuery extends Ref<
+  "query",
+  "public",
+  Schema.Schema.AnyNoContext,
+  Schema.Schema.AnyNoContext
+> {}
 
-export interface AnyPublicMutation
-  extends Ref<
-    "mutation",
-    "public",
-    Schema.Schema.AnyNoContext,
-    Schema.Schema.AnyNoContext
-  > {}
+export interface AnyPublicMutation extends Ref<
+  "mutation",
+  "public",
+  Schema.Schema.AnyNoContext,
+  Schema.Schema.AnyNoContext
+> {}
 
-export interface AnyPublicAction
-  extends Ref<
-    "action",
-    "public",
-    Schema.Schema.AnyNoContext,
-    Schema.Schema.AnyNoContext
-  > {}
+export interface AnyPublicAction extends Ref<
+  "action",
+  "public",
+  Schema.Schema.AnyNoContext,
+  Schema.Schema.AnyNoContext
+> {}
 
 export type GetFunctionType<Ref_> =
   Ref_ extends Ref<
@@ -107,6 +101,13 @@ export type Returns<Ref_> =
   >
     ? Returns_
     : never;
+
+export type FromFunctionSpec<F extends FunctionSpec.AnyWithProps> = Ref<
+  FunctionSpec.GetFunctionType<F>,
+  FunctionSpec.GetFunctionVisibility<F>,
+  FunctionSpec.Args<F>,
+  FunctionSpec.Returns<F>
+>;
 
 export const make = <
   FunctionType_ extends FunctionType,

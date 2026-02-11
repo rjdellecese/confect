@@ -2,7 +2,20 @@ packages:
   - packages/*
   - apps/*
 
-overrides:
-  "@confect/core": link:packages/core
-  "@confect/server": link:packages/server
-  "@confect/react": link:packages/react
+onlyBuiltDependencies:
+  - sharp
+
+packageExtensions:
+  "@mintlify/mdx":
+    peerDependencies:
+      react: "*"
+      react-dom: "*"
+  "next-mdx-remote-client":
+    peerDependencies:
+      react: "*"
+      react-dom: "*"
+
+peerDependencyRules:
+  allowedVersions:
+    react: "19"
+    react-dom: "19"

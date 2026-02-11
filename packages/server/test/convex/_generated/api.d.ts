@@ -20,6 +20,36 @@ import type { GenericId as Id } from "convex/values";
  * ```
  */
 export declare const api: {
+  databaseReader: {
+    getNote: FunctionReference<
+      "query",
+      "public",
+      { noteId: Id<"notes"> },
+      {
+        _creationTime: number;
+        _id: Id<"notes">;
+        author?: { name: string; role: "admin" | "user" };
+        embedding?: Array<number>;
+        tag?: string;
+        text: string;
+        userId?: Id<"users">;
+      }
+    >;
+    listNotes: FunctionReference<
+      "query",
+      "public",
+      {},
+      Array<{
+        _creationTime: number;
+        _id: Id<"notes">;
+        author?: { name: string; role: "admin" | "user" };
+        embedding?: Array<number>;
+        tag?: string;
+        text: string;
+        userId?: Id<"users">;
+      }>
+    >;
+  };
   groups: {
     notes: {
       delete_: FunctionReference<

@@ -1,6 +1,6 @@
 ---
 icon: "octagon-minus"
-title: "Schema restrictions"
+title: "Schema Restrictions"
 description: "Understand the restrictions on Effect schemas that can be used in Confect."
 ---
 
@@ -13,7 +13,7 @@ type Schema<Type, Encoded, Context>
 For `Schema`s used in Confect:
 
 - `Type` represents the value that you'll be operating on in your code. Any TypeScript type is permitted here.
-- `Encoded` represents the value that is stored in the database or provided as an argument/returned as a value in a Convex function. This must be a valid [Convex value](https://docs.convex.dev/database/types#convex-values).
+- `Encoded` represents the value that is stored in the database or serialized as the argument/output of a Convex function. This must be a valid [Convex value](https://docs.convex.dev/database/types#convex-values).
 - `Context` is not currently supported. It should always be `never`.
 
 ## Additional caveats

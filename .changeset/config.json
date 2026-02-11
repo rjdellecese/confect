@@ -2,10 +2,10 @@
   "$schema": "../node_modules/@changesets/config/schema.json",
   "changelog": "@changesets/cli/changelog",
   "commit": false,
-  "fixed": [["@confect/core", "@confect/react", "@confect/server"]],
-  "linked": [],
+  "fixed": [],
+  "linked": [["@confect/*"]],
   "access": "public",
-  "baseBranch": "main",
+  "baseBranch": "v1",
   "updateInternalDependencies": "patch",
   "ignore": []
 }

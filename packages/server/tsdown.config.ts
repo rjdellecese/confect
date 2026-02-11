@@ -1,34 +1,10 @@
-import type { UserConfig } from "tsdown";
 import { defineConfig } from "tsdown";
+import { createConfig } from "../../tsdown.shared";
 
-const createConfig = ({
-  platform,
-  entry,
-  outDir,
-}: {
-  platform: NonNullable<UserConfig["platform"]>;
-  entry: NonNullable<UserConfig["entry"]>;
-  outDir: NonNullable<UserConfig["outDir"]>;
-}): UserConfig => ({
-  entry,
-  platform,
-  outDir,
-  clean: true,
-  dts: true,
-  sourcemap: true,
-  format: ["esm"],
-  unbundle: true,
-});
-
-export default defineConfig([
+export default defineConfig(
   createConfig({
     platform: "neutral",
-    entry: ["src/index.ts", "src/**/*.ts", "!src/cli/**/*"],
+    entry: ["src/**/*.ts"],
     outDir: "dist",
   }),
-  createConfig({
-    platform: "node",
-    entry: ["src/cli/index.ts"],
-    outDir: "dist/cli",
-  }),
-]);
+);

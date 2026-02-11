@@ -38,36 +38,47 @@
         "group": "Getting Started",
         "pages": [
           "getting-started/introduction",
-          "getting-started/quickstart",
-          "getting-started/project-structure",
-          "getting-started/services",
-          "getting-started/schema-restrictions"
+          "getting-started/quickstart"
+        ]
+      },
+      {
+        "group": "Orientation",
+        "pages": [
+          "orientation/packages",
+          "orientation/project-structure",
+          "orientation/services"
         ]
       },
       {
         "group": "Platform",
         "pages": [
-          {
-            "icon": "square-function",
-            "group": "Functions",
-            "pages": ["platform/functions/overview"]
-          },
+          "platform/functions",
           {
             "icon": "database",
             "group": "Database",
             "pages": [
+              "platform/database/schema",
               "platform/database/reading",
               "platform/database/writing",
               "platform/database/system-tables"
             ]
           },
-          "platform/http",
+          "platform/http-api",
           "platform/storage",
           "platform/scheduling",
           "platform/authentication",
+          "platform/crons",
           "platform/search",
           "platform/components"
         ]
+      },
+      {
+        "group": "Clients",
+        "pages": ["clients/react", "clients/http"]
+      },
+      {
+        "group": "Guides",
+        "pages": ["guides/testing"]
       }
     ]
   },
@@ -77,11 +88,6 @@
         "icon": "github",
         "label": "GitHub",
         "href": "https://github.com/rjdellecese/confect"
-      },
-      {
-        "icon": "npm",
-        "label": "npm",
-        "href": "https://www.npmjs.com/package/@rjdellecese/confect"
       }
     ]
   },

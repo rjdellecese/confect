@@ -30,5 +30,6 @@ runs:
       shell: bash
 
     - name: Generate Convex types (example)
+      if: ${{ env.CONVEX_DEPLOYMENT || env.CONVEX_DEPLOY_KEY }}
       run: pnpm --filter example convex-codegen
       shell: bash

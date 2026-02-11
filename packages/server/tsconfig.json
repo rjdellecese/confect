@@ -22,7 +22,5 @@
     "module": "ESNext"
   },
   "exclude": ["coverage", "dist", "node_modules"],
-  "extends": ["@tsconfig/strictest/tsconfig"]
+  "extends": ["../../tsconfig.base.json"]
 }
-
-

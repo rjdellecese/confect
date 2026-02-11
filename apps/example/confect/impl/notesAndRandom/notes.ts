@@ -11,7 +11,7 @@ const insert = FunctionImpl.make(
     Effect.gen(function* () {
       const writer = yield* DatabaseWriter;
 
-      return yield* writer.insert("notes", { text });
+      return yield* writer.table("notes").insert({ text });
     }).pipe(Effect.orDie),
 );
 
@@ -34,7 +34,7 @@ const delete_ = FunctionImpl.make(
     Effect.gen(function* () {
       const writer = yield* DatabaseWriter;
 
-      yield* writer.delete("notes", noteId);
+      yield* writer.table("notes").delete(noteId);
 
       return null;
     }).pipe(Effect.orDie),

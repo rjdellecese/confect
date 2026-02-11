@@ -5,15 +5,20 @@
     "build:server": "pnpm --filter @confect/server build",
     "build:react": "pnpm --filter @confect/react build",
     "dev": "pnpm -r --parallel dev",
-    "dev:core": "pnpm --filter @confect/core dev",
-    "dev:server": "pnpm --filter @confect/server dev",
-    "dev:react": "pnpm --filter @confect/react dev",
-    "dev:docs": "pnpm --filter docs dev",
-    "dev:example": "pnpm --filter example dev",
+    "dev:packages": "pnpm --filter='@confect/*' dev",
+    "dev:packages:cli": "pnpm --filter @confect/cli dev",
+    "dev:packages:core": "pnpm --filter @confect/core dev",
+    "dev:packages:server": "pnpm --filter @confect/server dev",
+    "dev:packages:react": "pnpm --filter @confect/react dev",
+    "dev:packages:test": "pnpm --filter @confect/test dev",
+    "dev:apps": "pnpm --filter='docs example' dev",
+    "dev:apps:docs": "pnpm --filter docs dev",
+    "dev:apps:example": "pnpm --filter example dev",
     "typecheck": "pnpm -r typecheck",
     "typecheck:core": "pnpm --filter @confect/core typecheck",
     "typecheck:server": "pnpm --filter @confect/server typecheck",
     "typecheck:react": "pnpm --filter @confect/react typecheck",
+    "typecheck:test": "pnpm --filter @confect/test typecheck",
     "typecheck:docs": "pnpm --filter docs typecheck",
     "typecheck:example": "pnpm --filter example typecheck",
     "lint": "pnpm -r lint",
@@ -23,10 +28,11 @@
     "lint:docs": "pnpm --filter docs lint",
     "lint:example": "pnpm --filter example lint",
     "fix": "pnpm -r fix",
-    "test": "pnpm -r test",
-    "test:core": "pnpm --filter @confect/core test",
-    "test:server": "pnpm --filter @confect/server test",
-    "test:react": "pnpm --filter @confect/react test",
+    "format": "pnpm -r format",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:core": "vitest run --project @confect/core",
+    "test:server": "vitest run --project @confect/server",
     "release": "pnpm build && changeset publish",
     "clean": "pnpm -r clean && rm -rf node_modules"
   },
@@ -36,22 +42,27 @@
   ],
   "license": "ISC",
   "devDependencies": {
-    "@changesets/cli": "2.29.7",
-    "@changesets/config": "3.1.1",
-    "@eslint/js": "^9.39.2",
-    "@types/node": "24.10.1",
-    "eslint": "^9.39.2",
+    "@changesets/cli": "2.29.8",
+    "@changesets/config": "3.1.2",
+    "@eslint/js": "9.39.2",
+    "@types/node": "25.2.3",
+    "@vitest/coverage-v8": "3.2.4",
+    "eslint": "9.39.2",
     "eslint-plugin-mdx": "3.6.2",
+    "tsdown": "0.20.3",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.46.4"
+    "typescript-eslint": "8.55.0",
+    "vitest": "3.2.4"
   },
   "engines": {
     "node": ">=22",
     "pnpm": ">=10"
   },
-  "dependencies": {
-    "@confect/core": "link:packages/core",
-    "@confect/react": "link:packages/react",
-    "@confect/server": "link:packages/server"
+  "pnpm": {
+    "overrides": {
+      "effect": "3.19.16",
+      "react": "19.2.4",
+      "react-dom": "19.2.4"
+    }
   }
 }

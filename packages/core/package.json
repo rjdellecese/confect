@@ -1,7 +1,7 @@
 {
   "name": "@confect/core",
-  "version": "0.0.1",
-  "description": "Confect core",
+  "version": "1.0.0-next.2",
+  "description": "Shared specs and schemas used by all Confect packages",
   "repository": {
     "type": "git",
     "url": "https://github.com/rjdellecese/confect.git"
@@ -9,7 +9,7 @@
   "bugs": {
     "url": "https://github.com/rjdellecese/confect/issues"
   },
-  "homepage": "https://confect.rjdellecese.com",
+  "homepage": "https://confect.dev",
   "sideEffects": false,
   "type": "module",
   "files": [
@@ -33,10 +33,14 @@
     "./internal/*": null
   },
   "scripts": {
-    "build": "tsdown",
+    "build": "tsdown --config-loader unrun",
+    "dev": "tsdown --watch",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "fix": "prettier --write . && eslint --fix . --max-warnings=0",
-    "lint": "prettier --check . && eslint . --max-warnings=0",
+    "format": "prettier --check .",
+    "lint": "eslint . --max-warnings=0",
+    "bench": "tsx test/Refs.bench.ts",
     "clean": "rm -rf dist coverage node_modules"
   },
   "keywords": [
@@ -46,19 +50,22 @@
   "author": "RJ Dellecese",
   "license": "ISC",
   "devDependencies": {
-    "@effect/language-service": "0.56.0",
-    "@eslint/js": "9.39.1",
-    "@tsconfig/strictest": "2.0.8",
-    "@types/node": "24.10.1",
-    "eslint": "9.39.1",
-    "prettier": "3.6.2",
-    "tsdown": "0.16.4",
+    "@ark/attest": "0.56.0",
+    "@effect/language-service": "0.73.1",
+    "@effect/vitest": "0.27.0",
+    "@eslint/js": "9.39.2",
+    "@types/node": "25.2.3",
+    "eslint": "9.39.2",
+    "prettier": "3.8.1",
+    "tsdown": "0.20.3",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.46.4"
+    "typescript-eslint": "8.55.0",
+    "vitest": "3.2.4",
+    "effect": "3.19.16"
   },
   "peerDependencies": {
     "convex": "^1.30.0",
-    "effect": "^3.19.3"
+    "effect": "^3.19.16"
   },
   "engines": {
     "node": ">=22",

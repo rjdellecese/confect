@@ -8,4 +8,4 @@ Confect is a framework that deeply integrates Effect with Convex. It's more than
 - Use Effect's HTTP API modules to define your HTTP API(s). Includes interactive OpenAPI documentation powered by [Scalar](https://github.com/scalar/scalar).
 - Use Effect-ified versions of all of the Convex server APIs (`Promises` become `Effect`s, `A | null`s becomes `Option<A>`s, etc.).
 
-Want to learn more? Read the [docs](https://rjdellecese.gitbook.io/confect)!
+Want to learn more? Read the [docs](https://confect.dev)!

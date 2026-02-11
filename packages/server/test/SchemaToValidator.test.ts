@@ -1188,6 +1188,40 @@ describe("ValueToValidator", () => {
 
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
+
+    test("{ foo: string } | { bar: number }", () => {
+      const _expectedValidator = v.union(
+        v.object({ foo: v.string() }),
+        v.object({ bar: v.float64() }),
+      );
+      type ExpectedValidator = typeof _expectedValidator;
+
+      type CompiledValidator = ValueToValidator<
+        { foo: string } | { bar: number }
+      >;
+
+      expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+    });
+
+    test("'admin' | 'user'", () => {
+      const _expectedValidator = v.union(v.literal("admin"), v.literal("user"));
+      type ExpectedValidator = typeof _expectedValidator;
+
+      type CompiledValidator = ValueToValidator<"admin" | "user">;
+
+      expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+    });
+
+    test("{ foo: 'admin' | 'user' }", () => {
+      const _expectedValidator = v.object({
+        foo: v.union(v.literal("admin"), v.literal("user")),
+      });
+      type ExpectedValidator = typeof _expectedValidator;
+
+      type CompiledValidator = ValueToValidator<{ foo: "admin" | "user" }>;
+
+      expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+    });
   });
 
   describe("optional", () => {
