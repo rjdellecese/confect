@@ -30,7 +30,6 @@ export type TableInfo<Table_ extends Table.AnyWithProps> =
         readonly [TypeId]: TypeId;
         readonly document: Table_["Doc"]["Type"];
         readonly encodedDocument: Table_["Doc"]["Encoded"];
-        // TODO: Can we exclude this and derive the convex document type from the encoded document?
         readonly convexDocument: ExtractConvexDocument<
           TableName,
           TableValidator

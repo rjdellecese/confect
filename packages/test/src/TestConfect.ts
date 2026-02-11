@@ -26,7 +26,6 @@ export type TestConfectWithoutIdentity<
     actionRef: ActionRef,
     args: Ref.Args<ActionRef>["Type"],
   ) => Effect.Effect<Ref.Returns<ActionRef>["Type"], ParseResult.ParseError>;
-  // TODO: Make this API better
   run: {
     <E>(
       handler: Effect.Effect<

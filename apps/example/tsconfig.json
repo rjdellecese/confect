@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "plugins": [{"name": "@effect/language-service"}],
+    "plugins": [{ "name": "@effect/language-service" }],
     "composite": true,
     "lib": ["ESNext", "DOM"],
     "types": ["node"],
@@ -12,7 +12,7 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "paths": {"~/*": ["*"]}
+    "paths": { "~/*": ["*"] }
   },
   "include": ["src/**/*", "confect/**/*", "env.d.ts"],
   "exclude": ["node_modules", "convex/_generated"],
