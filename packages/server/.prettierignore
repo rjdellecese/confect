@@ -1,3 +1,5 @@
 node_modules/
 dist/
 coverage/
+test/convex/_generated/
+test/confect/_generated/
