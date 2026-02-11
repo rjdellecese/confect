@@ -5,8 +5,6 @@ import type {
   GenericDataModel,
   TableNamesInDataModel,
 } from "convex/server";
-import type { GenericId } from "convex/values";
-import type { Brand } from "effect";
 
 export type IsOptional<T, K extends keyof T> =
   {} extends Pick<T, K> ? true : false;
@@ -55,36 +53,9 @@ export type IsRecord<T> = [T] extends [never]
         : false
       : false;
 
-export type DeepMutable<T> =
-  IsAny<T> extends true
-    ? any
-    : T extends Brand.Brand<any> | GenericId<any>
-      ? T
-      : T extends ReadonlyMap<infer K, infer V>
-        ? Map<DeepMutable<K>, DeepMutable<V>>
-        : T extends ReadonlySet<infer V>
-          ? Set<DeepMutable<V>>
-          : [keyof T] extends [never]
-            ? T
-            : { -readonly [K in keyof T]: DeepMutable<T[K]> };
-
-export type DeepReadonly<T> =
-  IsAny<T> extends true
-    ? any
-    : T extends Map<infer K, infer V>
-      ? ReadonlyMap<DeepReadonly<K>, DeepReadonly<V>>
-      : T extends Set<infer V>
-        ? ReadonlySet<DeepReadonly<V>>
-        : [keyof T] extends [never]
-          ? T
-          : { readonly [K in keyof T]: DeepReadonly<T[K]> };
-
 export type TypeError<Message extends string, T = never> = [Message, T];
 
-export type TypeDefect<Message extends string, T = never> = TypeError<
-  `Unexpected type error:\n  ${Message}`,
-  T
->;
+export type TypeDefect<Message extends string, T = never> = [Message, T];
 
 export type IsRecursive<T> = true extends DetectCycle<T> ? true : false;
 
