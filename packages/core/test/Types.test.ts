@@ -4,7 +4,6 @@ import { describe, expectTypeOf, test } from "vitest";
 
 import type {
   DeepMutable,
-  DeepReadonly,
   IsAny,
   IsOptional,
   IsRecord,
@@ -144,63 +143,6 @@ describe("DeepMutable", () => {
     type Expected = BrandedString;
 
     expectTypeOf<Actual>().toEqualTypeOf<Expected>();
-  });
-});
-
-describe("DeepReadonly", () => {
-  describe("no-op on other types", () => {
-    test("any", () => {
-      expectTypeOf<DeepReadonly<any>>().toEqualTypeOf<any>();
-    });
-
-    test("never", () => {
-      expectTypeOf<DeepReadonly<never>>().toEqualTypeOf<never>();
-    });
-
-    test("unknown", () => {
-      expectTypeOf<DeepReadonly<unknown>>().toEqualTypeOf<unknown>();
-    });
-
-    test("{ readonly foo: readonly number[]; readonly bar: any  }", () => {
-      expectTypeOf<DeepReadonly<{ foo: number[]; bar: any }>>().toEqualTypeOf<{
-        readonly foo: readonly number[];
-        readonly bar: any;
-      }>();
-    });
-  });
-
-  test("Map", () => {
-    expectTypeOf<DeepReadonly<Map<string, number>>>().toEqualTypeOf<
-      ReadonlyMap<string, number>
-    >();
-  });
-
-  test("Set", () => {
-    expectTypeOf<DeepReadonly<Set<number>>>().toEqualTypeOf<
-      ReadonlySet<number>
-    >();
-  });
-
-  test("Array", () => {
-    expectTypeOf<DeepReadonly<number[]>>().toEqualTypeOf<readonly number[]>();
-  });
-
-  test("Record", () => {
-    expectTypeOf<DeepReadonly<Record<string, number>>>().toEqualTypeOf<
-      ReadonlyRecord<string, number>
-    >();
-  });
-
-  test("object", () => {
-    expectTypeOf<DeepReadonly<{ foo: number }>>().toEqualTypeOf<{
-      readonly foo: number;
-    }>();
-  });
-
-  test("deep object", () => {
-    expectTypeOf<DeepReadonly<{ foo: { bar: number[] } }>>().toEqualTypeOf<{
-      readonly foo: { readonly bar: readonly number[] };
-    }>();
   });
 });
 

@@ -5,7 +5,6 @@ import * as GroupPath from "./GroupPath";
  * The path to a function in the Confect API.
  */
 export class FunctionPath extends Schema.Class<FunctionPath>("FunctionPath")({
-  // TODO: Support root-level functions (also must be supported in the other packages, e.g. `core` and `server`)
   groupPath: GroupPath.GroupPath,
   name: Schema.NonEmptyString,
 }) {}

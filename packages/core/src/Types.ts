@@ -68,23 +68,9 @@ export type DeepMutable<T> =
             ? T
             : { -readonly [K in keyof T]: DeepMutable<T[K]> };
 
-export type DeepReadonly<T> =
-  IsAny<T> extends true
-    ? any
-    : T extends Map<infer K, infer V>
-      ? ReadonlyMap<DeepReadonly<K>, DeepReadonly<V>>
-      : T extends Set<infer V>
-        ? ReadonlySet<DeepReadonly<V>>
-        : [keyof T] extends [never]
-          ? T
-          : { readonly [K in keyof T]: DeepReadonly<T[K]> };
-
 export type TypeError<Message extends string, T = never> = [Message, T];
 
-export type TypeDefect<Message extends string, T = never> = TypeError<
-  `Unexpected type error:\n  ${Message}`,
-  T
->;
+export type TypeDefect<Message extends string, T = never> = [Message, T];
 
 export type IsRecursive<T> = true extends DetectCycle<T> ? true : false;
 

@@ -86,8 +86,7 @@ export type TableSchemaToTableValidator<
     | VObject<any, any, any, any>
     | VUnion<any, any, any, any>
     ? Vd
-    : // TODO: Add type error message
-      never;
+    : never;
 
 export const compileTableSchema = <
   TableSchema extends Schema.Schema.AnyNoContext,
@@ -244,7 +243,6 @@ type ValueTupleToValidatorTuple<VlTuple extends ReadonlyArray<ReadonlyValue>> =
 
 export const compileSchema = <T, E>(
   schema: Schema.Schema<T, E>,
-  // TODO: Can `ValueToValidator` here just accept `E` directly?
 ): ValueToValidator<(typeof schema)["Encoded"]> =>
   runSyncThrow(compileAst(schema.ast)) as any;
 

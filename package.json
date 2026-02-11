@@ -28,6 +28,7 @@
     "lint:docs": "pnpm --filter docs lint",
     "lint:example": "pnpm --filter example lint",
     "fix": "pnpm -r fix",
+    "format": "pnpm -r format",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:core": "vitest run --project @confect/core",
@@ -56,10 +57,5 @@
   "engines": {
     "node": ">=22",
     "pnpm": ">=10"
-  },
-  "dependencies": {
-    "@confect/core": "link:packages/core",
-    "@confect/react": "link:packages/react",
-    "@confect/server": "link:packages/server"
   }
 }

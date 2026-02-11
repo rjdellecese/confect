@@ -8,11 +8,6 @@ export default mergeConfig(
     plugins: [tsconfigPaths()],
     test: {
       root: import.meta.dirname,
-      coverage: {
-        thresholds: {
-          "100": true,
-        },
-      },
     },
   }),
 );

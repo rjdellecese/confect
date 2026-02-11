@@ -7,7 +7,8 @@
     "convex-codegen": "pnpm convex codegen",
     "typecheck": "tsc --noEmit --project tsconfig.json && tsc --noEmit --project convex/tsconfig.json",
     "build": "vite build --mode development",
-    "lint": "prettier --check . && eslint . --max-warnings=0",
+    "format": "prettier --check .",
+    "lint": "eslint . --max-warnings=0",
     "fix": "prettier --write . && eslint --fix . --max-warnings=0",
     "clean": "rm -rf dist node_modules"
   },

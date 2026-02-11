@@ -24,3 +24,7 @@ runs:
     - name: Install dependencies
       run: pnpm install
       shell: bash
+
+    - name: Build Confect packages
+      run: pnpm --filter "@confect/*" build
+      shell: bash

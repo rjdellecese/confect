@@ -1,28 +1,39 @@
-name: Docs App
+name: Docs
 
 on:
   push:
     branches:
       - main
+      - v1
     paths:
-      - 'apps/docs/**'
-      - 'package.json'
-      - 'pnpm-workspace.yaml'
-      - '.github/workflows/docs.yml'
-      - '.github/actions/docs-setup/**'
+      - "apps/docs/**"
+      - "package.json"
+      - "pnpm-workspace.yaml"
+      - ".github/workflows/docs.yml"
+      - ".github/actions/docs-setup/**"
   pull_request:
     branches:
       - main
+      - v1
     paths:
-      - 'apps/docs/**'
-      - 'package.json'
-      - 'pnpm-workspace.yaml'
-      - '.github/workflows/docs.yml'
-      - '.github/actions/docs-setup/**'
+      - "apps/docs/**"
+      - "package.json"
+      - "pnpm-workspace.yaml"
+      - ".github/workflows/docs.yml"
+      - ".github/actions/docs-setup/**"
 
 jobs:
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/docs-setup
+      - run: pnpm format
+      - run: pnpm --filter docs format
+
   typecheck:
-    name: Type Check
+    name: Typecheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
