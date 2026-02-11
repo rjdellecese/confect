@@ -1,11 +1,6 @@
 {
   "compilerOptions": {
-    "plugins": [
-      {
-        "name": "@effect/language-service"
-      }
-    ],
-    "exactOptionalPropertyTypes": true,
+    "plugins": [{"name": "@effect/language-service"}],
     "composite": true,
     "lib": ["ESNext", "DOM"],
     "types": ["node"],
@@ -14,15 +9,12 @@
     "module": "ESNext",
     "baseUrl": ".",
     "jsx": "react-jsx",
-    "strict": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "forceConsistentCasingInFileNames": true,
-    "paths": {
-      "~/*": ["*"]
-    }
+    "paths": {"~/*": ["*"]}
   },
   "include": ["src/**/*", "confect/**/*", "env.d.ts"],
-  "exclude": ["node_modules", "convex/_generated"]
+  "exclude": ["node_modules", "convex/_generated"],
+  "extends": ["../../tsconfig.base.json"]
 }
