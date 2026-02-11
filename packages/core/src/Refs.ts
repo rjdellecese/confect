@@ -8,28 +8,29 @@ import type * as Spec from "./Spec";
 export type Refs<
   Spec_ extends Spec.AnyWithProps,
   Predicate extends Ref.Any = Ref.Any,
-> = Types.Simplify<Helper<Spec.Groups<Spec_>, Predicate>>;
+> = RemoveIndexSignature<Types.Simplify<Helper<Spec.Groups<Spec_>, Predicate>>>;
 
 type GroupRefs<
   Group extends GroupSpec.AnyWithProps,
   Predicate extends Ref.Any,
-> = Types.Simplify<
-  Helper<GroupSpec.Groups<Group>, Predicate> &
-    FilteredFunctions<GroupSpec.Functions<Group>, Predicate>
+> = RemoveIndexSignature<
+  Types.Simplify<
+    Helper<GroupSpec.Groups<Group>, Predicate> &
+      FilteredFunctions<GroupSpec.Functions<Group>, Predicate>
+  >
 >;
 
 type FilteredFunctions<
   Functions extends FunctionSpec.AnyWithProps,
   Predicate extends Ref.Any,
 > = {
-  [Name in FunctionSpec.Name<Functions> as FunctionSpec.WithName<
-    Functions,
-    Name
-  > extends infer F extends FunctionSpec.AnyWithProps
-    ? Ref.FromFunctionSpec<F> extends Predicate
-      ? Name
-      : never
-    : never]: FunctionSpec.WithName<Functions, Name> extends infer F extends
+  [Name in FunctionSpec.Name<Functions> as KnownKey<Name> &
+    (FunctionSpec.WithName<Functions, Name> extends infer F extends
+      FunctionSpec.AnyWithProps
+      ? Ref.FromFunctionSpec<F> extends Predicate
+        ? Name
+        : never
+      : never)]: FunctionSpec.WithName<Functions, Name> extends infer F extends
     FunctionSpec.AnyWithProps
     ? Ref.FromFunctionSpec<F>
     : never;
@@ -51,6 +52,27 @@ type Helper<
     ? GroupRefs<Group, Predicate>
     : never;
 };
+
+/** Excludes index signature keys (string, number, symbol) to ensure dot notation works with noPropertyAccessFromIndexSignature. */
+type KnownKey<K> = string extends K
+  ? never
+  : number extends K
+    ? never
+    : symbol extends K
+      ? never
+      : K;
+
+type RemoveIndexSignature<T> = T extends Ref.Any
+  ? T
+  : T extends object
+    ? {
+        [K in keyof T as KnownKey<K>]: T[K] extends Ref.Any
+          ? T[K]
+          : T[K] extends object
+            ? RemoveIndexSignature<T[K]>
+            : T[K];
+      }
+    : T;
 
 type Any =
   | {

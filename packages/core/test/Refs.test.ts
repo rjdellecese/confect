@@ -156,4 +156,45 @@ describe("make", () => {
     // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     publicRefs.notes.internalList;
   });
+
+  it("supports nested groups and dot notation for noPropertyAccessFromIndexSignature", () => {
+    const spec = Spec.make()
+      .add(
+        GroupSpec.make("groups")
+          .addGroup(
+            GroupSpec.make("notes").addFunction(
+              FunctionSpec.query({
+                name: "list",
+                args: Schema.Struct({}),
+                returns: Schema.Array(Schema.String),
+              }),
+            ),
+          )
+          .addGroup(
+            GroupSpec.make("random").addFunction(
+              FunctionSpec.action({
+                name: "getNumber",
+                args: Schema.Struct({}),
+                returns: Schema.Number,
+              }),
+            ),
+          ),
+      )
+      .add(
+        GroupSpec.make("databaseReader").addFunction(
+          FunctionSpec.query({
+            name: "getNote",
+            args: Schema.Struct({}),
+            returns: Schema.String,
+          }),
+        ),
+      );
+
+    const { public: api } = Refs.make(spec);
+
+    // This must work with dot notation (noPropertyAccessFromIndexSignature)
+    void api.databaseReader;
+    void api.databaseReader.getNote;
+    void api.groups.notes.list;
+  });
 });
