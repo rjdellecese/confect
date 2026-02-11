@@ -6,7 +6,7 @@ export class HttpClientError extends Schema.TaggedError<HttpClientError>()(
   "HttpClientError",
   {
     cause: Schema.Unknown,
-  }
+  },
 ) {
   override get message() {
     return `Convex HTTP Client Error: ${JSON.stringify(this.cause, null, 2)}`;
@@ -15,7 +15,7 @@ export class HttpClientError extends Schema.TaggedError<HttpClientError>()(
 
 const make = (
   address: string,
-  options?: ConstructorParameters<typeof ConvexHttpClient_>[1]
+  options?: ConstructorParameters<typeof ConvexHttpClient_>[1],
 ) => {
   const client = new ConvexHttpClient_(address, options);
 
@@ -31,7 +31,7 @@ const make = (
 
   const query = <Query extends Ref.AnyQuery>(
     ref: Query,
-    args: Ref.Args<Query>["Type"]
+    args: Ref.Args<Query>["Type"],
   ) =>
     Effect.gen(function* () {
       const function_ = Ref.getFunction(ref);
@@ -49,7 +49,7 @@ const make = (
 
   const mutation = <Mutation extends Ref.AnyMutation>(
     ref: Mutation,
-    args: Ref.Args<Mutation>["Type"]
+    args: Ref.Args<Mutation>["Type"],
   ) =>
     Effect.gen(function* () {
       const function_ = Ref.getFunction(ref);
@@ -67,7 +67,7 @@ const make = (
 
   const action = <Action extends Ref.AnyAction>(
     ref: Action,
-    args: Ref.Args<Action>["Type"]
+    args: Ref.Args<Action>["Type"],
   ) =>
     Effect.gen(function* () {
       const function_ = Ref.getFunction(ref);
@@ -93,16 +93,16 @@ const make = (
 };
 
 export const HttpClient = Context.GenericTag<ReturnType<typeof make>>(
-  "@confect/server/HttpClient"
+  "@confect/server/HttpClient",
 );
 
 export type HttpClient = typeof HttpClient.Identifier;
 
 export const layer = (
   address: string,
-  options?: ConstructorParameters<typeof ConvexHttpClient_>[1]
+  options?: ConstructorParameters<typeof ConvexHttpClient_>[1],
 ) =>
   Layer.effect(
     HttpClient,
-    Effect.sync(() => make(address, options))
+    Effect.sync(() => make(address, options)),
   );
