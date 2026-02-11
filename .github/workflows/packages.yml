@@ -98,7 +98,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/confect-setup
-      - run: pnpm --filter ${{ matrix.package }} test
+      - run: pnpm exec vitest run --project ${{ matrix.package }}
 
   build:
     name: Build

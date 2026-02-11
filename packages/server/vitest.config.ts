@@ -21,7 +21,7 @@ export default mergeConfig(
     },
     test: {
       root: path.resolve(import.meta.dirname),
-      include: ["test/**/*.test.ts"],
+      include: [path.join(import.meta.dirname, "test/**/*.test.ts")],
       globalSetup: ["./test/setup.ts"],
     },
   }),
