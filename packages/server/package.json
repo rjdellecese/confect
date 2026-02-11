@@ -1,7 +1,7 @@
 {
   "name": "@confect/server",
   "version": "1.0.0-next.0",
-  "description": "Confect server",
+  "description": "Backend bindings to the Convex platform",
   "repository": {
     "type": "git",
     "url": "https://github.com/rjdellecese/confect.git"
@@ -9,7 +9,7 @@
   "bugs": {
     "url": "https://github.com/rjdellecese/confect/issues"
   },
-  "homepage": "https://confect.rjdellecese.com",
+  "homepage": "https://confect.dev",
   "sideEffects": false,
   "type": "module",
   "files": [
