@@ -1,5 +1,6 @@
 import * as Ref from "@confect/core/Ref";
 import { ConvexHttpClient as ConvexHttpClient_ } from "convex/browser";
+import type { ParseResult } from "effect";
 import { Context, Effect, Layer, Schema } from "effect";
 
 export class HttpClientError extends Schema.TaggedError<HttpClientError>()(
@@ -32,7 +33,10 @@ const make = (
   const query = <Query extends Ref.AnyQuery>(
     ref: Query,
     args: Ref.Args<Query>["Type"],
-  ) =>
+  ): Effect.Effect<
+    Ref.Returns<Query>["Type"],
+    HttpClientError | ParseResult.ParseError
+  > =>
     Effect.gen(function* () {
       const function_ = Ref.getFunction(ref);
       const functionName = Ref.getConvexFunctionName(ref);
@@ -50,7 +54,10 @@ const make = (
   const mutation = <Mutation extends Ref.AnyMutation>(
     ref: Mutation,
     args: Ref.Args<Mutation>["Type"],
-  ) =>
+  ): Effect.Effect<
+    Ref.Returns<Mutation>["Type"],
+    HttpClientError | ParseResult.ParseError
+  > =>
     Effect.gen(function* () {
       const function_ = Ref.getFunction(ref);
       const functionName = Ref.getConvexFunctionName(ref);
@@ -68,7 +75,10 @@ const make = (
   const action = <Action extends Ref.AnyAction>(
     ref: Action,
     args: Ref.Args<Action>["Type"],
-  ) =>
+  ): Effect.Effect<
+    Ref.Returns<Action>["Type"],
+    HttpClientError | ParseResult.ParseError
+  > =>
     Effect.gen(function* () {
       const function_ = Ref.getFunction(ref);
       const functionName = Ref.getConvexFunctionName(ref);
