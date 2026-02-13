@@ -23,8 +23,10 @@ export interface Any {
   readonly [TypeId]: TypeId;
 }
 
-export interface AnyWithProps
-  extends Api<DatabaseSchema.AnyWithProps, Spec.AnyWithProps> {}
+export interface AnyWithProps extends Api<
+  DatabaseSchema.AnyWithProps,
+  Spec.AnyWithProps
+> {}
 
 export type Schema<Api_ extends AnyWithProps> = Api_["databaseSchema"];
 

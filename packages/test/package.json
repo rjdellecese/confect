@@ -49,21 +49,22 @@
   "author": "RJ Dellecese",
   "license": "ISC",
   "devDependencies": {
-    "@effect/language-service": "0.56.0",
-    "@eslint/js": "9.39.1",
-    "@types/node": "24.10.1",
-    "eslint": "9.39.1",
-    "prettier": "3.6.2",
-    "tsdown": "0.16.4",
+    "@effect/language-service": "0.73.1",
+    "@eslint/js": "9.39.2",
+    "@types/node": "25.2.3",
+    "eslint": "9.39.2",
+    "prettier": "3.8.1",
+    "tsdown": "0.20.3",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.46.4"
+    "typescript-eslint": "8.55.0",
+    "effect": "3.19.16"
   },
   "peerDependencies": {
     "@confect/core": "workspace:*",
     "@confect/server": "workspace:*",
     "convex": "^1.30.0",
     "convex-test": "^0.0.38",
-    "effect": "^3.19.3"
+    "effect": "^3.19.16"
   },
   "engines": {
     "node": ">=22",

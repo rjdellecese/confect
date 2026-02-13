@@ -66,8 +66,7 @@ export const TestConfect = <
 
 class TestConfectImplWithoutIdentity<
   ConfectSchema extends DatabaseSchema.AnyWithProps,
-> implements TestConfectWithoutIdentity<ConfectSchema>
-{
+> implements TestConfectWithoutIdentity<ConfectSchema> {
   constructor(
     private confectSchema: ConfectSchema,
     private testConvex: TestConvexForDataModel<
@@ -185,9 +184,9 @@ class TestConfectImplWithoutIdentity<
     );
 }
 
-class TestConfectImpl<ConfectSchema extends DatabaseSchema.AnyWithProps>
-  implements TestConfect<ConfectSchema>
-{
+class TestConfectImpl<
+  ConfectSchema extends DatabaseSchema.AnyWithProps,
+> implements TestConfect<ConfectSchema> {
   private readonly testConfectImplWithoutIdentity: TestConfectImplWithoutIdentity<ConfectSchema>;
 
   constructor(

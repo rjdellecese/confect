@@ -38,8 +38,11 @@ export interface Any {
   readonly [TypeId]: TypeId;
 }
 
-export interface AnyWithProps
-  extends GroupSpec<string, FunctionSpec.AnyWithProps, AnyWithProps> {}
+export interface AnyWithProps extends GroupSpec<
+  string,
+  FunctionSpec.AnyWithProps,
+  AnyWithProps
+> {}
 
 export type Name<Group extends AnyWithProps> = Group["name"];
 

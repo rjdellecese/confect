@@ -20,8 +20,10 @@ export interface Impl<
 
 export type FinalizationStatus = "Unfinalized" | "Finalized";
 
-export interface AnyWithProps
-  extends Impl<Api.AnyWithProps, FinalizationStatus> {}
+export interface AnyWithProps extends Impl<
+  Api.AnyWithProps,
+  FinalizationStatus
+> {}
 
 export const Impl = <
   Api_ extends Api.AnyWithProps,
