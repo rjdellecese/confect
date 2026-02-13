@@ -9,6 +9,7 @@
     "@confect/test": "0.0.1"
   },
   "changesets": [
-    "cute-rules-jog"
+    "cute-rules-jog",
+    "polite-bags-tap"
   ]
 }

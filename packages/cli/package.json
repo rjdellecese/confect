@@ -1,6 +1,6 @@
 {
   "name": "@confect/cli",
-  "version": "1.0.0-next.0",
+  "version": "1.0.0-next.1",
   "description": "Developer tooling for codegen and sync",
   "repository": {
     "type": "git",
