@@ -27,8 +27,8 @@ export const isTable = (u: unknown): u is Any =>
 export interface Table<
   Name_ extends string,
   TableSchema_ extends Schema.Schema.AnyNoContext,
-  TableValidator_ extends
-    GenericValidator = TableSchemaToTableValidator<TableSchema_>,
+  TableValidator_ extends GenericValidator =
+    TableSchemaToTableValidator<TableSchema_>,
   Indexes_ extends GenericTableIndexes = {},
   SearchIndexes_ extends GenericTableSearchIndexes = {},
   VectorIndexes_ extends GenericTableVectorIndexes = {},
@@ -349,8 +349,8 @@ const makeProto = <
 export const make = <
   const Name_ extends string,
   TableSchema_ extends Schema.Schema.AnyNoContext,
-  TableValidator_ extends
-    GenericValidator = TableSchemaToTableValidator<TableSchema_>,
+  TableValidator_ extends GenericValidator =
+    TableSchemaToTableValidator<TableSchema_>,
   Indexes_ extends GenericTableIndexes = {},
   SearchIndexes_ extends GenericTableSearchIndexes = {},
   VectorIndexes_ extends GenericTableVectorIndexes = {},

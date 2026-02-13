@@ -34,24 +34,23 @@ export interface Any {
   readonly [TypeId]: TypeId;
 }
 
-export interface AnyWithProps
-  extends FunctionSpec<
-    FunctionType,
-    FunctionVisibility,
-    string,
-    Schema.Schema.AnyNoContext,
-    Schema.Schema.AnyNoContext
-  > {}
+export interface AnyWithProps extends FunctionSpec<
+  FunctionType,
+  FunctionVisibility,
+  string,
+  Schema.Schema.AnyNoContext,
+  Schema.Schema.AnyNoContext
+> {}
 
 export interface AnyWithPropsWithFunctionType<
   FunctionType_ extends FunctionType,
 > extends FunctionSpec<
-    FunctionType_,
-    FunctionVisibility,
-    string,
-    Schema.Schema.AnyNoContext,
-    Schema.Schema.AnyNoContext
-  > {}
+  FunctionType_,
+  FunctionVisibility,
+  string,
+  Schema.Schema.AnyNoContext,
+  Schema.Schema.AnyNoContext
+> {}
 
 export type GetFunctionType<Function extends AnyWithProps> =
   Function["functionType"];

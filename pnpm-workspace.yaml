@@ -4,3 +4,18 @@ packages:
 
 onlyBuiltDependencies:
   - sharp
+
+packageExtensions:
+  "@mintlify/mdx":
+    peerDependencies:
+      react: "*"
+      react-dom: "*"
+  "next-mdx-remote-client":
+    peerDependencies:
+      react: "*"
+      react-dom: "*"
+
+peerDependencyRules:
+  allowedVersions:
+    react: "19"
+    react-dom: "19"
