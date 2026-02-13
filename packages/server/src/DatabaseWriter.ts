@@ -22,10 +22,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   >,
 ) => {
   type DataModel_ = DataModel.FromSchema<DatabaseSchema_>;
-  const tables = databaseSchema.tables as Record<
-    string,
-    Table.AnyWithProps
-  >;
+  const tables = databaseSchema.tables as Record<string, Table.AnyWithProps>;
 
   const table = <const TableName extends DataModel.TableNames<DataModel_>>(
     tableName: TableName,
