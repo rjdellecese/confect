@@ -8,15 +8,19 @@ import type * as Spec from "./Spec";
 export type Refs<
   Spec_ extends Spec.AnyWithProps,
   Predicate extends Ref.Any = Ref.Any,
-> = Types.Simplify<Helper<Spec.Groups<Spec_>, Predicate>>;
+> = Types.Simplify<OmitEmpty<Helper<Spec.Groups<Spec_>, Predicate>>>;
 
 type GroupRefs<
   Group extends GroupSpec.AnyWithProps,
   Predicate extends Ref.Any,
 > = Types.Simplify<
-  Helper<GroupSpec.Groups<Group>, Predicate> &
+  OmitEmpty<Helper<GroupSpec.Groups<Group>, Predicate>> &
     FilteredFunctions<GroupSpec.Functions<Group>, Predicate>
 >;
+
+type OmitEmpty<T> = {
+  [K in keyof T as keyof T[K] extends never ? never : K]: T[K];
+};
 
 type FilteredFunctions<
   Functions extends FunctionSpec.AnyWithProps,
@@ -39,15 +43,10 @@ type Helper<
   Groups extends GroupSpec.AnyWithProps,
   Predicate extends Ref.Any,
 > = {
-  [GroupName in GroupSpec.Name<Groups> as GroupSpec.WithName<
+  [GroupName in GroupSpec.Name<Groups>]: GroupSpec.WithName<
     Groups,
     GroupName
   > extends infer Group extends GroupSpec.AnyWithProps
-    ? GroupRefs<Group, Predicate> extends Record<string, never>
-      ? never
-      : GroupName
-    : never]: GroupSpec.WithName<Groups, GroupName> extends infer Group extends
-    GroupSpec.AnyWithProps
     ? GroupRefs<Group, Predicate>
     : never;
 };
