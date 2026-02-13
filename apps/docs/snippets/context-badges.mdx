@@ -37,35 +37,3 @@ export const ContextBadges = ({ query, mutation, action }) => (
     )}
   </>
 );
-
-export const ServiceHeading = ({ name, query, mutation, action }) => (
-  <div
-    style={{
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      gap: "1rem",
-    }}
-  >
-    <h3 style={{ margin: 0 }}>{name}</h3>
-    <span>
-      {query && (
-        <Badge color="blue" size="md">
-          Query
-        </Badge>
-      )}
-      {query && (mutation || action) && " "}
-      {mutation && (
-        <Badge color="purple" size="md">
-          Mutation
-        </Badge>
-      )}
-      {mutation && action && " "}
-      {action && (
-        <Badge color="orange" size="md">
-          Action
-        </Badge>
-      )}
-    </span>
-  </div>
-);
