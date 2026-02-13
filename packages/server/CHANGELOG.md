@@ -1,5 +1,12 @@
 # @confect/server
 
+## 1.0.0-next.1
+
+### Patch Changes
+
+- Updated dependencies [5a4127f]
+  - @confect/core@1.0.0-next.1
+
 ## 1.0.0-next.0
 
 ### Major Changes

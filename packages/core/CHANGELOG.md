@@ -1,5 +1,11 @@
 # @confect/core
 
+## 1.0.0-next.1
+
+### Patch Changes
+
+- 5a4127f: Fix `Refs` type (#304)
+
 ## 1.0.0-next.0
 
 ### Major Changes
