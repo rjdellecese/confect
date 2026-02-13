@@ -1,0 +1,124 @@
+---
+icon: "tool-case"
+title: "Services"
+description: "Understand which Effect services Confect provides."
+---
+
+{/* eslint-disable-next-line @typescript-eslint/no-unused-vars -- ContextBadges is used in JSX below */}
+import { ContextBadges } from "/snippets/context-badges.mdx";
+
+Confect exposes Effect services that wrap Convex platform capabilities. These services are generated in `confect/_generated/services.ts` and are available when implementing your Confect functions.
+
+```ts
+import {
+  ActionRunner,
+  Auth,
+  DatabaseReader,
+  DatabaseWriter,
+  MutationRunner,
+  QueryRunner,
+  Scheduler,
+  StorageReader,
+  StorageWriter,
+  StorageActionWriter,
+  VectorSearch,
+} from "./_generated/services";
+```
+
+## Database
+
+### `DatabaseReader`
+
+<ContextBadges query mutation />
+
+Read documents from the database.
+
+### `DatabaseWriter`
+
+<ContextBadges mutation />
+
+Insert, edit, and delete documents from the database.
+
+## Function invocation
+
+### `QueryRunner`
+
+<ContextBadges query mutation action />
+
+Run Confect queries.
+
+### `MutationRunner`
+
+<ContextBadges mutation action />
+
+Run Confect mutations.
+
+### `ActionRunner`
+
+<ContextBadges action />
+
+Run Confect actions.
+
+## Storage
+
+### `StorageReader`
+
+<ContextBadges query mutation action />
+
+Retrieve URLs for blobs in storage.
+
+### `StorageWriter`
+
+<ContextBadges mutation action />
+
+Generate upload URLs and delete blobs.
+
+### `StorageActionWriter`
+
+<ContextBadges action />
+
+Get and store blobs.
+
+## Authentication
+
+### `Auth`
+
+<ContextBadges query mutation action />
+
+Access the current user's identity.
+
+## Scheduling
+
+### `Scheduler`
+
+<ContextBadges mutation action />
+
+Schedule Confect functions to run after a delay or at a specific time.
+
+## Search
+
+### `VectorSearch`
+
+<ContextBadges action />
+
+Query vector indexes for semantic similarity search.
+
+## Convex context
+
+### `QueryCtx`
+
+<ContextBadges query />
+
+Raw Convex query context.
+
+### `MutationCtx`
+
+<ContextBadges mutation />
+
+Raw Convex mutation context.
+
+### `ActionCtx`
+
+<ContextBadges action />
+
+Raw Convex action context.

@@ -1,0 +1,61 @@
+---
+icon: "map"
+title: "Schema"
+description: "Define your database schema using Effect schemas."
+---
+
+Your database schema is defined in a `schema.ts` file in your `confect/` directory, and should be the default export of that file.
+
+Tables are defined using the `Table.make` function, and are added to the database schema with the `addTable` method. Indexes are defined on tables the same way as in the base Convex APIs.
+
+```ts confect/schema.ts
+import { GenericId } from "@confect/core";
+import { DatabaseSchema, Table } from "@confect/server";
+import { Schema } from "effect";
+
+export const Notes = Table.make(
+  "notes",
+  Schema.Struct({
+    userId: Schema.optional(GenericId.GenericId("users")),
+    text: Schema.String.pipe(Schema.maxLength(100)),
+    tag: Schema.optional(Schema.String),
+    author: Schema.optional(
+      Schema.Struct({
+        role: Schema.Literal("admin", "user"),
+        name: Schema.String,
+      }),
+    ),
+    embedding: Schema.optional(Schema.Array(Schema.Number)),
+  }),
+)
+  .index("by_text", ["text"])
+  .index("by_role", ["author.role"])
+  .searchIndex("text", {
+    searchField: "text",
+    filterFields: ["tag"],
+  })
+  .vectorIndex("embedding", {
+    vectorField: "embedding",
+    filterFields: ["author.name", "tag"],
+    dimensions: 1536,
+  });
+
+export const Users = Table.make(
+  "users",
+  Schema.Struct({
+    username: Schema.String,
+  }),
+);
+
+export default DatabaseSchema.make().addTable(Notes).addTable(Users);
+```
+
+## Deriving table `Schema`s
+
+### Fields
+
+A `Table`'s `Fields` property contains an Effect `Schema` for the user-defined fields of a table.
+
+### Doc
+
+A `Table`'s `Doc` property contains an Effect `Schema` for the table's document, meaning the table's user-defined `Fields` plus its system fields (`_id` and `_creationTime`).

@@ -1,0 +1,39 @@
+export const QueryBadge = () => (
+  <Badge color="blue" size="md">
+    Query
+  </Badge>
+);
+
+export const MutationBadge = () => (
+  <Badge color="purple" size="md">
+    Mutation
+  </Badge>
+);
+
+export const ActionBadge = () => (
+  <Badge color="orange" size="md">
+    Action
+  </Badge>
+);
+
+export const ContextBadges = ({ query, mutation, action }) => (
+  <>
+    {query && (
+      <Badge color="blue" size="md">
+        Query
+      </Badge>
+    )}
+    {query && (mutation || action) && " "}
+    {mutation && (
+      <Badge color="purple" size="md">
+        Mutation
+      </Badge>
+    )}
+    {mutation && action && " "}
+    {action && (
+      <Badge color="orange" size="md">
+        Action
+      </Badge>
+    )}
+  </>
+);
