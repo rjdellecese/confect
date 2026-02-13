@@ -142,7 +142,7 @@ deno add convex @confect/core @confect/server @confect/cli @confect/react
       Effect.gen(function* () {
         const writer = yield* DatabaseWriter;
 
-        return yield* writer.insert("notes", { text });
+        return yield* writer.table("notes").insert({ text });
       }).pipe(Effect.orDie),
     );
 
