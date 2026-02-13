@@ -5,10 +5,6 @@ import type * as GroupSpec from "./GroupSpec";
 import * as Ref from "./Ref";
 import type * as Spec from "./Spec";
 
-type OmitEmpty<T> = {
-  [K in keyof T as keyof T[K] extends never ? never : K]: T[K];
-};
-
 export type Refs<
   Spec_ extends Spec.AnyWithProps,
   Predicate extends Ref.Any = Ref.Any,
@@ -21,6 +17,10 @@ type GroupRefs<
   OmitEmpty<Helper<GroupSpec.Groups<Group>, Predicate>> &
     FilteredFunctions<GroupSpec.Functions<Group>, Predicate>
 >;
+
+type OmitEmpty<T> = {
+  [K in keyof T as keyof T[K] extends never ? never : K]: T[K];
+};
 
 type FilteredFunctions<
   Functions extends FunctionSpec.AnyWithProps,
