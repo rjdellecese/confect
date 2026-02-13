@@ -1,0 +1,80 @@
+---
+icon: "square-function"
+title: "Functions"
+description: "Define and implement your Confect API's functions."
+---
+
+Your Confect API is broken up into two parts: a spec and its implementation.
+
+## Spec
+
+A spec is made up of group specs and function specs. Each function spec defines the function's name, arguments schema, and returns schema.
+
+```ts confect/spec/notes.ts
+import { GroupSpec, FunctionSpec } from "@confect/core";
+import { Schema } from "effect";
+
+import { Notes } from "../tables/Notes";
+
+const list = FunctionSpec.query({
+  name: "list",
+  args: Schema.Struct({}),
+  returns: Schema.Array(Notes.Doc),
+});
+
+export const notes = GroupSpec.make("notes").addFunction(list);
+```
+
+Your spec must be the default export of a `spec.ts` file in your `confect/` directory.
+
+```ts confect/spec.ts
+import { Spec } from "@confect/server";
+
+import { notes } from "./spec/notes";
+
+export default Spec.make().addGroup(notes);
+```
+
+### Impl
+
+An impl is made up of group impls and function impls, and is constructed using Effect layers. Each function impl contains a handler function that implements the function's logic.
+
+```ts confect/impl/notes.ts
+import { FunctionImpl, GroupImpl } from "@confect/server";
+import { Effect, Layer } from "effect";
+
+import api from "../_generated/api";
+import {
+  DatabaseReader,
+  DatabaseWriter,
+} from "../_generated/services";
+
+const list = FunctionImpl.make(api, "notes", "list", () =>
+  Effect.gen(function* () {
+    const reader = yield* DatabaseReader;
+
+    return yield* reader
+      .table("notes")
+      .index("by_creation_time", "desc")
+      .collect();
+  }).pipe(Effect.orDie),
+);
+
+export const notes = GroupImpl.make(api, "notes").pipe(
+  Layer.provide(list),
+);
+```
+
+Your impl should be the default export of a `impl.ts` file in your `confect/` directory. It must be finalized with the `Impl.finalize` function before it can be used.
+
+```ts confect/impl.ts
+import { Impl } from "@confect/server";
+
+import api from "./_generated/api";
+import { notes } from "./impl/notes";
+
+export default Impl.make(api).pipe(
+  Layer.provide(notes),
+  Impl.finalize,
+);
+```
