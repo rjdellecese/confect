@@ -17,7 +17,7 @@ describe("DatabaseReader", () => {
         Effect.gen(function* () {
           const writer = yield* DatabaseWriter;
 
-          return yield* writer.insert("notes", {
+          return yield* writer.table("notes").insert({
             text,
           });
         }),
@@ -41,7 +41,7 @@ describe("DatabaseReader", () => {
           const writer = yield* DatabaseWriter;
 
           yield* Effect.forEach(Array.range(1, 10), (i) =>
-            writer.insert("notes", {
+            writer.table("notes").insert({
               text: `${i}`,
             }),
           );
