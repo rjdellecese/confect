@@ -1,6 +1,6 @@
 {
   "name": "@confect/server",
-  "version": "1.0.0-next.1",
+  "version": "1.0.0-next.2",
   "description": "Backend bindings to the Convex platform",
   "repository": {
     "type": "git",

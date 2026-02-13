@@ -1,5 +1,15 @@
 # @confect/cli
 
+## 1.0.0-next.2
+
+### Patch Changes
+
+- 071b6ed: Upgrade deps
+- Updated dependencies [071b6ed]
+- Updated dependencies [afc9fb4]
+  - @confect/server@1.0.0-next.2
+  - @confect/core@1.0.0-next.2
+
 ## 1.0.0-next.1
 
 ### Patch Changes
