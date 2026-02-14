@@ -8,13 +8,13 @@ import {
 import { Effect, Layer, Schema } from "effect";
 import { api } from "../_generated/refs";
 import { QueryRunner } from "../_generated/services";
-import { Note } from "../tables/note";
+import { Notes } from "../tables/Notes";
 
 class ApiGroup extends HttpApiGroup.make("notes")
   .add(
     HttpApiEndpoint.get("getFirst", "/get-first")
       .annotate(OpenApi.Description, "Get the first note, if there is one.")
-      .addSuccess(Schema.Option(Note.Doc)),
+      .addSuccess(Schema.Option(Notes.Doc)),
   )
   .annotate(OpenApi.Title, "Notes")
   .annotate(OpenApi.Description, "Operations on notes.") {}

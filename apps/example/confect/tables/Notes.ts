@@ -2,7 +2,7 @@ import { GenericId } from "@confect/core";
 import { Table } from "@confect/server";
 import { Schema } from "effect";
 
-export const Note = Table.make(
+export const Notes = Table.make(
   "notes",
   Schema.Struct({
     userId: Schema.optional(GenericId.GenericId("users")),
