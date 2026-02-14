@@ -6,7 +6,7 @@ import {
   OpenApi,
 } from "@effect/platform";
 import { Effect, Layer, Schema } from "effect";
-import { api } from "../_generated/refs";
+import refs from "../_generated/refs";
 import { QueryRunner } from "../_generated/services";
 import { Notes } from "../tables/Notes";
 
@@ -39,7 +39,10 @@ const ApiGroupLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
     Effect.gen(function* () {
       const runQuery = yield* QueryRunner;
 
-      const firstNote = yield* runQuery(api.notesAndRandom.notes.getFirst, {});
+      const firstNote = yield* runQuery(
+        refs.public.notesAndRandom.notes.getFirst,
+        {},
+      );
 
       return firstNote;
     }).pipe(Effect.orDie),
