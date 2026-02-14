@@ -92,9 +92,7 @@ export const refs = ({ specImportPath }: { specImportPath: string }) =>
     yield* cbw.writeLine(`import { Refs } from "@confect/core";`);
     yield* cbw.writeLine(`import spec from "${specImportPath}";`);
     yield* cbw.blankLine();
-    yield* cbw.writeLine(
-      `export const { public: api, internal } = Refs.make(spec);`,
-    );
+    yield* cbw.writeLine(`export default Refs.make(spec);`);
 
     return yield* cbw.toString();
   });

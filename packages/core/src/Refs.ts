@@ -60,13 +60,11 @@ type Any =
 export const make = <Spec_ extends Spec.AnyWithProps>(
   spec: Spec_,
 ): {
-  all: Refs<Spec_>;
   public: Refs<Spec_, Ref.AnyPublic>;
   internal: Refs<Spec_, Ref.AnyInternal>;
 } => {
   const refs = makeHelper(spec.groups);
   return {
-    all: refs as Refs<Spec_>,
     public: refs as Refs<Spec_, Ref.AnyPublic>,
     internal: refs as Refs<Spec_, Ref.AnyInternal>,
   };

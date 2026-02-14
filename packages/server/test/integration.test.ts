@@ -2,7 +2,7 @@ import { GenericId } from "@confect/core";
 import { describe, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
 import { Array, Effect } from "effect";
-import { api } from "./confect/_generated/refs";
+import refs from "./confect/_generated/refs";
 import { DatabaseWriter } from "./confect/_generated/services";
 import * as TestConfect from "./TestConfect";
 
@@ -25,7 +25,7 @@ describe("DatabaseReader", () => {
       );
 
       const retrievedText = yield* c
-        .query(api.databaseReader.getNote, { noteId: noteId })
+        .query(refs.public.databaseReader.getNote, { noteId: noteId })
         .pipe(Effect.map((note) => note.text));
 
       assertEquals(retrievedText, text);
@@ -48,7 +48,7 @@ describe("DatabaseReader", () => {
         }),
       );
 
-      const notes = yield* c.query(api.databaseReader.listNotes, {});
+      const notes = yield* c.query(refs.public.databaseReader.listNotes, {});
 
       assertEquals(notes.length, 10);
       assertEquals(notes[0]?.text, "10");

@@ -3,7 +3,7 @@ import { FetchHttpClient, HttpApiClient } from "@effect/platform";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { Array, Effect, Exit, Option } from "effect";
 import { useEffect, useState } from "react";
-import { api } from "../confect/_generated/refs";
+import refs from "../confect/_generated/refs";
 import { Api } from "../confect/http/path-prefix";
 
 const App = () => {
@@ -18,10 +18,10 @@ const App = () => {
 
 const Page = () => {
   const [note, setNote] = useState("");
-  const insertNote = useMutation(api.notesAndRandom.notes.insert);
+  const insertNote = useMutation(refs.public.notesAndRandom.notes.insert);
 
   const [randomNumber, setRandomNumber] = useState<number | null>(null);
-  const getRandom = useAction(api.notesAndRandom.random.getNumber);
+  const getRandom = useAction(refs.public.notesAndRandom.random.getNumber);
 
   const retrieveRandomNumber = () => {
     getRandom({}).pipe(Effect.map(setRandomNumber), Effect.runPromise);
@@ -71,9 +71,9 @@ const Page = () => {
 };
 
 const NoteList = () => {
-  const optionNotes = useQuery(api.notesAndRandom.notes.list, {});
+  const optionNotes = useQuery(refs.public.notesAndRandom.notes.list, {});
 
-  const deleteNote = useMutation(api.notesAndRandom.notes.delete_);
+  const deleteNote = useMutation(refs.public.notesAndRandom.notes.delete_);
 
   return Option.match(optionNotes, {
     onNone: () => <p>Loading…</p>,
