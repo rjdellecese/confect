@@ -4,7 +4,7 @@ import * as FunctionSpec from "../src/FunctionSpec";
 
 describe("isFunctionSpec", () => {
   it("checks whether a value is a function spec", () => {
-    const functionSpec: unknown = FunctionSpec.query({
+    const functionSpec: unknown = FunctionSpec.publicQuery({
       name: "myFunction",
       args: Schema.Struct({}),
       returns: Schema.String,
@@ -17,7 +17,7 @@ describe("isFunctionSpec", () => {
 describe("make", () => {
   it("disallows invalid JS identifiers as function names", () => {
     expect(() =>
-      FunctionSpec.query({
+      FunctionSpec.publicQuery({
         name: "123",
         args: Schema.Struct({}),
         returns: Schema.String,
@@ -29,7 +29,7 @@ describe("make", () => {
 
   it("disallows reserved keywords as function names", () => {
     expect(() =>
-      FunctionSpec.query({
+      FunctionSpec.publicQuery({
         name: "if",
         args: Schema.Struct({}),
         returns: Schema.String,
@@ -41,7 +41,7 @@ describe("make", () => {
 
   it("disallows reserved Convex file names as function names", () => {
     expect(() =>
-      FunctionSpec.query({
+      FunctionSpec.publicQuery({
         name: "schema",
         args: Schema.Struct({}),
         returns: Schema.String,

@@ -38,7 +38,7 @@ describe("FunctionPaths.make", () => {
   test("spec with one group with one function", () => {
     const spec = Spec.make().add(
       GroupSpec.make("myGroup").addFunction(
-        FunctionSpec.query({
+        FunctionSpec.publicQuery({
           name: "myQuery",
           args: Schema.Struct({}),
           returns: Schema.Null,
@@ -60,21 +60,21 @@ describe("FunctionPaths.make", () => {
     const spec = Spec.make().add(
       GroupSpec.make("myGroup")
         .addFunction(
-          FunctionSpec.query({
+          FunctionSpec.publicQuery({
             name: "list",
             args: Schema.Struct({}),
             returns: Schema.Array(Schema.String),
           }),
         )
         .addFunction(
-          FunctionSpec.mutation({
+          FunctionSpec.publicMutation({
             name: "insert",
             args: Schema.Struct({ text: Schema.String }),
             returns: Schema.String,
           }),
         )
         .addFunction(
-          FunctionSpec.action({
+          FunctionSpec.publicAction({
             name: "doSomething",
             args: Schema.Struct({}),
             returns: Schema.Void,
@@ -100,7 +100,7 @@ describe("FunctionPaths.make", () => {
     const spec = Spec.make()
       .add(
         GroupSpec.make("users").addFunction(
-          FunctionSpec.query({
+          FunctionSpec.publicQuery({
             name: "getById",
             args: Schema.Struct({ id: Schema.String }),
             returns: Schema.Unknown,
@@ -109,7 +109,7 @@ describe("FunctionPaths.make", () => {
       )
       .add(
         GroupSpec.make("posts").addFunction(
-          FunctionSpec.query({
+          FunctionSpec.publicQuery({
             name: "list",
             args: Schema.Struct({}),
             returns: Schema.Array(Schema.Unknown),
@@ -132,7 +132,7 @@ describe("FunctionPaths.make", () => {
 
   test("spec with nested groups", () => {
     const innerGroup = GroupSpec.make("inner").addFunction(
-      FunctionSpec.query({
+      FunctionSpec.publicQuery({
         name: "innerQuery",
         args: Schema.Struct({}),
         returns: Schema.Null,
@@ -142,7 +142,7 @@ describe("FunctionPaths.make", () => {
     const outerGroup = GroupSpec.make("outer")
       .addGroup(innerGroup)
       .addFunction(
-        FunctionSpec.mutation({
+        FunctionSpec.publicMutation({
           name: "outerMutation",
           args: Schema.Struct({}),
           returns: Schema.Null,
@@ -166,7 +166,7 @@ describe("FunctionPaths.make", () => {
 
   test("spec with deeply nested groups", () => {
     const level3 = GroupSpec.make("level3").addFunction(
-      FunctionSpec.query({
+      FunctionSpec.publicQuery({
         name: "deepQuery",
         args: Schema.Struct({}),
         returns: Schema.Number,
@@ -194,14 +194,14 @@ describe("FunctionPaths.make", () => {
   test("spec with multiple nested groups at same level", () => {
     const notes = GroupSpec.make("notes")
       .addFunction(
-        FunctionSpec.mutation({
+        FunctionSpec.publicMutation({
           name: "insert",
           args: Schema.Struct({ text: Schema.String }),
           returns: Schema.String,
         }),
       )
       .addFunction(
-        FunctionSpec.query({
+        FunctionSpec.publicQuery({
           name: "list",
           args: Schema.Struct({}),
           returns: Schema.Array(Schema.String),
@@ -209,7 +209,7 @@ describe("FunctionPaths.make", () => {
       );
 
     const random = GroupSpec.make("random").addFunction(
-      FunctionSpec.action({
+      FunctionSpec.publicAction({
         name: "getNumber",
         args: Schema.Struct({}),
         returns: Schema.Number,
@@ -240,7 +240,7 @@ describe("FunctionPaths.make", () => {
     const spec = Spec.make().add(
       GroupSpec.make("api")
         .addFunction(
-          FunctionSpec.query({
+          FunctionSpec.publicQuery({
             name: "publicQuery",
             args: Schema.Struct({}),
             returns: Schema.Null,
@@ -254,7 +254,7 @@ describe("FunctionPaths.make", () => {
           }),
         )
         .addFunction(
-          FunctionSpec.mutation({
+          FunctionSpec.publicMutation({
             name: "publicMutation",
             args: Schema.Struct({}),
             returns: Schema.Null,
@@ -268,7 +268,7 @@ describe("FunctionPaths.make", () => {
           }),
         )
         .addFunction(
-          FunctionSpec.action({
+          FunctionSpec.publicAction({
             name: "publicAction",
             args: Schema.Struct({}),
             returns: Schema.Null,

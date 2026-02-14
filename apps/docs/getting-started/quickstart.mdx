@@ -81,14 +81,14 @@ deno add convex @confect/core @confect/server @confect/cli @confect/react
 
     export const notes = GroupSpec.make("notes")
       .addFunction(
-        FunctionSpec.query({
+        FunctionSpec.publicQuery({
           name: "list",
           args: Schema.Struct({}),
           returns: Schema.Array(Notes.Doc),
         }),
       )
       .addFunction(
-        FunctionSpec.mutation({
+        FunctionSpec.publicMutation({
           name: "create",
           args: Schema.Struct({ text: Schema.String }),
           returns: Schema.Null,
