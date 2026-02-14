@@ -16,7 +16,7 @@ import { Schema } from "effect";
 
 import { Notes } from "../tables/Notes";
 
-const list = FunctionSpec.query({
+const list = FunctionSpec.publicQuery({
   name: "list",
   args: Schema.Struct({}),
   returns: Schema.Array(Notes.Doc),

@@ -13,7 +13,7 @@ describe("make", () => {
 
     const spec = Spec.make().add(
       GroupSpec.make("notes").addFunction(
-        FunctionSpec.query({
+        FunctionSpec.publicQuery({
           name: "list",
           args: FnArgs,
           returns: FnReturns,
@@ -25,7 +25,7 @@ describe("make", () => {
     const actualRef = refs.public.notes.list;
     const expectedRef = Ref.make(
       "notes:list",
-      FunctionSpec.query({
+      FunctionSpec.publicQuery({
         name: "list",
         args: FnArgs,
         returns: FnReturns,
@@ -46,7 +46,7 @@ describe("make", () => {
       GroupSpec.make("notes")
         .addGroup(GroupSpec.make("list"))
         .addFunction(
-          FunctionSpec.query({
+          FunctionSpec.publicQuery({
             name: "list",
             args: Schema.Struct({}),
             returns: Schema.Array(Schema.String),
@@ -65,7 +65,7 @@ describe("make", () => {
     const spec = Spec.make().add(
       GroupSpec.make("notes")
         .addFunction(
-          FunctionSpec.query({
+          FunctionSpec.publicQuery({
             name: "publicList",
             args: FnArgs,
             returns: FnReturns,
@@ -96,7 +96,7 @@ describe("make", () => {
     const spec = Spec.make()
       .add(
         GroupSpec.make("publicOnly").addFunction(
-          FunctionSpec.query({
+          FunctionSpec.publicQuery({
             name: "list",
             args: FnArgs,
             returns: FnReturns,
@@ -130,7 +130,7 @@ describe("make", () => {
     const spec = Spec.make().add(
       GroupSpec.make("notes")
         .addFunction(
-          FunctionSpec.query({
+          FunctionSpec.publicQuery({
             name: "publicList",
             args: FnArgs,
             returns: FnReturns,

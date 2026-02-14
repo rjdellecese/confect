@@ -143,10 +143,10 @@ const make =
   };
 
 export const internalQuery = make("query", "internal");
-export const query = make("query", "public");
+export const publicQuery = make("query", "public");
 
 export const internalMutation = make("mutation", "internal");
-export const mutation = make("mutation", "public");
+export const publicMutation = make("mutation", "public");
 
 export const internalAction = make("action", "internal");
-export const action = make("action", "public");
+export const publicAction = make("action", "public");
