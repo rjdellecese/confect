@@ -1,5 +1,5 @@
-node_modules/
-dist/
 coverage/
-test/convex/_generated/
+dist/
+node_modules/
 test/confect/_generated/
+test/convex/

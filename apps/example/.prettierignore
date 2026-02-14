@@ -1,3 +1,4 @@
-node_modules
-dist
-convex/_generated
+confect/_generated/
+convex/
+dist/
+node_modules/
