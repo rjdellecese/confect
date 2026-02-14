@@ -46,11 +46,11 @@ deno add convex @confect/core @confect/server @confect/cli @confect/react
 
     Define a table.
 
-    ```ts confect/tables/note.ts
+    ```ts confect/tables/Notes.ts
     import { Table } from "@confect/server";
     import { Schema } from "effect";
 
-    export const Note = Table.make(
+    export const Notes = Table.make(
       "notes",
       Schema.Struct({
         text: Schema.String,
@@ -63,9 +63,9 @@ deno add convex @confect/core @confect/server @confect/cli @confect/react
     ```ts confect/schema.ts
     import { DatabaseSchema } from "@confect/server";
 
-    import { Note } from "./tables/note";
+    import { Notes } from "./tables/Notes";
 
-    export default DatabaseSchema.make().addTable(Note);
+    export default DatabaseSchema.make().addTable(Notes);
     ```
 
   </Step>
@@ -73,7 +73,7 @@ deno add convex @confect/core @confect/server @confect/cli @confect/react
   <Step title="Define your Confect API spec">
     Create a `GroupSpec` and add some functions to it.
 
-    ```ts confect/spec/notes.ts
+    ```ts confect/spec/Notes.ts
     import { GroupSpec } from "@confect/core";
     import { Schema } from "effect";
 
@@ -84,7 +84,7 @@ deno add convex @confect/core @confect/server @confect/cli @confect/react
         FunctionSpec.query({
           name: "list",
           args: Schema.Struct({}),
-          returns: Schema.Array(Note.Doc),
+          returns: Schema.Array(Notes.Doc),
         }),
       )
       .addFunction(

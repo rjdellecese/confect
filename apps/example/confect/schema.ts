@@ -1,10 +1,10 @@
 import { DatabaseSchema } from "@confect/server";
 
-import { Note } from "./tables/note";
-import { Tag } from "./tables/tag";
-import { User } from "./tables/user";
+import { Notes } from "./tables/Notes";
+import { Tags } from "./tables/Tags";
+import { Users } from "./tables/Users";
 
 export default DatabaseSchema.make()
-  .addTable(Note)
-  .addTable(User)
-  .addTable(Tag);
+  .addTable(Notes)
+  .addTable(Users)
+  .addTable(Tags);

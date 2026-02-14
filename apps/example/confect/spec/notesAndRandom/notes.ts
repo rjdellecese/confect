@@ -1,6 +1,6 @@
 import { FunctionSpec, GenericId, GroupSpec } from "@confect/core";
 import { Schema } from "effect";
-import { Note } from "../../tables/note";
+import { Notes } from "../../tables/Notes";
 
 export const notes = GroupSpec.make("notes")
   .addFunction(
@@ -14,7 +14,7 @@ export const notes = GroupSpec.make("notes")
     FunctionSpec.query({
       name: "list",
       args: Schema.Struct({}),
-      returns: Schema.Array(Note.Doc),
+      returns: Schema.Array(Notes.Doc),
     }),
   )
   .addFunction(
@@ -28,13 +28,13 @@ export const notes = GroupSpec.make("notes")
     FunctionSpec.query({
       name: "getFirst",
       args: Schema.Struct({}),
-      returns: Schema.Option(Note.Doc),
+      returns: Schema.Option(Notes.Doc),
     }),
   )
   .addFunction(
     FunctionSpec.internalQuery({
       name: "internalGetFirst",
       args: Schema.Struct({}),
-      returns: Schema.Option(Note.Doc),
+      returns: Schema.Option(Notes.Doc),
     }),
   );
