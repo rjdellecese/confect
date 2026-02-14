@@ -2,7 +2,7 @@ import { Predicate, Record } from "effect";
 import type * as FunctionSpec from "./FunctionSpec";
 import { validateConfectFunctionIdentifier } from "./internal/utils";
 
-export const TypeId = "@confect/core/api/GroupSpec";
+export const TypeId = "@confect/core/GroupSpec";
 export type TypeId = typeof TypeId;
 
 export const isGroupSpec = (u: unknown): u is Any =>

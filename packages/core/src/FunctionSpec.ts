@@ -9,7 +9,7 @@ import type { Schema } from "effect";
 import { Predicate } from "effect";
 import { validateConfectFunctionIdentifier } from "./internal/utils";
 
-export const TypeId = "@confect/core/api/FunctionSpec";
+export const TypeId = "@confect/core/FunctionSpec";
 export type TypeId = typeof TypeId;
 
 export const isFunctionSpec = (u: unknown): u is AnyWithProps =>
