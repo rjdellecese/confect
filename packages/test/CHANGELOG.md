@@ -1,5 +1,14 @@
 # @confect/test
 
+## 1.0.0-next.3
+
+### Patch Changes
+
+- Updated dependencies [9cd3cda]
+- Updated dependencies [186c130]
+  - @confect/server@1.0.0-next.3
+  - @confect/core@1.0.0-next.3
+
 ## 1.0.0-next.2
 
 ### Patch Changes
