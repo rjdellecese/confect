@@ -20,9 +20,9 @@ describe("make", () => {
         }),
       ),
     );
-    const { all: refs } = Refs.make(spec);
+    const refs = Refs.make(spec);
 
-    const actualRef = refs.notes.list;
+    const actualRef = refs.public.notes.list;
     const expectedRef = Ref.make(
       "notes:list",
       FunctionSpec.query({
@@ -79,15 +79,14 @@ describe("make", () => {
           }),
         ),
     );
-    const { internal: internalRefs } = Refs.make(spec);
+    const refs = Refs.make(spec);
 
-    expectTypeOf(internalRefs.notes.internalList).toEqualTypeOf<
+    expectTypeOf(refs.internal.notes.internalList).toEqualTypeOf<
       Ref.Ref<"query", "internal", typeof FnArgs, typeof FnReturns>
     >();
 
     // @ts-expect-error - publicList should be filtered out
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-    internalRefs.notes.publicList;
+    void refs.internal.notes.publicList;
   });
 
   it("filters out groups with no matching functions", () => {
@@ -114,15 +113,14 @@ describe("make", () => {
         ),
       );
 
-    const { internal: internalRefs } = Refs.make(spec);
+    const refs = Refs.make(spec);
 
-    expectTypeOf(internalRefs.internalOnly.list).toEqualTypeOf<
+    expectTypeOf(refs.internal.internalOnly.list).toEqualTypeOf<
       Ref.Ref<"query", "internal", typeof FnArgs, typeof FnReturns>
     >();
 
     // @ts-expect-error - publicOnly group should be filtered out entirely
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-    internalRefs.publicOnly;
+    void refs.internal.publicOnly;
   });
 
   it("filters public refs to only public functions", () => {
@@ -146,14 +144,13 @@ describe("make", () => {
           }),
         ),
     );
-    const { public: publicRefs } = Refs.make(spec);
+    const refs = Refs.make(spec);
 
-    expectTypeOf(publicRefs.notes.publicList).toEqualTypeOf<
+    expectTypeOf(refs.public.notes.publicList).toEqualTypeOf<
       Ref.Ref<"query", "public", typeof FnArgs, typeof FnReturns>
     >();
 
     // @ts-expect-error - internalList should be filtered out
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-    publicRefs.notes.internalList;
+    void refs.public.notes.internalList;
   });
 });

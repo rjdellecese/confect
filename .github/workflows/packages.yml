@@ -100,6 +100,17 @@ jobs:
       - uses: ./.github/actions/confect-setup
       - run: cd packages/${{ matrix.package }} && pnpm test
 
+  bench:
+    name: Bench
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package: ["@confect/core"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/confect-setup
+      - run: pnpm --filter ${{ matrix.package }} bench
+
   build:
     name: Build
     runs-on: ubuntu-latest
