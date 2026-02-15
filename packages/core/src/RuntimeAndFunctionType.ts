@@ -1,61 +1,57 @@
 import type { FunctionType } from "convex/server";
-import { Data } from "effect";
-import type * as Runtime from "./Runtime";
 
-export type RuntimeAndFunctionType = Data.TaggedEnum<{
-  Convex: {
-    readonly functionType: FunctionType;
-  };
-  Node: {
-    readonly functionType: "action";
-  };
-}>;
+export type RuntimeAndFunctionType =
+  | { readonly runtime: "Convex"; readonly functionType: FunctionType }
+  | { readonly runtime: "Node"; readonly functionType: "action" };
 
-export const RuntimeAndFunctionType = Data.taggedEnum<RuntimeAndFunctionType>();
+export type Runtime = RuntimeAndFunctionType["runtime"];
+
+const make = <
+  Runtime_ extends Runtime,
+  FunctionType_ extends GetFunctionType<WithRuntime<Runtime_>>,
+>(
+  runtime: Runtime_,
+  functionType: FunctionType_,
+): { readonly runtime: Runtime_; readonly functionType: FunctionType_ } => ({
+  runtime,
+  functionType,
+});
 
 export type AnyQuery = Extract<
   RuntimeAndFunctionType,
-  { functionType: "query" }
+  { readonly functionType: "query" }
 >;
 
 export type AnyMutation = Extract<
   RuntimeAndFunctionType,
-  { functionType: "mutation" }
+  { readonly functionType: "mutation" }
 >;
 
 export type AnyAction = Extract<
   RuntimeAndFunctionType,
-  { functionType: "action" }
+  { readonly functionType: "action" }
 >;
 
-export type WithRuntime<Runtime_ extends Runtime.Runtime> = Extract<
+export type WithRuntime<Runtime_ extends Runtime> = Extract<
   RuntimeAndFunctionType,
-  { _tag: Runtime_ }
+  { readonly runtime: Runtime_ }
 >;
 
 export type GetRuntime<RuntimeAndFunctionType_ extends RuntimeAndFunctionType> =
-  RuntimeAndFunctionType_["_tag"];
+  RuntimeAndFunctionType_["runtime"];
 
 export type GetFunctionType<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType,
 > = RuntimeAndFunctionType_["functionType"];
 
-export const ConvexQuery = RuntimeAndFunctionType.Convex({
-  functionType: "query",
-});
+export const ConvexQuery = make("Convex", "query");
 export type ConvexQuery = typeof ConvexQuery;
 
-export const ConvexMutation = RuntimeAndFunctionType.Convex({
-  functionType: "mutation",
-});
+export const ConvexMutation = make("Convex", "mutation");
 export type ConvexMutation = typeof ConvexMutation;
 
-export const ConvexAction = RuntimeAndFunctionType.Convex({
-  functionType: "action",
-});
+export const ConvexAction = make("Convex", "action");
 export type ConvexAction = typeof ConvexAction;
 
-export const NodeAction = RuntimeAndFunctionType.Node({
-  functionType: "action",
-});
+export const NodeAction = make("Node", "action");
 export type NodeAction = typeof NodeAction;

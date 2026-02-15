@@ -8,7 +8,6 @@ import type {
 import type { Schema } from "effect";
 import { Predicate } from "effect";
 import { validateConfectFunctionIdentifier } from "./internal/utils";
-import type * as Runtime from "./Runtime";
 import * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
 export const TypeId = "@confect/core/FunctionSpec";
@@ -45,9 +44,9 @@ export interface AnyWithProps extends FunctionSpec<
 > {}
 
 export interface AnyWithPropsWithRuntime<
-  Runtime_ extends Runtime.Runtime,
+  Runtime extends RuntimeAndFunctionType.Runtime,
 > extends FunctionSpec<
-  RuntimeAndFunctionType.WithRuntime<Runtime_>,
+  RuntimeAndFunctionType.WithRuntime<Runtime>,
   FunctionVisibility,
   string,
   Schema.Schema.AnyNoContext,

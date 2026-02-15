@@ -1,6 +1,6 @@
 import { Predicate, Record } from "effect";
 import type * as GroupSpec from "./GroupSpec";
-import type * as Runtime from "./Runtime";
+import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
 export const TypeId = "@confect/core/Spec";
 export type TypeId = typeof TypeId;
@@ -9,11 +9,11 @@ export const isSpec = (u: unknown): u is AnyWithProps =>
   Predicate.hasProperty(u, TypeId);
 
 export interface Spec<
-  Runtime_ extends Runtime.Runtime,
-  Groups_ extends GroupSpec.AnyWithPropsWithRuntime<Runtime_> = never,
+  Runtime extends RuntimeAndFunctionType.Runtime,
+  Groups_ extends GroupSpec.AnyWithPropsWithRuntime<Runtime> = never,
 > {
   readonly [TypeId]: TypeId;
-  readonly runtime: Runtime_;
+  readonly runtime: Runtime;
   readonly groups: {
     [GroupName in GroupSpec.Name<Groups_>]: GroupSpec.WithName<
       Groups_,
@@ -21,9 +21,9 @@ export interface Spec<
     >;
   };
 
-  add<Group extends GroupSpec.AnyWithPropsWithRuntime<Runtime_>>(
+  add<Group extends GroupSpec.AnyWithPropsWithRuntime<Runtime>>(
     group: Group,
-  ): Spec<Runtime_, Groups_ | Group>;
+  ): Spec<Runtime, Groups_ | Group>;
 }
 
 export interface Any {
@@ -31,13 +31,13 @@ export interface Any {
 }
 
 export interface AnyWithProps extends Spec<
-  Runtime.Runtime,
+  RuntimeAndFunctionType.Runtime,
   GroupSpec.AnyWithProps
 > {}
 
 export interface AnyWithPropsWithRuntime<
-  Runtime_ extends Runtime.Runtime,
-> extends Spec<Runtime_, GroupSpec.AnyWithPropsWithRuntime<Runtime_>> {}
+  Runtime extends RuntimeAndFunctionType.Runtime,
+> extends Spec<Runtime, GroupSpec.AnyWithPropsWithRuntime<Runtime>> {}
 
 export type Groups<Spec_ extends AnyWithProps> =
   Spec_["groups"][keyof Spec_["groups"]];
@@ -54,15 +54,15 @@ const Proto = {
 };
 
 const makeProto = <
-  Runtime_ extends Runtime.Runtime,
-  Groups_ extends GroupSpec.AnyWithPropsWithRuntime<Runtime_>,
+  Runtime extends RuntimeAndFunctionType.Runtime,
+  Groups_ extends GroupSpec.AnyWithPropsWithRuntime<Runtime>,
 >({
   runtime,
   groups,
 }: {
-  runtime: Runtime_;
+  runtime: Runtime;
   groups: Record.ReadonlyRecord<string, Groups_>;
-}): Spec<Runtime_, Groups_> =>
+}): Spec<Runtime, Groups_> =>
   Object.assign(Object.create(Proto), {
     runtime,
     groups,

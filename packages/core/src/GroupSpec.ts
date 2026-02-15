@@ -1,6 +1,6 @@
 import { Predicate, Record } from "effect";
 import type * as FunctionSpec from "./FunctionSpec";
-import type * as Runtime from "./Runtime";
+import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 import { validateConfectFunctionIdentifier } from "./internal/utils";
 
 export const TypeId = "@confect/core/GroupSpec";
@@ -10,30 +10,30 @@ export const isGroupSpec = (u: unknown): u is Any =>
   Predicate.hasProperty(u, TypeId);
 
 export interface GroupSpec<
-  Runtime_ extends Runtime.Runtime,
+  Runtime extends RuntimeAndFunctionType.Runtime,
   Name_ extends string,
-  Functions_ extends FunctionSpec.AnyWithPropsWithRuntime<Runtime_> = never,
-  Groups_ extends AnyWithPropsWithRuntime<Runtime_> = never,
+  Functions_ extends FunctionSpec.AnyWithPropsWithRuntime<Runtime> = never,
+  Groups_ extends AnyWithPropsWithRuntime<Runtime> = never,
 > {
   readonly [TypeId]: TypeId;
-  readonly runtime: Runtime_;
+  readonly runtime: Runtime;
   readonly name: Name_;
   readonly functions: {
     [FunctionName in FunctionSpec.Name<
-      FunctionSpec.AnyWithPropsWithRuntime<Runtime_>
+      FunctionSpec.AnyWithPropsWithRuntime<Runtime>
     >]: FunctionSpec.WithName<Functions_, FunctionName>;
   };
   readonly groups: {
     [GroupName in Name<Groups_>]: WithName<Groups_, GroupName>;
   };
 
-  addFunction<Function extends FunctionSpec.AnyWithPropsWithRuntime<Runtime_>>(
+  addFunction<Function extends FunctionSpec.AnyWithPropsWithRuntime<Runtime>>(
     function_: Function,
-  ): GroupSpec<Runtime_, Name_, Functions_ | Function, Groups_>;
+  ): GroupSpec<Runtime, Name_, Functions_ | Function, Groups_>;
 
-  addGroup<Group extends AnyWithPropsWithRuntime<Runtime_>>(
+  addGroup<Group extends AnyWithPropsWithRuntime<Runtime>>(
     group: Group,
-  ): GroupSpec<Runtime_, Name_, Functions_, Groups_ | Group>;
+  ): GroupSpec<Runtime, Name_, Functions_, Groups_ | Group>;
 }
 
 export interface Any {
@@ -41,19 +41,19 @@ export interface Any {
 }
 
 export interface AnyWithProps extends GroupSpec<
-  Runtime.Runtime,
+  RuntimeAndFunctionType.Runtime,
   string,
   FunctionSpec.AnyWithProps,
   AnyWithProps
 > {}
 
 export interface AnyWithPropsWithRuntime<
-  Runtime_ extends Runtime.Runtime,
+  Runtime extends RuntimeAndFunctionType.Runtime,
 > extends GroupSpec<
-  Runtime_,
+  Runtime,
   string,
-  FunctionSpec.AnyWithPropsWithRuntime<Runtime_>,
-  AnyWithPropsWithRuntime<Runtime_>
+  FunctionSpec.AnyWithPropsWithRuntime<Runtime>,
+  AnyWithPropsWithRuntime<Runtime>
 > {}
 
 export type Name<Group extends AnyWithProps> = Group["name"];
@@ -106,21 +106,21 @@ const Proto = {
 };
 
 const makeProto = <
-  Runtime_ extends Runtime.Runtime,
+  Runtime extends RuntimeAndFunctionType.Runtime,
   Name_ extends string,
-  Functions_ extends FunctionSpec.AnyWithPropsWithRuntime<Runtime_>,
-  Groups_ extends AnyWithPropsWithRuntime<Runtime_>,
+  Functions_ extends FunctionSpec.AnyWithPropsWithRuntime<Runtime>,
+  Groups_ extends AnyWithPropsWithRuntime<Runtime>,
 >({
   runtime,
   name,
   functions,
   groups,
 }: {
-  runtime: Runtime_;
+  runtime: Runtime;
   name: Name_;
   functions: Record.ReadonlyRecord<string, Functions_>;
   groups: Record.ReadonlyRecord<string, Groups_>;
-}): GroupSpec<Runtime_, Name_, Functions_, Groups_> =>
+}): GroupSpec<Runtime, Name_, Functions_, Groups_> =>
   Object.assign(Object.create(Proto), {
     runtime,
     name,
