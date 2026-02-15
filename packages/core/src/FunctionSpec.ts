@@ -8,6 +8,7 @@ import type {
 import type { Schema } from "effect";
 import { Predicate } from "effect";
 import { validateConfectFunctionIdentifier } from "./internal/utils";
+import type * as Runtime from "./Runtime";
 
 export const TypeId = "@confect/core/FunctionSpec";
 export type TypeId = typeof TypeId;
@@ -16,13 +17,15 @@ export const isFunctionSpec = (u: unknown): u is AnyWithProps =>
   Predicate.hasProperty(u, TypeId);
 
 export interface FunctionSpec<
-  FunctionType_ extends FunctionType,
+  Runtime_ extends Runtime.Runtime,
+  FunctionType_ extends Runtime.FunctionType<Runtime_>,
   FunctionVisibility_ extends FunctionVisibility,
   Name_ extends string,
   Args_ extends Schema.Schema.AnyNoContext,
   Returns_ extends Schema.Schema.AnyNoContext,
 > {
   readonly [TypeId]: TypeId;
+  readonly runtime: Runtime_;
   readonly functionType: FunctionType_;
   readonly functionVisibility: FunctionVisibility_;
   readonly name: Name_;
@@ -35,6 +38,7 @@ export interface Any {
 }
 
 export interface AnyWithProps extends FunctionSpec<
+  Runtime.Runtime,
   FunctionType,
   FunctionVisibility,
   string,
@@ -42,15 +46,30 @@ export interface AnyWithProps extends FunctionSpec<
   Schema.Schema.AnyNoContext
 > {}
 
-export interface AnyWithPropsWithFunctionType<
-  FunctionType_ extends FunctionType,
+export interface AnyWithPropsWithRuntime<
+  Runtime_ extends Runtime.Runtime,
 > extends FunctionSpec<
+  Runtime_,
+  Runtime.FunctionType<Runtime_>,
+  FunctionVisibility,
+  string,
+  Schema.Schema.AnyNoContext,
+  Schema.Schema.AnyNoContext
+> {}
+
+export interface AnyWithPropsWithFunctionType<
+  Runtime_ extends Runtime.Runtime,
+  FunctionType_ extends Runtime.FunctionType<Runtime_>,
+> extends FunctionSpec<
+  Runtime_,
   FunctionType_,
   FunctionVisibility,
   string,
   Schema.Schema.AnyNoContext,
   Schema.Schema.AnyNoContext
 > {}
+
+export type GetRuntime<Function extends AnyWithProps> = Function["runtime"];
 
 export type GetFunctionType<Function extends AnyWithProps> =
   Function["functionType"];
@@ -106,9 +125,11 @@ const Proto = {
 
 const make =
   <
-    FunctionType_ extends FunctionType,
+    Runtime_ extends Runtime.Runtime,
+    FunctionType_ extends Runtime.FunctionType<Runtime_>,
     FunctionVisibility_ extends FunctionVisibility,
   >(
+    runtime: Runtime_,
     functionType: FunctionType_,
     functionVisibility: FunctionVisibility_,
   ) =>
@@ -125,6 +146,7 @@ const make =
     args: Args_;
     returns: Returns_;
   }): FunctionSpec<
+    Runtime_,
     FunctionType_,
     FunctionVisibility_,
     Name_,
@@ -134,6 +156,7 @@ const make =
     validateConfectFunctionIdentifier(name);
 
     return Object.assign(Object.create(Proto), {
+      runtime,
       functionType,
       functionVisibility,
       name,
@@ -142,11 +165,12 @@ const make =
     });
   };
 
-export const internalQuery = make("query", "internal");
-export const publicQuery = make("query", "public");
+export const publicQuery = make("Convex", "query", "public");
+export const internalQuery = make("Convex", "query", "internal");
+export const publicMutation = make("Convex", "mutation", "public");
+export const internalMutation = make("Convex", "mutation", "internal");
+export const publicAction = make("Convex", "action", "public");
+export const internalAction = make("Convex", "action", "internal");
 
-export const internalMutation = make("mutation", "internal");
-export const publicMutation = make("mutation", "public");
-
-export const internalAction = make("action", "internal");
-export const publicAction = make("action", "public");
+export const publicNodeAction = make("Node", "action", "public");
+export const internalNodeAction = make("Node", "action", "internal");
