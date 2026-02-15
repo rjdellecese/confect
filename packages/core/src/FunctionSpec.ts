@@ -9,6 +9,7 @@ import type { Schema } from "effect";
 import { Predicate } from "effect";
 import { validateConfectFunctionIdentifier } from "./internal/utils";
 import type * as Runtime from "./Runtime";
+import * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
 export const TypeId = "@confect/core/FunctionSpec";
 export type TypeId = typeof TypeId;
@@ -17,16 +18,14 @@ export const isFunctionSpec = (u: unknown): u is AnyWithProps =>
   Predicate.hasProperty(u, TypeId);
 
 export interface FunctionSpec<
-  Runtime_ extends Runtime.Runtime,
-  FunctionType_ extends Runtime.FunctionType<Runtime_>,
+  RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility_ extends FunctionVisibility,
   Name_ extends string,
   Args_ extends Schema.Schema.AnyNoContext,
   Returns_ extends Schema.Schema.AnyNoContext,
 > {
   readonly [TypeId]: TypeId;
-  readonly runtime: Runtime_;
-  readonly functionType: FunctionType_;
+  readonly runtimeAndFunctionType: RuntimeAndFunctionType_;
   readonly functionVisibility: FunctionVisibility_;
   readonly name: Name_;
   readonly args: Args_;
@@ -38,8 +37,7 @@ export interface Any {
 }
 
 export interface AnyWithProps extends FunctionSpec<
-  Runtime.Runtime,
-  FunctionType,
+  RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility,
   string,
   Schema.Schema.AnyNoContext,
@@ -49,8 +47,7 @@ export interface AnyWithProps extends FunctionSpec<
 export interface AnyWithPropsWithRuntime<
   Runtime_ extends Runtime.Runtime,
 > extends FunctionSpec<
-  Runtime_,
-  Runtime.FunctionType<Runtime_>,
+  RuntimeAndFunctionType.WithRuntime<Runtime_>,
   FunctionVisibility,
   string,
   Schema.Schema.AnyNoContext,
@@ -58,21 +55,17 @@ export interface AnyWithPropsWithRuntime<
 > {}
 
 export interface AnyWithPropsWithFunctionType<
-  Runtime_ extends Runtime.Runtime,
-  FunctionType_ extends Runtime.FunctionType<Runtime_>,
+  RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
 > extends FunctionSpec<
-  Runtime_,
-  FunctionType_,
+  RuntimeAndFunctionType_,
   FunctionVisibility,
   string,
   Schema.Schema.AnyNoContext,
   Schema.Schema.AnyNoContext
 > {}
 
-export type GetRuntime<Function extends AnyWithProps> = Function["runtime"];
-
-export type GetFunctionType<Function extends AnyWithProps> =
-  Function["functionType"];
+export type GetRuntimeAndFunctionType<Function extends AnyWithProps> =
+  Function["runtimeAndFunctionType"];
 
 export type GetFunctionVisibility<Function extends AnyWithProps> =
   Function["functionVisibility"];
@@ -91,27 +84,36 @@ export type WithName<
 export type WithFunctionType<
   Function extends AnyWithProps,
   FunctionType_ extends FunctionType,
-> = Extract<Function, { readonly functionType: FunctionType_ }>;
+> = Extract<
+  Function,
+  { readonly runtimeAndFunctionType: { readonly functionType: FunctionType_ } }
+>;
 
-export type ExcludeName<
+export type WithoutName<
   Function extends AnyWithProps,
   Name_ extends Name<Function>,
 > = Exclude<Function, { readonly name: Name_ }>;
 
 export type RegisteredFunction<Function extends AnyWithProps> =
-  Function["functionType"] extends "query"
+  RuntimeAndFunctionType.GetFunctionType<
+    Function["runtimeAndFunctionType"]
+  > extends "Convex"
     ? RegisteredQuery<
         GetFunctionVisibility<Function>,
         Args<Function>["Encoded"],
         Promise<Returns<Function>["Encoded"]>
       >
-    : Function["functionType"] extends "mutation"
+    : RuntimeAndFunctionType.GetFunctionType<
+          Function["runtimeAndFunctionType"]
+        > extends "mutation"
       ? RegisteredMutation<
           GetFunctionVisibility<Function>,
           Args<Function>["Encoded"],
           Promise<Returns<Function>["Encoded"]>
         >
-      : Function["functionType"] extends "action"
+      : RuntimeAndFunctionType.GetFunctionType<
+            Function["runtimeAndFunctionType"]
+          > extends "action"
         ? RegisteredAction<
             GetFunctionVisibility<Function>,
             Args<Function>["Encoded"],
@@ -125,12 +127,11 @@ const Proto = {
 
 const make =
   <
-    Runtime_ extends Runtime.Runtime,
-    FunctionType_ extends Runtime.FunctionType<Runtime_>,
+    RuntimeAndFunctionType_ extends
+      RuntimeAndFunctionType.RuntimeAndFunctionType,
     FunctionVisibility_ extends FunctionVisibility,
   >(
-    runtime: Runtime_,
-    functionType: FunctionType_,
+    runtimeAndFunctionType: RuntimeAndFunctionType_,
     functionVisibility: FunctionVisibility_,
   ) =>
   <
@@ -146,8 +147,7 @@ const make =
     args: Args_;
     returns: Returns_;
   }): FunctionSpec<
-    Runtime_,
-    FunctionType_,
+    RuntimeAndFunctionType_,
     FunctionVisibility_,
     Name_,
     Args_,
@@ -156,8 +156,7 @@ const make =
     validateConfectFunctionIdentifier(name);
 
     return Object.assign(Object.create(Proto), {
-      runtime,
-      functionType,
+      runtimeAndFunctionType,
       functionVisibility,
       name,
       args,
@@ -165,12 +164,30 @@ const make =
     });
   };
 
-export const publicQuery = make("Convex", "query", "public");
-export const internalQuery = make("Convex", "query", "internal");
-export const publicMutation = make("Convex", "mutation", "public");
-export const internalMutation = make("Convex", "mutation", "internal");
-export const publicAction = make("Convex", "action", "public");
-export const internalAction = make("Convex", "action", "internal");
+export const publicQuery = make(RuntimeAndFunctionType.ConvexQuery, "public");
+export const internalQuery = make(
+  RuntimeAndFunctionType.ConvexQuery,
+  "internal",
+);
+export const publicMutation = make(
+  RuntimeAndFunctionType.ConvexMutation,
+  "public",
+);
+export const internalMutation = make(
+  RuntimeAndFunctionType.ConvexMutation,
+  "internal",
+);
+export const publicAction = make(RuntimeAndFunctionType.ConvexAction, "public");
+export const internalAction = make(
+  RuntimeAndFunctionType.ConvexAction,
+  "internal",
+);
 
-export const publicNodeAction = make("Node", "action", "public");
-export const internalNodeAction = make("Node", "action", "internal");
+export const publicNodeAction = make(
+  RuntimeAndFunctionType.NodeAction,
+  "public",
+);
+export const internalNodeAction = make(
+  RuntimeAndFunctionType.NodeAction,
+  "internal",
+);
