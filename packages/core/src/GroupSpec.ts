@@ -131,7 +131,6 @@ const makeProto = <
 export const make = <const Name_ extends string>(
   name: Name_,
 ): GroupSpec<"Convex", Name_> => {
-  // TODO: Ensure that group named `"node"` is not allowed at the top-level
   validateConfectFunctionIdentifier(name);
 
   return makeProto({
