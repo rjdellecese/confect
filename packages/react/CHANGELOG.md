@@ -1,5 +1,12 @@
 # @confect/react
 
+## 1.0.0-next.4
+
+### Patch Changes
+
+- Updated dependencies [46109fb]
+  - @confect/core@1.0.0-next.4
+
 ## 1.0.0-next.3
 
 ### Patch Changes

@@ -9,6 +9,7 @@
     "@confect/test": "0.0.1"
   },
   "changesets": [
+    "clear-laws-double",
     "cute-rules-jog",
     "lazy-forks-roll",
     "mighty-icons-pick",
