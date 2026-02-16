@@ -8,6 +8,7 @@ import {
   logFileAdded,
   logFileModified,
   logFileRemoved,
+  logPending,
   logSuccess,
 } from "../log";
 import { ConfectDirectory } from "../services/ConfectDirectory";
@@ -53,6 +54,7 @@ const loadNodeSpec = Effect.gen(function* () {
 
 export const codegen = Command.make("codegen", {}, () =>
   Effect.gen(function* () {
+    yield* logPending("Performing initial sync…");
     yield* codegenHandler;
     yield* logSuccess("Generated files are up-to-date");
   }),

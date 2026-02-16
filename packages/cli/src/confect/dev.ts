@@ -5,6 +5,7 @@ import { Ansi, AnsiDoc } from "@effect/printer-ansi";
 import {
   Array,
   Console,
+  Deferred,
   Duration,
   Effect,
   Equal,
@@ -24,7 +25,7 @@ import * as tsx from "tsx/esm/api";
 import type * as FunctionPath from "../FunctionPath";
 import * as FunctionPaths from "../FunctionPaths";
 import * as GroupPath from "../GroupPath";
-import { logFailure, logSuccess } from "../log";
+import { logFailure, logPending, logSuccess } from "../log";
 import { ConfectDirectory } from "../services/ConfectDirectory";
 import { ConvexDirectory } from "../services/ConvexDirectory";
 import { ProjectRoot } from "../services/ProjectRoot";
@@ -136,6 +137,7 @@ const logFunctionRemovedIndented = (functionPath: FunctionPath.FunctionPath) =>
 
 export const dev = Command.make("dev", {}, () =>
   Effect.gen(function* () {
+    yield* logPending("Performing initial sync…");
     const initialFunctionPaths = yield* codegenHandler;
 
     const pendingRef = yield* Ref.make<Pending>(pendingInit);
@@ -160,11 +162,19 @@ const syncLoop = (
 ) =>
   Effect.gen(function* () {
     const functionPathsRef = yield* Ref.make(initialFunctionPaths);
+    const initialSyncDone = yield* Deferred.make<void>();
 
     return yield* Effect.forever(
       Effect.gen(function* () {
         yield* Effect.logDebug("Running sync loop...");
         yield* Queue.take(signal);
+
+        const isDone = yield* Deferred.isDone(initialSyncDone);
+        yield* Effect.when(
+          logPending("Dependencies changed, reloading…"),
+          () => isDone,
+        );
+        yield* Deferred.succeed(initialSyncDone, undefined);
 
         const pending = yield* Ref.getAndSet(pendingRef, pendingInit);
 

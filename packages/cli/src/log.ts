@@ -79,3 +79,5 @@ const logStatus = (char: string, charColor: Ansi.Ansi) => (message: string) =>
 export const logSuccess = logStatus("✔︎", Ansi.green);
 
 export const logFailure = logStatus("✘", Ansi.red);
+
+export const logPending = logStatus("⭘", Ansi.yellow);
