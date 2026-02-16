@@ -1,7 +1,7 @@
-import type { FunctionType } from "convex/server";
-
 export type RuntimeAndFunctionType =
-  | { readonly runtime: "Convex"; readonly functionType: FunctionType }
+  | { readonly runtime: "Convex"; readonly functionType: "query" }
+  | { readonly runtime: "Convex"; readonly functionType: "mutation" }
+  | { readonly runtime: "Convex"; readonly functionType: "action" }
   | { readonly runtime: "Node"; readonly functionType: "action" };
 
 export type Runtime = RuntimeAndFunctionType["runtime"];

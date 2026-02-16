@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently --restart-tries=1 --prefix-colors='white.bold.bgCyan,white.bold.bgYellow' --prefix=' {name} ' --names='VITE,CONVEX' 'vite' 'convex dev --tail-logs'",
+    "dev": "concurrently --restart-tries=1 --prefix-colors='white.bold.bgCyan,white.bold.bgYellow,white.bold.bgGreen' --prefix=' {name} ' --names='VITE,CONVEX,CONFECT' 'vite' 'convex dev --tail-logs' 'confect dev'",
     "convex-codegen": "pnpm convex codegen",
     "typecheck": "tsc --noEmit --project tsconfig.json && tsc --noEmit --project convex/tsconfig.json",
     "build": "vite build --mode development",

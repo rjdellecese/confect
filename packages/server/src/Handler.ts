@@ -1,4 +1,5 @@
-import type { FunctionSpec } from "@confect/core";
+import type { FunctionSpec, RuntimeAndFunctionType } from "@confect/core";
+import type { NodeContext } from "@effect/platform-node";
 import type { Effect } from "effect";
 import type * as ActionCtx from "./ActionCtx";
 import type * as ActionRunner from "./ActionRunner";
@@ -30,16 +31,22 @@ export type Handler<
           "mutation"
         >
       ? Mutation<DatabaseSchema_, FunctionSpec_>
-      : FunctionSpec_ extends FunctionSpec.WithFunctionType<
+      : FunctionSpec_ extends FunctionSpec.WithRuntimeAndFunctionType<
             FunctionSpec_,
-            "action"
+            RuntimeAndFunctionType.ConvexAction
           >
-        ? Action<DatabaseSchema_, FunctionSpec_>
-        : never;
+        ? ConvexAction<DatabaseSchema_, FunctionSpec_>
+        : FunctionSpec_ extends FunctionSpec.WithRuntimeAndFunctionType<
+              FunctionSpec_,
+              RuntimeAndFunctionType.NodeAction
+            >
+          ? NodeAction<DatabaseSchema_, FunctionSpec_>
+          : never;
 
 export type Query<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  FunctionSpec_ extends FunctionSpec.AnyWithPropsWithFunctionType<"query">,
+  FunctionSpec_ extends
+    FunctionSpec.AnyWithPropsWithFunctionType<RuntimeAndFunctionType.AnyQuery>,
 > = Base<
   FunctionSpec_,
   | DatabaseReader.DatabaseReader<DatabaseSchema_>
@@ -51,7 +58,8 @@ export type Query<
 
 export type Mutation<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  FunctionSpec_ extends FunctionSpec.AnyWithPropsWithFunctionType<"mutation">,
+  FunctionSpec_ extends
+    FunctionSpec.AnyWithPropsWithFunctionType<RuntimeAndFunctionType.AnyMutation>,
 > = Base<
   FunctionSpec_,
   | DatabaseReader.DatabaseReader<DatabaseSchema_>
@@ -67,11 +75,7 @@ export type Mutation<
     >
 >;
 
-export type Action<
-  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  FunctionSpec_ extends FunctionSpec.AnyWithPropsWithFunctionType<"action">,
-> = Base<
-  FunctionSpec_,
+type ActionServices<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
   | Scheduler.Scheduler
   | Auth.Auth
   | StorageReader
@@ -83,7 +87,21 @@ export type Action<
   | VectorSearch.VectorSearch<DataModel.FromSchema<DatabaseSchema_>>
   | ActionCtx.ActionCtx<
       DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
-    >
+    >;
+
+export type ConvexAction<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+  FunctionSpec_ extends
+    FunctionSpec.AnyWithPropsWithFunctionType<RuntimeAndFunctionType.AnyAction>,
+> = Base<FunctionSpec_, ActionServices<DatabaseSchema_>>;
+
+export type NodeAction<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+  FunctionSpec_ extends
+    FunctionSpec.AnyWithPropsWithFunctionType<RuntimeAndFunctionType.NodeAction>,
+> = Base<
+  FunctionSpec_,
+  ActionServices<DatabaseSchema_> | NodeContext.NodeContext
 >;
 
 type Base<FunctionSpec_ extends FunctionSpec.AnyWithProps, R> = (

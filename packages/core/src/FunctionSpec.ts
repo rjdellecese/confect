@@ -80,6 +80,14 @@ export type WithName<
   Name_ extends string,
 > = Extract<Function, { readonly name: Name_ }>;
 
+export type WithRuntimeAndFunctionType<
+  Function extends AnyWithProps,
+  RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
+> = Extract<
+  Function,
+  { readonly runtimeAndFunctionType: RuntimeAndFunctionType_ }
+>;
+
 export type WithFunctionType<
   Function extends AnyWithProps,
   FunctionType_ extends FunctionType,

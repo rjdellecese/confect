@@ -7,21 +7,34 @@ export const functions = ({
   groupPath,
   functionNames,
   registeredFunctionsImportPath,
+  registeredFunctionsVariableName = "registeredFunctions",
+  registeredFunctionsLookupPath,
+  useNode = false,
 }: {
   groupPath: GroupPath.GroupPath;
   functionNames: string[];
   registeredFunctionsImportPath: string;
+  registeredFunctionsVariableName?: string;
+  registeredFunctionsLookupPath?: readonly string[];
+  useNode?: boolean;
 }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
+    const lookupPath = registeredFunctionsLookupPath ?? groupPath.pathSegments;
+
+    if (useNode) {
+      yield* cbw.writeLine(`"use node";`);
+      yield* cbw.blankLine();
+    }
+
     yield* cbw.writeLine(
-      `import registeredFunctions from "${registeredFunctionsImportPath}";`,
+      `import ${registeredFunctionsVariableName} from "${registeredFunctionsImportPath}";`,
     );
     yield* cbw.newLine();
     for (const functionName of functionNames) {
       yield* cbw.writeLine(
-        `export const ${functionName} = registeredFunctions.${Array.join([...groupPath.pathSegments, functionName], ".")};`,
+        `export const ${functionName} = ${registeredFunctionsVariableName}.${Array.join([...lookupPath, functionName], ".")};`,
       );
     }
 
@@ -85,14 +98,27 @@ export const authConfig = ({ authImportPath }: { authImportPath: string }) =>
     return yield* cbw.toString();
   });
 
-export const refs = ({ specImportPath }: { specImportPath: string }) =>
+export const refs = ({
+  specImportPath,
+  nodeSpecImportPath,
+}: {
+  specImportPath: string;
+  nodeSpecImportPath?: string;
+}) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
     yield* cbw.writeLine(`import { Refs } from "@confect/core";`);
     yield* cbw.writeLine(`import spec from "${specImportPath}";`);
+    if (nodeSpecImportPath !== undefined) {
+      yield* cbw.writeLine(`import nodeSpec from "${nodeSpecImportPath}";`);
+    }
     yield* cbw.blankLine();
-    yield* cbw.writeLine(`export default Refs.make(spec);`);
+    yield* cbw.writeLine(
+      nodeSpecImportPath !== undefined
+        ? `export default Refs.make(spec, nodeSpec);`
+        : `export default Refs.make(spec);`,
+    );
 
     return yield* cbw.toString();
   });
@@ -116,6 +142,26 @@ export const api = ({
     return yield* cbw.toString();
   });
 
+export const nodeApi = ({
+  schemaImportPath,
+  nodeSpecImportPath,
+}: {
+  schemaImportPath: string;
+  nodeSpecImportPath: string;
+}) =>
+  Effect.gen(function* () {
+    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+
+    yield* cbw.writeLine(`import { Api } from "@confect/server";`);
+    yield* cbw.blankLine();
+    yield* cbw.writeLine(`import schema from "${schemaImportPath}";`);
+    yield* cbw.writeLine(`import nodeSpec from "${nodeSpecImportPath}";`);
+    yield* cbw.blankLine();
+    yield* cbw.writeLine(`export default Api.make(schema, nodeSpec);`);
+
+    return yield* cbw.toString();
+  });
+
 export const registeredFunctions = ({
   implImportPath,
 }: {
@@ -125,11 +171,37 @@ export const registeredFunctions = ({
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
     yield* cbw.writeLine(
-      `import { RegisteredFunctions } from "@confect/server";`,
+      `import { RegisteredConvexFunction, RegisteredFunctions } from "@confect/server";`,
     );
     yield* cbw.writeLine(`import impl from "${implImportPath}";`);
     yield* cbw.blankLine();
-    yield* cbw.writeLine(`export default RegisteredFunctions.make(impl);`);
+    yield* cbw.writeLine(
+      `export default RegisteredFunctions.make(impl, RegisteredConvexFunction.make);`,
+    );
+
+    return yield* cbw.toString();
+  });
+
+export const nodeRegisteredFunctions = ({
+  nodeImplImportPath,
+}: {
+  nodeImplImportPath: string;
+}) =>
+  Effect.gen(function* () {
+    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+
+    yield* cbw.writeLine(
+      `import { RegisteredFunctions } from "@confect/server";`,
+    );
+    yield* cbw.writeLine(
+      `import { RegisteredNodeFunction } from "@confect/server/node";`,
+    );
+    yield* cbw.blankLine();
+    yield* cbw.writeLine(`import nodeImpl from "${nodeImplImportPath}";`);
+    yield* cbw.blankLine();
+    yield* cbw.writeLine(
+      `export default RegisteredFunctions.make(nodeImpl, RegisteredNodeFunction.make);`,
+    );
 
     return yield* cbw.toString();
   });

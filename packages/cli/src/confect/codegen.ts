@@ -4,7 +4,12 @@ import { Command } from "@effect/cli";
 import { FileSystem, Path } from "@effect/platform";
 import { Effect, Match, Option } from "effect";
 import * as tsx from "tsx/esm/api";
-import { logCompleted, logFileAdded, logFileModified } from "../log";
+import {
+  logFileAdded,
+  logFileModified,
+  logFileRemoved,
+  logSuccess,
+} from "../log";
 import { ConfectDirectory } from "../services/ConfectDirectory";
 import { ConvexDirectory } from "../services/ConvexDirectory";
 import * as templates from "../templates";
@@ -18,10 +23,38 @@ import {
   writeFileStringAndLog,
 } from "../utils";
 
+const getNodeSpecPath = Effect.gen(function* () {
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
+  return path.join(confectDirectory, "nodeSpec.ts");
+});
+
+const loadNodeSpec = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const nodeSpecPath = yield* getNodeSpecPath;
+
+  if (!(yield* fs.exists(nodeSpecPath))) {
+    return Option.none<Spec.AnyWithPropsWithRuntime<"Node">>();
+  }
+
+  const nodeSpecPathUrl = yield* path.toFileUrl(nodeSpecPath);
+  const nodeSpecModule = yield* Effect.promise(() =>
+    tsx.tsImport(nodeSpecPathUrl.href, import.meta.url),
+  );
+  const nodeSpec = nodeSpecModule.default;
+
+  if (!Spec.isNodeSpec(nodeSpec)) {
+    return yield* Effect.die("nodeSpec.ts does not export a valid Node Spec");
+  }
+
+  return Option.some(nodeSpec);
+});
+
 export const codegen = Command.make("codegen", {}, () =>
   Effect.gen(function* () {
     yield* codegenHandler;
-    yield* logCompleted("Generated files are up-to-date");
+    yield* logSuccess("Generated files are up-to-date");
   }),
 ).pipe(
   Command.withDescription(
@@ -32,7 +65,14 @@ export const codegen = Command.make("codegen", {}, () =>
 export const codegenHandler = Effect.gen(function* () {
   yield* generateConfectGeneratedDirectory;
   yield* Effect.all(
-    [generateApi, generateRefs, generateRegisteredFunctions, generateServices],
+    [
+      generateApi,
+      generateRefs,
+      generateRegisteredFunctions,
+      generateNodeApi,
+      generateNodeRegisteredFunctions,
+      generateServices,
+    ],
     { concurrency: "unbounded" },
   );
   const [functionPaths] = yield* Effect.all(
@@ -67,19 +107,14 @@ const generateApi = Effect.gen(function* () {
   const confectDirectory = yield* ConfectDirectory.get;
 
   const apiPath = path.join(confectDirectory, "_generated", "api.ts");
+  const apiDir = path.dirname(apiPath);
 
   const schemaImportPath = yield* removePathExtension(
-    path.relative(
-      path.dirname(apiPath),
-      path.join(confectDirectory, "schema.ts"),
-    ),
+    path.relative(apiDir, path.join(confectDirectory, "schema.ts")),
   );
 
   const specImportPath = yield* removePathExtension(
-    path.relative(
-      path.dirname(apiPath),
-      path.join(confectDirectory, "spec.ts"),
-    ),
+    path.relative(apiDir, path.join(confectDirectory, "spec.ts")),
   );
 
   const apiContents = yield* templates.api({
@@ -90,7 +125,42 @@ const generateApi = Effect.gen(function* () {
   yield* writeFileStringAndLog(apiPath, apiContents);
 });
 
+export const generateNodeApi = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
+
+  const nodeSpecPath = yield* getNodeSpecPath;
+  const nodeApiPath = path.join(confectDirectory, "_generated", "nodeApi.ts");
+
+  if (!(yield* fs.exists(nodeSpecPath))) {
+    if (yield* fs.exists(nodeApiPath)) {
+      yield* fs.remove(nodeApiPath);
+      yield* logFileRemoved(nodeApiPath);
+    }
+    return;
+  }
+
+  const nodeApiDir = path.dirname(nodeApiPath);
+
+  const schemaImportPath = yield* removePathExtension(
+    path.relative(nodeApiDir, path.join(confectDirectory, "schema.ts")),
+  );
+
+  const nodeSpecImportPath = yield* removePathExtension(
+    path.relative(nodeApiDir, nodeSpecPath),
+  );
+
+  const nodeApiContents = yield* templates.nodeApi({
+    schemaImportPath,
+    nodeSpecImportPath,
+  });
+
+  yield* writeFileStringAndLog(nodeApiPath, nodeApiContents);
+});
+
 const generateFunctionModules = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
 
@@ -102,11 +172,20 @@ const generateFunctionModules = Effect.gen(function* () {
   );
   const spec = specModule.default;
 
-  if (!Spec.isSpec(spec)) {
-    return yield* Effect.die("spec.ts does not export a valid Spec");
+  if (!Spec.isConvexSpec(spec)) {
+    return yield* Effect.die("spec.ts does not export a valid Convex Spec");
   }
 
-  return yield* generateFunctions(spec);
+  const nodeImplPath = path.join(confectDirectory, "nodeImpl.ts");
+  const nodeImplExists = yield* fs.exists(nodeImplPath);
+  const nodeSpecOption = yield* loadNodeSpec;
+
+  const mergedSpec = Option.match(nodeSpecOption, {
+    onNone: () => spec,
+    onSome: (nodeSpec) => (nodeImplExists ? Spec.merge(spec, nodeSpec) : spec),
+  });
+
+  return yield* generateFunctions(mergedSpec);
 });
 
 const generateSchema = Effect.gen(function* () {
@@ -189,23 +268,67 @@ const generateRegisteredFunctions = Effect.gen(function* () {
   );
 });
 
+export const generateNodeRegisteredFunctions = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
+
+  const nodeImplPath = path.join(confectDirectory, "nodeImpl.ts");
+  const nodeSpecPath = yield* getNodeSpecPath;
+  const nodeRegisteredFunctionsPath = path.join(
+    confectDirectory,
+    "_generated",
+    "nodeRegisteredFunctions.ts",
+  );
+
+  const nodeImplExists = yield* fs.exists(nodeImplPath);
+  const nodeSpecExists = yield* fs.exists(nodeSpecPath);
+
+  if (!nodeImplExists || !nodeSpecExists) {
+    if (yield* fs.exists(nodeRegisteredFunctionsPath)) {
+      yield* fs.remove(nodeRegisteredFunctionsPath);
+      yield* logFileRemoved(nodeRegisteredFunctionsPath);
+    }
+    return;
+  }
+
+  const nodeImplImportPath = yield* removePathExtension(
+    path.relative(path.dirname(nodeRegisteredFunctionsPath), nodeImplPath),
+  );
+
+  const nodeRegisteredFunctionsContents =
+    yield* templates.nodeRegisteredFunctions({
+      nodeImplImportPath,
+    });
+
+  yield* writeFileStringAndLog(
+    nodeRegisteredFunctionsPath,
+    nodeRegisteredFunctionsContents,
+  );
+});
+
 const generateRefs = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
 
   const confectGeneratedDirectory = path.join(confectDirectory, "_generated");
-
-  const confectSpecPath = path.join(confectDirectory, "spec.ts");
   const refsPath = path.join(confectGeneratedDirectory, "refs.ts");
+  const refsDir = path.dirname(refsPath);
 
-  const relativeImportPath = path.relative(
-    path.dirname(refsPath),
-    confectSpecPath,
+  const specImportPath = yield* removePathExtension(
+    path.relative(refsDir, path.join(confectDirectory, "spec.ts")),
   );
-  const importPathWithoutExt = yield* removePathExtension(relativeImportPath);
+
+  const nodeSpecPath = yield* getNodeSpecPath;
+  const nodeSpecExists = yield* fs.exists(nodeSpecPath);
+  const nodeSpecImportPath = nodeSpecExists
+    ? yield* removePathExtension(path.relative(refsDir, nodeSpecPath))
+    : null;
 
   const refsContents = yield* templates.refs({
-    specImportPath: importPathWithoutExt,
+    specImportPath,
+    ...(nodeSpecImportPath === null ? {} : { nodeSpecImportPath }),
   });
 
   yield* writeFileStringAndLog(refsPath, refsContents);
