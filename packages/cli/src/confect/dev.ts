@@ -5,7 +5,6 @@ import { Ansi, AnsiDoc } from "@effect/printer-ansi";
 import {
   Array,
   Console,
-  Data,
   Duration,
   Effect,
   Equal,
@@ -61,50 +60,6 @@ const pendingInit: Pending = {
   authDirty: false,
 };
 
-type FileChange = Data.TaggedEnum<{
-  OptionalFile: {
-    readonly change: "Added" | "Removed" | "Modified";
-    readonly filePath: string;
-  };
-  GroupModule: {
-    readonly change: "Added" | "Removed" | "Modified";
-    readonly filePath: string;
-    readonly functionsAdded: ReadonlyArray<FunctionPath.FunctionPath>;
-    readonly functionsRemoved: ReadonlyArray<FunctionPath.FunctionPath>;
-  };
-}>;
-
-const FileChange = Data.taggedEnum<FileChange>();
-
-const logChangeReport = (changes: ReadonlyArray<FileChange>) =>
-  Effect.gen(function* () {
-    yield* logSuccess("Generated files are up-to-date");
-
-    yield* Effect.when(
-      Effect.forEach(changes, (change) =>
-        FileChange.$match(change, {
-          OptionalFile: ({ change: c, filePath }) =>
-            logFileChangeIndented(c, filePath),
-          GroupModule: ({
-            change: c,
-            filePath,
-            functionsAdded,
-            functionsRemoved,
-          }) =>
-            Effect.gen(function* () {
-              yield* logFileChangeIndented(c, filePath);
-              yield* Effect.forEach(functionsAdded, logFunctionAddedIndented);
-              yield* Effect.forEach(
-                functionsRemoved,
-                logFunctionRemovedIndented,
-              );
-            }),
-        }),
-      ),
-      () => Array.isNonEmptyReadonlyArray(changes),
-    );
-  });
-
 const changeChar = (change: "Added" | "Removed" | "Modified") =>
   Match.value(change).pipe(
     Match.when("Added", () => ({ char: "+", color: Ansi.green })),
@@ -130,8 +85,8 @@ const logFileChangeIndented = (
 
     yield* Console.log(
       pipe(
-        AnsiDoc.text("  "),
-        AnsiDoc.cat(pipe(AnsiDoc.char(char), AnsiDoc.annotate(color))),
+        AnsiDoc.char(char),
+        AnsiDoc.annotate(color),
         AnsiDoc.catWithSpace(
           AnsiDoc.hcat([
             pipe(AnsiDoc.text(prefix), AnsiDoc.annotate(Ansi.blackBright)),
@@ -146,7 +101,7 @@ const logFileChangeIndented = (
 const logFunctionAddedIndented = (functionPath: FunctionPath.FunctionPath) =>
   Console.log(
     pipe(
-      AnsiDoc.text("    "),
+      AnsiDoc.text("  "),
       AnsiDoc.cat(pipe(AnsiDoc.char("+"), AnsiDoc.annotate(Ansi.green))),
       AnsiDoc.catWithSpace(
         AnsiDoc.hcat([
@@ -164,7 +119,7 @@ const logFunctionAddedIndented = (functionPath: FunctionPath.FunctionPath) =>
 const logFunctionRemovedIndented = (functionPath: FunctionPath.FunctionPath) =>
   Console.log(
     pipe(
-      AnsiDoc.text("    "),
+      AnsiDoc.text("  "),
       AnsiDoc.cat(pipe(AnsiDoc.char("-"), AnsiDoc.annotate(Ansi.red))),
       AnsiDoc.catWithSpace(
         AnsiDoc.hcat([
@@ -205,7 +160,6 @@ const syncLoop = (
 ) =>
   Effect.gen(function* () {
     const functionPathsRef = yield* Ref.make(initialFunctionPaths);
-    const changesRef = yield* Ref.make<ReadonlyArray<FileChange>>([]);
 
     return yield* Effect.forever(
       Effect.gen(function* () {
@@ -219,8 +173,9 @@ const syncLoop = (
           yield* generateNodeRegisteredFunctions;
         }
 
-        const specResult: Option.Option<ReadonlyArray<FileChange>> =
-          yield* Effect.if(pending.specDirty, {
+        const specResult: Option.Option<void> = yield* Effect.if(
+          pending.specDirty,
+          {
             onTrue: () =>
               loadSpec.pipe(
                 Effect.andThen(
@@ -243,87 +198,81 @@ const syncLoop = (
 
                     // Removed groups
                     yield* removeGroups(groupsRemoved);
-                    const removedChanges = yield* Effect.forEach(
-                      groupsRemoved,
-                      (gp) =>
-                        Effect.gen(function* () {
-                          const relativeModulePath =
-                            yield* GroupPath.modulePath(gp);
-                          return FileChange.GroupModule({
-                            change: "Removed",
-                            filePath: path.join(
-                              convexDirectory,
-                              relativeModulePath,
+                    yield* Effect.forEach(groupsRemoved, (gp) =>
+                      Effect.gen(function* () {
+                        const relativeModulePath =
+                          yield* GroupPath.modulePath(gp);
+                        const filePath = path.join(
+                          convexDirectory,
+                          relativeModulePath,
+                        );
+                        yield* logFileChangeIndented("Removed", filePath);
+                        yield* Effect.forEach(
+                          Array.fromIterable(
+                            HashSet.filter(functionsRemoved, (fp) =>
+                              Equal.equals(fp.groupPath, gp),
                             ),
-                            functionsAdded: [],
-                            functionsRemoved: Array.fromIterable(
-                              HashSet.filter(functionsRemoved, (fp) =>
-                                Equal.equals(fp.groupPath, gp),
-                              ),
-                            ),
-                          });
-                        }),
+                          ),
+                          logFunctionRemovedIndented,
+                        );
+                      }),
                     );
 
                     // Added groups
                     yield* writeGroups(spec, groupsAdded);
-                    const addedChanges = yield* Effect.forEach(
-                      groupsAdded,
-                      (gp) =>
-                        Effect.gen(function* () {
-                          const relativeModulePath =
-                            yield* GroupPath.modulePath(gp);
-                          return FileChange.GroupModule({
-                            change: "Added",
-                            filePath: path.join(
-                              convexDirectory,
-                              relativeModulePath,
+                    yield* Effect.forEach(groupsAdded, (gp) =>
+                      Effect.gen(function* () {
+                        const relativeModulePath =
+                          yield* GroupPath.modulePath(gp);
+                        const filePath = path.join(
+                          convexDirectory,
+                          relativeModulePath,
+                        );
+                        yield* logFileChangeIndented("Added", filePath);
+                        yield* Effect.forEach(
+                          Array.fromIterable(
+                            HashSet.filter(functionsAdded, (fp) =>
+                              Equal.equals(fp.groupPath, gp),
                             ),
-                            functionsAdded: Array.fromIterable(
-                              HashSet.filter(functionsAdded, (fp) =>
-                                Equal.equals(fp.groupPath, gp),
-                              ),
-                            ),
-                            functionsRemoved: [],
-                          });
-                        }),
+                          ),
+                          logFunctionAddedIndented,
+                        );
+                      }),
                     );
 
                     // Changed groups
                     yield* writeGroups(spec, groupsChanged);
-                    const changedChanges = yield* Effect.forEach(
-                      groupsChanged,
-                      (gp) =>
-                        Effect.gen(function* () {
-                          const relativeModulePath =
-                            yield* GroupPath.modulePath(gp);
-                          return FileChange.GroupModule({
-                            change: "Modified",
-                            filePath: path.join(
-                              convexDirectory,
-                              relativeModulePath,
+                    yield* Effect.forEach(groupsChanged, (gp) =>
+                      Effect.gen(function* () {
+                        const relativeModulePath =
+                          yield* GroupPath.modulePath(gp);
+                        const filePath = path.join(
+                          convexDirectory,
+                          relativeModulePath,
+                        );
+                        yield* logFileChangeIndented("Modified", filePath);
+                        yield* Effect.forEach(
+                          Array.fromIterable(
+                            HashSet.filter(functionsAdded, (fp) =>
+                              Equal.equals(fp.groupPath, gp),
                             ),
-                            functionsAdded: Array.fromIterable(
-                              HashSet.filter(functionsAdded, (fp) =>
-                                Equal.equals(fp.groupPath, gp),
-                              ),
+                          ),
+                          logFunctionAddedIndented,
+                        );
+                        yield* Effect.forEach(
+                          Array.fromIterable(
+                            HashSet.filter(functionsRemoved, (fp) =>
+                              Equal.equals(fp.groupPath, gp),
                             ),
-                            functionsRemoved: Array.fromIterable(
-                              HashSet.filter(functionsRemoved, (fp) =>
-                                Equal.equals(fp.groupPath, gp),
-                              ),
-                            ),
-                          });
-                        }),
+                          ),
+                          logFunctionRemovedIndented,
+                        );
+                      }),
                     );
 
                     yield* Ref.set(functionPathsRef, current);
 
-                    return Option.some([
-                      ...removedChanges,
-                      ...addedChanges,
-                      ...changedChanges,
-                    ]);
+                    return Option.some(undefined);
                   }),
                 ),
                 Effect.catchTag("SpecImportFailedError", () =>
@@ -342,10 +291,9 @@ const syncLoop = (
                   ).pipe(Effect.as(Option.none())),
                 ),
               ),
-            onFalse: () => Effect.succeed(Option.some([])),
-          });
-
-        const specChanges = Option.getOrElse(specResult, () => []);
+            onFalse: () => Effect.succeed(Option.some(undefined)),
+          },
+        );
 
         const dirtyOptionalFiles = [
           ...(pending.httpDirty
@@ -362,35 +310,13 @@ const syncLoop = (
             : []),
         ];
 
-        const optionalChanges: ReadonlyArray<FileChange> =
-          Array.isNonEmptyReadonlyArray(dirtyOptionalFiles)
-            ? yield* pipe(
-                Effect.all(dirtyOptionalFiles, {
-                  concurrency: "unbounded",
-                }),
-                Effect.map(Array.getSomes),
-              )
-            : [];
-
-        yield* Ref.update(changesRef, (prev) => [
-          ...prev,
-          ...specChanges,
-          ...optionalChanges,
-        ]);
+        yield* Array.isNonEmptyReadonlyArray(dirtyOptionalFiles)
+          ? Effect.all(dirtyOptionalFiles, { concurrency: "unbounded" })
+          : Effect.void;
 
         yield* Option.match(specResult, {
-          onSome: () =>
-            Effect.gen(function* () {
-              const pendingSize = yield* Queue.size(signal);
-              yield* Effect.when(
-                Effect.gen(function* () {
-                  const allChanges = yield* Ref.getAndSet(changesRef, []);
-                  yield* logChangeReport(allChanges);
-                }),
-                () => pendingSize === 0,
-              );
-            }),
-          onNone: () => Ref.set(changesRef, []),
+          onSome: () => logSuccess("Generated files are up-to-date"),
+          onNone: () => Effect.void,
         });
       }),
     );
@@ -478,7 +404,6 @@ const esbuildOptions = (entryPoint: string) => ({
           } else {
             Effect.runPromise(
               Effect.gen(function* () {
-                yield* logFailure("Build errors");
                 const formattedMessages = yield* Effect.promise(() =>
                   esbuild.formatMessages(result.errors, {
                     kind: "error",
@@ -491,6 +416,7 @@ const esbuildOptions = (entryPoint: string) => ({
                   formattedMessages,
                 );
                 yield* Console.error("\n" + output + "\n");
+                yield* logFailure("Build errors found");
               }),
             );
           }
@@ -593,11 +519,7 @@ const formatBuildError = (
       onSome: (index) => Array.modify(lines, index, () => redErrorText),
     }),
   );
-  return pipe(
-    replaced,
-    Array.map((l) => (pipe(l, String.trim, String.isNonEmpty) ? `  ${l}` : l)),
-    Array.join("\n"),
-  );
+  return pipe(replaced, Array.join("\n"));
 };
 
 const formatBuildErrors = (
@@ -635,16 +557,9 @@ const syncOptionalFile = (generate: typeof generateHttp, convexFile: string) =>
       Option.match({
         onSome: ({ change, convexFilePath }) =>
           Match.value(change).pipe(
-            Match.when("Unchanged", () => Effect.succeed(Option.none())),
+            Match.when("Unchanged", () => Effect.void),
             Match.whenOr("Added", "Modified", (addedOrModified) =>
-              Effect.succeed(
-                Option.some(
-                  FileChange.OptionalFile({
-                    change: addedOrModified,
-                    filePath: convexFilePath,
-                  }),
-                ),
-              ),
+              logFileChangeIndented(addedOrModified, convexFilePath),
             ),
             Match.exhaustive,
           ),
@@ -657,15 +572,7 @@ const syncOptionalFile = (generate: typeof generateHttp, convexFile: string) =>
 
             if (yield* fs.exists(convexFilePath)) {
               yield* fs.remove(convexFilePath);
-
-              return Option.some(
-                FileChange.OptionalFile({
-                  change: "Removed",
-                  filePath: convexFilePath,
-                }),
-              );
-            } else {
-              return Option.none();
+              yield* logFileChangeIndented("Removed", convexFilePath);
             }
           }),
       }),
