@@ -1,6 +1,6 @@
 import { Ref } from "@confect/core";
 import type { DatabaseSchema, DataModel } from "@confect/server";
-import { RegisteredFunctions } from "@confect/server";
+import { RegisteredConvexFunction } from "@confect/server";
 import type {
   TestConvexForDataModel,
   TestConvexForDataModelAndIdentity,
@@ -31,14 +31,14 @@ export type TestConfectWithoutIdentity<
       handler: Effect.Effect<
         void,
         E,
-        RegisteredFunctions.MutationServices<ConfectSchema>
+        RegisteredConvexFunction.MutationServices<ConfectSchema>
       >,
     ): Effect.Effect<void>;
     <A, B extends Value, E>(
       handler: Effect.Effect<
         A,
         E,
-        RegisteredFunctions.MutationServices<ConfectSchema>
+        RegisteredConvexFunction.MutationServices<ConfectSchema>
       >,
       returns: Schema.Schema<A, B>,
     ): Effect.Effect<A, ParseResult.ParseError>;
@@ -133,7 +133,7 @@ class TestConfectImplWithoutIdentity<
     handler: Effect.Effect<
       A,
       E,
-      RegisteredFunctions.MutationServices<ConfectSchema>
+      RegisteredConvexFunction.MutationServices<ConfectSchema>
     >,
     returns?: Schema.Schema<A, B>,
   ): Effect.Effect<void> | Effect.Effect<A, ParseResult.ParseError> => {
@@ -141,11 +141,13 @@ class TestConfectImplWithoutIdentity<
       mutationCtx: GenericMutationCtx<
         DataModel.ToConvex<DataModel.FromSchema<ConfectSchema>>
       >,
-    ): Layer.Layer<RegisteredFunctions.MutationServices<ConfectSchema>> =>
-      RegisteredFunctions.mutationLayer(
+    ): Layer.Layer<RegisteredConvexFunction.MutationServices<ConfectSchema>> =>
+      RegisteredConvexFunction.mutationLayer(
         this.confectSchema,
         mutationCtx,
-      ) as Layer.Layer<RegisteredFunctions.MutationServices<ConfectSchema>>;
+      ) as Layer.Layer<
+        RegisteredConvexFunction.MutationServices<ConfectSchema>
+      >;
 
     return returns === undefined
       ? Effect.promise(() =>
