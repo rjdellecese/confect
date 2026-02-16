@@ -66,41 +66,18 @@ export const logFunctionRemoved = logFunction("-", Ansi.red);
 
 // --- Process status logs ---
 
-const logStatus =
-  (
-    char: string,
-    charColor: Ansi.Ansi,
-    messageText: string,
-    messageColor: Ansi.Ansi,
-  ) =>
-  (message: string) =>
-    Console.log(
-      pipe(
-        AnsiDoc.char(char),
-        AnsiDoc.annotate(charColor),
-        AnsiDoc.catWithSpace(
-          pipe(
-            AnsiDoc.char(" "),
-            AnsiDoc.cat(AnsiDoc.text(messageText)),
-            AnsiDoc.cat(AnsiDoc.char(" ")),
-            AnsiDoc.annotate(messageColor),
-          ),
-        ),
-        AnsiDoc.catWithSpace(AnsiDoc.text(message)),
-        AnsiDoc.render({ style: "pretty" }),
-      ),
-    );
+const logStatus = (char: string, charColor: Ansi.Ansi) => (message: string) =>
+  Console.log(
+    pipe(
+      AnsiDoc.char(char),
+      AnsiDoc.annotate(charColor),
+      AnsiDoc.catWithSpace(AnsiDoc.text(message)),
+      AnsiDoc.render({ style: "pretty" }),
+    ),
+  );
 
-export const logCompleted = logStatus(
-  "✔︎",
-  Ansi.green,
-  "SUCCESS",
-  Ansi.combine(Ansi.green, Ansi.bgGreenBright),
-);
+export const logSuccess = logStatus("✔︎", Ansi.green);
 
-export const logFailed = logStatus(
-  "✘",
-  Ansi.red,
-  "FAILURE",
-  Ansi.combine(Ansi.red, Ansi.bgRedBright),
-);
+export const logFailure = logStatus("✘", Ansi.red);
+
+export const logPending = logStatus("⭘", Ansi.yellow);

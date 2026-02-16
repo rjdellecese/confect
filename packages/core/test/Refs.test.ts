@@ -4,6 +4,7 @@ import * as FunctionSpec from "../src/FunctionSpec";
 import * as GroupSpec from "../src/GroupSpec";
 import * as Ref from "../src/Ref";
 import * as Refs from "../src/Refs";
+import type * as RuntimeAndFunctionType from "../src/RuntimeAndFunctionType";
 import * as Spec from "../src/Spec";
 
 describe("make", () => {
@@ -82,7 +83,12 @@ describe("make", () => {
     const refs = Refs.make(spec);
 
     expectTypeOf(refs.internal.notes.internalList).toEqualTypeOf<
-      Ref.Ref<"query", "internal", typeof FnArgs, typeof FnReturns>
+      Ref.Ref<
+        RuntimeAndFunctionType.ConvexQuery,
+        "internal",
+        typeof FnArgs,
+        typeof FnReturns
+      >
     >();
 
     // @ts-expect-error - publicList should be filtered out
@@ -116,7 +122,12 @@ describe("make", () => {
     const refs = Refs.make(spec);
 
     expectTypeOf(refs.internal.internalOnly.list).toEqualTypeOf<
-      Ref.Ref<"query", "internal", typeof FnArgs, typeof FnReturns>
+      Ref.Ref<
+        RuntimeAndFunctionType.ConvexQuery,
+        "internal",
+        typeof FnArgs,
+        typeof FnReturns
+      >
     >();
 
     // @ts-expect-error - publicOnly group should be filtered out entirely
@@ -147,7 +158,12 @@ describe("make", () => {
     const refs = Refs.make(spec);
 
     expectTypeOf(refs.public.notes.publicList).toEqualTypeOf<
-      Ref.Ref<"query", "public", typeof FnArgs, typeof FnReturns>
+      Ref.Ref<
+        RuntimeAndFunctionType.ConvexQuery,
+        "public",
+        typeof FnArgs,
+        typeof FnReturns
+      >
     >();
 
     // @ts-expect-error - internalList should be filtered out

@@ -1,14 +1,30 @@
 import type { Types } from "effect";
-import { pipe, Record } from "effect";
+import { Array, pipe, Record } from "effect";
 import type * as FunctionSpec from "./FunctionSpec";
-import type * as GroupSpec from "./GroupSpec";
+import * as GroupSpec from "./GroupSpec";
 import * as Ref from "./Ref";
 import type * as Spec from "./Spec";
 
 export type Refs<
-  Spec_ extends Spec.AnyWithProps,
+  ConvexSpec extends Spec.AnyWithPropsWithRuntime<"Convex">,
+  NodeSpec extends Spec.AnyWithPropsWithRuntime<"Node"> = never,
   Predicate extends Ref.Any = Ref.Any,
-> = Types.Simplify<OmitEmpty<Helper<Spec.Groups<Spec_>, Predicate>>>;
+> = Types.Simplify<
+  OmitEmpty<
+    Helper<
+      | Spec.Groups<ConvexSpec>
+      | (NodeSpec extends never
+          ? never
+          : GroupSpec.GroupSpec<
+              "Node",
+              "node",
+              never,
+              NodeSpec["groups"][keyof NodeSpec["groups"]]
+            >),
+      Predicate
+    >
+  >
+>;
 
 type GroupRefs<
   Group extends GroupSpec.AnyWithProps,
@@ -57,16 +73,31 @@ type Any =
     }
   | Ref.Any;
 
-export const make = <Spec_ extends Spec.AnyWithProps>(
-  spec: Spec_,
+export const make = <
+  ConvexSpec extends Spec.AnyWithPropsWithRuntime<"Convex">,
+  NodeSpec extends Spec.AnyWithPropsWithRuntime<"Node"> = never,
+>(
+  convexSpec: ConvexSpec,
+  nodeSpec?: NodeSpec,
 ): {
-  public: Refs<Spec_, Ref.AnyPublic>;
-  internal: Refs<Spec_, Ref.AnyInternal>;
+  public: Refs<ConvexSpec, NodeSpec, Ref.AnyPublic>;
+  internal: Refs<ConvexSpec, NodeSpec, Ref.AnyInternal>;
 } => {
-  const refs = makeHelper(spec.groups);
+  const nodeGroup = nodeSpec
+    ? Array.reduce(
+        Record.values(nodeSpec.groups),
+        GroupSpec.makeNode("node"),
+        (nodeGroupSpec, group) => nodeGroupSpec.addGroup(group),
+      )
+    : null;
+
+  const groups = nodeGroup
+    ? { ...convexSpec.groups, node: nodeGroup }
+    : convexSpec.groups;
+  const refs = makeHelper(groups);
   return {
-    public: refs as Refs<Spec_, Ref.AnyPublic>,
-    internal: refs as Refs<Spec_, Ref.AnyInternal>,
+    public: refs as Refs<ConvexSpec, NodeSpec, Ref.AnyPublic>,
+    internal: refs as Refs<ConvexSpec, NodeSpec, Ref.AnyInternal>,
   };
 };
 

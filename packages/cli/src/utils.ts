@@ -103,19 +103,33 @@ export const generateGroupModule = ({
       yield* fs.makeDirectory(directoryPath, { recursive: true });
     }
 
+    const isNodeGroup = groupPath.pathSegments[0] === "node";
+    const registeredFunctionsFileName = isNodeGroup
+      ? "nodeRegisteredFunctions.ts"
+      : "registeredFunctions.ts";
     const registeredFunctionsPath = path.join(
       confectDirectory,
       "_generated",
-      "registeredFunctions.ts",
+      registeredFunctionsFileName,
     );
     const registeredFunctionsImportPath = yield* removePathExtension(
       path.relative(path.dirname(modulePath), registeredFunctionsPath),
     );
+    const registeredFunctionsVariableName = isNodeGroup
+      ? "nodeRegisteredFunctions"
+      : "registeredFunctions";
 
     const functionsContentsString = yield* templates.functions({
       groupPath,
       functionNames,
       registeredFunctionsImportPath,
+      registeredFunctionsVariableName,
+      useNode: isNodeGroup,
+      ...(isNodeGroup
+        ? {
+            registeredFunctionsLookupPath: groupPath.pathSegments.slice(1),
+          }
+        : {}),
     });
 
     if (!(yield* fs.exists(modulePath))) {

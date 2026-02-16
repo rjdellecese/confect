@@ -20,6 +20,22 @@ import type { GenericId as Id } from "convex/values";
  * ```
  */
 export declare const api: {
+  node: {
+    email: {
+      getInbox: FunctionReference<
+        "action",
+        "public",
+        {},
+        Array<{ body: string; subject: string; to: string }>
+      >;
+      send: FunctionReference<
+        "action",
+        "public",
+        { body: string; subject: string; to: string },
+        null
+      >;
+    };
+  };
   notesAndRandom: {
     notes: {
       delete_: FunctionReference<

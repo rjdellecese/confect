@@ -1,7 +1,7 @@
 import { useAction, useMutation, useQuery } from "@confect/react";
 import { FetchHttpClient, HttpApiClient } from "@effect/platform";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
-import { Array, Effect, Exit, Option } from "effect";
+import { Array, Cause, Effect, Exit, Option } from "effect";
 import { useEffect, useState } from "react";
 import refs from "../confect/_generated/refs";
 import { Api } from "../confect/http/path-prefix";
@@ -27,6 +27,28 @@ const Page = () => {
     getRandom({}).pipe(Effect.map(setRandomNumber), Effect.runPromise);
   };
 
+  const [emailStatus, setEmailStatus] = useState<string | null>(null);
+  const sendEmail = useAction(refs.public.node.email.send);
+
+  const testEmail = () => {
+    setEmailStatus("Sending…");
+    sendEmail({
+      to: "test@example.com",
+      subject: "Test email",
+      body: "Test email body",
+    })
+      .pipe(
+        Effect.andThen(() => setEmailStatus("Sent!")),
+        Effect.runPromiseExit,
+      )
+      .then((exit) =>
+        Exit.match(exit, {
+          onSuccess: () => {},
+          onFailure: (cause) => setEmailStatus(`Error: ${Cause.pretty(cause)}`),
+        }),
+      );
+  };
+
   useEffect(() => {
     retrieveRandomNumber();
   }, []);
@@ -41,6 +63,15 @@ const Page = () => {
         <button type="button" onClick={retrieveRandomNumber}>
           Get new random number
         </button>
+      </div>
+
+      <br />
+
+      <div>
+        <button type="button" onClick={testEmail}>
+          Test email send
+        </button>
+        {emailStatus && <span style={{ marginLeft: 8 }}>{emailStatus}</span>}
       </div>
 
       <br />

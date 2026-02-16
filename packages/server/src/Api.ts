@@ -1,3 +1,4 @@
+import type { RuntimeAndFunctionType } from "@confect/core";
 import type * as Spec from "@confect/core/Spec";
 import type { GenericSchema, SchemaDefinition } from "convex/server";
 import { defineSchema as defineConvexSchema } from "convex/server";
@@ -28,7 +29,16 @@ export interface AnyWithProps extends Api<
   Spec.AnyWithProps
 > {}
 
+export interface AnyWithPropsWithRuntime<
+  Runtime extends RuntimeAndFunctionType.Runtime,
+> extends Api<
+  DatabaseSchema.AnyWithProps,
+  Spec.AnyWithPropsWithRuntime<Runtime>
+> {}
+
 export type Schema<Api_ extends AnyWithProps> = Api_["databaseSchema"];
+
+export type GetSpec<Api_ extends AnyWithProps> = Api_["spec"];
 
 export type Groups<Api_ extends AnyWithProps> = Spec.Groups<Api_["spec"]>;
 
