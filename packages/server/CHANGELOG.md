@@ -1,5 +1,13 @@
 # @confect/server
 
+## 1.0.0-next.4
+
+### Patch Changes
+
+- 46109fb: Support Node actions
+- Updated dependencies [46109fb]
+  - @confect/core@1.0.0-next.4
+
 ## 1.0.0-next.3
 
 ### Patch Changes

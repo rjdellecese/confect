@@ -1,6 +1,6 @@
 {
   "name": "@confect/react",
-  "version": "1.0.0-next.3",
+  "version": "1.0.0-next.4",
   "description": "Client-side bindings for React apps",
   "repository": {
     "type": "git",
