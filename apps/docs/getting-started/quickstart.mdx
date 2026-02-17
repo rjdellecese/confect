@@ -210,24 +210,29 @@ deno add convex @confect/core @confect/server @confect/cli @confect/react
 
     ```tsx src/App.tsx
     import { useMutation, useQuery } from "@confect/react";
-    import { Array, Effect } from "effect";
+    import { Array, Effect, Option } from "effect";
     import { useState } from "react";
 
     import { public } from "../confect/_generated/refs";
 
     const App = () => {
-      const notes = useQuery(public.notes.list, {});
+      const optionNotes = useQuery(public.notes.list, {});
 
       const createNote = useMutation(public.notes.create);
 
-      const [note, setNote] = useState("");
+      const [newNote, setNewNote] = useState("");
 
       return (
         <div>
           <ul>
-            {Array.map(notes, (note) => (
-              <li key={note._id}>{note.text}</li>
-            ))}
+            {Option.match(optionNotes, {
+              onNone: () => <p>Loading…</p>,
+              onSome: (notes) => (
+                Array.map(notes, (note) => (
+                  <li key={note._id}>{note.text}</li>
+                ))
+              ),
+            })}
           </ul>
 
           <br />
@@ -235,13 +240,17 @@ deno add convex @confect/core @confect/server @confect/cli @confect/react
           <textarea
             rows={4}
             cols={50}
-            value={note}
+            value={newNote}
             onChange={(e) => setNote(e.target.value)}
           />
           <br />
           <button
-            onClick={() => createNote({ text: note }).then(() => setNote(""))}
-          >
+            onClick={() =>
+              createNote({ text: newNote })
+                .pipe(Effect.andThen(() => setNewNote("")))
+                .runPromise()
+            }
+          ></button>
             Create note
           </button>
         </div>
