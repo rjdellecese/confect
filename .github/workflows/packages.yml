@@ -1,0 +1,104 @@
+name: Packages
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package:
+          [
+            "@confect/cli",
+            "@confect/core",
+            "@confect/server",
+            "@confect/react",
+            "@confect/test",
+          ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/confect-setup
+      - run: pnpm --filter ${{ matrix.package }} format
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package:
+          [
+            "@confect/cli",
+            "@confect/core",
+            "@confect/server",
+            "@confect/react",
+            "@confect/test",
+          ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/confect-setup
+      - run: pnpm --filter ${{ matrix.package }} typecheck
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package:
+          [
+            "@confect/cli",
+            "@confect/core",
+            "@confect/server",
+            "@confect/react",
+            "@confect/test",
+          ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/confect-setup
+      - run: pnpm --filter ${{ matrix.package }} lint
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package: [cli, core, server]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/confect-setup
+      - run: cd packages/${{ matrix.package }} && pnpm test
+
+  bench:
+    name: Bench
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package: ["@confect/core"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/confect-setup
+      - run: pnpm --filter ${{ matrix.package }} bench
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package:
+          [
+            "@confect/cli",
+            "@confect/core",
+            "@confect/server",
+            "@confect/react",
+            "@confect/test",
+          ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/confect-setup
+      - run: pnpm --filter ${{ matrix.package }} build

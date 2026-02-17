@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "Effect": {
+      "command": "pnpm",
+      "args": ["dlx", "effect-mcp@latest"]
+    },
+    "Mintlify": {
+      "name": "Mintlify",
+      "url": "https://www.mintlify.com/docs/mcp",
+      "headers": {}
+    }
+  }
+}

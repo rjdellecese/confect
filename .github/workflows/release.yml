@@ -14,7 +14,7 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Get pnpm version from package.json
         id: pnpm-version
@@ -27,7 +27,7 @@ jobs:
           version: ${{ steps.pnpm-version.outputs.pnpm_version }}
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version-file: "package.json"
           cache: "pnpm"
@@ -35,10 +35,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Create release pull request
+      - name: Create release pull request or publish
         uses: changesets/action@v1
         with:
           publish: pnpm release
+          branch: main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -1,0 +1,179 @@
+---
+icon: "square-function"
+title: "Functions"
+description: "Define and implement your Confect API's functions."
+---
+
+Your Confect API is broken up into two parts: a spec and its implementation.
+
+## Spec
+
+A spec is made up of group specs and function specs. Each function spec defines the function's name, arguments schema, and returns schema.
+
+```ts confect/spec/notes.ts
+import { GroupSpec, FunctionSpec } from "@confect/core";
+import { Schema } from "effect";
+
+import { Notes } from "../tables/Notes";
+
+const list = FunctionSpec.publicQuery({
+  name: "list",
+  args: Schema.Struct({}),
+  returns: Schema.Array(Notes.Doc),
+});
+
+export const notes = GroupSpec.make("notes").addFunction(list);
+```
+
+Your spec must be the default export of a `spec.ts` file in your `confect/` directory.
+
+```ts confect/spec.ts
+import { Spec } from "@confect/server";
+
+import { notes } from "./spec/notes";
+
+export default Spec.make().addGroup(notes);
+```
+
+## Impl
+
+An impl is made up of group impls and function impls, and is constructed using Effect layers. Each function impl contains a handler function that implements the function's logic.
+
+```ts confect/impl/notes.ts
+import { FunctionImpl, GroupImpl } from "@confect/server";
+import { Effect, Layer } from "effect";
+
+import api from "../_generated/api";
+import {
+  DatabaseReader,
+  DatabaseWriter,
+} from "../_generated/services";
+
+const list = FunctionImpl.make(api, "notes", "list", () =>
+  Effect.gen(function* () {
+    const reader = yield* DatabaseReader;
+
+    return yield* reader
+      .table("notes")
+      .index("by_creation_time", "desc")
+      .collect();
+  }).pipe(Effect.orDie),
+);
+
+export const notes = GroupImpl.make(api, "notes").pipe(
+  Layer.provide(list),
+);
+```
+
+Your impl should be the default export of a `impl.ts` file in your `confect/` directory. It must be finalized with the `Impl.finalize` function before it can be used.
+
+```ts confect/impl.ts
+import { Impl } from "@confect/server";
+
+import api from "./_generated/api";
+import { notes } from "./impl/notes";
+
+export default Impl.make(api).pipe(
+  Layer.provide(notes),
+  Impl.finalize,
+);
+```
+
+## Node Actions
+
+Node actions are like regular actions, but they are executed in the Node.js runtime. To keep Node actions separate from the rest of your Convex API, they must be defined in their own spec and impl files: `nodeSpec.ts` and `nodeImpl.ts`.
+
+### Node Spec
+
+A node spec uses `Spec.makeNode()` and `GroupSpec.makeNode()` to define groups, and `FunctionSpec.publicNodeAction()` or `FunctionSpec.internalNodeAction()` to define functions.
+
+```ts confect/nodeSpec/email.ts
+import { FunctionSpec, GroupSpec } from "@confect/core";
+import { Schema } from "effect";
+
+export const email = GroupSpec.makeNode("email").addFunction(
+  FunctionSpec.publicNodeAction({
+    name: "send",
+    args: Schema.Struct({
+      to: Schema.String,
+      subject: Schema.String,
+      body: Schema.String,
+    }),
+    returns: Schema.Null,
+  }),
+);
+```
+
+Your node spec must be the default export of a `nodeSpec.ts` file in your `confect/` directory.
+
+```ts confect/nodeSpec.ts
+import { Spec } from "@confect/core";
+import { email } from "./nodeSpec/email";
+
+export default Spec.makeNode().add(email);
+```
+
+### Node Impl
+
+A node impl uses `nodeApi` from `_generated/nodeApi` instead of `api`, and `Impl.make(nodeApi)` to construct the implementation. Each function impl contains a handler that runs in the Node.js runtime, where you have access to [`NodeContext` services](https://effect-ts.github.io/effect/platform-node/NodeContext.ts.html#nodecontext-type-alias), which are accessible via the `@effect/platform` package.
+
+```ts confect/nodeImpl/email.ts
+import { FunctionImpl, GroupImpl } from "@confect/server";
+import { Command } from "@effect/platform";
+import { Console, Duration, Effect, Layer } from "effect";
+import nodeApi from "../_generated/nodeApi";
+
+const send = FunctionImpl.make(
+  nodeApi,
+  "email",
+  "send",
+  Effect.fn(function* ({ to, subject, body }) {
+    const result = yield* Command.make(
+      "echo",
+      `Sending email to ${to} with subject ${subject} and body ${body}…`,
+    ).pipe(Command.stdout("pipe"), Command.string, Effect.orDie);
+
+    yield* Console.log(result);
+    yield* Effect.sleep(Duration.seconds(1));
+    yield* Console.log("Email sent!");
+
+    return null;
+  }),
+);
+
+export const email = GroupImpl.make(nodeApi, "email").pipe(
+  Layer.provide(send),
+);
+```
+
+Your node impl must be the default export of a `nodeImpl.ts` file in your `confect/` directory.
+
+```ts confect/nodeImpl.ts
+import { Impl } from "@confect/server";
+import { Layer } from "effect";
+import nodeApi from "./_generated/nodeApi";
+import { email } from "./nodeImpl/email";
+
+export default Impl.make(nodeApi).pipe(
+  Layer.provide(email),
+  Impl.finalize,
+);
+```
+
+### Calling Node Actions
+
+Node actions are exposed under the `node` namespace in your refs.
+
+```ts
+import { useAction } from "@confect/react";
+import { Effect } from "effect";
+import refs from "../confect/_generated/refs";
+
+const sendEmail = useAction(refs.public.node.email.send);
+
+sendEmail({
+  to: "user@example.com",
+  subject: "Hello",
+  body: "Hello from Confect!",
+}).pipe(Effect.runPromise);
+```

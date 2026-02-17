@@ -1,0 +1,62 @@
+---
+icon: "notebook-pen"
+title: "Writing"
+description: "Insert, modify, and delete documents in the database."
+---
+
+The `ConfectDatabaseWriter` service is used to insert, modify, and delete documents in the database.
+
+```ts
+Effect.gen(function* () {
+  const writer = yield* ConfectDatabaseWriter;
+
+  return yield* writer.table("notes").insert({
+    title: "My first note",
+    text: "This is my first note",
+  });
+});
+```
+
+## Methods
+
+### Insert
+
+Insert a new document.
+
+```ts
+writer.table("notes").insert({
+  title: "My first note",
+  text: "This is my first note",
+});
+```
+
+### Patch
+
+Shallow merge the provided object with the existing document. New fields are added. Existing fields are overwritten. Fields set to `undefined` are removed.
+
+```ts
+writer.table("notes").patch(noteId, {
+  title: "Patched title"
+  author: "John Doe",
+  text: undefined,
+});
+```
+
+### Replace
+
+Replace the entire document.
+
+```ts
+writer.table("notes").replace(noteId, {
+  title: "Replaced title",
+  text: "I'm replacing the whole document",
+});
+```
+
+### Delete
+
+Delete the document with the given ID.
+
+```ts
+writer.table("notes").delete(noteId);
+```

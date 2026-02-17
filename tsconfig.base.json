@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "moduleDetection": "force",
+    "downlevelIteration": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": false,
+    "declaration": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "sourceMap": true,
+    "declarationMap": true,
+    "noImplicitReturns": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": true,
+    "noEmitOnError": false,
+    "noErrorTruncation": false,
+    "allowJs": false,
+    "checkJs": false,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "noUncheckedIndexedAccess": false,
+    "strictNullChecks": true,
+    "removeComments": false
+  }
+}

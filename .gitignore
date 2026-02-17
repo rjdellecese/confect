@@ -1,8 +1,9 @@
+.attest/
 .env.local
 .pnpm-store/
 .tsup
-.vscode/
 coverage/
 dist/
 node_modules/
+node-compile-cache/
 tsconfig.vitest-temp.json

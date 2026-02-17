@@ -1,5 +1,0 @@
-ignoredBuiltDependencies:
-  - msgpackr-extract
-
-onlyBuiltDependencies:
-  - esbuild

@@ -1,48 +1,5 @@
 # @rjdellecese/confect
 
-## 0.0.35
-
-### Patch Changes
-
-- 5d93334: Fix `ConfectDoc` type
-
-## 0.0.34
-
-### Patch Changes
-
-- fa436f8: Add missing `ConfectQueryCtx` Effect requirement for `internalMutation` handler
-
-## 0.0.33
-
-### Patch Changes
-
-- c40f8ed: Add `ConfectQueryCtx` to mutation context so that read-only helper functions are usable directly in both queries and mutations.
-
-## 0.0.32
-
-### Patch Changes
-
-- d1ca9f9: Bump deps
-
-## 0.0.31
-
-### Patch Changes
-
-- 58b03e7: Bump deps
-
-## 0.0.30
-
-### Patch Changes
-
-- 5fb67ad: Bump deps
-- 0ccaab3: Expose original Convex context for component integrations
-
-## 0.0.29
-
-### Patch Changes
-
-- ca9fead: Bump deps
-
 ## 0.0.28
 
 ### Patch Changes
@@ -94,7 +51,6 @@
 - ed4a380: Initial support for recursive schemas.
 
   Current caveats:
-
   - Recursive schemas will be converted to `v.any()` Convex validators (you still get the same type-safety you expect when reading/writing to the DB, as long as you use the Confect APIs.
   - One consequence of the above is that type-checking for indexes (both when defining and using) on tables with a recursive schema will be unavailable.
 

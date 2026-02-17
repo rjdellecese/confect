@@ -1,0 +1,106 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Confect 🧁",
+  "colors": {
+    "primary": "#C026D3",
+    "light": "#F9A8D4",
+    "dark": "#BE185D"
+  },
+  "background": {
+    "color": {
+      "light": "#FAFAF9",
+      "dark": "#1C1917"
+    }
+  },
+  "icons": {
+    "library": "lucide"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "global": {
+      "anchors": [
+        {
+          "icon": "layers",
+          "anchor": "Effect Docs",
+          "href": "https://effect.website/docs"
+        },
+        {
+          "icon": "database",
+          "anchor": "Convex Docs",
+          "href": "https://docs.convex.dev"
+        }
+      ]
+    },
+    "groups": [
+      {
+        "group": "Getting Started",
+        "pages": [
+          "getting-started/introduction",
+          "getting-started/quickstart",
+          "getting-started/schema-restrictions"
+        ]
+      },
+      {
+        "group": "Orientation",
+        "pages": [
+          "orientation/packages",
+          "orientation/project-structure",
+          "orientation/services"
+        ]
+      },
+      {
+        "group": "Platform",
+        "pages": [
+          "platform/functions",
+          {
+            "icon": "database",
+            "group": "Database",
+            "pages": [
+              "platform/database/schema",
+              "platform/database/reading",
+              "platform/database/writing",
+              "platform/database/system-tables"
+            ]
+          },
+          "platform/http-api",
+          "platform/storage",
+          "platform/scheduling",
+          "platform/authentication",
+          "platform/crons",
+          "platform/search",
+          "platform/components"
+        ]
+      },
+      {
+        "group": "Clients",
+        "pages": ["clients/react", "clients/http"]
+      },
+      {
+        "group": "Guides",
+        "pages": ["guides/testing"]
+      }
+    ]
+  },
+  "navbar": {
+    "links": [
+      {
+        "icon": "github",
+        "label": "GitHub",
+        "href": "https://github.com/rjdellecese/confect"
+      }
+    ]
+  },
+  "contextual": {
+    "options": [
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "perplexity",
+      "mcp",
+      "cursor",
+      "vscode"
+    ]
+  }
+}

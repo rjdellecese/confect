@@ -1,0 +1,30 @@
+name: "Confect Packages Setup"
+description: "Sets up Node.js and pnpm for the confect packages"
+author: "Confect"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Get pnpm version from package.json
+      id: pnpm-version
+      shell: bash
+      run: echo "pnpm_version=$(node -p 'require(`./package.json`).engines.pnpm')" >> $GITHUB_OUTPUT
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: ${{ steps.pnpm-version.outputs.pnpm_version }}
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: "package.json"
+        cache: "pnpm"
+
+    - name: Install dependencies
+      run: pnpm install
+      shell: bash
+
+    - name: Build Confect packages
+      run: pnpm --filter "@confect/*" build
+      shell: bash

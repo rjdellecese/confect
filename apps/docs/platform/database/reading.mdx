@@ -1,0 +1,137 @@
+---
+icon: "book-open-text"
+title: "Reading"
+description: "Retrieve documents from the database."
+---
+
+The `ConfectDatabaseReader` service is used to read documents from the database.
+
+```ts
+Effect.gen(function* () {
+  const reader = yield* ConfectDatabaseReader;
+
+  return yield* reader
+    .table("notes")
+    .index("by_creation_time")
+    .collect();
+});
+```
+
+## Retrieve a single document
+
+### By ID
+
+```ts
+reader.table("notes").get(noteId);
+```
+
+### By index
+
+#### Single field
+
+```ts
+reader.table("notes").get("by_author", "John Doe");
+```
+
+#### Multiple fields
+
+```ts
+reader.table("users").get("by_name_and_age", "John Doe", 21);
+```
+
+## Retrieve multiple documents
+
+### Indexes
+
+Every query must specify either a standard index or a search index.
+
+#### Standard indexes
+
+Standard indexes are what you'll use most of the time. There are two default standard indexes, which exist for every table: `by_creation_time` and `by_id`. The rest are defined in your schema.
+
+Standard indexes determine both the sort order of the results and which fields may be filtered on. Fields must be filtered in the order they are defined in the index.
+
+Order is ascending by default, but can be specified in the final argument to the `index` method.
+
+```ts Users sorted by name and age, ascending
+reader.table("users").index("by_name_and_age");
+```
+
+```ts Users sorted by name and age, descending
+reader.table("users").index("by_name_and_age", "desc");
+```
+
+```ts Users sorted by name and age, where name equals "John Doe", ascending
+reader
+  .table("users")
+  .index("by_name_and_age", (q) => q.eq("name", "John Doe"));
+```
+
+```ts Users sorted by name and age, where name equals "John Doe", and age equals 21, descending
+reader
+  .table("users")
+  .index(
+    "by_name_and_age",
+    (q) => q.eq("name", "John Doe").eq("age", 21),
+    "desc",
+  );
+```
+
+#### Search indexes
+
+Search indexes are used for full-text search, and are defined in your schema. The results are always sorted by relevance, descending.
+
+```ts
+reader
+  .table("notes")
+  .search("text", (q) =>
+    q.search("text", "hello").eq("tag", "colors"),
+  );
+```
+
+### Methods
+
+The following methods are available for queries using both database indexes and search indexes.
+
+#### Collect
+
+Collect all documents matching the query.
+
+```ts
+reader.table("notes").index("by_creation_time").collect();
+```
+
+#### First
+
+Retrieve the first document matching the query.
+
+```ts
+reader.table("notes").index("by_creation_time").first();
+```
+
+#### Take
+
+Take the first `n` documents matching the query.
+
+```ts
+reader.table("notes").index("by_creation_time").take(10);
+```
+
+#### Paginate
+
+Retrieve a page of documents matching the query. Expects a [`PaginationOptions`](https://docs.convex.dev/api/interfaces/server.PaginationOptions) object.
+
+```ts
+reader
+  .table("notes")
+  .index("by_creation_time")
+  .paginate(paginationOptions);
+```
+
+#### Stream
+
+Get a `Stream` of documents matching the query.
+
+```ts
+reader.table("notes").index("by_creation_time").stream();
+```
