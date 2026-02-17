@@ -23,7 +23,7 @@ jobs:
             "@confect/test",
           ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/confect-setup
       - run: pnpm --filter ${{ matrix.package }} format
 
@@ -41,7 +41,7 @@ jobs:
             "@confect/test",
           ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/confect-setup
       - run: pnpm --filter ${{ matrix.package }} typecheck
 
@@ -59,7 +59,7 @@ jobs:
             "@confect/test",
           ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/confect-setup
       - run: pnpm --filter ${{ matrix.package }} lint
 
@@ -70,7 +70,7 @@ jobs:
       matrix:
         package: [cli, core, server]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/confect-setup
       - run: cd packages/${{ matrix.package }} && pnpm test
 
@@ -81,7 +81,7 @@ jobs:
       matrix:
         package: ["@confect/core"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/confect-setup
       - run: pnpm --filter ${{ matrix.package }} bench
 
@@ -99,6 +99,6 @@ jobs:
             "@confect/test",
           ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/confect-setup
       - run: pnpm --filter ${{ matrix.package }} build
