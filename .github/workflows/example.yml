@@ -5,30 +5,10 @@ on:
     branches:
       - main
       - v1
-    paths:
-      - "apps/example/**"
-      - "packages/cli/**"
-      - "packages/core/**"
-      - "packages/server/**"
-      - "packages/react/**"
-      - "package.json"
-      - "pnpm-workspace.yaml"
-      - ".github/workflows/example.yml"
-      - ".github/actions/example-setup/**"
   pull_request:
     branches:
       - main
       - v1
-    paths:
-      - "apps/example/**"
-      - "packages/cli/**"
-      - "packages/core/**"
-      - "packages/server/**"
-      - "packages/react/**"
-      - "package.json"
-      - "pnpm-workspace.yaml"
-      - ".github/workflows/example.yml"
-      - ".github/actions/example-setup/**"
 
 jobs:
   format:

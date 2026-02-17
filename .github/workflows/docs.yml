@@ -5,22 +5,10 @@ on:
     branches:
       - main
       - v1
-    paths:
-      - "apps/docs/**"
-      - "package.json"
-      - "pnpm-workspace.yaml"
-      - ".github/workflows/docs.yml"
-      - ".github/actions/docs-setup/**"
   pull_request:
     branches:
       - main
       - v1
-    paths:
-      - "apps/docs/**"
-      - "package.json"
-      - "pnpm-workspace.yaml"
-      - ".github/workflows/docs.yml"
-      - ".github/actions/docs-setup/**"
 
 jobs:
   format:
