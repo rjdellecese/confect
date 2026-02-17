@@ -5,7 +5,7 @@
   "fixed": [],
   "linked": [["@confect/*"]],
   "access": "public",
-  "baseBranch": "v1",
+  "baseBranch": "main",
   "updateInternalDependencies": "patch",
   "ignore": []
 }
