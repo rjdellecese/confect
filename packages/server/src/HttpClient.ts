@@ -116,4 +116,3 @@ export const layer = (
     HttpClient,
     Effect.sync(() => make(address, options)),
   );
-
