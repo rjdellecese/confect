@@ -245,8 +245,12 @@ deno add convex @confect/core @confect/server @confect/cli @confect/react
           />
           <br />
           <button
-            onClick={() => createNote({ text: newNote }).then(() => setNewNote(""))}
-          >
+            onClick={() =>
+              createNote({ text: newNote })
+                .pipe(Effect.andThen(() => setNewNote("")))
+                .runPromise()
+            }
+          ></button>
             Create note
           </button>
         </div>
