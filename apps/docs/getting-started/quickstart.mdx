@@ -99,11 +99,11 @@ deno add convex @confect/core @confect/server @confect/cli @confect/react
     Add the `GroupSpec` to your API's `Spec`.
 
     ```ts confect/spec.ts
-    import { Spec } from "@confect/server";
+    import { Spec } from "@confect/core";
+    import { notes } from "./spec/Notes";
 
-    import { notes } from "./spec/notes";
+    export default Spec.make().add(notes);
 
-    export default Spec.make().addGroup(notes);
     ```
 
   </Step>
