@@ -42,6 +42,22 @@ jobs:
       - uses: ./.github/actions/docs-setup
       - run: pnpm --filter docs exec mint broken-links
 
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/docs-setup
+      - run: pnpm --filter docs exec mint validate
+
+  a11y:
+    name: Accessibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/docs-setup
+      - run: pnpm --filter docs exec mint a11y
+
   build:
     name: Build
     runs-on: ubuntu-latest
