@@ -34,6 +34,14 @@ jobs:
       - uses: ./.github/actions/docs-setup
       - run: pnpm --filter docs lint
 
+  broken-links:
+    name: Broken Links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/docs-setup
+      - run: pnpm --filter docs exec mint broken-links
+
   build:
     name: Build
     runs-on: ubuntu-latest
