@@ -40,7 +40,7 @@ deno add convex @confect/core @confect/server @confect/cli @confect/react
   <Step title="Define your database schema">
     <Note>
       Not every Effect `Schema` is valid for use in Confect. See
-      <a href="schema-restrictions">schema-restrictions</a> for more
+      [Schema Restrictions](/getting-started/schema-restrictions) for more
       information about what's permitted and what's not.
     </Note>
 
@@ -247,8 +247,10 @@ deno add convex @confect/core @confect/server @confect/cli @confect/react
           <button
             onClick={() =>
               createNote({ text: newNote })
-                .pipe(Effect.andThen(() => setNewNote("")))
-                .runPromise()
+                .pipe(
+                  Effect.andThen(() => setNewNote("")),
+                  Effect.runPromise
+                )
             }
           ></button>
             Create note

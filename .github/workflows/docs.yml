@@ -18,14 +18,6 @@ jobs:
       - run: pnpm format
       - run: pnpm --filter docs format
 
-  typecheck:
-    name: Typecheck
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: ./.github/actions/docs-setup
-      - run: pnpm --filter docs typecheck
-
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -34,10 +26,26 @@ jobs:
       - uses: ./.github/actions/docs-setup
       - run: pnpm --filter docs lint
 
-  build:
-    name: Build
+  broken-links:
+    name: Broken Links
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/docs-setup
-      - run: pnpm --filter docs build
+      - run: pnpm --filter docs exec mint broken-links
+
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/docs-setup
+      - run: pnpm --filter docs exec mint validate
+
+  a11y:
+    name: Accessibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/docs-setup
+      - run: pnpm --filter docs exec mint a11y

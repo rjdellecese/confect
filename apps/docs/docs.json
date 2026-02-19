@@ -3,9 +3,9 @@
   "theme": "mint",
   "name": "Confect 🧁",
   "colors": {
-    "primary": "#C026D3",
+    "primary": "#941A97",
     "light": "#F9A8D4",
-    "dark": "#BE185D"
+    "dark": "#D11B6A"
   },
   "background": {
     "color": {

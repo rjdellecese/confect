@@ -39,7 +39,9 @@
     "fix": "prettier --write . && eslint --fix . --max-warnings=0",
     "format": "prettier --check .",
     "lint": "eslint . --max-warnings=0",
-    "clean": "rm -rf dist coverage node_modules"
+    "clean": "rm -rf dist coverage node_modules",
+    "prepack": "rm -f ./README.md && cp ../../README.md ./README.md",
+    "postpack": "rm ./README.md && ln -s ../../README.md ./README.md"
   },
   "keywords": [
     "effect",

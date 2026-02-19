@@ -41,7 +41,9 @@
     "format": "prettier --check .",
     "lint": "eslint . --max-warnings=0",
     "bench": "tsx test/Refs.bench.ts",
-    "clean": "rm -rf dist coverage node_modules"
+    "clean": "rm -rf dist coverage node_modules",
+    "prepack": "rm -f ./README.md && cp ../../README.md ./README.md",
+    "postpack": "rm ./README.md && ln -s ../../README.md ./README.md"
   },
   "keywords": [
     "effect",
