@@ -8,11 +8,7 @@ export class HttpClientError extends Schema.TaggedError<HttpClientError>()(
   {
     cause: Schema.Unknown,
   },
-) {
-  override get message() {
-    return `Convex HTTP Client Error: ${JSON.stringify(this.cause, null, 2)}`;
-  }
-}
+) {}
 
 const make = (
   address: string,
