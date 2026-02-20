@@ -50,8 +50,14 @@ const program = Effect.gen(function* () {
       input.file_path,
     ).pipe(Command.stderr("inherit"));
 
-    // Run ESLint; exit code is ignored so unfixable issues don't fail the hook
-    yield* Command.exitCode(command);
+    const exitCode = yield* Command.exitCode(command);
+
+    // https://eslint.org/docs/latest/use/command-line-interface#exit-codes
+    if (exitCode === 2) {
+      return yield* Effect.dieMessage(
+        "ESLint encountered a configuration problem or internal error",
+      );
+    }
 
     yield* Console.log("{}");
   }
