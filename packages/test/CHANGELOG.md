@@ -1,5 +1,13 @@
 # @confect/test
 
+## 1.0.1
+
+### Patch Changes
+
+- Updated dependencies [00b12a0]
+  - @confect/core@1.0.1
+  - @confect/server@1.0.1
+
 ## 1.0.0
 
 ### Major Changes

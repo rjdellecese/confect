@@ -1,5 +1,11 @@
 # @confect/core
 
+## 1.0.1
+
+### Patch Changes
+
+- 00b12a0: Fix `RegisteredFunction` type, which was previously inferring query functions as `never`
+
 ## 1.0.0
 
 ### Major Changes
