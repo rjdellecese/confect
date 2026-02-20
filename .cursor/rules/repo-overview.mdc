@@ -1,0 +1,47 @@
+---
+description: Overview of the Confect monorepo structure, packages, and key workflows
+alwaysApply: true
+---
+
+# Repo Overview
+
+Confect is a library that integrates Effect with the Convex backend platform. It is a pnpm monorepo (requires Node >= 22, pnpm >= 10).
+
+## Package Dependency Graph
+
+- `@confect/core` - Shared specs, schemas, and types (no workspace deps)
+- `@confect/server` - Backend bindings to Convex (depends on core)
+- `@confect/react` - Client-side React hooks (depends on core)
+- `@confect/cli` - CLI tooling for codegen and dev-mode watching (depends on core, server)
+- `@confect/test` - Testing utilities via convex-test (depends on core, server)
+
+## Apps
+
+- `apps/example` - Vite + React example app demonstrating Confect usage
+- `apps/docs` - Documentation site powered by Mintlify
+
+## Build System
+
+Packages are built with tsdown. There is no Turborepo; orchestration is via pnpm workspace scripts.
+
+**Critical: packages must be rebuilt with `pnpm build` after source changes for those changes to be reflected outside their package directory.** Consumers import from `dist/`, not `src/`. During development, use `pnpm dev:packages` (or a variant like `pnpm dev:packages:server`) to run tsdown in watch mode so rebuilds happen automatically.
+
+### Key Commands (run from repo root)
+
+- `pnpm build` - Build all @confect packages
+- `pnpm dev` - Watch-rebuild all packages and apps in parallel
+- `pnpm dev:packages` - Watch-rebuild all packages only
+- `pnpm test` - Run all tests via Vitest
+- `pnpm test:server` - Run only @confect/server tests
+- `pnpm typecheck` - Typecheck all packages
+- `pnpm lint` / `pnpm fix` - Lint or auto-fix all packages
+- `pnpm release` - Build all packages then publish via Changesets
+- `pnpm clean` - Remove dist, coverage, and node_modules everywhere
+
+## Testing
+
+Tests use Vitest with a root-level `vitest.config.ts` and shared config in `vitest.shared.ts`. The @confect/server package has integration tests using convex-test.
+
+## Versioning and Publishing
+
+All @confect packages are in a fixed version group via Changesets, meaning they are always versioned and released together. Use `pnpm changeset` to create a changeset before merging a PR with user-facing changes.

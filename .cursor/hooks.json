@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "hooks": {
+    "afterFileEdit": [
+      {
+        "command": "pnpm exec bun .cursor/hooks/format-file.ts",
+        "timeout": 10
+      },
+      {
+        "command": "pnpm exec bun .cursor/hooks/lint-file.ts",
+        "timeout": 10
+      }
+    ]
+  }
+}

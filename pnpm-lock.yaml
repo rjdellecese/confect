@@ -21,6 +21,12 @@ importers:
       '@changesets/config':
         specifier: 3.1.2
         version: 3.1.2
+      '@effect/platform':
+        specifier: 0.94.4
+        version: 0.94.4(effect@3.19.16)
+      '@effect/platform-node':
+        specifier: 0.104.1
+        version: 0.104.1(@effect/cluster@0.56.3(@effect/platform@0.94.4(effect@3.19.16))(@effect/rpc@0.73.0(@effect/platform@0.94.4(effect@3.19.16))(effect@3.19.16))(@effect/sql@0.49.0(@effect/experimental@0.58.0(@effect/platform@0.94.4(effect@3.19.16))(effect@3.19.16))(@effect/platform@0.94.4(effect@3.19.16))(effect@3.19.16))(@effect/workflow@0.16.0(@effect/experimental@0.58.0(@effect/platform@0.94.4(effect@3.19.16))(effect@3.19.16))(@effect/platform@0.94.4(effect@3.19.16))(@effect/rpc@0.73.0(@effect/platform@0.94.4(effect@3.19.16))(effect@3.19.16))(effect@3.19.16))(effect@3.19.16))(@effect/platform@0.94.4(effect@3.19.16))(@effect/rpc@0.73.0(@effect/platform@0.94.4(effect@3.19.16))(effect@3.19.16))(@effect/sql@0.49.0(@effect/experimental@0.58.0(@effect/platform@0.94.4(effect@3.19.16))(effect@3.19.16))(@effect/platform@0.94.4(effect@3.19.16))(effect@3.19.16))(effect@3.19.16)
       '@eslint/js':
         specifier: 9.39.2
         version: 9.39.2
@@ -30,12 +36,21 @@ importers:
       '@vitest/coverage-v8':
         specifier: 3.2.4
         version: 3.2.4(vitest@3.2.4(@types/debug@4.1.12)(@types/node@25.2.3)(jiti@2.5.1)(tsx@4.21.0)(yaml@2.6.0))
+      bun:
+        specifier: 1.1.38
+        version: 1.1.38
+      effect:
+        specifier: 3.19.16
+        version: 3.19.16
       eslint:
         specifier: 9.39.2
         version: 9.39.2(jiti@2.5.1)
       eslint-plugin-mdx:
         specifier: 3.6.2
         version: 3.6.2(eslint@9.39.2(jiti@2.5.1))
+      prettier:
+        specifier: 3.8.1
+        version: 3.8.1
       tsdown:
         specifier: 0.20.3
         version: 0.20.3(@arethetypeswrong/core@0.18.2)(synckit@0.11.11)(typescript@5.9.3)
@@ -1759,6 +1774,46 @@ packages:
   '@openapi-contrib/openapi-schema-to-json-schema@3.2.0':
     resolution: {integrity: sha512-Gj6C0JwCr8arj0sYuslWXUBSP/KnUlEGnPW4qxlXvAl543oaNQgMgIgkQUA6vs5BCCvwTEiL8m/wdWzfl4UvSw==}
 
+  '@oven/bun-darwin-aarch64@1.1.38':
+    resolution: {integrity: sha512-6r+PgOE1s56h16wHs4Tg32ZOB9JQEgLi3V+FyIag/lIKS5FV9rUjfSZSwwI8UGfNqj7RrD5cB+1PT3IFpV6gmA==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@oven/bun-darwin-x64-baseline@1.1.38':
+    resolution: {integrity: sha512-hqaAsJGdGXiwwN6Y7dvYWjYwgAB8r3fXFIecjmxeijbOIw8zfru+zKFCBQtHa5AglAUAw1fOSOsWGlu8rtGp7Q==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@oven/bun-darwin-x64@1.1.38':
+    resolution: {integrity: sha512-eda41VCgQcYkrvRnob1xep8zlOm0Io3q1uiBGMaNL8aSrhpYaz3NhMH1NVlZEFahfIHhCfkin/gSLhJK0qK1fg==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@oven/bun-linux-aarch64@1.1.38':
+    resolution: {integrity: sha512-YIyJ2cBEgvQAYUh1udxe6yximei2QUh6gpdGWmhHiWWRX0VhVxPpZ2E8n6NIlpM2TBy4h/hOndoImiD/XnSq5Q==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@oven/bun-linux-x64-baseline@1.1.38':
+    resolution: {integrity: sha512-7Sv4RHpWBVjmkGjER90e99bYYkPiiNPGVP02CTBo49JwHfogVl8md8oWKr9A6K3ZZ05HS5atOg7wrKolkbR0bA==}
+    cpu: [x64]
+    os: [linux]
+
+  '@oven/bun-linux-x64@1.1.38':
+    resolution: {integrity: sha512-foVXWa2/zRPMudxVpr+/COmcF1F849g4JJHTDDzpxIp30Xp7422nSk/c0NESveklrqhCvINq4CNcKnBh3WPFAw==}
+    cpu: [x64]
+    os: [linux]
+
+  '@oven/bun-windows-x64-baseline@1.1.38':
+    resolution: {integrity: sha512-iwvzUC59J/aMwEsCkKyPLVc2oNep2OhWL6VRp2d9Sx0g9hycBgxOfBfAhii0bDOBI/aQAVevcTRoQJ1V79PT9Q==}
+    cpu: [x64]
+    os: [win32]
+
+  '@oven/bun-windows-x64@1.1.38':
+    resolution: {integrity: sha512-bMo3o7lyfC8HlyaunUXBFZVbVrYCQHHQRPXsCtgtBKzKbe/r51piwtMl4wpcvd5VZUhBDXMPrm7/OR89XXteyA==}
+    cpu: [x64]
+    os: [win32]
+
   '@oxc-project/types@0.112.0':
     resolution: {integrity: sha512-m6RebKHIRsax2iCwVpYW2ErQwa4ywHJrE4sCK3/8JK8ZZAWOKXaRJFl/uP51gaVyyXlaS4+chU1nSCdzYf6QqQ==}
 
@@ -3014,6 +3069,12 @@ packages:
 
   buffer@5.7.1:
     resolution: {integrity: sha512-EHcyIPBQ4BSGlvjB16k5KgAJ27CIsHY/2JBmCRReo48y9rQ3MaUzWX3KVlBa4U7MyX02HdVj0K7C3WaB3ju7FQ==}
+
+  bun@1.1.38:
+    resolution: {integrity: sha512-cr+UDFiEasyw0kKEbbD7kDewrI2vTo17JssVVjzBv/eNskeL2wikJ+4RNgUfoRqgthCjDZux7r6ELGgIGq6aWw==}
+    cpu: [arm64, x64]
+    os: [darwin, linux, win32]
+    hasBin: true
 
   bytes@3.1.2:
     resolution: {integrity: sha512-/Nf7TyzTx6S3yRJObOAV7956r8cr2+Oj8AC5dt8wSP3BQAoeX58NoHyCU8P8zGkNXStjTSi6fzO6F0pBdcYbEg==}
@@ -8223,6 +8284,30 @@ snapshots:
     dependencies:
       fast-deep-equal: 3.1.3
 
+  '@oven/bun-darwin-aarch64@1.1.38':
+    optional: true
+
+  '@oven/bun-darwin-x64-baseline@1.1.38':
+    optional: true
+
+  '@oven/bun-darwin-x64@1.1.38':
+    optional: true
+
+  '@oven/bun-linux-aarch64@1.1.38':
+    optional: true
+
+  '@oven/bun-linux-x64-baseline@1.1.38':
+    optional: true
+
+  '@oven/bun-linux-x64@1.1.38':
+    optional: true
+
+  '@oven/bun-windows-x64-baseline@1.1.38':
+    optional: true
+
+  '@oven/bun-windows-x64@1.1.38':
+    optional: true
+
   '@oxc-project/types@0.112.0': {}
 
   '@parcel/watcher-android-arm64@2.5.1':
@@ -9497,6 +9582,17 @@ snapshots:
     dependencies:
       base64-js: 1.5.1
       ieee754: 1.2.1
+
+  bun@1.1.38:
+    optionalDependencies:
+      '@oven/bun-darwin-aarch64': 1.1.38
+      '@oven/bun-darwin-x64': 1.1.38
+      '@oven/bun-darwin-x64-baseline': 1.1.38
+      '@oven/bun-linux-aarch64': 1.1.38
+      '@oven/bun-linux-x64': 1.1.38
+      '@oven/bun-linux-x64-baseline': 1.1.38
+      '@oven/bun-windows-x64': 1.1.38
+      '@oven/bun-windows-x64-baseline': 1.1.38
 
   bytes@3.1.2: {}
 
