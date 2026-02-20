@@ -56,8 +56,7 @@
     "@effect/printer": "^0.47.0",
     "@effect/printer-ansi": "^0.47.0",
     "code-block-writer": "^13.0.3",
-    "esbuild": "^0.27.3",
-    "tsx": "^4.21.0"
+    "esbuild": "^0.27.3"
   },
   "devDependencies": {
     "@effect/language-service": "0.73.1",

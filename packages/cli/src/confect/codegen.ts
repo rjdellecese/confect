@@ -3,7 +3,6 @@ import { DatabaseSchema } from "@confect/server";
 import { Command } from "@effect/cli";
 import { FileSystem, Path } from "@effect/platform";
 import { Effect, Match, Option } from "effect";
-import * as tsx from "tsx/esm/api";
 import {
   logFileAdded,
   logFileModified,
@@ -15,6 +14,7 @@ import { ConfectDirectory } from "../services/ConfectDirectory";
 import { ConvexDirectory } from "../services/ConvexDirectory";
 import * as templates from "../templates";
 import {
+  bundleAndImport,
   generateAuthConfig,
   generateConvexConfig,
   generateCrons,
@@ -32,17 +32,13 @@ const getNodeSpecPath = Effect.gen(function* () {
 
 const loadNodeSpec = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
   const nodeSpecPath = yield* getNodeSpecPath;
 
   if (!(yield* fs.exists(nodeSpecPath))) {
     return Option.none<Spec.AnyWithPropsWithRuntime<"Node">>();
   }
 
-  const nodeSpecPathUrl = yield* path.toFileUrl(nodeSpecPath);
-  const nodeSpecModule = yield* Effect.promise(() =>
-    tsx.tsImport(nodeSpecPathUrl.href, import.meta.url),
-  );
+  const nodeSpecModule = yield* bundleAndImport(nodeSpecPath);
   const nodeSpec = nodeSpecModule.default;
 
   if (!Spec.isNodeSpec(nodeSpec)) {
@@ -167,11 +163,8 @@ const generateFunctionModules = Effect.gen(function* () {
   const confectDirectory = yield* ConfectDirectory.get;
 
   const specPath = path.join(confectDirectory, "spec.ts");
-  const specPathUrl = yield* path.toFileUrl(specPath);
 
-  const specModule = yield* Effect.promise(() =>
-    tsx.tsImport(specPathUrl.href, import.meta.url),
-  );
+  const specModule = yield* bundleAndImport(specPath);
   const spec = specModule.default;
 
   if (!Spec.isConvexSpec(spec)) {
@@ -196,11 +189,8 @@ const generateSchema = Effect.gen(function* () {
   const convexDirectory = yield* ConvexDirectory.get;
 
   const confectSchemaPath = path.join(confectDirectory, "schema.ts");
-  const confectSchemaUrl = yield* path.toFileUrl(confectSchemaPath);
 
-  yield* Effect.promise(() =>
-    tsx.tsImport(confectSchemaUrl.href, import.meta.url),
-  ).pipe(
+  yield* bundleAndImport(confectSchemaPath).pipe(
     Effect.andThen((schemaModule) => {
       const defaultExport = schemaModule.default;
 

@@ -21,7 +21,6 @@ import {
 } from "effect";
 import type { ReadonlyRecord } from "effect/Record";
 import * as esbuild from "esbuild";
-import * as tsx from "tsx/esm/api";
 import type * as FunctionPath from "../FunctionPath";
 import * as FunctionPaths from "../FunctionPaths";
 import * as GroupPath from "../GroupPath";
@@ -30,6 +29,8 @@ import { ConfectDirectory } from "../services/ConfectDirectory";
 import { ConvexDirectory } from "../services/ConvexDirectory";
 import { ProjectRoot } from "../services/ProjectRoot";
 import {
+  bundleAndImport,
+  EXTERNAL_PACKAGES,
   generateAuthConfig,
   generateConvexConfig,
   generateCrons,
@@ -336,11 +337,10 @@ const loadSpec = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
-  const specPathUrl = yield* path.toFileUrl(yield* getSpecPath);
-  const specModule = yield* Effect.tryPromise({
-    try: () => tsx.tsImport(specPathUrl.href, import.meta.url),
-    catch: (error) => new SpecImportFailedError({ error }),
-  });
+  const specPath = yield* getSpecPath;
+  const specModule = yield* bundleAndImport(specPath).pipe(
+    Effect.mapError((error) => new SpecImportFailedError({ error })),
+  );
   const spec = specModule.default;
 
   if (!Spec.isConvexSpec(spec)) {
@@ -374,18 +374,15 @@ const getNodeSpecPath = Effect.gen(function* () {
 
 const loadNodeSpec = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
   const nodeSpecPath = yield* getNodeSpecPath;
 
   if (!(yield* fs.exists(nodeSpecPath))) {
     return Option.none();
   }
 
-  const nodeSpecPathUrl = yield* path.toFileUrl(nodeSpecPath);
-  const nodeSpecModule = yield* Effect.tryPromise({
-    try: () => tsx.tsImport(nodeSpecPathUrl.href, import.meta.url),
-    catch: (error) => new SpecImportFailedError({ error }),
-  });
+  const nodeSpecModule = yield* bundleAndImport(nodeSpecPath).pipe(
+    Effect.mapError((error) => new SpecImportFailedError({ error })),
+  );
   const nodeSpec = nodeSpecModule.default;
 
   if (!Spec.isNodeSpec(nodeSpec)) {
@@ -403,7 +400,7 @@ const esbuildOptions = (entryPoint: string) => ({
   platform: "node" as const,
   format: "esm" as const,
   logLevel: "silent" as const,
-  external: ["@confect/core", "@confect/server", "effect", "@effect/*"],
+  external: EXTERNAL_PACKAGES,
   plugins: [
     {
       name: "notify-rebuild",
