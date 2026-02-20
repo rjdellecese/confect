@@ -11,6 +11,7 @@ import {
   Record,
   String,
 } from "effect";
+import * as esbuild from "esbuild";
 import * as FunctionPaths from "./FunctionPaths";
 import * as GroupPath from "./GroupPath";
 import * as GroupPaths from "./GroupPaths";
@@ -24,6 +25,61 @@ export const removePathExtension = (pathStr: string) =>
     const path = yield* Path.Path;
 
     return String.slice(0, -path.extname(pathStr).length)(pathStr);
+  });
+
+export const EXTERNAL_PACKAGES = [
+  "@confect/core",
+  "@confect/server",
+  "effect",
+  "@effect/*",
+];
+
+const isExternalImport = (path: string) =>
+  EXTERNAL_PACKAGES.some((p) => {
+    if (p.endsWith("/*")) {
+      return path.startsWith(p.slice(0, -1));
+    }
+    return path === p || path.startsWith(p + "/");
+  });
+
+const absoluteExternalsPlugin: esbuild.Plugin = {
+  name: "absolute-externals",
+  setup(build) {
+    build.onResolve({ filter: /.*/ }, async (args) => {
+      if (args.kind !== "import-statement" && args.kind !== "dynamic-import")
+        return;
+      if (!isExternalImport(args.path)) return;
+      const resolved = import.meta.resolve(
+        args.path,
+        "file://" + args.resolveDir + "/",
+      );
+      return { path: resolved, external: true };
+    });
+  },
+};
+
+/**
+ * Bundle a TypeScript entry point with esbuild and import the result via a
+ * data URL. This handles extensionless `.ts` imports regardless of whether the
+ * user's project sets `"type": "module"` in package.json.
+ */
+export const bundleAndImport = (entryPoint: string) =>
+  Effect.gen(function* () {
+    const result = yield* Effect.promise(() =>
+      esbuild.build({
+        entryPoints: [entryPoint],
+        bundle: true,
+        write: false,
+        platform: "node",
+        format: "esm",
+        logLevel: "silent",
+        plugins: [absoluteExternalsPlugin],
+      }),
+    );
+    const code = result.outputFiles[0]!.text;
+    const dataUrl =
+      "data:text/javascript;base64," + Buffer.from(code).toString("base64");
+    return yield* Effect.promise(() => import(dataUrl));
   });
 
 export const writeFileStringAndLog = (filePath: string, contents: string) =>
