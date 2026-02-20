@@ -78,8 +78,7 @@ export const bundleAndImport = (entryPoint: string) =>
     );
     const code = result.outputFiles[0]!.text;
     const dataUrl =
-      "data:text/javascript;base64," +
-      Buffer.from(code).toString("base64");
+      "data:text/javascript;base64," + Buffer.from(code).toString("base64");
     return yield* Effect.promise(() => import(dataUrl));
   });
 
