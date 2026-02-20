@@ -73,6 +73,7 @@ export default [
       "**/vitest.config.ts",
       "**/vitest.shared.ts",
       "**/tsdown.shared.ts",
+      ".cursor/hooks/**/*.ts",
     ],
     languageOptions: {
       parserOptions: {
