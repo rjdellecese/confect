@@ -104,7 +104,7 @@ export type WithoutName<
 export type RegisteredFunction<Function extends AnyWithProps> =
   RuntimeAndFunctionType.GetFunctionType<
     Function["runtimeAndFunctionType"]
-  > extends "Convex"
+  > extends "query"
     ? RegisteredQuery<
         GetFunctionVisibility<Function>,
         Args<Function>["Encoded"],
