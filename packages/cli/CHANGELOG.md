@@ -1,5 +1,14 @@
 # @confect/cli
 
+## 1.0.1
+
+### Patch Changes
+
+- d3ecdc7: Fix codegen failure in projects without `"type": "module"` in their `package.json`. Also dramatically improve codegen performance.
+- Updated dependencies [00b12a0]
+  - @confect/core@1.0.1
+  - @confect/server@1.0.1
+
 ## 1.0.0
 
 ### Major Changes
