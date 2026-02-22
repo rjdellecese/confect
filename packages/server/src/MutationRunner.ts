@@ -1,5 +1,6 @@
 import * as Ref from "@confect/core/Ref";
 import { type GenericMutationCtx } from "convex/server";
+import type { ParseResult } from "effect";
 import { Context, Effect, Layer, Schema } from "effect";
 
 const makeMutationRunner =
@@ -7,7 +8,7 @@ const makeMutationRunner =
   <Mutation extends Ref.AnyMutation>(
     mutation: Mutation,
     args: Ref.Args<Mutation>["Type"],
-  ) =>
+  ): Effect.Effect<Ref.Returns<Mutation>["Type"], ParseResult.ParseError> =>
     Effect.gen(function* () {
       const function_ = Ref.getFunction(mutation);
       const functionName = Ref.getConvexFunctionName(mutation);

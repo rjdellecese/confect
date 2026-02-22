@@ -1,5 +1,6 @@
 import * as Ref from "@confect/core/Ref";
 import { type GenericActionCtx } from "convex/server";
+import type { ParseResult } from "effect";
 import { Context, Effect, Layer, Schema } from "effect";
 
 const makeActionRunner =
@@ -7,7 +8,7 @@ const makeActionRunner =
   <Action extends Ref.AnyAction>(
     action: Action,
     args: Ref.Args<Action>["Type"],
-  ) =>
+  ): Effect.Effect<Ref.Returns<Action>["Type"], ParseResult.ParseError> =>
     Effect.gen(function* () {
       const function_ = Ref.getFunction(action);
       const functionName = Ref.getConvexFunctionName(action);
