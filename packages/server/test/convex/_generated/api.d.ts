@@ -100,6 +100,16 @@ export declare const api: {
     random: {
       getNumber: FunctionReference<"action", "public", {}, number>;
     };
+    runners: {
+      countNotesViaRunner: FunctionReference<"action", "public", {}, number>;
+      getNumberViaRunner: FunctionReference<"action", "public", {}, number>;
+      insertNoteViaRunner: FunctionReference<
+        "action",
+        "public",
+        { text: string },
+        Id<"notes">
+      >;
+    };
   };
 };
 
