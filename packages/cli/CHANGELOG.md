@@ -1,5 +1,13 @@
 # @confect/cli
 
+## 1.0.2
+
+### Patch Changes
+
+- Updated dependencies [c4f9d67]
+  - @confect/server@1.0.2
+  - @confect/core@1.0.2
+
 ## 1.0.1
 
 ### Patch Changes

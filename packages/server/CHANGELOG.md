@@ -1,5 +1,12 @@
 # @confect/server
 
+## 1.0.2
+
+### Patch Changes
+
+- c4f9d67: Fix return types of `MutationRunner` and `ActionRunner` services
+  - @confect/core@1.0.2
+
 ## 1.0.1
 
 ### Patch Changes
