@@ -1,5 +1,13 @@
 # @confect/cli
 
+## 1.0.3
+
+### Patch Changes
+
+- 12b465a: Confect no longer maintains an `app.ts` which maps to `convex.config.ts`. If you'd like to use Convex components, define a `convex.config.ts` file in your `convex/` folder directly.
+  - @confect/server@1.0.3
+  - @confect/core@1.0.3
+
 ## 1.0.2
 
 ### Patch Changes
