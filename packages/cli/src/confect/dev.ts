@@ -32,7 +32,6 @@ import {
   bundleAndImport,
   EXTERNAL_PACKAGES,
   generateAuthConfig,
-  generateConvexConfig,
   generateCrons,
   generateHttp,
   removeGroups,
@@ -48,7 +47,6 @@ type Pending = {
   readonly specDirty: boolean;
   readonly nodeImplDirty: boolean;
   readonly httpDirty: boolean;
-  readonly appDirty: boolean;
   readonly cronsDirty: boolean;
   readonly authDirty: boolean;
 };
@@ -57,7 +55,6 @@ const pendingInit: Pending = {
   specDirty: false,
   nodeImplDirty: false,
   httpDirty: false,
-  appDirty: false,
   cronsDirty: false,
   authDirty: false,
 };
@@ -309,9 +306,6 @@ const syncLoop = (
         const dirtyOptionalFiles = [
           ...(pending.httpDirty
             ? [syncOptionalFile(generateHttp, "http.ts")]
-            : []),
-          ...(pending.appDirty
-            ? [syncOptionalFile(generateConvexConfig, "convex.config.ts")]
             : []),
           ...(pending.cronsDirty
             ? [syncOptionalFile(generateCrons, "crons.ts")]
@@ -588,7 +582,6 @@ const syncOptionalFile = (generate: typeof generateHttp, convexFile: string) =>
 
 const optionalConfectFiles: ReadonlyRecord<string, keyof Pending> = {
   "http.ts": "httpDirty",
-  "app.ts": "appDirty",
   "crons.ts": "cronsDirty",
   "auth.ts": "authDirty",
   "nodeSpec.ts": "specDirty",

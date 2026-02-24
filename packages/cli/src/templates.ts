@@ -65,17 +65,6 @@ export const http = ({ httpImportPath }: { httpImportPath: string }) =>
     return yield* cbw.toString();
   });
 
-export const convexConfig = ({ appImportPath }: { appImportPath: string }) =>
-  Effect.gen(function* () {
-    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
-
-    yield* cbw.writeLine(`import app from "${appImportPath}";`);
-    yield* cbw.newLine();
-    yield* cbw.writeLine(`export default app;`);
-
-    return yield* cbw.toString();
-  });
-
 export const crons = ({ cronsImportPath }: { cronsImportPath: string }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });

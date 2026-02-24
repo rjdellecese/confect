@@ -383,12 +383,6 @@ export const generateHttp = generateOptionalFile(
   (importPath) => templates.http({ httpImportPath: importPath }),
 );
 
-export const generateConvexConfig = generateOptionalFile(
-  "app.ts",
-  "convex.config.ts",
-  (importPath) => templates.convexConfig({ appImportPath: importPath }),
-);
-
 export const generateCrons = generateOptionalFile(
   "crons.ts",
   "crons.ts",

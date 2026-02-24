@@ -16,7 +16,6 @@ import * as templates from "../templates";
 import {
   bundleAndImport,
   generateAuthConfig,
-  generateConvexConfig,
   generateCrons,
   generateFunctions,
   generateHttp,
@@ -78,7 +77,6 @@ export const codegenHandler = Effect.gen(function* () {
       generateFunctionModules,
       generateSchema,
       logGenerated(generateHttp),
-      logGenerated(generateConvexConfig),
       logGenerated(generateCrons),
       logGenerated(generateAuthConfig),
     ],
