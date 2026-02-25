@@ -1,5 +1,5 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
-import { Effect, Layer } from "effect";
+import { Config, Effect, Layer } from "effect";
 import api from "../../_generated/api";
 import { DatabaseReader, DatabaseWriter } from "../../_generated/services";
 
@@ -64,10 +64,18 @@ const internalGetFirst = FunctionImpl.make(
     }).pipe(Effect.orDie),
 );
 
+const readEnvVar = FunctionImpl.make(
+  api,
+  "notesAndRandom.notes",
+  "readEnvVar",
+  () => Config.string("TEST_ENV_VAR").pipe(Effect.orDie),
+);
+
 export const notes = GroupImpl.make(api, "notesAndRandom.notes").pipe(
   Layer.provide(insert),
   Layer.provide(list),
   Layer.provide(delete_),
   Layer.provide(getFirst),
   Layer.provide(internalGetFirst),
+  Layer.provide(readEnvVar),
 );

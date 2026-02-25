@@ -16,13 +16,14 @@ import {
   type RouteSpecWithPathPrefix,
 } from "convex/server";
 import { Array, Layer, pipe, Record } from "effect";
+import * as ActionCtx from "./ActionCtx";
 import * as ActionRunner from "./ActionRunner";
 import * as Auth from "./Auth";
+import * as ConvexConfigProvider from "./ConvexConfigProvider";
 import * as MutationRunner from "./MutationRunner";
 import * as QueryRunner from "./QueryRunner";
 import * as Scheduler from "./Scheduler";
 import { StorageActionWriter, StorageReader, StorageWriter } from "./Storage";
-import * as ActionCtx from "./ActionCtx";
 
 type Middleware = (
   httpApp: HttpApp.Default,
@@ -84,6 +85,7 @@ const makeHandler =
       ApiLive,
       ApiDocsLive,
       HttpServer.layerContext,
+      Layer.setConfigProvider(ConvexConfigProvider.make()),
     );
 
     const { handler } = HttpApiBuilder.toWebHandler(

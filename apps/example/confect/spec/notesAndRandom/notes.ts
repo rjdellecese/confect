@@ -37,4 +37,11 @@ export const notes = GroupSpec.make("notes")
       args: Schema.Struct({}),
       returns: Schema.Option(Notes.Doc),
     }),
+  )
+  .addFunction(
+    FunctionSpec.publicQuery({
+      name: "readEnvVar",
+      args: Schema.Struct({}),
+      returns: Schema.String,
+    }),
   );

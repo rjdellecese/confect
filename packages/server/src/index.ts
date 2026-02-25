@@ -7,6 +7,7 @@ export * as DatabaseSchema from "./DatabaseSchema";
 export * as DatabaseWriter from "./DatabaseWriter";
 export * as DataModel from "./DataModel";
 export * as Document from "./Document";
+export * as ConvexConfigProvider from "./ConvexConfigProvider";
 export * as FunctionImpl from "./FunctionImpl";
 export * as GroupImpl from "./GroupImpl";
 export * as Handler from "./Handler";
