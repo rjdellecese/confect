@@ -69,7 +69,8 @@
           "platform/authentication",
           "platform/crons",
           "platform/search",
-          "platform/components"
+          "platform/components",
+          "platform/environment-variables"
         ]
       },
       {

@@ -1,0 +1,63 @@
+---
+icon: "bolt"
+title: "Environment Variables"
+description: "Read environment variables using Effect's Config module."
+---
+
+Confect provides a `ConfigProvider` that is compatible with the Convex runtime, where `process.env` is not enumerable. This provider is automatically set for all Confect functions (queries, mutations, actions, and HTTP API handlers), so Effect's [`Config`](https://effect.website/docs/configuration/config/) module works out of the box.
+
+## Reading environment variables
+
+Use `Config` from Effect to read [Convex environment variables](https://docs.convex.dev/production/environment-variables) in your function handlers.
+
+```ts confect/impl/settings.ts
+import { FunctionImpl } from "@confect/server";
+import { Config, Effect } from "effect";
+
+import api from "../_generated/api";
+
+const getApiKey = FunctionImpl.make(
+  api,
+  "settings",
+  "getApiKey",
+  () => Config.string("API_KEY").pipe(Effect.orDie),
+);
+```
+
+All of Effect's `Config` combinators work as expected — `Config.string`, `Config.number`, `Config.boolean`, `Config.withDefault`, `Config.option`, etc.
+
+```ts
+Config.integer("MAX_RESULTS").pipe(Config.withDefault(100));
+```
+
+## Limitations
+
+Config operations that require enumerating `process.env` are unsupported in the Convex runtime. This includes `Config.hashMap` and other combinators that need to discover keys dynamically. Attempting to use them will result in an `Unsupported` config error.
+
+## Custom config provider
+
+The `ConvexConfigProvider` module is exported from `@confect/server` if you need to create a provider with custom options. It supports the same options as Effect's default [`ConfigProvider.fromEnv`](https://effect.website/docs/configuration/config-provider/#fromenv).
+
+```ts
+import { ConvexConfigProvider } from "@confect/server";
+
+const provider = ConvexConfigProvider.make({
+  pathDelim: "__",
+  seqDelim: ";",
+});
+```
+
+To use a custom provider in a function handler, pass it to `Effect.withConfigProvider`.
+
+```ts
+const getApiKey = FunctionImpl.make(
+  api,
+  "settings",
+  "getApiKey",
+  () =>
+    Config.string("API_KEY").pipe(
+      Effect.withConfigProvider(provider),
+      Effect.orDie,
+    ),
+);
+```
