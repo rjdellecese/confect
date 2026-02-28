@@ -1,0 +1,106 @@
+---
+icon: "globe"
+title: "HTTP API"
+description: "Define HTTP endpoints using Effect's HTTP API modules."
+---
+
+Confect's HTTP API integration lets you define HTTP endpoints using [`@effect/platform`'s HTTP API modules](https://github.com/Effect-TS/effect/blob/main/packages/platform/README.md#http-api) and mount them onto Convex's HTTP router. It includes built-in interactive API documentation powered by [Scalar](https://github.com/scalar/scalar).
+
+## Defining endpoints
+
+Define your API groups and endpoints using `@effect/platform`.
+
+```ts confect/http/notes.ts
+import {
+  HttpApi,
+  HttpApiBuilder,
+  HttpApiEndpoint,
+  HttpApiGroup,
+  OpenApi,
+} from "@effect/platform";
+import { Effect, Layer, Schema } from "effect";
+
+import refs from "../_generated/refs";
+import { QueryRunner } from "../_generated/services";
+import { Notes } from "../tables/Notes";
+
+class NotesGroup extends HttpApiGroup.make("notes")
+  .add(
+    HttpApiEndpoint.get("getFirst", "/get-first")
+      .annotate(
+        OpenApi.Description,
+        "Get the first note, if there is one.",
+      )
+      .addSuccess(Schema.Option(Notes.Doc)),
+  )
+  .annotate(OpenApi.Title, "Notes")
+  .annotate(
+    OpenApi.Description,
+    "Operations on notes.",
+  ) {}
+
+export class Api extends HttpApi.make("Api")
+  .annotate(OpenApi.Title, "My App")
+  .add(NotesGroup)
+  .prefix("/api") {}
+```
+
+## Implementing handlers
+
+Implement your endpoint handlers using `HttpApiBuilder`. All Confect action [services](/concepts/services) (`QueryRunner`, `MutationRunner`, `ActionRunner`, `Scheduler`, `Auth`, `StorageReader`, `StorageWriter`, `StorageActionWriter`) are available in handlers.
+
+```ts confect/http/notes.ts
+const NotesGroupLive = HttpApiBuilder.group(
+  Api,
+  "notes",
+  (handlers) =>
+    handlers.handle("getFirst", () =>
+      Effect.gen(function* () {
+        const runQuery = yield* QueryRunner;
+
+        return yield* runQuery(
+          refs.public.notes.getFirst,
+          {},
+        );
+      }).pipe(Effect.orDie),
+    ),
+);
+
+export const ApiLive = HttpApiBuilder.api(Api).pipe(
+  Layer.provide(NotesGroupLive),
+);
+```
+
+## Creating the router
+
+Create the Convex HTTP router in `confect/http.ts` using `HttpApi.make` from `@confect/server`. Each key is a path prefix that must be either `"/"` or end with a trailing slash (e.g. `"/api/"`).
+
+```ts confect/http.ts
+import { HttpApi } from "@confect/server";
+import { HttpMiddleware } from "@effect/platform";
+import { flow } from "effect";
+
+import { ApiLive } from "./http/notes";
+
+export default HttpApi.make({
+  "/api/": {
+    apiLive: ApiLive,
+    middleware: flow(
+      HttpMiddleware.cors(),
+      HttpMiddleware.logger,
+    ),
+  },
+});
+```
+
+Each path prefix entry accepts:
+
+| Property     | Description                                                                                              |
+| ------------ | -------------------------------------------------------------------------------------------------------- |
+| `apiLive`    | A `Layer` providing `HttpApi.Api`, built with `HttpApiBuilder.api`                                       |
+| `middleware`  | Optional middleware function (e.g. `HttpMiddleware.cors()`, `HttpMiddleware.logger`)                     |
+| `scalar`     | Optional [Scalar configuration](https://github.com/scalar/scalar) to customize the interactive API docs  |
+
+## API documentation
+
+Interactive API docs are automatically served at `{pathPrefix}docs` (e.g. `/api/docs`). The docs are powered by Scalar and generated from your endpoint definitions and OpenApi annotations.

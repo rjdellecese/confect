@@ -1,0 +1,86 @@
+---
+icon: "square-function"
+title: "Functions"
+description: "Define and implement your Confect functions."
+---
+
+Confect functions are defined as a [spec and impl](/concepts/spec-impl-model) pair. The spec declares each function's name, arguments, and return type. The impl provides the handler logic.
+
+## Function types
+
+| Constructor                        | Description                        |
+| ---------------------------------- | ---------------------------------- |
+| `FunctionSpec.publicQuery`         | Public query function              |
+| `FunctionSpec.publicMutation`      | Public mutation function           |
+| `FunctionSpec.publicAction`        | Public action function             |
+| `FunctionSpec.internalQuery`       | Internal query function            |
+| `FunctionSpec.internalMutation`    | Internal mutation function         |
+| `FunctionSpec.internalAction`      | Internal action function           |
+
+## Defining a spec
+
+Each function spec defines the function's name, arguments schema, and returns schema. Function specs are grouped into group specs, which are combined into your API's top-level spec.
+
+```ts confect/spec/notes.ts
+import { GroupSpec, FunctionSpec } from "@confect/core";
+import { Schema } from "effect";
+
+import { Notes } from "../tables/Notes";
+
+const list = FunctionSpec.publicQuery({
+  name: "list",
+  args: Schema.Struct({}),
+  returns: Schema.Array(Notes.Doc),
+});
+
+export const notes = GroupSpec.make("notes").addFunction(list);
+```
+
+```ts confect/spec.ts
+import { Spec } from "@confect/core";
+
+import { notes } from "./spec/notes";
+
+export default Spec.make().add(notes);
+```
+
+## Implementing functions
+
+Each function impl contains a handler that implements the function's logic. Function impls are composed into group impls using Effect layers.
+
+```ts confect/impl/notes.ts
+import { FunctionImpl, GroupImpl } from "@confect/server";
+import { Effect, Layer } from "effect";
+
+import api from "../_generated/api";
+import { DatabaseReader } from "../_generated/services";
+
+const list = FunctionImpl.make(api, "notes", "list", () =>
+  Effect.gen(function* () {
+    const reader = yield* DatabaseReader;
+
+    return yield* reader
+      .table("notes")
+      .index("by_creation_time", "desc")
+      .collect();
+  }).pipe(Effect.orDie),
+);
+
+export const notes = GroupImpl.make(api, "notes").pipe(
+  Layer.provide(list),
+);
+```
+
+Your impl must be the default export of an `impl.ts` file in your `confect/` directory, and must be finalized with `Impl.finalize`.
+
+```ts confect/impl.ts
+import { Impl } from "@confect/server";
+
+import api from "./_generated/api";
+import { notes } from "./impl/notes";
+
+export default Impl.make(api).pipe(
+  Layer.provide(notes),
+  Impl.finalize,
+);
+```

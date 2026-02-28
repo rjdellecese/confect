@@ -1,0 +1,23 @@
+---
+icon: "calendar"
+title: "Crons"
+description: "Schedule recurring tasks with cron jobs."
+---
+
+Cron jobs use the vanilla Convex API. Define your crons in `confect/crons.ts` and the Confect CLI will re-export them into `convex/crons.ts`.
+
+```ts confect/crons.ts
+import { cronJobs } from "convex/server";
+
+const crons = cronJobs();
+
+crons.interval(
+  "clear stale sessions",
+  { hours: 1 },
+  internal.sessions.clearStale,
+);
+
+export default crons;
+```
+
+See the [Convex cron jobs documentation](https://docs.convex.dev/scheduling/cron-jobs) for the full API.

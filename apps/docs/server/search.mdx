@@ -1,0 +1,40 @@
+---
+icon: "search"
+title: "Search"
+description: "Query vector indexes for semantic similarity search."
+---
+
+{/* eslint-disable-next-line @typescript-eslint/no-unused-vars -- ContextBadges is used in JSX below */}
+import { ContextBadges } from "/snippets/context-badges.mdx";
+
+## Vector search
+
+<ContextBadges action />
+
+The `VectorSearch` service queries vector indexes defined in your [schema](/server/database/schema). It is only available in actions.
+
+```ts
+Effect.gen(function* () {
+  const vectorSearch = yield* VectorSearch;
+
+  const results = yield* vectorSearch("notes", "embedding", {
+    vector: embeddingVector,
+    limit: 10,
+    filter: (q) => q.eq("tag", "colors"),
+  });
+});
+```
+
+Each result contains the document's `_id` and a `_score` representing similarity (higher is more similar).
+
+```ts
+Array<{ _id: GenericId<TableName>; _score: number }>
+```
+
+Vector indexes are defined on tables using the `vectorIndex` method. See the [Schema](/server/database/schema) page for an example.
+
+For more details on vector search queries and index configuration, see the [Convex vector search documentation](https://docs.convex.dev/search/vector-search).
+
+## Full-text search
+
+Full-text search uses search indexes via the `DatabaseReader` service, not the `VectorSearch` service. See the [Reading](/server/database/reading) page for usage.

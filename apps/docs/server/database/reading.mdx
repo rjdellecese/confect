@@ -4,11 +4,11 @@ title: "Reading"
 description: "Retrieve documents from the database."
 ---
 
-The `ConfectDatabaseReader` service is used to read documents from the database.
+The `DatabaseReader` service is used to read documents from the database.
 
 ```ts
 Effect.gen(function* () {
-  const reader = yield* ConfectDatabaseReader;
+  const reader = yield* DatabaseReader;
 
   return yield* reader
     .table("notes")

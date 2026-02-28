@@ -37,39 +37,41 @@
         "group": "Getting Started",
         "pages": [
           "getting-started/introduction",
-          "getting-started/quickstart",
-          "getting-started/schema-restrictions"
+          "getting-started/quickstart"
         ]
       },
       {
-        "group": "Orientation",
+        "group": "Concepts",
         "pages": [
-          "orientation/packages",
-          "orientation/project-structure",
-          "orientation/services"
+          "concepts/packages",
+          "concepts/project-structure",
+          "concepts/spec-impl-model",
+          "concepts/services",
+          "concepts/schema-restrictions"
         ]
       },
       {
-        "group": "Platform",
+        "group": "Server",
         "pages": [
-          "platform/functions",
+          "server/functions",
+          "server/node-actions",
           {
             "icon": "database",
             "group": "Database",
             "pages": [
-              "platform/database/schema",
-              "platform/database/reading",
-              "platform/database/writing",
-              "platform/database/system-tables"
+              "server/database/schema",
+              "server/database/reading",
+              "server/database/writing",
+              "server/database/system-tables"
             ]
           },
-          "platform/http-api",
-          "platform/storage",
-          "platform/scheduling",
-          "platform/authentication",
-          "platform/crons",
-          "platform/search",
-          "platform/components"
+          "server/http-api",
+          "server/storage",
+          "server/scheduling",
+          "server/authentication",
+          "server/crons",
+          "server/search",
+          "server/components"
         ]
       },
       {

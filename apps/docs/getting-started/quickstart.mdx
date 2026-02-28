@@ -24,10 +24,6 @@ yarn add convex @confect/core @confect/server @confect/cli @confect/react
 bun add convex @confect/core @confect/server @confect/cli @confect/react
 ```
 
-```bash deno
-deno add convex @confect/core @confect/server @confect/cli @confect/react
-```
-
 </CodeGroup>
 
 ## Usage
@@ -40,7 +36,7 @@ deno add convex @confect/core @confect/server @confect/cli @confect/react
   <Step title="Define your database schema">
     <Note>
       Not every Effect `Schema` is valid for use in Confect. See
-      [Schema Restrictions](/getting-started/schema-restrictions) for more
+      [Schema Restrictions](/concepts/schema-restrictions) for more
       information about what's permitted and what's not.
     </Note>
 
@@ -213,12 +209,12 @@ deno add convex @confect/core @confect/server @confect/cli @confect/react
     import { Array, Effect, Option } from "effect";
     import { useState } from "react";
 
-    import { public } from "../confect/_generated/refs";
+    import refs from "../confect/_generated/refs";
 
     const App = () => {
-      const optionNotes = useQuery(public.notes.list, {});
+      const optionNotes = useQuery(refs.public.notes.list, {});
 
-      const createNote = useMutation(public.notes.create);
+      const createNote = useMutation(refs.public.notes.create);
 
       const [newNote, setNewNote] = useState("");
 
@@ -241,7 +237,7 @@ deno add convex @confect/core @confect/server @confect/cli @confect/react
             rows={4}
             cols={50}
             value={newNote}
-            onChange={(e) => setNote(e.target.value)}
+            onChange={(e) => setNewNote(e.target.value)}
           />
           <br />
           <button
@@ -252,7 +248,7 @@ deno add convex @confect/core @confect/server @confect/cli @confect/react
                   Effect.runPromise
                 )
             }
-          ></button>
+          >
             Create note
           </button>
         </div>

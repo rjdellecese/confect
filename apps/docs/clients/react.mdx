@@ -1,4 +1,123 @@
 ---
 icon: "react"
 title: "React"
+description: "Use Confect's React hooks to call your functions from the client."
 ---
+
+`@confect/react` provides React hooks that wrap Convex's hooks with Effect-native types. They use refs from `confect/_generated/refs` for type-safe function invocation with automatic schema encoding and decoding.
+
+## Setup
+
+The React provider setup is the same as vanilla Convex.
+
+```tsx src/main.tsx
+import { ConvexProvider, ConvexReactClient } from "convex/react";
+import React from "react";
+import ReactDOM from "react-dom/client";
+
+import App from "./App";
+
+const convexClient = new ConvexReactClient(
+  import.meta.env.VITE_CONVEX_URL,
+);
+
+ReactDOM.createRoot(
+  document.getElementById("root") as HTMLElement,
+).render(
+  <React.StrictMode>
+    <ConvexProvider client={convexClient}>
+      <App />
+    </ConvexProvider>
+  </React.StrictMode>,
+);
+```
+
+## `useQuery`
+
+Returns an `Option<T>` instead of `T | undefined`. The `Option` is `None` while the query is loading and `Some` once data is available.
+
+```tsx
+import { useQuery } from "@confect/react";
+import { Option } from "effect";
+import refs from "../confect/_generated/refs";
+
+const NoteList = () => {
+  const optionNotes = useQuery(
+    refs.public.notes.list,
+    {},
+  );
+
+  return Option.match(optionNotes, {
+    onNone: () => <p>Loading…</p>,
+    onSome: (notes) => (
+      <ul>
+        {notes.map((note) => (
+          <li key={note._id}>{note.text}</li>
+        ))}
+      </ul>
+    ),
+  });
+};
+```
+
+## `useMutation`
+
+Returns a function that accepts args and returns an `Effect`. The `Effect` must be run explicitly (e.g. with `Effect.runPromise`).
+
+```tsx
+import { useMutation } from "@confect/react";
+import { Effect } from "effect";
+import refs from "../confect/_generated/refs";
+
+const InsertNote = () => {
+  const insertNote = useMutation(
+    refs.public.notes.insert,
+  );
+
+  return (
+    <button
+      onClick={() =>
+        insertNote({ text: "Hello" }).pipe(
+          Effect.runPromise,
+        )
+      }
+    >
+      Insert note
+    </button>
+  );
+};
+```
+
+## `useAction`
+
+Same pattern as `useMutation`: returns a function that accepts args and returns an `Effect`.
+
+```tsx
+import { useAction } from "@confect/react";
+import { Effect } from "effect";
+import refs from "../confect/_generated/refs";
+
+const RandomNumber = () => {
+  const getRandom = useAction(
+    refs.public.random.getNumber,
+  );
+
+  const handleClick = () => {
+    getRandom({}).pipe(
+      Effect.map(console.log),
+      Effect.runPromise,
+    );
+  };
+
+  return <button onClick={handleClick}>Get random</button>;
+};
+```
+
+## Differences from vanilla Convex hooks
+
+| Vanilla Convex                        | Confect                                  |
+| ------------------------------------- | ---------------------------------------- |
+| `useQuery` returns `T \| undefined`   | `useQuery` returns `Option<T>`           |
+| `useMutation` returns `(args) => Promise<T>` | `useMutation` returns `(args) => Effect<T>` |
+| `useAction` returns `(args) => Promise<T>`  | `useAction` returns `(args) => Effect<T>`  |
+| Functions referenced via `api.module.fn`    | Functions referenced via refs              |
