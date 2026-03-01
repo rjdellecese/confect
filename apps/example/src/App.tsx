@@ -53,7 +53,7 @@ const Page = () => {
     retrieveRandomNumber();
   }, []);
 
-  const envVar = useQuery(refs.public.notesAndRandom.notes.readEnvVar, {});
+  const envVar = useQuery(refs.public.env.readEnvVar, {});
 
   return (
     <div>
