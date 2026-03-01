@@ -1,7 +1,7 @@
 ---
 icon: "square-function"
 title: "Functions"
-description: "Define and implement your Confect functions."
+description: "Define and implement Convex queries, mutations, and actions with Confect."
 ---
 
 Confect functions are defined as a [spec and impl](/concepts/spec-impl-model) pair. The spec declares each function's name, arguments, and return type. The impl provides the handler logic.
@@ -17,9 +17,11 @@ Confect functions are defined as a [spec and impl](/concepts/spec-impl-model) pa
 | `FunctionSpec.internalMutation` | Internal mutation function |
 | `FunctionSpec.internalAction`   | Internal action function   |
 
+For Node.js actions, see [Node Actions](/server/node-actions).
+
 ## Defining a spec
 
-Each function spec defines the function's name, arguments schema, and returns schema. Function specs are grouped into group specs, which are combined into your API's top-level spec.
+Each function spec defines the function's name, arguments schema, and returns schema. Function specs are grouped into group specs, which are combined into your API's top-level spec. See [The Spec/Impl Model](/concepts/spec-impl-model) for a full walkthrough.
 
 ```ts confect/spec/notes.ts
 import { GroupSpec, FunctionSpec } from "@confect/core";
@@ -48,6 +50,8 @@ export default Spec.make().add(notes);
 
 Each function impl contains a handler that implements the function's logic. Function impls are composed into group impls using Effect layers.
 
+The handler receives the decoded arguments as its first parameter and returns an `Effect`. Use the generated [services](/concepts/services) (like `DatabaseReader`, `DatabaseWriter`, `Auth`, etc.) inside your handler to interact with Convex.
+
 ```ts confect/impl/notes.ts
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Effect, Layer } from "effect";
@@ -75,6 +79,7 @@ Your impl must be the default export of an `impl.ts` file in your `confect/` dir
 
 ```ts confect/impl.ts
 import { Impl } from "@confect/server";
+import { Layer } from "effect";
 
 import api from "./_generated/api";
 import { notes } from "./impl/notes";

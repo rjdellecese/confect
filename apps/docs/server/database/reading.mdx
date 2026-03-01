@@ -7,6 +7,9 @@ description: "Retrieve documents from the database."
 The `DatabaseReader` service is used to read documents from the database.
 
 ```ts
+import { Effect } from "effect";
+import { DatabaseReader } from "./confect/_generated/services";
+
 Effect.gen(function* () {
   const reader = yield* DatabaseReader;
 

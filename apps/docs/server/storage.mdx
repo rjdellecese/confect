@@ -9,6 +9,9 @@ description: "Store and retrieve blobs using Convex file storage."
 The `StorageReader` service is used to retrieve the URLs of blobs in storage.
 
 ```ts
+import { Effect } from "effect";
+import { StorageReader } from "./confect/_generated/services";
+
 Effect.gen(function* () {
   const reader = yield* StorageReader;
 
@@ -44,12 +47,26 @@ storage.delete(storageId);
 
 ## Writing in actions
 
-The `StorageActionWriter` service is used to write blobs to storage in actions.
+The `StorageActionWriter` service is used to read and write blobs to storage in actions.
 
 ```ts
 Effect.gen(function* () {
   const storage = yield* StorageActionWriter;
 
-  return yield* storage.get(storageId);
+  // ...
 });
+```
+
+### Methods
+
+#### Get a blob
+
+```ts
+storage.get(storageId);
+```
+
+#### Store a blob
+
+```ts
+storage.store(blob, { sha256: optionalHash });
 ```

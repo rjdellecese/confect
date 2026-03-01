@@ -44,9 +44,9 @@ export class Api extends HttpApi.make("Api")
 
 ## Implementing handlers
 
-Implement your endpoint handlers using `HttpApiBuilder`. All Confect action [services](/concepts/services) (`QueryRunner`, `MutationRunner`, `ActionRunner`, `Scheduler`, `Auth`, `StorageReader`, `StorageWriter`, `StorageActionWriter`) are available in handlers.
+Implement your endpoint handlers in the same file using `HttpApiBuilder`. All Confect action [services](/concepts/services) (`QueryRunner`, `MutationRunner`, `ActionRunner`, `Scheduler`, `Auth`, `StorageReader`, `StorageWriter`, `StorageActionWriter`) are available in handlers.
 
-```ts confect/http/notes.ts
+```ts confect/http/notes.ts (continued)
 const NotesGroupLive = HttpApiBuilder.group(
   Api,
   "notes",

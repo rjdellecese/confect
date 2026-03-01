@@ -8,11 +8,12 @@ import { ContextBadges } from "/snippets/context-badges.mdx";
 
 ## Vector search
 
-<ContextBadges action />
-
 The `VectorSearch` service queries vector indexes defined in your [schema](/server/database/schema). It is only available in actions.
 
 ```ts
+import { Effect } from "effect";
+import { VectorSearch } from "./confect/_generated/services";
+
 Effect.gen(function* () {
   const vectorSearch = yield* VectorSearch;
 

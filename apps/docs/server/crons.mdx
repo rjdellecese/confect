@@ -8,6 +8,7 @@ Cron jobs use the vanilla Convex API. Define your crons in `confect/crons.ts` an
 
 ```ts confect/crons.ts
 import { cronJobs } from "convex/server";
+import { internal } from "../convex/_generated/api";
 
 const crons = cronJobs();
 

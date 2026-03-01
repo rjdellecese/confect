@@ -9,6 +9,9 @@ The `Auth` service provides access to the current user's identity. Unlike vanill
 ## Getting the user identity
 
 ```ts
+import { Effect } from "effect";
+import { Auth } from "./confect/_generated/services";
+
 Effect.gen(function* () {
   const auth = yield* Auth;
 
