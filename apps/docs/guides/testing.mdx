@@ -1,4 +1,191 @@
 ---
 icon: "flask-conical"
 title: "Testing"
+description: "Test your Confect functions without a live Convex backend."
 ---
+
+`@confect/test` wraps [`convex-test`](https://docs.convex.dev/testing) with Effect-native APIs. It provides a `TestConfect` service that lets you call your Confect functions using refs, run arbitrary mutation-context code for test setup, and test with user identities.
+
+## Installation
+
+<CodeGroup>
+
+```bash pnpm
+pnpm add -D @confect/test convex-test @effect/vitest
+```
+
+```bash npm
+npm install -D @confect/test convex-test @effect/vitest
+```
+
+```bash yarn
+yarn add -D @confect/test convex-test @effect/vitest
+```
+
+```bash
+bun add -D @confect/test convex-test @effect/vitest
+```
+
+</CodeGroup>
+
+## Setup
+
+Create a `TestConfect.ts` file that configures the test layer with your database schema and Convex modules.
+
+```ts test/TestConfect.ts
+/// <reference types="vite/client" />
+
+import { TestConfect as TestConfect_ } from "@confect/test";
+
+import confectSchema from "./confect/schema";
+
+export const TestConfect =
+  TestConfect_.TestConfect<typeof confectSchema>();
+
+export const layer = TestConfect_.layer(
+  confectSchema,
+  import.meta.glob("./convex/**/!(*.*.*)*.*s"),
+);
+```
+
+Every time the `TestConfect` layer is constructed, a new test database is created. If you want a clean database for each test, provide the layer on a per-test basis (as shown below). If you want to share state across tests in a describe block, you can provide the layer at a higher scope instead.
+
+## Writing tests
+
+Use `@effect/vitest`'s `it.effect` to write effectful tests. Yield `TestConfect` from the service, then call your functions using refs.
+
+```ts test/notes.test.ts
+import { describe, it } from "@effect/vitest";
+import { assertEquals } from "@effect/vitest/utils";
+import { Effect } from "effect";
+
+import refs from "./confect/_generated/refs";
+import * as TestConfect from "./TestConfect";
+
+describe("notes", () => {
+  it.effect("can insert and list notes", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.mutation(refs.public.notes.insert, {
+        text: "Hello",
+      });
+
+      const notes = yield* c.query(refs.public.notes.list, {});
+
+      assertEquals(notes.length, 1);
+      assertEquals(notes[0]?.text, "Hello");
+    }).pipe(Effect.provide(TestConfect.layer())),
+  );
+});
+```
+
+## Calling functions
+
+`TestConfect` provides `query`, `mutation`, and `action` methods that accept a ref and args, returning an `Effect` with the decoded result.
+
+```ts
+Effect.gen(function* () {
+  const c = yield* TestConfect.TestConfect;
+
+  const notes = yield* c.query(refs.public.notes.list, {});
+
+  const noteId = yield* c.mutation(refs.public.notes.insert, {
+    text: "Hello",
+  });
+
+  const result = yield* c.action(refs.public.random.getNumber, {});
+});
+```
+
+## Running setup code
+
+Use `run` to execute arbitrary code with mutation-context services (like `DatabaseWriter`) for test setup. When the handler returns a value, pass a `Schema` as the second argument for decoding.
+
+```ts
+import { GenericId } from "@confect/core";
+import { DatabaseWriter } from "./confect/_generated/services";
+
+Effect.gen(function* () {
+  const c = yield* TestConfect.TestConfect;
+
+  const noteId = yield* c.run(
+    Effect.gen(function* () {
+      const writer = yield* DatabaseWriter;
+
+      return yield* writer
+        .table("notes")
+        .insert({ text: "seed data" });
+    }),
+    GenericId.GenericId("notes"),
+  );
+});
+```
+
+When the handler returns `void`, the second argument can be omitted.
+
+```ts
+Effect.gen(function* () {
+  const c = yield* TestConfect.TestConfect;
+
+  yield* c.run(
+    Effect.gen(function* () {
+      const writer = yield* DatabaseWriter;
+
+      yield* Effect.forEach(items, (item) =>
+        writer.table("notes").insert(item),
+      );
+    }),
+  );
+});
+```
+
+## Testing with user identity
+
+Use `withIdentity` to scope function calls to a specific user identity.
+
+```ts
+Effect.gen(function* () {
+  const c = yield* TestConfect.TestConfect;
+
+  const asUser = c.withIdentity({
+    subject: "user-123",
+    tokenIdentifier: "https://example.com|user-123",
+    email: "user@example.com",
+  });
+
+  const identity = yield* asUser.query(
+    refs.public.auth.getIdentity,
+    {},
+  );
+});
+```
+
+## Testing HTTP endpoints
+
+Use `fetch` to test your [HTTP API](/server/http-api) endpoints.
+
+```ts
+Effect.gen(function* () {
+  const c = yield* TestConfect.TestConfect;
+
+  const response = yield* c.fetch("/api/get-first");
+  const body = yield* Effect.promise(() => response.json());
+});
+```
+
+## Testing scheduled functions
+
+`TestConfect` provides helpers for advancing scheduled functions in tests.
+
+```ts
+Effect.gen(function* () {
+  const c = yield* TestConfect.TestConfect;
+
+  yield* c.finishInProgressScheduledFunctions();
+
+  yield* c.finishAllScheduledFunctions(() => {
+    vi.advanceTimersByTime(5000);
+  });
+});
+```
