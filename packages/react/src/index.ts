@@ -1,4 +1,4 @@
-import * as Ref from "@confect/core/Ref";
+import { Ref } from "@confect/core";
 import {
   useAction as useConvexAction,
   useMutation as useConvexMutation,
@@ -47,7 +47,7 @@ export const useMutation = <Mutation extends Ref.AnyPublicMutation>(
       );
 
       return yield* Schema.decode(function_.returns)(actualReturns);
-    }).pipe(Effect.orDie);
+    }).pipe(Effect.orDie) as Effect.Effect<Ref.Returns<Mutation>["Type"]>;
 };
 
 export const useAction = <Action extends Ref.AnyPublicAction>(ref: Action) => {
@@ -66,5 +66,5 @@ export const useAction = <Action extends Ref.AnyPublicAction>(ref: Action) => {
       );
 
       return yield* Schema.decode(function_.returns)(actualReturns);
-    }).pipe(Effect.orDie);
+    }).pipe(Effect.orDie) as Effect.Effect<Ref.Returns<Action>["Type"]>;
 };
