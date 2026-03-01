@@ -7,6 +7,10 @@
     "Mintlify": {
       "url": "https://www.mintlify.com/docs/mcp",
       "headers": {}
+    },
+    "Lucide": {
+      "command": "pnpm",
+      "args": ["dlx", "lucide-icons-mcp", "--stdio"]
     }
   }
 }

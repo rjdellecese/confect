@@ -4,10 +4,41 @@ title: "Introduction"
 description: "What is Confect?"
 ---
 
-Confect is a framework that deeply integrates Effect with Convex. It's more than just Effect bindings! Confect allows you to:
+Confect is a framework that deeply integrates [Effect](https://effect.website) with [Convex](https://convex.dev). It's more than just Effect bindings! Confect allows you to:
 
 - Define your Convex database schema using Effect schemas.
 - Write Convex function args and returns validators using Effect's schema library.
 - Use Confect functions to automatically decode and encode your data according to your Effect schema definitions for end-to-end rich types, from client to function to database (and back).
 - Use Effect's HTTP API modules to define your HTTP API(s). Includes interactive OpenAPI documentation powered by [Scalar](https://github.com/scalar/scalar).
 - Access Convex platform capabilities via Effect services.
+
+## Prerequisites
+
+It's recommended that you have some familiarity with both Effect and Convex, including the vanilla `convex` APIs, before getting started with Confect.
+
+<CardGroup cols={2}>
+  <Card
+    title="Effect documentation"
+    icon="layers"
+    href="https://effect.website/docs"
+  >
+    Learn about Effect's core concepts.
+  </Card>
+  <Card
+    title="Convex documentation"
+    icon="database"
+    href="https://docs.convex.dev"
+  >
+    Learn about Convex's platform and APIs.
+  </Card>
+</CardGroup>
+
+## Next steps
+
+<Card
+  title="Quickstart"
+  icon="rocket"
+  href="/getting-started/quickstart"
+>
+  Install Confect and build your first app.
+</Card>

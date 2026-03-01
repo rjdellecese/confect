@@ -1,0 +1,37 @@
+---
+icon: "clock"
+title: "Scheduling"
+description: "Schedule functions to run after a delay or at a specific time."
+---
+
+The `Scheduler` service schedules Confect functions to run in the future. It wraps Convex's scheduler with Effect-native types: delays use [`Duration`](https://effect.website/docs/data-types/duration/) and timestamps use [`DateTime`](https://effect.website/docs/data-types/date-time/).
+
+## Run after a delay
+
+```ts
+Effect.gen(function* () {
+  const scheduler = yield* Scheduler;
+
+  yield* scheduler.runAfter(Duration.minutes(5), functionReference, {
+    text: "Hello",
+  });
+});
+```
+
+## Run at a specific time
+
+```ts
+Effect.gen(function* () {
+  const scheduler = yield* Scheduler;
+
+  const dateTime = yield* DateTime.make("2025-12-31T00:00:00Z");
+
+  yield* scheduler.runAt(dateTime, functionReference, {
+    text: "Happy new year",
+  });
+});
+```
+
+## Function references
+
+The `Scheduler` accepts Convex [`SchedulableFunctionReference`](https://docs.convex.dev/api/modules/server#schedulablefunctionreference) values -- the same function references used by vanilla Convex's `scheduler.runAfter` and `scheduler.runAt`. See the [Convex scheduling documentation](https://docs.convex.dev/scheduling/scheduled-functions) for more details.
