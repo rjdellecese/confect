@@ -94,10 +94,7 @@ Effect.gen(function* () {
     text: "Hello",
   });
 
-  const result = yield* c.action(
-    refs.public.random.getNumber,
-    {},
-  );
+  const result = yield* c.action(refs.public.random.getNumber, {});
 });
 ```
 

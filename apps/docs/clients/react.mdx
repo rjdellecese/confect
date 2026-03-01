@@ -42,10 +42,7 @@ import { Option } from "effect";
 import refs from "../confect/_generated/refs";
 
 const NoteList = () => {
-  const optionNotes = useQuery(
-    refs.public.notes.list,
-    {},
-  );
+  const optionNotes = useQuery(refs.public.notes.list, {});
 
   return Option.match(optionNotes, {
     onNone: () => <p>Loading…</p>,
@@ -70,16 +67,12 @@ import { Effect } from "effect";
 import refs from "../confect/_generated/refs";
 
 const InsertNote = () => {
-  const insertNote = useMutation(
-    refs.public.notes.insert,
-  );
+  const insertNote = useMutation(refs.public.notes.insert);
 
   return (
     <button
       onClick={() =>
-        insertNote({ text: "Hello" }).pipe(
-          Effect.runPromise,
-        )
+        insertNote({ text: "Hello" }).pipe(Effect.runPromise)
       }
     >
       Insert note
@@ -98,15 +91,10 @@ import { Effect } from "effect";
 import refs from "../confect/_generated/refs";
 
 const RandomNumber = () => {
-  const getRandom = useAction(
-    refs.public.random.getNumber,
-  );
+  const getRandom = useAction(refs.public.random.getNumber);
 
   const handleClick = () => {
-    getRandom({}).pipe(
-      Effect.map(console.log),
-      Effect.runPromise,
-    );
+    getRandom({}).pipe(Effect.map(console.log), Effect.runPromise);
   };
 
   return <button onClick={handleClick}>Get random</button>;
@@ -115,9 +103,9 @@ const RandomNumber = () => {
 
 ## Differences from vanilla Convex hooks
 
-| Vanilla Convex                        | Confect                                  |
-| ------------------------------------- | ---------------------------------------- |
-| `useQuery` returns `T \| undefined`   | `useQuery` returns `Option<T>`           |
+| Vanilla Convex                               | Confect                                     |
+| -------------------------------------------- | ------------------------------------------- |
+| `useQuery` returns `T \| undefined`          | `useQuery` returns `Option<T>`              |
 | `useMutation` returns `(args) => Promise<T>` | `useMutation` returns `(args) => Effect<T>` |
-| `useAction` returns `(args) => Promise<T>`  | `useAction` returns `(args) => Effect<T>`  |
-| Functions referenced via `api.module.fn`    | Functions referenced via refs              |
+| `useAction` returns `(args) => Promise<T>`   | `useAction` returns `(args) => Effect<T>`   |
+| Functions referenced via `api.module.fn`     | Functions referenced via refs               |

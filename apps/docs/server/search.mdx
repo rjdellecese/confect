@@ -28,7 +28,7 @@ Effect.gen(function* () {
 Each result contains the document's `_id` and a `_score` representing similarity (higher is more similar).
 
 ```ts
-Array<{ _id: GenericId<TableName>; _score: number }>
+Array<{ _id: GenericId<TableName>; _score: number }>;
 ```
 
 Vector indexes are defined on tables using the `vectorIndex` method. See the [Schema](/server/database/schema) page for an example.

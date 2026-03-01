@@ -12,11 +12,9 @@ The `Scheduler` service schedules Confect functions to run in the future. It wra
 Effect.gen(function* () {
   const scheduler = yield* Scheduler;
 
-  yield* scheduler.runAfter(
-    Duration.minutes(5),
-    functionReference,
-    { text: "Hello" },
-  );
+  yield* scheduler.runAfter(Duration.minutes(5), functionReference, {
+    text: "Hello",
+  });
 });
 ```
 
@@ -28,11 +26,9 @@ Effect.gen(function* () {
 
   const dateTime = yield* DateTime.make("2025-12-31T00:00:00Z");
 
-  yield* scheduler.runAt(
-    dateTime,
-    functionReference,
-    { text: "Happy new year" },
-  );
+  yield* scheduler.runAt(dateTime, functionReference, {
+    text: "Happy new year",
+  });
 });
 ```
 

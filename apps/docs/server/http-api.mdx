@@ -34,10 +34,7 @@ class NotesGroup extends HttpApiGroup.make("notes")
       .addSuccess(Schema.Option(Notes.Doc)),
   )
   .annotate(OpenApi.Title, "Notes")
-  .annotate(
-    OpenApi.Description,
-    "Operations on notes.",
-  ) {}
+  .annotate(OpenApi.Description, "Operations on notes.") {}
 
 export class Api extends HttpApi.make("Api")
   .annotate(OpenApi.Title, "My App")
@@ -58,10 +55,7 @@ const NotesGroupLive = HttpApiBuilder.group(
       Effect.gen(function* () {
         const runQuery = yield* QueryRunner;
 
-        return yield* runQuery(
-          refs.public.notes.getFirst,
-          {},
-        );
+        return yield* runQuery(refs.public.notes.getFirst, {});
       }).pipe(Effect.orDie),
     ),
 );
@@ -85,21 +79,18 @@ import { ApiLive } from "./http/notes";
 export default HttpApi.make({
   "/api/": {
     apiLive: ApiLive,
-    middleware: flow(
-      HttpMiddleware.cors(),
-      HttpMiddleware.logger,
-    ),
+    middleware: flow(HttpMiddleware.cors(), HttpMiddleware.logger),
   },
 });
 ```
 
 Each path prefix entry accepts:
 
-| Property     | Description                                                                                              |
-| ------------ | -------------------------------------------------------------------------------------------------------- |
-| `apiLive`    | A `Layer` providing `HttpApi.Api`, built with `HttpApiBuilder.api`                                       |
-| `middleware`  | Optional middleware function (e.g. `HttpMiddleware.cors()`, `HttpMiddleware.logger`)                     |
-| `scalar`     | Optional [Scalar configuration](https://github.com/scalar/scalar) to customize the interactive API docs  |
+| Property     | Description                                                                                             |
+| ------------ | ------------------------------------------------------------------------------------------------------- |
+| `apiLive`    | A `Layer` providing `HttpApi.Api`, built with `HttpApiBuilder.api`                                      |
+| `middleware` | Optional middleware function (e.g. `HttpMiddleware.cors()`, `HttpMiddleware.logger`)                    |
+| `scalar`     | Optional [Scalar configuration](https://github.com/scalar/scalar) to customize the interactive API docs |
 
 ## API documentation
 
