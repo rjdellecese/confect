@@ -103,9 +103,9 @@ const RandomNumber = () => {
 
 ## Differences from vanilla Convex hooks
 
-| Vanilla Convex                               | Confect                                     |
-| -------------------------------------------- | ------------------------------------------- |
-| `useQuery` returns `T \| undefined`          | `useQuery` returns `Option<T>`              |
+| Vanilla Convex | Confect |
+| --- | --- |
+| `useQuery` returns `T \| undefined` | `useQuery` returns `Option<T>` |
 | `useMutation` returns `(args) => Promise<T>` | `useMutation` returns `(args) => Effect<T>` |
-| `useAction` returns `(args) => Promise<T>`   | `useAction` returns `(args) => Effect<T>`   |
-| Functions referenced via `api.module.fn`     | Functions referenced via refs               |
+| `useAction` returns `(args) => Promise<T>` | `useAction` returns `(args) => Effect<T>` |
+| Functions referenced via `api.module.fn` | Functions referenced via refs |
