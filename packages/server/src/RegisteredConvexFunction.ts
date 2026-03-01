@@ -24,6 +24,7 @@ import * as RegisteredFunction from "./RegisteredFunction";
 import type * as RegistryItem from "./RegistryItem";
 import * as Scheduler from "./Scheduler";
 import * as SchemaToValidator from "./SchemaToValidator";
+import * as ConvexConfigProvider from "./ConvexConfigProvider";
 import { StorageReader, StorageWriter } from "./Storage";
 
 export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
@@ -137,6 +138,7 @@ const queryFunction = <
                 >(),
                 ctx,
               ),
+              Layer.setConfigProvider(ConvexConfigProvider.make()),
             ),
           ),
         ),
@@ -167,6 +169,7 @@ export const mutationLayer = <Schema extends DatabaseSchema.AnyWithProps>(
       >(),
       ctx,
     ),
+    Layer.setConfigProvider(ConvexConfigProvider.make()),
   );
 
 export type MutationServices<Schema extends DatabaseSchema.AnyWithProps> =
@@ -248,5 +251,9 @@ const convexActionFunction = <
     args,
     returns,
     handler,
-    createLayer: (ctx) => RegisteredFunction.actionLayer(schema, ctx),
+    createLayer: (ctx) =>
+      Layer.mergeAll(
+        RegisteredFunction.actionLayer(schema, ctx),
+        Layer.setConfigProvider(ConvexConfigProvider.make()),
+      ),
   });

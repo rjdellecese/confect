@@ -1,4 +1,4 @@
-import * as Ref from "@confect/core/Ref";
+import { Ref } from "@confect/core";
 import {
   useAction as useConvexAction,
   useMutation as useConvexMutation,

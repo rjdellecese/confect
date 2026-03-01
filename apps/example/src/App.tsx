@@ -53,9 +53,21 @@ const Page = () => {
     retrieveRandomNumber();
   }, []);
 
+  const envVar = useQuery(refs.public.env.readEnvVar, {});
+
   return (
     <div>
       <h1>Confect Example</h1>
+
+      <div>
+        <span style={{ fontFamily: "monospace" }}>TEST_ENV_VAR: </span>
+        {Option.match(envVar, {
+          onNone: () => "Loading…",
+          onSome: (value) => value,
+        })}
+      </div>
+
+      <br />
 
       <div>
         Random number: {randomNumber ? randomNumber : "Loading…"}

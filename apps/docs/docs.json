@@ -71,7 +71,8 @@
           "server/authentication",
           "server/crons",
           "server/search",
-          "server/components"
+          "server/components",
+          "server/environment-variables"
         ]
       },
       {

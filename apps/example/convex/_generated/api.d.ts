@@ -82,6 +82,7 @@ export declare const api: {
           userId?: Id<"users">;
         }>
       >;
+      readEnvVar: FunctionReference<"query", "public", {}, string>;
     };
     random: {
       getNumber: FunctionReference<"action", "public", {}, number>;
