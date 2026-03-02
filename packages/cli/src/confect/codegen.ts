@@ -11,6 +11,7 @@ import {
   logSuccess,
 } from "../log";
 import { ConfectDirectory } from "../services/ConfectDirectory";
+import { ConfectConfig } from "../services/ConfectConfig";
 import { ConvexDirectory } from "../services/ConvexDirectory";
 import * as templates from "../templates";
 import {
@@ -22,6 +23,11 @@ import {
   removePathExtension,
   writeFileStringAndLog,
 } from "../utils";
+
+const isPreservedConvexFile = (
+  preservedConvexFileNames: ReadonlySet<string>,
+  fileName: string,
+) => preservedConvexFileNames.has(fileName);
 
 const getNodeSpecPath = Effect.gen(function* () {
   const path = yield* Path.Path;
@@ -60,6 +66,9 @@ export const codegen = Command.make("codegen", {}, () =>
 );
 
 export const codegenHandler = Effect.gen(function* () {
+  const preservedConvexFileNames =
+    yield* ConfectConfig.getPreservedConvexFileNames;
+
   yield* generateConfectGeneratedDirectory;
   yield* Effect.all(
     [
@@ -72,13 +81,23 @@ export const codegenHandler = Effect.gen(function* () {
     ],
     { concurrency: "unbounded" },
   );
+  const optionalFileEffects = [
+    ...(isPreservedConvexFile(preservedConvexFileNames, "http.ts")
+      ? []
+      : [logGenerated(generateHttp)]),
+    ...(isPreservedConvexFile(preservedConvexFileNames, "crons.ts")
+      ? []
+      : [logGenerated(generateCrons)]),
+    ...(isPreservedConvexFile(preservedConvexFileNames, "auth.config.ts")
+      ? []
+      : [logGenerated(generateAuthConfig)]),
+  ] as const;
+
   const [functionPaths] = yield* Effect.all(
     [
-      generateFunctionModules,
-      generateSchema,
-      logGenerated(generateHttp),
-      logGenerated(generateCrons),
-      logGenerated(generateAuthConfig),
+      generateFunctionModules(preservedConvexFileNames),
+      generateSchema(preservedConvexFileNames),
+      ...optionalFileEffects,
     ],
     { concurrency: "unbounded" },
   );
@@ -155,62 +174,76 @@ export const generateNodeApi = Effect.gen(function* () {
   yield* writeFileStringAndLog(nodeApiPath, nodeApiContents);
 });
 
-const generateFunctionModules = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
+const generateFunctionModules = (
+  preservedConvexFileNames: ReadonlySet<string>,
+) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const confectDirectory = yield* ConfectDirectory.get;
 
-  const specPath = path.join(confectDirectory, "spec.ts");
+    const specPath = path.join(confectDirectory, "spec.ts");
 
-  const specModule = yield* bundleAndImport(specPath);
-  const spec = specModule.default;
+    const specModule = yield* bundleAndImport(specPath);
+    const spec = specModule.default;
 
-  if (!Spec.isConvexSpec(spec)) {
-    return yield* Effect.die("spec.ts does not export a valid Convex Spec");
-  }
+    if (!Spec.isConvexSpec(spec)) {
+      return yield* Effect.die("spec.ts does not export a valid Convex Spec");
+    }
 
-  const nodeImplPath = path.join(confectDirectory, "nodeImpl.ts");
-  const nodeImplExists = yield* fs.exists(nodeImplPath);
-  const nodeSpecOption = yield* loadNodeSpec;
+    const nodeImplPath = path.join(confectDirectory, "nodeImpl.ts");
+    const nodeImplExists = yield* fs.exists(nodeImplPath);
+    const nodeSpecOption = yield* loadNodeSpec;
 
-  const mergedSpec = Option.match(nodeSpecOption, {
-    onNone: () => spec,
-    onSome: (nodeSpec) => (nodeImplExists ? Spec.merge(spec, nodeSpec) : spec),
+    const mergedSpec = Option.match(nodeSpecOption, {
+      onNone: () => spec,
+      onSome: (nodeSpec) =>
+        nodeImplExists ? Spec.merge(spec, nodeSpec) : spec,
+    });
+
+    return yield* generateFunctions(mergedSpec, preservedConvexFileNames);
   });
 
-  return yield* generateFunctions(mergedSpec);
-});
+const generateSchema = (preservedConvexFileNames: ReadonlySet<string>) =>
+  Effect.gen(function* () {
+    const path = yield* Path.Path;
+    const confectDirectory = yield* ConfectDirectory.get;
+    const convexDirectory = yield* ConvexDirectory.get;
 
-const generateSchema = Effect.gen(function* () {
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  const convexDirectory = yield* ConvexDirectory.get;
+    const confectSchemaPath = path.join(confectDirectory, "schema.ts");
 
-  const confectSchemaPath = path.join(confectDirectory, "schema.ts");
+    yield* bundleAndImport(confectSchemaPath).pipe(
+      Effect.andThen((schemaModule) => {
+        const defaultExport = schemaModule.default;
 
-  yield* bundleAndImport(confectSchemaPath).pipe(
-    Effect.andThen((schemaModule) => {
-      const defaultExport = schemaModule.default;
+        return DatabaseSchema.isSchema(defaultExport)
+          ? Effect.succeed(defaultExport)
+          : Effect.die("Invalid schema module");
+      }),
+    );
 
-      return DatabaseSchema.isSchema(defaultExport)
-        ? Effect.succeed(defaultExport)
-        : Effect.die("Invalid schema module");
-    }),
-  );
+    const convexSchemaPath = path.join(convexDirectory, "schema.ts");
 
-  const convexSchemaPath = path.join(convexDirectory, "schema.ts");
+    if (
+      isPreservedConvexFile(
+        preservedConvexFileNames,
+        path.basename(convexSchemaPath),
+      )
+    ) {
+      return;
+    }
 
-  const relativeImportPath = path.relative(
-    path.dirname(convexSchemaPath),
-    confectSchemaPath,
-  );
-  const importPathWithoutExt = yield* removePathExtension(relativeImportPath);
-  const schemaContents = yield* templates.schema({
-    schemaImportPath: importPathWithoutExt,
+    const relativeImportPath = path.relative(
+      path.dirname(convexSchemaPath),
+      confectSchemaPath,
+    );
+    const importPathWithoutExt = yield* removePathExtension(relativeImportPath);
+    const schemaContents = yield* templates.schema({
+      schemaImportPath: importPathWithoutExt,
+    });
+
+    yield* writeFileStringAndLog(convexSchemaPath, schemaContents);
   });
-
-  yield* writeFileStringAndLog(convexSchemaPath, schemaContents);
-});
 
 const generateServices = Effect.gen(function* () {
   const path = yield* Path.Path;

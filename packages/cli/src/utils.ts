@@ -216,12 +216,17 @@ const logGroupPaths = <R>(
     );
   });
 
-export const generateFunctions = (spec: Spec.AnyWithProps) =>
+export const generateFunctions = (
+  spec: Spec.AnyWithProps,
+  preservedConvexFileNames: ReadonlySet<string>,
+) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
     const convexDirectory = yield* ConvexDirectory.get;
 
-    const groupPathsFromFs = yield* getGroupPathsFromFs;
+    const groupPathsFromFs = yield* getGroupPathsFromFs(
+      preservedConvexFileNames,
+    );
     const functionPaths = FunctionPaths.make(spec);
     const groupPathsFromSpec = FunctionPaths.groupPaths(functionPaths);
 
@@ -267,36 +272,45 @@ export const generateFunctions = (spec: Spec.AnyWithProps) =>
     return functionPaths;
   });
 
-const getGroupPathsFromFs = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const convexDirectory = yield* ConvexDirectory.get;
+const getGroupPathsFromFs = (preservedConvexFileNames: ReadonlySet<string>) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const convexDirectory = yield* ConvexDirectory.get;
 
-  const RESERVED_CONVEX_TS_FILE_NAMES = new Set([
-    "schema.ts",
-    "http.ts",
-    "crons.ts",
-    "auth.config.ts",
-    "convex.config.ts",
-  ]);
+    const RESERVED_CONVEX_TS_FILE_NAMES = new Set([
+      "schema.ts",
+      "http.ts",
+      "crons.ts",
+      "auth.config.ts",
+      "convex.config.ts",
+    ]);
 
-  const allConvexPaths = yield* fs.readDirectory(convexDirectory, {
-    recursive: true,
+    for (const preservedFileName of preservedConvexFileNames) {
+      RESERVED_CONVEX_TS_FILE_NAMES.add(preservedFileName);
+    }
+
+    const allConvexPaths = yield* fs.readDirectory(convexDirectory, {
+      recursive: true,
+    });
+    const groupPathArray = yield* pipe(
+      allConvexPaths,
+      Array.filter(
+        (convexPath) =>
+          path.extname(convexPath) === ".ts" &&
+          !RESERVED_CONVEX_TS_FILE_NAMES.has(path.basename(convexPath)) &&
+          path.basename(path.dirname(convexPath)) !== "_generated",
+      ),
+      Effect.forEach((groupModulePath) =>
+        GroupPath.fromGroupModulePath(groupModulePath),
+      ),
+    );
+    return pipe(
+      groupPathArray,
+      HashSet.fromIterable,
+      GroupPaths.GroupPaths.make,
+    );
   });
-  const groupPathArray = yield* pipe(
-    allConvexPaths,
-    Array.filter(
-      (convexPath) =>
-        path.extname(convexPath) === ".ts" &&
-        !RESERVED_CONVEX_TS_FILE_NAMES.has(path.basename(convexPath)) &&
-        path.basename(path.dirname(convexPath)) !== "_generated",
-    ),
-    Effect.forEach((groupModulePath) =>
-      GroupPath.fromGroupModulePath(groupModulePath),
-    ),
-  );
-  return pipe(groupPathArray, HashSet.fromIterable, GroupPaths.GroupPaths.make);
-});
 
 export const removeGroups = (groupPaths: GroupPaths.GroupPaths) =>
   Effect.gen(function* () {
