@@ -89,7 +89,6 @@ Node actions are exposed under the `node` namespace in your refs.
 
 ```ts
 import { useAction } from "@confect/react";
-import { Effect } from "effect";
 import refs from "../confect/_generated/refs";
 
 const sendEmail = useAction(refs.public.node.email.send);
@@ -98,5 +97,5 @@ sendEmail({
   to: "user@example.com",
   subject: "Hello",
   body: "Hello from Confect!",
-}).pipe(Effect.runPromise);
+});
 ```

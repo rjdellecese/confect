@@ -4,12 +4,12 @@ import {
   useMutation as useConvexMutation,
   useQuery as useConvexQuery,
 } from "convex/react";
-import { Effect, Option, Schema } from "effect";
+import { Schema } from "effect";
 
 export const useQuery = <Query extends Ref.AnyPublicQuery>(
   ref: Query,
   args: Ref.Args<Query>["Type"],
-): Option.Option<Ref.Returns<Query>["Type"]> => {
+): Ref.Returns<Query>["Type"] | undefined => {
   const function_ = Ref.getFunction(ref);
   const functionName = Ref.getConvexFunctionName(ref);
 
@@ -21,11 +21,9 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
   );
 
   if (encodedReturnsOrUndefined === undefined) {
-    return Option.none();
+    return undefined;
   } else {
-    return Option.some(
-      Schema.decodeSync(function_.returns)(encodedReturnsOrUndefined),
-    );
+    return Schema.decodeSync(function_.returns)(encodedReturnsOrUndefined);
   }
 };
 
@@ -36,18 +34,13 @@ export const useMutation = <Mutation extends Ref.AnyPublicMutation>(
   const functionName = Ref.getConvexFunctionName(ref);
   const actualMutation = useConvexMutation(functionName as any);
 
-  return (
+  return async (
     args: Ref.Args<Mutation>["Type"],
-  ): Effect.Effect<Ref.Returns<Mutation>["Type"]> =>
-    Effect.gen(function* () {
-      const encodedArgs = yield* Schema.encode(function_.args)(args);
-
-      const actualReturns = yield* Effect.promise(() =>
-        actualMutation(encodedArgs),
-      );
-
-      return yield* Schema.decode(function_.returns)(actualReturns);
-    }).pipe(Effect.orDie);
+  ): Promise<Ref.Returns<Mutation>["Type"]> => {
+    const encodedArgs = Schema.encodeSync(function_.args)(args);
+    const actualReturns = await actualMutation(encodedArgs);
+    return Schema.decodeSync(function_.returns)(actualReturns);
+  };
 };
 
 export const useAction = <Action extends Ref.AnyPublicAction>(ref: Action) => {
@@ -55,16 +48,11 @@ export const useAction = <Action extends Ref.AnyPublicAction>(ref: Action) => {
   const functionName = Ref.getConvexFunctionName(ref);
   const actualAction = useConvexAction(functionName as any);
 
-  return (
+  return async (
     args: Ref.Args<Action>["Type"],
-  ): Effect.Effect<Ref.Returns<Action>["Type"]> =>
-    Effect.gen(function* () {
-      const encodedArgs = yield* Schema.encode(function_.args)(args);
-
-      const actualReturns = yield* Effect.promise(() =>
-        actualAction(encodedArgs),
-      );
-
-      return yield* Schema.decode(function_.returns)(actualReturns);
-    }).pipe(Effect.orDie);
+  ): Promise<Ref.Returns<Action>["Type"]> => {
+    const encodedArgs = Schema.encodeSync(function_.args)(args);
+    const actualReturns = await actualAction(encodedArgs);
+    return Schema.decodeSync(function_.returns)(actualReturns);
+  };
 };

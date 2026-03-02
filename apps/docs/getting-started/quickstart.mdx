@@ -205,13 +205,13 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
 
     ```tsx src/App.tsx
     import { useMutation, useQuery } from "@confect/react";
-    import { Array, Effect, Option } from "effect";
+    import { Array } from "effect";
     import { useState } from "react";
 
     import refs from "../confect/_generated/refs";
 
     const App = () => {
-      const optionNotes = useQuery(refs.public.notes.list, {});
+      const notes = useQuery(refs.public.notes.list, {});
 
       const createNote = useMutation(refs.public.notes.create);
 
@@ -220,14 +220,11 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
       return (
         <div>
           <ul>
-            {Option.match(optionNotes, {
-              onNone: () => <p>Loading…</p>,
-              onSome: (notes) => (
-                Array.map(notes, (note) => (
+            {notes === undefined
+              ? <p>Loading…</p>
+              : Array.map(notes, (note) => (
                   <li key={note._id}>{note.text}</li>
-                ))
-              ),
-            })}
+                ))}
           </ul>
 
           <br />
@@ -241,11 +238,7 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
           <br />
           <button
             onClick={() =>
-              createNote({ text: newNote })
-                .pipe(
-                  Effect.andThen(() => setNewNote("")),
-                  Effect.runPromise
-                )
+              void createNote({ text: newNote }).then(() => setNewNote(""))
             }
           >
             Create note
