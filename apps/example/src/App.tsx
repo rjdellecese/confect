@@ -1,7 +1,7 @@
 import { useAction, useMutation, useQuery } from "@confect/react";
 import { FetchHttpClient, HttpApiClient } from "@effect/platform";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
-import { Array, Cause, Effect, Exit, Option } from "effect";
+import { Array, Effect, Exit } from "effect";
 import { useEffect, useState } from "react";
 import refs from "../confect/_generated/refs";
 import { Api } from "../confect/http/path-prefix";
@@ -24,7 +24,7 @@ const Page = () => {
   const getRandom = useAction(refs.public.notesAndRandom.random.getNumber);
 
   const retrieveRandomNumber = () => {
-    getRandom({}).pipe(Effect.map(setRandomNumber), Effect.runPromise);
+    void getRandom({}).then(setRandomNumber);
   };
 
   const [emailStatus, setEmailStatus] = useState<string | null>(null);
@@ -32,21 +32,13 @@ const Page = () => {
 
   const testEmail = () => {
     setEmailStatus("Sending…");
-    sendEmail({
+    void sendEmail({
       to: "test@example.com",
       subject: "Test email",
       body: "Test email body",
     })
-      .pipe(
-        Effect.andThen(() => setEmailStatus("Sent!")),
-        Effect.runPromiseExit,
-      )
-      .then((exit) =>
-        Exit.match(exit, {
-          onSuccess: () => {},
-          onFailure: (cause) => setEmailStatus(`Error: ${Cause.pretty(cause)}`),
-        }),
-      );
+      .then(() => setEmailStatus("Sent!"))
+      .catch((error) => setEmailStatus(`Error: ${String(error)}`));
   };
 
   useEffect(() => {
@@ -61,10 +53,7 @@ const Page = () => {
 
       <div>
         <span style={{ fontFamily: "monospace" }}>TEST_ENV_VAR: </span>
-        {Option.match(envVar, {
-          onNone: () => "Loading…",
-          onSome: (value) => value,
-        })}
+        {envVar === undefined ? "Loading…" : envVar}
       </div>
 
       <br />
@@ -97,12 +86,7 @@ const Page = () => {
       <br />
       <button
         type="button"
-        onClick={() =>
-          insertNote({ text: note }).pipe(
-            Effect.andThen(() => setNote("")),
-            Effect.runPromise,
-          )
-        }
+        onClick={() => void insertNote({ text: note }).then(() => setNote(""))}
       >
         Insert note
       </button>
@@ -114,30 +98,29 @@ const Page = () => {
 };
 
 const NoteList = () => {
-  const optionNotes = useQuery(refs.public.notesAndRandom.notes.list, {});
+  const notes = useQuery(refs.public.notesAndRandom.notes.list, {});
 
   const deleteNote = useMutation(refs.public.notesAndRandom.notes.delete_);
 
-  return Option.match(optionNotes, {
-    onNone: () => <p>Loading…</p>,
-    onSome: (notes) => (
-      <ul>
-        {Array.map(notes, (note) => (
-          <li key={note._id}>
-            <p>{note.text}</p>
-            <button
-              type="button"
-              onClick={() =>
-                deleteNote({ noteId: note._id }).pipe(Effect.runPromise)
-              }
-            >
-              Delete note
-            </button>
-          </li>
-        ))}
-      </ul>
-    ),
-  });
+  if (notes === undefined) {
+    return <p>Loading…</p>;
+  }
+
+  return (
+    <ul>
+      {Array.map(notes, (note) => (
+        <li key={note._id}>
+          <p>{note.text}</p>
+          <button
+            type="button"
+            onClick={() => void deleteNote({ noteId: note._id })}
+          >
+            Delete note
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
 };
 
 const ApiClient = HttpApiClient.make(Api, {

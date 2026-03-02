@@ -4,7 +4,9 @@ title: "React"
 description: "Use Confect's React hooks to call your functions from the client."
 ---
 
-`@confect/react` provides React hooks that wrap Convex's hooks with Effect-native types. They use refs from `confect/_generated/refs` for type-safe function invocation with automatic schema encoding and decoding.
+`@confect/react` provides drop-in replacements for Convex's React hooks. Each hook automatically encodes your args and decodes return values through the [Effect Schemas](/concepts/schema-restrictions) defined in your [function specs](/concepts/spec-impl-model). You work with the Schema `Type` (decoded) values on both sides — the hooks handle the round-trip to Convex's `Encoded` representation transparently.
+
+Functions are referenced via `refs` (from `confect/_generated/refs`) instead of Convex's `api` object. Each ref carries the `args` and `returns` schemas from the corresponding function spec, which is what enables the automatic encoding and decoding.
 
 ## Setup
 
@@ -34,47 +36,73 @@ ReactDOM.createRoot(
 
 ## `useQuery`
 
-Returns an `Option<T>` instead of `T | undefined`. The `Option` is `None` while the query is loading and `Some` once data is available.
+Encodes args using the spec's `args` schema, passes them to Convex, and decodes the result using the spec's `returns` schema. Returns `T | undefined` (undefined while loading), matching Convex's `useQuery`.
+
+Given this spec:
+
+```ts confect/spec/notes.ts
+import { FunctionSpec, GroupSpec } from "@confect/core";
+import { Schema } from "effect";
+
+import { Notes } from "../tables/Notes";
+
+export const notes = GroupSpec.make("notes").addFunction(
+  FunctionSpec.publicQuery({
+    name: "list",
+    args: Schema.Struct({}),
+    returns: Schema.Array(Notes.Doc),
+  }),
+);
+```
+
+The hook accepts `{}` (the `Type` of `Schema.Struct({})`) as args and returns `readonly Notes.Doc["Type"][]` (the `Type` of `Schema.Array(Notes.Doc)`):
 
 ```tsx
 import { useQuery } from "@confect/react";
-import { Option } from "effect";
 import refs from "../confect/_generated/refs";
 
 const NoteList = () => {
-  const optionNotes = useQuery(refs.public.notes.list, {});
+  const notes = useQuery(refs.public.notes.list, {});
 
-  return Option.match(optionNotes, {
-    onNone: () => <p>Loading…</p>,
-    onSome: (notes) => (
-      <ul>
-        {notes.map((note) => (
-          <li key={note._id}>{note.text}</li>
-        ))}
-      </ul>
-    ),
-  });
+  if (notes === undefined) {
+    return <p>Loading…</p>;
+  }
+
+  return (
+    <ul>
+      {notes.map((note) => (
+        <li key={note._id}>{note.text}</li>
+      ))}
+    </ul>
+  );
 };
 ```
 
 ## `useMutation`
 
-Returns a function that accepts args and returns an `Effect`. The `Effect` must be run explicitly (e.g. with `Effect.runPromise`).
+Returns a function that encodes args using the spec's `args` schema, calls the Convex mutation, and decodes the result using the spec's `returns` schema. Returns `(args) => Promise<T>`, matching Convex's `useMutation`.
+
+Given this spec:
+
+```ts confect/spec/notes.ts
+FunctionSpec.publicMutation({
+  name: "insert",
+  args: Schema.Struct({ text: Schema.String }),
+  returns: GenericId.GenericId("notes"),
+})
+```
+
+The returned function accepts `{ text: string }` (the `Type` of the `args` schema) and returns a `Promise<GenericId<"notes">>` (the `Type` of the `returns` schema):
 
 ```tsx
 import { useMutation } from "@confect/react";
-import { Effect } from "effect";
 import refs from "../confect/_generated/refs";
 
 const InsertNote = () => {
   const insertNote = useMutation(refs.public.notes.insert);
 
   return (
-    <button
-      onClick={() =>
-        insertNote({ text: "Hello" }).pipe(Effect.runPromise)
-      }
-    >
+    <button onClick={() => void insertNote({ text: "Hello" })}>
       Insert note
     </button>
   );
@@ -83,18 +111,29 @@ const InsertNote = () => {
 
 ## `useAction`
 
-Same pattern as `useMutation`: returns a function that accepts args and returns an `Effect`.
+Same pattern as `useMutation`: encodes args via the spec's `args` schema, calls the Convex action, and decodes the result via the spec's `returns` schema. Returns `(args) => Promise<T>`.
+
+Given this spec:
+
+```ts confect/spec/random.ts
+FunctionSpec.publicAction({
+  name: "getNumber",
+  args: Schema.Struct({}),
+  returns: Schema.Number,
+})
+```
+
+The returned function accepts `{}` and returns a `Promise<number>`:
 
 ```tsx
 import { useAction } from "@confect/react";
-import { Effect } from "effect";
 import refs from "../confect/_generated/refs";
 
 const RandomNumber = () => {
   const getRandom = useAction(refs.public.random.getNumber);
 
   const handleClick = () => {
-    getRandom({}).pipe(Effect.map(console.log), Effect.runPromise);
+    void getRandom({}).then(console.log);
   };
 
   return <button onClick={handleClick}>Get random</button>;
@@ -105,7 +144,6 @@ const RandomNumber = () => {
 
 | Vanilla Convex | Confect |
 | --- | --- |
-| `useQuery` returns `T \| undefined` | `useQuery` returns `Option<T>` |
-| `useMutation` returns `(args) => Promise<T>` | `useMutation` returns `(args) => Effect<T>` |
-| `useAction` returns `(args) => Promise<T>` | `useAction` returns `(args) => Effect<T>` |
-| Functions referenced via `api.module.fn` | Functions referenced via refs |
+| Functions referenced via `api.module.fn` | Functions referenced via `refs` |
+| Args passed directly to Convex as-is | Args are schema-encoded from `Type` to `Encoded` before sending to Convex |
+| Return values received directly from Convex as-is | Return values are schema-decoded from `Encoded` to `Type` before returning |
