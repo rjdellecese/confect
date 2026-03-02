@@ -89,7 +89,7 @@ FunctionSpec.publicMutation({
   name: "insert",
   args: Schema.Struct({ text: Schema.String }),
   returns: GenericId.GenericId("notes"),
-})
+});
 ```
 
 The returned function accepts `{ text: string }` (the `Type` of the `args` schema) and returns a `Promise<GenericId<"notes">>` (the `Type` of the `returns` schema):
@@ -120,7 +120,7 @@ FunctionSpec.publicAction({
   name: "getNumber",
   args: Schema.Struct({}),
   returns: Schema.Number,
-})
+});
 ```
 
 The returned function accepts `{}` and returns a `Promise<number>`:
