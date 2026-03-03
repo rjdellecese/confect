@@ -51,7 +51,6 @@
   "author": "RJ Dellecese",
   "license": "ISC",
   "devDependencies": {
-    "@effect/language-service": "0.77.0",
     "@eslint/js": "10.0.1",
     "@types/node": "25.3.3",
     "eslint": "10.0.2",

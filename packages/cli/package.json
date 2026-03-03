@@ -78,7 +78,7 @@
   "peerDependencies": {
     "@confect/core": "workspace:*",
     "@confect/server": "workspace:*",
-    "@effect/platform": "^0.94.4",
+    "@effect/platform": "^0.94.5",
     "effect": "^3.19.16"
   },
   "engines": {
