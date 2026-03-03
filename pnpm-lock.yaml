@@ -22,7 +22,7 @@ importers:
         specifier: 3.1.2
         version: 3.1.2
       '@effect/language-service':
-        specifier: 0.77.0
+        specifier: ^0.77.0
         version: 0.77.0
       '@effect/platform':
         specifier: 0.94.5
@@ -185,6 +185,9 @@ importers:
         specifier: ^0.27.3
         version: 0.27.3
     devDependencies:
+      '@effect/language-service':
+        specifier: 0.77.0
+        version: 0.77.0
       '@effect/platform':
         specifier: 0.94.5
         version: 0.94.5(effect@3.19.19)
