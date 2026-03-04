@@ -2,7 +2,8 @@ import { Command } from "@effect/platform";
 import { NodeContext, NodeRuntime } from "@effect/platform-node";
 import { Cause, Console, Effect, Schema, String } from "effect";
 import { readFileSync } from "node:fs";
-import { extname } from "node:path";
+import { dirname, extname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 /**
  * @see https://cursor.com/docs/agent/hooks#afterfileedit
@@ -37,18 +38,22 @@ const SUPPORTED_EXTENSIONS = new Set([
 const isSupportedFileType = (filePath: string) =>
   SUPPORTED_EXTENSIONS.has(String.toLowerCase(extname(filePath)));
 
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const ESLINT_BIN = resolve(REPO_ROOT, "node_modules/.bin/eslint");
+
 const program = Effect.gen(function* () {
   const jsonString = readFileSync(0, "utf-8");
   const input = yield* Schema.decode(AfterFileEditInput)(jsonString);
 
   if (isSupportedFileType(input.file_path)) {
     const command = Command.make(
-      "pnpm",
-      "exec",
-      "eslint",
+      ESLINT_BIN,
       "--fix",
+      "--cache",
+      "--cache-strategy",
+      "content",
       input.file_path,
-    ).pipe(Command.stderr("inherit"));
+    ).pipe(Command.workingDirectory(REPO_ROOT), Command.stderr("inherit"));
 
     const exitCode = yield* Command.exitCode(command);
 
