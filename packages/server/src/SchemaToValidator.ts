@@ -125,59 +125,59 @@ export type ReadonlyRecordValue = {
   readonly [key: string]: ReadonlyValue | undefined;
 };
 
-type MutableValue<T> = T extends ReadonlyArray<infer El>
-  ? MutableValue<El>[]
-  : T extends ReadonlyRecordValue
-    ? { -readonly [K in keyof T]: MutableValue<T[K]> }
-    : T;
+type MutableValue<T> =
+  T extends ReadonlyArray<infer El>
+    ? MutableValue<El>[]
+    : T extends ReadonlyRecordValue
+      ? { -readonly [K in keyof T]: MutableValue<T[K]> }
+      : T;
 
-export type ValueToValidator<Vl> =
-  [Vl] extends [never]
-    ? never
-    : IsAny<Vl> extends true
-      ? VAny
-      : [Vl] extends [null]
-        ? VNull
-        : [Vl] extends [boolean]
-          ? [boolean] extends [Vl]
-            ? VBoolean
-            : VLiteral<Vl>
-          : IsUnion<Vl> extends true
-            ? IsRecursive<Vl> extends true
-              ? VAny
-              : [Vl] extends [ReadonlyValue]
-                ? UnionValueToValidator<Vl>
-                : TypeError<"Provided value is not a valid Convex value", Vl>
-            : [Vl] extends [number]
-              ? [number] extends [Vl]
-                ? VFloat64
+export type ValueToValidator<Vl> = [Vl] extends [never]
+  ? never
+  : IsAny<Vl> extends true
+    ? VAny
+    : [Vl] extends [null]
+      ? VNull
+      : [Vl] extends [boolean]
+        ? [boolean] extends [Vl]
+          ? VBoolean
+          : VLiteral<Vl>
+        : IsUnion<Vl> extends true
+          ? IsRecursive<Vl> extends true
+            ? VAny
+            : [Vl] extends [ReadonlyValue]
+              ? UnionValueToValidator<Vl>
+              : TypeError<"Provided value is not a valid Convex value", Vl>
+          : [Vl] extends [number]
+            ? [number] extends [Vl]
+              ? VFloat64
+              : VLiteral<Vl>
+            : [Vl] extends [bigint]
+              ? [bigint] extends [Vl]
+                ? VInt64
                 : VLiteral<Vl>
-              : [Vl] extends [bigint]
-                ? [bigint] extends [Vl]
-                  ? VInt64
-                  : VLiteral<Vl>
-                : [Vl] extends [string]
-                  ? Vl extends {
-                      __tableName: infer TableName extends string;
-                    }
-                    ? VId<GenericId.GenericId<TableName>>
-                    : [string] extends [Vl]
-                      ? VString
-                      : VLiteral<Vl>
-                  : [Vl] extends [ArrayBuffer]
-                    ? VBytes
-                    : IsRecursive<Vl> extends true
-                      ? VAny
-                      : [Vl] extends [ReadonlyValue]
-                        ? Vl extends ReadonlyArray<ReadonlyValue>
-                          ? ArrayValueToValidator<Vl>
-                          : Vl extends ReadonlyRecordValue
-                            ? RecordValueToValidator<Vl>
-                            : TypeError<"Unexpected value", Vl>
-                        : TypeError<
-                            "Provided value is not a valid Convex value",
-                            Vl
-                          >;
+              : [Vl] extends [string]
+                ? Vl extends {
+                    __tableName: infer TableName extends string;
+                  }
+                  ? VId<GenericId.GenericId<TableName>>
+                  : [string] extends [Vl]
+                    ? VString
+                    : VLiteral<Vl>
+                : [Vl] extends [ArrayBuffer]
+                  ? VBytes
+                  : IsRecursive<Vl> extends true
+                    ? VAny
+                    : [Vl] extends [ReadonlyValue]
+                      ? Vl extends ReadonlyArray<ReadonlyValue>
+                        ? ArrayValueToValidator<Vl>
+                        : Vl extends ReadonlyRecordValue
+                          ? RecordValueToValidator<Vl>
+                          : TypeError<"Unexpected value", Vl>
+                      : TypeError<
+                          "Provided value is not a valid Convex value",
+                          Vl
+                        >;
 
 type ArrayValueToValidator<Vl extends ReadonlyArray<ReadonlyValue>> =
   Vl extends ReadonlyArray<infer El extends ReadonlyValue>
@@ -234,7 +234,6 @@ type UnionValueToValidator<Vl extends ReadonlyValue> = [Vl] extends [
       : TypeError<"Failed to convert union to tuple">
     : TypeError<"Expected a union of values, but got a single value instead">
   : TypeError<"Provided value is not a valid Convex value">;
-
 
 type ValueTupleToValidatorTuple<VlTuple extends ReadonlyArray<ReadonlyValue>> =
   VlTuple extends
