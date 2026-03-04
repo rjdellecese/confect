@@ -323,6 +323,9 @@ importers:
         specifier: ^1.30.0
         version: 1.31.2(react@19.2.4)
     devDependencies:
+      '@ark/attest':
+        specifier: 0.56.0
+        version: 0.56.0(typescript@5.9.3)
       '@confect/cli':
         specifier: workspace:*
         version: link:../cli
@@ -380,6 +383,9 @@ importers:
       tsdown:
         specifier: 0.20.3
         version: 0.20.3(@arethetypeswrong/core@0.18.2)(synckit@0.11.11)(typescript@5.9.3)
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
       typescript:
         specifier: 5.9.3
         version: 5.9.3
@@ -6772,7 +6778,7 @@ snapshots:
       '@babel/types': 7.29.0
       '@jridgewell/remapping': 2.3.5
       convert-source-map: 2.0.0
-      debug: 4.4.1
+      debug: 4.4.3
       gensync: 1.0.0-beta.2
       json5: 2.2.3
       semver: 6.3.1

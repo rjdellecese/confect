@@ -3,6 +3,7 @@ packages:
   - apps/*
 
 onlyBuiltDependencies:
+  - bun
   - sharp
 
 packageExtensions:

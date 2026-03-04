@@ -22,9 +22,10 @@ export class Auth extends Effect.Tag("@confect/server/Auth")<
 
 export const layer = (auth: ConvexAuth) => Layer.succeed(Auth, make(auth));
 
-export class NoUserIdentityFoundError extends Schema.TaggedError<NoUserIdentityFoundError>(
+export class NoUserIdentityFoundError extends Schema.TaggedError<NoUserIdentityFoundError>()(
   "NoUserIdentityFoundError",
-)("NoUserIdentityFoundError", {}) {
+  {},
+) {
   override get message(): string {
     return "No user identity found";
   }

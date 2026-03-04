@@ -40,9 +40,10 @@ export const findProjectRoot = Effect.gen(function* () {
   });
 });
 
-export class ProjectRootNotFoundError extends Schema.TaggedError<ProjectRootNotFoundError>(
+export class ProjectRootNotFoundError extends Schema.TaggedError<ProjectRootNotFoundError>()(
   "ProjectRootNotFoundError",
-)("ProjectRootNotFoundError", {}) {
+  {},
+) {
   override get message(): string {
     return "Could not find project root (no 'package.json' found)";
   }

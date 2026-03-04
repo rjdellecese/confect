@@ -44,6 +44,7 @@
     "fix": "prettier --write . && eslint --fix . --max-warnings=0",
     "format": "prettier --check .",
     "lint": "eslint . --max-warnings=0",
+    "bench": "tsx test/SchemaToValidator.bench.ts",
     "clean": "rm -rf dist coverage node_modules",
     "prepack": "rm -f ./README.md && cp ../../README.md ./README.md",
     "postpack": "rm ./README.md && ln -s ../../README.md ./README.md"
@@ -55,6 +56,7 @@
   "author": "RJ Dellecese",
   "license": "ISC",
   "devDependencies": {
+    "@ark/attest": "0.56.0",
     "@confect/cli": "workspace:*",
     "@confect/test": "workspace:*",
     "@effect/cluster": "0.56.4",
@@ -74,6 +76,7 @@
     "eslint": "10.0.2",
     "prettier": "3.8.1",
     "tsdown": "0.20.3",
+    "tsx": "^4.21.0",
     "typescript": "5.9.3",
     "typescript-eslint": "8.56.1",
     "vite": "7.3.1",

@@ -17,9 +17,10 @@ export class ConfectDirectory extends Effect.Service<ConfectDirectory>()(
   },
 ) {}
 
-export class ConfectDirectoryNotFoundError extends Schema.TaggedError<ConfectDirectoryNotFoundError>(
+export class ConfectDirectoryNotFoundError extends Schema.TaggedError<ConfectDirectoryNotFoundError>()(
   "ConfectDirectoryNotFoundError",
-)("ConfectDirectoryNotFoundError", {}) {
+  {},
+) {
   override get message(): string {
     return "Could not find Confect directory";
   }
@@ -36,6 +37,6 @@ export const findConfectDirectory = Effect.gen(function* () {
   if (yield* fs.exists(confectDirectory)) {
     return confectDirectory;
   } else {
-    return yield* Effect.fail(new ConfectDirectoryNotFoundError());
+    return yield* new ConfectDirectoryNotFoundError();
   }
 });

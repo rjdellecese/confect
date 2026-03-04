@@ -280,12 +280,13 @@ export const getById =
       Effect.andThen(Document.decode(tableName, table.Fields)),
     );
 
-export class GetByIdFailure extends Schema.TaggedError<GetByIdFailure>(
+export class GetByIdFailure extends Schema.TaggedError<GetByIdFailure>()(
   "GetByIdFailure",
-)("GetByIdFailure", {
-  id: Schema.String,
-  tableName: Schema.String,
-}) {
+  {
+    id: Schema.String,
+    tableName: Schema.String,
+  },
+) {
   override get message(): string {
     return Document.documentErrorMessage({
       id: this.id,
@@ -295,13 +296,14 @@ export class GetByIdFailure extends Schema.TaggedError<GetByIdFailure>(
   }
 }
 
-export class GetByIndexFailure extends Schema.TaggedError<GetByIndexFailure>(
+export class GetByIndexFailure extends Schema.TaggedError<GetByIndexFailure>()(
   "GetByIndexFailure",
-)("GetByIndexFailure", {
-  tableName: Schema.String,
-  indexName: Schema.String,
-  indexFieldValues: Schema.Array(Schema.String),
-}) {
+  {
+    tableName: Schema.String,
+    indexName: Schema.String,
+    indexFieldValues: Schema.Array(Schema.String),
+  },
+) {
   override get message(): string {
     return `No documents found in table '${this.tableName}' with index '${this.indexName}' and field values '${this.indexFieldValues}'`;
   }

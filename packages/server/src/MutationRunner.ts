@@ -28,12 +28,13 @@ export type MutationRunner = typeof MutationRunner.Identifier;
 export const layer = (runMutation: GenericMutationCtx<any>["runMutation"]) =>
   Layer.succeed(MutationRunner, makeMutationRunner(runMutation));
 
-export class MutationRollback extends Schema.TaggedError<MutationRollback>(
+export class MutationRollback extends Schema.TaggedError<MutationRollback>()(
   "MutationRollback",
-)("MutationRollback", {
-  mutationName: Schema.String,
-  error: Schema.Unknown,
-}) {
+  {
+    mutationName: Schema.String,
+    error: Schema.Unknown,
+  },
+) {
   /* v8 ignore start */
   override get message(): string {
     return `Mutation ${this.mutationName} failed and was rolled back.\n\n${this.error}`;

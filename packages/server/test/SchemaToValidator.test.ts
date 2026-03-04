@@ -1,6 +1,6 @@
 import { describe, effect, expect, expectTypeOf, test } from "@effect/vitest";
 import { v, type VBoolean, type VString, type VUnion } from "convex/values";
-import { Effect, Exit, identity, Schema } from "effect";
+import { Effect, Exit, Schema } from "effect";
 
 import { GenericId } from "@confect/core/GenericId";
 import {
@@ -1401,7 +1401,7 @@ describe(compileTableSchema, () => {
     Effect.gen(function* () {
       const exit = yield* Effect.try({
         try: () => compileTableSchema(Schema.String),
-        catch: identity,
+        catch: (e) => e as TopLevelMustBeObjectOrUnionError,
       }).pipe(Effect.exit);
 
       expect(exit).toStrictEqual(
@@ -1436,7 +1436,7 @@ describe(compileArgsSchema, () => {
 
       const exit = yield* Effect.try({
         try: () => compileArgsSchema(structWithIndexSignatures),
-        catch: identity,
+        catch: (e) => e as IndexSignaturesAreNotSupportedError,
       }).pipe(Effect.exit);
 
       expect(exit).toStrictEqual(
@@ -1449,7 +1449,7 @@ describe(compileArgsSchema, () => {
     Effect.gen(function* () {
       const exit = yield* Effect.try({
         try: () => compileArgsSchema(Schema.String),
-        catch: identity,
+        catch: (e) => e as TopLevelMustBeObjectError,
       }).pipe(Effect.exit);
 
       expect(exit).toStrictEqual(Exit.fail(new TopLevelMustBeObjectError()));
