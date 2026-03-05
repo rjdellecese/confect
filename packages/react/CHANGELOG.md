@@ -1,5 +1,15 @@
 # @confect/react
 
+## 2.0.0
+
+### Major Changes
+
+- 7861159: Replace Effect-native return types with Convex-equivalent return types in React hooks. `useQuery` now returns `T | undefined` instead of `Option<T>`. `useMutation` and `useAction` now return `(args) => Promise<T>` instead of `(args) => Effect<T>`. The hooks still encode args and decode return values via the spec's Effect Schemas automatically.
+
+### Patch Changes
+
+- @confect/core@2.0.0
+
 ## 1.0.3
 
 ### Patch Changes
