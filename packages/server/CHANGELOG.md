@@ -1,5 +1,16 @@
 # @confect/server
 
+## 2.0.0
+
+### Minor Changes
+
+- f78c58a: Add support for `Config` usage in Convex runtime functions. Effect's default `ConfigProvider` doesn't work because `process.env` is not enumerable in the Convex runtime. The new `ConvexConfigProvider` supports the same options as Effect's default `ConfigProvider.fromEnv`, but is also provided to Convex runtime functions by default. Configs which require enumeration are still unsupported, until/unless this Convex runtime limitation is removed.
+
+### Patch Changes
+
+- 69ce9c9: Improve type-checking performance of `SchemaToValidator` compilation.
+  - @confect/core@2.0.0
+
 ## 1.0.3
 
 ### Patch Changes
