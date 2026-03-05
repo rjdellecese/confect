@@ -47,9 +47,9 @@ export const fromGroupModulePath = (groupModulePath: string) =>
       yield* Effect.logDebug(Array.append(dirSegments, name));
       return make(Array.append(dirSegments, name));
     } else {
-      return yield* Effect.fail(
-        new GroupModulePathIsNotATypeScriptFileError({ path: groupModulePath }),
-      );
+      return yield* new GroupModulePathIsNotATypeScriptFileError({
+        path: groupModulePath,
+      });
     }
   });
 
@@ -106,11 +106,12 @@ const getGroupSpecHelper = (
 export const toString = (groupPath: GroupPath) =>
   Array.join(groupPath.pathSegments, ".");
 
-export class GroupModulePathIsNotATypeScriptFileError extends Schema.TaggedError<GroupModulePathIsNotATypeScriptFileError>(
+export class GroupModulePathIsNotATypeScriptFileError extends Schema.TaggedError<GroupModulePathIsNotATypeScriptFileError>()(
   "GroupModulePathIsNotATypeScriptFileError",
-)("GroupModulePathIsNotATypeScriptFileError", {
-  path: Schema.NonEmptyString,
-}) {
+  {
+    path: Schema.NonEmptyString,
+  },
+) {
   override get message(): string {
     return `Expected group module path to end with .ts, got ${this.path}`;
   }

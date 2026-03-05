@@ -17,9 +17,10 @@ export class ConvexDirectory extends Effect.Service<ConvexDirectory>()(
   },
 ) {}
 
-export class ConvexDirectoryNotFoundError extends Schema.TaggedError<ConvexDirectoryNotFoundError>(
+export class ConvexDirectoryNotFoundError extends Schema.TaggedError<ConvexDirectoryNotFoundError>()(
   "ConvexDirectoryNotFoundError",
-)("ConvexDirectoryNotFoundError", {}) {
+  {},
+) {
   override get message(): string {
     return "Could not find Convex directory";
   }
@@ -62,6 +63,6 @@ const findConvexDirectory = Effect.gen(function* () {
   if (yield* fs.exists(convexDirectory)) {
     return convexDirectory;
   } else {
-    return yield* Effect.fail(new ConvexDirectoryNotFoundError());
+    return yield* new ConvexDirectoryNotFoundError();
   }
 });

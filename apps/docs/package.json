@@ -11,11 +11,11 @@
     "clean": "rm -rf .mintlify node_modules"
   },
   "devDependencies": {
-    "@eslint/js": "9.39.2",
-    "@mintlify/scraping": "4.0.585",
-    "eslint": "9.39.2",
-    "eslint-plugin-mdx": "3.6.2",
-    "mintlify": "4.2.345",
+    "@eslint/js": "10.0.1",
+    "@mintlify/scraping": "4.0.632",
+    "eslint": "10.0.2",
+    "eslint-plugin-mdx": "3.7.0",
+    "mintlify": "4.2.397",
     "prettier": "3.8.1",
     "react": "19.2.4"
   }

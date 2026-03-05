@@ -32,7 +32,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/docs-setup
-      - run: pnpm --filter docs exec mint broken-links
+      - run: pnpm --filter docs exec mintlify broken-links
 
   validate:
     name: Validate
@@ -40,7 +40,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/docs-setup
-      - run: pnpm --filter docs exec mint validate
+      - run: pnpm --filter docs exec mintlify validate
 
   a11y:
     name: Accessibility
@@ -48,4 +48,4 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/docs-setup
-      - run: pnpm --filter docs exec mint a11y
+      - run: pnpm --filter docs exec mintlify a11y

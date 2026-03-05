@@ -75,11 +75,12 @@ export class StorageActionWriter extends Effect.Tag(
     Layer.succeed(this, makeStorageActionWriter(storageActionWriter));
 }
 
-export class BlobNotFoundError extends Schema.TaggedError<BlobNotFoundError>(
+export class BlobNotFoundError extends Schema.TaggedError<BlobNotFoundError>()(
   "BlobNotFoundError",
-)("BlobNotFoundError", {
-  id: Schema.String,
-}) {
+  {
+    id: Schema.String,
+  },
+) {
   override get message(): string {
     return `File with ID '${this.id}' not found`;
   }

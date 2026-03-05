@@ -24,6 +24,14 @@
     "noImplicitThis": true,
     "noUncheckedIndexedAccess": false,
     "strictNullChecks": true,
-    "removeComments": false
+    "removeComments": false,
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        "diagnosticSeverity": {
+          "deterministicKeys": "error"
+        }
+      }
+    ]
   }
 }

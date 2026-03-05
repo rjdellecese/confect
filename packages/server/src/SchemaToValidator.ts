@@ -36,13 +36,11 @@ import {
 
 import * as GenericId from "@confect/core/GenericId";
 import type {
-  DeepMutable,
   IsAny,
   IsOptional,
   IsRecord,
   IsRecursive,
   IsUnion,
-  IsValueLiteral,
   TypeError,
   UnionToTuple,
 } from "@confect/core/Types";
@@ -127,45 +125,64 @@ export type ReadonlyRecordValue = {
   readonly [key: string]: ReadonlyValue | undefined;
 };
 
-export type ValueToValidator<Vl> =
-  IsRecursive<Vl> extends true
+type MutableValue<T> =
+  T extends ReadonlyArray<infer El>
+    ? MutableValue<El>[]
+    : T extends ReadonlyRecordValue
+      ? { -readonly [K in keyof T]: MutableValue<T[K]> }
+      : T;
+
+export type ValueToValidator<Vl> = [Vl] extends [never]
+  ? never
+  : IsAny<Vl> extends true
     ? VAny
-    : [Vl] extends [never]
-      ? never
-      : IsAny<Vl> extends true
-        ? VAny
-        : [Vl] extends [ReadonlyValue]
-          ? Vl extends {
-              __tableName: infer TableName extends string;
-            }
-            ? VId<GenericId.GenericId<TableName>>
-            : IsValueLiteral<Vl> extends true
-              ? VLiteral<Vl>
-              : [Vl] extends [null]
-                ? VNull
-                : [Vl] extends [boolean]
-                  ? VBoolean
-                  : IsUnion<Vl> extends true
-                    ? UnionValueToValidator<Vl>
-                    : [Vl] extends [number]
-                      ? VFloat64
-                      : [Vl] extends [bigint]
-                        ? VInt64
-                        : [Vl] extends [string]
-                          ? VString
-                          : [Vl] extends [ArrayBuffer]
-                            ? VBytes
-                            : Vl extends ReadonlyArray<ReadonlyValue>
-                              ? ArrayValueToValidator<Vl>
-                              : Vl extends ReadonlyRecordValue
-                                ? RecordValueToValidator<Vl>
-                                : TypeError<"Unexpected value", Vl>
-          : TypeError<"Provided value is not a valid Convex value", Vl>;
+    : [Vl] extends [null]
+      ? VNull
+      : [Vl] extends [boolean]
+        ? [boolean] extends [Vl]
+          ? VBoolean
+          : VLiteral<Vl>
+        : IsUnion<Vl> extends true
+          ? IsRecursive<Vl> extends true
+            ? VAny
+            : [Vl] extends [ReadonlyValue]
+              ? UnionValueToValidator<Vl>
+              : TypeError<"Provided value is not a valid Convex value", Vl>
+          : [Vl] extends [number]
+            ? [number] extends [Vl]
+              ? VFloat64
+              : VLiteral<Vl>
+            : [Vl] extends [bigint]
+              ? [bigint] extends [Vl]
+                ? VInt64
+                : VLiteral<Vl>
+              : [Vl] extends [string]
+                ? Vl extends {
+                    __tableName: infer TableName extends string;
+                  }
+                  ? VId<GenericId.GenericId<TableName>>
+                  : [string] extends [Vl]
+                    ? VString
+                    : VLiteral<Vl>
+                : [Vl] extends [ArrayBuffer]
+                  ? VBytes
+                  : IsRecursive<Vl> extends true
+                    ? VAny
+                    : [Vl] extends [ReadonlyValue]
+                      ? Vl extends ReadonlyArray<ReadonlyValue>
+                        ? ArrayValueToValidator<Vl>
+                        : Vl extends ReadonlyRecordValue
+                          ? RecordValueToValidator<Vl>
+                          : TypeError<"Unexpected value", Vl>
+                      : TypeError<
+                          "Provided value is not a valid Convex value",
+                          Vl
+                        >;
 
 type ArrayValueToValidator<Vl extends ReadonlyArray<ReadonlyValue>> =
   Vl extends ReadonlyArray<infer El extends ReadonlyValue>
     ? ValueToValidator<El> extends infer Vd extends Validator<any, any, any>
-      ? VArray<DeepMutable<El[]>, Vd>
+      ? VArray<MutableValue<El[]>, Vd>
       : never
     : never;
 
@@ -179,8 +196,8 @@ type RecordValueToValidator<Vl> = Vl extends ReadonlyRecordValue
     } extends infer VdRecord extends Record<string, any>
     ? {
         -readonly [K in keyof Vl]: undefined extends Vl[K]
-          ? DeepMutable<Exclude<Vl[K], undefined>>
-          : DeepMutable<Vl[K]>;
+          ? MutableValue<Exclude<Vl[K], undefined>>
+          : MutableValue<Vl[K]>;
       } extends infer VlRecord extends Record<string, any>
       ? IsRecord<VlRecord> extends true
         ? VRecord<VlRecord, VString, VdRecord[keyof VdRecord]>
@@ -212,7 +229,7 @@ type UnionValueToValidator<Vl extends ReadonlyValue> = [Vl] extends [
         ReadonlyArray<ReadonlyValue>
       ? ValueTupleToValidatorTuple<VlTuple> extends infer VdTuple extends
           Validator<any, "required", any>[]
-        ? VUnion<DeepMutable<Vl>, VdTuple>
+        ? VUnion<MutableValue<Vl>, VdTuple>
         : TypeError<"Failed to convert value tuple to validator tuple">
       : TypeError<"Failed to convert union to tuple">
     : TypeError<"Expected a union of values, but got a single value instead">

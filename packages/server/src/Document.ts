@@ -157,13 +157,14 @@ export const encode = Function.dual<
     }),
 );
 
-export class DocumentDecodeError extends Schema.TaggedError<DocumentDecodeError>(
+export class DocumentDecodeError extends Schema.TaggedError<DocumentDecodeError>()(
   "DocumentDecodeError",
-)("DocumentDecodeError", {
-  tableName: Schema.String,
-  id: Schema.String,
-  parseError: Schema.String,
-}) {
+  {
+    tableName: Schema.String,
+    id: Schema.String,
+    parseError: Schema.String,
+  },
+) {
   override get message(): string {
     return documentErrorMessage({
       id: this.id,
@@ -173,13 +174,14 @@ export class DocumentDecodeError extends Schema.TaggedError<DocumentDecodeError>
   }
 }
 
-export class DocumentEncodeError extends Schema.TaggedError<DocumentEncodeError>(
+export class DocumentEncodeError extends Schema.TaggedError<DocumentEncodeError>()(
   "DocumentEncodeError",
-)("DocumentEncodeError", {
-  tableName: Schema.String,
-  id: Schema.String,
-  parseError: Schema.String,
-}) {
+  {
+    tableName: Schema.String,
+    id: Schema.String,
+    parseError: Schema.String,
+  },
+) {
   override get message(): string {
     return documentErrorMessage({
       id: this.id,
