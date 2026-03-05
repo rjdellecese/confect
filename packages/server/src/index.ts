@@ -26,6 +26,7 @@ export * as Registry from "./Registry";
 export * as RegistryItem from "./RegistryItem";
 export * as Scheduler from "./Scheduler";
 export * as SchemaToValidator from "./SchemaToValidator";
+export * as ValidatorToSchema from "./ValidatorToSchema";
 export * as Storage from "./Storage";
 export * as Table from "./Table";
 export * as TableInfo from "./TableInfo";
