@@ -1,5 +1,5 @@
 import type { Infer, Validator, VObject, VUnion } from "convex/values";
-import { Cause, Data, Effect, Exit, Match, pipe, Schema } from "effect";
+import { Match, pipe, Schema } from "effect";
 
 import { GenericId } from "@confect/core/GenericId";
 
@@ -7,131 +7,78 @@ import { GenericId } from "@confect/core/GenericId";
 
 export const compileValidator = <V extends Validator<any, "required", any>>(
   validator: V,
-): Schema.Schema<Infer<V>> =>
-  runSyncThrow(compileValidatorEffect(validator)) as any;
+): Schema.Schema<Infer<V>> => compile(validator) as any;
 
 export const compileTableValidator = <
   V extends VObject<any, any, any, any> | VUnion<any, any, any, any>,
 >(
   validator: V,
-): Schema.Schema<Infer<V>> =>
-  runSyncThrow(compileValidatorEffect(validator)) as any;
+): Schema.Schema<Infer<V>> => compile(validator) as any;
 
 const kind = Match.discriminator("kind");
 
-const compileValidatorEffect = (
-  validator: Validator<any, any, any>,
-): Effect.Effect<Schema.Schema.AnyNoContext, UnsupportedValidatorKindError> =>
+const compile = (validator: Validator<any, any, any>): Schema.Schema.Any =>
   pipe(
     validator,
     Match.value,
-    kind("string", () => Effect.succeed(Schema.String)),
-    kind("float64", () => Effect.succeed(Schema.Number)),
-    kind("int64", () => Effect.succeed(Schema.BigIntFromSelf)),
-    kind("boolean", () => Effect.succeed(Schema.Boolean)),
-    kind("null", () => Effect.succeed(Schema.Null)),
-    kind("any", () => Effect.succeed(Schema.Any)),
-    kind("bytes", () => Effect.succeed(Schema.instanceOf(ArrayBuffer))),
-    kind("id", ({ tableName }) => Effect.succeed(GenericId(tableName))),
-    kind("literal", ({ value }) => Effect.succeed(Schema.Literal(value))),
+    kind("string", () => Schema.String),
+    kind("float64", () => Schema.Number),
+    kind("int64", () => Schema.BigIntFromSelf),
+    kind("boolean", () => Schema.Boolean),
+    kind("null", () => Schema.Null),
+    kind("any", () => Schema.Any),
+    kind("bytes", () => Schema.instanceOf(ArrayBuffer)),
+    kind("id", ({ tableName }) => GenericId(tableName)),
+    kind("literal", ({ value }) => Schema.Literal(value)),
     kind("array", ({ element }) =>
-      Effect.map(compileValidatorEffect(element), (el) =>
-        Schema.Array(el as Schema.Schema.Any),
-      ),
+      Schema.Array(compile(element) as Schema.Schema.Any),
     ),
     kind("object", ({ fields }) => handleObject(fields)),
     kind("union", ({ members }) => handleUnion(members)),
     kind("record", ({ key, value }) => handleRecord(key, value)),
-    Match.orElse((v) =>
-      Effect.fail(
-        new UnsupportedValidatorKindError({
-          kind: (v as { kind: string }).kind,
-        }),
-      ),
-    ),
+    Match.exhaustive,
   );
 
-const handleObject = (
-  fields: Record<string, Validator<any, any, any>>,
-): Effect.Effect<Schema.Schema.AnyNoContext, UnsupportedValidatorKindError> =>
-  Effect.gen(function* () {
-    const schemaFields: Record<string, any> = {};
+const handleObject = (fields: Record<string, Validator<any, any, any>>) => {
+  const schemaFields: Record<string, any> = {};
 
-    for (const [key, fieldValidator] of Object.entries(fields)) {
-      const fieldSchema = yield* compileValidatorEffect(fieldValidator);
-      schemaFields[key] =
-        fieldValidator.isOptional === "optional"
-          ? Schema.optionalWith(fieldSchema as Schema.Schema.Any, {
-              exact: true,
-            })
-          : fieldSchema;
-    }
+  for (const [key, fieldValidator] of Object.entries(fields)) {
+    const fieldSchema = compile(fieldValidator);
+    schemaFields[key] =
+      fieldValidator.isOptional === "optional"
+        ? Schema.optionalWith(fieldSchema as Schema.Schema.Any, {
+            exact: true,
+          })
+        : fieldSchema;
+  }
 
-    return Schema.Struct(
-      schemaFields as Schema.Struct.Fields,
-    ) as unknown as Schema.Schema.AnyNoContext;
-  });
+  return Schema.Struct(schemaFields as Schema.Struct.Fields);
+};
 
-const handleUnion = (
-  members: Validator<any, "required", any>[],
-): Effect.Effect<Schema.Schema.AnyNoContext, UnsupportedValidatorKindError> =>
-  Effect.gen(function* () {
-    const schemas = yield* Effect.forEach(members, (m) =>
-      compileValidatorEffect(m),
+const handleUnion = (members: Validator<any, "required", any>[]) => {
+  const schemas = members.map((m) => compile(m)) as Schema.Schema.Any[];
+  const [first, second, ...rest] = schemas;
+
+  /* v8 ignore start */
+  if (first === undefined || second === undefined) {
+    throw new Error(
+      "Union must have at least 2 members; this should be impossible.",
     );
-    const [first, second, ...rest] = schemas as Schema.Schema.Any[];
+  }
+  /* v8 ignore stop */
 
-    /* v8 ignore start */
-    if (first === undefined || second === undefined) {
-      return yield* Effect.dieMessage(
-        "Union must have at least 2 members; this should be impossible.",
-      );
-    }
-    /* v8 ignore stop */
-
-    return Schema.Union(
-      first,
-      second,
-      ...rest,
-    ) as unknown as Schema.Schema.AnyNoContext;
-  });
+  return Schema.Union(first, second, ...rest);
+};
 
 const handleRecord = (
   key: Validator<string, "required", any>,
   value: Validator<any, "required", any>,
-): Effect.Effect<Schema.Schema.AnyNoContext, UnsupportedValidatorKindError> =>
-  Effect.gen(function* () {
-    const keySchema = yield* compileValidatorEffect(key);
-    const valueSchema = yield* compileValidatorEffect(value);
+) => {
+  const keySchema = compile(key);
+  const valueSchema = compile(value);
 
-    return Schema.Record({
-      key: keySchema as Schema.Schema<string>,
-      value: valueSchema as Schema.Schema.Any,
-    }) as unknown as Schema.Schema.AnyNoContext;
+  return Schema.Record({
+    key: keySchema as Schema.Schema<string>,
+    value: valueSchema as Schema.Schema.Any,
   });
-
-// Errors
-
-const runSyncThrow = <A, E>(effect: Effect.Effect<A, E>) =>
-  pipe(
-    effect,
-    Effect.runSyncExit,
-    Exit.match({
-      onSuccess: (value) => value,
-      onFailure: (cause) => {
-        throw Cause.squash(cause);
-      },
-    }),
-  );
-
-export class UnsupportedValidatorKindError extends Data.TaggedError(
-  "UnsupportedValidatorKindError",
-)<{
-  readonly kind: string;
-}> {
-  /* v8 ignore start */
-  override get message() {
-    return `Unsupported validator kind '${this.kind}'`;
-  }
-  /* v8 ignore stop */
-}
+};
