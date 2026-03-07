@@ -1,4 +1,10 @@
-import type { Infer, Validator, VObject, VUnion } from "convex/values";
+import type {
+  GenericValidator,
+  Infer,
+  Validator,
+  VObject,
+  VUnion,
+} from "convex/values";
 import { Match, pipe, Schema } from "effect";
 
 import { GenericId } from "@confect/core/GenericId";
@@ -17,7 +23,7 @@ export const compileTableValidator = <
 
 const kind = Match.discriminator("kind");
 
-const compile = (validator: Validator<any, any, any>): Schema.Schema.Any =>
+const compile = (validator: GenericValidator): Schema.Schema.Any =>
   pipe(
     validator,
     Match.value,
@@ -39,7 +45,7 @@ const compile = (validator: Validator<any, any, any>): Schema.Schema.Any =>
     Match.exhaustive,
   );
 
-const handleObject = (fields: Record<string, Validator<any, any, any>>) => {
+const handleObject = (fields: Record<string, GenericValidator>) => {
   const schemaFields: Record<string, any> = {};
 
   for (const [key, fieldValidator] of Object.entries(fields)) {
