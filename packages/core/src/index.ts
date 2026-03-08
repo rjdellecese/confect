@@ -10,3 +10,4 @@ export * as Spec from "./Spec";
 export * as SystemFields from "./SystemFields";
 export * as Types from "./Types";
 export * as UserIdentity from "./UserIdentity";
+export * as ValidatorToSchema from "./ValidatorToSchema";

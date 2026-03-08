@@ -7,7 +7,7 @@ import type {
 } from "convex/values";
 import { Match, pipe, Schema } from "effect";
 
-import { GenericId } from "@confect/core/GenericId";
+import { GenericId } from "./GenericId";
 
 // Compiler
 

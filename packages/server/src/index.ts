@@ -29,5 +29,4 @@ export * as SchemaToValidator from "./SchemaToValidator";
 export * as Storage from "./Storage";
 export * as Table from "./Table";
 export * as TableInfo from "./TableInfo";
-export * as ValidatorToSchema from "./ValidatorToSchema";
 export * as VectorSearch from "./VectorSearch";
