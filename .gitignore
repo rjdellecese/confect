@@ -5,6 +5,7 @@
 .tsup
 coverage/
 dist/
-node_modules/
 node-compile-cache/
+node_modules/
+opensrc/
 tsconfig.vitest-temp.json
