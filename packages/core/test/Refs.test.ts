@@ -1,4 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
+import type { RegisteredMutation, RegisteredQuery } from "convex/server";
 import { Schema } from "effect";
 import * as FunctionSpec from "../src/FunctionSpec";
 import * as GroupSpec from "../src/GroupSpec";
@@ -36,8 +37,8 @@ describe("make", () => {
     expect(Ref.getConvexFunctionName(actualRef)).toStrictEqual(
       Ref.getConvexFunctionName(expectedRef),
     );
-    expect(Ref.getFunction(actualRef)).toStrictEqual(
-      Ref.getFunction(expectedRef),
+    expect(Ref.getFunctionSpec(actualRef)).toStrictEqual(
+      Ref.getFunctionSpec(expectedRef),
     );
     expectTypeOf(actualRef).toEqualTypeOf(expectedRef);
   });
@@ -86,8 +87,8 @@ describe("make", () => {
       Ref.Ref<
         RuntimeAndFunctionType.ConvexQuery,
         "internal",
-        typeof FnArgs,
-        typeof FnReturns
+        typeof FnArgs.Type,
+        typeof FnReturns.Type
       >
     >();
 
@@ -125,8 +126,8 @@ describe("make", () => {
       Ref.Ref<
         RuntimeAndFunctionType.ConvexQuery,
         "internal",
-        typeof FnArgs,
-        typeof FnReturns
+        typeof FnArgs.Type,
+        typeof FnReturns.Type
       >
     >();
 
@@ -161,12 +162,149 @@ describe("make", () => {
       Ref.Ref<
         RuntimeAndFunctionType.ConvexQuery,
         "public",
-        typeof FnArgs,
-        typeof FnReturns
+        typeof FnArgs.Type,
+        typeof FnReturns.Type
       >
     >();
 
     // @ts-expect-error - internalList should be filtered out
     void refs.public.notes.internalList;
+  });
+
+  it("turns a Convex-native spec into refs", () => {
+    type ListQueryArgs = { tag: string };
+    type ListQueryReturns = string[];
+
+    type ListQuery = RegisteredQuery<
+      "public",
+      ListQueryArgs,
+      Promise<ListQueryReturns>
+    >;
+
+    const listSpec = FunctionSpec.convexPublicQuery<ListQuery>()("list");
+
+    const spec = Spec.make().add(GroupSpec.make("notes").addFunction(listSpec));
+    const refs = Refs.make(spec);
+
+    const actualRef = refs.public.notes.list;
+    const expectedRef = Ref.make("notes:list", listSpec);
+
+    expect(Ref.getConvexFunctionName(actualRef)).toStrictEqual(
+      Ref.getConvexFunctionName(expectedRef),
+    );
+    expect(Ref.getFunctionSpec(actualRef)).toStrictEqual(
+      Ref.getFunctionSpec(expectedRef),
+    );
+    expectTypeOf(actualRef).toEqualTypeOf(expectedRef);
+
+    expectTypeOf(actualRef).toEqualTypeOf<
+      Ref.Ref<
+        RuntimeAndFunctionType.ConvexQuery,
+        "public",
+        ListQueryArgs,
+        ListQueryReturns
+      >
+    >();
+  });
+
+  it("filters Convex-native refs by visibility", () => {
+    type GetQueryArgs = { id: string };
+    type GetQueryReturns = string;
+
+    type GetQuery = RegisteredQuery<
+      "public",
+      GetQueryArgs,
+      Promise<GetQueryReturns>
+    >;
+
+    type RemoveMutationArgs = { id: string };
+    type RemoveMutationReturns = void;
+
+    type RemoveMutation = RegisteredMutation<
+      "internal",
+      RemoveMutationArgs,
+      Promise<RemoveMutationReturns>
+    >;
+
+    const spec = Spec.make().add(
+      GroupSpec.make("notes")
+        .addFunction(FunctionSpec.convexPublicQuery<GetQuery>()("get"))
+        .addFunction(
+          FunctionSpec.convexInternalMutation<RemoveMutation>()("remove"),
+        ),
+    );
+    const refs = Refs.make(spec);
+
+    expectTypeOf(refs.public.notes.get).toEqualTypeOf<
+      Ref.Ref<
+        RuntimeAndFunctionType.ConvexQuery,
+        "public",
+        GetQueryArgs,
+        GetQueryReturns
+      >
+    >();
+
+    expectTypeOf(refs.internal.notes.remove).toEqualTypeOf<
+      Ref.Ref<
+        RuntimeAndFunctionType.ConvexMutation,
+        "internal",
+        RemoveMutationArgs,
+        RemoveMutationReturns
+      >
+    >();
+
+    // @ts-expect-error - remove is internal, not public
+    void refs.public.notes.remove;
+
+    // @ts-expect-error - get is public, not internal
+    void refs.internal.notes.get;
+  });
+
+  it("mixes Confect-native and Convex-native specs", () => {
+    type ConvexQueryArgs = { cursor: string };
+    type ConvexQueryReturns = string[];
+
+    type ConvexQuery = RegisteredQuery<
+      "public",
+      ConvexQueryArgs,
+      Promise<ConvexQueryReturns>
+    >;
+
+    const ConfectQueryArgs = Schema.Struct({ limit: Schema.Number });
+    type ConfectQueryArgs = typeof ConfectQueryArgs.Type;
+
+    const ConfectQueryReturns = Schema.Array(Schema.String);
+    type ConfectQueryReturns = typeof ConfectQueryReturns.Type;
+
+    const ConfectQuery = FunctionSpec.publicQuery({
+      name: "list",
+      args: ConfectQueryArgs,
+      returns: ConfectQueryReturns,
+    });
+
+    const spec = Spec.make().add(
+      GroupSpec.make("notes")
+        .addFunction(ConfectQuery)
+        .addFunction(FunctionSpec.convexPublicQuery<ConvexQuery>()("search")),
+    );
+    const refs = Refs.make(spec);
+
+    expectTypeOf(refs.public.notes.list).toEqualTypeOf<
+      Ref.Ref<
+        RuntimeAndFunctionType.ConvexQuery,
+        "public",
+        ConfectQueryArgs,
+        ConfectQueryReturns
+      >
+    >();
+
+    expectTypeOf(refs.public.notes.search).toEqualTypeOf<
+      Ref.Ref<
+        RuntimeAndFunctionType.ConvexQuery,
+        "public",
+        ConvexQueryArgs,
+        ConvexQueryReturns
+      >
+    >();
   });
 });

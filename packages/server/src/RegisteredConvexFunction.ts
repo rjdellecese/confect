@@ -1,3 +1,4 @@
+import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import {
   actionGeneric,
   type DefaultFunctionArgs,
@@ -29,9 +30,11 @@ import { StorageReader, StorageWriter } from "./Storage";
 
 export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
   api: Api_,
-  { function_, handler }: RegistryItem.AnyWithProps,
-): RegisteredFunction.RegisteredFunction =>
-  Match.value(function_.runtimeAndFunctionType.functionType).pipe(
+  { function_: anyFunction_, handler }: RegistryItem.AnyWithProps,
+): RegisteredFunction.RegisteredFunction => {
+  const function_ = anyFunction_ as FunctionSpec.AnyConfect;
+
+  return Match.value(function_.runtimeAndFunctionType.functionType).pipe(
     Match.when("query", () => {
       const genericFunction = Match.value(function_.functionVisibility).pipe(
         Match.when("public", () => queryGeneric),
@@ -41,8 +44,8 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
 
       return genericFunction(
         queryFunction(api.databaseSchema, {
-          args: function_.args,
-          returns: function_.returns,
+          args: function_.functionProvenance.args,
+          returns: function_.functionProvenance.returns,
           handler,
         }),
       );
@@ -56,8 +59,8 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
 
       return genericFunction(
         mutationFunction(api.databaseSchema, {
-          args: function_.args,
-          returns: function_.returns,
+          args: function_.functionProvenance.args,
+          returns: function_.functionProvenance.returns,
           handler,
         }),
       );
@@ -71,14 +74,15 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
 
       return genericFunction(
         convexActionFunction(api.databaseSchema, {
-          args: function_.args,
-          returns: function_.returns,
+          args: function_.functionProvenance.args,
+          returns: function_.functionProvenance.returns,
           handler,
         }),
       );
     }),
     Match.exhaustive,
   );
+};
 
 const queryFunction = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,

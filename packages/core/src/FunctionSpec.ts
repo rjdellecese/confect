@@ -1,4 +1,5 @@
 import type {
+  DefaultFunctionArgs,
   FunctionType,
   FunctionVisibility,
   RegisteredAction,
@@ -7,6 +8,7 @@ import type {
 } from "convex/server";
 import type { Schema } from "effect";
 import { Predicate } from "effect";
+import * as FunctionProvenance from "./FunctionProvenance";
 import { validateConfectFunctionIdentifier } from "./internal/utils";
 import * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
@@ -20,15 +22,13 @@ export interface FunctionSpec<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility_ extends FunctionVisibility,
   Name_ extends string,
-  Args_ extends Schema.Schema.AnyNoContext,
-  Returns_ extends Schema.Schema.AnyNoContext,
+  FunctionProvenance_ extends FunctionProvenance.FunctionProvenance,
 > {
   readonly [TypeId]: TypeId;
   readonly runtimeAndFunctionType: RuntimeAndFunctionType_;
   readonly functionVisibility: FunctionVisibility_;
   readonly name: Name_;
-  readonly args: Args_;
-  readonly returns: Returns_;
+  readonly functionProvenance: FunctionProvenance_;
 }
 
 export interface Any {
@@ -39,8 +39,17 @@ export interface AnyWithProps extends FunctionSpec<
   RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility,
   string,
-  Schema.Schema.AnyNoContext,
-  Schema.Schema.AnyNoContext
+  FunctionProvenance.FunctionProvenance
+> {}
+
+export interface AnyConfect extends FunctionSpec<
+  RuntimeAndFunctionType.RuntimeAndFunctionType,
+  FunctionVisibility,
+  string,
+  FunctionProvenance.Confect<
+    Schema.Schema.AnyNoContext,
+    Schema.Schema.AnyNoContext
+  >
 > {}
 
 export interface AnyWithPropsWithRuntime<
@@ -49,8 +58,7 @@ export interface AnyWithPropsWithRuntime<
   RuntimeAndFunctionType.WithRuntime<Runtime>,
   FunctionVisibility,
   string,
-  Schema.Schema.AnyNoContext,
-  Schema.Schema.AnyNoContext
+  FunctionProvenance.FunctionProvenance
 > {}
 
 export interface AnyWithPropsWithFunctionType<
@@ -59,8 +67,7 @@ export interface AnyWithPropsWithFunctionType<
   RuntimeAndFunctionType_,
   FunctionVisibility,
   string,
-  Schema.Schema.AnyNoContext,
-  Schema.Schema.AnyNoContext
+  FunctionProvenance.FunctionProvenance
 > {}
 
 export type GetRuntimeAndFunctionType<Function extends AnyWithProps> =
@@ -71,9 +78,57 @@ export type GetFunctionVisibility<Function extends AnyWithProps> =
 
 export type Name<Function extends AnyWithProps> = Function["name"];
 
-export type Args<Function extends AnyWithProps> = Function["args"];
+// --- Args / Returns: return plain caller-facing types ---
 
-export type Returns<Function extends AnyWithProps> = Function["returns"];
+export type Args<Function extends AnyWithProps> = Function extends {
+  functionProvenance: { _tag: "Confect"; args: infer ArgsSchema_ };
+}
+  ? ArgsSchema_ extends Schema.Schema.AnyNoContext
+    ? ArgsSchema_["Type"]
+    : never
+  : Function extends {
+        functionProvenance: { _tag: "Convex"; _args: infer Args_ };
+      }
+    ? Args_
+    : never;
+
+export type Returns<Function extends AnyWithProps> = Function extends {
+  functionProvenance: { _tag: "Confect"; returns: infer ReturnsSchema_ };
+}
+  ? ReturnsSchema_ extends Schema.Schema.AnyNoContext
+    ? ReturnsSchema_["Type"]
+    : never
+  : Function extends {
+        functionProvenance: { _tag: "Convex"; _returns: infer Returns_ };
+      }
+    ? Awaited<Returns_>
+    : never;
+
+// --- EncodedArgs / EncodedReturns: wire-format types for RegisteredFunction ---
+
+export type EncodedArgs<Function extends AnyWithProps> = Function extends {
+  functionProvenance: { _tag: "Confect"; args: infer ArgsSchema_ };
+}
+  ? ArgsSchema_ extends Schema.Schema.AnyNoContext
+    ? ArgsSchema_["Encoded"]
+    : never
+  : Function extends {
+        functionProvenance: { _tag: "Convex"; _args: infer Args_ };
+      }
+    ? Args_
+    : never;
+
+export type EncodedReturns<Function extends AnyWithProps> = Function extends {
+  functionProvenance: { _tag: "Confect"; returns: infer ReturnsSchema_ };
+}
+  ? ReturnsSchema_ extends Schema.Schema.AnyNoContext
+    ? ReturnsSchema_["Encoded"]
+    : never
+  : Function extends {
+        functionProvenance: { _tag: "Convex"; _returns: infer Returns_ };
+      }
+    ? Returns_
+    : never;
 
 export type WithName<
   Function extends AnyWithProps,
@@ -101,32 +156,64 @@ export type WithoutName<
   Name_ extends Name<Function>,
 > = Exclude<Function, { readonly name: Name_ }>;
 
-export type RegisteredFunction<Function extends AnyWithProps> =
+// --- RegisteredFunction: provenance-aware ---
+
+type ConfectRegisteredFunction<Function extends AnyWithProps> =
   RuntimeAndFunctionType.GetFunctionType<
     Function["runtimeAndFunctionType"]
   > extends "query"
     ? RegisteredQuery<
         GetFunctionVisibility<Function>,
-        Args<Function>["Encoded"],
-        Promise<Returns<Function>["Encoded"]>
+        EncodedArgs<Function> & DefaultFunctionArgs,
+        Promise<EncodedReturns<Function>>
       >
     : RuntimeAndFunctionType.GetFunctionType<
           Function["runtimeAndFunctionType"]
         > extends "mutation"
       ? RegisteredMutation<
           GetFunctionVisibility<Function>,
-          Args<Function>["Encoded"],
-          Promise<Returns<Function>["Encoded"]>
+          EncodedArgs<Function> & DefaultFunctionArgs,
+          Promise<EncodedReturns<Function>>
         >
       : RuntimeAndFunctionType.GetFunctionType<
             Function["runtimeAndFunctionType"]
           > extends "action"
         ? RegisteredAction<
             GetFunctionVisibility<Function>,
-            Args<Function>["Encoded"],
-            Promise<Returns<Function>["Encoded"]>
+            EncodedArgs<Function> & DefaultFunctionArgs,
+            Promise<EncodedReturns<Function>>
           >
         : never;
+
+type ConvexRegisteredFunction<Function extends AnyWithProps> =
+  Function extends {
+    functionProvenance: {
+      _tag: "Convex";
+      _args: infer Args_ extends DefaultFunctionArgs;
+      _returns: infer Returns_;
+    };
+  }
+    ? RuntimeAndFunctionType.GetFunctionType<
+        Function["runtimeAndFunctionType"]
+      > extends "query"
+      ? RegisteredQuery<GetFunctionVisibility<Function>, Args_, Returns_>
+      : RuntimeAndFunctionType.GetFunctionType<
+            Function["runtimeAndFunctionType"]
+          > extends "mutation"
+        ? RegisteredMutation<GetFunctionVisibility<Function>, Args_, Returns_>
+        : RuntimeAndFunctionType.GetFunctionType<
+              Function["runtimeAndFunctionType"]
+            > extends "action"
+          ? RegisteredAction<GetFunctionVisibility<Function>, Args_, Returns_>
+          : never
+    : never;
+
+export type RegisteredFunction<Function extends AnyWithProps> =
+  Function extends { functionProvenance: { _tag: "Convex" } }
+    ? ConvexRegisteredFunction<Function>
+    : ConfectRegisteredFunction<Function>;
+
+// --- Confect constructors ---
 
 const Proto = {
   [TypeId]: TypeId,
@@ -157,8 +244,7 @@ const make =
     RuntimeAndFunctionType_,
     FunctionVisibility_,
     Name_,
-    Args_,
-    Returns_
+    FunctionProvenance.Confect<Args_, Returns_>
   > => {
     validateConfectFunctionIdentifier(name);
 
@@ -166,8 +252,7 @@ const make =
       runtimeAndFunctionType,
       functionVisibility,
       name,
-      args,
-      returns,
+      functionProvenance: FunctionProvenance.Confect(args, returns),
     });
   };
 
@@ -195,6 +280,104 @@ export const publicNodeAction = make(
   "public",
 );
 export const internalNodeAction = make(
+  RuntimeAndFunctionType.NodeAction,
+  "internal",
+);
+
+// --- Convex-native constructors ---
+
+type MatchingRegisteredFunction<
+  RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
+  FunctionVisibility_ extends FunctionVisibility,
+> =
+  RuntimeAndFunctionType.GetFunctionType<RuntimeAndFunctionType_> extends "query"
+    ? RegisteredQuery<FunctionVisibility_, any, any>
+    : RuntimeAndFunctionType.GetFunctionType<RuntimeAndFunctionType_> extends "mutation"
+      ? RegisteredMutation<FunctionVisibility_, any, any>
+      : RuntimeAndFunctionType.GetFunctionType<RuntimeAndFunctionType_> extends "action"
+        ? RegisteredAction<FunctionVisibility_, any, any>
+        : never;
+
+type ExtractArgs<F> =
+  F extends RegisteredQuery<any, infer Args_, any>
+    ? Args_
+    : F extends RegisteredMutation<any, infer Args_, any>
+      ? Args_
+      : F extends RegisteredAction<any, infer Args_, any>
+        ? Args_
+        : never;
+
+type ExtractReturns<F> =
+  F extends RegisteredQuery<any, any, infer Returns_>
+    ? Returns_
+    : F extends RegisteredMutation<any, any, infer Returns_>
+      ? Returns_
+      : F extends RegisteredAction<any, any, infer Returns_>
+        ? Returns_
+        : never;
+
+const makeConvex =
+  <
+    RuntimeAndFunctionType_ extends
+      RuntimeAndFunctionType.RuntimeAndFunctionType,
+    FunctionVisibility_ extends FunctionVisibility,
+  >(
+    runtimeAndFunctionType: RuntimeAndFunctionType_,
+    functionVisibility: FunctionVisibility_,
+  ) =>
+  <
+    F extends MatchingRegisteredFunction<
+      RuntimeAndFunctionType_,
+      FunctionVisibility_
+    >,
+  >() =>
+  <const Name_ extends string>(
+    name: Name_,
+  ): FunctionSpec<
+    RuntimeAndFunctionType_,
+    FunctionVisibility_,
+    Name_,
+    FunctionProvenance.Convex<ExtractArgs<F>, ExtractReturns<F>>
+  > => {
+    validateConfectFunctionIdentifier(name);
+
+    return Object.assign(Object.create(Proto), {
+      runtimeAndFunctionType,
+      functionVisibility,
+      name,
+      functionProvenance: FunctionProvenance.Convex(),
+    }) as any;
+  };
+
+export const convexPublicQuery = makeConvex(
+  RuntimeAndFunctionType.ConvexQuery,
+  "public",
+);
+export const convexInternalQuery = makeConvex(
+  RuntimeAndFunctionType.ConvexQuery,
+  "internal",
+);
+export const convexPublicMutation = makeConvex(
+  RuntimeAndFunctionType.ConvexMutation,
+  "public",
+);
+export const convexInternalMutation = makeConvex(
+  RuntimeAndFunctionType.ConvexMutation,
+  "internal",
+);
+export const convexPublicAction = makeConvex(
+  RuntimeAndFunctionType.ConvexAction,
+  "public",
+);
+export const convexInternalAction = makeConvex(
+  RuntimeAndFunctionType.ConvexAction,
+  "internal",
+);
+export const convexPublicNodeAction = makeConvex(
+  RuntimeAndFunctionType.NodeAction,
+  "public",
+);
+export const convexInternalNodeAction = makeConvex(
   RuntimeAndFunctionType.NodeAction,
   "internal",
 );

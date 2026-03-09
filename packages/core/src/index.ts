@@ -1,3 +1,4 @@
+export * as FunctionProvenance from "./FunctionProvenance";
 export * as FunctionSpec from "./FunctionSpec";
 export * as GenericId from "./GenericId";
 export * as GroupPath from "./GroupPath";

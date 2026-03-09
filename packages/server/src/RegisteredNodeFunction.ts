@@ -1,3 +1,4 @@
+import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import { NodeContext } from "@effect/platform-node";
 import {
   actionGeneric,
@@ -13,8 +14,10 @@ import type * as RegistryItem from "./RegistryItem";
 
 export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Node">>(
   api: Api_,
-  { function_, handler }: RegistryItem.AnyWithProps,
+  { function_: anyFunction_, handler }: RegistryItem.AnyWithProps,
 ): RegisteredFunction.RegisteredFunction => {
+  const function_ = anyFunction_ as FunctionSpec.AnyConfect;
+
   const genericFunction = Match.value(function_.functionVisibility).pipe(
     Match.when("public", () => actionGeneric),
     Match.when("internal", () => internalActionGeneric),
@@ -23,8 +26,8 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Node">>(
 
   return genericFunction(
     nodeActionFunction(api.databaseSchema, {
-      args: function_.args,
-      returns: function_.returns,
+      args: function_.functionProvenance.args,
+      returns: function_.functionProvenance.returns,
       handler,
     }),
   );
