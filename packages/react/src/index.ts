@@ -44,12 +44,13 @@ export const useMutation = <Mutation extends Ref.AnyPublicMutation>(
   const functionName = Ref.getConvexFunctionName(ref);
   const actualMutation = useConvexMutation(functionName as any);
 
-  return async (args: Ref.Args<Mutation>): Promise<Ref.Returns<Mutation>> =>
+  return (args: Ref.Args<Mutation>): Promise<Ref.Returns<Mutation>> =>
     Match.value(function_.functionProvenance).pipe(
-      Match.tag("Confect", async (confect) => {
+      Match.tag("Confect", (confect) => {
         const encodedArgs = Schema.encodeSync(confect.args)(args);
-        const actualReturns = await actualMutation(encodedArgs);
-        return Schema.decodeSync(confect.returns)(actualReturns);
+        return actualMutation(encodedArgs).then((result) =>
+          Schema.decodeSync(confect.returns)(result),
+        );
       }),
       Match.tag("Convex", () => actualMutation(args as any)),
       Match.exhaustive,
@@ -61,12 +62,13 @@ export const useAction = <Action extends Ref.AnyPublicAction>(ref: Action) => {
   const functionName = Ref.getConvexFunctionName(ref);
   const actualAction = useConvexAction(functionName as any);
 
-  return async (args: Ref.Args<Action>): Promise<Ref.Returns<Action>> =>
+  return (args: Ref.Args<Action>): Promise<Ref.Returns<Action>> =>
     Match.value(function_.functionProvenance).pipe(
-      Match.tag("Confect", async (confect) => {
+      Match.tag("Confect", (confect) => {
         const encodedArgs = Schema.encodeSync(confect.args)(args);
-        const actualReturns = await actualAction(encodedArgs);
-        return Schema.decodeSync(confect.returns)(actualReturns);
+        return actualAction(encodedArgs).then((result) =>
+          Schema.decodeSync(confect.returns)(result),
+        );
       }),
       Match.tag("Convex", () => actualAction(args as any)),
       Match.exhaustive,
