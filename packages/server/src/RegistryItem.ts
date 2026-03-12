@@ -2,6 +2,7 @@ import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import { Predicate } from "effect";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as Handler from "./Handler";
+import type * as RegisteredFunction from "./RegisteredFunction";
 
 export const TypeId = "@confect/server/RegistryItem";
 export type TypeId = typeof TypeId;
@@ -25,19 +26,18 @@ export interface RegistryItem<
 export interface AnyWithProps {
   readonly [TypeId]: TypeId;
   readonly function_: FunctionSpec.AnyWithProps;
-  readonly handler: Handler.AnyWithProps;
+  readonly handler:
+    | Handler.AnyWithProps
+    | RegisteredFunction.RegisteredFunction;
 }
 
-export const make = <
-  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  FunctionSpec_ extends FunctionSpec.AnyWithProps,
->({
+export const make = ({
   function_,
   handler,
 }: {
-  function_: FunctionSpec_;
-  handler: Handler.Handler<DatabaseSchema_, FunctionSpec_>;
-}): RegistryItem<DatabaseSchema_, FunctionSpec_> =>
+  function_: FunctionSpec.AnyWithProps;
+  handler: AnyWithProps["handler"];
+}): AnyWithProps =>
   Object.assign(Object.create(RegistryItemProto), {
     function_,
     handler,

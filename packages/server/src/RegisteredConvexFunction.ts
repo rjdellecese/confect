@@ -17,6 +17,7 @@ import * as DatabaseReader from "./DatabaseReader";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import * as DatabaseWriter from "./DatabaseWriter";
 import type * as DataModel from "./DataModel";
+import type * as Handler from "./Handler";
 import * as MutationCtx from "./MutationCtx";
 import * as MutationRunner from "./MutationRunner";
 import * as QueryCtx from "./QueryCtx";
@@ -31,58 +32,70 @@ import { StorageReader, StorageWriter } from "./Storage";
 export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
   api: Api_,
   { function_: anyFunction_, handler }: RegistryItem.AnyWithProps,
-): RegisteredFunction.RegisteredFunction => {
-  const function_ = anyFunction_ as FunctionSpec.AnyConfect;
+): RegisteredFunction.RegisteredFunction =>
+  Match.value(anyFunction_.functionProvenance).pipe(
+    Match.tag("Convex", () => handler as RegisteredFunction.RegisteredFunction),
+    Match.tag("Confect", (confect) => {
+      const function_ = anyFunction_ as FunctionSpec.AnyConfect;
+      const confectHandler = handler as Handler.AnyWithProps;
 
-  return Match.value(function_.runtimeAndFunctionType.functionType).pipe(
-    Match.when("query", () => {
-      const genericFunction = Match.value(function_.functionVisibility).pipe(
-        Match.when("public", () => queryGeneric),
-        Match.when("internal", () => internalQueryGeneric),
-        Match.exhaustive,
-      );
+      return Match.value(function_.runtimeAndFunctionType.functionType).pipe(
+        Match.when("query", () => {
+          const genericFunction = Match.value(
+            function_.functionVisibility,
+          ).pipe(
+            Match.when("public", () => queryGeneric),
+            Match.when("internal", () => internalQueryGeneric),
+            Match.exhaustive,
+          );
 
-      return genericFunction(
-        queryFunction(api.databaseSchema, {
-          args: function_.functionProvenance.args,
-          returns: function_.functionProvenance.returns,
-          handler,
+          return genericFunction(
+            queryFunction(api.databaseSchema, {
+              args: confect.args,
+              returns: confect.returns,
+              handler: confectHandler,
+            }),
+          );
         }),
-      );
-    }),
-    Match.when("mutation", () => {
-      const genericFunction = Match.value(function_.functionVisibility).pipe(
-        Match.when("public", () => mutationGeneric),
-        Match.when("internal", () => internalMutationGeneric),
-        Match.exhaustive,
-      );
+        Match.when("mutation", () => {
+          const genericFunction = Match.value(
+            function_.functionVisibility,
+          ).pipe(
+            Match.when("public", () => mutationGeneric),
+            Match.when("internal", () => internalMutationGeneric),
+            Match.exhaustive,
+          );
 
-      return genericFunction(
-        mutationFunction(api.databaseSchema, {
-          args: function_.functionProvenance.args,
-          returns: function_.functionProvenance.returns,
-          handler,
+          return genericFunction(
+            mutationFunction(api.databaseSchema, {
+              args: confect.args,
+              returns: confect.returns,
+              handler: confectHandler,
+            }),
+          );
         }),
-      );
-    }),
-    Match.when("action", () => {
-      const genericFunction = Match.value(function_.functionVisibility).pipe(
-        Match.when("public", () => actionGeneric),
-        Match.when("internal", () => internalActionGeneric),
-        Match.exhaustive,
-      );
+        Match.when("action", () => {
+          const genericFunction = Match.value(
+            function_.functionVisibility,
+          ).pipe(
+            Match.when("public", () => actionGeneric),
+            Match.when("internal", () => internalActionGeneric),
+            Match.exhaustive,
+          );
 
-      return genericFunction(
-        convexActionFunction(api.databaseSchema, {
-          args: function_.functionProvenance.args,
-          returns: function_.functionProvenance.returns,
-          handler,
+          return genericFunction(
+            convexActionFunction(api.databaseSchema, {
+              args: confect.args,
+              returns: confect.returns,
+              handler: confectHandler,
+            }),
+          );
         }),
+        Match.exhaustive,
       );
     }),
     Match.exhaustive,
   );
-};
 
 const queryFunction = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,

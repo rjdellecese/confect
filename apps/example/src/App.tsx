@@ -58,6 +58,10 @@ const Page = () => {
 
       <br />
 
+      <NoteCount />
+
+      <br />
+
       <div>
         Random number: {randomNumber ? randomNumber : "Loading…"}
         <br />
@@ -93,6 +97,17 @@ const Page = () => {
 
       <NoteList />
       <HttpEndpoints />
+    </div>
+  );
+};
+
+const NoteCount = () => {
+  const noteCount = useQuery(refs.public.native.noteCount, {});
+
+  return (
+    <div>
+      Note count (native Convex query):{" "}
+      {noteCount === undefined ? "Loading…" : noteCount}
     </div>
   );
 };

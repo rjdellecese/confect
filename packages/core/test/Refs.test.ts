@@ -175,13 +175,10 @@ describe("make", () => {
     type ListQueryArgs = { tag: string };
     type ListQueryReturns = string[];
 
-    type ListQuery = RegisteredQuery<
-      "public",
-      ListQueryArgs,
-      Promise<ListQueryReturns>
-    >;
-
-    const listSpec = FunctionSpec.convexPublicQuery<ListQuery>()("list");
+    const listSpec =
+      FunctionSpec.convexPublicQuery<
+        RegisteredQuery<"public", ListQueryArgs, Promise<ListQueryReturns>>
+      >()("list");
 
     const spec = Spec.make().add(GroupSpec.make("notes").addFunction(listSpec));
     const refs = Refs.make(spec);
@@ -211,26 +208,24 @@ describe("make", () => {
     type GetQueryArgs = { id: string };
     type GetQueryReturns = string;
 
-    type GetQuery = RegisteredQuery<
-      "public",
-      GetQueryArgs,
-      Promise<GetQueryReturns>
-    >;
-
     type RemoveMutationArgs = { id: string };
     type RemoveMutationReturns = void;
 
-    type RemoveMutation = RegisteredMutation<
-      "internal",
-      RemoveMutationArgs,
-      Promise<RemoveMutationReturns>
-    >;
-
     const spec = Spec.make().add(
       GroupSpec.make("notes")
-        .addFunction(FunctionSpec.convexPublicQuery<GetQuery>()("get"))
         .addFunction(
-          FunctionSpec.convexInternalMutation<RemoveMutation>()("remove"),
+          FunctionSpec.convexPublicQuery<
+            RegisteredQuery<"public", GetQueryArgs, Promise<GetQueryReturns>>
+          >()("get"),
+        )
+        .addFunction(
+          FunctionSpec.convexInternalMutation<
+            RegisteredMutation<
+              "internal",
+              RemoveMutationArgs,
+              Promise<RemoveMutationReturns>
+            >
+          >()("remove"),
         ),
     );
     const refs = Refs.make(spec);
@@ -264,12 +259,6 @@ describe("make", () => {
     type ConvexQueryArgs = { cursor: string };
     type ConvexQueryReturns = string[];
 
-    type ConvexQuery = RegisteredQuery<
-      "public",
-      ConvexQueryArgs,
-      Promise<ConvexQueryReturns>
-    >;
-
     const ConfectQueryArgs = Schema.Struct({ limit: Schema.Number });
     type ConfectQueryArgs = typeof ConfectQueryArgs.Type;
 
@@ -285,7 +274,15 @@ describe("make", () => {
     const spec = Spec.make().add(
       GroupSpec.make("notes")
         .addFunction(ConfectQuery)
-        .addFunction(FunctionSpec.convexPublicQuery<ConvexQuery>()("search")),
+        .addFunction(
+          FunctionSpec.convexPublicQuery<
+            RegisteredQuery<
+              "public",
+              ConvexQueryArgs,
+              Promise<ConvexQueryReturns>
+            >
+          >()("search"),
+        ),
     );
     const refs = Refs.make(spec);
 

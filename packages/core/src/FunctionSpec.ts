@@ -299,21 +299,21 @@ type MatchingRegisteredFunction<
         : never;
 
 type ExtractArgs<F> =
-  F extends RegisteredQuery<any, infer Args_, any>
-    ? Args_
-    : F extends RegisteredMutation<any, infer Args_, any>
-      ? Args_
-      : F extends RegisteredAction<any, infer Args_, any>
-        ? Args_
+  F extends RegisteredQuery<any, infer A, any>
+    ? A
+    : F extends RegisteredMutation<any, infer A, any>
+      ? A
+      : F extends RegisteredAction<any, infer A, any>
+        ? A
         : never;
 
 type ExtractReturns<F> =
-  F extends RegisteredQuery<any, any, infer Returns_>
-    ? Returns_
-    : F extends RegisteredMutation<any, any, infer Returns_>
-      ? Returns_
-      : F extends RegisteredAction<any, any, infer Returns_>
-        ? Returns_
+  F extends RegisteredQuery<any, any, infer R>
+    ? R
+    : F extends RegisteredMutation<any, any, infer R>
+      ? R
+      : F extends RegisteredAction<any, any, infer R>
+        ? R
         : never;
 
 const makeConvex =

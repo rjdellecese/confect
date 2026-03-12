@@ -9,29 +9,36 @@ import type { Effect } from "effect";
 import { Layer, Match, type Schema } from "effect";
 import type * as Api from "./Api";
 import type * as DatabaseSchema from "./DatabaseSchema";
+import type * as Handler from "./Handler";
 import * as RegisteredFunction from "./RegisteredFunction";
 import type * as RegistryItem from "./RegistryItem";
 
 export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Node">>(
   api: Api_,
   { function_: anyFunction_, handler }: RegistryItem.AnyWithProps,
-): RegisteredFunction.RegisteredFunction => {
-  const function_ = anyFunction_ as FunctionSpec.AnyConfect;
+): RegisteredFunction.RegisteredFunction =>
+  Match.value(anyFunction_.functionProvenance).pipe(
+    Match.tag("Convex", () => handler as RegisteredFunction.RegisteredFunction),
+    Match.tag("Confect", (confect) => {
+      const function_ = anyFunction_ as FunctionSpec.AnyConfect;
+      const confectHandler = handler as Handler.AnyWithProps;
 
-  const genericFunction = Match.value(function_.functionVisibility).pipe(
-    Match.when("public", () => actionGeneric),
-    Match.when("internal", () => internalActionGeneric),
+      const genericFunction = Match.value(function_.functionVisibility).pipe(
+        Match.when("public", () => actionGeneric),
+        Match.when("internal", () => internalActionGeneric),
+        Match.exhaustive,
+      );
+
+      return genericFunction(
+        nodeActionFunction(api.databaseSchema, {
+          args: confect.args,
+          returns: confect.returns,
+          handler: confectHandler,
+        }),
+      );
+    }),
     Match.exhaustive,
   );
-
-  return genericFunction(
-    nodeActionFunction(api.databaseSchema, {
-      args: function_.functionProvenance.args,
-      returns: function_.functionProvenance.returns,
-      handler,
-    }),
-  );
-};
 
 const nodeActionFunction = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,

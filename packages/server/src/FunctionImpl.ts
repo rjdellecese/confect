@@ -3,10 +3,25 @@ import type * as GroupPath from "@confect/core/GroupPath";
 import type * as GroupSpec from "@confect/core/GroupSpec";
 import { Array, Context, Effect, Layer, Ref, String } from "effect";
 import type * as Api from "./Api";
+import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as Handler from "./Handler";
 import { setNestedProperty } from "./internal/utils";
 import * as Registry from "./Registry";
 import * as RegistryItem from "./RegistryItem";
+
+type ImplFor<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+  Functions extends FunctionSpec.AnyWithProps,
+  FunctionName extends string,
+> =
+  FunctionSpec.WithName<
+    Functions,
+    FunctionName
+  > extends infer FunctionSpec_ extends FunctionSpec.AnyWithProps
+    ? FunctionSpec_ extends { functionProvenance: { _tag: "Convex" } }
+      ? FunctionSpec.RegisteredFunction<FunctionSpec_>
+      : Handler.WithName<DatabaseSchema_, Functions, FunctionName>
+    : never;
 
 export interface FunctionImpl<
   GroupPath_ extends string,
@@ -40,7 +55,7 @@ export const make = <
   api: Api_,
   groupPath: GroupPath_,
   functionName: FunctionName,
-  handler: Handler.WithName<
+  handler: ImplFor<
     Api.Schema<Api_>,
     GroupSpec.Functions<GroupPath.GroupAt<Api.Groups<Api_>, GroupPath_>>,
     FunctionName
@@ -72,7 +87,7 @@ export const make = <
           [...groupPathParts, functionName],
           RegistryItem.make({
             function_,
-            handler: handler as Handler.AnyWithProps,
+            handler: handler as RegistryItem.AnyWithProps["handler"],
           }),
         ),
       );
