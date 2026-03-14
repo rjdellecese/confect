@@ -1,6 +1,6 @@
 import { Command, type CommandExecutor } from "@effect/platform";
 import { NodeContext } from "@effect/platform-node";
-import { Effect } from "effect";
+import { Config, Effect, Option, pipe } from "effect";
 
 const runCommand = (
   command: string,
@@ -17,12 +17,24 @@ const runCommand = (
   );
 
 export const setup = () =>
-  Effect.gen(function* () {
-    const originalCwd = process.cwd();
-    const testDir = import.meta.dirname;
+  pipe(
+    Config.option(Config.boolean("CI")),
+    Effect.map(Option.getOrElse(() => false)),
+    Effect.if({
+      onTrue: () => Effect.void,
+      onFalse: () =>
+        Effect.gen(function* () {
+          const originalCwd = process.cwd();
+          const testDir = import.meta.dirname;
 
-    yield* Effect.gen(function* () {
-      process.chdir(testDir);
-      yield* runCommand("pnpm", ["confect", "codegen"]);
-    }).pipe(Effect.ensuring(Effect.sync(() => process.chdir(originalCwd))));
-  }).pipe(Effect.provide(NodeContext.layer), Effect.runPromise);
+          yield* Effect.gen(function* () {
+            process.chdir(testDir);
+            yield* runCommand("pnpm", ["confect", "codegen"]);
+          }).pipe(
+            Effect.ensuring(Effect.sync(() => process.chdir(originalCwd))),
+          );
+        }),
+    }),
+    Effect.provide(NodeContext.layer),
+    Effect.runPromise,
+  );
