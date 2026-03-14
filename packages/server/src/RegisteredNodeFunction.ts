@@ -15,15 +15,15 @@ import type * as RegistryItem from "./RegistryItem";
 
 export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Node">>(
   api: Api_,
-  { function_: anyFunction_, handler }: RegistryItem.AnyWithProps,
+  { functionSpec: anyFunctionSpec, handler }: RegistryItem.AnyWithProps,
 ): RegisteredFunction.RegisteredFunction =>
-  Match.value(anyFunction_.functionProvenance).pipe(
+  Match.value(anyFunctionSpec.functionProvenance).pipe(
     Match.tag("Convex", () => handler as RegisteredFunction.RegisteredFunction),
     Match.tag("Confect", (confect) => {
-      const function_ = anyFunction_ as FunctionSpec.AnyConfect;
+      const functionSpec = anyFunctionSpec as FunctionSpec.AnyConfect;
       const confectHandler = handler as Handler.AnyWithProps;
 
-      const genericFunction = Match.value(function_.functionVisibility).pipe(
+      const genericFunction = Match.value(functionSpec.functionVisibility).pipe(
         Match.when("public", () => actionGeneric),
         Match.when("internal", () => internalActionGeneric),
         Match.exhaustive,

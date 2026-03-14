@@ -9,20 +9,6 @@ import { setNestedProperty } from "./internal/utils";
 import * as Registry from "./Registry";
 import * as RegistryItem from "./RegistryItem";
 
-type ImplFor<
-  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  Functions extends FunctionSpec.AnyWithProps,
-  FunctionName extends string,
-> =
-  FunctionSpec.WithName<
-    Functions,
-    FunctionName
-  > extends infer FunctionSpec_ extends FunctionSpec.AnyWithProps
-    ? FunctionSpec_ extends { functionProvenance: { _tag: "Convex" } }
-      ? FunctionSpec.RegisteredFunction<FunctionSpec_>
-      : Handler.WithName<DatabaseSchema_, Functions, FunctionName>
-    : never;
-
 export interface FunctionImpl<
   GroupPath_ extends string,
   FunctionName extends string,
@@ -71,7 +57,7 @@ export const make = <
       currentGroup.groups[groupPathPart],
   );
 
-  const function_ = group_.functions[functionName]!;
+  const functionSpec = group_.functions[functionName]!;
 
   return Layer.effect(
     FunctionImpl<GroupPath_, FunctionName>({
@@ -86,7 +72,7 @@ export const make = <
           registryItems,
           [...groupPathParts, functionName],
           RegistryItem.make({
-            function_,
+            functionSpec,
             handler: handler as RegistryItem.AnyWithProps["handler"],
           }),
         ),
@@ -99,6 +85,20 @@ export const make = <
     }),
   );
 };
+
+type ImplFor<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+  FunctionSpecs extends FunctionSpec.AnyWithProps,
+  FunctionName extends string,
+> =
+  FunctionSpec.WithName<
+    FunctionSpecs,
+    FunctionName
+  > extends infer FunctionSpec_ extends FunctionSpec.AnyWithProps
+    ? FunctionSpec_ extends { functionProvenance: { _tag: "Convex" } }
+      ? FunctionSpec.RegisteredFunction<FunctionSpec_>
+      : Handler.WithName<DatabaseSchema_, FunctionSpecs, FunctionName>
+    : never;
 
 /**
  * Get the function implementation service type for a specific group path and function name.

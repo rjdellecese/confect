@@ -31,18 +31,18 @@ import { StorageReader, StorageWriter } from "./Storage";
 
 export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
   api: Api_,
-  { function_: anyFunction_, handler }: RegistryItem.AnyWithProps,
+  { functionSpec: anyFunctionSpec, handler }: RegistryItem.AnyWithProps,
 ): RegisteredFunction.RegisteredFunction =>
-  Match.value(anyFunction_.functionProvenance).pipe(
+  Match.value(anyFunctionSpec.functionProvenance).pipe(
     Match.tag("Convex", () => handler as RegisteredFunction.RegisteredFunction),
     Match.tag("Confect", (confect) => {
-      const function_ = anyFunction_ as FunctionSpec.AnyConfect;
+      const functionSpec = anyFunctionSpec as FunctionSpec.AnyConfect;
       const confectHandler = handler as Handler.AnyWithProps;
 
-      return Match.value(function_.runtimeAndFunctionType.functionType).pipe(
+      return Match.value(functionSpec.runtimeAndFunctionType.functionType).pipe(
         Match.when("query", () => {
           const genericFunction = Match.value(
-            function_.functionVisibility,
+            functionSpec.functionVisibility,
           ).pipe(
             Match.when("public", () => queryGeneric),
             Match.when("internal", () => internalQueryGeneric),
@@ -59,7 +59,7 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
         }),
         Match.when("mutation", () => {
           const genericFunction = Match.value(
-            function_.functionVisibility,
+            functionSpec.functionVisibility,
           ).pipe(
             Match.when("public", () => mutationGeneric),
             Match.when("internal", () => internalMutationGeneric),
@@ -76,7 +76,7 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
         }),
         Match.when("action", () => {
           const genericFunction = Match.value(
-            function_.functionVisibility,
+            functionSpec.functionVisibility,
           ).pipe(
             Match.when("public", () => actionGeneric),
             Match.when("internal", () => internalActionGeneric),

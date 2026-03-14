@@ -14,13 +14,17 @@ const make =
       const functionName = Ref.getConvexFunctionName(action);
 
       return yield* Match.value(functionSpec.functionProvenance).pipe(
-        Match.tag("Confect", (confect) =>
+        Match.tag("Confect", (confectFunctionSpec) =>
           Effect.gen(function* () {
-            const encodedArgs = yield* Schema.encode(confect.args)(args);
+            const encodedArgs = yield* Schema.encode(confectFunctionSpec.args)(
+              args,
+            );
             const encodedReturns = yield* Effect.promise(() =>
               runAction(functionName as any, encodedArgs),
             );
-            return yield* Schema.decode(confect.returns)(encodedReturns);
+            return yield* Schema.decode(confectFunctionSpec.returns)(
+              encodedReturns,
+            );
           }),
         ),
         Match.tag("Convex", () =>

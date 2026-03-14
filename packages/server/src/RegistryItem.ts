@@ -19,26 +19,26 @@ export interface RegistryItem<
   FunctionSpec_ extends FunctionSpec.AnyWithProps,
 > {
   readonly [TypeId]: TypeId;
-  readonly function_: FunctionSpec_;
+  readonly functionSpec: FunctionSpec_;
   readonly handler: Handler.Handler<DatabaseSchema_, FunctionSpec_>;
 }
 
 export interface AnyWithProps {
   readonly [TypeId]: TypeId;
-  readonly function_: FunctionSpec.AnyWithProps;
+  readonly functionSpec: FunctionSpec.AnyWithProps;
   readonly handler:
     | Handler.AnyWithProps
     | RegisteredFunction.RegisteredFunction;
 }
 
 export const make = ({
-  function_,
+  functionSpec,
   handler,
 }: {
-  function_: FunctionSpec.AnyWithProps;
+  functionSpec: FunctionSpec.AnyWithProps;
   handler: AnyWithProps["handler"];
 }): AnyWithProps =>
   Object.assign(Object.create(RegistryItemProto), {
-    function_,
+    functionSpec,
     handler,
   });
