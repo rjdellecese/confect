@@ -78,8 +78,6 @@ export type GetFunctionVisibility<Function extends AnyWithProps> =
 
 export type Name<Function extends AnyWithProps> = Function["name"];
 
-// --- Args / Returns: return plain caller-facing types ---
-
 export type Args<Function extends AnyWithProps> = Function extends {
   functionProvenance: {
     _tag: "Confect";
@@ -160,8 +158,6 @@ export type WithoutName<
   Name_ extends Name<Function>,
 > = Exclude<Function, { readonly name: Name_ }>;
 
-// --- RegisteredFunction: provenance-aware ---
-
 type ConfectRegisteredFunction<Function extends AnyWithProps> =
   RuntimeAndFunctionType.GetFunctionType<
     Function["runtimeAndFunctionType"]
@@ -216,8 +212,6 @@ export type RegisteredFunction<Function extends AnyWithProps> =
   Function extends { functionProvenance: { _tag: "Convex" } }
     ? ConvexRegisteredFunction<Function>
     : ConfectRegisteredFunction<Function>;
-
-// --- Confect constructors ---
 
 const Proto = {
   [TypeId]: TypeId,
@@ -287,8 +281,6 @@ export const internalNodeAction = make(
   RuntimeAndFunctionType.NodeAction,
   "internal",
 );
-
-// --- Convex-native constructors ---
 
 type MatchingRegisteredFunction<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
