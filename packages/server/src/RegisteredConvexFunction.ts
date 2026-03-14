@@ -51,7 +51,7 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
             queryFunction(api.databaseSchema, {
               args: functionProvenance.args,
               returns: functionProvenance.returns,
-              handler: handler as Handler.Any,
+              handler: handler as Handler.AnyConfectProvenance,
             }),
           );
         }),
@@ -66,7 +66,7 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
             mutationFunction(api.databaseSchema, {
               args: functionProvenance.args,
               returns: functionProvenance.returns,
-              handler: handler as Handler.Any,
+              handler: handler as Handler.AnyConfectProvenance,
             }),
           );
         }),
@@ -81,7 +81,7 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
             convexActionFunction(api.databaseSchema, {
               args: functionProvenance.args,
               returns: functionProvenance.returns,
-              handler: handler as Handler.Any,
+              handler: handler as Handler.AnyConfectProvenance,
             }),
           );
         }),

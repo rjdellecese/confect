@@ -74,6 +74,15 @@ export interface AnyWithPropsWithFunctionType<
   FunctionProvenance.FunctionProvenance
 > {}
 
+export interface AnyWithPropsWithFunctionProvenance<
+  FunctionProvenance_ extends FunctionProvenance.FunctionProvenance,
+> extends FunctionSpec<
+  RuntimeAndFunctionType.RuntimeAndFunctionType,
+  FunctionVisibility,
+  string,
+  FunctionProvenance_
+> {}
+
 export type GetRuntimeAndFunctionType<Function extends AnyWithProps> =
   Function["runtimeAndFunctionType"];
 
@@ -154,6 +163,11 @@ export type WithFunctionType<
   Function,
   { readonly runtimeAndFunctionType: { readonly functionType: FunctionType_ } }
 >;
+
+export type WithFunctionProvenance<
+  Function extends AnyWithProps,
+  FunctionProvenance_ extends FunctionProvenance.FunctionProvenance,
+> = Extract<Function, { readonly functionProvenance: FunctionProvenance_ }>;
 
 export type WithoutName<
   Function extends AnyWithProps,

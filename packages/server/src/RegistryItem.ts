@@ -2,7 +2,6 @@ import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import { Predicate } from "effect";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as Handler from "./Handler";
-import type * as RegisteredFunction from "./RegisteredFunction";
 
 export const TypeId = "@confect/server/RegistryItem";
 export type TypeId = typeof TypeId;
@@ -26,7 +25,7 @@ export interface RegistryItem<
 export interface AnyWithProps {
   readonly [TypeId]: TypeId;
   readonly functionSpec: FunctionSpec.AnyWithProps;
-  readonly handler: Handler.Any | RegisteredFunction.RegisteredFunction;
+  readonly handler: Handler.Any;
 }
 
 export const make = ({

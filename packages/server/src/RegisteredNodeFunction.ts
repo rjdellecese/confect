@@ -33,7 +33,7 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Node">>(
         nodeActionFunction(api.databaseSchema, {
           args: functionProvenance.args,
           returns: functionProvenance.returns,
-          handler: handler as Handler.Any,
+          handler: handler as Handler.AnyConfectProvenance,
         }),
       );
     }),
