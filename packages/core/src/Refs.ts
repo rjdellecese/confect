@@ -39,12 +39,12 @@ type OmitEmpty<T> = {
 };
 
 type FunctionSpecMatchesPredicate<
-  F extends FunctionSpec.AnyWithProps,
+  FunctionSpec_ extends FunctionSpec.AnyWithProps,
   Predicate extends Ref.Any,
 > =
   Ref.Ref<
-    FunctionSpec.GetRuntimeAndFunctionType<F>,
-    FunctionSpec.GetFunctionVisibility<F>,
+    FunctionSpec.GetRuntimeAndFunctionType<FunctionSpec_>,
+    FunctionSpec.GetFunctionVisibility<FunctionSpec_>,
     any,
     any
   > extends Predicate
@@ -52,17 +52,17 @@ type FunctionSpecMatchesPredicate<
     : false;
 
 type FilteredFunctions<
-  Functions extends FunctionSpec.AnyWithProps,
+  FunctionSpecs extends FunctionSpec.AnyWithProps,
   Predicate extends Ref.Any,
 > = {
-  [Name in FunctionSpec.Name<Functions> as FunctionSpec.WithName<
-    Functions,
+  [Name in FunctionSpec.Name<FunctionSpecs> as FunctionSpec.WithName<
+    FunctionSpecs,
     Name
-  > extends infer F extends FunctionSpec.AnyWithProps
-    ? FunctionSpecMatchesPredicate<F, Predicate> extends true
+  > extends infer FunctionSpec_ extends FunctionSpec.AnyWithProps
+    ? FunctionSpecMatchesPredicate<FunctionSpec_, Predicate> extends true
       ? Name
       : never
-    : never]: FunctionSpec.WithName<Functions, Name> extends infer F extends
+    : never]: FunctionSpec.WithName<FunctionSpecs, Name> extends infer F extends
     FunctionSpec.AnyWithProps
     ? Ref.FromFunctionSpec<F>
     : never;
