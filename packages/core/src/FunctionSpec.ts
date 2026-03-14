@@ -81,11 +81,12 @@ export type Name<Function extends AnyWithProps> = Function["name"];
 // --- Args / Returns: return plain caller-facing types ---
 
 export type Args<Function extends AnyWithProps> = Function extends {
-  functionProvenance: { _tag: "Confect"; args: infer ArgsSchema_ };
+  functionProvenance: {
+    _tag: "Confect";
+    args: infer ArgsSchema_ extends Schema.Schema.AnyNoContext;
+  };
 }
-  ? ArgsSchema_ extends Schema.Schema.AnyNoContext
-    ? ArgsSchema_["Type"]
-    : never
+  ? ArgsSchema_["Type"]
   : Function extends {
         functionProvenance: { _tag: "Convex"; _args: infer Args_ };
       }
@@ -93,11 +94,12 @@ export type Args<Function extends AnyWithProps> = Function extends {
     : never;
 
 export type Returns<Function extends AnyWithProps> = Function extends {
-  functionProvenance: { _tag: "Confect"; returns: infer ReturnsSchema_ };
+  functionProvenance: {
+    _tag: "Confect";
+    returns: infer ReturnsSchema_ extends Schema.Schema.AnyNoContext;
+  };
 }
-  ? ReturnsSchema_ extends Schema.Schema.AnyNoContext
-    ? ReturnsSchema_["Type"]
-    : never
+  ? ReturnsSchema_["Type"]
   : Function extends {
         functionProvenance: { _tag: "Convex"; _returns: infer Returns_ };
       }
@@ -107,11 +109,12 @@ export type Returns<Function extends AnyWithProps> = Function extends {
 // --- EncodedArgs / EncodedReturns: wire-format types for RegisteredFunction ---
 
 export type EncodedArgs<Function extends AnyWithProps> = Function extends {
-  functionProvenance: { _tag: "Confect"; args: infer ArgsSchema_ };
+  functionProvenance: {
+    _tag: "Confect";
+    args: infer ArgsSchema_ extends Schema.Schema.AnyNoContext;
+  };
 }
-  ? ArgsSchema_ extends Schema.Schema.AnyNoContext
-    ? ArgsSchema_["Encoded"]
-    : never
+  ? ArgsSchema_["Encoded"]
   : Function extends {
         functionProvenance: { _tag: "Convex"; _args: infer Args_ };
       }
@@ -119,11 +122,12 @@ export type EncodedArgs<Function extends AnyWithProps> = Function extends {
     : never;
 
 export type EncodedReturns<Function extends AnyWithProps> = Function extends {
-  functionProvenance: { _tag: "Confect"; returns: infer ReturnsSchema_ };
+  functionProvenance: {
+    _tag: "Confect";
+    returns: infer ReturnsSchema_ extends Schema.Schema.AnyNoContext;
+  };
 }
-  ? ReturnsSchema_ extends Schema.Schema.AnyNoContext
-    ? ReturnsSchema_["Encoded"]
-    : never
+  ? ReturnsSchema_["Encoded"]
   : Function extends {
         functionProvenance: { _tag: "Convex"; _returns: infer Returns_ };
       }

@@ -38,6 +38,19 @@ type OmitEmpty<T> = {
   [K in keyof T as keyof T[K] extends never ? never : K]: T[K];
 };
 
+type FunctionSpecMatchesPredicate<
+  F extends FunctionSpec.AnyWithProps,
+  Predicate extends Ref.Any,
+> =
+  Ref.Ref<
+    FunctionSpec.GetRuntimeAndFunctionType<F>,
+    FunctionSpec.GetFunctionVisibility<F>,
+    any,
+    any
+  > extends Predicate
+    ? true
+    : false;
+
 type FilteredFunctions<
   Functions extends FunctionSpec.AnyWithProps,
   Predicate extends Ref.Any,
@@ -46,7 +59,7 @@ type FilteredFunctions<
     Functions,
     Name
   > extends infer F extends FunctionSpec.AnyWithProps
-    ? Ref.FromFunctionSpec<F> extends Predicate
+    ? FunctionSpecMatchesPredicate<F, Predicate> extends true
       ? Name
       : never
     : never]: FunctionSpec.WithName<Functions, Name> extends infer F extends
