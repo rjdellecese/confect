@@ -73,7 +73,7 @@ export const make = <
           [...groupPathParts, functionName],
           RegistryItem.make({
             functionSpec,
-            handler: handler as RegistryItem.AnyWithProps["handler"],
+            handler,
           }),
         ),
       );
