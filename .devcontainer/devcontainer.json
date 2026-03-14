@@ -4,6 +4,7 @@
   "customizations": {
     "vscode": {
       "extensions": [
+        "GitHub.vscode-pull-request-github",
         "YoavBls.pretty-ts-errors",
         "dbaeumer.vscode-eslint",
         "effectful-tech.effect-vscode",
