@@ -46,10 +46,14 @@ export interface AnyConfect extends FunctionSpec<
   RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility,
   string,
-  FunctionProvenance.Confect<
-    Schema.Schema.AnyNoContext,
-    Schema.Schema.AnyNoContext
-  >
+  FunctionProvenance.AnyConfect
+> {}
+
+export interface AnyConvex extends FunctionSpec<
+  RuntimeAndFunctionType.RuntimeAndFunctionType,
+  FunctionVisibility,
+  string,
+  FunctionProvenance.AnyConvex
 > {}
 
 export interface AnyWithPropsWithRuntime<
@@ -104,8 +108,6 @@ export type Returns<Function extends AnyWithProps> = Function extends {
     ? Awaited<Returns_>
     : never;
 
-// --- EncodedArgs / EncodedReturns: wire-format types for RegisteredFunction ---
-
 export type EncodedArgs<Function extends AnyWithProps> = Function extends {
   functionProvenance: {
     _tag: "Confect";
@@ -159,31 +161,33 @@ export type WithoutName<
 > = Exclude<Function, { readonly name: Name_ }>;
 
 type ConfectRegisteredFunction<Function extends AnyWithProps> =
-  RuntimeAndFunctionType.GetFunctionType<
-    Function["runtimeAndFunctionType"]
-  > extends "query"
-    ? RegisteredQuery<
-        GetFunctionVisibility<Function>,
-        EncodedArgs<Function> & DefaultFunctionArgs,
-        Promise<EncodedReturns<Function>>
-      >
-    : RuntimeAndFunctionType.GetFunctionType<
-          Function["runtimeAndFunctionType"]
-        > extends "mutation"
-      ? RegisteredMutation<
+  EncodedArgs<Function> extends infer Args_ extends DefaultFunctionArgs
+    ? RuntimeAndFunctionType.GetFunctionType<
+        Function["runtimeAndFunctionType"]
+      > extends "query"
+      ? RegisteredQuery<
           GetFunctionVisibility<Function>,
-          EncodedArgs<Function> & DefaultFunctionArgs,
+          Args_,
           Promise<EncodedReturns<Function>>
         >
       : RuntimeAndFunctionType.GetFunctionType<
             Function["runtimeAndFunctionType"]
-          > extends "action"
-        ? RegisteredAction<
+          > extends "mutation"
+        ? RegisteredMutation<
             GetFunctionVisibility<Function>,
-            EncodedArgs<Function> & DefaultFunctionArgs,
+            Args_,
             Promise<EncodedReturns<Function>>
           >
-        : never;
+        : RuntimeAndFunctionType.GetFunctionType<
+              Function["runtimeAndFunctionType"]
+            > extends "action"
+          ? RegisteredAction<
+              GetFunctionVisibility<Function>,
+              Args_,
+              Promise<EncodedReturns<Function>>
+            >
+          : never
+    : never;
 
 type ConvexRegisteredFunction<Function extends AnyWithProps> =
   Function extends {

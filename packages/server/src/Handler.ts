@@ -108,7 +108,7 @@ type Base<FunctionSpec_ extends FunctionSpec.AnyWithProps, R> = (
   args: FunctionSpec.Args<FunctionSpec_>,
 ) => Effect.Effect<FunctionSpec.Returns<FunctionSpec_>, never, R>;
 
-export type AnyWithProps = Handler<
+export type Any = Handler<
   DatabaseSchema.AnyWithProps,
   FunctionSpec.AnyWithProps
 >;

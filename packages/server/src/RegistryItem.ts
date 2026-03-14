@@ -26,9 +26,7 @@ export interface RegistryItem<
 export interface AnyWithProps {
   readonly [TypeId]: TypeId;
   readonly functionSpec: FunctionSpec.AnyWithProps;
-  readonly handler:
-    | Handler.AnyWithProps
-    | RegisteredFunction.RegisteredFunction;
+  readonly handler: Handler.Any | RegisteredFunction.RegisteredFunction;
 }
 
 export const make = ({

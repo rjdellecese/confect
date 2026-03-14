@@ -15,20 +15,27 @@ export type FunctionProvenance = Data.TaggedEnum<{
   };
 }>;
 
-export type Confect<
+export interface Confect<
   Args extends Schema.Schema.AnyNoContext,
   Returns extends Schema.Schema.AnyNoContext,
-> = {
+> {
   readonly _tag: "Confect";
   readonly args: Args;
   readonly returns: Returns;
-};
+}
 
-export type Convex<Args extends DefaultFunctionArgs, Returns> = {
+export interface AnyConfect extends Confect<
+  Schema.Schema.AnyNoContext,
+  Schema.Schema.AnyNoContext
+> {}
+
+export interface Convex<Args extends DefaultFunctionArgs, Returns> {
   readonly _tag: "Convex";
   readonly _args: Args;
   readonly _returns: Returns;
-};
+}
+
+export interface AnyConvex extends Convex<DefaultFunctionArgs, any> {}
 
 export const FunctionProvenance = Data.taggedEnum<FunctionProvenance>();
 

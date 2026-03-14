@@ -13,6 +13,7 @@ import {
 import { Effect, Layer, Match, pipe, Schema } from "effect";
 import type * as Api from "./Api";
 import * as Auth from "./Auth";
+import * as ConvexConfigProvider from "./ConvexConfigProvider";
 import * as DatabaseReader from "./DatabaseReader";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import * as DatabaseWriter from "./DatabaseWriter";
@@ -26,24 +27,21 @@ import * as RegisteredFunction from "./RegisteredFunction";
 import type * as RegistryItem from "./RegistryItem";
 import * as Scheduler from "./Scheduler";
 import * as SchemaToValidator from "./SchemaToValidator";
-import * as ConvexConfigProvider from "./ConvexConfigProvider";
 import { StorageReader, StorageWriter } from "./Storage";
 
 export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
   api: Api_,
-  { functionSpec: anyFunctionSpec, handler }: RegistryItem.AnyWithProps,
+  { functionSpec, handler }: RegistryItem.AnyWithProps,
 ): RegisteredFunction.RegisteredFunction =>
-  Match.value(anyFunctionSpec.functionProvenance).pipe(
+  Match.value(functionSpec.functionProvenance).pipe(
     Match.tag("Convex", () => handler as RegisteredFunction.RegisteredFunction),
-    Match.tag("Confect", (confect) => {
-      const functionSpec = anyFunctionSpec as FunctionSpec.AnyConfect;
-      const confectHandler = handler as Handler.AnyWithProps;
+    Match.tag("Confect", () => {
+      const { functionVisibility, functionProvenance } =
+        functionSpec as FunctionSpec.AnyConfect;
 
       return Match.value(functionSpec.runtimeAndFunctionType.functionType).pipe(
         Match.when("query", () => {
-          const genericFunction = Match.value(
-            functionSpec.functionVisibility,
-          ).pipe(
+          const genericFunction = Match.value(functionVisibility).pipe(
             Match.when("public", () => queryGeneric),
             Match.when("internal", () => internalQueryGeneric),
             Match.exhaustive,
@@ -51,16 +49,14 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
 
           return genericFunction(
             queryFunction(api.databaseSchema, {
-              args: confect.args,
-              returns: confect.returns,
-              handler: confectHandler,
+              args: functionProvenance.args,
+              returns: functionProvenance.returns,
+              handler: handler as Handler.Any,
             }),
           );
         }),
         Match.when("mutation", () => {
-          const genericFunction = Match.value(
-            functionSpec.functionVisibility,
-          ).pipe(
+          const genericFunction = Match.value(functionVisibility).pipe(
             Match.when("public", () => mutationGeneric),
             Match.when("internal", () => internalMutationGeneric),
             Match.exhaustive,
@@ -68,16 +64,14 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
 
           return genericFunction(
             mutationFunction(api.databaseSchema, {
-              args: confect.args,
-              returns: confect.returns,
-              handler: confectHandler,
+              args: functionProvenance.args,
+              returns: functionProvenance.returns,
+              handler: handler as Handler.Any,
             }),
           );
         }),
         Match.when("action", () => {
-          const genericFunction = Match.value(
-            functionSpec.functionVisibility,
-          ).pipe(
+          const genericFunction = Match.value(functionVisibility).pipe(
             Match.when("public", () => actionGeneric),
             Match.when("internal", () => internalActionGeneric),
             Match.exhaustive,
@@ -85,9 +79,9 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
 
           return genericFunction(
             convexActionFunction(api.databaseSchema, {
-              args: confect.args,
-              returns: confect.returns,
-              handler: confectHandler,
+              args: functionProvenance.args,
+              returns: functionProvenance.returns,
+              handler: handler as Handler.Any,
             }),
           );
         }),
