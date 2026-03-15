@@ -109,6 +109,9 @@ importers:
       '@confect/server':
         specifier: workspace:*
         version: link:../../packages/server
+      '@convex-dev/workpool':
+        specifier: ^0.4.2
+        version: 0.4.2(convex-helpers@0.1.114(@standard-schema/spec@1.0.0)(convex@1.33.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(convex@1.33.1(react@19.2.4))
       '@effect/platform':
         specifier: 0.94.5
         version: 0.94.5(effect@3.19.19)
@@ -675,6 +678,12 @@ packages:
 
   '@changesets/write@0.4.0':
     resolution: {integrity: sha512-CdTLvIOPiCNuH71pyDu3rA+Q0n65cmAbXnwWH84rKGiFumFzkmHNT8KHTMEchcxN+Kl8I54xGUhJ7l3E7X396Q==}
+
+  '@convex-dev/workpool@0.4.2':
+    resolution: {integrity: sha512-lNFFouUeCVPAzT6OVDZSqN17sw+MiJSzXwet2CevVzbec6snt0IXf/qazYmhQkbGl6SIfqT3y8yL7sxw+7gEfA==}
+    peerDependencies:
+      convex: 1.33.1
+      convex-helpers: ^0.1.94
 
   '@effect/cli@0.73.2':
     resolution: {integrity: sha512-K8IJo81+qa1LU8dhxcDU4QO/bIjL/dPd3zUOSCpLiuUNz8Y3/T+WNs3GqIXEhMfCFMSlRZERN0YgmtRlEZUREA==}
@@ -3183,6 +3192,28 @@ packages:
   convert-to-spaces@2.0.1:
     resolution: {integrity: sha512-rcQ1bsQO9799wq24uE5AM2tAILy4gXGIK/njFWcVQkGNZ96edlpY+A7bjwvzjYvLDyzmG1MmMLZhpcsb+klNMQ==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
+
+  convex-helpers@0.1.114:
+    resolution: {integrity: sha512-elEdh+gG6BDv2dWIWVvBeJPbHnDQS5+WexUuwlGVJXz1EbMkXz/UIQwFIfLMZIXUwW6ot4JYf/1JJKNStrE6lg==}
+    hasBin: true
+    peerDependencies:
+      '@standard-schema/spec': ^1.0.0
+      convex: 1.33.1
+      hono: ^4.0.5
+      react: 19.2.4
+      typescript: ^5.5
+      zod: ^3.25.0 || ^4.0.0
+    peerDependenciesMeta:
+      '@standard-schema/spec':
+        optional: true
+      hono:
+        optional: true
+      react:
+        optional: true
+      typescript:
+        optional: true
+      zod:
+        optional: true
 
   convex-test@0.0.38:
     resolution: {integrity: sha512-1o/3GvUR9gMLjiqq7SxchI/0OYQaWwbQC4INmB1SNt1WLBjUgEM8+brgpqrZwJ+Vb1DdGZokCVeihwT5IPk49w==}
@@ -6904,6 +6935,11 @@ snapshots:
       human-id: 4.1.1
       prettier: 2.8.8
 
+  '@convex-dev/workpool@0.4.2(convex-helpers@0.1.114(@standard-schema/spec@1.0.0)(convex@1.33.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(convex@1.33.1(react@19.2.4))':
+    dependencies:
+      convex: 1.33.1(react@19.2.4)
+      convex-helpers: 0.1.114(@standard-schema/spec@1.0.0)(convex@1.33.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3)
+
   '@effect/cli@0.73.2(@effect/platform@0.94.5(effect@3.19.19))(@effect/printer-ansi@0.47.0(@effect/typeclass@0.38.0(effect@3.19.19))(effect@3.19.19))(@effect/printer@0.47.0(@effect/typeclass@0.38.0(effect@3.19.19))(effect@3.19.19))(effect@3.19.19)':
     dependencies:
       '@effect/platform': 0.94.5(effect@3.19.19)
@@ -9640,6 +9676,14 @@ snapshots:
   convert-source-map@2.0.0: {}
 
   convert-to-spaces@2.0.1: {}
+
+  convex-helpers@0.1.114(@standard-schema/spec@1.0.0)(convex@1.33.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3):
+    dependencies:
+      convex: 1.33.1(react@19.2.4)
+    optionalDependencies:
+      '@standard-schema/spec': 1.0.0
+      react: 19.2.4
+      typescript: 5.9.3
 
   convex-test@0.0.38(convex@1.33.1(react@19.2.4)):
     dependencies:

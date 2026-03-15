@@ -171,7 +171,7 @@ describe("make", () => {
     void refs.public.notes.internalList;
   });
 
-  it("turns a Convex-native spec into refs", () => {
+  it("turns a plain Convex spec into refs", () => {
     type ListQueryArgs = { tag: string };
     type ListQueryReturns = string[];
 
@@ -204,7 +204,7 @@ describe("make", () => {
     >();
   });
 
-  it("filters Convex-native refs by visibility", () => {
+  it("filters plain Convex refs by visibility", () => {
     type GetQueryArgs = { id: string };
     type GetQueryReturns = string;
 
@@ -255,7 +255,7 @@ describe("make", () => {
     void refs.internal.notes.get;
   });
 
-  it("mixes Confect-native and Convex-native specs", () => {
+  it("mixes Confect and plain Convex specs", () => {
     type ConvexQueryArgs = { cursor: string };
     type ConvexQueryReturns = string[];
 
