@@ -1,0 +1,120 @@
+---
+icon: "files"
+title: "File Naming Conventions"
+description: "Recommended patterns for organizing spec, impl, and related files in your confect directory."
+---
+
+Confect requires a small number of fixed entry-point files in your `confect/` directory (see [Project Structure](/concepts/project-structure)). Beyond those, you can organize your group spec and impl files however you like. The conventions below are what the Confect documentation and example project follow.
+
+## Spec and impl files
+
+Name your group spec and impl files with `.spec.ts` and `.impl.ts` suffixes. This keeps each group's interface and implementation easy to identify, and colocates them in directory listings.
+
+```
+confect/
+  notes.spec.ts
+  notes.impl.ts
+  spec.ts
+  impl.ts
+```
+
+The entry-point files `spec.ts` and `impl.ts` then import from the corresponding `.spec.ts` and `.impl.ts` files:
+
+```ts confect/spec.ts
+import { Spec } from "@confect/core";
+import { notes } from "./notes.spec";
+
+export default Spec.make().add(notes);
+```
+
+```ts confect/impl.ts
+import { Impl } from "@confect/server";
+import { Layer } from "effect";
+import api from "./_generated/api";
+import { notes } from "./notes.impl";
+
+export default Impl.make(api).pipe(
+  Layer.provide(notes),
+  Impl.finalize,
+);
+```
+
+<Warning>
+  Some test runners (such as Vitest and Jest) treat `.spec.ts` files
+  as test files by default. If your test runner is picking up Confect
+  spec files, configure it to exclude them. For example, in Vitest you
+  can add `"**/*.spec.ts"` to the `test.exclude` array in your config.
+</Warning>
+
+## Native Convex functions
+
+When a group wraps [native Convex functions](/server/plain-convex-functions) (for use with components or other libraries), place the plain function definitions in a file named after the group — without a suffix. This puts all three files for a group side by side:
+
+```
+confect/
+  workpool.ts          ← native Convex function definitions
+  workpool.spec.ts     ← spec (type-only imports from workpool.ts)
+  workpool.impl.ts     ← impl (runtime imports from workpool.ts)
+```
+
+## Node actions
+
+Place [node action](/server/node-actions) spec and impl files in a `node/` subdirectory, using the same `.spec.ts` / `.impl.ts` suffixes. The entry-point files `nodeSpec.ts` and `nodeImpl.ts` import from this directory.
+
+```
+confect/
+  nodeSpec.ts
+  nodeImpl.ts
+  node/
+    email.spec.ts
+    email.impl.ts
+```
+
+## Nested groups
+
+When a group contains subgroups, use a subdirectory named after the parent group. The parent's `.spec.ts` and `.impl.ts` files stay at the top level and import from the subdirectory.
+
+```
+confect/
+  billing.spec.ts           ← parent group spec
+  billing.impl.ts           ← parent group impl
+  billing/
+    invoices.spec.ts        ← subgroup spec
+    invoices.impl.ts        ← subgroup impl
+    subscriptions.spec.ts
+    subscriptions.impl.ts
+```
+
+## Full example
+
+Putting it all together, a project using all of these conventions might look like this:
+
+<Tree>
+  <Tree.Folder name="confect" defaultOpen>
+    <Tree.Folder name="_generated" />
+    <Tree.Folder name="node" defaultOpen>
+      <Tree.File name="email.spec.ts" />
+      <Tree.File name="email.impl.ts" />
+    </Tree.Folder>
+    <Tree.Folder name="notesAndRandom" defaultOpen>
+      <Tree.File name="notes.spec.ts" />
+      <Tree.File name="notes.impl.ts" />
+      <Tree.File name="random.spec.ts" />
+      <Tree.File name="random.impl.ts" />
+    </Tree.Folder>
+    <Tree.Folder name="tables" />
+    <Tree.File name="env.spec.ts" />
+    <Tree.File name="env.impl.ts" />
+    <Tree.File name="http.ts" />
+    <Tree.File name="impl.ts" />
+    <Tree.File name="nodeImpl.ts" />
+    <Tree.File name="nodeSpec.ts" />
+    <Tree.File name="notesAndRandom.spec.ts" />
+    <Tree.File name="notesAndRandom.impl.ts" />
+    <Tree.File name="schema.ts" />
+    <Tree.File name="spec.ts" />
+    <Tree.File name="workpool.ts" />
+    <Tree.File name="workpool.spec.ts" />
+    <Tree.File name="workpool.impl.ts" />
+  </Tree.Folder>
+</Tree>

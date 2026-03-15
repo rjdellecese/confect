@@ -46,6 +46,7 @@
           "concepts/packages",
           "concepts/project-structure",
           "concepts/spec-impl-model",
+          "concepts/file-naming-conventions",
           "concepts/services",
           "concepts/schema-restrictions"
         ]

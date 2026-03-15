@@ -10,11 +10,11 @@ Confect provides a `ConfigProvider` that is compatible with the Convex runtime, 
 
 Use `Config` from Effect to read [Convex environment variables](https://docs.convex.dev/production/environment-variables) in your function handlers.
 
-```ts confect/impl/settings.ts
+```ts confect/settings.impl.ts
 import { FunctionImpl } from "@confect/server";
 import { Config, Effect } from "effect";
 
-import api from "../_generated/api";
+import api from "./_generated/api";
 
 const getApiKey = FunctionImpl.make(
   api,

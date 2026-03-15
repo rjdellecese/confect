@@ -1,7 +1,7 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Effect, Layer } from "effect";
-import api from "../_generated/api";
-import { DatabaseReader } from "../_generated/services";
+import api from "./_generated/api";
+import { DatabaseReader } from "./_generated/services";
 
 export const databaseReader = GroupImpl.make(api, "databaseReader").pipe(
   Layer.provide(

@@ -45,9 +45,9 @@ export default app;
 
 ### Write the Convex functions
 
-Write standard Convex functions using the Convex API. Place them in your `confect/` directory — a common convention is a `plain/` subfolder.
+Write standard Convex functions using the Convex API and place them in your `confect/` directory. By [convention](/concepts/file-naming-conventions), they go adjacent to their corresponding spec and impl files — for example, `workpool.ts` alongside `workpool.spec.ts` and `workpool.impl.ts`.
 
-```ts confect/plain/workpool.ts
+```ts confect/workpool.ts
 import {
   type WorkId,
   Workpool,
@@ -55,13 +55,13 @@ import {
   vOnCompleteArgs,
 } from "@convex-dev/workpool";
 import { v } from "convex/values";
-import { components, internal } from "../../convex/_generated/api";
+import { components, internal } from "../convex/_generated/api";
 import {
   internalAction,
   internalMutation,
   mutation,
   query,
-} from "../../convex/_generated/server";
+} from "../convex/_generated/server";
 
 const pool = new Workpool(components.workpool, {
   maxParallelism: 3,
@@ -127,14 +127,14 @@ export const onComplete = internalMutation({
 
 Use the `convex*` spec constructors and pass each Convex function's type as a type argument. Confect extracts argument and return types from the Convex `RegisteredQuery`, `RegisteredMutation`, or `RegisteredAction` type so that refs are fully typed.
 
-```ts confect/spec/workpool.ts
+```ts confect/workpool.spec.ts
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import type {
   backgroundWork,
   enqueue,
   onComplete,
   status,
-} from "../plain/workpool";
+} from "./workpool";
 
 export const workpool = GroupSpec.make("workpool")
   .addFunction(
@@ -166,7 +166,7 @@ Add the group to your top-level spec as usual.
 
 ```ts confect/spec.ts
 import { Spec } from "@confect/core";
-import { workpool } from "./spec/workpool";
+import { workpool } from "./workpool.spec";
 
 export default Spec.make().add(workpool);
 ```
@@ -175,16 +175,16 @@ export default Spec.make().add(workpool);
 
 For plain Convex functions, the impl is the Convex function value itself. Pass each one directly to `FunctionImpl.make`.
 
-```ts confect/impl/workpool.ts
+```ts confect/workpool.impl.ts
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Layer } from "effect";
-import api from "../_generated/api";
+import api from "./_generated/api";
 import {
   backgroundWork,
   enqueue,
   onComplete,
   status,
-} from "../plain/workpool";
+} from "./workpool";
 
 const enqueueImpl = FunctionImpl.make(
   api,
@@ -225,7 +225,7 @@ Provide the group layer in your top-level impl as usual.
 import { Impl } from "@confect/server";
 import { Layer } from "effect";
 import api from "./_generated/api";
-import { workpool } from "./impl/workpool";
+import { workpool } from "./workpool.impl";
 
 export default Impl.make(api).pipe(
   Layer.provide(workpool),
@@ -249,11 +249,11 @@ const status = useQuery(refs.public.workpool.status, { workId });
 
 A single group can contain both Confect functions (with Effect schemas) and plain Convex functions. Each function's spec constructor determines how it is registered and called.
 
-```ts confect/spec/notes.ts
+```ts confect/notes.spec.ts
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import { Schema } from "effect";
-import type { search } from "../plain/search";
-import { Notes } from "../tables/Notes";
+import type { search } from "./search";
+import { Notes } from "./tables/Notes";
 
 const list = FunctionSpec.publicQuery({
   name: "list",

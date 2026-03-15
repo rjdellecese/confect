@@ -10,7 +10,9 @@ Node actions are like regular actions, but they are executed in the Node.js runt
 
 A node spec uses `Spec.makeNode()` and `GroupSpec.makeNode()` to define groups, and `FunctionSpec.publicNodeAction()` or `FunctionSpec.internalNodeAction()` to define functions.
 
-```ts confect/nodeSpec/email.ts
+By [convention](/concepts/file-naming-conventions), node action specs and impls go in a `node/` subdirectory of your `confect/` directory, using the standard `.spec.ts` and `.impl.ts` suffixes.
+
+```ts confect/node/email.spec.ts
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import { Schema } from "effect";
 
@@ -31,7 +33,7 @@ Your node spec must be the default export of a `nodeSpec.ts` file in your `confe
 
 ```ts confect/nodeSpec.ts
 import { Spec } from "@confect/core";
-import { email } from "./nodeSpec/email";
+import { email } from "./node/email.spec";
 
 export default Spec.makeNode().add(email);
 ```
@@ -40,7 +42,7 @@ export default Spec.makeNode().add(email);
 
 A node impl uses `nodeApi` from `_generated/nodeApi` instead of `api`, and `Impl.make(nodeApi)` to construct the implementation. Each function impl contains a handler that runs in the Node.js runtime, where you have access to [`NodeContext` services](https://effect-ts.github.io/effect/platform-node/NodeContext.ts.html#nodecontext-type-alias), which are accessible via the `@effect/platform` package.
 
-```ts confect/nodeImpl/email.ts
+```ts confect/node/email.impl.ts
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Command } from "@effect/platform";
 import { Console, Duration, Effect, Layer } from "effect";
@@ -75,7 +77,7 @@ Your node impl must be the default export of a `nodeImpl.ts` file in your `confe
 import { Impl } from "@confect/server";
 import { Layer } from "effect";
 import nodeApi from "./_generated/nodeApi";
-import { email } from "./nodeImpl/email";
+import { email } from "./node/email.impl";
 
 export default Impl.make(nodeApi).pipe(
   Layer.provide(email),

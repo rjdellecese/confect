@@ -69,11 +69,11 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
   <Step title="Define your Confect API spec">
     Create a `GroupSpec` and add some functions to it.
 
-    ```ts confect/spec/notes.ts
+    ```ts confect/notes.spec.ts
     import { FunctionSpec, GroupSpec } from "@confect/core";
     import { Schema } from "effect";
 
-    import { Notes } from "../tables/Notes";
+    import { Notes } from "./tables/Notes";
 
     export const notes = GroupSpec.make("notes")
       .addFunction(
@@ -96,7 +96,7 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
 
     ```ts confect/spec.ts
     import { Spec } from "@confect/core";
-    import { notes } from "./spec/notes";
+    import { notes } from "./notes.spec";
 
     export default Spec.make().add(notes);
     ```
@@ -115,12 +115,12 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
   <Step title="Implement your Confect functions">
     Create a `GroupImpl` and implement its functions.
 
-    ```ts confect/impl/notes.ts
+    ```ts confect/notes.impl.ts
     import { FunctionImpl, GroupImpl } from "@confect/server";
     import { Effect, Layer } from "effect";
 
-    import api from "../_generated/api";
-    import { DatabaseReader, DatabaseWriter } from "../_generated/services";
+    import api from "./_generated/api";
+    import { DatabaseReader, DatabaseWriter } from "./_generated/services";
 
     const list = FunctionImpl.make(api, "notes", "list", () =>
       Effect.gen(function* () {
@@ -154,7 +154,7 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
     import { Layer } from "effect";
 
     import api from "./_generated/api";
-    import { notes } from "./impl/notes";
+    import { notes } from "./notes.impl";
 
     export default Impl.make(api).pipe(
       Layer.provide(notes),

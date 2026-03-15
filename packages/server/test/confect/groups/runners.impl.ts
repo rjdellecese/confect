@@ -1,12 +1,12 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Effect, Layer } from "effect";
-import api from "../../_generated/api";
-import refs from "../../_generated/refs";
+import api from "../_generated/api";
+import refs from "../_generated/refs";
 import {
   ActionRunner,
   MutationRunner,
   QueryRunner,
-} from "../../_generated/services";
+} from "../_generated/services";
 
 const insertNoteViaRunner = FunctionImpl.make(
   api,
