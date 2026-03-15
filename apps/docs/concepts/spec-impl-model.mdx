@@ -4,13 +4,13 @@ title: "The Spec/Impl Model"
 description: "Understand how Confect separates function interfaces from their implementations."
 ---
 
-Your Confect API is broken up into two parts: a **spec** and its **implementation** (impl).
+Your Confect API is broken up into two parts: a **spec** and its implementation (or **impl**).
 
 ## Spec
 
 A spec defines the interface of your Confect API. It is made up of group specs and function specs. Each function spec defines the function's name, arguments schema, and returns schema -- but not the function's logic.
 
-Specs are built using `@confect/core`, which means they can be shared between the server and client. This separation is what enables end-to-end type safety: the client knows the exact shape of every function's arguments and return value without importing any server code.
+Specs are built using `@confect/core`, which means they can be shared between the server and client. This separation is what enables end-to-end schema decoding and encoding: the client knows the exact shape of every function's arguments and return value without importing any server code.
 
 ```ts confect/spec/notes.ts
 import { GroupSpec, FunctionSpec } from "@confect/core";
