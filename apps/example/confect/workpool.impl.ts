@@ -1,7 +1,7 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Layer } from "effect";
-import api from "../_generated/api";
-import { backgroundWork, enqueue, onComplete, status } from "../plain/workpool";
+import api from "./_generated/api";
+import { backgroundWork, enqueue, onComplete, status } from "./workpool";
 
 const enqueueImpl = FunctionImpl.make(api, "workpool", "enqueue", enqueue);
 const statusImpl = FunctionImpl.make(api, "workpool", "status", status);

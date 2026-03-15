@@ -40,11 +40,11 @@ Encodes args using the spec's `args` schema, passes them to Convex, and decodes 
 
 Given this spec:
 
-```ts confect/spec/notes.ts
+```ts confect/notes.spec.ts
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import { Schema } from "effect";
 
-import { Notes } from "../tables/Notes";
+import { Notes } from "./tables/Notes";
 
 export const notes = GroupSpec.make("notes").addFunction(
   FunctionSpec.publicQuery({
@@ -84,7 +84,7 @@ Returns a function that encodes args using the spec's `args` schema, calls the C
 
 Given this spec:
 
-```ts confect/spec/notes.ts
+```ts confect/notes.spec.ts
 FunctionSpec.publicMutation({
   name: "insert",
   args: Schema.Struct({ text: Schema.String }),
@@ -115,7 +115,7 @@ Same pattern as `useMutation`: encodes args via the spec's `args` schema, calls 
 
 Given this spec:
 
-```ts confect/spec/random.ts
+```ts confect/random.spec.ts
 FunctionSpec.publicAction({
   name: "getNumber",
   args: Schema.Struct({}),

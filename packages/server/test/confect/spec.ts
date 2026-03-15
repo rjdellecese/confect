@@ -1,5 +1,5 @@
 import { Spec } from "@confect/core";
-import { databaseReader } from "./spec/databaseReader";
-import { groups } from "./spec/groups";
+import { databaseReader } from "./databaseReader.spec";
+import { groups } from "./groups.spec";
 
 export default Spec.make().add(groups).add(databaseReader);

@@ -1,6 +1,6 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Effect, Layer } from "effect";
-import api from "../../_generated/api";
+import api from "../_generated/api";
 
 const getNumber = FunctionImpl.make(
   api,

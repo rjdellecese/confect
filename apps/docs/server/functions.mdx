@@ -23,11 +23,11 @@ For Node.js actions, see [Node Actions](/server/node-actions). To integrate plai
 
 Each function spec defines the function's name, arguments schema, and returns schema. Function specs are grouped into group specs, which are combined into your API's top-level spec. See [The Spec/Impl Model](/concepts/spec-impl-model) for a full walkthrough.
 
-```ts confect/spec/notes.ts
+```ts confect/notes.spec.ts
 import { GroupSpec, FunctionSpec } from "@confect/core";
 import { Schema } from "effect";
 
-import { Notes } from "../tables/Notes";
+import { Notes } from "./tables/Notes";
 
 const list = FunctionSpec.publicQuery({
   name: "list",
@@ -41,7 +41,7 @@ export const notes = GroupSpec.make("notes").addFunction(list);
 ```ts confect/spec.ts
 import { Spec } from "@confect/core";
 
-import { notes } from "./spec/notes";
+import { notes } from "./notes.spec";
 
 export default Spec.make().add(notes);
 ```
@@ -52,12 +52,12 @@ Each function impl contains a handler that implements the function's logic. Func
 
 The handler receives the decoded arguments as its first parameter and returns an `Effect`. Use the generated [services](/concepts/services) (like `DatabaseReader`, `DatabaseWriter`, `Auth`, etc.) inside your handler to interact with Convex.
 
-```ts confect/impl/notes.ts
+```ts confect/notes.impl.ts
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Effect, Layer } from "effect";
 
-import api from "../_generated/api";
-import { DatabaseReader } from "../_generated/services";
+import api from "./_generated/api";
+import { DatabaseReader } from "./_generated/services";
 
 const list = FunctionImpl.make(api, "notes", "list", () =>
   Effect.gen(function* () {
@@ -82,7 +82,7 @@ import { Impl } from "@confect/server";
 import { Layer } from "effect";
 
 import api from "./_generated/api";
-import { notes } from "./impl/notes";
+import { notes } from "./notes.impl";
 
 export default Impl.make(api).pipe(
   Layer.provide(notes),
