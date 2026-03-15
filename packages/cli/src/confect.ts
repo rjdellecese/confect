@@ -3,6 +3,7 @@ import { Layer } from "effect";
 import { codegen } from "./confect/codegen";
 import { dev } from "./confect/dev";
 import { ConfectDirectory } from "./services/ConfectDirectory";
+import { ConfectConfig } from "./services/ConfectConfig";
 import { ConvexDirectory } from "./services/ConvexDirectory";
 import { ProjectRoot } from "./services/ProjectRoot";
 
@@ -12,6 +13,7 @@ export const confect = Command.make("confect").pipe(
   Command.provide(
     Layer.mergeAll(
       ConfectDirectory.Default,
+      ConfectConfig.Default,
       ProjectRoot.Default,
       ConvexDirectory.Default,
     ),

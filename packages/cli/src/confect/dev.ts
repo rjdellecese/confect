@@ -26,6 +26,7 @@ import * as FunctionPaths from "../FunctionPaths";
 import * as GroupPath from "../GroupPath";
 import { logFailure, logPending, logSuccess } from "../log";
 import { ConfectDirectory } from "../services/ConfectDirectory";
+import { ConfectConfig } from "../services/ConfectConfig";
 import { ConvexDirectory } from "../services/ConvexDirectory";
 import { ProjectRoot } from "../services/ProjectRoot";
 import {
@@ -66,6 +67,11 @@ const changeChar = (change: "Added" | "Removed" | "Modified") =>
     Match.when("Modified", () => ({ char: "~", color: Ansi.yellow })),
     Match.exhaustive,
   );
+
+const isPreservedConvexFile = (
+  preservedConvexFileNames: ReadonlySet<string>,
+  fileName: string,
+) => preservedConvexFileNames.has(fileName);
 
 const logFileChangeIndented = (
   change: "Added" | "Removed" | "Modified",
@@ -175,6 +181,8 @@ const syncLoop = (
         yield* Deferred.succeed(initialSyncDone, undefined);
 
         const pending = yield* Ref.getAndSet(pendingRef, pendingInit);
+        const preservedConvexFileNames =
+          yield* ConfectConfig.getPreservedConvexFileNames;
 
         if (pending.specDirty || pending.nodeImplDirty) {
           yield* generateNodeApi;
@@ -304,14 +312,35 @@ const syncLoop = (
         );
 
         const dirtyOptionalFiles = [
-          ...(pending.httpDirty
-            ? [syncOptionalFile(generateHttp, "http.ts")]
+          ...(pending.httpDirty &&
+          !isPreservedConvexFile(preservedConvexFileNames, "http.ts")
+            ? [
+                syncOptionalFile(
+                  generateHttp,
+                  "http.ts",
+                  preservedConvexFileNames,
+                ),
+              ]
             : []),
-          ...(pending.cronsDirty
-            ? [syncOptionalFile(generateCrons, "crons.ts")]
+          ...(pending.cronsDirty &&
+          !isPreservedConvexFile(preservedConvexFileNames, "crons.ts")
+            ? [
+                syncOptionalFile(
+                  generateCrons,
+                  "crons.ts",
+                  preservedConvexFileNames,
+                ),
+              ]
             : []),
-          ...(pending.authDirty
-            ? [syncOptionalFile(generateAuthConfig, "auth.config.ts")]
+          ...(pending.authDirty &&
+          !isPreservedConvexFile(preservedConvexFileNames, "auth.config.ts")
+            ? [
+                syncOptionalFile(
+                  generateAuthConfig,
+                  "auth.config.ts",
+                  preservedConvexFileNames,
+                ),
+              ]
             : []),
         ];
 
@@ -551,7 +580,11 @@ export class SpecImportFailedError extends Schema.TaggedError<SpecImportFailedEr
   },
 ) {}
 
-const syncOptionalFile = (generate: typeof generateHttp, convexFile: string) =>
+const syncOptionalFile = (
+  generate: typeof generateHttp,
+  convexFile: string,
+  preservedConvexFileNames: ReadonlySet<string>,
+) =>
   pipe(
     generate,
     Effect.andThen(
@@ -571,7 +604,10 @@ const syncOptionalFile = (generate: typeof generateHttp, convexFile: string) =>
             const convexDirectory = yield* ConvexDirectory.get;
             const convexFilePath = path.join(convexDirectory, convexFile);
 
-            if (yield* fs.exists(convexFilePath)) {
+            if (
+              !isPreservedConvexFile(preservedConvexFileNames, convexFile) &&
+              (yield* fs.exists(convexFilePath))
+            ) {
               yield* fs.remove(convexFilePath);
               yield* logFileChangeIndented("Removed", convexFilePath);
             }

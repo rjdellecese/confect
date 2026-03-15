@@ -1,4 +1,5 @@
 .attest/
+.idea/
 .env.local
 .pnpm-store/
 .tsup
