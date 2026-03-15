@@ -10,10 +10,10 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
   ref: Query,
   args: Ref.Args<Query>,
 ): Ref.Returns<Query> | undefined => {
-  const function_ = Ref.getFunctionSpec(ref);
+  const functionSpec = Ref.getFunctionSpec(ref);
   const functionName = Ref.getConvexFunctionName(ref);
 
-  const encodedArgs = Match.value(function_.functionProvenance).pipe(
+  const encodedArgs = Match.value(functionSpec.functionProvenance).pipe(
     Match.tag("Confect", (confect) => Schema.encodeSync(confect.args)(args)),
     Match.tag("Convex", () => args),
     Match.exhaustive,
@@ -28,7 +28,7 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
     return undefined;
   }
 
-  return Match.value(function_.functionProvenance).pipe(
+  return Match.value(functionSpec.functionProvenance).pipe(
     Match.tag("Confect", (confect) =>
       Schema.decodeSync(confect.returns)(encodedReturnsOrUndefined),
     ),
@@ -40,12 +40,12 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
 export const useMutation = <Mutation extends Ref.AnyPublicMutation>(
   ref: Mutation,
 ) => {
-  const function_ = Ref.getFunctionSpec(ref);
+  const functionSpec = Ref.getFunctionSpec(ref);
   const functionName = Ref.getConvexFunctionName(ref);
   const actualMutation = useConvexMutation(functionName as any);
 
   return (args: Ref.Args<Mutation>): Promise<Ref.Returns<Mutation>> =>
-    Match.value(function_.functionProvenance).pipe(
+    Match.value(functionSpec.functionProvenance).pipe(
       Match.tag("Confect", (confect) => {
         const encodedArgs = Schema.encodeSync(confect.args)(args);
         return actualMutation(encodedArgs).then((result) =>
@@ -58,12 +58,12 @@ export const useMutation = <Mutation extends Ref.AnyPublicMutation>(
 };
 
 export const useAction = <Action extends Ref.AnyPublicAction>(ref: Action) => {
-  const function_ = Ref.getFunctionSpec(ref);
+  const functionSpec = Ref.getFunctionSpec(ref);
   const functionName = Ref.getConvexFunctionName(ref);
   const actualAction = useConvexAction(functionName as any);
 
   return (args: Ref.Args<Action>): Promise<Ref.Returns<Action>> =>
-    Match.value(function_.functionProvenance).pipe(
+    Match.value(functionSpec.functionProvenance).pipe(
       Match.tag("Confect", (confect) => {
         const encodedArgs = Schema.encodeSync(confect.args)(args);
         return actualAction(encodedArgs).then((result) =>
