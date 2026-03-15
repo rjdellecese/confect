@@ -1,7 +1,7 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Effect, Layer } from "effect";
-import api from "../../_generated/api";
-import { DatabaseReader, DatabaseWriter } from "../../_generated/services";
+import api from "../_generated/api";
+import { DatabaseReader, DatabaseWriter } from "../_generated/services";
 
 const insert = FunctionImpl.make(
   api,

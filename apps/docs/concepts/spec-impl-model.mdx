@@ -12,11 +12,11 @@ A spec defines the interface of your Confect API. It is made up of group specs a
 
 Specs are built using `@confect/core`, which means they can be shared between the server and client. This separation is what enables end-to-end schema decoding and encoding: the client knows the exact shape of every function's arguments and return value without importing any server code.
 
-```ts confect/spec/notes.ts
+```ts confect/notes.spec.ts
 import { GroupSpec, FunctionSpec } from "@confect/core";
 import { Schema } from "effect";
 
-import { Notes } from "../tables/Notes";
+import { Notes } from "./tables/Notes";
 
 const list = FunctionSpec.publicQuery({
   name: "list",
@@ -27,12 +27,14 @@ const list = FunctionSpec.publicQuery({
 export const notes = GroupSpec.make("notes").addFunction(list);
 ```
 
+The `.spec.ts` suffix used here is a [naming convention](/concepts/file-naming-conventions), not a requirement. Only the entry-point files (`spec.ts` and `impl.ts`) have fixed names.
+
 Your spec must be the default export of a `spec.ts` file in your `confect/` directory.
 
 ```ts confect/spec.ts
 import { Spec } from "@confect/core";
 
-import { notes } from "./spec/notes";
+import { notes } from "./notes.spec";
 
 export default Spec.make().add(notes);
 ```
@@ -41,15 +43,15 @@ export default Spec.make().add(notes);
 
 An impl provides the logic for each function declared in your spec. It is built using Effect layers: each function impl is a `Layer` that is composed into a group impl, and group impls are composed into the top-level impl.
 
-```ts confect/impl/notes.ts
+```ts confect/notes.impl.ts
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Effect, Layer } from "effect";
 
-import api from "../_generated/api";
+import api from "./_generated/api";
 import {
   DatabaseReader,
   DatabaseWriter,
-} from "../_generated/services";
+} from "./_generated/services";
 
 const list = FunctionImpl.make(api, "notes", "list", () =>
   Effect.gen(function* () {
@@ -74,7 +76,7 @@ import { Impl } from "@confect/server";
 import { Layer } from "effect";
 
 import api from "./_generated/api";
-import { notes } from "./impl/notes";
+import { notes } from "./notes.impl";
 
 export default Impl.make(api).pipe(
   Layer.provide(notes),
