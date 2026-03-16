@@ -1,11 +1,6 @@
 import type { FunctionSpec, RuntimeAndFunctionType } from "@confect/core";
 import type * as FunctionProvenance from "@confect/core/FunctionProvenance";
 import type { NodeContext } from "@effect/platform-node";
-import type {
-  RegisteredAction,
-  RegisteredMutation,
-  RegisteredQuery,
-} from "convex/server";
 import type { Effect } from "effect";
 import type * as ActionCtx from "./ActionCtx";
 import type * as ActionRunner from "./ActionRunner";
@@ -46,32 +41,7 @@ export type Handler<
 type ConvexProvenanceHandler<
   FunctionSpec_ extends
     FunctionSpec.AnyWithPropsWithFunctionProvenance<FunctionProvenance.AnyConvex>,
-> =
-  FunctionSpec_ extends FunctionSpec.WithFunctionType<FunctionSpec_, "query">
-    ? RegisteredQuery<
-        FunctionSpec.GetFunctionVisibility<FunctionSpec_>,
-        FunctionSpec.Args<FunctionSpec_>,
-        FunctionSpec.Returns<FunctionSpec_>
-      >
-    : FunctionSpec_ extends FunctionSpec.WithFunctionType<
-          FunctionSpec_,
-          "mutation"
-        >
-      ? RegisteredMutation<
-          FunctionSpec.GetFunctionVisibility<FunctionSpec_>,
-          FunctionSpec.Args<FunctionSpec_>,
-          FunctionSpec.Returns<FunctionSpec_>
-        >
-      : FunctionSpec_ extends FunctionSpec.WithFunctionType<
-            FunctionSpec_,
-            "action"
-          >
-        ? RegisteredAction<
-            FunctionSpec.GetFunctionVisibility<FunctionSpec_>,
-            FunctionSpec.Args<FunctionSpec_>,
-            FunctionSpec.Returns<FunctionSpec_>
-          >
-        : never;
+> = FunctionSpec.RegisteredFunction<FunctionSpec_>;
 
 type ConfectProvenanceHandler<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
