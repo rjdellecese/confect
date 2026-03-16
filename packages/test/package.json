@@ -1,6 +1,6 @@
 {
   "name": "@confect/test",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Utilities for testing Confect apps without a live Convex backend",
   "repository": {
     "type": "git",

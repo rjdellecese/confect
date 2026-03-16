@@ -1,5 +1,16 @@
 # @confect/react
 
+## 3.0.0
+
+### Minor Changes
+
+- 5fb6a61: Add support for plain Convex functions. Plain Convex queries, mutations, and actions can now be included in your Confect spec and impl tree using new `FunctionSpec.convexPublic*` and `FunctionSpec.convexInternal*` constructors. This enables interop with Convex components and libraries (such as Workpool, Workflow, Migrations, and Better Auth) that require user-defined or -provided Convex functions.
+
+### Patch Changes
+
+- Updated dependencies [5fb6a61]
+  - @confect/core@3.0.0
+
 ## 2.0.0
 
 ### Major Changes
