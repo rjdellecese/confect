@@ -29,9 +29,7 @@ export const setup = () =>
 
           yield* Effect.gen(function* () {
             process.chdir(testDir);
-
             yield* runCommand("pnpm", ["confect", "codegen"]);
-            yield* runCommand("pnpm", ["convex", "dev", "--local", "--once"]);
           }).pipe(
             Effect.ensuring(Effect.sync(() => process.chdir(originalCwd))),
           );

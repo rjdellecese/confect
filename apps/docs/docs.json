@@ -54,6 +54,7 @@
         "group": "Server",
         "pages": [
           "server/functions",
+          "server/plain-convex-functions",
           "server/node-actions",
           {
             "icon": "database",

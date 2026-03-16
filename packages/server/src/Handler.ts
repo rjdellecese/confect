@@ -1,4 +1,5 @@
 import type { FunctionSpec, RuntimeAndFunctionType } from "@confect/core";
+import type * as FunctionProvenance from "@confect/core/FunctionProvenance";
 import type { NodeContext } from "@effect/platform-node";
 import type { Effect } from "effect";
 import type * as ActionCtx from "./ActionCtx";
@@ -12,6 +13,7 @@ import type * as MutationCtx from "./MutationCtx";
 import type * as MutationRunner from "./MutationRunner";
 import type * as QueryCtx from "./QueryCtx";
 import type * as QueryRunner from "./QueryRunner";
+import type * as RegisteredFunction from "./RegisteredFunction";
 import type * as Scheduler from "./Scheduler";
 import type {
   StorageActionWriter,
@@ -24,26 +26,48 @@ export type Handler<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   FunctionSpec_ extends FunctionSpec.AnyWithProps,
 > =
+  FunctionSpec_ extends FunctionSpec.WithFunctionProvenance<
+    FunctionSpec_,
+    FunctionProvenance.AnyConvex
+  >
+    ? ConvexProvenanceHandler<FunctionSpec_>
+    : FunctionSpec_ extends FunctionSpec.WithFunctionProvenance<
+          FunctionSpec_,
+          FunctionProvenance.AnyConfect
+        >
+      ? ConfectProvenanceHandler<DatabaseSchema_, FunctionSpec_>
+      : never;
+
+type ConvexProvenanceHandler<
+  FunctionSpec_ extends
+    FunctionSpec.AnyWithPropsWithFunctionProvenance<FunctionProvenance.AnyConvex>,
+> = RegisteredFunction.ConvexRegisteredFunction<FunctionSpec_>;
+
+type ConfectProvenanceHandler<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+  FunctionSpec_ extends
+    FunctionSpec.AnyWithPropsWithFunctionProvenance<FunctionProvenance.AnyConfect>,
+> =
   FunctionSpec_ extends FunctionSpec.WithFunctionType<FunctionSpec_, "query">
-    ? Query<DatabaseSchema_, FunctionSpec_>
+    ? ConfectProvenanceQuery<DatabaseSchema_, FunctionSpec_>
     : FunctionSpec_ extends FunctionSpec.WithFunctionType<
           FunctionSpec_,
           "mutation"
         >
-      ? Mutation<DatabaseSchema_, FunctionSpec_>
+      ? ConfectProvenanceMutation<DatabaseSchema_, FunctionSpec_>
       : FunctionSpec_ extends FunctionSpec.WithRuntimeAndFunctionType<
             FunctionSpec_,
             RuntimeAndFunctionType.ConvexAction
           >
-        ? ConvexAction<DatabaseSchema_, FunctionSpec_>
+        ? ConvexRuntimeAction<DatabaseSchema_, FunctionSpec_>
         : FunctionSpec_ extends FunctionSpec.WithRuntimeAndFunctionType<
               FunctionSpec_,
               RuntimeAndFunctionType.NodeAction
             >
-          ? NodeAction<DatabaseSchema_, FunctionSpec_>
+          ? NodeRuntimeAction<DatabaseSchema_, FunctionSpec_>
           : never;
 
-export type Query<
+export type ConfectProvenanceQuery<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   FunctionSpec_ extends
     FunctionSpec.AnyWithPropsWithFunctionType<RuntimeAndFunctionType.AnyQuery>,
@@ -56,7 +80,7 @@ export type Query<
   | QueryCtx.QueryCtx<DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>>
 >;
 
-export type Mutation<
+export type ConfectProvenanceMutation<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   FunctionSpec_ extends
     FunctionSpec.AnyWithPropsWithFunctionType<RuntimeAndFunctionType.AnyMutation>,
@@ -89,13 +113,13 @@ type ActionServices<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
       DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
     >;
 
-export type ConvexAction<
+export type ConvexRuntimeAction<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   FunctionSpec_ extends
     FunctionSpec.AnyWithPropsWithFunctionType<RuntimeAndFunctionType.AnyAction>,
 > = Base<FunctionSpec_, ActionServices<DatabaseSchema_>>;
 
-export type NodeAction<
+export type NodeRuntimeAction<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   FunctionSpec_ extends
     FunctionSpec.AnyWithPropsWithFunctionType<RuntimeAndFunctionType.NodeAction>,
@@ -105,13 +129,14 @@ export type NodeAction<
 >;
 
 type Base<FunctionSpec_ extends FunctionSpec.AnyWithProps, R> = (
-  args: FunctionSpec.Args<FunctionSpec_>["Type"],
-) => Effect.Effect<FunctionSpec.Returns<FunctionSpec_>["Type"], never, R>;
+  args: FunctionSpec.Args<FunctionSpec_>,
+) => Effect.Effect<FunctionSpec.Returns<FunctionSpec_>, never, R>;
 
-export type AnyWithProps = Handler<
-  DatabaseSchema.AnyWithProps,
-  FunctionSpec.AnyWithProps
->;
+export type Any = AnyConfectProvenance | AnyConvexProvenance;
+
+export type AnyConfectProvenance = Base<FunctionSpec.AnyConfect, any>;
+
+export type AnyConvexProvenance = RegisteredFunction.Any;
 
 export type WithName<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,

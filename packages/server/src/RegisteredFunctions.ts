@@ -27,8 +27,8 @@ type RegisteredFunctionsHelper<Groups extends GroupSpec.AnyWithProps> = {
             >]: FunctionSpec.WithName<
               GroupSpec.Functions<Group>,
               FunctionName
-            > extends infer Function extends FunctionSpec.AnyWithProps
-              ? FunctionSpec.RegisteredFunction<Function>
+            > extends infer FunctionSpec_ extends FunctionSpec.AnyWithProps
+              ? RegisteredFunction.RegisteredFunction<FunctionSpec_>
               : never;
           }
         >
@@ -38,15 +38,15 @@ type RegisteredFunctionsHelper<Groups extends GroupSpec.AnyWithProps> = {
           >]: FunctionSpec.WithName<
             GroupSpec.Functions<Group>,
             FunctionName
-          > extends infer Function extends FunctionSpec.AnyWithProps
-            ? FunctionSpec.RegisteredFunction<Function>
+          > extends infer FunctionSpec_ extends FunctionSpec.AnyWithProps
+            ? RegisteredFunction.RegisteredFunction<FunctionSpec_>
             : never;
         }
     : never;
 };
 
 export interface AnyWithProps {
-  readonly [key: string]: RegisteredFunction.RegisteredFunction | AnyWithProps;
+  readonly [key: string]: RegisteredFunction.Any | AnyWithProps;
 }
 
 export const make = <Api_ extends Api.AnyWithProps>(
@@ -54,7 +54,7 @@ export const make = <Api_ extends Api.AnyWithProps>(
   makeRegisteredFunction: (
     api: Api_,
     registryItem: RegistryItem.AnyWithProps,
-  ) => RegisteredFunction.RegisteredFunction,
+  ) => RegisteredFunction.Any,
 ) =>
   Effect.gen(function* () {
     const registry = yield* Registry.Registry;
@@ -70,11 +70,10 @@ export const make = <Api_ extends Api.AnyWithProps>(
       ),
       Match.when("Finalized", () =>
         Effect.succeed(
-          mapLeaves<
-            RegistryItem.AnyWithProps,
-            RegisteredFunction.RegisteredFunction
-          >(functionImplItems, RegistryItem.isRegistryItem, (registryItem) =>
-            makeRegisteredFunction(api, registryItem),
+          mapLeaves<RegistryItem.AnyWithProps, RegisteredFunction.Any>(
+            functionImplItems,
+            RegistryItem.isRegistryItem,
+            (registryItem) => makeRegisteredFunction(api, registryItem),
           ) as RegisteredFunctions<Api_["spec"]>,
         ),
       ),

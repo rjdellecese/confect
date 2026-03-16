@@ -56,7 +56,7 @@ export const make = <
       currentGroup.groups[groupPathPart],
   );
 
-  const function_ = group_.functions[functionName]!;
+  const functionSpec = group_.functions[functionName]!;
 
   return Layer.effect(
     FunctionImpl<GroupPath_, FunctionName>({
@@ -71,8 +71,8 @@ export const make = <
           registryItems,
           [...groupPathParts, functionName],
           RegistryItem.make({
-            function_,
-            handler: handler as Handler.AnyWithProps,
+            functionSpec,
+            handler,
           }),
         ),
       );

@@ -1,4 +1,5 @@
 import { useAction, useMutation, useQuery } from "@confect/react";
+import type { WorkId } from "@convex-dev/workpool";
 import { FetchHttpClient, HttpApiClient } from "@effect/platform";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { Array, Effect, Exit } from "effect";
@@ -58,6 +59,10 @@ const Page = () => {
 
       <br />
 
+      <WorkpoolDemo />
+
+      <br />
+
       <div>
         Random number: {randomNumber ? randomNumber : "Loading…"}
         <br />
@@ -94,6 +99,84 @@ const Page = () => {
       <NoteList />
       <HttpEndpoints />
     </div>
+  );
+};
+
+const WorkpoolDemo = () => {
+  const [jobs, setJobs] = useState<Array<{ id: WorkId; enqueuedAt: number }>>(
+    [],
+  );
+  const enqueue = useMutation(refs.public.workpool.enqueue);
+
+  const handleEnqueue = () => {
+    void enqueue({}).then((id) =>
+      setJobs((prev) => [...prev, { id, enqueuedAt: Date.now() }]),
+    );
+  };
+
+  return (
+    <div>
+      <strong>Workpool (plain Convex component)</strong>
+      <br />
+      <button type="button" onClick={handleEnqueue}>
+        Enqueue background work
+      </button>
+      {jobs.length > 0 && (
+        <table style={{ marginTop: 8, borderCollapse: "collapse" }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: "left", paddingRight: 16 }}>Job</th>
+              <th style={{ textAlign: "left" }}>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {jobs
+              .slice(-10)
+              .toReversed()
+              .map((job, i) => (
+                <WorkStatusRow
+                  key={job.id}
+                  index={jobs.length - i}
+                  workId={job.id}
+                />
+              ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+};
+
+const statusLabel = (status: {
+  state: string;
+  previousAttempts?: number;
+}): string => {
+  switch (status.state) {
+    case "pending":
+      return `⏳ Pending (attempts: ${status.previousAttempts})`;
+    case "running":
+      return `🔄 Running (attempts: ${status.previousAttempts})`;
+    case "finished":
+      return "✅ Finished";
+    default:
+      return status.state;
+  }
+};
+
+const WorkStatusRow = ({
+  index,
+  workId,
+}: {
+  index: number;
+  workId: WorkId;
+}) => {
+  const status = useQuery(refs.public.workpool.status, { workId });
+
+  return (
+    <tr>
+      <td style={{ paddingRight: 16, fontFamily: "monospace" }}>#{index}</td>
+      <td>{status === undefined ? "Loading…" : statusLabel(status)}</td>
+    </tr>
   );
 };
 

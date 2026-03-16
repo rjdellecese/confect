@@ -1,13 +1,12 @@
 import type { FunctionVisibility } from "convex/server";
-import type { Schema } from "effect";
 import type * as FunctionSpec from "./FunctionSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
 export interface Ref<
   _RuntimeAndFunctionType extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   _FunctionVisibility extends FunctionVisibility,
-  _Args extends Schema.Schema.AnyNoContext,
-  _Returns extends Schema.Schema.AnyNoContext,
+  _Args,
+  _Returns,
 > {
   readonly _RuntimeAndFunctionType?: _RuntimeAndFunctionType;
   readonly _FunctionVisibility?: _FunctionVisibility;
@@ -24,43 +23,43 @@ export interface AnyPublic extends Ref<any, "public", any, any> {}
 export interface AnyQuery extends Ref<
   RuntimeAndFunctionType.AnyQuery,
   FunctionVisibility,
-  Schema.Schema.AnyNoContext,
-  Schema.Schema.AnyNoContext
+  any,
+  any
 > {}
 
 export interface AnyMutation extends Ref<
   RuntimeAndFunctionType.AnyMutation,
   FunctionVisibility,
-  Schema.Schema.AnyNoContext,
-  Schema.Schema.AnyNoContext
+  any,
+  any
 > {}
 
 export interface AnyAction extends Ref<
   RuntimeAndFunctionType.AnyAction,
   FunctionVisibility,
-  Schema.Schema.AnyNoContext,
-  Schema.Schema.AnyNoContext
+  any,
+  any
 > {}
 
 export interface AnyPublicQuery extends Ref<
   RuntimeAndFunctionType.AnyQuery,
   "public",
-  Schema.Schema.AnyNoContext,
-  Schema.Schema.AnyNoContext
+  any,
+  any
 > {}
 
 export interface AnyPublicMutation extends Ref<
   RuntimeAndFunctionType.AnyMutation,
   "public",
-  Schema.Schema.AnyNoContext,
-  Schema.Schema.AnyNoContext
+  any,
+  any
 > {}
 
 export interface AnyPublicAction extends Ref<
   RuntimeAndFunctionType.AnyAction,
   "public",
-  Schema.Schema.AnyNoContext,
-  Schema.Schema.AnyNoContext
+  any,
+  any
 > {}
 
 export type GetRuntimeAndFunctionType<Ref_> =
@@ -130,64 +129,25 @@ export type FromFunctionSpec<F extends FunctionSpec.AnyWithProps> = Ref<
   FunctionSpec.Returns<F>
 >;
 
-export const make = <
-  RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
-  FunctionVisibility_ extends FunctionVisibility,
-  Args_ extends Schema.Schema.AnyNoContext,
-  Returns_ extends Schema.Schema.AnyNoContext,
->(
+export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
   /**
-   * This is a Convex "function name" of the format "myGroupDir/myGroupMod:myFunc".
+   * This is a Convex "function name" of the format `myGroupDir/myGroupMod:myFunc`.
    */
   convexFunctionName: string,
-  function_: FunctionSpec.FunctionSpec<
-    RuntimeAndFunctionType_,
-    FunctionVisibility_,
-    string,
-    Args_,
-    Returns_
-  >,
-): Ref<RuntimeAndFunctionType_, FunctionVisibility_, Args_, Returns_> =>
+  functionSpec: FunctionSpec_,
+): FromFunctionSpec<FunctionSpec_> =>
   ({
-    [HiddenFunctionKey]: function_,
+    [HiddenFunctionSpecKey]: functionSpec,
     [HiddenConvexFunctionNameKey]: convexFunctionName,
-  }) as Ref<RuntimeAndFunctionType_, FunctionVisibility_, Args_, Returns_>;
+  }) as FromFunctionSpec<FunctionSpec_>;
 
-const HiddenFunctionKey = "@confect/core/api/HiddenFunctionKey";
-type HiddenFunctionKey = typeof HiddenFunctionKey;
-type HiddenFunction<Ref_ extends Any> = FunctionSpec.FunctionSpec<
-  GetRuntimeAndFunctionType<Ref_>,
-  GetFunctionVisibility<Ref_>,
-  string,
-  Args<Ref_>,
-  Returns<Ref_>
->;
+const HiddenFunctionSpecKey = "@confect/core/api/HiddenFunctionSpecKey";
 
-export const getFunction = <
-  RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
-  FunctionVisibility_ extends FunctionVisibility,
-  Args_ extends Schema.Schema.AnyNoContext,
-  Returns_ extends Schema.Schema.AnyNoContext,
-  Ref_ extends Ref<
-    RuntimeAndFunctionType_,
-    FunctionVisibility_,
-    Args_,
-    Returns_
-  >,
->(
-  ref: Ref_,
-): HiddenFunction<Ref_> => (ref as any)[HiddenFunctionKey];
+export const getFunctionSpec = (ref: Any): FunctionSpec.AnyWithProps =>
+  (ref as any)[HiddenFunctionSpecKey];
 
 const HiddenConvexFunctionNameKey =
   "@confect/core/api/HiddenConvexFunctionNameKey";
-type HiddenConvexFunctionNameKey = typeof HiddenConvexFunctionNameKey;
-type HiddenConvexFunctionName = string;
 
-export const getConvexFunctionName = <
-  RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
-  FunctionVisibility_ extends FunctionVisibility,
-  Args_ extends Schema.Schema.AnyNoContext,
-  Returns_ extends Schema.Schema.AnyNoContext,
->(
-  ref: Ref<RuntimeAndFunctionType_, FunctionVisibility_, Args_, Returns_>,
-): HiddenConvexFunctionName => (ref as any)[HiddenConvexFunctionNameKey];
+export const getConvexFunctionName = (ref: Any): string =>
+  (ref as any)[HiddenConvexFunctionNameKey];

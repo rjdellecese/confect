@@ -1,29 +1,43 @@
 import * as Ref from "@confect/core/Ref";
 import { type GenericActionCtx } from "convex/server";
 import type { ParseResult } from "effect";
-import { Context, Effect, Layer, Schema } from "effect";
+import { Context, Effect, Layer, Match, Schema } from "effect";
 
-const makeActionRunner =
+const make =
   (runAction: GenericActionCtx<any>["runAction"]) =>
   <Action extends Ref.AnyAction>(
     action: Action,
-    args: Ref.Args<Action>["Type"],
-  ): Effect.Effect<Ref.Returns<Action>["Type"], ParseResult.ParseError> =>
+    args: Ref.Args<Action>,
+  ): Effect.Effect<Ref.Returns<Action>, ParseResult.ParseError> =>
     Effect.gen(function* () {
-      const function_ = Ref.getFunction(action);
+      const functionSpec = Ref.getFunctionSpec(action);
       const functionName = Ref.getConvexFunctionName(action);
 
-      const encodedArgs = yield* Schema.encode(function_.args)(args);
-      const encodedReturns = yield* Effect.promise(() =>
-        runAction(functionName as any, encodedArgs),
+      return yield* Match.value(functionSpec.functionProvenance).pipe(
+        Match.tag("Confect", (confectFunctionSpec) =>
+          Effect.gen(function* () {
+            const encodedArgs = yield* Schema.encode(confectFunctionSpec.args)(
+              args,
+            );
+            const encodedReturns = yield* Effect.promise(() =>
+              runAction(functionName as any, encodedArgs),
+            );
+            return yield* Schema.decode(confectFunctionSpec.returns)(
+              encodedReturns,
+            );
+          }),
+        ),
+        Match.tag("Convex", () =>
+          Effect.promise(() => runAction(functionName as any, args as any)),
+        ),
+        Match.exhaustive,
       );
-      return yield* Schema.decode(function_.returns)(encodedReturns);
     });
 
-export const ActionRunner = Context.GenericTag<
-  ReturnType<typeof makeActionRunner>
->("@confect/server/ActionRunner");
+export const ActionRunner = Context.GenericTag<ReturnType<typeof make>>(
+  "@confect/server/ActionRunner",
+);
 export type ActionRunner = typeof ActionRunner.Identifier;
 
 export const layer = (runAction: GenericActionCtx<any>["runAction"]) =>
-  Layer.succeed(ActionRunner, makeActionRunner(runAction));
+  Layer.succeed(ActionRunner, make(runAction));

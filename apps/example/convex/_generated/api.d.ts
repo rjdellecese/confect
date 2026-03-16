@@ -8,8 +8,27 @@
  * @module
  */
 
-import type { FunctionReference } from "convex/server";
-import type { GenericId as Id } from "convex/values";
+import type * as env from "../env.js";
+import type * as http from "../http.js";
+import type * as node_email from "../node/email.js";
+import type * as notesAndRandom_notes from "../notesAndRandom/notes.js";
+import type * as notesAndRandom_random from "../notesAndRandom/random.js";
+import type * as workpool from "../workpool.js";
+
+import type {
+  ApiFromModules,
+  FilterApi,
+  FunctionReference,
+} from "convex/server";
+
+declare const fullApi: ApiFromModules<{
+  env: typeof env;
+  http: typeof http;
+  "node/email": typeof node_email;
+  "notesAndRandom/notes": typeof notesAndRandom_notes;
+  "notesAndRandom/random": typeof notesAndRandom_random;
+  workpool: typeof workpool;
+}>;
 
 /**
  * A utility for referencing Convex functions in your app's public API.
@@ -19,76 +38,10 @@ import type { GenericId as Id } from "convex/values";
  * const myFunctionReference = api.myModule.myFunction;
  * ```
  */
-export declare const api: {
-  node: {
-    email: {
-      getInbox: FunctionReference<
-        "action",
-        "public",
-        {},
-        Array<{ body: string; subject: string; to: string }>
-      >;
-      send: FunctionReference<
-        "action",
-        "public",
-        { body: string; subject: string; to: string },
-        null
-      >;
-    };
-  };
-  notesAndRandom: {
-    notes: {
-      delete_: FunctionReference<
-        "mutation",
-        "public",
-        { noteId: Id<"notes"> },
-        null
-      >;
-      getFirst: FunctionReference<
-        "query",
-        "public",
-        {},
-        | { _tag: "None" }
-        | {
-            _tag: "Some";
-            value: {
-              _creationTime: number;
-              _id: Id<"notes">;
-              author?: { name: string; role: "admin" | "user" };
-              embedding?: Array<number>;
-              tag?: string;
-              text: string;
-              userId?: Id<"users">;
-            };
-          }
-      >;
-      insert: FunctionReference<
-        "mutation",
-        "public",
-        { text: string },
-        Id<"notes">
-      >;
-      list: FunctionReference<
-        "query",
-        "public",
-        {},
-        Array<{
-          _creationTime: number;
-          _id: Id<"notes">;
-          author?: { name: string; role: "admin" | "user" };
-          embedding?: Array<number>;
-          tag?: string;
-          text: string;
-          userId?: Id<"users">;
-        }>
-      >;
-      readEnvVar: FunctionReference<"query", "public", {}, string>;
-    };
-    random: {
-      getNumber: FunctionReference<"action", "public", {}, number>;
-    };
-  };
-};
+export declare const api: FilterApi<
+  typeof fullApi,
+  FunctionReference<any, "public">
+>;
 
 /**
  * A utility for referencing Convex functions in your app's internal API.
@@ -98,29 +51,108 @@ export declare const api: {
  * const myFunctionReference = internal.myModule.myFunction;
  * ```
  */
-export declare const internal: {
-  notesAndRandom: {
-    notes: {
-      internalGetFirst: FunctionReference<
+export declare const internal: FilterApi<
+  typeof fullApi,
+  FunctionReference<any, "internal">
+>;
+
+export declare const components: {
+  workpool: {
+    config: {
+      update: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          logLevel?: "DEBUG" | "TRACE" | "INFO" | "REPORT" | "WARN" | "ERROR";
+          maxParallelism?: number;
+        },
+        any
+      >;
+    };
+    lib: {
+      cancel: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          id: string;
+          logLevel?: "DEBUG" | "TRACE" | "INFO" | "REPORT" | "WARN" | "ERROR";
+        },
+        any
+      >;
+      cancelAll: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          before?: number;
+          limit?: number;
+          logLevel?: "DEBUG" | "TRACE" | "INFO" | "REPORT" | "WARN" | "ERROR";
+        },
+        any
+      >;
+      enqueue: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          config: {
+            logLevel?: "DEBUG" | "TRACE" | "INFO" | "REPORT" | "WARN" | "ERROR";
+            maxParallelism?: number;
+          };
+          fnArgs: any;
+          fnHandle: string;
+          fnName: string;
+          fnType: "action" | "mutation" | "query";
+          onComplete?: { context?: any; fnHandle: string };
+          retryBehavior?: {
+            base: number;
+            initialBackoffMs: number;
+            maxAttempts: number;
+          };
+          runAt: number;
+        },
+        string
+      >;
+      enqueueBatch: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          config: {
+            logLevel?: "DEBUG" | "TRACE" | "INFO" | "REPORT" | "WARN" | "ERROR";
+            maxParallelism?: number;
+          };
+          items: Array<{
+            fnArgs: any;
+            fnHandle: string;
+            fnName: string;
+            fnType: "action" | "mutation" | "query";
+            onComplete?: { context?: any; fnHandle: string };
+            retryBehavior?: {
+              base: number;
+              initialBackoffMs: number;
+              maxAttempts: number;
+            };
+            runAt: number;
+          }>;
+        },
+        Array<string>
+      >;
+      status: FunctionReference<
         "query",
         "internal",
-        {},
-        | { _tag: "None" }
-        | {
-            _tag: "Some";
-            value: {
-              _creationTime: number;
-              _id: Id<"notes">;
-              author?: { name: string; role: "admin" | "user" };
-              embedding?: Array<number>;
-              tag?: string;
-              text: string;
-              userId?: Id<"users">;
-            };
-          }
+        { id: string },
+        | { previousAttempts: number; state: "pending" }
+        | { previousAttempts: number; state: "running" }
+        | { state: "finished" }
+      >;
+      statusBatch: FunctionReference<
+        "query",
+        "internal",
+        { ids: Array<string> },
+        Array<
+          | { previousAttempts: number; state: "pending" }
+          | { previousAttempts: number; state: "running" }
+          | { state: "finished" }
+        >
       >;
     };
   };
 };
-
-export declare const components: {};
