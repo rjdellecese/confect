@@ -1,5 +1,4 @@
 import type {
-  DefaultFunctionArgs,
   FunctionType,
   FunctionVisibility,
   RegisteredAction,
@@ -83,153 +82,102 @@ export interface AnyWithPropsWithFunctionProvenance<
   FunctionProvenance_
 > {}
 
-export type GetRuntimeAndFunctionType<Function extends AnyWithProps> =
-  Function["runtimeAndFunctionType"];
+export type GetRuntimeAndFunctionType<FunctionSpec_ extends AnyWithProps> =
+  FunctionSpec_["runtimeAndFunctionType"];
 
-export type GetFunctionVisibility<Function extends AnyWithProps> =
-  Function["functionVisibility"];
+export type GetFunctionVisibility<FunctionSpec_ extends AnyWithProps> =
+  FunctionSpec_["functionVisibility"];
 
-export type Name<Function extends AnyWithProps> = Function["name"];
+export type Name<FunctionSpec_ extends AnyWithProps> = FunctionSpec_["name"];
 
-export type Args<Function extends AnyWithProps> = Function extends {
+export type Args<FunctionSpec_ extends AnyWithProps> = FunctionSpec_ extends {
   functionProvenance: {
     _tag: "Confect";
     args: infer ArgsSchema_ extends Schema.Schema.AnyNoContext;
   };
 }
   ? ArgsSchema_["Type"]
-  : Function extends {
+  : FunctionSpec_ extends {
         functionProvenance: { _tag: "Convex"; _args: infer Args_ };
       }
     ? Args_
     : never;
 
-export type Returns<Function extends AnyWithProps> = Function extends {
-  functionProvenance: {
-    _tag: "Confect";
-    returns: infer ReturnsSchema_ extends Schema.Schema.AnyNoContext;
-  };
-}
-  ? ReturnsSchema_["Type"]
-  : Function extends {
-        functionProvenance: { _tag: "Convex"; _returns: infer Returns_ };
-      }
-    ? Awaited<Returns_>
-    : never;
+export type Returns<FunctionSpec_ extends AnyWithProps> =
+  FunctionSpec_ extends {
+    functionProvenance: {
+      _tag: "Confect";
+      returns: infer ReturnsSchema_ extends Schema.Schema.AnyNoContext;
+    };
+  }
+    ? ReturnsSchema_["Type"]
+    : FunctionSpec_ extends {
+          functionProvenance: { _tag: "Convex"; _returns: infer Returns_ };
+        }
+      ? Awaited<Returns_>
+      : never;
 
-export type EncodedArgs<Function extends AnyWithProps> = Function extends {
-  functionProvenance: {
-    _tag: "Confect";
-    args: infer ArgsSchema_ extends Schema.Schema.AnyNoContext;
-  };
-}
-  ? ArgsSchema_["Encoded"]
-  : Function extends {
-        functionProvenance: { _tag: "Convex"; _args: infer Args_ };
-      }
-    ? Args_
-    : never;
+export type EncodedArgs<FunctionSpec_ extends AnyWithProps> =
+  FunctionSpec_ extends {
+    functionProvenance: {
+      _tag: "Confect";
+      args: infer ArgsSchema_ extends Schema.Schema.AnyNoContext;
+    };
+  }
+    ? ArgsSchema_["Encoded"]
+    : FunctionSpec_ extends {
+          functionProvenance: { _tag: "Convex"; _args: infer Args_ };
+        }
+      ? Args_
+      : never;
 
-export type EncodedReturns<Function extends AnyWithProps> = Function extends {
-  functionProvenance: {
-    _tag: "Confect";
-    returns: infer ReturnsSchema_ extends Schema.Schema.AnyNoContext;
-  };
-}
-  ? ReturnsSchema_["Encoded"]
-  : Function extends {
-        functionProvenance: { _tag: "Convex"; _returns: infer Returns_ };
-      }
-    ? Returns_
-    : never;
+export type EncodedReturns<FunctionSpec_ extends AnyWithProps> =
+  FunctionSpec_ extends {
+    functionProvenance: {
+      _tag: "Confect";
+      returns: infer ReturnsSchema_ extends Schema.Schema.AnyNoContext;
+    };
+  }
+    ? ReturnsSchema_["Encoded"]
+    : FunctionSpec_ extends {
+          functionProvenance: { _tag: "Convex"; _returns: infer Returns_ };
+        }
+      ? Returns_
+      : never;
 
 export type WithName<
-  Function extends AnyWithProps,
+  FunctionSpec_ extends AnyWithProps,
   Name_ extends string,
-> = Extract<Function, { readonly name: Name_ }>;
+> = Extract<FunctionSpec_, { readonly name: Name_ }>;
 
 export type WithRuntimeAndFunctionType<
-  Function extends AnyWithProps,
+  FunctionSpec_ extends AnyWithProps,
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
 > = Extract<
-  Function,
+  FunctionSpec_,
   { readonly runtimeAndFunctionType: RuntimeAndFunctionType_ }
 >;
 
 export type WithFunctionType<
-  Function extends AnyWithProps,
+  FunctionSpec_ extends AnyWithProps,
   FunctionType_ extends FunctionType,
 > = Extract<
-  Function,
+  FunctionSpec_,
   { readonly runtimeAndFunctionType: { readonly functionType: FunctionType_ } }
 >;
 
 export type WithFunctionProvenance<
-  Function extends AnyWithProps,
+  FunctionSpec_ extends AnyWithProps,
   FunctionProvenance_ extends FunctionProvenance.FunctionProvenance,
-> = Extract<Function, { readonly functionProvenance: FunctionProvenance_ }>;
+> = Extract<
+  FunctionSpec_,
+  { readonly functionProvenance: FunctionProvenance_ }
+>;
 
 export type WithoutName<
-  Function extends AnyWithProps,
-  Name_ extends Name<Function>,
-> = Exclude<Function, { readonly name: Name_ }>;
-
-type ConfectRegisteredFunction<Function extends AnyWithProps> =
-  EncodedArgs<Function> extends infer Args_ extends DefaultFunctionArgs
-    ? RuntimeAndFunctionType.GetFunctionType<
-        Function["runtimeAndFunctionType"]
-      > extends "query"
-      ? RegisteredQuery<
-          GetFunctionVisibility<Function>,
-          Args_,
-          Promise<EncodedReturns<Function>>
-        >
-      : RuntimeAndFunctionType.GetFunctionType<
-            Function["runtimeAndFunctionType"]
-          > extends "mutation"
-        ? RegisteredMutation<
-            GetFunctionVisibility<Function>,
-            Args_,
-            Promise<EncodedReturns<Function>>
-          >
-        : RuntimeAndFunctionType.GetFunctionType<
-              Function["runtimeAndFunctionType"]
-            > extends "action"
-          ? RegisteredAction<
-              GetFunctionVisibility<Function>,
-              Args_,
-              Promise<EncodedReturns<Function>>
-            >
-          : never
-    : never;
-
-type ConvexRegisteredFunction<Function extends AnyWithProps> =
-  Function extends {
-    functionProvenance: {
-      _tag: "Convex";
-      _args: infer Args_ extends DefaultFunctionArgs;
-      _returns: infer Returns_;
-    };
-  }
-    ? RuntimeAndFunctionType.GetFunctionType<
-        Function["runtimeAndFunctionType"]
-      > extends "query"
-      ? RegisteredQuery<GetFunctionVisibility<Function>, Args_, Returns_>
-      : RuntimeAndFunctionType.GetFunctionType<
-            Function["runtimeAndFunctionType"]
-          > extends "mutation"
-        ? RegisteredMutation<GetFunctionVisibility<Function>, Args_, Returns_>
-        : RuntimeAndFunctionType.GetFunctionType<
-              Function["runtimeAndFunctionType"]
-            > extends "action"
-          ? RegisteredAction<GetFunctionVisibility<Function>, Args_, Returns_>
-          : never
-    : never;
-
-export type RegisteredFunction<Function extends AnyWithProps> =
-  Function extends { functionProvenance: { _tag: "Convex" } }
-    ? ConvexRegisteredFunction<Function>
-    : ConfectRegisteredFunction<Function>;
+  FunctionSpec_ extends AnyWithProps,
+  Name_ extends Name<FunctionSpec_>,
+> = Exclude<FunctionSpec_, { readonly name: Name_ }>;
 
 const Proto = {
   [TypeId]: TypeId,

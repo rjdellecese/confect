@@ -1,3 +1,5 @@
+import type { FunctionSpec, RuntimeAndFunctionType } from "@confect/core";
+import type * as FunctionProvenance from "@confect/core/FunctionProvenance";
 import {
   type DefaultFunctionArgs,
   type FunctionVisibility,
@@ -19,10 +21,93 @@ import * as SchemaToValidator from "./SchemaToValidator";
 import { StorageActionWriter, StorageReader, StorageWriter } from "./Storage";
 import * as VectorSearch from "./VectorSearch";
 
-export type RegisteredFunction =
+export type Any =
   | RegisteredQuery<FunctionVisibility, DefaultFunctionArgs, any>
   | RegisteredMutation<FunctionVisibility, DefaultFunctionArgs, any>
   | RegisteredAction<FunctionVisibility, DefaultFunctionArgs, any>;
+
+type ConfectRegisteredFunction<
+  FunctionSpec_ extends FunctionSpec.AnyWithProps,
+> =
+  FunctionSpec.EncodedArgs<FunctionSpec_> extends infer Args_ extends
+    DefaultFunctionArgs
+    ? RuntimeAndFunctionType.GetFunctionType<
+        FunctionSpec_["runtimeAndFunctionType"]
+      > extends "query"
+      ? RegisteredQuery<
+          FunctionSpec.GetFunctionVisibility<FunctionSpec_>,
+          Args_,
+          Promise<FunctionSpec.EncodedReturns<FunctionSpec_>>
+        >
+      : RuntimeAndFunctionType.GetFunctionType<
+            FunctionSpec_["runtimeAndFunctionType"]
+          > extends "mutation"
+        ? RegisteredMutation<
+            FunctionSpec.GetFunctionVisibility<FunctionSpec_>,
+            Args_,
+            Promise<FunctionSpec.EncodedReturns<FunctionSpec_>>
+          >
+        : RuntimeAndFunctionType.GetFunctionType<
+              FunctionSpec_["runtimeAndFunctionType"]
+            > extends "action"
+          ? RegisteredAction<
+              FunctionSpec.GetFunctionVisibility<FunctionSpec_>,
+              Args_,
+              Promise<FunctionSpec.EncodedReturns<FunctionSpec_>>
+            >
+          : never
+    : never;
+
+export type ConvexRegisteredFunction<
+  FunctionSpec_ extends FunctionSpec.AnyWithProps,
+> = FunctionSpec_ extends {
+  functionProvenance: {
+    _tag: "Convex";
+    _args: infer Args_ extends DefaultFunctionArgs;
+    _returns: infer Returns_;
+  };
+}
+  ? RuntimeAndFunctionType.GetFunctionType<
+      FunctionSpec_["runtimeAndFunctionType"]
+    > extends "query"
+    ? RegisteredQuery<
+        FunctionSpec.GetFunctionVisibility<FunctionSpec_>,
+        Args_,
+        Returns_
+      >
+    : RuntimeAndFunctionType.GetFunctionType<
+          FunctionSpec_["runtimeAndFunctionType"]
+        > extends "mutation"
+      ? RegisteredMutation<
+          FunctionSpec.GetFunctionVisibility<FunctionSpec_>,
+          Args_,
+          Returns_
+        >
+      : RuntimeAndFunctionType.GetFunctionType<
+            FunctionSpec_["runtimeAndFunctionType"]
+          > extends "action"
+        ? RegisteredAction<
+            FunctionSpec.GetFunctionVisibility<FunctionSpec_>,
+            Args_,
+            Returns_
+          >
+        : never
+  : never;
+
+export type RegisteredFunction<
+  FunctionSpec_ extends FunctionSpec.AnyWithProps,
+> =
+  FunctionSpec_ extends FunctionSpec.WithFunctionProvenance<
+    FunctionSpec_,
+    FunctionProvenance.AnyConvex
+  >
+    ? ConvexRegisteredFunction<FunctionSpec_>
+    : FunctionSpec_ extends FunctionSpec.WithFunctionProvenance<
+          FunctionSpec_,
+          FunctionProvenance.AnyConfect
+        >
+      ? ConfectRegisteredFunction<FunctionSpec_>
+      : never;
 
 export const actionFunctionBase = <
   Schema extends DatabaseSchema.AnyWithProps,

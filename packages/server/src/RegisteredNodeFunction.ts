@@ -16,9 +16,9 @@ import type * as RegistryItem from "./RegistryItem";
 export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Node">>(
   api: Api_,
   { functionSpec, handler }: RegistryItem.AnyWithProps,
-): RegisteredFunction.RegisteredFunction =>
+): RegisteredFunction.Any =>
   Match.value(functionSpec.functionProvenance).pipe(
-    Match.tag("Convex", () => handler as RegisteredFunction.RegisteredFunction),
+    Match.tag("Convex", () => handler as RegisteredFunction.Any),
     Match.tag("Confect", () => {
       const { functionVisibility, functionProvenance } =
         functionSpec as FunctionSpec.AnyConfect;

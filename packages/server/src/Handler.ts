@@ -41,7 +41,7 @@ export type Handler<
 type ConvexProvenanceHandler<
   FunctionSpec_ extends
     FunctionSpec.AnyWithPropsWithFunctionProvenance<FunctionProvenance.AnyConvex>,
-> = FunctionSpec.RegisteredFunction<FunctionSpec_>;
+> = RegisteredFunction.ConvexRegisteredFunction<FunctionSpec_>;
 
 type ConfectProvenanceHandler<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
@@ -136,7 +136,7 @@ export type Any = AnyConfectProvenance | AnyConvexProvenance;
 
 export type AnyConfectProvenance = Base<FunctionSpec.AnyConfect, any>;
 
-export type AnyConvexProvenance = RegisteredFunction.RegisteredFunction;
+export type AnyConvexProvenance = RegisteredFunction.Any;
 
 export type WithName<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
