@@ -1,5 +1,6 @@
 import * as Ref from "@confect/core/Ref";
-import { ConvexHttpClient as ConvexHttpClient_ } from "convex/browser";
+import { ConvexHttpClient } from "convex/browser";
+import type { FunctionReference } from "convex/server";
 import type { ParseResult } from "effect";
 import { Context, Effect, Layer, Match, Schema } from "effect";
 
@@ -12,9 +13,11 @@ export class HttpClientError extends Schema.TaggedError<HttpClientError>()(
 
 const make = (
   address: string,
-  options?: ConstructorParameters<typeof ConvexHttpClient_>[1],
+  options?: ConstructorParameters<typeof ConvexHttpClient>[1],
 ) => {
-  const client = new ConvexHttpClient_(address, options);
+  const client = new ConvexHttpClient(address, options);
+
+  const url = client.url;
 
   const setAuth = (token: string) =>
     Effect.sync(() => {
@@ -34,10 +37,12 @@ const make = (
     HttpClientError | ParseResult.ParseError
   > =>
     Effect.gen(function* () {
-      const function_ = Ref.getFunctionSpec(ref);
-      const functionName = Ref.getConvexFunctionName(ref);
+      const functionSpec = Ref.getFunctionSpec(ref);
+      const functionName = Ref.getConvexFunctionName(
+        ref,
+      ) as unknown as FunctionReference<"query">;
 
-      return yield* Match.value(function_.functionProvenance).pipe(
+      return yield* Match.value(functionSpec.functionProvenance).pipe(
         Match.tag("Confect", (confectFunctionSpec) =>
           Effect.gen(function* () {
             const encodedArgs = yield* Schema.encode(confectFunctionSpec.args)(
@@ -45,7 +50,7 @@ const make = (
             );
 
             const encodedResult = yield* Effect.tryPromise({
-              try: () => client.query(functionName as any, encodedArgs),
+              try: () => client.query(functionName, encodedArgs),
               catch: (cause) => new HttpClientError({ cause }),
             });
 
@@ -56,7 +61,7 @@ const make = (
         ),
         Match.tag("Convex", () =>
           Effect.tryPromise({
-            try: () => client.query(functionName as any, args as any),
+            try: () => client.query(functionName, args),
             catch: (cause) => new HttpClientError({ cause }),
           }),
         ),
@@ -72,10 +77,12 @@ const make = (
     HttpClientError | ParseResult.ParseError
   > =>
     Effect.gen(function* () {
-      const function_ = Ref.getFunctionSpec(ref);
-      const functionName = Ref.getConvexFunctionName(ref);
+      const functionSpec = Ref.getFunctionSpec(ref);
+      const functionName = Ref.getConvexFunctionName(
+        ref,
+      ) as unknown as FunctionReference<"mutation">;
 
-      return yield* Match.value(function_.functionProvenance).pipe(
+      return yield* Match.value(functionSpec.functionProvenance).pipe(
         Match.tag("Confect", (confectFunctionSpec) =>
           Effect.gen(function* () {
             const encodedArgs = yield* Schema.encode(confectFunctionSpec.args)(
@@ -83,7 +90,7 @@ const make = (
             );
 
             const encodedResult = yield* Effect.tryPromise({
-              try: () => client.mutation(functionName as any, encodedArgs),
+              try: () => client.mutation(functionName, encodedArgs),
               catch: (cause) => new HttpClientError({ cause }),
             });
 
@@ -94,7 +101,7 @@ const make = (
         ),
         Match.tag("Convex", () =>
           Effect.tryPromise({
-            try: () => client.mutation(functionName as any, args as any),
+            try: () => client.mutation(functionName, args),
             catch: (cause) => new HttpClientError({ cause }),
           }),
         ),
@@ -110,10 +117,12 @@ const make = (
     HttpClientError | ParseResult.ParseError
   > =>
     Effect.gen(function* () {
-      const function_ = Ref.getFunctionSpec(ref);
-      const functionName = Ref.getConvexFunctionName(ref);
+      const functionSpec = Ref.getFunctionSpec(ref);
+      const functionName = Ref.getConvexFunctionName(
+        ref,
+      ) as unknown as FunctionReference<"action">;
 
-      return yield* Match.value(function_.functionProvenance).pipe(
+      return yield* Match.value(functionSpec.functionProvenance).pipe(
         Match.tag("Confect", (confectFunctionSpec) =>
           Effect.gen(function* () {
             const encodedArgs = yield* Schema.encode(confectFunctionSpec.args)(
@@ -121,7 +130,7 @@ const make = (
             );
 
             const encodedResult = yield* Effect.tryPromise({
-              try: () => client.action(functionName as any, encodedArgs),
+              try: () => client.action(functionName, encodedArgs),
               catch: (cause) => new HttpClientError({ cause }),
             });
 
@@ -132,7 +141,7 @@ const make = (
         ),
         Match.tag("Convex", () =>
           Effect.tryPromise({
-            try: () => client.action(functionName as any, args as any),
+            try: () => client.action(functionName, args),
             catch: (cause) => new HttpClientError({ cause }),
           }),
         ),
@@ -141,6 +150,7 @@ const make = (
     });
 
   return {
+    url,
     setAuth,
     clearAuth,
     query,
@@ -150,7 +160,7 @@ const make = (
 };
 
 /**
- * Effect-based [ConvexHttpClient](https://docs.convex.dev/api/classes/browser.ConvexHttpClient)
+ * A Confect client which uses HTTP to communicate with your Convex backend. Works in any JS runtime that supports `fetch`. Wraps [ConvexHttpClient](https://docs.convex.dev/api/classes/browser.ConvexHttpClient).
  */
 export const HttpClient = Context.GenericTag<ReturnType<typeof make>>(
   "@confect/server/HttpClient",
@@ -160,9 +170,5 @@ export type HttpClient = typeof HttpClient.Identifier;
 
 export const layer = (
   address: string,
-  options?: ConstructorParameters<typeof ConvexHttpClient_>[1],
-) =>
-  Layer.effect(
-    HttpClient,
-    Effect.sync(() => make(address, options)),
-  );
+  options?: ConstructorParameters<typeof ConvexHttpClient>[1],
+) => Layer.sync(HttpClient, () => make(address, options));
