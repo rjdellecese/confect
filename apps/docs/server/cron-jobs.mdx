@@ -1,0 +1,68 @@
+---
+icon: "calendar"
+title: "Cron Jobs"
+description: "Schedule recurring tasks with cron jobs."
+---
+
+Define cron jobs in `confect/crons.ts` using `CronJob` and `CronJobs` from `@confect/server`. Each job has a unique identifier, a schedule, and a ref to an internal mutation or action.
+
+Schedules are either an Effect [`Cron`](https://effect.website/docs/cron) (cron expression) or a [`Duration`](https://effect.website/docs/data-types/duration/) (fixed interval). The Confect CLI re-exports the result into `convex/crons.ts`.
+
+<Note>
+  `Cron` schedules must not use a custom `seconds` field — Convex cron
+  expressions only support minute-level granularity. For sub-minute
+  scheduling, use a `Duration` interval instead.
+</Note>
+
+<Note>
+  `Duration` intervals must be a positive, whole number of seconds,
+  minutes, or hours. Sub-second durations (e.g.
+  `Duration.millis(500)`) are not supported.
+</Note>
+
+```ts confect/crons.ts
+import { Cron, Duration } from "effect";
+import { CronJob, CronJobs } from "@confect/server";
+import refs from "./_generated/refs";
+
+export default CronJobs.make()
+  .add(
+    CronJob.make(
+      "clear stale sessions",
+      Cron.make({
+        minutes: [0],
+        hours: [],
+        days: [],
+        months: [],
+        weekdays: [],
+      }),
+      refs.internal.sessions.clearStale,
+    ),
+  )
+  .add(
+    CronJob.make(
+      "send weekly digest",
+      Cron.unsafeParse("0 9 * * 1"),
+      refs.internal.emails.sendDigest,
+    ),
+  )
+  .add(
+    CronJob.make(
+      "send hourly reminder",
+      Duration.hours(1),
+      refs.internal.notifications.sendReminder,
+    ),
+  )
+  .add(
+    CronJob.make(
+      "payment reminder",
+      Cron.unsafeParse("0 16 1 * *"),
+      refs.internal.payments.sendPaymentEmail,
+      { email: "billing@example.com" },
+    ),
+  );
+```
+
+`CronJob.make` accepts a unique identifier, a schedule (`Cron` or `Duration`), a ref to an internal mutation or action, and an optional args object matching the ref's args schema. `CronJobs.make()` creates an empty collection; each `.add()` call returns a new `CronJobs` object, so calls can be chained.
+
+For the full scheduling APIs, see the [Effect `Cron` documentation](https://effect.website/docs/cron), the [Effect `Duration` documentation](https://effect.website/docs/data-types/duration/), and the [Convex cron jobs documentation](https://docs.convex.dev/scheduling/cron-jobs).

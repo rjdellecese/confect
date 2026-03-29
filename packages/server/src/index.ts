@@ -3,6 +3,8 @@ export * as ActionRunner from "./ActionRunner";
 export * as Api from "./Api";
 export * as Auth from "./Auth";
 export * as ConvexConfigProvider from "./ConvexConfigProvider";
+export * as CronJob from "./CronJob";
+export * as CronJobs from "./CronJobs";
 export * as DatabaseReader from "./DatabaseReader";
 export * as DatabaseSchema from "./DatabaseSchema";
 export * as DatabaseWriter from "./DatabaseWriter";

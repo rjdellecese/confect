@@ -64,10 +64,47 @@ const internalGetFirst = FunctionImpl.make(
     }).pipe(Effect.orDie),
 );
 
+const clearAll = FunctionImpl.make(
+  api,
+  "notesAndRandom.notes",
+  "clearAll",
+  () =>
+    Effect.gen(function* () {
+      const reader = yield* DatabaseReader;
+      const writer = yield* DatabaseWriter;
+      const allNotes = yield* reader
+        .table("notes")
+        .index("by_creation_time")
+        .collect();
+
+      for (const note of allNotes) {
+        yield* writer.table("notes").delete(note._id);
+      }
+
+      return null;
+    }).pipe(Effect.orDie),
+);
+
+const insertDefault = FunctionImpl.make(
+  api,
+  "notesAndRandom.notes",
+  "insertDefault",
+  ({ text }) =>
+    Effect.gen(function* () {
+      const writer = yield* DatabaseWriter;
+
+      yield* writer.table("notes").insert({ text });
+
+      return null;
+    }).pipe(Effect.orDie),
+);
+
 export const notes = GroupImpl.make(api, "notesAndRandom.notes").pipe(
   Layer.provide(insert),
   Layer.provide(list),
   Layer.provide(delete_),
   Layer.provide(getFirst),
   Layer.provide(internalGetFirst),
+  Layer.provide(clearAll),
+  Layer.provide(insertDefault),
 );

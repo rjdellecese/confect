@@ -71,7 +71,7 @@ export const crons = ({ cronsImportPath }: { cronsImportPath: string }) =>
 
     yield* cbw.writeLine(`import crons from "${cronsImportPath}";`);
     yield* cbw.newLine();
-    yield* cbw.writeLine(`export default crons;`);
+    yield* cbw.writeLine(`export default crons.convexCronJobs;`);
 
     return yield* cbw.toString();
   });

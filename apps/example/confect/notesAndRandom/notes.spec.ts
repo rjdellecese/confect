@@ -37,4 +37,18 @@ export const notes = GroupSpec.make("notes")
       args: Schema.Struct({}),
       returns: Schema.Option(Notes.Doc),
     }),
+  )
+  .addFunction(
+    FunctionSpec.internalMutation({
+      name: "clearAll",
+      args: Schema.Struct({}),
+      returns: Schema.Null,
+    }),
+  )
+  .addFunction(
+    FunctionSpec.internalMutation({
+      name: "insertDefault",
+      args: Schema.Struct({ text: Schema.String }),
+      returns: Schema.Null,
+    }),
   );
