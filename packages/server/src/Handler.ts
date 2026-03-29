@@ -15,11 +15,9 @@ import type * as QueryCtx from "./QueryCtx";
 import type * as QueryRunner from "./QueryRunner";
 import type * as RegisteredFunction from "./RegisteredFunction";
 import type * as Scheduler from "./Scheduler";
-import type {
-  StorageActionWriter,
-  StorageReader,
-  StorageWriter,
-} from "./Storage";
+import type { StorageActionWriter } from "./StorageActionWriter";
+import type { StorageReader } from "./StorageReader";
+import type { StorageWriter } from "./StorageWriter";
 import type * as VectorSearch from "./VectorSearch";
 
 export type Handler<

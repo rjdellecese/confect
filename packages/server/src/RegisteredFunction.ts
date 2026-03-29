@@ -18,7 +18,9 @@ import * as MutationRunner from "./MutationRunner";
 import * as QueryRunner from "./QueryRunner";
 import * as Scheduler from "./Scheduler";
 import * as SchemaToValidator from "./SchemaToValidator";
-import { StorageActionWriter, StorageReader, StorageWriter } from "./Storage";
+import { StorageActionWriter } from "./StorageActionWriter";
+import { StorageReader } from "./StorageReader";
+import { StorageWriter } from "./StorageWriter";
 import * as VectorSearch from "./VectorSearch";
 
 export type Any =

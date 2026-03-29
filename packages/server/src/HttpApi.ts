@@ -23,7 +23,9 @@ import * as ConvexConfigProvider from "./ConvexConfigProvider";
 import * as MutationRunner from "./MutationRunner";
 import * as QueryRunner from "./QueryRunner";
 import * as Scheduler from "./Scheduler";
-import { StorageActionWriter, StorageReader, StorageWriter } from "./Storage";
+import { StorageActionWriter } from "./StorageActionWriter";
+import { StorageReader } from "./StorageReader";
+import { StorageWriter } from "./StorageWriter";
 
 type Middleware = (
   httpApp: HttpApp.Default,

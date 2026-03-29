@@ -27,7 +27,8 @@ import * as RegisteredFunction from "./RegisteredFunction";
 import type * as RegistryItem from "./RegistryItem";
 import * as Scheduler from "./Scheduler";
 import * as SchemaToValidator from "./SchemaToValidator";
-import { StorageReader, StorageWriter } from "./Storage";
+import { StorageReader } from "./StorageReader";
+import { StorageWriter } from "./StorageWriter";
 
 export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
   api: Api_,

@@ -10,7 +10,9 @@ import {
   QueryCtx as QueryCtx_,
   QueryRunner as QueryRunner_,
   Scheduler as Scheduler_,
-  Storage,
+  StorageActionWriter as StorageActionWriter_,
+  StorageReader as StorageReader_,
+  StorageWriter as StorageWriter_,
   VectorSearch as VectorSearch_,
 } from "@confect/server";
 import type schemaDefinition from "../schema";
@@ -21,13 +23,13 @@ export type Auth = typeof Auth.Identifier;
 export const Scheduler = Scheduler_.Scheduler;
 export type Scheduler = typeof Scheduler.Identifier;
 
-export const StorageReader = Storage.StorageReader;
+export const StorageReader = StorageReader_.StorageReader;
 export type StorageReader = typeof StorageReader.Identifier;
 
-export const StorageWriter = Storage.StorageWriter;
+export const StorageWriter = StorageWriter_.StorageWriter;
 export type StorageWriter = typeof StorageWriter.Identifier;
 
-export const StorageActionWriter = Storage.StorageActionWriter;
+export const StorageActionWriter = StorageActionWriter_.StorageActionWriter;
 export type StorageActionWriter = typeof StorageActionWriter.Identifier;
 
 export const VectorSearch =

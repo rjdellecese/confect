@@ -214,7 +214,9 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
         yield* cbw.writeLine("QueryCtx as QueryCtx_,");
         yield* cbw.writeLine("QueryRunner as QueryRunner_,");
         yield* cbw.writeLine("Scheduler as Scheduler_,");
-        yield* cbw.writeLine("Storage,");
+        yield* cbw.writeLine("StorageActionWriter as StorageActionWriter_,");
+        yield* cbw.writeLine("StorageReader as StorageReader_,");
+        yield* cbw.writeLine("StorageWriter as StorageWriter_,");
         yield* cbw.writeLine("VectorSearch as VectorSearch_,");
       }),
     );
@@ -237,14 +239,18 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
     yield* cbw.blankLine();
 
     // StorageReader
-    yield* cbw.writeLine("export const StorageReader = Storage.StorageReader;");
+    yield* cbw.writeLine(
+      "export const StorageReader = StorageReader_.StorageReader;",
+    );
     yield* cbw.writeLine(
       "export type StorageReader = typeof StorageReader.Identifier;",
     );
     yield* cbw.blankLine();
 
     // StorageWriter
-    yield* cbw.writeLine("export const StorageWriter = Storage.StorageWriter;");
+    yield* cbw.writeLine(
+      "export const StorageWriter = StorageWriter_.StorageWriter;",
+    );
     yield* cbw.writeLine(
       "export type StorageWriter = typeof StorageWriter.Identifier;",
     );
@@ -252,7 +258,7 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
 
     // StorageActionWriter
     yield* cbw.writeLine(
-      "export const StorageActionWriter = Storage.StorageActionWriter;",
+      "export const StorageActionWriter = StorageActionWriter_.StorageActionWriter;",
     );
     yield* cbw.writeLine(
       "export type StorageActionWriter = typeof StorageActionWriter.Identifier;",
