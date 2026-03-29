@@ -36,6 +36,7 @@ jobs:
         run: pnpm install
 
       - name: Create release pull request or publish
+        id: changesets
         uses: changesets/action@v1
         with:
           publish: pnpm release
@@ -43,3 +44,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Update docs deployment branch
+        if: steps.changesets.outputs.published == 'true'
+        run: git push origin HEAD:refs/heads/release
