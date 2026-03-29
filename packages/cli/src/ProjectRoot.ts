@@ -3,7 +3,7 @@ import { NodeFileSystem } from "@effect/platform-node";
 import { Array, Effect, Option, Ref, Schema } from "effect";
 
 export class ProjectRoot extends Effect.Service<ProjectRoot>()(
-  "@confect/cli/services/ProjectRoot",
+  "@confect/cli/ProjectRoot",
   {
     effect: Effect.gen(function* () {
       const projectRoot = yield* findProjectRoot;

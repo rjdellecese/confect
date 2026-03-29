@@ -10,8 +10,8 @@ import {
   logPending,
   logSuccess,
 } from "../log";
-import { ConfectDirectory } from "../services/ConfectDirectory";
-import { ConvexDirectory } from "../services/ConvexDirectory";
+import { ConfectDirectory } from "../ConfectDirectory";
+import { ConvexDirectory } from "../ConvexDirectory";
 import * as templates from "../templates";
 import {
   bundleAndImport,

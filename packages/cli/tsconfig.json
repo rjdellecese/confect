@@ -4,8 +4,7 @@
       {
         "name": "@effect/language-service",
         "diagnosticSeverity": {
-          "deterministicKeys": "error",
-          "skipLeadingPath": ["packages/cli/src"]
+          "deterministicKeys": "error"
         }
       }
     ],

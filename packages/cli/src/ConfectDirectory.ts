@@ -3,7 +3,7 @@ import { Effect, Ref, Schema } from "effect";
 import { ConvexDirectory } from "./ConvexDirectory";
 
 export class ConfectDirectory extends Effect.Service<ConfectDirectory>()(
-  "@confect/cli/services/ConfectDirectory",
+  "@confect/cli/ConfectDirectory",
   {
     effect: Effect.gen(function* () {
       const convexDirectory = yield* findConfectDirectory;

@@ -3,7 +3,7 @@ import { Ansi, AnsiDoc } from "@effect/printer-ansi";
 import { Console, Effect, pipe, String } from "effect";
 import type * as FunctionPath from "./FunctionPath";
 import * as GroupPath from "./GroupPath";
-import { ProjectRoot } from "./services/ProjectRoot";
+import { ProjectRoot } from "./ProjectRoot";
 
 // --- File operation logs ---
 

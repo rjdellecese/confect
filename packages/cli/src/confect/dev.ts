@@ -25,9 +25,9 @@ import type * as FunctionPath from "../FunctionPath";
 import * as FunctionPaths from "../FunctionPaths";
 import * as GroupPath from "../GroupPath";
 import { logFailure, logPending, logSuccess } from "../log";
-import { ConfectDirectory } from "../services/ConfectDirectory";
-import { ConvexDirectory } from "../services/ConvexDirectory";
-import { ProjectRoot } from "../services/ProjectRoot";
+import { ConfectDirectory } from "../ConfectDirectory";
+import { ConvexDirectory } from "../ConvexDirectory";
+import { ProjectRoot } from "../ProjectRoot";
 import {
   bundleAndImport,
   EXTERNAL_PACKAGES,

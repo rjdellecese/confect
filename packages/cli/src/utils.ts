@@ -16,8 +16,8 @@ import * as FunctionPaths from "./FunctionPaths";
 import * as GroupPath from "./GroupPath";
 import * as GroupPaths from "./GroupPaths";
 import { logFileAdded, logFileModified, logFileRemoved } from "./log";
-import { ConfectDirectory } from "./services/ConfectDirectory";
-import { ConvexDirectory } from "./services/ConvexDirectory";
+import { ConfectDirectory } from "./ConfectDirectory";
+import { ConvexDirectory } from "./ConvexDirectory";
 import * as templates from "./templates";
 
 export const removePathExtension = (pathStr: string) =>

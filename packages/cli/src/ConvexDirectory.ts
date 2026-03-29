@@ -3,7 +3,7 @@ import { Effect, Option, Ref, Schema } from "effect";
 import { ProjectRoot } from "./ProjectRoot";
 
 export class ConvexDirectory extends Effect.Service<ConvexDirectory>()(
-  "@confect/cli/services/ConvexDirectory",
+  "@confect/cli/ConvexDirectory",
   {
     effect: Effect.gen(function* () {
       const convexDirectory = yield* findConvexDirectory;
