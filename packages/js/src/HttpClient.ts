@@ -168,7 +168,7 @@ const make = (
  * A Confect client which uses HTTP to communicate with your Convex backend. Works in any JS runtime that supports `fetch`. Wraps [ConvexHttpClient](https://docs.convex.dev/api/classes/browser.ConvexHttpClient).
  */
 export const HttpClient = Context.GenericTag<ReturnType<typeof make>>(
-  "@confect/server/HttpClient",
+  "@confect/js/HttpClient",
 );
 
 export type HttpClient = typeof HttpClient.Identifier;
