@@ -11,6 +11,9 @@ export class HttpClientError extends Schema.TaggedError<HttpClientError>()(
   },
 ) {}
 
+type OptionalArgs<R extends Ref.AnyQuery | Ref.AnyMutation | Ref.AnyAction> =
+  keyof Ref.Args<R> extends never ? [args?: Ref.Args<R>] : [args: Ref.Args<R>];
+
 const make = (
   address: string,
   options?: ConstructorParameters<typeof ConvexHttpClient>[1],
@@ -30,12 +33,13 @@ const make = (
 
   const query = <Query extends Ref.AnyQuery>(
     ref: Query,
-    args: Ref.Args<Query>,
+    ...rest: OptionalArgs<Query>
   ): Effect.Effect<
     Ref.Returns<Query>,
     HttpClientError | ParseResult.ParseError
   > =>
     Effect.gen(function* () {
+      const args = (rest[0] ?? {}) as Ref.Args<Query>;
       const functionSpec = Ref.getFunctionSpec(ref);
       const functionName = Ref.getConvexFunctionName(
         ref,
@@ -70,12 +74,13 @@ const make = (
 
   const mutation = <Mutation extends Ref.AnyMutation>(
     ref: Mutation,
-    args: Ref.Args<Mutation>,
+    ...rest: OptionalArgs<Mutation>
   ): Effect.Effect<
     Ref.Returns<Mutation>,
     HttpClientError | ParseResult.ParseError
   > =>
     Effect.gen(function* () {
+      const args = (rest[0] ?? {}) as Ref.Args<Mutation>;
       const functionSpec = Ref.getFunctionSpec(ref);
       const functionName = Ref.getConvexFunctionName(
         ref,
@@ -110,12 +115,13 @@ const make = (
 
   const action = <Action extends Ref.AnyAction>(
     ref: Action,
-    args: Ref.Args<Action>,
+    ...rest: OptionalArgs<Action>
   ): Effect.Effect<
     Ref.Returns<Action>,
     HttpClientError | ParseResult.ParseError
   > =>
     Effect.gen(function* () {
+      const args = (rest[0] ?? {}) as Ref.Args<Action>;
       const functionSpec = Ref.getFunctionSpec(ref);
       const functionName = Ref.getConvexFunctionName(
         ref,
