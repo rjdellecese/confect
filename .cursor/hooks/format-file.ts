@@ -1,9 +1,6 @@
-import { Command } from "@effect/platform";
-import { NodeContext, NodeRuntime } from "@effect/platform-node";
-import { Cause, Console, Effect, Schema, String } from "effect";
-import { readFileSync } from "node:fs";
-import { dirname, extname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { Command, Path } from "@effect/platform";
+import { BunContext, BunRuntime, BunStream } from "@effect/platform-bun";
+import { Cause, Console, Effect, Schema, Stream, String } from "effect";
 
 /**
  * @see https://cursor.com/docs/agent/hooks#afterfileedit
@@ -58,20 +55,28 @@ const SUPPORTED_EXTENSIONS = new Set([
 ]);
 
 const isSupportedFileType = (filePath: string) =>
-  SUPPORTED_EXTENSIONS.has(String.toLowerCase(extname(filePath)));
+  Effect.gen(function* () {
+    const path = yield* Path.Path;
 
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const PRETTIER_BIN = resolve(REPO_ROOT, "node_modules/.bin/prettier");
+    const ext = String.toLowerCase(path.extname(filePath));
+    return SUPPORTED_EXTENSIONS.has(ext);
+  });
 
 const program = Effect.gen(function* () {
-  const jsonString = readFileSync(0, "utf-8");
+  const jsonString = yield* BunStream.stdin.pipe(
+    Stream.decodeText(),
+    Stream.mkString,
+  );
+
   const input = yield* Schema.decode(AfterFileEditInput)(jsonString);
 
-  if (isSupportedFileType(input.file_path)) {
-    const command = Command.make(PRETTIER_BIN, "--write", input.file_path).pipe(
-      Command.workingDirectory(REPO_ROOT),
-      Command.stderr("inherit"),
-    );
+  if ((yield* isSupportedFileType(input.file_path)) === true) {
+    const command = Command.make(
+      "pnpm",
+      "prettier",
+      "--write",
+      input.file_path,
+    ).pipe(Command.stderr("inherit"));
 
     const exitCode = yield* Command.exitCode(command);
 
@@ -81,9 +86,9 @@ const program = Effect.gen(function* () {
   }
 });
 
-NodeRuntime.runMain(
+BunRuntime.runMain(
   program.pipe(
     Effect.tapErrorCause((cause) => Console.error(Cause.pretty(cause))),
-    Effect.provide(NodeContext.layer),
+    Effect.provide(BunContext.layer),
   ),
 );

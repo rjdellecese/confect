@@ -1,14 +1,29 @@
 {
   "version": 1,
   "hooks": {
+    "preToolUse": [
+      {
+        "command": "bun .cursor/hooks/redirect-to-opensrc.ts",
+        "matcher": "Read|Grep|Glob",
+        "timeout": 5
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "type": "prompt",
+        "prompt": "Disallow this command if it is trying to read or search dependency source code inside `node_modules` or `.pnpm-store` (e.g. `cat`, `head`, `tail`, `grep`, `rg`, `find` targeting source files in those directories). Allow maintenance commands (`rm`, `du`, `ls`, `install`, `pnpm`, `npm`) and commands that merely mention `node_modules` in flags or output paths. If you reject this command, tell the agent that it must use the `opensrc` tool to fetch the dependency source code into `opensrc/` instead.",
+        "matcher": "node_modules|.pnpm-store|.pnpm",
+        "timeout": 10
+      }
+    ],
     "afterFileEdit": [
       {
         "command": "./node_modules/.bin/bun .cursor/hooks/format-file.ts",
-        "timeout": 15
+        "timeout": 10
       },
       {
         "command": "./node_modules/.bin/bun .cursor/hooks/lint-file.ts",
-        "timeout": 15
+        "timeout": 10
       }
     ]
   }
