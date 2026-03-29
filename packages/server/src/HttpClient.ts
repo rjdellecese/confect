@@ -24,10 +24,9 @@ const make = (
       client.setAuth(token);
     });
 
-  const clearAuth = () =>
-    Effect.sync(() => {
-      client.clearAuth();
-    });
+  const clearAuth = Effect.sync(() => {
+    client.clearAuth();
+  });
 
   const query = <Query extends Ref.AnyQuery>(
     ref: Query,
