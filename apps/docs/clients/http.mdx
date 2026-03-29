@@ -68,7 +68,7 @@ Provide the `HttpClient` layer when running your program.
 
 ```ts
 import { HttpClient } from "@confect/server";
-import { Effect } from "effect";
+import { Console, Effect } from "effect";
 
 const HttpClientLive = HttpClient.layer(
   "https://example-123.convex.cloud",
@@ -78,7 +78,7 @@ const program = Effect.gen(function* () {
   const client = yield* HttpClient.HttpClient;
 
   const notes = yield* client.query(refs.public.notes.list);
-  console.log(notes);
+  yield* Console.log(notes);
 });
 
 Effect.runPromise(program.pipe(Effect.provide(HttpClientLive)));
