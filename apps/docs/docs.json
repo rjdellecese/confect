@@ -79,7 +79,14 @@
       },
       {
         "group": "Clients",
-        "pages": ["clients/react"]
+        "pages": [
+          "clients/react",
+          {
+            "icon": "js",
+            "group": "JS",
+            "pages": ["clients/http"]
+          }
+        ]
       },
       {
         "group": "Guides",
