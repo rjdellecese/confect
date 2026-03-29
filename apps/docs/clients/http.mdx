@@ -14,7 +14,9 @@ Create the `HttpClient` layer by passing your Convex deployment URL.
 import { HttpClient } from "@confect/server";
 import { Effect } from "effect";
 
-const HttpClientLive = HttpClient.layer(process.env.CONVEX_URL!);
+const HttpClientLive = HttpClient.layer(
+  "https://example-123.convex.cloud",
+);
 ```
 
 The layer can then be provided to any Effect that uses the `HttpClient` service.
@@ -68,7 +70,9 @@ Provide the `HttpClient` layer when running your program.
 import { HttpClient } from "@confect/server";
 import { Effect } from "effect";
 
-const HttpClientLive = HttpClient.layer(process.env.CONVEX_URL!);
+const HttpClientLive = HttpClient.layer(
+  "https://example-123.convex.cloud",
+);
 
 const program = Effect.gen(function* () {
   const client = yield* HttpClient.HttpClient;
