@@ -71,7 +71,7 @@
           "server/storage",
           "server/scheduling",
           "server/authentication",
-          "server/crons",
+          "server/cron-jobs",
           "server/search",
           "server/components",
           "server/environment-variables"
