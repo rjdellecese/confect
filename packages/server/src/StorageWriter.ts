@@ -17,9 +17,10 @@ const make = (storageWriter: ConvexStorageWriter) => ({
     }),
 });
 
-export class StorageWriter extends Effect.Tag(
-  "@confect/server/StorageWriter",
-)<StorageWriter, ReturnType<typeof make>>() {
+export class StorageWriter extends Effect.Tag("@confect/server/StorageWriter")<
+  StorageWriter,
+  ReturnType<typeof make>
+>() {
   static readonly layer = (storageWriter: ConvexStorageWriter) =>
     Layer.succeed(this, make(storageWriter));
 }

@@ -18,9 +18,10 @@ const make = (storageReader: ConvexStorageReader) => ({
     ),
 });
 
-export class StorageReader extends Effect.Tag(
-  "@confect/server/StorageReader",
-)<StorageReader, ReturnType<typeof make>>() {
+export class StorageReader extends Effect.Tag("@confect/server/StorageReader")<
+  StorageReader,
+  ReturnType<typeof make>
+>() {
   static readonly layer = (storageReader: ConvexStorageReader) =>
     Layer.succeed(this, make(storageReader));
 }
