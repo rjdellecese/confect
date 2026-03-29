@@ -13,6 +13,16 @@ const makeMutationRef = (convexFunctionName: string) =>
     }),
   );
 
+const makeMutationRefWithArgs = (convexFunctionName: string) =>
+  Ref.make(
+    convexFunctionName,
+    FunctionSpec.internalMutation({
+      name: convexFunctionName.split(":")[1]!,
+      args: Schema.Struct({ email: Schema.String }),
+      returns: Schema.Void,
+    }),
+  );
+
 describe("CronJob.make", () => {
   test("creates a CronJob with a Cron schedule", () => {
     const ref = makeMutationRef("tasks:cleanup");
@@ -29,6 +39,7 @@ describe("CronJob.make", () => {
     expect(job.identifier).toBe("cleanup");
     expect(Cron.isCron(job.schedule)).toBe(true);
     expect(job.ref).toBe(ref);
+    expect(job.args).toEqual({});
   });
 
   test("creates a CronJob with a Duration schedule", () => {
@@ -40,6 +51,25 @@ describe("CronJob.make", () => {
     expect(job.identifier).toBe("ping");
     expect(Duration.isDuration(job.schedule)).toBe(true);
     expect(job.ref).toBe(ref);
+    expect(job.args).toEqual({});
+  });
+
+  test("creates a CronJob with args", () => {
+    const ref = makeMutationRefWithArgs("payments:sendEmail");
+
+    const job = CronJob.make("payment reminder", Duration.hours(1), ref, {
+      email: "billing@example.com",
+    });
+
+    expect(job.identifier).toBe("payment reminder");
+    expect(job.args).toEqual({ email: "billing@example.com" });
+  });
+
+  test("defaults args to {} when omitted", () => {
+    const ref = makeMutationRef("tasks:cleanup");
+    const job = CronJob.make("cleanup", Duration.seconds(10), ref);
+
+    expect(job.args).toEqual({});
   });
 });
 

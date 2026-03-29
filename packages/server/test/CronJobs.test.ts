@@ -24,6 +24,16 @@ const makeActionRef = (convexFunctionName: string) =>
     }),
   );
 
+const makeMutationRefWithArgs = (convexFunctionName: string) =>
+  Ref.make(
+    convexFunctionName,
+    FunctionSpec.internalMutation({
+      name: convexFunctionName.split(":")[1]!,
+      args: Schema.Struct({ email: Schema.String }),
+      returns: Schema.Void,
+    }),
+  );
+
 describe("cronToConvexCronString", () => {
   test("daily at 4:00 UTC", () => {
     const cron = Cron.make({
@@ -381,6 +391,39 @@ describe("CronJobs.add", () => {
         args: [{}],
         schedule: { type: "cron", cron: "0 * * * *" },
       },
+    });
+  });
+
+  test("passes encoded args to convexCronJobs for a cron schedule", () => {
+    const ref = makeMutationRefWithArgs("payments:sendEmail");
+    const cronJob = CronJob.make(
+      "payment reminder",
+      Cron.unsafeParse("0 16 1 * *"),
+      ref,
+      { email: "billing@example.com" },
+    );
+
+    const result = CronJobs.make().add(cronJob);
+
+    expect(result.convexCronJobs.crons["payment reminder"]).toEqual({
+      name: "payments:sendEmail",
+      args: [{ email: "billing@example.com" }],
+      schedule: { type: "cron", cron: "0 16 1 * *" },
+    });
+  });
+
+  test("passes encoded args to convexCronJobs for an interval schedule", () => {
+    const ref = makeMutationRefWithArgs("notifications:send");
+    const cronJob = CronJob.make("send notification", Duration.hours(1), ref, {
+      email: "user@example.com",
+    });
+
+    const result = CronJobs.make().add(cronJob);
+
+    expect(result.convexCronJobs.crons["send notification"]).toEqual({
+      name: "notifications:send",
+      args: [{ email: "user@example.com" }],
+      schedule: { type: "interval", hours: 1 },
     });
   });
 });

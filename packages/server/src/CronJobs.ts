@@ -13,6 +13,7 @@ import {
   pipe,
   Predicate,
   Record,
+  Schema,
 } from "effect";
 import type * as CronJob from "./CronJob";
 
@@ -42,12 +43,22 @@ const Proto = {
       cronJob.ref,
     ) as unknown as SchedulableFunctionReference;
 
+    const functionSpec = Ref.getFunctionSpec(cronJob.ref);
+    const encodedArgs = Match.value(functionSpec.functionProvenance).pipe(
+      Match.tag("Confect", (confect) =>
+        Schema.encodeSync(confect.args)(cronJob.args),
+      ),
+      Match.tag("Convex", () => cronJob.args),
+      Match.exhaustive,
+    );
+
     Match.value(cronJob.schedule).pipe(
       Match.when(Cron.isCron, (cron) => {
         newConvexCrons.cron(
           cronJob.identifier,
           cronToConvexCronString(cron),
           schedulableFunctionReference,
+          encodedArgs,
         );
       }),
       Match.when(Duration.isDuration, (duration) => {
@@ -55,6 +66,7 @@ const Proto = {
           cronJob.identifier,
           durationToConvexIntervalSchedule(duration),
           schedulableFunctionReference,
+          encodedArgs,
         );
       }),
       Match.exhaustive,
