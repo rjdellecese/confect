@@ -1,6 +1,6 @@
 {
   "name": "@confect/core",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "description": "Shared specs and schemas used by all Confect packages",
   "repository": {
     "type": "git",

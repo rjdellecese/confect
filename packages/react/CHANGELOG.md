@@ -1,5 +1,11 @@
 # @confect/react
 
+## 4.0.0
+
+### Patch Changes
+
+- @confect/core@4.0.0
+
 ## 3.0.0
 
 ### Minor Changes

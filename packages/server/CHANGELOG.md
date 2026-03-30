@@ -1,5 +1,27 @@
 # @confect/server
 
+## 4.0.0
+
+### Major Changes
+
+- 60be7e6: Add Effect-native cron job support via new `CronJob` and `CronJobs` modules.
+
+  Cron jobs are now defined using Effect's `Cron` (cron expressions) or `Duration` (fixed intervals) types instead of the vanilla Convex `cronJobs()` API. `CronJob.make` creates individual jobs with a unique identifier, schedule, and ref to an internal mutation or action. `CronJobs.make()` creates an empty collection with a chainable `.add()` method.
+
+  Interval schedules are represented in the largest whole unit possible (hours > minutes > seconds) to avoid floating-point precision issues with large durations.
+
+- 8ae4d51: Standardize all Effect service tags to a consistent `@confect/{package}/{ServiceName}` format.
+
+  The `Storage` namespace export has been removed from `@confect/server`. `StorageReader`, `StorageWriter`, `StorageActionWriter`, and `BlobNotFoundError` are now exported as individual top-level namespaces. Replace `Storage.StorageReader` with `StorageReader.StorageReader`, etc. After upgrading, rerun `confect codegen` to regenerate the `services.ts` file.
+
+### Minor Changes
+
+- 641fd99: Add optional `filter` parameter to `OrderedQuery.paginate`. This allows applying a Convex filter directly at the pagination level — the one scenario where `.filter()` is recommended over index-based filtering. The filter callback receives a `FilterBuilder` and is applied to the underlying query before paginating.
+
+### Patch Changes
+
+- @confect/core@4.0.0
+
 ## 3.0.0
 
 ### Minor Changes

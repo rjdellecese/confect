@@ -1,5 +1,15 @@
 # @confect/test
 
+## 4.0.0
+
+### Patch Changes
+
+- Updated dependencies [60be7e6]
+- Updated dependencies [641fd99]
+- Updated dependencies [8ae4d51]
+  - @confect/server@4.0.0
+  - @confect/core@4.0.0
+
 ## 3.0.0
 
 ### Minor Changes
