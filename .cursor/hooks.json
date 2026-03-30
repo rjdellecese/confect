@@ -3,7 +3,7 @@
   "hooks": {
     "preToolUse": [
       {
-        "command": "bun .cursor/hooks/redirect-to-opensrc.ts",
+        "command": "./node_modules/.bin/bun .cursor/hooks/redirect-to-opensrc.ts",
         "matcher": "Read|Grep|Glob",
         "timeout": 5
       }
