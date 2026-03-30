@@ -91,4 +91,5 @@ describe("ConvexConfigProvider", () => {
       Effect.tap((value) => Effect.sync(() => assertEquals(value, true))),
     ),
   );
+
 });

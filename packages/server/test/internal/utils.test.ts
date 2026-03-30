@@ -78,6 +78,13 @@ describe("setNestedProperty", () => {
   });
 
   describe("edge cases", () => {
+    test("returns original object when path is empty", () => {
+      const obj = { a: 1, b: 2 };
+      const result = setNestedProperty(obj, [], "ignored");
+
+      expect(result).toBe(obj);
+    });
+
     test("handles empty objects at intermediate levels", () => {
       const obj = { a: {}, b: 2 };
       const result = setNestedProperty(obj, ["a", "x"], 10);

@@ -82,6 +82,29 @@ describe("Document", () => {
     );
   });
 
+  describe("encode error path", () => {
+    it.effect("fails with DocumentEncodeError on invalid data", () =>
+      Effect.gen(function* () {
+        const StrictSchema = Schema.Struct({
+          name: Schema.String.pipe(Schema.pattern(/^[a-z]+$/)),
+        });
+
+        const invalidDoc = {
+          _id: "id123" as any,
+          _creationTime: 123 as any,
+          name: "INVALID_UPPERCASE",
+        };
+
+        const exit = yield* Document.encode(
+          invalidDoc as any,
+          "test",
+          StrictSchema,
+        ).pipe(Effect.exit);
+        assertTrue(Exit.isFailure(exit));
+      }),
+    );
+  });
+
   describe("error messages", () => {
     it.effect("DocumentDecodeError has a descriptive message", () =>
       Effect.gen(function* () {

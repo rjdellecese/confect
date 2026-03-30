@@ -38,12 +38,12 @@ export const make = (
 
         if (!split) {
           return pipe(parse(value), Effect.map(Array.of));
-        } else {
-          return pipe(
-            value.split(seqDelim),
-            Effect.forEach((v) => parse(v)),
-          );
         }
+        /* v8 ignore next 4 -- split=true path unreachable: Effect Config APIs call enumerateChildren (which is unsupported) before falling through to load with split=true */
+        return pipe(
+          value.split(seqDelim),
+          Effect.forEach((v) => parse(v)),
+        );
       },
       enumerateChildren: (path) =>
         Effect.fail(

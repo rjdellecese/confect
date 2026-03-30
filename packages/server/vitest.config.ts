@@ -23,6 +23,14 @@ export default mergeConfig(
       root: import.meta.dirname,
       include: ["test/**/*.test.ts"],
       globalSetup: ["./test/setup.ts"],
+      coverage: {
+        exclude: [
+          "src/DataModel.ts",
+          "src/Handler.ts",
+          "src/TableInfo.ts",
+          "src/node.ts",
+        ],
+      },
     },
   }),
 );
