@@ -48,9 +48,7 @@ export const databaseReader = GroupImpl.make(api, "databaseReader").pipe(
             return yield* reader
               .table("notes")
               .index("by_creation_time")
-              .paginate({ cursor, numItems }, (q) =>
-                q.eq(q.field("tag"), tag),
-              );
+              .paginate({ cursor, numItems }, (q) => q.eq(q.field("tag"), tag));
           }).pipe(Effect.orDie),
       ),
     ),

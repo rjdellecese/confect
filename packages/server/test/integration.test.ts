@@ -129,18 +129,18 @@ describe("paginate", () => {
         }),
       );
 
-      const result = yield* c.query(
-        refs.public.databaseReader.paginateNotes,
-        { cursor: null, numItems: 3 },
-      );
+      const result = yield* c.query(refs.public.databaseReader.paginateNotes, {
+        cursor: null,
+        numItems: 3,
+      });
 
       assertEquals(result.page.length, 3);
       assertEquals(result.isDone, false);
 
-      const result2 = yield* c.query(
-        refs.public.databaseReader.paginateNotes,
-        { cursor: result.continueCursor, numItems: 3 },
-      );
+      const result2 = yield* c.query(refs.public.databaseReader.paginateNotes, {
+        cursor: result.continueCursor,
+        numItems: 3,
+      });
 
       assertEquals(result2.page.length, 2);
       assertEquals(result2.isDone, true);

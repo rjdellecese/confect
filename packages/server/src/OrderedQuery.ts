@@ -82,8 +82,7 @@ export const make = <
 
   const paginate: OrderedQueryFunction<"paginate"> = (options, filter) =>
     Effect.gen(function* () {
-      const filteredQuery =
-        filter !== undefined ? query.filter(filter) : query;
+      const filteredQuery = filter !== undefined ? query.filter(filter) : query;
 
       const paginationResult = yield* Effect.promise(() =>
         filteredQuery.paginate(options),
