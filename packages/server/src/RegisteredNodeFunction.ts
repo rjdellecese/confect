@@ -70,6 +70,7 @@ const nodeActionFunction = <
     args,
     returns,
     handler,
+    /* v8 ignore next 5 -- createLayer is invoked by the Convex action runtime, not directly testable */
     createLayer: (ctx) =>
       Layer.mergeAll(
         RegisteredFunction.actionLayer(databaseSchema, ctx),

@@ -34,6 +34,7 @@ type Middleware = (
   HttpApi.Api | HttpApiBuilder.Router | HttpRouter.HttpRouter.DefaultServices
 >;
 
+/* v8 ignore start -- handler is invoked by the Convex HTTP action runtime, not directly testable outside it */
 const makeHandler =
   <DataModel extends GenericDataModel>({
     pathPrefix,
@@ -97,6 +98,7 @@ const makeHandler =
 
     return handler(request);
   };
+/* v8 ignore stop */
 
 const makeHttpAction = <DataModel extends GenericDataModel>({
   pathPrefix,
@@ -222,6 +224,7 @@ const applyMonkeyPatches = () => {
 
   // eslint-disable-next-line no-global-assign
   URL = class extends URL {
+    /* v8 ignore next 6 -- getter methods only invoked within the Convex runtime */
     override get username() {
       return "";
     }
@@ -230,6 +233,7 @@ const applyMonkeyPatches = () => {
     }
   };
 
+  /* v8 ignore next 3 -- AbortSignal constructor is only available in the Convex runtime */
   Object.defineProperty(Request.prototype, "signal", {
     get: () => new AbortSignal(),
   });

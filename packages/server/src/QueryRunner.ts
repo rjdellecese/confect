@@ -27,6 +27,7 @@ const make =
             );
           }),
         ),
+        /* v8 ignore next 3 -- Convex-provenance queries are pass-through; requires raw Convex query in test app */
         Match.tag("Convex", () =>
           Effect.promise(() => runQuery(functionName as any, args as any)),
         ),

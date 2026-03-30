@@ -80,4 +80,16 @@ describe("HttpApi", () => {
       assertTrue(router !== undefined);
     }),
   );
+
+  it.effect(
+    "monkey-patched URL returns empty string for username and password",
+    () =>
+      Effect.gen(function* () {
+        HttpApi_.make({});
+        const url = new URL("https://user:pass@example.com");
+        assertTrue(url.username === "");
+        assertTrue(url.password === "");
+      }),
+  );
+
 });

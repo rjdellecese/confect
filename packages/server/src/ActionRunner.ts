@@ -27,6 +27,7 @@ const make =
             );
           }),
         ),
+        /* v8 ignore next 3 -- Convex-provenance actions are pass-through; requires raw Convex action in test app */
         Match.tag("Convex", () =>
           Effect.promise(() => runAction(functionName as any, args as any)),
         ),
