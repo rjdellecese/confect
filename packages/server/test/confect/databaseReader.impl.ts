@@ -23,6 +23,36 @@ export const databaseReader = GroupImpl.make(api, "databaseReader").pipe(
             .collect();
         }).pipe(Effect.orDie),
       ),
+      FunctionImpl.make(
+        api,
+        "databaseReader",
+        "paginateNotes",
+        ({ cursor, numItems }) =>
+          Effect.gen(function* () {
+            const reader = yield* DatabaseReader;
+
+            return yield* reader
+              .table("notes")
+              .index("by_creation_time")
+              .paginate({ cursor, numItems });
+          }).pipe(Effect.orDie),
+      ),
+      FunctionImpl.make(
+        api,
+        "databaseReader",
+        "paginateNotesWithFilter",
+        ({ cursor, numItems, tag }) =>
+          Effect.gen(function* () {
+            const reader = yield* DatabaseReader;
+
+            return yield* reader
+              .table("notes")
+              .index("by_creation_time")
+              .paginate({ cursor, numItems }, (q) =>
+                q.eq(q.field("tag"), tag),
+              );
+          }).pipe(Effect.orDie),
+      ),
     ),
   ),
 );

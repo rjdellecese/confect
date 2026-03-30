@@ -1,4 +1,6 @@
 import type {
+  ExpressionOrValue,
+  FilterBuilder,
   OrderedQuery as ConvexOrderedQuery,
   PaginationResult,
 } from "convex/server";
@@ -28,10 +30,15 @@ export type OrderedQuery<
     TableInfo_["document"],
     Document.DocumentDecodeError
   >;
-  readonly paginate: (options: {
-    cursor: string | null;
-    numItems: number;
-  }) => Effect.Effect<
+  readonly paginate: (
+    options: {
+      cursor: string | null;
+      numItems: number;
+    },
+    filter?: (
+      q: FilterBuilder<TableInfo.ConvexTableInfo<TableInfo_>>,
+    ) => ExpressionOrValue<boolean>,
+  ) => Effect.Effect<
     PaginationResult<TableInfo_["document"]>,
     Document.DocumentDecodeError
   >;
@@ -73,10 +80,13 @@ export const make = <
   const collect: OrderedQueryFunction<"collect"> = () =>
     pipe(stream(), Stream.runCollect, Effect.map(Chunk.toReadonlyArray));
 
-  const paginate: OrderedQueryFunction<"paginate"> = (options) =>
+  const paginate: OrderedQueryFunction<"paginate"> = (options, filter) =>
     Effect.gen(function* () {
+      const filteredQuery =
+        filter !== undefined ? query.filter(filter) : query;
+
       const paginationResult = yield* Effect.promise(() =>
-        query.paginate(options),
+        filteredQuery.paginate(options),
       );
 
       const parsedPage = yield* Effect.forEach(
