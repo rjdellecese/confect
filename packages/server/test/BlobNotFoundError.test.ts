@@ -5,7 +5,7 @@ import { BlobNotFoundError } from "../src/BlobNotFoundError";
 
 describe("BlobNotFoundError", () => {
   it.effect("has a descriptive message with the storage id", () =>
-    Effect.gen(function* () {
+    Effect.sync(() => {
       const error = new BlobNotFoundError({ id: "storage123" });
       assertTrue(error.message.includes("storage123"));
       assertTrue(error.message.includes("not found"));

@@ -47,7 +47,7 @@ describe("Scheduler", () => {
         runAt: async (
           timestamp: number,
           functionReference: any,
-          ...args: any[]
+          ..._args: any[]
         ) => {
           capturedTimestamp = timestamp;
           capturedFuncRef = functionReference;

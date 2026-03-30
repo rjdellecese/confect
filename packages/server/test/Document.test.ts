@@ -107,7 +107,7 @@ describe("Document", () => {
 
   describe("error messages", () => {
     it.effect("DocumentDecodeError has a descriptive message", () =>
-      Effect.gen(function* () {
+      Effect.sync(() => {
         const error = new Document.DocumentDecodeError({
           tableName: "notes",
           id: "doc123",
@@ -121,7 +121,7 @@ describe("Document", () => {
     );
 
     it.effect("DocumentEncodeError has a descriptive message", () =>
-      Effect.gen(function* () {
+      Effect.sync(() => {
         const error = new Document.DocumentEncodeError({
           tableName: "users",
           id: "user456",
@@ -135,7 +135,7 @@ describe("Document", () => {
     );
 
     it.effect("documentErrorMessage formats correctly", () =>
-      Effect.gen(function* () {
+      Effect.sync(() => {
         const msg = Document.documentErrorMessage({
           id: "id1",
           tableName: "tbl",

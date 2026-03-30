@@ -1,4 +1,4 @@
-import { GenericId } from "@confect/core";
+import type { GenericId } from "@confect/core";
 import { describe, it } from "@effect/vitest";
 import { assertEquals, assertTrue } from "@effect/vitest/utils";
 import { Cause, Effect, Exit } from "effect";
@@ -43,9 +43,7 @@ describe("QueryInitializer", () => {
           assertTrue(Exit.isFailure(exit));
           const cause = exit.cause;
           assertTrue(Cause.isFailType(cause));
-          assertTrue(
-            cause.error instanceof QueryInitializer.GetByIndexFailure,
-          );
+          assertTrue(cause.error instanceof QueryInitializer.GetByIndexFailure);
           assertEquals(cause.error.tableName, "notes");
           assertEquals(cause.error.indexName, "by_text");
         }),
@@ -154,11 +152,7 @@ describe("QueryInitializer", () => {
           const reader = yield* DatabaseReader;
           const results = yield* reader
             .table("notes")
-            .index(
-              "by_text",
-              (q) => q.gte("text", "x"),
-              "desc",
-            )
+            .index("by_text", (q) => q.gte("text", "x"), "desc")
             .collect();
           assertEquals(results.length, 2);
           assertEquals(results[0]?.text, "y");
@@ -169,7 +163,7 @@ describe("QueryInitializer", () => {
 
   describe("error messages", () => {
     it.effect("GetByIdFailure has a descriptive message", () =>
-      Effect.gen(function* () {
+      Effect.sync(() => {
         const error = new QueryInitializer.GetByIdFailure({
           tableName: "users",
           id: "abc123",
@@ -181,7 +175,7 @@ describe("QueryInitializer", () => {
     );
 
     it.effect("GetByIndexFailure has a descriptive message", () =>
-      Effect.gen(function* () {
+      Effect.sync(() => {
         const error = new QueryInitializer.GetByIndexFailure({
           tableName: "notes",
           indexName: "by_text",

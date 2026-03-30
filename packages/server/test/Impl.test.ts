@@ -5,7 +5,7 @@ import * as Impl from "../src/Impl";
 
 describe("Impl", () => {
   it.effect("isImpl returns true for Impl values", () =>
-    Effect.gen(function* () {
+    Effect.sync(() => {
       const value = {
         [Impl.TypeId]: Impl.TypeId,
         api: {},
@@ -16,7 +16,7 @@ describe("Impl", () => {
   );
 
   it.effect("isImpl returns false for non-Impl values", () =>
-    Effect.gen(function* () {
+    Effect.sync(() => {
       assertFalse(Impl.isImpl({}));
       assertFalse(Impl.isImpl(null));
       assertFalse(Impl.isImpl("string"));

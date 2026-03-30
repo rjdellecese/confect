@@ -10,9 +10,7 @@ import { Effect } from "effect";
 import * as HttpApi_ from "../src/HttpApi";
 
 class TestApi extends HttpApi.make("TestApi").add(
-  HttpApiGroup.make("health").add(
-    HttpApiEndpoint.get("check", "/health"),
-  ),
+  HttpApiGroup.make("health").add(HttpApiEndpoint.get("check", "/health")),
 ) {}
 
 const TestApiLive = HttpApiBuilder.group(TestApi, "health", (handlers) =>
@@ -21,7 +19,7 @@ const TestApiLive = HttpApiBuilder.group(TestApi, "health", (handlers) =>
 
 describe("HttpApi", () => {
   it.effect("make creates a ConvexHttpRouter with routes", () =>
-    Effect.gen(function* () {
+    Effect.sync(() => {
       const router = HttpApi_.make({
         "/": {
           apiLive: TestApiLive as any,
@@ -34,22 +32,20 @@ describe("HttpApi", () => {
     }),
   );
 
-  it.effect(
-    "make creates a ConvexHttpRouter with custom path prefix",
-    () =>
-      Effect.gen(function* () {
-        const router = HttpApi_.make({
-          "/api/": {
-            apiLive: TestApiLive as any,
-          },
-        });
+  it.effect("make creates a ConvexHttpRouter with custom path prefix", () =>
+    Effect.sync(() => {
+      const router = HttpApi_.make({
+        "/api/": {
+          apiLive: TestApiLive as any,
+        },
+      });
 
-        assertTrue(router !== undefined);
-      }),
+      assertTrue(router !== undefined);
+    }),
   );
 
   it.effect("make with middleware option", () =>
-    Effect.gen(function* () {
+    Effect.sync(() => {
       const router = HttpApi_.make({
         "/": {
           apiLive: TestApiLive as any,
@@ -62,7 +58,7 @@ describe("HttpApi", () => {
   );
 
   it.effect("make with scalar option", () =>
-    Effect.gen(function* () {
+    Effect.sync(() => {
       const router = HttpApi_.make({
         "/": {
           apiLive: TestApiLive as any,
@@ -75,7 +71,7 @@ describe("HttpApi", () => {
   );
 
   it.effect("make with empty httpApis creates an empty router", () =>
-    Effect.gen(function* () {
+    Effect.sync(() => {
       const router = HttpApi_.make({});
       assertTrue(router !== undefined);
     }),
@@ -84,12 +80,11 @@ describe("HttpApi", () => {
   it.effect(
     "monkey-patched URL returns empty string for username and password",
     () =>
-      Effect.gen(function* () {
+      Effect.sync(() => {
         HttpApi_.make({});
         const url = new URL("https://user:pass@example.com");
         assertTrue(url.username === "");
         assertTrue(url.password === "");
       }),
   );
-
 });

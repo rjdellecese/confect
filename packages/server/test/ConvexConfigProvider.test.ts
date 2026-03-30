@@ -50,9 +50,7 @@ describe("ConvexConfigProvider", () => {
       { "APP-DB-HOST": "localhost" },
       Config.string("HOST").pipe(Config.nested("DB"), Config.nested("APP")),
     ).pipe(
-      Effect.withConfigProvider(
-        ConvexConfigProvider.make({ pathDelim: "-" }),
-      ),
+      Effect.withConfigProvider(ConvexConfigProvider.make({ pathDelim: "-" })),
       Effect.tap((value) =>
         Effect.sync(() => assertEquals(value, "localhost")),
       ),
@@ -72,9 +70,7 @@ describe("ConvexConfigProvider", () => {
   it.effect("trims whitespace from values", () =>
     withEnv({ TRIM_TEST: "  trimmed  " }, Config.string("TRIM_TEST")).pipe(
       Effect.withConfigProvider(ConvexConfigProvider.make()),
-      Effect.tap((value) =>
-        Effect.sync(() => assertEquals(value, "trimmed")),
-      ),
+      Effect.tap((value) => Effect.sync(() => assertEquals(value, "trimmed"))),
     ),
   );
 
@@ -91,5 +87,4 @@ describe("ConvexConfigProvider", () => {
       Effect.tap((value) => Effect.sync(() => assertEquals(value, true))),
     ),
   );
-
 });

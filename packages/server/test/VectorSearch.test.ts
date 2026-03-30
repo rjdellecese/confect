@@ -25,10 +25,14 @@ describe("VectorSearch", () => {
       };
 
       const vs = VectorSearch.make(fakeVectorSearch as any);
-      const results = yield* vs("notes" as any, "embedding" as any, {
-        vector: [1, 2, 3],
-        limit: 10,
-      } as any);
+      const results = yield* vs(
+        "notes" as any,
+        "embedding" as any,
+        {
+          vector: [1, 2, 3],
+          limit: 10,
+        } as any,
+      );
 
       assertEquals(capturedTable, "notes");
       assertEquals(capturedIndex, "embedding");
@@ -46,10 +50,14 @@ describe("VectorSearch", () => {
         Effect.provide(VectorSearch.layer(fakeVectorSearch as any)),
       );
 
-      const results = yield* vs("table" as any, "idx" as any, {
-        vector: [],
-        limit: 5,
-      } as any);
+      const results = yield* vs(
+        "table" as any,
+        "idx" as any,
+        {
+          vector: [],
+          limit: 5,
+        } as any,
+      );
       assertEquals(results.length, 0);
     }),
   );

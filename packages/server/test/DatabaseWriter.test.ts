@@ -71,9 +71,7 @@ describe("DatabaseWriter", () => {
       yield* c.run(
         Effect.gen(function* () {
           const writer = yield* DatabaseWriter;
-          yield* writer
-            .table("notes")
-            .patch(noteId, { tag: undefined } as any);
+          yield* writer.table("notes").patch(noteId, { tag: undefined } as any);
         }),
       );
 

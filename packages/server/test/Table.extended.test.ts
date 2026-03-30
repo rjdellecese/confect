@@ -5,14 +5,14 @@ import * as Table from "../src/Table";
 
 describe("Table", () => {
   it.effect("isTable returns true for Table values", () =>
-    Effect.gen(function* () {
+    Effect.sync(() => {
       const table = Table.make("test", Schema.Struct({ x: Schema.String }));
       assertTrue(Table.isTable(table));
     }),
   );
 
   it.effect("isTable returns false for non-Table values", () =>
-    Effect.gen(function* () {
+    Effect.sync(() => {
       assertFalse(Table.isTable({}));
       assertFalse(Table.isTable(null));
       assertFalse(Table.isTable("string"));
@@ -20,7 +20,7 @@ describe("Table", () => {
   );
 
   it.effect("searchIndex creates a searchable table definition", () =>
-    Effect.gen(function* () {
+    Effect.sync(() => {
       const table = Table.make(
         "articles",
         Schema.Struct({ body: Schema.String, category: Schema.String }),
@@ -34,7 +34,7 @@ describe("Table", () => {
   );
 
   it.effect("vectorIndex creates a vector-searchable table definition", () =>
-    Effect.gen(function* () {
+    Effect.sync(() => {
       const table = Table.make(
         "docs",
         Schema.Struct({
@@ -54,7 +54,7 @@ describe("Table", () => {
   it.effect(
     "vectorIndex without filterFields creates a vector-searchable table",
     () =>
-      Effect.gen(function* () {
+      Effect.sync(() => {
         const table = Table.make(
           "docs",
           Schema.Struct({

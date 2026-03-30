@@ -40,7 +40,7 @@ describe("Auth", () => {
   );
 
   it.effect("NoUserIdentityFoundError has a descriptive message", () =>
-    Effect.gen(function* () {
+    Effect.sync(() => {
       const error = new Auth.NoUserIdentityFoundError();
       assertTrue(error.message.includes("No user identity found"));
       assertEquals(error._tag, "NoUserIdentityFoundError");

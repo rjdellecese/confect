@@ -17,7 +17,7 @@ describe("RegisteredNodeFunction", () => {
   it.effect(
     "make with Confect provenance returns a registered action (public)",
     () =>
-      Effect.gen(function* () {
+      Effect.sync(() => {
         const functionSpec = FunctionSpec.publicAction({
           name: "testAction",
           args: Schema.Struct({}),
@@ -37,7 +37,7 @@ describe("RegisteredNodeFunction", () => {
   it.effect(
     "make with Confect provenance returns a registered action (internal)",
     () =>
-      Effect.gen(function* () {
+      Effect.sync(() => {
         const functionSpec = FunctionSpec.internalAction({
           name: "testInternalAction",
           args: Schema.Struct({}),
@@ -55,7 +55,7 @@ describe("RegisteredNodeFunction", () => {
   );
 
   it.effect("make with Convex provenance returns the raw handler", () =>
-    Effect.gen(function* () {
+    Effect.sync(() => {
       const rawHandler = { isRegistered: true } as any;
 
       const convexFunctionSpec = {
