@@ -1,69 +1,85 @@
+import type { Scheduler as ConvexScheduler } from "convex/server";
+import type { GenericId } from "convex/values";
 import { describe, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
-import { DateTime, Duration, Effect } from "effect";
+import { DateTime, Duration, Effect, Ref } from "effect";
 import * as Scheduler from "../src/Scheduler";
+
+interface ScheduledCall {
+  readonly method: "runAfter" | "runAt";
+  readonly timeValue: number;
+  readonly functionReference: string;
+}
+
+const testSchedulerLayer = () =>
+  Effect.gen(function* () {
+    const calls = yield* Ref.make<ReadonlyArray<ScheduledCall>>([]);
+
+    const convexScheduler: ConvexScheduler = {
+      runAfter: (delayMs, functionReference, ..._args) => {
+        const call: ScheduledCall = {
+          method: "runAfter",
+          timeValue: delayMs,
+          functionReference: String(functionReference),
+        };
+        Effect.runSync(Ref.update(calls, (prev) => [...prev, call]));
+        return Promise.resolve(
+          "scheduled" as unknown as GenericId<"_scheduled_functions">,
+        );
+      },
+      runAt: (timestamp, functionReference, ..._args) => {
+        const call: ScheduledCall = {
+          method: "runAt",
+          timeValue:
+            typeof timestamp === "number" ? timestamp : timestamp.getTime(),
+          functionReference: String(functionReference),
+        };
+        Effect.runSync(Ref.update(calls, (prev) => [...prev, call]));
+        return Promise.resolve(
+          "scheduled" as unknown as GenericId<"_scheduled_functions">,
+        );
+      },
+      cancel: () => Promise.resolve(),
+    };
+
+    return { layer: Scheduler.layer(convexScheduler), calls };
+  });
 
 describe("Scheduler", () => {
   it.effect("runAfter schedules with correct delay in ms", () =>
     Effect.gen(function* () {
-      let capturedDelayMs: number | undefined;
-      let capturedFuncRef: string | undefined;
+      const { layer, calls } = yield* testSchedulerLayer();
 
-      const fakeScheduler = {
-        runAfter: async (
-          delayMs: number,
-          functionReference: any,
-          ..._args: any[]
-        ) => {
-          capturedDelayMs = delayMs;
-          capturedFuncRef = functionReference;
-          return "scheduled-id" as any;
-        },
-        runAt: async () => "scheduled-id" as any,
-      };
+      yield* Effect.gen(function* () {
+        const scheduler = yield* Scheduler.Scheduler;
+        yield* scheduler.runAfter(Duration.seconds(30), "api:myFunc" as any);
+      }).pipe(Effect.provide(layer));
 
-      const scheduler = yield* Scheduler.Scheduler.pipe(
-        Effect.provide(Scheduler.layer(fakeScheduler as any)),
-      );
-
-      yield* scheduler.runAfter(
-        Duration.seconds(30),
-        "api:myFunc" as any,
-        { key: "value" } as any,
-      );
-
-      assertEquals(capturedDelayMs, 30000);
-      assertEquals(capturedFuncRef, "api:myFunc");
+      const recorded = yield* Ref.get(calls);
+      assertEquals(recorded.length, 1);
+      assertEquals(recorded[0]?.method, "runAfter");
+      assertEquals(recorded[0]?.timeValue, 30000);
+      assertEquals(recorded[0]?.functionReference, "api:myFunc");
     }),
   );
 
   it.effect("runAt schedules with correct timestamp", () =>
     Effect.gen(function* () {
-      let capturedTimestamp: number | undefined;
-      let capturedFuncRef: string | undefined;
+      const { layer, calls } = yield* testSchedulerLayer();
 
-      const fakeScheduler = {
-        runAfter: async () => "scheduled-id" as any,
-        runAt: async (
-          timestamp: number,
-          functionReference: any,
-          ..._args: any[]
-        ) => {
-          capturedTimestamp = timestamp;
-          capturedFuncRef = functionReference;
-          return "scheduled-id" as any;
-        },
-      };
+      yield* Effect.gen(function* () {
+        const scheduler = yield* Scheduler.Scheduler;
+        yield* scheduler.runAt(
+          DateTime.unsafeMake(1700000000000),
+          "api:otherFunc" as any,
+        );
+      }).pipe(Effect.provide(layer));
 
-      const scheduler = yield* Scheduler.Scheduler.pipe(
-        Effect.provide(Scheduler.layer(fakeScheduler as any)),
-      );
-
-      const dateTime = DateTime.unsafeMake(1700000000000);
-      yield* scheduler.runAt(dateTime, "api:otherFunc" as any);
-
-      assertEquals(capturedTimestamp, 1700000000000);
-      assertEquals(capturedFuncRef, "api:otherFunc");
+      const recorded = yield* Ref.get(calls);
+      assertEquals(recorded.length, 1);
+      assertEquals(recorded[0]?.method, "runAt");
+      assertEquals(recorded[0]?.timeValue, 1700000000000);
+      assertEquals(recorded[0]?.functionReference, "api:otherFunc");
     }),
   );
 });
