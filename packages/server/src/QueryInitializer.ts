@@ -241,7 +241,7 @@ export const make = <
     >(orderedQuery, tableName, table.Fields);
   };
 
-  /* v8 ignore next 14 -- search indexes are not supported by convex-test */
+  /* v8 ignore start -- search indexes are not supported by convex-test */
   const search: QueryInitializerFunction<"search"> = (
     indexName,
     searchFilter,
@@ -256,6 +256,7 @@ export const make = <
       tableName,
       table.Fields,
     );
+  /* v8 ignore stop */
 
   return {
     get,

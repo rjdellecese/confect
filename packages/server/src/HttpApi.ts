@@ -224,17 +224,19 @@ const applyMonkeyPatches = () => {
 
   // eslint-disable-next-line no-global-assign
   URL = class extends URL {
-    /* v8 ignore next 6 -- getter methods only invoked within the Convex runtime */
+    /* v8 ignore start -- getter methods only invoked within the Convex runtime */
     override get username() {
       return "";
     }
     override get password() {
       return "";
     }
+    /* v8 ignore stop */
   };
 
-  /* v8 ignore next 3 -- AbortSignal constructor is only available in the Convex runtime */
+  /* v8 ignore start -- AbortSignal constructor is only available in the Convex runtime */
   Object.defineProperty(Request.prototype, "signal", {
     get: () => new AbortSignal(),
   });
+  /* v8 ignore stop */
 };

@@ -27,10 +27,11 @@ const make =
             );
           }),
         ),
-        /* v8 ignore next 3 -- Convex-provenance mutations are pass-through; requires raw Convex mutation in test app */
+        /* v8 ignore start -- Convex-provenance mutations are pass-through; requires raw Convex mutation in test app */
         Match.tag("Convex", () =>
           Effect.promise(() => runMutation(functionName as any, args as any)),
         ),
+        /* v8 ignore stop */
         Match.exhaustive,
       );
     });
