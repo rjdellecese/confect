@@ -13,29 +13,30 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
+      id-token: write
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v6
-
-      - name: Get pnpm version from package.json
-        id: pnpm-version
-        shell: bash
-        run: echo "pnpm_version=$(node -p 'require(`./package.json`).engines.pnpm')" >> $GITHUB_OUTPUT
+        uses: actions/checkout@v4
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v5
+        uses: pnpm/action-setup@v4
         with:
-          version: ${{ steps.pnpm-version.outputs.pnpm_version }}
+          version: 10
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version-file: "package.json"
           cache: "pnpm"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Update npm (Trusted Publishers requirement)
+        run: npm install -g npm@latest
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Create release pull request or publish
         id: changesets
@@ -45,7 +46,8 @@ jobs:
           branch: main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # Trusted Publishers uses GitHub OIDC; no registry token secret required.
+          NPM_CONFIG_PROVENANCE: "true"
 
       - name: Update docs deployment branch
         if: steps.changesets.outputs.published == 'true'
