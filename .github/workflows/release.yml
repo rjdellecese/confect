@@ -49,4 +49,6 @@ jobs:
 
       - name: Update docs deployment branch
         if: steps.changesets.outputs.published == 'true'
-        run: git push origin HEAD:refs/heads/release
+        run: |
+          git fetch origin release || true
+          git push --force-with-lease origin HEAD:refs/heads/release
