@@ -4,7 +4,7 @@ title: "WebSocket"
 description: "Call your Confect functions and subscribe to reactive queries over a persistent WebSocket connection."
 ---
 
-`ConfectClient` is an [Effect service](https://effect.website/docs/requirements-management/services/) that wraps Convex's [`ConvexClient`](https://docs.convex.dev/api/classes/browser.ConvexClient). It provides the same `query`, `mutation`, and `action` methods as [`HttpClient`](/clients/js/http), plus a `reactiveQuery` method that returns a [`Stream`](https://effect.website/docs/stream/introduction/) of live results. Works in any JavaScript environment that supports `WebSocket`.
+`ConfectClient` is an [Effect service](https://effect.website/docs/requirements-management/services/) that wraps Convex's [`ConvexClient`](https://docs.convex.dev/api/classes/browser.ConvexClient). It provides the same `query`, `mutation`, and `action` methods as [`HttpClient`](/clients/js/http), plus a `reactiveQuery` method that returns a [`Stream`](https://effect.website/docs/stream/introduction/) of live results. It works in any JavaScript environment that supports `WebSocket`.
 
 The WebSocket connection is managed as a [scoped resource](https://effect.website/docs/resource-management/scope/) -- it is opened when the layer is provided and closed automatically when the scope ends.
 
