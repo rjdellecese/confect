@@ -84,7 +84,7 @@
           {
             "icon": "js",
             "group": "JS",
-            "pages": ["clients/js/http"]
+            "pages": ["clients/js/http", "clients/js/websocket"]
           }
         ]
       },

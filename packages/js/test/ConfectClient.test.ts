@@ -119,7 +119,6 @@ const TestConfectClientLayer = Layer.effect(
     return {
       url: "https://test.convex.cloud",
       setAuth: () => Effect.void,
-      close: Effect.void,
 
       query: (funcRef: Ref.Any, ...rest: [unknown?]) =>
         recordCall(spy.queryCalls, funcRef, rest).pipe(Effect.as({})),
