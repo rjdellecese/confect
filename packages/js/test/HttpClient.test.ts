@@ -20,7 +20,7 @@ vi.mock("convex/browser", () => ({
 }));
 
 const noArgsQueryRef = Ref.make(
-  "notes:list",
+  "notes",
   FunctionSpec.publicQuery({
     name: "list",
     args: Schema.Struct({}),
@@ -29,7 +29,7 @@ const noArgsQueryRef = Ref.make(
 );
 
 const argsQueryRef = Ref.make(
-  "notes:get",
+  "notes",
   FunctionSpec.publicQuery({
     name: "get",
     args: Schema.Struct({ id: Schema.String }),
@@ -38,7 +38,7 @@ const argsQueryRef = Ref.make(
 );
 
 const noArgsMutationRef = Ref.make(
-  "tasks:cleanup",
+  "tasks",
   FunctionSpec.publicMutation({
     name: "cleanup",
     args: Schema.Struct({}),
@@ -47,7 +47,7 @@ const noArgsMutationRef = Ref.make(
 );
 
 const argsMutationRef = Ref.make(
-  "notes:insert",
+  "notes",
   FunctionSpec.publicMutation({
     name: "insert",
     args: Schema.Struct({ text: Schema.String }),
@@ -56,7 +56,7 @@ const argsMutationRef = Ref.make(
 );
 
 const noArgsActionRef = Ref.make(
-  "random:getNumber",
+  "random",
   FunctionSpec.publicAction({
     name: "getNumber",
     args: Schema.Struct({}),
@@ -65,7 +65,7 @@ const noArgsActionRef = Ref.make(
 );
 
 const argsActionRef = Ref.make(
-  "email:send",
+  "email",
   FunctionSpec.publicAction({
     name: "send",
     args: Schema.Struct({ to: Schema.String }),

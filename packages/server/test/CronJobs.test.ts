@@ -4,31 +4,31 @@ import { describe, expect, test } from "vitest";
 import * as CronJob from "../src/CronJob";
 import * as CronJobs from "../src/CronJobs";
 
-const makeMutationRef = (convexFunctionName: string) =>
+const makeMutationRef = (functionNamespace: string, name: string) =>
   Ref.make(
-    convexFunctionName,
+    functionNamespace,
     FunctionSpec.internalMutation({
-      name: convexFunctionName.split(":")[1]!,
+      name,
       args: Schema.Struct({}),
       returns: Schema.Void,
     }),
   );
 
-const makeActionRef = (convexFunctionName: string) =>
+const makeActionRef = (functionNamespace: string, name: string) =>
   Ref.make(
-    convexFunctionName,
+    functionNamespace,
     FunctionSpec.internalAction({
-      name: convexFunctionName.split(":")[1]!,
+      name,
       args: Schema.Struct({}),
       returns: Schema.Void,
     }),
   );
 
-const makeMutationRefWithArgs = (convexFunctionName: string) =>
+const makeMutationRefWithArgs = (functionNamespace: string, name: string) =>
   Ref.make(
-    convexFunctionName,
+    functionNamespace,
     FunctionSpec.internalMutation({
-      name: convexFunctionName.split(":")[1]!,
+      name,
       args: Schema.Struct({ email: Schema.String }),
       returns: Schema.Void,
     }),
@@ -237,7 +237,7 @@ describe("CronJobs.make", () => {
 
 describe("CronJobs.add", () => {
   test("adds a cron job and populates convexCronJobs", () => {
-    const ref = makeMutationRef("sessions:clearStale");
+    const ref = makeMutationRef("sessions", "clearStale");
     const cron = Cron.make({
       minutes: [0],
       hours: [],
@@ -258,8 +258,8 @@ describe("CronJobs.add", () => {
   });
 
   test("chains multiple add calls", () => {
-    const ref1 = makeMutationRef("sessions:clearStale");
-    const ref2 = makeActionRef("emails:sendDigest");
+    const ref1 = makeMutationRef("sessions", "clearStale");
+    const ref2 = makeActionRef("emails", "sendDigest");
 
     const result = CronJobs.make()
       .add(
@@ -305,7 +305,7 @@ describe("CronJobs.add", () => {
   });
 
   test("does not mutate previous CronJobs instance", () => {
-    const ref = makeMutationRef("sessions:clearStale");
+    const ref = makeMutationRef("sessions", "clearStale");
     const cron = Cron.make({
       minutes: [0],
       hours: [],
@@ -326,7 +326,7 @@ describe("CronJobs.add", () => {
   });
 
   test("adds an interval job and populates convexCronJobs", () => {
-    const ref = makeMutationRef("health:ping");
+    const ref = makeMutationRef("health", "ping");
     const schedule = Duration.seconds(30);
     const cronJob = CronJob.make("ping", schedule, ref);
 
@@ -341,8 +341,8 @@ describe("CronJobs.add", () => {
   });
 
   test("mixes cron and interval jobs", () => {
-    const ref1 = makeMutationRef("sessions:clearStale");
-    const ref2 = makeMutationRef("health:ping");
+    const ref1 = makeMutationRef("sessions", "clearStale");
+    const ref2 = makeMutationRef("health", "ping");
 
     const result = CronJobs.make()
       .add(
@@ -371,7 +371,7 @@ describe("CronJobs.add", () => {
   });
 
   test("convexCronJobs.export() serializes all jobs", () => {
-    const ref = makeMutationRef("sessions:clearStale");
+    const ref = makeMutationRef("sessions", "clearStale");
     const cron = Cron.make({
       minutes: [0],
       hours: [],
@@ -395,7 +395,7 @@ describe("CronJobs.add", () => {
   });
 
   test("passes encoded args to convexCronJobs for a cron schedule", () => {
-    const ref = makeMutationRefWithArgs("payments:sendEmail");
+    const ref = makeMutationRefWithArgs("payments", "sendEmail");
     const cronJob = CronJob.make(
       "payment reminder",
       Cron.unsafeParse("0 16 1 * *"),
@@ -413,7 +413,7 @@ describe("CronJobs.add", () => {
   });
 
   test("passes encoded args to convexCronJobs for an interval schedule", () => {
-    const ref = makeMutationRefWithArgs("notifications:send");
+    const ref = makeMutationRefWithArgs("notifications", "send");
     const cronJob = CronJob.make("send notification", Duration.hours(1), ref, {
       email: "user@example.com",
     });

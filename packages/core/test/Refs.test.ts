@@ -26,7 +26,7 @@ describe("make", () => {
 
     const actualRef = refs.public.notes.list;
     const expectedRef = Ref.make(
-      "notes:list",
+      "notes",
       FunctionSpec.publicQuery({
         name: "list",
         args: FnArgs,
@@ -184,7 +184,7 @@ describe("make", () => {
     const refs = Refs.make(spec);
 
     const actualRef = refs.public.notes.list;
-    const expectedRef = Ref.make("notes:list", listSpec);
+    const expectedRef = Ref.make("notes", listSpec);
 
     expect(Ref.getConvexFunctionName(actualRef)).toStrictEqual(
       Ref.getConvexFunctionName(expectedRef),

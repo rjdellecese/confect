@@ -131,14 +131,16 @@ export type FromFunctionSpec<F extends FunctionSpec.AnyWithProps> = Ref<
 
 export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
   /**
-   * This is a Convex "function name" of the format `myGroupDir/myGroupMod:myFunc`.
+   * The namespace portion of a Convex function name, i.e. the part before the
+   * colon. For example, for `myGroupDir/myGroupMod:myFunc` this would be
+   * `myGroupDir/myGroupMod`.
    */
-  convexFunctionName: string,
+  functionNamespace: string,
   functionSpec: FunctionSpec_,
 ): FromFunctionSpec<FunctionSpec_> =>
   ({
     [HiddenFunctionSpecKey]: functionSpec,
-    [HiddenConvexFunctionNameKey]: convexFunctionName,
+    [HiddenFunctionNamespaceKey]: functionNamespace,
   }) as FromFunctionSpec<FunctionSpec_>;
 
 const HiddenFunctionSpecKey = "@confect/core/api/HiddenFunctionSpecKey";
@@ -146,8 +148,8 @@ const HiddenFunctionSpecKey = "@confect/core/api/HiddenFunctionSpecKey";
 export const getFunctionSpec = (ref: Any): FunctionSpec.AnyWithProps =>
   (ref as any)[HiddenFunctionSpecKey];
 
-const HiddenConvexFunctionNameKey =
-  "@confect/core/api/HiddenConvexFunctionNameKey";
+const HiddenFunctionNamespaceKey =
+  "@confect/core/api/HiddenFunctionNamespaceKey";
 
 export const getConvexFunctionName = (ref: Any): string =>
-  (ref as any)[HiddenConvexFunctionNameKey];
+  `${(ref as any)[HiddenFunctionNamespaceKey]}:${getFunctionSpec(ref).name}`;

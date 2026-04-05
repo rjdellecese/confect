@@ -116,19 +116,19 @@ export const make = <
 
 const makeHelper = (
   groups: Record.ReadonlyRecord<string, GroupSpec.Any>,
-  groupPath: string | null = null,
+  functionNamespace: string | null = null,
 ): Any =>
   pipe(
     groups as Record.ReadonlyRecord<string, GroupSpec.AnyWithProps>,
     Record.map((group) => {
-      const currentGroupPath = groupPath
-        ? `${groupPath}/${group.name}`
+      const currentFunctionNamespace = functionNamespace
+        ? `${functionNamespace}/${group.name}`
         : group.name;
 
       return Record.union(
-        makeHelper(group.groups, currentGroupPath),
+        makeHelper(group.groups, currentFunctionNamespace),
         Record.map(group.functions, (function_) =>
-          Ref.make(`${currentGroupPath}:${function_.name}`, function_),
+          Ref.make(currentFunctionNamespace, function_),
         ),
         (_subGroup, _function) => {
           throw new Error(
