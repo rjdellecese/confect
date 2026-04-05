@@ -25,6 +25,7 @@
     "noUncheckedIndexedAccess": false,
     "strictNullChecks": true,
     "removeComments": false,
+    "stripInternal": true,
     "plugins": [
       {
         "name": "@effect/language-service",

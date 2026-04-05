@@ -12,6 +12,10 @@ export interface Ref<
   readonly _FunctionVisibility?: _FunctionVisibility;
   readonly _Args?: _Args;
   readonly _Returns?: _Returns;
+  /** @internal */
+  readonly functionSpec: FunctionSpec.AnyWithProps;
+  /** @internal */
+  readonly functionNamespace: string;
 }
 
 export interface Any extends Ref<any, any, any, any> {}
@@ -138,18 +142,10 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
   functionNamespace: string,
   functionSpec: FunctionSpec_,
 ): FromFunctionSpec<FunctionSpec_> =>
-  ({
-    [HiddenFunctionSpecKey]: functionSpec,
-    [HiddenFunctionNamespaceKey]: functionNamespace,
-  }) as FromFunctionSpec<FunctionSpec_>;
-
-const HiddenFunctionSpecKey = "@confect/core/api/HiddenFunctionSpecKey";
+  ({ functionSpec, functionNamespace }) as FromFunctionSpec<FunctionSpec_>;
 
 export const getFunctionSpec = (ref: Any): FunctionSpec.AnyWithProps =>
-  (ref as any)[HiddenFunctionSpecKey];
-
-const HiddenFunctionNamespaceKey =
-  "@confect/core/api/HiddenFunctionNamespaceKey";
+  ref.functionSpec;
 
 export const getConvexFunctionName = (ref: Any): string =>
-  `${(ref as any)[HiddenFunctionNamespaceKey]}:${getFunctionSpec(ref).name}`;
+  `${ref.functionNamespace}:${ref.functionSpec.name}`;
