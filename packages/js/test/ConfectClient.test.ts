@@ -65,10 +65,6 @@ const argsActionRef = Ref.make(
   }),
 );
 
-// ---------------------------------------------------------------------------
-// Test spy service: tracks all calls made through the ConfectClient
-// ---------------------------------------------------------------------------
-
 interface Call {
   readonly name: string;
   readonly args: unknown;
@@ -96,10 +92,6 @@ const SpyLayer = Layer.effect(
     };
   }),
 );
-
-// ---------------------------------------------------------------------------
-// Test ConfectClient layer backed by the spy
-// ---------------------------------------------------------------------------
 
 const TestConfectClientLayer = Layer.effect(
   ConfectClient.ConfectClient,
@@ -150,10 +142,6 @@ const TestLayer = Layer.merge(
   SpyLayer,
   TestConfectClientLayer.pipe(Layer.provide(SpyLayer)),
 );
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 describe("ConfectClient", () => {
   describe("query", () => {
