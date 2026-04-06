@@ -141,8 +141,7 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
    */
   functionNamespace: string,
   functionSpec: FunctionSpec_,
-): FromFunctionSpec<FunctionSpec_> =>
-  ({ functionSpec, functionNamespace });
+): FromFunctionSpec<FunctionSpec_> => ({ functionSpec, functionNamespace });
 
 export const getFunctionSpec = (ref: Any): FunctionSpec.AnyWithProps =>
   ref.functionSpec;
