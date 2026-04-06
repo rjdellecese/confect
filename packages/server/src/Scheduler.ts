@@ -13,8 +13,10 @@ import {
   Schema,
 } from "effect";
 
-type OptionalArgs<R extends Ref.AnyMutation | Ref.AnyAction> =
-  keyof Ref.Args<R> extends never ? [args?: Ref.Args<R>] : [args: Ref.Args<R>];
+type OptionalArgs<Ref_ extends Ref.AnyMutation | Ref.AnyAction> =
+  keyof Ref.Args<Ref_> extends never
+    ? [args?: Ref.Args<Ref_>]
+    : [args: Ref.Args<Ref_>];
 
 const encodeArgs = (
   ref: Ref.AnyMutation | Ref.AnyAction,
@@ -29,10 +31,10 @@ const encodeArgs = (
 };
 
 const make = (scheduler: ConvexScheduler) => ({
-  runAfter: <R extends Ref.AnyMutation | Ref.AnyAction>(
+  runAfter: <Ref_ extends Ref.AnyMutation | Ref.AnyAction>(
     delay: Duration.Duration,
-    ref: R,
-    ...args: OptionalArgs<R>
+    ref: Ref_,
+    ...args: OptionalArgs<Ref_>
   ) => {
     const delayMs = Duration.toMillis(delay);
     const schedulableFunctionReference = Ref.getConvexFunctionName(
@@ -47,10 +49,10 @@ const make = (scheduler: ConvexScheduler) => ({
       scheduler.runAfter(delayMs, schedulableFunctionReference, encodedArgs),
     );
   },
-  runAt: <R extends Ref.AnyMutation | Ref.AnyAction>(
+  runAt: <Ref_ extends Ref.AnyMutation | Ref.AnyAction>(
     dateTime: DateTime.DateTime,
-    ref: R,
-    ...args: OptionalArgs<R>
+    ref: Ref_,
+    ...args: OptionalArgs<Ref_>
   ) => {
     const timestamp = DateTime.toEpochMillis(dateTime);
     const schedulableFunctionReference = Ref.getConvexFunctionName(
