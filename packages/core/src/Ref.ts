@@ -165,13 +165,6 @@ export const getFunctionReference = <R extends Any>(
 ): FunctionReference<R> =>
   makeFunctionReference(getConvexFunctionName(ref)) as FunctionReference<R>;
 
-export const deconstruct = (ref: Any) => ({
-  functionSpec: getFunctionSpec(ref),
-  functionName: getConvexFunctionName(ref),
-  functionReference: getFunctionReference(ref),
-  provenance: getFunctionSpec(ref).functionProvenance,
-});
-
 export const encodeArgs = <R extends Any>(
   ref: R,
   args: Args<R>,
@@ -235,12 +228,10 @@ export const runWithCodec: {
   ) => Effect.Effect<unknown, E> | PromiseLike<unknown>,
 ): Effect.Effect<Returns<R>, E | ParseResult.ParseError> =>
   Effect.gen(function* () {
-    const { provenance, functionReference } = deconstruct(ref);
+    const funcRef = getFunctionReference(ref) as FunctionReference<R>;
+    const provenance = getFunctionSpec(ref).functionProvenance;
     const call = (encodedArgs: unknown) => {
-      const result = callFn(
-        functionReference as FunctionReference<R>,
-        encodedArgs,
-      );
+      const result = callFn(funcRef, encodedArgs);
       return Effect.isEffect(result)
         ? (result as Effect.Effect<unknown, E>)
         : Effect.promise(() => result as PromiseLike<unknown>);
