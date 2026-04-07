@@ -143,12 +143,10 @@ const make = (
     }),
   );
 
-type ServiceShape = Effect.Effect.Success<ReturnType<typeof make>>;
-
 /**
  * A Confect client which uses a WebSocket to communicate with your Convex backend and supports reactive query subscriptions. The WebSocket connection is managed by the layer's scope and closed automatically when the scope ends. Wraps [ConvexClient](https://docs.convex.dev/api/classes/browser.ConvexClient).
  */
-export const ConfectClient = Context.GenericTag<ServiceShape>(
+export const ConfectClient = Context.GenericTag<Effect.Effect.Success<ReturnType<typeof make>>>(
   "@confect/js/ConfectClient",
 );
 
