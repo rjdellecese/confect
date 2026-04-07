@@ -155,9 +155,6 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
   functionSpec: FunctionSpec_,
 ): FromFunctionSpec<FunctionSpec_> => ({ functionSpec, functionNamespace });
 
-export const getFunctionSpec = (ref: Any): FunctionSpec.AnyWithProps =>
-  ref.functionSpec;
-
 export const getConvexFunctionName = (ref: Any): string =>
   `${ref.functionNamespace}:${ref.functionSpec.name}`;
 
@@ -170,7 +167,7 @@ export const encodeArgs = <Ref_ extends Any>(
   ref: Ref_,
   args: Args<Ref_>,
 ): Effect.Effect<unknown, ParseResult.ParseError> =>
-  Match.value(getFunctionSpec(ref).functionProvenance).pipe(
+  Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag("Confect", (c) => Schema.encode(c.args)(args)),
     Match.tag("Convex", () => Effect.succeed(args)),
     Match.exhaustive,
@@ -180,7 +177,7 @@ export const decodeReturns = <Ref_ extends Any>(
   ref: Ref_,
   returns: unknown,
 ): Effect.Effect<Returns<Ref_>, ParseResult.ParseError> =>
-  Match.value(getFunctionSpec(ref).functionProvenance).pipe(
+  Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag("Confect", (c) => Schema.decode(c.returns)(returns)),
     Match.tag("Convex", () => Effect.succeed(returns)),
     Match.exhaustive,
@@ -190,7 +187,7 @@ export const encodeArgsSync = <Ref_ extends Any>(
   ref: Ref_,
   args: Args<Ref_>,
 ): unknown =>
-  Match.value(getFunctionSpec(ref).functionProvenance).pipe(
+  Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag("Confect", (c) => Schema.encodeSync(c.args)(args)),
     Match.tag("Convex", () => args),
     Match.exhaustive,
@@ -200,7 +197,7 @@ export const decodeReturnsSync = <Ref_ extends Any>(
   ref: Ref_,
   encodedReturns: unknown,
 ): Returns<Ref_> =>
-  Match.value(getFunctionSpec(ref).functionProvenance).pipe(
+  Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag("Confect", (c) => Schema.decodeSync(c.returns)(encodedReturns)),
     Match.tag("Convex", () => encodedReturns),
     Match.exhaustive,

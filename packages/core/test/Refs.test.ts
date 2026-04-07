@@ -37,9 +37,7 @@ describe("make", () => {
     expect(Ref.getConvexFunctionName(actualRef)).toStrictEqual(
       Ref.getConvexFunctionName(expectedRef),
     );
-    expect(Ref.getFunctionSpec(actualRef)).toStrictEqual(
-      Ref.getFunctionSpec(expectedRef),
-    );
+    expect(actualRef.functionSpec).toStrictEqual(expectedRef.functionSpec);
     expectTypeOf(actualRef).toEqualTypeOf(expectedRef);
   });
 
@@ -189,9 +187,7 @@ describe("make", () => {
     expect(Ref.getConvexFunctionName(actualRef)).toStrictEqual(
       Ref.getConvexFunctionName(expectedRef),
     );
-    expect(Ref.getFunctionSpec(actualRef)).toStrictEqual(
-      Ref.getFunctionSpec(expectedRef),
-    );
+    expect(actualRef.functionSpec).toStrictEqual(expectedRef.functionSpec);
     expectTypeOf(actualRef).toEqualTypeOf(expectedRef);
 
     expectTypeOf(actualRef).toEqualTypeOf<
