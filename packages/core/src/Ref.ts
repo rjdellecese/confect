@@ -184,7 +184,7 @@ export const decodeReturns = <Ref_ extends Any>(
     Match.tag("Confect", (c) => Schema.decode(c.returns)(returns)),
     Match.tag("Convex", () => Effect.succeed(returns)),
     Match.exhaustive,
-  ) as Effect.Effect<Returns<Ref_>, ParseResult.ParseError>;
+  );
 
 export const encodeArgsSync = <Ref_ extends Any>(
   ref: Ref_,
@@ -232,15 +232,11 @@ export const runWithCodec: {
   ) => Effect.Effect<unknown, E> | PromiseLike<unknown>,
 ): Effect.Effect<Returns<Ref_>, E | ParseResult.ParseError> =>
   Effect.gen(function* () {
-    const functionReference = getFunctionReference(
-      ref,
-    ) as FunctionReference<Ref_>;
+    const functionReference = getFunctionReference(ref);
     const functionProvenance = ref.functionSpec.functionProvenance;
     const call = (encodedArgs: unknown) => {
       const result = f(functionReference, encodedArgs);
-      return Effect.isEffect(result)
-        ? (result as Effect.Effect<unknown, E>)
-        : Effect.promise(() => result as PromiseLike<unknown>);
+      return Effect.isEffect(result) ? result : Effect.promise(() => result);
     };
     return yield* Match.value(functionProvenance).pipe(
       Match.tag("Confect", (confect) =>
@@ -250,7 +246,7 @@ export const runWithCodec: {
           return yield* Schema.decode(confect.returns)(encodedReturns);
         }),
       ),
-      Match.tag("Convex", () => call(args as any)),
+      Match.tag("Convex", () => call(args)),
       Match.exhaustive,
     );
-  }) as Effect.Effect<Returns<Ref_>, E | ParseResult.ParseError>;
+  });
