@@ -35,6 +35,7 @@
     "test:core": "vitest run --project @confect/core",
     "test:js": "vitest run --project @confect/js",
     "test:server": "vitest run --project @confect/server",
+    "test:cli": "vitest run --project @confect/cli",
     "release": "pnpm build && changeset publish",
     "clean": "pnpm -r clean && rm -rf node_modules",
     "prepare": "effect-language-service patch"
