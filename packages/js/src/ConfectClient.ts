@@ -125,7 +125,11 @@ const make = (
               }),
             );
           }),
-        ).pipe(Stream.mapEffect((raw) => Ref.decodeReturns(ref, raw)));
+        ).pipe(
+          Stream.mapEffect((encodedReturns) =>
+            Ref.decodeReturns(ref, encodedReturns),
+          ),
+        );
       };
 
       return {

@@ -246,8 +246,8 @@ export const runWithCodec: {
       Match.tag("Confect", (confect) =>
         Effect.gen(function* () {
           const encodedArgs = yield* Schema.encode(confect.args)(args);
-          const raw = yield* call(encodedArgs);
-          return yield* Schema.decode(confect.returns)(raw);
+          const encodedReturns = yield* call(encodedArgs);
+          return yield* Schema.decode(confect.returns)(encodedReturns);
         }),
       ),
       Match.tag("Convex", () => call(args as any)),
