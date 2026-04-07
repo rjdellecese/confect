@@ -40,14 +40,14 @@ This runs Vite, the Convex local backend, and the Confect codegen watcher concur
 
 #### Convex environment variables
 
-The Convex local backend requires certain environment variables. After starting the dev server for the first time (so the local backend is initialized), set them:
+The Convex local backend requires certain environment variables. After starting the dev server for the first time (so the local backend is initialized), set them from the checked-in defaults file:
 
 ```bash
 cd apps/example
-npx convex env set TEST_ENV_VAR "test-value"
+npx convex env set < .env.defaults
 ```
 
-These are stored in the local backend's state (`.convex/`) and persist across restarts, but not across fresh clones or environment resets.
+This bulk-sets all variables from `.env.defaults` (added in convex 1.33.0). The values are stored in the local backend's state (`.convex/`) and persist across restarts, but not across fresh clones or environment resets.
 
 #### Convex WebSocket proxy
 
