@@ -8,16 +8,21 @@ import { Match, Schema } from "effect";
 
 export const useQuery = <Query extends Ref.AnyPublicQuery>(
   ref: Query,
-  args: Ref.Args<Query>,
+  args: Ref.Args<Query> | "skip",
 ): Ref.Returns<Query> | undefined => {
   const functionSpec = Ref.getFunctionSpec(ref);
   const functionName = Ref.getConvexFunctionName(ref);
 
-  const encodedArgs = Match.value(functionSpec.functionProvenance).pipe(
-    Match.tag("Confect", (confect) => Schema.encodeSync(confect.args)(args)),
-    Match.tag("Convex", () => args),
-    Match.exhaustive,
-  );
+  const encodedArgs =
+    args === "skip"
+      ? "skip"
+      : Match.value(functionSpec.functionProvenance).pipe(
+          Match.tag("Confect", (confect) =>
+            Schema.encodeSync(confect.args)(args),
+          ),
+          Match.tag("Convex", () => args),
+          Match.exhaustive,
+        );
 
   const encodedReturnsOrUndefined = useConvexQuery(
     functionName as any,
