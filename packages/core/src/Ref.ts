@@ -210,7 +210,7 @@ export const runWithCodec: {
   <Ref_ extends Any, E>(
     ref: Ref_,
     args: Args<Ref_>,
-    callFn: (
+    f: (
       functionReference: FunctionReference<Ref_>,
       encodedArgs: unknown,
     ) => Effect.Effect<unknown, E>,
@@ -218,7 +218,7 @@ export const runWithCodec: {
   <Ref_ extends Any>(
     ref: Ref_,
     args: Args<Ref_>,
-    callFn: (
+    f: (
       functionReference: FunctionReference<Ref_>,
       encodedArgs: unknown,
     ) => PromiseLike<unknown>,
@@ -226,16 +226,18 @@ export const runWithCodec: {
 } = <Ref_ extends Any, E>(
   ref: Ref_,
   args: Args<Ref_>,
-  callFn: (
+  f: (
     functionReference: FunctionReference<Ref_>,
     encodedArgs: unknown,
   ) => Effect.Effect<unknown, E> | PromiseLike<unknown>,
 ): Effect.Effect<Returns<Ref_>, E | ParseResult.ParseError> =>
   Effect.gen(function* () {
-    const funcRef = getFunctionReference(ref) as FunctionReference<Ref_>;
+    const functionReference = getFunctionReference(
+      ref,
+    ) as FunctionReference<Ref_>;
     const functionProvenance = ref.functionSpec.functionProvenance;
     const call = (encodedArgs: unknown) => {
-      const result = callFn(funcRef, encodedArgs);
+      const result = f(functionReference, encodedArgs);
       return Effect.isEffect(result)
         ? (result as Effect.Effect<unknown, E>)
         : Effect.promise(() => result as PromiseLike<unknown>);
