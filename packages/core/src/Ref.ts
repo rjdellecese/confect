@@ -1,4 +1,6 @@
 import type { FunctionVisibility } from "convex/server";
+import type { ParseResult } from "effect";
+import { Effect, Match, Schema } from "effect";
 import type * as FunctionSpec from "./FunctionSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
@@ -148,3 +150,69 @@ export const getFunctionSpec = (ref: Any): FunctionSpec.AnyWithProps =>
 
 export const getConvexFunctionName = (ref: Any): string =>
   `${ref.functionNamespace}:${ref.functionSpec.name}`;
+
+export const deconstruct = (ref: Any) => ({
+  functionSpec: getFunctionSpec(ref),
+  functionName: getConvexFunctionName(ref),
+  provenance: getFunctionSpec(ref).functionProvenance,
+});
+
+export const encodeArgs = <R extends Any>(
+  ref: R,
+  args: Args<R>,
+): Effect.Effect<unknown, ParseResult.ParseError> =>
+  Match.value(getFunctionSpec(ref).functionProvenance).pipe(
+    Match.tag("Confect", (c) => Schema.encode(c.args)(args)),
+    Match.tag("Convex", () => Effect.succeed(args)),
+    Match.exhaustive,
+  );
+
+export const decodeReturns = <R extends Any>(
+  ref: R,
+  returns: unknown,
+): Effect.Effect<Returns<R>, ParseResult.ParseError> =>
+  Match.value(getFunctionSpec(ref).functionProvenance).pipe(
+    Match.tag("Confect", (c) => Schema.decode(c.returns)(returns)),
+    Match.tag("Convex", () => Effect.succeed(returns)),
+    Match.exhaustive,
+  ) as Effect.Effect<Returns<R>, ParseResult.ParseError>;
+
+export const encodeArgsSync = <R extends Any>(ref: R, args: Args<R>): unknown =>
+  Match.value(getFunctionSpec(ref).functionProvenance).pipe(
+    Match.tag("Confect", (c) => Schema.encodeSync(c.args)(args)),
+    Match.tag("Convex", () => args),
+    Match.exhaustive,
+  );
+
+export const decodeReturnsSync = <R extends Any>(
+  ref: R,
+  returns: unknown,
+): Returns<R> =>
+  Match.value(getFunctionSpec(ref).functionProvenance).pipe(
+    Match.tag("Confect", (c) => Schema.decodeSync(c.returns)(returns)),
+    Match.tag("Convex", () => returns),
+    Match.exhaustive,
+  ) as Returns<R>;
+
+export const runWithCodec = <R extends Any, E>(
+  ref: R,
+  args: Args<R>,
+  callFn: (
+    functionName: string,
+    encodedArgs: unknown,
+  ) => Effect.Effect<unknown, E>,
+): Effect.Effect<Returns<R>, E | ParseResult.ParseError> =>
+  Effect.gen(function* () {
+    const { provenance, functionName } = deconstruct(ref);
+    return yield* Match.value(provenance).pipe(
+      Match.tag("Confect", (confect) =>
+        Effect.gen(function* () {
+          const encodedArgs = yield* Schema.encode(confect.args)(args);
+          const raw = yield* callFn(functionName, encodedArgs);
+          return yield* Schema.decode(confect.returns)(raw);
+        }),
+      ),
+      Match.tag("Convex", () => callFn(functionName, args as any)),
+      Match.exhaustive,
+    );
+  }) as Effect.Effect<Returns<R>, E | ParseResult.ParseError>;

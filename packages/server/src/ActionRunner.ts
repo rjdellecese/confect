@@ -1,7 +1,7 @@
 import * as Ref from "@confect/core/Ref";
 import { type GenericActionCtx } from "convex/server";
 import type { ParseResult } from "effect";
-import { Context, Effect, Layer, Match, Schema } from "effect";
+import { Context, Effect, Layer } from "effect";
 
 const make =
   (runAction: GenericActionCtx<any>["runAction"]) =>
@@ -9,30 +9,9 @@ const make =
     action: Action,
     args: Ref.Args<Action>,
   ): Effect.Effect<Ref.Returns<Action>, ParseResult.ParseError> =>
-    Effect.gen(function* () {
-      const functionSpec = Ref.getFunctionSpec(action);
-      const functionName = Ref.getConvexFunctionName(action);
-
-      return yield* Match.value(functionSpec.functionProvenance).pipe(
-        Match.tag("Confect", (confectFunctionSpec) =>
-          Effect.gen(function* () {
-            const encodedArgs = yield* Schema.encode(confectFunctionSpec.args)(
-              args,
-            );
-            const encodedReturns = yield* Effect.promise(() =>
-              runAction(functionName as any, encodedArgs),
-            );
-            return yield* Schema.decode(confectFunctionSpec.returns)(
-              encodedReturns,
-            );
-          }),
-        ),
-        Match.tag("Convex", () =>
-          Effect.promise(() => runAction(functionName as any, args as any)),
-        ),
-        Match.exhaustive,
-      );
-    });
+    Ref.runWithCodec(action, args, (functionName, encodedArgs) =>
+      Effect.promise(() => runAction(functionName as any, encodedArgs)),
+    );
 
 export const ActionRunner = Context.GenericTag<ReturnType<typeof make>>(
   "@confect/server/ActionRunner",

@@ -2,7 +2,7 @@ import * as Ref from "@confect/core/Ref";
 import { ConvexClient } from "convex/browser";
 import type { FunctionReference } from "convex/server";
 import type { ParseResult } from "effect";
-import { Context, Effect, Layer, Match, Schema, Stream } from "effect";
+import { Context, Effect, Layer, Schema, Stream } from "effect";
 
 export class ConfectClientError extends Schema.TaggedError<ConfectClientError>()(
   "ConfectClientError",
@@ -49,40 +49,19 @@ const make = (
       ): Effect.Effect<
         Ref.Returns<Query>,
         ConfectClientError | ParseResult.ParseError
-      > =>
-        Effect.gen(function* () {
-          const args = (rest[0] ?? {}) as Ref.Args<Query>;
-          const functionSpec = Ref.getFunctionSpec(ref);
-          const functionName = Ref.getConvexFunctionName(
-            ref,
-          ) as unknown as FunctionReference<"query">;
-
-          return yield* Match.value(functionSpec.functionProvenance).pipe(
-            Match.tag("Confect", (confectFunctionSpec) =>
-              Effect.gen(function* () {
-                const encodedArgs = yield* Schema.encode(
-                  confectFunctionSpec.args,
-                )(args);
-
-                const encodedResult = yield* Effect.tryPromise({
-                  try: () => convexClient.query(functionName, encodedArgs),
-                  catch: (cause) => new ConfectClientError({ cause }),
-                });
-
-                return yield* Schema.decode(confectFunctionSpec.returns)(
-                  encodedResult,
-                );
-              }),
-            ),
-            Match.tag("Convex", () =>
-              Effect.tryPromise({
-                try: () => convexClient.query(functionName, args),
-                catch: (cause) => new ConfectClientError({ cause }),
-              }),
-            ),
-            Match.exhaustive,
-          );
-        });
+      > => {
+        const args = (rest[0] ?? {}) as Ref.Args<Query>;
+        return Ref.runWithCodec(ref, args, (functionName, encodedArgs) =>
+          Effect.tryPromise({
+            try: () =>
+              convexClient.query(
+                functionName as unknown as FunctionReference<"query">,
+                encodedArgs,
+              ),
+            catch: (cause) => new ConfectClientError({ cause }),
+          }),
+        );
+      };
 
       const mutation = <Mutation extends Ref.AnyMutation>(
         ref: Mutation,
@@ -90,40 +69,19 @@ const make = (
       ): Effect.Effect<
         Ref.Returns<Mutation>,
         ConfectClientError | ParseResult.ParseError
-      > =>
-        Effect.gen(function* () {
-          const args = (rest[0] ?? {}) as Ref.Args<Mutation>;
-          const functionSpec = Ref.getFunctionSpec(ref);
-          const functionName = Ref.getConvexFunctionName(
-            ref,
-          ) as unknown as FunctionReference<"mutation">;
-
-          return yield* Match.value(functionSpec.functionProvenance).pipe(
-            Match.tag("Confect", (confectFunctionSpec) =>
-              Effect.gen(function* () {
-                const encodedArgs = yield* Schema.encode(
-                  confectFunctionSpec.args,
-                )(args);
-
-                const encodedResult = yield* Effect.tryPromise({
-                  try: () => convexClient.mutation(functionName, encodedArgs),
-                  catch: (cause) => new ConfectClientError({ cause }),
-                });
-
-                return yield* Schema.decode(confectFunctionSpec.returns)(
-                  encodedResult,
-                );
-              }),
-            ),
-            Match.tag("Convex", () =>
-              Effect.tryPromise({
-                try: () => convexClient.mutation(functionName, args),
-                catch: (cause) => new ConfectClientError({ cause }),
-              }),
-            ),
-            Match.exhaustive,
-          );
-        });
+      > => {
+        const args = (rest[0] ?? {}) as Ref.Args<Mutation>;
+        return Ref.runWithCodec(ref, args, (functionName, encodedArgs) =>
+          Effect.tryPromise({
+            try: () =>
+              convexClient.mutation(
+                functionName as unknown as FunctionReference<"mutation">,
+                encodedArgs,
+              ),
+            catch: (cause) => new ConfectClientError({ cause }),
+          }),
+        );
+      };
 
       const action = <Action extends Ref.AnyAction>(
         ref: Action,
@@ -131,40 +89,19 @@ const make = (
       ): Effect.Effect<
         Ref.Returns<Action>,
         ConfectClientError | ParseResult.ParseError
-      > =>
-        Effect.gen(function* () {
-          const args = (rest[0] ?? {}) as Ref.Args<Action>;
-          const functionSpec = Ref.getFunctionSpec(ref);
-          const functionName = Ref.getConvexFunctionName(
-            ref,
-          ) as unknown as FunctionReference<"action">;
-
-          return yield* Match.value(functionSpec.functionProvenance).pipe(
-            Match.tag("Confect", (confectFunctionSpec) =>
-              Effect.gen(function* () {
-                const encodedArgs = yield* Schema.encode(
-                  confectFunctionSpec.args,
-                )(args);
-
-                const encodedResult = yield* Effect.tryPromise({
-                  try: () => convexClient.action(functionName, encodedArgs),
-                  catch: (cause) => new ConfectClientError({ cause }),
-                });
-
-                return yield* Schema.decode(confectFunctionSpec.returns)(
-                  encodedResult,
-                );
-              }),
-            ),
-            Match.tag("Convex", () =>
-              Effect.tryPromise({
-                try: () => convexClient.action(functionName, args),
-                catch: (cause) => new ConfectClientError({ cause }),
-              }),
-            ),
-            Match.exhaustive,
-          );
-        });
+      > => {
+        const args = (rest[0] ?? {}) as Ref.Args<Action>;
+        return Ref.runWithCodec(ref, args, (functionName, encodedArgs) =>
+          Effect.tryPromise({
+            try: () =>
+              convexClient.action(
+                functionName as unknown as FunctionReference<"action">,
+                encodedArgs,
+              ),
+            catch: (cause) => new ConfectClientError({ cause }),
+          }),
+        );
+      };
 
       const reactiveQuery = <Query extends Ref.AnyQuery>(
         ref: Query,
@@ -174,49 +111,19 @@ const make = (
         ConfectClientError | ParseResult.ParseError
       > => {
         const args = (rest[0] ?? {}) as Ref.Args<Query>;
-        const functionSpec = Ref.getFunctionSpec(ref);
         const functionName = Ref.getConvexFunctionName(
           ref,
         ) as unknown as FunctionReference<"query">;
 
-        return Match.value(functionSpec.functionProvenance).pipe(
-          Match.tag("Confect", (confectFunctionSpec) =>
-            Stream.unwrapScoped(
-              Effect.gen(function* () {
-                const encodedArgs = yield* Schema.encode(
-                  confectFunctionSpec.args,
-                )(args);
+        return Stream.unwrapScoped(
+          Effect.gen(function* () {
+            const encodedArgs = yield* Ref.encodeArgs(ref, args);
 
-                return Stream.asyncScoped<unknown, ConfectClientError>((emit) =>
-                  Effect.gen(function* () {
-                    const unsubscribe = convexClient.onUpdate(
-                      functionName,
-                      encodedArgs,
-                      (result) => {
-                        emit.single(result);
-                      },
-                      (error) => {
-                        emit.fail(new ConfectClientError({ cause: error }));
-                      },
-                    );
-                    yield* Effect.addFinalizer(() =>
-                      Effect.sync(() => unsubscribe()),
-                    );
-                  }),
-                );
-              }),
-            ).pipe(
-              Stream.mapEffect((raw) =>
-                Schema.decode(confectFunctionSpec.returns)(raw),
-              ),
-            ),
-          ),
-          Match.tag("Convex", () =>
-            Stream.asyncScoped<Ref.Returns<Query>, ConfectClientError>((emit) =>
+            return Stream.asyncScoped<unknown, ConfectClientError>((emit) =>
               Effect.gen(function* () {
                 const unsubscribe = convexClient.onUpdate(
                   functionName,
-                  args,
+                  encodedArgs,
                   (result) => {
                     emit.single(result);
                   },
@@ -228,10 +135,9 @@ const make = (
                   Effect.sync(() => unsubscribe()),
                 );
               }),
-            ),
-          ),
-          Match.exhaustive,
-        );
+            );
+          }),
+        ).pipe(Stream.mapEffect((raw) => Ref.decodeReturns(ref, raw)));
       };
 
       return {
