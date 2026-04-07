@@ -9,9 +9,6 @@ export default defineConfig({
         target: "http://127.0.0.1:3210",
         ws: true,
       },
-      "/path-prefix": {
-        target: "http://127.0.0.1:3211",
-      },
     },
   },
   plugins: [react()],

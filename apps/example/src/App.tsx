@@ -207,10 +207,7 @@ const NoteList = () => {
 };
 
 const ApiClient = HttpApiClient.make(Api, {
-  baseUrl: import.meta.env.VITE_CONVEX_URL.replace(
-    "convex.cloud",
-    "convex.site",
-  ),
+  baseUrl: import.meta.env.VITE_CONVEX_SITE_URL,
 });
 
 const getFirst = ApiClient.pipe(

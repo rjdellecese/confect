@@ -53,6 +53,6 @@ This bulk-sets all variables from `.env.defaults` (added in convex 1.33.0). The 
 
 In cloud agent environments, only the Vite dev server port (5173) is forwarded to the browser. The Convex backend (port 3210) is not directly accessible. To handle this:
 
-- `vite.config.ts` has proxies that forward `/api` requests (including WebSocket) to the Convex backend on port 3210, and `/path-prefix` requests to the Convex HTTP actions server on port 3211.
+- `vite.config.ts` has a proxy that forwards `/api` requests (including WebSocket) to the Convex backend on port 3210.
 - `.env.development.local` overrides `VITE_CONVEX_URL` to `http://127.0.0.1:5173` so the Convex client connects through Vite's proxy instead of directly to port 3210.
 - Vite loads `.env.development.local` with higher priority than `.env.local` (which `convex dev` manages), so the override is stable.
