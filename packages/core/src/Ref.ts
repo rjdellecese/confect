@@ -1,8 +1,4 @@
-import type {
-  FunctionReference,
-  FunctionType,
-  FunctionVisibility,
-} from "convex/server";
+import type { FunctionReference, FunctionVisibility } from "convex/server";
 import { makeFunctionReference } from "convex/server";
 import type { ParseResult } from "effect";
 import { Effect, Match, Schema } from "effect";
@@ -134,8 +130,8 @@ export type Returns<Ref_> =
     : never;
 
 export type ToFunctionReference<R extends Any> = FunctionReference<
-  GetFunctionType<R> & FunctionType,
-  GetFunctionVisibility<R> & FunctionVisibility
+  GetFunctionType<R>,
+  GetFunctionVisibility<R>
 >;
 
 export type FromFunctionSpec<F extends FunctionSpec.AnyWithProps> = Ref<
