@@ -4,21 +4,21 @@ import { describe, expectTypeOf, test } from "vitest";
 import type * as Ref from "../src/Ref";
 import type * as RuntimeAndFunctionType from "../src/RuntimeAndFunctionType";
 
-describe("ToFunctionReference", () => {
+describe("FunctionReference", () => {
   test("public query ref -> FunctionReference<'query', 'public'>", () => {
-    expectTypeOf<Ref.ToFunctionReference<Ref.AnyPublicQuery>>().toEqualTypeOf<
+    expectTypeOf<Ref.FunctionReference<Ref.AnyPublicQuery>>().toEqualTypeOf<
       FunctionReference<"query", "public">
     >();
   });
 
   test("public mutation ref -> FunctionReference<'mutation', 'public'>", () => {
-    expectTypeOf<
-      Ref.ToFunctionReference<Ref.AnyPublicMutation>
-    >().toEqualTypeOf<FunctionReference<"mutation", "public">>();
+    expectTypeOf<Ref.FunctionReference<Ref.AnyPublicMutation>>().toEqualTypeOf<
+      FunctionReference<"mutation", "public">
+    >();
   });
 
   test("public action ref -> FunctionReference<'action', 'public'>", () => {
-    expectTypeOf<Ref.ToFunctionReference<Ref.AnyPublicAction>>().toEqualTypeOf<
+    expectTypeOf<Ref.FunctionReference<Ref.AnyPublicAction>>().toEqualTypeOf<
       FunctionReference<"action", "public">
     >();
   });
@@ -30,7 +30,7 @@ describe("ToFunctionReference", () => {
       { id: string },
       string[]
     >;
-    expectTypeOf<Ref.ToFunctionReference<MyRef>>().toEqualTypeOf<
+    expectTypeOf<Ref.FunctionReference<MyRef>>().toEqualTypeOf<
       FunctionReference<"query", "public">
     >();
   });
@@ -42,7 +42,7 @@ describe("ToFunctionReference", () => {
       { name: string },
       void
     >;
-    expectTypeOf<Ref.ToFunctionReference<MyRef>>().toEqualTypeOf<
+    expectTypeOf<Ref.FunctionReference<MyRef>>().toEqualTypeOf<
       FunctionReference<"mutation", "internal">
     >();
   });
@@ -54,7 +54,7 @@ describe("ToFunctionReference", () => {
       Record<string, never>,
       number
     >;
-    expectTypeOf<Ref.ToFunctionReference<MyRef>>().toEqualTypeOf<
+    expectTypeOf<Ref.FunctionReference<MyRef>>().toEqualTypeOf<
       FunctionReference<"action", "internal">
     >();
   });
@@ -66,25 +66,25 @@ describe("ToFunctionReference", () => {
       Record<string, never>,
       void
     >;
-    expectTypeOf<Ref.ToFunctionReference<MyRef>>().toEqualTypeOf<
+    expectTypeOf<Ref.FunctionReference<MyRef>>().toEqualTypeOf<
       FunctionReference<"action", "public">
     >();
   });
 
   test("AnyQuery ref -> FunctionReference<'query', FunctionVisibility>", () => {
-    expectTypeOf<Ref.ToFunctionReference<Ref.AnyQuery>>().toEqualTypeOf<
+    expectTypeOf<Ref.FunctionReference<Ref.AnyQuery>>().toEqualTypeOf<
       FunctionReference<"query", FunctionVisibility>
     >();
   });
 
   test("AnyMutation ref -> FunctionReference<'mutation', FunctionVisibility>", () => {
-    expectTypeOf<Ref.ToFunctionReference<Ref.AnyMutation>>().toEqualTypeOf<
+    expectTypeOf<Ref.FunctionReference<Ref.AnyMutation>>().toEqualTypeOf<
       FunctionReference<"mutation", FunctionVisibility>
     >();
   });
 
   test("AnyAction ref -> FunctionReference<'action', FunctionVisibility>", () => {
-    expectTypeOf<Ref.ToFunctionReference<Ref.AnyAction>>().toEqualTypeOf<
+    expectTypeOf<Ref.FunctionReference<Ref.AnyAction>>().toEqualTypeOf<
       FunctionReference<"action", FunctionVisibility>
     >();
   });

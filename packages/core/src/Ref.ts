@@ -1,4 +1,7 @@
-import type { FunctionReference, FunctionVisibility } from "convex/server";
+import type {
+  FunctionReference as ConvexFunctionReference,
+  FunctionVisibility,
+} from "convex/server";
 import { makeFunctionReference } from "convex/server";
 import type { ParseResult } from "effect";
 import { Effect, Match, Schema } from "effect";
@@ -129,7 +132,7 @@ export type Returns<Ref_> =
     ? Returns_
     : never;
 
-export type ToFunctionReference<R extends Any> = FunctionReference<
+export type FunctionReference<R extends Any> = ConvexFunctionReference<
   GetFunctionType<R>,
   GetFunctionVisibility<R>
 >;
@@ -159,8 +162,8 @@ export const getConvexFunctionName = (ref: Any): string =>
 
 export const getFunctionReference = <R extends Any>(
   ref: R,
-): ToFunctionReference<R> =>
-  makeFunctionReference(getConvexFunctionName(ref)) as ToFunctionReference<R>;
+): FunctionReference<R> =>
+  makeFunctionReference(getConvexFunctionName(ref)) as FunctionReference<R>;
 
 export const deconstruct = (ref: Any) => ({
   functionSpec: getFunctionSpec(ref),
@@ -211,7 +214,7 @@ export const runWithCodec: {
     ref: R,
     args: Args<R>,
     callFn: (
-      functionReference: ToFunctionReference<R>,
+      functionReference: FunctionReference<R>,
       encodedArgs: unknown,
     ) => Effect.Effect<unknown, E>,
   ): Effect.Effect<Returns<R>, E | ParseResult.ParseError>;
@@ -219,7 +222,7 @@ export const runWithCodec: {
     ref: R,
     args: Args<R>,
     callFn: (
-      functionReference: ToFunctionReference<R>,
+      functionReference: FunctionReference<R>,
       encodedArgs: unknown,
     ) => PromiseLike<unknown>,
   ): Effect.Effect<Returns<R>, ParseResult.ParseError>;
@@ -227,7 +230,7 @@ export const runWithCodec: {
   ref: R,
   args: Args<R>,
   callFn: (
-    functionReference: ToFunctionReference<R>,
+    functionReference: FunctionReference<R>,
     encodedArgs: unknown,
   ) => Effect.Effect<unknown, E> | PromiseLike<unknown>,
 ): Effect.Effect<Returns<R>, E | ParseResult.ParseError> =>
@@ -235,7 +238,7 @@ export const runWithCodec: {
     const { provenance, functionReference } = deconstruct(ref);
     const call = (encodedArgs: unknown) => {
       const result = callFn(
-        functionReference as ToFunctionReference<R>,
+        functionReference as FunctionReference<R>,
         encodedArgs,
       );
       return Effect.isEffect(result)
