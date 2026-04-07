@@ -32,8 +32,6 @@
     "lint:example": "pnpm --filter example lint",
     "fix": "pnpm -r fix",
     "format": "pnpm -r format",
-    "test": "vitest run",
-    "test:watch": "vitest",
     "test:core": "vitest run --project @confect/core",
     "test:js": "vitest run --project @confect/js",
     "test:server": "vitest run --project @confect/server",
