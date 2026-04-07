@@ -4,7 +4,7 @@ import type {
   FunctionVisibility,
 } from "convex/server";
 import { makeFunctionReference } from "convex/server";
-import type { Cause, ParseResult } from "effect";
+import type { ParseResult } from "effect";
 import { Effect, Match, Schema } from "effect";
 import type * as FunctionSpec from "./FunctionSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
@@ -226,7 +226,7 @@ export const runWithCodec: {
       functionReference: ToFunctionReference<R>,
       encodedArgs: unknown,
     ) => PromiseLike<unknown>,
-  ): Effect.Effect<Returns<R>, Cause.UnknownException | ParseResult.ParseError>;
+  ): Effect.Effect<Returns<R>, ParseResult.ParseError>;
 } = <R extends Any, E>(
   ref: R,
   args: Args<R>,
@@ -234,10 +234,7 @@ export const runWithCodec: {
     functionReference: ToFunctionReference<R>,
     encodedArgs: unknown,
   ) => Effect.Effect<unknown, E> | PromiseLike<unknown>,
-): Effect.Effect<
-  Returns<R>,
-  E | Cause.UnknownException | ParseResult.ParseError
-> =>
+): Effect.Effect<Returns<R>, E | ParseResult.ParseError> =>
   Effect.gen(function* () {
     const { provenance, functionReference } = deconstruct(ref);
     const call = (encodedArgs: unknown) => {
@@ -260,7 +257,4 @@ export const runWithCodec: {
       Match.tag("Convex", () => call(args as any)),
       Match.exhaustive,
     );
-  }) as Effect.Effect<
-    Returns<R>,
-    E | Cause.UnknownException | ParseResult.ParseError
-  >;
+  }) as Effect.Effect<Returns<R>, E | ParseResult.ParseError>;

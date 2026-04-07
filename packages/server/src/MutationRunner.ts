@@ -1,16 +1,15 @@
 import * as Ref from "@confect/core/Ref";
 import { type GenericMutationCtx } from "convex/server";
-import type { ParseResult } from "effect";
-import { Context, Effect, Layer, Schema } from "effect";
+import { Context, Layer, Schema } from "effect";
 
 const make =
   (runMutation: GenericMutationCtx<any>["runMutation"]) =>
   <Mutation extends Ref.AnyMutation>(
     mutation: Mutation,
     args: Ref.Args<Mutation>,
-  ): Effect.Effect<Ref.Returns<Mutation>, ParseResult.ParseError> =>
+  ) =>
     Ref.runWithCodec(mutation, args, (functionReference, encodedArgs) =>
-      Effect.promise(() => runMutation(functionReference as any, encodedArgs)),
+      runMutation(functionReference as any, encodedArgs),
     );
 
 export const MutationRunner = Context.GenericTag<ReturnType<typeof make>>(
