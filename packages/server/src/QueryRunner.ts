@@ -6,7 +6,7 @@ const make =
   (runQuery: GenericQueryCtx<any>["runQuery"]) =>
   <Query extends Ref.AnyQuery>(query: Query, args: Ref.Args<Query>) =>
     Ref.runWithCodec(query, args, (functionReference, encodedArgs) =>
-      runQuery(functionReference as any, encodedArgs),
+      runQuery(functionReference, encodedArgs),
     );
 
 export const QueryRunner = Context.GenericTag<ReturnType<typeof make>>(

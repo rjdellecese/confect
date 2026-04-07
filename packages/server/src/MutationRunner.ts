@@ -9,7 +9,7 @@ const make =
     args: Ref.Args<Mutation>,
   ) =>
     Ref.runWithCodec(mutation, args, (functionReference, encodedArgs) =>
-      runMutation(functionReference as any, encodedArgs),
+      runMutation(functionReference, encodedArgs),
     );
 
 export const MutationRunner = Context.GenericTag<ReturnType<typeof make>>(

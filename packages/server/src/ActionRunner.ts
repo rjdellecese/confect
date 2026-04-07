@@ -6,7 +6,7 @@ const make =
   (runAction: GenericActionCtx<any>["runAction"]) =>
   <Action extends Ref.AnyAction>(action: Action, args: Ref.Args<Action>) =>
     Ref.runWithCodec(action, args, (functionReference, encodedArgs) =>
-      runAction(functionReference as any, encodedArgs),
+      runAction(functionReference, encodedArgs),
     );
 
 export const ActionRunner = Context.GenericTag<ReturnType<typeof make>>(

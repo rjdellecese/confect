@@ -43,7 +43,7 @@ const Proto = {
         newConvexCrons.cron(
           cronJob.identifier,
           cronToConvexCronString(cron),
-          functionReference as any,
+          functionReference,
           encodedArgs,
         );
       }),
@@ -51,7 +51,7 @@ const Proto = {
         newConvexCrons.interval(
           cronJob.identifier,
           durationToConvexIntervalSchedule(duration),
-          functionReference as any,
+          functionReference,
           encodedArgs,
         );
       }),

@@ -10,8 +10,11 @@ export class ConfectClientError extends Schema.TaggedError<ConfectClientError>()
   },
 ) {}
 
-type OptionalArgs<R extends Ref.AnyQuery | Ref.AnyMutation | Ref.AnyAction> =
-  keyof Ref.Args<R> extends never ? [args?: Ref.Args<R>] : [args: Ref.Args<R>];
+type OptionalArgs<
+  R extends Ref.AnyPublicQuery | Ref.AnyPublicMutation | Ref.AnyPublicAction,
+> = keyof Ref.Args<R> extends never
+  ? [args?: Ref.Args<R>]
+  : [args: Ref.Args<R>];
 
 const make = (
   address: string,
@@ -42,7 +45,7 @@ const make = (
           );
         });
 
-      const query = <Query extends Ref.AnyQuery>(
+      const query = <Query extends Ref.AnyPublicQuery>(
         ref: Query,
         ...rest: OptionalArgs<Query>
       ): Effect.Effect<
@@ -52,14 +55,13 @@ const make = (
         const args = (rest[0] ?? {}) as Ref.Args<Query>;
         return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
           Effect.tryPromise({
-            try: () =>
-              convexClient.query(functionReference as any, encodedArgs),
+            try: () => convexClient.query(functionReference, encodedArgs),
             catch: (cause) => new ConfectClientError({ cause }),
           }),
         );
       };
 
-      const mutation = <Mutation extends Ref.AnyMutation>(
+      const mutation = <Mutation extends Ref.AnyPublicMutation>(
         ref: Mutation,
         ...rest: OptionalArgs<Mutation>
       ): Effect.Effect<
@@ -69,14 +71,13 @@ const make = (
         const args = (rest[0] ?? {}) as Ref.Args<Mutation>;
         return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
           Effect.tryPromise({
-            try: () =>
-              convexClient.mutation(functionReference as any, encodedArgs),
+            try: () => convexClient.mutation(functionReference, encodedArgs),
             catch: (cause) => new ConfectClientError({ cause }),
           }),
         );
       };
 
-      const action = <Action extends Ref.AnyAction>(
+      const action = <Action extends Ref.AnyPublicAction>(
         ref: Action,
         ...rest: OptionalArgs<Action>
       ): Effect.Effect<
@@ -86,14 +87,13 @@ const make = (
         const args = (rest[0] ?? {}) as Ref.Args<Action>;
         return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
           Effect.tryPromise({
-            try: () =>
-              convexClient.action(functionReference as any, encodedArgs),
+            try: () => convexClient.action(functionReference, encodedArgs),
             catch: (cause) => new ConfectClientError({ cause }),
           }),
         );
       };
 
-      const reactiveQuery = <Query extends Ref.AnyQuery>(
+      const reactiveQuery = <Query extends Ref.AnyPublicQuery>(
         ref: Query,
         ...rest: OptionalArgs<Query>
       ): Stream.Stream<
@@ -110,7 +110,7 @@ const make = (
             return Stream.asyncScoped<unknown, ConfectClientError>((emit) =>
               Effect.gen(function* () {
                 const unsubscribe = convexClient.onUpdate(
-                  functionReference as any,
+                  functionReference,
                   encodedArgs,
                   (result) => {
                     emit.single(result);

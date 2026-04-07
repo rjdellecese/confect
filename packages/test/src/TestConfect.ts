@@ -79,7 +79,7 @@ class TestConfectImplWithoutIdentity<
     args: Ref.Args<QueryRef>,
   ): Effect.Effect<Ref.Returns<QueryRef>, ParseResult.ParseError> =>
     Ref.runWithCodec(queryRef, args, (functionReference, encodedArgs) =>
-      this.testConvex.query(functionReference as any, encodedArgs),
+      this.testConvex.query(functionReference, encodedArgs),
     );
 
   readonly mutation = <MutationRef extends Ref.AnyMutation>(
@@ -87,7 +87,7 @@ class TestConfectImplWithoutIdentity<
     args: Ref.Args<MutationRef>,
   ): Effect.Effect<Ref.Returns<MutationRef>, ParseResult.ParseError> =>
     Ref.runWithCodec(mutationRef, args, (functionReference, encodedArgs) =>
-      this.testConvex.mutation(functionReference as any, encodedArgs),
+      this.testConvex.mutation(functionReference, encodedArgs),
     );
 
   readonly action = <ActionRef extends Ref.AnyAction>(
@@ -95,7 +95,7 @@ class TestConfectImplWithoutIdentity<
     args: Ref.Args<ActionRef>,
   ): Effect.Effect<Ref.Returns<ActionRef>, ParseResult.ParseError> =>
     Ref.runWithCodec(actionRef, args, (functionReference, encodedArgs) =>
-      this.testConvex.action(functionReference as any, encodedArgs),
+      this.testConvex.action(functionReference, encodedArgs),
     );
 
   readonly run: TestConfectWithoutIdentity<ConfectSchema>["run"] = (<

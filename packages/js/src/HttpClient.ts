@@ -10,8 +10,11 @@ export class HttpClientError extends Schema.TaggedError<HttpClientError>()(
   },
 ) {}
 
-type OptionalArgs<R extends Ref.AnyQuery | Ref.AnyMutation | Ref.AnyAction> =
-  keyof Ref.Args<R> extends never ? [args?: Ref.Args<R>] : [args: Ref.Args<R>];
+type OptionalArgs<
+  R extends Ref.AnyPublicQuery | Ref.AnyPublicMutation | Ref.AnyPublicAction,
+> = keyof Ref.Args<R> extends never
+  ? [args?: Ref.Args<R>]
+  : [args: Ref.Args<R>];
 
 const make = (
   address: string,
@@ -30,7 +33,7 @@ const make = (
     client.clearAuth();
   });
 
-  const query = <Query extends Ref.AnyQuery>(
+  const query = <Query extends Ref.AnyPublicQuery>(
     ref: Query,
     ...rest: OptionalArgs<Query>
   ): Effect.Effect<
@@ -40,13 +43,13 @@ const make = (
     const args = (rest[0] ?? {}) as Ref.Args<Query>;
     return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
       Effect.tryPromise({
-        try: () => client.query(functionReference as any, encodedArgs),
+        try: () => client.query(functionReference, encodedArgs),
         catch: (cause) => new HttpClientError({ cause }),
       }),
     );
   };
 
-  const mutation = <Mutation extends Ref.AnyMutation>(
+  const mutation = <Mutation extends Ref.AnyPublicMutation>(
     ref: Mutation,
     ...rest: OptionalArgs<Mutation>
   ): Effect.Effect<
@@ -56,13 +59,13 @@ const make = (
     const args = (rest[0] ?? {}) as Ref.Args<Mutation>;
     return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
       Effect.tryPromise({
-        try: () => client.mutation(functionReference as any, encodedArgs),
+        try: () => client.mutation(functionReference, encodedArgs),
         catch: (cause) => new HttpClientError({ cause }),
       }),
     );
   };
 
-  const action = <Action extends Ref.AnyAction>(
+  const action = <Action extends Ref.AnyPublicAction>(
     ref: Action,
     ...rest: OptionalArgs<Action>
   ): Effect.Effect<
@@ -72,7 +75,7 @@ const make = (
     const args = (rest[0] ?? {}) as Ref.Args<Action>;
     return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
       Effect.tryPromise({
-        try: () => client.action(functionReference as any, encodedArgs),
+        try: () => client.action(functionReference, encodedArgs),
         catch: (cause) => new HttpClientError({ cause }),
       }),
     );
