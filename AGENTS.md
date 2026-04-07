@@ -2,7 +2,7 @@
 
 Instructions for AI coding agents working with this codebase.
 
-
+<!-- opensrc:start -->
 
 ## Source Code Reference
 
@@ -23,7 +23,7 @@ npx opensrc crates:<package>    # Rust crate (e.g., npx opensrc crates:serde)
 npx opensrc <owner>/<repo>      # GitHub repo (e.g., npx opensrc vercel/ai)
 ```
 
-
+<!-- opensrc:end -->
 
 ## Cursor Cloud specific instructions
 
@@ -56,4 +56,3 @@ The example app uses three local ports, all accessible from the browser:
 - **5173**: Vite dev server (frontend)
 - **3210**: Convex backend (WebSocket sync, used by `VITE_CONVEX_URL`)
 - **3211**: Convex HTTP actions server (used by `VITE_CONVEX_SITE_URL`)
-
