@@ -2,7 +2,7 @@
 
 Instructions for AI coding agents working with this codebase.
 
-<!-- opensrc:start -->
+
 
 ## Source Code Reference
 
@@ -23,7 +23,7 @@ npx opensrc crates:<package>    # Rust crate (e.g., npx opensrc crates:serde)
 npx opensrc <owner>/<repo>      # GitHub repo (e.g., npx opensrc vercel/ai)
 ```
 
-<!-- opensrc:end -->
+
 
 ## Cursor Cloud specific instructions
 
@@ -49,10 +49,11 @@ npx convex env set < .env.defaults
 
 This bulk-sets all variables from `.env.defaults` (added in convex 1.33.0). The values are stored in the local backend's state (`.convex/`) and persist across restarts, but not across fresh clones or environment resets.
 
-#### Convex WebSocket proxy
+#### Ports
 
-In cloud agent environments, only the Vite dev server port (5173) is forwarded to the browser. The Convex backend (port 3210) is not directly accessible. To handle this:
+The example app uses three local ports, all accessible from the browser:
 
-- `vite.config.ts` has a proxy that forwards `/api` requests (including WebSocket) to the Convex backend on port 3210.
-- `.env.development.local` overrides `VITE_CONVEX_URL` to `http://127.0.0.1:5173` so the Convex client connects through Vite's proxy instead of directly to port 3210.
-- Vite loads `.env.development.local` with higher priority than `.env.local` (which `convex dev` manages), so the override is stable.
+- **5173**: Vite dev server (frontend)
+- **3210**: Convex backend (WebSocket sync, used by `VITE_CONVEX_URL`)
+- **3211**: Convex HTTP actions server (used by `VITE_CONVEX_SITE_URL`)
+
