@@ -78,9 +78,9 @@ class TestConfectImplWithoutIdentity<
     queryRef: QueryRef,
     args: Ref.Args<QueryRef>,
   ): Effect.Effect<Ref.Returns<QueryRef>, ParseResult.ParseError> =>
-    Ref.runWithCodec(queryRef, args, (functionName, encodedArgs) =>
+    Ref.runWithCodec(queryRef, args, (functionReference, encodedArgs) =>
       Effect.promise(() =>
-        this.testConvex.query(functionName as any, encodedArgs),
+        this.testConvex.query(functionReference as any, encodedArgs),
       ),
     );
 
@@ -88,9 +88,9 @@ class TestConfectImplWithoutIdentity<
     mutationRef: MutationRef,
     args: Ref.Args<MutationRef>,
   ): Effect.Effect<Ref.Returns<MutationRef>, ParseResult.ParseError> =>
-    Ref.runWithCodec(mutationRef, args, (functionName, encodedArgs) =>
+    Ref.runWithCodec(mutationRef, args, (functionReference, encodedArgs) =>
       Effect.promise(() =>
-        this.testConvex.mutation(functionName as any, encodedArgs),
+        this.testConvex.mutation(functionReference as any, encodedArgs),
       ),
     );
 
@@ -98,9 +98,9 @@ class TestConfectImplWithoutIdentity<
     actionRef: ActionRef,
     args: Ref.Args<ActionRef>,
   ): Effect.Effect<Ref.Returns<ActionRef>, ParseResult.ParseError> =>
-    Ref.runWithCodec(actionRef, args, (functionName, encodedArgs) =>
+    Ref.runWithCodec(actionRef, args, (functionReference, encodedArgs) =>
       Effect.promise(() =>
-        this.testConvex.action(functionName as any, encodedArgs),
+        this.testConvex.action(functionReference as any, encodedArgs),
       ),
     );
 

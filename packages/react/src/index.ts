@@ -9,11 +9,11 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
   ref: Query,
   args: Ref.Args<Query>,
 ): Ref.Returns<Query> | undefined => {
-  const functionName = Ref.getConvexFunctionName(ref);
+  const functionReference = Ref.getFunctionReference(ref);
   const encodedArgs = Ref.encodeArgsSync(ref, args);
 
   const encodedReturnsOrUndefined = useConvexQuery(
-    functionName as any,
+    functionReference as any,
     encodedArgs,
   );
 
@@ -27,8 +27,8 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
 export const useMutation = <Mutation extends Ref.AnyPublicMutation>(
   ref: Mutation,
 ) => {
-  const functionName = Ref.getConvexFunctionName(ref);
-  const actualMutation = useConvexMutation(functionName as any);
+  const functionReference = Ref.getFunctionReference(ref);
+  const actualMutation = useConvexMutation(functionReference as any);
 
   return (args: Ref.Args<Mutation>): Promise<Ref.Returns<Mutation>> => {
     const encodedArgs = Ref.encodeArgsSync(ref, args);
@@ -39,8 +39,8 @@ export const useMutation = <Mutation extends Ref.AnyPublicMutation>(
 };
 
 export const useAction = <Action extends Ref.AnyPublicAction>(ref: Action) => {
-  const functionName = Ref.getConvexFunctionName(ref);
-  const actualAction = useConvexAction(functionName as any);
+  const functionReference = Ref.getFunctionReference(ref);
+  const actualAction = useConvexAction(functionReference as any);
 
   return (args: Ref.Args<Action>): Promise<Ref.Returns<Action>> => {
     const encodedArgs = Ref.encodeArgsSync(ref, args);

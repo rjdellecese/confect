@@ -9,8 +9,8 @@ const make =
     mutation: Mutation,
     args: Ref.Args<Mutation>,
   ): Effect.Effect<Ref.Returns<Mutation>, ParseResult.ParseError> =>
-    Ref.runWithCodec(mutation, args, (functionName, encodedArgs) =>
-      Effect.promise(() => runMutation(functionName as any, encodedArgs)),
+    Ref.runWithCodec(mutation, args, (functionReference, encodedArgs) =>
+      Effect.promise(() => runMutation(functionReference as any, encodedArgs)),
     );
 
 export const MutationRunner = Context.GenericTag<ReturnType<typeof make>>(

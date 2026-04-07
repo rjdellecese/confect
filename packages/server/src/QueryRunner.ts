@@ -9,8 +9,8 @@ const make =
     query: Query,
     args: Ref.Args<Query>,
   ): Effect.Effect<Ref.Returns<Query>, ParseResult.ParseError> =>
-    Ref.runWithCodec(query, args, (functionName, encodedArgs) =>
-      Effect.promise(() => runQuery(functionName as any, encodedArgs)),
+    Ref.runWithCodec(query, args, (functionReference, encodedArgs) =>
+      Effect.promise(() => runQuery(functionReference as any, encodedArgs)),
     );
 
 export const QueryRunner = Context.GenericTag<ReturnType<typeof make>>(

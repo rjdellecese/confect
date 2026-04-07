@@ -1,6 +1,5 @@
 import * as Ref from "@confect/core/Ref";
 import { ConvexHttpClient } from "convex/browser";
-import type { FunctionReference } from "convex/server";
 import type { ParseResult } from "effect";
 import { Context, Effect, Layer, Schema } from "effect";
 
@@ -39,13 +38,9 @@ const make = (
     HttpClientError | ParseResult.ParseError
   > => {
     const args = (rest[0] ?? {}) as Ref.Args<Query>;
-    return Ref.runWithCodec(ref, args, (functionName, encodedArgs) =>
+    return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
       Effect.tryPromise({
-        try: () =>
-          client.query(
-            functionName as unknown as FunctionReference<"query">,
-            encodedArgs,
-          ),
+        try: () => client.query(functionReference as any, encodedArgs),
         catch: (cause) => new HttpClientError({ cause }),
       }),
     );
@@ -59,13 +54,9 @@ const make = (
     HttpClientError | ParseResult.ParseError
   > => {
     const args = (rest[0] ?? {}) as Ref.Args<Mutation>;
-    return Ref.runWithCodec(ref, args, (functionName, encodedArgs) =>
+    return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
       Effect.tryPromise({
-        try: () =>
-          client.mutation(
-            functionName as unknown as FunctionReference<"mutation">,
-            encodedArgs,
-          ),
+        try: () => client.mutation(functionReference as any, encodedArgs),
         catch: (cause) => new HttpClientError({ cause }),
       }),
     );
@@ -79,13 +70,9 @@ const make = (
     HttpClientError | ParseResult.ParseError
   > => {
     const args = (rest[0] ?? {}) as Ref.Args<Action>;
-    return Ref.runWithCodec(ref, args, (functionName, encodedArgs) =>
+    return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
       Effect.tryPromise({
-        try: () =>
-          client.action(
-            functionName as unknown as FunctionReference<"action">,
-            encodedArgs,
-          ),
+        try: () => client.action(functionReference as any, encodedArgs),
         catch: (cause) => new HttpClientError({ cause }),
       }),
     );

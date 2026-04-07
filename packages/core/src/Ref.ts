@@ -1,5 +1,10 @@
-import type { FunctionVisibility } from "convex/server";
-import type { ParseResult } from "effect";
+import type {
+  FunctionReference,
+  FunctionType,
+  FunctionVisibility,
+} from "convex/server";
+import { makeFunctionReference } from "convex/server";
+import type { Cause, ParseResult } from "effect";
 import { Effect, Match, Schema } from "effect";
 import type * as FunctionSpec from "./FunctionSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
@@ -128,6 +133,11 @@ export type Returns<Ref_> =
     ? Returns_
     : never;
 
+export type ToFunctionReference<R extends Any> = FunctionReference<
+  GetFunctionType<R> & FunctionType,
+  GetFunctionVisibility<R> & FunctionVisibility
+>;
+
 export type FromFunctionSpec<F extends FunctionSpec.AnyWithProps> = Ref<
   FunctionSpec.GetRuntimeAndFunctionType<F>,
   FunctionSpec.GetFunctionVisibility<F>,
@@ -151,9 +161,15 @@ export const getFunctionSpec = (ref: Any): FunctionSpec.AnyWithProps =>
 export const getConvexFunctionName = (ref: Any): string =>
   `${ref.functionNamespace}:${ref.functionSpec.name}`;
 
+export const getFunctionReference = <R extends Any>(
+  ref: R,
+): ToFunctionReference<R> =>
+  makeFunctionReference(getConvexFunctionName(ref)) as ToFunctionReference<R>;
+
 export const deconstruct = (ref: Any) => ({
   functionSpec: getFunctionSpec(ref),
   functionName: getConvexFunctionName(ref),
+  functionReference: getFunctionReference(ref),
   provenance: getFunctionSpec(ref).functionProvenance,
 });
 
@@ -194,25 +210,57 @@ export const decodeReturnsSync = <R extends Any>(
     Match.exhaustive,
   ) as Returns<R>;
 
-export const runWithCodec = <R extends Any, E>(
+export const runWithCodec: {
+  <R extends Any, E>(
+    ref: R,
+    args: Args<R>,
+    callFn: (
+      functionReference: ToFunctionReference<R>,
+      encodedArgs: unknown,
+    ) => Effect.Effect<unknown, E>,
+  ): Effect.Effect<Returns<R>, E | ParseResult.ParseError>;
+  <R extends Any>(
+    ref: R,
+    args: Args<R>,
+    callFn: (
+      functionReference: ToFunctionReference<R>,
+      encodedArgs: unknown,
+    ) => PromiseLike<unknown>,
+  ): Effect.Effect<Returns<R>, Cause.UnknownException | ParseResult.ParseError>;
+} = <R extends Any, E>(
   ref: R,
   args: Args<R>,
   callFn: (
-    functionName: string,
+    functionReference: ToFunctionReference<R>,
     encodedArgs: unknown,
-  ) => Effect.Effect<unknown, E>,
-): Effect.Effect<Returns<R>, E | ParseResult.ParseError> =>
+  ) => Effect.Effect<unknown, E> | PromiseLike<unknown>,
+): Effect.Effect<
+  Returns<R>,
+  E | Cause.UnknownException | ParseResult.ParseError
+> =>
   Effect.gen(function* () {
-    const { provenance, functionName } = deconstruct(ref);
+    const { provenance, functionReference } = deconstruct(ref);
+    const call = (encodedArgs: unknown) => {
+      const result = callFn(
+        functionReference as ToFunctionReference<R>,
+        encodedArgs,
+      );
+      return Effect.isEffect(result)
+        ? (result as Effect.Effect<unknown, E>)
+        : Effect.promise(() => result as PromiseLike<unknown>);
+    };
     return yield* Match.value(provenance).pipe(
       Match.tag("Confect", (confect) =>
         Effect.gen(function* () {
           const encodedArgs = yield* Schema.encode(confect.args)(args);
-          const raw = yield* callFn(functionName, encodedArgs);
+          const raw = yield* call(encodedArgs);
           return yield* Schema.decode(confect.returns)(raw);
         }),
       ),
-      Match.tag("Convex", () => callFn(functionName, args as any)),
+      Match.tag("Convex", () => call(args as any)),
       Match.exhaustive,
     );
-  }) as Effect.Effect<Returns<R>, E | ParseResult.ParseError>;
+  }) as Effect.Effect<
+    Returns<R>,
+    E | Cause.UnknownException | ParseResult.ParseError
+  >;

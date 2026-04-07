@@ -9,8 +9,8 @@ const make =
     action: Action,
     args: Ref.Args<Action>,
   ): Effect.Effect<Ref.Returns<Action>, ParseResult.ParseError> =>
-    Ref.runWithCodec(action, args, (functionName, encodedArgs) =>
-      Effect.promise(() => runAction(functionName as any, encodedArgs)),
+    Ref.runWithCodec(action, args, (functionReference, encodedArgs) =>
+      Effect.promise(() => runAction(functionReference as any, encodedArgs)),
     );
 
 export const ActionRunner = Context.GenericTag<ReturnType<typeof make>>(
