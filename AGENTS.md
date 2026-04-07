@@ -24,3 +24,35 @@ npx opensrc <owner>/<repo>      # GitHub repo (e.g., npx opensrc vercel/ai)
 ```
 
 <!-- opensrc:end -->
+
+## Cursor Cloud specific instructions
+
+### Running the example app
+
+The example app is in `apps/example`. To start it:
+
+```bash
+cd apps/example
+pnpm dev
+```
+
+This runs Vite, the Convex local backend, and the Confect codegen watcher concurrently.
+
+#### Convex environment variables
+
+The Convex local backend requires certain environment variables. After starting the dev server for the first time (so the local backend is initialized), set them:
+
+```bash
+cd apps/example
+npx convex env set TEST_ENV_VAR "test-value"
+```
+
+These are stored in the local backend's state (`.convex/`) and persist across restarts, but not across fresh clones or environment resets.
+
+#### Convex WebSocket proxy
+
+In cloud agent environments, only the Vite dev server port (5173) is forwarded to the browser. The Convex backend (port 3210) is not directly accessible. To handle this:
+
+- `vite.config.ts` has a proxy that forwards `/api` requests (including WebSocket) to the Convex backend on port 3210.
+- `.env.development.local` overrides `VITE_CONVEX_URL` to `http://127.0.0.1:5173` so the Convex client connects through Vite's proxy instead of directly to port 3210.
+- Vite loads `.env.development.local` with higher priority than `.env.local` (which `convex dev` manages), so the override is stable.
