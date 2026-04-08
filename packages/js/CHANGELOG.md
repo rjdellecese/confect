@@ -1,5 +1,18 @@
 # @confect/js
 
+## 5.0.0
+
+### Minor Changes
+
+- fb17b7e: Add `WebSocketClient`, a WebSocket-based client wrapping Convex's `ConvexClient`. Provides the same `query`, `mutation`, and `action` methods as `HttpClient`, plus `reactiveQuery` which returns a `Stream` of live query results.
+
+### Patch Changes
+
+- 2c4b0c9: Fix `HttpClient` to only accept public `Ref`s
+
+  `HttpClient` query, mutation, and action methods now correctly reject internal `Ref`s at the type level, matching the runtime behavior of Convex browser clients which can only call public functions.
+  - @confect/core@5.0.0
+
 ## 4.0.0
 
 ### Minor Changes

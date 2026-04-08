@@ -1,5 +1,13 @@
 # @confect/test
 
+## 5.0.0
+
+### Patch Changes
+
+- Updated dependencies [8853cbf]
+  - @confect/server@5.0.0
+  - @confect/core@5.0.0
+
 ## 4.0.0
 
 ### Patch Changes

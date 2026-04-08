@@ -1,5 +1,15 @@
 # @confect/react
 
+## 5.0.0
+
+### Minor Changes
+
+- 5ddb437: Support passing `"skip"` as args to `useQuery` to disable query subscription.
+
+### Patch Changes
+
+- @confect/core@5.0.0
+
 ## 4.0.0
 
 ### Patch Changes

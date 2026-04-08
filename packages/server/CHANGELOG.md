@@ -1,5 +1,15 @@
 # @confect/server
 
+## 5.0.0
+
+### Minor Changes
+
+- 8853cbf: Update `Scheduler` to accept Confect `Ref`s instead of Convex `SchedulableFunctionReference` values. `runAfter` and `runAt` now take a `Ref` to a mutation or action with typed args, aligning the Scheduler API with all other Confect function-calling APIs.
+
+### Patch Changes
+
+- @confect/core@5.0.0
+
 ## 4.0.0
 
 ### Major Changes
