@@ -7,10 +7,10 @@ import {
 
 export const useQuery = <Query extends Ref.AnyPublicQuery>(
   ref: Query,
-  args: Ref.Args<Query>,
+  args: Ref.Args<Query> | "skip",
 ): Ref.Returns<Query> | undefined => {
   const functionReference = Ref.getFunctionReference(ref);
-  const encodedArgs = Ref.encodeArgsSync(ref, args);
+  const encodedArgs = args === "skip" ? "skip" : Ref.encodeArgsSync(ref, args);
 
   const encodedReturnsOrUndefined = useConvexQuery(
     functionReference,
