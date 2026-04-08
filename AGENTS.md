@@ -42,7 +42,7 @@ The Convex local backend requires certain environment variables. After starting 
 
 ```bash
 cd apps/example
-npx convex env set < .env.defaults
+pnpm convex env set < .env.defaults
 ```
 
 This bulk-sets all variables from `.env.defaults` (added in convex 1.33.0). The values are stored in the local backend's state (`.convex/`) and persist across restarts, but not across fresh clones or environment resets.
