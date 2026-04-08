@@ -1,7 +1,8 @@
 import type { FunctionReference, FunctionVisibility } from "convex/server";
+import { Schema } from "effect";
 import { describe, expectTypeOf, test } from "vitest";
 
-import type * as FunctionSpec from "../src/FunctionSpec";
+import * as FunctionSpec from "../src/FunctionSpec";
 import type * as Ref from "../src/Ref";
 
 describe("FunctionReference", () => {
@@ -75,6 +76,31 @@ describe("FunctionReference", () => {
     expectTypeOf<Ref.FunctionReference<Ref_>>().toEqualTypeOf<
       FunctionReference<"action", "internal">
     >();
+  });
+
+  test("preserves args and returns", () => {
+    const spec = FunctionSpec.publicQuery({
+      name: "get",
+      args: Schema.Struct({ id: Schema.String }),
+      returns: Schema.Array(Schema.Number),
+    });
+    type Ref_ = Ref.FromFunctionSpec<typeof spec>;
+    expectTypeOf<Ref.Args<Ref_>>().toEqualTypeOf<{ readonly id: string }>();
+    expectTypeOf<Ref.Returns<Ref_>>().toEqualTypeOf<readonly number[]>();
+    expectTypeOf<Ref.FunctionReference<Ref_>>().toEqualTypeOf<
+      FunctionReference<"query", "public">
+    >();
+  });
+
+  test("empty args", () => {
+    const spec = FunctionSpec.internalMutation({
+      name: "reset",
+      args: Schema.Struct({}),
+      returns: Schema.Void,
+    });
+    type Ref_ = Ref.FromFunctionSpec<typeof spec>;
+    expectTypeOf<Ref.Args<Ref_>>().toEqualTypeOf<{}>();
+    expectTypeOf<Ref.Returns<Ref_>>().toEqualTypeOf<void>();
   });
 
   test("AnyQuery", () => {
