@@ -1,8 +1,5 @@
 import { Ref } from "@confect/core";
-import type {
-  CronJob as ConvexCronJob,
-  SchedulableFunctionReference,
-} from "convex/server";
+import type { CronJob as ConvexCronJob } from "convex/server";
 import { cronJobs as makeConvexCrons, type Crons } from "convex/server";
 import {
   Array,
@@ -13,7 +10,6 @@ import {
   pipe,
   Predicate,
   Record,
-  Schema,
 } from "effect";
 import type * as CronJob from "./CronJob";
 
@@ -39,25 +35,15 @@ const Proto = {
       crons: { ...this.convexCronJobs.crons },
     });
 
-    const schedulableFunctionReference = Ref.getConvexFunctionName(
-      cronJob.ref,
-    ) as unknown as SchedulableFunctionReference;
-
-    const functionSpec = Ref.getFunctionSpec(cronJob.ref);
-    const encodedArgs = Match.value(functionSpec.functionProvenance).pipe(
-      Match.tag("Confect", (confect) =>
-        Schema.encodeSync(confect.args)(cronJob.args),
-      ),
-      Match.tag("Convex", () => cronJob.args),
-      Match.exhaustive,
-    );
+    const functionReference = Ref.getFunctionReference(cronJob.ref);
+    const encodedArgs = Ref.encodeArgsSync(cronJob.ref, cronJob.args);
 
     Match.value(cronJob.schedule).pipe(
       Match.when(Cron.isCron, (cron) => {
         newConvexCrons.cron(
           cronJob.identifier,
           cronToConvexCronString(cron),
-          schedulableFunctionReference,
+          functionReference,
           encodedArgs,
         );
       }),
@@ -65,7 +51,7 @@ const Proto = {
         newConvexCrons.interval(
           cronJob.identifier,
           durationToConvexIntervalSchedule(duration),
-          schedulableFunctionReference,
+          functionReference,
           encodedArgs,
         );
       }),

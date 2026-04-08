@@ -9,7 +9,7 @@ import { convexTest } from "convex-test";
 import type { GenericMutationCtx, UserIdentity } from "convex/server";
 import type { Value } from "convex/values";
 import type { ParseResult } from "effect";
-import { Context, Effect, Layer, Match, Schema } from "effect";
+import { Context, Effect, Layer, Schema } from "effect";
 
 export type TestConfectWithoutIdentity<
   ConfectSchema extends DatabaseSchema.AnyWithProps,
@@ -78,82 +78,25 @@ class TestConfectImplWithoutIdentity<
     queryRef: QueryRef,
     args: Ref.Args<QueryRef>,
   ): Effect.Effect<Ref.Returns<QueryRef>, ParseResult.ParseError> =>
-    Effect.gen(this, function* () {
-      const querySpec = Ref.getFunctionSpec(queryRef);
-      const queryName = Ref.getConvexFunctionName(queryRef);
-
-      return yield* Match.value(querySpec.functionProvenance).pipe(
-        Match.tag("Confect", (confect) =>
-          Effect.gen(this, function* () {
-            const encodedArgs = yield* Schema.encode(confect.args)(args);
-            const encodedReturns = yield* Effect.promise(() =>
-              this.testConvex.query(queryName as any, encodedArgs),
-            );
-            return yield* Schema.decode(confect.returns)(encodedReturns);
-          }),
-        ),
-        Match.tag("Convex", () =>
-          Effect.promise(() =>
-            this.testConvex.query(queryName as any, args as any),
-          ),
-        ),
-        Match.exhaustive,
-      );
-    });
+    Ref.runWithCodec(queryRef, args, (functionReference, encodedArgs) =>
+      this.testConvex.query(functionReference, encodedArgs),
+    );
 
   readonly mutation = <MutationRef extends Ref.AnyMutation>(
     mutationRef: MutationRef,
     args: Ref.Args<MutationRef>,
   ): Effect.Effect<Ref.Returns<MutationRef>, ParseResult.ParseError> =>
-    Effect.gen(this, function* () {
-      const mutationSpec = Ref.getFunctionSpec(mutationRef);
-      const mutationName = Ref.getConvexFunctionName(mutationRef);
-
-      return yield* Match.value(mutationSpec.functionProvenance).pipe(
-        Match.tag("Confect", (confect) =>
-          Effect.gen(this, function* () {
-            const encodedArgs = yield* Schema.encode(confect.args)(args);
-            const encodedReturns = yield* Effect.promise(() =>
-              this.testConvex.mutation(mutationName as any, encodedArgs),
-            );
-            return yield* Schema.decode(confect.returns)(encodedReturns);
-          }),
-        ),
-        Match.tag("Convex", () =>
-          Effect.promise(() =>
-            this.testConvex.mutation(mutationName as any, args as any),
-          ),
-        ),
-        Match.exhaustive,
-      );
-    });
+    Ref.runWithCodec(mutationRef, args, (functionReference, encodedArgs) =>
+      this.testConvex.mutation(functionReference, encodedArgs),
+    );
 
   readonly action = <ActionRef extends Ref.AnyAction>(
     actionRef: ActionRef,
     args: Ref.Args<ActionRef>,
   ): Effect.Effect<Ref.Returns<ActionRef>, ParseResult.ParseError> =>
-    Effect.gen(this, function* () {
-      const actionSpec = Ref.getFunctionSpec(actionRef);
-      const actionName = Ref.getConvexFunctionName(actionRef);
-
-      return yield* Match.value(actionSpec.functionProvenance).pipe(
-        Match.tag("Confect", (confect) =>
-          Effect.gen(this, function* () {
-            const encodedArgs = yield* Schema.encode(confect.args)(args);
-            const encodedReturns = yield* Effect.promise(() =>
-              this.testConvex.action(actionName as any, encodedArgs),
-            );
-            return yield* Schema.decode(confect.returns)(encodedReturns);
-          }),
-        ),
-        Match.tag("Convex", () =>
-          Effect.promise(() =>
-            this.testConvex.action(actionName as any, args as any),
-          ),
-        ),
-        Match.exhaustive,
-      );
-    });
+    Ref.runWithCodec(actionRef, args, (functionReference, encodedArgs) =>
+      this.testConvex.action(functionReference, encodedArgs),
+    );
 
   readonly run: TestConfectWithoutIdentity<ConfectSchema>["run"] = (<
     A,

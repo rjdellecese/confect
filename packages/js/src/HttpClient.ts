@@ -1,8 +1,7 @@
 import * as Ref from "@confect/core/Ref";
 import { ConvexHttpClient } from "convex/browser";
-import type { FunctionReference } from "convex/server";
 import type { ParseResult } from "effect";
-import { Context, Effect, Layer, Match, Schema } from "effect";
+import { Context, Effect, Layer, Schema } from "effect";
 
 export class HttpClientError extends Schema.TaggedError<HttpClientError>()(
   "HttpClientError",
@@ -11,8 +10,11 @@ export class HttpClientError extends Schema.TaggedError<HttpClientError>()(
   },
 ) {}
 
-type OptionalArgs<R extends Ref.AnyQuery | Ref.AnyMutation | Ref.AnyAction> =
-  keyof Ref.Args<R> extends never ? [args?: Ref.Args<R>] : [args: Ref.Args<R>];
+type OptionalArgs<
+  R extends Ref.AnyPublicQuery | Ref.AnyPublicMutation | Ref.AnyPublicAction,
+> = keyof Ref.Args<R> extends never
+  ? [args?: Ref.Args<R>]
+  : [args: Ref.Args<R>];
 
 const make = (
   address: string,
@@ -31,128 +33,53 @@ const make = (
     client.clearAuth();
   });
 
-  const query = <Query extends Ref.AnyQuery>(
+  const query = <Query extends Ref.AnyPublicQuery>(
     ref: Query,
     ...rest: OptionalArgs<Query>
   ): Effect.Effect<
     Ref.Returns<Query>,
     HttpClientError | ParseResult.ParseError
-  > =>
-    Effect.gen(function* () {
-      const args = (rest[0] ?? {}) as Ref.Args<Query>;
-      const functionSpec = Ref.getFunctionSpec(ref);
-      const functionName = Ref.getConvexFunctionName(
-        ref,
-      ) as unknown as FunctionReference<"query">;
+  > => {
+    const args = (rest[0] ?? {}) as Ref.Args<Query>;
+    return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
+      Effect.tryPromise({
+        try: () => client.query(functionReference, encodedArgs),
+        catch: (cause) => new HttpClientError({ cause }),
+      }),
+    );
+  };
 
-      return yield* Match.value(functionSpec.functionProvenance).pipe(
-        Match.tag("Confect", (confectFunctionSpec) =>
-          Effect.gen(function* () {
-            const encodedArgs = yield* Schema.encode(confectFunctionSpec.args)(
-              args,
-            );
-
-            const encodedResult = yield* Effect.tryPromise({
-              try: () => client.query(functionName, encodedArgs),
-              catch: (cause) => new HttpClientError({ cause }),
-            });
-
-            return yield* Schema.decode(confectFunctionSpec.returns)(
-              encodedResult,
-            );
-          }),
-        ),
-        Match.tag("Convex", () =>
-          Effect.tryPromise({
-            try: () => client.query(functionName, args),
-            catch: (cause) => new HttpClientError({ cause }),
-          }),
-        ),
-        Match.exhaustive,
-      );
-    });
-
-  const mutation = <Mutation extends Ref.AnyMutation>(
+  const mutation = <Mutation extends Ref.AnyPublicMutation>(
     ref: Mutation,
     ...rest: OptionalArgs<Mutation>
   ): Effect.Effect<
     Ref.Returns<Mutation>,
     HttpClientError | ParseResult.ParseError
-  > =>
-    Effect.gen(function* () {
-      const args = (rest[0] ?? {}) as Ref.Args<Mutation>;
-      const functionSpec = Ref.getFunctionSpec(ref);
-      const functionName = Ref.getConvexFunctionName(
-        ref,
-      ) as unknown as FunctionReference<"mutation">;
+  > => {
+    const args = (rest[0] ?? {}) as Ref.Args<Mutation>;
+    return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
+      Effect.tryPromise({
+        try: () => client.mutation(functionReference, encodedArgs),
+        catch: (cause) => new HttpClientError({ cause }),
+      }),
+    );
+  };
 
-      return yield* Match.value(functionSpec.functionProvenance).pipe(
-        Match.tag("Confect", (confectFunctionSpec) =>
-          Effect.gen(function* () {
-            const encodedArgs = yield* Schema.encode(confectFunctionSpec.args)(
-              args,
-            );
-
-            const encodedResult = yield* Effect.tryPromise({
-              try: () => client.mutation(functionName, encodedArgs),
-              catch: (cause) => new HttpClientError({ cause }),
-            });
-
-            return yield* Schema.decode(confectFunctionSpec.returns)(
-              encodedResult,
-            );
-          }),
-        ),
-        Match.tag("Convex", () =>
-          Effect.tryPromise({
-            try: () => client.mutation(functionName, args),
-            catch: (cause) => new HttpClientError({ cause }),
-          }),
-        ),
-        Match.exhaustive,
-      );
-    });
-
-  const action = <Action extends Ref.AnyAction>(
+  const action = <Action extends Ref.AnyPublicAction>(
     ref: Action,
     ...rest: OptionalArgs<Action>
   ): Effect.Effect<
     Ref.Returns<Action>,
     HttpClientError | ParseResult.ParseError
-  > =>
-    Effect.gen(function* () {
-      const args = (rest[0] ?? {}) as Ref.Args<Action>;
-      const functionSpec = Ref.getFunctionSpec(ref);
-      const functionName = Ref.getConvexFunctionName(
-        ref,
-      ) as unknown as FunctionReference<"action">;
-
-      return yield* Match.value(functionSpec.functionProvenance).pipe(
-        Match.tag("Confect", (confectFunctionSpec) =>
-          Effect.gen(function* () {
-            const encodedArgs = yield* Schema.encode(confectFunctionSpec.args)(
-              args,
-            );
-
-            const encodedResult = yield* Effect.tryPromise({
-              try: () => client.action(functionName, encodedArgs),
-              catch: (cause) => new HttpClientError({ cause }),
-            });
-
-            return yield* Schema.decode(confectFunctionSpec.returns)(
-              encodedResult,
-            );
-          }),
-        ),
-        Match.tag("Convex", () =>
-          Effect.tryPromise({
-            try: () => client.action(functionName, args),
-            catch: (cause) => new HttpClientError({ cause }),
-          }),
-        ),
-        Match.exhaustive,
-      );
-    });
+  > => {
+    const args = (rest[0] ?? {}) as Ref.Args<Action>;
+    return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
+      Effect.tryPromise({
+        try: () => client.action(functionReference, encodedArgs),
+        catch: (cause) => new HttpClientError({ cause }),
+      }),
+    );
+  };
 
   return {
     url,
