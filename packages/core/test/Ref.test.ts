@@ -79,12 +79,12 @@ describe("FunctionReference", () => {
   });
 
   test("preserves args and returns", () => {
-    const spec = FunctionSpec.publicQuery({
+    const _spec = FunctionSpec.publicQuery({
       name: "get",
       args: Schema.Struct({ id: Schema.String }),
       returns: Schema.Array(Schema.Number),
     });
-    type Ref_ = Ref.FromFunctionSpec<typeof spec>;
+    type Ref_ = Ref.FromFunctionSpec<typeof _spec>;
     expectTypeOf<Ref.Args<Ref_>>().toEqualTypeOf<{ readonly id: string }>();
     expectTypeOf<Ref.Returns<Ref_>>().toEqualTypeOf<readonly number[]>();
     expectTypeOf<Ref.FunctionReference<Ref_>>().toEqualTypeOf<
@@ -93,12 +93,12 @@ describe("FunctionReference", () => {
   });
 
   test("empty args", () => {
-    const spec = FunctionSpec.internalMutation({
+    const _spec = FunctionSpec.internalMutation({
       name: "reset",
       args: Schema.Struct({}),
       returns: Schema.Void,
     });
-    type Ref_ = Ref.FromFunctionSpec<typeof spec>;
+    type Ref_ = Ref.FromFunctionSpec<typeof _spec>;
     expectTypeOf<Ref.Args<Ref_>>().toEqualTypeOf<{}>();
     expectTypeOf<Ref.Returns<Ref_>>().toEqualTypeOf<void>();
   });
