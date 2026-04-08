@@ -1,34 +1,11 @@
 import { Ref } from "@confect/core";
-import type {
-  SchedulableFunctionReference,
-  Scheduler as ConvexScheduler,
-} from "convex/server";
-import {
-  Context,
-  DateTime,
-  Duration,
-  Effect,
-  Layer,
-  Match,
-  Schema,
-} from "effect";
+import type { Scheduler as ConvexScheduler } from "convex/server";
+import { Context, DateTime, Duration, Effect, Layer } from "effect";
 
 type OptionalArgs<Ref_ extends Ref.AnyMutation | Ref.AnyAction> =
   keyof Ref.Args<Ref_> extends never
     ? [args?: Ref.Args<Ref_>]
     : [args: Ref.Args<Ref_>];
-
-const encodeArgs = (
-  ref: Ref.AnyMutation | Ref.AnyAction,
-  args: Record<string, unknown>,
-) => {
-  const functionSpec = Ref.getFunctionSpec(ref);
-  return Match.value(functionSpec.functionProvenance).pipe(
-    Match.tag("Confect", (confect) => Schema.encodeSync(confect.args)(args)),
-    Match.tag("Convex", () => args),
-    Match.exhaustive,
-  );
-};
 
 const make = (scheduler: ConvexScheduler) => ({
   runAfter: <Ref_ extends Ref.AnyMutation | Ref.AnyAction>(
@@ -37,16 +14,14 @@ const make = (scheduler: ConvexScheduler) => ({
     ...args: OptionalArgs<Ref_>
   ) => {
     const delayMs = Duration.toMillis(delay);
-    const schedulableFunctionReference = Ref.getConvexFunctionName(
+    const functionReference = Ref.getFunctionReference(ref);
+    const encodedArgs = Ref.encodeArgsSync(
       ref,
-    ) as unknown as SchedulableFunctionReference;
-    const encodedArgs = encodeArgs(
-      ref,
-      (args[0] ?? {}) as Record<string, unknown>,
+      (args[0] ?? {}) as Ref.Args<Ref_>,
     );
 
     return Effect.promise(() =>
-      scheduler.runAfter(delayMs, schedulableFunctionReference, encodedArgs),
+      scheduler.runAfter(delayMs, functionReference, encodedArgs),
     );
   },
   runAt: <Ref_ extends Ref.AnyMutation | Ref.AnyAction>(
@@ -55,16 +30,14 @@ const make = (scheduler: ConvexScheduler) => ({
     ...args: OptionalArgs<Ref_>
   ) => {
     const timestamp = DateTime.toEpochMillis(dateTime);
-    const schedulableFunctionReference = Ref.getConvexFunctionName(
+    const functionReference = Ref.getFunctionReference(ref);
+    const encodedArgs = Ref.encodeArgsSync(
       ref,
-    ) as unknown as SchedulableFunctionReference;
-    const encodedArgs = encodeArgs(
-      ref,
-      (args[0] ?? {}) as Record<string, unknown>,
+      (args[0] ?? {}) as Ref.Args<Ref_>,
     );
 
     return Effect.promise(() =>
-      scheduler.runAt(timestamp, schedulableFunctionReference, encodedArgs),
+      scheduler.runAt(timestamp, functionReference, encodedArgs),
     );
   },
 });
