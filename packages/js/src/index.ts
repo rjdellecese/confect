@@ -1,2 +1,2 @@
-export * as ConfectClient from "./ConfectClient";
+export * as WebSocketClient from "./WebSocketClient";
 export * as HttpClient from "./HttpClient";

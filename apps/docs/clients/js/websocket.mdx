@@ -4,36 +4,36 @@ title: "WebSocket"
 description: "Call your Confect functions and subscribe to reactive queries over a persistent WebSocket connection."
 ---
 
-`ConfectClient` is an [Effect service](https://effect.website/docs/requirements-management/services/) that wraps Convex's [`ConvexClient`](https://docs.convex.dev/api/classes/browser.ConvexClient). It provides the same `query`, `mutation`, and `action` methods as [`HttpClient`](/clients/js/http), plus a `reactiveQuery` method that returns a [`Stream`](https://effect.website/docs/stream/introduction/) of live results. It works in any JavaScript environment that supports `WebSocket`.
+`WebSocketClient` is an [Effect service](https://effect.website/docs/requirements-management/services/) that wraps Convex's [`ConvexClient`](https://docs.convex.dev/api/classes/browser.ConvexClient). It provides the same `query`, `mutation`, and `action` methods as [`HttpClient`](/clients/js/http), plus a `reactiveQuery` method that returns a [`Stream`](https://effect.website/docs/stream/introduction/) of live results. It works in any JavaScript environment that supports `WebSocket`.
 
 The WebSocket connection is managed as a [scoped resource](https://effect.website/docs/resource-management/scope/) -- it is opened when the layer is provided and closed automatically when the scope ends.
 
 ## Setup
 
-Create the `ConfectClient` layer by passing your Convex deployment URL.
+Create the `WebSocketClient` layer by passing your Convex deployment URL.
 
 ```ts
-import { ConfectClient } from "@confect/js";
+import { WebSocketClient } from "@confect/js";
 
-const ConfectClientLive = ConfectClient.layer(
+const WebSocketClientLive = WebSocketClient.layer(
   "https://example-123.convex.cloud",
 );
 ```
 
-The layer can then be provided to any Effect that uses the `ConfectClient` service. The underlying WebSocket connection is closed automatically when the layer's scope ends -- there is no need to close it manually.
+The layer can then be provided to any Effect that uses the `WebSocketClient` service. The underlying WebSocket connection is closed automatically when the layer's scope ends -- there is no need to close it manually.
 
 ## Calling functions
 
-Use the `ConfectClient` service inside `Effect.gen` to call your functions with refs, the same way you would with `HttpClient`, `@confect/react` hooks, or `@confect/test`.
+Use the `WebSocketClient` service inside `Effect.gen` to call your functions with refs, the same way you would with `HttpClient`, `@confect/react` hooks, or `@confect/test`.
 
 ```ts
-import { ConfectClient } from "@confect/js";
+import { WebSocketClient } from "@confect/js";
 import { Effect } from "effect";
 
 import refs from "./confect/_generated/refs";
 
 const program = Effect.gen(function* () {
-  const client = yield* ConfectClient.ConfectClient;
+  const client = yield* WebSocketClient.WebSocketClient;
 
   const notes = yield* client.query(refs.public.notes.list);
 
@@ -45,20 +45,20 @@ const program = Effect.gen(function* () {
 });
 ```
 
-Each method returns an `Effect` that can fail with `ConfectClientError` (wrapping transport-level errors) or `ParseResult.ParseError` (if schema encoding or decoding fails).
+Each method returns an `Effect` that can fail with `WebSocketClientError` (wrapping transport-level errors) or `ParseResult.ParseError` (if schema encoding or decoding fails).
 
 ## Reactive queries
 
 `reactiveQuery` subscribes to a query over the WebSocket connection and returns a `Stream` that emits a new value whenever the query result changes on the server.
 
 ```ts
-import { ConfectClient } from "@confect/js";
+import { WebSocketClient } from "@confect/js";
 import { Console, Effect, Stream } from "effect";
 
 import refs from "./confect/_generated/refs";
 
 const program = Effect.gen(function* () {
-  const client = yield* ConfectClient.ConfectClient;
+  const client = yield* WebSocketClient.WebSocketClient;
 
   yield* client
     .reactiveQuery(refs.public.notes.list)
@@ -74,7 +74,7 @@ Set the authentication token provider before making authenticated requests. `set
 
 ```ts
 Effect.gen(function* () {
-  const client = yield* ConfectClient.ConfectClient;
+  const client = yield* WebSocketClient.WebSocketClient;
 
   yield* client.setAuth(
     ({ forceRefreshToken }) =>
@@ -91,18 +91,18 @@ The optional second argument is a function that receives the current `isAuthenti
 
 ## Running programs
 
-Provide the `ConfectClient` layer when running your program.
+Provide the `WebSocketClient` layer when running your program.
 
 ```ts
-import { ConfectClient } from "@confect/js";
+import { WebSocketClient } from "@confect/js";
 import { Console, Effect, Stream } from "effect";
 
-const ConfectClientLive = ConfectClient.layer(
+const WebSocketClientLive = WebSocketClient.layer(
   "https://example-123.convex.cloud",
 );
 
 const program = Effect.gen(function* () {
-  const client = yield* ConfectClient.ConfectClient;
+  const client = yield* WebSocketClient.WebSocketClient;
 
   yield* client.reactiveQuery(refs.public.notes.list).pipe(
     Stream.take(10),
@@ -110,12 +110,12 @@ const program = Effect.gen(function* () {
   );
 });
 
-Effect.runPromise(program.pipe(Effect.provide(ConfectClientLive)));
+Effect.runPromise(program.pipe(Effect.provide(WebSocketClientLive)));
 ```
 
 ## Differences from `ConvexClient`
 
-| `ConvexClient` | `ConfectClient` |
+| `ConvexClient` | `WebSocketClient` |
 | --- | --- |
 | Functions referenced via `api.module.fn` | Functions referenced via `refs` |
 | Args passed directly to Convex as-is | Args are schema-encoded from `Type` to `Encoded` before sending |

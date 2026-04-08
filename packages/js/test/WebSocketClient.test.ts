@@ -9,7 +9,7 @@ import {
   Schema,
   Stream,
 } from "effect";
-import * as ConfectClient from "../src/ConfectClient";
+import * as WebSocketClient from "../src/WebSocketClient";
 
 const noArgsQueryRef = Ref.make(
   "notes",
@@ -70,16 +70,16 @@ interface Call {
   readonly args: unknown;
 }
 
-const ConfectClientSpy = Context.GenericTag<{
+const WebSocketClientSpy = Context.GenericTag<{
   readonly queryCalls: MutableRef.Ref<ReadonlyArray<Call>>;
   readonly mutationCalls: MutableRef.Ref<ReadonlyArray<Call>>;
   readonly actionCalls: MutableRef.Ref<ReadonlyArray<Call>>;
   readonly reactiveQueryCalls: MutableRef.Ref<ReadonlyArray<Call>>;
   readonly reactiveQueryFinalizations: MutableRef.Ref<ReadonlyArray<string>>;
-}>("@test/ConfectClientSpy");
+}>("@test/WebSocketClientSpy");
 
 const SpyLayer = Layer.effect(
-  ConfectClientSpy,
+  WebSocketClientSpy,
   Effect.gen(function* () {
     return {
       queryCalls: yield* MutableRef.make<ReadonlyArray<Call>>([]),
@@ -93,10 +93,10 @@ const SpyLayer = Layer.effect(
   }),
 );
 
-const TestConfectClientLayer = Layer.effect(
-  ConfectClient.ConfectClient,
+const TestWebSocketClientLayer = Layer.effect(
+  WebSocketClient.WebSocketClient,
   Effect.gen(function* () {
-    const spy = yield* ConfectClientSpy;
+    const spy = yield* WebSocketClientSpy;
 
     const recordCall = (
       calls: MutableRef.Ref<ReadonlyArray<Call>>,
@@ -140,15 +140,15 @@ const TestConfectClientLayer = Layer.effect(
 
 const TestLayer = Layer.merge(
   SpyLayer,
-  TestConfectClientLayer.pipe(Layer.provide(SpyLayer)),
+  TestWebSocketClientLayer.pipe(Layer.provide(SpyLayer)),
 );
 
-describe("ConfectClient", () => {
+describe("WebSocketClient", () => {
   describe("query", () => {
     it.effect("args omitted when empty", () =>
       Effect.gen(function* () {
-        const client = yield* ConfectClient.ConfectClient;
-        const spy = yield* ConfectClientSpy;
+        const client = yield* WebSocketClient.WebSocketClient;
+        const spy = yield* WebSocketClientSpy;
         yield* client.query(noArgsQueryRef);
         expect(yield* MutableRef.get(spy.queryCalls)).toEqual([
           { name: "notes:list", args: {} },
@@ -158,8 +158,8 @@ describe("ConfectClient", () => {
 
     it.effect("args passed when provided", () =>
       Effect.gen(function* () {
-        const client = yield* ConfectClient.ConfectClient;
-        const spy = yield* ConfectClientSpy;
+        const client = yield* WebSocketClient.WebSocketClient;
+        const spy = yield* WebSocketClientSpy;
         yield* client.query(argsQueryRef, { id: "abc" });
         expect(yield* MutableRef.get(spy.queryCalls)).toEqual([
           { name: "notes:get", args: { id: "abc" } },
@@ -171,8 +171,8 @@ describe("ConfectClient", () => {
   describe("mutation", () => {
     it.effect("args omitted when empty", () =>
       Effect.gen(function* () {
-        const client = yield* ConfectClient.ConfectClient;
-        const spy = yield* ConfectClientSpy;
+        const client = yield* WebSocketClient.WebSocketClient;
+        const spy = yield* WebSocketClientSpy;
         yield* client.mutation(noArgsMutationRef);
         expect(yield* MutableRef.get(spy.mutationCalls)).toEqual([
           { name: "tasks:cleanup", args: {} },
@@ -182,8 +182,8 @@ describe("ConfectClient", () => {
 
     it.effect("args passed when provided", () =>
       Effect.gen(function* () {
-        const client = yield* ConfectClient.ConfectClient;
-        const spy = yield* ConfectClientSpy;
+        const client = yield* WebSocketClient.WebSocketClient;
+        const spy = yield* WebSocketClientSpy;
         yield* client.mutation(argsMutationRef, { text: "hello" });
         expect(yield* MutableRef.get(spy.mutationCalls)).toEqual([
           { name: "notes:insert", args: { text: "hello" } },
@@ -195,8 +195,8 @@ describe("ConfectClient", () => {
   describe("action", () => {
     it.effect("args omitted when empty", () =>
       Effect.gen(function* () {
-        const client = yield* ConfectClient.ConfectClient;
-        const spy = yield* ConfectClientSpy;
+        const client = yield* WebSocketClient.WebSocketClient;
+        const spy = yield* WebSocketClientSpy;
         yield* client.action(noArgsActionRef);
         expect(yield* MutableRef.get(spy.actionCalls)).toEqual([
           { name: "random:getNumber", args: {} },
@@ -206,8 +206,8 @@ describe("ConfectClient", () => {
 
     it.effect("args passed when provided", () =>
       Effect.gen(function* () {
-        const client = yield* ConfectClient.ConfectClient;
-        const spy = yield* ConfectClientSpy;
+        const client = yield* WebSocketClient.WebSocketClient;
+        const spy = yield* WebSocketClientSpy;
         yield* client.action(argsActionRef, { to: "user@example.com" });
         expect(yield* MutableRef.get(spy.actionCalls)).toEqual([
           { name: "email:send", args: { to: "user@example.com" } },
@@ -219,7 +219,7 @@ describe("ConfectClient", () => {
   describe("reactiveQuery", () => {
     it.effect("subscribes and emits values", () =>
       Effect.gen(function* () {
-        const client = yield* ConfectClient.ConfectClient;
+        const client = yield* WebSocketClient.WebSocketClient;
         const result = yield* client
           .reactiveQuery(noArgsQueryRef)
           .pipe(Stream.take(1), Stream.runCollect);
@@ -230,8 +230,8 @@ describe("ConfectClient", () => {
 
     it.effect("passes args", () =>
       Effect.gen(function* () {
-        const client = yield* ConfectClient.ConfectClient;
-        const spy = yield* ConfectClientSpy;
+        const client = yield* WebSocketClient.WebSocketClient;
+        const spy = yield* WebSocketClientSpy;
         yield* client
           .reactiveQuery(argsQueryRef, { id: "abc" })
           .pipe(Stream.take(1), Stream.runCollect);
@@ -244,8 +244,8 @@ describe("ConfectClient", () => {
 
     it.effect("runs finalizer when stream is consumed", () =>
       Effect.gen(function* () {
-        const client = yield* ConfectClient.ConfectClient;
-        const spy = yield* ConfectClientSpy;
+        const client = yield* WebSocketClient.WebSocketClient;
+        const spy = yield* WebSocketClientSpy;
         yield* client
           .reactiveQuery(noArgsQueryRef)
           .pipe(Stream.take(1), Stream.runCollect);
