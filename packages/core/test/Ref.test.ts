@@ -1,89 +1,95 @@
 import type { FunctionReference, FunctionVisibility } from "convex/server";
 import { describe, expectTypeOf, test } from "vitest";
 
+import type * as FunctionSpec from "../src/FunctionSpec";
 import type * as Ref from "../src/Ref";
-import type * as RuntimeAndFunctionType from "../src/RuntimeAndFunctionType";
 
 describe("FunctionReference", () => {
-  test("public query ref -> FunctionReference<'query', 'public'>", () => {
-    expectTypeOf<Ref.FunctionReference<Ref.AnyPublicQuery>>().toEqualTypeOf<
+  test("public query", () => {
+    type Ref_ = Ref.FromFunctionSpec<
+      ReturnType<typeof FunctionSpec.publicQuery>
+    >;
+    expectTypeOf<Ref.FunctionReference<Ref_>>().toEqualTypeOf<
       FunctionReference<"query", "public">
     >();
   });
 
-  test("public mutation ref -> FunctionReference<'mutation', 'public'>", () => {
-    expectTypeOf<Ref.FunctionReference<Ref.AnyPublicMutation>>().toEqualTypeOf<
+  test("internal query", () => {
+    type Ref_ = Ref.FromFunctionSpec<
+      ReturnType<typeof FunctionSpec.internalQuery>
+    >;
+    expectTypeOf<Ref.FunctionReference<Ref_>>().toEqualTypeOf<
+      FunctionReference<"query", "internal">
+    >();
+  });
+
+  test("public mutation", () => {
+    type Ref_ = Ref.FromFunctionSpec<
+      ReturnType<typeof FunctionSpec.publicMutation>
+    >;
+    expectTypeOf<Ref.FunctionReference<Ref_>>().toEqualTypeOf<
       FunctionReference<"mutation", "public">
     >();
   });
 
-  test("public action ref -> FunctionReference<'action', 'public'>", () => {
-    expectTypeOf<Ref.FunctionReference<Ref.AnyPublicAction>>().toEqualTypeOf<
-      FunctionReference<"action", "public">
-    >();
-  });
-
-  test("concrete public query ref preserves exact type params", () => {
-    type MyRef = Ref.Ref<
-      RuntimeAndFunctionType.ConvexQuery,
-      "public",
-      { id: string },
-      string[]
+  test("internal mutation", () => {
+    type Ref_ = Ref.FromFunctionSpec<
+      ReturnType<typeof FunctionSpec.internalMutation>
     >;
-    expectTypeOf<Ref.FunctionReference<MyRef>>().toEqualTypeOf<
-      FunctionReference<"query", "public">
-    >();
-  });
-
-  test("concrete internal mutation ref -> FunctionReference<'mutation', 'internal'>", () => {
-    type MyRef = Ref.Ref<
-      RuntimeAndFunctionType.ConvexMutation,
-      "internal",
-      { name: string },
-      void
-    >;
-    expectTypeOf<Ref.FunctionReference<MyRef>>().toEqualTypeOf<
+    expectTypeOf<Ref.FunctionReference<Ref_>>().toEqualTypeOf<
       FunctionReference<"mutation", "internal">
     >();
   });
 
-  test("concrete internal action ref -> FunctionReference<'action', 'internal'>", () => {
-    type MyRef = Ref.Ref<
-      RuntimeAndFunctionType.ConvexAction,
-      "internal",
-      Record<string, never>,
-      number
+  test("public action", () => {
+    type Ref_ = Ref.FromFunctionSpec<
+      ReturnType<typeof FunctionSpec.publicAction>
     >;
-    expectTypeOf<Ref.FunctionReference<MyRef>>().toEqualTypeOf<
-      FunctionReference<"action", "internal">
-    >();
-  });
-
-  test("node action ref -> FunctionReference<'action', ...>", () => {
-    type MyRef = Ref.Ref<
-      RuntimeAndFunctionType.NodeAction,
-      "public",
-      Record<string, never>,
-      void
-    >;
-    expectTypeOf<Ref.FunctionReference<MyRef>>().toEqualTypeOf<
+    expectTypeOf<Ref.FunctionReference<Ref_>>().toEqualTypeOf<
       FunctionReference<"action", "public">
     >();
   });
 
-  test("AnyQuery ref -> FunctionReference<'query', FunctionVisibility>", () => {
+  test("internal action", () => {
+    type Ref_ = Ref.FromFunctionSpec<
+      ReturnType<typeof FunctionSpec.internalAction>
+    >;
+    expectTypeOf<Ref.FunctionReference<Ref_>>().toEqualTypeOf<
+      FunctionReference<"action", "internal">
+    >();
+  });
+
+  test("public node action", () => {
+    type Ref_ = Ref.FromFunctionSpec<
+      ReturnType<typeof FunctionSpec.publicNodeAction>
+    >;
+    expectTypeOf<Ref.FunctionReference<Ref_>>().toEqualTypeOf<
+      FunctionReference<"action", "public">
+    >();
+  });
+
+  test("internal node action", () => {
+    type Ref_ = Ref.FromFunctionSpec<
+      ReturnType<typeof FunctionSpec.internalNodeAction>
+    >;
+    expectTypeOf<Ref.FunctionReference<Ref_>>().toEqualTypeOf<
+      FunctionReference<"action", "internal">
+    >();
+  });
+
+  test("AnyQuery", () => {
     expectTypeOf<Ref.FunctionReference<Ref.AnyQuery>>().toEqualTypeOf<
       FunctionReference<"query", FunctionVisibility>
     >();
   });
 
-  test("AnyMutation ref -> FunctionReference<'mutation', FunctionVisibility>", () => {
+  test("AnyMutation", () => {
     expectTypeOf<Ref.FunctionReference<Ref.AnyMutation>>().toEqualTypeOf<
       FunctionReference<"mutation", FunctionVisibility>
     >();
   });
 
-  test("AnyAction ref -> FunctionReference<'action', FunctionVisibility>", () => {
+  test("AnyAction", () => {
     expectTypeOf<Ref.FunctionReference<Ref.AnyAction>>().toEqualTypeOf<
       FunctionReference<"action", FunctionVisibility>
     >();
