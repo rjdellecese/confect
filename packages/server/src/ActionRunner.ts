@@ -4,9 +4,15 @@ import { Context, Layer } from "effect";
 
 const make =
   (runAction: GenericActionCtx<any>["runAction"]) =>
-  <Action extends Ref.AnyAction>(action: Action, args: Ref.Args<Action>) =>
-    Ref.runWithCodec(action, args, (functionReference, encodedArgs) =>
-      runAction(functionReference, encodedArgs),
+  <Action extends Ref.AnyAction>(
+    action: Action,
+    ...args: Ref.OptionalArgs<Action>
+  ) =>
+    Ref.runWithCodec(
+      action,
+      (args[0] ?? {}) as Ref.Args<Action>,
+      (functionReference, encodedArgs) =>
+        runAction(functionReference, encodedArgs),
     );
 
 export const ActionRunner = Context.GenericTag<ReturnType<typeof make>>(

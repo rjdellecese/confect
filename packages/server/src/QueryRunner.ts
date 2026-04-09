@@ -4,9 +4,15 @@ import { Context, Layer } from "effect";
 
 const make =
   (runQuery: GenericQueryCtx<any>["runQuery"]) =>
-  <Query extends Ref.AnyQuery>(query: Query, args: Ref.Args<Query>) =>
-    Ref.runWithCodec(query, args, (functionReference, encodedArgs) =>
-      runQuery(functionReference, encodedArgs),
+  <Query extends Ref.AnyQuery>(
+    query: Query,
+    ...args: Ref.OptionalArgs<Query>
+  ) =>
+    Ref.runWithCodec(
+      query,
+      (args[0] ?? {}) as Ref.Args<Query>,
+      (functionReference, encodedArgs) =>
+        runQuery(functionReference, encodedArgs),
     );
 
 export const QueryRunner = Context.GenericTag<ReturnType<typeof make>>(

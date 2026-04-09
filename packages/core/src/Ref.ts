@@ -122,6 +122,10 @@ export type Args<Ref_> =
     ? Args_
     : never;
 
+export type OptionalArgs<Ref_ extends Any> = keyof Args<Ref_> extends never
+  ? [args?: Args<Ref_>]
+  : [args: Args<Ref_>];
+
 export type Returns<Ref_> =
   Ref_ extends Ref<
     infer _RuntimeAndFunctionType,

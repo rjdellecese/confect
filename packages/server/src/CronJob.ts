@@ -17,9 +17,6 @@ export interface CronJob {
 export const isCronJob = (u: unknown): u is CronJob =>
   Predicate.hasProperty(u, TypeId);
 
-type OptionalArgs<R extends Ref.AnyMutation | Ref.AnyAction> =
-  keyof Ref.Args<R> extends never ? [args?: Ref.Args<R>] : [args: Ref.Args<R>];
-
 const Proto = {
   [TypeId]: TypeId,
 };
@@ -41,5 +38,5 @@ export const make = <R extends Ref.AnyMutation | Ref.AnyAction>(
   identifier: string,
   schedule: Cron.Cron | Duration.Duration,
   ref: R,
-  ...args: OptionalArgs<R>
+  ...args: Ref.OptionalArgs<R>
 ): CronJob => makeProto(identifier, schedule, ref, args[0] ?? {});

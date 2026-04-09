@@ -6,10 +6,13 @@ const make =
   (runMutation: GenericMutationCtx<any>["runMutation"]) =>
   <Mutation extends Ref.AnyMutation>(
     mutation: Mutation,
-    args: Ref.Args<Mutation>,
+    ...args: Ref.OptionalArgs<Mutation>
   ) =>
-    Ref.runWithCodec(mutation, args, (functionReference, encodedArgs) =>
-      runMutation(functionReference, encodedArgs),
+    Ref.runWithCodec(
+      mutation,
+      (args[0] ?? {}) as Ref.Args<Mutation>,
+      (functionReference, encodedArgs) =>
+        runMutation(functionReference, encodedArgs),
     );
 
 export const MutationRunner = Context.GenericTag<ReturnType<typeof make>>(

@@ -10,12 +10,6 @@ export class HttpClientError extends Schema.TaggedError<HttpClientError>()(
   },
 ) {}
 
-type OptionalArgs<
-  R extends Ref.AnyPublicQuery | Ref.AnyPublicMutation | Ref.AnyPublicAction,
-> = keyof Ref.Args<R> extends never
-  ? [args?: Ref.Args<R>]
-  : [args: Ref.Args<R>];
-
 const make = (
   address: string,
   options?: ConstructorParameters<typeof ConvexHttpClient>[1],
@@ -35,7 +29,7 @@ const make = (
 
   const query = <Query extends Ref.AnyPublicQuery>(
     ref: Query,
-    ...rest: OptionalArgs<Query>
+    ...rest: Ref.OptionalArgs<Query>
   ): Effect.Effect<
     Ref.Returns<Query>,
     HttpClientError | ParseResult.ParseError
@@ -51,7 +45,7 @@ const make = (
 
   const mutation = <Mutation extends Ref.AnyPublicMutation>(
     ref: Mutation,
-    ...rest: OptionalArgs<Mutation>
+    ...rest: Ref.OptionalArgs<Mutation>
   ): Effect.Effect<
     Ref.Returns<Mutation>,
     HttpClientError | ParseResult.ParseError
@@ -67,7 +61,7 @@ const make = (
 
   const action = <Action extends Ref.AnyPublicAction>(
     ref: Action,
-    ...rest: OptionalArgs<Action>
+    ...rest: Ref.OptionalArgs<Action>
   ): Effect.Effect<
     Ref.Returns<Action>,
     HttpClientError | ParseResult.ParseError
