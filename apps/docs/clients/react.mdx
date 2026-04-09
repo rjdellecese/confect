@@ -78,6 +78,34 @@ const NoteList = () => {
 };
 ```
 
+### Skipping queries
+
+Pass `"skip"` instead of args to disable the query subscription. The hook returns `undefined` when skipped, just as it does while loading. This is useful for conditional queries where a prerequisite value may not yet be available.
+
+```tsx
+import { useQuery } from "@confect/react";
+import refs from "../confect/_generated/refs";
+
+const NoteDetail = ({
+  selectedId,
+}: {
+  selectedId: string | undefined;
+}) => {
+  const note = useQuery(
+    refs.public.notes.get,
+    selectedId !== undefined ? { id: selectedId } : "skip",
+  );
+
+  if (note === undefined) {
+    return (
+      <p>{selectedId === undefined ? "Select a note" : "Loading…"}</p>
+    );
+  }
+
+  return <p>{note.text}</p>;
+};
+```
+
 ## `useMutation`
 
 Returns a function that encodes args using the spec's `args` schema, calls the Convex mutation, and decodes the result using the spec's `returns` schema. Returns `(args) => Promise<T>`, matching Convex's `useMutation`.
@@ -147,3 +175,4 @@ const RandomNumber = () => {
 | Functions referenced via `api.module.fn` | Functions referenced via `refs` |
 | Args passed directly to Convex as-is | Args are schema-encoded from `Type` to `Encoded` before sending to Convex |
 | Return values received directly from Convex as-is | Return values are schema-decoded from `Encoded` to `Type` before returning |
+| Pass `"skip"` to disable query subscription | Same — pass `"skip"` to disable query subscription |
