@@ -49,7 +49,7 @@ describe("DatabaseReader", () => {
         }),
       );
 
-      const notes = yield* c.query(refs.public.databaseReader.listNotes, {});
+      const notes = yield* c.query(refs.public.databaseReader.listNotes);
 
       assertEquals(notes.length, 10);
       assertEquals(notes[0]?.text, "10");
@@ -86,7 +86,6 @@ describe("ActionRunner", () => {
 
       const result = yield* c.action(
         refs.public.groups.runners.getNumberViaRunner,
-        {},
       );
 
       expectTypeOf(result).toEqualTypeOf<number>();
@@ -105,7 +104,6 @@ describe("QueryRunner", () => {
 
       const count = yield* c.action(
         refs.public.groups.runners.countNotesViaRunner,
-        {},
       );
 
       expectTypeOf(count).toEqualTypeOf<number>();

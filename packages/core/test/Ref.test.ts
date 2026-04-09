@@ -103,6 +103,28 @@ describe("FunctionReference", () => {
     expectTypeOf<Ref.Returns<Ref_>>().toEqualTypeOf<void>();
   });
 
+  test("OptionalArgs is optional tuple when args are empty", () => {
+    const _spec = FunctionSpec.publicQuery({
+      name: "list",
+      args: Schema.Struct({}),
+      returns: Schema.Void,
+    });
+    type Ref_ = Ref.FromFunctionSpec<typeof _spec>;
+    expectTypeOf<Ref.OptionalArgs<Ref_>>().toEqualTypeOf<[args?: {}]>();
+  });
+
+  test("OptionalArgs is required tuple when args have keys", () => {
+    const _spec = FunctionSpec.publicQuery({
+      name: "get",
+      args: Schema.Struct({ id: Schema.String }),
+      returns: Schema.Void,
+    });
+    type Ref_ = Ref.FromFunctionSpec<typeof _spec>;
+    expectTypeOf<Ref.OptionalArgs<Ref_>>().toEqualTypeOf<
+      [args: { readonly id: string }]
+    >();
+  });
+
   test("AnyQuery", () => {
     expectTypeOf<Ref.FunctionReference<Ref.AnyQuery>>().toEqualTypeOf<
       FunctionReference<"query", FunctionVisibility>
