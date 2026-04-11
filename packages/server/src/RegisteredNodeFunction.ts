@@ -33,6 +33,7 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Node">>(
         nodeActionFunction(api.databaseSchema, {
           args: functionProvenance.args,
           returns: functionProvenance.returns,
+          error: functionProvenance.error,
           handler: handler as Handler.AnyConfectProvenance,
         }),
       );
@@ -52,10 +53,12 @@ const nodeActionFunction = <
   {
     args,
     returns,
+    error,
     handler,
   }: {
     args: Schema.Schema<Args, ConvexArgs>;
     returns: Schema.Schema<Returns, ConvexReturns>;
+    error: Schema.Schema.AnyNoContext | undefined;
     handler: (
       a: Args,
     ) => Effect.Effect<
@@ -69,6 +72,7 @@ const nodeActionFunction = <
   RegisteredFunction.actionFunctionBase({
     args,
     returns,
+    error,
     handler,
     createLayer: (ctx) =>
       Layer.mergeAll(

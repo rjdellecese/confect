@@ -128,7 +128,11 @@ export type NodeRuntimeAction<
 
 type Base<FunctionSpec_ extends FunctionSpec.AnyWithProps, R> = (
   args: FunctionSpec.Args<FunctionSpec_>,
-) => Effect.Effect<FunctionSpec.Returns<FunctionSpec_>, never, R>;
+) => Effect.Effect<
+  FunctionSpec.Returns<FunctionSpec_>,
+  FunctionSpec.Error<FunctionSpec_>,
+  R
+>;
 
 export type Any = AnyConfectProvenance | AnyConvexProvenance;
 

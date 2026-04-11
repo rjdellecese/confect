@@ -8,6 +8,7 @@ import {
   type RegisteredMutation,
   type RegisteredQuery,
 } from "convex/server";
+import { ConvexError } from "convex/values";
 import { Effect, Layer, pipe, Schema } from "effect";
 import * as ActionCtx from "./ActionCtx";
 import * as ActionRunner from "./ActionRunner";
@@ -111,6 +112,26 @@ export type RegisteredFunction<
       ? ConfectRegisteredFunction<FunctionSpec_>
       : never;
 
+const catchTypedError = <A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+  errorSchema: Schema.Schema.AnyNoContext | undefined,
+): Effect.Effect<A, never, R> => {
+  if (errorSchema === undefined) {
+    return effect as Effect.Effect<A, never, R>;
+  }
+  return effect.pipe(
+    Effect.catchAll((typedError) =>
+      pipe(
+        Schema.encode(errorSchema)(typedError),
+        Effect.orDie,
+        Effect.andThen((encodedError) =>
+          Effect.die(new ConvexError(encodedError)),
+        ),
+      ),
+    ),
+  );
+};
+
 export const actionFunctionBase = <
   Schema extends DatabaseSchema.AnyWithProps,
   Args,
@@ -122,11 +143,13 @@ export const actionFunctionBase = <
 >({
   args,
   returns,
+  error,
   handler,
   createLayer,
 }: {
   args: Schema.Schema<Args, ConvexArgs>;
   returns: Schema.Schema<Returns, ConvexReturns>;
+  error: Schema.Schema.AnyNoContext | undefined;
   handler: (a: Args) => Effect.Effect<Returns, E, R>;
   createLayer: (
     ctx: GenericActionCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
@@ -148,6 +171,7 @@ export const actionFunctionBase = <
       Effect.andThen((convexReturns) =>
         Schema.encodeUnknown(returns)(convexReturns),
       ),
+      (effect) => catchTypedError(effect, error),
       Effect.runPromise,
     ),
 });

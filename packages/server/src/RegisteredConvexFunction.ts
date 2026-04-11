@@ -10,6 +10,7 @@ import {
   mutationGeneric,
   queryGeneric,
 } from "convex/server";
+import { ConvexError } from "convex/values";
 import { Effect, Layer, Match, pipe, Schema } from "effect";
 import type * as Api from "./Api";
 import * as Auth from "./Auth";
@@ -52,6 +53,7 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
             queryFunction(api.databaseSchema, {
               args: functionProvenance.args,
               returns: functionProvenance.returns,
+              error: functionProvenance.error,
               handler: handler as Handler.AnyConfectProvenance,
             }),
           );
@@ -67,6 +69,7 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
             mutationFunction(api.databaseSchema, {
               args: functionProvenance.args,
               returns: functionProvenance.returns,
+              error: functionProvenance.error,
               handler: handler as Handler.AnyConfectProvenance,
             }),
           );
@@ -82,6 +85,7 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
             convexActionFunction(api.databaseSchema, {
               args: functionProvenance.args,
               returns: functionProvenance.returns,
+              error: functionProvenance.error,
               handler: handler as Handler.AnyConfectProvenance,
             }),
           );
@@ -91,6 +95,26 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
     }),
     Match.exhaustive,
   );
+
+const catchTypedError = <A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+  errorSchema: Schema.Schema.AnyNoContext | undefined,
+): Effect.Effect<A, never, R> => {
+  if (errorSchema === undefined) {
+    return effect as Effect.Effect<A, never, R>;
+  }
+  return effect.pipe(
+    Effect.catchAll((typedError) =>
+      pipe(
+        Schema.encode(errorSchema)(typedError),
+        Effect.orDie,
+        Effect.andThen((encodedError) =>
+          Effect.die(new ConvexError(encodedError)),
+        ),
+      ),
+    ),
+  );
+};
 
 const queryFunction = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
@@ -104,10 +128,12 @@ const queryFunction = <
   {
     args,
     returns,
+    error,
     handler,
   }: {
     args: Schema.Schema<Args, ConvexArgs>;
     returns: Schema.Schema<Returns, ConvexReturns>;
+    error: Schema.Schema.AnyNoContext | undefined;
     handler: (
       a: Args,
     ) => Effect.Effect<
@@ -158,6 +184,7 @@ const queryFunction = <
       Effect.andThen((convexReturns) =>
         Schema.encodeUnknown(returns)(convexReturns),
       ),
+      (effect) => catchTypedError(effect, error),
       Effect.runPromise,
     ),
 });
@@ -207,10 +234,12 @@ const mutationFunction = <
   {
     args,
     returns,
+    error,
     handler,
   }: {
     args: Schema.Schema<Args, ConvexArgs>;
     returns: Schema.Schema<Returns, ConvexReturns>;
+    error: Schema.Schema.AnyNoContext | undefined;
     handler: (a: Args) => Effect.Effect<Returns, E, MutationServices<Schema>>;
   },
 ) => ({
@@ -230,6 +259,7 @@ const mutationFunction = <
       Effect.andThen((convexReturns) =>
         Schema.encodeUnknown(returns)(convexReturns),
       ),
+      (effect) => catchTypedError(effect, error),
       Effect.runPromise,
     ),
 });
@@ -246,10 +276,12 @@ const convexActionFunction = <
   {
     args,
     returns,
+    error,
     handler,
   }: {
     args: Schema.Schema<Args, ConvexArgs>;
     returns: Schema.Schema<Returns, ConvexReturns>;
+    error: Schema.Schema.AnyNoContext | undefined;
     handler: (
       a: Args,
     ) => Effect.Effect<
@@ -262,6 +294,7 @@ const convexActionFunction = <
   RegisteredFunction.actionFunctionBase({
     args,
     returns,
+    error,
     handler,
     createLayer: (ctx) =>
       Layer.mergeAll(

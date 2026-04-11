@@ -3,6 +3,7 @@ import type {
   FunctionVisibility,
 } from "convex/server";
 import { makeFunctionReference } from "convex/server";
+import { ConvexError } from "convex/values";
 import type { ParseResult } from "effect";
 import { Effect, Match, Schema } from "effect";
 import type * as FunctionSpec from "./FunctionSpec";
@@ -13,26 +14,29 @@ export interface Ref<
   _FunctionVisibility extends FunctionVisibility,
   _Args,
   _Returns,
+  _Error = never,
 > {
   readonly _RuntimeAndFunctionType?: _RuntimeAndFunctionType;
   readonly _FunctionVisibility?: _FunctionVisibility;
   readonly _Args?: _Args;
   readonly _Returns?: _Returns;
+  readonly _Error?: _Error;
   /** @internal */
   readonly functionSpec: FunctionSpec.AnyWithProps;
   /** @internal */
   readonly functionNamespace: string;
 }
 
-export interface Any extends Ref<any, any, any, any> {}
+export interface Any extends Ref<any, any, any, any, any> {}
 
-export interface AnyInternal extends Ref<any, "internal", any, any> {}
+export interface AnyInternal extends Ref<any, "internal", any, any, any> {}
 
-export interface AnyPublic extends Ref<any, "public", any, any> {}
+export interface AnyPublic extends Ref<any, "public", any, any, any> {}
 
 export interface AnyQuery extends Ref<
   RuntimeAndFunctionType.AnyQuery,
   FunctionVisibility,
+  any,
   any,
   any
 > {}
@@ -41,12 +45,14 @@ export interface AnyMutation extends Ref<
   RuntimeAndFunctionType.AnyMutation,
   FunctionVisibility,
   any,
+  any,
   any
 > {}
 
 export interface AnyAction extends Ref<
   RuntimeAndFunctionType.AnyAction,
   FunctionVisibility,
+  any,
   any,
   any
 > {}
@@ -55,6 +61,7 @@ export interface AnyPublicQuery extends Ref<
   RuntimeAndFunctionType.AnyQuery,
   "public",
   any,
+  any,
   any
 > {}
 
@@ -62,12 +69,14 @@ export interface AnyPublicMutation extends Ref<
   RuntimeAndFunctionType.AnyMutation,
   "public",
   any,
+  any,
   any
 > {}
 
 export interface AnyPublicAction extends Ref<
   RuntimeAndFunctionType.AnyAction,
   "public",
+  any,
   any,
   any
 > {}
@@ -77,7 +86,8 @@ export type GetRuntimeAndFunctionType<Ref_> =
     infer RuntimeAndFunctionType_,
     infer _FunctionVisibility,
     infer _Args,
-    infer _Returns
+    infer _Returns,
+    infer _Error
   >
     ? RuntimeAndFunctionType_
     : never;
@@ -87,7 +97,8 @@ export type GetRuntime<Ref_> =
     infer RuntimeAndFunctionType_,
     infer _FunctionVisibility,
     infer _Args,
-    infer _Returns
+    infer _Returns,
+    infer _Error
   >
     ? RuntimeAndFunctionType.GetRuntime<RuntimeAndFunctionType_>
     : never;
@@ -97,7 +108,8 @@ export type GetFunctionType<Ref_> =
     infer RuntimeAndFunctionType_,
     infer _FunctionVisibility,
     infer _Args,
-    infer _Returns
+    infer _Returns,
+    infer _Error
   >
     ? RuntimeAndFunctionType.GetFunctionType<RuntimeAndFunctionType_>
     : never;
@@ -107,7 +119,8 @@ export type GetFunctionVisibility<Ref_> =
     infer _RuntimeAndFunctionType,
     infer FunctionVisibility_,
     infer _Args,
-    infer _Returns
+    infer _Returns,
+    infer _Error
   >
     ? FunctionVisibility_
     : never;
@@ -117,7 +130,8 @@ export type Args<Ref_> =
     infer _RuntimeAndFunctionType,
     infer _FunctionVisibility,
     infer Args_,
-    infer _Returns
+    infer _Returns,
+    infer _Error
   >
     ? Args_
     : never;
@@ -131,9 +145,21 @@ export type Returns<Ref_> =
     infer _RuntimeAndFunctionType,
     infer _FunctionVisibility,
     infer _Args,
-    infer Returns_
+    infer Returns_,
+    infer _Error
   >
     ? Returns_
+    : never;
+
+export type Error<Ref_> =
+  Ref_ extends Ref<
+    infer _RuntimeAndFunctionType,
+    infer _FunctionVisibility,
+    infer _Args,
+    infer _Returns,
+    infer Error_
+  >
+    ? Error_
     : never;
 
 export type FunctionReference<Ref_ extends Any> = ConvexFunctionReference<
@@ -146,7 +172,8 @@ export type FromFunctionSpec<FunctionSpec_ extends FunctionSpec.AnyWithProps> =
     FunctionSpec.GetRuntimeAndFunctionType<FunctionSpec_>,
     FunctionSpec.GetFunctionVisibility<FunctionSpec_>,
     FunctionSpec.Args<FunctionSpec_>,
-    FunctionSpec.Returns<FunctionSpec_>
+    FunctionSpec.Returns<FunctionSpec_>,
+    FunctionSpec.Error<FunctionSpec_>
   >;
 
 export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
@@ -206,6 +233,48 @@ export const decodeReturnsSync = <Ref_ extends Any>(
     Match.tag("Convex", () => encodedReturns),
     Match.exhaustive,
   ) as Returns<Ref_>;
+
+export const isConvexError = (error: unknown): error is ConvexError<any> =>
+  error instanceof ConvexError;
+
+export const decodeError = <Ref_ extends Any>(
+  ref: Ref_,
+  errorData: unknown,
+): Effect.Effect<Error<Ref_>, ParseResult.ParseError> =>
+  Match.value(ref.functionSpec.functionProvenance).pipe(
+    Match.tag("Confect", (c) =>
+      c.error !== undefined
+        ? Schema.decode(c.error)(errorData)
+        : Effect.succeed(errorData),
+    ),
+    Match.tag("Convex", () => Effect.succeed(errorData)),
+    Match.exhaustive,
+  );
+
+export const decodeErrorSync = <Ref_ extends Any>(
+  ref: Ref_,
+  errorData: unknown,
+): Error<Ref_> =>
+  Match.value(ref.functionSpec.functionProvenance).pipe(
+    Match.tag("Confect", (c) =>
+      c.error !== undefined ? Schema.decodeSync(c.error)(errorData) : errorData,
+    ),
+    Match.tag("Convex", () => errorData),
+    Match.exhaustive,
+  ) as Error<Ref_>;
+
+export const maybeDecodeErrorSync = <Ref_ extends Any>(
+  ref: Ref_,
+  error: unknown,
+): unknown => {
+  if (isConvexError(error)) {
+    const provenance = ref.functionSpec.functionProvenance;
+    if (provenance._tag === "Confect" && provenance.error !== undefined) {
+      return Schema.decodeSync(provenance.error)(error.data);
+    }
+  }
+  return error;
+};
 
 export const runWithCodec: {
   <Ref_ extends Any, E>(

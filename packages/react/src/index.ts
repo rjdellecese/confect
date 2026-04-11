@@ -21,16 +21,20 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
       ? "skip"
       : Ref.encodeArgsSync(ref, (args ?? {}) as Ref.Args<Query>);
 
-  const encodedReturnsOrUndefined = useConvexQuery(
-    functionReference,
-    encodedArgs,
-  );
+  try {
+    const encodedReturnsOrUndefined = useConvexQuery(
+      functionReference,
+      encodedArgs,
+    );
 
-  if (encodedReturnsOrUndefined === undefined) {
-    return undefined;
+    if (encodedReturnsOrUndefined === undefined) {
+      return undefined;
+    }
+
+    return Ref.decodeReturnsSync(ref, encodedReturnsOrUndefined);
+  } catch (error) {
+    throw Ref.maybeDecodeErrorSync(ref, error);
   }
-
-  return Ref.decodeReturnsSync(ref, encodedReturnsOrUndefined);
 };
 
 export const useMutation = <Mutation extends Ref.AnyPublicMutation>(
@@ -46,9 +50,11 @@ export const useMutation = <Mutation extends Ref.AnyPublicMutation>(
       ref,
       (args[0] ?? {}) as Ref.Args<Mutation>,
     );
-    return actualMutation(encodedArgs).then((result) =>
-      Ref.decodeReturnsSync(ref, result),
-    );
+    return actualMutation(encodedArgs)
+      .then((result) => Ref.decodeReturnsSync(ref, result))
+      .catch((error) => {
+        throw Ref.maybeDecodeErrorSync(ref, error);
+      });
   };
 };
 
@@ -61,8 +67,10 @@ export const useAction = <Action extends Ref.AnyPublicAction>(ref: Action) => {
       ref,
       (args[0] ?? {}) as Ref.Args<Action>,
     );
-    return actualAction(encodedArgs).then((result) =>
-      Ref.decodeReturnsSync(ref, result),
-    );
+    return actualAction(encodedArgs)
+      .then((result) => Ref.decodeReturnsSync(ref, result))
+      .catch((error) => {
+        throw Ref.maybeDecodeErrorSync(ref, error);
+      });
   };
 };

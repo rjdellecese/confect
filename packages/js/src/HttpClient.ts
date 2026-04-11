@@ -1,7 +1,7 @@
 import * as Ref from "@confect/core/Ref";
 import { ConvexHttpClient } from "convex/browser";
 import type { ParseResult } from "effect";
-import { Context, Effect, Layer, Schema } from "effect";
+import { Context, Effect, Layer, pipe, Schema } from "effect";
 
 export class HttpClientError extends Schema.TaggedError<HttpClientError>()(
   "HttpClientError",
@@ -27,12 +27,28 @@ const make = (
     client.clearAuth();
   });
 
+  const extractConvexError = <R extends Ref.Any>(
+    ref: R,
+    httpError: HttpClientError,
+  ): Effect.Effect<
+    never,
+    Ref.Error<R> | HttpClientError | ParseResult.ParseError
+  > => {
+    if (Ref.isConvexError(httpError.cause)) {
+      return pipe(
+        Ref.decodeError(ref, httpError.cause.data),
+        Effect.andThen(Effect.fail),
+      );
+    }
+    return Effect.fail(httpError);
+  };
+
   const query = <Query extends Ref.AnyPublicQuery>(
     ref: Query,
     ...rest: Ref.OptionalArgs<Query>
   ): Effect.Effect<
     Ref.Returns<Query>,
-    HttpClientError | ParseResult.ParseError
+    Ref.Error<Query> | HttpClientError | ParseResult.ParseError
   > => {
     const args = (rest[0] ?? {}) as Ref.Args<Query>;
     return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
@@ -40,6 +56,12 @@ const make = (
         try: () => client.query(functionReference, encodedArgs),
         catch: (cause) => new HttpClientError({ cause }),
       }),
+    ).pipe(
+      Effect.catchAll((error) =>
+        error._tag === "HttpClientError"
+          ? extractConvexError(ref, error)
+          : Effect.fail(error),
+      ),
     );
   };
 
@@ -48,7 +70,7 @@ const make = (
     ...rest: Ref.OptionalArgs<Mutation>
   ): Effect.Effect<
     Ref.Returns<Mutation>,
-    HttpClientError | ParseResult.ParseError
+    Ref.Error<Mutation> | HttpClientError | ParseResult.ParseError
   > => {
     const args = (rest[0] ?? {}) as Ref.Args<Mutation>;
     return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
@@ -56,6 +78,12 @@ const make = (
         try: () => client.mutation(functionReference, encodedArgs),
         catch: (cause) => new HttpClientError({ cause }),
       }),
+    ).pipe(
+      Effect.catchAll((error) =>
+        error._tag === "HttpClientError"
+          ? extractConvexError(ref, error)
+          : Effect.fail(error),
+      ),
     );
   };
 
@@ -64,7 +92,7 @@ const make = (
     ...rest: Ref.OptionalArgs<Action>
   ): Effect.Effect<
     Ref.Returns<Action>,
-    HttpClientError | ParseResult.ParseError
+    Ref.Error<Action> | HttpClientError | ParseResult.ParseError
   > => {
     const args = (rest[0] ?? {}) as Ref.Args<Action>;
     return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
@@ -72,6 +100,12 @@ const make = (
         try: () => client.action(functionReference, encodedArgs),
         catch: (cause) => new HttpClientError({ cause }),
       }),
+    ).pipe(
+      Effect.catchAll((error) =>
+        error._tag === "HttpClientError"
+          ? extractConvexError(ref, error)
+          : Effect.fail(error),
+      ),
     );
   };
 
