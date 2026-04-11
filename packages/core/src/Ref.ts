@@ -199,7 +199,9 @@ export const encodeArgs = <Ref_ extends Any>(
   args: Args<Ref_>,
 ): Effect.Effect<unknown, ParseResult.ParseError> =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
-    Match.tag("Confect", (c) => Schema.encode(c.args)(args)),
+    Match.tag("Confect", (confectFunctionProvenance) =>
+      Schema.encode(confectFunctionProvenance.args)(args),
+    ),
     Match.tag("Convex", () => Effect.succeed(args)),
     Match.exhaustive,
   );
@@ -209,7 +211,9 @@ export const decodeReturns = <Ref_ extends Any>(
   returns: unknown,
 ): Effect.Effect<Returns<Ref_>, ParseResult.ParseError> =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
-    Match.tag("Confect", (c) => Schema.decode(c.returns)(returns)),
+    Match.tag("Confect", (confectFunctionProvenance) =>
+      Schema.decode(confectFunctionProvenance.returns)(returns),
+    ),
     Match.tag("Convex", () => Effect.succeed(returns)),
     Match.exhaustive,
   );
@@ -219,7 +223,9 @@ export const encodeArgsSync = <Ref_ extends Any>(
   args: Args<Ref_>,
 ): unknown =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
-    Match.tag("Confect", (c) => Schema.encodeSync(c.args)(args)),
+    Match.tag("Confect", (confectFunctionProvenance) =>
+      Schema.encodeSync(confectFunctionProvenance.args)(args),
+    ),
     Match.tag("Convex", () => args),
     Match.exhaustive,
   );
@@ -229,7 +235,9 @@ export const decodeReturnsSync = <Ref_ extends Any>(
   encodedReturns: unknown,
 ): Returns<Ref_> =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
-    Match.tag("Confect", (c) => Schema.decodeSync(c.returns)(encodedReturns)),
+    Match.tag("Confect", (confectFunctionProvenance) =>
+      Schema.decodeSync(confectFunctionProvenance.returns)(encodedReturns),
+    ),
     Match.tag("Convex", () => encodedReturns),
     Match.exhaustive,
   ) as Returns<Ref_>;
@@ -239,27 +247,29 @@ export const isConvexError = (error: unknown): error is ConvexError<any> =>
 
 export const decodeError = <Ref_ extends Any>(
   ref: Ref_,
-  errorData: unknown,
+  encodedError: unknown,
 ): Effect.Effect<Error<Ref_>, ParseResult.ParseError> =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
-    Match.tag("Confect", (c) =>
-      c.error !== undefined
-        ? Schema.decode(c.error)(errorData)
-        : Effect.succeed(errorData),
+    Match.tag("Confect", (confectFunctionProvenance) =>
+      confectFunctionProvenance.error !== undefined
+        ? Schema.decode(confectFunctionProvenance.error)(encodedError)
+        : Effect.succeed(encodedError),
     ),
-    Match.tag("Convex", () => Effect.succeed(errorData)),
+    Match.tag("Convex", () => Effect.succeed(encodedError)),
     Match.exhaustive,
   );
 
 export const decodeErrorSync = <Ref_ extends Any>(
   ref: Ref_,
-  errorData: unknown,
+  encodedError: unknown,
 ): Error<Ref_> =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
-    Match.tag("Confect", (c) =>
-      c.error !== undefined ? Schema.decodeSync(c.error)(errorData) : errorData,
+    Match.tag("Confect", (confectFunctionProvenance) =>
+      confectFunctionProvenance.error !== undefined
+        ? Schema.decodeSync(confectFunctionProvenance.error)(encodedError)
+        : encodedError,
     ),
-    Match.tag("Convex", () => errorData),
+    Match.tag("Convex", () => encodedError),
     Match.exhaustive,
   ) as Error<Ref_>;
 
@@ -309,11 +319,15 @@ export const runWithCodec: {
       return Effect.isEffect(result) ? result : Effect.promise(() => result);
     };
     return yield* Match.value(functionProvenance).pipe(
-      Match.tag("Confect", (confect) =>
+      Match.tag("Confect", (confectFunctionProvenance) =>
         Effect.gen(function* () {
-          const encodedArgs = yield* Schema.encode(confect.args)(args);
+          const encodedArgs = yield* Schema.encode(
+            confectFunctionProvenance.args,
+          )(args);
           const encodedReturns = yield* call(encodedArgs);
-          return yield* Schema.decode(confect.returns)(encodedReturns);
+          return yield* Schema.decode(confectFunctionProvenance.returns)(
+            encodedReturns,
+          );
         }),
       ),
       Match.tag("Convex", () => call(args)),
