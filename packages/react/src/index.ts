@@ -1,4 +1,5 @@
-import { Ref } from "@confect/core";
+import { type AsyncResult, Ref } from "@confect/core";
+import * as AR from "@confect/core/AsyncResult";
 import {
   useAction as useConvexAction,
   useMutation as useConvexMutation,
@@ -13,7 +14,7 @@ type UseQueryArgs<Query extends Ref.AnyPublicQuery> =
 export const useQuery = <Query extends Ref.AnyPublicQuery>(
   ref: Query,
   ...rest: UseQueryArgs<Query>
-): Ref.Returns<Query> | undefined => {
+): AsyncResult.AsyncResult<Ref.Returns<Query>, Ref.Error<Query>> => {
   const functionReference = Ref.getFunctionReference(ref);
   const args = rest[0];
   const encodedArgs =
@@ -28,12 +29,13 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
     );
 
     if (encodedReturnsOrUndefined === undefined) {
-      return undefined;
+      return AR.initial(true);
     }
 
-    return Ref.decodeReturnsSync(ref, encodedReturnsOrUndefined);
+    return AR.success(Ref.decodeReturnsSync(ref, encodedReturnsOrUndefined));
   } catch (error) {
-    throw Ref.maybeDecodeErrorSync(ref, error);
+    const decoded = Ref.maybeDecodeErrorSync(ref, error);
+    return AR.failure(decoded as Ref.Error<Query>);
   }
 };
 

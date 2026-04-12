@@ -1,3 +1,4 @@
+import { AsyncResult } from "@confect/core";
 import { useAction, useMutation, useQuery } from "@confect/react";
 import type { WorkId } from "@convex-dev/workpool";
 import { FetchHttpClient, HttpApiClient } from "@effect/platform";
@@ -54,7 +55,7 @@ const Page = () => {
 
       <div>
         <span style={{ fontFamily: "monospace" }}>TEST_ENV_VAR: </span>
-        {envVar === undefined ? "Loading…" : envVar}
+        {AsyncResult.isSuccess(envVar) ? envVar.value : "Loading…"}
       </div>
 
       <br />
@@ -175,7 +176,9 @@ const WorkStatusRow = ({
   return (
     <tr>
       <td style={{ paddingRight: 16, fontFamily: "monospace" }}>#{index}</td>
-      <td>{status === undefined ? "Loading…" : statusLabel(status)}</td>
+      <td>
+        {AsyncResult.isSuccess(status) ? statusLabel(status.value) : "Loading…"}
+      </td>
     </tr>
   );
 };
@@ -185,13 +188,13 @@ const NoteList = () => {
 
   const deleteNote = useMutation(refs.public.notesAndRandom.notes.delete_);
 
-  if (notes === undefined) {
+  if (!AsyncResult.isSuccess(notes)) {
     return <p>Loading…</p>;
   }
 
   return (
     <ul>
-      {Array.map(notes, (note) => (
+      {Array.map(notes.value, (note) => (
         <li key={note._id}>
           <p>{note.text}</p>
           <button
