@@ -3,6 +3,7 @@ import type {
   FunctionVisibility,
 } from "convex/server";
 import { makeFunctionReference } from "convex/server";
+import type { Value } from "convex/values";
 import { ConvexError } from "convex/values";
 import type { ParseResult } from "effect";
 import { Effect, Match, Schema } from "effect";
@@ -242,7 +243,7 @@ export const decodeReturnsSync = <Ref_ extends Any>(
     Match.exhaustive,
   ) as Returns<Ref_>;
 
-export const isConvexError = (error: unknown): error is ConvexError<any> =>
+export const isConvexError = (error: unknown): error is ConvexError<Value> =>
   error instanceof ConvexError;
 
 export const decodeError = <Ref_ extends Any>(
@@ -276,15 +277,18 @@ export const decodeErrorSync = <Ref_ extends Any>(
 export const maybeDecodeErrorSync = <Ref_ extends Any>(
   ref: Ref_,
   error: unknown,
-): unknown => {
-  if (isConvexError(error)) {
-    const provenance = ref.functionSpec.functionProvenance;
-    if (provenance._tag === "Confect" && provenance.error !== undefined) {
-      return Schema.decodeSync(provenance.error)(error.data);
-    }
-  }
-  return error;
-};
+): unknown =>
+  isConvexError(error)
+    ? Match.value(ref.functionSpec.functionProvenance).pipe(
+        Match.tag("Confect", (confectFunctionProvenance) =>
+          confectFunctionProvenance.error !== undefined
+            ? Schema.decodeSync(confectFunctionProvenance.error)(error.data)
+            : error,
+        ),
+        Match.tag("Convex", () => error),
+        Match.exhaustive,
+      )
+    : error;
 
 export const runWithCodec: {
   <Ref_ extends Any, E>(

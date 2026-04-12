@@ -1,7 +1,7 @@
 import * as Ref from "@confect/core/Ref";
 import { ConvexClient } from "convex/browser";
 import type { ParseResult } from "effect";
-import { Context, Effect, Layer, pipe, Schema, Stream } from "effect";
+import { Context, Effect, Layer, Schema, Stream } from "effect";
 
 export class WebSocketClientError extends Schema.TaggedError<WebSocketClientError>()(
   "WebSocketClientError",
@@ -39,21 +39,13 @@ const make = (
           );
         });
 
-      const extractConvexError = <R extends Ref.Any>(
+      const catchError = <R extends Ref.Any>(
         ref: R,
-        wsError: WebSocketClientError,
-      ): Effect.Effect<
-        never,
-        Ref.Error<R> | WebSocketClientError | ParseResult.ParseError
-      > => {
-        if (Ref.isConvexError(wsError.cause)) {
-          return pipe(
-            Ref.decodeError(ref, wsError.cause.data),
-            Effect.andThen(Effect.fail),
-          );
-        }
-        return Effect.fail(wsError);
-      };
+        error: unknown,
+      ): Ref.Error<R> | WebSocketClientError =>
+        Ref.isConvexError(error)
+          ? Ref.decodeErrorSync(ref, error.data)
+          : new WebSocketClientError({ cause: error });
 
       const query = <Query extends Ref.AnyPublicQuery>(
         ref: Query,
@@ -66,14 +58,8 @@ const make = (
         return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
           Effect.tryPromise({
             try: () => convexClient.query(functionReference, encodedArgs),
-            catch: (cause) => new WebSocketClientError({ cause }),
+            catch: (error) => catchError(ref, error),
           }),
-        ).pipe(
-          Effect.catchAll((error) =>
-            error._tag === "WebSocketClientError"
-              ? extractConvexError(ref, error)
-              : Effect.fail(error),
-          ),
         );
       };
 
@@ -88,14 +74,8 @@ const make = (
         return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
           Effect.tryPromise({
             try: () => convexClient.mutation(functionReference, encodedArgs),
-            catch: (cause) => new WebSocketClientError({ cause }),
+            catch: (error) => catchError(ref, error),
           }),
-        ).pipe(
-          Effect.catchAll((error) =>
-            error._tag === "WebSocketClientError"
-              ? extractConvexError(ref, error)
-              : Effect.fail(error),
-          ),
         );
       };
 
@@ -110,14 +90,8 @@ const make = (
         return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
           Effect.tryPromise({
             try: () => convexClient.action(functionReference, encodedArgs),
-            catch: (cause) => new WebSocketClientError({ cause }),
+            catch: (error) => catchError(ref, error),
           }),
-        ).pipe(
-          Effect.catchAll((error) =>
-            error._tag === "WebSocketClientError"
-              ? extractConvexError(ref, error)
-              : Effect.fail(error),
-          ),
         );
       };
 
