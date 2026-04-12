@@ -1,10 +1,13 @@
-import { type AsyncResult, Ref } from "@confect/core";
-import * as AR from "@confect/core/AsyncResult";
+import { Ref } from "@confect/core";
+import type { Result } from "@effect-atom/atom/Result";
+import * as AtomResult from "@effect-atom/atom/Result";
 import {
   useAction as useConvexAction,
   useMutation as useConvexMutation,
   useQuery as useConvexQuery,
 } from "convex/react";
+
+export * as Result from "@effect-atom/atom/Result";
 
 type UseQueryArgs<Query extends Ref.AnyPublicQuery> =
   keyof Ref.Args<Query> extends never
@@ -14,7 +17,7 @@ type UseQueryArgs<Query extends Ref.AnyPublicQuery> =
 export const useQuery = <Query extends Ref.AnyPublicQuery>(
   ref: Query,
   ...rest: UseQueryArgs<Query>
-): AsyncResult.AsyncResult<Ref.Returns<Query>, Ref.Error<Query>> => {
+): Result<Ref.Returns<Query>, Ref.Error<Query>> => {
   const functionReference = Ref.getFunctionReference(ref);
   const args = rest[0];
   const encodedArgs =
@@ -29,13 +32,15 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
     );
 
     if (encodedReturnsOrUndefined === undefined) {
-      return AR.initial(true);
+      return AtomResult.initial(true);
     }
 
-    return AR.success(Ref.decodeReturnsSync(ref, encodedReturnsOrUndefined));
+    return AtomResult.success(
+      Ref.decodeReturnsSync(ref, encodedReturnsOrUndefined),
+    );
   } catch (error) {
     const decoded = Ref.maybeDecodeErrorSync(ref, error);
-    return AR.failure(decoded as Ref.Error<Query>);
+    return AtomResult.fail(decoded as Ref.Error<Query>);
   }
 };
 

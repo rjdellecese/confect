@@ -1,5 +1,4 @@
-import { AsyncResult } from "@confect/core";
-import { useAction, useMutation, useQuery } from "@confect/react";
+import { Result, useAction, useMutation, useQuery } from "@confect/react";
 import type { WorkId } from "@convex-dev/workpool";
 import { FetchHttpClient, HttpApiClient } from "@effect/platform";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
@@ -55,7 +54,7 @@ const Page = () => {
 
       <div>
         <span style={{ fontFamily: "monospace" }}>TEST_ENV_VAR: </span>
-        {AsyncResult.isSuccess(envVar) ? envVar.value : "Loading…"}
+        {Result.isSuccess(envVar) ? envVar.value : "Loading…"}
       </div>
 
       <br />
@@ -177,7 +176,7 @@ const WorkStatusRow = ({
     <tr>
       <td style={{ paddingRight: 16, fontFamily: "monospace" }}>#{index}</td>
       <td>
-        {AsyncResult.isSuccess(status) ? statusLabel(status.value) : "Loading…"}
+        {Result.isSuccess(status) ? statusLabel(status.value) : "Loading…"}
       </td>
     </tr>
   );
@@ -188,7 +187,7 @@ const NoteList = () => {
 
   const deleteNote = useMutation(refs.public.notesAndRandom.notes.delete_);
 
-  if (!AsyncResult.isSuccess(notes)) {
+  if (!Result.isSuccess(notes)) {
     return <p>Loading…</p>;
   }
 
