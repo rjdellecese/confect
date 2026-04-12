@@ -54,7 +54,11 @@ const Page = () => {
 
       <div>
         <span style={{ fontFamily: "monospace" }}>TEST_ENV_VAR: </span>
-        {Result.isSuccess(envVar) ? envVar.value : "Loading…"}
+        {Result.match(envVar, {
+          onInitial: () => "Loading…",
+          onFailure: () => "Error",
+          onSuccess: (result) => result.value,
+        })}
       </div>
 
       <br />
@@ -176,7 +180,11 @@ const WorkStatusRow = ({
     <tr>
       <td style={{ paddingRight: 16, fontFamily: "monospace" }}>#{index}</td>
       <td>
-        {Result.isSuccess(status) ? statusLabel(status.value) : "Loading…"}
+        {Result.match(status, {
+          onInitial: () => "Loading…",
+          onFailure: () => "Error",
+          onSuccess: (result) => statusLabel(result.value),
+        })}
       </td>
     </tr>
   );
@@ -187,25 +195,25 @@ const NoteList = () => {
 
   const deleteNote = useMutation(refs.public.notesAndRandom.notes.delete_);
 
-  if (!Result.isSuccess(notes)) {
-    return <p>Loading…</p>;
-  }
-
-  return (
-    <ul>
-      {Array.map(notes.value, (note) => (
-        <li key={note._id}>
-          <p>{note.text}</p>
-          <button
-            type="button"
-            onClick={() => void deleteNote({ noteId: note._id })}
-          >
-            Delete note
-          </button>
-        </li>
-      ))}
-    </ul>
-  );
+  return Result.match(notes, {
+    onInitial: () => <p>Loading…</p>,
+    onFailure: () => <p>Error</p>,
+    onSuccess: (result) => (
+      <ul>
+        {Array.map(result.value, (note) => (
+          <li key={note._id}>
+            <p>{note.text}</p>
+            <button
+              type="button"
+              onClick={() => void deleteNote({ noteId: note._id })}
+            >
+              Delete note
+            </button>
+          </li>
+        ))}
+      </ul>
+    ),
+  });
 };
 
 const ApiClient = HttpApiClient.make(Api, {
