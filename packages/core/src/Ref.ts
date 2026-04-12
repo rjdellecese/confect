@@ -246,6 +246,16 @@ export const decodeReturnsSync = <Ref_ extends Any>(
 export const isConvexError = (error: unknown): error is ConvexError<Value> =>
   error instanceof ConvexError;
 
+export const catchConvexError = <Ref_ extends Any>(
+  ref: Ref_,
+  error: unknown,
+): Error<Ref_> => {
+  if (isConvexError(error)) {
+    return decodeErrorSync(ref, error.data);
+  }
+  throw error;
+};
+
 export const decodeError = <Ref_ extends Any>(
   ref: Ref_,
   encodedError: unknown,
