@@ -1,6 +1,5 @@
 import { Ref } from "@confect/core";
-import type { Result } from "@effect-atom/atom/Result";
-import * as AtomResult from "@effect-atom/atom/Result";
+import * as Result_ from "@effect-atom/atom/Result";
 import {
   useAction as useConvexAction,
   useMutation as useConvexMutation,
@@ -17,7 +16,7 @@ type UseQueryArgs<Query extends Ref.AnyPublicQuery> =
 export const useQuery = <Query extends Ref.AnyPublicQuery>(
   ref: Query,
   ...rest: UseQueryArgs<Query>
-): Result<Ref.Returns<Query>, Ref.Error<Query>> => {
+): Result_.Result<Ref.Returns<Query>, Ref.Error<Query>> => {
   const functionReference = Ref.getFunctionReference(ref);
   const args = rest[0];
   const encodedArgs =
@@ -32,15 +31,15 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
     );
 
     if (encodedReturnsOrUndefined === undefined) {
-      return AtomResult.initial(true);
+      return Result_.initial(true);
     }
 
-    return AtomResult.success(
+    return Result_.success(
       Ref.decodeReturnsSync(ref, encodedReturnsOrUndefined),
     );
   } catch (error) {
     const decoded = Ref.maybeDecodeErrorSync(ref, error);
-    return AtomResult.fail(decoded as Ref.Error<Query>);
+    return Result_.fail(decoded as Ref.Error<Query>);
   }
 };
 

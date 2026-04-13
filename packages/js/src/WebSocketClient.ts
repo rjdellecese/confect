@@ -123,7 +123,7 @@ const make = (
                   (error) => {
                     if (Ref.isConvexError(error)) {
                       const decoded = Ref.decodeErrorSync(ref, error.data);
-                      emit.fail(decoded as Ref.Error<Query>);
+                      emit.fail(decoded);
                     } else {
                       emit.fail(new WebSocketClientError({ cause: error }));
                     }
