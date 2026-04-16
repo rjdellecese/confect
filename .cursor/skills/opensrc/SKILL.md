@@ -41,7 +41,15 @@ pnpm exec opensrc path owner/repo#main
 
 ### Version resolution
 
-For npm packages, opensrc detects the installed version from lockfiles (`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`). Point at another project with `--cwd`:
+For npm packages, opensrc resolves the version in this order:
+
+1. `node_modules/<pkg>/package.json`
+2. `package-lock.json`
+3. `pnpm-lock.yaml`
+4. `yarn.lock`
+5. Registry `latest`
+
+Point at another project with `--cwd`:
 
 ```bash
 pnpm exec opensrc path zod --cwd /path/to/project
