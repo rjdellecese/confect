@@ -4,6 +4,7 @@ packages:
 
 onlyBuiltDependencies:
   - bun
+  - opensrc
   - sharp
 
 packageExtensions:

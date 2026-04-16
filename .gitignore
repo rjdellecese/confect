@@ -7,5 +7,5 @@ coverage/
 dist/
 node-compile-cache/
 node_modules/
-opensrc/
+/opensrc/
 tsconfig.vitest-temp.json
