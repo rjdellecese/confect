@@ -92,6 +92,17 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
     Match.exhaustive,
   );
 
+const zeroNow = () => 0;
+const withStubbedDateNow = async <T>(fn: () => Promise<T>): Promise<T> => {
+  const orig = Date.now;
+  Date.now = zeroNow;
+  try {
+    return await fn();
+  } finally {
+    Date.now = orig;
+  }
+};
+
 const queryFunction = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Args,
@@ -131,34 +142,36 @@ const queryFunction = <
     >,
     actualArgs: ConvexArgs,
   ): Promise<ConvexReturns> =>
-    pipe(
-      actualArgs,
-      Schema.decode(args),
-      Effect.orDie,
-      Effect.andThen((decodedArgs) =>
-        pipe(
-          handler(decodedArgs),
-          Effect.provide(
-            Layer.mergeAll(
-              DatabaseReader.layer(databaseSchema, ctx.db),
-              Auth.layer(ctx.auth),
-              StorageReader.layer(ctx.storage),
-              QueryRunner.layer(ctx.runQuery),
-              Layer.succeed(
-                QueryCtx.QueryCtx<
-                  DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
-                >(),
-                ctx,
+    withStubbedDateNow(() =>
+      pipe(
+        actualArgs,
+        Schema.decode(args),
+        Effect.orDie,
+        Effect.andThen((decodedArgs) =>
+          pipe(
+            handler(decodedArgs),
+            Effect.provide(
+              Layer.mergeAll(
+                DatabaseReader.layer(databaseSchema, ctx.db),
+                Auth.layer(ctx.auth),
+                StorageReader.layer(ctx.storage),
+                QueryRunner.layer(ctx.runQuery),
+                Layer.succeed(
+                  QueryCtx.QueryCtx<
+                    DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+                  >(),
+                  ctx,
+                ),
+                Layer.setConfigProvider(ConvexConfigProvider.make()),
               ),
-              Layer.setConfigProvider(ConvexConfigProvider.make()),
             ),
           ),
         ),
+        Effect.andThen((convexReturns) =>
+          Schema.encodeUnknown(returns)(convexReturns),
+        ),
+        Effect.runPromise,
       ),
-      Effect.andThen((convexReturns) =>
-        Schema.encodeUnknown(returns)(convexReturns),
-      ),
-      Effect.runPromise,
     ),
 });
 
