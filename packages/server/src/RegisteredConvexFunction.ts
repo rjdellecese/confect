@@ -10,7 +10,7 @@ import {
   mutationGeneric,
   queryGeneric,
 } from "convex/server";
-import { Effect, Layer, Match, pipe, Schema } from "effect";
+import { Clock, Effect, Layer, Match, pipe, Schema } from "effect";
 import type * as Api from "./Api";
 import * as Auth from "./Auth";
 import * as ConvexConfigProvider from "./ConvexConfigProvider";
@@ -92,12 +92,40 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
     Match.exhaustive,
   );
 
+// Convex's query cache is invalidated by any Date.now() call during handler
+// execution. Effect's unsafeFork calls Date.now() when constructing a
+// FiberId.Runtime, which trips the cache for every confect-wrapped query. We
+// stub Date.now to 0 for the span of the handler; queries are forbidden from
+// relying on real time for correctness anyway.
+//
+// Users who explicitly want the real timestamp can still reach it via Effect's
+// Clock service (Clock.currentTimeMillis / Clock.currentTimeNanos). We provide
+// a Clock layer whose methods close over the *original* Date.now, so opting in
+// to Clock is an opt-in to worse caching — but caching is not broken by default.
 const zeroNow = () => 0;
-const withStubbedDateNow = async <T>(fn: () => Promise<T>): Promise<T> => {
+
+const unpatchedClock = (realNow: () => number): Clock.Clock => {
+  const bigint1e6 = BigInt(1_000_000);
+  const unsafeCurrentTimeMillis = () => realNow();
+  const unsafeCurrentTimeNanos = () => BigInt(realNow()) * bigint1e6;
+  const defaultClock = Clock.make();
+  return {
+    ...defaultClock,
+    unsafeCurrentTimeMillis,
+    unsafeCurrentTimeNanos,
+    currentTimeMillis: Effect.sync(unsafeCurrentTimeMillis),
+    currentTimeNanos: Effect.sync(unsafeCurrentTimeNanos),
+  };
+};
+
+const withStubbedDateNow = async <T>(
+  fn: (clock: Clock.Clock) => Promise<T>,
+): Promise<T> => {
   const orig = Date.now;
+  const clock = unpatchedClock(orig);
   Date.now = zeroNow;
   try {
-    return await fn();
+    return await fn(clock);
   } finally {
     Date.now = orig;
   }
@@ -142,7 +170,7 @@ const queryFunction = <
     >,
     actualArgs: ConvexArgs,
   ): Promise<ConvexReturns> =>
-    withStubbedDateNow(() =>
+    withStubbedDateNow((clock) =>
       pipe(
         actualArgs,
         Schema.decode(args),
@@ -170,6 +198,7 @@ const queryFunction = <
         Effect.andThen((convexReturns) =>
           Schema.encodeUnknown(returns)(convexReturns),
         ),
+        Effect.withClock(clock),
         Effect.runPromise,
       ),
     ),
