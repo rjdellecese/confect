@@ -102,12 +102,10 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
 // Clock service (Clock.currentTimeMillis / Clock.currentTimeNanos). We provide
 // a Clock layer whose methods close over the *original* Date.now, so opting in
 // to Clock is an opt-in to worse caching — but caching is not broken by default.
-const zeroNow = () => 0;
-
-const unpatchedClock = (realNow: () => number): Clock.Clock => {
+const unpatchedClock = (realDateNow: () => number): Clock.Clock => {
   const bigint1e6 = BigInt(1_000_000);
-  const unsafeCurrentTimeMillis = () => realNow();
-  const unsafeCurrentTimeNanos = () => BigInt(realNow()) * bigint1e6;
+  const unsafeCurrentTimeMillis = () => realDateNow();
+  const unsafeCurrentTimeNanos = () => BigInt(realDateNow()) * bigint1e6;
   const defaultClock = Clock.make();
   return {
     ...defaultClock,
@@ -119,15 +117,15 @@ const unpatchedClock = (realNow: () => number): Clock.Clock => {
 };
 
 const withStubbedDateNow = async <T>(
-  fn: (clock: Clock.Clock) => Promise<T>,
+  queryHandler: (clock: Clock.Clock) => Promise<T>,
 ): Promise<T> => {
-  const orig = Date.now;
-  const clock = unpatchedClock(orig);
-  Date.now = zeroNow;
+  const realDateNow = Date.now;
+  const clock = unpatchedClock(realDateNow);
+  Date.now = () => 0;
   try {
-    return await fn(clock);
+    return await queryHandler(clock);
   } finally {
-    Date.now = orig;
+    Date.now = realDateNow;
   }
 };
 
