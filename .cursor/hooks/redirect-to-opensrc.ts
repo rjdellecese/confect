@@ -88,15 +88,15 @@ const program = Effect.gen(function* () {
       JSON.stringify({
         permission: "deny",
         user_message:
-          "Use `pnpm opensrc <package>` instead of reading from `node_modules` or `.pnpm-store`.",
+          "Use `pnpm opensrc path <package>` instead of reading from `node_modules` or `.pnpm-store`.",
         agent_message: Array.join(
           [
             "Do not read source code from `node_modules` or `.pnpm-store`.",
-            "Use the opensrc tool to fetch dependency source code into `opensrc/` instead.",
+            "Use the opensrc tool to resolve dependency source code in the global `~/.opensrc/` cache instead.",
             "",
-            "1. Check `opensrc/sources.json` to see if the package was already fetched.",
-            "2. If not, run: `pnpm opensrc <package-name>`",
-            "3. Then read from `opensrc/<package-name>/`.",
+            "1. Run: `pnpm opensrc path <package-name>`",
+            "2. Use the returned absolute path with read or search commands.",
+            "3. Check `~/.opensrc/sources.json` to see cached packages and versions.",
           ],
           "\n",
         ),

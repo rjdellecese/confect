@@ -11,7 +11,7 @@ import {
   queryGeneric,
 } from "convex/server";
 import { ConvexError } from "convex/values";
-import { Effect, Layer, Match, pipe, Schema } from "effect";
+import { Clock, Effect, Layer, Match, pipe, Schema } from "effect";
 import type * as Api from "./Api";
 import * as Auth from "./Auth";
 import * as ConvexConfigProvider from "./ConvexConfigProvider";
@@ -116,6 +116,43 @@ const catchTypedError = <A, E, R>(
   );
 };
 
+// Convex's query cache is invalidated by any Date.now() call during handler
+// execution. Effect's unsafeFork calls Date.now() when constructing a
+// FiberId.Runtime, which trips the cache for every confect-wrapped query. We
+// stub Date.now to 0 for the span of the handler; queries are forbidden from
+// relying on real time for correctness anyway.
+//
+// Users who explicitly want the real timestamp can still reach it via Effect's
+// Clock service (Clock.currentTimeMillis / Clock.currentTimeNanos). We provide
+// a Clock layer whose methods close over the *original* Date.now, so opting in
+// to Clock is an opt-in to worse caching — but caching is not broken by default.
+const unpatchedClock = (realDateNow: () => number): Clock.Clock => {
+  const bigint1e6 = BigInt(1_000_000);
+  const unsafeCurrentTimeMillis = () => realDateNow();
+  const unsafeCurrentTimeNanos = () => BigInt(realDateNow()) * bigint1e6;
+  const defaultClock = Clock.make();
+  return {
+    ...defaultClock,
+    unsafeCurrentTimeMillis,
+    unsafeCurrentTimeNanos,
+    currentTimeMillis: Effect.sync(unsafeCurrentTimeMillis),
+    currentTimeNanos: Effect.sync(unsafeCurrentTimeNanos),
+  };
+};
+
+const withStubbedDateNow = async <T>(
+  queryHandler: (clock: Clock.Clock) => Promise<T>,
+): Promise<T> => {
+  const realDateNow = Date.now;
+  const clock = unpatchedClock(realDateNow);
+  Date.now = () => 0;
+  try {
+    return await queryHandler(clock);
+  } finally {
+    Date.now = realDateNow;
+  }
+};
+
 const queryFunction = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Args,
@@ -157,35 +194,38 @@ const queryFunction = <
     >,
     actualArgs: ConvexArgs,
   ): Promise<ConvexReturns> =>
-    pipe(
-      actualArgs,
-      Schema.decode(args),
-      Effect.orDie,
-      Effect.andThen((decodedArgs) =>
-        pipe(
-          handler(decodedArgs),
-          Effect.provide(
-            Layer.mergeAll(
-              DatabaseReader.layer(databaseSchema, ctx.db),
-              Auth.layer(ctx.auth),
-              StorageReader.layer(ctx.storage),
-              QueryRunner.layer(ctx.runQuery),
-              Layer.succeed(
-                QueryCtx.QueryCtx<
-                  DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
-                >(),
-                ctx,
+    withStubbedDateNow((clock) =>
+      pipe(
+        actualArgs,
+        Schema.decode(args),
+        Effect.orDie,
+        Effect.andThen((decodedArgs) =>
+          pipe(
+            handler(decodedArgs),
+            Effect.provide(
+              Layer.mergeAll(
+                DatabaseReader.layer(databaseSchema, ctx.db),
+                Auth.layer(ctx.auth),
+                StorageReader.layer(ctx.storage),
+                QueryRunner.layer(ctx.runQuery),
+                Layer.succeed(
+                  QueryCtx.QueryCtx<
+                    DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+                  >(),
+                  ctx,
+                ),
+                Layer.setConfigProvider(ConvexConfigProvider.make()),
               ),
-              Layer.setConfigProvider(ConvexConfigProvider.make()),
             ),
           ),
         ),
+        Effect.andThen((convexReturns) =>
+          Schema.encodeUnknown(returns)(convexReturns),
+        ),
+        Effect.withClock(clock),
+        (effect) => catchTypedError(effect, error),
+        Effect.runPromise,
       ),
-      Effect.andThen((convexReturns) =>
-        Schema.encodeUnknown(returns)(convexReturns),
-      ),
-      (effect) => catchTypedError(effect, error),
-      Effect.runPromise,
     ),
 });
 

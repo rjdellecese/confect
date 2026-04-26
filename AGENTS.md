@@ -1,27 +1,30 @@
 # AGENTS.md
 
-<!-- opensrc:start -->
-
 ## Source Code Reference
 
-Source code for dependencies is available in `opensrc/` for deeper understanding of implementation details.
+Source code for dependencies is cached at `~/.opensrc/` for deeper understanding of implementation details.
 
-See `opensrc/sources.json` for the list of available packages and their versions.
+See `~/.opensrc/sources.json` for the list of cached packages and their versions.
 
 Use this source code when you need to understand how a package works internally, not just its types/interface.
 
-### Fetching Additional Source Code
+### Reading Source Code
 
-To fetch source code for a package or repository you need to understand, run:
+Use `pnpm opensrc path` inside other commands to search, read, or explore a package's source. It fetches source code on cache miss and prints the cached absolute path to stdout.
 
 ```bash
-npx opensrc <package>           # npm package (e.g., npx opensrc zod)
-npx opensrc pypi:<package>      # Python package (e.g., npx opensrc pypi:requests)
-npx opensrc crates:<package>    # Rust crate (e.g., npx opensrc crates:serde)
-npx opensrc <owner>/<repo>      # GitHub repo (e.g., npx opensrc vercel/ai)
+rg "pattern" $(pnpm opensrc path <package>)
+cat $(pnpm opensrc path <package>)/path/to/file
+find $(pnpm opensrc path <package>) -name "*.ts"
 ```
 
-<!-- opensrc:end -->
+Works with any registry:
+
+```bash
+rg "pattern" $(pnpm opensrc path pypi:<package>)
+rg "pattern" $(pnpm opensrc path crates:<package>)
+rg "pattern" $(pnpm opensrc path <owner>/<repo>)
+```
 
 ## Cursor Cloud specific instructions
 

@@ -26,7 +26,7 @@ jobs:
         run: echo "pnpm_version=$(node -p 'require(`./package.json`).engines.pnpm')" >> $GITHUB_OUTPUT
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v5
+        uses: pnpm/action-setup@v6
         with:
           version: ${{ steps.pnpm-version.outputs.pnpm_version }}
 

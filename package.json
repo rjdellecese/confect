@@ -58,7 +58,7 @@
     "effect": "3.19.19",
     "eslint": "10.0.2",
     "eslint-plugin-mdx": "3.7.0",
-    "opensrc": "^0.6.0",
+    "opensrc": "^0.7.2",
     "prettier": "3.8.1",
     "tsdown": "0.20.3",
     "typescript": "5.9.3",
