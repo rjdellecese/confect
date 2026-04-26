@@ -1,5 +1,5 @@
 ---
-"@confect/server": patch
+"@confect/server": major
 ---
 
-Fix Confect-wrapped Convex queries so internal Effect runtime calls to `Date.now()` no longer invalidate Convex's reactive query cache. Query handlers now stub `Date.now()` by default while preserving real-time access through Effect's `Clock` service for callers that intentionally opt in.
+Fixed an issue where the cached value for any Confect query would be regularly busted by a hidden Effect dependency on `Date.now()`. This has been solved by stubbing `Date.now()` to always return the Unix epoch (`0`). If you previously relied on `Date.now()` in your queries, (1) try to rewrite them to avoid it (see [Convex best practices](https://docs.convex.dev/understanding/best-practices/#date-in-queries) on using dates in queries), or (2) use Effect's `Clock` service, which will still return an unstubbed timestamp.
