@@ -78,21 +78,23 @@ type DetectCycle<T, Cache extends any[] = []> =
   IsAny<T> extends true
     ? false
     : [T] extends [any]
-      ? T extends Cache[number]
-        ? true
-        : T extends Array<infer U>
-          ? DetectCycle<U, [...Cache, T]>
-          : T extends Map<infer _U, infer V>
-            ? DetectCycle<V, [...Cache, T]>
-            : T extends Set<infer U>
-              ? DetectCycle<U, [...Cache, T]>
-              : T extends object
-                ? true extends {
-                    [K in keyof T]: DetectCycle<T[K], [...Cache, T]>;
-                  }[keyof T]
-                  ? true
+      ? T extends Brand.Brand<any> | GenericId<any>
+        ? false
+        : T extends Cache[number]
+          ? true
+          : T extends Array<infer U>
+            ? DetectCycle<U, [...Cache, T]>
+            : T extends Map<infer _U, infer V>
+              ? DetectCycle<V, [...Cache, T]>
+              : T extends Set<infer U>
+                ? DetectCycle<U, [...Cache, T]>
+                : T extends object
+                  ? true extends {
+                      [K in keyof T]: DetectCycle<T[K], [...Cache, T]>;
+                    }[keyof T]
+                    ? true
+                    : false
                   : false
-                : false
       : never;
 
 //////////////////////////////////

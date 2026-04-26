@@ -1,6 +1,7 @@
 import type { Brand } from "effect";
 import type { ReadonlyRecord } from "effect/Record";
 import { describe, expectTypeOf, test } from "vitest";
+import type { GenericId } from "../src/GenericId";
 
 import type {
   DeepMutable,
@@ -440,6 +441,15 @@ describe("IsRecursive", () => {
 
     test("primitive", () => {
       expectTypeOf<IsRecursive<number>>().toEqualTypeOf<false>();
+    });
+
+    test("branded string", () => {
+      type BrandedString = string & Brand.Brand<"BrandedString">;
+      expectTypeOf<IsRecursive<BrandedString>>().toEqualTypeOf<false>();
+    });
+
+    test("GenericId", () => {
+      expectTypeOf<IsRecursive<GenericId<"users">>>().toEqualTypeOf<false>();
     });
 
     test("empty object", () => {
