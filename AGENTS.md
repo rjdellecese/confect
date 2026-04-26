@@ -1,7 +1,5 @@
 # AGENTS.md
 
-<!-- opensrc:start -->
-
 ## Source Code Reference
 
 Source code for dependencies is cached at `~/.opensrc/` for deeper understanding of implementation details.
@@ -27,8 +25,6 @@ rg "pattern" $(pnpm opensrc path pypi:<package>)
 rg "pattern" $(pnpm opensrc path crates:<package>)
 rg "pattern" $(pnpm opensrc path <owner>/<repo>)
 ```
-
-<!-- opensrc:end -->
 
 ## Cursor Cloud specific instructions
 
