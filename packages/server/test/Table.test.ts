@@ -112,4 +112,26 @@ describe("Table", () => {
       confectOrganizationsTableDefinition,
     );
   });
+
+  it("supports indexes on name fields when the schema includes optional bytes", () => {
+    const confectImagesTableDefinition = Table.make(
+      "images",
+      Schema.Struct({
+        name: Schema.String,
+        bytes: Schema.optional(Schema.instanceOf(ArrayBuffer)),
+      }),
+    ).index("by_name", ["name"]).tableDefinition;
+
+    const convexImagesTableDefinition = defineTable({
+      name: v.string(),
+      bytes: v.optional(v.bytes()),
+    }).index("by_name", ["name"]);
+
+    expectTypeOf(confectImagesTableDefinition).toEqualTypeOf(
+      convexImagesTableDefinition,
+    );
+    expect(convexImagesTableDefinition).toStrictEqual(
+      confectImagesTableDefinition,
+    );
+  });
 });

@@ -145,6 +145,10 @@ describe("DeepMutable", () => {
 
     expectTypeOf<Actual>().toEqualTypeOf<Expected>();
   });
+
+  test("ArrayBuffer", () => {
+    expectTypeOf<DeepMutable<ArrayBuffer>>().toEqualTypeOf<ArrayBuffer>();
+  });
 });
 
 describe("IsValueLiteral", () => {
@@ -441,6 +445,10 @@ describe("IsRecursive", () => {
 
     test("primitive", () => {
       expectTypeOf<IsRecursive<number>>().toEqualTypeOf<false>();
+    });
+
+    test("ArrayBuffer", () => {
+      expectTypeOf<IsRecursive<ArrayBuffer>>().toEqualTypeOf<false>();
     });
 
     test("branded string", () => {

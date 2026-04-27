@@ -58,7 +58,7 @@ export type IsRecord<T> = [T] extends [never]
 export type DeepMutable<T> =
   IsAny<T> extends true
     ? any
-    : T extends Brand.Brand<any> | GenericId<any>
+    : T extends NonRecursiveLeaf
       ? T
       : T extends ReadonlyMap<infer K, infer V>
         ? Map<DeepMutable<K>, DeepMutable<V>>
@@ -74,11 +74,13 @@ export type TypeDefect<Message extends string, T = never> = [Message, T];
 
 export type IsRecursive<T> = true extends DetectCycle<T> ? true : false;
 
+type NonRecursiveLeaf = Brand.Brand<any> | GenericId<any> | ArrayBuffer;
+
 type DetectCycle<T, Cache extends any[] = []> =
   IsAny<T> extends true
     ? false
     : [T] extends [any]
-      ? T extends Brand.Brand<any> | GenericId<any>
+      ? T extends NonRecursiveLeaf
         ? false
         : T extends Cache[number]
           ? true
