@@ -2,6 +2,7 @@ import type {
   ExpressionOrValue,
   FilterBuilder,
   OrderedQuery as ConvexOrderedQuery,
+  PaginationOptions,
   PaginationResult,
 } from "convex/server";
 import { Chunk, Effect, identity, type Option, pipe, Stream } from "effect";
@@ -31,10 +32,7 @@ export type OrderedQuery<
     Document.DocumentDecodeError
   >;
   readonly paginate: (
-    options: {
-      cursor: string | null;
-      numItems: number;
-    },
+    options: PaginationOptions,
     filter?: (
       q: FilterBuilder<TableInfo.ConvexTableInfo<TableInfo_>>,
     ) => ExpressionOrValue<boolean>,
