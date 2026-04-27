@@ -1,5 +1,6 @@
 import { Ref } from "@confect/core";
 import type { CronJob as ConvexCronJob } from "convex/server";
+import type { Value } from "convex/values";
 import { cronJobs as makeConvexCrons, type Crons } from "convex/server";
 import {
   Array,
@@ -44,7 +45,7 @@ const Proto = {
           cronJob.identifier,
           cronToConvexCronString(cron),
           functionReference,
-          encodedArgs,
+          encodedArgs as Ref.EncodedArgs<typeof cronJob.ref> & Value,
         );
       }),
       Match.when(Duration.isDuration, (duration) => {
@@ -52,7 +53,7 @@ const Proto = {
           cronJob.identifier,
           durationToConvexIntervalSchedule(duration),
           functionReference,
-          encodedArgs,
+          encodedArgs as Ref.EncodedArgs<typeof cronJob.ref> & Value,
         );
       }),
       Match.exhaustive,

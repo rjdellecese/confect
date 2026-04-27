@@ -16,7 +16,11 @@ const make = (scheduler: ConvexScheduler) => ({
     );
 
     return Effect.promise(() =>
-      scheduler.runAfter(delayMs, functionReference, encodedArgs),
+      scheduler.runAfter(
+        delayMs,
+        functionReference,
+        encodedArgs as Ref.EncodedArgs<Ref_>,
+      ),
     );
   },
   runAt: <Ref_ extends Ref.AnyMutation | Ref.AnyAction>(
@@ -32,7 +36,11 @@ const make = (scheduler: ConvexScheduler) => ({
     );
 
     return Effect.promise(() =>
-      scheduler.runAt(timestamp, functionReference, encodedArgs),
+      scheduler.runAt(
+        timestamp,
+        functionReference,
+        encodedArgs as Ref.EncodedArgs<Ref_>,
+      ),
     );
   },
 });

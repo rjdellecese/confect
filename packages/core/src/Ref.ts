@@ -122,6 +122,18 @@ export type Args<Ref_> =
     ? Args_
     : never;
 
+type NeverToFallback<T, Fallback> = [T] extends [never]
+  ? [Fallback] extends [never]
+    ? any
+    : Fallback
+  : T;
+
+export type EncodedArgs<Ref_> = Ref_ extends {
+  readonly functionSpec: infer FunctionSpec_ extends FunctionSpec.AnyWithProps;
+}
+  ? NeverToFallback<FunctionSpec.EncodedArgs<FunctionSpec_>, Args<Ref_>>
+  : never;
+
 export type OptionalArgs<Ref_ extends Any> = keyof Args<Ref_> extends never
   ? [args?: Args<Ref_>]
   : [args: Args<Ref_>];
@@ -136,9 +148,17 @@ export type Returns<Ref_> =
     ? Returns_
     : never;
 
+export type EncodedReturns<Ref_> = Ref_ extends {
+  readonly functionSpec: infer FunctionSpec_ extends FunctionSpec.AnyWithProps;
+}
+  ? NeverToFallback<FunctionSpec.EncodedReturns<FunctionSpec_>, Returns<Ref_>>
+  : never;
+
 export type FunctionReference<Ref_ extends Any> = ConvexFunctionReference<
   GetFunctionType<Ref_>,
-  GetFunctionVisibility<Ref_>
+  GetFunctionVisibility<Ref_>,
+  EncodedArgs<Ref_>,
+  EncodedReturns<Ref_>
 >;
 
 export type FromFunctionSpec<FunctionSpec_ extends FunctionSpec.AnyWithProps> =
@@ -197,6 +217,18 @@ export const encodeArgsSync = <Ref_ extends Any>(
     Match.exhaustive,
   );
 
+export const encodePaginatedArgsSync = <Ref_ extends Any>(
+  ref: Ref_,
+  args: Omit<Args<Ref_>, "paginationOpts">,
+): unknown =>
+  Match.value(ref.functionSpec.functionProvenance).pipe(
+    Match.tag("Confect", (c) =>
+      Schema.encodeSync(c.args.pipe(Schema.omit("paginationOpts")))(args),
+    ),
+    Match.tag("Convex", () => args),
+    Match.exhaustive,
+  );
+
 export const decodeReturnsSync = <Ref_ extends Any>(
   ref: Ref_,
   encodedReturns: unknown,
@@ -206,6 +238,25 @@ export const decodeReturnsSync = <Ref_ extends Any>(
     Match.tag("Convex", () => encodedReturns),
     Match.exhaustive,
   ) as Returns<Ref_>;
+
+export const decodePageItemSync = <Ref_ extends Any>(
+  ref: Ref_,
+  encodedItem: unknown,
+): Returns<Ref_> extends { readonly page: ReadonlyArray<infer Item> }
+  ? Item
+  : never =>
+  Match.value(ref.functionSpec.functionProvenance).pipe(
+    Match.tag("Confect", (c) => {
+      const decoded = Schema.decodeSync(c.returns.pipe(Schema.pick("page")))({
+        page: [encodedItem],
+      });
+      return decoded.page[0];
+    }),
+    Match.tag("Convex", () => encodedItem),
+    Match.exhaustive,
+  ) as Returns<Ref_> extends { readonly page: ReadonlyArray<infer Item> }
+    ? Item
+    : never;
 
 export const runWithCodec: {
   <Ref_ extends Any, E>(

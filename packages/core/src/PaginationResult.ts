@@ -1,5 +1,16 @@
 import { Schema } from "effect";
 
+export const PaginationOptions = Schema.Struct({
+  numItems: Schema.Number,
+  cursor: Schema.NullOr(Schema.String),
+  endCursor: Schema.optionalWith(Schema.NullOr(Schema.String), {
+    exact: true,
+  }),
+  id: Schema.optionalWith(Schema.Number, { exact: true }),
+  maximumRowsRead: Schema.optionalWith(Schema.Number, { exact: true }),
+  maximumBytesRead: Schema.optionalWith(Schema.Number, { exact: true }),
+});
+
 export const PaginationResult = <Doc extends Schema.Schema.AnyNoContext>(
   Doc: Doc,
 ) =>

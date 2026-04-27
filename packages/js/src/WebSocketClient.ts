@@ -49,7 +49,11 @@ const make = (
         const args = (rest[0] ?? {}) as Ref.Args<Query>;
         return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
           Effect.tryPromise({
-            try: () => convexClient.query(functionReference, encodedArgs),
+            try: () =>
+              convexClient.query(
+                functionReference,
+                encodedArgs as Ref.EncodedArgs<Query>,
+              ),
             catch: (cause) => new WebSocketClientError({ cause }),
           }),
         );
@@ -65,7 +69,11 @@ const make = (
         const args = (rest[0] ?? {}) as Ref.Args<Mutation>;
         return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
           Effect.tryPromise({
-            try: () => convexClient.mutation(functionReference, encodedArgs),
+            try: () =>
+              convexClient.mutation(
+                functionReference,
+                encodedArgs as Ref.EncodedArgs<Mutation>,
+              ),
             catch: (cause) => new WebSocketClientError({ cause }),
           }),
         );
@@ -81,7 +89,11 @@ const make = (
         const args = (rest[0] ?? {}) as Ref.Args<Action>;
         return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
           Effect.tryPromise({
-            try: () => convexClient.action(functionReference, encodedArgs),
+            try: () =>
+              convexClient.action(
+                functionReference,
+                encodedArgs as Ref.EncodedArgs<Action>,
+              ),
             catch: (cause) => new WebSocketClientError({ cause }),
           }),
         );
@@ -105,7 +117,7 @@ const make = (
               Effect.gen(function* () {
                 const unsubscribe = convexClient.onUpdate(
                   functionReference,
-                  encodedArgs,
+                  encodedArgs as Ref.EncodedArgs<Query>,
                   (result) => {
                     emit.single(result);
                   },

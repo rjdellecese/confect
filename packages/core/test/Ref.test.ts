@@ -88,7 +88,12 @@ describe("FunctionReference", () => {
     expectTypeOf<Ref.Args<Ref_>>().toEqualTypeOf<{ readonly id: string }>();
     expectTypeOf<Ref.Returns<Ref_>>().toEqualTypeOf<readonly number[]>();
     expectTypeOf<Ref.FunctionReference<Ref_>>().toEqualTypeOf<
-      FunctionReference<"query", "public">
+      FunctionReference<
+        "query",
+        "public",
+        { readonly id: string },
+        readonly number[]
+      >
     >();
   });
 

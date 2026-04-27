@@ -12,7 +12,7 @@ const make =
       query,
       (args[0] ?? {}) as Ref.Args<Query>,
       (functionReference, encodedArgs) =>
-        runQuery(functionReference, encodedArgs),
+        runQuery(functionReference, encodedArgs as Ref.EncodedArgs<Query>),
     );
 
 export const QueryRunner = Context.GenericTag<ReturnType<typeof make>>(

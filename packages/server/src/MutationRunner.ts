@@ -12,7 +12,10 @@ const make =
       mutation,
       (args[0] ?? {}) as Ref.Args<Mutation>,
       (functionReference, encodedArgs) =>
-        runMutation(functionReference, encodedArgs),
+        runMutation(
+          functionReference,
+          encodedArgs as Ref.EncodedArgs<Mutation>,
+        ),
     );
 
 export const MutationRunner = Context.GenericTag<ReturnType<typeof make>>(

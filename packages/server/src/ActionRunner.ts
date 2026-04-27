@@ -12,7 +12,7 @@ const make =
       action,
       (args[0] ?? {}) as Ref.Args<Action>,
       (functionReference, encodedArgs) =>
-        runAction(functionReference, encodedArgs),
+        runAction(functionReference, encodedArgs as Ref.EncodedArgs<Action>),
     );
 
 export const ActionRunner = Context.GenericTag<ReturnType<typeof make>>(

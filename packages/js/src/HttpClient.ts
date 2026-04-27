@@ -1,5 +1,7 @@
 import * as Ref from "@confect/core/Ref";
 import { ConvexHttpClient } from "convex/browser";
+import type { FunctionReference } from "convex/server";
+import type { Value } from "convex/values";
 import type { ParseResult } from "effect";
 import { Context, Effect, Layer, Schema } from "effect";
 
@@ -37,7 +39,11 @@ const make = (
     const args = (rest[0] ?? {}) as Ref.Args<Query>;
     return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
       Effect.tryPromise({
-        try: () => client.query(functionReference, encodedArgs),
+        try: () =>
+          client.query(
+            functionReference,
+            encodedArgs as Ref.EncodedArgs<Query>,
+          ),
         catch: (cause) => new HttpClientError({ cause }),
       }),
     );
@@ -53,7 +59,16 @@ const make = (
     const args = (rest[0] ?? {}) as Ref.Args<Mutation>;
     return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
       Effect.tryPromise({
-        try: () => client.mutation(functionReference, encodedArgs),
+        try: () =>
+          client.mutation(
+            functionReference as FunctionReference<
+              "mutation",
+              "public",
+              any,
+              unknown
+            >,
+            encodedArgs as Ref.EncodedArgs<Mutation> & Value,
+          ),
         catch: (cause) => new HttpClientError({ cause }),
       }),
     );
@@ -69,7 +84,16 @@ const make = (
     const args = (rest[0] ?? {}) as Ref.Args<Action>;
     return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
       Effect.tryPromise({
-        try: () => client.action(functionReference, encodedArgs),
+        try: () =>
+          client.action(
+            functionReference as FunctionReference<
+              "action",
+              "public",
+              any,
+              unknown
+            >,
+            encodedArgs as Ref.EncodedArgs<Action> & Value,
+          ),
         catch: (cause) => new HttpClientError({ cause }),
       }),
     );
