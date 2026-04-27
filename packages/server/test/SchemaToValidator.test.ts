@@ -1370,7 +1370,7 @@ describe(compileTableSchema, () => {
     expect(compiledValidator).toStrictEqual(expectedValidator);
   });
 
-  test("succeeds if provided Schema has a name field and optional id", () => {
+  test("succeeds if provided Schema has a name field and optional ID", () => {
     const compiledValidator = compileTableSchema(
       Schema.Struct({
         name: Schema.String,

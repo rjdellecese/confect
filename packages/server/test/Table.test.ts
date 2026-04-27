@@ -85,7 +85,7 @@ describe("Table", () => {
     );
   });
 
-  it("supports indexes on name fields when the schema includes an optional id", () => {
+  it("supports indexes on name fields when the schema includes an optional ID", () => {
     const confectOrganizationsTableDefinition = Table.make(
       "organizations",
       Schema.Struct({
