@@ -3,6 +3,7 @@ export * as FunctionSpec from "./FunctionSpec";
 export * as GenericId from "./GenericId";
 export * as GroupPath from "./GroupPath";
 export * as GroupSpec from "./GroupSpec";
+export * as PaginationOptions from "./PaginationOptions";
 export * as PaginationResult from "./PaginationResult";
 export * as Ref from "./Ref";
 export * as Refs from "./Refs";
