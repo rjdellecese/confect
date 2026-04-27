@@ -1,5 +1,22 @@
 # @confect/server
 
+## 6.0.0
+
+### Major Changes
+
+- 228589b: Fixed an issue where the cached value for any Confect query would be regularly busted by a hidden Effect dependency on `Date.now()`. This has been solved by stubbing `Date.now()` to always return the Unix epoch (`0`). If you previously relied on `Date.now()` in your queries, (1) try to rewrite them to avoid it (see [Convex best practices](https://docs.convex.dev/understanding/best-practices/#date-in-queries) on using dates in queries), or (2) use Effect's `Clock` service, which will still return an unstubbed timestamp.
+
+### Minor Changes
+
+- df95ce7: Add `Ref.OptionalArgs` type utility to `@confect/core` for conditionally optional function args. `QueryRunner`, `MutationRunner`, and `ActionRunner` now accept optional args for no-arg Confect functions. `useQuery`, `useMutation`, and `useAction` now accept optional args for no-arg Confect functions. `TestConfect` `query`/`mutation`/`action` helpers now accept optional args for no-arg Confect functions.
+
+### Patch Changes
+
+- a8083e8: Fix table field path inference when a schema has a `name` field and an optional Convex ID or bytes field.
+- Updated dependencies [df95ce7]
+- Updated dependencies [a8083e8]
+  - @confect/core@6.0.0
+
 ## 5.0.0
 
 ### Minor Changes

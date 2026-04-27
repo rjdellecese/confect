@@ -1,5 +1,15 @@
 # @confect/core
 
+## 6.0.0
+
+### Minor Changes
+
+- df95ce7: Add `Ref.OptionalArgs` type utility to `@confect/core` for conditionally optional function args. `QueryRunner`, `MutationRunner`, and `ActionRunner` now accept optional args for no-arg Confect functions. `useQuery`, `useMutation`, and `useAction` now accept optional args for no-arg Confect functions. `TestConfect` `query`/`mutation`/`action` helpers now accept optional args for no-arg Confect functions.
+
+### Patch Changes
+
+- a8083e8: Fix table field path inference when a schema has a `name` field and an optional Convex ID or bytes field.
+
 ## 5.0.0
 
 ## 4.0.0

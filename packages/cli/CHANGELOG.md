@@ -1,5 +1,15 @@
 # @confect/cli
 
+## 6.0.0
+
+### Patch Changes
+
+- Updated dependencies [df95ce7]
+- Updated dependencies [a8083e8]
+- Updated dependencies [228589b]
+  - @confect/core@6.0.0
+  - @confect/server@6.0.0
+
 ## 5.0.0
 
 ### Patch Changes

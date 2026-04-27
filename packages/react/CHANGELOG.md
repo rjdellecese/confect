@@ -1,5 +1,17 @@
 # @confect/react
 
+## 6.0.0
+
+### Minor Changes
+
+- df95ce7: Add `Ref.OptionalArgs` type utility to `@confect/core` for conditionally optional function args. `QueryRunner`, `MutationRunner`, and `ActionRunner` now accept optional args for no-arg Confect functions. `useQuery`, `useMutation`, and `useAction` now accept optional args for no-arg Confect functions. `TestConfect` `query`/`mutation`/`action` helpers now accept optional args for no-arg Confect functions.
+
+### Patch Changes
+
+- Updated dependencies [df95ce7]
+- Updated dependencies [a8083e8]
+  - @confect/core@6.0.0
+
 ## 5.0.0
 
 ### Minor Changes
