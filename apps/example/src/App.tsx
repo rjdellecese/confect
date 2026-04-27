@@ -1,4 +1,9 @@
-import { useAction, useMutation, useQuery } from "@confect/react";
+import {
+  useAction,
+  useMutation,
+  usePaginatedQuery,
+  useQuery,
+} from "@confect/react";
 import type { WorkId } from "@convex-dev/workpool";
 import { FetchHttpClient, HttpApiClient } from "@effect/platform";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
@@ -97,6 +102,7 @@ const Page = () => {
       </button>
 
       <NoteList />
+      <PaginatedNoteList />
       <HttpEndpoints />
     </div>
   );
@@ -203,6 +209,39 @@ const NoteList = () => {
         </li>
       ))}
     </ul>
+  );
+};
+
+const PaginatedNoteList = () => {
+  const { results, status, isLoading, loadMore } = usePaginatedQuery(
+    refs.public.notesAndRandom.notes.paginate,
+    {},
+    { initialNumItems: 3 },
+  );
+
+  return (
+    <div>
+      <h2>Paginated notes</h2>
+      {results.length === 0 && isLoading ? (
+        <p>Loading…</p>
+      ) : (
+        <ol>
+          {results.map((note) => (
+            <li key={note._id}>{note.text}</li>
+          ))}
+        </ol>
+      )}
+      <p>
+        Status: <code>{status}</code>
+      </p>
+      <button
+        type="button"
+        onClick={() => loadMore(3)}
+        disabled={status !== "CanLoadMore"}
+      >
+        Load more
+      </button>
+    </div>
   );
 };
 

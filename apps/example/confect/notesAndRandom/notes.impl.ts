@@ -26,6 +26,21 @@ const list = FunctionImpl.make(api, "notesAndRandom.notes", "list", () =>
   }).pipe(Effect.orDie),
 );
 
+const paginate = FunctionImpl.make(
+  api,
+  "notesAndRandom.notes",
+  "paginate",
+  ({ paginationOpts }) =>
+    Effect.gen(function* () {
+      const reader = yield* DatabaseReader;
+
+      return yield* reader
+        .table("notes")
+        .index("by_creation_time", "desc")
+        .paginate(paginationOpts);
+    }).pipe(Effect.orDie),
+);
+
 const delete_ = FunctionImpl.make(
   api,
   "notesAndRandom.notes",
@@ -102,6 +117,7 @@ const insertDefault = FunctionImpl.make(
 export const notes = GroupImpl.make(api, "notesAndRandom.notes").pipe(
   Layer.provide(insert),
   Layer.provide(list),
+  Layer.provide(paginate),
   Layer.provide(delete_),
   Layer.provide(getFirst),
   Layer.provide(internalGetFirst),

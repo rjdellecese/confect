@@ -1,4 +1,10 @@
-import { FunctionSpec, GenericId, GroupSpec } from "@confect/core";
+import {
+  FunctionSpec,
+  GenericId,
+  GroupSpec,
+  PaginationOptions,
+  PaginationResult,
+} from "@confect/core";
 import { Schema } from "effect";
 import { Notes } from "../tables/Notes";
 
@@ -15,6 +21,15 @@ export const notes = GroupSpec.make("notes")
       name: "list",
       args: Schema.Struct({}),
       returns: Schema.Array(Notes.Doc),
+    }),
+  )
+  .addFunction(
+    FunctionSpec.publicQuery({
+      name: "paginate",
+      args: Schema.Struct({
+        paginationOpts: PaginationOptions.PaginationOptions,
+      }),
+      returns: PaginationResult.PaginationResult(Notes.Doc),
     }),
   )
   .addFunction(

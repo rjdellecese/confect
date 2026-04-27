@@ -168,6 +168,110 @@ const RandomNumber = () => {
 };
 ```
 
+## `usePaginatedQuery`
+
+Loads a [paginated query](/server/database/reading#paginate) reactively, concatenating pages into a growing list. Mirrors Convex's [`usePaginatedQuery`](https://docs.convex.dev/api/modules/react#usepaginatedquery), but encodes args and decodes page items through the spec's Effect Schemas.
+
+The query spec must:
+
+- Be a public query.
+- Accept a `paginationOpts` arg whose schema is `PaginationOptions.PaginationOptions` from `@confect/core`.
+- Return a `PaginationResult.PaginationResult(Doc)` from `@confect/core`.
+
+Given this spec:
+
+```ts confect/notes.spec.ts
+import {
+  FunctionSpec,
+  GroupSpec,
+  PaginationOptions,
+  PaginationResult,
+} from "@confect/core";
+import { Schema } from "effect";
+
+import { Notes } from "./tables/Notes";
+
+export const notes = GroupSpec.make("notes").addFunction(
+  FunctionSpec.publicQuery({
+    name: "paginate",
+    args: Schema.Struct({
+      paginationOpts: PaginationOptions.PaginationOptions,
+    }),
+    returns: PaginationResult.PaginationResult(Notes.Doc),
+  }),
+);
+```
+
+And this implementation:
+
+```ts confect/notes.impl.ts
+import { FunctionImpl } from "@confect/server";
+import { Effect } from "effect";
+
+import api from "./_generated/api";
+import { DatabaseReader } from "./_generated/services";
+
+export const paginate = FunctionImpl.make(
+  api,
+  "notes",
+  "paginate",
+  ({ paginationOpts }) =>
+    Effect.gen(function* () {
+      const reader = yield* DatabaseReader;
+
+      return yield* reader
+        .table("notes")
+        .index("by_creation_time", "desc")
+        .paginate(paginationOpts);
+    }).pipe(Effect.orDie),
+);
+```
+
+The hook accepts the rest of the args (`{}` in this example — the `paginationOpts` field is injected automatically) and an `initialNumItems` option, and returns `results: Notes.Doc["Type"][]`:
+
+```tsx
+import { usePaginatedQuery } from "@confect/react";
+import refs from "../confect/_generated/refs";
+
+const PaginatedNotes = () => {
+  const { results, status, isLoading, loadMore } = usePaginatedQuery(
+    refs.public.notes.paginate,
+    {},
+    { initialNumItems: 10 },
+  );
+
+  return (
+    <div>
+      <ul>
+        {results.map((note) => (
+          <li key={note._id}>{note.text}</li>
+        ))}
+      </ul>
+      <button
+        onClick={() => loadMore(10)}
+        disabled={status !== "CanLoadMore"}
+      >
+        {isLoading ? "Loading…" : "Load more"}
+      </button>
+    </div>
+  );
+};
+```
+
+`status` is `"LoadingFirstPage"`, `"CanLoadMore"`, `"LoadingMore"`, or `"Exhausted"` — same as Convex's hook.
+
+### Skipping paginated queries
+
+Pass `"skip"` instead of args to disable the subscription. While skipped, `results` is empty and `status` stays at `"LoadingFirstPage"`.
+
+```tsx
+const { results, status } = usePaginatedQuery(
+  refs.public.notes.paginate,
+  enabled ? {} : "skip",
+  { initialNumItems: 10 },
+);
+```
+
 ## Differences from vanilla Convex hooks
 
 | Vanilla Convex | Confect |
