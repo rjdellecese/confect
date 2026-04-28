@@ -10,7 +10,7 @@ import {
   mutationGeneric,
   queryGeneric,
 } from "convex/server";
-import { ConvexError } from "convex/values";
+import type { Value } from "convex/values";
 import { Clock, Effect, Layer, Match, pipe, Schema } from "effect";
 import type * as Api from "./Api";
 import * as Auth from "./Auth";
@@ -50,7 +50,8 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
           );
 
           return genericFunction(
-            queryFunction(api.databaseSchema, {
+            queryFunction({
+              databaseSchema: api.databaseSchema,
               args: functionProvenance.args,
               returns: functionProvenance.returns,
               error: functionProvenance.error,
@@ -66,7 +67,8 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
           );
 
           return genericFunction(
-            mutationFunction(api.databaseSchema, {
+            mutationFunction({
+              databaseSchema: api.databaseSchema,
               args: functionProvenance.args,
               returns: functionProvenance.returns,
               error: functionProvenance.error,
@@ -95,26 +97,6 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
     }),
     Match.exhaustive,
   );
-
-const catchTypedError = <A, E, R>(
-  effect: Effect.Effect<A, E, R>,
-  errorSchema: Schema.Schema.AnyNoContext | undefined,
-): Effect.Effect<A, never, R> => {
-  if (errorSchema === undefined) {
-    return effect as Effect.Effect<A, never, R>;
-  }
-  return effect.pipe(
-    Effect.catchAll((typedError) =>
-      pipe(
-        Schema.encode(errorSchema)(typedError),
-        Effect.orDie,
-        Effect.andThen((encodedError) =>
-          Effect.die(new ConvexError(encodedError)),
-        ),
-      ),
-    ),
-  );
-};
 
 // Convex's query cache is invalidated by any Date.now() call during handler
 // execution. Effect's unsafeFork calls Date.now() when constructing a
@@ -160,32 +142,31 @@ const queryFunction = <
   Returns,
   ConvexReturns,
   E,
->(
-  databaseSchema: DatabaseSchema_,
-  {
-    args,
-    returns,
-    error,
-    handler,
-  }: {
-    args: Schema.Schema<Args, ConvexArgs>;
-    returns: Schema.Schema<Returns, ConvexReturns>;
-    error: Schema.Schema.AnyNoContext | undefined;
-    handler: (
-      a: Args,
-    ) => Effect.Effect<
-      Returns,
-      E,
-      | DatabaseReader.DatabaseReader<DatabaseSchema_>
-      | Auth.Auth
-      | StorageReader
-      | QueryRunner.QueryRunner
-      | QueryCtx.QueryCtx<
-          DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
-        >
-    >;
-  },
-) => ({
+>({
+  databaseSchema,
+  args,
+  returns,
+  error,
+  handler,
+}: {
+  databaseSchema: DatabaseSchema_;
+  args: Schema.Schema<Args, ConvexArgs>;
+  returns: Schema.Schema<Returns, ConvexReturns>;
+  error: Schema.Schema<Error, Value> | undefined;
+  handler: (
+    a: Args,
+  ) => Effect.Effect<
+    Returns,
+    E,
+    | DatabaseReader.DatabaseReader<DatabaseSchema_>
+    | Auth.Auth
+    | StorageReader
+    | QueryRunner.QueryRunner
+    | QueryCtx.QueryCtx<
+        DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+      >
+  >;
+}) => ({
   args: SchemaToValidator.compileArgsSchema(args),
   returns: SchemaToValidator.compileReturnsSchema(returns),
   handler: (
@@ -195,36 +176,37 @@ const queryFunction = <
     actualArgs: ConvexArgs,
   ): Promise<ConvexReturns> =>
     withStubbedDateNow((clock) =>
-      pipe(
-        actualArgs,
-        Schema.decode(args),
-        Effect.orDie,
-        Effect.andThen((decodedArgs) =>
-          pipe(
-            handler(decodedArgs),
-            Effect.provide(
-              Layer.mergeAll(
-                DatabaseReader.layer(databaseSchema, ctx.db),
-                Auth.layer(ctx.auth),
-                StorageReader.layer(ctx.storage),
-                QueryRunner.layer(ctx.runQuery),
-                Layer.succeed(
-                  QueryCtx.QueryCtx<
-                    DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
-                  >(),
-                  ctx,
-                ),
-                Layer.setConfigProvider(ConvexConfigProvider.make()),
+      Effect.gen(function* () {
+        const decodedArgs = yield* pipe(
+          actualArgs,
+          Schema.decode(args),
+          Effect.orDie,
+        );
+        const decodedReturns = yield* handler(decodedArgs).pipe(
+          Effect.provide(
+            Layer.mergeAll(
+              DatabaseReader.layer(databaseSchema, ctx.db),
+              Auth.layer(ctx.auth),
+              StorageReader.layer(ctx.storage),
+              QueryRunner.layer(ctx.runQuery),
+              Layer.succeed(
+                QueryCtx.QueryCtx<
+                  DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+                >(),
+                ctx,
               ),
+              Layer.setConfigProvider(ConvexConfigProvider.make()),
             ),
           ),
-        ),
-        Effect.andThen((convexReturns) =>
-          Schema.encodeUnknown(returns)(convexReturns),
-        ),
+        );
+        return yield* pipe(
+          decodedReturns,
+          Schema.encode(returns),
+          Effect.orDie,
+        );
+      }).pipe(
         Effect.withClock(clock),
-        (effect) => catchTypedError(effect, error),
-        Effect.runPromise,
+        RegisteredFunction.runHandlerPromise(error),
       ),
     ),
 });
@@ -263,45 +245,46 @@ export type MutationServices<Schema extends DatabaseSchema.AnyWithProps> =
   | MutationCtx.MutationCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>;
 
 const mutationFunction = <
-  Schema extends DatabaseSchema.AnyWithProps,
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Args,
   ConvexArgs extends DefaultFunctionArgs,
   Returns,
   ConvexReturns,
   E,
->(
-  schema: Schema,
-  {
-    args,
-    returns,
-    error,
-    handler,
-  }: {
-    args: Schema.Schema<Args, ConvexArgs>;
-    returns: Schema.Schema<Returns, ConvexReturns>;
-    error: Schema.Schema.AnyNoContext | undefined;
-    handler: (a: Args) => Effect.Effect<Returns, E, MutationServices<Schema>>;
-  },
-) => ({
+>({
+  databaseSchema,
+  args,
+  returns,
+  error,
+  handler,
+}: {
+  databaseSchema: DatabaseSchema_;
+  args: Schema.Schema<Args, ConvexArgs>;
+  returns: Schema.Schema<Returns, ConvexReturns>;
+  error: Schema.Schema<Error, Value> | undefined;
+  handler: (
+    a: Args,
+  ) => Effect.Effect<Returns, E, MutationServices<DatabaseSchema_>>;
+}) => ({
   args: SchemaToValidator.compileArgsSchema(args),
   returns: SchemaToValidator.compileReturnsSchema(returns),
   handler: (
-    ctx: GenericMutationCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
+    ctx: GenericMutationCtx<
+      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+    >,
     actualArgs: ConvexArgs,
   ): Promise<ConvexReturns> =>
-    pipe(
-      actualArgs,
-      Schema.decode(args),
-      Effect.orDie,
-      Effect.andThen((decodedArgs) =>
-        handler(decodedArgs).pipe(Effect.provide(mutationLayer(schema, ctx))),
-      ),
-      Effect.andThen((convexReturns) =>
-        Schema.encodeUnknown(returns)(convexReturns),
-      ),
-      (effect) => catchTypedError(effect, error),
-      Effect.runPromise,
-    ),
+    Effect.gen(function* () {
+      const decodedArgs = yield* pipe(
+        actualArgs,
+        Schema.decode(args),
+        Effect.orDie,
+      );
+      const decodedReturns = yield* handler(decodedArgs).pipe(
+        Effect.provide(mutationLayer(databaseSchema, ctx)),
+      );
+      return yield* pipe(decodedReturns, Schema.encode(returns), Effect.orDie);
+    }).pipe(RegisteredFunction.runHandlerPromise(error)),
 });
 
 const convexActionFunction = <

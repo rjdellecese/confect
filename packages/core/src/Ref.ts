@@ -4,7 +4,7 @@ import type {
 } from "convex/server";
 import { makeFunctionReference } from "convex/server";
 import type { Value } from "convex/values";
-import { ConvexError } from "convex/values";
+import { ConvexError, jsonToConvex } from "convex/values";
 import type { ParseResult } from "effect";
 import { Effect, Match, Schema } from "effect";
 import type * as FunctionSpec from "./FunctionSpec";
@@ -243,15 +243,29 @@ export const decodeReturnsSync = <Ref_ extends Any>(
     Match.exhaustive,
   ) as Returns<Ref_>;
 
+const ConvexErrorIdentifier = Symbol.for("ConvexError");
+
 export const isConvexError = (error: unknown): error is ConvexError<Value> =>
-  error instanceof ConvexError;
+  error instanceof ConvexError ||
+  (typeof error === "object" &&
+    error !== null &&
+    ConvexErrorIdentifier in error);
+
+// `serializeConvexErrorData` (in convex's registration_impl) JSON-stringifies
+// the data field of any thrown ConvexError when it crosses a function
+// boundary. In production, the syscall layer reverses this via `jsonToConvex`
+// before the caller sees the error; in convex-test, no such reversal happens
+// because its `runQuery`/`runMutation`/`runAction` overrides bypass the
+// syscall path. Normalize here so error decoding works in either environment.
+const normalizeConvexErrorData = (data: unknown): unknown =>
+  typeof data === "string" ? jsonToConvex(JSON.parse(data)) : data;
 
 export const catchConvexError = <Ref_ extends Any>(
   ref: Ref_,
   error: unknown,
 ): Error<Ref_> => {
   if (isConvexError(error)) {
-    return decodeErrorSync(ref, error.data);
+    return decodeErrorSync(ref, normalizeConvexErrorData(error.data));
   }
   throw error;
 };
@@ -292,7 +306,9 @@ export const maybeDecodeErrorSync = <Ref_ extends Any>(
     ? Match.value(ref.functionSpec.functionProvenance).pipe(
         Match.tag("Confect", (confectFunctionProvenance) =>
           confectFunctionProvenance.error !== undefined
-            ? Schema.decodeSync(confectFunctionProvenance.error)(error.data)
+            ? Schema.decodeSync(confectFunctionProvenance.error)(
+                normalizeConvexErrorData(error.data),
+              )
             : error,
         ),
         Match.tag("Convex", () => error),
