@@ -1,7 +1,7 @@
 import * as Ref from "@confect/core/Ref";
 import { type GenericActionCtx } from "convex/server";
-import type { ParseResult } from "effect";
-import { Context, Effect, Layer } from "effect";
+import type { ParseResult, Effect } from "effect";
+import { Context, Layer } from "effect";
 
 const make =
   (runAction: GenericActionCtx<any>["runAction"]) =>
@@ -16,10 +16,7 @@ const make =
       action,
       (args[0] ?? {}) as Ref.Args<Action>,
       (functionReference, encodedArgs) =>
-        Effect.tryPromise({
-          try: () => runAction(functionReference, encodedArgs),
-          catch: (error) => Ref.catchConvexError(action, error),
-        }),
+        runAction(functionReference, encodedArgs),
     );
 
 export const ActionRunner = Context.GenericTag<ReturnType<typeof make>>(

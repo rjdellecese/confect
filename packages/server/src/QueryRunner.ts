@@ -1,7 +1,7 @@
 import * as Ref from "@confect/core/Ref";
 import { type GenericQueryCtx } from "convex/server";
-import type { ParseResult } from "effect";
-import { Context, Effect, Layer } from "effect";
+import type { ParseResult, Effect } from "effect";
+import { Context, Layer } from "effect";
 
 const make =
   (runQuery: GenericQueryCtx<any>["runQuery"]) =>
@@ -16,10 +16,7 @@ const make =
       query,
       (args[0] ?? {}) as Ref.Args<Query>,
       (functionReference, encodedArgs) =>
-        Effect.tryPromise({
-          try: () => runQuery(functionReference, encodedArgs),
-          catch: (error) => Ref.catchConvexError(query, error),
-        }),
+        runQuery(functionReference, encodedArgs),
     );
 
 export const QueryRunner = Context.GenericTag<ReturnType<typeof make>>(

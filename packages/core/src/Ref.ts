@@ -6,7 +6,7 @@ import { makeFunctionReference } from "convex/server";
 import type { Value } from "convex/values";
 import { ConvexError, jsonToConvex } from "convex/values";
 import type { ParseResult } from "effect";
-import { Effect, Match, Schema } from "effect";
+import { Cause, Effect, Match, Option, Schema } from "effect";
 import type * as FunctionSpec from "./FunctionSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
@@ -260,43 +260,97 @@ export const isConvexError = (error: unknown): error is ConvexError<Value> =>
 const normalizeConvexErrorData = (data: unknown): unknown =>
   typeof data === "string" ? jsonToConvex(JSON.parse(data)) : data;
 
-export const catchConvexError = <Ref_ extends Any>(
+/**
+ * Build a callback-style handler that decodes the ref's typed error from a
+ * caught `ConvexError`, or else forwards the value to `mapUnknownError`. The
+ * fallback is also invoked when the input *is* a `ConvexError` but the ref
+ * doesn't declare a typed-error schema — by definition such a value falls
+ * outside the ref's error contract. Useful when adapting non-Effect APIs (e.g.
+ * emitter callbacks for streamed subscriptions) to the same error semantics
+ * that `runWithCodec` provides.
+ */
+export const decodeErrorOrElse =
+  <Ref_ extends Any, E>(ref: Ref_, mapUnknownError: (error: unknown) => E) =>
+  (error: unknown): Error<Ref_> | E => {
+    if (isConvexError(error)) {
+      const decoded = decodeErrorSync(
+        ref,
+        normalizeConvexErrorData(error.data),
+      );
+      if (Option.isSome(decoded)) {
+        return decoded.value;
+      }
+    }
+    return mapUnknownError(error);
+  };
+
+/**
+ * Translate a caught error into an Effect `Cause`. A `ConvexError` carrying
+ * the ref's typed error data becomes `Cause.fail(typedError)`; anything else —
+ * non-`ConvexError` values, *and* `ConvexError`s thrown by refs that don't
+ * declare a typed-error schema — becomes `Cause.die(error)`, since by
+ * definition those fall outside the ref's error contract. Useful when bridging
+ * caught errors into APIs that consume `Cause` directly (e.g.
+ * `@effect-atom/atom`'s `Result.failure`).
+ */
+export const causeOfCaughtError = <Ref_ extends Any>(
   ref: Ref_,
   error: unknown,
-): Error<Ref_> => {
+): Cause.Cause<Error<Ref_>> => {
   if (isConvexError(error)) {
-    return decodeErrorSync(ref, normalizeConvexErrorData(error.data));
+    const decoded = decodeErrorSync(ref, normalizeConvexErrorData(error.data));
+    if (Option.isSome(decoded)) {
+      return Cause.fail(decoded.value);
+    }
   }
-  throw error;
+  return Cause.die(error);
 };
 
+/**
+ * Decode `encodedError` against the ref's error schema. Returns `None` if the
+ * ref doesn't declare a typed error (Confect ref without an `error` schema, or
+ * a Convex-provenance ref) — by definition there's nothing to decode the value
+ * into, and the caller is responsible for deciding what to do (typically:
+ * surface the original value as a defect).
+ */
 export const decodeError = <Ref_ extends Any>(
   ref: Ref_,
   encodedError: unknown,
-): Effect.Effect<Error<Ref_>, ParseResult.ParseError> =>
+): Effect.Effect<Option.Option<Error<Ref_>>, ParseResult.ParseError> =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag("Confect", (confectFunctionProvenance) =>
       confectFunctionProvenance.error !== undefined
-        ? Schema.decode(confectFunctionProvenance.error)(encodedError)
-        : Effect.succeed(encodedError),
+        ? Effect.map(
+            Schema.decode(confectFunctionProvenance.error)(encodedError),
+            Option.some,
+          )
+        : Effect.succeed(Option.none<Error<Ref_>>()),
     ),
-    Match.tag("Convex", () => Effect.succeed(encodedError)),
+    Match.tag("Convex", () => Effect.succeed(Option.none<Error<Ref_>>())),
     Match.exhaustive,
   );
 
+/**
+ * Synchronous counterpart to `decodeError`. Throws on schema-decode failure;
+ * returns `None` when the ref doesn't declare a typed error.
+ */
 export const decodeErrorSync = <Ref_ extends Any>(
   ref: Ref_,
   encodedError: unknown,
-): Error<Ref_> =>
+): Option.Option<Error<Ref_>> =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag("Confect", (confectFunctionProvenance) =>
       confectFunctionProvenance.error !== undefined
-        ? Schema.decodeSync(confectFunctionProvenance.error)(encodedError)
-        : encodedError,
+        ? Option.some(
+            Schema.decodeSync(confectFunctionProvenance.error)(
+              encodedError,
+            ) as Error<Ref_>,
+          )
+        : Option.none<Error<Ref_>>(),
     ),
-    Match.tag("Convex", () => encodedError),
+    Match.tag("Convex", () => Option.none<Error<Ref_>>()),
     Match.exhaustive,
-  ) as Error<Ref_>;
+  );
 
 export const maybeDecodeErrorSync = <Ref_ extends Any>(
   ref: Ref_,
@@ -316,51 +370,65 @@ export const maybeDecodeErrorSync = <Ref_ extends Any>(
       )
     : error;
 
-export const runWithCodec: {
-  <Ref_ extends Any, E>(
-    ref: Ref_,
-    args: Args<Ref_>,
-    f: (
-      functionReference: FunctionReference<Ref_>,
-      encodedArgs: unknown,
-    ) => Effect.Effect<unknown, E>,
-  ): Effect.Effect<Returns<Ref_>, E | ParseResult.ParseError>;
-  <Ref_ extends Any>(
-    ref: Ref_,
-    args: Args<Ref_>,
-    f: (
-      functionReference: FunctionReference<Ref_>,
-      encodedArgs: unknown,
-    ) => PromiseLike<unknown>,
-  ): Effect.Effect<Returns<Ref_>, ParseResult.ParseError>;
-} = <Ref_ extends Any, E>(
+/**
+ * Encode args via the ref's args schema, invoke `call`, decode returns via the
+ * ref's returns schema, and translate any thrown `ConvexError` into the ref's
+ * typed error. Anything else the Promise rejects with — network failures,
+ * server-side runtime errors, validation failures, etc. — is passed to
+ * `mapUnknownError` to be turned into a typed `E`, or surfaced as a defect
+ * when no handler is provided.
+ *
+ * Centralizing this here means every caller (server runners, JS clients,
+ * `@confect/test`) gets the same `ConvexError` decoding for free, including
+ * `normalizeConvexErrorData`'s workaround for `convex-test`'s missing syscall
+ * reversal.
+ */
+export const runWithCodec = <Ref_ extends Any, E = never>(
   ref: Ref_,
   args: Args<Ref_>,
-  f: (
+  call: (
     functionReference: FunctionReference<Ref_>,
     encodedArgs: unknown,
-  ) => Effect.Effect<unknown, E> | PromiseLike<unknown>,
-): Effect.Effect<Returns<Ref_>, E | ParseResult.ParseError> =>
+  ) => PromiseLike<unknown>,
+  mapUnknownError?: (error: unknown) => E,
+): Effect.Effect<Returns<Ref_>, E | Error<Ref_> | ParseResult.ParseError> =>
   Effect.gen(function* () {
     const functionReference = getFunctionReference(ref);
     const functionProvenance = ref.functionSpec.functionProvenance;
-    const call = (encodedArgs: unknown) => {
-      const result = f(functionReference, encodedArgs);
-      return Effect.isEffect(result) ? result : Effect.promise(() => result);
-    };
+    const invoke = (
+      encodedArgs: unknown,
+    ): Effect.Effect<unknown, Error<Ref_> | E> =>
+      Effect.tryPromise({
+        try: () => Promise.resolve(call(functionReference, encodedArgs)),
+        catch: (error): Error<Ref_> | E => {
+          if (isConvexError(error)) {
+            const decoded = decodeErrorSync(
+              ref,
+              normalizeConvexErrorData(error.data),
+            );
+            if (Option.isSome(decoded)) {
+              return decoded.value;
+            }
+          }
+          if (mapUnknownError !== undefined) {
+            return mapUnknownError(error);
+          }
+          throw error;
+        },
+      });
     return yield* Match.value(functionProvenance).pipe(
       Match.tag("Confect", (confectFunctionProvenance) =>
         Effect.gen(function* () {
           const encodedArgs = yield* Schema.encode(
             confectFunctionProvenance.args,
           )(args);
-          const encodedReturns = yield* call(encodedArgs);
+          const encodedReturns = yield* invoke(encodedArgs);
           return yield* Schema.decode(confectFunctionProvenance.returns)(
             encodedReturns,
           );
         }),
       ),
-      Match.tag("Convex", () => call(args)),
+      Match.tag("Convex", () => invoke(args)),
       Match.exhaustive,
     );
   });

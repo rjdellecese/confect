@@ -38,8 +38,7 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
       Ref.decodeReturnsSync(ref, encodedReturnsOrUndefined),
     );
   } catch (error) {
-    const decoded = Ref.maybeDecodeErrorSync(ref, error);
-    return Result_.fail(decoded as Ref.Error<Query>);
+    return Result_.failure(Ref.causeOfCaughtError(ref, error));
   }
 };
 

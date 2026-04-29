@@ -1,6 +1,6 @@
 import type { FunctionReference, FunctionVisibility } from "convex/server";
 import { ConvexError } from "convex/values";
-import { Effect, Schema } from "effect";
+import { Effect, Option, Schema } from "effect";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
 import * as FunctionSpec from "../src/FunctionSpec";
@@ -280,7 +280,23 @@ describe("decodeError", () => {
     const result = await Effect.runPromise(
       Ref.decodeError(ref, { _tag: "NotFound", id: "abc" }),
     );
-    expect(result).toBeInstanceOf(NotFound);
-    expect((result as NotFound).id).toBe("abc");
+    expect(Option.isSome(result)).toBe(true);
+    const decoded = Option.getOrThrow(result);
+    expect(decoded).toBeInstanceOf(NotFound);
+    expect(decoded.id).toBe("abc");
+  });
+
+  test("returns None when the ref has no error schema", async () => {
+    const spec = FunctionSpec.publicMutation({
+      name: "create",
+      args: Schema.Struct({}),
+      returns: Schema.Void,
+    });
+    const ref = Ref.make("test/mod", spec);
+
+    const result = await Effect.runPromise(
+      Ref.decodeError(ref, { anything: "goes" }),
+    );
+    expect(Option.isNone(result)).toBe(true);
   });
 });

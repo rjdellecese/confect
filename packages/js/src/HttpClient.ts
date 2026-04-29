@@ -27,13 +27,7 @@ const make = (
     client.clearAuth();
   });
 
-  const catchError = <R extends Ref.Any>(
-    ref: R,
-    error: unknown,
-  ): Ref.Error<R> | HttpClientError =>
-    Ref.isConvexError(error)
-      ? Ref.decodeErrorSync(ref, error.data)
-      : new HttpClientError({ cause: error });
+  const mapUnknownError = (cause: unknown) => new HttpClientError({ cause });
 
   const query = <Query extends Ref.AnyPublicQuery>(
     ref: Query,
@@ -43,11 +37,12 @@ const make = (
     Ref.Error<Query> | HttpClientError | ParseResult.ParseError
   > => {
     const args = (rest[0] ?? {}) as Ref.Args<Query>;
-    return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
-      Effect.tryPromise({
-        try: () => client.query(functionReference, encodedArgs),
-        catch: (error) => catchError(ref, error),
-      }),
+    return Ref.runWithCodec(
+      ref,
+      args,
+      (functionReference, encodedArgs) =>
+        client.query(functionReference, encodedArgs),
+      mapUnknownError,
     );
   };
 
@@ -59,11 +54,12 @@ const make = (
     Ref.Error<Mutation> | HttpClientError | ParseResult.ParseError
   > => {
     const args = (rest[0] ?? {}) as Ref.Args<Mutation>;
-    return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
-      Effect.tryPromise({
-        try: () => client.mutation(functionReference, encodedArgs),
-        catch: (error) => catchError(ref, error),
-      }),
+    return Ref.runWithCodec(
+      ref,
+      args,
+      (functionReference, encodedArgs) =>
+        client.mutation(functionReference, encodedArgs),
+      mapUnknownError,
     );
   };
 
@@ -75,11 +71,12 @@ const make = (
     Ref.Error<Action> | HttpClientError | ParseResult.ParseError
   > => {
     const args = (rest[0] ?? {}) as Ref.Args<Action>;
-    return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
-      Effect.tryPromise({
-        try: () => client.action(functionReference, encodedArgs),
-        catch: (error) => catchError(ref, error),
-      }),
+    return Ref.runWithCodec(
+      ref,
+      args,
+      (functionReference, encodedArgs) =>
+        client.action(functionReference, encodedArgs),
+      mapUnknownError,
     );
   };
 
