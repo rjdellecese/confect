@@ -34,6 +34,7 @@
     "format": "pnpm -r format",
     "test:core": "vitest run --project @confect/core",
     "test:js": "vitest run --project @confect/js",
+    "test:react": "vitest run --project @confect/react",
     "test:server": "vitest run --project @confect/server",
     "test:cli": "vitest run --project @confect/cli",
     "release": "pnpm build && changeset publish",
