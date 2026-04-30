@@ -1,6 +1,6 @@
 import type { FunctionReference, FunctionVisibility } from "convex/server";
 import { ConvexError } from "convex/values";
-import { Effect, Option, Schema } from "effect";
+import { Cause, Effect, MutableRef, Option, Schema } from "effect";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
 import * as FunctionSpec from "../src/FunctionSpec";
@@ -298,5 +298,112 @@ describe("decodeError", () => {
       Ref.decodeError(ref, { anything: "goes" }),
     );
     expect(Option.isNone(result)).toBe(true);
+  });
+});
+
+describe("decodeErrorOrElse", () => {
+  class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+    id: Schema.String,
+  }) {}
+
+  const refWithSchema = Ref.make(
+    "test/mod",
+    FunctionSpec.publicMutation({
+      name: "update",
+      args: Schema.Struct({}),
+      returns: Schema.Void,
+      error: NotFound,
+    }),
+  );
+
+  const refWithoutSchema = Ref.make(
+    "test/mod",
+    FunctionSpec.publicMutation({
+      name: "create",
+      args: Schema.Struct({}),
+      returns: Schema.Void,
+    }),
+  );
+
+  test("decodes a ConvexError into the typed error when the schema matches", () => {
+    const handler = Ref.decodeErrorOrElse(refWithSchema, () => "FALLBACK");
+    const decoded = handler(new ConvexError({ _tag: "NotFound", id: "abc" }));
+    expect(decoded).toBeInstanceOf(NotFound);
+    expect((decoded as NotFound).id).toBe("abc");
+  });
+
+  test("calls the fallback for a non-ConvexError input", () => {
+    const handler = Ref.decodeErrorOrElse(
+      refWithSchema,
+      (e) => `wrapped:${String(e)}`,
+    );
+    const original = new Error("network down");
+    expect(handler(original)).toBe(`wrapped:${String(original)}`);
+  });
+
+  test("calls the fallback with the original ConvexError when the ref has no error schema", () => {
+    const calls = MutableRef.make<ReadonlyArray<unknown>>([]);
+    const fallback = (error: unknown) => {
+      MutableRef.update(calls, (prev) => [...prev, error]);
+      return error;
+    };
+    const handler = Ref.decodeErrorOrElse(refWithoutSchema, fallback);
+    const convexError = new ConvexError({ _tag: "Anything", id: "abc" });
+
+    expect(handler(convexError)).toBe(convexError);
+    expect(MutableRef.get(calls)).toEqual([convexError]);
+  });
+});
+
+describe("causeOfCaughtError", () => {
+  class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+    id: Schema.String,
+  }) {}
+
+  const refWithSchema = Ref.make(
+    "test/mod",
+    FunctionSpec.publicMutation({
+      name: "update",
+      args: Schema.Struct({}),
+      returns: Schema.Void,
+      error: NotFound,
+    }),
+  );
+
+  const refWithoutSchema = Ref.make(
+    "test/mod",
+    FunctionSpec.publicMutation({
+      name: "create",
+      args: Schema.Struct({}),
+      returns: Schema.Void,
+    }),
+  );
+
+  test("Cause.fail with the decoded typed error for a matching ConvexError", () => {
+    const cause = Ref.causeOfCaughtError(
+      refWithSchema,
+      new ConvexError({ _tag: "NotFound", id: "abc" }),
+    );
+
+    const failure = Option.getOrThrow(Cause.failureOption(cause));
+    expect(failure).toBeInstanceOf(NotFound);
+    expect((failure as NotFound).id).toBe("abc");
+    expect(Option.isNone(Cause.dieOption(cause))).toBe(true);
+  });
+
+  test("Cause.die with the original error for a non-ConvexError", () => {
+    const original = new Error("network down");
+    const cause = Ref.causeOfCaughtError(refWithSchema, original);
+
+    expect(Option.isNone(Cause.failureOption(cause))).toBe(true);
+    expect(Option.getOrThrow(Cause.dieOption(cause))).toBe(original);
+  });
+
+  test("Cause.die with the original ConvexError when the ref has no error schema", () => {
+    const original = new ConvexError({ _tag: "Anything", id: "abc" });
+    const cause = Ref.causeOfCaughtError(refWithoutSchema, original);
+
+    expect(Option.isNone(Cause.failureOption(cause))).toBe(true);
+    expect(Option.getOrThrow(Cause.dieOption(cause))).toBe(original);
   });
 });
