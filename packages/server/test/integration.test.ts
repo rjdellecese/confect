@@ -5,6 +5,7 @@ import { Array, Effect, Either } from "effect";
 import refs from "./confect/_generated/refs";
 import { DatabaseWriter } from "./confect/_generated/services";
 import { Forbidden, NotFound } from "./confect/groups/typedErrors.spec";
+import { NodeNotFound } from "./confect/node/typedErrorsNode.spec";
 import type { Notes } from "./confect/tables/Notes";
 import * as TestConfect from "./TestConfect";
 
@@ -498,6 +499,44 @@ describe("typed errors", () => {
 
           const notes = yield* c.query(refs.public.databaseReader.listNotes);
           assertEquals(notes.length, 0);
+        }).pipe(Effect.provide(TestConfect.layer())),
+    );
+  });
+
+  describe("internal visibility", () => {
+    it.effect(
+      "QueryRunner decodes a typed error from an internal query into the typed E channel",
+      () =>
+        Effect.gen(function* () {
+          const c = yield* TestConfect.TestConfect;
+          const missingId = yield* insertAndDeleteNote;
+
+          const result = yield* c.action(
+            refs.public.groups.typedErrors.tryInternalGetNote,
+            { noteId: missingId },
+          );
+
+          expect(result).toStrictEqual({ _tag: "NotFound", id: missingId });
+        }).pipe(Effect.provide(TestConfect.layer())),
+    );
+  });
+
+  describe("node action", () => {
+    it.effect(
+      "typed error from a publicNodeAction surfaces as the typed error",
+      () =>
+        Effect.gen(function* () {
+          const c = yield* TestConfect.TestConfect;
+
+          const result = yield* Effect.either(
+            c.action(refs.public.node.typedErrorsNode.failingNodeAction, {
+              id: "abc",
+            }),
+          );
+
+          const error = expectFailure(result);
+          expect(error).toBeInstanceOf(NodeNotFound);
+          expect((error as NodeNotFound).id).toBe("abc");
         }).pipe(Effect.provide(TestConfect.layer())),
     );
   });

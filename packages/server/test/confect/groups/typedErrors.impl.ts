@@ -157,6 +157,43 @@ const tryFailingAction = FunctionImpl.make(
     ),
 );
 
+const internalGetNoteOrFail = FunctionImpl.make(
+  api,
+  "groups.typedErrors",
+  "internalGetNoteOrFail",
+  ({ noteId }) =>
+    Effect.gen(function* () {
+      const reader = yield* DatabaseReader;
+
+      return yield* reader
+        .table("notes")
+        .get(noteId)
+        .pipe(Effect.mapError(() => new NotFound({ id: noteId })));
+    }),
+);
+
+const tryInternalGetNote = FunctionImpl.make(
+  api,
+  "groups.typedErrors",
+  "tryInternalGetNote",
+  ({ noteId }) =>
+    Effect.gen(function* () {
+      const runQuery = yield* QueryRunner;
+
+      const note = yield* runQuery(
+        refs.internal.groups.typedErrors.internalGetNoteOrFail,
+        { noteId },
+      );
+
+      return { _tag: "Ok" as const, text: note.text };
+    }).pipe(
+      Effect.catchTag("NotFound", (notFound) =>
+        Effect.succeed({ _tag: "NotFound" as const, id: notFound.id }),
+      ),
+      Effect.orDie,
+    ),
+);
+
 export const typedErrors = GroupImpl.make(api, "groups.typedErrors").pipe(
   Layer.provide(getNoteOrFail),
   Layer.provide(deleteNoteOrFail),
@@ -165,4 +202,6 @@ export const typedErrors = GroupImpl.make(api, "groups.typedErrors").pipe(
   Layer.provide(tryGetNote),
   Layer.provide(tryDeleteNote),
   Layer.provide(tryFailingAction),
+  Layer.provide(internalGetNoteOrFail),
+  Layer.provide(tryInternalGetNote),
 );

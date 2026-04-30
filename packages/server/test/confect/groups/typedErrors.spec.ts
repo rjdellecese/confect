@@ -91,4 +91,19 @@ export const typedErrors = GroupSpec.make("typedErrors")
       }),
       returns: TryFailingActionResult,
     }),
+  )
+  .addFunction(
+    FunctionSpec.internalQuery({
+      name: "internalGetNoteOrFail",
+      args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
+      returns: Notes.Doc,
+      error: NotFound,
+    }),
+  )
+  .addFunction(
+    FunctionSpec.publicAction({
+      name: "tryInternalGetNote",
+      args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
+      returns: TryGetResult,
+    }),
   );
