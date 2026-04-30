@@ -11,6 +11,26 @@ import type { Value } from "convex/values";
 import type { ParseResult } from "effect";
 import { Context, Effect, Layer, Schema } from "effect";
 
+/**
+ * Bridge from `runWithCodec`'s erased `(unknown, unknown) => Promise<unknown>`
+ * world to `convex-test`'s precisely-typed `t.query`/`t.mutation`/`t.action`
+ * signatures (which use a conditional `OptionalRestArgs` rest parameter that
+ * doesn't accept opaque inputs at the type level). The runtime contract is
+ * already satisfied by the schema encoding upstream, so the cast is safe.
+ */
+const invokeTestConvex = (
+  testConvex: { query: any; mutation: any; action: any },
+  kind: "query" | "mutation" | "action",
+  functionReference: unknown,
+  encodedArgs: unknown,
+): Promise<unknown> =>
+  (
+    testConvex[kind] as (
+      functionReference: unknown,
+      args: unknown,
+    ) => Promise<unknown>
+  )(functionReference, encodedArgs);
+
 export type TestConfectWithoutIdentity<
   ConfectSchema extends DatabaseSchema.AnyWithProps,
 > = {
@@ -94,12 +114,12 @@ class TestConfectImplWithoutIdentity<
       queryRef,
       (args[0] ?? {}) as Ref.Args<QueryRef>,
       (functionReference, encodedArgs) =>
-        (
-          this.testConvex.query as (
-            functionReference: unknown,
-            args: unknown,
-          ) => Promise<unknown>
-        )(functionReference, encodedArgs),
+        invokeTestConvex(
+          this.testConvex,
+          "query",
+          functionReference,
+          encodedArgs,
+        ),
     );
 
   readonly mutation = <MutationRef extends Ref.AnyMutation>(
@@ -113,12 +133,12 @@ class TestConfectImplWithoutIdentity<
       mutationRef,
       (args[0] ?? {}) as Ref.Args<MutationRef>,
       (functionReference, encodedArgs) =>
-        (
-          this.testConvex.mutation as (
-            functionReference: unknown,
-            args: unknown,
-          ) => Promise<unknown>
-        )(functionReference, encodedArgs),
+        invokeTestConvex(
+          this.testConvex,
+          "mutation",
+          functionReference,
+          encodedArgs,
+        ),
     );
 
   readonly action = <ActionRef extends Ref.AnyAction>(
@@ -132,12 +152,12 @@ class TestConfectImplWithoutIdentity<
       actionRef,
       (args[0] ?? {}) as Ref.Args<ActionRef>,
       (functionReference, encodedArgs) =>
-        (
-          this.testConvex.action as (
-            functionReference: unknown,
-            args: unknown,
-          ) => Promise<unknown>
-        )(functionReference, encodedArgs),
+        invokeTestConvex(
+          this.testConvex,
+          "action",
+          functionReference,
+          encodedArgs,
+        ),
     );
 
   readonly run: TestConfectWithoutIdentity<ConfectSchema>["run"] = (<
