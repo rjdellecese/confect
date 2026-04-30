@@ -94,7 +94,12 @@ class TestConfectImplWithoutIdentity<
       queryRef,
       (args[0] ?? {}) as Ref.Args<QueryRef>,
       (functionReference, encodedArgs) =>
-        this.testConvex.query(functionReference, encodedArgs),
+        (
+          this.testConvex.query as (
+            functionReference: unknown,
+            args: unknown,
+          ) => Promise<unknown>
+        )(functionReference, encodedArgs),
     );
 
   readonly mutation = <MutationRef extends Ref.AnyMutation>(
@@ -108,7 +113,12 @@ class TestConfectImplWithoutIdentity<
       mutationRef,
       (args[0] ?? {}) as Ref.Args<MutationRef>,
       (functionReference, encodedArgs) =>
-        this.testConvex.mutation(functionReference, encodedArgs),
+        (
+          this.testConvex.mutation as (
+            functionReference: unknown,
+            args: unknown,
+          ) => Promise<unknown>
+        )(functionReference, encodedArgs),
     );
 
   readonly action = <ActionRef extends Ref.AnyAction>(
@@ -122,7 +132,12 @@ class TestConfectImplWithoutIdentity<
       actionRef,
       (args[0] ?? {}) as Ref.Args<ActionRef>,
       (functionReference, encodedArgs) =>
-        this.testConvex.action(functionReference, encodedArgs),
+        (
+          this.testConvex.action as (
+            functionReference: unknown,
+            args: unknown,
+          ) => Promise<unknown>
+        )(functionReference, encodedArgs),
     );
 
   readonly run: TestConfectWithoutIdentity<ConfectSchema>["run"] = (<

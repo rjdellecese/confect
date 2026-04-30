@@ -419,8 +419,8 @@ importers:
         specifier: 3.2.4
         version: 3.2.4(vitest@3.2.4(@types/debug@4.1.12)(@types/node@25.3.3)(jiti@2.5.1)(tsx@4.21.0)(yaml@2.6.0))
       convex-test:
-        specifier: 0.0.41
-        version: 0.0.41(convex@1.33.1(react@19.2.4))
+        specifier: 0.0.50
+        version: 0.0.50(convex@1.33.1(react@19.2.4))
       dotenv:
         specifier: 17.3.1
         version: 17.3.1
@@ -467,8 +467,8 @@ importers:
         specifier: 1.33.1
         version: 1.33.1(react@19.2.4)
       convex-test:
-        specifier: ^0.0.38
-        version: 0.0.38(convex@1.33.1(react@19.2.4))
+        specifier: ^0.0.50
+        version: 0.0.50(convex@1.33.1(react@19.2.4))
     devDependencies:
       '@eslint/js':
         specifier: 10.0.1
@@ -3305,13 +3305,8 @@ packages:
       zod:
         optional: true
 
-  convex-test@0.0.38:
-    resolution: {integrity: sha512-1o/3GvUR9gMLjiqq7SxchI/0OYQaWwbQC4INmB1SNt1WLBjUgEM8+brgpqrZwJ+Vb1DdGZokCVeihwT5IPk49w==}
-    peerDependencies:
-      convex: 1.33.1
-
-  convex-test@0.0.41:
-    resolution: {integrity: sha512-GPHeYFOi70n7UtW0eCEQFVhzl/+m8PvbWkDCbKpHLybI1MrScf4sVpGeM0cC2qmtxiduxa2nLPbehPalhh9oyQ==}
+  convex-test@0.0.50:
+    resolution: {integrity: sha512-rMNfrgcKJGToYDqNns2n1AO9KUP1NyC/AF9ldYEuWwTfRbgC9RQiHjlZsZQ/sOjLIVPUyKKIjoI/fNJUzy1urw==}
     peerDependencies:
       convex: 1.33.1
 
@@ -9781,11 +9776,7 @@ snapshots:
       react: 19.2.4
       typescript: 5.9.3
 
-  convex-test@0.0.38(convex@1.33.1(react@19.2.4)):
-    dependencies:
-      convex: 1.33.1(react@19.2.4)
-
-  convex-test@0.0.41(convex@1.33.1(react@19.2.4)):
+  convex-test@0.0.50(convex@1.33.1(react@19.2.4)):
     dependencies:
       convex: 1.33.1(react@19.2.4)
 
