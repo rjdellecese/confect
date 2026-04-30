@@ -2,6 +2,7 @@ import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Effect, Layer } from "effect";
 import api from "../_generated/api";
 import { DatabaseReader, DatabaseWriter } from "../_generated/services";
+import { NoteNotFound } from "./notes.spec";
 
 const insert = FunctionImpl.make(
   api,
@@ -50,6 +51,21 @@ const getFirst = FunctionImpl.make(
 
       return yield* reader.table("notes").index("by_creation_time").first();
     }).pipe(Effect.orDie),
+);
+
+const getOrFail = FunctionImpl.make(
+  api,
+  "notesAndRandom.notes",
+  "getOrFail",
+  ({ noteId }) =>
+    Effect.gen(function* () {
+      const reader = yield* DatabaseReader;
+
+      return yield* reader
+        .table("notes")
+        .get(noteId)
+        .pipe(Effect.mapError(() => new NoteNotFound({ noteId })));
+    }),
 );
 
 const internalGetFirst = FunctionImpl.make(
@@ -104,6 +120,7 @@ export const notes = GroupImpl.make(api, "notesAndRandom.notes").pipe(
   Layer.provide(list),
   Layer.provide(delete_),
   Layer.provide(getFirst),
+  Layer.provide(getOrFail),
   Layer.provide(internalGetFirst),
   Layer.provide(clearAll),
   Layer.provide(insertDefault),

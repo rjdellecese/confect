@@ -2,8 +2,10 @@ import { Result, useAction, useMutation, useQuery } from "@confect/react";
 import type { WorkId } from "@convex-dev/workpool";
 import { FetchHttpClient, HttpApiClient } from "@effect/platform";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
+import type { GenericId } from "convex/values";
 import { Array, Effect, Exit } from "effect";
 import { useEffect, useState } from "react";
+import { NoteNotFound } from "../confect/notesAndRandom/notes.spec";
 import refs from "../confect/_generated/refs";
 import { Api } from "../confect/http/path-prefix";
 
@@ -101,7 +103,51 @@ const Page = () => {
       </button>
 
       <NoteList />
+      <NoteLookup />
       <HttpEndpoints />
+    </div>
+  );
+};
+
+const NoteLookup = () => {
+  const [input, setInput] = useState("");
+  const [noteId, setNoteId] = useState<GenericId<"notes"> | undefined>();
+
+  const lookup = useQuery(
+    refs.public.notesAndRandom.notes.getOrFail,
+    noteId === undefined ? "skip" : { noteId },
+  );
+
+  return (
+    <div>
+      <h2>Look up a note by id</h2>
+      <input
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        placeholder="note id"
+        style={{ fontFamily: "monospace" }}
+      />
+      <button
+        type="button"
+        onClick={() => setNoteId(input as GenericId<"notes">)}
+      >
+        Look up
+      </button>
+      <div>
+        {noteId === undefined
+          ? "Enter a note id and click Look up."
+          : Result.matchWithError(lookup, {
+              onInitial: () => "Looking up…",
+              onSuccess: (success) => `Found note: "${success.value.text}"`,
+              onError: (error) => {
+                if (error instanceof NoteNotFound) {
+                  return `Note ${error.noteId} not found.`;
+                }
+                return `Unexpected typed error: ${String(error)}`;
+              },
+              onDefect: (defect) => `Unexpected defect: ${String(defect)}`,
+            })}
+      </div>
     </div>
   );
 };
@@ -203,6 +249,15 @@ const NoteList = () => {
         {Array.map(result.value, (note) => (
           <li key={note._id}>
             <p>{note.text}</p>
+            <p
+              style={{
+                fontFamily: "monospace",
+                fontSize: "0.85em",
+                color: "#666",
+              }}
+            >
+              id: {note._id}
+            </p>
             <button
               type="button"
               onClick={() => void deleteNote({ noteId: note._id })}
