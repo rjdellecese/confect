@@ -1,6 +1,6 @@
 import { FunctionSpec, Ref } from "@confect/core";
 import { ConvexError } from "convex/values";
-import { Cause, Option, Schema } from "effect";
+import { Cause, Either, Option, Schema } from "effect";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 const useConvexQueryMock = vi.fn();
@@ -167,26 +167,33 @@ describe("useQuery", () => {
 });
 
 describe("useMutation", () => {
-  test("resolves with the decoded result", async () => {
+  test("resolves to Either.Right with the decoded result", async () => {
     const inner = vi.fn().mockResolvedValue("note-1");
     useConvexMutationMock.mockReturnValue(inner);
 
     const mutate = useMutation(mutationNoError);
-    await expect(mutate({ text: "hi" })).resolves.toBe("note-1");
+    const either = await mutate({ text: "hi" });
+
+    expect(Either.isRight(either)).toBe(true);
+    if (Either.isRight(either)) {
+      expect(either.right).toBe("note-1");
+    }
   });
 
-  test("rejects with the decoded typed error for a matching ConvexError", async () => {
+  test("resolves to Either.Left with the decoded typed error for a matching ConvexError", async () => {
     const inner = vi
       .fn()
       .mockRejectedValue(new ConvexError({ _tag: "NotFound", id: "abc" }));
     useConvexMutationMock.mockReturnValue(inner);
 
     const mutate = useMutation(mutationWithError);
+    const either = await mutate({ id: "abc" });
 
-    await expect(mutate({ id: "abc" })).rejects.toMatchObject({
-      _tag: "NotFound",
-      id: "abc",
-    });
+    expect(Either.isLeft(either)).toBe(true);
+    if (Either.isLeft(either)) {
+      expect(either.left).toBeInstanceOf(NotFound);
+      expect((either.left as NotFound).id).toBe("abc");
+    }
   });
 
   test("rejects with the original error for a non-ConvexError", async () => {
@@ -211,26 +218,33 @@ describe("useMutation", () => {
 });
 
 describe("useAction", () => {
-  test("resolves with the decoded result", async () => {
+  test("resolves to Either.Right with the decoded result", async () => {
     const inner = vi.fn().mockResolvedValue("pong");
     useConvexActionMock.mockReturnValue(inner);
 
     const run = useAction(actionNoError);
-    await expect(run({})).resolves.toBe("pong");
+    const either = await run({});
+
+    expect(Either.isRight(either)).toBe(true);
+    if (Either.isRight(either)) {
+      expect(either.right).toBe("pong");
+    }
   });
 
-  test("rejects with the decoded typed error for a matching ConvexError", async () => {
+  test("resolves to Either.Left with the decoded typed error for a matching ConvexError", async () => {
     const inner = vi
       .fn()
       .mockRejectedValue(new ConvexError({ _tag: "NotFound", id: "abc" }));
     useConvexActionMock.mockReturnValue(inner);
 
     const run = useAction(actionWithError);
+    const either = await run({ id: "abc" });
 
-    await expect(run({ id: "abc" })).rejects.toMatchObject({
-      _tag: "NotFound",
-      id: "abc",
-    });
+    expect(Either.isLeft(either)).toBe(true);
+    if (Either.isLeft(either)) {
+      expect(either.left).toBeInstanceOf(NotFound);
+      expect((either.left as NotFound).id).toBe("abc");
+    }
   });
 
   test("rejects with the original error for a non-ConvexError", async () => {
