@@ -90,6 +90,7 @@ describe("useQuery", () => {
     const result = useQuery(queryNoError, {});
 
     expect(Result.isInitial(result)).toBe(true);
+    expect(result.waiting).toBe(true);
   });
 
   test("returns Success with decoded value", () => {
@@ -153,12 +154,27 @@ describe("useQuery", () => {
     }
   });
 
-  test("forwards `skip` to the underlying convex hook", () => {
+  test("`skip` on a query with no args returns non-waiting Initial", () => {
     useConvexQueryMock.mockReturnValue(undefined);
 
     const result = useQuery(queryNoError, "skip");
 
     expect(Result.isInitial(result)).toBe(true);
+    expect(result.waiting).toBe(false);
+    expect(useConvexQueryMock).toHaveBeenCalledExactlyOnceWith(
+      expect.anything(),
+      "skip",
+    );
+  });
+
+  test("`skip` on a query with required args returns non-waiting Initial and no value", () => {
+    useConvexQueryMock.mockReturnValue(undefined);
+
+    const result = useQuery(queryWithError, "skip");
+
+    expect(Result.isInitial(result)).toBe(true);
+    expect(result.waiting).toBe(false);
+    expect(Option.isNone(Result.value(result))).toBe(true);
     expect(useConvexQueryMock).toHaveBeenCalledExactlyOnceWith(
       expect.anything(),
       "skip",

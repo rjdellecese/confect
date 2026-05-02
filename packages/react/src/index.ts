@@ -33,7 +33,7 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
     );
 
     if (encodedReturnsOrUndefined === undefined) {
-      return Result_.initial(true);
+      return args === "skip" ? Result_.initial(false) : Result_.initial(true);
     }
 
     return Result_.success(
