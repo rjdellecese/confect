@@ -177,6 +177,26 @@ export const encodeArgs = <Ref_ extends Any>(
     Match.exhaustive,
   );
 
+export const decodeArgs = <Ref_ extends Any>(
+  ref: Ref_,
+  encodedArgs: unknown,
+): Effect.Effect<Args<Ref_>, ParseResult.ParseError> =>
+  Match.value(ref.functionSpec.functionProvenance).pipe(
+    Match.tag("Confect", (c) => Schema.decode(c.args)(encodedArgs)),
+    Match.tag("Convex", () => Effect.succeed(encodedArgs)),
+    Match.exhaustive,
+  ) as Effect.Effect<Args<Ref_>, ParseResult.ParseError>;
+
+export const encodeReturns = <Ref_ extends Any>(
+  ref: Ref_,
+  returns: Returns<Ref_>,
+): Effect.Effect<unknown, ParseResult.ParseError> =>
+  Match.value(ref.functionSpec.functionProvenance).pipe(
+    Match.tag("Confect", (c) => Schema.encode(c.returns)(returns)),
+    Match.tag("Convex", () => Effect.succeed(returns)),
+    Match.exhaustive,
+  );
+
 export const decodeReturns = <Ref_ extends Any>(
   ref: Ref_,
   returns: unknown,
@@ -194,6 +214,26 @@ export const encodeArgsSync = <Ref_ extends Any>(
   Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag("Confect", (c) => Schema.encodeSync(c.args)(args)),
     Match.tag("Convex", () => args),
+    Match.exhaustive,
+  );
+
+export const decodeArgsSync = <Ref_ extends Any>(
+  ref: Ref_,
+  encodedArgs: unknown,
+): Args<Ref_> =>
+  Match.value(ref.functionSpec.functionProvenance).pipe(
+    Match.tag("Confect", (c) => Schema.decodeSync(c.args)(encodedArgs)),
+    Match.tag("Convex", () => encodedArgs),
+    Match.exhaustive,
+  ) as Args<Ref_>;
+
+export const encodeReturnsSync = <Ref_ extends Any>(
+  ref: Ref_,
+  returns: Returns<Ref_>,
+): unknown =>
+  Match.value(ref.functionSpec.functionProvenance).pipe(
+    Match.tag("Confect", (c) => Schema.encodeSync(c.returns)(returns)),
+    Match.tag("Convex", () => returns),
     Match.exhaustive,
   );
 

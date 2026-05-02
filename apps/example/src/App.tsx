@@ -183,7 +183,21 @@ const WorkStatusRow = ({
 const NoteList = () => {
   const notes = useQuery(refs.public.notesAndRandom.notes.list, {});
 
-  const deleteNote = useMutation(refs.public.notesAndRandom.notes.delete_);
+  const deleteNote = useMutation(
+    refs.public.notesAndRandom.notes.delete_,
+  ).withOptimisticUpdate((localStore, { noteId }) => {
+    const current = localStore.getQuery(
+      refs.public.notesAndRandom.notes.list,
+      {},
+    );
+    if (current !== undefined) {
+      localStore.setQuery(
+        refs.public.notesAndRandom.notes.list,
+        {},
+        current.filter((note) => note._id !== noteId),
+      );
+    }
+  });
 
   if (notes === undefined) {
     return <p>Loading…</p>;
