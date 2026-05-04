@@ -53,7 +53,12 @@ return QueryResult.match(note, {
 
 For infrastructure or contract violations outside the typed-error channel, use an error boundary (or avoid calling the hook in a state that can throw, if applicable).
 
-`useMutation` and `useAction` now return `(args) => Promise<Either<Returns, Ref.Error<Ref>>>` instead of `(args) => Promise<Returns>`. `Either.Right` carries the decoded return value; `Either.Left` carries the decoded typed error for `ConvexError`s whose payload matches the ref's `error` schema. Anything else — network failures, contract-violating `ConvexError`s on schema-less refs, or args/returns schema decode failures — rejects the Promise with the original error so plain `try` / `catch` can recover. Use `Either.match` plus `Match.tags` for exhaustive dispatch on the typed error:
+`useMutation` and `useAction` pick their Promise shape based on whether the ref declares typed errors:
+
+- **No `error` schema:** returns `(args) => Promise<Returns>`, matching Convex's `useMutation` / `useAction` — you `await` the decoded value directly.
+- **With an `error` schema:** returns `(args) => Promise<Either<Returns, Error>>`. `Either.Right` carries the decoded return value; `Either.Left` carries the decoded typed error for `ConvexError`s whose payload matches the ref's `error` schema.
+
+For either shape, anything outside the typed-error contract — network failures, contract-violating `ConvexError`s on schema-less refs, or args/returns schema decode failures — rejects the Promise with the original error so plain `try` / `catch` can recover. For refs with an `error` schema, use `Either.match` plus `Match.tags` for exhaustive dispatch on the typed error:
 
 ```tsx
 import { useMutation } from "@confect/react";
@@ -82,5 +87,5 @@ const onClick = async (noteId: string) => {
 ### Breaking changes
 
 - `useQuery` now returns `QueryResult<Returns, Ref.Error<Query>>` (`Loading` with `skipped`, `Success`, `Failure`) instead of `T | undefined`. Typed failures use `onFailure` / `Failure.error`; everything outside the typed-error contract throws from the hook (handle with an error boundary). Migrate with `QueryResult.match` or `QueryResult.isLoading` / `isSuccess` / `isFailure`. Import from the `QueryResult` namespace re-exported from `@confect/react` or directly from `@confect/react/QueryResult`.
-- `useMutation` and `useAction` now return `(args) => Promise<Either<Returns, Ref.Error<Ref>>>` instead of `(args) => Promise<Returns>`. `Either.Right` carries the decoded return value; `Either.Left` carries the decoded typed error. Everything else rejects the Promise with the original error. To migrate: replace `await mutate(args)` with `Either.match(await mutate(args), { onRight, onLeft })` (or `Either.isRight` / `Either.isLeft`); add a surrounding `try` / `catch` if you also want to handle infrastructure failures.
+- `useMutation` / `useAction` on refs **with** an optional `error` schema return `(args) => Promise<Either<Returns, Error>>`; use `Either.match` / `Either.isRight` etc. Everything else rejects the Promise with the original error. Refs **without** an error schema continue to resolve `(args) => Promise<Returns>` — no mutation/action migration needed for those refs.
 - `@confect/test`'s `convex-test` peer dependency is now `^0.0.50` (was `^0.0.38`), which fixes upstream `ConvexError.data` deserialization across function-boundary crossings.

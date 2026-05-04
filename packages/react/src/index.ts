@@ -4,12 +4,18 @@ import {
   useMutation as useConvexMutation,
   useQuery as useConvexQuery,
 } from "convex/react";
-import type { Either } from "effect";
-import { Cause, Effect, Exit, Option } from "effect";
+import { Cause, Effect, Either, Exit, Option } from "effect";
 
 import * as QueryResult from "./QueryResult";
 
 export { QueryResult };
+
+/** Return type for `useMutation` / `useAction` wrappers. */
+export type InvokeReturn<Ref_ extends Ref.Any> = [Ref.Error<Ref_>] extends [
+  never,
+]
+  ? Promise<Ref.Returns<Ref_>>
+  : Promise<Either.Either<Ref.Returns<Ref_>, Ref.Error<Ref_>>>;
 
 type UseQueryArgs<Query extends Ref.AnyPublicQuery> =
   keyof Ref.Args<Query> extends never
@@ -52,41 +58,53 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
 };
 
 /**
- * Returns a function that resolves to `Either.Right(decodedReturn)` on
- * success and `Either.Left(typedError)` when the function fails with a
- * `ConvexError` whose payload matches the ref's `error` schema. Anything
- * else — network failures, contract-violating `ConvexError`s on schema-less
- * refs, or args/returns schema decode failures — rejects the Promise with
- * the original error.
+ * Returns a function invoked with the ref's args:
+ *
+ * - When the ref **declares** an `error` schema: resolves to
+ *   `Either.Right(decodedReturn)` on success and `Either.Left(typedError)` when
+ *   the Convex call fails with a `ConvexError` whose payload matches that schema.
+ * - When there is **no** typed-error schema (typical refs): resolves directly to the
+ *   decoded `returns` value — like vanilla `convex/react` `useMutation`.
+ *
+ * In all cases — network failures, schema-less `ConvexError`s, contract-violating
+ * payloads, or args/returns decode failures — the Promise rejects with the original
+ * error unless it was consumed as typed `ConvexError` data above.
  */
 export const useMutation = <Mutation extends Ref.AnyPublicMutation>(
   ref: Mutation,
-) => {
+): ((...args: Ref.OptionalArgs<Mutation>) => InvokeReturn<Mutation>) => {
   const functionReference = Ref.getFunctionReference(ref);
   const actualMutation = useConvexMutation(functionReference);
 
-  return (
-    ...args: Ref.OptionalArgs<Mutation>
-  ): Promise<Either.Either<Ref.Returns<Mutation>, Ref.Error<Mutation>>> =>
-    invokeAsEither(ref, (_, encodedArgs) => actualMutation(encodedArgs), args);
+  return ((...args: Ref.OptionalArgs<Mutation>) =>
+    invokeAsEither(
+      ref,
+      (_, encodedArgs) => actualMutation(encodedArgs),
+      args,
+    ).then((either) =>
+      Ref.hasErrorSchema(ref) ? either : Either.getOrThrow(either),
+    )) as (...args: Ref.OptionalArgs<Mutation>) => InvokeReturn<Mutation>;
 };
 
 /**
- * Returns a function that resolves to `Either.Right(decodedReturn)` on
- * success and `Either.Left(typedError)` when the function fails with a
- * `ConvexError` whose payload matches the ref's `error` schema. Anything
- * else — network failures, contract-violating `ConvexError`s on schema-less
- * refs, or args/returns schema decode failures — rejects the Promise with
- * the original error.
+ * Same contract as {@link useMutation}, but for actions.
+ *
+ * See `useMutation` for `Either<A, E>` vs plain `Promise<A>` behavior.
  */
-export const useAction = <Action extends Ref.AnyPublicAction>(ref: Action) => {
+export const useAction = <Action extends Ref.AnyPublicAction>(
+  ref: Action,
+): ((...args: Ref.OptionalArgs<Action>) => InvokeReturn<Action>) => {
   const functionReference = Ref.getFunctionReference(ref);
   const actualAction = useConvexAction(functionReference);
 
-  return (
-    ...args: Ref.OptionalArgs<Action>
-  ): Promise<Either.Either<Ref.Returns<Action>, Ref.Error<Action>>> =>
-    invokeAsEither(ref, (_, encodedArgs) => actualAction(encodedArgs), args);
+  return ((...args: Ref.OptionalArgs<Action>) =>
+    invokeAsEither(
+      ref,
+      (_, encodedArgs) => actualAction(encodedArgs),
+      args,
+    ).then((either) =>
+      Ref.hasErrorSchema(ref) ? either : Either.getOrThrow(either),
+    )) as (...args: Ref.OptionalArgs<Action>) => InvokeReturn<Action>;
 };
 
 const invokeAsEither = async <Ref_ extends Ref.Any>(

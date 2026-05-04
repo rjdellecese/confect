@@ -1,7 +1,8 @@
 import { FunctionSpec, Ref } from "@confect/core";
 import { ConvexError } from "convex/values";
 import { Either, Schema } from "effect";
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { beforeEach, describe, expect, expectTypeOf, test, vi } from "vitest";
+import type { InvokeReturn } from "../src/index";
 import { QueryResult, useAction, useMutation, useQuery } from "../src/index";
 
 const useConvexQueryMock = vi.fn();
@@ -170,17 +171,32 @@ describe("useQuery", () => {
 });
 
 describe("useMutation", () => {
-  test("resolves to Either.Right with the decoded result", async () => {
+  test("InvokeReturn is Promise<A> without an error schema", () => {
+    expectTypeOf<InvokeReturn<typeof mutationNoError>>().toEqualTypeOf<
+      Promise<string>
+    >();
+    expectTypeOf<InvokeReturn<typeof mutationWithError>>().toEqualTypeOf<
+      Promise<Either.Either<null, NotFound>>
+    >();
+  });
+
+  test("resolves directly to decoded result without an error schema", async () => {
     const inner = vi.fn().mockResolvedValue("note-1");
     useConvexMutationMock.mockReturnValue(inner);
 
     const mutate = useMutation(mutationNoError);
-    const either = await mutate({ text: "hi" });
+    await expect(mutate({ text: "hi" })).resolves.toBe("note-1");
+  });
+
+  test("resolves to Either.Right with decoded result when error schema succeeds", async () => {
+    const inner = vi.fn().mockResolvedValue(null);
+    useConvexMutationMock.mockReturnValue(inner);
+
+    const mutate = useMutation(mutationWithError);
+    const either = await mutate({ id: "abc" });
 
     expect(Either.isRight(either)).toBe(true);
-    if (Either.isRight(either)) {
-      expect(either.right).toBe("note-1");
-    }
+    if (Either.isRight(either)) expect(either.right).toBeNull();
   });
 
   test("resolves to Either.Left with the decoded typed error for a matching ConvexError", async () => {
@@ -221,17 +237,32 @@ describe("useMutation", () => {
 });
 
 describe("useAction", () => {
-  test("resolves to Either.Right with the decoded result", async () => {
+  test("InvokeReturn is Promise<A> without an error schema", () => {
+    expectTypeOf<InvokeReturn<typeof actionNoError>>().toEqualTypeOf<
+      Promise<string>
+    >();
+    expectTypeOf<InvokeReturn<typeof actionWithError>>().toEqualTypeOf<
+      Promise<Either.Either<null, NotFound>>
+    >();
+  });
+
+  test("resolves directly to decoded result without an error schema", async () => {
     const inner = vi.fn().mockResolvedValue("pong");
     useConvexActionMock.mockReturnValue(inner);
 
     const run = useAction(actionNoError);
-    const either = await run({});
+    await expect(run({})).resolves.toBe("pong");
+  });
+
+  test("resolves to Either.Right with decoded result when error schema succeeds", async () => {
+    const inner = vi.fn().mockResolvedValue(null);
+    useConvexActionMock.mockReturnValue(inner);
+
+    const run = useAction(actionWithError);
+    const either = await run({ id: "abc" });
 
     expect(Either.isRight(either)).toBe(true);
-    if (Either.isRight(either)) {
-      expect(either.right).toBe("pong");
-    }
+    if (Either.isRight(either)) expect(either.right).toBeNull();
   });
 
   test("resolves to Either.Left with the decoded typed error for a matching ConvexError", async () => {

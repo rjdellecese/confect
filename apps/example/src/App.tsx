@@ -3,7 +3,7 @@ import type { WorkId } from "@convex-dev/workpool";
 import { FetchHttpClient, HttpApiClient } from "@effect/platform";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import type { GenericId } from "convex/values";
-import { Array, Effect, Either, Exit } from "effect";
+import { Array, Effect, Exit } from "effect";
 import { useEffect, useState } from "react";
 import refs from "../confect/_generated/refs";
 import { Api } from "../confect/http/path-prefix";
@@ -26,8 +26,8 @@ const Page = () => {
   const getRandom = useAction(refs.public.notesAndRandom.random.getNumber);
 
   const retrieveRandomNumber = () => {
-    void getRandom({}).then((either) => {
-      if (Either.isRight(either)) setRandomNumber(either.right);
+    void getRandom({}).then((n) => {
+      setRandomNumber(n);
     });
   };
 
@@ -98,11 +98,7 @@ const Page = () => {
       <br />
       <button
         type="button"
-        onClick={() =>
-          void insertNote({ text: note }).then((either) => {
-            if (Either.isRight(either)) setNote("");
-          })
-        }
+        onClick={() => void insertNote({ text: note }).then(() => setNote(""))}
       >
         Insert note
       </button>
@@ -158,13 +154,8 @@ const WorkpoolDemo = () => {
   const enqueue = useMutation(refs.public.workpool.enqueue);
 
   const handleEnqueue = () => {
-    void enqueue({}).then((either) => {
-      if (Either.isRight(either)) {
-        setJobs((prev) => [
-          ...prev,
-          { id: either.right, enqueuedAt: Date.now() },
-        ]);
-      }
+    void enqueue({}).then((id) => {
+      setJobs((prev) => [...prev, { id, enqueuedAt: Date.now() }]);
     });
   };
 

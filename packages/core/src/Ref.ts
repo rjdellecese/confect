@@ -195,6 +195,17 @@ export const getFunctionReference = <Ref_ extends Any>(
 ): FunctionReference<Ref_> =>
   makeFunctionReference(getConvexFunctionName(ref)) as FunctionReference<Ref_>;
 
+export const hasErrorSchema = (ref: Any): boolean =>
+  Match.value(ref.functionSpec.functionProvenance).pipe(
+    Match.tag(
+      "Confect",
+      (confectFunctionProvenance) =>
+        confectFunctionProvenance.error !== undefined,
+    ),
+    Match.tag("Convex", () => false),
+    Match.exhaustive,
+  );
+
 export const encodeArgs = <Ref_ extends Any>(
   ref: Ref_,
   args: Args<Ref_>,

@@ -1,4 +1,8 @@
-import type { FunctionReference, FunctionVisibility } from "convex/server";
+import type {
+  FunctionReference,
+  FunctionVisibility,
+  RegisteredMutation,
+} from "convex/server";
 import { ConvexError } from "convex/values";
 import { Effect, MutableRef, Option, Schema } from "effect";
 import { describe, expect, expectTypeOf, test } from "vitest";
@@ -352,5 +356,48 @@ describe("decodeErrorOrElse", () => {
 
     expect(handler(convexError)).toBe(convexError);
     expect(MutableRef.get(calls)).toEqual([convexError]);
+  });
+});
+
+describe("hasErrorSchema", () => {
+  test("returns true for Confect ref with an error schema", () => {
+    class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+      id: Schema.String,
+    }) {}
+
+    const ref = Ref.make(
+      "test/mod",
+      FunctionSpec.publicMutation({
+        name: "update",
+        args: Schema.Struct({}),
+        returns: Schema.Void,
+        error: NotFound,
+      }),
+    );
+
+    expect(Ref.hasErrorSchema(ref)).toBe(true);
+  });
+
+  test("returns false for Confect ref without an error schema", () => {
+    const ref = Ref.make(
+      "test/mod",
+      FunctionSpec.publicMutation({
+        name: "create",
+        args: Schema.Struct({}),
+        returns: Schema.Void,
+      }),
+    );
+
+    expect(Ref.hasErrorSchema(ref)).toBe(false);
+  });
+
+  test("returns false for Convex-provenance ref", () => {
+    const convexSpec =
+      FunctionSpec.convexPublicMutation<
+        RegisteredMutation<"public", Record<string, never>, null>
+      >()("enqueue");
+    const ref = Ref.make("workpool", convexSpec);
+
+    expect(Ref.hasErrorSchema(ref)).toBe(false);
   });
 });
