@@ -1,6 +1,6 @@
 import type { FunctionReference, FunctionVisibility } from "convex/server";
 import { ConvexError } from "convex/values";
-import { Cause, Effect, MutableRef, Option, Schema } from "effect";
+import { Effect, MutableRef, Option, Schema } from "effect";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
 import * as FunctionSpec from "../src/FunctionSpec";
@@ -352,58 +352,5 @@ describe("decodeErrorOrElse", () => {
 
     expect(handler(convexError)).toBe(convexError);
     expect(MutableRef.get(calls)).toEqual([convexError]);
-  });
-});
-
-describe("causeOfCaughtError", () => {
-  class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
-    id: Schema.String,
-  }) {}
-
-  const refWithSchema = Ref.make(
-    "test/mod",
-    FunctionSpec.publicMutation({
-      name: "update",
-      args: Schema.Struct({}),
-      returns: Schema.Void,
-      error: NotFound,
-    }),
-  );
-
-  const refWithoutSchema = Ref.make(
-    "test/mod",
-    FunctionSpec.publicMutation({
-      name: "create",
-      args: Schema.Struct({}),
-      returns: Schema.Void,
-    }),
-  );
-
-  test("Cause.fail with the decoded typed error for a matching ConvexError", () => {
-    const cause = Ref.causeOfCaughtError(
-      refWithSchema,
-      new ConvexError({ _tag: "NotFound", id: "abc" }),
-    );
-
-    const failure = Option.getOrThrow(Cause.failureOption(cause));
-    expect(failure).toBeInstanceOf(NotFound);
-    expect((failure as NotFound).id).toBe("abc");
-    expect(Option.isNone(Cause.dieOption(cause))).toBe(true);
-  });
-
-  test("Cause.die with the original error for a non-ConvexError", () => {
-    const original = new Error("network down");
-    const cause = Ref.causeOfCaughtError(refWithSchema, original);
-
-    expect(Option.isNone(Cause.failureOption(cause))).toBe(true);
-    expect(Option.getOrThrow(Cause.dieOption(cause))).toBe(original);
-  });
-
-  test("Cause.die with the original ConvexError when the ref has no error schema", () => {
-    const original = new ConvexError({ _tag: "Anything", id: "abc" });
-    const cause = Ref.causeOfCaughtError(refWithoutSchema, original);
-
-    expect(Option.isNone(Cause.failureOption(cause))).toBe(true);
-    expect(Option.getOrThrow(Cause.dieOption(cause))).toBe(original);
   });
 });

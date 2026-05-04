@@ -1,14 +1,15 @@
 import { Ref } from "@confect/core";
-import * as Result_ from "@effect-atom/atom/Result";
 import {
   useAction as useConvexAction,
   useMutation as useConvexMutation,
   useQuery as useConvexQuery,
 } from "convex/react";
 import type { Either } from "effect";
-import { Cause, Effect, Exit } from "effect";
+import { Cause, Effect, Exit, Option } from "effect";
 
-export * as Result from "@effect-atom/atom/Result";
+import * as QueryResult from "./QueryResult";
+
+export { QueryResult };
 
 type UseQueryArgs<Query extends Ref.AnyPublicQuery> =
   keyof Ref.Args<Query> extends never
@@ -18,7 +19,7 @@ type UseQueryArgs<Query extends Ref.AnyPublicQuery> =
 export const useQuery = <Query extends Ref.AnyPublicQuery>(
   ref: Query,
   ...rest: UseQueryArgs<Query>
-): Result_.Result<Ref.Returns<Query>, Ref.Error<Query>> => {
+): QueryResult.QueryResult<Ref.Returns<Query>, Ref.Error<Query>> => {
   const functionReference = Ref.getFunctionReference(ref);
   const args = rest[0];
   const encodedArgs =
@@ -33,14 +34,20 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
     );
 
     if (encodedReturnsOrUndefined === undefined) {
-      return args === "skip" ? Result_.initial(false) : Result_.initial(true);
+      return QueryResult.load(args === "skip");
     }
 
-    return Result_.success(
+    return QueryResult.succeed(
       Ref.decodeReturnsSync(ref, encodedReturnsOrUndefined),
     );
   } catch (error) {
-    return Result_.failure(Ref.causeOfCaughtError(ref, error));
+    if (Ref.isConvexError(error)) {
+      const decoded = Ref.decodeErrorSync(ref, error.data);
+      if (Option.isSome(decoded)) {
+        return QueryResult.fail(decoded.value);
+      }
+    }
+    throw error;
   }
 };
 

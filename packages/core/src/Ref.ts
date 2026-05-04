@@ -6,7 +6,7 @@ import { makeFunctionReference } from "convex/server";
 import type { Value } from "convex/values";
 import { ConvexError } from "convex/values";
 import type { ParseResult } from "effect";
-import { Cause, Effect, Match, Option, Schema } from "effect";
+import { Effect, Match, Option, Schema } from "effect";
 import type * as FunctionSpec from "./FunctionSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
@@ -271,28 +271,6 @@ export const decodeErrorOrElse =
     }
     return mapUnknownError(error);
   };
-
-/**
- * Translate a caught error into an Effect `Cause`. A `ConvexError` carrying the
- * ref's typed error data becomes `Cause.fail(typedError)`; anything
- * else—non-`ConvexError` values _and_ `ConvexError`s thrown by refs that don't
- * declare a typed-error schema—becomes `Cause.die(error)`, since by definition
- * those fall outside the ref's error contract. Useful when bridging caught
- * errors into APIs that consume `Cause` directly (e.g.  `@effect-atom/atom`'s
- * `Result.failure`).
- */
-export const causeOfCaughtError = <Ref_ extends Any>(
-  ref: Ref_,
-  error: unknown,
-): Cause.Cause<Error<Ref_>> => {
-  if (isConvexError(error)) {
-    const decoded = decodeErrorSync(ref, error.data);
-    if (Option.isSome(decoded)) {
-      return Cause.fail(decoded.value);
-    }
-  }
-  return Cause.die(error);
-};
 
 /**
  * Decode `encodedError` against the ref's error schema. Returns `None` if the

@@ -1,11 +1,10 @@
-import { Result, useAction, useMutation, useQuery } from "@confect/react";
+import { QueryResult, useAction, useMutation, useQuery } from "@confect/react";
 import type { WorkId } from "@convex-dev/workpool";
 import { FetchHttpClient, HttpApiClient } from "@effect/platform";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import type { GenericId } from "convex/values";
 import { Array, Effect, Either, Exit } from "effect";
 import { useEffect, useState } from "react";
-import { NoteNotFound } from "../confect/notesAndRandom/notes.spec";
 import refs from "../confect/_generated/refs";
 import { Api } from "../confect/http/path-prefix";
 
@@ -58,10 +57,10 @@ const Page = () => {
 
       <div>
         <span style={{ fontFamily: "monospace" }}>TEST_ENV_VAR: </span>
-        {Result.match(envVar, {
-          onInitial: () => "Loading…",
+        {QueryResult.match(envVar, {
+          onLoading: () => "Loading…",
           onFailure: () => "Error",
-          onSuccess: (result) => result.value,
+          onSuccess: (value) => value,
         })}
       </div>
 
@@ -142,16 +141,10 @@ const NoteLookup = () => {
       <div>
         {noteId === undefined
           ? "Enter a note id and click Look up."
-          : Result.matchWithError(lookup, {
-              onInitial: () => "Looking up…",
-              onSuccess: (success) => `Found note: "${success.value.text}"`,
-              onError: (error) => {
-                if (error instanceof NoteNotFound) {
-                  return `Note ${error.noteId} not found.`;
-                }
-                return `Unexpected typed error: ${String(error)}`;
-              },
-              onDefect: (defect) => `Unexpected defect: ${String(defect)}`,
+          : QueryResult.match(lookup, {
+              onLoading: () => "Looking up…",
+              onSuccess: (note) => `Found note: "${note.text}"`,
+              onFailure: (error) => `Note ${error.noteId} not found.`,
             })}
       </div>
     </div>
@@ -237,10 +230,10 @@ const WorkStatusRow = ({
     <tr>
       <td style={{ paddingRight: 16, fontFamily: "monospace" }}>#{index}</td>
       <td>
-        {Result.match(status, {
-          onInitial: () => "Loading…",
+        {QueryResult.match(status, {
+          onLoading: () => "Loading…",
           onFailure: () => "Error",
-          onSuccess: (result) => statusLabel(result.value),
+          onSuccess: (value) => statusLabel(value),
         })}
       </td>
     </tr>
@@ -252,12 +245,12 @@ const NoteList = () => {
 
   const deleteNote = useMutation(refs.public.notesAndRandom.notes.delete_);
 
-  return Result.match(notes, {
-    onInitial: () => <p>Loading…</p>,
+  return QueryResult.match(notes, {
+    onLoading: () => <p>Loading…</p>,
     onFailure: () => <p>Error</p>,
-    onSuccess: (result) => (
+    onSuccess: (value) => (
       <ul>
-        {Array.map(result.value, (note) => (
+        {Array.map(value, (note) => (
           <li key={note._id}>
             <p>{note.text}</p>
             <p

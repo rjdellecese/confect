@@ -1,7 +1,8 @@
 import { FunctionSpec, Ref } from "@confect/core";
 import { ConvexError } from "convex/values";
-import { Cause, Either, Option, Schema } from "effect";
+import { Either, Schema } from "effect";
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { QueryResult, useAction, useMutation, useQuery } from "../src/index";
 
 const useConvexQueryMock = vi.fn();
 const useConvexMutationMock = vi.fn();
@@ -12,9 +13,6 @@ vi.mock("convex/react", () => ({
   useMutation: (...args: unknown[]) => useConvexMutationMock(...args),
   useAction: (...args: unknown[]) => useConvexActionMock(...args),
 }));
-
-const { Result, useAction, useMutation, useQuery } =
-  await import("../src/index");
 
 class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
   id: Schema.String,
@@ -84,97 +82,86 @@ beforeEach(() => {
 });
 
 describe("useQuery", () => {
-  test("returns Initial when convex returns undefined", () => {
+  test("returns Loading when convex returns undefined", () => {
     useConvexQueryMock.mockReturnValue(undefined);
 
-    const result = useQuery(queryNoError, {});
+    const queryResult = useQuery(queryNoError, {});
 
-    expect(Result.isInitial(result)).toBe(true);
-    expect(result.waiting).toBe(true);
+    expect(QueryResult.isLoading(queryResult)).toBe(true);
+    if (QueryResult.isLoading(queryResult)) {
+      expect(queryResult.skipped).toBe(false);
+    }
   });
 
   test("returns Success with decoded value", () => {
     useConvexQueryMock.mockReturnValue([{ text: "hello" }]);
 
-    const result = useQuery(queryNoError, {});
+    const queryResult = useQuery(queryNoError, {});
 
-    expect(Result.isSuccess(result)).toBe(true);
-    if (Result.isSuccess(result)) {
-      expect(result.value).toEqual([{ text: "hello" }]);
+    expect(QueryResult.isSuccess(queryResult)).toBe(true);
+    if (QueryResult.isSuccess(queryResult)) {
+      expect(queryResult.value).toEqual([{ text: "hello" }]);
     }
   });
 
-  test("Failure carries Cause.fail with the decoded typed error for a matching ConvexError", () => {
+  test("Failure carries decoded typed error for a matching ConvexError", () => {
     useConvexQueryMock.mockImplementation(() => {
       throw new ConvexError({ _tag: "NotFound", id: "abc" });
     });
 
-    const result = useQuery(queryWithError, { id: "abc" });
+    const queryResult = useQuery(queryWithError, { id: "abc" });
 
-    expect(Result.isFailure(result)).toBe(true);
-    if (Result.isFailure(result)) {
-      const failure = Option.getOrThrow(Cause.failureOption(result.cause));
-      expect(failure).toBeInstanceOf(NotFound);
-      expect(failure.id).toBe("abc");
-      expect(Option.isNone(Cause.dieOption(result.cause))).toBe(true);
+    expect(QueryResult.isFailure(queryResult)).toBe(true);
+    if (QueryResult.isFailure(queryResult)) {
+      expect(queryResult.error).toBeInstanceOf(NotFound);
+      expect(queryResult.error.id).toBe("abc");
     }
   });
 
-  test("Failure carries Cause.die for a non-ConvexError", () => {
+  test("rethrows a non-ConvexError as a defect", () => {
     const transportError = new Error("network down");
     useConvexQueryMock.mockImplementation(() => {
       throw transportError;
     });
 
-    const result = useQuery(queryWithError, { id: "abc" });
-
-    expect(Result.isFailure(result)).toBe(true);
-    if (Result.isFailure(result)) {
-      expect(Option.isNone(Cause.failureOption(result.cause))).toBe(true);
-      expect(Option.getOrThrow(Cause.dieOption(result.cause))).toBe(
-        transportError,
-      );
-    }
+    expect(() => useQuery(queryWithError, { id: "abc" })).toThrow(
+      transportError,
+    );
   });
 
-  test("Failure carries Cause.die when a ConvexError is thrown from a ref without an error schema", () => {
+  test("rethrows a ConvexError from a ref without an error schema", () => {
     const convexError = new ConvexError({ _tag: "Anything", id: "abc" });
     useConvexQueryMock.mockImplementation(() => {
       throw convexError;
     });
 
-    const result = useQuery(queryNoError, {});
-
-    expect(Result.isFailure(result)).toBe(true);
-    if (Result.isFailure(result)) {
-      expect(Option.isNone(Cause.failureOption(result.cause))).toBe(true);
-      expect(Option.getOrThrow(Cause.dieOption(result.cause))).toBe(
-        convexError,
-      );
-    }
+    expect(() => useQuery(queryNoError, {})).toThrow(convexError);
   });
 
-  test("`skip` on a query with no args returns non-waiting Initial", () => {
+  test("`skip` on a query with no args returns Loading with skipped true", () => {
     useConvexQueryMock.mockReturnValue(undefined);
 
-    const result = useQuery(queryNoError, "skip");
+    const queryResult = useQuery(queryNoError, "skip");
 
-    expect(Result.isInitial(result)).toBe(true);
-    expect(result.waiting).toBe(false);
+    expect(QueryResult.isLoading(queryResult)).toBe(true);
+    if (QueryResult.isLoading(queryResult)) {
+      expect(queryResult.skipped).toBe(true);
+    }
     expect(useConvexQueryMock).toHaveBeenCalledExactlyOnceWith(
       expect.anything(),
       "skip",
     );
   });
 
-  test("`skip` on a query with required args returns non-waiting Initial and no value", () => {
+  test("`skip` on a query with required args returns Loading with skipped true", () => {
     useConvexQueryMock.mockReturnValue(undefined);
 
-    const result = useQuery(queryWithError, "skip");
+    const queryResult = useQuery(queryWithError, "skip");
 
-    expect(Result.isInitial(result)).toBe(true);
-    expect(result.waiting).toBe(false);
-    expect(Option.isNone(Result.value(result))).toBe(true);
+    expect(QueryResult.isLoading(queryResult)).toBe(true);
+    if (QueryResult.isLoading(queryResult)) {
+      expect(queryResult.skipped).toBe(true);
+    }
     expect(useConvexQueryMock).toHaveBeenCalledExactlyOnceWith(
       expect.anything(),
       "skip",
