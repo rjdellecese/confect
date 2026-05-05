@@ -10,6 +10,7 @@ import * as QueryResult from "./QueryResult";
 
 export { QueryResult };
 
+// TODO: Rename, and can this be marked as internal?
 /** Return type for `useMutation` / `useAction` wrappers. */
 export type InvokeReturn<Ref_ extends Ref.Any> = [Ref.Error<Ref_>] extends [
   never,

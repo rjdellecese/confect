@@ -1,6 +1,4 @@
-import * as Equal from "effect/Equal";
-import * as Hash from "effect/Hash";
-import { pipe } from "effect/Function";
+import { Equal, Hash, pipe } from "effect";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
 import * as QueryResult from "../src/QueryResult";
@@ -110,7 +108,6 @@ describe("pipe", () => {
       QueryResult.match({
         onLoading: () => 0,
         onSuccess: (n) => n * 3,
-        onFailure: () => -1,
       }),
     );
     expect(r).toBe(6);
@@ -123,7 +120,6 @@ describe("match", () => {
       QueryResult.match(QueryResult.load(true), {
         onLoading: (skipped) => skipped,
         onSuccess: () => false,
-        onFailure: () => false,
       }),
     ).toBe(true);
 
@@ -131,7 +127,6 @@ describe("match", () => {
       QueryResult.match(QueryResult.succeed("ok"), {
         onLoading: () => "",
         onSuccess: (v) => v,
-        onFailure: () => "",
       }),
     ).toBe("ok");
 
@@ -155,6 +150,43 @@ describe("match", () => {
     expect(f(QueryResult.load(false))).toBe("L:false");
     expect(f(QueryResult.succeed(7))).toBe("S:7");
     expect(f(QueryResult.fail("z"))).toBe("F:z");
+  });
+
+  test("type: may omit onFailure when E is never", () => {
+    const f = QueryResult.match<number, never, string, string>({
+      onLoading: (s) => `L:${s}`,
+      onSuccess: (v) => `S:${v}`,
+    });
+    expectTypeOf(f)
+      .parameter(0)
+      .toExtend<QueryResult.QueryResult<number, never>>();
+    expectTypeOf(f).returns.toEqualTypeOf<string>();
+    expectTypeOf(f(QueryResult.succeed(1))).toEqualTypeOf<string>();
+
+    QueryResult.match<number, never, string, string, string>({
+      onLoading: (s) => `L:${s}`,
+      onSuccess: (v) => `S:${v}`,
+      // @ts-expect-error - onFailure must not be passed when E is never
+      onFailure: () => "noop",
+    });
+  });
+
+  test("type: onFailure is required when E is not never", () => {
+    expectTypeOf(
+      QueryResult.match<number, string, string, string, string>({
+        onLoading: (s) => `L:${s}`,
+        onSuccess: (v) => `S:${v}`,
+        onFailure: (e) => `F:${e}`,
+      }),
+    ).toEqualTypeOf<
+      (self: QueryResult.QueryResult<number, string>) => string
+    >();
+
+    // @ts-expect-error - onFailure is required when E is not never
+    QueryResult.match<number, string, string, string, string>({
+      onLoading: (s) => `L:${s}`,
+      onSuccess: (v) => `S:${v}`,
+    });
   });
 });
 

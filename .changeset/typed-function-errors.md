@@ -18,6 +18,8 @@ When a handler fails with a typed error, Confect schema-encodes the error data a
 
 If the failure is not a matching typed error (including refs without an `error` schema), or client-side args/returns decoding throws, **`useQuery` rethrows** so you can recover with a React error boundary (or treat it like other unexpected render errors). Use `QueryResult.match` (whose `onLoading` callback receives `skipped`), or `isLoading` / `isSuccess` / `isFailure`. These are available either via the `QueryResult` namespace export from `@confect/react` or as a dedicated subpath import from `@confect/react/QueryResult`.
 
+`QueryResult.match` **requires `onFailure` only when the error type parameter `E` is not `never`** (queries whose ref declares an `error` schema). For queries with no typed failure channel (`E` is `never`), omit `onFailure` — the `Failure` branch is not part of the static type in that case.
+
 **Before:**
 
 ```tsx
@@ -48,6 +50,23 @@ return QueryResult.match(note, {
       Match.tag("Forbidden", (e) => <p>Forbidden: {e.reason}</p>),
       Match.exhaustive,
     ),
+});
+```
+
+For a ref **without** an `error` schema, `useQuery` still returns `QueryResult<A, never>`; `match` then only needs `onLoading` and `onSuccess`:
+
+```tsx
+const notes = useQuery(refs.public.notes.list, {});
+
+return QueryResult.match(notes, {
+  onLoading: () => <p>Loading…</p>,
+  onSuccess: (value) => (
+    <ul>
+      {value.map((note) => (
+        <li key={note._id}>{note.text}</li>
+      ))}
+    </ul>
+  ),
 });
 ```
 
@@ -86,6 +105,6 @@ const onClick = async (noteId: string) => {
 
 ### Breaking changes
 
-- `useQuery` now returns `QueryResult<Returns, Ref.Error<Query>>` (`Loading` with `skipped`, `Success`, `Failure`) instead of `T | undefined`. Typed failures use `onFailure` / `Failure.error`; everything outside the typed-error contract throws from the hook (handle with an error boundary). Migrate with `QueryResult.match` or `QueryResult.isLoading` / `isSuccess` / `isFailure`. Import from the `QueryResult` namespace re-exported from `@confect/react` or directly from `@confect/react/QueryResult`.
+- `useQuery` now returns `QueryResult<Returns, Ref.Error<Query>>` (`Loading` with `skipped`, `Success`, `Failure`) instead of `T | undefined`. Typed failures use `Failure.error`; everything outside the typed-error contract throws from the hook (handle with an error boundary). Migrate with `QueryResult.match` or `QueryResult.isLoading` / `isSuccess` / `isFailure`. In `QueryResult.match`, pass **`onFailure` when `Ref.Error<Query>` is not `never`** (ref has an `error` schema); omit **`onFailure` when there is no typed error**. Import from the `QueryResult` namespace re-exported from `@confect/react` or directly from `@confect/react/QueryResult`.
 - `useMutation` / `useAction` on refs **with** an optional `error` schema return `(args) => Promise<Either<Returns, Error>>`; use `Either.match` / `Either.isRight` etc. Everything else rejects the Promise with the original error. Refs **without** an error schema continue to resolve `(args) => Promise<Returns>` — no mutation/action migration needed for those refs.
 - `@confect/test`'s `convex-test` peer dependency is now `^0.0.50` (was `^0.0.38`), which fixes upstream `ConvexError.data` deserialization across function-boundary crossings.

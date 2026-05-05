@@ -1,8 +1,4 @@
-import * as Equal from "effect/Equal";
-import { dual, identity } from "effect/Function";
-import * as Hash from "effect/Hash";
-import { type Pipeable, pipeArguments } from "effect/Pipeable";
-import { hasProperty } from "effect/Predicate";
+import { Equal, Function, Hash, identity, Pipeable, Predicate } from "effect";
 
 const TypeId = "@confect/react/QueryResult";
 type TypeId = typeof TypeId;
@@ -13,7 +9,7 @@ export type QueryResult<A, E = never> =
   | Failure<A, E>;
 
 export declare namespace QueryResult {
-  export interface Proto<A, E> extends Pipeable {
+  export interface Proto<A, E> extends Pipeable.Pipeable {
     readonly [TypeId]: {
       readonly E: (_: never) => E;
       readonly A: (_: never) => A;
@@ -43,7 +39,7 @@ export interface Failure<A, E = never> extends QueryResult.Proto<A, E> {
 }
 
 export const isQueryResult = (u: unknown): u is QueryResult<unknown, unknown> =>
-  hasProperty(u, TypeId);
+  Predicate.hasProperty(u, TypeId);
 
 const QueryResultProto = {
   [TypeId]: {
@@ -51,9 +47,9 @@ const QueryResultProto = {
     A: identity,
   },
   pipe(this: QueryResult<any, any>, ...args: ReadonlyArray<unknown>) {
-    return pipeArguments(
+    return Pipeable.pipeArguments(
       this,
-      args as unknown as Parameters<typeof pipeArguments>[1],
+      args as unknown as Parameters<typeof Pipeable.pipeArguments>[1],
     );
   },
   [Equal.symbol](
@@ -118,37 +114,38 @@ export const isFailure = <A, E>(
   queryResult: QueryResult<A, E>,
 ): queryResult is Failure<A, E> => queryResult._tag === "Failure";
 
+type MatchOptions<A, E, X, Y, Z> = {
+  readonly onLoading: (skipped: boolean) => X;
+  readonly onSuccess: (value: A) => Y;
+} & ([E] extends [never]
+  ? { readonly onFailure?: never }
+  : { readonly onFailure: (error: E) => Z });
+
+type MatchReturn<E, X, Y, Z> = [E] extends [never] ? X | Y : X | Y | Z;
+
 export const match: {
-  <A, E, X, Y, Z>(options: {
-    readonly onLoading: (skipped: boolean) => X;
-    readonly onSuccess: (value: A) => Y;
-    readonly onFailure: (error: E) => Z;
-  }): (self: QueryResult<A, E>) => X | Y | Z;
-  <A, E, X, Y, Z>(
+  <A, E, X, Y, Z = never>(
+    options: MatchOptions<A, E, X, Y, Z>,
+  ): (self: QueryResult<A, E>) => MatchReturn<E, X, Y, Z>;
+  <A, E, X, Y, Z = never>(
     self: QueryResult<A, E>,
-    options: {
-      readonly onLoading: (skipped: boolean) => X;
-      readonly onSuccess: (value: A) => Y;
-      readonly onFailure: (error: E) => Z;
-    },
-  ): X | Y | Z;
-} = dual(
+    options: MatchOptions<A, E, X, Y, Z>,
+  ): MatchReturn<E, X, Y, Z>;
+} = Function.dual(
   2,
-  <A, E, X, Y, Z>(
+  <A, E, X, Y, Z = never>(
     self: QueryResult<A, E>,
-    options: {
-      readonly onLoading: (skipped: boolean) => X;
-      readonly onSuccess: (value: A) => Y;
-      readonly onFailure: (error: E) => Z;
-    },
-  ): X | Y | Z => {
+    options: MatchOptions<A, E, X, Y, Z>,
+  ): MatchReturn<E, X, Y, Z> => {
     switch (self._tag) {
       case "Loading":
         return options.onLoading(self.skipped);
       case "Success":
         return options.onSuccess(self.value);
       case "Failure":
-        return options.onFailure(self.error);
+        return (options.onFailure as ((error: E) => Z) | undefined)?.(
+          self.error,
+        ) as MatchReturn<E, X, Y, Z>;
     }
   },
 );
