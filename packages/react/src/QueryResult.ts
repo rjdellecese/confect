@@ -117,9 +117,7 @@ export const isFailure = <A, E>(
 type MatchOptions<A, E, X, Y, Z> = {
   readonly onLoading: (skipped: boolean) => X;
   readonly onSuccess: (value: A) => Y;
-} & ([E] extends [never]
-  ? { readonly onFailure?: never }
-  : { readonly onFailure: (error: E) => Z });
+} & ([E] extends [never] ? {} : { readonly onFailure: (error: E) => Z });
 
 type MatchReturn<E, X, Y, Z> = [E] extends [never] ? X | Y : X | Y | Z;
 
@@ -142,10 +140,14 @@ export const match: {
         return options.onLoading(self.skipped);
       case "Success":
         return options.onSuccess(self.value);
-      case "Failure":
-        return (options.onFailure as ((error: E) => Z) | undefined)?.(
-          self.error,
-        ) as MatchReturn<E, X, Y, Z>;
+      case "Failure": {
+        if (Predicate.hasProperty(options, "onFailure")) {
+          return options.onFailure(self.error) as MatchReturn<E, X, Y, Z>;
+        }
+        throw new Error(
+          "`onFailure` is required when error schema is provided",
+        );
+      }
     }
   },
 );

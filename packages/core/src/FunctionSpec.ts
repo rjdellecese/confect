@@ -145,25 +145,25 @@ export type EncodedReturns<FunctionSpec_ extends AnyWithProps> =
       ? Returns_
       : never;
 
-export type ErrorSchema<FunctionSpec_ extends AnyWithProps> =
+export type Error<FunctionSpec_ extends AnyConfect> = FunctionSpec_ extends {
+  functionProvenance: FunctionProvenance.Confect<
+    any,
+    any,
+    infer ErrorSchema_ extends Schema.Schema.AnyNoContext
+  >;
+}
+  ? ErrorSchema_["Type"]
+  : never;
+
+export type EncodedError<FunctionSpec_ extends AnyConfect> =
   FunctionSpec_ extends {
     functionProvenance: FunctionProvenance.Confect<
       any,
       any,
-      infer ErrorSchema_
+      infer ErrorSchema_ extends Schema.Schema.AnyNoContext
     >;
   }
-    ? ErrorSchema_
-    : never;
-
-export type Error<FunctionSpec_ extends AnyWithProps> =
-  ErrorSchema<FunctionSpec_> extends Schema.Schema.AnyNoContext
-    ? ErrorSchema<FunctionSpec_>["Type"]
-    : never;
-
-export type EncodedError<FunctionSpec_ extends AnyWithProps> =
-  ErrorSchema<FunctionSpec_> extends Schema.Schema.AnyNoContext
-    ? ErrorSchema<FunctionSpec_>["Encoded"]
+    ? ErrorSchema_["Encoded"]
     : never;
 
 export type WithName<

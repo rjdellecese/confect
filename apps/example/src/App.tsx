@@ -59,7 +59,6 @@ const Page = () => {
         <span style={{ fontFamily: "monospace" }}>TEST_ENV_VAR: </span>
         {QueryResult.match(envVar, {
           onLoading: () => "Loading…",
-          onFailure: () => "Error",
           onSuccess: (value) => value,
         })}
       </div>
@@ -223,7 +222,6 @@ const WorkStatusRow = ({
       <td>
         {QueryResult.match(status, {
           onLoading: () => "Loading…",
-          onFailure: () => "Error",
           onSuccess: (value) => statusLabel(value),
         })}
       </td>
@@ -232,16 +230,15 @@ const WorkStatusRow = ({
 };
 
 const NoteList = () => {
-  const notes = useQuery(refs.public.notesAndRandom.notes.list, {});
+  const notesResult = useQuery(refs.public.notesAndRandom.notes.list, {});
 
   const deleteNote = useMutation(refs.public.notesAndRandom.notes.delete_);
 
-  return QueryResult.match(notes, {
+  return QueryResult.match(notesResult, {
     onLoading: () => <p>Loading…</p>,
-    onFailure: () => <p>Error</p>,
-    onSuccess: (value) => (
+    onSuccess: (notes) => (
       <ul>
-        {Array.map(value, (note) => (
+        {Array.map(notes, (note) => (
           <li key={note._id}>
             <p>{note.text}</p>
             <p
