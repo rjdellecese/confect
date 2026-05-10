@@ -10,8 +10,6 @@ import * as QueryResult from "./QueryResult";
 
 export { QueryResult };
 
-// TODO: Rename, and can this be marked as internal?
-/** Return type for `useMutation` / `useAction` wrappers. */
 export type InvokeReturn<Ref_ extends Ref.Any> = [Ref.Error<Ref_>] extends [
   never,
 ]
@@ -59,17 +57,17 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
 };
 
 /**
- * Returns a function invoked with the ref's args:
+ * Returns a function that invokes the provided `Ref`'s mutation.
  *
- * - When the ref **declares** an `error` schema: resolves to
- *   `Either.Right(decodedReturn)` on success and `Either.Left(typedError)` when
- *   the Convex call fails with a `ConvexError` whose payload matches that schema.
- * - When there is **no** typed-error schema (typical refs): resolves directly to the
- *   decoded `returns` value — like vanilla `convex/react` `useMutation`.
+ * If the `Ref` declares an `error` schema, the returned promise resolves to an
+ * `Either` with the decoded `returns` value on the right and the decoded error
+ * on the left.
  *
- * In all cases — network failures, schema-less `ConvexError`s, contract-violating
- * payloads, or args/returns decode failures — the Promise rejects with the original
- * error unless it was consumed as typed `ConvexError` data above.
+ * If the `Ref` does not declare an `error` schema, the promise resolves
+ * directly to the decoded `returns` value, matching the behavior of
+ * `useMutation` from `convex/react`.
+ *
+ * Any other failure rejects the promise.
  */
 export const useMutation = <Mutation extends Ref.AnyPublicMutation>(
   ref: Mutation,
@@ -88,9 +86,17 @@ export const useMutation = <Mutation extends Ref.AnyPublicMutation>(
 };
 
 /**
- * Same contract as {@link useMutation}, but for actions.
+ * Returns a function that invokes the provided `Ref`'s action.
  *
- * See `useMutation` for `Either<A, E>` vs plain `Promise<A>` behavior.
+ * If the `Ref` declares an `error` schema, the returned promise resolves to an
+ * `Either` with the decoded `returns` value on the right and the decoded error
+ * on the left.
+ *
+ * If the `Ref` does not declare an `error` schema, the promise resolves
+ * directly to the decoded `returns` value, matching the behavior of
+ * `useMutation` from `convex/react`.
+ *
+ * Any other failure rejects the promise.
  */
 export const useAction = <Action extends Ref.AnyPublicAction>(
   ref: Action,

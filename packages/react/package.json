@@ -25,9 +25,9 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./QueryResult": {
-      "types": "./dist/QueryResult.d.ts",
-      "default": "./dist/QueryResult.js"
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
     },
     "./package.json": "./package.json"
   },

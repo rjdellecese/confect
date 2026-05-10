@@ -145,7 +145,7 @@ export type EncodedReturns<FunctionSpec_ extends AnyWithProps> =
       ? Returns_
       : never;
 
-export type Error<FunctionSpec_ extends AnyConfect> = FunctionSpec_ extends {
+export type Error<FunctionSpec_ extends AnyWithProps> = FunctionSpec_ extends {
   functionProvenance: FunctionProvenance.Confect<
     any,
     any,
@@ -155,7 +155,7 @@ export type Error<FunctionSpec_ extends AnyConfect> = FunctionSpec_ extends {
   ? ErrorSchema_["Type"]
   : never;
 
-export type EncodedError<FunctionSpec_ extends AnyConfect> =
+export type EncodedError<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
     functionProvenance: FunctionProvenance.Confect<
       any,

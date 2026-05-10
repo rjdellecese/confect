@@ -3,6 +3,12 @@ import { Equal, Function, Hash, identity, Pipeable, Predicate } from "effect";
 const TypeId = "@confect/react/QueryResult";
 type TypeId = typeof TypeId;
 
+/**
+ * A `QueryResult` represents the result of a Confect query.
+ *
+ * @typeParam A - The type of the decoded `returns` value in the `Success` variant.
+ * @typeParam E - The type of the decoded typed error in the `Failure` variant.
+ */
 export type QueryResult<A, E = never> =
   | Loading<A, E>
   | Success<A, E>
@@ -119,22 +125,35 @@ type MatchOptions<A, E, X, Y, Z> = {
   readonly onSuccess: (value: A) => Y;
 } & ([E] extends [never] ? {} : { readonly onFailure: (error: E) => Z });
 
-type MatchReturn<E, X, Y, Z> = [E] extends [never] ? X | Y : X | Y | Z;
+type MatchReturns<E, X, Y, Z> = [E] extends [never] ? X | Y : X | Y | Z;
 
+/**
+ * Matches a {@link QueryResult} to the appropriate handler based on its tag. If
+ * the provided `QueryResult` cannot fail (i.e. `E` is `never`), `onFailure` is
+ * not required.
+ *
+ * @example
+ * ```tsx
+ * const result = QueryResult.match(queryResult, {
+ *   onLoading: (skipped) => skipped ? null : <p>Loading…</p>,
+ *   onSuccess: (value) => <p>{value.text}</p>,
+ *   onFailure: (error) => <p>Error: {error.message}</p>,
+ * });
+ */
 export const match: {
   <A, E, X, Y, Z = never>(
     options: MatchOptions<A, E, X, Y, Z>,
-  ): (self: QueryResult<A, E>) => MatchReturn<E, X, Y, Z>;
+  ): (self: QueryResult<A, E>) => MatchReturns<E, X, Y, Z>;
   <A, E, X, Y, Z = never>(
     self: QueryResult<A, E>,
     options: MatchOptions<A, E, X, Y, Z>,
-  ): MatchReturn<E, X, Y, Z>;
+  ): MatchReturns<E, X, Y, Z>;
 } = Function.dual(
   2,
   <A, E, X, Y, Z = never>(
     self: QueryResult<A, E>,
     options: MatchOptions<A, E, X, Y, Z>,
-  ): MatchReturn<E, X, Y, Z> => {
+  ): MatchReturns<E, X, Y, Z> => {
     switch (self._tag) {
       case "Loading":
         return options.onLoading(self.skipped);
@@ -142,7 +161,7 @@ export const match: {
         return options.onSuccess(self.value);
       case "Failure": {
         if (Predicate.hasProperty(options, "onFailure")) {
-          return options.onFailure(self.error) as MatchReturn<E, X, Y, Z>;
+          return options.onFailure(self.error) as MatchReturns<E, X, Y, Z>;
         }
         throw new Error(
           "`onFailure` is required when error schema is provided",
