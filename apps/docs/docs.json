@@ -57,6 +57,7 @@
           "server/functions",
           "server/plain-convex-functions",
           "server/node-actions",
+          "server/error-handling",
           {
             "icon": "database",
             "group": "Database",

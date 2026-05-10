@@ -45,7 +45,14 @@ const program = Effect.gen(function* () {
 });
 ```
 
-Each method returns an `Effect` that can fail with `WebSocketClientError` (wrapping transport-level errors) or `ParseResult.ParseError` (if schema encoding or decoding fails).
+Each method returns an `Effect` that can fail with `WebSocketClientError` (wrapping transport-level errors), `ParseResult.ParseError` (if schema encoding or decoding fails), or the ref's declared [typed error](/server/error-handling), if any:
+
+```ts
+client.query(refs.public.notes.getOrFail, { noteId });
+// Effect.Effect<Note, NoteNotFound | WebSocketClientError | ParseError>
+```
+
+`reactiveQuery` propagates the same errors through the `Stream`'s failure channel.
 
 ## Reactive queries
 

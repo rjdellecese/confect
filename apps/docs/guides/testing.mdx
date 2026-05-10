@@ -98,6 +98,22 @@ Effect.gen(function* () {
 });
 ```
 
+When the ref declares an [`error` schema](/server/error-handling), the decoded typed error is exposed in the `Effect` error channel, so you can assert against it with `Effect.either` or recover with `Effect.catchTag`:
+
+```ts
+import { Effect, Either } from "effect";
+
+Effect.gen(function* () {
+  const c = yield* TestConfect.TestConfect;
+
+  const result = yield* Effect.either(
+    c.query(refs.public.notes.getOrFail, { noteId }),
+  );
+
+  assertEquals(Either.isLeft(result), true);
+});
+```
+
 ## Running setup code
 
 Use `run` to execute arbitrary code with mutation-context services (like `DatabaseWriter`) for test setup. When the handler returns a value, pass a `Schema` as the second argument for decoding.

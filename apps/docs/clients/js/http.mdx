@@ -44,7 +44,12 @@ const program = Effect.gen(function* () {
 });
 ```
 
-Each method returns an `Effect` that can fail with `HttpClientError` (wrapping transport-level errors) or `ParseResult.ParseError` (if schema encoding or decoding fails).
+Each method returns an `Effect` that can fail with `HttpClientError` (wrapping transport-level errors), `ParseResult.ParseError` (if schema encoding or decoding fails), or the ref's declared [typed error](/server/error-handling), if any:
+
+```ts
+HttpClient.query(refs.public.notes.getOrFail, { noteId });
+// Effect.Effect<Note, NoteNotFound | HttpClientError | ParseError>
+```
 
 ## Authentication
 
