@@ -6,105 +6,121 @@
 "@confect/test": minor
 ---
 
-Add typed function errors via an optional `error: Schema` field on `FunctionSpec.publicQuery` / `publicMutation` / `publicAction` (and their `internal*` and `*NodeAction` variants). Handlers can now fail with values of the declared error type — typically an `Effect.TaggedError` — and Confect surfaces the decoded error in the Effect `E` channel at every consumer call site.
+Add typed errors to Confect functions (queries, mutations, and actions). Declare an optional `error` schema in `FunctionSpec` and recover it as a typed value at every call site — `useQuery`, `useMutation`, `useAction`, `HttpClient`, `WebSocketClient`, and `TestConfect` — without paying for it on functions that don't fail.
 
-When a handler fails with a typed error, Confect schema-encodes the error data and throws as a `ConvexError` so vanilla Convex tooling sees a normal failure. `QueryRunner`, `MutationRunner`, and `ActionRunner` then decode the error back into the Effect `E` channel of any calling Confect handler, so nested calls retain typed-error semantics. `@confect/test`'s `query` / `mutation` / `action` and `@confect/js`'s `HttpClient` / `WebSocketClient` (including `reactiveQuery`) all expose the typed error in their respective `E` channels alongside `ParseResult.ParseError` and any client-specific transport error.
+Typed errors travel across the function boundary as Convex's native [`ConvexError`](https://docs.convex.dev/functions/error-handling/application-errors#throwing-application-errors): the encoded error sits in `ConvexError.data`, leaving the `returns` channel unsullied and preserving native Convex semantics for non-Confect callers of the same API.
 
-`@confect/react`'s `useQuery` returns a dedicated `QueryResult<A, E>` type, shaped for Convex subscriptions:
+### Authoring a function with typed errors
 
-- **`{ _tag: "Loading", skipped }`** — no data from Convex yet. `skipped` is `true` when the second argument was `"skip"`, letting you distinguish a deliberately-skipped subscription from one waiting for its first value.
-- **`{ _tag: "Success", value }`** — decoded `returns` value.
-- **`{ _tag: "Failure", error }`** — the query threw a `ConvexError` whose payload matches the ref's `error` schema; `error` is the decoded typed error.
+`FunctionSpec` constructors now accept an optional `error` schema. To support multiple error shapes, combine them with `Schema.Union`.
 
-If the failure is not a matching typed error (including refs without an `error` schema), or client-side args/returns decoding throws, **`useQuery` rethrows** so you can recover with a React error boundary (or treat it like other unexpected render errors). Use `QueryResult.match` (whose `onLoading` callback receives `skipped`), or `isLoading` / `isSuccess` / `isFailure`. These are available either via the `QueryResult` namespace export from `@confect/react` or as a dedicated subpath import from `@confect/react/QueryResult`.
+```ts
+import { FunctionSpec, GenericId, GroupSpec } from "@confect/core";
+import { Schema } from "effect";
 
-`QueryResult.match` **requires `onFailure` only when the error type parameter `E` is not `never`** (queries whose ref declares an `error` schema). For queries with no typed failure channel (`E` is `never`), omit `onFailure` — the `Failure` branch is not part of the static type in that case.
+export class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
+  "NoteNotFound",
+  { noteId: GenericId.GenericId("notes") },
+) {}
 
-**Before:**
-
-```tsx
-import { useQuery } from "@confect/react";
-import refs from "../confect/_generated/refs";
-
-const note = useQuery(refs.public.notes.get, { noteId });
-
-if (note === undefined) return <p>Loading…</p>;
-return <p>{note.text}</p>;
+export const notes = GroupSpec.make("notes").addFunction(
+  FunctionSpec.publicQuery({
+    name: "getOrFail",
+    args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
+    returns: Notes.Doc,
+    error: NoteNotFound,
+  }),
+);
 ```
 
-**After** (where `getOrFail`'s spec declares `error: Schema.Union(NotFound, Forbidden)`):
+The `FunctionImpl` for that ref can now `Effect.fail` (or `mapError` to) any value matching the declared schema. Whichever invocation path the caller takes — `useQuery` / `useMutation` / `useAction`, `HttpClient`, `WebSocketClient`, or `TestConfect` — Confect encodes the failure, transports it via `ConvexError`, and surfaces the decoded value in the appropriate channel for that call site.
 
-```tsx
-import { QueryResult, useQuery } from "@confect/react";
-import { Match } from "effect";
-import refs from "../confect/_generated/refs";
+```ts
+import { FunctionImpl } from "@confect/server";
+import { Effect } from "effect";
+import api from "../_generated/api";
+import { DatabaseReader } from "../_generated/services";
+import { NoteNotFound } from "./notes.spec";
 
-const note = useQuery(refs.public.notes.getOrFail, { noteId });
-
-return QueryResult.match(note, {
-  onLoading: () => <p>Loading…</p>,
-  onSuccess: (value) => <p>{value.text}</p>,
-  onFailure: (error) =>
-    Match.value(error).pipe(
-      Match.tag("NotFound", (e) => <p>Note {e.id} not found.</p>),
-      Match.tag("Forbidden", (e) => <p>Forbidden: {e.reason}</p>),
-      Match.exhaustive,
-    ),
-});
+const getOrFail = FunctionImpl.make(api, "notes", "getOrFail", ({ noteId }) =>
+  Effect.gen(function* () {
+    const reader = yield* DatabaseReader;
+    return yield* reader
+      .table("notes")
+      .get(noteId)
+      .pipe(Effect.mapError(() => new NoteNotFound({ noteId })));
+  }),
+);
 ```
 
-For a ref **without** an `error` schema, `useQuery` still returns `QueryResult<A, never>`; `match` then only needs `onLoading` and `onSuccess`:
+### Consuming a typed error
+
+`@confect/js` (`HttpClient`, `WebSocketClient`) and `@confect/test` (`TestConfect`) surface the decoded error in the `Effect` error channel alongside the existing `HttpClientError` / `WebSocketClientError` / `ParseError`:
+
+```ts
+HttpClient.query(refs.public.notes.getOrFail, { noteId });
+// Effect.Effect<Note, NoteNotFound | HttpClientError | ParseError>
+```
+
+### `@confect/react` — breaking changes
+
+`useQuery`, `useMutation`, and `useAction` now expose typed errors, and `useQuery` returns a tagged result type instead of `Returns | undefined`.
+
+**`useQuery` now returns `QueryResult<A, E>`.** Loading and (when an `error` schema is declared) failure are reified as variants alongside success. Match on the result with `QueryResult.match`:
+
+Before:
 
 ```tsx
 const notes = useQuery(refs.public.notes.list, {});
+if (notes === undefined) return <p>Loading…</p>;
+return <NoteList notes={notes} />;
+```
 
+After:
+
+```tsx
+import { QueryResult, useQuery } from "@confect/react";
+
+const notes = useQuery(refs.public.notes.list, {});
 return QueryResult.match(notes, {
-  onLoading: () => <p>Loading…</p>,
-  onSuccess: (value) => (
-    <ul>
-      {value.map((note) => (
-        <li key={note._id}>{note.text}</li>
-      ))}
-    </ul>
-  ),
+  onLoading: (skipped) => (skipped ? null : <p>Loading…</p>),
+  onSuccess: (notes) => <NoteList notes={notes} />,
 });
 ```
 
-For infrastructure or contract violations outside the typed-error channel, use an error boundary (or avoid calling the hook in a state that can throw, if applicable).
+The `Loading` variant carries a `skipped: boolean` flag, exposed as the argument to `onLoading`. It distinguishes a query that is genuinely in flight (`skipped: false`) from one that is sitting idle because `"skip"` was passed as its args (`skipped: true`) — a distinction `convex/react`'s plain `undefined` return value cannot make. Use it to render a loading indicator only when work is actually happening, and an empty / placeholder state otherwise.
 
-`useMutation` and `useAction` pick their Promise shape based on whether the ref declares typed errors:
-
-- **No `error` schema:** returns `(args) => Promise<Returns>`, matching Convex's `useMutation` / `useAction` — you `await` the decoded value directly.
-- **With an `error` schema:** returns `(args) => Promise<Either<Returns, Error>>`. `Either.Right` carries the decoded return value; `Either.Left` carries the decoded typed error for `ConvexError`s whose payload matches the ref's `error` schema.
-
-For either shape, anything outside the typed-error contract — network failures, contract-violating `ConvexError`s on schema-less refs, or args/returns schema decode failures — rejects the Promise with the original error so plain `try` / `catch` can recover. For refs with an `error` schema, use `Either.match` plus `Match.tags` for exhaustive dispatch on the typed error:
+When the ref declares an `error` schema, `onFailure` becomes required and receives the decoded typed error:
 
 ```tsx
-import { useMutation } from "@confect/react";
-import { Either, Match } from "effect";
-import refs from "../confect/_generated/refs";
-
-const deleteNote = useMutation(refs.public.notes.deleteOrFail);
-
-const onClick = async (noteId: string) => {
-  const result = await deleteNote({ noteId });
-
-  Either.match(result, {
-    onRight: () => {
-      /* navigate, toast, etc. */
-    },
-    onLeft: (error) =>
-      Match.value(error).pipe(
-        Match.tag("NotFound", (e) => /* render NotFound */ undefined),
-        Match.tag("Forbidden", (e) => /* render Forbidden */ undefined),
-        Match.exhaustive,
-      ),
-  });
-};
+const lookup = useQuery(refs.public.notes.getOrFail, { noteId });
+QueryResult.match(lookup, {
+  onLoading: (skipped) => (skipped ? null : "Looking up…"),
+  onSuccess: (note) => `Found: ${note.text}`,
+  onFailure: (error) => `Note ${error.noteId} not found.`,
+});
 ```
 
-### Breaking changes
+`QueryResult` is a Confect-native type exported from `@confect/react`.
 
-- `useQuery` now returns `QueryResult<Returns, Ref.Error<Query>>` (`Loading` with `skipped`, `Success`, `Failure`) instead of `T | undefined`. Typed failures use `Failure.error`; everything outside the typed-error contract throws from the hook (handle with an error boundary). Migrate with `QueryResult.match` or `QueryResult.isLoading` / `isSuccess` / `isFailure`. In `QueryResult.match`, pass **`onFailure` when `Ref.Error<Query>` is not `never`** (ref has an `error` schema); omit **`onFailure` when there is no typed error**. Import from the `QueryResult` namespace re-exported from `@confect/react` or directly from `@confect/react/QueryResult`.
-- `useMutation` / `useAction` on refs **with** an optional `error` schema return `(args) => Promise<Either<Returns, Error>>`; use `Either.match` / `Either.isRight` etc. Everything else rejects the Promise with the original error. Refs **without** an error schema continue to resolve `(args) => Promise<Returns>` — no mutation/action migration needed for those refs.
-- `@confect/test`'s `convex-test` peer dependency is now `^0.0.50` (was `^0.0.38`), which fixes upstream `ConvexError.data` deserialization across function-boundary crossings.
+**`useMutation` and `useAction` return `Promise<Either<A, E>>` when the ref declares an `error` schema.** Refs without an `error` schema continue to resolve to `Promise<A>`, matching the prior shape and `convex/react`'s behavior.
+
+```ts
+const deleteOrFail = useMutation(refs.public.notes.deleteOrFail);
+const result = await deleteOrFail({ noteId });
+// Either.Either<null, NoteNotFound | Forbidden>
+Either.match(result, {
+  onLeft: (error) => /* typed error */,
+  onRight: (value) => /* success */,
+});
+
+const deleteNote = useMutation(refs.public.notes.delete_); // no `error` schema
+await deleteNote({ noteId }); // Promise<null>, as before
+```
+
+Unspecified failures continue to reject the promise.
+
+### Migration
+
+- For each `useQuery` call site, replace `result === undefined` checks and direct property access with `QueryResult.match` (or the lower-level `QueryResult.isLoading` / `isSuccess` / `isFailure` predicates).
+- For each `useMutation` / `useAction` call site whose ref now declares an `error` schema, unwrap the resolved `Either` (e.g. with `Either.match`); call sites against refs without an `error` schema need no change.
