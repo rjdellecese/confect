@@ -266,7 +266,7 @@ export const isConvexError = (error: unknown): error is ConvexError<Value> =>
  * Build a callback-style handler that decodes the ref's typed error from a
  * caught `ConvexError`, or else forwards the value to `mapUnknownError`. The
  * fallback is also invoked when the input *is* a `ConvexError` but the ref
- * doesn't declare a typed-error schema — by definition such a value falls
+ * doesn't declare a typed-error schema—by definition such a value falls
  * outside the ref's error contract. Useful when adapting non-Effect APIs (e.g.
  * emitter callbacks for streamed subscriptions) to the same error semantics
  * that `runWithCodec` provides.

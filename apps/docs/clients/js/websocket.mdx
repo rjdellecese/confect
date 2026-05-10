@@ -120,7 +120,7 @@ Effect.runPromise(program.pipe(Effect.provide(WebSocketClientLive)));
 | Functions referenced via `api.module.fn` | Functions referenced via `refs` |
 | Args passed directly to Convex as-is | Args are schema-encoded from `Type` to `Encoded` before sending |
 | Return values received directly as-is | Return values are schema-decoded from `Encoded` to `Type` |
-| `query` / `mutation` / `action` return `Promise` | `query` / `mutation` / `action` return `Effect` with typed errors |
+| `query`/`mutation`/`action` return `Promise` | `query`/`mutation`/`action` return `Effect` with typed errors |
 | `onUpdate` uses callbacks and returns an unsubscribe function | `reactiveQuery` returns a `Stream` with automatic cleanup |
 | Must call `close()` manually | Connection closed automatically when the layer's scope ends |
 | `setAuth` takes a `Promise`-returning callback | `setAuth` takes an `Effect`-returning function |

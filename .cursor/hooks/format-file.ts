@@ -36,21 +36,21 @@ const SUPPORTED_EXTENSIONS = new Set([
   ".yml",
   // TOML
   ".toml",
-  // HTML / Angular / Vue
+  // HTML/Angular/Vue
   ".html",
   ".htm",
   ".vue",
-  // CSS / SCSS / Less
+  // CSS/SCSS/Less
   ".css",
   ".scss",
   ".less",
-  // Markdown / MDX
+  // Markdown/MDX
   ".md",
   ".mdx",
   // GraphQL
   ".graphql",
   ".gql",
-  // Handlebars / Ember
+  // Handlebars/Ember
   ".hbs",
 ]);
 

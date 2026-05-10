@@ -32,9 +32,9 @@ Packages are built with tsdown. There is no Turborepo; orchestration is via pnpm
 - `pnpm build` - Build all @confect packages
 - `pnpm dev` - Watch-rebuild all packages and apps in parallel
 - `pnpm dev:packages` - Watch-rebuild all packages only
-- `pnpm test:core` / `pnpm test:js` / `pnpm test:server` / `pnpm test:cli` - Run tests for a specific package via Vitest
+- `pnpm test:core`/`pnpm test:js`/`pnpm test:server`/`pnpm test:cli` - Run tests for a specific package via Vitest
 - `pnpm typecheck` - Typecheck all packages
-- `pnpm lint` / `pnpm fix` - Lint or auto-fix all packages
+- `pnpm lint`/`pnpm fix` - Lint or auto-fix all packages
 - `pnpm format` - Check formatting via Prettier across all packages
 - `pnpm clean` - Remove dist, coverage, and node_modules everywhere
 

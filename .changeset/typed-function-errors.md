@@ -6,7 +6,7 @@
 "@confect/test": minor
 ---
 
-Add typed errors to Confect functions (queries, mutations, and actions). Declare an optional `error` schema in `FunctionSpec` and recover it as a typed value at every call site — `useQuery`, `useMutation`, `useAction`, `HttpClient`, `WebSocketClient`, and `TestConfect` — without paying for it on functions that don't fail.
+Add typed errors to Confect functions (queries, mutations, and actions). Declare an optional `error` schema in `FunctionSpec` and recover it as a typed value at every call site—`useQuery`, `useMutation`, `useAction`, `HttpClient`, `WebSocketClient`, and `TestConfect`—without paying for it on functions that don't fail.
 
 Typed errors travel across the function boundary as Convex's native [`ConvexError`](https://docs.convex.dev/functions/error-handling/application-errors#throwing-application-errors): the encoded error sits in `ConvexError.data`, leaving the `returns` channel unsullied and preserving native Convex semantics for non-Confect callers of the same API.
 
@@ -33,7 +33,7 @@ export const notes = GroupSpec.make("notes").addFunction(
 );
 ```
 
-The `FunctionImpl` for that ref can now `Effect.fail` (or `mapError` to) any value matching the declared schema. Whichever invocation path the caller takes — `useQuery` / `useMutation` / `useAction`, `HttpClient`, `WebSocketClient`, or `TestConfect` — Confect encodes the failure, transports it via `ConvexError`, and surfaces the decoded value in the appropriate channel for that call site.
+The `FunctionImpl` for that ref can now `Effect.fail` (or `mapError` to) any value matching the declared schema. Whichever invocation path the caller takes—`useQuery`/`useMutation`/`useAction`, `HttpClient`, `WebSocketClient`, or `TestConfect`—Confect encodes the failure, transports it via `ConvexError`, and surfaces the decoded value in the appropriate channel for that call site.
 
 ```ts
 import { FunctionImpl } from "@confect/server";
@@ -55,14 +55,14 @@ const getOrFail = FunctionImpl.make(api, "notes", "getOrFail", ({ noteId }) =>
 
 ### Consuming a typed error
 
-`@confect/js` (`HttpClient`, `WebSocketClient`) and `@confect/test` (`TestConfect`) surface the decoded error in the `Effect` error channel alongside the existing `HttpClientError` / `WebSocketClientError` / `ParseError`:
+`@confect/js` (`HttpClient`, `WebSocketClient`) and `@confect/test` (`TestConfect`) surface the decoded error in the `Effect` error channel alongside the existing `HttpClientError`/`WebSocketClientError`/`ParseError`:
 
 ```ts
 HttpClient.query(refs.public.notes.getOrFail, { noteId });
 // Effect.Effect<Note, NoteNotFound | HttpClientError | ParseError>
 ```
 
-### `@confect/react` — breaking changes
+### `@confect/react`—breaking changes
 
 `useQuery`, `useMutation`, and `useAction` now expose typed errors, and `useQuery` returns a tagged result type instead of `Returns | undefined`.
 
@@ -88,7 +88,7 @@ return QueryResult.match(notes, {
 });
 ```
 
-The `Loading` variant carries a `skipped: boolean` flag, exposed as the argument to `onLoading`. It distinguishes a query that is genuinely in flight (`skipped: false`) from one that is sitting idle because `"skip"` was passed as its args (`skipped: true`) — a distinction `convex/react`'s plain `undefined` return value cannot make. Use it to render a loading indicator only when work is actually happening, and an empty / placeholder state otherwise.
+The `Loading` variant carries a `skipped: boolean` flag, exposed as the argument to `onLoading`. It distinguishes a query that is genuinely in flight (`skipped: false`) from one that is sitting idle because `"skip"` was passed as its args (`skipped: true`)—a distinction `convex/react`'s plain `undefined` return value cannot make. Use it to render a loading indicator only when work is actually happening, and an empty/placeholder state otherwise.
 
 When the ref declares an `error` schema, `onFailure` becomes required and receives the decoded typed error:
 
@@ -122,5 +122,5 @@ Unspecified failures continue to reject the promise.
 
 ### Migration
 
-- For each `useQuery` call site, replace `result === undefined` checks and direct property access with `QueryResult.match` (or the lower-level `QueryResult.isLoading` / `isSuccess` / `isFailure` predicates).
-- For each `useMutation` / `useAction` call site whose ref now declares an `error` schema, unwrap the resolved `Either` (e.g. with `Either.match`); call sites against refs without an `error` schema need no change.
+- For each `useQuery` call site, replace `result === undefined` checks and direct property access with `QueryResult.match` (or the lower-level `QueryResult.isLoading`/`isSuccess`/`isFailure` predicates).
+- For each `useMutation`/`useAction` call site whose ref now declares an `error` schema, unwrap the resolved `Either` (e.g. with `Either.match`); call sites against refs without an `error` schema need no change.

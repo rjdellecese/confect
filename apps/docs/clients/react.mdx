@@ -4,7 +4,7 @@ title: "React"
 description: "Use Confect's React hooks to call your functions from the client."
 ---
 
-`@confect/react` provides drop-in replacements for Convex's React hooks. Each hook automatically encodes your args and decodes return values through the [Effect Schemas](/concepts/schema-restrictions) defined in your [function specs](/concepts/spec-impl-model). You work with the Schema `Type` (decoded) values on both sides — the hooks handle the round-trip to Convex's `Encoded` representation transparently.
+`@confect/react` provides drop-in replacements for Convex's React hooks. Each hook automatically encodes your args and decodes return values through the [Effect Schemas](/concepts/schema-restrictions) defined in your [function specs](/concepts/spec-impl-model). You work with the Schema `Type` (decoded) values on both sides—the hooks handle the round-trip to Convex's `Encoded` representation transparently.
 
 Functions are referenced via `refs` (from `confect/_generated/refs`) instead of Convex's `api` object. Each ref carries the `args` and `returns` schemas from the corresponding function spec, which is what enables the automatic encoding and decoding.
 
@@ -175,4 +175,4 @@ const RandomNumber = () => {
 | Functions referenced via `api.module.fn` | Functions referenced via `refs` |
 | Args passed directly to Convex as-is | Args are schema-encoded from `Type` to `Encoded` before sending to Convex |
 | Return values received directly from Convex as-is | Return values are schema-decoded from `Encoded` to `Type` before returning |
-| Pass `"skip"` to disable query subscription | Same — pass `"skip"` to disable query subscription |
+| Pass `"skip"` to disable query subscription | Same—pass `"skip"` to disable query subscription |

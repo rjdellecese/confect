@@ -105,9 +105,9 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
 // relying on real time for correctness anyway.
 //
 // Users who explicitly want the real timestamp can still reach it via Effect's
-// Clock service (Clock.currentTimeMillis / Clock.currentTimeNanos). We provide
+// Clock service (Clock.currentTimeMillis/Clock.currentTimeNanos). We provide
 // a Clock layer whose methods close over the *original* Date.now, so opting in
-// to Clock is an opt-in to worse caching — but caching is not broken by default.
+// to Clock is an opt-in to worse caching—but caching is not broken by default.
 const unpatchedClock = (realDateNow: () => number): Clock.Clock => {
   const bigint1e6 = BigInt(1_000_000);
   const unsafeCurrentTimeMillis = () => realDateNow();
