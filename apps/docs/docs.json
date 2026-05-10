@@ -55,6 +55,7 @@
         "group": "Server",
         "pages": [
           "server/functions",
+          "server/typed-errors",
           "server/plain-convex-functions",
           "server/node-actions",
           {

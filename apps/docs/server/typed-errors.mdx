@@ -1,0 +1,195 @@
+---
+icon: "shield-alert"
+title: "Typed Errors"
+description: "Declare typed error schemas on Confect functions and recover them as decoded values at every call site."
+---
+
+Confect functions can declare an optional `error` schema alongside their `args` and `returns` schemas. When a handler fails with a value matching the schema, the error is encoded, transported across the function boundary, and surfaced as a decoded, typed value to the caller.
+
+Use typed errors when a function has a known failure mode that callers should handle explicitly — for example, "note not found", "insufficient permissions", or a domain-specific validation error. Use plain `Effect.orDie` (or let an exception bubble) for unexpected failures that should surface as defects.
+
+## How it works
+
+Typed errors are transported as Convex's native [`ConvexError`](https://docs.convex.dev/functions/error-handling/application-errors#throwing-application-errors). The encoded error sits in `ConvexError.data`, leaving the function's `returns` channel untouched and preserving native Convex semantics for non-Confect callers of the same API.
+
+Each Confect call site — `useQuery`, `useMutation`, `useAction`, `HttpClient`, `WebSocketClient`, and `TestConfect` — detects the `ConvexError`, decodes its data against the ref's `error` schema, and surfaces the decoded value in the appropriate channel for that call site.
+
+## Declaring a typed error
+
+Add an `error` schema to any `FunctionSpec` constructor. The schema can be any Effect `Schema` — most commonly a `Schema.TaggedError` for a single failure mode, or a `Schema.Union` of tagged errors for multiple failure modes.
+
+```ts confect/notes.spec.ts
+import { FunctionSpec, GenericId, GroupSpec } from "@confect/core";
+import { Schema } from "effect";
+
+import { Notes } from "./tables/Notes";
+
+export class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
+  "NoteNotFound",
+  { noteId: GenericId.GenericId("notes") },
+) {}
+
+export const notes = GroupSpec.make("notes").addFunction(
+  FunctionSpec.publicQuery({
+    name: "getOrFail",
+    args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
+    returns: Notes.Doc,
+    error: NoteNotFound,
+  }),
+);
+```
+
+To support multiple error shapes, combine them with `Schema.Union`:
+
+```ts
+export class Forbidden extends Schema.TaggedError<Forbidden>()(
+  "Forbidden",
+  {},
+) {}
+
+FunctionSpec.publicMutation({
+  name: "deleteOrFail",
+  args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
+  returns: Schema.Null,
+  error: Schema.Union(NoteNotFound, Forbidden),
+});
+```
+
+## Implementing a function with typed errors
+
+The handler can `Effect.fail` with any value matching the declared schema. Confect encodes the failure and transports it via `ConvexError` automatically.
+
+```ts confect/notes.impl.ts
+import { FunctionImpl } from "@confect/server";
+import { Effect } from "effect";
+
+import api from "../_generated/api";
+import { DatabaseReader } from "../_generated/services";
+import { NoteNotFound } from "./notes.spec";
+
+const getOrFail = FunctionImpl.make(
+  api,
+  "notes",
+  "getOrFail",
+  ({ noteId }) =>
+    Effect.gen(function* () {
+      const reader = yield* DatabaseReader;
+
+      return yield* reader
+        .table("notes")
+        .get(noteId)
+        .pipe(Effect.mapError(() => new NoteNotFound({ noteId })));
+    }),
+);
+```
+
+Failures that fall outside the declared schema continue to surface as defects on the caller — they are not part of the function's typed error contract.
+
+## Consuming typed errors
+
+### React hooks
+
+`useQuery` returns a [`QueryResult`](/clients/react#query-results) with a `Failure` variant carrying the decoded error. Match on it with `QueryResult.match`:
+
+```tsx
+import { QueryResult, useQuery } from "@confect/react";
+import refs from "../confect/_generated/refs";
+
+const NoteLookup = ({ noteId }: { noteId: GenericId<"notes"> }) => {
+  const lookup = useQuery(refs.public.notes.getOrFail, { noteId });
+
+  return QueryResult.match(lookup, {
+    onLoading: () => <p>Looking up…</p>,
+    onSuccess: (note) => <p>Found: {note.text}</p>,
+    onFailure: (error) => <p>Note {error.noteId} not found.</p>,
+  });
+};
+```
+
+`useMutation` and `useAction` resolve to `Promise<Either<Returns, Error>>` when the ref declares an `error` schema. Match on the `Either` to handle the success and failure branches:
+
+```tsx
+import { useMutation } from "@confect/react";
+import { Either } from "effect";
+import refs from "../confect/_generated/refs";
+
+const DeleteNote = ({ noteId }: { noteId: GenericId<"notes"> }) => {
+  const deleteOrFail = useMutation(refs.public.notes.deleteOrFail);
+
+  const handleClick = async () => {
+    const result = await deleteOrFail({ noteId });
+    Either.match(result, {
+      onLeft: (error) => console.error("Failed:", error._tag),
+      onRight: () => console.log("Deleted"),
+    });
+  };
+
+  return <button onClick={handleClick}>Delete</button>;
+};
+```
+
+Refs without an `error` schema continue to resolve to `Promise<Returns>` — no `Either` wrapper — matching `convex/react`'s behavior.
+
+### JS clients
+
+`HttpClient` and `WebSocketClient` surface the decoded error in the `Effect` error channel alongside the existing transport and parse errors.
+
+```ts
+import { HttpClient } from "@confect/js";
+import { Effect } from "effect";
+
+import refs from "./confect/_generated/refs";
+
+const program = Effect.gen(function* () {
+  const client = yield* HttpClient.HttpClient;
+
+  return yield* client.query(refs.public.notes.getOrFail, { noteId });
+  // Effect.Effect<Note, NoteNotFound | HttpClientError | ParseError>
+});
+```
+
+Handle the typed error with `Effect.catchTag` (or `Effect.catchTags` for a union):
+
+```ts
+program.pipe(
+  Effect.catchTag("NoteNotFound", (error) =>
+    Effect.succeed(`Note ${error.noteId} not found`),
+  ),
+);
+```
+
+### Tests
+
+`TestConfect`'s `query`, `mutation`, and `action` methods surface the decoded error in the `Effect` error channel, so you can assert on it with `Effect.either` or `Effect.exit`:
+
+```ts test/notes.test.ts
+import { describe, it } from "@effect/vitest";
+import { assertEquals } from "@effect/vitest/utils";
+import { Effect, Either } from "effect";
+
+import refs from "./confect/_generated/refs";
+import * as TestConfect from "./TestConfect";
+
+describe("getOrFail", () => {
+  it.effect("fails with NoteNotFound for an unknown id", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      const result = yield* Effect.either(
+        c.query(refs.public.notes.getOrFail, {
+          noteId: "missing" as GenericId<"notes">,
+        }),
+      );
+
+      assertEquals(Either.isLeft(result), true);
+      if (Either.isLeft(result)) {
+        assertEquals(result.left._tag, "NoteNotFound");
+      }
+    }).pipe(Effect.provide(TestConfect.layer())),
+  );
+});
+```
+
+## Interop with non-Confect callers
+
+Because typed errors are transported as plain `ConvexError`s, any client calling your Confect function with the vanilla Convex SDK still sees a standard `ConvexError` with the encoded payload in `error.data`. The typed-error contract is additive — it costs nothing for callers that don't opt in.

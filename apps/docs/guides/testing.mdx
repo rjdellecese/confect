@@ -98,6 +98,38 @@ Effect.gen(function* () {
 });
 ```
 
+## Asserting on typed errors
+
+When a function declares an [`error` schema](/server/typed-errors), `query`, `mutation`, and `action` surface the decoded error in the `Effect` error channel. Use `Effect.either` or `Effect.exit` to assert on the failure path.
+
+```ts test/notes.test.ts
+import { describe, it } from "@effect/vitest";
+import { assertEquals } from "@effect/vitest/utils";
+import { Effect, Either } from "effect";
+
+import refs from "./confect/_generated/refs";
+import * as TestConfect from "./TestConfect";
+
+describe("getOrFail", () => {
+  it.effect("fails with NoteNotFound for an unknown id", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      const result = yield* Effect.either(
+        c.query(refs.public.notes.getOrFail, {
+          noteId: "missing" as GenericId<"notes">,
+        }),
+      );
+
+      assertEquals(Either.isLeft(result), true);
+      if (Either.isLeft(result)) {
+        assertEquals(result.left._tag, "NoteNotFound");
+      }
+    }).pipe(Effect.provide(TestConfect.layer())),
+  );
+});
+```
+
 ## Running setup code
 
 Use `run` to execute arbitrary code with mutation-context services (like `DatabaseWriter`) for test setup. When the handler returns a value, pass a `Schema` as the second argument for decoding.

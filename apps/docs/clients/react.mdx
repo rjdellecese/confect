@@ -6,7 +6,7 @@ description: "Use Confect's React hooks to call your functions from the client."
 
 `@confect/react` provides drop-in replacements for Convex's React hooks. Each hook automatically encodes your args and decodes return values through the [Effect Schemas](/concepts/schema-restrictions) defined in your [function specs](/concepts/spec-impl-model). You work with the Schema `Type` (decoded) values on both sides — the hooks handle the round-trip to Convex's `Encoded` representation transparently.
 
-Functions are referenced via `refs` (from `confect/_generated/refs`) instead of Convex's `api` object. Each ref carries the `args` and `returns` schemas from the corresponding function spec, which is what enables the automatic encoding and decoding.
+Functions are referenced via `refs` (from `confect/_generated/refs`) instead of Convex's `api` object. Each ref carries the `args`, `returns`, and (optional) `error` schemas from the corresponding function spec, which is what enables the automatic encoding, decoding, and [typed error](/server/typed-errors) recovery.
 
 ## Setup
 
@@ -36,7 +36,7 @@ ReactDOM.createRoot(
 
 ## `useQuery`
 
-Encodes args using the spec's `args` schema, passes them to Convex, and decodes the result using the spec's `returns` schema. Returns `T | undefined` (undefined while loading), matching Convex's `useQuery`.
+Encodes args using the spec's `args` schema, passes them to Convex, and decodes the result using the spec's `returns` schema. Returns a `QueryResult<A, E>` — a tagged union with `Loading`, `Success`, and `Failure` variants — instead of `A | undefined`.
 
 Given this spec:
 
@@ -55,35 +55,48 @@ export const notes = GroupSpec.make("notes").addFunction(
 );
 ```
 
-The hook accepts `{}` (the `Type` of `Schema.Struct({})`) as args and returns `readonly Notes.Doc["Type"][]` (the `Type` of `Schema.Array(Notes.Doc)`):
+The hook accepts `{}` (the `Type` of `Schema.Struct({})`) as args and returns `QueryResult<readonly Notes.Doc["Type"][], never>`. Use `QueryResult.match` to render each variant:
 
 ```tsx
-import { useQuery } from "@confect/react";
+import { QueryResult, useQuery } from "@confect/react";
 import refs from "../confect/_generated/refs";
 
 const NoteList = () => {
   const notes = useQuery(refs.public.notes.list, {});
 
-  if (notes === undefined) {
-    return <p>Loading…</p>;
-  }
-
-  return (
-    <ul>
-      {notes.map((note) => (
-        <li key={note._id}>{note.text}</li>
-      ))}
-    </ul>
-  );
+  return QueryResult.match(notes, {
+    onLoading: () => <p>Loading…</p>,
+    onSuccess: (notes) => (
+      <ul>
+        {notes.map((note) => (
+          <li key={note._id}>{note.text}</li>
+        ))}
+      </ul>
+    ),
+  });
 };
 ```
 
+### Query results
+
+`QueryResult<A, E>` is a tagged union with three variants:
+
+| Variant   | Description                                                                                                                                                                                               |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Loading` | The query has no result yet. Carries a `skipped: boolean` flag (exposed as the argument to `onLoading`) that is `true` when `"skip"` was passed as args, and `false` when a fetch is genuinely in flight. |
+| `Success` | The query succeeded. Carries the decoded `returns` value.                                                                                                                                                 |
+| `Failure` | The query failed with a [typed error](/server/typed-errors). Only present when the ref declares an `error` schema. Carries the decoded error.                                                             |
+
+`QueryResult.match` requires `onFailure` only when the ref declares an `error` schema — for refs without typed errors, `E` is `never` and the failure variant is unreachable. You can also use `QueryResult.isLoading`, `QueryResult.isSuccess`, and `QueryResult.isFailure` directly if you prefer predicates over `match`.
+
+Failures that fall outside the ref's `error` schema (network errors, decode errors, contract violations) are thrown from the hook, so they propagate to the nearest React error boundary rather than producing a `Failure` variant.
+
 ### Skipping queries
 
-Pass `"skip"` instead of args to disable the query subscription. The hook returns `undefined` when skipped, just as it does while loading. This is useful for conditional queries where a prerequisite value may not yet be available.
+Pass `"skip"` instead of args to disable the query subscription. The hook returns a `Loading` variant with `skipped: true`. This is useful for conditional queries where a prerequisite value may not yet be available — use the `skipped` flag inside `onLoading` to distinguish "actively fetching" from "idle, waiting for input".
 
 ```tsx
-import { useQuery } from "@confect/react";
+import { QueryResult, useQuery } from "@confect/react";
 import refs from "../confect/_generated/refs";
 
 const NoteDetail = ({
@@ -96,19 +109,36 @@ const NoteDetail = ({
     selectedId !== undefined ? { id: selectedId } : "skip",
   );
 
-  if (note === undefined) {
-    return (
-      <p>{selectedId === undefined ? "Select a note" : "Loading…"}</p>
-    );
-  }
-
-  return <p>{note.text}</p>;
+  return QueryResult.match(note, {
+    onLoading: (skipped) =>
+      skipped ? <p>Select a note</p> : <p>Loading…</p>,
+    onSuccess: (note) => <p>{note.text}</p>,
+  });
 };
+```
+
+### Typed errors
+
+When a ref declares an `error` schema, `QueryResult` gains a `Failure` variant carrying the decoded error, and `onFailure` becomes required in `QueryResult.match`. See [Typed Errors](/server/typed-errors) for the full pattern.
+
+```tsx
+const lookup = useQuery(refs.public.notes.getOrFail, { noteId });
+
+QueryResult.match(lookup, {
+  onLoading: () => "Looking up…",
+  onSuccess: (note) => `Found: ${note.text}`,
+  onFailure: (error) => `Note ${error.noteId} not found.`,
+});
 ```
 
 ## `useMutation`
 
-Returns a function that encodes args using the spec's `args` schema, calls the Convex mutation, and decodes the result using the spec's `returns` schema. Returns `(args) => Promise<T>`, matching Convex's `useMutation`.
+Returns a function that encodes args using the spec's `args` schema, calls the Convex mutation, and decodes the result using the spec's `returns` schema.
+
+The return shape depends on whether the ref declares an `error` schema:
+
+- **No `error` schema:** the returned function resolves to `Promise<Returns>`, matching `convex/react`'s behavior.
+- **With an `error` schema:** the returned function resolves to `Promise<Either<Returns, Error>>`. The success value is on the `Right`, the decoded typed error on the `Left`. Match on the `Either` to handle each branch. See [Typed Errors](/server/typed-errors) for details.
 
 Given this spec:
 
@@ -120,7 +150,7 @@ FunctionSpec.publicMutation({
 });
 ```
 
-The returned function accepts `{ text: string }` (the `Type` of the `args` schema) and returns a `Promise<GenericId<"notes">>` (the `Type` of the `returns` schema):
+The returned function accepts `{ text: string }` and returns a `Promise<GenericId<"notes">>`:
 
 ```tsx
 import { useMutation } from "@confect/react";
@@ -137,9 +167,11 @@ const InsertNote = () => {
 };
 ```
 
+Failures that fall outside the ref's `error` schema reject the returned promise — wrap the call in `try`/`catch` or chain `.catch(...)` to handle them.
+
 ## `useAction`
 
-Same pattern as `useMutation`: encodes args via the spec's `args` schema, calls the Convex action, and decodes the result via the spec's `returns` schema. Returns `(args) => Promise<T>`.
+Same pattern as `useMutation`: encodes args via the spec's `args` schema, calls the Convex action, and decodes the result via the spec's `returns` schema. Return shape follows the same rule — `Promise<Returns>` without an `error` schema, `Promise<Either<Returns, Error>>` with one.
 
 Given this spec:
 
@@ -170,9 +202,12 @@ const RandomNumber = () => {
 
 ## Differences from vanilla Convex hooks
 
-| Vanilla Convex | Confect |
-| --- | --- |
-| Functions referenced via `api.module.fn` | Functions referenced via `refs` |
-| Args passed directly to Convex as-is | Args are schema-encoded from `Type` to `Encoded` before sending to Convex |
-| Return values received directly from Convex as-is | Return values are schema-decoded from `Encoded` to `Type` before returning |
-| Pass `"skip"` to disable query subscription | Same — pass `"skip"` to disable query subscription |
+| Vanilla Convex                                            | Confect                                                                                                          |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Functions referenced via `api.module.fn`                  | Functions referenced via `refs`                                                                                  |
+| Args passed directly to Convex as-is                      | Args are schema-encoded from `Type` to `Encoded` before sending to Convex                                        |
+| Return values received directly from Convex as-is         | Return values are schema-decoded from `Encoded` to `Type` before returning                                       |
+| `useQuery` returns `Returns \| undefined`                 | `useQuery` returns `QueryResult<Returns, Error>` — a tagged `Loading` / `Success` / `Failure` union              |
+| `useMutation` / `useAction` resolve to `Promise<Returns>` | Same when no `error` schema is declared; `Promise<Either<Returns, Error>>` when one is                           |
+| No typed-error support — every failure rejects/throws     | Failures matching the ref's `error` schema surface as decoded values; everything else rejects/throws as before   |
+| Pass `"skip"` to disable query subscription               | Same — pass `"skip"` to disable query subscription. Reified as `Loading.skipped === true` on the result.         |
