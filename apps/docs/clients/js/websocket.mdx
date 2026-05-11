@@ -68,6 +68,45 @@ const program = Effect.gen(function* () {
 
 The underlying WebSocket subscription is cleaned up automatically when the stream's scope ends (for example, when the consuming Effect is interrupted or when an operator like `Stream.take` completes).
 
+## Typed errors
+
+When a ref's spec declares an `error` schema, the decoded error is added to the error channel of `query`, `mutation`, `action`, and `reactiveQuery` alongside `WebSocketClientError` and `ParseError`. See [Error Handling](/server/error-handling) for how to declare error schemas.
+
+```ts
+import { WebSocketClient } from "@confect/js";
+import { Effect } from "effect";
+
+import refs from "./confect/_generated/refs";
+
+const lookup = Effect.gen(function* () {
+  const client = yield* WebSocketClient.WebSocketClient;
+
+  return yield* client.query(refs.public.notes.getOrFail, { noteId });
+});
+// Effect.Effect<Note, NoteNotFound | WebSocketClientError | ParseError, WebSocketClient.WebSocketClient>
+```
+
+For `reactiveQuery`, a typed failure terminates the `Stream` with the decoded value in its error channel — the subscription does not stay open across failures. Recover with `Stream.catchTag` (or any other `Stream` error combinator) to keep the stream alive across typed failures.
+
+```ts
+import { WebSocketClient } from "@confect/js";
+import { Effect, Stream } from "effect";
+
+import refs from "./confect/_generated/refs";
+
+const lookups = Effect.gen(function* () {
+  const client = yield* WebSocketClient.WebSocketClient;
+
+  return client
+    .reactiveQuery(refs.public.notes.getOrFail, { noteId })
+    .pipe(
+      Stream.catchTag("NoteNotFound", (error) =>
+        Stream.succeed(`Note ${error.noteId} not found.`),
+      ),
+    );
+});
+```
+
 ## Authentication
 
 Set the authentication token provider before making authenticated requests. `setAuth` accepts an Effect-returning function that is called whenever a token is needed or expires.
