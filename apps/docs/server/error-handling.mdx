@@ -4,7 +4,7 @@ title: "Error Handling"
 description: "Declare typed errors on Confect functions and consume them at every call site."
 ---
 
-A Confect function can declare a typed error in its spec. When the handler fails with a value matching that schema, the error travels across the function boundary and surfaces — already decoded — at every call site (React hooks, JS clients, and tests).
+A Confect function can declare a typed error in its spec. When the handler fails with a value matching that schema, the error travels across the function boundary and surfaces—already decoded—at every call site (React hooks, JS clients, and tests).
 
 Typed errors are transported as Convex's native [`ConvexError`](https://docs.convex.dev/functions/error-handling/application-errors#throwing-application-errors), with the encoded error stored in `ConvexError.data`. The `returns` channel is left untouched, and non-Confect callers of the same Convex API see ordinary `ConvexError`s. For mutations, throwing a `ConvexError` triggers Convex's transaction rollback as usual.
 
