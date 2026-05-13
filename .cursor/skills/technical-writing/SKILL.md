@@ -11,12 +11,12 @@ Best practices for technical documentation, distilled from [Mintlify's Guide to 
 
 Categorize every page into exactly one type before writing:
 
-| Type | Reader Goal | Structure | Assumed Knowledge |
-|------|-------------|-----------|-------------------|
-| **Tutorial** | Learn through practice | Sequential steps, guided tasks | None (beginner) |
-| **How-to guide** | Solve a specific problem | Problem-solution, logical sequence | Some (intermediate) |
-| **Reference** | Look up precise details | Scannable facts, tables, specs | Significant (experienced) |
-| **Explanation** | Understand concepts | Conceptual discussion, background | Any level |
+| Type             | Reader Goal              | Structure                          | Assumed Knowledge         |
+| ---------------- | ------------------------ | ---------------------------------- | ------------------------- |
+| **Tutorial**     | Learn through practice   | Sequential steps, guided tasks     | None (beginner)           |
+| **How-to guide** | Solve a specific problem | Problem-solution, logical sequence | Some (intermediate)       |
+| **Reference**    | Look up precise details  | Scannable facts, tables, specs     | Significant (experienced) |
+| **Explanation**  | Understand concepts      | Conceptual discussion, background  | Any level                 |
 
 ### Writing approach per type
 
@@ -37,7 +37,7 @@ Each piece of content should target **one specific persona**. Common personas:
 - **Developer** integrating the product
 - **AI agents/LLMs** retrieving structured answers
 
-Before writing, answer: *What is the reader trying to accomplish? How much do they already know?*
+Before writing, answer: _What is the reader trying to accomplish? How much do they already know?_
 
 ### Writing for AI agents
 
@@ -55,11 +55,11 @@ Practices that help LLMs also help humans:
 
 ### Core principles
 
-1. **Be concise** — readers want to achieve a goal, not read prose. Cut unnecessary words.
-2. **Clarity over cleverness** — simple, direct language. Avoid jargon and complex sentences.
-3. **Active voice** — "Create a configuration file" not "A configuration file should be created."
-4. **Skimmable** — use headings to orient. Break up text-heavy paragraphs.
-5. **Second person** — address the reader as "you."
+1. **Be concise**—readers want to achieve a goal, not read prose. Cut unnecessary words.
+2. **Clarity over cleverness**—simple, direct language. Avoid jargon and complex sentences.
+3. **Active voice**—"Create a configuration file" not "A configuration file should be created."
+4. **Skimmable**—use headings to orient. Break up text-heavy paragraphs.
+5. **Second person**—address the reader as "you."
 
 ### Common mistakes to avoid
 
@@ -72,6 +72,7 @@ Practices that help LLMs also help humans:
 ### Style guide references
 
 When standardizing, lean on established guides:
+
 - [Google Developer Documentation Style Guide](https://developers.google.com/style)
 - [Microsoft Style Guide](https://learn.microsoft.com/en-us/style-guide/welcome/)
 
@@ -96,11 +97,11 @@ When standardizing, lean on established guides:
 
 Use screenshots, GIFs, and videos **sparingly and intentionally**. Media is supplementary, not primary.
 
-| Media | When to use | Maintenance cost |
-|-------|-------------|------------------|
-| Screenshot | UI elements that are hard to describe in text | Low (~5 min to update) |
-| GIF | Short, complex workflows or promotional content | Medium (~1 hour) |
-| Video | Abstract concepts and long workflows | High (several hours) |
+| Media      | When to use                                     | Maintenance cost       |
+| ---------- | ----------------------------------------------- | ---------------------- |
+| Screenshot | UI elements that are hard to describe in text   | Low (~5 min to update) |
+| GIF        | Short, complex workflows or promotional content | Medium (~1 hour)       |
+| Video      | Abstract concepts and long workflows            | High (several hours)   |
 
 Always provide alt text for images, subtitles for videos, and transcripts for audio.
 

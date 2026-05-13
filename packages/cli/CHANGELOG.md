@@ -1,5 +1,13 @@
 # @confect/cli
 
+## 7.0.0
+
+### Patch Changes
+
+- Updated dependencies [90094d0]
+  - @confect/core@7.0.0
+  - @confect/server@7.0.0
+
 ## 6.0.0
 
 ### Patch Changes

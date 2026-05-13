@@ -6,6 +6,7 @@ export type FunctionProvenance = Data.TaggedEnum<{
   Confect: {
     args: Schema.Schema.AnyNoContext;
     returns: Schema.Schema.AnyNoContext;
+    error?: Schema.Schema.AnyNoContext;
   };
   Convex: {
     /** @internal */
@@ -18,13 +19,16 @@ export type FunctionProvenance = Data.TaggedEnum<{
 export interface Confect<
   Args extends Schema.Schema.AnyNoContext,
   Returns extends Schema.Schema.AnyNoContext,
+  Error extends Schema.Schema.AnyNoContext = never,
 > {
   readonly _tag: "Confect";
   readonly args: Args;
   readonly returns: Returns;
+  readonly error?: Error;
 }
 
 export interface AnyConfect extends Confect<
+  Schema.Schema.AnyNoContext,
   Schema.Schema.AnyNoContext,
   Schema.Schema.AnyNoContext
 > {}
@@ -42,13 +46,16 @@ export const FunctionProvenance = Data.taggedEnum<FunctionProvenance>();
 export const Confect = <
   Args extends Schema.Schema.AnyNoContext,
   Returns extends Schema.Schema.AnyNoContext,
+  Error extends Schema.Schema.AnyNoContext = never,
 >(
   args: Args,
   returns: Returns,
+  error?: Error,
 ) =>
   FunctionProvenance.Confect({
     args,
     returns,
+    ...(error !== undefined ? { error } : {}),
   });
 
 export const Convex = <_Args extends DefaultFunctionArgs, _Returns>() =>

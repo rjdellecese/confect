@@ -1,31 +1,3 @@
-# AGENTS.md
-
-## Source Code Reference
-
-Source code for dependencies is cached at `~/.opensrc/` for deeper understanding of implementation details.
-
-See `~/.opensrc/sources.json` for the list of cached packages and their versions.
-
-Use this source code when you need to understand how a package works internally, not just its types/interface.
-
-### Reading Source Code
-
-Use `pnpm opensrc path` inside other commands to search, read, or explore a package's source. It fetches source code on cache miss and prints the cached absolute path to stdout.
-
-```bash
-rg "pattern" $(pnpm opensrc path <package>)
-cat $(pnpm opensrc path <package>)/path/to/file
-find $(pnpm opensrc path <package>) -name "*.ts"
-```
-
-Works with any registry:
-
-```bash
-rg "pattern" $(pnpm opensrc path pypi:<package>)
-rg "pattern" $(pnpm opensrc path crates:<package>)
-rg "pattern" $(pnpm opensrc path <owner>/<repo>)
-```
-
 ## Cursor Cloud specific instructions
 
 ### Running the example app
@@ -57,3 +29,26 @@ The example app uses three local ports, all accessible from the browser:
 - **5173**: Vite dev server (frontend)
 - **3210**: Convex backend (WebSocket sync, used by `VITE_CONVEX_URL`)
 - **3211**: Convex HTTP actions server (used by `VITE_CONVEX_SITE_URL`)
+
+<!-- opensrc:start -->
+
+## Source Code Reference
+
+Source code for dependencies is available in `opensrc/` for deeper understanding of implementation details.
+
+See `opensrc/sources.json` for the list of available packages and their versions.
+
+Use this source code when you need to understand how a package works internally, not just its types/interface.
+
+### Fetching Additional Source Code
+
+To fetch source code for a package or repository you need to understand, run:
+
+```bash
+npx opensrc <package>           # npm package (e.g., npx opensrc zod)
+npx opensrc pypi:<package>      # Python package (e.g., npx opensrc pypi:requests)
+npx opensrc crates:<package>    # Rust crate (e.g., npx opensrc crates:serde)
+npx opensrc <owner>/<repo>      # GitHub repo (e.g., npx opensrc vercel/ai)
+```
+
+<!-- opensrc:end -->

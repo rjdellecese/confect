@@ -145,6 +145,27 @@ export type EncodedReturns<FunctionSpec_ extends AnyWithProps> =
       ? Returns_
       : never;
 
+export type Error<FunctionSpec_ extends AnyWithProps> = FunctionSpec_ extends {
+  functionProvenance: FunctionProvenance.Confect<
+    any,
+    any,
+    infer ErrorSchema_ extends Schema.Schema.AnyNoContext
+  >;
+}
+  ? ErrorSchema_["Type"]
+  : never;
+
+export type EncodedError<FunctionSpec_ extends AnyWithProps> =
+  FunctionSpec_ extends {
+    functionProvenance: FunctionProvenance.Confect<
+      any,
+      any,
+      infer ErrorSchema_ extends Schema.Schema.AnyNoContext
+    >;
+  }
+    ? ErrorSchema_["Encoded"]
+    : never;
+
 export type WithName<
   FunctionSpec_ extends AnyWithProps,
   Name_ extends string,
@@ -196,19 +217,22 @@ const make =
     const Name_ extends string,
     Args_ extends Schema.Schema.AnyNoContext,
     Returns_ extends Schema.Schema.AnyNoContext,
+    Error_ extends Schema.Schema.AnyNoContext = never,
   >({
     name,
     args,
     returns,
+    error,
   }: {
     name: Name_;
     args: Args_;
     returns: Returns_;
+    error?: Error_;
   }): FunctionSpec<
     RuntimeAndFunctionType_,
     FunctionVisibility_,
     Name_,
-    FunctionProvenance.Confect<Args_, Returns_>
+    FunctionProvenance.Confect<Args_, Returns_, Error_>
   > => {
     validateConfectFunctionIdentifier(name);
 
@@ -216,7 +240,7 @@ const make =
       runtimeAndFunctionType,
       functionVisibility,
       name,
-      functionProvenance: FunctionProvenance.Confect(args, returns),
+      functionProvenance: FunctionProvenance.Confect(args, returns, error),
     });
   };
 

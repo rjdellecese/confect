@@ -2,6 +2,11 @@ import { FunctionSpec, GenericId, GroupSpec } from "@confect/core";
 import { Schema } from "effect";
 import { Notes } from "../tables/Notes";
 
+export class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
+  "NoteNotFound",
+  { noteId: GenericId.GenericId("notes") },
+) {}
+
 export const notes = GroupSpec.make("notes")
   .addFunction(
     FunctionSpec.publicMutation({
@@ -22,6 +27,14 @@ export const notes = GroupSpec.make("notes")
       name: "delete_",
       args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
       returns: Schema.Null,
+    }),
+  )
+  .addFunction(
+    FunctionSpec.publicQuery({
+      name: "getOrFail",
+      args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
+      returns: Notes.Doc,
+      error: NoteNotFound,
     }),
   )
   .addFunction(

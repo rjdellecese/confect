@@ -27,7 +27,7 @@ const SUPPORTED_EXTENSIONS = new Set([
   ".tsx",
   ".mts",
   ".cts",
-  // Markdown / MDX (apps/docs)
+  // Markdown/MDX (apps/docs)
   ".md",
   ".mdx",
 ]);

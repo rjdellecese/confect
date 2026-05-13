@@ -4,9 +4,9 @@ title: "React"
 description: "Use Confect's React hooks to call your functions from the client."
 ---
 
-`@confect/react` provides drop-in replacements for Convex's React hooks. Each hook automatically encodes your args and decodes return values through the [Effect Schemas](/concepts/schema-restrictions) defined in your [function specs](/concepts/spec-impl-model). You work with the Schema `Type` (decoded) values on both sides — the hooks handle the round-trip to Convex's `Encoded` representation transparently.
+`@confect/react` provides drop-in replacements for Convex's React hooks. Each hook automatically encodes your args and decodes return values through the [Effect Schemas](/concepts/schema-restrictions) defined in your [function specs](/concepts/spec-impl-model). You work with the Schema `Type` (decoded) values on both sides—the hooks handle the round-trip to Convex's `Encoded` representation transparently.
 
-Functions are referenced via `refs` (from `confect/_generated/refs`) instead of Convex's `api` object. Each ref carries the `args` and `returns` schemas from the corresponding function spec, which is what enables the automatic encoding and decoding.
+Functions are referenced via `refs` (from `confect/_generated/refs`) instead of Convex's `api` object. Each ref carries the `args`, `returns`, and (optionally) `error` schemas from the corresponding function spec, which is what enables the automatic encoding and decoding.
 
 ## Setup
 
@@ -36,7 +36,7 @@ ReactDOM.createRoot(
 
 ## `useQuery`
 
-Encodes args using the spec's `args` schema, passes them to Convex, and decodes the result using the spec's `returns` schema. Returns `T | undefined` (undefined while loading), matching Convex's `useQuery`.
+Encodes args using the spec's `args` schema, passes them to Convex, and decodes the result using the spec's `returns` schema. Returns a `QueryResult<A, E>`—a tagged union with `Loading`, `Success`, and `Failure` variants.
 
 Given this spec:
 
@@ -55,35 +55,61 @@ export const notes = GroupSpec.make("notes").addFunction(
 );
 ```
 
-The hook accepts `{}` (the `Type` of `Schema.Struct({})`) as args and returns `readonly Notes.Doc["Type"][]` (the `Type` of `Schema.Array(Notes.Doc)`):
+The hook accepts `{}` (the `Type` of `Schema.Struct({})`) as args and returns a `QueryResult<readonly Notes.Doc["Type"][]>`. Match it with `QueryResult.match`:
 
 ```tsx
-import { useQuery } from "@confect/react";
+import { QueryResult, useQuery } from "@confect/react";
 import refs from "../confect/_generated/refs";
 
 const NoteList = () => {
   const notes = useQuery(refs.public.notes.list, {});
 
-  if (notes === undefined) {
-    return <p>Loading…</p>;
-  }
+  return QueryResult.match(notes, {
+    onLoading: () => <p>Loading…</p>,
+    onSuccess: (notes) => (
+      <ul>
+        {notes.map((note) => (
+          <li key={note._id}>{note.text}</li>
+        ))}
+      </ul>
+    ),
+  });
+};
+```
+
+`QueryResult` also exposes the lower-level predicates `QueryResult.isLoading`, `QueryResult.isSuccess`, and `QueryResult.isFailure` for cases where pattern matching is awkward.
+
+### Typed errors
+
+When the ref's spec declares an `error` schema, `useQuery` returns `QueryResult<A, E>` and `QueryResult.match` requires an `onFailure` handler that receives the decoded typed error. See [Error Handling](/server/error-handling) for how to declare error schemas.
+
+```tsx
+import { QueryResult, useQuery } from "@confect/react";
+import refs from "../confect/_generated/refs";
+
+const NoteLookup = ({ noteId }: { noteId: string }) => {
+  const lookup = useQuery(refs.public.notes.getOrFail, { noteId });
 
   return (
-    <ul>
-      {notes.map((note) => (
-        <li key={note._id}>{note.text}</li>
-      ))}
-    </ul>
+    <div>
+      {QueryResult.match(lookup, {
+        onLoading: () => "Looking up…",
+        onSuccess: (note) => `Found: ${note.text}`,
+        onFailure: (error) => `Note ${error.noteId} not found.`,
+      })}
+    </div>
   );
 };
 ```
 
+Failures that are not declared in the `error` schema are not surfaced as `Failure`. They propagate the same way they do with `convex/react`'s `useQuery` (typically reaching the nearest [error boundary](https://react.dev/reference/react/Component#catching-rendering-errors-with-an-error-boundary)).
+
 ### Skipping queries
 
-Pass `"skip"` instead of args to disable the query subscription. The hook returns `undefined` when skipped, just as it does while loading. This is useful for conditional queries where a prerequisite value may not yet be available.
+Pass `"skip"` instead of args to disable the query subscription. The hook returns a `Loading` variant whose `skipped` flag is `true`, which lets you distinguish a query that is genuinely in flight from one sitting idle because no args have been provided.
 
 ```tsx
-import { useQuery } from "@confect/react";
+import { QueryResult, useQuery } from "@confect/react";
 import refs from "../confect/_generated/refs";
 
 const NoteDetail = ({
@@ -96,21 +122,22 @@ const NoteDetail = ({
     selectedId !== undefined ? { id: selectedId } : "skip",
   );
 
-  if (note === undefined) {
-    return (
-      <p>{selectedId === undefined ? "Select a note" : "Loading…"}</p>
-    );
-  }
-
-  return <p>{note.text}</p>;
+  return QueryResult.match(note, {
+    onLoading: (skipped) => (
+      <p>{skipped ? "Select a note" : "Loading…"}</p>
+    ),
+    onSuccess: (note) => <p>{note.text}</p>,
+  });
 };
 ```
 
 ## `useMutation`
 
-Returns a function that encodes args using the spec's `args` schema, calls the Convex mutation, and decodes the result using the spec's `returns` schema. Returns `(args) => Promise<T>`, matching Convex's `useMutation`.
+Returns a function that encodes args using the spec's `args` schema, calls the Convex mutation, and decodes the result using the spec's `returns` schema. The returned promise's shape depends on whether the spec declares an `error` schema.
 
-Given this spec:
+### Without an `error` schema
+
+The function returns `Promise<A>`, matching `convex/react`'s `useMutation`. Undeclared failures still reject the promise.
 
 ```ts confect/notes.spec.ts
 FunctionSpec.publicMutation({
@@ -119,8 +146,6 @@ FunctionSpec.publicMutation({
   returns: GenericId.GenericId("notes"),
 });
 ```
-
-The returned function accepts `{ text: string }` (the `Type` of the `args` schema) and returns a `Promise<GenericId<"notes">>` (the `Type` of the `returns` schema):
 
 ```tsx
 import { useMutation } from "@confect/react";
@@ -137,11 +162,42 @@ const InsertNote = () => {
 };
 ```
 
+### With an `error` schema
+
+When the spec declares an `error` schema, the function returns `Promise<Either<A, E>>`. Unwrap with `Either.match` (or another `Either` combinator) to handle both branches. Undeclared failures still reject the promise.
+
+```ts confect/notes.spec.ts
+FunctionSpec.publicMutation({
+  name: "deleteOrFail",
+  args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
+  returns: Schema.Null,
+  error: Schema.Union(NoteNotFound, Forbidden),
+});
+```
+
+```tsx
+import { useMutation } from "@confect/react";
+import { Either } from "effect";
+import refs from "../confect/_generated/refs";
+
+const DeleteNote = ({ noteId }: { noteId: string }) => {
+  const deleteOrFail = useMutation(refs.public.notes.deleteOrFail);
+
+  const handleClick = async () => {
+    const result = await deleteOrFail({ noteId });
+    Either.match(result, {
+      onLeft: (error) => console.error(error._tag, error),
+      onRight: () => console.log("deleted"),
+    });
+  };
+
+  return <button onClick={handleClick}>Delete</button>;
+};
+```
+
 ## `useAction`
 
-Same pattern as `useMutation`: encodes args via the spec's `args` schema, calls the Convex action, and decodes the result via the spec's `returns` schema. Returns `(args) => Promise<T>`.
-
-Given this spec:
+Same shape as `useMutation`: returns `Promise<A>` when the ref has no `error` schema, and `Promise<Either<A, E>>` when it does.
 
 ```ts confect/random.spec.ts
 FunctionSpec.publicAction({
@@ -150,8 +206,6 @@ FunctionSpec.publicAction({
   returns: Schema.Number,
 });
 ```
-
-The returned function accepts `{}` and returns a `Promise<number>`:
 
 ```tsx
 import { useAction } from "@confect/react";
@@ -175,4 +229,7 @@ const RandomNumber = () => {
 | Functions referenced via `api.module.fn` | Functions referenced via `refs` |
 | Args passed directly to Convex as-is | Args are schema-encoded from `Type` to `Encoded` before sending to Convex |
 | Return values received directly from Convex as-is | Return values are schema-decoded from `Encoded` to `Type` before returning |
-| Pass `"skip"` to disable query subscription | Same — pass `"skip"` to disable query subscription |
+| `useQuery` returns `T \| undefined` | `useQuery` returns `QueryResult<A, E>` |
+| Cannot distinguish loading from skipped | `Loading` carries a `skipped: boolean` flag |
+| `useMutation`/`useAction` always return `Promise<T>` | Refs with an `error` schema return `Promise<Either<A, E>>`; refs without one still return `Promise<A>` |
+| Pass `"skip"` to disable query subscription | Same—pass `"skip"` to disable query subscription |

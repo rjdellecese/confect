@@ -39,19 +39,23 @@ const make = (
           );
         });
 
+      const mapUnknownError = (cause: unknown) =>
+        new WebSocketClientError({ cause });
+
       const query = <Query extends Ref.AnyPublicQuery>(
         ref: Query,
         ...rest: Ref.OptionalArgs<Query>
       ): Effect.Effect<
         Ref.Returns<Query>,
-        WebSocketClientError | ParseResult.ParseError
+        Ref.Error<Query> | WebSocketClientError | ParseResult.ParseError
       > => {
         const args = (rest[0] ?? {}) as Ref.Args<Query>;
-        return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
-          Effect.tryPromise({
-            try: () => convexClient.query(functionReference, encodedArgs),
-            catch: (cause) => new WebSocketClientError({ cause }),
-          }),
+        return Ref.runWithCodec(
+          ref,
+          args,
+          (functionReference, encodedArgs) =>
+            convexClient.query(functionReference, encodedArgs),
+          mapUnknownError,
         );
       };
 
@@ -60,14 +64,15 @@ const make = (
         ...rest: Ref.OptionalArgs<Mutation>
       ): Effect.Effect<
         Ref.Returns<Mutation>,
-        WebSocketClientError | ParseResult.ParseError
+        Ref.Error<Mutation> | WebSocketClientError | ParseResult.ParseError
       > => {
         const args = (rest[0] ?? {}) as Ref.Args<Mutation>;
-        return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
-          Effect.tryPromise({
-            try: () => convexClient.mutation(functionReference, encodedArgs),
-            catch: (cause) => new WebSocketClientError({ cause }),
-          }),
+        return Ref.runWithCodec(
+          ref,
+          args,
+          (functionReference, encodedArgs) =>
+            convexClient.mutation(functionReference, encodedArgs),
+          mapUnknownError,
         );
       };
 
@@ -76,14 +81,15 @@ const make = (
         ...rest: Ref.OptionalArgs<Action>
       ): Effect.Effect<
         Ref.Returns<Action>,
-        WebSocketClientError | ParseResult.ParseError
+        Ref.Error<Action> | WebSocketClientError | ParseResult.ParseError
       > => {
         const args = (rest[0] ?? {}) as Ref.Args<Action>;
-        return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
-          Effect.tryPromise({
-            try: () => convexClient.action(functionReference, encodedArgs),
-            catch: (cause) => new WebSocketClientError({ cause }),
-          }),
+        return Ref.runWithCodec(
+          ref,
+          args,
+          (functionReference, encodedArgs) =>
+            convexClient.action(functionReference, encodedArgs),
+          mapUnknownError,
         );
       };
 
@@ -92,16 +98,20 @@ const make = (
         ...rest: Ref.OptionalArgs<Query>
       ): Stream.Stream<
         Ref.Returns<Query>,
-        WebSocketClientError | ParseResult.ParseError
+        Ref.Error<Query> | WebSocketClientError | ParseResult.ParseError
       > => {
         const args = (rest[0] ?? {}) as Ref.Args<Query>;
         const functionReference = Ref.getFunctionReference(ref);
+        const onError = Ref.decodeErrorOrElse(ref, mapUnknownError);
 
         return Stream.unwrapScoped(
           Effect.gen(function* () {
             const encodedArgs = yield* Ref.encodeArgs(ref, args);
 
-            return Stream.asyncScoped<unknown, WebSocketClientError>((emit) =>
+            return Stream.asyncScoped<
+              unknown,
+              Ref.Error<Query> | WebSocketClientError
+            >((emit) =>
               Effect.gen(function* () {
                 const unsubscribe = convexClient.onUpdate(
                   functionReference,
@@ -110,7 +120,7 @@ const make = (
                     emit.single(result);
                   },
                   (error) => {
-                    emit.fail(new WebSocketClientError({ cause: error }));
+                    emit.fail(onError(error));
                   },
                 );
                 yield* Effect.addFinalizer(() =>

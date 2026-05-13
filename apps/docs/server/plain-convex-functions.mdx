@@ -23,7 +23,7 @@ Confect lets you include these plain Convex function definitions in your spec an
 
 ## Workpool component example
 
-The [Workpool](https://www.convex.dev/components/workpool) component pools actions and mutations with configurable parallelism and retries. It requires you to define Convex functions that it can reference — such as the action to run and an `onComplete` callback. This walkthrough shows how to integrate those functions into Confect.
+The [Workpool](https://www.convex.dev/components/workpool) component pools actions and mutations with configurable parallelism and retries. It requires you to define Convex functions that it can reference—such as the action to run and an `onComplete` callback. This walkthrough shows how to integrate those functions into Confect.
 
 ### Install the component
 
@@ -45,7 +45,7 @@ export default app;
 
 ### Write the Convex functions
 
-Write standard Convex functions using the Convex API and place them in your `confect/` directory. By [convention](/concepts/file-naming-conventions), they go adjacent to their corresponding spec and impl files — for example, `workpool.ts` alongside `workpool.spec.ts` and `workpool.impl.ts`.
+Write standard Convex functions using the Convex API and place them in your `confect/` directory. By [convention](/concepts/file-naming-conventions), they go adjacent to their corresponding spec and impl files—for example, `workpool.ts` alongside `workpool.spec.ts` and `workpool.impl.ts`.
 
 ```ts confect/workpool.ts
 import {

@@ -1,15 +1,53 @@
 import { FunctionSpec, Ref } from "@confect/core";
 import { describe, expect, it } from "@effect/vitest";
+import { ConvexError } from "convex/values";
 import {
   Chunk,
   Context,
   Effect,
+  Either,
   Layer,
   Ref as MutableRef,
   Schema,
   Stream,
 } from "effect";
+import { beforeEach, vi } from "vitest";
 import * as WebSocketClient from "../src/WebSocketClient";
+
+const mockQuery = vi.fn().mockResolvedValue({});
+const mockMutation = vi.fn().mockResolvedValue({});
+const mockAction = vi.fn().mockResolvedValue({});
+
+type OnUpdate = (result: unknown) => void;
+type OnError = (error: unknown) => void;
+
+const subscribers: Array<{ onUpdate: OnUpdate; onError: OnError }> = [];
+
+beforeEach(() => {
+  mockQuery.mockReset().mockResolvedValue({});
+  mockMutation.mockReset().mockResolvedValue({});
+  mockAction.mockReset().mockResolvedValue({});
+  subscribers.length = 0;
+});
+
+vi.mock("convex/browser", () => ({
+  ConvexClient: class {
+    setAuth() {}
+    close = vi.fn().mockResolvedValue(undefined);
+    query = mockQuery;
+    mutation = mockMutation;
+    action = mockAction;
+    onUpdate(
+      _ref: unknown,
+      _args: unknown,
+      onUpdate: OnUpdate,
+      onError: OnError,
+    ) {
+      subscribers.push({ onUpdate, onError });
+      return () => {};
+    }
+  },
+}));
 
 const noArgsQueryRef = Ref.make(
   "notes",
@@ -254,6 +292,191 @@ describe("WebSocketClient", () => {
           "notes:list",
         ]);
       }).pipe(Effect.provide(TestLayer)),
+    );
+  });
+});
+
+class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+  id: Schema.String,
+}) {}
+
+const queryWithError = Ref.make(
+  "notes",
+  FunctionSpec.publicQuery({
+    name: "getOrFail",
+    args: Schema.Struct({ id: Schema.String }),
+    returns: Schema.Struct({ text: Schema.String }),
+    error: NotFound,
+  }),
+);
+
+const mutationWithError = Ref.make(
+  "notes",
+  FunctionSpec.publicMutation({
+    name: "deleteOrFail",
+    args: Schema.Struct({ id: Schema.String }),
+    returns: Schema.Null,
+    error: NotFound,
+  }),
+);
+
+const actionWithError = Ref.make(
+  "tasks",
+  FunctionSpec.publicAction({
+    name: "runOrFail",
+    args: Schema.Struct({ id: Schema.String }),
+    returns: Schema.Null,
+    error: NotFound,
+  }),
+);
+
+const realLayer = WebSocketClient.layer("https://test.convex.cloud");
+
+describe("WebSocketClient error decoding", () => {
+  describe("query", () => {
+    it.scoped("decodes a matching ConvexError into the typed error", () =>
+      Effect.gen(function* () {
+        mockQuery.mockRejectedValue(
+          new ConvexError({ _tag: "NotFound", id: "abc" }),
+        );
+        const client = yield* WebSocketClient.WebSocketClient;
+
+        const result = yield* Effect.either(
+          client.query(queryWithError, { id: "abc" }),
+        );
+        expect(Either.isLeft(result)).toBe(true);
+        if (Either.isLeft(result)) {
+          expect(result.left).toBeInstanceOf(NotFound);
+          expect((result.left as NotFound).id).toBe("abc");
+        }
+      }).pipe(Effect.provide(realLayer)),
+    );
+
+    it.scoped("wraps a non-ConvexError as WebSocketClientError", () =>
+      Effect.gen(function* () {
+        mockQuery.mockRejectedValue(new Error("network down"));
+        const client = yield* WebSocketClient.WebSocketClient;
+
+        const result = yield* Effect.either(
+          client.query(queryWithError, { id: "abc" }),
+        );
+        expect(Either.isLeft(result)).toBe(true);
+        if (Either.isLeft(result)) {
+          expect(result.left).toBeInstanceOf(
+            WebSocketClient.WebSocketClientError,
+          );
+        }
+      }).pipe(Effect.provide(realLayer)),
+    );
+  });
+
+  describe("mutation", () => {
+    it.scoped("decodes a matching ConvexError into the typed error", () =>
+      Effect.gen(function* () {
+        mockMutation.mockRejectedValue(
+          new ConvexError({ _tag: "NotFound", id: "abc" }),
+        );
+        const client = yield* WebSocketClient.WebSocketClient;
+
+        const result = yield* Effect.either(
+          client.mutation(mutationWithError, { id: "abc" }),
+        );
+        expect(Either.isLeft(result)).toBe(true);
+        if (Either.isLeft(result)) {
+          expect(result.left).toBeInstanceOf(NotFound);
+        }
+      }).pipe(Effect.provide(realLayer)),
+    );
+  });
+
+  describe("action", () => {
+    it.scoped("decodes a matching ConvexError into the typed error", () =>
+      Effect.gen(function* () {
+        mockAction.mockRejectedValue(
+          new ConvexError({ _tag: "NotFound", id: "abc" }),
+        );
+        const client = yield* WebSocketClient.WebSocketClient;
+
+        const result = yield* Effect.either(
+          client.action(actionWithError, { id: "abc" }),
+        );
+        expect(Either.isLeft(result)).toBe(true);
+        if (Either.isLeft(result)) {
+          expect(result.left).toBeInstanceOf(NotFound);
+        }
+      }).pipe(Effect.provide(realLayer)),
+    );
+  });
+
+  describe("reactiveQuery", () => {
+    it.scoped("emits the typed error when a matching ConvexError fires", () =>
+      Effect.gen(function* () {
+        const client = yield* WebSocketClient.WebSocketClient;
+        const fiber = yield* Effect.fork(
+          Effect.either(
+            client
+              .reactiveQuery(queryWithError, { id: "abc" })
+              .pipe(Stream.take(1), Stream.runCollect),
+          ),
+        );
+
+        // Wait for the subscription to register before firing.
+        yield* Effect.async<void>((resume) => {
+          const tick = () => {
+            if (subscribers.length > 0) {
+              resume(Effect.void);
+            } else {
+              setTimeout(tick, 1);
+            }
+          };
+          tick();
+        });
+
+        subscribers[0]!.onError(
+          new ConvexError({ _tag: "NotFound", id: "abc" }),
+        );
+
+        const result = yield* fiber;
+        expect(Either.isLeft(result)).toBe(true);
+        if (Either.isLeft(result)) {
+          expect(result.left).toBeInstanceOf(NotFound);
+          expect((result.left as NotFound).id).toBe("abc");
+        }
+      }).pipe(Effect.provide(realLayer)),
+    );
+
+    it.scoped("emits a WebSocketClientError when a non-ConvexError fires", () =>
+      Effect.gen(function* () {
+        const client = yield* WebSocketClient.WebSocketClient;
+        const fiber = yield* Effect.fork(
+          Effect.either(
+            client
+              .reactiveQuery(queryWithError, { id: "abc" })
+              .pipe(Stream.take(1), Stream.runCollect),
+          ),
+        );
+
+        yield* Effect.async<void>((resume) => {
+          const tick = () => {
+            if (subscribers.length > 0) {
+              resume(Effect.void);
+            } else {
+              setTimeout(tick, 1);
+            }
+          };
+          tick();
+        });
+
+        subscribers[0]!.onError(new Error("network down"));
+
+        const result = yield* fiber;
+        expect(Either.isLeft(result)).toBe(true);
+        if (Either.isLeft(result)) {
+          expect(result.left).toBeInstanceOf(
+            WebSocketClient.WebSocketClientError,
+          );
+        }
+      }).pipe(Effect.provide(realLayer)),
     );
   });
 });

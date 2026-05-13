@@ -17,15 +17,24 @@ export type TestConfectWithoutIdentity<
   query: <QueryRef extends Ref.AnyQuery>(
     queryRef: QueryRef,
     ...args: Ref.OptionalArgs<QueryRef>
-  ) => Effect.Effect<Ref.Returns<QueryRef>, ParseResult.ParseError>;
+  ) => Effect.Effect<
+    Ref.Returns<QueryRef>,
+    Ref.Error<QueryRef> | ParseResult.ParseError
+  >;
   mutation: <MutationRef extends Ref.AnyMutation>(
     mutationRef: MutationRef,
     ...args: Ref.OptionalArgs<MutationRef>
-  ) => Effect.Effect<Ref.Returns<MutationRef>, ParseResult.ParseError>;
+  ) => Effect.Effect<
+    Ref.Returns<MutationRef>,
+    Ref.Error<MutationRef> | ParseResult.ParseError
+  >;
   action: <ActionRef extends Ref.AnyAction>(
     actionRef: ActionRef,
     ...args: Ref.OptionalArgs<ActionRef>
-  ) => Effect.Effect<Ref.Returns<ActionRef>, ParseResult.ParseError>;
+  ) => Effect.Effect<
+    Ref.Returns<ActionRef>,
+    Ref.Error<ActionRef> | ParseResult.ParseError
+  >;
   run: {
     <E>(
       handler: Effect.Effect<
@@ -77,34 +86,43 @@ class TestConfectImplWithoutIdentity<
   readonly query = <QueryRef extends Ref.AnyQuery>(
     queryRef: QueryRef,
     ...args: Ref.OptionalArgs<QueryRef>
-  ): Effect.Effect<Ref.Returns<QueryRef>, ParseResult.ParseError> =>
+  ): Effect.Effect<
+    Ref.Returns<QueryRef>,
+    Ref.Error<QueryRef> | ParseResult.ParseError
+  > =>
     Ref.runWithCodec(
       queryRef,
       (args[0] ?? {}) as Ref.Args<QueryRef>,
       (functionReference, encodedArgs) =>
-        this.testConvex.query(functionReference, encodedArgs),
+        this.testConvex.query(functionReference as any, encodedArgs),
     );
 
   readonly mutation = <MutationRef extends Ref.AnyMutation>(
     mutationRef: MutationRef,
     ...args: Ref.OptionalArgs<MutationRef>
-  ): Effect.Effect<Ref.Returns<MutationRef>, ParseResult.ParseError> =>
+  ): Effect.Effect<
+    Ref.Returns<MutationRef>,
+    Ref.Error<MutationRef> | ParseResult.ParseError
+  > =>
     Ref.runWithCodec(
       mutationRef,
       (args[0] ?? {}) as Ref.Args<MutationRef>,
       (functionReference, encodedArgs) =>
-        this.testConvex.mutation(functionReference, encodedArgs),
+        this.testConvex.mutation(functionReference as any, encodedArgs),
     );
 
   readonly action = <ActionRef extends Ref.AnyAction>(
     actionRef: ActionRef,
     ...args: Ref.OptionalArgs<ActionRef>
-  ): Effect.Effect<Ref.Returns<ActionRef>, ParseResult.ParseError> =>
+  ): Effect.Effect<
+    Ref.Returns<ActionRef>,
+    Ref.Error<ActionRef> | ParseResult.ParseError
+  > =>
     Ref.runWithCodec(
       actionRef,
       (args[0] ?? {}) as Ref.Args<ActionRef>,
       (functionReference, encodedArgs) =>
-        this.testConvex.action(functionReference, encodedArgs),
+        this.testConvex.action(functionReference as any, encodedArgs),
     );
 
   readonly run: TestConfectWithoutIdentity<ConfectSchema>["run"] = (<
@@ -241,11 +259,6 @@ export const layer =
       () =>
         new TestConfectImpl(
           databaseSchema,
-          convexTest(
-            databaseSchema.convexSchemaDefinition,
-            modules,
-          ) as unknown as TestConvexForDataModelAndIdentity<
-            DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
-          >,
+          convexTest(databaseSchema.convexSchemaDefinition, modules) as any,
         ),
     );

@@ -27,19 +27,22 @@ const make = (
     client.clearAuth();
   });
 
+  const mapUnknownError = (cause: unknown) => new HttpClientError({ cause });
+
   const query = <Query extends Ref.AnyPublicQuery>(
     ref: Query,
     ...rest: Ref.OptionalArgs<Query>
   ): Effect.Effect<
     Ref.Returns<Query>,
-    HttpClientError | ParseResult.ParseError
+    Ref.Error<Query> | HttpClientError | ParseResult.ParseError
   > => {
     const args = (rest[0] ?? {}) as Ref.Args<Query>;
-    return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
-      Effect.tryPromise({
-        try: () => client.query(functionReference, encodedArgs),
-        catch: (cause) => new HttpClientError({ cause }),
-      }),
+    return Ref.runWithCodec(
+      ref,
+      args,
+      (functionReference, encodedArgs) =>
+        client.query(functionReference, encodedArgs),
+      mapUnknownError,
     );
   };
 
@@ -48,14 +51,15 @@ const make = (
     ...rest: Ref.OptionalArgs<Mutation>
   ): Effect.Effect<
     Ref.Returns<Mutation>,
-    HttpClientError | ParseResult.ParseError
+    Ref.Error<Mutation> | HttpClientError | ParseResult.ParseError
   > => {
     const args = (rest[0] ?? {}) as Ref.Args<Mutation>;
-    return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
-      Effect.tryPromise({
-        try: () => client.mutation(functionReference, encodedArgs),
-        catch: (cause) => new HttpClientError({ cause }),
-      }),
+    return Ref.runWithCodec(
+      ref,
+      args,
+      (functionReference, encodedArgs) =>
+        client.mutation(functionReference, encodedArgs),
+      mapUnknownError,
     );
   };
 
@@ -64,14 +68,15 @@ const make = (
     ...rest: Ref.OptionalArgs<Action>
   ): Effect.Effect<
     Ref.Returns<Action>,
-    HttpClientError | ParseResult.ParseError
+    Ref.Error<Action> | HttpClientError | ParseResult.ParseError
   > => {
     const args = (rest[0] ?? {}) as Ref.Args<Action>;
-    return Ref.runWithCodec(ref, args, (functionReference, encodedArgs) =>
-      Effect.tryPromise({
-        try: () => client.action(functionReference, encodedArgs),
-        catch: (cause) => new HttpClientError({ cause }),
-      }),
+    return Ref.runWithCodec(
+      ref,
+      args,
+      (functionReference, encodedArgs) =>
+        client.action(functionReference, encodedArgs),
+      mapUnknownError,
     );
   };
 

@@ -1,7 +1,8 @@
-import { useAction, useMutation, useQuery } from "@confect/react";
+import { QueryResult, useAction, useMutation, useQuery } from "@confect/react";
 import type { WorkId } from "@convex-dev/workpool";
 import { FetchHttpClient, HttpApiClient } from "@effect/platform";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
+import type { GenericId } from "convex/values";
 import { Array, Effect, Exit } from "effect";
 import { useEffect, useState } from "react";
 import refs from "../confect/_generated/refs";
@@ -25,7 +26,9 @@ const Page = () => {
   const getRandom = useAction(refs.public.notesAndRandom.random.getNumber);
 
   const retrieveRandomNumber = () => {
-    void getRandom({}).then(setRandomNumber);
+    void getRandom({}).then((n) => {
+      setRandomNumber(n);
+    });
   };
 
   const [emailStatus, setEmailStatus] = useState<string | null>(null);
@@ -54,7 +57,10 @@ const Page = () => {
 
       <div>
         <span style={{ fontFamily: "monospace" }}>TEST_ENV_VAR: </span>
-        {envVar === undefined ? "Loading…" : envVar}
+        {QueryResult.match(envVar, {
+          onLoading: () => "Loading…",
+          onSuccess: (value) => value,
+        })}
       </div>
 
       <br />
@@ -97,7 +103,45 @@ const Page = () => {
       </button>
 
       <NoteList />
+      <NoteLookup />
       <HttpEndpoints />
+    </div>
+  );
+};
+
+const NoteLookup = () => {
+  const [input, setInput] = useState("");
+  const [noteId, setNoteId] = useState<GenericId<"notes"> | undefined>();
+
+  const lookup = useQuery(
+    refs.public.notesAndRandom.notes.getOrFail,
+    noteId === undefined ? "skip" : { noteId },
+  );
+
+  return (
+    <div>
+      <h2>Look up a note by id</h2>
+      <input
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        placeholder="note id"
+        style={{ fontFamily: "monospace" }}
+      />
+      <button
+        type="button"
+        onClick={() => setNoteId(input as GenericId<"notes">)}
+      >
+        Look up
+      </button>
+      <div>
+        {noteId === undefined
+          ? "Enter a note id and click Look up."
+          : QueryResult.match(lookup, {
+              onLoading: () => "Looking up…",
+              onSuccess: (note) => `Found note: "${note.text}"`,
+              onFailure: (error) => `Note ${error.noteId} not found.`,
+            })}
+      </div>
     </div>
   );
 };
@@ -109,9 +153,9 @@ const WorkpoolDemo = () => {
   const enqueue = useMutation(refs.public.workpool.enqueue);
 
   const handleEnqueue = () => {
-    void enqueue({}).then((id) =>
-      setJobs((prev) => [...prev, { id, enqueuedAt: Date.now() }]),
-    );
+    void enqueue({}).then((id) => {
+      setJobs((prev) => [...prev, { id, enqueuedAt: Date.now() }]);
+    });
   };
 
   return (
@@ -175,13 +219,18 @@ const WorkStatusRow = ({
   return (
     <tr>
       <td style={{ paddingRight: 16, fontFamily: "monospace" }}>#{index}</td>
-      <td>{status === undefined ? "Loading…" : statusLabel(status)}</td>
+      <td>
+        {QueryResult.match(status, {
+          onLoading: () => "Loading…",
+          onSuccess: (value) => statusLabel(value),
+        })}
+      </td>
     </tr>
   );
 };
 
 const NoteList = () => {
-  const notes = useQuery(refs.public.notesAndRandom.notes.list, {});
+  const notesResult = useQuery(refs.public.notesAndRandom.notes.list, {});
 
   const deleteNote = useMutation(
     refs.public.notesAndRandom.notes.delete_,
@@ -199,25 +248,33 @@ const NoteList = () => {
     }
   });
 
-  if (notes === undefined) {
-    return <p>Loading…</p>;
-  }
-
-  return (
-    <ul>
-      {Array.map(notes, (note) => (
-        <li key={note._id}>
-          <p>{note.text}</p>
-          <button
-            type="button"
-            onClick={() => void deleteNote({ noteId: note._id })}
-          >
-            Delete note
-          </button>
-        </li>
-      ))}
-    </ul>
-  );
+  return QueryResult.match(notesResult, {
+    onLoading: () => <p>Loading…</p>,
+    onSuccess: (notes) => (
+      <ul>
+        {Array.map(notes, (note) => (
+          <li key={note._id}>
+            <p>{note.text}</p>
+            <p
+              style={{
+                fontFamily: "monospace",
+                fontSize: "0.85em",
+                color: "#666",
+              }}
+            >
+              id: {note._id}
+            </p>
+            <button
+              type="button"
+              onClick={() => void deleteNote({ noteId: note._id })}
+            >
+              Delete note
+            </button>
+          </li>
+        ))}
+      </ul>
+    ),
+  });
 };
 
 const ApiClient = HttpApiClient.make(Api, {
