@@ -62,12 +62,6 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
   }
 };
 
-/**
- * A view of the query results currently in the Convex client for use within
- * optimistic updates. Mirrors {@link OptimisticLocalStore}, but accepts Confect
- * `Ref`s and exposes decoded (Effect Schema) values rather than the encoded
- * wire format.
- */
 export interface ConfectOptimisticLocalStore {
   getQuery<Query extends Ref.AnyPublicQuery>(
     queryRef: Query,
@@ -184,10 +178,6 @@ const makeConfectMutation = <Mutation extends Ref.AnyPublicMutation>(
  * `useMutation` from `convex/react`.
  *
  * Any other failure rejects the promise.
- *
- * The returned function also exposes `.withOptimisticUpdate(...)`, mirroring
- * the Convex hook, which accepts a Confect-aware optimistic update that
- * operates on decoded values.
  */
 export const useMutation = <Mutation extends Ref.AnyPublicMutation>(
   ref: Mutation,
