@@ -9,7 +9,7 @@ Define cron jobs in `confect/crons.ts` using `CronJob` and `CronJobs` from `@con
 Schedules are either an Effect [`Cron`](https://effect.website/docs/cron) (cron expression) or a [`Duration`](https://effect.website/docs/data-types/duration/) (fixed interval). The Confect CLI re-exports the result into `convex/crons.ts`.
 
 <Note>
-  `Cron` schedules must not use a custom `seconds` field — Convex cron
+  `Cron` schedules must not use a custom `seconds` field—Convex cron
   expressions only support minute-level granularity. For sub-minute
   scheduling, use a `Duration` interval instead.
 </Note>

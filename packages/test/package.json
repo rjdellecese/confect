@@ -1,6 +1,6 @@
 {
   "name": "@confect/test",
-  "version": "6.0.0",
+  "version": "7.0.0",
   "description": "Utilities for testing Confect apps without a live Convex backend",
   "repository": {
     "type": "git",
@@ -64,7 +64,7 @@
     "@confect/core": "workspace:*",
     "@confect/server": "workspace:*",
     "convex": "^1.30.0",
-    "convex-test": "^0.0.38",
+    "convex-test": "^0.0.50",
     "effect": "^3.19.16"
   },
   "engines": {

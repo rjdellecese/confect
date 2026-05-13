@@ -46,6 +46,29 @@ import { notes } from "./notes.spec";
 export default Spec.make().add(notes);
 ```
 
+### Typed errors
+
+A spec can also declare an optional `error` schema. When it does, the corresponding handler's `Effect` error channel is typed as that schema, and the failure is decoded for callers at every call site (React hooks, JS clients, and tests). See [Error Handling](/server/error-handling) for the full walkthrough.
+
+```ts
+import { FunctionSpec, GenericId } from "@confect/core";
+import { Schema } from "effect";
+
+import { Notes } from "./tables/Notes";
+
+class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
+  "NoteNotFound",
+  { noteId: GenericId.GenericId("notes") },
+) {}
+
+FunctionSpec.publicQuery({
+  name: "getOrFail",
+  args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
+  returns: Notes.Doc,
+  error: NoteNotFound,
+});
+```
+
 ## Implementing functions
 
 Each function impl contains a handler that implements the function's logic. Function impls are composed into group impls using Effect layers.

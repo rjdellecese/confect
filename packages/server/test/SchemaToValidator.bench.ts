@@ -81,7 +81,7 @@ bench("ValueToValidator<any[]>", () => {
   return {} as ValueToValidator<any[]>;
 }).types([3102, "instantiations"]);
 
-// --- Objects (small / medium / large) ---
+// --- Objects (small/medium/large) ---
 
 bench("small object", () => {
   return {} as ValueToValidator<{ foo: string }>;

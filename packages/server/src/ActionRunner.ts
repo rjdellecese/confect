@@ -1,5 +1,6 @@
 import * as Ref from "@confect/core/Ref";
 import { type GenericActionCtx } from "convex/server";
+import type { ParseResult, Effect } from "effect";
 import { Context, Layer } from "effect";
 
 const make =
@@ -7,7 +8,10 @@ const make =
   <Action extends Ref.AnyAction>(
     action: Action,
     ...args: Ref.OptionalArgs<Action>
-  ) =>
+  ): Effect.Effect<
+    Ref.Returns<Action>,
+    Ref.Error<Action> | ParseResult.ParseError
+  > =>
     Ref.runWithCodec(
       action,
       (args[0] ?? {}) as Ref.Args<Action>,

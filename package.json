@@ -34,6 +34,7 @@
     "format": "pnpm -r format",
     "test:core": "vitest run --project @confect/core",
     "test:js": "vitest run --project @confect/js",
+    "test:react": "vitest run --project @confect/react",
     "test:server": "vitest run --project @confect/server",
     "test:cli": "vitest run --project @confect/cli",
     "release": "pnpm build && changeset publish",
@@ -66,15 +67,8 @@
     "vitest": "3.2.4"
   },
   "engines": {
-    "node": ">=22",
-    "pnpm": ">=10"
+    "node": ">=22.13",
+    "pnpm": "11.0.9"
   },
-  "pnpm": {
-    "overrides": {
-      "convex": "1.33.1",
-      "effect": "3.19.19",
-      "react": "19.2.4",
-      "react-dom": "19.2.4"
-    }
-  }
+  "packageManager": "pnpm@11.0.9"
 }

@@ -141,7 +141,7 @@ reader.table("notes").index("by_creation_time").stream();
 
 ### Accessing the current time
 
-Convex queries are cached based on the data they read. Calling `Date.now()` directly in a query reads real wall-clock time, which [invalidates the cache](https://docs.convex.dev/production/best-practices/) and causes unnecessary re-execution — Convex's own best practices advise against it.
+Convex queries are cached based on the data they read. Calling `Date.now()` directly in a query reads real wall-clock time, which [invalidates the cache](https://docs.convex.dev/production/best-practices/) and causes unnecessary re-execution—Convex's own best practices advise against it.
 
 To keep queries cacheable by default, confect stubs `Date.now()` to return `0` for the span of a query handler. If you need the current time inside a query, reach for Effect's `Clock` service instead:
 
@@ -163,6 +163,6 @@ Effect.gen(function* () {
 
 Reading `Clock.currentTimeMillis` (or `Clock.currentTimeNanos`) returns the real timestamp. Note that this is an **opt-in to cache invalidation**: any query that reads the clock will frequently bust the cache and be re-executed, rather than reliably served from cache. This matches Convex's behavior for any query that observes real time.
 
-If you don't actually need sub-second accuracy, prefer Convex's [recommended patterns](https://docs.convex.dev/production/best-practices/) — passing a coarse timestamp as a query argument, or maintaining a boolean/status field updated by a scheduled function — to preserve caching.
+If you don't actually need sub-second accuracy, prefer Convex's [recommended patterns](https://docs.convex.dev/production/best-practices/)—passing a coarse timestamp as a query argument, or maintaining a boolean/status field updated by a scheduled function—to preserve caching.
 
 Mutations and actions are unaffected: `Date.now()` works as expected there, and the `Clock` service returns the real timestamp without any caching concerns.

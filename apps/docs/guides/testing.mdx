@@ -98,6 +98,35 @@ Effect.gen(function* () {
 });
 ```
 
+## Typed errors
+
+When a ref's spec declares an `error` schema, the decoded error is added to the error channel of `query`, `mutation`, and `action` alongside `ParseError`. See [Error Handling](/server/error-handling) for how to declare error schemas.
+
+```ts
+import { describe, it } from "@effect/vitest";
+import { assertLeft } from "@effect/vitest/utils";
+import { Effect } from "effect";
+
+import refs from "./confect/_generated/refs";
+import * as TestConfect from "./TestConfect";
+
+describe("notes", () => {
+  it.effect("returns NoteNotFound for a missing id", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      const result = yield* c
+        .query(refs.public.notes.getOrFail, {
+          noteId: "missing" as GenericId<"notes">,
+        })
+        .pipe(Effect.either);
+
+      assertLeft(result, new NoteNotFound({ noteId: "missing" }));
+    }).pipe(Effect.provide(TestConfect.layer())),
+  );
+});
+```
+
 ## Running setup code
 
 Use `run` to execute arbitrary code with mutation-context services (like `DatabaseWriter`) for test setup. When the handler returns a value, pass a `Schema` as the second argument for decoding.

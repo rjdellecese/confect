@@ -1,5 +1,6 @@
 import * as Ref from "@confect/core/Ref";
 import { type GenericQueryCtx } from "convex/server";
+import type { ParseResult, Effect } from "effect";
 import { Context, Layer } from "effect";
 
 const make =
@@ -7,7 +8,10 @@ const make =
   <Query extends Ref.AnyQuery>(
     query: Query,
     ...args: Ref.OptionalArgs<Query>
-  ) =>
+  ): Effect.Effect<
+    Ref.Returns<Query>,
+    Ref.Error<Query> | ParseResult.ParseError
+  > =>
     Ref.runWithCodec(
       query,
       (args[0] ?? {}) as Ref.Args<Query>,
