@@ -50,11 +50,11 @@
   "author": "RJ Dellecese",
   "license": "ISC",
   "devDependencies": {
-    "@effect/vitest": "0.27.0",
+    "@effect/vitest": "0.29.0",
     "@eslint/js": "10.0.1",
     "@types/node": "25.3.3",
     "convex": "1.33.1",
-    "effect": "3.19.19",
+    "effect": "3.21.2",
     "eslint": "10.0.2",
     "prettier": "3.8.1",
     "tsdown": "0.20.3",
@@ -66,7 +66,7 @@
   "peerDependencies": {
     "@confect/core": "workspace:*",
     "convex": "^1.30.0",
-    "effect": "^3.19.16",
+    "effect": "^3.21.2",
     "react": "^18.0.0 || ^19.0.0"
   },
   "engines": {
