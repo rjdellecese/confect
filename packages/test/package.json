@@ -58,14 +58,14 @@
     "tsdown": "0.20.3",
     "typescript": "5.9.3",
     "typescript-eslint": "8.56.1",
-    "effect": "3.19.19"
+    "effect": "3.21.2"
   },
   "peerDependencies": {
     "@confect/core": "workspace:*",
     "@confect/server": "workspace:*",
     "convex": "^1.30.0",
     "convex-test": "^0.0.50",
-    "effect": "^3.19.16"
+    "effect": "^3.21.2"
   },
   "engines": {
     "node": ">=22",
