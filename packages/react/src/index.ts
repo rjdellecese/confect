@@ -1,8 +1,5 @@
 import { Ref } from "@confect/core";
-import type {
-  OptimisticLocalStore,
-  OptimisticUpdate,
-} from "convex/browser";
+import type { OptimisticLocalStore, OptimisticUpdate } from "convex/browser";
 import {
   useAction as useConvexAction,
   useMutation as useConvexMutation,
@@ -98,40 +95,32 @@ const wrapLocalStore = (
   localStore: OptimisticLocalStore,
 ): ConfectOptimisticLocalStore => ({
   getQuery: (queryRef, ...rest) => {
-    const functionReference = Ref.getFunctionReference(
-      queryRef,
-    ) as FunctionReference<"query">;
+    const functionReference = Ref.getFunctionReference(queryRef);
     const args = (rest[0] ?? {}) as Ref.Args<typeof queryRef>;
-    const encodedArgs = Ref.encodeArgsSync(queryRef, args) as Record<
-      string,
-      unknown
-    >;
+    const encodedArgs = Ref.encodeArgsSync(queryRef, args);
     const encoded = localStore.getQuery(functionReference, encodedArgs);
     return encoded === undefined
       ? undefined
       : Ref.decodeReturnsSync(queryRef, encoded);
   },
   setQuery: (queryRef, args, value) => {
-    const functionReference = Ref.getFunctionReference(
-      queryRef,
-    ) as FunctionReference<"query">;
-    const encodedArgs = Ref.encodeArgsSync(queryRef, args) as Record<
-      string,
-      unknown
-    >;
+    const functionReference = Ref.getFunctionReference(queryRef);
+    const encodedArgs = Ref.encodeArgsSync(queryRef, args);
     const encodedValue =
       value === undefined ? undefined : Ref.encodeReturnsSync(queryRef, value);
     localStore.setQuery(functionReference, encodedArgs, encodedValue);
   },
   getAllQueries: (queryRef) => {
-    const functionReference = Ref.getFunctionReference(
-      queryRef,
-    ) as FunctionReference<"query">;
-    return localStore.getAllQueries(functionReference).map(({ args, value }) => ({
-      args: Ref.decodeArgsSync(queryRef, args),
-      value:
-        value === undefined ? undefined : Ref.decodeReturnsSync(queryRef, value),
-    }));
+    const functionReference = Ref.getFunctionReference(queryRef);
+    return localStore
+      .getAllQueries(functionReference)
+      .map(({ args, value }) => ({
+        args: Ref.decodeArgsSync(queryRef, args),
+        value:
+          value === undefined
+            ? undefined
+            : Ref.decodeReturnsSync(queryRef, value),
+      }));
   },
 });
 
@@ -153,13 +142,14 @@ const makeConfectMutation = <Mutation extends Ref.AnyPublicMutation>(
   const withOptimisticUpdate = (
     optimisticUpdate: ConfectOptimisticUpdate<Mutation>,
   ): ConfectMutation<Mutation> => {
-    const wrappedUpdate: OptimisticUpdate<never> = (localStore, encodedArgs) => {
+    const wrappedUpdate: OptimisticUpdate<Ref.Args<Mutation>> = (
+      localStore,
+      encodedArgs,
+    ) => {
       const decodedArgs = Ref.decodeArgsSync(ref, encodedArgs);
       optimisticUpdate(wrapLocalStore(localStore), decodedArgs);
     };
-    const nextReactMutation = reactMutation.withOptimisticUpdate(
-      wrappedUpdate as never,
-    );
+    const nextReactMutation = reactMutation.withOptimisticUpdate(wrappedUpdate);
     return makeConfectMutation(ref, nextReactMutation);
   };
 

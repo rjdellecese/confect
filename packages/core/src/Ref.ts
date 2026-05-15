@@ -226,7 +226,7 @@ export const decodeArgs = <Ref_ extends Any>(
     Match.tag("Confect", (c) => Schema.decode(c.args)(encodedArgs)),
     Match.tag("Convex", () => Effect.succeed(encodedArgs)),
     Match.exhaustive,
-  ) as Effect.Effect<Args<Ref_>, ParseResult.ParseError>;
+  );
 
 export const encodeReturns = <Ref_ extends Any>(
   ref: Ref_,
