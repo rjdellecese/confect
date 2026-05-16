@@ -40,6 +40,7 @@
     "build": "tsdown --config-loader unrun",
     "dev": "tsdown --watch",
     "test": "vitest run",
+    "test:end-to-end": "vitest run --config vitest.end-to-end.config.ts",
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "fix": "prettier --write . && eslint --fix . --max-warnings=0",
     "format": "prettier --check .",

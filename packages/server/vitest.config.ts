@@ -22,6 +22,10 @@ export default mergeConfig(
     test: {
       root: import.meta.dirname,
       include: ["test/**/*.test.ts"],
+      // End-to-end tests live in `test/end-to-end/` and require a real
+      // Convex local backend. They are run via `pnpm test:end-to-end` against
+      // `vitest.end-to-end.config.ts` instead of the default fast suite.
+      exclude: ["test/end-to-end/**"],
       globalSetup: ["./test/setup.ts"],
     },
   }),

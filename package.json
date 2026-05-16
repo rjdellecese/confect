@@ -36,6 +36,7 @@
     "test:js": "vitest run --project @confect/js",
     "test:react": "vitest run --project @confect/react",
     "test:server": "vitest run --project @confect/server",
+    "test:end-to-end:server": "pnpm --filter @confect/server test:end-to-end",
     "test:cli": "vitest run --project @confect/cli",
     "release": "pnpm build && changeset publish",
     "clean": "pnpm -r clean && rm -rf node_modules",
