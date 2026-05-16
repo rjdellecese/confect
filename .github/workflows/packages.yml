@@ -77,6 +77,21 @@ jobs:
       - uses: ./.github/actions/confect-setup
       - run: cd packages/${{ matrix.package }} && pnpm test
 
+  test-end-to-end:
+    name: Test (end-to-end)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/confect-setup
+      - name: Cache convex local-backend binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/convex/binaries
+          key: convex-local-backend-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            convex-local-backend-${{ runner.os }}-
+      - run: pnpm --filter @confect/server test:end-to-end
+
   bench:
     name: Bench
     runs-on: ubuntu-latest
