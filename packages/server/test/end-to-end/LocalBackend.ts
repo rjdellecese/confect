@@ -2,11 +2,20 @@ import path from "node:path";
 import { Command } from "@effect/platform";
 import { NodeContext } from "@effect/platform-node";
 import { ConvexHttpClient } from "convex/browser";
-import { Context, Effect, Layer, Option, Stream } from "effect";
+import {
+  Context,
+  Duration,
+  Effect,
+  Layer,
+  Option,
+  Schema,
+  Stream,
+} from "effect";
 
-class BackendNotReadyError extends Error {
-  readonly _tag = "BackendNotReadyError";
-}
+class BackendNotReadyError extends Schema.TaggedError<BackendNotReadyError>()(
+  "BackendNotReadyError",
+  { message: Schema.String },
+) {}
 
 export class LocalBackend extends Context.Tag(
   "@confect/server/test/end-to-end/LocalBackend",
@@ -15,6 +24,25 @@ export class LocalBackend extends Context.Tag(
 const SERVER_PACKAGE_DIR = path.resolve(import.meta.dirname, "../..");
 const READY_LINE = "Convex functions ready!";
 const URL = "http://127.0.0.1:3210";
+
+// Knobs read by `crates/common/src/knobs.rs` in `convex-backend`. Lowering
+// these shrinks `MAX_CACHE_AGE` (`crates/application/src/cache/mod.rs:106-113`)
+// to a few seconds so a single test run can comfortably wait past the
+// cache eviction window.
+const USER_TIMEOUT_SECONDS = 1;
+const SYSTEM_TIMEOUT_SECONDS = 1;
+
+/**
+ * Duration after which a query whose handler observed time (e.g. via
+ * `Date.now()`, `setTimeout`, `Effect.sleep`) is evicted from the local
+ * backend's reactive cache. Per `crates/application/src/cache/mod.rs`,
+ * `MAX_CACHE_AGE = USER_TIMEOUT + SYSTEM_TIMEOUT + 1s`. Exported so tests
+ * can wait `Duration.sum(maxCacheAge, slack)` instead of hard-coding a
+ * magic number that has to be kept in sync with the env vars below.
+ */
+export const maxCacheAge = Duration.seconds(
+  USER_TIMEOUT_SECONDS + SYSTEM_TIMEOUT_SECONDS + 1,
+);
 
 /**
  * Spawn `convex dev` from `packages/server/` (which already targets
@@ -54,11 +82,8 @@ const make = Effect.gen(function* () {
     Command.workingDirectory(SERVER_PACKAGE_DIR),
     Command.env({
       CONVEX_AGENT_MODE: "anonymous",
-      // Knobs read by `crates/common/src/knobs.rs` in `convex-backend`.
-      // `MAX_CACHE_AGE = USER_TIMEOUT + SYSTEM_TIMEOUT + 1s`, so this gives
-      // us ~3s before a time-observed query is evicted from the cache.
-      DATABASE_UDF_USER_TIMEOUT_SECONDS: "1",
-      DATABASE_UDF_SYSTEM_TIMEOUT_SECONDS: "1",
+      DATABASE_UDF_USER_TIMEOUT_SECONDS: USER_TIMEOUT_SECONDS.toString(),
+      DATABASE_UDF_SYSTEM_TIMEOUT_SECONDS: SYSTEM_TIMEOUT_SECONDS.toString(),
     }),
     Command.stdout("pipe"),
     Command.stderr("pipe"),
@@ -78,9 +103,9 @@ const make = Effect.gen(function* () {
     Effect.timeoutFail({
       duration: "90 seconds",
       onTimeout: () =>
-        new BackendNotReadyError(
-          `convex dev did not print "${READY_LINE}" within 90s (cold-start binary download?)`,
-        ),
+        new BackendNotReadyError({
+          message: `convex dev did not print "${READY_LINE}" within 90s (cold-start binary download?)`,
+        }),
     }),
   );
 
@@ -89,9 +114,9 @@ const make = Effect.gen(function* () {
       Effect.succeed(LocalBackend.of({ client: new ConvexHttpClient(URL) })),
     onNone: () =>
       Effect.fail(
-        new BackendNotReadyError(
-          `convex dev exited before printing "${READY_LINE}"`,
-        ),
+        new BackendNotReadyError({
+          message: `convex dev exited before printing "${READY_LINE}"`,
+        }),
       ),
   });
 });

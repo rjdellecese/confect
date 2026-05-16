@@ -1,17 +1,14 @@
+import { Ref } from "@confect/core";
 import type { ConvexHttpClient } from "convex/browser";
-import type {
-  FunctionReference,
-  FunctionReturnType,
-  OptionalRestArgs,
-} from "convex/server";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 
-class ConvexQueryError extends Error {
-  readonly _tag = "ConvexQueryError";
-}
+class ConvexQueryError extends Schema.TaggedError<ConvexQueryError>()(
+  "ConvexQueryError",
+  { message: Schema.String },
+) {}
 
 /**
- * Run a Convex query once over HTTP, with no reactive subscription.
+ * Run a Confect query once over HTTP.
  *
  * `ConvexHttpClient.query` POSTs to `/api/query`, which the local backend
  * routes through the same `CacheManager.get` (in
@@ -24,16 +21,19 @@ class ConvexQueryError extends Error {
  * across every test case — there is no per-call construction cost and no
  * risk of multiple clients drifting out of sync.
  *
- * Accepts a `FunctionReference` rather than a raw name so the return
- * type is inferred at the call site (via `FunctionReturnType<Q>`). Get
- * one from a Confect `Ref` via `Ref.getFunctionReference`.
+ * Accepts a Confect `Ref` directly (rather than a raw `FunctionReference`
+ * or string) so the return type is inferred at the call site via
+ * `Ref.Returns<R>`. The underlying `FunctionReference` is built internally
+ * via `Ref.getFunctionReference`.
  */
-export const queryOnce = <Q extends FunctionReference<"query">>(
+export const queryOnce = <R extends Ref.AnyPublicQuery>(
   client: ConvexHttpClient,
-  reference: Q,
-  ...args: OptionalRestArgs<Q>
-): Effect.Effect<FunctionReturnType<Q>, ConvexQueryError> =>
+  ref: R,
+  ...args: Ref.OptionalArgs<R>
+): Effect.Effect<Ref.Returns<R>, ConvexQueryError> =>
   Effect.tryPromise({
-    try: () => client.query(reference, ...args),
-    catch: (error) => new ConvexQueryError(`query failed: ${String(error)}`),
+    try: () =>
+      client.query(Ref.getFunctionReference(ref), (args[0] ?? {}) as never),
+    catch: (error) =>
+      new ConvexQueryError({ message: `query failed: ${String(error)}` }),
   });

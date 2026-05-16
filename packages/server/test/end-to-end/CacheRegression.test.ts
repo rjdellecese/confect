@@ -31,25 +31,31 @@
  * captures.
  */
 
-import { Ref } from "@confect/core";
+import type { Ref } from "@confect/core";
 import { describe, expect, layer } from "@effect/vitest";
-import { Effect } from "effect";
+import { Duration, Effect } from "effect";
 import refs from "../confect/_generated/refs";
 import * as LocalBackend from "./LocalBackend";
 import { queryOnce } from "./queryOnce";
 
-const SLEEP_PAST_CACHE = "4 seconds";
+// Wait long enough for the local backend to evict any time-observed query
+// from its reactive cache, plus 1s of slack for scheduling jitter. Derived
+// from `LocalBackend.maxCacheAge` (which is itself derived from the UDF
+// timeout knobs the layer sets on the backend) so the two cannot drift.
+const SLEEP_PAST_CACHE = Duration.sum(LocalBackend.maxCacheAge, "1 second");
 
-// All four fixtures are zero-arg, so `{}` is always a valid args object.
-// We pass it explicitly because TypeScript does not simplify
-// `OptionalRestArgs<...>` at this generic call site to drop the args tuple.
+// All four fixtures take zero args (`Schema.Struct({})`), but TypeScript
+// does not simplify `Ref.OptionalArgs<R>` for an unconstrained `R`, so the
+// rest tuple stays mandatory at this generic call site. Forward an empty
+// args list cast to the parameter type — `queryOnce` defaults missing
+// args to `{}` internally.
 const captureAcrossEvictionWindow = <R extends Ref.AnyPublicQuery>(ref: R) =>
   Effect.gen(function* () {
     const { client } = yield* LocalBackend.LocalBackend;
-    const reference = Ref.getFunctionReference(ref);
-    const first = yield* queryOnce(client, reference, {});
+    const args = [] as unknown as Ref.OptionalArgs<R>;
+    const first = yield* queryOnce(client, ref, ...args);
     yield* Effect.sleep(SLEEP_PAST_CACHE);
-    const second = yield* queryOnce(client, reference, {});
+    const second = yield* queryOnce(client, ref, ...args);
     return { first, second };
   });
 
