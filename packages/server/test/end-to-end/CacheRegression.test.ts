@@ -31,19 +31,44 @@
  * captures.
  */
 
+import { Ref } from "@confect/core";
 import { describe, expect, layer } from "@effect/vitest";
+import type { FunctionReference } from "convex/server";
+import { makeFunctionReference } from "convex/server";
 import { Effect } from "effect";
+import refs from "../confect/_generated/refs";
 import * as LocalBackend from "./LocalBackend";
 import { queryOnce } from "./queryOnce";
 
 const SLEEP_PAST_CACHE = "4 seconds";
 
-const captureAcrossEvictionWindow = (functionName: string) =>
+// `cacheControl:control` is a vanilla Convex query (not in the Confect spec
+// tree, so no entry in `_generated/refs`). Build its `FunctionReference`
+// directly with the typed args / returns we know it has, so call sites get
+// proper return-type inference rather than `any`.
+const cacheControlRef: FunctionReference<"query", "public", {}, number> =
+  makeFunctionReference("groups/cacheControl:control");
+
+// Confect refs already encode runtime + visibility; `Ref.getFunctionReference`
+// returns the underlying Convex `FunctionReference` for HTTP transport.
+const stubbing = refs.public.groups.cacheStubbing;
+const confectNoTimeRef = Ref.getFunctionReference(stubbing.confectNoTime);
+const confectWithRawDateNowRef = Ref.getFunctionReference(
+  stubbing.confectWithRawDateNow,
+);
+const confectWithClockRef = Ref.getFunctionReference(stubbing.confectWithClock);
+
+// All four fixtures are zero-arg, so `{}` is always a valid args object.
+// We pass it explicitly because TypeScript does not simplify
+// `OptionalRestArgs<Q>` at this generic call site to drop the args tuple.
+const captureAcrossEvictionWindow = <Q extends FunctionReference<"query">>(
+  reference: Q,
+) =>
   Effect.gen(function* () {
     const { url } = yield* LocalBackend.LocalBackend;
-    const first = yield* queryOnce<number>(url, functionName);
+    const first = yield* queryOnce(url, reference, {});
     yield* Effect.sleep(SLEEP_PAST_CACHE);
-    const second = yield* queryOnce<number>(url, functionName);
+    const second = yield* queryOnce(url, reference, {});
     return { first, second };
   });
 
@@ -60,9 +85,8 @@ describe("Cache regression (e2e)", () => {
       "control: native query that calls Date.now evicts after MAX_CACHE_AGE",
       () =>
         Effect.gen(function* () {
-          const { first, second } = yield* captureAcrossEvictionWindow(
-            "groups/cacheControl:control",
-          );
+          const { first, second } =
+            yield* captureAcrossEvictionWindow(cacheControlRef);
           // Sanity check on the harness itself: if this fails, the test
           // infrastructure is broken (cache eviction is not happening within
           // the configured window) and any green Confect cases below are
@@ -78,9 +102,8 @@ describe("Cache regression (e2e)", () => {
       "regression: Confect query stays cached across MAX_CACHE_AGE",
       () =>
         Effect.gen(function* () {
-          const { first, second } = yield* captureAcrossEvictionWindow(
-            "groups/cacheStubbing:confectNoTime",
-          );
+          const { first, second } =
+            yield* captureAcrossEvictionWindow(confectNoTimeRef);
           expect(
             first,
             "withStubbedDateNow should keep observed_time=false so the cache holds",
@@ -93,7 +116,7 @@ describe("Cache regression (e2e)", () => {
       () =>
         Effect.gen(function* () {
           const { first, second } = yield* captureAcrossEvictionWindow(
-            "groups/cacheStubbing:confectWithRawDateNow",
+            confectWithRawDateNowRef,
           );
           expect(
             first,
@@ -106,9 +129,8 @@ describe("Cache regression (e2e)", () => {
       "opt-in: Clock.currentTimeMillis correctly evicts after MAX_CACHE_AGE",
       () =>
         Effect.gen(function* () {
-          const { first, second } = yield* captureAcrossEvictionWindow(
-            "groups/cacheStubbing:confectWithClock",
-          );
+          const { first, second } =
+            yield* captureAcrossEvictionWindow(confectWithClockRef);
           expect(
             first,
             "Clock.currentTimeMillis should reach op_now via the unpatched clock",
