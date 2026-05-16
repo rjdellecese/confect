@@ -31,95 +31,89 @@
  * captures.
  */
 
-import { ConvexClient } from "convex/browser";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { spawnLocalBackend } from "./spawnLocalBackend";
+import { describe, expect, layer } from "@effect/vitest";
+import { Effect } from "effect";
+import * as LocalBackend from "./LocalBackend";
 import { subscribeOnce } from "./subscribeOnce";
 
-const MAX_CACHE_AGE_MS = 3_000;
-const SLEEP_PAST_CACHE_MS = MAX_CACHE_AGE_MS + 1_000;
+const SLEEP_PAST_CACHE = "4 seconds";
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const captureWithFreshClient = async (
-  url: string,
-  functionName: string,
-): Promise<number> => {
-  const client = new ConvexClient(url);
-  try {
-    return await subscribeOnce<number>(client, functionName);
-  } finally {
-    await client.close();
-  }
-};
-
-const captureAcrossEvictionWindow = async (
-  url: string,
-  functionName: string,
-): Promise<{ first: number; second: number }> => {
-  const first = await captureWithFreshClient(url, functionName);
-  await sleep(SLEEP_PAST_CACHE_MS);
-  const second = await captureWithFreshClient(url, functionName);
-  return { first, second };
-};
+const captureAcrossEvictionWindow = (functionName: string) =>
+  Effect.gen(function* () {
+    const { url } = yield* LocalBackend.LocalBackend;
+    const first = yield* subscribeOnce<number>(url, functionName);
+    yield* Effect.sleep(SLEEP_PAST_CACHE);
+    const second = yield* subscribeOnce<number>(url, functionName);
+    return { first, second };
+  });
 
 describe.runIf(process.platform !== "win32")("Cache regression (e2e)", () => {
-  let url: string;
-  let stopBackend: () => Promise<void>;
-
-  beforeAll(async () => {
-    const backend = await spawnLocalBackend();
-    url = backend.url;
-    stopBackend = backend.stop;
-  }, 120_000);
-
-  afterAll(async () => {
-    if (stopBackend !== undefined) {
-      await stopBackend();
-    }
-  }, 30_000);
-
-  it("control: native query that calls Date.now evicts after MAX_CACHE_AGE", async () => {
-    const { first, second } = await captureAcrossEvictionWindow(
-      url,
-      "groups/cacheControl:control",
+  // `excludeTestServices: true` opts out of `TestClock`/`TestServices` so
+  // that `Effect.sleep` actually waits real wall-clock time — without this
+  // the test-runtime clock is virtual and `Effect.sleep("4 seconds")` would
+  // never fire, so the cache eviction window is never crossed.
+  layer(LocalBackend.layer, {
+    timeout: "120 seconds",
+    excludeTestServices: true,
+  })((it) => {
+    it.effect(
+      "control: native query that calls Date.now evicts after MAX_CACHE_AGE",
+      () =>
+        Effect.gen(function* () {
+          const { first, second } = yield* captureAcrossEvictionWindow(
+            "groups/cacheControl:control",
+          );
+          // Sanity check on the harness itself: if this fails, the test
+          // infrastructure is broken (cache eviction is not happening within
+          // the configured window) and any green Confect cases below are
+          // meaningless.
+          expect(first, "harness sanity: control should re-execute").not.toBe(
+            second,
+          );
+        }),
+      30_000,
     );
-    // Sanity check on the harness itself: if this fails, the test
-    // infrastructure is broken (cache eviction is not happening within the
-    // configured window) and any green Confect cases below are meaningless.
-    expect(first, "harness sanity: control should re-execute").not.toBe(second);
-  }, 20_000);
 
-  it("regression: Confect query stays cached across MAX_CACHE_AGE", async () => {
-    const { first, second } = await captureAcrossEvictionWindow(
-      url,
-      "groups/cacheStubbing:confectNoTime",
+    it.effect(
+      "regression: Confect query stays cached across MAX_CACHE_AGE",
+      () =>
+        Effect.gen(function* () {
+          const { first, second } = yield* captureAcrossEvictionWindow(
+            "groups/cacheStubbing:confectNoTime",
+          );
+          expect(
+            first,
+            "withStubbedDateNow should keep observed_time=false so the cache holds",
+          ).toBe(second);
+        }),
     );
-    expect(
-      first,
-      "withStubbedDateNow should keep observed_time=false so the cache holds",
-    ).toBe(second);
-  }, 20_000);
 
-  it("regression: Confect query that calls raw Date.now stays cached", async () => {
-    const { first, second } = await captureAcrossEvictionWindow(
-      url,
-      "groups/cacheStubbing:confectWithRawDateNow",
+    it.effect(
+      "regression: Confect query that calls raw Date.now stays cached",
+      () =>
+        Effect.gen(function* () {
+          const { first, second } = yield* captureAcrossEvictionWindow(
+            "groups/cacheStubbing:confectWithRawDateNow",
+          );
+          expect(
+            first,
+            "withStubbedDateNow should mask user-level Date.now too",
+          ).toBe(second);
+        }),
     );
-    expect(
-      first,
-      "withStubbedDateNow should mask user-level Date.now too",
-    ).toBe(second);
-  }, 20_000);
 
-  it("opt-in: Clock.currentTimeMillis correctly evicts after MAX_CACHE_AGE", async () => {
-    const { first, second } = await captureAcrossEvictionWindow(
-      url,
-      "groups/cacheStubbing:confectWithClock",
+    it.effect(
+      "opt-in: Clock.currentTimeMillis correctly evicts after MAX_CACHE_AGE",
+      () =>
+        Effect.gen(function* () {
+          const { first, second } = yield* captureAcrossEvictionWindow(
+            "groups/cacheStubbing:confectWithClock",
+          );
+          expect(
+            first,
+            "Clock.currentTimeMillis should reach op_now via the unpatched clock",
+          ).not.toBe(second);
+        }),
     );
-    expect(
-      first,
-      "Clock.currentTimeMillis should reach op_now via the unpatched clock",
-    ).not.toBe(second);
-  }, 20_000);
+  });
 });
