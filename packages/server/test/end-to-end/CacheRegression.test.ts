@@ -34,20 +34,20 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { Effect } from "effect";
 import * as LocalBackend from "./LocalBackend";
-import { subscribeOnce } from "./subscribeOnce";
+import { queryOnce } from "./queryOnce";
 
 const SLEEP_PAST_CACHE = "4 seconds";
 
 const captureAcrossEvictionWindow = (functionName: string) =>
   Effect.gen(function* () {
     const { url } = yield* LocalBackend.LocalBackend;
-    const first = yield* subscribeOnce<number>(url, functionName);
+    const first = yield* queryOnce<number>(url, functionName);
     yield* Effect.sleep(SLEEP_PAST_CACHE);
-    const second = yield* subscribeOnce<number>(url, functionName);
+    const second = yield* queryOnce<number>(url, functionName);
     return { first, second };
   });
 
-describe.runIf(process.platform !== "win32")("Cache regression (e2e)", () => {
+describe("Cache regression (e2e)", () => {
   // `excludeTestServices: true` opts out of `TestClock`/`TestServices` so
   // that `Effect.sleep` actually waits real wall-clock time — without this
   // the test-runtime clock is virtual and `Effect.sleep("4 seconds")` would
