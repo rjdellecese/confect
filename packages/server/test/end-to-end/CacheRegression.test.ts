@@ -49,14 +49,16 @@ const SLEEP_PAST_CACHE = Duration.sum(LocalBackend.maxCacheAge, "1 second");
 // rest tuple stays mandatory at this generic call site. Forward an empty
 // args list cast to the parameter type — `queryOnce` defaults missing
 // args to `{}` internally.
-const captureAcrossEvictionWindow = <R extends Ref.AnyPublicQuery>(ref: R) =>
+const captureAcrossEvictionWindow = <R extends Ref.AnyPublicQuery>(
+  ref: R,
+  ...args: Ref.OptionalArgs<R>
+) =>
   Effect.gen(function* () {
     const { client } = yield* LocalBackend.LocalBackend;
-    const args = [] as unknown as Ref.OptionalArgs<R>;
-    const first = yield* queryOnce(client, ref, ...args);
+    const initial = yield* queryOnce(client, ref, ...args);
     yield* Effect.sleep(SLEEP_PAST_CACHE);
-    const second = yield* queryOnce(client, ref, ...args);
-    return { first, second };
+    const pastMaxCacheAge = yield* queryOnce(client, ref, ...args);
+    return { initial, pastMaxCacheAge };
   });
 
 describe("Cache regression (e2e)", () => {
@@ -72,15 +74,16 @@ describe("Cache regression (e2e)", () => {
       "control: native query that calls Date.now evicts after MAX_CACHE_AGE",
       () =>
         Effect.gen(function* () {
-          const { first, second } = yield* captureAcrossEvictionWindow(
-            refs.public.groups.cacheControl.control,
-          );
+          const { initial, pastMaxCacheAge } =
+            yield* captureAcrossEvictionWindow(
+              refs.public.groups.cacheControl.control,
+            );
           // Sanity check on the harness itself: if this fails, the test
           // infrastructure is broken (cache eviction is not happening within
           // the configured window) and any green Confect cases below are
           // meaningless.
-          expect(first, "harness sanity: control should re-execute").not.toBe(
-            second,
+          expect(initial, "harness sanity: control should re-execute").not.toBe(
+            pastMaxCacheAge,
           );
         }),
       30_000,
@@ -90,13 +93,14 @@ describe("Cache regression (e2e)", () => {
       "regression: Confect query stays cached across MAX_CACHE_AGE",
       () =>
         Effect.gen(function* () {
-          const { first, second } = yield* captureAcrossEvictionWindow(
-            refs.public.groups.cacheStubbing.confectNoTime,
-          );
+          const { initial, pastMaxCacheAge } =
+            yield* captureAcrossEvictionWindow(
+              refs.public.groups.cacheStubbing.confectNoTime,
+            );
           expect(
-            first,
+            initial,
             "withStubbedDateNow should keep observed_time=false so the cache holds",
-          ).toBe(second);
+          ).toBe(pastMaxCacheAge);
         }),
     );
 
@@ -104,13 +108,14 @@ describe("Cache regression (e2e)", () => {
       "regression: Confect query that calls raw Date.now stays cached",
       () =>
         Effect.gen(function* () {
-          const { first, second } = yield* captureAcrossEvictionWindow(
-            refs.public.groups.cacheStubbing.confectWithRawDateNow,
-          );
+          const { initial, pastMaxCacheAge } =
+            yield* captureAcrossEvictionWindow(
+              refs.public.groups.cacheStubbing.confectWithRawDateNow,
+            );
           expect(
-            first,
+            initial,
             "withStubbedDateNow should mask user-level Date.now too",
-          ).toBe(second);
+          ).toBe(pastMaxCacheAge);
         }),
     );
 
@@ -118,13 +123,14 @@ describe("Cache regression (e2e)", () => {
       "opt-in: Clock.currentTimeMillis correctly evicts after MAX_CACHE_AGE",
       () =>
         Effect.gen(function* () {
-          const { first, second } = yield* captureAcrossEvictionWindow(
-            refs.public.groups.cacheStubbing.confectWithClock,
-          );
+          const { initial, pastMaxCacheAge } =
+            yield* captureAcrossEvictionWindow(
+              refs.public.groups.cacheStubbing.confectWithClock,
+            );
           expect(
-            first,
+            initial,
             "Clock.currentTimeMillis should reach op_now via the unpatched clock",
-          ).not.toBe(second);
+          ).not.toBe(pastMaxCacheAge);
         }),
     );
   });
