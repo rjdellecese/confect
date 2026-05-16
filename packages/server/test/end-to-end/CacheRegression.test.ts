@@ -45,11 +45,11 @@ const SLEEP_PAST_CACHE = "4 seconds";
 // `OptionalRestArgs<...>` at this generic call site to drop the args tuple.
 const captureAcrossEvictionWindow = <R extends Ref.AnyPublicQuery>(ref: R) =>
   Effect.gen(function* () {
-    const { url } = yield* LocalBackend.LocalBackend;
+    const { client } = yield* LocalBackend.LocalBackend;
     const reference = Ref.getFunctionReference(ref);
-    const first = yield* queryOnce(url, reference, {});
+    const first = yield* queryOnce(client, reference, {});
     yield* Effect.sleep(SLEEP_PAST_CACHE);
-    const second = yield* queryOnce(url, reference, {});
+    const second = yield* queryOnce(client, reference, {});
     return { first, second };
   });
 

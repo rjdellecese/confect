@@ -1,6 +1,7 @@
 import path from "node:path";
 import { Command } from "@effect/platform";
 import { NodeContext } from "@effect/platform-node";
+import { ConvexHttpClient } from "convex/browser";
 import { Context, Effect, Layer, Option, Stream } from "effect";
 
 class BackendNotReadyError extends Error {
@@ -9,10 +10,11 @@ class BackendNotReadyError extends Error {
 
 export class LocalBackend extends Context.Tag(
   "@confect/server/test/end-to-end/LocalBackend",
-)<LocalBackend, { readonly url: string }>() {}
+)<LocalBackend, { readonly client: ConvexHttpClient }>() {}
 
 const SERVER_PACKAGE_DIR = path.resolve(import.meta.dirname, "../..");
 const READY_LINE = "Convex functions ready!";
+const URL = "http://127.0.0.1:3210";
 
 /**
  * Spawn `convex dev` from `packages/server/` (which already targets
@@ -20,6 +22,11 @@ const READY_LINE = "Convex functions ready!";
  * `MAX_CACHE_AGE = total_query_timeout + 1s ≈ 3s` in the local-backend
  * Rust process. The CLI keeps the local backend alive for the lifetime
  * of the layer's scope and is signalled on scope close.
+ *
+ * Once the backend is ready, a single `ConvexHttpClient` is constructed
+ * and exposed through the service, shared by every test case so we don't
+ * pay the per-call construction cost or risk multiple clients drifting
+ * out of sync.
  *
  * We deliberately do NOT clean `.convex/` or `.env.local` between runs.
  * If `.convex/local/default/config.json` exists, the CLI's
@@ -35,7 +42,7 @@ const READY_LINE = "Convex functions ready!";
  * the in-memory query cache lives inside the per-run backend subprocess
  * and the test fixtures don't write to the database.
  */
-const acquire = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const command = Command.make(
     "pnpm",
     "convex",
@@ -76,17 +83,19 @@ const acquire = Effect.gen(function* () {
         ),
     }),
   );
-  if (Option.isNone(seenReady)) {
-    return yield* Effect.fail(
-      new BackendNotReadyError(
-        `convex dev exited before printing "${READY_LINE}"`,
-      ),
-    );
-  }
 
-  return LocalBackend.of({ url: "http://127.0.0.1:3210" });
+  return yield* Option.match(seenReady, {
+    onSome: () =>
+      Effect.succeed(LocalBackend.of({ client: new ConvexHttpClient(URL) })),
+    onNone: () =>
+      Effect.fail(
+        new BackendNotReadyError(
+          `convex dev exited before printing "${READY_LINE}"`,
+        ),
+      ),
+  });
 });
 
-export const layer = Layer.scoped(LocalBackend, acquire).pipe(
+export const layer = Layer.scoped(LocalBackend, make).pipe(
   Layer.provide(NodeContext.layer),
 );
