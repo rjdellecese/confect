@@ -105,20 +105,24 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
 // relying on real time for correctness anyway.
 //
 // Users who explicitly want the real timestamp can still reach it via Effect's
-// Clock service (Clock.currentTimeMillis/Clock.currentTimeNanos). We provide
-// a Clock layer whose methods close over the *original* Date.now, so opting in
-// to Clock is an opt-in to worse caching—but caching is not broken by default.
+// Clock service (Clock.currentTimeMillis / Clock.currentTimeNanos). We provide
+// a Clock whose user-facing Effects call realDateNow (Convex's tracker)
+// directly, making Clock an explicit opt-in to cache invalidation. The unsafe
+// methods used internally by Effect (logging, span events, scheduler) return
+// constants so they never touch the tracker — caching is not broken by
+// default.
+//
+// _defaultClock is created at module load time, before Convex installs its
+// Date.now wrapper, so its unsafeCurrentTimeNanos uses process.hrtime safely.
+const _defaultClock = Clock.make();
 const unpatchedClock = (realDateNow: () => number): Clock.Clock => {
   const bigint1e6 = BigInt(1_000_000);
-  const unsafeCurrentTimeMillis = () => realDateNow();
-  const unsafeCurrentTimeNanos = () => BigInt(realDateNow()) * bigint1e6;
-  const defaultClock = Clock.make();
   return {
-    ...defaultClock,
-    unsafeCurrentTimeMillis,
-    unsafeCurrentTimeNanos,
-    currentTimeMillis: Effect.sync(unsafeCurrentTimeMillis),
-    currentTimeNanos: Effect.sync(unsafeCurrentTimeNanos),
+    ..._defaultClock,
+    unsafeCurrentTimeMillis: () => 0,
+    unsafeCurrentTimeNanos: () => _defaultClock.unsafeCurrentTimeNanos(),
+    currentTimeMillis: Effect.sync(() => realDateNow()),
+    currentTimeNanos: Effect.sync(() => BigInt(realDateNow()) * bigint1e6),
   };
 };
 
