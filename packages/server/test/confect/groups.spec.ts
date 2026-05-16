@@ -1,10 +1,12 @@
 import { GroupSpec } from "@confect/core";
+import { cacheStubbing } from "./groups/cacheStubbing.spec";
 import { notes } from "./groups/notes.spec";
 import { random } from "./groups/random.spec";
 import { runners } from "./groups/runners.spec";
 import { typedErrors } from "./groups/typedErrors.spec";
 
 export const groups = GroupSpec.make("groups")
+  .addGroup(cacheStubbing)
   .addGroup(notes)
   .addGroup(random)
   .addGroup(runners)
