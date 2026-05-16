@@ -1,4 +1,5 @@
-import { Command, FileSystem, Path } from "@effect/platform";
+import path from "node:path";
+import { Command } from "@effect/platform";
 import { NodeContext } from "@effect/platform-node";
 import { Context, Effect, Layer, Option, Stream } from "effect";
 
@@ -10,9 +11,8 @@ export class LocalBackend extends Context.Tag(
   "@confect/server/test/end-to-end/LocalBackend",
 )<LocalBackend, { readonly url: string }>() {}
 
+const SERVER_PACKAGE_DIR = path.resolve(import.meta.dirname, "../..");
 const READY_LINE = "Convex functions ready!";
-
-const RESET_PATHS = [".convex", ".env.local"] as const;
 
 /**
  * Spawn `convex dev` from `packages/server/` (which already targets
@@ -20,26 +20,22 @@ const RESET_PATHS = [".convex", ".env.local"] as const;
  * `MAX_CACHE_AGE = total_query_timeout + 1s ≈ 3s` in the local-backend
  * Rust process. The CLI keeps the local backend alive for the lifetime
  * of the layer's scope and is signalled on scope close.
+ *
+ * We deliberately do NOT clean `.convex/` or `.env.local` between runs.
+ * If `.convex/local/default/config.json` exists, the CLI's
+ * `chooseDeployment` (in `cli/lib/localDeployment/anonymous.ts`) returns
+ * `kind: "existing"` and skips `doInitConvexFolder`, so the boilerplate
+ * `README.md` / `tsconfig.json` codegen never runs at all. On a cold
+ * machine the boilerplate codegen does run, but the committed
+ * `test/convex/README.md` is then preserved by `doReadmeCodegen`'s
+ * `skipIfExists` check.
+ *
+ * Nothing else carried in `.convex/` (deployment name, instance secret,
+ * admin key, SQLite shell) interferes with the cache regression test:
+ * the in-memory query cache lives inside the per-run backend subprocess
+ * and the test fixtures don't write to the database.
  */
 const acquire = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const serverPackageDir = path.resolve(import.meta.dirname, "../..");
-
-  // Reset deployment state to a known-good blank slate every run so this
-  // test does not interact with whatever the developer last did locally.
-  yield* Effect.forEach(
-    RESET_PATHS,
-    (relative) =>
-      fs
-        .remove(path.join(serverPackageDir, relative), {
-          recursive: true,
-          force: true,
-        })
-        .pipe(Effect.ignore),
-    { discard: true },
-  );
-
   const command = Command.make(
     "pnpm",
     "convex",
@@ -48,7 +44,7 @@ const acquire = Effect.gen(function* () {
     "--codegen=disable",
     "--tail-logs=disable",
   ).pipe(
-    Command.workingDirectory(serverPackageDir),
+    Command.workingDirectory(SERVER_PACKAGE_DIR),
     Command.env({
       CONVEX_AGENT_MODE: "anonymous",
       // Knobs read by `crates/common/src/knobs.rs` in `convex-backend`.
