@@ -35,8 +35,27 @@ const confectWithRawDateNow = FunctionImpl.make(
   () => Effect.sync(() => Date.now()),
 );
 
+// `confectWithSpan` exercises the bug PR #399 fixes: when user code does not
+// touch the `Clock` service at all, but Effect's runtime *internally* invokes
+// `clock.unsafeCurrentTimeNanos()` (e.g. when creating / ending a tracing
+// span -- `internal/core-effect.js:777,810`), the v6 `unpatchedClock` wiring
+// (`unsafeCurrentTimeMillis = () => realDateNow()`) reaches `op_now` and
+// busts the cache. The handler returns `Math.random()` for the same reason
+// `confectNoTime` does -- a per-execution witness that doesn't itself
+// observe time.
+const confectWithSpan = FunctionImpl.make(
+  api,
+  "groups.cacheStubbing",
+  "confectWithSpan",
+  () =>
+    Effect.sync(() => Math.random()).pipe(
+      Effect.withSpan("cacheStubbing.confectWithSpan"),
+    ),
+);
+
 export const cacheStubbing = GroupImpl.make(api, "groups.cacheStubbing").pipe(
   Layer.provide(confectNoTime),
   Layer.provide(confectWithClock),
   Layer.provide(confectWithRawDateNow),
+  Layer.provide(confectWithSpan),
 );

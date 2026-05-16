@@ -6,3 +6,5 @@ export const confectWithClock =
   registeredFunctions.groups.cacheStubbing.confectWithClock;
 export const confectWithRawDateNow =
   registeredFunctions.groups.cacheStubbing.confectWithRawDateNow;
+export const confectWithSpan =
+  registeredFunctions.groups.cacheStubbing.confectWithSpan;

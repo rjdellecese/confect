@@ -133,5 +133,21 @@ describe("Cache regression (e2e)", () => {
           ).not.toBe(pastMaxCacheAge);
         }),
     );
+
+    it.effect(
+      "regression (PR #399): Effect.withSpan must not bust the cache",
+      () =>
+        Effect.gen(function* () {
+          const { initial, pastMaxCacheAge } =
+            yield* captureAcrossEvictionWindow(
+              refs.public.groups.cacheStubbing.confectWithSpan,
+            );
+          expect(
+            initial,
+            "Effect.withSpan calls clock.unsafeCurrentTimeNanos internally; " +
+              "that path must not reach op_now (PR #399)",
+          ).toBe(pastMaxCacheAge);
+        }),
+    );
   });
 });

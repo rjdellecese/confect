@@ -22,4 +22,11 @@ export const cacheStubbing = GroupSpec.make("cacheStubbing")
       args: Schema.Struct({}),
       returns: Schema.Number,
     }),
+  )
+  .addFunction(
+    FunctionSpec.publicQuery({
+      name: "confectWithSpan",
+      args: Schema.Struct({}),
+      returns: Schema.Number,
+    }),
   );
