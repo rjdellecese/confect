@@ -13,22 +13,14 @@ const confectWithClock = FunctionImpl.make(
   api,
   "groups.cacheStubbing",
   "confectWithClock",
-  () =>
-    Effect.gen(function* () {
-      yield* Clock.currentTimeMillis;
-      return Math.random();
-    }),
+  () => Clock.currentTimeMillis,
 );
 
 const confectWithRawDateNow = FunctionImpl.make(
   api,
   "groups.cacheStubbing",
   "confectWithRawDateNow",
-  () =>
-    Effect.sync(() => {
-      Date.now();
-      return Math.random();
-    }),
+  () => Effect.sync(() => Date.now()),
 );
 
 export const cacheStubbing = GroupImpl.make(api, "groups.cacheStubbing").pipe(

@@ -96,7 +96,7 @@ const make = Effect.gen(function* () {
   // Find the first chunk containing READY_LINE. If the streams close first
   // (process exited), `Stream.runHead` returns `None` and we fail explicitly
   // — otherwise a runaway misconfiguration would silently hang up to 90s.
-  const seenReady = yield* Stream.merge(process.stdout, process.stderr).pipe(
+  const readySeen = yield* Stream.merge(process.stdout, process.stderr).pipe(
     Stream.decodeText("utf-8"),
     Stream.find((chunk) => chunk.includes(READY_LINE)),
     Stream.runHead,
@@ -109,7 +109,7 @@ const make = Effect.gen(function* () {
     }),
   );
 
-  return yield* Option.match(seenReady, {
+  return yield* Option.match(readySeen, {
     onSome: () =>
       Effect.succeed(LocalBackend.of({ client: new ConvexHttpClient(URL) })),
     onNone: () =>
