@@ -34,7 +34,6 @@
 import { Ref } from "@confect/core";
 import { describe, expect, layer } from "@effect/vitest";
 import type { FunctionReference } from "convex/server";
-import { makeFunctionReference } from "convex/server";
 import { Effect } from "effect";
 import refs from "../confect/_generated/refs";
 import * as LocalBackend from "./LocalBackend";
@@ -42,15 +41,13 @@ import { queryOnce } from "./queryOnce";
 
 const SLEEP_PAST_CACHE = "4 seconds";
 
-// `cacheControl:control` is a vanilla Convex query (not in the Confect spec
-// tree, so no entry in `_generated/refs`). Build its `FunctionReference`
-// directly with the typed args / returns we know it has, so call sites get
-// proper return-type inference rather than `any`.
-const cacheControlRef: FunctionReference<"query", "public", {}, number> =
-  makeFunctionReference("groups/cacheControl:control");
-
-// Confect refs already encode runtime + visibility; `Ref.getFunctionReference`
-// returns the underlying Convex `FunctionReference` for HTTP transport.
+// Every test fixture (Confect-wrapped and the plain native control) lives in
+// the Confect spec tree, so all four refs come from the same generated
+// `refs` namespace. `Ref.getFunctionReference` returns the underlying
+// Convex `FunctionReference` for HTTP transport.
+const cacheControlRef = Ref.getFunctionReference(
+  refs.public.groups.cacheControl.control,
+);
 const stubbing = refs.public.groups.cacheStubbing;
 const confectNoTimeRef = Ref.getFunctionReference(stubbing.confectNoTime);
 const confectWithRawDateNowRef = Ref.getFunctionReference(
