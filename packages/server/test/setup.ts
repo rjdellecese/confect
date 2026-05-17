@@ -22,10 +22,7 @@ const runCommand = (
 // which is brittle in CI: `pnpm install` runs before workspace packages are
 // built, so the bin link for `confect` ends up dangling until something
 // re-links it.
-const confectCliEntryUrl = new URL(
-  "../../cli/dist/index.mjs",
-  import.meta.url,
-);
+const confectCliEntryUrl = new URL("../../cli/dist/index.mjs", import.meta.url);
 
 /**
  * Build a Vitest `globalSetup` that runs `confect codegen` against the
