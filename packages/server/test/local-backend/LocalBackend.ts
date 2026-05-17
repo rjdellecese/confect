@@ -1,4 +1,4 @@
-import { Command } from "@effect/platform";
+import { Command, Path } from "@effect/platform";
 import { NodeContext } from "@effect/platform-node";
 import { ConvexHttpClient } from "convex/browser";
 import {
@@ -10,7 +10,6 @@ import {
   Schema,
   Stream,
 } from "effect";
-import path from "node:path";
 
 class BackendNotReadyError extends Schema.TaggedError<BackendNotReadyError>()(
   "BackendNotReadyError",
@@ -21,7 +20,6 @@ export class LocalBackend extends Context.Tag(
   "@confect/server/test/local-backend/LocalBackend",
 )<LocalBackend, { readonly client: ConvexHttpClient }>() {}
 
-const FIXTURES_DIR = path.resolve(import.meta.dirname, "./fixtures");
 const READY_LINE = "Convex functions ready!";
 const URL = "http://127.0.0.1:3210";
 
@@ -52,6 +50,9 @@ export const maxCacheAge = Duration.seconds(
  * codegen that would otherwise overwrite committed fixture files.
  */
 const make = Effect.gen(function* () {
+  const path = yield* Path.Path;
+  const fixturesDir = path.resolve(import.meta.dirname, "./fixtures");
+
   const command = Command.make(
     "pnpm",
     "convex",
@@ -60,7 +61,7 @@ const make = Effect.gen(function* () {
     "--codegen=disable",
     "--tail-logs=disable",
   ).pipe(
-    Command.workingDirectory(FIXTURES_DIR),
+    Command.workingDirectory(fixturesDir),
     Command.env({
       CONVEX_AGENT_MODE: "anonymous",
       DATABASE_UDF_USER_TIMEOUT_SECONDS: USER_TIMEOUT_SECONDS.toString(),
