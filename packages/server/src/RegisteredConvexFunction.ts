@@ -98,19 +98,20 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
     Match.exhaustive,
   );
 
-// Convex's query cache is invalidated by any Date.now() call during handler
-// execution. Effect's unsafeFork calls Date.now() when constructing a
-// FiberId.Runtime, which trips the cache for every confect-wrapped query. We
-// stub Date.now to 0 for the span of the handler; queries are forbidden from
-// relying on real time for correctness anyway.
-//
-// Users who explicitly want the real timestamp can still reach it via Effect's
-// Clock service (Clock.currentTimeMillis / Clock.currentTimeNanos). We provide
-// a Clock whose user-facing Effects call realDateNow (Convex's tracker)
-// directly, making Clock an explicit opt-in to cache invalidation. The unsafe
-// methods used internally by Effect (logging, span events, scheduler) return
-// constants so they never touch the tracker — caching is not broken by
-// default.
+/**
+ * Convex's query cache is invalidated by any Date.now() call during handler
+ * execution. Effect's unsafeFork calls Date.now() when constructing a
+ * FiberId.Runtime, which trips the cache for every confect-wrapped query. We
+ * stub Date.now to 0 for the span of the handler; queries are forbidden from
+ * relying on real time for correctness anyway.
+ *
+ * Users who explicitly want the real timestamp can still reach it via Effect's
+ * Clock service (Clock.currentTimeMillis/Clock.currentTimeNanos). We provide a
+ * Clock whose user-facing Effects call realDateNow (Convex's tracker) directly,
+ * making Clock an explicit opt-in to cache invalidation. The unsafe methods
+ * used internally by Effect (logging, span events, scheduler) return constants
+ * so they never touch the tracker—caching is not broken by default.
+ */
 const unpatchedClock = (realDateNow: () => number): Clock.Clock => {
   const defaultClock = Clock.make();
   return {
