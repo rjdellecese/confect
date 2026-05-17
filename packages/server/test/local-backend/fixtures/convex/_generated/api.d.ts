@@ -24,7 +24,7 @@ export declare const api: {
     cacheControl: {
       control: FunctionReference<"query", "public", {}, any>;
     };
-    cacheStubbing: {
+    cacheStubbed: {
       confectNoTime: FunctionReference<"query", "public", {}, number>;
       confectWithClock: FunctionReference<"query", "public", {}, number>;
       confectWithRawDateNow: FunctionReference<"query", "public", {}, number>;

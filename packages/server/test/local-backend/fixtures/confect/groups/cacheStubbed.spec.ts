@@ -1,7 +1,7 @@
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import { Schema } from "effect";
 
-export const cacheStubbing = GroupSpec.make("cacheStubbing")
+export const cacheStubbed = GroupSpec.make("cacheStubbed")
   .addFunction(
     FunctionSpec.publicQuery({
       name: "confectNoTime",

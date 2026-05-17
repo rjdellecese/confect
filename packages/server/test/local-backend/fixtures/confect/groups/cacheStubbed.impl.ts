@@ -12,21 +12,21 @@ import api from "../_generated/api";
 
 const confectNoTime = FunctionImpl.make(
   api,
-  "groups.cacheStubbing",
+  "groups.cacheStubbed",
   "confectNoTime",
   () => Effect.sync(() => Math.random()),
 );
 
 const confectWithClock = FunctionImpl.make(
   api,
-  "groups.cacheStubbing",
+  "groups.cacheStubbed",
   "confectWithClock",
   () => Clock.currentTimeMillis,
 );
 
 const confectWithRawDateNow = FunctionImpl.make(
   api,
-  "groups.cacheStubbing",
+  "groups.cacheStubbed",
   "confectWithRawDateNow",
   () => Effect.sync(() => Date.now()),
 );
@@ -39,15 +39,15 @@ const confectWithRawDateNow = FunctionImpl.make(
  */
 const confectWithSpan = FunctionImpl.make(
   api,
-  "groups.cacheStubbing",
+  "groups.cacheStubbed",
   "confectWithSpan",
   () =>
     Effect.sync(() => Math.random()).pipe(
-      Effect.withSpan("cacheStubbing.confectWithSpan"),
+      Effect.withSpan("cacheStubbed.confectWithSpan"),
     ),
 );
 
-export const cacheStubbing = GroupImpl.make(api, "groups.cacheStubbing").pipe(
+export const cacheStubbed = GroupImpl.make(api, "groups.cacheStubbed").pipe(
   Layer.provide(confectNoTime),
   Layer.provide(confectWithClock),
   Layer.provide(confectWithRawDateNow),
