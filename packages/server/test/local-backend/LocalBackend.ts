@@ -18,9 +18,14 @@ class BackendNotReadyError extends Schema.TaggedError<BackendNotReadyError>()(
 ) {}
 
 export class LocalBackend extends Context.Tag(
-  "@confect/server/test/end-to-end/LocalBackend",
+  "@confect/server/test/local-backend/LocalBackend",
 )<LocalBackend, { readonly client: ConvexHttpClient }>() {}
 
+// `convex dev` is spawned from `packages/server/` rather than the fixtures
+// directory so that esbuild can resolve `@confect/server` via the package's
+// self-reference (its own `package.json` "name" field). The local-backend
+// project's location is conveyed via the sibling `packages/server/convex.json`,
+// which points at `test/local-backend/fixtures/convex/`.
 const SERVER_PACKAGE_DIR = path.resolve(import.meta.dirname, "../..");
 const READY_LINE = "Convex functions ready!";
 const URL = "http://127.0.0.1:3210";
@@ -45,11 +50,11 @@ export const maxCacheAge = Duration.seconds(
 );
 
 /**
- * Spawn `convex dev` from `packages/server/` (which already targets
- * `test/convex/` via `convex.json`) with reduced UDF timeouts so that
- * `MAX_CACHE_AGE = total_query_timeout + 1s ≈ 3s` in the local-backend
- * Rust process. The CLI keeps the local backend alive for the lifetime
- * of the layer's scope and is signalled on scope close.
+ * Spawn `convex dev` from `packages/server/` (whose `convex.json` targets
+ * `test/local-backend/fixtures/convex/`) with reduced UDF timeouts so
+ * that `MAX_CACHE_AGE = total_query_timeout + 1s ≈ 3s` in the
+ * local-backend Rust process. The CLI keeps the local backend alive for
+ * the lifetime of the layer's scope and is signalled on scope close.
  *
  * Once the backend is ready, a single `ConvexHttpClient` is constructed
  * and exposed through the service, shared by every test case so we don't
@@ -62,8 +67,8 @@ export const maxCacheAge = Duration.seconds(
  * `kind: "existing"` and skips `doInitConvexFolder`, so the boilerplate
  * `README.md` / `tsconfig.json` codegen never runs at all. On a cold
  * machine the boilerplate codegen does run, but the committed
- * `test/convex/README.md` is then preserved by `doReadmeCodegen`'s
- * `skipIfExists` check.
+ * `test/local-backend/fixtures/convex/README.md` is then preserved by
+ * `doReadmeCodegen`'s `skipIfExists` check.
  *
  * Nothing else carried in `.convex/` (deployment name, instance secret,
  * admin key, SQLite shell) interferes with the cache regression test:

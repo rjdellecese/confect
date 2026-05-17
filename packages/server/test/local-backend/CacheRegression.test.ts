@@ -34,7 +34,7 @@
 import type { Ref } from "@confect/core";
 import { describe, expect, layer } from "@effect/vitest";
 import { Duration, Effect } from "effect";
-import refs from "../confect/_generated/refs";
+import refs from "./fixtures/confect/_generated/refs";
 import * as LocalBackend from "./LocalBackend";
 import { queryOnce } from "./queryOnce";
 
@@ -49,9 +49,9 @@ const SLEEP_PAST_CACHE = Duration.sum(LocalBackend.maxCacheAge, "1 second");
 // rest tuple stays mandatory at this generic call site. Forward an empty
 // args list cast to the parameter type — `queryOnce` defaults missing
 // args to `{}` internally.
-const captureAcrossEvictionWindow = <R extends Ref.AnyPublicQuery>(
-  ref: R,
-  ...args: Ref.OptionalArgs<R>
+const captureAcrossEvictionWindow = <PublicQueryRef extends Ref.AnyPublicQuery>(
+  ref: PublicQueryRef,
+  ...args: Ref.OptionalArgs<PublicQueryRef>
 ) =>
   Effect.gen(function* () {
     const { client } = yield* LocalBackend.LocalBackend;

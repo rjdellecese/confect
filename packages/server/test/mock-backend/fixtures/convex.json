@@ -1,5 +1,5 @@
 {
-  "functions": "test/local-backend/fixtures/convex/",
+  "functions": "./convex/",
   "codegen": {
     "staticApi": true,
     "staticDataModel": true

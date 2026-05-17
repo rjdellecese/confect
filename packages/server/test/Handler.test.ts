@@ -8,8 +8,12 @@ import type {
 import type { Infer } from "convex/values";
 import { v } from "convex/values";
 import type * as Handler from "../src/Handler";
-import type schema from "./confect/schema";
-import { internalAction, mutation, query } from "./convex/_generated/server";
+import type schema from "./mock-backend/fixtures/confect/schema";
+import {
+  internalAction,
+  mutation,
+  query,
+} from "./mock-backend/fixtures/convex/_generated/server";
 
 type ExtractQueryReturns<F> =
   F extends RegisteredQuery<any, any, infer R> ? R : never;

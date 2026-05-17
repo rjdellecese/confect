@@ -4,13 +4,13 @@ import { defineConfig, mergeConfig } from "vitest/config";
 import sharedConfig from "../../vitest.shared";
 
 /**
- * Default `@confect/server` test config: in-process unit tests that don't
- * require any backend.
+ * Vitest config for in-process backend tests under `test/mock-backend/`.
  *
- * Tests that need a backend live under `test/mock-backend/` (in-process via
- * `convex-test`) and `test/local-backend/` (real `convex dev` subprocess),
- * and are run via their own configs (`vitest.mock-backend.config.ts` and
- * `vitest.local-backend.config.ts`).
+ * These tests drive Confect functions through `convex-test`'s in-memory
+ * mock backend (no `convex dev` subprocess) and are still fast enough to
+ * run alongside the unit suite during normal development. The fixture
+ * project lives at `test/mock-backend/fixtures/` and is regenerated via
+ * `pnpm confect codegen` in `globalSetup`.
  */
 export default mergeConfig(
   sharedConfig,
@@ -30,7 +30,9 @@ export default mergeConfig(
     },
     test: {
       root: import.meta.dirname,
-      include: ["test/*.test.ts", "test/internal/**/*.test.ts"],
+      name: "@confect/server (mock-backend)",
+      include: ["test/mock-backend/**/*.test.ts"],
+      globalSetup: ["./test/mock-backend/setup.ts"],
     },
   }),
 );

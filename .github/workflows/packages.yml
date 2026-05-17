@@ -77,8 +77,16 @@ jobs:
       - uses: ./.github/actions/confect-setup
       - run: cd packages/${{ matrix.package }} && pnpm test
 
-  test-end-to-end:
-    name: Test (end-to-end)
+  test-mock-backend:
+    name: Test (mock-backend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/confect-setup
+      - run: pnpm --filter @confect/server test:mock-backend
+
+  test-local-backend:
+    name: Test (local-backend)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -90,7 +98,7 @@ jobs:
           key: convex-local-backend-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             convex-local-backend-${{ runner.os }}-
-      - run: pnpm --filter @confect/server test:end-to-end
+      - run: pnpm --filter @confect/server test:local-backend
 
   bench:
     name: Bench
