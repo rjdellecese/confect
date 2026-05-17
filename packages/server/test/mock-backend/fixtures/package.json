@@ -1,0 +1,13 @@
+{
+  "name": "@confect/server-mock-backend-fixtures",
+  "version": "0.0.0",
+  "description": "Internal fixture project for @confect/server's mock-backend test suite.",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@confect/core": "workspace:*",
+    "@confect/server": "workspace:*",
+    "convex": "*",
+    "effect": "*"
+  }
+}

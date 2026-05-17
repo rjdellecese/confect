@@ -21,12 +21,7 @@ export class LocalBackend extends Context.Tag(
   "@confect/server/test/local-backend/LocalBackend",
 )<LocalBackend, { readonly client: ConvexHttpClient }>() {}
 
-// `convex dev` is spawned from `packages/server/` rather than the fixtures
-// directory so that esbuild can resolve `@confect/server` via the package's
-// self-reference (its own `package.json` "name" field). The local-backend
-// project's location is conveyed via the sibling `packages/server/convex.json`,
-// which points at `test/local-backend/fixtures/convex/`.
-const SERVER_PACKAGE_DIR = path.resolve(import.meta.dirname, "../..");
+const FIXTURES_DIR = path.resolve(import.meta.dirname, "./fixtures");
 const READY_LINE = "Convex functions ready!";
 const URL = "http://127.0.0.1:3210";
 
@@ -50,11 +45,13 @@ export const maxCacheAge = Duration.seconds(
 );
 
 /**
- * Spawn `convex dev` from `packages/server/` (whose `convex.json` targets
- * `test/local-backend/fixtures/convex/`) with reduced UDF timeouts so
- * that `MAX_CACHE_AGE = total_query_timeout + 1s ≈ 3s` in the
- * local-backend Rust process. The CLI keeps the local backend alive for
- * the lifetime of the layer's scope and is signalled on scope close.
+ * Spawn `convex dev` from `test/local-backend/fixtures/` (which is its
+ * own `pnpm` workspace package: `@confect/server-local-backend-fixtures`,
+ * with `@confect/server` declared as a `workspace:*` dep so esbuild can
+ * resolve it via `node_modules`) with reduced UDF timeouts so that
+ * `MAX_CACHE_AGE = total_query_timeout + 1s ≈ 3s` in the local-backend
+ * Rust process. The CLI keeps the local backend alive for the lifetime
+ * of the layer's scope and is signalled on scope close.
  *
  * Once the backend is ready, a single `ConvexHttpClient` is constructed
  * and exposed through the service, shared by every test case so we don't
@@ -84,7 +81,7 @@ const make = Effect.gen(function* () {
     "--codegen=disable",
     "--tail-logs=disable",
   ).pipe(
-    Command.workingDirectory(SERVER_PACKAGE_DIR),
+    Command.workingDirectory(FIXTURES_DIR),
     Command.env({
       CONVEX_AGENT_MODE: "anonymous",
       DATABASE_UDF_USER_TIMEOUT_SECONDS: USER_TIMEOUT_SECONDS.toString(),

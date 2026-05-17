@@ -9,6 +9,7 @@
  */
 
 import type { FunctionReference } from "convex/server";
+import type { GenericId as Id } from "convex/values";
 
 /**
  * A utility for referencing Convex functions in your app's public API.
@@ -21,7 +22,7 @@ import type { FunctionReference } from "convex/server";
 export declare const api: {
   groups: {
     cacheControl: {
-      control: FunctionReference<"query", "public", {}, number>;
+      control: FunctionReference<"query", "public", {}, any>;
     };
     cacheStubbing: {
       confectNoTime: FunctionReference<"query", "public", {}, number>;
