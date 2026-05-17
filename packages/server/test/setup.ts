@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { Command, type CommandExecutor, Path } from "@effect/platform";
 import { NodeContext } from "@effect/platform-node";
 import { Effect, pipe } from "effect";
@@ -16,14 +17,24 @@ const runCommand = (
     Effect.orDie,
   );
 
+// Absolute path to the @confect/cli entry point. Resolved from this file's
+// location rather than relying on a `confect` bin in `node_modules/.bin/`,
+// which is brittle in CI: `pnpm install` runs before workspace packages are
+// built, so the bin link for `confect` ends up dangling until something
+// re-links it.
+const confectCliEntryUrl = new URL(
+  "../../cli/dist/index.mjs",
+  import.meta.url,
+);
+
 /**
- * Build a Vitest `globalSetup` that runs `pnpm confect codegen` against the
+ * Build a Vitest `globalSetup` that runs `confect codegen` against the
  * given fixture directory before the suite starts.
  *
- * `pnpm confect codegen` walks up from `process.cwd()` to find the nearest
- * `convex.json` (see `@confect/cli`'s `ConvexDirectory`), so each fixture
- * project needs to be the cwd while its codegen runs. We chdir for the
- * duration of the codegen call and restore the original cwd via `ensuring`.
+ * The CLI walks up from `process.cwd()` to find the nearest `convex.json`
+ * (see `@confect/cli`'s `ConvexDirectory`), so each fixture project needs
+ * to be the cwd while its codegen runs. We chdir for the duration of the
+ * codegen call and restore the original cwd via `ensuring`.
  *
  * Codegen runs both locally and on CI. The fixtures' generated outputs
  * (`confect/_generated/` and the wrapper files under `convex/`) are committed
@@ -37,10 +48,11 @@ export const setupForFixture =
         const path = yield* Path.Path;
         const fixtureDir = path.resolve(baseDir, fixtureSubpath);
         const originalCwd = process.cwd();
+        const cliEntry = fileURLToPath(confectCliEntryUrl);
 
         yield* Effect.gen(function* () {
           process.chdir(fixtureDir);
-          yield* runCommand("pnpm", ["confect", "codegen"]);
+          yield* runCommand(process.execPath, [cliEntry, "codegen"]);
         }).pipe(Effect.ensuring(Effect.sync(() => process.chdir(originalCwd))));
       }),
       Effect.provide(NodeContext.layer),

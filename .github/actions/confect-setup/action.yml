@@ -28,12 +28,3 @@ runs:
     - name: Build Confect packages
       run: pnpm --filter "@confect/*" build
       shell: bash
-
-    # `pnpm install` runs before the workspace packages are built, so
-    # workspace bins (e.g. `confect` from `@confect/cli`) fail to link
-    # the first time around because their `dist/index.mjs` entry points
-    # don't yet exist. Re-run install post-build so those bins end up in
-    # every consumer's `node_modules/.bin/`.
-    - name: Relink workspace bins
-      run: pnpm install --frozen-lockfile --prefer-offline
-      shell: bash
