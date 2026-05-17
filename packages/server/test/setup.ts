@@ -28,10 +28,11 @@ const confectCliEntryUrl = new URL("../../cli/dist/index.mjs", import.meta.url);
  * Build a Vitest `globalSetup` that runs `confect codegen` against the
  * given fixture directory before the suite starts.
  *
- * The CLI walks up from `process.cwd()` to find the nearest `convex.json`
- * (see `@confect/cli`'s `ConvexDirectory`), so each fixture project needs
- * to be the cwd while its codegen runs. We chdir for the duration of the
- * codegen call and restore the original cwd via `ensuring`.
+ * The CLI walks up from `process.cwd()` to find the nearest `package.json`
+ * (see `@confect/cli`'s `ProjectRoot`), which it then treats as the project
+ * root when locating the Convex directory. Each fixture project therefore
+ * needs to be the cwd while its codegen runs. We chdir for the duration
+ * of the codegen call and restore the original cwd via `ensuring`.
  *
  * Codegen runs both locally and on CI. The fixtures' generated outputs
  * (`confect/_generated/` and the wrapper files under `convex/`) are committed
