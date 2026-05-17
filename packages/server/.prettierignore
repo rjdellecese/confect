@@ -2,3 +2,5 @@ coverage/
 dist/
 node_modules/
 test/**/fixtures/.convex/
+test/**/fixtures/confect/_generated/
+test/**/fixtures/convex/

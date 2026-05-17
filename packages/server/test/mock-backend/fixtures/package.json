@@ -9,5 +9,8 @@
     "@confect/server": "workspace:*",
     "convex": "*",
     "effect": "*"
+  },
+  "devDependencies": {
+    "@confect/cli": "workspace:*"
   }
 }

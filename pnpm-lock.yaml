@@ -473,6 +473,10 @@ importers:
       effect:
         specifier: 3.21.2
         version: 3.21.2
+    devDependencies:
+      '@confect/cli':
+        specifier: workspace:*
+        version: link:../../../../cli
 
   packages/server/test/mock-backend/fixtures:
     dependencies:
@@ -488,6 +492,10 @@ importers:
       effect:
         specifier: 3.21.2
         version: 3.21.2
+    devDependencies:
+      '@confect/cli':
+        specifier: workspace:*
+        version: link:../../../../cli
 
   packages/test:
     dependencies:
