@@ -31,12 +31,6 @@ const confectWithRawDateNow = FunctionImpl.make(
   () => Effect.sync(() => Date.now()),
 );
 
-/**
- * Exercises the bug fixed in PR #399: Effect's runtime internally calls
- * `clock.unsafeCurrentTimeNanos()` when creating/ending a span, which used
- * to reach `op_now` via `unpatchedClock` and bust the cache even though user
- * code never touched `Clock`.
- */
 const confectWithSpan = FunctionImpl.make(
   api,
   "groups.cacheStubbed",
