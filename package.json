@@ -38,6 +38,8 @@
     "test:server": "vitest run --project @confect/server",
     "test:server:mock-backend": "pnpm --filter @confect/server test:mock-backend",
     "test:server:local-backend": "pnpm --filter @confect/server test:local-backend",
+    "codegen:server:mock-backend": "pnpm --filter @confect/server codegen:mock-backend",
+    "codegen:server:local-backend": "pnpm --filter @confect/server codegen:local-backend",
     "test:cli": "vitest run --project @confect/cli",
     "release": "pnpm build && changeset publish",
     "clean": "pnpm -r clean && rm -rf node_modules",

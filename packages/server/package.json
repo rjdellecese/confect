@@ -42,6 +42,8 @@
     "test": "vitest run",
     "test:mock-backend": "vitest run --config vitest.mock-backend.config.ts",
     "test:local-backend": "vitest run --config vitest.local-backend.config.ts",
+    "codegen:mock-backend": "cd test/mock-backend/fixtures && pnpm confect codegen",
+    "codegen:local-backend": "cd test/local-backend/fixtures && pnpm confect codegen",
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "fix": "prettier --write . && eslint --fix . --max-warnings=0",
     "format": "prettier --check .",
