@@ -1,4 +1,4 @@
-import { Command, type CommandExecutor } from "@effect/platform";
+import { Command, type CommandExecutor, Path } from "@effect/platform";
 import { NodeContext } from "@effect/platform-node";
 import { Config, Effect, Option, pipe } from "effect";
 
@@ -29,24 +29,27 @@ const runCommand = (
  * Confect CLI as a separate step before invoking vitest, so this hook is
  * just a developer convenience for local runs.
  */
-export const setupForFixture = (fixtureDir: string) => () =>
-  pipe(
-    Config.option(Config.boolean("CI")),
-    Effect.map(Option.getOrElse(() => false)),
-    Effect.if({
-      onTrue: () => Effect.void,
-      onFalse: () =>
-        Effect.gen(function* () {
-          const originalCwd = process.cwd();
+export const setupForFixture =
+  (baseDir: string, fixtureSubpath: string) => () =>
+    pipe(
+      Config.option(Config.boolean("CI")),
+      Effect.map(Option.getOrElse(() => false)),
+      Effect.if({
+        onTrue: () => Effect.void,
+        onFalse: () =>
+          Effect.gen(function* () {
+            const path = yield* Path.Path;
+            const fixtureDir = path.resolve(baseDir, fixtureSubpath);
+            const originalCwd = process.cwd();
 
-          yield* Effect.gen(function* () {
-            process.chdir(fixtureDir);
-            yield* runCommand("pnpm", ["confect", "codegen"]);
-          }).pipe(
-            Effect.ensuring(Effect.sync(() => process.chdir(originalCwd))),
-          );
-        }),
-    }),
-    Effect.provide(NodeContext.layer),
-    Effect.runPromise,
-  );
+            yield* Effect.gen(function* () {
+              process.chdir(fixtureDir);
+              yield* runCommand("pnpm", ["confect", "codegen"]);
+            }).pipe(
+              Effect.ensuring(Effect.sync(() => process.chdir(originalCwd))),
+            );
+          }),
+      }),
+      Effect.provide(NodeContext.layer),
+      Effect.runPromise,
+    );
