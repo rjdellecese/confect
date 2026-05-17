@@ -57,7 +57,7 @@ describe("Convex query cache behavior", () => {
     excludeTestServices: true,
   })((it) => {
     it.effect(
-      "A native Convex query that calls Date.now is evicted from the cache",
+      "a native Convex query that calls Date.now is evicted from the cache",
       () =>
         Effect.gen(function* () {
           const { initial, afterMaxCacheAge } =
@@ -69,7 +69,7 @@ describe("Convex query cache behavior", () => {
       30_000,
     );
 
-    it.effect("A Confect query that does not observe time stays cached", () =>
+    it.effect("a Confect query that does not observe time stays cached", () =>
       Effect.gen(function* () {
         const { initial, afterMaxCacheAge } =
           yield* captureAcrossEvictionWindow(
@@ -79,7 +79,7 @@ describe("Convex query cache behavior", () => {
       }),
     );
 
-    it.effect("A Confect query that calls raw Date.now stays cached", () =>
+    it.effect("a Confect query that calls raw Date.now stays cached", () =>
       Effect.gen(function* () {
         const { initial, afterMaxCacheAge } =
           yield* captureAcrossEvictionWindow(
@@ -90,7 +90,7 @@ describe("Convex query cache behavior", () => {
     );
 
     it.effect(
-      "A Confect query that uses Clock.currentTimeMillis is evicted from the cache",
+      "a Confect query that uses Clock.currentTimeMillis is evicted from the cache",
       () =>
         Effect.gen(function* () {
           const { initial, afterMaxCacheAge } =
@@ -101,11 +101,21 @@ describe("Convex query cache behavior", () => {
         }),
     );
 
-    it.effect("A Confect query that uses Effect.withSpan stays cached", () =>
+    it.effect("a Confect query that uses Effect.withSpan stays cached", () =>
       Effect.gen(function* () {
         const { initial, afterMaxCacheAge } =
           yield* captureAcrossEvictionWindow(
             refs.public.groups.cacheStubbed.confectWithSpan,
+          );
+        expect(initial).toBe(afterMaxCacheAge);
+      }),
+    );
+
+    it.effect("a Confect query that emits a log stays cached", () =>
+      Effect.gen(function* () {
+        const { initial, afterMaxCacheAge } =
+          yield* captureAcrossEvictionWindow(
+            refs.public.groups.cacheStubbed.confectWithLog,
           );
         expect(initial).toBe(afterMaxCacheAge);
       }),

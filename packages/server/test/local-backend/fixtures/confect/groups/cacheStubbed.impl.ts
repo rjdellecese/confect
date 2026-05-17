@@ -41,9 +41,21 @@ const confectWithSpan = FunctionImpl.make(
     ),
 );
 
+const confectWithLog = FunctionImpl.make(
+  api,
+  "groups.cacheStubbed",
+  "confectWithLog",
+  () =>
+    Effect.gen(function* () {
+      yield* Effect.logInfo("cacheStubbed.confectWithLog");
+      return Math.random();
+    }),
+);
+
 export const cacheStubbed = GroupImpl.make(api, "groups.cacheStubbed").pipe(
   Layer.provide(confectNoTime),
   Layer.provide(confectWithClock),
   Layer.provide(confectWithRawDateNow),
   Layer.provide(confectWithSpan),
+  Layer.provide(confectWithLog),
 );

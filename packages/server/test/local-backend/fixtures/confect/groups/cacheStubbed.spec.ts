@@ -29,4 +29,11 @@ export const cacheStubbed = GroupSpec.make("cacheStubbed")
       args: Schema.Struct({}),
       returns: Schema.Number,
     }),
+  )
+  .addFunction(
+    FunctionSpec.publicQuery({
+      name: "confectWithLog",
+      args: Schema.Struct({}),
+      returns: Schema.Number,
+    }),
   );

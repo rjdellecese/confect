@@ -111,18 +111,14 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
 // methods used internally by Effect (logging, span events, scheduler) return
 // constants so they never touch the tracker — caching is not broken by
 // default.
-//
-// _defaultClock is created at module load time, before Convex installs its
-// Date.now wrapper, so its unsafeCurrentTimeNanos uses process.hrtime safely.
-const _defaultClock = Clock.make();
 const unpatchedClock = (realDateNow: () => number): Clock.Clock => {
-  const bigint1e6 = BigInt(1_000_000);
+  const defaultClock = Clock.make();
   return {
-    ..._defaultClock,
+    ...defaultClock,
     unsafeCurrentTimeMillis: () => 0,
-    unsafeCurrentTimeNanos: () => _defaultClock.unsafeCurrentTimeNanos(),
+    unsafeCurrentTimeNanos: () => 0n,
     currentTimeMillis: Effect.sync(() => realDateNow()),
-    currentTimeNanos: Effect.sync(() => BigInt(realDateNow()) * bigint1e6),
+    currentTimeNanos: Effect.sync(() => BigInt(realDateNow()) * 1_000_000n),
   };
 };
 
