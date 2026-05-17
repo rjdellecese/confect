@@ -1,6 +1,6 @@
 import { Command, type CommandExecutor, Path } from "@effect/platform";
 import { NodeContext } from "@effect/platform-node";
-import { Config, Effect, Option, pipe } from "effect";
+import { Effect, pipe } from "effect";
 
 const runCommand = (
   command: string,
@@ -25,30 +25,23 @@ const runCommand = (
  * project needs to be the cwd while its codegen runs. We chdir for the
  * duration of the codegen call and restore the original cwd via `ensuring`.
  *
- * Codegen is skipped on CI: the `@confect/server` GitHub workflow runs the
- * Confect CLI as a separate step before invoking vitest, so this hook is
- * just a developer convenience for local runs.
+ * Codegen runs both locally and on CI. The fixtures' generated outputs
+ * (`confect/_generated/` and the wrapper files under `convex/`) are committed
+ * to the repo, and CI verifies via `git diff --exit-code` that codegen
+ * produces no changes — i.e. that the committed outputs are up-to-date.
  */
 export const setupForFixture =
   (baseDir: string, fixtureSubpath: string) => () =>
     pipe(
-      Config.option(Config.boolean("CI")),
-      Effect.map(Option.getOrElse(() => false)),
-      Effect.if({
-        onTrue: () => Effect.void,
-        onFalse: () =>
-          Effect.gen(function* () {
-            const path = yield* Path.Path;
-            const fixtureDir = path.resolve(baseDir, fixtureSubpath);
-            const originalCwd = process.cwd();
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const fixtureDir = path.resolve(baseDir, fixtureSubpath);
+        const originalCwd = process.cwd();
 
-            yield* Effect.gen(function* () {
-              process.chdir(fixtureDir);
-              yield* runCommand("pnpm", ["confect", "codegen"]);
-            }).pipe(
-              Effect.ensuring(Effect.sync(() => process.chdir(originalCwd))),
-            );
-          }),
+        yield* Effect.gen(function* () {
+          process.chdir(fixtureDir);
+          yield* runCommand("pnpm", ["confect", "codegen"]);
+        }).pipe(Effect.ensuring(Effect.sync(() => process.chdir(originalCwd))));
       }),
       Effect.provide(NodeContext.layer),
       Effect.runPromise,

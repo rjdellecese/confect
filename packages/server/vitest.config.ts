@@ -3,15 +3,6 @@ import tsconfigPaths from "vite-tsconfig-paths";
 import { defineConfig, mergeConfig } from "vitest/config";
 import sharedConfig from "../../vitest.shared";
 
-/**
- * Default `@confect/server` test config: in-process unit tests that don't
- * require any backend.
- *
- * Tests that need a backend live under `test/mock-backend/` (in-process via
- * `convex-test`) and `test/local-backend/` (real `convex dev` subprocess),
- * and are run via their own configs (`vitest.mock-backend.config.ts` and
- * `vitest.local-backend.config.ts`).
- */
 export default mergeConfig(
   sharedConfig,
   defineConfig({

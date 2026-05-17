@@ -2,16 +2,6 @@ import path from "node:path";
 import tsconfigPaths from "vite-tsconfig-paths";
 import { configDefaults, defineConfig } from "vitest/config";
 
-/**
- * Vitest config for local-backend tests under `test/local-backend/`.
- *
- * These tests own a real Convex local-backend subprocess and assert
- * cache-machinery behavior; they are orders of magnitude slower than the
- * unit and mock-backend suites and are therefore opted into via
- * `pnpm test:local-backend`. The fixture project lives at
- * `test/local-backend/fixtures/` and is regenerated via
- * `pnpm confect codegen` in `globalSetup`.
- */
 export default defineConfig({
   plugins: [tsconfigPaths()],
   resolve: {
@@ -34,7 +24,5 @@ export default defineConfig({
     globalSetup: ["./test/local-backend/setup.ts"],
     testTimeout: 60_000,
     hookTimeout: 120_000,
-    typecheck: { enabled: false },
-    coverage: { enabled: false },
   },
 });
