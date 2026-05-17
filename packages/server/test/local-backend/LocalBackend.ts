@@ -25,52 +25,31 @@ const FIXTURES_DIR = path.resolve(import.meta.dirname, "./fixtures");
 const READY_LINE = "Convex functions ready!";
 const URL = "http://127.0.0.1:3210";
 
-// Knobs read by `crates/common/src/knobs.rs` in `convex-backend`. Lowering
-// these shrinks `MAX_CACHE_AGE` (`crates/application/src/cache/mod.rs:106-113`)
-// to a few seconds so a single test run can comfortably wait past the
-// cache eviction window.
+// Knobs read by `crates/common/src/knobs.rs` in convex-backend. Lowering
+// these shrinks `MAX_CACHE_AGE` (= `USER_TIMEOUT` + `SYSTEM_TIMEOUT` + 1s,
+// per `crates/application/src/cache/mod.rs`) to ~3s so a single test run
+// can wait past the cache eviction window.
 const USER_TIMEOUT_SECONDS = 1;
 const SYSTEM_TIMEOUT_SECONDS = 1;
 
 /**
- * Duration after which a query whose handler observed time (e.g. via
- * `Date.now()`, `setTimeout`, `Effect.sleep`) is evicted from the local
- * backend's reactive cache. Per `crates/application/src/cache/mod.rs`,
- * `MAX_CACHE_AGE = USER_TIMEOUT + SYSTEM_TIMEOUT + 1s`. Exported so tests
- * can wait `Duration.sum(maxCacheAge, slack)` instead of hard-coding a
- * magic number that has to be kept in sync with the env vars below.
+ * Duration after which a query whose handler observed time is evicted from
+ * the local backend's reactive cache. Exported so tests can derive their
+ * sleep from it rather than hard-coding a magic number.
  */
 export const maxCacheAge = Duration.seconds(
   USER_TIMEOUT_SECONDS + SYSTEM_TIMEOUT_SECONDS + 1,
 );
 
 /**
- * Spawn `convex dev` from `test/local-backend/fixtures/` (which is its
- * own `pnpm` workspace package: `@confect/server-local-backend-fixtures`,
- * with `@confect/server` declared as a `workspace:*` dep so esbuild can
- * resolve it via `node_modules`) with reduced UDF timeouts so that
- * `MAX_CACHE_AGE = total_query_timeout + 1s ≈ 3s` in the local-backend
- * Rust process. The CLI keeps the local backend alive for the lifetime
- * of the layer's scope and is signalled on scope close.
+ * Spawn `convex dev` from `test/local-backend/fixtures/` with reduced UDF
+ * timeouts. The CLI keeps the local backend alive for the lifetime of the
+ * scope and is signalled on scope close; the `ConvexHttpClient` is shared
+ * by every test case.
  *
- * Once the backend is ready, a single `ConvexHttpClient` is constructed
- * and exposed through the service, shared by every test case so we don't
- * pay the per-call construction cost or risk multiple clients drifting
- * out of sync.
- *
- * We deliberately do NOT clean `.convex/` or `.env.local` between runs.
- * If `.convex/local/default/config.json` exists, the CLI's
- * `chooseDeployment` (in `cli/lib/localDeployment/anonymous.ts`) returns
- * `kind: "existing"` and skips `doInitConvexFolder`, so the boilerplate
- * `README.md` / `tsconfig.json` codegen never runs at all. On a cold
- * machine the boilerplate codegen does run, but the committed
- * `test/local-backend/fixtures/convex/README.md` is then preserved by
- * `doReadmeCodegen`'s `skipIfExists` check.
- *
- * Nothing else carried in `.convex/` (deployment name, instance secret,
- * admin key, SQLite shell) interferes with the cache regression test:
- * the in-memory query cache lives inside the per-run backend subprocess
- * and the test fixtures don't write to the database.
+ * `.convex/` and `.env.local` are intentionally preserved between runs so
+ * the CLI takes the "existing deployment" path and skips boilerplate
+ * codegen that would otherwise overwrite committed fixture files.
  */
 const make = Effect.gen(function* () {
   const command = Command.make(
@@ -91,13 +70,10 @@ const make = Effect.gen(function* () {
     Command.stderr("pipe"),
   );
 
-  // `Command.start` is scoped: when this layer's scope closes, the process
-  // (and its child local-backend) is signalled and reaped automatically.
   const process = yield* Command.start(command);
 
-  // Find the first chunk containing READY_LINE. If the streams close first
-  // (process exited), `Stream.runHead` returns `None` and we fail explicitly
-  // — otherwise a runaway misconfiguration would silently hang up to 90s.
+  // If the streams close before READY_LINE appears, `Stream.runHead` returns
+  // `None` and we fail explicitly rather than letting the timeout hide it.
   const readySeen = yield* Stream.merge(process.stdout, process.stderr).pipe(
     Stream.decodeText("utf-8"),
     Stream.find((chunk) => chunk.includes(READY_LINE)),

@@ -8,12 +8,8 @@ import {
 } from "../src/ConvexDirectory";
 
 /**
- * Scoped helper that creates a fresh tmp dir and restores `process.cwd()`
- * on scope close.
- *
- * `findConvexDirectory` reads from `process.cwd()`, so each test moves into
- * the directory it wants to resolve from. The original cwd is captured at
- * scope entry and restored as a finalizer so the suite is hermetic.
+ * Creates a fresh tmp dir and restores `process.cwd()` on scope close so
+ * tests can freely `chdir` into the directory they want to resolve from.
  */
 const tmpRoot = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
