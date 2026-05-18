@@ -2,7 +2,7 @@ import type { GenericDataModel, GenericMutationCtx } from "convex/server";
 import { Context } from "effect";
 
 export const MutationCtx = <DataModel extends GenericDataModel>() =>
-  Context.GenericTag<GenericMutationCtx<DataModel>>(
+  Context.Service<GenericMutationCtx<DataModel>>(
     "@gunta/confect-server/MutationCtx",
   );
 

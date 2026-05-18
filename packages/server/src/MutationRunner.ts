@@ -10,7 +10,7 @@ const make =
     ...args: Ref.OptionalArgs<Mutation>
   ): Effect.Effect<
     Ref.Returns<Mutation>,
-    Ref.Error<Mutation> | ParseResult.ParseError
+    Ref.Error<Mutation> | Schema.SchemaError
   > =>
     Ref.runWithCodec(
       mutation,
@@ -19,7 +19,7 @@ const make =
         runMutation(functionReference, encodedArgs),
     );
 
-export const MutationRunner = Context.GenericTag<ReturnType<typeof make>>(
+export const MutationRunner = Context.Service<ReturnType<typeof make>>(
   "@gunta/confect-server/MutationRunner",
 );
 export type MutationRunner = typeof MutationRunner.Identifier;

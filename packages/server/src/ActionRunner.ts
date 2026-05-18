@@ -10,7 +10,7 @@ const make =
     ...args: Ref.OptionalArgs<Action>
   ): Effect.Effect<
     Ref.Returns<Action>,
-    Ref.Error<Action> | ParseResult.ParseError
+    Ref.Error<Action> | Schema.SchemaError
   > =>
     Ref.runWithCodec(
       action,
@@ -19,7 +19,7 @@ const make =
         runAction(functionReference, encodedArgs),
     );
 
-export const ActionRunner = Context.GenericTag<ReturnType<typeof make>>(
+export const ActionRunner = Context.Service<ReturnType<typeof make>>(
   "@gunta/confect-server/ActionRunner",
 );
 export type ActionRunner = typeof ActionRunner.Identifier;

@@ -1,4 +1,4 @@
-import { Effect, Function, ParseResult, pipe, Schema } from "effect";
+import { Effect, Function, pipe, Schema } from "effect";
 import type { ReadonlyRecord } from "effect/Record";
 import * as SystemFields from "@gunta/confect-core/SystemFields";
 import type * as DataModel from "./DataModel";
@@ -64,7 +64,7 @@ export const decode = Function.dual<
 
       const decodedDoc = yield* pipe(
         encodedDoc,
-        Schema.decode(TableSchemaWithSystemFields),
+        Schema.decodeEffect(TableSchemaWithSystemFields),
         Effect.catchTag("ParseError", (parseError) =>
           Effect.gen(function* () {
             const formattedParseError =
@@ -138,7 +138,7 @@ export const encode = Function.dual<
 
       const encodedDoc = yield* pipe(
         decodedDoc,
-        Schema.encode(tableSchema),
+        Schema.encodeEffect(tableSchema),
         Effect.catchTag("ParseError", (parseError) =>
           Effect.gen(function* () {
             const formattedParseError =

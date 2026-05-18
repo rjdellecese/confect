@@ -129,7 +129,7 @@ export type RegisteredFunction<
  * `runPromise` rejects with a generic failure.
  */
 export const runHandlerPromise =
-  (errorSchema: Schema.Schema.AnyNoContext | undefined) =>
+  (errorSchema: Schema.Codec<any, any, never, never> | undefined) =>
   <A, E>(effect: Effect.Effect<A, E>): Promise<A> => {
     if (errorSchema === undefined) {
       return Effect.runPromise(Effect.orDie(effect));
@@ -137,7 +137,7 @@ export const runHandlerPromise =
     const withConvexError = effect.pipe(
       Effect.catchAll((typedError) =>
         pipe(
-          Schema.encode(errorSchema)(typedError),
+          Schema.encodeEffect(errorSchema)(typedError),
           Effect.orDie,
           Effect.andThen((encodedError) =>
             Effect.fail(new ConvexError(encodedError)),
@@ -187,13 +187,13 @@ export const actionFunctionBase = <
     Effect.gen(function* () {
       const decodedArgs = yield* pipe(
         actualArgs,
-        Schema.decode(args),
+        Schema.decodeEffect(args),
         Effect.orDie,
       );
       const decodedReturns = yield* handler(decodedArgs).pipe(
         Effect.provide(createLayer(ctx)),
       );
-      return yield* pipe(decodedReturns, Schema.encode(returns), Effect.orDie);
+      return yield* pipe(decodedReturns, Schema.encodeEffect(returns), Effect.orDie);
     }).pipe(runHandlerPromise(error)),
 });
 

@@ -50,13 +50,13 @@ import type {
 export const compileArgsSchema = <ConfectValue, ConvexValue>(
   argsSchema: Schema.Schema<ConfectValue, ConvexValue>,
 ): PropertyValidators => {
-  const ast = Schema.encodedSchema(argsSchema).ast;
+  const ast = Schema.toEncoded(argsSchema).ast;
 
   return pipe(
     ast,
     Match.value,
-    Match.tag("TypeLiteral", (typeLiteralAst) =>
-      Array.isEmptyReadonlyArray(typeLiteralAst.indexSignatures)
+    Match.tag("Objects", (typeLiteralAst) =>
+      Array.isEmptyArray(typeLiteralAst.indexSignatures)
         ? handlePropertySignatures(typeLiteralAst)
         : Effect.fail(new IndexSignaturesAreNotSupportedError()),
     ),
@@ -70,7 +70,7 @@ export const compileArgsSchema = <ConfectValue, ConvexValue>(
 export const compileReturnsSchema = <ConfectValue, ConvexValue>(
   schema: Schema.Schema<ConfectValue, ConvexValue>,
 ): Validator<any, any, any> =>
-  runSyncThrow(compileAst(Schema.encodedSchema(schema).ast));
+  runSyncThrow(compileAst(Schema.toEncoded(schema).ast));
 
 // Table
 
@@ -78,7 +78,7 @@ export const compileReturnsSchema = <ConfectValue, ConvexValue>(
  * Convert a table `Schema` to a table `Validator`.
  */
 export type TableSchemaToTableValidator<
-  TableSchema extends Schema.Schema.AnyNoContext,
+  TableSchema extends Schema.Codec<any, any, never, never>,
 > =
   ValueToValidator<TableSchema["Encoded"]> extends infer Vd extends
     | VObject<any, any, any, any>
@@ -87,17 +87,17 @@ export type TableSchemaToTableValidator<
     : never;
 
 export const compileTableSchema = <
-  TableSchema extends Schema.Schema.AnyNoContext,
+  TableSchema extends Schema.Codec<any, any, never, never>,
 >(
   schema: TableSchema,
 ): TableSchemaToTableValidator<TableSchema> => {
-  const ast = Schema.encodedSchema(schema).ast;
+  const ast = Schema.toEncoded(schema).ast;
 
   return pipe(
     ast,
     Match.value,
-    Match.tag("TypeLiteral", ({ indexSignatures }) =>
-      Array.isEmptyReadonlyArray(indexSignatures)
+    Match.tag("Objects", ({ indexSignatures }) =>
+      Array.isEmptyArray(indexSignatures)
         ? (compileAst(ast) as Effect.Effect<any>)
         : Effect.fail(new IndexSignaturesAreNotSupportedError()),
     ),
@@ -269,19 +269,19 @@ export const isRecursive = (ast: SchemaAST.AST): boolean =>
     Match.value,
     Match.tag(
       "Literal",
-      "BooleanKeyword",
-      "StringKeyword",
-      "NumberKeyword",
-      "BigIntKeyword",
-      "UnknownKeyword",
-      "AnyKeyword",
+      "Boolean",
+      "String",
+      "Number",
+      "BigInt",
+      "Unknown",
+      "Any",
       "Declaration",
       "UniqueSymbol",
-      "SymbolKeyword",
-      "UndefinedKeyword",
-      "VoidKeyword",
-      "NeverKeyword",
-      "Enums",
+      "Symbol",
+      "Undefined",
+      "Void",
+      "Never",
+      "Enum",
       "TemplateLiteral",
       "ObjectKeyword",
       "Transformation",
@@ -290,11 +290,11 @@ export const isRecursive = (ast: SchemaAST.AST): boolean =>
     Match.tag("Union", ({ types }) =>
       Array.some(types, (type) => isRecursive(type)),
     ),
-    Match.tag("TypeLiteral", ({ propertySignatures }) =>
+    Match.tag("Objects", ({ propertySignatures }) =>
       Array.some(propertySignatures, ({ type }) => isRecursive(type)),
     ),
     Match.tag(
-      "TupleType",
+      "Arrays",
       ({ elements: optionalElements, rest: elements }) =>
         Array.some(optionalElements, (optionalElement) =>
           isRecursive(optionalElement.type),
@@ -338,8 +338,8 @@ export const compileAst = (
             Effect.succeed,
           ),
         ),
-        Match.tag("BooleanKeyword", () => Effect.succeed(v.boolean())),
-        Match.tag("StringKeyword", (stringAst) =>
+        Match.tag("Boolean", () => Effect.succeed(v.boolean())),
+        Match.tag("String", (stringAst) =>
           GenericId.tableName(stringAst).pipe(
             Option.match({
               onNone: () => Effect.succeed(v.string()),
@@ -347,16 +347,16 @@ export const compileAst = (
             }),
           ),
         ),
-        Match.tag("NumberKeyword", () => Effect.succeed(v.float64())),
-        Match.tag("BigIntKeyword", () => Effect.succeed(v.int64())),
+        Match.tag("Number", () => Effect.succeed(v.float64())),
+        Match.tag("BigInt", () => Effect.succeed(v.int64())),
         Match.tag("Union", (unionAst) =>
           handleUnion(unionAst, isOptionalPropertyOfTypeLiteral),
         ),
-        Match.tag("TypeLiteral", (typeLiteralAst) =>
+        Match.tag("Objects", (typeLiteralAst) =>
           handleTypeLiteral(typeLiteralAst),
         ),
-        Match.tag("TupleType", (tupleTypeAst) => handleTupleType(tupleTypeAst)),
-        Match.tag("UnknownKeyword", "AnyKeyword", () =>
+        Match.tag("Arrays", (tupleTypeAst) => handleTupleType(tupleTypeAst)),
+        Match.tag("Unknown", "Any", () =>
           Effect.succeed(v.any()),
         ),
         Match.tag("Declaration", (declaration) =>
@@ -365,7 +365,7 @@ export const compileAst = (
               new ArrayBuffer(0),
               {},
               declaration,
-            ) as Effect.Effect<ArrayBuffer, ParseResult.ParseIssue>,
+            ) as Effect.Effect<ArrayBuffer.ParseIssue>,
             {
               onSuccess: () => v.bytes(),
               onFailure: () =>
@@ -379,11 +379,11 @@ export const compileAst = (
         Match.tag("Suspend", () => Effect.succeed(v.any())),
         Match.tag(
           "UniqueSymbol",
-          "SymbolKeyword",
-          "UndefinedKeyword",
-          "VoidKeyword",
-          "NeverKeyword",
-          "Enums",
+          "Symbol",
+          "Undefined",
+          "Void",
+          "Never",
+          "Enum",
           "TemplateLiteral",
           "ObjectKeyword",
           "Transformation",

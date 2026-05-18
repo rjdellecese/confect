@@ -26,7 +26,7 @@ export const FunctionImpl = <
   groupPath: GroupPath_;
   functionName: FunctionName;
 }) =>
-  Context.GenericTag<FunctionImpl<GroupPath_, FunctionName>>(
+  Context.Service<FunctionImpl<GroupPath_, FunctionName>>(
     `@gunta/confect-server/FunctionImpl/${groupPath}/${functionName}`,
   );
 

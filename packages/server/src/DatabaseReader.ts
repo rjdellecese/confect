@@ -55,7 +55,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
 export const DatabaseReader = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 >() =>
-  Context.GenericTag<ReturnType<typeof make<DatabaseSchema_>>>(
+  Context.Service<ReturnType<typeof make<DatabaseSchema_>>>(
     "@gunta/confect-server/DatabaseReader",
   );
 

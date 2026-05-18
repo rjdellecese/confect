@@ -10,7 +10,7 @@ const make =
     ...args: Ref.OptionalArgs<Query>
   ): Effect.Effect<
     Ref.Returns<Query>,
-    Ref.Error<Query> | ParseResult.ParseError
+    Ref.Error<Query> | Schema.SchemaError
   > =>
     Ref.runWithCodec(
       query,
@@ -19,7 +19,7 @@ const make =
         runQuery(functionReference, encodedArgs),
     );
 
-export const QueryRunner = Context.GenericTag<ReturnType<typeof make>>(
+export const QueryRunner = Context.Service<ReturnType<typeof make>>(
   "@gunta/confect-server/QueryRunner",
 );
 export type QueryRunner = typeof QueryRunner.Identifier;

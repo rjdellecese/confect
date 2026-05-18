@@ -179,7 +179,7 @@ const queryFunction = <
       Effect.gen(function* () {
         const decodedArgs = yield* pipe(
           actualArgs,
-          Schema.decode(args),
+          Schema.decodeEffect(args),
           Effect.orDie,
         );
         const decodedReturns = yield* handler(decodedArgs).pipe(
@@ -201,7 +201,7 @@ const queryFunction = <
         );
         return yield* pipe(
           decodedReturns,
-          Schema.encode(returns),
+          Schema.encodeEffect(returns),
           Effect.orDie,
         );
       }).pipe(
@@ -277,13 +277,13 @@ const mutationFunction = <
     Effect.gen(function* () {
       const decodedArgs = yield* pipe(
         actualArgs,
-        Schema.decode(args),
+        Schema.decodeEffect(args),
         Effect.orDie,
       );
       const decodedReturns = yield* handler(decodedArgs).pipe(
         Effect.provide(mutationLayer(databaseSchema, ctx)),
       );
-      return yield* pipe(decodedReturns, Schema.encode(returns), Effect.orDie);
+      return yield* pipe(decodedReturns, Schema.encodeEffect(returns), Effect.orDie);
     }).pipe(RegisteredFunction.runHandlerPromise(error)),
 });
 
@@ -304,7 +304,7 @@ const convexActionFunction = <
   }: {
     args: Schema.Schema<Args, ConvexArgs>;
     returns: Schema.Schema<Returns, ConvexReturns>;
-    error: Schema.Schema.AnyNoContext | undefined;
+    error: Schema.Codec<any, any, never, never> | undefined;
     handler: (
       a: Args,
     ) => Effect.Effect<

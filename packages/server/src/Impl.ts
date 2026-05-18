@@ -29,7 +29,7 @@ export const Impl = <
   Api_ extends Api.AnyWithProps,
   FinalizationStatus_ extends FinalizationStatus,
 >() =>
-  Context.GenericTag<Impl<Api_, FinalizationStatus_>>(`@gunta/confect-server/Impl`);
+  Context.Service<Impl<Api_, FinalizationStatus_>>(`@gunta/confect-server/Impl`);
 
 export const make = <Api_ extends Api.AnyWithProps>(
   api: Api_,

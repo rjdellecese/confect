@@ -7,7 +7,7 @@ const make = (storageWriter: ConvexStorageWriter) => ({
   generateUploadUrl: () =>
     Effect.promise(() => storageWriter.generateUploadUrl()).pipe(
       Effect.andThen((url) =>
-        pipe(url, Schema.decode(Schema.URL), Effect.orDie),
+        pipe(url, Schema.decodeEffect(Schema.URL), Effect.orDie),
       ),
     ),
   delete: (storageId: GenericId<"_storage">) =>

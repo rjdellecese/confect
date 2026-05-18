@@ -58,7 +58,7 @@ const nodeActionFunction = <
   }: {
     args: Schema.Schema<Args, ConvexArgs>;
     returns: Schema.Schema<Returns, ConvexReturns>;
-    error: Schema.Schema.AnyNoContext | undefined;
+    error: Schema.Codec<any, any, never, never> | undefined;
     handler: (
       a: Args,
     ) => Effect.Effect<

@@ -135,7 +135,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
 export const DatabaseWriter = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 >() =>
-  Context.GenericTag<ReturnType<typeof make<DatabaseSchema_>>>(
+  Context.Service<ReturnType<typeof make<DatabaseSchema_>>>(
     "@gunta/confect-server/DatabaseWriter",
   );
 
