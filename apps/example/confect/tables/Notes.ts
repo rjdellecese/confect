@@ -6,11 +6,11 @@ export const Notes = Table.make(
   "notes",
   Schema.Struct({
     userId: Schema.optional(GenericId.GenericId("users")),
-    text: Schema.String.pipe(Schema.maxLength(100)),
+    text: Schema.String.pipe(Schema.check(Schema.isMaxLength(100))),
     tag: Schema.optional(Schema.String),
     author: Schema.optional(
       Schema.Struct({
-        role: Schema.Literal("admin", "user"),
+        role: Schema.Literals(["admin", "user"]),
         name: Schema.String,
       }),
     ),

@@ -12,9 +12,12 @@ Confect exposes Effect services that wrap Convex platform capabilities. These se
 import {
   ActionRunner,
   Auth,
+  ActionMeta,
   DatabaseReader,
   DatabaseWriter,
+  MutationMeta,
   MutationRunner,
+  QueryMeta,
   QueryRunner,
   Scheduler,
   StorageReader,
@@ -94,6 +97,26 @@ Access the current user's identity.
 
 Schedule Confect functions to run after a delay or at a specific time.
 
+## Metadata
+
+### `QueryMeta`
+
+<ContextBadges query />
+
+Read function, deployment, and transaction metadata for the current query.
+
+### `MutationMeta`
+
+<ContextBadges mutation />
+
+Read function, deployment, transaction, and request metadata for the current mutation.
+
+### `ActionMeta`
+
+<ContextBadges action />
+
+Read function, deployment, and request metadata for the current action or HTTP API handler.
+
 ## Search
 
 ### `VectorSearch`
@@ -121,3 +144,58 @@ Raw Convex mutation context.
 <ContextBadges action />
 
 Raw Convex action context.
+
+## Defining your own services
+
+Define a service in two pieces:
+
+1. Declare the **tag** with `Context.Service<Self, Shape>()(name)`.
+2. Build the **layer** with `Layer.effect(tag, effect)` (or `Layer.succeed(tag, value)` for a constant value).
+
+```ts Email.ts
+import { Context, Effect, Layer } from "effect";
+
+import { ApiKey } from "./ApiKey";
+
+export class Email extends Context.Service<
+  Email,
+  {
+    readonly send: (
+      to: string,
+      body: string,
+    ) => Effect.Effect<void, EmailError>;
+  }
+>()("Email") {
+  static readonly layer = Layer.effect(
+    Email,
+    Effect.gen(function* () {
+      const apiKey = yield* ApiKey;
+      return {
+        send: (to, body) =>
+          Effect.tryPromise(() => sendWithProvider(apiKey, to, body)),
+      };
+    }),
+  ).pipe(Layer.provide(ApiKey.layer));
+}
+```
+
+Yield the tag inside `Effect.gen` to use the service: `const email = yield* Email; yield* email.send(...)`.
+
+Provide `Email.layer` into your Confect impl alongside any other layer:
+
+```ts confect/impl.ts
+import { Impl } from "@confect/server";
+import { Layer } from "effect";
+
+import api from "./_generated/api";
+import { Email } from "./services/Email";
+import { notes } from "./notes.impl";
+
+export default Impl.make(api).pipe(
+  Layer.provide(notes),
+  Layer.provide(Email.layer),
+  Impl.finalize,
+);
+```
+
+All of the built-in Confect services on this page follow the same pattern — they're plain `Context.Service` tags with a static `layer` helper.

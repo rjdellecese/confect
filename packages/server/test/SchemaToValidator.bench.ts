@@ -194,7 +194,7 @@ const LargeTableSchema = Schema.Struct({
   name: Schema.String,
   age: Schema.Number,
   active: Schema.Boolean,
-  score: Schema.BigIntFromSelf,
+  score: Schema.BigInt,
   avatar: Schema.instanceOf(ArrayBuffer),
   deletedAt: Schema.NullOr(Schema.String),
   tags: Schema.Array(Schema.String),
@@ -204,7 +204,7 @@ const LargeTableSchema = Schema.Struct({
     zip: Schema.Number,
   }),
   notes: Schema.optional(Schema.String),
-  role: Schema.Union(Schema.Literal("admin"), Schema.Literal("user")),
+  role: Schema.Literals(["admin", "user"]),
 });
 
 type LargeTableSchema = typeof LargeTableSchema;

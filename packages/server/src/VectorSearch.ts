@@ -34,7 +34,7 @@ export const make =
     Effect.promise(() => vectorSearch(tableName, indexName, query));
 
 export const VectorSearch = <DataModel_ extends DataModel.AnyWithProps>() =>
-  Context.GenericTag<ReturnType<typeof make<DataModel_>>>(
+  Context.Service<ReturnType<typeof make<DataModel_>>>(
     "@confect/server/VectorSearch",
   );
 

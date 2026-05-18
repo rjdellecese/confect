@@ -1,58 +1,75 @@
-import {
-  Array,
-  ConfigError,
-  ConfigProvider,
-  ConfigProviderPathPatch,
-  Effect,
-  pipe,
-} from "effect";
+import type {
+  AppDefinition,
+  ComponentDefinition,
+  EnvFromAppDefinition,
+  EnvFromDefinition,
+} from "convex/server";
+import { Config, ConfigProvider, type Option } from "effect";
 
 declare const process: { env: Record<string, string | undefined> };
 
+type FromEnvOptions = Parameters<typeof ConfigProvider.fromEnv>[0];
+
+type StringKey<Env> = keyof Env & string;
+
+type OptionalStringKey<Env> = {
+  [Key in StringKey<Env>]-?: undefined extends Env[Key] ? Key : never;
+}[StringKey<Env>];
+
+/**
+ * Build a `ConfigProvider` that reads from `process.env` at Convex function
+ * runtime.
+ *
+ * Effect 4's `ConfigProvider.fromEnv` would normally use `import.meta.env`,
+ * which the Convex bundler cannot statically analyze (see effect-smol#2143).
+ * Pass an explicit env snapshot at construction time to side-step that.
+ */
 export const make = (
-  options?: Partial<ConfigProvider.ConfigProvider.FromEnvConfig>,
+  options?: FromEnvOptions,
 ): ConfigProvider.ConfigProvider => {
-  const pathDelim = options?.pathDelim ?? "_";
-  const seqDelim = options?.seqDelim ?? ",";
-
-  return ConfigProvider.fromFlat(
-    ConfigProvider.makeFlat({
-      load: (path, primitive, split = true) => {
-        const pathString = Array.join(path, pathDelim);
-        const value = process.env[pathString];
-
-        if (value === undefined) {
-          return Effect.fail(
-            ConfigError.MissingData(
-              [...path],
-              `Expected ${pathString} to exist in the process context`,
-            ),
-          );
-        }
-
-        const parse = (text: string) =>
-          pipe(
-            primitive.parse(text.trim()),
-            Effect.mapError(ConfigError.prefixed([...path])),
-          );
-
-        if (!split) {
-          return pipe(parse(value), Effect.map(Array.of));
-        } else {
-          return pipe(
-            value.split(seqDelim),
-            Effect.forEach((v) => parse(v)),
-          );
-        }
-      },
-      enumerateChildren: (path) =>
-        Effect.fail(
-          ConfigError.Unsupported(
-            [...path],
-            "process.env is not enumerable in the Convex runtime",
-          ),
-        ),
-      patch: ConfigProviderPathPatch.empty,
-    }),
-  );
+  const env: Record<string, string> = { ...options?.env };
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value !== undefined && !(key in env)) {
+      env[key] = value;
+    }
+  }
+  return ConfigProvider.fromEnv({ ...options, env });
 };
+
+export type EnvFromComponentDefinition<ComponentDefinition_> =
+  ComponentDefinition_ extends ComponentDefinition<any, infer Env>
+    ? EnvFromDefinition<Env>
+    : never;
+
+const string =
+  <Env>() =>
+  <Key extends StringKey<Env>>(
+    key: Key,
+  ): Config.Config<Extract<Env[Key], string>> =>
+    Config.string(key) as Config.Config<Extract<Env[Key], string>>;
+
+const option =
+  <Env>() =>
+  <Key extends OptionalStringKey<Env>>(
+    key: Key,
+  ): Config.Config<Option.Option<Extract<Env[Key], string>>> =>
+    Config.option(Config.string(key)) as Config.Config<
+      Option.Option<Extract<Env[Key], string>>
+    >;
+
+export const fromApp = <App extends AppDefinition<any>>() => ({
+  string: string<EnvFromAppDefinition<App>>(),
+  option: option<EnvFromAppDefinition<App>>(),
+});
+
+export const fromComponent = <
+  ComponentDefinition_ extends ComponentDefinition<any, any>,
+>() => ({
+  string: string<EnvFromComponentDefinition<ComponentDefinition_>>(),
+  option: option<EnvFromComponentDefinition<ComponentDefinition_>>(),
+});
+
+export const fromEnv = <Env>() => ({
+  string: string<Env>(),
+  option: option<Env>(),
+});

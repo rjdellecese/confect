@@ -1,7 +1,7 @@
 import { GenericId } from "@confect/core";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
-import { Array, Effect, Either } from "effect";
+import { Array, Effect, Result } from "effect";
 import refs from "./confect/_generated/refs";
 import { DatabaseWriter } from "./confect/_generated/services";
 import { Forbidden, NotFound } from "./confect/groups/typedErrors.spec";
@@ -231,10 +231,10 @@ describe("paginate", () => {
   );
 });
 
-const expectFailure = <A, E>(either: Either.Either<A, E>): E => {
-  expect(Either.isLeft(either)).toBe(true);
-  if (!Either.isLeft(either)) throw new Error("unreachable");
-  return either.left;
+const expectFailure = <A, E>(result: Result.Result<A, E>): E => {
+  expect(Result.isFailure(result)).toBe(true);
+  if (!Result.isFailure(result)) throw new Error("unreachable");
+  return result.failure;
 };
 
 // Insert a note then immediately delete it to obtain a well-formed Convex id
@@ -260,7 +260,7 @@ describe("typed errors", () => {
         const c = yield* TestConfect.TestConfect;
         const missingId = yield* insertAndDeleteNote;
 
-        const result = yield* Effect.either(
+        const result = yield* Effect.result(
           c.query(refs.public.groups.typedErrors.getNoteOrFail, {
             noteId: missingId,
           }),
@@ -279,7 +279,7 @@ describe("typed errors", () => {
           const c = yield* TestConfect.TestConfect;
           const missingId = yield* insertAndDeleteNote;
 
-          const result = yield* Effect.either(
+          const result = yield* Effect.result(
             c.mutation(refs.public.groups.typedErrors.deleteNoteOrFail, {
               noteId: missingId,
               asAdmin: true,
@@ -299,7 +299,7 @@ describe("typed errors", () => {
           const c = yield* TestConfect.TestConfect;
           const missingId = yield* insertAndDeleteNote;
 
-          const result = yield* Effect.either(
+          const result = yield* Effect.result(
             c.mutation(refs.public.groups.typedErrors.deleteNoteOrFail, {
               noteId: missingId,
               asAdmin: false,
@@ -316,7 +316,7 @@ describe("typed errors", () => {
       Effect.gen(function* () {
         const c = yield* TestConfect.TestConfect;
 
-        const result = yield* Effect.either(
+        const result = yield* Effect.result(
           c.action(refs.public.groups.typedErrors.failingAction, {
             kind: "forbidden",
           }),
@@ -458,7 +458,7 @@ describe("typed errors", () => {
           const c = yield* TestConfect.TestConfect;
           const missingId = yield* insertAndDeleteNote;
 
-          const queryResult = yield* Effect.either(
+          const queryResult = yield* Effect.result(
             c.query(refs.public.groups.typedErrors.getNoteOrFail, {
               noteId: missingId,
             }),
@@ -467,7 +467,7 @@ describe("typed errors", () => {
           expect(notFound).toBeInstanceOf(NotFound);
           expect((notFound as NotFound).id).toBe(missingId);
 
-          const mutationResult = yield* Effect.either(
+          const mutationResult = yield* Effect.result(
             c.mutation(refs.public.groups.typedErrors.deleteNoteOrFail, {
               noteId: missingId,
               asAdmin: false,
@@ -487,7 +487,7 @@ describe("typed errors", () => {
         Effect.gen(function* () {
           const c = yield* TestConfect.TestConfect;
 
-          const result = yield* Effect.either(
+          const result = yield* Effect.result(
             c.mutation(refs.public.groups.typedErrors.insertThenFail, {
               text: "should not persist",
             }),
@@ -528,7 +528,7 @@ describe("typed errors", () => {
         Effect.gen(function* () {
           const c = yield* TestConfect.TestConfect;
 
-          const result = yield* Effect.either(
+          const result = yield* Effect.result(
             c.action(refs.public.node.typedErrorsNode.failingNodeAction, {
               id: "abc",
             }),

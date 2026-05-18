@@ -4,7 +4,7 @@ import {
   useMutation as useConvexMutation,
   useQuery as useConvexQuery,
 } from "convex/react";
-import { Cause, Effect, Either, Exit, Option } from "effect";
+import { Cause, Effect, Exit, Option, Result } from "effect";
 
 import * as QueryResult from "./QueryResult";
 
@@ -14,7 +14,7 @@ export type InvokeReturn<Ref_ extends Ref.Any> = [Ref.Error<Ref_>] extends [
   never,
 ]
   ? Promise<Ref.Returns<Ref_>>
-  : Promise<Either.Either<Ref.Returns<Ref_>, Ref.Error<Ref_>>>;
+  : Promise<Result.Result<Ref.Returns<Ref_>, Ref.Error<Ref_>>>;
 
 type UseQueryArgs<Query extends Ref.AnyPublicQuery> =
   keyof Ref.Args<Query> extends never
@@ -81,7 +81,7 @@ export const useMutation = <Mutation extends Ref.AnyPublicMutation>(
       (_, encodedArgs) => actualMutation(encodedArgs),
       args,
     ).then((either) =>
-      Ref.hasErrorSchema(ref) ? either : Either.getOrThrow(either),
+      Ref.hasErrorSchema(ref) ? either : Result.getOrThrow(either),
     )) as (...args: Ref.OptionalArgs<Mutation>) => InvokeReturn<Mutation>;
 };
 
@@ -110,7 +110,7 @@ export const useAction = <Action extends Ref.AnyPublicAction>(
       (_, encodedArgs) => actualAction(encodedArgs),
       args,
     ).then((either) =>
-      Ref.hasErrorSchema(ref) ? either : Either.getOrThrow(either),
+      Ref.hasErrorSchema(ref) ? either : Result.getOrThrow(either),
     )) as (...args: Ref.OptionalArgs<Action>) => InvokeReturn<Action>;
 };
 
@@ -121,11 +121,11 @@ const invokeAsEither = async <Ref_ extends Ref.Any>(
     encodedArgs: unknown,
   ) => PromiseLike<unknown>,
   args: Ref.OptionalArgs<Ref_>,
-): Promise<Either.Either<Ref.Returns<Ref_>, Ref.Error<Ref_>>> => {
+): Promise<Result.Result<Ref.Returns<Ref_>, Ref.Error<Ref_>>> => {
   const exit = await Effect.runPromiseExit(
     Ref.runWithCodec(ref, (args[0] ?? {}) as Ref.Args<Ref_>, invoke).pipe(
-      Effect.catchTag("ParseError", Effect.die),
-      Effect.either,
+      Effect.catchTag("SchemaError", Effect.die),
+      Effect.result,
     ),
   );
   if (Exit.isSuccess(exit)) return exit.value;

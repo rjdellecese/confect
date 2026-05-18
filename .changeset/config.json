@@ -5,7 +5,7 @@
   "fixed": [["@confect/*"]],
   "linked": [],
   "access": "public",
-  "baseBranch": "main",
+  "baseBranch": "effect4",
   "updateInternalDependencies": "patch",
   "ignore": []
 }

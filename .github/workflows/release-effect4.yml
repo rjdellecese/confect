@@ -1,0 +1,62 @@
+name: Release (Effect 4 prerelease)
+
+on:
+  push:
+    branches:
+      - effect4
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+# This workflow mirrors `release.yml` but targets the `effect4`
+# branch and publishes under the `effect4` dist-tag rather than `latest`. It uses
+# changesets prerelease mode (see `.changeset/pre.json`) so versions are
+# bumped as `<base>-effect4.<N>` (e.g., `8.0.0-effect4.0`, `8.0.0-effect4.1`, …) and
+# `pnpm publish` automatically routes them to the `effect4` channel via each
+# package's `publishConfig.tag`.
+#
+# Consumers opt in with `pnpm add @confect/server@effect4`; the
+# default `pnpm add @confect/server` continues to install the latest Effect 3
+# release from `main`.
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Get pnpm version from package.json
+        id: pnpm-version
+        shell: bash
+        run: echo "pnpm_version=$(node -p 'require(`./package.json`).engines.pnpm')" >> $GITHUB_OUTPUT
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: ${{ steps.pnpm-version.outputs.pnpm_version }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: "package.json"
+          cache: "pnpm"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Create release pull request or publish
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          publish: pnpm release
+          branch: effect4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

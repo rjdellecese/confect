@@ -74,6 +74,7 @@
           "server/authentication",
           "server/cron-jobs",
           "server/search",
+          "server/metadata",
           "server/components",
           "server/environment-variables"
         ]
@@ -91,7 +92,7 @@
       },
       {
         "group": "Guides",
-        "pages": ["guides/testing"]
+        "pages": ["guides/migrating-to-effect-4", "guides/testing"]
       }
     ]
   },

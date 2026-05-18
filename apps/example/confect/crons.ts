@@ -13,7 +13,7 @@ export default CronJobs.make()
   .add(
     CronJob.make(
       "insert default note",
-      Cron.unsafeParse("0 9 * * 1"),
+      Cron.parseUnsafe("0 9 * * 1"),
       refs.internal.notesAndRandom.notes.insertDefault,
       { text: "Weekly reminder: review your notes!" },
     ),

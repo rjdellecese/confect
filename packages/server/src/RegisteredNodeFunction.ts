@@ -1,12 +1,11 @@
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
-import { NodeContext } from "@effect/platform-node";
 import {
   actionGeneric,
   type DefaultFunctionArgs,
   internalActionGeneric,
 } from "convex/server";
 import type { Effect } from "effect";
-import { Layer, Match, type Schema } from "effect";
+import { Match, type Schema } from "effect";
 import type * as Api from "./Api";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as Handler from "./Handler";
@@ -56,16 +55,15 @@ const nodeActionFunction = <
     error,
     handler,
   }: {
-    args: Schema.Schema<Args, ConvexArgs>;
-    returns: Schema.Schema<Returns, ConvexReturns>;
-    error: Schema.Schema.AnyNoContext | undefined;
+    args: Schema.Codec<Args, ConvexArgs, never, never>;
+    returns: Schema.Codec<Returns, ConvexReturns, never, never>;
+    error: Schema.Codec<any, any, never, never> | undefined;
     handler: (
       a: Args,
     ) => Effect.Effect<
       Returns,
       E,
-      | RegisteredFunction.ActionServices<DatabaseSchema_>
-      | NodeContext.NodeContext
+      RegisteredFunction.ActionServices<DatabaseSchema_>
     >;
   },
 ) =>
@@ -74,9 +72,5 @@ const nodeActionFunction = <
     returns,
     error,
     handler,
-    createLayer: (ctx) =>
-      Layer.mergeAll(
-        RegisteredFunction.actionLayer(databaseSchema, ctx),
-        NodeContext.layer,
-      ),
+    createLayer: (ctx) => RegisteredFunction.actionLayer(databaseSchema, ctx),
   });

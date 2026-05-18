@@ -16,7 +16,7 @@ import type {
   SearchIndexes,
 } from "convex/server";
 import type { GenericId } from "convex/values";
-import { Array, Effect, Either, pipe, Schema } from "effect";
+import { Array, Effect, pipe, Schema } from "effect";
 import type {
   BaseDatabaseReader,
   IndexFieldTypesForEq,
@@ -138,17 +138,18 @@ export const make = <
           )
           .unique(),
       ),
-      Effect.andThen(
-        Either.fromNullable(
-          () =>
-            new GetByIndexFailure({
-              tableName,
-              indexName: indexName as string,
-              indexFieldValues: indexFieldValues as string[],
-            }),
-        ),
+      Effect.flatMap((value) =>
+        value == null
+          ? Effect.fail(
+              new GetByIndexFailure({
+                tableName,
+                indexName: indexName as string,
+                indexFieldValues: indexFieldValues as string[],
+              }),
+            )
+          : Effect.succeed(value),
       ),
-      Effect.andThen(Document.decode(tableName, table.Fields)),
+      Effect.andThen(Document.decode(tableName, table.Fields as never)),
     );
   };
 
@@ -274,20 +275,22 @@ export const getById =
   (id: GenericId<TableName>) =>
     pipe(
       Effect.promise(() => convexDatabaseReader.get(id)),
-      Effect.andThen(
-        Either.fromNullable(() => new GetByIdFailure({ tableName, id })),
+      Effect.flatMap((value) =>
+        value == null
+          ? Effect.fail(new GetByIdFailure({ tableName, id }))
+          : Effect.succeed(value),
       ),
-      Effect.andThen(Document.decode(tableName, table.Fields)),
+      Effect.andThen(Document.decode(tableName, table.Fields as never)),
     );
 
-export class GetByIdFailure extends Schema.TaggedError<GetByIdFailure>()(
+export class GetByIdFailure extends Schema.TaggedErrorClass<GetByIdFailure>()(
   "GetByIdFailure",
   {
     id: Schema.String,
     tableName: Schema.String,
   },
 ) {
-  override get message(): string {
+  get message(): string {
     return Document.documentErrorMessage({
       id: this.id,
       tableName: this.tableName,
@@ -296,7 +299,7 @@ export class GetByIdFailure extends Schema.TaggedError<GetByIdFailure>()(
   }
 }
 
-export class GetByIndexFailure extends Schema.TaggedError<GetByIndexFailure>()(
+export class GetByIndexFailure extends Schema.TaggedErrorClass<GetByIndexFailure>()(
   "GetByIndexFailure",
   {
     tableName: Schema.String,
@@ -304,7 +307,7 @@ export class GetByIndexFailure extends Schema.TaggedError<GetByIndexFailure>()(
     indexFieldValues: Schema.Array(Schema.String),
   },
 ) {
-  override get message(): string {
+  get message(): string {
     return `No documents found in table '${this.tableName}' with index '${this.indexName}' and field values '${this.indexFieldValues}'`;
   }
 }

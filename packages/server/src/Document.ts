@@ -1,4 +1,4 @@
-import { Effect, Function, ParseResult, pipe, Schema } from "effect";
+import { Effect, Function, pipe, Schema } from "effect";
 import type { ReadonlyRecord } from "effect/Record";
 import * as SystemFields from "@confect/core/SystemFields";
 import type * as DataModel from "./DataModel";
@@ -64,20 +64,20 @@ export const decode = Function.dual<
 
       const decodedDoc = yield* pipe(
         encodedDoc,
-        Schema.decode(TableSchemaWithSystemFields),
-        Effect.catchTag("ParseError", (parseError) =>
-          Effect.gen(function* () {
-            const formattedParseError =
-              yield* ParseResult.TreeFormatter.formatError(parseError);
-
-            return yield* new DocumentDecodeError({
+        Schema.decodeEffect(TableSchemaWithSystemFields),
+        Effect.catchTag(
+          "SchemaError",
+          (schemaError) =>
+            new DocumentDecodeError({
               tableName,
-              id: encodedDoc._id,
-              parseError: formattedParseError,
-            });
-          }),
+              id: (encodedDoc as { _id: string })._id,
+              parseError: schemaError.message,
+            }),
         ),
-      );
+      ) as Effect.Effect<
+        DataModel.TableInfoWithName_<DataModel_, TableName>["document"],
+        DocumentDecodeError
+      >;
 
       return decodedDoc;
     }),
@@ -138,26 +138,26 @@ export const encode = Function.dual<
 
       const encodedDoc = yield* pipe(
         decodedDoc,
-        Schema.encode(tableSchema),
-        Effect.catchTag("ParseError", (parseError) =>
-          Effect.gen(function* () {
-            const formattedParseError =
-              yield* ParseResult.TreeFormatter.formatError(parseError);
-
-            return yield* new DocumentEncodeError({
+        Schema.encodeEffect(tableSchema),
+        Effect.catchTag(
+          "SchemaError",
+          (schemaError) =>
+            new DocumentEncodeError({
               tableName,
-              id: decodedDoc._id,
-              parseError: formattedParseError,
-            });
-          }),
+              id: (decodedDoc as { _id: string })._id,
+              parseError: schemaError.message,
+            }),
         ),
-      );
+      ) as Effect.Effect<
+        DataModel.TableInfoWithName_<DataModel_, TableName>["encodedDocument"],
+        DocumentEncodeError
+      >;
 
       return encodedDoc;
     }),
 );
 
-export class DocumentDecodeError extends Schema.TaggedError<DocumentDecodeError>()(
+export class DocumentDecodeError extends Schema.TaggedErrorClass<DocumentDecodeError>()(
   "DocumentDecodeError",
   {
     tableName: Schema.String,
@@ -165,7 +165,7 @@ export class DocumentDecodeError extends Schema.TaggedError<DocumentDecodeError>
     parseError: Schema.String,
   },
 ) {
-  override get message(): string {
+  get message(): string {
     return documentErrorMessage({
       id: this.id,
       tableName: this.tableName,
@@ -174,7 +174,7 @@ export class DocumentDecodeError extends Schema.TaggedError<DocumentDecodeError>
   }
 }
 
-export class DocumentEncodeError extends Schema.TaggedError<DocumentEncodeError>()(
+export class DocumentEncodeError extends Schema.TaggedErrorClass<DocumentEncodeError>()(
   "DocumentEncodeError",
   {
     tableName: Schema.String,
@@ -182,7 +182,7 @@ export class DocumentEncodeError extends Schema.TaggedError<DocumentEncodeError>
     parseError: Schema.String,
   },
 ) {
-  override get message(): string {
+  get message(): string {
     return documentErrorMessage({
       id: this.id,
       tableName: this.tableName,

@@ -1,9 +1,10 @@
 import { QueryResult, useAction, useMutation, useQuery } from "@confect/react";
 import type { WorkId } from "@convex-dev/workpool";
-import { FetchHttpClient, HttpApiClient } from "@effect/platform";
+import { Array, Effect, Exit } from "effect";
+import { FetchHttpClient } from "effect/unstable/http";
+import { HttpApiClient } from "effect/unstable/httpapi";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import type { GenericId } from "convex/values";
-import { Array, Effect, Exit } from "effect";
 import { useEffect, useState } from "react";
 import refs from "../confect/_generated/refs";
 import { Api } from "../confect/http/path-prefix";

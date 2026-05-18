@@ -13,9 +13,8 @@ allowBuilds:
   sharp: true
 
 overrides:
-  convex: 1.33.1
-  effect: 3.21.2
-  "@effect/typeclass": 0.40.0
+  convex: 1.39.1
+  effect: 4.0.0-beta.67
   react: 19.2.4
   react-dom: 19.2.4
 

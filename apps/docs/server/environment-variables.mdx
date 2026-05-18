@@ -4,7 +4,7 @@ title: "Environment Variables"
 description: "Read environment variables using Effect's Config module."
 ---
 
-Confect provides a `ConfigProvider` that is compatible with the Convex runtime, where `process.env` is not enumerable. This provider is automatically set for all Confect functions (queries, mutations, actions, and HTTP API handlers), so Effect's [`Config`](https://effect.website/docs/configuration/config/) module works out of the box.
+Confect provides a `ConfigProvider` that is compatible with the Convex runtime. This provider is automatically set for all Confect functions (queries, mutations, actions, and HTTP API handlers), so Effect's [`Config`](https://effect.website/docs/configuration/config/) module works out of the box.
 
 ## Reading environment variables
 
@@ -24,40 +24,91 @@ const getApiKey = FunctionImpl.make(
 );
 ```
 
-All of Effect's `Config` combinators work as expected—`Config.string`, `Config.number`, `Config.boolean`, `Config.withDefault`, `Config.option`, etc.
+Common Effect `Config` combinators work as expected—`Config.string`, `Config.number`, `Config.boolean`, `Config.withDefault`, `Config.option`, etc.
 
 ```ts
 Config.integer("MAX_RESULTS").pipe(Config.withDefault(100));
 ```
 
-## Limitations
+## Typed Convex env definitions
 
-Config operations that require enumerating `process.env` are unsupported in the Convex runtime. This includes `Config.hashMap` and other combinators that need to discover keys dynamically. Attempting to use them will result in an `Unsupported` config error.
+Convex 1.39 added typed env declarations in `defineApp` and `defineComponent`. Confect can derive key-safe `Config` helpers from those declarations:
+
+```ts convex/convex.config.ts
+import { defineApp } from "convex/server";
+import { v } from "convex/values";
+
+const app = defineApp({
+  env: {
+    API_KEY: v.string(),
+    MODE: v.union(v.literal("dev"), v.literal("prod")),
+  },
+});
+
+export default app;
+```
+
+```ts confect/settings.impl.ts
+import { ConvexConfigProvider, FunctionImpl } from "@confect/server";
+import { Effect } from "effect";
+
+import type app from "../convex/convex.config";
+import api from "./_generated/api";
+
+const env = ConvexConfigProvider.fromApp<typeof app>();
+
+const getMode = FunctionImpl.make(api, "settings", "getMode", () =>
+  env.string("MODE").pipe(Effect.orDie),
+);
+```
+
+For components, use `ConvexConfigProvider.fromComponent<typeof component>()`.
+
+If your Confect files and `convex.config.ts` live in separate TypeScript projects, use a local env shape instead:
+
+```ts
+const env = ConvexConfigProvider.fromEnv<{
+  API_KEY: string;
+  OPTIONAL_API_KEY?: string;
+}>();
+```
+
+For optional declarations, use the key-safe `option` helper. It wraps Effect's `Config.option(Config.string(key))` and returns an `Option.Option<string>`.
+
+```ts
+const optionalApiKey = env.option("OPTIONAL_API_KEY");
+```
 
 ## Custom config provider
 
-The `ConvexConfigProvider` module is exported from `@confect/server` if you need to create a provider with custom options. It supports the same options as Effect's default [`ConfigProvider.fromEnv`](https://effect.website/docs/configuration/config-provider/#fromenv).
+The `ConvexConfigProvider` module is exported from `@confect/server` if you need to create a provider with a custom env snapshot. It supports the same options as Effect's default [`ConfigProvider.fromEnv`](https://effect.website/docs/configuration/config-provider/#fromenv).
 
 ```ts
 import { ConvexConfigProvider } from "@confect/server";
 
 const provider = ConvexConfigProvider.make({
-  pathDelim: "__",
-  seqDelim: ";",
+  env: {
+    API_KEY: "secret",
+  },
 });
 ```
 
-To use a custom provider in a function handler, pass it to `Effect.withConfigProvider`.
+<Note>
+  Internally, `ConvexConfigProvider.make()` snapshots `process.env` at
+  construction time and forwards it to `ConfigProvider.fromEnv(...)`.
+  Effect 4's default `ConfigProvider.fromEnv` would read
+  `import.meta.env`, which the Convex bundler cannot statically
+  analyze; passing the env explicitly side-steps that bundler
+  limitation.
+</Note>
+
+To use a custom provider directly, parse the config with that provider.
 
 ```ts
 const getApiKey = FunctionImpl.make(
   api,
   "settings",
   "getApiKey",
-  () =>
-    Config.string("API_KEY").pipe(
-      Effect.withConfigProvider(provider),
-      Effect.orDie,
-    ),
+  () => Config.string("API_KEY").parse(provider).pipe(Effect.orDie),
 );
 ```

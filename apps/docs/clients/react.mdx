@@ -4,6 +4,12 @@ title: "React"
 description: "Use Confect's React hooks to call your functions from the client."
 ---
 
+<Note>
+  This page targets the `@confect/react@effect4` prerelease, which
+  depends on `effect@4.0.0-beta.67` and `convex@^1.39.0`. For Effect 3
+  docs, see the stable `@confect/react` (latest) release.
+</Note>
+
 `@confect/react` provides drop-in replacements for Convex's React hooks. Each hook automatically encodes your args and decodes return values through the [Effect Schemas](/concepts/schema-restrictions) defined in your [function specs](/concepts/spec-impl-model). You work with the Schema `Type` (decoded) values on both sides—the hooks handle the round-trip to Convex's `Encoded` representation transparently.
 
 Functions are referenced via `refs` (from `confect/_generated/refs`) instead of Convex's `api` object. Each ref carries the `args`, `returns`, and (optionally) `error` schemas from the corresponding function spec, which is what enables the automatic encoding and decoding.
@@ -164,7 +170,7 @@ const InsertNote = () => {
 
 ### With an `error` schema
 
-When the spec declares an `error` schema, the function returns `Promise<Either<A, E>>`. Unwrap with `Either.match` (or another `Either` combinator) to handle both branches. Undeclared failures still reject the promise.
+When the spec declares an `error` schema, the function returns `Promise<Result<A, E>>`. Unwrap with `Result.match` (or another `Result` combinator) to handle both branches. Undeclared failures still reject the promise.
 
 ```ts confect/notes.spec.ts
 FunctionSpec.publicMutation({
@@ -177,7 +183,7 @@ FunctionSpec.publicMutation({
 
 ```tsx
 import { useMutation } from "@confect/react";
-import { Either } from "effect";
+import { Result } from "effect";
 import refs from "../confect/_generated/refs";
 
 const DeleteNote = ({ noteId }: { noteId: string }) => {
@@ -185,9 +191,9 @@ const DeleteNote = ({ noteId }: { noteId: string }) => {
 
   const handleClick = async () => {
     const result = await deleteOrFail({ noteId });
-    Either.match(result, {
-      onLeft: (error) => console.error(error._tag, error),
-      onRight: () => console.log("deleted"),
+    Result.match(result, {
+      onFailure: (error) => console.error(error._tag, error),
+      onSuccess: () => console.log("deleted"),
     });
   };
 
@@ -195,9 +201,20 @@ const DeleteNote = ({ noteId }: { noteId: string }) => {
 };
 ```
 
+You can also narrow with `Result.isSuccess` / `Result.isFailure` instead of pattern matching:
+
+```tsx
+const result = await deleteOrFail({ noteId });
+if (Result.isSuccess(result)) {
+  console.log("deleted", result.success);
+} else {
+  console.error(result.failure);
+}
+```
+
 ## `useAction`
 
-Same shape as `useMutation`: returns `Promise<A>` when the ref has no `error` schema, and `Promise<Either<A, E>>` when it does.
+Same shape as `useMutation`: returns `Promise<A>` when the ref has no `error` schema, and `Promise<Result<A, E>>` when it does.
 
 ```ts confect/random.spec.ts
 FunctionSpec.publicAction({
@@ -231,5 +248,5 @@ const RandomNumber = () => {
 | Return values received directly from Convex as-is | Return values are schema-decoded from `Encoded` to `Type` before returning |
 | `useQuery` returns `T \| undefined` | `useQuery` returns `QueryResult<A, E>` |
 | Cannot distinguish loading from skipped | `Loading` carries a `skipped: boolean` flag |
-| `useMutation`/`useAction` always return `Promise<T>` | Refs with an `error` schema return `Promise<Either<A, E>>`; refs without one still return `Promise<A>` |
+| `useMutation`/`useAction` always return `Promise<T>` | Refs with an `error` schema return `Promise<Result<A, E>>`; refs without one still return `Promise<A>` |
 | Pass `"skip"` to disable query subscription | Same—pass `"skip"` to disable query subscription |

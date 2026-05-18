@@ -1,0 +1,44 @@
+---
+icon: "info"
+title: "Metadata"
+description: "Read Convex function, deployment, request, and transaction metadata."
+---
+
+Convex exposes runtime metadata on `ctx.meta`. Confect exposes the same surface as Effect services.
+
+Use the service that matches the function runtime:
+
+| Function kind | Service | Methods |
+| --- | --- | --- |
+| Query | `QueryMeta` | `getFunctionMetadata`, `getDeploymentMetadata`, `getTransactionMetrics` |
+| Mutation | `MutationMeta` | `getFunctionMetadata`, `getDeploymentMetadata`, `getTransactionMetrics`, `getRequestMetadata` |
+| Action / HTTP API | `ActionMeta` | `getFunctionMetadata`, `getDeploymentMetadata`, `getRequestMetadata` |
+
+```ts
+import { Effect } from "effect";
+import { QueryMeta } from "./confect/_generated/services";
+
+const readMetadata = Effect.gen(function* () {
+  const meta = yield* QueryMeta;
+
+  const functionMetadata = yield* meta.getFunctionMetadata();
+  const deploymentMetadata = yield* meta.getDeploymentMetadata();
+  const transactionMetrics = yield* meta.getTransactionMetrics();
+
+  return { functionMetadata, deploymentMetadata, transactionMetrics };
+});
+```
+
+For request metadata in mutations or actions:
+
+```ts
+import { Effect } from "effect";
+import { ActionMeta } from "./confect/_generated/services";
+
+const readRequest = Effect.gen(function* () {
+  const meta = yield* ActionMeta;
+  return yield* meta.getRequestMetadata();
+});
+```
+
+These services are provided automatically in Confect handlers. They wrap the corresponding Convex promises in `Effect.promise`, so Convex syscall failures surface the same way they would when calling `ctx.meta` directly.

@@ -12,7 +12,7 @@ Error schemas are optional. When omitted, the error type defaults to `never` and
 
 ## Declaring an error schema
 
-Add an `error` field to any `FunctionSpec` constructor. The schema is an ordinary Effect `Schema`, so a `Schema.TaggedError` class works well for a single failure mode.
+Add an `error` field to any `FunctionSpec` constructor. The schema is an ordinary Effect `Schema`, so a `Schema.TaggedErrorClass` class works well for a single failure mode.
 
 ```ts confect/notes.spec.ts
 import { FunctionSpec, GenericId, GroupSpec } from "@confect/core";
@@ -20,7 +20,7 @@ import { Schema } from "effect";
 
 import { Notes } from "./tables/Notes";
 
-export class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
+export class NoteNotFound extends Schema.TaggedErrorClass<NoteNotFound>()(
   "NoteNotFound",
   { noteId: GenericId.GenericId("notes") },
 ) {}
@@ -40,12 +40,12 @@ To declare more than one failure mode, combine them with `Schema.Union`.
 ```ts
 import { Schema } from "effect";
 
-export class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
+export class NoteNotFound extends Schema.TaggedErrorClass<NoteNotFound>()(
   "NoteNotFound",
   { noteId: GenericId.GenericId("notes") },
 ) {}
 
-export class Forbidden extends Schema.TaggedError<Forbidden>()(
+export class Forbidden extends Schema.TaggedErrorClass<Forbidden>()(
   "Forbidden",
   {},
 ) {}
@@ -54,7 +54,7 @@ FunctionSpec.publicMutation({
   name: "deleteOrFail",
   args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
   returns: Schema.Null,
-  error: Schema.Union(NoteNotFound, Forbidden),
+  error: Schema.Union([NoteNotFound, Forbidden]),
 });
 ```
 
@@ -95,7 +95,7 @@ The decoded error is surfaced at every call site. The exact shape depends on the
 ### `@confect/react`
 
 - **`useQuery`** returns a `QueryResult<A, E>`. Match it with `QueryResult.match`, where `onFailure` is required when the ref declares an `error` schema.
-- **`useMutation`** and **`useAction`** return `Promise<Either<A, E>>` when the ref declares an `error` schema (and `Promise<A>` otherwise).
+- **`useMutation`** and **`useAction`** return `Promise<Result<A, E>>` when the ref declares an `error` schema (and `Promise<A>` otherwise).
 
 See [React](/clients/react) for full examples.
 
@@ -114,11 +114,11 @@ QueryResult.match(lookup, {
 
 ### `@confect/js`
 
-Both `HttpClient` and `WebSocketClient` add the decoded error to the returned `Effect`'s error channel, alongside the existing transport error and `ParseError`.
+Both `HttpClient` and `WebSocketClient` add the decoded error to the returned `Effect`'s error channel, alongside the existing transport error and `Schema.SchemaError`.
 
 ```ts
 HttpClient.query(refs.public.notes.getOrFail, { noteId });
-// Effect.Effect<Note, NoteNotFound | HttpClientError | ParseError>
+// Effect.Effect<Note, NoteNotFound | HttpClientError | Schema.SchemaError>
 ```
 
 `WebSocketClient.reactiveQuery` carries typed errors too: when the subscribed query fails with a typed error, the returned `Stream` terminates with the decoded value in its error channel. See [HTTP](/clients/js/http) and [WebSocket](/clients/js/websocket).

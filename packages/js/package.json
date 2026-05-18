@@ -46,10 +46,10 @@
   "author": "RJ Dellecese",
   "license": "ISC",
   "devDependencies": {
-    "@effect/vitest": "0.29.0",
+    "@effect/vitest": "4.0.0-beta.67",
     "@eslint/js": "10.0.1",
     "@types/node": "25.3.3",
-    "effect": "3.21.2",
+    "effect": "4.0.0-beta.67",
     "eslint": "10.0.2",
     "prettier": "3.8.1",
     "tsdown": "0.20.3",
@@ -59,8 +59,8 @@
   },
   "peerDependencies": {
     "@confect/core": "workspace:*",
-    "convex": "^1.30.0",
-    "effect": "^3.21.2"
+    "convex": "^1.39.0",
+    "effect": "4.0.0-beta.67"
   },
   "engines": {
     "node": ">=22",
@@ -68,5 +68,9 @@
   },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
-  "types": "./dist/index.d.ts"
+  "types": "./dist/index.d.ts",
+  "publishConfig": {
+    "tag": "effect4",
+    "access": "public"
+  }
 }

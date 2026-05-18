@@ -4,9 +4,9 @@ import { Data } from "effect";
 
 export type FunctionProvenance = Data.TaggedEnum<{
   Confect: {
-    args: Schema.Schema.AnyNoContext;
-    returns: Schema.Schema.AnyNoContext;
-    error?: Schema.Schema.AnyNoContext;
+    args: Schema.Codec<any, any, never, never>;
+    returns: Schema.Codec<any, any, never, never>;
+    error?: Schema.Codec<any, any, never, never>;
   };
   Convex: {
     /** @internal */
@@ -17,9 +17,9 @@ export type FunctionProvenance = Data.TaggedEnum<{
 }>;
 
 export interface Confect<
-  Args extends Schema.Schema.AnyNoContext,
-  Returns extends Schema.Schema.AnyNoContext,
-  Error extends Schema.Schema.AnyNoContext = never,
+  Args extends Schema.Codec<any, any, never, never>,
+  Returns extends Schema.Codec<any, any, never, never>,
+  Error extends Schema.Codec<any, any, never, never> = never,
 > {
   readonly _tag: "Confect";
   readonly args: Args;
@@ -28,9 +28,9 @@ export interface Confect<
 }
 
 export interface AnyConfect extends Confect<
-  Schema.Schema.AnyNoContext,
-  Schema.Schema.AnyNoContext,
-  Schema.Schema.AnyNoContext
+  Schema.Codec<any, any, never, never>,
+  Schema.Codec<any, any, never, never>,
+  Schema.Codec<any, any, never, never>
 > {}
 
 export interface Convex<Args extends DefaultFunctionArgs, Returns> {
@@ -44,9 +44,9 @@ export interface AnyConvex extends Convex<DefaultFunctionArgs, any> {}
 export const FunctionProvenance = Data.taggedEnum<FunctionProvenance>();
 
 export const Confect = <
-  Args extends Schema.Schema.AnyNoContext,
-  Returns extends Schema.Schema.AnyNoContext,
-  Error extends Schema.Schema.AnyNoContext = never,
+  Args extends Schema.Codec<any, any, never, never>,
+  Returns extends Schema.Codec<any, any, never, never>,
+  Error extends Schema.Codec<any, any, never, never> = never,
 >(
   args: Args,
   returns: Returns,

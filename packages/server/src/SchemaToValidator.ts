@@ -26,7 +26,6 @@ import {
   Match,
   Number,
   Option,
-  type ParseResult,
   pipe,
   Predicate,
   Schema,
@@ -48,15 +47,15 @@ import type {
 // Args
 
 export const compileArgsSchema = <ConfectValue, ConvexValue>(
-  argsSchema: Schema.Schema<ConfectValue, ConvexValue>,
+  argsSchema: Schema.Codec<ConfectValue, ConvexValue, never, never>,
 ): PropertyValidators => {
-  const ast = Schema.encodedSchema(argsSchema).ast;
+  const ast = Schema.toEncoded(argsSchema).ast;
 
   return pipe(
     ast,
     Match.value,
-    Match.tag("TypeLiteral", (typeLiteralAst) =>
-      Array.isEmptyReadonlyArray(typeLiteralAst.indexSignatures)
+    Match.tag("Objects", (typeLiteralAst) =>
+      typeLiteralAst.indexSignatures.length === 0
         ? handlePropertySignatures(typeLiteralAst)
         : Effect.fail(new IndexSignaturesAreNotSupportedError()),
     ),
@@ -68,9 +67,9 @@ export const compileArgsSchema = <ConfectValue, ConvexValue>(
 // Returns
 
 export const compileReturnsSchema = <ConfectValue, ConvexValue>(
-  schema: Schema.Schema<ConfectValue, ConvexValue>,
+  schema: Schema.Codec<ConfectValue, ConvexValue, never, never>,
 ): Validator<any, any, any> =>
-  runSyncThrow(compileAst(Schema.encodedSchema(schema).ast));
+  runSyncThrow(compileAst(Schema.toEncoded(schema).ast));
 
 // Table
 
@@ -78,7 +77,7 @@ export const compileReturnsSchema = <ConfectValue, ConvexValue>(
  * Convert a table `Schema` to a table `Validator`.
  */
 export type TableSchemaToTableValidator<
-  TableSchema extends Schema.Schema.AnyNoContext,
+  TableSchema extends Schema.Codec<any, any, never, never>,
 > =
   ValueToValidator<TableSchema["Encoded"]> extends infer Vd extends
     | VObject<any, any, any, any>
@@ -87,17 +86,17 @@ export type TableSchemaToTableValidator<
     : never;
 
 export const compileTableSchema = <
-  TableSchema extends Schema.Schema.AnyNoContext,
+  TableSchema extends Schema.Codec<any, any, never, never>,
 >(
   schema: TableSchema,
 ): TableSchemaToTableValidator<TableSchema> => {
-  const ast = Schema.encodedSchema(schema).ast;
+  const ast = Schema.toEncoded(schema).ast;
 
   return pipe(
     ast,
     Match.value,
-    Match.tag("TypeLiteral", ({ indexSignatures }) =>
-      Array.isEmptyReadonlyArray(indexSignatures)
+    Match.tag("Objects", ({ indexSignatures }) =>
+      indexSignatures.length === 0
         ? (compileAst(ast) as Effect.Effect<any>)
         : Effect.fail(new IndexSignaturesAreNotSupportedError()),
     ),
@@ -259,7 +258,7 @@ type ValueTupleToValidatorTuple<VlTuple extends ReadonlyArray<ReadonlyValue>> =
       : [];
 
 export const compileSchema = <T, E>(
-  schema: Schema.Schema<T, E>,
+  schema: Schema.Codec<T, E, never, never>,
 ): ValueToValidator<(typeof schema)["Encoded"]> =>
   runSyncThrow(compileAst(schema.ast)) as any;
 
@@ -269,54 +268,55 @@ export const isRecursive = (ast: SchemaAST.AST): boolean =>
     Match.value,
     Match.tag(
       "Literal",
-      "BooleanKeyword",
-      "StringKeyword",
-      "NumberKeyword",
-      "BigIntKeyword",
-      "UnknownKeyword",
-      "AnyKeyword",
+      "Boolean",
+      "String",
+      "Number",
+      "BigInt",
+      "Unknown",
+      "Any",
       "Declaration",
       "UniqueSymbol",
-      "SymbolKeyword",
-      "UndefinedKeyword",
-      "VoidKeyword",
-      "NeverKeyword",
-      "Enums",
+      "Symbol",
+      "Undefined",
+      "Void",
+      "Never",
+      "Null",
+      "Enum",
       "TemplateLiteral",
       "ObjectKeyword",
-      "Transformation",
       () => false,
     ),
     Match.tag("Union", ({ types }) =>
       Array.some(types, (type) => isRecursive(type)),
     ),
-    Match.tag("TypeLiteral", ({ propertySignatures }) =>
+    Match.tag("Objects", ({ propertySignatures }) =>
       Array.some(propertySignatures, ({ type }) => isRecursive(type)),
     ),
+    // In Effect 4 there is no separate `Refinement`/`Transformation` AST tag —
+    // refinements live as `checks` and transformations live as `encoding` on
+    // the underlying Base node, so the `from` schema is the AST itself.
     Match.tag(
-      "TupleType",
-      ({ elements: optionalElements, rest: elements }) =>
-        Array.some(optionalElements, (optionalElement) =>
-          isRecursive(optionalElement.type),
-        ) || Array.some(elements, (element) => isRecursive(element.type)),
+      "Arrays",
+      ({ elements, rest }) =>
+        Array.some(elements, (el) => isRecursive(el)) ||
+        Array.some(rest, (r) => isRecursive(r)),
     ),
-    Match.tag("Refinement", ({ from }) => isRecursive(from)),
     Match.tag("Suspend", () => true),
     Match.exhaustive,
   );
 
-export const compileAst = (
-  ast: SchemaAST.AST,
-  isOptionalPropertyOfTypeLiteral = false,
-): Effect.Effect<
-  Validator<any, any, any>,
+type CompileAstError =
   | UnsupportedSchemaTypeError
   | UnsupportedPropertySignatureKeyTypeError
   | IndexSignaturesAreNotSupportedError
   | MixedIndexAndPropertySignaturesAreNotSupportedError
   | OptionalTupleElementsAreNotSupportedError
-  | EmptyTupleIsNotSupportedError
-> =>
+  | EmptyTupleIsNotSupportedError;
+
+export const compileAst = (
+  ast: SchemaAST.AST,
+  isOptionalPropertyOfTypeLiteral = false,
+): Effect.Effect<Validator<any, any, any>, CompileAstError> =>
   isRecursive(ast)
     ? Effect.succeed(v.any())
     : pipe(
@@ -333,13 +333,13 @@ export const compileAst = (
               Match.boolean,
               (l) => v.literal(l),
             ),
-            Match.when(Match.null, () => v.null()),
             Match.exhaustive,
             Effect.succeed,
           ),
         ),
-        Match.tag("BooleanKeyword", () => Effect.succeed(v.boolean())),
-        Match.tag("StringKeyword", (stringAst) =>
+        Match.tag("Null", () => Effect.succeed(v.null())),
+        Match.tag("Boolean", () => Effect.succeed(v.boolean())),
+        Match.tag("String", (stringAst) =>
           GenericId.tableName(stringAst).pipe(
             Option.match({
               onNone: () => Effect.succeed(v.string()),
@@ -347,74 +347,111 @@ export const compileAst = (
             }),
           ),
         ),
-        Match.tag("NumberKeyword", () => Effect.succeed(v.float64())),
-        Match.tag("BigIntKeyword", () => Effect.succeed(v.int64())),
+        Match.tag("Number", () => Effect.succeed(v.float64())),
+        Match.tag("BigInt", () => Effect.succeed(v.int64())),
         Match.tag("Union", (unionAst) =>
           handleUnion(unionAst, isOptionalPropertyOfTypeLiteral),
         ),
-        Match.tag("TypeLiteral", (typeLiteralAst) =>
+        Match.tag("Objects", (typeLiteralAst) =>
           handleTypeLiteral(typeLiteralAst),
         ),
-        Match.tag("TupleType", (tupleTypeAst) => handleTupleType(tupleTypeAst)),
-        Match.tag("UnknownKeyword", "AnyKeyword", () =>
-          Effect.succeed(v.any()),
-        ),
+        Match.tag("Arrays", (tupleTypeAst) => handleTupleType(tupleTypeAst)),
+        Match.tag("Unknown", "Any", () => Effect.succeed(v.any())),
         Match.tag("Declaration", (declaration) =>
-          Effect.mapBoth(
-            declaration.decodeUnknown(...declaration.typeParameters)(
-              new ArrayBuffer(0),
-              {},
-              declaration,
-            ) as Effect.Effect<ArrayBuffer, ParseResult.ParseIssue>,
-            {
-              onSuccess: () => v.bytes(),
-              onFailure: () =>
-                new UnsupportedSchemaTypeError({
-                  schemaType: declaration._tag,
-                }),
-            },
-          ),
+          handleDeclaration(declaration),
         ),
-        Match.tag("Refinement", ({ from }) => compileAst(from)),
         Match.tag("Suspend", () => Effect.succeed(v.any())),
         Match.tag(
           "UniqueSymbol",
-          "SymbolKeyword",
-          "UndefinedKeyword",
-          "VoidKeyword",
-          "NeverKeyword",
-          "Enums",
+          "Symbol",
+          "Undefined",
+          "Void",
+          "Never",
+          "Enum",
           "TemplateLiteral",
           "ObjectKeyword",
-          "Transformation",
           () =>
-            new UnsupportedSchemaTypeError({
-              schemaType: ast._tag,
-            }),
+            Effect.fail(
+              new UnsupportedSchemaTypeError({
+                schemaType: ast._tag,
+              }),
+            ),
         ),
         Match.exhaustive,
       );
 
+// In Effect 4, Declaration#run is the parser factory. To detect a "bytes"
+// declaration (e.g. `Schema.instanceOf(ArrayBuffer)` or `Schema.Uint8Array`),
+// we attempt to parse a freshly-allocated `ArrayBuffer` / `Uint8Array` and
+// treat anything that succeeds as a bytes validator. Anything else is rejected
+// as an unsupported declaration.
+const handleDeclaration = (
+  declaration: SchemaAST.Declaration,
+): Effect.Effect<Validator<any, any, any>, CompileAstError> =>
+  Effect.gen(function* () {
+    const encodedAst = declaration.encoding?.[0]?.to;
+    if (encodedAst !== undefined && encodedAst._tag === "Objects") {
+      return yield* compileAst(encodedAst);
+    }
+
+    const typeConstructor = declaration.annotations?.["typeConstructor"] as
+      | { readonly _tag?: string }
+      | undefined;
+    if (typeConstructor?._tag === "effect/Option") {
+      const [valueAst] = declaration.typeParameters;
+      if (valueAst === undefined) {
+        return yield* Effect.die(
+          new Error("Option declaration is missing its value type parameter."),
+        );
+      }
+      const valueValidator = yield* compileAst(valueAst);
+
+      return v.object({ value: v.optional(valueValidator) });
+    }
+
+    const rawParser = declaration.run(declaration.typeParameters);
+    const parser = (input: unknown): Effect.Effect<unknown, unknown> =>
+      rawParser(input, declaration, {}) as Effect.Effect<unknown, unknown>;
+
+    const arrayBufferResult = yield* Effect.exit(parser(new ArrayBuffer(0)));
+
+    if (Exit.isSuccess(arrayBufferResult)) {
+      return v.bytes();
+    }
+
+    const uint8ArrayResult = yield* Effect.exit(parser(new Uint8Array(0)));
+
+    if (Exit.isSuccess(uint8ArrayResult)) {
+      return v.bytes();
+    }
+
+    return yield* new UnsupportedSchemaTypeError({
+      schemaType: declaration._tag,
+    });
+  });
+
 const handleUnion = (
-  { types: [first, second, ...rest] }: SchemaAST.Union,
+  { types }: SchemaAST.Union,
   isOptionalPropertyOfTypeLiteral: boolean,
 ) =>
   Effect.gen(function* () {
-    const validatorEffects = isOptionalPropertyOfTypeLiteral
-      ? Array.filterMap([first, second, ...rest], (type) =>
-          Predicate.not(SchemaAST.isUndefinedKeyword)(type)
-            ? Option.some(compileAst(type))
-            : Option.none(),
-        )
-      : Array.map([first, second, ...rest], (type) => compileAst(type));
+    const consideredTypes: ReadonlyArray<SchemaAST.AST> =
+      isOptionalPropertyOfTypeLiteral
+        ? Array.filter(types, Predicate.not(SchemaAST.isUndefined))
+        : types;
+
+    const validatorEffects: ReadonlyArray<ReturnType<typeof compileAst>> =
+      Array.map(consideredTypes, (type) => compileAst(type));
 
     const [firstValidator, secondValidator, ...restValidators] =
       yield* Effect.all(validatorEffects);
 
     /* v8 ignore start */
     if (firstValidator === undefined) {
-      return yield* Effect.dieMessage(
-        "First validator of union is undefined; this should be impossible.",
+      return yield* Effect.die(
+        new Error(
+          "First validator of union is undefined; this should be impossible.",
+        ),
       );
       /* v8 ignore stop */
     } else if (secondValidator === undefined) {
@@ -424,7 +461,7 @@ const handleUnion = (
     }
   });
 
-const handleTypeLiteral = (typeLiteralAst: SchemaAST.TypeLiteral) =>
+const handleTypeLiteral = (typeLiteralAst: SchemaAST.Objects) =>
   pipe(
     typeLiteralAst.indexSignatures,
     Array.head,
@@ -453,31 +490,29 @@ const handleTypeLiteral = (typeLiteralAst: SchemaAST.TypeLiteral) =>
     }),
   );
 
-const handleTupleType = ({ elements, rest }: SchemaAST.TupleType) =>
+const handleTupleType = ({ elements, rest }: SchemaAST.Arrays) =>
   Effect.gen(function* () {
-    const restValidator = pipe(
+    const restValidator: Effect.Effect<
+      Validator<any, any, any>,
+      CompileAstError
+    > = pipe(
       rest,
       Array.head,
-      Option.map(({ type }) => compileAst(type)),
-      Effect.flatten,
+      Option.match({
+        onNone: () => Effect.fail(new EmptyTupleIsNotSupportedError()),
+        onSome: (restAst) => compileAst(restAst),
+      }),
     );
 
     const [f, s, ...r] = elements;
 
-    const elementToValidator = ({ type, isOptional }: SchemaAST.OptionalType) =>
-      Effect.if(isOptional, {
-        onTrue: () =>
-          Effect.fail(new OptionalTupleElementsAreNotSupportedError()),
-        onFalse: () => compileAst(type),
-      });
+    const elementToValidator = (elementAst: SchemaAST.AST) =>
+      SchemaAST.isOptional(elementAst)
+        ? Effect.fail(new OptionalTupleElementsAreNotSupportedError())
+        : compileAst(elementAst);
 
     const arrayItemsValidator = yield* f === undefined
-      ? pipe(
-          restValidator,
-          Effect.catchTag("NoSuchElementException", () =>
-            Effect.fail(new EmptyTupleIsNotSupportedError()),
-          ),
-        )
+      ? restValidator
       : s === undefined
         ? elementToValidator(f)
         : Effect.gen(function* () {
@@ -491,10 +526,11 @@ const handleTupleType = ({ elements, rest }: SchemaAST.TupleType) =>
     return v.array(arrayItemsValidator);
   });
 
-const handlePropertySignatures = (typeLiteralAst: SchemaAST.TypeLiteral) =>
+const handlePropertySignatures = (typeLiteralAst: SchemaAST.Objects) =>
   pipe(
     typeLiteralAst.propertySignatures,
-    Effect.forEach(({ type, name, isOptional }) => {
+    Effect.forEach(({ type, name }) => {
+      const isOptional = SchemaAST.isOptional(type);
       if (String.isString(name)) {
         // Somehow, somewhere, keys of type number are being coerced to strings…
         return Option.match(Number.parse(name), {
@@ -553,7 +589,7 @@ export class TopLevelMustBeObjectError extends Data.TaggedError(
   "TopLevelMustBeObjectError",
 ) {
   /* v8 ignore start */
-  override get message() {
+  get message() {
     return "Top level schema must be an object";
   }
   /* v8 ignore stop */
@@ -563,7 +599,7 @@ export class TopLevelMustBeObjectOrUnionError extends Data.TaggedError(
   "TopLevelMustBeObjectOrUnionError",
 ) {
   /* v8 ignore start */
-  override get message() {
+  get message() {
     return "Top level schema must be an object or a union";
   }
   /* v8 ignore stop */
@@ -575,7 +611,7 @@ export class UnsupportedPropertySignatureKeyTypeError extends Data.TaggedError(
   readonly propertyKey: number | symbol;
 }> {
   /* v8 ignore start */
-  override get message() {
+  get message() {
     return `Unsupported property signature '${this.propertyKey.toString()}'. Property is of type '${typeof this.propertyKey}' but only 'string' properties are supported.`;
   }
   /* v8 ignore stop */
@@ -585,7 +621,7 @@ export class EmptyTupleIsNotSupportedError extends Data.TaggedError(
   "EmptyTupleIsNotSupportedError",
 ) {
   /* v8 ignore start */
-  override get message() {
+  get message() {
     return "Tuple must have at least one element";
   }
   /* v8 ignore stop */
@@ -597,7 +633,7 @@ export class UnsupportedSchemaTypeError extends Data.TaggedError(
   readonly schemaType: SchemaAST.AST["_tag"];
 }> {
   /* v8 ignore start */
-  override get message() {
+  get message() {
     return `Unsupported schema type '${this.schemaType}'`;
   }
   /* v8 ignore stop */
@@ -607,7 +643,7 @@ export class IndexSignaturesAreNotSupportedError extends Data.TaggedError(
   "IndexSignaturesAreNotSupportedError",
 ) {
   /* v8 ignore start */
-  override get message() {
+  get message() {
     return "Index signatures are not supported";
   }
   /* v8 ignore stop */
@@ -617,7 +653,7 @@ export class MixedIndexAndPropertySignaturesAreNotSupportedError extends Data.Ta
   "MixedIndexAndPropertySignaturesAreNotSupportedError",
 ) {
   /* v8 ignore start */
-  override get message() {
+  get message() {
     return "Mixed index and property signatures are not supported";
   }
   /* v8 ignore stop */
@@ -627,7 +663,7 @@ export class OptionalTupleElementsAreNotSupportedError extends Data.TaggedError(
   "OptionalTupleElementsAreNotSupportedError",
 ) {
   /* v8 ignore start */
-  override get message() {
+  get message() {
     return "Optional tuple elements are not supported";
   }
   /* v8 ignore stop */

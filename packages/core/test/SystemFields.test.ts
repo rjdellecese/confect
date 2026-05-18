@@ -52,14 +52,14 @@ describe("extendWithSystemFields", () => {
       url: Schema.String,
     });
 
-    const ItemSchema = Schema.Union(NoteSchema, ImageSchema);
+    const ItemSchema = Schema.Union([NoteSchema, ImageSchema]);
 
     const ExtendedItemSchema = SystemFields.extendWithSystemFields(
       "items",
       ItemSchema,
     );
 
-    const Expected = Schema.Union(
+    const Expected = Schema.Union([
       Schema.Struct({
         content: Schema.String,
         _id: GenericId("items"),
@@ -70,7 +70,7 @@ describe("extendWithSystemFields", () => {
         _id: GenericId("items"),
         _creationTime: Schema.Number,
       }),
-    );
+    ]);
 
     type Expected = typeof Expected;
 

@@ -4,9 +4,9 @@ import * as FunctionPath from "./FunctionPath";
 import * as GroupPath from "./GroupPath";
 import * as GroupPaths from "./GroupPaths";
 
-export const FunctionPaths = Schema.HashSetFromSelf(
-  FunctionPath.FunctionPath,
-).pipe(Schema.brand("@confect/cli/FunctionPaths"));
+export const FunctionPaths = Schema.HashSet(FunctionPath.FunctionPath).pipe(
+  Schema.brand("@confect/cli/FunctionPaths"),
+);
 export type FunctionPaths = typeof FunctionPaths.Type;
 
 export const make = (spec: Spec.AnyWithProps): FunctionPaths =>

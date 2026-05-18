@@ -2,31 +2,34 @@ import { FunctionSpec, GenericId, GroupSpec } from "@confect/core";
 import { Schema } from "effect";
 import { Notes } from "../tables/Notes";
 
-export class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+export class NotFound extends Schema.TaggedErrorClass<NotFound>()("NotFound", {
   id: Schema.String,
 }) {}
 
-export class Forbidden extends Schema.TaggedError<Forbidden>()("Forbidden", {
-  reason: Schema.String,
-}) {}
+export class Forbidden extends Schema.TaggedErrorClass<Forbidden>()(
+  "Forbidden",
+  {
+    reason: Schema.String,
+  },
+) {}
 
-const NoteError = Schema.Union(NotFound, Forbidden);
+const NoteError = Schema.Union([NotFound, Forbidden]);
 
-const TryGetResult = Schema.Union(
+const TryGetResult = Schema.Union([
   Schema.TaggedStruct("Ok", { text: Schema.String }),
   Schema.TaggedStruct("NotFound", { id: Schema.String }),
-);
+]);
 
-const TryDeleteResult = Schema.Union(
+const TryDeleteResult = Schema.Union([
   Schema.TaggedStruct("Ok", {}),
   Schema.TaggedStruct("NotFound", { id: Schema.String }),
   Schema.TaggedStruct("Forbidden", { reason: Schema.String }),
-);
+]);
 
-const TryFailingActionResult = Schema.Union(
+const TryFailingActionResult = Schema.Union([
   Schema.TaggedStruct("NotFound", { id: Schema.String }),
   Schema.TaggedStruct("Forbidden", { reason: Schema.String }),
-);
+]);
 
 export const typedErrors = GroupSpec.make("typedErrors")
   .addFunction(
@@ -52,7 +55,7 @@ export const typedErrors = GroupSpec.make("typedErrors")
     FunctionSpec.publicAction({
       name: "failingAction",
       args: Schema.Struct({
-        kind: Schema.Literal("notFound", "forbidden"),
+        kind: Schema.Literals(["notFound", "forbidden"]),
       }),
       returns: Schema.Null,
       error: NoteError,
@@ -87,7 +90,7 @@ export const typedErrors = GroupSpec.make("typedErrors")
     FunctionSpec.publicAction({
       name: "tryFailingAction",
       args: Schema.Struct({
-        kind: Schema.Literal("notFound", "forbidden"),
+        kind: Schema.Literals(["notFound", "forbidden"]),
       }),
       returns: TryFailingActionResult,
     }),

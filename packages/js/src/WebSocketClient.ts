@@ -1,9 +1,8 @@
 import * as Ref from "@confect/core/Ref";
 import { ConvexClient } from "convex/browser";
-import type { ParseResult } from "effect";
-import { Context, Effect, Layer, Schema, Stream } from "effect";
+import { Cause, Context, Effect, Layer, Queue, Schema, Stream } from "effect";
 
-export class WebSocketClientError extends Schema.TaggedError<WebSocketClientError>()(
+export class WebSocketClientError extends Schema.TaggedErrorClass<WebSocketClientError>()(
   "WebSocketClientError",
   {
     cause: Schema.Unknown,
@@ -47,7 +46,7 @@ const make = (
         ...rest: Ref.OptionalArgs<Query>
       ): Effect.Effect<
         Ref.Returns<Query>,
-        Ref.Error<Query> | WebSocketClientError | ParseResult.ParseError
+        Ref.Error<Query> | WebSocketClientError | Schema.SchemaError
       > => {
         const args = (rest[0] ?? {}) as Ref.Args<Query>;
         return Ref.runWithCodec(
@@ -64,7 +63,7 @@ const make = (
         ...rest: Ref.OptionalArgs<Mutation>
       ): Effect.Effect<
         Ref.Returns<Mutation>,
-        Ref.Error<Mutation> | WebSocketClientError | ParseResult.ParseError
+        Ref.Error<Mutation> | WebSocketClientError | Schema.SchemaError
       > => {
         const args = (rest[0] ?? {}) as Ref.Args<Mutation>;
         return Ref.runWithCodec(
@@ -81,7 +80,7 @@ const make = (
         ...rest: Ref.OptionalArgs<Action>
       ): Effect.Effect<
         Ref.Returns<Action>,
-        Ref.Error<Action> | WebSocketClientError | ParseResult.ParseError
+        Ref.Error<Action> | WebSocketClientError | Schema.SchemaError
       > => {
         const args = (rest[0] ?? {}) as Ref.Args<Action>;
         return Ref.runWithCodec(
@@ -98,29 +97,29 @@ const make = (
         ...rest: Ref.OptionalArgs<Query>
       ): Stream.Stream<
         Ref.Returns<Query>,
-        Ref.Error<Query> | WebSocketClientError | ParseResult.ParseError
+        Ref.Error<Query> | WebSocketClientError | Schema.SchemaError
       > => {
         const args = (rest[0] ?? {}) as Ref.Args<Query>;
         const functionReference = Ref.getFunctionReference(ref);
         const onError = Ref.decodeErrorOrElse(ref, mapUnknownError);
 
-        return Stream.unwrapScoped(
+        return Stream.unwrap(
           Effect.gen(function* () {
             const encodedArgs = yield* Ref.encodeArgs(ref, args);
 
-            return Stream.asyncScoped<
+            return Stream.callback<
               unknown,
               Ref.Error<Query> | WebSocketClientError
-            >((emit) =>
+            >((queue) =>
               Effect.gen(function* () {
                 const unsubscribe = convexClient.onUpdate(
                   functionReference,
                   encodedArgs,
                   (result) => {
-                    emit.single(result);
+                    Queue.offerUnsafe(queue, result);
                   },
                   (error) => {
-                    emit.fail(onError(error));
+                    Queue.failCauseUnsafe(queue, Cause.fail(onError(error)));
                   },
                 );
                 yield* Effect.addFinalizer(() =>
@@ -150,8 +149,8 @@ const make = (
 /**
  * A Confect client which uses a WebSocket to communicate with your Convex backend and supports reactive query subscriptions. The WebSocket connection is managed by the layer's scope and closed automatically when the scope ends. Wraps [ConvexClient](https://docs.convex.dev/api/classes/browser.ConvexClient).
  */
-export const WebSocketClient = Context.GenericTag<
-  Effect.Effect.Success<ReturnType<typeof make>>
+export const WebSocketClient = Context.Service<
+  Effect.Success<ReturnType<typeof make>>
 >("@confect/js/WebSocketClient");
 
 export type WebSocketClient = typeof WebSocketClient.Identifier;
@@ -159,4 +158,4 @@ export type WebSocketClient = typeof WebSocketClient.Identifier;
 export const layer = (
   address: string,
   options?: ConstructorParameters<typeof ConvexClient>[1],
-) => Layer.scoped(WebSocketClient, make(address, options));
+) => Layer.effect(WebSocketClient, make(address, options));

@@ -56,7 +56,7 @@ import { Schema } from "effect";
 
 import { Notes } from "./tables/Notes";
 
-class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
+class NoteNotFound extends Schema.TaggedErrorClass<NoteNotFound>()(
   "NoteNotFound",
   { noteId: GenericId.GenericId("notes") },
 ) {}

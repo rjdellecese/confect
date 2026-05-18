@@ -11,7 +11,15 @@ import {
   queryGeneric,
 } from "convex/server";
 import type { Value } from "convex/values";
-import { Clock, Effect, Layer, Match, pipe, Schema } from "effect";
+import {
+  Clock,
+  ConfigProvider,
+  Effect,
+  Layer,
+  Match,
+  pipe,
+  Schema,
+} from "effect";
 import type * as Api from "./Api";
 import * as Auth from "./Auth";
 import * as ConvexConfigProvider from "./ConvexConfigProvider";
@@ -20,6 +28,7 @@ import type * as DatabaseSchema from "./DatabaseSchema";
 import * as DatabaseWriter from "./DatabaseWriter";
 import type * as DataModel from "./DataModel";
 import type * as Handler from "./Handler";
+import * as Meta from "./Meta";
 import * as MutationCtx from "./MutationCtx";
 import * as MutationRunner from "./MutationRunner";
 import * as QueryCtx from "./QueryCtx";
@@ -30,6 +39,8 @@ import * as Scheduler from "./Scheduler";
 import * as SchemaToValidator from "./SchemaToValidator";
 import { StorageReader } from "./StorageReader";
 import { StorageWriter } from "./StorageWriter";
+
+const ConfigProviderRef = ConfigProvider.ConfigProvider;
 
 export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
   api: Api_,
@@ -110,15 +121,14 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
 // to Clock is an opt-in to worse caching—but caching is not broken by default.
 const unpatchedClock = (realDateNow: () => number): Clock.Clock => {
   const bigint1e6 = BigInt(1_000_000);
-  const unsafeCurrentTimeMillis = () => realDateNow();
-  const unsafeCurrentTimeNanos = () => BigInt(realDateNow()) * bigint1e6;
-  const defaultClock = Clock.make();
+  const currentTimeMillisUnsafe = () => realDateNow();
+  const currentTimeNanosUnsafe = () => BigInt(realDateNow()) * bigint1e6;
   return {
-    ...defaultClock,
-    unsafeCurrentTimeMillis,
-    unsafeCurrentTimeNanos,
-    currentTimeMillis: Effect.sync(unsafeCurrentTimeMillis),
-    currentTimeNanos: Effect.sync(unsafeCurrentTimeNanos),
+    currentTimeMillisUnsafe,
+    currentTimeNanosUnsafe,
+    currentTimeMillis: Effect.sync(currentTimeMillisUnsafe),
+    currentTimeNanos: Effect.sync(currentTimeNanosUnsafe),
+    sleep: (duration) => Effect.sleep(duration),
   };
 };
 
@@ -150,9 +160,9 @@ const queryFunction = <
   handler,
 }: {
   databaseSchema: DatabaseSchema_;
-  args: Schema.Schema<Args, ConvexArgs>;
-  returns: Schema.Schema<Returns, ConvexReturns>;
-  error: Schema.Schema<Error, Value> | undefined;
+  args: Schema.Codec<Args, ConvexArgs, never, never>;
+  returns: Schema.Codec<Returns, ConvexReturns, never, never>;
+  error: Schema.Codec<Error, Value, never, never> | undefined;
   handler: (
     a: Args,
   ) => Effect.Effect<
@@ -162,6 +172,7 @@ const queryFunction = <
     | Auth.Auth
     | StorageReader
     | QueryRunner.QueryRunner
+    | Meta.QueryMeta
     | QueryCtx.QueryCtx<
         DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
       >
@@ -179,7 +190,7 @@ const queryFunction = <
       Effect.gen(function* () {
         const decodedArgs = yield* pipe(
           actualArgs,
-          Schema.decode(args),
+          Schema.decodeEffect(args),
           Effect.orDie,
         );
         const decodedReturns = yield* handler(decodedArgs).pipe(
@@ -189,23 +200,24 @@ const queryFunction = <
               Auth.layer(ctx.auth),
               StorageReader.layer(ctx.storage),
               QueryRunner.layer(ctx.runQuery),
+              Meta.QueryMeta.layer(ctx.meta),
               Layer.succeed(
                 QueryCtx.QueryCtx<
                   DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
                 >(),
                 ctx,
               ),
-              Layer.setConfigProvider(ConvexConfigProvider.make()),
+              Layer.succeed(ConfigProviderRef, ConvexConfigProvider.make()),
             ),
           ),
         );
         return yield* pipe(
           decodedReturns,
-          Schema.encode(returns),
+          Schema.encodeEffect(returns),
           Effect.orDie,
         );
       }).pipe(
-        Effect.withClock(clock),
+        Effect.provideService(Clock.Clock, clock),
         RegisteredFunction.runHandlerPromise(error),
       ),
     ),
@@ -224,13 +236,14 @@ export const mutationLayer = <Schema extends DatabaseSchema.AnyWithProps>(
     StorageWriter.layer(ctx.storage),
     QueryRunner.layer(ctx.runQuery),
     MutationRunner.layer(ctx.runMutation),
+    Meta.MutationMeta.layer(ctx.meta),
     Layer.succeed(
       MutationCtx.MutationCtx<
         DataModel.ToConvex<DataModel.FromSchema<Schema>>
       >(),
       ctx,
     ),
-    Layer.setConfigProvider(ConvexConfigProvider.make()),
+    Layer.succeed(ConfigProviderRef, ConvexConfigProvider.make()),
   );
 
 export type MutationServices<Schema extends DatabaseSchema.AnyWithProps> =
@@ -242,6 +255,7 @@ export type MutationServices<Schema extends DatabaseSchema.AnyWithProps> =
   | StorageWriter
   | QueryRunner.QueryRunner
   | MutationRunner.MutationRunner
+  | Meta.MutationMeta
   | MutationCtx.MutationCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>;
 
 const mutationFunction = <
@@ -259,9 +273,9 @@ const mutationFunction = <
   handler,
 }: {
   databaseSchema: DatabaseSchema_;
-  args: Schema.Schema<Args, ConvexArgs>;
-  returns: Schema.Schema<Returns, ConvexReturns>;
-  error: Schema.Schema<Error, Value> | undefined;
+  args: Schema.Codec<Args, ConvexArgs, never, never>;
+  returns: Schema.Codec<Returns, ConvexReturns, never, never>;
+  error: Schema.Codec<Error, Value, never, never> | undefined;
   handler: (
     a: Args,
   ) => Effect.Effect<Returns, E, MutationServices<DatabaseSchema_>>;
@@ -277,13 +291,17 @@ const mutationFunction = <
     Effect.gen(function* () {
       const decodedArgs = yield* pipe(
         actualArgs,
-        Schema.decode(args),
+        Schema.decodeEffect(args),
         Effect.orDie,
       );
       const decodedReturns = yield* handler(decodedArgs).pipe(
         Effect.provide(mutationLayer(databaseSchema, ctx)),
       );
-      return yield* pipe(decodedReturns, Schema.encode(returns), Effect.orDie);
+      return yield* pipe(
+        decodedReturns,
+        Schema.encodeEffect(returns),
+        Effect.orDie,
+      );
     }).pipe(RegisteredFunction.runHandlerPromise(error)),
 });
 
@@ -302,9 +320,9 @@ const convexActionFunction = <
     error,
     handler,
   }: {
-    args: Schema.Schema<Args, ConvexArgs>;
-    returns: Schema.Schema<Returns, ConvexReturns>;
-    error: Schema.Schema.AnyNoContext | undefined;
+    args: Schema.Codec<Args, ConvexArgs, never, never>;
+    returns: Schema.Codec<Returns, ConvexReturns, never, never>;
+    error: Schema.Codec<any, any, never, never> | undefined;
     handler: (
       a: Args,
     ) => Effect.Effect<
@@ -322,6 +340,6 @@ const convexActionFunction = <
     createLayer: (ctx) =>
       Layer.mergeAll(
         RegisteredFunction.actionLayer(schema, ctx),
-        Layer.setConfigProvider(ConvexConfigProvider.make()),
+        Layer.succeed(ConfigProviderRef, ConvexConfigProvider.make()),
       ),
   });

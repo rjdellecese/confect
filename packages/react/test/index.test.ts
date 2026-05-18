@@ -1,6 +1,6 @@
 import { FunctionSpec, Ref } from "@confect/core";
 import { ConvexError } from "convex/values";
-import { Either, Schema } from "effect";
+import { Result, Schema } from "effect";
 import { beforeEach, describe, expect, expectTypeOf, test, vi } from "vitest";
 import type { InvokeReturn } from "../src/index";
 import { QueryResult, useAction, useMutation, useQuery } from "../src/index";
@@ -15,7 +15,7 @@ vi.mock("convex/react", () => ({
   useAction: (...args: unknown[]) => useConvexActionMock(...args),
 }));
 
-class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+class NotFound extends Schema.TaggedErrorClass<NotFound>()("NotFound", {
   id: Schema.String,
 }) {}
 
@@ -176,7 +176,7 @@ describe("useMutation", () => {
       Promise<string>
     >();
     expectTypeOf<InvokeReturn<typeof mutationWithError>>().toEqualTypeOf<
-      Promise<Either.Either<null, NotFound>>
+      Promise<Result.Result<null, NotFound>>
     >();
   });
 
@@ -188,30 +188,30 @@ describe("useMutation", () => {
     await expect(mutate({ text: "hi" })).resolves.toBe("note-1");
   });
 
-  test("resolves to Either.Right with decoded result when error schema succeeds", async () => {
+  test("resolves to Result.Success with decoded result when error schema succeeds", async () => {
     const inner = vi.fn().mockResolvedValue(null);
     useConvexMutationMock.mockReturnValue(inner);
 
     const mutate = useMutation(mutationWithError);
-    const either = await mutate({ id: "abc" });
+    const result = await mutate({ id: "abc" });
 
-    expect(Either.isRight(either)).toBe(true);
-    if (Either.isRight(either)) expect(either.right).toBeNull();
+    expect(Result.isSuccess(result)).toBe(true);
+    if (Result.isSuccess(result)) expect(result.success).toBeNull();
   });
 
-  test("resolves to Either.Left with the decoded typed error for a matching ConvexError", async () => {
+  test("resolves to Result.Failure with the decoded typed error for a matching ConvexError", async () => {
     const inner = vi
       .fn()
       .mockRejectedValue(new ConvexError({ _tag: "NotFound", id: "abc" }));
     useConvexMutationMock.mockReturnValue(inner);
 
     const mutate = useMutation(mutationWithError);
-    const either = await mutate({ id: "abc" });
+    const result = await mutate({ id: "abc" });
 
-    expect(Either.isLeft(either)).toBe(true);
-    if (Either.isLeft(either)) {
-      expect(either.left).toBeInstanceOf(NotFound);
-      expect((either.left as NotFound).id).toBe("abc");
+    expect(Result.isFailure(result)).toBe(true);
+    if (Result.isFailure(result)) {
+      expect(result.failure).toBeInstanceOf(NotFound);
+      expect((result.failure as NotFound).id).toBe("abc");
     }
   });
 
@@ -242,7 +242,7 @@ describe("useAction", () => {
       Promise<string>
     >();
     expectTypeOf<InvokeReturn<typeof actionWithError>>().toEqualTypeOf<
-      Promise<Either.Either<null, NotFound>>
+      Promise<Result.Result<null, NotFound>>
     >();
   });
 
@@ -254,30 +254,30 @@ describe("useAction", () => {
     await expect(run({})).resolves.toBe("pong");
   });
 
-  test("resolves to Either.Right with decoded result when error schema succeeds", async () => {
+  test("resolves to Result.Success with decoded result when error schema succeeds", async () => {
     const inner = vi.fn().mockResolvedValue(null);
     useConvexActionMock.mockReturnValue(inner);
 
     const run = useAction(actionWithError);
-    const either = await run({ id: "abc" });
+    const result = await run({ id: "abc" });
 
-    expect(Either.isRight(either)).toBe(true);
-    if (Either.isRight(either)) expect(either.right).toBeNull();
+    expect(Result.isSuccess(result)).toBe(true);
+    if (Result.isSuccess(result)) expect(result.success).toBeNull();
   });
 
-  test("resolves to Either.Left with the decoded typed error for a matching ConvexError", async () => {
+  test("resolves to Result.Failure with the decoded typed error for a matching ConvexError", async () => {
     const inner = vi
       .fn()
       .mockRejectedValue(new ConvexError({ _tag: "NotFound", id: "abc" }));
     useConvexActionMock.mockReturnValue(inner);
 
     const run = useAction(actionWithError);
-    const either = await run({ id: "abc" });
+    const result = await run({ id: "abc" });
 
-    expect(Either.isLeft(either)).toBe(true);
-    if (Either.isLeft(either)) {
-      expect(either.left).toBeInstanceOf(NotFound);
-      expect((either.left as NotFound).id).toBe("abc");
+    expect(Result.isFailure(result)).toBe(true);
+    if (Result.isFailure(result)) {
+      expect(result.failure).toBeInstanceOf(NotFound);
+      expect((result.failure as NotFound).id).toBe("abc");
     }
   });
 

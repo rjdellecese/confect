@@ -1,6 +1,5 @@
 import type { FunctionSpec, RuntimeAndFunctionType } from "@confect/core";
 import type * as FunctionProvenance from "@confect/core/FunctionProvenance";
-import type { NodeContext } from "@effect/platform-node";
 import type { Effect } from "effect";
 import type * as ActionCtx from "./ActionCtx";
 import type * as ActionRunner from "./ActionRunner";
@@ -9,6 +8,7 @@ import type * as DatabaseReader from "./DatabaseReader";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as DatabaseWriter from "./DatabaseWriter";
 import type * as DataModel from "./DataModel";
+import type * as Meta from "./Meta";
 import type * as MutationCtx from "./MutationCtx";
 import type * as MutationRunner from "./MutationRunner";
 import type * as QueryCtx from "./QueryCtx";
@@ -75,6 +75,7 @@ export type ConfectProvenanceQuery<
   | Auth.Auth
   | StorageReader
   | QueryRunner.QueryRunner
+  | Meta.QueryMeta
   | QueryCtx.QueryCtx<DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>>
 >;
 
@@ -92,6 +93,7 @@ export type ConfectProvenanceMutation<
   | StorageWriter
   | QueryRunner.QueryRunner
   | MutationRunner.MutationRunner
+  | Meta.MutationMeta
   | MutationCtx.MutationCtx<
       DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
     >
@@ -107,6 +109,7 @@ type ActionServices<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
   | MutationRunner.MutationRunner
   | ActionRunner.ActionRunner
   | VectorSearch.VectorSearch<DataModel.FromSchema<DatabaseSchema_>>
+  | Meta.ActionMeta
   | ActionCtx.ActionCtx<
       DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
     >;
@@ -121,10 +124,7 @@ export type NodeRuntimeAction<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   FunctionSpec_ extends
     FunctionSpec.AnyWithPropsWithFunctionType<RuntimeAndFunctionType.NodeAction>,
-> = Base<
-  FunctionSpec_,
-  ActionServices<DatabaseSchema_> | NodeContext.NodeContext
->;
+> = Base<FunctionSpec_, ActionServices<DatabaseSchema_>>;
 
 type Base<FunctionSpec_ extends FunctionSpec.AnyWithProps, R> = (
   args: FunctionSpec.Args<FunctionSpec_>,

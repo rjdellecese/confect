@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - main
+      - effect4
   pull_request:
     branches:
       - main
+      - effect4
 
 jobs:
   format:

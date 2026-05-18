@@ -1,12 +1,12 @@
 import { Schema } from "effect";
 
-export class BlobNotFoundError extends Schema.TaggedError<BlobNotFoundError>()(
+export class BlobNotFoundError extends Schema.TaggedErrorClass<BlobNotFoundError>()(
   "BlobNotFoundError",
   {
     id: Schema.String,
   },
 ) {
-  override get message(): string {
+  get message(): string {
     return `File with ID '${this.id}' not found`;
   }
 }

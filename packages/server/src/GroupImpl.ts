@@ -13,7 +13,7 @@ export const GroupImpl = <GroupPath_ extends string>({
 }: {
   groupPath: GroupPath_;
 }) =>
-  Context.GenericTag<GroupImpl<GroupPath_>>(
+  Context.Service<GroupImpl<GroupPath_>>(
     `@confect/server/GroupImpl/${groupPath}`,
   );
 

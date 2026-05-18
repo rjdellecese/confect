@@ -50,12 +50,47 @@ export const Users = Table.make(
 export default DatabaseSchema.make().addTable(Notes).addTable(Users);
 ```
 
+<Note>
+  `Table.make` is built on top of Convex's `defineTable`, so the
+  underlying validator and table definition are fully compatible with
+  Convex 1.39+. The `_id` system field is generated as a
+  `Schema.Codec<GenericId<TableName>, GenericId<TableName>, never, never>`,
+  and `_creationTime` as `Schema.Number`.
+</Note>
+
+## Polymorphic tables
+
+A single Convex table can hold multiple record shapes. `Table.make` accepts either a `Schema.Struct` (single shape) or a `Schema.Union<readonly Schema.Struct[]>` (discriminated union of shapes). The system fields (`_id`, `_creationTime`) are added to **every** member of the union, so `Table.Doc` ends up as a `Schema.Union` of structs that each carry those fields.
+
+```ts confect/schema.ts
+import { DatabaseSchema, Table } from "@confect/server";
+import { Schema } from "effect";
+
+export const Events = Table.make(
+  "events",
+  Schema.Union([
+    Schema.Struct({
+      kind: Schema.Literal("note_created"),
+      noteId: Schema.String,
+    }),
+    Schema.Struct({
+      kind: Schema.Literal("user_signed_in"),
+      userId: Schema.String,
+    }),
+  ]),
+);
+
+export default DatabaseSchema.make().addTable(Events);
+```
+
+Internally, `extendWithSystemFields` detects a `Schema.Union` of structs and maps each member through `Schema.fieldsAssign(systemFields)` so that, for example, both `note_created` and `user_signed_in` documents carry `_id: Schema.Codec<GenericId<"events">, GenericId<"events">, never, never>` and `_creationTime`.
+
 ## Deriving table `Schema`s
 
 ### Fields
 
-A `Table`'s `Fields` property contains an Effect `Schema` for the user-defined fields of a table.
+A `Table`'s `Fields` property contains an Effect `Schema` for the user-defined fields of a table. For polymorphic tables this is the `Schema.Union` passed to `Table.make`.
 
 ### Doc
 
-A `Table`'s `Doc` property contains an Effect `Schema` for the table's document, meaning the table's user-defined `Fields` plus its system fields (`_id` and `_creationTime`).
+A `Table`'s `Doc` property contains an Effect `Schema` for the table's document, meaning the table's user-defined `Fields` plus its system fields (`_id` and `_creationTime`). For polymorphic tables, `Doc` is a `Schema.Union` whose members each include the system fields.

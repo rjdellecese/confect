@@ -8,7 +8,9 @@ export type Tags = {
 
 const TagSchema = Schema.Struct({
   name: Schema.String,
-  tags: Schema.Array(Schema.suspend((): Schema.Schema<Tags> => TagSchema)),
+  tags: Schema.Array(
+    Schema.suspend((): Schema.Codec<Tags, Tags, never, never> => TagSchema),
+  ),
 });
 
 export const Tags = Table.make("tags", TagSchema);

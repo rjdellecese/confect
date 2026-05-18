@@ -10,12 +10,13 @@ import {
 } from "convex/server";
 import type { Value } from "convex/values";
 import { ConvexError } from "convex/values";
-import { Effect, Either, Layer, pipe, Schema } from "effect";
+import { Effect, Layer, pipe, Result, Schema } from "effect";
 import * as ActionCtx from "./ActionCtx";
 import * as ActionRunner from "./ActionRunner";
 import * as Auth from "./Auth";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
+import * as Meta from "./Meta";
 import * as MutationRunner from "./MutationRunner";
 import * as QueryRunner from "./QueryRunner";
 import * as Scheduler from "./Scheduler";
@@ -119,7 +120,7 @@ export type RegisteredFunction<
  *
  * - With a schema: typed errors are schema-encoded and wrapped in a
  * `ConvexError`, then thrown so Convex surfaces the data to the client.
- * `Effect.either` escapes the failure channel before `runPromise` so the thrown
+ * `Effect.result` escapes the failure channel before `runPromise` so the thrown
  * `ConvexError` retains its `Symbol.for("ConvexError")` identity instead of
  * being wrapped in Effect's `FiberFailure`.
  *
@@ -129,28 +130,30 @@ export type RegisteredFunction<
  * `runPromise` rejects with a generic failure.
  */
 export const runHandlerPromise =
-  (errorSchema: Schema.Schema.AnyNoContext | undefined) =>
+  (errorSchema: Schema.Codec<any, any, never, never> | undefined) =>
   <A, E>(effect: Effect.Effect<A, E>): Promise<A> => {
     if (errorSchema === undefined) {
       return Effect.runPromise(Effect.orDie(effect));
     }
     const withConvexError = effect.pipe(
-      Effect.catchAll((typedError) =>
-        pipe(
-          Schema.encode(errorSchema)(typedError),
-          Effect.orDie,
-          Effect.andThen((encodedError) =>
-            Effect.fail(new ConvexError(encodedError)),
+      Effect.matchEffect({
+        onFailure: (typedError: E) =>
+          pipe(
+            Schema.encodeEffect(errorSchema)(typedError),
+            Effect.orDie,
+            Effect.andThen((encodedError) =>
+              Effect.fail(new ConvexError(encodedError)),
+            ),
           ),
-        ),
-      ),
+        onSuccess: (value: A) => Effect.succeed(value),
+      }),
     );
-    return Effect.runPromise(Effect.either(withConvexError)).then(
-      Either.match({
-        onLeft: (error) => {
+    return Effect.runPromise(Effect.result(withConvexError)).then(
+      Result.match({
+        onFailure: (error) => {
           throw error;
         },
-        onRight: (value) => value,
+        onSuccess: (value) => value,
       }),
     );
   };
@@ -170,9 +173,9 @@ export const actionFunctionBase = <
   handler,
   createLayer,
 }: {
-  args: Schema.Schema<Args, ConvexArgs>;
-  returns: Schema.Schema<Returns, ConvexReturns>;
-  error: Schema.Schema<Error, Value> | undefined;
+  args: Schema.Codec<Args, ConvexArgs, never, never>;
+  returns: Schema.Codec<Returns, ConvexReturns, never, never>;
+  error: Schema.Codec<Error, Value, never, never> | undefined;
   handler: (a: Args) => Effect.Effect<Returns, E, R>;
   createLayer: (
     ctx: GenericActionCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
@@ -187,13 +190,17 @@ export const actionFunctionBase = <
     Effect.gen(function* () {
       const decodedArgs = yield* pipe(
         actualArgs,
-        Schema.decode(args),
+        Schema.decodeEffect(args),
         Effect.orDie,
       );
       const decodedReturns = yield* handler(decodedArgs).pipe(
         Effect.provide(createLayer(ctx)),
       );
-      return yield* pipe(decodedReturns, Schema.encode(returns), Effect.orDie);
+      return yield* pipe(
+        decodedReturns,
+        Schema.encodeEffect(returns),
+        Effect.orDie,
+      );
     }).pipe(runHandlerPromise(error)),
 });
 
@@ -209,6 +216,7 @@ export type ActionServices<
   | MutationRunner.MutationRunner
   | ActionRunner.ActionRunner
   | VectorSearch.VectorSearch<DataModel.FromSchema<DatabaseSchema_>>
+  | Meta.ActionMeta
   | ActionCtx.ActionCtx<
       DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
     >;
@@ -231,6 +239,7 @@ export const actionLayer = <
     MutationRunner.layer(ctx.runMutation),
     ActionRunner.layer(ctx.runAction),
     VectorSearch.layer(ctx.vectorSearch),
+    Meta.ActionMeta.layer(ctx.meta),
     Layer.succeed(
       ActionCtx.ActionCtx<
         DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>

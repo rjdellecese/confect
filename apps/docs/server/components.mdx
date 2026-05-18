@@ -8,12 +8,19 @@ Convex [components](https://docs.convex.dev/components) are configured in `conve
 
 ```ts convex/convex.config.ts
 import { defineApp } from "convex/server";
+import { v } from "convex/values";
 
-const app = defineApp();
+const app = defineApp({
+  env: {
+    API_KEY: v.string(),
+  },
+});
 
 export default app;
 ```
 
 Some components (such as [Workflow](https://www.convex.dev/components/workflow), [Migrations](https://www.convex.dev/components/migrations), and [Workpool](https://www.convex.dev/components/workpool)) expect you to define Convex functions in your project that they can reference. You can integrate these into your Confect spec and impl using [plain Convex functions](/server/plain-convex-functions).
+
+If you declare env vars with Convex 1.39's typed `env` option, Confect can derive key-safe Effect config helpers from the app or component definition. See [Environment Variables](/server/environment-variables#typed-convex-env-definitions).
 
 See the [Convex components documentation](https://docs.convex.dev/components) for details on installing and using components.

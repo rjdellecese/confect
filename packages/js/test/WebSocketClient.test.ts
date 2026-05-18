@@ -2,12 +2,12 @@ import { FunctionSpec, Ref } from "@confect/core";
 import { describe, expect, it } from "@effect/vitest";
 import { ConvexError } from "convex/values";
 import {
-  Chunk,
   Context,
   Effect,
-  Either,
+  Fiber,
   Layer,
   Ref as MutableRef,
+  Result,
   Schema,
   Stream,
 } from "effect";
@@ -108,7 +108,7 @@ interface Call {
   readonly args: unknown;
 }
 
-const WebSocketClientSpy = Context.GenericTag<{
+const WebSocketClientSpy = Context.Service<{
   readonly queryCalls: MutableRef.Ref<ReadonlyArray<Call>>;
   readonly mutationCalls: MutableRef.Ref<ReadonlyArray<Call>>;
   readonly actionCalls: MutableRef.Ref<ReadonlyArray<Call>>;
@@ -262,7 +262,7 @@ describe("WebSocketClient", () => {
           .reactiveQuery(noArgsQueryRef)
           .pipe(Stream.take(1), Stream.runCollect);
 
-        expect(Chunk.toReadonlyArray(result)).toEqual([{}]);
+        expect(result).toEqual([{}]);
       }).pipe(Effect.provide(TestLayer)),
     );
 
@@ -296,7 +296,7 @@ describe("WebSocketClient", () => {
   });
 });
 
-class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+class NotFound extends Schema.TaggedErrorClass<NotFound>()("NotFound", {
   id: Schema.String,
 }) {}
 
@@ -334,35 +334,35 @@ const realLayer = WebSocketClient.layer("https://test.convex.cloud");
 
 describe("WebSocketClient error decoding", () => {
   describe("query", () => {
-    it.scoped("decodes a matching ConvexError into the typed error", () =>
+    it.effect("decodes a matching ConvexError into the typed error", () =>
       Effect.gen(function* () {
         mockQuery.mockRejectedValue(
           new ConvexError({ _tag: "NotFound", id: "abc" }),
         );
         const client = yield* WebSocketClient.WebSocketClient;
 
-        const result = yield* Effect.either(
+        const result = yield* Effect.result(
           client.query(queryWithError, { id: "abc" }),
         );
-        expect(Either.isLeft(result)).toBe(true);
-        if (Either.isLeft(result)) {
-          expect(result.left).toBeInstanceOf(NotFound);
-          expect((result.left as NotFound).id).toBe("abc");
+        expect(Result.isFailure(result)).toBe(true);
+        if (Result.isFailure(result)) {
+          expect(result.failure).toBeInstanceOf(NotFound);
+          expect((result.failure as NotFound).id).toBe("abc");
         }
       }).pipe(Effect.provide(realLayer)),
     );
 
-    it.scoped("wraps a non-ConvexError as WebSocketClientError", () =>
+    it.effect("wraps a non-ConvexError as WebSocketClientError", () =>
       Effect.gen(function* () {
         mockQuery.mockRejectedValue(new Error("network down"));
         const client = yield* WebSocketClient.WebSocketClient;
 
-        const result = yield* Effect.either(
+        const result = yield* Effect.result(
           client.query(queryWithError, { id: "abc" }),
         );
-        expect(Either.isLeft(result)).toBe(true);
-        if (Either.isLeft(result)) {
-          expect(result.left).toBeInstanceOf(
+        expect(Result.isFailure(result)).toBe(true);
+        if (Result.isFailure(result)) {
+          expect(result.failure).toBeInstanceOf(
             WebSocketClient.WebSocketClientError,
           );
         }
@@ -371,49 +371,49 @@ describe("WebSocketClient error decoding", () => {
   });
 
   describe("mutation", () => {
-    it.scoped("decodes a matching ConvexError into the typed error", () =>
+    it.effect("decodes a matching ConvexError into the typed error", () =>
       Effect.gen(function* () {
         mockMutation.mockRejectedValue(
           new ConvexError({ _tag: "NotFound", id: "abc" }),
         );
         const client = yield* WebSocketClient.WebSocketClient;
 
-        const result = yield* Effect.either(
+        const result = yield* Effect.result(
           client.mutation(mutationWithError, { id: "abc" }),
         );
-        expect(Either.isLeft(result)).toBe(true);
-        if (Either.isLeft(result)) {
-          expect(result.left).toBeInstanceOf(NotFound);
+        expect(Result.isFailure(result)).toBe(true);
+        if (Result.isFailure(result)) {
+          expect(result.failure).toBeInstanceOf(NotFound);
         }
       }).pipe(Effect.provide(realLayer)),
     );
   });
 
   describe("action", () => {
-    it.scoped("decodes a matching ConvexError into the typed error", () =>
+    it.effect("decodes a matching ConvexError into the typed error", () =>
       Effect.gen(function* () {
         mockAction.mockRejectedValue(
           new ConvexError({ _tag: "NotFound", id: "abc" }),
         );
         const client = yield* WebSocketClient.WebSocketClient;
 
-        const result = yield* Effect.either(
+        const result = yield* Effect.result(
           client.action(actionWithError, { id: "abc" }),
         );
-        expect(Either.isLeft(result)).toBe(true);
-        if (Either.isLeft(result)) {
-          expect(result.left).toBeInstanceOf(NotFound);
+        expect(Result.isFailure(result)).toBe(true);
+        if (Result.isFailure(result)) {
+          expect(result.failure).toBeInstanceOf(NotFound);
         }
       }).pipe(Effect.provide(realLayer)),
     );
   });
 
   describe("reactiveQuery", () => {
-    it.scoped("emits the typed error when a matching ConvexError fires", () =>
+    it.effect("emits the typed error when a matching ConvexError fires", () =>
       Effect.gen(function* () {
         const client = yield* WebSocketClient.WebSocketClient;
-        const fiber = yield* Effect.fork(
-          Effect.either(
+        const fiber = yield* Effect.forkScoped(
+          Effect.result(
             client
               .reactiveQuery(queryWithError, { id: "abc" })
               .pipe(Stream.take(1), Stream.runCollect),
@@ -421,58 +421,64 @@ describe("WebSocketClient error decoding", () => {
         );
 
         // Wait for the subscription to register before firing.
-        yield* Effect.async<void>((resume) => {
-          const tick = () => {
-            if (subscribers.length > 0) {
-              resume(Effect.void);
-            } else {
-              setTimeout(tick, 1);
-            }
-          };
-          tick();
-        });
+        yield* Effect.promise<void>(
+          () =>
+            new Promise((resolve) => {
+              const tick = () => {
+                if (subscribers.length > 0) {
+                  resolve();
+                } else {
+                  setTimeout(tick, 1);
+                }
+              };
+              tick();
+            }),
+        );
 
         subscribers[0]!.onError(
           new ConvexError({ _tag: "NotFound", id: "abc" }),
         );
 
-        const result = yield* fiber;
-        expect(Either.isLeft(result)).toBe(true);
-        if (Either.isLeft(result)) {
-          expect(result.left).toBeInstanceOf(NotFound);
-          expect((result.left as NotFound).id).toBe("abc");
+        const result = yield* Fiber.join(fiber);
+        expect(Result.isFailure(result)).toBe(true);
+        if (Result.isFailure(result)) {
+          expect(result.failure).toBeInstanceOf(NotFound);
+          expect((result.failure as NotFound).id).toBe("abc");
         }
       }).pipe(Effect.provide(realLayer)),
     );
 
-    it.scoped("emits a WebSocketClientError when a non-ConvexError fires", () =>
+    it.effect("emits a WebSocketClientError when a non-ConvexError fires", () =>
       Effect.gen(function* () {
         const client = yield* WebSocketClient.WebSocketClient;
-        const fiber = yield* Effect.fork(
-          Effect.either(
+        const fiber = yield* Effect.forkScoped(
+          Effect.result(
             client
               .reactiveQuery(queryWithError, { id: "abc" })
               .pipe(Stream.take(1), Stream.runCollect),
           ),
         );
 
-        yield* Effect.async<void>((resume) => {
-          const tick = () => {
-            if (subscribers.length > 0) {
-              resume(Effect.void);
-            } else {
-              setTimeout(tick, 1);
-            }
-          };
-          tick();
-        });
+        yield* Effect.promise<void>(
+          () =>
+            new Promise((resolve) => {
+              const tick = () => {
+                if (subscribers.length > 0) {
+                  resolve();
+                } else {
+                  setTimeout(tick, 1);
+                }
+              };
+              tick();
+            }),
+        );
 
         subscribers[0]!.onError(new Error("network down"));
 
-        const result = yield* fiber;
-        expect(Either.isLeft(result)).toBe(true);
-        if (Either.isLeft(result)) {
-          expect(result.left).toBeInstanceOf(
+        const result = yield* Fiber.join(fiber);
+        expect(Result.isFailure(result)).toBe(true);
+        if (Result.isFailure(result)) {
+          expect(result.failure).toBeInstanceOf(
             WebSocketClient.WebSocketClientError,
           );
         }

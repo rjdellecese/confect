@@ -12,3 +12,22 @@ description: "Understand the packages that make up the Confect ecosystem."
 | [`@confect/js`](https://www.npmjs.com/package/@confect/js) | JavaScript client bindings for any JS runtime |
 | [`@confect/react`](https://www.npmjs.com/package/@confect/react) | Client-side bindings for React apps |
 | [`@confect/test`](https://www.npmjs.com/package/@confect/test) | Utilities for testing Confect apps without a live Convex backend |
+
+<Note>
+  All Confect packages are published to the `effect4` dist-tag during
+  the Effect 4 prerelease. Install with `@effect4` (e.g. `pnpm add
+  @confect/server@effect4`), and pin peer dependencies to
+  `effect@4.0.0-beta.67` and `convex@^1.39.0`.
+</Note>
+
+## Platform dependencies
+
+Effect 4 no longer ships the `@effect/platform`, `@effect/platform-node`, `@effect/platform-bun`, `@effect/cluster`, `@effect/experimental`, `@effect/rpc`, `@effect/sql`, `@effect/workflow`, or `@effect/typeclass` companion packages — most of that surface area was folded into `effect/unstable/*`, and a few modules have no v4 release yet. You don't need any of them to use Confect.
+
+Because Effect 4 doesn't yet provide a Node `FileSystem`/`Path` platform layer, `@confect/cli` ships a small hand-rolled Node shim for filesystem, path, and child-process access:
+
+- `packages/cli/src/internal/fs.ts` — minimal filesystem operations
+- `packages/cli/src/internal/path.ts` — path manipulation
+- `packages/cli/src/internal/command.ts` — child-process spawning
+
+These are internal implementation details and are not part of the public API.
