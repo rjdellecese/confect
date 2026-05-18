@@ -4,7 +4,7 @@ title: "React"
 description: "Use Confect's React hooks to call your functions from the client."
 ---
 
-`@confect/react` provides drop-in replacements for Convex's React hooks. Each hook automatically encodes your args and decodes return values through the [Effect Schemas](/concepts/schema-restrictions) defined in your [function specs](/concepts/spec-impl-model). You work with the Schema `Type` (decoded) values on both sides—the hooks handle the round-trip to Convex's `Encoded` representation transparently.
+`@gunta/confect-react` provides drop-in replacements for Convex's React hooks. Each hook automatically encodes your args and decodes return values through the [Effect Schemas](/concepts/schema-restrictions) defined in your [function specs](/concepts/spec-impl-model). You work with the Schema `Type` (decoded) values on both sides—the hooks handle the round-trip to Convex's `Encoded` representation transparently.
 
 Functions are referenced via `refs` (from `confect/_generated/refs`) instead of Convex's `api` object. Each ref carries the `args`, `returns`, and (optionally) `error` schemas from the corresponding function spec, which is what enables the automatic encoding and decoding.
 
@@ -41,7 +41,7 @@ Encodes args using the spec's `args` schema, passes them to Convex, and decodes 
 Given this spec:
 
 ```ts confect/notes.spec.ts
-import { FunctionSpec, GroupSpec } from "@confect/core";
+import { FunctionSpec, GroupSpec } from "@gunta/confect-core";
 import { Schema } from "effect";
 
 import { Notes } from "./tables/Notes";
@@ -58,7 +58,7 @@ export const notes = GroupSpec.make("notes").addFunction(
 The hook accepts `{}` (the `Type` of `Schema.Struct({})`) as args and returns a `QueryResult<readonly Notes.Doc["Type"][]>`. Match it with `QueryResult.match`:
 
 ```tsx
-import { QueryResult, useQuery } from "@confect/react";
+import { QueryResult, useQuery } from "@gunta/confect-react";
 import refs from "../confect/_generated/refs";
 
 const NoteList = () => {
@@ -84,7 +84,7 @@ const NoteList = () => {
 When the ref's spec declares an `error` schema, `useQuery` returns `QueryResult<A, E>` and `QueryResult.match` requires an `onFailure` handler that receives the decoded typed error. See [Error Handling](/server/error-handling) for how to declare error schemas.
 
 ```tsx
-import { QueryResult, useQuery } from "@confect/react";
+import { QueryResult, useQuery } from "@gunta/confect-react";
 import refs from "../confect/_generated/refs";
 
 const NoteLookup = ({ noteId }: { noteId: string }) => {
@@ -109,7 +109,7 @@ Failures that are not declared in the `error` schema are not surfaced as `Failur
 Pass `"skip"` instead of args to disable the query subscription. The hook returns a `Loading` variant whose `skipped` flag is `true`, which lets you distinguish a query that is genuinely in flight from one sitting idle because no args have been provided.
 
 ```tsx
-import { QueryResult, useQuery } from "@confect/react";
+import { QueryResult, useQuery } from "@gunta/confect-react";
 import refs from "../confect/_generated/refs";
 
 const NoteDetail = ({
@@ -148,7 +148,7 @@ FunctionSpec.publicMutation({
 ```
 
 ```tsx
-import { useMutation } from "@confect/react";
+import { useMutation } from "@gunta/confect-react";
 import refs from "../confect/_generated/refs";
 
 const InsertNote = () => {
@@ -176,7 +176,7 @@ FunctionSpec.publicMutation({
 ```
 
 ```tsx
-import { useMutation } from "@confect/react";
+import { useMutation } from "@gunta/confect-react";
 import { Either } from "effect";
 import refs from "../confect/_generated/refs";
 
@@ -208,7 +208,7 @@ FunctionSpec.publicAction({
 ```
 
 ```tsx
-import { useAction } from "@confect/react";
+import { useAction } from "@gunta/confect-react";
 import refs from "../confect/_generated/refs";
 
 const RandomNumber = () => {

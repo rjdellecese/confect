@@ -1,6 +1,6 @@
-import type * as FunctionSpec from "@confect/core/FunctionSpec";
-import type * as GroupSpec from "@confect/core/GroupSpec";
-import type * as Spec from "@confect/core/Spec";
+import type * as FunctionSpec from "@gunta/confect-core/FunctionSpec";
+import type * as GroupSpec from "@gunta/confect-core/GroupSpec";
+import type * as Spec from "@gunta/confect-core/Spec";
 import type { Layer } from "effect";
 import { Effect, Match, Ref, type Types } from "effect";
 import type * as Api from "./Api";

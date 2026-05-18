@@ -1,4 +1,4 @@
-import * as SystemFields from "@confect/core/SystemFields";
+import * as SystemFields from "@gunta/confect-core/SystemFields";
 import {
   defineTable,
   type SystemFields as ConvexSystemFields,
@@ -18,7 +18,7 @@ import {
   type TableSchemaToTableValidator,
 } from "./SchemaToValidator";
 
-export const TypeId = "@confect/server/Table";
+export const TypeId = "@gunta/confect-server/Table";
 export type TypeId = typeof TypeId;
 
 export const isTable = (u: unknown): u is Any =>

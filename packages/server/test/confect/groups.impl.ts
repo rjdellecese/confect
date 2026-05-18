@@ -1,4 +1,4 @@
-import { GroupImpl } from "@confect/server";
+import { GroupImpl } from "@gunta/confect-server";
 import { Layer } from "effect";
 import api from "./_generated/api";
 import { notes } from "./groups/notes.impl";

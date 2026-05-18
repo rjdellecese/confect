@@ -1,6 +1,6 @@
 import type { GenericDatabaseReader } from "convex/server";
 import { Array, Context, Layer } from "effect";
-import type { BaseDatabaseReader } from "@confect/core/Types";
+import type { BaseDatabaseReader } from "@gunta/confect-core/Types";
 import * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
 import * as QueryInitializer from "./QueryInitializer";
@@ -56,7 +56,7 @@ export const DatabaseReader = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 >() =>
   Context.GenericTag<ReturnType<typeof make<DatabaseSchema_>>>(
-    "@confect/server/DatabaseReader",
+    "@gunta/confect-server/DatabaseReader",
   );
 
 export type DatabaseReader<

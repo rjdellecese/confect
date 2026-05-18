@@ -1,6 +1,6 @@
 import { Equal, Function, Hash, identity, Pipeable, Predicate } from "effect";
 
-const TypeId = "@confect/react/QueryResult";
+const TypeId = "@gunta/confect-react/QueryResult";
 type TypeId = typeof TypeId;
 
 /**

@@ -13,10 +13,10 @@
     "clean": "rm -rf dist node_modules"
   },
   "dependencies": {
-    "@confect/cli": "workspace:*",
-    "@confect/core": "workspace:*",
-    "@confect/react": "workspace:*",
-    "@confect/server": "workspace:*",
+    "@gunta/confect-cli": "workspace:*",
+    "@gunta/confect-core": "workspace:*",
+    "@gunta/confect-react": "workspace:*",
+    "@gunta/confect-server": "workspace:*",
     "@convex-dev/workpool": "^0.4.2",
     "@effect/platform": "0.96.1",
     "convex": "1.33.1",

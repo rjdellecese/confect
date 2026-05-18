@@ -1,5 +1,5 @@
-import type { FunctionSpec, RuntimeAndFunctionType } from "@confect/core";
-import type * as FunctionProvenance from "@confect/core/FunctionProvenance";
+import type { FunctionSpec, RuntimeAndFunctionType } from "@gunta/confect-core";
+import type * as FunctionProvenance from "@gunta/confect-core/FunctionProvenance";
 import type { NodeContext } from "@effect/platform-node";
 import type { Effect } from "effect";
 import type * as ActionCtx from "./ActionCtx";

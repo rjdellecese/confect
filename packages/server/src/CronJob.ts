@@ -1,8 +1,8 @@
-import type { Ref } from "@confect/core";
+import type { Ref } from "@gunta/confect-core";
 import type { Cron, Duration } from "effect";
 import { Predicate } from "effect";
 
-export const TypeId = "@confect/server/CronJob";
+export const TypeId = "@gunta/confect-server/CronJob";
 export type TypeId = typeof TypeId;
 
 export interface CronJob {

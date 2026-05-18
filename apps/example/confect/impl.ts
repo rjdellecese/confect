@@ -1,4 +1,4 @@
-import { Impl } from "@confect/server";
+import { Impl } from "@gunta/confect-server";
 import { Layer } from "effect";
 import api from "./_generated/api";
 import { env } from "./env.impl";

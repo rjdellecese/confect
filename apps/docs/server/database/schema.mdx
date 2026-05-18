@@ -9,8 +9,8 @@ Your database schema is defined in a `schema.ts` file in your `confect/` directo
 Tables are defined using the `Table.make` function, and are added to the database schema with the `addTable` method. Indexes are defined on tables the same way as in the base Convex APIs.
 
 ```ts confect/schema.ts
-import { GenericId } from "@confect/core";
-import { DatabaseSchema, Table } from "@confect/server";
+import { GenericId } from "@gunta/confect-core";
+import { DatabaseSchema, Table } from "@gunta/confect-server";
 import { Schema } from "effect";
 
 export const Notes = Table.make(

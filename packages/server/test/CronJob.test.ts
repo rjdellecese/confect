@@ -1,4 +1,4 @@
-import { FunctionSpec, Ref } from "@confect/core";
+import { FunctionSpec, Ref } from "@gunta/confect-core";
 import { Cron, Duration, Schema } from "effect";
 import { describe, expect, test } from "vitest";
 import * as CronJob from "../src/CronJob";

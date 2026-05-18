@@ -128,7 +128,7 @@ export const onComplete = internalMutation({
 Use the `convex*` spec constructors and pass each Convex function's type as a type argument. Confect extracts argument and return types from the Convex `RegisteredQuery`, `RegisteredMutation`, or `RegisteredAction` type so that refs are fully typed.
 
 ```ts confect/workpool.spec.ts
-import { FunctionSpec, GroupSpec } from "@confect/core";
+import { FunctionSpec, GroupSpec } from "@gunta/confect-core";
 import type {
   backgroundWork,
   enqueue,
@@ -165,7 +165,7 @@ export const workpool = GroupSpec.make("workpool")
 Add the group to your top-level spec as usual.
 
 ```ts confect/spec.ts
-import { Spec } from "@confect/core";
+import { Spec } from "@gunta/confect-core";
 import { workpool } from "./workpool.spec";
 
 export default Spec.make().add(workpool);
@@ -176,7 +176,7 @@ export default Spec.make().add(workpool);
 For plain Convex functions, the impl is the Convex function value itself. Pass each one directly to `FunctionImpl.make`.
 
 ```ts confect/workpool.impl.ts
-import { FunctionImpl, GroupImpl } from "@confect/server";
+import { FunctionImpl, GroupImpl } from "@gunta/confect-server";
 import { Layer } from "effect";
 import api from "./_generated/api";
 import {
@@ -222,7 +222,7 @@ export const workpool = GroupImpl.make(api, "workpool").pipe(
 Provide the group layer in your top-level impl as usual.
 
 ```ts confect/impl.ts
-import { Impl } from "@confect/server";
+import { Impl } from "@gunta/confect-server";
 import { Layer } from "effect";
 import api from "./_generated/api";
 import { workpool } from "./workpool.impl";
@@ -238,7 +238,7 @@ export default Impl.make(api).pipe(
 Plain Convex functions are available through refs just like Confect functions.
 
 ```tsx
-import { useMutation, useQuery } from "@confect/react";
+import { useMutation, useQuery } from "@gunta/confect-react";
 import refs from "../confect/_generated/refs";
 
 const enqueue = useMutation(refs.public.workpool.enqueue);
@@ -250,7 +250,7 @@ const status = useQuery(refs.public.workpool.status, { workId });
 A single group can contain both Confect functions (with Effect schemas) and plain Convex functions. Each function's spec constructor determines how it is registered and called.
 
 ```ts confect/notes.spec.ts
-import { FunctionSpec, GroupSpec } from "@confect/core";
+import { FunctionSpec, GroupSpec } from "@gunta/confect-core";
 import { Schema } from "effect";
 import type { search } from "./search";
 import { Notes } from "./tables/Notes";

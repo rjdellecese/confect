@@ -1,4 +1,4 @@
-import type { GroupSpec, Spec } from "@confect/core";
+import type { GroupSpec, Spec } from "@gunta/confect-core";
 import { HashSet, Option, pipe, Record, Schema } from "effect";
 import * as FunctionPath from "./FunctionPath";
 import * as GroupPath from "./GroupPath";
@@ -6,7 +6,7 @@ import * as GroupPaths from "./GroupPaths";
 
 export const FunctionPaths = Schema.HashSetFromSelf(
   FunctionPath.FunctionPath,
-).pipe(Schema.brand("@confect/cli/FunctionPaths"));
+).pipe(Schema.brand("@gunta/confect-cli/FunctionPaths"));
 export type FunctionPaths = typeof FunctionPaths.Type;
 
 export const make = (spec: Spec.AnyWithProps): FunctionPaths =>

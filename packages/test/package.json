@@ -1,5 +1,5 @@
 {
-  "name": "@confect/test",
+  "name": "@gunta/confect-test",
   "version": "7.0.0",
   "description": "Utilities for testing Confect apps without a live Convex backend",
   "repository": {
@@ -58,14 +58,14 @@
     "tsdown": "0.20.3",
     "typescript": "5.9.3",
     "typescript-eslint": "8.56.1",
-    "effect": "3.21.2"
+    "effect": "4.0.0-beta.67"
   },
   "peerDependencies": {
-    "@confect/core": "workspace:*",
-    "@confect/server": "workspace:*",
-    "convex": "^1.30.0",
-    "convex-test": "^0.0.50",
-    "effect": "^3.21.2"
+    "@gunta/confect-core": "workspace:*",
+    "@gunta/confect-server": "workspace:*",
+    "convex": "^1.39.0",
+    "convex-test": "^0.0.53",
+    "effect": "4.0.0-beta.67"
   },
   "engines": {
     "node": ">=22",

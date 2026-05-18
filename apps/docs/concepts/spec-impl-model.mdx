@@ -10,10 +10,10 @@ Your Confect API is broken up into two parts: a **spec** and its implementation 
 
 A spec defines the interface of your Confect API. It is made up of group specs and function specs. Each function spec defines the function's name, arguments schema, and returns schema -- but not the function's logic.
 
-Specs are built using `@confect/core`, which means they can be shared between the server and client. This separation is what enables end-to-end schema decoding and encoding: the client knows the exact shape of every function's arguments and return value without importing any server code.
+Specs are built using `@gunta/confect-core`, which means they can be shared between the server and client. This separation is what enables end-to-end schema decoding and encoding: the client knows the exact shape of every function's arguments and return value without importing any server code.
 
 ```ts confect/notes.spec.ts
-import { GroupSpec, FunctionSpec } from "@confect/core";
+import { GroupSpec, FunctionSpec } from "@gunta/confect-core";
 import { Schema } from "effect";
 
 import { Notes } from "./tables/Notes";
@@ -32,7 +32,7 @@ The `.spec.ts` suffix used here is a [naming convention](/concepts/file-naming-c
 Your spec must be the default export of a `spec.ts` file in your `confect/` directory.
 
 ```ts confect/spec.ts
-import { Spec } from "@confect/core";
+import { Spec } from "@gunta/confect-core";
 
 import { notes } from "./notes.spec";
 
@@ -44,7 +44,7 @@ export default Spec.make().add(notes);
 An impl provides the logic for each function declared in your spec. It is built using Effect layers: each function impl is a `Layer` that is composed into a group impl, and group impls are composed into the top-level impl.
 
 ```ts confect/notes.impl.ts
-import { FunctionImpl, GroupImpl } from "@confect/server";
+import { FunctionImpl, GroupImpl } from "@gunta/confect-server";
 import { Effect, Layer } from "effect";
 
 import api from "./_generated/api";
@@ -72,7 +72,7 @@ export const notes = GroupImpl.make(api, "notes").pipe(
 Your impl must be the default export of an `impl.ts` file in your `confect/` directory, and must be finalized with `Impl.finalize`.
 
 ```ts confect/impl.ts
-import { Impl } from "@confect/server";
+import { Impl } from "@gunta/confect-server";
 import { Layer } from "effect";
 
 import api from "./_generated/api";

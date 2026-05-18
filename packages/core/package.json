@@ -1,5 +1,5 @@
 {
-  "name": "@confect/core",
+  "name": "@gunta/confect-core",
   "version": "7.0.0",
   "description": "Shared specs and schemas used by all Confect packages",
   "repository": {
@@ -53,10 +53,9 @@
   "license": "ISC",
   "devDependencies": {
     "@ark/attest": "0.56.0",
-    "@effect/vitest": "0.29.0",
     "@eslint/js": "10.0.1",
     "@types/node": "25.3.3",
-    "effect": "3.21.2",
+    "effect": "4.0.0-beta.67",
     "eslint": "10.0.2",
     "prettier": "3.8.1",
     "tsdown": "0.20.3",
@@ -66,8 +65,8 @@
     "vitest": "3.2.4"
   },
   "peerDependencies": {
-    "convex": "^1.30.0",
-    "effect": "^3.21.2"
+    "convex": "^1.39.0",
+    "effect": "4.0.0-beta.67"
   },
   "engines": {
     "node": ">=22",

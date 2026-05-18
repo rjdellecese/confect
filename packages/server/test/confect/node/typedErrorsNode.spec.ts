@@ -1,4 +1,4 @@
-import { FunctionSpec, GroupSpec } from "@confect/core";
+import { FunctionSpec, GroupSpec } from "@gunta/confect-core";
 import { Schema } from "effect";
 
 export class NodeNotFound extends Schema.TaggedError<NodeNotFound>()(

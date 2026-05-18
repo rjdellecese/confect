@@ -4,7 +4,7 @@ title: "Cron Jobs"
 description: "Schedule recurring tasks with cron jobs."
 ---
 
-Define cron jobs in `confect/crons.ts` using `CronJob` and `CronJobs` from `@confect/server`. Each job has a unique identifier, a schedule, and a ref to an internal mutation or action.
+Define cron jobs in `confect/crons.ts` using `CronJob` and `CronJobs` from `@gunta/confect-server`. Each job has a unique identifier, a schedule, and a ref to an internal mutation or action.
 
 Schedules are either an Effect [`Cron`](https://effect.website/docs/cron) (cron expression) or a [`Duration`](https://effect.website/docs/data-types/duration/) (fixed interval). The Confect CLI re-exports the result into `convex/crons.ts`.
 
@@ -22,7 +22,7 @@ Schedules are either an Effect [`Cron`](https://effect.website/docs/cron) (cron 
 
 ```ts confect/crons.ts
 import { Cron, Duration } from "effect";
-import { CronJob, CronJobs } from "@confect/server";
+import { CronJob, CronJobs } from "@gunta/confect-server";
 import refs from "./_generated/refs";
 
 export default CronJobs.make()

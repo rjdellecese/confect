@@ -1,4 +1,4 @@
-import { GroupSpec, Spec } from "@confect/core";
+import { GroupSpec, Spec } from "@gunta/confect-core";
 import { describe, expect, test } from "@effect/vitest";
 import { Option } from "effect";
 

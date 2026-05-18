@@ -1,4 +1,4 @@
-import { Spec } from "@confect/core";
+import { Spec } from "@gunta/confect-core";
 import { Command } from "@effect/cli";
 import { FileSystem, Path } from "@effect/platform";
 import { Ansi, AnsiDoc } from "@effect/printer-ansi";

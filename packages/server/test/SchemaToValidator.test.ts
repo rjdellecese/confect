@@ -2,7 +2,7 @@ import { describe, effect, expect, expectTypeOf, test } from "@effect/vitest";
 import { v, type VBoolean, type VString, type VUnion } from "convex/values";
 import { Effect, Exit, Schema } from "effect";
 
-import { GenericId } from "@confect/core/GenericId";
+import { GenericId } from "@gunta/confect-core/GenericId";
 import {
   compileArgsSchema,
   compileAst,

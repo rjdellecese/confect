@@ -1,5 +1,5 @@
-import { Spec } from "@confect/core";
-import { DatabaseSchema } from "@confect/server";
+import { Spec } from "@gunta/confect-core";
+import { DatabaseSchema } from "@gunta/confect-server";
 import { Command } from "@effect/cli";
 import { FileSystem, Path } from "@effect/platform";
 import { Effect, Match, Option } from "effect";

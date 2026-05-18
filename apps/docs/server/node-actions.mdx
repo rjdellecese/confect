@@ -13,7 +13,7 @@ A node spec uses `Spec.makeNode()` and `GroupSpec.makeNode()` to define groups, 
 By [convention](/concepts/file-naming-conventions), node action specs and impls go in a `node/` subdirectory of your `confect/` directory, using the standard `.spec.ts` and `.impl.ts` suffixes.
 
 ```ts confect/node/email.spec.ts
-import { FunctionSpec, GroupSpec } from "@confect/core";
+import { FunctionSpec, GroupSpec } from "@gunta/confect-core";
 import { Schema } from "effect";
 
 export const email = GroupSpec.makeNode("email").addFunction(
@@ -32,7 +32,7 @@ export const email = GroupSpec.makeNode("email").addFunction(
 Your node spec must be the default export of a `nodeSpec.ts` file in your `confect/` directory.
 
 ```ts confect/nodeSpec.ts
-import { Spec } from "@confect/core";
+import { Spec } from "@gunta/confect-core";
 import { email } from "./node/email.spec";
 
 export default Spec.makeNode().add(email);
@@ -43,7 +43,7 @@ export default Spec.makeNode().add(email);
 A node impl uses `nodeApi` from `_generated/nodeApi` instead of `api`, and `Impl.make(nodeApi)` to construct the implementation. Each function impl contains a handler that runs in the Node.js runtime, where you have access to [`NodeContext` services](https://effect-ts.github.io/effect/platform-node/NodeContext.ts.html#nodecontext-type-alias), which are accessible via the `@effect/platform` package.
 
 ```ts confect/node/email.impl.ts
-import { FunctionImpl, GroupImpl } from "@confect/server";
+import { FunctionImpl, GroupImpl } from "@gunta/confect-server";
 import { Command } from "@effect/platform";
 import { Console, Duration, Effect, Layer } from "effect";
 import nodeApi from "../_generated/nodeApi";
@@ -74,7 +74,7 @@ export const email = GroupImpl.make(nodeApi, "email").pipe(
 Your node impl must be the default export of a `nodeImpl.ts` file in your `confect/` directory.
 
 ```ts confect/nodeImpl.ts
-import { Impl } from "@confect/server";
+import { Impl } from "@gunta/confect-server";
 import { Layer } from "effect";
 import nodeApi from "./_generated/nodeApi";
 import { email } from "./node/email.impl";
@@ -90,7 +90,7 @@ export default Impl.make(nodeApi).pipe(
 Node actions are exposed under the `node` namespace in your refs.
 
 ```ts
-import { useAction } from "@confect/react";
+import { useAction } from "@gunta/confect-react";
 import refs from "../confect/_generated/refs";
 
 const sendEmail = useAction(refs.public.node.email.send);

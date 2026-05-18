@@ -11,7 +11,7 @@ Confect provides a `ConfigProvider` that is compatible with the Convex runtime, 
 Use `Config` from Effect to read [Convex environment variables](https://docs.convex.dev/production/environment-variables) in your function handlers.
 
 ```ts confect/settings.impl.ts
-import { FunctionImpl } from "@confect/server";
+import { FunctionImpl } from "@gunta/confect-server";
 import { Config, Effect } from "effect";
 
 import api from "./_generated/api";
@@ -36,10 +36,10 @@ Config operations that require enumerating `process.env` are unsupported in the 
 
 ## Custom config provider
 
-The `ConvexConfigProvider` module is exported from `@confect/server` if you need to create a provider with custom options. It supports the same options as Effect's default [`ConfigProvider.fromEnv`](https://effect.website/docs/configuration/config-provider/#fromenv).
+The `ConvexConfigProvider` module is exported from `@gunta/confect-server` if you need to create a provider with custom options. It supports the same options as Effect's default [`ConfigProvider.fromEnv`](https://effect.website/docs/configuration/config-provider/#fromenv).
 
 ```ts
-import { ConvexConfigProvider } from "@confect/server";
+import { ConvexConfigProvider } from "@gunta/confect-server";
 
 const provider = ConvexConfigProvider.make({
   pathDelim: "__",

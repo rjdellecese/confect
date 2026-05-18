@@ -6,7 +6,7 @@ export interface RegistryItems {
 }
 
 export class Registry extends Context.Reference<Registry>()(
-  "@confect/server/Registry",
+  "@gunta/confect-server/Registry",
   {
     defaultValue: () => Ref.unsafeMake<RegistryItems>({}),
   },

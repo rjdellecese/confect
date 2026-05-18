@@ -21,14 +21,14 @@ confect/
 The entry-point files `spec.ts` and `impl.ts` then import from the corresponding `.spec.ts` and `.impl.ts` files:
 
 ```ts confect/spec.ts
-import { Spec } from "@confect/core";
+import { Spec } from "@gunta/confect-core";
 import { notes } from "./notes.spec";
 
 export default Spec.make().add(notes);
 ```
 
 ```ts confect/impl.ts
-import { Impl } from "@confect/server";
+import { Impl } from "@gunta/confect-server";
 import { Layer } from "effect";
 import api from "./_generated/api";
 import { notes } from "./notes.impl";

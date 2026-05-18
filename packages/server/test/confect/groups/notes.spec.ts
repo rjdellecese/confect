@@ -1,4 +1,4 @@
-import { FunctionSpec, GenericId, GroupSpec } from "@confect/core";
+import { FunctionSpec, GenericId, GroupSpec } from "@gunta/confect-core";
 import { Schema } from "effect";
 import { Notes } from "../tables/Notes";
 

@@ -1,5 +1,5 @@
 import { Cron, Duration } from "effect";
-import { CronJob, CronJobs } from "@confect/server";
+import { CronJob, CronJobs } from "@gunta/confect-server";
 import refs from "./_generated/refs";
 
 export default CronJobs.make()

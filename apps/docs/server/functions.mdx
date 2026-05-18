@@ -24,7 +24,7 @@ For Node.js actions, see [Node Actions](/server/node-actions). To integrate plai
 Each function spec defines the function's name, arguments schema, and returns schema. Function specs are grouped into group specs, which are combined into your API's top-level spec. See [The Spec/Impl Model](/concepts/spec-impl-model) for a full walkthrough.
 
 ```ts confect/notes.spec.ts
-import { GroupSpec, FunctionSpec } from "@confect/core";
+import { GroupSpec, FunctionSpec } from "@gunta/confect-core";
 import { Schema } from "effect";
 
 import { Notes } from "./tables/Notes";
@@ -39,7 +39,7 @@ export const notes = GroupSpec.make("notes").addFunction(list);
 ```
 
 ```ts confect/spec.ts
-import { Spec } from "@confect/core";
+import { Spec } from "@gunta/confect-core";
 
 import { notes } from "./notes.spec";
 
@@ -51,7 +51,7 @@ export default Spec.make().add(notes);
 A spec can also declare an optional `error` schema. When it does, the corresponding handler's `Effect` error channel is typed as that schema, and the failure is decoded for callers at every call site (React hooks, JS clients, and tests). See [Error Handling](/server/error-handling) for the full walkthrough.
 
 ```ts
-import { FunctionSpec, GenericId } from "@confect/core";
+import { FunctionSpec, GenericId } from "@gunta/confect-core";
 import { Schema } from "effect";
 
 import { Notes } from "./tables/Notes";
@@ -76,7 +76,7 @@ Each function impl contains a handler that implements the function's logic. Func
 The handler receives the decoded arguments as its first parameter and returns an `Effect`. Use the generated [services](/concepts/services) (like `DatabaseReader`, `DatabaseWriter`, `Auth`, etc.) inside your handler to interact with Convex.
 
 ```ts confect/notes.impl.ts
-import { FunctionImpl, GroupImpl } from "@confect/server";
+import { FunctionImpl, GroupImpl } from "@gunta/confect-server";
 import { Effect, Layer } from "effect";
 
 import api from "./_generated/api";
@@ -101,7 +101,7 @@ export const notes = GroupImpl.make(api, "notes").pipe(
 Your impl must be the default export of an `impl.ts` file in your `confect/` directory, and must be finalized with `Impl.finalize`.
 
 ```ts confect/impl.ts
-import { Impl } from "@confect/server";
+import { Impl } from "@gunta/confect-server";
 import { Layer } from "effect";
 
 import api from "./_generated/api";

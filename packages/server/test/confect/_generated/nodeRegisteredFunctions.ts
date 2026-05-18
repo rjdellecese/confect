@@ -1,5 +1,5 @@
-import { RegisteredFunctions } from "@confect/server";
-import { RegisteredNodeFunction } from "@confect/server/node";
+import { RegisteredFunctions } from "@gunta/confect-server";
+import { RegisteredNodeFunction } from "@gunta/confect-server/node";
 
 import nodeImpl from "../nodeImpl";
 

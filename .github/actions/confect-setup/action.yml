@@ -26,5 +26,5 @@ runs:
       shell: bash
 
     - name: Build Confect packages
-      run: pnpm --filter "@confect/*" build
+      run: pnpm --filter "@gunta/confect-*" build
       shell: bash

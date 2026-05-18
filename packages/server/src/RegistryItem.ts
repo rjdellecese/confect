@@ -1,9 +1,9 @@
-import type * as FunctionSpec from "@confect/core/FunctionSpec";
+import type * as FunctionSpec from "@gunta/confect-core/FunctionSpec";
 import { Predicate } from "effect";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as Handler from "./Handler";
 
-export const TypeId = "@confect/server/RegistryItem";
+export const TypeId = "@gunta/confect-server/RegistryItem";
 export type TypeId = typeof TypeId;
 
 export const isRegistryItem = (value: unknown): value is AnyWithProps =>

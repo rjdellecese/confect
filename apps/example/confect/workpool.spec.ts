@@ -1,4 +1,4 @@
-import { FunctionSpec, GroupSpec } from "@confect/core";
+import { FunctionSpec, GroupSpec } from "@gunta/confect-core";
 import type { backgroundWork, enqueue, onComplete, status } from "./workpool";
 
 export const workpool = GroupSpec.make("workpool")

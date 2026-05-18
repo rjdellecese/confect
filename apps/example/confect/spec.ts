@@ -1,4 +1,4 @@
-import { Spec } from "@confect/core";
+import { Spec } from "@gunta/confect-core";
 import { env } from "./env.spec";
 import { notesAndRandom } from "./notesAndRandom.spec";
 import { workpool } from "./workpool.spec";

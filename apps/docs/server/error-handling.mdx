@@ -15,7 +15,7 @@ Error schemas are optional. When omitted, the error type defaults to `never` and
 Add an `error` field to any `FunctionSpec` constructor. The schema is an ordinary Effect `Schema`, so a `Schema.TaggedError` class works well for a single failure mode.
 
 ```ts confect/notes.spec.ts
-import { FunctionSpec, GenericId, GroupSpec } from "@confect/core";
+import { FunctionSpec, GenericId, GroupSpec } from "@gunta/confect-core";
 import { Schema } from "effect";
 
 import { Notes } from "./tables/Notes";
@@ -63,7 +63,7 @@ FunctionSpec.publicMutation({
 When a spec declares an `error` schema, the corresponding `FunctionImpl` handler's `Effect` error channel is typed as that schema's `Type`. Use `Effect.fail` (or `Effect.mapError`) to fail with any value matching the schema.
 
 ```ts confect/notes.impl.ts
-import { FunctionImpl } from "@confect/server";
+import { FunctionImpl } from "@gunta/confect-server";
 import { Effect } from "effect";
 
 import api from "./_generated/api";
@@ -92,7 +92,7 @@ Without an `error` schema, the handler's error channel is `never` and any unmapp
 
 The decoded error is surfaced at every call site. The exact shape depends on the client.
 
-### `@confect/react`
+### `@gunta/confect-react`
 
 - **`useQuery`** returns a `QueryResult<A, E>`. Match it with `QueryResult.match`, where `onFailure` is required when the ref declares an `error` schema.
 - **`useMutation`** and **`useAction`** return `Promise<Either<A, E>>` when the ref declares an `error` schema (and `Promise<A>` otherwise).
@@ -100,7 +100,7 @@ The decoded error is surfaced at every call site. The exact shape depends on the
 See [React](/clients/react) for full examples.
 
 ```tsx
-import { QueryResult, useQuery } from "@confect/react";
+import { QueryResult, useQuery } from "@gunta/confect-react";
 import refs from "../confect/_generated/refs";
 
 const lookup = useQuery(refs.public.notes.getOrFail, { noteId });
@@ -112,7 +112,7 @@ QueryResult.match(lookup, {
 });
 ```
 
-### `@confect/js`
+### `@gunta/confect-js`
 
 Both `HttpClient` and `WebSocketClient` add the decoded error to the returned `Effect`'s error channel, alongside the existing transport error and `ParseError`.
 
@@ -123,10 +123,10 @@ HttpClient.query(refs.public.notes.getOrFail, { noteId });
 
 `WebSocketClient.reactiveQuery` carries typed errors too: when the subscribed query fails with a typed error, the returned `Stream` terminates with the decoded value in its error channel. See [HTTP](/clients/js/http) and [WebSocket](/clients/js/websocket).
 
-### `@confect/test`
+### `@gunta/confect-test`
 
 `TestConfect`'s `query`, `mutation`, and `action` decode typed errors into the `Effect` error channel, so test bridges see the same shape as the JS clients. See [Testing](/guides/testing).
 
 ## Non-typed failures
 
-Failures that are not declared in the `error` schema are not silently swallowed. They propagate through Convex's normal failure path: they reject promises in `@convex/react`, fail `Effect`s with `HttpClientError`/`WebSocketClientError` in `@confect/js`, and surface as defects (cause) in `TestConfect`. Use a typed `error` schema for failures you want callers to handle, and let everything else die.
+Failures that are not declared in the `error` schema are not silently swallowed. They propagate through Convex's normal failure path: they reject promises in `@convex/react`, fail `Effect`s with `HttpClientError`/`WebSocketClientError` in `@gunta/confect-js`, and surface as defects (cause) in `TestConfect`. Use a typed `error` schema for failures you want callers to handle, and let everything else die.

@@ -1,6 +1,6 @@
-import { Ref } from "@confect/core";
-import type { DatabaseSchema, DataModel } from "@confect/server";
-import { RegisteredConvexFunction } from "@confect/server";
+import { Ref } from "@gunta/confect-core";
+import type { DatabaseSchema, DataModel } from "@gunta/confect-server";
+import { RegisteredConvexFunction } from "@gunta/confect-server";
 import type {
   TestConvexForDataModel,
   TestConvexForDataModelAndIdentity,
@@ -71,7 +71,7 @@ export type TestConfect<ConfectSchema extends DatabaseSchema.AnyWithProps> = {
 export const TestConfect = <
   ConfectSchema extends DatabaseSchema.AnyWithProps,
 >() =>
-  Context.GenericTag<TestConfect<ConfectSchema>>("@confect/test/TestConfect");
+  Context.GenericTag<TestConfect<ConfectSchema>>("@gunta/confect-test/TestConfect");
 
 class TestConfectImplWithoutIdentity<
   ConfectSchema extends DatabaseSchema.AnyWithProps,

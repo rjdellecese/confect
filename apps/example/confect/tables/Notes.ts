@@ -1,5 +1,5 @@
-import { GenericId } from "@confect/core";
-import { Table } from "@confect/server";
+import { GenericId } from "@gunta/confect-core";
+import { Table } from "@gunta/confect-server";
 import { Schema } from "effect";
 
 export const Notes = Table.make(

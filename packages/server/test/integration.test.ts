@@ -1,4 +1,4 @@
-import { GenericId } from "@confect/core";
+import { GenericId } from "@gunta/confect-core";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
 import { Array, Effect, Either } from "effect";

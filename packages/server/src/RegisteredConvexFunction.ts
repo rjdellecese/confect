@@ -1,4 +1,4 @@
-import type * as FunctionSpec from "@confect/core/FunctionSpec";
+import type * as FunctionSpec from "@gunta/confect-core/FunctionSpec";
 import {
   actionGeneric,
   type DefaultFunctionArgs,

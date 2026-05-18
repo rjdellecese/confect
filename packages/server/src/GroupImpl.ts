@@ -1,5 +1,5 @@
-import type * as GroupPath from "@confect/core/GroupPath";
-import type * as GroupSpec from "@confect/core/GroupSpec";
+import type * as GroupPath from "@gunta/confect-core/GroupPath";
+import type * as GroupSpec from "@gunta/confect-core/GroupSpec";
 import { Context, Layer } from "effect";
 import type * as Api from "./Api";
 import type * as FunctionImpl from "./FunctionImpl";
@@ -14,7 +14,7 @@ export const GroupImpl = <GroupPath_ extends string>({
   groupPath: GroupPath_;
 }) =>
   Context.GenericTag<GroupImpl<GroupPath_>>(
-    `@confect/server/GroupImpl/${groupPath}`,
+    `@gunta/confect-server/GroupImpl/${groupPath}`,
   );
 
 export const make = <

@@ -3,7 +3,7 @@ import { Context } from "effect";
 
 export const MutationCtx = <DataModel extends GenericDataModel>() =>
   Context.GenericTag<GenericMutationCtx<DataModel>>(
-    "@confect/server/MutationCtx",
+    "@gunta/confect-server/MutationCtx",
   );
 
 export type MutationCtx<DataModel extends GenericDataModel> = ReturnType<

@@ -13,7 +13,7 @@ The WebSocket connection is managed as a [scoped resource](https://effect.websit
 Create the `WebSocketClient` layer by passing your Convex deployment URL.
 
 ```ts
-import { WebSocketClient } from "@confect/js";
+import { WebSocketClient } from "@gunta/confect-js";
 
 const WebSocketClientLive = WebSocketClient.layer(
   "https://example-123.convex.cloud",
@@ -24,10 +24,10 @@ The layer can then be provided to any Effect that uses the `WebSocketClient` ser
 
 ## Calling functions
 
-Use the `WebSocketClient` service inside `Effect.gen` to call your functions with refs, the same way you would with `HttpClient`, `@confect/react` hooks, or `@confect/test`.
+Use the `WebSocketClient` service inside `Effect.gen` to call your functions with refs, the same way you would with `HttpClient`, `@gunta/confect-react` hooks, or `@gunta/confect-test`.
 
 ```ts
-import { WebSocketClient } from "@confect/js";
+import { WebSocketClient } from "@gunta/confect-js";
 import { Effect } from "effect";
 
 import refs from "./confect/_generated/refs";
@@ -52,7 +52,7 @@ Each method returns an `Effect` that can fail with `WebSocketClientError` (wrapp
 `reactiveQuery` subscribes to a query over the WebSocket connection and returns a `Stream` that emits a new value whenever the query result changes on the server.
 
 ```ts
-import { WebSocketClient } from "@confect/js";
+import { WebSocketClient } from "@gunta/confect-js";
 import { Console, Effect, Stream } from "effect";
 
 import refs from "./confect/_generated/refs";
@@ -73,7 +73,7 @@ The underlying WebSocket subscription is cleaned up automatically when the strea
 When a ref's spec declares an `error` schema, the decoded error is added to the error channel of `query`, `mutation`, `action`, and `reactiveQuery` alongside `WebSocketClientError` and `ParseError`. See [Error Handling](/server/error-handling) for how to declare error schemas.
 
 ```ts
-import { WebSocketClient } from "@confect/js";
+import { WebSocketClient } from "@gunta/confect-js";
 import { Effect } from "effect";
 
 import refs from "./confect/_generated/refs";
@@ -89,7 +89,7 @@ const lookup = Effect.gen(function* () {
 For `reactiveQuery`, a typed failure terminates the `Stream` with the decoded value in its error channel—the subscription does not stay open across failures. Recover with `Stream.catchTag` (or any other `Stream` error combinator) to keep the stream alive across typed failures.
 
 ```ts
-import { WebSocketClient } from "@confect/js";
+import { WebSocketClient } from "@gunta/confect-js";
 import { Effect, Stream } from "effect";
 
 import refs from "./confect/_generated/refs";
@@ -133,7 +133,7 @@ The optional second argument is a function that receives the current `isAuthenti
 Provide the `WebSocketClient` layer when running your program.
 
 ```ts
-import { WebSocketClient } from "@confect/js";
+import { WebSocketClient } from "@gunta/confect-js";
 import { Console, Effect, Stream } from "effect";
 
 const WebSocketClientLive = WebSocketClient.layer(

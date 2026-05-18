@@ -1,4 +1,4 @@
-import { FunctionSpec } from "@confect/core";
+import { FunctionSpec } from "@gunta/confect-core";
 import { describe, expectTypeOf, it } from "@effect/vitest";
 import type {
   RegisteredAction,

@@ -1,4 +1,4 @@
-import type * as FunctionSpec from "@confect/core/FunctionSpec";
+import type * as FunctionSpec from "@gunta/confect-core/FunctionSpec";
 import { NodeContext } from "@effect/platform-node";
 import {
   actionGeneric,

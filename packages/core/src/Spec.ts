@@ -2,7 +2,7 @@ import { Array, Predicate, Record } from "effect";
 import * as GroupSpec from "./GroupSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
-export const TypeId = "@confect/core/Spec";
+export const TypeId = "@gunta/confect-core/Spec";
 export type TypeId = typeof TypeId;
 
 export const isSpec = (u: unknown): u is AnyWithProps =>

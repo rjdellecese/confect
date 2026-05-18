@@ -1,4 +1,4 @@
-import * as Ref from "@confect/core/Ref";
+import * as Ref from "@gunta/confect-core/Ref";
 import { type GenericQueryCtx } from "convex/server";
 import type { ParseResult, Effect } from "effect";
 import { Context, Layer } from "effect";
@@ -20,7 +20,7 @@ const make =
     );
 
 export const QueryRunner = Context.GenericTag<ReturnType<typeof make>>(
-  "@confect/server/QueryRunner",
+  "@gunta/confect-server/QueryRunner",
 );
 export type QueryRunner = typeof QueryRunner.Identifier;
 

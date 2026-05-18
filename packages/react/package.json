@@ -1,5 +1,5 @@
 {
-  "name": "@confect/react",
+  "name": "@gunta/confect-react",
   "version": "7.0.0",
   "description": "Client-side bindings for React apps",
   "repository": {
@@ -50,11 +50,10 @@
   "author": "RJ Dellecese",
   "license": "ISC",
   "devDependencies": {
-    "@effect/vitest": "0.29.0",
     "@eslint/js": "10.0.1",
     "@types/node": "25.3.3",
-    "convex": "1.33.1",
-    "effect": "3.21.2",
+    "convex": "1.39.1",
+    "effect": "4.0.0-beta.67",
     "eslint": "10.0.2",
     "prettier": "3.8.1",
     "tsdown": "0.20.3",
@@ -64,9 +63,9 @@
     "vitest": "3.2.4"
   },
   "peerDependencies": {
-    "@confect/core": "workspace:*",
-    "convex": "^1.30.0",
-    "effect": "^3.21.2",
+    "@gunta/confect-core": "workspace:*",
+    "convex": "^1.39.0",
+    "effect": "4.0.0-beta.67",
     "react": "^18.0.0 || ^19.0.0"
   },
   "engines": {

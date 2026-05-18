@@ -9,19 +9,19 @@ description: "Install Confect and build a type-safe Convex app with Effect schem
 <CodeGroup>
 
 ```bash pnpm
-pnpm add convex @confect/core @confect/server @confect/cli @confect/react
+pnpm add convex @gunta/confect-core @gunta/confect-server @gunta/confect-cli @gunta/confect-react
 ```
 
 ```bash npm
-npm install convex @confect/core @confect/server @confect/cli @confect/react
+npm install convex @gunta/confect-core @gunta/confect-server @gunta/confect-cli @gunta/confect-react
 ```
 
 ```bash yarn
-yarn add convex @confect/core @confect/server @confect/cli @confect/react
+yarn add convex @gunta/confect-core @gunta/confect-server @gunta/confect-cli @gunta/confect-react
 ```
 
 ```bash bun
-bun add convex @confect/core @confect/server @confect/cli @confect/react
+bun add convex @gunta/confect-core @gunta/confect-server @gunta/confect-cli @gunta/confect-react
 ```
 
 </CodeGroup>
@@ -43,7 +43,7 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
     Define a table.
 
     ```ts confect/tables/Notes.ts
-    import { Table } from "@confect/server";
+    import { Table } from "@gunta/confect-server";
     import { Schema } from "effect";
 
     export const Notes = Table.make(
@@ -57,7 +57,7 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
     And then add it to your database schema.
 
     ```ts confect/schema.ts
-    import { DatabaseSchema } from "@confect/server";
+    import { DatabaseSchema } from "@gunta/confect-server";
 
     import { Notes } from "./tables/Notes";
 
@@ -70,7 +70,7 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
     Create a `GroupSpec` and add some functions to it.
 
     ```ts confect/notes.spec.ts
-    import { FunctionSpec, GroupSpec } from "@confect/core";
+    import { FunctionSpec, GroupSpec } from "@gunta/confect-core";
     import { Schema } from "effect";
 
     import { Notes } from "./tables/Notes";
@@ -95,7 +95,7 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
     Add the `GroupSpec` to your API's `Spec`.
 
     ```ts confect/spec.ts
-    import { Spec } from "@confect/core";
+    import { Spec } from "@gunta/confect-core";
     import { notes } from "./notes.spec";
 
     export default Spec.make().add(notes);
@@ -116,7 +116,7 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
     Create a `GroupImpl` and implement its functions.
 
     ```ts confect/notes.impl.ts
-    import { FunctionImpl, GroupImpl } from "@confect/server";
+    import { FunctionImpl, GroupImpl } from "@gunta/confect-server";
     import { Effect, Layer } from "effect";
 
     import api from "./_generated/api";
@@ -150,7 +150,7 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
     Add the `GroupImpl` to your API's `Impl`, and finalize it.
 
     ```ts confect/impl.ts
-    import { Impl } from "@confect/server";
+    import { Impl } from "@gunta/confect-server";
     import { Layer } from "effect";
 
     import api from "./_generated/api";
@@ -204,7 +204,7 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
     Use Confect's React hooks alongside your Confect public refs to call your Confect functions.
 
     ```tsx src/App.tsx
-    import { useMutation, useQuery } from "@confect/react";
+    import { useMutation, useQuery } from "@gunta/confect-react";
     import { Array } from "effect";
     import { useState } from "react";
 

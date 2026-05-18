@@ -34,7 +34,7 @@ import {
   String,
 } from "effect";
 
-import * as GenericId from "@confect/core/GenericId";
+import * as GenericId from "@gunta/confect-core/GenericId";
 import type {
   IsAny,
   IsOptional,
@@ -43,7 +43,7 @@ import type {
   IsUnion,
   TypeError,
   UnionToTuple,
-} from "@confect/core/Types";
+} from "@gunta/confect-core/Types";
 
 // Args
 

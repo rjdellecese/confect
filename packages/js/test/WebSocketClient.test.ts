@@ -1,4 +1,4 @@
-import { FunctionSpec, Ref } from "@confect/core";
+import { FunctionSpec, Ref } from "@gunta/confect-core";
 import { describe, expect, it } from "@effect/vitest";
 import { ConvexError } from "convex/values";
 import {

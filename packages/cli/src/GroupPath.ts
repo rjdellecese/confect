@@ -1,4 +1,4 @@
-import { type GroupSpec, type Spec } from "@confect/core";
+import { type GroupSpec, type Spec } from "@gunta/confect-core";
 import { Path } from "@effect/platform";
 import {
   Array,

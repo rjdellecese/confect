@@ -17,7 +17,7 @@ const make = (storageWriter: ConvexStorageWriter) => ({
     }),
 });
 
-export class StorageWriter extends Effect.Tag("@confect/server/StorageWriter")<
+export class StorageWriter extends Effect.Tag("@gunta/confect-server/StorageWriter")<
   StorageWriter,
   ReturnType<typeof make>
 >() {

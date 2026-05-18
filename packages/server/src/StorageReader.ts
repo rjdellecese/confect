@@ -18,7 +18,7 @@ const make = (storageReader: ConvexStorageReader) => ({
     ),
 });
 
-export class StorageReader extends Effect.Tag("@confect/server/StorageReader")<
+export class StorageReader extends Effect.Tag("@gunta/confect-server/StorageReader")<
   StorageReader,
   ReturnType<typeof make>
 >() {

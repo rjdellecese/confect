@@ -1,11 +1,11 @@
-import type { RuntimeAndFunctionType } from "@confect/core";
-import type * as Spec from "@confect/core/Spec";
+import type { RuntimeAndFunctionType } from "@gunta/confect-core";
+import type * as Spec from "@gunta/confect-core/Spec";
 import type { GenericSchema, SchemaDefinition } from "convex/server";
 import { defineSchema as defineConvexSchema } from "convex/server";
 import { pipe, Predicate, Record } from "effect";
 import type * as DatabaseSchema from "./DatabaseSchema";
 
-export const TypeId = "@confect/server/Api";
+export const TypeId = "@gunta/confect-server/Api";
 export type TypeId = typeof TypeId;
 
 export const isApi = (u: unknown): u is Any => Predicate.hasProperty(u, TypeId);

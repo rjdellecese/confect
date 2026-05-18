@@ -11,7 +11,7 @@ import * as FunctionProvenance from "./FunctionProvenance";
 import { validateConfectFunctionIdentifier } from "./internal/utils";
 import * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
-export const TypeId = "@confect/core/FunctionSpec";
+export const TypeId = "@gunta/confect-core/FunctionSpec";
 export type TypeId = typeof TypeId;
 
 export const isFunctionSpec = (u: unknown): u is AnyWithProps =>

@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-import { TestConfect as TestConfect_ } from "@confect/test";
+import { TestConfect as TestConfect_ } from "@gunta/confect-test";
 
 import confectSchema from "./confect/schema";
 

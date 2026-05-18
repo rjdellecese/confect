@@ -1,4 +1,4 @@
-import { FunctionImpl, GroupImpl } from "@confect/server";
+import { FunctionImpl, GroupImpl } from "@gunta/confect-server";
 import { Layer } from "effect";
 import api from "./_generated/api";
 import { backgroundWork, enqueue, onComplete, status } from "./workpool";

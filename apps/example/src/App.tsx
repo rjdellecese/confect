@@ -1,4 +1,4 @@
-import { QueryResult, useAction, useMutation, useQuery } from "@confect/react";
+import { QueryResult, useAction, useMutation, useQuery } from "@gunta/confect-react";
 import type { WorkId } from "@convex-dev/workpool";
 import { FetchHttpClient, HttpApiClient } from "@effect/platform";
 import { ConvexProvider, ConvexReactClient } from "convex/react";

@@ -1,4 +1,4 @@
-import { FunctionImpl, GroupImpl } from "@confect/server";
+import { FunctionImpl, GroupImpl } from "@gunta/confect-server";
 import { Effect, Layer, Match } from "effect";
 import api from "../_generated/api";
 import refs from "../_generated/refs";

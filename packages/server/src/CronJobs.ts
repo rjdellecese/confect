@@ -1,4 +1,4 @@
-import { Ref } from "@confect/core";
+import { Ref } from "@gunta/confect-core";
 import type { CronJob as ConvexCronJob } from "convex/server";
 import { cronJobs as makeConvexCrons, type Crons } from "convex/server";
 import {
@@ -13,7 +13,7 @@ import {
 } from "effect";
 import type * as CronJob from "./CronJob";
 
-export const TypeId = "@confect/server/CronJobs";
+export const TypeId = "@gunta/confect-server/CronJobs";
 export type TypeId = typeof TypeId;
 
 export interface CronJobs {

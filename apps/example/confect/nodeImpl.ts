@@ -1,4 +1,4 @@
-import { Impl } from "@confect/server";
+import { Impl } from "@gunta/confect-server";
 import { Layer } from "effect";
 import nodeApi from "./_generated/nodeApi";
 import { email } from "./node/email.impl";

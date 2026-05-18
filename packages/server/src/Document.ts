@@ -1,6 +1,6 @@
 import { Effect, Function, ParseResult, pipe, Schema } from "effect";
 import type { ReadonlyRecord } from "effect/Record";
-import * as SystemFields from "@confect/core/SystemFields";
+import * as SystemFields from "@gunta/confect-core/SystemFields";
 import type * as DataModel from "./DataModel";
 import type { ReadonlyValue } from "./SchemaToValidator";
 import type * as TableInfo from "./TableInfo";

@@ -16,12 +16,12 @@ jobs:
       matrix:
         package:
           [
-            "@confect/cli",
-            "@confect/core",
-            "@confect/js",
-            "@confect/server",
-            "@confect/react",
-            "@confect/test",
+            "@gunta/confect-cli",
+            "@gunta/confect-core",
+            "@gunta/confect-js",
+            "@gunta/confect-server",
+            "@gunta/confect-react",
+            "@gunta/confect-test",
           ]
     steps:
       - uses: actions/checkout@v6
@@ -35,12 +35,12 @@ jobs:
       matrix:
         package:
           [
-            "@confect/cli",
-            "@confect/core",
-            "@confect/js",
-            "@confect/server",
-            "@confect/react",
-            "@confect/test",
+            "@gunta/confect-cli",
+            "@gunta/confect-core",
+            "@gunta/confect-js",
+            "@gunta/confect-server",
+            "@gunta/confect-react",
+            "@gunta/confect-test",
           ]
     steps:
       - uses: actions/checkout@v6
@@ -54,12 +54,12 @@ jobs:
       matrix:
         package:
           [
-            "@confect/cli",
-            "@confect/core",
-            "@confect/js",
-            "@confect/server",
-            "@confect/react",
-            "@confect/test",
+            "@gunta/confect-cli",
+            "@gunta/confect-core",
+            "@gunta/confect-js",
+            "@gunta/confect-server",
+            "@gunta/confect-react",
+            "@gunta/confect-test",
           ]
     steps:
       - uses: actions/checkout@v6
@@ -82,7 +82,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        package: ["@confect/core", "@confect/server"]
+        package: ["@gunta/confect-core", "@gunta/confect-server"]
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/confect-setup
@@ -95,12 +95,12 @@ jobs:
       matrix:
         package:
           [
-            "@confect/cli",
-            "@confect/core",
-            "@confect/js",
-            "@confect/server",
-            "@confect/react",
-            "@confect/test",
+            "@gunta/confect-cli",
+            "@gunta/confect-core",
+            "@gunta/confect-js",
+            "@gunta/confect-server",
+            "@gunta/confect-react",
+            "@gunta/confect-test",
           ]
     steps:
       - uses: actions/checkout@v6

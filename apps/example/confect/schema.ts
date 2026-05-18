@@ -1,4 +1,4 @@
-import { DatabaseSchema } from "@confect/server";
+import { DatabaseSchema } from "@gunta/confect-server";
 
 import { Notes } from "./tables/Notes";
 import { Tags } from "./tables/Tags";

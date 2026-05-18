@@ -1,4 +1,4 @@
-import { Table } from "@confect/server";
+import { Table } from "@gunta/confect-server";
 import { Schema } from "effect";
 
 export const Users = Table.make(

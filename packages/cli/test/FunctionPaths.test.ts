@@ -1,4 +1,4 @@
-import { FunctionSpec, GroupSpec, Spec } from "@confect/core";
+import { FunctionSpec, GroupSpec, Spec } from "@gunta/confect-core";
 import { describe, expect, test } from "@effect/vitest";
 import { Equal, HashSet, Schema } from "effect";
 

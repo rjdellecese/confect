@@ -97,7 +97,7 @@ export const refs = ({
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-    yield* cbw.writeLine(`import { Refs } from "@confect/core";`);
+    yield* cbw.writeLine(`import { Refs } from "@gunta/confect-core";`);
     yield* cbw.writeLine(`import spec from "${specImportPath}";`);
     if (nodeSpecImportPath !== undefined) {
       yield* cbw.writeLine(`import nodeSpec from "${nodeSpecImportPath}";`);
@@ -122,7 +122,7 @@ export const api = ({
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-    yield* cbw.writeLine(`import { Api } from "@confect/server";`);
+    yield* cbw.writeLine(`import { Api } from "@gunta/confect-server";`);
     yield* cbw.writeLine(`import schema from "${schemaImportPath}";`);
     yield* cbw.writeLine(`import spec from "${specImportPath}";`);
     yield* cbw.blankLine();
@@ -141,7 +141,7 @@ export const nodeApi = ({
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-    yield* cbw.writeLine(`import { Api } from "@confect/server";`);
+    yield* cbw.writeLine(`import { Api } from "@gunta/confect-server";`);
     yield* cbw.blankLine();
     yield* cbw.writeLine(`import schema from "${schemaImportPath}";`);
     yield* cbw.writeLine(`import nodeSpec from "${nodeSpecImportPath}";`);
@@ -160,7 +160,7 @@ export const registeredFunctions = ({
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
     yield* cbw.writeLine(
-      `import { RegisteredConvexFunction, RegisteredFunctions } from "@confect/server";`,
+      `import { RegisteredConvexFunction, RegisteredFunctions } from "@gunta/confect-server";`,
     );
     yield* cbw.writeLine(`import impl from "${implImportPath}";`);
     yield* cbw.blankLine();
@@ -180,10 +180,10 @@ export const nodeRegisteredFunctions = ({
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
     yield* cbw.writeLine(
-      `import { RegisteredFunctions } from "@confect/server";`,
+      `import { RegisteredFunctions } from "@gunta/confect-server";`,
     );
     yield* cbw.writeLine(
-      `import { RegisteredNodeFunction } from "@confect/server/node";`,
+      `import { RegisteredNodeFunction } from "@gunta/confect-server/node";`,
     );
     yield* cbw.blankLine();
     yield* cbw.writeLine(`import nodeImpl from "${nodeImplImportPath}";`);
@@ -220,7 +220,7 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
         yield* cbw.writeLine("VectorSearch as VectorSearch_,");
       }),
     );
-    yield* cbw.writeLine(`} from "@confect/server";`);
+    yield* cbw.writeLine(`} from "@gunta/confect-server";`);
     yield* cbw.writeLine(
       `import type schemaDefinition from "${schemaImportPath}";`,
     );

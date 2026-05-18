@@ -35,7 +35,7 @@ export const make =
 
 export const VectorSearch = <DataModel_ extends DataModel.AnyWithProps>() =>
   Context.GenericTag<ReturnType<typeof make<DataModel_>>>(
-    "@confect/server/VectorSearch",
+    "@gunta/confect-server/VectorSearch",
   );
 
 export type VectorSearch<DataModel_ extends DataModel.AnyWithProps> =

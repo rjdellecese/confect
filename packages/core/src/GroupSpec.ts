@@ -3,7 +3,7 @@ import type * as FunctionSpec from "./FunctionSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 import { validateConfectFunctionIdentifier } from "./internal/utils";
 
-export const TypeId = "@confect/core/GroupSpec";
+export const TypeId = "@gunta/confect-core/GroupSpec";
 export type TypeId = typeof TypeId;
 
 export const isGroupSpec = (u: unknown): u is Any =>

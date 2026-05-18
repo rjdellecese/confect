@@ -67,10 +67,10 @@ export const ApiLive = HttpApiBuilder.api(Api).pipe(
 
 ## Creating the router
 
-Create the Convex HTTP router in `confect/http.ts` using `HttpApi.make` from `@confect/server`. Each key is a path prefix that must be either `"/"` or end with a trailing slash (e.g. `"/api/"`).
+Create the Convex HTTP router in `confect/http.ts` using `HttpApi.make` from `@gunta/confect-server`. Each key is a path prefix that must be either `"/"` or end with a trailing slash (e.g. `"/api/"`).
 
 ```ts confect/http.ts
-import { HttpApi } from "@confect/server";
+import { HttpApi } from "@gunta/confect-server";
 import { HttpMiddleware } from "@effect/platform";
 import { flow } from "effect";
 

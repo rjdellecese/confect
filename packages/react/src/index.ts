@@ -1,4 +1,4 @@
-import { Ref } from "@confect/core";
+import { Ref } from "@gunta/confect-core";
 import {
   useAction as useConvexAction,
   useMutation as useConvexMutation,

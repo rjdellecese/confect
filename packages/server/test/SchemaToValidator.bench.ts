@@ -1,5 +1,5 @@
 import { bench } from "@ark/attest";
-import type { GenericId } from "@confect/core/GenericId";
+import type { GenericId } from "@gunta/confect-core/GenericId";
 import { Schema } from "effect";
 import type {
   TableSchemaToTableValidator,
