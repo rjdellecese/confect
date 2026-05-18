@@ -3,13 +3,14 @@ import type {
   IdField,
   SystemFields as NonIdSystemFields,
 } from "convex/server";
-import { Schema } from "effect";
+import { Schema, type Struct as StructModule } from "effect";
 import * as GenericId from "./GenericId";
 
 type SystemFieldsSchema<TableName extends string> = Schema.Struct<{
-  _id: Schema.Schema<
+  _id: Schema.Codec<
     GenericId.GenericId<TableName>,
-    GenericId.GenericId<TableName>,
+    string,
+    never,
     never
   >;
   _creationTime: typeof Schema.Number;
@@ -28,23 +29,38 @@ export const SystemFields = <TableName extends string>(
 
 /**
  * Extend a table schema with Convex system fields.
+ *
+ * In Effect 4, `Schema.extend` was removed; struct fields are now merged via
+ * `Schema.fieldsAssign`. Table schemas are constrained to `Schema.Struct`
+ * (not arbitrary Codec) so the merge is type-safe.
  */
 export const extendWithSystemFields = <
   TableName extends string,
-  TableSchema extends Schema.Schema.AnyNoContext,
+  TableSchema extends Schema.Struct<Schema.Struct.Fields>,
 >(
   tableName: TableName,
   schema: TableSchema,
 ): ExtendWithSystemFields<TableName, TableSchema> =>
-  Schema.extend(SystemFields(tableName), schema);
+  schema.pipe(
+    Schema.fieldsAssign(SystemFields(tableName).fields),
+  ) as ExtendWithSystemFields<TableName, TableSchema>;
 
 /**
  * Extend a table schema with Convex system fields at the type level.
  */
 export type ExtendWithSystemFields<
   TableName extends string,
-  TableSchema extends Schema.Schema.AnyNoContext,
-> = Schema.extend<SystemFieldsSchema<TableName>, TableSchema>;
+  TableSchema extends Schema.Struct<Schema.Struct.Fields>,
+> = TableSchema extends Schema.Struct<infer Fields>
+  ? Schema.Struct<
+      StructModule.Simplify<
+        StructModule.Assign<
+          Fields,
+          SystemFieldsSchema<TableName>["fields"]
+        >
+      >
+    >
+  : never;
 
 export type WithSystemFields<TableName extends string, Document> = Expand<
   Readonly<IdField<TableName>> & Readonly<NonIdSystemFields> & Document
