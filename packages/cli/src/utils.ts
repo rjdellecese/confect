@@ -1,4 +1,6 @@
 import type { FunctionSpec, Spec } from "@confect/core";
+import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
 import { FileSystem, Path } from "@effect/platform";
 import type { PlatformError } from "@effect/platform/Error";
 import {
@@ -49,10 +51,16 @@ const absoluteExternalsPlugin: esbuild.Plugin = {
       if (args.kind !== "import-statement" && args.kind !== "dynamic-import")
         return;
       if (!isExternalImport(args.path)) return;
-      const resolved = import.meta.resolve(
-        args.path,
-        "file://" + args.resolveDir + "/",
-      );
+      // `import.meta.resolve`'s second argument is silently ignored in modern
+      // Node, so resolution would always walk up from the CLI's bundled file
+      // (`packages/cli/dist/utils.mjs`) instead of from the user's project.
+      // Use `createRequire` keyed on the importing file's directory so we
+      // resolve out of *their* `node_modules`. The synthetic filename is just
+      // a CommonJS resolution anchor; the file does not need to exist.
+      const parentFile = pathToFileURL(args.resolveDir + "/_").href;
+      const require_ = createRequire(parentFile);
+      const resolvedPath = require_.resolve(args.path);
+      const resolved = pathToFileURL(resolvedPath).href;
       return { path: resolved, external: true };
     });
   },
