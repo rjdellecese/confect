@@ -65,7 +65,8 @@
               "server/database/schema",
               "server/database/reading",
               "server/database/writing",
-              "server/database/system-tables"
+              "server/database/system-tables",
+              "server/database/determinism"
             ]
           },
           "server/http-api",
