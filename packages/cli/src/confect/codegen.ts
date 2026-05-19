@@ -1,5 +1,4 @@
-import { Spec } from "@confect/core";
-import { DatabaseSchema } from "@confect/server";
+import { DatabaseSchema, Spec } from "@confect/core";
 import { Command } from "@effect/cli";
 import { FileSystem, Path } from "@effect/platform";
 import { Effect, Match, Option } from "effect";
@@ -192,7 +191,7 @@ const generateSchema = Effect.gen(function* () {
     Effect.andThen((schemaModule) => {
       const defaultExport = schemaModule.default;
 
-      return DatabaseSchema.isSchema(defaultExport)
+      return DatabaseSchema.isDatabaseSchema(defaultExport)
         ? Effect.succeed(defaultExport)
         : Effect.die("Invalid schema module");
     }),

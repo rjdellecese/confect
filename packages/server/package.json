@@ -88,7 +88,7 @@
     "vitest": "3.2.4"
   },
   "peerDependencies": {
-    "@confect/core": "workspace:*",
+    "@confect/core": "workspace:^",
     "@effect/platform": "^0.96.1",
     "@effect/platform-node": "^0.106.0",
     "convex": "^1.30.0",

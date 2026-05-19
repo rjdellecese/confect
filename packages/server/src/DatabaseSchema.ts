@@ -3,14 +3,15 @@ import {
   defineSchema as defineConvexSchema,
   type SchemaDefinition,
 } from "convex/server";
-import { Array, pipe, Predicate, Record } from "effect";
+import { Array, pipe, Record } from "effect";
 import * as Table from "./Table";
+import { TypeId } from "@confect/core/DatabaseSchema";
 
-export const TypeId = "@confect/server/DatabaseSchema";
-export type TypeId = typeof TypeId;
-
-export const isSchema = (u: unknown): u is Any =>
-  Predicate.hasProperty(u, TypeId);
+export {
+  type Any,
+  isDatabaseSchema,
+  TypeId,
+} from "@confect/core/DatabaseSchema";
 
 /**
  * A schema definition tracks the schema and its Convex schema definition.
@@ -29,10 +30,6 @@ export interface DatabaseSchema<Tables_ extends Table.AnyWithProps = never> {
   addTable<TableDef extends Table.AnyWithProps>(
     table: TableDef,
   ): DatabaseSchema<Tables_ | TableDef>;
-}
-
-export interface Any {
-  readonly [TypeId]: TypeId;
 }
 
 export interface AnyWithProps {
