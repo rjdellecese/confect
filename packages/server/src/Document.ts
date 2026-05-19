@@ -10,6 +10,25 @@ export type WithoutSystemFields<Doc> = Omit<Doc, "_creationTime" | "_id">;
 export type Any = any;
 export type AnyEncoded = ReadonlyRecord<string, ReadonlyValue>;
 
+const decoderCache = new WeakMap<
+  Schema.Schema.AnyNoContext,
+  (doc: unknown) => unknown
+>();
+
+const getDecoder = (
+  tableName: string,
+  tableSchema: Schema.Schema.AnyNoContext,
+): ((doc: unknown) => unknown) => {
+  let decoder = decoderCache.get(tableSchema);
+  if (decoder === undefined) {
+    decoder = Schema.decodeUnknownSync(
+      SystemFields.extendWithSystemFields(tableName, tableSchema),
+    ) as (doc: unknown) => unknown;
+    decoderCache.set(tableSchema, decoder);
+  }
+  return decoder;
+};
+
 export const decode = Function.dual<
   <
     DataModel_ extends DataModel.AnyWithProps,
@@ -54,18 +73,20 @@ export const decode = Function.dual<
     DocumentDecodeError
   > =>
     Effect.gen(function* () {
-      const TableSchemaWithSystemFields = SystemFields.extendWithSystemFields(
-        tableName,
-        tableSchema,
-      );
-
-      const encodedDoc =
-        self as (typeof TableSchemaWithSystemFields)["Encoded"];
+      const encodedDoc = self as { _id: string };
+      const decoder = getDecoder(tableName, tableSchema);
 
       const decodedDoc = yield* pipe(
-        encodedDoc,
-        Schema.decode(TableSchemaWithSystemFields),
-        Effect.catchTag("ParseError", (parseError) =>
+        Effect.try({
+          try: () => decoder(encodedDoc),
+          catch: (error) => {
+            if (ParseResult.isParseError(error)) {
+              return error;
+            }
+            throw error;
+          },
+        }),
+        Effect.catchIf(ParseResult.isParseError, (parseError) =>
           Effect.gen(function* () {
             const formattedParseError =
               yield* ParseResult.TreeFormatter.formatError(parseError);
@@ -79,7 +100,10 @@ export const decode = Function.dual<
         ),
       );
 
-      return decodedDoc;
+      return decodedDoc as DataModel.TableInfoWithName_<
+        DataModel_,
+        TableName
+      >["document"];
     }),
 );
 
