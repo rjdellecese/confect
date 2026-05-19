@@ -1,6 +1,6 @@
+import * as SystemFields from "@confect/core/SystemFields";
 import { Effect, Function, ParseResult, pipe, Schema } from "effect";
 import type { ReadonlyRecord } from "effect/Record";
-import * as SystemFields from "@confect/core/SystemFields";
 import type * as DataModel from "./DataModel";
 import type { ReadonlyValue } from "./SchemaToValidator";
 import type * as TableInfo from "./TableInfo";
@@ -10,25 +10,35 @@ export type WithoutSystemFields<Doc> = Omit<Doc, "_creationTime" | "_id">;
 export type Any = any;
 export type AnyEncoded = ReadonlyRecord<string, ReadonlyValue>;
 
+type Decode = (doc: unknown) => Effect.Effect<unknown, ParseResult.ParseError>;
+
 const decoderCache = new WeakMap<
   Schema.Schema.AnyNoContext,
-  (doc: unknown) => unknown
+  Map<string, Decode>
 >();
 
 const getDecoder = (
   tableName: string,
   tableSchema: Schema.Schema.AnyNoContext,
-): ((doc: unknown) => unknown) => {
-  const cachedDecoder = decoderCache.get(tableSchema);
-  if (cachedDecoder === undefined) {
-    const decoder = Schema.decodeUnknownSync(
-      SystemFields.extendWithSystemFields(tableName, tableSchema),
-    ) as (doc: unknown) => unknown;
-    decoderCache.set(tableSchema, decoder);
-    return decoder;
-  } else {
-    return cachedDecoder;
-  }
+): Decode => {
+  const byTable =
+    decoderCache.get(tableSchema) ??
+    (() => {
+      const map = new Map<string, Decode>();
+      decoderCache.set(tableSchema, map);
+      return map;
+    })();
+
+  return (
+    byTable.get(tableName) ??
+    (() => {
+      const decoder = Schema.decode(
+        SystemFields.extendWithSystemFields(tableName, tableSchema),
+      ) as Decode;
+      byTable.set(tableName, decoder);
+      return decoder;
+    })()
+  );
 };
 
 export const decode = Function.dual<
@@ -73,19 +83,10 @@ export const decode = Function.dual<
   ): Effect.Effect<
     DataModel.TableInfoWithName_<DataModel_, TableName>["document"],
     DocumentDecodeError
-  > => {
-    const encodedDoc = self as { _id: string };
-
-    return pipe(
-      Effect.try({
-        try: () => pipe(encodedDoc, getDecoder(tableName, tableSchema)),
-        catch: (error) => {
-          if (ParseResult.isParseError(error)) {
-            return error;
-          }
-          throw error;
-        },
-      }),
+  > =>
+    pipe(
+      self,
+      getDecoder(tableName, tableSchema),
       Effect.catchIf(ParseResult.isParseError, (parseError) =>
         Effect.gen(function* () {
           const formattedParseError =
@@ -93,7 +94,7 @@ export const decode = Function.dual<
 
           return yield* new DocumentDecodeError({
             tableName,
-            id: encodedDoc._id,
+            id: self._id,
             parseError: formattedParseError,
           });
         }),
@@ -105,9 +106,20 @@ export const decode = Function.dual<
             TableName
           >["document"],
       ),
-    );
-  },
+    ),
 );
+
+type Encode = (doc: unknown) => Effect.Effect<unknown, ParseResult.ParseError>;
+
+const encoderCache = new WeakMap<Schema.Schema.AnyNoContext, Encode>();
+
+const getEncoder = (tableSchema: Schema.Schema.AnyNoContext): Encode =>
+  encoderCache.get(tableSchema) ??
+  (() => {
+    const encoder = Schema.encode(tableSchema) as Encode;
+    encoderCache.set(tableSchema, encoder);
+    return encoder;
+  })();
 
 export const encode = Function.dual<
   <
@@ -152,35 +164,29 @@ export const encode = Function.dual<
     DataModel.TableInfoWithName_<DataModel_, TableName>["encodedDocument"],
     DocumentEncodeError
   > =>
-    Effect.gen(function* () {
-      type TableSchemaWithSystemFields = SystemFields.ExtendWithSystemFields<
-        TableName,
-        TableInfo.TableSchema<
-          DataModel.TableInfoWithName_<DataModel_, TableName>
-        >
-      >;
+    pipe(
+      self,
+      getEncoder(tableSchema),
+      Effect.catchIf(ParseResult.isParseError, (parseError) =>
+        Effect.gen(function* () {
+          const formattedParseError =
+            yield* ParseResult.TreeFormatter.formatError(parseError);
 
-      const decodedDoc = self as TableSchemaWithSystemFields["Type"];
-
-      const encodedDoc = yield* pipe(
-        decodedDoc,
-        Schema.encode(tableSchema),
-        Effect.catchTag("ParseError", (parseError) =>
-          Effect.gen(function* () {
-            const formattedParseError =
-              yield* ParseResult.TreeFormatter.formatError(parseError);
-
-            return yield* new DocumentEncodeError({
-              tableName,
-              id: decodedDoc._id,
-              parseError: formattedParseError,
-            });
-          }),
-        ),
-      );
-
-      return encodedDoc;
-    }),
+          return yield* new DocumentEncodeError({
+            tableName,
+            id: self._id,
+            parseError: formattedParseError,
+          });
+        }),
+      ),
+      Effect.map(
+        (encodedDoc) =>
+          encodedDoc as DataModel.TableInfoWithName_<
+            DataModel_,
+            TableName
+          >["encodedDocument"],
+      ),
+    ),
 );
 
 export class DocumentDecodeError extends Schema.TaggedError<DocumentDecodeError>()(

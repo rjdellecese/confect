@@ -23,6 +23,11 @@ const decodeUncached = (
     SystemFields.extendWithSystemFields(tableName, tableSchema),
   )(convexDocument);
 
+const encodeUncached = (
+  tableSchema: typeof NoteSchema,
+  document: ReturnType<typeof decodeUncached>,
+) => Schema.encodeSync(tableSchema)(document);
+
 describe("Document.decode", () => {
   it("decodes documents identically to an uncached decoder", () => {
     const expected = decodeUncached("notes", NoteSchema, convexNote);
@@ -49,6 +54,30 @@ describe("Document.decode", () => {
     expect(third).toEqual(first);
   });
 
+  it("decodes each table name with its own cached decoder when the schema is shared", () => {
+    const SharedSchema = Schema.Struct({
+      content: Schema.String,
+    });
+
+    const convexPost = {
+      content: "A post",
+      _id: "post456" as GenericId<"posts">,
+      _creationTime: 9_876_543_210,
+    };
+
+    Effect.runSync(Document.decode(convexNote, "notes", SharedSchema));
+
+    const decodedPost = Effect.runSync(
+      Document.decode(convexPost, "posts", SharedSchema),
+    );
+
+    const expectedPost = Schema.decodeUnknownSync(
+      SystemFields.extendWithSystemFields("posts", SharedSchema),
+    )(convexPost);
+
+    expect(decodedPost).toEqual(expectedPost);
+  });
+
   it("fails with DocumentDecodeError for invalid documents", () => {
     const invalidNote = {
       ...convexNote,
@@ -62,5 +91,35 @@ describe("Document.decode", () => {
     expect(error).toBeInstanceOf(Document.DocumentDecodeError);
     expect(error.tableName).toBe("notes");
     expect(error.id).toBe(convexNote._id);
+  });
+});
+
+describe("Document.encode", () => {
+  it("encodes documents identically to an uncached encoder", () => {
+    const decoded = decodeUncached("notes", NoteSchema, convexNote);
+    const expected = encodeUncached(NoteSchema, decoded);
+
+    const encoded = Effect.runSync(
+      Document.encode(decoded, "notes", NoteSchema),
+    );
+
+    expect(encoded).toEqual(expected);
+  });
+
+  it("returns the same output when encoding repeatedly with the same table schema", () => {
+    const decoded = decodeUncached("notes", NoteSchema, convexNote);
+
+    const first = Effect.runSync(
+      Document.encode(decoded, "notes", NoteSchema),
+    );
+    const second = Effect.runSync(
+      Document.encode(decoded, "notes", NoteSchema),
+    );
+    const third = Effect.runSync(
+      Document.encode(decoded, "notes", NoteSchema),
+    );
+
+    expect(second).toEqual(first);
+    expect(third).toEqual(first);
   });
 });

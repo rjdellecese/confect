@@ -32,6 +32,10 @@ const extendedSchema = SystemFields.extendWithSystemFields(
 
 const cachedDecoder = Schema.decodeUnknownSync(extendedSchema);
 
+const decodedNote = Schema.decodeUnknownSync(extendedSchema)(convexNote);
+
+const cachedEncoder = Schema.encodeSync(NoteSchema);
+
 bench("decode document (recompile decoder each call)", () => {
   Schema.decodeUnknownSync(
     SystemFields.extendWithSystemFields(tableName, NoteSchema),
@@ -40,4 +44,12 @@ bench("decode document (recompile decoder each call)", () => {
 
 bench("decode document (cached decoder)", () => {
   cachedDecoder(convexNote);
+}).median([406.34, "ns"]);
+
+bench("encode document (recompile encoder each call)", () => {
+  Schema.encodeSync(NoteSchema)(decodedNote);
+}).median([27.98, "us"]);
+
+bench("encode document (cached encoder)", () => {
+  cachedEncoder(decodedNote);
 }).median([406.34, "ns"]);
