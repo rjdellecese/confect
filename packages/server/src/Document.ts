@@ -10,22 +10,46 @@ export type WithoutSystemFields<Doc> = Omit<Doc, "_creationTime" | "_id">;
 export type Any = any;
 export type AnyEncoded = ReadonlyRecord<string, ReadonlyValue>;
 
+type ExtendedTableSchema<
+  TableName extends string,
+  TableSchema extends Schema.Schema.AnyNoContext,
+> = SystemFields.ExtendWithSystemFields<TableName, TableSchema>;
+
+type DocumentDecoder<
+  TableName extends string,
+  TableSchema extends Schema.Schema.AnyNoContext,
+> = (
+  doc: Schema.Schema.Encoded<ExtendedTableSchema<TableName, TableSchema>>,
+) => Schema.Schema.Type<ExtendedTableSchema<TableName, TableSchema>>;
+
 const decoderCache = new WeakMap<
   Schema.Schema.AnyNoContext,
-  (doc: unknown) => unknown
+  DocumentDecoder<string, Schema.Schema.AnyNoContext>
 >();
 
-const getDecoder = (
-  tableName: string,
-  tableSchema: Schema.Schema.AnyNoContext,
-): ((doc: unknown) => unknown) => {
-  let decoder = decoderCache.get(tableSchema);
-  if (decoder === undefined) {
-    decoder = Schema.decodeUnknownSync(
-      SystemFields.extendWithSystemFields(tableName, tableSchema),
-    ) as (doc: unknown) => unknown;
-    decoderCache.set(tableSchema, decoder);
+const getDecoder = <
+  TableName extends string,
+  TableSchema extends Schema.Schema.AnyNoContext,
+>(
+  tableName: TableName,
+  tableSchema: TableSchema,
+): DocumentDecoder<TableName, TableSchema> => {
+  const cached = decoderCache.get(tableSchema);
+  if (cached !== undefined) {
+    return cached as DocumentDecoder<TableName, TableSchema>;
   }
+
+  const decoder = Schema.decodeUnknownSync(
+    SystemFields.extendWithSystemFields(
+      tableName,
+      tableSchema,
+    ) as unknown as ExtendedTableSchema<TableName, TableSchema> &
+      Schema.Schema.AnyNoContext,
+  ) as DocumentDecoder<TableName, TableSchema>;
+  decoderCache.set(
+    tableSchema,
+    decoder as DocumentDecoder<string, Schema.Schema.AnyNoContext>,
+  );
   return decoder;
 };
 
@@ -73,7 +97,9 @@ export const decode = Function.dual<
     DocumentDecodeError
   > =>
     Effect.gen(function* () {
-      const encodedDoc = self as { _id: string };
+      const encodedDoc = self as Schema.Schema.Encoded<
+        ExtendedTableSchema<TableName, typeof tableSchema>
+      >;
       const decoder = getDecoder(tableName, tableSchema);
 
       const decodedDoc = yield* pipe(
