@@ -1,6 +1,6 @@
 import { describe, expectTypeOf, it } from "@effect/vitest";
 import type { GenericSchema, SchemaDefinition } from "convex/server";
-import type confectSchema from "./confect/schema";
+import type confectSchema from "./mock-backend/fixtures/confect/schema";
 
 describe("ConvexSchemaFromTables", () => {
   it("should be able to create a database schema", () => {

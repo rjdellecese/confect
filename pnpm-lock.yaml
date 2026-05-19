@@ -459,6 +459,44 @@ importers:
         specifier: 3.2.4
         version: 3.2.4(@types/debug@4.1.12)(@types/node@25.3.3)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.6.0)
 
+  packages/server/test/local-backend/fixtures:
+    dependencies:
+      '@confect/core':
+        specifier: workspace:*
+        version: link:../../../../core
+      '@confect/server':
+        specifier: workspace:*
+        version: link:../../..
+      convex:
+        specifier: 1.33.1
+        version: 1.33.1(react@19.2.4)
+      effect:
+        specifier: 3.21.2
+        version: 3.21.2
+    devDependencies:
+      '@confect/cli':
+        specifier: workspace:*
+        version: link:../../../../cli
+
+  packages/server/test/mock-backend/fixtures:
+    dependencies:
+      '@confect/core':
+        specifier: workspace:*
+        version: link:../../../../core
+      '@confect/server':
+        specifier: workspace:*
+        version: link:../../..
+      convex:
+        specifier: 1.33.1
+        version: 1.33.1(react@19.2.4)
+      effect:
+        specifier: 3.21.2
+        version: 3.21.2
+    devDependencies:
+      '@confect/cli':
+        specifier: workspace:*
+        version: link:../../../../cli
+
   packages/test:
     dependencies:
       '@confect/core':

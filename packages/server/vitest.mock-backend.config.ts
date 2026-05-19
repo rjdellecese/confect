@@ -21,7 +21,9 @@ export default mergeConfig(
     },
     test: {
       root: import.meta.dirname,
-      include: ["test/*.test.ts", "test/internal/**/*.test.ts"],
+      name: "@confect/server (mock-backend)",
+      include: ["test/mock-backend/**/*.test.ts"],
+      globalSetup: ["./test/mock-backend/setup.ts"],
     },
   }),
 );

@@ -2,11 +2,14 @@ import { GenericId } from "@confect/core";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
 import { Array, Effect, Either } from "effect";
-import refs from "./confect/_generated/refs";
-import { DatabaseWriter } from "./confect/_generated/services";
-import { Forbidden, NotFound } from "./confect/groups/typedErrors.spec";
-import { NodeNotFound } from "./confect/node/typedErrorsNode.spec";
-import type { Notes } from "./confect/tables/Notes";
+import refs from "./fixtures/confect/_generated/refs";
+import { DatabaseWriter } from "./fixtures/confect/_generated/services";
+import {
+  Forbidden,
+  NotFound,
+} from "./fixtures/confect/groups/typedErrors.spec";
+import { NodeNotFound } from "./fixtures/confect/node/typedErrorsNode.spec";
+import type { Notes } from "./fixtures/confect/tables/Notes";
 import * as TestConfect from "./TestConfect";
 
 describe("DatabaseReader", () => {
