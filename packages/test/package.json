@@ -61,8 +61,8 @@
     "effect": "3.21.2"
   },
   "peerDependencies": {
-    "@confect/core": "workspace:*",
-    "@confect/server": "workspace:*",
+    "@confect/core": "workspace:^",
+    "@confect/server": "workspace:^",
     "convex": "^1.30.0",
     "convex-test": "^0.0.50",
     "effect": "^3.21.2"

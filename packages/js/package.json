@@ -58,7 +58,7 @@
     "vitest": "3.2.4"
   },
   "peerDependencies": {
-    "@confect/core": "workspace:*",
+    "@confect/core": "workspace:^",
     "convex": "^1.30.0",
     "effect": "^3.21.2"
   },
