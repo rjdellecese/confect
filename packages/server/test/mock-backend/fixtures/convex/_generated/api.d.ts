@@ -49,6 +49,46 @@ export declare const api: {
         userId?: Id<"users">;
       }>
     >;
+    paginateNotes: FunctionReference<
+      "query",
+      "public",
+      { cursor: string | null; numItems: number },
+      {
+        continueCursor: string;
+        isDone: boolean;
+        page: Array<{
+          _creationTime: number;
+          _id: Id<"notes">;
+          author?: { name: string; role: "admin" | "user" };
+          embedding?: Array<number>;
+          tag?: string;
+          text: string;
+          userId?: Id<"users">;
+        }>;
+        pageStatus?: "SplitRecommended" | "SplitRequired" | null;
+        splitCursor?: string | null;
+      }
+    >;
+    paginateNotesWithFilter: FunctionReference<
+      "query",
+      "public",
+      { cursor: string | null; numItems: number; tag: string },
+      {
+        continueCursor: string;
+        isDone: boolean;
+        page: Array<{
+          _creationTime: number;
+          _id: Id<"notes">;
+          author?: { name: string; role: "admin" | "user" };
+          embedding?: Array<number>;
+          tag?: string;
+          text: string;
+          userId?: Id<"users">;
+        }>;
+        pageStatus?: "SplitRecommended" | "SplitRequired" | null;
+        splitCursor?: string | null;
+      }
+    >;
   };
   groups: {
     notes: {
@@ -110,6 +150,76 @@ export declare const api: {
         Id<"notes">
       >;
     };
+    typedErrors: {
+      deleteNoteOrFail: FunctionReference<
+        "mutation",
+        "public",
+        { asAdmin: boolean; noteId: Id<"notes"> },
+        null
+      >;
+      failingAction: FunctionReference<
+        "action",
+        "public",
+        { kind: "notFound" | "forbidden" },
+        null
+      >;
+      getNoteOrFail: FunctionReference<
+        "query",
+        "public",
+        { noteId: Id<"notes"> },
+        {
+          _creationTime: number;
+          _id: Id<"notes">;
+          author?: { name: string; role: "admin" | "user" };
+          embedding?: Array<number>;
+          tag?: string;
+          text: string;
+          userId?: Id<"users">;
+        }
+      >;
+      insertThenFail: FunctionReference<
+        "mutation",
+        "public",
+        { text: string },
+        null
+      >;
+      tryDeleteNote: FunctionReference<
+        "action",
+        "public",
+        { asAdmin: boolean; noteId: Id<"notes"> },
+        | { _tag: "Ok" }
+        | { _tag: "NotFound"; id: string }
+        | { _tag: "Forbidden"; reason: string }
+      >;
+      tryFailingAction: FunctionReference<
+        "action",
+        "public",
+        { kind: "notFound" | "forbidden" },
+        { _tag: "NotFound"; id: string } | { _tag: "Forbidden"; reason: string }
+      >;
+      tryGetNote: FunctionReference<
+        "query",
+        "public",
+        { noteId: Id<"notes"> },
+        { _tag: "Ok"; text: string } | { _tag: "NotFound"; id: string }
+      >;
+      tryInternalGetNote: FunctionReference<
+        "action",
+        "public",
+        { noteId: Id<"notes"> },
+        { _tag: "Ok"; text: string } | { _tag: "NotFound"; id: string }
+      >;
+    };
+  };
+  node: {
+    typedErrorsNode: {
+      failingNodeAction: FunctionReference<
+        "action",
+        "public",
+        { id: string },
+        null
+      >;
+    };
   };
 };
 
@@ -141,6 +251,22 @@ export declare const internal: {
               userId?: Id<"users">;
             };
           }
+      >;
+    };
+    typedErrors: {
+      internalGetNoteOrFail: FunctionReference<
+        "query",
+        "internal",
+        { noteId: Id<"notes"> },
+        {
+          _creationTime: number;
+          _id: Id<"notes">;
+          author?: { name: string; role: "admin" | "user" };
+          embedding?: Array<number>;
+          tag?: string;
+          text: string;
+          userId?: Id<"users">;
+        }
       >;
     };
   };

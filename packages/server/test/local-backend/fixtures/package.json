@@ -1,0 +1,16 @@
+{
+  "name": "@confect/server-local-backend-fixtures",
+  "version": "0.0.0",
+  "description": "Internal fixture project for @confect/server's local-backend test suite.",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@confect/core": "workspace:*",
+    "@confect/server": "workspace:*",
+    "convex": "*",
+    "effect": "*"
+  },
+  "devDependencies": {
+    "@confect/cli": "workspace:*"
+  }
+}

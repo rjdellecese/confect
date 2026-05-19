@@ -183,7 +183,7 @@ const generateSchema = Effect.gen(function* () {
     Effect.andThen((schemaModule) => {
       const defaultExport = schemaModule.default;
 
-      return DatabaseSchema.isSchema(defaultExport)
+      return DatabaseSchema.isDatabaseSchema(defaultExport)
         ? Effect.succeed(defaultExport)
         : Effect.die("Invalid schema module");
     }),

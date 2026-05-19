@@ -1,6 +1,6 @@
 import { describe, expectTypeOf, it } from "@effect/vitest";
 import type { RegisteredQuery } from "convex/server";
-import registeredFunctions from "./confect/_generated/registeredFunctions";
+import registeredFunctions from "./mock-backend/fixtures/confect/_generated/registeredFunctions";
 
 describe("RegisteredFunctions", () => {
   it("types public Query functions as RegisteredQuery<public, ...>", () => {
