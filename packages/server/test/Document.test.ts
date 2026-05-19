@@ -109,15 +109,11 @@ describe("Document.encode", () => {
   it("returns the same output when encoding repeatedly with the same table schema", () => {
     const decoded = decodeUncached("notes", NoteSchema, convexNote);
 
-    const first = Effect.runSync(
-      Document.encode(decoded, "notes", NoteSchema),
-    );
+    const first = Effect.runSync(Document.encode(decoded, "notes", NoteSchema));
     const second = Effect.runSync(
       Document.encode(decoded, "notes", NoteSchema),
     );
-    const third = Effect.runSync(
-      Document.encode(decoded, "notes", NoteSchema),
-    );
+    const third = Effect.runSync(Document.encode(decoded, "notes", NoteSchema));
 
     expect(second).toEqual(first);
     expect(third).toEqual(first);
