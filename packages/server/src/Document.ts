@@ -19,14 +19,15 @@ const getDecoder = (
   tableName: string,
   tableSchema: Schema.Schema.AnyNoContext,
 ): ((doc: unknown) => unknown) => {
-  let decoder = decoderCache.get(tableSchema);
-  if (decoder === undefined) {
-    decoder = Schema.decodeUnknownSync(
+  const cachedDecoder = decoderCache.get(tableSchema);
+  if (cachedDecoder === undefined) {
+    const decoder = Schema.decodeUnknownSync(
       SystemFields.extendWithSystemFields(tableName, tableSchema),
     ) as (doc: unknown) => unknown;
     decoderCache.set(tableSchema, decoder);
+    return decoder;
   }
-  return decoder;
+  return cachedDecoder;
 };
 
 export const decode = Function.dual<
