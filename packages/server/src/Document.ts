@@ -26,8 +26,9 @@ const getDecoder = (
     ) as (doc: unknown) => unknown;
     decoderCache.set(tableSchema, decoder);
     return decoder;
+  } else {
+    return cachedDecoder;
   }
-  return cachedDecoder;
 };
 
 export const decode = Function.dual<
@@ -72,40 +73,40 @@ export const decode = Function.dual<
   ): Effect.Effect<
     DataModel.TableInfoWithName_<DataModel_, TableName>["document"],
     DocumentDecodeError
-  > =>
-    Effect.gen(function* () {
-      const encodedDoc = self as { _id: string };
-      const decoder = getDecoder(tableName, tableSchema);
+  > => {
+    const encodedDoc = self as { _id: string };
 
-      const decodedDoc = yield* pipe(
-        Effect.try({
-          try: () => decoder(encodedDoc),
-          catch: (error) => {
-            if (ParseResult.isParseError(error)) {
-              return error;
-            }
-            throw error;
-          },
+    return pipe(
+      Effect.try({
+        try: () => pipe(encodedDoc, getDecoder(tableName, tableSchema)),
+        catch: (error) => {
+          if (ParseResult.isParseError(error)) {
+            return error;
+          }
+          throw error;
+        },
+      }),
+      Effect.catchIf(ParseResult.isParseError, (parseError) =>
+        Effect.gen(function* () {
+          const formattedParseError =
+            yield* ParseResult.TreeFormatter.formatError(parseError);
+
+          return yield* new DocumentDecodeError({
+            tableName,
+            id: encodedDoc._id,
+            parseError: formattedParseError,
+          });
         }),
-        Effect.catchIf(ParseResult.isParseError, (parseError) =>
-          Effect.gen(function* () {
-            const formattedParseError =
-              yield* ParseResult.TreeFormatter.formatError(parseError);
-
-            return yield* new DocumentDecodeError({
-              tableName,
-              id: encodedDoc._id,
-              parseError: formattedParseError,
-            });
-          }),
-        ),
-      );
-
-      return decodedDoc as DataModel.TableInfoWithName_<
-        DataModel_,
-        TableName
-      >["document"];
-    }),
+      ),
+      Effect.map(
+        (decodedDoc) =>
+          decodedDoc as DataModel.TableInfoWithName_<
+            DataModel_,
+            TableName
+          >["document"],
+      ),
+    );
+  },
 );
 
 export const encode = Function.dual<
