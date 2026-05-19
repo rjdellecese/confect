@@ -4,7 +4,7 @@ import type {
   RegisteredMutation,
 } from "convex/server";
 import { ConvexError } from "convex/values";
-import { Effect, MutableRef, Option, Schema } from "effect";
+import { Cause, Effect, Exit, MutableRef, Option, Schema } from "effect";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
 import * as FunctionSpec from "../src/FunctionSpec";
@@ -163,7 +163,7 @@ describe("Error type extraction", () => {
   });
 
   test("error schema extracts the error type", () => {
-    class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+    class NotFound extends Schema.TaggedErrorClass<NotFound>()("NotFound", {
       id: Schema.String,
     }) {}
 
@@ -178,10 +178,10 @@ describe("Error type extraction", () => {
   });
 
   test("union error schema extracts the union type", () => {
-    class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+    class NotFound extends Schema.TaggedErrorClass<NotFound>()("NotFound", {
       id: Schema.String,
     }) {}
-    class Forbidden extends Schema.TaggedError<Forbidden>()("Forbidden", {
+    class Forbidden extends Schema.TaggedErrorClass<Forbidden>()("Forbidden", {
       reason: Schema.String,
     }) {}
 
@@ -189,7 +189,7 @@ describe("Error type extraction", () => {
       name: "remove",
       args: Schema.Struct({ id: Schema.String }),
       returns: Schema.Void,
-      error: Schema.Union(NotFound, Forbidden),
+      error: Schema.Union([NotFound, Forbidden]),
     });
     type Ref_ = Ref.FromFunctionSpec<typeof _spec>;
     expectTypeOf<Ref.Error<Ref_>>().toEqualTypeOf<NotFound | Forbidden>();
@@ -215,7 +215,7 @@ describe("isConvexError", () => {
 
 describe("maybeDecodeErrorSync", () => {
   test("decodes ConvexError when error schema is present", () => {
-    class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+    class NotFound extends Schema.TaggedErrorClass<NotFound>()("NotFound", {
       id: Schema.String,
     }) {}
 
@@ -250,7 +250,7 @@ describe("maybeDecodeErrorSync", () => {
   });
 
   test("returns non-ConvexError errors unchanged", () => {
-    class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+    class NotFound extends Schema.TaggedErrorClass<NotFound>()("NotFound", {
       id: Schema.String,
     }) {}
 
@@ -269,7 +269,7 @@ describe("maybeDecodeErrorSync", () => {
 
 describe("decodeError", () => {
   test("decodes error data using the error schema", async () => {
-    class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+    class NotFound extends Schema.TaggedErrorClass<NotFound>()("NotFound", {
       id: Schema.String,
     }) {}
 
@@ -306,7 +306,7 @@ describe("decodeError", () => {
 });
 
 describe("decodeErrorOrElse", () => {
-  class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+  class NotFound extends Schema.TaggedErrorClass<NotFound>()("NotFound", {
     id: Schema.String,
   }) {}
 
@@ -359,9 +359,103 @@ describe("decodeErrorOrElse", () => {
   });
 });
 
+describe("runWithCodec", () => {
+  class NotFound extends Schema.TaggedErrorClass<NotFound>()("NotFound", {
+    id: Schema.String,
+  }) {}
+
+  const refWithSchema = Ref.make(
+    "test/mod",
+    FunctionSpec.publicMutation({
+      name: "update",
+      args: Schema.Struct({ id: Schema.String }),
+      returns: Schema.String,
+      error: NotFound,
+    }),
+  );
+
+  const refWithoutSchema = Ref.make(
+    "test/mod",
+    FunctionSpec.publicMutation({
+      name: "create",
+      args: Schema.Struct({ id: Schema.String }),
+      returns: Schema.String,
+    }),
+  );
+
+  test("decodes returns through the return schema", async () => {
+    const result = await Effect.runPromise(
+      Ref.runWithCodec(refWithoutSchema, { id: "abc" }, () =>
+        Promise.resolve("created"),
+      ),
+    );
+
+    expect(result).toBe("created");
+  });
+
+  test("fails with a decoded typed ConvexError when the schema matches", async () => {
+    const exit = await Effect.runPromise(
+      Effect.exit(
+        Ref.runWithCodec(refWithSchema, { id: "abc" }, () =>
+          Promise.reject(new ConvexError({ _tag: "NotFound", id: "abc" })),
+        ),
+      ),
+    );
+
+    expect(Exit.isFailure(exit)).toBe(true);
+    if (Exit.isFailure(exit)) {
+      const error = Cause.squash(exit.cause);
+      expect(error).toBeInstanceOf(NotFound);
+      expect((error as NotFound).id).toBe("abc");
+    }
+  });
+
+  test("dies with the original non-ConvexError when no mapper is provided", async () => {
+    const transportError = new Error("network down");
+
+    await expect(
+      Effect.runPromise(
+        Ref.runWithCodec(refWithoutSchema, { id: "abc" }, () =>
+          Promise.reject(transportError),
+        ),
+      ),
+    ).rejects.toBe(transportError);
+  });
+
+  test("dies with the original ConvexError when the ref has no error schema", async () => {
+    const convexError = new ConvexError({ _tag: "Anything", id: "abc" });
+
+    await expect(
+      Effect.runPromise(
+        Ref.runWithCodec(refWithoutSchema, { id: "abc" }, () =>
+          Promise.reject(convexError),
+        ),
+      ),
+    ).rejects.toBe(convexError);
+  });
+
+  test("uses the unknown-error mapper when provided", async () => {
+    const transportError = new Error("network down");
+    const mappedError = { _tag: "UnknownInvokeError", error: transportError };
+
+    const exit = await Effect.runPromise(
+      Effect.exit(
+        Ref.runWithCodec(
+          refWithoutSchema,
+          { id: "abc" },
+          () => Promise.reject(transportError),
+          () => mappedError,
+        ),
+      ),
+    );
+
+    expect(exit).toStrictEqual(Exit.fail(mappedError));
+  });
+});
+
 describe("hasErrorSchema", () => {
   test("returns true for Confect ref with an error schema", () => {
-    class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+    class NotFound extends Schema.TaggedErrorClass<NotFound>()("NotFound", {
       id: Schema.String,
     }) {}
 

@@ -4,9 +4,15 @@ title: "WebSocket"
 description: "Call your Confect functions and subscribe to reactive queries over a persistent WebSocket connection."
 ---
 
+<Note>
+  This page targets the `@confect/js@effect4` prerelease, which
+  depends on `effect@4.0.0-beta.67` and `convex@^1.39.0`. For Effect 3
+  docs, see the stable `@confect/js` (latest) release.
+</Note>
+
 `WebSocketClient` is an [Effect service](https://effect.website/docs/requirements-management/services/) that wraps Convex's [`ConvexClient`](https://docs.convex.dev/api/classes/browser.ConvexClient). It provides the same `query`, `mutation`, and `action` methods as [`HttpClient`](/clients/js/http), plus a `reactiveQuery` method that returns a [`Stream`](https://effect.website/docs/stream/introduction/) of live results. It works in any JavaScript environment that supports `WebSocket`.
 
-The WebSocket connection is managed as a [scoped resource](https://effect.website/docs/resource-management/scope/) -- it is opened when the layer is provided and closed automatically when the scope ends.
+The WebSocket connection is still managed as a scoped resource: it is opened when the layer is provided and closed automatically when the scope ends. In Effect 4 the layer is constructed with `Layer.effect` rather than `Layer.scoped`—the type system tracks the underlying `Scope` requirement automatically.
 
 ## Setup
 
@@ -45,7 +51,7 @@ const program = Effect.gen(function* () {
 });
 ```
 
-Each method returns an `Effect` that can fail with `WebSocketClientError` (wrapping transport-level errors) or `ParseResult.ParseError` (if schema encoding or decoding fails).
+Each method returns an `Effect` that can fail with `WebSocketClientError` (defined internally as a `Schema.TaggedErrorClass` wrapping transport-level errors) or `Schema.SchemaError` (if schema encoding or decoding fails).
 
 ## Reactive queries
 
@@ -70,7 +76,7 @@ The underlying WebSocket subscription is cleaned up automatically when the strea
 
 ## Typed errors
 
-When a ref's spec declares an `error` schema, the decoded error is added to the error channel of `query`, `mutation`, `action`, and `reactiveQuery` alongside `WebSocketClientError` and `ParseError`. See [Error Handling](/server/error-handling) for how to declare error schemas.
+When a ref's spec declares an `error` schema, the decoded error is added to the error channel of `query`, `mutation`, `action`, and `reactiveQuery` alongside `WebSocketClientError` and `Schema.SchemaError`. See [Error Handling](/server/error-handling) for how to declare error schemas.
 
 ```ts
 import { WebSocketClient } from "@confect/js";
@@ -83,7 +89,7 @@ const lookup = Effect.gen(function* () {
 
   return yield* client.query(refs.public.notes.getOrFail, { noteId });
 });
-// Effect.Effect<Note, NoteNotFound | WebSocketClientError | ParseError, WebSocketClient.WebSocketClient>
+// Effect.Effect<Note, NoteNotFound | WebSocketClientError | Schema.SchemaError, WebSocketClient.WebSocketClient>
 ```
 
 For `reactiveQuery`, a typed failure terminates the `Stream` with the decoded value in its error channel—the subscription does not stay open across failures. Recover with `Stream.catchTag` (or any other `Stream` error combinator) to keep the stream alive across typed failures.

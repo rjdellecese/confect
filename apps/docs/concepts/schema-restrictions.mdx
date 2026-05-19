@@ -4,17 +4,45 @@ title: "Schema Restrictions"
 description: "Understand the restrictions on Effect schemas that can be used in Confect."
 ---
 
-Not every Effect `Schema` is valid for use in Confect. Remember that an Effect `Schema` looks like this:
+Not every Effect `Schema` is valid for use in Confect. A `Schema` is a `Codec` parameterized by four type arguments:
 
 ```typescript
-type Schema<Type, Encoded, Context>
+type Codec<Type, Encoded, DecodingServices, EncodingServices>
 ```
 
-For `Schema`s used in Confect:
+For codecs used in Confect:
 
 - `Type` represents the value that you'll be operating on in your code. Any TypeScript type is permitted here.
 - `Encoded` represents the value that is stored in the database or serialized as the argument/output of a Convex function. This must be a valid [Convex value](https://docs.convex.dev/database/types#convex-values).
-- `Context` is not currently supported. It should always be `never`.
+- `DecodingServices` and `EncodingServices` must both be `never`.
+
+## Supported schema constructors
+
+Confect's validator compiler walks the underlying [`SchemaAST`](https://effect.website/docs/schema/getting-started/#schemas-and-asts) and emits a Convex validator for each node.
+
+| `Schema` constructor | Convex validator | Notes |
+| --- | --- | --- |
+| `Schema.String` | `v.string()` |  |
+| `Schema.Number` | `v.float64()` |  |
+| `Schema.Boolean` | `v.boolean()` |  |
+| `Schema.BigInt` | `v.int64()` | Stored as `bigint`. |
+| `Schema.Null` | `v.null_()` | Use this in place of `void`/`undefined` for `returns`. |
+| `Schema.Literal("a")` | `v.literal("a")` |  |
+| `Schema.Literals(["a", "b"])` | `v.union(v.literal("a"), v.literal("b"))` |  |
+| `Schema.Array(s)` | `v.array(...)` |  |
+| `Schema.Struct({ ... })` | `v.object({ ... })` |  |
+| `Schema.Tuple([a, b])` | `v.array(v.union(a, b))` |  |
+| `Schema.Union([a, b, c])` | `v.union(...)` |  |
+| `Schema.optionalKey(s)` | optional field in `v.object` |  |
+| `Schema.URLFromString` | `v.string()` | Use this for URL fields. |
+| `Schema.fieldsAssign(...)` | object extension | Call as `a.pipe(Schema.fieldsAssign(b.fields))`. |
+| `Schema.fromJsonString(s)` | `v.string()` |  |
+
+For full details on every supported constructor, see the validator compiler in `packages/server/src/SchemaToValidator.ts`.
+
+<Note>
+  Annotation keys must be strings — symbol keys are not accepted.
+</Note>
 
 ## Additional caveats
 

@@ -40,11 +40,20 @@ export default Spec.makeNode().add(email);
 
 ## Node Impl
 
-A node impl uses `nodeApi` from `_generated/nodeApi` instead of `api`, and `Impl.make(nodeApi)` to construct the implementation. Each function impl contains a handler that runs in the Node.js runtime, where you have access to [`NodeContext` services](https://effect-ts.github.io/effect/platform-node/NodeContext.ts.html#nodecontext-type-alias), which are accessible via the `@effect/platform` package.
+A node impl uses `nodeApi` from `_generated/nodeApi` instead of `api`, and `Impl.make(nodeApi)` to construct the implementation. Each function impl contains a handler that runs in the Node.js runtime.
+
+<Note>
+  Effect 4 retired `@effect/platform-node`, and Confect's Node-action
+  handlers do **not** receive a `NodeContext` in the Effect requirements set.
+  For child-process work, use the new `effect/unstable/process` module inside
+  your handler, model your own service, or use the underlying Convex action
+  context. `@confect/cli` ships its own Node shim
+  (`packages/cli/src/internal/{fs,path,command}.ts`) for build-time tooling,
+  but those are not exposed to user code.
+</Note>
 
 ```ts confect/node/email.impl.ts
 import { FunctionImpl, GroupImpl } from "@confect/server";
-import { Command } from "@effect/platform";
 import { Console, Duration, Effect, Layer } from "effect";
 import nodeApi from "../_generated/nodeApi";
 
@@ -53,12 +62,9 @@ const send = FunctionImpl.make(
   "email",
   "send",
   Effect.fn(function* ({ to, subject, body }) {
-    const result = yield* Command.make(
-      "echo",
+    yield* Console.log(
       `Sending email to ${to} with subject ${subject} and body ${body}…`,
-    ).pipe(Command.stdout("pipe"), Command.string, Effect.orDie);
-
-    yield* Console.log(result);
+    );
     yield* Effect.sleep(Duration.seconds(1));
     yield* Console.log("Email sent!");
 

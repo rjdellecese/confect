@@ -28,6 +28,8 @@ Effect.gen(function* () {
 reader.table("notes").get(noteId);
 ```
 
+Convex 1.31+ also supports the explicit-table-id form (`db.get("table", id)`) at the base API layer. When wiring plain Convex functions alongside Confect, prefer that form for tables not already exposed through a Confect `Table`.
+
 ### By index
 
 #### Single field
@@ -130,6 +132,12 @@ reader
   .index("by_creation_time")
   .paginate(paginationOptions);
 ```
+
+<Note>
+  Convex 1.32+ adds `maximumRowsRead` and `maximumBytesRead` options
+  to `PaginationOptions` for bounding a single page's work. These pass
+  through `paginate` unchanged.
+</Note>
 
 #### Stream
 

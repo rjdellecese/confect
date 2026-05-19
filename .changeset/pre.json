@@ -1,0 +1,13 @@
+{
+  "mode": "pre",
+  "tag": "effect4",
+  "initialVersions": {
+    "@confect/cli": "7.0.0",
+    "@confect/core": "7.0.0",
+    "@confect/js": "7.0.0",
+    "@confect/react": "7.0.0",
+    "@confect/server": "7.0.0",
+    "@confect/test": "7.0.0"
+  },
+  "changesets": []
+}

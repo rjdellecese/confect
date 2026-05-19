@@ -1,50 +1,40 @@
-import { FileSystem, Path } from "@effect/platform";
-import { NodeFileSystem } from "@effect/platform-node";
-import { Array, Effect, Option, Ref, Schema } from "effect";
+/**
+ * Project-root discovery: walks up from `cwd` to find the nearest directory
+ * containing a `package.json`.
+ */
+import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 
-export class ProjectRoot extends Effect.Service<ProjectRoot>()(
-  "@confect/cli/ProjectRoot",
-  {
-    effect: Effect.gen(function* () {
-      const projectRoot = yield* findProjectRoot;
+import * as Fs from "./internal/fs";
+import * as Path from "./internal/path";
 
-      const ref = yield* Ref.make<string>(projectRoot);
-
-      return { get: Ref.get(ref) } as const;
-    }),
-    dependencies: [NodeFileSystem.layer],
-    accessors: true,
-  },
-) {}
-
-export const findProjectRoot = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-
-  const startDir = path.resolve(".");
-  const root = path.parse(startDir).root;
-
-  const directories = Array.unfold(startDir, (dir) =>
-    dir === root
-      ? Option.none()
-      : Option.some([dir, path.dirname(dir)] as const),
-  );
-
-  const projectRoot = yield* Effect.findFirst(directories, (dir) =>
-    fs.exists(path.join(dir, "package.json")),
-  );
-
-  return yield* Option.match(projectRoot, {
-    onNone: () => Effect.fail(new ProjectRootNotFoundError()),
-    onSome: Effect.succeed,
-  });
-});
-
-export class ProjectRootNotFoundError extends Schema.TaggedError<ProjectRootNotFoundError>()(
+export class ProjectRootNotFoundError extends Schema.TaggedErrorClass<ProjectRootNotFoundError>()(
   "ProjectRootNotFoundError",
   {},
 ) {
-  override get message(): string {
+  get message(): string {
     return "Could not find project root (no 'package.json' found)";
   }
 }
+
+/**
+ * Resolve the project root by walking up from `cwd` until a `package.json`
+ * is found, returning its containing directory.
+ */
+export const findProjectRoot: Effect.Effect<string, ProjectRootNotFoundError> =
+  Effect.gen(function* () {
+    const startDir = Path.resolve(".");
+    const root = Path.parse(startDir).root;
+
+    let current = startDir;
+    while (current !== root) {
+      if (yield* Fs.exists(Path.join(current, "package.json"))) {
+        return current;
+      }
+      const parent = Path.dirname(current);
+      if (parent === current) break;
+      current = parent;
+    }
+
+    return yield* new ProjectRootNotFoundError();
+  });

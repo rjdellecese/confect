@@ -4,11 +4,11 @@ title: "HTTP API"
 description: "Define HTTP endpoints using Effect's HTTP API modules."
 ---
 
-Confect's HTTP API integration lets you define HTTP endpoints using [`@effect/platform`'s HTTP API modules](https://github.com/Effect-TS/effect/blob/main/packages/platform/README.md#http-api) and mount them onto Convex's HTTP router. It includes built-in interactive API documentation powered by [Scalar](https://github.com/scalar/scalar).
+Confect's HTTP API integration lets you define HTTP endpoints using Effect 4's HTTP API modules (`effect/unstable/httpapi` and `effect/unstable/http`) and mount them onto Convex's HTTP router. It includes built-in interactive API documentation powered by [Scalar](https://github.com/scalar/scalar).
 
 ## Defining endpoints
 
-Define your API groups and endpoints using `@effect/platform`.
+Define your API groups and endpoints using `effect/unstable/httpapi`.
 
 ```ts confect/http/notes.ts
 import {
@@ -17,7 +17,7 @@ import {
   HttpApiEndpoint,
   HttpApiGroup,
   OpenApi,
-} from "@effect/platform";
+} from "effect/unstable/httpapi";
 import { Effect, Layer, Schema } from "effect";
 
 import refs from "../_generated/refs";
@@ -26,12 +26,12 @@ import { Notes } from "../tables/Notes";
 
 class NotesGroup extends HttpApiGroup.make("notes")
   .add(
-    HttpApiEndpoint.get("getFirst", "/get-first")
-      .annotate(
-        OpenApi.Description,
-        "Get the first note, if there is one.",
-      )
-      .addSuccess(Schema.Option(Notes.Doc)),
+    HttpApiEndpoint.get("getFirst", "/get-first", {
+      success: Schema.Option(Notes.Doc),
+    }).annotate(
+      OpenApi.Description,
+      "Get the first note, if there is one.",
+    ),
   )
   .annotate(OpenApi.Title, "Notes")
   .annotate(OpenApi.Description, "Operations on notes.") {}
@@ -42,9 +42,15 @@ export class Api extends HttpApi.make("Api")
   .prefix("/api") {}
 ```
 
+<Note>
+  `HttpApiEndpoint.get(name, path)` accepts an options object with
+  `success`, `error`, `params`, `query`, `payload`, and `headers`
+  fields.
+</Note>
+
 ## Implementing handlers
 
-Implement your endpoint handlers in the same file using `HttpApiBuilder`. All Confect action [services](/concepts/services) (`QueryRunner`, `MutationRunner`, `ActionRunner`, `Scheduler`, `Auth`, `StorageReader`, `StorageWriter`, `StorageActionWriter`) are available in handlers.
+Implement your endpoint handlers in the same file using `HttpApiBuilder.group`. All Confect action [services](/concepts/services) (`QueryRunner`, `MutationRunner`, `ActionRunner`, `Scheduler`, `Auth`, `ActionMeta`, `StorageReader`, `StorageWriter`, `StorageActionWriter`) are available in handlers.
 
 ```ts confect/http/notes.ts (continued)
 const NotesGroupLive = HttpApiBuilder.group(
@@ -60,10 +66,16 @@ const NotesGroupLive = HttpApiBuilder.group(
     ),
 );
 
-export const ApiLive = HttpApiBuilder.api(Api).pipe(
+export const ApiLive = HttpApiBuilder.layer(Api).pipe(
   Layer.provide(NotesGroupLive),
 );
 ```
+
+<Note>
+  Each group is provided as its own `Layer` (built with
+  `HttpApiBuilder.group(Api, name, build)`) and composed onto
+  `HttpApiBuilder.layer(Api)` via `Layer.provide`.
+</Note>
 
 ## Creating the router
 
@@ -71,13 +83,14 @@ Create the Convex HTTP router in `confect/http.ts` using `HttpApi.make` from `@c
 
 ```ts confect/http.ts
 import { HttpApi } from "@confect/server";
-import { HttpMiddleware } from "@effect/platform";
+import { HttpMiddleware } from "effect/unstable/http";
 import { flow } from "effect";
 
-import { ApiLive } from "./http/notes";
+import { Api, ApiLive } from "./http/notes";
 
 export default HttpApi.make({
   "/api/": {
+    api: Api,
     apiLive: ApiLive,
     middleware: flow(HttpMiddleware.cors(), HttpMiddleware.logger),
   },
@@ -88,7 +101,8 @@ Each path prefix entry accepts:
 
 | Property | Description |
 | --- | --- |
-| `apiLive` | A `Layer` providing `HttpApi.Api`, built with `HttpApiBuilder.api` |
+| `api` | The `HttpApi` value used for route reflection and Scalar docs |
+| `apiLive` | A `Layer` providing the HTTP API, built with `HttpApiBuilder.layer` |
 | `middleware` | Optional middleware function (e.g. `HttpMiddleware.cors()`, `HttpMiddleware.logger`) |
 | `scalar` | Optional [Scalar configuration](https://github.com/scalar/scalar) to customize the interactive API docs |
 

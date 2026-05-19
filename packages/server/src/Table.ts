@@ -26,7 +26,7 @@ export const isTable = (u: unknown): u is Any =>
 
 export interface Table<
   Name_ extends string,
-  TableSchema_ extends Schema.Schema.AnyNoContext,
+  TableSchema_ extends Schema.Codec<any, any, never, never>,
   TableValidator_ extends GenericValidator =
     TableSchemaToTableValidator<TableSchema_>,
   Indexes_ extends GenericTableIndexes = {},
@@ -128,7 +128,7 @@ export interface Any {
 
 export type AnyWithProps = Table<
   any,
-  Schema.Schema.AnyNoContext,
+  Schema.Codec<any, any, never, never>,
   GenericValidator,
   GenericTableIndexes,
   GenericTableSearchIndexes,
@@ -305,7 +305,7 @@ const Proto = {
 
 const makeProto = <
   Name_ extends string,
-  TableSchema_ extends Schema.Schema.AnyNoContext,
+  TableSchema_ extends Schema.Codec<any, any, never, never>,
   TableValidator_ extends Validator<any, any, any>,
   Indexes_ extends GenericTableIndexes,
   SearchIndexes_ extends GenericTableSearchIndexes,
@@ -348,7 +348,7 @@ const makeProto = <
  */
 export const make = <
   const Name_ extends string,
-  TableSchema_ extends Schema.Schema.AnyNoContext,
+  TableSchema_ extends Schema.Codec<any, any, never, never>,
   TableValidator_ extends GenericValidator =
     TableSchemaToTableValidator<TableSchema_>,
   Indexes_ extends GenericTableIndexes = {},
@@ -394,8 +394,8 @@ export const scheduledFunctionsTable = make(
     name: Schema.String,
     args: Schema.Array(Schema.Any),
     scheduledTime: Schema.Number,
-    completedTime: Schema.optionalWith(Schema.Number, { exact: true }),
-    state: Schema.Union(
+    completedTime: Schema.optionalKey(Schema.Number),
+    state: Schema.Union([
       Schema.Struct({ kind: Schema.Literal("pending") }),
       Schema.Struct({ kind: Schema.Literal("inProgress") }),
       Schema.Struct({ kind: Schema.Literal("success") }),
@@ -404,7 +404,7 @@ export const scheduledFunctionsTable = make(
         error: Schema.String,
       }),
       Schema.Struct({ kind: Schema.Literal("canceled") }),
-    ),
+    ]),
   }),
 );
 
@@ -413,7 +413,7 @@ export const storageTable = make(
   Schema.Struct({
     sha256: Schema.String,
     size: Schema.Number,
-    contentType: Schema.optionalWith(Schema.String, { exact: true }),
+    contentType: Schema.optionalKey(Schema.String),
   }),
 );
 

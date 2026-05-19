@@ -2,7 +2,7 @@ import { FunctionSpec, GenericId, GroupSpec } from "@confect/core";
 import { Schema } from "effect";
 import { Notes } from "../tables/Notes";
 
-export class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
+export class NoteNotFound extends Schema.TaggedErrorClass<NoteNotFound>()(
   "NoteNotFound",
   { noteId: GenericId.GenericId("notes") },
 ) {}

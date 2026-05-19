@@ -1,6 +1,6 @@
 import * as Ref from "@confect/core/Ref";
 import { type GenericActionCtx } from "convex/server";
-import type { ParseResult, Effect } from "effect";
+import type { Effect, Schema } from "effect";
 import { Context, Layer } from "effect";
 
 const make =
@@ -10,7 +10,7 @@ const make =
     ...args: Ref.OptionalArgs<Action>
   ): Effect.Effect<
     Ref.Returns<Action>,
-    Ref.Error<Action> | ParseResult.ParseError
+    Ref.Error<Action> | Schema.SchemaError
   > =>
     Ref.runWithCodec(
       action,
@@ -19,7 +19,7 @@ const make =
         runAction(functionReference, encodedArgs),
     );
 
-export const ActionRunner = Context.GenericTag<ReturnType<typeof make>>(
+export const ActionRunner = Context.Service<ReturnType<typeof make>>(
   "@confect/server/ActionRunner",
 );
 export type ActionRunner = typeof ActionRunner.Identifier;

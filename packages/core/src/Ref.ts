@@ -5,7 +5,6 @@ import type {
 import { makeFunctionReference } from "convex/server";
 import type { Value } from "convex/values";
 import { ConvexError } from "convex/values";
-import type { ParseResult } from "effect";
 import { Effect, Match, Option, Schema } from "effect";
 import type * as FunctionSpec from "./FunctionSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
@@ -209,10 +208,10 @@ export const hasErrorSchema = (ref: Any): boolean =>
 export const encodeArgs = <Ref_ extends Any>(
   ref: Ref_,
   args: Args<Ref_>,
-): Effect.Effect<unknown, ParseResult.ParseError> =>
+): Effect.Effect<unknown, Schema.SchemaError> =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag("Confect", (confectFunctionProvenance) =>
-      Schema.encode(confectFunctionProvenance.args)(args),
+      Schema.encodeEffect(confectFunctionProvenance.args)(args),
     ),
     Match.tag("Convex", () => Effect.succeed(args)),
     Match.exhaustive,
@@ -221,10 +220,10 @@ export const encodeArgs = <Ref_ extends Any>(
 export const decodeReturns = <Ref_ extends Any>(
   ref: Ref_,
   returns: unknown,
-): Effect.Effect<Returns<Ref_>, ParseResult.ParseError> =>
+): Effect.Effect<Returns<Ref_>, Schema.SchemaError> =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag("Confect", (confectFunctionProvenance) =>
-      Schema.decode(confectFunctionProvenance.returns)(returns),
+      Schema.decodeEffect(confectFunctionProvenance.returns)(returns),
     ),
     Match.tag("Convex", () => Effect.succeed(returns)),
     Match.exhaustive,
@@ -293,12 +292,12 @@ export const decodeErrorOrElse =
 export const decodeError = <Ref_ extends Any>(
   ref: Ref_,
   encodedError: unknown,
-): Effect.Effect<Option.Option<Error<Ref_>>, ParseResult.ParseError> =>
+): Effect.Effect<Option.Option<Error<Ref_>>, Schema.SchemaError> =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag("Confect", (confectFunctionProvenance) =>
       confectFunctionProvenance.error !== undefined
         ? Effect.map(
-            Schema.decode(confectFunctionProvenance.error)(encodedError),
+            Schema.decodeEffect(confectFunctionProvenance.error)(encodedError),
             Option.some,
           )
         : Effect.succeed(Option.none<Error<Ref_>>()),
@@ -361,16 +360,29 @@ export const runWithCodec = <Ref_ extends Any, E = never>(
     encodedArgs: unknown,
   ) => PromiseLike<unknown>,
   mapUnknownError?: (error: unknown) => E,
-): Effect.Effect<Returns<Ref_>, E | Error<Ref_> | ParseResult.ParseError> =>
+): Effect.Effect<Returns<Ref_>, E | Error<Ref_> | Schema.SchemaError> =>
   Effect.gen(function* () {
     const functionReference = getFunctionReference(ref);
     const functionProvenance = ref.functionSpec.functionProvenance;
+    const UnknownInvokeErrorTypeId = Symbol(
+      "@confect/core/Ref/UnknownInvokeError",
+    );
+    type UnknownInvokeError = {
+      readonly [UnknownInvokeErrorTypeId]: true;
+      readonly error: unknown;
+    };
+    const isUnknownInvokeError = (
+      error: unknown,
+    ): error is UnknownInvokeError =>
+      typeof error === "object" &&
+      error !== null &&
+      UnknownInvokeErrorTypeId in error;
     const invoke = (
       encodedArgs: unknown,
     ): Effect.Effect<unknown, Error<Ref_> | E> =>
       Effect.tryPromise({
         try: () => Promise.resolve(call(functionReference, encodedArgs)),
-        catch: (error): Error<Ref_> | E => {
+        catch: (error): Error<Ref_> | E | UnknownInvokeError => {
           if (isConvexError(error)) {
             const decoded = decodeErrorSync(ref, error.data);
             if (Option.isSome(decoded)) {
@@ -380,17 +392,25 @@ export const runWithCodec = <Ref_ extends Any, E = never>(
           if (mapUnknownError !== undefined) {
             return mapUnknownError(error);
           }
-          throw error;
+          return { [UnknownInvokeErrorTypeId]: true, error };
         },
-      });
+      }).pipe(
+        Effect.matchEffect({
+          onFailure: (error) =>
+            isUnknownInvokeError(error)
+              ? Effect.die(error.error)
+              : Effect.fail(error),
+          onSuccess: (value) => Effect.succeed(value),
+        }),
+      );
     return yield* Match.value(functionProvenance).pipe(
       Match.tag("Confect", (confectFunctionProvenance) =>
         Effect.gen(function* () {
-          const encodedArgs = yield* Schema.encode(
+          const encodedArgs = yield* Schema.encodeEffect(
             confectFunctionProvenance.args,
           )(args);
           const encodedReturns = yield* invoke(encodedArgs);
-          return yield* Schema.decode(confectFunctionProvenance.returns)(
+          return yield* Schema.decodeEffect(confectFunctionProvenance.returns)(
             encodedReturns,
           );
         }),

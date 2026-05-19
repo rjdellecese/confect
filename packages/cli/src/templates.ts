@@ -209,6 +209,7 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
         yield* cbw.writeLine("type DataModel,");
         yield* cbw.writeLine("DatabaseReader as DatabaseReader_,");
         yield* cbw.writeLine("DatabaseWriter as DatabaseWriter_,");
+        yield* cbw.writeLine("Meta as Meta_,");
         yield* cbw.writeLine("MutationCtx as MutationCtx_,");
         yield* cbw.writeLine("MutationRunner as MutationRunner_,");
         yield* cbw.writeLine("QueryCtx as QueryCtx_,");
@@ -328,6 +329,23 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
     );
     yield* cbw.blankLine();
 
+    // Meta
+    yield* cbw.writeLine("export const QueryMeta = Meta_.QueryMeta;");
+    yield* cbw.writeLine(
+      "export type QueryMeta = typeof QueryMeta.Identifier;",
+    );
+    yield* cbw.blankLine();
+    yield* cbw.writeLine("export const MutationMeta = Meta_.MutationMeta;");
+    yield* cbw.writeLine(
+      "export type MutationMeta = typeof MutationMeta.Identifier;",
+    );
+    yield* cbw.blankLine();
+    yield* cbw.writeLine("export const ActionMeta = Meta_.ActionMeta;");
+    yield* cbw.writeLine(
+      "export type ActionMeta = typeof ActionMeta.Identifier;",
+    );
+    yield* cbw.blankLine();
+
     // QueryCtx
     yield* cbw.writeLine("export const QueryCtx =");
     yield* cbw.indent(
@@ -392,7 +410,7 @@ class CodeBlockWriter {
   indent<E = never, R = never>(
     eff: Effect.Effect<void, E, R>,
   ): Effect.Effect<void, E, R> {
-    return Effect.gen(this, function* () {
+    return Effect.gen({ self: this }, function* () {
       const indentationLevel = this.writer.getIndentationLevel();
       this.writer.setIndentationLevel(indentationLevel + 1);
       yield* eff;

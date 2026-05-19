@@ -1,27 +1,22 @@
-import { Command, Path } from "@effect/platform";
-import { NodeContext } from "@effect/platform-node";
+import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import path from "node:path";
 import { ConvexHttpClient } from "convex/browser";
-import {
-  Context,
-  Duration,
-  Effect,
-  Layer,
-  Option,
-  Schema,
-  Stream,
-} from "effect";
+import { Context, Duration, Effect, Layer, Schema } from "effect";
 
-class BackendNotReadyError extends Schema.TaggedError<BackendNotReadyError>()(
+class BackendNotReadyError extends Schema.TaggedErrorClass<BackendNotReadyError>()(
   "BackendNotReadyError",
   { message: Schema.String },
 ) {}
 
-export class LocalBackend extends Context.Tag(
-  "@confect/server/test/local-backend/LocalBackend",
-)<LocalBackend, { readonly client: ConvexHttpClient }>() {}
+export class LocalBackend extends Context.Service<
+  LocalBackend,
+  { readonly client: ConvexHttpClient }
+>()("@confect/server/test/local-backend/LocalBackend") {}
 
 const READY_LINE = "Convex functions ready!";
-const URL = "http://127.0.0.1:3210";
+const CLOUD_PORT = 13210;
+const SITE_PORT = 13211;
+const URL = `http://127.0.0.1:${CLOUD_PORT}`;
 
 // Knobs read by `crates/common/src/knobs.rs` in convex-backend. Lowering
 // these shrinks `MAX_CACHE_AGE` (= `USER_TIMEOUT` + `SYSTEM_TIMEOUT` + 1s,
@@ -49,57 +44,102 @@ export const maxCacheAge = Duration.seconds(
  * the CLI takes the "existing deployment" path and skips boilerplate
  * codegen that would otherwise overwrite committed fixture files.
  */
+const waitForReady = (
+  child: ChildProcessWithoutNullStreams,
+): Effect.Effect<void, BackendNotReadyError> =>
+  Effect.callback<void, BackendNotReadyError>((resume) => {
+    let done = false;
+    const complete = (effect: Effect.Effect<void, BackendNotReadyError>) => {
+      if (!done) {
+        done = true;
+        resume(effect);
+      }
+    };
+    const onData = (chunk: Buffer | string) => {
+      if (String(chunk).includes(READY_LINE)) {
+        complete(Effect.void);
+      }
+    };
+    const onError = (error: Error) => {
+      complete(
+        Effect.fail(new BackendNotReadyError({ message: error.message })),
+      );
+    };
+    const onExit = () => {
+      complete(
+        Effect.fail(
+          new BackendNotReadyError({
+            message: `convex dev exited before printing "${READY_LINE}"`,
+          }),
+        ),
+      );
+    };
+    const cleanup = () => {
+      clearTimeout(timeout);
+      child.stdout.off("data", onData);
+      child.stderr.off("data", onData);
+      child.off("error", onError);
+      child.off("exit", onExit);
+    };
+    const timeout = setTimeout(() => {
+      complete(
+        Effect.fail(
+          new BackendNotReadyError({
+            message: `convex dev did not print "${READY_LINE}" within 90s (cold-start binary download?)`,
+          }),
+        ),
+      );
+    }, 90_000);
+
+    child.stdout.on("data", onData);
+    child.stderr.on("data", onData);
+    child.on("error", onError);
+    child.on("exit", onExit);
+
+    return Effect.sync(cleanup);
+  });
+
 const make = Effect.gen(function* () {
-  const path = yield* Path.Path;
   const fixturesDir = path.resolve(import.meta.dirname, "./fixtures");
 
-  const command = Command.make(
-    "pnpm",
-    "convex",
-    "dev",
-    "--typecheck=disable",
-    "--codegen=disable",
-    "--tail-logs=disable",
-  ).pipe(
-    Command.workingDirectory(fixturesDir),
-    Command.env({
-      CONVEX_AGENT_MODE: "anonymous",
-      DATABASE_UDF_USER_TIMEOUT_SECONDS: USER_TIMEOUT_SECONDS.toString(),
-      DATABASE_UDF_SYSTEM_TIMEOUT_SECONDS: SYSTEM_TIMEOUT_SECONDS.toString(),
-    }),
-    Command.stdout("pipe"),
-    Command.stderr("pipe"),
-  );
-
-  const process = yield* Command.start(command);
-
-  // If the streams close before READY_LINE appears, `Stream.runHead` returns
-  // `None` and we fail explicitly rather than letting the timeout hide it.
-  const readySeen = yield* Stream.merge(process.stdout, process.stderr).pipe(
-    Stream.decodeText("utf-8"),
-    Stream.find((chunk) => chunk.includes(READY_LINE)),
-    Stream.runHead,
-    Effect.timeoutFail({
-      duration: "90 seconds",
-      onTimeout: () =>
-        new BackendNotReadyError({
-          message: `convex dev did not print "${READY_LINE}" within 90s (cold-start binary download?)`,
-        }),
-    }),
-  );
-
-  return yield* Option.match(readySeen, {
-    onSome: () =>
-      Effect.succeed(LocalBackend.of({ client: new ConvexHttpClient(URL) })),
-    onNone: () =>
-      Effect.fail(
-        new BackendNotReadyError({
-          message: `convex dev exited before printing "${READY_LINE}"`,
-        }),
+  const child = yield* Effect.acquireRelease(
+    Effect.sync(() =>
+      spawn(
+        "pnpm",
+        [
+          "convex",
+          "dev",
+          "--local-cloud-port",
+          CLOUD_PORT.toString(),
+          "--local-site-port",
+          SITE_PORT.toString(),
+          "--typecheck=disable",
+          "--codegen=disable",
+          "--tail-logs=disable",
+        ],
+        {
+          cwd: fixturesDir,
+          env: {
+            ...process.env,
+            CONVEX_AGENT_MODE: "anonymous",
+            DATABASE_UDF_USER_TIMEOUT_SECONDS: USER_TIMEOUT_SECONDS.toString(),
+            DATABASE_UDF_SYSTEM_TIMEOUT_SECONDS:
+              SYSTEM_TIMEOUT_SECONDS.toString(),
+          },
+        },
       ),
-  });
+    ),
+    (child) =>
+      Effect.sync(() => {
+        if (!child.killed) {
+          child.kill("SIGTERM");
+        }
+      }),
+  );
+
+  yield* waitForReady(child);
+
+  return LocalBackend.of({ client: new ConvexHttpClient(URL) });
 });
 
-export const layer = Layer.scoped(LocalBackend, make).pipe(
-  Layer.provide(NodeContext.layer),
-);
+export const layer = Layer.effect(LocalBackend)(make);

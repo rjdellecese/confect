@@ -63,3 +63,11 @@ Delete the document with the given ID.
 ```ts
 writer.table("notes").delete(noteId);
 ```
+
+<Note>
+  Convex 1.31+ also supports the explicit-table-id form
+  (`db.patch("table", id, ...)`, `db.replace("table", id, ...)`,
+  `db.delete("table", id)`) at the base API layer. Confect's `writer`
+  is bound to a single table per call, so the table argument is
+  implicit.
+</Note>

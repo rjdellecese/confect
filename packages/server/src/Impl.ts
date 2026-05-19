@@ -28,8 +28,7 @@ export interface AnyWithProps extends Impl<
 export const Impl = <
   Api_ extends Api.AnyWithProps,
   FinalizationStatus_ extends FinalizationStatus,
->() =>
-  Context.GenericTag<Impl<Api_, FinalizationStatus_>>(`@confect/server/Impl`);
+>() => Context.Service<Impl<Api_, FinalizationStatus_>>(`@confect/server/Impl`);
 
 export const make = <Api_ extends Api.AnyWithProps>(
   api: Api_,
@@ -50,10 +49,11 @@ export const make = <Api_ extends Api.AnyWithProps>(
 export const finalize = <Api_ extends Api.AnyWithProps>(
   impl: Layer.Layer<Impl<Api_, "Unfinalized">>,
 ): Layer.Layer<Impl<Api_, "Finalized">> =>
-  Layer.map(impl, (context) =>
-    Context.make(Impl<Api_, "Finalized">(), {
+  Layer.effect(
+    Impl<Api_, "Finalized">(),
+    Effect.map(Effect.service(Impl<Api_, "Unfinalized">()), (unfinalized) => ({
       [TypeId]: TypeId,
-      api: Context.get(context, Impl<Api_, "Unfinalized">()).api,
-      finalizationStatus: "Finalized",
-    }),
-  );
+      api: unfinalized.api,
+      finalizationStatus: "Finalized" as const,
+    })),
+  ).pipe(Layer.provide(impl));

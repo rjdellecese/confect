@@ -72,7 +72,7 @@ describe("Equal", () => {
       true,
     );
     expect(
-      Equal.equals(QueryResult.fail(new Error("x")), QueryResult.fail(err)),
+      Equal.equals(QueryResult.fail(new Error("y")), QueryResult.fail(err)),
     ).toBe(false);
   });
 

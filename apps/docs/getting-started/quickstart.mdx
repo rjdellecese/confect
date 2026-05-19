@@ -4,24 +4,38 @@ title: "Quickstart"
 description: "Install Confect and build a type-safe Convex app with Effect schemas in minutes."
 ---
 
+<Note>
+  This guide targets the Effect 4 prerelease (`effect4` dist-tag). For
+  the stable Effect 3 release, see the [v7 docs
+  branch](https://github.com/rjdellecese/confect/tree/main). If you're
+  upgrading from Effect 3, see the [Migrating to Effect
+  4](/guides/migrating-to-effect-4) guide.
+</Note>
+
 ## Installation
+
+Confect's Effect 4 release ships under the `effect4` dist-tag. Install Confect alongside `effect@4.0.0-beta.67` and `convex@^1.39.0`.
 
 <CodeGroup>
 
 ```bash pnpm
-pnpm add convex @confect/core @confect/server @confect/cli @confect/react
+pnpm add convex@^1.39.0 effect@4.0.0-beta.67 \
+  @confect/core@effect4 @confect/server@effect4 @confect/cli@effect4 @confect/react@effect4
 ```
 
 ```bash npm
-npm install convex @confect/core @confect/server @confect/cli @confect/react
+npm install convex@^1.39.0 effect@4.0.0-beta.67 \
+  @confect/core@effect4 @confect/server@effect4 @confect/cli@effect4 @confect/react@effect4
 ```
 
 ```bash yarn
-yarn add convex @confect/core @confect/server @confect/cli @confect/react
+yarn add convex@^1.39.0 effect@4.0.0-beta.67 \
+  @confect/core@effect4 @confect/server@effect4 @confect/cli@effect4 @confect/react@effect4
 ```
 
 ```bash bun
-bun add convex @confect/core @confect/server @confect/cli @confect/react
+bun add convex@^1.39.0 effect@4.0.0-beta.67 \
+  @confect/core@effect4 @confect/server@effect4 @confect/cli@effect4 @confect/react@effect4
 ```
 
 </CodeGroup>

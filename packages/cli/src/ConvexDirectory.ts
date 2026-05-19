@@ -1,68 +1,54 @@
-import { FileSystem, Path } from "@effect/platform";
-import { Effect, Option, Ref, Schema } from "effect";
-import { ProjectRoot } from "./ProjectRoot";
+/**
+ * Convex directory discovery: reads `convex.json#functions` to locate the
+ * Convex functions directory, falling back to `<projectRoot>/convex`.
+ */
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 
-export class ConvexDirectory extends Effect.Service<ConvexDirectory>()(
-  "@confect/cli/ConvexDirectory",
-  {
-    effect: Effect.gen(function* () {
-      const convexDirectory = yield* findConvexDirectory;
+import * as Fs from "./internal/fs";
+import * as Path from "./internal/path";
+import { findProjectRoot } from "./ProjectRoot";
 
-      const ref = yield* Ref.make<string>(convexDirectory);
-
-      return { get: Ref.get(ref) } as const;
-    }),
-    dependencies: [ProjectRoot.Default],
-    accessors: true,
-  },
-) {}
-
-export class ConvexDirectoryNotFoundError extends Schema.TaggedError<ConvexDirectoryNotFoundError>()(
+export class ConvexDirectoryNotFoundError extends Schema.TaggedErrorClass<ConvexDirectoryNotFoundError>()(
   "ConvexDirectoryNotFoundError",
   {},
 ) {
-  override get message(): string {
+  get message(): string {
     return "Could not find Convex directory";
   }
 }
 
-/**
- * Schema for `convex.json` configuration file.
- * @see https://docs.convex.dev/production/project-configuration
- */
-const ConvexJsonConfig = Schema.parseJson(
+const ConvexJsonConfig = Schema.fromJsonString(
   Schema.Struct({
     functions: Schema.optional(Schema.String),
   }),
 );
 
-const findConvexDirectory = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
+export const findConvexDirectory = Effect.gen(function* () {
+  const projectRoot = yield* findProjectRoot;
+  const defaultPath = Path.join(projectRoot, "convex");
+  const convexJsonPath = Path.join(projectRoot, "convex.json");
 
-  const projectRoot = yield* ProjectRoot.get;
-
-  const defaultPath = path.join(projectRoot, "convex");
-
-  const convexJsonPath = path.join(projectRoot, "convex.json");
-
-  const convexDirectory = yield* Effect.if(fs.exists(convexJsonPath), {
-    onTrue: () =>
-      fs.readFileString(convexJsonPath).pipe(
-        Effect.andThen(Schema.decodeOption(ConvexJsonConfig)),
+  const convexDirectory = (yield* Fs.exists(convexJsonPath))
+    ? yield* Fs.readFileString(convexJsonPath).pipe(
+        Effect.flatMap((s) => Schema.decodeUnknownEffect(ConvexJsonConfig)(s)),
         Effect.map((config) =>
-          Option.fromNullable(config.functions).pipe(
-            Option.map((functionsDir) => path.join(projectRoot, functionsDir)),
+          Option.fromNullishOr(config.functions).pipe(
+            Option.map((functionsDir) => Path.join(projectRoot, functionsDir)),
+            Option.getOrElse(() => defaultPath),
           ),
         ),
-        Effect.andThen(Option.getOrElse(() => defaultPath)),
-      ),
-    onFalse: () => Effect.succeed(defaultPath),
-  });
+        Effect.matchEffect({
+          onFailure: () => Effect.succeed(defaultPath),
+          onSuccess: Effect.succeed,
+        }),
+      )
+    : defaultPath;
 
-  if (yield* fs.exists(convexDirectory)) {
+  if (yield* Fs.exists(convexDirectory)) {
     return convexDirectory;
-  } else {
-    return yield* new ConvexDirectoryNotFoundError();
   }
+
+  return yield* new ConvexDirectoryNotFoundError();
 });

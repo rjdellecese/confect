@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - main
+      - effect4
   pull_request:
     branches:
       - main
+      - effect4
 
 jobs:
   format:
@@ -132,4 +134,4 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/confect-setup
-      - run: pnpm --filter ${{ matrix.package }} build
+      - run: pnpm --filter "${{ matrix.package }}..." build

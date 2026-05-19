@@ -4,7 +4,7 @@ import {
   HttpApiEndpoint,
   HttpApiGroup,
   OpenApi,
-} from "@effect/platform";
+} from "effect/unstable/httpapi";
 import { Effect, Layer, Schema } from "effect";
 import refs from "../_generated/refs";
 import { QueryRunner } from "../_generated/services";
@@ -12,9 +12,9 @@ import { Notes } from "../tables/Notes";
 
 class ApiGroup extends HttpApiGroup.make("notes")
   .add(
-    HttpApiEndpoint.get("getFirst", "/get-first")
-      .annotate(OpenApi.Description, "Get the first note, if there is one.")
-      .addSuccess(Schema.Option(Notes.Doc)),
+    HttpApiEndpoint.get("getFirst", "/get-first", {
+      success: Schema.Option(Notes.Doc),
+    }).annotate(OpenApi.Description, "Get the first note, if there is one."),
   )
   .annotate(OpenApi.Title, "Notes")
   .annotate(OpenApi.Description, "Operations on notes.") {}
@@ -49,6 +49,6 @@ const ApiGroupLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
   ),
 );
 
-export const ApiLive = HttpApiBuilder.api(Api).pipe(
+export const ApiLive = HttpApiBuilder.layer(Api).pipe(
   Layer.provide(ApiGroupLive),
 );

@@ -4,7 +4,21 @@ title: "Testing"
 description: "Test your Confect functions without a live Convex backend."
 ---
 
+<Note>
+  This page targets the `@confect/test@effect4` prerelease, which
+  depends on `effect@4.0.0-beta.67`, `@effect/vitest@4.0.0-beta.67`,
+  `convex@^1.39.0`, and `convex-test@^0.0.53`. For Effect 3 docs, see
+  the stable `@confect/test` (latest) release.
+</Note>
+
 `@confect/test` wraps [`convex-test`](https://docs.convex.dev/testing) with Effect-native APIs. It provides a `TestConfect` service that lets you call your Confect functions using refs, run arbitrary mutation-context code for test setup, and test with user identities.
+
+<Tip>
+  `convex-test@^0.0.53` builds on the parallel-test isolation upgrade
+  introduced in `0.0.45`: each `convexTest()` instance scopes its
+  in-memory state via `AsyncLocalStorage`, which removes flakiness
+  when multiple test files (or `describe` blocks) run concurrently.
+</Tip>
 
 ## Installation
 
@@ -100,11 +114,11 @@ Effect.gen(function* () {
 
 ## Typed errors
 
-When a ref's spec declares an `error` schema, the decoded error is added to the error channel of `query`, `mutation`, and `action` alongside `ParseError`. See [Error Handling](/server/error-handling) for how to declare error schemas.
+When a ref's spec declares an `error` schema, the decoded error is added to the error channel of `query`, `mutation`, and `action` alongside `Schema.SchemaError`. See [Error Handling](/server/error-handling) for how to declare error schemas.
 
 ```ts
 import { describe, it } from "@effect/vitest";
-import { assertLeft } from "@effect/vitest/utils";
+import { assertFailure } from "@effect/vitest/utils";
 import { Effect } from "effect";
 
 import refs from "./confect/_generated/refs";
@@ -119,17 +133,19 @@ describe("notes", () => {
         .query(refs.public.notes.getOrFail, {
           noteId: "missing" as GenericId<"notes">,
         })
-        .pipe(Effect.either);
+        .pipe(Effect.result);
 
-      assertLeft(result, new NoteNotFound({ noteId: "missing" }));
+      assertFailure(result, new NoteNotFound({ noteId: "missing" }));
     }).pipe(Effect.provide(TestConfect.layer())),
   );
 });
 ```
 
+`Effect.result(eff)` materialises the error channel as `Result.Result<A, E>`. Use `assertSuccess` / `assertFailure` from `@effect/vitest/utils` to assert on the result.
+
 ## Running setup code
 
-Use `run` to execute arbitrary code with mutation-context services (like `DatabaseWriter`) for test setup. When the handler returns a value, pass a `Schema` as the second argument for decoding.
+Use `run` to execute arbitrary code with mutation-context services (like `DatabaseWriter`) for test setup. When the handler returns a value, pass a `Schema.Codec<A, B, never, never>` as the second argument for decoding.
 
 ```ts
 import { GenericId } from "@confect/core";

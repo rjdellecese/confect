@@ -1,19 +1,18 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
-import { Command } from "@effect/platform";
 import { Console, Duration, Effect, Layer } from "effect";
 import nodeApi from "../_generated/nodeApi";
 
+// v3 invoked an `echo` subprocess via `@effect/platform`'s `Command.make` to
+// demo shelling out from a Node action. The example's observable behavior is
+// just a log line, so the Effect 4 example keeps that behavior inline.
 const send = FunctionImpl.make(
   nodeApi,
   "email",
   "send",
   Effect.fn(function* ({ to, subject, body }) {
-    const result = yield* Command.make(
-      "echo",
+    yield* Console.log(
       `Sending email to ${to} with subject ${subject} and body ${body}…`,
-    ).pipe(Command.stdout("pipe"), Command.string, Effect.orDie);
-
-    yield* Console.log(result);
+    );
 
     yield* Effect.sleep(Duration.seconds(1));
 

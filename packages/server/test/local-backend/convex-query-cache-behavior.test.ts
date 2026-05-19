@@ -13,7 +13,7 @@ import { Duration, Effect, Schema } from "effect";
 import refs from "./fixtures/confect/_generated/refs";
 import * as LocalBackend from "./LocalBackend";
 
-class ConvexQueryError extends Schema.TaggedError<ConvexQueryError>()(
+class ConvexQueryError extends Schema.TaggedErrorClass<ConvexQueryError>()(
   "ConvexQueryError",
   { message: Schema.String },
 ) {}
@@ -35,7 +35,10 @@ const queryOnce = <R extends Ref.AnyPublicQuery>(
   });
 
 // `MAX_CACHE_AGE` plus 1s of slack for scheduling jitter.
-const SLEEP_PAST_CACHE = Duration.sum(LocalBackend.maxCacheAge, "1 second");
+const SLEEP_PAST_CACHE = Duration.sum(
+  LocalBackend.maxCacheAge,
+  Duration.seconds(1),
+);
 
 const captureAcrossEvictionWindow = <PublicQueryRef extends Ref.AnyPublicQuery>(
   ref: PublicQueryRef,
@@ -53,7 +56,7 @@ describe("Convex query cache behavior", () => {
   // `excludeTestServices: true` opts out of `TestClock` so `Effect.sleep`
   // waits real wall-clock time and actually crosses the eviction window.
   layer(LocalBackend.layer, {
-    timeout: "120 seconds",
+    timeout: Duration.seconds(120),
     excludeTestServices: true,
   })((it) => {
     it.effect(

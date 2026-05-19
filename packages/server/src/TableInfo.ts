@@ -65,9 +65,11 @@ export type ConvexTableInfo<TableInfo_ extends AnyWithProps> = {
   vectorIndexes: TableInfo_["vectorIndexes"];
 };
 
-export type TableSchema<TableInfo_ extends AnyWithProps> = Schema.Schema<
+export type TableSchema<TableInfo_ extends AnyWithProps> = Schema.Codec<
   TableInfo_["document"],
-  TableInfo_["encodedDocument"]
+  TableInfo_["encodedDocument"],
+  never,
+  never
 >;
 
 export type Document<TableInfo_ extends AnyWithProps> = TableInfo_["document"];

@@ -1,7 +1,11 @@
-import { DatabaseSchema, Spec } from "@confect/core";
-import { Command } from "@effect/cli";
-import { FileSystem, Path } from "@effect/platform";
+import { Spec } from "@confect/core";
+import { DatabaseSchema } from "@confect/server";
 import { Effect, Match, Option } from "effect";
+import { Command } from "effect/unstable/cli";
+import { findConfectDirectory } from "../ConfectDirectory";
+import { findConvexDirectory } from "../ConvexDirectory";
+import * as Fs from "../internal/fs";
+import * as Path from "../internal/path";
 import {
   logFileAdded,
   logFileModified,
@@ -9,8 +13,6 @@ import {
   logPending,
   logSuccess,
 } from "../log";
-import { ConfectDirectory } from "../ConfectDirectory";
-import { ConvexDirectory } from "../ConvexDirectory";
 import * as templates from "../templates";
 import {
   bundleAndImport,
@@ -23,16 +25,14 @@ import {
 } from "../utils";
 
 const getNodeSpecPath = Effect.gen(function* () {
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  return path.join(confectDirectory, "nodeSpec.ts");
+  const confectDirectory = yield* findConfectDirectory;
+  return Path.join(confectDirectory, "nodeSpec.ts");
 });
 
 const loadNodeSpec = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
   const nodeSpecPath = yield* getNodeSpecPath;
 
-  if (!(yield* fs.exists(nodeSpecPath))) {
+  if (!(yield* Fs.exists(nodeSpecPath))) {
     return Option.none<Spec.AnyWithPropsWithRuntime<"Node">>();
   }
 
@@ -43,7 +43,7 @@ const loadNodeSpec = Effect.gen(function* () {
     return yield* Effect.die("nodeSpec.ts does not export a valid Node Spec");
   }
 
-  return Option.some(nodeSpec);
+  return Option.some(nodeSpec as Spec.AnyWithPropsWithRuntime<"Node">);
 });
 
 export const codegen = Command.make("codegen", {}, () =>
@@ -85,31 +85,28 @@ export const codegenHandler = Effect.gen(function* () {
 });
 
 const generateConfectGeneratedDirectory = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
+  const confectDirectory = yield* findConfectDirectory;
 
-  if (!(yield* fs.exists(path.join(confectDirectory, "_generated")))) {
-    yield* fs.makeDirectory(path.join(confectDirectory, "_generated"), {
+  if (!(yield* Fs.exists(Path.join(confectDirectory, "_generated")))) {
+    yield* Fs.makeDirectory(Path.join(confectDirectory, "_generated"), {
       recursive: true,
     });
-    yield* logFileAdded(path.join(confectDirectory, "_generated") + "/");
+    yield* logFileAdded(Path.join(confectDirectory, "_generated") + "/");
   }
 });
 
 const generateApi = Effect.gen(function* () {
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
+  const confectDirectory = yield* findConfectDirectory;
 
-  const apiPath = path.join(confectDirectory, "_generated", "api.ts");
-  const apiDir = path.dirname(apiPath);
+  const apiPath = Path.join(confectDirectory, "_generated", "api.ts");
+  const apiDir = Path.dirname(apiPath);
 
-  const schemaImportPath = yield* removePathExtension(
-    path.relative(apiDir, path.join(confectDirectory, "schema.ts")),
+  const schemaImportPath = removePathExtension(
+    Path.relative(apiDir, Path.join(confectDirectory, "schema.ts")),
   );
 
-  const specImportPath = yield* removePathExtension(
-    path.relative(apiDir, path.join(confectDirectory, "spec.ts")),
+  const specImportPath = removePathExtension(
+    Path.relative(apiDir, Path.join(confectDirectory, "spec.ts")),
   );
 
   const apiContents = yield* templates.api({
@@ -121,29 +118,27 @@ const generateApi = Effect.gen(function* () {
 });
 
 export const generateNodeApi = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
+  const confectDirectory = yield* findConfectDirectory;
 
   const nodeSpecPath = yield* getNodeSpecPath;
-  const nodeApiPath = path.join(confectDirectory, "_generated", "nodeApi.ts");
+  const nodeApiPath = Path.join(confectDirectory, "_generated", "nodeApi.ts");
 
-  if (!(yield* fs.exists(nodeSpecPath))) {
-    if (yield* fs.exists(nodeApiPath)) {
-      yield* fs.remove(nodeApiPath);
+  if (!(yield* Fs.exists(nodeSpecPath))) {
+    if (yield* Fs.exists(nodeApiPath)) {
+      yield* Fs.remove(nodeApiPath);
       yield* logFileRemoved(nodeApiPath);
     }
     return;
   }
 
-  const nodeApiDir = path.dirname(nodeApiPath);
+  const nodeApiDir = Path.dirname(nodeApiPath);
 
-  const schemaImportPath = yield* removePathExtension(
-    path.relative(nodeApiDir, path.join(confectDirectory, "schema.ts")),
+  const schemaImportPath = removePathExtension(
+    Path.relative(nodeApiDir, Path.join(confectDirectory, "schema.ts")),
   );
 
-  const nodeSpecImportPath = yield* removePathExtension(
-    path.relative(nodeApiDir, nodeSpecPath),
+  const nodeSpecImportPath = removePathExtension(
+    Path.relative(nodeApiDir, nodeSpecPath),
   );
 
   const nodeApiContents = yield* templates.nodeApi({
@@ -155,11 +150,9 @@ export const generateNodeApi = Effect.gen(function* () {
 });
 
 const generateFunctionModules = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
+  const confectDirectory = yield* findConfectDirectory;
 
-  const specPath = path.join(confectDirectory, "spec.ts");
+  const specPath = Path.join(confectDirectory, "spec.ts");
 
   const specModule = yield* bundleAndImport(specPath);
   const spec = specModule.default;
@@ -168,8 +161,8 @@ const generateFunctionModules = Effect.gen(function* () {
     return yield* Effect.die("spec.ts does not export a valid Convex Spec");
   }
 
-  const nodeImplPath = path.join(confectDirectory, "nodeImpl.ts");
-  const nodeImplExists = yield* fs.exists(nodeImplPath);
+  const nodeImplPath = Path.join(confectDirectory, "nodeImpl.ts");
+  const nodeImplExists = yield* Fs.exists(nodeImplPath);
   const nodeSpecOption = yield* loadNodeSpec;
 
   const mergedSpec = Option.match(nodeSpecOption, {
@@ -181,11 +174,10 @@ const generateFunctionModules = Effect.gen(function* () {
 });
 
 const generateSchema = Effect.gen(function* () {
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  const convexDirectory = yield* ConvexDirectory.get;
+  const confectDirectory = yield* findConfectDirectory;
+  const convexDirectory = yield* findConvexDirectory;
 
-  const confectSchemaPath = path.join(confectDirectory, "schema.ts");
+  const confectSchemaPath = Path.join(confectDirectory, "schema.ts");
 
   yield* bundleAndImport(confectSchemaPath).pipe(
     Effect.andThen((schemaModule) => {
@@ -197,13 +189,13 @@ const generateSchema = Effect.gen(function* () {
     }),
   );
 
-  const convexSchemaPath = path.join(convexDirectory, "schema.ts");
+  const convexSchemaPath = Path.join(convexDirectory, "schema.ts");
 
-  const relativeImportPath = path.relative(
-    path.dirname(convexSchemaPath),
+  const relativeImportPath = Path.relative(
+    Path.dirname(convexSchemaPath),
     confectSchemaPath,
   );
-  const importPathWithoutExt = yield* removePathExtension(relativeImportPath);
+  const importPathWithoutExt = removePathExtension(relativeImportPath);
   const schemaContents = yield* templates.schema({
     schemaImportPath: importPathWithoutExt,
   });
@@ -212,15 +204,14 @@ const generateSchema = Effect.gen(function* () {
 });
 
 const generateServices = Effect.gen(function* () {
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
+  const confectDirectory = yield* findConfectDirectory;
 
-  const confectGeneratedDirectory = path.join(confectDirectory, "_generated");
+  const confectGeneratedDirectory = Path.join(confectDirectory, "_generated");
 
-  const servicesPath = path.join(confectGeneratedDirectory, "services.ts");
-  const schemaImportPath = path.relative(
-    path.dirname(servicesPath),
-    path.join(confectDirectory, "schema"),
+  const servicesPath = Path.join(confectGeneratedDirectory, "services.ts");
+  const schemaImportPath = Path.relative(
+    Path.dirname(servicesPath),
+    Path.join(confectDirectory, "schema"),
   );
 
   const servicesContentsString = yield* templates.services({
@@ -231,19 +222,18 @@ const generateServices = Effect.gen(function* () {
 });
 
 const generateRegisteredFunctions = Effect.gen(function* () {
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
+  const confectDirectory = yield* findConfectDirectory;
 
-  const confectGeneratedDirectory = path.join(confectDirectory, "_generated");
+  const confectGeneratedDirectory = Path.join(confectDirectory, "_generated");
 
-  const registeredFunctionsPath = path.join(
+  const registeredFunctionsPath = Path.join(
     confectGeneratedDirectory,
     "registeredFunctions.ts",
   );
-  const implImportPath = yield* removePathExtension(
-    path.relative(
-      path.dirname(registeredFunctionsPath),
-      path.join(confectDirectory, "impl.ts"),
+  const implImportPath = removePathExtension(
+    Path.relative(
+      Path.dirname(registeredFunctionsPath),
+      Path.join(confectDirectory, "impl.ts"),
     ),
   );
 
@@ -258,31 +248,29 @@ const generateRegisteredFunctions = Effect.gen(function* () {
 });
 
 export const generateNodeRegisteredFunctions = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
+  const confectDirectory = yield* findConfectDirectory;
 
-  const nodeImplPath = path.join(confectDirectory, "nodeImpl.ts");
+  const nodeImplPath = Path.join(confectDirectory, "nodeImpl.ts");
   const nodeSpecPath = yield* getNodeSpecPath;
-  const nodeRegisteredFunctionsPath = path.join(
+  const nodeRegisteredFunctionsPath = Path.join(
     confectDirectory,
     "_generated",
     "nodeRegisteredFunctions.ts",
   );
 
-  const nodeImplExists = yield* fs.exists(nodeImplPath);
-  const nodeSpecExists = yield* fs.exists(nodeSpecPath);
+  const nodeImplExists = yield* Fs.exists(nodeImplPath);
+  const nodeSpecExists = yield* Fs.exists(nodeSpecPath);
 
   if (!nodeImplExists || !nodeSpecExists) {
-    if (yield* fs.exists(nodeRegisteredFunctionsPath)) {
-      yield* fs.remove(nodeRegisteredFunctionsPath);
+    if (yield* Fs.exists(nodeRegisteredFunctionsPath)) {
+      yield* Fs.remove(nodeRegisteredFunctionsPath);
       yield* logFileRemoved(nodeRegisteredFunctionsPath);
     }
     return;
   }
 
-  const nodeImplImportPath = yield* removePathExtension(
-    path.relative(path.dirname(nodeRegisteredFunctionsPath), nodeImplPath),
+  const nodeImplImportPath = removePathExtension(
+    Path.relative(Path.dirname(nodeRegisteredFunctionsPath), nodeImplPath),
   );
 
   const nodeRegisteredFunctionsContents =
@@ -297,22 +285,20 @@ export const generateNodeRegisteredFunctions = Effect.gen(function* () {
 });
 
 const generateRefs = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
+  const confectDirectory = yield* findConfectDirectory;
 
-  const confectGeneratedDirectory = path.join(confectDirectory, "_generated");
-  const refsPath = path.join(confectGeneratedDirectory, "refs.ts");
-  const refsDir = path.dirname(refsPath);
+  const confectGeneratedDirectory = Path.join(confectDirectory, "_generated");
+  const refsPath = Path.join(confectGeneratedDirectory, "refs.ts");
+  const refsDir = Path.dirname(refsPath);
 
-  const specImportPath = yield* removePathExtension(
-    path.relative(refsDir, path.join(confectDirectory, "spec.ts")),
+  const specImportPath = removePathExtension(
+    Path.relative(refsDir, Path.join(confectDirectory, "spec.ts")),
   );
 
   const nodeSpecPath = yield* getNodeSpecPath;
-  const nodeSpecExists = yield* fs.exists(nodeSpecPath);
+  const nodeSpecExists = yield* Fs.exists(nodeSpecPath);
   const nodeSpecImportPath = nodeSpecExists
-    ? yield* removePathExtension(path.relative(refsDir, nodeSpecPath))
+    ? removePathExtension(Path.relative(refsDir, nodeSpecPath))
     : null;
 
   const refsContents = yield* templates.refs({
