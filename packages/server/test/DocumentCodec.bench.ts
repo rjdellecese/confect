@@ -8,16 +8,34 @@
  *
  * | Operation | Users | Notes sparse | Notes full (+1536 embedding) | Large synthetic |
  * |---|---|---|---|---|
- * | Document.decode | ~33 µs | ~37 µs | ~130 µs | ~51 µs |
+ * | Document.decode | ~33 µs | ~37 µs | ~41 µs rich / ~130 µs w/ embedding | ~51 µs |
  * | Document.encode | ~2.4 µs | ~2.7 µs | ~74 µs | ~11 µs |
  *
- * Notes full ×50 batch: ~6.4 ms (~128 µs/doc). Embedding array dominates full Notes cost.
+ * The 1536-dim `embedding` field adds ~90 µs/decode (~130 vs ~41 µs). Notes full ×50:
+ * ~6.4 ms (~128 µs/doc). A 1,000-doc collect with embeddings ≈130 ms decode-only.
  * `extendWithSystemFields` per decode: ~20 µs (cacheable). Document wrapper adds ~55 µs over raw Schema.decode.
+ *
+ * GlobeCommerce-style `CatalogProductConfiguration` (Quantity/Units transformOrFail + BigDecimal wire strings,
+ * 3× dimension structs, many `NullOr` fields):
+ *
+ * | Operation | sparse (mostly null) | full (populated) |
+ * |---|---|---|
+ * | Document.decode | ~45–60 µs | ~155 µs |
+ * | Document.encode | ~9 µs | ~93 µs |
+ * | Raw Schema.decode (pre-extended) | — | ~103 µs |
+ *
+ * Full ×50 ≈ 7.9 ms (~158 µs/doc). Dominated by ~18 `transformOrFail` BigDecimal parses when populated;
+ * sparse decode still walks nested dimension structs with null leaves.
  */
 import { bench } from "@ark/attest";
 import * as SystemFields from "@confect/core/SystemFields";
 import { Document } from "@confect/server";
 import { Effect, pipe, Schema } from "effect";
+import {
+  catalogProductConvexDocFull,
+  catalogProductConvexDocSparse,
+  CatalogProductConfigurationFields,
+} from "./document-codec-fixtures/GlobeCommerceUnits";
 import { Notes } from "./mock-backend/fixtures/confect/tables/Notes";
 import { Users } from "./mock-backend/fixtures/confect/tables/Users";
 
@@ -108,6 +126,13 @@ const LargeDocFields = Schema.Struct({
   ),
 });
 
+const catalogTableName = "catalogProductConfigurations";
+const catalogFields = CatalogProductConfigurationFields;
+const catalogSchemaWithSystemFields = SystemFields.extendWithSystemFields(
+  catalogTableName,
+  catalogFields,
+);
+
 const largeTableName = "largeDocs";
 const largeSchemaWithSystemFields = SystemFields.extendWithSystemFields(
   largeTableName,
@@ -163,6 +188,16 @@ const notesDecodedFull = runSync(
 const largeDecodedDoc = runSync(
   Document.decode(largeConvexDoc, largeTableName, LargeDocFields),
 );
+const catalogDecodedSparse = runSync(
+  Document.decode(
+    catalogProductConvexDocSparse,
+    catalogTableName,
+    catalogFields,
+  ),
+);
+const catalogDecodedFull = runSync(
+  Document.decode(catalogProductConvexDocFull, catalogTableName, catalogFields),
+);
 
 // --- Document.decode / encode (production path) ---
 
@@ -181,6 +216,24 @@ const decodeNotesFull = () =>
 const decodeLarge = () =>
   runSync(Document.decode(largeConvexDoc, largeTableName, LargeDocFields));
 
+const decodeCatalogSparse = () =>
+  runSync(
+    Document.decode(
+      catalogProductConvexDocSparse,
+      catalogTableName,
+      catalogFields,
+    ),
+  );
+
+const decodeCatalogFull = () =>
+  runSync(
+    Document.decode(
+      catalogProductConvexDocFull,
+      catalogTableName,
+      catalogFields,
+    ),
+  );
+
 const encodeUser = () =>
   runSync(Document.encode(userDecodedDoc, Users.name, usersFields));
 
@@ -192,6 +245,14 @@ const encodeNotesFull = () =>
 
 const encodeLarge = () =>
   runSync(Document.encode(largeDecodedDoc, largeTableName, LargeDocFields));
+
+const encodeCatalogSparse = () =>
+  runSync(
+    Document.encode(catalogDecodedSparse, catalogTableName, catalogFields),
+  );
+
+const encodeCatalogFull = () =>
+  runSync(Document.encode(catalogDecodedFull, catalogTableName, catalogFields));
 
 // --- Breakdown: isolate Schema vs Document wrapper vs extendWithSystemFields ---
 
@@ -236,6 +297,21 @@ const decodeNotesSparseBatch = () => {
   }
 };
 
+const decodeCatalogFullBatch = () => {
+  for (let i = 0; i < COLLECT_BATCH; i++) {
+    decodeCatalogFull();
+  }
+};
+
+const rawDecodeCatalogFull = () =>
+  runSync(
+    pipe(
+      catalogProductConvexDocFull,
+      Schema.decode(catalogSchemaWithSystemFields),
+      Effect.orDie,
+    ),
+  );
+
 // --- Benchmarks: decode ---
 
 bench("decode: Users (simple struct)", () => decodeUser()).mark({
@@ -258,6 +334,20 @@ bench("decode: Notes full (nested + 1536-dim embedding)", () =>
 bench("decode: large synthetic doc (nested, unions, 20 history entries)", () =>
   decodeLarge(),
 ).mark({ mean: [55.07, "us"], median: [52.36, "us"] });
+
+bench(
+  "decode: CatalogProductConfiguration sparse (GlobeCommerce, mostly null)",
+  () => decodeCatalogSparse(),
+).mark({ mean: [48.92, "us"], median: [45.02, "us"] });
+
+bench(
+  "decode: CatalogProductConfiguration full (Quantity/Units + 3× dimensions)",
+  () => decodeCatalogFull(),
+).mark({ mean: [159.94, "us"], median: [152.82, "us"] });
+
+bench(`decode: CatalogProductConfiguration full ×${COLLECT_BATCH}`, () =>
+  decodeCatalogFullBatch(),
+).mark({ mean: [7.9, "ms"], median: [7.9, "ms"] });
 
 bench(`decode: Notes full ×${COLLECT_BATCH} (collect-like batch)`, () =>
   decodeNotesFullBatch(),
@@ -288,6 +378,14 @@ bench("encode: large synthetic doc", () => encodeLarge()).mark({
   median: [11.22, "us"],
 });
 
+bench("encode: CatalogProductConfiguration sparse", () =>
+  encodeCatalogSparse(),
+).mark({ mean: [9.51, "us"], median: [9.36, "us"] });
+
+bench("encode: CatalogProductConfiguration full", () =>
+  encodeCatalogFull(),
+).mark({ mean: [94.44, "us"], median: [92.85, "us"] });
+
 // --- Benchmarks: breakdown ---
 
 bench("breakdown: Schema.decode Notes full (pre-extended schema)", () =>
@@ -311,3 +409,13 @@ bench(
   "breakdown: decode without Document wrapper (schema only, pre-extended)",
   () => documentDecodeWithoutExtendPerCall(),
 ).mark({ mean: [76.08, "us"], median: [75.89, "us"] });
+
+bench(
+  "breakdown: Schema.decode CatalogProductConfiguration full (pre-extended)",
+  () => rawDecodeCatalogFull(),
+).mark({ mean: [103.32, "us"], median: [102.58, "us"] });
+
+bench(
+  "breakdown: Document.decode CatalogProductConfiguration full (production)",
+  () => decodeCatalogFull(),
+).mark({ mean: [164.59, "us"], median: [157.73, "us"] });
