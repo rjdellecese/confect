@@ -40,16 +40,16 @@ bench("decode document (recompile decoder each call)", () => {
   Schema.decodeUnknownSync(
     SystemFields.extendWithSystemFields(tableName, NoteSchema),
   )(convexNote);
-}).median([47.01, "us"]);
+}).median([46.06, "us"]);
 
 bench("decode document (cached decoder)", () => {
   cachedDecoder(convexNote);
-}).median([592.56, "ns"]);
+}).median([741.33, "ns"]);
 
 bench("encode document (recompile encoder each call)", () => {
   Schema.encodeSync(NoteSchema)(decodedNote);
-}).median([0.5, "us"]);
+}).median([0.59, "us"]);
 
 bench("encode document (cached encoder)", () => {
   cachedEncoder(decodedNote);
-}).median([455.2, "ns"]);
+}).median([541.55, "ns"]);
