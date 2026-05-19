@@ -169,11 +169,14 @@ importers:
   packages/cli:
     dependencies:
       '@confect/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
       '@effect/cli':
         specifier: ^0.75.1
         version: 0.75.1(@effect/platform@0.96.1(effect@3.21.2))(@effect/printer-ansi@0.49.0(@effect/typeclass@0.40.0(effect@3.21.2))(effect@3.21.2))(@effect/printer@0.49.0(@effect/typeclass@0.40.0(effect@3.21.2))(effect@3.21.2))(effect@3.21.2)
+      '@effect/platform':
+        specifier: 0.96.1
+        version: 0.96.1(effect@3.21.2)
       '@effect/platform-node':
         specifier: 0.106.0
         version: 0.106.0(@effect/cluster@0.58.2(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/workflow@0.18.1(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(effect@3.21.2)
@@ -196,9 +199,6 @@ importers:
       '@effect/language-service':
         specifier: 0.86.1
         version: 0.86.1
-      '@effect/platform':
-        specifier: 0.96.1
-        version: 0.96.1(effect@3.21.2)
       '@effect/vitest':
         specifier: 0.29.0
         version: 0.29.0(effect@3.21.2)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@25.3.3)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.6.0))
@@ -285,7 +285,7 @@ importers:
   packages/js:
     dependencies:
       '@confect/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
       convex:
         specifier: 1.33.1
@@ -325,7 +325,7 @@ importers:
   packages/react:
     dependencies:
       '@confect/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
       react:
         specifier: 19.2.4
@@ -371,7 +371,7 @@ importers:
   packages/server:
     dependencies:
       '@confect/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
       '@effect/platform-node':
         specifier: ^0.106.0
@@ -462,10 +462,10 @@ importers:
   packages/test:
     dependencies:
       '@confect/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
       '@confect/server':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../server
       convex:
         specifier: 1.33.1
