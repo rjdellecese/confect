@@ -36,6 +36,14 @@ export interface Spec<
   add<Group extends GroupSpec.AnyWithPropsWithRuntime<Runtime>>(
     group: Group,
   ): Spec<Runtime, Groups_ | Group>;
+
+  addAt<
+    const Name extends string,
+    Group extends GroupSpec.AnyWithPropsWithRuntime<Runtime>,
+  >(
+    name: Name,
+    group: Group,
+  ): Spec<Runtime, Groups_ | GroupSpec.NamedAt<Group, Name>>;
 }
 
 export interface Any {
@@ -61,6 +69,21 @@ const Proto = {
     return makeProto({
       runtime: this.runtime,
       groups: Record.set(this.groups, group.name, group),
+    });
+  },
+
+  addAt<Group extends GroupSpec.AnyWithProps>(
+    this: AnyWithProps,
+    name: string,
+    group: Group,
+  ) {
+    return makeProto({
+      runtime: this.runtime,
+      groups: Record.set(
+        this.groups,
+        name,
+        GroupSpec.withName(name, group),
+      ),
     });
   },
 };
@@ -100,9 +123,10 @@ export const merge = <
 ): AnyWithProps => {
   const nodeGroup = nodeSpec
     ? Array.reduce(
-        Record.values(nodeSpec.groups),
-        GroupSpec.makeNode("node"),
-        (nodeGroupSpec, group) => nodeGroupSpec.addGroup(group),
+        Record.toEntries(nodeSpec.groups),
+        GroupSpec.makeNodeAt("node"),
+        (nodeGroupSpec, [name, group]) =>
+          nodeGroupSpec.addGroupAt(name, group),
       )
     : null;
 

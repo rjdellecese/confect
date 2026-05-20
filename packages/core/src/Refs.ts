@@ -98,9 +98,10 @@ export const make = <
 } => {
   const nodeGroup = nodeSpec
     ? Array.reduce(
-        Record.values(nodeSpec.groups),
-        GroupSpec.makeNode("node"),
-        (nodeGroupSpec, group) => nodeGroupSpec.addGroup(group),
+        Record.toEntries(nodeSpec.groups),
+        GroupSpec.makeNodeAt("node"),
+        (nodeGroupSpec, [name, group]) =>
+          nodeGroupSpec.addGroupAt(name, group),
       )
     : null;
 
@@ -120,10 +121,10 @@ const makeHelper = (
 ): Any =>
   pipe(
     groups as Record.ReadonlyRecord<string, GroupSpec.AnyWithProps>,
-    Record.map((group) => {
+    Record.map((group, name) => {
       const currentFunctionNamespace = functionNamespace
-        ? `${functionNamespace}/${group.name}`
-        : group.name;
+        ? `${functionNamespace}/${name}`
+        : name;
 
       return Record.union(
         makeHelper(group.groups, currentFunctionNamespace),

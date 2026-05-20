@@ -11,7 +11,7 @@ const Returns = Schema.String;
 
 // --- Small spec: 1 group, 2 functions ---
 const SmallSpec = Spec.make().add(
-  GroupSpec.make("auth")
+  GroupSpec.makeAt("auth")
     .addFunction(
       FunctionSpec.publicQuery({ name: "login", args: Args, returns: Returns }),
     )
@@ -28,7 +28,7 @@ type SmallSpec = typeof SmallSpec;
 // --- Medium spec (original): 4 groups, 12 functions ---
 const MediumSpec = Spec.make()
   .add(
-    GroupSpec.make("users")
+    GroupSpec.makeAt("users")
       .addFunction(
         FunctionSpec.publicQuery({
           name: "list",
@@ -59,7 +59,7 @@ const MediumSpec = Spec.make()
       ),
   )
   .add(
-    GroupSpec.make("posts")
+    GroupSpec.makeAt("posts")
       .addFunction(
         FunctionSpec.publicQuery({
           name: "list",
@@ -83,7 +83,7 @@ const MediumSpec = Spec.make()
       ),
   )
   .add(
-    GroupSpec.make("comments")
+    GroupSpec.makeAt("comments")
       .addFunction(
         FunctionSpec.publicQuery({
           name: "list",
@@ -107,7 +107,7 @@ const MediumSpec = Spec.make()
       ),
   )
   .add(
-    GroupSpec.make("analytics")
+    GroupSpec.makeAt("analytics")
       .addFunction(
         FunctionSpec.internalQuery({
           name: "aggregate",
@@ -129,7 +129,7 @@ type MediumSpec = typeof MediumSpec;
 // --- Large spec: 8 groups, 28 functions ---
 const LargeSpec = Spec.make()
   .add(
-    GroupSpec.make("users")
+    GroupSpec.makeAt("users")
       .addFunction(
         FunctionSpec.publicQuery({
           name: "list",
@@ -160,7 +160,7 @@ const LargeSpec = Spec.make()
       ),
   )
   .add(
-    GroupSpec.make("posts")
+    GroupSpec.makeAt("posts")
       .addFunction(
         FunctionSpec.publicQuery({
           name: "list",
@@ -184,7 +184,7 @@ const LargeSpec = Spec.make()
       ),
   )
   .add(
-    GroupSpec.make("comments")
+    GroupSpec.makeAt("comments")
       .addFunction(
         FunctionSpec.publicQuery({
           name: "list",
@@ -208,7 +208,7 @@ const LargeSpec = Spec.make()
       ),
   )
   .add(
-    GroupSpec.make("analytics")
+    GroupSpec.makeAt("analytics")
       .addFunction(
         FunctionSpec.internalQuery({
           name: "aggregate",
@@ -225,7 +225,7 @@ const LargeSpec = Spec.make()
       ),
   )
   .add(
-    GroupSpec.make("products")
+    GroupSpec.makeAt("products")
       .addFunction(
         FunctionSpec.publicQuery({
           name: "list",
@@ -256,7 +256,7 @@ const LargeSpec = Spec.make()
       ),
   )
   .add(
-    GroupSpec.make("orders")
+    GroupSpec.makeAt("orders")
       .addFunction(
         FunctionSpec.publicQuery({
           name: "list",
@@ -287,7 +287,7 @@ const LargeSpec = Spec.make()
       ),
   )
   .add(
-    GroupSpec.make("notifications")
+    GroupSpec.makeAt("notifications")
       .addFunction(
         FunctionSpec.publicQuery({
           name: "list",
@@ -311,7 +311,7 @@ const LargeSpec = Spec.make()
       ),
   )
   .add(
-    GroupSpec.make("settings")
+    GroupSpec.makeAt("settings")
       .addFunction(
         FunctionSpec.publicQuery({ name: "get", args: Args, returns: Returns }),
       )

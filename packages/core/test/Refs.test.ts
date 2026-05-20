@@ -14,7 +14,7 @@ describe("make", () => {
     const FnReturns = Schema.Array(Schema.String);
 
     const spec = Spec.make().add(
-      GroupSpec.make("notes").addFunction(
+      GroupSpec.makeAt("notes").addFunction(
         FunctionSpec.publicQuery({
           name: "list",
           args: FnArgs,
@@ -43,8 +43,8 @@ describe("make", () => {
 
   it("throws an error if a group and function have the same name", () => {
     const spec = Spec.make().add(
-      GroupSpec.make("notes")
-        .addGroup(GroupSpec.make("list"))
+      GroupSpec.makeAt("notes")
+        .addGroup(GroupSpec.makeAt("list"))
         .addFunction(
           FunctionSpec.publicQuery({
             name: "list",
@@ -63,7 +63,7 @@ describe("make", () => {
     const FnReturns = Schema.String;
 
     const spec = Spec.make().add(
-      GroupSpec.make("notes")
+      GroupSpec.makeAt("notes")
         .addFunction(
           FunctionSpec.publicQuery({
             name: "publicList",
@@ -100,7 +100,7 @@ describe("make", () => {
 
     const spec = Spec.make()
       .add(
-        GroupSpec.make("publicOnly").addFunction(
+        GroupSpec.makeAt("publicOnly").addFunction(
           FunctionSpec.publicQuery({
             name: "list",
             args: FnArgs,
@@ -109,7 +109,7 @@ describe("make", () => {
         ),
       )
       .add(
-        GroupSpec.make("internalOnly").addFunction(
+        GroupSpec.makeAt("internalOnly").addFunction(
           FunctionSpec.internalQuery({
             name: "list",
             args: FnArgs,
@@ -138,7 +138,7 @@ describe("make", () => {
     const FnReturns = Schema.String;
 
     const spec = Spec.make().add(
-      GroupSpec.make("notes")
+      GroupSpec.makeAt("notes")
         .addFunction(
           FunctionSpec.publicQuery({
             name: "publicList",
@@ -178,7 +178,7 @@ describe("make", () => {
         RegisteredQuery<"public", ListQueryArgs, Promise<ListQueryReturns>>
       >()("list");
 
-    const spec = Spec.make().add(GroupSpec.make("notes").addFunction(listSpec));
+    const spec = Spec.make().add(GroupSpec.makeAt("notes").addFunction(listSpec));
     const refs = Refs.make(spec);
 
     const actualRef = refs.public.notes.list;
@@ -208,7 +208,7 @@ describe("make", () => {
     type RemoveMutationReturns = void;
 
     const spec = Spec.make().add(
-      GroupSpec.make("notes")
+      GroupSpec.makeAt("notes")
         .addFunction(
           FunctionSpec.convexPublicQuery<
             RegisteredQuery<"public", GetQueryArgs, Promise<GetQueryReturns>>
@@ -268,7 +268,7 @@ describe("make", () => {
     });
 
     const spec = Spec.make().add(
-      GroupSpec.make("notes")
+      GroupSpec.makeAt("notes")
         .addFunction(ConfectQuery)
         .addFunction(
           FunctionSpec.convexPublicQuery<
