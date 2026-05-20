@@ -4,40 +4,52 @@ title: "File Naming Conventions"
 description: "Recommended patterns for organizing spec, impl, and related files in your confect directory."
 ---
 
-Confect requires a small number of fixed entry-point files in your `confect/` directory (see [Project Structure](/concepts/project-structure)). Beyond those, you can organize your group spec and impl files however you like. The conventions below are what the Confect documentation and example project follow.
+Confect requires a small number of fixed entry-point files in your `confect/` directory (see [Project Structure](/concepts/project-structure)). Beyond those, organize your API as colocated leaf `*.spec.ts` / `*.impl.ts` pairs. Group names come from the filesystem path at codegen time.
 
 ## Spec and impl files
 
-Name your group spec and impl files with `.spec.ts` and `.impl.ts` suffixes. This keeps each group's interface and implementation easy to identify, and colocates them in directory listings.
+Name each leaf group's spec and impl with `.spec.ts` and `.impl.ts` suffixes. Use `GroupSpec.make()` (or `GroupSpec.makeNode()` for node actions) without a name — the CLI derives the group path from the file location. **Default-export** the group from each leaf module (`export default GroupSpec.make()…` / `export default GroupImpl.make(…)…`). Additional named exports on `.spec.ts` (for example error classes) are allowed.
 
+Each impl default-imports its sibling spec by group name (the `*.spec.ts` stem) and passes that group object to `FunctionImpl.make` and `GroupImpl.make`:
+
+```ts confect/notes.spec.ts
+import { GroupSpec, FunctionSpec } from "@confect/core";
+import { Schema } from "effect";
+
+import { Notes } from "./tables/Notes";
+
+const list = FunctionSpec.publicQuery({
+  name: "list",
+  args: Schema.Struct({}),
+  returns: Schema.Array(Notes.Doc),
+});
+
+export default GroupSpec.make().addFunction(list);
 ```
-confect/
-  notes.spec.ts
-  notes.impl.ts
-  spec.ts
-  impl.ts
-```
 
-The entry-point files `spec.ts` and `impl.ts` then import from the corresponding `.spec.ts` and `.impl.ts` files:
+```ts confect/notes.impl.ts
+import { FunctionImpl, GroupImpl } from "@confect/server";
+import { Effect, Layer } from "effect";
 
-```ts confect/spec.ts
-import { Spec } from "@confect/core";
-import { notes } from "./notes.spec";
-
-export default Spec.make().add(notes);
-```
-
-```ts confect/impl.ts
-import { Impl } from "@confect/server";
-import { Layer } from "effect";
 import api from "./_generated/api";
-import { notes } from "./notes.impl";
+import { DatabaseReader } from "./_generated/services";
+import notes from "./notes.spec";
 
-export default Impl.make(api).pipe(
-  Layer.provide(notes),
-  Impl.finalize,
+const list = FunctionImpl.make(api, notes, "list", () =>
+  Effect.gen(function* () {
+    const reader = yield* DatabaseReader;
+
+    return yield* reader
+      .table("notes")
+      .index("by_creation_time", "desc")
+      .collect();
+  }).pipe(Effect.orDie),
 );
+
+export default GroupImpl.make(api, notes).pipe(Layer.provide(list));
 ```
+
+Run `confect codegen` to assemble leaf specs into `confect/_generated/spec.ts` and emit per-group registries under `confect/_generated/registeredFunctions/`. Do not hand-write root `spec.ts`, `impl.ts`, or parent compose files.
 
 <Warning>
   Some test runners (such as Vitest and Jest) treat `.spec.ts` files
@@ -59,12 +71,10 @@ confect/
 
 ## Node actions
 
-Place [node action](/server/node-actions) spec and impl files in a `node/` subdirectory, using the same `.spec.ts`/`.impl.ts` suffixes. The entry-point files `nodeSpec.ts` and `nodeImpl.ts` import from this directory.
+Place [node action](/server/node-actions) spec and impl files in a `node/` subdirectory, using the same `.spec.ts`/`.impl.ts` suffixes and `GroupSpec.makeNode()` without a name. The CLI assembles them into `confect/_generated/nodeSpec.ts`.
 
 ```
 confect/
-  nodeSpec.ts
-  nodeImpl.ts
   node/
     email.spec.ts
     email.impl.ts
@@ -72,15 +82,13 @@ confect/
 
 ## Nested groups
 
-When a group contains subgroups, use a subdirectory named after the parent group. The parent's `.spec.ts` and `.impl.ts` files stay at the top level and import from the subdirectory.
+When a group contains subgroups, use a subdirectory named after the parent group. Write only leaf `*.spec.ts` / `*.impl.ts` files in that subdirectory — do not add parent `billing.spec.ts` / `billing.impl.ts` compose files. Codegen builds the parent group in `_generated/spec.ts` from the leaf paths.
 
 ```
 confect/
-  billing.spec.ts           ← parent group spec
-  billing.impl.ts           ← parent group impl
   billing/
-    invoices.spec.ts        ← subgroup spec
-    invoices.impl.ts        ← subgroup impl
+    invoices.spec.ts        ← leaf spec (group path billing.invoices)
+    invoices.impl.ts
     subscriptions.spec.ts
     subscriptions.impl.ts
 ```
@@ -91,7 +99,23 @@ Putting it all together, a project using all of these conventions might look lik
 
 <Tree>
   <Tree.Folder name="confect" defaultOpen>
-    <Tree.Folder name="_generated" />
+    <Tree.Folder name="_generated" defaultOpen>
+      <Tree.File name="api.ts" />
+      <Tree.File name="nodeApi.ts" />
+      <Tree.File name="nodeSpec.ts" />
+      <Tree.File name="refs.ts" />
+      <Tree.File name="services.ts" />
+      <Tree.File name="spec.ts" />
+      <Tree.Folder name="registeredFunctions" defaultOpen>
+        <Tree.File name="env.ts" />
+        <Tree.Folder name="notesAndRandom" defaultOpen>
+          <Tree.File name="notes.ts" />
+          <Tree.File name="random.ts" />
+        </Tree.Folder>
+        <Tree.File name="workpool.ts" />
+        <Tree.File name="email.ts" />
+      </Tree.Folder>
+    </Tree.Folder>
     <Tree.Folder name="node" defaultOpen>
       <Tree.File name="email.spec.ts" />
       <Tree.File name="email.impl.ts" />
@@ -106,13 +130,7 @@ Putting it all together, a project using all of these conventions might look lik
     <Tree.File name="env.spec.ts" />
     <Tree.File name="env.impl.ts" />
     <Tree.File name="http.ts" />
-    <Tree.File name="impl.ts" />
-    <Tree.File name="nodeImpl.ts" />
-    <Tree.File name="nodeSpec.ts" />
-    <Tree.File name="notesAndRandom.spec.ts" />
-    <Tree.File name="notesAndRandom.impl.ts" />
     <Tree.File name="schema.ts" />
-    <Tree.File name="spec.ts" />
     <Tree.File name="workpool.ts" />
     <Tree.File name="workpool.spec.ts" />
     <Tree.File name="workpool.impl.ts" />

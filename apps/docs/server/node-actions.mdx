@@ -4,11 +4,11 @@ title: "Node Actions"
 description: "Define actions that run in the Node.js runtime."
 ---
 
-Node actions are like regular actions, but they are executed in the Node.js runtime. To keep Node actions separate from the rest of your Convex API, they must be defined in their own spec and impl files: `nodeSpec.ts` and `nodeImpl.ts`.
+Node actions are like regular actions, but they are executed in the Node.js runtime. To keep Node actions separate from the rest of your Convex API, define them as colocated leaf spec/impl pairs under a `node/` subdirectory. The CLI assembles them into `confect/_generated/nodeSpec.ts` and per-group `_generated/registeredFunctions/{name}.ts` registries.
 
 ## Node Spec
 
-A node spec uses `Spec.makeNode()` and `GroupSpec.makeNode()` to define groups, and `FunctionSpec.publicNodeAction()` or `FunctionSpec.internalNodeAction()` to define functions.
+A node spec uses `GroupSpec.makeNode()` without a name and `FunctionSpec.publicNodeAction()` or `FunctionSpec.internalNodeAction()` to define functions.
 
 By [convention](/concepts/file-naming-conventions), node action specs and impls go in a `node/` subdirectory of your `confect/` directory, using the standard `.spec.ts` and `.impl.ts` suffixes.
 
@@ -16,7 +16,7 @@ By [convention](/concepts/file-naming-conventions), node action specs and impls 
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import { Schema } from "effect";
 
-export const email = GroupSpec.makeNode("email").addFunction(
+export default GroupSpec.makeNode().addFunction(
   FunctionSpec.publicNodeAction({
     name: "send",
     args: Schema.Struct({
@@ -29,28 +29,20 @@ export const email = GroupSpec.makeNode("email").addFunction(
 );
 ```
 
-Your node spec must be the default export of a `nodeSpec.ts` file in your `confect/` directory.
-
-```ts confect/nodeSpec.ts
-import { Spec } from "@confect/core";
-import { email } from "./node/email.spec";
-
-export default Spec.makeNode().add(email);
-```
-
 ## Node Impl
 
-A node impl uses `nodeApi` from `_generated/nodeApi` instead of `api`, and `Impl.make(nodeApi)` to construct the implementation. Each function impl contains a handler that runs in the Node.js runtime, where you have access to [`NodeContext` services](https://effect-ts.github.io/effect/platform-node/NodeContext.ts.html#nodecontext-type-alias), which are accessible via the `@effect/platform` package.
+A node impl uses `nodeApi` from `_generated/nodeApi` instead of `api`, default-imports its sibling spec by group name, and passes that spec object to `FunctionImpl.make` and `GroupImpl.make`. Each function impl contains a handler that runs in the Node.js runtime, where you have access to [`NodeContext` services](https://effect-ts.github.io/effect/platform-node/NodeContext.ts.html#nodecontext-type-alias), which are accessible via the `@effect/platform` package.
 
 ```ts confect/node/email.impl.ts
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Command } from "@effect/platform";
 import { Console, Duration, Effect, Layer } from "effect";
 import nodeApi from "../_generated/nodeApi";
+import email from "./email.spec";
 
 const send = FunctionImpl.make(
   nodeApi,
-  "email",
+  email,
   "send",
   Effect.fn(function* ({ to, subject, body }) {
     const result = yield* Command.make(
@@ -66,24 +58,12 @@ const send = FunctionImpl.make(
   }),
 );
 
-export const email = GroupImpl.make(nodeApi, "email").pipe(
+export default GroupImpl.make(nodeApi, email).pipe(
   Layer.provide(send),
 );
 ```
 
-Your node impl must be the default export of a `nodeImpl.ts` file in your `confect/` directory.
-
-```ts confect/nodeImpl.ts
-import { Impl } from "@confect/server";
-import { Layer } from "effect";
-import nodeApi from "./_generated/nodeApi";
-import { email } from "./node/email.impl";
-
-export default Impl.make(nodeApi).pipe(
-  Layer.provide(email),
-  Impl.finalize,
-);
-```
+Codegen wires each node group into `convex/node/{name}.ts` via its `_generated/registeredFunctions/{name}.ts` registry. You do not hand-write `nodeSpec.ts`, `nodeImpl.ts`, or a root node registry.
 
 ## Calling Node Actions
 

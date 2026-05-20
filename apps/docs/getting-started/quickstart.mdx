@@ -75,7 +75,7 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
 
     import { Notes } from "./tables/Notes";
 
-    export const notes = GroupSpec.make("notes")
+    export default GroupSpec.make()
       .addFunction(
         FunctionSpec.publicQuery({
           name: "list",
@@ -92,19 +92,10 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
       );
     ```
 
-    Add the `GroupSpec` to your API's `Spec`.
-
-    ```ts confect/spec.ts
-    import { Spec } from "@confect/core";
-    import { notes } from "./notes.spec";
-
-    export default Spec.make().add(notes);
-    ```
-
   </Step>
 
   <Step title="Run the codegen command">
-    Generate your app's Confect API, services, and registered functions.
+    Generate your app's assembled spec (`confect/_generated/spec.ts`), API, services, and per-group registered functions.
 
     ```bash
     confect codegen
@@ -121,8 +112,9 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
 
     import api from "./_generated/api";
     import { DatabaseReader, DatabaseWriter } from "./_generated/services";
+    import notes from "./notes.spec";
 
-    const list = FunctionImpl.make(api, "notes", "list", () =>
+    const list = FunctionImpl.make(api, notes, "list", () =>
       Effect.gen(function* () {
         const reader = yield* DatabaseReader;
 
@@ -133,7 +125,7 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
       }).pipe(Effect.orDie),
     );
 
-    const create = FunctionImpl.make(api, "notes", "create", ({ text }) =>
+    const create = FunctionImpl.make(api, notes, "create", ({ text }) =>
       Effect.gen(function* () {
         const writer = yield* DatabaseWriter;
 
@@ -141,26 +133,13 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
       }).pipe(Effect.orDie),
     );
 
-    export const notes = GroupImpl.make(api, "notes").pipe(
+    export default GroupImpl.make(api, notes).pipe(
       Layer.provide(list),
       Layer.provide(create),
     );
     ```
 
-    Add the `GroupImpl` to your API's `Impl`, and finalize it.
-
-    ```ts confect/impl.ts
-    import { Impl } from "@confect/server";
-    import { Layer } from "effect";
-
-    import api from "./_generated/api";
-    import { notes } from "./notes.impl";
-
-    export default Impl.make(api).pipe(
-      Layer.provide(notes),
-      Impl.finalize,
-    );
-    ```
+    Run `confect codegen` again so the CLI emits the per-group registry that wires this impl into `convex/`.
 
   </Step>
 

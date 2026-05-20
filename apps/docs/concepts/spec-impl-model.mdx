@@ -12,48 +12,38 @@ A spec defines the interface of your Confect API. It is made up of group specs a
 
 Specs are built using `@confect/core`, which means they can be shared between the server and client. This separation is what enables end-to-end schema decoding and encoding: the client knows the exact shape of every function's arguments and return value without importing any server code.
 
-```ts confect/notes.spec.ts
+Leaf specs live in colocated `*.spec.ts` files and **default-export** their `GroupSpec`. Group names are derived from the filesystem path at codegen time — authors use `GroupSpec.make()` without a name:
+
+```ts confect/notesAndRandom/notes.spec.ts
 import { GroupSpec, FunctionSpec } from "@confect/core";
 import { Schema } from "effect";
 
-import { Notes } from "./tables/Notes";
+import { Notes } from "../tables/Notes";
 
-const list = FunctionSpec.publicQuery({
-  name: "list",
-  args: Schema.Struct({}),
-  returns: Schema.Array(Notes.Doc),
-});
-
-export const notes = GroupSpec.make("notes").addFunction(list);
+export default GroupSpec.make().addFunction(
+  FunctionSpec.publicQuery({
+    name: "list",
+    args: Schema.Struct({}),
+    returns: Schema.Array(Notes.Doc),
+  }),
+);
 ```
 
-The `.spec.ts` suffix used here is a [naming convention](/concepts/file-naming-conventions), not a requirement. Only the entry-point files (`spec.ts` and `impl.ts`) have fixed names.
-
-Your spec must be the default export of a `spec.ts` file in your `confect/` directory.
-
-```ts confect/spec.ts
-import { Spec } from "@confect/core";
-
-import { notes } from "./notes.spec";
-
-export default Spec.make().add(notes);
-```
+The CLI assembles all leaf specs into `confect/_generated/spec.ts`. Do not hand-write a root `spec.ts`.
 
 ## Impl
 
-An impl provides the logic for each function declared in your spec. It is built using Effect layers: each function impl is a `Layer` that is composed into a group impl, and group impls are composed into the top-level impl.
+An impl provides the logic for each function declared in your spec. Each leaf impl default-imports its sibling spec by group name (the `*.spec.ts` stem) and passes that group object to `FunctionImpl.make` and `GroupImpl.make` — no dot-path strings:
 
-```ts confect/notes.impl.ts
+```ts confect/notesAndRandom/notes.impl.ts
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Effect, Layer } from "effect";
 
-import api from "./_generated/api";
-import {
-  DatabaseReader,
-  DatabaseWriter,
-} from "./_generated/services";
+import api from "../_generated/api";
+import { DatabaseReader } from "../_generated/services";
+import notes from "./notes.spec";
 
-const list = FunctionImpl.make(api, "notes", "list", () =>
+const list = FunctionImpl.make(api, notes, "list", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
 
@@ -64,22 +54,9 @@ const list = FunctionImpl.make(api, "notes", "list", () =>
   }).pipe(Effect.orDie),
 );
 
-export const notes = GroupImpl.make(api, "notes").pipe(
-  Layer.provide(list),
-);
+export default GroupImpl.make(api, notes).pipe(Layer.provide(list));
 ```
 
-Your impl must be the default export of an `impl.ts` file in your `confect/` directory, and must be finalized with `Impl.finalize`.
+Each Convex module imports a per-group registry from `confect/_generated/registeredFunctions/{path}` that pulls in **only** that leaf impl. There is no root `impl.ts`.
 
-```ts confect/impl.ts
-import { Impl } from "@confect/server";
-import { Layer } from "effect";
-
-import api from "./_generated/api";
-import { notes } from "./notes.impl";
-
-export default Impl.make(api).pipe(
-  Layer.provide(notes),
-  Impl.finalize,
-);
-```
+Run `confect codegen` after changing specs or impls.

@@ -1,6 +1,6 @@
 "use node";
 
-import nodeRegisteredFunctions from "../../confect/_generated/nodeRegisteredFunctions";
+import registeredFunctions from "../../confect/_generated/registeredFunctions/email";
 
-export const getInbox = nodeRegisteredFunctions.email.getInbox;
-export const send = nodeRegisteredFunctions.email.send;
+export const getInbox = registeredFunctions.getInbox;
+export const send = registeredFunctions.send;

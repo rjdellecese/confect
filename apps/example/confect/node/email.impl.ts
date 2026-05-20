@@ -2,10 +2,11 @@ import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Command } from "@effect/platform";
 import { Console, Duration, Effect, Layer } from "effect";
 import nodeApi from "../_generated/nodeApi";
+import email from "./email.spec";
 
 const send = FunctionImpl.make(
   nodeApi,
-  "email",
+  email,
   "send",
   Effect.fn(function* ({ to, subject, body }) {
     const result = yield* Command.make(
@@ -25,7 +26,7 @@ const send = FunctionImpl.make(
 
 const getInbox = FunctionImpl.make(
   nodeApi,
-  "email",
+  email,
   "getInbox",
   Effect.fn(function* () {
     yield* Console.log("Getting inbox…");
@@ -44,7 +45,7 @@ const getInbox = FunctionImpl.make(
   }),
 );
 
-export const email = GroupImpl.make(nodeApi, "email").pipe(
+export default GroupImpl.make(nodeApi, email).pipe(
   Layer.provide(send),
   Layer.provide(getInbox),
 );

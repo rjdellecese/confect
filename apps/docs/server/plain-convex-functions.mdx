@@ -136,7 +136,7 @@ import type {
   status,
 } from "./workpool";
 
-export const workpool = GroupSpec.make("workpool")
+export default GroupSpec.make()
   .addFunction(
     FunctionSpec.convexPublicMutation<typeof enqueue>()("enqueue"),
   )
@@ -162,14 +162,7 @@ export const workpool = GroupSpec.make("workpool")
   client bundle.
 </Note>
 
-Add the group to your top-level spec as usual.
-
-```ts confect/spec.ts
-import { Spec } from "@confect/core";
-import { workpool } from "./workpool.spec";
-
-export default Spec.make().add(workpool);
-```
+Run `confect codegen` to assemble leaf specs into `confect/_generated/spec.ts`.
 
 ### Implement the functions
 
@@ -185,33 +178,24 @@ import {
   onComplete,
   status,
 } from "./workpool";
+import workpool from "./workpool.spec";
 
-const enqueueImpl = FunctionImpl.make(
-  api,
-  "workpool",
-  "enqueue",
-  enqueue,
-);
-const statusImpl = FunctionImpl.make(
-  api,
-  "workpool",
-  "status",
-  status,
-);
+const enqueueImpl = FunctionImpl.make(api, workpool, "enqueue", enqueue);
+const statusImpl = FunctionImpl.make(api, workpool, "status", status);
 const backgroundWorkImpl = FunctionImpl.make(
   api,
-  "workpool",
+  workpool,
   "backgroundWork",
   backgroundWork,
 );
 const onCompleteImpl = FunctionImpl.make(
   api,
-  "workpool",
+  workpool,
   "onComplete",
   onComplete,
 );
 
-export const workpool = GroupImpl.make(api, "workpool").pipe(
+export default GroupImpl.make(api, workpool).pipe(
   Layer.provide(enqueueImpl),
   Layer.provide(statusImpl),
   Layer.provide(backgroundWorkImpl),
@@ -264,7 +248,7 @@ const list = FunctionSpec.publicQuery({
 const searchSpec =
   FunctionSpec.convexPublicQuery<typeof search>()("search");
 
-export const notes = GroupSpec.make("notes")
+export default GroupSpec.make()
   .addFunction(list)
   .addFunction(searchSpec);
 ```
