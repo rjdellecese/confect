@@ -1,7 +1,10 @@
 import { DatabaseSchema, Spec } from "@confect/core";
 import { Command } from "@effect/cli";
 import { FileSystem, Path } from "@effect/platform";
-import { Effect, Match, Option } from "effect";
+import { Array, Effect, Match, Option } from "effect";
+import { ConfectDirectory } from "../ConfectDirectory";
+import { ConvexDirectory } from "../ConvexDirectory";
+import { validateImplModule, validateSpecModule } from "../implValidation";
 import {
   logFileAdded,
   logFileModified,
@@ -9,8 +12,20 @@ import {
   logPending,
   logSuccess,
 } from "../log";
-import { ConfectDirectory } from "../ConfectDirectory";
-import { ConvexDirectory } from "../ConvexDirectory";
+import {
+  discoverLeafSpecFiles,
+  implPathForSpec,
+  registeredFunctionsRelativePath,
+  toLeafModule,
+  type LeafModule,
+} from "../modulePaths";
+import {
+  buildSpecTree,
+  collectConvexLeaves,
+  collectNodeLeaves,
+  collectSpecAssemblyNodes,
+  emitAssembledSpec,
+} from "../specAssembly";
 import * as templates from "../templates";
 import {
   bundleAndImport,
@@ -19,32 +34,25 @@ import {
   generateFunctions,
   generateHttp,
   removePathExtension,
+  toModuleImportPath,
   writeFileStringAndLog,
 } from "../utils";
 
-const getNodeSpecPath = Effect.gen(function* () {
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  return path.join(confectDirectory, "nodeSpec.ts");
-});
+const GENERATED_SPEC_PATH = "_generated/spec.ts";
+const GENERATED_NODE_SPEC_PATH = "_generated/nodeSpec.ts";
 
-const loadNodeSpec = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const nodeSpecPath = yield* getNodeSpecPath;
-
-  if (!(yield* fs.exists(nodeSpecPath))) {
-    return Option.none<Spec.AnyWithPropsWithRuntime<"Node">>();
-  }
-
-  const nodeSpecModule = yield* bundleAndImport(nodeSpecPath);
-  const nodeSpec = nodeSpecModule.default;
-
-  if (!Spec.isNodeSpec(nodeSpec)) {
-    return yield* Effect.die("nodeSpec.ts does not export a valid Node Spec");
-  }
-
-  return Option.some(nodeSpec);
-});
+const LEGACY_PATHS = [
+  "spec.ts",
+  "nodeSpec.ts",
+  "impl.ts",
+  "nodeImpl.ts",
+  "notesAndRandom.impl.ts",
+  "groups.impl.ts",
+  "_generated/registeredFunctions.ts",
+  "_generated/nodeRegisteredFunctions.ts",
+  "_generated/impl.ts",
+  "_generated/nodeImpl.ts",
+];
 
 export const codegen = Command.make("codegen", {}, () =>
   Effect.gen(function* () {
@@ -60,15 +68,14 @@ export const codegen = Command.make("codegen", {}, () =>
 
 export const codegenHandler = Effect.gen(function* () {
   yield* generateConfectGeneratedDirectory;
+  const leaves = yield* loadAndValidateLeafModules;
+  yield* removeLegacyFiles;
+  yield* generateAssembledSpecs(leaves);
+  yield* validateImplModules(leaves);
+  yield* generateGroupRegisteredFunctions(leaves);
+  yield* removeObsoleteRegisteredFunctions(leaves);
   yield* Effect.all(
-    [
-      generateApi,
-      generateRefs,
-      generateRegisteredFunctions,
-      generateNodeApi,
-      generateNodeRegisteredFunctions,
-      generateServices,
-    ],
+    [generateApi, generateRefs, generateNodeApi, generateServices],
     { concurrency: "unbounded" },
   );
   const [functionPaths] = yield* Effect.all(
@@ -97,6 +104,220 @@ const generateConfectGeneratedDirectory = Effect.gen(function* () {
   }
 });
 
+const loadAndValidateLeafModules = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
+  const specFiles = yield* discoverLeafSpecFiles;
+
+  return yield* Effect.forEach(specFiles, (specRelativePath) =>
+    Effect.gen(function* () {
+      const leaf = yield* toLeafModule(specRelativePath);
+      yield* validateSpecModule(specRelativePath);
+
+      const implRelativePath = yield* implPathForSpec(specRelativePath);
+      const implAbsolutePath = path.join(confectDirectory, implRelativePath);
+      if (!(yield* fs.exists(implAbsolutePath))) {
+        return yield* Effect.dieMessage(
+          `${implRelativePath}: required sibling impl for ${specRelativePath}`,
+        );
+      }
+
+      return leaf;
+    }),
+  );
+});
+
+const removeLegacyFiles = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
+
+  yield* Effect.forEach(LEGACY_PATHS, (relativePath) =>
+    Effect.gen(function* () {
+      const absolutePath = path.join(confectDirectory, relativePath);
+      if (yield* fs.exists(absolutePath)) {
+        yield* fs.remove(absolutePath);
+        yield* logFileRemoved(absolutePath);
+      }
+    }),
+  );
+});
+
+const generateAssembledSpecs = (leaves: ReadonlyArray<LeafModule>) =>
+  Effect.gen(function* () {
+    const path = yield* Path.Path;
+    const confectDirectory = yield* ConfectDirectory.get;
+    const convexLeaves = collectConvexLeaves(leaves);
+    const nodeLeaves = collectNodeLeaves(leaves);
+
+    if (convexLeaves.length > 0) {
+      const tree = buildSpecTree(convexLeaves);
+      const nodes = collectSpecAssemblyNodes(tree);
+      const specContents = emitAssembledSpec(nodes, "Convex");
+      yield* writeFileStringAndLog(
+        path.join(confectDirectory, GENERATED_SPEC_PATH),
+        specContents,
+      );
+    }
+
+    if (nodeLeaves.length > 0) {
+      const tree = buildSpecTree(
+        Array.map(nodeLeaves, (leaf) => ({
+          ...leaf,
+          pathSegments: [leaf.exportName] as [string, ...string[]],
+          groupPathDot: leaf.exportName,
+        })),
+      );
+      const nodes = collectSpecAssemblyNodes(tree);
+      const nodeSpecContents = emitAssembledSpec(nodes, "Node");
+      yield* writeFileStringAndLog(
+        path.join(confectDirectory, GENERATED_NODE_SPEC_PATH),
+        nodeSpecContents,
+      );
+    }
+  });
+
+const validateImplModules = (leaves: ReadonlyArray<LeafModule>) =>
+  Effect.forEach(leaves, (leaf) =>
+    Effect.gen(function* () {
+      const implRelativePath = yield* implPathForSpec(leaf.relativePath);
+      yield* validateImplModule(implRelativePath, leaf.relativePath);
+    }),
+  );
+
+const generateGroupRegisteredFunctions = (leaves: ReadonlyArray<LeafModule>) =>
+  Effect.gen(function* () {
+    const path = yield* Path.Path;
+    const confectDirectory = yield* ConfectDirectory.get;
+
+    yield* Effect.forEach(leaves, (leaf) =>
+      Effect.gen(function* () {
+        const registryRelativePath =
+          yield* registeredFunctionsRelativePath(leaf);
+        const registryPath = path.join(
+          confectDirectory,
+          "_generated",
+          registryRelativePath,
+        );
+        const registryDir = path.dirname(registryPath);
+        const fs = yield* FileSystem.FileSystem;
+        if (!(yield* fs.exists(registryDir))) {
+          yield* fs.makeDirectory(registryDir, { recursive: true });
+        }
+
+        const implRelativePath = yield* implPathForSpec(leaf.relativePath);
+        const apiFileName = leaf.runtime === "Node" ? "nodeApi.ts" : "api.ts";
+        const apiImportPath = yield* toModuleImportPath(
+          path.relative(
+            path.dirname(registryPath),
+            path.join(confectDirectory, "_generated", apiFileName),
+          ),
+        );
+        const implImportPath = yield* toModuleImportPath(
+          path.relative(
+            path.dirname(registryPath),
+            path.join(confectDirectory, implRelativePath),
+          ),
+        );
+
+        const contents = yield* templates.registeredFunctionsForGroup({
+          apiImportPath,
+          groupPathDot: leaf.registryGroupPathDot,
+          implImportPath,
+          layerExportName: leaf.exportName,
+          useNode: leaf.runtime === "Node",
+        });
+
+        yield* writeFileStringAndLog(registryPath, contents);
+      }),
+    );
+  });
+
+const removeObsoleteRegisteredFunctions = (leaves: ReadonlyArray<LeafModule>) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const confectDirectory = yield* ConfectDirectory.get;
+    const registryRoot = path.join(
+      confectDirectory,
+      "_generated",
+      "registeredFunctions",
+    );
+
+    if (!(yield* fs.exists(registryRoot))) {
+      return;
+    }
+
+    const expected = new Set(
+      yield* Effect.forEach(leaves, (leaf) =>
+        registeredFunctionsRelativePath(leaf),
+      ),
+    );
+
+    const existing = yield* fs.readDirectory(registryRoot, { recursive: true });
+    yield* Effect.forEach(existing, (relativePath) => {
+      if (!relativePath.endsWith(".ts")) {
+        return Effect.void;
+      }
+      const normalized = path.join("registeredFunctions", relativePath);
+      if (!expected.has(normalized)) {
+        return Effect.gen(function* () {
+          const absolutePath = path.join(registryRoot, relativePath);
+          yield* fs.remove(absolutePath);
+          yield* logFileRemoved(absolutePath);
+        });
+      }
+      return Effect.void;
+    });
+  });
+
+const getGeneratedSpecPath = Effect.gen(function* () {
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
+  return path.join(confectDirectory, GENERATED_SPEC_PATH);
+});
+
+const getGeneratedNodeSpecPath = Effect.gen(function* () {
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
+  return path.join(confectDirectory, GENERATED_NODE_SPEC_PATH);
+});
+
+const loadGeneratedSpec = Effect.gen(function* () {
+  const specPath = yield* getGeneratedSpecPath;
+  const specModule = yield* bundleAndImport(specPath);
+  const spec = specModule.default;
+
+  if (!Spec.isConvexSpec(spec)) {
+    return yield* Effect.dieMessage(
+      "_generated/spec.ts does not export a valid Convex Spec",
+    );
+  }
+
+  return spec;
+});
+
+const loadGeneratedNodeSpec = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const nodeSpecPath = yield* getGeneratedNodeSpecPath;
+
+  if (!(yield* fs.exists(nodeSpecPath))) {
+    return Option.none<Spec.AnyWithPropsWithRuntime<"Node">>();
+  }
+
+  const nodeSpecModule = yield* bundleAndImport(nodeSpecPath);
+  const nodeSpec = nodeSpecModule.default;
+
+  if (!Spec.isNodeSpec(nodeSpec)) {
+    return yield* Effect.dieMessage(
+      "_generated/nodeSpec.ts does not export a valid Node Spec",
+    );
+  }
+
+  return Option.some(nodeSpec);
+});
+
 const generateApi = Effect.gen(function* () {
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
@@ -104,12 +325,12 @@ const generateApi = Effect.gen(function* () {
   const apiPath = path.join(confectDirectory, "_generated", "api.ts");
   const apiDir = path.dirname(apiPath);
 
-  const schemaImportPath = yield* removePathExtension(
+  const schemaImportPath = yield* toModuleImportPath(
     path.relative(apiDir, path.join(confectDirectory, "schema.ts")),
   );
 
-  const specImportPath = yield* removePathExtension(
-    path.relative(apiDir, path.join(confectDirectory, "spec.ts")),
+  const specImportPath = yield* toModuleImportPath(
+    path.relative(apiDir, path.join(confectDirectory, GENERATED_SPEC_PATH)),
   );
 
   const apiContents = yield* templates.api({
@@ -125,7 +346,7 @@ export const generateNodeApi = Effect.gen(function* () {
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
 
-  const nodeSpecPath = yield* getNodeSpecPath;
+  const nodeSpecPath = yield* getGeneratedNodeSpecPath;
   const nodeApiPath = path.join(confectDirectory, "_generated", "nodeApi.ts");
 
   if (!(yield* fs.exists(nodeSpecPath))) {
@@ -138,11 +359,11 @@ export const generateNodeApi = Effect.gen(function* () {
 
   const nodeApiDir = path.dirname(nodeApiPath);
 
-  const schemaImportPath = yield* removePathExtension(
+  const schemaImportPath = yield* toModuleImportPath(
     path.relative(nodeApiDir, path.join(confectDirectory, "schema.ts")),
   );
 
-  const nodeSpecImportPath = yield* removePathExtension(
+  const nodeSpecImportPath = yield* toModuleImportPath(
     path.relative(nodeApiDir, nodeSpecPath),
   );
 
@@ -155,26 +376,12 @@ export const generateNodeApi = Effect.gen(function* () {
 });
 
 const generateFunctionModules = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-
-  const specPath = path.join(confectDirectory, "spec.ts");
-
-  const specModule = yield* bundleAndImport(specPath);
-  const spec = specModule.default;
-
-  if (!Spec.isConvexSpec(spec)) {
-    return yield* Effect.die("spec.ts does not export a valid Convex Spec");
-  }
-
-  const nodeImplPath = path.join(confectDirectory, "nodeImpl.ts");
-  const nodeImplExists = yield* fs.exists(nodeImplPath);
-  const nodeSpecOption = yield* loadNodeSpec;
+  const spec = yield* loadGeneratedSpec;
+  const nodeSpecOption = yield* loadGeneratedNodeSpec;
 
   const mergedSpec = Option.match(nodeSpecOption, {
     onNone: () => spec,
-    onSome: (nodeSpec) => (nodeImplExists ? Spec.merge(spec, nodeSpec) : spec),
+    onSome: (nodeSpec) => Spec.merge(spec, nodeSpec),
   });
 
   return yield* generateFunctions(mergedSpec);
@@ -193,7 +400,7 @@ const generateSchema = Effect.gen(function* () {
 
       return DatabaseSchema.isDatabaseSchema(defaultExport)
         ? Effect.succeed(defaultExport)
-        : Effect.die("Invalid schema module");
+        : Effect.dieMessage("Invalid schema module");
     }),
   );
 
@@ -230,72 +437,6 @@ const generateServices = Effect.gen(function* () {
   yield* writeFileStringAndLog(servicesPath, servicesContentsString);
 });
 
-const generateRegisteredFunctions = Effect.gen(function* () {
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-
-  const confectGeneratedDirectory = path.join(confectDirectory, "_generated");
-
-  const registeredFunctionsPath = path.join(
-    confectGeneratedDirectory,
-    "registeredFunctions.ts",
-  );
-  const implImportPath = yield* removePathExtension(
-    path.relative(
-      path.dirname(registeredFunctionsPath),
-      path.join(confectDirectory, "impl.ts"),
-    ),
-  );
-
-  const registeredFunctionsContents = yield* templates.registeredFunctions({
-    implImportPath,
-  });
-
-  yield* writeFileStringAndLog(
-    registeredFunctionsPath,
-    registeredFunctionsContents,
-  );
-});
-
-export const generateNodeRegisteredFunctions = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-
-  const nodeImplPath = path.join(confectDirectory, "nodeImpl.ts");
-  const nodeSpecPath = yield* getNodeSpecPath;
-  const nodeRegisteredFunctionsPath = path.join(
-    confectDirectory,
-    "_generated",
-    "nodeRegisteredFunctions.ts",
-  );
-
-  const nodeImplExists = yield* fs.exists(nodeImplPath);
-  const nodeSpecExists = yield* fs.exists(nodeSpecPath);
-
-  if (!nodeImplExists || !nodeSpecExists) {
-    if (yield* fs.exists(nodeRegisteredFunctionsPath)) {
-      yield* fs.remove(nodeRegisteredFunctionsPath);
-      yield* logFileRemoved(nodeRegisteredFunctionsPath);
-    }
-    return;
-  }
-
-  const nodeImplImportPath = yield* removePathExtension(
-    path.relative(path.dirname(nodeRegisteredFunctionsPath), nodeImplPath),
-  );
-
-  const nodeRegisteredFunctionsContents =
-    yield* templates.nodeRegisteredFunctions({
-      nodeImplImportPath,
-    });
-
-  yield* writeFileStringAndLog(
-    nodeRegisteredFunctionsPath,
-    nodeRegisteredFunctionsContents,
-  );
-});
-
 const generateRefs = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -305,14 +446,14 @@ const generateRefs = Effect.gen(function* () {
   const refsPath = path.join(confectGeneratedDirectory, "refs.ts");
   const refsDir = path.dirname(refsPath);
 
-  const specImportPath = yield* removePathExtension(
-    path.relative(refsDir, path.join(confectDirectory, "spec.ts")),
+  const specImportPath = yield* toModuleImportPath(
+    path.relative(refsDir, path.join(confectDirectory, GENERATED_SPEC_PATH)),
   );
 
-  const nodeSpecPath = yield* getNodeSpecPath;
+  const nodeSpecPath = yield* getGeneratedNodeSpecPath;
   const nodeSpecExists = yield* fs.exists(nodeSpecPath);
   const nodeSpecImportPath = nodeSpecExists
-    ? yield* removePathExtension(path.relative(refsDir, nodeSpecPath))
+    ? yield* toModuleImportPath(path.relative(refsDir, nodeSpecPath))
     : null;
 
   const refsContents = yield* templates.refs({

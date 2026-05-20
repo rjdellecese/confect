@@ -1,27 +1,18 @@
 import type { Options as CodeBlockWriterOptions } from "code-block-writer";
 import CodeBlockWriter_ from "code-block-writer";
-import { Array, Effect } from "effect";
-import type * as GroupPath from "./GroupPath";
+import { Effect } from "effect";
 
 export const functions = ({
-  groupPath,
   functionNames,
   registeredFunctionsImportPath,
-  registeredFunctionsVariableName = "registeredFunctions",
-  registeredFunctionsLookupPath,
   useNode = false,
 }: {
-  groupPath: GroupPath.GroupPath;
   functionNames: string[];
   registeredFunctionsImportPath: string;
-  registeredFunctionsVariableName?: string;
-  registeredFunctionsLookupPath?: readonly string[];
   useNode?: boolean;
 }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
-
-    const lookupPath = registeredFunctionsLookupPath ?? groupPath.pathSegments;
 
     if (useNode) {
       yield* cbw.writeLine(`"use node";`);
@@ -29,12 +20,12 @@ export const functions = ({
     }
 
     yield* cbw.writeLine(
-      `import ${registeredFunctionsVariableName} from "${registeredFunctionsImportPath}";`,
+      `import registeredFunctions from "${registeredFunctionsImportPath}";`,
     );
     yield* cbw.newLine();
     for (const functionName of functionNames) {
       yield* cbw.writeLine(
-        `export const ${functionName} = ${registeredFunctionsVariableName}.${Array.join([...lookupPath, functionName], ".")};`,
+        `export const ${functionName} = registeredFunctions.${functionName};`,
       );
     }
 
@@ -147,6 +138,49 @@ export const nodeApi = ({
     yield* cbw.writeLine(`import nodeSpec from "${nodeSpecImportPath}";`);
     yield* cbw.blankLine();
     yield* cbw.writeLine(`export default Api.make(schema, nodeSpec);`);
+
+    return yield* cbw.toString();
+  });
+
+export const registeredFunctionsForGroup = ({
+  apiImportPath,
+  groupPathDot,
+  implImportPath,
+  layerExportName,
+  useNode = false,
+}: {
+  apiImportPath: string;
+  groupPathDot: string;
+  implImportPath: string;
+  layerExportName: string;
+  useNode?: boolean;
+}) =>
+  Effect.gen(function* () {
+    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+
+    if (useNode) {
+      yield* cbw.writeLine(
+        `import { RegisteredFunctions } from "@confect/server";`,
+      );
+      yield* cbw.writeLine(
+        `import { RegisteredNodeFunction } from "@confect/server/node";`,
+      );
+    } else {
+      yield* cbw.writeLine(
+        `import { RegisteredConvexFunction, RegisteredFunctions } from "@confect/server";`,
+      );
+    }
+
+    yield* cbw.writeLine(`import api from "${apiImportPath}";`);
+    yield* cbw.writeLine(
+      `import ${layerExportName} from "${implImportPath}";`,
+    );
+    yield* cbw.blankLine();
+    yield* cbw.writeLine(
+      useNode
+        ? `export default RegisteredFunctions.buildForGroup(api, ${JSON.stringify(groupPathDot)}, ${layerExportName}, RegisteredNodeFunction.make);`
+        : `export default RegisteredFunctions.buildForGroup(api, ${JSON.stringify(groupPathDot)}, ${layerExportName}, RegisteredConvexFunction.make);`,
+    );
 
     return yield* cbw.toString();
   });

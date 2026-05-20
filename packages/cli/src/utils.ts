@@ -29,6 +29,13 @@ export const removePathExtension = (pathStr: string) =>
     return String.slice(0, -path.extname(pathStr).length)(pathStr);
   });
 
+/** Ensures a relative path is a valid ESM/TS module specifier (e.g. `spec` → `./spec`). */
+export const toModuleImportPath = (relativePath: string) =>
+  Effect.gen(function* () {
+    const withoutExt = yield* removePathExtension(relativePath);
+    return withoutExt.startsWith(".") ? withoutExt : `./${withoutExt}`;
+  });
+
 export const EXTERNAL_PACKAGES = [
   "@confect/core",
   "@confect/server",
@@ -66,6 +73,37 @@ const absoluteExternalsPlugin: esbuild.Plugin = {
   },
 };
 
+const bundleEntry = (entryPoint: string, metafile: boolean) =>
+  Effect.promise(() =>
+    esbuild.build({
+      entryPoints: [entryPoint],
+      bundle: true,
+      write: false,
+      platform: "node",
+      format: "esm",
+      logLevel: "silent",
+      metafile,
+      plugins: [absoluteExternalsPlugin],
+    }),
+  );
+
+const importBundledModule = (result: esbuild.BuildResult) => {
+  const code = result.outputFiles![0]!.text;
+  const dataUrl =
+    "data:text/javascript;base64," + Buffer.from(code).toString("base64");
+  return import(dataUrl);
+};
+
+export const bundleAndImportWithInputs = (entryPoint: string) =>
+  Effect.gen(function* () {
+    const result = yield* bundleEntry(entryPoint, true);
+    const module = yield* Effect.promise(() => importBundledModule(result));
+    if (!result.metafile) {
+      return yield* Effect.dieMessage("esbuild metafile missing");
+    }
+    return { module, metafile: result.metafile } as const;
+  });
+
 /**
  * Bundle a TypeScript entry point with esbuild and import the result via a
  * data URL. This handles extensionless `.ts` imports regardless of whether the
@@ -73,21 +111,8 @@ const absoluteExternalsPlugin: esbuild.Plugin = {
  */
 export const bundleAndImport = (entryPoint: string) =>
   Effect.gen(function* () {
-    const result = yield* Effect.promise(() =>
-      esbuild.build({
-        entryPoints: [entryPoint],
-        bundle: true,
-        write: false,
-        platform: "node",
-        format: "esm",
-        logLevel: "silent",
-        plugins: [absoluteExternalsPlugin],
-      }),
-    );
-    const code = result.outputFiles[0]!.text;
-    const dataUrl =
-      "data:text/javascript;base64," + Buffer.from(code).toString("base64");
-    return yield* Effect.promise(() => import(dataUrl));
+    const { module } = yield* bundleAndImportWithInputs(entryPoint);
+    return module;
   });
 
 export const writeFileStringAndLog = (filePath: string, contents: string) =>
@@ -149,15 +174,18 @@ export const writeFileString = (
 export const generateGroupModule = ({
   groupPath,
   functionNames,
+  registeredFunctionsImportPath,
+  useNode = false,
 }: {
   groupPath: GroupPath.GroupPath;
   functionNames: string[];
+  registeredFunctionsImportPath: string;
+  useNode?: boolean;
 }) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const convexDirectory = yield* ConvexDirectory.get;
-    const confectDirectory = yield* ConfectDirectory.get;
 
     const relativeModulePath = yield* GroupPath.modulePath(groupPath);
     const modulePath = path.join(convexDirectory, relativeModulePath);
@@ -167,33 +195,10 @@ export const generateGroupModule = ({
       yield* fs.makeDirectory(directoryPath, { recursive: true });
     }
 
-    const isNodeGroup = groupPath.pathSegments[0] === "node";
-    const registeredFunctionsFileName = isNodeGroup
-      ? "nodeRegisteredFunctions.ts"
-      : "registeredFunctions.ts";
-    const registeredFunctionsPath = path.join(
-      confectDirectory,
-      "_generated",
-      registeredFunctionsFileName,
-    );
-    const registeredFunctionsImportPath = yield* removePathExtension(
-      path.relative(path.dirname(modulePath), registeredFunctionsPath),
-    );
-    const registeredFunctionsVariableName = isNodeGroup
-      ? "nodeRegisteredFunctions"
-      : "registeredFunctions";
-
     const functionsContentsString = yield* templates.functions({
-      groupPath,
       functionNames,
       registeredFunctionsImportPath,
-      registeredFunctionsVariableName,
-      useNode: isNodeGroup,
-      ...(isNodeGroup
-        ? {
-            registeredFunctionsLookupPath: groupPath.pathSegments.slice(1),
-          }
-        : {}),
+      useNode,
     });
 
     if (!(yield* fs.exists(modulePath))) {
@@ -228,6 +233,7 @@ export const generateFunctions = (spec: Spec.AnyWithProps) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
     const convexDirectory = yield* ConvexDirectory.get;
+    const confectDirectory = yield* ConfectDirectory.get;
 
     const groupPathsFromFs = yield* getGroupPathsFromFs;
     const functionPaths = FunctionPaths.make(spec);
@@ -250,12 +256,29 @@ export const generateFunctions = (spec: Spec.AnyWithProps) =>
           ),
           Array.map((fn) => fn.name),
         );
-        const result = yield* generateGroupModule({ groupPath, functionNames });
+        const relativeModulePath = yield* GroupPath.modulePath(groupPath);
+        const modulePath = path.join(convexDirectory, relativeModulePath);
+        const registrySegments =
+          groupPath.pathSegments[0] === "node"
+            ? groupPath.pathSegments.slice(1)
+            : groupPath.pathSegments;
+        const registeredFunctionsPath = path.join(
+          confectDirectory,
+          "_generated",
+          "registeredFunctions",
+          ...registrySegments,
+        ) + ".ts";
+        const registeredFunctionsImportPath = yield* toModuleImportPath(
+          path.relative(path.dirname(modulePath), registeredFunctionsPath),
+        );
+        const result = yield* generateGroupModule({
+          groupPath,
+          functionNames,
+          registeredFunctionsImportPath,
+          useNode: groupPath.pathSegments[0] === "node",
+        });
         if (result === "Modified") {
-          const relativeModulePath = yield* GroupPath.modulePath(groupPath);
-          yield* logFileModified(
-            path.join(convexDirectory, relativeModulePath),
-          );
+          yield* logFileModified(modulePath);
         }
       }),
     );
@@ -334,6 +357,9 @@ export const writeGroups = (
 ) =>
   Effect.forEach(groupPaths, (groupPath) =>
     Effect.gen(function* () {
+      const path = yield* Path.Path;
+      const convexDirectory = yield* ConvexDirectory.get;
+      const confectDirectory = yield* ConfectDirectory.get;
       const group = yield* GroupPath.getGroupSpec(spec, groupPath);
 
       const functionNames = pipe(
@@ -348,10 +374,24 @@ export const writeGroups = (
         Array.map((fn) => fn.name),
       );
 
+      const relativeModulePath = yield* GroupPath.modulePath(groupPath);
+      const modulePath = path.join(convexDirectory, relativeModulePath);
+      const registeredFunctionsPath = path.join(
+        confectDirectory,
+        "_generated",
+        "registeredFunctions",
+        ...groupPath.pathSegments,
+      ) + ".ts";
+      const registeredFunctionsImportPath = yield* toModuleImportPath(
+        path.relative(path.dirname(modulePath), registeredFunctionsPath),
+      );
+
       yield* Effect.logDebug(`Generating group ${groupPath}...`);
       yield* generateGroupModule({
         groupPath,
         functionNames,
+        registeredFunctionsImportPath,
+        useNode: groupPath.pathSegments[0] === "node",
       });
       yield* Effect.logDebug(`Group ${groupPath} generated`);
     }),
