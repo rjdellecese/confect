@@ -1,7 +1,7 @@
 import { FunctionSpec, GenericId, GroupSpec } from "@confect/core";
 import { Schema } from "effect";
 
-export const runners = GroupSpec.make("runners")
+export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicAction({
       name: "insertNoteViaRunner",

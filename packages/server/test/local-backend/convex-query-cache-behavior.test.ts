@@ -7,7 +7,7 @@
  */
 
 import { Ref } from "@confect/core";
-import { describe, expect, layer } from "@effect/vitest";
+import { expect, layer } from "@effect/vitest";
 import type { ConvexHttpClient } from "convex/browser";
 import { Duration, Effect, Schema } from "effect";
 import refs from "./fixtures/confect/_generated/refs";
@@ -49,76 +49,74 @@ const captureAcrossEvictionWindow = <PublicQueryRef extends Ref.AnyPublicQuery>(
     return { initial, afterMaxCacheAge };
   });
 
-describe("Convex query cache behavior", () => {
-  // `excludeTestServices: true` opts out of `TestClock` so `Effect.sleep`
-  // waits real wall-clock time and actually crosses the eviction window.
-  layer(LocalBackend.layer, {
-    timeout: "120 seconds",
-    excludeTestServices: true,
-  })((it) => {
-    it.effect(
-      "a native Convex query that calls Date.now is evicted from the cache",
-      () =>
-        Effect.gen(function* () {
-          const { initial, afterMaxCacheAge } =
-            yield* captureAcrossEvictionWindow(
-              refs.public.groups.cacheControl.control,
-            );
-          expect(initial).not.toBe(afterMaxCacheAge);
-        }),
-      30_000,
-    );
-
-    it.effect("a Confect query that does not observe time stays cached", () =>
+// `excludeTestServices: true` opts out of `TestClock` so `Effect.sleep`
+// waits real wall-clock time and actually crosses the eviction window.
+layer(LocalBackend.layer, {
+  timeout: "120 seconds",
+  excludeTestServices: true,
+})("Convex query cache behavior", (it) => {
+  it.effect(
+    "a native Convex query that calls Date.now is evicted from the cache",
+    () =>
       Effect.gen(function* () {
         const { initial, afterMaxCacheAge } =
           yield* captureAcrossEvictionWindow(
-            refs.public.groups.cacheStubbed.confectNoTime,
+            refs.public.groups.cacheControl.control,
           );
-        expect(initial).toBe(afterMaxCacheAge);
+        expect(initial).not.toBe(afterMaxCacheAge);
       }),
-    );
+    30_000,
+  );
 
-    it.effect("a Confect query that calls raw Date.now stays cached", () =>
+  it.effect("a Confect query that does not observe time stays cached", () =>
+    Effect.gen(function* () {
+      const { initial, afterMaxCacheAge } =
+        yield* captureAcrossEvictionWindow(
+          refs.public.groups.cacheStubbed.confectNoTime,
+        );
+      expect(initial).toBe(afterMaxCacheAge);
+    }),
+  );
+
+  it.effect("a Confect query that calls raw Date.now stays cached", () =>
+    Effect.gen(function* () {
+      const { initial, afterMaxCacheAge } =
+        yield* captureAcrossEvictionWindow(
+          refs.public.groups.cacheStubbed.confectWithRawDateNow,
+        );
+      expect(initial).toBe(afterMaxCacheAge);
+    }),
+  );
+
+  it.effect(
+    "a Confect query that uses Clock.currentTimeMillis is evicted from the cache",
+    () =>
       Effect.gen(function* () {
         const { initial, afterMaxCacheAge } =
           yield* captureAcrossEvictionWindow(
-            refs.public.groups.cacheStubbed.confectWithRawDateNow,
+            refs.public.groups.cacheStubbed.confectWithClock,
           );
-        expect(initial).toBe(afterMaxCacheAge);
+        expect(initial).not.toBe(afterMaxCacheAge);
       }),
-    );
+  );
 
-    it.effect(
-      "a Confect query that uses Clock.currentTimeMillis is evicted from the cache",
-      () =>
-        Effect.gen(function* () {
-          const { initial, afterMaxCacheAge } =
-            yield* captureAcrossEvictionWindow(
-              refs.public.groups.cacheStubbed.confectWithClock,
-            );
-          expect(initial).not.toBe(afterMaxCacheAge);
-        }),
-    );
+  it.effect("a Confect query that uses Effect.withSpan stays cached", () =>
+    Effect.gen(function* () {
+      const { initial, afterMaxCacheAge } =
+        yield* captureAcrossEvictionWindow(
+          refs.public.groups.cacheStubbed.confectWithSpan,
+        );
+      expect(initial).toBe(afterMaxCacheAge);
+    }),
+  );
 
-    it.effect("a Confect query that uses Effect.withSpan stays cached", () =>
-      Effect.gen(function* () {
-        const { initial, afterMaxCacheAge } =
-          yield* captureAcrossEvictionWindow(
-            refs.public.groups.cacheStubbed.confectWithSpan,
-          );
-        expect(initial).toBe(afterMaxCacheAge);
-      }),
-    );
-
-    it.effect("a Confect query that emits a log stays cached", () =>
-      Effect.gen(function* () {
-        const { initial, afterMaxCacheAge } =
-          yield* captureAcrossEvictionWindow(
-            refs.public.groups.cacheStubbed.confectWithLog,
-          );
-        expect(initial).toBe(afterMaxCacheAge);
-      }),
-    );
-  });
+  it.effect("a Confect query that emits a log stays cached", () =>
+    Effect.gen(function* () {
+      const { initial, afterMaxCacheAge } =
+        yield* captureAcrossEvictionWindow(
+          refs.public.groups.cacheStubbed.confectWithLog,
+        );
+      expect(initial).toBe(afterMaxCacheAge);
+    }),
+  );
 });

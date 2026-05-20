@@ -1,7 +1,7 @@
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import { Schema } from "effect";
 
-export const random = GroupSpec.make("random").addFunction(
+export default GroupSpec.make().addFunction(
   FunctionSpec.publicAction({
     name: "getNumber",
     args: Schema.Struct({}),

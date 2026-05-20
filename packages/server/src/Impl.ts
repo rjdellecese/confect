@@ -57,3 +57,20 @@ export const finalize = <Api_ extends Api.AnyWithProps>(
       finalizationStatus: "Finalized",
     }),
   );
+
+export const buildForGroup = <Api_ extends Api.AnyWithProps>(
+  api: Api_,
+  groupLayer: Layer.Layer<never, unknown, unknown>,
+): Layer.Layer<Impl<Api_, "Finalized">> =>
+  Layer.effect(
+    Impl<Api_, "Finalized">(),
+    Effect.succeed({
+      [TypeId]: TypeId,
+      api,
+      finalizationStatus: "Finalized" as const,
+    }),
+  ).pipe(Layer.provide(groupLayer)) as Layer.Layer<
+    Impl<Api_, "Finalized">,
+    never,
+    never
+  >;

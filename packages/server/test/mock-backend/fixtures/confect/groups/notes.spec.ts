@@ -2,7 +2,7 @@ import { FunctionSpec, GenericId, GroupSpec } from "@confect/core";
 import { Schema } from "effect";
 import { Notes } from "../tables/Notes";
 
-export const notes = GroupSpec.make("notes")
+export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicMutation({
       name: "insert",

@@ -2,18 +2,19 @@ import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Effect, Layer } from "effect";
 import api from "./_generated/api";
 import { DatabaseReader } from "./_generated/services";
+import databaseReader from "./databaseReader.spec";
 
-export const databaseReader = GroupImpl.make(api, "databaseReader").pipe(
+export default GroupImpl.make(api, databaseReader).pipe(
   Layer.provide(
     Layer.mergeAll(
-      FunctionImpl.make(api, "databaseReader", "getNote", ({ noteId }) =>
+      FunctionImpl.make(api, databaseReader, "getNote", ({ noteId }) =>
         Effect.gen(function* () {
           const reader = yield* DatabaseReader;
 
           return yield* reader.table("notes").get(noteId);
         }).pipe(Effect.orDie),
       ),
-      FunctionImpl.make(api, "databaseReader", "listNotes", () =>
+      FunctionImpl.make(api, databaseReader, "listNotes", () =>
         Effect.gen(function* () {
           const reader = yield* DatabaseReader;
 
@@ -23,10 +24,7 @@ export const databaseReader = GroupImpl.make(api, "databaseReader").pipe(
             .collect();
         }).pipe(Effect.orDie),
       ),
-      FunctionImpl.make(
-        api,
-        "databaseReader",
-        "paginateNotes",
+      FunctionImpl.make(api, databaseReader, "paginateNotes",
         ({ cursor, numItems }) =>
           Effect.gen(function* () {
             const reader = yield* DatabaseReader;
@@ -37,10 +35,7 @@ export const databaseReader = GroupImpl.make(api, "databaseReader").pipe(
               .paginate({ cursor, numItems });
           }).pipe(Effect.orDie),
       ),
-      FunctionImpl.make(
-        api,
-        "databaseReader",
-        "paginateNotesWithFilter",
+      FunctionImpl.make(api, databaseReader, "paginateNotesWithFilter",
         ({ cursor, numItems, tag }) =>
           Effect.gen(function* () {
             const reader = yield* DatabaseReader;

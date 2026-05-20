@@ -28,7 +28,7 @@ const TryFailingActionResult = Schema.Union(
   Schema.TaggedStruct("Forbidden", { reason: Schema.String }),
 );
 
-export const typedErrors = GroupSpec.make("typedErrors")
+export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicQuery({
       name: "getNoteOrFail",

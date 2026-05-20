@@ -49,6 +49,24 @@ export interface AnyWithProps {
   readonly [key: string]: RegisteredFunction.Any | AnyWithProps;
 }
 
+type RegisteredFunctionsAtPath<
+  Tree,
+  Path extends string,
+> = Path extends `${infer Head}.${infer Tail}`
+  ? Head extends keyof Tree
+    ? Tree[Head] extends AnyWithProps
+      ? RegisteredFunctionsAtPath<Tree[Head], Tail>
+      : never
+    : never
+  : Path extends keyof Tree
+    ? Tree[Path]
+    : never;
+
+export type ForGroupPath<
+  Spec_ extends Spec.AnyWithProps,
+  Path extends string,
+> = RegisteredFunctionsAtPath<RegisteredFunctions<Spec_>, Path>;
+
 export const make = <Api_ extends Api.AnyWithProps>(
   impl: Layer.Layer<Impl.Impl<Api_, "Finalized">>,
   makeRegisteredFunction: (
@@ -80,3 +98,37 @@ export const make = <Api_ extends Api.AnyWithProps>(
       Match.exhaustive,
     );
   }).pipe(Effect.provide(impl), Effect.runSync);
+
+export const buildForGroup = <
+  Api_ extends Api.AnyWithProps,
+  const GroupPath_ extends string,
+>(
+  api: Api_,
+  groupPath: GroupPath_,
+  groupLayer: Layer.Layer<never, unknown, unknown>,
+  makeRegisteredFunction: (
+    api: Api_,
+    registryItem: RegistryItem.AnyWithProps,
+  ) => RegisteredFunction.Any,
+): ForGroupPath<Api_["spec"], GroupPath_> => {
+  const registeredFunctions = make(
+    Impl.buildForGroup(api, groupLayer),
+    makeRegisteredFunction,
+  ) as RegisteredFunctions<Api_["spec"]>;
+
+  let groupFunctions: unknown = registeredFunctions;
+  for (const segment of groupPath.split(".")) {
+    if (
+      groupFunctions === null ||
+      typeof groupFunctions !== "object" ||
+      !(segment in groupFunctions)
+    ) {
+      throw new Error(
+        `No functions registered for group path "${groupPath}"`,
+      );
+    }
+    groupFunctions = (groupFunctions as Record<string, unknown>)[segment];
+  }
+
+  return groupFunctions as ForGroupPath<Api_["spec"], GroupPath_>;
+};
