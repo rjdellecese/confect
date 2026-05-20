@@ -172,9 +172,7 @@ export const registeredFunctionsForGroup = ({
     }
 
     yield* cbw.writeLine(`import api from "${apiImportPath}";`);
-    yield* cbw.writeLine(
-      `import ${layerExportName} from "${implImportPath}";`,
-    );
+    yield* cbw.writeLine(`import ${layerExportName} from "${implImportPath}";`);
     yield* cbw.blankLine();
     yield* cbw.writeLine(
       useNode
