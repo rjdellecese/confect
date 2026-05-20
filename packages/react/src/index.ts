@@ -1,7 +1,9 @@
 import { Ref } from "@confect/core";
+import type { UsePaginatedQueryResult } from "convex/react";
 import {
   useAction as useConvexAction,
   useMutation as useConvexMutation,
+  usePaginatedQuery as useConvexPaginatedQuery,
   useQuery as useConvexQuery,
 } from "convex/react";
 import { Cause, Effect, Either, Exit, Option } from "effect";
@@ -54,6 +56,77 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
     }
     throw error;
   }
+};
+
+/**
+ * Convex's `usePaginatedQuery` removes the need for `paginationOpts` from the args.
+ */
+export type PaginatedQueryArgs<TQuery extends Ref.AnyPublicPaginatedQuery> =
+  Omit<Ref.Args<TQuery>, "paginationOpts">;
+
+/**
+ * The item type for a paginated query.
+ */
+export type PaginatedQueryItem<TQuery extends Ref.AnyPublicPaginatedQuery> =
+  Ref.Returns<TQuery>["page"][number];
+
+/**
+ * The args type for a paginated query.
+ */
+export type UsePaginatedQueryArgs<Query extends Ref.AnyPublicPaginatedQuery> =
+  keyof Ref.Args<Query> extends never ? {} : PaginatedQueryArgs<Query> | "skip";
+
+export type PaginatedQueryOptions = Parameters<
+  typeof useConvexPaginatedQuery
+>[2];
+
+function getEncodedArgs<TPaginatedQuery extends Ref.AnyPublicPaginatedQuery>(
+  ref: TPaginatedQuery,
+  args: UsePaginatedQueryArgs<TPaginatedQuery>,
+): "skip" | UsePaginatedQueryArgs<TPaginatedQuery> {
+  if (args === "skip") {
+    return "skip" as const;
+  }
+  const toEncode = {
+    ...(args as PaginatedQueryArgs<TPaginatedQuery>),
+    // `paginationOpts` are only added so that encoding arguments validate.
+    // They aren't passed to the query function.
+    paginationOpts: { numItems: 10, cursor: null },
+  } as Ref.Args<TPaginatedQuery>;
+
+  const encoded = Ref.encodeArgsSync(ref, toEncode);
+  if (
+    typeof encoded !== "object" ||
+    encoded === null ||
+    !("paginationOpts" in encoded)
+  ) {
+    throw new Error(
+      "Encoded args is not an object or does not contain `paginationOpts`",
+    );
+  }
+  const { paginationOpts: _paginationOpts, ...encodedArgs } = encoded;
+  return encodedArgs as UsePaginatedQueryArgs<TPaginatedQuery>;
+}
+
+export const usePaginatedQuery = <
+  TPaginatedQuery extends Ref.AnyPublicPaginatedQuery,
+>(
+  ref: TPaginatedQuery,
+  args: UsePaginatedQueryArgs<TPaginatedQuery>,
+  options: PaginatedQueryOptions,
+): UsePaginatedQueryResult<PaginatedQueryItem<TPaginatedQuery>> => {
+  const functionReference = Ref.getFunctionReference(ref);
+  const encodedArgs = getEncodedArgs(ref, args);
+  const { results, ...rest } = useConvexPaginatedQuery(
+    functionReference,
+    encodedArgs,
+    options,
+  );
+  const decodedResults = Ref.decodePaginationPageSync(ref, results);
+  return {
+    results: decodedResults,
+    ...rest,
+  };
 };
 
 /**

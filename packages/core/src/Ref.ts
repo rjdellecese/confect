@@ -1,6 +1,8 @@
 import type {
   FunctionReference as ConvexFunctionReference,
   FunctionVisibility,
+  PaginationOptions,
+  PaginationResult,
 } from "convex/server";
 import { makeFunctionReference } from "convex/server";
 import type { Value } from "convex/values";
@@ -40,6 +42,16 @@ export interface AnyQuery extends Ref<
   any,
   any,
   any
+> {}
+
+export interface AnyPublicPaginatedQuery extends Ref<
+  RuntimeAndFunctionType.AnyQuery,
+  "public",
+  {
+    [key: string]: any;
+    paginationOpts: PaginationOptions;
+  },
+  PaginationResult<any>
 > {}
 
 export interface AnyMutation extends Ref<
@@ -344,6 +356,26 @@ export const maybeDecodeErrorSync = <Ref_ extends Any>(
         Match.exhaustive,
       )
     : error;
+
+type PaginationResultSchema = Schema.Struct<{
+  page: Schema.mutable<Schema.Array$<Schema.Schema.AnyNoContext>>;
+}>;
+
+export const decodePaginationPageSync = <Ref_ extends AnyPublicPaginatedQuery>(
+  ref: Ref_,
+  encodedResults: unknown,
+): Returns<Ref_>["page"] => {
+  return Match.value(ref.functionSpec.functionProvenance).pipe(
+    Match.tag("Confect", (c) => {
+      // Since `ref` is a paginated query reference we know that the return type
+      // includes a mutable array called `page` of the document type.
+      const pageSchema = (c.returns as PaginationResultSchema).fields.page;
+      return Schema.decodeUnknownSync(pageSchema)(encodedResults);
+    }),
+    Match.tag("Convex", () => encodedResults),
+    Match.exhaustive,
+  ) as Returns<Ref_>["page"];
+};
 
 /**
  * Encode args via the ref's args schema, invoke `call`, decode returns via the
