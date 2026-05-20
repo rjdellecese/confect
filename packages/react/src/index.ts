@@ -1,9 +1,12 @@
 import { Ref } from "@confect/core";
+import type { OptimisticLocalStore, OptimisticUpdate } from "convex/browser";
 import {
   useAction as useConvexAction,
   useMutation as useConvexMutation,
   useQuery as useConvexQuery,
+  type ReactMutation,
 } from "convex/react";
+import type { FunctionReference } from "convex/server";
 import { Cause, Effect, Either, Exit, Option } from "effect";
 
 import * as QueryResult from "./QueryResult";
@@ -56,6 +59,103 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
   }
 };
 
+export interface ConfectOptimisticLocalStore {
+  getQuery<Query extends Ref.AnyPublicQuery>(
+    queryRef: Query,
+    ...args: Ref.OptionalArgs<Query>
+  ): Ref.Returns<Query> | undefined;
+
+  getAllQueries<Query extends Ref.AnyPublicQuery>(
+    queryRef: Query,
+  ): Array<{
+    args: Ref.Args<Query>;
+    value: Ref.Returns<Query> | undefined;
+  }>;
+
+  setQuery<Query extends Ref.AnyPublicQuery>(
+    queryRef: Query,
+    args: Ref.Args<Query>,
+    value: Ref.Returns<Query> | undefined,
+  ): void;
+}
+
+export type ConfectOptimisticUpdate<Mutation extends Ref.AnyPublicMutation> = (
+  localStore: ConfectOptimisticLocalStore,
+  args: Ref.Args<Mutation>,
+) => void;
+
+export interface ConfectMutation<Mutation extends Ref.AnyPublicMutation> {
+  (...args: Ref.OptionalArgs<Mutation>): InvokeReturn<Mutation>;
+  withOptimisticUpdate(
+    optimisticUpdate: ConfectOptimisticUpdate<Mutation>,
+  ): ConfectMutation<Mutation>;
+}
+
+const wrapLocalStore = (
+  localStore: OptimisticLocalStore,
+): ConfectOptimisticLocalStore => ({
+  getQuery: (queryRef, ...rest) => {
+    const functionReference = Ref.getFunctionReference(queryRef);
+    const args = (rest[0] ?? {}) as Ref.Args<typeof queryRef>;
+    const encodedArgs = Ref.encodeArgsSync(queryRef, args);
+    const encoded = localStore.getQuery(functionReference, encodedArgs);
+    return encoded === undefined
+      ? undefined
+      : Ref.decodeReturnsSync(queryRef, encoded);
+  },
+  setQuery: (queryRef, args, value) => {
+    const functionReference = Ref.getFunctionReference(queryRef);
+    const encodedArgs = Ref.encodeArgsSync(queryRef, args);
+    const encodedValue =
+      value === undefined ? undefined : Ref.encodeReturnsSync(queryRef, value);
+    localStore.setQuery(functionReference, encodedArgs, encodedValue);
+  },
+  getAllQueries: (queryRef) => {
+    const functionReference = Ref.getFunctionReference(queryRef);
+    return localStore
+      .getAllQueries(functionReference)
+      .map(({ args, value }) => ({
+        args: Ref.decodeArgsSync(queryRef, args),
+        value:
+          value === undefined
+            ? undefined
+            : Ref.decodeReturnsSync(queryRef, value),
+      }));
+  },
+});
+
+const makeConfectMutation = <Mutation extends Ref.AnyPublicMutation>(
+  ref: Mutation,
+  reactMutation: ReactMutation<
+    Ref.FunctionReference<Mutation> & FunctionReference<"mutation">
+  >,
+): ConfectMutation<Mutation> => {
+  const callable = ((...args: Ref.OptionalArgs<Mutation>) =>
+    invokeAsEither(
+      ref,
+      (_, encodedArgs) => reactMutation(encodedArgs as never),
+      args,
+    ).then((either) =>
+      Ref.hasErrorSchema(ref) ? either : Either.getOrThrow(either),
+    )) as (...args: Ref.OptionalArgs<Mutation>) => InvokeReturn<Mutation>;
+
+  const withOptimisticUpdate = (
+    optimisticUpdate: ConfectOptimisticUpdate<Mutation>,
+  ): ConfectMutation<Mutation> => {
+    const wrappedUpdate: OptimisticUpdate<Ref.Args<Mutation>> = (
+      localStore,
+      encodedArgs,
+    ) => {
+      const decodedArgs = Ref.decodeArgsSync(ref, encodedArgs);
+      optimisticUpdate(wrapLocalStore(localStore), decodedArgs);
+    };
+    const nextReactMutation = reactMutation.withOptimisticUpdate(wrappedUpdate);
+    return makeConfectMutation(ref, nextReactMutation);
+  };
+
+  return Object.assign(callable, { withOptimisticUpdate });
+};
+
 /**
  * Returns a function that invokes the provided `Ref`'s mutation.
  *
@@ -71,18 +171,15 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
  */
 export const useMutation = <Mutation extends Ref.AnyPublicMutation>(
   ref: Mutation,
-): ((...args: Ref.OptionalArgs<Mutation>) => InvokeReturn<Mutation>) => {
+): ConfectMutation<Mutation> => {
   const functionReference = Ref.getFunctionReference(ref);
-  const actualMutation = useConvexMutation(functionReference);
-
-  return ((...args: Ref.OptionalArgs<Mutation>) =>
-    invokeAsEither(
-      ref,
-      (_, encodedArgs) => actualMutation(encodedArgs),
-      args,
-    ).then((either) =>
-      Ref.hasErrorSchema(ref) ? either : Either.getOrThrow(either),
-    )) as (...args: Ref.OptionalArgs<Mutation>) => InvokeReturn<Mutation>;
+  const reactMutation = useConvexMutation(functionReference);
+  return makeConfectMutation(
+    ref,
+    reactMutation as ReactMutation<
+      Ref.FunctionReference<Mutation> & FunctionReference<"mutation">
+    >,
+  );
 };
 
 /**
