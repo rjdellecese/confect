@@ -1,5 +1,34 @@
 # @confect/server
 
+## 8.0.0
+
+### Major Changes
+
+- 87b7207: Renamed `DatabaseSchema.isSchema` to `DatabaseSchema.isDatabaseSchema` for consistency with the `is<TypeName>` predicate convention used elsewhere (e.g. `Spec.isSpec`). `TypeId` and `Any` are now defined in `@confect/core/DatabaseSchema` and re-exported from `@confect/server`; the underlying brand string is unchanged, so existing schema values continue to be recognized. Migration: replace `DatabaseSchema.isSchema(x)` with `DatabaseSchema.isDatabaseSchema(x)`.
+
+  Internally, this removes a cyclic workspace dependency between `@confect/cli` and `@confect/server` that triggered a pnpm install warning. `@confect/cli` no longer peer-depends on `@confect/server`.
+
+### Minor Changes
+
+- 4bb2722: Bump Effect ecosystem to latest. `@effect/platform` is now `^0.96.1` and `@effect/platform-node` is now `^0.106.0` in `@confect/server`'s peer dependencies; `effect` peer is now `^3.21.2` across packages. Consumers must upgrade `@effect/platform`, `@effect/platform-node`, and `effect` in lockstep when bumping `@confect/server`.
+
+### Patch Changes
+
+- f308edd: Fix Convex query cache invalidation when handlers use `Effect.log`, `Effect.withSpan`, or other Effect features that read the clock through its `unsafe*` methods.
+
+  The `Clock` provided to confect-wrapped handlers previously implemented `unsafeCurrentTimeMillis`/`unsafeCurrentTimeNanos` by calling the real `Date.now`, so Effect internals (logging, span events, the default scheduler) would read real time during handler execution and invalidate Convex's per-query cache. Those unsafe methods now return constants (`0`/`0n`), making the only opt-in to cache invalidation the user-facing `Clock.currentTimeMillis`/`Clock.currentTimeNanos` effects, as originally intended.
+
+- a02ef8a: Memoize `Document.decode` and `Document.encode` parsers in module-scoped `WeakMap` caches. Decoders are keyed by table schema and table name so shared schemas across tables get the correct `extendWithSystemFields` parser; encoders are keyed by schema only.
+- 40c1cff: Switch sibling `@confect/*` peer-dependency specifiers from `workspace:*` to `workspace:^`. Published peer ranges are now caret-based (e.g. `^7.0.0`) instead of exact-pinned, so non-major upgrades of one `@confect/*` package no longer fall out of range for its peer dependents.
+
+  Paired with the Changesets `onlyUpdatePeerDependentsWhenOutOfRange` flag, this prevents the entire `@confect/*` family from being promoted to a major bump on every release when only minor/patch changes are present.
+
+  `@confect/cli` additionally moves `@effect/platform` from `peerDependencies` to `dependencies`, since the CLI consumes it as an internal implementation detail (for `FileSystem`/`Path`) rather than exposing it in its public API. Consumers no longer need to install `@effect/platform` themselves to use the CLI.
+
+- Updated dependencies [4bb2722]
+- Updated dependencies [40c1cff]
+  - @confect/core@8.0.0
+
 ## 7.0.0
 
 ### Minor Changes
