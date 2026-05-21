@@ -12,7 +12,7 @@ A spec defines the interface of your Confect API. It is made up of group specs a
 
 Specs are built using `@confect/core`, which means they can be shared between the server and client. This separation is what enables end-to-end schema decoding and encoding: the client knows the exact shape of every function's arguments and return value without importing any server code.
 
-Leaf specs live in colocated `*.spec.ts` files and **default-export** their `GroupSpec`. Group names are derived from the filesystem path at codegen time — authors use `GroupSpec.make()` without a name:
+Each group spec is the default export of a `*.spec.ts` file. The group's name comes from the file's path — its stem for top-level groups, or the dot-joined directory path for nested groups:
 
 ```ts confect/notesAndRandom/notes.spec.ts
 import { GroupSpec, FunctionSpec } from "@confect/core";
@@ -29,11 +29,9 @@ export default GroupSpec.make().addFunction(
 );
 ```
 
-The CLI assembles all leaf specs into `confect/_generated/spec.ts`. Do not hand-write a root `spec.ts`.
-
 ## Impl
 
-An impl provides the logic for each function declared in your spec. Each leaf impl default-imports its sibling spec (conventionally bound to a variable named after the group — the `*.spec.ts` stem) and passes that group object to `FunctionImpl.make` and `GroupImpl.make` — no dot-path strings:
+An impl provides the logic for each function declared in your spec. Each impl is the default export of a `*.impl.ts` file colocated with its sibling spec. It default-imports that sibling spec and passes it to `FunctionImpl.make` and `GroupImpl.make`:
 
 ```ts confect/notesAndRandom/notes.impl.ts
 import { FunctionImpl, GroupImpl } from "@confect/server";
@@ -57,6 +55,4 @@ const list = FunctionImpl.make(api, notes, "list", () =>
 export default GroupImpl.make(api, notes).pipe(Layer.provide(list));
 ```
 
-Each Convex module imports a per-group registry from `confect/_generated/registeredFunctions/{path}` that pulls in **only** that leaf impl. There is no root `impl.ts`.
-
-Run `confect codegen` after changing specs or impls.
+Run `confect codegen` after adding or changing specs and impls.

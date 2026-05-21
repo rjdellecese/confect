@@ -21,7 +21,7 @@ For Node.js actions, see [Node Actions](/server/node-actions). To integrate plai
 
 ## Defining a spec
 
-Each function spec defines the function's name, arguments schema, and returns schema. Function specs are grouped into group specs, which the CLI assembles into your API's top-level spec in `_generated/spec.ts`. See [The Spec/Impl Model](/concepts/spec-impl-model) for a full walkthrough.
+Each function spec defines the function's name, arguments schema, and returns schema. Function specs are added to a `GroupSpec` and default-exported from a `*.spec.ts` file. See [The Spec/Impl Model](/concepts/spec-impl-model) for a full walkthrough.
 
 ```ts confect/notes.spec.ts
 import { GroupSpec, FunctionSpec } from "@confect/core";
@@ -38,7 +38,7 @@ const list = FunctionSpec.publicQuery({
 export default GroupSpec.make().addFunction(list);
 ```
 
-Run `confect codegen` after adding or changing leaf specs. Do not hand-write a root `spec.ts`.
+Run `confect codegen` after adding or changing specs.
 
 ### Typed errors
 
@@ -91,4 +91,4 @@ const list = FunctionImpl.make(api, notes, "list", () =>
 export default GroupImpl.make(api, notes).pipe(Layer.provide(list));
 ```
 
-Each leaf impl is wired into Convex through a per-group registry at `confect/_generated/registeredFunctions/{path}`. There is no root `impl.ts` — run `confect codegen` after changing impls.
+Run `confect codegen` after adding or changing impls.

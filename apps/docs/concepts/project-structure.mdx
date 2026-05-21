@@ -42,7 +42,7 @@ description: "Understand the structure of a Confect project."
 
 <Info>
   `_generated/nodeApi.ts` and `_generated/nodeSpec.ts` are only
-  generated when you have node action leaf specs (files under
+  generated when you have node action specs (files under
   `confect/node/`).
 </Info>
 
@@ -57,7 +57,7 @@ Contains a single default `Api` export, which combines your database schema and 
 #### `nodeApi.ts`
 
 <Info>
-  This file is only generated when you have node action leaf specs
+  This file is only generated when you have node action specs
   (files under `confect/node/`).
 </Info>
 
@@ -66,15 +66,15 @@ Contains a single default `Api` export, which combines your database schema and 
 #### `nodeSpec.ts`
 
 <Info>
-  This file is only generated when you have node action leaf specs
+  This file is only generated when you have node action specs
   (files under `confect/node/`).
 </Info>
 
-Assembled by the CLI from leaf `confect/node/*.spec.ts` files. You should not hand-write `nodeSpec.ts`.
+Contains your assembled Node spec, used to build `nodeApi.ts`.
 
 #### `registeredFunctions/`
 
-Contains one registry module per leaf group (for example `registeredFunctions/notesAndRandom/notes.ts`). Each registry imports **only** that group's impl for cold-start isolation. Convex modules in `convex/` import the matching registry; you should not import these yourself except through generated `convex/` files.
+Contains one module per group (for example `registeredFunctions/notesAndRandom/notes.ts`), each exporting that group's functions in a form the Convex CLI can consume. These modules are consumed by the generated `convex/` files; you should not need to import them directly.
 
 #### `refs.ts`
 
@@ -86,7 +86,7 @@ Contains Effect service wrappers for Convex platform capabilities, scoped to you
 
 #### `spec.ts`
 
-Assembled by the CLI from all leaf `*.spec.ts` files. You should not hand-write a root `spec.ts`.
+Contains your assembled Confect spec, used to build `api.ts` and `refs.ts`.
 
 ### `auth.ts`
 
@@ -112,11 +112,11 @@ Expects a default Convex `HttpRouter` export. Construct this using Confect's `Ht
 
 Expects a default `DatabaseSchema` export which specifies your Convex database table schemas.
 
-### Leaf `*.spec.ts` / `*.impl.ts`
+### `*.spec.ts` / `*.impl.ts`
 
 <Badge color="green">Required</Badge>
 
-Your Convex API is defined as colocated leaf spec/impl pairs. Each leaf spec uses `GroupSpec.make()` without a name; each leaf impl imports its sibling spec export and passes it to `FunctionImpl.make` and `GroupImpl.make`. See [File Naming Conventions](/concepts/file-naming-conventions) and [The Spec/Impl Model](/concepts/spec-impl-model).
+Your Convex API is defined as colocated `*.spec.ts` / `*.impl.ts` pairs, one pair per group. Each file's path within `confect/` becomes the group's name. See [File Naming Conventions](/concepts/file-naming-conventions) and [The Spec/Impl Model](/concepts/spec-impl-model).
 
 ## Rules
 

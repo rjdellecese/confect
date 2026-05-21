@@ -4,13 +4,11 @@ title: "Node Actions"
 description: "Define actions that run in the Node.js runtime."
 ---
 
-Node actions are like regular actions, but they are executed in the Node.js runtime. To keep Node actions separate from the rest of your Convex API, define them as colocated leaf spec/impl pairs under a `node/` subdirectory. The CLI assembles them into `confect/_generated/nodeSpec.ts` and per-group `_generated/registeredFunctions/{name}.ts` registries.
+Node actions are like regular actions, but they are executed in the Node.js runtime. To keep node actions separate from the rest of your Convex API, define them as colocated spec/impl pairs under a `node/` subdirectory of your `confect/` directory, using the standard `.spec.ts` and `.impl.ts` suffixes.
 
 ## Node Spec
 
-A node spec uses `GroupSpec.makeNode()` without a name and `FunctionSpec.publicNodeAction()` or `FunctionSpec.internalNodeAction()` to define functions.
-
-By [convention](/concepts/file-naming-conventions), node action specs and impls go in a `node/` subdirectory of your `confect/` directory, using the standard `.spec.ts` and `.impl.ts` suffixes.
+A node spec uses `GroupSpec.makeNode()` and one of `FunctionSpec.publicNodeAction()` or `FunctionSpec.internalNodeAction()` to define functions.
 
 ```ts confect/node/email.spec.ts
 import { FunctionSpec, GroupSpec } from "@confect/core";
@@ -31,7 +29,7 @@ export default GroupSpec.makeNode().addFunction(
 
 ## Node Impl
 
-A node impl uses `nodeApi` from `_generated/nodeApi` instead of `api`, default-imports its sibling spec (conventionally named after the group), and passes that spec object to `FunctionImpl.make` and `GroupImpl.make`. Each function impl contains a handler that runs in the Node.js runtime, where you have access to [`NodeContext` services](https://effect-ts.github.io/effect/platform-node/NodeContext.ts.html#nodecontext-type-alias), which are accessible via the `@effect/platform` package.
+A node impl default-imports its sibling spec and uses `nodeApi` from `_generated/nodeApi` (instead of `api`) when calling `FunctionImpl.make` and `GroupImpl.make`. Each handler runs in the Node.js runtime, so it has access to [`NodeContext` services](https://effect-ts.github.io/effect/platform-node/NodeContext.ts.html#nodecontext-type-alias) from the `@effect/platform` package.
 
 ```ts confect/node/email.impl.ts
 import { FunctionImpl, GroupImpl } from "@confect/server";
@@ -62,8 +60,6 @@ export default GroupImpl.make(nodeApi, email).pipe(
   Layer.provide(send),
 );
 ```
-
-Codegen wires each node group into `convex/node/{name}.ts` via its `_generated/registeredFunctions/{name}.ts` registry. You do not hand-write `nodeSpec.ts`, `nodeImpl.ts`, or a root node registry.
 
 ## Calling Node Actions
 

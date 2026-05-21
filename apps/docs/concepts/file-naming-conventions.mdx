@@ -4,13 +4,13 @@ title: "File Naming Conventions"
 description: "Recommended patterns for organizing spec, impl, and related files in your confect directory."
 ---
 
-Confect requires a small number of fixed entry-point files in your `confect/` directory (see [Project Structure](/concepts/project-structure)). Beyond those, organize your API as colocated leaf `*.spec.ts` / `*.impl.ts` pairs. Group names come from the filesystem path at codegen time.
+Confect requires a small number of fixed entry-point files in your `confect/` directory (see [Project Structure](/concepts/project-structure)). Beyond those, organize your API as colocated `*.spec.ts` / `*.impl.ts` pairs, one pair per group. The group's name is the file's path within `confect/` (its stem for top-level groups, the dot-joined directory path for nested groups).
 
 ## Spec and impl files
 
-Name each leaf group's spec and impl with `.spec.ts` and `.impl.ts` suffixes. Use `GroupSpec.make()` (or `GroupSpec.makeNode()` for node actions) without a name — the CLI derives the group path from the file location. **Default-export** the group from each leaf module (`export default GroupSpec.make()…` / `export default GroupImpl.make(…)…`). Additional named exports on `.spec.ts` (for example error classes) are allowed.
+Name each group's spec and impl with `.spec.ts` and `.impl.ts` suffixes. Each file must default-export its `GroupSpec` or `GroupImpl`; additional named exports on `.spec.ts` (for example error classes) are fine.
 
-Each impl default-imports its sibling spec (the binding is conventionally named after the group — the `*.spec.ts` stem) and passes that group object to `FunctionImpl.make` and `GroupImpl.make`:
+A complete pair looks like this. The impl default-imports its sibling spec and passes it to `FunctionImpl.make` and `GroupImpl.make`:
 
 ```ts confect/notes.spec.ts
 import { GroupSpec, FunctionSpec } from "@confect/core";
@@ -49,13 +49,14 @@ const list = FunctionImpl.make(api, notes, "list", () =>
 export default GroupImpl.make(api, notes).pipe(Layer.provide(list));
 ```
 
-Run `confect codegen` to assemble leaf specs into `confect/_generated/spec.ts` and emit per-group registries under `confect/_generated/registeredFunctions/`. Do not hand-write root `spec.ts`, `impl.ts`, or parent compose files.
+Run `confect codegen` after adding or changing specs and impls.
 
 <Note>
-  Because group paths are derived from the filesystem, renaming a leaf
-  file or its parent directory renames the public Convex API path
-  (e.g. `internal.notesAndRandom.notes.list`). Treat leaf paths as
-  part of your API's contract.
+  A file's path within `confect/` determines the public Convex API
+  path it produces — `confect/notesAndRandom/notes.spec.ts` becomes
+  `internal.notesAndRandom.notes.list`. Renaming a file or directory
+  renames the API path, so treat these paths as part of your API's
+  contract.
 </Note>
 
 <Warning>
@@ -78,7 +79,7 @@ confect/
 
 ## Node actions
 
-Place [node action](/server/node-actions) spec and impl files in a `node/` subdirectory, using the same `.spec.ts`/`.impl.ts` suffixes and `GroupSpec.makeNode()` without a name. The CLI assembles them into `confect/_generated/nodeSpec.ts`.
+Place [node action](/server/node-actions) spec and impl files in a `node/` subdirectory, using the same `.spec.ts` / `.impl.ts` suffixes. Their specs use `GroupSpec.makeNode()` and their impls use the `nodeApi` from `_generated/nodeApi`.
 
 ```
 confect/
@@ -89,14 +90,14 @@ confect/
 
 ## Nested groups
 
-When a group contains subgroups, use a subdirectory named after the parent group. Write only leaf `*.spec.ts` / `*.impl.ts` files in that subdirectory — do not add parent `billing.spec.ts` / `billing.impl.ts` compose files. Codegen builds the parent group in `_generated/spec.ts` from the leaf paths.
+When a group contains subgroups, place each subgroup's `.spec.ts` / `.impl.ts` pair inside a subdirectory named after the parent group. The parent group itself does not need a spec or impl file — it is composed from its subgroups by their paths.
 
 ```
 confect/
   billing/
-    invoices.spec.ts        ← leaf spec (group path billing.invoices)
+    invoices.spec.ts        ← group path billing.invoices
     invoices.impl.ts
-    subscriptions.spec.ts
+    subscriptions.spec.ts   ← group path billing.subscriptions
     subscriptions.impl.ts
 ```
 

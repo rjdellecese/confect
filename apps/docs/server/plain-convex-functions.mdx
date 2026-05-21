@@ -162,7 +162,7 @@ export default GroupSpec.make()
   client bundle.
 </Note>
 
-Run `confect codegen` to assemble leaf specs into `confect/_generated/spec.ts`.
+Run `confect codegen` to pick up the new spec.
 
 ### Implement the functions
 
@@ -208,7 +208,7 @@ export default GroupImpl.make(api, workpool).pipe(
 );
 ```
 
-Run `confect codegen` to emit the per-group registry that wires this leaf impl into `convex/`.
+Run `confect codegen` to pick up the new impl.
 
 ### Call plain functions from the client
 

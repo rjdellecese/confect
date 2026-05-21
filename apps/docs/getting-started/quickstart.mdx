@@ -95,7 +95,7 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
   </Step>
 
   <Step title="Run the codegen command">
-    Generate your app's assembled spec (`confect/_generated/spec.ts`), API, services, and per-group registered functions.
+    Generate your app's `confect/_generated/` files.
 
     ```bash
     confect codegen
@@ -139,7 +139,7 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
     );
     ```
 
-    Run `confect codegen` again so the CLI emits the per-group registry that wires this impl into `convex/`.
+    Run `confect codegen` again to pick up the new impl.
 
   </Step>
 
