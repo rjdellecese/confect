@@ -114,14 +114,17 @@ importers:
         specifier: workspace:*
         version: link:../../packages/server
       '@convex-dev/workpool':
-        specifier: ^0.4.2
-        version: 0.4.2(convex-helpers@0.1.114(@standard-schema/spec@1.0.0)(convex@1.39.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(convex@1.39.1(react@19.2.4))
+        specifier: 0.4.6
+        version: 0.4.6(convex-helpers@0.1.118(@standard-schema/spec@1.0.0)(convex@1.33.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(convex@1.33.1(react@19.2.4))
       '@effect/platform':
         specifier: 0.96.1
         version: 0.96.1(effect@3.21.2)
       convex:
-        specifier: 1.39.1
-        version: 1.39.1(react@19.2.4)
+        specifier: 1.33.1
+        version: 1.33.1(react@19.2.4)
+      convex-helpers:
+        specifier: 0.1.118
+        version: 0.1.118(@standard-schema/spec@1.0.0)(convex@1.33.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3)
       effect:
         specifier: 3.21.2
         version: 3.21.2
@@ -757,8 +760,8 @@ packages:
   '@changesets/write@0.4.0':
     resolution: {integrity: sha512-CdTLvIOPiCNuH71pyDu3rA+Q0n65cmAbXnwWH84rKGiFumFzkmHNT8KHTMEchcxN+Kl8I54xGUhJ7l3E7X396Q==}
 
-  '@convex-dev/workpool@0.4.2':
-    resolution: {integrity: sha512-lNFFouUeCVPAzT6OVDZSqN17sw+MiJSzXwet2CevVzbec6snt0IXf/qazYmhQkbGl6SIfqT3y8yL7sxw+7gEfA==}
+  '@convex-dev/workpool@0.4.6':
+    resolution: {integrity: sha512-e+cIgQePx5rrGizvzaYocWQCsDFbFlYqR1ZbtFPLa909izwc5GvoasPJPANeFhHRWaA5NBipNVqNtfHySi7Ldw==}
     peerDependencies:
       convex: 1.33.1
       convex-helpers: ^0.1.94
@@ -3302,15 +3305,15 @@ packages:
     resolution: {integrity: sha512-rcQ1bsQO9799wq24uE5AM2tAILy4gXGIK/njFWcVQkGNZ96edlpY+A7bjwvzjYvLDyzmG1MmMLZhpcsb+klNMQ==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
 
-  convex-helpers@0.1.114:
-    resolution: {integrity: sha512-elEdh+gG6BDv2dWIWVvBeJPbHnDQS5+WexUuwlGVJXz1EbMkXz/UIQwFIfLMZIXUwW6ot4JYf/1JJKNStrE6lg==}
+  convex-helpers@0.1.118:
+    resolution: {integrity: sha512-07t10n8CZG/YCDzOy5/WDdNNQYL+mP7VU76BLJCZrB2dvJTH7UZJxPqNrhPH+pZbW52joQ91eQHSksdcgOXebQ==}
     hasBin: true
     peerDependencies:
       '@standard-schema/spec': ^1.0.0
       convex: 1.33.1
       hono: ^4.0.5
       react: 19.2.4
-      typescript: ^5.5
+      typescript: ^5.5 || ^6.0.0
       zod: ^3.25.0 || ^4.0.0
     peerDependenciesMeta:
       '@standard-schema/spec':
@@ -3341,25 +3344,6 @@ packages:
       '@auth0/auth0-react':
         optional: true
       '@clerk/clerk-react':
-        optional: true
-      react:
-        optional: true
-
-  convex@1.39.1:
-    resolution: {integrity: sha512-W+gVXA7BpRF1xLlS1kGTtKVaqd5yonqbGESKiPtIUXjV744GdDz8IG7RVsSY5KzHbgxuJBHKaJYk+92OIHTskQ==}
-    engines: {node: '>=18.0.0', npm: '>=7.0.0'}
-    hasBin: true
-    peerDependencies:
-      '@auth0/auth0-react': ^2.0.1
-      '@clerk/clerk-react': ^4.12.8 || ^5.0.0
-      '@clerk/react': ^6.4.3
-      react: 19.2.4
-    peerDependenciesMeta:
-      '@auth0/auth0-react':
-        optional: true
-      '@clerk/clerk-react':
-        optional: true
-      '@clerk/react':
         optional: true
       react:
         optional: true
@@ -7012,10 +6996,10 @@ snapshots:
       human-id: 4.1.1
       prettier: 2.8.8
 
-  '@convex-dev/workpool@0.4.2(convex-helpers@0.1.114(@standard-schema/spec@1.0.0)(convex@1.39.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(convex@1.39.1(react@19.2.4))':
+  '@convex-dev/workpool@0.4.6(convex-helpers@0.1.118(@standard-schema/spec@1.0.0)(convex@1.33.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(convex@1.33.1(react@19.2.4))':
     dependencies:
-      convex: 1.39.1(react@19.2.4)
-      convex-helpers: 0.1.114(@standard-schema/spec@1.0.0)(convex@1.39.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3)
+      convex: 1.33.1(react@19.2.4)
+      convex-helpers: 0.1.118(@standard-schema/spec@1.0.0)(convex@1.33.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3)
 
   '@effect/cli@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(@effect/printer-ansi@0.49.0(@effect/typeclass@0.40.0(effect@3.21.2))(effect@3.21.2))(@effect/printer@0.49.0(@effect/typeclass@0.40.0(effect@3.21.2))(effect@3.21.2))(effect@3.21.2)':
     dependencies:
@@ -9749,9 +9733,9 @@ snapshots:
 
   convert-to-spaces@2.0.1: {}
 
-  convex-helpers@0.1.114(@standard-schema/spec@1.0.0)(convex@1.39.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3):
+  convex-helpers@0.1.118(@standard-schema/spec@1.0.0)(convex@1.33.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3):
     dependencies:
-      convex: 1.39.1(react@19.2.4)
+      convex: 1.33.1(react@19.2.4)
     optionalDependencies:
       '@standard-schema/spec': 1.0.0
       react: 19.2.4
@@ -9762,17 +9746,6 @@ snapshots:
       convex: 1.33.1(react@19.2.4)
 
   convex@1.33.1(react@19.2.4):
-    dependencies:
-      esbuild: 0.27.0
-      prettier: 3.8.1
-      ws: 8.18.0
-    optionalDependencies:
-      react: 19.2.4
-    transitivePeerDependencies:
-      - bufferutil
-      - utf-8-validate
-
-  convex@1.39.1(react@19.2.4):
     dependencies:
       esbuild: 0.27.0
       prettier: 3.8.1
