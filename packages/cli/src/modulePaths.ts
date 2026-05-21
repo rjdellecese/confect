@@ -131,6 +131,27 @@ export const discoverLeafSpecFiles = Effect.gen(function* () {
   });
 });
 
+export const discoverLeafImplFiles = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
+
+  const excludedDirs = new Set(["_generated", "tables"]);
+
+  const allPaths = yield* fs.readDirectory(confectDirectory, {
+    recursive: true,
+  });
+
+  return Array.filter(allPaths, (relativePath) => {
+    if (!isLeafImplPath(relativePath)) {
+      return false;
+    }
+
+    const segments = String.split(relativePath, path.sep);
+    return !Array.some(segments, (segment) => excludedDirs.has(segment));
+  });
+});
+
 export const toLeafModule = (specRelativePath: string) =>
   Effect.gen(function* () {
     const exportName = yield* exportNameFromModulePath(specRelativePath);

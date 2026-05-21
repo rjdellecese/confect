@@ -14,6 +14,7 @@ import {
   String,
 } from "effect";
 import * as esbuild from "esbuild";
+import { BundlerError } from "./codegenErrors";
 import * as FunctionPaths from "./FunctionPaths";
 import * as GroupPath from "./GroupPath";
 import * as GroupPaths from "./GroupPaths";
@@ -51,7 +52,7 @@ const isExternalImport = (path: string) =>
     return path === p || path.startsWith(p + "/");
   });
 
-const absoluteExternalsPlugin: esbuild.Plugin = {
+export const absoluteExternalsPlugin: esbuild.Plugin = {
   name: "absolute-externals",
   setup(build) {
     build.onResolve({ filter: /.*/ }, async (args) => {
@@ -74,18 +75,20 @@ const absoluteExternalsPlugin: esbuild.Plugin = {
 };
 
 const bundleEntry = (entryPoint: string, metafile: boolean) =>
-  Effect.promise(() =>
-    esbuild.build({
-      entryPoints: [entryPoint],
-      bundle: true,
-      write: false,
-      platform: "node",
-      format: "esm",
-      logLevel: "silent",
-      metafile,
-      plugins: [absoluteExternalsPlugin],
-    }),
-  );
+  Effect.tryPromise({
+    try: () =>
+      esbuild.build({
+        entryPoints: [entryPoint],
+        bundle: true,
+        write: false,
+        platform: "node",
+        format: "esm",
+        logLevel: "silent",
+        metafile,
+        plugins: [absoluteExternalsPlugin],
+      }),
+    catch: (cause) => new BundlerError({ cause }),
+  });
 
 const importBundledModule = (result: esbuild.BuildResult) => {
   const code = result.outputFiles![0]!.text;
@@ -97,7 +100,10 @@ const importBundledModule = (result: esbuild.BuildResult) => {
 export const bundleAndImportWithInputs = (entryPoint: string) =>
   Effect.gen(function* () {
     const result = yield* bundleEntry(entryPoint, true);
-    const module = yield* Effect.promise(() => importBundledModule(result));
+    const module = yield* Effect.tryPromise({
+      try: () => importBundledModule(result),
+      catch: (cause) => new BundlerError({ cause }),
+    });
     if (!result.metafile) {
       return yield* Effect.dieMessage("esbuild metafile missing");
     }
@@ -169,6 +175,23 @@ export const writeFileString = (
       return "Modified";
     }
     return "Unchanged";
+  });
+
+export const removePathIfExists = (
+  filePath: string,
+): Effect.Effect<void, PlatformError, FileSystem.FileSystem> =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+
+    if (!(yield* fs.exists(filePath))) {
+      return;
+    }
+
+    yield* fs.remove(filePath).pipe(
+      Effect.catchTag("SystemError", (error) =>
+        error.reason === "NotFound" ? Effect.void : Effect.fail(error),
+      ),
+    );
   });
 
 export const generateGroupModule = ({
@@ -332,7 +355,6 @@ const getGroupPathsFromFs = Effect.gen(function* () {
 
 export const removeGroups = (groupPaths: GroupPaths.GroupPaths) =>
   Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const convexDirectory = yield* ConvexDirectory.get;
 
@@ -344,7 +366,7 @@ export const removeGroups = (groupPaths: GroupPaths.GroupPaths) =>
 
           yield* Effect.logDebug(`Removing group '${relativeModulePath}'...`);
 
-          yield* fs.remove(modulePath);
+          yield* removePathIfExists(modulePath);
           yield* Effect.logDebug(`Group '${relativeModulePath}' removed`);
         }),
       ),

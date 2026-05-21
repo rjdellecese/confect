@@ -1,22 +1,24 @@
-import { GroupSpec } from "@confect/core";
+import { GroupSpec, DatabaseSchema } from "@confect/core";
 import { Path } from "@effect/platform";
-import { Effect, Layer, Schema } from "effect";
+import { Effect, Layer } from "effect";
 import type * as esbuild from "esbuild";
+import {
+  ImplValidationError,
+  SchemaValidationError,
+  mapBundleError,
+} from "./codegenErrors";
 import { ConfectDirectory } from "./ConfectDirectory";
 import { isNodeLeafModule } from "./modulePaths";
 import { bundleAndImport, bundleAndImportWithInputs } from "./utils";
 
-export class ImplValidationError extends Schema.TaggedError<ImplValidationError>()(
-  "ImplValidationError",
-  {
-    file: Schema.String,
-    reason: Schema.String,
-  },
-) {
-  override get message(): string {
-    return `${this.file}: ${this.reason}`;
-  }
-}
+export type { CodegenUserError } from "./codegenErrors";
+export {
+  BundlerError,
+  ImplValidationError,
+  SchemaValidationError,
+  SpecBuildError,
+  SpecImportFailedError,
+} from "./codegenErrors";
 
 const absoluteModulePath = (relativePath: string) =>
   Effect.gen(function* () {
@@ -66,13 +68,7 @@ export const validateSpecModule = (specRelativePath: string) =>
   Effect.gen(function* () {
     const absolutePath = yield* absoluteModulePath(specRelativePath);
     const module = yield* bundleAndImport(absolutePath).pipe(
-      Effect.mapError(
-        (error) =>
-          new ImplValidationError({
-            file: specRelativePath,
-            reason: `failed to load spec module: ${String(error)}`,
-          }),
-      ),
+      Effect.mapError((error) => mapBundleError(specRelativePath, error)),
     );
 
     const groupSpec = module.default;
@@ -97,6 +93,29 @@ export const validateSpecModule = (specRelativePath: string) =>
     }
   });
 
+export const validateSchemaModule = () =>
+  Effect.gen(function* () {
+    const path = yield* Path.Path;
+    const confectDirectory = yield* ConfectDirectory.get;
+    const confectSchemaPath = path.join(confectDirectory, "schema.ts");
+
+    yield* bundleAndImport(confectSchemaPath).pipe(
+      Effect.mapError((error) => mapBundleError("schema.ts", error)),
+      Effect.andThen((schemaModule) => {
+        const defaultExport = schemaModule.default;
+
+        return DatabaseSchema.isDatabaseSchema(defaultExport)
+          ? Effect.succeed(defaultExport)
+          : Effect.fail(
+              new SchemaValidationError({
+                file: "schema.ts",
+                reason: "default export is not a DatabaseSchema",
+              }),
+            );
+      }),
+    );
+  });
+
 export const validateImplModule = (
   implRelativePath: string,
   specRelativePath: string,
@@ -107,15 +126,7 @@ export const validateImplModule = (
 
     const { module, metafile } = yield* bundleAndImportWithInputs(
       implAbsolutePath,
-    ).pipe(
-      Effect.mapError(
-        (error) =>
-          new ImplValidationError({
-            file: implRelativePath,
-            reason: `failed to load impl module: ${String(error)}`,
-          }),
-      ),
-    );
+    ).pipe(Effect.mapError((error) => mapBundleError(implRelativePath, error)));
 
     if (
       !(yield* implDirectlyImportsSpec(

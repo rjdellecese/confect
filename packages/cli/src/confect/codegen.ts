@@ -1,16 +1,18 @@
-import { DatabaseSchema, Spec } from "@confect/core";
+import { Spec } from "@confect/core";
 import { Command } from "@effect/cli";
 import { FileSystem, Path } from "@effect/platform";
-import { Array, Effect, Either, Match, Option } from "effect";
+import { Array, Effect, Either, HashSet, Match, Option } from "effect";
 import { ConfectDirectory } from "../ConfectDirectory";
 import { ConvexDirectory } from "../ConvexDirectory";
+import * as FunctionPaths from "../FunctionPaths";
+import { logCodegenUserError } from "../buildErrors";
+import { ImplValidationError, type CodegenUserError } from "../codegenErrors";
 import {
-  ImplValidationError,
   validateImplModule,
+  validateSchemaModule,
   validateSpecModule,
 } from "../implValidation";
 import {
-  logFailure,
   logFileAdded,
   logFileModified,
   logFileRemoved,
@@ -18,9 +20,11 @@ import {
   logSuccess,
 } from "../log";
 import {
+  discoverLeafImplFiles,
   discoverLeafSpecFiles,
   implPathForSpec,
   registeredFunctionsRelativePath,
+  specPathForImpl,
   toLeafModule,
   toNodeRegistryLeaf,
   type LeafModule,
@@ -39,6 +43,7 @@ import {
   generateFunctions,
   generateHttp,
   removePathExtension,
+  removePathIfExists,
   toModuleImportPath,
   writeFileStringAndLog,
 } from "../utils";
@@ -59,13 +64,16 @@ const LEGACY_PATHS = [
   "_generated/nodeImpl.ts",
 ];
 
+const dieUnexpected = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+  effect.pipe(Effect.orDie);
+
 export const codegen = Command.make("codegen", {}, () =>
   Effect.gen(function* () {
     yield* logPending("Performing initial sync…");
     const result = yield* Effect.either(codegenHandler);
     yield* Either.match(result, {
-      onLeft: (error) =>
-        logFailure(error.message).pipe(Effect.andThen(Effect.fail(error))),
+      onLeft: (error: CodegenUserError) =>
+        logCodegenUserError(error).pipe(Effect.andThen(Effect.fail(error))),
       onRight: () => logSuccess("Generated files are up-to-date"),
     });
   }),
@@ -76,24 +84,25 @@ export const codegen = Command.make("codegen", {}, () =>
 );
 
 export const codegenHandler = Effect.gen(function* () {
-  yield* generateConfectGeneratedDirectory;
+  yield* dieUnexpected(generateConfectGeneratedDirectory);
   const leaves = yield* loadAndValidateLeafModules;
-  yield* removeLegacyFiles;
-  yield* generateAssembledSpecs(leaves);
+  yield* dieUnexpected(removeLegacyFiles);
+  yield* dieUnexpected(generateAssembledSpecs(leaves));
   yield* validateImplModules(leaves);
-  yield* generateGroupRegisteredFunctions(leaves);
-  yield* removeObsoleteRegisteredFunctions(leaves);
-  yield* Effect.all(
-    [generateApi, generateRefs, generateNodeApi, generateServices],
-    { concurrency: "unbounded" },
+  yield* dieUnexpected(generateGroupRegisteredFunctions(leaves));
+  yield* dieUnexpected(removeObsoleteRegisteredFunctions(leaves));
+  yield* dieUnexpected(
+    Effect.all([generateApi, generateRefs, generateNodeApi, generateServices], {
+      concurrency: "unbounded",
+    }),
   );
   const [functionPaths] = yield* Effect.all(
     [
       generateFunctionModules,
       generateSchema,
-      logGenerated(generateHttp),
-      logGenerated(generateCrons),
-      logGenerated(generateAuthConfig),
+      dieUnexpected(logGenerated(generateHttp)),
+      dieUnexpected(logGenerated(generateCrons)),
+      dieUnexpected(logGenerated(generateAuthConfig)),
     ],
     { concurrency: "unbounded" },
   );
@@ -117,16 +126,16 @@ const loadAndValidateLeafModules = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
-  const specFiles = yield* discoverLeafSpecFiles;
+  const specFiles = yield* discoverLeafSpecFiles.pipe(Effect.orDie);
 
-  return yield* Effect.forEach(specFiles, (specRelativePath) =>
+  const leaves = yield* Effect.forEach(specFiles, (specRelativePath) =>
     Effect.gen(function* () {
       const leaf = yield* toLeafModule(specRelativePath);
       yield* validateSpecModule(specRelativePath);
 
       const implRelativePath = yield* implPathForSpec(specRelativePath);
       const implAbsolutePath = path.join(confectDirectory, implRelativePath);
-      if (!(yield* fs.exists(implAbsolutePath))) {
+      if (!(yield* fs.exists(implAbsolutePath).pipe(Effect.orDie))) {
         return yield* new ImplValidationError({
           file: implRelativePath,
           reason: `required sibling impl for ${specRelativePath}`,
@@ -136,7 +145,37 @@ const loadAndValidateLeafModules = Effect.gen(function* () {
       return leaf;
     }),
   );
+
+  yield* validateOrphanImpls(specFiles);
+
+  return leaves;
 });
+
+const validateOrphanImpls = (specFiles: ReadonlyArray<string>) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const confectDirectory = yield* ConfectDirectory.get;
+    const implFiles = yield* discoverLeafImplFiles.pipe(Effect.orDie);
+    const specPaths = new Set(specFiles);
+
+    yield* Effect.forEach(implFiles, (implRelativePath) =>
+      Effect.gen(function* () {
+        const specRelativePath = yield* specPathForImpl(implRelativePath);
+        if (specPaths.has(specRelativePath)) {
+          return;
+        }
+
+        const specAbsolutePath = path.join(confectDirectory, specRelativePath);
+        if (!(yield* fs.exists(specAbsolutePath).pipe(Effect.orDie))) {
+          return yield* new ImplValidationError({
+            file: implRelativePath,
+            reason: `required sibling spec ${specRelativePath}`,
+          });
+        }
+      }),
+    );
+  });
 
 const removeLegacyFiles = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
@@ -147,7 +186,7 @@ const removeLegacyFiles = Effect.gen(function* () {
     Effect.gen(function* () {
       const absolutePath = path.join(confectDirectory, relativePath);
       if (yield* fs.exists(absolutePath)) {
-        yield* fs.remove(absolutePath);
+        yield* removePathIfExists(absolutePath);
         yield* logFileRemoved(absolutePath);
       }
     }),
@@ -274,8 +313,10 @@ const removeObsoleteRegisteredFunctions = (leaves: ReadonlyArray<LeafModule>) =>
       if (!expected.has(normalized)) {
         return Effect.gen(function* () {
           const absolutePath = path.join(registryRoot, relativePath);
-          yield* fs.remove(absolutePath);
-          yield* logFileRemoved(absolutePath);
+          if (yield* fs.exists(absolutePath)) {
+            yield* removePathIfExists(absolutePath);
+            yield* logFileRemoved(absolutePath);
+          }
         });
       }
       return Effect.void;
@@ -296,7 +337,7 @@ const getGeneratedNodeSpecPath = Effect.gen(function* () {
 
 const loadGeneratedSpec = Effect.gen(function* () {
   const specPath = yield* getGeneratedSpecPath;
-  const specModule = yield* bundleAndImport(specPath);
+  const specModule = yield* bundleAndImport(specPath).pipe(Effect.orDie);
   const spec = specModule.default;
 
   if (!Spec.isConvexSpec(spec)) {
@@ -312,11 +353,13 @@ const loadGeneratedNodeSpec = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const nodeSpecPath = yield* getGeneratedNodeSpecPath;
 
-  if (!(yield* fs.exists(nodeSpecPath))) {
+  if (!(yield* fs.exists(nodeSpecPath).pipe(Effect.orDie))) {
     return Option.none<Spec.AnyWithPropsWithRuntime<"Node">>();
   }
 
-  const nodeSpecModule = yield* bundleAndImport(nodeSpecPath);
+  const nodeSpecModule = yield* bundleAndImport(nodeSpecPath).pipe(
+    Effect.orDie,
+  );
   const nodeSpec = nodeSpecModule.default;
 
   if (!Spec.isNodeSpec(nodeSpec)) {
@@ -326,6 +369,31 @@ const loadGeneratedNodeSpec = Effect.gen(function* () {
   }
 
   return Option.some(nodeSpec);
+});
+
+const emptyFunctionPaths = FunctionPaths.FunctionPaths.make(HashSet.empty());
+
+export const loadPreviousFunctionPaths = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const specPath = yield* getGeneratedSpecPath;
+
+  if (!(yield* fs.exists(specPath))) {
+    return emptyFunctionPaths;
+  }
+
+  const specEither = yield* loadGeneratedSpec.pipe(Effect.either);
+  if (Either.isLeft(specEither)) {
+    return emptyFunctionPaths;
+  }
+
+  const nodeSpecOption = yield* loadGeneratedNodeSpec;
+
+  const mergedSpec = Option.match(nodeSpecOption, {
+    onNone: () => specEither.right,
+    onSome: (nodeSpec) => Spec.merge(specEither.right, nodeSpec),
+  });
+
+  return FunctionPaths.make(mergedSpec);
 });
 
 const generateApi = Effect.gen(function* () {
@@ -361,7 +429,7 @@ export const generateNodeApi = Effect.gen(function* () {
 
   if (!(yield* fs.exists(nodeSpecPath))) {
     if (yield* fs.exists(nodeApiPath)) {
-      yield* fs.remove(nodeApiPath);
+      yield* removePathIfExists(nodeApiPath);
       yield* logFileRemoved(nodeApiPath);
     }
     return;
@@ -394,7 +462,7 @@ const generateFunctionModules = Effect.gen(function* () {
     onSome: (nodeSpec) => Spec.merge(spec, nodeSpec),
   });
 
-  return yield* generateFunctions(mergedSpec);
+  return yield* dieUnexpected(generateFunctions(mergedSpec));
 });
 
 const generateSchema = Effect.gen(function* () {
@@ -404,15 +472,7 @@ const generateSchema = Effect.gen(function* () {
 
   const confectSchemaPath = path.join(confectDirectory, "schema.ts");
 
-  yield* bundleAndImport(confectSchemaPath).pipe(
-    Effect.andThen((schemaModule) => {
-      const defaultExport = schemaModule.default;
-
-      return DatabaseSchema.isDatabaseSchema(defaultExport)
-        ? Effect.succeed(defaultExport)
-        : Effect.dieMessage("Invalid schema module");
-    }),
-  );
+  yield* validateSchemaModule();
 
   const convexSchemaPath = path.join(convexDirectory, "schema.ts");
 
@@ -425,7 +485,9 @@ const generateSchema = Effect.gen(function* () {
     schemaImportPath: importPathWithoutExt,
   });
 
-  yield* writeFileStringAndLog(convexSchemaPath, schemaContents);
+  yield* writeFileStringAndLog(convexSchemaPath, schemaContents).pipe(
+    Effect.orDie,
+  );
 });
 
 const generateServices = Effect.gen(function* () {

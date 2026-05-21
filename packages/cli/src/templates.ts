@@ -174,10 +174,11 @@ export const registeredFunctionsForGroup = ({
     yield* cbw.writeLine(`import api from "${apiImportPath}";`);
     yield* cbw.writeLine(`import ${layerExportName} from "${implImportPath}";`);
     yield* cbw.blankLine();
+    const quotedGroupPath = `"${groupPathDot.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
     yield* cbw.writeLine(
       useNode
-        ? `export default RegisteredFunctions.buildForGroup(api, ${JSON.stringify(groupPathDot)}, ${layerExportName}, RegisteredNodeFunction.make);`
-        : `export default RegisteredFunctions.buildForGroup(api, ${JSON.stringify(groupPathDot)}, ${layerExportName}, RegisteredConvexFunction.make);`,
+        ? `export default RegisteredFunctions.buildForGroup(api, ${quotedGroupPath}, ${layerExportName}, RegisteredNodeFunction.make);`
+        : `export default RegisteredFunctions.buildForGroup(api, ${quotedGroupPath}, ${layerExportName}, RegisteredConvexFunction.make);`,
     );
 
     return yield* cbw.toString();
