@@ -4,7 +4,11 @@ import { FileSystem, Path } from "@effect/platform";
 import { Array, Effect, Match, Option } from "effect";
 import { ConfectDirectory } from "../ConfectDirectory";
 import { ConvexDirectory } from "../ConvexDirectory";
-import { validateImplModule, validateSpecModule } from "../implValidation";
+import {
+  ImplValidationError,
+  validateImplModule,
+  validateSpecModule,
+} from "../implValidation";
 import {
   logFileAdded,
   logFileModified,
@@ -17,6 +21,7 @@ import {
   implPathForSpec,
   registeredFunctionsRelativePath,
   toLeafModule,
+  toNodeRegistryLeaf,
   type LeafModule,
 } from "../modulePaths";
 import {
@@ -24,7 +29,6 @@ import {
   collectConvexLeaves,
   collectNodeLeaves,
   collectSpecAssemblyNodes,
-  emitAssembledSpec,
 } from "../specAssembly";
 import * as templates from "../templates";
 import {
@@ -118,9 +122,10 @@ const loadAndValidateLeafModules = Effect.gen(function* () {
       const implRelativePath = yield* implPathForSpec(specRelativePath);
       const implAbsolutePath = path.join(confectDirectory, implRelativePath);
       if (!(yield* fs.exists(implAbsolutePath))) {
-        return yield* Effect.dieMessage(
-          `${implRelativePath}: required sibling impl for ${specRelativePath}`,
-        );
+        return yield* new ImplValidationError({
+          file: implRelativePath,
+          reason: `required sibling impl for ${specRelativePath}`,
+        });
       }
 
       return leaf;
@@ -154,7 +159,10 @@ const generateAssembledSpecs = (leaves: ReadonlyArray<LeafModule>) =>
     if (convexLeaves.length > 0) {
       const tree = buildSpecTree(convexLeaves);
       const nodes = collectSpecAssemblyNodes(tree);
-      const specContents = emitAssembledSpec(nodes, "Convex");
+      const specContents = yield* templates.assembledSpec({
+        nodes,
+        runtime: "Convex",
+      });
       yield* writeFileStringAndLog(
         path.join(confectDirectory, GENERATED_SPEC_PATH),
         specContents,
@@ -162,15 +170,12 @@ const generateAssembledSpecs = (leaves: ReadonlyArray<LeafModule>) =>
     }
 
     if (nodeLeaves.length > 0) {
-      const tree = buildSpecTree(
-        Array.map(nodeLeaves, (leaf) => ({
-          ...leaf,
-          pathSegments: [leaf.exportName] as [string, ...string[]],
-          groupPathDot: leaf.exportName,
-        })),
-      );
+      const tree = buildSpecTree(Array.map(nodeLeaves, toNodeRegistryLeaf));
       const nodes = collectSpecAssemblyNodes(tree);
-      const nodeSpecContents = emitAssembledSpec(nodes, "Node");
+      const nodeSpecContents = yield* templates.assembledSpec({
+        nodes,
+        runtime: "Node",
+      });
       yield* writeFileStringAndLog(
         path.join(confectDirectory, GENERATED_NODE_SPEC_PATH),
         nodeSpecContents,
@@ -257,7 +262,7 @@ const removeObsoleteRegisteredFunctions = (leaves: ReadonlyArray<LeafModule>) =>
 
     const existing = yield* fs.readDirectory(registryRoot, { recursive: true });
     yield* Effect.forEach(existing, (relativePath) => {
-      if (!relativePath.endsWith(".ts")) {
+      if (path.extname(relativePath) !== ".ts") {
         return Effect.void;
       }
       const normalized = path.join("registeredFunctions", relativePath);

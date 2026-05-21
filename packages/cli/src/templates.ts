@@ -1,6 +1,9 @@
-import type { Options as CodeBlockWriterOptions } from "code-block-writer";
-import CodeBlockWriter_ from "code-block-writer";
-import { Effect } from "effect";
+import { Array, Effect } from "effect";
+import { CodeBlockWriter } from "./CodeBlockWriter";
+import {
+  collectImportBindings,
+  type SpecAssemblyNode,
+} from "./specAssembly";
 
 export const functions = ({
   functionNames,
@@ -414,64 +417,96 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
     return yield* cbw.toString();
   });
 
-class CodeBlockWriter {
-  private readonly writer: CodeBlockWriter_;
+const writeGroupAssembly: (
+  cbw: CodeBlockWriter,
+  node: SpecAssemblyNode,
+  groupFactory: string,
+) => Effect.Effect<void, never, never> = (cbw, node, groupFactory) =>
+  Effect.gen(function* () {
+    if (node.importBinding !== undefined && node.children.length === 0) {
+      yield* cbw.write(node.importBinding.exportName);
+      return;
+    }
 
-  constructor(opts?: Partial<CodeBlockWriterOptions>) {
-    this.writer = new CodeBlockWriter_(opts);
-  }
+    yield* cbw.write(groupFactory);
+    yield* cbw.write("(");
+    yield* cbw.quote(node.segment);
+    yield* cbw.write(")");
 
-  indent<E = never, R = never>(
-    eff: Effect.Effect<void, E, R>,
-  ): Effect.Effect<void, E, R> {
-    return Effect.gen(this, function* () {
-      const indentationLevel = this.writer.getIndentationLevel();
-      this.writer.setIndentationLevel(indentationLevel + 1);
-      yield* eff;
-      this.writer.setIndentationLevel(indentationLevel);
-    });
-  }
+    for (const child of node.children) {
+      yield* cbw.write(".addGroupAt(");
+      yield* cbw.quote(child.segment);
+      yield* cbw.write(", ");
+      yield* writeGroupAssembly(cbw, child, groupFactory);
+      yield* cbw.write(")");
+    }
+  });
 
-  writeLine<E = never, R = never>(line: string): Effect.Effect<void, E, R> {
-    return Effect.sync(() => {
-      this.writer.writeLine(line);
-    });
-  }
+const writeRootAddAt: (
+  cbw: CodeBlockWriter,
+  node: SpecAssemblyNode,
+  groupFactory: string,
+) => Effect.Effect<void, never, never> = (cbw, node, groupFactory) =>
+  Effect.gen(function* () {
+    yield* cbw.write(".addAt(");
+    yield* cbw.quote(node.segment);
+    yield* cbw.write(", ");
 
-  write<E = never, R = never>(text: string): Effect.Effect<void, E, R> {
-    return Effect.sync(() => {
-      this.writer.write(text);
-    });
-  }
+    if (node.importBinding !== undefined && node.children.length === 0) {
+      yield* cbw.write(node.importBinding.exportName);
+    } else {
+      yield* cbw.write(groupFactory);
+      yield* cbw.write("(");
+      yield* cbw.quote(node.segment);
+      yield* cbw.write(")");
 
-  quote<E = never, R = never>(text: string): Effect.Effect<void, E, R> {
-    return Effect.sync(() => {
-      this.writer.quote(text);
-    });
-  }
+      for (const child of node.children) {
+        yield* cbw.write(".addGroupAt(");
+        yield* cbw.quote(child.segment);
+        yield* cbw.write(", ");
+        yield* writeGroupAssembly(cbw, child, groupFactory);
+        yield* cbw.write(")");
+      }
+    }
 
-  conditionalWriteLine<E = never, R = never>(
-    condition: boolean,
-    text: string,
-  ): Effect.Effect<void, E, R> {
-    return Effect.sync(() => {
-      this.writer.conditionalWriteLine(condition, text);
-    });
-  }
+    yield* cbw.write(")");
+  });
 
-  newLine<E = never, R = never>(): Effect.Effect<void, E, R> {
-    return Effect.sync(() => {
-      this.writer.newLine();
-    });
-  }
+export const assembledSpec = ({
+  nodes,
+  runtime,
+}: {
+  nodes: ReadonlyArray<SpecAssemblyNode>;
+  runtime: "Convex" | "Node";
+}) =>
+  Effect.gen(function* () {
+    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-  blankLine<E = never, R = never>(): Effect.Effect<void, E, R> {
-    return Effect.sync(() => {
-      this.writer.blankLine();
-    });
-  }
+    const needsGroupSpec = Array.some(nodes, (node) => node.children.length > 0);
+    yield* cbw.writeLine(
+      needsGroupSpec
+        ? `import { GroupSpec, Spec } from "@confect/core";`
+        : `import { Spec } from "@confect/core";`,
+    );
 
-  toString<E = never, R = never>(): Effect.Effect<string, E, R> {
-    return Effect.sync(() => this.writer.toString());
-  }
-}
+    for (const binding of collectImportBindings(nodes)) {
+      yield* cbw.writeLine(
+        `import ${binding.exportName} from "${binding.importPath}";`,
+      );
+    }
+
+    yield* cbw.blankLine();
+
+    const specFactory = runtime === "Convex" ? "Spec.make()" : "Spec.makeNode()";
+    const groupFactory =
+      runtime === "Convex" ? "GroupSpec.makeAt" : "GroupSpec.makeNodeAt";
+
+    yield* cbw.write(`export default ${specFactory}`);
+    for (const node of nodes) {
+      yield* writeRootAddAt(cbw, node, groupFactory);
+    }
+    yield* cbw.write(";");
+    yield* cbw.newLine();
+
+    return yield* cbw.toString();
+  });

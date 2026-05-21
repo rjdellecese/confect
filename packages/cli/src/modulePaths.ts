@@ -1,6 +1,7 @@
 import { FileSystem, Path } from "@effect/platform";
 import { Array, Effect, String } from "effect";
 import { ConfectDirectory } from "./ConfectDirectory";
+import { removePathExtension } from "./utils";
 
 export interface LeafModule {
   readonly relativePath: string;
@@ -9,10 +10,36 @@ export interface LeafModule {
   readonly registryGroupPathDot: string;
   readonly exportName: string;
   readonly runtime: "Convex" | "Node";
+  readonly specImportPath: string;
 }
 
-const SPEC_SUFFIX = ".spec.ts";
-const IMPL_SUFFIX = ".impl.ts";
+export const SPEC_SUFFIX = ".spec.ts";
+export const IMPL_SUFFIX = ".impl.ts";
+
+const swapModuleSuffix = (
+  relativePath: string,
+  fromSuffix: string,
+  toSuffix: string,
+) =>
+  Effect.gen(function* () {
+    const path = yield* Path.Path;
+    const { dir, name, ext } = path.parse(relativePath);
+    if (ext !== ".ts" || !name.endsWith(fromSuffix.slice(0, -".ts".length))) {
+      return relativePath;
+    }
+
+    const stem = name.slice(0, -fromSuffix.slice(0, -".ts".length).length);
+    const nextName = `${stem}${toSuffix.slice(0, -".ts".length)}`;
+    return dir.length > 0
+      ? path.join(dir, `${nextName}${ext}`)
+      : `${nextName}${ext}`;
+  });
+
+export const isLeafSpecPath = (relativePath: string) =>
+  relativePath.endsWith(SPEC_SUFFIX);
+
+export const isLeafImplPath = (relativePath: string) =>
+  relativePath.endsWith(IMPL_SUFFIX);
 
 export const exportNameFromModulePath = (relativePath: string) =>
   Effect.gen(function* () {
@@ -28,7 +55,10 @@ export const groupPathFromRelativeModulePath = (relativePath: string) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
     const { dir, name, ext } = path.parse(relativePath);
-    const stem = ext === ".ts" ? name.replace(/\.spec$/, "") : name;
+    const stem =
+      ext === ".ts" && name.endsWith(".spec")
+        ? name.slice(0, -".spec".length)
+        : name;
     const dirSegments = Array.filter(
       String.split(dir, path.sep),
       String.isNonEmpty,
@@ -43,22 +73,36 @@ export const groupPathFromRelativeModulePath = (relativePath: string) =>
     };
   });
 
+export const specImportPathFromGenerated = (specRelativePath: string) =>
+  Effect.gen(function* () {
+    const withoutExt = yield* removePathExtension(specRelativePath);
+    return `../${withoutExt}`;
+  });
+
 export const specPathForImpl = (implRelativePath: string) =>
-  Effect.succeed(implRelativePath.replace(IMPL_SUFFIX, SPEC_SUFFIX));
+  swapModuleSuffix(implRelativePath, IMPL_SUFFIX, SPEC_SUFFIX);
 
 export const implPathForSpec = (specRelativePath: string) =>
-  Effect.succeed(specRelativePath.replace(SPEC_SUFFIX, IMPL_SUFFIX));
+  swapModuleSuffix(specRelativePath, SPEC_SUFFIX, IMPL_SUFFIX);
 
 export const isNodeLeafModule = (relativePath: string) =>
   relativePath.startsWith("node/") || relativePath.startsWith("node\\");
 
+export const toNodeRegistryLeaf = (leaf: LeafModule): LeafModule => ({
+  ...leaf,
+  pathSegments: [leaf.exportName],
+  groupPathDot: leaf.exportName,
+});
+
 export const registeredFunctionsRelativePath = (leaf: LeafModule) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
-    return path.join(
-      "registeredFunctions",
-      ...leaf.pathSegments.slice(leaf.runtime === "Node" ? 1 : 0),
-    ) + ".ts";
+    return (
+      path.join(
+        "registeredFunctions",
+        ...leaf.pathSegments.slice(leaf.runtime === "Node" ? 1 : 0),
+      ) + ".ts"
+    );
   });
 
 export const discoverLeafSpecFiles = Effect.gen(function* () {
@@ -74,7 +118,7 @@ export const discoverLeafSpecFiles = Effect.gen(function* () {
   });
 
   return Array.filter(allPaths, (relativePath) => {
-    if (!relativePath.endsWith(SPEC_SUFFIX)) {
+    if (!isLeafSpecPath(relativePath)) {
       return false;
     }
 
@@ -83,7 +127,7 @@ export const discoverLeafSpecFiles = Effect.gen(function* () {
     }
 
     const segments = String.split(relativePath, path.sep);
-    return !segments.some((segment) => excludedDirs.has(segment));
+    return !Array.some(segments, (segment) => excludedDirs.has(segment));
   });
 });
 
@@ -92,6 +136,7 @@ export const toLeafModule = (specRelativePath: string) =>
     const exportName = yield* exportNameFromModulePath(specRelativePath);
     const { pathSegments, groupPathDot } =
       yield* groupPathFromRelativeModulePath(specRelativePath);
+    const specImportPath = yield* specImportPathFromGenerated(specRelativePath);
     const runtime = isNodeLeafModule(specRelativePath) ? "Node" : "Convex";
 
     return {
@@ -101,5 +146,6 @@ export const toLeafModule = (specRelativePath: string) =>
       exportName,
       runtime,
       registryGroupPathDot: runtime === "Node" ? exportName : groupPathDot,
+      specImportPath,
     } satisfies LeafModule;
   });

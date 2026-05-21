@@ -1,4 +1,5 @@
 import type { LeafModule } from "./modulePaths";
+import { Array, Order, pipe, Record } from "effect";
 
 export interface SpecTreeNode {
   readonly children: Map<string, SpecTreeNode>;
@@ -13,25 +14,22 @@ export const insertLeafModule = (
   root: SpecTreeNode,
   leaf: LeafModule,
 ): SpecTreeNode => {
-  let current = root;
-  for (const segment of leaf.pathSegments) {
+  const terminal = Array.reduce(leaf.pathSegments, root, (current, segment) => {
     const existing = current.children.get(segment);
-    if (existing === undefined) {
-      const next = emptySpecTreeNode();
-      current.children.set(segment, next);
-      current = next;
-    } else {
-      current = existing;
+    if (existing !== undefined) {
+      return existing;
     }
-  }
-  current.leaf = leaf;
+    const next = emptySpecTreeNode();
+    current.children.set(segment, next);
+    return next;
+  });
+  terminal.leaf = leaf;
   return root;
 };
 
 export const buildSpecTree = (leaves: ReadonlyArray<LeafModule>): SpecTreeNode =>
-  leaves.reduce(
-    (tree, leaf) => insertLeafModule(tree, leaf),
-    emptySpecTreeNode(),
+  Array.reduce(leaves, emptySpecTreeNode(), (tree, leaf) =>
+    insertLeafModule(tree, leaf),
   );
 
 export interface SpecImportBinding {
@@ -45,99 +43,57 @@ export interface SpecAssemblyNode {
   readonly children: ReadonlyArray<SpecAssemblyNode>;
 }
 
+const sortedChildEntries = (children: Map<string, SpecTreeNode>) =>
+  pipe(
+    Array.fromIterable(children.entries()),
+    Array.sortBy(Order.mapInput(Order.string, ([segment]) => segment)),
+  );
+
 export const collectSpecAssemblyNodes = (
   tree: SpecTreeNode,
-  importPathPrefix = "../",
 ): ReadonlyArray<SpecAssemblyNode> =>
-  [...tree.children.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([segment, child]) => ({
+  pipe(
+    sortedChildEntries(tree.children),
+    Array.map(([segment, child]) => ({
       segment,
       ...(child.leaf === undefined
         ? {}
         : {
             importBinding: {
-              importPath: `${importPathPrefix}${child.leaf.relativePath.replace(/\.ts$/, "")}`,
+              importPath: child.leaf.specImportPath,
               exportName: child.leaf.exportName,
             },
           }),
-      children: collectSpecAssemblyNodes(child, importPathPrefix),
-    }));
+      children: collectSpecAssemblyNodes(child),
+    })),
+  );
 
 export const collectConvexLeaves = (leaves: ReadonlyArray<LeafModule>) =>
-  leaves.filter((leaf) => leaf.runtime === "Convex");
+  Array.filter(leaves, (leaf) => leaf.runtime === "Convex");
 
 export const collectNodeLeaves = (leaves: ReadonlyArray<LeafModule>) =>
-  leaves.filter((leaf) => leaf.runtime === "Node");
+  Array.filter(leaves, (leaf) => leaf.runtime === "Node");
 
-const emitGroupAssembly = (node: SpecAssemblyNode): string => {
-  if (node.importBinding !== undefined && node.children.length === 0) {
-    return node.importBinding.exportName;
-  }
+const importBindingsForNode = (
+  node: SpecAssemblyNode,
+): ReadonlyArray<SpecImportBinding> =>
+  pipe(
+    node.children,
+    Array.flatMap(importBindingsForNode),
+    (childBindings) =>
+      node.importBinding === undefined
+        ? childBindings
+        : Array.prepend(childBindings, node.importBinding),
+  );
 
-  const childAssembly = node.children
-    .map(
-      (child) =>
-        `.addGroupAt(${JSON.stringify(child.segment)}, ${emitGroupAssembly(child)})`,
-    )
-    .join("");
-
-  return `GroupSpec.makeAt(${JSON.stringify(node.segment)})${childAssembly}`;
-};
-
-export const emitAssembledSpec = (
+export const collectImportBindings = (
   nodes: ReadonlyArray<SpecAssemblyNode>,
-  runtime: "Convex" | "Node",
-): string => {
-  const imports = new Map<string, string>();
-  const collectImports = (node: SpecAssemblyNode) => {
-    if (node.importBinding !== undefined) {
-      imports.set(
-        node.importBinding.exportName,
-        node.importBinding.importPath,
-      );
-    }
-    node.children.forEach(collectImports);
-  };
-  nodes.forEach(collectImports);
-
-  const importLines = [...imports.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(
-      ([exportName, importPath]) =>
-        `import ${exportName} from "${importPath}";`,
-    );
-
-  const specFactory = runtime === "Convex" ? "Spec.make()" : "Spec.makeNode()";
-  const groupFactory =
-    runtime === "Convex" ? "GroupSpec.makeAt" : "GroupSpec.makeNodeAt";
-  const needsGroupSpec = nodes.some((node) => node.children.length > 0);
-
-  const rootAssembly = nodes
-    .map((node) => {
-      if (node.importBinding !== undefined && node.children.length === 0) {
-        return `.addAt(${JSON.stringify(node.segment)}, ${node.importBinding.exportName})`;
-      }
-
-      const childAssembly = node.children
-        .map(
-          (child) =>
-            `.addGroupAt(${JSON.stringify(child.segment)}, ${emitGroupAssembly(child)})`,
-        )
-        .join("");
-
-      return `.addAt(${JSON.stringify(node.segment)}, ${groupFactory}(${JSON.stringify(node.segment)})${childAssembly})`;
-    })
-    .join("");
-
-  const coreImports = needsGroupSpec ? "GroupSpec, Spec" : "Spec";
-
-  return [
-    `import { ${coreImports} } from "@confect/core";`,
-    ...importLines,
-    "",
-    `export default ${specFactory}${rootAssembly};`,
-    "",
-  ].join("\n");
-};
-
+): ReadonlyArray<SpecImportBinding> =>
+  pipe(
+    Array.flatMap(nodes, importBindingsForNode),
+    (bindings) =>
+      Record.fromIterableBy(bindings, (binding) => binding.exportName),
+    Record.toEntries,
+    Array.sortBy(Order.mapInput(Order.string, ([exportName]) => exportName)),
+    Array.map(([, binding]) => binding),
+  );

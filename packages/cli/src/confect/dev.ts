@@ -19,6 +19,7 @@ import type { ReadonlyRecord } from "effect/Record";
 import { logPending, logSuccess } from "../log";
 import { ConfectDirectory } from "../ConfectDirectory";
 import { ConvexDirectory } from "../ConvexDirectory";
+import { isLeafImplPath, isLeafSpecPath } from "../modulePaths";
 import { ProjectRoot } from "../ProjectRoot";
 import {
   generateAuthConfig,
@@ -162,10 +163,7 @@ const specFileWatcher = (
       Stream.debounce(Duration.millis(200)),
       Stream.runForEach((event) => {
         const relativePath = path.relative(confectDirectory, event.path);
-        if (
-          !relativePath.endsWith(".spec.ts") &&
-          !relativePath.endsWith(".impl.ts")
-        ) {
+        if (!isLeafSpecPath(relativePath) && !isLeafImplPath(relativePath)) {
           return Effect.void;
         }
 

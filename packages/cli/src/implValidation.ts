@@ -1,17 +1,20 @@
 import { GroupSpec } from "@confect/core";
 import { Path } from "@effect/platform";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Schema } from "effect";
 import type * as esbuild from "esbuild";
 import { ConfectDirectory } from "./ConfectDirectory";
 import { isNodeLeafModule } from "./modulePaths";
 import { bundleAndImport, bundleAndImportWithInputs } from "./utils";
 
-export class ImplValidationError extends Error {
-  readonly _tag = "ImplValidationError";
-
-  constructor(readonly details: { file: string; message: string }) {
-    super(`${details.file}: ${details.message}`);
-    this.name = "ImplValidationError";
+export class ImplValidationError extends Schema.TaggedError<ImplValidationError>()(
+  "ImplValidationError",
+  {
+    file: Schema.String,
+    reason: Schema.String,
+  },
+) {
+  override get message(): string {
+    return `${this.file}: ${this.reason}`;
   }
 }
 
@@ -44,7 +47,12 @@ const implDirectlyImportsSpec = (
     }
 
     const specResolved = path.resolve(specKey);
-    return metafile.inputs[implKey]!.imports.some(
+    const implInput = metafile.inputs[implKey];
+    if (implInput === undefined) {
+      return false;
+    }
+
+    return implInput.imports.some(
       (imp) => path.resolve(imp.path) === specResolved,
     );
   });
@@ -57,7 +65,7 @@ export const validateSpecModule = (specRelativePath: string) =>
         (error) =>
           new ImplValidationError({
             file: specRelativePath,
-            message: `failed to load spec module: ${String(error)}`,
+            reason: `failed to load spec module: ${String(error)}`,
           }),
       ),
     );
@@ -65,25 +73,20 @@ export const validateSpecModule = (specRelativePath: string) =>
     const groupSpec = module.default;
 
     if (!GroupSpec.isGroupSpec(groupSpec)) {
-      return yield* Effect.fail(
-        new ImplValidationError({
-          file: specRelativePath,
-          message:
-            "must default-export GroupSpec.make() or GroupSpec.makeNode()",
-        }),
-      );
+      return yield* new ImplValidationError({
+        file: specRelativePath,
+        reason: "must default-export GroupSpec.make() or GroupSpec.makeNode()",
+      });
     }
 
     const expectedRuntime = isNodeLeafModule(specRelativePath) ? "Node" : "Convex";
     const group = groupSpec as GroupSpec.AnyWithProps;
 
     if (group.runtime !== expectedRuntime) {
-      return yield* Effect.fail(
-        new ImplValidationError({
-          file: specRelativePath,
-          message: `expected GroupSpec runtime "${expectedRuntime}", got "${group.runtime}"`,
-        }),
-      );
+      return yield* new ImplValidationError({
+        file: specRelativePath,
+        reason: `expected GroupSpec runtime "${expectedRuntime}", got "${group.runtime}"`,
+      });
     }
   });
 
@@ -102,7 +105,7 @@ export const validateImplModule = (
         (error) =>
           new ImplValidationError({
             file: implRelativePath,
-            message: `failed to load impl module: ${String(error)}`,
+            reason: `failed to load impl module: ${String(error)}`,
           }),
       ),
     );
@@ -114,20 +117,16 @@ export const validateImplModule = (
         specAbsolutePath,
       ))
     ) {
-      return yield* Effect.fail(
-        new ImplValidationError({
-          file: implRelativePath,
-          message: `must import sibling spec "${specRelativePath}"`,
-        }),
-      );
+      return yield* new ImplValidationError({
+        file: implRelativePath,
+        reason: `must import sibling spec "${specRelativePath}"`,
+      });
     }
 
     if (!Layer.isLayer(module.default)) {
-      return yield* Effect.fail(
-        new ImplValidationError({
-          file: implRelativePath,
-          message: "must default-export a GroupImpl layer",
-        }),
-      );
+      return yield* new ImplValidationError({
+        file: implRelativePath,
+        reason: "must default-export a GroupImpl layer",
+      });
     }
   });
