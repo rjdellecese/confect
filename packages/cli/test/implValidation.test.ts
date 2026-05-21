@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Effect, Layer } from "effect";
 import { ConfectDirectory } from "../src/ConfectDirectory";
+import type { ImplValidationError } from "../src/implValidation";
 import { validateImplModule, validateSpecModule } from "../src/implValidation";
 
 const fixtureConfect = join(
