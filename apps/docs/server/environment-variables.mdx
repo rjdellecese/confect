@@ -17,11 +17,8 @@ import { Config, Effect } from "effect";
 import api from "./_generated/api";
 import settings from "./settings.spec";
 
-const getApiKey = FunctionImpl.make(
-  api,
-  settings,
-  "getApiKey",
-  () => Config.string("API_KEY").pipe(Effect.orDie),
+const getApiKey = FunctionImpl.make(api, settings, "getApiKey", () =>
+  Config.string("API_KEY").pipe(Effect.orDie),
 );
 ```
 
@@ -51,14 +48,10 @@ const provider = ConvexConfigProvider.make({
 To use a custom provider in a function handler, pass it to `Effect.withConfigProvider`.
 
 ```ts
-const getApiKey = FunctionImpl.make(
-  api,
-  settings,
-  "getApiKey",
-  () =>
-    Config.string("API_KEY").pipe(
-      Effect.withConfigProvider(provider),
-      Effect.orDie,
-    ),
+const getApiKey = FunctionImpl.make(api, settings, "getApiKey", () =>
+  Config.string("API_KEY").pipe(
+    Effect.withConfigProvider(provider),
+    Effect.orDie,
+  ),
 );
 ```
