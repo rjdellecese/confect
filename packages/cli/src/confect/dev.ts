@@ -16,9 +16,9 @@ import {
   String,
 } from "effect";
 import type { ReadonlyRecord } from "effect/Record";
-import { logPending, logSuccess } from "../log";
 import { ConfectDirectory } from "../ConfectDirectory";
 import { ConvexDirectory } from "../ConvexDirectory";
+import { logPending, logSuccess } from "../log";
 import { isLeafImplPath, isLeafSpecPath } from "../modulePaths";
 import { ProjectRoot } from "../ProjectRoot";
 import { generateAuthConfig, generateCrons, generateHttp } from "../utils";
@@ -105,12 +105,12 @@ const syncLoop = (
 
     return yield* Effect.forever(
       Effect.gen(function* () {
-        yield* Effect.logDebug("Running sync loop...");
+        yield* Effect.logDebug("Running sync loop…");
         yield* Queue.take(signal);
 
         const isDone = yield* Deferred.isDone(initialSyncDone);
         yield* Effect.when(
-          logPending("Dependencies changed, reloading…"),
+          logPending("Dependencies may have changed, reloading…"),
           () => isDone,
         );
         yield* Deferred.succeed(initialSyncDone, undefined);
