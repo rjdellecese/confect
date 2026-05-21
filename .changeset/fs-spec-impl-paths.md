@@ -20,6 +20,4 @@ Replace hand-written root `spec.ts` / `impl.ts` with colocated leaf `*.spec.ts` 
 
 1. Split specs into leaf `confect/{path}.spec.ts` files using `export default GroupSpec.make()` (or `GroupSpec.makeNode()` for node actions).
 2. Pair each spec with `confect/{path}.impl.ts` that default-imports the sibling spec (conventionally bound to a variable named after the group, e.g. `import notes from "./notes.spec"`) and default-exports `GroupImpl.make(api, notes)`.
-3. Delete root `spec.ts`, `impl.ts`, and parent aggregator specs/impls.
-4. Delete the now-stale `confect/_generated/registeredFunctions.ts` and `confect/_generated/nodeRegisteredFunctions.ts` files — they are replaced by directories with the same names, and a leftover file will collide with the new layout.
-5. Run `confect codegen`. Every Convex module under `convex/` is re-emitted to import from `_generated/registeredFunctions/{path}` instead of the old aggregate file; expect a full re-write of `convex/` if you commit it to source control.
+3. Run `confect codegen`. The CLI deletes legacy root files (`spec.ts`, `impl.ts`, `nodeSpec.ts`, `nodeImpl.ts`, common aggregator names) and stale `_generated/registeredFunctions.ts` / `_generated/nodeRegisteredFunctions.ts` automatically, then assembles the new `_generated/spec.ts` and per-group registries. Every Convex module under `convex/` is re-emitted to import from `_generated/registeredFunctions/{path}` instead of the old aggregate file; expect a full re-write of `convex/` if you commit it to source control.
