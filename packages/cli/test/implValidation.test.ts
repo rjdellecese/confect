@@ -1,17 +1,12 @@
 import { FileSystem, Path } from "@effect/platform";
 import { NodeFileSystem, NodePath } from "@effect/platform-node";
 import { expect, layer } from "@effect/vitest";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { Effect, Layer } from "effect";
 import { ConfectDirectory } from "../src/ConfectDirectory";
 import type { ImplValidationError } from "../src/implValidation";
 import { validateImplModule, validateSpecModule } from "../src/implValidation";
 
-const fixtureConfect = join(
-  dirname(fileURLToPath(import.meta.url)),
-  "../../server/test/mock-backend/fixtures/confect",
-);
+const fixtureConfect = `${import.meta.dirname}/../../server/test/mock-backend/fixtures/confect`;
 
 const ValidationLayer = Layer.mergeAll(
   NodePath.layer,

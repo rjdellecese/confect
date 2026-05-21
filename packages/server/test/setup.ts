@@ -1,7 +1,6 @@
 import { Command, type CommandExecutor, Path } from "@effect/platform";
 import { NodeContext } from "@effect/platform-node";
 import { Effect, pipe } from "effect";
-import { fileURLToPath } from "node:url";
 
 const runCommand = (
   command: string,
@@ -46,7 +45,7 @@ export const setupForFixture =
         const path = yield* Path.Path;
         const fixtureDir = path.resolve(baseDir, fixtureSubpath);
         const originalCwd = process.cwd();
-        const cliEntry = fileURLToPath(confectCliEntryUrl);
+        const cliEntry = yield* path.fromFileUrl(confectCliEntryUrl);
 
         yield* Effect.gen(function* () {
           process.chdir(fixtureDir);
