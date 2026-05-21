@@ -2,9 +2,6 @@
 "@confect/core": major
 "@confect/server": major
 "@confect/cli": major
-"@confect/react": major
-"@confect/js": major
-"@confect/test": major
 ---
 
 Derive Confect function paths from the filesystem layout of `confect/`. Each group lives in a colocated `*.spec.ts` / `*.impl.ts` pair, and the group's name is its path within `confect/` (file stem for top-level groups, dot-joined directory path for nested groups). See [`/concepts/project-structure`](/concepts/project-structure), [`/concepts/file-naming-conventions`](/concepts/file-naming-conventions), and [`/concepts/spec-impl-model`](/concepts/spec-impl-model) for the current model.
