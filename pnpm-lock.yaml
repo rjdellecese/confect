@@ -115,13 +115,13 @@ importers:
         version: link:../../packages/server
       '@convex-dev/workpool':
         specifier: ^0.4.2
-        version: 0.4.2(convex-helpers@0.1.114(@standard-schema/spec@1.0.0)(convex@1.33.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(convex@1.33.1(react@19.2.4))
+        version: 0.4.2(convex-helpers@0.1.114(@standard-schema/spec@1.0.0)(convex@1.39.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(convex@1.39.1(react@19.2.4))
       '@effect/platform':
         specifier: 0.96.1
         version: 0.96.1(effect@3.21.2)
       convex:
-        specifier: 1.33.1
-        version: 1.33.1(react@19.2.4)
+        specifier: 1.39.1
+        version: 1.39.1(react@19.2.4)
       effect:
         specifier: 3.21.2
         version: 3.21.2
@@ -3341,6 +3341,25 @@ packages:
       '@auth0/auth0-react':
         optional: true
       '@clerk/clerk-react':
+        optional: true
+      react:
+        optional: true
+
+  convex@1.39.1:
+    resolution: {integrity: sha512-W+gVXA7BpRF1xLlS1kGTtKVaqd5yonqbGESKiPtIUXjV744GdDz8IG7RVsSY5KzHbgxuJBHKaJYk+92OIHTskQ==}
+    engines: {node: '>=18.0.0', npm: '>=7.0.0'}
+    hasBin: true
+    peerDependencies:
+      '@auth0/auth0-react': ^2.0.1
+      '@clerk/clerk-react': ^4.12.8 || ^5.0.0
+      '@clerk/react': ^6.4.3
+      react: 19.2.4
+    peerDependenciesMeta:
+      '@auth0/auth0-react':
+        optional: true
+      '@clerk/clerk-react':
+        optional: true
+      '@clerk/react':
         optional: true
       react:
         optional: true
@@ -6993,10 +7012,10 @@ snapshots:
       human-id: 4.1.1
       prettier: 2.8.8
 
-  '@convex-dev/workpool@0.4.2(convex-helpers@0.1.114(@standard-schema/spec@1.0.0)(convex@1.33.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(convex@1.33.1(react@19.2.4))':
+  '@convex-dev/workpool@0.4.2(convex-helpers@0.1.114(@standard-schema/spec@1.0.0)(convex@1.39.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(convex@1.39.1(react@19.2.4))':
     dependencies:
-      convex: 1.33.1(react@19.2.4)
-      convex-helpers: 0.1.114(@standard-schema/spec@1.0.0)(convex@1.33.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3)
+      convex: 1.39.1(react@19.2.4)
+      convex-helpers: 0.1.114(@standard-schema/spec@1.0.0)(convex@1.39.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3)
 
   '@effect/cli@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(@effect/printer-ansi@0.49.0(@effect/typeclass@0.40.0(effect@3.21.2))(effect@3.21.2))(@effect/printer@0.49.0(@effect/typeclass@0.40.0(effect@3.21.2))(effect@3.21.2))(effect@3.21.2)':
     dependencies:
@@ -9730,9 +9749,9 @@ snapshots:
 
   convert-to-spaces@2.0.1: {}
 
-  convex-helpers@0.1.114(@standard-schema/spec@1.0.0)(convex@1.33.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3):
+  convex-helpers@0.1.114(@standard-schema/spec@1.0.0)(convex@1.39.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3):
     dependencies:
-      convex: 1.33.1(react@19.2.4)
+      convex: 1.39.1(react@19.2.4)
     optionalDependencies:
       '@standard-schema/spec': 1.0.0
       react: 19.2.4
@@ -9743,6 +9762,17 @@ snapshots:
       convex: 1.33.1(react@19.2.4)
 
   convex@1.33.1(react@19.2.4):
+    dependencies:
+      esbuild: 0.27.0
+      prettier: 3.8.1
+      ws: 8.18.0
+    optionalDependencies:
+      react: 19.2.4
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
+  convex@1.39.1(react@19.2.4):
     dependencies:
       esbuild: 0.27.0
       prettier: 3.8.1
