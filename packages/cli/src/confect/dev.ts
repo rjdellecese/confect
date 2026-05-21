@@ -18,7 +18,7 @@ import {
 import type { ReadonlyRecord } from "effect/Record";
 import { ConfectDirectory } from "../ConfectDirectory";
 import { ConvexDirectory } from "../ConvexDirectory";
-import { logPending, logSuccess } from "../log";
+import { logFailure, logPending, logSuccess } from "../log";
 import { isLeafImplPath, isLeafSpecPath } from "../modulePaths";
 import { ProjectRoot } from "../ProjectRoot";
 import { generateAuthConfig, generateCrons, generateHttp } from "../utils";
@@ -79,7 +79,10 @@ const logFileChangeIndented = (
 export const dev = Command.make("dev", {}, () =>
   Effect.gen(function* () {
     yield* logPending("Performing initial sync…");
-    const initialFunctionPaths = yield* codegenHandler;
+    yield* codegenHandler.pipe(
+      Effect.tap(() => logSuccess("Generated files are up-to-date")),
+      Effect.catchTag("ImplValidationError", (error) => logFailure(error.message)),
+    );
 
     const pendingRef = yield* Ref.make<Pending>(pendingInit);
     const signal = yield* Queue.sliding<void>(1);
@@ -88,7 +91,7 @@ export const dev = Command.make("dev", {}, () =>
       [
         specFileWatcher(signal, pendingRef),
         confectDirectoryWatcher(signal, pendingRef),
-        syncLoop(signal, pendingRef, initialFunctionPaths),
+        syncLoop(signal, pendingRef),
       ],
       { concurrency: "unbounded" },
     );
@@ -98,7 +101,6 @@ export const dev = Command.make("dev", {}, () =>
 const syncLoop = (
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
-  _initialFunctionPaths: unknown,
 ) =>
   Effect.gen(function* () {
     const initialSyncDone = yield* Deferred.make<void>();
@@ -140,7 +142,9 @@ const syncLoop = (
         yield* pending.specDirty
           ? logSuccess("Generated files are up-to-date")
           : Effect.void;
-      }),
+      }).pipe(
+        Effect.catchTag("ImplValidationError", (error) => logFailure(error.message)),
+      ),
     );
   });
 

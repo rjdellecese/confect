@@ -1,7 +1,7 @@
 import { DatabaseSchema, Spec } from "@confect/core";
 import { Command } from "@effect/cli";
 import { FileSystem, Path } from "@effect/platform";
-import { Array, Effect, Match, Option } from "effect";
+import { Array, Effect, Either, Match, Option } from "effect";
 import { ConfectDirectory } from "../ConfectDirectory";
 import { ConvexDirectory } from "../ConvexDirectory";
 import {
@@ -10,6 +10,7 @@ import {
   validateSpecModule,
 } from "../implValidation";
 import {
+  logFailure,
   logFileAdded,
   logFileModified,
   logFileRemoved,
@@ -61,8 +62,12 @@ const LEGACY_PATHS = [
 export const codegen = Command.make("codegen", {}, () =>
   Effect.gen(function* () {
     yield* logPending("Performing initial sync…");
-    yield* codegenHandler;
-    yield* logSuccess("Generated files are up-to-date");
+    const result = yield* Effect.either(codegenHandler);
+    yield* Either.match(result, {
+      onLeft: (error) =>
+        logFailure(error.message).pipe(Effect.andThen(Effect.fail(error))),
+      onRight: () => logSuccess("Generated files are up-to-date"),
+    });
   }),
 ).pipe(
   Command.withDescription(
