@@ -208,19 +208,7 @@ export default GroupImpl.make(api, workpool).pipe(
 );
 ```
 
-Provide the group layer in your top-level impl as usual.
-
-```ts confect/impl.ts
-import { Impl } from "@confect/server";
-import { Layer } from "effect";
-import api from "./_generated/api";
-import { workpool } from "./workpool.impl";
-
-export default Impl.make(api).pipe(
-  Layer.provide(workpool),
-  Impl.finalize,
-);
-```
+Run `confect codegen` to emit the per-group registry that wires this leaf impl into `convex/`.
 
 ### Call plain functions from the client
 

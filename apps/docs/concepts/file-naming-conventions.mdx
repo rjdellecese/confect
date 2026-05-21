@@ -10,7 +10,7 @@ Confect requires a small number of fixed entry-point files in your `confect/` di
 
 Name each leaf group's spec and impl with `.spec.ts` and `.impl.ts` suffixes. Use `GroupSpec.make()` (or `GroupSpec.makeNode()` for node actions) without a name — the CLI derives the group path from the file location. **Default-export** the group from each leaf module (`export default GroupSpec.make()…` / `export default GroupImpl.make(…)…`). Additional named exports on `.spec.ts` (for example error classes) are allowed.
 
-Each impl default-imports its sibling spec by group name (the `*.spec.ts` stem) and passes that group object to `FunctionImpl.make` and `GroupImpl.make`:
+Each impl default-imports its sibling spec (the binding is conventionally named after the group — the `*.spec.ts` stem) and passes that group object to `FunctionImpl.make` and `GroupImpl.make`:
 
 ```ts confect/notes.spec.ts
 import { GroupSpec, FunctionSpec } from "@confect/core";
@@ -50,6 +50,13 @@ export default GroupImpl.make(api, notes).pipe(Layer.provide(list));
 ```
 
 Run `confect codegen` to assemble leaf specs into `confect/_generated/spec.ts` and emit per-group registries under `confect/_generated/registeredFunctions/`. Do not hand-write root `spec.ts`, `impl.ts`, or parent compose files.
+
+<Note>
+  Because group paths are derived from the filesystem, renaming a leaf
+  file or its parent directory renames the public Convex API path
+  (e.g. `internal.notesAndRandom.notes.list`). Treat leaf paths as
+  part of your API's contract.
+</Note>
 
 <Warning>
   Some test runners (such as Vitest and Jest) treat `.spec.ts` files

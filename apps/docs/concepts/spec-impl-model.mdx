@@ -33,7 +33,7 @@ The CLI assembles all leaf specs into `confect/_generated/spec.ts`. Do not hand-
 
 ## Impl
 
-An impl provides the logic for each function declared in your spec. Each leaf impl default-imports its sibling spec by group name (the `*.spec.ts` stem) and passes that group object to `FunctionImpl.make` and `GroupImpl.make` — no dot-path strings:
+An impl provides the logic for each function declared in your spec. Each leaf impl default-imports its sibling spec (conventionally bound to a variable named after the group — the `*.spec.ts` stem) and passes that group object to `FunctionImpl.make` and `GroupImpl.make` — no dot-path strings:
 
 ```ts confect/notesAndRandom/notes.impl.ts
 import { FunctionImpl, GroupImpl } from "@confect/server";

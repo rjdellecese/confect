@@ -40,13 +40,19 @@ description: "Understand the structure of a Confect project."
   <Tree.Folder name="convex" />
 </Tree>
 
+<Info>
+  `_generated/nodeApi.ts` and `_generated/nodeSpec.ts` are only
+  generated when you have node action leaf specs (files under
+  `confect/node/`).
+</Info>
+
 ## `confect/`
 
 ### `_generated/`
 
 #### `api.ts`
 
-Contains a single default `Api` export, which combines your database schema and spec. Pass this as the first argument to the `Impl.make`, `GroupImpl.make`, and `FunctionImpl.make` constructor functions when building your spec's implementation.
+Contains a single default `Api` export, which combines your database schema and spec. Pass this as the first argument to the `GroupImpl.make` and `FunctionImpl.make` constructor functions when building your spec's implementation.
 
 #### `nodeApi.ts`
 

@@ -68,11 +68,11 @@ import { Effect } from "effect";
 
 import api from "./_generated/api";
 import { DatabaseReader } from "./_generated/services";
-import { NoteNotFound } from "./notes.spec";
+import notes, { NoteNotFound } from "./notes.spec";
 
 const getOrFail = FunctionImpl.make(
   api,
-  "notes",
+  notes,
   "getOrFail",
   ({ noteId }) =>
     Effect.gen(function* () {
