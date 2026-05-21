@@ -23,15 +23,14 @@ const list = FunctionImpl.make(api, notes, "list", () =>
   }).pipe(Effect.orDie),
 );
 
-const delete_ = FunctionImpl.make(api, notes, "delete_",
-  ({ noteId }) =>
-    Effect.gen(function* () {
-      const writer = yield* DatabaseWriter;
+const delete_ = FunctionImpl.make(api, notes, "delete_", ({ noteId }) =>
+  Effect.gen(function* () {
+    const writer = yield* DatabaseWriter;
 
-      yield* writer.table("notes").delete(noteId);
+    yield* writer.table("notes").delete(noteId);
 
-      return null;
-    }).pipe(Effect.orDie),
+    return null;
+  }).pipe(Effect.orDie),
 );
 
 const getFirst = FunctionImpl.make(api, notes, "getFirst", () =>
@@ -42,13 +41,12 @@ const getFirst = FunctionImpl.make(api, notes, "getFirst", () =>
   }).pipe(Effect.orDie),
 );
 
-const internalGetFirst = FunctionImpl.make(api, notes, "internalGetFirst",
-  () =>
-    Effect.gen(function* () {
-      const reader = yield* DatabaseReader;
+const internalGetFirst = FunctionImpl.make(api, notes, "internalGetFirst", () =>
+  Effect.gen(function* () {
+    const reader = yield* DatabaseReader;
 
-      return yield* reader.table("notes").index("by_creation_time").first();
-    }).pipe(Effect.orDie),
+    return yield* reader.table("notes").index("by_creation_time").first();
+  }).pipe(Effect.orDie),
 );
 
 export default GroupImpl.make(api, notes).pipe(

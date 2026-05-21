@@ -70,20 +70,18 @@ layer(LocalBackend.layer, {
 
   it.effect("a Confect query that does not observe time stays cached", () =>
     Effect.gen(function* () {
-      const { initial, afterMaxCacheAge } =
-        yield* captureAcrossEvictionWindow(
-          refs.public.groups.cacheStubbed.confectNoTime,
-        );
+      const { initial, afterMaxCacheAge } = yield* captureAcrossEvictionWindow(
+        refs.public.groups.cacheStubbed.confectNoTime,
+      );
       expect(initial).toBe(afterMaxCacheAge);
     }),
   );
 
   it.effect("a Confect query that calls raw Date.now stays cached", () =>
     Effect.gen(function* () {
-      const { initial, afterMaxCacheAge } =
-        yield* captureAcrossEvictionWindow(
-          refs.public.groups.cacheStubbed.confectWithRawDateNow,
-        );
+      const { initial, afterMaxCacheAge } = yield* captureAcrossEvictionWindow(
+        refs.public.groups.cacheStubbed.confectWithRawDateNow,
+      );
       expect(initial).toBe(afterMaxCacheAge);
     }),
   );
@@ -102,20 +100,18 @@ layer(LocalBackend.layer, {
 
   it.effect("a Confect query that uses Effect.withSpan stays cached", () =>
     Effect.gen(function* () {
-      const { initial, afterMaxCacheAge } =
-        yield* captureAcrossEvictionWindow(
-          refs.public.groups.cacheStubbed.confectWithSpan,
-        );
+      const { initial, afterMaxCacheAge } = yield* captureAcrossEvictionWindow(
+        refs.public.groups.cacheStubbed.confectWithSpan,
+      );
       expect(initial).toBe(afterMaxCacheAge);
     }),
   );
 
   it.effect("a Confect query that emits a log stays cached", () =>
     Effect.gen(function* () {
-      const { initial, afterMaxCacheAge } =
-        yield* captureAcrossEvictionWindow(
-          refs.public.groups.cacheStubbed.confectWithLog,
-        );
+      const { initial, afterMaxCacheAge } = yield* captureAcrossEvictionWindow(
+        refs.public.groups.cacheStubbed.confectWithLog,
+      );
       expect(initial).toBe(afterMaxCacheAge);
     }),
   );

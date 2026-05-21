@@ -262,12 +262,13 @@ export const generateFunctions = (spec: Spec.AnyWithProps) =>
           groupPath.pathSegments[0] === "node"
             ? groupPath.pathSegments.slice(1)
             : groupPath.pathSegments;
-        const registeredFunctionsPath = path.join(
-          confectDirectory,
-          "_generated",
-          "registeredFunctions",
-          ...registrySegments,
-        ) + ".ts";
+        const registeredFunctionsPath =
+          path.join(
+            confectDirectory,
+            "_generated",
+            "registeredFunctions",
+            ...registrySegments,
+          ) + ".ts";
         const registeredFunctionsImportPath = yield* toModuleImportPath(
           path.relative(path.dirname(modulePath), registeredFunctionsPath),
         );
@@ -376,12 +377,13 @@ export const writeGroups = (
 
       const relativeModulePath = yield* GroupPath.modulePath(groupPath);
       const modulePath = path.join(convexDirectory, relativeModulePath);
-      const registeredFunctionsPath = path.join(
-        confectDirectory,
-        "_generated",
-        "registeredFunctions",
-        ...groupPath.pathSegments,
-      ) + ".ts";
+      const registeredFunctionsPath =
+        path.join(
+          confectDirectory,
+          "_generated",
+          "registeredFunctions",
+          ...groupPath.pathSegments,
+        ) + ".ts";
       const registeredFunctionsImportPath = yield* toModuleImportPath(
         path.relative(path.dirname(modulePath), registeredFunctionsPath),
       );

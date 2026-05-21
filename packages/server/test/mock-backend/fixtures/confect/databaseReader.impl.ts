@@ -24,7 +24,10 @@ export default GroupImpl.make(api, databaseReader).pipe(
             .collect();
         }).pipe(Effect.orDie),
       ),
-      FunctionImpl.make(api, databaseReader, "paginateNotes",
+      FunctionImpl.make(
+        api,
+        databaseReader,
+        "paginateNotes",
         ({ cursor, numItems }) =>
           Effect.gen(function* () {
             const reader = yield* DatabaseReader;
@@ -35,7 +38,10 @@ export default GroupImpl.make(api, databaseReader).pipe(
               .paginate({ cursor, numItems });
           }).pipe(Effect.orDie),
       ),
-      FunctionImpl.make(api, databaseReader, "paginateNotesWithFilter",
+      FunctionImpl.make(
+        api,
+        databaseReader,
+        "paginateNotesWithFilter",
         ({ cursor, numItems, tag }) =>
           Effect.gen(function* () {
             const reader = yield* DatabaseReader;

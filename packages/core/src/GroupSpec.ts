@@ -36,12 +36,12 @@ export interface GroupSpec<
   ): GroupSpec<Runtime, Name_, Functions_, Groups_ | Group>;
 
   addGroupAt<
-    const Name extends string,
+    const AtName extends string,
     Group extends AnyWithPropsWithRuntime<Runtime>,
   >(
-    name: Name,
+    name: AtName,
     group: Group,
-  ): GroupSpec<Runtime, Name_, Functions_, Groups_ | NamedAt<Group, Name>>;
+  ): GroupSpec<Runtime, Name_, Functions_, Groups_ | NamedAt<Group, AtName>>;
 }
 
 export interface Any {
@@ -84,10 +84,10 @@ export type WithName<
 > = Extract<Group, { readonly name: Name_ }>;
 
 /** Assigns a segment name to a leaf group created with {@link make} for typing and refs. */
-export type NamedAt<
-  Group extends Any,
-  Name_ extends string,
-> = Omit<Group, "name"> & {
+export type NamedAt<Group extends Any, Name_ extends string> = Omit<
+  Group,
+  "name"
+> & {
   readonly name: Name_;
 };
 

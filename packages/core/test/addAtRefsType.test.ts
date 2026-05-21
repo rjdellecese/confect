@@ -1,7 +1,7 @@
 import { expectTypeOf, it } from "@effect/vitest";
 import * as FunctionSpec from "../src/FunctionSpec";
 import * as GroupSpec from "../src/GroupSpec";
-import * as Refs from "../src/Refs";
+import type * as Refs from "../src/Refs";
 import * as Spec from "../src/Spec";
 import { Schema } from "effect";
 
@@ -25,22 +25,15 @@ it("infers refs from addAt-assembled spec", () => {
     }),
   );
 
-  const spec = Spec.make()
+  const _spec = Spec.make()
     .addAt("databaseReader", databaseReader)
-    .addAt(
-      "groups",
-      GroupSpec.makeAt("groups").addGroupAt("notes", notes),
-    );
+    .addAt("groups", GroupSpec.makeAt("groups").addGroupAt("notes", notes));
 
-  type SpecGroups = Spec.Groups<typeof spec>;
+  type SpecGroups = Spec.Groups<typeof _spec>;
   type TopLevelNames = GroupSpec.Name<SpecGroups>;
-  type PublicRefs = Refs.Refs<typeof spec>;
+  type PublicRefs = Refs.Refs<typeof _spec>;
 
-  expectTypeOf<TopLevelNames>().toEqualTypeOf<
-    "databaseReader" | "groups"
-  >();
-  expectTypeOf<keyof PublicRefs>().toEqualTypeOf<
-    "databaseReader" | "groups"
-  >();
+  expectTypeOf<TopLevelNames>().toEqualTypeOf<"databaseReader" | "groups">();
+  expectTypeOf<keyof PublicRefs>().toEqualTypeOf<"databaseReader" | "groups">();
   expectTypeOf<PublicRefs["groups"]["notes"]["list"]>().not.toBeNever();
 });

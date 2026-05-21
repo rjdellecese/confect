@@ -79,11 +79,7 @@ const Proto = {
   ) {
     return makeProto({
       runtime: this.runtime,
-      groups: Record.set(
-        this.groups,
-        name,
-        GroupSpec.withName(name, group),
-      ),
+      groups: Record.set(this.groups, name, GroupSpec.withName(name, group)),
     });
   },
 };
@@ -125,8 +121,7 @@ export const merge = <
     ? Array.reduce(
         Record.toEntries(nodeSpec.groups),
         GroupSpec.makeNodeAt("node"),
-        (nodeGroupSpec, [name, group]) =>
-          nodeGroupSpec.addGroupAt(name, group),
+        (nodeGroupSpec, [name, group]) => nodeGroupSpec.addGroupAt(name, group),
       )
     : null;
 

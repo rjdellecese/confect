@@ -88,9 +88,7 @@ const list = FunctionImpl.make(api, notes, "list", () =>
   }).pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(api, notes).pipe(
-  Layer.provide(list),
-);
+export default GroupImpl.make(api, notes).pipe(Layer.provide(list));
 ```
 
 Each leaf impl is wired into Convex through a per-group registry at `confect/_generated/registeredFunctions/{path}`. There is no root `impl.ts` — run `confect codegen` after changing impls.

@@ -100,8 +100,7 @@ export const make = <
     ? Array.reduce(
         Record.toEntries(nodeSpec.groups),
         GroupSpec.makeNodeAt("node"),
-        (nodeGroupSpec, [name, group]) =>
-          nodeGroupSpec.addGroupAt(name, group),
+        (nodeGroupSpec, [name, group]) => nodeGroupSpec.addGroupAt(name, group),
       )
     : null;
 

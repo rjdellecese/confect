@@ -1,6 +1,10 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Layer } from "effect";
-import { Impl, RegisteredConvexFunction, RegisteredFunctions } from "@confect/server";
+import {
+  Impl,
+  RegisteredConvexFunction,
+  RegisteredFunctions,
+} from "@confect/server";
 import api from "./mock-backend/fixtures/confect/_generated/api";
 import notes from "./mock-backend/fixtures/confect/groups/notes.impl";
 

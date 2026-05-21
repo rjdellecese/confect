@@ -27,7 +27,9 @@ export const insertLeafModule = (
   return root;
 };
 
-export const buildSpecTree = (leaves: ReadonlyArray<LeafModule>): SpecTreeNode =>
+export const buildSpecTree = (
+  leaves: ReadonlyArray<LeafModule>,
+): SpecTreeNode =>
   Array.reduce(leaves, emptySpecTreeNode(), (tree, leaf) =>
     insertLeafModule(tree, leaf),
   );
@@ -77,13 +79,10 @@ export const collectNodeLeaves = (leaves: ReadonlyArray<LeafModule>) =>
 const importBindingsForNode = (
   node: SpecAssemblyNode,
 ): ReadonlyArray<SpecImportBinding> =>
-  pipe(
-    node.children,
-    Array.flatMap(importBindingsForNode),
-    (childBindings) =>
-      node.importBinding === undefined
-        ? childBindings
-        : Array.prepend(childBindings, node.importBinding),
+  pipe(node.children, Array.flatMap(importBindingsForNode), (childBindings) =>
+    node.importBinding === undefined
+      ? childBindings
+      : Array.prepend(childBindings, node.importBinding),
   );
 
 export const collectImportBindings = (

@@ -21,11 +21,7 @@ import { ConfectDirectory } from "../ConfectDirectory";
 import { ConvexDirectory } from "../ConvexDirectory";
 import { isLeafImplPath, isLeafSpecPath } from "../modulePaths";
 import { ProjectRoot } from "../ProjectRoot";
-import {
-  generateAuthConfig,
-  generateCrons,
-  generateHttp,
-} from "../utils";
+import { generateAuthConfig, generateCrons, generateHttp } from "../utils";
 import { codegenHandler } from "./codegen";
 
 type Pending = {
@@ -79,7 +75,6 @@ const logFileChangeIndented = (
       ),
     );
   });
-
 
 export const dev = Command.make("dev", {}, () =>
   Effect.gen(function* () {

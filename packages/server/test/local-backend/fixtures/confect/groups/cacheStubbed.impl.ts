@@ -11,11 +11,17 @@ import { Clock, Effect, Layer } from "effect";
 import api from "../_generated/api";
 import cacheStubbed from "./cacheStubbed.spec";
 
-const confectNoTime = FunctionImpl.make(api, cacheStubbed, "confectNoTime",
+const confectNoTime = FunctionImpl.make(
+  api,
+  cacheStubbed,
+  "confectNoTime",
   () => Effect.sync(() => Math.random()),
 );
 
-const confectWithClock = FunctionImpl.make(api, cacheStubbed, "confectWithClock",
+const confectWithClock = FunctionImpl.make(
+  api,
+  cacheStubbed,
+  "confectWithClock",
   () => Clock.currentTimeMillis,
 );
 
@@ -26,14 +32,20 @@ const confectWithRawDateNow = FunctionImpl.make(
   () => Effect.sync(() => Date.now()),
 );
 
-const confectWithSpan = FunctionImpl.make(api, cacheStubbed, "confectWithSpan",
+const confectWithSpan = FunctionImpl.make(
+  api,
+  cacheStubbed,
+  "confectWithSpan",
   () =>
     Effect.sync(() => Math.random()).pipe(
       Effect.withSpan("cacheStubbed.confectWithSpan"),
     ),
 );
 
-const confectWithLog = FunctionImpl.make(api, cacheStubbed, "confectWithLog",
+const confectWithLog = FunctionImpl.make(
+  api,
+  cacheStubbed,
+  "confectWithLog",
   () =>
     Effect.gen(function* () {
       yield* Effect.logInfo("cacheStubbed.confectWithLog");

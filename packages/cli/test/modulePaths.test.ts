@@ -40,12 +40,14 @@ layer(Path.layer)("modulePaths", (it) => {
     }),
   );
 
-  it.effect("specImportPathFromGenerated builds import paths for _generated", () =>
-    Effect.gen(function* () {
-      expect(yield* specImportPathFromGenerated("notesAndRandom/notes.spec.ts")).toBe(
-        "../notesAndRandom/notes.spec",
-      );
-    }),
+  it.effect(
+    "specImportPathFromGenerated builds import paths for _generated",
+    () =>
+      Effect.gen(function* () {
+        expect(
+          yield* specImportPathFromGenerated("notesAndRandom/notes.spec.ts"),
+        ).toBe("../notesAndRandom/notes.spec");
+      }),
   );
 
   it.effect("toNodeRegistryLeaf remaps node leaves for nodeSpec assembly", () =>
@@ -68,12 +70,14 @@ layer(Path.layer)("modulePaths", (it) => {
     }),
   );
 
-  it.effect("isLeafSpecPath and isLeafImplPath detect leaf module suffixes", () =>
-    Effect.sync(() => {
-      expect(isLeafSpecPath("notes.spec.ts")).toBe(true);
-      expect(isLeafSpecPath("notes.impl.ts")).toBe(false);
-      expect(isLeafImplPath("notes.impl.ts")).toBe(true);
-      expect(isLeafImplPath("notes.spec.ts")).toBe(false);
-    }),
+  it.effect(
+    "isLeafSpecPath and isLeafImplPath detect leaf module suffixes",
+    () =>
+      Effect.sync(() => {
+        expect(isLeafSpecPath("notes.spec.ts")).toBe(true);
+        expect(isLeafSpecPath("notes.impl.ts")).toBe(false);
+        expect(isLeafImplPath("notes.impl.ts")).toBe(true);
+        expect(isLeafImplPath("notes.spec.ts")).toBe(false);
+      }),
   );
 });

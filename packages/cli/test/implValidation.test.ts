@@ -5,11 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Effect, Layer } from "effect";
 import { ConfectDirectory } from "../src/ConfectDirectory";
-import {
-  ImplValidationError,
-  validateImplModule,
-  validateSpecModule,
-} from "../src/implValidation";
+import { validateImplModule, validateSpecModule } from "../src/implValidation";
 
 const fixtureConfect = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -28,7 +24,11 @@ const ValidationLayer = Layer.mergeAll(
 const withTempFile = (
   relativePath: string,
   contents: string,
-  use: Effect.Effect<void, ImplValidationError, ConfectDirectory | Path.Path | FileSystem.FileSystem>,
+  use: Effect.Effect<
+    void,
+    ImplValidationError,
+    ConfectDirectory | Path.Path | FileSystem.FileSystem
+  >,
 ) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;

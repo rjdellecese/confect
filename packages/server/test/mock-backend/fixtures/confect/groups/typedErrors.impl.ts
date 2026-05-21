@@ -12,7 +12,10 @@ import {
 import typedErrors from "./typedErrors.spec";
 import { Forbidden, NotFound } from "./typedErrors.spec";
 
-const getNoteOrFail = FunctionImpl.make(api, typedErrors, "getNoteOrFail",
+const getNoteOrFail = FunctionImpl.make(
+  api,
+  typedErrors,
+  "getNoteOrFail",
   ({ noteId }) =>
     Effect.gen(function* () {
       const reader = yield* DatabaseReader;
@@ -24,7 +27,10 @@ const getNoteOrFail = FunctionImpl.make(api, typedErrors, "getNoteOrFail",
     }),
 );
 
-const deleteNoteOrFail = FunctionImpl.make(api, typedErrors, "deleteNoteOrFail",
+const deleteNoteOrFail = FunctionImpl.make(
+  api,
+  typedErrors,
+  "deleteNoteOrFail",
   ({ noteId, asAdmin }) =>
     Effect.gen(function* () {
       if (!asAdmin) {
@@ -45,7 +51,10 @@ const deleteNoteOrFail = FunctionImpl.make(api, typedErrors, "deleteNoteOrFail",
     }),
 );
 
-const failingAction = FunctionImpl.make(api, typedErrors, "failingAction",
+const failingAction = FunctionImpl.make(
+  api,
+  typedErrors,
+  "failingAction",
   ({ kind }) =>
     Match.value(kind).pipe(
       Match.when("notFound", () =>
@@ -58,7 +67,10 @@ const failingAction = FunctionImpl.make(api, typedErrors, "failingAction",
     ),
 );
 
-const insertThenFail = FunctionImpl.make(api, typedErrors, "insertThenFail",
+const insertThenFail = FunctionImpl.make(
+  api,
+  typedErrors,
+  "insertThenFail",
   ({ text }) =>
     Effect.gen(function* () {
       const writer = yield* DatabaseWriter;
@@ -69,7 +81,10 @@ const insertThenFail = FunctionImpl.make(api, typedErrors, "insertThenFail",
     }),
 );
 
-const tryGetNote = FunctionImpl.make(api, typedErrors, "tryGetNote",
+const tryGetNote = FunctionImpl.make(
+  api,
+  typedErrors,
+  "tryGetNote",
   ({ noteId }) =>
     Effect.gen(function* () {
       const runQuery = yield* QueryRunner;
@@ -88,7 +103,10 @@ const tryGetNote = FunctionImpl.make(api, typedErrors, "tryGetNote",
     ),
 );
 
-const tryDeleteNote = FunctionImpl.make(api, typedErrors, "tryDeleteNote",
+const tryDeleteNote = FunctionImpl.make(
+  api,
+  typedErrors,
+  "tryDeleteNote",
   ({ noteId, asAdmin }) =>
     Effect.gen(function* () {
       const runMutation = yield* MutationRunner;
@@ -113,7 +131,10 @@ const tryDeleteNote = FunctionImpl.make(api, typedErrors, "tryDeleteNote",
     ),
 );
 
-const tryFailingAction = FunctionImpl.make(api, typedErrors, "tryFailingAction",
+const tryFailingAction = FunctionImpl.make(
+  api,
+  typedErrors,
+  "tryFailingAction",
   ({ kind }) =>
     Effect.gen(function* () {
       const runAction = yield* ActionRunner;

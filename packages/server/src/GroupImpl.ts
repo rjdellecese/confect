@@ -23,11 +23,7 @@ export const make = <
 >(
   api: Api_,
   group: Group,
-): Layer.Layer<
-  GroupImpl<string>,
-  never,
-  FunctionImpl.FromGroupSpec<Group>
-> => {
+): Layer.Layer<GroupImpl<string>, never, FunctionImpl.FromGroupSpec<Group>> => {
   const groupPath = resolveGroupPathOrDie(api.spec, group);
 
   return Layer.succeed(
@@ -37,11 +33,7 @@ export const make = <
     {
       groupPath,
     },
-  ) as Layer.Layer<
-    GroupImpl<string>,
-    never,
-    FunctionImpl.FromGroupSpec<Group>
-  >;
+  ) as Layer.Layer<GroupImpl<string>, never, FunctionImpl.FromGroupSpec<Group>>;
 };
 
 export type FromGroups<Groups extends GroupSpec.Any> = Groups extends never

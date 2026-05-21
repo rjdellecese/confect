@@ -33,9 +33,7 @@ export const FunctionImpl = <
 export const make = <
   Api_ extends Api.AnyWithProps,
   Group extends GroupSpec.AnyWithProps,
-  const FunctionName extends FunctionSpec.Name<
-    GroupSpec.Functions<Group>
-  >,
+  const FunctionName extends FunctionSpec.Name<GroupSpec.Functions<Group>>,
 >(
   api: Api_,
   group: Group,
@@ -100,6 +98,6 @@ export type FromGroupSpec<Group extends GroupSpec.AnyWithProps> =
  * @deprecated Use {@link FromGroupSpec} instead.
  */
 export type FromGroupAtPath<
-  GroupPath_ extends string,
+  _GroupPath extends string,
   Group extends GroupSpec.AnyWithProps,
 > = FromGroupSpec<Group>;

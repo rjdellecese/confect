@@ -178,7 +178,9 @@ describe("make", () => {
         RegisteredQuery<"public", ListQueryArgs, Promise<ListQueryReturns>>
       >()("list");
 
-    const spec = Spec.make().add(GroupSpec.makeAt("notes").addFunction(listSpec));
+    const spec = Spec.make().add(
+      GroupSpec.makeAt("notes").addFunction(listSpec),
+    );
     const refs = Refs.make(spec);
 
     const actualRef = refs.public.notes.list;

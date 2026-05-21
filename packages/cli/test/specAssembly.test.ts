@@ -1,9 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
-import {
-  buildSpecTree,
-  collectSpecAssemblyNodes,
-} from "../src/specAssembly";
+import { buildSpecTree, collectSpecAssemblyNodes } from "../src/specAssembly";
 import type { LeafModule } from "../src/modulePaths";
 import * as templates from "../src/templates";
 

@@ -123,9 +123,7 @@ export const buildForGroup = <
       typeof groupFunctions !== "object" ||
       !(segment in groupFunctions)
     ) {
-      throw new Error(
-        `No functions registered for group path "${groupPath}"`,
-      );
+      throw new Error(`No functions registered for group path "${groupPath}"`);
     }
     groupFunctions = (groupFunctions as Record<string, unknown>)[segment];
   }

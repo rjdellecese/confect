@@ -1,9 +1,6 @@
 import { Array, Effect } from "effect";
 import { CodeBlockWriter } from "./CodeBlockWriter";
-import {
-  collectImportBindings,
-  type SpecAssemblyNode,
-} from "./specAssembly";
+import { collectImportBindings, type SpecAssemblyNode } from "./specAssembly";
 
 export const functions = ({
   functionNames,
@@ -482,7 +479,10 @@ export const assembledSpec = ({
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-    const needsGroupSpec = Array.some(nodes, (node) => node.children.length > 0);
+    const needsGroupSpec = Array.some(
+      nodes,
+      (node) => node.children.length > 0,
+    );
     yield* cbw.writeLine(
       needsGroupSpec
         ? `import { GroupSpec, Spec } from "@confect/core";`
@@ -497,7 +497,8 @@ export const assembledSpec = ({
 
     yield* cbw.blankLine();
 
-    const specFactory = runtime === "Convex" ? "Spec.make()" : "Spec.makeNode()";
+    const specFactory =
+      runtime === "Convex" ? "Spec.make()" : "Spec.makeNode()";
     const groupFactory =
       runtime === "Convex" ? "GroupSpec.makeAt" : "GroupSpec.makeNodeAt";
 

@@ -30,7 +30,10 @@ const resolveGroupPathInGroup = (
       return Array.join([...pathSegments, name], ".");
     }
 
-    const nested = resolveGroupPathInGroup(child, target, [...pathSegments, name]);
+    const nested = resolveGroupPathInGroup(child, target, [
+      ...pathSegments,
+      name,
+    ]);
     if (nested !== undefined) {
       return nested;
     }

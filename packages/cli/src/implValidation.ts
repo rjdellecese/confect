@@ -25,11 +25,16 @@ const absoluteModulePath = (relativePath: string) =>
     return path.resolve(confectDirectory, relativePath);
   });
 
-const findMetafileInputKey = (metafile: esbuild.Metafile, absolutePath: string) =>
+const findMetafileInputKey = (
+  metafile: esbuild.Metafile,
+  absolutePath: string,
+) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
     const resolved = path.resolve(absolutePath);
-    return Object.keys(metafile.inputs).find((key) => path.resolve(key) === resolved);
+    return Object.keys(metafile.inputs).find(
+      (key) => path.resolve(key) === resolved,
+    );
   });
 
 const implDirectlyImportsSpec = (
@@ -79,7 +84,9 @@ export const validateSpecModule = (specRelativePath: string) =>
       });
     }
 
-    const expectedRuntime = isNodeLeafModule(specRelativePath) ? "Node" : "Convex";
+    const expectedRuntime = isNodeLeafModule(specRelativePath)
+      ? "Node"
+      : "Convex";
     const group = groupSpec as GroupSpec.AnyWithProps;
 
     if (group.runtime !== expectedRuntime) {

@@ -180,7 +180,12 @@ import {
 } from "./workpool";
 import workpool from "./workpool.spec";
 
-const enqueueImpl = FunctionImpl.make(api, workpool, "enqueue", enqueue);
+const enqueueImpl = FunctionImpl.make(
+  api,
+  workpool,
+  "enqueue",
+  enqueue,
+);
 const statusImpl = FunctionImpl.make(api, workpool, "status", status);
 const backgroundWorkImpl = FunctionImpl.make(
   api,
