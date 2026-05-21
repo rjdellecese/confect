@@ -4,7 +4,7 @@ title: "File Naming Conventions"
 description: "Recommended patterns for organizing spec, impl, and related files in your confect directory."
 ---
 
-Confect requires a small number of fixed entry-point files in your `confect/` directory (see [Project Structure](/concepts/project-structure)). Beyond those, organize your API as colocated `*.spec.ts` / `*.impl.ts` pairs, one pair per group. The group's name is the file's path within `confect/` (its stem for top-level groups, the dot-joined directory path for nested groups).
+Confect requires a small number of fixed entry-point files in your `confect/` directory (see [Project Structure](/concepts/project-structure)). Beyond those, organize your API as colocated `*.spec.ts`/`*.impl.ts` pairs, one pair per group. The group's name is the file's path within `confect/` (its stem for top-level groups, the dot-joined directory path for nested groups).
 
 ## Spec and impl files
 
@@ -53,7 +53,7 @@ Run `confect codegen` after adding or changing specs and impls.
 
 <Note>
   A file's path within `confect/` determines the public Convex API
-  path it produces — `confect/notesAndRandom/notes.spec.ts` becomes
+  path it produces—`confect/notesAndRandom/notes.spec.ts` becomes
   `internal.notesAndRandom.notes.list`. Renaming a file or directory
   renames the API path, so treat these paths as part of your API's
   contract.
@@ -79,7 +79,7 @@ confect/
 
 ## Node actions
 
-Place [node action](/server/node-actions) spec and impl files in a `node/` subdirectory, using the same `.spec.ts` / `.impl.ts` suffixes. Their specs use `GroupSpec.makeNode()` and their impls use the `nodeApi` from `_generated/nodeApi`.
+Place [node action](/server/node-actions) spec and impl files in a `node/` subdirectory, using the same `.spec.ts`/`.impl.ts` suffixes. Their specs use `GroupSpec.makeNode()` and their impls use the `nodeApi` from `_generated/nodeApi`.
 
 ```
 confect/
@@ -90,7 +90,7 @@ confect/
 
 ## Nested groups
 
-When a group contains subgroups, place each subgroup's `.spec.ts` / `.impl.ts` pair inside a subdirectory named after the parent group. The parent group itself does not need a spec or impl file — it is composed from its subgroups by their paths.
+When a group contains subgroups, place each subgroup's `.spec.ts`/`.impl.ts` pair inside a subdirectory named after the parent group. The parent group itself does not need a spec or impl file—it is composed from its subgroups by their paths.
 
 ```
 confect/

@@ -1,7 +1,7 @@
-import { fileURLToPath } from "node:url";
 import { Command, type CommandExecutor, Path } from "@effect/platform";
 import { NodeContext } from "@effect/platform-node";
 import { Effect, pipe } from "effect";
+import { fileURLToPath } from "node:url";
 
 const runCommand = (
   command: string,
@@ -37,7 +37,7 @@ const confectCliEntryUrl = new URL("../../cli/dist/index.mjs", import.meta.url);
  * Codegen runs both locally and on CI. The fixtures' generated outputs
  * (`confect/_generated/` and the wrapper files under `convex/`) are committed
  * to the repo, and CI verifies via `git diff --exit-code` that codegen
- * produces no changes — i.e. that the committed outputs are up-to-date.
+ * produces no changes—i.e. that the committed outputs are up-to-date.
  */
 export const setupForFixture =
   (baseDir: string, fixtureSubpath: string) => () =>

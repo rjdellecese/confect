@@ -57,8 +57,8 @@ Contains a single default `Api` export, which combines your database schema and 
 #### `nodeApi.ts`
 
 <Info>
-  This file is only generated when you have node action specs
-  (files under `confect/node/`).
+  This file is only generated when you have node action specs (files
+  under `confect/node/`).
 </Info>
 
 Contains a single default `Api` export, which combines your database schema and Node spec. Pass this as the first argument to `GroupImpl.make` and `FunctionImpl.make` when implementing node actions.
@@ -66,8 +66,8 @@ Contains a single default `Api` export, which combines your database schema and 
 #### `nodeSpec.ts`
 
 <Info>
-  This file is only generated when you have node action specs
-  (files under `confect/node/`).
+  This file is only generated when you have node action specs (files
+  under `confect/node/`).
 </Info>
 
 Contains your assembled Node spec, used to build `nodeApi.ts`.
@@ -112,11 +112,11 @@ Expects a default Convex `HttpRouter` export. Construct this using Confect's `Ht
 
 Expects a default `DatabaseSchema` export which specifies your Convex database table schemas.
 
-### `*.spec.ts` / `*.impl.ts`
+### `*.spec.ts`/`*.impl.ts`
 
 <Badge color="green">Required</Badge>
 
-Your Convex API is defined as colocated `*.spec.ts` / `*.impl.ts` pairs, one pair per group. Each file's path within `confect/` becomes the group's name. See [File Naming Conventions](/concepts/file-naming-conventions) and [The Spec/Impl Model](/concepts/spec-impl-model).
+Your Convex API is defined as colocated `*.spec.ts`/`*.impl.ts` pairs, one pair per group. Each file's path within `confect/` becomes the group's name. See [File Naming Conventions](/concepts/file-naming-conventions) and [The Spec/Impl Model](/concepts/spec-impl-model).
 
 ## Rules
 
