@@ -4,7 +4,7 @@
 "@confect/cli": major
 ---
 
-Derive Confect function paths from the filesystem layout of `confect/`. Each group lives in a colocated `*.spec.ts`/`*.impl.ts` pair, and the group's name is its path within `confect/` (file stem for top-level groups, dot-joined directory path for nested groups). See [`/concepts/project-structure`](/concepts/project-structure), [`/concepts/file-naming-conventions`](/concepts/file-naming-conventions), and [`/concepts/spec-impl-model`](/concepts/spec-impl-model) for the current model.
+Derive Confect function paths from the filesystem layout of `confect/`. Each group lives in a colocated `*.spec.ts`/`*.impl.ts` pair, and the group's name is its path within `confect/` (file stem for top-level groups, dot-joined directory path for nested groups). See [Project Structure](https://confect.dev/concepts/project-structure), [File Naming Conventions](https://confect.dev/concepts/file-naming-conventions), and [The Spec/Impl Model](https://confect.dev/concepts/spec-impl-model) for the current model.
 
 Each `*.spec.ts` default-exports its `GroupSpec`. Each `*.impl.ts` default-imports its sibling spec and default-exports its `GroupImpl`. Named co-exports on `*.spec.ts` (such as error classes) remain allowed.
 
