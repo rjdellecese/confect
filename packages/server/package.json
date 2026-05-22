@@ -91,7 +91,7 @@
     "@confect/core": "workspace:^",
     "@effect/platform": "^0.96.1",
     "@effect/platform-node": "^0.106.0",
-    "convex": "^1.30.0",
+    "convex": "1.39.1",
     "effect": "^3.21.2"
   },
   "engines": {
