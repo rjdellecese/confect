@@ -1,6 +1,14 @@
 /// <reference types="vite/client" />
 
-import { TestConfect as TestConfect_ } from "@confect/test";
+// Imported by relative path rather than as `@confect/test` to keep
+// `@confect/test` out of `@confect/server`'s declared dep graph.
+// `@confect/test` peer-depends on `@confect/server` (its `TestConfect.run`
+// helper consumes server-side `RegisteredConvexFunction.mutationLayer`
+// values at runtime), so a reciprocal devDep here would create a cyclic
+// workspace-dependency warning from pnpm. Bypassing module resolution at
+// the import site is symmetric with how `setup.ts` resolves the
+// `@confect/cli` binary by filesystem path for the same reason.
+import { TestConfect as TestConfect_ } from "../../../test/src";
 
 import confectSchema from "./fixtures/confect/schema";
 
