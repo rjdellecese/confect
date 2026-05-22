@@ -2,11 +2,14 @@ import { Spec } from "@confect/core";
 import { Command } from "@effect/cli";
 import { FileSystem, Path } from "@effect/platform";
 import { Array, Effect, Either, HashSet, Match, Option } from "effect";
+import * as CodegenError from "../CodegenError";
+import {
+  MissingImplFileError,
+  MissingSpecFileError,
+} from "../CodegenError";
 import { ConfectDirectory } from "../ConfectDirectory";
 import { ConvexDirectory } from "../ConvexDirectory";
 import * as FunctionPaths from "../FunctionPaths";
-import { logCodegenUserError } from "../buildErrors";
-import { ImplValidationError, type CodegenUserError } from "../codegenErrors";
 import {
   validateImplModule,
   validateSchemaModule,
@@ -64,18 +67,13 @@ const LEGACY_PATHS = [
   "_generated/nodeImpl.ts",
 ];
 
-const dieUnexpected = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-  effect.pipe(Effect.orDie);
-
 export const codegen = Command.make("codegen", {}, () =>
   Effect.gen(function* () {
     yield* logPending("Performing initial sync…");
-    const result = yield* Effect.either(codegenHandler);
-    yield* Either.match(result, {
-      onLeft: (error: CodegenUserError) =>
-        logCodegenUserError(error).pipe(Effect.andThen(Effect.fail(error))),
-      onRight: () => logSuccess("Generated files are up-to-date"),
-    });
+    yield* codegenHandler.pipe(
+      Effect.tap(() => logSuccess("Generated files are up-to-date")),
+      CodegenError.tapAndLog,
+    );
   }),
 ).pipe(
   Command.withDescription(
@@ -84,25 +82,24 @@ export const codegen = Command.make("codegen", {}, () =>
 );
 
 export const codegenHandler = Effect.gen(function* () {
-  yield* dieUnexpected(generateConfectGeneratedDirectory);
+  yield* generateConfectGeneratedDirectory;
   const leaves = yield* loadAndValidateLeafModules;
-  yield* dieUnexpected(removeLegacyFiles);
-  yield* dieUnexpected(generateAssembledSpecs(leaves));
+  yield* removeLegacyFiles;
+  yield* generateAssembledSpecs(leaves);
   yield* validateImplModules(leaves);
-  yield* dieUnexpected(generateGroupRegisteredFunctions(leaves));
-  yield* dieUnexpected(removeObsoleteRegisteredFunctions(leaves));
-  yield* dieUnexpected(
-    Effect.all([generateApi, generateRefs, generateNodeApi, generateServices], {
-      concurrency: "unbounded",
-    }),
+  yield* generateGroupRegisteredFunctions(leaves);
+  yield* removeObsoleteRegisteredFunctions(leaves);
+  yield* Effect.all(
+    [generateApi, generateRefs, generateNodeApi, generateServices],
+    { concurrency: "unbounded" },
   );
   const [functionPaths] = yield* Effect.all(
     [
       generateFunctionModules,
       generateSchema,
-      dieUnexpected(logGenerated(generateHttp)),
-      dieUnexpected(logGenerated(generateCrons)),
-      dieUnexpected(logGenerated(generateAuthConfig)),
+      logGenerated(generateHttp),
+      logGenerated(generateCrons),
+      logGenerated(generateAuthConfig),
     ],
     { concurrency: "unbounded" },
   );
@@ -126,7 +123,7 @@ const loadAndValidateLeafModules = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
-  const specFiles = yield* discoverLeafSpecFiles.pipe(Effect.orDie);
+  const specFiles = yield* discoverLeafSpecFiles;
 
   const leaves = yield* Effect.forEach(specFiles, (specRelativePath) =>
     Effect.gen(function* () {
@@ -135,10 +132,10 @@ const loadAndValidateLeafModules = Effect.gen(function* () {
 
       const implRelativePath = yield* implPathForSpec(specRelativePath);
       const implAbsolutePath = path.join(confectDirectory, implRelativePath);
-      if (!(yield* fs.exists(implAbsolutePath).pipe(Effect.orDie))) {
-        return yield* new ImplValidationError({
-          file: implRelativePath,
-          reason: `required sibling impl for ${specRelativePath}`,
+      if (!(yield* fs.exists(implAbsolutePath))) {
+        return yield* new MissingImplFileError({
+          specPath: specRelativePath,
+          expectedImplPath: implRelativePath,
         });
       }
 
@@ -156,7 +153,7 @@ const validateOrphanImpls = (specFiles: ReadonlyArray<string>) =>
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const confectDirectory = yield* ConfectDirectory.get;
-    const implFiles = yield* discoverLeafImplFiles.pipe(Effect.orDie);
+    const implFiles = yield* discoverLeafImplFiles;
     const specPaths = new Set(specFiles);
 
     yield* Effect.forEach(implFiles, (implRelativePath) =>
@@ -167,10 +164,10 @@ const validateOrphanImpls = (specFiles: ReadonlyArray<string>) =>
         }
 
         const specAbsolutePath = path.join(confectDirectory, specRelativePath);
-        if (!(yield* fs.exists(specAbsolutePath).pipe(Effect.orDie))) {
-          return yield* new ImplValidationError({
-            file: implRelativePath,
-            reason: `required sibling spec ${specRelativePath}`,
+        if (!(yield* fs.exists(specAbsolutePath))) {
+          return yield* new MissingSpecFileError({
+            implPath: implRelativePath,
+            expectedSpecPath: specRelativePath,
           });
         }
       }),
@@ -337,7 +334,7 @@ const getGeneratedNodeSpecPath = Effect.gen(function* () {
 
 const loadGeneratedSpec = Effect.gen(function* () {
   const specPath = yield* getGeneratedSpecPath;
-  const specModule = yield* bundleAndImport(specPath).pipe(Effect.orDie);
+  const specModule = yield* bundleAndImport(specPath);
   const spec = specModule.default;
 
   if (!Spec.isConvexSpec(spec)) {
@@ -353,13 +350,11 @@ const loadGeneratedNodeSpec = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const nodeSpecPath = yield* getGeneratedNodeSpecPath;
 
-  if (!(yield* fs.exists(nodeSpecPath).pipe(Effect.orDie))) {
+  if (!(yield* fs.exists(nodeSpecPath))) {
     return Option.none<Spec.AnyWithPropsWithRuntime<"Node">>();
   }
 
-  const nodeSpecModule = yield* bundleAndImport(nodeSpecPath).pipe(
-    Effect.orDie,
-  );
+  const nodeSpecModule = yield* bundleAndImport(nodeSpecPath);
   const nodeSpec = nodeSpecModule.default;
 
   if (!Spec.isNodeSpec(nodeSpec)) {
@@ -462,7 +457,7 @@ const generateFunctionModules = Effect.gen(function* () {
     onSome: (nodeSpec) => Spec.merge(spec, nodeSpec),
   });
 
-  return yield* dieUnexpected(generateFunctions(mergedSpec));
+  return yield* generateFunctions(mergedSpec);
 });
 
 const generateSchema = Effect.gen(function* () {
@@ -485,9 +480,7 @@ const generateSchema = Effect.gen(function* () {
     schemaImportPath: importPathWithoutExt,
   });
 
-  yield* writeFileStringAndLog(convexSchemaPath, schemaContents).pipe(
-    Effect.orDie,
-  );
+  yield* writeFileStringAndLog(convexSchemaPath, schemaContents);
 });
 
 const generateServices = Effect.gen(function* () {

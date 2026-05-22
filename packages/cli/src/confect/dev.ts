@@ -19,14 +19,13 @@ import {
 } from "effect";
 import type { ReadonlyRecord } from "effect/Record";
 import * as esbuild from "esbuild";
-import { formatBuildErrors, logSpecBuildError } from "../buildErrors";
-import type { CodegenUserError } from "../codegenErrors";
+import { BundleFailedError, logBuildError } from "../BuildError";
+import * as CodegenError from "../CodegenError";
 import { ConfectDirectory } from "../ConfectDirectory";
 import { ConvexDirectory } from "../ConvexDirectory";
 import * as FunctionPaths from "../FunctionPaths";
 import type * as GroupPaths from "../GroupPaths";
 import {
-  logFailure,
   logFunctionAdded,
   logFunctionRemoved,
   logPending,
@@ -116,22 +115,6 @@ const logFileChangeIndented = (
     );
   });
 
-const catchCodegenUserErrors = <A, R>(
-  effect: Effect.Effect<A, CodegenUserError, R>,
-): Effect.Effect<A | undefined, never, R> =>
-  effect.pipe(
-    Effect.catchTags({
-      ImplValidationError: (error) =>
-        logFailure(error.message).pipe(Effect.as(undefined)),
-      SpecImportFailedError: (error) =>
-        logFailure(error.message).pipe(Effect.as(undefined)),
-      SchemaValidationError: (error) =>
-        logFailure(error.message).pipe(Effect.as(undefined)),
-      SpecBuildError: (error) =>
-        logSpecBuildError(error).pipe(Effect.as(undefined)),
-    }),
-  );
-
 const logFunctionPathDiff = (
   previous: FunctionPaths.FunctionPaths,
   current: FunctionPaths.FunctionPaths,
@@ -187,13 +170,12 @@ export const dev = Command.make("dev", {}, () =>
   Effect.gen(function* () {
     yield* logPending("Performing initial sync…");
     const initialFunctionPaths =
-      (yield* catchCodegenUserErrors(
-        codegenHandler.pipe(
-          Effect.tap((current) =>
-            logFunctionPathDiff(emptyFunctionPaths, current),
-          ),
-          Effect.tap(() => logSuccess("Generated files are up-to-date")),
+      (yield* codegenHandler.pipe(
+        Effect.tap((current) =>
+          logFunctionPathDiff(emptyFunctionPaths, current),
         ),
+        Effect.tap(() => logSuccess("Generated files are up-to-date")),
+        CodegenError.catchAndLog,
       )) ?? emptyFunctionPaths;
 
     const pendingRef = yield* Ref.make<Pending>(pendingInit);
@@ -236,17 +218,16 @@ const syncLoop = (
         const pending = yield* Ref.getAndSet(pendingRef, pendingInit);
 
         if (pending.specDirty) {
-          const current = yield* catchCodegenUserErrors(
-            codegenHandler.pipe(
-              Effect.tap((nextFunctionPaths) =>
-                Effect.gen(function* () {
-                  const previous = yield* Ref.get(functionPathsRef);
-                  yield* logFunctionPathDiff(previous, nextFunctionPaths);
-                  yield* Ref.set(functionPathsRef, nextFunctionPaths);
-                }),
-              ),
-              Effect.tap(() => logSuccess("Generated files are up-to-date")),
+          const current = yield* codegenHandler.pipe(
+            Effect.tap((nextFunctionPaths) =>
+              Effect.gen(function* () {
+                const previous = yield* Ref.get(functionPathsRef);
+                yield* logFunctionPathDiff(previous, nextFunctionPaths);
+                yield* Ref.set(functionPathsRef, nextFunctionPaths);
+              }),
             ),
+            Effect.tap(() => logSuccess("Generated files are up-to-date")),
+            CodegenError.catchAndLog,
           );
           if (current === undefined) {
             return;
@@ -272,7 +253,7 @@ const syncLoop = (
     );
   });
 
-const esbuildOptions = (entryPoint: string) => ({
+const esbuildOptions = (entryPoint: string, displayPath: string) => ({
   entryPoints: [entryPoint],
   bundle: true,
   write: false,
@@ -289,21 +270,12 @@ const esbuildOptions = (entryPoint: string) => ({
         build.onEnd((result) => {
           if (result.errors.length > 0) {
             Effect.runPromise(
-              Effect.gen(function* () {
-                const formattedMessages = yield* Effect.tryPromise(() =>
-                  esbuild.formatMessages(result.errors, {
-                    kind: "error",
-                    color: true,
-                    terminalWidth: 80,
-                  }),
-                ).pipe(Effect.orElseSucceed(() => [] as string[]));
-                const output = formatBuildErrors(
-                  result.errors,
-                  formattedMessages,
-                );
-                yield* Console.error("\n" + output + "\n");
-                yield* logFailure("Build errors found");
-              }),
+              logBuildError(
+                new BundleFailedError({
+                  file: displayPath,
+                  errors: result.errors,
+                }),
+              ),
             );
           }
         });
@@ -312,12 +284,14 @@ const esbuildOptions = (entryPoint: string) => ({
   ],
 });
 
-const createSpecWatcher = (entryPoint: string) =>
+const createSpecWatcher = (entryPoint: string, displayPath: string) =>
   Stream.asyncPush<void>(
     (emit) =>
       Effect.acquireRelease(
         Effect.promise(async () => {
-          const ctx = await esbuild.context(esbuildOptions(entryPoint));
+          const ctx = await esbuild.context(
+            esbuildOptions(entryPoint, displayPath),
+          );
           await ctx.watch();
           return ctx;
         }),
@@ -333,6 +307,8 @@ const generatedSpecWatcher = (specWatcherRestartQueue: Queue.Queue<void>) =>
   Effect.forever(
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const projectRoot = yield* ProjectRoot.get;
       const specPath = yield* getGeneratedSpecPath;
       const nodeSpecPath = yield* getGeneratedNodeSpecPath;
 
@@ -342,9 +318,12 @@ const generatedSpecWatcher = (specWatcherRestartQueue: Queue.Queue<void>) =>
       }
 
       const nodeSpecExists = yield* fs.exists(nodeSpecPath);
-      const specWatcher = createSpecWatcher(specPath);
+      const specWatcher = createSpecWatcher(
+        specPath,
+        path.relative(projectRoot, specPath),
+      );
       const nodeSpecWatcher = nodeSpecExists
-        ? createSpecWatcher(nodeSpecPath)
+        ? createSpecWatcher(nodeSpecPath, path.relative(projectRoot, nodeSpecPath))
         : Stream.empty;
 
       yield* Effect.race(

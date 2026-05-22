@@ -2,12 +2,9 @@ import { FileSystem, Path } from "@effect/platform";
 import { NodeFileSystem, NodePath } from "@effect/platform-node";
 import { expect, layer } from "@effect/vitest";
 import { Effect, Layer } from "effect";
+import type { BundleFailedError } from "../src/BuildError";
+import type { CodegenError } from "../src/CodegenError";
 import { ConfectDirectory } from "../src/ConfectDirectory";
-import type {
-  CodegenUserError,
-  SchemaValidationError,
-  SpecBuildError,
-} from "../src/codegenErrors";
 import {
   validateImplModule,
   validateSchemaModule,
@@ -30,7 +27,7 @@ const withTempFile = (
   contents: string,
   use: Effect.Effect<
     void,
-    CodegenUserError,
+    CodegenError,
     ConfectDirectory | Path.Path | FileSystem.FileSystem
   >,
 ) =>
@@ -74,8 +71,7 @@ layer(ValidationLayer)("validateSpecModule", (it) => {
 
       expect(result._tag).toBe("Left");
       if (result._tag === "Left") {
-        expect(result.left._tag).toBe("ImplValidationError");
-        expect(result.left.message).toContain("must default-export GroupSpec");
+        expect(result.left._tag).toBe("SpecMissingDefaultGroupSpecError");
       }
     }),
   );
@@ -92,10 +88,10 @@ layer(ValidationLayer)("validateSpecModule", (it) => {
 
       expect(result._tag).toBe("Left");
       if (result._tag === "Left") {
-        expect(result.left._tag).toBe("SpecBuildError");
-        expect((result.left as SpecBuildError).errors.length).toBeGreaterThan(
-          0,
-        );
+        expect(result.left._tag).toBe("BundleFailedError");
+        expect(
+          (result.left as BundleFailedError).errors.length,
+        ).toBeGreaterThan(0);
       }
     }),
   );
@@ -114,10 +110,7 @@ layer(ValidationLayer)("validateImplModule", (it) => {
 
       expect(result._tag).toBe("Left");
       if (result._tag === "Left") {
-        expect(result.left._tag).toBe("ImplValidationError");
-        expect(result.left.message).toContain(
-          'must import sibling spec "groups/notes.spec.ts"',
-        );
+        expect(result.left._tag).toBe("ImplMissingSpecImportError");
       }
     }),
   );
@@ -136,10 +129,7 @@ export default notes;
 
       expect(result._tag).toBe("Left");
       if (result._tag === "Left") {
-        expect(result.left._tag).toBe("ImplValidationError");
-        expect(result.left.message).toContain(
-          "must default-export a GroupImpl layer",
-        );
+        expect(result.left._tag).toBe("ImplMissingDefaultLayerError");
       }
     }),
   );
@@ -161,10 +151,10 @@ export default GroupImpl.make(
 
       expect(result._tag).toBe("Left");
       if (result._tag === "Left") {
-        expect(result.left._tag).toBe("SpecBuildError");
-        expect((result.left as SpecBuildError).errors.length).toBeGreaterThan(
-          0,
-        );
+        expect(result.left._tag).toBe("BundleFailedError");
+        expect(
+          (result.left as BundleFailedError).errors.length,
+        ).toBeGreaterThan(0);
       }
     }),
   );
@@ -189,10 +179,10 @@ layer(ValidationLayer)("validateSchemaModule", (it) => {
 
         expect(result._tag).toBe("Left");
         if (result._tag === "Left") {
-          expect(result.left._tag).toBe("SpecBuildError");
-          expect((result.left as SpecBuildError).errors.length).toBeGreaterThan(
-            0,
-          );
+          expect(result.left._tag).toBe("BundleFailedError");
+          expect(
+            (result.left as BundleFailedError).errors.length,
+          ).toBeGreaterThan(0);
         }
       }).pipe(
         Effect.ensuring(
@@ -217,10 +207,7 @@ layer(ValidationLayer)("validateSchemaModule", (it) => {
 
           expect(result._tag).toBe("Left");
           if (result._tag === "Left") {
-            expect(result.left._tag).toBe("SchemaValidationError");
-            expect((result.left as SchemaValidationError).reason).toContain(
-              "default export is not a DatabaseSchema",
-            );
+            expect(result.left._tag).toBe("SchemaInvalidDefaultExportError");
           }
         }).pipe(
           Effect.ensuring(

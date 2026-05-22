@@ -14,7 +14,7 @@ import {
   String,
 } from "effect";
 import * as esbuild from "esbuild";
-import { BundlerError } from "./codegenErrors";
+import { BundlerError } from "./BuildError";
 import * as FunctionPaths from "./FunctionPaths";
 import * as GroupPath from "./GroupPath";
 import * as GroupPaths from "./GroupPaths";

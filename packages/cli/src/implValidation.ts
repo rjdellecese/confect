@@ -2,23 +2,17 @@ import { GroupSpec, DatabaseSchema } from "@confect/core";
 import { Path } from "@effect/platform";
 import { Effect, Layer } from "effect";
 import type * as esbuild from "esbuild";
+import { fromBundlerError } from "./BuildError";
 import {
-  ImplValidationError,
-  SchemaValidationError,
-  mapBundleError,
-} from "./codegenErrors";
+  ImplMissingDefaultLayerError,
+  ImplMissingSpecImportError,
+  SchemaInvalidDefaultExportError,
+  SpecMissingDefaultGroupSpecError,
+  SpecRuntimeMismatchError,
+} from "./CodegenError";
 import { ConfectDirectory } from "./ConfectDirectory";
 import { isNodeLeafModule } from "./modulePaths";
 import { bundleAndImport, bundleAndImportWithInputs } from "./utils";
-
-export type { CodegenUserError } from "./codegenErrors";
-export {
-  BundlerError,
-  ImplValidationError,
-  SchemaValidationError,
-  SpecBuildError,
-  SpecImportFailedError,
-} from "./codegenErrors";
 
 const absoluteModulePath = (relativePath: string) =>
   Effect.gen(function* () {
@@ -68,15 +62,14 @@ export const validateSpecModule = (specRelativePath: string) =>
   Effect.gen(function* () {
     const absolutePath = yield* absoluteModulePath(specRelativePath);
     const module = yield* bundleAndImport(absolutePath).pipe(
-      Effect.mapError((error) => mapBundleError(specRelativePath, error)),
+      Effect.mapError((error) => fromBundlerError(specRelativePath, error)),
     );
 
     const groupSpec = module.default;
 
     if (!GroupSpec.isGroupSpec(groupSpec)) {
-      return yield* new ImplValidationError({
-        file: specRelativePath,
-        reason: "must default-export GroupSpec.make() or GroupSpec.makeNode()",
+      return yield* new SpecMissingDefaultGroupSpecError({
+        specPath: specRelativePath,
       });
     }
 
@@ -86,9 +79,10 @@ export const validateSpecModule = (specRelativePath: string) =>
     const group = groupSpec as GroupSpec.AnyWithProps;
 
     if (group.runtime !== expectedRuntime) {
-      return yield* new ImplValidationError({
-        file: specRelativePath,
-        reason: `expected GroupSpec runtime "${expectedRuntime}", got "${group.runtime}"`,
+      return yield* new SpecRuntimeMismatchError({
+        specPath: specRelativePath,
+        expectedRuntime,
+        actualRuntime: group.runtime,
       });
     }
   });
@@ -100,16 +94,15 @@ export const validateSchemaModule = () =>
     const confectSchemaPath = path.join(confectDirectory, "schema.ts");
 
     yield* bundleAndImport(confectSchemaPath).pipe(
-      Effect.mapError((error) => mapBundleError("schema.ts", error)),
+      Effect.mapError((error) => fromBundlerError("schema.ts", error)),
       Effect.andThen((schemaModule) => {
         const defaultExport = schemaModule.default;
 
         return DatabaseSchema.isDatabaseSchema(defaultExport)
           ? Effect.succeed(defaultExport)
           : Effect.fail(
-              new SchemaValidationError({
-                file: "schema.ts",
-                reason: "default export is not a DatabaseSchema",
+              new SchemaInvalidDefaultExportError({
+                schemaPath: "schema.ts",
               }),
             );
       }),
@@ -126,7 +119,9 @@ export const validateImplModule = (
 
     const { module, metafile } = yield* bundleAndImportWithInputs(
       implAbsolutePath,
-    ).pipe(Effect.mapError((error) => mapBundleError(implRelativePath, error)));
+    ).pipe(
+      Effect.mapError((error) => fromBundlerError(implRelativePath, error)),
+    );
 
     if (
       !(yield* implDirectlyImportsSpec(
@@ -135,16 +130,15 @@ export const validateImplModule = (
         specAbsolutePath,
       ))
     ) {
-      return yield* new ImplValidationError({
-        file: implRelativePath,
-        reason: `must import sibling spec "${specRelativePath}"`,
+      return yield* new ImplMissingSpecImportError({
+        implPath: implRelativePath,
+        expectedSpecPath: specRelativePath,
       });
     }
 
     if (!Layer.isLayer(module.default)) {
-      return yield* new ImplValidationError({
-        file: implRelativePath,
-        reason: "must default-export a GroupImpl layer",
+      return yield* new ImplMissingDefaultLayerError({
+        implPath: implRelativePath,
       });
     }
   });
