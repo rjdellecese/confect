@@ -389,9 +389,6 @@ importers:
       '@ark/attest':
         specifier: 0.56.0
         version: 0.56.0(typescript@5.9.3)
-      '@confect/cli':
-        specifier: workspace:*
-        version: link:../cli
       '@confect/test':
         specifier: workspace:*
         version: link:../test

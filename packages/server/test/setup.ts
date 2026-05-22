@@ -21,6 +21,15 @@ const runCommand = (
 // which is brittle in CI: `pnpm install` runs before workspace packages are
 // built, so the bin link for `confect` ends up dangling until something
 // re-links it.
+//
+// Note: `@confect/cli` is intentionally NOT declared as a (dev)dependency of
+// `@confect/server`. The CLI peer-depends on `@confect/server` (its codegen
+// emits and type-checks against `@confect/server` imports), so a reciprocal
+// dep here would create a cyclic workspace-dependency warning from pnpm. The
+// fixture sub-packages under `test/{mock,local}-backend/fixtures` declare
+// `@confect/cli` themselves for the `pnpm confect codegen` calls in this
+// package's `codegen:*` scripts; this `globalSetup` resolves the binary by
+// filesystem path instead, so it does not require the dep graph either.
 const confectCliEntryUrl = new URL("../../cli/dist/index.mjs", import.meta.url);
 
 /**
