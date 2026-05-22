@@ -1,4 +1,9 @@
-import { Command, type CommandExecutor, Path } from "@effect/platform";
+import {
+  Command,
+  type CommandExecutor,
+  FileSystem,
+  Path,
+} from "@effect/platform";
 import { NodeContext } from "@effect/platform-node";
 import { Effect, pipe } from "effect";
 
@@ -52,9 +57,25 @@ export const setupForFixture =
     pipe(
       Effect.gen(function* () {
         const path = yield* Path.Path;
+        const fs = yield* FileSystem.FileSystem;
         const fixtureDir = path.resolve(baseDir, fixtureSubpath);
         const originalCwd = process.cwd();
         const cliEntry = yield* path.fromFileUrl(confectCliEntryUrl);
+
+        // Verify the @confect/cli build output exists before invoking it,
+        // so a fresh checkout that hasn't run `pnpm build` yet gets a clear
+        // remediation hint instead of an opaque ENOENT from `process.chdir`
+        // / `node <missing-path>`. This package's tests need `@confect/cli`'s
+        // `dist/` to exist as a workspace invariant; the dep graph used to
+        // (vacuously) signal that requirement, but the cycle-breaking
+        // refactor above means it's now only enforced by `pnpm build`.
+        if (!(yield* fs.exists(cliEntry))) {
+          return yield* Effect.dieMessage(
+            `@confect/cli's build output is missing at ${cliEntry}. ` +
+              `Run \`pnpm build\` from the repo root (or \`pnpm dev:packages:cli\` ` +
+              `for a watcher) before running this test suite.`,
+          );
+        }
 
         yield* Effect.gen(function* () {
           process.chdir(fixtureDir);
