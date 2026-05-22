@@ -1,6 +1,9 @@
-import { DatabaseSchema, GroupSpec, Registry } from "@confect/core";
+import { GroupSpec, Registry } from "@confect/core";
+import * as DatabaseSchema from "@confect/server/DatabaseSchema";
+import * as GroupImpl from "@confect/server/GroupImpl";
 import { Path } from "@effect/platform";
-import { type Context, Effect, Layer, Ref } from "effect";
+import type { Context } from "effect";
+import { Array, Effect, Layer, Option, Ref } from "effect";
 import type * as esbuild from "esbuild";
 import { fromBundlerError } from "./BuildError";
 import {
@@ -15,18 +18,6 @@ import {
 import { ConfectDirectory } from "./ConfectDirectory";
 import { isNodeLeafModule } from "./modulePaths";
 import { bundleAndImport, bundleAndImportWithInputs } from "./utils";
-
-/**
- * Runtime tag prefix shared by every `Finalized` `GroupImpl` service in
- * `@confect/server`. The CLI walks a built layer's `Context` for this prefix
- * to detect impls that have been correctly piped through `GroupImpl.finalize`.
- *
- * The prefix is hardcoded rather than imported from `@confect/server` to avoid
- * adding a runtime dependency from `@confect/cli` to `@confect/server`. It
- * must stay in sync with the `FINALIZED_TAG_PREFIX` constant exported from
- * `packages/server/src/GroupImpl.ts`.
- */
-const FINALIZED_GROUP_IMPL_TAG_PREFIX = "@confect/server/GroupImpl/Finalized/";
 
 const absoluteModulePath = (relativePath: string) =>
   Effect.gen(function* () {
@@ -123,59 +114,31 @@ export const validateSchemaModule = () =>
     );
   });
 
-const findFinalizedGroupPath = (
-  context: Context.Context<unknown>,
-): string | undefined => {
-  for (const key of context.unsafeMap.keys()) {
-    if (key.startsWith(FINALIZED_GROUP_IMPL_TAG_PREFIX)) {
-      return key.slice(FINALIZED_GROUP_IMPL_TAG_PREFIX.length);
-    }
-  }
-  return undefined;
-};
-
-const collectRegisteredFunctionNames = (
-  items: Registry.RegistryItems,
-  groupPath: string,
-): ReadonlyArray<string> => {
-  let node: unknown = items;
-  for (const segment of groupPath.split(".")) {
-    if (node === null || typeof node !== "object" || !(segment in node)) {
-      return [];
-    }
-    node = (node as Record<string, unknown>)[segment];
-  }
-  if (node === null || typeof node !== "object") {
-    return [];
-  }
-  const names: string[] = [];
-  for (const [name, value] of Object.entries(node)) {
-    if (
-      value !== null &&
-      typeof value === "object" &&
-      "functionSpec" in value
-    ) {
-      names.push(name);
-    }
-  }
-  return names;
-};
+/**
+ * Walk the built `Context` for a `Finalized` `GroupImpl` service value. The
+ * lookup is value-shaped (via `GroupImpl.isFinalizedGroupImpl`) so we don't
+ * need to know the group's path up front to construct a typed tag for it.
+ */
+const findFinalizedGroupImpl = <S>(
+  context: Context.Context<S>,
+): Option.Option<GroupImpl.AnyFinalized> =>
+  Array.findFirst(context.unsafeMap.values(), GroupImpl.isFinalizedGroupImpl);
 
 /**
- * Build the impl layer with a fresh `Registry` so that each validation only
- * sees the function items registered by *this* impl. The CLI imports the
- * same `Registry` tag that the bundled `@confect/server`'s `FunctionImpl`
- * writes to, so providing this fresh `Ref` to the build's runtime context
- * causes every `FunctionImpl.make` initializer to populate it.
+ * Build the impl layer with a fresh `Registry` so each validation is
+ * isolated from prior validations' `FunctionImpl.make` writes. The CLI no
+ * longer reads the registry directly — `GroupImpl.finalize` snapshots the
+ * registered function names onto the produced `Finalized` `GroupImpl`
+ * service value — but a fresh `Ref` is still required because the default
+ * `Context.Reference` is cached globally and would otherwise accumulate
+ * items across impls.
  */
-const buildAndInspectImplLayer = (implLayer: Layer.Layer<unknown>) =>
+const buildImplLayer = (implLayer: Layer.Layer<unknown>) =>
   Effect.gen(function* () {
     const registry = Ref.unsafeMake<Registry.RegistryItems>({});
-    const context = yield* Layer.build(
+    return yield* Layer.build(
       implLayer as Layer.Layer<unknown, never, never>,
     ).pipe(Effect.provideService(Registry.Registry, registry));
-    const registryItems = yield* Ref.get(registry);
-    return { context, registryItems };
   }).pipe(Effect.scoped);
 
 export const validateImplModule = (
@@ -217,22 +180,19 @@ export const validateImplModule = (
     const groupSpec = specModule.default as GroupSpec.AnyWithProps;
     const expectedFunctionNames = Object.keys(groupSpec.functions);
 
-    const { context, registryItems } = yield* buildAndInspectImplLayer(
+    const context = yield* buildImplLayer(
       module.default as Layer.Layer<unknown>,
     );
-    const finalizedGroupPath = findFinalizedGroupPath(context);
+    const finalizedGroupImplOption = findFinalizedGroupImpl(context);
 
-    if (finalizedGroupPath === undefined) {
+    if (Option.isNone(finalizedGroupImplOption)) {
       return yield* new ImplNotFinalizedError({
         implPath: implRelativePath,
       });
     }
+    const finalizedGroupImpl = finalizedGroupImplOption.value;
 
-    const registeredFunctionNames = collectRegisteredFunctionNames(
-      registryItems,
-      finalizedGroupPath,
-    );
-    const registeredSet = new Set(registeredFunctionNames);
+    const registeredSet = new Set(finalizedGroupImpl.registeredFunctionNames);
     const missing = expectedFunctionNames.filter(
       (name) => !registeredSet.has(name),
     );
@@ -240,7 +200,7 @@ export const validateImplModule = (
     if (missing.length > 0) {
       return yield* new ImplMissingFunctionsError({
         implPath: implRelativePath,
-        groupPath: finalizedGroupPath,
+        groupPath: finalizedGroupImpl.groupPath,
         missingFunctionNames: missing,
       });
     }

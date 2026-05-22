@@ -3,15 +3,18 @@ import {
   defineSchema as defineConvexSchema,
   type SchemaDefinition,
 } from "convex/server";
-import { Array, pipe, Record } from "effect";
+import { Array, pipe, Predicate, Record } from "effect";
 import * as Table from "./Table";
-import { TypeId } from "@confect/core/DatabaseSchema";
 
-export {
-  type Any,
-  isDatabaseSchema,
-  TypeId,
-} from "@confect/core/DatabaseSchema";
+export const TypeId = "@confect/server/DatabaseSchema";
+export type TypeId = typeof TypeId;
+
+export interface Any {
+  readonly [TypeId]: TypeId;
+}
+
+export const isDatabaseSchema = (u: unknown): u is Any =>
+  Predicate.hasProperty(u, TypeId);
 
 /**
  * A schema definition tracks the schema and its Convex schema definition.

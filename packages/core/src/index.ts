@@ -1,4 +1,3 @@
-export * as DatabaseSchema from "./DatabaseSchema";
 export * as FunctionProvenance from "./FunctionProvenance";
 export * as FunctionSpec from "./FunctionSpec";
 export * as GenericId from "./GenericId";
