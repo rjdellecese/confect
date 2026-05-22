@@ -48,6 +48,7 @@ import {
   removePathExtension,
   removePathIfExists,
   toModuleImportPath,
+  touchConvexSchema,
   writeFileStringAndLog,
 } from "../utils";
 
@@ -77,7 +78,7 @@ export const codegen = Command.make("codegen", {}, () =>
   }),
 ).pipe(
   Command.withDescription(
-    "Generate `confect/_generated` files and the contents of the `convex` directory (except `tsconfig.json`)",
+    "Generate `confect/_generated` files and the contents of the `convex` directory (except `convex.config.ts` and `tsconfig.json`)",
   ),
 );
 
@@ -103,6 +104,7 @@ export const codegenHandler = Effect.gen(function* () {
     ],
     { concurrency: "unbounded" },
   );
+  yield* touchConvexSchema;
   return functionPaths;
 });
 

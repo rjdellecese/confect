@@ -44,7 +44,7 @@ import {
   generateCrons,
   generateHttp,
 } from "../utils";
-import { codegenHandler } from "./codegen";
+import { codegenHandler, loadPreviousFunctionPaths } from "./codegen";
 
 const GENERATED_SPEC_PATH = "_generated/spec.ts";
 const GENERATED_NODE_SPEC_PATH = "_generated/nodeSpec.ts";
@@ -169,10 +169,11 @@ const logFunctionPathDiff = (
 export const dev = Command.make("dev", {}, () =>
   Effect.gen(function* () {
     yield* logPending("Performing initial sync…");
+    const previousFunctionPaths = yield* loadPreviousFunctionPaths;
     const initialFunctionPaths =
       (yield* codegenHandler.pipe(
         Effect.tap((current) =>
-          logFunctionPathDiff(emptyFunctionPaths, current),
+          logFunctionPathDiff(previousFunctionPaths, current),
         ),
         Effect.tap(() => logSuccess("Generated files are up-to-date")),
         CodegenError.catchAndLog,

@@ -194,6 +194,27 @@ export const removePathIfExists = (
     );
   });
 
+/**
+ * Bump the mtime of `convex/schema.ts` so the Convex CLI's chokidar watcher
+ * emits a `change` event after every successful Confect codegen run. Without
+ * this, a codegen that doesn't change any file content (for example,
+ * recovering from a transient broken state in `confect/`) leaves Convex
+ * stuck on its previous error because nothing it observes has changed.
+ */
+export const touchConvexSchema = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const convexDirectory = yield* ConvexDirectory.get;
+  const schemaPath = path.join(convexDirectory, "schema.ts");
+
+  if (!(yield* fs.exists(schemaPath))) {
+    return;
+  }
+
+  const now = new Date();
+  yield* fs.utimes(schemaPath, now, now);
+});
+
 export const generateGroupModule = ({
   groupPath,
   functionNames,
