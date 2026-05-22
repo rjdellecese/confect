@@ -37,10 +37,19 @@ export interface GroupImpl<
   readonly registeredFunctionNames: ReadonlyArray<string>;
 }
 
-export interface AnyWithProps extends GroupImpl<string, FinalizationStatus> {}
+export interface Any extends GroupImpl<string, FinalizationStatus> {}
 
-export const isGroupImpl = (u: unknown): u is AnyWithProps =>
+export const isGroupImpl = (u: unknown): u is Any =>
   Predicate.hasProperty(u, TypeId);
+
+export interface AnyFinalized extends GroupImpl<string, "Finalized"> {}
+export interface AnyUnfinalized extends GroupImpl<string, "Unfinalized"> {}
+
+export const isFinalized = (u: unknown): u is AnyFinalized =>
+  isGroupImpl(u) && u.finalizationStatus === "Finalized";
+
+export const isUnfinalized = (u: unknown): u is AnyUnfinalized =>
+  isGroupImpl(u) && u.finalizationStatus === "Unfinalized";
 
 /**
  * Build the runtime tag for a `GroupImpl` service. The finalization status is
@@ -127,10 +136,10 @@ const collectFunctionNamesAtPath = (
 
 const findUnfinalizedGroupImpl = <S>(
   context: Context.Context<S>,
-): Option.Option<AnyWithProps> =>
+): Option.Option<Any> =>
   Array.findFirst(
     context.unsafeMap.values() as Iterable<unknown>,
-    (value): value is AnyWithProps =>
+    (value): value is Any =>
       isGroupImpl(value) && value.finalizationStatus === "Unfinalized",
   );
 

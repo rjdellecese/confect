@@ -122,10 +122,10 @@ export const validateSchemaModule = () =>
  */
 const findFinalizedGroupImpl = <S>(
   context: Context.Context<S>,
-): Option.Option<GroupImpl.AnyWithProps> =>
+): Option.Option<GroupImpl.Any> =>
   Array.findFirst(
-    context.unsafeMap.values() as Iterable<unknown>,
-    (value): value is GroupImpl.AnyWithProps =>
+    context.unsafeMap.values(),
+    (value): value is GroupImpl.Any =>
       GroupImpl.isGroupImpl(value) && value.finalizationStatus === "Finalized",
   );
 
