@@ -88,5 +88,10 @@ const list = FunctionImpl.make(api, notes, "list", () =>
   }).pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(api, notes).pipe(Layer.provide(list));
+export default GroupImpl.make(api, notes).pipe(
+  Layer.provide(list),
+  GroupImpl.finalize,
+);
 ```
+
+`GroupImpl.finalize` is the per-group completeness check: it only typechecks once every function declared by the spec has been provided to the group layer.

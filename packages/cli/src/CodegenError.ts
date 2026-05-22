@@ -52,6 +52,22 @@ export class ImplMissingDefaultLayerError extends Schema.TaggedError<ImplMissing
   },
 ) {}
 
+export class ImplNotFinalizedError extends Schema.TaggedError<ImplNotFinalizedError>()(
+  "ImplNotFinalizedError",
+  {
+    implPath: Schema.String,
+  },
+) {}
+
+export class ImplMissingFunctionsError extends Schema.TaggedError<ImplMissingFunctionsError>()(
+  "ImplMissingFunctionsError",
+  {
+    implPath: Schema.String,
+    groupPath: Schema.String,
+    missingFunctionNames: Schema.Array(Schema.String),
+  },
+) {}
+
 export class SchemaInvalidDefaultExportError extends Schema.TaggedError<SchemaInvalidDefaultExportError>()(
   "SchemaInvalidDefaultExportError",
   {
@@ -67,6 +83,8 @@ export const CodegenError = Schema.Union(
   SpecRuntimeMismatchError,
   ImplMissingSpecImportError,
   ImplMissingDefaultLayerError,
+  ImplNotFinalizedError,
+  ImplMissingFunctionsError,
   SchemaInvalidDefaultExportError,
 );
 export type CodegenError = typeof CodegenError.Type;
@@ -174,6 +192,30 @@ const renderImplMissingDefaultLayerError = (
     ),
   );
 
+const renderImplNotFinalizedError = (
+  error: ImplNotFinalizedError,
+): AnsiDoc.AnsiDoc =>
+  singleLine(
+    AnsiDoc.text("Impl "),
+    formatPathDoc(error.implPath),
+    AnsiDoc.text(
+      " is not finalized; append `GroupImpl.finalize` to the end of the pipeline (e.g. `GroupImpl.make(api, group).pipe(Layer.provide(...), GroupImpl.finalize)`).",
+    ),
+  );
+
+const renderImplMissingFunctionsError = (
+  error: ImplMissingFunctionsError,
+): AnsiDoc.AnsiDoc => {
+  const names = error.missingFunctionNames.join(", ");
+  return singleLine(
+    AnsiDoc.text("Impl "),
+    formatPathDoc(error.implPath),
+    AnsiDoc.text(
+      ` does not implement every function declared by group \`${error.groupPath}\`; missing: ${names}. Add a \`FunctionImpl.make\` for each missing function and provide it to the group layer.`,
+    ),
+  );
+};
+
 const renderSchemaInvalidDefaultExportError = (
   error: SchemaInvalidDefaultExportError,
 ): AnsiDoc.AnsiDoc =>
@@ -221,6 +263,15 @@ export const renderCodegenError = (error: CodegenError): string => {
     Match.tag("ImplMissingDefaultLayerError", (e) =>
       pipe(
         renderImplMissingDefaultLayerError(e),
+        AnsiDoc.render({ style: "pretty" }),
+      ),
+    ),
+    Match.tag("ImplNotFinalizedError", (e) =>
+      pipe(renderImplNotFinalizedError(e), AnsiDoc.render({ style: "pretty" })),
+    ),
+    Match.tag("ImplMissingFunctionsError", (e) =>
+      pipe(
+        renderImplMissingFunctionsError(e),
         AnsiDoc.render({ style: "pretty" }),
       ),
     ),

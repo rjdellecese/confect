@@ -7,4 +7,7 @@ const getNumber = FunctionImpl.make(api, random, "getNumber", () =>
   Effect.succeed(Math.random()).pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(api, random).pipe(Layer.provide(getNumber));
+export default GroupImpl.make(api, random).pipe(
+  Layer.provide(getNumber),
+  GroupImpl.finalize,
+);

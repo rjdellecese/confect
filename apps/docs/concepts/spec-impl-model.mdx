@@ -31,7 +31,7 @@ export default GroupSpec.make().addFunction(
 
 ## Impl
 
-An impl provides the logic for each function declared in your spec. Each impl is the default export of a `*.impl.ts` file colocated with its sibling spec. It default-imports that sibling spec and passes it to `FunctionImpl.make` and `GroupImpl.make`:
+An impl provides the logic for each function declared in your spec. Each impl is the default export of a `*.impl.ts` file colocated with its sibling spec. It default-imports that sibling spec, passes it to `FunctionImpl.make` and `GroupImpl.make`, and finalizes the resulting layer with `GroupImpl.finalize`:
 
 ```ts confect/notesAndRandom/notes.impl.ts
 import { FunctionImpl, GroupImpl } from "@confect/server";
@@ -52,7 +52,12 @@ const list = FunctionImpl.make(api, notes, "list", () =>
   }).pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(api, notes).pipe(Layer.provide(list));
+export default GroupImpl.make(api, notes).pipe(
+  Layer.provide(list),
+  GroupImpl.finalize,
+);
 ```
+
+`GroupImpl.finalize` rejects, at compile time, any pipeline that has not provided a `FunctionImpl` for every function declared by the spec. This guarantees that the group is fully implemented before it is handed to the generated `convex/` module.
 
 Run `confect codegen` after adding or changing specs and impls.

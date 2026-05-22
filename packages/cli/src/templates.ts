@@ -184,50 +184,6 @@ export const registeredFunctionsForGroup = ({
     return yield* cbw.toString();
   });
 
-export const registeredFunctions = ({
-  implImportPath,
-}: {
-  implImportPath: string;
-}) =>
-  Effect.gen(function* () {
-    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
-
-    yield* cbw.writeLine(
-      `import { RegisteredConvexFunction, RegisteredFunctions } from "@confect/server";`,
-    );
-    yield* cbw.writeLine(`import impl from "${implImportPath}";`);
-    yield* cbw.blankLine();
-    yield* cbw.writeLine(
-      `export default RegisteredFunctions.make(impl, RegisteredConvexFunction.make);`,
-    );
-
-    return yield* cbw.toString();
-  });
-
-export const nodeRegisteredFunctions = ({
-  nodeImplImportPath,
-}: {
-  nodeImplImportPath: string;
-}) =>
-  Effect.gen(function* () {
-    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
-
-    yield* cbw.writeLine(
-      `import { RegisteredFunctions } from "@confect/server";`,
-    );
-    yield* cbw.writeLine(
-      `import { RegisteredNodeFunction } from "@confect/server/node";`,
-    );
-    yield* cbw.blankLine();
-    yield* cbw.writeLine(`import nodeImpl from "${nodeImplImportPath}";`);
-    yield* cbw.blankLine();
-    yield* cbw.writeLine(
-      `export default RegisteredFunctions.make(nodeImpl, RegisteredNodeFunction.make);`,
-    );
-
-    return yield* cbw.toString();
-  });
-
 export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });

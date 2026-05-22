@@ -10,7 +10,7 @@ Confect requires a small number of fixed entry-point files in your `confect/` di
 
 Name each group's spec and impl with `.spec.ts` and `.impl.ts` suffixes. Each file must default-export its `GroupSpec` or `GroupImpl`; additional named exports on `.spec.ts` (for example error classes) are fine.
 
-A complete pair looks like this. The impl default-imports its sibling spec and passes it to `FunctionImpl.make` and `GroupImpl.make`:
+A complete pair looks like this. The impl default-imports its sibling spec, passes it to `FunctionImpl.make` and `GroupImpl.make`, and finalizes the resulting layer with `GroupImpl.finalize`:
 
 ```ts confect/notes.spec.ts
 import { GroupSpec, FunctionSpec } from "@confect/core";
@@ -46,7 +46,10 @@ const list = FunctionImpl.make(api, notes, "list", () =>
   }).pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(api, notes).pipe(Layer.provide(list));
+export default GroupImpl.make(api, notes).pipe(
+  Layer.provide(list),
+  GroupImpl.finalize,
+);
 ```
 
 Run `confect codegen` after adding or changing specs and impls.

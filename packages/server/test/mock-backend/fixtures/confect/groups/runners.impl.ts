@@ -47,4 +47,5 @@ export default GroupImpl.make(api, runners).pipe(
   Layer.provide(insertNoteViaRunner),
   Layer.provide(getNumberViaRunner),
   Layer.provide(countNotesViaRunner),
+  GroupImpl.finalize,
 );

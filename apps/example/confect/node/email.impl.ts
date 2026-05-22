@@ -48,4 +48,5 @@ const getInbox = FunctionImpl.make(
 export default GroupImpl.make(nodeApi, email).pipe(
   Layer.provide(send),
   Layer.provide(getInbox),
+  GroupImpl.finalize,
 );

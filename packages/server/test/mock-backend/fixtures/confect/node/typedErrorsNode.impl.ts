@@ -13,4 +13,5 @@ const failingNodeAction = FunctionImpl.make(
 
 export default GroupImpl.make(nodeApi, typedErrorsNode).pipe(
   Layer.provide(failingNodeAction),
+  GroupImpl.finalize,
 );

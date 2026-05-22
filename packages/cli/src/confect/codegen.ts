@@ -3,10 +3,7 @@ import { Command } from "@effect/cli";
 import { FileSystem, Path } from "@effect/platform";
 import { Array, Effect, Either, HashSet, Match, Option } from "effect";
 import * as CodegenError from "../CodegenError";
-import {
-  MissingImplFileError,
-  MissingSpecFileError,
-} from "../CodegenError";
+import { MissingImplFileError, MissingSpecFileError } from "../CodegenError";
 import { ConfectDirectory } from "../ConfectDirectory";
 import { ConvexDirectory } from "../ConvexDirectory";
 import * as FunctionPaths from "../FunctionPaths";

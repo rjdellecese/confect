@@ -58,6 +58,7 @@ const send = FunctionImpl.make(
 
 export default GroupImpl.make(nodeApi, email).pipe(
   Layer.provide(send),
+  GroupImpl.finalize,
 );
 ```
 

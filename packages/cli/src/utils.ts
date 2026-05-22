@@ -187,11 +187,13 @@ export const removePathIfExists = (
       return;
     }
 
-    yield* fs.remove(filePath).pipe(
-      Effect.catchTag("SystemError", (error) =>
-        error.reason === "NotFound" ? Effect.void : Effect.fail(error),
-      ),
-    );
+    yield* fs
+      .remove(filePath)
+      .pipe(
+        Effect.catchTag("SystemError", (error) =>
+          error.reason === "NotFound" ? Effect.void : Effect.fail(error),
+        ),
+      );
   });
 
 /**

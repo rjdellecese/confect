@@ -1,10 +1,9 @@
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import type * as GroupSpec from "@confect/core/GroupSpec";
 import type * as Spec from "@confect/core/Spec";
-import type { Layer } from "effect";
-import { Effect, Match, Ref, type Types } from "effect";
+import { Effect, type Layer, Ref, type Types } from "effect";
 import type * as Api from "./Api";
-import * as Impl from "./Impl";
+import type * as GroupImpl from "./GroupImpl";
 import { mapLeaves } from "./internal/utils";
 import type * as RegisteredFunction from "./RegisteredFunction";
 import * as Registry from "./Registry";
@@ -67,54 +66,38 @@ export type ForGroupPath<
   Path extends string,
 > = RegisteredFunctionsAtPath<RegisteredFunctions<Spec_>, Path>;
 
-export const make = <Api_ extends Api.AnyWithProps>(
-  impl: Layer.Layer<Impl.Impl<Api_, "Finalized">>,
-  makeRegisteredFunction: (
-    api: Api_,
-    registryItem: RegistryItem.AnyWithProps,
-  ) => RegisteredFunction.Any,
-) =>
-  Effect.gen(function* () {
-    const registry = yield* Registry.Registry;
-    const functionImplItems = yield* Ref.get(registry);
-    const { api, finalizationStatus } = yield* Impl.Impl<Api_, "Finalized">();
-
-    return yield* Match.value(
-      finalizationStatus as Impl.FinalizationStatus,
-    ).pipe(
-      Match.withReturnType<Effect.Effect<RegisteredFunctions<Api_["spec"]>>>(),
-      Match.when("Unfinalized", () =>
-        Effect.dieMessage("Impl is not finalized"),
-      ),
-      Match.when("Finalized", () =>
-        Effect.succeed(
-          mapLeaves<RegistryItem.AnyWithProps, RegisteredFunction.Any>(
-            functionImplItems,
-            RegistryItem.isRegistryItem,
-            (registryItem) => makeRegisteredFunction(api, registryItem),
-          ) as RegisteredFunctions<Api_["spec"]>,
-        ),
-      ),
-      Match.exhaustive,
-    );
-  }).pipe(Effect.provide(impl), Effect.runSync);
-
+/**
+ * Build the registered Convex functions for a single group from its finalized
+ * `GroupImpl` layer.
+ *
+ * The `groupLayer` parameter requires `GroupImpl<string, "Finalized">`, so
+ * impls that were never piped through `GroupImpl.finalize` (and impls with
+ * unmet `FunctionImpl` requirements, which cannot be finalized) are rejected
+ * at the codegen boundary, not just deep inside Convex at runtime.
+ */
 export const buildForGroup = <
   Api_ extends Api.AnyWithProps,
   const GroupPath_ extends string,
 >(
   api: Api_,
   groupPath: GroupPath_,
-  groupLayer: Layer.Layer<never, unknown, unknown>,
+  groupLayer: Layer.Layer<GroupImpl.GroupImpl<string, "Finalized">>,
   makeRegisteredFunction: (
     api: Api_,
     registryItem: RegistryItem.AnyWithProps,
   ) => RegisteredFunction.Any,
 ): ForGroupPath<Api_["spec"], GroupPath_> => {
-  const registeredFunctions = make(
-    Impl.buildForGroup(api, groupLayer),
-    makeRegisteredFunction,
-  ) as RegisteredFunctions<Api_["spec"]>;
+  const registryItems = Effect.gen(function* () {
+    const registry = yield* Registry.Registry;
+    return yield* Ref.get(registry);
+  }).pipe(Effect.provide(groupLayer), Effect.runSync);
+
+  const registeredFunctions = mapLeaves<
+    RegistryItem.AnyWithProps,
+    RegisteredFunction.Any
+  >(registryItems, RegistryItem.isRegistryItem, (registryItem) =>
+    makeRegisteredFunction(api, registryItem),
+  );
 
   let groupFunctions: unknown = registeredFunctions;
   for (const segment of groupPath.split(".")) {

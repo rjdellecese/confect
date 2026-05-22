@@ -8,4 +8,5 @@ const controlImpl = FunctionImpl.make(api, cacheControl, "control", control);
 
 export default GroupImpl.make(api, cacheControl).pipe(
   Layer.provide(controlImpl),
+  GroupImpl.finalize,
 );

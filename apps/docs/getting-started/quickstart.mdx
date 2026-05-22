@@ -136,8 +136,11 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
     export default GroupImpl.make(api, notes).pipe(
       Layer.provide(list),
       Layer.provide(create),
+      GroupImpl.finalize,
     );
     ```
+
+    `GroupImpl.finalize` only typechecks once every function declared by the spec has a corresponding `FunctionImpl`, so it acts as a per-group completeness check.
 
     Run `confect codegen` again to pick up the new impl.
 

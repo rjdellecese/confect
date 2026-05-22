@@ -205,4 +205,5 @@ export default GroupImpl.make(api, typedErrors).pipe(
   Layer.provide(tryFailingAction),
   Layer.provide(internalGetNoteOrFail),
   Layer.provide(tryInternalGetNote),
+  GroupImpl.finalize,
 );

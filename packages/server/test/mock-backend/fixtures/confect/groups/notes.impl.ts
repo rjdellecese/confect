@@ -55,4 +55,5 @@ export default GroupImpl.make(api, notes).pipe(
   Layer.provide(delete_),
   Layer.provide(getFirst),
   Layer.provide(internalGetFirst),
+  GroupImpl.finalize,
 );

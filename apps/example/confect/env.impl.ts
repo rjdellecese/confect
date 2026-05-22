@@ -7,4 +7,7 @@ const readEnvVar = FunctionImpl.make(api, env, "readEnvVar", () =>
   Config.string("TEST_ENV_VAR").pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(api, env).pipe(Layer.provide(readEnvVar));
+export default GroupImpl.make(api, env).pipe(
+  Layer.provide(readEnvVar),
+  GroupImpl.finalize,
+);

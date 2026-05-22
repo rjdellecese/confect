@@ -100,4 +100,5 @@ export default GroupImpl.make(api, notes).pipe(
   Layer.provide(internalGetFirst),
   Layer.provide(clearAll),
   Layer.provide(insertDefault),
+  GroupImpl.finalize,
 );

@@ -324,7 +324,10 @@ const generatedSpecWatcher = (specWatcherRestartQueue: Queue.Queue<void>) =>
         path.relative(projectRoot, specPath),
       );
       const nodeSpecWatcher = nodeSpecExists
-        ? createSpecWatcher(nodeSpecPath, path.relative(projectRoot, nodeSpecPath))
+        ? createSpecWatcher(
+            nodeSpecPath,
+            path.relative(projectRoot, nodeSpecPath),
+          )
         : Stream.empty;
 
       yield* Effect.race(

@@ -54,4 +54,5 @@ export default GroupImpl.make(api, databaseReader).pipe(
       ),
     ),
   ),
+  GroupImpl.finalize,
 );

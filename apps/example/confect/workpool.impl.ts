@@ -24,4 +24,5 @@ export default GroupImpl.make(api, workpool).pipe(
   Layer.provide(statusImpl),
   Layer.provide(backgroundWorkImpl),
   Layer.provide(onCompleteImpl),
+  GroupImpl.finalize,
 );

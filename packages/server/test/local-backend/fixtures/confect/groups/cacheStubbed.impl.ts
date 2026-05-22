@@ -59,4 +59,5 @@ export default GroupImpl.make(api, cacheStubbed).pipe(
   Layer.provide(confectWithRawDateNow),
   Layer.provide(confectWithSpan),
   Layer.provide(confectWithLog),
+  GroupImpl.finalize,
 );
