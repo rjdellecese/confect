@@ -45,10 +45,10 @@ export const isGroupImpl = (u: unknown): u is Any =>
 export interface AnyFinalized extends GroupImpl<string, "Finalized"> {}
 export interface AnyUnfinalized extends GroupImpl<string, "Unfinalized"> {}
 
-export const isFinalized = (u: unknown): u is AnyFinalized =>
+export const isFinalizedGroupImpl = (u: unknown): u is AnyFinalized =>
   isGroupImpl(u) && u.finalizationStatus === "Finalized";
 
-export const isUnfinalized = (u: unknown): u is AnyUnfinalized =>
+export const isUnfinalizedGroupImpl = (u: unknown): u is AnyUnfinalized =>
   isGroupImpl(u) && u.finalizationStatus === "Unfinalized";
 
 /**
@@ -136,12 +136,8 @@ const collectFunctionNamesAtPath = (
 
 const findUnfinalizedGroupImpl = <S>(
   context: Context.Context<S>,
-): Option.Option<Any> =>
-  Array.findFirst(
-    context.unsafeMap.values() as Iterable<unknown>,
-    (value): value is Any =>
-      isGroupImpl(value) && value.finalizationStatus === "Unfinalized",
-  );
+): Option.Option<AnyUnfinalized> =>
+  Array.findFirst(context.unsafeMap.values(), isUnfinalizedGroupImpl);
 
 /**
  * Mark a `GroupImpl` layer as fully implemented. The parameter type defaults

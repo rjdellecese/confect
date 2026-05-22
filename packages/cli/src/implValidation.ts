@@ -116,18 +116,13 @@ export const validateSchemaModule = () =>
 
 /**
  * Walk the built `Context` for a `Finalized` `GroupImpl` service value. The
- * lookup is value-shaped (via `GroupImpl.isGroupImpl` + the
- * `finalizationStatus` discriminant) so we don't need to know the group's
- * path up front to construct a typed tag for it.
+ * lookup is value-shaped (via `GroupImpl.isFinalizedGroupImpl`) so we don't
+ * need to know the group's path up front to construct a typed tag for it.
  */
 const findFinalizedGroupImpl = <S>(
   context: Context.Context<S>,
-): Option.Option<GroupImpl.Any> =>
-  Array.findFirst(
-    context.unsafeMap.values(),
-    (value): value is GroupImpl.Any =>
-      GroupImpl.isGroupImpl(value) && value.finalizationStatus === "Finalized",
-  );
+): Option.Option<GroupImpl.AnyFinalized> =>
+  Array.findFirst(context.unsafeMap.values(), GroupImpl.isFinalizedGroupImpl);
 
 /**
  * Build the impl layer with a fresh `Registry` so each validation is
