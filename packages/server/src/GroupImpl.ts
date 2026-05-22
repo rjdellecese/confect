@@ -1,6 +1,17 @@
 import type * as GroupSpec from "@confect/core/GroupSpec";
 import * as Registry from "@confect/core/Registry";
-import { Context, Effect, Layer, Predicate, Ref } from "effect";
+import {
+  Array,
+  Context,
+  Effect,
+  Layer,
+  Option,
+  pipe,
+  Predicate,
+  Record,
+  Ref,
+  String,
+} from "effect";
 import type * as Api from "./Api";
 import type * as FunctionImpl from "./FunctionImpl";
 import { resolveGroupPathOrDie } from "./resolveGroupPath";
@@ -83,6 +94,9 @@ export const make = <
   >;
 };
 
+const isFunctionShaped = (value: unknown): boolean =>
+  Predicate.isRecord(value) && "functionSpec" in value;
+
 /**
  * Walk a `RegistryItems` tree to the entries at `groupPath` and return the
  * names of the function-shaped leaves directly underneath.
@@ -90,29 +104,35 @@ export const make = <
 const collectFunctionNamesAtPath = (
   items: Registry.RegistryItems,
   groupPath: string,
-): ReadonlyArray<string> => {
-  let node: unknown = items;
-  for (const segment of groupPath.split(".")) {
-    if (node === null || typeof node !== "object" || !(segment in node)) {
-      return [];
-    }
-    node = (node as Record<string, unknown>)[segment];
-  }
-  if (node === null || typeof node !== "object") {
-    return [];
-  }
-  const names: string[] = [];
-  for (const [name, value] of Object.entries(node)) {
-    if (
-      value !== null &&
-      typeof value === "object" &&
-      "functionSpec" in value
-    ) {
-      names.push(name);
-    }
-  }
-  return names;
-};
+): ReadonlyArray<string> =>
+  pipe(
+    String.split(groupPath, "."),
+    Array.reduce(Option.some<unknown>(items), (acc, segment) =>
+      acc.pipe(
+        Option.filter(Predicate.isRecord),
+        Option.flatMap((node) =>
+          segment in node ? Option.some(node[segment]) : Option.none(),
+        ),
+      ),
+    ),
+    Option.filter(Predicate.isRecord),
+    Option.map(Record.toEntries),
+    Option.map(
+      Array.filterMap(([name, value]) =>
+        isFunctionShaped(value) ? Option.some(name) : Option.none(),
+      ),
+    ),
+    Option.getOrElse((): ReadonlyArray<string> => []),
+  );
+
+const findUnfinalizedGroupImpl = <S>(
+  context: Context.Context<S>,
+): Option.Option<AnyWithProps> =>
+  Array.findFirst(
+    context.unsafeMap.values() as Iterable<unknown>,
+    (value): value is AnyWithProps =>
+      isGroupImpl(value) && value.finalizationStatus === "Unfinalized",
+  );
 
 /**
  * Mark a `GroupImpl` layer as fully implemented. The parameter type defaults
@@ -130,41 +150,42 @@ const collectFunctionNamesAtPath = (
 export const finalize = <GroupPath_ extends string>(
   group: Layer.Layer<GroupImpl<GroupPath_, "Unfinalized">>,
 ): Layer.Layer<GroupImpl<GroupPath_, "Finalized">> =>
-  Layer.flatMap(group, (context) => {
-    let unfinalized: AnyWithProps | undefined;
-    for (const value of context.unsafeMap.values() as Iterable<unknown>) {
-      if (isGroupImpl(value) && value.finalizationStatus === "Unfinalized") {
-        unfinalized = value;
-        break;
-      }
-    }
-    if (unfinalized === undefined) {
-      throw new Error(
-        "GroupImpl.finalize: no Unfinalized GroupImpl service was found in the layer's context.",
-      );
-    }
-    const groupPath = unfinalized.groupPath as GroupPath_;
-    return Layer.effect(
-      GroupImpl<GroupPath_, "Finalized">({
-        groupPath,
-        finalizationStatus: "Finalized",
-      }),
-      Effect.gen(function* () {
-        const registry = yield* Registry.Registry;
-        const items = yield* Ref.get(registry);
-        const registeredFunctionNames = collectFunctionNamesAtPath(
-          items,
-          groupPath,
-        );
-        return {
-          [TypeId]: TypeId,
-          groupPath,
-          finalizationStatus: "Finalized" as const,
-          registeredFunctionNames,
-        };
-      }),
-    );
-  });
+  Layer.flatMap(
+    group,
+    (context): Layer.Layer<GroupImpl<GroupPath_, "Finalized">> =>
+      findUnfinalizedGroupImpl(context).pipe(
+        Option.match({
+          onNone: () =>
+            Layer.die(
+              new Error(
+                "GroupImpl.finalize: no Unfinalized GroupImpl service was found in the layer's context.",
+              ),
+            ),
+          onSome: (unfinalized) => {
+            const groupPath = unfinalized.groupPath as GroupPath_;
+            return Layer.effect(
+              GroupImpl<GroupPath_, "Finalized">({
+                groupPath,
+                finalizationStatus: "Finalized",
+              }),
+              Effect.gen(function* () {
+                const registry = yield* Registry.Registry;
+                const items = yield* Ref.get(registry);
+                return {
+                  [TypeId]: TypeId,
+                  groupPath,
+                  finalizationStatus: "Finalized" as const,
+                  registeredFunctionNames: collectFunctionNamesAtPath(
+                    items,
+                    groupPath,
+                  ),
+                };
+              }),
+            );
+          },
+        }),
+      ),
+  );
 
 export type FromGroupSpec<Group extends GroupSpec.AnyWithProps> =
   FunctionImpl.FromGroupSpec<Group>;

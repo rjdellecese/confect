@@ -3,7 +3,7 @@ import * as DatabaseSchema from "@confect/server/DatabaseSchema";
 import * as GroupImpl from "@confect/server/GroupImpl";
 import { Path } from "@effect/platform";
 import type { Context } from "effect";
-import { Effect, Layer, Ref } from "effect";
+import { Array, Effect, Layer, Option, Ref } from "effect";
 import type * as esbuild from "esbuild";
 import { fromBundlerError } from "./BuildError";
 import {
@@ -120,19 +120,14 @@ export const validateSchemaModule = () =>
  * `finalizationStatus` discriminant) so we don't need to know the group's
  * path up front to construct a typed tag for it.
  */
-const findFinalizedGroupImpl = (
-  context: Context.Context<unknown>,
-): GroupImpl.AnyWithProps | undefined => {
-  for (const value of context.unsafeMap.values() as Iterable<unknown>) {
-    if (
-      GroupImpl.isGroupImpl(value) &&
-      value.finalizationStatus === "Finalized"
-    ) {
-      return value;
-    }
-  }
-  return undefined;
-};
+const findFinalizedGroupImpl = <S>(
+  context: Context.Context<S>,
+): Option.Option<GroupImpl.AnyWithProps> =>
+  Array.findFirst(
+    context.unsafeMap.values() as Iterable<unknown>,
+    (value): value is GroupImpl.AnyWithProps =>
+      GroupImpl.isGroupImpl(value) && value.finalizationStatus === "Finalized",
+  );
 
 /**
  * Build the impl layer with a fresh `Registry` so each validation is
@@ -193,13 +188,14 @@ export const validateImplModule = (
     const context = yield* buildImplLayer(
       module.default as Layer.Layer<unknown>,
     );
-    const finalizedGroupImpl = findFinalizedGroupImpl(context);
+    const finalizedGroupImplOption = findFinalizedGroupImpl(context);
 
-    if (finalizedGroupImpl === undefined) {
+    if (Option.isNone(finalizedGroupImplOption)) {
       return yield* new ImplNotFinalizedError({
         implPath: implRelativePath,
       });
     }
+    const finalizedGroupImpl = finalizedGroupImplOption.value;
 
     const registeredSet = new Set(finalizedGroupImpl.registeredFunctionNames);
     const missing = expectedFunctionNames.filter(
