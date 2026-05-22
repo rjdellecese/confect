@@ -7,6 +7,7 @@ export * as GroupSpec from "./GroupSpec";
 export * as PaginationResult from "./PaginationResult";
 export * as Ref from "./Ref";
 export * as Refs from "./Refs";
+export * as Registry from "./Registry";
 export * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 export * as Spec from "./Spec";
 export * as SystemFields from "./SystemFields";

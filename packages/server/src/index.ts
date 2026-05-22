@@ -24,7 +24,6 @@ export * as QueryRunner from "./QueryRunner";
 export * as RegisteredConvexFunction from "./RegisteredConvexFunction";
 export * as RegisteredFunction from "./RegisteredFunction";
 export * as RegisteredFunctions from "./RegisteredFunctions";
-export * as Registry from "./Registry";
 export * as RegistryItem from "./RegistryItem";
 export * as Scheduler from "./Scheduler";
 export * as SchemaToValidator from "./SchemaToValidator";

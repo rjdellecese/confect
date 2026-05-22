@@ -1,10 +1,10 @@
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import type * as GroupSpec from "@confect/core/GroupSpec";
+import * as Registry from "@confect/core/Registry";
 import { Context, Effect, Layer, Ref, String } from "effect";
 import type * as Api from "./Api";
 import type * as Handler from "./Handler";
 import { setNestedProperty } from "./internal/utils";
-import * as Registry from "./Registry";
 import * as RegistryItem from "./RegistryItem";
 import { resolveGroupPathOrDie } from "./resolveGroupPath";
 

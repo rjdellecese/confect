@@ -1,6 +1,6 @@
-import { DatabaseSchema, GroupSpec } from "@confect/core";
+import { DatabaseSchema, GroupSpec, Registry } from "@confect/core";
 import { Path } from "@effect/platform";
-import { Context, Effect, Layer, Ref } from "effect";
+import { type Context, Effect, Layer, Ref } from "effect";
 import type * as esbuild from "esbuild";
 import { fromBundlerError } from "./BuildError";
 import {
@@ -27,28 +27,6 @@ import { bundleAndImport, bundleAndImportWithInputs } from "./utils";
  * `packages/server/src/GroupImpl.ts`.
  */
 const FINALIZED_GROUP_IMPL_TAG_PREFIX = "@confect/server/GroupImpl/Finalized/";
-
-interface RegistryItem {
-  readonly functionSpec: { readonly name: string };
-}
-
-type RegistryItems = {
-  readonly [key: string]: RegistryItem | RegistryItems;
-};
-
-/**
- * Mirror of `@confect/server`'s `Registry` reference, identified by the same
- * key. Effect's `Context.Reference` caches default values globally by key
- * (via `effect/Context/defaultValueCache`), so accessing this tag in the CLI
- * returns the very same `Ref` that the user's bundled `FunctionImpl` layers
- * populated when the impl layer was built.
- */
-class CliRegistry extends Context.Reference<CliRegistry>()(
-  "@confect/server/Registry",
-  {
-    defaultValue: () => Ref.unsafeMake<RegistryItems>({}),
-  },
-) {}
 
 const absoluteModulePath = (relativePath: string) =>
   Effect.gen(function* () {
@@ -157,7 +135,7 @@ const findFinalizedGroupPath = (
 };
 
 const collectRegisteredFunctionNames = (
-  items: RegistryItems,
+  items: Registry.RegistryItems,
   groupPath: string,
 ): ReadonlyArray<string> => {
   let node: unknown = items;
@@ -185,17 +163,17 @@ const collectRegisteredFunctionNames = (
 
 /**
  * Build the impl layer with a fresh `Registry` so that each validation only
- * sees the function items registered by *this* impl. Because the user's
- * `@confect/server` and the CLI's {@link CliRegistry} share the same string
- * key, providing this fresh `Ref` to the build's runtime context causes every
- * `FunctionImpl.make` initializer to write into it.
+ * sees the function items registered by *this* impl. The CLI imports the
+ * same `Registry` tag that the bundled `@confect/server`'s `FunctionImpl`
+ * writes to, so providing this fresh `Ref` to the build's runtime context
+ * causes every `FunctionImpl.make` initializer to populate it.
  */
 const buildAndInspectImplLayer = (implLayer: Layer.Layer<unknown>) =>
   Effect.gen(function* () {
-    const registry = Ref.unsafeMake<RegistryItems>({});
+    const registry = Ref.unsafeMake<Registry.RegistryItems>({});
     const context = yield* Layer.build(
       implLayer as Layer.Layer<unknown, never, never>,
-    ).pipe(Effect.provideService(CliRegistry, registry));
+    ).pipe(Effect.provideService(Registry.Registry, registry));
     const registryItems = yield* Ref.get(registry);
     return { context, registryItems };
   }).pipe(Effect.scoped);

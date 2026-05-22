@@ -1,12 +1,12 @@
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import type * as GroupSpec from "@confect/core/GroupSpec";
+import * as Registry from "@confect/core/Registry";
 import type * as Spec from "@confect/core/Spec";
 import { Effect, type Layer, Ref, type Types } from "effect";
 import type * as Api from "./Api";
 import type * as GroupImpl from "./GroupImpl";
 import { mapLeaves } from "./internal/utils";
 import type * as RegisteredFunction from "./RegisteredFunction";
-import * as Registry from "./Registry";
 import * as RegistryItem from "./RegistryItem";
 
 export type RegisteredFunctions<Spec_ extends Spec.AnyWithProps> =
@@ -95,8 +95,10 @@ export const buildForGroup = <
   const registeredFunctions = mapLeaves<
     RegistryItem.AnyWithProps,
     RegisteredFunction.Any
-  >(registryItems, RegistryItem.isRegistryItem, (registryItem) =>
-    makeRegisteredFunction(api, registryItem),
+  >(
+    registryItems as { [key: string]: RegistryItem.AnyWithProps },
+    RegistryItem.isRegistryItem,
+    (registryItem) => makeRegisteredFunction(api, registryItem),
   );
 
   let groupFunctions: unknown = registeredFunctions;
