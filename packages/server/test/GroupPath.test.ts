@@ -1,8 +1,8 @@
 import { describe, expect, it } from "@effect/vitest";
 import { GroupSpec, Spec } from "@confect/core";
-import { resolveGroupPath } from "../src/resolveGroupPath";
+import { resolveGroupPathOrDie } from "../src/GroupPath";
 
-describe("resolveGroupPath", () => {
+describe("resolveGroupPathOrDie", () => {
   it("finds nested group path by object identity", () => {
     const notes = GroupSpec.make();
     const notesAndRandom = GroupSpec.makeAt("notesAndRandom").addGroupAt(
@@ -11,6 +11,6 @@ describe("resolveGroupPath", () => {
     );
     const spec = Spec.make().addAt("notesAndRandom", notesAndRandom);
 
-    expect(resolveGroupPath(spec, notes)).toBe("notesAndRandom.notes");
+    expect(resolveGroupPathOrDie(spec, notes)).toBe("notesAndRandom.notes");
   });
 });

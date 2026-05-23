@@ -6,7 +6,7 @@ import type * as Api from "./Api";
 import type * as Handler from "./Handler";
 import { setNestedProperty } from "./internal/utils";
 import * as RegistryItem from "./RegistryItem";
-import { resolveGroupPathOrDie } from "./resolveGroupPath";
+import { resolveGroupPathOrDie } from "./GroupPath";
 
 export interface FunctionImpl<
   GroupPath_ extends string,

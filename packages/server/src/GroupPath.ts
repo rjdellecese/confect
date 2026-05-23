@@ -2,7 +2,7 @@ import type * as GroupSpec from "@confect/core/GroupSpec";
 import type * as Spec from "@confect/core/Spec";
 import { Array, Record } from "effect";
 
-export const resolveGroupPath = (
+const resolveGroupPath = (
   spec: Spec.AnyWithProps,
   target: GroupSpec.AnyWithProps,
 ): string | undefined => {
