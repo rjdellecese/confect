@@ -285,22 +285,16 @@ const esbuildOptions = (entryPoint: string, displayPath: string) => ({
 });
 
 const createSpecWatcher = (entryPoint: string, displayPath: string) =>
-  Stream.asyncPush<void>(
-    (emit) =>
-      Effect.acquireRelease(
-        Effect.promise(async () => {
-          const ctx = await esbuild.context(
-            esbuildOptions(entryPoint, displayPath),
-          );
-          await ctx.watch();
-          return ctx;
-        }),
-        (ctx) =>
-          Effect.promise(() => ctx.dispose()).pipe(
-            Effect.tap(() => Effect.logDebug("esbuild watcher disposed")),
-          ),
+  Effect.acquireRelease(
+    Effect.promise(async () => {
+      const ctx = await esbuild.context(esbuildOptions(entryPoint, displayPath));
+      await ctx.watch();
+      return ctx;
+    }),
+    (ctx) =>
+      Effect.promise(() => ctx.dispose()).pipe(
+        Effect.tap(() => Effect.logDebug("esbuild watcher disposed")),
       ),
-    { bufferSize: 1, strategy: "sliding" },
   );
 
 const generatedSpecWatcher = (specWatcherRestartQueue: Queue.Queue<void>) =>
@@ -327,10 +321,14 @@ const generatedSpecWatcher = (specWatcherRestartQueue: Queue.Queue<void>) =>
             nodeSpecPath,
             path.relative(projectRoot, nodeSpecPath),
           )
-        : Stream.empty;
+        : Effect.void;
 
       yield* Effect.race(
-        pipe(Stream.merge(specWatcher, nodeSpecWatcher), Stream.runDrain),
+        Effect.scoped(
+          Effect.all([specWatcher, nodeSpecWatcher], {
+            concurrency: "unbounded",
+          }).pipe(Effect.zipRight(Effect.never)),
+        ),
         Queue.take(specWatcherRestartQueue),
       );
     }),
