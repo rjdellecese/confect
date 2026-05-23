@@ -3,8 +3,8 @@ import { FileSystem, Path } from "@effect/platform";
 import { Ansi, AnsiDoc } from "@effect/printer-ansi";
 import {
   Array,
+  Chunk,
   Console,
-  Deferred,
   Duration,
   Effect,
   Equal,
@@ -21,7 +21,7 @@ import {
   String,
 } from "effect";
 import * as esbuild from "esbuild";
-import { BundleFailedError, logBuildError } from "../BuildError";
+import { logCoalescedBuildErrors } from "../BuildError";
 import { absoluteExternalsPlugin, EXTERNAL_PACKAGES } from "../Bundler";
 import * as CodegenError from "../CodegenError";
 import { ConfectDirectory } from "../ConfectDirectory";
@@ -46,6 +46,24 @@ import { codegenHandler, loadPreviousFunctionPaths } from "./codegen";
 const GENERATED_SPEC_PATH = "_generated/spec.ts";
 const GENERATED_NODE_SPEC_PATH = "_generated/nodeSpec.ts";
 
+// Quiescence window: the sync loop waits this long for further signals
+// after each batch. One user edit fires `onEnd` on every esbuild
+// watcher that touches the file, and rebuild times vary across entry
+// points so the onEnds can be spread over hundreds of milliseconds.
+// The drain keeps extending its wait (bounded by `COALESCE_MAX_WAIT`)
+// until no new signals arrive within the window, collapsing the whole
+// burst into a single codegen cycle.
+const COALESCE_QUIESCENCE = Duration.millis(300);
+
+// Upper bound on `drainUntilQuiescent` so a pathological infinite
+// signal stream can't pin the sync loop forever.
+const COALESCE_MAX_WAIT = Duration.seconds(5);
+
+// How long to wait for esbuild watchers to react to codegen's own
+// writes (e.g. an updated `_generated/spec.ts`). Added on top of the
+// quiescence drain when codegen reported writes happened.
+const ECHO_COOLDOWN = Duration.millis(500);
+
 const emptyFunctionPaths = FunctionPaths.FunctionPaths.make(HashSet.empty());
 
 type Pending = {
@@ -63,6 +81,13 @@ const pendingInit: Pending = {
   cronsDirty: false,
   authDirty: false,
 };
+
+const isPendingDirty = (p: Pending): boolean =>
+  p.specDirty || p.httpDirty || p.cronsDirty || p.authDirty;
+
+type WatcherErrors = ReadonlyMap<string, readonly esbuild.Message[]>;
+
+const emptyWatcherErrors: WatcherErrors = new Map();
 
 const changeChar = (change: "Added" | "Removed" | "Modified") =>
   Match.value(change).pipe(
@@ -170,40 +195,141 @@ export const dev = Command.make("dev", {}, () =>
     const pendingRef = yield* Ref.make<Pending>(pendingInit);
     const signal = yield* Queue.sliding<void>(1);
     const restartQueue = yield* Queue.sliding<void>(1);
+    const watcherErrorsRef =
+      yield* Ref.make<WatcherErrors>(emptyWatcherErrors);
 
     yield* Effect.all(
       [
-        Effect.scoped(entryPointsWatcher(signal, pendingRef, restartQueue)),
+        Effect.scoped(
+          entryPointsWatcher(
+            signal,
+            pendingRef,
+            restartQueue,
+            watcherErrorsRef,
+          ),
+        ),
         confectStructureWatcher(signal, pendingRef, restartQueue),
-        syncLoop(signal, pendingRef, initialFunctionPaths),
+        syncLoop(
+          signal,
+          pendingRef,
+          initialFunctionPaths,
+          watcherErrorsRef,
+        ),
       ],
       { concurrency: "unbounded" },
     );
   }),
 ).pipe(Command.withDescription("Start the Confect development server"));
 
+const esbuildMessageKey = (m: esbuild.Message): string =>
+  `${m.location?.file ?? ""}:${m.location?.line ?? ""}:${m.location?.column ?? ""}:${m.text}`;
+
+const dedupeWatcherErrors = (
+  errors: WatcherErrors,
+): readonly esbuild.Message[] => {
+  const seen = new Set<string>();
+  const unique: esbuild.Message[] = [];
+  for (const messages of errors.values()) {
+    for (const message of messages) {
+      const key = esbuildMessageKey(message);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push(message);
+    }
+  }
+  return unique;
+};
+
+const watcherErrorsSignature = (errors: WatcherErrors): string => {
+  const keys = new Set<string>();
+  for (const messages of errors.values()) {
+    for (const message of messages) {
+      keys.add(esbuildMessageKey(message));
+    }
+  }
+  return [...keys].sort().join("\n");
+};
+
+/**
+ * Log any watcher errors that haven't already been logged at their
+ * current signature. Suppresses the per-watcher fanout that happens
+ * when one root cause (e.g. a missing import) breaks every entry
+ * point's build at the same source location.
+ */
+const logChangedWatcherErrors = (
+  watcherErrorsRef: Ref.Ref<WatcherErrors>,
+  lastLoggedSignatureRef: Ref.Ref<string>,
+) =>
+  Effect.gen(function* () {
+    const errors = yield* Ref.get(watcherErrorsRef);
+    const signature = watcherErrorsSignature(errors);
+    const previous = yield* Ref.get(lastLoggedSignatureRef);
+    if (signature === previous) return;
+    yield* Ref.set(lastLoggedSignatureRef, signature);
+    if (errors.size === 0) return;
+    yield* logCoalescedBuildErrors(dedupeWatcherErrors(errors));
+  });
+
+/**
+ * Block until the signal queue has been quiet for `quiescence`. esbuild
+ * watchers' `onEnd` events for a single user edit can be spread across
+ * hundreds of milliseconds, so a fixed window misses late arrivals.
+ * Bounded by `maxWait` so pathological signal floods can't pin the
+ * loop forever.
+ */
+const drainUntilQuiescent = (
+  signal: Queue.Queue<void>,
+  quiescence: Duration.Duration,
+  maxWait: Duration.Duration,
+) =>
+  Effect.gen(function* () {
+    const start = Date.now();
+    const maxMillis = Duration.toMillis(maxWait);
+    while (true) {
+      yield* Effect.sleep(quiescence);
+      const drained = yield* Queue.takeAll(signal);
+      if (Chunk.isEmpty(drained)) return;
+      if (Date.now() - start >= maxMillis) return;
+    }
+  });
+
 const syncLoop = (
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
   initialFunctionPaths: FunctionPaths.FunctionPaths,
+  watcherErrorsRef: Ref.Ref<WatcherErrors>,
 ) =>
   Effect.gen(function* () {
     const functionPathsRef = yield* Ref.make(initialFunctionPaths);
-    const initialSyncDone = yield* Deferred.make<void>();
+    const lastLoggedErrorsRef = yield* Ref.make<string>("");
 
     return yield* Effect.forever(
       Effect.gen(function* () {
         yield* Effect.logDebug("Running sync loop…");
+        // Wait for the first signal of a burst, then keep absorbing
+        // follow-up signals from other watchers' onEnds until the queue
+        // stays quiet for `COALESCE_QUIESCENCE`.
         yield* Queue.take(signal);
-
-        const isDone = yield* Deferred.isDone(initialSyncDone);
-        yield* Effect.when(
-          logPending("Dependencies may have changed, reloading…"),
-          () => isDone,
+        yield* drainUntilQuiescent(
+          signal,
+          COALESCE_QUIESCENCE,
+          COALESCE_MAX_WAIT,
         );
-        yield* Deferred.succeed(initialSyncDone, undefined);
+
+        yield* logChangedWatcherErrors(
+          watcherErrorsRef,
+          lastLoggedErrorsRef,
+        );
 
         const pending = yield* Ref.getAndSet(pendingRef, pendingInit);
+
+        if (!isPendingDirty(pending)) {
+          // No-op signal (e.g. a late echo after a previous cycle
+          // already drained). Stay silent.
+          return;
+        }
+
+        yield* logPending("Dependencies may have changed, reloading…");
 
         if (pending.specDirty) {
           const current = yield* codegenHandler.pipe(
@@ -214,19 +340,25 @@ const syncLoop = (
                 yield* Ref.set(functionPathsRef, nextFunctionPaths);
               }),
             ),
-            Effect.tap(() => logSuccess("Generated files are up-to-date")),
             CodegenError.catchAndLog,
           );
           if (current === undefined) {
             return;
           }
+          // Drain any stragglers from this cycle's burst (slow watchers
+          // whose onEnd fired after the first quiescence) plus, when
+          // codegen wrote, the echo signals esbuild emits in response
+          // to our writes. Reset `pendingRef` so those drained signals
+          // don't carry a dirty flag into the next cycle.
           if (current.anyWritesHappened) {
-            // Codegen rewrote files that the esbuild watchers track as entry
-            // points (e.g. `_generated/spec.ts`). The watchers will fire an
-            // onEnd → signal echo that we don't want to act on. Drain one
-            // pending offer so the next take blocks for a genuine change.
-            yield* Queue.poll(signal);
+            yield* Effect.sleep(ECHO_COOLDOWN);
           }
+          yield* drainUntilQuiescent(
+            signal,
+            COALESCE_QUIESCENCE,
+            COALESCE_MAX_WAIT,
+          );
+          yield* Ref.set(pendingRef, pendingInit);
         }
 
         const dirtyOptionalFiles = [
@@ -244,6 +376,8 @@ const syncLoop = (
         yield* Array.isNonEmptyReadonlyArray(dirtyOptionalFiles)
           ? Effect.all(dirtyOptionalFiles, { concurrency: "unbounded" })
           : Effect.void;
+
+        yield* logSuccess("Generated files are up-to-date");
       }),
     );
   });
@@ -301,66 +435,93 @@ const esbuildOptions = (
   entry: EntryPoint,
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
-) => ({
-  entryPoints: [entry.absolutePath],
-  bundle: true,
-  write: false,
-  metafile: true,
-  platform: "node" as const,
-  format: "esm" as const,
-  logLevel: "silent" as const,
-  external: EXTERNAL_PACKAGES,
-  plugins: [
-    absoluteExternalsPlugin,
-    {
-      name: "notify-rebuild",
-      setup(build: esbuild.PluginBuild) {
-        build.onEnd((result) => {
-          if (result.errors.length > 0) {
+  watcherErrorsRef: Ref.Ref<WatcherErrors>,
+) => {
+  // First `onEnd` fires when esbuild finishes the watcher's initial
+  // build. At startup that's an echo of the just-completed initial
+  // codegen pass; for a watcher spawned mid-session (e.g. a newly
+  // added impl) it's an echo of the codegen run that triggered the
+  // restart. Either way, the entry's contents were already accounted
+  // for, so we record any errors but don't flip dirty or push a
+  // signal — only genuine subsequent rebuilds should do that.
+  let initialBuildSeen = false;
+  return {
+    entryPoints: [entry.absolutePath],
+    bundle: true,
+    write: false,
+    metafile: true,
+    platform: "node" as const,
+    format: "esm" as const,
+    logLevel: "silent" as const,
+    external: EXTERNAL_PACKAGES,
+    plugins: [
+      absoluteExternalsPlugin,
+      {
+        name: "notify-rebuild",
+        setup(build: esbuild.PluginBuild) {
+          build.onEnd((result) => {
+            const isInitial = !initialBuildSeen;
+            initialBuildSeen = true;
             Effect.runPromise(
-              logBuildError(
-                new BundleFailedError({
-                  file: entry.displayPath,
-                  errors: result.errors,
+              pipe(
+                Ref.update(watcherErrorsRef, (current) => {
+                  const next = new Map(current);
+                  if (result.errors.length > 0) {
+                    next.set(entry.absolutePath, result.errors);
+                  } else {
+                    next.delete(entry.absolutePath);
+                  }
+                  return next;
                 }),
+                Effect.andThen(
+                  isInitial && result.errors.length === 0
+                    ? Effect.void
+                    : pipe(
+                        Ref.update(pendingRef, (p) => ({
+                          ...p,
+                          [entry.pendingKey]: true,
+                        })),
+                        Effect.andThen(Queue.offer(signal, undefined)),
+                      ),
+                ),
               ),
             );
-          }
-
-          Effect.runPromise(
-            pipe(
-              Ref.update(pendingRef, (p) => ({
-                ...p,
-                [entry.pendingKey]: true,
-              })),
-              Effect.andThen(Queue.offer(signal, undefined)),
-            ),
-          );
-        });
+          });
+        },
       },
-    },
-  ],
-});
+    ],
+  };
+};
 
 const createEntryPointWatcher = (
   entry: EntryPoint,
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
+  watcherErrorsRef: Ref.Ref<WatcherErrors>,
 ) =>
   Effect.acquireRelease(
     Effect.promise(async () => {
       const ctx = await esbuild.context(
-        esbuildOptions(entry, signal, pendingRef),
+        esbuildOptions(entry, signal, pendingRef, watcherErrorsRef),
       );
       await ctx.watch();
       return ctx;
     }),
     (ctx) =>
-      Effect.promise(() => ctx.dispose()).pipe(
-        Effect.tap(() =>
-          Effect.logDebug(`esbuild watcher disposed: ${entry.displayPath}`),
-        ),
-      ),
+      Effect.gen(function* () {
+        yield* Effect.promise(() => ctx.dispose());
+        // Clear any errors recorded by this watcher so a disposed
+        // watcher can't leave stale errors visible to the sync loop.
+        yield* Ref.update(watcherErrorsRef, (current) => {
+          if (!current.has(entry.absolutePath)) return current;
+          const next = new Map(current);
+          next.delete(entry.absolutePath);
+          return next;
+        });
+        yield* Effect.logDebug(
+          `esbuild watcher disposed: ${entry.displayPath}`,
+        );
+      }),
   );
 
 /**
@@ -374,6 +535,7 @@ const entryPointsWatcher = (
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
   restartQueue: Queue.Queue<void>,
+  watcherErrorsRef: Ref.Ref<WatcherErrors>,
 ) =>
   Effect.gen(function* () {
     const parentScope = yield* Effect.scope;
@@ -402,9 +564,12 @@ const entryPointsWatcher = (
           parentScope,
           ExecutionStrategy.sequential,
         );
-        yield* createEntryPointWatcher(entry, signal, pendingRef).pipe(
-          Scope.extend(childScope),
-        );
+        yield* createEntryPointWatcher(
+          entry,
+          signal,
+          pendingRef,
+          watcherErrorsRef,
+        ).pipe(Scope.extend(childScope));
         next.set(entry.absolutePath, childScope);
       }
 

@@ -180,3 +180,31 @@ export const renderBuildError = (error: BuildError): string =>
 
 export const logBuildError = (error: BuildError) =>
   Effect.sync(() => console.error(renderBuildError(error)));
+
+/**
+ * Render a flat list of esbuild messages as a single error block with a
+ * generic `✘ Build errors` header. Used by dev-mode when multiple
+ * watchers surface the same underlying error and we want to log the
+ * coalesced set rather than one block per watcher.
+ */
+const renderCoalescedBuildErrors = (messages: readonly esbuild.Message[]): string => {
+  const formatted = esbuild.formatMessagesSync(messages as esbuild.Message[], {
+    kind: "error",
+    color: true,
+    terminalWidth: 80,
+  });
+  const header = pipe(
+    cross,
+    AnsiDoc.catWithSpace(AnsiDoc.text("Build errors")),
+    AnsiDoc.render({ style: "pretty" }),
+  );
+  return `${header}\n${formatEsbuildMessages(messages, formatted)}`;
+};
+
+export const logCoalescedBuildErrors = (
+  messages: readonly esbuild.Message[],
+) =>
+  Effect.sync(() => {
+    if (messages.length === 0) return;
+    console.error(renderCoalescedBuildErrors(messages));
+  });
