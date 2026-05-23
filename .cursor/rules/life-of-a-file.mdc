@@ -1,0 +1,316 @@
+---
+alwaysApply: true
+---
+
+# Life of a File
+
+This rule encodes a specific philosophy of code organization. It is **strongly prescriptive**: follow these rules unless there is a clear, articulated reason to deviate. If you find yourself wanting to deviate, be sure to justify your decision to the user so that they may evaluate it.
+
+The headline rule: **organize code around data structures, not around technical layers or surface similarity.** Everything below follows from that.
+
+---
+
+## Rule 1: Do not fear long files
+
+Short files are not inherently better. The intuition that "this file is getting too long, I should split it" comes from a JavaScript world where long files meant accidental mutation and tangled state. With TypeScript and immutable, functional programming patterns via Effect, that risk is gone: there is no spooky action at a distance between two functions in the same file.
+
+**Concrete guidance:**
+
+- A 200-line file is small. A 400-line file is normal. A 600-line file is fine if it has one coherent topic.
+- Do not split a file solely because it crossed a line count. Splits must be justified by a _data structure_ that has emerged (see Rule 2).
+- A file of 1,000+ lines is a signal to _look_ for an emerging structure — not an automatic mandate to split.
+
+**Do not** create folder hierarchies like `/handlers`, `/types`, `/utils`, `/services` as the primary organization. Those split a feature across many files by technical role, which is the opposite of what you want. Organize by domain entity (`Book.ts`, `Library.ts`, `Order.ts`), and let each file contain whatever types, constructors, and operations belong to that entity.
+
+---
+
+## Rule 2: Grow files until a data structure emerges, then split on it
+
+The correct trigger for splitting a file is the discovery of a coherent **data structure** that owns a cluster of operations. Not line count. Not "this feels big." A real data structure.
+
+**The growth pattern looks like this:**
+
+1. Start with one file containing the model, the operations, and the view/handlers for a feature.
+2. As you add features, watch for groups of functions that all take the same type as their primary argument.
+3. When you can name that type and list 3+ operations on it that form a coherent algebra (construct, query, transform), extract it into its own module.
+4. Name the module after the _data structure_, not after a technical role. `Book.ts`, not `BookHandlers.ts` or `BookUtils.ts`.
+
+**Do not** preemptively split. The architecture does not need to be right from the start. Refactoring with Effect + TypeScript is cheap and reliable — the compiler will guide you through the rename. Premature splits create modules whose boundaries do not match the actual joints in the problem, and those splits are _more_ expensive to undo than just letting the file grow until the right joint reveals itself.
+
+If after a feature is done you still cannot name a coherent data structure, **leave the file alone**. Splits without a clear data structure are noise.
+
+---
+
+## Rule 3: Design the data representation deliberately, before writing logic
+
+Before writing any logic for a new feature, enumerate at least 2–3 ways to represent the data, and pick deliberately. The choice of representation determines almost everything that follows.
+
+**Always ask:**
+
+- What invariants must hold? (Can the type system enforce them?)
+- What is the source of order? (Is order part of the data, or determined by the view?)
+- What changes dynamically vs. what is fixed at compile time?
+- What operations dominate? (Lookup, insertion, iteration, ordering?)
+
+**Example: a settings panel with three fixed toggles (email, autoplay, location).**
+
+| Representation                                                    | Verdict                                                                |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Record `{ email: boolean; autoplay: boolean; location: boolean }` | Type-checked field names, stable order in code, simplest update logic. |
+| `Array<[string, boolean]>`                                        | No type safety on keys, order leaks into update logic.                 |
+| `Record<string, boolean>` (string-keyed)                          | Same problem.                                                          |
+| `{ options: string[]; selected: Set<string> }`                    | Overkill — the options are fixed at compile time.                      |
+
+The record wins because the options are **known statically** and you want the compiler to catch typos.
+
+**Example: a fruit picker where the available fruits load from the server and ordering is dynamic.**
+
+The record loses immediately — you cannot enumerate fruits at compile time. Now `{ fruits: Fruit[]; selected: HashSet<Fruit> }` is correct because fruits are data, not types.
+
+The point: the _same surface UI_ (a list of checkboxes) demands _fundamentally different_ internal representations depending on where the data comes from. Do not let UI similarity drive your data design.
+
+**Expect to iterate.** "Pick deliberately" does not mean "pick correctly on the first try." A new constraint may force you to revise the representation. For a "select up to N items, preserving insertion order" feature, the progression typically goes:
+
+- `[string, string]` — fails: no way to represent 0 or 1 selected.
+- `[Option<string>, Option<string>]` — fails: which slot fills first?
+- A `Zero | One | Two` tagged enum — works, but hard-codes N = 2.
+- `ReadonlyArray<string>` with a size cap — generalizes to any N.
+
+Each step exposed an invariant the previous representation could not express. The last representation plus the size cap is exactly the seed of the `BoundedSet` module in Rule 5.
+
+---
+
+## Rule 4: Make illegal states unrepresentable using TypeScript's type system and Effect's data modeling tools
+
+When fields in a record have dependencies between them, do not model them as independent fields. Use a discriminated union so that the dependency is enforced by the type system.
+
+**Independent fields are fine.** If a record's fields have no relationships to each other — changing one cannot make another meaningless — keep it as a record. The trigger for a tagged enum is _dependencies between fields_, not "this value might be in different states."
+
+**Bad — fields with hidden dependencies:**
+
+```typescript
+interface AutoplaySettings {
+  enabled: boolean;
+  audio: boolean; // only meaningful if enabled
+  withoutWifi: boolean; // only meaningful if enabled
+}
+```
+
+Every reader of this code must remember that `audio` and `withoutWifi` are only meaningful when `enabled` is `true`. Every writer must remember to gate UI on `enabled`. The compiler helps with none of this.
+
+**Good — discriminated union via `Data.taggedEnum`:**
+
+```typescript
+import { Data, Match } from "effect";
+
+type Autoplay = Data.TaggedEnum<{
+  Off: {};
+  On: { readonly audio: boolean; readonly withoutWifi: boolean };
+}>;
+
+const Autoplay = Data.taggedEnum<Autoplay>();
+
+const a: Autoplay = Autoplay.On({ audio: true, withoutWifi: false });
+const b: Autoplay = Autoplay.Off();
+
+const describe = (a: Autoplay): string =>
+  Match.value(a).pipe(
+    Match.tag("Off", () => "autoplay disabled"),
+    Match.tag(
+      "On",
+      ({ audio, withoutWifi }) =>
+        `autoplay on (audio=${audio}, wifi-only=${!withoutWifi})`,
+    ),
+    Match.exhaustive,
+  );
+```
+
+**Subtlety: preserve user state across toggles.** A naïve translation drops the user's audio and wifi preferences every time they toggle off. If those preferences should persist, lift them into a record that lives in _both_ cases of the union — the union still controls whether they're acted on:
+
+```typescript
+interface AutoplayPrefs {
+  readonly audio: boolean;
+  readonly withoutWifi: boolean;
+}
+
+type Autoplay = Data.TaggedEnum<{
+  Off: { readonly prefs: AutoplayPrefs };
+  On: { readonly prefs: AutoplayPrefs };
+}>;
+```
+
+Toggling `Off` ↔ `On` preserves `prefs`, but `prefs` is only _consumed_ in the `On` branch. The compiler still enforces "you cannot use these prefs without first proving you're On."
+
+**Reach for these Effect tools in this order when designing a type:**
+
+1. **`Data.taggedEnum`** — for sum types where the case determines which fields exist. This is your primary tool for modeling state that has multiple distinct shapes.
+2. **`Data.Class` / `Data.TaggedClass`** — for product types where you want structural equality (`Equal.equals`) and immutability without writing it by hand.
+3. **`Schema.Struct` + `Schema.brand`** — when the value is parsed from outside the system (API, file, user input) and you want a single point where validation produces a refined type.
+4. **`Brand.Brand`** — for refined primitives (`UserId`, `EmailAddress`, `PositiveInt`) where you want nominal typing without runtime cost.
+5. **`Option<A>`** — for "may be absent." Never use `T | null` or `T | undefined` for domain modeling. Use `Option` so the absence is consumed via `Option.match` / `Option.getOrElse` and cannot be ignored.
+6. **`Either<E, A>` / `Effect<A, E, R>`** — for "may fail." Never use exceptions to model expected domain failures.
+
+**A rule of thumb:** if you are about to write `if (x.kind === "foo")` or `if (x.something !== undefined)`, stop and ask whether a `Match.value(...)` over a tagged enum would make the relationship structural.
+
+---
+
+## Rule 5: When the type system cannot enforce an invariant, use an opaque module
+
+A module does two things: it **groups** related types and functions, and it can **hide** some of them. Rules 5 and 6 are about hiding. It is the lever you pull when types alone cannot enforce an invariant — and the lever you should pull as little as necessary (Rule 6).
+
+Some invariants cannot be captured by the shape of a type alone. Examples: "at most N items," "this string is a validated email," "this number is positive," "these two fields stay in sync." For these, hide the implementation behind a module with a narrow public API. The module becomes the only place that can violate the invariant, so you only need to audit one file.
+
+**Pattern — opaque type via branded interface and unexported internals:**
+
+```typescript
+// BoundedSet.ts
+import { Brand } from "effect";
+
+interface BoundedSetImpl<A> {
+  readonly maxSize: number;
+  readonly items: ReadonlyArray<A>;
+}
+
+export type BoundedSet<A> = BoundedSetImpl<A> & Brand.Brand<"BoundedSet">;
+
+const make = <A>(impl: BoundedSetImpl<A>): BoundedSet<A> =>
+  impl as BoundedSet<A>;
+
+export const empty = <A>(maxSize: number): BoundedSet<A> =>
+  make({ maxSize, items: [] });
+
+export const insert =
+  <A>(item: A) =>
+  (set: BoundedSet<A>): BoundedSet<A> => {
+    if (set.items.includes(item)) return set;
+    return make({
+      maxSize: set.maxSize,
+      items: [item, ...set.items].slice(0, set.maxSize),
+    });
+  };
+
+export const remove =
+  <A>(item: A) =>
+  (set: BoundedSet<A>): BoundedSet<A> =>
+    make({
+      maxSize: set.maxSize,
+      items: set.items.filter((x) => x !== item),
+    });
+
+export const has =
+  <A>(item: A) =>
+  (set: BoundedSet<A>): boolean =>
+    set.items.includes(item);
+
+export const size = <A>(set: BoundedSet<A>): number => set.items.length;
+```
+
+`ReadonlyArray` is chosen here because the invariant being enforced is _insertion order_ (newest at the front, oldest evicted at capacity). `HashSet` would be wrong: its iteration order is not guaranteed, so "drop the oldest" is unimplementable. Picking the right underlying structure is itself an application of Rule 3.
+
+Outside this module, no one can construct a `BoundedSet` except via `empty`, no one can mutate `maxSize`, and no one can bypass the size check. The invariant `size ≤ maxSize` holds globally as long as this one file is correct.
+
+**This pattern is what enables fuzz testing of invariants.** Because every legal `BoundedSet` is produced by this module's public API, `fc.assert(fc.property(arbitraryOps, ops => size(applyAll(ops, empty(2))) <= 2))` actually proves the invariant.
+
+**When to reach for this pattern:**
+
+- A primitive with a constraint (`EmailAddress`, `NonEmptyString`, `Slug`).
+- A collection with a size/order/uniqueness constraint.
+- A state machine where only certain transitions are valid.
+- Anything where you want to write a comment like "callers must always X before Y" — instead, hide Y so it can only be reached via X.
+
+For simple branded primitives, prefer `Schema.brand` or `Brand.refined` over hand-rolling — they handle the validation + constructor pattern more concisely. The hand-rolled opaque type is for cases with non-trivial internal state.
+
+---
+
+## Rule 6: Expose as little as possible, but no less
+
+In every module you write, default to _not_ exporting things. Add `export` only when an external caller demonstrably needs it.
+
+**Specifically:**
+
+- Helper functions used only inside the module: do not export.
+- The shape of an internal type: do not export.
+- Constants used for implementation: do not export.
+- A public API function: export.
+- A type that crosses the module boundary: export.
+
+The benefit is not stylistic. It is operational: **if the public API is correct, the module is correct everywhere.** You can refactor any non-exported symbol without grepping the codebase, without worrying about callers, without writing migration notes. The compiler proves the change is local.
+
+**Counter-pattern to avoid: getters and setters on an "opaque" type.**
+
+If you wrote `BoundedSet` and then added `export const getMaxSize` and `export const setMaxSize`, you have just defeated the entire exercise. The whole point of hiding the implementation was that no one could violate the invariant. A setter punches a hole in that wall. If callers genuinely need to read or write a field, the data does not belong behind an opaque module — use a plain `interface` and `Data.struct` or `Data.Class` and stop pretending.
+
+The rule: **either the implementation is hidden and the module owns the invariant, or it is exposed and callers own the invariant.** No in-between.
+
+---
+
+## Anti-patterns to refuse
+
+These are common impulses that this rule exists to push back on. When you feel one of these, stop and re-read the relevant section.
+
+### "This file is over N lines, I should split it."
+
+No. See Rule 1. Splits are triggered by data structures, not line counts.
+
+### "Let me organize this project by `/types`, `/services`, `/handlers`, `/utils`."
+
+No. See Rule 1. Organize by domain entity. A `Book` module contains the `Book` type, its constructors, its operations, and the handlers that consume it. Splitting a feature across four folders by technical role guarantees that every change touches four folders.
+
+### "Both screens have a checkbox list, let me extract a generic `<CheckboxList>`."
+
+Probably no. See Rule 3. Shared _surface_ (a list of checkboxes) almost never implies shared _structure_. The settings panel has a fixed-shape record; the fruit picker has a dynamic list with a size invariant. These have nothing in common except seven lines of JSX. Extracting a shared component forces both screens to compromise their data design to fit the abstraction.
+
+Share the leaf primitive (a single `<Checkbox>`) if it has consistent styling. Do not share the list-level component.
+
+### "Let me make this reusable / generic / parameterized."
+
+Ask: how many call sites are there _right now_? If the answer is one, do not generalize. If the answer is two, look at whether they will actually evolve together. Generalization for an imagined second caller almost always picks the wrong axis of variation and has to be undone when the real second caller arrives.
+
+### "I'll add a getter just in case someone needs it later."
+
+No. See Rule 6. You do not know what shape the future need will have. Adding speculative exports locks in implementation details that you then cannot change. Wait until a real caller appears and then add exactly what they need.
+
+### "I'll define this type with all optional fields so it's flexible."
+
+Probably no. See Rule 4. Optional fields with hidden dependencies between them are the classic illegal-states-representable trap. Reach for a tagged enum first; only fall back to optional fields when the fields are genuinely, mutually independent.
+
+---
+
+## Process: how to actually do this
+
+When working on a feature, follow this sequence:
+
+1. **Identify the data.** What is the feature _about_? Books? Orders? A drawing canvas? Name the entity.
+
+2. **Enumerate representations.** Write down 2–3 candidate types. For each, note: invariants, source of order, what's static vs. dynamic, dominant operations. Pick deliberately, and expect to iterate as new constraints surface (Rule 3).
+
+3. **Reach for `Data.taggedEnum` first.** If the entity has multiple distinct shapes (loading/loaded/error, on/off, draft/submitted/approved), model them as a tagged enum so the compiler enforces case-specific fields.
+
+4. **Write everything in one file.** Model, operations, helpers, and the consuming view/handler all together. Resist the urge to split.
+
+5. **Let the file grow.** Add features. Add operations. Let it reach 400, 600, even 800 lines if the topic is coherent.
+
+6. **Watch for the joint.** When a cluster of 3+ functions all take the same secondary type as input and form a coherent algebra on it, that type is a candidate for its own module. Examples: a `Book` inside a `Library`, a `LineItem` inside an `Order`.
+
+7. **Extract on the joint.** Move the type + its operations to its own file named after the data structure. Export only what the outer module actually calls.
+
+8. **If an invariant emerged that the types cannot express,** turn the new module into an opaque module (Rule 5). Otherwise leave the type transparent — opacity has a cost in ergonomics and should be paid only when it buys an invariant.
+
+9. **Stop.** Do not extract further until the next data structure emerges. There may not be one. That is fine.
+
+---
+
+## A short checklist before merging
+
+Before considering module organization "done" on a piece of work, verify:
+
+- [ ] Every file is named after a domain entity, not a technical role.
+- [ ] No file was split solely because of length.
+- [ ] No discriminated-union-shaped data is modeled as a record with optional fields and a boolean flag.
+- [ ] Every module's `export` list is minimal — no speculative exports.
+- [ ] No opaque module exposes getters or setters for its internals.
+- [ ] No "generic" component or function was extracted to serve a single caller.
+- [ ] `null`/`undefined` does not appear in domain types where `Option` would do.
+- [ ] Exceptions are not thrown for expected domain failures where `Either`/`Effect` would do.
+
+If any of these fail, revisit the relevant section above before merging.
