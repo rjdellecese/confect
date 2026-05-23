@@ -2,7 +2,7 @@ import { Spec } from "@confect/core";
 import * as DatabaseSchema from "@confect/server/DatabaseSchema";
 import { Command } from "@effect/cli";
 import { FileSystem, Path } from "@effect/platform";
-import { Array, Effect, Either, HashSet, Match, Option } from "effect";
+import { Array, Effect, Either, HashSet, Match, Option, Ref } from "effect";
 import { fromBundlerError } from "../BuildError";
 import * as CodegenError from "../CodegenError";
 import {
@@ -49,6 +49,7 @@ import {
   toModuleImportPath,
   touchConvexSchema,
   writeFileStringAndLog,
+  WriteTracker,
 } from "../utils";
 
 const GENERATED_SPEC_PATH = "_generated/spec.ts";
@@ -71,6 +72,7 @@ export const codegen = Command.make("codegen", {}, () =>
   Effect.gen(function* () {
     yield* logPending("Performing initial sync…");
     yield* codegenHandler.pipe(
+      Effect.asVoid,
       Effect.tap(() => logSuccess("Generated files are up-to-date")),
       CodegenError.tapAndLog,
     );
@@ -82,7 +84,23 @@ export const codegen = Command.make("codegen", {}, () =>
 );
 
 export const codegenHandler = Effect.gen(function* () {
+  const tracker = yield* Ref.make(false);
+
+  const functionPaths = yield* runCodegen.pipe(
+    Effect.provideService(WriteTracker, tracker),
+  );
+
+  const anyWritesHappened = yield* Ref.get(tracker);
+  return { functionPaths, anyWritesHappened };
+});
+
+const runCodegen = Effect.gen(function* () {
   yield* generateConfectGeneratedDirectory;
+  // Validate schema first so its missing-file / invalid-default-export
+  // diagnostics surface ahead of impl bundling, which transitively depends
+  // on schema via `_generated/api.ts` and would otherwise blow up with a
+  // less actionable bundler error.
+  yield* validateSchema;
   const leaves = yield* loadAndValidateLeafModules;
   yield* removeLegacyFiles;
   yield* generateAssembledSpecs(leaves);
@@ -488,7 +506,8 @@ const generateSchema = Effect.gen(function* () {
 
   const confectSchemaPath = path.join(confectDirectory, "schema.ts");
 
-  yield* validateSchema;
+  // `validateSchema` runs once at the top of `runCodegen`; no need to
+  // bundle the schema again here.
 
   const convexSchemaPath = path.join(convexDirectory, "schema.ts");
 

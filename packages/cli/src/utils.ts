@@ -3,12 +3,14 @@ import { FileSystem, Path } from "@effect/platform";
 import type { PlatformError } from "@effect/platform/Error";
 import {
   Array,
+  Context,
   Effect,
   HashSet,
   Option,
   Order,
   pipe,
   Record,
+  Ref,
   String,
 } from "effect";
 import * as FunctionPaths from "./FunctionPaths";
@@ -18,6 +20,24 @@ import { logFileAdded, logFileModified, logFileRemoved } from "./log";
 import { ConfectDirectory } from "./ConfectDirectory";
 import { ConvexDirectory } from "./ConvexDirectory";
 import * as templates from "./templates";
+
+/**
+ * Tracks whether the current codegen run wrote anything to disk. Set to
+ * `true` by every helper that actually overwrites a file (skipping the
+ * content-unchanged case). `codegenHandler` provides a fresh `Ref` per
+ * run and reads it back to report `anyWritesHappened`; callers outside a
+ * codegen pass hit the cached default `Ref` and need not interact with
+ * the tracker.
+ */
+export class WriteTracker extends Context.Reference<WriteTracker>()(
+  "@confect/cli/WriteTracker",
+  { defaultValue: () => Ref.unsafeMake(false) },
+) {}
+
+const markWritten = Effect.gen(function* () {
+  const tracker = yield* WriteTracker;
+  yield* Ref.set(tracker, true);
+});
 
 export const removePathExtension = (pathStr: string) =>
   Effect.gen(function* () {
@@ -38,12 +58,14 @@ export const writeFileStringAndLog = (filePath: string, contents: string) =>
     const fs = yield* FileSystem.FileSystem;
     if (!(yield* fs.exists(filePath))) {
       yield* fs.writeFileString(filePath, contents);
+      yield* markWritten;
       yield* logFileAdded(filePath);
       return;
     }
     const existing = yield* fs.readFileString(filePath);
     if (existing !== contents) {
       yield* fs.writeFileString(filePath, contents);
+      yield* markWritten;
       yield* logFileModified(filePath);
     }
   });
@@ -79,11 +101,13 @@ export const writeFileString = (
 
     if (!(yield* fs.exists(filePath))) {
       yield* fs.writeFileString(filePath, contents);
+      yield* markWritten;
       return "Added";
     }
     const existing = yield* fs.readFileString(filePath);
     if (existing !== contents) {
       yield* fs.writeFileString(filePath, contents);
+      yield* markWritten;
       return "Modified";
     }
     return "Unchanged";
@@ -161,11 +185,13 @@ export const generateGroupModule = ({
 
     if (!(yield* fs.exists(modulePath))) {
       yield* fs.writeFileString(modulePath, functionsContentsString);
+      yield* markWritten;
       return "Added" as const;
     }
     const existing = yield* fs.readFileString(modulePath);
     if (existing !== functionsContentsString) {
       yield* fs.writeFileString(modulePath, functionsContentsString);
+      yield* markWritten;
       return "Modified" as const;
     }
     return "Unchanged" as const;
