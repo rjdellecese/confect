@@ -4,6 +4,7 @@ import { Ansi, AnsiDoc } from "@effect/printer-ansi";
 import {
   Array,
   Chunk,
+  Clock,
   Console,
   Duration,
   Effect,
@@ -283,13 +284,14 @@ const drainUntilQuiescent = (
   maxWait: Duration.Duration,
 ) =>
   Effect.gen(function* () {
-    const start = Date.now();
+    const start = yield* Clock.currentTimeMillis;
     const maxMillis = Duration.toMillis(maxWait);
     while (true) {
       yield* Effect.sleep(quiescence);
       const drained = yield* Queue.takeAll(signal);
       if (Chunk.isEmpty(drained)) return;
-      if (Date.now() - start >= maxMillis) return;
+      const now = yield* Clock.currentTimeMillis;
+      if (now - start >= maxMillis) return;
     }
   });
 
