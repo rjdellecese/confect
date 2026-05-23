@@ -7,6 +7,7 @@ import { fromBundlerError } from "../BuildError";
 import * as CodegenError from "../CodegenError";
 import {
   MissingImplFileError,
+  MissingSchemaFileError,
   MissingSpecFileError,
   SchemaInvalidDefaultExportError,
 } from "../CodegenError";
@@ -455,9 +456,14 @@ const generateFunctionModules = Effect.gen(function* () {
 });
 
 export const validateSchema = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
   const confectSchemaPath = path.join(confectDirectory, "schema.ts");
+
+  if (!(yield* fs.exists(confectSchemaPath))) {
+    return yield* new MissingSchemaFileError({ schemaPath: "schema.ts" });
+  }
 
   yield* Bundler.bundle(confectSchemaPath).pipe(
     Effect.mapError((error) => fromBundlerError("schema.ts", error)),

@@ -73,4 +73,26 @@ layer(CodegenLayer)("validateSchema", (it) => {
         );
       }),
   );
+
+  it.effect("rejects a missing schema file", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const tempDir = yield* fs.makeTempDirectoryScoped();
+
+      const result = yield* validateSchema.pipe(
+        Effect.either,
+        Effect.provide(
+          Layer.mock(ConfectDirectory, {
+            _tag: "@confect/cli/ConfectDirectory",
+            get: Effect.succeed(tempDir),
+          }),
+        ),
+      );
+
+      expect(result._tag).toBe("Left");
+      if (result._tag === "Left") {
+        expect(result.left._tag).toBe("MissingSchemaFileError");
+      }
+    }).pipe(Effect.scoped),
+  );
 });

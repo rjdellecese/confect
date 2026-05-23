@@ -433,6 +433,14 @@ const confectDirectoryWatcher = (
             Effect.andThen(Queue.offer(signal, undefined)),
           );
         }
+
+        if (basename === "schema.ts") {
+          return pipe(
+            pendingRef,
+            Ref.update((pending) => ({ ...pending, specDirty: true })),
+            Effect.andThen(Queue.offer(signal, undefined)),
+          );
+        }
         return Effect.void;
       }),
     );

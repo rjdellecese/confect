@@ -75,6 +75,13 @@ export class SchemaInvalidDefaultExportError extends Schema.TaggedError<SchemaIn
   },
 ) {}
 
+export class MissingSchemaFileError extends Schema.TaggedError<MissingSchemaFileError>()(
+  "MissingSchemaFileError",
+  {
+    schemaPath: Schema.String,
+  },
+) {}
+
 export const CodegenError = Schema.Union(
   BuildError,
   MissingImplFileError,
@@ -86,6 +93,7 @@ export const CodegenError = Schema.Union(
   ImplNotFinalizedError,
   ImplMissingFunctionsError,
   SchemaInvalidDefaultExportError,
+  MissingSchemaFileError,
 );
 export type CodegenError = typeof CodegenError.Type;
 
@@ -227,6 +235,17 @@ const renderSchemaInvalidDefaultExportError = (
     ),
   );
 
+const renderMissingSchemaFileError = (
+  error: MissingSchemaFileError,
+): AnsiDoc.AnsiDoc =>
+  singleLine(
+    AnsiDoc.text("Schema "),
+    formatPathDoc(error.schemaPath),
+    AnsiDoc.text(
+      " is required but is missing; create it and default-export a DatabaseSchema (DatabaseSchema.make({ ... })).",
+    ),
+  );
+
 /**
  * Render any {@link CodegenError} into a styled, ready-to-print string.
  * Single-error variants render to a one-line `✘`-prefixed message;
@@ -280,6 +299,9 @@ export const renderCodegenError = (error: CodegenError): string => {
         renderSchemaInvalidDefaultExportError(e),
         AnsiDoc.render({ style: "pretty" }),
       ),
+    ),
+    Match.tag("MissingSchemaFileError", (e) =>
+      pipe(renderMissingSchemaFileError(e), AnsiDoc.render({ style: "pretty" })),
     ),
     Match.exhaustive,
   );
