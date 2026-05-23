@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
-import { buildSpecTree, collectSpecAssemblyNodes } from "../src/specAssembly";
-import type { LeafModule } from "../src/modulePaths";
+import type { LeafModule } from "../src/LeafModule";
+import { assemblyNodesFromLeaves } from "../src/SpecAssemblyNode";
 import * as templates from "../src/templates";
 
 const leaf = (
@@ -17,15 +17,14 @@ const leaf = (
   specImportPath: `../${relativePath.slice(0, -".ts".length)}`,
 });
 
-describe("specAssembly", () => {
+describe("SpecAssemblyNode", () => {
   it.effect("assembledSpec builds nested imports from leaf modules", () =>
     Effect.gen(function* () {
-      const tree = buildSpecTree([
+      const nodes = assemblyNodesFromLeaves([
         leaf("notesAndRandom/notes.spec.ts", ["notesAndRandom", "notes"]),
         leaf("notesAndRandom/random.spec.ts", ["notesAndRandom", "random"]),
         leaf("env.spec.ts", ["env"]),
       ]);
-      const nodes = collectSpecAssemblyNodes(tree);
       const contents = yield* templates.assembledSpec({
         nodes,
         runtime: "Convex",

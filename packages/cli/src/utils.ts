@@ -1,6 +1,4 @@
 import type { FunctionSpec, Spec } from "@confect/core";
-import { createRequire } from "node:module";
-import { pathToFileURL } from "node:url";
 import { FileSystem, Path } from "@effect/platform";
 import type { PlatformError } from "@effect/platform/Error";
 import {
@@ -13,8 +11,6 @@ import {
   Record,
   String,
 } from "effect";
-import * as esbuild from "esbuild";
-import { BundlerError } from "./BuildError";
 import * as FunctionPaths from "./FunctionPaths";
 import * as GroupPath from "./GroupPath";
 import * as GroupPaths from "./GroupPaths";
@@ -35,90 +31,6 @@ export const toModuleImportPath = (relativePath: string) =>
   Effect.gen(function* () {
     const withoutExt = yield* removePathExtension(relativePath);
     return withoutExt.startsWith(".") ? withoutExt : `./${withoutExt}`;
-  });
-
-export const EXTERNAL_PACKAGES = [
-  "@confect/core",
-  "@confect/server",
-  "effect",
-  "@effect/*",
-];
-
-const isExternalImport = (path: string) =>
-  EXTERNAL_PACKAGES.some((p) => {
-    if (p.endsWith("/*")) {
-      return path.startsWith(p.slice(0, -1));
-    }
-    return path === p || path.startsWith(p + "/");
-  });
-
-export const absoluteExternalsPlugin: esbuild.Plugin = {
-  name: "absolute-externals",
-  setup(build) {
-    build.onResolve({ filter: /.*/ }, async (args) => {
-      if (args.kind !== "import-statement" && args.kind !== "dynamic-import")
-        return;
-      if (!isExternalImport(args.path)) return;
-      // `import.meta.resolve`'s second argument is silently ignored in modern
-      // Node, so resolution would always walk up from the CLI's bundled file
-      // (`packages/cli/dist/utils.mjs`) instead of from the user's project.
-      // Use `createRequire` keyed on the importing file's directory so we
-      // resolve out of *their* `node_modules`. The synthetic filename is just
-      // a CommonJS resolution anchor; the file does not need to exist.
-      const parentFile = pathToFileURL(args.resolveDir + "/_").href;
-      const require_ = createRequire(parentFile);
-      const resolvedPath = require_.resolve(args.path);
-      const resolved = pathToFileURL(resolvedPath).href;
-      return { path: resolved, external: true };
-    });
-  },
-};
-
-const bundleEntry = (entryPoint: string, metafile: boolean) =>
-  Effect.tryPromise({
-    try: () =>
-      esbuild.build({
-        entryPoints: [entryPoint],
-        bundle: true,
-        write: false,
-        platform: "node",
-        format: "esm",
-        logLevel: "silent",
-        metafile,
-        plugins: [absoluteExternalsPlugin],
-      }),
-    catch: (cause) => new BundlerError({ cause }),
-  });
-
-const importBundledModule = (result: esbuild.BuildResult) => {
-  const code = result.outputFiles![0]!.text;
-  const dataUrl =
-    "data:text/javascript;base64," + Buffer.from(code).toString("base64");
-  return import(dataUrl);
-};
-
-export const bundleAndImportWithInputs = (entryPoint: string) =>
-  Effect.gen(function* () {
-    const result = yield* bundleEntry(entryPoint, true);
-    const module = yield* Effect.tryPromise({
-      try: () => importBundledModule(result),
-      catch: (cause) => new BundlerError({ cause }),
-    });
-    if (!result.metafile) {
-      return yield* Effect.dieMessage("esbuild metafile missing");
-    }
-    return { module, metafile: result.metafile } as const;
-  });
-
-/**
- * Bundle a TypeScript entry point with esbuild and import the result via a
- * data URL. This handles extensionless `.ts` imports regardless of whether the
- * user's project sets `"type": "module"` in package.json.
- */
-export const bundleAndImport = (entryPoint: string) =>
-  Effect.gen(function* () {
-    const { module } = yield* bundleAndImportWithInputs(entryPoint);
-    return module;
   });
 
 export const writeFileStringAndLog = (filePath: string, contents: string) =>

@@ -1,5 +1,18 @@
+import { GroupSpec, Registry } from "@confect/core";
+import * as GroupImpl from "@confect/server/GroupImpl";
 import { FileSystem, Path } from "@effect/platform";
-import { Array, Effect, String } from "effect";
+import type { Context } from "effect";
+import { Array, Effect, Layer, Option, Ref, String } from "effect";
+import { fromBundlerError } from "./BuildError";
+import * as Bundler from "./Bundler";
+import {
+  ImplMissingDefaultLayerError,
+  ImplMissingFunctionsError,
+  ImplMissingSpecImportError,
+  ImplNotFinalizedError,
+  SpecMissingDefaultGroupSpecError,
+  SpecRuntimeMismatchError,
+} from "./CodegenError";
 import { ConfectDirectory } from "./ConfectDirectory";
 import { removePathExtension } from "./utils";
 
@@ -169,4 +182,135 @@ export const toLeafModule = (specRelativePath: string) =>
       registryGroupPathDot: runtime === "Node" ? exportName : groupPathDot,
       specImportPath,
     } satisfies LeafModule;
+  });
+
+const absoluteModulePath = (relativePath: string) =>
+  Effect.gen(function* () {
+    const confectDirectory = yield* ConfectDirectory.get;
+    const path = yield* Path.Path;
+    return path.resolve(confectDirectory, relativePath);
+  });
+
+/**
+ * Validate that the leaf's spec file default-exports a `GroupSpec` whose
+ * runtime matches the leaf's location (`Convex` for files outside
+ * `confect/node/`, `Node` for files inside it).
+ */
+export const validateSpec = (leaf: LeafModule) =>
+  Effect.gen(function* () {
+    const absolutePath = yield* absoluteModulePath(leaf.relativePath);
+    const { module } = yield* Bundler.bundle(absolutePath).pipe(
+      Effect.mapError((error) => fromBundlerError(leaf.relativePath, error)),
+    );
+
+    const groupSpec = module.default;
+
+    if (!GroupSpec.isGroupSpec(groupSpec)) {
+      return yield* new SpecMissingDefaultGroupSpecError({
+        specPath: leaf.relativePath,
+      });
+    }
+
+    const group = groupSpec as GroupSpec.AnyWithProps;
+
+    if (group.runtime !== leaf.runtime) {
+      return yield* new SpecRuntimeMismatchError({
+        specPath: leaf.relativePath,
+        expectedRuntime: leaf.runtime,
+        actualRuntime: group.runtime,
+      });
+    }
+  });
+
+/**
+ * Walk the built `Context` for a `Finalized` `GroupImpl` service value. The
+ * lookup is value-shaped (via `GroupImpl.isFinalizedGroupImpl`) so we don't
+ * need to know the group's path up front to construct a typed tag for it.
+ */
+const findFinalizedGroupImpl = <S>(
+  context: Context.Context<S>,
+): Option.Option<GroupImpl.AnyFinalized> =>
+  Array.findFirst(context.unsafeMap.values(), GroupImpl.isFinalizedGroupImpl);
+
+/**
+ * Build the impl layer with a fresh `Registry` so each validation is
+ * isolated from prior validations' `FunctionImpl.make` writes. The CLI no
+ * longer reads the registry directly — `GroupImpl.finalize` snapshots the
+ * registered function names onto the produced `Finalized` `GroupImpl`
+ * service value — but a fresh `Ref` is still required because the default
+ * `Context.Reference` is cached globally and would otherwise accumulate
+ * items across impls.
+ */
+const buildImplLayer = (implLayer: Layer.Layer<unknown>) =>
+  Effect.gen(function* () {
+    const registry = Ref.unsafeMake<Registry.RegistryItems>({});
+    return yield* Layer.build(
+      implLayer as Layer.Layer<unknown, never, never>,
+    ).pipe(Effect.provideService(Registry.Registry, registry));
+  }).pipe(Effect.scoped);
+
+/**
+ * Validate that the leaf's sibling impl file imports the spec, default-exports
+ * a finalized `GroupImpl` layer, and provides a `FunctionImpl` for every
+ * function declared by the spec.
+ */
+export const validateImpl = (leaf: LeafModule) =>
+  Effect.gen(function* () {
+    const implRelativePath = yield* implPathForSpec(leaf.relativePath);
+    const implAbsolutePath = yield* absoluteModulePath(implRelativePath);
+    const specAbsolutePath = yield* absoluteModulePath(leaf.relativePath);
+
+    const bundled = yield* Bundler.bundle(implAbsolutePath).pipe(
+      Effect.mapError((error) => fromBundlerError(implRelativePath, error)),
+    );
+
+    if (
+      !(yield* Bundler.directlyImports(
+        bundled,
+        implAbsolutePath,
+        specAbsolutePath,
+      ))
+    ) {
+      return yield* new ImplMissingSpecImportError({
+        implPath: implRelativePath,
+        expectedSpecPath: leaf.relativePath,
+      });
+    }
+
+    if (!Layer.isLayer(bundled.module.default)) {
+      return yield* new ImplMissingDefaultLayerError({
+        implPath: implRelativePath,
+      });
+    }
+
+    const { module: specModule } = yield* Bundler.bundle(specAbsolutePath).pipe(
+      Effect.mapError((error) => fromBundlerError(leaf.relativePath, error)),
+    );
+    const groupSpec = specModule.default as GroupSpec.AnyWithProps;
+    const expectedFunctionNames = Object.keys(groupSpec.functions);
+
+    const context = yield* buildImplLayer(
+      bundled.module.default as Layer.Layer<unknown>,
+    );
+    const finalizedGroupImplOption = findFinalizedGroupImpl(context);
+
+    if (Option.isNone(finalizedGroupImplOption)) {
+      return yield* new ImplNotFinalizedError({
+        implPath: implRelativePath,
+      });
+    }
+    const finalizedGroupImpl = finalizedGroupImplOption.value;
+
+    const registeredSet = new Set(finalizedGroupImpl.registeredFunctionNames);
+    const missing = expectedFunctionNames.filter(
+      (name) => !registeredSet.has(name),
+    );
+
+    if (missing.length > 0) {
+      return yield* new ImplMissingFunctionsError({
+        implPath: implRelativePath,
+        groupPath: finalizedGroupImpl.groupPath,
+        missingFunctionNames: missing,
+      });
+    }
   });

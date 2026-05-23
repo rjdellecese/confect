@@ -1,17 +1,18 @@
 import { Spec } from "@confect/core";
+import * as DatabaseSchema from "@confect/server/DatabaseSchema";
 import { Command } from "@effect/cli";
 import { FileSystem, Path } from "@effect/platform";
 import { Array, Effect, Either, HashSet, Match, Option } from "effect";
+import { fromBundlerError } from "../BuildError";
 import * as CodegenError from "../CodegenError";
-import { MissingImplFileError, MissingSpecFileError } from "../CodegenError";
+import {
+  MissingImplFileError,
+  MissingSpecFileError,
+  SchemaInvalidDefaultExportError,
+} from "../CodegenError";
 import { ConfectDirectory } from "../ConfectDirectory";
 import { ConvexDirectory } from "../ConvexDirectory";
 import * as FunctionPaths from "../FunctionPaths";
-import {
-  validateImplModule,
-  validateSchemaModule,
-  validateSpecModule,
-} from "../implValidation";
 import {
   logFileAdded,
   logFileModified,
@@ -27,17 +28,17 @@ import {
   specPathForImpl,
   toLeafModule,
   toNodeRegistryLeaf,
+  validateImpl,
+  validateSpec,
   type LeafModule,
-} from "../modulePaths";
+} from "../LeafModule";
 import {
-  buildSpecTree,
-  collectConvexLeaves,
-  collectNodeLeaves,
-  collectSpecAssemblyNodes,
-} from "../specAssembly";
+  assemblyNodesFromLeaves,
+  partitionByRuntime,
+} from "../SpecAssemblyNode";
 import * as templates from "../templates";
+import * as Bundler from "../Bundler";
 import {
-  bundleAndImport,
   generateAuthConfig,
   generateCrons,
   generateFunctions,
@@ -127,7 +128,7 @@ const loadAndValidateLeafModules = Effect.gen(function* () {
   const leaves = yield* Effect.forEach(specFiles, (specRelativePath) =>
     Effect.gen(function* () {
       const leaf = yield* toLeafModule(specRelativePath);
-      yield* validateSpecModule(specRelativePath);
+      yield* validateSpec(leaf);
 
       const implRelativePath = yield* implPathForSpec(specRelativePath);
       const implAbsolutePath = path.join(confectDirectory, implRelativePath);
@@ -193,12 +194,10 @@ const generateAssembledSpecs = (leaves: ReadonlyArray<LeafModule>) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
     const confectDirectory = yield* ConfectDirectory.get;
-    const convexLeaves = collectConvexLeaves(leaves);
-    const nodeLeaves = collectNodeLeaves(leaves);
+    const { convex, node } = partitionByRuntime(leaves);
 
-    if (convexLeaves.length > 0) {
-      const tree = buildSpecTree(convexLeaves);
-      const nodes = collectSpecAssemblyNodes(tree);
+    if (convex.length > 0) {
+      const nodes = assemblyNodesFromLeaves(convex);
       const specContents = yield* templates.assembledSpec({
         nodes,
         runtime: "Convex",
@@ -209,9 +208,10 @@ const generateAssembledSpecs = (leaves: ReadonlyArray<LeafModule>) =>
       );
     }
 
-    if (nodeLeaves.length > 0) {
-      const tree = buildSpecTree(Array.map(nodeLeaves, toNodeRegistryLeaf));
-      const nodes = collectSpecAssemblyNodes(tree);
+    if (node.length > 0) {
+      const nodes = assemblyNodesFromLeaves(
+        Array.map(node, toNodeRegistryLeaf),
+      );
       const nodeSpecContents = yield* templates.assembledSpec({
         nodes,
         runtime: "Node",
@@ -224,12 +224,7 @@ const generateAssembledSpecs = (leaves: ReadonlyArray<LeafModule>) =>
   });
 
 const validateImplModules = (leaves: ReadonlyArray<LeafModule>) =>
-  Effect.forEach(leaves, (leaf) =>
-    Effect.gen(function* () {
-      const implRelativePath = yield* implPathForSpec(leaf.relativePath);
-      yield* validateImplModule(implRelativePath, leaf.relativePath);
-    }),
-  );
+  Effect.forEach(leaves, validateImpl);
 
 const generateGroupRegisteredFunctions = (leaves: ReadonlyArray<LeafModule>) =>
   Effect.gen(function* () {
@@ -333,7 +328,7 @@ const getGeneratedNodeSpecPath = Effect.gen(function* () {
 
 const loadGeneratedSpec = Effect.gen(function* () {
   const specPath = yield* getGeneratedSpecPath;
-  const specModule = yield* bundleAndImport(specPath);
+  const { module: specModule } = yield* Bundler.bundle(specPath);
   const spec = specModule.default;
 
   if (!Spec.isConvexSpec(spec)) {
@@ -353,7 +348,7 @@ const loadGeneratedNodeSpec = Effect.gen(function* () {
     return Option.none<Spec.AnyWithPropsWithRuntime<"Node">>();
   }
 
-  const nodeSpecModule = yield* bundleAndImport(nodeSpecPath);
+  const { module: nodeSpecModule } = yield* Bundler.bundle(nodeSpecPath);
   const nodeSpec = nodeSpecModule.default;
 
   if (!Spec.isNodeSpec(nodeSpec)) {
@@ -459,6 +454,27 @@ const generateFunctionModules = Effect.gen(function* () {
   return yield* generateFunctions(mergedSpec);
 });
 
+export const validateSchema = Effect.gen(function* () {
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
+  const confectSchemaPath = path.join(confectDirectory, "schema.ts");
+
+  yield* Bundler.bundle(confectSchemaPath).pipe(
+    Effect.mapError((error) => fromBundlerError("schema.ts", error)),
+    Effect.andThen(({ module: schemaModule }) => {
+      const defaultExport = schemaModule.default;
+
+      return DatabaseSchema.isDatabaseSchema(defaultExport)
+        ? Effect.succeed(defaultExport)
+        : Effect.fail(
+            new SchemaInvalidDefaultExportError({
+              schemaPath: "schema.ts",
+            }),
+          );
+    }),
+  );
+});
+
 const generateSchema = Effect.gen(function* () {
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
@@ -466,7 +482,7 @@ const generateSchema = Effect.gen(function* () {
 
   const confectSchemaPath = path.join(confectDirectory, "schema.ts");
 
-  yield* validateSchemaModule();
+  yield* validateSchema;
 
   const convexSchemaPath = path.join(convexDirectory, "schema.ts");
 

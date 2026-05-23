@@ -1,6 +1,9 @@
 import { Array, Effect } from "effect";
 import { CodeBlockWriter } from "./CodeBlockWriter";
-import { collectImportBindings, type SpecAssemblyNode } from "./specAssembly";
+import {
+  collectImportBindings,
+  type SpecAssemblyNode,
+} from "./SpecAssemblyNode";
 
 export const functions = ({
   functionNames,

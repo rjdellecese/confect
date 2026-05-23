@@ -6,14 +6,22 @@ import type { BundleFailedError } from "../src/BuildError";
 import type { CodegenError } from "../src/CodegenError";
 import { ConfectDirectory } from "../src/ConfectDirectory";
 import {
-  validateImplModule,
-  validateSchemaModule,
-  validateSpecModule,
-} from "../src/implValidation";
+  groupPathFromRelativeModulePath,
+  implPathForSpec,
+  isLeafImplPath,
+  isLeafSpecPath,
+  specImportPathFromGenerated,
+  specPathForImpl,
+  toLeafModule,
+  toNodeRegistryLeaf,
+  validateImpl,
+  validateSpec,
+} from "../src/LeafModule";
+import type { LeafModule } from "../src/LeafModule";
 
 const fixtureConfect = `${import.meta.dirname}/../../server/test/mock-backend/fixtures/confect`;
 
-const ValidationLayer = Layer.mergeAll(
+const LeafModuleLayer = Layer.mergeAll(
   NodePath.layer,
   NodeFileSystem.layer,
   Layer.mock(ConfectDirectory, {
@@ -22,9 +30,13 @@ const ValidationLayer = Layer.mergeAll(
   }),
 );
 
-const withTempFile = (
-  relativePath: string,
-  contents: string,
+interface TempFile {
+  readonly relativePath: string;
+  readonly contents: string;
+}
+
+const withTempFiles = (
+  files: ReadonlyArray<TempFile>,
   use: Effect.Effect<
     void,
     CodegenError,
@@ -34,38 +46,157 @@ const withTempFile = (
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
-    const absolutePath = path.join(fixtureConfect, relativePath);
-    yield* fs.writeFileString(absolutePath, contents);
+    yield* Effect.forEach(files, ({ relativePath, contents }) =>
+      fs.writeFileString(path.join(fixtureConfect, relativePath), contents),
+    );
     yield* use;
   }).pipe(
     Effect.ensuring(
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
-        const absolutePath = path.join(fixtureConfect, relativePath);
-        if (yield* fs.exists(absolutePath)) {
-          yield* fs.remove(absolutePath);
-        }
+        yield* Effect.forEach(files, ({ relativePath }) =>
+          Effect.gen(function* () {
+            const absolutePath = path.join(fixtureConfect, relativePath);
+            if (yield* fs.exists(absolutePath)) {
+              yield* fs.remove(absolutePath);
+            }
+          }),
+        );
       }).pipe(Effect.orDie),
     ),
   );
 
-layer(ValidationLayer)("validateSpecModule", (it) => {
+const withTempFile = (
+  relativePath: string,
+  contents: string,
+  use: Effect.Effect<
+    void,
+    CodegenError,
+    ConfectDirectory | Path.Path | FileSystem.FileSystem
+  >,
+) => withTempFiles([{ relativePath, contents }], use);
+
+/**
+ * Materializes a temporary `groups/<stem>.spec.ts` + `groups/<stem>.impl.ts`
+ * pair and yields the {@link LeafModule} for the spec to `use`. The spec
+ * re-exports `./notes.spec`'s GroupSpec by default so impl contents that
+ * reference `notes` continue to typecheck against the real notes GroupSpec.
+ */
+const withTempLeaf = (
+  stem: string,
+  implContents: string,
+  use: (leaf: LeafModule) => Effect.Effect<
+    void,
+    CodegenError,
+    ConfectDirectory | Path.Path | FileSystem.FileSystem
+  >,
+  specContents = `export { default } from "./notes.spec";\n`,
+) =>
+  Effect.gen(function* () {
+    const leaf = yield* toLeafModule(`groups/${stem}.spec.ts`);
+    yield* withTempFiles(
+      [
+        { relativePath: `groups/${stem}.spec.ts`, contents: specContents },
+        { relativePath: `groups/${stem}.impl.ts`, contents: implContents },
+      ],
+      use(leaf),
+    );
+  });
+
+layer(LeafModuleLayer)("LeafModule paths", (it) => {
+  it.effect("groupPathFromRelativeModulePath maps nested spec files", () =>
+    Effect.gen(function* () {
+      expect(
+        yield* groupPathFromRelativeModulePath("notesAndRandom/notes.spec.ts"),
+      ).toEqual({
+        pathSegments: ["notesAndRandom", "notes"],
+        groupPathDot: "notesAndRandom.notes",
+      });
+    }),
+  );
+
+  it.effect("specPathForImpl maps impl paths to sibling spec paths", () =>
+    Effect.gen(function* () {
+      expect(yield* specPathForImpl("notesAndRandom/notes.impl.ts")).toBe(
+        "notesAndRandom/notes.spec.ts",
+      );
+    }),
+  );
+
+  it.effect("implPathForSpec maps spec paths to sibling impl paths", () =>
+    Effect.gen(function* () {
+      expect(yield* implPathForSpec("notesAndRandom/notes.spec.ts")).toBe(
+        "notesAndRandom/notes.impl.ts",
+      );
+    }),
+  );
+
+  it.effect(
+    "specImportPathFromGenerated builds import paths for _generated",
+    () =>
+      Effect.gen(function* () {
+        expect(
+          yield* specImportPathFromGenerated("notesAndRandom/notes.spec.ts"),
+        ).toBe("../notesAndRandom/notes.spec");
+      }),
+  );
+
+  it.effect("toNodeRegistryLeaf remaps node leaves for nodeSpec assembly", () =>
+    Effect.sync(() => {
+      const leaf: LeafModule = {
+        relativePath: "node/email.spec.ts",
+        pathSegments: ["node", "email"],
+        groupPathDot: "node.email",
+        registryGroupPathDot: "email",
+        exportName: "email",
+        runtime: "Node",
+        specImportPath: "../node/email.spec",
+      };
+
+      expect(toNodeRegistryLeaf(leaf)).toEqual({
+        ...leaf,
+        pathSegments: ["email"],
+        groupPathDot: "email",
+      });
+    }),
+  );
+
+  it.effect(
+    "isLeafSpecPath and isLeafImplPath detect leaf module suffixes",
+    () =>
+      Effect.sync(() => {
+        expect(isLeafSpecPath("notes.spec.ts")).toBe(true);
+        expect(isLeafSpecPath("notes.impl.ts")).toBe(false);
+        expect(isLeafImplPath("notes.impl.ts")).toBe(true);
+        expect(isLeafImplPath("notes.spec.ts")).toBe(false);
+      }),
+  );
+});
+
+layer(LeafModuleLayer)("validateSpec", (it) => {
   it.effect("accepts a valid leaf spec", () =>
-    validateSpecModule("groups/notes.spec.ts"),
+    Effect.gen(function* () {
+      const leaf = yield* toLeafModule("groups/notes.spec.ts");
+      yield* validateSpec(leaf);
+    }),
   );
 
   it.effect("accepts a valid node leaf spec", () =>
-    validateSpecModule("node/typedErrorsNode.spec.ts"),
+    Effect.gen(function* () {
+      const leaf = yield* toLeafModule("node/typedErrorsNode.spec.ts");
+      yield* validateSpec(leaf);
+    }),
   );
 
   it.effect("rejects a spec without a GroupSpec default export", () =>
     Effect.gen(function* () {
+      const leaf = yield* toLeafModule("groups/_invalid.spec.ts");
       const result = yield* Effect.either(
         withTempFile(
           "groups/_invalid.spec.ts",
           "export default {};\n",
-          validateSpecModule("groups/_invalid.spec.ts"),
+          validateSpec(leaf),
         ),
       );
 
@@ -78,11 +209,12 @@ layer(ValidationLayer)("validateSpecModule", (it) => {
 
   it.effect("rejects a spec with a syntax error", () =>
     Effect.gen(function* () {
+      const leaf = yield* toLeafModule("groups/_brokenSyntax.spec.ts");
       const result = yield* Effect.either(
         withTempFile(
           "groups/_brokenSyntax.spec.ts",
           "export default GroupSpec.make(\n",
-          validateSpecModule("groups/_brokenSyntax.spec.ts"),
+          validateSpec(leaf),
         ),
       );
 
@@ -97,15 +229,27 @@ layer(ValidationLayer)("validateSpecModule", (it) => {
   );
 });
 
-layer(ValidationLayer)("validateImplModule", (it) => {
+layer(LeafModuleLayer)("validateImpl", (it) => {
   it.effect("accepts a valid leaf impl paired with its spec", () =>
-    validateImplModule("groups/notes.impl.ts", "groups/notes.spec.ts"),
+    Effect.gen(function* () {
+      const leaf = yield* toLeafModule("groups/notes.spec.ts");
+      yield* validateImpl(leaf);
+    }),
   );
 
   it.effect("rejects impl that does not directly import the sibling spec", () =>
     Effect.gen(function* () {
       const result = yield* Effect.either(
-        validateImplModule("groups/random.impl.ts", "groups/notes.spec.ts"),
+        withTempLeaf(
+          "_mismatch",
+          // Imports `./notes.spec` instead of its sibling `./_mismatch.spec`.
+          `import notes from "./notes.spec";
+import { Layer } from "effect";
+void notes;
+export default Layer.empty;
+`,
+          validateImpl,
+        ),
       );
 
       expect(result._tag).toBe("Left");
@@ -118,12 +262,12 @@ layer(ValidationLayer)("validateImplModule", (it) => {
   it.effect("rejects impl without a layer default export", () =>
     Effect.gen(function* () {
       const result = yield* Effect.either(
-        withTempFile(
-          "groups/_invalid.impl.ts",
-          `import notes from "./notes.spec";
+        withTempLeaf(
+          "_notLayer",
+          `import notes from "./_notLayer.spec";
 export default notes;
 `,
-          validateImplModule("groups/_invalid.impl.ts", "groups/notes.spec.ts"),
+          validateImpl,
         ),
       );
 
@@ -137,15 +281,12 @@ export default notes;
   it.effect("rejects impl with a syntax error", () =>
     Effect.gen(function* () {
       const result = yield* Effect.either(
-        withTempFile(
-          "groups/_brokenSyntax.impl.ts",
-          `import notes from "./notes.spec";
+        withTempLeaf(
+          "_brokenSyntax",
+          `import notes from "./_brokenSyntax.spec";
 export default GroupImpl.make(
 `,
-          validateImplModule(
-            "groups/_brokenSyntax.impl.ts",
-            "groups/notes.spec.ts",
-          ),
+          validateImpl,
         ),
       );
 
@@ -164,13 +305,13 @@ export default GroupImpl.make(
     () =>
       Effect.gen(function* () {
         const result = yield* Effect.either(
-          withTempFile(
-            "groups/_unfinalized.impl.ts",
+          withTempLeaf(
+            "_unfinalized",
             `import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Effect, Layer } from "effect";
 import api from "../_generated/api";
 import { DatabaseReader, DatabaseWriter } from "../_generated/services";
-import notes from "./notes.spec";
+import notes from "./_unfinalized.spec";
 
 const insert = FunctionImpl.make(api, notes, "insert", ({ text }) =>
   Effect.gen(function* () {
@@ -219,10 +360,7 @@ export default GroupImpl.make(api, notes).pipe(
   Layer.provide(internalGetFirst),
 );
 `,
-            validateImplModule(
-              "groups/_unfinalized.impl.ts",
-              "groups/notes.spec.ts",
-            ),
+            validateImpl,
           ),
         );
 
@@ -238,13 +376,13 @@ export default GroupImpl.make(api, notes).pipe(
     () =>
       Effect.gen(function* () {
         const result = yield* Effect.either(
-          withTempFile(
-            "groups/_incomplete.impl.ts",
+          withTempLeaf(
+            "_incomplete",
             `import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Effect, Layer } from "effect";
 import api from "../_generated/api";
 import { DatabaseWriter } from "../_generated/services";
-import notes from "./notes.spec";
+import notes from "./_incomplete.spec";
 
 const insert = FunctionImpl.make(api, notes, "insert", ({ text }) =>
   Effect.gen(function* () {
@@ -264,10 +402,7 @@ export default GroupImpl.make(api, notes).pipe(
   ) => Layer.Layer<unknown, never, never>,
 );
 `,
-            validateImplModule(
-              "groups/_incomplete.impl.ts",
-              "groups/notes.spec.ts",
-            ),
+            validateImpl,
           ),
         );
 
@@ -281,64 +416,6 @@ export default GroupImpl.make(api, notes).pipe(
             );
           }
         }
-      }),
-  );
-});
-
-layer(ValidationLayer)("validateSchemaModule", (it) => {
-  it.effect("accepts the fixture schema", () => validateSchemaModule());
-
-  it.effect("rejects a schema with a syntax error", () =>
-    Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem;
-      const path = yield* Path.Path;
-      const schemaPath = path.join(fixtureConfect, "schema.ts");
-      const original = yield* fs.readFileString(schemaPath);
-
-      yield* Effect.gen(function* () {
-        yield* fs.writeFileString(
-          schemaPath,
-          "export default DatabaseSchema.make(\n",
-        );
-        const result = yield* Effect.either(validateSchemaModule());
-
-        expect(result._tag).toBe("Left");
-        if (result._tag === "Left") {
-          expect(result.left._tag).toBe("BundleFailedError");
-          expect(
-            (result.left as BundleFailedError).errors.length,
-          ).toBeGreaterThan(0);
-        }
-      }).pipe(
-        Effect.ensuring(
-          fs.writeFileString(schemaPath, original).pipe(Effect.orDie),
-        ),
-      );
-    }),
-  );
-
-  it.effect(
-    "rejects a schema whose default export is not a DatabaseSchema",
-    () =>
-      Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        const schemaPath = path.join(fixtureConfect, "schema.ts");
-        const original = yield* fs.readFileString(schemaPath);
-
-        yield* Effect.gen(function* () {
-          yield* fs.writeFileString(schemaPath, "export default {};\n");
-          const result = yield* Effect.either(validateSchemaModule());
-
-          expect(result._tag).toBe("Left");
-          if (result._tag === "Left") {
-            expect(result.left._tag).toBe("SchemaInvalidDefaultExportError");
-          }
-        }).pipe(
-          Effect.ensuring(
-            fs.writeFileString(schemaPath, original).pipe(Effect.orDie),
-          ),
-        );
       }),
   );
 });

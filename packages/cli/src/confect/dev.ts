@@ -35,11 +35,10 @@ import {
   isLeafImplPath,
   isLeafSpecPath,
   isNodeLeafModule,
-} from "../modulePaths";
+} from "../LeafModule";
 import { ProjectRoot } from "../ProjectRoot";
+import { absoluteExternalsPlugin, EXTERNAL_PACKAGES } from "../Bundler";
 import {
-  absoluteExternalsPlugin,
-  EXTERNAL_PACKAGES,
   generateAuthConfig,
   generateCrons,
   generateHttp,
