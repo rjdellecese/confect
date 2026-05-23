@@ -1,4 +1,4 @@
-import { Array, Predicate, Record } from "effect";
+import { Array, Option, Predicate, Record } from "effect";
 import * as GroupSpec from "./GroupSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
@@ -117,17 +117,19 @@ export const merge = <
   convexSpec: ConvexSpec,
   nodeSpec?: NodeSpec,
 ): AnyWithProps => {
-  const nodeGroup = nodeSpec
-    ? Array.reduce(
-        Record.toEntries(nodeSpec.groups),
+  const groups = Option.fromNullable(nodeSpec).pipe(
+    Option.map((nodeSpec_) =>
+      Array.reduce(
+        Record.toEntries(nodeSpec_.groups),
         GroupSpec.makeNodeAt("node"),
         (nodeGroupSpec, [name, group]) => nodeGroupSpec.addGroupAt(name, group),
-      )
-    : null;
-
-  const groups = nodeGroup
-    ? { ...convexSpec.groups, node: nodeGroup }
-    : convexSpec.groups;
+      ),
+    ),
+    Option.match({
+      onNone: () => convexSpec.groups,
+      onSome: (nodeGroup) => ({ ...convexSpec.groups, node: nodeGroup }),
+    }),
+  );
 
   return Object.assign(Object.create(Proto), {
     runtime: "Convex" as const,

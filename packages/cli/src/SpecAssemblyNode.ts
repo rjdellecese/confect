@@ -1,5 +1,5 @@
 import type { LeafModule } from "./LeafModule";
-import { Array, Order, pipe, Record } from "effect";
+import { Array, Option, Order, pipe, Record } from "effect";
 
 export interface SpecImportBinding {
   readonly importPath: string;
@@ -8,7 +8,7 @@ export interface SpecImportBinding {
 
 export interface SpecAssemblyNode {
   readonly segment: string;
-  readonly importBinding?: SpecImportBinding;
+  readonly importBinding: Option.Option<SpecImportBinding>;
   readonly children: ReadonlyArray<SpecAssemblyNode>;
 }
 
@@ -26,17 +26,17 @@ const assemblyNodesAtDepth = (
     Record.toEntries,
     Array.sortBy(Order.mapInput(Order.string, ([segment]) => segment)),
     Array.map(([segment, groupLeaves]) => {
-      const terminal = groupLeaves.find(
+      const terminal = Array.findFirst(
+        groupLeaves,
         (leaf) => leaf.pathSegments.length === depth + 1,
       );
-      const descendants = groupLeaves.filter(
+      const descendants = Array.filter(
+        groupLeaves,
         (leaf) => leaf.pathSegments.length > depth + 1,
       );
       return {
         segment,
-        ...(terminal === undefined
-          ? {}
-          : { importBinding: importBindingFromLeaf(terminal) }),
+        importBinding: Option.map(terminal, importBindingFromLeaf),
         children: assemblyNodesAtDepth(descendants, depth + 1),
       };
     }),
@@ -63,9 +63,10 @@ const importBindingsForNode = (
   node: SpecAssemblyNode,
 ): ReadonlyArray<SpecImportBinding> =>
   pipe(node.children, Array.flatMap(importBindingsForNode), (childBindings) =>
-    node.importBinding === undefined
-      ? childBindings
-      : Array.prepend(childBindings, node.importBinding),
+    Option.match(node.importBinding, {
+      onNone: () => childBindings,
+      onSome: (binding) => Array.prepend(childBindings, binding),
+    }),
   );
 
 export const collectImportBindings = (

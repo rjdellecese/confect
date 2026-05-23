@@ -1,5 +1,5 @@
 import type { Types } from "effect";
-import { Array, pipe, Record } from "effect";
+import { Array, Option, pipe, Record } from "effect";
 import type * as FunctionSpec from "./FunctionSpec";
 import * as GroupSpec from "./GroupSpec";
 import * as Ref from "./Ref";
@@ -96,17 +96,19 @@ export const make = <
   public: Refs<ConvexSpec, NodeSpec, Ref.AnyPublic>;
   internal: Refs<ConvexSpec, NodeSpec, Ref.AnyInternal>;
 } => {
-  const nodeGroup = nodeSpec
-    ? Array.reduce(
-        Record.toEntries(nodeSpec.groups),
+  const groups = Option.fromNullable(nodeSpec).pipe(
+    Option.map((nodeSpec_) =>
+      Array.reduce(
+        Record.toEntries(nodeSpec_.groups),
         GroupSpec.makeNodeAt("node"),
         (nodeGroupSpec, [name, group]) => nodeGroupSpec.addGroupAt(name, group),
-      )
-    : null;
-
-  const groups = nodeGroup
-    ? { ...convexSpec.groups, node: nodeGroup }
-    : convexSpec.groups;
+      ),
+    ),
+    Option.match({
+      onNone: () => convexSpec.groups,
+      onSome: (nodeGroup) => ({ ...convexSpec.groups, node: nodeGroup }),
+    }),
+  );
   const refs = makeHelper(groups);
   return {
     public: refs as Refs<ConvexSpec, NodeSpec, Ref.AnyPublic>,
@@ -116,17 +118,18 @@ export const make = <
 
 const makeHelper = (
   groups: Record.ReadonlyRecord<string, GroupSpec.Any>,
-  functionNamespace: string | null = null,
+  functionNamespace: Option.Option<string> = Option.none(),
 ): Any =>
   pipe(
     groups as Record.ReadonlyRecord<string, GroupSpec.AnyWithProps>,
     Record.map((group, name) => {
-      const currentFunctionNamespace = functionNamespace
-        ? `${functionNamespace}/${name}`
-        : name;
+      const currentFunctionNamespace = Option.match(functionNamespace, {
+        onNone: () => name,
+        onSome: (parentNamespace) => `${parentNamespace}/${name}`,
+      });
 
       return Record.union(
-        makeHelper(group.groups, currentFunctionNamespace),
+        makeHelper(group.groups, Option.some(currentFunctionNamespace)),
         Record.map(group.functions, (function_) =>
           Ref.make(currentFunctionNamespace, function_),
         ),

@@ -292,14 +292,13 @@ export const validateImpl = (leaf: LeafModule) =>
     const context = yield* buildImplLayer(
       bundled.module.default as Layer.Layer<unknown>,
     );
-    const finalizedGroupImplOption = findFinalizedGroupImpl(context);
-
-    if (Option.isNone(finalizedGroupImplOption)) {
-      return yield* new ImplNotFinalizedError({
-        implPath: implRelativePath,
-      });
-    }
-    const finalizedGroupImpl = finalizedGroupImplOption.value;
+    const finalizedGroupImpl = yield* Option.match(
+      findFinalizedGroupImpl(context),
+      {
+        onNone: () => new ImplNotFinalizedError({ implPath: implRelativePath }),
+        onSome: Effect.succeed,
+      },
+    );
 
     const registeredSet = new Set(finalizedGroupImpl.registeredFunctionNames);
     const missing = expectedFunctionNames.filter(

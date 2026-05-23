@@ -2,7 +2,17 @@ import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import type * as GroupSpec from "@confect/core/GroupSpec";
 import * as Registry from "@confect/core/Registry";
 import type * as Spec from "@confect/core/Spec";
-import { Effect, type Layer, Ref, type Types } from "effect";
+import {
+  Array,
+  Effect,
+  type Layer,
+  Option,
+  pipe,
+  Predicate,
+  Ref,
+  String,
+  type Types,
+} from "effect";
 import type * as Api from "./Api";
 import type * as GroupImpl from "./GroupImpl";
 import { mapLeaves } from "./internal/utils";
@@ -101,17 +111,22 @@ export const buildForGroup = <
     (registryItem) => makeRegisteredFunction(api, registryItem),
   );
 
-  let groupFunctions: unknown = registeredFunctions;
-  for (const segment of groupPath.split(".")) {
-    if (
-      groupFunctions === null ||
-      typeof groupFunctions !== "object" ||
-      !(segment in groupFunctions)
-    ) {
-      throw new Error(`No functions registered for group path "${groupPath}"`);
-    }
-    groupFunctions = (groupFunctions as Record<string, unknown>)[segment];
-  }
-
-  return groupFunctions as ForGroupPath<Api_["spec"], GroupPath_>;
+  return pipe(
+    String.split(groupPath, "."),
+    Array.reduce(
+      Option.some<unknown>(registeredFunctions),
+      (currentNode, segment) =>
+        currentNode.pipe(
+          Option.filter(Predicate.isRecord),
+          Option.flatMap((nodeRecord) =>
+            segment in nodeRecord
+              ? Option.some(nodeRecord[segment])
+              : Option.none(),
+          ),
+        ),
+    ),
+    Option.getOrThrowWith(
+      () => new Error(`No functions registered for group path "${groupPath}"`),
+    ),
+  ) as ForGroupPath<Api_["spec"], GroupPath_>;
 };

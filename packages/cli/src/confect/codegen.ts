@@ -390,18 +390,19 @@ export const loadPreviousFunctionPaths = Effect.gen(function* () {
   }
 
   const specEither = yield* loadGeneratedSpec.pipe(Effect.either);
-  if (Either.isLeft(specEither)) {
-    return emptyFunctionPaths;
-  }
 
-  const nodeSpecOption = yield* loadGeneratedNodeSpec;
-
-  const mergedSpec = Option.match(nodeSpecOption, {
-    onNone: () => specEither.right,
-    onSome: (nodeSpec) => Spec.merge(specEither.right, nodeSpec),
+  return yield* Either.match(specEither, {
+    onLeft: () => Effect.succeed(emptyFunctionPaths),
+    onRight: (spec) =>
+      Effect.gen(function* () {
+        const nodeSpecOption = yield* loadGeneratedNodeSpec;
+        const mergedSpec = Option.match(nodeSpecOption, {
+          onNone: () => spec,
+          onSome: (nodeSpec) => Spec.merge(spec, nodeSpec),
+        });
+        return FunctionPaths.make(mergedSpec);
+      }),
   });
-
-  return FunctionPaths.make(mergedSpec);
 });
 
 const generateApi = Effect.gen(function* () {
@@ -558,12 +559,14 @@ const generateRefs = Effect.gen(function* () {
   const nodeSpecPath = yield* getGeneratedNodeSpecPath;
   const nodeSpecExists = yield* fs.exists(nodeSpecPath);
   const nodeSpecImportPath = nodeSpecExists
-    ? yield* toModuleImportPath(path.relative(refsDir, nodeSpecPath))
-    : null;
+    ? Option.some(
+        yield* toModuleImportPath(path.relative(refsDir, nodeSpecPath)),
+      )
+    : Option.none<string>();
 
   const refsContents = yield* templates.refs({
     specImportPath,
-    ...(nodeSpecImportPath === null ? {} : { nodeSpecImportPath }),
+    nodeSpecImportPath,
   });
 
   yield* writeFileStringAndLog(refsPath, refsContents);

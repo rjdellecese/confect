@@ -187,7 +187,9 @@ export const logBuildError = (error: BuildError) =>
  * watchers surface the same underlying error and we want to log the
  * coalesced set rather than one block per watcher.
  */
-const renderCoalescedBuildErrors = (messages: readonly esbuild.Message[]): string => {
+const renderCoalescedBuildErrors = (
+  messages: readonly esbuild.Message[],
+): string => {
   const formatted = esbuild.formatMessagesSync(messages as esbuild.Message[], {
     kind: "error",
     color: true,
@@ -201,9 +203,7 @@ const renderCoalescedBuildErrors = (messages: readonly esbuild.Message[]): strin
   return `${header}\n${formatEsbuildMessages(messages, formatted)}`;
 };
 
-export const logCoalescedBuildErrors = (
-  messages: readonly esbuild.Message[],
-) =>
+export const logCoalescedBuildErrors = (messages: readonly esbuild.Message[]) =>
   Effect.sync(() => {
     if (messages.length === 0) return;
     console.error(renderCoalescedBuildErrors(messages));

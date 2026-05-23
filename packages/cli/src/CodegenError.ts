@@ -1,5 +1,5 @@
 import { Ansi, AnsiDoc } from "@effect/printer-ansi";
-import { Effect, Match, pipe, Schema } from "effect";
+import { Effect, Match, Option, pipe, Schema } from "effect";
 import { BuildError, isBuildError, renderBuildError } from "./BuildError";
 import { formatPathDoc } from "./log";
 
@@ -301,7 +301,10 @@ export const renderCodegenError = (error: CodegenError): string => {
       ),
     ),
     Match.tag("MissingSchemaFileError", (e) =>
-      pipe(renderMissingSchemaFileError(e), AnsiDoc.render({ style: "pretty" })),
+      pipe(
+        renderMissingSchemaFileError(e),
+        AnsiDoc.render({ style: "pretty" }),
+      ),
     ),
     Match.exhaustive,
   );
@@ -329,12 +332,13 @@ export const tapAndLog = <A, E, R>(
 
 /**
  * Catch any {@link CodegenError} thrown by `effect`, log it, and resolve to
- * `undefined` (used by the `dev` command's sync loop, which continues after
- * a failed sync rather than exiting).
+ * `Option.none()` (used by the `dev` command's sync loop, which continues
+ * after a failed sync rather than exiting). Success resolves to
+ * `Option.some(value)`.
  */
 export const catchAndLog = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
-): Effect.Effect<A | undefined, Exclude<E, CodegenError>, R> =>
-  Effect.catchIf(effect, isCodegenError, (error) =>
-    logCodegenError(error).pipe(Effect.as(undefined)),
-  ) as Effect.Effect<A | undefined, Exclude<E, CodegenError>, R>;
+): Effect.Effect<Option.Option<A>, Exclude<E, CodegenError>, R> =>
+  Effect.catchIf(Effect.map(effect, Option.some<A>), isCodegenError, (error) =>
+    logCodegenError(error).pipe(Effect.as(Option.none<A>())),
+  ) as Effect.Effect<Option.Option<A>, Exclude<E, CodegenError>, R>;

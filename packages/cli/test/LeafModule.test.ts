@@ -86,7 +86,9 @@ const withTempFile = (
 const withTempLeaf = (
   stem: string,
   implContents: string,
-  use: (leaf: LeafModule) => Effect.Effect<
+  use: (
+    leaf: LeafModule,
+  ) => Effect.Effect<
     void,
     CodegenError,
     ConfectDirectory | Path.Path | FileSystem.FileSystem

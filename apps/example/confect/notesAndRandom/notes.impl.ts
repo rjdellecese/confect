@@ -69,9 +69,9 @@ const clearAll = FunctionImpl.make(api, notes, "clearAll", () =>
       .index("by_creation_time")
       .collect();
 
-    for (const note of allNotes) {
-      yield* writer.table("notes").delete(note._id);
-    }
+    yield* Effect.forEach(allNotes, (note) =>
+      writer.table("notes").delete(note._id),
+    );
 
     return null;
   }).pipe(Effect.orDie),

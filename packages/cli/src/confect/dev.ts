@@ -14,6 +14,7 @@ import {
   HashSet,
   Match,
   Option,
+  Order,
   pipe,
   Queue,
   Ref,
@@ -190,14 +191,15 @@ export const dev = Command.make("dev", {}, () =>
       Effect.tap(() => logSuccess("Generated files are up-to-date")),
       CodegenError.catchAndLog,
     );
-    const initialFunctionPaths =
-      initialResult?.functionPaths ?? emptyFunctionPaths;
+    const initialFunctionPaths = Option.match(initialResult, {
+      onNone: () => emptyFunctionPaths,
+      onSome: ({ functionPaths }) => functionPaths,
+    });
 
     const pendingRef = yield* Ref.make<Pending>(pendingInit);
     const signal = yield* Queue.sliding<void>(1);
     const restartQueue = yield* Queue.sliding<void>(1);
-    const watcherErrorsRef =
-      yield* Ref.make<WatcherErrors>(emptyWatcherErrors);
+    const watcherErrorsRef = yield* Ref.make<WatcherErrors>(emptyWatcherErrors);
 
     yield* Effect.all(
       [
@@ -210,12 +212,7 @@ export const dev = Command.make("dev", {}, () =>
           ),
         ),
         confectStructureWatcher(signal, pendingRef, restartQueue),
-        syncLoop(
-          signal,
-          pendingRef,
-          initialFunctionPaths,
-          watcherErrorsRef,
-        ),
+        syncLoop(signal, pendingRef, initialFunctionPaths, watcherErrorsRef),
       ],
       { concurrency: "unbounded" },
     );
@@ -225,31 +222,28 @@ export const dev = Command.make("dev", {}, () =>
 const esbuildMessageKey = (m: esbuild.Message): string =>
   `${m.location?.file ?? ""}:${m.location?.line ?? ""}:${m.location?.column ?? ""}:${m.text}`;
 
+const allMessages = (errors: WatcherErrors): ReadonlyArray<esbuild.Message> =>
+  pipe(Array.fromIterable(errors.values()), Array.flatten);
+
 const dedupeWatcherErrors = (
   errors: WatcherErrors,
-): readonly esbuild.Message[] => {
-  const seen = new Set<string>();
-  const unique: esbuild.Message[] = [];
-  for (const messages of errors.values()) {
-    for (const message of messages) {
-      const key = esbuildMessageKey(message);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      unique.push(message);
-    }
-  }
-  return unique;
-};
+): ReadonlyArray<esbuild.Message> =>
+  pipe(
+    allMessages(errors),
+    Array.dedupeWith(
+      (messageA, messageB) =>
+        esbuildMessageKey(messageA) === esbuildMessageKey(messageB),
+    ),
+  );
 
-const watcherErrorsSignature = (errors: WatcherErrors): string => {
-  const keys = new Set<string>();
-  for (const messages of errors.values()) {
-    for (const message of messages) {
-      keys.add(esbuildMessageKey(message));
-    }
-  }
-  return [...keys].sort().join("\n");
-};
+const watcherErrorsSignature = (errors: WatcherErrors): string =>
+  pipe(
+    allMessages(errors),
+    Array.map(esbuildMessageKey),
+    Array.dedupe,
+    Array.sort(Order.string),
+    Array.join("\n"),
+  );
 
 /**
  * Log any watcher errors that haven't already been logged at their
@@ -286,13 +280,17 @@ const drainUntilQuiescent = (
   Effect.gen(function* () {
     const start = yield* Clock.currentTimeMillis;
     const maxMillis = Duration.toMillis(maxWait);
-    while (true) {
-      yield* Effect.sleep(quiescence);
-      const drained = yield* Queue.takeAll(signal);
-      if (Chunk.isEmpty(drained)) return;
-      const now = yield* Clock.currentTimeMillis;
-      if (now - start >= maxMillis) return;
-    }
+    yield* Effect.iterate(true as boolean, {
+      while: (keepGoing) => keepGoing,
+      body: () =>
+        Effect.gen(function* () {
+          yield* Effect.sleep(quiescence);
+          const drained = yield* Queue.takeAll(signal);
+          if (Chunk.isEmpty(drained)) return false;
+          const now = yield* Clock.currentTimeMillis;
+          return now - start < maxMillis;
+        }),
+    });
   });
 
 const syncLoop = (
@@ -318,10 +316,7 @@ const syncLoop = (
           COALESCE_MAX_WAIT,
         );
 
-        yield* logChangedWatcherErrors(
-          watcherErrorsRef,
-          lastLoggedErrorsRef,
-        );
+        yield* logChangedWatcherErrors(watcherErrorsRef, lastLoggedErrorsRef);
 
         const pending = yield* Ref.getAndSet(pendingRef, pendingInit);
 
@@ -344,7 +339,7 @@ const syncLoop = (
             ),
             CodegenError.catchAndLog,
           );
-          if (current === undefined) {
+          if (Option.isNone(current)) {
             return;
           }
           // Drain any stragglers from this cycle's burst (slow watchers
@@ -352,7 +347,7 @@ const syncLoop = (
           // codegen wrote, the echo signals esbuild emits in response
           // to our writes. Reset `pendingRef` so those drained signals
           // don't carry a dirty flag into the next cycle.
-          if (current.anyWritesHappened) {
+          if (current.value.anyWritesHappened) {
             yield* Effect.sleep(ECHO_COOLDOWN);
           }
           yield* drainUntilQuiescent(
@@ -430,7 +425,7 @@ const discoverEntryPoints = Effect.gen(function* () {
     (relativePath) => tryEntry(relativePath, "specDirty"),
   );
 
-  return Array.filterMap([...fixedEntryOptions, ...implEntryOptions], (o) => o);
+  return Array.getSomes([...fixedEntryOptions, ...implEntryOptions]);
 });
 
 const esbuildOptions = (
@@ -446,7 +441,7 @@ const esbuildOptions = (
   // restart. Either way, the entry's contents were already accounted
   // for, so we record any errors but don't flip dirty or push a
   // signal — only genuine subsequent rebuilds should do that.
-  let initialBuildSeen = false;
+  const initialBuildSeenRef = Ref.unsafeMake(false);
   return {
     entryPoints: [entry.absolutePath],
     bundle: true,
@@ -462,11 +457,14 @@ const esbuildOptions = (
         name: "notify-rebuild",
         setup(build: esbuild.PluginBuild) {
           build.onEnd((result) => {
-            const isInitial = !initialBuildSeen;
-            initialBuildSeen = true;
             Effect.runPromise(
-              pipe(
-                Ref.update(watcherErrorsRef, (current) => {
+              Effect.gen(function* () {
+                const wasInitial = yield* Ref.getAndSet(
+                  initialBuildSeenRef,
+                  true,
+                );
+                const isInitial = !wasInitial;
+                yield* Ref.update(watcherErrorsRef, (current) => {
                   const next = new Map(current);
                   if (result.errors.length > 0) {
                     next.set(entry.absolutePath, result.errors);
@@ -474,19 +472,14 @@ const esbuildOptions = (
                     next.delete(entry.absolutePath);
                   }
                   return next;
-                }),
-                Effect.andThen(
-                  isInitial && result.errors.length === 0
-                    ? Effect.void
-                    : pipe(
-                        Ref.update(pendingRef, (p) => ({
-                          ...p,
-                          [entry.pendingKey]: true,
-                        })),
-                        Effect.andThen(Queue.offer(signal, undefined)),
-                      ),
-                ),
-              ),
+                });
+                if (isInitial && result.errors.length === 0) return;
+                yield* Ref.update(pendingRef, (p) => ({
+                  ...p,
+                  [entry.pendingKey]: true,
+                }));
+                yield* Queue.offer(signal, undefined);
+              }),
             );
           });
         },
@@ -541,41 +534,53 @@ const entryPointsWatcher = (
 ) =>
   Effect.gen(function* () {
     const parentScope = yield* Effect.scope;
-    const scopesRef = yield* Ref.make(
-      new Map<string, Scope.CloseableScope>(),
-    );
+    const scopesRef = yield* Ref.make(new Map<string, Scope.CloseableScope>());
 
     const sync = Effect.gen(function* () {
       const desired = yield* discoverEntryPoints;
-      const desiredByPath = new Map(desired.map((e) => [e.absolutePath, e]));
+      const desiredByPath = new Map(
+        desired.map((entryPoint) => [entryPoint.absolutePath, entryPoint]),
+      );
       const current = yield* Ref.get(scopesRef);
-      const next = new Map(current);
 
-      for (const [absolutePath, childScope] of current) {
-        if (!desiredByPath.has(absolutePath)) {
-          yield* Scope.close(childScope, Exit.void);
-          next.delete(absolutePath);
-        }
-      }
+      yield* Effect.forEach(
+        Array.fromIterable(current),
+        ([absolutePath, childScope]) =>
+          desiredByPath.has(absolutePath)
+            ? Effect.void
+            : Scope.close(childScope, Exit.void).pipe(
+                Effect.andThen(
+                  Ref.update(scopesRef, (scopes) => {
+                    const updated = new Map(scopes);
+                    updated.delete(absolutePath);
+                    return updated;
+                  }),
+                ),
+              ),
+      );
 
-      for (const entry of desired) {
-        if (next.has(entry.absolutePath)) {
-          continue;
-        }
-        const childScope = yield* Scope.fork(
-          parentScope,
-          ExecutionStrategy.sequential,
-        );
-        yield* createEntryPointWatcher(
-          entry,
-          signal,
-          pendingRef,
-          watcherErrorsRef,
-        ).pipe(Scope.extend(childScope));
-        next.set(entry.absolutePath, childScope);
-      }
+      yield* Effect.forEach(desired, (entry) =>
+        Effect.gen(function* () {
+          const existing = yield* Ref.get(scopesRef);
+          if (existing.has(entry.absolutePath)) return;
 
-      yield* Ref.set(scopesRef, next);
+          const childScope = yield* Scope.fork(
+            parentScope,
+            ExecutionStrategy.sequential,
+          );
+          yield* createEntryPointWatcher(
+            entry,
+            signal,
+            pendingRef,
+            watcherErrorsRef,
+          ).pipe(Scope.extend(childScope));
+          yield* Ref.update(scopesRef, (scopes) => {
+            const updated = new Map(scopes);
+            updated.set(entry.absolutePath, childScope);
+            return updated;
+          });
+        }),
+      );
     });
 
     yield* sync;

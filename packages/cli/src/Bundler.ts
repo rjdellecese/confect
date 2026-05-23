@@ -1,7 +1,7 @@
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { Path } from "@effect/platform";
-import { Effect } from "effect";
+import { Array, Effect, Option, pipe } from "effect";
 import * as esbuild from "esbuild";
 import { BundlerError } from "./BuildError";
 
@@ -99,7 +99,8 @@ const findMetafileInputKey = (
   Effect.gen(function* () {
     const path = yield* Path.Path;
     const resolved = path.resolve(absolutePath);
-    return Object.keys(metafile.inputs).find(
+    return Array.findFirst(
+      Object.keys(metafile.inputs),
       (key) => path.resolve(key) === resolved,
     );
   });
@@ -125,17 +126,19 @@ export const directlyImports = (
       targetAbsolutePath,
     );
 
-    if (sourceKey === undefined || targetKey === undefined) {
-      return false;
-    }
-
-    const targetResolved = path.resolve(targetKey);
-    const sourceInput = bundled.metafile.inputs[sourceKey];
-    if (sourceInput === undefined) {
-      return false;
-    }
-
-    return sourceInput.imports.some(
-      (imp) => path.resolve(imp.path) === targetResolved,
+    return pipe(
+      Option.all([sourceKey, targetKey]),
+      Option.flatMap(([sourceKey_, targetKey_]) =>
+        Option.fromNullable(bundled.metafile.inputs[sourceKey_]).pipe(
+          Option.map((sourceInput) => {
+            const targetResolved = path.resolve(targetKey_);
+            return sourceInput.imports.some(
+              (importedFile) =>
+                path.resolve(importedFile.path) === targetResolved,
+            );
+          }),
+        ),
+      ),
+      Option.getOrElse(() => false),
     );
   });
