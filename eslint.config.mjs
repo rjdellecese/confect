@@ -3,6 +3,7 @@
 
 import eslint from "@eslint/js";
 import * as mdx from "eslint-plugin-mdx";
+import unicorn from "eslint-plugin-unicorn";
 import tseslint from "typescript-eslint";
 
 export default [
@@ -19,6 +20,20 @@ export default [
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
+
+  {
+    files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
+    plugins: {
+      unicorn,
+    },
+    rules: {
+      "unicorn/filename-case": [
+        "error",
+        { cases: { camelCase: true, pascalCase: true } },
+      ],
+    },
+  },
+
   {
     files: ["**/*.{ts,tsx}"],
     languageOptions: {

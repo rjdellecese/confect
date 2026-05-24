@@ -6,7 +6,7 @@ import type { GenericId } from "convex/values";
 import { Array, Effect, Exit } from "effect";
 import { useEffect, useState } from "react";
 import refs from "../confect/_generated/refs";
-import { Api } from "../confect/http/path-prefix";
+import { Api } from "../confect/http/pathPrefix";
 
 const App = () => {
   const convexClient = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
