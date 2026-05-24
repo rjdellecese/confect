@@ -29,7 +29,7 @@ const resolveGroupPath = (
     ),
   );
 
-export const resolveGroupPathOrDie = (
+export const resolveGroupPathUnsafe = (
   spec: Spec.AnyWithProps,
   target: GroupSpec.AnyWithProps,
 ): string =>

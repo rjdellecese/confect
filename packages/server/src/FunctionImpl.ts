@@ -3,10 +3,10 @@ import type * as GroupSpec from "@confect/core/GroupSpec";
 import * as Registry from "@confect/core/Registry";
 import { Context, Effect, Layer, Ref, String } from "effect";
 import type * as Api from "./Api";
+import { resolveGroupPathUnsafe } from "./GroupPath";
 import type * as Handler from "./Handler";
 import { setNestedProperty } from "./internal/utils";
 import * as RegistryItem from "./RegistryItem";
-import { resolveGroupPathOrDie } from "./GroupPath";
 
 export interface FunctionImpl<
   GroupPath_ extends string,
@@ -44,7 +44,7 @@ export const make = <
     FunctionName
   >,
 ): Layer.Layer<FunctionImpl<string, FunctionName>> => {
-  const groupPath = resolveGroupPathOrDie(api.spec, group);
+  const groupPath = resolveGroupPathUnsafe(api.spec, group);
   const functionSpec = group.functions[functionName]!;
 
   return Layer.effect(

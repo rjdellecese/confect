@@ -14,7 +14,7 @@ import {
 } from "effect";
 import type * as Api from "./Api";
 import type * as FunctionImpl from "./FunctionImpl";
-import { resolveGroupPathOrDie } from "./GroupPath";
+import { resolveGroupPathUnsafe } from "./GroupPath";
 
 export const TypeId = "@confect/server/GroupImpl";
 export type TypeId = typeof TypeId;
@@ -83,7 +83,7 @@ export const make = <
   never,
   FunctionImpl.FromGroupSpec<Group>
 > => {
-  const groupPath = resolveGroupPathOrDie(api.spec, group);
+  const groupPath = resolveGroupPathUnsafe(api.spec, group);
 
   return Layer.succeed(
     GroupImpl<string, "Unfinalized">({
