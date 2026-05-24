@@ -1,5 +1,5 @@
 import { FunctionSpec, Ref } from "@confect/core";
-import { describe, expect, layer } from "@effect/vitest";
+import { assert, describe, expect, layer } from "@effect/vitest";
 import { ConvexError } from "convex/values";
 import {
   Chunk,
@@ -374,11 +374,9 @@ layer(RealLayer)("WebSocketClient error decoding", (it) => {
         const result = yield* Effect.either(
           client.query(queryWithError, { id: "abc" }),
         );
-        expect(Either.isLeft(result)).toBe(true);
-        if (Either.isLeft(result)) {
-          expect(result.left).toBeInstanceOf(NotFound);
-          expect((result.left as NotFound).id).toBe("abc");
-        }
+        assert(Either.isLeft(result));
+        assert(result.left instanceof NotFound);
+        expect(result.left.id).toBe("abc");
       }),
     );
 
@@ -390,12 +388,10 @@ layer(RealLayer)("WebSocketClient error decoding", (it) => {
         const result = yield* Effect.either(
           client.query(queryWithError, { id: "abc" }),
         );
-        expect(Either.isLeft(result)).toBe(true);
-        if (Either.isLeft(result)) {
-          expect(result.left).toBeInstanceOf(
-            WebSocketClient.WebSocketClientError,
-          );
-        }
+        assert(Either.isLeft(result));
+        expect(result.left).toBeInstanceOf(
+          WebSocketClient.WebSocketClientError,
+        );
       }),
     );
   });
@@ -411,10 +407,8 @@ layer(RealLayer)("WebSocketClient error decoding", (it) => {
         const result = yield* Effect.either(
           client.mutation(mutationWithError, { id: "abc" }),
         );
-        expect(Either.isLeft(result)).toBe(true);
-        if (Either.isLeft(result)) {
-          expect(result.left).toBeInstanceOf(NotFound);
-        }
+        assert(Either.isLeft(result));
+        expect(result.left).toBeInstanceOf(NotFound);
       }),
     );
   });
@@ -430,10 +424,8 @@ layer(RealLayer)("WebSocketClient error decoding", (it) => {
         const result = yield* Effect.either(
           client.action(actionWithError, { id: "abc" }),
         );
-        expect(Either.isLeft(result)).toBe(true);
-        if (Either.isLeft(result)) {
-          expect(result.left).toBeInstanceOf(NotFound);
-        }
+        assert(Either.isLeft(result));
+        expect(result.left).toBeInstanceOf(NotFound);
       }),
     );
   });
@@ -467,11 +459,9 @@ layer(RealLayer)("WebSocketClient error decoding", (it) => {
         );
 
         const result = yield* fiber;
-        expect(Either.isLeft(result)).toBe(true);
-        if (Either.isLeft(result)) {
-          expect(result.left).toBeInstanceOf(NotFound);
-          expect((result.left as NotFound).id).toBe("abc");
-        }
+        assert(Either.isLeft(result));
+        assert(result.left instanceof NotFound);
+        expect(result.left.id).toBe("abc");
       }),
     );
 
@@ -500,12 +490,10 @@ layer(RealLayer)("WebSocketClient error decoding", (it) => {
         subscribers[0]!.onError(new Error("network down"));
 
         const result = yield* fiber;
-        expect(Either.isLeft(result)).toBe(true);
-        if (Either.isLeft(result)) {
-          expect(result.left).toBeInstanceOf(
-            WebSocketClient.WebSocketClientError,
-          );
-        }
+        assert(Either.isLeft(result));
+        expect(result.left).toBeInstanceOf(
+          WebSocketClient.WebSocketClientError,
+        );
       }),
     );
   });

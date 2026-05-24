@@ -1,5 +1,5 @@
 import { FunctionSpec, Ref } from "@confect/core";
-import { describe, expect, layer } from "@effect/vitest";
+import { assert, describe, expect, layer } from "@effect/vitest";
 import { ConvexError } from "convex/values";
 import { Effect, Either, Schema } from "effect";
 import { beforeEach, vi } from "vitest";
@@ -190,11 +190,9 @@ layer(HttpClientLayer)("HttpClient error decoding", (it) => {
         const result = yield* Effect.either(
           client.query(queryWithError, { id: "abc" }),
         );
-        expect(Either.isLeft(result)).toBe(true);
-        if (Either.isLeft(result)) {
-          expect(result.left).toBeInstanceOf(NotFound);
-          expect((result.left as NotFound).id).toBe("abc");
-        }
+        assert(Either.isLeft(result));
+        assert(result.left instanceof NotFound);
+        expect(result.left.id).toBe("abc");
       }),
     );
 
@@ -207,13 +205,9 @@ layer(HttpClientLayer)("HttpClient error decoding", (it) => {
         const result = yield* Effect.either(
           client.query(queryWithError, { id: "abc" }),
         );
-        expect(Either.isLeft(result)).toBe(true);
-        if (Either.isLeft(result)) {
-          expect(result.left).toBeInstanceOf(HttpClient.HttpClientError);
-          expect((result.left as HttpClient.HttpClientError).cause).toBe(
-            transport,
-          );
-        }
+        assert(Either.isLeft(result));
+        assert(result.left instanceof HttpClient.HttpClientError);
+        expect(result.left.cause).toBe(transport);
       }),
     );
   });
@@ -229,10 +223,8 @@ layer(HttpClientLayer)("HttpClient error decoding", (it) => {
         const result = yield* Effect.either(
           client.mutation(mutationWithError, { id: "abc" }),
         );
-        expect(Either.isLeft(result)).toBe(true);
-        if (Either.isLeft(result)) {
-          expect(result.left).toBeInstanceOf(NotFound);
-        }
+        assert(Either.isLeft(result));
+        expect(result.left).toBeInstanceOf(NotFound);
       }),
     );
 
@@ -244,10 +236,8 @@ layer(HttpClientLayer)("HttpClient error decoding", (it) => {
         const result = yield* Effect.either(
           client.mutation(mutationWithError, { id: "abc" }),
         );
-        expect(Either.isLeft(result)).toBe(true);
-        if (Either.isLeft(result)) {
-          expect(result.left).toBeInstanceOf(HttpClient.HttpClientError);
-        }
+        assert(Either.isLeft(result));
+        expect(result.left).toBeInstanceOf(HttpClient.HttpClientError);
       }),
     );
   });
@@ -263,10 +253,8 @@ layer(HttpClientLayer)("HttpClient error decoding", (it) => {
         const result = yield* Effect.either(
           client.action(actionWithError, { id: "abc" }),
         );
-        expect(Either.isLeft(result)).toBe(true);
-        if (Either.isLeft(result)) {
-          expect(result.left).toBeInstanceOf(NotFound);
-        }
+        assert(Either.isLeft(result));
+        expect(result.left).toBeInstanceOf(NotFound);
       }),
     );
 
@@ -278,10 +266,8 @@ layer(HttpClientLayer)("HttpClient error decoding", (it) => {
         const result = yield* Effect.either(
           client.action(actionWithError, { id: "abc" }),
         );
-        expect(Either.isLeft(result)).toBe(true);
-        if (Either.isLeft(result)) {
-          expect(result.left).toBeInstanceOf(HttpClient.HttpClientError);
-        }
+        assert(Either.isLeft(result));
+        expect(result.left).toBeInstanceOf(HttpClient.HttpClientError);
       }),
     );
   });

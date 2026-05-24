@@ -211,13 +211,11 @@ export const validateSpec = (leaf: LeafModule) =>
       });
     }
 
-    const group = groupSpec as GroupSpec.AnyWithProps;
-
-    if (group.runtime !== leaf.runtime) {
+    if (groupSpec.runtime !== leaf.runtime) {
       return yield* new SpecRuntimeMismatchError({
         specPath: leaf.relativePath,
         expectedRuntime: leaf.runtime,
-        actualRuntime: group.runtime,
+        actualRuntime: groupSpec.runtime,
       });
     }
   });

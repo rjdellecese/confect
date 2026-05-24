@@ -1,8 +1,7 @@
 import { FileSystem, Path } from "@effect/platform";
 import { NodeFileSystem, NodePath } from "@effect/platform-node";
-import { expect, layer } from "@effect/vitest";
-import { Effect, Layer } from "effect";
-import type { BundleFailedError } from "../src/BuildError";
+import { assert, expect, layer } from "@effect/vitest";
+import { Effect, Either, Layer } from "effect";
 import type { CodegenError } from "../src/CodegenError";
 import { ConfectDirectory } from "../src/ConfectDirectory";
 import {
@@ -202,10 +201,8 @@ layer(LeafModuleLayer)("validateSpec", (it) => {
         ),
       );
 
-      expect(result._tag).toBe("Left");
-      if (result._tag === "Left") {
-        expect(result.left._tag).toBe("SpecMissingDefaultGroupSpecError");
-      }
+      assert(Either.isLeft(result));
+      expect(result.left._tag).toBe("SpecMissingDefaultGroupSpecError");
     }),
   );
 
@@ -220,13 +217,9 @@ layer(LeafModuleLayer)("validateSpec", (it) => {
         ),
       );
 
-      expect(result._tag).toBe("Left");
-      if (result._tag === "Left") {
-        expect(result.left._tag).toBe("BundleFailedError");
-        expect(
-          (result.left as BundleFailedError).errors.length,
-        ).toBeGreaterThan(0);
-      }
+      assert(Either.isLeft(result));
+      assert(result.left._tag === "BundleFailedError");
+      expect(result.left.errors.length).toBeGreaterThan(0);
     }),
   );
 });
@@ -254,10 +247,8 @@ export default Layer.empty;
         ),
       );
 
-      expect(result._tag).toBe("Left");
-      if (result._tag === "Left") {
-        expect(result.left._tag).toBe("ImplMissingSpecImportError");
-      }
+      assert(Either.isLeft(result));
+      expect(result.left._tag).toBe("ImplMissingSpecImportError");
     }),
   );
 
@@ -273,10 +264,8 @@ export default notes;
         ),
       );
 
-      expect(result._tag).toBe("Left");
-      if (result._tag === "Left") {
-        expect(result.left._tag).toBe("ImplMissingDefaultLayerError");
-      }
+      assert(Either.isLeft(result));
+      expect(result.left._tag).toBe("ImplMissingDefaultLayerError");
     }),
   );
 
@@ -292,13 +281,9 @@ export default GroupImpl.make(
         ),
       );
 
-      expect(result._tag).toBe("Left");
-      if (result._tag === "Left") {
-        expect(result.left._tag).toBe("BundleFailedError");
-        expect(
-          (result.left as BundleFailedError).errors.length,
-        ).toBeGreaterThan(0);
-      }
+      assert(Either.isLeft(result));
+      assert(result.left._tag === "BundleFailedError");
+      expect(result.left.errors.length).toBeGreaterThan(0);
     }),
   );
 
@@ -366,10 +351,8 @@ export default GroupImpl.make(api, notes).pipe(
           ),
         );
 
-        expect(result._tag).toBe("Left");
-        if (result._tag === "Left") {
-          expect(result.left._tag).toBe("ImplNotFinalizedError");
-        }
+        assert(Either.isLeft(result));
+        expect(result.left._tag).toBe("ImplNotFinalizedError");
       }),
   );
 
@@ -408,16 +391,12 @@ export default GroupImpl.make(api, notes).pipe(
           ),
         );
 
-        expect(result._tag).toBe("Left");
-        if (result._tag === "Left") {
-          expect(result.left._tag).toBe("ImplMissingFunctionsError");
-          if (result.left._tag === "ImplMissingFunctionsError") {
-            expect(result.left.groupPath).toBe("groups.notes");
-            expect([...result.left.missingFunctionNames].sort()).toEqual(
-              ["delete_", "getFirst", "internalGetFirst", "list"].sort(),
-            );
-          }
-        }
+        assert(Either.isLeft(result));
+        assert(result.left._tag === "ImplMissingFunctionsError");
+        expect(result.left.groupPath).toBe("groups.notes");
+        expect([...result.left.missingFunctionNames].sort()).toEqual(
+          ["delete_", "getFirst", "internalGetFirst", "list"].sort(),
+        );
       }),
   );
 });

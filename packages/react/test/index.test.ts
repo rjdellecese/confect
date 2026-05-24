@@ -1,7 +1,15 @@
 import { FunctionSpec, Ref } from "@confect/core";
 import { ConvexError } from "convex/values";
 import { Either, Schema } from "effect";
-import { beforeEach, describe, expect, expectTypeOf, test, vi } from "vitest";
+import {
+  assert,
+  beforeEach,
+  describe,
+  expect,
+  expectTypeOf,
+  test,
+  vi,
+} from "vitest";
 import type { InvokeReturn } from "../src/index";
 import { QueryResult, useAction, useMutation, useQuery } from "../src/index";
 
@@ -88,10 +96,8 @@ describe("useQuery", () => {
 
     const queryResult = useQuery(queryNoError, {});
 
-    expect(QueryResult.isLoading(queryResult)).toBe(true);
-    if (QueryResult.isLoading(queryResult)) {
-      expect(queryResult.skipped).toBe(false);
-    }
+    assert(QueryResult.isLoading(queryResult));
+    expect(queryResult.skipped).toBe(false);
   });
 
   test("returns Success with decoded value", () => {
@@ -99,10 +105,8 @@ describe("useQuery", () => {
 
     const queryResult = useQuery(queryNoError, {});
 
-    expect(QueryResult.isSuccess(queryResult)).toBe(true);
-    if (QueryResult.isSuccess(queryResult)) {
-      expect(queryResult.value).toEqual([{ text: "hello" }]);
-    }
+    assert(QueryResult.isSuccess(queryResult));
+    expect(queryResult.value).toEqual([{ text: "hello" }]);
   });
 
   test("Failure carries decoded typed error for a matching ConvexError", () => {
@@ -112,11 +116,9 @@ describe("useQuery", () => {
 
     const queryResult = useQuery(queryWithError, { id: "abc" });
 
-    expect(QueryResult.isFailure(queryResult)).toBe(true);
-    if (QueryResult.isFailure(queryResult)) {
-      expect(queryResult.error).toBeInstanceOf(NotFound);
-      expect(queryResult.error.id).toBe("abc");
-    }
+    assert(QueryResult.isFailure(queryResult));
+    expect(queryResult.error).toBeInstanceOf(NotFound);
+    expect(queryResult.error.id).toBe("abc");
   });
 
   test("rethrows a non-ConvexError as a defect", () => {
@@ -144,10 +146,8 @@ describe("useQuery", () => {
 
     const queryResult = useQuery(queryNoError, "skip");
 
-    expect(QueryResult.isLoading(queryResult)).toBe(true);
-    if (QueryResult.isLoading(queryResult)) {
-      expect(queryResult.skipped).toBe(true);
-    }
+    assert(QueryResult.isLoading(queryResult));
+    expect(queryResult.skipped).toBe(true);
     expect(useConvexQueryMock).toHaveBeenCalledExactlyOnceWith(
       expect.anything(),
       "skip",
@@ -159,10 +159,8 @@ describe("useQuery", () => {
 
     const queryResult = useQuery(queryWithError, "skip");
 
-    expect(QueryResult.isLoading(queryResult)).toBe(true);
-    if (QueryResult.isLoading(queryResult)) {
-      expect(queryResult.skipped).toBe(true);
-    }
+    assert(QueryResult.isLoading(queryResult));
+    expect(queryResult.skipped).toBe(true);
     expect(useConvexQueryMock).toHaveBeenCalledExactlyOnceWith(
       expect.anything(),
       "skip",
@@ -195,8 +193,8 @@ describe("useMutation", () => {
     const mutate = useMutation(mutationWithError);
     const either = await mutate({ id: "abc" });
 
-    expect(Either.isRight(either)).toBe(true);
-    if (Either.isRight(either)) expect(either.right).toBeNull();
+    assert(Either.isRight(either));
+    expect(either.right).toBeNull();
   });
 
   test("resolves to Either.Left with the decoded typed error for a matching ConvexError", async () => {
@@ -208,11 +206,9 @@ describe("useMutation", () => {
     const mutate = useMutation(mutationWithError);
     const either = await mutate({ id: "abc" });
 
-    expect(Either.isLeft(either)).toBe(true);
-    if (Either.isLeft(either)) {
-      expect(either.left).toBeInstanceOf(NotFound);
-      expect((either.left as NotFound).id).toBe("abc");
-    }
+    assert(Either.isLeft(either));
+    assert(either.left instanceof NotFound);
+    expect(either.left.id).toBe("abc");
   });
 
   test("rejects with the original error for a non-ConvexError", async () => {
@@ -261,8 +257,8 @@ describe("useAction", () => {
     const run = useAction(actionWithError);
     const either = await run({ id: "abc" });
 
-    expect(Either.isRight(either)).toBe(true);
-    if (Either.isRight(either)) expect(either.right).toBeNull();
+    assert(Either.isRight(either));
+    expect(either.right).toBeNull();
   });
 
   test("resolves to Either.Left with the decoded typed error for a matching ConvexError", async () => {
@@ -274,11 +270,9 @@ describe("useAction", () => {
     const run = useAction(actionWithError);
     const either = await run({ id: "abc" });
 
-    expect(Either.isLeft(either)).toBe(true);
-    if (Either.isLeft(either)) {
-      expect(either.left).toBeInstanceOf(NotFound);
-      expect((either.left as NotFound).id).toBe("abc");
-    }
+    assert(Either.isLeft(either));
+    assert(either.left instanceof NotFound);
+    expect(either.left.id).toBe("abc");
   });
 
   test("rejects with the original error for a non-ConvexError", async () => {

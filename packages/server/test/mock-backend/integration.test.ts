@@ -1,5 +1,5 @@
 import { GenericId } from "@confect/core";
-import { describe, expect, expectTypeOf, it } from "@effect/vitest";
+import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
 import { Array, Effect, Either } from "effect";
 import refs from "./fixtures/confect/_generated/refs";
@@ -235,8 +235,7 @@ describe("paginate", () => {
 });
 
 const expectFailure = <A, E>(either: Either.Either<A, E>): E => {
-  expect(Either.isLeft(either)).toBe(true);
-  if (!Either.isLeft(either)) throw new Error("unreachable");
+  assert(Either.isLeft(either));
   return either.left;
 };
 

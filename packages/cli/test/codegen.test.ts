@@ -1,8 +1,7 @@
 import { FileSystem, Path } from "@effect/platform";
 import { NodeFileSystem, NodePath } from "@effect/platform-node";
-import { expect, layer } from "@effect/vitest";
-import { Effect, Layer } from "effect";
-import type { BundleFailedError } from "../src/BuildError";
+import { assert, expect, layer } from "@effect/vitest";
+import { Effect, Either, Layer } from "effect";
 import { validateSchema } from "../src/confect/codegen";
 import { ConfectDirectory } from "../src/ConfectDirectory";
 
@@ -34,13 +33,9 @@ layer(CodegenLayer)("validateSchema", (it) => {
         );
         const result = yield* Effect.either(validateSchema);
 
-        expect(result._tag).toBe("Left");
-        if (result._tag === "Left") {
-          expect(result.left._tag).toBe("BundleFailedError");
-          expect(
-            (result.left as BundleFailedError).errors.length,
-          ).toBeGreaterThan(0);
-        }
+        assert(Either.isLeft(result));
+        assert(result.left._tag === "BundleFailedError");
+        expect(result.left.errors.length).toBeGreaterThan(0);
       }).pipe(
         Effect.ensuring(
           fs.writeFileString(schemaPath, original).pipe(Effect.orDie),
@@ -62,10 +57,8 @@ layer(CodegenLayer)("validateSchema", (it) => {
           yield* fs.writeFileString(schemaPath, "export default {};\n");
           const result = yield* Effect.either(validateSchema);
 
-          expect(result._tag).toBe("Left");
-          if (result._tag === "Left") {
-            expect(result.left._tag).toBe("SchemaInvalidDefaultExportError");
-          }
+          assert(Either.isLeft(result));
+          expect(result.left._tag).toBe("SchemaInvalidDefaultExportError");
         }).pipe(
           Effect.ensuring(
             fs.writeFileString(schemaPath, original).pipe(Effect.orDie),
@@ -89,10 +82,8 @@ layer(CodegenLayer)("validateSchema", (it) => {
         ),
       );
 
-      expect(result._tag).toBe("Left");
-      if (result._tag === "Left") {
-        expect(result.left._tag).toBe("MissingSchemaFileError");
-      }
+      assert(Either.isLeft(result));
+      expect(result.left._tag).toBe("MissingSchemaFileError");
     }).pipe(Effect.scoped),
   );
 });

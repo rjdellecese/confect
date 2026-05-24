@@ -6,7 +6,7 @@ import { validateConfectFunctionIdentifier } from "./internal/utils";
 export const TypeId = "@confect/core/GroupSpec";
 export type TypeId = typeof TypeId;
 
-export const isGroupSpec = (u: unknown): u is Any =>
+export const isGroupSpec = (u: unknown): u is AnyWithProps =>
   Predicate.hasProperty(u, TypeId);
 
 export interface GroupSpec<
