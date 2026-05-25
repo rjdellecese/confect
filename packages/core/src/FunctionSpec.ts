@@ -331,7 +331,10 @@ const makeConvex =
       runtimeAndFunctionType,
       functionVisibility,
       name,
-      functionProvenance: FunctionProvenance.Convex(),
+      functionProvenance: FunctionProvenance.Convex<
+        ExtractArgs<F>,
+        ExtractReturns<F>
+      >(),
     }) as any;
   };
 

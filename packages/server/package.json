@@ -61,8 +61,6 @@
   "license": "ISC",
   "devDependencies": {
     "@ark/attest": "0.56.0",
-    "@confect/cli": "workspace:*",
-    "@confect/test": "workspace:*",
     "@effect/cluster": "0.58.2",
     "@effect/experimental": "0.60.0",
     "@effect/platform": "0.96.1",
@@ -91,7 +89,7 @@
     "@confect/core": "workspace:^",
     "@effect/platform": "^0.96.1",
     "@effect/platform-node": "^0.106.0",
-    "convex": "^1.30.0",
+    "convex": "1.39.1",
     "effect": "^3.21.2"
   },
   "engines": {

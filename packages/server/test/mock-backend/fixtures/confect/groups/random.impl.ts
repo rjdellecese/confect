@@ -1,11 +1,13 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Effect, Layer } from "effect";
 import api from "../_generated/api";
+import random from "./random.spec";
 
-const getNumber = FunctionImpl.make(api, "groups.random", "getNumber", () =>
+const getNumber = FunctionImpl.make(api, random, "getNumber", () =>
   Effect.succeed(Math.random()).pipe(Effect.orDie),
 );
 
-export const random = GroupImpl.make(api, "groups.random").pipe(
+export default GroupImpl.make(api, random).pipe(
   Layer.provide(getNumber),
+  GroupImpl.finalize,
 );

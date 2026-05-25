@@ -6,9 +6,7 @@ export class NodeNotFound extends Schema.TaggedError<NodeNotFound>()(
   { id: Schema.String },
 ) {}
 
-export const typedErrorsNode = GroupSpec.makeNode(
-  "typedErrorsNode",
-).addFunction(
+export default GroupSpec.makeNode().addFunction(
   FunctionSpec.publicNodeAction({
     name: "failingNodeAction",
     args: Schema.Struct({ id: Schema.String }),

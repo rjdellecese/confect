@@ -32,7 +32,7 @@
   },
   "scripts": {
     "build": "tsdown --config-loader unrun",
-    "dev": "tsdown --watch",
+    "dev": "tsdown --watch --config-loader unrun",
     "test": "vitest run",
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "fix": "prettier --write . && eslint --fix . --max-warnings=0",
@@ -77,6 +77,7 @@
   },
   "peerDependencies": {
     "@confect/core": "workspace:^",
+    "@confect/server": "workspace:^",
     "effect": "^3.21.2"
   },
   "engines": {

@@ -63,6 +63,7 @@
     "effect": "3.21.2",
     "eslint": "10.0.2",
     "eslint-plugin-mdx": "3.7.0",
+    "eslint-plugin-unicorn": "64.0.0",
     "opensrc": "0.7.2",
     "prettier": "3.8.1",
     "tsdown": "0.20.3",

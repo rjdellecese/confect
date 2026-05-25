@@ -1,19 +1,18 @@
 import type { FunctionSpec, Spec } from "@confect/core";
-import { createRequire } from "node:module";
-import { pathToFileURL } from "node:url";
 import { FileSystem, Path } from "@effect/platform";
 import type { PlatformError } from "@effect/platform/Error";
 import {
   Array,
+  Context,
   Effect,
   HashSet,
   Option,
   Order,
   pipe,
   Record,
+  Ref,
   String,
 } from "effect";
-import * as esbuild from "esbuild";
 import * as FunctionPaths from "./FunctionPaths";
 import * as GroupPath from "./GroupPath";
 import * as GroupPaths from "./GroupPaths";
@@ -22,6 +21,24 @@ import { ConfectDirectory } from "./ConfectDirectory";
 import { ConvexDirectory } from "./ConvexDirectory";
 import * as templates from "./templates";
 
+/**
+ * Tracks whether the current codegen run wrote anything to disk. Set to
+ * `true` by every helper that actually overwrites a file (skipping the
+ * content-unchanged case). `codegenHandler` provides a fresh `Ref` per
+ * run and reads it back to report `anyWritesHappened`; callers outside a
+ * codegen pass hit the cached default `Ref` and need not interact with
+ * the tracker.
+ */
+export class WriteTracker extends Context.Reference<WriteTracker>()(
+  "@confect/cli/WriteTracker",
+  { defaultValue: () => Ref.unsafeMake(false) },
+) {}
+
+const markWritten = Effect.gen(function* () {
+  const tracker = yield* WriteTracker;
+  yield* Ref.set(tracker, true);
+});
+
 export const removePathExtension = (pathStr: string) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
@@ -29,65 +46,11 @@ export const removePathExtension = (pathStr: string) =>
     return String.slice(0, -path.extname(pathStr).length)(pathStr);
   });
 
-export const EXTERNAL_PACKAGES = [
-  "@confect/core",
-  "@confect/server",
-  "effect",
-  "@effect/*",
-];
-
-const isExternalImport = (path: string) =>
-  EXTERNAL_PACKAGES.some((p) => {
-    if (p.endsWith("/*")) {
-      return path.startsWith(p.slice(0, -1));
-    }
-    return path === p || path.startsWith(p + "/");
-  });
-
-const absoluteExternalsPlugin: esbuild.Plugin = {
-  name: "absolute-externals",
-  setup(build) {
-    build.onResolve({ filter: /.*/ }, async (args) => {
-      if (args.kind !== "import-statement" && args.kind !== "dynamic-import")
-        return;
-      if (!isExternalImport(args.path)) return;
-      // `import.meta.resolve`'s second argument is silently ignored in modern
-      // Node, so resolution would always walk up from the CLI's bundled file
-      // (`packages/cli/dist/utils.mjs`) instead of from the user's project.
-      // Use `createRequire` keyed on the importing file's directory so we
-      // resolve out of *their* `node_modules`. The synthetic filename is just
-      // a CommonJS resolution anchor; the file does not need to exist.
-      const parentFile = pathToFileURL(args.resolveDir + "/_").href;
-      const require_ = createRequire(parentFile);
-      const resolvedPath = require_.resolve(args.path);
-      const resolved = pathToFileURL(resolvedPath).href;
-      return { path: resolved, external: true };
-    });
-  },
-};
-
-/**
- * Bundle a TypeScript entry point with esbuild and import the result via a
- * data URL. This handles extensionless `.ts` imports regardless of whether the
- * user's project sets `"type": "module"` in package.json.
- */
-export const bundleAndImport = (entryPoint: string) =>
+/** Ensures a relative path is a valid ESM/TS module specifier (e.g. `spec` → `./spec`). */
+export const toModuleImportPath = (relativePath: string) =>
   Effect.gen(function* () {
-    const result = yield* Effect.promise(() =>
-      esbuild.build({
-        entryPoints: [entryPoint],
-        bundle: true,
-        write: false,
-        platform: "node",
-        format: "esm",
-        logLevel: "silent",
-        plugins: [absoluteExternalsPlugin],
-      }),
-    );
-    const code = result.outputFiles[0]!.text;
-    const dataUrl =
-      "data:text/javascript;base64," + Buffer.from(code).toString("base64");
-    return yield* Effect.promise(() => import(dataUrl));
+    const withoutExt = yield* removePathExtension(relativePath);
+    return withoutExt.startsWith(".") ? withoutExt : `./${withoutExt}`;
   });
 
 export const writeFileStringAndLog = (filePath: string, contents: string) =>
@@ -95,12 +58,14 @@ export const writeFileStringAndLog = (filePath: string, contents: string) =>
     const fs = yield* FileSystem.FileSystem;
     if (!(yield* fs.exists(filePath))) {
       yield* fs.writeFileString(filePath, contents);
+      yield* markWritten;
       yield* logFileAdded(filePath);
       return;
     }
     const existing = yield* fs.readFileString(filePath);
     if (existing !== contents) {
       yield* fs.writeFileString(filePath, contents);
+      yield* markWritten;
       yield* logFileModified(filePath);
     }
   });
@@ -136,28 +101,73 @@ export const writeFileString = (
 
     if (!(yield* fs.exists(filePath))) {
       yield* fs.writeFileString(filePath, contents);
+      yield* markWritten;
       return "Added";
     }
     const existing = yield* fs.readFileString(filePath);
     if (existing !== contents) {
       yield* fs.writeFileString(filePath, contents);
+      yield* markWritten;
       return "Modified";
     }
     return "Unchanged";
   });
 
+export const removePathIfExists = (
+  filePath: string,
+): Effect.Effect<void, PlatformError, FileSystem.FileSystem> =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+
+    if (!(yield* fs.exists(filePath))) {
+      return;
+    }
+
+    yield* fs
+      .remove(filePath)
+      .pipe(
+        Effect.catchTag("SystemError", (error) =>
+          error.reason === "NotFound" ? Effect.void : Effect.fail(error),
+        ),
+      );
+  });
+
+/**
+ * Bump the mtime of `convex/schema.ts` so the Convex CLI's chokidar watcher
+ * emits a `change` event after every successful Confect codegen run. Without
+ * this, a codegen that doesn't change any file content (for example,
+ * recovering from a transient broken state in `confect/`) leaves Convex
+ * stuck on its previous error because nothing it observes has changed.
+ */
+export const touchConvexSchema = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const convexDirectory = yield* ConvexDirectory.get;
+  const schemaPath = path.join(convexDirectory, "schema.ts");
+
+  if (!(yield* fs.exists(schemaPath))) {
+    return;
+  }
+
+  const now = new Date();
+  yield* fs.utimes(schemaPath, now, now);
+});
+
 export const generateGroupModule = ({
   groupPath,
   functionNames,
+  registeredFunctionsImportPath,
+  useNode = false,
 }: {
   groupPath: GroupPath.GroupPath;
   functionNames: string[];
+  registeredFunctionsImportPath: string;
+  useNode?: boolean;
 }) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const convexDirectory = yield* ConvexDirectory.get;
-    const confectDirectory = yield* ConfectDirectory.get;
 
     const relativeModulePath = yield* GroupPath.modulePath(groupPath);
     const modulePath = path.join(convexDirectory, relativeModulePath);
@@ -167,42 +177,21 @@ export const generateGroupModule = ({
       yield* fs.makeDirectory(directoryPath, { recursive: true });
     }
 
-    const isNodeGroup = groupPath.pathSegments[0] === "node";
-    const registeredFunctionsFileName = isNodeGroup
-      ? "nodeRegisteredFunctions.ts"
-      : "registeredFunctions.ts";
-    const registeredFunctionsPath = path.join(
-      confectDirectory,
-      "_generated",
-      registeredFunctionsFileName,
-    );
-    const registeredFunctionsImportPath = yield* removePathExtension(
-      path.relative(path.dirname(modulePath), registeredFunctionsPath),
-    );
-    const registeredFunctionsVariableName = isNodeGroup
-      ? "nodeRegisteredFunctions"
-      : "registeredFunctions";
-
     const functionsContentsString = yield* templates.functions({
-      groupPath,
       functionNames,
       registeredFunctionsImportPath,
-      registeredFunctionsVariableName,
-      useNode: isNodeGroup,
-      ...(isNodeGroup
-        ? {
-            registeredFunctionsLookupPath: groupPath.pathSegments.slice(1),
-          }
-        : {}),
+      useNode,
     });
 
     if (!(yield* fs.exists(modulePath))) {
       yield* fs.writeFileString(modulePath, functionsContentsString);
+      yield* markWritten;
       return "Added" as const;
     }
     const existing = yield* fs.readFileString(modulePath);
     if (existing !== functionsContentsString) {
       yield* fs.writeFileString(modulePath, functionsContentsString);
+      yield* markWritten;
       return "Modified" as const;
     }
     return "Unchanged" as const;
@@ -228,6 +217,7 @@ export const generateFunctions = (spec: Spec.AnyWithProps) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
     const convexDirectory = yield* ConvexDirectory.get;
+    const confectDirectory = yield* ConfectDirectory.get;
 
     const groupPathsFromFs = yield* getGroupPathsFromFs;
     const functionPaths = FunctionPaths.make(spec);
@@ -250,12 +240,30 @@ export const generateFunctions = (spec: Spec.AnyWithProps) =>
           ),
           Array.map((fn) => fn.name),
         );
-        const result = yield* generateGroupModule({ groupPath, functionNames });
+        const relativeModulePath = yield* GroupPath.modulePath(groupPath);
+        const modulePath = path.join(convexDirectory, relativeModulePath);
+        const registrySegments =
+          groupPath.pathSegments[0] === "node"
+            ? groupPath.pathSegments.slice(1)
+            : groupPath.pathSegments;
+        const registeredFunctionsPath =
+          path.join(
+            confectDirectory,
+            "_generated",
+            "registeredFunctions",
+            ...registrySegments,
+          ) + ".ts";
+        const registeredFunctionsImportPath = yield* toModuleImportPath(
+          path.relative(path.dirname(modulePath), registeredFunctionsPath),
+        );
+        const result = yield* generateGroupModule({
+          groupPath,
+          functionNames,
+          registeredFunctionsImportPath,
+          useNode: groupPath.pathSegments[0] === "node",
+        });
         if (result === "Modified") {
-          const relativeModulePath = yield* GroupPath.modulePath(groupPath);
-          yield* logFileModified(
-            path.join(convexDirectory, relativeModulePath),
-          );
+          yield* logFileModified(modulePath);
         }
       }),
     );
@@ -308,7 +316,6 @@ const getGroupPathsFromFs = Effect.gen(function* () {
 
 export const removeGroups = (groupPaths: GroupPaths.GroupPaths) =>
   Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const convexDirectory = yield* ConvexDirectory.get;
 
@@ -320,7 +327,7 @@ export const removeGroups = (groupPaths: GroupPaths.GroupPaths) =>
 
           yield* Effect.logDebug(`Removing group '${relativeModulePath}'...`);
 
-          yield* fs.remove(modulePath);
+          yield* removePathIfExists(modulePath);
           yield* Effect.logDebug(`Group '${relativeModulePath}' removed`);
         }),
       ),
@@ -334,6 +341,9 @@ export const writeGroups = (
 ) =>
   Effect.forEach(groupPaths, (groupPath) =>
     Effect.gen(function* () {
+      const path = yield* Path.Path;
+      const convexDirectory = yield* ConvexDirectory.get;
+      const confectDirectory = yield* ConfectDirectory.get;
       const group = yield* GroupPath.getGroupSpec(spec, groupPath);
 
       const functionNames = pipe(
@@ -348,10 +358,25 @@ export const writeGroups = (
         Array.map((fn) => fn.name),
       );
 
+      const relativeModulePath = yield* GroupPath.modulePath(groupPath);
+      const modulePath = path.join(convexDirectory, relativeModulePath);
+      const registeredFunctionsPath =
+        path.join(
+          confectDirectory,
+          "_generated",
+          "registeredFunctions",
+          ...groupPath.pathSegments,
+        ) + ".ts";
+      const registeredFunctionsImportPath = yield* toModuleImportPath(
+        path.relative(path.dirname(modulePath), registeredFunctionsPath),
+      );
+
       yield* Effect.logDebug(`Generating group ${groupPath}...`);
       yield* generateGroupModule({
         groupPath,
         functionNames,
+        registeredFunctionsImportPath,
+        useNode: groupPath.pathSegments[0] === "node",
       });
       yield* Effect.logDebug(`Group ${groupPath} generated`);
     }),

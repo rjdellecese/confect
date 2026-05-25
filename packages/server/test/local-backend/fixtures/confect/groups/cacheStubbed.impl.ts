@@ -9,31 +9,32 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Clock, Effect, Layer } from "effect";
 import api from "../_generated/api";
+import cacheStubbed from "./cacheStubbed.spec";
 
 const confectNoTime = FunctionImpl.make(
   api,
-  "groups.cacheStubbed",
+  cacheStubbed,
   "confectNoTime",
   () => Effect.sync(() => Math.random()),
 );
 
 const confectWithClock = FunctionImpl.make(
   api,
-  "groups.cacheStubbed",
+  cacheStubbed,
   "confectWithClock",
   () => Clock.currentTimeMillis,
 );
 
 const confectWithRawDateNow = FunctionImpl.make(
   api,
-  "groups.cacheStubbed",
+  cacheStubbed,
   "confectWithRawDateNow",
   () => Effect.sync(() => Date.now()),
 );
 
 const confectWithSpan = FunctionImpl.make(
   api,
-  "groups.cacheStubbed",
+  cacheStubbed,
   "confectWithSpan",
   () =>
     Effect.sync(() => Math.random()).pipe(
@@ -43,7 +44,7 @@ const confectWithSpan = FunctionImpl.make(
 
 const confectWithLog = FunctionImpl.make(
   api,
-  "groups.cacheStubbed",
+  cacheStubbed,
   "confectWithLog",
   () =>
     Effect.gen(function* () {
@@ -52,10 +53,11 @@ const confectWithLog = FunctionImpl.make(
     }),
 );
 
-export const cacheStubbed = GroupImpl.make(api, "groups.cacheStubbed").pipe(
+export default GroupImpl.make(api, cacheStubbed).pipe(
   Layer.provide(confectNoTime),
   Layer.provide(confectWithClock),
   Layer.provide(confectWithRawDateNow),
   Layer.provide(confectWithSpan),
   Layer.provide(confectWithLog),
+  GroupImpl.finalize,
 );

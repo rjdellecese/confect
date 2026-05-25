@@ -1,7 +1,7 @@
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import { Schema } from "effect";
 
-export const email = GroupSpec.makeNode("email")
+export default GroupSpec.makeNode()
   .addFunction(
     FunctionSpec.publicNodeAction({
       name: "send",

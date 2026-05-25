@@ -1,5 +1,5 @@
 "use node";
 
-import nodeRegisteredFunctions from "../../confect/_generated/nodeRegisteredFunctions";
+import registeredFunctions from "../../confect/_generated/registeredFunctions/typedErrorsNode";
 
-export const failingNodeAction = nodeRegisteredFunctions.typedErrorsNode.failingNodeAction;
+export const failingNodeAction = registeredFunctions.failingNodeAction;

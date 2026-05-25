@@ -7,7 +7,7 @@ import {
 import { Schema } from "effect";
 import { Notes } from "./tables/Notes";
 
-export const databaseReader = GroupSpec.make("databaseReader")
+export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicQuery({
       name: "getNote",

@@ -7,7 +7,7 @@ export class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
   { noteId: GenericId.GenericId("notes") },
 ) {}
 
-export const notes = GroupSpec.make("notes")
+export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicMutation({
       name: "insert",

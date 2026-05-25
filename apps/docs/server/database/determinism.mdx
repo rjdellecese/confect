@@ -20,7 +20,7 @@ Mutations and actions are not affected by any of this. Real time is always avail
 
 The following do **not** observe real time from within a query handler and so do not interfere with caching:
 
-- `Effect.log` / `Effect.logInfo` / etc.
+- `Effect.log`/`Effect.logInfo`/etc.
 - `Effect.withSpan` and other tracing primitives
 - Forking fibers, the default scheduler, and other Effect internals
 - A bare `Date.now()` call inside the handler (returns `0`)

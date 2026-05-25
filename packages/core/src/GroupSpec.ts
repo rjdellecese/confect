@@ -6,7 +6,7 @@ import { validateConfectFunctionIdentifier } from "./internal/utils";
 export const TypeId = "@confect/core/GroupSpec";
 export type TypeId = typeof TypeId;
 
-export const isGroupSpec = (u: unknown): u is Any =>
+export const isGroupSpec = (u: unknown): u is AnyWithProps =>
   Predicate.hasProperty(u, TypeId);
 
 export interface GroupSpec<
@@ -34,6 +34,14 @@ export interface GroupSpec<
   addGroup<Group extends AnyWithPropsWithRuntime<Runtime>>(
     group: Group,
   ): GroupSpec<Runtime, Name_, Functions_, Groups_ | Group>;
+
+  addGroupAt<
+    const AtName extends string,
+    Group extends AnyWithPropsWithRuntime<Runtime>,
+  >(
+    name: AtName,
+    group: Group,
+  ): GroupSpec<Runtime, Name_, Functions_, Groups_ | NamedAt<Group, AtName>>;
 }
 
 export interface Any {
@@ -75,6 +83,14 @@ export type WithName<
   Name_ extends Name<Group>,
 > = Extract<Group, { readonly name: Name_ }>;
 
+/** Assigns a segment name to a leaf group created with {@link make} for typing and refs. */
+export type NamedAt<Group extends Any, Name_ extends string> = Omit<
+  Group,
+  "name"
+> & {
+  readonly name: Name_;
+};
+
 const Proto = {
   [TypeId]: TypeId,
 
@@ -103,6 +119,18 @@ const Proto = {
       groups: Record.set(this_.groups, group_.name, group_),
     });
   },
+
+  addGroupAt<Group extends Any>(this: Any, name: string, group: Group) {
+    const this_ = this as AnyWithProps;
+    const group_ = group as unknown as AnyWithProps;
+
+    return makeProto({
+      runtime: this_.runtime,
+      name: this_.name,
+      functions: this_.functions,
+      groups: Record.set(this_.groups, name, withName(name, group_)),
+    });
+  },
 };
 
 const makeProto = <
@@ -128,7 +156,15 @@ const makeProto = <
     groups,
   });
 
-export const make = <const Name_ extends string>(
+export const make = (): GroupSpec<"Convex", ""> =>
+  makeProto({
+    runtime: "Convex",
+    name: "",
+    functions: Record.empty(),
+    groups: Record.empty(),
+  });
+
+export const makeAt = <const Name_ extends string>(
   name: Name_,
 ): GroupSpec<"Convex", Name_> => {
   validateConfectFunctionIdentifier(name);
@@ -141,7 +177,15 @@ export const make = <const Name_ extends string>(
   });
 };
 
-export const makeNode = <const Name_ extends string>(
+export const makeNode = (): GroupSpec<"Node", ""> =>
+  makeProto({
+    runtime: "Node",
+    name: "",
+    functions: Record.empty(),
+    groups: Record.empty(),
+  });
+
+export const makeNodeAt = <const Name_ extends string>(
   name: Name_,
 ): GroupSpec<"Node", Name_> => {
   validateConfectFunctionIdentifier(name);
@@ -152,4 +196,20 @@ export const makeNode = <const Name_ extends string>(
     functions: Record.empty(),
     groups: Record.empty(),
   });
+};
+
+export const withName = <const Name_ extends string>(
+  name: Name_,
+  group: Any,
+): AnyWithProps => {
+  validateConfectFunctionIdentifier(name);
+  const group_ = group as AnyWithProps;
+
+  if (group_.name === name) {
+    return group_;
+  }
+
+  // Keep object identity so impls can pass the same GroupSpec instance
+  // imported from a sibling `.spec.ts` into `resolveGroupPath`.
+  return Object.assign(group_, { name }) as AnyWithProps;
 };

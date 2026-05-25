@@ -1,27 +1,21 @@
-import type { Options as CodeBlockWriterOptions } from "code-block-writer";
-import CodeBlockWriter_ from "code-block-writer";
-import { Array, Effect } from "effect";
-import type * as GroupPath from "./GroupPath";
+import { Array, Effect, Option } from "effect";
+import { CodeBlockWriter } from "./CodeBlockWriter";
+import {
+  collectImportBindings,
+  type SpecAssemblyNode,
+} from "./SpecAssemblyNode";
 
 export const functions = ({
-  groupPath,
   functionNames,
   registeredFunctionsImportPath,
-  registeredFunctionsVariableName = "registeredFunctions",
-  registeredFunctionsLookupPath,
   useNode = false,
 }: {
-  groupPath: GroupPath.GroupPath;
   functionNames: string[];
   registeredFunctionsImportPath: string;
-  registeredFunctionsVariableName?: string;
-  registeredFunctionsLookupPath?: readonly string[];
   useNode?: boolean;
 }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
-
-    const lookupPath = registeredFunctionsLookupPath ?? groupPath.pathSegments;
 
     if (useNode) {
       yield* cbw.writeLine(`"use node";`);
@@ -29,14 +23,14 @@ export const functions = ({
     }
 
     yield* cbw.writeLine(
-      `import ${registeredFunctionsVariableName} from "${registeredFunctionsImportPath}";`,
+      `import registeredFunctions from "${registeredFunctionsImportPath}";`,
     );
     yield* cbw.newLine();
-    for (const functionName of functionNames) {
-      yield* cbw.writeLine(
-        `export const ${functionName} = ${registeredFunctionsVariableName}.${Array.join([...lookupPath, functionName], ".")};`,
-      );
-    }
+    yield* Effect.forEach(functionNames, (functionName) =>
+      cbw.writeLine(
+        `export const ${functionName} = registeredFunctions.${functionName};`,
+      ),
+    );
 
     return yield* cbw.toString();
   });
@@ -92,21 +86,24 @@ export const refs = ({
   nodeSpecImportPath,
 }: {
   specImportPath: string;
-  nodeSpecImportPath?: string;
+  nodeSpecImportPath: Option.Option<string>;
 }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
     yield* cbw.writeLine(`import { Refs } from "@confect/core";`);
     yield* cbw.writeLine(`import spec from "${specImportPath}";`);
-    if (nodeSpecImportPath !== undefined) {
-      yield* cbw.writeLine(`import nodeSpec from "${nodeSpecImportPath}";`);
-    }
+    yield* Option.match(nodeSpecImportPath, {
+      onNone: () => Effect.void,
+      onSome: (nodeSpecImportPath_) =>
+        cbw.writeLine(`import nodeSpec from "${nodeSpecImportPath_}";`),
+    });
     yield* cbw.blankLine();
     yield* cbw.writeLine(
-      nodeSpecImportPath !== undefined
-        ? `export default Refs.make(spec, nodeSpec);`
-        : `export default Refs.make(spec);`,
+      Option.match(nodeSpecImportPath, {
+        onSome: () => `export default Refs.make(spec, nodeSpec);`,
+        onNone: () => `export default Refs.make(spec);`,
+      }),
     );
 
     return yield* cbw.toString();
@@ -151,45 +148,43 @@ export const nodeApi = ({
     return yield* cbw.toString();
   });
 
-export const registeredFunctions = ({
+export const registeredFunctionsForGroup = ({
+  apiImportPath,
+  groupPathDot,
   implImportPath,
+  layerExportName,
+  useNode = false,
 }: {
+  apiImportPath: string;
+  groupPathDot: string;
   implImportPath: string;
+  layerExportName: string;
+  useNode?: boolean;
 }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-    yield* cbw.writeLine(
-      `import { RegisteredConvexFunction, RegisteredFunctions } from "@confect/server";`,
-    );
-    yield* cbw.writeLine(`import impl from "${implImportPath}";`);
-    yield* cbw.blankLine();
-    yield* cbw.writeLine(
-      `export default RegisteredFunctions.make(impl, RegisteredConvexFunction.make);`,
-    );
+    if (useNode) {
+      yield* cbw.writeLine(
+        `import { RegisteredFunctions } from "@confect/server";`,
+      );
+      yield* cbw.writeLine(
+        `import { RegisteredNodeFunction } from "@confect/server/node";`,
+      );
+    } else {
+      yield* cbw.writeLine(
+        `import { RegisteredConvexFunction, RegisteredFunctions } from "@confect/server";`,
+      );
+    }
 
-    return yield* cbw.toString();
-  });
-
-export const nodeRegisteredFunctions = ({
-  nodeImplImportPath,
-}: {
-  nodeImplImportPath: string;
-}) =>
-  Effect.gen(function* () {
-    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
-
-    yield* cbw.writeLine(
-      `import { RegisteredFunctions } from "@confect/server";`,
-    );
-    yield* cbw.writeLine(
-      `import { RegisteredNodeFunction } from "@confect/server/node";`,
-    );
+    yield* cbw.writeLine(`import api from "${apiImportPath}";`);
+    yield* cbw.writeLine(`import ${layerExportName} from "${implImportPath}";`);
     yield* cbw.blankLine();
-    yield* cbw.writeLine(`import nodeImpl from "${nodeImplImportPath}";`);
-    yield* cbw.blankLine();
+    const quotedGroupPath = `"${groupPathDot.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
     yield* cbw.writeLine(
-      `export default RegisteredFunctions.make(nodeImpl, RegisteredNodeFunction.make);`,
+      useNode
+        ? `export default RegisteredFunctions.buildForGroup(api, ${quotedGroupPath}, ${layerExportName}, RegisteredNodeFunction.make);`
+        : `export default RegisteredFunctions.buildForGroup(api, ${quotedGroupPath}, ${layerExportName}, RegisteredConvexFunction.make);`,
     );
 
     return yield* cbw.toString();
@@ -382,64 +377,101 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
     return yield* cbw.toString();
   });
 
-class CodeBlockWriter {
-  private readonly writer: CodeBlockWriter_;
+const writeChildAddGroupAt = (
+  cbw: CodeBlockWriter,
+  child: SpecAssemblyNode,
+  groupFactory: string,
+): Effect.Effect<void> =>
+  Effect.gen(function* () {
+    yield* cbw.write(".addGroupAt(");
+    yield* cbw.quote(child.segment);
+    yield* cbw.write(", ");
+    yield* writeGroupAssembly(cbw, child, groupFactory);
+    yield* cbw.write(")");
+  });
 
-  constructor(opts?: Partial<CodeBlockWriterOptions>) {
-    this.writer = new CodeBlockWriter_(opts);
-  }
+const writeGroupFactoryCall = (
+  cbw: CodeBlockWriter,
+  node: SpecAssemblyNode,
+  groupFactory: string,
+): Effect.Effect<void> =>
+  Effect.gen(function* () {
+    yield* cbw.write(groupFactory);
+    yield* cbw.write("(");
+    yield* cbw.quote(node.segment);
+    yield* cbw.write(")");
 
-  indent<E = never, R = never>(
-    eff: Effect.Effect<void, E, R>,
-  ): Effect.Effect<void, E, R> {
-    return Effect.gen(this, function* () {
-      const indentationLevel = this.writer.getIndentationLevel();
-      this.writer.setIndentationLevel(indentationLevel + 1);
-      yield* eff;
-      this.writer.setIndentationLevel(indentationLevel);
-    });
-  }
+    yield* Effect.forEach(node.children, (child) =>
+      writeChildAddGroupAt(cbw, child, groupFactory),
+    );
+  });
 
-  writeLine<E = never, R = never>(line: string): Effect.Effect<void, E, R> {
-    return Effect.sync(() => {
-      this.writer.writeLine(line);
-    });
-  }
+const writeGroupAssembly: (
+  cbw: CodeBlockWriter,
+  node: SpecAssemblyNode,
+  groupFactory: string,
+) => Effect.Effect<void> = (cbw, node, groupFactory) =>
+  node.children.length === 0
+    ? Option.match(node.importBinding, {
+        onNone: () => writeGroupFactoryCall(cbw, node, groupFactory),
+        onSome: (binding) => cbw.write(binding.exportName),
+      })
+    : writeGroupFactoryCall(cbw, node, groupFactory);
 
-  write<E = never, R = never>(text: string): Effect.Effect<void, E, R> {
-    return Effect.sync(() => {
-      this.writer.write(text);
-    });
-  }
+const writeRootAddAt = (
+  cbw: CodeBlockWriter,
+  node: SpecAssemblyNode,
+  groupFactory: string,
+): Effect.Effect<void> =>
+  Effect.gen(function* () {
+    yield* cbw.write(".addAt(");
+    yield* cbw.quote(node.segment);
+    yield* cbw.write(", ");
 
-  quote<E = never, R = never>(text: string): Effect.Effect<void, E, R> {
-    return Effect.sync(() => {
-      this.writer.quote(text);
-    });
-  }
+    yield* writeGroupAssembly(cbw, node, groupFactory);
 
-  conditionalWriteLine<E = never, R = never>(
-    condition: boolean,
-    text: string,
-  ): Effect.Effect<void, E, R> {
-    return Effect.sync(() => {
-      this.writer.conditionalWriteLine(condition, text);
-    });
-  }
+    yield* cbw.write(")");
+  });
 
-  newLine<E = never, R = never>(): Effect.Effect<void, E, R> {
-    return Effect.sync(() => {
-      this.writer.newLine();
-    });
-  }
+export const assembledSpec = ({
+  nodes,
+  runtime,
+}: {
+  nodes: ReadonlyArray<SpecAssemblyNode>;
+  runtime: "Convex" | "Node";
+}) =>
+  Effect.gen(function* () {
+    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-  blankLine<E = never, R = never>(): Effect.Effect<void, E, R> {
-    return Effect.sync(() => {
-      this.writer.blankLine();
-    });
-  }
+    const needsGroupSpec = Array.some(
+      nodes,
+      (node) => node.children.length > 0,
+    );
+    yield* cbw.writeLine(
+      needsGroupSpec
+        ? `import { GroupSpec, Spec } from "@confect/core";`
+        : `import { Spec } from "@confect/core";`,
+    );
 
-  toString<E = never, R = never>(): Effect.Effect<string, E, R> {
-    return Effect.sync(() => this.writer.toString());
-  }
-}
+    yield* Effect.forEach(collectImportBindings(nodes), (binding) =>
+      cbw.writeLine(
+        `import ${binding.exportName} from "${binding.importPath}";`,
+      ),
+    );
+
+    yield* cbw.blankLine();
+
+    const specFactory =
+      runtime === "Convex" ? "Spec.make()" : "Spec.makeNode()";
+    const groupFactory =
+      runtime === "Convex" ? "GroupSpec.makeAt" : "GroupSpec.makeNodeAt";
+
+    yield* cbw.write(`export default ${specFactory}`);
+    yield* Effect.forEach(nodes, (node) =>
+      writeRootAddAt(cbw, node, groupFactory),
+    );
+    yield* cbw.write(";");
+    yield* cbw.newLine();
+
+    return yield* cbw.toString();
+  });

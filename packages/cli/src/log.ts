@@ -5,6 +5,27 @@ import type * as FunctionPath from "./FunctionPath";
 import * as GroupPath from "./GroupPath";
 import { ProjectRoot } from "./ProjectRoot";
 
+// --- Path styling ---
+
+/**
+ * Render a relative path as an AnsiDoc with the directory portion
+ * dimmed (`Ansi.blackBright`) and the file leaf rendered in the
+ * default terminal color. Used inline anywhere a file path appears
+ * in a CLI message.
+ */
+export const formatPathDoc = (relativePath: string): AnsiDoc.AnsiDoc => {
+  const lastSep = Math.max(
+    relativePath.lastIndexOf("/"),
+    relativePath.lastIndexOf("\\"),
+  );
+  const dir = lastSep < 0 ? "" : relativePath.slice(0, lastSep + 1);
+  const leaf = lastSep < 0 ? relativePath : relativePath.slice(lastSep + 1);
+  return AnsiDoc.hcat([
+    pipe(AnsiDoc.text(dir), AnsiDoc.annotate(Ansi.blackBright)),
+    AnsiDoc.text(leaf),
+  ]);
+};
+
 // --- File operation logs ---
 
 const logFile = (char: string, color: Ansi.Ansi) => (fullPath: string) =>

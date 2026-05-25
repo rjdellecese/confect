@@ -1,5 +1,5 @@
-import registeredFunctions from "../../confect/_generated/registeredFunctions";
+import registeredFunctions from "../../confect/_generated/registeredFunctions/groups/runners";
 
-export const countNotesViaRunner = registeredFunctions.groups.runners.countNotesViaRunner;
-export const getNumberViaRunner = registeredFunctions.groups.runners.getNumberViaRunner;
-export const insertNoteViaRunner = registeredFunctions.groups.runners.insertNoteViaRunner;
+export const countNotesViaRunner = registeredFunctions.countNotesViaRunner;
+export const getNumberViaRunner = registeredFunctions.getNumberViaRunner;
+export const insertNoteViaRunner = registeredFunctions.insertNoteViaRunner;

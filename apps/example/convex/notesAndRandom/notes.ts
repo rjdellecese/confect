@@ -1,10 +1,10 @@
-import registeredFunctions from "../../confect/_generated/registeredFunctions";
+import registeredFunctions from "../../confect/_generated/registeredFunctions/notesAndRandom/notes";
 
-export const clearAll = registeredFunctions.notesAndRandom.notes.clearAll;
-export const delete_ = registeredFunctions.notesAndRandom.notes.delete_;
-export const getFirst = registeredFunctions.notesAndRandom.notes.getFirst;
-export const getOrFail = registeredFunctions.notesAndRandom.notes.getOrFail;
-export const insert = registeredFunctions.notesAndRandom.notes.insert;
-export const insertDefault = registeredFunctions.notesAndRandom.notes.insertDefault;
-export const internalGetFirst = registeredFunctions.notesAndRandom.notes.internalGetFirst;
-export const list = registeredFunctions.notesAndRandom.notes.list;
+export const clearAll = registeredFunctions.clearAll;
+export const delete_ = registeredFunctions.delete_;
+export const getFirst = registeredFunctions.getFirst;
+export const getOrFail = registeredFunctions.getOrFail;
+export const insert = registeredFunctions.insert;
+export const insertDefault = registeredFunctions.insertDefault;
+export const internalGetFirst = registeredFunctions.internalGetFirst;
+export const list = registeredFunctions.list;

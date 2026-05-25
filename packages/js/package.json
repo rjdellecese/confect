@@ -59,7 +59,7 @@
   },
   "peerDependencies": {
     "@confect/core": "workspace:^",
-    "convex": "^1.30.0",
+    "convex": "1.39.1",
     "effect": "^3.21.2"
   },
   "engines": {

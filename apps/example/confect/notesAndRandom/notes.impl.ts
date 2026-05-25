@@ -2,21 +2,17 @@ import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Effect, Layer } from "effect";
 import api from "../_generated/api";
 import { DatabaseReader, DatabaseWriter } from "../_generated/services";
-import { NoteNotFound } from "./notes.spec";
+import notes, { NoteNotFound } from "./notes.spec";
 
-const insert = FunctionImpl.make(
-  api,
-  "notesAndRandom.notes",
-  "insert",
-  ({ text }) =>
-    Effect.gen(function* () {
-      const writer = yield* DatabaseWriter;
+const insert = FunctionImpl.make(api, notes, "insert", ({ text }) =>
+  Effect.gen(function* () {
+    const writer = yield* DatabaseWriter;
 
-      return yield* writer.table("notes").insert({ text });
-    }).pipe(Effect.orDie),
+    return yield* writer.table("notes").insert({ text });
+  }).pipe(Effect.orDie),
 );
 
-const list = FunctionImpl.make(api, "notesAndRandom.notes", "list", () =>
+const list = FunctionImpl.make(api, notes, "list", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
 
@@ -27,83 +23,63 @@ const list = FunctionImpl.make(api, "notesAndRandom.notes", "list", () =>
   }).pipe(Effect.orDie),
 );
 
-const delete_ = FunctionImpl.make(
-  api,
-  "notesAndRandom.notes",
-  "delete_",
-  ({ noteId }) =>
-    Effect.gen(function* () {
-      const writer = yield* DatabaseWriter;
+const delete_ = FunctionImpl.make(api, notes, "delete_", ({ noteId }) =>
+  Effect.gen(function* () {
+    const writer = yield* DatabaseWriter;
 
-      yield* writer.table("notes").delete(noteId);
+    yield* writer.table("notes").delete(noteId);
 
-      return null;
-    }).pipe(Effect.orDie),
+    return null;
+  }).pipe(Effect.orDie),
 );
 
-const getFirst = FunctionImpl.make(
-  api,
-  "notesAndRandom.notes",
-  "getFirst",
-  () =>
-    Effect.gen(function* () {
-      const reader = yield* DatabaseReader;
+const getFirst = FunctionImpl.make(api, notes, "getFirst", () =>
+  Effect.gen(function* () {
+    const reader = yield* DatabaseReader;
 
-      return yield* reader.table("notes").index("by_creation_time").first();
-    }).pipe(Effect.orDie),
+    return yield* reader.table("notes").index("by_creation_time").first();
+  }).pipe(Effect.orDie),
 );
 
-const getOrFail = FunctionImpl.make(
-  api,
-  "notesAndRandom.notes",
-  "getOrFail",
-  ({ noteId }) =>
-    Effect.gen(function* () {
-      const reader = yield* DatabaseReader;
+const getOrFail = FunctionImpl.make(api, notes, "getOrFail", ({ noteId }) =>
+  Effect.gen(function* () {
+    const reader = yield* DatabaseReader;
 
-      return yield* reader
-        .table("notes")
-        .get(noteId)
-        .pipe(Effect.mapError(() => new NoteNotFound({ noteId })));
-    }),
+    return yield* reader
+      .table("notes")
+      .get(noteId)
+      .pipe(Effect.mapError(() => new NoteNotFound({ noteId })));
+  }),
 );
 
-const internalGetFirst = FunctionImpl.make(
-  api,
-  "notesAndRandom.notes",
-  "internalGetFirst",
-  () =>
-    Effect.gen(function* () {
-      const reader = yield* DatabaseReader;
+const internalGetFirst = FunctionImpl.make(api, notes, "internalGetFirst", () =>
+  Effect.gen(function* () {
+    const reader = yield* DatabaseReader;
 
-      return yield* reader.table("notes").index("by_creation_time").first();
-    }).pipe(Effect.orDie),
+    return yield* reader.table("notes").index("by_creation_time").first();
+  }).pipe(Effect.orDie),
 );
 
-const clearAll = FunctionImpl.make(
-  api,
-  "notesAndRandom.notes",
-  "clearAll",
-  () =>
-    Effect.gen(function* () {
-      const reader = yield* DatabaseReader;
-      const writer = yield* DatabaseWriter;
-      const allNotes = yield* reader
-        .table("notes")
-        .index("by_creation_time")
-        .collect();
+const clearAll = FunctionImpl.make(api, notes, "clearAll", () =>
+  Effect.gen(function* () {
+    const reader = yield* DatabaseReader;
+    const writer = yield* DatabaseWriter;
+    const allNotes = yield* reader
+      .table("notes")
+      .index("by_creation_time")
+      .collect();
 
-      for (const note of allNotes) {
-        yield* writer.table("notes").delete(note._id);
-      }
+    yield* Effect.forEach(allNotes, (note) =>
+      writer.table("notes").delete(note._id),
+    );
 
-      return null;
-    }).pipe(Effect.orDie),
+    return null;
+  }).pipe(Effect.orDie),
 );
 
 const insertDefault = FunctionImpl.make(
   api,
-  "notesAndRandom.notes",
+  notes,
   "insertDefault",
   ({ text }) =>
     Effect.gen(function* () {
@@ -115,7 +91,7 @@ const insertDefault = FunctionImpl.make(
     }).pipe(Effect.orDie),
 );
 
-export const notes = GroupImpl.make(api, "notesAndRandom.notes").pipe(
+export default GroupImpl.make(api, notes).pipe(
   Layer.provide(insert),
   Layer.provide(list),
   Layer.provide(delete_),
@@ -124,4 +100,5 @@ export const notes = GroupImpl.make(api, "notesAndRandom.notes").pipe(
   Layer.provide(internalGetFirst),
   Layer.provide(clearAll),
   Layer.provide(insertDefault),
+  GroupImpl.finalize,
 );

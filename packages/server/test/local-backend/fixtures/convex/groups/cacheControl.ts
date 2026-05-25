@@ -1,3 +1,3 @@
-import registeredFunctions from "../../confect/_generated/registeredFunctions";
+import registeredFunctions from "../../confect/_generated/registeredFunctions/groups/cacheControl";
 
-export const control = registeredFunctions.groups.cacheControl.control;
+export const control = registeredFunctions.control;

@@ -1,4 +1,4 @@
-import { Array, Predicate, Record } from "effect";
+import { Array, Option, Predicate, Record } from "effect";
 import * as GroupSpec from "./GroupSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
@@ -36,6 +36,14 @@ export interface Spec<
   add<Group extends GroupSpec.AnyWithPropsWithRuntime<Runtime>>(
     group: Group,
   ): Spec<Runtime, Groups_ | Group>;
+
+  addAt<
+    const Name extends string,
+    Group extends GroupSpec.AnyWithPropsWithRuntime<Runtime>,
+  >(
+    name: Name,
+    group: Group,
+  ): Spec<Runtime, Groups_ | GroupSpec.NamedAt<Group, Name>>;
 }
 
 export interface Any {
@@ -61,6 +69,17 @@ const Proto = {
     return makeProto({
       runtime: this.runtime,
       groups: Record.set(this.groups, group.name, group),
+    });
+  },
+
+  addAt<Group extends GroupSpec.AnyWithProps>(
+    this: AnyWithProps,
+    name: string,
+    group: Group,
+  ) {
+    return makeProto({
+      runtime: this.runtime,
+      groups: Record.set(this.groups, name, GroupSpec.withName(name, group)),
     });
   },
 };
@@ -98,17 +117,19 @@ export const merge = <
   convexSpec: ConvexSpec,
   nodeSpec?: NodeSpec,
 ): AnyWithProps => {
-  const nodeGroup = nodeSpec
-    ? Array.reduce(
-        Record.values(nodeSpec.groups),
-        GroupSpec.makeNode("node"),
-        (nodeGroupSpec, group) => nodeGroupSpec.addGroup(group),
-      )
-    : null;
-
-  const groups = nodeGroup
-    ? { ...convexSpec.groups, node: nodeGroup }
-    : convexSpec.groups;
+  const groups = Option.fromNullable(nodeSpec).pipe(
+    Option.map((nodeSpec_) =>
+      Array.reduce(
+        Record.toEntries(nodeSpec_.groups),
+        GroupSpec.makeNodeAt("node"),
+        (nodeGroupSpec, [name, group]) => nodeGroupSpec.addGroupAt(name, group),
+      ),
+    ),
+    Option.match({
+      onNone: () => convexSpec.groups,
+      onSome: (nodeGroup) => ({ ...convexSpec.groups, node: nodeGroup }),
+    }),
+  );
 
   return Object.assign(Object.create(Proto), {
     runtime: "Convex" as const,

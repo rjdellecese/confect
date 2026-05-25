@@ -9,11 +9,12 @@ import {
   MutationRunner,
   QueryRunner,
 } from "../_generated/services";
+import typedErrors from "./typedErrors.spec";
 import { Forbidden, NotFound } from "./typedErrors.spec";
 
 const getNoteOrFail = FunctionImpl.make(
   api,
-  "groups.typedErrors",
+  typedErrors,
   "getNoteOrFail",
   ({ noteId }) =>
     Effect.gen(function* () {
@@ -28,7 +29,7 @@ const getNoteOrFail = FunctionImpl.make(
 
 const deleteNoteOrFail = FunctionImpl.make(
   api,
-  "groups.typedErrors",
+  typedErrors,
   "deleteNoteOrFail",
   ({ noteId, asAdmin }) =>
     Effect.gen(function* () {
@@ -52,7 +53,7 @@ const deleteNoteOrFail = FunctionImpl.make(
 
 const failingAction = FunctionImpl.make(
   api,
-  "groups.typedErrors",
+  typedErrors,
   "failingAction",
   ({ kind }) =>
     Match.value(kind).pipe(
@@ -68,7 +69,7 @@ const failingAction = FunctionImpl.make(
 
 const insertThenFail = FunctionImpl.make(
   api,
-  "groups.typedErrors",
+  typedErrors,
   "insertThenFail",
   ({ text }) =>
     Effect.gen(function* () {
@@ -82,7 +83,7 @@ const insertThenFail = FunctionImpl.make(
 
 const tryGetNote = FunctionImpl.make(
   api,
-  "groups.typedErrors",
+  typedErrors,
   "tryGetNote",
   ({ noteId }) =>
     Effect.gen(function* () {
@@ -95,7 +96,7 @@ const tryGetNote = FunctionImpl.make(
 
       return { _tag: "Ok" as const, text: note.text };
     }).pipe(
-      Effect.catchTag("NotFound", (notFound) =>
+      Effect.catchTag("NotFound", (notFound: NotFound) =>
         Effect.succeed({ _tag: "NotFound" as const, id: notFound.id }),
       ),
       Effect.orDie,
@@ -104,7 +105,7 @@ const tryGetNote = FunctionImpl.make(
 
 const tryDeleteNote = FunctionImpl.make(
   api,
-  "groups.typedErrors",
+  typedErrors,
   "tryDeleteNote",
   ({ noteId, asAdmin }) =>
     Effect.gen(function* () {
@@ -118,9 +119,9 @@ const tryDeleteNote = FunctionImpl.make(
       return { _tag: "Ok" as const };
     }).pipe(
       Effect.catchTags({
-        NotFound: (notFound) =>
+        NotFound: (notFound: NotFound) =>
           Effect.succeed({ _tag: "NotFound" as const, id: notFound.id }),
-        Forbidden: (forbidden) =>
+        Forbidden: (forbidden: Forbidden) =>
           Effect.succeed({
             _tag: "Forbidden" as const,
             reason: forbidden.reason,
@@ -132,7 +133,7 @@ const tryDeleteNote = FunctionImpl.make(
 
 const tryFailingAction = FunctionImpl.make(
   api,
-  "groups.typedErrors",
+  typedErrors,
   "tryFailingAction",
   ({ kind }) =>
     Effect.gen(function* () {
@@ -145,9 +146,9 @@ const tryFailingAction = FunctionImpl.make(
       );
     }).pipe(
       Effect.catchTags({
-        NotFound: (notFound) =>
+        NotFound: (notFound: NotFound) =>
           Effect.succeed({ _tag: "NotFound" as const, id: notFound.id }),
-        Forbidden: (forbidden) =>
+        Forbidden: (forbidden: Forbidden) =>
           Effect.succeed({
             _tag: "Forbidden" as const,
             reason: forbidden.reason,
@@ -159,7 +160,7 @@ const tryFailingAction = FunctionImpl.make(
 
 const internalGetNoteOrFail = FunctionImpl.make(
   api,
-  "groups.typedErrors",
+  typedErrors,
   "internalGetNoteOrFail",
   ({ noteId }) =>
     Effect.gen(function* () {
@@ -174,7 +175,7 @@ const internalGetNoteOrFail = FunctionImpl.make(
 
 const tryInternalGetNote = FunctionImpl.make(
   api,
-  "groups.typedErrors",
+  typedErrors,
   "tryInternalGetNote",
   ({ noteId }) =>
     Effect.gen(function* () {
@@ -187,14 +188,14 @@ const tryInternalGetNote = FunctionImpl.make(
 
       return { _tag: "Ok" as const, text: note.text };
     }).pipe(
-      Effect.catchTag("NotFound", (notFound) =>
+      Effect.catchTag("NotFound", (notFound: NotFound) =>
         Effect.succeed({ _tag: "NotFound" as const, id: notFound.id }),
       ),
       Effect.orDie,
     ),
 );
 
-export const typedErrors = GroupImpl.make(api, "groups.typedErrors").pipe(
+export default GroupImpl.make(api, typedErrors).pipe(
   Layer.provide(getNoteOrFail),
   Layer.provide(deleteNoteOrFail),
   Layer.provide(failingAction),
@@ -204,4 +205,5 @@ export const typedErrors = GroupImpl.make(api, "groups.typedErrors").pipe(
   Layer.provide(tryFailingAction),
   Layer.provide(internalGetNoteOrFail),
   Layer.provide(tryInternalGetNote),
+  GroupImpl.finalize,
 );

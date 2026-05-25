@@ -25,7 +25,7 @@ export class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
   { noteId: GenericId.GenericId("notes") },
 ) {}
 
-export const notes = GroupSpec.make("notes").addFunction(
+export default GroupSpec.make().addFunction(
   FunctionSpec.publicQuery({
     name: "getOrFail",
     args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
@@ -68,11 +68,11 @@ import { Effect } from "effect";
 
 import api from "./_generated/api";
 import { DatabaseReader } from "./_generated/services";
-import { NoteNotFound } from "./notes.spec";
+import notes, { NoteNotFound } from "./notes.spec";
 
 const getOrFail = FunctionImpl.make(
   api,
-  "notes",
+  notes,
   "getOrFail",
   ({ noteId }) =>
     Effect.gen(function* () {

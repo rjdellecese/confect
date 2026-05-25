@@ -21,7 +21,7 @@ For Node.js actions, see [Node Actions](/server/node-actions). To integrate plai
 
 ## Defining a spec
 
-Each function spec defines the function's name, arguments schema, and returns schema. Function specs are grouped into group specs, which are combined into your API's top-level spec. See [The Spec/Impl Model](/concepts/spec-impl-model) for a full walkthrough.
+Each function spec defines the function's name, arguments schema, and returns schema. Function specs are added to a `GroupSpec` and default-exported from a `*.spec.ts` file. See [The Spec/Impl Model](/concepts/spec-impl-model) for a full walkthrough.
 
 ```ts confect/notes.spec.ts
 import { GroupSpec, FunctionSpec } from "@confect/core";
@@ -35,16 +35,10 @@ const list = FunctionSpec.publicQuery({
   returns: Schema.Array(Notes.Doc),
 });
 
-export const notes = GroupSpec.make("notes").addFunction(list);
+export default GroupSpec.make().addFunction(list);
 ```
 
-```ts confect/spec.ts
-import { Spec } from "@confect/core";
-
-import { notes } from "./notes.spec";
-
-export default Spec.make().add(notes);
-```
+Run `confect codegen` after adding or changing specs.
 
 ### Typed errors
 
@@ -81,8 +75,9 @@ import { Effect, Layer } from "effect";
 
 import api from "./_generated/api";
 import { DatabaseReader } from "./_generated/services";
+import notes from "./notes.spec";
 
-const list = FunctionImpl.make(api, "notes", "list", () =>
+const list = FunctionImpl.make(api, notes, "list", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
 
@@ -93,22 +88,10 @@ const list = FunctionImpl.make(api, "notes", "list", () =>
   }).pipe(Effect.orDie),
 );
 
-export const notes = GroupImpl.make(api, "notes").pipe(
+export default GroupImpl.make(api, notes).pipe(
   Layer.provide(list),
+  GroupImpl.finalize,
 );
 ```
 
-Your impl must be the default export of an `impl.ts` file in your `confect/` directory, and must be finalized with `Impl.finalize`.
-
-```ts confect/impl.ts
-import { Impl } from "@confect/server";
-import { Layer } from "effect";
-
-import api from "./_generated/api";
-import { notes } from "./notes.impl";
-
-export default Impl.make(api).pipe(
-  Layer.provide(notes),
-  Impl.finalize,
-);
-```
+`GroupImpl.finalize` is the per-group completeness check: it only typechecks once every function declared by the spec has been provided to the group layer.
