@@ -11,5 +11,7 @@
     "@confect/server-mock-backend-fixtures": "0.0.0",
     "@confect/test": "8.0.0"
   },
-  "changesets": []
+  "changesets": [
+    "fs-based-function-paths"
+  ]
 }
