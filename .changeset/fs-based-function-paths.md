@@ -8,6 +8,12 @@ Derive Confect function paths from the filesystem layout of `confect/`. Each gro
 
 Each `*.spec.ts` default-exports its `GroupSpec`. Each `*.impl.ts` default-imports its sibling spec, builds its `GroupImpl`, and default-exports the result of `GroupImpl.finalize`. Named co-exports on `*.spec.ts` (such as error classes) remain allowed.
 
+### Why
+
+The previous model assembled every group's impl into a single root `confect/impl.ts` (plus `confect/nodeImpl.ts`), which `confect codegen` emitted as the aggregate `_generated/registeredFunctions.ts`. Every generated `convex/` module — one per Convex function — imported from that aggregate, so loading any single query, mutation, or action transitively loaded the impl module of every other Convex function in the project, along with all of their dependencies. For large projects this inflated each function's bundle and added meaningful cold-start cost on Convex.
+
+Splitting impl across colocated `*.impl.ts` files is the vehicle for fixing that. With this change, `confect codegen` emits one `_generated/registeredFunctions/{path}.ts` per group, and each generated `convex/` module imports only its own group's per-group registry — which in turn imports only its own sibling `.impl.ts`. A Convex function's cold-start bundle now scales with its own group's impl rather than with the size of the whole project.
+
 ### Breaking changes
 
 - `GroupSpec.make()` and `GroupSpec.makeNode()` no longer take a name argument; the group name is derived from the spec file's path within `confect/`.
@@ -16,8 +22,6 @@ Each `*.spec.ts` default-exports its `GroupSpec`. Each `*.impl.ts` default-impor
 - The previously-exported `Impl.make` and `Impl.finalize` (used by the old root `impl.ts`/`nodeImpl.ts` files) are removed. Per-group completeness is now enforced by `GroupImpl.finalize`.
 - Root `confect/spec.ts`, `confect/impl.ts`, `confect/nodeSpec.ts`, `confect/nodeImpl.ts`, and any parent aggregator `*.spec.ts`/`*.impl.ts` files are no longer used. `confect codegen` deletes any of these on upgrade, along with the stale `_generated/registeredFunctions.ts` and `_generated/nodeRegisteredFunctions.ts`.
 - Every module under `convex/` is re-emitted to import from `_generated/registeredFunctions/{path}` instead of the previous aggregate file. Users who commit `convex/` to source control should expect a full rewrite of that directory on first codegen.
-- The `Registry` reference that `FunctionImpl` writes to (and that `confect codegen` provides a fresh `Ref` for during impl validation) moved from `@confect/server` to `@confect/core` so both packages can import the same tag instead of mirroring it by string key. Application code never interacts with `Registry` directly.
-- `@confect/cli` peer-depends on `@confect/server` again, and the `DatabaseSchema` brand tag, `Any` interface, and `isDatabaseSchema` predicate are reunited in `@confect/server/DatabaseSchema`. They were temporarily relocated to `@confect/core/DatabaseSchema` to keep the two packages decoupled; with the cli now sharing typed contracts with the server directly (notably the `GroupImpl` tag used for impl validation), the split is no longer needed. Public usage via `@confect/server`'s `DatabaseSchema` namespace is unchanged.
 
 ### Migration
 
