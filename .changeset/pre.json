@@ -1,0 +1,15 @@
+{
+  "mode": "pre",
+  "tag": "next",
+  "initialVersions": {
+    "@confect/cli": "8.0.0",
+    "@confect/core": "8.0.0",
+    "@confect/js": "8.0.0",
+    "@confect/react": "8.0.0",
+    "@confect/server": "8.0.0",
+    "@confect/server-local-backend-fixtures": "0.0.0",
+    "@confect/server-mock-backend-fixtures": "0.0.0",
+    "@confect/test": "8.0.0"
+  },
+  "changesets": []
+}

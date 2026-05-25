@@ -5,7 +5,7 @@
   "fixed": [["@confect/*"]],
   "linked": [],
   "access": "public",
-  "baseBranch": "main",
+  "baseBranch": "v9",
   "updateInternalDependencies": "patch",
   "ignore": ["@confect/server-*-fixtures"],
   "___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH": {

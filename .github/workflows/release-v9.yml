@@ -1,0 +1,49 @@
+name: Release v9
+
+on:
+  push:
+    branches:
+      - v9
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Get pnpm version from package.json
+        id: pnpm-version
+        shell: bash
+        run: echo "pnpm_version=$(node -p 'require(`./package.json`).engines.pnpm')" >> $GITHUB_OUTPUT
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: ${{ steps.pnpm-version.outputs.pnpm_version }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: "package.json"
+          cache: "pnpm"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Create release pull request or publish
+        uses: changesets/action@v1
+        with:
+          publish: pnpm release
+          branch: v9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
