@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - v9
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -45,12 +46,12 @@ jobs:
         uses: changesets/action@v1
         with:
           publish: pnpm release
-          branch: main
+          branch: ${{ github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update docs deployment branch
-        if: steps.changesets.outputs.published == 'true'
+        if: steps.changesets.outputs.published == 'true' && github.ref_name == 'main'
         run: |
           git fetch origin release || true
           git push --force-with-lease origin HEAD:refs/heads/release
