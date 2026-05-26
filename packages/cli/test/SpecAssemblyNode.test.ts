@@ -174,7 +174,9 @@ describe("SpecAssemblyNode", () => {
 
         const importLines = contents
           .split("\n")
-          .filter((line) => line.startsWith("import ") && line.includes(".spec"));
+          .filter(
+            (line) => line.startsWith("import ") && line.includes(".spec"),
+          );
         expect(importLines).toHaveLength(leaves.length);
 
         expect(contents).toContain(
