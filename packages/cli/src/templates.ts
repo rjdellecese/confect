@@ -411,12 +411,16 @@ const writeGroupAssembly: (
   node: SpecAssemblyNode,
   groupFactory: string,
 ) => Effect.Effect<void> = (cbw, node, groupFactory) =>
-  node.children.length === 0
-    ? Option.match(node.importBinding, {
-        onNone: () => writeGroupFactoryCall(cbw, node, groupFactory),
-        onSome: (binding) => cbw.write(binding.exportName),
-      })
-    : writeGroupFactoryCall(cbw, node, groupFactory);
+  Option.match(node.importBinding, {
+    onNone: () => writeGroupFactoryCall(cbw, node, groupFactory),
+    onSome: (binding) =>
+      Effect.gen(function* () {
+        yield* cbw.write(binding.exportName);
+        yield* Effect.forEach(node.children, (child) =>
+          writeChildAddGroupAt(cbw, child, groupFactory),
+        );
+      }),
+  });
 
 const writeRootAddAt = (
   cbw: CodeBlockWriter,
@@ -443,10 +447,11 @@ export const assembledSpec = ({
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-    const needsGroupSpec = Array.some(
-      nodes,
-      (node) => node.children.length > 0,
-    );
+    const nodeRequiresGroupFactory = (node: SpecAssemblyNode): boolean =>
+      Option.isNone(node.importBinding) ||
+      Array.some(node.children, nodeRequiresGroupFactory);
+
+    const needsGroupSpec = Array.some(nodes, nodeRequiresGroupFactory);
     yield* cbw.writeLine(
       needsGroupSpec
         ? `import { GroupSpec, Spec } from "@confect/core";`

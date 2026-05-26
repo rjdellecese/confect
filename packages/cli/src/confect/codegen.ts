@@ -1,4 +1,4 @@
-import { Spec } from "@confect/core";
+import { type GroupSpec, Spec } from "@confect/core";
 import * as DatabaseSchema from "@confect/server/DatabaseSchema";
 import { Command } from "@effect/cli";
 import { FileSystem, Path } from "@effect/platform";
@@ -9,6 +9,7 @@ import {
   MissingImplFileError,
   MissingSchemaFileError,
   MissingSpecFileError,
+  ParentChildNameCollisionError,
   SchemaInvalidDefaultExportError,
 } from "../CodegenError";
 import { ConfectDirectory } from "../ConfectDirectory";
@@ -36,6 +37,7 @@ import {
 import {
   assemblyNodesFromLeaves,
   partitionByRuntime,
+  type SpecAssemblyNode,
 } from "../SpecAssemblyNode";
 import * as templates from "../templates";
 import * as Bundler from "../Bundler";
@@ -101,8 +103,10 @@ const runCodegen = Effect.gen(function* () {
   // on schema via `_generated/api.ts` and would otherwise blow up with a
   // less actionable bundler error.
   yield* validateSchema;
-  const leaves = yield* loadAndValidateLeafModules;
+  const { leaves, groupSpecsByRelativePath } =
+    yield* loadAndValidateLeafModules;
   yield* removeLegacyFiles;
+  yield* validateNoParentChildNameCollisions(leaves, groupSpecsByRelativePath);
   yield* generateAssembledSpecs(leaves);
   yield* validateImplModules(leaves);
   yield* generateGroupRegisteredFunctions(leaves);
@@ -144,10 +148,10 @@ const loadAndValidateLeafModules = Effect.gen(function* () {
   const confectDirectory = yield* ConfectDirectory.get;
   const specFiles = yield* discoverLeafSpecFiles;
 
-  const leaves = yield* Effect.forEach(specFiles, (specRelativePath) =>
+  const results = yield* Effect.forEach(specFiles, (specRelativePath) =>
     Effect.gen(function* () {
       const leaf = yield* toLeafModule(specRelativePath);
-      yield* validateSpec(leaf);
+      const groupSpec = yield* validateSpec(leaf);
 
       const implRelativePath = yield* implPathForSpec(specRelativePath);
       const implAbsolutePath = path.join(confectDirectory, implRelativePath);
@@ -158,14 +162,131 @@ const loadAndValidateLeafModules = Effect.gen(function* () {
         });
       }
 
-      return leaf;
+      return { leaf, groupSpec };
     }),
   );
 
   yield* validateOrphanImpls(specFiles);
 
-  return leaves;
+  const leaves = Array.map(results, ({ leaf }) => leaf);
+  const groupSpecsByRelativePath = new Map(
+    Array.map(results, ({ leaf, groupSpec }) => [leaf.relativePath, groupSpec]),
+  );
+
+  return { leaves, groupSpecsByRelativePath };
 });
+
+/**
+ * Walk the assembly tree and fail with a {@link ParentChildNameCollisionError}
+ * when a parent leaf declares a function or subgroup whose name matches a
+ * sibling subdirectory spec's segment. Without this check the colliding
+ * descendant would overwrite the parent's entry in the assembled
+ * `GroupSpec.groups` map at runtime, surfacing as a confusing
+ * `Refs.make` error rather than a codegen-time diagnostic.
+ */
+export const validateNoParentChildNameCollisions = (
+  leaves: ReadonlyArray<LeafModule>,
+  groupSpecsByRelativePath: ReadonlyMap<string, GroupSpec.AnyWithProps>,
+) =>
+  Effect.gen(function* () {
+    const { convex, node } = partitionByRuntime(leaves);
+    const convexNodes = assemblyNodesFromLeaves(convex);
+    const nodeNodes = assemblyNodesFromLeaves(
+      Array.map(node, toNodeRegistryLeaf),
+    );
+    yield* Effect.forEach(convexNodes, (n) =>
+      checkAssemblyNodeForCollisions(n, groupSpecsByRelativePath),
+    );
+    yield* Effect.forEach(nodeNodes, (n) =>
+      checkAssemblyNodeForCollisions(n, groupSpecsByRelativePath),
+    );
+  });
+
+const checkAssemblyNodeForCollisions = (
+  node: SpecAssemblyNode,
+  groupSpecsByRelativePath: ReadonlyMap<string, GroupSpec.AnyWithProps>,
+): Effect.Effect<void, ParentChildNameCollisionError> =>
+  Effect.gen(function* () {
+    yield* Option.match(node.importBinding, {
+      onNone: () => Effect.void,
+      onSome: (binding) =>
+        Effect.gen(function* () {
+          if (node.children.length === 0) return;
+          const parentRelativePath = bindingToRelativeSpecPath(
+            binding.importPath,
+          );
+          const parentGroupSpec =
+            groupSpecsByRelativePath.get(parentRelativePath);
+          if (parentGroupSpec === undefined) return;
+          yield* Effect.forEach(node.children, (child) => {
+            if (
+              Object.prototype.hasOwnProperty.call(
+                parentGroupSpec.functions,
+                child.segment,
+              )
+            ) {
+              return Effect.fail(
+                new ParentChildNameCollisionError({
+                  parentSpecPath: parentRelativePath,
+                  childSpecPath: childRepresentativeSpecPath(child),
+                  collisionName: child.segment,
+                  collisionKind: "function",
+                }),
+              );
+            }
+            if (
+              Object.prototype.hasOwnProperty.call(
+                parentGroupSpec.groups,
+                child.segment,
+              )
+            ) {
+              return Effect.fail(
+                new ParentChildNameCollisionError({
+                  parentSpecPath: parentRelativePath,
+                  childSpecPath: childRepresentativeSpecPath(child),
+                  collisionName: child.segment,
+                  collisionKind: "group",
+                }),
+              );
+            }
+            return Effect.void;
+          });
+        }),
+    });
+    yield* Effect.forEach(node.children, (child) =>
+      checkAssemblyNodeForCollisions(child, groupSpecsByRelativePath),
+    );
+  });
+
+/**
+ * `LeafModule.specImportPath` is the import path used from inside the
+ * generated `_generated/spec.ts` (e.g. `"../notes.spec"`). Strip the
+ * `../` prefix and re-add the `.ts` extension to recover the leaf's
+ * confect-relative spec path used as the key in
+ * `groupSpecsByRelativePath`.
+ */
+const bindingToRelativeSpecPath = (importPath: string): string => {
+  const withoutDotDot = importPath.startsWith("../")
+    ? importPath.slice(3)
+    : importPath;
+  return `${withoutDotDot}.ts`;
+};
+
+/**
+ * A child assembly node may itself be a parent without a leaf (when the
+ * actual leaves live only in deeper subdirectories). In that case we
+ * surface the first descendant leaf as a representative path so the
+ * error message points at something the user actually wrote.
+ */
+const childRepresentativeSpecPath = (node: SpecAssemblyNode): string => {
+  if (Option.isSome(node.importBinding)) {
+    return bindingToRelativeSpecPath(node.importBinding.value.importPath);
+  }
+  for (const child of node.children) {
+    return childRepresentativeSpecPath(child);
+  }
+  return node.segment;
+};
 
 const validateOrphanImpls = (specFiles: ReadonlyArray<string>) =>
   Effect.gen(function* () {

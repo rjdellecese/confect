@@ -75,6 +75,16 @@ export class SchemaInvalidDefaultExportError extends Schema.TaggedError<SchemaIn
   },
 ) {}
 
+export class ParentChildNameCollisionError extends Schema.TaggedError<ParentChildNameCollisionError>()(
+  "ParentChildNameCollisionError",
+  {
+    parentSpecPath: Schema.String,
+    childSpecPath: Schema.String,
+    collisionName: Schema.String,
+    collisionKind: Schema.Literal("function", "group"),
+  },
+) {}
+
 export class MissingSchemaFileError extends Schema.TaggedError<MissingSchemaFileError>()(
   "MissingSchemaFileError",
   {
@@ -94,6 +104,7 @@ export const CodegenError = Schema.Union(
   ImplMissingFunctionsError,
   SchemaInvalidDefaultExportError,
   MissingSchemaFileError,
+  ParentChildNameCollisionError,
 );
 export type CodegenError = typeof CodegenError.Type;
 
@@ -246,6 +257,21 @@ const renderMissingSchemaFileError = (
     ),
   );
 
+const renderParentChildNameCollisionError = (
+  error: ParentChildNameCollisionError,
+): AnsiDoc.AnsiDoc =>
+  singleLine(
+    AnsiDoc.text("Spec "),
+    formatPathDoc(error.parentSpecPath),
+    AnsiDoc.text(
+      ` declares a ${error.collisionKind} \`${error.collisionName}\` whose name collides with the sibling subdirectory spec `,
+    ),
+    formatPathDoc(error.childSpecPath),
+    AnsiDoc.text(
+      `. Rename one of them so the assembled spec has a unique key at this path.`,
+    ),
+  );
+
 /**
  * Render any {@link CodegenError} into a styled, ready-to-print string.
  * Single-error variants render to a one-line `✘`-prefixed message;
@@ -303,6 +329,12 @@ export const renderCodegenError = (error: CodegenError): string => {
     Match.tag("MissingSchemaFileError", (e) =>
       pipe(
         renderMissingSchemaFileError(e),
+        AnsiDoc.render({ style: "pretty" }),
+      ),
+    ),
+    Match.tag("ParentChildNameCollisionError", (e) =>
+      pipe(
+        renderParentChildNameCollisionError(e),
         AnsiDoc.render({ style: "pretty" }),
       ),
     ),
