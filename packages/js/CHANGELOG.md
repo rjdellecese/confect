@@ -1,5 +1,12 @@
 # @confect/js
 
+## 9.0.0-next.3
+
+### Patch Changes
+
+- Updated dependencies [6d85210]
+  - @confect/core@9.0.0-next.3
+
 ## 9.0.0-next.2
 
 ### Patch Changes
