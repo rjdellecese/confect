@@ -12,6 +12,7 @@
     "@confect/test": "8.0.0"
   },
   "changesets": [
-    "fs-based-function-paths"
+    "fs-based-function-paths",
+    "preserve-parent-leaf-in-assembled-spec"
   ]
 }
