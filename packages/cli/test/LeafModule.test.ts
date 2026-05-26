@@ -232,6 +232,13 @@ layer(LeafModuleLayer)("validateImpl", (it) => {
     }),
   );
 
+  it.effect("accepts a leaf impl that imports a CJS package", () =>
+    Effect.gen(function* () {
+      const leaf = yield* toLeafModule("groups/cjsImporter.spec.ts");
+      yield* validateImpl(leaf);
+    }),
+  );
+
   it.effect("rejects impl that does not directly import the sibling spec", () =>
     Effect.gen(function* () {
       const result = yield* Effect.either(

@@ -10,20 +10,10 @@ export interface Bundled {
   readonly metafile: esbuild.Metafile;
 }
 
-export const EXTERNAL_PACKAGES = [
-  "@confect/core",
-  "@confect/server",
-  "effect",
-  "@effect/*",
-];
-
-const isExternalImport = (path: string) =>
-  EXTERNAL_PACKAGES.some((p) => {
-    if (p.endsWith("/*")) {
-      return path.startsWith(p.slice(0, -1));
-    }
-    return path === p || path.startsWith(p + "/");
-  });
+const isRelativeOrAbsolutePath = (importPath: string) =>
+  importPath.startsWith("./") ||
+  importPath.startsWith("../") ||
+  importPath.startsWith("/");
 
 export const absoluteExternalsPlugin: esbuild.Plugin = {
   name: "absolute-externals",
@@ -31,7 +21,10 @@ export const absoluteExternalsPlugin: esbuild.Plugin = {
     build.onResolve({ filter: /.*/ }, async (args) => {
       if (args.kind !== "import-statement" && args.kind !== "dynamic-import")
         return;
-      if (!isExternalImport(args.path)) return;
+      if (isRelativeOrAbsolutePath(args.path)) return;
+      if (args.path.startsWith("node:")) {
+        return { path: args.path, external: true };
+      }
       // `import.meta.resolve`'s second argument is silently ignored in modern
       // Node, so resolution would always walk up from the CLI's bundled file
       // (`packages/cli/dist/utils.mjs`) instead of from the user's project.
