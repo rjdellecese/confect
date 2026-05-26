@@ -28,3 +28,35 @@ describe("makeAt", () => {
     );
   });
 });
+
+describe("withName", () => {
+  it("returns the input unchanged when the name already matches", () => {
+    const group = GroupSpec.makeAt("notes");
+
+    const renamed = GroupSpec.withName("notes", group);
+
+    expect(renamed).toBe(group);
+  });
+
+  it("returns a fresh copy with the new name and does not mutate the input", () => {
+    const group = GroupSpec.makeAt("notes");
+    const originalName = group.name;
+
+    const renamed = GroupSpec.withName("renamed", group);
+
+    expect(renamed).not.toBe(group);
+    expect(renamed.name).toBe("renamed");
+    // Input is untouched — no in-place rename, no shared state.
+    expect(group.name).toBe(originalName);
+  });
+
+  it("preserves functions and groups in the copy", () => {
+    const child = GroupSpec.makeAt("child");
+    const group = GroupSpec.makeAt("parent").addGroup(child);
+
+    const renamed = GroupSpec.withName("renamed", group);
+
+    expect(renamed.groups).toBe(group.groups);
+    expect(renamed.functions).toBe(group.functions);
+  });
+});

@@ -2,6 +2,7 @@ import { Array, Effect, Option } from "effect";
 import { CodeBlockWriter } from "./CodeBlockWriter";
 import {
   collectImportBindings,
+  collectLeafPaths,
   type SpecAssemblyNode,
 } from "./SpecAssemblyNode";
 
@@ -472,6 +473,13 @@ export const assembledSpec = ({
       runtime === "Convex" ? "GroupSpec.makeAt" : "GroupSpec.makeNodeAt";
 
     yield* cbw.write(`export default ${specFactory}`);
+    yield* Effect.forEach(collectLeafPaths(nodes), (leaf) =>
+      Effect.gen(function* () {
+        yield* cbw.write(`.addPath(${leaf.binding.localName}, `);
+        yield* cbw.quote(leaf.dotPath);
+        yield* cbw.write(")");
+      }),
+    );
     yield* Effect.forEach(nodes, (node) =>
       writeRootAddAt(cbw, node, groupFactory),
     );

@@ -209,7 +209,10 @@ export const withName = <const Name_ extends string>(
     return group_;
   }
 
-  // Keep object identity so impls can pass the same GroupSpec instance
-  // imported from a sibling `.spec.ts` into `resolveGroupPath`.
-  return Object.assign(group_, { name }) as AnyWithProps;
+  return makeProto({
+    runtime: group_.runtime,
+    name,
+    functions: group_.functions,
+    groups: group_.groups,
+  });
 };
