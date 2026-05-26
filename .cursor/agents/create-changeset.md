@@ -92,6 +92,33 @@ Lead with the API the consumer recognises, not the internal symbol that implemen
 
 If a refactor only changes how a public API is implemented (no surface change, no behavior change), say so in patch-level prose without naming the internal moving parts.
 
+### Behavior, not mechanics
+
+"Naming things" above keeps internal classes out of summaries; this rule extends past identifiers to the _shape_ of the entry. Even with public API names in backticks, an entry that narrates _how_ a fix was implemented — the pipeline step that changed, the internal exception class that was renamed, the intermediate representation that's now built differently — is still implementation-facing. Frame entries entirely around **what the user authors, what they get back, and what they see on stdout/stderr.**
+
+In practice:
+
+- **Layouts the user writes** (e.g. `confect/notes.spec.ts` next to a sibling `confect/notes/` subdirectory), not the pipeline's internal model of them (import bindings, assembly chains, `_generated/*` artifacts they never import by name).
+- **Refs, hooks, types, and CLI commands the user calls** (`refs.notes.list`, `useQuery(refs.notes.list)`, `confect codegen`, `confect dev`), not the internal builders that produce them (`writeGroupAssembly`, `Refs.make`, `GroupSpec`).
+- **Error messages the user reads in their terminal**, not the internal exception class. The formatted message ("child segment `notes` collides with a function on the parent spec") is what the user sees; an internal name like `` `ParentChildNameCollisionError` `` only appears in maintainer-facing stack traces and does not belong in a changelog.
+- **CLI subcommand behavioral splits** when they're user-visible — whether `confect codegen` exits non-zero versus `confect dev` logs and keeps watching determines whether someone's CI will catch a regression. State both, in the user's command-line terms.
+
+**Bad — internal symbols and pipeline mechanics:**
+
+```md
+Fix `writeGroupAssembly` losing the parent's `FunctionSpec` entries when a leaf module also has child groups. The assembly now starts from the leaf's import binding and chains `.addGroupAt(...)` for each child, so `Refs.make` no longer drops the parent's functions from `_generated/spec.ts`. Codegen also throws a new `ParentChildNameCollisionError` when a child segment shadows a parent function.
+```
+
+**Good — authored layout, resulting refs, observed CLI behavior:**
+
+```md
+Allow a `confect/{path}.spec.ts` file to declare functions even when a sibling `confect/{path}/` subdirectory contains further specs.
+
+Previously, every function on the parent spec silently disappeared from the generated api and refs in this layout: `refs.{path}.{fn}` was not defined, while `refs.{path}.{child}.{fn}` (from the subdirectory specs) worked.
+
+Both `confect codegen` and `confect dev` now generate the parent's functions and the subdirectory's groups side by side, as `refs.{path}.{fn}` and `refs.{path}.{child}.{fn}`. Codegen also reports a clear error when the parent spec declares a function or subgroup whose name matches one of the subdirectory's child segments — `confect codegen` exits non-zero, while `confect dev` logs it and keeps watching.
+```
+
 ### Code and API references
 
 - **Backtick every symbol the user might search for**—types, functions, classes, hooks, module names, flag names, environment variables, file paths.
