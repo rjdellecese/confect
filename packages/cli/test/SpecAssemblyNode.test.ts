@@ -40,4 +40,74 @@ describe("SpecAssemblyNode", () => {
       expect(contents).toContain('.addAt("env", env)');
     }),
   );
+
+  it.effect(
+    "assembledSpec preserves a parent leaf when sibling subdirectory specs exist",
+    () =>
+      Effect.gen(function* () {
+        const nodes = assemblyNodesFromLeaves([
+          leaf("notes.spec.ts", ["notes"]),
+          leaf("notes/archived.spec.ts", ["notes", "archived"]),
+        ]);
+        const contents = yield* templates.assembledSpec({
+          nodes,
+          runtime: "Convex",
+        });
+
+        expect(contents).toContain('import notes from "../notes.spec";');
+        expect(contents).toContain(
+          'import archived from "../notes/archived.spec";',
+        );
+        expect(contents).toContain(
+          '.addAt("notes", notes.addGroupAt("archived", archived))',
+        );
+        expect(contents).not.toContain('GroupSpec.makeAt("notes")');
+      }),
+  );
+
+  it.effect(
+    "assembledSpec only imports GroupSpec when at least one node lacks a leaf binding",
+    () =>
+      Effect.gen(function* () {
+        const nodes = assemblyNodesFromLeaves([
+          leaf("notes.spec.ts", ["notes"]),
+          leaf("notes/archived.spec.ts", ["notes", "archived"]),
+        ]);
+        const contents = yield* templates.assembledSpec({
+          nodes,
+          runtime: "Convex",
+        });
+
+        expect(contents).toContain('import { Spec } from "@confect/core";');
+        expect(contents).not.toContain(
+          'import { GroupSpec, Spec } from "@confect/core";',
+        );
+      }),
+  );
+
+  it.effect(
+    "assembledSpec keeps GroupSpec.makeAt when a leafless descendant has children",
+    () =>
+      Effect.gen(function* () {
+        const nodes = assemblyNodesFromLeaves([
+          leaf("notes.spec.ts", ["notes"]),
+          leaf("notes/archived/legacy.spec.ts", [
+            "notes",
+            "archived",
+            "legacy",
+          ]),
+        ]);
+        const contents = yield* templates.assembledSpec({
+          nodes,
+          runtime: "Convex",
+        });
+
+        expect(contents).toContain(
+          'import { GroupSpec, Spec } from "@confect/core";',
+        );
+        expect(contents).toContain(
+          '.addAt("notes", notes.addGroupAt("archived", GroupSpec.makeAt("archived").addGroupAt("legacy", legacy)))',
+        );
+      }),
+  );
 });

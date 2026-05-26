@@ -194,7 +194,9 @@ const absoluteModulePath = (relativePath: string) =>
 /**
  * Validate that the leaf's spec file default-exports a `GroupSpec` whose
  * runtime matches the leaf's location (`Convex` for files outside
- * `confect/node/`, `Node` for files inside it).
+ * `confect/node/`, `Node` for files inside it). Returns the validated
+ * `GroupSpec` so callers can avoid re-bundling for later inspection (e.g.
+ * parent/child name-collision checks at codegen time).
  */
 export const validateSpec = (leaf: LeafModule) =>
   Effect.gen(function* () {
@@ -218,6 +220,8 @@ export const validateSpec = (leaf: LeafModule) =>
         actualRuntime: groupSpec.runtime,
       });
     }
+
+    return groupSpec;
   });
 
 /**

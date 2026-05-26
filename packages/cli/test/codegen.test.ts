@@ -1,9 +1,14 @@
+import { FunctionSpec, GroupSpec } from "@confect/core";
 import { FileSystem, Path } from "@effect/platform";
 import { NodeFileSystem, NodePath } from "@effect/platform-node";
-import { assert, expect, layer } from "@effect/vitest";
-import { Effect, Either, Layer } from "effect";
-import { validateSchema } from "../src/confect/codegen";
+import { assert, describe, expect, it, layer } from "@effect/vitest";
+import { Effect, Either, Layer, Schema } from "effect";
+import {
+  validateNoParentChildNameCollisions,
+  validateSchema,
+} from "../src/confect/codegen";
 import { ConfectDirectory } from "../src/ConfectDirectory";
+import type { LeafModule } from "../src/LeafModule";
 
 const fixtureConfect = `${import.meta.dirname}/../../server/test/mock-backend/fixtures/confect`;
 
@@ -85,5 +90,109 @@ layer(CodegenLayer)("validateSchema", (it) => {
       assert(Either.isLeft(result));
       expect(result.left._tag).toBe("MissingSchemaFileError");
     }).pipe(Effect.scoped),
+  );
+});
+
+const leaf = (
+  relativePath: string,
+  pathSegments: [string, ...string[]],
+): LeafModule => ({
+  relativePath,
+  pathSegments,
+  groupPathDot: pathSegments.join("."),
+  registryGroupPathDot: pathSegments.join("."),
+  exportName: pathSegments[pathSegments.length - 1]!,
+  runtime: "Convex",
+  specImportPath: `../${relativePath.slice(0, -".ts".length)}`,
+});
+
+const emptyArgs = Schema.Struct({});
+const emptyReturns = Schema.Null;
+
+describe("validateNoParentChildNameCollisions", () => {
+  it.effect("accepts non-colliding parent-with-children layouts", () =>
+    Effect.gen(function* () {
+      const parent = leaf("notes.spec.ts", ["notes"]);
+      const child = leaf("notes/archived.spec.ts", ["notes", "archived"]);
+      const parentGroupSpec = GroupSpec.make().addFunction(
+        FunctionSpec.publicQuery({
+          name: "list",
+          args: emptyArgs,
+          returns: emptyReturns,
+        }),
+      );
+
+      yield* validateNoParentChildNameCollisions(
+        [parent, child],
+        new Map([[parent.relativePath, parentGroupSpec]]),
+      );
+    }),
+  );
+
+  it.effect(
+    "fails when a parent function name matches a sibling subdirectory segment",
+    () =>
+      Effect.gen(function* () {
+        const parent = leaf("notes.spec.ts", ["notes"]);
+        const child = leaf("notes/archived.spec.ts", ["notes", "archived"]);
+        const parentGroupSpec = GroupSpec.make().addFunction(
+          FunctionSpec.publicQuery({
+            name: "archived",
+            args: emptyArgs,
+            returns: emptyReturns,
+          }),
+        );
+
+        const result = yield* Effect.either(
+          validateNoParentChildNameCollisions(
+            [parent, child],
+            new Map([[parent.relativePath, parentGroupSpec]]),
+          ),
+        );
+
+        assert(Either.isLeft(result));
+        expect(result.left._tag).toBe("ParentChildNameCollisionError");
+        expect(result.left.collisionKind).toBe("function");
+        expect(result.left.collisionName).toBe("archived");
+        expect(result.left.parentSpecPath).toBe("notes.spec.ts");
+        expect(result.left.childSpecPath).toBe("notes/archived.spec.ts");
+      }),
+  );
+
+  it.effect(
+    "fails when a parent addGroupAt name matches a sibling subdirectory segment",
+    () =>
+      Effect.gen(function* () {
+        const parent = leaf("notes.spec.ts", ["notes"]);
+        const child = leaf("notes/archived.spec.ts", ["notes", "archived"]);
+        const inner = GroupSpec.makeAt("inner").addFunction(
+          FunctionSpec.publicQuery({
+            name: "list",
+            args: emptyArgs,
+            returns: emptyReturns,
+          }),
+        );
+        const parentGroupSpec = GroupSpec.make().addGroupAt("archived", inner);
+
+        const result = yield* Effect.either(
+          validateNoParentChildNameCollisions(
+            [parent, child],
+            new Map([[parent.relativePath, parentGroupSpec]]),
+          ),
+        );
+
+        assert(Either.isLeft(result));
+        expect(result.left._tag).toBe("ParentChildNameCollisionError");
+        expect(result.left.collisionKind).toBe("group");
+        expect(result.left.collisionName).toBe("archived");
+      }),
+  );
+
+  it.effect("ignores collisions when there is no parent leaf", () =>
+    Effect.gen(function* () {
+      const child = leaf("notes/archived.spec.ts", ["notes", "archived"]);
+
+      yield* validateNoParentChildNameCollisions([child], new Map());
+    }),
   );
 });

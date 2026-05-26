@@ -34,10 +34,10 @@ interface TempFile {
   readonly contents: string;
 }
 
-const withTempFiles = (
+const withTempFiles = <A>(
   files: ReadonlyArray<TempFile>,
   use: Effect.Effect<
-    void,
+    A,
     CodegenError,
     ConfectDirectory | Path.Path | FileSystem.FileSystem
   >,
@@ -48,7 +48,7 @@ const withTempFiles = (
     yield* Effect.forEach(files, ({ relativePath, contents }) =>
       fs.writeFileString(path.join(fixtureConfect, relativePath), contents),
     );
-    yield* use;
+    return yield* use;
   }).pipe(
     Effect.ensuring(
       Effect.gen(function* () {
@@ -66,11 +66,11 @@ const withTempFiles = (
     ),
   );
 
-const withTempFile = (
+const withTempFile = <A>(
   relativePath: string,
   contents: string,
   use: Effect.Effect<
-    void,
+    A,
     CodegenError,
     ConfectDirectory | Path.Path | FileSystem.FileSystem
   >,
