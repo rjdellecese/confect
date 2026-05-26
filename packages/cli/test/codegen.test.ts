@@ -1,7 +1,7 @@
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import { FileSystem, Path } from "@effect/platform";
 import { NodeFileSystem, NodePath } from "@effect/platform-node";
-import { assert, describe, expect, it, layer } from "@effect/vitest";
+import { assert, expect, layer } from "@effect/vitest";
 import { Effect, Either, Layer, Schema } from "effect";
 import {
   validateNoParentChildNameCollisions,
@@ -109,7 +109,7 @@ const leaf = (
 const emptyArgs = Schema.Struct({});
 const emptyReturns = Schema.Null;
 
-describe("validateNoParentChildNameCollisions", () => {
+layer(Layer.empty)("validateNoParentChildNameCollisions", (it) => {
   it.effect("accepts non-colliding parent-with-children layouts", () =>
     Effect.gen(function* () {
       const parent = leaf("notes.spec.ts", ["notes"]);
