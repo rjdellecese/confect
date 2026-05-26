@@ -1,5 +1,7 @@
 # @confect/core
 
+## 9.0.0-next.5
+
 ## 9.0.0-next.4
 
 ## 9.0.0-next.3

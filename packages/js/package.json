@@ -1,6 +1,6 @@
 {
   "name": "@confect/js",
-  "version": "9.0.0-next.4",
+  "version": "9.0.0-next.5",
   "description": "JavaScript client bindings for any JS runtime",
   "repository": {
     "type": "git",
