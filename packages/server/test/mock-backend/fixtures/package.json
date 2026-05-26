@@ -12,6 +12,7 @@
     "luxon": "^3.7.1"
   },
   "devDependencies": {
-    "@confect/cli": "workspace:*"
+    "@confect/cli": "workspace:*",
+    "@types/luxon": "^3.7.1"
   }
 }
