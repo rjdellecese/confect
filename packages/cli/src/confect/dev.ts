@@ -22,9 +22,13 @@ import {
   Stream,
   String,
 } from "effect";
+import {
+  externalPlugin,
+  loadTsConfig,
+  tsconfigPathsToRegExp,
+} from "bundle-require";
 import * as esbuild from "esbuild";
 import { logCoalescedBuildErrors } from "../BuildError";
-import { absoluteExternalsPlugin } from "../Bundler";
 import * as CodegenError from "../CodegenError";
 import { ConfectDirectory } from "../ConfectDirectory";
 import { ConvexDirectory } from "../ConvexDirectory";
@@ -430,6 +434,7 @@ const discoverEntryPoints = Effect.gen(function* () {
 
 const esbuildOptions = (
   entry: EntryPoint,
+  notExternal: ReadonlyArray<RegExp>,
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
   watcherErrorsRef: Ref.Ref<WatcherErrors>,
@@ -451,7 +456,7 @@ const esbuildOptions = (
     format: "esm" as const,
     logLevel: "silent" as const,
     plugins: [
-      absoluteExternalsPlugin,
+      externalPlugin({ notExternal: [...notExternal] }),
       {
         name: "notify-rebuild",
         setup(build: esbuild.PluginBuild) {
@@ -489,6 +494,7 @@ const esbuildOptions = (
 
 const createEntryPointWatcher = (
   entry: EntryPoint,
+  notExternal: ReadonlyArray<RegExp>,
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
   watcherErrorsRef: Ref.Ref<WatcherErrors>,
@@ -496,7 +502,13 @@ const createEntryPointWatcher = (
   Effect.acquireRelease(
     Effect.promise(async () => {
       const ctx = await esbuild.context(
-        esbuildOptions(entry, signal, pendingRef, watcherErrorsRef),
+        esbuildOptions(
+          entry,
+          notExternal,
+          signal,
+          pendingRef,
+          watcherErrorsRef,
+        ),
       );
       await ctx.watch();
       return ctx;
@@ -534,6 +546,17 @@ const entryPointsWatcher = (
   Effect.gen(function* () {
     const parentScope = yield* Effect.scope;
     const scopesRef = yield* Ref.make(new Map<string, Scope.CloseableScope>());
+    const projectRoot = yield* ProjectRoot.get;
+    // Discover the user's `tsconfig.json#paths` once at watcher startup so
+    // `~/...`-style aliases pointing into the user's source tree get bundled
+    // by esbuild instead of externalized via `bundle-require`'s `node_modules`
+    // heuristic. `loadTsConfig` walks up from `projectRoot` to find a
+    // `tsconfig.json`; if none exists, `paths` is empty and `notExternal` is
+    // `[]`, leaving the externalization rule unchanged.
+    const tsconfig = loadTsConfig(projectRoot);
+    const notExternal = tsconfigPathsToRegExp(
+      tsconfig?.data.compilerOptions?.paths ?? {},
+    );
 
     const sync = Effect.gen(function* () {
       const desired = yield* discoverEntryPoints;
@@ -569,6 +592,7 @@ const entryPointsWatcher = (
           );
           yield* createEntryPointWatcher(
             entry,
+            notExternal,
             signal,
             pendingRef,
             watcherErrorsRef,

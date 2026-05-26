@@ -1,7 +1,8 @@
-import { pathToFileURL } from "node:url";
+import { dirname, isAbsolute, resolve } from "node:path";
 import { Path } from "@effect/platform";
+import { bundleRequire } from "bundle-require";
 import { Array, Effect, Option, pipe } from "effect";
-import * as esbuild from "esbuild";
+import type * as esbuild from "esbuild";
 import { BundlerError } from "./BuildError";
 
 export interface Bundled {
@@ -9,108 +10,84 @@ export interface Bundled {
   readonly metafile: esbuild.Metafile;
 }
 
-const isRelativeOrAbsolutePath = (importPath: string) =>
-  importPath.startsWith("./") ||
-  importPath.startsWith("../") ||
-  importPath.startsWith("/");
-
-// Recursion guard for `absoluteExternalsPlugin`. When the plugin asks esbuild
-// to resolve a bare specifier via `build.resolve(...)`, esbuild invokes every
-// registered `onResolve` hook again for that same specifier — including this
-// one. The flag (carried through the recursive call via `pluginData`) tells
-// the recursive invocation to skip rewriting and fall through to esbuild's
-// built-in resolver, which is what we wanted from `build.resolve` in the
-// first place.
-const PLUGIN_DATA_SKIP = Symbol("absolute-externals.skip");
-
 /**
- * Mark every bare-specifier import as external and rewrite it to an absolute
- * `file://` URL. Resolution is delegated to esbuild's own resolver via
- * `build.resolve(...)`, which honors each package's `exports` map (preferring
- * the `import` condition under `format: "esm"`) and falls back to
- * `module`/`main` exactly the way Node's ESM resolution algorithm does.
- *
- * Bundles produced with this plugin are loaded via a data URL `import(...)`
- * (see {@link bundle}); rewriting bare externals to absolute file URLs is what
- * makes them resolvable at runtime, since a data URL has no parent file from
- * which a bare specifier could be resolved.
- *
- * Relative/absolute-path imports are left to esbuild to bundle as usual, and
- * `node:*` built-ins are passed through unchanged.
+ * `bundle-require` sets `absWorkingDir: cwd` on the underlying esbuild build,
+ * so the metafile's input keys (and each input's `imports[].path`) are stored
+ * relative to that cwd. Callers reach for the metafile with absolute paths
+ * (e.g. {@link directlyImports}), so we normalize every key/import path to
+ * absolute up front. That way the lookup logic stays oblivious to whatever
+ * cwd was used during bundling.
  */
-export const absoluteExternalsPlugin: esbuild.Plugin = {
-  name: "absolute-externals",
-  setup(build) {
-    build.onResolve({ filter: /.*/ }, async (args) => {
-      if (args.pluginData?.[PLUGIN_DATA_SKIP]) return;
-      if (args.kind !== "import-statement" && args.kind !== "dynamic-import")
-        return;
-      if (isRelativeOrAbsolutePath(args.path)) return;
-      if (args.path.startsWith("node:")) {
-        return { path: args.path, external: true };
-      }
-
-      const resolved = await build.resolve(args.path, {
-        kind: args.kind,
-        resolveDir: args.resolveDir,
-        pluginData: { [PLUGIN_DATA_SKIP]: true },
-      });
-
-      if (resolved.errors.length > 0) {
-        return { errors: resolved.errors, warnings: resolved.warnings };
-      }
-
-      return {
-        path: pathToFileURL(resolved.path).href,
-        external: true,
-      };
-    });
-  },
-};
-
-const buildEntry = (entryPoint: string) =>
-  Effect.tryPromise({
-    try: () =>
-      esbuild.build({
-        entryPoints: [entryPoint],
-        bundle: true,
-        write: false,
-        platform: "node",
-        format: "esm",
-        logLevel: "silent",
-        metafile: true,
-        plugins: [absoluteExternalsPlugin],
-      }),
-    catch: (cause) => new BundlerError({ cause }),
-  });
-
-const importBundledModule = (result: esbuild.BuildResult) => {
-  const code = result.outputFiles![0]!.text;
-  const dataUrl =
-    "data:text/javascript;base64," + Buffer.from(code).toString("base64");
-  return import(dataUrl);
+const absolutizeMetafile = (
+  metafile: esbuild.Metafile,
+  cwd: string,
+): esbuild.Metafile => {
+  const absolutize = (p: string) => (isAbsolute(p) ? p : resolve(cwd, p));
+  const inputs: esbuild.Metafile["inputs"] = {};
+  for (const [key, value] of Object.entries(metafile.inputs)) {
+    inputs[absolutize(key)] = {
+      ...value,
+      imports: value.imports.map((i) => ({ ...i, path: absolutize(i.path) })),
+    };
+  }
+  const outputs: esbuild.Metafile["outputs"] = {};
+  for (const [key, value] of Object.entries(metafile.outputs)) {
+    outputs[absolutize(key)] = value;
+  }
+  return { inputs, outputs };
 };
 
 /**
- * Bundle a TypeScript entry point with esbuild and import the result via a
- * data URL. This handles extensionless `.ts` imports regardless of whether
- * the user's project sets `"type": "module"` in package.json. The returned
- * pair carries both the imported module and the esbuild metafile so callers
- * can inspect the import graph (see {@link directlyImports}).
+ * Bundle a TypeScript entry point with esbuild via {@link bundleRequire} and
+ * import the result. `bundle-require` writes a temp `.mjs` next to the source,
+ * `import()`s it, and deletes it — so bare-specifier externals (third-party
+ * packages, workspace deps) resolve through the user's normal `node_modules`
+ * walk, and tsconfig `paths` aliases stay inside the bundle.
+ *
+ * `cwd` is set to the entry's directory so `bundle-require`'s `tsconfig.json`
+ * discovery (which walks upward from `cwd`) lands on the project's tsconfig
+ * regardless of where `confect codegen` was invoked from, and so esbuild
+ * resolves relative imports against the entry's location.
+ *
+ * The returned pair carries both the imported module and the esbuild metafile
+ * so callers can inspect the import graph (see {@link directlyImports}); the
+ * metafile is captured via a small `onEnd` plugin because `bundle-require`
+ * itself only exposes a flat `dependencies: string[]`.
  */
 export const bundle = (
   entryPoint: string,
 ): Effect.Effect<Bundled, BundlerError> =>
   Effect.gen(function* () {
-    const result = yield* buildEntry(entryPoint);
-    const module = yield* Effect.tryPromise({
-      try: () => importBundledModule(result),
+    let metafile: esbuild.Metafile | undefined;
+    const captureMetafile: esbuild.Plugin = {
+      name: "confect:capture-metafile",
+      setup(build) {
+        build.onEnd((result) => {
+          metafile = result.metafile;
+        });
+      },
+    };
+
+    const cwd = dirname(entryPoint);
+    const result = yield* Effect.tryPromise({
+      try: () =>
+        bundleRequire({
+          filepath: entryPoint,
+          cwd,
+          format: "esm",
+          esbuildOptions: {
+            plugins: [captureMetafile],
+            logLevel: "silent",
+          },
+        }),
       catch: (cause) => new BundlerError({ cause }),
     });
-    if (!result.metafile) {
+
+    if (!metafile) {
       return yield* Effect.dieMessage("esbuild metafile missing");
     }
-    return { module, metafile: result.metafile };
+
+    return { module: result.mod, metafile: absolutizeMetafile(metafile, cwd) };
   });
 
 const findMetafileInputKey = (
