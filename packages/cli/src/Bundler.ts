@@ -1,4 +1,3 @@
-import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { Path } from "@effect/platform";
 import { Array, Effect, Option, pipe } from "effect";
@@ -10,39 +9,61 @@ export interface Bundled {
   readonly metafile: esbuild.Metafile;
 }
 
-export const EXTERNAL_PACKAGES = [
-  "@confect/core",
-  "@confect/server",
-  "effect",
-  "@effect/*",
-];
+const isRelativeOrAbsolutePath = (importPath: string) =>
+  importPath.startsWith("./") ||
+  importPath.startsWith("../") ||
+  importPath.startsWith("/");
 
-const isExternalImport = (path: string) =>
-  EXTERNAL_PACKAGES.some((p) => {
-    if (p.endsWith("/*")) {
-      return path.startsWith(p.slice(0, -1));
-    }
-    return path === p || path.startsWith(p + "/");
-  });
+// Recursion guard for `absoluteExternalsPlugin`. When the plugin asks esbuild
+// to resolve a bare specifier via `build.resolve(...)`, esbuild invokes every
+// registered `onResolve` hook again for that same specifier — including this
+// one. The flag (carried through the recursive call via `pluginData`) tells
+// the recursive invocation to skip rewriting and fall through to esbuild's
+// built-in resolver, which is what we wanted from `build.resolve` in the
+// first place.
+const PLUGIN_DATA_SKIP = Symbol("absolute-externals.skip");
 
+/**
+ * Mark every bare-specifier import as external and rewrite it to an absolute
+ * `file://` URL. Resolution is delegated to esbuild's own resolver via
+ * `build.resolve(...)`, which honors each package's `exports` map (preferring
+ * the `import` condition under `format: "esm"`) and falls back to
+ * `module`/`main` exactly the way Node's ESM resolution algorithm does.
+ *
+ * Bundles produced with this plugin are loaded via a data URL `import(...)`
+ * (see {@link bundle}); rewriting bare externals to absolute file URLs is what
+ * makes them resolvable at runtime, since a data URL has no parent file from
+ * which a bare specifier could be resolved.
+ *
+ * Relative/absolute-path imports are left to esbuild to bundle as usual, and
+ * `node:*` built-ins are passed through unchanged.
+ */
 export const absoluteExternalsPlugin: esbuild.Plugin = {
   name: "absolute-externals",
   setup(build) {
     build.onResolve({ filter: /.*/ }, async (args) => {
+      if (args.pluginData?.[PLUGIN_DATA_SKIP]) return;
       if (args.kind !== "import-statement" && args.kind !== "dynamic-import")
         return;
-      if (!isExternalImport(args.path)) return;
-      // `import.meta.resolve`'s second argument is silently ignored in modern
-      // Node, so resolution would always walk up from the CLI's bundled file
-      // (`packages/cli/dist/utils.mjs`) instead of from the user's project.
-      // Use `createRequire` keyed on the importing file's directory so we
-      // resolve out of *their* `node_modules`. The synthetic filename is just
-      // a CommonJS resolution anchor; the file does not need to exist.
-      const parentFile = pathToFileURL(args.resolveDir + "/_").href;
-      const require_ = createRequire(parentFile);
-      const resolvedPath = require_.resolve(args.path);
-      const resolved = pathToFileURL(resolvedPath).href;
-      return { path: resolved, external: true };
+      if (isRelativeOrAbsolutePath(args.path)) return;
+      if (args.path.startsWith("node:")) {
+        return { path: args.path, external: true };
+      }
+
+      const resolved = await build.resolve(args.path, {
+        kind: args.kind,
+        resolveDir: args.resolveDir,
+        pluginData: { [PLUGIN_DATA_SKIP]: true },
+      });
+
+      if (resolved.errors.length > 0) {
+        return { errors: resolved.errors, warnings: resolved.warnings };
+      }
+
+      return {
+        path: pathToFileURL(resolved.path).href,
+        external: true,
+      };
     });
   },
 };

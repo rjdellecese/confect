@@ -24,7 +24,7 @@ import {
 } from "effect";
 import * as esbuild from "esbuild";
 import { logCoalescedBuildErrors } from "../BuildError";
-import { absoluteExternalsPlugin, EXTERNAL_PACKAGES } from "../Bundler";
+import { absoluteExternalsPlugin } from "../Bundler";
 import * as CodegenError from "../CodegenError";
 import { ConfectDirectory } from "../ConfectDirectory";
 import { ConvexDirectory } from "../ConvexDirectory";
@@ -450,7 +450,6 @@ const esbuildOptions = (
     platform: "node" as const,
     format: "esm" as const,
     logLevel: "silent" as const,
-    external: EXTERNAL_PACKAGES,
     plugins: [
       absoluteExternalsPlugin,
       {
