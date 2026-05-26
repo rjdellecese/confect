@@ -32,10 +32,13 @@ describe("SpecAssemblyNode", () => {
 
       expect(contents).toContain('import env from "../env.spec";');
       expect(contents).toContain(
-        'import notes from "../notesAndRandom/notes.spec";',
+        'import notesAndRandom_notes from "../notesAndRandom/notes.spec";',
       );
       expect(contents).toContain(
-        'GroupSpec.makeAt("notesAndRandom").addGroupAt("notes", notes).addGroupAt("random", random)',
+        'import notesAndRandom_random from "../notesAndRandom/random.spec";',
+      );
+      expect(contents).toContain(
+        'GroupSpec.makeAt("notesAndRandom").addGroupAt("notes", notesAndRandom_notes).addGroupAt("random", notesAndRandom_random)',
       );
       expect(contents).toContain('.addAt("env", env)');
     }),
@@ -56,10 +59,10 @@ describe("SpecAssemblyNode", () => {
 
         expect(contents).toContain('import notes from "../notes.spec";');
         expect(contents).toContain(
-          'import archived from "../notes/archived.spec";',
+          'import notes_archived from "../notes/archived.spec";',
         );
         expect(contents).toContain(
-          '.addAt("notes", notes.addGroupAt("archived", archived))',
+          '.addAt("notes", notes.addGroupAt("archived", notes_archived))',
         );
         expect(contents).not.toContain('GroupSpec.makeAt("notes")');
       }),
@@ -106,7 +109,88 @@ describe("SpecAssemblyNode", () => {
           'import { GroupSpec, Spec } from "@confect/core";',
         );
         expect(contents).toContain(
-          '.addAt("notes", notes.addGroupAt("archived", GroupSpec.makeAt("archived").addGroupAt("legacy", legacy)))',
+          '.addAt("notes", notes.addGroupAt("archived", GroupSpec.makeAt("archived").addGroupAt("legacy", notes_archived_legacy)))',
+        );
+      }),
+  );
+
+  it.effect(
+    "assembledSpec gives every leaf a unique import binding when sibling specs share a basename",
+    () =>
+      Effect.gen(function* () {
+        const leaves = [
+          leaf("scripts/operational/inviteUser/mutations.spec.ts", [
+            "scripts",
+            "operational",
+            "inviteUser",
+            "mutations",
+          ]),
+          leaf("scripts/operational/inviteUser/queries.spec.ts", [
+            "scripts",
+            "operational",
+            "inviteUser",
+            "queries",
+          ]),
+          leaf("scripts/operational/seed/mutations.spec.ts", [
+            "scripts",
+            "operational",
+            "seed",
+            "mutations",
+          ]),
+          leaf("scripts/operational/seedTestUser/mutations.spec.ts", [
+            "scripts",
+            "operational",
+            "seedTestUser",
+            "mutations",
+          ]),
+          leaf("scripts/operational/seedTestUser/queries.spec.ts", [
+            "scripts",
+            "operational",
+            "seedTestUser",
+            "queries",
+          ]),
+        ];
+        const nodes = assemblyNodesFromLeaves(leaves);
+        const contents = yield* templates.assembledSpec({
+          nodes,
+          runtime: "Convex",
+        });
+
+        expect(contents).toContain(
+          'import scripts_operational_inviteUser_mutations from "../scripts/operational/inviteUser/mutations.spec";',
+        );
+        expect(contents).toContain(
+          'import scripts_operational_inviteUser_queries from "../scripts/operational/inviteUser/queries.spec";',
+        );
+        expect(contents).toContain(
+          'import scripts_operational_seed_mutations from "../scripts/operational/seed/mutations.spec";',
+        );
+        expect(contents).toContain(
+          'import scripts_operational_seedTestUser_mutations from "../scripts/operational/seedTestUser/mutations.spec";',
+        );
+        expect(contents).toContain(
+          'import scripts_operational_seedTestUser_queries from "../scripts/operational/seedTestUser/queries.spec";',
+        );
+
+        const importLines = contents
+          .split("\n")
+          .filter((line) => line.startsWith("import ") && line.includes(".spec"));
+        expect(importLines).toHaveLength(leaves.length);
+
+        expect(contents).toContain(
+          '.addGroupAt("mutations", scripts_operational_inviteUser_mutations)',
+        );
+        expect(contents).toContain(
+          '.addGroupAt("queries", scripts_operational_inviteUser_queries)',
+        );
+        expect(contents).toContain(
+          '.addGroupAt("mutations", scripts_operational_seed_mutations)',
+        );
+        expect(contents).toContain(
+          '.addGroupAt("mutations", scripts_operational_seedTestUser_mutations)',
+        );
+        expect(contents).toContain(
+          '.addGroupAt("queries", scripts_operational_seedTestUser_queries)',
         );
       }),
   );

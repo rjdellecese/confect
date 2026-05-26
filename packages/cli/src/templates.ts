@@ -415,7 +415,7 @@ const writeGroupAssembly: (
     onNone: () => writeGroupFactoryCall(cbw, node, groupFactory),
     onSome: (binding) =>
       Effect.gen(function* () {
-        yield* cbw.write(binding.exportName);
+        yield* cbw.write(binding.localName);
         yield* Effect.forEach(node.children, (child) =>
           writeChildAddGroupAt(cbw, child, groupFactory),
         );
@@ -460,7 +460,7 @@ export const assembledSpec = ({
 
     yield* Effect.forEach(collectImportBindings(nodes), (binding) =>
       cbw.writeLine(
-        `import ${binding.exportName} from "${binding.importPath}";`,
+        `import ${binding.localName} from "${binding.importPath}";`,
       ),
     );
 
