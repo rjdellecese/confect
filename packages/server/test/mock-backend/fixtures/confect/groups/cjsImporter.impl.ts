@@ -5,7 +5,7 @@ import api from "../_generated/api";
 import cjsImporter from "./cjsImporter.spec";
 
 const now = FunctionImpl.make(api, cjsImporter, "now", () =>
-  Effect.sync(() => DateTime.now().toISO()),
+  Effect.sync(() => DateTime.now().toISO() ?? ""),
 );
 
 export default GroupImpl.make(api, cjsImporter).pipe(
