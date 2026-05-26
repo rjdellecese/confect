@@ -1,6 +1,3 @@
-import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { Path } from "@effect/platform";
 import { Array, Effect, Option, pipe } from "effect";
@@ -17,97 +14,54 @@ const isRelativeOrAbsolutePath = (importPath: string) =>
   importPath.startsWith("../") ||
   importPath.startsWith("/");
 
-const packageNameFromSpecifier = (specifier: string) => {
-  if (specifier.startsWith("@")) {
-    const scopeEnd = specifier.indexOf("/", 1);
-    if (scopeEnd === -1) {
-      return specifier;
-    }
-    const subpathStart = specifier.indexOf("/", scopeEnd + 1);
-    return subpathStart === -1 ? specifier : specifier.slice(0, subpathStart);
-  }
-  const slash = specifier.indexOf("/");
-  return slash === -1 ? specifier : specifier.slice(0, slash);
-};
-
-const exportSubpathFromSpecifier = (specifier: string) => {
-  const packageName = packageNameFromSpecifier(specifier);
-  if (specifier === packageName) {
-    return ".";
-  }
-  return `.${specifier.slice(packageName.length)}`;
-};
-
-const readExportTarget = (
-  entry: unknown,
-  condition: "import" | "require",
-): string | undefined => {
-  if (typeof entry === "string") {
-    return entry;
-  }
-  if (!entry || typeof entry !== "object") {
-    return undefined;
-  }
-  const conditions = entry as Record<string, unknown>;
-  const primary = conditions[condition];
-  if (typeof primary === "string") {
-    return primary;
-  }
-  if (primary && typeof primary === "object") {
-    const nested = primary as Record<string, unknown>;
-    const nestedTarget = nested[condition];
-    if (typeof nestedTarget === "string") {
-      return nestedTarget;
-    }
-  }
-  return undefined;
-};
+// Recursion guard for `absoluteExternalsPlugin`. When the plugin asks esbuild
+// to resolve a bare specifier via `build.resolve(...)`, esbuild invokes every
+// registered `onResolve` hook again for that same specifier — including this
+// one. The flag (carried through the recursive call via `pluginData`) tells
+// the recursive invocation to skip rewriting and fall through to esbuild's
+// built-in resolver, which is what we wanted from `build.resolve` in the
+// first place.
+const PLUGIN_DATA_SKIP = Symbol("absolute-externals.skip");
 
 /**
- * Resolve a bare specifier to an absolute file URL suitable for `import()` from
- * a bundled ESM data URL. Prefer each package's ESM `import` export condition
- * so dual-package CJS/ESM deps like `convex/server` keep their named exports.
- * Fall back to CommonJS resolution for packages without an ESM entry (e.g.
- * `luxon`).
+ * Mark every bare-specifier import as external and rewrite it to an absolute
+ * `file://` URL. Resolution is delegated to esbuild's own resolver via
+ * `build.resolve(...)`, which honors each package's `exports` map (preferring
+ * the `import` condition under `format: "esm"`) and falls back to
+ * `module`/`main` exactly the way Node's ESM resolution algorithm does.
+ *
+ * Bundles produced with this plugin are loaded via a data URL `import(...)`
+ * (see {@link bundle}); rewriting bare externals to absolute file URLs is what
+ * makes them resolvable at runtime, since a data URL has no parent file from
+ * which a bare specifier could be resolved.
+ *
+ * Relative/absolute-path imports are left to esbuild to bundle as usual, and
+ * `node:*` built-ins are passed through unchanged.
  */
-const resolveBareSpecifierToFileUrl = (
-  specifier: string,
-  resolveDir: string,
-) => {
-  const parentFile = pathToFileURL(`${resolveDir}/_`).href;
-  const require_ = createRequire(parentFile);
-  const packageName = packageNameFromSpecifier(specifier);
-  const subpath = exportSubpathFromSpecifier(specifier);
-  const pkgJsonPath = require_.resolve(`${packageName}/package.json`);
-  const pkgDir = dirname(pkgJsonPath);
-  const pkg = JSON.parse(readFileSync(pkgJsonPath, "utf8")) as {
-    exports?: Record<string, unknown>;
-    module?: string;
-  };
-
-  const exportsEntry = pkg.exports?.[subpath];
-  const importTarget =
-    readExportTarget(exportsEntry, "import") ??
-    (subpath === "." ? pkg.module : undefined);
-  const resolvedPath = importTarget
-    ? join(pkgDir, importTarget)
-    : require_.resolve(specifier);
-
-  return pathToFileURL(resolvedPath).href;
-};
-
 export const absoluteExternalsPlugin: esbuild.Plugin = {
   name: "absolute-externals",
   setup(build) {
     build.onResolve({ filter: /.*/ }, async (args) => {
+      if (args.pluginData?.[PLUGIN_DATA_SKIP]) return;
       if (args.kind !== "import-statement" && args.kind !== "dynamic-import")
         return;
       if (isRelativeOrAbsolutePath(args.path)) return;
       if (args.path.startsWith("node:")) {
         return { path: args.path, external: true };
       }
+
+      const resolved = await build.resolve(args.path, {
+        kind: args.kind,
+        resolveDir: args.resolveDir,
+        pluginData: { [PLUGIN_DATA_SKIP]: true },
+      });
+
+      if (resolved.errors.length > 0) {
+        return { errors: resolved.errors, warnings: resolved.warnings };
+      }
+
       return {
-        path: resolveBareSpecifierToFileUrl(args.path, args.resolveDir),
+        path: pathToFileURL(resolved.path).href,
         external: true,
       };
     });
