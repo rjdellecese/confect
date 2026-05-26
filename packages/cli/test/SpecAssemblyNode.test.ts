@@ -37,6 +37,13 @@ describe("SpecAssemblyNode", () => {
       expect(contents).toContain(
         'import notesAndRandom_random from "../notesAndRandom/random.spec";',
       );
+      expect(contents).toContain('.addPath(env, "env")');
+      expect(contents).toContain(
+        '.addPath(notesAndRandom_notes, "notesAndRandom.notes")',
+      );
+      expect(contents).toContain(
+        '.addPath(notesAndRandom_random, "notesAndRandom.random")',
+      );
       expect(contents).toContain(
         'GroupSpec.makeAt("notesAndRandom").addGroupAt("notes", notesAndRandom_notes).addGroupAt("random", notesAndRandom_random)',
       );
@@ -60,6 +67,10 @@ describe("SpecAssemblyNode", () => {
         expect(contents).toContain('import notes from "../notes.spec";');
         expect(contents).toContain(
           'import notes_archived from "../notes/archived.spec";',
+        );
+        expect(contents).toContain('.addPath(notes, "notes")');
+        expect(contents).toContain(
+          '.addPath(notes_archived, "notes.archived")',
         );
         expect(contents).toContain(
           '.addAt("notes", notes.addGroupAt("archived", notes_archived))',
@@ -107,6 +118,10 @@ describe("SpecAssemblyNode", () => {
 
         expect(contents).toContain(
           'import { GroupSpec, Spec } from "@confect/core";',
+        );
+        expect(contents).toContain('.addPath(notes, "notes")');
+        expect(contents).toContain(
+          '.addPath(notes_archived_legacy, "notes.archived.legacy")',
         );
         expect(contents).toContain(
           '.addAt("notes", notes.addGroupAt("archived", GroupSpec.makeAt("archived").addGroupAt("legacy", notes_archived_legacy)))',
@@ -194,6 +209,81 @@ describe("SpecAssemblyNode", () => {
         expect(contents).toContain(
           '.addGroupAt("queries", scripts_operational_seedTestUser_queries)',
         );
+
+        for (const segments of [
+          ["scripts", "operational", "inviteUser", "mutations"],
+          ["scripts", "operational", "inviteUser", "queries"],
+          ["scripts", "operational", "seed", "mutations"],
+          ["scripts", "operational", "seedTestUser", "mutations"],
+          ["scripts", "operational", "seedTestUser", "queries"],
+        ]) {
+          expect(contents).toContain(
+            `.addPath(${segments.join("_")}, "${segments.join(".")}")`,
+          );
+        }
+      }),
+  );
+
+  it.effect(
+    "assembledSpec registers every leaf for the ISSUE.md catalog layout",
+    () =>
+      Effect.gen(function* () {
+        // Mirrors the layout in ISSUE.md: a parent leaf alongside subdirectory
+        // children at multiple nesting depths. Every impl below must be able
+        // to resolve its sibling spec's group path via Spec.addPath, not via
+        // identity walking the assembled tree.
+        const nodes = assemblyNodesFromLeaves([
+          leaf("remix/routes/_app/catalog.spec.ts", [
+            "remix",
+            "routes",
+            "_app",
+            "catalog",
+          ]),
+          leaf("remix/routes/_app/catalog/productId/queries.spec.ts", [
+            "remix",
+            "routes",
+            "_app",
+            "catalog",
+            "productId",
+            "queries",
+          ]),
+          leaf("remix/routes/_app/catalog/productId/variants.spec.ts", [
+            "remix",
+            "routes",
+            "_app",
+            "catalog",
+            "productId",
+            "variants",
+          ]),
+          leaf("remix/routes/_app/catalog/productId/details.spec.ts", [
+            "remix",
+            "routes",
+            "_app",
+            "catalog",
+            "productId",
+            "details",
+          ]),
+        ]);
+        const contents = yield* templates.assembledSpec({
+          nodes,
+          runtime: "Convex",
+        });
+
+        expect(contents).toContain(
+          '.addPath(remix_routes__app_catalog, "remix.routes._app.catalog")',
+        );
+        expect(contents).toContain(
+          '.addPath(remix_routes__app_catalog_productId_queries, "remix.routes._app.catalog.productId.queries")',
+        );
+        expect(contents).toContain(
+          '.addPath(remix_routes__app_catalog_productId_variants, "remix.routes._app.catalog.productId.variants")',
+        );
+        expect(contents).toContain(
+          '.addPath(remix_routes__app_catalog_productId_details, "remix.routes._app.catalog.productId.details")',
+        );
+        // Tree-assembly shape is preserved; the addGroupAt-wrapped parent leaf
+        // still ends up in the tree, but its impl now resolves through paths.
+        expect(contents).toContain("remix_routes__app_catalog.addGroupAt(");
       }),
   );
 });

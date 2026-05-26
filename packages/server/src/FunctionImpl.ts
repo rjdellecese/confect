@@ -2,8 +2,7 @@ import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import type * as GroupSpec from "@confect/core/GroupSpec";
 import * as Registry from "@confect/core/Registry";
 import { Context, Effect, Layer, Ref, String } from "effect";
-import type * as Api from "./Api";
-import { resolveGroupPathUnsafe } from "./GroupPath";
+import * as Api from "./Api";
 import type * as Handler from "./Handler";
 import { setNestedProperty } from "./internal/utils";
 import * as RegistryItem from "./RegistryItem";
@@ -44,7 +43,7 @@ export const make = <
     FunctionName
   >,
 ): Layer.Layer<FunctionImpl<string, FunctionName>> => {
-  const groupPath = resolveGroupPathUnsafe(api.spec, group);
+  const groupPath = Api.resolveGroupPathUnsafe(api, group);
   const functionSpec = group.functions[functionName]!;
 
   return Layer.effect(

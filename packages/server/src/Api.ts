@@ -1,4 +1,5 @@
 import type { RuntimeAndFunctionType } from "@confect/core";
+import type * as GroupSpec from "@confect/core/GroupSpec";
 import type * as Spec from "@confect/core/Spec";
 import type { GenericSchema, SchemaDefinition } from "convex/server";
 import { defineSchema as defineConvexSchema } from "convex/server";
@@ -73,3 +74,29 @@ export const make = <
   databaseSchema: DatabaseSchema_,
   spec: Spec_,
 ): Api<DatabaseSchema_, Spec_> => makeProto({ databaseSchema, spec });
+
+/**
+ * Resolve the dot-path of `group` within `api.spec` by reading the immutable
+ * `paths` mapping that codegen populated in `_generated/spec.ts`. Throws when
+ * the spec is not registered, with a message pointing the caller at the
+ * place to register it.
+ *
+ * The legacy identity-based tree walk (`packages/server/src/GroupPath.ts`)
+ * was deleted in favor of this O(1) map lookup; both the registration
+ * mechanism (`Spec.addPath`) and the lookup key are the same JS reference
+ * thanks to ES module dedup between `_generated/spec.ts` and `*.impl.ts`.
+ */
+export const resolveGroupPathUnsafe = (
+  api: AnyWithProps,
+  group: GroupSpec.AnyWithProps,
+): string => {
+  const groupPath = api.spec.paths.get(group);
+  if (groupPath === undefined) {
+    throw new Error(
+      "GroupSpec has no registered path in this api's spec. " +
+        "Ensure the spec is added via Spec.addPath in _generated/spec.ts " +
+        "(or, in tests, call .addPath(spec, 'dot.path') on the Spec you pass to Api.make).",
+    );
+  }
+  return groupPath;
+};
