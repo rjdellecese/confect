@@ -24,9 +24,7 @@ const packageNameFromSpecifier = (specifier: string) => {
       return specifier;
     }
     const subpathStart = specifier.indexOf("/", scopeEnd + 1);
-    return subpathStart === -1
-      ? specifier
-      : specifier.slice(0, subpathStart);
+    return subpathStart === -1 ? specifier : specifier.slice(0, subpathStart);
   }
   const slash = specifier.indexOf("/");
   return slash === -1 ? specifier : specifier.slice(0, slash);
