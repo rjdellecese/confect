@@ -4,6 +4,7 @@ import { Array, Option, Order, pipe, Record } from "effect";
 export interface SpecImportBinding {
   readonly importPath: string;
   readonly exportName: string;
+  readonly localName: string;
 }
 
 export interface SpecAssemblyNode {
@@ -15,6 +16,7 @@ export interface SpecAssemblyNode {
 const importBindingFromLeaf = (leaf: LeafModule): SpecImportBinding => ({
   importPath: leaf.specImportPath,
   exportName: leaf.exportName,
+  localName: leaf.pathSegments.join("_"),
 });
 
 const assemblyNodesAtDepth = (
@@ -75,8 +77,8 @@ export const collectImportBindings = (
   pipe(
     Array.flatMap(nodes, importBindingsForNode),
     (bindings) =>
-      Record.fromIterableBy(bindings, (binding) => binding.exportName),
+      Record.fromIterableBy(bindings, (binding) => binding.importPath),
     Record.toEntries,
-    Array.sortBy(Order.mapInput(Order.string, ([exportName]) => exportName)),
     Array.map(([, binding]) => binding),
+    Array.sortBy(Order.mapInput(Order.string, (binding) => binding.localName)),
   );
