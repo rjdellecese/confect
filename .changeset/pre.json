@@ -13,6 +13,7 @@
   },
   "changesets": [
     "fs-based-function-paths",
-    "preserve-parent-leaf-in-assembled-spec"
+    "preserve-parent-leaf-in-assembled-spec",
+    "unique-spec-import-bindings"
   ]
 }
