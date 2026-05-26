@@ -1,5 +1,12 @@
 # @confect/test
 
+## 9.0.0-next.2
+
+### Patch Changes
+
+- @confect/core@9.0.0-next.2
+- @confect/server@9.0.0-next.2
+
 ## 9.0.0-next.1
 
 ### Patch Changes
