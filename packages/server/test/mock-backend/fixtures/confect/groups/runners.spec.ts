@@ -1,12 +1,13 @@
-import { FunctionSpec, GenericId, GroupSpec } from "@confect/core";
+import { FunctionSpec, GroupSpec } from "@confect/core";
 import { Schema } from "effect";
+import { Id } from "../_generated/id";
 
 export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicAction({
       name: "insertNoteViaRunner",
       args: Schema.Struct({ text: Schema.String }),
-      returns: GenericId.GenericId("notes"),
+      returns: Id("notes"),
     }),
   )
   .addFunction(

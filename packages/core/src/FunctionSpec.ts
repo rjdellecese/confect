@@ -8,7 +8,7 @@ import type {
 import type { Schema } from "effect";
 import { Predicate } from "effect";
 import * as FunctionProvenance from "./FunctionProvenance";
-import { validateConfectFunctionIdentifier } from "./internal/utils";
+import { validateConfectFunctionIdentifier } from "./Identifier";
 import * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
 export const TypeId = "@confect/core/FunctionSpec";

@@ -3,12 +3,13 @@ import { FileSystem, Path } from "@effect/platform";
 import { NodeFileSystem, NodePath } from "@effect/platform-node";
 import { assert, expect, layer } from "@effect/vitest";
 import { Effect, Either, Layer, Schema } from "effect";
-import {
-  validateNoParentChildNameCollisions,
-  validateSchema,
-} from "../src/confect/codegen";
+import { validateNoParentChildNameCollisions } from "../src/confect/codegen";
 import { ConfectDirectory } from "../src/ConfectDirectory";
 import type { LeafModule } from "../src/LeafModule";
+import {
+  discover as discoverTables,
+  validate as validateTables,
+} from "../src/TableModule";
 
 const fixtureConfect = `${import.meta.dirname}/../../server/test/mock-backend/fixtures/confect`;
 
@@ -21,64 +22,71 @@ const CodegenLayer = Layer.mergeAll(
   }),
 );
 
-layer(CodegenLayer)("validateSchema", (it) => {
-  it.effect("accepts the fixture schema", () => validateSchema);
-
-  it.effect("rejects a schema with a syntax error", () =>
+layer(CodegenLayer)("TableModule.discover", (it) => {
+  it.effect("discovers the fixture tables", () =>
     Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem;
-      const path = yield* Path.Path;
-      const schemaPath = path.join(fixtureConfect, "schema.ts");
-      const original = yield* fs.readFileString(schemaPath);
-
-      yield* Effect.gen(function* () {
-        yield* fs.writeFileString(
-          schemaPath,
-          "export default DatabaseSchema.make(\n",
-        );
-        const result = yield* Effect.either(validateSchema);
-
-        assert(Either.isLeft(result));
-        assert(result.left._tag === "BundleFailedError");
-        expect(result.left.errors.length).toBeGreaterThan(0);
-      }).pipe(
-        Effect.ensuring(
-          fs.writeFileString(schemaPath, original).pipe(Effect.orDie),
-        ),
-      );
+      const tables = yield* discoverTables;
+      expect(tables.map((t) => t.tableName).sort()).toEqual([
+        "notes",
+        "tags",
+        "users",
+      ]);
+      for (const table of tables) {
+        expect(table.relativePath.startsWith("tables/")).toBe(true);
+      }
     }),
   );
 
   it.effect(
-    "rejects a schema whose default export is not a DatabaseSchema",
+    "rejects a `confect/tables/*.ts` file that does not default-export an UnnamedTable",
     () =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
-        const schemaPath = path.join(fixtureConfect, "schema.ts");
-        const original = yield* fs.readFileString(schemaPath);
+        const stowedPath = path.join(fixtureConfect, "tables", "stowed.ts");
 
         yield* Effect.gen(function* () {
-          yield* fs.writeFileString(schemaPath, "export default {};\n");
-          const result = yield* Effect.either(validateSchema);
+          yield* fs.writeFileString(stowedPath, "export default {};\n");
+          const tables = yield* discoverTables;
+          const result = yield* Effect.either(validateTables(tables));
 
           assert(Either.isLeft(result));
-          expect(result.left._tag).toBe("SchemaInvalidDefaultExportError");
-        }).pipe(
-          Effect.ensuring(
-            fs.writeFileString(schemaPath, original).pipe(Effect.orDie),
-          ),
-        );
+          expect(result.left._tag).toBe("InvalidTableDefaultExportError");
+        }).pipe(Effect.ensuring(fs.remove(stowedPath).pipe(Effect.orDie)));
       }),
   );
 
-  it.effect("rejects a missing schema file", () =>
+  // Each rejected filename exercises a different validator branch:
+  //   - "user-profiles.ts" violates the JS identifier pattern (dash).
+  //   - "_internal.ts" starts with `_`, which is reserved for Convex system
+  //     tables and excluded by `validateConfectTableIdentifier` even though
+  //     `_internal` is a legal JS identifier.
+  //   - "import.ts" is a legal-looking identifier but a reserved JS keyword,
+  //     so emitting it as a binding in generated files would fail to parse.
+  it.effect.each(["user-profiles.ts", "_internal.ts", "import.ts"])(
+    "rejects table filename %s",
+    (filename) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const invalidPath = path.join(fixtureConfect, "tables", filename);
+
+        yield* Effect.gen(function* () {
+          yield* fs.writeFileString(invalidPath, "export default {};\n");
+          const result = yield* Effect.either(discoverTables);
+
+          assert(Either.isLeft(result));
+          expect(result.left._tag).toBe("InvalidTableFilenameError");
+        }).pipe(Effect.ensuring(fs.remove(invalidPath).pipe(Effect.orDie)));
+      }),
+  );
+
+  it.effect("returns an empty array when there is no tables/ directory", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const tempDir = yield* fs.makeTempDirectoryScoped();
 
-      const result = yield* validateSchema.pipe(
-        Effect.either,
+      const tables = yield* discoverTables.pipe(
         Effect.provide(
           Layer.mock(ConfectDirectory, {
             _tag: "@confect/cli/ConfectDirectory",
@@ -87,9 +95,41 @@ layer(CodegenLayer)("validateSchema", (it) => {
         ),
       );
 
-      assert(Either.isLeft(result));
-      expect(result.left._tag).toBe("MissingSchemaFileError");
+      expect(tables).toEqual([]);
     }).pipe(Effect.scoped),
+  );
+
+  // The "tables/ exists but has no .ts files" branch in `listTableFiles`
+  // is structurally distinct from the missing-directory branch above
+  // (different early return path) and deserves its own regression test;
+  // both branches collapse to an empty result, which the codegen pipeline
+  // promotes into a `⚠` warning at the call site (see `warnIfNoTables`).
+  it.effect(
+    "returns an empty array when tables/ exists but has no .ts files",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const tempDir = yield* fs.makeTempDirectoryScoped();
+        const tablesDir = path.join(tempDir, "tables");
+        yield* fs.makeDirectory(tablesDir);
+        yield* fs.writeFileString(path.join(tablesDir, ".gitkeep"), "");
+        yield* fs.writeFileString(
+          path.join(tablesDir, "README.md"),
+          "tables go here\n",
+        );
+
+        const tables = yield* discoverTables.pipe(
+          Effect.provide(
+            Layer.mock(ConfectDirectory, {
+              _tag: "@confect/cli/ConfectDirectory",
+              get: Effect.succeed(tempDir),
+            }),
+          ),
+        );
+
+        expect(tables).toEqual([]);
+      }).pipe(Effect.scoped),
   );
 });
 

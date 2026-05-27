@@ -68,13 +68,6 @@ export class ImplMissingFunctionsError extends Schema.TaggedError<ImplMissingFun
   },
 ) {}
 
-export class SchemaInvalidDefaultExportError extends Schema.TaggedError<SchemaInvalidDefaultExportError>()(
-  "SchemaInvalidDefaultExportError",
-  {
-    schemaPath: Schema.String,
-  },
-) {}
-
 export class ParentChildNameCollisionError extends Schema.TaggedError<ParentChildNameCollisionError>()(
   "ParentChildNameCollisionError",
   {
@@ -85,8 +78,23 @@ export class ParentChildNameCollisionError extends Schema.TaggedError<ParentChil
   },
 ) {}
 
-export class MissingSchemaFileError extends Schema.TaggedError<MissingSchemaFileError>()(
-  "MissingSchemaFileError",
+export class InvalidTableDefaultExportError extends Schema.TaggedError<InvalidTableDefaultExportError>()(
+  "InvalidTableDefaultExportError",
+  {
+    tablePath: Schema.String,
+  },
+) {}
+
+export class InvalidTableFilenameError extends Schema.TaggedError<InvalidTableFilenameError>()(
+  "InvalidTableFilenameError",
+  {
+    tablePath: Schema.String,
+    reason: Schema.String,
+  },
+) {}
+
+export class LegacySchemaFileError extends Schema.TaggedError<LegacySchemaFileError>()(
+  "LegacySchemaFileError",
   {
     schemaPath: Schema.String,
   },
@@ -102,9 +110,10 @@ export const CodegenError = Schema.Union(
   ImplMissingDefaultLayerError,
   ImplNotFinalizedError,
   ImplMissingFunctionsError,
-  SchemaInvalidDefaultExportError,
-  MissingSchemaFileError,
   ParentChildNameCollisionError,
+  InvalidTableDefaultExportError,
+  InvalidTableFilenameError,
+  LegacySchemaFileError,
 );
 export type CodegenError = typeof CodegenError.Type;
 
@@ -235,25 +244,36 @@ const renderImplMissingFunctionsError = (
   );
 };
 
-const renderSchemaInvalidDefaultExportError = (
-  error: SchemaInvalidDefaultExportError,
+const renderInvalidTableDefaultExportError = (
+  error: InvalidTableDefaultExportError,
 ): AnsiDoc.AnsiDoc =>
   singleLine(
-    AnsiDoc.text("Schema "),
-    formatPathDoc(error.schemaPath),
+    AnsiDoc.text("Table "),
+    formatPathDoc(error.tablePath),
     AnsiDoc.text(
-      " must default-export a DatabaseSchema; build it with DatabaseSchema.make({ ... }).",
+      " must default-export a Table (e.g. `export default Table.make({ ... })`); convert any named export to a default export.",
     ),
   );
 
-const renderMissingSchemaFileError = (
-  error: MissingSchemaFileError,
+const renderInvalidTableFilenameError = (
+  error: InvalidTableFilenameError,
 ): AnsiDoc.AnsiDoc =>
   singleLine(
-    AnsiDoc.text("Schema "),
+    AnsiDoc.text("Table "),
+    formatPathDoc(error.tablePath),
+    AnsiDoc.text(
+      ` has an invalid filename: ${error.reason} Convex table names must start with a letter and contain only letters, numbers, and underscores; leading underscores are reserved for system tables.`,
+    ),
+  );
+
+const renderLegacySchemaFileError = (
+  error: LegacySchemaFileError,
+): AnsiDoc.AnsiDoc =>
+  singleLine(
+    AnsiDoc.text("Found a legacy "),
     formatPathDoc(error.schemaPath),
     AnsiDoc.text(
-      " is required but is missing; create it and default-export a DatabaseSchema (DatabaseSchema.make({ ... })).",
+      ". Delete it: tables in `confect/tables/*.ts` are now the single source of truth, and the runtime schema is generated as `confect/_generated/schema.ts`.",
     ),
   );
 
@@ -320,23 +340,26 @@ export const renderCodegenError = (error: CodegenError): string => {
         AnsiDoc.render({ style: "pretty" }),
       ),
     ),
-    Match.tag("SchemaInvalidDefaultExportError", (e) =>
-      pipe(
-        renderSchemaInvalidDefaultExportError(e),
-        AnsiDoc.render({ style: "pretty" }),
-      ),
-    ),
-    Match.tag("MissingSchemaFileError", (e) =>
-      pipe(
-        renderMissingSchemaFileError(e),
-        AnsiDoc.render({ style: "pretty" }),
-      ),
-    ),
     Match.tag("ParentChildNameCollisionError", (e) =>
       pipe(
         renderParentChildNameCollisionError(e),
         AnsiDoc.render({ style: "pretty" }),
       ),
+    ),
+    Match.tag("InvalidTableDefaultExportError", (e) =>
+      pipe(
+        renderInvalidTableDefaultExportError(e),
+        AnsiDoc.render({ style: "pretty" }),
+      ),
+    ),
+    Match.tag("InvalidTableFilenameError", (e) =>
+      pipe(
+        renderInvalidTableFilenameError(e),
+        AnsiDoc.render({ style: "pretty" }),
+      ),
+    ),
+    Match.tag("LegacySchemaFileError", (e) =>
+      pipe(renderLegacySchemaFileError(e), AnsiDoc.render({ style: "pretty" })),
     ),
     Match.exhaustive,
   );

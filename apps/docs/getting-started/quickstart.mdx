@@ -40,29 +40,20 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
       information about what's permitted and what's not.
     </Note>
 
-    Define a table.
+    Define a table — one file per table under `confect/tables/`, where the **filename is the table name** (so filenames must be valid JS identifiers and may not start with `_`). Each file **must default-export** an unnamed `Table`; codegen reads `module.default` and invokes it with the filename. From other modules (e.g. specs), default-import the codegen-emitted wrapper at `confect/_generated/tables/<name>` to reach the table's derived `Schema`s (`notes.Doc`, `notes.Fields`).
 
-    ```ts confect/tables/Notes.ts
+    ```ts confect/tables/notes.ts
     import { Table } from "@confect/server";
     import { Schema } from "effect";
 
-    export const Notes = Table.make(
-      "notes",
+    export default Table.make(
       Schema.Struct({
         text: Schema.String,
       }),
     );
     ```
 
-    And then add it to your database schema.
-
-    ```ts confect/schema.ts
-    import { DatabaseSchema } from "@confect/server";
-
-    import { Notes } from "./tables/Notes";
-
-    export default DatabaseSchema.make().addTable(Notes);
-    ```
+    Codegen will assemble every `confect/tables/*.ts` into a `DatabaseSchema` (in `confect/_generated/schema.ts`) and a Convex deploy `SchemaDefinition` (in `confect/_generated/convexSchema.ts`) for you — you never write a `confect/schema.ts`. It also emits a `confect/_generated/id.ts` module exporting a type-safe `Id` constructor (`Id("notes")`) for cross-table references.
 
   </Step>
 
@@ -73,14 +64,14 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
     import { FunctionSpec, GroupSpec } from "@confect/core";
     import { Schema } from "effect";
 
-    import { Notes } from "./tables/Notes";
+    import notes from "./_generated/tables/notes";
 
     export default GroupSpec.make()
       .addFunction(
         FunctionSpec.publicQuery({
           name: "list",
           args: Schema.Struct({}),
-          returns: Schema.Array(Notes.Doc),
+          returns: Schema.Array(notes.Doc),
         }),
       )
       .addFunction(

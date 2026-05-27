@@ -23,12 +23,12 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
       tableName: TableName,
     ) => {
       const table = Object.values(extendedTables).find(
-        (def) => def.name === tableName,
+        (def) => def.tableName === tableName,
       ) as Table.WithName<IncludedTables, TableName>;
 
       const baseDatabaseReader: BaseDatabaseReader<any> = Array.some(
         Object.values(Table.systemTables),
-        (systemTableDef) => systemTableDef.name === tableName,
+        (systemTableDef) => systemTableDef.tableName === tableName,
       )
         ? ({
             get: convexDatabaseReader.system.get,

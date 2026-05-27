@@ -15,21 +15,22 @@ Error schemas are optional. When omitted, the error type defaults to `never` and
 Add an `error` field to any `FunctionSpec` constructor. The schema is an ordinary Effect `Schema`, so a `Schema.TaggedError` class works well for a single failure mode.
 
 ```ts confect/notes.spec.ts
-import { FunctionSpec, GenericId, GroupSpec } from "@confect/core";
+import { FunctionSpec, GroupSpec } from "@confect/core";
 import { Schema } from "effect";
 
-import { Notes } from "./tables/Notes";
+import { Id } from "./_generated/id";
+import notes from "./_generated/tables/notes";
 
 export class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
   "NoteNotFound",
-  { noteId: GenericId.GenericId("notes") },
+  { noteId: Id("notes") },
 ) {}
 
 export default GroupSpec.make().addFunction(
   FunctionSpec.publicQuery({
     name: "getOrFail",
-    args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
-    returns: Notes.Doc,
+    args: Schema.Struct({ noteId: Id("notes") }),
+    returns: notes.Doc,
     error: NoteNotFound,
   }),
 );
@@ -40,9 +41,11 @@ To declare more than one failure mode, combine them with `Schema.Union`.
 ```ts
 import { Schema } from "effect";
 
+import { Id } from "./_generated/id";
+
 export class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
   "NoteNotFound",
-  { noteId: GenericId.GenericId("notes") },
+  { noteId: Id("notes") },
 ) {}
 
 export class Forbidden extends Schema.TaggedError<Forbidden>()(
@@ -52,7 +55,7 @@ export class Forbidden extends Schema.TaggedError<Forbidden>()(
 
 FunctionSpec.publicMutation({
   name: "deleteOrFail",
-  args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
+  args: Schema.Struct({ noteId: Id("notes") }),
   returns: Schema.Null,
   error: Schema.Union(NoteNotFound, Forbidden),
 });

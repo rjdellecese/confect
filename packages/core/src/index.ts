@@ -2,6 +2,7 @@ export * as FunctionProvenance from "./FunctionProvenance";
 export * as FunctionSpec from "./FunctionSpec";
 export * as GenericId from "./GenericId";
 export * as GroupPath from "./GroupPath";
+export * as Identifier from "./Identifier";
 export * as GroupSpec from "./GroupSpec";
 export * as PaginationResult from "./PaginationResult";
 export * as Ref from "./Ref";

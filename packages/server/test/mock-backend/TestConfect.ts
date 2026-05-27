@@ -10,11 +10,13 @@
 // `@confect/cli` binary by filesystem path for the same reason.
 import { TestConfect as TestConfect_ } from "../../../test/src";
 
-import confectSchema from "./fixtures/confect/schema";
+import convexSchema from "./fixtures/confect/_generated/convexSchema";
+import confectSchema from "./fixtures/confect/_generated/schema";
 
 export const TestConfect = TestConfect_.TestConfect<typeof confectSchema>();
 
 export const layer = TestConfect_.layer(
   confectSchema,
+  convexSchema,
   import.meta.glob("./fixtures/convex/**/!(*.*.*)*.*s"),
 );

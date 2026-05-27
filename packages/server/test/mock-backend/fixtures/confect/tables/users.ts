@@ -1,8 +1,7 @@
 import { Table } from "@confect/server";
 import { Schema } from "effect";
 
-export const Users = Table.make(
-  "users",
+export default Table.make(
   Schema.Struct({
     username: Schema.String,
   }),

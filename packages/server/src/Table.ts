@@ -21,8 +21,26 @@ import {
 export const TypeId = "@confect/server/Table";
 export type TypeId = typeof TypeId;
 
+// -----------------------------------------------------------------------------
+// Predicates
+// -----------------------------------------------------------------------------
+//
+// Both bound `Table`s and `UnnamedTable` callables share the same `[TypeId]`
+// brand. They disambiguate by whether a `tableName` property is set: bound
+// tables have one, unnamed callables do not.
+//
+// The discriminator is `tableName` (not `name`) so it does not collide with
+// the built-in `Function.prototype.name` that every JS function carries.
+
 export const isTable = (u: unknown): u is Any =>
-  Predicate.hasProperty(u, TypeId);
+  Predicate.hasProperty(u, TypeId) && Predicate.hasProperty(u, "tableName");
+
+export const isUnnamedTable = (u: unknown): u is UnnamedAny =>
+  Predicate.hasProperty(u, TypeId) && !Predicate.hasProperty(u, "tableName");
+
+// -----------------------------------------------------------------------------
+// Bound Table
+// -----------------------------------------------------------------------------
 
 export interface Table<
   Name_ extends string,
@@ -34,18 +52,70 @@ export interface Table<
   VectorIndexes_ extends GenericTableVectorIndexes = {},
 > {
   readonly [TypeId]: TypeId;
+  readonly tableName: Name_;
   readonly tableDefinition: TableDefinition<
     TableValidator_,
     Indexes_,
     SearchIndexes_,
     VectorIndexes_
   >;
-
-  readonly name: Name_;
-
   readonly Fields: TableSchema_;
   readonly Doc: SystemFields.ExtendWithSystemFields<Name_, TableSchema_>;
+  readonly indexes: Indexes_;
+}
 
+export interface Any {
+  readonly [TypeId]: TypeId;
+  readonly tableName: string;
+}
+
+export type AnyWithProps = Table<
+  any,
+  Schema.Schema.AnyNoContext,
+  GenericValidator,
+  GenericTableIndexes,
+  GenericTableSearchIndexes,
+  GenericTableVectorIndexes
+>;
+
+// -----------------------------------------------------------------------------
+// UnnamedTable (callable)
+// -----------------------------------------------------------------------------
+//
+// `Table.make(fields)` returns an `UnnamedTable`: a callable that produces a
+// fully bound `Table` when invoked with a name. Chaining methods (`.index`,
+// `.searchIndex`, `.vectorIndex`) live here and return new `UnnamedTable`s, so
+// indexes are accumulated before the name is bound. The codegen pipeline emits
+// a wrapper file per user-authored table that simply invokes the unnamed
+// callable with the filename basename.
+
+export interface UnnamedTable<
+  TableSchema_ extends Schema.Schema.AnyNoContext,
+  TableValidator_ extends GenericValidator =
+    TableSchemaToTableValidator<TableSchema_>,
+  Indexes_ extends GenericTableIndexes = {},
+  SearchIndexes_ extends GenericTableSearchIndexes = {},
+  VectorIndexes_ extends GenericTableVectorIndexes = {},
+> {
+  <const Name_ extends string>(
+    tableName: Name_,
+  ): Table<
+    Name_,
+    TableSchema_,
+    TableValidator_,
+    Indexes_,
+    SearchIndexes_,
+    VectorIndexes_
+  >;
+
+  readonly [TypeId]: TypeId;
+  readonly Fields: TableSchema_;
+  readonly tableDefinition: TableDefinition<
+    TableValidator_,
+    Indexes_,
+    SearchIndexes_,
+    VectorIndexes_
+  >;
   readonly indexes: Indexes_;
 
   index<
@@ -55,8 +125,7 @@ export interface Table<
   >(
     name: IndexName,
     fields: [FirstFieldPath, ...RestFieldPaths],
-  ): Table<
-    Name_,
+  ): UnnamedTable<
     TableSchema_,
     TableValidator_,
     Expand<
@@ -77,8 +146,7 @@ export interface Table<
   >(
     name: IndexName,
     indexConfig: Expand<SearchIndexConfig<SearchField, FilterFields>>,
-  ): Table<
-    Name_,
+  ): UnnamedTable<
     TableSchema_,
     TableValidator_,
     Indexes_,
@@ -102,8 +170,7 @@ export interface Table<
   >(
     name: IndexName,
     indexConfig: Expand<VectorIndexConfig<VectorField, FilterFields>>,
-  ): Table<
-    Name_,
+  ): UnnamedTable<
     TableSchema_,
     TableValidator_,
     Indexes_,
@@ -122,18 +189,21 @@ export interface Table<
   >;
 }
 
-export interface Any {
+export interface UnnamedAny {
   readonly [TypeId]: TypeId;
 }
 
-export type AnyWithProps = Table<
-  any,
+export type UnnamedAnyWithProps = UnnamedTable<
   Schema.Schema.AnyNoContext,
   GenericValidator,
   GenericTableIndexes,
   GenericTableSearchIndexes,
   GenericTableVectorIndexes
 >;
+
+// -----------------------------------------------------------------------------
+// Type extractors
+// -----------------------------------------------------------------------------
 
 export type Name<TableDef extends AnyWithProps> =
   TableDef extends Table<
@@ -234,76 +304,17 @@ export type Fields<TableDef extends AnyWithProps> =
 export type WithName<
   TableDef extends AnyWithProps,
   Name_ extends string,
-> = TableDef extends { readonly name: Name_ } ? TableDef : never;
+> = TableDef extends { readonly tableName: Name_ } ? TableDef : never;
 
 export type TablesRecord<Tables extends AnyWithProps> = {
   readonly [TableName_ in Name<Tables>]: WithName<Tables, TableName_>;
 };
 
-const Proto = {
-  [TypeId]: TypeId,
+// -----------------------------------------------------------------------------
+// Construction
+// -----------------------------------------------------------------------------
 
-  index<
-    IndexName extends string,
-    FirstFieldPath extends string,
-    RestFieldPaths extends string[],
-  >(
-    this: AnyWithProps,
-    name: IndexName,
-    fields: [FirstFieldPath, ...RestFieldPaths],
-  ) {
-    return makeProto({
-      name: this.name,
-      Fields: this.Fields,
-      Doc: this.Doc,
-      tableDefinition: this.tableDefinition.index(name, fields as any),
-      indexes: {
-        ...this.indexes,
-        [name]: fields,
-      },
-    });
-  },
-
-  searchIndex<IndexName extends string, SearchField extends string>(
-    this: AnyWithProps,
-    name: IndexName,
-    indexConfig: SearchIndexConfig<SearchField, any>,
-  ) {
-    return makeProto({
-      name: this.name,
-      Fields: this.Fields,
-      Doc: this.Doc,
-      tableDefinition: this.tableDefinition.searchIndex(name, indexConfig),
-      indexes: this.indexes,
-    });
-  },
-
-  vectorIndex<IndexName extends string, VectorField extends string>(
-    this: AnyWithProps,
-    name: IndexName,
-    indexConfig: {
-      vectorField: VectorField;
-      dimensions: number;
-      filterFields?: string[] | undefined;
-    },
-  ) {
-    return makeProto({
-      name: this.name,
-      Fields: this.Fields,
-      Doc: this.Doc,
-      tableDefinition: this.tableDefinition.vectorIndex(name, {
-        vectorField: indexConfig.vectorField,
-        dimensions: indexConfig.dimensions,
-        ...(indexConfig.filterFields
-          ? { filterFields: indexConfig.filterFields }
-          : {}),
-      }),
-      indexes: this.indexes,
-    });
-  },
-};
-
-const makeProto = <
+const makeBound = <
   Name_ extends string,
   TableSchema_ extends Schema.Schema.AnyNoContext,
   TableValidator_ extends Validator<any, any, any>,
@@ -311,13 +322,13 @@ const makeProto = <
   SearchIndexes_ extends GenericTableSearchIndexes,
   VectorIndexes_ extends GenericTableVectorIndexes,
 >({
-  name,
+  tableName,
   Fields,
   Doc,
   tableDefinition,
   indexes,
 }: {
-  name: Name_;
+  tableName: Name_;
   Fields: TableSchema_;
   Doc: SystemFields.ExtendWithSystemFields<Name_, TableSchema_>;
   tableDefinition: TableDefinition<
@@ -334,54 +345,139 @@ const makeProto = <
   Indexes_,
   SearchIndexes_,
   VectorIndexes_
-> =>
-  Object.assign(Object.create(Proto), {
-    name,
-    Fields,
-    Doc,
-    tableDefinition,
-    indexes,
-  });
+> => ({
+  [TypeId]: TypeId,
+  tableName,
+  Fields,
+  Doc,
+  tableDefinition,
+  indexes,
+});
 
-/**
- * Create a table.
- */
-export const make = <
-  const Name_ extends string,
+const makeUnnamed = <
   TableSchema_ extends Schema.Schema.AnyNoContext,
-  TableValidator_ extends GenericValidator =
-    TableSchemaToTableValidator<TableSchema_>,
-  Indexes_ extends GenericTableIndexes = {},
-  SearchIndexes_ extends GenericTableSearchIndexes = {},
-  VectorIndexes_ extends GenericTableVectorIndexes = {},
->(
-  name: Name_,
-  fields: TableSchema_,
-): Table<
-  Name_,
+  TableValidator_ extends Validator<any, any, any>,
+  Indexes_ extends GenericTableIndexes,
+  SearchIndexes_ extends GenericTableSearchIndexes,
+  VectorIndexes_ extends GenericTableVectorIndexes,
+>({
+  Fields,
+  tableDefinition,
+  indexes,
+}: {
+  Fields: TableSchema_;
+  tableDefinition: TableDefinition<
+    TableValidator_,
+    Indexes_,
+    SearchIndexes_,
+    VectorIndexes_
+  >;
+  indexes: Indexes_;
+}): UnnamedTable<
   TableSchema_,
   TableValidator_,
   Indexes_,
   SearchIndexes_,
   VectorIndexes_
 > => {
-  const tableValidator = compileTableSchema(fields) as any;
-  const tableDefinition = defineTable(tableValidator) as any;
+  type UnnamedTable_ = UnnamedTable<
+    TableSchema_,
+    TableValidator_,
+    Indexes_,
+    SearchIndexes_,
+    VectorIndexes_
+  >;
 
-  return makeProto<
+  type UnnamedTableFunction<FunctionName extends keyof UnnamedTable_> =
+    UnnamedTable_[FunctionName];
+
+  const bind = <const Name_ extends string>(
+    tableName: Name_,
+  ): Table<
     Name_,
     TableSchema_,
     TableValidator_,
     Indexes_,
     SearchIndexes_,
     VectorIndexes_
-  >({
+  > =>
+    makeBound({
+      tableName,
+      Fields,
+      Doc: SystemFields.extendWithSystemFields(tableName as any, Fields) as any,
+      tableDefinition,
+      indexes,
+    });
+
+  const index: UnnamedTableFunction<"index"> = (name, fields) =>
+    makeUnnamed({
+      Fields,
+      tableDefinition: tableDefinition.index(name as any, fields as any) as any,
+      indexes: { ...indexes, [name]: fields } as any,
+    });
+
+  const searchIndex: UnnamedTableFunction<"searchIndex"> = (
     name,
-    Fields: fields,
-    Doc: SystemFields.extendWithSystemFields(name, fields),
+    indexConfig,
+  ) =>
+    makeUnnamed({
+      Fields,
+      tableDefinition: tableDefinition.searchIndex(
+        name as any,
+        indexConfig as any,
+      ) as any,
+      indexes,
+    });
+
+  const vectorIndex: UnnamedTableFunction<"vectorIndex"> = (
+    name,
+    indexConfig,
+  ) =>
+    makeUnnamed({
+      Fields,
+      tableDefinition: tableDefinition.vectorIndex(
+        name as any,
+        indexConfig as any,
+      ) as any,
+      indexes,
+    });
+
+  return Object.assign(bind, {
+    [TypeId]: TypeId as TypeId,
+    Fields,
     tableDefinition,
-    indexes: {} as Indexes_,
-  });
+    indexes,
+    index,
+    searchIndex,
+    vectorIndex,
+  }) satisfies UnnamedTable_;
+};
+
+export const make = <
+  const TableSchema_ extends Schema.Schema.AnyNoContext,
+>(
+  fields: TableSchema_,
+): UnnamedTable<
+  TableSchema_,
+  TableSchemaToTableValidator<TableSchema_>
+> => {
+  type TableValidator_ = TableSchemaToTableValidator<TableSchema_>;
+  type UnnamedTable_ = UnnamedTable<TableSchema_, TableValidator_>;
+
+  const tableValidator = compileTableSchema(fields);
+  const tableDefinition = defineTable(tableValidator);
+
+  return makeUnnamed<
+    TableSchema_,
+    TableValidator_,
+    {},
+    {},
+    {}
+  >({
+    Fields: fields,
+    tableDefinition,
+    indexes: {},
+  }) satisfies UnnamedTable_;
 };
 
 // -----------------------------------------------------------------------------
@@ -389,7 +485,6 @@ export const make = <
 // -----------------------------------------------------------------------------
 
 export const scheduledFunctionsTable = make(
-  "_scheduled_functions",
   Schema.Struct({
     name: Schema.String,
     args: Schema.Array(Schema.Any),
@@ -406,16 +501,15 @@ export const scheduledFunctionsTable = make(
       Schema.Struct({ kind: Schema.Literal("canceled") }),
     ),
   }),
-);
+)("_scheduled_functions");
 
 export const storageTable = make(
-  "_storage",
   Schema.Struct({
     sha256: Schema.String,
     size: Schema.Number,
     contentType: Schema.optionalWith(Schema.String, { exact: true }),
   }),
-);
+)("_storage");
 
 export const systemTables = {
   _scheduled_functions: scheduledFunctionsTable,

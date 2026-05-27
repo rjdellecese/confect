@@ -1,9 +1,4 @@
-import type { Expand, GenericSchema } from "convex/server";
-import {
-  defineSchema as defineConvexSchema,
-  type SchemaDefinition,
-} from "convex/server";
-import { Array, pipe, Predicate, Record } from "effect";
+import { Predicate, Record } from "effect";
 import * as Table from "./Table";
 
 export const TypeId = "@confect/server/DatabaseSchema";
@@ -17,15 +12,11 @@ export const isDatabaseSchema = (u: unknown): u is Any =>
   Predicate.hasProperty(u, TypeId);
 
 /**
- * A schema definition tracks the schema and its Convex schema definition.
+ * A schema definition tracks the runtime tables used for codec lookup.
  */
 export interface DatabaseSchema<Tables_ extends Table.AnyWithProps = never> {
   readonly [TypeId]: TypeId;
   readonly tables: Table.TablesRecord<Tables_>;
-  readonly convexSchemaDefinition: SchemaDefinition<
-    ConvexDatabaseSchemaFromTables<Tables_>,
-    true
-  >;
 
   /**
    * Add a table definition to the schema.
@@ -38,7 +29,6 @@ export interface DatabaseSchema<Tables_ extends Table.AnyWithProps = never> {
 export interface AnyWithProps {
   readonly [TypeId]: TypeId;
   readonly tables: Record<string, Table.AnyWithProps>;
-  readonly convexSchemaDefinition: SchemaDefinition<GenericSchema, true>;
   addTable<TableDef extends Table.AnyWithProps>(table: TableDef): AnyWithProps;
 }
 
@@ -53,7 +43,7 @@ export type TableNames<DatabaseSchema_ extends AnyWithProps> = Table.Name<
 export type TableWithName<
   DatabaseSchema_ extends AnyWithProps,
   TableName extends TableNames<DatabaseSchema_>,
-> = Extract<Tables<DatabaseSchema_>, { readonly name: TableName }>;
+> = Extract<Tables<DatabaseSchema_>, { readonly tableName: TableName }>;
 
 const Proto = {
   [TypeId]: TypeId,
@@ -62,33 +52,19 @@ const Proto = {
     this: DatabaseSchema<Table.AnyWithProps>,
     table: TableDef,
   ) {
-    const tablesArray = Object.values(this.tables) as Table.AnyWithProps[];
-    const newTablesArray = [...tablesArray, table];
-
     return makeProto({
-      tables: Record.set(this.tables, table.name, table),
-      convexSchemaDefinition: pipe(
-        newTablesArray,
-        Array.map(
-          ({ name, tableDefinition }) => [name, tableDefinition] as const,
-        ),
-        Record.fromEntries,
-        defineConvexSchema,
-      ),
+      tables: Record.set(this.tables, table.tableName, table),
     });
   },
 };
 
 const makeProto = <Tables_ extends Table.AnyWithProps>({
   tables,
-  convexSchemaDefinition,
 }: {
   tables: Record.ReadonlyRecord<string, Tables_>;
-  convexSchemaDefinition: SchemaDefinition<GenericSchema, true>;
 }): DatabaseSchema<Tables_> =>
   Object.assign(Object.create(Proto), {
     tables,
-    convexSchemaDefinition,
   });
 
 /**
@@ -97,16 +73,7 @@ const makeProto = <Tables_ extends Table.AnyWithProps>({
 export const make = (): DatabaseSchema<never> =>
   makeProto({
     tables: Record.empty(),
-    convexSchemaDefinition: defineConvexSchema({}),
   });
-
-export type ConvexDatabaseSchemaFromTables<Tables_ extends Table.AnyWithProps> =
-  Expand<{
-    [TableName in Table.Name<Tables_> & string]: Table.WithName<
-      Tables_,
-      TableName
-    >["tableDefinition"];
-  }>;
 
 // System tables
 

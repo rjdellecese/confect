@@ -1,11 +1,10 @@
-import { GenericId } from "@confect/core";
 import { Table } from "@confect/server";
 import { Schema } from "effect";
+import { Id } from "../_generated/id";
 
-export const Notes = Table.make(
-  "notes",
+export default Table.make(
   Schema.Struct({
-    userId: Schema.optionalWith(GenericId.GenericId("users"), { exact: true }),
+    userId: Schema.optionalWith(Id("users"), { exact: true }),
     text: Schema.String.pipe(Schema.maxLength(100)),
     tag: Schema.optionalWith(Schema.String, { exact: true }),
     author: Schema.optionalWith(

@@ -14,7 +14,6 @@ import * as Table from "../src/Table";
 describe("Table", () => {
   it("tableDefinition property should extend a generic Convex TableDefinition", () => {
     const confectNotesTableDefinition = Table.make(
-      "notes",
       Schema.Struct({
         userId: Schema.optionalWith(GenericId.GenericId("users"), {
           exact: true,
@@ -87,7 +86,6 @@ describe("Table", () => {
 
   it("supports indexes on name fields when the schema includes an optional ID", () => {
     const confectOrganizationsTableDefinition = Table.make(
-      "organizations",
       Schema.Struct({
         name: Schema.String,
         description: Schema.optional(Schema.String),
@@ -115,7 +113,6 @@ describe("Table", () => {
 
   it("supports indexes on name fields when the schema includes optional bytes", () => {
     const confectImagesTableDefinition = Table.make(
-      "images",
       Schema.Struct({
         name: Schema.String,
         bytes: Schema.optional(Schema.instanceOf(ArrayBuffer)),
@@ -133,5 +130,52 @@ describe("Table", () => {
     expect(convexImagesTableDefinition).toStrictEqual(
       confectImagesTableDefinition,
     );
+  });
+
+  describe("UnnamedTable callable shape", () => {
+    const fields = Schema.Struct({ text: Schema.String });
+
+    it("Table.make(fields) returns an UnnamedTable", () => {
+      const unnamed = Table.make(fields);
+      expect(Table.isUnnamedTable(unnamed)).toBe(true);
+      expect(Table.isTable(unnamed)).toBe(false);
+      // No `tableName` property on the unnamed callable, so the discriminator
+      // is `tableName` presence — not `name`, which every JS function has
+      // (Function.prototype.name) and which would silently mislead any
+      // hasProperty-style predicate.
+      expect("tableName" in unnamed).toBe(false);
+    });
+
+    it("chaining .index() stays unnamed", () => {
+      const unnamedWithIndex = Table.make(fields).index("by_text", ["text"]);
+      expect(Table.isUnnamedTable(unnamedWithIndex)).toBe(true);
+      expect(Table.isTable(unnamedWithIndex)).toBe(false);
+    });
+
+    it("invoking the callable with a name produces a bound Table", () => {
+      const named = Table.make(fields)("notes");
+      expect(Table.isTable(named)).toBe(true);
+      expect(Table.isUnnamedTable(named)).toBe(false);
+      expect(named.tableName).toBe("notes");
+      expectTypeOf(named.tableName).toEqualTypeOf<"notes">();
+    });
+
+    it("the unnamed callable still has Function.prototype.name and that does not confuse the predicate", () => {
+      const unnamed = Table.make(fields);
+      expect(typeof (unnamed as unknown as { name: unknown }).name).toBe(
+        "string",
+      );
+      expect(Table.isUnnamedTable(unnamed)).toBe(true);
+    });
+
+    it("invoking the same UnnamedTable with different names produces distinct Tables", () => {
+      const unnamed = Table.make(fields);
+      const a = unnamed("notes_a");
+      const b = unnamed("notes_b");
+      expect(a.tableName).toBe("notes_a");
+      expect(b.tableName).toBe("notes_b");
+      expectTypeOf(a.tableName).toEqualTypeOf<"notes_a">();
+      expectTypeOf(b.tableName).toEqualTypeOf<"notes_b">();
+    });
   });
 });

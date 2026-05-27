@@ -36,15 +36,173 @@ export const functions = ({
     return yield* cbw.toString();
   });
 
-export const schema = ({ schemaImportPath }: { schemaImportPath: string }) =>
+/**
+ * Emit `convex/schema.ts` as a one-line re-export of the codegen-emitted
+ * deploy schema in `confect/_generated/convexSchema.ts`. Deploy-time
+ * consumers (the Convex CLI, `convex-test`) keep reading
+ * `convex/schema.ts`; the runtime `DatabaseSchema` in
+ * `confect/_generated/schema.ts` is untouched by this file.
+ */
+export const schema = ({
+  convexSchemaImportPath,
+}: {
+  convexSchemaImportPath: string;
+}) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-    yield* cbw.writeLine(`import schemaDefinition from "${schemaImportPath}";`);
-    yield* cbw.newLine();
     yield* cbw.writeLine(
-      `export default schemaDefinition.convexSchemaDefinition;`,
+      `export { default } from "${convexSchemaImportPath}";`,
     );
+
+    return yield* cbw.toString();
+  });
+
+interface TableModuleBinding {
+  readonly importPath: string;
+  readonly tableName: string;
+}
+
+/**
+ * Emit `confect/_generated/schema.ts` — the runtime `DatabaseSchema` used
+ * by `_generated/api.ts` (and downstream by per-function bundles for codec
+ * lookup). Imports every table from its generated wrapper at
+ * `_generated/tables/<name>` and chains them onto a fresh
+ * `DatabaseSchema.make()`. The file deliberately avoids any `convex/server`
+ * import so that runtime bundles never pull in `defineSchema(...)`.
+ */
+export const runtimeSchema = ({
+  tableModules,
+}: {
+  tableModules: ReadonlyArray<TableModuleBinding>;
+}) =>
+  Effect.gen(function* () {
+    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+
+    yield* cbw.writeLine(`import { DatabaseSchema } from "@confect/server";`);
+
+    if (tableModules.length > 0) {
+      yield* cbw.blankLine();
+      yield* Effect.forEach(tableModules, ({ tableName, importPath }) =>
+        cbw.writeLine(`import ${tableName} from "${importPath}";`),
+      );
+    }
+
+    yield* cbw.blankLine();
+
+    if (tableModules.length === 0) {
+      yield* cbw.writeLine(`export default DatabaseSchema.make();`);
+    } else {
+      yield* cbw.writeLine(`export default DatabaseSchema.make()`);
+      yield* cbw.indent(
+        Effect.gen(function* () {
+          for (const [index, { tableName }] of tableModules.entries()) {
+            const isLast = index === tableModules.length - 1;
+            yield* cbw.writeLine(`.addTable(${tableName})${isLast ? ";" : ""}`);
+          }
+        }),
+      );
+    }
+
+    return yield* cbw.toString();
+  });
+
+/**
+ * Emit `confect/_generated/convexSchema.ts` — the Convex deploy-time
+ * `SchemaDefinition`. Imports every table from its generated wrapper at
+ * `_generated/tables/<name>` and calls `defineSchema({...})` exactly once.
+ * The file deliberately avoids any `@confect/server` import so that the
+ * deploy artifact's import graph stays decoupled from the runtime
+ * `DatabaseSchema` machinery.
+ */
+export const convexSchema = ({
+  tableModules,
+}: {
+  tableModules: ReadonlyArray<TableModuleBinding>;
+}) =>
+  Effect.gen(function* () {
+    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+
+    yield* cbw.writeLine(`import { defineSchema } from "convex/server";`);
+
+    if (tableModules.length > 0) {
+      yield* cbw.blankLine();
+      yield* Effect.forEach(tableModules, ({ tableName, importPath }) =>
+        cbw.writeLine(`import ${tableName} from "${importPath}";`),
+      );
+    }
+
+    yield* cbw.blankLine();
+
+    if (tableModules.length === 0) {
+      yield* cbw.writeLine(`export default defineSchema({});`);
+    } else {
+      yield* cbw.writeLine(`export default defineSchema({`);
+      yield* cbw.indent(
+        Effect.gen(function* () {
+          for (const { tableName } of tableModules) {
+            yield* cbw.writeLine(`${tableName}: ${tableName}.tableDefinition,`);
+          }
+        }),
+      );
+      yield* cbw.writeLine(`});`);
+    }
+
+    return yield* cbw.toString();
+  });
+
+/**
+ * Emit `confect/_generated/id.ts` — a type-constrained `Id` constructor and
+ * a `TableNames` union derived from the user's `confect/tables/*.ts`
+ * filenames. User-authored table modules import `Id` from this file to
+ * declare cross-table id references without typing the destination name as
+ * a free string (and without ever importing each other transitively).
+ *
+ * When the table directory is empty the `TableNames` union resolves to
+ * `never`, which still lets the file typecheck against an empty workspace.
+ */
+export const id = ({ tableNames }: { tableNames: ReadonlyArray<string> }) =>
+  Effect.gen(function* () {
+    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+
+    yield* cbw.writeLine(`import { GenericId } from "@confect/core";`);
+    yield* cbw.blankLine();
+
+    const union =
+      tableNames.length === 0
+        ? "never"
+        : tableNames.map((n) => `"${n}"`).join(" | ");
+    yield* cbw.writeLine(`export type TableNames = ${union};`);
+    yield* cbw.blankLine();
+
+    yield* cbw.writeLine(
+      `export const Id = <const TableName extends TableNames>(`,
+    );
+    yield* cbw.indent(cbw.writeLine(`tableName: TableName,`));
+    yield* cbw.writeLine(`) => GenericId.GenericId(tableName);`);
+
+    return yield* cbw.toString();
+  });
+
+/**
+ * Emit `confect/_generated/tables/<tableName>.ts` — a two-line wrapper that
+ * imports the user-authored `UnnamedTable` and binds the file basename to
+ * it, producing the fully-named `Table` value that downstream consumers
+ * (schema, specs, impls) read.
+ */
+export const tableWrapper = ({
+  tableName,
+  unnamedImportPath,
+}: {
+  tableName: string;
+  unnamedImportPath: string;
+}) =>
+  Effect.gen(function* () {
+    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+
+    yield* cbw.writeLine(`import unnamed from "${unnamedImportPath}";`);
+    yield* cbw.blankLine();
+    yield* cbw.writeLine(`export default unnamed("${tableName}");`);
 
     return yield* cbw.toString();
   });

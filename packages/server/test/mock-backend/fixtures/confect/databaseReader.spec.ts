@@ -1,25 +1,21 @@
-import {
-  FunctionSpec,
-  GenericId,
-  GroupSpec,
-  PaginationResult,
-} from "@confect/core";
+import { FunctionSpec, GroupSpec, PaginationResult } from "@confect/core";
 import { Schema } from "effect";
-import { Notes } from "./tables/Notes";
+import { Id } from "./_generated/id";
+import notes from "./_generated/tables/notes";
 
 export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicQuery({
       name: "getNote",
-      args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
-      returns: Notes.Doc,
+      args: Schema.Struct({ noteId: Id("notes") }),
+      returns: notes.Doc,
     }),
   )
   .addFunction(
     FunctionSpec.publicQuery({
       name: "listNotes",
       args: Schema.Struct({}),
-      returns: Schema.Array(Notes.Doc),
+      returns: Schema.Array(notes.Doc),
     }),
   )
   .addFunction(
@@ -29,7 +25,7 @@ export default GroupSpec.make()
         cursor: Schema.NullOr(Schema.String),
         numItems: Schema.Number,
       }),
-      returns: PaginationResult.PaginationResult(Notes.Doc),
+      returns: PaginationResult.PaginationResult(notes.Doc),
     }),
   )
   .addFunction(
@@ -40,6 +36,6 @@ export default GroupSpec.make()
         numItems: Schema.Number,
         tag: Schema.String,
       }),
-      returns: PaginationResult.PaginationResult(Notes.Doc),
+      returns: PaginationResult.PaginationResult(notes.Doc),
     }),
   );

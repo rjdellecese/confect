@@ -1,15 +1,15 @@
-import { GenericId } from "@confect/core";
 import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
 import { Array, Effect, Either } from "effect";
 import refs from "./fixtures/confect/_generated/refs";
 import { DatabaseWriter } from "./fixtures/confect/_generated/services";
+import { Id } from "./fixtures/confect/_generated/id";
+import type notes from "./fixtures/confect/_generated/tables/notes";
 import {
   Forbidden,
   NotFound,
 } from "./fixtures/confect/groups/typedErrors.spec";
 import { NodeNotFound } from "./fixtures/confect/node/typedErrorsNode.spec";
-import type { Notes } from "./fixtures/confect/tables/Notes";
 import * as TestConfect from "./TestConfect";
 
 describe("DatabaseReader", () => {
@@ -27,7 +27,7 @@ describe("DatabaseReader", () => {
             text,
           });
         }),
-        GenericId.GenericId("notes"),
+        Id("notes"),
       );
 
       const retrievedText = yield* c
@@ -78,7 +78,7 @@ describe("MutationRunner", () => {
       const note = yield* c.query(refs.public.databaseReader.getNote, {
         noteId,
       });
-      expectTypeOf(note).toEqualTypeOf<(typeof Notes.Doc)["Type"]>();
+      expectTypeOf(note).toEqualTypeOf<(typeof notes.Doc)["Type"]>();
       assertEquals(note.text, text);
     }).pipe(Effect.provide(TestConfect.layer())),
   );
@@ -251,7 +251,7 @@ const insertAndDeleteNote = Effect.gen(function* () {
       yield* writer.table("notes").delete(id);
       return id;
     }),
-    GenericId.GenericId("notes"),
+    Id("notes"),
   );
 }).pipe(Effect.orDie);
 
@@ -355,7 +355,7 @@ describe("typed errors", () => {
             const writer = yield* DatabaseWriter;
             return yield* writer.table("notes").insert({ text: "hello" });
           }),
-          GenericId.GenericId("notes"),
+          Id("notes"),
         );
 
         const result = yield* c.query(
@@ -407,7 +407,7 @@ describe("typed errors", () => {
             const writer = yield* DatabaseWriter;
             return yield* writer.table("notes").insert({ text: "to delete" });
           }),
-          GenericId.GenericId("notes"),
+          Id("notes"),
         );
 
         const result = yield* c.action(

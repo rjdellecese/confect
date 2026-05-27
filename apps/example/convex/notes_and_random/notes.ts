@@ -1,4 +1,4 @@
-import registeredFunctions from "../../confect/_generated/registeredFunctions/notesAndRandom/notes";
+import registeredFunctions from "../../confect/_generated/registeredFunctions/notes_and_random/notes";
 
 export const clearAll = registeredFunctions.clearAll;
 export const delete_ = registeredFunctions.delete_;

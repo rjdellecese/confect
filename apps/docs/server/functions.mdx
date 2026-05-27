@@ -27,12 +27,12 @@ Each function spec defines the function's name, arguments schema, and returns sc
 import { GroupSpec, FunctionSpec } from "@confect/core";
 import { Schema } from "effect";
 
-import { Notes } from "./tables/Notes";
+import notes from "./_generated/tables/notes";
 
 const list = FunctionSpec.publicQuery({
   name: "list",
   args: Schema.Struct({}),
-  returns: Schema.Array(Notes.Doc),
+  returns: Schema.Array(notes.Doc),
 });
 
 export default GroupSpec.make().addFunction(list);
@@ -45,20 +45,21 @@ Run `confect codegen` after adding or changing specs.
 A spec can also declare an optional `error` schema. When it does, the corresponding handler's `Effect` error channel is typed as that schema, and the failure is decoded for callers at every call site (React hooks, JS clients, and tests). See [Error Handling](/server/error-handling) for the full walkthrough.
 
 ```ts
-import { FunctionSpec, GenericId } from "@confect/core";
+import { FunctionSpec } from "@confect/core";
 import { Schema } from "effect";
 
-import { Notes } from "./tables/Notes";
+import { Id } from "./_generated/id";
+import notes from "./_generated/tables/notes";
 
 class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
   "NoteNotFound",
-  { noteId: GenericId.GenericId("notes") },
+  { noteId: Id("notes") },
 ) {}
 
 FunctionSpec.publicQuery({
   name: "getOrFail",
-  args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
-  returns: Notes.Doc,
+  args: Schema.Struct({ noteId: Id("notes") }),
+  returns: notes.Doc,
   error: NoteNotFound,
 });
 ```
