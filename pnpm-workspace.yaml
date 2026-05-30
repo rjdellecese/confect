@@ -5,9 +5,8 @@ packages:
   - packages/server/test/local-backend/fixtures
 
 allowBuilds:
-  '@parcel/watcher': false
-  '@swc/core': false
-  bun: true
+  "@parcel/watcher": false
+  "@swc/core": false
   esbuild: false
   msgpackr-extract: false
   opensrc: false

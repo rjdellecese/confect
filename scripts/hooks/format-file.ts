@@ -3,11 +3,13 @@ import { BunContext, BunRuntime, BunStream } from "@effect/platform-bun";
 import { Cause, Console, Effect, Schema, Stream, String } from "effect";
 
 /**
- * @see https://cursor.com/docs/agent/hooks#afterfileedit
+ * @see https://docs.claude.com/en/docs/claude-code/hooks
  */
-const AfterFileEditInput = Schema.parseJson(
+const PostToolUseInput = Schema.parseJson(
   Schema.Struct({
-    file_path: Schema.String,
+    tool_input: Schema.Struct({
+      file_path: Schema.String,
+    }),
   }),
 );
 
@@ -68,15 +70,13 @@ const program = Effect.gen(function* () {
     Stream.mkString,
   );
 
-  const input = yield* Schema.decode(AfterFileEditInput)(jsonString);
+  const input = yield* Schema.decode(PostToolUseInput)(jsonString);
+  const filePath = input.tool_input.file_path;
 
-  if ((yield* isSupportedFileType(input.file_path)) === true) {
-    const command = Command.make(
-      "pnpm",
-      "prettier",
-      "--write",
-      input.file_path,
-    ).pipe(Command.stderr("inherit"));
+  if ((yield* isSupportedFileType(filePath)) === true) {
+    const command = Command.make("pnpm", "prettier", "--write", filePath).pipe(
+      Command.stderr("inherit"),
+    );
 
     const exitCode = yield* Command.exitCode(command);
 

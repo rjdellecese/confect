@@ -1,8 +1,11 @@
 ---
 name: technical-writing
-description: Guides writing clear, well-structured technical documentation following Mintlify's best practices (Diátaxis framework, audience awareness, style/tone, navigation, SEO/AEO). Use when writing, reviewing, or improving documentation, guides, tutorials, API references, or any user-facing technical content.
+description: >-
+  Guides writing clear, well-structured technical documentation following
+  Mintlify's best practices (Diátaxis framework, audience awareness, style/tone,
+  navigation, SEO/AEO). Use when writing, reviewing, or improving documentation,
+  guides, tutorials, API references, or any user-facing technical content.
 ---
-
 # Technical Writing
 
 Best practices for technical documentation, distilled from [Mintlify's Guide to Technical Writing](https://www.mintlify.com/guides/introduction).

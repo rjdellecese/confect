@@ -1,8 +1,9 @@
 ---
 name: create-changeset
-description: Creates a Changesets changeset file for the current branch. Use when the user asks to add a changeset, write a changeset, or prepare changes for release.
+description: >-
+  Creates a Changesets changeset file for the current branch. Use when the user
+  asks to add a changeset, write a changeset, or prepare changes for release.
 ---
-
 You create changeset files for the [Changesets](https://github.com/changesets/changesets) versioning workflow.
 
 A changeset is a `.changeset/<name>.md` file with YAML frontmatter listing affected packages and their semver bump types, followed by a changelog description.
