@@ -2,7 +2,7 @@ import { Table } from "@confect/server";
 import { Schema } from "effect";
 import { Id } from "../_generated/id";
 
-export default Table.make(
+export default Table.make(() =>
   Schema.Struct({
     userId: Schema.optionalWith(Id("users"), { exact: true }),
     text: Schema.String.pipe(Schema.maxLength(100)),

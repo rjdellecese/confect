@@ -13,6 +13,7 @@ import {
 } from "convex/server";
 import type { GenericValidator, Validator } from "convex/values";
 import { Predicate, Schema } from "effect";
+import { defineLazy } from "./internal/utils";
 import {
   compileTableSchema,
   type TableSchemaToTableValidator,
@@ -82,12 +83,14 @@ export type AnyWithProps = Table<
 // UnnamedTable (callable)
 // -----------------------------------------------------------------------------
 //
-// `Table.make(fields)` returns an `UnnamedTable`: a callable that produces a
-// fully bound `Table` when invoked with a name. Chaining methods (`.index`,
-// `.searchIndex`, `.vectorIndex`) live here and return new `UnnamedTable`s, so
-// indexes are accumulated before the name is bound. The codegen pipeline emits
-// a wrapper file per user-authored table that simply invokes the unnamed
-// callable with the filename basename.
+// `Table.make(lazyFields)` returns an `UnnamedTable`: a callable that
+// produces a fully bound `Table` when invoked with a name. Chaining methods
+// (`.index`, `.searchIndex`, `.vectorIndex`) live here and return new
+// `UnnamedTable`s, accumulating plain index metadata records. Neither the
+// field-schema nor the deploy-time `tableDefinition` is constructed at this
+// stage — the user-supplied `lazyFields` callback is just carried through.
+// The codegen pipeline emits a wrapper file per user-authored table that
+// simply invokes the unnamed callable with the filename basename.
 
 export interface UnnamedTable<
   TableSchema_ extends Schema.Schema.AnyNoContext,
@@ -109,13 +112,6 @@ export interface UnnamedTable<
   >;
 
   readonly [TypeId]: TypeId;
-  readonly Fields: TableSchema_;
-  readonly tableDefinition: TableDefinition<
-    TableValidator_,
-    Indexes_,
-    SearchIndexes_,
-    VectorIndexes_
-  >;
   readonly indexes: Indexes_;
 
   index<
@@ -313,6 +309,29 @@ export type TablesRecord<Tables extends AnyWithProps> = {
 // -----------------------------------------------------------------------------
 // Construction
 // -----------------------------------------------------------------------------
+//
+// `make` only stores the user-supplied `lazyFields` callback alongside any
+// chained index metadata. Neither `Fields` nor `Doc` nor `tableDefinition`
+// is constructed until first access on a bound `Table`. Each chain step is
+// O(1) (plain object spread of the metadata records) and never invokes the
+// callback. Binding via `unnamed(tableName)` installs lazy memoised getters
+// for `Fields`, `Doc`, and `tableDefinition` via `defineLazy`, so the
+// first access materialises the value and replaces the getter with a plain
+// data property — second-and-subsequent accesses are observably
+// indistinguishable from a plain property and avoid all function-call
+// overhead.
+
+interface UnnamedState<
+  TableSchema_ extends Schema.Schema.AnyNoContext,
+  Indexes_ extends GenericTableIndexes,
+  SearchIndexes_ extends GenericTableSearchIndexes,
+  VectorIndexes_ extends GenericTableVectorIndexes,
+> {
+  readonly lazyFields: () => TableSchema_;
+  readonly indexes: Indexes_;
+  readonly searchIndexes: SearchIndexes_;
+  readonly vectorIndexes: VectorIndexes_;
+}
 
 const makeBound = <
   Name_ extends string,
@@ -321,38 +340,64 @@ const makeBound = <
   Indexes_ extends GenericTableIndexes,
   SearchIndexes_ extends GenericTableSearchIndexes,
   VectorIndexes_ extends GenericTableVectorIndexes,
->({
-  tableName,
-  Fields,
-  Doc,
-  tableDefinition,
-  indexes,
-}: {
-  tableName: Name_;
-  Fields: TableSchema_;
-  Doc: SystemFields.ExtendWithSystemFields<Name_, TableSchema_>;
-  tableDefinition: TableDefinition<
-    TableValidator_,
-    Indexes_,
-    SearchIndexes_,
-    VectorIndexes_
-  >;
-  indexes: Indexes_;
-}): Table<
+>(
+  tableName: Name_,
+  state: UnnamedState<TableSchema_, Indexes_, SearchIndexes_, VectorIndexes_>,
+): Table<
   Name_,
   TableSchema_,
   TableValidator_,
   Indexes_,
   SearchIndexes_,
   VectorIndexes_
-> => ({
-  [TypeId]: TypeId,
-  tableName,
-  Fields,
-  Doc,
-  tableDefinition,
-  indexes,
-});
+> => {
+  const bound = {
+    [TypeId]: TypeId as TypeId,
+    tableName,
+    indexes: state.indexes,
+  } as Table<
+    Name_,
+    TableSchema_,
+    TableValidator_,
+    Indexes_,
+    SearchIndexes_,
+    VectorIndexes_
+  >;
+
+  defineLazy(bound, "Fields", () => state.lazyFields());
+
+  defineLazy(bound, "Doc", () =>
+    SystemFields.extendWithSystemFields(
+      tableName,
+      (bound as { Fields: TableSchema_ }).Fields,
+    ),
+  );
+
+  defineLazy(bound, "tableDefinition", () => {
+    const fields = (bound as { Fields: TableSchema_ }).Fields;
+    let definition: TableDefinition<any, any, any, any> = defineTable(
+      compileTableSchema(fields),
+    );
+    for (const [name, indexFields] of Object.entries(
+      state.indexes as Record<string, any>,
+    )) {
+      definition = definition.index(name, indexFields);
+    }
+    for (const [name, config] of Object.entries(
+      state.searchIndexes as Record<string, any>,
+    )) {
+      definition = definition.searchIndex(name, config);
+    }
+    for (const [name, config] of Object.entries(
+      state.vectorIndexes as Record<string, any>,
+    )) {
+      definition = definition.vectorIndex(name, config);
+    }
+    return definition;
+  });
+
+  return bound;
+};
 
 const makeUnnamed = <
   TableSchema_ extends Schema.Schema.AnyNoContext,
@@ -360,20 +405,9 @@ const makeUnnamed = <
   Indexes_ extends GenericTableIndexes,
   SearchIndexes_ extends GenericTableSearchIndexes,
   VectorIndexes_ extends GenericTableVectorIndexes,
->({
-  Fields,
-  tableDefinition,
-  indexes,
-}: {
-  Fields: TableSchema_;
-  tableDefinition: TableDefinition<
-    TableValidator_,
-    Indexes_,
-    SearchIndexes_,
-    VectorIndexes_
-  >;
-  indexes: Indexes_;
-}): UnnamedTable<
+>(
+  state: UnnamedState<TableSchema_, Indexes_, SearchIndexes_, VectorIndexes_>,
+): UnnamedTable<
   TableSchema_,
   TableValidator_,
   Indexes_,
@@ -401,19 +435,24 @@ const makeUnnamed = <
     SearchIndexes_,
     VectorIndexes_
   > =>
-    makeBound({
-      tableName,
-      Fields,
-      Doc: SystemFields.extendWithSystemFields(tableName as any, Fields) as any,
-      tableDefinition,
-      indexes,
-    });
+    makeBound<
+      Name_,
+      TableSchema_,
+      TableValidator_,
+      Indexes_,
+      SearchIndexes_,
+      VectorIndexes_
+    >(tableName, state);
 
   const index: UnnamedTableFunction<"index"> = (name, fields) =>
     makeUnnamed({
-      Fields,
-      tableDefinition: tableDefinition.index(name as any, fields as any) as any,
-      indexes: { ...indexes, [name]: fields } as any,
+      lazyFields: state.lazyFields,
+      indexes: {
+        ...state.indexes,
+        [name]: fields,
+      } as any,
+      searchIndexes: state.searchIndexes,
+      vectorIndexes: state.vectorIndexes,
     });
 
   const searchIndex: UnnamedTableFunction<"searchIndex"> = (
@@ -421,12 +460,13 @@ const makeUnnamed = <
     indexConfig,
   ) =>
     makeUnnamed({
-      Fields,
-      tableDefinition: tableDefinition.searchIndex(
-        name as any,
-        indexConfig as any,
-      ) as any,
-      indexes,
+      lazyFields: state.lazyFields,
+      indexes: state.indexes,
+      searchIndexes: {
+        ...state.searchIndexes,
+        [name]: indexConfig,
+      } as any,
+      vectorIndexes: state.vectorIndexes,
     });
 
   const vectorIndex: UnnamedTableFunction<"vectorIndex"> = (
@@ -434,49 +474,35 @@ const makeUnnamed = <
     indexConfig,
   ) =>
     makeUnnamed({
-      Fields,
-      tableDefinition: tableDefinition.vectorIndex(
-        name as any,
-        indexConfig as any,
-      ) as any,
-      indexes,
+      lazyFields: state.lazyFields,
+      indexes: state.indexes,
+      searchIndexes: state.searchIndexes,
+      vectorIndexes: {
+        ...state.vectorIndexes,
+        [name]: indexConfig,
+      } as any,
     });
 
   return Object.assign(bind, {
     [TypeId]: TypeId as TypeId,
-    Fields,
-    tableDefinition,
-    indexes,
+    indexes: state.indexes,
     index,
     searchIndex,
     vectorIndex,
   }) satisfies UnnamedTable_;
 };
 
-export const make = <
-  const TableSchema_ extends Schema.Schema.AnyNoContext,
->(
-  fields: TableSchema_,
-): UnnamedTable<
-  TableSchema_,
-  TableSchemaToTableValidator<TableSchema_>
-> => {
+export const make = <const TableSchema_ extends Schema.Schema.AnyNoContext>(
+  lazyFields: () => TableSchema_,
+): UnnamedTable<TableSchema_, TableSchemaToTableValidator<TableSchema_>> => {
   type TableValidator_ = TableSchemaToTableValidator<TableSchema_>;
   type UnnamedTable_ = UnnamedTable<TableSchema_, TableValidator_>;
 
-  const tableValidator = compileTableSchema(fields);
-  const tableDefinition = defineTable(tableValidator);
-
-  return makeUnnamed<
-    TableSchema_,
-    TableValidator_,
-    {},
-    {},
-    {}
-  >({
-    Fields: fields,
-    tableDefinition,
+  return makeUnnamed<TableSchema_, TableValidator_, {}, {}, {}>({
+    lazyFields,
     indexes: {},
+    searchIndexes: {},
+    vectorIndexes: {},
   }) satisfies UnnamedTable_;
 };
 
@@ -484,7 +510,7 @@ export const make = <
 // System tables
 // -----------------------------------------------------------------------------
 
-export const scheduledFunctionsTable = make(
+export const scheduledFunctionsTable = make(() =>
   Schema.Struct({
     name: Schema.String,
     args: Schema.Array(Schema.Any),
@@ -503,7 +529,7 @@ export const scheduledFunctionsTable = make(
   }),
 )("_scheduled_functions");
 
-export const storageTable = make(
+export const storageTable = make(() =>
   Schema.Struct({
     sha256: Schema.String,
     size: Schema.Number,

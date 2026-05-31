@@ -1,3 +1,3 @@
 import { DatabaseSchema } from "@confect/server";
 
-export default DatabaseSchema.make();
+export default DatabaseSchema.make({});

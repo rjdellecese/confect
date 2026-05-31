@@ -46,7 +46,7 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
     import { Table } from "@confect/server";
     import { Schema } from "effect";
 
-    export default Table.make(
+    export default Table.make(() =>
       Schema.Struct({
         text: Schema.String,
       }),

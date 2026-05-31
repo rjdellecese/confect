@@ -238,7 +238,13 @@ export const make = <
     return OrderedQuery.make<
       DataModel.TableInfoWithName_<DataModel_, TableName>,
       TableName
-    >(orderedQuery, tableName, table.Fields);
+    >(
+      orderedQuery,
+      tableName,
+      table.Fields as TableInfo.TableSchema<
+        DataModel.TableInfoWithName_<DataModel_, TableName>
+      >,
+    );
   };
 
   const search: QueryInitializerFunction<"search"> = (
@@ -253,7 +259,9 @@ export const make = <
         .query(tableName)
         .withSearchIndex(indexName, searchFilter),
       tableName,
-      table.Fields,
+      table.Fields as TableInfo.TableSchema<
+        DataModel.TableInfoWithName_<DataModel_, TableName>
+      >,
     );
 
   return {

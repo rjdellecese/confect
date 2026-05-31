@@ -1,5 +1,5 @@
-import { Predicate, Record } from "effect";
-import * as Table from "./Table";
+import { Predicate } from "effect";
+import type * as Table from "./Table";
 
 export const TypeId = "@confect/server/DatabaseSchema";
 export type TypeId = typeof TypeId;
@@ -12,24 +12,25 @@ export const isDatabaseSchema = (u: unknown): u is Any =>
   Predicate.hasProperty(u, TypeId);
 
 /**
- * A schema definition tracks the runtime tables used for codec lookup.
+ * A schema definition holding a record of bound `Table`s keyed by table
+ * name. Codegen emits a single static `DatabaseSchema.make({ ... })` call;
+ * laziness now lives entirely on each `Table` (its `Fields`, `Doc`, and
+ * `tableDefinition` are lazy memoised getters), so this layer is a plain
+ * record indirection with no module-loading or async machinery.
  */
 export interface DatabaseSchema<Tables_ extends Table.AnyWithProps = never> {
   readonly [TypeId]: TypeId;
-  readonly tables: Table.TablesRecord<Tables_>;
-
-  /**
-   * Add a table definition to the schema.
-   */
-  addTable<TableDef extends Table.AnyWithProps>(
-    table: TableDef,
-  ): DatabaseSchema<Tables_ | TableDef>;
+  readonly tables: {
+    readonly [TableName in Table.Name<Tables_>]: Table.WithName<
+      Tables_,
+      TableName
+    >;
+  };
 }
 
 export interface AnyWithProps {
   readonly [TypeId]: TypeId;
   readonly tables: Record<string, Table.AnyWithProps>;
-  addTable<TableDef extends Table.AnyWithProps>(table: TableDef): AnyWithProps;
 }
 
 export type Tables<DatabaseSchema_ extends AnyWithProps> =
@@ -45,57 +46,20 @@ export type TableWithName<
   TableName extends TableNames<DatabaseSchema_>,
 > = Extract<Tables<DatabaseSchema_>, { readonly tableName: TableName }>;
 
-const Proto = {
-  [TypeId]: TypeId,
-
-  addTable<TableDef extends Table.AnyWithProps>(
-    this: DatabaseSchema<Table.AnyWithProps>,
-    table: TableDef,
-  ) {
-    return makeProto({
-      tables: Record.set(this.tables, table.tableName, table),
-    });
-  },
-};
-
-const makeProto = <Tables_ extends Table.AnyWithProps>({
-  tables,
-}: {
-  tables: Record.ReadonlyRecord<string, Tables_>;
-}): DatabaseSchema<Tables_> =>
-  Object.assign(Object.create(Proto), {
-    tables,
-  });
-
 /**
- * Create an empty schema definition. Add tables incrementally via `addTable`.
+ * Construct a `DatabaseSchema` from a record of bound `Table`s. The empty
+ * case is `DatabaseSchema.make({})`. The `Tables_` union is inferred from
+ * the value record's values, so codegen-emitted calls of the form
+ * `DatabaseSchema.make({ notes, tags, users })` do not need an explicit
+ * type argument.
  */
-export const make = (): DatabaseSchema<never> =>
-  makeProto({
-    tables: Record.empty(),
-  });
-
-// System tables
-
-export const systemSchema = make()
-  .addTable(Table.scheduledFunctionsTable)
-  .addTable(Table.storageTable);
-
-export const extendWithSystemTables = <Tables_ extends Table.AnyWithProps>(
-  tables: Table.TablesRecord<Tables_>,
-): ExtendWithSystemTables<Tables_> =>
-  ({
-    ...tables,
-    ...Table.systemTables,
-  }) as ExtendWithSystemTables<Tables_>;
-
-export type ExtendWithSystemTables<Tables_ extends Table.AnyWithProps> =
-  Table.TablesRecord<Tables_ | Table.SystemTables>;
-
-export type IncludeSystemTables<Tables_ extends Table.AnyWithProps> =
-  | Tables_
-  | Table.SystemTables extends infer T
-  ? T extends Table.AnyWithProps
-    ? T
-    : never
-  : never;
+export const make = <
+  const TablesRecord extends Record<string, Table.AnyWithProps>,
+>(
+  tables: TablesRecord,
+): DatabaseSchema<TablesRecord[keyof TablesRecord]> => ({
+  [TypeId]: TypeId,
+  tables: tables as unknown as DatabaseSchema<
+    TablesRecord[keyof TablesRecord]
+  >["tables"],
+});

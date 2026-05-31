@@ -66,10 +66,14 @@ interface TableModuleBinding {
 /**
  * Emit `confect/_generated/schema.ts` — the runtime `DatabaseSchema` used
  * by `_generated/api.ts` (and downstream by per-function bundles for codec
- * lookup). Imports every table from its generated wrapper at
- * `_generated/tables/<name>` and chains them onto a fresh
- * `DatabaseSchema.make()`. The file deliberately avoids any `convex/server`
- * import so that runtime bundles never pull in `defineSchema(...)`.
+ * lookup). Every table wrapper at
+ * `confect/_generated/tables/<name>.ts` is imported statically and
+ * registered as a value entry on the `DatabaseSchema.make({...})` call.
+ * Per-table laziness lives inside each `Table`: its `Fields`, `Doc`, and
+ * `tableDefinition` are lazy memoised getters that only evaluate the
+ * user-supplied field-schema callback on first access, so unused tables in
+ * a function bundle never pay schema-construction cost despite the
+ * static import.
  */
 export const runtimeSchema = ({
   tableModules,
@@ -91,17 +95,17 @@ export const runtimeSchema = ({
     yield* cbw.blankLine();
 
     if (tableModules.length === 0) {
-      yield* cbw.writeLine(`export default DatabaseSchema.make();`);
+      yield* cbw.writeLine(`export default DatabaseSchema.make({});`);
     } else {
-      yield* cbw.writeLine(`export default DatabaseSchema.make()`);
+      yield* cbw.writeLine(`export default DatabaseSchema.make({`);
       yield* cbw.indent(
         Effect.gen(function* () {
-          for (const [index, { tableName }] of tableModules.entries()) {
-            const isLast = index === tableModules.length - 1;
-            yield* cbw.writeLine(`.addTable(${tableName})${isLast ? ";" : ""}`);
+          for (const { tableName } of tableModules) {
+            yield* cbw.writeLine(`${tableName},`);
           }
         }),
       );
+      yield* cbw.writeLine(`});`);
     }
 
     return yield* cbw.toString();

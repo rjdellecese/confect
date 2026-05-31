@@ -1,7 +1,7 @@
 import type { GenericDatabaseReader } from "convex/server";
-import { Array, Context, Layer } from "effect";
+import { Context, Layer } from "effect";
 import type { BaseDatabaseReader } from "@confect/core/Types";
-import * as DatabaseSchema from "./DatabaseSchema";
+import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
 import * as QueryInitializer from "./QueryInitializer";
 import * as Table from "./Table";
@@ -13,35 +13,31 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   >,
 ) => {
   type Tables = DatabaseSchema.Tables<DatabaseSchema_>;
-  type IncludedTables = DatabaseSchema.IncludeSystemTables<Tables>;
-  const extendedTables = DatabaseSchema.extendWithSystemTables(
-    databaseSchema.tables as Table.TablesRecord<Tables>,
-  );
+  type IncludedTables = Tables | Table.SystemTables;
 
   return {
     table: <const TableName extends Table.Name<IncludedTables>>(
       tableName: TableName,
     ) => {
-      const table = Object.values(extendedTables).find(
-        (def) => def.tableName === tableName,
-      ) as Table.WithName<IncludedTables, TableName>;
+      const isSystem = Object.hasOwn(Table.systemTables, tableName);
 
-      const baseDatabaseReader: BaseDatabaseReader<any> = Array.some(
-        Object.values(Table.systemTables),
-        (systemTableDef) => systemTableDef.tableName === tableName,
-      )
-        ? ({
+      const baseDatabaseReader: BaseDatabaseReader<any> = isSystem
+        ? {
             get: convexDatabaseReader.system.get,
             query: convexDatabaseReader.system.query,
-          } as BaseDatabaseReader<
-            DataModel.ToConvex<DataModel.FromTables<Table.SystemTables>>
-          >)
-        : ({
+          }
+        : {
             get: convexDatabaseReader.get,
             query: convexDatabaseReader.query,
-          } as BaseDatabaseReader<
-            DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
-          >);
+          };
+
+      const table = (
+        isSystem
+          ? (Table.systemTables as Record<string, Table.AnyWithProps>)[
+              tableName
+            ]
+          : databaseSchema.tables[tableName]
+      ) as Table.WithName<IncludedTables, TableName>;
 
       return QueryInitializer.make<IncludedTables, TableName>(
         tableName,

@@ -15,4 +15,4 @@ const TagSchema = Schema.Struct({
   tags: Schema.Array(Schema.suspend((): Schema.Schema<Tags> => TagSchema)),
 });
 
-export default Table.make(TagSchema);
+export default Table.make(() => TagSchema);
