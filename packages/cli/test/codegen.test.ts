@@ -81,6 +81,48 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
       }),
   );
 
+  // Names are derived from the basename alone, but the directory is scanned
+  // recursively — so two files in different subdirectories can resolve to the
+  // same table name. That must fail loudly rather than racing on a shared
+  // generated wrapper path / emitting duplicate schema bindings.
+  it.effect("rejects two files that resolve to the same table name", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const tempDir = yield* fs.makeTempDirectoryScoped();
+      const tablesDir = path.join(tempDir, "tables");
+      yield* fs.makeDirectory(path.join(tablesDir, "a"), { recursive: true });
+      yield* fs.makeDirectory(path.join(tablesDir, "b"), { recursive: true });
+      yield* fs.writeFileString(
+        path.join(tablesDir, "a", "notes.ts"),
+        "export default {};\n",
+      );
+      yield* fs.writeFileString(
+        path.join(tablesDir, "b", "notes.ts"),
+        "export default {};\n",
+      );
+
+      const result = yield* Effect.either(
+        discoverTables.pipe(
+          Effect.provide(
+            Layer.mock(ConfectDirectory, {
+              _tag: "@confect/cli/ConfectDirectory",
+              get: Effect.succeed(tempDir),
+            }),
+          ),
+        ),
+      );
+
+      assert(Either.isLeft(result));
+      assert(result.left._tag === "DuplicateTableNameError");
+      expect(result.left.tableName).toBe("notes");
+      expect([...result.left.tablePaths].sort()).toEqual([
+        path.join("tables", "a", "notes.ts"),
+        path.join("tables", "b", "notes.ts"),
+      ]);
+    }).pipe(Effect.scoped),
+  );
+
   it.effect("returns an empty array when there is no tables/ directory", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;

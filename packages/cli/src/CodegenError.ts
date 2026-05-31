@@ -93,6 +93,14 @@ export class InvalidTableFilenameError extends Schema.TaggedError<InvalidTableFi
   },
 ) {}
 
+export class DuplicateTableNameError extends Schema.TaggedError<DuplicateTableNameError>()(
+  "DuplicateTableNameError",
+  {
+    tableName: Schema.String,
+    tablePaths: Schema.Array(Schema.String),
+  },
+) {}
+
 export class LegacySchemaFileError extends Schema.TaggedError<LegacySchemaFileError>()(
   "LegacySchemaFileError",
   {
@@ -113,6 +121,7 @@ export const CodegenError = Schema.Union(
   ParentChildNameCollisionError,
   InvalidTableDefaultExportError,
   InvalidTableFilenameError,
+  DuplicateTableNameError,
   LegacySchemaFileError,
 );
 export type CodegenError = typeof CodegenError.Type;
@@ -266,6 +275,15 @@ const renderInvalidTableFilenameError = (
     ),
   );
 
+const renderDuplicateTableNameError = (
+  error: DuplicateTableNameError,
+): AnsiDoc.AnsiDoc =>
+  singleLine(
+    AnsiDoc.text(
+      `Multiple files under \`confect/tables/\` resolve to the table name \`${error.tableName}\`: ${error.tablePaths.join(", ")}. Table names are derived from filenames, so each must be unique across the directory (including subdirectories); rename or remove all but one.`,
+    ),
+  );
+
 const renderLegacySchemaFileError = (
   error: LegacySchemaFileError,
 ): AnsiDoc.AnsiDoc =>
@@ -355,6 +373,12 @@ export const renderCodegenError = (error: CodegenError): string => {
     Match.tag("InvalidTableFilenameError", (e) =>
       pipe(
         renderInvalidTableFilenameError(e),
+        AnsiDoc.render({ style: "pretty" }),
+      ),
+    ),
+    Match.tag("DuplicateTableNameError", (e) =>
+      pipe(
+        renderDuplicateTableNameError(e),
         AnsiDoc.render({ style: "pretty" }),
       ),
     ),

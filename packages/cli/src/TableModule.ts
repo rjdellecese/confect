@@ -5,6 +5,7 @@ import { Array, Effect, Order, pipe } from "effect";
 import { fromBundlerError } from "./BuildError";
 import * as Bundler from "./Bundler";
 import {
+  DuplicateTableNameError,
   InvalidTableDefaultExportError,
   InvalidTableFilenameError,
 } from "./CodegenError";
@@ -73,7 +74,10 @@ const byTableName = Order.mapInput(
  * A missing `confect/tables/` directory is allowed and produces an empty list.
  *
  * Fails with {@link InvalidTableFilenameError} if any filename is not a valid
- * table identifier.
+ * table identifier, or {@link DuplicateTableNameError} if two files resolve to
+ * the same table name (the directory is scanned recursively but names are
+ * derived from the basename alone, so `tables/a/notes.ts` and
+ * `tables/b/notes.ts` would collide).
  */
 export const discover = Effect.gen(function* () {
   const relativePaths = yield* listTableFiles;
@@ -96,7 +100,21 @@ export const discover = Effect.gen(function* () {
     { concurrency: "unbounded" },
   );
 
-  return pipe(tableModules, Array.sortBy(byTableName));
+  const sorted = pipe(tableModules, Array.sortBy(byTableName));
+
+  const collisions = Object.entries(
+    Array.groupBy(sorted, (tableModule) => tableModule.tableName),
+  ).filter(([, group]) => group.length > 1);
+
+  if (collisions.length > 0) {
+    const [tableName, group] = collisions[0]!;
+    return yield* new DuplicateTableNameError({
+      tableName,
+      tablePaths: Array.map(group, (tableModule) => tableModule.relativePath),
+    });
+  }
+
+  return sorted;
 });
 
 /**
