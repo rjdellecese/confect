@@ -5,7 +5,7 @@
 "@confect/test": major
 ---
 
-Split the deploy-time Convex schema from the runtime `DatabaseSchema`, and make `confect/tables/` the single source of truth — including the table name, which is now derived from the filename.
+Split the deploy-time Convex schema from the runtime `DatabaseSchema`, make `confect/tables/` the single source of truth — including the table name, which is now derived from the filename — and make per-table schema construction lazy.
 
 Previously, `confect/schema.ts` was user-authored and `DatabaseSchema` carried a `convexSchemaDefinition` field that was eagerly rebuilt on every `.addTable(...)`. That field was an `O(n²)` allocation for `n` tables, and it forced both the deploy CLI (which only needs `defineSchema(...)`) and the runtime (which only needs the table codec lookup) through the same module — so any runtime function bundle dragged in `convex/server`'s `defineSchema`. Issue 1.
 
@@ -18,7 +18,7 @@ The `convexSchemaDefinition` field is removed from `DatabaseSchema` and `Api`. `
 
 ### Filename-derived table names
 
-The table name is now derived from the file's basename — `confect/tables/notes.ts` defines a table called `notes`. `Table.make` no longer accepts a name argument and returns an *unnamed* `Table` value; codegen invokes that value with the filename to produce the bound table.
+The table name is now derived from the file's basename — `confect/tables/notes.ts` defines a table called `notes`. `Table.make` no longer accepts a name argument and returns an _unnamed_ `Table` value; codegen invokes that value with the filename to produce the bound table.
 
 This eliminates a class of subtle infelicities: the file basename and the table name can never drift out of sync, cross-table `_id` references are type-constrained against the actual set of declared tables (catching typos at compile time), and ESM cycle hazards for mutual cross-table `Id` references are gone because authoring files no longer transitively import each other.
 
@@ -31,11 +31,19 @@ Table filenames must be valid JS identifiers, may not start with `_` (Convex res
 
 The bound `Table`'s `name` property has been renamed to `tableName`. This avoids a silent collision with the built-in `Function.prototype.name` that JavaScript carries on every function value (including the new unnamed-callable `UnnamedTable`).
 
+### Lazy per-table schema construction
+
+`Table.make` takes a `() => Schema.Struct({...})` callback rather than a bare struct, and a bound `Table`'s `Fields`, `Doc`, and `tableDefinition` are lazy memoised getters that only invoke that callback on first access.
+
+Previously, every `confect/tables/<name>.ts` module ran `Schema.Struct({...})` (and the corresponding `compileTableSchema` / `defineTable` work) at module-load time. Because the codegen-emitted `_generated/schema.ts` is imported transitively from every per-group function bundle, loading any one function eagerly built _every_ table's schema graph — paying a cold-start cost proportional to the whole project, not just the function being invoked.
+
+The bound `Table` now exposes `Fields` / `Doc` / `tableDefinition` as lazy getters that compute their value on first access, then replace themselves with a plain non-writable data property so second-and-subsequent accesses are observably indistinguishable from a plain property (and skip all function-call overhead). The result: a function bundle only pays the schema-construction cost for tables it actually touches via `db.table(name)` (which reaches `Fields` through `Document.decode`). The `UnnamedTable` callable no longer exposes `Fields` or `tableDefinition` — read these off the bound `Table` (the generated `_generated/tables/<name>.ts` wrapper already binds the name).
+
 ### Migration
 
 1. Delete your `confect/schema.ts`. Codegen will refuse to run while a stray copy is present.
 2. Rename each `confect/tables/<Name>.ts` to a valid JS identifier in your chosen casing convention (e.g. `confect/tables/notes.ts`). The basename becomes the table name; you no longer pass it as an argument.
-3. Convert each table file to a **default-export-only** unnamed module: drop the name argument from `Table.make`, and switch any `GenericId.GenericId("users")` references to `Id("users")` imported from `../_generated/id`:
+3. Convert each table file to a **default-export-only** unnamed module: drop the name argument from `Table.make`, wrap the field-schema struct in a `() => ...` callback, and switch any `GenericId.GenericId("users")` references to `Id("users")` imported from `../_generated/id`:
 
    ```diff
    - import { GenericId } from "@confect/core";
@@ -50,7 +58,7 @@ The bound `Table`'s `name` property has been renamed to `tableName`. This avoids
    -     text: Schema.String,
    -   }),
    - );
-   + export default Table.make(
+   + export default Table.make(() =>
    +   Schema.Struct({
    +     userId: Schema.optional(Id("users")),
    +     text: Schema.String,
@@ -58,7 +66,7 @@ The bound `Table`'s `name` property has been renamed to `tableName`. This avoids
    + );
    ```
 
-4. Rewire every consumer site (specs, impls, integration tests, HTTP handlers, etc.) to import from the generated wrapper rather than directly from `tables/`:
+4. Rewire every consumer site (specs, impls, integration tests, HTTP handlers, etc.) to import from the generated wrapper rather than directly from `tables/`. The wrapper is also where you now read `Doc` / `Fields` / `tableDefinition` (the unnamed `Table.make(...)` callable no longer exposes them):
 
    ```diff
    - import Notes from "../tables/Notes";
