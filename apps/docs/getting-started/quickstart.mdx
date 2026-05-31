@@ -40,7 +40,7 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
       information about what's permitted and what's not.
     </Note>
 
-    Define a table — one file per table under `confect/tables/`, where the **filename is the table name** (so filenames must be valid JS identifiers and may not start with `_`). Each file **must default-export** an unnamed `Table`; codegen reads `module.default` and invokes it with the filename. From other modules (e.g. specs), default-import the codegen-emitted wrapper at `confect/_generated/tables/<name>` to reach the table's derived `Schema`s (`notes.Doc`, `notes.Fields`).
+    Define a table — one file per table under `confect/tables/`, where the **filename is the table name** (so filenames must be valid JS identifiers and may not start with `_`). Each file **must default-export** a `Table`; codegen reads `module.default` and applies the filename as the table name. From other modules (e.g. specs), default-import the codegen-emitted wrapper at `confect/_generated/tables/<name>` to reach the table's derived `Schema`s (`notes.Doc`, `notes.Fields`).
 
     ```ts confect/tables/notes.ts
     import { Table } from "@confect/server";

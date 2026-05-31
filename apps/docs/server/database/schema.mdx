@@ -6,7 +6,7 @@ description: "Define your database schema using Effect schemas."
 
 Your database schema lives in `confect/tables/`: one file per table, each default-exporting a `Table.make(...)` value. The **filename is the table name** — `confect/tables/notes.ts` defines a table called `notes` — so filenames must be valid JS identifiers and may not start with `_` (Convex reserves underscore-prefixed names for system tables). Codegen scans this directory and produces `confect/_generated/schema.ts` (the runtime `DatabaseSchema` consumed by `_generated/api.ts`), `confect/_generated/convexSchema.ts` (the deploy-time Convex `SchemaDefinition` re-exported from `convex/schema.ts`), and a pair of consumer-facing modules per table: `confect/_generated/id.ts` (a type-safe `Id` constructor) and `confect/_generated/tables/<name>.ts` (a thin wrapper that binds the table name). You never edit any of these generated files directly.
 
-Each table is defined with `Table.make`, which takes a callback returning the table's fields and produces an _unnamed_ table value. The callback is invoked lazily — only on the first access of the bound table's `Fields`, `Doc`, or `tableDefinition` — so an unused table in a Convex function bundle pays no schema-construction cost. Indexes are defined on tables the same way as in the base Convex APIs. Cross-table `Id` references are constructed with the codegen-emitted `Id` helper from `confect/_generated/id.ts`, whose argument is type-constrained to the set of declared table names.
+Each table is defined with `Table.make`, which takes a callback returning the table's fields. The callback runs lazily — only the first time the table's `Fields`, `Doc`, or `tableDefinition` is accessed — so an unused table in a Convex function bundle pays no schema-construction cost. Indexes are defined on tables the same way as in the base Convex APIs. Cross-table `Id` references are constructed with the codegen-emitted `Id` helper from `confect/_generated/id.ts`, whose argument is type-constrained to the set of declared table names.
 
 ```ts confect/tables/notes.ts
 import { Table } from "@confect/server";
@@ -51,7 +51,7 @@ export default Table.make(() =>
 );
 ```
 
-Each `confect/tables/*.ts` file **must default-export an unnamed `Table`** — codegen reads `module.default` and invokes it with the filename to produce the bound table. Consumers (specs, impls, HTTP handlers, etc.) reach a table's derived `Schema`s through the generated wrapper at `confect/_generated/tables/<name>`, e.g. `import notes from "../_generated/tables/notes"` and then `notes.Doc`.
+Each `confect/tables/*.ts` file **must default-export a `Table`** — codegen reads `module.default` and applies the filename as the table name. Consumers (specs, impls, HTTP handlers, etc.) reach a table's derived `Schema`s through the generated wrapper at `confect/_generated/tables/<name>`, e.g. `import notes from "../_generated/tables/notes"` and then `notes.Doc`.
 
 ## Deriving table `Schema`s
 

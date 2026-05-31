@@ -104,7 +104,7 @@ Contains the runtime `DatabaseSchema` — the codec-lookup view of your tables c
 
 #### `tables/`
 
-Contains one wrapper module per user-authored table (for example `tables/notes.ts` for `confect/tables/notes.ts`). Each wrapper binds the unnamed `Table.make(...)` value from `confect/tables/<name>.ts` to its filename-derived table name and re-exports the bound `Table` as the default. Specs, impls, and other consumers should default-import from `confect/_generated/tables/<name>` to reach a table's `Doc`, `Fields`, and `tableName` properties — for example, `import notes from "../_generated/tables/notes"` and then `notes.Doc`.
+Contains one wrapper module per user-authored table (for example `tables/notes.ts` for `confect/tables/notes.ts`). Each wrapper applies the filename-derived table name to the `Table` defined in `confect/tables/<name>.ts` and re-exports it as the default. Specs, impls, and other consumers should default-import from `confect/_generated/tables/<name>` to reach a table's `Doc`, `Fields`, and `tableName` properties — for example, `import notes from "../_generated/tables/notes"` and then `notes.Doc`.
 
 #### `services.ts`
 
@@ -136,7 +136,7 @@ Expects a default Convex `HttpRouter` export. Construct this using Confect's `Ht
 
 <Badge color="green">Required</Badge>
 
-Defines your database tables, one file per table. The **filename is the table name** — `confect/tables/notes.ts` defines a table called `notes` — so filenames must be valid JS identifiers and may not start with `_` (Convex reserves underscore-prefixed names for system tables). Each module **must default-export an unnamed `Table`** (built with `Table.make(...)`, no name argument); codegen reads `module.default`, validates the filename, and binds the table name to produce `_generated/tables/<name>.ts`. Other modules import from the wrapper, not directly from `tables/`. Codegen also scans this directory to produce `_generated/schema.ts` (runtime), `_generated/convexSchema.ts` (deploy), and `_generated/id.ts` (the cross-table `Id` constructor). See [Schema](/server/database/schema).
+Defines your database tables, one file per table. The **filename is the table name** — `confect/tables/notes.ts` defines a table called `notes` — so filenames must be valid JS identifiers and may not start with `_` (Convex reserves underscore-prefixed names for system tables). Each module **must default-export a `Table`** (built with `Table.make(...)`); codegen reads `module.default`, validates the filename, and applies it as the table name to produce `_generated/tables/<name>.ts`. Other modules import from the wrapper, not directly from `tables/`. Codegen also scans this directory to produce `_generated/schema.ts` (runtime), `_generated/convexSchema.ts` (deploy), and `_generated/id.ts` (the cross-table `Id` constructor). See [Schema](/server/database/schema).
 
 ### `*.spec.ts`/`*.impl.ts`
 
