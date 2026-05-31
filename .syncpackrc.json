@@ -1,0 +1,49 @@
+{
+  "customTypes": {
+    "enginesNode": {
+      "path": "engines.node",
+      "strategy": "versionsByName"
+    }
+  },
+  "versionGroups": [
+    {
+      "label": "engines.node must match across all published packages",
+      "dependencyTypes": ["enginesNode"],
+      "policy": "sameRange"
+    },
+    {
+      "label": "Internal @confect/* peerDependencies must use workspace:^",
+      "dependencies": ["@confect/**"],
+      "dependencyTypes": ["peer"],
+      "pinVersion": "workspace:^"
+    },
+    {
+      "label": "Internal @confect/* devDependencies must use workspace:*",
+      "dependencies": ["@confect/**"],
+      "dependencyTypes": ["dev"],
+      "pinVersion": "workspace:*"
+    },
+    {
+      "label": "Internal @confect/* dependencies must use workspace:*",
+      "dependencies": ["@confect/**"],
+      "dependencyTypes": ["prod"],
+      "pinVersion": "workspace:*"
+    },
+    {
+      "label": "devDependencies must use the same version across the workspace",
+      "dependencyTypes": ["dev"]
+    },
+    {
+      "label": "External prod/peer dependencies may use any version style",
+      "dependencyTypes": ["prod", "peer"],
+      "isIgnored": true
+    }
+  ],
+  "semverGroups": [
+    {
+      "label": "devDependencies must be exact pins (no semver range prefix)",
+      "dependencyTypes": ["dev"],
+      "range": ""
+    }
+  ]
+}

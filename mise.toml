@@ -1,0 +1,14 @@
+[tools]
+bun = "1.3.10"
+gh = "latest"
+
+[settings]
+idiomatic_version_file_enable_tools = ["node", "pnpm"]
+
+[hooks]
+enter = """
+if [ ! -d "$MISE_PROJECT_ROOT/node_modules" ]; then
+  echo "Installing Node dependencies with pnpm..."
+  (cd "$MISE_PROJECT_ROOT" && pnpm install)
+fi
+"""

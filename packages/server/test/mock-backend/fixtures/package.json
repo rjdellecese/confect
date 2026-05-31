@@ -1,9 +1,7 @@
 {
   "name": "@confect/server-mock-backend-fixtures",
-  "version": "0.0.0",
   "description": "Internal fixture project for @confect/server's mock-backend test suite.",
-  "private": true,
-  "type": "module",
+  "version": "0.0.0",
   "dependencies": {
     "@confect/core": "workspace:*",
     "@confect/server": "workspace:*",
@@ -13,6 +11,8 @@
   },
   "devDependencies": {
     "@confect/cli": "workspace:*",
-    "@types/luxon": "^3.7.1"
-  }
+    "@types/luxon": "3.7.1"
+  },
+  "private": true,
+  "type": "module"
 }

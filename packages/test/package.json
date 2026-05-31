@@ -1,25 +1,24 @@
 {
   "name": "@confect/test",
-  "version": "9.0.0-next.5",
   "description": "Utilities for testing Confect apps without a live Convex backend",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/rjdellecese/confect.git"
-  },
+  "version": "9.0.0-next.5",
+  "author": "RJ Dellecese",
   "bugs": {
     "url": "https://github.com/rjdellecese/confect/issues"
   },
-  "homepage": "https://confect.dev",
-  "sideEffects": false,
-  "type": "module",
-  "files": [
-    "CHANGELOG.md",
-    "LICENSE",
-    "README.md",
-    "dist",
-    "package.json",
-    "src"
-  ],
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "25.3.3",
+    "effect": "3.21.2",
+    "eslint": "10.0.2",
+    "prettier": "3.8.1",
+    "tsdown": "0.20.3",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.56.1"
+  },
+  "engines": {
+    "node": ">=22"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -32,34 +31,23 @@
     "./package.json": "./package.json",
     "./internal/*": null
   },
-  "scripts": {
-    "build": "tsdown --config-loader unrun",
-    "dev": "tsdown --watch",
-    "typecheck": "tsc --noEmit --project tsconfig.json",
-    "fix": "prettier --write . && eslint --fix . --max-warnings=0",
-    "format": "prettier --check .",
-    "lint": "eslint . --max-warnings=0",
-    "clean": "rm -rf dist coverage node_modules",
-    "prepack": "rm -f ./README.md && cp ../../README.md ./README.md",
-    "postpack": "rm ./README.md && ln -s ../../README.md ./README.md"
-  },
+  "files": [
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md",
+    "dist",
+    "package.json",
+    "src"
+  ],
+  "homepage": "https://confect.dev",
   "keywords": [
-    "effect",
     "convex",
+    "effect",
     "testing"
   ],
-  "author": "RJ Dellecese",
   "license": "ISC",
-  "devDependencies": {
-    "@eslint/js": "10.0.1",
-    "@types/node": "25.3.3",
-    "eslint": "10.0.2",
-    "prettier": "3.8.1",
-    "tsdown": "0.20.3",
-    "typescript": "5.9.3",
-    "typescript-eslint": "8.56.1",
-    "effect": "3.21.2"
-  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
   "peerDependencies": {
     "@confect/core": "workspace:^",
     "@confect/server": "workspace:^",
@@ -67,11 +55,22 @@
     "convex-test": "^0.0.50",
     "effect": "^3.21.2"
   },
-  "engines": {
-    "node": ">=22",
-    "pnpm": ">=10"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rjdellecese/confect.git"
   },
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
+  "scripts": {
+    "build": "tsdown --config-loader unrun",
+    "clean": "rm -rf dist coverage node_modules",
+    "dev": "tsdown --watch",
+    "fix": "prettier --write . && eslint --fix . --max-warnings=0",
+    "format": "prettier --check .",
+    "lint": "eslint . --max-warnings=0",
+    "postpack": "rm ./README.md && ln -s ../../README.md ./README.md",
+    "prepack": "rm -f ./README.md && cp ../../README.md ./README.md",
+    "typecheck": "tsc --noEmit --project tsconfig.json"
+  },
+  "sideEffects": false,
+  "type": "module",
   "types": "./dist/index.d.ts"
 }
