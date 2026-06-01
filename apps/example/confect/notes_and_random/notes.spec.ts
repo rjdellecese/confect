@@ -1,10 +1,11 @@
-import { FunctionSpec, GenericId, GroupSpec } from "@confect/core";
+import { FunctionSpec, GroupSpec } from "@confect/core";
 import { Schema } from "effect";
-import { Notes } from "../tables/Notes";
+import { Id } from "../_generated/id";
+import notes from "../_generated/tables/notes";
 
 export class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
   "NoteNotFound",
-  { noteId: GenericId.GenericId("notes") },
+  { noteId: Id("notes") },
 ) {}
 
 export default GroupSpec.make()
@@ -12,28 +13,28 @@ export default GroupSpec.make()
     FunctionSpec.publicMutation({
       name: "insert",
       args: Schema.Struct({ text: Schema.String }),
-      returns: GenericId.GenericId("notes"),
+      returns: Id("notes"),
     }),
   )
   .addFunction(
     FunctionSpec.publicQuery({
       name: "list",
       args: Schema.Struct({}),
-      returns: Schema.Array(Notes.Doc),
+      returns: Schema.Array(notes.Doc),
     }),
   )
   .addFunction(
     FunctionSpec.publicMutation({
       name: "delete_",
-      args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
+      args: Schema.Struct({ noteId: Id("notes") }),
       returns: Schema.Null,
     }),
   )
   .addFunction(
     FunctionSpec.publicQuery({
       name: "getOrFail",
-      args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
-      returns: Notes.Doc,
+      args: Schema.Struct({ noteId: Id("notes") }),
+      returns: notes.Doc,
       error: NoteNotFound,
     }),
   )
@@ -41,14 +42,14 @@ export default GroupSpec.make()
     FunctionSpec.publicQuery({
       name: "getFirst",
       args: Schema.Struct({}),
-      returns: Schema.Option(Notes.Doc),
+      returns: Schema.Option(notes.Doc),
     }),
   )
   .addFunction(
     FunctionSpec.internalQuery({
       name: "internalGetFirst",
       args: Schema.Struct({}),
-      returns: Schema.Option(Notes.Doc),
+      returns: Schema.Option(notes.Doc),
     }),
   )
   .addFunction(

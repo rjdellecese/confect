@@ -1,7 +1,7 @@
 import { Array, Option, Predicate, Record, String } from "effect";
 import * as GroupSpec from "./GroupSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
-import { validateConfectFunctionIdentifier } from "./internal/utils";
+import { validateConfectFunctionIdentifier } from "./Identifier";
 
 export const TypeId = "@confect/core/Spec";
 export type TypeId = typeof TypeId;

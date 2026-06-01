@@ -20,10 +20,10 @@ const App = () => {
 
 const Page = () => {
   const [note, setNote] = useState("");
-  const insertNote = useMutation(refs.public.notesAndRandom.notes.insert);
+  const insertNote = useMutation(refs.public.notes_and_random.notes.insert);
 
   const [randomNumber, setRandomNumber] = useState<number | null>(null);
-  const getRandom = useAction(refs.public.notesAndRandom.random.getNumber);
+  const getRandom = useAction(refs.public.notes_and_random.random.getNumber);
 
   const retrieveRandomNumber = () => {
     void getRandom({}).then((n) => {
@@ -114,7 +114,7 @@ const NoteLookup = () => {
   const [noteId, setNoteId] = useState<GenericId<"notes"> | undefined>();
 
   const lookup = useQuery(
-    refs.public.notesAndRandom.notes.getOrFail,
+    refs.public.notes_and_random.notes.getOrFail,
     noteId === undefined ? "skip" : { noteId },
   );
 
@@ -230,9 +230,9 @@ const WorkStatusRow = ({
 };
 
 const NoteList = () => {
-  const notesResult = useQuery(refs.public.notesAndRandom.notes.list, {});
+  const notesResult = useQuery(refs.public.notes_and_random.notes.list, {});
 
-  const deleteNote = useMutation(refs.public.notesAndRandom.notes.delete_);
+  const deleteNote = useMutation(refs.public.notes_and_random.notes.delete_);
 
   return QueryResult.match(notesResult, {
     onLoading: () => <p>Loading…</p>,

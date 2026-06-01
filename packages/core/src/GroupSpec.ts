@@ -1,7 +1,7 @@
 import { Predicate, Record } from "effect";
 import type * as FunctionSpec from "./FunctionSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
-import { validateConfectFunctionIdentifier } from "./internal/utils";
+import { validateConfectFunctionIdentifier } from "./Identifier";
 
 export const TypeId = "@confect/core/GroupSpec";
 export type TypeId = typeof TypeId;

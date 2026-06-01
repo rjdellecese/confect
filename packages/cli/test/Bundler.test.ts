@@ -58,7 +58,12 @@ layer(BundlerLayer)("bundle", (it) => {
         yield* fs.writeFileString(entry, `export default import.meta.url;\n`);
 
         const bundled = yield* Bundler.bundle(entry);
-        expect(bundled.module.default).toBe(pathToFileURL(entry).href);
+        // esbuild canonicalizes `import.meta.url` to the entry's real path, so
+        // resolve symlinks before comparing — otherwise this fails when the
+        // temp dir lives under a symlinked root (e.g. macOS `/tmp` ->
+        // `/private/tmp`).
+        const realEntry = yield* fs.realPath(entry);
+        expect(bundled.module.default).toBe(pathToFileURL(realEntry).href);
       }).pipe(Effect.scoped),
   );
 });

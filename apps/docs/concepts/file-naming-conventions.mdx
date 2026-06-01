@@ -16,12 +16,12 @@ A complete pair looks like this. The impl default-imports its sibling spec, pass
 import { GroupSpec, FunctionSpec } from "@confect/core";
 import { Schema } from "effect";
 
-import { Notes } from "./tables/Notes";
+import notes from "./_generated/tables/notes";
 
 const list = FunctionSpec.publicQuery({
   name: "list",
   args: Schema.Struct({}),
-  returns: Schema.Array(Notes.Doc),
+  returns: Schema.Array(notes.Doc),
 });
 
 export default GroupSpec.make().addFunction(list);
@@ -56,8 +56,8 @@ Run `confect codegen` after adding or changing specs and impls.
 
 <Note>
   A file's path within `confect/` determines the public Convex API
-  path it produces—`confect/notesAndRandom/notes.spec.ts` becomes
-  `internal.notesAndRandom.notes.list`. Renaming a file or directory
+  path it produces—`confect/notes_and_random/notes.spec.ts` becomes
+  `internal.notes_and_random.notes.list`. Renaming a file or directory
   renames the API path, so treat these paths as part of your API's
   contract.
 </Note>
@@ -112,36 +112,45 @@ Putting it all together, a project using all of these conventions might look lik
   <Tree.Folder name="confect" defaultOpen>
     <Tree.Folder name="_generated" defaultOpen>
       <Tree.File name="api.ts" />
+      <Tree.File name="convexSchema.ts" />
       <Tree.File name="nodeApi.ts" />
       <Tree.File name="nodeSpec.ts" />
       <Tree.File name="refs.ts" />
+      <Tree.File name="schema.ts" />
       <Tree.File name="services.ts" />
       <Tree.File name="spec.ts" />
       <Tree.Folder name="registeredFunctions" defaultOpen>
         <Tree.File name="env.ts" />
-        <Tree.Folder name="notesAndRandom" defaultOpen>
+        <Tree.Folder name="notes_and_random" defaultOpen>
           <Tree.File name="notes.ts" />
           <Tree.File name="random.ts" />
         </Tree.Folder>
         <Tree.File name="workpool.ts" />
         <Tree.File name="email.ts" />
       </Tree.Folder>
+      <Tree.Folder name="tables" defaultOpen>
+        <Tree.File name="notes.ts" />
+        <Tree.File name="users.ts" />
+      </Tree.Folder>
+      <Tree.File name="id.ts" />
     </Tree.Folder>
     <Tree.Folder name="node" defaultOpen>
       <Tree.File name="email.spec.ts" />
       <Tree.File name="email.impl.ts" />
     </Tree.Folder>
-    <Tree.Folder name="notesAndRandom" defaultOpen>
+    <Tree.Folder name="notes_and_random" defaultOpen>
       <Tree.File name="notes.spec.ts" />
       <Tree.File name="notes.impl.ts" />
       <Tree.File name="random.spec.ts" />
       <Tree.File name="random.impl.ts" />
     </Tree.Folder>
-    <Tree.Folder name="tables" />
+    <Tree.Folder name="tables" defaultOpen>
+      <Tree.File name="notes.ts" />
+      <Tree.File name="users.ts" />
+    </Tree.Folder>
     <Tree.File name="env.spec.ts" />
     <Tree.File name="env.impl.ts" />
     <Tree.File name="http.ts" />
-    <Tree.File name="schema.ts" />
     <Tree.File name="workpool.ts" />
     <Tree.File name="workpool.spec.ts" />
     <Tree.File name="workpool.impl.ts" />

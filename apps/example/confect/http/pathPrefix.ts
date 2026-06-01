@@ -8,13 +8,13 @@ import {
 import { Effect, Layer, Schema } from "effect";
 import refs from "../_generated/refs";
 import { QueryRunner } from "../_generated/services";
-import { Notes } from "../tables/Notes";
+import notes from "../_generated/tables/notes";
 
 class ApiGroup extends HttpApiGroup.make("notes")
   .add(
     HttpApiEndpoint.get("getFirst", "/get-first")
       .annotate(OpenApi.Description, "Get the first note, if there is one.")
-      .addSuccess(Schema.Option(Notes.Doc)),
+      .addSuccess(Schema.Option(notes.Doc)),
   )
   .annotate(OpenApi.Title, "Notes")
   .annotate(OpenApi.Description, "Operations on notes.") {}
@@ -40,7 +40,7 @@ const ApiGroupLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
       const runQuery = yield* QueryRunner;
 
       const firstNote = yield* runQuery(
-        refs.public.notesAndRandom.notes.getFirst,
+        refs.public.notes_and_random.notes.getFirst,
         {},
       );
 

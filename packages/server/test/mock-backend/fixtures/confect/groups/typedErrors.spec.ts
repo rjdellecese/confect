@@ -1,6 +1,7 @@
-import { FunctionSpec, GenericId, GroupSpec } from "@confect/core";
+import { FunctionSpec, GroupSpec } from "@confect/core";
 import { Schema } from "effect";
-import { Notes } from "../tables/Notes";
+import { Id } from "../_generated/id";
+import notes from "../_generated/tables/notes";
 
 export class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
   id: Schema.String,
@@ -32,8 +33,8 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicQuery({
       name: "getNoteOrFail",
-      args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
-      returns: Notes.Doc,
+      args: Schema.Struct({ noteId: Id("notes") }),
+      returns: notes.Doc,
       error: NotFound,
     }),
   )
@@ -41,7 +42,7 @@ export default GroupSpec.make()
     FunctionSpec.publicMutation({
       name: "deleteNoteOrFail",
       args: Schema.Struct({
-        noteId: GenericId.GenericId("notes"),
+        noteId: Id("notes"),
         asAdmin: Schema.Boolean,
       }),
       returns: Schema.Null,
@@ -69,7 +70,7 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicQuery({
       name: "tryGetNote",
-      args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
+      args: Schema.Struct({ noteId: Id("notes") }),
       returns: TryGetResult,
     }),
   )
@@ -77,7 +78,7 @@ export default GroupSpec.make()
     FunctionSpec.publicAction({
       name: "tryDeleteNote",
       args: Schema.Struct({
-        noteId: GenericId.GenericId("notes"),
+        noteId: Id("notes"),
         asAdmin: Schema.Boolean,
       }),
       returns: TryDeleteResult,
@@ -95,15 +96,15 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.internalQuery({
       name: "internalGetNoteOrFail",
-      args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
-      returns: Notes.Doc,
+      args: Schema.Struct({ noteId: Id("notes") }),
+      returns: notes.Doc,
       error: NotFound,
     }),
   )
   .addFunction(
     FunctionSpec.publicAction({
       name: "tryInternalGetNote",
-      args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
+      args: Schema.Struct({ noteId: Id("notes") }),
       returns: TryGetResult,
     }),
   );

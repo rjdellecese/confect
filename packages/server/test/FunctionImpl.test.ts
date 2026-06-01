@@ -12,7 +12,7 @@ const fnSpec = (name: string) =>
   });
 
 const buildApi = (spec: Spec.AnyWithProps): Api.AnyWithProps =>
-  Api.make(DatabaseSchema.make(), spec) as unknown as Api.AnyWithProps;
+  Api.make(DatabaseSchema.make({}), spec) as unknown as Api.AnyWithProps;
 
 // The handler type FunctionImpl.make infers for a strongly-typed Api is more
 // specific than the erased `Api.AnyWithProps` casts in this file can satisfy;

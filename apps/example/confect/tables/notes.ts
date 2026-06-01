@@ -1,23 +1,19 @@
-import { GenericId } from "@confect/core";
 import { Table } from "@confect/server";
 import { Schema } from "effect";
+import { Id } from "../_generated/id";
 
-export const Notes = Table.make(
-  "notes",
+export default Table.make(() =>
   Schema.Struct({
-    userId: Schema.optionalWith(GenericId.GenericId("users"), { exact: true }),
+    userId: Schema.optional(Id("users")),
     text: Schema.String.pipe(Schema.maxLength(100)),
-    tag: Schema.optionalWith(Schema.String, { exact: true }),
-    author: Schema.optionalWith(
+    tag: Schema.optional(Schema.String),
+    author: Schema.optional(
       Schema.Struct({
         role: Schema.Literal("admin", "user"),
         name: Schema.String,
       }),
-      { exact: true },
     ),
-    embedding: Schema.optionalWith(Schema.Array(Schema.Number), {
-      exact: true,
-    }),
+    embedding: Schema.optional(Schema.Array(Schema.Number)),
   }),
 )
   .index("by_text", ["text"])

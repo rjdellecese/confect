@@ -49,8 +49,14 @@ import { ProjectRoot } from "../ProjectRoot";
 import { generateAuthConfig, generateCrons, generateHttp } from "../utils";
 import { codegenHandler, loadPreviousFunctionPaths } from "./codegen";
 
-const GENERATED_SPEC_PATH = "_generated/spec.ts";
-const GENERATED_NODE_SPEC_PATH = "_generated/nodeSpec.ts";
+const GENERATED_DIRNAME = "_generated";
+
+const GENERATED_SPEC_PATH = Effect.andThen(Path.Path, (path) =>
+  path.join(GENERATED_DIRNAME, "spec.ts"),
+);
+const GENERATED_NODE_SPEC_PATH = Effect.andThen(Path.Path, (path) =>
+  path.join(GENERATED_DIRNAME, "nodeSpec.ts"),
+);
 
 // Quiescence window: the sync loop waits this long for further signals
 // after each batch. One user edit fires `onEnd` on every esbuild
@@ -99,7 +105,7 @@ const changeChar = (change: "Added" | "Removed" | "Modified") =>
   Match.value(change).pipe(
     Match.when("Added", () => ({ char: "+", color: Ansi.green })),
     Match.when("Removed", () => ({ char: "-", color: Ansi.red })),
-    Match.when("Modified", () => ({ char: "~", color: Ansi.yellow })),
+    Match.when("Modified", () => ({ char: "~", color: Ansi.magenta })),
     Match.exhaustive,
   );
 
@@ -414,10 +420,18 @@ const discoverEntryPoints = Effect.gen(function* () {
       });
     });
 
+  const generatedSpecPath = yield* GENERATED_SPEC_PATH;
+  const generatedNodeSpecPath = yield* GENERATED_NODE_SPEC_PATH;
+
   const fixedEntryOptions = yield* Effect.all([
-    tryEntry(GENERATED_SPEC_PATH, "specDirty"),
-    tryEntry(GENERATED_NODE_SPEC_PATH, "specDirty"),
-    tryEntry("schema.ts", "specDirty"),
+    tryEntry(generatedSpecPath, "specDirty"),
+    tryEntry(generatedNodeSpecPath, "specDirty"),
+    // `confect/schema.ts` is no longer user-authored; the runtime
+    // `DatabaseSchema` lives at `_generated/schema.ts` (codegen-written,
+    // so not an entry point — wiring it through esbuild would form a
+    // codegen→write→onEnd→codegen loop). Updates to `confect/tables/*.ts`
+    // still reach this dev loop via the impl entry points' import graphs;
+    // brand-new tables are caught by the Create-event safety net below.
     tryEntry("http.ts", "httpDirty"),
     tryEntry("crons.ts", "cronsDirty"),
     tryEntry("auth.ts", "authDirty"),
@@ -703,6 +717,10 @@ const handleConfectChange = ({
     );
   }
 
+  // A stray `confect/schema.ts` (now codegen-owned at
+  // `_generated/schema.ts`) shouldn't exist; flagging it here ensures the
+  // next codegen pass surfaces the migration error
+  // (`LegacySchemaFileError`) instead of silently ignoring the file.
   if (relativePath === "schema.ts") {
     return flipDirtyAndSignal(
       pendingRef,
@@ -723,7 +741,7 @@ const handleConfectChange = ({
     );
   }
 
-  // Any other `.ts` under `confect/` (helpers like `tables/Notes.ts`).
+  // Any other `.ts` under `confect/` (helpers like `tables/notes.ts`).
   // Updates to such files are handled by the esbuild watcher for whichever
   // entry point imports them — its onEnd flips the right dirty flag.
   // Creates are our safety net: when a previously-missing import is added,

@@ -44,18 +44,18 @@ Given this spec:
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import { Schema } from "effect";
 
-import { Notes } from "./tables/Notes";
+import notes from "./_generated/tables/notes";
 
 export default GroupSpec.make().addFunction(
   FunctionSpec.publicQuery({
     name: "list",
     args: Schema.Struct({}),
-    returns: Schema.Array(Notes.Doc),
+    returns: Schema.Array(notes.Doc),
   }),
 );
 ```
 
-The hook accepts `{}` (the `Type` of `Schema.Struct({})`) as args and returns a `QueryResult<readonly Notes.Doc["Type"][]>`. Match it with `QueryResult.match`:
+The hook accepts `{}` (the `Type` of `Schema.Struct({})`) as args and returns a `QueryResult<readonly notes.Doc["Type"][]>`. Match it with `QueryResult.match`:
 
 ```tsx
 import { QueryResult, useQuery } from "@confect/react";
@@ -140,10 +140,12 @@ Returns a function that encodes args using the spec's `args` schema, calls the C
 The function returns `Promise<A>`, matching `convex/react`'s `useMutation`. Undeclared failures still reject the promise.
 
 ```ts confect/notes.spec.ts
+import { Id } from "./_generated/id";
+
 FunctionSpec.publicMutation({
   name: "insert",
   args: Schema.Struct({ text: Schema.String }),
-  returns: GenericId.GenericId("notes"),
+  returns: Id("notes"),
 });
 ```
 
@@ -167,9 +169,11 @@ const InsertNote = () => {
 When the spec declares an `error` schema, the function returns `Promise<Either<A, E>>`. Unwrap with `Either.match` (or another `Either` combinator) to handle both branches. Undeclared failures still reject the promise.
 
 ```ts confect/notes.spec.ts
+import { Id } from "./_generated/id";
+
 FunctionSpec.publicMutation({
   name: "deleteOrFail",
-  args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
+  args: Schema.Struct({ noteId: Id("notes") }),
   returns: Schema.Null,
   error: Schema.Union(NoteNotFound, Forbidden),
 });

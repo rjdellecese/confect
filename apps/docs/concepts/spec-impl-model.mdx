@@ -14,17 +14,17 @@ Specs are built using `@confect/core`, which means they can be shared between th
 
 Each group spec is the default export of a `*.spec.ts` file. The group's name comes from the file's path—its stem for top-level groups, or the dot-joined directory path for nested groups:
 
-```ts confect/notesAndRandom/notes.spec.ts
+```ts confect/notes_and_random/notes.spec.ts
 import { GroupSpec, FunctionSpec } from "@confect/core";
 import { Schema } from "effect";
 
-import { Notes } from "../tables/Notes";
+import notes from "../_generated/tables/notes";
 
 export default GroupSpec.make().addFunction(
   FunctionSpec.publicQuery({
     name: "list",
     args: Schema.Struct({}),
-    returns: Schema.Array(Notes.Doc),
+    returns: Schema.Array(notes.Doc),
   }),
 );
 ```
@@ -33,7 +33,7 @@ export default GroupSpec.make().addFunction(
 
 An impl provides the logic for each function declared in your spec. Each impl is the default export of a `*.impl.ts` file colocated with its sibling spec. It default-imports that sibling spec, passes it to `FunctionImpl.make` and `GroupImpl.make`, and finalizes the resulting layer with `GroupImpl.finalize`:
 
-```ts confect/notesAndRandom/notes.impl.ts
+```ts confect/notes_and_random/notes.impl.ts
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Effect, Layer } from "effect";
 

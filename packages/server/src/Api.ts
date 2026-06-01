@@ -1,9 +1,7 @@
 import type { RuntimeAndFunctionType } from "@confect/core";
 import type * as GroupSpec from "@confect/core/GroupSpec";
 import type * as Spec from "@confect/core/Spec";
-import type { GenericSchema, SchemaDefinition } from "convex/server";
-import { defineSchema as defineConvexSchema } from "convex/server";
-import { pipe, Predicate, Record } from "effect";
+import { Predicate } from "effect";
 import type * as DatabaseSchema from "./DatabaseSchema";
 
 export const TypeId = "@confect/server/Api";
@@ -18,7 +16,6 @@ export interface Api<
   readonly [TypeId]: TypeId;
   readonly spec: Spec_;
   readonly databaseSchema: DatabaseSchema_;
-  readonly convexSchemaDefinition: SchemaDefinition<GenericSchema, true>;
 }
 
 export interface Any {
@@ -60,11 +57,6 @@ const makeProto = <
   Object.assign(Object.create(Proto), {
     databaseSchema,
     spec,
-    convexSchemaDefinition: pipe(
-      databaseSchema.tables,
-      Record.map(({ tableDefinition }) => tableDefinition),
-      defineConvexSchema,
-    ),
   });
 
 export const make = <

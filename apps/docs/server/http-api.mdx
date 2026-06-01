@@ -22,7 +22,7 @@ import { Effect, Layer, Schema } from "effect";
 
 import refs from "../_generated/refs";
 import { QueryRunner } from "../_generated/services";
-import { Notes } from "../tables/Notes";
+import notes from "../_generated/tables/notes";
 
 class NotesGroup extends HttpApiGroup.make("notes")
   .add(
@@ -31,7 +31,7 @@ class NotesGroup extends HttpApiGroup.make("notes")
         OpenApi.Description,
         "Get the first note, if there is one.",
       )
-      .addSuccess(Schema.Option(Notes.Doc)),
+      .addSuccess(Schema.Option(notes.Doc)),
   )
   .annotate(OpenApi.Title, "Notes")
   .annotate(OpenApi.Description, "Operations on notes.") {}

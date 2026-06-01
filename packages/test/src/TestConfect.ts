@@ -6,7 +6,12 @@ import type {
   TestConvexForDataModelAndIdentity,
 } from "convex-test";
 import { convexTest } from "convex-test";
-import type { GenericMutationCtx, UserIdentity } from "convex/server";
+import type {
+  GenericMutationCtx,
+  GenericSchema,
+  SchemaDefinition,
+  UserIdentity,
+} from "convex/server";
 import type { Value } from "convex/values";
 import type { ParseResult } from "effect";
 import { Context, Effect, Layer, Schema } from "effect";
@@ -251,6 +256,7 @@ class TestConfectImpl<
 export const layer =
   <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
     databaseSchema: DatabaseSchema_,
+    convexSchemaDefinition: SchemaDefinition<GenericSchema, true>,
     modules: Record<string, () => Promise<any>>,
   ) =>
   (): Layer.Layer<TestConfect<DatabaseSchema_>> =>
@@ -259,6 +265,6 @@ export const layer =
       () =>
         new TestConfectImpl(
           databaseSchema,
-          convexTest(databaseSchema.convexSchemaDefinition, modules) as any,
+          convexTest(convexSchemaDefinition, modules) as any,
         ),
     );
