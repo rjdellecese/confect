@@ -9,7 +9,9 @@
     "@confect/server": "8.0.0",
     "@confect/server-local-backend-fixtures": "0.0.0",
     "@confect/server-mock-backend-fixtures": "0.0.0",
-    "@confect/test": "8.0.0"
+    "@confect/test": "8.0.0",
+    "docs": "0.0.0",
+    "example": "0.0.0"
   },
   "changesets": [
     "bundle-require",
@@ -17,6 +19,7 @@
     "fs-based-function-paths",
     "preserve-parent-leaf-in-assembled-spec",
     "spec-paths-immutable-lookup",
+    "split-deploy-schema-from-runtime",
     "unique-spec-import-bindings"
   ]
 }
