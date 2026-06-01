@@ -52,6 +52,15 @@ export type TableWithName<
  * the value record's values, so codegen-emitted calls of the form
  * `DatabaseSchema.make({ notes, tags, users })` do not need an explicit
  * type argument.
+ *
+ * Invariant: each record **key must equal its value's `tableName`**. The
+ * record is stored verbatim and later read by key (`databaseSchema.tables[
+ * tableName]` in `DatabaseReader`/`DatabaseWriter`), so a key that diverges
+ * from the bound table's name would make those lookups silently miss. The
+ * type signature does not enforce this — codegen upholds it by deriving both
+ * the key and the table name from the same filename (and the shorthand
+ * `{ notes, tags, users }` form it emits makes them identical by
+ * construction). Hand-written calls must preserve it.
  */
 export const make = <
   const TablesRecord extends Record<string, Table.AnyWithProps>,

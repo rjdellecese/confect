@@ -104,14 +104,15 @@ export const discover = Effect.gen(function* () {
 
   const collisions = Object.entries(
     Array.groupBy(sorted, (tableModule) => tableModule.tableName),
-  ).filter(([, group]) => group.length > 1);
-
-  if (collisions.length > 0) {
-    const [tableName, group] = collisions[0]!;
-    return yield* new DuplicateTableNameError({
+  )
+    .filter(([, group]) => group.length > 1)
+    .map(([tableName, group]) => ({
       tableName,
       tablePaths: Array.map(group, (tableModule) => tableModule.relativePath),
-    });
+    }));
+
+  if (collisions.length > 0) {
+    return yield* new DuplicateTableNameError({ collisions });
   }
 
   return sorted;

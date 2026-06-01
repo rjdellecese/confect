@@ -74,6 +74,14 @@ interface TableModuleBinding {
  * user-supplied field-schema callback on first access, so unused tables in
  * a function bundle never pay schema-construction cost despite the
  * static import.
+ *
+ * The `DatabaseSchema` import is aliased to `$DatabaseSchema` because each
+ * table is imported under its own (filename-derived) name; a table named
+ * `DatabaseSchema` would otherwise collide with the library import and emit
+ * a duplicate-binding file. The leading `$` makes the alias collision-proof:
+ * `validateConfectTableIdentifier` requires names to match
+ * `/^[a-zA-Z][a-zA-Z0-9_]*$/`, which forbids `$`, so no valid table import
+ * can ever shadow it.
  */
 export const runtimeSchema = ({
   tableModules,
@@ -83,7 +91,9 @@ export const runtimeSchema = ({
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-    yield* cbw.writeLine(`import { DatabaseSchema } from "@confect/server";`);
+    yield* cbw.writeLine(
+      `import { DatabaseSchema as $DatabaseSchema } from "@confect/server";`,
+    );
 
     if (tableModules.length > 0) {
       yield* cbw.blankLine();
@@ -95,9 +105,9 @@ export const runtimeSchema = ({
     yield* cbw.blankLine();
 
     if (tableModules.length === 0) {
-      yield* cbw.writeLine(`export default DatabaseSchema.make({});`);
+      yield* cbw.writeLine(`export default $DatabaseSchema.make({});`);
     } else {
-      yield* cbw.writeLine(`export default DatabaseSchema.make({`);
+      yield* cbw.writeLine(`export default $DatabaseSchema.make({`);
       yield* cbw.indent(
         Effect.gen(function* () {
           for (const { tableName } of tableModules) {
@@ -118,6 +128,14 @@ export const runtimeSchema = ({
  * The file deliberately avoids any `@confect/server` import so that the
  * deploy artifact's import graph stays decoupled from the runtime
  * `DatabaseSchema` machinery.
+ *
+ * The `defineSchema` import is aliased to `$defineSchema` because each table
+ * is imported under its own (filename-derived) name; a table named
+ * `defineSchema` would otherwise collide with the library import and emit a
+ * duplicate-binding file. The leading `$` makes the alias collision-proof:
+ * `validateConfectTableIdentifier` requires names to match
+ * `/^[a-zA-Z][a-zA-Z0-9_]*$/`, which forbids `$`, so no valid table import
+ * can ever shadow it.
  */
 export const convexSchema = ({
   tableModules,
@@ -127,7 +145,9 @@ export const convexSchema = ({
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-    yield* cbw.writeLine(`import { defineSchema } from "convex/server";`);
+    yield* cbw.writeLine(
+      `import { defineSchema as $defineSchema } from "convex/server";`,
+    );
 
     if (tableModules.length > 0) {
       yield* cbw.blankLine();
@@ -139,9 +159,9 @@ export const convexSchema = ({
     yield* cbw.blankLine();
 
     if (tableModules.length === 0) {
-      yield* cbw.writeLine(`export default defineSchema({});`);
+      yield* cbw.writeLine(`export default $defineSchema({});`);
     } else {
-      yield* cbw.writeLine(`export default defineSchema({`);
+      yield* cbw.writeLine(`export default $defineSchema({`);
       yield* cbw.indent(
         Effect.gen(function* () {
           for (const { tableName } of tableModules) {

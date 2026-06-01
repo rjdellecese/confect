@@ -84,8 +84,10 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
   // Names are derived from the basename alone, but the directory is scanned
   // recursively — so two files in different subdirectories can resolve to the
   // same table name. That must fail loudly rather than racing on a shared
-  // generated wrapper path / emitting duplicate schema bindings.
-  it.effect("rejects two files that resolve to the same table name", () =>
+  // generated wrapper path / emitting duplicate schema bindings. Two distinct
+  // colliding names are seeded so we can assert that *all* collisions are
+  // captured in a single pass, not just the first.
+  it.effect("rejects every set of files that resolve to the same name", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
@@ -99,6 +101,14 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
       );
       yield* fs.writeFileString(
         path.join(tablesDir, "b", "notes.ts"),
+        "export default {};\n",
+      );
+      yield* fs.writeFileString(
+        path.join(tablesDir, "a", "users.ts"),
+        "export default {};\n",
+      );
+      yield* fs.writeFileString(
+        path.join(tablesDir, "b", "users.ts"),
         "export default {};\n",
       );
 
@@ -115,11 +125,22 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
 
       assert(Either.isLeft(result));
       assert(result.left._tag === "DuplicateTableNameError");
-      expect(result.left.tableName).toBe("notes");
-      expect([...result.left.tablePaths].sort()).toEqual([
-        path.join("tables", "a", "notes.ts"),
-        path.join("tables", "b", "notes.ts"),
-      ]);
+      const byName = Object.fromEntries(
+        result.left.collisions.map((c) => [
+          c.tableName,
+          [...c.tablePaths].sort(),
+        ]),
+      );
+      expect(byName).toEqual({
+        notes: [
+          path.join("tables", "a", "notes.ts"),
+          path.join("tables", "b", "notes.ts"),
+        ],
+        users: [
+          path.join("tables", "a", "users.ts"),
+          path.join("tables", "b", "users.ts"),
+        ],
+      });
     }).pipe(Effect.scoped),
   );
 

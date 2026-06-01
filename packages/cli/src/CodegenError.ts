@@ -96,8 +96,16 @@ export class InvalidTableFilenameError extends Schema.TaggedError<InvalidTableFi
 export class DuplicateTableNameError extends Schema.TaggedError<DuplicateTableNameError>()(
   "DuplicateTableNameError",
   {
-    tableName: Schema.String,
-    tablePaths: Schema.Array(Schema.String),
+    // Every table name that more than one file resolves to, each paired with
+    // the colliding file paths. All collisions are captured in a single pass
+    // so the user can fix them together rather than re-running codegen once
+    // per conflict.
+    collisions: Schema.Array(
+      Schema.Struct({
+        tableName: Schema.String,
+        tablePaths: Schema.Array(Schema.String),
+      }),
+    ),
   },
 ) {}
 
@@ -277,12 +285,19 @@ const renderInvalidTableFilenameError = (
 
 const renderDuplicateTableNameError = (
   error: DuplicateTableNameError,
-): AnsiDoc.AnsiDoc =>
-  singleLine(
+): AnsiDoc.AnsiDoc => {
+  const conflicts = error.collisions
+    .map(
+      ({ tableName, tablePaths }) =>
+        `\`${tableName}\` (${tablePaths.join(", ")})`,
+    )
+    .join("; ");
+  return singleLine(
     AnsiDoc.text(
-      `Multiple files under \`confect/tables/\` resolve to the table name \`${error.tableName}\`: ${error.tablePaths.join(", ")}. Table names are derived from filenames, so each must be unique across the directory (including subdirectories); rename or remove all but one.`,
+      `Multiple files under \`confect/tables/\` resolve to the same table name. Table names are derived from filenames, so each must be unique across the directory (including subdirectories); rename or remove all but one. Conflicts: ${conflicts}.`,
     ),
   );
+};
 
 const renderLegacySchemaFileError = (
   error: LegacySchemaFileError,
