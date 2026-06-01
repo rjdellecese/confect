@@ -13,13 +13,17 @@ const Returns = Schema.String;
 const SmallSpec = Spec.make().add(
   GroupSpec.makeAt("auth")
     .addFunction(
-      FunctionSpec.publicQuery({ name: "login", args: Args, returns: Returns }),
+      FunctionSpec.publicQuery({
+        name: "login",
+        args: () => Args,
+        returns: () => Returns,
+      }),
     )
     .addFunction(
       FunctionSpec.publicMutation({
         name: "logout",
-        args: Args,
-        returns: Returns,
+        args: () => Args,
+        returns: () => Returns,
       }),
     ),
 );
@@ -32,29 +36,29 @@ const MediumSpec = Spec.make()
       .addFunction(
         FunctionSpec.publicQuery({
           name: "list",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       )
       .addFunction(
         FunctionSpec.internalQuery({
           name: "getById",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       )
       .addFunction(
         FunctionSpec.publicMutation({
           name: "create",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       )
       .addFunction(
         FunctionSpec.internalMutation({
           name: "remove",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       ),
   )
@@ -63,22 +67,22 @@ const MediumSpec = Spec.make()
       .addFunction(
         FunctionSpec.publicQuery({
           name: "list",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       )
       .addFunction(
         FunctionSpec.publicQuery({
           name: "getById",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       )
       .addFunction(
         FunctionSpec.internalMutation({
           name: "archive",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       ),
   )
@@ -87,22 +91,22 @@ const MediumSpec = Spec.make()
       .addFunction(
         FunctionSpec.publicQuery({
           name: "list",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       )
       .addFunction(
         FunctionSpec.publicMutation({
           name: "create",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       )
       .addFunction(
         FunctionSpec.internalQuery({
           name: "flagged",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       ),
   )
@@ -111,15 +115,15 @@ const MediumSpec = Spec.make()
       .addFunction(
         FunctionSpec.internalQuery({
           name: "aggregate",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       )
       .addFunction(
         FunctionSpec.internalAction({
           name: "exportData",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       ),
   );
@@ -133,29 +137,29 @@ const LargeSpec = Spec.make()
       .addFunction(
         FunctionSpec.publicQuery({
           name: "list",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       )
       .addFunction(
         FunctionSpec.internalQuery({
           name: "getById",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       )
       .addFunction(
         FunctionSpec.publicMutation({
           name: "create",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       )
       .addFunction(
         FunctionSpec.internalMutation({
           name: "remove",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       ),
   )
@@ -164,22 +168,22 @@ const LargeSpec = Spec.make()
       .addFunction(
         FunctionSpec.publicQuery({
           name: "list",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       )
       .addFunction(
         FunctionSpec.publicQuery({
           name: "getById",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       )
       .addFunction(
         FunctionSpec.internalMutation({
           name: "archive",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       ),
   )
@@ -188,22 +192,22 @@ const LargeSpec = Spec.make()
       .addFunction(
         FunctionSpec.publicQuery({
           name: "list",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       )
       .addFunction(
         FunctionSpec.publicMutation({
           name: "create",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       )
       .addFunction(
         FunctionSpec.internalQuery({
           name: "flagged",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       ),
   )
@@ -212,15 +216,15 @@ const LargeSpec = Spec.make()
       .addFunction(
         FunctionSpec.internalQuery({
           name: "aggregate",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       )
       .addFunction(
         FunctionSpec.internalAction({
           name: "exportData",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       ),
   )
@@ -229,29 +233,29 @@ const LargeSpec = Spec.make()
       .addFunction(
         FunctionSpec.publicQuery({
           name: "list",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       )
       .addFunction(
         FunctionSpec.publicQuery({
           name: "getById",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       )
       .addFunction(
         FunctionSpec.publicMutation({
           name: "create",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       )
       .addFunction(
         FunctionSpec.internalMutation({
           name: "archive",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       ),
   )
@@ -260,29 +264,29 @@ const LargeSpec = Spec.make()
       .addFunction(
         FunctionSpec.publicQuery({
           name: "list",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       )
       .addFunction(
         FunctionSpec.publicQuery({
           name: "getById",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       )
       .addFunction(
         FunctionSpec.publicMutation({
           name: "create",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       )
       .addFunction(
         FunctionSpec.internalMutation({
           name: "cancel",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       ),
   )
@@ -291,42 +295,46 @@ const LargeSpec = Spec.make()
       .addFunction(
         FunctionSpec.publicQuery({
           name: "list",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       )
       .addFunction(
         FunctionSpec.publicMutation({
           name: "markRead",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       )
       .addFunction(
         FunctionSpec.internalQuery({
           name: "flagged",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       ),
   )
   .add(
     GroupSpec.makeAt("settings")
       .addFunction(
-        FunctionSpec.publicQuery({ name: "get", args: Args, returns: Returns }),
+        FunctionSpec.publicQuery({
+          name: "get",
+          args: () => Args,
+          returns: () => Returns,
+        }),
       )
       .addFunction(
         FunctionSpec.publicMutation({
           name: "update",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       )
       .addFunction(
         FunctionSpec.internalAction({
           name: "reset",
-          args: Args,
-          returns: Returns,
+          args: () => Args,
+          returns: () => Returns,
         }),
       ),
   );

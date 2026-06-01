@@ -4,7 +4,7 @@ import { Schema } from "effect";
 export default GroupSpec.make().addFunction(
   FunctionSpec.publicAction({
     name: "getNumber",
-    args: Schema.Struct({}),
-    returns: Schema.Number,
+    args: () => Schema.Struct({}),
+    returns: () => Schema.Number,
   }),
 );

@@ -86,8 +86,8 @@ describe("FunctionReference", () => {
   test("preserves args and returns", () => {
     const _spec = FunctionSpec.publicQuery({
       name: "get",
-      args: Schema.Struct({ id: Schema.String }),
-      returns: Schema.Array(Schema.Number),
+      args: () => Schema.Struct({ id: Schema.String }),
+      returns: () => Schema.Array(Schema.Number),
     });
     type Ref_ = Ref.FromFunctionSpec<typeof _spec>;
     expectTypeOf<Ref.Args<Ref_>>().toEqualTypeOf<{ readonly id: string }>();
@@ -100,8 +100,8 @@ describe("FunctionReference", () => {
   test("empty args", () => {
     const _spec = FunctionSpec.internalMutation({
       name: "reset",
-      args: Schema.Struct({}),
-      returns: Schema.Void,
+      args: () => Schema.Struct({}),
+      returns: () => Schema.Void,
     });
     type Ref_ = Ref.FromFunctionSpec<typeof _spec>;
     expectTypeOf<Ref.Args<Ref_>>().toEqualTypeOf<{}>();
@@ -131,8 +131,8 @@ describe("OptionalArgs", () => {
   test("optional tuple when args are empty", () => {
     const _spec = FunctionSpec.publicQuery({
       name: "list",
-      args: Schema.Struct({}),
-      returns: Schema.Void,
+      args: () => Schema.Struct({}),
+      returns: () => Schema.Void,
     });
     type Ref_ = Ref.FromFunctionSpec<typeof _spec>;
     expectTypeOf<Ref.OptionalArgs<Ref_>>().toEqualTypeOf<[args?: {}]>();
@@ -141,8 +141,8 @@ describe("OptionalArgs", () => {
   test("required tuple when args have keys", () => {
     const _spec = FunctionSpec.publicQuery({
       name: "get",
-      args: Schema.Struct({ id: Schema.String }),
-      returns: Schema.Void,
+      args: () => Schema.Struct({ id: Schema.String }),
+      returns: () => Schema.Void,
     });
     type Ref_ = Ref.FromFunctionSpec<typeof _spec>;
     expectTypeOf<Ref.OptionalArgs<Ref_>>().toEqualTypeOf<
@@ -155,8 +155,8 @@ describe("Error type extraction", () => {
   test("no error schema means Error is never", () => {
     const _spec = FunctionSpec.publicMutation({
       name: "create",
-      args: Schema.Struct({ name: Schema.String }),
-      returns: Schema.Void,
+      args: () => Schema.Struct({ name: Schema.String }),
+      returns: () => Schema.Void,
     });
     type Ref_ = Ref.FromFunctionSpec<typeof _spec>;
     expectTypeOf<Ref.Error<Ref_>>().toEqualTypeOf<never>();
@@ -169,9 +169,9 @@ describe("Error type extraction", () => {
 
     const _spec = FunctionSpec.publicMutation({
       name: "update",
-      args: Schema.Struct({ id: Schema.String }),
-      returns: Schema.Void,
-      error: NotFound,
+      args: () => Schema.Struct({ id: Schema.String }),
+      returns: () => Schema.Void,
+      error: () => NotFound,
     });
     type Ref_ = Ref.FromFunctionSpec<typeof _spec>;
     expectTypeOf<Ref.Error<Ref_>>().toEqualTypeOf<NotFound>();
@@ -187,9 +187,9 @@ describe("Error type extraction", () => {
 
     const _spec = FunctionSpec.publicMutation({
       name: "remove",
-      args: Schema.Struct({ id: Schema.String }),
-      returns: Schema.Void,
-      error: Schema.Union(NotFound, Forbidden),
+      args: () => Schema.Struct({ id: Schema.String }),
+      returns: () => Schema.Void,
+      error: () => Schema.Union(NotFound, Forbidden),
     });
     type Ref_ = Ref.FromFunctionSpec<typeof _spec>;
     expectTypeOf<Ref.Error<Ref_>>().toEqualTypeOf<NotFound | Forbidden>();
@@ -221,9 +221,9 @@ describe("maybeDecodeErrorSync", () => {
 
     const spec = FunctionSpec.publicMutation({
       name: "update",
-      args: Schema.Struct({}),
-      returns: Schema.Void,
-      error: NotFound,
+      args: () => Schema.Struct({}),
+      returns: () => Schema.Void,
+      error: () => NotFound,
     });
     const ref = Ref.make("test/mod", spec);
 
@@ -239,8 +239,8 @@ describe("maybeDecodeErrorSync", () => {
   test("returns original error when no error schema", () => {
     const spec = FunctionSpec.publicMutation({
       name: "create",
-      args: Schema.Struct({}),
-      returns: Schema.Void,
+      args: () => Schema.Struct({}),
+      returns: () => Schema.Void,
     });
     const ref = Ref.make("test/mod", spec);
 
@@ -256,9 +256,9 @@ describe("maybeDecodeErrorSync", () => {
 
     const spec = FunctionSpec.publicMutation({
       name: "update",
-      args: Schema.Struct({}),
-      returns: Schema.Void,
-      error: NotFound,
+      args: () => Schema.Struct({}),
+      returns: () => Schema.Void,
+      error: () => NotFound,
     });
     const ref = Ref.make("test/mod", spec);
 
@@ -275,9 +275,9 @@ describe("decodeError", () => {
 
     const spec = FunctionSpec.publicMutation({
       name: "update",
-      args: Schema.Struct({}),
-      returns: Schema.Void,
-      error: NotFound,
+      args: () => Schema.Struct({}),
+      returns: () => Schema.Void,
+      error: () => NotFound,
     });
     const ref = Ref.make("test/mod", spec);
 
@@ -293,8 +293,8 @@ describe("decodeError", () => {
   test("returns None when the ref has no error schema", async () => {
     const spec = FunctionSpec.publicMutation({
       name: "create",
-      args: Schema.Struct({}),
-      returns: Schema.Void,
+      args: () => Schema.Struct({}),
+      returns: () => Schema.Void,
     });
     const ref = Ref.make("test/mod", spec);
 
@@ -314,9 +314,9 @@ describe("decodeErrorOrElse", () => {
     "test/mod",
     FunctionSpec.publicMutation({
       name: "update",
-      args: Schema.Struct({}),
-      returns: Schema.Void,
-      error: NotFound,
+      args: () => Schema.Struct({}),
+      returns: () => Schema.Void,
+      error: () => NotFound,
     }),
   );
 
@@ -324,8 +324,8 @@ describe("decodeErrorOrElse", () => {
     "test/mod",
     FunctionSpec.publicMutation({
       name: "create",
-      args: Schema.Struct({}),
-      returns: Schema.Void,
+      args: () => Schema.Struct({}),
+      returns: () => Schema.Void,
     }),
   );
 
@@ -369,9 +369,9 @@ describe("hasErrorSchema", () => {
       "test/mod",
       FunctionSpec.publicMutation({
         name: "update",
-        args: Schema.Struct({}),
-        returns: Schema.Void,
-        error: NotFound,
+        args: () => Schema.Struct({}),
+        returns: () => Schema.Void,
+        error: () => NotFound,
       }),
     );
 
@@ -383,8 +383,8 @@ describe("hasErrorSchema", () => {
       "test/mod",
       FunctionSpec.publicMutation({
         name: "create",
-        args: Schema.Struct({}),
-        returns: Schema.Void,
+        args: () => Schema.Struct({}),
+        returns: () => Schema.Void,
       }),
     );
 

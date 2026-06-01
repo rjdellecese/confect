@@ -2,17 +2,7 @@ import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import type * as GroupSpec from "@confect/core/GroupSpec";
 import * as Registry from "@confect/core/Registry";
 import type * as Spec from "@confect/core/Spec";
-import {
-  Array,
-  Effect,
-  type Layer,
-  Option,
-  pipe,
-  Predicate,
-  Ref,
-  String,
-  type Types,
-} from "effect";
+import { Effect, type Layer, Ref, type Types } from "effect";
 import type * as Api from "./Api";
 import type * as GroupImpl from "./GroupImpl";
 import { mapLeaves } from "./internal/utils";
@@ -80,18 +70,26 @@ export type ForGroupPath<
  * Build the registered Convex functions for a single group from its finalized
  * `GroupImpl` layer.
  *
- * The `groupLayer` parameter requires `GroupImpl<string, "Finalized">`, so
- * impls that were never piped through `GroupImpl.finalize` (and impls with
- * unmet `FunctionImpl` requirements, which cannot be finalized) are rejected
- * at the codegen boundary, not just deep inside Convex at runtime.
+ * The `groupLayer` parameter requires `GroupImpl<"Finalized">`, so impls that
+ * were never piped through `GroupImpl.finalize` (and impls with unmet
+ * `FunctionImpl` requirements, which cannot be finalized) are rejected at the
+ * codegen boundary, not just deep inside Convex at runtime.
+ *
+ * The group layer is built with a fresh, isolated `Registry` (rather than the
+ * globally-cached default `Context.Reference`), so each `FunctionImpl.make`
+ * registers under its flat, single-segment function-name key without colliding
+ * with any other group built in the same process. `groupPath` is therefore no
+ * longer needed to navigate a shared registry tree — the built registry holds
+ * exactly this group's functions at the top level — and is retained only to
+ * shape the returned record's type.
  */
 export const buildForGroup = <
   Api_ extends Api.AnyWithProps,
   const GroupPath_ extends string,
 >(
   api: Api_,
-  groupPath: GroupPath_,
-  groupLayer: Layer.Layer<GroupImpl.GroupImpl<string, "Finalized">>,
+  _groupPath: GroupPath_,
+  groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,
   makeRegisteredFunction: (
     api: Api_,
     registryItem: RegistryItem.AnyWithProps,
@@ -100,33 +98,18 @@ export const buildForGroup = <
   const registryItems = Effect.gen(function* () {
     const registry = yield* Registry.Registry;
     return yield* Ref.get(registry);
-  }).pipe(Effect.provide(groupLayer), Effect.runSync);
+  }).pipe(
+    Effect.provide(groupLayer),
+    Effect.provideService(
+      Registry.Registry,
+      Ref.unsafeMake<Registry.RegistryItems>({}),
+    ),
+    Effect.runSync,
+  );
 
-  const registeredFunctions = mapLeaves<
-    RegistryItem.AnyWithProps,
-    RegisteredFunction.Any
-  >(
+  return mapLeaves<RegistryItem.AnyWithProps, RegisteredFunction.Any>(
     registryItems as { [key: string]: RegistryItem.AnyWithProps },
     RegistryItem.isRegistryItem,
     (registryItem) => makeRegisteredFunction(api, registryItem),
-  );
-
-  return pipe(
-    String.split(groupPath, "."),
-    Array.reduce(
-      Option.some<unknown>(registeredFunctions),
-      (currentNode, segment) =>
-        currentNode.pipe(
-          Option.filter(Predicate.isRecord),
-          Option.flatMap((nodeRecord) =>
-            segment in nodeRecord
-              ? Option.some(nodeRecord[segment])
-              : Option.none(),
-          ),
-        ),
-    ),
-    Option.getOrThrowWith(
-      () => new Error(`No functions registered for group path "${groupPath}"`),
-    ),
   ) as ForGroupPath<Api_["spec"], GroupPath_>;
 };

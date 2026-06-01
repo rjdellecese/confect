@@ -225,9 +225,9 @@ const make =
     error,
   }: {
     name: Name_;
-    args: Args_;
-    returns: Returns_;
-    error?: Error_;
+    args: () => Args_;
+    returns: () => Returns_;
+    error?: () => Error_;
   }): FunctionSpec<
     RuntimeAndFunctionType_,
     FunctionVisibility_,

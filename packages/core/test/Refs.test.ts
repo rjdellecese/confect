@@ -17,8 +17,8 @@ describe("make", () => {
       GroupSpec.makeAt("notes").addFunction(
         FunctionSpec.publicQuery({
           name: "list",
-          args: FnArgs,
-          returns: FnReturns,
+          args: () => FnArgs,
+          returns: () => FnReturns,
         }),
       ),
     );
@@ -29,8 +29,8 @@ describe("make", () => {
       "notes",
       FunctionSpec.publicQuery({
         name: "list",
-        args: FnArgs,
-        returns: FnReturns,
+        args: () => FnArgs,
+        returns: () => FnReturns,
       }),
     );
 
@@ -48,8 +48,8 @@ describe("make", () => {
         .addFunction(
           FunctionSpec.publicQuery({
             name: "list",
-            args: Schema.Struct({}),
-            returns: Schema.Array(Schema.String),
+            args: () => Schema.Struct({}),
+            returns: () => Schema.Array(Schema.String),
           }),
         ),
     );
@@ -67,15 +67,15 @@ describe("make", () => {
         .addFunction(
           FunctionSpec.publicQuery({
             name: "publicList",
-            args: FnArgs,
-            returns: FnReturns,
+            args: () => FnArgs,
+            returns: () => FnReturns,
           }),
         )
         .addFunction(
           FunctionSpec.internalQuery({
             name: "internalList",
-            args: FnArgs,
-            returns: FnReturns,
+            args: () => FnArgs,
+            returns: () => FnReturns,
           }),
         ),
     );
@@ -103,8 +103,8 @@ describe("make", () => {
         GroupSpec.makeAt("publicOnly").addFunction(
           FunctionSpec.publicQuery({
             name: "list",
-            args: FnArgs,
-            returns: FnReturns,
+            args: () => FnArgs,
+            returns: () => FnReturns,
           }),
         ),
       )
@@ -112,8 +112,8 @@ describe("make", () => {
         GroupSpec.makeAt("internalOnly").addFunction(
           FunctionSpec.internalQuery({
             name: "list",
-            args: FnArgs,
-            returns: FnReturns,
+            args: () => FnArgs,
+            returns: () => FnReturns,
           }),
         ),
       );
@@ -142,15 +142,15 @@ describe("make", () => {
         .addFunction(
           FunctionSpec.publicQuery({
             name: "publicList",
-            args: FnArgs,
-            returns: FnReturns,
+            args: () => FnArgs,
+            returns: () => FnReturns,
           }),
         )
         .addFunction(
           FunctionSpec.internalQuery({
             name: "internalList",
-            args: FnArgs,
-            returns: FnReturns,
+            args: () => FnArgs,
+            returns: () => FnReturns,
           }),
         ),
     );
@@ -265,8 +265,8 @@ describe("make", () => {
 
     const ConfectQuery = FunctionSpec.publicQuery({
       name: "list",
-      args: ConfectQueryArgs,
-      returns: ConfectQueryReturns,
+      args: () => ConfectQueryArgs,
+      returns: () => ConfectQueryReturns,
     });
 
     const spec = Spec.make().add(
