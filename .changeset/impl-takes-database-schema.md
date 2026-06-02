@@ -1,5 +1,6 @@
 ---
 "@confect/server": major
+"@confect/cli": major
 ---
 
 `FunctionImpl.make` and `GroupImpl.make` now take the runtime `DatabaseSchema` (the default export of `_generated/schema.ts`) as their first argument instead of the whole `Api`.
@@ -19,4 +20,6 @@ Author migration — in each `*.impl.ts`, import the database schema and pass it
 + export default GroupImpl.make(databaseSchema, notes).pipe(Layer.provide(insert), GroupImpl.finalize);
 ```
 
-Node impls migrate identically (from `nodeApi` to the same `_generated/schema`); only their specs differ (`GroupSpec.makeNode()`). `_generated/api.ts` / `_generated/nodeApi.ts` are still emitted (the combined `Api` value) but are no longer imported by generated or impl code.
+Node impls migrate identically (from `nodeApi` to the same `_generated/schema`); only their specs differ (`GroupSpec.makeNode()`).
+
+Because nothing imports them anymore, `confect codegen` **no longer emits `_generated/api.ts` / `_generated/nodeApi.ts`** and deletes any copies left over from earlier versions. If you referenced the generated `Api` value directly, construct it yourself with `Api.make(schema, spec)` from `@confect/server` and `@confect/core`.

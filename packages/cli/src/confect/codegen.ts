@@ -118,8 +118,7 @@ const runCodegen = Effect.gen(function* () {
   yield* generateConfectGeneratedDirectory;
   // Reject a legacy `confect/schema.ts` up front so the user-facing
   // migration message surfaces before any bundler error from impl
-  // validation (which transitively imports `_generated/api.ts`, which
-  // imports `_generated/schema.ts`).
+  // validation (each impl imports `_generated/schema.ts`).
   yield* rejectLegacySchemaFile;
   // List `confect/tables/*.ts` (filename-only — no bundling yet) so the
   // `_generated/id.ts` constructor can be emitted *before* we bundle any
@@ -140,16 +139,15 @@ const runCodegen = Effect.gen(function* () {
   yield* removeLegacyFiles;
   yield* validateNoParentChildNameCollisions(leaves, groupSpecsByRelativePath);
   yield* generateAssembledSpecs(leaves);
-  // `_generated/api.ts` (and `_generated/nodeApi.ts`) must be regenerated
-  // before `validateImplModules`, because each impl bundle transitively
-  // imports `_generated/api.ts`; the stale on-disk copy would still point
-  // at the now-deleted user-authored `confect/schema.ts` and fail to
-  // resolve.
+  // `_generated/api.ts` / `nodeApi.ts` are no longer imported by generated or
+  // impl code (impls take the database schema from `_generated/schema`
+  // directly), so remove any copies left over from earlier versions before
+  // impl validation runs.
   yield* Effect.all(
     [
-      generateApi,
+      removeGeneratedApi,
       generateRefs,
-      generateNodeApi,
+      removeGeneratedNodeApi,
       generateServices,
       generateConvexSchema(tableModules),
     ],
@@ -581,65 +579,30 @@ export const loadPreviousFunctionPaths = Effect.gen(function* () {
   });
 });
 
-const generateApi = Effect.gen(function* () {
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  const generatedSchemaPath = yield* GENERATED_SCHEMA_PATH;
-  const generatedSpecPath = yield* GENERATED_SPEC_PATH;
+/**
+ * Remove a now-obsolete `_generated/<name>.ts` if present (and log it), for
+ * projects upgrading from a version that still emitted it.
+ */
+const removeObsoleteGeneratedFile = (fileName: string) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const confectDirectory = yield* ConfectDirectory.get;
+    const filePath = path.join(confectDirectory, "_generated", fileName);
 
-  const apiPath = path.join(confectDirectory, "_generated", "api.ts");
-  const apiDir = path.dirname(apiPath);
-
-  const schemaImportPath = yield* toModuleImportPath(
-    path.relative(apiDir, path.join(confectDirectory, generatedSchemaPath)),
-  );
-
-  const specImportPath = yield* toModuleImportPath(
-    path.relative(apiDir, path.join(confectDirectory, generatedSpecPath)),
-  );
-
-  const apiContents = yield* templates.api({
-    schemaImportPath,
-    specImportPath,
-  });
-
-  yield* writeFileStringAndLog(apiPath, apiContents);
-});
-
-export const generateNodeApi = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-
-  const nodeSpecPath = yield* getGeneratedNodeSpecPath;
-  const nodeApiPath = path.join(confectDirectory, "_generated", "nodeApi.ts");
-
-  if (!(yield* fs.exists(nodeSpecPath))) {
-    if (yield* fs.exists(nodeApiPath)) {
-      yield* removePathIfExists(nodeApiPath);
-      yield* logFileRemoved(nodeApiPath);
+    if (yield* fs.exists(filePath)) {
+      yield* removePathIfExists(filePath);
+      yield* logFileRemoved(filePath);
     }
-    return;
-  }
-
-  const nodeApiDir = path.dirname(nodeApiPath);
-  const generatedSchemaPath = yield* GENERATED_SCHEMA_PATH;
-
-  const schemaImportPath = yield* toModuleImportPath(
-    path.relative(nodeApiDir, path.join(confectDirectory, generatedSchemaPath)),
-  );
-
-  const nodeSpecImportPath = yield* toModuleImportPath(
-    path.relative(nodeApiDir, nodeSpecPath),
-  );
-
-  const nodeApiContents = yield* templates.nodeApi({
-    schemaImportPath,
-    nodeSpecImportPath,
   });
 
-  yield* writeFileStringAndLog(nodeApiPath, nodeApiContents);
-});
+// `_generated/api.ts` is no longer imported by generated or impl code: impls
+// take the database schema (`_generated/schema`) directly, and per-group
+// registries reference the spec type-only. Remove any stale copy.
+const removeGeneratedApi = removeObsoleteGeneratedFile("api.ts");
+
+// `_generated/nodeApi.ts` is obsolete for the same reason.
+const removeGeneratedNodeApi = removeObsoleteGeneratedFile("nodeApi.ts");
 
 const generateFunctionModules = Effect.gen(function* () {
   const spec = yield* loadGeneratedSpec;
@@ -658,7 +621,8 @@ const generateFunctionModules = Effect.gen(function* () {
  * owns both `_generated/schema.ts` (runtime) and `_generated/convexSchema.ts`
  * (deploy), derived from a single scan of `confect/tables/*.ts`. Detect a
  * stray file and fail with a clear migration message — leaving it in place
- * would silently shadow the codegen output and confuse `_generated/api.ts`.
+ * would silently shadow the codegen-owned `_generated/schema.ts` /
+ * `_generated/convexSchema.ts`.
  */
 const rejectLegacySchemaFile = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;

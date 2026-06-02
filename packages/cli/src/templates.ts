@@ -64,8 +64,8 @@ interface TableModuleBinding {
 
 /**
  * Emit `confect/_generated/schema.ts` — the runtime `DatabaseSchema` used
- * by `_generated/api.ts` (and downstream by per-function bundles for codec
- * lookup). Every table wrapper at
+ * by impls and the per-group registries (and downstream by per-function
+ * bundles for codec lookup). Every table wrapper at
  * `confect/_generated/tables/<name>.ts` is imported statically and
  * registered as a value entry on the `DatabaseSchema.make({...})` call.
  * Per-table laziness lives inside each `Table`: its `Fields`, `Doc`, and
@@ -287,45 +287,6 @@ export const refs = ({
         onNone: () => `export default Refs.make(spec);`,
       }),
     );
-
-    return yield* cbw.toString();
-  });
-
-export const api = ({
-  schemaImportPath,
-  specImportPath,
-}: {
-  schemaImportPath: string;
-  specImportPath: string;
-}) =>
-  Effect.gen(function* () {
-    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
-
-    yield* cbw.writeLine(`import { Api } from "@confect/server";`);
-    yield* cbw.writeLine(`import schema from "${schemaImportPath}";`);
-    yield* cbw.writeLine(`import spec from "${specImportPath}";`);
-    yield* cbw.blankLine();
-    yield* cbw.writeLine(`export default Api.make(schema, spec);`);
-
-    return yield* cbw.toString();
-  });
-
-export const nodeApi = ({
-  schemaImportPath,
-  nodeSpecImportPath,
-}: {
-  schemaImportPath: string;
-  nodeSpecImportPath: string;
-}) =>
-  Effect.gen(function* () {
-    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
-
-    yield* cbw.writeLine(`import { Api } from "@confect/server";`);
-    yield* cbw.blankLine();
-    yield* cbw.writeLine(`import schema from "${schemaImportPath}";`);
-    yield* cbw.writeLine(`import nodeSpec from "${nodeSpecImportPath}";`);
-    yield* cbw.blankLine();
-    yield* cbw.writeLine(`export default Api.make(schema, nodeSpec);`);
 
     return yield* cbw.toString();
   });

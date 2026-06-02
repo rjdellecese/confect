@@ -7,10 +7,8 @@ description: "Understand the structure of a Confect project."
 <Tree>
   <Tree.Folder name="confect" defaultOpen>
     <Tree.Folder name="_generated" defaultOpen>
-      <Tree.File name="api.ts" />
       <Tree.File name="convexSchema.ts" />
       <Tree.File name="id.ts" />
-      <Tree.File name="nodeApi.ts" />
       <Tree.File name="nodeSpec.ts" />
       <Tree.File name="refs.ts" />
       <Tree.File name="schema.ts" />
@@ -51,18 +49,13 @@ description: "Understand the structure of a Confect project."
 </Tree>
 
 <Info>
-  `_generated/nodeApi.ts` and `_generated/nodeSpec.ts` are only
-  generated when you have node action specs (files under
-  `confect/node/`).
+  `_generated/nodeSpec.ts` is only generated when you have node action
+  specs (files under `confect/node/`).
 </Info>
 
 ## `confect/`
 
 ### `_generated/`
-
-#### `api.ts`
-
-Contains a single default `Api` export, which combines your database schema and spec. Impl files pass the database schema — the default export of `_generated/schema.ts` — as the first argument to `GroupImpl.make` and `FunctionImpl.make`; they no longer take the `Api` itself.
 
 #### `convexSchema.ts`
 
@@ -72,15 +65,6 @@ Contains the Convex deploy-time `SchemaDefinition` (a single `defineSchema({...}
 
 Contains a type-constrained `Id` constructor whose only argument is the union of your table names — for example, `Id("users")` returns the `Schema` for an `_id` value in the `users` table. Use this when defining cross-table references (e.g. a `userId: Id("users")` field) and inside spec `args`/`returns` schemas. The type-level constraint catches typos at compile time, replacing the loosely-typed `GenericId.GenericId("users")` form.
 
-#### `nodeApi.ts`
-
-<Info>
-  This file is only generated when you have node action specs (files
-  under `confect/node/`).
-</Info>
-
-Contains a single default `Api` export, which combines your database schema and Node spec. Like non-node impls, node impls pass the database schema (`_generated/schema.ts`'s default export) to `GroupImpl.make` and `FunctionImpl.make`.
-
 #### `nodeSpec.ts`
 
 <Info>
@@ -88,7 +72,7 @@ Contains a single default `Api` export, which combines your database schema and 
   under `confect/node/`).
 </Info>
 
-Contains your assembled Node spec, used to build `nodeApi.ts`.
+Contains your assembled Node spec. It is merged into `refs.ts` and referenced type-only by the node groups' `registeredFunctions/` modules.
 
 #### `registeredFunctions/`
 
@@ -100,7 +84,7 @@ Contains a single default `Refs` export, which is a map of your Convex functions
 
 #### `schema.ts`
 
-Contains the runtime `DatabaseSchema` — the codec-lookup view of your tables consumed by `_generated/api.ts` (and, transitively, by every function bundle). It is generated from `confect/tables/*.ts` and intentionally avoids any `convex/server` import so runtime bundles never pull in `defineSchema(...)`. Each table's field-schema is constructed lazily on the first access to its `Fields`, `Doc`, or `tableDefinition` and then cached, so a function bundle only pays the schema-construction cost for the tables it actually touches via `db.table(name)`. Use this when a test or a non-codegen-generated module needs to refer to your `DatabaseSchema` type or value.
+Contains the runtime `DatabaseSchema` — the codec-lookup view of your tables. Impls import it and pass it to `FunctionImpl.make` / `GroupImpl.make`, and the per-group `registeredFunctions/` modules forward it to the function builders, so it is in every function's bundle. It is generated from `confect/tables/*.ts` and intentionally avoids any `convex/server` import so runtime bundles never pull in `defineSchema(...)`. Each table's field-schema is constructed lazily on the first access to its `Fields`, `Doc`, or `tableDefinition` and then cached, so a function bundle only pays the schema-construction cost for the tables it actually touches via `db.table(name)`. Use this when a test or a non-codegen-generated module needs to refer to your `DatabaseSchema` type or value.
 
 #### `tables/`
 
@@ -112,7 +96,7 @@ Contains Effect service wrappers for Convex platform capabilities, scoped to you
 
 #### `spec.ts`
 
-Contains your assembled Confect spec, used to build `api.ts` and `refs.ts`.
+Contains your assembled Confect spec. It is used to build `refs.ts` and is referenced type-only by the `registeredFunctions/` modules.
 
 ### `auth.ts`
 
