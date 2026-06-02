@@ -35,8 +35,47 @@ Also flag the inverse: a PR that deletes or weakens the guard tests in
 `packages/core/test/FunctionSpec.test.ts` (`describe("laziness invariant")`)
 without an equivalent replacement.
 
-### Verification bar
+## Always check: per-function bundle isolation must be preserved
 
-Before posting a laziness finding, cite the specific `file:line` where a thunk
-is evaluated eagerly or `.error` is read as a presence test. Do not infer a
-violation from naming alone.
+The v9 codegen split impl and schema across the filesystem so that a single
+Convex function's cold-start bundle scales with its own group, not the whole
+project. This is invisible to types, lint, and most tests — a stray import in a
+codegen template silently regresses every function's bundle. Flag as 🔴
+Important any change (chiefly in `packages/cli/src/templates.ts`, the generated
+`_generated/` layout, or `packages/server/src/`) that breaks either rule:
+
+1. **One group per bundle.** A generated `convex/{path}.ts` must import only its
+   own `_generated/registeredFunctions/{path}` module, and each
+   `_generated/registeredFunctions/{path}.ts` must import only its own sibling
+   `{path}.impl`. Flag any reintroduction of an aggregate registry (e.g.
+   `_generated/registeredFunctions.ts`) or any cross-group import that pulls one
+   group's `.impl` into another group's bundle.
+
+2. **Deploy schema stays out of the runtime bundle.** `_generated/schema.ts`
+   (the runtime `DatabaseSchema`) must import `@confect/server` and never
+   `convex/server`; `_generated/convexSchema.ts` (the deploy `SchemaDefinition`)
+   must import `convex/server`'s `defineSchema` and never `@confect/server`.
+   Flag any runtime code path or template that makes a function bundle reach
+   `convex/server`'s `defineSchema`, or that merges the two schema artifacts
+   back into a single module.
+
+Guard: `packages/server/test/importIsolation.test.ts`. Flag PRs that delete or
+weaken it without an equivalent replacement.
+
+## Always check: spec / group / table builders stay pure
+
+`Spec`, `GroupSpec`, and `Table` builder methods (`add` / `addAt` /
+`addGroupAt` / `addFunction` / `withName` / `make`, etc.) must be immutable:
+return a fresh value, never mutate their argument or `this`, and perform no side
+effects at module load. A v9 regression hinged on `GroupSpec.withName` secretly
+mutating its input in place — load-bearing for one code path and broken for
+another. Flag as 🔴 Important any builder that mutates an input or `this` in
+place, relies on such mutation for object identity, or runs side effects when a
+`*.spec.ts` / `confect/tables/*.ts` module is merely imported.
+
+## Verification bar
+
+Before posting any "always check" finding above, cite the specific `file:line`
+where the violation occurs — the eager thunk evaluation, the cross-group or
+`convex/server` import, the in-place mutation. Do not infer a violation from
+naming alone.
