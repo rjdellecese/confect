@@ -1,5 +1,5 @@
 import { RegisteredConvexFunction, RegisteredFunctions } from "@confect/server";
-import api from "../../api";
+import databaseSchema from "../../schema";
 import runners from "../../../groups/runners.impl";
 
-export default RegisteredFunctions.buildForGroup(api, "groups.runners", runners, RegisteredConvexFunction.make);
+export default RegisteredFunctions.buildForGroup<typeof import("../../../groups/runners.spec")["default"]>(databaseSchema, runners, RegisteredConvexFunction.make);

@@ -29,9 +29,9 @@ export class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
 export default GroupSpec.make().addFunction(
   FunctionSpec.publicQuery({
     name: "getOrFail",
-    args: Schema.Struct({ noteId: Id("notes") }),
-    returns: notes.Doc,
-    error: NoteNotFound,
+    args: () => Schema.Struct({ noteId: Id("notes") }),
+    returns: () => notes.Doc,
+    error: () => NoteNotFound,
   }),
 );
 ```
@@ -55,9 +55,9 @@ export class Forbidden extends Schema.TaggedError<Forbidden>()(
 
 FunctionSpec.publicMutation({
   name: "deleteOrFail",
-  args: Schema.Struct({ noteId: Id("notes") }),
-  returns: Schema.Null,
-  error: Schema.Union(NoteNotFound, Forbidden),
+  args: () => Schema.Struct({ noteId: Id("notes") }),
+  returns: () => Schema.Null,
+  error: () => Schema.Union(NoteNotFound, Forbidden),
 });
 ```
 

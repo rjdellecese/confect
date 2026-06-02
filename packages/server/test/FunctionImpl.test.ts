@@ -2,13 +2,13 @@ import { FunctionSpec, GroupSpec, Registry, Spec } from "@confect/core";
 import { DatabaseSchema, FunctionImpl, GroupImpl } from "@confect/server";
 import * as Api from "@confect/server/Api";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Layer, Ref, Schema } from "effect";
+import { Context, Effect, Layer, Ref, Schema } from "effect";
 
-const fnSpec = (name: string) =>
+const fnSpec = <const Name extends string>(name: Name) =>
   FunctionSpec.publicQuery({
     name,
-    args: Schema.Struct({}),
-    returns: Schema.Null,
+    args: () => Schema.Struct({}),
+    returns: () => Schema.Null,
   });
 
 const buildApi = (spec: Spec.AnyWithProps): Api.AnyWithProps =>
@@ -18,13 +18,13 @@ const buildApi = (spec: Spec.AnyWithProps): Api.AnyWithProps =>
 // specific than the erased `Api.AnyWithProps` casts in this file can satisfy;
 // the runtime behavior being tested here is independent of the handler shape,
 // so we cast the placeholder to `never` (a subtype of every expected handler
-// type) to keep the test focused on path resolution.
+// type) to keep the test focused on registration.
 const handler = (() => Effect.succeed(null)) as never;
 
 /**
- * Build every provided layer with a single shared `Registry` so the writes
- * performed by each `FunctionImpl.make` initializer are observable. Returns
- * the final `RegistryItems` tree.
+ * Build a layer against a fresh, isolated `Registry` (mirroring how
+ * `RegisteredFunctions.buildForGroup` and the CLI's `validateImpl` build a
+ * group's impl layer) and return the resulting `RegistryItems` tree.
  */
 const collectRegistry = <RIn>(
   layer: Layer.Layer<RIn, never, never>,
@@ -40,82 +40,84 @@ const collectRegistry = <RIn>(
 
 describe("FunctionImpl.make", () => {
   it.effect(
-    "resolves a parent leaf's path even when codegen wrapped it in addGroupAt",
+    "registers each function under a flat, single-segment name key",
     () =>
       Effect.gen(function* () {
-        // Mirrors the bug from ISSUE.md: codegen wraps the imported `parent`
-        // leaf in `parent.addGroupAt("child", parentChild)`, producing a
-        // fresh JS object in the assembled tree. Before this change, the
-        // impl's `FunctionImpl.make(api, parent, ...)` failed because the
-        // assembled tree no longer contained `parent` by `===`.
-        const parent = GroupSpec.make().addFunction(fnSpec("parentFn"));
-        const parentChild = GroupSpec.make().addFunction(fnSpec("childFn"));
-
-        const spec = Spec.make()
-          .addPath(parent, "parent")
-          .addPath(parentChild, "parent.child")
-          .addAt("parent", parent.addGroupAt("child", parentChild));
-        const api = buildApi(spec);
+        const notes = GroupSpec.make()
+          .addFunction(fnSpec("insert"))
+          .addFunction(fnSpec("list"));
+        const api = buildApi(Spec.make().addAt("notes", notes));
 
         const layers = Layer.mergeAll(
-          FunctionImpl.make(api, parent, "parentFn", handler),
-          FunctionImpl.make(api, parentChild, "childFn", handler),
+          FunctionImpl.make(api, notes, "insert", handler),
+          FunctionImpl.make(api, notes, "list", handler),
         );
 
         const registry = yield* collectRegistry(layers);
 
-        const parentNode = (registry as Record<string, unknown>).parent as
-          | Record<string, unknown>
-          | undefined;
-        expect(parentNode).toBeDefined();
-        expect(parentNode?.parentFn).toBeDefined();
-
-        const childNode = parentNode?.child as
-          | Record<string, unknown>
-          | undefined;
-        expect(childNode).toBeDefined();
-        expect(childNode?.childFn).toBeDefined();
+        // No project-wide dot-path nesting: functions live at the top level
+        // of their group's isolated registry, keyed by their own name.
+        expect(Object.keys(registry).sort()).toEqual(["insert", "list"]);
+        expect((registry as Record<string, unknown>).insert).toBeDefined();
+        expect((registry as Record<string, unknown>).list).toBeDefined();
       }),
   );
 
-  it("throws a helpful error when the spec has no registered path", () => {
-    const orphan = GroupSpec.makeAt("orphan").addFunction(fnSpec("orphanFn"));
-    // Add the group to the tree but deliberately omit `.addPath` so the
-    // runtime resolver cannot find a registered path. This mirrors the
-    // failure mode a codegen-generated `_generated/spec.ts` would produce
-    // if its `.addPath(...)` line was missing.
-    const spec = Spec.make().add(orphan);
-    const api = buildApi(spec);
+  it.effect(
+    "needs no registered group path — a leaf wrapped in addGroupAt still registers",
+    () =>
+      Effect.gen(function* () {
+        // Codegen wraps a parent leaf as `parent.addGroupAt("child", child)`,
+        // producing a fresh tree object. Registration no longer consults the
+        // assembled tree at all, so the impl's own `parent`/`child` references
+        // register without any path lookup.
+        const parent = GroupSpec.make().addFunction(fnSpec("parentFn"));
+        const child = GroupSpec.make().addFunction(fnSpec("childFn"));
+        const api = buildApi(
+          Spec.make().addAt("parent", parent.addGroupAt("child", child)),
+        );
 
-    expect(() =>
-      FunctionImpl.make(api, orphan, "orphanFn", handler),
-    ).toThrowError(/Spec\.addPath/);
-  });
+        const parentRegistry = yield* collectRegistry(
+          FunctionImpl.make(api, parent, "parentFn", handler),
+        );
+        const childRegistry = yield* collectRegistry(
+          FunctionImpl.make(api, child, "childFn", handler),
+        );
+
+        expect(Object.keys(parentRegistry)).toEqual(["parentFn"]);
+        expect(Object.keys(childRegistry)).toEqual(["childFn"]);
+      }),
+  );
 });
 
-describe("GroupImpl.make", () => {
-  it("resolves a parent leaf's path even when codegen wrapped it in addGroupAt", () => {
-    // Same shape as the FunctionImpl regression: GroupImpl.make also reads
-    // the path from api.spec.paths, so it must succeed for parent leaves
-    // that were re-wrapped during tree assembly.
-    const parent = GroupSpec.make().addFunction(fnSpec("parentFn"));
-    const parentChild = GroupSpec.make().addFunction(fnSpec("childFn"));
+describe("GroupImpl.finalize", () => {
+  it.effect(
+    "snapshots the names of every function registered into the group",
+    () =>
+      Effect.gen(function* () {
+        const notes = GroupSpec.make()
+          .addFunction(fnSpec("insert"))
+          .addFunction(fnSpec("list"));
+        const api = buildApi(Spec.make().addAt("notes", notes));
 
-    const spec = Spec.make()
-      .addPath(parent, "parent")
-      .addPath(parentChild, "parent.child")
-      .addAt("parent", parent.addGroupAt("child", parentChild));
-    const api = buildApi(spec);
+        const groupLayer = GroupImpl.make(api, notes).pipe(
+          Layer.provide(FunctionImpl.make(api, notes, "insert", handler)),
+          Layer.provide(FunctionImpl.make(api, notes, "list", handler)),
+          GroupImpl.finalize,
+        );
 
-    expect(() => GroupImpl.make(api, parent)).not.toThrow();
-    expect(() => GroupImpl.make(api, parentChild)).not.toThrow();
-  });
+        const registeredFunctionNames = yield* Effect.gen(function* () {
+          const ref = yield* Ref.make<Registry.RegistryItems>({});
+          const context = yield* Layer.build(groupLayer).pipe(
+            Effect.provideService(Registry.Registry, ref),
+          );
+          return Context.get(
+            context,
+            GroupImpl.GroupImpl({ finalizationStatus: "Finalized" }),
+          ).registeredFunctionNames;
+        }).pipe(Effect.scoped);
 
-  it("throws a helpful error when the spec has no registered path", () => {
-    const orphan = GroupSpec.make();
-    const spec = Spec.make().addAt("parent", orphan);
-    const api = buildApi(spec);
-
-    expect(() => GroupImpl.make(api, orphan)).toThrowError(/Spec\.addPath/);
-  });
+        expect([...registeredFunctionNames].sort()).toEqual(["insert", "list"]);
+      }),
+  );
 });

@@ -9,8 +9,8 @@ export class NodeNotFound extends Schema.TaggedError<NodeNotFound>()(
 export default GroupSpec.makeNode().addFunction(
   FunctionSpec.publicNodeAction({
     name: "failingNodeAction",
-    args: Schema.Struct({ id: Schema.String }),
-    returns: Schema.Null,
-    error: NodeNotFound,
+    args: () => Schema.Struct({ id: Schema.String }),
+    returns: () => Schema.Null,
+    error: () => NodeNotFound,
   }),
 );

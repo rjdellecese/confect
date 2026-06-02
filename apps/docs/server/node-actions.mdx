@@ -17,12 +17,13 @@ import { Schema } from "effect";
 export default GroupSpec.makeNode().addFunction(
   FunctionSpec.publicNodeAction({
     name: "send",
-    args: Schema.Struct({
-      to: Schema.String,
-      subject: Schema.String,
-      body: Schema.String,
-    }),
-    returns: Schema.Null,
+    args: () =>
+      Schema.Struct({
+        to: Schema.String,
+        subject: Schema.String,
+        body: Schema.String,
+      }),
+    returns: () => Schema.Null,
   }),
 );
 ```

@@ -1,5 +1,5 @@
 import { RegisteredConvexFunction, RegisteredFunctions } from "@confect/server";
-import api from "../../api";
+import databaseSchema from "../../schema";
 import random from "../../../notes_and_random/random.impl";
 
-export default RegisteredFunctions.buildForGroup(api, "notes_and_random.random", random, RegisteredConvexFunction.make);
+export default RegisteredFunctions.buildForGroup<typeof import("../../../notes_and_random/random.spec")["default"]>(databaseSchema, random, RegisteredConvexFunction.make);

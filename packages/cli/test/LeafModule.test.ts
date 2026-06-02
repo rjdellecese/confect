@@ -400,7 +400,9 @@ export default GroupImpl.make(api, notes).pipe(
 
         assert(Either.isLeft(result));
         assert(result.left._tag === "ImplMissingFunctionsError");
-        expect(result.left.groupPath).toBe("groups.notes");
+        // The reported group path is the impl/spec leaf's own filesystem
+        // location, which points at the file that is missing functions.
+        expect(result.left.groupPath).toBe("groups._incomplete");
         expect([...result.left.missingFunctionNames].sort()).toEqual(
           ["delete_", "getFirst", "internalGetFirst", "list"].sort(),
         );

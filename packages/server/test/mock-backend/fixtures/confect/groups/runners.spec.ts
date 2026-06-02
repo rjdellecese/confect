@@ -6,21 +6,21 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicAction({
       name: "insertNoteViaRunner",
-      args: Schema.Struct({ text: Schema.String }),
-      returns: Id("notes"),
+      args: () => Schema.Struct({ text: Schema.String }),
+      returns: () => Id("notes"),
     }),
   )
   .addFunction(
     FunctionSpec.publicAction({
       name: "getNumberViaRunner",
-      args: Schema.Struct({}),
-      returns: Schema.Number,
+      args: () => Schema.Struct({}),
+      returns: () => Schema.Number,
     }),
   )
   .addFunction(
     FunctionSpec.publicAction({
       name: "countNotesViaRunner",
-      args: Schema.Struct({}),
-      returns: Schema.Number,
+      args: () => Schema.Struct({}),
+      returns: () => Schema.Number,
     }),
   );
