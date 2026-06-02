@@ -43,6 +43,20 @@ There is no root-level `pnpm test` command; always run tests per-package (e.g. `
 
 All @confect packages are in a fixed version group via Changesets, meaning they are always versioned and released together. Use `pnpm changeset` to create a changeset before merging a PR with user-facing changes.
 
+## Invariants (review these in every PR)
+
+These are correctness/performance contracts that are easy to break silently. When reviewing or writing changes that touch the listed areas, verify the invariant still holds and flag any violation.
+
+### Schema laziness (`@confect/core`: `FunctionProvenance`, `FunctionSpec`, `Ref`; `@confect/server`: `Table`)
+
+`FunctionSpec.*` takes `args`/`returns`/`error` as `() => Schema` thunks, and `Table.make` takes `() => Fields`. These are exposed as lazy, memoised getters so that importing the codegen-assembled `_generated/spec.ts` (which transitively references every function in the project) builds **no** schemas at module load — the cold-start cost of one function must not scale with project size. Rules:
+
+- Constructing a `FunctionSpec` (or `Table`) must never evaluate a schema thunk.
+- Code that only needs to know **whether** an optional `error` schema exists must use a key-presence check (`"error" in functionProvenance`), **not** read `.error` (which force-builds the schema). See `Ref.hasErrorSchema` / `Ref.decodeError`.
+- Do not "fix" a failing laziness test by eagerly reading a schema; preserve the deferral instead.
+
+Enforced by `packages/core/test/FunctionSpec.test.ts` (`describe("laziness invariant")`) and the `Table` lazy-construction tests. A PR that reads these schemas eagerly should fail CI; if it doesn't, the guard test is incomplete and should be extended.
+
 ## Cursor Cloud specific instructions
 
 ### Running the example app

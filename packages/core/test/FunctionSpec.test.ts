@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Schema } from "effect";
 import * as FunctionSpec from "../src/FunctionSpec";
+import * as Ref from "../src/Ref";
 
 describe("isFunctionSpec", () => {
   it("checks whether a value is a function spec", () => {
@@ -49,5 +50,105 @@ describe("make", () => {
     ).toThrowErrorMatchingInlineSnapshot(
       `[Error: Expected a valid Confect function identifier, but received: "schema". "schema" is a reserved Convex file name.]`,
     );
+  });
+});
+
+// LAZINESS INVARIANT — DO NOT REGRESS.
+//
+// `args`/`returns`/`error` are passed as `() => Schema` thunks and exposed as
+// lazy memoised getters so that importing the assembled `_generated/spec.ts`
+// (which transitively references every function in the project) does not build
+// any schemas at module load. The cold-start win depends on two rules:
+//
+//   1. Constructing a `FunctionSpec` must NOT evaluate any schema thunk.
+//   2. Code that only needs to know WHETHER an `error` schema exists must use a
+//      key-presence check (`"error" in functionProvenance`) rather than reading
+//      `.error`, which would force-build the schema. See `Ref.hasErrorSchema`.
+//
+// If you are changing `FunctionProvenance`, `FunctionSpec`, or `Ref` and these
+// tests fail, do not "fix" them by eagerly reading the schemas — preserve the
+// laziness instead.
+describe("laziness invariant", () => {
+  const makeSpec = (track: {
+    args?: () => void;
+    returns?: () => void;
+    error?: () => void;
+  }) =>
+    FunctionSpec.publicQuery({
+      name: "tracked",
+      args: () => {
+        track.args?.();
+        return Schema.Struct({});
+      },
+      returns: () => {
+        track.returns?.();
+        return Schema.Null;
+      },
+      error: () => {
+        track.error?.();
+        return Schema.String;
+      },
+    });
+
+  it("constructing a FunctionSpec does not evaluate any schema thunk", () => {
+    let argsBuilt = false;
+    let returnsBuilt = false;
+    let errorBuilt = false;
+
+    makeSpec({
+      args: () => {
+        argsBuilt = true;
+      },
+      returns: () => {
+        returnsBuilt = true;
+      },
+      error: () => {
+        errorBuilt = true;
+      },
+    });
+
+    expect(argsBuilt).toBe(false);
+    expect(returnsBuilt).toBe(false);
+    expect(errorBuilt).toBe(false);
+  });
+
+  it("Ref.hasErrorSchema checks presence without forcing the error thunk", () => {
+    let errorBuilt = false;
+    const spec = makeSpec({
+      error: () => {
+        errorBuilt = true;
+      },
+    });
+    const ref = Ref.make("ns", spec);
+
+    expect(Ref.hasErrorSchema(ref)).toBe(true);
+    expect(errorBuilt).toBe(false);
+  });
+
+  it("a spec without an error schema reports no error without defining the key", () => {
+    const spec = FunctionSpec.publicQuery({
+      name: "noError",
+      args: () => Schema.Struct({}),
+      returns: () => Schema.Null,
+    });
+    const ref = Ref.make("ns", spec);
+
+    expect(Ref.hasErrorSchema(ref)).toBe(false);
+    expect("error" in spec.functionProvenance).toBe(false);
+  });
+
+  it("accessing a schema getter forces the thunk exactly once and memoises", () => {
+    let argsCalls = 0;
+    const spec = makeSpec({
+      args: () => {
+        argsCalls += 1;
+      },
+    });
+
+    const first = spec.functionProvenance.args;
+    const second = spec.functionProvenance.args;
+
+    expect(argsCalls).toBe(1);
+    expect(second).toBe(first);
   });
 });
