@@ -74,11 +74,11 @@ The handler receives the decoded arguments as its first parameter and returns an
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Effect, Layer } from "effect";
 
-import api from "./_generated/api";
+import databaseSchema from "./_generated/schema";
 import { DatabaseReader } from "./_generated/services";
 import notes from "./notes.spec";
 
-const list = FunctionImpl.make(api, notes, "list", () =>
+const list = FunctionImpl.make(databaseSchema, notes, "list", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
 
@@ -89,7 +89,7 @@ const list = FunctionImpl.make(api, notes, "list", () =>
   }).pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(api, notes).pipe(
+export default GroupImpl.make(databaseSchema, notes).pipe(
   Layer.provide(list),
   GroupImpl.finalize,
 );

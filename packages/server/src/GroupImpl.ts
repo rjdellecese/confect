@@ -11,7 +11,7 @@ import {
   Record,
   Ref,
 } from "effect";
-import type * as Api from "./Api";
+import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as FunctionImpl from "./FunctionImpl";
 
 export const TypeId = "@confect/server/GroupImpl";
@@ -69,16 +69,17 @@ export const GroupImpl = <FinalizationStatus_ extends FinalizationStatus>({
   );
 
 /**
- * Begin a group's impl layer. `api` and `group` are retained only as
- * type-level carriers (driving the required `FunctionImpl` services via
- * `FromGroupSpec<Group>`); neither is read at runtime, and no group-path
- * lookup against `api.spec` is performed.
+ * Begin a group's impl layer. `databaseSchema` and `group` are retained only as
+ * type-level carriers (`group` drives the required `FunctionImpl` services via
+ * `FromGroupSpec<Group>`; `databaseSchema` keeps the impl's dependency on
+ * `_generated/schema` symmetric with `FunctionImpl.make`). Neither is read at
+ * runtime.
  */
 export const make = <
-  Api_ extends Api.AnyWithProps,
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Group extends GroupSpec.AnyWithProps,
 >(
-  _api: Api_,
+  _databaseSchema: DatabaseSchema_,
   _group: Group,
 ): Layer.Layer<
   GroupImpl<"Unfinalized">,

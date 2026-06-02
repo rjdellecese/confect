@@ -30,17 +30,17 @@ export default GroupSpec.makeNode().addFunction(
 
 ## Node Impl
 
-A node impl default-imports its sibling spec and uses `nodeApi` from `_generated/nodeApi` (instead of `api`) when calling `FunctionImpl.make` and `GroupImpl.make`. Each handler runs in the Node.js runtime, so it has access to [`NodeContext` services](https://effect-ts.github.io/effect/platform-node/NodeContext.ts.html#nodecontext-type-alias) from the `@effect/platform` package.
+A node impl default-imports its sibling spec and passes the database schema from `_generated/schema` to `FunctionImpl.make` and `GroupImpl.make` — exactly like a non-node impl; only the spec differs (`GroupSpec.makeNode()`). Each handler runs in the Node.js runtime, so it has access to [`NodeContext` services](https://effect-ts.github.io/effect/platform-node/NodeContext.ts.html#nodecontext-type-alias) from the `@effect/platform` package.
 
 ```ts confect/node/email.impl.ts
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Command } from "@effect/platform";
 import { Console, Duration, Effect, Layer } from "effect";
-import nodeApi from "../_generated/nodeApi";
+import databaseSchema from "../_generated/schema";
 import email from "./email.spec";
 
 const send = FunctionImpl.make(
-  nodeApi,
+  databaseSchema,
   email,
   "send",
   Effect.fn(function* ({ to, subject, body }) {
@@ -57,7 +57,7 @@ const send = FunctionImpl.make(
   }),
 );
 
-export default GroupImpl.make(nodeApi, email).pipe(
+export default GroupImpl.make(databaseSchema, email).pipe(
   Layer.provide(send),
   GroupImpl.finalize,
 );

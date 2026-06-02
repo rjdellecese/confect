@@ -14,11 +14,14 @@ Use `Config` from Effect to read [Convex environment variables](https://docs.con
 import { FunctionImpl } from "@confect/server";
 import { Config, Effect } from "effect";
 
-import api from "./_generated/api";
+import databaseSchema from "./_generated/schema";
 import settings from "./settings.spec";
 
-const getApiKey = FunctionImpl.make(api, settings, "getApiKey", () =>
-  Config.string("API_KEY").pipe(Effect.orDie),
+const getApiKey = FunctionImpl.make(
+  databaseSchema,
+  settings,
+  "getApiKey",
+  () => Config.string("API_KEY").pipe(Effect.orDie),
 );
 ```
 
@@ -48,10 +51,14 @@ const provider = ConvexConfigProvider.make({
 To use a custom provider in a function handler, pass it to `Effect.withConfigProvider`.
 
 ```ts
-const getApiKey = FunctionImpl.make(api, settings, "getApiKey", () =>
-  Config.string("API_KEY").pipe(
-    Effect.withConfigProvider(provider),
-    Effect.orDie,
-  ),
+const getApiKey = FunctionImpl.make(
+  databaseSchema,
+  settings,
+  "getApiKey",
+  () =>
+    Config.string("API_KEY").pipe(
+      Effect.withConfigProvider(provider),
+      Effect.orDie,
+    ),
 );
 ```

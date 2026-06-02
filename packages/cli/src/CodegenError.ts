@@ -233,7 +233,7 @@ const renderImplMissingDefaultLayerError = (
     AnsiDoc.text("Impl "),
     formatPathDoc(error.implPath),
     AnsiDoc.text(
-      " must default-export a GroupImpl layer; wrap your handlers with `GroupImpl.make(api, groupSpec).pipe(Layer.provide(...))` and `export default` it.",
+      " must default-export a GroupImpl layer; wrap your handlers with `GroupImpl.make(databaseSchema, groupSpec).pipe(Layer.provide(...))` and `export default` it.",
     ),
   );
 
@@ -244,7 +244,7 @@ const renderImplNotFinalizedError = (
     AnsiDoc.text("Impl "),
     formatPathDoc(error.implPath),
     AnsiDoc.text(
-      " is not finalized; append `GroupImpl.finalize` to the end of the pipeline (e.g. `GroupImpl.make(api, group).pipe(Layer.provide(...), GroupImpl.finalize)`).",
+      " is not finalized; append `GroupImpl.finalize` to the end of the pipeline (e.g. `GroupImpl.make(databaseSchema, group).pipe(Layer.provide(...), GroupImpl.finalize)`).",
     ),
   );
 

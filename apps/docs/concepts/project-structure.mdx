@@ -62,7 +62,7 @@ description: "Understand the structure of a Confect project."
 
 #### `api.ts`
 
-Contains a single default `Api` export, which combines your database schema and spec. Pass this as the first argument to the `GroupImpl.make` and `FunctionImpl.make` constructor functions when building your spec's implementation.
+Contains a single default `Api` export, which combines your database schema and spec. Impl files pass the database schema — the default export of `_generated/schema.ts` — as the first argument to `GroupImpl.make` and `FunctionImpl.make`; they no longer take the `Api` itself.
 
 #### `convexSchema.ts`
 
@@ -79,7 +79,7 @@ Contains a type-constrained `Id` constructor whose only argument is the union of
   under `confect/node/`).
 </Info>
 
-Contains a single default `Api` export, which combines your database schema and Node spec. Pass this as the first argument to `GroupImpl.make` and `FunctionImpl.make` when implementing node actions.
+Contains a single default `Api` export, which combines your database schema and Node spec. Like non-node impls, node impls pass the database schema (`_generated/schema.ts`'s default export) to `GroupImpl.make` and `FunctionImpl.make`.
 
 #### `nodeSpec.ts`
 

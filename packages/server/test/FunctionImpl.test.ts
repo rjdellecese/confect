@@ -1,6 +1,5 @@
-import { FunctionSpec, GroupSpec, Registry, Spec } from "@confect/core";
+import { FunctionSpec, GroupSpec, Registry } from "@confect/core";
 import { DatabaseSchema, FunctionImpl, GroupImpl } from "@confect/server";
-import * as Api from "@confect/server/Api";
 import { describe, expect, it } from "@effect/vitest";
 import { Context, Effect, Layer, Ref, Schema } from "effect";
 
@@ -11,14 +10,13 @@ const fnSpec = <const Name extends string>(name: Name) =>
     returns: () => Schema.Null,
   });
 
-const buildApi = (spec: Spec.AnyWithProps): Api.AnyWithProps =>
-  Api.make(DatabaseSchema.make({}), spec) as unknown as Api.AnyWithProps;
+const databaseSchema = DatabaseSchema.make({});
 
-// The handler type FunctionImpl.make infers for a strongly-typed Api is more
-// specific than the erased `Api.AnyWithProps` casts in this file can satisfy;
-// the runtime behavior being tested here is independent of the handler shape,
-// so we cast the placeholder to `never` (a subtype of every expected handler
-// type) to keep the test focused on registration.
+// The handler type FunctionImpl.make infers for a strongly-typed DatabaseSchema
+// is more specific than the empty `DatabaseSchema.make({})` used here can
+// satisfy; the runtime behavior being tested is independent of the handler
+// shape, so we cast the placeholder to `never` (a subtype of every expected
+// handler type) to keep the test focused on registration.
 const handler = (() => Effect.succeed(null)) as never;
 
 /**
@@ -46,11 +44,10 @@ describe("FunctionImpl.make", () => {
         const notes = GroupSpec.make()
           .addFunction(fnSpec("insert"))
           .addFunction(fnSpec("list"));
-        const api = buildApi(Spec.make().addAt("notes", notes));
 
         const layers = Layer.mergeAll(
-          FunctionImpl.make(api, notes, "insert", handler),
-          FunctionImpl.make(api, notes, "list", handler),
+          FunctionImpl.make(databaseSchema, notes, "insert", handler),
+          FunctionImpl.make(databaseSchema, notes, "list", handler),
         );
 
         const registry = yield* collectRegistry(layers);
@@ -64,24 +61,20 @@ describe("FunctionImpl.make", () => {
   );
 
   it.effect(
-    "needs no registered group path — a leaf wrapped in addGroupAt still registers",
+    "registers a group's function without any api or assembled-spec context",
     () =>
       Effect.gen(function* () {
-        // Codegen wraps a parent leaf as `parent.addGroupAt("child", child)`,
-        // producing a fresh tree object. Registration no longer consults the
-        // assembled tree at all, so the impl's own `parent`/`child` references
-        // register without any path lookup.
+        // Registration consults neither `api` nor the assembled spec tree —
+        // only the group's own spec and the function name — so independent
+        // groups each register their own function flatly.
         const parent = GroupSpec.make().addFunction(fnSpec("parentFn"));
         const child = GroupSpec.make().addFunction(fnSpec("childFn"));
-        const api = buildApi(
-          Spec.make().addAt("parent", parent.addGroupAt("child", child)),
-        );
 
         const parentRegistry = yield* collectRegistry(
-          FunctionImpl.make(api, parent, "parentFn", handler),
+          FunctionImpl.make(databaseSchema, parent, "parentFn", handler),
         );
         const childRegistry = yield* collectRegistry(
-          FunctionImpl.make(api, child, "childFn", handler),
+          FunctionImpl.make(databaseSchema, child, "childFn", handler),
         );
 
         expect(Object.keys(parentRegistry)).toEqual(["parentFn"]);
@@ -98,11 +91,14 @@ describe("GroupImpl.finalize", () => {
         const notes = GroupSpec.make()
           .addFunction(fnSpec("insert"))
           .addFunction(fnSpec("list"));
-        const api = buildApi(Spec.make().addAt("notes", notes));
 
-        const groupLayer = GroupImpl.make(api, notes).pipe(
-          Layer.provide(FunctionImpl.make(api, notes, "insert", handler)),
-          Layer.provide(FunctionImpl.make(api, notes, "list", handler)),
+        const groupLayer = GroupImpl.make(databaseSchema, notes).pipe(
+          Layer.provide(
+            FunctionImpl.make(databaseSchema, notes, "insert", handler),
+          ),
+          Layer.provide(
+            FunctionImpl.make(databaseSchema, notes, "list", handler),
+          ),
           GroupImpl.finalize,
         );
 

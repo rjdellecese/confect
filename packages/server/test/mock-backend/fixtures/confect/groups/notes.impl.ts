@@ -1,10 +1,10 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Effect, Layer } from "effect";
-import api from "../_generated/api";
+import databaseSchema from "../_generated/schema";
 import { DatabaseReader, DatabaseWriter } from "../_generated/services";
 import notes from "./notes.spec";
 
-const insert = FunctionImpl.make(api, notes, "insert", ({ text }) =>
+const insert = FunctionImpl.make(databaseSchema, notes, "insert", ({ text }) =>
   Effect.gen(function* () {
     const writer = yield* DatabaseWriter;
 
@@ -12,7 +12,7 @@ const insert = FunctionImpl.make(api, notes, "insert", ({ text }) =>
   }).pipe(Effect.orDie),
 );
 
-const list = FunctionImpl.make(api, notes, "list", () =>
+const list = FunctionImpl.make(databaseSchema, notes, "list", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
 
@@ -23,25 +23,21 @@ const list = FunctionImpl.make(api, notes, "list", () =>
   }).pipe(Effect.orDie),
 );
 
-const delete_ = FunctionImpl.make(api, notes, "delete_", ({ noteId }) =>
-  Effect.gen(function* () {
-    const writer = yield* DatabaseWriter;
+const delete_ = FunctionImpl.make(
+  databaseSchema,
+  notes,
+  "delete_",
+  ({ noteId }) =>
+    Effect.gen(function* () {
+      const writer = yield* DatabaseWriter;
 
-    yield* writer.table("notes").delete(noteId);
+      yield* writer.table("notes").delete(noteId);
 
-    return null;
-  }).pipe(Effect.orDie),
+      return null;
+    }).pipe(Effect.orDie),
 );
 
-const getFirst = FunctionImpl.make(api, notes, "getFirst", () =>
-  Effect.gen(function* () {
-    const reader = yield* DatabaseReader;
-
-    return yield* reader.table("notes").index("by_creation_time").first();
-  }).pipe(Effect.orDie),
-);
-
-const internalGetFirst = FunctionImpl.make(api, notes, "internalGetFirst", () =>
+const getFirst = FunctionImpl.make(databaseSchema, notes, "getFirst", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
 
@@ -49,7 +45,19 @@ const internalGetFirst = FunctionImpl.make(api, notes, "internalGetFirst", () =>
   }).pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(api, notes).pipe(
+const internalGetFirst = FunctionImpl.make(
+  databaseSchema,
+  notes,
+  "internalGetFirst",
+  () =>
+    Effect.gen(function* () {
+      const reader = yield* DatabaseReader;
+
+      return yield* reader.table("notes").index("by_creation_time").first();
+    }).pipe(Effect.orDie),
+);
+
+export default GroupImpl.make(databaseSchema, notes).pipe(
   Layer.provide(insert),
   Layer.provide(list),
   Layer.provide(delete_),

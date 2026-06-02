@@ -1,6 +1,6 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Effect, Layer } from "effect";
-import api from "../_generated/api";
+import databaseSchema from "../_generated/schema";
 import refs from "../_generated/refs";
 import {
   ActionRunner,
@@ -10,7 +10,7 @@ import {
 import runners from "./runners.spec";
 
 const insertNoteViaRunner = FunctionImpl.make(
-  api,
+  databaseSchema,
   runners,
   "insertNoteViaRunner",
   ({ text }) =>
@@ -21,7 +21,7 @@ const insertNoteViaRunner = FunctionImpl.make(
 );
 
 const getNumberViaRunner = FunctionImpl.make(
-  api,
+  databaseSchema,
   runners,
   "getNumberViaRunner",
   () =>
@@ -32,7 +32,7 @@ const getNumberViaRunner = FunctionImpl.make(
 );
 
 const countNotesViaRunner = FunctionImpl.make(
-  api,
+  databaseSchema,
   runners,
   "countNotesViaRunner",
   () =>
@@ -43,7 +43,7 @@ const countNotesViaRunner = FunctionImpl.make(
     }).pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(api, runners).pipe(
+export default GroupImpl.make(databaseSchema, runners).pipe(
   Layer.provide(insertNoteViaRunner),
   Layer.provide(getNumberViaRunner),
   Layer.provide(countNotesViaRunner),

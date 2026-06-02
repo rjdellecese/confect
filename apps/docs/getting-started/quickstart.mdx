@@ -101,11 +101,11 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
     import { FunctionImpl, GroupImpl } from "@confect/server";
     import { Effect, Layer } from "effect";
 
-    import api from "./_generated/api";
+    import databaseSchema from "./_generated/schema";
     import { DatabaseReader, DatabaseWriter } from "./_generated/services";
     import notes from "./notes.spec";
 
-    const list = FunctionImpl.make(api, notes, "list", () =>
+    const list = FunctionImpl.make(databaseSchema, notes, "list", () =>
       Effect.gen(function* () {
         const reader = yield* DatabaseReader;
 
@@ -116,7 +116,7 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
       }).pipe(Effect.orDie),
     );
 
-    const create = FunctionImpl.make(api, notes, "create", ({ text }) =>
+    const create = FunctionImpl.make(databaseSchema, notes, "create", ({ text }) =>
       Effect.gen(function* () {
         const writer = yield* DatabaseWriter;
 
@@ -124,7 +124,7 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
       }).pipe(Effect.orDie),
     );
 
-    export default GroupImpl.make(api, notes).pipe(
+    export default GroupImpl.make(databaseSchema, notes).pipe(
       Layer.provide(list),
       Layer.provide(create),
       GroupImpl.finalize,

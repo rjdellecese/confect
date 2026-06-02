@@ -69,12 +69,12 @@ When a spec declares an `error` schema, the corresponding `FunctionImpl` handler
 import { FunctionImpl } from "@confect/server";
 import { Effect } from "effect";
 
-import api from "./_generated/api";
+import databaseSchema from "./_generated/schema";
 import { DatabaseReader } from "./_generated/services";
 import notes, { NoteNotFound } from "./notes.spec";
 
 const getOrFail = FunctionImpl.make(
-  api,
+  databaseSchema,
   notes,
   "getOrFail",
   ({ noteId }) =>
