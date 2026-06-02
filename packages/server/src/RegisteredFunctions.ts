@@ -3,7 +3,7 @@ import type * as GroupSpec from "@confect/core/GroupSpec";
 import * as Registry from "@confect/core/Registry";
 import type * as Spec from "@confect/core/Spec";
 import { Effect, type Layer, Ref, type Types } from "effect";
-import type * as Api from "./Api";
+import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as GroupImpl from "./GroupImpl";
 import { mapLeaves } from "./internal/utils";
 import type * as RegisteredFunction from "./RegisteredFunction";
@@ -78,23 +78,28 @@ export type ForGroupPath<
  * The group layer is built with a fresh, isolated `Registry` (rather than the
  * globally-cached default `Context.Reference`), so each `FunctionImpl.make`
  * registers under its flat, single-segment function-name key without colliding
- * with any other group built in the same process. `groupPath` is therefore no
- * longer needed to navigate a shared registry tree — the built registry holds
- * exactly this group's functions at the top level — and is retained only to
- * shape the returned record's type.
+ * with any other group built in the same process — the built registry holds
+ * exactly this group's functions at the top level.
+ *
+ * Only the runtime `databaseSchema` value is needed at runtime (it is forwarded
+ * to `makeRegisteredFunction` to build each function's ctx services); the spec
+ * is supplied purely as the `Spec_` type parameter to shape the returned
+ * record, and `GroupPath_` selects this group's slice of it. The generated
+ * caller therefore passes both type arguments explicitly and imports the spec
+ * type-only (`typeof import("…/spec")["default"]`), so a function's bundle
+ * never imports the project-wide assembled spec module at runtime.
  */
 export const buildForGroup = <
-  Api_ extends Api.AnyWithProps,
-  const GroupPath_ extends string,
+  Spec_ extends Spec.AnyWithProps,
+  GroupPath_ extends string,
 >(
-  api: Api_,
-  _groupPath: GroupPath_,
+  databaseSchema: DatabaseSchema.AnyWithProps,
   groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,
   makeRegisteredFunction: (
-    api: Api_,
+    databaseSchema: DatabaseSchema.AnyWithProps,
     registryItem: RegistryItem.AnyWithProps,
   ) => RegisteredFunction.Any,
-): ForGroupPath<Api_["spec"], GroupPath_> => {
+): ForGroupPath<Spec_, GroupPath_> => {
   const registryItems = Effect.gen(function* () {
     const registry = yield* Registry.Registry;
     return yield* Ref.get(registry);
@@ -110,6 +115,6 @@ export const buildForGroup = <
   return mapLeaves<RegistryItem.AnyWithProps, RegisteredFunction.Any>(
     registryItems as { [key: string]: RegistryItem.AnyWithProps },
     RegistryItem.isRegistryItem,
-    (registryItem) => makeRegisteredFunction(api, registryItem),
-  ) as ForGroupPath<Api_["spec"], GroupPath_>;
+    (registryItem) => makeRegisteredFunction(databaseSchema, registryItem),
+  ) as ForGroupPath<Spec_, GroupPath_>;
 };

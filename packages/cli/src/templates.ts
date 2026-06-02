@@ -331,13 +331,15 @@ export const nodeApi = ({
   });
 
 export const registeredFunctionsForGroup = ({
-  apiImportPath,
+  schemaImportPath,
+  specImportPath,
   groupPathDot,
   implImportPath,
   layerExportName,
   useNode = false,
 }: {
-  apiImportPath: string;
+  schemaImportPath: string;
+  specImportPath: string;
   groupPathDot: string;
   implImportPath: string;
   layerExportName: string;
@@ -359,14 +361,19 @@ export const registeredFunctionsForGroup = ({
       );
     }
 
-    yield* cbw.writeLine(`import api from "${apiImportPath}";`);
+    yield* cbw.writeLine(`import databaseSchema from "${schemaImportPath}";`);
     yield* cbw.writeLine(`import ${layerExportName} from "${implImportPath}";`);
     yield* cbw.blankLine();
     const quotedGroupPath = `"${groupPathDot.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+    // The spec is referenced type-only (`typeof import(...)`) so the spec
+    // module is erased at transpile time and never enters the per-function
+    // bundle; only `databaseSchema` and the impl are runtime imports.
+    const specType = `typeof import("${specImportPath}")["default"]`;
+    const makeFn = useNode
+      ? "RegisteredNodeFunction.make"
+      : "RegisteredConvexFunction.make";
     yield* cbw.writeLine(
-      useNode
-        ? `export default RegisteredFunctions.buildForGroup(api, ${quotedGroupPath}, ${layerExportName}, RegisteredNodeFunction.make);`
-        : `export default RegisteredFunctions.buildForGroup(api, ${quotedGroupPath}, ${layerExportName}, RegisteredConvexFunction.make);`,
+      `export default RegisteredFunctions.buildForGroup<${specType}, ${quotedGroupPath}>(databaseSchema, ${layerExportName}, ${makeFn});`,
     );
 
     return yield* cbw.toString();

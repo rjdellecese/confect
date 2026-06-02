@@ -1,5 +1,5 @@
 import { RegisteredConvexFunction, RegisteredFunctions } from "@confect/server";
-import api from "../../api";
+import databaseSchema from "../../schema";
 import cjsImporter from "../../../groups/cjsImporter.impl";
 
-export default RegisteredFunctions.buildForGroup(api, "groups.cjsImporter", cjsImporter, RegisteredConvexFunction.make);
+export default RegisteredFunctions.buildForGroup<typeof import("../../spec")["default"], "groups.cjsImporter">(databaseSchema, cjsImporter, RegisteredConvexFunction.make);
