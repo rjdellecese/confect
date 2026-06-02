@@ -1,10 +1,5 @@
 # Review instructions
 
-Repo-specific rules for Claude Code Review, applied on top of the default
-correctness review. Defer style, formatting, lint, and type errors to CI — they
-are already enforced there. Focus findings on real bugs and on the invariants
-below.
-
 ## Always check: schema laziness must be preserved
 
 `@confect/core` exposes function and table schemas lazily so that importing the
@@ -31,10 +26,6 @@ Flag as 🔴 Important any change under `packages/core/src/` or
    `fp.error !== undefined`, or any read of `.error` used purely as an
    existence test. See `Ref.hasErrorSchema` / `Ref.decodeError`.
 
-Also flag the inverse: a PR that deletes or weakens the guard tests in
-`packages/core/test/FunctionSpec.test.ts` (`describe("laziness invariant")`)
-without an equivalent replacement.
-
 ## Always check: per-function bundle isolation must be preserved
 
 The v9 codegen split impl and schema across the filesystem so that a single
@@ -58,9 +49,6 @@ Important any change (chiefly in `packages/cli/src/templates.ts`, the generated
    Flag any runtime code path or template that makes a function bundle reach
    `convex/server`'s `defineSchema`, or that merges the two schema artifacts
    back into a single module.
-
-Guard: `packages/server/test/importIsolation.test.ts`. Flag PRs that delete or
-weaken it without an equivalent replacement.
 
 ## Always check: spec / group / table builders stay pure
 
