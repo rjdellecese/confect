@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Schema } from "effect";
+import { MutableRef, Schema } from "effect";
 import * as FunctionSpec from "../src/FunctionSpec";
 import * as Ref from "../src/Ref";
 
@@ -91,38 +91,30 @@ describe("laziness invariant", () => {
     });
 
   it("constructing a FunctionSpec does not evaluate any schema thunk", () => {
-    let argsBuilt = false;
-    let returnsBuilt = false;
-    let errorBuilt = false;
+    const argsBuilt = MutableRef.make(false);
+    const returnsBuilt = MutableRef.make(false);
+    const errorBuilt = MutableRef.make(false);
 
     makeSpec({
-      args: () => {
-        argsBuilt = true;
-      },
-      returns: () => {
-        returnsBuilt = true;
-      },
-      error: () => {
-        errorBuilt = true;
-      },
+      args: () => MutableRef.set(argsBuilt, true),
+      returns: () => MutableRef.set(returnsBuilt, true),
+      error: () => MutableRef.set(errorBuilt, true),
     });
 
-    expect(argsBuilt).toBe(false);
-    expect(returnsBuilt).toBe(false);
-    expect(errorBuilt).toBe(false);
+    expect(MutableRef.get(argsBuilt)).toBe(false);
+    expect(MutableRef.get(returnsBuilt)).toBe(false);
+    expect(MutableRef.get(errorBuilt)).toBe(false);
   });
 
   it("Ref.hasErrorSchema checks presence without forcing the error thunk", () => {
-    let errorBuilt = false;
+    const errorBuilt = MutableRef.make(false);
     const spec = makeSpec({
-      error: () => {
-        errorBuilt = true;
-      },
+      error: () => MutableRef.set(errorBuilt, true),
     });
     const ref = Ref.make("ns", spec);
 
     expect(Ref.hasErrorSchema(ref)).toBe(true);
-    expect(errorBuilt).toBe(false);
+    expect(MutableRef.get(errorBuilt)).toBe(false);
   });
 
   it("a spec without an error schema reports no error without defining the key", () => {
@@ -138,17 +130,15 @@ describe("laziness invariant", () => {
   });
 
   it("accessing a schema getter forces the thunk exactly once and memoises", () => {
-    let argsCalls = 0;
+    const argsCalls = MutableRef.make(0);
     const spec = makeSpec({
-      args: () => {
-        argsCalls += 1;
-      },
+      args: () => MutableRef.increment(argsCalls),
     });
 
     const first = spec.functionProvenance.args;
     const second = spec.functionProvenance.args;
 
-    expect(argsCalls).toBe(1);
+    expect(MutableRef.get(argsCalls)).toBe(1);
     expect(second).toBe(first);
   });
 });
