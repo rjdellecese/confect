@@ -43,8 +43,11 @@ layer(TestLayer)("import isolation", (it) => {
         expect(contents).not.toMatch(
           /^import .* from "[^"]*\/(spec|nodeSpec)";$/m,
         );
-        // The spec is referenced type-only, so it is erased at transpile time.
-        expect(contents).toContain('typeof import("../../spec")["default"]');
+        // The group's own leaf spec is referenced type-only, so it is erased
+        // at transpile time (and the project-wide assembled spec is not used).
+        expect(contents).toContain(
+          'typeof import("../../../groups/notes.spec")["default"]',
+        );
       }),
   );
 });

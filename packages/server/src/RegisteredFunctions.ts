@@ -17,54 +17,44 @@ type RegisteredFunctionsHelper<Groups extends GroupSpec.AnyWithProps> = {
     Groups,
     GroupName
   > extends infer Group extends GroupSpec.AnyWithProps
-    ? GroupSpec.Groups<Group> extends infer SubGroups extends
-        GroupSpec.AnyWithProps
-      ? Types.Simplify<
-          RegisteredFunctionsHelper<SubGroups> & {
-            [FunctionName in FunctionSpec.Name<
-              GroupSpec.Functions<Group>
-            >]: FunctionSpec.WithName<
-              GroupSpec.Functions<Group>,
-              FunctionName
-            > extends infer FunctionSpec_ extends FunctionSpec.AnyWithProps
-              ? RegisteredFunction.RegisteredFunction<FunctionSpec_>
-              : never;
-          }
-        >
-      : {
-          [FunctionName in FunctionSpec.Name<
-            GroupSpec.Functions<Group>
-          >]: FunctionSpec.WithName<
-            GroupSpec.Functions<Group>,
-            FunctionName
-          > extends infer FunctionSpec_ extends FunctionSpec.AnyWithProps
-            ? RegisteredFunction.RegisteredFunction<FunctionSpec_>
-            : never;
-        }
+    ? RegisteredFunctionsForGroupSpec<Group>
     : never;
 };
+
+/** The `RegisteredFunction` record for a group's own declared functions. */
+type RegisteredFunctionsOf<Group extends GroupSpec.AnyWithProps> = {
+  [FunctionName in FunctionSpec.Name<
+    GroupSpec.Functions<Group>
+  >]: FunctionSpec.WithName<
+    GroupSpec.Functions<Group>,
+    FunctionName
+  > extends infer FunctionSpec_ extends FunctionSpec.AnyWithProps
+    ? RegisteredFunction.RegisteredFunction<FunctionSpec_>
+    : never;
+};
+
+/**
+ * The registered-functions record for a single group, derived from the group's
+ * own `GroupSpec`: its declared functions, plus any nested subgroups it carries
+ * directly. This is the node that `buildForGroup` returns — computed from the
+ * leaf `GroupSpec` itself rather than by navigating the project-wide assembled
+ * `Spec` to a dot-path, so the per-group registry's type depends only on its
+ * own leaf. For the filesystem layout a leaf `GroupSpec` carries no subgroups
+ * (subdirectory children are assembled separately into `_generated/spec.ts`),
+ * so this resolves to just the leaf's functions.
+ */
+export type RegisteredFunctionsForGroupSpec<
+  Group extends GroupSpec.AnyWithProps,
+> =
+  GroupSpec.Groups<Group> extends infer SubGroups extends GroupSpec.AnyWithProps
+    ? Types.Simplify<
+        RegisteredFunctionsHelper<SubGroups> & RegisteredFunctionsOf<Group>
+      >
+    : RegisteredFunctionsOf<Group>;
 
 export interface AnyWithProps {
   readonly [key: string]: RegisteredFunction.Any | AnyWithProps;
 }
-
-type RegisteredFunctionsAtPath<
-  Tree,
-  Path extends string,
-> = Path extends `${infer Head}.${infer Tail}`
-  ? Head extends keyof Tree
-    ? Tree[Head] extends AnyWithProps
-      ? RegisteredFunctionsAtPath<Tree[Head], Tail>
-      : never
-    : never
-  : Path extends keyof Tree
-    ? Tree[Path]
-    : never;
-
-export type ForGroupPath<
-  Spec_ extends Spec.AnyWithProps,
-  Path extends string,
-> = RegisteredFunctionsAtPath<RegisteredFunctions<Spec_>, Path>;
 
 /**
  * Build the registered Convex functions for a single group from its finalized
@@ -82,24 +72,20 @@ export type ForGroupPath<
  * exactly this group's functions at the top level.
  *
  * Only the runtime `databaseSchema` value is needed at runtime (it is forwarded
- * to `makeRegisteredFunction` to build each function's ctx services); the spec
- * is supplied purely as the `Spec_` type parameter to shape the returned
- * record, and `GroupPath_` selects this group's slice of it. The generated
- * caller therefore passes both type arguments explicitly and imports the spec
- * type-only (`typeof import("…/spec")["default"]`), so a function's bundle
- * never imports the project-wide assembled spec module at runtime.
+ * to `makeRegisteredFunction` to build each function's ctx services); the
+ * group's `GroupSpec` is supplied purely as the `Group` type parameter to shape
+ * the returned record. The generated caller passes it explicitly and imports
+ * the leaf spec type-only (`typeof import("…/<group>.spec")["default"]`), so a
+ * function's bundle never imports a spec module at runtime.
  */
-export const buildForGroup = <
-  Spec_ extends Spec.AnyWithProps,
-  GroupPath_ extends string,
->(
+export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
   databaseSchema: DatabaseSchema.AnyWithProps,
   groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,
   makeRegisteredFunction: (
     databaseSchema: DatabaseSchema.AnyWithProps,
     registryItem: RegistryItem.AnyWithProps,
   ) => RegisteredFunction.Any,
-): ForGroupPath<Spec_, GroupPath_> => {
+): RegisteredFunctionsForGroupSpec<Group> => {
   const registryItems = Effect.gen(function* () {
     const registry = yield* Registry.Registry;
     return yield* Ref.get(registry);
@@ -116,5 +102,5 @@ export const buildForGroup = <
     registryItems as { [key: string]: RegistryItem.AnyWithProps },
     RegistryItem.isRegistryItem,
     (registryItem) => makeRegisteredFunction(databaseSchema, registryItem),
-  ) as ForGroupPath<Spec_, GroupPath_>;
+  ) as RegisteredFunctionsForGroupSpec<Group>;
 };

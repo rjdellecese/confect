@@ -433,18 +433,18 @@ const generateGroupRegisteredFunctions = (leaves: ReadonlyArray<LeafModule>) =>
         }
 
         const implRelativePath = yield* implPathForSpec(leaf.relativePath);
-        const specFileName =
-          leaf.runtime === "Node" ? "nodeSpec.ts" : "spec.ts";
         const schemaImportPath = yield* toModuleImportPath(
           path.relative(
             path.dirname(registryPath),
             path.join(confectDirectory, "_generated", "schema.ts"),
           ),
         );
+        // The group's own leaf spec (sibling of its impl), referenced
+        // type-only by the registry to shape its returned record.
         const specImportPath = yield* toModuleImportPath(
           path.relative(
             path.dirname(registryPath),
-            path.join(confectDirectory, "_generated", specFileName),
+            path.join(confectDirectory, leaf.relativePath),
           ),
         );
         const implImportPath = yield* toModuleImportPath(
@@ -457,7 +457,6 @@ const generateGroupRegisteredFunctions = (leaves: ReadonlyArray<LeafModule>) =>
         const contents = yield* templates.registeredFunctionsForGroup({
           schemaImportPath,
           specImportPath,
-          groupPathDot: leaf.registryGroupPathDot,
           implImportPath,
           layerExportName: leaf.exportName,
           useNode: leaf.runtime === "Node",

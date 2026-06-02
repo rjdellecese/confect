@@ -333,14 +333,12 @@ export const nodeApi = ({
 export const registeredFunctionsForGroup = ({
   schemaImportPath,
   specImportPath,
-  groupPathDot,
   implImportPath,
   layerExportName,
   useNode = false,
 }: {
   schemaImportPath: string;
   specImportPath: string;
-  groupPathDot: string;
   implImportPath: string;
   layerExportName: string;
   useNode?: boolean;
@@ -364,16 +362,17 @@ export const registeredFunctionsForGroup = ({
     yield* cbw.writeLine(`import databaseSchema from "${schemaImportPath}";`);
     yield* cbw.writeLine(`import ${layerExportName} from "${implImportPath}";`);
     yield* cbw.blankLine();
-    const quotedGroupPath = `"${groupPathDot.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-    // The spec is referenced type-only (`typeof import(...)`) so the spec
-    // module is erased at transpile time and never enters the per-function
-    // bundle; only `databaseSchema` and the impl are runtime imports.
+    // The group's own leaf spec is referenced type-only (`typeof import(...)`),
+    // so the spec module is erased at transpile time and never enters the
+    // per-function bundle; only `databaseSchema` and the impl are runtime
+    // imports. Typing from the leaf spec (not the project-wide assembled spec)
+    // keeps the registry's type dependent solely on its own group.
     const specType = `typeof import("${specImportPath}")["default"]`;
     const makeFn = useNode
       ? "RegisteredNodeFunction.make"
       : "RegisteredConvexFunction.make";
     yield* cbw.writeLine(
-      `export default RegisteredFunctions.buildForGroup<${specType}, ${quotedGroupPath}>(databaseSchema, ${layerExportName}, ${makeFn});`,
+      `export default RegisteredFunctions.buildForGroup<${specType}>(databaseSchema, ${layerExportName}, ${makeFn});`,
     );
 
     return yield* cbw.toString();
