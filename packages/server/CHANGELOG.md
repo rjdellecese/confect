@@ -1,5 +1,12 @@
 # @confect/server
 
+## 9.0.0-next.7
+
+### Patch Changes
+
+- Updated dependencies [5d19484]
+  - @confect/core@9.0.0-next.7
+
 ## 9.0.0-next.6
 
 ### Major Changes

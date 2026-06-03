@@ -1,7 +1,7 @@
 {
   "name": "@confect/cli",
   "description": "Developer tooling for codegen and sync",
-  "version": "9.0.0-next.6",
+  "version": "9.0.0-next.7",
   "author": "RJ Dellecese",
   "bin": {
     "confect": "./dist/index.mjs"
