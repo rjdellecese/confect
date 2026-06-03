@@ -5,6 +5,7 @@ import {
   useQuery as useConvexQuery,
 } from "convex/react";
 import { Cause, Effect, Either, Exit, Option } from "effect";
+import { useCallback, useMemo } from "react";
 
 import * as QueryResult from "./QueryResult";
 
@@ -27,33 +28,47 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
 ): QueryResult.QueryResult<Ref.Returns<Query>, Ref.Error<Query>> => {
   const functionReference = Ref.getFunctionReference(ref);
   const args = rest[0];
-  const encodedArgs =
-    args === "skip"
-      ? "skip"
-      : Ref.encodeArgsSync(ref, (args ?? {}) as Ref.Args<Query>);
+  const skipped = args === "skip";
+  const encodedArgs = skipped
+    ? "skip"
+    : Ref.encodeArgsSync(ref, (args ?? {}) as Ref.Args<Query>);
 
-  try {
-    const encodedReturnsOrUndefined = useConvexQuery(
-      functionReference,
-      encodedArgs,
-    );
+  // `useConvexQuery` returns a referentially stable value while the underlying
+  // Convex result is unchanged, and throws a stable error when the query
+  // fails. We capture either outcome as an `Either` and decode/wrap it inside
+  // `useMemo` so that the returned `QueryResult` keeps a stable identity across
+  // renders when nothing has actually changed. Decoding on every render would
+  // hand consumers a fresh object each time, breaking effects and memoization
+  // that depend on the result's identity.
+  const encodedReturnsOrError: Either.Either<unknown, unknown> = Either.try(
+    () => useConvexQuery(functionReference, encodedArgs),
+  );
 
-    if (encodedReturnsOrUndefined === undefined) {
-      return QueryResult.load(args === "skip");
-    }
-
-    return QueryResult.succeed(
-      Ref.decodeReturnsSync(ref, encodedReturnsOrUndefined),
-    );
-  } catch (error) {
-    if (Ref.isConvexError(error)) {
-      const decoded = Ref.decodeErrorSync(ref, error.data);
-      if (Option.isSome(decoded)) {
-        return QueryResult.fail(decoded.value);
-      }
-    }
-    throw error;
-  }
+  return useMemo(
+    () =>
+      Either.match(encodedReturnsOrError, {
+        onRight: (encodedReturnsOrUndefined) =>
+          encodedReturnsOrUndefined === undefined
+            ? QueryResult.load(skipped)
+            : QueryResult.succeed(
+                Ref.decodeReturnsSync(ref, encodedReturnsOrUndefined),
+              ),
+        onLeft: (error) => {
+          if (Ref.isConvexError(error)) {
+            const decoded = Ref.decodeErrorSync(ref, error.data);
+            if (Option.isSome(decoded)) {
+              return QueryResult.fail(decoded.value);
+            }
+          }
+          throw error;
+        },
+      }),
+    // `Either.try` allocates a fresh wrapper each render, so we key the memo on
+    // the stable value it carries (the Convex result or thrown error) rather
+    // than the wrapper itself; the decoded result is a function of that value,
+    // `ref`, and `skipped`.
+    [ref, skipped, Either.merge(encodedReturnsOrError)],
+  );
 };
 
 /**
@@ -75,14 +90,17 @@ export const useMutation = <Mutation extends Ref.AnyPublicMutation>(
   const functionReference = Ref.getFunctionReference(ref);
   const actualMutation = useConvexMutation(functionReference);
 
-  return ((...args: Ref.OptionalArgs<Mutation>) =>
-    invokeAsEither(
-      ref,
-      (_, encodedArgs) => actualMutation(encodedArgs),
-      args,
-    ).then((either) =>
-      Ref.hasErrorSchema(ref) ? either : Either.getOrThrow(either),
-    )) as (...args: Ref.OptionalArgs<Mutation>) => InvokeReturn<Mutation>;
+  return useCallback(
+    ((...args: Ref.OptionalArgs<Mutation>) =>
+      invokeAsEither(
+        ref,
+        (_, encodedArgs) => actualMutation(encodedArgs),
+        args,
+      ).then((either) =>
+        Ref.hasErrorSchema(ref) ? either : Either.getOrThrow(either),
+      )) as (...args: Ref.OptionalArgs<Mutation>) => InvokeReturn<Mutation>,
+    [ref, actualMutation],
+  );
 };
 
 /**
@@ -104,14 +122,17 @@ export const useAction = <Action extends Ref.AnyPublicAction>(
   const functionReference = Ref.getFunctionReference(ref);
   const actualAction = useConvexAction(functionReference);
 
-  return ((...args: Ref.OptionalArgs<Action>) =>
-    invokeAsEither(
-      ref,
-      (_, encodedArgs) => actualAction(encodedArgs),
-      args,
-    ).then((either) =>
-      Ref.hasErrorSchema(ref) ? either : Either.getOrThrow(either),
-    )) as (...args: Ref.OptionalArgs<Action>) => InvokeReturn<Action>;
+  return useCallback(
+    ((...args: Ref.OptionalArgs<Action>) =>
+      invokeAsEither(
+        ref,
+        (_, encodedArgs) => actualAction(encodedArgs),
+        args,
+      ).then((either) =>
+        Ref.hasErrorSchema(ref) ? either : Either.getOrThrow(either),
+      )) as (...args: Ref.OptionalArgs<Action>) => InvokeReturn<Action>,
+    [ref, actualAction],
+  );
 };
 
 const invokeAsEither = async <Ref_ extends Ref.Any>(
