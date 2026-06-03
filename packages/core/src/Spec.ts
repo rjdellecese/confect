@@ -106,7 +106,8 @@ export const makeNode = (): Spec<"Node"> =>
   makeProto({ runtime: "Node", groups: {} });
 
 /**
- * Merges a Convex spec with an optional Node spec for use with `Api.make`.
+ * Merges a Convex spec with an optional Node spec into a single assembled
+ * spec (used by codegen to build `Refs.make` and to enumerate function paths).
  * When `nodeSpec` is provided, its groups are merged under a "node" namespace,
  * mirroring the structure used by `Refs.make`.
  */

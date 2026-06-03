@@ -49,9 +49,9 @@ Node impls migrate identically (from `nodeApi` to the same `_generated/schema`);
 
 `RegisteredFunctions.buildForGroup` takes the `DatabaseSchema` value plus the group's own `GroupSpec` as a single type argument (`buildForGroup<typeof groupSpec>(…)`, returning `RegisteredFunctionsForGroupSpec<Group>`); the `api` / `groupPath` parameters and the `ForGroupPath` dot-path navigation are gone. `RegisteredConvexFunction.make` / `RegisteredNodeFunction.make` take the `DatabaseSchema` rather than the `Api`. Each `_generated/registeredFunctions/{path}.ts` imports the runtime schema and references its group's leaf spec **type-only** (`typeof import("…/{group}.spec")["default"]`), so it never imports a spec module at runtime.
 
-### `_generated/api.ts` / `nodeApi.ts` are no longer emitted
+### `_generated/api.ts` / `nodeApi.ts` are no longer emitted, and `Api` is removed
 
-Nothing imports them anymore, so `confect codegen` no longer emits `_generated/api.ts` / `_generated/nodeApi.ts` and deletes any copies left over from earlier versions. If you referenced the generated `Api` value directly, construct it with `Api.make(schema, spec)` from `@confect/server` and `@confect/core`.
+Nothing imports them anymore, so `confect codegen` no longer emits `_generated/api.ts` / `_generated/nodeApi.ts` and deletes any copies left over from earlier versions. The `Api` module itself (`@confect/server/Api` — `Api.make`, the `Api` type, `Api.resolveGroupPathUnsafe`, etc.) is **removed entirely**: impls and the generated registries take the `DatabaseSchema` value and the spec directly, so the combined database-schema-plus-spec `Api` is no longer used anywhere.
 
 ### Net effect
 
