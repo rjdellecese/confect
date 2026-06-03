@@ -21,7 +21,7 @@ For Node.js actions, see [Node Actions](/server/node-actions). To integrate plai
 
 ## Defining a spec
 
-Each function spec defines the function's name, arguments schema, and returns schema. The `args`, `returns`, and (optional) `error` schemas are passed as `() => Schema` callbacks that run lazily—only the first time that function is invoked—so loading one function never pays to build every other function's schemas. Function specs are added to a `GroupSpec` and default-exported from a `*.spec.ts` file. See [The Spec/Impl Model](/concepts/spec-impl-model) for a full walkthrough.
+Each function spec defines the function's name, arguments schema, and returns schema. The `args`, `returns`, and (optional) `error` schemas are passed as `() => Schema` callbacks, evaluated lazily the first time the function is invoked. Function specs are added to a `GroupSpec` and default-exported from a `*.spec.ts` file. See [The Spec/Impl Model](/concepts/spec-impl-model) for a full walkthrough.
 
 ```ts confect/notes.spec.ts
 import { GroupSpec, FunctionSpec } from "@confect/core";

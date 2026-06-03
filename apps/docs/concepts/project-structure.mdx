@@ -72,7 +72,7 @@ Contains a type-constrained `Id` constructor whose only argument is the union of
   under `confect/node/`).
 </Info>
 
-Contains your assembled Node spec. It is merged into `refs.ts` and referenced type-only by the node groups' `registeredFunctions/` modules.
+Contains your assembled Node spec, used together with `spec.ts` to build `refs.ts`.
 
 #### `registeredFunctions/`
 
@@ -84,7 +84,7 @@ Contains a single default `Refs` export, which is a map of your Convex functions
 
 #### `schema.ts`
 
-Contains the runtime `DatabaseSchema` — the codec-lookup view of your tables. Impls import it and pass it to `FunctionImpl.make` / `GroupImpl.make`, and the per-group `registeredFunctions/` modules forward it to the function builders, so it is in every function's bundle. It is generated from `confect/tables/*.ts` and intentionally avoids any `convex/server` import so runtime bundles never pull in `defineSchema(...)`. Each table's field-schema is constructed lazily on the first access to its `Fields`, `Doc`, or `tableDefinition` and then cached, so a function bundle only pays the schema-construction cost for the tables it actually touches via `db.table(name)`. Use this when a test or a non-codegen-generated module needs to refer to your `DatabaseSchema` type or value.
+Contains the runtime `DatabaseSchema` — the codec-lookup view of your tables. Impls import it and pass it to `FunctionImpl.make` / `GroupImpl.make`. It is generated from `confect/tables/*.ts` and intentionally avoids any `convex/server` import so runtime bundles never pull in `defineSchema(...)`. Each table's field-schema is constructed lazily on the first access to its `Fields`, `Doc`, or `tableDefinition` and then cached, so a function bundle only pays the schema-construction cost for the tables it actually touches via `db.table(name)`. Use this when a test or a non-codegen-generated module needs to refer to your `DatabaseSchema` type or value.
 
 #### `tables/`
 
@@ -96,7 +96,7 @@ Contains Effect service wrappers for Convex platform capabilities, scoped to you
 
 #### `spec.ts`
 
-Contains your assembled Confect spec. It is used to build `refs.ts` and is referenced type-only by the `registeredFunctions/` modules.
+Contains your assembled Confect spec, used to build `refs.ts`.
 
 ### `auth.ts`
 
