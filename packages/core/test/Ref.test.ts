@@ -151,6 +151,36 @@ describe("OptionalArgs", () => {
   });
 });
 
+describe("getFunctionReference", () => {
+  const ref = Ref.make(
+    "notes",
+    FunctionSpec.publicQuery({
+      name: "list",
+      args: () => Schema.Struct({}),
+      returns: () => Schema.Void,
+    }),
+  );
+
+  test("returns a reference for the ref's Convex function name", () => {
+    expect(Ref.getFunctionReference(ref)).toBe(Ref.getFunctionReference(ref));
+  });
+
+  test("distinct function names produce distinct references", () => {
+    const other = Ref.make(
+      "notes",
+      FunctionSpec.publicQuery({
+        name: "get",
+        args: () => Schema.Struct({}),
+        returns: () => Schema.Void,
+      }),
+    );
+
+    expect(Ref.getFunctionReference(ref)).not.toBe(
+      Ref.getFunctionReference(other),
+    );
+  });
+});
+
 describe("Error type extraction", () => {
   test("no error schema means Error is never", () => {
     const _spec = FunctionSpec.publicMutation({

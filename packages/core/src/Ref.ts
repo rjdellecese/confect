@@ -190,10 +190,25 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
 export const getConvexFunctionName = (ref: Any): string =>
   `${ref.functionNamespace}:${ref.functionSpec.name}`;
 
+const functionReferenceCache = new Map<string, FunctionReference<Any>>();
+
 export const getFunctionReference = <Ref_ extends Any>(
   ref: Ref_,
-): FunctionReference<Ref_> =>
-  makeFunctionReference(getConvexFunctionName(ref)) as FunctionReference<Ref_>;
+): FunctionReference<Ref_> => {
+  const functionName = getConvexFunctionName(ref);
+
+  const cached = functionReferenceCache.get(functionName);
+  if (cached !== undefined) {
+    return cached as FunctionReference<Ref_>;
+  }
+
+  const functionReference = makeFunctionReference(
+    functionName,
+  ) as FunctionReference<Any>;
+  functionReferenceCache.set(functionName, functionReference);
+
+  return functionReference as FunctionReference<Ref_>;
+};
 
 export const hasErrorSchema = (ref: Any): boolean =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
