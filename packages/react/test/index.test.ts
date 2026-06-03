@@ -208,6 +208,41 @@ describe("useQuery", () => {
 
     expect(result.current).toBe(first);
   });
+
+  test("preserves Failure identity across rerenders for an unchanged ConvexError", () => {
+    const convexError = new ConvexError({ _tag: "NotFound", id: "abc" });
+    useConvexQueryMock.mockImplementation(() => {
+      throw convexError;
+    });
+
+    const { result, rerender } = renderHook(() =>
+      useQuery(queryWithError, { id: "abc" }),
+    );
+    const first = result.current;
+    assert(QueryResult.isFailure(first));
+
+    rerender();
+
+    expect(result.current).toBe(first);
+  });
+
+  test("produces a new Loading when `skipped` changes while convex returns undefined", () => {
+    useConvexQueryMock.mockReturnValue(undefined);
+
+    const { result, rerender } = renderHook(
+      ({ args }: { args: {} | "skip" }) => useQuery(queryNoError, args),
+      { initialProps: { args: {} as {} | "skip" } },
+    );
+    const first = result.current;
+    assert(QueryResult.isLoading(first));
+    expect(first.skipped).toBe(false);
+
+    rerender({ args: "skip" });
+
+    expect(result.current).not.toBe(first);
+    assert(QueryResult.isLoading(result.current));
+    expect(result.current.skipped).toBe(true);
+  });
 });
 
 describe("useMutation", () => {

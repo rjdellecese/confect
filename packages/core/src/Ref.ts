@@ -202,9 +202,7 @@ export const getFunctionReference = <Ref_ extends Any>(
     return cached as FunctionReference<Ref_>;
   }
 
-  const functionReference = makeFunctionReference(
-    functionName,
-  ) as FunctionReference<Any>;
+  const functionReference = makeFunctionReference(functionName);
   functionReferenceCache.set(functionName, functionReference);
 
   return functionReference as FunctionReference<Ref_>;
