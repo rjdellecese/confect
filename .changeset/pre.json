@@ -21,6 +21,7 @@
     "preserve-parent-leaf-in-assembled-spec",
     "spec-paths-immutable-lookup",
     "split-deploy-schema-from-runtime",
+    "stable-react-query-results",
     "unique-spec-import-bindings"
   ]
 }
