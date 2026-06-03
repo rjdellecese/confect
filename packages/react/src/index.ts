@@ -35,41 +35,40 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
 
   // `useConvexQuery` returns a referentially stable value while the underlying
   // Convex result is unchanged, and throws a stable error when the query
-  // fails. We capture either outcome and decode/wrap it inside `useMemo` so
-  // that the returned `QueryResult` keeps a stable identity across renders
-  // when nothing has actually changed. Decoding on every render would hand
-  // consumers a fresh object each time, breaking effects and memoization that
-  // depend on the result's identity.
-  let encodedReturnsOrUndefined: unknown;
-  let caughtError: unknown;
-  let didCatch = false;
+  // fails. We capture either outcome as an `Either` and decode/wrap it inside
+  // `useMemo` so that the returned `QueryResult` keeps a stable identity across
+  // renders when nothing has actually changed. Decoding on every render would
+  // hand consumers a fresh object each time, breaking effects and memoization
+  // that depend on the result's identity.
+  const encodedReturnsOrError: Either.Either<unknown, unknown> = Either.try(
+    () => useConvexQuery(functionReference, encodedArgs),
+  );
 
-  try {
-    encodedReturnsOrUndefined = useConvexQuery(functionReference, encodedArgs);
-  } catch (error) {
-    didCatch = true;
-    caughtError = error;
-  }
-
-  return useMemo(() => {
-    if (didCatch) {
-      if (Ref.isConvexError(caughtError)) {
-        const decoded = Ref.decodeErrorSync(ref, caughtError.data);
-        if (Option.isSome(decoded)) {
-          return QueryResult.fail(decoded.value);
-        }
-      }
-      throw caughtError;
-    }
-
-    if (encodedReturnsOrUndefined === undefined) {
-      return QueryResult.load(skipped);
-    }
-
-    return QueryResult.succeed(
-      Ref.decodeReturnsSync(ref, encodedReturnsOrUndefined),
-    );
-  }, [ref, skipped, didCatch, caughtError, encodedReturnsOrUndefined]);
+  return useMemo(
+    () =>
+      Either.match(encodedReturnsOrError, {
+        onRight: (encodedReturnsOrUndefined) =>
+          encodedReturnsOrUndefined === undefined
+            ? QueryResult.load(skipped)
+            : QueryResult.succeed(
+                Ref.decodeReturnsSync(ref, encodedReturnsOrUndefined),
+              ),
+        onLeft: (error) => {
+          if (Ref.isConvexError(error)) {
+            const decoded = Ref.decodeErrorSync(ref, error.data);
+            if (Option.isSome(decoded)) {
+              return QueryResult.fail(decoded.value);
+            }
+          }
+          throw error;
+        },
+      }),
+    // `Either.try` allocates a fresh wrapper each render, so we key the memo on
+    // the stable value it carries (the Convex result or thrown error) rather
+    // than the wrapper itself; the decoded result is a function of that value,
+    // `ref`, and `skipped`.
+    [ref, skipped, Either.merge(encodedReturnsOrError)],
+  );
 };
 
 /**
