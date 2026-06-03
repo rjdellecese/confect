@@ -1,6 +1,7 @@
 packages:
   - packages/*
   - apps/*
+  - bench
   - packages/server/test/mock-backend/fixtures
   - packages/server/test/local-backend/fixtures
 

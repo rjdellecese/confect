@@ -1,0 +1,19 @@
+{
+  "name": "@confect/bench",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Cold-start benchmark harness: vanilla Convex vs Confect v9 per-function startup overhead.",
+  "scripts": {
+    "bench": "node src/driver.mjs",
+    "report": "node src/report.mjs"
+  },
+  "dependencies": {
+    "@confect/cli": "workspace:*",
+    "@confect/core": "workspace:*",
+    "@confect/server": "workspace:*",
+    "convex": "1.39.1",
+    "effect": "3.21.2",
+    "esbuild": "0.27.3"
+  }
+}
