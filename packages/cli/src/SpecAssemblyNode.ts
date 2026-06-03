@@ -82,39 +82,3 @@ export const collectImportBindings = (
     Array.map(([, binding]) => binding),
     Array.sortBy(Order.mapInput(Order.string, (binding) => binding.localName)),
   );
-
-export interface SpecLeafPath {
-  readonly binding: SpecImportBinding;
-  readonly dotPath: string;
-}
-
-const leafPathsForNode = (
-  node: SpecAssemblyNode,
-  ancestorSegments: ReadonlyArray<string>,
-): ReadonlyArray<SpecLeafPath> => {
-  const segments = [...ancestorSegments, node.segment];
-  const childPaths = Array.flatMap(node.children, (child) =>
-    leafPathsForNode(child, segments),
-  );
-  return Option.match(node.importBinding, {
-    onNone: () => childPaths,
-    onSome: (binding) =>
-      Array.prepend(childPaths, { binding, dotPath: segments.join(".") }),
-  });
-};
-
-/**
- * Walk the assembly tree and produce one entry per leaf spec, pairing its
- * import binding with the full dot-path codegen will register via
- * `Spec.addPath`. Ordering matches `collectImportBindings` (sorted by the
- * binding's local name) so the generated file is stable across runs.
- */
-export const collectLeafPaths = (
-  nodes: ReadonlyArray<SpecAssemblyNode>,
-): ReadonlyArray<SpecLeafPath> =>
-  pipe(
-    Array.flatMap(nodes, (node) => leafPathsForNode(node, [])),
-    Array.sortBy(
-      Order.mapInput(Order.string, (entry) => entry.binding.localName),
-    ),
-  );

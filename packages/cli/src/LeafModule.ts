@@ -310,7 +310,7 @@ export const validateImpl = (leaf: LeafModule) =>
     if (missing.length > 0) {
       return yield* new ImplMissingFunctionsError({
         implPath: implRelativePath,
-        groupPath: finalizedGroupImpl.groupPath,
+        groupPath: leaf.groupPathDot,
         missingFunctionNames: missing,
       });
     }

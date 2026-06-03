@@ -1,12 +1,17 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Layer } from "effect";
-import api from "../_generated/api";
+import databaseSchema from "../_generated/schema";
 import { control } from "./cacheControl";
 import cacheControl from "./cacheControl.spec";
 
-const controlImpl = FunctionImpl.make(api, cacheControl, "control", control);
+const controlImpl = FunctionImpl.make(
+  databaseSchema,
+  cacheControl,
+  "control",
+  control,
+);
 
-export default GroupImpl.make(api, cacheControl).pipe(
+export default GroupImpl.make(databaseSchema, cacheControl).pipe(
   Layer.provide(controlImpl),
   GroupImpl.finalize,
 );

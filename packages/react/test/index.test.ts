@@ -31,9 +31,9 @@ const queryWithError = Ref.make(
   "notes",
   FunctionSpec.publicQuery({
     name: "getOrFail",
-    args: Schema.Struct({ id: Schema.String }),
-    returns: Schema.Struct({ text: Schema.String }),
-    error: NotFound,
+    args: () => Schema.Struct({ id: Schema.String }),
+    returns: () => Schema.Struct({ text: Schema.String }),
+    error: () => NotFound,
   }),
 );
 
@@ -41,8 +41,8 @@ const queryNoError = Ref.make(
   "notes",
   FunctionSpec.publicQuery({
     name: "list",
-    args: Schema.Struct({}),
-    returns: Schema.Array(Schema.Struct({ text: Schema.String })),
+    args: () => Schema.Struct({}),
+    returns: () => Schema.Array(Schema.Struct({ text: Schema.String })),
   }),
 );
 
@@ -50,9 +50,9 @@ const mutationWithError = Ref.make(
   "notes",
   FunctionSpec.publicMutation({
     name: "deleteOrFail",
-    args: Schema.Struct({ id: Schema.String }),
-    returns: Schema.Null,
-    error: NotFound,
+    args: () => Schema.Struct({ id: Schema.String }),
+    returns: () => Schema.Null,
+    error: () => NotFound,
   }),
 );
 
@@ -60,8 +60,8 @@ const mutationNoError = Ref.make(
   "notes",
   FunctionSpec.publicMutation({
     name: "insert",
-    args: Schema.Struct({ text: Schema.String }),
-    returns: Schema.String,
+    args: () => Schema.Struct({ text: Schema.String }),
+    returns: () => Schema.String,
   }),
 );
 
@@ -69,9 +69,9 @@ const actionWithError = Ref.make(
   "tasks",
   FunctionSpec.publicAction({
     name: "runOrFail",
-    args: Schema.Struct({ id: Schema.String }),
-    returns: Schema.Null,
-    error: NotFound,
+    args: () => Schema.Struct({ id: Schema.String }),
+    returns: () => Schema.Null,
+    error: () => NotFound,
   }),
 );
 
@@ -79,8 +79,8 @@ const actionNoError = Ref.make(
   "tasks",
   FunctionSpec.publicAction({
     name: "ping",
-    args: Schema.Struct({}),
-    returns: Schema.String,
+    args: () => Schema.Struct({}),
+    returns: () => Schema.String,
   }),
 );
 

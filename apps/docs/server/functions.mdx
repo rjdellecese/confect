@@ -21,7 +21,7 @@ For Node.js actions, see [Node Actions](/server/node-actions). To integrate plai
 
 ## Defining a spec
 
-Each function spec defines the function's name, arguments schema, and returns schema. Function specs are added to a `GroupSpec` and default-exported from a `*.spec.ts` file. See [The Spec/Impl Model](/concepts/spec-impl-model) for a full walkthrough.
+Each function spec defines the function's name, arguments schema, and returns schema. The `args`, `returns`, and (optional) `error` schemas are passed as `() => Schema` callbacks, evaluated lazily the first time the function is invoked. Function specs are added to a `GroupSpec` and default-exported from a `*.spec.ts` file. See [The Spec/Impl Model](/concepts/spec-impl-model) for a full walkthrough.
 
 ```ts confect/notes.spec.ts
 import { GroupSpec, FunctionSpec } from "@confect/core";
@@ -31,8 +31,8 @@ import notes from "./_generated/tables/notes";
 
 const list = FunctionSpec.publicQuery({
   name: "list",
-  args: Schema.Struct({}),
-  returns: Schema.Array(notes.Doc),
+  args: () => Schema.Struct({}),
+  returns: () => Schema.Array(notes.Doc),
 });
 
 export default GroupSpec.make().addFunction(list);
@@ -58,9 +58,9 @@ class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
 
 FunctionSpec.publicQuery({
   name: "getOrFail",
-  args: Schema.Struct({ noteId: Id("notes") }),
-  returns: notes.Doc,
-  error: NoteNotFound,
+  args: () => Schema.Struct({ noteId: Id("notes") }),
+  returns: () => notes.Doc,
+  error: () => NoteNotFound,
 });
 ```
 
@@ -74,11 +74,11 @@ The handler receives the decoded arguments as its first parameter and returns an
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Effect, Layer } from "effect";
 
-import api from "./_generated/api";
+import databaseSchema from "./_generated/schema";
 import { DatabaseReader } from "./_generated/services";
 import notes from "./notes.spec";
 
-const list = FunctionImpl.make(api, notes, "list", () =>
+const list = FunctionImpl.make(databaseSchema, notes, "list", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
 
@@ -89,7 +89,7 @@ const list = FunctionImpl.make(api, notes, "list", () =>
   }).pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(api, notes).pipe(
+export default GroupImpl.make(databaseSchema, notes).pipe(
   Layer.provide(list),
   GroupImpl.finalize,
 );

@@ -1,20 +1,24 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Effect, Layer } from "effect";
-import api from "./_generated/api";
+import databaseSchema from "./_generated/schema";
 import { DatabaseReader } from "./_generated/services";
 import databaseReader from "./databaseReader.spec";
 
-export default GroupImpl.make(api, databaseReader).pipe(
+export default GroupImpl.make(databaseSchema, databaseReader).pipe(
   Layer.provide(
     Layer.mergeAll(
-      FunctionImpl.make(api, databaseReader, "getNote", ({ noteId }) =>
-        Effect.gen(function* () {
-          const reader = yield* DatabaseReader;
+      FunctionImpl.make(
+        databaseSchema,
+        databaseReader,
+        "getNote",
+        ({ noteId }) =>
+          Effect.gen(function* () {
+            const reader = yield* DatabaseReader;
 
-          return yield* reader.table("notes").get(noteId);
-        }).pipe(Effect.orDie),
+            return yield* reader.table("notes").get(noteId);
+          }).pipe(Effect.orDie),
       ),
-      FunctionImpl.make(api, databaseReader, "listNotes", () =>
+      FunctionImpl.make(databaseSchema, databaseReader, "listNotes", () =>
         Effect.gen(function* () {
           const reader = yield* DatabaseReader;
 
@@ -25,7 +29,7 @@ export default GroupImpl.make(api, databaseReader).pipe(
         }).pipe(Effect.orDie),
       ),
       FunctionImpl.make(
-        api,
+        databaseSchema,
         databaseReader,
         "paginateNotes",
         ({ cursor, numItems }) =>
@@ -39,7 +43,7 @@ export default GroupImpl.make(api, databaseReader).pipe(
           }).pipe(Effect.orDie),
       ),
       FunctionImpl.make(
-        api,
+        databaseSchema,
         databaseReader,
         "paginateNotesWithFilter",
         ({ cursor, numItems, tag }) =>

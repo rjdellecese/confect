@@ -199,8 +199,7 @@ export const hasErrorSchema = (ref: Any): boolean =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag(
       "Confect",
-      (confectFunctionProvenance) =>
-        confectFunctionProvenance.error !== undefined,
+      (confectFunctionProvenance) => "error" in confectFunctionProvenance,
     ),
     Match.tag("Convex", () => false),
     Match.exhaustive,
@@ -296,7 +295,7 @@ export const decodeError = <Ref_ extends Any>(
 ): Effect.Effect<Option.Option<Error<Ref_>>, ParseResult.ParseError> =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag("Confect", (confectFunctionProvenance) =>
-      confectFunctionProvenance.error !== undefined
+      "error" in confectFunctionProvenance
         ? Effect.map(
             Schema.decode(confectFunctionProvenance.error)(encodedError),
             Option.some,
@@ -317,7 +316,7 @@ export const decodeErrorSync = <Ref_ extends Any>(
 ): Option.Option<Error<Ref_>> =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag("Confect", (confectFunctionProvenance) =>
-      confectFunctionProvenance.error !== undefined
+      "error" in confectFunctionProvenance
         ? Option.some(
             Schema.decodeSync(confectFunctionProvenance.error)(
               encodedError,
@@ -336,7 +335,7 @@ export const maybeDecodeErrorSync = <Ref_ extends Any>(
   isConvexError(error)
     ? Match.value(ref.functionSpec.functionProvenance).pipe(
         Match.tag("Confect", (confectFunctionProvenance) =>
-          confectFunctionProvenance.error !== undefined
+          "error" in confectFunctionProvenance
             ? Schema.decodeSync(confectFunctionProvenance.error)(error.data)
             : error,
         ),

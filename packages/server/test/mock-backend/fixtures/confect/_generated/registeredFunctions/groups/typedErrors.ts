@@ -1,5 +1,5 @@
 import { RegisteredConvexFunction, RegisteredFunctions } from "@confect/server";
-import api from "../../api";
+import databaseSchema from "../../schema";
 import typedErrors from "../../../groups/typedErrors.impl";
 
-export default RegisteredFunctions.buildForGroup(api, "groups.typedErrors", typedErrors, RegisteredConvexFunction.make);
+export default RegisteredFunctions.buildForGroup<typeof import("../../../groups/typedErrors.spec")["default"]>(databaseSchema, typedErrors, RegisteredConvexFunction.make);

@@ -1,5 +1,5 @@
 import { RegisteredConvexFunction, RegisteredFunctions } from "@confect/server";
-import api from "../../api";
+import databaseSchema from "../../schema";
 import cacheControl from "../../../groups/cacheControl.impl";
 
-export default RegisteredFunctions.buildForGroup(api, "groups.cacheControl", cacheControl, RegisteredConvexFunction.make);
+export default RegisteredFunctions.buildForGroup<typeof import("../../../groups/cacheControl.spec")["default"]>(databaseSchema, cacheControl, RegisteredConvexFunction.make);

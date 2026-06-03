@@ -220,8 +220,8 @@ layer(Layer.empty)("validateNoParentChildNameCollisions", (it) => {
       const parentGroupSpec = GroupSpec.make().addFunction(
         FunctionSpec.publicQuery({
           name: "list",
-          args: emptyArgs,
-          returns: emptyReturns,
+          args: () => emptyArgs,
+          returns: () => emptyReturns,
         }),
       );
 
@@ -241,8 +241,8 @@ layer(Layer.empty)("validateNoParentChildNameCollisions", (it) => {
         const parentGroupSpec = GroupSpec.make().addFunction(
           FunctionSpec.publicQuery({
             name: "archived",
-            args: emptyArgs,
-            returns: emptyReturns,
+            args: () => emptyArgs,
+            returns: () => emptyReturns,
           }),
         );
 
@@ -271,8 +271,8 @@ layer(Layer.empty)("validateNoParentChildNameCollisions", (it) => {
         const inner = GroupSpec.makeAt("inner").addFunction(
           FunctionSpec.publicQuery({
             name: "list",
-            args: emptyArgs,
-            returns: emptyReturns,
+            args: () => emptyArgs,
+            returns: () => emptyReturns,
           }),
         );
         const parentGroupSpec = GroupSpec.make().addGroupAt("archived", inner);

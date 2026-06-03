@@ -1,11 +1,11 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Command } from "@effect/platform";
 import { Console, Duration, Effect, Layer } from "effect";
-import nodeApi from "../_generated/nodeApi";
+import databaseSchema from "../_generated/schema";
 import email from "./email.spec";
 
 const send = FunctionImpl.make(
-  nodeApi,
+  databaseSchema,
   email,
   "send",
   Effect.fn(function* ({ to, subject, body }) {
@@ -25,7 +25,7 @@ const send = FunctionImpl.make(
 );
 
 const getInbox = FunctionImpl.make(
-  nodeApi,
+  databaseSchema,
   email,
   "getInbox",
   Effect.fn(function* () {
@@ -45,7 +45,7 @@ const getInbox = FunctionImpl.make(
   }),
 );
 
-export default GroupImpl.make(nodeApi, email).pipe(
+export default GroupImpl.make(databaseSchema, email).pipe(
   Layer.provide(send),
   Layer.provide(getInbox),
   GroupImpl.finalize,

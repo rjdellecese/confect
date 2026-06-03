@@ -171,7 +171,7 @@ For plain Convex functions, the impl is the Convex function value itself. Pass e
 ```ts confect/workpool.impl.ts
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Layer } from "effect";
-import api from "./_generated/api";
+import databaseSchema from "./_generated/schema";
 import {
   backgroundWork,
   enqueue,
@@ -181,26 +181,31 @@ import {
 import workpool from "./workpool.spec";
 
 const enqueueImpl = FunctionImpl.make(
-  api,
+  databaseSchema,
   workpool,
   "enqueue",
   enqueue,
 );
-const statusImpl = FunctionImpl.make(api, workpool, "status", status);
+const statusImpl = FunctionImpl.make(
+  databaseSchema,
+  workpool,
+  "status",
+  status,
+);
 const backgroundWorkImpl = FunctionImpl.make(
-  api,
+  databaseSchema,
   workpool,
   "backgroundWork",
   backgroundWork,
 );
 const onCompleteImpl = FunctionImpl.make(
-  api,
+  databaseSchema,
   workpool,
   "onComplete",
   onComplete,
 );
 
-export default GroupImpl.make(api, workpool).pipe(
+export default GroupImpl.make(databaseSchema, workpool).pipe(
   Layer.provide(enqueueImpl),
   Layer.provide(statusImpl),
   Layer.provide(backgroundWorkImpl),
@@ -235,8 +240,8 @@ import notes from "./_generated/tables/notes";
 
 const list = FunctionSpec.publicQuery({
   name: "list",
-  args: Schema.Struct({}),
-  returns: Schema.Array(notes.Doc),
+  args: () => Schema.Struct({}),
+  returns: () => Schema.Array(notes.Doc),
 });
 
 const searchSpec =

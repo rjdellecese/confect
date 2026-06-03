@@ -2,7 +2,6 @@ import { Array, Effect, Option } from "effect";
 import { CodeBlockWriter } from "./CodeBlockWriter";
 import {
   collectImportBindings,
-  collectLeafPaths,
   type SpecAssemblyNode,
 } from "./SpecAssemblyNode";
 
@@ -65,8 +64,8 @@ interface TableModuleBinding {
 
 /**
  * Emit `confect/_generated/schema.ts` — the runtime `DatabaseSchema` used
- * by `_generated/api.ts` (and downstream by per-function bundles for codec
- * lookup). Every table wrapper at
+ * by impls and the per-group registries (and downstream by per-function
+ * bundles for codec lookup). Every table wrapper at
  * `confect/_generated/tables/<name>.ts` is imported statically and
  * registered as a value entry on the `DatabaseSchema.make({...})` call.
  * Per-table laziness lives inside each `Table`: its `Fields`, `Doc`, and
@@ -292,54 +291,15 @@ export const refs = ({
     return yield* cbw.toString();
   });
 
-export const api = ({
+export const registeredFunctionsForGroup = ({
   schemaImportPath,
   specImportPath,
-}: {
-  schemaImportPath: string;
-  specImportPath: string;
-}) =>
-  Effect.gen(function* () {
-    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
-
-    yield* cbw.writeLine(`import { Api } from "@confect/server";`);
-    yield* cbw.writeLine(`import schema from "${schemaImportPath}";`);
-    yield* cbw.writeLine(`import spec from "${specImportPath}";`);
-    yield* cbw.blankLine();
-    yield* cbw.writeLine(`export default Api.make(schema, spec);`);
-
-    return yield* cbw.toString();
-  });
-
-export const nodeApi = ({
-  schemaImportPath,
-  nodeSpecImportPath,
-}: {
-  schemaImportPath: string;
-  nodeSpecImportPath: string;
-}) =>
-  Effect.gen(function* () {
-    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
-
-    yield* cbw.writeLine(`import { Api } from "@confect/server";`);
-    yield* cbw.blankLine();
-    yield* cbw.writeLine(`import schema from "${schemaImportPath}";`);
-    yield* cbw.writeLine(`import nodeSpec from "${nodeSpecImportPath}";`);
-    yield* cbw.blankLine();
-    yield* cbw.writeLine(`export default Api.make(schema, nodeSpec);`);
-
-    return yield* cbw.toString();
-  });
-
-export const registeredFunctionsForGroup = ({
-  apiImportPath,
-  groupPathDot,
   implImportPath,
   layerExportName,
   useNode = false,
 }: {
-  apiImportPath: string;
-  groupPathDot: string;
+  schemaImportPath: string;
+  specImportPath: string;
   implImportPath: string;
   layerExportName: string;
   useNode?: boolean;
@@ -360,14 +320,20 @@ export const registeredFunctionsForGroup = ({
       );
     }
 
-    yield* cbw.writeLine(`import api from "${apiImportPath}";`);
+    yield* cbw.writeLine(`import databaseSchema from "${schemaImportPath}";`);
     yield* cbw.writeLine(`import ${layerExportName} from "${implImportPath}";`);
     yield* cbw.blankLine();
-    const quotedGroupPath = `"${groupPathDot.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+    // The group's own leaf spec is referenced type-only (`typeof import(...)`),
+    // so the spec module is erased at transpile time and never enters the
+    // per-function bundle; only `databaseSchema` and the impl are runtime
+    // imports. Typing from the leaf spec (not the project-wide assembled spec)
+    // keeps the registry's type dependent solely on its own group.
+    const specType = `typeof import("${specImportPath}")["default"]`;
+    const makeFn = useNode
+      ? "RegisteredNodeFunction.make"
+      : "RegisteredConvexFunction.make";
     yield* cbw.writeLine(
-      useNode
-        ? `export default RegisteredFunctions.buildForGroup(api, ${quotedGroupPath}, ${layerExportName}, RegisteredNodeFunction.make);`
-        : `export default RegisteredFunctions.buildForGroup(api, ${quotedGroupPath}, ${layerExportName}, RegisteredConvexFunction.make);`,
+      `export default RegisteredFunctions.buildForGroup<${specType}>(databaseSchema, ${layerExportName}, ${makeFn});`,
     );
 
     return yield* cbw.toString();
@@ -655,13 +621,6 @@ export const assembledSpec = ({
       runtime === "Convex" ? "GroupSpec.makeAt" : "GroupSpec.makeNodeAt";
 
     yield* cbw.write(`export default ${specFactory}`);
-    yield* Effect.forEach(collectLeafPaths(nodes), (leaf) =>
-      Effect.gen(function* () {
-        yield* cbw.write(`.addPath(${leaf.binding.localName}, `);
-        yield* cbw.quote(leaf.dotPath);
-        yield* cbw.write(")");
-      }),
-    );
     yield* Effect.forEach(nodes, (node) =>
       writeRootAddAt(cbw, node, groupFactory),
     );

@@ -1,6 +1,5 @@
 export * as ActionCtx from "./ActionCtx";
 export * as ActionRunner from "./ActionRunner";
-export * as Api from "./Api";
 export * as Auth from "./Auth";
 export * as BlobNotFoundError from "./BlobNotFoundError";
 export * as ConvexConfigProvider from "./ConvexConfigProvider";

@@ -10,9 +10,8 @@ import {
   Predicate,
   Record,
   Ref,
-  String,
 } from "effect";
-import * as Api from "./Api";
+import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as FunctionImpl from "./FunctionImpl";
 
 export const TypeId = "@confect/server/GroupImpl";
@@ -21,11 +20,9 @@ export type TypeId = typeof TypeId;
 export type FinalizationStatus = "Unfinalized" | "Finalized";
 
 export interface GroupImpl<
-  GroupPath_ extends string,
   FinalizationStatus_ extends FinalizationStatus = "Unfinalized",
 > {
   readonly [TypeId]: TypeId;
-  readonly groupPath: GroupPath_;
   readonly finalizationStatus: FinalizationStatus_;
   /**
    * Names of every function registered into this group's layer scope by
@@ -36,13 +33,13 @@ export interface GroupImpl<
   readonly registeredFunctionNames: ReadonlyArray<string>;
 }
 
-export interface Any extends GroupImpl<string, FinalizationStatus> {}
+export interface Any extends GroupImpl<FinalizationStatus> {}
 
 export const isGroupImpl = (u: unknown): u is Any =>
   Predicate.hasProperty(u, TypeId);
 
-export interface AnyFinalized extends GroupImpl<string, "Finalized"> {}
-export interface AnyUnfinalized extends GroupImpl<string, "Unfinalized"> {}
+export interface AnyFinalized extends GroupImpl<"Finalized"> {}
+export interface AnyUnfinalized extends GroupImpl<"Unfinalized"> {}
 
 export const isFinalizedGroupImpl = (u: unknown): u is AnyFinalized =>
   isGroupImpl(u) && u.finalizationStatus === "Finalized";
@@ -54,83 +51,71 @@ export const isUnfinalizedGroupImpl = (u: unknown): u is AnyUnfinalized =>
  * Build the runtime tag for a `GroupImpl` service. The finalization status is
  * embedded in the tag string so that `Unfinalized` and `Finalized` are distinct
  * services at runtime; consumers of a finalized layer (the server's
- * `RegisteredFunctions.buildForGroup` and the CLI's `implValidation`) retrieve
+ * `RegisteredFunctions.buildForGroup` and the CLI's `validateImpl`) retrieve
  * the typed `Finalized` service directly rather than scanning the context.
+ *
+ * The tag is keyed only by finalization status — no group path — because each
+ * group's impl layer is built in its own isolated scope (`buildForGroup` /
+ * `validateImpl` each provide a fresh `Registry`), so at most one `GroupImpl`
+ * service of each status exists per build.
  */
-export const GroupImpl = <
-  GroupPath_ extends string,
-  FinalizationStatus_ extends FinalizationStatus,
->({
-  groupPath,
+export const GroupImpl = <FinalizationStatus_ extends FinalizationStatus>({
   finalizationStatus,
 }: {
-  groupPath: GroupPath_;
   finalizationStatus: FinalizationStatus_;
 }) =>
-  Context.GenericTag<GroupImpl<GroupPath_, FinalizationStatus_>>(
-    `@confect/server/GroupImpl/${finalizationStatus}/${groupPath}`,
+  Context.GenericTag<GroupImpl<FinalizationStatus_>>(
+    `@confect/server/GroupImpl/${finalizationStatus}`,
   );
 
+/**
+ * Begin a group's impl layer. `databaseSchema` and `group` are retained only as
+ * type-level carriers (`group` drives the required `FunctionImpl` services via
+ * `FromGroupSpec<Group>`; `databaseSchema` keeps the impl's dependency on
+ * `_generated/schema` symmetric with `FunctionImpl.make`). Neither is read at
+ * runtime.
+ */
 export const make = <
-  Api_ extends Api.AnyWithProps,
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Group extends GroupSpec.AnyWithProps,
 >(
-  api: Api_,
-  group: Group,
+  _databaseSchema: DatabaseSchema_,
+  _group: Group,
 ): Layer.Layer<
-  GroupImpl<string, "Unfinalized">,
+  GroupImpl<"Unfinalized">,
   never,
   FunctionImpl.FromGroupSpec<Group>
-> => {
-  const groupPath = Api.resolveGroupPathUnsafe(api, group);
-
-  return Layer.succeed(
-    GroupImpl<string, "Unfinalized">({
-      groupPath,
-      finalizationStatus: "Unfinalized",
-    }),
+> =>
+  Layer.succeed(
+    GroupImpl<"Unfinalized">({ finalizationStatus: "Unfinalized" }),
     {
       [TypeId]: TypeId,
-      groupPath,
       finalizationStatus: "Unfinalized" as const,
       registeredFunctionNames: [],
     },
   ) as Layer.Layer<
-    GroupImpl<string, "Unfinalized">,
+    GroupImpl<"Unfinalized">,
     never,
     FunctionImpl.FromGroupSpec<Group>
   >;
-};
 
 const isFunctionShaped = (value: unknown): boolean =>
   Predicate.isRecord(value) && "functionSpec" in value;
 
 /**
- * Walk a `RegistryItems` tree to the entries at `groupPath` and return the
- * names of the function-shaped leaves directly underneath.
+ * Return the names of the function-shaped entries in a group's (flat,
+ * isolated) registry. `FunctionImpl.make` registers each function under a
+ * single-segment key, so the registry built for one group contains exactly
+ * that group's functions at the top level.
  */
-const collectFunctionNamesAtPath = (
+const collectFunctionNames = (
   items: Registry.RegistryItems,
-  groupPath: string,
 ): ReadonlyArray<string> =>
   pipe(
-    String.split(groupPath, "."),
-    Array.reduce(Option.some<unknown>(items), (acc, segment) =>
-      acc.pipe(
-        Option.filter(Predicate.isRecord),
-        Option.flatMap((node) =>
-          segment in node ? Option.some(node[segment]) : Option.none(),
-        ),
-      ),
+    Record.toEntries(items),
+    Array.filterMap(([name, value]) =>
+      isFunctionShaped(value) ? Option.some(name) : Option.none(),
     ),
-    Option.filter(Predicate.isRecord),
-    Option.map(Record.toEntries),
-    Option.map(
-      Array.filterMap(([name, value]) =>
-        isFunctionShaped(value) ? Option.some(name) : Option.none(),
-      ),
-    ),
-    Option.getOrElse((): ReadonlyArray<string> => []),
   );
 
 const findUnfinalizedGroupImpl = <S>(
@@ -151,12 +136,12 @@ const findUnfinalizedGroupImpl = <S>(
  * impl completeness against a `GroupSpec`'s expected functions without
  * having to inspect the `Registry` themselves.
  */
-export const finalize = <GroupPath_ extends string>(
-  group: Layer.Layer<GroupImpl<GroupPath_, "Unfinalized">>,
-): Layer.Layer<GroupImpl<GroupPath_, "Finalized">> =>
+export const finalize = (
+  group: Layer.Layer<GroupImpl<"Unfinalized">>,
+): Layer.Layer<GroupImpl<"Finalized">> =>
   Layer.flatMap(
     group,
-    (context): Layer.Layer<GroupImpl<GroupPath_, "Finalized">> =>
+    (context): Layer.Layer<GroupImpl<"Finalized">> =>
       findUnfinalizedGroupImpl(context).pipe(
         Option.match({
           onNone: () =>
@@ -165,28 +150,19 @@ export const finalize = <GroupPath_ extends string>(
                 "GroupImpl.finalize: no Unfinalized GroupImpl service was found in the layer's context.",
               ),
             ),
-          onSome: (unfinalized) => {
-            const groupPath = unfinalized.groupPath as GroupPath_;
-            return Layer.effect(
-              GroupImpl<GroupPath_, "Finalized">({
-                groupPath,
-                finalizationStatus: "Finalized",
-              }),
+          onSome: () =>
+            Layer.effect(
+              GroupImpl<"Finalized">({ finalizationStatus: "Finalized" }),
               Effect.gen(function* () {
                 const registry = yield* Registry.Registry;
                 const items = yield* Ref.get(registry);
                 return {
                   [TypeId]: TypeId,
-                  groupPath,
                   finalizationStatus: "Finalized" as const,
-                  registeredFunctionNames: collectFunctionNamesAtPath(
-                    items,
-                    groupPath,
-                  ),
+                  registeredFunctionNames: collectFunctionNames(items),
                 };
               }),
-            );
-          },
+            ),
         }),
       ),
   );

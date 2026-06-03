@@ -303,18 +303,18 @@ export default GroupImpl.make(
             "_unfinalized",
             `import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Effect, Layer } from "effect";
-import api from "../_generated/api";
+import databaseSchema from "../_generated/schema";
 import { DatabaseReader, DatabaseWriter } from "../_generated/services";
 import notes from "./_unfinalized.spec";
 
-const insert = FunctionImpl.make(api, notes, "insert", ({ text }) =>
+const insert = FunctionImpl.make(databaseSchema, notes, "insert", ({ text }) =>
   Effect.gen(function* () {
     const writer = yield* DatabaseWriter;
     return yield* writer.table("notes").insert({ text });
   }).pipe(Effect.orDie),
 );
 
-const list = FunctionImpl.make(api, notes, "list", () =>
+const list = FunctionImpl.make(databaseSchema, notes, "list", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
     return yield* reader
@@ -324,7 +324,7 @@ const list = FunctionImpl.make(api, notes, "list", () =>
   }).pipe(Effect.orDie),
 );
 
-const delete_ = FunctionImpl.make(api, notes, "delete_", ({ noteId }) =>
+const delete_ = FunctionImpl.make(databaseSchema, notes, "delete_", ({ noteId }) =>
   Effect.gen(function* () {
     const writer = yield* DatabaseWriter;
     yield* writer.table("notes").delete(noteId);
@@ -332,21 +332,21 @@ const delete_ = FunctionImpl.make(api, notes, "delete_", ({ noteId }) =>
   }).pipe(Effect.orDie),
 );
 
-const getFirst = FunctionImpl.make(api, notes, "getFirst", () =>
+const getFirst = FunctionImpl.make(databaseSchema, notes, "getFirst", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
     return yield* reader.table("notes").index("by_creation_time").first();
   }).pipe(Effect.orDie),
 );
 
-const internalGetFirst = FunctionImpl.make(api, notes, "internalGetFirst", () =>
+const internalGetFirst = FunctionImpl.make(databaseSchema, notes, "internalGetFirst", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
     return yield* reader.table("notes").index("by_creation_time").first();
   }).pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(api, notes).pipe(
+export default GroupImpl.make(databaseSchema, notes).pipe(
   Layer.provide(insert),
   Layer.provide(list),
   Layer.provide(delete_),
@@ -372,18 +372,18 @@ export default GroupImpl.make(api, notes).pipe(
             "_incomplete",
             `import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Effect, Layer } from "effect";
-import api from "../_generated/api";
+import databaseSchema from "../_generated/schema";
 import { DatabaseWriter } from "../_generated/services";
 import notes from "./_incomplete.spec";
 
-const insert = FunctionImpl.make(api, notes, "insert", ({ text }) =>
+const insert = FunctionImpl.make(databaseSchema, notes, "insert", ({ text }) =>
   Effect.gen(function* () {
     const writer = yield* DatabaseWriter;
     return yield* writer.table("notes").insert({ text });
   }).pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(api, notes).pipe(
+export default GroupImpl.make(databaseSchema, notes).pipe(
   Layer.provide(insert),
   // Cast away the remaining FunctionImpl requirements so the file
   // compiles even though only "insert" is implemented; the CLI must
@@ -400,7 +400,9 @@ export default GroupImpl.make(api, notes).pipe(
 
         assert(Either.isLeft(result));
         assert(result.left._tag === "ImplMissingFunctionsError");
-        expect(result.left.groupPath).toBe("groups.notes");
+        // The reported group path is the impl/spec leaf's own filesystem
+        // location, which points at the file that is missing functions.
+        expect(result.left.groupPath).toBe("groups._incomplete");
         expect([...result.left.missingFunctionNames].sort()).toEqual(
           ["delete_", "getFirst", "internalGetFirst", "list"].sort(),
         );

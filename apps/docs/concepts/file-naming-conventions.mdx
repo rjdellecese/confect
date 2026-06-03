@@ -20,8 +20,8 @@ import notes from "./_generated/tables/notes";
 
 const list = FunctionSpec.publicQuery({
   name: "list",
-  args: Schema.Struct({}),
-  returns: Schema.Array(notes.Doc),
+  args: () => Schema.Struct({}),
+  returns: () => Schema.Array(notes.Doc),
 });
 
 export default GroupSpec.make().addFunction(list);
@@ -31,11 +31,11 @@ export default GroupSpec.make().addFunction(list);
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Effect, Layer } from "effect";
 
-import api from "./_generated/api";
+import databaseSchema from "./_generated/schema";
 import { DatabaseReader } from "./_generated/services";
 import notes from "./notes.spec";
 
-const list = FunctionImpl.make(api, notes, "list", () =>
+const list = FunctionImpl.make(databaseSchema, notes, "list", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
 
@@ -46,7 +46,7 @@ const list = FunctionImpl.make(api, notes, "list", () =>
   }).pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(api, notes).pipe(
+export default GroupImpl.make(databaseSchema, notes).pipe(
   Layer.provide(list),
   GroupImpl.finalize,
 );
@@ -82,7 +82,7 @@ confect/
 
 ## Node actions
 
-Place [node action](/server/node-actions) spec and impl files in a `node/` subdirectory, using the same `.spec.ts`/`.impl.ts` suffixes. Their specs use `GroupSpec.makeNode()` and their impls use the `nodeApi` from `_generated/nodeApi`.
+Place [node action](/server/node-actions) spec and impl files in a `node/` subdirectory, using the same `.spec.ts`/`.impl.ts` suffixes. Their specs use `GroupSpec.makeNode()`; their impls are otherwise identical to non-node impls, passing the database schema from `_generated/schema`.
 
 ```
 confect/
@@ -111,9 +111,7 @@ Putting it all together, a project using all of these conventions might look lik
 <Tree>
   <Tree.Folder name="confect" defaultOpen>
     <Tree.Folder name="_generated" defaultOpen>
-      <Tree.File name="api.ts" />
       <Tree.File name="convexSchema.ts" />
-      <Tree.File name="nodeApi.ts" />
       <Tree.File name="nodeSpec.ts" />
       <Tree.File name="refs.ts" />
       <Tree.File name="schema.ts" />

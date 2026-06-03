@@ -1,63 +1,66 @@
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import type * as GroupSpec from "@confect/core/GroupSpec";
 import * as Registry from "@confect/core/Registry";
-import { Context, Effect, Layer, Ref, String } from "effect";
-import * as Api from "./Api";
+import { Context, Effect, Layer, Ref } from "effect";
+import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as Handler from "./Handler";
 import { setNestedProperty } from "./internal/utils";
 import * as RegistryItem from "./RegistryItem";
 
-export interface FunctionImpl<
-  GroupPath_ extends string,
-  FunctionName extends string,
-> {
-  readonly groupPath: GroupPath_;
+export interface FunctionImpl<FunctionName extends string> {
   readonly functionName: FunctionName;
 }
 
-export const FunctionImpl = <
-  GroupPath_ extends string,
-  FunctionName extends string,
->({
-  groupPath,
+export const FunctionImpl = <FunctionName extends string>({
   functionName,
 }: {
-  groupPath: GroupPath_;
   functionName: FunctionName;
 }) =>
-  Context.GenericTag<FunctionImpl<GroupPath_, FunctionName>>(
-    `@confect/server/FunctionImpl/${groupPath}/${functionName}`,
+  Context.GenericTag<FunctionImpl<FunctionName>>(
+    `@confect/server/FunctionImpl/${functionName}`,
   );
 
+/**
+ * Register a single function's implementation into the group's `Registry`.
+ *
+ * The function is registered under a flat, single-segment key (its own
+ * `functionName`), not a project-wide dot-path. Each group's impl layer is
+ * built in isolation — `RegisteredFunctions.buildForGroup` (and the CLI's
+ * `validateImpl`) provide a fresh `Registry` per group — so function names
+ * only need to be unique within their own group.
+ *
+ * `databaseSchema` is retained purely as a type-level carrier: the handler's
+ * ctx-service requirements (`DatabaseReader`, `QueryCtx<DataModel>`, …) are
+ * derived from it via `Handler.WithName`. It is not read at runtime — the
+ * generated per-group registry forwards the schema value to the function
+ * builders — so impls depend on `_generated/schema` (table schemas) rather than
+ * `_generated/api` (which transitively imports every function spec).
+ */
 export const make = <
-  Api_ extends Api.AnyWithProps,
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Group extends GroupSpec.AnyWithProps,
   const FunctionName extends FunctionSpec.Name<GroupSpec.Functions<Group>>,
 >(
-  api: Api_,
+  _databaseSchema: DatabaseSchema_,
   group: Group,
   functionName: FunctionName,
   handler: Handler.WithName<
-    Api.Schema<Api_>,
+    DatabaseSchema_,
     GroupSpec.Functions<Group>,
     FunctionName
   >,
-): Layer.Layer<FunctionImpl<string, FunctionName>> => {
-  const groupPath = Api.resolveGroupPathUnsafe(api, group);
+): Layer.Layer<FunctionImpl<FunctionName>> => {
   const functionSpec = group.functions[functionName]!;
 
   return Layer.effect(
-    FunctionImpl<string, FunctionName>({
-      groupPath,
-      functionName,
-    }),
+    FunctionImpl<FunctionName>({ functionName }),
     Effect.gen(function* () {
       const registry = yield* Registry.Registry;
 
       yield* Ref.update(registry, (registryItems) =>
         setNestedProperty(
           registryItems,
-          [...String.split(groupPath, "."), functionName],
+          [functionName],
           RegistryItem.make({
             functionSpec,
             handler,
@@ -65,21 +68,16 @@ export const make = <
         ),
       );
 
-      return {
-        groupPath,
-        functionName,
-      };
+      return { functionName };
     }),
   );
 };
 
 /**
- * Get the function implementation service type for a specific group path and function name.
+ * Get the function implementation service type for a specific function name.
  */
-export type ForGroupPathAndFunction<
-  GroupPath_ extends string,
-  FunctionName extends string,
-> = FunctionImpl<GroupPath_, FunctionName>;
+export type ForFunction<FunctionName extends string> =
+  FunctionImpl<FunctionName>;
 
 /**
  * Get all function implementation services required for a group spec.
@@ -89,14 +87,6 @@ export type FromGroupSpec<Group extends GroupSpec.AnyWithProps> =
     GroupSpec.Functions<Group>
   > extends infer FunctionNames extends string
     ? FunctionNames extends string
-      ? FunctionImpl<string, FunctionNames>
+      ? FunctionImpl<FunctionNames>
       : never
     : never;
-
-/**
- * @deprecated Use {@link FromGroupSpec} instead.
- */
-export type FromGroupAtPath<
-  _GroupPath extends string,
-  Group extends GroupSpec.AnyWithProps,
-> = FromGroupSpec<Group>;

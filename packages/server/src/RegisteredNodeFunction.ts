@@ -7,14 +7,13 @@ import {
 } from "convex/server";
 import type { Effect } from "effect";
 import { Layer, Match, type Schema } from "effect";
-import type * as Api from "./Api";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as Handler from "./Handler";
 import * as RegisteredFunction from "./RegisteredFunction";
 import type * as RegistryItem from "./RegistryItem";
 
-export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Node">>(
-  api: Api_,
+export const make = (
+  databaseSchema: DatabaseSchema.AnyWithProps,
   { functionSpec, handler }: RegistryItem.AnyWithProps,
 ): RegisteredFunction.Any =>
   Match.value(functionSpec.functionProvenance).pipe(
@@ -30,7 +29,7 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Node">>(
       );
 
       return genericFunction(
-        nodeActionFunction(api.databaseSchema, {
+        nodeActionFunction(databaseSchema, {
           args: functionProvenance.args,
           returns: functionProvenance.returns,
           error: functionProvenance.error,

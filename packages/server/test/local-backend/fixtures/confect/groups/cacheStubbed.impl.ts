@@ -8,32 +8,32 @@
 
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Clock, Effect, Layer } from "effect";
-import api from "../_generated/api";
+import databaseSchema from "../_generated/schema";
 import cacheStubbed from "./cacheStubbed.spec";
 
 const confectNoTime = FunctionImpl.make(
-  api,
+  databaseSchema,
   cacheStubbed,
   "confectNoTime",
   () => Effect.sync(() => Math.random()),
 );
 
 const confectWithClock = FunctionImpl.make(
-  api,
+  databaseSchema,
   cacheStubbed,
   "confectWithClock",
   () => Clock.currentTimeMillis,
 );
 
 const confectWithRawDateNow = FunctionImpl.make(
-  api,
+  databaseSchema,
   cacheStubbed,
   "confectWithRawDateNow",
   () => Effect.sync(() => Date.now()),
 );
 
 const confectWithSpan = FunctionImpl.make(
-  api,
+  databaseSchema,
   cacheStubbed,
   "confectWithSpan",
   () =>
@@ -43,7 +43,7 @@ const confectWithSpan = FunctionImpl.make(
 );
 
 const confectWithLog = FunctionImpl.make(
-  api,
+  databaseSchema,
   cacheStubbed,
   "confectWithLog",
   () =>
@@ -53,7 +53,7 @@ const confectWithLog = FunctionImpl.make(
     }),
 );
 
-export default GroupImpl.make(api, cacheStubbed).pipe(
+export default GroupImpl.make(databaseSchema, cacheStubbed).pipe(
   Layer.provide(confectNoTime),
   Layer.provide(confectWithClock),
   Layer.provide(confectWithRawDateNow),

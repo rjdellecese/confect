@@ -25,23 +25,23 @@ Unlike the vanilla APIs, Convex functions defined with Confect may not return `u
 ```typescript ✅
 FunctionSpec.publicQuery({
   name: "myQuery",
-  args: Schema.Struct({}),
-  returns: Schema.Null,
+  args: () => Schema.Struct({}),
+  returns: () => Schema.Null,
 });
 ```
 
 ```typescript ❌
 FunctionSpec.publicQuery({
   name: "myQuery",
-  args: Schema.Struct({}),
-  returns: Schema.Undefined,
+  args: () => Schema.Struct({}),
+  returns: () => Schema.Undefined,
 });
 ```
 
 ```typescript ❌
 FunctionSpec.publicQuery({
   name: "myQuery",
-  args: Schema.Struct({}),
-  returns: Schema.Void,
+  args: () => Schema.Struct({}),
+  returns: () => Schema.Void,
 });
 ```
