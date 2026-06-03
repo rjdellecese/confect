@@ -1,7 +1,7 @@
 import type { DefaultFunctionArgs } from "convex/server";
 import type { Schema } from "effect";
 import { Data } from "effect";
-import { defineLazy } from "./internal/utils";
+import * as Lazy from "./Lazy";
 
 export type FunctionProvenance = Data.TaggedEnum<{
   Confect: {
@@ -46,7 +46,7 @@ export const FunctionProvenance = Data.taggedEnum<FunctionProvenance>();
 
 /**
  * Build a `Confect` provenance from lazy schema thunks. `args`, `returns`,
- * and `error` are exposed as sync lazy memoised getters (via {@link defineLazy})
+ * and `error` are exposed as sync lazy memoised getters (via {@link Lazy.defineProperty})
  * that only evaluate their thunk on first access, mirroring how `Table`
  * defers `Fields`/`Doc`/`tableDefinition`. This keeps importing the assembled
  * `_generated/spec.ts` cheap — no `Schema.Struct(...)` / `Schema.Array(...)`
@@ -71,10 +71,10 @@ export const Confect = <
 ): Confect<Args, Returns, Error> => {
   const provenance = { _tag: "Confect" as const };
 
-  defineLazy(provenance, "args", args);
-  defineLazy(provenance, "returns", returns);
+  Lazy.defineProperty(provenance, "args", args);
+  Lazy.defineProperty(provenance, "returns", returns);
   if (error !== undefined) {
-    defineLazy(provenance, "error", error);
+    Lazy.defineProperty(provenance, "error", error);
   }
 
   return provenance as Confect<Args, Returns, Error>;

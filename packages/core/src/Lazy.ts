@@ -12,8 +12,13 @@
  * is also `enumerable` before materialising, so presence checks
  * (`"key" in target`, `Object.hasOwn(target, key)`) observe it without
  * forcing the computation.
+ *
+ * This is the single shared implementation consumed across packages (e.g.
+ * `@confect/core`'s lazy `FunctionSpec` schemas and `@confect/server`'s lazy
+ * `Table` `Fields` / `Doc` / `tableDefinition`), so there is no chance of the
+ * two drifting apart.
  */
-export const defineLazy = <T extends object, K extends PropertyKey>(
+export const defineProperty = <T extends object, K extends PropertyKey>(
   target: T,
   key: K,
   compute: () => unknown,

@@ -1,3 +1,4 @@
+import * as Lazy from "@confect/core/Lazy";
 import * as SystemFields from "@confect/core/SystemFields";
 import {
   defineTable,
@@ -13,7 +14,6 @@ import {
 } from "convex/server";
 import type { GenericValidator, Validator } from "convex/values";
 import { Predicate, Schema } from "effect";
-import { defineLazy } from "./internal/utils";
 import {
   compileTableSchema,
   type TableSchemaToTableValidator,
@@ -315,7 +315,7 @@ export type TablesRecord<Tables extends AnyWithProps> = {
 // is constructed until first access on a bound `Table`. Each chain step is
 // O(1) (plain object spread of the metadata records) and never invokes the
 // callback. Binding via `unnamed(tableName)` installs lazy memoised getters
-// for `Fields`, `Doc`, and `tableDefinition` via `defineLazy`, so the
+// for `Fields`, `Doc`, and `tableDefinition` via `Lazy.defineProperty`, so the
 // first access materialises the value and replaces the getter with a plain
 // data property — second-and-subsequent accesses are observably
 // indistinguishable from a plain property and avoid all function-call
@@ -364,16 +364,16 @@ const makeBound = <
     VectorIndexes_
   >;
 
-  defineLazy(bound, "Fields", () => state.lazyFields());
+  Lazy.defineProperty(bound, "Fields", () => state.lazyFields());
 
-  defineLazy(bound, "Doc", () =>
+  Lazy.defineProperty(bound, "Doc", () =>
     SystemFields.extendWithSystemFields(
       tableName,
       (bound as { Fields: TableSchema_ }).Fields,
     ),
   );
 
-  defineLazy(bound, "tableDefinition", () => {
+  Lazy.defineProperty(bound, "tableDefinition", () => {
     const fields = (bound as { Fields: TableSchema_ }).Fields;
     let definition: TableDefinition<any, any, any, any> = defineTable(
       compileTableSchema(fields),
