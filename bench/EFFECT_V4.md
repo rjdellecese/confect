@@ -12,15 +12,18 @@ function needs — the runtime (`Effect`/`Layer`) and `Schema` — between Effec
 3.21.2 and Effect 4.0.0-beta.78, using the same bundle+cold-eval methodology.
 
 > Reproduce: `node src/effect4.mjs` (installs both versions, needs network).
-> Identical `import * as` probes, esbuild-minified, median of 31 fresh-process
-> evals. `import * as` is a worst-case (no tree-shaking) — but it's the right
-> model for Confect, whose `SchemaToValidator` pulls a broad Schema surface.
+> The probes assign the **whole namespace object** to a global, a deliberate
+> no-tree-shaking upper bound — and the right model for Confect, which pays the
+> full price today (it pulls the entire `effect/Schema`; see
+> `ATTRIBUTION.md` §5). Note this upper bound comes from escaping the whole
+> namespace, **not** from `import * as` syntax, which tree-shakes fine.
 
 ## Measured: Effect 3.21.2 vs 4.0.0-beta.78
 
-Top group: whole-namespace `import * as` (no tree-shaking) — an upper bound, and
-the right model for Confect (broad Schema surface). Bottom group: tree-shaken
-realistic fixtures mirroring effect-smol's own bundle fixtures.
+Top group: whole-namespace probes (assign the namespace object to a global → no
+tree-shaking) — an upper bound, and the model that matches what Confect pulls
+today. Bottom group: tree-shaken realistic fixtures mirroring effect-smol's own
+bundle fixtures.
 
 | surface | v3 min / gz / eval | v4 min / gz / eval | Δbytes | Δeval |
 |---|---|---|---|---|

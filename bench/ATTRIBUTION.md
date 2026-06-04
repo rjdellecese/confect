@@ -95,7 +95,42 @@ Ordered by leverage:
    only structural wins are upstream (lighter Effect module init) or a different
    validation strategy that doesn't load `effect/Schema` at cold start.
 
-## 5. Important context
+## 5. Import style: barrel vs submodule (a real, verified lever)
+
+`node src/treeshake.mjs`. A correction and a concrete finding:
+
+- **`import * as X` does NOT defeat tree-shaking.** With esbuild + effect's
+  `sideEffects: false`, `import * as Schema from "effect/Schema"` and
+  `import { Struct, … } from "effect/Schema"` produce **identical** bundles
+  (171.9 KiB here). The "no-tree-shaking upper bound" in earlier probes came from
+  assigning the whole namespace object to a global, not from the `import *` syntax.
+- **The real lever is the barrel vs the submodule path.** Importing a large
+  namespace from the **barrel** — `import { Schema } from "effect"` — pulls the
+  **entire** Schema namespace (308.8 KiB) regardless of how little you use, because
+  esbuild can't shake property accesses on the barrel's `export * as Schema`
+  object. The **submodule** path `import * as Schema from "effect/Schema"`
+  tree-shakes to 171.9 KiB — **~44% smaller**, even with broad AST-walking usage.
+- **One barrel importer spoils the whole bundle** (170.5 → 308.7 KiB): the retained
+  set is the union across all importers, so a single `from "effect"` Schema user
+  anywhere in the graph re-pulls everything.
+- **Confect today pays the full price.** Its real function bundle retains the
+  *entire* `effect/Schema` module (152.9 KiB, ≈ the 152.6 KiB full-namespace
+  reference) — it isn't tree-shaking Schema at all, because `@confect/server`
+  internals and the generated `tables/*`/`*.spec` files all use the barrel
+  (`import { Schema } from "effect"`). The same applies to `Stream` (the
+  `OrderedQuery` pull in §2/§4).
+
+**Implication.** There is real *bundle-size* headroom (Schema ~−44%, plus the
+Stream/etc. modules), but only as a **library-wide convention change**: every
+module in a function's graph that touches `Schema`/`Stream` must import from the
+submodule path, or one barrel importer spoils it. That means `@confect/server`'s
+own imports **and** the codegen templates for `confect/tables/*` and `*.spec.ts`.
+An app author can't achieve it from their own code alone. And temper the
+cold-start expectation: per §3, bytes ≠ eval — shrinking Schema's bytes will help
+download/parse more than module-eval, since the AST/ParseResult machinery Confect
+actually executes is the expensive-to-evaluate part and can't be shaken away.
+
+## 6. Important context
 
 - **This is a cold-start cost, paid once per V8 isolate, not per request.**
   Convex reuses warm isolates, so most invocations don't pay it. Against the 1 s
