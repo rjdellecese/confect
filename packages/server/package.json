@@ -79,7 +79,7 @@
     "url": "https://github.com/rjdellecese/confect.git"
   },
   "scripts": {
-    "bench": "tsx test/SchemaToValidator.bench.ts && tsx test/Document.bench.ts",
+    "bench": "tsx test/SchemaToValidator.bench.ts && tsx test/Document.bench.ts && tsx test/RegisteredFunctions.bench.ts",
     "build": "tsdown --config-loader unrun",
     "clean": "rm -rf dist coverage node_modules",
     "codegen:local-backend": "cd test/local-backend/fixtures && pnpm confect codegen && CONVEX_AGENT_MODE=anonymous pnpm convex dev --once --typecheck=disable --tail-logs=disable",
