@@ -1,7 +1,9 @@
 import { FunctionSpec, Ref } from "@confect/core";
 import { assert, describe, expect, layer } from "@effect/vitest";
 import { ConvexError } from "convex/values";
-import { Effect, Either, Schema } from "effect";
+import * as Effect from "effect/Effect";
+import * as Either from "effect/Either";
+import * as Schema from "effect/Schema";
 import { beforeEach, vi } from "vitest";
 import * as HttpClient from "../src/HttpClient";
 

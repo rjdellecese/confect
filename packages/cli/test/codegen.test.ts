@@ -1,8 +1,13 @@
 import { FunctionSpec, GroupSpec } from "@confect/core";
-import { FileSystem, Path } from "@effect/platform";
-import { NodeFileSystem, NodePath } from "@effect/platform-node";
+import * as FileSystem from "@effect/platform/FileSystem";
+import * as Path from "@effect/platform/Path";
+import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
+import * as NodePath from "@effect/platform-node/NodePath";
 import { assert, expect, layer } from "@effect/vitest";
-import { Effect, Either, Layer, Schema } from "effect";
+import * as Effect from "effect/Effect";
+import * as Either from "effect/Either";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 import { validateNoParentChildNameCollisions } from "../src/confect/codegen";
 import { ConfectDirectory } from "../src/ConfectDirectory";
 import type { LeafModule } from "../src/LeafModule";

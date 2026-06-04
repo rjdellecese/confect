@@ -1,6 +1,8 @@
 import { FunctionSpec, GroupSpec, Spec } from "@confect/core";
 import { describe, expect, test } from "@effect/vitest";
-import { Equal, HashSet, Schema } from "effect";
+import * as Equal from "effect/Equal";
+import * as HashSet from "effect/HashSet";
+import * as Schema from "effect/Schema";
 
 import * as FunctionPath from "../src/FunctionPath";
 import * as FunctionPaths from "../src/FunctionPaths";

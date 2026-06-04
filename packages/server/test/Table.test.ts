@@ -8,7 +8,7 @@ import {
   type TableDefinition,
 } from "convex/server";
 import { v, type GenericValidator } from "convex/values";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import * as Table from "../src/Table";
 
 describe("Table", () => {

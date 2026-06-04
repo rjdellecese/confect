@@ -1,7 +1,11 @@
-import { FileSystem, Path } from "@effect/platform";
-import { NodeFileSystem, NodePath } from "@effect/platform-node";
+import * as FileSystem from "@effect/platform/FileSystem";
+import * as Path from "@effect/platform/Path";
+import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
+import * as NodePath from "@effect/platform-node/NodePath";
 import { expect, layer } from "@effect/vitest";
-import { Effect, HashSet, Layer } from "effect";
+import * as Effect from "effect/Effect";
+import * as HashSet from "effect/HashSet";
+import * as Layer from "effect/Layer";
 import { ConfectDirectory } from "../src/ConfectDirectory";
 import { ConvexDirectory } from "../src/ConvexDirectory";
 import * as GroupPath from "../src/GroupPath";

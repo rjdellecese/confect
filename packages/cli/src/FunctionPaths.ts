@@ -1,5 +1,9 @@
 import type { GroupSpec, Spec } from "@confect/core";
-import { HashSet, Option, pipe, Record, Schema } from "effect";
+import { pipe } from "effect/Function";
+import * as HashSet from "effect/HashSet";
+import * as Option from "effect/Option";
+import * as Record from "effect/Record";
+import * as Schema from "effect/Schema";
 import * as FunctionPath from "./FunctionPath";
 import * as GroupPath from "./GroupPath";
 import * as GroupPaths from "./GroupPaths";

@@ -1,6 +1,7 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { DateTime } from "luxon";
-import { Effect, Layer } from "effect";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import databaseSchema from "../_generated/schema";
 import cjsImporter from "./cjsImporter.spec";
 

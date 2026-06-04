@@ -1,7 +1,8 @@
 import { FunctionSpec, Ref } from "@confect/core";
 import { renderHook } from "@testing-library/react";
 import { ConvexError } from "convex/values";
-import { Either, Schema } from "effect";
+import * as Either from "effect/Either";
+import * as Schema from "effect/Schema";
 import {
   assert,
   beforeEach,

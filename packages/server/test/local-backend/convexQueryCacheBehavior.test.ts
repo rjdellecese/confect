@@ -9,7 +9,9 @@
 import { Ref } from "@confect/core";
 import { expect, layer } from "@effect/vitest";
 import type { ConvexHttpClient } from "convex/browser";
-import { Duration, Effect, Schema } from "effect";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 import refs from "./fixtures/confect/_generated/refs";
 import * as LocalBackend from "./LocalBackend";
 

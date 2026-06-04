@@ -4,7 +4,11 @@ import {
   useMutation as useConvexMutation,
   useQuery as useConvexQuery,
 } from "convex/react";
-import { Cause, Effect, Either, Exit, Option } from "effect";
+import * as Cause from "effect/Cause";
+import * as Effect from "effect/Effect";
+import * as Either from "effect/Either";
+import * as Exit from "effect/Exit";
+import * as Option from "effect/Option";
 import { useCallback, useMemo } from "react";
 
 import * as QueryResult from "./QueryResult";

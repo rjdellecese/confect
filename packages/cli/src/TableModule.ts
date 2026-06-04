@@ -1,7 +1,11 @@
 import { Identifier } from "@confect/core";
 import * as Table from "@confect/server/Table";
-import { FileSystem, Path } from "@effect/platform";
-import { Array, Effect, Order, pipe } from "effect";
+import * as FileSystem from "@effect/platform/FileSystem";
+import * as Path from "@effect/platform/Path";
+import { pipe } from "effect/Function";
+import * as Array from "effect/Array";
+import * as Effect from "effect/Effect";
+import * as Order from "effect/Order";
 import { fromBundlerError } from "./BuildError";
 import * as Bundler from "./Bundler";
 import {

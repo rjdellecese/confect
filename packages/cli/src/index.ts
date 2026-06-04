@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
-import { NodeContext, NodeRuntime } from "@effect/platform-node";
-import { Effect } from "effect";
+import * as NodeContext from "@effect/platform-node/NodeContext";
+import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
+import * as Effect from "effect/Effect";
 import { cliApp } from "./cliApp";
 
 // Track if we received SIGINT so we can re-raise it after cleanup.

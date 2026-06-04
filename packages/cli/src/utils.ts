@@ -1,18 +1,17 @@
 import type { FunctionSpec, Spec } from "@confect/core";
-import { FileSystem, Path } from "@effect/platform";
+import * as FileSystem from "@effect/platform/FileSystem";
+import * as Path from "@effect/platform/Path";
 import type { PlatformError } from "@effect/platform/Error";
-import {
-  Array,
-  Context,
-  Effect,
-  HashSet,
-  Option,
-  Order,
-  pipe,
-  Record,
-  Ref,
-  String,
-} from "effect";
+import { pipe } from "effect/Function";
+import * as Array from "effect/Array";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as HashSet from "effect/HashSet";
+import * as Option from "effect/Option";
+import * as Order from "effect/Order";
+import * as Record from "effect/Record";
+import * as Ref from "effect/Ref";
+import * as String from "effect/String";
 import * as FunctionPaths from "./FunctionPaths";
 import * as GroupPath from "./GroupPath";
 import * as GroupPaths from "./GroupPaths";

@@ -1,8 +1,14 @@
 import { GroupSpec, Registry } from "@confect/core";
 import * as GroupImpl from "@confect/server/GroupImpl";
-import { FileSystem, Path } from "@effect/platform";
+import * as FileSystem from "@effect/platform/FileSystem";
+import * as Path from "@effect/platform/Path";
 import type { Context } from "effect";
-import { Array, Effect, Layer, Option, Ref, String } from "effect";
+import * as Array from "effect/Array";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Ref from "effect/Ref";
+import * as String from "effect/String";
 import { fromBundlerError } from "./BuildError";
 import * as Bundler from "./Bundler";
 import {

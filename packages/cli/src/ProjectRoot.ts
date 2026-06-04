@@ -1,6 +1,11 @@
-import { FileSystem, Path } from "@effect/platform";
-import { NodeFileSystem } from "@effect/platform-node";
-import { Array, Effect, Option, Ref, Schema } from "effect";
+import * as FileSystem from "@effect/platform/FileSystem";
+import * as Path from "@effect/platform/Path";
+import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
+import * as Array from "effect/Array";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as Ref from "effect/Ref";
+import * as Schema from "effect/Schema";
 
 export class ProjectRoot extends Effect.Service<ProjectRoot>()(
   "@confect/cli/ProjectRoot",

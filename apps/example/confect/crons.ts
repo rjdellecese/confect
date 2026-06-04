@@ -1,4 +1,5 @@
-import { Cron, Duration } from "effect";
+import * as Cron from "effect/Cron";
+import * as Duration from "effect/Duration";
 import { CronJob, CronJobs } from "@confect/server";
 import refs from "./_generated/refs";
 

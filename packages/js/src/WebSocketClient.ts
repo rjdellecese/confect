@@ -1,7 +1,11 @@
 import * as Ref from "@confect/core/Ref";
 import { ConvexClient } from "convex/browser";
 import type { ParseResult } from "effect";
-import { Context, Effect, Layer, Schema, Stream } from "effect";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
 
 export class WebSocketClientError extends Schema.TaggedError<WebSocketClientError>()(
   "WebSocketClientError",

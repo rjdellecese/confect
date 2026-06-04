@@ -1,5 +1,5 @@
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
-import { NodeContext } from "@effect/platform-node";
+import * as NodeContext from "@effect/platform-node/NodeContext";
 import {
   actionGeneric,
   type DefaultFunctionArgs,

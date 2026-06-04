@@ -1,6 +1,6 @@
 import type { Options as CodeBlockWriterOptions } from "code-block-writer";
 import CodeBlockWriter_ from "code-block-writer";
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 
 export class CodeBlockWriter {
   private readonly writer: CodeBlockWriter_;

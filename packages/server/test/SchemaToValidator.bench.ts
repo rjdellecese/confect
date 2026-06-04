@@ -1,6 +1,6 @@
 import { bench } from "@ark/attest";
 import type { GenericId } from "@confect/core/GenericId";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import type {
   TableSchemaToTableValidator,
   ValueToValidator,

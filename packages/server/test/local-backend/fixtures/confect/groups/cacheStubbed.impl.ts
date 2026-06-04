@@ -7,7 +7,9 @@
  */
 
 import { FunctionImpl, GroupImpl } from "@confect/server";
-import { Clock, Effect, Layer } from "effect";
+import * as Clock from "effect/Clock";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import databaseSchema from "../_generated/schema";
 import cacheStubbed from "./cacheStubbed.spec";
 

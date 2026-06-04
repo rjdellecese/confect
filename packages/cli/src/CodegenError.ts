@@ -1,5 +1,10 @@
-import { Ansi, AnsiDoc } from "@effect/printer-ansi";
-import { Effect, Match, Option, pipe, Schema } from "effect";
+import * as Ansi from "@effect/printer-ansi/Ansi";
+import * as AnsiDoc from "@effect/printer-ansi/AnsiDoc";
+import { pipe } from "effect/Function";
+import * as Effect from "effect/Effect";
+import * as Match from "effect/Match";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import { BuildError, isBuildError, renderBuildError } from "./BuildError";
 import { formatPathDoc } from "./log";
 

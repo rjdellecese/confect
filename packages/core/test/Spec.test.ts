@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import * as FunctionSpec from "../src/FunctionSpec";
 import * as GroupSpec from "../src/GroupSpec";
 import type * as Refs from "../src/Refs";

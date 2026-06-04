@@ -1,5 +1,5 @@
 import { FunctionSpec, GroupSpec } from "@confect/core";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import { Id } from "../_generated/id";
 import notes from "../_generated/tables/notes";
 

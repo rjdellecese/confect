@@ -1,6 +1,9 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
-import { Command } from "@effect/platform";
-import { Console, Duration, Effect, Layer } from "effect";
+import * as Command from "@effect/platform/Command";
+import * as Console from "effect/Console";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import databaseSchema from "../_generated/schema";
 import email from "./email.spec";
 

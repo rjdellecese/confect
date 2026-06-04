@@ -1,5 +1,7 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
-import { Effect, Layer, Match } from "effect";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Match from "effect/Match";
 import databaseSchema from "../_generated/schema";
 import refs from "../_generated/refs";
 import {

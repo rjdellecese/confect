@@ -1,7 +1,7 @@
 import { bench } from "@ark/attest";
 import type { GenericId } from "@confect/core/GenericId";
 import * as SystemFields from "@confect/core/SystemFields";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
 const NoteSchema = Schema.Struct({
   content: Schema.String,

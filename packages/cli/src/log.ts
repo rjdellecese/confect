@@ -1,6 +1,10 @@
-import { Path } from "@effect/platform";
-import { Ansi, AnsiDoc } from "@effect/printer-ansi";
-import { Console, Effect, pipe, String } from "effect";
+import * as Path from "@effect/platform/Path";
+import * as Ansi from "@effect/printer-ansi/Ansi";
+import * as AnsiDoc from "@effect/printer-ansi/AnsiDoc";
+import { pipe } from "effect/Function";
+import * as Console from "effect/Console";
+import * as Effect from "effect/Effect";
+import * as String from "effect/String";
 import type * as FunctionPath from "./FunctionPath";
 import * as GroupPath from "./GroupPath";
 import { ProjectRoot } from "./ProjectRoot";

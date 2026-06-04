@@ -1,6 +1,7 @@
 import type { GenericId } from "@confect/core/GenericId";
 import * as SystemFields from "@confect/core/SystemFields";
-import { Effect, Schema } from "effect";
+import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 import { describe, expect, it } from "@effect/vitest";
 import * as Document from "../src/Document";
 

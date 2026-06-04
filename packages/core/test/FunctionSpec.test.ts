@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
-import { MutableRef, Schema } from "effect";
+import * as MutableRef from "effect/MutableRef";
+import * as Schema from "effect/Schema";
 import * as FunctionSpec from "../src/FunctionSpec";
 import * as Ref from "../src/Ref";
 

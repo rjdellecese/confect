@@ -1,11 +1,7 @@
-import {
-  type HttpApi,
-  HttpApiBuilder,
-  HttpApiScalar,
-  type HttpApp,
-  type HttpRouter,
-  HttpServer,
-} from "@effect/platform";
+import type { HttpApi, HttpApp, HttpRouter } from "@effect/platform";
+import * as HttpApiBuilder from "@effect/platform/HttpApiBuilder";
+import * as HttpApiScalar from "@effect/platform/HttpApiScalar";
+import * as HttpServer from "@effect/platform/HttpServer";
 import {
   type HttpRouter as ConvexHttpRouter,
   type GenericActionCtx,
