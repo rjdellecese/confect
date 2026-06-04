@@ -4,7 +4,7 @@ import type {
   OrderedQuery as ConvexOrderedQuery,
   PaginationResult,
 } from "convex/server";
-import { identity, pipe } from "effect";
+import { identity, pipe } from "effect/Function";
 import type { Option } from "effect";
 import * as Chunk from "effect/Chunk";
 import * as Effect from "effect/Effect";

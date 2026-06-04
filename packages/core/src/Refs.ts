@@ -1,5 +1,5 @@
 import type { Types } from "effect";
-import { pipe } from "effect";
+import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Option from "effect/Option";
 import * as Record from "effect/Record";

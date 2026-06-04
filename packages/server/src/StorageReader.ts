@@ -1,6 +1,6 @@
 import type { StorageReader as ConvexStorageReader } from "convex/server";
 import type { GenericId } from "convex/values";
-import { flow, pipe } from "effect";
+import { flow, pipe } from "effect/Function";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";

@@ -1,5 +1,5 @@
 import * as SystemFields from "@confect/core/SystemFields";
-import { pipe } from "effect";
+import { pipe } from "effect/Function";
 import * as Effect from "effect/Effect";
 import * as Function from "effect/Function";
 import * as ParseResult from "effect/ParseResult";

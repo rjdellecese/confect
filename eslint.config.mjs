@@ -72,6 +72,31 @@ export default [
     },
   },
 
+  // Enforce submodule Effect imports in library source that ends up in every
+  // Convex function bundle. `import { Schema } from "effect"` pulls the entire
+  // namespace because esbuild can't tree-shake property access on the barrel's
+  // re-exports, so a single barrel import re-pins all of Schema/Stream/etc. (see
+  // bench/ATTRIBUTION.md §5). `import * as Schema from "effect/Schema"` tree-shakes
+  // — and is the import style Effect v4 recommends. Type-only imports are exempt.
+  {
+    files: ["packages/core/src/**/*.ts", "packages/server/src/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "effect",
+              message:
+                'Import Effect modules from their submodule path so they tree-shake, e.g. `import * as Schema from "effect/Schema"`. Bare helpers (pipe, flow, identity) come from "effect/Function".',
+              allowTypeImports: true,
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // apps/docs
   {
     ...mdx.flat,

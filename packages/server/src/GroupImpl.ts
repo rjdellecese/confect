@@ -1,6 +1,6 @@
 import type * as GroupSpec from "@confect/core/GroupSpec";
 import * as Registry from "@confect/core/Registry";
-import { pipe } from "effect";
+import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";

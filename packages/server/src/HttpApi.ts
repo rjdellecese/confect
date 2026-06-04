@@ -15,7 +15,7 @@ import {
   ROUTABLE_HTTP_METHODS,
   type RouteSpecWithPathPrefix,
 } from "convex/server";
-import { pipe } from "effect";
+import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Layer from "effect/Layer";
 import * as Record from "effect/Record";

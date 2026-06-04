@@ -1,6 +1,6 @@
 import type { StorageWriter as ConvexStorageWriter } from "convex/server";
 import type { GenericId } from "convex/values";
-import { pipe } from "effect";
+import { pipe } from "effect/Function";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";

@@ -1,7 +1,7 @@
 import { Ref } from "@confect/core";
 import type { CronJob as ConvexCronJob } from "convex/server";
 import { cronJobs as makeConvexCrons, type Crons } from "convex/server";
-import { pipe } from "effect";
+import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Cron from "effect/Cron";
 import * as Duration from "effect/Duration";

@@ -29,11 +29,19 @@ const NS = new Set([...indexSrc.matchAll(/export \* as ([A-Za-z0-9_]+) /g)].map(
 const dirs = [join(repo, "packages/server/src"), join(repo, "packages/core/src")];
 const importRe = /import\s*\{([^}]*)\}\s*from\s*["']effect["'];?/gs;
 
+async function walk(dir) {
+  const out = [];
+  for (const e of await readdir(dir, { withFileTypes: true })) {
+    const p = join(dir, e.name);
+    if (e.isDirectory()) out.push(...(await walk(p)));
+    else if (e.name.endsWith(".ts")) out.push(p);
+  }
+  return out;
+}
+
 let rewrites = 0, files = 0;
 for (const dir of dirs) {
-  for (const name of await readdir(dir)) {
-    if (!name.endsWith(".ts")) continue;
-    const path = join(dir, name);
+  for (const path of await walk(dir)) {
     let src = await readFile(path, "utf8");
     let changed = false;
     src = src.replace(importRe, (_full, inner) => {

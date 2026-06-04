@@ -17,7 +17,7 @@ import type {
   VUnion,
 } from "convex/values";
 import { v } from "convex/values";
-import { pipe } from "effect";
+import { pipe } from "effect/Function";
 import type { ParseResult } from "effect";
 import * as Array from "effect/Array";
 import * as Cause from "effect/Cause";

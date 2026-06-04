@@ -47,6 +47,11 @@ eval — but here both moved a lot.)
    (forward-compatible with a future v4 port). The diff is mechanical; it can be
    scoped to just the heavy namespaces (`Schema`, `Stream`, `ParseResult`,
    `Chunk`, `Arbitrary`/`FastCheck` chain) if a smaller diff is preferred.
+   The convention is enforced by an ESLint rule
+   (`@typescript-eslint/no-restricted-imports` in `eslint.config.mjs`, scoped to
+   `packages/{core,server}/src`) that bans value imports from the `"effect"`
+   barrel (type-only imports are exempt) and points at the submodule path. Bare
+   helpers (`pipe`/`flow`/`identity`) come from `"effect/Function"`.
 2. **Recommend submodule imports in user `confect/tables/*` and `*.spec.ts`
    files** (docs/examples): `import * as Schema from "effect/Schema"`. This
    unlocks the Schema tree-shaking for the full −54% bundle / −40 ms result.

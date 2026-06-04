@@ -6,7 +6,7 @@ import type {
   WithoutSystemFields,
 } from "convex/server";
 import type { GenericId } from "convex/values";
-import { pipe } from "effect";
+import { pipe } from "effect/Function";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";

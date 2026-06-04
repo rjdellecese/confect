@@ -16,7 +16,7 @@ import type {
   SearchIndexes,
 } from "convex/server";
 import type { GenericId } from "convex/values";
-import { pipe } from "effect";
+import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Either from "effect/Either";
