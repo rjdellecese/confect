@@ -1,4 +1,8 @@
-import { RegisteredConvexFunction, RegisteredFunctions } from "@confect/server";
+import {
+  RegisteredConvexFunction,
+  RegisteredConvexFunctionWithoutValidators,
+  RegisteredFunctions,
+} from "@confect/server";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import type { RegisteredQuery } from "convex/server";
 import databaseSchema from "./mock-backend/fixtures/confect/_generated/schema";
@@ -37,5 +41,34 @@ describe("buildForGroup", () => {
 
     expect(registered.list).toBeDefined();
     expect(registered.insert).toBeDefined();
+  });
+
+  it("RegisteredConvexFunctionWithoutValidators omits Convex args/returns validators", () => {
+    const withValidators = RegisteredFunctions.buildForGroup<typeof notesSpec>(
+      databaseSchema,
+      notes,
+      RegisteredConvexFunction.make,
+    );
+    const withoutValidators = RegisteredFunctions.buildForGroup<
+      typeof notesSpec
+    >(databaseSchema, notes, RegisteredConvexFunctionWithoutValidators.make);
+
+    // Convex reports `v.any()` for a function registered without an args
+    // validator. The default builder instead compiles a concrete object
+    // validator from the args `Schema`, so the two serializations differ.
+    const anyValidator = JSON.stringify({ type: "any" });
+    const exportArgs = (fn: unknown) =>
+      (fn as { exportArgs: () => string }).exportArgs();
+    const exportReturns = (fn: unknown) =>
+      (fn as { exportReturns: () => string }).exportReturns();
+
+    expect(exportArgs(withoutValidators.insert)).toBe(anyValidator);
+    expect(exportArgs(withValidators.insert)).not.toBe(anyValidator);
+    // No returns validator -> Convex serializes `null`.
+    expect(exportReturns(withoutValidators.insert)).toBe(JSON.stringify(null));
+
+    // The functions themselves are still registered.
+    expect(withoutValidators.list).toBeDefined();
+    expect(withoutValidators.insert).toBeDefined();
   });
 });

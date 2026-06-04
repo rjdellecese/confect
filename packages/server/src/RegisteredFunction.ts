@@ -8,7 +8,7 @@ import {
   type RegisteredMutation,
   type RegisteredQuery,
 } from "convex/server";
-import type { Value } from "convex/values";
+import type { PropertyValidators, Validator, Value } from "convex/values";
 import { ConvexError } from "convex/values";
 import { Effect, Either, Layer, pipe, Schema } from "effect";
 import * as ActionCtx from "./ActionCtx";
@@ -19,7 +19,6 @@ import type * as DataModel from "./DataModel";
 import * as MutationRunner from "./MutationRunner";
 import * as QueryRunner from "./QueryRunner";
 import * as Scheduler from "./Scheduler";
-import * as SchemaToValidator from "./SchemaToValidator";
 import * as StorageActionWriter from "./StorageActionWriter";
 import * as StorageReader from "./StorageReader";
 import * as StorageWriter from "./StorageWriter";
@@ -155,6 +154,31 @@ export const runHandlerPromise =
     );
   };
 
+/**
+ * The pair of `Schema` → `Validator` compilers used to attach Convex
+ * `args`/`returns` validators to a registered function. Injected by the
+ * validator-compiling builders (`RegisteredConvexFunction` /
+ * `RegisteredNodeFunction`) and omitted by the validator-free builders
+ * (`*WithoutValidators`). Keeping this as injected functions — rather than a
+ * top-level `import * as SchemaToValidator` here — is what lets the
+ * validator-free builders avoid pulling `SchemaToValidator` into a function's
+ * startup import graph.
+ */
+export interface Compilers {
+  readonly compileArgs: (
+    schema: Schema.Schema.AnyNoContext,
+  ) => PropertyValidators;
+  readonly compileReturns: (
+    schema: Schema.Schema.AnyNoContext,
+  ) => Validator<any, any, any>;
+}
+
+/**
+ * Build the validator-free action body — just the `{ handler }` closure that
+ * decodes args, provides the layer, encodes returns, and runs the Effect. The
+ * Convex `args`/`returns` validators (when wanted) are layered on by the caller
+ * via {@link Compilers}; this base never references `SchemaToValidator`.
+ */
 export const actionFunctionBase = <
   Schema extends DatabaseSchema.AnyWithProps,
   Args,
@@ -178,8 +202,6 @@ export const actionFunctionBase = <
     ctx: GenericActionCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
   ) => Layer.Layer<R>;
 }) => ({
-  args: SchemaToValidator.compileArgsSchema(args),
-  returns: SchemaToValidator.compileReturnsSchema(returns),
   handler: (
     ctx: GenericActionCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
     actualArgs: ConvexArgs,

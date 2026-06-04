@@ -297,26 +297,39 @@ export const registeredFunctionsForGroup = ({
   implImportPath,
   layerExportName,
   useNode = false,
+  skipValidators = false,
 }: {
   schemaImportPath: string;
   specImportPath: string;
   implImportPath: string;
   layerExportName: string;
   useNode?: boolean;
+  skipValidators?: boolean;
 }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+
+    // When `skipValidators` is set, the registry routes through the
+    // validator-free builders, which do not import `SchemaToValidator` and
+    // register functions with no Convex args/returns validators — confect's own
+    // `Schema.decode`/`Schema.encode` in each handler still enforce correctness.
+    const convexBuilder = skipValidators
+      ? "RegisteredConvexFunctionWithoutValidators"
+      : "RegisteredConvexFunction";
+    const nodeBuilder = skipValidators
+      ? "RegisteredNodeFunctionWithoutValidators"
+      : "RegisteredNodeFunction";
 
     if (useNode) {
       yield* cbw.writeLine(
         `import { RegisteredFunctions } from "@confect/server";`,
       );
       yield* cbw.writeLine(
-        `import { RegisteredNodeFunction } from "@confect/server/node";`,
+        `import { ${nodeBuilder} } from "@confect/server/node";`,
       );
     } else {
       yield* cbw.writeLine(
-        `import { RegisteredConvexFunction, RegisteredFunctions } from "@confect/server";`,
+        `import { ${convexBuilder}, RegisteredFunctions } from "@confect/server";`,
       );
     }
 
@@ -329,9 +342,7 @@ export const registeredFunctionsForGroup = ({
     // imports. Typing from the leaf spec (not the project-wide assembled spec)
     // keeps the registry's type dependent solely on its own group.
     const specType = `typeof import("${specImportPath}")["default"]`;
-    const makeFn = useNode
-      ? "RegisteredNodeFunction.make"
-      : "RegisteredConvexFunction.make";
+    const makeFn = useNode ? `${nodeBuilder}.make` : `${convexBuilder}.make`;
     yield* cbw.writeLine(
       `export default RegisteredFunctions.buildForGroup<${specType}>(databaseSchema, ${layerExportName}, ${makeFn});`,
     );

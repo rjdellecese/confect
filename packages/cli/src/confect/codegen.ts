@@ -1,7 +1,17 @@
 import { Spec, type GroupSpec } from "@confect/core";
-import { Command } from "@effect/cli";
+import { Command, Options } from "@effect/cli";
 import { FileSystem, Path } from "@effect/platform";
-import { Array, Effect, Either, HashSet, Match, Option, Ref } from "effect";
+import {
+  Array,
+  Config,
+  Context,
+  Effect,
+  Either,
+  HashSet,
+  Match,
+  Option,
+  Ref,
+} from "effect";
 import * as Bundler from "../Bundler";
 import * as CodegenError from "../CodegenError";
 import {
@@ -54,6 +64,36 @@ import {
 
 const GENERATED_DIRNAME = "_generated";
 
+/**
+ * Build-time flag controlling whether generated registries register Convex
+ * functions with compiled args/returns validators. Default `false` (validators
+ * on). Provided once per CLI command from {@link skipValidatorsOption} and read
+ * in {@link generateGroupRegisteredFunctions}; threading it as a
+ * `Context.Reference` avoids passing a parameter through the deep `dev` sync
+ * loop while keeping a safe (validators-on) default everywhere else.
+ */
+export class SkipValidators extends Context.Reference<SkipValidators>()(
+  "@confect/cli/SkipValidators",
+  { defaultValue: () => false },
+) {}
+
+/**
+ * `--skip-validators` flag (with a `CONFECT_SKIP_VALIDATORS` env fallback) for
+ * the `codegen` and `dev` commands. When set, generated registries route
+ * through the validator-free builders: smaller per-function startup cost, at the
+ * price of Convex's boundary arg-validation and args/returns metadata in the
+ * deployed spec. Confect's handler-level `Schema.decode`/`Schema.encode` still
+ * enforce correctness.
+ */
+export const skipValidatorsOption = Options.boolean("skip-validators").pipe(
+  Options.withFallbackConfig(
+    Config.boolean("CONFECT_SKIP_VALIDATORS").pipe(Config.withDefault(false)),
+  ),
+  Options.withDescription(
+    "Register Convex functions without args/returns validators to reduce per-function cold-start time. Confect still validates via Effect Schema in each handler; Convex boundary validation and deployed args/returns metadata are dropped.",
+  ),
+);
+
 const GENERATED_SPEC_PATH = Effect.andThen(Path.Path, (path) =>
   path.join(GENERATED_DIRNAME, "spec.ts"),
 );
@@ -88,15 +128,18 @@ const LEGACY_PATHS = Effect.gen(function* () {
   ];
 });
 
-export const codegen = Command.make("codegen", {}, () =>
-  Effect.gen(function* () {
-    yield* logPending("Performing initial sync…");
-    yield* codegenHandler.pipe(
-      Effect.asVoid,
-      Effect.tap(() => logSuccess("Generated files are up-to-date")),
-      CodegenError.tapAndLog,
-    );
-  }),
+export const codegen = Command.make(
+  "codegen",
+  { skipValidators: skipValidatorsOption },
+  ({ skipValidators }) =>
+    Effect.gen(function* () {
+      yield* logPending("Performing initial sync…");
+      yield* codegenHandler.pipe(
+        Effect.asVoid,
+        Effect.tap(() => logSuccess("Generated files are up-to-date")),
+        CodegenError.tapAndLog,
+      );
+    }).pipe(Effect.provideService(SkipValidators, skipValidators)),
 ).pipe(
   Command.withDescription(
     "Generate `confect/_generated` files and the contents of the `convex` directory (except `convex.config.ts` and `tsconfig.json`)",
@@ -414,6 +457,7 @@ const generateGroupRegisteredFunctions = (leaves: ReadonlyArray<LeafModule>) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
     const confectDirectory = yield* ConfectDirectory.get;
+    const skipValidators = yield* SkipValidators;
 
     yield* Effect.forEach(leaves, (leaf) =>
       Effect.gen(function* () {
@@ -458,6 +502,7 @@ const generateGroupRegisteredFunctions = (leaves: ReadonlyArray<LeafModule>) =>
           implImportPath,
           layerExportName: leaf.exportName,
           useNode: leaf.runtime === "Node",
+          skipValidators,
         });
 
         yield* writeFileStringAndLog(registryPath, contents);

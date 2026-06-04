@@ -96,3 +96,27 @@ export default GroupImpl.make(databaseSchema, notes).pipe(
 ```
 
 `GroupImpl.finalize` is the per-group completeness check: it only typechecks once every function declared by the spec has been provided to the group layer.
+
+## Skipping validator compilation
+
+By default, codegen registers each function with Convex `args` and `returns` validators compiled from its schemas. That compilation runs when the function's module is evaluated, on every cold start.
+
+Confect always decodes arguments and encodes return values with the Effect `Schema` inside the handler, so these Convex validators are redundant for Confect's own correctness. To skip compiling them — trimming per-function cold-start time — pass `--skip-validators`:
+
+```bash
+confect codegen --skip-validators
+confect dev --skip-validators
+```
+
+You can also set `CONFECT_SKIP_VALIDATORS=true` so every codegen run (including the dev watcher) picks it up.
+
+<Warning>
+  With validators skipped, Convex no longer validates arguments at the
+  boundary before your handler runs — a failed `Schema.decode` dies
+  the request instead — and the function's `args`/`returns` no longer
+  appear in Convex's deployed function spec or generated `api.d.ts`.
+  Confect's own clients are unaffected, as they derive their types
+  from your Effect schemas.
+</Warning>
+
+This flag only affects function validators. Table validators and the deploy schema (`convex/schema.ts`) are unchanged, so Convex still validates stored documents.

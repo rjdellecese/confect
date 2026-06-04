@@ -21,6 +21,7 @@ export * as QueryCtx from "./QueryCtx";
 export * as QueryInitializer from "./QueryInitializer";
 export * as QueryRunner from "./QueryRunner";
 export * as RegisteredConvexFunction from "./RegisteredConvexFunction";
+export * as RegisteredConvexFunctionWithoutValidators from "./RegisteredConvexFunctionWithoutValidators";
 export * as RegisteredFunction from "./RegisteredFunction";
 export * as RegisteredFunctions from "./RegisteredFunctions";
 export * as RegistryItem from "./RegistryItem";

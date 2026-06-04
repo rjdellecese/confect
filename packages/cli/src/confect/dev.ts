@@ -47,7 +47,12 @@ import {
 } from "../log";
 import { ProjectRoot } from "../ProjectRoot";
 import { generateAuthConfig, generateCrons, generateHttp } from "../utils";
-import { codegenHandler, loadPreviousFunctionPaths } from "./codegen";
+import {
+  codegenHandler,
+  loadPreviousFunctionPaths,
+  SkipValidators,
+  skipValidatorsOption,
+} from "./codegen";
 
 const GENERATED_DIRNAME = "_generated";
 
@@ -190,43 +195,47 @@ const logFunctionPathDiff = (
     );
   });
 
-export const dev = Command.make("dev", {}, () =>
-  Effect.gen(function* () {
-    yield* logPending("Performing initial sync…");
-    const previousFunctionPaths = yield* loadPreviousFunctionPaths;
-    const initialResult = yield* codegenHandler.pipe(
-      Effect.tap(({ functionPaths }) =>
-        logFunctionPathDiff(previousFunctionPaths, functionPaths),
-      ),
-      Effect.tap(() => logSuccess("Generated files are up-to-date")),
-      CodegenError.catchAndLog,
-    );
-    const initialFunctionPaths = Option.match(initialResult, {
-      onNone: () => emptyFunctionPaths,
-      onSome: ({ functionPaths }) => functionPaths,
-    });
-
-    const pendingRef = yield* Ref.make<Pending>(pendingInit);
-    const signal = yield* Queue.sliding<void>(1);
-    const restartQueue = yield* Queue.sliding<void>(1);
-    const watcherErrorsRef = yield* Ref.make<WatcherErrors>(emptyWatcherErrors);
-
-    yield* Effect.all(
-      [
-        Effect.scoped(
-          entryPointsWatcher(
-            signal,
-            pendingRef,
-            restartQueue,
-            watcherErrorsRef,
-          ),
+export const dev = Command.make(
+  "dev",
+  { skipValidators: skipValidatorsOption },
+  ({ skipValidators }) =>
+    Effect.gen(function* () {
+      yield* logPending("Performing initial sync…");
+      const previousFunctionPaths = yield* loadPreviousFunctionPaths;
+      const initialResult = yield* codegenHandler.pipe(
+        Effect.tap(({ functionPaths }) =>
+          logFunctionPathDiff(previousFunctionPaths, functionPaths),
         ),
-        confectStructureWatcher(signal, pendingRef, restartQueue),
-        syncLoop(signal, pendingRef, initialFunctionPaths, watcherErrorsRef),
-      ],
-      { concurrency: "unbounded" },
-    );
-  }),
+        Effect.tap(() => logSuccess("Generated files are up-to-date")),
+        CodegenError.catchAndLog,
+      );
+      const initialFunctionPaths = Option.match(initialResult, {
+        onNone: () => emptyFunctionPaths,
+        onSome: ({ functionPaths }) => functionPaths,
+      });
+
+      const pendingRef = yield* Ref.make<Pending>(pendingInit);
+      const signal = yield* Queue.sliding<void>(1);
+      const restartQueue = yield* Queue.sliding<void>(1);
+      const watcherErrorsRef =
+        yield* Ref.make<WatcherErrors>(emptyWatcherErrors);
+
+      yield* Effect.all(
+        [
+          Effect.scoped(
+            entryPointsWatcher(
+              signal,
+              pendingRef,
+              restartQueue,
+              watcherErrorsRef,
+            ),
+          ),
+          confectStructureWatcher(signal, pendingRef, restartQueue),
+          syncLoop(signal, pendingRef, initialFunctionPaths, watcherErrorsRef),
+        ],
+        { concurrency: "unbounded" },
+      );
+    }).pipe(Effect.provideService(SkipValidators, skipValidators)),
 ).pipe(Command.withDescription("Start the Confect development server"));
 
 const esbuildMessageKey = (m: esbuild.Message): string =>

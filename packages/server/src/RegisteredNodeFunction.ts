@@ -1,81 +1,22 @@
-import type * as FunctionSpec from "@confect/core/FunctionSpec";
-import { NodeContext } from "@effect/platform-node";
-import {
-  actionGeneric,
-  type DefaultFunctionArgs,
-  internalActionGeneric,
-} from "convex/server";
-import type { Effect } from "effect";
-import { Layer, Match, type Schema } from "effect";
 import type * as DatabaseSchema from "./DatabaseSchema";
-import type * as Handler from "./Handler";
-import * as RegisteredFunction from "./RegisteredFunction";
+import * as Core from "./RegisteredNodeFunctionCore";
+import type * as RegisteredFunction from "./RegisteredFunction";
 import type * as RegistryItem from "./RegistryItem";
+import * as SchemaToValidator from "./SchemaToValidator";
 
+const compilers: RegisteredFunction.Compilers = {
+  compileArgs: SchemaToValidator.compileArgsSchema,
+  compileReturns: SchemaToValidator.compileReturnsSchema,
+};
+
+/**
+ * The default builder for Node-runtime actions: registers each action with
+ * Convex `args`/`returns` validators compiled from its `Schema`. The
+ * validator-free counterpart (`RegisteredNodeFunctionWithoutValidators`) skips
+ * compilation; codegen selects between them via the build-time skip-validators
+ * flag.
+ */
 export const make = (
   databaseSchema: DatabaseSchema.AnyWithProps,
-  { functionSpec, handler }: RegistryItem.AnyWithProps,
-): RegisteredFunction.Any =>
-  Match.value(functionSpec.functionProvenance).pipe(
-    Match.tag("Convex", () => handler as RegisteredFunction.Any),
-    Match.tag("Confect", () => {
-      const { functionVisibility, functionProvenance } =
-        functionSpec as FunctionSpec.AnyConfect;
-
-      const genericFunction = Match.value(functionVisibility).pipe(
-        Match.when("public", () => actionGeneric),
-        Match.when("internal", () => internalActionGeneric),
-        Match.exhaustive,
-      );
-
-      return genericFunction(
-        nodeActionFunction(databaseSchema, {
-          args: functionProvenance.args,
-          returns: functionProvenance.returns,
-          error: functionProvenance.error,
-          handler: handler as Handler.AnyConfectProvenance,
-        }),
-      );
-    }),
-    Match.exhaustive,
-  );
-
-const nodeActionFunction = <
-  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  Args,
-  ConvexArgs extends DefaultFunctionArgs,
-  Returns,
-  ConvexReturns,
-  E,
->(
-  databaseSchema: DatabaseSchema_,
-  {
-    args,
-    returns,
-    error,
-    handler,
-  }: {
-    args: Schema.Schema<Args, ConvexArgs>;
-    returns: Schema.Schema<Returns, ConvexReturns>;
-    error: Schema.Schema.AnyNoContext | undefined;
-    handler: (
-      a: Args,
-    ) => Effect.Effect<
-      Returns,
-      E,
-      | RegisteredFunction.ActionServices<DatabaseSchema_>
-      | NodeContext.NodeContext
-    >;
-  },
-) =>
-  RegisteredFunction.actionFunctionBase({
-    args,
-    returns,
-    error,
-    handler,
-    createLayer: (ctx) =>
-      Layer.mergeAll(
-        RegisteredFunction.actionLayer(databaseSchema, ctx),
-        NodeContext.layer,
-      ),
-  });
+  registryItem: RegistryItem.AnyWithProps,
+): RegisteredFunction.Any => Core.make(databaseSchema, registryItem, compilers);
