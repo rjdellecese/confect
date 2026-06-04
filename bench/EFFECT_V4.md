@@ -18,13 +18,19 @@ function needs — the runtime (`Effect`/`Layer`) and `Schema` — between Effec
 
 ## Measured: Effect 3.21.2 vs 4.0.0-beta.78
 
+Top group: whole-namespace `import * as` (no tree-shaking) — an upper bound, and
+the right model for Confect (broad Schema surface). Bottom group: tree-shaken
+realistic fixtures mirroring effect-smol's own bundle fixtures.
+
 | surface | v3 min / gz / eval | v4 min / gz / eval | Δbytes | Δeval |
 |---|---|---|---|---|
-| runtime (`Effect`+`Layer`) | 197 KiB / 65 / **32.7 ms** | 78 KiB / 27 / **19.1 ms** | **−60%** | **−42%** |
-| `Schema` | 309 KiB / 94 / **49.1 ms** | 340 KiB / 110 / **80.4 ms** | +10% | **+64%** |
-| runtime + `Schema` | 374 KiB / 118 / **57.5 ms** | 382 KiB / 125 / **89.4 ms** | +2% | **+56%** |
-| `Effect`+`Stream`+`Schema` | 501 KiB / 154 / **70.1 ms** | 447 KiB / 145 / **96.1 ms** | −11% | **+37%** |
-| whole `effect` barrel | 938 KiB / 300 / **120.7 ms** | 726 KiB / 233 / **136.5 ms** | −23% | +13% |
+| runtime (`Effect`+`Layer`) | 197 KiB / 65 / **33.4 ms** | 78 KiB / 27 / **19.0 ms** | **−60%** | **−43%** |
+| `Schema` (namespace) | 309 KiB / 94 / **52.8 ms** | 340 KiB / 110 / **82.2 ms** | +10% | **+56%** |
+| runtime + `Schema` | 374 KiB / 118 / **57.8 ms** | 382 KiB / 125 / **87.2 ms** | +2% | **+51%** |
+| `Effect`+`Stream`+`Schema` | 501 KiB / 154 / **68.8 ms** | 447 KiB / 145 / **97.6 ms** | −11% | **+42%** |
+| whole `effect` barrel | 938 KiB / 300 / **126.1 ms** | 726 KiB / 233 / **143.8 ms** | −23% | +14% |
+| _fixture: basic_ (`Effect.succeed.runFork`) | 128 KiB / 41 / **25.5 ms** | 23 KiB / 8.1 / **12.6 ms** | **−82%** | **−50%** |
+| _fixture: schema-decode_ (tree-shaken) | 171 KiB / 54 / **30.5 ms** | 61 KiB / 21 / **66.2 ms** | **−64%** | **+117%** |
 
 ## What this means
 
@@ -46,6 +52,41 @@ function needs — the runtime (`Effect`/`Layer`) and `Schema` — between Effec
   evaluation** here. The thing that counts against the 1 s query/mutation budget
   is eval time, not download size.
 - `fast-check` is still pulled into the Schema bundle in **both** v3 and v4.
+
+## Cross-check against effect-smol's own benchmarks
+
+The `effect-smol` repo benchmarks two axes, and my results agree with both — the
+divergence is on a third axis it doesn't measure.
+
+1. **Bundle size** — `packages/tools/bundle` Rollup-bundles realistic tree-shaken
+   fixtures (e.g. `fixtures/basic.ts` = `Effect.succeed(123).pipe(Effect.runFork)`)
+   and reports **gzipped KB** (the `Bundle Size` PR comment). **We agree:** my
+   tree-shaken fixtures show v4 dramatically smaller — `basic` **−82%** (8.1 vs
+   41 KB gz, ≈ their advertised ~6.3 KB minimal program) and `schema-decode`
+   **−64%** (21 vs 54 KB gz). My earlier "+10% Schema bytes" was purely the
+   no-tree-shaking `import * as` upper bound; with a real fixture, v4's Schema is
+   much smaller, exactly as they claim.
+2. **Schema decode throughput** — `packages/effect/benchmark/schema/*` use
+   `tinybench` to measure `decodeUnknownExit(...)` **ops/sec** vs zod/valibot/
+   arktype. That's steady-state *execution* speed after modules are loaded — a
+   different axis from cold start. I didn't measure it and don't contradict it.
+
+3. **Module-evaluation (cold-start) time — neither effect-smol benchmark covers
+   this**, and it's exactly where v4 regresses: the tree-shaken `schema-decode`
+   fixture is **−64% smaller yet +117% slower to evaluate** (30.5 → 66.2 ms).
+   v4's Schema ships far less code but does much more eager work at module import
+   (the decode call itself is ~nanoseconds — the 66 ms is module init, not the
+   decode). Size went down, throughput is fine, but one-time module-init went up.
+
+**Why this is consistent, not contradictory.** For Effect's primary audience —
+long-running Node/Bun/Deno servers — module-init is paid once at process boot and
+is irrelevant; bundle size (frontends) and decode throughput (hot paths) are what
+matter, and v4 improves both. So it's reasonable both that the Effect team doesn't
+benchmark module-init *and* that v4 traded some module-init cost for smaller
+bundles, faster decode, and better tree-shaking. Confect is the unusual case:
+Convex evaluates each function module on every **isolate cold start**, against a
+1 s budget, so module-init is first-class — and that's the one axis v4 currently
+worsens for the Schema-dominated Confect path.
 
 ## Projection for Confect
 

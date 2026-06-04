@@ -30,11 +30,18 @@ const VERSIONS = { v3: "3.21.2", v4: "4.0.0-beta.78" };
 // Identical probe source for both versions; submodule import paths
 // (effect/Effect, effect/Layer, effect/Schema, effect/Stream) exist in v3 and v4.
 const PROBES = {
+  // Whole-namespace `import * as` — a no-tree-shaking UPPER BOUND. This is the
+  // right model for Confect, whose @confect/server uses a broad Schema surface.
   runtime: `import * as Effect from "effect/Effect";\nimport * as Layer from "effect/Layer";\nglobalThis.__s = [Effect, Layer];`,
   schema: `import * as Schema from "effect/Schema";\nglobalThis.__s = [Schema];`,
   "runtime+schema": `import * as Effect from "effect/Effect";\nimport * as Layer from "effect/Layer";\nimport * as Schema from "effect/Schema";\nglobalThis.__s = [Effect, Layer, Schema];`,
   "Effect+Stream+Schema": `import * as Effect from "effect/Effect";\nimport * as Stream from "effect/Stream";\nimport * as Schema from "effect/Schema";\nglobalThis.__s = [Effect, Stream, Schema];`,
   barrel: `import * as E from "effect";\nglobalThis.__s = E;`,
+  // Tree-shaken REALISTIC fixtures, mirroring effect-smol's own bundle fixtures
+  // (packages/tools/bundle/fixtures) — use specific functions so the bundler can
+  // prune. These are what Effect's published bundle-size figures measure.
+  "fixture: basic": `import * as Effect from "effect/Effect";\nEffect.succeed(123).pipe(Effect.runFork);`,
+  "fixture: schema-decode": `import * as Schema from "effect/Schema";\nconst S = Schema.Struct({ a: Schema.String });\nconst dec = Schema.decodeUnknownSync(S);\nglobalThis.__x = dec({ a: "x" });`,
 };
 
 const REPS = 31;
