@@ -6,7 +6,9 @@ import {
   internalActionGeneric,
 } from "convex/server";
 import type { Effect } from "effect";
-import { Layer, Match, type Schema } from "effect";
+import type { Schema } from "effect";
+import * as Layer from "effect/Layer";
+import * as Match from "effect/Match";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as Handler from "./Handler";
 import * as RegisteredFunction from "./RegisteredFunction";

@@ -1,6 +1,10 @@
 import type { StorageReader as ConvexStorageReader } from "convex/server";
 import type { GenericId } from "convex/values";
-import { Effect, flow, Layer, Option, pipe, Schema } from "effect";
+import { flow, pipe } from "effect";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import { BlobNotFoundError } from "./BlobNotFoundError";
 
 const make = (storageReader: ConvexStorageReader) => ({

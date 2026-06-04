@@ -6,7 +6,9 @@ import type {
   VectorSearchQuery,
 } from "convex/server";
 import type { GenericId } from "convex/values";
-import { Context, Effect, Layer } from "effect";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import type * as DataModel from "./DataModel";
 
 type ConvexVectorSearch<DataModel_ extends DataModel.AnyWithProps> =

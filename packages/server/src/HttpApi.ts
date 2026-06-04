@@ -15,7 +15,10 @@ import {
   ROUTABLE_HTTP_METHODS,
   type RouteSpecWithPathPrefix,
 } from "convex/server";
-import { Array, Layer, pipe, Record } from "effect";
+import { pipe } from "effect";
+import * as Array from "effect/Array";
+import * as Layer from "effect/Layer";
+import * as Record from "effect/Record";
 import * as ActionCtx from "./ActionCtx";
 import * as ActionRunner from "./ActionRunner";
 import * as Auth from "./Auth";

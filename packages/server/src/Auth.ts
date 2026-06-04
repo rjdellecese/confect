@@ -1,5 +1,9 @@
 import type { Auth as ConvexAuth } from "convex/server";
-import { Effect, flow, Layer, Option, Schema } from "effect";
+import { flow } from "effect";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 
 const make = (auth: ConvexAuth) => ({
   getUserIdentity: Effect.promise(() => auth.getUserIdentity()).pipe(

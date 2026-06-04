@@ -16,7 +16,11 @@ import type {
   SearchIndexes,
 } from "convex/server";
 import type { GenericId } from "convex/values";
-import { Array, Effect, Either, pipe, Schema } from "effect";
+import { pipe } from "effect";
+import * as Array from "effect/Array";
+import * as Effect from "effect/Effect";
+import * as Either from "effect/Either";
+import * as Schema from "effect/Schema";
 import type {
   BaseDatabaseReader,
   IndexFieldTypesForEq,

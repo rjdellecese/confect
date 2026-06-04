@@ -1,5 +1,9 @@
 import * as SystemFields from "@confect/core/SystemFields";
-import { Effect, Function, ParseResult, pipe, Schema } from "effect";
+import { pipe } from "effect";
+import * as Effect from "effect/Effect";
+import * as Function from "effect/Function";
+import * as ParseResult from "effect/ParseResult";
+import * as Schema from "effect/Schema";
 import type { ReadonlyRecord } from "effect/Record";
 import type * as DataModel from "./DataModel";
 import type { ReadonlyValue } from "./SchemaToValidator";

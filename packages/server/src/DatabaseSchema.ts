@@ -1,4 +1,4 @@
-import { Predicate } from "effect";
+import * as Predicate from "effect/Predicate";
 import type * as Table from "./Table";
 
 export const TypeId = "@confect/server/DatabaseSchema";

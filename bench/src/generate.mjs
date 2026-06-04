@@ -74,7 +74,7 @@ ${fns}
 
 const confectTable = (complexity) =>
   `import { Table } from "@confect/server";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
 export default Table.make(() =>
   ${indent(effectBody(complexity), "  ")},
@@ -95,7 +95,7 @@ const confectSpec = (complexity, F) => {
     )
     .join("\n");
   return `import { FunctionSpec, GroupSpec } from "@confect/core";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
 export default GroupSpec.make()
 ${fns};
@@ -112,7 +112,8 @@ const confectImpl = (groupName, F) => {
     .join("\n\n");
   const provides = names.map((f) => `  Layer.provide(${f}),`).join("\n");
   return `import { FunctionImpl, GroupImpl } from "@confect/server";
-import { Effect, Layer } from "effect";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import databaseSchema from "./_generated/schema";
 import group from "./${groupName}.spec";
 

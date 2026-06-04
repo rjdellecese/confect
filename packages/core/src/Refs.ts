@@ -1,5 +1,8 @@
 import type { Types } from "effect";
-import { Array, Option, pipe, Record } from "effect";
+import { pipe } from "effect";
+import * as Array from "effect/Array";
+import * as Option from "effect/Option";
+import * as Record from "effect/Record";
 import type * as FunctionSpec from "./FunctionSpec";
 import * as GroupSpec from "./GroupSpec";
 import * as Ref from "./Ref";

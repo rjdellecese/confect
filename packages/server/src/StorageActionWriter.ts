@@ -1,6 +1,9 @@
 import type { StorageActionWriter as ConvexStorageActionWriter } from "convex/server";
 import type { GenericId } from "convex/values";
-import { Effect, flow, Layer, Option } from "effect";
+import { flow } from "effect";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import { BlobNotFoundError } from "./BlobNotFoundError";
 
 const make = (storageActionWriter: ConvexStorageActionWriter) => ({
