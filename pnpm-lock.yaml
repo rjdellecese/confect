@@ -172,27 +172,6 @@ importers:
         specifier: 8.56.1
         version: 8.56.1(eslint@10.0.2(jiti@1.21.7))(typescript@5.9.3)
 
-  bench:
-    dependencies:
-      '@confect/cli':
-        specifier: workspace:*
-        version: link:../packages/cli
-      '@confect/core':
-        specifier: workspace:*
-        version: link:../packages/core
-      '@confect/server':
-        specifier: workspace:*
-        version: link:../packages/server
-      convex:
-        specifier: 1.39.1
-        version: 1.39.1(react@19.2.4)
-      effect:
-        specifier: 3.21.2
-        version: 3.21.2
-      esbuild:
-        specifier: 0.27.3
-        version: 0.27.3
-
   packages/cli:
     dependencies:
       '@confect/core':
