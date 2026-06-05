@@ -1,5 +1,5 @@
 import type { UserIdentity as ConvexUserIdentity } from "convex/server";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import { expectTypeOf, test } from "vitest";
 import * as UserIdentity from "../src/UserIdentity";
 

@@ -1,11 +1,11 @@
-import {
-  HttpApi,
-  HttpApiBuilder,
-  HttpApiEndpoint,
-  HttpApiGroup,
-  OpenApi,
-} from "@effect/platform";
-import { Effect, Layer, Schema } from "effect";
+import * as HttpApi from "@effect/platform/HttpApi";
+import * as HttpApiBuilder from "@effect/platform/HttpApiBuilder";
+import * as HttpApiEndpoint from "@effect/platform/HttpApiEndpoint";
+import * as HttpApiGroup from "@effect/platform/HttpApiGroup";
+import * as OpenApi from "@effect/platform/OpenApi";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 import refs from "../_generated/refs";
 import { QueryRunner } from "../_generated/services";
 import notes from "../_generated/tables/notes";

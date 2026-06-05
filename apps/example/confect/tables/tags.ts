@@ -1,5 +1,5 @@
 import { Table } from "@confect/server";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
 // Exported (as a type only — there is no `Tags` value export here) so the
 // default export's inferred type can name this recursive alias. The

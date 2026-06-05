@@ -1,5 +1,9 @@
 import type { LeafModule } from "./LeafModule";
-import { Array, Option, Order, pipe, Record } from "effect";
+import { pipe } from "effect/Function";
+import * as Array from "effect/Array";
+import * as Option from "effect/Option";
+import * as Order from "effect/Order";
+import * as Record from "effect/Record";
 
 export interface SpecImportBinding {
   readonly importPath: string;

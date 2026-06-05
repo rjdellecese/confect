@@ -1,7 +1,10 @@
 import { dirname, isAbsolute, resolve } from "node:path";
-import { Path } from "@effect/platform";
+import * as Path from "@effect/platform/Path";
 import { bundleRequire } from "bundle-require";
-import { Array, Effect, Option, pipe } from "effect";
+import { pipe } from "effect/Function";
+import * as Array from "effect/Array";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import type * as esbuild from "esbuild";
 import { BundlerError } from "./BuildError";
 

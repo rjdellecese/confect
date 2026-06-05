@@ -1,7 +1,11 @@
 import { FunctionSpec, GroupSpec, Registry } from "@confect/core";
 import { DatabaseSchema, FunctionImpl, GroupImpl } from "@confect/server";
 import { describe, expect, it } from "@effect/vitest";
-import { Context, Effect, Layer, Ref, Schema } from "effect";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Ref from "effect/Ref";
+import * as Schema from "effect/Schema";
 
 const fnSpec = <const Name extends string>(name: Name) =>
   FunctionSpec.publicQuery({

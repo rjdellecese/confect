@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Option } from "effect";
+import * as Option from "effect/Option";
 import * as GenericId from "../src/GenericId";
 
 describe("tableName", () => {

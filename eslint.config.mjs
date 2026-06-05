@@ -72,6 +72,39 @@ export default [
     },
   },
 
+  // Enforce submodule Effect imports across the repo. `import { Schema } from
+  // "effect"` pulls the entire namespace because esbuild can't tree-shake property
+  // access on the barrel's re-exports, so a single barrel import re-pins all of
+  // Schema/Stream/etc. into a function's bundle. `import * as Schema from
+  // "effect/Schema"` tree-shakes — and is the import style Effect v4 recommends.
+  // Type-only imports are exempt; @effect/vitest is exempt (test utilities).
+  {
+    files: ["**/*.{ts,tsx,mts,cts}"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "effect",
+              message:
+                'Import Effect modules from their submodule path so they tree-shake, e.g. `import * as Schema from "effect/Schema"`. Bare helpers (pipe, flow, identity) come from "effect/Function".',
+              allowTypeImports: true,
+            },
+          ],
+          patterns: [
+            {
+              regex: "^@effect/(?!vitest)[^/]+$",
+              message:
+                'Import @effect/* modules from their submodule path so they tree-shake, e.g. `import * as Path from "@effect/platform/Path"`.',
+              allowTypeImports: true,
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // apps/docs
   {
     ...mdx.flat,

@@ -1,5 +1,5 @@
 import type { GenericDataModel, GenericQueryCtx } from "convex/server";
-import { Context } from "effect";
+import * as Context from "effect/Context";
 
 export const QueryCtx = <DataModel extends GenericDataModel>() =>
   Context.GenericTag<GenericQueryCtx<DataModel>>("@confect/server/QueryCtx");

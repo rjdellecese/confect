@@ -1,5 +1,7 @@
 import { FunctionSpec, Ref } from "@confect/core";
-import { Cron, Duration, Schema } from "effect";
+import * as Cron from "effect/Cron";
+import * as Duration from "effect/Duration";
+import * as Schema from "effect/Schema";
 import { describe, expect, test } from "vitest";
 import * as CronJob from "../src/CronJob";
 

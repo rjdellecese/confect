@@ -1,27 +1,27 @@
-import { Command } from "@effect/cli";
-import { FileSystem, Path } from "@effect/platform";
-import { Ansi, AnsiDoc } from "@effect/printer-ansi";
-import {
-  Array,
-  Chunk,
-  Clock,
-  Console,
-  Duration,
-  Effect,
-  Equal,
-  ExecutionStrategy,
-  Exit,
-  HashSet,
-  Match,
-  Option,
-  Order,
-  pipe,
-  Queue,
-  Ref,
-  Scope,
-  Stream,
-  String,
-} from "effect";
+import * as Command from "@effect/cli/Command";
+import * as FileSystem from "@effect/platform/FileSystem";
+import * as Path from "@effect/platform/Path";
+import * as Ansi from "@effect/printer-ansi/Ansi";
+import * as AnsiDoc from "@effect/printer-ansi/AnsiDoc";
+import { pipe } from "effect/Function";
+import * as Array from "effect/Array";
+import * as Chunk from "effect/Chunk";
+import * as Clock from "effect/Clock";
+import * as Console from "effect/Console";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as Equal from "effect/Equal";
+import * as ExecutionStrategy from "effect/ExecutionStrategy";
+import * as Exit from "effect/Exit";
+import * as HashSet from "effect/HashSet";
+import * as Match from "effect/Match";
+import * as Option from "effect/Option";
+import * as Order from "effect/Order";
+import * as Queue from "effect/Queue";
+import * as Ref from "effect/Ref";
+import * as Scope from "effect/Scope";
+import * as Stream from "effect/Stream";
+import * as String from "effect/String";
 import {
   externalPlugin,
   loadTsConfig,

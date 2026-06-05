@@ -1,7 +1,14 @@
 import { Spec, type GroupSpec } from "@confect/core";
-import { Command } from "@effect/cli";
-import { FileSystem, Path } from "@effect/platform";
-import { Array, Effect, Either, HashSet, Match, Option, Ref } from "effect";
+import * as Command from "@effect/cli/Command";
+import * as FileSystem from "@effect/platform/FileSystem";
+import * as Path from "@effect/platform/Path";
+import * as Array from "effect/Array";
+import * as Effect from "effect/Effect";
+import * as Either from "effect/Either";
+import * as HashSet from "effect/HashSet";
+import * as Match from "effect/Match";
+import * as Option from "effect/Option";
+import * as Ref from "effect/Ref";
 import * as Bundler from "../Bundler";
 import * as CodegenError from "../CodegenError";
 import {

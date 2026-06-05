@@ -1,5 +1,7 @@
 import type { Predicate } from "effect";
-import { Array, Effect, Record } from "effect";
+import * as Array from "effect/Array";
+import * as Effect from "effect/Effect";
+import * as Record from "effect/Record";
 
 type NestedObject<T> = {
   [key: string]: T | NestedObject<T>;

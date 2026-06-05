@@ -1,5 +1,5 @@
 import type { GenericActionCtx, GenericDataModel } from "convex/server";
-import { Context } from "effect";
+import * as Context from "effect/Context";
 
 export const ActionCtx = <DataModel extends GenericDataModel>() =>
   Context.GenericTag<GenericActionCtx<DataModel>>("@confect/server/ActionCtx");

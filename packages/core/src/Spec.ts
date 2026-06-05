@@ -1,4 +1,7 @@
-import { Array, Option, Predicate, Record } from "effect";
+import * as Array from "effect/Array";
+import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
+import * as Record from "effect/Record";
 import * as GroupSpec from "./GroupSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 

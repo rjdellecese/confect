@@ -10,7 +10,11 @@ import {
 } from "convex/server";
 import type { Value } from "convex/values";
 import { ConvexError } from "convex/values";
-import { Effect, Either, Layer, pipe, Schema } from "effect";
+import { pipe } from "effect/Function";
+import * as Effect from "effect/Effect";
+import * as Either from "effect/Either";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 import * as ActionCtx from "./ActionCtx";
 import * as ActionRunner from "./ActionRunner";
 import * as Auth from "./Auth";

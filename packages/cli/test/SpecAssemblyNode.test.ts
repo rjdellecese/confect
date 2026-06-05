@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 import type { LeafModule } from "../src/LeafModule";
 import { assemblyNodesFromLeaves } from "../src/SpecAssemblyNode";
 import * as templates from "../src/templates";

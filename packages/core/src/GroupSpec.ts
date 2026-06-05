@@ -1,4 +1,5 @@
-import { Predicate, Record } from "effect";
+import * as Predicate from "effect/Predicate";
+import * as Record from "effect/Record";
 import type * as FunctionSpec from "./FunctionSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 import { validateConfectFunctionIdentifier } from "./Identifier";

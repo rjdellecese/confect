@@ -1,6 +1,6 @@
 import { GroupSpec, Spec } from "@confect/core";
 import { describe, expect, test } from "@effect/vitest";
-import { Option } from "effect";
+import * as Option from "effect/Option";
 
 import * as GroupPath from "../src/GroupPath";
 

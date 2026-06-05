@@ -1,5 +1,5 @@
 import { bench } from "@ark/attest";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import * as FunctionSpec from "../src/FunctionSpec";
 import * as GroupSpec from "../src/GroupSpec";
 import type * as Ref from "../src/Ref";

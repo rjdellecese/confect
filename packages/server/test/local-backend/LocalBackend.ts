@@ -1,15 +1,14 @@
-import { Command, Path } from "@effect/platform";
-import { NodeContext } from "@effect/platform-node";
+import * as Command from "@effect/platform/Command";
+import * as Path from "@effect/platform/Path";
+import * as NodeContext from "@effect/platform-node/NodeContext";
 import { ConvexHttpClient } from "convex/browser";
-import {
-  Context,
-  Duration,
-  Effect,
-  Layer,
-  Option,
-  Schema,
-  Stream,
-} from "effect";
+import * as Context from "effect/Context";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
 
 class BackendNotReadyError extends Schema.TaggedError<BackendNotReadyError>()(
   "BackendNotReadyError",

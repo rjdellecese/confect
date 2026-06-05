@@ -1,16 +1,14 @@
 import type * as GroupSpec from "@confect/core/GroupSpec";
 import * as Registry from "@confect/core/Registry";
-import {
-  Array,
-  Context,
-  Effect,
-  Layer,
-  Option,
-  pipe,
-  Predicate,
-  Record,
-  Ref,
-} from "effect";
+import { pipe } from "effect/Function";
+import * as Array from "effect/Array";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
+import * as Record from "effect/Record";
+import * as Ref from "effect/Ref";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as FunctionImpl from "./FunctionImpl";
 

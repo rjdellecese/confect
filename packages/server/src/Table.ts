@@ -13,7 +13,8 @@ import {
   type VectorIndexConfig,
 } from "convex/server";
 import type { GenericValidator, Validator } from "convex/values";
-import { Predicate, Schema } from "effect";
+import * as Predicate from "effect/Predicate";
+import * as Schema from "effect/Schema";
 import {
   compileTableSchema,
   type TableSchemaToTableValidator,

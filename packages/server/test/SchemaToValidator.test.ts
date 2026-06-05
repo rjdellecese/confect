@@ -1,6 +1,8 @@
 import { describe, effect, expect, expectTypeOf, test } from "@effect/vitest";
 import { v, type VBoolean, type VString, type VUnion } from "convex/values";
-import { Effect, Exit, Schema } from "effect";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Schema from "effect/Schema";
 
 import { GenericId } from "@confect/core/GenericId";
 import {

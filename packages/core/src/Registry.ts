@@ -1,4 +1,5 @@
-import { Context, Ref } from "effect";
+import * as Context from "effect/Context";
+import * as Ref from "effect/Ref";
 
 /**
  * Recursive tree that mirrors a `Spec`'s group structure. Leaves are the

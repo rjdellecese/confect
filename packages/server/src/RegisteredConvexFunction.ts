@@ -11,7 +11,12 @@ import {
   queryGeneric,
 } from "convex/server";
 import type { Value } from "convex/values";
-import { Clock, Effect, Layer, Match, pipe, Schema } from "effect";
+import { pipe } from "effect/Function";
+import * as Clock from "effect/Clock";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Match from "effect/Match";
+import * as Schema from "effect/Schema";
 import * as Auth from "./Auth";
 import * as ConvexConfigProvider from "./ConvexConfigProvider";
 import * as DatabaseReader from "./DatabaseReader";

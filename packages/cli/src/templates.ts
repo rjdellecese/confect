@@ -1,4 +1,6 @@
-import { Array, Effect, Option } from "effect";
+import * as Array from "effect/Array";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import { CodeBlockWriter } from "./CodeBlockWriter";
 import {
   collectImportBindings,

@@ -1,6 +1,6 @@
 import type { DefaultFunctionArgs } from "convex/server";
 import type { Schema } from "effect";
-import { Data } from "effect";
+import * as Data from "effect/Data";
 import * as Lazy from "./Lazy";
 
 export type FunctionProvenance = Data.TaggedEnum<{

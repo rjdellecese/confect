@@ -4,7 +4,10 @@ import type {
   RegisteredMutation,
 } from "convex/server";
 import { ConvexError } from "convex/values";
-import { Effect, MutableRef, Option, Schema } from "effect";
+import * as Effect from "effect/Effect";
+import * as MutableRef from "effect/MutableRef";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
 import * as FunctionSpec from "../src/FunctionSpec";

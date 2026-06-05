@@ -1,5 +1,5 @@
 import { Table } from "@confect/server";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
 export default Table.make(() =>
   Schema.Struct({

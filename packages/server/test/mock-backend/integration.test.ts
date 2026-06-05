@@ -1,6 +1,8 @@
 import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
-import { Array, Effect, Either } from "effect";
+import * as Array from "effect/Array";
+import * as Effect from "effect/Effect";
+import * as Either from "effect/Either";
 import refs from "./fixtures/confect/_generated/refs";
 import { DatabaseWriter } from "./fixtures/confect/_generated/services";
 import { Id } from "./fixtures/confect/_generated/id";

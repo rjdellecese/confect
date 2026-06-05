@@ -1,7 +1,11 @@
-import { FileSystem, Path } from "@effect/platform";
-import { NodeFileSystem, NodePath } from "@effect/platform-node";
+import * as FileSystem from "@effect/platform/FileSystem";
+import * as Path from "@effect/platform/Path";
+import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
+import * as NodePath from "@effect/platform-node/NodePath";
 import { assert, expect, layer } from "@effect/vitest";
-import { Effect, Either, Layer } from "effect";
+import * as Effect from "effect/Effect";
+import * as Either from "effect/Either";
+import * as Layer from "effect/Layer";
 import type { CodegenError } from "../src/CodegenError";
 import { ConfectDirectory } from "../src/ConfectDirectory";
 import {
@@ -246,7 +250,7 @@ layer(LeafModuleLayer)("validateImpl", (it) => {
           "_mismatch",
           // Imports `./notes.spec` instead of its sibling `./_mismatch.spec`.
           `import notes from "./notes.spec";
-import { Layer } from "effect";
+import * as Layer from "effect/Layer";
 void notes;
 export default Layer.empty;
 `,
@@ -302,7 +306,8 @@ export default GroupImpl.make(
           withTempLeaf(
             "_unfinalized",
             `import { FunctionImpl, GroupImpl } from "@confect/server";
-import { Effect, Layer } from "effect";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import databaseSchema from "../_generated/schema";
 import { DatabaseReader, DatabaseWriter } from "../_generated/services";
 import notes from "./_unfinalized.spec";
@@ -371,7 +376,8 @@ export default GroupImpl.make(databaseSchema, notes).pipe(
           withTempLeaf(
             "_incomplete",
             `import { FunctionImpl, GroupImpl } from "@confect/server";
-import { Effect, Layer } from "effect";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import databaseSchema from "../_generated/schema";
 import { DatabaseWriter } from "../_generated/services";
 import notes from "./_incomplete.spec";

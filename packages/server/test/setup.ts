@@ -1,11 +1,10 @@
-import {
-  Command,
-  type CommandExecutor,
-  FileSystem,
-  Path,
-} from "@effect/platform";
-import { NodeContext } from "@effect/platform-node";
-import { Effect, pipe } from "effect";
+import type { CommandExecutor } from "@effect/platform";
+import * as Command from "@effect/platform/Command";
+import * as FileSystem from "@effect/platform/FileSystem";
+import * as Path from "@effect/platform/Path";
+import * as NodeContext from "@effect/platform-node/NodeContext";
+import { pipe } from "effect/Function";
+import * as Effect from "effect/Effect";
 
 const runCommand = (
   command: string,

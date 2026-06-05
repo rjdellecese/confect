@@ -1,5 +1,7 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
-import { Config, Effect, Layer } from "effect";
+import * as Config from "effect/Config";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import databaseSchema from "./_generated/schema";
 import env from "./env.spec";
 
