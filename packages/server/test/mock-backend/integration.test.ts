@@ -11,7 +11,7 @@ import {
   Forbidden,
   NotFound,
 } from "./fixtures/confect/groups/typedErrors.spec";
-import { NodeNotFound } from "./fixtures/confect/node/typedErrorsNode.spec";
+import { NodeNotFound } from "./fixtures/confect/typedErrorsNode.spec";
 import * as TestConfect from "./TestConfect";
 
 describe("DatabaseReader", () => {
@@ -533,7 +533,7 @@ describe("typed errors", () => {
           const c = yield* TestConfect.TestConfect;
 
           const result = yield* Effect.either(
-            c.action(refs.public.node.typedErrorsNode.failingNodeAction, {
+            c.action(refs.public.typedErrorsNode.failingNodeAction, {
               id: "abc",
             }),
           );

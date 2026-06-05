@@ -82,13 +82,12 @@ confect/
 
 ## Node actions
 
-Place [node action](/server/node-actions) spec and impl files in a `node/` subdirectory, using the same `.spec.ts`/`.impl.ts` suffixes. Their specs use `GroupSpec.makeNode()`; their impls are otherwise identical to non-node impls, passing the database schema from `_generated/schema`.
+[Node action](/server/node-actions) specs and impls are ordinary `.spec.ts`/`.impl.ts` pairs — they can live anywhere in `confect/`, with no special `node/` subdirectory. A group is marked Node-runtime by its spec using `GroupSpec.makeNode()` (instead of `GroupSpec.make()`); its impl is otherwise identical to a non-node impl, passing the database schema from `_generated/schema`. Confect emits Convex's `"use node"` directive into the generated module based on the spec.
 
 ```
 confect/
-  node/
-    email.spec.ts
-    email.impl.ts
+  email.spec.ts
+  email.impl.ts
 ```
 
 ## Nested groups
@@ -112,7 +111,6 @@ Putting it all together, a project using all of these conventions might look lik
   <Tree.Folder name="confect" defaultOpen>
     <Tree.Folder name="_generated" defaultOpen>
       <Tree.File name="convexSchema.ts" />
-      <Tree.File name="nodeSpec.ts" />
       <Tree.File name="refs.ts" />
       <Tree.File name="schema.ts" />
       <Tree.File name="services.ts" />
@@ -132,10 +130,6 @@ Putting it all together, a project using all of these conventions might look lik
       </Tree.Folder>
       <Tree.File name="id.ts" />
     </Tree.Folder>
-    <Tree.Folder name="node" defaultOpen>
-      <Tree.File name="email.spec.ts" />
-      <Tree.File name="email.impl.ts" />
-    </Tree.Folder>
     <Tree.Folder name="notes_and_random" defaultOpen>
       <Tree.File name="notes.spec.ts" />
       <Tree.File name="notes.impl.ts" />
@@ -146,6 +140,8 @@ Putting it all together, a project using all of these conventions might look lik
       <Tree.File name="notes.ts" />
       <Tree.File name="users.ts" />
     </Tree.Folder>
+    <Tree.File name="email.spec.ts" />
+    <Tree.File name="email.impl.ts" />
     <Tree.File name="env.spec.ts" />
     <Tree.File name="env.impl.ts" />
     <Tree.File name="http.ts" />

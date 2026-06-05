@@ -54,9 +54,6 @@ const GENERATED_DIRNAME = "_generated";
 const GENERATED_SPEC_PATH = Effect.andThen(Path.Path, (path) =>
   path.join(GENERATED_DIRNAME, "spec.ts"),
 );
-const GENERATED_NODE_SPEC_PATH = Effect.andThen(Path.Path, (path) =>
-  path.join(GENERATED_DIRNAME, "nodeSpec.ts"),
-);
 
 // Quiescence window: the sync loop waits this long for further signals
 // after each batch. One user edit fires `onEnd` on every esbuild
@@ -421,11 +418,9 @@ const discoverEntryPoints = Effect.gen(function* () {
     });
 
   const generatedSpecPath = yield* GENERATED_SPEC_PATH;
-  const generatedNodeSpecPath = yield* GENERATED_NODE_SPEC_PATH;
 
   const fixedEntryOptions = yield* Effect.all([
     tryEntry(generatedSpecPath, "specDirty"),
-    tryEntry(generatedNodeSpecPath, "specDirty"),
     // `confect/schema.ts` is no longer user-authored; the runtime
     // `DatabaseSchema` lives at `_generated/schema.ts` (codegen-written,
     // so not an entry point — wiring it through esbuild would form a

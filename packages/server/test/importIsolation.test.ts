@@ -43,9 +43,7 @@ layer(TestLayer)("import isolation", (it) => {
         expect(contents).not.toMatch(
           /^import .* from "[^"]*\/(api|nodeApi)";$/m,
         );
-        expect(contents).not.toMatch(
-          /^import .* from "[^"]*\/(spec|nodeSpec)";$/m,
-        );
+        expect(contents).not.toMatch(/^import .* from "[^"]*\/spec";$/m);
         // The group's own leaf spec is referenced type-only, so it is erased
         // at transpile time (and the project-wide assembled spec is not used).
         expect(contents).toContain(

@@ -56,92 +56,119 @@ const GenerateFunctionsLayer = Layer.mergeAll(
 const emptyArgs = Schema.Struct({});
 const emptyReturns = Schema.Null;
 
-// Spec with a single Node-runtime function group (`node.typedErrorsNode`),
-// mirroring what `Spec.merge` hands `generateFunctions` for a project with a
-// `confect/node/*` group.
-const nodeSpec = Spec.merge(
-  Spec.make(),
-  Spec.makeNode().addAt(
-    "typedErrorsNode",
-    GroupSpec.makeNode().addFunction(
-      FunctionSpec.publicNodeAction({
-        name: "failingNodeAction",
-        args: () => emptyArgs,
-        returns: () => emptyReturns,
+const nodeGroup = () =>
+  GroupSpec.makeNode().addFunction(
+    FunctionSpec.publicNodeAction({
+      name: "failingNodeAction",
+      args: () => emptyArgs,
+      returns: () => emptyReturns,
+    }),
+  );
+
+/**
+ * Run `generateFunctions(spec)` against a clean convex tree (no pre-existing
+ * `convex/` modules — every group takes the `writeGroups` "new group" branch),
+ * with a registry file pre-seeded at `registryRelativePath` so the generated
+ * module's import can be resolved on disk. Returns the generated module's
+ * contents plus whether its registry import resolves to a real file.
+ */
+const runGenerateForNodeGroup = ({
+  spec,
+  moduleRelativePath,
+  registryRelativePath,
+}: {
+  spec: Spec.AnyWithProps;
+  moduleRelativePath: string;
+  registryRelativePath: string;
+}) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+
+    const root = yield* fs.makeTempDirectoryScoped();
+    const convexDir = path.join(root, "convex");
+    const confectDir = path.join(root, "confect");
+    yield* fs.makeDirectory(convexDir, { recursive: true });
+
+    const registryPath = path.join(
+      confectDir,
+      "_generated",
+      "registeredFunctions",
+      registryRelativePath,
+    );
+    yield* fs.makeDirectory(path.dirname(registryPath), { recursive: true });
+    yield* fs.writeFileString(registryPath, "export default {};\n");
+
+    const TempDirsLayer = Layer.mergeAll(
+      Layer.mock(ProjectRoot, {
+        _tag: "@confect/cli/ProjectRoot",
+        get: Effect.succeed(root),
       }),
-    ),
-  ),
-);
+      Layer.mock(ConvexDirectory, {
+        _tag: "@confect/cli/ConvexDirectory",
+        get: Effect.succeed(convexDir),
+      }),
+      Layer.mock(ConfectDirectory, {
+        _tag: "@confect/cli/ConfectDirectory",
+        get: Effect.succeed(confectDir),
+      }),
+    );
+
+    yield* generateFunctions(spec).pipe(Effect.provide(TempDirsLayer));
+
+    const modulePath = path.join(convexDir, moduleRelativePath);
+    const contents = yield* fs.readFileString(modulePath);
+
+    const importMatch = contents.match(/from "([^"]+)"/);
+    assert(importMatch !== null, "expected a registry import in the module");
+    const resolved =
+      path.resolve(path.dirname(modulePath), importMatch[1]!) + ".ts";
+    const resolves = yield* fs.exists(resolved);
+
+    return { contents, resolves };
+  }).pipe(Effect.scoped);
 
 layer(GenerateFunctionsLayer)("generateFunctions", (it) => {
-  // Regression test for the clean-tree codegen bug: when no `convex/` modules
-  // exist yet, every group takes the "new group" (`writeGroups`) branch. That
-  // branch used to leave the leading `node` segment in the registry import
-  // path, so the generated `convex/node/<name>.ts` imported
-  // `registeredFunctions/node/<name>` while the registry file is actually
-  // written at `registeredFunctions/<name>`. The incremental path stripped the
-  // segment correctly, hiding the bug until a from-scratch regeneration.
-  it.effect(
-    "writes a resolvable registry import for a Node group on a clean tree",
-    () =>
-      Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
+  // A Node group declared with `GroupSpec.makeNode()` is now an ordinary group:
+  // it generates `convex/<path>.ts` (no `node/` directory) carrying the
+  // `"use node"` directive, importing its registry at the matching path. This
+  // is exercised from a clean tree, so it also guards the `writeGroups` path.
+  it.effect("generates a top-level Node module with `use node`", () =>
+    Effect.gen(function* () {
+      const spec = Spec.make().addAt("typedErrorsNode", nodeGroup());
 
-        const root = yield* fs.makeTempDirectoryScoped();
-        const convexDir = path.join(root, "convex");
-        const confectDir = path.join(root, "confect");
-        yield* fs.makeDirectory(convexDir, { recursive: true });
-        // The registry file lives at the top level (no `node/` segment), as
-        // emitted by `registeredFunctionsRelativePath`.
-        const registryDir = path.join(
-          confectDir,
-          "_generated",
-          "registeredFunctions",
-        );
-        yield* fs.makeDirectory(registryDir, { recursive: true });
-        yield* fs.writeFileString(
-          path.join(registryDir, "typedErrorsNode.ts"),
-          "export default {};\n",
-        );
+      const { contents, resolves } = yield* runGenerateForNodeGroup({
+        spec,
+        moduleRelativePath: "typedErrorsNode.ts",
+        registryRelativePath: "typedErrorsNode.ts",
+      });
 
-        const TempDirsLayer = Layer.mergeAll(
-          Layer.mock(ProjectRoot, {
-            _tag: "@confect/cli/ProjectRoot",
-            get: Effect.succeed(root),
-          }),
-          Layer.mock(ConvexDirectory, {
-            _tag: "@confect/cli/ConvexDirectory",
-            get: Effect.succeed(convexDir),
-          }),
-          Layer.mock(ConfectDirectory, {
-            _tag: "@confect/cli/ConfectDirectory",
-            get: Effect.succeed(confectDir),
-          }),
-        );
+      expect(contents).toContain(`"use node";`);
+      expect(contents).toContain(
+        "export const failingNodeAction = registeredFunctions.failingNodeAction;",
+      );
+      expect(resolves).toBe(true);
+    }),
+  );
 
-        yield* generateFunctions(nodeSpec).pipe(Effect.provide(TempDirsLayer));
+  // Nesting is preserved for Node groups just like Convex groups: a node spec at
+  // `notes/archived` generates `convex/notes/archived.ts` with `"use node"` and
+  // a registry import that resolves at the matching nested path.
+  it.effect("generates a nested Node module preserving its path", () =>
+    Effect.gen(function* () {
+      const spec = Spec.make().addAt(
+        "notes",
+        GroupSpec.makeAt("notes").addGroupAt("archived", nodeGroup()),
+      );
 
-        const nodeModulePath = path.join(
-          convexDir,
-          "node",
-          "typedErrorsNode.ts",
-        );
-        const contents = yield* fs.readFileString(nodeModulePath);
+      const { contents, resolves } = yield* runGenerateForNodeGroup({
+        spec,
+        moduleRelativePath: "notes/archived.ts",
+        registryRelativePath: "notes/archived.ts",
+      });
 
-        const importMatch = contents.match(/from "([^"]+)"/);
-        assert(
-          importMatch !== null,
-          "expected a registry import in the module",
-        );
-        const importSpecifier = importMatch[1]!;
-
-        // The import must not retain the `node/` segment...
-        expect(importSpecifier).not.toContain("registeredFunctions/node/");
-        // ...and must resolve to the registry file that was actually written.
-        const resolved =
-          path.resolve(path.dirname(nodeModulePath), importSpecifier) + ".ts";
-        expect(yield* fs.exists(resolved)).toBe(true);
-      }).pipe(Effect.scoped),
+      expect(contents).toContain(`"use node";`);
+      expect(resolves).toBe(true);
+    }),
   );
 });

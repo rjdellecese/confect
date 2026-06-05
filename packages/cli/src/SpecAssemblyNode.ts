@@ -52,19 +52,6 @@ export const assemblyNodesFromLeaves = (
   leaves: ReadonlyArray<LeafModule>,
 ): ReadonlyArray<SpecAssemblyNode> => assemblyNodesAtDepth(leaves, 0);
 
-export const partitionByRuntime = (
-  leaves: ReadonlyArray<LeafModule>,
-): {
-  readonly convex: ReadonlyArray<LeafModule>;
-  readonly node: ReadonlyArray<LeafModule>;
-} => {
-  const [node, convex] = Array.partition(
-    leaves,
-    (leaf) => leaf.runtime === "Convex",
-  );
-  return { convex, node };
-};
-
 const importBindingsForNode = (
   node: SpecAssemblyNode,
 ): ReadonlyArray<SpecImportBinding> =>

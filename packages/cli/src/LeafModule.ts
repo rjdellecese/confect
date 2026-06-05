@@ -17,7 +17,6 @@ import {
   ImplMissingSpecImportError,
   ImplNotFinalizedError,
   SpecMissingDefaultGroupSpecError,
-  SpecRuntimeMismatchError,
 } from "./CodegenError";
 import { ConfectDirectory } from "./ConfectDirectory";
 import { removePathExtension } from "./utils";
@@ -26,8 +25,14 @@ export interface LeafModule {
   readonly relativePath: string;
   readonly pathSegments: readonly [string, ...string[]];
   readonly groupPathDot: string;
-  readonly registryGroupPathDot: string;
   readonly exportName: string;
+  /**
+   * The runtime of the group, which is declared by its spec
+   * (`GroupSpec.makeNode()` → `"Node"`, `GroupSpec.make()` → `"Convex"`), not by
+   * its location on disk. `toLeafModule` cannot know this without bundling, so it
+   * produces a `"Convex"` placeholder that `loadAndValidateLeafModules` overwrites
+   * with the validated `GroupSpec`'s runtime.
+   */
   readonly runtime: "Convex" | "Node";
   readonly specImportPath: string;
 }
@@ -104,24 +109,10 @@ export const specPathForImpl = (implRelativePath: string) =>
 export const implPathForSpec = (specRelativePath: string) =>
   swapModuleSuffix(specRelativePath, SPEC_SUFFIX, IMPL_SUFFIX);
 
-export const isNodeLeafModule = (relativePath: string) =>
-  relativePath.startsWith("node/") || relativePath.startsWith("node\\");
-
-export const toNodeRegistryLeaf = (leaf: LeafModule): LeafModule => ({
-  ...leaf,
-  pathSegments: [leaf.exportName],
-  groupPathDot: leaf.exportName,
-});
-
 export const registeredFunctionsRelativePath = (leaf: LeafModule) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
-    return (
-      path.join(
-        "registeredFunctions",
-        ...leaf.pathSegments.slice(leaf.runtime === "Node" ? 1 : 0),
-      ) + ".ts"
-    );
+    return path.join("registeredFunctions", ...leaf.pathSegments) + ".ts";
   });
 
 export const discoverLeafSpecFiles = Effect.gen(function* () {
@@ -177,15 +168,15 @@ export const toLeafModule = (specRelativePath: string) =>
     const { pathSegments, groupPathDot } =
       yield* groupPathFromRelativeModulePath(specRelativePath);
     const specImportPath = yield* specImportPathFromGenerated(specRelativePath);
-    const runtime = isNodeLeafModule(specRelativePath) ? "Node" : "Convex";
 
     return {
       relativePath: specRelativePath,
       pathSegments,
       groupPathDot,
       exportName,
-      runtime,
-      registryGroupPathDot: runtime === "Node" ? exportName : groupPathDot,
+      // Placeholder; the real runtime is stamped from the bundled spec in
+      // `loadAndValidateLeafModules`. See `LeafModule.runtime`.
+      runtime: "Convex",
       specImportPath,
     } satisfies LeafModule;
   });
@@ -198,11 +189,11 @@ const absoluteModulePath = (relativePath: string) =>
   });
 
 /**
- * Validate that the leaf's spec file default-exports a `GroupSpec` whose
- * runtime matches the leaf's location (`Convex` for files outside
- * `confect/node/`, `Node` for files inside it). Returns the validated
- * `GroupSpec` so callers can avoid re-bundling for later inspection (e.g.
- * parent/child name-collision checks at codegen time).
+ * Validate that the leaf's spec file default-exports a `GroupSpec`. Returns the
+ * validated `GroupSpec` so callers can read its runtime and avoid re-bundling for
+ * later inspection (e.g. stamping `leaf.runtime` and parent/child name-collision
+ * checks at codegen time). The group's runtime (`Convex` vs `Node`) is whatever
+ * the spec declares — it is not constrained by the file's location.
  */
 export const validateSpec = (leaf: LeafModule) =>
   Effect.gen(function* () {
@@ -216,14 +207,6 @@ export const validateSpec = (leaf: LeafModule) =>
     if (!GroupSpec.isGroupSpec(groupSpec)) {
       return yield* new SpecMissingDefaultGroupSpecError({
         specPath: leaf.relativePath,
-      });
-    }
-
-    if (groupSpec.runtime !== leaf.runtime) {
-      return yield* new SpecRuntimeMismatchError({
-        specPath: leaf.relativePath,
-        expectedRuntime: leaf.runtime,
-        actualRuntime: groupSpec.runtime,
       });
     }
 

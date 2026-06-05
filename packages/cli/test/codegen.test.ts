@@ -208,7 +208,6 @@ const leaf = (
   relativePath,
   pathSegments,
   groupPathDot: pathSegments.join("."),
-  registryGroupPathDot: pathSegments.join("."),
   exportName: pathSegments[pathSegments.length - 1]!,
   runtime: "Convex",
   specImportPath: `../${relativePath.slice(0, -".ts".length)}`,

@@ -33,15 +33,6 @@ export class SpecMissingDefaultGroupSpecError extends Schema.TaggedError<SpecMis
   },
 ) {}
 
-export class SpecRuntimeMismatchError extends Schema.TaggedError<SpecRuntimeMismatchError>()(
-  "SpecRuntimeMismatchError",
-  {
-    specPath: Schema.String,
-    expectedRuntime: Schema.Literal("Convex", "Node"),
-    actualRuntime: Schema.Literal("Convex", "Node"),
-  },
-) {}
-
 export class ImplMissingSpecImportError extends Schema.TaggedError<ImplMissingSpecImportError>()(
   "ImplMissingSpecImportError",
   {
@@ -126,7 +117,6 @@ export const CodegenError = Schema.Union(
   MissingImplFileError,
   MissingSpecFileError,
   SpecMissingDefaultGroupSpecError,
-  SpecRuntimeMismatchError,
   ImplMissingSpecImportError,
   ImplMissingDefaultLayerError,
   ImplNotFinalizedError,
@@ -197,26 +187,6 @@ const renderSpecMissingDefaultGroupSpecError = (
       " must default-export a GroupSpec; build it with GroupSpec.make() or GroupSpec.makeNode().",
     ),
   );
-
-const renderSpecRuntimeMismatchError = (
-  error: SpecRuntimeMismatchError,
-): AnsiDoc.AnsiDoc => {
-  const constructor =
-    error.expectedRuntime === "Node"
-      ? "GroupSpec.makeNode()"
-      : "GroupSpec.make()";
-  const moveHint =
-    error.expectedRuntime === "Node"
-      ? " or move the file into confect/node/."
-      : " or move the file out of confect/node/.";
-  return singleLine(
-    AnsiDoc.text("Spec "),
-    formatPathDoc(error.specPath),
-    AnsiDoc.text(
-      ` declares a ${error.actualRuntime} GroupSpec but its location requires ${error.expectedRuntime}; use ${constructor}${moveHint}`,
-    ),
-  );
-};
 
 const renderImplMissingSpecImportError = (
   error: ImplMissingSpecImportError,
@@ -348,12 +318,6 @@ export const renderCodegenError = (error: CodegenError): string => {
     Match.tag("SpecMissingDefaultGroupSpecError", (e) =>
       pipe(
         renderSpecMissingDefaultGroupSpecError(e),
-        AnsiDoc.render({ style: "pretty" }),
-      ),
-    ),
-    Match.tag("SpecRuntimeMismatchError", (e) =>
-      pipe(
-        renderSpecRuntimeMismatchError(e),
         AnsiDoc.render({ style: "pretty" }),
       ),
     ),

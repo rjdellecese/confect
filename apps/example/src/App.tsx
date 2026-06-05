@@ -35,7 +35,7 @@ const Page = () => {
   };
 
   const [emailStatus, setEmailStatus] = useState<string | null>(null);
-  const sendEmail = useAction(refs.public.node.email.send);
+  const sendEmail = useAction(refs.public.email.send);
 
   const testEmail = () => {
     setEmailStatus("Sending…");

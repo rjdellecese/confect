@@ -9,9 +9,9 @@
  */
 
 import type * as crons from "../crons.js";
+import type * as email from "../email.js";
 import type * as env from "../env.js";
 import type * as http from "../http.js";
-import type * as node_email from "../node/email.js";
 import type * as notes_and_random_notes from "../notes_and_random/notes.js";
 import type * as notes_and_random_random from "../notes_and_random/random.js";
 import type * as workpool from "../workpool.js";
@@ -24,9 +24,9 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   crons: typeof crons;
+  email: typeof email;
   env: typeof env;
   http: typeof http;
-  "node/email": typeof node_email;
   "notes_and_random/notes": typeof notes_and_random_notes;
   "notes_and_random/random": typeof notes_and_random_random;
   workpool: typeof workpool;

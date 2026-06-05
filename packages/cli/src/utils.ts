@@ -198,11 +198,11 @@ export const generateGroupModule = ({
 
 /**
  * Compute the module import specifier (relative to `modulePath`) for a group's
- * registry file under `confect/_generated/registeredFunctions/`. The leading
- * `node` segment is stripped for Node-runtime groups, matching how the registry
- * files are actually emitted (see `registeredFunctionsRelativePath` in
- * `LeafModule.ts`). Centralizing this here keeps the "overlapping" and "new"
- * group branches of `generateFunctions` from drifting apart.
+ * registry file under `confect/_generated/registeredFunctions/`. The registry
+ * path mirrors the group's path one-to-one (see `registeredFunctionsRelativePath`
+ * in `LeafModule.ts`) for both Convex and Node groups. Centralizing this here
+ * keeps the "overlapping" and "new" group branches of `generateFunctions` from
+ * drifting apart.
  */
 const registeredFunctionsImportPathForGroup = (
   groupPath: GroupPath.GroupPath,
@@ -212,16 +212,12 @@ const registeredFunctionsImportPathForGroup = (
     const path = yield* Path.Path;
     const confectDirectory = yield* ConfectDirectory.get;
 
-    const registrySegments =
-      groupPath.pathSegments[0] === "node"
-        ? groupPath.pathSegments.slice(1)
-        : groupPath.pathSegments;
     const registeredFunctionsPath =
       path.join(
         confectDirectory,
         "_generated",
         "registeredFunctions",
-        ...registrySegments,
+        ...groupPath.pathSegments,
       ) + ".ts";
 
     return yield* toModuleImportPath(
@@ -279,7 +275,7 @@ export const generateFunctions = (spec: Spec.AnyWithProps) =>
           groupPath,
           functionNames,
           registeredFunctionsImportPath,
-          useNode: groupPath.pathSegments[0] === "node",
+          useNode: group.runtime === "Node",
         });
         if (result === "Modified") {
           yield* logFileModified(modulePath);
@@ -386,7 +382,7 @@ export const writeGroups = (
         groupPath,
         functionNames,
         registeredFunctionsImportPath,
-        useNode: groupPath.pathSegments[0] === "node",
+        useNode: group.runtime === "Node",
       });
       yield* Effect.logDebug(`Group ${groupPath} generated`);
     }),

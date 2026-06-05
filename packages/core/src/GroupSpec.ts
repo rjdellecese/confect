@@ -14,7 +14,11 @@ export interface GroupSpec<
   Runtime extends RuntimeAndFunctionType.Runtime,
   Name_ extends string,
   Functions_ extends FunctionSpec.AnyWithPropsWithRuntime<Runtime> = never,
-  Groups_ extends AnyWithPropsWithRuntime<Runtime> = never,
+  // Subgroups may be of any runtime, independent of this group's own runtime: a
+  // group is only a namespace for its children, which are otherwise-independent
+  // modules. Functions, by contrast, stay homogeneous (a Node group only accepts
+  // Node actions) — `addFunction` keeps the `<Runtime>` bound below.
+  Groups_ extends AnyWithProps = never,
 > {
   readonly [TypeId]: TypeId;
   readonly runtime: Runtime;
@@ -32,14 +36,11 @@ export interface GroupSpec<
     function_: Function,
   ): GroupSpec<Runtime, Name_, Functions_ | Function, Groups_>;
 
-  addGroup<Group extends AnyWithPropsWithRuntime<Runtime>>(
+  addGroup<Group extends AnyWithProps>(
     group: Group,
   ): GroupSpec<Runtime, Name_, Functions_, Groups_ | Group>;
 
-  addGroupAt<
-    const AtName extends string,
-    Group extends AnyWithPropsWithRuntime<Runtime>,
-  >(
+  addGroupAt<const AtName extends string, Group extends AnyWithProps>(
     name: AtName,
     group: Group,
   ): GroupSpec<Runtime, Name_, Functions_, Groups_ | NamedAt<Group, AtName>>;
