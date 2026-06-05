@@ -22,6 +22,7 @@
     "spec-paths-immutable-lookup",
     "split-deploy-schema-from-runtime",
     "stable-react-query-results",
+    "submodule-effect-imports",
     "unique-spec-import-bindings"
   ]
 }
