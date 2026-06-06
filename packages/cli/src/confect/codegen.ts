@@ -198,9 +198,11 @@ const loadAndValidateLeafModules = Effect.gen(function* () {
     Effect.gen(function* () {
       const discovered = yield* toLeafModule(specRelativePath);
       const groupSpec = yield* validateSpec(discovered);
-      // A group's runtime is declared by its spec, not its location, so stamp
-      // the validated `GroupSpec`'s runtime onto the leaf now that it's bundled.
-      const leaf = { ...discovered, runtime: groupSpec.runtime };
+      // Fill in the runtime now that the spec is bundled; discovery left it `None`.
+      const leaf = {
+        ...discovered,
+        runtime: Option.some(groupSpec.runtime),
+      };
 
       const implRelativePath = yield* implPathForSpec(specRelativePath);
       const implAbsolutePath = path.join(confectDirectory, implRelativePath);
@@ -444,7 +446,7 @@ const generateGroupRegisteredFunctions = (leaves: ReadonlyArray<LeafModule>) =>
           specImportPath,
           implImportPath,
           layerExportName: leaf.exportName,
-          useNode: leaf.runtime === "Node",
+          useNode: Option.contains(leaf.runtime, "Node"),
         });
 
         yield* writeFileStringAndLog(registryPath, contents);

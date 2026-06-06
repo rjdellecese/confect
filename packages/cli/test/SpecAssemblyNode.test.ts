@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import type { LeafModule } from "../src/LeafModule";
 import { assemblyNodesFromLeaves } from "../src/SpecAssemblyNode";
 import * as templates from "../src/templates";
@@ -12,7 +13,7 @@ const leaf = (
   pathSegments,
   groupPathDot: pathSegments.join("."),
   exportName: pathSegments[pathSegments.length - 1]!,
-  runtime: "Convex",
+  runtime: Option.none(),
   specImportPath: `../${relativePath.slice(0, -".ts".length)}`,
 });
 

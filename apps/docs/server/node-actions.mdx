@@ -4,7 +4,7 @@ title: "Node Actions"
 description: "Define actions that run in the Node.js runtime."
 ---
 
-Node actions are like regular actions, but they are executed in the Node.js runtime. You declare one by writing its spec with `GroupSpec.makeNode()` instead of `GroupSpec.make()` — that single choice is what marks the group as Node-runtime. Node action specs and impls are ordinary colocated `.spec.ts`/`.impl.ts` pairs that can live anywhere in your `confect/` directory; there is no special `node/` subdirectory. Confect emits Convex's `"use node"` directive into the generated module for you, based on the spec.
+Node actions are like regular actions, but they are executed in the Node.js runtime, so their handlers can use Node's built-in modules and npm packages that depend on them. You declare a node action group by building its spec with `GroupSpec.makeNode()` (rather than `GroupSpec.make()`); that marks the group as Node-runtime, and Confect adds Convex's [`"use node"`](https://docs.convex.dev/functions/runtimes#nodejs-runtime) directive to the generated module accordingly. A node action group is otherwise an ordinary group — the same colocated `.spec.ts`/`.impl.ts` files, following the same [naming and nesting conventions](/concepts/file-naming-conventions).
 
 ## Node Spec
 
@@ -65,7 +65,7 @@ export default GroupImpl.make(databaseSchema, email).pipe(
 
 ## Calling Node Actions
 
-Node actions are referenced exactly like any other function — there is no `node` namespace. A node group at `confect/email.spec.ts` is reached at `refs.public.email`.
+Node actions are referenced like any other function. A node group at `confect/email.spec.ts` is reached at `refs.public.email`.
 
 ```ts
 import { useAction } from "@confect/react";

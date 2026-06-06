@@ -82,7 +82,7 @@ confect/
 
 ## Node actions
 
-[Node action](/server/node-actions) specs and impls are ordinary `.spec.ts`/`.impl.ts` pairs — they can live anywhere in `confect/`, with no special `node/` subdirectory. A group is marked Node-runtime by its spec using `GroupSpec.makeNode()` (instead of `GroupSpec.make()`); its impl is otherwise identical to a non-node impl, passing the database schema from `_generated/schema`. Confect emits Convex's `"use node"` directive into the generated module based on the spec.
+[Node action](/server/node-actions) groups follow the same `.spec.ts`/`.impl.ts` naming and nesting conventions as any other group. A group is Node-runtime when its spec is built with `GroupSpec.makeNode()` (rather than `GroupSpec.make()`); its impl is otherwise identical to a non-node impl, passing the database schema from `_generated/schema`. Confect emits Convex's `"use node"` directive into the generated module based on the spec.
 
 ```
 confect/

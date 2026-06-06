@@ -27,13 +27,13 @@ export interface LeafModule {
   readonly groupPathDot: string;
   readonly exportName: string;
   /**
-   * The runtime of the group, which is declared by its spec
-   * (`GroupSpec.makeNode()` → `"Node"`, `GroupSpec.make()` → `"Convex"`), not by
-   * its location on disk. `toLeafModule` cannot know this without bundling, so it
-   * produces a `"Convex"` placeholder that `loadAndValidateLeafModules` overwrites
-   * with the validated `GroupSpec`'s runtime.
+   * The runtime declared by the group's spec — `"Node"` for
+   * `GroupSpec.makeNode()`, `"Convex"` for `GroupSpec.make()`. `None` while the
+   * runtime is unknown: discovery (`toLeafModule`) works from the file path alone,
+   * which does not determine the runtime, so this is filled in once the spec has
+   * been bundled and validated (see `validateSpec`).
    */
-  readonly runtime: "Convex" | "Node";
+  readonly runtime: Option.Option<"Convex" | "Node">;
   readonly specImportPath: string;
 }
 
@@ -174,9 +174,8 @@ export const toLeafModule = (specRelativePath: string) =>
       pathSegments,
       groupPathDot,
       exportName,
-      // Placeholder; the real runtime is stamped from the bundled spec in
-      // `loadAndValidateLeafModules`. See `LeafModule.runtime`.
-      runtime: "Convex",
+      // Unknown until the spec is bundled; see `LeafModule.runtime`.
+      runtime: Option.none(),
       specImportPath,
     } satisfies LeafModule;
   });
