@@ -18,6 +18,7 @@
     "externalize-bare-specifiers",
     "fs-based-function-paths",
     "lazy-functionspec-bundle-isolation",
+    "node-functions-first-class",
     "preserve-parent-leaf-in-assembled-spec",
     "spec-paths-immutable-lookup",
     "split-deploy-schema-from-runtime",

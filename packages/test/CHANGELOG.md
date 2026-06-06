@@ -1,5 +1,13 @@
 # @confect/test
 
+## 9.0.0-next.9
+
+### Patch Changes
+
+- Updated dependencies [4894959]
+  - @confect/core@9.0.0-next.9
+  - @confect/server@9.0.0-next.9
+
 ## 9.0.0-next.8
 
 ### Patch Changes
