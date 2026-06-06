@@ -1,5 +1,5 @@
 ---
-name: git-commit
+name: writing-commit-messages
 description: >-
   Write thoughtful, prose-style git commit messages with a sentence-case
   imperative-mood subject under 50 characters, a blank line, then a
