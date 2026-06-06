@@ -441,12 +441,23 @@ const generateGroupRegisteredFunctions = (leaves: ReadonlyArray<LeafModule>) =>
           ),
         );
 
+        // Every leaf reaching this point came through
+        // `loadAndValidateLeafModules`, which stamps the runtime from the
+        // validated spec — so `None` here means that invariant was broken.
+        const runtime = yield* Option.match(leaf.runtime, {
+          onNone: () =>
+            Effect.dieMessage(
+              `Runtime for '${leaf.relativePath}' was not resolved before registry generation.`,
+            ),
+          onSome: Effect.succeed,
+        });
+
         const contents = yield* templates.registeredFunctionsForGroup({
           schemaImportPath,
           specImportPath,
           implImportPath,
           layerExportName: leaf.exportName,
-          useNode: Option.contains(leaf.runtime, "Node"),
+          useNode: runtime === "Node",
         });
 
         yield* writeFileStringAndLog(registryPath, contents);
