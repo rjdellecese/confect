@@ -59,8 +59,8 @@ it("places a Node group alongside Convex groups, with no `node` namespace", () =
     }),
   );
 
-  // A Node action group built with `makeNode()` is added at the top level just
-  // like any Convex group — there is no synthetic `node` namespace.
+  // A Node action group built with `makeNode()` is added at the top level like
+  // any Convex group; its runtime lives on the group, not in a `node` namespace.
   const email = GroupSpec.makeNode().addFunction(
     FunctionSpec.publicNodeAction({
       name: "send",
@@ -75,8 +75,8 @@ it("places a Node group alongside Convex groups, with no `node` namespace", () =
 
   const refs = Refs.make(spec);
 
-  // The Node action is reachable at the top level (`refs.public.email.send`),
-  // not under `refs.public.node.email.send`.
+  // The Node action is reachable at the group's own path
+  // (`refs.public.email.send`), with no enclosing `node` group.
   expect("node" in refs.public).toBe(false);
 
   type PublicRefs = Refs.Refs<typeof spec, RefMod.AnyPublic>;

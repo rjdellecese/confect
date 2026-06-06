@@ -87,8 +87,8 @@ const LEGACY_PATHS = Effect.gen(function* () {
     path.join(GENERATED_DIRNAME, "nodeRegisteredFunctions.ts"),
     path.join(GENERATED_DIRNAME, "impl.ts"),
     path.join(GENERATED_DIRNAME, "nodeImpl.ts"),
-    // `_generated/nodeSpec.ts` is obsolete: node groups now live in the single
-    // unified `_generated/spec.ts`. Delete any copy left over from earlier v9.
+    // `_generated/nodeSpec.ts` is not part of the generated output (all groups
+    // live in `_generated/spec.ts`); delete any copy left by an older version.
     path.join(GENERATED_DIRNAME, "nodeSpec.ts"),
   ];
 });
@@ -238,9 +238,9 @@ export const validateNoParentChildNameCollisions = (
   groupSpecsByRelativePath: ReadonlyMap<string, GroupSpec.AnyWithProps>,
 ) =>
   Effect.gen(function* () {
-    // Convex and Node groups now share one namespace, so they assemble into a
+    // Convex and Node groups share one namespace, so they assemble into a
     // single tree. A Node group nested under a Convex parent (or vice versa) is
-    // then caught by the same parent/child collision check.
+    // caught here by the parent/child collision check.
     const nodes = assemblyNodesFromLeaves(leaves);
     yield* Effect.forEach(nodes, (n) =>
       checkAssemblyNodeForCollisions(n, groupSpecsByRelativePath),
@@ -382,10 +382,10 @@ const generateAssembledSpecs = (leaves: ReadonlyArray<LeafModule>) =>
     const confectDirectory = yield* ConfectDirectory.get;
     const generatedSpecPath = yield* GENERATED_SPEC_PATH;
 
-    // One unified spec holds every group regardless of runtime — a Node group's
-    // `makeNode()` lives in its imported leaf spec, so the assembled file is
-    // runtime-agnostic. Always emit it (even empty) so downstream readers
-    // (`loadGeneratedSpec`, `generateRefs`) always find a spec module.
+    // A single assembled spec holds every group regardless of runtime — a Node
+    // group's `makeNode()` lives in its imported leaf spec, so the assembled
+    // file is runtime-agnostic. Always emit it (even empty) so downstream
+    // readers (`loadGeneratedSpec`, `generateRefs`) always find a spec module.
     const nodes = assemblyNodesFromLeaves(leaves);
     const specContents = yield* templates.assembledSpec({ nodes });
     yield* writeFileStringAndLog(

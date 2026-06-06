@@ -129,10 +129,9 @@ const runGenerateForNodeGroup = ({
   }).pipe(Effect.scoped);
 
 layer(GenerateFunctionsLayer)("generateFunctions", (it) => {
-  // A Node group declared with `GroupSpec.makeNode()` is now an ordinary group:
-  // it generates `convex/<path>.ts` (no `node/` directory) carrying the
-  // `"use node"` directive, importing its registry at the matching path. This
-  // is exercised from a clean tree, so it also guards the `writeGroups` path.
+  // A Node group declared with `GroupSpec.makeNode()` generates `convex/<path>.ts`
+  // carrying the `"use node"` directive and importing its registry at the matching
+  // path. Exercised from a clean tree, so it also guards the `writeGroups` path.
   it.effect("generates a top-level Node module with `use node`", () =>
     Effect.gen(function* () {
       const spec = Spec.make().addAt("typedErrorsNode", nodeGroup());
@@ -151,9 +150,9 @@ layer(GenerateFunctionsLayer)("generateFunctions", (it) => {
     }),
   );
 
-  // Nesting is preserved for Node groups just like Convex groups: a node spec at
-  // `notes/archived` generates `convex/notes/archived.ts` with `"use node"` and
-  // a registry import that resolves at the matching nested path.
+  // A nested Node group (a `makeNode()` spec at `notes/archived`) generates
+  // `convex/notes/archived.ts` with `"use node"` and a registry import that
+  // resolves at the matching nested path.
   it.effect("generates a nested Node module preserving its path", () =>
     Effect.gen(function* () {
       const spec = Spec.make().addAt(
