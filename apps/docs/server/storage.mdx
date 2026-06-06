@@ -24,6 +24,9 @@ Effect.gen(function* () {
 The `StorageWriter` service is used to write blobs to storage in mutations.
 
 ```ts
+import { Effect } from "effect";
+import { StorageWriter } from "./confect/_generated/services";
+
 Effect.gen(function* () {
   const storage = yield* StorageWriter;
 
@@ -50,6 +53,9 @@ storage.delete(storageId);
 The `StorageActionWriter` service is used to read and write blobs to storage in actions.
 
 ```ts
+import { Effect } from "effect";
+import { StorageActionWriter } from "./confect/_generated/services";
+
 Effect.gen(function* () {
   const storage = yield* StorageActionWriter;
 
