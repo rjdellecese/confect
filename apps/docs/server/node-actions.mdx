@@ -4,13 +4,13 @@ title: "Node Actions"
 description: "Define actions that run in the Node.js runtime."
 ---
 
-Node actions are like regular actions, but they are executed in the Node.js runtime. To keep node actions separate from the rest of your Convex API, define them as colocated spec/impl pairs under a `node/` subdirectory of your `confect/` directory, using the standard `.spec.ts` and `.impl.ts` suffixes.
+Node actions are like regular actions, but they are executed in the Node.js runtime, so their handlers can use Node's built-in modules and npm packages that depend on them. You declare a node action group by building its spec with `GroupSpec.makeNode()` (rather than `GroupSpec.make()`); that marks the group as Node-runtime, and Confect adds Convex's [`"use node"`](https://docs.convex.dev/functions/runtimes#nodejs-runtime) directive to the generated module accordingly. A node action group is otherwise an ordinary group — the same colocated `.spec.ts`/`.impl.ts` files, following the same [naming and nesting conventions](/concepts/file-naming-conventions).
 
 ## Node Spec
 
 A node spec uses `GroupSpec.makeNode()` and one of `FunctionSpec.publicNodeAction()` or `FunctionSpec.internalNodeAction()` to define functions.
 
-```ts confect/node/email.spec.ts
+```ts confect/email.spec.ts
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import { Schema } from "effect";
 
@@ -32,11 +32,11 @@ export default GroupSpec.makeNode().addFunction(
 
 A node impl default-imports its sibling spec and passes the database schema from `_generated/schema` to `FunctionImpl.make` and `GroupImpl.make` — exactly like a non-node impl; only the spec differs (`GroupSpec.makeNode()`). Each handler runs in the Node.js runtime, so it has access to [`NodeContext` services](https://effect-ts.github.io/effect/platform-node/NodeContext.ts.html#nodecontext-type-alias) from the `@effect/platform` package.
 
-```ts confect/node/email.impl.ts
+```ts confect/email.impl.ts
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Command } from "@effect/platform";
 import { Console, Duration, Effect, Layer } from "effect";
-import databaseSchema from "../_generated/schema";
+import databaseSchema from "./_generated/schema";
 import email from "./email.spec";
 
 const send = FunctionImpl.make(
@@ -65,13 +65,13 @@ export default GroupImpl.make(databaseSchema, email).pipe(
 
 ## Calling Node Actions
 
-Node actions are exposed under the `node` namespace in your refs.
+Node actions are referenced like any other function. A node group at `confect/email.spec.ts` is reached at `refs.public.email`.
 
 ```ts
 import { useAction } from "@confect/react";
 import refs from "../confect/_generated/refs";
 
-const sendEmail = useAction(refs.public.node.email.send);
+const sendEmail = useAction(refs.public.email.send);
 
 sendEmail({
   to: "user@example.com",

@@ -7,6 +7,7 @@ import { assert, expect, layer } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Either from "effect/Either";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { validateNoParentChildNameCollisions } from "../src/confect/codegen";
 import { ConfectDirectory } from "../src/ConfectDirectory";
@@ -208,9 +209,8 @@ const leaf = (
   relativePath,
   pathSegments,
   groupPathDot: pathSegments.join("."),
-  registryGroupPathDot: pathSegments.join("."),
   exportName: pathSegments[pathSegments.length - 1]!,
-  runtime: "Convex",
+  runtime: Option.none(),
   specImportPath: `../${relativePath.slice(0, -".ts".length)}`,
 });
 

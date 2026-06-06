@@ -2,7 +2,8 @@ import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Schema from "effect/Schema";
 import * as FunctionSpec from "../src/FunctionSpec";
 import * as GroupSpec from "../src/GroupSpec";
-import type * as Refs from "../src/Refs";
+import type * as RefMod from "../src/Ref";
+import * as Refs from "../src/Refs";
 import * as Spec from "../src/Spec";
 
 describe("isSpec", () => {
@@ -46,30 +47,39 @@ it("infers refs from addAt-assembled spec", () => {
   expectTypeOf<PublicRefs["groups"]["notes"]["list"]>().not.toBeNever();
 });
 
-describe("merge", () => {
-  it("merges a node spec's groups under a 'node' namespace", () => {
-    const convexNotes = GroupSpec.make();
-    const nodeEmail = GroupSpec.makeNode();
+it("places a Node group alongside Convex groups, with no `node` namespace", () => {
+  const FnArgs = Schema.Struct({});
+  const FnReturns = Schema.Null;
 
-    const convexSpec = Spec.make().addAt("notes", convexNotes);
-    const nodeSpec = Spec.makeNode().addAt("email", nodeEmail);
+  const notes = GroupSpec.make().addFunction(
+    FunctionSpec.publicQuery({
+      name: "list",
+      args: () => FnArgs,
+      returns: () => Schema.Array(Schema.String),
+    }),
+  );
 
-    const merged = Spec.merge(convexSpec, nodeSpec);
+  // A Node action group built with `makeNode()` is added at the top level like
+  // any Convex group; its runtime lives on the group, not in a `node` namespace.
+  const email = GroupSpec.makeNode().addFunction(
+    FunctionSpec.publicNodeAction({
+      name: "send",
+      args: () => FnArgs,
+      returns: () => FnReturns,
+    }),
+  );
 
-    expect(Object.keys(merged.groups).sort()).toEqual(["node", "notes"]);
-    expect(
-      Object.keys(
-        (merged.groups as Record<string, GroupSpec.AnyWithProps>).node!.groups,
-      ),
-    ).toEqual(["email"]);
-  });
+  const spec = Spec.make().addAt("notes", notes).addAt("email", email);
 
-  it("without a node spec preserves Convex groups verbatim", () => {
-    const notes = GroupSpec.make();
-    const convexSpec = Spec.make().addAt("notes", notes);
+  expect(Object.keys(spec.groups).sort()).toEqual(["email", "notes"]);
 
-    const merged = Spec.merge(convexSpec);
+  const refs = Refs.make(spec);
 
-    expect(Object.keys(merged.groups)).toEqual(["notes"]);
-  });
+  // The Node action is reachable at the group's own path
+  // (`refs.public.email.send`), with no enclosing `node` group.
+  expect("node" in refs.public).toBe(false);
+
+  type PublicRefs = Refs.Refs<typeof spec, RefMod.AnyPublic>;
+  expectTypeOf<keyof PublicRefs>().toEqualTypeOf<"notes" | "email">();
+  expectTypeOf<PublicRefs["email"]["send"]>().toMatchTypeOf<RefMod.AnyAction>();
 });

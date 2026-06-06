@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import type { LeafModule } from "../src/LeafModule";
 import { assemblyNodesFromLeaves } from "../src/SpecAssemblyNode";
 import * as templates from "../src/templates";
@@ -11,9 +12,8 @@ const leaf = (
   relativePath,
   pathSegments,
   groupPathDot: pathSegments.join("."),
-  registryGroupPathDot: pathSegments.join("."),
   exportName: pathSegments[pathSegments.length - 1]!,
-  runtime: "Convex",
+  runtime: Option.none(),
   specImportPath: `../${relativePath.slice(0, -".ts".length)}`,
 });
 
@@ -25,10 +25,7 @@ describe("SpecAssemblyNode", () => {
         leaf("notesAndRandom/random.spec.ts", ["notesAndRandom", "random"]),
         leaf("env.spec.ts", ["env"]),
       ]);
-      const contents = yield* templates.assembledSpec({
-        nodes,
-        runtime: "Convex",
-      });
+      const contents = yield* templates.assembledSpec({ nodes });
 
       expect(contents).toContain('import env from "../env.spec";');
       expect(contents).toContain(
@@ -55,10 +52,7 @@ describe("SpecAssemblyNode", () => {
           leaf("notes.spec.ts", ["notes"]),
           leaf("notes/archived.spec.ts", ["notes", "archived"]),
         ]);
-        const contents = yield* templates.assembledSpec({
-          nodes,
-          runtime: "Convex",
-        });
+        const contents = yield* templates.assembledSpec({ nodes });
 
         expect(contents).toContain('import notes from "../notes.spec";');
         expect(contents).toContain(
@@ -79,10 +73,7 @@ describe("SpecAssemblyNode", () => {
           leaf("notes.spec.ts", ["notes"]),
           leaf("notes/archived.spec.ts", ["notes", "archived"]),
         ]);
-        const contents = yield* templates.assembledSpec({
-          nodes,
-          runtime: "Convex",
-        });
+        const contents = yield* templates.assembledSpec({ nodes });
 
         expect(contents).toContain('import { Spec } from "@confect/core";');
         expect(contents).not.toContain(
@@ -103,10 +94,7 @@ describe("SpecAssemblyNode", () => {
             "legacy",
           ]),
         ]);
-        const contents = yield* templates.assembledSpec({
-          nodes,
-          runtime: "Convex",
-        });
+        const contents = yield* templates.assembledSpec({ nodes });
 
         expect(contents).toContain(
           'import { GroupSpec, Spec } from "@confect/core";',
@@ -154,10 +142,7 @@ describe("SpecAssemblyNode", () => {
           ]),
         ];
         const nodes = assemblyNodesFromLeaves(leaves);
-        const contents = yield* templates.assembledSpec({
-          nodes,
-          runtime: "Convex",
-        });
+        const contents = yield* templates.assembledSpec({ nodes });
 
         expect(contents).toContain(
           'import scripts_operational_inviteUser_mutations from "../scripts/operational/inviteUser/mutations.spec";',
@@ -239,10 +224,7 @@ describe("SpecAssemblyNode", () => {
             "details",
           ]),
         ]);
-        const contents = yield* templates.assembledSpec({
-          nodes,
-          runtime: "Convex",
-        });
+        const contents = yield* templates.assembledSpec({ nodes });
 
         // Tree-assembly shape is preserved; the addGroupAt-wrapped parent leaf
         // still ends up in the tree, and its impl resolves its group path

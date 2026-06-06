@@ -1,33 +1,16 @@
 import type { Types } from "effect";
 import { pipe } from "effect/Function";
-import * as Array from "effect/Array";
 import * as Option from "effect/Option";
 import * as Record from "effect/Record";
 import type * as FunctionSpec from "./FunctionSpec";
-import * as GroupSpec from "./GroupSpec";
+import type * as GroupSpec from "./GroupSpec";
 import * as Ref from "./Ref";
 import type * as Spec from "./Spec";
 
 export type Refs<
-  ConvexSpec extends Spec.AnyWithPropsWithRuntime<"Convex">,
-  NodeSpec extends Spec.AnyWithPropsWithRuntime<"Node"> = never,
+  Spec_ extends Spec.AnyWithProps,
   Predicate extends Ref.Any = Ref.Any,
-> = Types.Simplify<
-  OmitEmpty<
-    Helper<
-      | Spec.Groups<ConvexSpec>
-      | (NodeSpec extends never
-          ? never
-          : GroupSpec.GroupSpec<
-              "Node",
-              "node",
-              never,
-              NodeSpec["groups"][keyof NodeSpec["groups"]]
-            >),
-      Predicate
-    >
-  >
->;
+> = Types.Simplify<OmitEmpty<Helper<Spec.Groups<Spec_>, Predicate>>>;
 
 type GroupRefs<
   Group extends GroupSpec.AnyWithProps,
@@ -89,33 +72,16 @@ type Any =
     }
   | Ref.Any;
 
-export const make = <
-  ConvexSpec extends Spec.AnyWithPropsWithRuntime<"Convex">,
-  NodeSpec extends Spec.AnyWithPropsWithRuntime<"Node"> = never,
->(
-  convexSpec: ConvexSpec,
-  nodeSpec?: NodeSpec,
+export const make = <Spec_ extends Spec.AnyWithProps>(
+  spec: Spec_,
 ): {
-  public: Refs<ConvexSpec, NodeSpec, Ref.AnyPublic>;
-  internal: Refs<ConvexSpec, NodeSpec, Ref.AnyInternal>;
+  public: Refs<Spec_, Ref.AnyPublic>;
+  internal: Refs<Spec_, Ref.AnyInternal>;
 } => {
-  const groups = Option.fromNullable(nodeSpec).pipe(
-    Option.map((nodeSpec_) =>
-      Array.reduce(
-        Record.toEntries(nodeSpec_.groups),
-        GroupSpec.makeNodeAt("node"),
-        (nodeGroupSpec, [name, group]) => nodeGroupSpec.addGroupAt(name, group),
-      ),
-    ),
-    Option.match({
-      onNone: () => convexSpec.groups,
-      onSome: (nodeGroup) => ({ ...convexSpec.groups, node: nodeGroup }),
-    }),
-  );
-  const refs = makeHelper(groups);
+  const refs = makeHelper(spec.groups);
   return {
-    public: refs as Refs<ConvexSpec, NodeSpec, Ref.AnyPublic>,
-    internal: refs as Refs<ConvexSpec, NodeSpec, Ref.AnyInternal>,
+    public: refs as Refs<Spec_, Ref.AnyPublic>,
+    internal: refs as Refs<Spec_, Ref.AnyInternal>,
   };
 };
 

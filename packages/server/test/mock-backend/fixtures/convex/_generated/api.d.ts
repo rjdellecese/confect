@@ -217,15 +217,13 @@ export declare const api: {
       >;
     };
   };
-  node: {
-    typedErrorsNode: {
-      failingNodeAction: FunctionReference<
-        "action",
-        "public",
-        { id: string },
-        null
-      >;
-    };
+  typedErrorsNode: {
+    failingNodeAction: FunctionReference<
+      "action",
+      "public",
+      { id: string },
+      null
+    >;
   };
 };
 

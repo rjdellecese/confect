@@ -9,7 +9,6 @@ description: "Understand the structure of a Confect project."
     <Tree.Folder name="_generated" defaultOpen>
       <Tree.File name="convexSchema.ts" />
       <Tree.File name="id.ts" />
-      <Tree.File name="nodeSpec.ts" />
       <Tree.File name="refs.ts" />
       <Tree.File name="schema.ts" />
       <Tree.File name="services.ts" />
@@ -48,11 +47,6 @@ description: "Understand the structure of a Confect project."
   <Tree.Folder name="convex" />
 </Tree>
 
-<Info>
-  `_generated/nodeSpec.ts` is only generated when you have node action
-  specs (files under `confect/node/`).
-</Info>
-
 ## `confect/`
 
 ### `_generated/`
@@ -64,15 +58,6 @@ Contains the Convex deploy-time `SchemaDefinition` (a single `defineSchema({...}
 #### `id.ts`
 
 Contains a type-constrained `Id` constructor whose only argument is the union of your table names — for example, `Id("users")` returns the `Schema` for an `_id` value in the `users` table. Use this when defining cross-table references (e.g. a `userId: Id("users")` field) and inside spec `args`/`returns` schemas. The type-level constraint catches typos at compile time, replacing the loosely-typed `GenericId.GenericId("users")` form.
-
-#### `nodeSpec.ts`
-
-<Info>
-  This file is only generated when you have node action specs (files
-  under `confect/node/`).
-</Info>
-
-Contains your assembled Node spec, used together with `spec.ts` to build `refs.ts`.
 
 #### `registeredFunctions/`
 
@@ -96,7 +81,7 @@ Contains Effect service wrappers for Convex platform capabilities, scoped to you
 
 #### `spec.ts`
 
-Contains your assembled Confect spec, used to build `refs.ts`.
+Contains your assembled Confect spec — every function group, of any runtime (including Node action groups) — used to build `refs.ts`.
 
 ### `auth.ts`
 

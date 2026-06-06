@@ -27,7 +27,6 @@ import {
   registeredFunctionsRelativePath,
   specPathForImpl,
   toLeafModule,
-  toNodeRegistryLeaf,
   validateImpl,
   validateSpec,
   type LeafModule,
@@ -42,7 +41,6 @@ import {
 } from "../log";
 import {
   assemblyNodesFromLeaves,
-  partitionByRuntime,
   type SpecAssemblyNode,
 } from "../SpecAssemblyNode";
 import * as TableModule from "../TableModule";
@@ -63,9 +61,6 @@ const GENERATED_DIRNAME = "_generated";
 
 const GENERATED_SPEC_PATH = Effect.andThen(Path.Path, (path) =>
   path.join(GENERATED_DIRNAME, "spec.ts"),
-);
-const GENERATED_NODE_SPEC_PATH = Effect.andThen(Path.Path, (path) =>
-  path.join(GENERATED_DIRNAME, "nodeSpec.ts"),
 );
 const GENERATED_SCHEMA_PATH = Effect.andThen(Path.Path, (path) =>
   path.join(GENERATED_DIRNAME, "schema.ts"),
@@ -92,6 +87,9 @@ const LEGACY_PATHS = Effect.gen(function* () {
     path.join(GENERATED_DIRNAME, "nodeRegisteredFunctions.ts"),
     path.join(GENERATED_DIRNAME, "impl.ts"),
     path.join(GENERATED_DIRNAME, "nodeImpl.ts"),
+    // `_generated/nodeSpec.ts` is not part of the generated output (all groups
+    // live in `_generated/spec.ts`); delete any copy left by an older version.
+    path.join(GENERATED_DIRNAME, "nodeSpec.ts"),
   ];
 });
 
@@ -198,8 +196,13 @@ const loadAndValidateLeafModules = Effect.gen(function* () {
 
   const results = yield* Effect.forEach(specFiles, (specRelativePath) =>
     Effect.gen(function* () {
-      const leaf = yield* toLeafModule(specRelativePath);
-      const groupSpec = yield* validateSpec(leaf);
+      const discovered = yield* toLeafModule(specRelativePath);
+      const groupSpec = yield* validateSpec(discovered);
+      // Fill in the runtime now that the spec is bundled; discovery left it `None`.
+      const leaf = {
+        ...discovered,
+        runtime: Option.some(groupSpec.runtime),
+      };
 
       const implRelativePath = yield* implPathForSpec(specRelativePath);
       const implAbsolutePath = path.join(confectDirectory, implRelativePath);
@@ -237,15 +240,11 @@ export const validateNoParentChildNameCollisions = (
   groupSpecsByRelativePath: ReadonlyMap<string, GroupSpec.AnyWithProps>,
 ) =>
   Effect.gen(function* () {
-    const { convex, node } = partitionByRuntime(leaves);
-    const convexNodes = assemblyNodesFromLeaves(convex);
-    const nodeNodes = assemblyNodesFromLeaves(
-      Array.map(node, toNodeRegistryLeaf),
-    );
-    yield* Effect.forEach(convexNodes, (n) =>
-      checkAssemblyNodeForCollisions(n, groupSpecsByRelativePath),
-    );
-    yield* Effect.forEach(nodeNodes, (n) =>
+    // Convex and Node groups share one namespace, so they assemble into a
+    // single tree. A Node group nested under a Convex parent (or vice versa) is
+    // caught here by the parent/child collision check.
+    const nodes = assemblyNodesFromLeaves(leaves);
+    yield* Effect.forEach(nodes, (n) =>
       checkAssemblyNodeForCollisions(n, groupSpecsByRelativePath),
     );
   });
@@ -384,34 +383,17 @@ const generateAssembledSpecs = (leaves: ReadonlyArray<LeafModule>) =>
     const path = yield* Path.Path;
     const confectDirectory = yield* ConfectDirectory.get;
     const generatedSpecPath = yield* GENERATED_SPEC_PATH;
-    const generatedNodeSpecPath = yield* GENERATED_NODE_SPEC_PATH;
-    const { convex, node } = partitionByRuntime(leaves);
 
-    if (convex.length > 0) {
-      const nodes = assemblyNodesFromLeaves(convex);
-      const specContents = yield* templates.assembledSpec({
-        nodes,
-        runtime: "Convex",
-      });
-      yield* writeFileStringAndLog(
-        path.join(confectDirectory, generatedSpecPath),
-        specContents,
-      );
-    }
-
-    if (node.length > 0) {
-      const nodes = assemblyNodesFromLeaves(
-        Array.map(node, toNodeRegistryLeaf),
-      );
-      const nodeSpecContents = yield* templates.assembledSpec({
-        nodes,
-        runtime: "Node",
-      });
-      yield* writeFileStringAndLog(
-        path.join(confectDirectory, generatedNodeSpecPath),
-        nodeSpecContents,
-      );
-    }
+    // A single assembled spec holds every group regardless of runtime — a Node
+    // group's `makeNode()` lives in its imported leaf spec, so the assembled
+    // file is runtime-agnostic. Always emit it (even empty) so downstream
+    // readers (`loadGeneratedSpec`, `generateRefs`) always find a spec module.
+    const nodes = assemblyNodesFromLeaves(leaves);
+    const specContents = yield* templates.assembledSpec({ nodes });
+    yield* writeFileStringAndLog(
+      path.join(confectDirectory, generatedSpecPath),
+      specContents,
+    );
   });
 
 const validateImplModules = (leaves: ReadonlyArray<LeafModule>) =>
@@ -459,12 +441,23 @@ const generateGroupRegisteredFunctions = (leaves: ReadonlyArray<LeafModule>) =>
           ),
         );
 
+        // Every leaf reaching this point came through
+        // `loadAndValidateLeafModules`, which stamps the runtime from the
+        // validated spec — so `None` here means that invariant was broken.
+        const runtime = yield* Option.match(leaf.runtime, {
+          onNone: () =>
+            Effect.dieMessage(
+              `Runtime for '${leaf.relativePath}' was not resolved before registry generation.`,
+            ),
+          onSome: Effect.succeed,
+        });
+
         const contents = yield* templates.registeredFunctionsForGroup({
           schemaImportPath,
           specImportPath,
           implImportPath,
           layerExportName: leaf.exportName,
-          useNode: leaf.runtime === "Node",
+          useNode: runtime === "Node",
         });
 
         yield* writeFileStringAndLog(registryPath, contents);
@@ -519,45 +512,18 @@ const getGeneratedSpecPath = Effect.gen(function* () {
   return path.join(confectDirectory, generatedSpecPath);
 });
 
-const getGeneratedNodeSpecPath = Effect.gen(function* () {
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  const generatedNodeSpecPath = yield* GENERATED_NODE_SPEC_PATH;
-  return path.join(confectDirectory, generatedNodeSpecPath);
-});
-
 const loadGeneratedSpec = Effect.gen(function* () {
   const specPath = yield* getGeneratedSpecPath;
   const { module: specModule } = yield* Bundler.bundle(specPath);
   const spec = specModule.default;
 
-  if (!Spec.isConvexSpec(spec)) {
+  if (!Spec.isSpec(spec)) {
     return yield* Effect.dieMessage(
-      "_generated/spec.ts does not export a valid Convex Spec",
+      "_generated/spec.ts does not export a valid Spec",
     );
   }
 
   return spec;
-});
-
-const loadGeneratedNodeSpec = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const nodeSpecPath = yield* getGeneratedNodeSpecPath;
-
-  if (!(yield* fs.exists(nodeSpecPath))) {
-    return Option.none<Spec.AnyWithPropsWithRuntime<"Node">>();
-  }
-
-  const { module: nodeSpecModule } = yield* Bundler.bundle(nodeSpecPath);
-  const nodeSpec = nodeSpecModule.default;
-
-  if (!Spec.isNodeSpec(nodeSpec)) {
-    return yield* Effect.dieMessage(
-      "_generated/nodeSpec.ts does not export a valid Node Spec",
-    );
-  }
-
-  return Option.some(nodeSpec);
 });
 
 const emptyFunctionPaths = FunctionPaths.FunctionPaths.make(HashSet.empty());
@@ -572,17 +538,9 @@ export const loadPreviousFunctionPaths = Effect.gen(function* () {
 
   const specEither = yield* loadGeneratedSpec.pipe(Effect.either);
 
-  return yield* Either.match(specEither, {
-    onLeft: () => Effect.succeed(emptyFunctionPaths),
-    onRight: (spec) =>
-      Effect.gen(function* () {
-        const nodeSpecOption = yield* loadGeneratedNodeSpec;
-        const mergedSpec = Option.match(nodeSpecOption, {
-          onNone: () => spec,
-          onSome: (nodeSpec) => Spec.merge(spec, nodeSpec),
-        });
-        return FunctionPaths.make(mergedSpec);
-      }),
+  return Either.match(specEither, {
+    onLeft: () => emptyFunctionPaths,
+    onRight: (spec) => FunctionPaths.make(spec),
   });
 });
 
@@ -613,14 +571,7 @@ const removeGeneratedNodeApi = removeObsoleteGeneratedFile("nodeApi.ts");
 
 const generateFunctionModules = Effect.gen(function* () {
   const spec = yield* loadGeneratedSpec;
-  const nodeSpecOption = yield* loadGeneratedNodeSpec;
-
-  const mergedSpec = Option.match(nodeSpecOption, {
-    onNone: () => spec,
-    onSome: (nodeSpec) => Spec.merge(spec, nodeSpec),
-  });
-
-  return yield* generateFunctions(mergedSpec);
+  return yield* generateFunctions(spec);
 });
 
 /**
@@ -862,7 +813,6 @@ const generateServices = Effect.gen(function* () {
 });
 
 const generateRefs = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
 
@@ -875,18 +825,7 @@ const generateRefs = Effect.gen(function* () {
     path.relative(refsDir, path.join(confectDirectory, generatedSpecPath)),
   );
 
-  const nodeSpecPath = yield* getGeneratedNodeSpecPath;
-  const nodeSpecExists = yield* fs.exists(nodeSpecPath);
-  const nodeSpecImportPath = nodeSpecExists
-    ? Option.some(
-        yield* toModuleImportPath(path.relative(refsDir, nodeSpecPath)),
-      )
-    : Option.none<string>();
-
-  const refsContents = yield* templates.refs({
-    specImportPath,
-    nodeSpecImportPath,
-  });
+  const refsContents = yield* templates.refs({ specImportPath });
 
   yield* writeFileStringAndLog(refsPath, refsContents);
 });

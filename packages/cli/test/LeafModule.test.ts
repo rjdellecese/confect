@@ -16,11 +16,10 @@ import {
   specImportPathFromGenerated,
   specPathForImpl,
   toLeafModule,
-  toNodeRegistryLeaf,
   validateImpl,
   validateSpec,
+  type LeafModule,
 } from "../src/LeafModule";
-import type { LeafModule } from "../src/LeafModule";
 
 const fixtureConfect = `${import.meta.dirname}/../../server/test/mock-backend/fixtures/confect`;
 
@@ -147,26 +146,6 @@ layer(LeafModuleLayer)("LeafModule paths", (it) => {
       }),
   );
 
-  it.effect("toNodeRegistryLeaf remaps node leaves for nodeSpec assembly", () =>
-    Effect.sync(() => {
-      const leaf: LeafModule = {
-        relativePath: "node/email.spec.ts",
-        pathSegments: ["node", "email"],
-        groupPathDot: "node.email",
-        registryGroupPathDot: "email",
-        exportName: "email",
-        runtime: "Node",
-        specImportPath: "../node/email.spec",
-      };
-
-      expect(toNodeRegistryLeaf(leaf)).toEqual({
-        ...leaf,
-        pathSegments: ["email"],
-        groupPathDot: "email",
-      });
-    }),
-  );
-
   it.effect(
     "isLeafSpecPath and isLeafImplPath detect leaf module suffixes",
     () =>
@@ -187,10 +166,13 @@ layer(LeafModuleLayer)("validateSpec", (it) => {
     }),
   );
 
-  it.effect("accepts a valid node leaf spec", () =>
+  // A `makeNode()` spec validates regardless of its location — runtime is
+  // declared by the spec, not the directory (no `confect/node/` requirement).
+  it.effect("accepts a valid node leaf spec at a non-`node/` path", () =>
     Effect.gen(function* () {
-      const leaf = yield* toLeafModule("node/typedErrorsNode.spec.ts");
-      yield* validateSpec(leaf);
+      const leaf = yield* toLeafModule("typedErrorsNode.spec.ts");
+      const groupSpec = yield* validateSpec(leaf);
+      expect(groupSpec.runtime).toBe("Node");
     }),
   );
 

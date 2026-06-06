@@ -4,7 +4,7 @@ import * as Console from "effect/Console";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import databaseSchema from "../_generated/schema";
+import databaseSchema from "./_generated/schema";
 import email from "./email.spec";
 
 const send = FunctionImpl.make(

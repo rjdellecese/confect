@@ -4,7 +4,7 @@ This is the Convex deployment used by `@confect/server`'s tests, **not** a
 template you should copy from when starting a new Convex project.
 
 `packages/server/convex.json` points the Convex CLI at this directory via the
-`functions` field, and the modules under `groups/`, `node/`, and
+`functions` field, and the modules under `groups/`, `typedErrorsNode.ts`, and
 `databaseReader.ts` re-export the registered functions produced by the
 Confect spec/impl tree under `../confect/`. The
 `packages/server/test/end-to-end/` suite spins up a real Convex local backend

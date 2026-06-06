@@ -14,7 +14,7 @@ export const isDatabaseSchema = (u: unknown): u is Any =>
 /**
  * A schema definition holding a record of bound `Table`s keyed by table
  * name. Codegen emits a single static `DatabaseSchema.make({ ... })` call;
- * laziness now lives entirely on each `Table` (its `Fields`, `Doc`, and
+ * laziness lives entirely on each `Table` (its `Fields`, `Doc`, and
  * `tableDefinition` are lazy memoised getters), so this layer is a plain
  * record indirection with no module-loading or async machinery.
  */

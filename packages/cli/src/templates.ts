@@ -265,30 +265,14 @@ export const authConfig = ({ authImportPath }: { authImportPath: string }) =>
     return yield* cbw.toString();
   });
 
-export const refs = ({
-  specImportPath,
-  nodeSpecImportPath,
-}: {
-  specImportPath: string;
-  nodeSpecImportPath: Option.Option<string>;
-}) =>
+export const refs = ({ specImportPath }: { specImportPath: string }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
     yield* cbw.writeLine(`import { Refs } from "@confect/core";`);
     yield* cbw.writeLine(`import spec from "${specImportPath}";`);
-    yield* Option.match(nodeSpecImportPath, {
-      onNone: () => Effect.void,
-      onSome: (nodeSpecImportPath_) =>
-        cbw.writeLine(`import nodeSpec from "${nodeSpecImportPath_}";`),
-    });
     yield* cbw.blankLine();
-    yield* cbw.writeLine(
-      Option.match(nodeSpecImportPath, {
-        onSome: () => `export default Refs.make(spec, nodeSpec);`,
-        onNone: () => `export default Refs.make(spec);`,
-      }),
-    );
+    yield* cbw.writeLine(`export default Refs.make(spec);`);
 
     return yield* cbw.toString();
   });
@@ -590,10 +574,8 @@ const writeRootAddAt = (
 
 export const assembledSpec = ({
   nodes,
-  runtime,
 }: {
   nodes: ReadonlyArray<SpecAssemblyNode>;
-  runtime: "Convex" | "Node";
 }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
@@ -617,14 +599,13 @@ export const assembledSpec = ({
 
     yield* cbw.blankLine();
 
-    const specFactory =
-      runtime === "Convex" ? "Spec.make()" : "Spec.makeNode()";
-    const groupFactory =
-      runtime === "Convex" ? "GroupSpec.makeAt" : "GroupSpec.makeNodeAt";
-
-    yield* cbw.write(`export default ${specFactory}`);
+    // The assembled spec is runtime-agnostic: a Node group's `makeNode()` is
+    // already baked into its imported leaf spec, so the root is always
+    // `Spec.make()` and binding-less container groups always use
+    // `GroupSpec.makeAt` (containers register no functions and carry no runtime).
+    yield* cbw.write(`export default Spec.make()`);
     yield* Effect.forEach(nodes, (node) =>
-      writeRootAddAt(cbw, node, groupFactory),
+      writeRootAddAt(cbw, node, "GroupSpec.makeAt"),
     );
     yield* cbw.write(";");
     yield* cbw.newLine();

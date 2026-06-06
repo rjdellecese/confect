@@ -1,7 +1,7 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import databaseSchema from "../_generated/schema";
+import databaseSchema from "./_generated/schema";
 import typedErrorsNode from "./typedErrorsNode.spec";
 import { NodeNotFound } from "./typedErrorsNode.spec";
 
