@@ -64,6 +64,7 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
     import { FunctionSpec, GroupSpec } from "@confect/core";
     import { Schema } from "effect";
 
+    import { Id } from "./_generated/id";
     import notes from "./_generated/tables/notes";
 
     export default GroupSpec.make()
@@ -78,7 +79,7 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
         FunctionSpec.publicMutation({
           name: "create",
           args: () => Schema.Struct({ text: Schema.String }),
-          returns: () => Schema.Null,
+          returns: () => Id("notes"),
         }),
       );
     ```
@@ -177,7 +178,7 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
     Use Confect's React hooks alongside your Confect public refs to call your Confect functions.
 
     ```tsx src/App.tsx
-    import { useMutation, useQuery } from "@confect/react";
+    import { QueryResult, useMutation, useQuery } from "@confect/react";
     import { Array } from "effect";
     import { useState } from "react";
 
@@ -193,11 +194,13 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
       return (
         <div>
           <ul>
-            {notes === undefined
-              ? <p>Loading…</p>
-              : Array.map(notes, (note) => (
+            {QueryResult.match(notes, {
+              onLoading: () => <p>Loading…</p>,
+              onSuccess: (notes) =>
+                Array.map(notes, (note) => (
                   <li key={note._id}>{note.text}</li>
-                ))}
+                )),
+            })}
           </ul>
 
           <br />

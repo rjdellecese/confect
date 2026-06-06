@@ -96,3 +96,16 @@ export default GroupImpl.make(databaseSchema, notes).pipe(
 ```
 
 `GroupImpl.finalize` is the per-group completeness check: it only typechecks once every function declared by the spec has been provided to the group layer.
+
+<Note>
+  Convex bundles a deployment into a single artifact, but a function's
+  cold start only evaluates the module graph reachable from its entry
+  point. Confect emits one Convex module per group, so cold-starting a
+  function only evaluates its own group's spec, impl, and the tables
+  it touches. To keep that cold start fast, import Effect from its
+  submodule paths (`import * as Schema from "effect/Schema"`) rather
+  than the `effect` barrel in your `confect/` files—a barrel import
+  pulls the whole `Schema` namespace into the module graph your
+  function evaluates at cold start, even when you use only a small
+  part of it.
+</Note>

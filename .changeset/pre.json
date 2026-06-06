@@ -13,17 +13,5 @@
     "docs": "0.0.0",
     "example": "0.0.0"
   },
-  "changesets": [
-    "bundle-require",
-    "externalize-bare-specifiers",
-    "fs-based-function-paths",
-    "lazy-functionspec-bundle-isolation",
-    "node-functions-first-class",
-    "preserve-parent-leaf-in-assembled-spec",
-    "spec-paths-immutable-lookup",
-    "split-deploy-schema-from-runtime",
-    "stable-react-query-results",
-    "submodule-effect-imports",
-    "unique-spec-import-bindings"
-  ]
+  "changesets": []
 }
