@@ -1,16 +1,17 @@
 ---
-name: technical-writing
+name: writing-technical-documentation
 description: >-
   Guides writing clear, well-structured technical documentation following
   Mintlify's best practices (Diátaxis framework, audience awareness, style/tone,
   navigation, SEO/AEO). Use when writing, reviewing, or improving documentation,
   guides, tutorials, API references, or any user-facing technical content.
 ---
-# Technical Writing
+
+# Writing technical documentation
 
 Best practices for technical documentation, distilled from [Mintlify's Guide to Technical Writing](https://www.mintlify.com/guides/introduction).
 
-## Content Types (Diátaxis Framework)
+## Content types (Diátaxis framework)
 
 Categorize every page into exactly one type before writing:
 
@@ -31,7 +32,7 @@ Categorize every page into exactly one type before writing:
 
 **Explanation**: Provide background context and design decisions. Acknowledge alternatives. Connect to other product areas or industry concepts.
 
-## Know Your Audience
+## Know your audience
 
 Each piece of content should target **one specific persona**. Common personas:
 
@@ -54,7 +55,7 @@ Practices that help LLMs also help humans:
 - Defined acronyms and jargon
 - Complete, runnable code examples
 
-## Style and Tone
+## Style and tone
 
 ### Core principles
 
@@ -79,7 +80,7 @@ When standardizing, lean on established guides:
 - [Google Developer Documentation Style Guide](https://developers.google.com/style)
 - [Microsoft Style Guide](https://learn.microsoft.com/en-us/style-guide/welcome/)
 
-## Navigation and Organization
+## Navigation and organization
 
 ### Structural principles
 
@@ -108,7 +109,7 @@ Use screenshots, GIFs, and videos **sparingly and intentionally**. Media is supp
 
 Always provide alt text for images, subtitles for videos, and transcripts for audio.
 
-## SEO and Answer Engine Optimization
+## SEO and answer engine optimization
 
 ### Content SEO
 
@@ -138,10 +139,10 @@ Always provide alt text for images, subtitles for videos, and transcripts for au
 - **Remove wrong docs**: outdated/misleading content is worse than no content.
 - **Plan periodic resets**: every 1-2 years, consider a structured audit and rewrite of the most impactful sections.
 
-## Content Freshness
+## Content freshness
 
 Optimize for evergreen content. If something represents a point-in-time snapshot, it's better as a blog post. Avoid embedding frequently-changing information (e.g. pricing) directly in docs.
 
-## Additional Resources
+## Additional resources
 
 For the full guide with expert quotes and detailed examples, see [reference.md](reference.md).

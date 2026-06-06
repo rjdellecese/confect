@@ -76,6 +76,7 @@ jobs:
       - uses: ./.github/actions/confect-setup
       - run: pnpm lint:syncpack
       - run: pnpm format:syncpack
+      - run: pnpm format:claude
       - run: pnpm lint:metadata
 
   test:

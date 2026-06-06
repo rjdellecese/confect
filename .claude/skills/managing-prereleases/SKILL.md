@@ -1,11 +1,17 @@
 ---
-name: prerelease
-description: Ship a major version of `@confect/*` as iterative Changesets prereleases on a dedicated `vN` release branch, then graduate to stable. Use whenever the user wants to cut a beta/next/prerelease, set up a `vN` branch, run `pnpm changeset pre enter`/`pre exit`, publish `X.0.0-next.N` versions under the npm `next` dist-tag, or merge a prerelease line back into `main`.
+name: managing-prereleases
+description: >-
+  How to optionally ship a major version of `@confect/*` as iterative Changesets
+  prereleases on a dedicated `vN` release branch before graduating to stable —
+  one possible release path for a major, not the only one. Use whenever the user
+  wants to cut a beta/next/prerelease, set up a `vN` branch, run `pnpm changeset
+  pre enter`/`pre exit`, publish `X.0.0-next.N` versions under the npm `next`
+  dist-tag, or merge a prerelease line back into `main`.
 ---
 
-# Prereleases
+# Managing prereleases
 
-Major versions of `@confect/*` ship as iterative prereleases on a dedicated `vN` branch under the npm `next` dist-tag, then graduate to stable when `vN` merges into `main`.
+A major version of `@confect/*` can be shipped as iterative prereleases on a dedicated `vN` branch under the npm `next` dist-tag, then graduated to stable when `vN` merges into `main`. This is one release path for a major, not a requirement — a major can also go straight out as a stable release from `main` like any other version. Reach for this workflow only when a major warrants a prerelease cycle (e.g. to let consumers try it under `@next` before it lands on `latest`).
 
 For Changesets-specific behavior and caveats, see the upstream [Changesets prereleases docs](https://github.com/changesets/changesets/blob/main/docs/prereleases.md). Read them in full before your first prerelease cycle — the docs themselves open with: "Prereleases are very complicated! Using them requires a thorough understanding of all parts of npm publishes. Mistakes can lead to repository and publish states that are very hard to fix."
 
@@ -30,7 +36,7 @@ Always use a dedicated `vN` branch so `main` can keep cutting patch releases of 
 These are from the Changesets docs but are easy to miss:
 
 - **Prerelease versions bump dependents more aggressively than stable releases.** Most semver ranges do not satisfy prerelease versions (e.g. `^5.0.0` is not satisfied by `5.1.0-next.0`), so `changeset version` will bump packages depending on a prereleased package even when the dependent itself has no changeset. With the `@confect/*` fixed group this is mostly invisible, but expect every package in the group to move in lockstep on every `next.N`.
-- **New packages introduced during a prerelease cycle publish to the `latest` dist-tag, not `next`.** A package being published for the first time always goes to `latest`, and continues going to `latest` for subsequent prereleases until the cycle exits. If a brand-new `@confect/foo` is added mid-cycle, its initial publish is *not* gated by `@next` and will be visible to all consumers immediately.
+- **New packages introduced during a prerelease cycle publish to the `latest` dist-tag, not `next`.** A package being published for the first time always goes to `latest`, and continues going to `latest` for subsequent prereleases until the cycle exits. If a brand-new `@confect/foo` is added mid-cycle, its initial publish is _not_ gated by `@next` and will be visible to all consumers immediately.
 - **Reuse `release.yml` for vN publishes — never add `release-vN.yml`.** npm trusted publishing matches on workflow filename. A separate workflow (e.g. `release-v9.yml`) will not match the trusted publisher entry for `release.yml`, and publish fails with `E404` rather than a clear auth error. Extend the existing workflow instead.
 
 ## Entering prerelease mode
@@ -121,7 +127,6 @@ There is no required cadence; ship as many `next.N`s as the major needs.
 2. **Open a PR merging `vN` back into `main`** with the major as the title (e.g. `v9`). Use a merge commit so the prerelease history is preserved in `main`.
 
 3. **In a follow-up commit on `main`, clean up the branch-specific machinery.** In one commit:
-
    - Revert `.changeset/config.json` `baseBranch` back to `main`.
    - Remove `- v9` from `push.branches` and `pull_request.branches` in every workflow that referenced it (including `release.yml`).
    - `release.yml` continues to publish stable from `main` with no further changes.
@@ -143,11 +148,11 @@ There is no required cadence; ship as many `next.N`s as the major needs.
 
 ## Quick reference
 
-| Step | Command |
-| --- | --- |
-| Enter pre mode | `pnpm changeset pre enter next` |
-| Author a changeset | `pnpm changeset` |
-| Apply versions locally (the action normally does this) | `pnpm changeset version` |
-| Exit pre mode | `pnpm changeset pre exit` |
-| Publish manually (the action normally does this) | `pnpm release` |
-| Install a prerelease | `pnpm add @confect/server@next` |
+| Step                                                   | Command                         |
+| ------------------------------------------------------ | ------------------------------- |
+| Enter pre mode                                         | `pnpm changeset pre enter next` |
+| Author a changeset                                     | `pnpm changeset`                |
+| Apply versions locally (the action normally does this) | `pnpm changeset version`        |
+| Exit pre mode                                          | `pnpm changeset pre exit`       |
+| Publish manually (the action normally does this)       | `pnpm release`                  |
+| Install a prerelease                                   | `pnpm add @confect/server@next` |

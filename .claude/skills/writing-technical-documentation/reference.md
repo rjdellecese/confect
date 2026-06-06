@@ -1,8 +1,8 @@
-# Technical Writing Reference
+# Technical writing reference
 
 Detailed reference material from [Mintlify's Guide to Technical Writing](https://www.mintlify.com/guides/introduction). This supplements the main SKILL.md with expert quotes, expanded guidance, and full examples.
 
-## Content Types—Expanded
+## Content types—expanded
 
 ### Selecting a content type
 
@@ -31,7 +31,7 @@ Optimize for evergreen documentation. If something represents a moment in time, 
 
 ---
 
-## Audience—Expanded
+## Audience—expanded
 
 ### The curse of knowledge
 
@@ -61,7 +61,7 @@ Talk to users to understand:
 
 ---
 
-## Navigation—Expanded
+## Navigation—expanded
 
 ### Why navigation matters
 
@@ -104,7 +104,7 @@ New hires are great proxies for new users. Before they become familiar with the 
 
 ---
 
-## Style and Tone—Expanded
+## Style and tone—expanded
 
 ### Enforcing style
 
@@ -123,7 +123,7 @@ Automate enforcement with linters like [Vale](https://vale.sh) or CI checks from
 
 ---
 
-## Media—Expanded
+## Media—expanded
 
 ### Decision table
 
@@ -143,7 +143,7 @@ _Table courtesy of Idan Englander, Manager of Technical Writing at Anaconda._
 
 ---
 
-## SEO—Expanded
+## SEO—expanded
 
 ### Content basics
 
@@ -165,7 +165,7 @@ _Table courtesy of Idan Englander, Manager of Technical Writing at Anaconda._
 - Keyword research with tools like Google Keyword Planner or Keywords Everywhere
 - Integrate keywords naturally—never stuff
 
-### Answer Engine Optimization (AEO)
+### Answer engine optimization (AEO)
 
 For AI-powered search (ChatGPT, Google AI Overviews, Perplexity):
 
@@ -180,7 +180,7 @@ For AI-powered search (ChatGPT, Google AI Overviews, Perplexity):
 
 ---
 
-## Maintenance—Expanded
+## Maintenance—expanded
 
 ### Automation strategies
 
@@ -207,7 +207,7 @@ Outdated or misleading documentation is worse than no documentation. If a doc is
 
 ---
 
-## Measuring Success
+## Measuring success
 
 ### Quantitative metrics (with context)
 

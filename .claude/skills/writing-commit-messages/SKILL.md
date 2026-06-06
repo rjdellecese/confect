@@ -1,9 +1,17 @@
 ---
-name: git-commit
-description: Write thoughtful, prose-style git commit messages with a sentence-case imperative-mood subject under 50 characters, a blank line, then a Markdown-formatted body that explains *why* the change was needed — never just *what* it did. Use this skill whenever writing a commit message, running `git commit`, preparing to commit code on the user's behalf, or drafting PR descriptions that follow commit-message conventions — even when the user doesn't explicitly ask for commit-message help. Also use when the user asks about git commit style or conventions.
+name: writing-commit-messages
+description: >-
+  Write thoughtful, prose-style git commit messages with a sentence-case
+  imperative-mood subject under 50 characters, a blank line, then a
+  Markdown-formatted body that explains *why* the change was needed — never just
+  *what* it did. Use this skill whenever writing a commit message, running `git
+  commit`, preparing to commit code on the user's behalf, or drafting PR
+  descriptions that follow commit-message conventions — even when the user
+  doesn't explicitly ask for commit-message help. Also use when the user asks
+  about git commit style or conventions.
 ---
 
-# Commit Messages
+# Writing commit messages
 
 A commit message is documentation written for your future self and your colleagues. The diff already shows _what_ changed; the message exists to explain _why_ it needed to change, what was wrong before, and what reviewers or future readers should watch for. The size of the diff has nothing to do with the appropriate size of the message — a one-character whitespace fix may deserve three paragraphs of context, and a 500-line mechanical refactor may need only two sentences.
 
