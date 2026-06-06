@@ -1,5 +1,5 @@
 ---
-name: technical-writing
+name: writing-technical-documentation
 description: >-
   Guides writing clear, well-structured technical documentation following
   Mintlify's best practices (Diátaxis framework, audience awareness, style/tone,

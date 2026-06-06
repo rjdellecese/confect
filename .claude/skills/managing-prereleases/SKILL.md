@@ -1,5 +1,5 @@
 ---
-name: prerelease
+name: managing-prereleases
 description: >-
   How to optionally ship a major version of `@confect/*` as iterative Changesets
   prereleases on a dedicated `vN` release branch before graduating to stable —
