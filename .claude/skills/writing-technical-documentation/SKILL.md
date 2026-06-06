@@ -7,7 +7,7 @@ description: >-
   guides, tutorials, API references, or any user-facing technical content.
 ---
 
-# Technical Writing
+# Writing technical documentation
 
 Best practices for technical documentation, distilled from [Mintlify's Guide to Technical Writing](https://www.mintlify.com/guides/introduction).
 

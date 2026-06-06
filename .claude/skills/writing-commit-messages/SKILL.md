@@ -11,7 +11,7 @@ description: >-
   about git commit style or conventions.
 ---
 
-# Commit Messages
+# Writing commit messages
 
 A commit message is documentation written for your future self and your colleagues. The diff already shows _what_ changed; the message exists to explain _why_ it needed to change, what was wrong before, and what reviewers or future readers should watch for. The size of the diff has nothing to do with the appropriate size of the message — a one-character whitespace fix may deserve three paragraphs of context, and a 500-line mechanical refactor may need only two sentences.
 

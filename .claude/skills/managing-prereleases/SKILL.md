@@ -9,7 +9,7 @@ description: >-
   dist-tag, or merge a prerelease line back into `main`.
 ---
 
-# Prereleases
+# Managing prereleases
 
 A major version of `@confect/*` can be shipped as iterative prereleases on a dedicated `vN` branch under the npm `next` dist-tag, then graduated to stable when `vN` merges into `main`. This is one release path for a major, not a requirement — a major can also go straight out as a stable release from `main` like any other version. Reach for this workflow only when a major warrants a prerelease cycle (e.g. to let consumers try it under `@next` before it lands on `latest`).
 
