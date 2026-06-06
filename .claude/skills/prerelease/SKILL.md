@@ -1,8 +1,12 @@
 ---
 name: prerelease
-description: Ship a major version of `@confect/*` as iterative Changesets prereleases on a dedicated `vN` release branch, then graduate to stable. Use whenever the user wants to cut a beta/next/prerelease, set up a `vN` branch, run `pnpm changeset pre enter`/`pre exit`, publish `X.0.0-next.N` versions under the npm `next` dist-tag, or merge a prerelease line back into `main`.
+description: >-
+  Ship a major version of `@confect/*` as iterative Changesets prereleases on a
+  dedicated `vN` release branch, then graduate to stable. Use whenever the user
+  wants to cut a beta/next/prerelease, set up a `vN` branch, run `pnpm changeset
+  pre enter`/`pre exit`, publish `X.0.0-next.N` versions under the npm `next`
+  dist-tag, or merge a prerelease line back into `main`.
 ---
-
 # Prereleases
 
 Major versions of `@confect/*` ship as iterative prereleases on a dedicated `vN` branch under the npm `next` dist-tag, then graduate to stable when `vN` merges into `main`.
