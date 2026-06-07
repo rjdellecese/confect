@@ -61,7 +61,7 @@ export const logFileAdded = logFile("+", Ansi.green);
 
 export const logFileRemoved = logFile("-", Ansi.red);
 
-export const logFileModified = logFile("~", Ansi.magenta);
+export const logFileModified = logFile("~", Ansi.yellow);
 
 // --- Function subline logs ---
 
@@ -105,6 +105,6 @@ export const logSuccess = logStatus("✔︎", Ansi.green);
 
 export const logFailure = logStatus("✘", Ansi.red);
 
-export const logPending = logStatus("⭘", Ansi.cyan);
+export const logPending = logStatus("⭘", Ansi.yellow);
 
 export const logWarn = logStatus("⚠", Ansi.yellow);
