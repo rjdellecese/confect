@@ -457,6 +457,9 @@ describe(compileAst, () => {
 
     effect("unsupported declaration", () =>
       Effect.gen(function* () {
+        // An empty class is the point here: it exercises Schema.instanceOf for
+        // a declaration the compiler can't support.
+        // oxlint-disable-next-line typescript/no-extraneous-class
         class Klass {}
 
         const schema = Schema.instanceOf(Klass);

@@ -523,10 +523,13 @@ const handlePropertySignatures = (typeLiteralAst: SchemaAST.TypeLiteral) =>
         propertyNamesWithValidators,
         Array.reduce(
           {} as Record<string, Validator<any, any, any>>,
-          (acc, { propertyName, validator }) => ({
-            [propertyName]: validator,
-            ...acc,
-          }),
+          (acc, { propertyName, validator }) => {
+            // Mutate the accumulator instead of spreading it on every step,
+            // which would be O(n^2). `??=` preserves the original "first
+            // occurrence wins" semantics of `{ [propertyName]: validator, ...acc }`.
+            acc[propertyName] ??= validator;
+            return acc;
+          },
         ),
         Effect.succeed,
       ),

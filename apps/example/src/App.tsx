@@ -29,9 +29,7 @@ const Page = () => {
   const getRandom = useAction(refs.public.notes_and_random.random.getNumber);
 
   const retrieveRandomNumber = () => {
-    void getRandom({}).then((n) => {
-      setRandomNumber(n);
-    });
+    void getRandom({}).then((n) => setRandomNumber(n));
   };
 
   const [emailStatus, setEmailStatus] = useState<string | null>(null);
@@ -156,9 +154,9 @@ const WorkpoolDemo = () => {
   const enqueue = useMutation(refs.public.workpool.enqueue);
 
   const handleEnqueue = () => {
-    void enqueue({}).then((id) => {
-      setJobs((prev) => [...prev, { id, enqueuedAt: Date.now() }]);
-    });
+    void enqueue({}).then((id) =>
+      setJobs((prev) => [...prev, { id, enqueuedAt: Date.now() }]),
+    );
   };
 
   return (

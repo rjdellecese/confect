@@ -30,7 +30,9 @@ const absolutizeMetafile = (
   for (const [key, value] of Object.entries(metafile.inputs)) {
     inputs[absolutize(key)] = {
       ...value,
-      imports: value.imports.map((i) => ({ ...i, path: absolutize(i.path) })),
+      imports: value.imports.map((i) =>
+        Object.assign({}, i, { path: absolutize(i.path) }),
+      ),
     };
   }
   const outputs: esbuild.Metafile["outputs"] = {};

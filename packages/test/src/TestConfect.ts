@@ -205,7 +205,6 @@ class TestConfectImpl<
       DataModel.ToConvex<DataModel.FromSchema<ConfectSchema>>
     >,
   ) {
-    this.testConvex = testConvex;
     this.testConfectImplWithoutIdentity = new TestConfectImplWithoutIdentity(
       confectSchema,
       testConvex,
