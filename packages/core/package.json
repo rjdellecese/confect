@@ -57,7 +57,6 @@
   },
   "scripts": {
     "bench": "tsx test/Refs.bench.ts",
-    "build": "tsdown --config-loader unrun",
     "clean": "rm -rf dist coverage node_modules",
     "dev": "tsdown --watch",
     "postpack": "rm ./README.md && ln -s ../../README.md ./README.md",
