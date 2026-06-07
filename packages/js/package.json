@@ -8,14 +8,10 @@
   },
   "devDependencies": {
     "@effect/vitest": "0.29.0",
-    "@eslint/js": "10.0.1",
     "@types/node": "25.3.3",
     "effect": "3.21.2",
-    "eslint": "10.0.2",
-    "prettier": "3.8.1",
     "tsdown": "0.20.3",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.56.1",
     "vitest": "3.2.4"
   },
   "engines": {
@@ -57,9 +53,6 @@
     "build": "tsdown --config-loader unrun",
     "clean": "rm -rf dist coverage node_modules",
     "dev": "tsdown --watch",
-    "fix": "prettier --write . && eslint --fix . --max-warnings=0",
-    "format": "prettier --check .",
-    "lint": "eslint . --max-warnings=0",
     "postpack": "rm ./README.md && ln -s ../../README.md ./README.md",
     "prepack": "rm -f ./README.md && cp ../../README.md ./README.md",
     "test": "vitest run",

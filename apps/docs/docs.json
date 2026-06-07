@@ -35,10 +35,7 @@
     "groups": [
       {
         "group": "Getting Started",
-        "pages": [
-          "getting-started/introduction",
-          "getting-started/quickstart"
-        ]
+        "pages": ["getting-started/introduction", "getting-started/quickstart"]
       },
       {
         "group": "Concepts",

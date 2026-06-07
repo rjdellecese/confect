@@ -30,9 +30,7 @@ Effect.gen(function* () {
   const auth = yield* Auth;
 
   const identity = yield* auth.getUserIdentity.pipe(
-    Effect.catchTag("NoUserIdentityFoundError", () =>
-      Effect.succeed(null),
-    ),
+    Effect.catchTag("NoUserIdentityFoundError", () => Effect.succeed(null)),
   );
 });
 ```

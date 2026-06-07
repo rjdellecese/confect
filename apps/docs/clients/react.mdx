@@ -19,13 +19,9 @@ import ReactDOM from "react-dom/client";
 
 import App from "./App";
 
-const convexClient = new ConvexReactClient(
-  import.meta.env.VITE_CONVEX_URL,
-);
+const convexClient = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
 
-ReactDOM.createRoot(
-  document.getElementById("root") as HTMLElement,
-).render(
+ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <ConvexProvider client={convexClient}>
       <App />
@@ -112,20 +108,14 @@ Pass `"skip"` instead of args to disable the query subscription. The hook return
 import { QueryResult, useQuery } from "@confect/react";
 import refs from "../confect/_generated/refs";
 
-const NoteDetail = ({
-  selectedId,
-}: {
-  selectedId: string | undefined;
-}) => {
+const NoteDetail = ({ selectedId }: { selectedId: string | undefined }) => {
   const note = useQuery(
     refs.public.notes.get,
     selectedId !== undefined ? { id: selectedId } : "skip",
   );
 
   return QueryResult.match(note, {
-    onLoading: (skipped) => (
-      <p>{skipped ? "Select a note" : "Loading…"}</p>
-    ),
+    onLoading: (skipped) => <p>{skipped ? "Select a note" : "Loading…"}</p>,
     onSuccess: (note) => <p>{note.text}</p>,
   });
 };
@@ -228,12 +218,12 @@ const RandomNumber = () => {
 
 ## Differences from vanilla Convex hooks
 
-| Vanilla Convex | Confect |
-| --- | --- |
-| Functions referenced via `api.module.fn` | Functions referenced via `refs` |
-| Args passed directly to Convex as-is | Args are schema-encoded from `Type` to `Encoded` before sending to Convex |
-| Return values received directly from Convex as-is | Return values are schema-decoded from `Encoded` to `Type` before returning |
-| `useQuery` returns `T \| undefined` | `useQuery` returns `QueryResult<A, E>` |
-| Cannot distinguish loading from skipped | `Loading` carries a `skipped: boolean` flag |
+| Vanilla Convex                                       | Confect                                                                                                |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Functions referenced via `api.module.fn`             | Functions referenced via `refs`                                                                        |
+| Args passed directly to Convex as-is                 | Args are schema-encoded from `Type` to `Encoded` before sending to Convex                              |
+| Return values received directly from Convex as-is    | Return values are schema-decoded from `Encoded` to `Type` before returning                             |
+| `useQuery` returns `T \| undefined`                  | `useQuery` returns `QueryResult<A, E>`                                                                 |
+| Cannot distinguish loading from skipped              | `Loading` carries a `skipped: boolean` flag                                                            |
 | `useMutation`/`useAction` always return `Promise<T>` | Refs with an `error` schema return `Promise<Either<A, E>>`; refs without one still return `Promise<A>` |
-| Pass `"skip"` to disable query subscription | Same—pass `"skip"` to disable query subscription |
+| Pass `"skip"` to disable query subscription          | Same—pass `"skip"` to disable query subscription                                                       |

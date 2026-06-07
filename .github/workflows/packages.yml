@@ -14,21 +14,12 @@ jobs:
   format:
     name: Format
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        package:
-          [
-            "@confect/cli",
-            "@confect/core",
-            "@confect/js",
-            "@confect/server",
-            "@confect/react",
-            "@confect/test",
-          ]
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/confect-setup
-      - run: pnpm --filter ${{ matrix.package }} format
+      # Oxfmt formats the whole workspace in one fast pass; `pnpm format` also
+      # checks Syncpack formatting.
+      - run: pnpm format
 
   typecheck:
     name: Typecheck
@@ -52,32 +43,12 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        package:
-          [
-            "@confect/cli",
-            "@confect/core",
-            "@confect/js",
-            "@confect/server",
-            "@confect/react",
-            "@confect/test",
-          ]
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/confect-setup
-      - run: pnpm --filter ${{ matrix.package }} lint
-
-  workspace-lint:
-    name: Workspace lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: ./.github/actions/confect-setup
-      - run: pnpm lint:syncpack
-      - run: pnpm format:syncpack
-      - run: pnpm format:claude
-      - run: pnpm lint:metadata
+      # Oxlint lints the whole workspace in one fast pass; `pnpm lint` also runs
+      # the Syncpack and package-metadata checks.
+      - run: pnpm lint
 
   test:
     name: Test

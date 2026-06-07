@@ -10,16 +10,16 @@ Confect lets you include these plain Convex function definitions in your spec an
 
 ## Spec constructors
 
-| Constructor | Description |
-| --- | --- |
-| `FunctionSpec.convexPublicQuery` | Public query function |
-| `FunctionSpec.convexPublicMutation` | Public mutation function |
-| `FunctionSpec.convexPublicAction` | Public action function |
-| `FunctionSpec.convexPublicNodeAction` | Public Node.js action |
-| `FunctionSpec.convexInternalQuery` | Internal query function |
-| `FunctionSpec.convexInternalMutation` | Internal mutation function |
-| `FunctionSpec.convexInternalAction` | Internal action function |
-| `FunctionSpec.convexInternalNodeAction` | Internal Node.js action |
+| Constructor                             | Description                |
+| --------------------------------------- | -------------------------- |
+| `FunctionSpec.convexPublicQuery`        | Public query function      |
+| `FunctionSpec.convexPublicMutation`     | Public mutation function   |
+| `FunctionSpec.convexPublicAction`       | Public action function     |
+| `FunctionSpec.convexPublicNodeAction`   | Public Node.js action      |
+| `FunctionSpec.convexInternalQuery`      | Internal query function    |
+| `FunctionSpec.convexInternalMutation`   | Internal mutation function |
+| `FunctionSpec.convexInternalAction`     | Internal action function   |
+| `FunctionSpec.convexInternalNodeAction` | Internal Node.js action    |
 
 ## Workpool component example
 
@@ -129,37 +129,25 @@ Use the `convex*` spec constructors and pass each Convex function's type as a ty
 
 ```ts confect/workpool.spec.ts
 import { FunctionSpec, GroupSpec } from "@confect/core";
-import type {
-  backgroundWork,
-  enqueue,
-  onComplete,
-  status,
-} from "./workpool";
+import type { backgroundWork, enqueue, onComplete, status } from "./workpool";
 
 export default GroupSpec.make()
-  .addFunction(
-    FunctionSpec.convexPublicMutation<typeof enqueue>()("enqueue"),
-  )
-  .addFunction(
-    FunctionSpec.convexPublicQuery<typeof status>()("status"),
-  )
+  .addFunction(FunctionSpec.convexPublicMutation<typeof enqueue>()("enqueue"))
+  .addFunction(FunctionSpec.convexPublicQuery<typeof status>()("status"))
   .addFunction(
     FunctionSpec.convexInternalAction<typeof backgroundWork>()(
       "backgroundWork",
     ),
   )
   .addFunction(
-    FunctionSpec.convexInternalMutation<typeof onComplete>()(
-      "onComplete",
-    ),
+    FunctionSpec.convexInternalMutation<typeof onComplete>()("onComplete"),
   );
 ```
 
 <Note>
-  Import the Convex functions as **type-only** imports (`import
-  type`). The spec is shared between the server and client, so a
-  runtime import here would leak the function implementation to the
-  client bundle.
+  Import the Convex functions as **type-only** imports (`import type`). The spec
+  is shared between the server and client, so a runtime import here would leak
+  the function implementation to the client bundle.
 </Note>
 
 Run `confect codegen` to pick up the new spec.
@@ -172,12 +160,7 @@ For plain Convex functions, the impl is the Convex function value itself. Pass e
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Layer } from "effect";
 import databaseSchema from "./_generated/schema";
-import {
-  backgroundWork,
-  enqueue,
-  onComplete,
-  status,
-} from "./workpool";
+import { backgroundWork, enqueue, onComplete, status } from "./workpool";
 import workpool from "./workpool.spec";
 
 const enqueueImpl = FunctionImpl.make(
@@ -244,12 +227,9 @@ const list = FunctionSpec.publicQuery({
   returns: () => Schema.Array(notes.Doc),
 });
 
-const searchSpec =
-  FunctionSpec.convexPublicQuery<typeof search>()("search");
+const searchSpec = FunctionSpec.convexPublicQuery<typeof search>()("search");
 
-export default GroupSpec.make()
-  .addFunction(list)
-  .addFunction(searchSpec);
+export default GroupSpec.make().addFunction(list).addFunction(searchSpec);
 ```
 
 In the impl, Confect functions use Effect handlers while plain functions pass through the Convex function value directly.

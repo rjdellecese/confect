@@ -14,9 +14,9 @@ const PostToolUseInput = Schema.parseJson(
 );
 
 /**
- * File extensions that ESLint supports in this project
+ * File extensions that Oxlint lints in this project
  *
- * @see eslint.config.mjs
+ * @see .oxlintrc.json
  */
 const SUPPORTED_EXTENSIONS = new Set([
   // JavaScript
@@ -29,9 +29,6 @@ const SUPPORTED_EXTENSIONS = new Set([
   ".tsx",
   ".mts",
   ".cts",
-  // Markdown/MDX (apps/docs)
-  ".md",
-  ".mdx",
 ]);
 
 const isSupportedFileType = (filePath: string) =>
@@ -52,24 +49,13 @@ const program = Effect.gen(function* () {
   const filePath = input.tool_input.file_path;
 
   if ((yield* isSupportedFileType(filePath)) === true) {
-    const command = Command.make(
-      "pnpm",
-      "eslint",
-      "--fix",
-      "--cache",
-      "--cache-strategy",
-      "content",
-      filePath,
-    ).pipe(Command.stderr("inherit"));
+    const command = Command.make("pnpm", "oxlint", "--fix", filePath).pipe(
+      Command.stderr("inherit"),
+    );
 
-    const exitCode = yield* Command.exitCode(command);
-
-    // https://eslint.org/docs/latest/use/command-line-interface#exit-codes
-    if (exitCode === 2) {
-      return yield* Effect.dieMessage(
-        "ESLint encountered a configuration problem or internal error",
-      );
-    }
+    // Oxlint exits non-zero when lint problems remain after fixing; that is not
+    // a hook failure (the edit still succeeds), so we only surface its stderr.
+    yield* Command.exitCode(command);
 
     yield* Console.log("{}");
   }

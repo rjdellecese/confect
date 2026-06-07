@@ -117,14 +117,11 @@ bench("ValueToValidator<{ foo?: string | undefined }>", () => {
   return {} as ValueToValidator<{ foo?: string | undefined }>;
 }).types([999, "instantiations"]);
 
-bench(
-  "ValueToValidator<{ foo?: { bar?: number | undefined } | undefined }>",
-  () => {
-    return {} as ValueToValidator<{
-      foo?: { bar?: number | undefined } | undefined;
-    }>;
-  },
-).types([9370, "instantiations"]);
+bench("ValueToValidator<{ foo?: { bar?: number | undefined } | undefined }>", () => {
+  return {} as ValueToValidator<{
+    foo?: { bar?: number | undefined } | undefined;
+  }>;
+}).types([9370, "instantiations"]);
 
 // --- Unions ---
 

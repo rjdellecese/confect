@@ -14,9 +14,9 @@ const PostToolUseInput = Schema.parseJson(
 );
 
 /**
- * File extensions that Prettier supports
+ * File extensions that Oxfmt supports
  *
- * @see https://prettier.io/docs/en/options.html
+ * @see https://oxc.rs/docs/guide/usage/formatter
  */
 const SUPPORTED_EXTENSIONS = new Set([
   // JavaScript
@@ -74,7 +74,7 @@ const program = Effect.gen(function* () {
   const filePath = input.tool_input.file_path;
 
   if ((yield* isSupportedFileType(filePath)) === true) {
-    const command = Command.make("pnpm", "prettier", "--write", filePath).pipe(
+    const command = Command.make("pnpm", "oxfmt", "--write", filePath).pipe(
       Command.stderr("inherit"),
     );
 

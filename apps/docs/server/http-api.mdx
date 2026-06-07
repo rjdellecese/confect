@@ -27,10 +27,7 @@ import notes from "../_generated/tables/notes";
 class NotesGroup extends HttpApiGroup.make("notes")
   .add(
     HttpApiEndpoint.get("getFirst", "/get-first")
-      .annotate(
-        OpenApi.Description,
-        "Get the first note, if there is one.",
-      )
+      .annotate(OpenApi.Description, "Get the first note, if there is one.")
       .addSuccess(Schema.Option(notes.Doc)),
   )
   .annotate(OpenApi.Title, "Notes")
@@ -47,17 +44,14 @@ export class Api extends HttpApi.make("Api")
 Implement your endpoint handlers in the same file using `HttpApiBuilder`. All Confect action [services](/concepts/services) (`QueryRunner`, `MutationRunner`, `ActionRunner`, `Scheduler`, `Auth`, `StorageReader`, `StorageWriter`, `StorageActionWriter`) are available in handlers.
 
 ```ts confect/http/notes.ts (continued)
-const NotesGroupLive = HttpApiBuilder.group(
-  Api,
-  "notes",
-  (handlers) =>
-    handlers.handle("getFirst", () =>
-      Effect.gen(function* () {
-        const runQuery = yield* QueryRunner;
+const NotesGroupLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
+  handlers.handle("getFirst", () =>
+    Effect.gen(function* () {
+      const runQuery = yield* QueryRunner;
 
-        return yield* runQuery(refs.public.notes.getFirst, {});
-      }).pipe(Effect.orDie),
-    ),
+      return yield* runQuery(refs.public.notes.getFirst, {});
+    }).pipe(Effect.orDie),
+  ),
 );
 
 export const ApiLive = HttpApiBuilder.api(Api).pipe(
@@ -86,11 +80,11 @@ export default HttpApi.make({
 
 Each path prefix entry accepts:
 
-| Property | Description |
-| --- | --- |
-| `apiLive` | A `Layer` providing `HttpApi.Api`, built with `HttpApiBuilder.api` |
-| `middleware` | Optional middleware function (e.g. `HttpMiddleware.cors()`, `HttpMiddleware.logger`) |
-| `scalar` | Optional [Scalar configuration](https://github.com/scalar/scalar) to customize the interactive API docs |
+| Property     | Description                                                                                             |
+| ------------ | ------------------------------------------------------------------------------------------------------- |
+| `apiLive`    | A `Layer` providing `HttpApi.Api`, built with `HttpApiBuilder.api`                                      |
+| `middleware` | Optional middleware function (e.g. `HttpMiddleware.cors()`, `HttpMiddleware.logger`)                    |
+| `scalar`     | Optional [Scalar configuration](https://github.com/scalar/scalar) to customize the interactive API docs |
 
 ## API documentation
 

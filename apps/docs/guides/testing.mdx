@@ -40,8 +40,7 @@ import { TestConfect as TestConfect_ } from "@confect/test";
 import confectSchema from "./confect/_generated/schema";
 import convexSchema from "./confect/_generated/convexSchema";
 
-export const TestConfect =
-  TestConfect_.TestConfect<typeof confectSchema>();
+export const TestConfect = TestConfect_.TestConfect<typeof confectSchema>();
 
 export const layer = TestConfect_.layer(
   confectSchema,
@@ -146,9 +145,7 @@ Effect.gen(function* () {
     Effect.gen(function* () {
       const writer = yield* DatabaseWriter;
 
-      return yield* writer
-        .table("notes")
-        .insert({ text: "seed data" });
+      return yield* writer.table("notes").insert({ text: "seed data" });
     }),
     Id("notes"),
   );
@@ -187,10 +184,7 @@ Effect.gen(function* () {
     email: "user@example.com",
   });
 
-  const identity = yield* asUser.query(
-    refs.public.auth.getIdentity,
-    {},
-  );
+  const identity = yield* asUser.query(refs.public.auth.getIdentity, {});
 });
 ```
 
