@@ -6,5 +6,5 @@
   "tabWidth": 2,
   "printWidth": 80,
   "sortPackageJson": false,
-  "ignorePatterns": ["**/_generated/**"]
+  "ignorePatterns": ["**/_generated/**", "**/fixtures/convex/**/*.ts"]
 }
