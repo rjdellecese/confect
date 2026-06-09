@@ -29,7 +29,8 @@
     ],
     "no-underscore-dangle": "off",
     "unicorn/consistent-function-scoping": "off",
-    "unicorn/no-array-sort": "off"
+    "unicorn/no-array-sort": "off",
+    "oxc/no-accumulating-spread": "off"
   },
   "overrides": [
     {

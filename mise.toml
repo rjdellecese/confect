@@ -1,6 +1,3 @@
-# Bun runs the fast TypeScript Claude Code hooks (scripts/hooks/*.ts). Pinned for
-# reproducibility across machines and CI. Node and pnpm versions come from the
-# idiomatic version files (.node-version, package.json "packageManager").
 [tools]
 bun = "1.3.14"
 
