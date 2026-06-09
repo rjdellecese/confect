@@ -55,7 +55,7 @@
     "postpack": "rm ./README.md && ln -s ../../README.md ./README.md",
     "prepack": "rm -f ./README.md && cp ../../README.md ./README.md",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit --project tsconfig.json"
+    "typecheck": "tsc -b tsconfig.src.json"
   },
   "sideEffects": false,
   "type": "module",

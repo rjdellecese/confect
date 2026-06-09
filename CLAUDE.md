@@ -18,7 +18,7 @@ Confect is a library that integrates Effect with the Convex backend platform. It
 
 ## Build System
 
-Packages are built with tsdown. Workspace task orchestration (build, test, lint, format, typecheck) runs through Vite+ (`vp`), which provides dependency-ordered, cached task running over the pnpm workspace.
+Packages are built with tsdown (JavaScript output) plus TypeScript project references: each package has a composite `tsconfig.src.json`, and `tsc -b` typechecks the graph in dependency order and emits the `.d.ts` declarations (tsdown is configured with `dts: false`). Build and the other workspace tasks (test, lint, format) run through Vite+ (`vp`), which provides dependency-ordered, cached task running over the pnpm workspace; typecheck runs via `tsc -b`.
 
 **Critical: packages must be rebuilt with `pnpm build` after source changes for those changes to be reflected outside their package directory.** Consumers import from `dist/`, not `src/`. During development, use `pnpm dev` to run tsdown in watch mode across all packages so rebuilds happen automatically.
 
@@ -30,7 +30,7 @@ Workspace tasks run through Vite+ (`vp`), which orders packages by their depende
 - `pnpm dev` - Watch-rebuild all packages in parallel
 - `pnpm dev:example` / `pnpm dev:docs` - Run the example app / docs site
 - `pnpm test` - Run all package test suites via Vitest (`vp test`)
-- `pnpm typecheck` - Typecheck all packages (cached)
+- `pnpm typecheck` - Typecheck the whole graph via `tsc -b` (project references, incremental)
 - `pnpm lint` / `pnpm lint:fix` - Lint (Oxlint + Syncpack); `lint:fix` writes fixes
 - `pnpm format` / `pnpm format:check` - Format (Oxfmt + Syncpack); `format` writes, `format:check` only checks
 - `pnpm check` - Format, lint, and type checks together (`vp check`)

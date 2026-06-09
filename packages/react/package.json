@@ -68,7 +68,7 @@
     "dev": "tsdown --watch --config-loader unrun",
     "postpack": "rm ./README.md && ln -s ../../README.md ./README.md",
     "prepack": "rm -f ./README.md && cp ../../README.md ./README.md",
-    "typecheck": "tsc --noEmit --project tsconfig.json"
+    "typecheck": "tsc -b tsconfig.src.json"
   },
   "sideEffects": false,
   "type": "module",

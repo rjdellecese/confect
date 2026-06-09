@@ -85,7 +85,7 @@
     "test": "vitest run",
     "test:local-backend": "vitest run --config vitest.local-backend.config.ts",
     "test:mock-backend": "vitest run --config vitest.mock-backend.config.ts",
-    "typecheck": "tsc --noEmit --project tsconfig.json"
+    "typecheck": "tsc -b tsconfig.src.json"
   },
   "sideEffects": false,
   "type": "module",

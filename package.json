@@ -44,6 +44,6 @@
     "test": "vitest run",
     "test:server:local-backend": "pnpm --filter @confect/server test:local-backend",
     "test:server:mock-backend": "pnpm --filter @confect/server test:mock-backend",
-    "typecheck": "vp run --cache -r typecheck"
+    "typecheck": "tsc -b"
   }
 }
