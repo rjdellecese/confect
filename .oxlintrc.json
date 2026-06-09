@@ -16,9 +16,7 @@
     "**/.pnpm-store/**",
     "**/.tsup/**",
     "**/_generated/**",
-    "**/.mintlify/**",
-    "scripts/**",
-    ".claude/**"
+    "**/.mintlify/**"
   ],
   "rules": {
     "no-unused-vars": [

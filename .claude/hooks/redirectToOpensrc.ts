@@ -1,14 +1,14 @@
-import { BunContext, BunRuntime, BunStream } from "@effect/platform-bun";
-import {
-  Array,
-  Cause,
-  Console,
-  Effect,
-  Match,
-  Option,
-  Schema,
-  Stream,
-} from "effect";
+import * as BunContext from "@effect/platform-bun/BunContext";
+import * as BunRuntime from "@effect/platform-bun/BunRuntime";
+import * as BunStream from "@effect/platform-bun/BunStream";
+import * as Array from "effect/Array";
+import * as Cause from "effect/Cause";
+import * as Console from "effect/Console";
+import * as Effect from "effect/Effect";
+import * as Match from "effect/Match";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
 
 /**
  * Discriminated union of preToolUse inputs for the tools we gate.
