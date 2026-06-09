@@ -10,7 +10,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "mise exec -- bun scripts/hooks/redirect-to-opensrc.ts",
+            "command": "mise exec -- bun .claude/hooks/redirect-to-opensrc.ts",
             "timeout": 5
           }
         ]
@@ -22,12 +22,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "mise exec -- bun scripts/hooks/format-file.ts",
+            "command": "mise exec -- bun .claude/hooks/format-file.ts",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "mise exec -- bun scripts/hooks/lint-file.ts",
+            "command": "mise exec -- bun .claude/hooks/lint-file.ts",
             "timeout": 10
           }
         ]
