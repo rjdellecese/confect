@@ -31,8 +31,8 @@ Workspace tasks run through Vite+ (`vp`), which orders packages by their depende
 - `pnpm dev:example` / `pnpm dev:docs` - Run the example app / docs site
 - `pnpm test` - Run all package test suites via Vitest (`vp test`)
 - `pnpm typecheck` - Typecheck all packages (cached)
-- `pnpm lint` / `pnpm fix` - Lint (Oxlint + Syncpack), or auto-fix formatting + lint
-- `pnpm format` - Check formatting (Oxfmt + Syncpack) across the repo
+- `pnpm lint` / `pnpm lint:fix` - Lint (Oxlint + Syncpack); `lint:fix` writes fixes
+- `pnpm format` / `pnpm format:check` - Format (Oxfmt + Syncpack); `format` writes, `format:check` only checks
 - `pnpm check` - Format, lint, and type checks together (`vp check`)
 - `pnpm clean` - Remove dist, coverage, and node_modules everywhere
 

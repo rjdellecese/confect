@@ -17,9 +17,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/confect-setup
-      # Oxfmt formats the whole workspace in one fast pass; `pnpm format` also
-      # checks Syncpack formatting.
-      - run: pnpm format
+      # `format` now writes; CI checks instead. Covers Oxfmt + Syncpack formatting.
+      - run: pnpm format:check
 
   typecheck:
     name: Typecheck
