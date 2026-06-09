@@ -19,7 +19,11 @@
     "target": "ESNext",
     "moduleResolution": "Bundler",
     "module": "ESNext",
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "paths": {
+      "@confect/react": ["./src/index.ts"],
+      "@confect/react/*": ["./src/*"]
+    }
   },
   "exclude": ["coverage", "dist", "node_modules"],
   "extends": ["../../tsconfig.base.json"]

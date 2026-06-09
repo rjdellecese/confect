@@ -10,8 +10,8 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
-import * as FunctionSpec from "../src/FunctionSpec";
-import * as Ref from "../src/Ref";
+import * as FunctionSpec from "@confect/core/FunctionSpec";
+import * as Ref from "@confect/core/Ref";
 
 describe("FunctionReference", () => {
   test("public query", () => {

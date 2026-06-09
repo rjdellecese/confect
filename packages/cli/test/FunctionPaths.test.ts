@@ -4,9 +4,9 @@ import * as Equal from "effect/Equal";
 import * as HashSet from "effect/HashSet";
 import * as Schema from "effect/Schema";
 
-import * as FunctionPath from "../src/FunctionPath";
-import * as FunctionPaths from "../src/FunctionPaths";
-import * as GroupPath from "../src/GroupPath";
+import * as FunctionPath from "@confect/cli/FunctionPath";
+import * as FunctionPaths from "@confect/cli/FunctionPaths";
+import * as GroupPath from "@confect/cli/GroupPath";
 
 /**
  * Helper to create a FunctionPath from group path segments and function name.

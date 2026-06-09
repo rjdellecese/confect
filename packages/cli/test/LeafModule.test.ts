@@ -6,8 +6,8 @@ import { assert, expect, layer } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Either from "effect/Either";
 import * as Layer from "effect/Layer";
-import type { CodegenError } from "../src/CodegenError";
-import { ConfectDirectory } from "../src/ConfectDirectory";
+import type { CodegenError } from "@confect/cli/CodegenError";
+import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import {
   groupPathFromRelativeModulePath,
   implPathForSpec,
@@ -19,7 +19,7 @@ import {
   validateImpl,
   validateSpec,
   type LeafModule,
-} from "../src/LeafModule";
+} from "@confect/cli/LeafModule";
 
 const fixtureConfect = `${import.meta.dirname}/../../server/test/mock-backend/fixtures/confect`;
 

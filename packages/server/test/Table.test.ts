@@ -9,7 +9,7 @@ import {
 } from "convex/server";
 import { v, type GenericValidator } from "convex/values";
 import * as Schema from "effect/Schema";
-import * as Table from "../src/Table";
+import * as Table from "@confect/server/Table";
 
 describe("Table", () => {
   it("tableDefinition property should extend a generic Convex TableDefinition", () => {

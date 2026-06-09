@@ -44,6 +44,6 @@
     "test": "vitest run",
     "test:server:local-backend": "pnpm --filter @confect/server test:local-backend",
     "test:server:mock-backend": "pnpm --filter @confect/server test:mock-backend",
-    "typecheck": "tsc -b"
+    "typecheck": "tsc -b tsconfig.packages.json tsconfig.json"
   }
 }

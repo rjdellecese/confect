@@ -3,7 +3,7 @@ import * as SystemFields from "@confect/core/SystemFields";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { describe, expect, it } from "@effect/vitest";
-import * as Document from "../src/Document";
+import * as Document from "@confect/server/Document";
 
 const NoteSchema = Schema.Struct({
   content: Schema.String,

@@ -8,12 +8,12 @@ import * as Effect from "effect/Effect";
 import * as HashSet from "effect/HashSet";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import { ConfectDirectory } from "../src/ConfectDirectory";
-import { ConvexDirectory } from "../src/ConvexDirectory";
-import * as GroupPath from "../src/GroupPath";
-import * as GroupPaths from "../src/GroupPaths";
-import { ProjectRoot } from "../src/ProjectRoot";
-import { generateFunctions, removeGroups } from "../src/utils";
+import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
+import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
+import * as GroupPath from "@confect/cli/GroupPath";
+import * as GroupPaths from "@confect/cli/GroupPaths";
+import { ProjectRoot } from "@confect/cli/ProjectRoot";
+import { generateFunctions, removeGroups } from "@confect/cli/utils";
 
 const fixtureRoot = `${import.meta.dirname}/../../server/test/mock-backend/fixtures`;
 const fixtureConvex = `${fixtureRoot}/convex`;

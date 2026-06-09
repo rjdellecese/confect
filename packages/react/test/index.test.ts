@@ -12,8 +12,13 @@ import {
   test,
   vi,
 } from "vitest";
-import type { InvokeReturn } from "../src/index";
-import { QueryResult, useAction, useMutation, useQuery } from "../src/index";
+import type { InvokeReturn } from "@confect/react/index";
+import {
+  QueryResult,
+  useAction,
+  useMutation,
+  useQuery,
+} from "@confect/react/index";
 
 const useConvexQueryMock = vi.fn();
 const useConvexMutationMock = vi.fn();

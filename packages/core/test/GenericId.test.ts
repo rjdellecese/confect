@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as Option from "effect/Option";
-import * as GenericId from "../src/GenericId";
+import * as GenericId from "@confect/core/GenericId";
 
 describe("tableName", () => {
   it("returns the table name of the GenericId", () => {

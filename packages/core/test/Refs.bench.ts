@@ -1,10 +1,10 @@
 import { bench } from "@ark/attest";
 import * as Schema from "effect/Schema";
-import * as FunctionSpec from "../src/FunctionSpec";
-import * as GroupSpec from "../src/GroupSpec";
-import type * as Ref from "../src/Ref";
-import type * as Refs from "../src/Refs";
-import * as Spec from "../src/Spec";
+import * as FunctionSpec from "@confect/core/FunctionSpec";
+import * as GroupSpec from "@confect/core/GroupSpec";
+import type * as Ref from "@confect/core/Ref";
+import type * as Refs from "@confect/core/Refs";
+import * as Spec from "@confect/core/Spec";
 
 const Args = Schema.Struct({});
 const Returns = Schema.String;

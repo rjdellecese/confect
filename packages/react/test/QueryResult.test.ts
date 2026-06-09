@@ -3,7 +3,7 @@ import * as Equal from "effect/Equal";
 import * as Hash from "effect/Hash";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
-import * as QueryResult from "../src/QueryResult";
+import * as QueryResult from "@confect/react/QueryResult";
 
 describe("constructors", () => {
   test("load sets Loading with skipped", () => {

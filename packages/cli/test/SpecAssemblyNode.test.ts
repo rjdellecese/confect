@@ -1,9 +1,9 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
-import type { LeafModule } from "../src/LeafModule";
-import { assemblyNodesFromLeaves } from "../src/SpecAssemblyNode";
-import * as templates from "../src/templates";
+import type { LeafModule } from "@confect/cli/LeafModule";
+import { assemblyNodesFromLeaves } from "@confect/cli/SpecAssemblyNode";
+import * as templates from "@confect/cli/templates";
 
 const leaf = (
   relativePath: string,
