@@ -17,7 +17,8 @@
     "**/.tsup/**",
     "**/_generated/**",
     "**/.mintlify/**",
-    "scripts/**"
+    "scripts/**",
+    ".claude/**"
   ],
   "rules": {
     "no-unused-vars": [
