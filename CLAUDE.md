@@ -18,26 +18,29 @@ Confect is a library that integrates Effect with the Convex backend platform. It
 
 ## Build System
 
-Packages are built with tsdown. There is no Turborepo; orchestration is via pnpm workspace scripts.
+Packages are built with tsdown. Workspace task orchestration (build, test, lint, format, typecheck) runs through Vite+ (`vp`), which provides dependency-ordered, cached task running over the pnpm workspace.
 
-**Critical: packages must be rebuilt with `pnpm build` after source changes for those changes to be reflected outside their package directory.** Consumers import from `dist/`, not `src/`. During development, use `pnpm dev:packages` (or a variant like `pnpm dev:packages:server`) to run tsdown in watch mode so rebuilds happen automatically.
+**Critical: packages must be rebuilt with `pnpm build` after source changes for those changes to be reflected outside their package directory.** Consumers import from `dist/`, not `src/`. During development, use `pnpm dev` to run tsdown in watch mode across all packages so rebuilds happen automatically.
+
+Workspace tasks run through Vite+ (`vp`), which orders packages by their dependency graph and caches results. There are no per-package script variants at the root; target a single package ad hoc with `vp run --filter <pkg> <task>` (e.g. `vp run --filter @confect/core build`, `vp test --project @confect/core`).
 
 ### Key Commands (run from repo root)
 
-- `pnpm build` - Build all @confect packages
-- `pnpm dev` - Watch-rebuild all packages and apps in parallel
-- `pnpm dev:packages` - Watch-rebuild all packages only
-- `pnpm test:core`/`pnpm test:js`/`pnpm test:server`/`pnpm test:cli` - Run tests for a specific package via Vitest
-- `pnpm typecheck` - Typecheck all packages
-- `pnpm lint`/`pnpm fix` - Lint or auto-fix all packages
-- `pnpm format` - Check formatting via Prettier across all packages
+- `pnpm build` - Build all @confect packages (cached, dependency-ordered)
+- `pnpm dev` - Watch-rebuild all packages in parallel
+- `pnpm dev:example` / `pnpm dev:docs` - Run the example app / docs site
+- `pnpm test` - Run all package test suites via Vitest (`vp test`)
+- `pnpm typecheck` - Typecheck all packages (cached)
+- `pnpm lint` / `pnpm fix` - Lint (Oxlint + Syncpack), or auto-fix formatting + lint
+- `pnpm format` - Check formatting (Oxfmt + Syncpack) across the repo
+- `pnpm check` - Format, lint, and type checks together (`vp check`)
 - `pnpm clean` - Remove dist, coverage, and node_modules everywhere
 
 ## Testing
 
 Tests use Vitest with a root-level `vitest.config.ts` (which uses `projects: ["packages/*"]` to discover per-package test projects) and shared config in `vitest.shared.ts`. The core, js, server, and cli packages all have tests. The @confect/server package has integration tests using convex-test.
 
-There is no root-level `pnpm test` command; always run tests per-package (e.g. `pnpm test:core`, `pnpm test:server`).
+Run `pnpm test` to run all suites at once, or target a single package with `vp test --project @confect/<pkg>` (e.g. `vp test --project @confect/core`). The server's Convex integration suites have dedicated scripts: `pnpm test:server:mock-backend` and `pnpm test:server:local-backend`.
 
 ## Versioning and Publishing
 

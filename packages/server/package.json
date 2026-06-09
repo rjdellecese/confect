@@ -79,7 +79,7 @@
     "clean": "rm -rf dist coverage node_modules",
     "codegen:local-backend": "cd test/local-backend/fixtures && pnpm confect codegen && CONVEX_AGENT_MODE=anonymous pnpm convex dev --once --typecheck=disable --tail-logs=disable",
     "codegen:mock-backend": "cd test/mock-backend/fixtures && pnpm confect codegen && CONVEX_AGENT_MODE=anonymous pnpm convex dev --once --typecheck=disable --tail-logs=disable",
-    "dev": "tsdown --watch",
+    "dev": "tsdown --watch --config-loader unrun",
     "postpack": "rm ./README.md && ln -s ../../README.md ./README.md",
     "prepack": "rm -f ./README.md && cp ../../README.md ./README.md",
     "test": "vitest run",
