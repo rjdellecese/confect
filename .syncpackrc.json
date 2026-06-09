@@ -3,6 +3,26 @@
     "enginesNode": {
       "path": "engines.node",
       "strategy": "versionsByName"
+    },
+    "author": {
+      "path": "author",
+      "strategy": "version"
+    },
+    "license": {
+      "path": "license",
+      "strategy": "version"
+    },
+    "homepage": {
+      "path": "homepage",
+      "strategy": "version"
+    },
+    "repoUrl": {
+      "path": "repository.url",
+      "strategy": "version"
+    },
+    "bugsUrl": {
+      "path": "bugs.url",
+      "strategy": "version"
     }
   },
   "versionGroups": [
@@ -10,6 +30,11 @@
       "label": "engines.node must match across all published packages",
       "dependencyTypes": ["enginesNode"],
       "policy": "sameRange"
+    },
+    {
+      "label": "Published metadata must match across all @confect/* packages",
+      "packages": ["@confect/*"],
+      "dependencyTypes": ["author", "license", "homepage", "repoUrl", "bugsUrl"]
     },
     {
       "label": "Internal @confect/* peerDependencies must use workspace:^",
