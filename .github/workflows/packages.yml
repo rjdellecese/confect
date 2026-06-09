@@ -50,6 +50,17 @@ jobs:
       # the Syncpack and package-metadata checks.
       - run: pnpm lint
 
+  circular:
+    name: Circular dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/confect-setup
+      # dpdm fails on real (runtime) import cycles; type-only `import type`
+      # cycles are ignored. confect-setup builds the packages first so
+      # cross-package `@confect/*` imports resolve.
+      - run: pnpm circular
+
   test:
     name: Test
     runs-on: ubuntu-latest
