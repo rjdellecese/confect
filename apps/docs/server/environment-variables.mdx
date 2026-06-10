@@ -4,7 +4,7 @@ title: "Environment Variables"
 description: "Read environment variables using Effect's Config module."
 ---
 
-Confect provides a `ConfigProvider` that is compatible with the Convex runtime, where `process.env` is not enumerable. This provider is automatically set for all Confect functions (queries, mutations, actions, and HTTP API handlers), so Effect's [`Config`](https://effect.website/docs/configuration/config/) module works out of the box.
+Confect provides a `ConfigProvider` that is compatible with the Convex runtime, where `process.env` is not enumerable. This provider is automatically set for all Confect functions (queries, mutations, actions, and HTTP API handlers), so Effect's [`Config`](https://effect.website/docs/configuration/) module works out of the box.
 
 ## Reading environment variables
 
@@ -36,7 +36,7 @@ Config operations that require enumerating `process.env` are unsupported in the 
 
 ## Custom config provider
 
-The `ConvexConfigProvider` module is exported from `@confect/server` if you need to create a provider with custom options. It supports the same options as Effect's default [`ConfigProvider.fromEnv`](https://effect.website/docs/configuration/config-provider/#fromenv).
+The `ConvexConfigProvider` module is exported from `@confect/server` if you need to create a provider with custom options. It supports the same options as Effect's default [`ConfigProvider.fromEnv`](https://effect.website/docs/configuration/#loading-configuration-from-environment-variables).
 
 ```ts
 import { ConvexConfigProvider } from "@confect/server";
