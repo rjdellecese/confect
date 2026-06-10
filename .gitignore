@@ -9,5 +9,4 @@ node-compile-cache/
 node_modules/
 opensrc/
 tsconfig.vitest-temp.json
-# TypeScript incremental build info
 *.tsbuildinfo
