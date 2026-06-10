@@ -1,5 +1,16 @@
 # @confect/js
 
+## 9.0.0-next.10
+
+### Patch Changes
+
+- 9eec71c: Generate the published `.d.ts` declarations with the TypeScript compiler instead of tsdown's declaration bundler. tsdown now emits JavaScript only (`dts: false`); each package has a composite `tsconfig.src.json`, and `tsc -b` emits the declarations into `dist/` as part of the build. (`@confect/cli` is the exception: it ships only a binary, so it emits no declarations at all.)
+
+  The emitted types are equivalent to before—same exported surface, same inferred shapes—so no consumer-facing type changes. One incidental improvement comes with the switch: declaration maps (`.d.ts.map`) now ship alongside the types (with `src/` included in the published files, so "go to definition" lands on the original source).
+
+- Updated dependencies [9eec71c]
+  - @confect/core@9.0.0-next.10
+
 ## 9.0.0-next.9
 
 ### Patch Changes
@@ -126,7 +137,7 @@
 
   export class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
     "NoteNotFound",
-    { noteId: GenericId.GenericId("notes") },
+    { noteId: GenericId.GenericId("notes") }
   ) {}
 
   export const notes = GroupSpec.make("notes").addFunction(
@@ -135,7 +146,7 @@
       args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
       returns: Notes.Doc,
       error: NoteNotFound,
-    }),
+    })
   );
   ```
 
@@ -155,7 +166,7 @@
         .table("notes")
         .get(noteId)
         .pipe(Effect.mapError(() => new NoteNotFound({ noteId })));
-    }),
+    })
   );
   ```
 
@@ -227,6 +238,7 @@
   Unspecified failures continue to reject the promise.
 
   ### Migration
+
   - For each `useQuery` call site, replace `result === undefined` checks and direct property access with `QueryResult.match` (or the lower-level `QueryResult.isLoading`/`isSuccess`/`isFailure` predicates).
   - For each `useMutation`/`useAction` call site whose ref now declares an `error` schema, unwrap the resolved `Either` (e.g. with `Either.match`); call sites against refs without an `error` schema need no change.
 
@@ -255,6 +267,7 @@
 - 2c4b0c9: Fix `HttpClient` to only accept public `Ref`s
 
   `HttpClient` query, mutation, and action methods now correctly reject internal `Ref`s at the type level, matching the runtime behavior of Convex browser clients which can only call public functions.
+
   - @confect/core@5.0.0
 
 ## 4.0.0

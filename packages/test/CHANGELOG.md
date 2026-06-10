@@ -1,5 +1,17 @@
 # @confect/test
 
+## 9.0.0-next.10
+
+### Patch Changes
+
+- 9eec71c: Generate the published `.d.ts` declarations with the TypeScript compiler instead of tsdown's declaration bundler. tsdown now emits JavaScript only (`dts: false`); each package has a composite `tsconfig.src.json`, and `tsc -b` emits the declarations into `dist/` as part of the build. (`@confect/cli` is the exception: it ships only a binary, so it emits no declarations at all.)
+
+  The emitted types are equivalent to before—same exported surface, same inferred shapes—so no consumer-facing type changes. One incidental improvement comes with the switch: declaration maps (`.d.ts.map`) now ship alongside the types (with `src/` included in the published files, so "go to definition" lands on the original source).
+
+- Updated dependencies [9eec71c]
+  - @confect/core@9.0.0-next.10
+  - @confect/server@9.0.0-next.10
+
 ## 9.0.0-next.9
 
 ### Patch Changes
@@ -56,6 +68,7 @@
   Previously, `confect/schema.ts` was user-authored and `DatabaseSchema` carried a `convexSchemaDefinition` field that was eagerly rebuilt on every `.addTable(...)`. That field was an `O(n²)` allocation for `n` tables, and it forced both the deploy CLI (which only needs `defineSchema(...)`) and the runtime (which only needs the table codec lookup) through the same module — so any runtime function bundle dragged in `convex/server`'s `defineSchema`. Issue 1.
 
   Codegen now scans `confect/tables/*.ts` (every file must default-export a `Table`) and emits two siblings:
+
   - `confect/_generated/schema.ts` — the runtime `DatabaseSchema`, consumed by `_generated/api.ts`. Imports `@confect/server` but never `convex/server`.
   - `confect/_generated/convexSchema.ts` — the Convex deploy `SchemaDefinition`, re-exported one-line from `convex/schema.ts`. Imports `convex/server` but never `@confect/server`.
 
@@ -68,6 +81,7 @@
   This eliminates a class of subtle infelicities: the file basename and the table name can never drift out of sync, cross-table `_id` references are type-constrained against the actual set of declared tables (catching typos at compile time), and ESM cycle hazards for mutual cross-table `Id` references are gone because authoring files no longer transitively import each other.
 
   Codegen now emits two new sets of files alongside `_generated/schema.ts` and `_generated/convexSchema.ts`:
+
   - `confect/_generated/id.ts` — a single `Id` constructor whose argument is type-constrained to the union of your table names. Use `Id("notes")` everywhere you previously wrote `GenericId.GenericId("notes")`.
   - `confect/_generated/tables/<name>.ts` — one thin wrapper per table that binds the unnamed value from `confect/tables/<name>.ts` to its filename. This is what other modules (specs, impls, HTTP handlers) default-import to reach a table's `Doc`, `Fields`, and `tableName`.
 
@@ -84,6 +98,7 @@
   The bound `Table` now exposes `Fields` / `Doc` / `tableDefinition` as lazy getters that compute their value on first access, then replace themselves with a plain non-writable data property so second-and-subsequent accesses are observably indistinguishable from a plain property (and skip all function-call overhead). The result: a function bundle only pays the schema-construction cost for tables it actually touches via `db.table(name)` (which reaches `Fields` through `Document.decode`). The `UnnamedTable` callable no longer exposes `Fields` or `tableDefinition` — read these off the bound `Table` (the generated `_generated/tables/<name>.ts` wrapper already binds the name).
 
   ### Migration
+
   1. Delete your `confect/schema.ts`. Codegen will refuse to run while a stray copy is present.
   2. Rename each `confect/tables/<Name>.ts` to a valid JS identifier in your chosen casing convention (e.g. `confect/tables/notes.ts`). The basename becomes the table name; you no longer pass it as an argument.
   3. Convert each table file to a **default-export-only** unnamed module: drop the name argument from `Table.make`, wrap the field-schema struct in a `() => ...` callback, and switch any `GenericId.GenericId("users")` references to `Id("users")` imported from `../_generated/id`:
@@ -235,7 +250,7 @@
 
   export class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
     "NoteNotFound",
-    { noteId: GenericId.GenericId("notes") },
+    { noteId: GenericId.GenericId("notes") }
   ) {}
 
   export const notes = GroupSpec.make("notes").addFunction(
@@ -244,7 +259,7 @@
       args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
       returns: Notes.Doc,
       error: NoteNotFound,
-    }),
+    })
   );
   ```
 
@@ -264,7 +279,7 @@
         .table("notes")
         .get(noteId)
         .pipe(Effect.mapError(() => new NoteNotFound({ noteId })));
-    }),
+    })
   );
   ```
 
@@ -336,6 +351,7 @@
   Unspecified failures continue to reject the promise.
 
   ### Migration
+
   - For each `useQuery` call site, replace `result === undefined` checks and direct property access with `QueryResult.match` (or the lower-level `QueryResult.isLoading`/`isSuccess`/`isFailure` predicates).
   - For each `useMutation`/`useAction` call site whose ref now declares an `error` schema, unwrap the resolved `Either` (e.g. with `Either.match`); call sites against refs without an `error` schema need no change.
 
