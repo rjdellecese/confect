@@ -1,5 +1,6 @@
-import fs from "node:fs";
-import path from "node:path";
+import { FileSystem, Path } from "@effect/platform";
+import { NodeContext } from "@effect/platform-node";
+import * as Effect from "effect/Effect";
 import { configDefaults, defineConfig } from "vitest/config";
 
 // Tests import the public package specifiers (`@confect/core/Ref`, …); alias
@@ -9,35 +10,45 @@ import { configDefaults, defineConfig } from "vitest/config";
 // can't go stale as packages are added or removed. A `src/index.ts` is what
 // marks a directory as an aliasable package; its specifier comes from the
 // package's own `name`.
-const packagesDir = path.resolve(import.meta.dirname, "packages");
+const discoverPackageAliases = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
 
-const packageAliases = fs
-  .readdirSync(packagesDir, { withFileTypes: true })
-  .filter(
-    (entry) =>
-      entry.isDirectory() &&
-      fs.existsSync(path.join(packagesDir, entry.name, "src/index.ts")),
-  )
-  .flatMap((entry) => {
-    const srcDir = path.join(packagesDir, entry.name, "src");
-    const { name } = JSON.parse(
-      fs.readFileSync(
-        path.join(packagesDir, entry.name, "package.json"),
-        "utf8",
-      ),
-    ) as { name: string };
+  const packagesDir = path.resolve(import.meta.dirname, "packages");
 
-    return [
-      {
-        find: new RegExp(`^${name}$`),
-        replacement: path.join(srcDir, "index.ts"),
-      },
-      {
-        find: new RegExp(`^${name}/(.*)$`),
-        replacement: path.join(srcDir, "$1"),
-      },
-    ];
-  });
+  return yield* Effect.forEach(yield* fs.readDirectory(packagesDir), (entry) =>
+    Effect.gen(function* () {
+      const srcDir = path.join(packagesDir, entry, "src");
+
+      if (!(yield* fs.exists(path.join(srcDir, "index.ts")))) {
+        return [];
+      }
+
+      const manifest = yield* fs.readFileString(
+        path.join(packagesDir, entry, "package.json"),
+      );
+      const { name } = yield* Effect.try(
+        () => JSON.parse(manifest) as { name: string },
+      );
+
+      return [
+        {
+          find: new RegExp(`^${name}$`),
+          replacement: path.join(srcDir, "index.ts"),
+        },
+        {
+          find: new RegExp(`^${name}/(.*)$`),
+          replacement: path.join(srcDir, "$1"),
+        },
+      ];
+    }),
+  ).pipe(Effect.map((aliases) => aliases.flat()));
+});
+
+const packageAliases = await discoverPackageAliases.pipe(
+  Effect.provide(NodeContext.layer),
+  Effect.runPromise,
+);
 
 export default defineConfig({
   resolve: {
