@@ -36,10 +36,6 @@
     "node": ">=22"
   },
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -47,8 +43,7 @@
     "LICENSE",
     "README.md",
     "dist",
-    "package.json",
-    "src"
+    "package.json"
   ],
   "homepage": "https://confect.dev",
   "keywords": [
@@ -57,8 +52,6 @@
     "effect"
   ],
   "license": "ISC",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
   "peerDependencies": {
     "@confect/core": "workspace:^",
     "@confect/server": "workspace:^",
@@ -74,9 +67,7 @@
     "postpack": "rm ./README.md && ln -s ../../README.md ./README.md",
     "prepack": "rm -f ./README.md && cp ../../README.md ./README.md",
     "test": "vitest run",
-    "typecheck": "tsc -b tsconfig.src.json"
+    "typecheck": "tsc --noEmit --project tsconfig.json"
   },
-  "sideEffects": false,
-  "type": "module",
-  "types": "./dist/index.d.ts"
+  "type": "module"
 }

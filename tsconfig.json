@@ -29,5 +29,14 @@
       "~/*": ["./packages/server/test/mock-backend/fixtures/confect/*"]
     }
   },
-  "include": ["*.ts", "packages/*/*.ts", "packages/*/test/**/*"]
+  // `packages/cli/src` is included explicitly: `@confect/cli` ships only a
+  // binary, so it has no composite `tsconfig.src.json` in the
+  // `tsconfig.packages.json` graph, and this project is what typechecks its
+  // sources (not all of which are reachable from its tests).
+  "include": [
+    "*.ts",
+    "packages/*/*.ts",
+    "packages/*/test/**/*",
+    "packages/cli/src/**/*"
+  ]
 }
