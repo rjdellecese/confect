@@ -64,7 +64,7 @@
             ],
             "patterns": [
               {
-                "regex": "^@effect/(?!vitest)[^/]+$",
+                "group": ["@effect/*", "!@effect/vitest"],
                 "message": "Import @effect/* modules from their submodule path so they tree-shake, e.g. `import * as Path from \"@effect/platform/Path\"`.",
                 "allowTypeImports": true
               }
