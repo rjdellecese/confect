@@ -5,7 +5,6 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { configDefaults, defineConfig } from "vitest/config";
 
-// The fields of each package's `package.json` that drive alias discovery.
 const PackageManifest = Schema.parseJson(
   Schema.Struct({ name: Schema.String }),
 );
