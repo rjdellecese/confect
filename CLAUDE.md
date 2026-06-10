@@ -18,7 +18,7 @@ Confect is a library that integrates Effect with the Convex backend platform. It
 
 ## Build System
 
-Packages are built with tsdown (JavaScript output) plus TypeScript project references: each package has a composite `tsconfig.src.json`, and `tsc -b` typechecks the graph in dependency order and emits the `.d.ts` declarations (tsdown is configured with `dts: false`). Build, lint, and format run through Vite+ (`vp`), which provides dependency-ordered, cached task running over the pnpm workspace. Tests run through Vitest directly (`vitest run`), and typecheck runs via `tsc -b`.
+Packages are built with tsdown (JavaScript output) plus TypeScript project references: each package has a composite `tsconfig.src.json`, and `tsc -b` typechecks the graph in dependency order and emits the `.d.ts` declarations (tsdown is configured with `dts: false`).
 
 **Critical: packages must be rebuilt with `pnpm build` after source changes for those changes to be reflected outside their package directory.** Consumers import from `dist/`, not `src/`. During development, use `pnpm dev` to run tsdown in watch mode across all packages so rebuilds happen automatically.
 
