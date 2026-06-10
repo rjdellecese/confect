@@ -1,7 +1,14 @@
 import { FileSystem, Path } from "@effect/platform";
 import { NodeContext } from "@effect/platform-node";
+import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 import { configDefaults, defineConfig } from "vitest/config";
+
+// The fields of each package's `package.json` that drive alias discovery.
+const PackageManifest = Schema.parseJson(
+  Schema.Struct({ name: Schema.String }),
+);
 
 // Tests import the public package specifiers (`@confect/core/Ref`, …); alias
 // them to source so tests exercise `src/` directly instead of built `dist/`.
@@ -24,11 +31,8 @@ const discoverPackageAliases = Effect.gen(function* () {
         return [];
       }
 
-      const manifest = yield* fs.readFileString(
-        path.join(packagesDir, entry, "package.json"),
-      );
-      const { name } = yield* Effect.try(
-        () => JSON.parse(manifest) as { name: string },
+      const { name } = yield* Schema.decode(PackageManifest)(
+        yield* fs.readFileString(path.join(packagesDir, entry, "package.json")),
       );
 
       return [
@@ -42,7 +46,7 @@ const discoverPackageAliases = Effect.gen(function* () {
         },
       ];
     }),
-  ).pipe(Effect.map((aliases) => aliases.flat()));
+  ).pipe(Effect.map(Array.flatten));
 });
 
 const packageAliases = await discoverPackageAliases.pipe(
