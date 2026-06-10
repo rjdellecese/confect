@@ -6,7 +6,6 @@
     { "path": "packages/server/tsconfig.src.json" },
     { "path": "packages/js/tsconfig.src.json" },
     { "path": "packages/react/tsconfig.src.json" },
-    { "path": "packages/cli/tsconfig.src.json" },
     { "path": "packages/test/tsconfig.src.json" }
   ]
 }
