@@ -3,8 +3,8 @@ import * as Cron from "effect/Cron";
 import * as Duration from "effect/Duration";
 import * as Schema from "effect/Schema";
 import { describe, expect, test } from "vitest";
-import * as CronJob from "../src/CronJob";
-import * as CronJobs from "../src/CronJobs";
+import * as CronJob from "@confect/server/CronJob";
+import * as CronJobs from "@confect/server/CronJobs";
 
 const makeMutationRef = (functionNamespace: string, name: string) =>
   Ref.make(

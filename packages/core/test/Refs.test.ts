@@ -1,12 +1,12 @@
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import type { RegisteredMutation, RegisteredQuery } from "convex/server";
 import * as Schema from "effect/Schema";
-import * as FunctionSpec from "../src/FunctionSpec";
-import * as GroupSpec from "../src/GroupSpec";
-import * as Ref from "../src/Ref";
-import * as Refs from "../src/Refs";
-import type * as RuntimeAndFunctionType from "../src/RuntimeAndFunctionType";
-import * as Spec from "../src/Spec";
+import * as FunctionSpec from "@confect/core/FunctionSpec";
+import * as GroupSpec from "@confect/core/GroupSpec";
+import * as Ref from "@confect/core/Ref";
+import * as Refs from "@confect/core/Refs";
+import type * as RuntimeAndFunctionType from "@confect/core/RuntimeAndFunctionType";
+import * as Spec from "@confect/core/Spec";
 
 describe("make", () => {
   it("turns a spec into refs", () => {

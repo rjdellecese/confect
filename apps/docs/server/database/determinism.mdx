@@ -35,10 +35,7 @@ import { DatabaseReader } from "./confect/_generated/services";
 
 Effect.gen(function* () {
   const reader = yield* DatabaseReader;
-  const rows = yield* reader
-    .table("notes")
-    .index("by_creation_time")
-    .collect();
+  const rows = yield* reader.table("notes").index("by_creation_time").collect();
   const fetchedAt = yield* Clock.currentTimeMillis;
 
   return { fetchedAt, rows };

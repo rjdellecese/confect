@@ -1,7 +1,7 @@
 import type { UserIdentity as ConvexUserIdentity } from "convex/server";
 import * as Schema from "effect/Schema";
 import { expectTypeOf, test } from "vitest";
-import * as UserIdentity from "../src/UserIdentity";
+import * as UserIdentity from "@confect/core/UserIdentity";
 
 test("UserIdentity's encoded type extends Convex type", () => {
   const _userIdentity = UserIdentity.UserIdentity({

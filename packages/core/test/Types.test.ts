@@ -1,7 +1,7 @@
 import type { Brand } from "effect";
 import type { ReadonlyRecord } from "effect/Record";
 import { describe, expectTypeOf, test } from "vitest";
-import type { GenericId } from "../src/GenericId";
+import type { GenericId } from "@confect/core/GenericId";
 
 import type {
   DeepMutable,
@@ -12,7 +12,7 @@ import type {
   IsUnion,
   IsValueLiteral,
   UnionToTuple,
-} from "../src/Types";
+} from "@confect/core/Types";
 
 describe("IsOptional", () => {
   test("{ foo?: any } = true", () => {

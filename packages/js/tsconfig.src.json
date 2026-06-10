@@ -1,0 +1,26 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "emitDeclarationOnly": true,
+    "declaration": true,
+    "declarationMap": true,
+    "tsBuildInfoFile": "dist/tsconfig.src.tsbuildinfo",
+    "isolatedDeclarations": false,
+    "skipLibCheck": true,
+    "importsNotUsedAsValues": "remove",
+    "exactOptionalPropertyTypes": true,
+    "lib": ["ESNext", "DOM"],
+    "target": "ESNext",
+    "moduleResolution": "Bundler",
+    "module": "ESNext"
+  },
+  "include": ["src"],
+  "references": [
+    {
+      "path": "../core/tsconfig.src.json"
+    }
+  ]
+}

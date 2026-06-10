@@ -19,7 +19,7 @@ import {
   UnsupportedPropertySignatureKeyTypeError,
   UnsupportedSchemaTypeError,
   type ValueToValidator,
-} from "../src/SchemaToValidator";
+} from "@confect/server/SchemaToValidator";
 
 describe(compileAst, () => {
   describe("allowed", () => {
@@ -457,6 +457,7 @@ describe(compileAst, () => {
 
     effect("unsupported declaration", () =>
       Effect.gen(function* () {
+        // oxlint-disable-next-line typescript/no-extraneous-class
         class Klass {}
 
         const schema = Schema.instanceOf(Klass);

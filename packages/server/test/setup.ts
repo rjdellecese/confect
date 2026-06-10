@@ -71,7 +71,7 @@ export const setupForFixture =
         if (!(yield* fs.exists(cliEntry))) {
           return yield* Effect.dieMessage(
             `@confect/cli's build output is missing at ${cliEntry}. ` +
-              `Run \`pnpm build\` from the repo root (or \`pnpm dev:packages:cli\` ` +
+              `Run \`pnpm build\` from the repo root (or \`vp run --filter @confect/cli dev\` ` +
               `for a watcher) before running this test suite.`,
           );
         }

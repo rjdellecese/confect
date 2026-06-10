@@ -10,7 +10,7 @@ import * as MutableRef from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import { beforeEach, vi } from "vitest";
-import * as WebSocketClient from "../src/WebSocketClient";
+import * as WebSocketClient from "@confect/js/WebSocketClient";
 
 const mockQuery = vi.fn().mockResolvedValue({});
 const mockMutation = vi.fn().mockResolvedValue({});

@@ -5,7 +5,7 @@ import * as Effect from "effect/Effect";
 import * as Either from "effect/Either";
 import * as Schema from "effect/Schema";
 import { beforeEach, vi } from "vitest";
-import * as HttpClient from "../src/HttpClient";
+import * as HttpClient from "@confect/js/HttpClient";
 
 const mockQuery = vi.fn().mockResolvedValue({});
 const mockMutation = vi.fn().mockResolvedValue({});

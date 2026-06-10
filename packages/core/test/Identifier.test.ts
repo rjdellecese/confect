@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import * as Identifier from "../src/Identifier";
+import * as Identifier from "@confect/core/Identifier";
 
 describe("validateConfectFunctionIdentifier", () => {
   it.each([

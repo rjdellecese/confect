@@ -9,13 +9,13 @@ import * as Either from "effect/Either";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import { validateNoParentChildNameCollisions } from "../src/confect/codegen";
-import { ConfectDirectory } from "../src/ConfectDirectory";
-import type { LeafModule } from "../src/LeafModule";
+import { validateNoParentChildNameCollisions } from "@confect/cli/confect/codegen";
+import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
+import type { LeafModule } from "@confect/cli/LeafModule";
 import {
   discover as discoverTables,
   validate as validateTables,
-} from "../src/TableModule";
+} from "@confect/cli/TableModule";
 
 const fixtureConfect = `${import.meta.dirname}/../../server/test/mock-backend/fixtures/confect`;
 

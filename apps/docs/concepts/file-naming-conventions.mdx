@@ -55,18 +55,17 @@ export default GroupImpl.make(databaseSchema, notes).pipe(
 Run `confect codegen` after adding or changing specs and impls.
 
 <Note>
-  A file's path within `confect/` determines the public Convex API
-  path it produces—`confect/notes_and_random/notes.spec.ts` becomes
-  `internal.notes_and_random.notes.list`. Renaming a file or directory
-  renames the API path, so treat these paths as part of your API's
-  contract.
+  A file's path within `confect/` determines the public Convex API path it
+  produces—`confect/notes_and_random/notes.spec.ts` becomes
+  `internal.notes_and_random.notes.list`. Renaming a file or directory renames
+  the API path, so treat these paths as part of your API's contract.
 </Note>
 
 <Warning>
-  Some test runners (such as Vitest and Jest) treat `.spec.ts` files
-  as test files by default. If your test runner is picking up Confect
-  spec files, configure it to exclude them. For example, in Vitest you
-  can add `"**/*.spec.ts"` to the `test.exclude` array in your config.
+  Some test runners (such as Vitest and Jest) treat `.spec.ts` files as test
+  files by default. If your test runner is picking up Confect spec files,
+  configure it to exclude them. For example, in Vitest you can add
+  `"**/*.spec.ts"` to the `test.exclude` array in your config.
 </Warning>
 
 ## Native Convex functions

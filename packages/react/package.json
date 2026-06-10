@@ -8,21 +8,17 @@
   },
   "devDependencies": {
     "@effect/vitest": "0.29.0",
-    "@eslint/js": "10.0.1",
     "@testing-library/react": "16.3.2",
     "@types/node": "25.3.3",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "convex": "1.39.1",
     "effect": "3.21.2",
-    "eslint": "10.0.2",
     "happy-dom": "15.11.7",
-    "prettier": "3.8.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "tsdown": "0.20.3",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.56.1",
     "vite": "7.3.1",
     "vitest": "3.2.4"
   },
@@ -68,15 +64,11 @@
     "url": "https://github.com/rjdellecese/confect.git"
   },
   "scripts": {
-    "build": "tsdown --config-loader unrun",
     "clean": "rm -rf dist coverage node_modules",
-    "dev": "tsdown --watch",
-    "fix": "prettier --write . && eslint --fix . --max-warnings=0",
-    "format": "prettier --check .",
-    "lint": "eslint . --max-warnings=0",
+    "dev": "tsdown --watch --config-loader unrun",
     "postpack": "rm ./README.md && ln -s ../../README.md ./README.md",
     "prepack": "rm -f ./README.md && cp ../../README.md ./README.md",
-    "typecheck": "tsc --noEmit --project tsconfig.json"
+    "typecheck": "tsc -b tsconfig.src.json"
   },
   "sideEffects": false,
   "type": "module",

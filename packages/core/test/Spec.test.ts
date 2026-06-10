@@ -1,10 +1,10 @@
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Schema from "effect/Schema";
-import * as FunctionSpec from "../src/FunctionSpec";
-import * as GroupSpec from "../src/GroupSpec";
-import type * as RefMod from "../src/Ref";
-import * as Refs from "../src/Refs";
-import * as Spec from "../src/Spec";
+import * as FunctionSpec from "@confect/core/FunctionSpec";
+import * as GroupSpec from "@confect/core/GroupSpec";
+import type * as RefMod from "@confect/core/Ref";
+import * as Refs from "@confect/core/Refs";
+import * as Spec from "@confect/core/Spec";
 
 describe("isSpec", () => {
   it("checks whether a value is a spec", () => {

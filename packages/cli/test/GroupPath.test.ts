@@ -2,7 +2,7 @@ import { GroupSpec, Spec } from "@confect/core";
 import { describe, expect, test } from "@effect/vitest";
 import * as Option from "effect/Option";
 
-import * as GroupPath from "../src/GroupPath";
+import * as GroupPath from "@confect/cli/GroupPath";
 
 describe("GroupPath.getGroupSpec", () => {
   const makeGroupPathObj = (pathSegments: readonly [string, ...string[]]) =>

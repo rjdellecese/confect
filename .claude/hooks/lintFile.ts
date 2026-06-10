@@ -1,6 +1,14 @@
-import { Command, Path } from "@effect/platform";
-import { BunContext, BunRuntime, BunStream } from "@effect/platform-bun";
-import { Cause, Console, Effect, Schema, Stream, String } from "effect";
+import * as Command from "@effect/platform/Command";
+import * as Path from "@effect/platform/Path";
+import * as BunContext from "@effect/platform-bun/BunContext";
+import * as BunRuntime from "@effect/platform-bun/BunRuntime";
+import * as BunStream from "@effect/platform-bun/BunStream";
+import * as Cause from "effect/Cause";
+import * as Console from "effect/Console";
+import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
+import * as String from "effect/String";
 
 /**
  * @see https://docs.claude.com/en/docs/claude-code/hooks
@@ -14,9 +22,9 @@ const PostToolUseInput = Schema.parseJson(
 );
 
 /**
- * File extensions that ESLint supports in this project
+ * File extensions that Oxlint lints in this project
  *
- * @see eslint.config.mjs
+ * @see .oxlintrc.json
  */
 const SUPPORTED_EXTENSIONS = new Set([
   // JavaScript
@@ -29,9 +37,6 @@ const SUPPORTED_EXTENSIONS = new Set([
   ".tsx",
   ".mts",
   ".cts",
-  // Markdown/MDX (apps/docs)
-  ".md",
-  ".mdx",
 ]);
 
 const isSupportedFileType = (filePath: string) =>
@@ -52,24 +57,13 @@ const program = Effect.gen(function* () {
   const filePath = input.tool_input.file_path;
 
   if ((yield* isSupportedFileType(filePath)) === true) {
-    const command = Command.make(
-      "pnpm",
-      "eslint",
-      "--fix",
-      "--cache",
-      "--cache-strategy",
-      "content",
-      filePath,
-    ).pipe(Command.stderr("inherit"));
+    const command = Command.make("pnpm", "oxlint", "--fix", filePath).pipe(
+      Command.stderr("inherit"),
+    );
 
-    const exitCode = yield* Command.exitCode(command);
-
-    // https://eslint.org/docs/latest/use/command-line-interface#exit-codes
-    if (exitCode === 2) {
-      return yield* Effect.dieMessage(
-        "ESLint encountered a configuration problem or internal error",
-      );
-    }
+    // Oxlint exits non-zero when lint problems remain after fixing; that is not
+    // a hook failure (the edit still succeeds), so we only surface its stderr.
+    yield* Command.exitCode(command);
 
     yield* Console.log("{}");
   }

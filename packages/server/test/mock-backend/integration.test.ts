@@ -176,10 +176,10 @@ describe("paginate", () => {
       assertEquals(result.page.length, 3);
       assertEquals(result.isDone, true);
 
-      const texts = result.page.map((n) => n.text);
-      assertEquals(texts.includes("a"), true);
-      assertEquals(texts.includes("c"), true);
-      assertEquals(texts.includes("e"), true);
+      const texts = new Set(result.page.map((n) => n.text));
+      assertEquals(texts.has("a"), true);
+      assertEquals(texts.has("c"), true);
+      assertEquals(texts.has("e"), true);
     }).pipe(Effect.provide(TestConfect.layer())),
   );
 

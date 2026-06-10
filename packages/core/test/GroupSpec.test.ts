@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import * as GroupSpec from "../src/GroupSpec";
+import * as GroupSpec from "@confect/core/GroupSpec";
 
 describe("isGroupSpec", () => {
   it("checks whether a value is a function spec", () => {

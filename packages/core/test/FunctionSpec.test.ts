@@ -1,8 +1,8 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as MutableRef from "effect/MutableRef";
 import * as Schema from "effect/Schema";
-import * as FunctionSpec from "../src/FunctionSpec";
-import * as Ref from "../src/Ref";
+import * as FunctionSpec from "@confect/core/FunctionSpec";
+import * as Ref from "@confect/core/Ref";
 
 describe("isFunctionSpec", () => {
   it("checks whether a value is a function spec", () => {

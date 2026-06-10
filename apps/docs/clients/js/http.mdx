@@ -14,9 +14,7 @@ Create the `HttpClient` layer by passing your Convex deployment URL.
 import { HttpClient } from "@confect/js";
 import { Effect } from "effect";
 
-const HttpClientLive = HttpClient.layer(
-  "https://example-123.convex.cloud",
-);
+const HttpClientLive = HttpClient.layer("https://example-123.convex.cloud");
 ```
 
 The layer can then be provided to any Effect that uses the `HttpClient` service.
@@ -98,9 +96,7 @@ Provide the `HttpClient` layer when running your program.
 import { HttpClient } from "@confect/js";
 import { Console, Effect } from "effect";
 
-const HttpClientLive = HttpClient.layer(
-  "https://example-123.convex.cloud",
-);
+const HttpClientLive = HttpClient.layer("https://example-123.convex.cloud");
 
 const program = Effect.gen(function* () {
   const client = yield* HttpClient.HttpClient;
@@ -114,9 +110,9 @@ Effect.runPromise(program.pipe(Effect.provide(HttpClientLive)));
 
 ## Differences from `ConvexHttpClient`
 
-| `ConvexHttpClient` | `HttpClient` |
-| --- | --- |
-| Functions referenced via `api.module.fn` | Functions referenced via `refs` |
-| Args passed directly to Convex as-is | Args are schema-encoded from `Type` to `Encoded` before sending |
-| Return values received directly as-is | Return values are schema-decoded from `Encoded` to `Type` |
-| Methods return `Promise` | Methods return `Effect` with typed errors |
+| `ConvexHttpClient`                       | `HttpClient`                                                    |
+| ---------------------------------------- | --------------------------------------------------------------- |
+| Functions referenced via `api.module.fn` | Functions referenced via `refs`                                 |
+| Args passed directly to Convex as-is     | Args are schema-encoded from `Type` to `Encoded` before sending |
+| Return values received directly as-is    | Return values are schema-decoded from `Encoded` to `Type`       |
+| Methods return `Promise`                 | Methods return `Effect` with typed errors                       |

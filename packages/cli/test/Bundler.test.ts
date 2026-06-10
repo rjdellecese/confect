@@ -6,7 +6,7 @@ import * as NodePath from "@effect/platform-node/NodePath";
 import { expect, layer } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Bundler from "../src/Bundler";
+import * as Bundler from "@confect/cli/Bundler";
 
 const BundlerLayer = Layer.mergeAll(NodePath.layer, NodeFileSystem.layer);
 

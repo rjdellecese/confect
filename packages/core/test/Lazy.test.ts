@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import * as Lazy from "../src/Lazy";
+import * as Lazy from "@confect/core/Lazy";
 
 describe("Lazy.defineProperty", () => {
   test("does not run compute until the property is first accessed", () => {
