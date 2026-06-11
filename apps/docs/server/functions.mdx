@@ -25,7 +25,7 @@ Each function spec defines the function's name, arguments schema, and returns sc
 
 ```ts confect/notes.spec.ts
 import { GroupSpec, FunctionSpec } from "@confect/core";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
 import notes from "./_generated/tables/notes";
 
@@ -46,7 +46,7 @@ A spec can also declare an optional `error` schema. When it does, the correspond
 
 ```ts
 import { FunctionSpec } from "@confect/core";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
 import { Id } from "./_generated/id";
 import notes from "./_generated/tables/notes";
@@ -71,7 +71,8 @@ The handler receives the decoded arguments as its first parameter and returns an
 
 ```ts confect/notes.impl.ts
 import { FunctionImpl, GroupImpl } from "@confect/server";
-import { Effect, Layer } from "effect";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 
 import databaseSchema from "./_generated/schema";
 import { DatabaseReader } from "./_generated/services";

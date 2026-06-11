@@ -10,7 +10,7 @@ Each table is defined with `Table.make`, which takes a callback returning the ta
 
 ```ts confect/tables/notes.ts
 import { Table } from "@confect/server";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import { Id } from "../_generated/id";
 
 export default Table.make(() =>
@@ -42,7 +42,7 @@ export default Table.make(() =>
 
 ```ts confect/tables/users.ts
 import { Table } from "@confect/server";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
 export default Table.make(() =>
   Schema.Struct({

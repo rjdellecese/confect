@@ -12,7 +12,7 @@ Create the `HttpClient` layer by passing your Convex deployment URL.
 
 ```ts
 import { HttpClient } from "@confect/js";
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 
 const HttpClientLive = HttpClient.layer("https://example-123.convex.cloud");
 ```
@@ -25,7 +25,7 @@ Use the `HttpClient` service inside `Effect.gen` to call your functions with ref
 
 ```ts
 import { HttpClient } from "@confect/js";
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 
 import refs from "./confect/_generated/refs";
 
@@ -50,7 +50,7 @@ When a ref's spec declares an `error` schema, the decoded error is added to the 
 
 ```ts
 import { HttpClient } from "@confect/js";
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 
 import refs from "./confect/_generated/refs";
 
@@ -94,7 +94,8 @@ Provide the `HttpClient` layer when running your program.
 
 ```ts
 import { HttpClient } from "@confect/js";
-import { Console, Effect } from "effect";
+import * as Console from "effect/Console";
+import * as Effect from "effect/Effect";
 
 const HttpClientLive = HttpClient.layer("https://example-123.convex.cloud");
 

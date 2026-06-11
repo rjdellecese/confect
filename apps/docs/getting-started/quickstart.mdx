@@ -44,7 +44,7 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
 
     ```ts confect/tables/notes.ts
     import { Table } from "@confect/server";
-    import { Schema } from "effect";
+    import * as Schema from "effect/Schema";
 
     export default Table.make(() =>
       Schema.Struct({
@@ -62,7 +62,7 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
 
     ```ts confect/notes.spec.ts
     import { FunctionSpec, GroupSpec } from "@confect/core";
-    import { Schema } from "effect";
+    import * as Schema from "effect/Schema";
 
     import { Id } from "./_generated/id";
     import notes from "./_generated/tables/notes";
@@ -100,7 +100,8 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
 
     ```ts confect/notes.impl.ts
     import { FunctionImpl, GroupImpl } from "@confect/server";
-    import { Effect, Layer } from "effect";
+    import * as Effect from "effect/Effect";
+    import * as Layer from "effect/Layer";
 
     import databaseSchema from "./_generated/schema";
     import { DatabaseReader, DatabaseWriter } from "./_generated/services";
@@ -179,7 +180,7 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
 
     ```tsx src/App.tsx
     import { QueryResult, useMutation, useQuery } from "@confect/react";
-    import { Array } from "effect";
+    import * as Array from "effect/Array";
     import { useState } from "react";
 
     import refs from "../confect/_generated/refs";

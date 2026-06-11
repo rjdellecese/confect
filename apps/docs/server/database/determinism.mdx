@@ -30,7 +30,8 @@ The following do **not** observe real time from within a query handler and so do
 Use Effect's `Clock` service when you need the real timestamp:
 
 ```ts
-import { Clock, Effect } from "effect";
+import * as Clock from "effect/Clock";
+import * as Effect from "effect/Effect";
 import { DatabaseReader } from "./confect/_generated/services";
 
 Effect.gen(function* () {

@@ -12,7 +12,7 @@ A node spec uses `GroupSpec.makeNode()` and one of `FunctionSpec.publicNodeActio
 
 ```ts confect/email.spec.ts
 import { FunctionSpec, GroupSpec } from "@confect/core";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
 export default GroupSpec.makeNode().addFunction(
   FunctionSpec.publicNodeAction({
@@ -35,7 +35,10 @@ A node impl default-imports its sibling spec and passes the database schema from
 ```ts confect/email.impl.ts
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Command } from "@effect/platform";
-import { Console, Duration, Effect, Layer } from "effect";
+import * as Console from "effect/Console";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import databaseSchema from "./_generated/schema";
 import email from "./email.spec";
 

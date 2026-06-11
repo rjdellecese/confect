@@ -58,7 +58,7 @@ Use `@effect/vitest`'s `it.effect` to write effectful tests. Yield `TestConfect`
 ```ts test/notes.test.ts
 import { describe, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 
 import refs from "./confect/_generated/refs";
 import * as TestConfect from "./TestConfect";
@@ -107,7 +107,7 @@ When a ref's spec declares an `error` schema, the decoded error is added to the 
 import { describe, it } from "@effect/vitest";
 import { assertLeft } from "@effect/vitest/utils";
 import type { GenericId } from "convex/values";
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 
 import { NoteNotFound } from "./confect/notes.spec";
 import refs from "./confect/_generated/refs";

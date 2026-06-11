@@ -9,7 +9,7 @@ description: "Query vector indexes for semantic similarity search."
 The `VectorSearch` service queries vector indexes defined in your [schema](/server/database/schema). It is only available in actions.
 
 ```ts
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 import { VectorSearch } from "./confect/_generated/services";
 
 Effect.gen(function* () {

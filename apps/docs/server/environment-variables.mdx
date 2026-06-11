@@ -12,7 +12,8 @@ Use `Config` from Effect to read [Convex environment variables](https://docs.con
 
 ```ts confect/settings.impl.ts
 import { FunctionImpl } from "@confect/server";
-import { Config, Effect } from "effect";
+import * as Config from "effect/Config";
+import * as Effect from "effect/Effect";
 
 import databaseSchema from "./_generated/schema";
 import settings from "./settings.spec";
