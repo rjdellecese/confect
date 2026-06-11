@@ -11,7 +11,6 @@
   ### Filesystem-driven groups
 
   Your API is now authored as colocated `*.spec.ts`/`*.impl.ts` pairs, one pair per group, and **the file's path within `confect/` is the group's name** (its stem for top-level groups, the dot-joined directory path for nested groups). `GroupSpec.make()` and `GroupSpec.makeNode()` no longer take a name argument.
-
   - Each `*.spec.ts` `export default`s its `GroupSpec` (named co-exports like error classes are still allowed).
   - Each `*.impl.ts` default-imports its sibling spec, passes it to `FunctionImpl.make` / `GroupImpl.make`, and ends the layer pipeline with `GroupImpl.finalize`—a compile-time completeness check that only typechecks once every function the spec declares has a `FunctionImpl` provided.
   - The root `confect/spec.ts`, `confect/impl.ts`, `confect/nodeSpec.ts`, and `confect/nodeImpl.ts` files are gone, along with `Impl.make` and `Impl.finalize`. `confect codegen` deletes any of these (and the stale aggregate `_generated/registeredFunctions.ts` / `_generated/nodeRegisteredFunctions.ts`) on upgrade.
@@ -31,12 +30,11 @@
     Schema.Struct({
       userId: Schema.optional(Id("users")),
       text: Schema.String,
-    })
+    }),
   );
   ```
 
   Codegen emits, alongside it:
-
   - `_generated/schema.ts`—the runtime `DatabaseSchema`. Never imports `convex/server`, so a runtime cold start no longer evaluates `defineSchema(...)`.
   - `_generated/convexSchema.ts`—the Convex deploy `SchemaDefinition`, re-exported from `convex/schema.ts`.
   - `_generated/id.ts`—a type-safe `Id` constructor whose argument is constrained to your table names. Use `Id("notes")` everywhere you previously wrote `GenericId.GenericId("notes")`; cross-table `_id` typos are now caught at compile time.
@@ -56,7 +54,7 @@
       name: "list",
       args: Schema.Struct({}),
       returns: Schema.Array(Notes.Doc),
-    })
+    }),
   );
   ```
 
@@ -75,7 +73,7 @@
       name: "list",
       args: () => Schema.Struct({}),
       returns: () => Schema.Array(notes.Doc),
-    })
+    }),
   );
   ```
 
@@ -86,14 +84,13 @@
   const list = FunctionImpl.make(databaseSchema, notes, "list", handler);
   export default GroupImpl.make(databaseSchema, notes).pipe(
     Layer.provide(list),
-    GroupImpl.finalize
+    GroupImpl.finalize,
   );
   ```
 
   ### Node functions are first-class
 
   A group's runtime is now declared solely by its spec—`GroupSpec.makeNode()` for a Node action group, `GroupSpec.make()` otherwise—mirroring vanilla Convex's per-file `"use node"` directive. The separate `node` namespace is gone: Node specs/impls are ordinary colocated pairs that can live anywhere in `confect/`, and codegen emits the `"use node"` directive based on the spec.
-
   - A Node group at `confect/email.spec.ts` is now reached at `refs.public.email.send` instead of `refs.public.node.email.send`.
   - `@confect/core` removes `Spec.makeNode`, `Spec.merge`, and `Spec.isConvexSpec` / `Spec.isNodeSpec`; `Spec.make()` is a single mixed-runtime container and `Refs.make(spec)` takes one argument. `GroupSpec.makeNode()`, `FunctionSpec.publicNodeAction()` / `internalNodeAction()` are unchanged.
 
@@ -110,7 +107,6 @@
   The codegen bundler now uses [`bundle-require`](https://github.com/egoist/bundle-require), so impls may import third-party packages and use `tsconfig.json` `paths` aliases (`~/*`, `@/*`, …) for their own source. A parent `confect/{path}.spec.ts` may now declare functions alongside a sibling `confect/{path}/` subdirectory of further specs, and codegen reports a clear error on a name collision between the two.
 
   ### Migration
-
   1. **Tables.** Delete `confect/schema.ts`. Rename each table file to a valid JS identifier (e.g. `confect/tables/notes.ts`); the basename becomes the table name. Drop the name argument from `Table.make`, wrap the field struct in `() =>`, and replace `GenericId.GenericId("x")` with `Id("x")` from `_generated/id`. If you read `table.name` off a bound table, rename it to `table.tableName`.
   2. **Specs.** Split each group into a colocated `*.spec.ts` that `export default`s `GroupSpec.make()` (no name). Wrap every `args`/`returns`/`error` in `() =>`. Import a table's `Doc`/`Fields` from its wrapper, `import notes from "./_generated/tables/notes"`.
   3. **Impls.** In each `*.impl.ts`, default-import the sibling spec, import `databaseSchema` from `_generated/schema`, pass it to `FunctionImpl.make` / `GroupImpl.make` in place of `api`, end the pipeline with `GroupImpl.finalize`, and `export default` it. Delete the root `confect/spec.ts`, `impl.ts`, `nodeSpec.ts`, and `nodeImpl.ts` (codegen will also remove them).
@@ -274,7 +270,7 @@
 
   export class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
     "NoteNotFound",
-    { noteId: GenericId.GenericId("notes") }
+    { noteId: GenericId.GenericId("notes") },
   ) {}
 
   export const notes = GroupSpec.make("notes").addFunction(
@@ -283,7 +279,7 @@
       args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
       returns: Notes.Doc,
       error: NoteNotFound,
-    })
+    }),
   );
   ```
 
@@ -303,7 +299,7 @@
         .table("notes")
         .get(noteId)
         .pipe(Effect.mapError(() => new NoteNotFound({ noteId })));
-    })
+    }),
   );
   ```
 
@@ -375,7 +371,6 @@
   Unspecified failures continue to reject the promise.
 
   ### Migration
-
   - For each `useQuery` call site, replace `result === undefined` checks and direct property access with `QueryResult.match` (or the lower-level `QueryResult.isLoading`/`isSuccess`/`isFailure` predicates).
   - For each `useMutation`/`useAction` call site whose ref now declares an `error` schema, unwrap the resolved `Either` (e.g. with `Either.match`); call sites against refs without an `error` schema need no change.
 
