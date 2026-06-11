@@ -48,7 +48,7 @@
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "peerDependencies": {
-    "convex": "1.39.1",
+    "convex": "^1.32.0",
     "effect": "^3.21.2"
   },
   "repository": {

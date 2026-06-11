@@ -67,8 +67,13 @@
     "@confect/core": "workspace:^",
     "@effect/platform": "^0.96.1",
     "@effect/platform-node": "^0.106.0",
-    "convex": "1.39.1",
+    "convex": "^1.32.0",
     "effect": "^3.21.2"
+  },
+  "peerDependenciesMeta": {
+    "@effect/platform-node": {
+      "optional": true
+    }
   },
   "repository": {
     "type": "git",
