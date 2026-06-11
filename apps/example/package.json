@@ -8,7 +8,7 @@
     "@confect/server": "workspace:*",
     "@convex-dev/workpool": "0.4.6",
     "@effect/platform": "0.96.1",
-    "convex": "1.39.1",
+    "convex": "1.40.0",
     "convex-helpers": "0.1.118",
     "effect": "3.21.2",
     "react": "19.2.4",
