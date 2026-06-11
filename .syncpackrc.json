@@ -60,6 +60,19 @@
       "dependencyTypes": ["dev"]
     },
     {
+      "label": "External dependencies shared across @confect/* packages must use the same range in prod/peer",
+      "packages": ["@confect/*"],
+      "dependencies": [
+        "convex",
+        "convex-test",
+        "effect",
+        "@effect/platform",
+        "@effect/platform-node"
+      ],
+      "dependencyTypes": ["prod", "peer"],
+      "policy": "sameRange"
+    },
+    {
       "label": "External prod/peer dependencies may use any version style",
       "dependencyTypes": ["prod", "peer"],
       "isIgnored": true

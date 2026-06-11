@@ -47,8 +47,8 @@
   "peerDependencies": {
     "@confect/core": "workspace:^",
     "@confect/server": "workspace:^",
-    "convex": "1.39.1",
-    "convex-test": "^0.0.50",
+    "convex": "^1.32.0",
+    "convex-test": ">=0.0.50 <0.1.0",
     "effect": "^3.21.2"
   },
   "repository": {
