@@ -117,26 +117,29 @@ There is no required cadence; ship as many `next.N`s as the major needs.
    git switch v9 && git pull
    pnpm changeset pre exit
    pnpm changeset version
+   pnpm format
    git add .
    git commit -m "Exit prerelease mode and version packages"
    git push
    ```
 
-   `pre exit` deletes `.changeset/pre.json`. `changeset version` then consumes every changeset accumulated during the prerelease cycle and writes the final stable versions (e.g. `9.0.0`) into each `package.json`. Pushing triggers `release.yml`; with no remaining changesets, `changesets/action` skips opening a Version Packages PR and goes straight to `pnpm release`, publishing the final stable to `latest`.
+   `pre exit` deletes `.changeset/pre.json`. `changeset version` then consumes every changeset accumulated during the prerelease cycle and writes the final stable versions (e.g. `9.0.0`) into each `package.json`. Run `pnpm format` before committing — `changeset version` writes CHANGELOG entries in its own Markdown style, which fails the Format CI job otherwise. Pushing triggers `release.yml`; with no remaining changesets, `changesets/action` skips opening a Version Packages PR and goes straight to `pnpm release`, publishing the final stable to `latest`.
 
-2. **Open a PR merging `vN` back into `main`** with the major as the title (e.g. `v9`). Use a merge commit so the prerelease history is preserved in `main`.
+2. **Open a PR merging `vN` back into `main`** with the major as the title (e.g. `v9`). Use a merge commit so the prerelease history is preserved in `main`. Merge commits are normally disallowed on this repository, so expect to temporarily allow them: enable "Allow merge commits" in the repository settings **and** disable any "Require linear history" rule on `main` (the ruleset overrides the repo-level toggle and hides the merge-commit option in the UI). Revert both after merging.
 
-3. **In a follow-up commit on `main`, clean up the branch-specific machinery.** In one commit:
+3. **In a follow-up PR against `main`, clean up the branch-specific machinery.** Direct pushes to `main` are disallowed, so branch off `main` and open a PR. In one commit:
    - Revert `.changeset/config.json` `baseBranch` back to `main`.
    - Remove `- v9` from `push.branches` and `pull_request.branches` in every workflow that referenced it (including `release.yml`).
    - `release.yml` continues to publish stable from `main` with no further changes.
 
    ```bash
    git switch main && git pull
+   git switch -c cleanup-v9-machinery
    # edit configs as above
    git add .changeset/config.json .github/workflows
    git commit -m "Update \`v9\` branch references to \`main\`"
-   git push
+   git push -u origin cleanup-v9-machinery
+   # open a PR against main and merge it once CI is green
    ```
 
 4. **Delete the release branch** once `main` has fully absorbed it.
