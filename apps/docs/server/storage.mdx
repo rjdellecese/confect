@@ -9,7 +9,7 @@ description: "Store and retrieve blobs using Convex file storage."
 The `StorageReader` service is used to retrieve the URLs of blobs in storage.
 
 ```ts
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 import { StorageReader } from "./confect/_generated/services";
 
 Effect.gen(function* () {
@@ -24,7 +24,7 @@ Effect.gen(function* () {
 The `StorageWriter` service is used to write blobs to storage in mutations.
 
 ```ts
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 import { StorageWriter } from "./confect/_generated/services";
 
 Effect.gen(function* () {
@@ -53,7 +53,7 @@ storage.delete(storageId);
 The `StorageActionWriter` service is used to read and write blobs to storage in actions.
 
 ```ts
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 import { StorageActionWriter } from "./confect/_generated/services";
 
 Effect.gen(function* () {

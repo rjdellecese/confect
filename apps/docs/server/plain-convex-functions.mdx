@@ -158,7 +158,7 @@ For plain Convex functions, the impl is the Convex function value itself. Pass e
 
 ```ts confect/workpool.impl.ts
 import { FunctionImpl, GroupImpl } from "@confect/server";
-import { Layer } from "effect";
+import * as Layer from "effect/Layer";
 import databaseSchema from "./_generated/schema";
 import { backgroundWork, enqueue, onComplete, status } from "./workpool";
 import workpool from "./workpool.spec";
@@ -217,7 +217,7 @@ A single group can contain both Confect functions (with Effect schemas) and plai
 
 ```ts confect/notes.spec.ts
 import { FunctionSpec, GroupSpec } from "@confect/core";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import type { search } from "./search";
 import notes from "./_generated/tables/notes";
 

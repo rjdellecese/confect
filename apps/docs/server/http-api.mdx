@@ -18,7 +18,9 @@ import {
   HttpApiGroup,
   OpenApi,
 } from "@effect/platform";
-import { Effect, Layer, Schema } from "effect";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 
 import refs from "../_generated/refs";
 import { QueryRunner } from "../_generated/services";
@@ -66,7 +68,7 @@ Create the Convex HTTP router in `confect/http.ts` using `HttpApi.make` from `@c
 ```ts confect/http.ts
 import { HttpApi } from "@confect/server";
 import { HttpMiddleware } from "@effect/platform";
-import { flow } from "effect";
+import { flow } from "effect/Function";
 
 import { ApiLive } from "./http/notes";
 

@@ -14,7 +14,7 @@ A complete pair looks like this. The impl default-imports its sibling spec, pass
 
 ```ts confect/notes.spec.ts
 import { GroupSpec, FunctionSpec } from "@confect/core";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
 import notes from "./_generated/tables/notes";
 
@@ -29,7 +29,8 @@ export default GroupSpec.make().addFunction(list);
 
 ```ts confect/notes.impl.ts
 import { FunctionImpl, GroupImpl } from "@confect/server";
-import { Effect, Layer } from "effect";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 
 import databaseSchema from "./_generated/schema";
 import { DatabaseReader } from "./_generated/services";
