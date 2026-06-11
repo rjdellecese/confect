@@ -1,15 +1,17 @@
-import { GenericId } from "@confect/core";
-import { describe, expect, expectTypeOf, it } from "@effect/vitest";
+import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
-import { Array, Effect, Either } from "effect";
+import * as Array from "effect/Array";
+import * as Effect from "effect/Effect";
+import * as Either from "effect/Either";
 import refs from "./fixtures/confect/_generated/refs";
 import { DatabaseWriter } from "./fixtures/confect/_generated/services";
+import { Id } from "./fixtures/confect/_generated/id";
+import type notes from "./fixtures/confect/_generated/tables/notes";
 import {
   Forbidden,
   NotFound,
 } from "./fixtures/confect/groups/typedErrors.spec";
-import { NodeNotFound } from "./fixtures/confect/node/typedErrorsNode.spec";
-import type { Notes } from "./fixtures/confect/tables/Notes";
+import { NodeNotFound } from "./fixtures/confect/typedErrorsNode.spec";
 import * as TestConfect from "./TestConfect";
 
 describe("DatabaseReader", () => {
@@ -27,7 +29,7 @@ describe("DatabaseReader", () => {
             text,
           });
         }),
-        GenericId.GenericId("notes"),
+        Id("notes"),
       );
 
       const retrievedText = yield* c
@@ -78,7 +80,7 @@ describe("MutationRunner", () => {
       const note = yield* c.query(refs.public.databaseReader.getNote, {
         noteId,
       });
-      expectTypeOf(note).toEqualTypeOf<(typeof Notes.Doc)["Type"]>();
+      expectTypeOf(note).toEqualTypeOf<(typeof notes.Doc)["Type"]>();
       assertEquals(note.text, text);
     }).pipe(Effect.provide(TestConfect.layer())),
   );
@@ -174,10 +176,10 @@ describe("paginate", () => {
       assertEquals(result.page.length, 3);
       assertEquals(result.isDone, true);
 
-      const texts = result.page.map((n) => n.text);
-      assertEquals(texts.includes("a"), true);
-      assertEquals(texts.includes("c"), true);
-      assertEquals(texts.includes("e"), true);
+      const texts = new Set(result.page.map((n) => n.text));
+      assertEquals(texts.has("a"), true);
+      assertEquals(texts.has("c"), true);
+      assertEquals(texts.has("e"), true);
     }).pipe(Effect.provide(TestConfect.layer())),
   );
 
@@ -235,8 +237,7 @@ describe("paginate", () => {
 });
 
 const expectFailure = <A, E>(either: Either.Either<A, E>): E => {
-  expect(Either.isLeft(either)).toBe(true);
-  if (!Either.isLeft(either)) throw new Error("unreachable");
+  assert(Either.isLeft(either));
   return either.left;
 };
 
@@ -252,7 +253,7 @@ const insertAndDeleteNote = Effect.gen(function* () {
       yield* writer.table("notes").delete(id);
       return id;
     }),
-    GenericId.GenericId("notes"),
+    Id("notes"),
   );
 }).pipe(Effect.orDie);
 
@@ -356,7 +357,7 @@ describe("typed errors", () => {
             const writer = yield* DatabaseWriter;
             return yield* writer.table("notes").insert({ text: "hello" });
           }),
-          GenericId.GenericId("notes"),
+          Id("notes"),
         );
 
         const result = yield* c.query(
@@ -408,7 +409,7 @@ describe("typed errors", () => {
             const writer = yield* DatabaseWriter;
             return yield* writer.table("notes").insert({ text: "to delete" });
           }),
-          GenericId.GenericId("notes"),
+          Id("notes"),
         );
 
         const result = yield* c.action(
@@ -532,7 +533,7 @@ describe("typed errors", () => {
           const c = yield* TestConfect.TestConfect;
 
           const result = yield* Effect.either(
-            c.action(refs.public.node.typedErrorsNode.failingNodeAction, {
+            c.action(refs.public.typedErrorsNode.failingNodeAction, {
               id: "abc",
             }),
           );

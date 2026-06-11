@@ -1,6 +1,6 @@
 import type { Ref } from "@confect/core";
 import type { Cron, Duration } from "effect";
-import { Predicate } from "effect";
+import * as Predicate from "effect/Predicate";
 
 export const TypeId = "@confect/server/CronJob";
 export type TypeId = typeof TypeId;

@@ -1,7 +1,10 @@
 import * as Ref from "@confect/core/Ref";
 import { ConvexHttpClient } from "convex/browser";
 import type { ParseResult } from "effect";
-import { Context, Effect, Layer, Schema } from "effect";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 
 export class HttpClientError extends Schema.TaggedError<HttpClientError>()(
   "HttpClientError",

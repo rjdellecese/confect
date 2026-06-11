@@ -7,8 +7,8 @@ import type {
 } from "convex/server";
 import type { Infer } from "convex/values";
 import { v } from "convex/values";
-import type * as Handler from "../src/Handler";
-import type schema from "./mock-backend/fixtures/confect/schema";
+import type * as Handler from "@confect/server/Handler";
+import type schema from "./mock-backend/fixtures/confect/_generated/schema";
 import {
   internalAction,
   mutation,

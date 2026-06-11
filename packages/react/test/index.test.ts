@@ -1,9 +1,19 @@
 import { FunctionSpec, Ref } from "@confect/core";
+import { renderHook } from "@testing-library/react";
 import { ConvexError } from "convex/values";
-import { Either, Schema } from "effect";
-import { beforeEach, describe, expect, expectTypeOf, test, vi } from "vitest";
-import type { InvokeReturn } from "../src/index";
-import { QueryResult, useAction, useMutation, useQuery } from "../src/index";
+import * as Either from "effect/Either";
+import * as Schema from "effect/Schema";
+import {
+  assert,
+  beforeEach,
+  describe,
+  expect,
+  expectTypeOf,
+  test,
+  vi,
+} from "vitest";
+import type { InvokeReturn } from "@confect/react";
+import { QueryResult, useAction, useMutation, useQuery } from "@confect/react";
 
 const useConvexQueryMock = vi.fn();
 const useConvexMutationMock = vi.fn();
@@ -23,9 +33,9 @@ const queryWithError = Ref.make(
   "notes",
   FunctionSpec.publicQuery({
     name: "getOrFail",
-    args: Schema.Struct({ id: Schema.String }),
-    returns: Schema.Struct({ text: Schema.String }),
-    error: NotFound,
+    args: () => Schema.Struct({ id: Schema.String }),
+    returns: () => Schema.Struct({ text: Schema.String }),
+    error: () => NotFound,
   }),
 );
 
@@ -33,8 +43,8 @@ const queryNoError = Ref.make(
   "notes",
   FunctionSpec.publicQuery({
     name: "list",
-    args: Schema.Struct({}),
-    returns: Schema.Array(Schema.Struct({ text: Schema.String })),
+    args: () => Schema.Struct({}),
+    returns: () => Schema.Array(Schema.Struct({ text: Schema.String })),
   }),
 );
 
@@ -42,9 +52,9 @@ const mutationWithError = Ref.make(
   "notes",
   FunctionSpec.publicMutation({
     name: "deleteOrFail",
-    args: Schema.Struct({ id: Schema.String }),
-    returns: Schema.Null,
-    error: NotFound,
+    args: () => Schema.Struct({ id: Schema.String }),
+    returns: () => Schema.Null,
+    error: () => NotFound,
   }),
 );
 
@@ -52,8 +62,8 @@ const mutationNoError = Ref.make(
   "notes",
   FunctionSpec.publicMutation({
     name: "insert",
-    args: Schema.Struct({ text: Schema.String }),
-    returns: Schema.String,
+    args: () => Schema.Struct({ text: Schema.String }),
+    returns: () => Schema.String,
   }),
 );
 
@@ -61,9 +71,9 @@ const actionWithError = Ref.make(
   "tasks",
   FunctionSpec.publicAction({
     name: "runOrFail",
-    args: Schema.Struct({ id: Schema.String }),
-    returns: Schema.Null,
-    error: NotFound,
+    args: () => Schema.Struct({ id: Schema.String }),
+    returns: () => Schema.Null,
+    error: () => NotFound,
   }),
 );
 
@@ -71,8 +81,8 @@ const actionNoError = Ref.make(
   "tasks",
   FunctionSpec.publicAction({
     name: "ping",
-    args: Schema.Struct({}),
-    returns: Schema.String,
+    args: () => Schema.Struct({}),
+    returns: () => Schema.String,
   }),
 );
 
@@ -86,23 +96,19 @@ describe("useQuery", () => {
   test("returns Loading when convex returns undefined", () => {
     useConvexQueryMock.mockReturnValue(undefined);
 
-    const queryResult = useQuery(queryNoError, {});
+    const { result } = renderHook(() => useQuery(queryNoError, {}));
 
-    expect(QueryResult.isLoading(queryResult)).toBe(true);
-    if (QueryResult.isLoading(queryResult)) {
-      expect(queryResult.skipped).toBe(false);
-    }
+    assert(QueryResult.isLoading(result.current));
+    expect(result.current.skipped).toBe(false);
   });
 
   test("returns Success with decoded value", () => {
     useConvexQueryMock.mockReturnValue([{ text: "hello" }]);
 
-    const queryResult = useQuery(queryNoError, {});
+    const { result } = renderHook(() => useQuery(queryNoError, {}));
 
-    expect(QueryResult.isSuccess(queryResult)).toBe(true);
-    if (QueryResult.isSuccess(queryResult)) {
-      expect(queryResult.value).toEqual([{ text: "hello" }]);
-    }
+    assert(QueryResult.isSuccess(result.current));
+    expect(result.current.value).toEqual([{ text: "hello" }]);
   });
 
   test("Failure carries decoded typed error for a matching ConvexError", () => {
@@ -110,13 +116,13 @@ describe("useQuery", () => {
       throw new ConvexError({ _tag: "NotFound", id: "abc" });
     });
 
-    const queryResult = useQuery(queryWithError, { id: "abc" });
+    const { result } = renderHook(() =>
+      useQuery(queryWithError, { id: "abc" }),
+    );
 
-    expect(QueryResult.isFailure(queryResult)).toBe(true);
-    if (QueryResult.isFailure(queryResult)) {
-      expect(queryResult.error).toBeInstanceOf(NotFound);
-      expect(queryResult.error.id).toBe("abc");
-    }
+    assert(QueryResult.isFailure(result.current));
+    expect(result.current.error).toBeInstanceOf(NotFound);
+    expect(result.current.error.id).toBe("abc");
   });
 
   test("rethrows a non-ConvexError as a defect", () => {
@@ -125,9 +131,9 @@ describe("useQuery", () => {
       throw transportError;
     });
 
-    expect(() => useQuery(queryWithError, { id: "abc" })).toThrow(
-      transportError,
-    );
+    expect(() =>
+      renderHook(() => useQuery(queryWithError, { id: "abc" })),
+    ).toThrow(transportError);
   });
 
   test("rethrows a ConvexError from a ref without an error schema", () => {
@@ -136,19 +142,19 @@ describe("useQuery", () => {
       throw convexError;
     });
 
-    expect(() => useQuery(queryNoError, {})).toThrow(convexError);
+    expect(() => renderHook(() => useQuery(queryNoError, {}))).toThrow(
+      convexError,
+    );
   });
 
   test("`skip` on a query with no args returns Loading with skipped true", () => {
     useConvexQueryMock.mockReturnValue(undefined);
 
-    const queryResult = useQuery(queryNoError, "skip");
+    const { result } = renderHook(() => useQuery(queryNoError, "skip"));
 
-    expect(QueryResult.isLoading(queryResult)).toBe(true);
-    if (QueryResult.isLoading(queryResult)) {
-      expect(queryResult.skipped).toBe(true);
-    }
-    expect(useConvexQueryMock).toHaveBeenCalledExactlyOnceWith(
+    assert(QueryResult.isLoading(result.current));
+    expect(result.current.skipped).toBe(true);
+    expect(useConvexQueryMock).toHaveBeenLastCalledWith(
       expect.anything(),
       "skip",
     );
@@ -157,16 +163,86 @@ describe("useQuery", () => {
   test("`skip` on a query with required args returns Loading with skipped true", () => {
     useConvexQueryMock.mockReturnValue(undefined);
 
-    const queryResult = useQuery(queryWithError, "skip");
+    const { result } = renderHook(() => useQuery(queryWithError, "skip"));
 
-    expect(QueryResult.isLoading(queryResult)).toBe(true);
-    if (QueryResult.isLoading(queryResult)) {
-      expect(queryResult.skipped).toBe(true);
-    }
-    expect(useConvexQueryMock).toHaveBeenCalledExactlyOnceWith(
+    assert(QueryResult.isLoading(result.current));
+    expect(result.current.skipped).toBe(true);
+    expect(useConvexQueryMock).toHaveBeenLastCalledWith(
       expect.anything(),
       "skip",
     );
+  });
+
+  test("preserves QueryResult identity across rerenders for an unchanged convex result", () => {
+    const encodedResult = [{ text: "hello" }];
+    useConvexQueryMock.mockReturnValue(encodedResult);
+
+    const { result, rerender } = renderHook(() => useQuery(queryNoError, {}));
+    const first = result.current;
+
+    rerender();
+
+    expect(result.current).toBe(first);
+  });
+
+  test("produces a new QueryResult when the convex result identity changes", () => {
+    useConvexQueryMock.mockReturnValue([{ text: "hello" }]);
+
+    const { result, rerender } = renderHook(() => useQuery(queryNoError, {}));
+    const first = result.current;
+
+    useConvexQueryMock.mockReturnValue([{ text: "hello" }]);
+    rerender();
+
+    expect(result.current).not.toBe(first);
+    assert(QueryResult.isSuccess(result.current));
+    expect(result.current.value).toEqual([{ text: "hello" }]);
+  });
+
+  test("preserves Loading identity across rerenders while convex returns undefined", () => {
+    useConvexQueryMock.mockReturnValue(undefined);
+
+    const { result, rerender } = renderHook(() => useQuery(queryNoError, {}));
+    const first = result.current;
+
+    rerender();
+
+    expect(result.current).toBe(first);
+  });
+
+  test("preserves Failure identity across rerenders for an unchanged ConvexError", () => {
+    const convexError = new ConvexError({ _tag: "NotFound", id: "abc" });
+    useConvexQueryMock.mockImplementation(() => {
+      throw convexError;
+    });
+
+    const { result, rerender } = renderHook(() =>
+      useQuery(queryWithError, { id: "abc" }),
+    );
+    const first = result.current;
+    assert(QueryResult.isFailure(first));
+
+    rerender();
+
+    expect(result.current).toBe(first);
+  });
+
+  test("produces a new Loading when `skipped` changes while convex returns undefined", () => {
+    useConvexQueryMock.mockReturnValue(undefined);
+
+    const { result, rerender } = renderHook(
+      ({ args }: { args: {} | "skip" }) => useQuery(queryNoError, args),
+      { initialProps: { args: {} as {} | "skip" } },
+    );
+    const first = result.current;
+    assert(QueryResult.isLoading(first));
+    expect(first.skipped).toBe(false);
+
+    rerender({ args: "skip" });
+
+    expect(result.current).not.toBe(first);
+    assert(QueryResult.isLoading(result.current));
+    expect(result.current.skipped).toBe(true);
   });
 });
 
@@ -184,19 +260,19 @@ describe("useMutation", () => {
     const inner = vi.fn().mockResolvedValue("note-1");
     useConvexMutationMock.mockReturnValue(inner);
 
-    const mutate = useMutation(mutationNoError);
-    await expect(mutate({ text: "hi" })).resolves.toBe("note-1");
+    const { result } = renderHook(() => useMutation(mutationNoError));
+    await expect(result.current({ text: "hi" })).resolves.toBe("note-1");
   });
 
   test("resolves to Either.Right with decoded result when error schema succeeds", async () => {
     const inner = vi.fn().mockResolvedValue(null);
     useConvexMutationMock.mockReturnValue(inner);
 
-    const mutate = useMutation(mutationWithError);
-    const either = await mutate({ id: "abc" });
+    const { result } = renderHook(() => useMutation(mutationWithError));
+    const either = await result.current({ id: "abc" });
 
-    expect(Either.isRight(either)).toBe(true);
-    if (Either.isRight(either)) expect(either.right).toBeNull();
+    assert(Either.isRight(either));
+    expect(either.right).toBeNull();
   });
 
   test("resolves to Either.Left with the decoded typed error for a matching ConvexError", async () => {
@@ -205,14 +281,12 @@ describe("useMutation", () => {
       .mockRejectedValue(new ConvexError({ _tag: "NotFound", id: "abc" }));
     useConvexMutationMock.mockReturnValue(inner);
 
-    const mutate = useMutation(mutationWithError);
-    const either = await mutate({ id: "abc" });
+    const { result } = renderHook(() => useMutation(mutationWithError));
+    const either = await result.current({ id: "abc" });
 
-    expect(Either.isLeft(either)).toBe(true);
-    if (Either.isLeft(either)) {
-      expect(either.left).toBeInstanceOf(NotFound);
-      expect((either.left as NotFound).id).toBe("abc");
-    }
+    assert(Either.isLeft(either));
+    assert(either.left instanceof NotFound);
+    expect(either.left.id).toBe("abc");
   });
 
   test("rejects with the original error for a non-ConvexError", async () => {
@@ -220,9 +294,9 @@ describe("useMutation", () => {
     const inner = vi.fn().mockRejectedValue(transportError);
     useConvexMutationMock.mockReturnValue(inner);
 
-    const mutate = useMutation(mutationNoError);
+    const { result } = renderHook(() => useMutation(mutationNoError));
 
-    await expect(mutate({ text: "hi" })).rejects.toBe(transportError);
+    await expect(result.current({ text: "hi" })).rejects.toBe(transportError);
   });
 
   test("rejects with the original ConvexError for a ref without an error schema", async () => {
@@ -230,9 +304,21 @@ describe("useMutation", () => {
     const inner = vi.fn().mockRejectedValue(convexError);
     useConvexMutationMock.mockReturnValue(inner);
 
-    const mutate = useMutation(mutationNoError);
+    const { result } = renderHook(() => useMutation(mutationNoError));
 
-    await expect(mutate({ text: "hi" })).rejects.toBe(convexError);
+    await expect(result.current({ text: "hi" })).rejects.toBe(convexError);
+  });
+
+  test("preserves callback identity across rerenders", () => {
+    const inner = vi.fn().mockResolvedValue("note-1");
+    useConvexMutationMock.mockReturnValue(inner);
+
+    const { result, rerender } = renderHook(() => useMutation(mutationNoError));
+    const first = result.current;
+
+    rerender();
+
+    expect(result.current).toBe(first);
   });
 });
 
@@ -250,19 +336,19 @@ describe("useAction", () => {
     const inner = vi.fn().mockResolvedValue("pong");
     useConvexActionMock.mockReturnValue(inner);
 
-    const run = useAction(actionNoError);
-    await expect(run({})).resolves.toBe("pong");
+    const { result } = renderHook(() => useAction(actionNoError));
+    await expect(result.current({})).resolves.toBe("pong");
   });
 
   test("resolves to Either.Right with decoded result when error schema succeeds", async () => {
     const inner = vi.fn().mockResolvedValue(null);
     useConvexActionMock.mockReturnValue(inner);
 
-    const run = useAction(actionWithError);
-    const either = await run({ id: "abc" });
+    const { result } = renderHook(() => useAction(actionWithError));
+    const either = await result.current({ id: "abc" });
 
-    expect(Either.isRight(either)).toBe(true);
-    if (Either.isRight(either)) expect(either.right).toBeNull();
+    assert(Either.isRight(either));
+    expect(either.right).toBeNull();
   });
 
   test("resolves to Either.Left with the decoded typed error for a matching ConvexError", async () => {
@@ -271,14 +357,12 @@ describe("useAction", () => {
       .mockRejectedValue(new ConvexError({ _tag: "NotFound", id: "abc" }));
     useConvexActionMock.mockReturnValue(inner);
 
-    const run = useAction(actionWithError);
-    const either = await run({ id: "abc" });
+    const { result } = renderHook(() => useAction(actionWithError));
+    const either = await result.current({ id: "abc" });
 
-    expect(Either.isLeft(either)).toBe(true);
-    if (Either.isLeft(either)) {
-      expect(either.left).toBeInstanceOf(NotFound);
-      expect((either.left as NotFound).id).toBe("abc");
-    }
+    assert(Either.isLeft(either));
+    assert(either.left instanceof NotFound);
+    expect(either.left.id).toBe("abc");
   });
 
   test("rejects with the original error for a non-ConvexError", async () => {
@@ -286,8 +370,20 @@ describe("useAction", () => {
     const inner = vi.fn().mockRejectedValue(transportError);
     useConvexActionMock.mockReturnValue(inner);
 
-    const run = useAction(actionNoError);
+    const { result } = renderHook(() => useAction(actionNoError));
 
-    await expect(run({})).rejects.toBe(transportError);
+    await expect(result.current({})).rejects.toBe(transportError);
+  });
+
+  test("preserves callback identity across rerenders", () => {
+    const inner = vi.fn().mockResolvedValue("pong");
+    useConvexActionMock.mockReturnValue(inner);
+
+    const { result, rerender } = renderHook(() => useAction(actionNoError));
+    const first = result.current;
+
+    rerender();
+
+    expect(result.current).toBe(first);
   });
 });

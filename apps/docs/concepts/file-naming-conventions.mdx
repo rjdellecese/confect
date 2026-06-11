@@ -4,46 +4,68 @@ title: "File Naming Conventions"
 description: "Recommended patterns for organizing spec, impl, and related files in your confect directory."
 ---
 
-Confect requires a small number of fixed entry-point files in your `confect/` directory (see [Project Structure](/concepts/project-structure)). Beyond those, you can organize your group spec and impl files however you like. The conventions below are what the Confect documentation and example project follow.
+Confect requires a small number of fixed entry-point files in your `confect/` directory (see [Project Structure](/concepts/project-structure)). Beyond those, organize your API as colocated `*.spec.ts`/`*.impl.ts` pairs, one pair per group. The group's name is the file's path within `confect/` (its stem for top-level groups, the dot-joined directory path for nested groups).
 
 ## Spec and impl files
 
-Name your group spec and impl files with `.spec.ts` and `.impl.ts` suffixes. This keeps each group's interface and implementation easy to identify, and colocates them in directory listings.
+Name each group's spec and impl with `.spec.ts` and `.impl.ts` suffixes. Each file must default-export its `GroupSpec` or `GroupImpl`; additional named exports on `.spec.ts` (for example error classes) are fine.
 
+A complete pair looks like this. The impl default-imports its sibling spec, passes it to `FunctionImpl.make` and `GroupImpl.make`, and finalizes the resulting layer with `GroupImpl.finalize`:
+
+```ts confect/notes.spec.ts
+import { GroupSpec, FunctionSpec } from "@confect/core";
+import { Schema } from "effect";
+
+import notes from "./_generated/tables/notes";
+
+const list = FunctionSpec.publicQuery({
+  name: "list",
+  args: () => Schema.Struct({}),
+  returns: () => Schema.Array(notes.Doc),
+});
+
+export default GroupSpec.make().addFunction(list);
 ```
-confect/
-  notes.spec.ts
-  notes.impl.ts
-  spec.ts
-  impl.ts
-```
 
-The entry-point files `spec.ts` and `impl.ts` then import from the corresponding `.spec.ts` and `.impl.ts` files:
+```ts confect/notes.impl.ts
+import { FunctionImpl, GroupImpl } from "@confect/server";
+import { Effect, Layer } from "effect";
 
-```ts confect/spec.ts
-import { Spec } from "@confect/core";
-import { notes } from "./notes.spec";
+import databaseSchema from "./_generated/schema";
+import { DatabaseReader } from "./_generated/services";
+import notes from "./notes.spec";
 
-export default Spec.make().add(notes);
-```
+const list = FunctionImpl.make(databaseSchema, notes, "list", () =>
+  Effect.gen(function* () {
+    const reader = yield* DatabaseReader;
 
-```ts confect/impl.ts
-import { Impl } from "@confect/server";
-import { Layer } from "effect";
-import api from "./_generated/api";
-import { notes } from "./notes.impl";
+    return yield* reader
+      .table("notes")
+      .index("by_creation_time", "desc")
+      .collect();
+  }).pipe(Effect.orDie),
+);
 
-export default Impl.make(api).pipe(
-  Layer.provide(notes),
-  Impl.finalize,
+export default GroupImpl.make(databaseSchema, notes).pipe(
+  Layer.provide(list),
+  GroupImpl.finalize,
 );
 ```
 
+Run `confect codegen` after adding or changing specs and impls.
+
+<Note>
+  A file's path within `confect/` determines the public Convex API path it
+  produces—`confect/notes_and_random/notes.spec.ts` becomes
+  `internal.notes_and_random.notes.list`. Renaming a file or directory renames
+  the API path, so treat these paths as part of your API's contract.
+</Note>
+
 <Warning>
-  Some test runners (such as Vitest and Jest) treat `.spec.ts` files
-  as test files by default. If your test runner is picking up Confect
-  spec files, configure it to exclude them. For example, in Vitest you
-  can add `"**/*.spec.ts"` to the `test.exclude` array in your config.
+  Some test runners (such as Vitest and Jest) treat `.spec.ts` files as test
+  files by default. If your test runner is picking up Confect spec files,
+  configure it to exclude them. For example, in Vitest you can add
+  `"**/*.spec.ts"` to the `test.exclude` array in your config.
 </Warning>
 
 ## Native Convex functions
@@ -59,29 +81,24 @@ confect/
 
 ## Node actions
 
-Place [node action](/server/node-actions) spec and impl files in a `node/` subdirectory, using the same `.spec.ts`/`.impl.ts` suffixes. The entry-point files `nodeSpec.ts` and `nodeImpl.ts` import from this directory.
+[Node action](/server/node-actions) groups follow the same `.spec.ts`/`.impl.ts` naming and nesting conventions as any other group. A group is Node-runtime when its spec is built with `GroupSpec.makeNode()` (rather than `GroupSpec.make()`); its impl is otherwise identical to a non-node impl, passing the database schema from `_generated/schema`. Confect emits Convex's `"use node"` directive into the generated module based on the spec.
 
 ```
 confect/
-  nodeSpec.ts
-  nodeImpl.ts
-  node/
-    email.spec.ts
-    email.impl.ts
+  email.spec.ts
+  email.impl.ts
 ```
 
 ## Nested groups
 
-When a group contains subgroups, use a subdirectory named after the parent group. The parent's `.spec.ts` and `.impl.ts` files stay at the top level and import from the subdirectory.
+When a group contains subgroups, place each subgroup's `.spec.ts`/`.impl.ts` pair inside a subdirectory named after the parent group. The parent group itself does not need a spec or impl file—it is composed from its subgroups by their paths.
 
 ```
 confect/
-  billing.spec.ts           ← parent group spec
-  billing.impl.ts           ← parent group impl
   billing/
-    invoices.spec.ts        ← subgroup spec
-    invoices.impl.ts        ← subgroup impl
-    subscriptions.spec.ts
+    invoices.spec.ts        ← group path billing.invoices
+    invoices.impl.ts
+    subscriptions.spec.ts   ← group path billing.subscriptions
     subscriptions.impl.ts
 ```
 
@@ -91,28 +108,42 @@ Putting it all together, a project using all of these conventions might look lik
 
 <Tree>
   <Tree.Folder name="confect" defaultOpen>
-    <Tree.Folder name="_generated" />
-    <Tree.Folder name="node" defaultOpen>
-      <Tree.File name="email.spec.ts" />
-      <Tree.File name="email.impl.ts" />
+    <Tree.Folder name="_generated" defaultOpen>
+      <Tree.File name="convexSchema.ts" />
+      <Tree.File name="refs.ts" />
+      <Tree.File name="schema.ts" />
+      <Tree.File name="services.ts" />
+      <Tree.File name="spec.ts" />
+      <Tree.Folder name="registeredFunctions" defaultOpen>
+        <Tree.File name="env.ts" />
+        <Tree.Folder name="notes_and_random" defaultOpen>
+          <Tree.File name="notes.ts" />
+          <Tree.File name="random.ts" />
+        </Tree.Folder>
+        <Tree.File name="workpool.ts" />
+        <Tree.File name="email.ts" />
+      </Tree.Folder>
+      <Tree.Folder name="tables" defaultOpen>
+        <Tree.File name="notes.ts" />
+        <Tree.File name="users.ts" />
+      </Tree.Folder>
+      <Tree.File name="id.ts" />
     </Tree.Folder>
-    <Tree.Folder name="notesAndRandom" defaultOpen>
+    <Tree.Folder name="notes_and_random" defaultOpen>
       <Tree.File name="notes.spec.ts" />
       <Tree.File name="notes.impl.ts" />
       <Tree.File name="random.spec.ts" />
       <Tree.File name="random.impl.ts" />
     </Tree.Folder>
-    <Tree.Folder name="tables" />
+    <Tree.Folder name="tables" defaultOpen>
+      <Tree.File name="notes.ts" />
+      <Tree.File name="users.ts" />
+    </Tree.Folder>
+    <Tree.File name="email.spec.ts" />
+    <Tree.File name="email.impl.ts" />
     <Tree.File name="env.spec.ts" />
     <Tree.File name="env.impl.ts" />
     <Tree.File name="http.ts" />
-    <Tree.File name="impl.ts" />
-    <Tree.File name="nodeImpl.ts" />
-    <Tree.File name="nodeSpec.ts" />
-    <Tree.File name="notesAndRandom.spec.ts" />
-    <Tree.File name="notesAndRandom.impl.ts" />
-    <Tree.File name="schema.ts" />
-    <Tree.File name="spec.ts" />
     <Tree.File name="workpool.ts" />
     <Tree.File name="workpool.spec.ts" />
     <Tree.File name="workpool.impl.ts" />

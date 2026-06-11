@@ -1,12 +1,14 @@
-export * as DatabaseSchema from "./DatabaseSchema";
 export * as FunctionProvenance from "./FunctionProvenance";
 export * as FunctionSpec from "./FunctionSpec";
 export * as GenericId from "./GenericId";
 export * as GroupPath from "./GroupPath";
 export * as GroupSpec from "./GroupSpec";
+export * as Identifier from "./Identifier";
+export * as Lazy from "./Lazy";
 export * as PaginationResult from "./PaginationResult";
 export * as Ref from "./Ref";
 export * as Refs from "./Refs";
+export * as Registry from "./Registry";
 export * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 export * as Spec from "./Spec";
 export * as SystemFields from "./SystemFields";

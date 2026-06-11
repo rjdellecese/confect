@@ -1,5 +1,5 @@
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
-import { Predicate } from "effect";
+import * as Predicate from "effect/Predicate";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as Handler from "./Handler";
 

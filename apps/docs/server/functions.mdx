@@ -21,51 +21,45 @@ For Node.js actions, see [Node Actions](/server/node-actions). To integrate plai
 
 ## Defining a spec
 
-Each function spec defines the function's name, arguments schema, and returns schema. Function specs are grouped into group specs, which are combined into your API's top-level spec. See [The Spec/Impl Model](/concepts/spec-impl-model) for a full walkthrough.
+Each function spec defines the function's name, arguments schema, and returns schema. The `args`, `returns`, and (optional) `error` schemas are passed as `() => Schema` callbacks, evaluated lazily the first time the function is invoked. Function specs are added to a `GroupSpec` and default-exported from a `*.spec.ts` file. See [The Spec/Impl Model](/concepts/spec-impl-model) for a full walkthrough.
 
 ```ts confect/notes.spec.ts
 import { GroupSpec, FunctionSpec } from "@confect/core";
 import { Schema } from "effect";
 
-import { Notes } from "./tables/Notes";
+import notes from "./_generated/tables/notes";
 
 const list = FunctionSpec.publicQuery({
   name: "list",
-  args: Schema.Struct({}),
-  returns: Schema.Array(Notes.Doc),
+  args: () => Schema.Struct({}),
+  returns: () => Schema.Array(notes.Doc),
 });
 
-export const notes = GroupSpec.make("notes").addFunction(list);
+export default GroupSpec.make().addFunction(list);
 ```
 
-```ts confect/spec.ts
-import { Spec } from "@confect/core";
-
-import { notes } from "./notes.spec";
-
-export default Spec.make().add(notes);
-```
+Run `confect codegen` after adding or changing specs.
 
 ### Typed errors
 
 A spec can also declare an optional `error` schema. When it does, the corresponding handler's `Effect` error channel is typed as that schema, and the failure is decoded for callers at every call site (React hooks, JS clients, and tests). See [Error Handling](/server/error-handling) for the full walkthrough.
 
 ```ts
-import { FunctionSpec, GenericId } from "@confect/core";
+import { FunctionSpec } from "@confect/core";
 import { Schema } from "effect";
 
-import { Notes } from "./tables/Notes";
+import { Id } from "./_generated/id";
+import notes from "./_generated/tables/notes";
 
-class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
-  "NoteNotFound",
-  { noteId: GenericId.GenericId("notes") },
-) {}
+class NoteNotFound extends Schema.TaggedError<NoteNotFound>()("NoteNotFound", {
+  noteId: Id("notes"),
+}) {}
 
 FunctionSpec.publicQuery({
   name: "getOrFail",
-  args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
-  returns: Notes.Doc,
-  error: NoteNotFound,
+  args: () => Schema.Struct({ noteId: Id("notes") }),
+  returns: () => notes.Doc,
+  error: () => NoteNotFound,
 });
 ```
 
@@ -79,10 +73,11 @@ The handler receives the decoded arguments as its first parameter and returns an
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { Effect, Layer } from "effect";
 
-import api from "./_generated/api";
+import databaseSchema from "./_generated/schema";
 import { DatabaseReader } from "./_generated/services";
+import notes from "./notes.spec";
 
-const list = FunctionImpl.make(api, "notes", "list", () =>
+const list = FunctionImpl.make(databaseSchema, notes, "list", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
 
@@ -93,22 +88,21 @@ const list = FunctionImpl.make(api, "notes", "list", () =>
   }).pipe(Effect.orDie),
 );
 
-export const notes = GroupImpl.make(api, "notes").pipe(
+export default GroupImpl.make(databaseSchema, notes).pipe(
   Layer.provide(list),
+  GroupImpl.finalize,
 );
 ```
 
-Your impl must be the default export of an `impl.ts` file in your `confect/` directory, and must be finalized with `Impl.finalize`.
+`GroupImpl.finalize` is the per-group completeness check: it only typechecks once every function declared by the spec has been provided to the group layer.
 
-```ts confect/impl.ts
-import { Impl } from "@confect/server";
-import { Layer } from "effect";
-
-import api from "./_generated/api";
-import { notes } from "./notes.impl";
-
-export default Impl.make(api).pipe(
-  Layer.provide(notes),
-  Impl.finalize,
-);
-```
+<Note>
+  Convex bundles a deployment into a single artifact, but a function's cold
+  start only evaluates the module graph reachable from its entry point. Confect
+  emits one Convex module per group, so cold-starting a function only evaluates
+  its own group's spec, impl, and the tables it touches. To keep that cold start
+  fast, import Effect from its submodule paths (`import * as Schema from
+  "effect/Schema"`) rather than the `effect` barrel in your `confect/` files—a
+  barrel import pulls the whole `Schema` namespace into the module graph your
+  function evaluates at cold start, even when you use only a small part of it.
+</Note>

@@ -7,21 +7,42 @@ description: "Understand the structure of a Confect project."
 <Tree>
   <Tree.Folder name="confect" defaultOpen>
     <Tree.Folder name="_generated" defaultOpen>
-      <Tree.File name="api.ts" />
-      <Tree.File name="nodeApi.ts" />
-      <Tree.File name="nodeRegisteredFunctions.ts" />
-      <Tree.File name="registeredFunctions.ts" />
+      <Tree.File name="convexSchema.ts" />
+      <Tree.File name="id.ts" />
       <Tree.File name="refs.ts" />
+      <Tree.File name="schema.ts" />
       <Tree.File name="services.ts" />
+      <Tree.File name="spec.ts" />
+      <Tree.Folder name="registeredFunctions" defaultOpen>
+        <Tree.File name="env.ts" />
+        <Tree.Folder name="notes_and_random" defaultOpen>
+          <Tree.File name="notes.ts" />
+          <Tree.File name="random.ts" />
+        </Tree.Folder>
+        <Tree.File name="workpool.ts" />
+      </Tree.Folder>
+      <Tree.Folder name="tables" defaultOpen>
+        <Tree.File name="notes.ts" />
+        <Tree.File name="users.ts" />
+      </Tree.Folder>
+    </Tree.Folder>
+    <Tree.Folder name="notes_and_random" defaultOpen>
+      <Tree.File name="notes.spec.ts" />
+      <Tree.File name="notes.impl.ts" />
+      <Tree.File name="random.spec.ts" />
+      <Tree.File name="random.impl.ts" />
+    </Tree.Folder>
+    <Tree.Folder name="tables" defaultOpen>
+      <Tree.File name="notes.ts" />
+      <Tree.File name="users.ts" />
     </Tree.Folder>
     <Tree.File name="auth.ts" />
     <Tree.File name="crons.ts" />
+    <Tree.File name="env.spec.ts" />
+    <Tree.File name="env.impl.ts" />
     <Tree.File name="http.ts" />
-    <Tree.File name="impl.ts" />
-    <Tree.File name="nodeImpl.ts" />
-    <Tree.File name="nodeSpec.ts" />
-    <Tree.File name="schema.ts" />
-    <Tree.File name="spec.ts" />
+    <Tree.File name="workpool.spec.ts" />
+    <Tree.File name="workpool.impl.ts" />
   </Tree.Folder>
   <Tree.Folder name="convex" />
 </Tree>
@@ -30,37 +51,37 @@ description: "Understand the structure of a Confect project."
 
 ### `_generated/`
 
-#### `api.ts`
+#### `convexSchema.ts`
 
-Contains a single default `Api` export, which combines your database schema and spec. Pass this as the first argument to the `Impl.make`, `GroupImpl.make`, and `FunctionImpl.make` constructor functions when building your spec's implementation.
+Contains the Convex deploy-time `SchemaDefinition` (a single `defineSchema({...})` call) assembled from every `confect/tables/*.ts` module. `convex/schema.ts` re-exports its default so Convex's CLI and `convex-test` find it where they expect. You should never import this file directly from your own code — use `_generated/schema.ts` for runtime needs.
 
-#### `nodeApi.ts`
+#### `id.ts`
 
-<Info>
-  This file will only be generated if `confect/nodeSpec.ts` exists.
-</Info>
+Contains a type-constrained `Id` constructor whose only argument is the union of your table names — for example, `Id("users")` returns the `Schema` for an `_id` value in the `users` table. Use this when defining cross-table references (e.g. a `userId: Id("users")` field) and inside spec `args`/`returns` schemas. The type-level constraint catches typos at compile time, replacing the loosely-typed `GenericId.GenericId("users")` form.
 
-Contains a single default `Api` export, which combines your database schema and Node spec. Pass this as the first argument to the `Impl.make`, `GroupImpl.make`, and `FunctionImpl.make` constructor functions when building your spec's implementation.
+#### `registeredFunctions/`
 
-#### `nodeRegisteredFunctions.ts`
-
-<Info>
-  This file will only be generated if `confect/nodeSpec.ts` exists.
-</Info>
-
-Contains a single default `RegisteredFunctions` export, which is a type-correct map of your Node actions, in the format that the Convex CLI can consume for bundling and deployment. You should never need to import this yourself—it is meant to be used internally by the Confect CLI for codegen in the `convex/` directory.
-
-#### `registeredFunctions.ts`
-
-Contains a single default `RegisteredFunctions` export, which is a type-correct map of your Convex functions, in the format that the Convex CLI can consume for bundling and deployment. You should never need to import this yourself—it is meant to be used internally by the Confect CLI for codegen in the `convex/` directory.
+Contains one module per group (for example `registeredFunctions/notes_and_random/notes.ts`), each exporting that group's functions in a form the Convex CLI can consume. These modules are consumed by the generated `convex/` files; you should not need to import them directly.
 
 #### `refs.ts`
 
 Contains a single default `Refs` export, which is a map of your Convex functions and their [function names](https://docs.convex.dev/api/modules/server#getfunctionname) and args/returns `Schema`s. Use this to invoke your Convex functions from the client or inside Convex functions using the `*Runner` services (`QueryRunner`, `MutationRunner`, and `ActionRunner`).
 
+#### `schema.ts`
+
+Contains the runtime `DatabaseSchema` — the codec-lookup view of your tables. Impls import it and pass it to `FunctionImpl.make` / `GroupImpl.make`. It is generated from `confect/tables/*.ts` and intentionally avoids any `convex/server` import so a runtime cold start never evaluates `defineSchema(...)`. Each table's field-schema is constructed lazily on the first access to its `Fields`, `Doc`, or `tableDefinition` and then cached, so a function only pays the schema-construction cost at cold start for the tables it actually touches via `db.table(name)`. Use this when a test or a non-codegen-generated module needs to refer to your `DatabaseSchema` type or value.
+
+#### `tables/`
+
+Contains one wrapper module per user-authored table (for example `tables/notes.ts` for `confect/tables/notes.ts`). Each wrapper applies the filename-derived table name to the `Table` defined in `confect/tables/<name>.ts` and re-exports it as the default. Specs, impls, and other consumers should default-import from `confect/_generated/tables/<name>` to reach a table's `Doc`, `Fields`, and `tableName` properties — for example, `import notes from "../_generated/tables/notes"` and then `notes.Doc`.
+
 #### `services.ts`
 
 Contains Effect service wrappers for Convex platform capabilities, scoped to your app's database schema. Use these in your function implementation handlers. See [Services](/concepts/services) for a full list.
+
+#### `spec.ts`
+
+Contains your assembled Confect spec — every function group, of any runtime (including Node action groups) — used to build `refs.ts`.
 
 ### `auth.ts`
 
@@ -80,37 +101,17 @@ Expects a default `CronJobs` export defining your [cron jobs](/server/cron-jobs)
 
 Expects a default Convex `HttpRouter` export. Construct this using Confect's `HttpApi.make` and `@effect/platform`'s [HTTP API modules](https://github.com/Effect-TS/effect/blob/main/packages/platform/README.md#http-api).
 
-### `impl.ts`
+### `tables/`
 
 <Badge color="green">Required</Badge>
 
-Expects a default `Impl` export which implements the `Spec` in `spec.ts`. Remember that your `Impl` must be finalized with `Impl.finalize`.
+Defines your database tables, one file per table. The **filename is the table name** — `confect/tables/notes.ts` defines a table called `notes` — so filenames must be valid JS identifiers and may not start with `_` (Convex reserves underscore-prefixed names for system tables). Each module **must default-export a `Table`** (built with `Table.make(...)`); codegen reads `module.default`, validates the filename, and applies it as the table name to produce `_generated/tables/<name>.ts`. Other modules import from the wrapper, not directly from `tables/`. Codegen also scans this directory to produce `_generated/schema.ts` (runtime), `_generated/convexSchema.ts` (deploy), and `_generated/id.ts` (the cross-table `Id` constructor). See [Schema](/server/database/schema).
 
-### `nodeImpl.ts`
-
-<Badge color="yellow">Optional</Badge>
-
-Expects a default `Impl` export which implements the Node actions `Spec` in `nodeSpec.ts`. Remember that your `Impl` must be finalized with `Impl.finalize`.
-
-### `nodeSpec.ts`
-
-<Badge color="yellow">Optional</Badge>
-
-Expects a default `Spec` export containing the interface of your Node actions API.
-
-### `schema.ts`
+### `*.spec.ts`/`*.impl.ts`
 
 <Badge color="green">Required</Badge>
 
-Expects a default `DatabaseSchema` export which specifies your Convex database table schemas.
-
-### `spec.ts`
-
-<Badge color="green">Required</Badge>
-
-Expects a default `Spec` export containing the interface of your Convex functions API.
-
-The files listed above are the fixed entry points that Confect requires or generates. For guidance on organizing the group spec, impl, and related files you create yourself, see [File Naming Conventions](/concepts/file-naming-conventions).
+Your Convex API is defined as colocated `*.spec.ts`/`*.impl.ts` pairs, one pair per group. Each file's path within `confect/` becomes the group's name. See [File Naming Conventions](/concepts/file-naming-conventions) and [The Spec/Impl Model](/concepts/spec-impl-model).
 
 ## Rules
 

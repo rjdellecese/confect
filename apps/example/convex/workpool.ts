@@ -1,6 +1,6 @@
-import registeredFunctions from "../confect/_generated/registeredFunctions";
+import registeredFunctions from "../confect/_generated/registeredFunctions/workpool";
 
-export const backgroundWork = registeredFunctions.workpool.backgroundWork;
-export const enqueue = registeredFunctions.workpool.enqueue;
-export const onComplete = registeredFunctions.workpool.onComplete;
-export const status = registeredFunctions.workpool.status;
+export const backgroundWork = registeredFunctions.backgroundWork;
+export const enqueue = registeredFunctions.enqueue;
+export const onComplete = registeredFunctions.onComplete;
+export const status = registeredFunctions.status;

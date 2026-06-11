@@ -1,16 +1,18 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
-import { Effect, Layer } from "effect";
-import api from "../_generated/api";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import databaseSchema from "../_generated/schema";
 import refs from "../_generated/refs";
 import {
   ActionRunner,
   MutationRunner,
   QueryRunner,
 } from "../_generated/services";
+import runners from "./runners.spec";
 
 const insertNoteViaRunner = FunctionImpl.make(
-  api,
-  "groups.runners",
+  databaseSchema,
+  runners,
   "insertNoteViaRunner",
   ({ text }) =>
     Effect.gen(function* () {
@@ -20,8 +22,8 @@ const insertNoteViaRunner = FunctionImpl.make(
 );
 
 const getNumberViaRunner = FunctionImpl.make(
-  api,
-  "groups.runners",
+  databaseSchema,
+  runners,
   "getNumberViaRunner",
   () =>
     Effect.gen(function* () {
@@ -31,8 +33,8 @@ const getNumberViaRunner = FunctionImpl.make(
 );
 
 const countNotesViaRunner = FunctionImpl.make(
-  api,
-  "groups.runners",
+  databaseSchema,
+  runners,
   "countNotesViaRunner",
   () =>
     Effect.gen(function* () {
@@ -42,8 +44,9 @@ const countNotesViaRunner = FunctionImpl.make(
     }).pipe(Effect.orDie),
 );
 
-export const runners = GroupImpl.make(api, "groups.runners").pipe(
+export default GroupImpl.make(databaseSchema, runners).pipe(
   Layer.provide(insertNoteViaRunner),
   Layer.provide(getNumberViaRunner),
   Layer.provide(countNotesViaRunner),
+  GroupImpl.finalize,
 );

@@ -1,7 +1,7 @@
 import type { PaginationResult as ConvexPaginationResult } from "convex/server";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import { expectTypeOf, test } from "vitest";
-import * as PaginationResult from "../src/PaginationResult";
+import * as PaginationResult from "@confect/core/PaginationResult";
 
 test("PaginationResult's encoded type extends Convex type", () => {
   const _paginationResult = PaginationResult.PaginationResult(Schema.String);

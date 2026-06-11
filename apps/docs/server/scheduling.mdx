@@ -18,11 +18,9 @@ import { Scheduler } from "./confect/_generated/services";
 Effect.gen(function* () {
   const scheduler = yield* Scheduler;
 
-  yield* scheduler.runAfter(
-    Duration.minutes(5),
-    refs.internal.messages.send,
-    { text: "Hello" },
-  );
+  yield* scheduler.runAfter(Duration.minutes(5), refs.internal.messages.send, {
+    text: "Hello",
+  });
 });
 ```
 

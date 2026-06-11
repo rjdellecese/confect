@@ -1,6 +1,6 @@
-import registeredFunctions from "../confect/_generated/registeredFunctions";
+import registeredFunctions from "../confect/_generated/registeredFunctions/databaseReader";
 
-export const getNote = registeredFunctions.databaseReader.getNote;
-export const listNotes = registeredFunctions.databaseReader.listNotes;
-export const paginateNotes = registeredFunctions.databaseReader.paginateNotes;
-export const paginateNotesWithFilter = registeredFunctions.databaseReader.paginateNotesWithFilter;
+export const getNote = registeredFunctions.getNote;
+export const listNotes = registeredFunctions.listNotes;
+export const paginateNotes = registeredFunctions.paginateNotes;
+export const paginateNotesWithFilter = registeredFunctions.paginateNotesWithFilter;

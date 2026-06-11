@@ -1,5 +1,5 @@
 import type { GenericDataModel, GenericMutationCtx } from "convex/server";
-import { Context } from "effect";
+import * as Context from "effect/Context";
 
 export const MutationCtx = <DataModel extends GenericDataModel>() =>
   Context.GenericTag<GenericMutationCtx<DataModel>>(

@@ -1,17 +1,29 @@
 {
   "name": "@confect/js",
-  "version": "8.0.0",
   "description": "JavaScript client bindings for any JS runtime",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/rjdellecese/confect.git"
-  },
+  "version": "9.0.0",
+  "author": "RJ Dellecese",
   "bugs": {
     "url": "https://github.com/rjdellecese/confect/issues"
   },
-  "homepage": "https://confect.dev",
-  "sideEffects": false,
-  "type": "module",
+  "devDependencies": {
+    "@effect/vitest": "0.29.0",
+    "@types/node": "25.3.3",
+    "effect": "3.21.2",
+    "tsdown": "0.20.3",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
   "files": [
     "CHANGELOG.md",
     "LICENSE",
@@ -20,53 +32,32 @@
     "package.json",
     "src"
   ],
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    },
-    "./package.json": "./package.json"
-  },
-  "scripts": {
-    "build": "tsdown --config-loader unrun",
-    "dev": "tsdown --watch",
-    "test": "vitest run",
-    "typecheck": "tsc --noEmit --project tsconfig.json",
-    "fix": "prettier --write . && eslint --fix . --max-warnings=0",
-    "format": "prettier --check .",
-    "lint": "eslint . --max-warnings=0",
-    "clean": "rm -rf dist coverage node_modules",
-    "prepack": "rm -f ./README.md && cp ../../README.md ./README.md",
-    "postpack": "rm ./README.md && ln -s ../../README.md ./README.md"
-  },
+  "homepage": "https://confect.dev",
   "keywords": [
-    "effect",
-    "convex"
+    "convex",
+    "effect"
   ],
-  "author": "RJ Dellecese",
   "license": "ISC",
-  "devDependencies": {
-    "@effect/vitest": "0.29.0",
-    "@eslint/js": "10.0.1",
-    "@types/node": "25.3.3",
-    "effect": "3.21.2",
-    "eslint": "10.0.2",
-    "prettier": "3.8.1",
-    "tsdown": "0.20.3",
-    "typescript": "5.9.3",
-    "typescript-eslint": "8.56.1",
-    "vitest": "3.2.4"
-  },
-  "peerDependencies": {
-    "@confect/core": "workspace:^",
-    "convex": "^1.30.0",
-    "effect": "^3.21.2"
-  },
-  "engines": {
-    "node": ">=22",
-    "pnpm": ">=10"
-  },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
+  "peerDependencies": {
+    "@confect/core": "workspace:^",
+    "convex": "1.39.1",
+    "effect": "^3.21.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rjdellecese/confect.git"
+  },
+  "scripts": {
+    "clean": "rm -rf dist coverage node_modules",
+    "dev": "tsdown --watch --config-loader unrun",
+    "postpack": "rm ./README.md && ln -s ../../README.md ./README.md",
+    "prepack": "rm -f ./README.md && cp ../../README.md ./README.md",
+    "test": "vitest run",
+    "typecheck": "tsc -b tsconfig.src.json"
+  },
+  "sideEffects": false,
+  "type": "module",
   "types": "./dist/index.d.ts"
 }

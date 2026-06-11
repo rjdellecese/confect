@@ -1,12 +1,12 @@
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import type { RegisteredMutation, RegisteredQuery } from "convex/server";
-import { Schema } from "effect";
-import * as FunctionSpec from "../src/FunctionSpec";
-import * as GroupSpec from "../src/GroupSpec";
-import * as Ref from "../src/Ref";
-import * as Refs from "../src/Refs";
-import type * as RuntimeAndFunctionType from "../src/RuntimeAndFunctionType";
-import * as Spec from "../src/Spec";
+import * as Schema from "effect/Schema";
+import * as FunctionSpec from "@confect/core/FunctionSpec";
+import * as GroupSpec from "@confect/core/GroupSpec";
+import * as Ref from "@confect/core/Ref";
+import * as Refs from "@confect/core/Refs";
+import type * as RuntimeAndFunctionType from "@confect/core/RuntimeAndFunctionType";
+import * as Spec from "@confect/core/Spec";
 
 describe("make", () => {
   it("turns a spec into refs", () => {
@@ -14,11 +14,11 @@ describe("make", () => {
     const FnReturns = Schema.Array(Schema.String);
 
     const spec = Spec.make().add(
-      GroupSpec.make("notes").addFunction(
+      GroupSpec.makeAt("notes").addFunction(
         FunctionSpec.publicQuery({
           name: "list",
-          args: FnArgs,
-          returns: FnReturns,
+          args: () => FnArgs,
+          returns: () => FnReturns,
         }),
       ),
     );
@@ -29,8 +29,8 @@ describe("make", () => {
       "notes",
       FunctionSpec.publicQuery({
         name: "list",
-        args: FnArgs,
-        returns: FnReturns,
+        args: () => FnArgs,
+        returns: () => FnReturns,
       }),
     );
 
@@ -43,13 +43,13 @@ describe("make", () => {
 
   it("throws an error if a group and function have the same name", () => {
     const spec = Spec.make().add(
-      GroupSpec.make("notes")
-        .addGroup(GroupSpec.make("list"))
+      GroupSpec.makeAt("notes")
+        .addGroup(GroupSpec.makeAt("list"))
         .addFunction(
           FunctionSpec.publicQuery({
             name: "list",
-            args: Schema.Struct({}),
-            returns: Schema.Array(Schema.String),
+            args: () => Schema.Struct({}),
+            returns: () => Schema.Array(Schema.String),
           }),
         ),
     );
@@ -63,19 +63,19 @@ describe("make", () => {
     const FnReturns = Schema.String;
 
     const spec = Spec.make().add(
-      GroupSpec.make("notes")
+      GroupSpec.makeAt("notes")
         .addFunction(
           FunctionSpec.publicQuery({
             name: "publicList",
-            args: FnArgs,
-            returns: FnReturns,
+            args: () => FnArgs,
+            returns: () => FnReturns,
           }),
         )
         .addFunction(
           FunctionSpec.internalQuery({
             name: "internalList",
-            args: FnArgs,
-            returns: FnReturns,
+            args: () => FnArgs,
+            returns: () => FnReturns,
           }),
         ),
     );
@@ -100,20 +100,20 @@ describe("make", () => {
 
     const spec = Spec.make()
       .add(
-        GroupSpec.make("publicOnly").addFunction(
+        GroupSpec.makeAt("publicOnly").addFunction(
           FunctionSpec.publicQuery({
             name: "list",
-            args: FnArgs,
-            returns: FnReturns,
+            args: () => FnArgs,
+            returns: () => FnReturns,
           }),
         ),
       )
       .add(
-        GroupSpec.make("internalOnly").addFunction(
+        GroupSpec.makeAt("internalOnly").addFunction(
           FunctionSpec.internalQuery({
             name: "list",
-            args: FnArgs,
-            returns: FnReturns,
+            args: () => FnArgs,
+            returns: () => FnReturns,
           }),
         ),
       );
@@ -138,19 +138,19 @@ describe("make", () => {
     const FnReturns = Schema.String;
 
     const spec = Spec.make().add(
-      GroupSpec.make("notes")
+      GroupSpec.makeAt("notes")
         .addFunction(
           FunctionSpec.publicQuery({
             name: "publicList",
-            args: FnArgs,
-            returns: FnReturns,
+            args: () => FnArgs,
+            returns: () => FnReturns,
           }),
         )
         .addFunction(
           FunctionSpec.internalQuery({
             name: "internalList",
-            args: FnArgs,
-            returns: FnReturns,
+            args: () => FnArgs,
+            returns: () => FnReturns,
           }),
         ),
     );
@@ -178,7 +178,9 @@ describe("make", () => {
         RegisteredQuery<"public", ListQueryArgs, Promise<ListQueryReturns>>
       >()("list");
 
-    const spec = Spec.make().add(GroupSpec.make("notes").addFunction(listSpec));
+    const spec = Spec.make().add(
+      GroupSpec.makeAt("notes").addFunction(listSpec),
+    );
     const refs = Refs.make(spec);
 
     const actualRef = refs.public.notes.list;
@@ -208,7 +210,7 @@ describe("make", () => {
     type RemoveMutationReturns = void;
 
     const spec = Spec.make().add(
-      GroupSpec.make("notes")
+      GroupSpec.makeAt("notes")
         .addFunction(
           FunctionSpec.convexPublicQuery<
             RegisteredQuery<"public", GetQueryArgs, Promise<GetQueryReturns>>
@@ -263,12 +265,12 @@ describe("make", () => {
 
     const ConfectQuery = FunctionSpec.publicQuery({
       name: "list",
-      args: ConfectQueryArgs,
-      returns: ConfectQueryReturns,
+      args: () => ConfectQueryArgs,
+      returns: () => ConfectQueryReturns,
     });
 
     const spec = Spec.make().add(
-      GroupSpec.make("notes")
+      GroupSpec.makeAt("notes")
         .addFunction(ConfectQuery)
         .addFunction(
           FunctionSpec.convexPublicQuery<

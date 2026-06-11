@@ -15,7 +15,7 @@ import {
   StorageWriter as StorageWriter_,
   VectorSearch as VectorSearch_,
 } from "@confect/server";
-import type schemaDefinition from "../schema";
+import type schemaDefinition from "./schema";
 
 export const Auth = Auth_.Auth;
 export type Auth = typeof Auth.Identifier;

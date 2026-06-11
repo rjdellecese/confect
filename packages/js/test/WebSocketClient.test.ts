@@ -1,18 +1,16 @@
 import { FunctionSpec, Ref } from "@confect/core";
-import { describe, expect, it } from "@effect/vitest";
+import { assert, describe, expect, layer } from "@effect/vitest";
 import { ConvexError } from "convex/values";
-import {
-  Chunk,
-  Context,
-  Effect,
-  Either,
-  Layer,
-  Ref as MutableRef,
-  Schema,
-  Stream,
-} from "effect";
+import * as Chunk from "effect/Chunk";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Either from "effect/Either";
+import * as Layer from "effect/Layer";
+import * as MutableRef from "effect/Ref";
+import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
 import { beforeEach, vi } from "vitest";
-import * as WebSocketClient from "../src/WebSocketClient";
+import * as WebSocketClient from "@confect/js/WebSocketClient";
 
 const mockQuery = vi.fn().mockResolvedValue({});
 const mockMutation = vi.fn().mockResolvedValue({});
@@ -53,8 +51,8 @@ const noArgsQueryRef = Ref.make(
   "notes",
   FunctionSpec.publicQuery({
     name: "list",
-    args: Schema.Struct({}),
-    returns: Schema.Struct({}),
+    args: () => Schema.Struct({}),
+    returns: () => Schema.Struct({}),
   }),
 );
 
@@ -62,8 +60,8 @@ const argsQueryRef = Ref.make(
   "notes",
   FunctionSpec.publicQuery({
     name: "get",
-    args: Schema.Struct({ id: Schema.String }),
-    returns: Schema.Struct({}),
+    args: () => Schema.Struct({ id: Schema.String }),
+    returns: () => Schema.Struct({}),
   }),
 );
 
@@ -71,8 +69,8 @@ const noArgsMutationRef = Ref.make(
   "tasks",
   FunctionSpec.publicMutation({
     name: "cleanup",
-    args: Schema.Struct({}),
-    returns: Schema.Struct({}),
+    args: () => Schema.Struct({}),
+    returns: () => Schema.Struct({}),
   }),
 );
 
@@ -80,8 +78,8 @@ const argsMutationRef = Ref.make(
   "notes",
   FunctionSpec.publicMutation({
     name: "insert",
-    args: Schema.Struct({ text: Schema.String }),
-    returns: Schema.Struct({}),
+    args: () => Schema.Struct({ text: Schema.String }),
+    returns: () => Schema.Struct({}),
   }),
 );
 
@@ -89,8 +87,8 @@ const noArgsActionRef = Ref.make(
   "random",
   FunctionSpec.publicAction({
     name: "getNumber",
-    args: Schema.Struct({}),
-    returns: Schema.Struct({}),
+    args: () => Schema.Struct({}),
+    returns: () => Schema.Struct({}),
   }),
 );
 
@@ -98,8 +96,8 @@ const argsActionRef = Ref.make(
   "email",
   FunctionSpec.publicAction({
     name: "send",
-    args: Schema.Struct({ to: Schema.String }),
-    returns: Schema.Struct({}),
+    args: () => Schema.Struct({ to: Schema.String }),
+    returns: () => Schema.Struct({}),
   }),
 );
 
@@ -181,117 +179,147 @@ const TestLayer = Layer.merge(
   TestWebSocketClientLayer.pipe(Layer.provide(SpyLayer)),
 );
 
-describe("WebSocketClient", () => {
+const clearSpy = Effect.gen(function* () {
+  const spy = yield* WebSocketClientSpy;
+  yield* MutableRef.set(spy.queryCalls, []);
+  yield* MutableRef.set(spy.mutationCalls, []);
+  yield* MutableRef.set(spy.actionCalls, []);
+  yield* MutableRef.set(spy.reactiveQueryCalls, []);
+  yield* MutableRef.set(spy.reactiveQueryFinalizations, []);
+});
+
+const withFreshSpy = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+  clearSpy.pipe(Effect.andThen(() => effect));
+
+layer(TestLayer)("WebSocketClient", (it) => {
   describe("query", () => {
     it.effect("args omitted when empty", () =>
-      Effect.gen(function* () {
-        const client = yield* WebSocketClient.WebSocketClient;
-        const spy = yield* WebSocketClientSpy;
-        yield* client.query(noArgsQueryRef);
-        expect(yield* MutableRef.get(spy.queryCalls)).toEqual([
-          { name: "notes:list", args: {} },
-        ]);
-      }).pipe(Effect.provide(TestLayer)),
+      withFreshSpy(
+        Effect.gen(function* () {
+          const client = yield* WebSocketClient.WebSocketClient;
+          const spy = yield* WebSocketClientSpy;
+          yield* client.query(noArgsQueryRef);
+          expect(yield* MutableRef.get(spy.queryCalls)).toEqual([
+            { name: "notes:list", args: {} },
+          ]);
+        }),
+      ),
     );
 
     it.effect("args passed when provided", () =>
-      Effect.gen(function* () {
-        const client = yield* WebSocketClient.WebSocketClient;
-        const spy = yield* WebSocketClientSpy;
-        yield* client.query(argsQueryRef, { id: "abc" });
-        expect(yield* MutableRef.get(spy.queryCalls)).toEqual([
-          { name: "notes:get", args: { id: "abc" } },
-        ]);
-      }).pipe(Effect.provide(TestLayer)),
+      withFreshSpy(
+        Effect.gen(function* () {
+          const client = yield* WebSocketClient.WebSocketClient;
+          const spy = yield* WebSocketClientSpy;
+          yield* client.query(argsQueryRef, { id: "abc" });
+          expect(yield* MutableRef.get(spy.queryCalls)).toEqual([
+            { name: "notes:get", args: { id: "abc" } },
+          ]);
+        }),
+      ),
     );
   });
 
   describe("mutation", () => {
     it.effect("args omitted when empty", () =>
-      Effect.gen(function* () {
-        const client = yield* WebSocketClient.WebSocketClient;
-        const spy = yield* WebSocketClientSpy;
-        yield* client.mutation(noArgsMutationRef);
-        expect(yield* MutableRef.get(spy.mutationCalls)).toEqual([
-          { name: "tasks:cleanup", args: {} },
-        ]);
-      }).pipe(Effect.provide(TestLayer)),
+      withFreshSpy(
+        Effect.gen(function* () {
+          const client = yield* WebSocketClient.WebSocketClient;
+          const spy = yield* WebSocketClientSpy;
+          yield* client.mutation(noArgsMutationRef);
+          expect(yield* MutableRef.get(spy.mutationCalls)).toEqual([
+            { name: "tasks:cleanup", args: {} },
+          ]);
+        }),
+      ),
     );
 
     it.effect("args passed when provided", () =>
-      Effect.gen(function* () {
-        const client = yield* WebSocketClient.WebSocketClient;
-        const spy = yield* WebSocketClientSpy;
-        yield* client.mutation(argsMutationRef, { text: "hello" });
-        expect(yield* MutableRef.get(spy.mutationCalls)).toEqual([
-          { name: "notes:insert", args: { text: "hello" } },
-        ]);
-      }).pipe(Effect.provide(TestLayer)),
+      withFreshSpy(
+        Effect.gen(function* () {
+          const client = yield* WebSocketClient.WebSocketClient;
+          const spy = yield* WebSocketClientSpy;
+          yield* client.mutation(argsMutationRef, { text: "hello" });
+          expect(yield* MutableRef.get(spy.mutationCalls)).toEqual([
+            { name: "notes:insert", args: { text: "hello" } },
+          ]);
+        }),
+      ),
     );
   });
 
   describe("action", () => {
     it.effect("args omitted when empty", () =>
-      Effect.gen(function* () {
-        const client = yield* WebSocketClient.WebSocketClient;
-        const spy = yield* WebSocketClientSpy;
-        yield* client.action(noArgsActionRef);
-        expect(yield* MutableRef.get(spy.actionCalls)).toEqual([
-          { name: "random:getNumber", args: {} },
-        ]);
-      }).pipe(Effect.provide(TestLayer)),
+      withFreshSpy(
+        Effect.gen(function* () {
+          const client = yield* WebSocketClient.WebSocketClient;
+          const spy = yield* WebSocketClientSpy;
+          yield* client.action(noArgsActionRef);
+          expect(yield* MutableRef.get(spy.actionCalls)).toEqual([
+            { name: "random:getNumber", args: {} },
+          ]);
+        }),
+      ),
     );
 
     it.effect("args passed when provided", () =>
-      Effect.gen(function* () {
-        const client = yield* WebSocketClient.WebSocketClient;
-        const spy = yield* WebSocketClientSpy;
-        yield* client.action(argsActionRef, { to: "user@example.com" });
-        expect(yield* MutableRef.get(spy.actionCalls)).toEqual([
-          { name: "email:send", args: { to: "user@example.com" } },
-        ]);
-      }).pipe(Effect.provide(TestLayer)),
+      withFreshSpy(
+        Effect.gen(function* () {
+          const client = yield* WebSocketClient.WebSocketClient;
+          const spy = yield* WebSocketClientSpy;
+          yield* client.action(argsActionRef, { to: "user@example.com" });
+          expect(yield* MutableRef.get(spy.actionCalls)).toEqual([
+            { name: "email:send", args: { to: "user@example.com" } },
+          ]);
+        }),
+      ),
     );
   });
 
   describe("reactiveQuery", () => {
     it.effect("subscribes and emits values", () =>
-      Effect.gen(function* () {
-        const client = yield* WebSocketClient.WebSocketClient;
-        const result = yield* client
-          .reactiveQuery(noArgsQueryRef)
-          .pipe(Stream.take(1), Stream.runCollect);
+      withFreshSpy(
+        Effect.gen(function* () {
+          const client = yield* WebSocketClient.WebSocketClient;
+          const result = yield* client
+            .reactiveQuery(noArgsQueryRef)
+            .pipe(Stream.take(1), Stream.runCollect);
 
-        expect(Chunk.toReadonlyArray(result)).toEqual([{}]);
-      }).pipe(Effect.provide(TestLayer)),
+          expect(Chunk.toReadonlyArray(result)).toEqual([{}]);
+        }),
+      ),
     );
 
     it.effect("passes args", () =>
-      Effect.gen(function* () {
-        const client = yield* WebSocketClient.WebSocketClient;
-        const spy = yield* WebSocketClientSpy;
-        yield* client
-          .reactiveQuery(argsQueryRef, { id: "abc" })
-          .pipe(Stream.take(1), Stream.runCollect);
+      withFreshSpy(
+        Effect.gen(function* () {
+          const client = yield* WebSocketClient.WebSocketClient;
+          const spy = yield* WebSocketClientSpy;
+          yield* client
+            .reactiveQuery(argsQueryRef, { id: "abc" })
+            .pipe(Stream.take(1), Stream.runCollect);
 
-        expect(yield* MutableRef.get(spy.reactiveQueryCalls)).toEqual([
-          { name: "notes:get", args: { id: "abc" } },
-        ]);
-      }).pipe(Effect.provide(TestLayer)),
+          expect(yield* MutableRef.get(spy.reactiveQueryCalls)).toEqual([
+            { name: "notes:get", args: { id: "abc" } },
+          ]);
+        }),
+      ),
     );
 
     it.effect("runs finalizer when stream is consumed", () =>
-      Effect.gen(function* () {
-        const client = yield* WebSocketClient.WebSocketClient;
-        const spy = yield* WebSocketClientSpy;
-        yield* client
-          .reactiveQuery(noArgsQueryRef)
-          .pipe(Stream.take(1), Stream.runCollect);
+      withFreshSpy(
+        Effect.gen(function* () {
+          const client = yield* WebSocketClient.WebSocketClient;
+          const spy = yield* WebSocketClientSpy;
+          yield* client
+            .reactiveQuery(noArgsQueryRef)
+            .pipe(Stream.take(1), Stream.runCollect);
 
-        expect(yield* MutableRef.get(spy.reactiveQueryFinalizations)).toEqual([
-          "notes:list",
-        ]);
-      }).pipe(Effect.provide(TestLayer)),
+          expect(yield* MutableRef.get(spy.reactiveQueryFinalizations)).toEqual(
+            ["notes:list"],
+          );
+        }),
+      ),
     );
   });
 });
@@ -304,9 +332,9 @@ const queryWithError = Ref.make(
   "notes",
   FunctionSpec.publicQuery({
     name: "getOrFail",
-    args: Schema.Struct({ id: Schema.String }),
-    returns: Schema.Struct({ text: Schema.String }),
-    error: NotFound,
+    args: () => Schema.Struct({ id: Schema.String }),
+    returns: () => Schema.Struct({ text: Schema.String }),
+    error: () => NotFound,
   }),
 );
 
@@ -314,9 +342,9 @@ const mutationWithError = Ref.make(
   "notes",
   FunctionSpec.publicMutation({
     name: "deleteOrFail",
-    args: Schema.Struct({ id: Schema.String }),
-    returns: Schema.Null,
-    error: NotFound,
+    args: () => Schema.Struct({ id: Schema.String }),
+    returns: () => Schema.Null,
+    error: () => NotFound,
   }),
 );
 
@@ -324,15 +352,15 @@ const actionWithError = Ref.make(
   "tasks",
   FunctionSpec.publicAction({
     name: "runOrFail",
-    args: Schema.Struct({ id: Schema.String }),
-    returns: Schema.Null,
-    error: NotFound,
+    args: () => Schema.Struct({ id: Schema.String }),
+    returns: () => Schema.Null,
+    error: () => NotFound,
   }),
 );
 
-const realLayer = WebSocketClient.layer("https://test.convex.cloud");
+const RealLayer = WebSocketClient.layer("https://test.convex.cloud");
 
-describe("WebSocketClient error decoding", () => {
+layer(RealLayer)("WebSocketClient error decoding", (it) => {
   describe("query", () => {
     it.scoped("decodes a matching ConvexError into the typed error", () =>
       Effect.gen(function* () {
@@ -344,12 +372,10 @@ describe("WebSocketClient error decoding", () => {
         const result = yield* Effect.either(
           client.query(queryWithError, { id: "abc" }),
         );
-        expect(Either.isLeft(result)).toBe(true);
-        if (Either.isLeft(result)) {
-          expect(result.left).toBeInstanceOf(NotFound);
-          expect((result.left as NotFound).id).toBe("abc");
-        }
-      }).pipe(Effect.provide(realLayer)),
+        assert(Either.isLeft(result));
+        assert(result.left instanceof NotFound);
+        expect(result.left.id).toBe("abc");
+      }),
     );
 
     it.scoped("wraps a non-ConvexError as WebSocketClientError", () =>
@@ -360,13 +386,11 @@ describe("WebSocketClient error decoding", () => {
         const result = yield* Effect.either(
           client.query(queryWithError, { id: "abc" }),
         );
-        expect(Either.isLeft(result)).toBe(true);
-        if (Either.isLeft(result)) {
-          expect(result.left).toBeInstanceOf(
-            WebSocketClient.WebSocketClientError,
-          );
-        }
-      }).pipe(Effect.provide(realLayer)),
+        assert(Either.isLeft(result));
+        expect(result.left).toBeInstanceOf(
+          WebSocketClient.WebSocketClientError,
+        );
+      }),
     );
   });
 
@@ -381,11 +405,9 @@ describe("WebSocketClient error decoding", () => {
         const result = yield* Effect.either(
           client.mutation(mutationWithError, { id: "abc" }),
         );
-        expect(Either.isLeft(result)).toBe(true);
-        if (Either.isLeft(result)) {
-          expect(result.left).toBeInstanceOf(NotFound);
-        }
-      }).pipe(Effect.provide(realLayer)),
+        assert(Either.isLeft(result));
+        expect(result.left).toBeInstanceOf(NotFound);
+      }),
     );
   });
 
@@ -400,11 +422,9 @@ describe("WebSocketClient error decoding", () => {
         const result = yield* Effect.either(
           client.action(actionWithError, { id: "abc" }),
         );
-        expect(Either.isLeft(result)).toBe(true);
-        if (Either.isLeft(result)) {
-          expect(result.left).toBeInstanceOf(NotFound);
-        }
-      }).pipe(Effect.provide(realLayer)),
+        assert(Either.isLeft(result));
+        expect(result.left).toBeInstanceOf(NotFound);
+      }),
     );
   });
 
@@ -437,12 +457,10 @@ describe("WebSocketClient error decoding", () => {
         );
 
         const result = yield* fiber;
-        expect(Either.isLeft(result)).toBe(true);
-        if (Either.isLeft(result)) {
-          expect(result.left).toBeInstanceOf(NotFound);
-          expect((result.left as NotFound).id).toBe("abc");
-        }
-      }).pipe(Effect.provide(realLayer)),
+        assert(Either.isLeft(result));
+        assert(result.left instanceof NotFound);
+        expect(result.left.id).toBe("abc");
+      }),
     );
 
     it.scoped("emits a WebSocketClientError when a non-ConvexError fires", () =>
@@ -470,13 +488,11 @@ describe("WebSocketClient error decoding", () => {
         subscribers[0]!.onError(new Error("network down"));
 
         const result = yield* fiber;
-        expect(Either.isLeft(result)).toBe(true);
-        if (Either.isLeft(result)) {
-          expect(result.left).toBeInstanceOf(
-            WebSocketClient.WebSocketClientError,
-          );
-        }
-      }).pipe(Effect.provide(realLayer)),
+        assert(Either.isLeft(result));
+        expect(result.left).toBeInstanceOf(
+          WebSocketClient.WebSocketClientError,
+        );
+      }),
     );
   });
 });

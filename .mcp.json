@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "Mintlify": {
+      "type": "http",
+      "url": "https://www.mintlify.com/docs/mcp"
+    },
+    "Lucide": {
+      "command": "pnpm",
+      "args": ["dlx", "lucide-icons-mcp", "--stdio"]
+    }
+  }
+}

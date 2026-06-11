@@ -1,15 +1,13 @@
 import { type GroupSpec, type Spec } from "@confect/core";
-import { Path } from "@effect/platform";
-import {
-  Array,
-  Data,
-  Effect,
-  Option,
-  pipe,
-  Record,
-  Schema,
-  String,
-} from "effect";
+import * as Path from "@effect/platform/Path";
+import { pipe } from "effect/Function";
+import * as Array from "effect/Array";
+import * as Data from "effect/Data";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as Record from "effect/Record";
+import * as Schema from "effect/Schema";
+import * as String from "effect/String";
 
 /**
  * The path to a group in the Confect API.

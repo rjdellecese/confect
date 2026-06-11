@@ -1,5 +1,7 @@
 import type { GenericId as ConvexGenericId } from "convex/values";
-import { type Option, Schema, SchemaAST } from "effect";
+import type { Option } from "effect";
+import * as Schema from "effect/Schema";
+import * as SchemaAST from "effect/SchemaAST";
 
 const ConvexId = Symbol.for("ConvexId");
 

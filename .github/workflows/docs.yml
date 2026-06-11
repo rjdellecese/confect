@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - main
+      - v9
   pull_request:
     branches:
       - main
+      - v9
 
 jobs:
   format:
@@ -15,8 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/docs-setup
-      - run: pnpm format
-      - run: pnpm --filter docs format
+      - run: pnpm format:check
 
   lint:
     name: Lint
@@ -24,7 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/docs-setup
-      - run: pnpm --filter docs lint
+      - run: pnpm lint
 
   broken-links:
     name: Broken Links

@@ -4,67 +4,51 @@ on:
   push:
     branches:
       - main
+      - v9
   pull_request:
     branches:
       - main
+      - v9
 
 jobs:
   format:
     name: Format
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        package:
-          [
-            "@confect/cli",
-            "@confect/core",
-            "@confect/js",
-            "@confect/server",
-            "@confect/react",
-            "@confect/test",
-          ]
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/confect-setup
-      - run: pnpm --filter ${{ matrix.package }} format
+      - run: pnpm format:check
 
   typecheck:
     name: Typecheck
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        package:
-          [
-            "@confect/cli",
-            "@confect/core",
-            "@confect/js",
-            "@confect/server",
-            "@confect/react",
-            "@confect/test",
-          ]
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/confect-setup
-      - run: pnpm --filter ${{ matrix.package }} typecheck
+      # `tsc -b` typechecks the whole project-references graph in dependency
+      # order (and emits the .d.ts that tsdown no longer does).
+      - run: pnpm typecheck
 
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        package:
-          [
-            "@confect/cli",
-            "@confect/core",
-            "@confect/js",
-            "@confect/server",
-            "@confect/react",
-            "@confect/test",
-          ]
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/confect-setup
-      - run: pnpm --filter ${{ matrix.package }} lint
+      # Oxlint lints the whole workspace in one fast pass; `pnpm lint` also runs
+      # the Syncpack and package-metadata checks.
+      - run: pnpm lint
+
+  circular:
+    name: Circular dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/confect-setup
+      # dpdm fails on real (runtime) import cycles; type-only `import type`
+      # cycles are ignored. confect-setup builds the packages first so
+      # cross-package `@confect/*` imports resolve.
+      - run: pnpm circular
 
   test:
     name: Test
@@ -132,4 +116,4 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/confect-setup
-      - run: pnpm --filter ${{ matrix.package }} build
+      - run: pnpm exec vp run --filter ${{ matrix.package }} build

@@ -1,16 +1,14 @@
 import { Ref } from "@confect/core";
 import type { CronJob as ConvexCronJob } from "convex/server";
 import { cronJobs as makeConvexCrons, type Crons } from "convex/server";
-import {
-  Array,
-  Cron,
-  Duration,
-  Match,
-  Order,
-  pipe,
-  Predicate,
-  Record,
-} from "effect";
+import { pipe } from "effect/Function";
+import * as Array from "effect/Array";
+import * as Cron from "effect/Cron";
+import * as Duration from "effect/Duration";
+import * as Match from "effect/Match";
+import * as Order from "effect/Order";
+import * as Predicate from "effect/Predicate";
+import * as Record from "effect/Record";
 import type * as CronJob from "./CronJob";
 
 export const TypeId = "@confect/server/CronJobs";

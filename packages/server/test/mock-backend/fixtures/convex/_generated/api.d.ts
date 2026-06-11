@@ -91,6 +91,12 @@ export declare const api: {
     >;
   };
   groups: {
+    aliasImporter: {
+      echo: FunctionReference<"query", "public", {}, string>;
+    };
+    cjsImporter: {
+      now: FunctionReference<"query", "public", {}, string>;
+    };
     notes: {
       delete_: FunctionReference<
         "mutation",
@@ -211,15 +217,13 @@ export declare const api: {
       >;
     };
   };
-  node: {
-    typedErrorsNode: {
-      failingNodeAction: FunctionReference<
-        "action",
-        "public",
-        { id: string },
-        null
-      >;
-    };
+  typedErrorsNode: {
+    failingNodeAction: FunctionReference<
+      "action",
+      "public",
+      { id: string },
+      null
+    >;
   };
 };
 

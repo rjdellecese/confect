@@ -10,7 +10,13 @@
     "lib": ["ESNext", "DOM"],
     "target": "ESNext",
     "moduleResolution": "Bundler",
-    "module": "ESNext"
+    "module": "ESNext",
+    "baseUrl": ".",
+    "paths": {
+      "@confect/server": ["./src/index.ts"],
+      "@confect/server/*": ["./src/*"],
+      "~/*": ["./test/mock-backend/fixtures/confect/*"]
+    }
   },
   "exclude": ["coverage", "dist", "node_modules"],
   "extends": ["../../tsconfig.base.json"]

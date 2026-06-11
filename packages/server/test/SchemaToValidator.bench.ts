@@ -1,10 +1,10 @@
 import { bench } from "@ark/attest";
 import type { GenericId } from "@confect/core/GenericId";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import type {
   TableSchemaToTableValidator,
   ValueToValidator,
-} from "../src/SchemaToValidator";
+} from "@confect/server/SchemaToValidator";
 
 // Force module-level instantiations so they are excluded from individual benchmarks.
 void ({} as ValueToValidator<any>);
@@ -117,14 +117,11 @@ bench("ValueToValidator<{ foo?: string | undefined }>", () => {
   return {} as ValueToValidator<{ foo?: string | undefined }>;
 }).types([999, "instantiations"]);
 
-bench(
-  "ValueToValidator<{ foo?: { bar?: number | undefined } | undefined }>",
-  () => {
-    return {} as ValueToValidator<{
-      foo?: { bar?: number | undefined } | undefined;
-    }>;
-  },
-).types([9370, "instantiations"]);
+bench("ValueToValidator<{ foo?: { bar?: number | undefined } | undefined }>", () => {
+  return {} as ValueToValidator<{
+    foo?: { bar?: number | undefined } | undefined;
+  }>;
+}).types([9370, "instantiations"]);
 
 // --- Unions ---
 

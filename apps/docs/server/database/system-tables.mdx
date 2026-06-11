@@ -11,8 +11,5 @@ reader.table("_storage").get(storageId);
 ```
 
 ```ts
-reader
-  .table("_scheduled_functions")
-  .index("by_creation_time", "desc")
-  .take(10);
+reader.table("_scheduled_functions").index("by_creation_time", "desc").take(10);
 ```

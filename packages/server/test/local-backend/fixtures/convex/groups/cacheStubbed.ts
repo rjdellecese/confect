@@ -1,7 +1,7 @@
-import registeredFunctions from "../../confect/_generated/registeredFunctions";
+import registeredFunctions from "../../confect/_generated/registeredFunctions/groups/cacheStubbed";
 
-export const confectNoTime = registeredFunctions.groups.cacheStubbed.confectNoTime;
-export const confectWithClock = registeredFunctions.groups.cacheStubbed.confectWithClock;
-export const confectWithLog = registeredFunctions.groups.cacheStubbed.confectWithLog;
-export const confectWithRawDateNow = registeredFunctions.groups.cacheStubbed.confectWithRawDateNow;
-export const confectWithSpan = registeredFunctions.groups.cacheStubbed.confectWithSpan;
+export const confectNoTime = registeredFunctions.confectNoTime;
+export const confectWithClock = registeredFunctions.confectWithClock;
+export const confectWithLog = registeredFunctions.confectWithLog;
+export const confectWithRawDateNow = registeredFunctions.confectWithRawDateNow;
+export const confectWithSpan = registeredFunctions.confectWithSpan;

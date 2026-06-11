@@ -16,7 +16,11 @@ import type {
   SearchIndexes,
 } from "convex/server";
 import type { GenericId } from "convex/values";
-import { Array, Effect, Either, pipe, Schema } from "effect";
+import { pipe } from "effect/Function";
+import * as Array from "effect/Array";
+import * as Effect from "effect/Effect";
+import * as Either from "effect/Either";
+import * as Schema from "effect/Schema";
 import type {
   BaseDatabaseReader,
   IndexFieldTypesForEq,
@@ -238,7 +242,13 @@ export const make = <
     return OrderedQuery.make<
       DataModel.TableInfoWithName_<DataModel_, TableName>,
       TableName
-    >(orderedQuery, tableName, table.Fields);
+    >(
+      orderedQuery,
+      tableName,
+      table.Fields as TableInfo.TableSchema<
+        DataModel.TableInfoWithName_<DataModel_, TableName>
+      >,
+    );
   };
 
   const search: QueryInitializerFunction<"search"> = (
@@ -253,7 +263,9 @@ export const make = <
         .query(tableName)
         .withSearchIndex(indexName, searchFilter),
       tableName,
-      table.Fields,
+      table.Fields as TableInfo.TableSchema<
+        DataModel.TableInfoWithName_<DataModel_, TableName>
+      >,
     );
 
   return {

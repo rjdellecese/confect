@@ -13,7 +13,7 @@ export const createConfig = ({
   platform,
   outDir,
   clean: true,
-  dts: true,
+  dts: false,
   sourcemap: true,
   format: ["esm"],
   unbundle: true,

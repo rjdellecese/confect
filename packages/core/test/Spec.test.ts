@@ -1,5 +1,10 @@
-import { describe, expect, it } from "@effect/vitest";
-import * as Spec from "../src/Spec";
+import { describe, expect, expectTypeOf, it } from "@effect/vitest";
+import * as Schema from "effect/Schema";
+import * as FunctionSpec from "@confect/core/FunctionSpec";
+import * as GroupSpec from "@confect/core/GroupSpec";
+import type * as RefMod from "@confect/core/Ref";
+import * as Refs from "@confect/core/Refs";
+import * as Spec from "@confect/core/Spec";
 
 describe("isSpec", () => {
   it("checks whether a value is a spec", () => {
@@ -7,4 +12,74 @@ describe("isSpec", () => {
 
     expect(Spec.isSpec(spec)).toStrictEqual(true);
   });
+});
+
+it("infers refs from addAt-assembled spec", () => {
+  const FnArgs = Schema.Struct({});
+  const FnReturns = Schema.Array(Schema.String);
+
+  const notes = GroupSpec.make().addFunction(
+    FunctionSpec.publicQuery({
+      name: "list",
+      args: () => FnArgs,
+      returns: () => FnReturns,
+    }),
+  );
+
+  const databaseReader = GroupSpec.make().addFunction(
+    FunctionSpec.publicQuery({
+      name: "listNotes",
+      args: () => FnArgs,
+      returns: () => FnReturns,
+    }),
+  );
+
+  const _spec = Spec.make()
+    .addAt("databaseReader", databaseReader)
+    .addAt("groups", GroupSpec.makeAt("groups").addGroupAt("notes", notes));
+
+  type SpecGroups = Spec.Groups<typeof _spec>;
+  type TopLevelNames = GroupSpec.Name<SpecGroups>;
+  type PublicRefs = Refs.Refs<typeof _spec>;
+
+  expectTypeOf<TopLevelNames>().toEqualTypeOf<"databaseReader" | "groups">();
+  expectTypeOf<keyof PublicRefs>().toEqualTypeOf<"databaseReader" | "groups">();
+  expectTypeOf<PublicRefs["groups"]["notes"]["list"]>().not.toBeNever();
+});
+
+it("places a Node group alongside Convex groups, with no `node` namespace", () => {
+  const FnArgs = Schema.Struct({});
+  const FnReturns = Schema.Null;
+
+  const notes = GroupSpec.make().addFunction(
+    FunctionSpec.publicQuery({
+      name: "list",
+      args: () => FnArgs,
+      returns: () => Schema.Array(Schema.String),
+    }),
+  );
+
+  // A Node action group built with `makeNode()` is added at the top level like
+  // any Convex group; its runtime lives on the group, not in a `node` namespace.
+  const email = GroupSpec.makeNode().addFunction(
+    FunctionSpec.publicNodeAction({
+      name: "send",
+      args: () => FnArgs,
+      returns: () => FnReturns,
+    }),
+  );
+
+  const spec = Spec.make().addAt("notes", notes).addAt("email", email);
+
+  expect(Object.keys(spec.groups).sort()).toEqual(["email", "notes"]);
+
+  const refs = Refs.make(spec);
+
+  // The Node action is reachable at the group's own path
+  // (`refs.public.email.send`), with no enclosing `node` group.
+  expect("node" in refs.public).toBe(false);
+
+  type PublicRefs = Refs.Refs<typeof spec, RefMod.AnyPublic>;
+  expectTypeOf<keyof PublicRefs>().toEqualTypeOf<"notes" | "email">();
+  expectTypeOf<PublicRefs["email"]["send"]>().toMatchTypeOf<RefMod.AnyAction>();
 });

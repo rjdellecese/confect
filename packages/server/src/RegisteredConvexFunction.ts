@@ -11,8 +11,12 @@ import {
   queryGeneric,
 } from "convex/server";
 import type { Value } from "convex/values";
-import { Clock, Effect, Layer, Match, pipe, Schema } from "effect";
-import type * as Api from "./Api";
+import { pipe } from "effect/Function";
+import * as Clock from "effect/Clock";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Match from "effect/Match";
+import * as Schema from "effect/Schema";
 import * as Auth from "./Auth";
 import * as ConvexConfigProvider from "./ConvexConfigProvider";
 import * as DatabaseReader from "./DatabaseReader";
@@ -31,8 +35,8 @@ import * as SchemaToValidator from "./SchemaToValidator";
 import { StorageReader } from "./StorageReader";
 import { StorageWriter } from "./StorageWriter";
 
-export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
-  api: Api_,
+export const make = (
+  databaseSchema: DatabaseSchema.AnyWithProps,
   { functionSpec, handler }: RegistryItem.AnyWithProps,
 ): RegisteredFunction.Any =>
   Match.value(functionSpec.functionProvenance).pipe(
@@ -51,7 +55,7 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
 
           return genericFunction(
             queryFunction({
-              databaseSchema: api.databaseSchema,
+              databaseSchema,
               args: functionProvenance.args,
               returns: functionProvenance.returns,
               error: functionProvenance.error,
@@ -68,7 +72,7 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
 
           return genericFunction(
             mutationFunction({
-              databaseSchema: api.databaseSchema,
+              databaseSchema,
               args: functionProvenance.args,
               returns: functionProvenance.returns,
               error: functionProvenance.error,
@@ -84,7 +88,7 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
           );
 
           return genericFunction(
-            convexActionFunction(api.databaseSchema, {
+            convexActionFunction(databaseSchema, {
               args: functionProvenance.args,
               returns: functionProvenance.returns,
               error: functionProvenance.error,

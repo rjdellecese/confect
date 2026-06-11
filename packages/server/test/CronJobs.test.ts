@@ -1,16 +1,18 @@
 import { FunctionSpec, Ref } from "@confect/core";
-import { Cron, Duration, Schema } from "effect";
+import * as Cron from "effect/Cron";
+import * as Duration from "effect/Duration";
+import * as Schema from "effect/Schema";
 import { describe, expect, test } from "vitest";
-import * as CronJob from "../src/CronJob";
-import * as CronJobs from "../src/CronJobs";
+import * as CronJob from "@confect/server/CronJob";
+import * as CronJobs from "@confect/server/CronJobs";
 
 const makeMutationRef = (functionNamespace: string, name: string) =>
   Ref.make(
     functionNamespace,
     FunctionSpec.internalMutation({
       name,
-      args: Schema.Struct({}),
-      returns: Schema.Void,
+      args: () => Schema.Struct({}),
+      returns: () => Schema.Void,
     }),
   );
 
@@ -19,8 +21,8 @@ const makeActionRef = (functionNamespace: string, name: string) =>
     functionNamespace,
     FunctionSpec.internalAction({
       name,
-      args: Schema.Struct({}),
-      returns: Schema.Void,
+      args: () => Schema.Struct({}),
+      returns: () => Schema.Void,
     }),
   );
 
@@ -29,8 +31,8 @@ const makeMutationRefWithArgs = (functionNamespace: string, name: string) =>
     functionNamespace,
     FunctionSpec.internalMutation({
       name,
-      args: Schema.Struct({ email: Schema.String }),
-      returns: Schema.Void,
+      args: () => Schema.Struct({ email: Schema.String }),
+      returns: () => Schema.Void,
     }),
   );
 

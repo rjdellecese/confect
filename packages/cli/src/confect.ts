@@ -1,5 +1,5 @@
-import { Command } from "@effect/cli";
-import { Layer } from "effect";
+import * as Command from "@effect/cli/Command";
+import * as Layer from "effect/Layer";
 import { codegen } from "./confect/codegen";
 import { dev } from "./confect/dev";
 import { ConfectDirectory } from "./ConfectDirectory";

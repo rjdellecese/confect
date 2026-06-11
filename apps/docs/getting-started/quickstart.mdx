@@ -40,29 +40,20 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
       information about what's permitted and what's not.
     </Note>
 
-    Define a table.
+    Define a table — one file per table under `confect/tables/`, where the **filename is the table name** (so filenames must be valid JS identifiers and may not start with `_`). Each file **must default-export** a `Table`; codegen reads `module.default` and applies the filename as the table name. From other modules (e.g. specs), default-import the codegen-emitted wrapper at `confect/_generated/tables/<name>` to reach the table's derived `Schema`s (`notes.Doc`, `notes.Fields`).
 
-    ```ts confect/tables/Notes.ts
+    ```ts confect/tables/notes.ts
     import { Table } from "@confect/server";
     import { Schema } from "effect";
 
-    export const Notes = Table.make(
-      "notes",
+    export default Table.make(() =>
       Schema.Struct({
         text: Schema.String,
       }),
     );
     ```
 
-    And then add it to your database schema.
-
-    ```ts confect/schema.ts
-    import { DatabaseSchema } from "@confect/server";
-
-    import { Notes } from "./tables/Notes";
-
-    export default DatabaseSchema.make().addTable(Notes);
-    ```
+    Codegen will assemble every `confect/tables/*.ts` into a `DatabaseSchema` (in `confect/_generated/schema.ts`) and a Convex deploy `SchemaDefinition` (in `confect/_generated/convexSchema.ts`) for you — you never write a `confect/schema.ts`. It also emits a `confect/_generated/id.ts` module exporting a type-safe `Id` constructor (`Id("notes")`) for cross-table references.
 
   </Step>
 
@@ -73,38 +64,30 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
     import { FunctionSpec, GroupSpec } from "@confect/core";
     import { Schema } from "effect";
 
-    import { Notes } from "./tables/Notes";
+    import { Id } from "./_generated/id";
+    import notes from "./_generated/tables/notes";
 
-    export const notes = GroupSpec.make("notes")
+    export default GroupSpec.make()
       .addFunction(
         FunctionSpec.publicQuery({
           name: "list",
-          args: Schema.Struct({}),
-          returns: Schema.Array(Notes.Doc),
+          args: () => Schema.Struct({}),
+          returns: () => Schema.Array(notes.Doc),
         }),
       )
       .addFunction(
         FunctionSpec.publicMutation({
           name: "create",
-          args: Schema.Struct({ text: Schema.String }),
-          returns: Schema.Null,
+          args: () => Schema.Struct({ text: Schema.String }),
+          returns: () => Id("notes"),
         }),
       );
-    ```
-
-    Add the `GroupSpec` to your API's `Spec`.
-
-    ```ts confect/spec.ts
-    import { Spec } from "@confect/core";
-    import { notes } from "./notes.spec";
-
-    export default Spec.make().add(notes);
     ```
 
   </Step>
 
   <Step title="Run the codegen command">
-    Generate your app's Confect API, services, and registered functions.
+    Generate your app's `confect/_generated/` files.
 
     ```bash
     confect codegen
@@ -119,10 +102,11 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
     import { FunctionImpl, GroupImpl } from "@confect/server";
     import { Effect, Layer } from "effect";
 
-    import api from "./_generated/api";
+    import databaseSchema from "./_generated/schema";
     import { DatabaseReader, DatabaseWriter } from "./_generated/services";
+    import notes from "./notes.spec";
 
-    const list = FunctionImpl.make(api, "notes", "list", () =>
+    const list = FunctionImpl.make(databaseSchema, notes, "list", () =>
       Effect.gen(function* () {
         const reader = yield* DatabaseReader;
 
@@ -133,7 +117,7 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
       }).pipe(Effect.orDie),
     );
 
-    const create = FunctionImpl.make(api, "notes", "create", ({ text }) =>
+    const create = FunctionImpl.make(databaseSchema, notes, "create", ({ text }) =>
       Effect.gen(function* () {
         const writer = yield* DatabaseWriter;
 
@@ -141,26 +125,16 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
       }).pipe(Effect.orDie),
     );
 
-    export const notes = GroupImpl.make(api, "notes").pipe(
+    export default GroupImpl.make(databaseSchema, notes).pipe(
       Layer.provide(list),
       Layer.provide(create),
+      GroupImpl.finalize,
     );
     ```
 
-    Add the `GroupImpl` to your API's `Impl`, and finalize it.
+    `GroupImpl.finalize` only typechecks once every function declared by the spec has a corresponding `FunctionImpl`, so it acts as a per-group completeness check.
 
-    ```ts confect/impl.ts
-    import { Impl } from "@confect/server";
-    import { Layer } from "effect";
-
-    import api from "./_generated/api";
-    import { notes } from "./notes.impl";
-
-    export default Impl.make(api).pipe(
-      Layer.provide(notes),
-      Impl.finalize,
-    );
-    ```
+    Run `confect codegen` again to pick up the new impl.
 
   </Step>
 
@@ -204,7 +178,7 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
     Use Confect's React hooks alongside your Confect public refs to call your Confect functions.
 
     ```tsx src/App.tsx
-    import { useMutation, useQuery } from "@confect/react";
+    import { QueryResult, useMutation, useQuery } from "@confect/react";
     import { Array } from "effect";
     import { useState } from "react";
 
@@ -220,11 +194,13 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
       return (
         <div>
           <ul>
-            {notes === undefined
-              ? <p>Loading…</p>
-              : Array.map(notes, (note) => (
+            {QueryResult.match(notes, {
+              onLoading: () => <p>Loading…</p>,
+              onSuccess: (notes) =>
+                Array.map(notes, (note) => (
                   <li key={note._id}>{note.text}</li>
-                ))}
+                )),
+            })}
           </ul>
 
           <br />

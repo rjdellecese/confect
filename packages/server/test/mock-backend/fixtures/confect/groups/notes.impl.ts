@@ -1,9 +1,11 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
-import { Effect, Layer } from "effect";
-import api from "../_generated/api";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import databaseSchema from "../_generated/schema";
 import { DatabaseReader, DatabaseWriter } from "../_generated/services";
+import notes from "./notes.spec";
 
-const insert = FunctionImpl.make(api, "groups.notes", "insert", ({ text }) =>
+const insert = FunctionImpl.make(databaseSchema, notes, "insert", ({ text }) =>
   Effect.gen(function* () {
     const writer = yield* DatabaseWriter;
 
@@ -11,7 +13,7 @@ const insert = FunctionImpl.make(api, "groups.notes", "insert", ({ text }) =>
   }).pipe(Effect.orDie),
 );
 
-const list = FunctionImpl.make(api, "groups.notes", "list", () =>
+const list = FunctionImpl.make(databaseSchema, notes, "list", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
 
@@ -23,8 +25,8 @@ const list = FunctionImpl.make(api, "groups.notes", "list", () =>
 );
 
 const delete_ = FunctionImpl.make(
-  api,
-  "groups.notes",
+  databaseSchema,
+  notes,
   "delete_",
   ({ noteId }) =>
     Effect.gen(function* () {
@@ -36,7 +38,7 @@ const delete_ = FunctionImpl.make(
     }).pipe(Effect.orDie),
 );
 
-const getFirst = FunctionImpl.make(api, "groups.notes", "getFirst", () =>
+const getFirst = FunctionImpl.make(databaseSchema, notes, "getFirst", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
 
@@ -45,8 +47,8 @@ const getFirst = FunctionImpl.make(api, "groups.notes", "getFirst", () =>
 );
 
 const internalGetFirst = FunctionImpl.make(
-  api,
-  "groups.notes",
+  databaseSchema,
+  notes,
   "internalGetFirst",
   () =>
     Effect.gen(function* () {
@@ -56,10 +58,11 @@ const internalGetFirst = FunctionImpl.make(
     }).pipe(Effect.orDie),
 );
 
-export const notes = GroupImpl.make(api, "groups.notes").pipe(
+export default GroupImpl.make(databaseSchema, notes).pipe(
   Layer.provide(insert),
   Layer.provide(list),
   Layer.provide(delete_),
   Layer.provide(getFirst),
   Layer.provide(internalGetFirst),
+  GroupImpl.finalize,
 );

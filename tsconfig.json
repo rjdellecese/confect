@@ -1,0 +1,42 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "incremental": true,
+    "tsBuildInfoFile": "node_modules/.cache/tsc/tsconfig.tsbuildinfo",
+    "rootDir": ".",
+    "skipLibCheck": true,
+    "isolatedDeclarations": false,
+    "exactOptionalPropertyTypes": true,
+    "lib": ["ESNext", "DOM"],
+    "target": "ESNext",
+    "moduleResolution": "Bundler",
+    "module": "ESNext",
+    "jsx": "react-jsx",
+    "paths": {
+      "@confect/core": ["./packages/core/src/index.ts"],
+      "@confect/core/*": ["./packages/core/src/*"],
+      "@confect/server": ["./packages/server/src/index.ts"],
+      "@confect/server/*": ["./packages/server/src/*"],
+      "@confect/js": ["./packages/js/src/index.ts"],
+      "@confect/js/*": ["./packages/js/src/*"],
+      "@confect/react": ["./packages/react/src/index.ts"],
+      "@confect/react/*": ["./packages/react/src/*"],
+      "@confect/cli": ["./packages/cli/src/index.ts"],
+      "@confect/cli/*": ["./packages/cli/src/*"],
+      "@confect/test": ["./packages/test/src/index.ts"],
+      "@confect/test/*": ["./packages/test/src/*"],
+      "~/*": ["./packages/server/test/mock-backend/fixtures/confect/*"]
+    }
+  },
+  // `packages/cli/src` is included explicitly: `@confect/cli` ships only a
+  // binary, so it has no composite `tsconfig.src.json` in the
+  // `tsconfig.packages.json` graph, and this project is what typechecks its
+  // sources (not all of which are reachable from its tests).
+  "include": [
+    "*.ts",
+    "packages/*/*.ts",
+    "packages/*/test/**/*",
+    "packages/cli/src/**/*"
+  ]
+}

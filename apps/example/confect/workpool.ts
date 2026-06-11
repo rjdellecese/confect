@@ -17,6 +17,30 @@ const pool = new Workpool(components.workpool, {
   maxParallelism: 3,
 });
 
+export const backgroundWork = internalAction({
+  args: {},
+  returns: v.null(),
+  handler: async (): Promise<null> => {
+    await new Promise((resolve) =>
+      setTimeout(resolve, 2000 + Math.random() * 3000),
+    );
+    return null;
+  },
+});
+
+export const onComplete = internalMutation({
+  args: vOnCompleteArgs(),
+  returns: v.null(),
+  handler: async (_ctx, { result }): Promise<null> => {
+    if (result.kind === "success") {
+      console.log("Background work completed successfully");
+    } else if (result.kind === "failed") {
+      console.error("Background work failed:", result.error);
+    }
+    return null;
+  },
+});
+
 export const enqueue = mutation({
   args: {},
   returns: vWorkId,
@@ -39,29 +63,5 @@ export const status = query({
   ),
   handler: async (ctx, { workId }) => {
     return await pool.status(ctx, workId);
-  },
-});
-
-export const backgroundWork = internalAction({
-  args: {},
-  returns: v.null(),
-  handler: async (): Promise<null> => {
-    await new Promise((resolve) =>
-      setTimeout(resolve, 2000 + Math.random() * 3000),
-    );
-    return null;
-  },
-});
-
-export const onComplete = internalMutation({
-  args: vOnCompleteArgs(),
-  returns: v.null(),
-  handler: async (_ctx, { result }): Promise<null> => {
-    if (result.kind === "success") {
-      console.log("Background work completed successfully");
-    } else if (result.kind === "failed") {
-      console.error("Background work failed:", result.error);
-    }
-    return null;
   },
 });
