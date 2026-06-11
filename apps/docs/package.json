@@ -1,6 +1,6 @@
 {
   "name": "docs",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "devDependencies": {
     "@mintlify/scraping": "4.0.632",
     "mintlify": "4.2.397",
