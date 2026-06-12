@@ -1,7 +1,7 @@
 {
   "name": "@confect/test",
   "description": "Utilities for testing Confect apps without a live Convex backend",
-  "version": "9.0.1",
+  "version": "9.0.2",
   "author": "RJ Dellecese",
   "bugs": {
     "url": "https://github.com/rjdellecese/confect/issues"
