@@ -2,6 +2,7 @@
   "$schema": "../node_modules/@changesets/config/schema.json",
   "changelog": "@changesets/cli/changelog",
   "commit": false,
+  "prettier": false,
   "fixed": [["@confect/*"]],
   "linked": [],
   "access": "public",

@@ -37,6 +37,7 @@ jobs:
         id: changesets
         uses: changesets/action@v1
         with:
+          version: pnpm version-packages
           publish: pnpm release
           branch: ${{ github.ref_name }}
         env:
