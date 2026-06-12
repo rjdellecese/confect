@@ -1,5 +1,13 @@
 # @confect/test
 
+## 9.0.2
+
+### Patch Changes
+
+- Updated dependencies [dd33006]
+  - @confect/server@9.0.2
+  - @confect/core@9.0.2
+
 ## 9.0.1
 
 ### Patch Changes
