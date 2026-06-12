@@ -317,6 +317,9 @@ export class GetByIndexFailure extends Schema.TaggedError<GetByIndexFailure>()(
   },
 ) {
   override get message(): string {
-    return `No documents found in table '${this.tableName}' with index '${this.indexName}' and field values '${JSON.stringify(this.indexFieldValues)}'`;
+    return `No documents found in table '${this.tableName}' with index '${this.indexName}' and field values '${JSON.stringify(
+      this.indexFieldValues,
+      (_key, value) => (typeof value === "bigint" ? value.toString() : value),
+    )}'`;
   }
 }
