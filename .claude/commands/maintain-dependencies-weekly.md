@@ -11,10 +11,11 @@ ladder, and changeset policy throughout. Do not merge anything.
    push a fix; if it's been superseded by `main` or a newer PR, close it with a
    comment saying why. Finish the sweep before opening new work.
 2. **Security first.** Run `pnpm audit`. Fix each actionable advisory in its
-   own PR, exempt from the cooling period, before anything else.
-3. **Survey.** Run `pnpm -r outdated`. Take only patch and minor updates that
-   clear the cooling period — majors are out of scope here (note any that look
-   significant for the monthly pass).
+   own PR before anything else; if the cooldown blocks a needed fix, override
+   it for that install (see the skill).
+3. **Survey.** Run `pnpm -r outdated`. Take only patch and minor updates —
+   majors are out of scope here (note any that look significant for the
+   monthly pass). pnpm's cooldown handles release age for you.
 4. **Group by judgment.** Keep interlocked dependencies together as the skill
    describes; beyond that, decide the grouping. A sensible default is one PR
    per interlocked set that has updates plus one batch PR for the

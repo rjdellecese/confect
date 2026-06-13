@@ -8,9 +8,9 @@ ladder, and changeset policy throughout. Do not merge anything.
 
 1. **Sweep open dependency PRs** exactly as the weekly pass does (rebase, fix
    red CI, close superseded ones) before opening new work.
-2. **Majors.** From `pnpm -r outdated`, take the available major upgrades that
-   clear the cooling period — one PR per major, or per tightly coupled set
-   that must move together (see the skill on interlocked dependencies). For
+2. **Majors.** From `pnpm -r outdated`, take the available major upgrades —
+   one PR per major, or per tightly coupled set that must move together (see
+   the skill on interlocked dependencies). For
    each: read the migration guide, apply the migration including any source
    changes, and run the full verification ladder. If a major can't be
    completed, open a **draft** PR with findings and what remains. If a major

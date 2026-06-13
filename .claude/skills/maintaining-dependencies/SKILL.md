@@ -42,10 +42,12 @@ into PRs — is your judgment call.
   another must move in the same PR as that other package. Treat `0.x`
   dependencies' minor bumps as potentially breaking and read their release
   notes.
-- **Cooling period.** Skip any version published less than 3 days ago (check
-  `pnpm view <pkg> time --json`) — supply-chain protection, not bug caution.
-  Exception: a version that resolves a `pnpm audit` finding may be taken
-  immediately.
+- **Cooling period is enforced by pnpm, not by you.** `minimumReleaseAge` in
+  `pnpm-workspace.yaml` makes `pnpm` refuse to install a registry version
+  until it's old enough, so you don't filter `pnpm outdated` results by age —
+  just run the upgrade and let pnpm resolve to the newest eligible version. To
+  take a version the cooldown is blocking on purpose (e.g. a fresh security
+  fix), override that one install with `--config.minimumReleaseAge=0`.
 - **Branches and PRs.** Branch from `main` as `claude/deps/<topic>-<date>`.
   Open at most 4 new PRs per run; update an existing open dependency PR rather
   than opening a near-duplicate. PR bodies summarize what moved and why, quote
