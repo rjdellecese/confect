@@ -1,9 +1,12 @@
 import { Ref } from "@confect/core";
+import type { OptimisticUpdate as ConvexOptimisticUpdate } from "convex/browser";
 import {
   useAction as useConvexAction,
   useMutation as useConvexMutation,
   useQuery as useConvexQuery,
+  type ReactMutation as ConvexReactMutation,
 } from "convex/react";
+import type { FunctionReference } from "convex/server";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Either from "effect/Either";
@@ -11,9 +14,10 @@ import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
 import { useCallback, useMemo } from "react";
 
+import * as OptimisticLocalStore from "./OptimisticLocalStore";
 import * as QueryResult from "./QueryResult";
 
-export { QueryResult };
+export { OptimisticLocalStore, QueryResult };
 
 export type InvokeReturn<Ref_ extends Ref.Any> = [Ref.Error<Ref_>] extends [
   never,
@@ -76,7 +80,69 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
 };
 
 /**
- * Returns a function that invokes the provided `Ref`'s mutation.
+ * An optimistic update for a Confect mutation. Mirrors Convex's
+ * `OptimisticUpdate`, but receives a Confect {@link OptimisticLocalStore} and
+ * the decoded mutation `args`.
+ */
+export type OptimisticUpdate<Mutation extends Ref.AnyPublicMutation> = (
+  localStore: OptimisticLocalStore.OptimisticLocalStore,
+  args: Ref.Args<Mutation>,
+) => void;
+
+/**
+ * The handle returned by {@link useMutation}. It is callable like the function
+ * returned by Convex's `useMutation`, and additionally exposes
+ * `withOptimisticUpdate` for attaching an optimistic update. Mirrors the
+ * `ReactMutation` type from `convex/react`.
+ */
+export interface ReactMutation<Mutation extends Ref.AnyPublicMutation> {
+  (...args: Ref.OptionalArgs<Mutation>): InvokeReturn<Mutation>;
+  withOptimisticUpdate(
+    optimisticUpdate: OptimisticUpdate<Mutation>,
+  ): ReactMutation<Mutation>;
+}
+
+const makeReactMutation = <Mutation extends Ref.AnyPublicMutation>(
+  ref: Mutation,
+  convexReactMutation: ConvexReactMutation<
+    Ref.FunctionReference<Mutation> & FunctionReference<"mutation">
+  >,
+): ReactMutation<Mutation> => {
+  const callable = ((...args: Ref.OptionalArgs<Mutation>) =>
+    invokeAsEither(
+      ref,
+      (_, encodedArgs) => convexReactMutation(encodedArgs as never),
+      args,
+    ).then((either) =>
+      Ref.hasErrorSchema(ref) ? either : Either.getOrThrow(either),
+    )) as (...args: Ref.OptionalArgs<Mutation>) => InvokeReturn<Mutation>;
+
+  const withOptimisticUpdate = (
+    optimisticUpdate: OptimisticUpdate<Mutation>,
+  ): ReactMutation<Mutation> => {
+    const wrappedUpdate: ConvexOptimisticUpdate<Ref.Args<Mutation>> = (
+      convexLocalStore,
+      encodedArgs,
+    ) => {
+      const decodedArgs = Ref.decodeArgsSync(ref, encodedArgs);
+      optimisticUpdate(
+        OptimisticLocalStore.make(convexLocalStore),
+        decodedArgs,
+      );
+    };
+    const nextConvexReactMutation =
+      convexReactMutation.withOptimisticUpdate(wrappedUpdate);
+    return makeReactMutation(ref, nextConvexReactMutation);
+  };
+
+  return Object.assign(callable, { withOptimisticUpdate });
+};
+
+/**
+ * Returns a {@link ReactMutation} handle for the provided `Ref`'s mutation. The
+ * handle is callable to invoke the mutation, and exposes `withOptimisticUpdate`
+ * for attaching an optimistic update, mirroring `useMutation` from
+ * `convex/react`.
  *
  * If the `Ref` declares an `error` schema, the returned promise resolves to an
  * `Either` with the decoded `returns` value on the right and the decoded error
@@ -90,20 +156,19 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
  */
 export const useMutation = <Mutation extends Ref.AnyPublicMutation>(
   ref: Mutation,
-): ((...args: Ref.OptionalArgs<Mutation>) => InvokeReturn<Mutation>) => {
+): ReactMutation<Mutation> => {
   const functionReference = Ref.getFunctionReference(ref);
-  const actualMutation = useConvexMutation(functionReference);
+  const convexReactMutation = useConvexMutation(functionReference);
 
-  return useCallback(
-    ((...args: Ref.OptionalArgs<Mutation>) =>
-      invokeAsEither(
+  return useMemo(
+    () =>
+      makeReactMutation(
         ref,
-        (_, encodedArgs) => actualMutation(encodedArgs),
-        args,
-      ).then((either) =>
-        Ref.hasErrorSchema(ref) ? either : Either.getOrThrow(either),
-      )) as (...args: Ref.OptionalArgs<Mutation>) => InvokeReturn<Mutation>,
-    [ref, actualMutation],
+        convexReactMutation as ConvexReactMutation<
+          Ref.FunctionReference<Mutation> & FunctionReference<"mutation">
+        >,
+      ),
+    [ref, convexReactMutation],
   );
 };
 

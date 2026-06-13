@@ -7,6 +7,7 @@ import type { GenericId } from "convex/values";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import * as Option from "effect/Option";
 import { useEffect, useState } from "react";
 import refs from "../confect/_generated/refs";
 import { Api } from "../confect/http/pathPrefix";
@@ -233,7 +234,21 @@ const WorkStatusRow = ({
 const NoteList = () => {
   const notesResult = useQuery(refs.public.notes_and_random.notes.list, {});
 
-  const deleteNote = useMutation(refs.public.notes_and_random.notes.delete_);
+  const deleteNote = useMutation(
+    refs.public.notes_and_random.notes.delete_,
+  ).withOptimisticUpdate((localStore, { noteId }) => {
+    const current = localStore.getQuery(
+      refs.public.notes_and_random.notes.list,
+      {},
+    );
+    if (Option.isSome(current)) {
+      localStore.setQuery(
+        refs.public.notes_and_random.notes.list,
+        {},
+        Option.some(current.value.filter((note) => note._id !== noteId)),
+      );
+    }
+  });
 
   return QueryResult.match(notesResult, {
     onLoading: () => <p>Loading…</p>,
