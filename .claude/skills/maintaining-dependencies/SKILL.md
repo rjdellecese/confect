@@ -1,20 +1,16 @@
 ---
 name: maintaining-dependencies
 description: >-
-  Shared rules for upgrading dependencies across the Confect monorepo — the
-  invariants, verification ladder, and changeset policy that the dependency
-  upgrade workflows depend on. Use whenever upgrading dependencies, responding
-  to `pnpm outdated` or `pnpm audit` findings, or sweeping previously opened
-  dependency PRs, and as the reference invoked by the deps upgrade commands.
+  Rules for upgrading dependencies across the Confect monorepo — the
+  invariants, verification ladder, and changeset policy every upgrade must
+  follow. Use whenever upgrading dependencies or responding to `pnpm outdated`
+  or `pnpm audit` findings.
 ---
 
 # Maintaining dependencies
 
-The Confect monorepo's dependency upgrades run through two commands —
-`/deps-weekly` (patch/minor upgrades, security fixes, PR sweeping) and
-`/deps-monthly` (major upgrades and peer-floor verification), both intended to
-be driven unattended by Claude Code Routines. This skill holds the rules they
-share. Read it before acting on either workflow.
+Rules for any dependency upgrade in this monorepo, however it's initiated.
+Read this before changing dependency versions.
 
 ## Invariants
 
