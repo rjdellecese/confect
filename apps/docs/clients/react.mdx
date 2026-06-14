@@ -19,13 +19,9 @@ import ReactDOM from "react-dom/client";
 
 import App from "./App";
 
-const convexClient = new ConvexReactClient(
-  import.meta.env.VITE_CONVEX_URL,
-);
+const convexClient = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
 
-ReactDOM.createRoot(
-  document.getElementById("root") as HTMLElement,
-).render(
+ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <ConvexProvider client={convexClient}>
       <App />
@@ -42,20 +38,20 @@ Given this spec:
 
 ```ts confect/notes.spec.ts
 import { FunctionSpec, GroupSpec } from "@confect/core";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
-import { Notes } from "./tables/Notes";
+import notes from "./_generated/tables/notes";
 
-export const notes = GroupSpec.make("notes").addFunction(
+export default GroupSpec.make().addFunction(
   FunctionSpec.publicQuery({
     name: "list",
-    args: Schema.Struct({}),
-    returns: Schema.Array(Notes.Doc),
+    args: () => Schema.Struct({}),
+    returns: () => Schema.Array(notes.Doc),
   }),
 );
 ```
 
-The hook accepts `{}` (the `Type` of `Schema.Struct({})`) as args and returns a `QueryResult<readonly Notes.Doc["Type"][]>`. Match it with `QueryResult.match`:
+The hook accepts `{}` (the `Type` of `Schema.Struct({})`) as args and returns a `QueryResult<readonly notes.Doc["Type"][]>`. Match it with `QueryResult.match`:
 
 ```tsx
 import { QueryResult, useQuery } from "@confect/react";
@@ -112,20 +108,14 @@ Pass `"skip"` instead of args to disable the query subscription. The hook return
 import { QueryResult, useQuery } from "@confect/react";
 import refs from "../confect/_generated/refs";
 
-const NoteDetail = ({
-  selectedId,
-}: {
-  selectedId: string | undefined;
-}) => {
+const NoteDetail = ({ selectedId }: { selectedId: string | undefined }) => {
   const note = useQuery(
     refs.public.notes.get,
     selectedId !== undefined ? { id: selectedId } : "skip",
   );
 
   return QueryResult.match(note, {
-    onLoading: (skipped) => (
-      <p>{skipped ? "Select a note" : "Loading…"}</p>
-    ),
+    onLoading: (skipped) => <p>{skipped ? "Select a note" : "Loading…"}</p>,
     onSuccess: (note) => <p>{note.text}</p>,
   });
 };
@@ -140,10 +130,12 @@ Returns a function that encodes args using the spec's `args` schema, calls the C
 The function returns `Promise<A>`, matching `convex/react`'s `useMutation`. Undeclared failures still reject the promise.
 
 ```ts confect/notes.spec.ts
+import { Id } from "./_generated/id";
+
 FunctionSpec.publicMutation({
   name: "insert",
-  args: Schema.Struct({ text: Schema.String }),
-  returns: GenericId.GenericId("notes"),
+  args: () => Schema.Struct({ text: Schema.String }),
+  returns: () => Id("notes"),
 });
 ```
 
@@ -167,17 +159,19 @@ const InsertNote = () => {
 When the spec declares an `error` schema, the function returns `Promise<Either<A, E>>`. Unwrap with `Either.match` (or another `Either` combinator) to handle both branches. Undeclared failures still reject the promise.
 
 ```ts confect/notes.spec.ts
+import { Id } from "./_generated/id";
+
 FunctionSpec.publicMutation({
   name: "deleteOrFail",
-  args: Schema.Struct({ noteId: GenericId.GenericId("notes") }),
-  returns: Schema.Null,
-  error: Schema.Union(NoteNotFound, Forbidden),
+  args: () => Schema.Struct({ noteId: Id("notes") }),
+  returns: () => Schema.Null,
+  error: () => Schema.Union(NoteNotFound, Forbidden),
 });
 ```
 
 ```tsx
 import { useMutation } from "@confect/react";
-import { Either } from "effect";
+import * as Either from "effect/Either";
 import refs from "../confect/_generated/refs";
 
 const DeleteNote = ({ noteId }: { noteId: string }) => {
@@ -202,8 +196,8 @@ Same shape as `useMutation`: returns `Promise<A>` when the ref has no `error` sc
 ```ts confect/random.spec.ts
 FunctionSpec.publicAction({
   name: "getNumber",
-  args: Schema.Struct({}),
-  returns: Schema.Number,
+  args: () => Schema.Struct({}),
+  returns: () => Schema.Number,
 });
 ```
 
@@ -224,12 +218,12 @@ const RandomNumber = () => {
 
 ## Differences from vanilla Convex hooks
 
-| Vanilla Convex | Confect |
-| --- | --- |
-| Functions referenced via `api.module.fn` | Functions referenced via `refs` |
-| Args passed directly to Convex as-is | Args are schema-encoded from `Type` to `Encoded` before sending to Convex |
-| Return values received directly from Convex as-is | Return values are schema-decoded from `Encoded` to `Type` before returning |
-| `useQuery` returns `T \| undefined` | `useQuery` returns `QueryResult<A, E>` |
-| Cannot distinguish loading from skipped | `Loading` carries a `skipped: boolean` flag |
+| Vanilla Convex                                       | Confect                                                                                                |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Functions referenced via `api.module.fn`             | Functions referenced via `refs`                                                                        |
+| Args passed directly to Convex as-is                 | Args are schema-encoded from `Type` to `Encoded` before sending to Convex                              |
+| Return values received directly from Convex as-is    | Return values are schema-decoded from `Encoded` to `Type` before returning                             |
+| `useQuery` returns `T \| undefined`                  | `useQuery` returns `QueryResult<A, E>`                                                                 |
+| Cannot distinguish loading from skipped              | `Loading` carries a `skipped: boolean` flag                                                            |
 | `useMutation`/`useAction` always return `Promise<T>` | Refs with an `error` schema return `Promise<Either<A, E>>`; refs without one still return `Promise<A>` |
-| Pass `"skip"` to disable query subscription | Same—pass `"skip"` to disable query subscription |
+| Pass `"skip"` to disable query subscription          | Same—pass `"skip"` to disable query subscription                                                       |

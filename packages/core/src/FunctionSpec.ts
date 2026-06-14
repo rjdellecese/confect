@@ -6,9 +6,9 @@ import type {
   RegisteredQuery,
 } from "convex/server";
 import type { Schema } from "effect";
-import { Predicate } from "effect";
+import * as Predicate from "effect/Predicate";
 import * as FunctionProvenance from "./FunctionProvenance";
-import { validateConfectFunctionIdentifier } from "./internal/utils";
+import { validateConfectFunctionIdentifier } from "./Identifier";
 import * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
 export const TypeId = "@confect/core/FunctionSpec";
@@ -225,9 +225,9 @@ const make =
     error,
   }: {
     name: Name_;
-    args: Args_;
-    returns: Returns_;
-    error?: Error_;
+    args: () => Args_;
+    returns: () => Returns_;
+    error?: () => Error_;
   }): FunctionSpec<
     RuntimeAndFunctionType_,
     FunctionVisibility_,
@@ -331,7 +331,10 @@ const makeConvex =
       runtimeAndFunctionType,
       functionVisibility,
       name,
-      functionProvenance: FunctionProvenance.Convex(),
+      functionProvenance: FunctionProvenance.Convex<
+        ExtractArgs<F>,
+        ExtractReturns<F>
+      >(),
     }) as any;
   };
 

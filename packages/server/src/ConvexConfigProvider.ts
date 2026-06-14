@@ -1,11 +1,9 @@
-import {
-  Array,
-  ConfigError,
-  ConfigProvider,
-  ConfigProviderPathPatch,
-  Effect,
-  pipe,
-} from "effect";
+import { pipe } from "effect/Function";
+import * as Array from "effect/Array";
+import * as ConfigError from "effect/ConfigError";
+import * as ConfigProvider from "effect/ConfigProvider";
+import * as ConfigProviderPathPatch from "effect/ConfigProviderPathPatch";
+import * as Effect from "effect/Effect";
 
 declare const process: { env: Record<string, string | undefined> };
 

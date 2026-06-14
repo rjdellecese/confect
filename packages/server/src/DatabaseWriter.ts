@@ -6,7 +6,11 @@ import type {
   WithoutSystemFields,
 } from "convex/server";
 import type { GenericId } from "convex/values";
-import { Context, Effect, Layer, pipe, Record } from "effect";
+import { pipe } from "effect/Function";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Record from "effect/Record";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
 import type { DocumentByName as DocumentByName_ } from "./DataModel";
@@ -22,14 +26,13 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   >,
 ) => {
   type DataModel_ = DataModel.FromSchema<DatabaseSchema_>;
-  const tables = databaseSchema.tables as Record<string, Table.AnyWithProps>;
 
   const table = <const TableName extends DataModel.TableNames<DataModel_>>(
     tableName: TableName,
   ) => {
-    const tableDef = tables[tableName]!;
-    const tableSchema = tableDef.Fields as TableInfo.TableSchema<
-      DataModel.TableInfoWithName_<DataModel_, TableName>
+    const tableDef = databaseSchema.tables[tableName] as Table.WithName<
+      DatabaseSchema.Tables<DatabaseSchema_>,
+      TableName
     >;
 
     const insert = (
@@ -63,6 +66,10 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
       >,
     ) =>
       Effect.gen(function* () {
+        const tableSchema = tableDef.Fields as TableInfo.TableSchema<
+          DataModel.TableInfoWithName_<DataModel_, TableName>
+        >;
+
         const originalDecodedDoc = yield* QueryInitializer.getById(
           tableName,
           convexDatabaseWriter as any,
@@ -100,7 +107,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
         const updatedEncodedDoc = yield* Document.encode(
           value,
           tableName,
-          tableSchema,
+          tableDef.Fields,
         );
 
         yield* Effect.promise(() =>

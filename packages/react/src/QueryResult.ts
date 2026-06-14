@@ -1,4 +1,9 @@
-import { Equal, Function, Hash, identity, Pipeable, Predicate } from "effect";
+import { identity } from "effect/Function";
+import * as Equal from "effect/Equal";
+import * as Function from "effect/Function";
+import * as Hash from "effect/Hash";
+import * as Pipeable from "effect/Pipeable";
+import * as Predicate from "effect/Predicate";
 
 const TypeId = "@confect/react/QueryResult";
 type TypeId = typeof TypeId;

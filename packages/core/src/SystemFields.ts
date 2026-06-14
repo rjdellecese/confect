@@ -3,7 +3,7 @@ import type {
   IdField,
   SystemFields as NonIdSystemFields,
 } from "convex/server";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import * as GenericId from "./GenericId";
 
 type SystemFieldsSchema<TableName extends string> = Schema.Struct<{

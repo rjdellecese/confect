@@ -1,0 +1,30 @@
+import { FunctionSpec, GroupSpec } from "@confect/core";
+import * as Schema from "effect/Schema";
+
+export default GroupSpec.makeNode()
+  .addFunction(
+    FunctionSpec.publicNodeAction({
+      name: "send",
+      args: () =>
+        Schema.Struct({
+          to: Schema.String,
+          subject: Schema.String,
+          body: Schema.String,
+        }),
+      returns: () => Schema.Null,
+    }),
+  )
+  .addFunction(
+    FunctionSpec.publicNodeAction({
+      name: "getInbox",
+      args: () => Schema.Struct({}),
+      returns: () =>
+        Schema.Array(
+          Schema.Struct({
+            to: Schema.String,
+            subject: Schema.String,
+            body: Schema.String,
+          }),
+        ),
+    }),
+  );

@@ -1,27 +1,23 @@
-import type { Options as CodeBlockWriterOptions } from "code-block-writer";
-import CodeBlockWriter_ from "code-block-writer";
-import { Array, Effect } from "effect";
-import type * as GroupPath from "./GroupPath";
+import * as Array from "effect/Array";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import { CodeBlockWriter } from "./CodeBlockWriter";
+import {
+  collectImportBindings,
+  type SpecAssemblyNode,
+} from "./SpecAssemblyNode";
 
 export const functions = ({
-  groupPath,
   functionNames,
   registeredFunctionsImportPath,
-  registeredFunctionsVariableName = "registeredFunctions",
-  registeredFunctionsLookupPath,
   useNode = false,
 }: {
-  groupPath: GroupPath.GroupPath;
   functionNames: string[];
   registeredFunctionsImportPath: string;
-  registeredFunctionsVariableName?: string;
-  registeredFunctionsLookupPath?: readonly string[];
   useNode?: boolean;
 }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
-
-    const lookupPath = registeredFunctionsLookupPath ?? groupPath.pathSegments;
 
     if (useNode) {
       yield* cbw.writeLine(`"use node";`);
@@ -29,27 +25,209 @@ export const functions = ({
     }
 
     yield* cbw.writeLine(
-      `import ${registeredFunctionsVariableName} from "${registeredFunctionsImportPath}";`,
+      `import registeredFunctions from "${registeredFunctionsImportPath}";`,
     );
     yield* cbw.newLine();
-    for (const functionName of functionNames) {
-      yield* cbw.writeLine(
-        `export const ${functionName} = ${registeredFunctionsVariableName}.${Array.join([...lookupPath, functionName], ".")};`,
+    yield* Effect.forEach(functionNames, (functionName) =>
+      cbw.writeLine(
+        `export const ${functionName} = registeredFunctions.${functionName};`,
+      ),
+    );
+
+    return yield* cbw.toString();
+  });
+
+/**
+ * Emit `convex/schema.ts` as a one-line re-export of the codegen-emitted
+ * deploy schema in `confect/_generated/convexSchema.ts`. Deploy-time
+ * consumers (the Convex CLI, `convex-test`) keep reading
+ * `convex/schema.ts`; the runtime `DatabaseSchema` in
+ * `confect/_generated/schema.ts` is untouched by this file.
+ */
+export const schema = ({
+  convexSchemaImportPath,
+}: {
+  convexSchemaImportPath: string;
+}) =>
+  Effect.gen(function* () {
+    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+
+    yield* cbw.writeLine(
+      `export { default } from "${convexSchemaImportPath}";`,
+    );
+
+    return yield* cbw.toString();
+  });
+
+interface TableModuleBinding {
+  readonly importPath: string;
+  readonly tableName: string;
+}
+
+/**
+ * Emit `confect/_generated/schema.ts` — the runtime `DatabaseSchema` used
+ * by impls and the per-group registries (and downstream by per-function
+ * bundles for codec lookup). Every table wrapper at
+ * `confect/_generated/tables/<name>.ts` is imported statically and
+ * registered as a value entry on the `DatabaseSchema.make({...})` call.
+ * Per-table laziness lives inside each `Table`: its `Fields`, `Doc`, and
+ * `tableDefinition` are lazy memoised getters that only evaluate the
+ * user-supplied field-schema callback on first access, so unused tables in
+ * a function bundle never pay schema-construction cost despite the
+ * static import.
+ *
+ * The `DatabaseSchema` import is aliased to `$DatabaseSchema` because each
+ * table is imported under its own (filename-derived) name; a table named
+ * `DatabaseSchema` would otherwise collide with the library import and emit
+ * a duplicate-binding file. The leading `$` makes the alias collision-proof:
+ * `validateConfectTableIdentifier` requires names to match
+ * `/^[a-zA-Z][a-zA-Z0-9_]*$/`, which forbids `$`, so no valid table import
+ * can ever shadow it.
+ */
+export const runtimeSchema = ({
+  tableModules,
+}: {
+  tableModules: ReadonlyArray<TableModuleBinding>;
+}) =>
+  Effect.gen(function* () {
+    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+
+    yield* cbw.writeLine(
+      `import { DatabaseSchema as $DatabaseSchema } from "@confect/server";`,
+    );
+
+    if (tableModules.length > 0) {
+      yield* cbw.blankLine();
+      yield* Effect.forEach(tableModules, ({ tableName, importPath }) =>
+        cbw.writeLine(`import ${tableName} from "${importPath}";`),
       );
+    }
+
+    yield* cbw.blankLine();
+
+    if (tableModules.length === 0) {
+      yield* cbw.writeLine(`export default $DatabaseSchema.make({});`);
+    } else {
+      yield* cbw.writeLine(`export default $DatabaseSchema.make({`);
+      yield* cbw.indent(
+        Effect.gen(function* () {
+          for (const { tableName } of tableModules) {
+            yield* cbw.writeLine(`${tableName},`);
+          }
+        }),
+      );
+      yield* cbw.writeLine(`});`);
     }
 
     return yield* cbw.toString();
   });
 
-export const schema = ({ schemaImportPath }: { schemaImportPath: string }) =>
+/**
+ * Emit `confect/_generated/convexSchema.ts` — the Convex deploy-time
+ * `SchemaDefinition`. Imports every table from its generated wrapper at
+ * `_generated/tables/<name>` and calls `defineSchema({...})` exactly once.
+ * The file deliberately avoids any `@confect/server` import so that the
+ * deploy artifact's import graph stays decoupled from the runtime
+ * `DatabaseSchema` machinery.
+ *
+ * The `defineSchema` import is aliased to `$defineSchema` because each table
+ * is imported under its own (filename-derived) name; a table named
+ * `defineSchema` would otherwise collide with the library import and emit a
+ * duplicate-binding file. The leading `$` makes the alias collision-proof:
+ * `validateConfectTableIdentifier` requires names to match
+ * `/^[a-zA-Z][a-zA-Z0-9_]*$/`, which forbids `$`, so no valid table import
+ * can ever shadow it.
+ */
+export const convexSchema = ({
+  tableModules,
+}: {
+  tableModules: ReadonlyArray<TableModuleBinding>;
+}) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-    yield* cbw.writeLine(`import schemaDefinition from "${schemaImportPath}";`);
-    yield* cbw.newLine();
     yield* cbw.writeLine(
-      `export default schemaDefinition.convexSchemaDefinition;`,
+      `import { defineSchema as $defineSchema } from "convex/server";`,
     );
+
+    if (tableModules.length > 0) {
+      yield* cbw.blankLine();
+      yield* Effect.forEach(tableModules, ({ tableName, importPath }) =>
+        cbw.writeLine(`import ${tableName} from "${importPath}";`),
+      );
+    }
+
+    yield* cbw.blankLine();
+
+    if (tableModules.length === 0) {
+      yield* cbw.writeLine(`export default $defineSchema({});`);
+    } else {
+      yield* cbw.writeLine(`export default $defineSchema({`);
+      yield* cbw.indent(
+        Effect.gen(function* () {
+          for (const { tableName } of tableModules) {
+            yield* cbw.writeLine(`${tableName}: ${tableName}.tableDefinition,`);
+          }
+        }),
+      );
+      yield* cbw.writeLine(`});`);
+    }
+
+    return yield* cbw.toString();
+  });
+
+/**
+ * Emit `confect/_generated/id.ts` — a type-constrained `Id` constructor and
+ * a `TableNames` union derived from the user's `confect/tables/*.ts`
+ * filenames. User-authored table modules import `Id` from this file to
+ * declare cross-table id references without typing the destination name as
+ * a free string (and without ever importing each other transitively).
+ *
+ * When the table directory is empty the `TableNames` union resolves to
+ * `never`, which still lets the file typecheck against an empty workspace.
+ */
+export const id = ({ tableNames }: { tableNames: ReadonlyArray<string> }) =>
+  Effect.gen(function* () {
+    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+
+    yield* cbw.writeLine(`import { GenericId } from "@confect/core";`);
+    yield* cbw.blankLine();
+
+    const union =
+      tableNames.length === 0
+        ? "never"
+        : tableNames.map((n) => `"${n}"`).join(" | ");
+    yield* cbw.writeLine(`export type TableNames = ${union};`);
+    yield* cbw.blankLine();
+
+    yield* cbw.writeLine(
+      `export const Id = <const TableName extends TableNames>(`,
+    );
+    yield* cbw.indent(cbw.writeLine(`tableName: TableName,`));
+    yield* cbw.writeLine(`) => GenericId.GenericId(tableName);`);
+
+    return yield* cbw.toString();
+  });
+
+/**
+ * Emit `confect/_generated/tables/<tableName>.ts` — a two-line wrapper that
+ * imports the user-authored `UnnamedTable` and binds the file basename to
+ * it, producing the fully-named `Table` value that downstream consumers
+ * (schema, specs, impls) read.
+ */
+export const tableWrapper = ({
+  tableName,
+  unnamedImportPath,
+}: {
+  tableName: string;
+  unnamedImportPath: string;
+}) =>
+  Effect.gen(function* () {
+    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+
+    yield* cbw.writeLine(`import unnamed from "${unnamedImportPath}";`);
+    yield* cbw.blankLine();
+    yield* cbw.writeLine(`export default unnamed("${tableName}");`);
 
     return yield* cbw.toString();
   });
@@ -87,109 +265,61 @@ export const authConfig = ({ authImportPath }: { authImportPath: string }) =>
     return yield* cbw.toString();
   });
 
-export const refs = ({
-  specImportPath,
-  nodeSpecImportPath,
-}: {
-  specImportPath: string;
-  nodeSpecImportPath?: string;
-}) =>
+export const refs = ({ specImportPath }: { specImportPath: string }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
     yield* cbw.writeLine(`import { Refs } from "@confect/core";`);
     yield* cbw.writeLine(`import spec from "${specImportPath}";`);
-    if (nodeSpecImportPath !== undefined) {
-      yield* cbw.writeLine(`import nodeSpec from "${nodeSpecImportPath}";`);
-    }
     yield* cbw.blankLine();
-    yield* cbw.writeLine(
-      nodeSpecImportPath !== undefined
-        ? `export default Refs.make(spec, nodeSpec);`
-        : `export default Refs.make(spec);`,
-    );
+    yield* cbw.writeLine(`export default Refs.make(spec);`);
 
     return yield* cbw.toString();
   });
 
-export const api = ({
+export const registeredFunctionsForGroup = ({
   schemaImportPath,
   specImportPath,
+  implImportPath,
+  layerExportName,
+  useNode = false,
 }: {
   schemaImportPath: string;
   specImportPath: string;
-}) =>
-  Effect.gen(function* () {
-    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
-
-    yield* cbw.writeLine(`import { Api } from "@confect/server";`);
-    yield* cbw.writeLine(`import schema from "${schemaImportPath}";`);
-    yield* cbw.writeLine(`import spec from "${specImportPath}";`);
-    yield* cbw.blankLine();
-    yield* cbw.writeLine(`export default Api.make(schema, spec);`);
-
-    return yield* cbw.toString();
-  });
-
-export const nodeApi = ({
-  schemaImportPath,
-  nodeSpecImportPath,
-}: {
-  schemaImportPath: string;
-  nodeSpecImportPath: string;
-}) =>
-  Effect.gen(function* () {
-    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
-
-    yield* cbw.writeLine(`import { Api } from "@confect/server";`);
-    yield* cbw.blankLine();
-    yield* cbw.writeLine(`import schema from "${schemaImportPath}";`);
-    yield* cbw.writeLine(`import nodeSpec from "${nodeSpecImportPath}";`);
-    yield* cbw.blankLine();
-    yield* cbw.writeLine(`export default Api.make(schema, nodeSpec);`);
-
-    return yield* cbw.toString();
-  });
-
-export const registeredFunctions = ({
-  implImportPath,
-}: {
   implImportPath: string;
+  layerExportName: string;
+  useNode?: boolean;
 }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-    yield* cbw.writeLine(
-      `import { RegisteredConvexFunction, RegisteredFunctions } from "@confect/server";`,
-    );
-    yield* cbw.writeLine(`import impl from "${implImportPath}";`);
-    yield* cbw.blankLine();
-    yield* cbw.writeLine(
-      `export default RegisteredFunctions.make(impl, RegisteredConvexFunction.make);`,
-    );
+    if (useNode) {
+      yield* cbw.writeLine(
+        `import { RegisteredFunctions } from "@confect/server";`,
+      );
+      yield* cbw.writeLine(
+        `import { RegisteredNodeFunction } from "@confect/server/node";`,
+      );
+    } else {
+      yield* cbw.writeLine(
+        `import { RegisteredConvexFunction, RegisteredFunctions } from "@confect/server";`,
+      );
+    }
 
-    return yield* cbw.toString();
-  });
-
-export const nodeRegisteredFunctions = ({
-  nodeImplImportPath,
-}: {
-  nodeImplImportPath: string;
-}) =>
-  Effect.gen(function* () {
-    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
-
-    yield* cbw.writeLine(
-      `import { RegisteredFunctions } from "@confect/server";`,
-    );
-    yield* cbw.writeLine(
-      `import { RegisteredNodeFunction } from "@confect/server/node";`,
-    );
+    yield* cbw.writeLine(`import databaseSchema from "${schemaImportPath}";`);
+    yield* cbw.writeLine(`import ${layerExportName} from "${implImportPath}";`);
     yield* cbw.blankLine();
-    yield* cbw.writeLine(`import nodeImpl from "${nodeImplImportPath}";`);
-    yield* cbw.blankLine();
+    // The group's own leaf spec is referenced type-only (`typeof import(...)`),
+    // so the spec module is erased at transpile time and never enters the
+    // per-function bundle; only `databaseSchema` and the impl are runtime
+    // imports. Typing from the leaf spec (not the project-wide assembled spec)
+    // keeps the registry's type dependent solely on its own group.
+    const specType = `typeof import("${specImportPath}")["default"]`;
+    const makeFn = useNode
+      ? "RegisteredNodeFunction.make"
+      : "RegisteredConvexFunction.make";
     yield* cbw.writeLine(
-      `export default RegisteredFunctions.make(nodeImpl, RegisteredNodeFunction.make);`,
+      `export default RegisteredFunctions.buildForGroup<${specType}>(databaseSchema, ${layerExportName}, ${makeFn});`,
     );
 
     return yield* cbw.toString();
@@ -382,64 +512,103 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
     return yield* cbw.toString();
   });
 
-class CodeBlockWriter {
-  private readonly writer: CodeBlockWriter_;
+const writeChildAddGroupAt = (
+  cbw: CodeBlockWriter,
+  child: SpecAssemblyNode,
+  groupFactory: string,
+): Effect.Effect<void> =>
+  Effect.gen(function* () {
+    yield* cbw.write(".addGroupAt(");
+    yield* cbw.quote(child.segment);
+    yield* cbw.write(", ");
+    yield* writeGroupAssembly(cbw, child, groupFactory);
+    yield* cbw.write(")");
+  });
 
-  constructor(opts?: Partial<CodeBlockWriterOptions>) {
-    this.writer = new CodeBlockWriter_(opts);
-  }
+const writeGroupFactoryCall = (
+  cbw: CodeBlockWriter,
+  node: SpecAssemblyNode,
+  groupFactory: string,
+): Effect.Effect<void> =>
+  Effect.gen(function* () {
+    yield* cbw.write(groupFactory);
+    yield* cbw.write("(");
+    yield* cbw.quote(node.segment);
+    yield* cbw.write(")");
 
-  indent<E = never, R = never>(
-    eff: Effect.Effect<void, E, R>,
-  ): Effect.Effect<void, E, R> {
-    return Effect.gen(this, function* () {
-      const indentationLevel = this.writer.getIndentationLevel();
-      this.writer.setIndentationLevel(indentationLevel + 1);
-      yield* eff;
-      this.writer.setIndentationLevel(indentationLevel);
-    });
-  }
+    yield* Effect.forEach(node.children, (child) =>
+      writeChildAddGroupAt(cbw, child, groupFactory),
+    );
+  });
 
-  writeLine<E = never, R = never>(line: string): Effect.Effect<void, E, R> {
-    return Effect.sync(() => {
-      this.writer.writeLine(line);
-    });
-  }
+const writeGroupAssembly: (
+  cbw: CodeBlockWriter,
+  node: SpecAssemblyNode,
+  groupFactory: string,
+) => Effect.Effect<void> = (cbw, node, groupFactory) =>
+  Option.match(node.importBinding, {
+    onNone: () => writeGroupFactoryCall(cbw, node, groupFactory),
+    onSome: (binding) =>
+      Effect.gen(function* () {
+        yield* cbw.write(binding.localName);
+        yield* Effect.forEach(node.children, (child) =>
+          writeChildAddGroupAt(cbw, child, groupFactory),
+        );
+      }),
+  });
 
-  write<E = never, R = never>(text: string): Effect.Effect<void, E, R> {
-    return Effect.sync(() => {
-      this.writer.write(text);
-    });
-  }
+const writeRootAddAt = (
+  cbw: CodeBlockWriter,
+  node: SpecAssemblyNode,
+  groupFactory: string,
+): Effect.Effect<void> =>
+  Effect.gen(function* () {
+    yield* cbw.write(".addAt(");
+    yield* cbw.quote(node.segment);
+    yield* cbw.write(", ");
 
-  quote<E = never, R = never>(text: string): Effect.Effect<void, E, R> {
-    return Effect.sync(() => {
-      this.writer.quote(text);
-    });
-  }
+    yield* writeGroupAssembly(cbw, node, groupFactory);
 
-  conditionalWriteLine<E = never, R = never>(
-    condition: boolean,
-    text: string,
-  ): Effect.Effect<void, E, R> {
-    return Effect.sync(() => {
-      this.writer.conditionalWriteLine(condition, text);
-    });
-  }
+    yield* cbw.write(")");
+  });
 
-  newLine<E = never, R = never>(): Effect.Effect<void, E, R> {
-    return Effect.sync(() => {
-      this.writer.newLine();
-    });
-  }
+export const assembledSpec = ({
+  nodes,
+}: {
+  nodes: ReadonlyArray<SpecAssemblyNode>;
+}) =>
+  Effect.gen(function* () {
+    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-  blankLine<E = never, R = never>(): Effect.Effect<void, E, R> {
-    return Effect.sync(() => {
-      this.writer.blankLine();
-    });
-  }
+    const nodeRequiresGroupFactory = (node: SpecAssemblyNode): boolean =>
+      Option.isNone(node.importBinding) ||
+      Array.some(node.children, nodeRequiresGroupFactory);
 
-  toString<E = never, R = never>(): Effect.Effect<string, E, R> {
-    return Effect.sync(() => this.writer.toString());
-  }
-}
+    const needsGroupSpec = Array.some(nodes, nodeRequiresGroupFactory);
+    yield* cbw.writeLine(
+      needsGroupSpec
+        ? `import { GroupSpec, Spec } from "@confect/core";`
+        : `import { Spec } from "@confect/core";`,
+    );
+
+    yield* Effect.forEach(collectImportBindings(nodes), (binding) =>
+      cbw.writeLine(
+        `import ${binding.localName} from "${binding.importPath}";`,
+      ),
+    );
+
+    yield* cbw.blankLine();
+
+    // The assembled spec is runtime-agnostic: a Node group's `makeNode()` is
+    // already baked into its imported leaf spec, so the root is always
+    // `Spec.make()` and binding-less container groups always use
+    // `GroupSpec.makeAt` (containers register no functions and carry no runtime).
+    yield* cbw.write(`export default Spec.make()`);
+    yield* Effect.forEach(nodes, (node) =>
+      writeRootAddAt(cbw, node, "GroupSpec.makeAt"),
+    );
+    yield* cbw.write(";");
+    yield* cbw.newLine();
+
+    return yield* cbw.toString();
+  });

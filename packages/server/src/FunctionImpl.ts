@@ -1,75 +1,69 @@
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
-import type * as GroupPath from "@confect/core/GroupPath";
 import type * as GroupSpec from "@confect/core/GroupSpec";
-import { Array, Context, Effect, Layer, Ref, String } from "effect";
-import type * as Api from "./Api";
+import * as Registry from "@confect/core/Registry";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Ref from "effect/Ref";
+import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as Handler from "./Handler";
 import { setNestedProperty } from "./internal/utils";
-import * as Registry from "./Registry";
 import * as RegistryItem from "./RegistryItem";
 
-export interface FunctionImpl<
-  GroupPath_ extends string,
-  FunctionName extends string,
-> {
-  readonly groupPath: GroupPath_;
+export interface FunctionImpl<FunctionName extends string> {
   readonly functionName: FunctionName;
 }
 
-export const FunctionImpl = <
-  GroupPath_ extends string,
-  FunctionName extends string,
->({
-  groupPath,
+export const FunctionImpl = <FunctionName extends string>({
   functionName,
 }: {
-  groupPath: GroupPath_;
   functionName: FunctionName;
 }) =>
-  Context.GenericTag<FunctionImpl<GroupPath_, FunctionName>>(
-    `@confect/server/FunctionImpl/${groupPath}/${functionName}`,
+  Context.GenericTag<FunctionImpl<FunctionName>>(
+    `@confect/server/FunctionImpl/${functionName}`,
   );
 
+/**
+ * Register a single function's implementation into the group's `Registry`.
+ *
+ * The function is registered under a flat, single-segment key (its own
+ * `functionName`), not a project-wide dot-path. Each group's impl layer is
+ * built in isolation — `RegisteredFunctions.buildForGroup` (and the CLI's
+ * `validateImpl`) provide a fresh `Registry` per group — so function names
+ * only need to be unique within their own group.
+ *
+ * `databaseSchema` is retained purely as a type-level carrier: the handler's
+ * ctx-service requirements (`DatabaseReader`, `QueryCtx<DataModel>`, …) are
+ * derived from it via `Handler.WithName`. It is not read at runtime — the
+ * generated per-group registry forwards the schema value to the function
+ * builders — so impls depend on `_generated/schema` (table schemas) rather than
+ * `_generated/api` (which transitively imports every function spec).
+ */
 export const make = <
-  Api_ extends Api.AnyWithProps,
-  const GroupPath_ extends GroupPath.All<Api.Groups<Api_>>,
-  const FunctionName extends FunctionSpec.Name<
-    GroupSpec.Functions<GroupPath.GroupAt<Api.Groups<Api_>, GroupPath_>>
-  >,
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+  Group extends GroupSpec.AnyWithProps,
+  const FunctionName extends FunctionSpec.Name<GroupSpec.Functions<Group>>,
 >(
-  api: Api_,
-  groupPath: GroupPath_,
+  _databaseSchema: DatabaseSchema_,
+  group: Group,
   functionName: FunctionName,
   handler: Handler.WithName<
-    Api.Schema<Api_>,
-    GroupSpec.Functions<GroupPath.GroupAt<Api.Groups<Api_>, GroupPath_>>,
+    DatabaseSchema_,
+    GroupSpec.Functions<Group>,
     FunctionName
   >,
-): Layer.Layer<FunctionImpl<GroupPath_, FunctionName>> => {
-  const groupPathParts = String.split(groupPath, ".");
-  const [firstGroupPathPart, ...restGroupPathParts] = groupPathParts;
-
-  const group_: GroupSpec.AnyWithProps = Array.reduce(
-    restGroupPathParts,
-    (api as any).spec.groups[firstGroupPathPart as any]!,
-    (currentGroup: any, groupPathPart: any) =>
-      currentGroup.groups[groupPathPart],
-  );
-
-  const functionSpec = group_.functions[functionName]!;
+): Layer.Layer<FunctionImpl<FunctionName>> => {
+  const functionSpec = group.functions[functionName]!;
 
   return Layer.effect(
-    FunctionImpl<GroupPath_, FunctionName>({
-      groupPath,
-      functionName,
-    }),
+    FunctionImpl<FunctionName>({ functionName }),
     Effect.gen(function* () {
       const registry = yield* Registry.Registry;
 
       yield* Ref.update(registry, (registryItems) =>
         setNestedProperty(
           registryItems,
-          [...groupPathParts, functionName],
+          [functionName],
           RegistryItem.make({
             functionSpec,
             handler,
@@ -77,36 +71,25 @@ export const make = <
         ),
       );
 
-      return {
-        groupPath,
-        functionName,
-      };
+      return { functionName };
     }),
   );
 };
 
 /**
- * Get the function implementation service type for a specific group path and function name.
+ * Get the function implementation service type for a specific function name.
  */
-export type ForGroupPathAndFunction<
-  GroupPath_ extends string,
-  FunctionName extends string,
-> = FunctionImpl<GroupPath_, FunctionName>;
+export type ForFunction<FunctionName extends string> =
+  FunctionImpl<FunctionName>;
 
 /**
- * Get all function implementation services required for a group at a given path.
+ * Get all function implementation services required for a group spec.
  */
-export type FromGroupAtPath<
-  GroupPath_ extends string,
-  Group extends GroupSpec.AnyWithProps,
-> =
-  GroupPath.GroupAt<Group, GroupPath_> extends infer GroupAtPath extends
-    GroupSpec.AnyWithProps
-    ? FunctionSpec.Name<
-        GroupSpec.Functions<GroupAtPath>
-      > extends infer FunctionNames extends string
-      ? FunctionNames extends string
-        ? FunctionImpl<GroupPath_, FunctionNames>
-        : never
+export type FromGroupSpec<Group extends GroupSpec.AnyWithProps> =
+  FunctionSpec.Name<
+    GroupSpec.Functions<Group>
+  > extends infer FunctionNames extends string
+    ? FunctionNames extends string
+      ? FunctionImpl<FunctionNames>
       : never
     : never;

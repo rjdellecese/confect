@@ -1,25 +1,36 @@
 {
   "name": "@confect/server",
-  "version": "7.0.0",
   "description": "Backend bindings to the Convex platform",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/rjdellecese/confect.git"
-  },
+  "version": "9.0.2",
+  "author": "RJ Dellecese",
   "bugs": {
     "url": "https://github.com/rjdellecese/confect/issues"
   },
-  "homepage": "https://confect.dev",
-  "sideEffects": false,
-  "type": "module",
-  "files": [
-    "CHANGELOG.md",
-    "LICENSE",
-    "README.md",
-    "dist",
-    "package.json",
-    "src"
-  ],
+  "devDependencies": {
+    "@ark/attest": "0.56.0",
+    "@effect/cluster": "0.58.2",
+    "@effect/experimental": "0.60.0",
+    "@effect/platform": "0.96.1",
+    "@effect/rpc": "0.75.1",
+    "@effect/sql": "0.51.1",
+    "@effect/vitest": "0.29.0",
+    "@effect/workflow": "0.18.1",
+    "@swc/jest": "0.2.39",
+    "@types/node": "25.3.3",
+    "@vitest/coverage-v8": "3.2.4",
+    "convex-test": "0.0.50",
+    "dotenv": "17.3.1",
+    "effect": "3.21.2",
+    "tsdown": "0.20.3",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3",
+    "vite": "7.3.1",
+    "vite-tsconfig-paths": "6.1.1",
+    "vitest": "3.2.4"
+  },
+  "engines": {
+    "node": ">=22"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -36,65 +47,52 @@
       "default": "./dist/node.js"
     }
   },
-  "scripts": {
-    "build": "tsdown --config-loader unrun",
-    "dev": "tsdown --watch",
-    "test": "vitest run",
-    "typecheck": "tsc --noEmit --project tsconfig.json",
-    "fix": "prettier --write . && eslint --fix . --max-warnings=0",
-    "format": "prettier --check .",
-    "lint": "eslint . --max-warnings=0",
-    "bench": "tsx test/SchemaToValidator.bench.ts",
-    "clean": "rm -rf dist coverage node_modules",
-    "prepack": "rm -f ./README.md && cp ../../README.md ./README.md",
-    "postpack": "rm ./README.md && ln -s ../../README.md ./README.md"
-  },
-  "keywords": [
-    "effect",
-    "convex"
+  "files": [
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md",
+    "dist",
+    "package.json",
+    "src"
   ],
-  "author": "RJ Dellecese",
+  "homepage": "https://confect.dev",
+  "keywords": [
+    "convex",
+    "effect"
+  ],
   "license": "ISC",
-  "devDependencies": {
-    "@ark/attest": "0.56.0",
-    "@confect/cli": "workspace:*",
-    "@confect/test": "workspace:*",
-    "@effect/cluster": "0.56.4",
-    "@effect/experimental": "0.58.0",
-    "@effect/platform": "0.94.5",
-    "@effect/rpc": "0.73.2",
-    "@effect/sql": "0.49.0",
-    "@effect/vitest": "0.27.0",
-    "@effect/workflow": "0.16.0",
-    "@eslint/js": "10.0.1",
-    "@swc/jest": "0.2.39",
-    "@types/node": "25.3.3",
-    "@vitest/coverage-v8": "3.2.4",
-    "convex-test": "0.0.50",
-    "dotenv": "17.3.1",
-    "effect": "3.19.19",
-    "eslint": "10.0.2",
-    "prettier": "3.8.1",
-    "tsdown": "0.20.3",
-    "tsx": "^4.21.0",
-    "typescript": "5.9.3",
-    "typescript-eslint": "8.56.1",
-    "vite": "7.3.1",
-    "vite-tsconfig-paths": "6.1.1",
-    "vitest": "3.2.4"
-  },
-  "peerDependencies": {
-    "@confect/core": "workspace:*",
-    "@effect/platform": "^0.94.5",
-    "@effect/platform-node": "^0.104.1",
-    "convex": "^1.30.0",
-    "effect": "^3.19.16"
-  },
-  "engines": {
-    "node": ">=22",
-    "pnpm": ">=10"
-  },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
+  "peerDependencies": {
+    "@confect/core": "workspace:^",
+    "@effect/platform": "^0.96.1",
+    "@effect/platform-node": "^0.106.0",
+    "convex": "^1.32.0",
+    "effect": "^3.21.2"
+  },
+  "peerDependenciesMeta": {
+    "@effect/platform-node": {
+      "optional": true
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rjdellecese/confect.git"
+  },
+  "scripts": {
+    "bench": "tsx test/SchemaToValidator.bench.ts && tsx test/Document.bench.ts",
+    "clean": "rm -rf dist coverage node_modules",
+    "codegen:local-backend": "cd test/local-backend/fixtures && pnpm confect codegen && CONVEX_AGENT_MODE=anonymous pnpm convex dev --once --typecheck=disable --tail-logs=disable",
+    "codegen:mock-backend": "cd test/mock-backend/fixtures && pnpm confect codegen && CONVEX_AGENT_MODE=anonymous pnpm convex dev --once --typecheck=disable --tail-logs=disable",
+    "dev": "tsdown --watch --config-loader unrun",
+    "postpack": "rm ./README.md && ln -s ../../README.md ./README.md",
+    "prepack": "rm -f ./README.md && cp ../../README.md ./README.md",
+    "test": "vitest run",
+    "test:local-backend": "vitest run --config vitest.local-backend.config.ts",
+    "test:mock-backend": "vitest run --config vitest.mock-backend.config.ts",
+    "typecheck": "tsc -b tsconfig.src.json"
+  },
+  "sideEffects": false,
+  "type": "module",
   "types": "./dist/index.d.ts"
 }

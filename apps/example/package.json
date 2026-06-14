@@ -1,40 +1,35 @@
 {
   "name": "example",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "concurrently --restart-tries=1 --prefix-colors='white.bold.bgCyan,white.bold.bgYellow,white.bold.bgGreen' --prefix=' {name} ' --names='VITE,CONVEX,CONFECT' 'vite' 'convex dev --tail-logs' 'confect dev'",
-    "convex-codegen": "pnpm convex codegen",
-    "typecheck": "tsc --noEmit --project tsconfig.json && tsc --noEmit --project convex/tsconfig.json",
-    "build": "vite build --mode development",
-    "format": "prettier --check .",
-    "lint": "eslint . --max-warnings=0",
-    "fix": "prettier --write . && eslint --fix . --max-warnings=0",
-    "clean": "rm -rf dist node_modules"
-  },
+  "version": "0.0.0",
   "dependencies": {
     "@confect/cli": "workspace:*",
     "@confect/core": "workspace:*",
     "@confect/react": "workspace:*",
     "@confect/server": "workspace:*",
-    "@convex-dev/workpool": "^0.4.2",
-    "@effect/platform": "0.94.5",
-    "convex": "1.33.1",
-    "effect": "3.19.19",
+    "@convex-dev/workpool": "0.4.6",
+    "@effect/platform": "0.96.1",
+    "convex": "1.40.0",
+    "convex-helpers": "0.1.118",
+    "effect": "3.21.2",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "vite": "7.3.1"
   },
   "devDependencies": {
-    "@eslint/js": "10.0.1",
     "@types/node": "25.3.3",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "5.1.4",
     "concurrently": "9.2.1",
-    "eslint": "10.0.2",
-    "prettier": "3.8.1",
-    "typescript": "5.9.3",
-    "typescript-eslint": "8.56.1"
-  }
+    "typescript": "5.9.3"
+  },
+  "private": true,
+  "scripts": {
+    "build": "vite build --mode development",
+    "clean": "rm -rf dist node_modules",
+    "convex-codegen": "pnpm convex codegen",
+    "dev": "concurrently --restart-tries=1 --prefix-colors='white.bold.bgCyan,white.bold.bgYellow,white.bold.bgGreen' --prefix=' {name} ' --names='VITE,CONVEX,CONFECT' 'vite' 'convex dev --tail-logs' 'confect dev'",
+    "typecheck": "tsc --noEmit --project tsconfig.json && tsc --noEmit --project convex/tsconfig.json"
+  },
+  "type": "module"
 }

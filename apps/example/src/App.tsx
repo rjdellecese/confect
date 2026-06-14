@@ -1,12 +1,16 @@
 import { QueryResult, useAction, useMutation, useQuery } from "@confect/react";
 import type { WorkId } from "@convex-dev/workpool";
-import { FetchHttpClient, HttpApiClient } from "@effect/platform";
+import * as FetchHttpClient from "@effect/platform/FetchHttpClient";
+import * as HttpApiClient from "@effect/platform/HttpApiClient";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import type { GenericId } from "convex/values";
-import { Array, Effect, Exit } from "effect";
+import * as Array from "effect/Array";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Option from "effect/Option";
 import { useEffect, useState } from "react";
 import refs from "../confect/_generated/refs";
-import { Api } from "../confect/http/path-prefix";
+import { Api } from "../confect/http/pathPrefix";
 
 const App = () => {
   const convexClient = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
@@ -20,19 +24,17 @@ const App = () => {
 
 const Page = () => {
   const [note, setNote] = useState("");
-  const insertNote = useMutation(refs.public.notesAndRandom.notes.insert);
+  const insertNote = useMutation(refs.public.notes_and_random.notes.insert);
 
   const [randomNumber, setRandomNumber] = useState<number | null>(null);
-  const getRandom = useAction(refs.public.notesAndRandom.random.getNumber);
+  const getRandom = useAction(refs.public.notes_and_random.random.getNumber);
 
   const retrieveRandomNumber = () => {
-    void getRandom({}).then((n) => {
-      setRandomNumber(n);
-    });
+    void getRandom({}).then((n) => setRandomNumber(n));
   };
 
   const [emailStatus, setEmailStatus] = useState<string | null>(null);
-  const sendEmail = useAction(refs.public.node.email.send);
+  const sendEmail = useAction(refs.public.email.send);
 
   const testEmail = () => {
     setEmailStatus("Sending…");
@@ -114,7 +116,7 @@ const NoteLookup = () => {
   const [noteId, setNoteId] = useState<GenericId<"notes"> | undefined>();
 
   const lookup = useQuery(
-    refs.public.notesAndRandom.notes.getOrFail,
+    refs.public.notes_and_random.notes.getOrFail,
     noteId === undefined ? "skip" : { noteId },
   );
 
@@ -153,9 +155,9 @@ const WorkpoolDemo = () => {
   const enqueue = useMutation(refs.public.workpool.enqueue);
 
   const handleEnqueue = () => {
-    void enqueue({}).then((id) => {
-      setJobs((prev) => [...prev, { id, enqueuedAt: Date.now() }]);
-    });
+    void enqueue({}).then((id) =>
+      setJobs((prev) => [...prev, { id, enqueuedAt: Date.now() }]),
+    );
   };
 
   return (
@@ -230,20 +232,20 @@ const WorkStatusRow = ({
 };
 
 const NoteList = () => {
-  const notesResult = useQuery(refs.public.notesAndRandom.notes.list, {});
+  const notesResult = useQuery(refs.public.notes_and_random.notes.list, {});
 
   const deleteNote = useMutation(
-    refs.public.notesAndRandom.notes.delete_,
+    refs.public.notes_and_random.notes.delete_,
   ).withOptimisticUpdate((localStore, { noteId }) => {
     const current = localStore.getQuery(
-      refs.public.notesAndRandom.notes.list,
+      refs.public.notes_and_random.notes.list,
       {},
     );
-    if (current !== undefined) {
+    if (Option.isSome(current)) {
       localStore.setQuery(
-        refs.public.notesAndRandom.notes.list,
+        refs.public.notes_and_random.notes.list,
         {},
-        current.filter((note) => note._id !== noteId),
+        Option.some(current.value.filter((note) => note._id !== noteId)),
       );
     }
   });

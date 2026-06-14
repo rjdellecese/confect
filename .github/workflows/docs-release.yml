@@ -1,0 +1,30 @@
+name: Docs Release
+
+# Manually force-pushes a ref to the `release` branch, which Mintlify deploys
+# docs from. The Release workflow does this automatically when a new version is
+# published; use this workflow to deploy docs updates for the currently
+# released version without publishing a new release.
+#
+# Note that this deploys everything on the chosen ref, so make sure it doesn't
+# contain docs for unreleased changes.
+
+on:
+  workflow_dispatch:
+
+concurrency: ${{ github.workflow }}
+
+jobs:
+  update-docs-branch:
+    name: Update docs deployment branch
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Update docs deployment branch
+        run: |
+          git fetch origin release || true
+          git push --force-with-lease origin HEAD:refs/heads/release

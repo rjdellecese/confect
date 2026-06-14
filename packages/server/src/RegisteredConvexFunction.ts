@@ -11,8 +11,12 @@ import {
   queryGeneric,
 } from "convex/server";
 import type { Value } from "convex/values";
-import { Clock, Effect, Layer, Match, pipe, Schema } from "effect";
-import type * as Api from "./Api";
+import { pipe } from "effect/Function";
+import * as Clock from "effect/Clock";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Match from "effect/Match";
+import * as Schema from "effect/Schema";
 import * as Auth from "./Auth";
 import * as ConvexConfigProvider from "./ConvexConfigProvider";
 import * as DatabaseReader from "./DatabaseReader";
@@ -31,8 +35,8 @@ import * as SchemaToValidator from "./SchemaToValidator";
 import { StorageReader } from "./StorageReader";
 import { StorageWriter } from "./StorageWriter";
 
-export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
-  api: Api_,
+export const make = (
+  databaseSchema: DatabaseSchema.AnyWithProps,
   { functionSpec, handler }: RegistryItem.AnyWithProps,
 ): RegisteredFunction.Any =>
   Match.value(functionSpec.functionProvenance).pipe(
@@ -51,7 +55,7 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
 
           return genericFunction(
             queryFunction({
-              databaseSchema: api.databaseSchema,
+              databaseSchema,
               args: functionProvenance.args,
               returns: functionProvenance.returns,
               error: functionProvenance.error,
@@ -68,7 +72,7 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
 
           return genericFunction(
             mutationFunction({
-              databaseSchema: api.databaseSchema,
+              databaseSchema,
               args: functionProvenance.args,
               returns: functionProvenance.returns,
               error: functionProvenance.error,
@@ -84,7 +88,7 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
           );
 
           return genericFunction(
-            convexActionFunction(api.databaseSchema, {
+            convexActionFunction(databaseSchema, {
               args: functionProvenance.args,
               returns: functionProvenance.returns,
               error: functionProvenance.error,
@@ -98,27 +102,28 @@ export const make = <Api_ extends Api.AnyWithPropsWithRuntime<"Convex">>(
     Match.exhaustive,
   );
 
-// Convex's query cache is invalidated by any Date.now() call during handler
-// execution. Effect's unsafeFork calls Date.now() when constructing a
-// FiberId.Runtime, which trips the cache for every confect-wrapped query. We
-// stub Date.now to 0 for the span of the handler; queries are forbidden from
-// relying on real time for correctness anyway.
-//
-// Users who explicitly want the real timestamp can still reach it via Effect's
-// Clock service (Clock.currentTimeMillis/Clock.currentTimeNanos). We provide
-// a Clock layer whose methods close over the *original* Date.now, so opting in
-// to Clock is an opt-in to worse caching—but caching is not broken by default.
+/**
+ * Convex's query cache is invalidated by any Date.now() call during handler
+ * execution. Effect's unsafeFork calls Date.now() when constructing a
+ * FiberId.Runtime, which trips the cache for every confect-wrapped query. We
+ * stub Date.now to 0 for the span of the handler; queries are forbidden from
+ * relying on real time for correctness anyway.
+ *
+ * Users who explicitly want the real timestamp can still reach it via Effect's
+ * Clock service (Clock.currentTimeMillis/Clock.currentTimeNanos). We provide a
+ * Clock whose user-facing Effects call realDateNow (Convex's tracker) directly,
+ * making Clock an explicit opt-in to cache invalidation. The unsafe methods
+ * used internally by Effect (logging, span events, scheduler) return constants
+ * so they never touch the tracker—caching is not broken by default.
+ */
 const unpatchedClock = (realDateNow: () => number): Clock.Clock => {
-  const bigint1e6 = BigInt(1_000_000);
-  const unsafeCurrentTimeMillis = () => realDateNow();
-  const unsafeCurrentTimeNanos = () => BigInt(realDateNow()) * bigint1e6;
   const defaultClock = Clock.make();
   return {
     ...defaultClock,
-    unsafeCurrentTimeMillis,
-    unsafeCurrentTimeNanos,
-    currentTimeMillis: Effect.sync(unsafeCurrentTimeMillis),
-    currentTimeNanos: Effect.sync(unsafeCurrentTimeNanos),
+    unsafeCurrentTimeMillis: () => 0,
+    unsafeCurrentTimeNanos: () => 0n,
+    currentTimeMillis: Effect.sync(() => realDateNow()),
+    currentTimeNanos: Effect.sync(() => BigInt(realDateNow()) * 1_000_000n),
   };
 };
 

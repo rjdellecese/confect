@@ -1,11 +1,12 @@
 packages:
   - packages/*
   - apps/*
+  - packages/server/test/mock-backend/fixtures
+  - packages/server/test/local-backend/fixtures
 
 allowBuilds:
-  '@parcel/watcher': false
-  '@swc/core': false
-  bun: true
+  "@parcel/watcher": false
+  "@swc/core": false
   esbuild: false
   msgpackr-extract: false
   opensrc: false
@@ -13,8 +14,9 @@ allowBuilds:
   sharp: true
 
 overrides:
-  convex: 1.33.1
-  effect: 3.19.19
+  convex: 1.40.0
+  effect: 3.21.2
+  "@effect/typeclass": 0.40.0
   react: 19.2.4
   react-dom: 19.2.4
 

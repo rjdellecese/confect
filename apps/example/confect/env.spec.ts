@@ -1,10 +1,10 @@
 import { FunctionSpec, GroupSpec } from "@confect/core";
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
-export const env = GroupSpec.make("env").addFunction(
+export default GroupSpec.make().addFunction(
   FunctionSpec.publicQuery({
     name: "readEnvVar",
-    args: Schema.Struct({}),
-    returns: Schema.String,
+    args: () => Schema.Struct({}),
+    returns: () => Schema.String,
   }),
 );

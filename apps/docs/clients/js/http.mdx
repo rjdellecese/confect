@@ -12,11 +12,9 @@ Create the `HttpClient` layer by passing your Convex deployment URL.
 
 ```ts
 import { HttpClient } from "@confect/js";
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 
-const HttpClientLive = HttpClient.layer(
-  "https://example-123.convex.cloud",
-);
+const HttpClientLive = HttpClient.layer("https://example-123.convex.cloud");
 ```
 
 The layer can then be provided to any Effect that uses the `HttpClient` service.
@@ -27,7 +25,7 @@ Use the `HttpClient` service inside `Effect.gen` to call your functions with ref
 
 ```ts
 import { HttpClient } from "@confect/js";
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 
 import refs from "./confect/_generated/refs";
 
@@ -52,7 +50,7 @@ When a ref's spec declares an `error` schema, the decoded error is added to the 
 
 ```ts
 import { HttpClient } from "@confect/js";
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 
 import refs from "./confect/_generated/refs";
 
@@ -96,11 +94,10 @@ Provide the `HttpClient` layer when running your program.
 
 ```ts
 import { HttpClient } from "@confect/js";
-import { Console, Effect } from "effect";
+import * as Console from "effect/Console";
+import * as Effect from "effect/Effect";
 
-const HttpClientLive = HttpClient.layer(
-  "https://example-123.convex.cloud",
-);
+const HttpClientLive = HttpClient.layer("https://example-123.convex.cloud");
 
 const program = Effect.gen(function* () {
   const client = yield* HttpClient.HttpClient;
@@ -114,9 +111,9 @@ Effect.runPromise(program.pipe(Effect.provide(HttpClientLive)));
 
 ## Differences from `ConvexHttpClient`
 
-| `ConvexHttpClient` | `HttpClient` |
-| --- | --- |
-| Functions referenced via `api.module.fn` | Functions referenced via `refs` |
-| Args passed directly to Convex as-is | Args are schema-encoded from `Type` to `Encoded` before sending |
-| Return values received directly as-is | Return values are schema-decoded from `Encoded` to `Type` |
-| Methods return `Promise` | Methods return `Effect` with typed errors |
+| `ConvexHttpClient`                       | `HttpClient`                                                    |
+| ---------------------------------------- | --------------------------------------------------------------- |
+| Functions referenced via `api.module.fn` | Functions referenced via `refs`                                 |
+| Args passed directly to Convex as-is     | Args are schema-encoded from `Type` to `Encoded` before sending |
+| Return values received directly as-is    | Return values are schema-decoded from `Encoded` to `Type`       |
+| Methods return `Promise`                 | Methods return `Effect` with typed errors                       |

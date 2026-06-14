@@ -7,16 +7,13 @@ description: "Retrieve documents from the database."
 The `DatabaseReader` service is used to read documents from the database.
 
 ```ts
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 import { DatabaseReader } from "./confect/_generated/services";
 
 Effect.gen(function* () {
   const reader = yield* DatabaseReader;
 
-  return yield* reader
-    .table("notes")
-    .index("by_creation_time")
-    .collect();
+  return yield* reader.table("notes").index("by_creation_time").collect();
 });
 ```
 
@@ -65,9 +62,7 @@ reader.table("users").index("by_name_and_age", "desc");
 ```
 
 ```ts Users sorted by name and age, where name equals "John Doe", ascending
-reader
-  .table("users")
-  .index("by_name_and_age", (q) => q.eq("name", "John Doe"));
+reader.table("users").index("by_name_and_age", (q) => q.eq("name", "John Doe"));
 ```
 
 ```ts Users sorted by name and age, where name equals "John Doe", and age equals 21, descending
@@ -87,9 +82,7 @@ Search indexes are used for full-text search, and are defined in your schema. Th
 ```ts
 reader
   .table("notes")
-  .search("text", (q) =>
-    q.search("text", "hello").eq("tag", "colors"),
-  );
+  .search("text", (q) => q.search("text", "hello").eq("tag", "colors"));
 ```
 
 ### Methods
@@ -125,10 +118,7 @@ reader.table("notes").index("by_creation_time").take(10);
 Retrieve a page of documents matching the query. Expects a [`PaginationOptions`](https://docs.convex.dev/api/interfaces/server.PaginationOptions) object.
 
 ```ts
-reader
-  .table("notes")
-  .index("by_creation_time")
-  .paginate(paginationOptions);
+reader.table("notes").index("by_creation_time").paginate(paginationOptions);
 ```
 
 #### Stream
@@ -141,28 +131,4 @@ reader.table("notes").index("by_creation_time").stream();
 
 ### Accessing the current time
 
-Convex queries are cached based on the data they read. Calling `Date.now()` directly in a query reads real wall-clock time, which [invalidates the cache](https://docs.convex.dev/production/best-practices/) and causes unnecessary re-execution—Convex's own best practices advise against it.
-
-To keep queries cacheable by default, confect stubs `Date.now()` to return `0` for the span of a query handler. If you need the current time inside a query, reach for Effect's `Clock` service instead:
-
-```ts
-import { Clock, Effect } from "effect";
-import { DatabaseReader } from "./confect/_generated/services";
-
-Effect.gen(function* () {
-  const reader = yield* DatabaseReader;
-  const rows = yield* reader
-    .table("notes")
-    .index("by_creation_time")
-    .collect();
-  const fetchedAt = yield* Clock.currentTimeMillis;
-
-  return { fetchedAt, rows };
-});
-```
-
-Reading `Clock.currentTimeMillis` (or `Clock.currentTimeNanos`) returns the real timestamp. Note that this is an **opt-in to cache invalidation**: any query that reads the clock will frequently bust the cache and be re-executed, rather than reliably served from cache. This matches Convex's behavior for any query that observes real time.
-
-If you don't actually need sub-second accuracy, prefer Convex's [recommended patterns](https://docs.convex.dev/production/best-practices/)—passing a coarse timestamp as a query argument, or maintaining a boolean/status field updated by a scheduled function—to preserve caching.
-
-Mutations and actions are unaffected: `Date.now()` works as expected there, and the `Clock` service returns the real timestamp without any caching concerns.
+Reading real time inside a query handler affects how aggressively Convex caches the result. See [Determinism](/server/database/determinism) for how Confect keeps queries cacheable by default and how to opt in to real time via Effect's `Clock` service.

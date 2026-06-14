@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import * as GroupPath from "./GroupPath";
 
 export const GroupPaths = Schema.HashSetFromSelf(GroupPath.GroupPath).pipe(

@@ -1,17 +1,23 @@
 import { Ref } from "@confect/core";
-import type { OptimisticLocalStore, OptimisticUpdate } from "convex/browser";
+import type { OptimisticUpdate as ConvexOptimisticUpdate } from "convex/browser";
 import {
   useAction as useConvexAction,
   useMutation as useConvexMutation,
   useQuery as useConvexQuery,
-  type ReactMutation,
+  type ReactMutation as ConvexReactMutation,
 } from "convex/react";
 import type { FunctionReference } from "convex/server";
-import { Cause, Effect, Either, Exit, Option } from "effect";
+import * as Cause from "effect/Cause";
+import * as Effect from "effect/Effect";
+import * as Either from "effect/Either";
+import * as Exit from "effect/Exit";
+import * as Option from "effect/Option";
+import { useCallback, useMemo } from "react";
 
+import * as OptimisticLocalStore from "./OptimisticLocalStore";
 import * as QueryResult from "./QueryResult";
 
-export { QueryResult };
+export { OptimisticLocalStore, QueryResult };
 
 export type InvokeReturn<Ref_ extends Ref.Any> = [Ref.Error<Ref_>] extends [
   never,
@@ -30,134 +36,113 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
 ): QueryResult.QueryResult<Ref.Returns<Query>, Ref.Error<Query>> => {
   const functionReference = Ref.getFunctionReference(ref);
   const args = rest[0];
-  const encodedArgs =
-    args === "skip"
-      ? "skip"
-      : Ref.encodeArgsSync(ref, (args ?? {}) as Ref.Args<Query>);
+  const skipped = args === "skip";
+  const encodedArgs = skipped
+    ? "skip"
+    : Ref.encodeArgsSync(ref, (args ?? {}) as Ref.Args<Query>);
 
-  try {
-    const encodedReturnsOrUndefined = useConvexQuery(
-      functionReference,
-      encodedArgs,
-    );
+  // `useConvexQuery` returns a referentially stable value while the underlying
+  // Convex result is unchanged, and throws a stable error when the query
+  // fails. We capture either outcome as an `Either` and decode/wrap it inside
+  // `useMemo` so that the returned `QueryResult` keeps a stable identity across
+  // renders when nothing has actually changed. Decoding on every render would
+  // hand consumers a fresh object each time, breaking effects and memoization
+  // that depend on the result's identity.
+  const encodedReturnsOrError: Either.Either<unknown, unknown> = Either.try(
+    () => useConvexQuery(functionReference, encodedArgs),
+  );
 
-    if (encodedReturnsOrUndefined === undefined) {
-      return QueryResult.load(args === "skip");
-    }
-
-    return QueryResult.succeed(
-      Ref.decodeReturnsSync(ref, encodedReturnsOrUndefined),
-    );
-  } catch (error) {
-    if (Ref.isConvexError(error)) {
-      const decoded = Ref.decodeErrorSync(ref, error.data);
-      if (Option.isSome(decoded)) {
-        return QueryResult.fail(decoded.value);
-      }
-    }
-    throw error;
-  }
+  return useMemo(
+    () =>
+      Either.match(encodedReturnsOrError, {
+        onRight: (encodedReturnsOrUndefined) =>
+          encodedReturnsOrUndefined === undefined
+            ? QueryResult.load(skipped)
+            : QueryResult.succeed(
+                Ref.decodeReturnsSync(ref, encodedReturnsOrUndefined),
+              ),
+        onLeft: (error) => {
+          if (Ref.isConvexError(error)) {
+            const decoded = Ref.decodeErrorSync(ref, error.data);
+            if (Option.isSome(decoded)) {
+              return QueryResult.fail(decoded.value);
+            }
+          }
+          throw error;
+        },
+      }),
+    // `Either.try` allocates a fresh wrapper each render, so we key the memo on
+    // the stable value it carries (the Convex result or thrown error) rather
+    // than the wrapper itself; the decoded result is a function of that value,
+    // `ref`, and `skipped`.
+    [ref, skipped, Either.merge(encodedReturnsOrError)],
+  );
 };
 
-export interface ConfectOptimisticLocalStore {
-  getQuery<Query extends Ref.AnyPublicQuery>(
-    queryRef: Query,
-    ...args: Ref.OptionalArgs<Query>
-  ): Ref.Returns<Query> | undefined;
-
-  getAllQueries<Query extends Ref.AnyPublicQuery>(
-    queryRef: Query,
-  ): Array<{
-    args: Ref.Args<Query>;
-    value: Ref.Returns<Query> | undefined;
-  }>;
-
-  setQuery<Query extends Ref.AnyPublicQuery>(
-    queryRef: Query,
-    args: Ref.Args<Query>,
-    value: Ref.Returns<Query> | undefined,
-  ): void;
-}
-
-export type ConfectOptimisticUpdate<Mutation extends Ref.AnyPublicMutation> = (
-  localStore: ConfectOptimisticLocalStore,
+/**
+ * An optimistic update for a Confect mutation. Mirrors Convex's
+ * `OptimisticUpdate`, but receives a Confect {@link OptimisticLocalStore} and
+ * the decoded mutation `args`.
+ */
+export type OptimisticUpdate<Mutation extends Ref.AnyPublicMutation> = (
+  localStore: OptimisticLocalStore.OptimisticLocalStore,
   args: Ref.Args<Mutation>,
 ) => void;
 
-export interface ConfectMutation<Mutation extends Ref.AnyPublicMutation> {
+/**
+ * The handle returned by {@link useMutation}. It is callable like the function
+ * returned by Convex's `useMutation`, and additionally exposes
+ * `withOptimisticUpdate` for attaching an optimistic update. Mirrors the
+ * `ReactMutation` type from `convex/react`.
+ */
+export interface ReactMutation<Mutation extends Ref.AnyPublicMutation> {
   (...args: Ref.OptionalArgs<Mutation>): InvokeReturn<Mutation>;
   withOptimisticUpdate(
-    optimisticUpdate: ConfectOptimisticUpdate<Mutation>,
-  ): ConfectMutation<Mutation>;
+    optimisticUpdate: OptimisticUpdate<Mutation>,
+  ): ReactMutation<Mutation>;
 }
 
-const wrapLocalStore = (
-  localStore: OptimisticLocalStore,
-): ConfectOptimisticLocalStore => ({
-  getQuery: (queryRef, ...rest) => {
-    const functionReference = Ref.getFunctionReference(queryRef);
-    const args = (rest[0] ?? {}) as Ref.Args<typeof queryRef>;
-    const encodedArgs = Ref.encodeArgsSync(queryRef, args);
-    const encoded = localStore.getQuery(functionReference, encodedArgs);
-    return encoded === undefined
-      ? undefined
-      : Ref.decodeReturnsSync(queryRef, encoded);
-  },
-  setQuery: (queryRef, args, value) => {
-    const functionReference = Ref.getFunctionReference(queryRef);
-    const encodedArgs = Ref.encodeArgsSync(queryRef, args);
-    const encodedValue =
-      value === undefined ? undefined : Ref.encodeReturnsSync(queryRef, value);
-    localStore.setQuery(functionReference, encodedArgs, encodedValue);
-  },
-  getAllQueries: (queryRef) => {
-    const functionReference = Ref.getFunctionReference(queryRef);
-    return localStore
-      .getAllQueries(functionReference)
-      .map(({ args, value }) => ({
-        args: Ref.decodeArgsSync(queryRef, args),
-        value:
-          value === undefined
-            ? undefined
-            : Ref.decodeReturnsSync(queryRef, value),
-      }));
-  },
-});
-
-const makeConfectMutation = <Mutation extends Ref.AnyPublicMutation>(
+const makeReactMutation = <Mutation extends Ref.AnyPublicMutation>(
   ref: Mutation,
-  reactMutation: ReactMutation<
+  convexReactMutation: ConvexReactMutation<
     Ref.FunctionReference<Mutation> & FunctionReference<"mutation">
   >,
-): ConfectMutation<Mutation> => {
+): ReactMutation<Mutation> => {
   const callable = ((...args: Ref.OptionalArgs<Mutation>) =>
     invokeAsEither(
       ref,
-      (_, encodedArgs) => reactMutation(encodedArgs as never),
+      (_, encodedArgs) => convexReactMutation(encodedArgs as never),
       args,
     ).then((either) =>
       Ref.hasErrorSchema(ref) ? either : Either.getOrThrow(either),
     )) as (...args: Ref.OptionalArgs<Mutation>) => InvokeReturn<Mutation>;
 
   const withOptimisticUpdate = (
-    optimisticUpdate: ConfectOptimisticUpdate<Mutation>,
-  ): ConfectMutation<Mutation> => {
-    const wrappedUpdate: OptimisticUpdate<Ref.Args<Mutation>> = (
-      localStore,
+    optimisticUpdate: OptimisticUpdate<Mutation>,
+  ): ReactMutation<Mutation> => {
+    const wrappedUpdate: ConvexOptimisticUpdate<Ref.Args<Mutation>> = (
+      convexLocalStore,
       encodedArgs,
     ) => {
       const decodedArgs = Ref.decodeArgsSync(ref, encodedArgs);
-      optimisticUpdate(wrapLocalStore(localStore), decodedArgs);
+      optimisticUpdate(
+        OptimisticLocalStore.make(convexLocalStore),
+        decodedArgs,
+      );
     };
-    const nextReactMutation = reactMutation.withOptimisticUpdate(wrappedUpdate);
-    return makeConfectMutation(ref, nextReactMutation);
+    const nextConvexReactMutation =
+      convexReactMutation.withOptimisticUpdate(wrappedUpdate);
+    return makeReactMutation(ref, nextConvexReactMutation);
   };
 
   return Object.assign(callable, { withOptimisticUpdate });
 };
 
 /**
- * Returns a function that invokes the provided `Ref`'s mutation.
+ * Returns a {@link ReactMutation} handle for the provided `Ref`'s mutation. The
+ * handle is callable to invoke the mutation, and exposes `withOptimisticUpdate`
+ * for attaching an optimistic update, mirroring `useMutation` from
+ * `convex/react`.
  *
  * If the `Ref` declares an `error` schema, the returned promise resolves to an
  * `Either` with the decoded `returns` value on the right and the decoded error
@@ -171,14 +156,19 @@ const makeConfectMutation = <Mutation extends Ref.AnyPublicMutation>(
  */
 export const useMutation = <Mutation extends Ref.AnyPublicMutation>(
   ref: Mutation,
-): ConfectMutation<Mutation> => {
+): ReactMutation<Mutation> => {
   const functionReference = Ref.getFunctionReference(ref);
-  const reactMutation = useConvexMutation(functionReference);
-  return makeConfectMutation(
-    ref,
-    reactMutation as ReactMutation<
-      Ref.FunctionReference<Mutation> & FunctionReference<"mutation">
-    >,
+  const convexReactMutation = useConvexMutation(functionReference);
+
+  return useMemo(
+    () =>
+      makeReactMutation(
+        ref,
+        convexReactMutation as ConvexReactMutation<
+          Ref.FunctionReference<Mutation> & FunctionReference<"mutation">
+        >,
+      ),
+    [ref, convexReactMutation],
   );
 };
 
@@ -201,14 +191,17 @@ export const useAction = <Action extends Ref.AnyPublicAction>(
   const functionReference = Ref.getFunctionReference(ref);
   const actualAction = useConvexAction(functionReference);
 
-  return ((...args: Ref.OptionalArgs<Action>) =>
-    invokeAsEither(
-      ref,
-      (_, encodedArgs) => actualAction(encodedArgs),
-      args,
-    ).then((either) =>
-      Ref.hasErrorSchema(ref) ? either : Either.getOrThrow(either),
-    )) as (...args: Ref.OptionalArgs<Action>) => InvokeReturn<Action>;
+  return useCallback(
+    ((...args: Ref.OptionalArgs<Action>) =>
+      invokeAsEither(
+        ref,
+        (_, encodedArgs) => actualAction(encodedArgs),
+        args,
+      ).then((either) =>
+        Ref.hasErrorSchema(ref) ? either : Either.getOrThrow(either),
+      )) as (...args: Ref.OptionalArgs<Action>) => InvokeReturn<Action>,
+    [ref, actualAction],
+  );
 };
 
 const invokeAsEither = async <Ref_ extends Ref.Any>(

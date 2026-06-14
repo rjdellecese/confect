@@ -20,20 +20,13 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v6
 
-      - name: Get pnpm version from package.json
-        id: pnpm-version
-        shell: bash
-        run: echo "pnpm_version=$(node -p 'require(`./package.json`).engines.pnpm')" >> $GITHUB_OUTPUT
-
       - name: Install pnpm
         uses: pnpm/action-setup@v6
-        with:
-          version: ${{ steps.pnpm-version.outputs.pnpm_version }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
-          node-version-file: "package.json"
+          node-version-file: ".node-version"
           cache: "pnpm"
           registry-url: "https://registry.npmjs.org"
 
@@ -44,13 +37,14 @@ jobs:
         id: changesets
         uses: changesets/action@v1
         with:
+          version: pnpm version-packages
           publish: pnpm release
-          branch: main
+          branch: ${{ github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update docs deployment branch
-        if: steps.changesets.outputs.published == 'true'
+        if: steps.changesets.outputs.published == 'true' && github.ref_name == 'main'
         run: |
           git fetch origin release || true
           git push --force-with-lease origin HEAD:refs/heads/release

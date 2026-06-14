@@ -4,25 +4,24 @@ title: "Scheduling"
 description: "Schedule functions to run after a delay or at a specific time."
 ---
 
-The `Scheduler` service schedules Confect functions to run in the future. It wraps Convex's scheduler with Effect-native types: delays use [`Duration`](https://effect.website/docs/data-types/duration/) and timestamps use [`DateTime`](https://effect.website/docs/data-types/date-time/).
+The `Scheduler` service schedules Confect functions to run in the future. It wraps Convex's scheduler with Effect-native types: delays use [`Duration`](https://effect.website/docs/data-types/duration/) and timestamps use [`DateTime`](https://effect.website/docs/data-types/datetime/).
 
 Both `runAfter` and `runAt` accept a ref to a mutation or action and an optional args object matching the ref's args schema.
 
 ## Run after a delay
 
 ```ts
-import { Duration, Effect } from "effect";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
 import refs from "./confect/_generated/refs";
 import { Scheduler } from "./confect/_generated/services";
 
 Effect.gen(function* () {
   const scheduler = yield* Scheduler;
 
-  yield* scheduler.runAfter(
-    Duration.minutes(5),
-    refs.internal.messages.send,
-    { text: "Hello" },
-  );
+  yield* scheduler.runAfter(Duration.minutes(5), refs.internal.messages.send, {
+    text: "Hello",
+  });
 });
 ```
 
@@ -40,4 +39,4 @@ Effect.gen(function* () {
 });
 ```
 
-For the full scheduling APIs, see the [Effect `Duration` documentation](https://effect.website/docs/data-types/duration/), the [Effect `DateTime` documentation](https://effect.website/docs/data-types/date-time/), and the [Convex scheduling documentation](https://docs.convex.dev/scheduling/scheduled-functions).
+For the full scheduling APIs, see the [Effect `Duration` documentation](https://effect.website/docs/data-types/duration/), the [Effect `DateTime` documentation](https://effect.website/docs/data-types/datetime/), and the [Convex scheduling documentation](https://docs.convex.dev/scheduling/scheduled-functions).

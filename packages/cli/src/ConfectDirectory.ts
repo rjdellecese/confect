@@ -1,5 +1,8 @@
-import { FileSystem, Path } from "@effect/platform";
-import { Effect, Ref, Schema } from "effect";
+import * as FileSystem from "@effect/platform/FileSystem";
+import * as Path from "@effect/platform/Path";
+import * as Effect from "effect/Effect";
+import * as Ref from "effect/Ref";
+import * as Schema from "effect/Schema";
 import { ConvexDirectory } from "./ConvexDirectory";
 
 export class ConfectDirectory extends Effect.Service<ConfectDirectory>()(

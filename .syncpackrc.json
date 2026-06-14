@@ -1,0 +1,88 @@
+{
+  "$schema": "./node_modules/syncpack/schema.json",
+  "customTypes": {
+    "enginesNode": {
+      "path": "engines.node",
+      "strategy": "versionsByName"
+    },
+    "author": {
+      "path": "author",
+      "strategy": "version"
+    },
+    "license": {
+      "path": "license",
+      "strategy": "version"
+    },
+    "homepage": {
+      "path": "homepage",
+      "strategy": "version"
+    },
+    "repoUrl": {
+      "path": "repository.url",
+      "strategy": "version"
+    },
+    "bugsUrl": {
+      "path": "bugs.url",
+      "strategy": "version"
+    }
+  },
+  "versionGroups": [
+    {
+      "label": "engines.node must match across all published packages",
+      "dependencyTypes": ["enginesNode"],
+      "policy": "sameRange"
+    },
+    {
+      "label": "Published metadata must match across all @confect/* packages",
+      "packages": ["@confect/*"],
+      "dependencyTypes": ["author", "license", "homepage", "repoUrl", "bugsUrl"]
+    },
+    {
+      "label": "Internal @confect/* peerDependencies must use workspace:^",
+      "dependencies": ["@confect/**"],
+      "dependencyTypes": ["peer"],
+      "pinVersion": "workspace:^"
+    },
+    {
+      "label": "Internal @confect/* devDependencies must use workspace:*",
+      "dependencies": ["@confect/**"],
+      "dependencyTypes": ["dev"],
+      "pinVersion": "workspace:*"
+    },
+    {
+      "label": "Internal @confect/* dependencies must use workspace:*",
+      "dependencies": ["@confect/**"],
+      "dependencyTypes": ["prod"],
+      "pinVersion": "workspace:*"
+    },
+    {
+      "label": "devDependencies must use the same version across the workspace",
+      "dependencyTypes": ["dev"]
+    },
+    {
+      "label": "External dependencies shared across @confect/* packages must use the same range in prod/peer",
+      "packages": ["@confect/*"],
+      "dependencies": [
+        "convex",
+        "convex-test",
+        "effect",
+        "@effect/platform",
+        "@effect/platform-node"
+      ],
+      "dependencyTypes": ["prod", "peer"],
+      "policy": "sameRange"
+    },
+    {
+      "label": "External prod/peer dependencies may use any version style",
+      "dependencyTypes": ["prod", "peer"],
+      "isIgnored": true
+    }
+  ],
+  "semverGroups": [
+    {
+      "label": "devDependencies must be exact pins (no semver range prefix)",
+      "dependencyTypes": ["dev"],
+      "range": ""
+    }
+  ]
+}

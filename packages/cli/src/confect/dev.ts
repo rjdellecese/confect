@@ -1,69 +1,108 @@
-import { Spec } from "@confect/core";
-import { Command } from "@effect/cli";
-import { FileSystem, Path } from "@effect/platform";
-import { Ansi, AnsiDoc } from "@effect/printer-ansi";
+import * as Command from "@effect/cli/Command";
+import * as FileSystem from "@effect/platform/FileSystem";
+import * as Path from "@effect/platform/Path";
+import * as Ansi from "@effect/printer-ansi/Ansi";
+import * as AnsiDoc from "@effect/printer-ansi/AnsiDoc";
+import { pipe } from "effect/Function";
+import * as Array from "effect/Array";
+import * as Chunk from "effect/Chunk";
+import * as Clock from "effect/Clock";
+import * as Console from "effect/Console";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as Equal from "effect/Equal";
+import * as ExecutionStrategy from "effect/ExecutionStrategy";
+import * as Exit from "effect/Exit";
+import * as HashSet from "effect/HashSet";
+import * as Match from "effect/Match";
+import * as Option from "effect/Option";
+import * as Order from "effect/Order";
+import * as Queue from "effect/Queue";
+import * as Ref from "effect/Ref";
+import * as Scope from "effect/Scope";
+import * as Stream from "effect/Stream";
+import * as String from "effect/String";
 import {
-  Array,
-  Console,
-  Deferred,
-  Duration,
-  Effect,
-  Equal,
-  HashSet,
-  Match,
-  Option,
-  pipe,
-  Queue,
-  Ref,
-  Schema,
-  Stream,
-  String,
-} from "effect";
-import type { ReadonlyRecord } from "effect/Record";
+  externalPlugin,
+  loadTsConfig,
+  tsconfigPathsToRegExp,
+} from "bundle-require";
 import * as esbuild from "esbuild";
-import type * as FunctionPath from "../FunctionPath";
-import * as FunctionPaths from "../FunctionPaths";
-import * as GroupPath from "../GroupPath";
-import { logFailure, logPending, logSuccess } from "../log";
+import { logCoalescedBuildErrors } from "../BuildError";
+import * as CodegenError from "../CodegenError";
 import { ConfectDirectory } from "../ConfectDirectory";
 import { ConvexDirectory } from "../ConvexDirectory";
+import * as FunctionPaths from "../FunctionPaths";
+import type * as GroupPaths from "../GroupPaths";
+import {
+  discoverLeafImplFiles,
+  isLeafImplPath,
+  isLeafSpecPath,
+} from "../LeafModule";
+import {
+  logFunctionAdded,
+  logFunctionRemoved,
+  logPending,
+  logSuccess,
+} from "../log";
 import { ProjectRoot } from "../ProjectRoot";
-import {
-  bundleAndImport,
-  EXTERNAL_PACKAGES,
-  generateAuthConfig,
-  generateCrons,
-  generateHttp,
-  removeGroups,
-  writeGroups,
-} from "../utils";
-import {
-  codegenHandler,
-  generateNodeApi,
-  generateNodeRegisteredFunctions,
-} from "./codegen";
+import { generateAuthConfig, generateCrons, generateHttp } from "../utils";
+import { codegenHandler, loadPreviousFunctionPaths } from "./codegen";
+
+const GENERATED_DIRNAME = "_generated";
+
+const GENERATED_SPEC_PATH = Effect.andThen(Path.Path, (path) =>
+  path.join(GENERATED_DIRNAME, "spec.ts"),
+);
+
+// Quiescence window: the sync loop waits this long for further signals
+// after each batch. One user edit fires `onEnd` on every esbuild
+// watcher that touches the file, and rebuild times vary across entry
+// points so the onEnds can be spread over hundreds of milliseconds.
+// The drain keeps extending its wait (bounded by `COALESCE_MAX_WAIT`)
+// until no new signals arrive within the window, collapsing the whole
+// burst into a single codegen cycle.
+const COALESCE_QUIESCENCE = Duration.millis(300);
+
+// Upper bound on `drainUntilQuiescent` so a pathological infinite
+// signal stream can't pin the sync loop forever.
+const COALESCE_MAX_WAIT = Duration.seconds(5);
+
+// How long to wait for esbuild watchers to react to codegen's own
+// writes (e.g. an updated `_generated/spec.ts`). Added on top of the
+// quiescence drain when codegen reported writes happened.
+const ECHO_COOLDOWN = Duration.millis(500);
+
+const emptyFunctionPaths = FunctionPaths.FunctionPaths.make(HashSet.empty());
 
 type Pending = {
   readonly specDirty: boolean;
-  readonly nodeImplDirty: boolean;
   readonly httpDirty: boolean;
   readonly cronsDirty: boolean;
   readonly authDirty: boolean;
 };
 
+type PendingKey = keyof Pending;
+
 const pendingInit: Pending = {
   specDirty: false,
-  nodeImplDirty: false,
   httpDirty: false,
   cronsDirty: false,
   authDirty: false,
 };
 
+const isPendingDirty = (p: Pending): boolean =>
+  p.specDirty || p.httpDirty || p.cronsDirty || p.authDirty;
+
+type WatcherErrors = ReadonlyMap<string, readonly esbuild.Message[]>;
+
+const emptyWatcherErrors: WatcherErrors = new Map();
+
 const changeChar = (change: "Added" | "Removed" | "Modified") =>
   Match.value(change).pipe(
     Match.when("Added", () => ({ char: "+", color: Ansi.green })),
     Match.when("Removed", () => ({ char: "-", color: Ansi.red })),
-    Match.when("Modified", () => ({ char: "~", color: Ansi.yellow })),
+    Match.when("Modified", () => ({ char: "~", color: Ansi.magenta })),
     Match.exhaustive,
   );
 
@@ -97,211 +136,234 @@ const logFileChangeIndented = (
     );
   });
 
-const logFunctionAddedIndented = (functionPath: FunctionPath.FunctionPath) =>
-  Console.log(
-    pipe(
-      AnsiDoc.text("  "),
-      AnsiDoc.cat(pipe(AnsiDoc.char("+"), AnsiDoc.annotate(Ansi.green))),
-      AnsiDoc.catWithSpace(
-        AnsiDoc.hcat([
-          pipe(
-            AnsiDoc.text(GroupPath.toString(functionPath.groupPath) + "."),
-            AnsiDoc.annotate(Ansi.blackBright),
-          ),
-          pipe(AnsiDoc.text(functionPath.name), AnsiDoc.annotate(Ansi.green)),
-        ]),
-      ),
-      AnsiDoc.render({ style: "pretty" }),
-    ),
-  );
+const logFunctionPathDiff = (
+  previous: FunctionPaths.FunctionPaths,
+  current: FunctionPaths.FunctionPaths,
+) =>
+  Effect.gen(function* () {
+    const {
+      functionsAdded,
+      functionsRemoved,
+      groupsRemoved,
+      groupsAdded,
+      groupsChanged,
+    } = FunctionPaths.diff(previous, current);
 
-const logFunctionRemovedIndented = (functionPath: FunctionPath.FunctionPath) =>
-  Console.log(
-    pipe(
-      AnsiDoc.text("  "),
-      AnsiDoc.cat(pipe(AnsiDoc.char("-"), AnsiDoc.annotate(Ansi.red))),
-      AnsiDoc.catWithSpace(
-        AnsiDoc.hcat([
-          pipe(
-            AnsiDoc.text(GroupPath.toString(functionPath.groupPath) + "."),
-            AnsiDoc.annotate(Ansi.blackBright),
+    const logForGroups = (
+      groupPaths: GroupPaths.GroupPaths,
+      fnPaths: FunctionPaths.FunctionPaths,
+      logFn: typeof logFunctionAdded,
+    ) =>
+      Effect.forEach(groupPaths, (gp) =>
+        Effect.forEach(
+          Array.fromIterable(
+            HashSet.filter(fnPaths, (fp) => Equal.equals(fp.groupPath, gp)),
           ),
-          pipe(AnsiDoc.text(functionPath.name), AnsiDoc.annotate(Ansi.red)),
-        ]),
-      ),
-      AnsiDoc.render({ style: "pretty" }),
-    ),
-  );
+          logFn,
+        ),
+      );
+
+    yield* logForGroups(groupsRemoved, functionsRemoved, logFunctionRemoved);
+    yield* logForGroups(groupsAdded, functionsAdded, logFunctionAdded);
+    yield* Effect.forEach(groupsChanged, (gp) =>
+      Effect.gen(function* () {
+        yield* Effect.forEach(
+          Array.fromIterable(
+            HashSet.filter(functionsAdded, (fp) =>
+              Equal.equals(fp.groupPath, gp),
+            ),
+          ),
+          logFunctionAdded,
+        );
+        yield* Effect.forEach(
+          Array.fromIterable(
+            HashSet.filter(functionsRemoved, (fp) =>
+              Equal.equals(fp.groupPath, gp),
+            ),
+          ),
+          logFunctionRemoved,
+        );
+      }),
+    );
+  });
 
 export const dev = Command.make("dev", {}, () =>
   Effect.gen(function* () {
     yield* logPending("Performing initial sync…");
-    const initialFunctionPaths = yield* codegenHandler;
+    const previousFunctionPaths = yield* loadPreviousFunctionPaths;
+    const initialResult = yield* codegenHandler.pipe(
+      Effect.tap(({ functionPaths }) =>
+        logFunctionPathDiff(previousFunctionPaths, functionPaths),
+      ),
+      Effect.tap(() => logSuccess("Generated files are up-to-date")),
+      CodegenError.catchAndLog,
+    );
+    const initialFunctionPaths = Option.match(initialResult, {
+      onNone: () => emptyFunctionPaths,
+      onSome: ({ functionPaths }) => functionPaths,
+    });
 
     const pendingRef = yield* Ref.make<Pending>(pendingInit);
     const signal = yield* Queue.sliding<void>(1);
-    const specWatcherRestartQueue = yield* Queue.sliding<void>(1);
+    const restartQueue = yield* Queue.sliding<void>(1);
+    const watcherErrorsRef = yield* Ref.make<WatcherErrors>(emptyWatcherErrors);
 
     yield* Effect.all(
       [
-        specFileWatcher(signal, pendingRef, specWatcherRestartQueue),
-        confectDirectoryWatcher(signal, pendingRef, specWatcherRestartQueue),
-        syncLoop(signal, pendingRef, initialFunctionPaths),
+        Effect.scoped(
+          entryPointsWatcher(
+            signal,
+            pendingRef,
+            restartQueue,
+            watcherErrorsRef,
+          ),
+        ),
+        confectStructureWatcher(signal, pendingRef, restartQueue),
+        syncLoop(signal, pendingRef, initialFunctionPaths, watcherErrorsRef),
       ],
       { concurrency: "unbounded" },
     );
   }),
 ).pipe(Command.withDescription("Start the Confect development server"));
 
+const esbuildMessageKey = (m: esbuild.Message): string =>
+  `${m.location?.file ?? ""}:${m.location?.line ?? ""}:${m.location?.column ?? ""}:${m.text}`;
+
+const allMessages = (errors: WatcherErrors): ReadonlyArray<esbuild.Message> =>
+  pipe(Array.fromIterable(errors.values()), Array.flatten);
+
+const dedupeWatcherErrors = (
+  errors: WatcherErrors,
+): ReadonlyArray<esbuild.Message> =>
+  pipe(
+    allMessages(errors),
+    Array.dedupeWith(
+      (messageA, messageB) =>
+        esbuildMessageKey(messageA) === esbuildMessageKey(messageB),
+    ),
+  );
+
+const watcherErrorsSignature = (errors: WatcherErrors): string =>
+  pipe(
+    allMessages(errors),
+    Array.map(esbuildMessageKey),
+    Array.dedupe,
+    Array.sort(Order.string),
+    Array.join("\n"),
+  );
+
+/**
+ * Log any watcher errors that haven't already been logged at their
+ * current signature. Suppresses the per-watcher fanout that happens
+ * when one root cause (e.g. a missing import) breaks every entry
+ * point's build at the same source location.
+ */
+const logChangedWatcherErrors = (
+  watcherErrorsRef: Ref.Ref<WatcherErrors>,
+  lastLoggedSignatureRef: Ref.Ref<string>,
+) =>
+  Effect.gen(function* () {
+    const errors = yield* Ref.get(watcherErrorsRef);
+    const signature = watcherErrorsSignature(errors);
+    const previous = yield* Ref.get(lastLoggedSignatureRef);
+    if (signature === previous) return;
+    yield* Ref.set(lastLoggedSignatureRef, signature);
+    if (errors.size === 0) return;
+    yield* logCoalescedBuildErrors(dedupeWatcherErrors(errors));
+  });
+
+/**
+ * Block until the signal queue has been quiet for `quiescence`. esbuild
+ * watchers' `onEnd` events for a single user edit can be spread across
+ * hundreds of milliseconds, so a fixed window misses late arrivals.
+ * Bounded by `maxWait` so pathological signal floods can't pin the
+ * loop forever.
+ */
+const drainUntilQuiescent = (
+  signal: Queue.Queue<void>,
+  quiescence: Duration.Duration,
+  maxWait: Duration.Duration,
+) =>
+  Effect.gen(function* () {
+    const start = yield* Clock.currentTimeMillis;
+    const maxMillis = Duration.toMillis(maxWait);
+    yield* Effect.iterate(true as boolean, {
+      while: (keepGoing) => keepGoing,
+      body: () =>
+        Effect.gen(function* () {
+          yield* Effect.sleep(quiescence);
+          const drained = yield* Queue.takeAll(signal);
+          if (Chunk.isEmpty(drained)) return false;
+          const now = yield* Clock.currentTimeMillis;
+          return now - start < maxMillis;
+        }),
+    });
+  });
+
 const syncLoop = (
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
   initialFunctionPaths: FunctionPaths.FunctionPaths,
+  watcherErrorsRef: Ref.Ref<WatcherErrors>,
 ) =>
   Effect.gen(function* () {
     const functionPathsRef = yield* Ref.make(initialFunctionPaths);
-    const initialSyncDone = yield* Deferred.make<void>();
+    const lastLoggedErrorsRef = yield* Ref.make<string>("");
 
     return yield* Effect.forever(
       Effect.gen(function* () {
-        yield* Effect.logDebug("Running sync loop...");
+        yield* Effect.logDebug("Running sync loop…");
+        // Wait for the first signal of a burst, then keep absorbing
+        // follow-up signals from other watchers' onEnds until the queue
+        // stays quiet for `COALESCE_QUIESCENCE`.
         yield* Queue.take(signal);
-
-        const isDone = yield* Deferred.isDone(initialSyncDone);
-        yield* Effect.when(
-          logPending("Dependencies changed, reloading…"),
-          () => isDone,
+        yield* drainUntilQuiescent(
+          signal,
+          COALESCE_QUIESCENCE,
+          COALESCE_MAX_WAIT,
         );
-        yield* Deferred.succeed(initialSyncDone, undefined);
+
+        yield* logChangedWatcherErrors(watcherErrorsRef, lastLoggedErrorsRef);
 
         const pending = yield* Ref.getAndSet(pendingRef, pendingInit);
 
-        if (pending.specDirty || pending.nodeImplDirty) {
-          yield* generateNodeApi;
-          yield* generateNodeRegisteredFunctions;
+        if (!isPendingDirty(pending)) {
+          // No-op signal (e.g. a late echo after a previous cycle
+          // already drained). Stay silent.
+          return;
         }
 
-        const specResult: Option.Option<void> = yield* Effect.if(
-          pending.specDirty,
-          {
-            onTrue: () =>
-              loadSpec.pipe(
-                Effect.andThen(
-                  Effect.fn(function* (spec) {
-                    yield* Effect.logDebug("Spec loaded");
+        yield* logPending("Dependencies may have changed, reloading…");
 
-                    const previous = yield* Ref.get(functionPathsRef);
-
-                    const path = yield* Path.Path;
-                    const convexDirectory = yield* ConvexDirectory.get;
-
-                    const current = FunctionPaths.make(spec);
-                    const {
-                      functionsAdded,
-                      functionsRemoved,
-                      groupsRemoved,
-                      groupsAdded,
-                      groupsChanged,
-                    } = FunctionPaths.diff(previous, current);
-
-                    // Removed groups
-                    yield* removeGroups(groupsRemoved);
-                    yield* Effect.forEach(groupsRemoved, (gp) =>
-                      Effect.gen(function* () {
-                        const relativeModulePath =
-                          yield* GroupPath.modulePath(gp);
-                        const filePath = path.join(
-                          convexDirectory,
-                          relativeModulePath,
-                        );
-                        yield* logFileChangeIndented("Removed", filePath);
-                        yield* Effect.forEach(
-                          Array.fromIterable(
-                            HashSet.filter(functionsRemoved, (fp) =>
-                              Equal.equals(fp.groupPath, gp),
-                            ),
-                          ),
-                          logFunctionRemovedIndented,
-                        );
-                      }),
-                    );
-
-                    // Added groups
-                    yield* writeGroups(spec, groupsAdded);
-                    yield* Effect.forEach(groupsAdded, (gp) =>
-                      Effect.gen(function* () {
-                        const relativeModulePath =
-                          yield* GroupPath.modulePath(gp);
-                        const filePath = path.join(
-                          convexDirectory,
-                          relativeModulePath,
-                        );
-                        yield* logFileChangeIndented("Added", filePath);
-                        yield* Effect.forEach(
-                          Array.fromIterable(
-                            HashSet.filter(functionsAdded, (fp) =>
-                              Equal.equals(fp.groupPath, gp),
-                            ),
-                          ),
-                          logFunctionAddedIndented,
-                        );
-                      }),
-                    );
-
-                    // Changed groups
-                    yield* writeGroups(spec, groupsChanged);
-                    yield* Effect.forEach(groupsChanged, (gp) =>
-                      Effect.gen(function* () {
-                        const relativeModulePath =
-                          yield* GroupPath.modulePath(gp);
-                        const filePath = path.join(
-                          convexDirectory,
-                          relativeModulePath,
-                        );
-                        yield* logFileChangeIndented("Modified", filePath);
-                        yield* Effect.forEach(
-                          Array.fromIterable(
-                            HashSet.filter(functionsAdded, (fp) =>
-                              Equal.equals(fp.groupPath, gp),
-                            ),
-                          ),
-                          logFunctionAddedIndented,
-                        );
-                        yield* Effect.forEach(
-                          Array.fromIterable(
-                            HashSet.filter(functionsRemoved, (fp) =>
-                              Equal.equals(fp.groupPath, gp),
-                            ),
-                          ),
-                          logFunctionRemovedIndented,
-                        );
-                      }),
-                    );
-
-                    yield* Ref.set(functionPathsRef, current);
-
-                    return Option.some(undefined);
-                  }),
-                ),
-                Effect.catchTag("SpecImportFailedError", () =>
-                  logFailure("Spec import failed").pipe(
-                    Effect.as(Option.none()),
-                  ),
-                ),
-                Effect.catchTag("SpecFileDoesNotExportSpecError", () =>
-                  logFailure(
-                    "Spec file does not default export a Convex spec",
-                  ).pipe(Effect.as(Option.none())),
-                ),
-                Effect.catchTag("NodeSpecFileDoesNotExportSpecError", () =>
-                  logFailure(
-                    "Node spec file does not default export a Node spec",
-                  ).pipe(Effect.as(Option.none())),
-                ),
-              ),
-            onFalse: () => Effect.succeed(Option.some(undefined)),
-          },
-        );
+        if (pending.specDirty) {
+          const current = yield* codegenHandler.pipe(
+            Effect.tap(({ functionPaths: nextFunctionPaths }) =>
+              Effect.gen(function* () {
+                const previous = yield* Ref.get(functionPathsRef);
+                yield* logFunctionPathDiff(previous, nextFunctionPaths);
+                yield* Ref.set(functionPathsRef, nextFunctionPaths);
+              }),
+            ),
+            CodegenError.catchAndLog,
+          );
+          if (Option.isNone(current)) {
+            return;
+          }
+          // Drain any stragglers from this cycle's burst (slow watchers
+          // whose onEnd fired after the first quiescence) plus, when
+          // codegen wrote, the echo signals esbuild emits in response
+          // to our writes. Reset `pendingRef` so those drained signals
+          // don't carry a dirty flag into the next cycle.
+          if (current.value.anyWritesHappened) {
+            yield* Effect.sleep(ECHO_COOLDOWN);
+          }
+          yield* drainUntilQuiescent(
+            signal,
+            COALESCE_QUIESCENCE,
+            COALESCE_MAX_WAIT,
+          );
+          yield* Ref.set(pendingRef, pendingInit);
+        }
 
         const dirtyOptionalFiles = [
           ...(pending.httpDirty
@@ -319,237 +381,379 @@ const syncLoop = (
           ? Effect.all(dirtyOptionalFiles, { concurrency: "unbounded" })
           : Effect.void;
 
-        yield* Option.match(specResult, {
-          onSome: () => logSuccess("Generated files are up-to-date"),
-          onNone: () => Effect.void,
-        });
+        yield* logSuccess("Generated files are up-to-date");
       }),
     );
   });
 
-const loadSpec = Effect.gen(function* () {
+interface EntryPoint {
+  readonly absolutePath: string;
+  readonly displayPath: string;
+  readonly pendingKey: PendingKey;
+}
+
+/**
+ * Every file whose import graph codegen should react to. Each one becomes
+ * its own scoped esbuild watcher; the union of their watches gives us
+ * dependency-aware tracking of anything reachable from `confect/`,
+ * including files outside `confect/`.
+ */
+const discoverEntryPoints = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  const specPath = yield* getSpecPath;
-  const specModule = yield* bundleAndImport(specPath).pipe(
-    Effect.mapError((error) => new SpecImportFailedError({ error })),
-  );
-  const spec = specModule.default;
-
-  if (!Spec.isConvexSpec(spec)) {
-    return yield* new SpecFileDoesNotExportSpecError();
-  }
-
-  const nodeImplPath = path.join(confectDirectory, "nodeImpl.ts");
-  const nodeImplExists = yield* fs.exists(nodeImplPath);
-  const nodeSpecOption = yield* loadNodeSpec;
-  const mergedSpec = Option.match(nodeSpecOption, {
-    onNone: () => spec,
-    onSome: (nodeSpec) => (nodeImplExists ? Spec.merge(spec, nodeSpec) : spec),
-  });
-
-  return mergedSpec;
-});
-
-const getSpecPath = Effect.gen(function* () {
-  const path = yield* Path.Path;
+  const projectRoot = yield* ProjectRoot.get;
   const confectDirectory = yield* ConfectDirectory.get;
 
-  return path.join(confectDirectory, "spec.ts");
-});
+  const tryEntry = (relativePath: string, pendingKey: PendingKey) =>
+    Effect.gen(function* () {
+      const absolutePath = path.join(confectDirectory, relativePath);
+      if (!(yield* fs.exists(absolutePath))) {
+        return Option.none<EntryPoint>();
+      }
+      return Option.some<EntryPoint>({
+        absolutePath,
+        displayPath: path.relative(projectRoot, absolutePath),
+        pendingKey,
+      });
+    });
 
-const getNodeSpecPath = Effect.gen(function* () {
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
+  const generatedSpecPath = yield* GENERATED_SPEC_PATH;
 
-  return path.join(confectDirectory, "nodeSpec.ts");
-});
+  const fixedEntryOptions = yield* Effect.all([
+    tryEntry(generatedSpecPath, "specDirty"),
+    // `confect/schema.ts` is no longer user-authored; the runtime
+    // `DatabaseSchema` lives at `_generated/schema.ts` (codegen-written,
+    // so not an entry point — wiring it through esbuild would form a
+    // codegen→write→onEnd→codegen loop). Updates to `confect/tables/*.ts`
+    // still reach this dev loop via the impl entry points' import graphs;
+    // brand-new tables are caught by the Create-event safety net below.
+    tryEntry("http.ts", "httpDirty"),
+    tryEntry("crons.ts", "cronsDirty"),
+    tryEntry("auth.ts", "authDirty"),
+  ]);
 
-const loadNodeSpec = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const nodeSpecPath = yield* getNodeSpecPath;
-
-  if (!(yield* fs.exists(nodeSpecPath))) {
-    return Option.none();
-  }
-
-  const nodeSpecModule = yield* bundleAndImport(nodeSpecPath).pipe(
-    Effect.mapError((error) => new SpecImportFailedError({ error })),
-  );
-  const nodeSpec = nodeSpecModule.default;
-
-  if (!Spec.isNodeSpec(nodeSpec)) {
-    return yield* new NodeSpecFileDoesNotExportSpecError();
-  }
-
-  return Option.some(nodeSpec);
-});
-
-const esbuildOptions = (entryPoint: string) => ({
-  entryPoints: [entryPoint],
-  bundle: true,
-  write: false,
-  metafile: true,
-  platform: "node" as const,
-  format: "esm" as const,
-  logLevel: "silent" as const,
-  external: EXTERNAL_PACKAGES,
-  plugins: [
-    {
-      name: "notify-rebuild",
-      setup(build: esbuild.PluginBuild) {
-        build.onEnd((result) => {
-          if (result.errors.length === 0) {
-            (build as { _emit?: (v: void) => void })._emit?.();
-          } else {
-            Effect.runPromise(
-              Effect.gen(function* () {
-                const formattedMessages = yield* Effect.promise(() =>
-                  esbuild.formatMessages(result.errors, {
-                    kind: "error",
-                    color: true,
-                    terminalWidth: 80,
-                  }),
-                );
-                const output = formatBuildErrors(
-                  result.errors,
-                  formattedMessages,
-                );
-                yield* Console.error("\n" + output + "\n");
-                yield* logFailure("Build errors found");
-              }),
-            );
-          }
-        });
-      },
-    },
-  ],
-});
-
-const createSpecWatcher = (entryPoint: string) =>
-  Stream.asyncPush<void>(
-    (emit) =>
-      Effect.acquireRelease(
-        Effect.promise(async () => {
-          const opts = esbuildOptions(entryPoint);
-          const plugin = opts.plugins[0];
-          const originalSetup = plugin!.setup!;
-          (plugin as { setup: (build: esbuild.PluginBuild) => void }).setup = (
-            build,
-          ) => {
-            (build as { _emit?: (v: void) => void })._emit = () =>
-              emit.single();
-            return originalSetup(build);
-          };
-
-          const ctx = await esbuild.context({
-            ...opts,
-            plugins: [plugin],
-          });
-
-          await ctx.watch();
-          return ctx;
-        }),
-        (ctx) =>
-          Effect.promise(() => ctx.dispose()).pipe(
-            Effect.tap(() => Effect.logDebug("esbuild watcher disposed")),
-          ),
-      ),
-    { bufferSize: 1, strategy: "sliding" },
+  const implRelativePaths = yield* discoverLeafImplFiles;
+  const implEntryOptions = yield* Effect.forEach(
+    implRelativePaths,
+    (relativePath) => tryEntry(relativePath, "specDirty"),
   );
 
-type SpecWatcherEvent = "change" | "restart";
+  return Array.getSomes([...fixedEntryOptions, ...implEntryOptions]);
+});
 
-const specFileWatcher = (
+const esbuildOptions = (
+  entry: EntryPoint,
+  notExternal: ReadonlyArray<RegExp>,
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
-  specWatcherRestartQueue: Queue.Queue<void>,
-) =>
-  Effect.forever(
-    Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem;
-      const specPath = yield* getSpecPath;
-      const nodeSpecPath = yield* getNodeSpecPath;
-      const nodeSpecExists = yield* fs.exists(nodeSpecPath);
-
-      const specWatcher = createSpecWatcher(specPath);
-      const nodeSpecWatcher = nodeSpecExists
-        ? createSpecWatcher(nodeSpecPath)
-        : Stream.empty;
-
-      const specChanges = pipe(
-        Stream.merge(specWatcher, nodeSpecWatcher),
-        Stream.map((): SpecWatcherEvent => "change"),
-      );
-      const restartStream = pipe(
-        Stream.fromQueue(specWatcherRestartQueue),
-        Stream.map((): SpecWatcherEvent => "restart"),
-      );
-
-      yield* pipe(
-        Stream.merge(specChanges, restartStream),
-        Stream.debounce(Duration.millis(200)),
-        Stream.takeUntil((event): event is "restart" => event === "restart"),
-        Stream.runForEach((event) =>
-          event === "change"
-            ? Ref.update(pendingRef, (pending) => ({
-                ...pending,
-                specDirty: true,
-              })).pipe(Effect.andThen(Queue.offer(signal, undefined)))
-            : Effect.void,
-        ),
-      );
-    }),
-  );
-
-const formatBuildError = (
-  error: esbuild.Message | undefined,
-  formattedMessage: string,
-): string => {
-  const lines = String.split(formattedMessage, "\n");
-  const redErrorText = pipe(
-    AnsiDoc.text(error?.text ?? ""),
-    AnsiDoc.annotate(Ansi.red),
-    AnsiDoc.render({ style: "pretty" }),
-  );
-  const replaced = pipe(
-    Array.findFirstIndex(lines, (l) => pipe(l, String.trim, String.isNonEmpty)),
-    Option.match({
-      onNone: () => lines,
-      onSome: (index) => Array.modify(lines, index, () => redErrorText),
-    }),
-  );
-  return pipe(replaced, Array.join("\n"));
+  watcherErrorsRef: Ref.Ref<WatcherErrors>,
+) => {
+  // First `onEnd` fires when esbuild finishes the watcher's initial
+  // build. At startup that's an echo of the just-completed initial
+  // codegen pass; for a watcher spawned mid-session (e.g. a newly
+  // added impl) it's an echo of the codegen run that triggered the
+  // restart. Either way, the entry's contents were already accounted
+  // for, so we record any errors but don't flip dirty or push a
+  // signal — only genuine subsequent rebuilds should do that.
+  const initialBuildSeenRef = Ref.unsafeMake(false);
+  return {
+    entryPoints: [entry.absolutePath],
+    bundle: true,
+    write: false,
+    metafile: true,
+    platform: "node" as const,
+    format: "esm" as const,
+    logLevel: "silent" as const,
+    plugins: [
+      externalPlugin({ notExternal: [...notExternal] }),
+      {
+        name: "notify-rebuild",
+        setup(build: esbuild.PluginBuild) {
+          build.onEnd((result) => {
+            Effect.runPromise(
+              Effect.gen(function* () {
+                const wasInitial = yield* Ref.getAndSet(
+                  initialBuildSeenRef,
+                  true,
+                );
+                const isInitial = !wasInitial;
+                yield* Ref.update(watcherErrorsRef, (current) => {
+                  const next = new Map(current);
+                  if (result.errors.length > 0) {
+                    next.set(entry.absolutePath, result.errors);
+                  } else {
+                    next.delete(entry.absolutePath);
+                  }
+                  return next;
+                });
+                if (isInitial && result.errors.length === 0) return;
+                yield* Ref.update(pendingRef, (p) => ({
+                  ...p,
+                  [entry.pendingKey]: true,
+                }));
+                yield* Queue.offer(signal, undefined);
+              }),
+            );
+          });
+        },
+      },
+    ],
+  };
 };
 
-const formatBuildErrors = (
-  errors: readonly esbuild.Message[],
-  formattedMessages: readonly string[],
-): string =>
-  pipe(
-    formattedMessages,
-    Array.map((message, i) => formatBuildError(errors[i], message)),
-    Array.join(""),
-    String.trimEnd,
+const createEntryPointWatcher = (
+  entry: EntryPoint,
+  notExternal: ReadonlyArray<RegExp>,
+  signal: Queue.Queue<void>,
+  pendingRef: Ref.Ref<Pending>,
+  watcherErrorsRef: Ref.Ref<WatcherErrors>,
+) =>
+  Effect.acquireRelease(
+    Effect.promise(async () => {
+      const ctx = await esbuild.context(
+        esbuildOptions(
+          entry,
+          notExternal,
+          signal,
+          pendingRef,
+          watcherErrorsRef,
+        ),
+      );
+      await ctx.watch();
+      return ctx;
+    }),
+    (ctx) =>
+      Effect.gen(function* () {
+        yield* Effect.promise(() => ctx.dispose());
+        // Clear any errors recorded by this watcher so a disposed
+        // watcher can't leave stale errors visible to the sync loop.
+        yield* Ref.update(watcherErrorsRef, (current) => {
+          if (!current.has(entry.absolutePath)) return current;
+          const next = new Map(current);
+          next.delete(entry.absolutePath);
+          return next;
+        });
+        yield* Effect.logDebug(
+          `esbuild watcher disposed: ${entry.displayPath}`,
+        );
+      }),
   );
 
-export class SpecFileDoesNotExportSpecError extends Schema.TaggedError<SpecFileDoesNotExportSpecError>()(
-  "SpecFileDoesNotExportSpecError",
-  {},
-) {}
+/**
+ * Holds one scoped esbuild watcher per entry point and reconciles the set
+ * whenever something offers to `restartQueue`. Adding or removing an entry
+ * point only spawns/disposes the affected watcher; unchanged entries keep
+ * their existing context, so a structural change doesn't churn watchers
+ * for unrelated files.
+ */
+const entryPointsWatcher = (
+  signal: Queue.Queue<void>,
+  pendingRef: Ref.Ref<Pending>,
+  restartQueue: Queue.Queue<void>,
+  watcherErrorsRef: Ref.Ref<WatcherErrors>,
+) =>
+  Effect.gen(function* () {
+    const parentScope = yield* Effect.scope;
+    const scopesRef = yield* Ref.make(new Map<string, Scope.CloseableScope>());
+    const projectRoot = yield* ProjectRoot.get;
+    // Discover the user's `tsconfig.json#paths` once at watcher startup so
+    // `~/...`-style aliases pointing into the user's source tree get bundled
+    // by esbuild instead of externalized via `bundle-require`'s `node_modules`
+    // heuristic. `loadTsConfig` walks up from `projectRoot` to find a
+    // `tsconfig.json`; if none exists, `paths` is empty and `notExternal` is
+    // `[]`, leaving the externalization rule unchanged.
+    const tsconfig = loadTsConfig(projectRoot);
+    const notExternal = tsconfigPathsToRegExp(
+      tsconfig?.data.compilerOptions?.paths ?? {},
+    );
 
-export class NodeSpecFileDoesNotExportSpecError extends Schema.TaggedError<NodeSpecFileDoesNotExportSpecError>()(
-  "NodeSpecFileDoesNotExportSpecError",
-  {},
-) {}
+    const sync = Effect.gen(function* () {
+      const desired = yield* discoverEntryPoints;
+      const desiredByPath = new Map(
+        desired.map((entryPoint) => [entryPoint.absolutePath, entryPoint]),
+      );
+      const current = yield* Ref.get(scopesRef);
 
-export class SpecImportFailedError extends Schema.TaggedError<SpecImportFailedError>()(
-  "SpecImportFailedError",
-  {
-    error: Schema.Unknown,
-  },
-) {}
+      yield* Effect.forEach(
+        Array.fromIterable(current),
+        ([absolutePath, childScope]) =>
+          desiredByPath.has(absolutePath)
+            ? Effect.void
+            : Scope.close(childScope, Exit.void).pipe(
+                Effect.andThen(
+                  Ref.update(scopesRef, (scopes) => {
+                    const updated = new Map(scopes);
+                    updated.delete(absolutePath);
+                    return updated;
+                  }),
+                ),
+              ),
+      );
+
+      yield* Effect.forEach(desired, (entry) =>
+        Effect.gen(function* () {
+          const existing = yield* Ref.get(scopesRef);
+          if (existing.has(entry.absolutePath)) return;
+
+          const childScope = yield* Scope.fork(
+            parentScope,
+            ExecutionStrategy.sequential,
+          );
+          yield* createEntryPointWatcher(
+            entry,
+            notExternal,
+            signal,
+            pendingRef,
+            watcherErrorsRef,
+          ).pipe(Scope.extend(childScope));
+          yield* Ref.update(scopesRef, (scopes) => {
+            const updated = new Map(scopes);
+            updated.set(entry.absolutePath, childScope);
+            return updated;
+          });
+        }),
+      );
+    });
+
+    yield* sync;
+
+    return yield* Effect.forever(
+      Queue.take(restartQueue).pipe(Effect.andThen(sync)),
+    );
+  });
+
+/**
+ * Single recursive `fs.watch` on `confect/`. Flips the matching dirty flag
+ * for any change to an entry-point-shaped file (so codegen runs without
+ * waiting on a newly spawned esbuild watcher), and offers to
+ * `restartQueue` when an entry point is created or removed so the watcher
+ * manager picks up the new set.
+ */
+const confectStructureWatcher = (
+  signal: Queue.Queue<void>,
+  pendingRef: Ref.Ref<Pending>,
+  restartQueue: Queue.Queue<void>,
+) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const confectDirectory = yield* ConfectDirectory.get;
+
+    yield* pipe(
+      fs.watch(confectDirectory, { recursive: true }),
+      Stream.debounce(Duration.millis(200)),
+      Stream.runForEach((event) =>
+        handleConfectChange({
+          relativePath: path.relative(confectDirectory, event.path),
+          eventTag: event._tag,
+          signal,
+          pendingRef,
+          restartQueue,
+        }),
+      ),
+    );
+  });
+
+const TOP_LEVEL_OPTIONAL_KEYS: ReadonlyMap<string, PendingKey> = new Map([
+  ["http.ts", "httpDirty"],
+  ["crons.ts", "cronsDirty"],
+  ["auth.ts", "authDirty"],
+]);
+
+const flipDirtyAndSignal = (
+  pendingRef: Ref.Ref<Pending>,
+  signal: Queue.Queue<void>,
+  key: PendingKey,
+  restartQueue: Queue.Queue<void>,
+  restart: boolean,
+) =>
+  pipe(
+    Ref.update(pendingRef, (p) => ({ ...p, [key]: true })),
+    Effect.andThen(Queue.offer(signal, undefined)),
+    Effect.andThen(
+      restart ? Queue.offer(restartQueue, undefined) : Effect.void,
+    ),
+  );
+
+const handleConfectChange = ({
+  relativePath,
+  eventTag,
+  signal,
+  pendingRef,
+  restartQueue,
+}: {
+  relativePath: string;
+  eventTag: "Create" | "Update" | "Remove";
+  signal: Queue.Queue<void>;
+  pendingRef: Ref.Ref<Pending>;
+  restartQueue: Queue.Queue<void>;
+}) => {
+  // _generated/ files are written by codegen itself; reacting to them here
+  // would form a loop. The esbuild watchers track the generated specs as
+  // entry points, so changes there flow back through `notify-rebuild`.
+  if (relativePath.split(/[/\\]/).includes("_generated")) {
+    return Effect.void;
+  }
+
+  if (!relativePath.endsWith(".ts")) {
+    return Effect.void;
+  }
+
+  const isLifecycleChange = eventTag !== "Update";
+
+  const topLevelKey = TOP_LEVEL_OPTIONAL_KEYS.get(relativePath);
+  if (topLevelKey !== undefined) {
+    return flipDirtyAndSignal(
+      pendingRef,
+      signal,
+      topLevelKey,
+      restartQueue,
+      isLifecycleChange,
+    );
+  }
+
+  // A stray `confect/schema.ts` (now codegen-owned at
+  // `_generated/schema.ts`) shouldn't exist; flagging it here ensures the
+  // next codegen pass surfaces the migration error
+  // (`LegacySchemaFileError`) instead of silently ignoring the file.
+  if (relativePath === "schema.ts") {
+    return flipDirtyAndSignal(
+      pendingRef,
+      signal,
+      "specDirty",
+      restartQueue,
+      isLifecycleChange,
+    );
+  }
+
+  if (isLeafSpecPath(relativePath) || isLeafImplPath(relativePath)) {
+    return flipDirtyAndSignal(
+      pendingRef,
+      signal,
+      "specDirty",
+      restartQueue,
+      isLifecycleChange,
+    );
+  }
+
+  // Any other `.ts` under `confect/` (helpers like `tables/notes.ts`).
+  // Updates to such files are handled by the esbuild watcher for whichever
+  // entry point imports them — its onEnd flips the right dirty flag.
+  // Creates are our safety net: when a previously-missing import is added,
+  // esbuild may not have its parent directory on a poll path, so we
+  // re-run codegen on Create here.
+  if (eventTag === "Create") {
+    return flipDirtyAndSignal(
+      pendingRef,
+      signal,
+      "specDirty",
+      restartQueue,
+      false,
+    );
+  }
+
+  return Effect.void;
+};
 
 const syncOptionalFile = (generate: typeof generateHttp, convexFile: string) =>
   pipe(
@@ -579,50 +783,3 @@ const syncOptionalFile = (generate: typeof generateHttp, convexFile: string) =>
       }),
     ),
   );
-
-const optionalConfectFiles: ReadonlyRecord<string, keyof Pending> = {
-  "http.ts": "httpDirty",
-  "crons.ts": "cronsDirty",
-  "auth.ts": "authDirty",
-  "nodeSpec.ts": "specDirty",
-  "nodeImpl.ts": "nodeImplDirty",
-};
-
-const confectDirectoryWatcher = (
-  signal: Queue.Queue<void>,
-  pendingRef: Ref.Ref<Pending>,
-  specWatcherRestartQueue: Queue.Queue<void>,
-) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const confectDirectory = yield* ConfectDirectory.get;
-
-    yield* pipe(
-      fs.watch(confectDirectory),
-      Stream.runForEach((event) => {
-        const basename = path.basename(event.path);
-        const pendingKey = optionalConfectFiles[basename];
-
-        if (pendingKey !== undefined) {
-          return pipe(
-            pendingRef,
-            Ref.update((pending) => {
-              const next = { ...pending, [pendingKey]: true };
-              if (basename === "nodeImpl.ts") {
-                return { ...next, specDirty: true };
-              }
-              return next;
-            }),
-            Effect.andThen(Queue.offer(signal, undefined)),
-            Effect.andThen(
-              basename === "nodeSpec.ts"
-                ? Queue.offer(specWatcherRestartQueue, undefined)
-                : Effect.void,
-            ),
-          );
-        }
-        return Effect.void;
-      }),
-    );
-  });

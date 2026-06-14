@@ -1,9 +1,34 @@
-import { Path } from "@effect/platform";
-import { Ansi, AnsiDoc } from "@effect/printer-ansi";
-import { Console, Effect, pipe, String } from "effect";
+import * as Path from "@effect/platform/Path";
+import * as Ansi from "@effect/printer-ansi/Ansi";
+import * as AnsiDoc from "@effect/printer-ansi/AnsiDoc";
+import { pipe } from "effect/Function";
+import * as Console from "effect/Console";
+import * as Effect from "effect/Effect";
+import * as String from "effect/String";
 import type * as FunctionPath from "./FunctionPath";
 import * as GroupPath from "./GroupPath";
 import { ProjectRoot } from "./ProjectRoot";
+
+// --- Path styling ---
+
+/**
+ * Render a relative path as an AnsiDoc with the directory portion
+ * dimmed (`Ansi.blackBright`) and the file leaf rendered in the
+ * default terminal color. Used inline anywhere a file path appears
+ * in a CLI message.
+ */
+export const formatPathDoc = (relativePath: string): AnsiDoc.AnsiDoc => {
+  const lastSep = Math.max(
+    relativePath.lastIndexOf("/"),
+    relativePath.lastIndexOf("\\"),
+  );
+  const dir = lastSep < 0 ? "" : relativePath.slice(0, lastSep + 1);
+  const leaf = lastSep < 0 ? relativePath : relativePath.slice(lastSep + 1);
+  return AnsiDoc.hcat([
+    pipe(AnsiDoc.text(dir), AnsiDoc.annotate(Ansi.blackBright)),
+    AnsiDoc.text(leaf),
+  ]);
+};
 
 // --- File operation logs ---
 
@@ -81,3 +106,5 @@ export const logSuccess = logStatus("✔︎", Ansi.green);
 export const logFailure = logStatus("✘", Ansi.red);
 
 export const logPending = logStatus("⭘", Ansi.yellow);
+
+export const logWarn = logStatus("⚠", Ansi.yellow);

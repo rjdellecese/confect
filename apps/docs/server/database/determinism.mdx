@@ -1,0 +1,58 @@
+---
+icon: "clock"
+title: "Determinism"
+description: "How Confect keeps queries cacheable by default."
+---
+
+Convex caches the result of every query, keyed on its arguments and on everything the handler reads—including real wall-clock time. A query that observes time (directly via `Date.now()`, or indirectly through APIs that read it) is [evicted from the cache much more aggressively](https://docs.convex.dev/production/best-practices/) and is re-executed on subsequent calls, even when its inputs are unchanged.
+
+Effect programs touch the clock far more often than ordinary JavaScript: forking a fiber, emitting a log, or opening a span all read the current time internally. Without intervention, every Confect-wrapped query would defeat the cache.
+
+To keep queries cacheable by default, Confect stubs the clock for the span of a query handler:
+
+- `Date.now()` returns `0`.
+- The `unsafe*` methods on Effect's `Clock` service (used internally by logging, span events, the default scheduler, and `Fiber` construction) return constants (`0` and `0n`).
+- The user-facing `Clock.currentTimeMillis` and `Clock.currentTimeNanos` effects are the **only** way to read real time, and they are an **explicit opt-in to cache invalidation**.
+
+Mutations and actions are not affected by any of this. Real time is always available there, with no caching trade-offs.
+
+## What stays cached
+
+The following do **not** observe real time from within a query handler and so do not interfere with caching:
+
+- `Effect.log`/`Effect.logInfo`/etc.
+- `Effect.withSpan` and other tracing primitives
+- Forking fibers, the default scheduler, and other Effect internals
+- A bare `Date.now()` call inside the handler (returns `0`)
+
+## Opting in to real time
+
+Use Effect's `Clock` service when you need the real timestamp:
+
+```ts
+import * as Clock from "effect/Clock";
+import * as Effect from "effect/Effect";
+import { DatabaseReader } from "./confect/_generated/services";
+
+Effect.gen(function* () {
+  const reader = yield* DatabaseReader;
+  const rows = yield* reader.table("notes").index("by_creation_time").collect();
+  const fetchedAt = yield* Clock.currentTimeMillis;
+
+  return { fetchedAt, rows };
+});
+```
+
+Any query that reads `Clock.currentTimeMillis` or `Clock.currentTimeNanos` will be evicted from Convex's cache and re-executed on every subscription update, matching Convex's behavior for any query that observes real time.
+
+## Preferring cacheable alternatives
+
+If you don't actually need sub-second accuracy inside the query, follow Convex's [recommended patterns](https://docs.convex.dev/production/best-practices/) to preserve caching:
+
+- Pass a coarse timestamp (e.g. rounded to the minute or hour) as a query argument from the client.
+- Maintain a boolean or status field on the document, updated by a scheduled function or mutation.
+- Compute time-dependent values in a mutation or action and persist the result.
+
+## Caveats
+
+Stubbing `Date.now()` inside the handler means library code that calls it during a query—logging timestamps, cache keys, ID generation—will see `0` rather than the real time. This is almost always what you want for a deterministic, cacheable query, but it can surprise code that was written assuming a real clock. If such code must run inside a query, route it through `Clock.currentTimeMillis` instead and accept the cache trade-off.

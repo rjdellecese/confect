@@ -10,7 +10,11 @@
     "lib": ["ESNext", "DOM"],
     "target": "ESNext",
     "moduleResolution": "Bundler",
-    "module": "ESNext"
+    "module": "ESNext",
+    "paths": {
+      "@confect/js": ["./src/index.ts"],
+      "@confect/js/*": ["./src/*"]
+    }
   },
   "exclude": ["coverage", "dist", "node_modules"],
   "extends": ["../../tsconfig.base.json"]

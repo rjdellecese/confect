@@ -1,6 +1,10 @@
 import { Ref } from "@confect/core";
 import type { Scheduler as ConvexScheduler } from "convex/server";
-import { Context, DateTime, Duration, Effect, Layer } from "effect";
+import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 
 const make = (scheduler: ConvexScheduler) => ({
   runAfter: <Ref_ extends Ref.AnyMutation | Ref.AnyAction>(

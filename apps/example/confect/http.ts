@@ -1,7 +1,7 @@
 import { HttpApi } from "@confect/server";
-import { HttpMiddleware } from "@effect/platform";
-import { flow } from "effect";
-import { ApiLive } from "./http/path-prefix";
+import * as HttpMiddleware from "@effect/platform/HttpMiddleware";
+import { flow } from "effect/Function";
+import { ApiLive } from "./http/pathPrefix";
 
 export default HttpApi.make({
   "/path-prefix/": {

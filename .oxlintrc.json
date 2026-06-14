@@ -1,0 +1,77 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "import", "promise", "node", "oxc"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error"
+  },
+  "env": {
+    "builtin": true
+  },
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/coverage/**",
+    "**/node_modules/**",
+    "**/.pnpm-store/**",
+    "**/.tsup/**",
+    "**/_generated/**",
+    "**/.mintlify/**"
+  ],
+  "rules": {
+    "no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "ignoreRestSiblings": true
+      }
+    ],
+    "no-underscore-dangle": "off",
+    "unicorn/consistent-function-scoping": "off",
+    "unicorn/no-array-sort": "off",
+    "oxc/no-accumulating-spread": "off"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.{ts,tsx,mts,cts}"],
+      "rules": {
+        "typescript/consistent-type-imports": "error",
+        "no-shadow": "error"
+      }
+    },
+    {
+      "files": ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
+      "rules": {
+        "unicorn/filename-case": [
+          "error",
+          { "cases": { "camelCase": true, "pascalCase": true } }
+        ]
+      }
+    },
+    {
+      "files": ["**/*.{ts,tsx,mts,cts}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "effect",
+                "message": "Import Effect modules from their submodule path so they tree-shake, e.g. `import * as Schema from \"effect/Schema\"`. Bare helpers (pipe, flow, identity) come from \"effect/Function\".",
+                "allowTypeImports": true
+              }
+            ],
+            "patterns": [
+              {
+                "group": ["@effect/*", "!@effect/vitest"],
+                "message": "Import @effect/* modules from their submodule path so they tree-shake, e.g. `import * as Path from \"@effect/platform/Path\"`.",
+                "allowTypeImports": true
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

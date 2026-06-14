@@ -1,4 +1,5 @@
-import { Cron, Duration } from "effect";
+import * as Cron from "effect/Cron";
+import * as Duration from "effect/Duration";
 import { CronJob, CronJobs } from "@confect/server";
 import refs from "./_generated/refs";
 
@@ -7,14 +8,14 @@ export default CronJobs.make()
     CronJob.make(
       "clear all notes",
       Duration.hours(24),
-      refs.internal.notesAndRandom.notes.clearAll,
+      refs.internal.notes_and_random.notes.clearAll,
     ),
   )
   .add(
     CronJob.make(
       "insert default note",
       Cron.unsafeParse("0 9 * * 1"),
-      refs.internal.notesAndRandom.notes.insertDefault,
+      refs.internal.notes_and_random.notes.insertDefault,
       { text: "Weekly reminder: review your notes!" },
     ),
   );

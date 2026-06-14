@@ -17,22 +17,20 @@ import type {
   VUnion,
 } from "convex/values";
 import { v } from "convex/values";
-import {
-  Array,
-  Cause,
-  Data,
-  Effect,
-  Exit,
-  Match,
-  Number,
-  Option,
-  type ParseResult,
-  pipe,
-  Predicate,
-  Schema,
-  SchemaAST,
-  String,
-} from "effect";
+import { pipe } from "effect/Function";
+import type { ParseResult } from "effect";
+import * as Array from "effect/Array";
+import * as Cause from "effect/Cause";
+import * as Data from "effect/Data";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Match from "effect/Match";
+import * as Number from "effect/Number";
+import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
+import * as Schema from "effect/Schema";
+import * as SchemaAST from "effect/SchemaAST";
+import * as String from "effect/String";
 
 import * as GenericId from "@confect/core/GenericId";
 import type {

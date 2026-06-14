@@ -30,20 +30,21 @@ bun add -D @confect/test convex-test @effect/vitest
 
 ## Setup
 
-Create a `TestConfect.ts` file that configures the test layer with your database schema and Convex modules.
+Create a `TestConfect.ts` file that configures the test layer with your generated runtime schema, generated Convex schema definition, and Convex modules. Both schemas are emitted by `confect codegen` from `confect/tables/*.ts`; you never edit them by hand.
 
 ```ts test/TestConfect.ts
 /// <reference types="vite/client" />
 
 import { TestConfect as TestConfect_ } from "@confect/test";
 
-import confectSchema from "./confect/schema";
+import confectSchema from "./confect/_generated/schema";
+import convexSchema from "./confect/_generated/convexSchema";
 
-export const TestConfect =
-  TestConfect_.TestConfect<typeof confectSchema>();
+export const TestConfect = TestConfect_.TestConfect<typeof confectSchema>();
 
 export const layer = TestConfect_.layer(
   confectSchema,
+  convexSchema,
   import.meta.glob("./convex/**/!(*.*.*)*.*s"),
 );
 ```
@@ -57,7 +58,7 @@ Use `@effect/vitest`'s `it.effect` to write effectful tests. Yield `TestConfect`
 ```ts test/notes.test.ts
 import { describe, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 
 import refs from "./confect/_generated/refs";
 import * as TestConfect from "./TestConfect";
@@ -105,8 +106,10 @@ When a ref's spec declares an `error` schema, the decoded error is added to the 
 ```ts
 import { describe, it } from "@effect/vitest";
 import { assertLeft } from "@effect/vitest/utils";
-import { Effect } from "effect";
+import type { GenericId } from "convex/values";
+import * as Effect from "effect/Effect";
 
+import { NoteNotFound } from "./confect/notes.spec";
 import refs from "./confect/_generated/refs";
 import * as TestConfect from "./TestConfect";
 
@@ -132,7 +135,7 @@ describe("notes", () => {
 Use `run` to execute arbitrary code with mutation-context services (like `DatabaseWriter`) for test setup. When the handler returns a value, pass a `Schema` as the second argument for decoding.
 
 ```ts
-import { GenericId } from "@confect/core";
+import { Id } from "./confect/_generated/id";
 import { DatabaseWriter } from "./confect/_generated/services";
 
 Effect.gen(function* () {
@@ -142,11 +145,9 @@ Effect.gen(function* () {
     Effect.gen(function* () {
       const writer = yield* DatabaseWriter;
 
-      return yield* writer
-        .table("notes")
-        .insert({ text: "seed data" });
+      return yield* writer.table("notes").insert({ text: "seed data" });
     }),
-    GenericId.GenericId("notes"),
+    Id("notes"),
   );
 });
 ```
@@ -183,10 +184,7 @@ Effect.gen(function* () {
     email: "user@example.com",
   });
 
-  const identity = yield* asUser.query(
-    refs.public.auth.getIdentity,
-    {},
-  );
+  const identity = yield* asUser.query(refs.public.auth.getIdentity, {});
 });
 ```
 
