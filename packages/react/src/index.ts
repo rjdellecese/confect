@@ -7,6 +7,7 @@ import {
   type ReactMutation as ConvexReactMutation,
 } from "convex/react";
 import type { FunctionReference } from "convex/server";
+import type { Value } from "convex/values";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Either from "effect/Either";
@@ -120,7 +121,7 @@ const makeReactMutation = <Mutation extends Ref.AnyPublicMutation>(
   const withOptimisticUpdate = (
     optimisticUpdate: OptimisticUpdate<Mutation>,
   ): ReactMutation<Mutation> => {
-    const wrappedUpdate: ConvexOptimisticUpdate<Ref.Args<Mutation>> = (
+    const wrappedUpdate: ConvexOptimisticUpdate<Record<string, Value>> = (
       convexLocalStore,
       encodedArgs,
     ) => {
