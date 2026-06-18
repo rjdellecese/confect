@@ -153,6 +153,7 @@ const runCodegen = Effect.gen(function* () {
       removeGeneratedApi,
       generateRefs,
       removeGeneratedNodeApi,
+      generateDocs(tableModules),
       generateServices,
       generateConvexSchema(tableModules),
     ],
@@ -809,6 +810,30 @@ const generateServices = Effect.gen(function* () {
 
   yield* writeFileStringAndLog(servicesPath, servicesContentsString);
 });
+
+const generateDocs = (tableModules: ReadonlyArray<TableModule.TableModule>) =>
+  Effect.gen(function* () {
+    const path = yield* Path.Path;
+    const confectDirectory = yield* ConfectDirectory.get;
+
+    const confectGeneratedDirectory = path.join(confectDirectory, "_generated");
+
+    const docsPath = path.join(confectGeneratedDirectory, "docs.ts");
+    const generatedSchemaPath = yield* GENERATED_SCHEMA_PATH;
+    const schemaImportPath = yield* toModuleImportPath(
+      path.relative(
+        path.dirname(docsPath),
+        path.join(confectDirectory, generatedSchemaPath),
+      ),
+    );
+
+    const docsContentsString = yield* templates.docs({
+      schemaImportPath,
+      tableNames: tableModules.map((tm) => tm.tableName),
+    });
+
+    yield* writeFileStringAndLog(docsPath, docsContentsString);
+  });
 
 const generateRefs = Effect.gen(function* () {
   const path = yield* Path.Path;

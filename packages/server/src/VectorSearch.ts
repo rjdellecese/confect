@@ -18,7 +18,9 @@ type ConvexVectorSearch<DataModel_ extends DataModel.AnyWithProps> =
  * The service shape backing the `VectorSearch` tag. Named so declaration emit
  * references it instead of expanding the call signature at every usage.
  */
-export interface VectorSearchService<DataModel_ extends DataModel.AnyWithProps> {
+export interface VectorSearchService<
+  DataModel_ extends DataModel.AnyWithProps,
+> {
   <
     TableName extends DataModel.TableNames<DataModel_>,
     IndexName extends VectorIndexNames<

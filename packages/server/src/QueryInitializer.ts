@@ -36,14 +36,16 @@ export interface QueryInitializer<
   TableName extends DataModel.TableNames<DataModel_>,
   _ConvexTableInfo extends GenericTableInfo,
   _TableInfo extends TableInfo.AnyWithProps,
+  // The decoded document type. Defaults to the schema-derived structural
+  // document; the database reader substitutes a *named* doc interface from the
+  // codegen registry so declaration emit prints the name instead of expanding
+  // the row structure inline.
+  Doc = _TableInfo["document"],
 > {
   readonly get: {
     (
       id: GenericId<TableName>,
-    ): Effect.Effect<
-      _TableInfo["document"],
-      Document.DocumentDecodeError | GetByIdFailure
-    >;
+    ): Effect.Effect<Doc, Document.DocumentDecodeError | GetByIdFailure>;
     <IndexName extends keyof Indexes<_ConvexTableInfo>>(
       indexName: IndexName,
       ...indexFieldValues: IndexFieldTypesForEq<
@@ -51,10 +53,7 @@ export interface QueryInitializer<
         TableName,
         Indexes<_ConvexTableInfo>[IndexName]
       >
-    ): Effect.Effect<
-      _TableInfo["document"],
-      Document.DocumentDecodeError | GetByIndexFailure
-    >;
+    ): Effect.Effect<Doc, Document.DocumentDecodeError | GetByIndexFailure>;
   };
   readonly index: {
     <IndexName extends keyof Indexes<_ConvexTableInfo>>(
@@ -66,11 +65,11 @@ export interface QueryInitializer<
         >,
       ) => IndexRange,
       order?: "asc" | "desc",
-    ): OrderedQuery.OrderedQuery<_TableInfo, TableName>;
+    ): OrderedQuery.OrderedQuery<_TableInfo, TableName, Doc>;
     <IndexName extends keyof Indexes<_ConvexTableInfo>>(
       indexName: IndexName,
       order?: "asc" | "desc",
-    ): OrderedQuery.OrderedQuery<_TableInfo, TableName>;
+    ): OrderedQuery.OrderedQuery<_TableInfo, TableName, Doc>;
   };
   readonly search: <IndexName extends keyof SearchIndexes<_ConvexTableInfo>>(
     indexName: IndexName,
@@ -80,7 +79,7 @@ export interface QueryInitializer<
         NamedSearchIndex<_ConvexTableInfo, IndexName>
       >,
     ) => SearchFilter,
-  ) => OrderedQuery.OrderedQuery<_TableInfo, TableName>;
+  ) => OrderedQuery.OrderedQuery<_TableInfo, TableName, Doc>;
 }
 
 export const make = <
