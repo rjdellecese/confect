@@ -30,11 +30,10 @@ rmSync(OUT_DIR, { recursive: true, force: true });
 let tscOutput = "";
 let tscFailed = false;
 try {
-  tscOutput = execFileSync(
-    "tsc",
-    ["-p", PROJECT, "--pretty", "false"],
-    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
-  );
+  tscOutput = execFileSync("tsc", ["-p", PROJECT, "--pretty", "false"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
 } catch (error) {
   tscFailed = true;
   tscOutput = `${error.stdout ?? ""}${error.stderr ?? ""}`;
