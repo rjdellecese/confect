@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "noEmit": false,
+    "outDir": "./.tsdeclcheck",
+    "tsBuildInfoFile": "./.tsdeclcheck/.tsbuildinfo"
+  },
+  "exclude": ["node_modules", "convex/_generated", "convex"]
+}
