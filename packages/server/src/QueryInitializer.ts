@@ -31,12 +31,12 @@ import * as OrderedQuery from "./OrderedQuery";
 import type * as Table from "./Table";
 import type * as TableInfo from "./TableInfo";
 
-type QueryInitializer<
+export interface QueryInitializer<
   DataModel_ extends DataModel.AnyWithProps,
   TableName extends DataModel.TableNames<DataModel_>,
   _ConvexTableInfo extends GenericTableInfo,
   _TableInfo extends TableInfo.AnyWithProps,
-> = {
+> {
   readonly get: {
     (
       id: GenericId<TableName>,
@@ -81,7 +81,7 @@ type QueryInitializer<
       >,
     ) => SearchFilter,
   ) => OrderedQuery.OrderedQuery<_TableInfo, TableName>;
-};
+}
 
 export const make = <
   Tables extends Table.AnyWithProps,

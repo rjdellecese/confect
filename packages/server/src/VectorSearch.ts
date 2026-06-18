@@ -14,10 +14,11 @@ import type * as DataModel from "./DataModel";
 type ConvexVectorSearch<DataModel_ extends DataModel.AnyWithProps> =
   GenericActionCtx<DataModel.ToConvex<DataModel_>>["vectorSearch"];
 
-export const make =
-  <DataModel_ extends DataModel.AnyWithProps>(
-    vectorSearch: ConvexVectorSearch<DataModel_>,
-  ) =>
+/**
+ * The service shape backing the `VectorSearch` tag. Named so declaration emit
+ * references it instead of expanding the call signature at every usage.
+ */
+export interface VectorSearchService<DataModel_ extends DataModel.AnyWithProps> {
   <
     TableName extends DataModel.TableNames<DataModel_>,
     IndexName extends VectorIndexNames<
@@ -32,16 +33,28 @@ export const make =
         IndexName
       >
     >,
-  ): Effect.Effect<Array<{ _id: GenericId<TableName>; _score: number }>> =>
+  ): Effect.Effect<Array<{ _id: GenericId<TableName>; _score: number }>>;
+}
+
+export type VectorSearchTag<DataModel_ extends DataModel.AnyWithProps> =
+  Context.Tag<VectorSearchService<DataModel_>, VectorSearchService<DataModel_>>;
+
+export const make =
+  <DataModel_ extends DataModel.AnyWithProps>(
+    vectorSearch: ConvexVectorSearch<DataModel_>,
+  ): VectorSearchService<DataModel_> =>
+  (tableName, indexName, query) =>
     Effect.promise(() => vectorSearch(tableName, indexName, query));
 
-export const VectorSearch = <DataModel_ extends DataModel.AnyWithProps>() =>
-  Context.GenericTag<ReturnType<typeof make<DataModel_>>>(
+export const VectorSearch = <
+  DataModel_ extends DataModel.AnyWithProps,
+>(): VectorSearchTag<DataModel_> =>
+  Context.GenericTag<VectorSearchService<DataModel_>>(
     "@confect/server/VectorSearch",
   );
 
 export type VectorSearch<DataModel_ extends DataModel.AnyWithProps> =
-  ReturnType<typeof VectorSearch<DataModel_>>["Identifier"];
+  VectorSearchService<DataModel_>;
 
 export const layer = <DataModel_ extends DataModel.AnyWithProps>(
   vectorSearch: ConvexVectorSearch<DataModel_>,

@@ -396,11 +396,14 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
     yield* cbw.blankLine();
 
     // VectorSearch
-    yield* cbw.writeLine("export const VectorSearch =");
+    yield* cbw.writeLine(
+      "export const VectorSearch: VectorSearch_.VectorSearchTag<",
+    );
     yield* cbw.indent(
-      cbw.writeLine(
-        "VectorSearch_.VectorSearch<DataModel.FromSchema<typeof schemaDefinition>>();",
-      ),
+      cbw.writeLine("DataModel.FromSchema<typeof schemaDefinition>"),
+    );
+    yield* cbw.writeLine(
+      "> = VectorSearch_.VectorSearch<DataModel.FromSchema<typeof schemaDefinition>>();",
     );
     yield* cbw.writeLine(
       "export type VectorSearch = typeof VectorSearch.Identifier;",
@@ -408,11 +411,12 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
     yield* cbw.blankLine();
 
     // DatabaseReader
-    yield* cbw.writeLine("export const DatabaseReader =");
-    yield* cbw.indent(
-      cbw.writeLine(
-        "DatabaseReader_.DatabaseReader<typeof schemaDefinition>();",
-      ),
+    yield* cbw.writeLine(
+      "export const DatabaseReader: DatabaseReader_.DatabaseReaderTag<",
+    );
+    yield* cbw.indent(cbw.writeLine("typeof schemaDefinition"));
+    yield* cbw.writeLine(
+      "> = DatabaseReader_.DatabaseReader<typeof schemaDefinition>();",
     );
     yield* cbw.writeLine(
       "export type DatabaseReader = typeof DatabaseReader.Identifier;",
@@ -420,11 +424,12 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
     yield* cbw.blankLine();
 
     // DatabaseWriter
-    yield* cbw.writeLine("export const DatabaseWriter =");
-    yield* cbw.indent(
-      cbw.writeLine(
-        "DatabaseWriter_.DatabaseWriter<typeof schemaDefinition>();",
-      ),
+    yield* cbw.writeLine(
+      "export const DatabaseWriter: DatabaseWriter_.DatabaseWriterTag<",
+    );
+    yield* cbw.indent(cbw.writeLine("typeof schemaDefinition"));
+    yield* cbw.writeLine(
+      "> = DatabaseWriter_.DatabaseWriter<typeof schemaDefinition>();",
     );
     yield* cbw.writeLine(
       "export type DatabaseWriter = typeof DatabaseWriter.Identifier;",
@@ -459,52 +464,57 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
     yield* cbw.blankLine();
 
     // QueryCtx
-    yield* cbw.writeLine("export const QueryCtx =");
+    yield* cbw.writeLine("export const QueryCtx: QueryCtx_.QueryCtxTag<");
     yield* cbw.indent(
-      Effect.gen(function* () {
-        yield* cbw.writeLine("QueryCtx_.QueryCtx<");
-        yield* cbw.indent(
-          cbw.writeLine(
-            "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
-          ),
-        );
-        yield* cbw.writeLine(">();");
-      }),
+      cbw.writeLine(
+        "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
+      ),
     );
+    yield* cbw.writeLine("> = QueryCtx_.QueryCtx<");
+    yield* cbw.indent(
+      cbw.writeLine(
+        "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
+      ),
+    );
+    yield* cbw.writeLine(">();");
     yield* cbw.writeLine("export type QueryCtx = typeof QueryCtx.Identifier;");
     yield* cbw.blankLine();
 
     // MutationCtx
-    yield* cbw.writeLine("export const MutationCtx =");
-    yield* cbw.indent(
-      Effect.gen(function* () {
-        yield* cbw.writeLine("MutationCtx_.MutationCtx<");
-        yield* cbw.indent(
-          cbw.writeLine(
-            "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
-          ),
-        );
-        yield* cbw.writeLine(">();");
-      }),
+    yield* cbw.writeLine(
+      "export const MutationCtx: MutationCtx_.MutationCtxTag<",
     );
+    yield* cbw.indent(
+      cbw.writeLine(
+        "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
+      ),
+    );
+    yield* cbw.writeLine("> = MutationCtx_.MutationCtx<");
+    yield* cbw.indent(
+      cbw.writeLine(
+        "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
+      ),
+    );
+    yield* cbw.writeLine(">();");
     yield* cbw.writeLine(
       "export type MutationCtx = typeof MutationCtx.Identifier;",
     );
     yield* cbw.blankLine();
 
     // ActionCtx
-    yield* cbw.writeLine("export const ActionCtx =");
+    yield* cbw.writeLine("export const ActionCtx: ActionCtx_.ActionCtxTag<");
     yield* cbw.indent(
-      Effect.gen(function* () {
-        yield* cbw.writeLine("ActionCtx_.ActionCtx<");
-        yield* cbw.indent(
-          cbw.writeLine(
-            "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
-          ),
-        );
-        yield* cbw.writeLine(">();");
-      }),
+      cbw.writeLine(
+        "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
+      ),
     );
+    yield* cbw.writeLine("> = ActionCtx_.ActionCtx<");
+    yield* cbw.indent(
+      cbw.writeLine(
+        "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
+      ),
+    );
+    yield* cbw.writeLine(">();");
     yield* cbw.writeLine(
       "export type ActionCtx = typeof ActionCtx.Identifier;",
     );

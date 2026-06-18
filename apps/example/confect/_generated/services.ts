@@ -32,16 +32,19 @@ export type StorageWriter = typeof StorageWriter.Identifier;
 export const StorageActionWriter = StorageActionWriter_.StorageActionWriter;
 export type StorageActionWriter = typeof StorageActionWriter.Identifier;
 
-export const VectorSearch =
-  VectorSearch_.VectorSearch<DataModel.FromSchema<typeof schemaDefinition>>();
+export const VectorSearch: VectorSearch_.VectorSearchTag<
+  DataModel.FromSchema<typeof schemaDefinition>
+> = VectorSearch_.VectorSearch<DataModel.FromSchema<typeof schemaDefinition>>();
 export type VectorSearch = typeof VectorSearch.Identifier;
 
-export const DatabaseReader =
-  DatabaseReader_.DatabaseReader<typeof schemaDefinition>();
+export const DatabaseReader: DatabaseReader_.DatabaseReaderTag<
+  typeof schemaDefinition
+> = DatabaseReader_.DatabaseReader<typeof schemaDefinition>();
 export type DatabaseReader = typeof DatabaseReader.Identifier;
 
-export const DatabaseWriter =
-  DatabaseWriter_.DatabaseWriter<typeof schemaDefinition>();
+export const DatabaseWriter: DatabaseWriter_.DatabaseWriterTag<
+  typeof schemaDefinition
+> = DatabaseWriter_.DatabaseWriter<typeof schemaDefinition>();
 export type DatabaseWriter = typeof DatabaseWriter.Identifier;
 
 export const QueryRunner = QueryRunner_.QueryRunner;
@@ -53,20 +56,23 @@ export type MutationRunner = typeof MutationRunner.Identifier;
 export const ActionRunner = ActionRunner_.ActionRunner;
 export type ActionRunner = typeof ActionRunner.Identifier;
 
-export const QueryCtx =
-  QueryCtx_.QueryCtx<
-    DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>
-  >();
+export const QueryCtx: QueryCtx_.QueryCtxTag<
+  DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>
+> = QueryCtx_.QueryCtx<
+  DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>
+>();
 export type QueryCtx = typeof QueryCtx.Identifier;
 
-export const MutationCtx =
-  MutationCtx_.MutationCtx<
-    DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>
-  >();
+export const MutationCtx: MutationCtx_.MutationCtxTag<
+  DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>
+> = MutationCtx_.MutationCtx<
+  DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>
+>();
 export type MutationCtx = typeof MutationCtx.Identifier;
 
-export const ActionCtx =
-  ActionCtx_.ActionCtx<
-    DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>
-  >();
+export const ActionCtx: ActionCtx_.ActionCtxTag<
+  DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>
+> = ActionCtx_.ActionCtx<
+  DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>
+>();
 export type ActionCtx = typeof ActionCtx.Identifier;
