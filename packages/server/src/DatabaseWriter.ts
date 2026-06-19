@@ -195,9 +195,6 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
     };
   };
 
-  // The `Docs`-conditional document type is a declaration-emit refinement only
-  // (structurally identical to the structural document), which the generic
-  // `make` body cannot prove, so assert it here.
   return {
     table,
   } as DatabaseWriterService<DatabaseSchema_>;
