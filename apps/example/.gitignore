@@ -1,5 +1,2 @@
 tsconfig.tsbuildinfo
 .env.local
-
-# Declaration-emit smoke-test output
-.tsdeclcheck/

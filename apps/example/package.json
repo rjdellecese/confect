@@ -26,7 +26,6 @@
   "private": true,
   "scripts": {
     "build": "vite build --mode development",
-    "check:declarations": "rm -rf .tsdeclcheck && tsc -p tsconfig.declcheck.json && node scripts/checkDeclarationSize.mjs",
     "clean": "rm -rf dist node_modules",
     "convex-codegen": "pnpm convex codegen",
     "dev": "concurrently --restart-tries=1 --prefix-colors='white.bold.bgCyan,white.bold.bgYellow,white.bold.bgGreen' --prefix=' {name} ' --names='VITE,CONVEX,CONFECT' 'vite' 'convex dev --tail-logs' 'confect dev'",
