@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`services.d.ts emit prints public types by name 1`] = `
+exports[`declaration emit > services.d.ts prints public types by name 1`] = `
 "import { ActionCtx as ActionCtx_, Auth as Auth_, type DataModel, DatabaseReader as DatabaseReader_, DatabaseWriter as DatabaseWriter_, MutationCtx as MutationCtx_, QueryCtx as QueryCtx_, StorageActionWriter as StorageActionWriter_, StorageReader as StorageReader_, StorageWriter as StorageWriter_, VectorSearch as VectorSearch_ } from "@confect/server";
 import type schemaDefinition from "./schema";
 import type { Docs } from "./docs";
