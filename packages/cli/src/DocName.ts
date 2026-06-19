@@ -34,5 +34,6 @@ export const fromTableName = (tableName: string): DocName =>
       Array.filter(String.isNonEmpty),
       Array.map(String.capitalize),
       Array.join(""),
-    ) + "Doc",
+      String.concat("Doc"),
+    ),
   );
