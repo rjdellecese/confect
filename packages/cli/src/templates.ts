@@ -279,7 +279,7 @@ export const refs = ({ specImportPath }: { specImportPath: string }) =>
 
 /**
  * Emit `_generated/docs.ts`: one nominal `interface <table>` per table plus a
- * `ConfectDocs` registry. Each interface `extends Confect.Doc<typeof
+ * `Docs` registry. Each interface `extends Confect.Doc<typeof
  * schemaDefinition, "<table>">`, so it stays structurally exact while giving
  * the document a *name* — declaration emit then prints e.g. `NotesDoc` instead
  * of expanding the row structure. The registry is threaded into the generated
@@ -299,7 +299,7 @@ export const docs = ({
     // With no tables there is nothing to import — emitting the (unused) imports
     // would trip `noUnusedLocals`.
     if (tables.length === 0) {
-      yield* cbw.writeLine(`export interface ConfectDocs {}`);
+      yield* cbw.writeLine(`export interface Docs {}`);
       return yield* cbw.toString();
     }
 
@@ -310,7 +310,7 @@ export const docs = ({
     yield* cbw.blankLine();
 
     // Each interface is named in PascalCase (`NotesDoc`) for an idiomatic hover,
-    // but the `ConfectDocs` registry is keyed by the verbatim table name — that
+    // but the `Docs` registry is keyed by the verbatim table name — that
     // key is what document lookups index through.
     for (const { tableName, docName } of tables) {
       yield* cbw.writeLine(
@@ -319,7 +319,7 @@ export const docs = ({
     }
     yield* cbw.blankLine();
 
-    yield* cbw.writeLine(`export interface ConfectDocs {`);
+    yield* cbw.writeLine(`export interface Docs {`);
     yield* cbw.indent(
       Effect.gen(function* () {
         for (const { tableName, docName } of tables) {
@@ -409,7 +409,7 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
     yield* cbw.writeLine(
       `import type schemaDefinition from "${schemaImportPath}";`,
     );
-    yield* cbw.writeLine(`import type { ConfectDocs } from "./docs";`);
+    yield* cbw.writeLine(`import type { Docs } from "./docs";`);
     yield* cbw.blankLine();
 
     // Auth
@@ -473,11 +473,11 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
     yield* cbw.indent(
       Effect.gen(function* () {
         yield* cbw.writeLine("typeof schemaDefinition,");
-        yield* cbw.writeLine("ConfectDocs");
+        yield* cbw.writeLine("Docs");
       }),
     );
     yield* cbw.writeLine(
-      "> = DatabaseReader_.DatabaseReader<typeof schemaDefinition, ConfectDocs>();",
+      "> = DatabaseReader_.DatabaseReader<typeof schemaDefinition, Docs>();",
     );
     yield* cbw.writeLine(
       "export type DatabaseReader = typeof DatabaseReader.Identifier;",
@@ -491,11 +491,11 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
     yield* cbw.indent(
       Effect.gen(function* () {
         yield* cbw.writeLine("typeof schemaDefinition,");
-        yield* cbw.writeLine("ConfectDocs");
+        yield* cbw.writeLine("Docs");
       }),
     );
     yield* cbw.writeLine(
-      "> = DatabaseWriter_.DatabaseWriter<typeof schemaDefinition, ConfectDocs>();",
+      "> = DatabaseWriter_.DatabaseWriter<typeof schemaDefinition, Docs>();",
     );
     yield* cbw.writeLine(
       "export type DatabaseWriter = typeof DatabaseWriter.Identifier;",

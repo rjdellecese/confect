@@ -16,7 +16,7 @@ import {
   VectorSearch as VectorSearch_,
 } from "@confect/server";
 import type schemaDefinition from "./schema";
-import type { ConfectDocs } from "./docs";
+import type { Docs } from "./docs";
 
 export const Auth = Auth_.Auth;
 export type Auth = typeof Auth.Identifier;
@@ -40,14 +40,14 @@ export type VectorSearch = typeof VectorSearch.Identifier;
 
 export const DatabaseReader: DatabaseReader_.DatabaseReaderTag<
   typeof schemaDefinition,
-  ConfectDocs
-> = DatabaseReader_.DatabaseReader<typeof schemaDefinition, ConfectDocs>();
+  Docs
+> = DatabaseReader_.DatabaseReader<typeof schemaDefinition, Docs>();
 export type DatabaseReader = typeof DatabaseReader.Identifier;
 
 export const DatabaseWriter: DatabaseWriter_.DatabaseWriterTag<
   typeof schemaDefinition,
-  ConfectDocs
-> = DatabaseWriter_.DatabaseWriter<typeof schemaDefinition, ConfectDocs>();
+  Docs
+> = DatabaseWriter_.DatabaseWriter<typeof schemaDefinition, Docs>();
 export type DatabaseWriter = typeof DatabaseWriter.Identifier;
 
 export const QueryRunner = QueryRunner_.QueryRunner;

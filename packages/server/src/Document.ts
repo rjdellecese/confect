@@ -14,7 +14,7 @@ import type * as TableInfo from "./TableInfo";
  * The decoded document type for a table in a given schema.
  *
  * Codegen emits one nominal `interface <table> extends Document.Document<typeof
- * schemaDefinition, "<table>"> {}` per table (plus a `ConfectDocs` registry).
+ * schemaDefinition, "<table>"> {}` per table (plus a `Docs` registry).
  * Because an `interface` is a named symbol, declaration emit prints the table
  * name instead of expanding the row structure — while `extends
  * Document.Document<…>` keeps it structurally exact. Hand-written code can also

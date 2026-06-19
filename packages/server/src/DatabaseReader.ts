@@ -96,7 +96,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
 /**
  * The fully-applied tag type for a given schema. Codegen annotates its
  * `_generated/services.ts` export with this alias so declaration emit copies
- * `DatabaseReaderTag<typeof schemaDefinition, ConfectDocs>` verbatim — keeping
+ * `DatabaseReaderTag<typeof schemaDefinition, Docs>` verbatim — keeping
  * `typeof schemaDefinition` a reference instead of expanding the whole schema.
  *
  * The tag's *Identifier* (the Effect requirements-channel type) is

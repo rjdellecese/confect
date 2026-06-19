@@ -1,1 +1,1 @@
-export interface ConfectDocs {}
+export interface Docs {}

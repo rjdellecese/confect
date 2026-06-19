@@ -9,7 +9,7 @@
  * That folding can make two distinct tables map to the same document name;
  * codegen guards against it (see `validateNoDocNameCollisions`).
  *
- * Note this name is purely cosmetic: the `ConfectDocs` registry is keyed by the
+ * Note this name is purely cosmetic: the `Docs` registry is keyed by the
  * verbatim table name, which is what document lookups index through.
  */
 export const toDocName = (tableName: string): string =>

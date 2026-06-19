@@ -624,19 +624,19 @@ const tableModuleBindings = (
 
     const generatedTablesDirname = yield* GENERATED_TABLES_DIRNAME;
 
-    return yield* Effect.forEach(tableModules, (tm) =>
+    return yield* Effect.forEach(tableModules, (tableModule) =>
       Effect.gen(function* () {
         const wrapperAbsolutePath = path.join(
           confectDirectory,
           generatedTablesDirname,
-          `${tm.tableName}.ts`,
+          `${tableModule.tableName}.ts`,
         );
         const importPath = yield* toModuleImportPath(
           path.relative(generatedDir, wrapperAbsolutePath),
         );
         return {
           importPath,
-          tableName: tm.tableName,
+          tableName: tableModule.tableName,
         };
       }),
     );
@@ -651,7 +651,7 @@ const generateIdConstructor = (
     const generatedIdPath = yield* GENERATED_ID_PATH;
     const idPath = path.join(confectDirectory, generatedIdPath);
 
-    const tableNames = tableModules.map((tm) => tm.tableName);
+    const tableNames = tableModules.map((tableModule) => tableModule.tableName);
     const contents = yield* templates.id({ tableNames });
 
     yield* writeFileStringAndLog(idPath, contents);
@@ -673,22 +673,22 @@ const generateTableWrappers = (
 
     yield* Effect.forEach(
       tableModules,
-      (tm) =>
+      (tableModule) =>
         Effect.gen(function* () {
           const wrapperPath = path.join(
             confectDirectory,
             generatedTablesDirname,
-            `${tm.tableName}.ts`,
+            `${tableModule.tableName}.ts`,
           );
           const unnamedAbsolutePath = path.join(
             confectDirectory,
-            tm.relativePath,
+            tableModule.relativePath,
           );
           const unnamedImportPath = yield* toModuleImportPath(
             path.relative(path.dirname(wrapperPath), unnamedAbsolutePath),
           );
           const contents = yield* templates.tableWrapper({
-            tableName: tm.tableName,
+            tableName: tableModule.tableName,
             unnamedImportPath,
           });
           yield* writeFileStringAndLog(wrapperPath, contents);
@@ -716,7 +716,9 @@ const removeObsoleteTableWrappers = (
       return;
     }
 
-    const expected = new Set(tableModules.map((tm) => `${tm.tableName}.ts`));
+    const expected = new Set(
+      tableModules.map((tableModule) => `${tableModule.tableName}.ts`),
+    );
     const existing = yield* fs.readDirectory(wrappersDir, { recursive: true });
     yield* Effect.forEach(existing, (entry) => {
       if (path.extname(entry) !== ".ts") {
@@ -822,12 +824,14 @@ const validateNoDocNameCollisions = (
 ) =>
   Effect.gen(function* () {
     const collisions = Object.entries(
-      Array.groupBy(tableModules, (tm) => toDocName(tm.tableName)),
+      Array.groupBy(tableModules, (tableModule) =>
+        toDocName(tableModule.tableName),
+      ),
     )
       .filter(([, group]) => group.length > 1)
       .map(([docName, group]) => ({
         docName,
-        tableNames: Array.map(group, (tm) => tm.tableName),
+        tableNames: Array.map(group, (tableModule) => tableModule.tableName),
       }));
 
     if (collisions.length > 0) {
@@ -853,9 +857,9 @@ const generateDocs = (tableModules: ReadonlyArray<TableModule.TableModule>) =>
 
     const docsContentsString = yield* templates.docs({
       schemaImportPath,
-      tables: tableModules.map((tm) => ({
-        tableName: tm.tableName,
-        docName: toDocName(tm.tableName),
+      tables: tableModules.map((tableModule) => ({
+        tableName: tableModule.tableName,
+        docName: toDocName(tableModule.tableName),
       })),
     });
 
