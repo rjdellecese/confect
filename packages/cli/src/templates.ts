@@ -309,9 +309,6 @@ export const docs = ({
     );
     yield* cbw.blankLine();
 
-    // Each interface is named in PascalCase (`NotesDoc`) for an idiomatic hover,
-    // but the `Docs` registry is keyed by the verbatim table name — that
-    // key is what document lookups index through.
     for (const { tableName, docName } of tables) {
       yield* cbw.writeLine(
         `export interface ${docName} extends Document.Document<typeof schemaDefinition, "${tableName}"> {}`,

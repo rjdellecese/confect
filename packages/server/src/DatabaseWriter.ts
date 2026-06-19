@@ -19,17 +19,9 @@ import * as QueryInitializer from "./QueryInitializer";
 import type * as Table from "./Table";
 import type * as TableInfo from "./TableInfo";
 
-/**
- * The per-table writer accessor returned by `DatabaseWriterService.table`.
- * Named so declaration emit references it instead of expanding the methods
- * inline at every call site.
- */
 export interface DatabaseWriterTableAccessor<
   DataModel_ extends DataModel.AnyWithProps,
   TableName extends DataModel.TableNames<DataModel_>,
-  // The decoded document type for this table. Defaults to the schema-derived
-  // structural document; the writer substitutes a *named* doc interface from
-  // the codegen registry so declaration emit prints the name.
   Doc = DocumentByName_<DataModel_, TableName>,
 > {
   readonly insert: (
@@ -76,8 +68,10 @@ export interface DatabaseWriterService<
   >;
 }
 
-// The tag's *Identifier* is `Docs`-independent (see `DatabaseReaderTag`); only
-// the *Service* carries `Docs` so writer inputs print the named doc interfaces.
+/**
+ * The tag's *Identifier* is `Docs`-independent (see `DatabaseReaderTag`); only
+ * the *Service* carries `Docs` so writer inputs print the named doc interfaces.
+ */
 export type DatabaseWriterTag<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Docs = {},

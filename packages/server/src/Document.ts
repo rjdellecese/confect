@@ -10,17 +10,6 @@ import type * as DataModel from "./DataModel";
 import type { ReadonlyValue } from "./SchemaToValidator";
 import type * as TableInfo from "./TableInfo";
 
-/**
- * The decoded document type for a table in a given schema.
- *
- * Codegen emits one nominal `interface <table> extends Document.Document<typeof
- * schemaDefinition, "<table>"> {}` per table (plus a `Docs` registry).
- * Because an `interface` is a named symbol, declaration emit prints the table
- * name instead of expanding the row structure — while `extends
- * Document.Document<…>` keeps it structurally exact. Hand-written code can also
- * use this as a compact return annotation, e.g.
- * `Document.Document<typeof schemaDefinition, "notes">`.
- */
 export type Document<
   Schema_ extends DatabaseSchema.AnyWithProps,
   TableName extends DatabaseSchema.TableNames<Schema_>,

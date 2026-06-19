@@ -1,8 +1,8 @@
 import { describe, expect, test } from "@effect/vitest";
 
-import { toDocName } from "@confect/cli/DocName";
+import * as DocName from "@confect/cli/DocName";
 
-describe("toDocName", () => {
+describe("fromTableName", () => {
   test.each([
     ["notes", "NotesDoc"],
     ["tags", "TagsDoc"],
@@ -13,10 +13,12 @@ describe("toDocName", () => {
     ["table2", "Table2Doc"],
     ["table_2", "Table2Doc"],
   ])("%s -> %s", (tableName, expected) => {
-    expect(toDocName(tableName)).toBe(expected);
+    expect(DocName.fromTableName(tableName)).toBe(expected);
   });
 
   test("folds camelCase and snake_case spellings to the same name", () => {
-    expect(toDocName("userProfiles")).toBe(toDocName("user_profiles"));
+    expect(DocName.fromTableName("userProfiles")).toBe(
+      DocName.fromTableName("user_profiles"),
+    );
   });
 });

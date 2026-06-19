@@ -115,9 +115,6 @@ export class LegacySchemaFileError extends Schema.TaggedError<LegacySchemaFileEr
 export class ConflictingDocNameError extends Schema.TaggedError<ConflictingDocNameError>()(
   "ConflictingDocNameError",
   {
-    // Each generated document type name that more than one table folds to,
-    // paired with the colliding table names. All collisions are captured in a
-    // single pass so the user can fix them together.
     collisions: Schema.Array(
       Schema.Struct({
         docName: Schema.String,

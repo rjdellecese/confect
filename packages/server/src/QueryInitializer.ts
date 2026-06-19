@@ -36,10 +36,6 @@ export interface QueryInitializer<
   TableName extends DataModel.TableNames<DataModel_>,
   ConvexTableInfo_ extends GenericTableInfo,
   TableInfo_ extends TableInfo.AnyWithProps,
-  // The decoded document type. Defaults to the schema-derived structural
-  // document; the database reader substitutes a *named* doc interface from the
-  // codegen registry so declaration emit prints the name instead of expanding
-  // the row structure inline.
   Doc = TableInfo_["document"],
 > {
   readonly get: {

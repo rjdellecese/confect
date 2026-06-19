@@ -14,18 +14,6 @@ type IncludedTables<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
 type IncludedDataModel<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
   DataModel.DataModel<IncludedTables<DatabaseSchema_>>;
 
-/**
- * The service shape backing the `DatabaseReader` tag. Named (rather than an
- * inferred anonymous object) so that declaration emit prints
- * `DatabaseReaderService<…>` by reference instead of expanding the entire data
- * model — both in `_generated/services.d.ts` and in every user helper's Effect
- * requirements channel.
- *
- * `Docs` is an optional named document registry (emitted by codegen). When a
- * table is present in it, queries resolve to its *named* doc interface so
- * declaration emit prints e.g. `NotesDoc`; otherwise it falls back to the
- * schema-derived structural document (the default, structurally identical).
- */
 export interface DatabaseReaderService<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Docs = {},
@@ -86,19 +74,10 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
         table,
       );
     },
-    // The runtime accessor resolves the structural document for every table.
-    // The `Docs`-conditional return type is a declaration-emit refinement only
-    // (structurally identical), which the generic `make` body cannot prove, so
-    // assert it here.
   } as DatabaseReaderService<DatabaseSchema_>;
 };
 
 /**
- * The fully-applied tag type for a given schema. Codegen annotates its
- * `_generated/services.ts` export with this alias so declaration emit copies
- * `DatabaseReaderTag<typeof schemaDefinition, Docs>` verbatim — keeping
- * `typeof schemaDefinition` a reference instead of expanding the whole schema.
- *
  * The tag's *Identifier* (the Effect requirements-channel type) is
  * `Docs`-independent so a helper's `R` channel is the same whether or not a
  * codegen document registry is supplied — this keeps it identical to what

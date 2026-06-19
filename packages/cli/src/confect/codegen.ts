@@ -19,7 +19,7 @@ import {
 } from "../CodegenError";
 import { ConfectDirectory } from "../ConfectDirectory";
 import { ConvexDirectory } from "../ConvexDirectory";
-import { toDocName } from "../DocName";
+import * as DocName from "../DocName";
 import * as FunctionPaths from "../FunctionPaths";
 import {
   discoverLeafImplFiles,
@@ -815,17 +815,19 @@ const generateServices = Effect.gen(function* () {
   yield* writeFileStringAndLog(servicesPath, servicesContentsString);
 });
 
-// Two tables whose names fold to the same PascalCase document type name (e.g.
-// `user_profiles` and `userProfiles` → `UserProfilesDoc`) would emit duplicate
-// interfaces in `_generated/docs.ts`. Catch that up front with a clear error
-// rather than letting `tsc` report a duplicate-identifier later.
+/**
+ * Two tables whose names fold to the same PascalCase document type name (e.g.
+ * `user_profiles` and `userProfiles` → `UserProfilesDoc`) would emit duplicate
+ * interfaces in `_generated/docs.ts`. Catch that up front with a clear error
+ * rather than letting `tsc` report a duplicate-identifier later.
+ */
 const validateNoDocNameCollisions = (
   tableModules: ReadonlyArray<TableModule.TableModule>,
 ) =>
   Effect.gen(function* () {
     const collisions = Object.entries(
       Array.groupBy(tableModules, (tableModule) =>
-        toDocName(tableModule.tableName),
+        DocName.fromTableName(tableModule.tableName),
       ),
     )
       .filter(([, group]) => group.length > 1)
@@ -859,7 +861,7 @@ const generateDocs = (tableModules: ReadonlyArray<TableModule.TableModule>) =>
       schemaImportPath,
       tables: tableModules.map((tableModule) => ({
         tableName: tableModule.tableName,
-        docName: toDocName(tableModule.tableName),
+        docName: DocName.fromTableName(tableModule.tableName),
       })),
     });
 

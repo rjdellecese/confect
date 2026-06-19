@@ -15,10 +15,6 @@ import type * as TableInfo from "./TableInfo";
 export type OrderedQuery<
   TableInfo_ extends TableInfo.AnyWithProps,
   _TableName extends string,
-  // The decoded document type. Defaults to the schema-derived structural
-  // document, but callers (the database reader) substitute a *named* doc
-  // interface from the codegen registry so declaration emit prints the name
-  // (e.g. `NotesDoc`) instead of expanding the row structure inline.
   Doc = TableInfo_["document"],
 > = {
   readonly first: () => Effect.Effect<
