@@ -75,7 +75,6 @@ layer(NodePath.layer)("declaration emit", (it) => {
         const declaration = yield* emitDeclaration("services.ts");
         expect(declaration).toMatchSnapshot();
       }),
-    // Building the TypeScript program is well past the default test timeout.
     60_000,
   );
 });
