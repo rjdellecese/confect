@@ -257,6 +257,30 @@ export const encodeArgsSync = <Ref_ extends Any>(
     Match.exhaustive,
   );
 
+export const decodeArgsSync = <Ref_ extends Any>(
+  ref: Ref_,
+  encodedArgs: unknown,
+): Args<Ref_> =>
+  Match.value(ref.functionSpec.functionProvenance).pipe(
+    Match.tag("Confect", (confectFunctionProvenance) =>
+      Schema.decodeSync(confectFunctionProvenance.args)(encodedArgs),
+    ),
+    Match.tag("Convex", () => encodedArgs),
+    Match.exhaustive,
+  ) as Args<Ref_>;
+
+export const encodeReturnsSync = <Ref_ extends Any>(
+  ref: Ref_,
+  returns: Returns<Ref_>,
+): unknown =>
+  Match.value(ref.functionSpec.functionProvenance).pipe(
+    Match.tag("Confect", (confectFunctionProvenance) =>
+      Schema.encodeSync(confectFunctionProvenance.returns)(returns),
+    ),
+    Match.tag("Convex", () => returns),
+    Match.exhaustive,
+  );
+
 export const decodeReturnsSync = <Ref_ extends Any>(
   ref: Ref_,
   encodedReturns: unknown,
