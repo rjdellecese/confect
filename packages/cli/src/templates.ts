@@ -303,7 +303,7 @@ export const docs = ({
       return yield* cbw.toString();
     }
 
-    yield* cbw.writeLine(`import type { Confect } from "@confect/server";`);
+    yield* cbw.writeLine(`import type { Document } from "@confect/server";`);
     yield* cbw.writeLine(
       `import type schemaDefinition from "${schemaImportPath}";`,
     );
@@ -311,7 +311,7 @@ export const docs = ({
 
     for (const tableName of tableNames) {
       yield* cbw.writeLine(
-        `export interface ${tableName} extends Confect.Doc<typeof schemaDefinition, "${tableName}"> {}`,
+        `export interface ${tableName} extends Document.Document<typeof schemaDefinition, "${tableName}"> {}`,
       );
     }
     yield* cbw.blankLine();

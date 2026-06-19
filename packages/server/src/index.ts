@@ -2,7 +2,6 @@ export * as ActionCtx from "./ActionCtx";
 export * as ActionRunner from "./ActionRunner";
 export * as Auth from "./Auth";
 export * as BlobNotFoundError from "./BlobNotFoundError";
-export * as Confect from "./Confect";
 export * as ConvexConfigProvider from "./ConvexConfigProvider";
 export * as CronJob from "./CronJob";
 export * as CronJobs from "./CronJobs";
