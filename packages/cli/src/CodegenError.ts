@@ -1,5 +1,6 @@
 import * as Ansi from "@effect/printer-ansi/Ansi";
 import * as AnsiDoc from "@effect/printer-ansi/AnsiDoc";
+import * as Array from "effect/Array";
 import { pipe } from "effect/Function";
 import * as Effect from "effect/Effect";
 import * as Match from "effect/Match";
@@ -290,11 +291,14 @@ const renderDuplicateTableNameError = (
 const renderConflictingDocNameError = (
   error: ConflictingDocNameError,
 ): AnsiDoc.AnsiDoc => {
-  const conflicts = error.collisions
-    .map(
-      ({ docName, tableNames }) => `\`${docName}\` (${tableNames.join(", ")})`,
-    )
-    .join("; ");
+  const conflicts = pipe(
+    error.collisions,
+    Array.map(
+      ({ docName, tableNames }) =>
+        `\`${docName}\` (${Array.join(tableNames, ", ")})`,
+    ),
+    Array.join("; "),
+  );
   return singleLine(
     AnsiDoc.text(
       `Multiple tables fold to the same generated document type name. Table names are converted to PascalCase (so \`user_profiles\` and \`userProfiles\` both become \`UserProfilesDoc\`); rename all but one of each colliding group. Conflicts: ${conflicts}.`,

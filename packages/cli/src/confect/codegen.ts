@@ -5,9 +5,11 @@ import * as Path from "@effect/platform/Path";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Either from "effect/Either";
+import { pipe } from "effect/Function";
 import * as HashSet from "effect/HashSet";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
+import * as Record from "effect/Record";
 import * as Ref from "effect/Ref";
 import * as Bundler from "../Bundler";
 import * as CodegenError from "../CodegenError";
@@ -651,7 +653,10 @@ const generateIdConstructor = (
     const generatedIdPath = yield* GENERATED_ID_PATH;
     const idPath = path.join(confectDirectory, generatedIdPath);
 
-    const tableNames = tableModules.map((tableModule) => tableModule.tableName);
+    const tableNames = Array.map(
+      tableModules,
+      (tableModule) => tableModule.tableName,
+    );
     const contents = yield* templates.id({ tableNames });
 
     yield* writeFileStringAndLog(idPath, contents);
@@ -717,7 +722,7 @@ const removeObsoleteTableWrappers = (
     }
 
     const expected = new Set(
-      tableModules.map((tableModule) => `${tableModule.tableName}.ts`),
+      Array.map(tableModules, (tableModule) => `${tableModule.tableName}.ts`),
     );
     const existing = yield* fs.readDirectory(wrappersDir, { recursive: true });
     yield* Effect.forEach(existing, (entry) => {
@@ -825,18 +830,20 @@ const validateNoDocNameCollisions = (
   tableModules: ReadonlyArray<TableModule.TableModule>,
 ) =>
   Effect.gen(function* () {
-    const collisions = Object.entries(
-      Array.groupBy(tableModules, (tableModule) =>
+    const collisions = pipe(
+      tableModules,
+      Array.groupBy((tableModule) =>
         DocName.fromTableName(tableModule.tableName),
       ),
-    )
-      .filter(([, group]) => group.length > 1)
-      .map(([docName, group]) => ({
+      Record.toEntries,
+      Array.filter(([, group]) => group.length > 1),
+      Array.map(([docName, group]) => ({
         docName,
         tableNames: Array.map(group, (tableModule) => tableModule.tableName),
-      }));
+      })),
+    );
 
-    if (collisions.length > 0) {
+    if (Array.isNonEmptyReadonlyArray(collisions)) {
       return yield* new CodegenError.ConflictingDocNameError({ collisions });
     }
   });
@@ -859,7 +866,7 @@ const generateDocs = (tableModules: ReadonlyArray<TableModule.TableModule>) =>
 
     const docsContentsString = yield* templates.docs({
       schemaImportPath,
-      tables: tableModules.map((tableModule) => ({
+      tables: Array.map(tableModules, (tableModule) => ({
         tableName: tableModule.tableName,
         docName: DocName.fromTableName(tableModule.tableName),
       })),

@@ -1,4 +1,7 @@
+import * as Array from "effect/Array";
 import * as Brand from "effect/Brand";
+import { pipe } from "effect/Function";
+import * as String from "effect/String";
 
 /**
  * The name of a table's generated document interface in
@@ -25,9 +28,11 @@ const DocName = Brand.nominal<DocName>();
  */
 export const fromTableName = (tableName: string): DocName =>
   DocName(
-    `${tableName
-      .split("_")
-      .filter((segment) => segment.length > 0)
-      .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-      .join("")}Doc`,
+    pipe(
+      tableName,
+      String.split("_"),
+      Array.filter(String.isNonEmpty),
+      Array.map(String.capitalize),
+      Array.join(""),
+    ) + "Doc",
   );

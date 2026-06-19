@@ -1,7 +1,10 @@
 import * as Path from "@effect/platform/Path";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { expect, layer } from "@effect/vitest";
+import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
+import { pipe } from "effect/Function";
+import * as String from "effect/String";
 import * as ts from "typescript";
 
 // Snapshot the generated declarations' `.d.ts` emit, ported from a standalone
@@ -52,13 +55,16 @@ const emitDeclaration = (entry: string) =>
     const program = ts.createProgram([entryPath], options, host);
     const result = program.emit();
 
-    const declarationPath = path.normalize(entryPath.replace(/\.ts$/, ".d.ts"));
+    const declarationPath = path.normalize(
+      pipe(entryPath, String.replace(/\.ts$/, ".d.ts")),
+    );
     const declaration = emitted.get(declarationPath);
 
     if (declaration === undefined) {
-      const diagnostics = ts
-        .getPreEmitDiagnostics(program)
-        .concat(result.diagnostics);
+      const diagnostics = Array.appendAll(
+        ts.getPreEmitDiagnostics(program),
+        result.diagnostics,
+      );
       return yield* Effect.dieMessage(
         `${entry} produced no declaration emit:\n${ts.formatDiagnostics(diagnostics, host)}`,
       );
