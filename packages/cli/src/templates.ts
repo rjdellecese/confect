@@ -288,17 +288,17 @@ export const refs = ({ specImportPath }: { specImportPath: string }) =>
  */
 export const docs = ({
   schemaImportPath,
-  tableNames,
+  tables,
 }: {
   schemaImportPath: string;
-  tableNames: ReadonlyArray<string>;
+  tables: ReadonlyArray<{ tableName: string; docName: string }>;
 }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
     // With no tables there is nothing to import — emitting the (unused) imports
     // would trip `noUnusedLocals`.
-    if (tableNames.length === 0) {
+    if (tables.length === 0) {
       yield* cbw.writeLine(`export interface ConfectDocs {}`);
       return yield* cbw.toString();
     }
@@ -309,9 +309,12 @@ export const docs = ({
     );
     yield* cbw.blankLine();
 
-    for (const tableName of tableNames) {
+    // Each interface is named in PascalCase (`NotesDoc`) for an idiomatic hover,
+    // but the `ConfectDocs` registry is keyed by the verbatim table name — that
+    // key is what document lookups index through.
+    for (const { tableName, docName } of tables) {
       yield* cbw.writeLine(
-        `export interface ${tableName} extends Document.Document<typeof schemaDefinition, "${tableName}"> {}`,
+        `export interface ${docName} extends Document.Document<typeof schemaDefinition, "${tableName}"> {}`,
       );
     }
     yield* cbw.blankLine();
@@ -319,8 +322,8 @@ export const docs = ({
     yield* cbw.writeLine(`export interface ConfectDocs {`);
     yield* cbw.indent(
       Effect.gen(function* () {
-        for (const tableName of tableNames) {
-          yield* cbw.writeLine(`${tableName}: ${tableName};`);
+        for (const { tableName, docName } of tables) {
+          yield* cbw.writeLine(`${tableName}: ${docName};`);
         }
       }),
     );

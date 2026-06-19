@@ -112,6 +112,21 @@ export class LegacySchemaFileError extends Schema.TaggedError<LegacySchemaFileEr
   },
 ) {}
 
+export class ConflictingDocNameError extends Schema.TaggedError<ConflictingDocNameError>()(
+  "ConflictingDocNameError",
+  {
+    // Each generated document type name that more than one table folds to,
+    // paired with the colliding table names. All collisions are captured in a
+    // single pass so the user can fix them together.
+    collisions: Schema.Array(
+      Schema.Struct({
+        docName: Schema.String,
+        tableNames: Schema.Array(Schema.String),
+      }),
+    ),
+  },
+) {}
+
 export const CodegenError = Schema.Union(
   BuildError,
   MissingImplFileError,
@@ -126,6 +141,7 @@ export const CodegenError = Schema.Union(
   InvalidTableFilenameError,
   DuplicateTableNameError,
   LegacySchemaFileError,
+  ConflictingDocNameError,
 );
 export type CodegenError = typeof CodegenError.Type;
 
@@ -274,6 +290,21 @@ const renderDuplicateTableNameError = (
   );
 };
 
+const renderConflictingDocNameError = (
+  error: ConflictingDocNameError,
+): AnsiDoc.AnsiDoc => {
+  const conflicts = error.collisions
+    .map(
+      ({ docName, tableNames }) => `\`${docName}\` (${tableNames.join(", ")})`,
+    )
+    .join("; ");
+  return singleLine(
+    AnsiDoc.text(
+      `Multiple tables fold to the same generated document type name. Table names are converted to PascalCase (so \`user_profiles\` and \`userProfiles\` both become \`UserProfilesDoc\`); rename all but one of each colliding group. Conflicts: ${conflicts}.`,
+    ),
+  );
+};
+
 const renderLegacySchemaFileError = (
   error: LegacySchemaFileError,
 ): AnsiDoc.AnsiDoc =>
@@ -368,6 +399,12 @@ export const renderCodegenError = (error: CodegenError): string => {
     ),
     Match.tag("LegacySchemaFileError", (e) =>
       pipe(renderLegacySchemaFileError(e), AnsiDoc.render({ style: "pretty" })),
+    ),
+    Match.tag("ConflictingDocNameError", (e) =>
+      pipe(
+        renderConflictingDocNameError(e),
+        AnsiDoc.render({ style: "pretty" }),
+      ),
     ),
     Match.exhaustive,
   );

@@ -19,6 +19,7 @@ import {
 } from "../CodegenError";
 import { ConfectDirectory } from "../ConfectDirectory";
 import { ConvexDirectory } from "../ConvexDirectory";
+import { toDocName } from "../DocName";
 import * as FunctionPaths from "../FunctionPaths";
 import {
   discoverLeafImplFiles,
@@ -136,6 +137,7 @@ const runCodegen = Effect.gen(function* () {
   // check its default export is an `UnnamedTable`. Surface diagnostics
   // here (rather than later) so they appear before impl-validation noise.
   yield* TableModule.validate(tableModules);
+  yield* validateNoDocNameCollisions(tableModules);
   yield* generateTableWrappers(tableModules);
   yield* removeObsoleteTableWrappers(tableModules);
   yield* generateRuntimeSchema(tableModules);
@@ -811,6 +813,28 @@ const generateServices = Effect.gen(function* () {
   yield* writeFileStringAndLog(servicesPath, servicesContentsString);
 });
 
+// Two tables whose names fold to the same PascalCase document type name (e.g.
+// `user_profiles` and `userProfiles` → `UserProfilesDoc`) would emit duplicate
+// interfaces in `_generated/docs.ts`. Catch that up front with a clear error
+// rather than letting `tsc` report a duplicate-identifier later.
+const validateNoDocNameCollisions = (
+  tableModules: ReadonlyArray<TableModule.TableModule>,
+) =>
+  Effect.gen(function* () {
+    const collisions = Object.entries(
+      Array.groupBy(tableModules, (tm) => toDocName(tm.tableName)),
+    )
+      .filter(([, group]) => group.length > 1)
+      .map(([docName, group]) => ({
+        docName,
+        tableNames: Array.map(group, (tm) => tm.tableName),
+      }));
+
+    if (collisions.length > 0) {
+      return yield* new CodegenError.ConflictingDocNameError({ collisions });
+    }
+  });
+
 const generateDocs = (tableModules: ReadonlyArray<TableModule.TableModule>) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
@@ -829,7 +853,10 @@ const generateDocs = (tableModules: ReadonlyArray<TableModule.TableModule>) =>
 
     const docsContentsString = yield* templates.docs({
       schemaImportPath,
-      tableNames: tableModules.map((tm) => tm.tableName),
+      tables: tableModules.map((tm) => ({
+        tableName: tm.tableName,
+        docName: toDocName(tm.tableName),
+      })),
     });
 
     yield* writeFileStringAndLog(docsPath, docsContentsString);
