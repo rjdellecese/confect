@@ -13,7 +13,7 @@ jobs:
     name: Format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/docs-setup
       - run: pnpm format:check
 
@@ -21,7 +21,7 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/docs-setup
       - run: pnpm lint
 
@@ -29,7 +29,7 @@ jobs:
     name: Broken Links
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/docs-setup
       - run: pnpm --filter docs exec mintlify broken-links
 
@@ -37,7 +37,7 @@ jobs:
     name: Validate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/docs-setup
       - run: pnpm --filter docs exec mintlify validate
 
@@ -45,6 +45,6 @@ jobs:
     name: Accessibility
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/docs-setup
       - run: pnpm --filter docs exec mintlify a11y

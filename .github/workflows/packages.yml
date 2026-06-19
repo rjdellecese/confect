@@ -13,7 +13,7 @@ jobs:
     name: Format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
       - run: pnpm format:check
 
@@ -21,7 +21,7 @@ jobs:
     name: Typecheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
       # `tsc -b` typechecks the whole project-references graph in dependency
       # order (and emits the .d.ts that tsdown no longer does).
@@ -31,7 +31,7 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
       # Oxlint lints the whole workspace in one fast pass; `pnpm lint` also runs
       # the Syncpack and package-metadata checks.
@@ -41,7 +41,7 @@ jobs:
     name: Circular dependencies
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
       # dpdm fails on real (runtime) import cycles; type-only `import type`
       # cycles are ignored. confect-setup builds the packages first so
@@ -55,7 +55,7 @@ jobs:
       matrix:
         package: [cli, core, js, server]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
       - run: cd packages/${{ matrix.package }} && pnpm test
 
@@ -63,7 +63,7 @@ jobs:
     name: Test (mock-backend)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
       - run: pnpm --filter @confect/server test:mock-backend
       - name: Verify codegen output is committed
@@ -73,7 +73,7 @@ jobs:
     name: Test (local-backend)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
       - name: Cache convex local-backend binary
         uses: actions/cache@v5
@@ -93,7 +93,7 @@ jobs:
       matrix:
         package: ["@confect/core", "@confect/server"]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
       - run: pnpm --filter ${{ matrix.package }} bench
 
@@ -112,6 +112,6 @@ jobs:
             "@confect/test",
           ]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
       - run: pnpm exec vp run --filter ${{ matrix.package }} build
