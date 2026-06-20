@@ -15,10 +15,6 @@ export type Document<
   TableName extends DatabaseSchema.TableNames<Schema_>,
 > = DataModel.DocumentByName<DataModel.FromSchema<Schema_>, TableName>;
 
-// Distributes over a (possibly union) document type so each branch keeps its
-// own fields. Stock `Omit<A | B, K>` collapses to `keyof A & keyof B` (a union's
-// keys are only the common ones), which would drop branch-specific fields and
-// break `db.patch`/`db.replace`/`db.insert` on `Schema.Union` tables.
 export type WithoutSystemFields<Doc> = Doc extends unknown
   ? Omit<Doc, "_creationTime" | "_id">
   : never;

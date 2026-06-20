@@ -77,11 +77,6 @@ export type TableSchema<TableInfo_ extends AnyWithProps> = Schema.Schema<
 
 export type Document<TableInfo_ extends AnyWithProps> = TableInfo_["document"];
 
-// Distributes the system fields over each member of a (possibly union) doc
-// type, so the public document type is `(Sys & A) | (Sys & B)` rather than the
-// collapsed `Sys & (A | B)`. The latter loses branch-specific fields under
-// `Omit`/`Partial` (`keyof` of a union keeps only the common keys), which broke
-// `db.patch`/`db.replace`/`db.insert` on `Schema.Union` tables.
 type WithSystemFields<TableName extends string, Doc> = Doc extends unknown
   ? IdField<TableName> & SystemFields & Doc
   : never;
