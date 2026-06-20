@@ -7,18 +7,6 @@ import { pipe } from "effect/Function";
 import * as String from "effect/String";
 import * as ts from "typescript";
 
-// Snapshot the generated declarations' `.d.ts` emit, ported from a standalone
-// size script in `apps/example` into the suite so it travels with the package
-// whose types it guards.
-//
-// `tsc` itself fails the build on `TS7056` (inferred type too large to
-// serialize), so that overflow is already guarded by the compiler. This adds an
-// early warning: a public type that starts expanding inline instead of printing
-// by name shows up here as a large, obvious diff (and would eventually trip
-// `TS7056` on a larger schema than these fixtures). The committed snapshot is
-// the baseline — when the emit changes legitimately, review the diff and update
-// it with `vitest -u`.
-
 // Type-check a generated fixture and return its `.d.ts` emit, resolving
 // `@confect/server` against `src/` via the package's tsconfig.
 const emitDeclaration = (entry: string) =>
