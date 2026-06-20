@@ -114,13 +114,14 @@ export const runtimeSchema = ({
         `const databaseSchema: $DatabaseSchema.DatabaseSchema<`,
       );
       yield* cbw.indent(
-        Effect.gen(function* () {
-          for (let i = 0; i < tableModules.length; i++) {
-            const { tableName } = tableModules[i]!;
-            const isLast = i === tableModules.length - 1;
-            yield* cbw.writeLine(`typeof ${tableName}${isLast ? "" : " |"}`);
-          }
-        }),
+        Effect.forEach(
+          tableModules,
+          ({ tableName }, i) =>
+            cbw.writeLine(
+              `typeof ${tableName}${i === tableModules.length - 1 ? "" : " |"}`,
+            ),
+          { discard: true },
+        ),
       );
       yield* cbw.writeLine(`> = $DatabaseSchema.make({`);
       yield* cbw.indent(
