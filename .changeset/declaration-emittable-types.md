@@ -16,7 +16,7 @@ whole data model (the example backend's `services.d.ts` drops from ~307 KB to
 ~5.6 KB).
 
 Codegen also emits `_generated/docs.ts` — a nominal `interface` per table plus
-a `Docs` registry — threaded into the reader/writer tags via the new
-`Confect.Doc<Schema, Table>` helper, so query/mutation helpers print named
+a `Docs` registry — threaded into the reader/writer tags via the
+`Document.Document<Schema, Table>` helper, so query/mutation helpers print named
 document types (e.g. `NotesDoc`) with no added annotations. Runtime behaviour is
 unchanged.

@@ -279,7 +279,7 @@ export const refs = ({ specImportPath }: { specImportPath: string }) =>
 
 /**
  * Emit `_generated/docs.ts`: one nominal `interface <table>` per table plus a
- * `Docs` registry. Each interface `extends Confect.Doc<typeof
+ * `Docs` registry. Each interface `extends Document.Document<typeof
  * schemaDefinition, "<table>">`, so it stays structurally exact while giving
  * the document a *name* — declaration emit then prints e.g. `NotesDoc` instead
  * of expanding the row structure. The registry is threaded into the generated
