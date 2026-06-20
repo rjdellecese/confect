@@ -105,10 +105,29 @@ export const runtimeSchema = ({
 
     yield* cbw.blankLine();
 
+    // Annotate the default export with the `DatabaseSchema` interface head
+    // (its `Tables_` is the exact `typeof <table>` union the call infers) so
+    // declaration emit prints the reference by name. An un-annotated default
+    // export forces inference-serialization of the whole schema and trips
+    // TS7056 at scale under `composite`/`declaration`.
     if (tableModules.length === 0) {
-      yield* cbw.writeLine(`export default $DatabaseSchema.make({});`);
+      yield* cbw.writeLine(
+        `const schemaDefinition: $DatabaseSchema.DatabaseSchema = $DatabaseSchema.make({});`,
+      );
     } else {
-      yield* cbw.writeLine(`export default $DatabaseSchema.make({`);
+      yield* cbw.writeLine(
+        `const schemaDefinition: $DatabaseSchema.DatabaseSchema<`,
+      );
+      yield* cbw.indent(
+        Effect.gen(function* () {
+          for (let i = 0; i < tableModules.length; i++) {
+            const { tableName } = tableModules[i]!;
+            const isLast = i === tableModules.length - 1;
+            yield* cbw.writeLine(`typeof ${tableName}${isLast ? "" : " |"}`);
+          }
+        }),
+      );
+      yield* cbw.writeLine(`> = $DatabaseSchema.make({`);
       yield* cbw.indent(
         Effect.gen(function* () {
           for (const { tableName } of tableModules) {
@@ -118,6 +137,9 @@ export const runtimeSchema = ({
       );
       yield* cbw.writeLine(`});`);
     }
+
+    yield* cbw.blankLine();
+    yield* cbw.writeLine(`export default schemaDefinition;`);
 
     return yield* cbw.toString();
   });
@@ -272,7 +294,15 @@ export const refs = ({ specImportPath }: { specImportPath: string }) =>
     yield* cbw.writeLine(`import { Refs } from "@confect/core";`);
     yield* cbw.writeLine(`import spec from "${specImportPath}";`);
     yield* cbw.blankLine();
-    yield* cbw.writeLine(`export default Refs.make(spec);`);
+    // Annotate with the named `Refs.FromSpec` head so declaration emit prints
+    // the reference by name instead of serializing the fully-expanded
+    // (`Types.Simplify`) ref trees — an un-annotated default export trips
+    // TS7056 at scale under `composite`/`declaration`.
+    yield* cbw.writeLine(
+      `const refs: Refs.FromSpec<typeof spec> = Refs.make(spec);`,
+    );
+    yield* cbw.blankLine();
+    yield* cbw.writeLine(`export default refs;`);
 
     return yield* cbw.toString();
   });
@@ -648,6 +678,40 @@ const writeRootAddAt = (
     yield* cbw.write(")");
   });
 
+/**
+ * Type-level mirror of {@link writeGroupAssembly}: the compact type of the
+ * group *value* a node assembles. Each leaf is referenced as
+ * `typeof <localName>` (and each container as `GroupSpec.GroupSpec<…>` over its
+ * children) so the annotation stays a small set of references — declaration
+ * emit then prints those names instead of expanding every group's full
+ * structure (an un-annotated `export default` does expand, tripping TS7056 at
+ * scale).
+ */
+const groupTypeRef = (node: SpecAssemblyNode): string => {
+  const childUnion = Array.map(
+    node.children,
+    (child) => `GroupSpec.NamedAt<${groupTypeRef(child)}, "${child.segment}">`,
+  ).join(" | ");
+
+  return Option.match(node.importBinding, {
+    // A binding-less container is always built with `GroupSpec.makeAt`, which is
+    // Convex-runtime and registers no functions: `GroupSpec<"Convex", seg, never, …>`.
+    onNone: () =>
+      `GroupSpec.GroupSpec<"Convex", "${node.segment}", never, ${childUnion}>`,
+    // A leaf spec module: its precise type lives in its own module, referenced
+    // by `typeof`. When it also has nested subgroups, `AddGroups` unions them in
+    // (the type-level mirror of the appended `.addGroupAt(...)` calls).
+    onSome: (binding) =>
+      node.children.length === 0
+        ? `typeof ${binding.localName}`
+        : `GroupSpec.AddGroups<typeof ${binding.localName}, ${childUnion}>`,
+  });
+};
+
+/** Each root group is added via `.addAt(seg, …)`, i.e. `NamedAt<groupType, seg>`. */
+const rootGroupMemberRef = (node: SpecAssemblyNode): string =>
+  `GroupSpec.NamedAt<${groupTypeRef(node)}, "${node.segment}">`;
+
 export const assembledSpec = ({
   nodes,
 }: {
@@ -656,13 +720,10 @@ export const assembledSpec = ({
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-    const nodeRequiresGroupFactory = (node: SpecAssemblyNode): boolean =>
-      Option.isNone(node.importBinding) ||
-      Array.some(node.children, nodeRequiresGroupFactory);
-
-    const needsGroupSpec = Array.some(nodes, nodeRequiresGroupFactory);
+    // `GroupSpec` is needed whenever there are any groups: every root member of
+    // the annotation is a `GroupSpec.NamedAt<…>` reference.
     yield* cbw.writeLine(
-      needsGroupSpec
+      nodes.length > 0
         ? `import { GroupSpec, Spec } from "@confect/core";`
         : `import { Spec } from "@confect/core";`,
     );
@@ -675,16 +736,37 @@ export const assembledSpec = ({
 
     yield* cbw.blankLine();
 
-    // The assembled spec is runtime-agnostic: a Node group's `makeNode()` is
-    // already baked into its imported leaf spec, so the root is always
-    // `Spec.make()` and binding-less container groups always use
-    // `GroupSpec.makeAt` (containers register no functions and carry no runtime).
-    yield* cbw.write(`export default Spec.make()`);
+    // Annotate the default export with the spec's type, reconstructed as compact
+    // `typeof`/interface references (see `groupTypeRef`). Without an explicit
+    // annotation, declaration emit infers and serializes the fully-expanded spec
+    // — every function's arg/return schema — and trips TS7056 under
+    // `composite`/`declaration`. The value is runtime-agnostic: a Node group's
+    // `makeNode()` is already baked into its imported leaf spec, so the root is
+    // always `Spec.make()` and binding-less container groups always use
+    // `GroupSpec.makeAt`.
+    yield* cbw.write(`const spec: `);
+    if (nodes.length === 0) {
+      yield* cbw.write(`Spec.Spec`);
+    } else {
+      yield* cbw.write(`Spec.Spec<`);
+      yield* cbw.newLine();
+      yield* cbw.indent(
+        Effect.gen(function* () {
+          for (const node of nodes) {
+            yield* cbw.writeLine(`| ${rootGroupMemberRef(node)}`);
+          }
+        }),
+      );
+      yield* cbw.write(`>`);
+    }
+    yield* cbw.write(` = Spec.make()`);
     yield* Effect.forEach(nodes, (node) =>
       writeRootAddAt(cbw, node, "GroupSpec.makeAt"),
     );
     yield* cbw.write(";");
     yield* cbw.newLine();
+    yield* cbw.blankLine();
+    yield* cbw.writeLine(`export default spec;`);
 
     return yield* cbw.toString();
   });

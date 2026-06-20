@@ -1,3 +1,5 @@
 import { DatabaseSchema as $DatabaseSchema } from "@confect/server";
 
-export default $DatabaseSchema.make({});
+const schemaDefinition: $DatabaseSchema.DatabaseSchema = $DatabaseSchema.make({});
+
+export default schemaDefinition;

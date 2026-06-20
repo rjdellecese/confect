@@ -93,6 +93,29 @@ export type NamedAt<Group extends Any, Name_ extends string> = Omit<
   readonly name: Name_;
 };
 
+/**
+ * Unions `ExtraGroups` into a `GroupSpec`'s subgroups — the type-level mirror of
+ * chaining `.addGroupAt(...)` onto an already-built group.
+ *
+ * Used by generated `_generated/spec.ts` to annotate a leaf spec module that
+ * also has nested subgroups (e.g. `notes.spec.ts` alongside
+ * `notes/archived.spec.ts`): the annotation stays a compact
+ * `AddGroups<typeof <leaf>, …>` reference so declaration emit prints the leaf by
+ * name instead of expanding its full structure (which trips TS7056 at scale).
+ */
+export type AddGroups<
+  Group extends AnyWithProps,
+  ExtraGroups extends AnyWithProps,
+> =
+  Group extends GroupSpec<
+    infer Runtime,
+    infer Name_,
+    infer Functions_,
+    infer Groups_
+  >
+    ? GroupSpec<Runtime, Name_, Functions_, Groups_ | ExtraGroups>
+    : never;
+
 const Proto = {
   [TypeId]: TypeId,
 

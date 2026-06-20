@@ -1,5 +1,24 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`declaration emit > refs.d.ts emits compact types without TS7056 1`] = `
+"import { Refs } from "@confect/core";
+import spec from "./spec";
+declare const refs: Refs.FromSpec<typeof spec>;
+export default refs;
+"
+`;
+
+exports[`declaration emit > schema.d.ts emits compact types without TS7056 1`] = `
+"import { DatabaseSchema as $DatabaseSchema } from "@confect/server";
+import events from "./tables/events";
+import notes from "./tables/notes";
+import tags from "./tables/tags";
+import users from "./tables/users";
+declare const schemaDefinition: $DatabaseSchema.DatabaseSchema<typeof events | typeof notes | typeof tags | typeof users>;
+export default schemaDefinition;
+"
+`;
+
 exports[`declaration emit > services.d.ts prints public types by name 1`] = `
 "import { ActionCtx as ActionCtx_, Auth as Auth_, type DataModel, DatabaseReader as DatabaseReader_, DatabaseWriter as DatabaseWriter_, MutationCtx as MutationCtx_, QueryCtx as QueryCtx_, StorageActionWriter as StorageActionWriter_, StorageReader as StorageReader_, StorageWriter as StorageWriter_, VectorSearch as VectorSearch_ } from "@confect/server";
 import type schemaDefinition from "./schema";
@@ -38,5 +57,20 @@ export declare const MutationCtx: MutationCtx_.MutationCtxTag<DataModel.ToConvex
 export type MutationCtx = typeof MutationCtx.Identifier;
 export declare const ActionCtx: ActionCtx_.ActionCtxTag<DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>>;
 export type ActionCtx = typeof ActionCtx.Identifier;
+"
+`;
+
+exports[`declaration emit > spec.d.ts emits compact types without TS7056 1`] = `
+"import { GroupSpec, Spec } from "@confect/core";
+import databaseReader from "../databaseReader.spec";
+import groups_aliasImporter from "../groups/aliasImporter.spec";
+import groups_cjsImporter from "../groups/cjsImporter.spec";
+import groups_notes from "../groups/notes.spec";
+import groups_random from "../groups/random.spec";
+import groups_runners from "../groups/runners.spec";
+import groups_typedErrors from "../groups/typedErrors.spec";
+import typedErrorsNode from "../typedErrorsNode.spec";
+declare const spec: Spec.Spec<GroupSpec.NamedAt<typeof databaseReader, "databaseReader"> | GroupSpec.NamedAt<GroupSpec.GroupSpec<"Convex", "groups", never, GroupSpec.NamedAt<typeof groups_aliasImporter, "aliasImporter"> | GroupSpec.NamedAt<typeof groups_cjsImporter, "cjsImporter"> | GroupSpec.NamedAt<typeof groups_notes, "notes"> | GroupSpec.NamedAt<typeof groups_random, "random"> | GroupSpec.NamedAt<typeof groups_runners, "runners"> | GroupSpec.NamedAt<typeof groups_typedErrors, "typedErrors">>, "groups"> | GroupSpec.NamedAt<typeof typedErrorsNode, "typedErrorsNode">>;
+export default spec;
 "
 `;

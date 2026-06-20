@@ -12,6 +12,20 @@ export type Refs<
   Predicate extends Ref.Any = Ref.Any,
 > = Types.Simplify<OmitEmpty<Helper<Spec.Groups<Spec_>, Predicate>>>;
 
+/**
+ * The result of {@link make}: the `public`/`internal` ref trees for a spec.
+ *
+ * Named (rather than an inferred anonymous object) so generated
+ * `_generated/refs.ts` can annotate its default export with
+ * `Refs.FromSpec<typeof spec>` — declaration emit then prints the reference by
+ * name instead of serializing the fully-expanded `Types.Simplify` ref trees
+ * (which trips `TS7056` at scale under `composite`/`declaration`).
+ */
+export interface FromSpec<Spec_ extends Spec.AnyWithProps> {
+  public: Refs<Spec_, Ref.AnyPublic>;
+  internal: Refs<Spec_, Ref.AnyInternal>;
+}
+
 type GroupRefs<
   Group extends GroupSpec.AnyWithProps,
   Predicate extends Ref.Any,
@@ -74,10 +88,7 @@ type Any =
 
 export const make = <Spec_ extends Spec.AnyWithProps>(
   spec: Spec_,
-): {
-  public: Refs<Spec_, Ref.AnyPublic>;
-  internal: Refs<Spec_, Ref.AnyInternal>;
-} => {
+): FromSpec<Spec_> => {
   const refs = makeHelper(spec.groups);
   return {
     public: refs as Refs<Spec_, Ref.AnyPublic>,

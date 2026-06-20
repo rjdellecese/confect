@@ -66,19 +66,39 @@ describe("SpecAssemblyNode", () => {
   );
 
   it.effect(
-    "assembledSpec only imports GroupSpec when at least one node lacks a leaf binding",
+    "assembledSpec imports GroupSpec whenever there are groups (for the annotation's NamedAt references)",
     () =>
       Effect.gen(function* () {
+        // Even all-leaf specs need `GroupSpec`: the default export's type
+        // annotation references `GroupSpec.NamedAt<…>` for every root group.
         const nodes = assemblyNodesFromLeaves([
           leaf("notes.spec.ts", ["notes"]),
           leaf("notes/archived.spec.ts", ["notes", "archived"]),
         ]);
         const contents = yield* templates.assembledSpec({ nodes });
 
+        expect(contents).toContain(
+          'import { GroupSpec, Spec } from "@confect/core";',
+        );
+        // The binding-with-children case is annotated via `GroupSpec.AddGroups`.
+        expect(contents).toContain(
+          'GroupSpec.AddGroups<typeof notes, GroupSpec.NamedAt<typeof notes_archived, "archived">>',
+        );
+      }),
+  );
+
+  it.effect(
+    "assembledSpec imports only Spec (not GroupSpec) for an empty spec",
+    () =>
+      Effect.gen(function* () {
+        const contents = yield* templates.assembledSpec({ nodes: [] });
+
         expect(contents).toContain('import { Spec } from "@confect/core";');
         expect(contents).not.toContain(
           'import { GroupSpec, Spec } from "@confect/core";',
         );
+        expect(contents).toContain("const spec: Spec.Spec = Spec.make();");
+        expect(contents).toContain("export default spec;");
       }),
   );
 
