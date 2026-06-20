@@ -7,8 +7,6 @@ import { pipe } from "effect/Function";
 import * as String from "effect/String";
 import * as ts from "typescript";
 
-// Type-check a generated fixture and return its `.d.ts` emit, resolving
-// `@confect/server` against `src/` via the package's tsconfig.
 const emitDeclaration = (entry: string) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
