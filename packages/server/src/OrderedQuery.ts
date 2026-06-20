@@ -15,25 +15,20 @@ import type * as TableInfo from "./TableInfo";
 export type OrderedQuery<
   TableInfo_ extends TableInfo.AnyWithProps,
   _TableName extends string,
+  Doc = TableInfo_["document"],
 > = {
   readonly first: () => Effect.Effect<
-    Option.Option<TableInfo_["document"]>,
+    Option.Option<Doc>,
     Document.DocumentDecodeError
   >;
   readonly take: (
     n: number,
-  ) => Effect.Effect<
-    ReadonlyArray<TableInfo_["document"]>,
-    Document.DocumentDecodeError
-  >;
+  ) => Effect.Effect<ReadonlyArray<Doc>, Document.DocumentDecodeError>;
   readonly collect: () => Effect.Effect<
-    ReadonlyArray<TableInfo_["document"]>,
+    ReadonlyArray<Doc>,
     Document.DocumentDecodeError
   >;
-  readonly stream: () => Stream.Stream<
-    TableInfo_["document"],
-    Document.DocumentDecodeError
-  >;
+  readonly stream: () => Stream.Stream<Doc, Document.DocumentDecodeError>;
   readonly paginate: (
     options: {
       cursor: string | null;
@@ -42,10 +37,7 @@ export type OrderedQuery<
     filter?: (
       q: FilterBuilder<TableInfo.ConvexTableInfo<TableInfo_>>,
     ) => ExpressionOrValue<boolean>,
-  ) => Effect.Effect<
-    PaginationResult<TableInfo_["document"]>,
-    Document.DocumentDecodeError
-  >;
+  ) => Effect.Effect<PaginationResult<Doc>, Document.DocumentDecodeError>;
 };
 
 export const make = <

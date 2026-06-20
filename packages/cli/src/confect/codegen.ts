@@ -5,9 +5,11 @@ import * as Path from "@effect/platform/Path";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Either from "effect/Either";
+import { pipe } from "effect/Function";
 import * as HashSet from "effect/HashSet";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
+import * as Record from "effect/Record";
 import * as Ref from "effect/Ref";
 import * as Bundler from "../Bundler";
 import * as CodegenError from "../CodegenError";
@@ -19,6 +21,7 @@ import {
 } from "../CodegenError";
 import { ConfectDirectory } from "../ConfectDirectory";
 import { ConvexDirectory } from "../ConvexDirectory";
+import * as DocName from "../DocName";
 import * as FunctionPaths from "../FunctionPaths";
 import {
   discoverLeafImplFiles,
@@ -136,6 +139,7 @@ const runCodegen = Effect.gen(function* () {
   // check its default export is an `UnnamedTable`. Surface diagnostics
   // here (rather than later) so they appear before impl-validation noise.
   yield* TableModule.validate(tableModules);
+  yield* validateNoDocNameCollisions(tableModules);
   yield* generateTableWrappers(tableModules);
   yield* removeObsoleteTableWrappers(tableModules);
   yield* generateRuntimeSchema(tableModules);
@@ -153,6 +157,7 @@ const runCodegen = Effect.gen(function* () {
       removeGeneratedApi,
       generateRefs,
       removeGeneratedNodeApi,
+      generateDocs(tableModules),
       generateServices,
       generateConvexSchema(tableModules),
     ],
@@ -621,19 +626,19 @@ const tableModuleBindings = (
 
     const generatedTablesDirname = yield* GENERATED_TABLES_DIRNAME;
 
-    return yield* Effect.forEach(tableModules, (tm) =>
+    return yield* Effect.forEach(tableModules, (tableModule) =>
       Effect.gen(function* () {
         const wrapperAbsolutePath = path.join(
           confectDirectory,
           generatedTablesDirname,
-          `${tm.tableName}.ts`,
+          `${tableModule.tableName}.ts`,
         );
         const importPath = yield* toModuleImportPath(
           path.relative(generatedDir, wrapperAbsolutePath),
         );
         return {
           importPath,
-          tableName: tm.tableName,
+          tableName: tableModule.tableName,
         };
       }),
     );
@@ -648,7 +653,10 @@ const generateIdConstructor = (
     const generatedIdPath = yield* GENERATED_ID_PATH;
     const idPath = path.join(confectDirectory, generatedIdPath);
 
-    const tableNames = tableModules.map((tm) => tm.tableName);
+    const tableNames = Array.map(
+      tableModules,
+      (tableModule) => tableModule.tableName,
+    );
     const contents = yield* templates.id({ tableNames });
 
     yield* writeFileStringAndLog(idPath, contents);
@@ -670,22 +678,22 @@ const generateTableWrappers = (
 
     yield* Effect.forEach(
       tableModules,
-      (tm) =>
+      (tableModule) =>
         Effect.gen(function* () {
           const wrapperPath = path.join(
             confectDirectory,
             generatedTablesDirname,
-            `${tm.tableName}.ts`,
+            `${tableModule.tableName}.ts`,
           );
           const unnamedAbsolutePath = path.join(
             confectDirectory,
-            tm.relativePath,
+            tableModule.relativePath,
           );
           const unnamedImportPath = yield* toModuleImportPath(
             path.relative(path.dirname(wrapperPath), unnamedAbsolutePath),
           );
           const contents = yield* templates.tableWrapper({
-            tableName: tm.tableName,
+            tableName: tableModule.tableName,
             unnamedImportPath,
           });
           yield* writeFileStringAndLog(wrapperPath, contents);
@@ -713,7 +721,9 @@ const removeObsoleteTableWrappers = (
       return;
     }
 
-    const expected = new Set(tableModules.map((tm) => `${tm.tableName}.ts`));
+    const expected = new Set(
+      Array.map(tableModules, (tableModule) => `${tableModule.tableName}.ts`),
+    );
     const existing = yield* fs.readDirectory(wrappersDir, { recursive: true });
     yield* Effect.forEach(existing, (entry) => {
       if (path.extname(entry) !== ".ts") {
@@ -809,6 +819,61 @@ const generateServices = Effect.gen(function* () {
 
   yield* writeFileStringAndLog(servicesPath, servicesContentsString);
 });
+
+/**
+ * Two tables whose names fold to the same PascalCase document type name (e.g.
+ * `user_profiles` and `userProfiles` → `UserProfilesDoc`) would emit duplicate
+ * interfaces in `_generated/docs.ts`. Catch that up front with a clear error
+ * rather than letting `tsc` report a duplicate-identifier later.
+ */
+const validateNoDocNameCollisions = (
+  tableModules: ReadonlyArray<TableModule.TableModule>,
+) =>
+  Effect.gen(function* () {
+    const collisions = pipe(
+      tableModules,
+      Array.groupBy((tableModule) =>
+        DocName.fromTableName(tableModule.tableName),
+      ),
+      Record.toEntries,
+      Array.filter(([, group]) => group.length > 1),
+      Array.map(([docName, group]) => ({
+        docName,
+        tableNames: Array.map(group, (tableModule) => tableModule.tableName),
+      })),
+    );
+
+    if (Array.isNonEmptyReadonlyArray(collisions)) {
+      return yield* new CodegenError.ConflictingDocNameError({ collisions });
+    }
+  });
+
+const generateDocs = (tableModules: ReadonlyArray<TableModule.TableModule>) =>
+  Effect.gen(function* () {
+    const path = yield* Path.Path;
+    const confectDirectory = yield* ConfectDirectory.get;
+
+    const confectGeneratedDirectory = path.join(confectDirectory, "_generated");
+
+    const docsPath = path.join(confectGeneratedDirectory, "docs.ts");
+    const generatedSchemaPath = yield* GENERATED_SCHEMA_PATH;
+    const schemaImportPath = yield* toModuleImportPath(
+      path.relative(
+        path.dirname(docsPath),
+        path.join(confectDirectory, generatedSchemaPath),
+      ),
+    );
+
+    const docsContentsString = yield* templates.docs({
+      schemaImportPath,
+      tables: Array.map(tableModules, (tableModule) => ({
+        tableName: tableModule.tableName,
+        docName: DocName.fromTableName(tableModule.tableName),
+      })),
+    });
+
+    yield* writeFileStringAndLog(docsPath, docsContentsString);
+  });
 
 const generateRefs = Effect.gen(function* () {
   const path = yield* Path.Path;

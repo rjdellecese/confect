@@ -19,12 +19,73 @@ import * as QueryInitializer from "./QueryInitializer";
 import type * as Table from "./Table";
 import type * as TableInfo from "./TableInfo";
 
+export interface DatabaseWriterTableAccessor<
+  DataModel_ extends DataModel.AnyWithProps,
+  TableName extends DataModel.TableNames<DataModel_>,
+  Doc = DocumentByName_<DataModel_, TableName>,
+> {
+  readonly insert: (
+    document: Document.WithoutSystemFields<Doc>,
+  ) => Effect.Effect<GenericId<TableName>, Document.DocumentEncodeError>;
+  readonly patch: (
+    id: GenericId<TableName>,
+    patchedValues: Partial<Document.WithoutSystemFields<Doc>>,
+  ) => Effect.Effect<
+    void,
+    | QueryInitializer.GetByIdFailure
+    | Document.DocumentDecodeError
+    | Document.DocumentEncodeError
+  >;
+  readonly replace: (
+    id: GenericId<TableName>,
+    value: Document.WithoutSystemFields<Doc>,
+  ) => Effect.Effect<void, Document.DocumentEncodeError>;
+  readonly delete: (id: GenericId<TableName>) => Effect.Effect<void>;
+}
+
+/**
+ * The service shape backing the `DatabaseWriter` tag. Named (rather than an
+ * inferred anonymous object) so declaration emit prints
+ * `DatabaseWriterService<…>` by reference instead of expanding the data model.
+ * `Docs` is the optional named document registry (see `DatabaseReaderService`).
+ */
+export interface DatabaseWriterService<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+  Docs = {},
+> {
+  readonly table: <
+    const TableName extends DataModel.TableNames<
+      DataModel.FromSchema<DatabaseSchema_>
+    >,
+  >(
+    tableName: TableName,
+  ) => DatabaseWriterTableAccessor<
+    DataModel.FromSchema<DatabaseSchema_>,
+    TableName,
+    TableName extends keyof Docs
+      ? Docs[TableName]
+      : DocumentByName_<DataModel.FromSchema<DatabaseSchema_>, TableName>
+  >;
+}
+
+/**
+ * The tag's *Identifier* is `Docs`-independent (see `DatabaseReaderTag`); only
+ * the *Service* carries `Docs` so writer inputs print the named doc interfaces.
+ */
+export type DatabaseWriterTag<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+  Docs = {},
+> = Context.Tag<
+  DatabaseWriterService<DatabaseSchema_>,
+  DatabaseWriterService<DatabaseSchema_, Docs>
+>;
+
 export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   databaseSchema: DatabaseSchema_,
   convexDatabaseWriter: GenericDatabaseWriter<
     DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
   >,
-) => {
+): DatabaseWriterService<DatabaseSchema_> => {
   type DataModel_ = DataModel.FromSchema<DatabaseSchema_>;
 
   const table = <const TableName extends DataModel.TableNames<DataModel_>>(
@@ -136,19 +197,21 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
 
   return {
     table,
-  };
+  } as DatabaseWriterService<DatabaseSchema_>;
 };
 
 export const DatabaseWriter = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
->() =>
-  Context.GenericTag<ReturnType<typeof make<DatabaseSchema_>>>(
-    "@confect/server/DatabaseWriter",
-  );
+  Docs = {},
+>(): DatabaseWriterTag<DatabaseSchema_, Docs> =>
+  Context.GenericTag<
+    DatabaseWriterService<DatabaseSchema_>,
+    DatabaseWriterService<DatabaseSchema_, Docs>
+  >("@confect/server/DatabaseWriter");
 
 export type DatabaseWriter<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-> = ReturnType<typeof DatabaseWriter<DatabaseSchema_>>["Identifier"];
+> = DatabaseWriterService<DatabaseSchema_>;
 
 export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   databaseSchema: DatabaseSchema_,

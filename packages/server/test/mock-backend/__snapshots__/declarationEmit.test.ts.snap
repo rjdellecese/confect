@@ -1,0 +1,42 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`declaration emit > services.d.ts prints public types by name 1`] = `
+"import { ActionCtx as ActionCtx_, Auth as Auth_, type DataModel, DatabaseReader as DatabaseReader_, DatabaseWriter as DatabaseWriter_, MutationCtx as MutationCtx_, QueryCtx as QueryCtx_, StorageActionWriter as StorageActionWriter_, StorageReader as StorageReader_, StorageWriter as StorageWriter_, VectorSearch as VectorSearch_ } from "@confect/server";
+import type schemaDefinition from "./schema";
+import type { Docs } from "./docs";
+export declare const Auth: typeof Auth_.Auth;
+export type Auth = typeof Auth.Identifier;
+export declare const Scheduler: import("effect/Context").Tag<{
+    runAfter: <Ref_ extends import("@confect/core/Ref").AnyMutation | import("@confect/core/Ref").AnyAction>(delay: import("effect/Duration").Duration, ref: Ref_, ...args: import("@confect/core/Ref").OptionalArgs<Ref_>) => import("effect/Effect").Effect<import("convex/values").GenericId<"_scheduled_functions">, never, never>;
+    runAt: <Ref_ extends import("@confect/core/Ref").AnyMutation | import("@confect/core/Ref").AnyAction>(dateTime: import("effect/DateTime").DateTime, ref: Ref_, ...args: import("@confect/core/Ref").OptionalArgs<Ref_>) => import("effect/Effect").Effect<import("convex/values").GenericId<"_scheduled_functions">, never, never>;
+}, {
+    runAfter: <Ref_ extends import("@confect/core/Ref").AnyMutation | import("@confect/core/Ref").AnyAction>(delay: import("effect/Duration").Duration, ref: Ref_, ...args: import("@confect/core/Ref").OptionalArgs<Ref_>) => import("effect/Effect").Effect<import("convex/values").GenericId<"_scheduled_functions">, never, never>;
+    runAt: <Ref_ extends import("@confect/core/Ref").AnyMutation | import("@confect/core/Ref").AnyAction>(dateTime: import("effect/DateTime").DateTime, ref: Ref_, ...args: import("@confect/core/Ref").OptionalArgs<Ref_>) => import("effect/Effect").Effect<import("convex/values").GenericId<"_scheduled_functions">, never, never>;
+}>;
+export type Scheduler = typeof Scheduler.Identifier;
+export declare const StorageReader: typeof StorageReader_.StorageReader;
+export type StorageReader = typeof StorageReader.Identifier;
+export declare const StorageWriter: typeof StorageWriter_.StorageWriter;
+export type StorageWriter = typeof StorageWriter.Identifier;
+export declare const StorageActionWriter: typeof StorageActionWriter_.StorageActionWriter;
+export type StorageActionWriter = typeof StorageActionWriter.Identifier;
+export declare const VectorSearch: VectorSearch_.VectorSearchTag<DataModel.FromSchema<typeof schemaDefinition>>;
+export type VectorSearch = typeof VectorSearch.Identifier;
+export declare const DatabaseReader: DatabaseReader_.DatabaseReaderTag<typeof schemaDefinition, Docs>;
+export type DatabaseReader = typeof DatabaseReader.Identifier;
+export declare const DatabaseWriter: DatabaseWriter_.DatabaseWriterTag<typeof schemaDefinition, Docs>;
+export type DatabaseWriter = typeof DatabaseWriter.Identifier;
+export declare const QueryRunner: import("effect/Context").Tag<(<Query extends import("@confect/core/Ref").AnyQuery>(query: Query, ...args: import("@confect/core/Ref").OptionalArgs<Query>) => import("effect/Effect").Effect<import("@confect/core/Ref").Returns<Query>, import("@confect/core/Ref").Error<Query> | import("effect/ParseResult").ParseError>), <Query extends import("@confect/core/Ref").AnyQuery>(query: Query, ...args: import("@confect/core/Ref").OptionalArgs<Query>) => import("effect/Effect").Effect<import("@confect/core/Ref").Returns<Query>, import("@confect/core/Ref").Error<Query> | import("effect/ParseResult").ParseError>>;
+export type QueryRunner = typeof QueryRunner.Identifier;
+export declare const MutationRunner: import("effect/Context").Tag<(<Mutation extends import("@confect/core/Ref").AnyMutation>(mutation: Mutation, ...args: import("@confect/core/Ref").OptionalArgs<Mutation>) => import("effect/Effect").Effect<import("@confect/core/Ref").Returns<Mutation>, import("@confect/core/Ref").Error<Mutation> | import("effect/ParseResult").ParseError>), <Mutation extends import("@confect/core/Ref").AnyMutation>(mutation: Mutation, ...args: import("@confect/core/Ref").OptionalArgs<Mutation>) => import("effect/Effect").Effect<import("@confect/core/Ref").Returns<Mutation>, import("@confect/core/Ref").Error<Mutation> | import("effect/ParseResult").ParseError>>;
+export type MutationRunner = typeof MutationRunner.Identifier;
+export declare const ActionRunner: import("effect/Context").Tag<(<Action extends import("@confect/core/Ref").AnyAction>(action: Action, ...args: import("@confect/core/Ref").OptionalArgs<Action>) => import("effect/Effect").Effect<import("@confect/core/Ref").Returns<Action>, import("@confect/core/Ref").Error<Action> | import("effect/ParseResult").ParseError>), <Action extends import("@confect/core/Ref").AnyAction>(action: Action, ...args: import("@confect/core/Ref").OptionalArgs<Action>) => import("effect/Effect").Effect<import("@confect/core/Ref").Returns<Action>, import("@confect/core/Ref").Error<Action> | import("effect/ParseResult").ParseError>>;
+export type ActionRunner = typeof ActionRunner.Identifier;
+export declare const QueryCtx: QueryCtx_.QueryCtxTag<DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>>;
+export type QueryCtx = typeof QueryCtx.Identifier;
+export declare const MutationCtx: MutationCtx_.MutationCtxTag<DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>>;
+export type MutationCtx = typeof MutationCtx.Identifier;
+export declare const ActionCtx: ActionCtx_.ActionCtxTag<DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>>;
+export type ActionCtx = typeof ActionCtx.Identifier;
+"
+`;

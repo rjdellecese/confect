@@ -8,6 +8,7 @@ description: "Understand the structure of a Confect project."
   <Tree.Folder name="confect" defaultOpen>
     <Tree.Folder name="_generated" defaultOpen>
       <Tree.File name="convexSchema.ts" />
+      <Tree.File name="docs.ts" />
       <Tree.File name="id.ts" />
       <Tree.File name="refs.ts" />
       <Tree.File name="schema.ts" />
@@ -54,6 +55,10 @@ description: "Understand the structure of a Confect project."
 #### `convexSchema.ts`
 
 Contains the Convex deploy-time `SchemaDefinition` (a single `defineSchema({...})` call) assembled from every `confect/tables/*.ts` module. `convex/schema.ts` re-exports its default so Convex's CLI and `convex-test` find it where they expect. You should never import this file directly from your own code — use `_generated/schema.ts` for runtime needs.
+
+#### `docs.ts`
+
+Contains a named TypeScript `interface` for each table's document — `NotesDoc`, `UsersDoc`, etc. — plus a `Docs` registry mapping each table name to its interface. These are pure types (no runtime code): use them to annotate a value with a table's document type, e.g. `const note: NotesDoc = …`. The `Docs` registry is what lets the `DatabaseReader`/`DatabaseWriter` services hand documents back under their named types. See [Document types](/server/database/schema#document-types).
 
 #### `id.ts`
 

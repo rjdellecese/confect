@@ -1,5 +1,6 @@
 import * as Ansi from "@effect/printer-ansi/Ansi";
 import * as AnsiDoc from "@effect/printer-ansi/AnsiDoc";
+import * as Array from "effect/Array";
 import { pipe } from "effect/Function";
 import * as Effect from "effect/Effect";
 import * as Match from "effect/Match";
@@ -112,6 +113,18 @@ export class LegacySchemaFileError extends Schema.TaggedError<LegacySchemaFileEr
   },
 ) {}
 
+export class ConflictingDocNameError extends Schema.TaggedError<ConflictingDocNameError>()(
+  "ConflictingDocNameError",
+  {
+    collisions: Schema.Array(
+      Schema.Struct({
+        docName: Schema.String,
+        tableNames: Schema.Array(Schema.String),
+      }),
+    ),
+  },
+) {}
+
 export const CodegenError = Schema.Union(
   BuildError,
   MissingImplFileError,
@@ -126,6 +139,7 @@ export const CodegenError = Schema.Union(
   InvalidTableFilenameError,
   DuplicateTableNameError,
   LegacySchemaFileError,
+  ConflictingDocNameError,
 );
 export type CodegenError = typeof CodegenError.Type;
 
@@ -274,6 +288,24 @@ const renderDuplicateTableNameError = (
   );
 };
 
+const renderConflictingDocNameError = (
+  error: ConflictingDocNameError,
+): AnsiDoc.AnsiDoc => {
+  const conflicts = pipe(
+    error.collisions,
+    Array.map(
+      ({ docName, tableNames }) =>
+        `\`${docName}\` (${Array.join(tableNames, ", ")})`,
+    ),
+    Array.join("; "),
+  );
+  return singleLine(
+    AnsiDoc.text(
+      `Multiple tables fold to the same generated document type name. Table names are converted to PascalCase (so \`user_profiles\` and \`userProfiles\` both become \`UserProfilesDoc\`); rename all but one of each colliding group. Conflicts: ${conflicts}.`,
+    ),
+  );
+};
+
 const renderLegacySchemaFileError = (
   error: LegacySchemaFileError,
 ): AnsiDoc.AnsiDoc =>
@@ -368,6 +400,12 @@ export const renderCodegenError = (error: CodegenError): string => {
     ),
     Match.tag("LegacySchemaFileError", (e) =>
       pipe(renderLegacySchemaFileError(e), AnsiDoc.render({ style: "pretty" })),
+    ),
+    Match.tag("ConflictingDocNameError", (e) =>
+      pipe(
+        renderConflictingDocNameError(e),
+        AnsiDoc.render({ style: "pretty" }),
+      ),
     ),
     Match.exhaustive,
   );

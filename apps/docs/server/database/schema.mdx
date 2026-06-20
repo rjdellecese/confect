@@ -4,7 +4,7 @@ title: "Schema"
 description: "Define your database schema using Effect schemas."
 ---
 
-Your database schema lives in `confect/tables/`: one file per table, each default-exporting a `Table.make(...)` value. The **filename is the table name** — `confect/tables/notes.ts` defines a table called `notes` — so filenames must be valid JS identifiers and may not start with `_` (Convex reserves underscore-prefixed names for system tables). Codegen scans this directory and produces `confect/_generated/schema.ts` (the runtime `DatabaseSchema`, consumed by your impls), `confect/_generated/convexSchema.ts` (the deploy-time Convex `SchemaDefinition` re-exported from `convex/schema.ts`), and a pair of consumer-facing modules per table: `confect/_generated/id.ts` (a type-safe `Id` constructor) and `confect/_generated/tables/<name>.ts` (a thin wrapper that binds the table name). You never edit any of these generated files directly.
+Your database schema lives in `confect/tables/`: one file per table, each default-exporting a `Table.make(...)` value, where the **filename is the table name** (`confect/tables/notes.ts` defines a table called `notes`). The Confect CLI's codegen combines these files into a single schema behind the scenes — and generates the per-table helpers your code imports — so you never assemble or edit a schema definition by hand. (For the full layout of what codegen emits, see [Project Structure](/concepts/project-structure).)
 
 Each table is defined with `Table.make`, which takes a callback returning the table's fields. The callback runs lazily — only the first time the table's `Fields`, `Doc`, or `tableDefinition` is accessed — so a function that never touches a table pays no schema-construction cost for it at cold start. Indexes are defined on tables the same way as in the base Convex APIs. Cross-table `Id` references are constructed with the codegen-emitted `Id` helper from `confect/_generated/id.ts`, whose argument is type-constrained to the set of declared table names.
 
@@ -62,3 +62,46 @@ A `Table`'s `Fields` property contains an Effect `Schema` for the user-defined f
 ### Doc
 
 A `Table`'s `Doc` property contains an Effect `Schema` for the table's document, meaning the table's user-defined `Fields` plus its system fields (`_id` and `_creationTime`).
+
+## Document types
+
+`Fields` and `Doc` are runtime `Schema`s — _values_. Reach for them whenever you need a value: a spec's `returns`, an HTTP endpoint's `addSuccess`, or decoding. Their TypeScript types are available as `typeof notes.Doc.Type` and `typeof notes.Fields.Type`.
+
+When you only need to annotate something with a table's document _type_, codegen also emits named document interfaces in `confect/_generated/docs.ts` — one per table (`NotesDoc`, `UsersDoc`, …) plus a `Docs` registry:
+
+```ts confect/_generated/docs.ts
+import type { Document } from "@confect/server";
+import type schemaDefinition from "./schema";
+
+export interface NotesDoc extends Document.Document<
+  typeof schemaDefinition,
+  "notes"
+> {}
+export interface UsersDoc extends Document.Document<
+  typeof schemaDefinition,
+  "users"
+> {}
+
+export interface Docs {
+  notes: NotesDoc;
+  users: UsersDoc;
+}
+```
+
+`NotesDoc` is the decoded document — the table's fields plus its system fields — exactly the same type as `typeof notes.Doc.Type`, but as a _named_ type. Because it's named, it keeps editor hovers and emitted `.d.ts` files readable (`NotesDoc` rather than the fully-expanded row), and it's what lets the `DatabaseReader`/`DatabaseWriter` services hand documents back under their table's name.
+
+```ts
+import type { NotesDoc } from "./confect/_generated/docs";
+
+const renderNote = (note: NotesDoc) => note.text;
+```
+
+You can also write the type inline with the same helper the generated interfaces extend, `Document.Document<typeof schemaDefinition, "notes">`, and drop the system fields with `Document.WithoutSystemFields<NotesDoc>`.
+
+As a rule of thumb: reach for `notes.Doc` when you need a **value** (a `Schema`), and `NotesDoc` when you need a **type**.
+
+<Note>
+  Each interface's name is the table name folded to PascalCase, so
+  `user_profiles` and `userProfiles` would both produce `UserProfilesDoc`.
+  Codegen reports an error if two tables would collide on the same name.
+</Note>

@@ -7,17 +7,45 @@ import type * as DataModel from "./DataModel";
 import * as QueryInitializer from "./QueryInitializer";
 import * as Table from "./Table";
 
+type IncludedTables<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
+  | DatabaseSchema.Tables<DatabaseSchema_>
+  | Table.SystemTables;
+
+type IncludedDataModel<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
+  DataModel.DataModel<IncludedTables<DatabaseSchema_>>;
+
+export interface DatabaseReaderService<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+  Docs = {},
+> {
+  readonly table: <
+    const TableName extends Table.Name<IncludedTables<DatabaseSchema_>>,
+  >(
+    tableName: TableName,
+  ) => QueryInitializer.QueryInitializer<
+    IncludedDataModel<DatabaseSchema_>,
+    TableName,
+    DataModel.TableInfoWithName<IncludedDataModel<DatabaseSchema_>, TableName>,
+    DataModel.TableInfoWithName_<IncludedDataModel<DatabaseSchema_>, TableName>,
+    TableName extends keyof Docs
+      ? Docs[TableName]
+      : DataModel.DocumentWithName<
+          IncludedDataModel<DatabaseSchema_>,
+          TableName
+        >
+  >;
+}
+
 export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   databaseSchema: DatabaseSchema_,
   convexDatabaseReader: GenericDatabaseReader<
     DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
   >,
-) => {
-  type Tables = DatabaseSchema.Tables<DatabaseSchema_>;
-  type IncludedTables = Tables | Table.SystemTables;
-
+): DatabaseReaderService<DatabaseSchema_> => {
   return {
-    table: <const TableName extends Table.Name<IncludedTables>>(
+    table: <
+      const TableName extends Table.Name<IncludedTables<DatabaseSchema_>>,
+    >(
       tableName: TableName,
     ) => {
       const isSystem = Object.hasOwn(Table.systemTables, tableName);
@@ -38,27 +66,44 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
               tableName
             ]
           : databaseSchema.tables[tableName]
-      ) as Table.WithName<IncludedTables, TableName>;
+      ) as Table.WithName<IncludedTables<DatabaseSchema_>, TableName>;
 
-      return QueryInitializer.make<IncludedTables, TableName>(
+      return QueryInitializer.make<IncludedTables<DatabaseSchema_>, TableName>(
         tableName,
         baseDatabaseReader,
         table,
       );
     },
-  };
+  } as DatabaseReaderService<DatabaseSchema_>;
 };
+
+/**
+ * The tag's *Identifier* (the Effect requirements-channel type) is
+ * `Docs`-independent so a helper's `R` channel is the same whether or not a
+ * codegen document registry is supplied — this keeps it identical to what
+ * `Handler`/runtime provisioning provide. The tag's *Service* (what `yield*`
+ * produces) carries `Docs`, so queries resolve to the named doc interfaces.
+ */
+export type DatabaseReaderTag<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+  Docs = {},
+> = Context.Tag<
+  DatabaseReaderService<DatabaseSchema_>,
+  DatabaseReaderService<DatabaseSchema_, Docs>
+>;
 
 export const DatabaseReader = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
->() =>
-  Context.GenericTag<ReturnType<typeof make<DatabaseSchema_>>>(
-    "@confect/server/DatabaseReader",
-  );
+  Docs = {},
+>(): DatabaseReaderTag<DatabaseSchema_, Docs> =>
+  Context.GenericTag<
+    DatabaseReaderService<DatabaseSchema_>,
+    DatabaseReaderService<DatabaseSchema_, Docs>
+  >("@confect/server/DatabaseReader");
 
 export type DatabaseReader<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-> = ReturnType<typeof DatabaseReader<DatabaseSchema_>>["Identifier"];
+> = DatabaseReaderService<DatabaseSchema_>;
 
 export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   databaseSchema: DatabaseSchema_,

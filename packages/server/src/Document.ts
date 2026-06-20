@@ -5,9 +5,15 @@ import * as Function from "effect/Function";
 import * as ParseResult from "effect/ParseResult";
 import * as Schema from "effect/Schema";
 import type { ReadonlyRecord } from "effect/Record";
+import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
 import type { ReadonlyValue } from "./SchemaToValidator";
 import type * as TableInfo from "./TableInfo";
+
+export type Document<
+  Schema_ extends DatabaseSchema.AnyWithProps,
+  TableName extends DatabaseSchema.TableNames<Schema_>,
+> = DataModel.DocumentByName<DataModel.FromSchema<Schema_>, TableName>;
 
 export type WithoutSystemFields<Doc> = Omit<Doc, "_creationTime" | "_id">;
 

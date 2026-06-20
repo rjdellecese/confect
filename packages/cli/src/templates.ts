@@ -277,6 +277,58 @@ export const refs = ({ specImportPath }: { specImportPath: string }) =>
     return yield* cbw.toString();
   });
 
+/**
+ * Emit `_generated/docs.ts`: one nominal `interface <table>` per table plus a
+ * `Docs` registry. Each interface `extends Document.Document<typeof
+ * schemaDefinition, "<table>">`, so it stays structurally exact while giving
+ * the document a *name* — declaration emit then prints e.g. `NotesDoc` instead
+ * of expanding the row structure. The registry is threaded into the generated
+ * `DatabaseReader`/`DatabaseWriter` tags so query/mutation helpers print named
+ * documents with no user annotations.
+ */
+export const docs = ({
+  schemaImportPath,
+  tables,
+}: {
+  schemaImportPath: string;
+  tables: ReadonlyArray<{ tableName: string; docName: string }>;
+}) =>
+  Effect.gen(function* () {
+    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+
+    // With no tables there is nothing to import — emitting the (unused) imports
+    // would trip `noUnusedLocals`.
+    if (tables.length === 0) {
+      yield* cbw.writeLine(`export interface Docs {}`);
+      return yield* cbw.toString();
+    }
+
+    yield* cbw.writeLine(`import type { Document } from "@confect/server";`);
+    yield* cbw.writeLine(
+      `import type schemaDefinition from "${schemaImportPath}";`,
+    );
+    yield* cbw.blankLine();
+
+    for (const { tableName, docName } of tables) {
+      yield* cbw.writeLine(
+        `export interface ${docName} extends Document.Document<typeof schemaDefinition, "${tableName}"> {}`,
+      );
+    }
+    yield* cbw.blankLine();
+
+    yield* cbw.writeLine(`export interface Docs {`);
+    yield* cbw.indent(
+      Effect.gen(function* () {
+        for (const { tableName, docName } of tables) {
+          yield* cbw.writeLine(`${tableName}: ${docName};`);
+        }
+      }),
+    );
+    yield* cbw.writeLine(`}`);
+
+    return yield* cbw.toString();
+  });
+
 export const registeredFunctionsForGroup = ({
   schemaImportPath,
   specImportPath,
@@ -354,6 +406,7 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
     yield* cbw.writeLine(
       `import type schemaDefinition from "${schemaImportPath}";`,
     );
+    yield* cbw.writeLine(`import type { Docs } from "./docs";`);
     yield* cbw.blankLine();
 
     // Auth
@@ -396,11 +449,14 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
     yield* cbw.blankLine();
 
     // VectorSearch
-    yield* cbw.writeLine("export const VectorSearch =");
+    yield* cbw.writeLine(
+      "export const VectorSearch: VectorSearch_.VectorSearchTag<",
+    );
     yield* cbw.indent(
-      cbw.writeLine(
-        "VectorSearch_.VectorSearch<DataModel.FromSchema<typeof schemaDefinition>>();",
-      ),
+      cbw.writeLine("DataModel.FromSchema<typeof schemaDefinition>"),
+    );
+    yield* cbw.writeLine(
+      "> = VectorSearch_.VectorSearch<DataModel.FromSchema<typeof schemaDefinition>>();",
     );
     yield* cbw.writeLine(
       "export type VectorSearch = typeof VectorSearch.Identifier;",
@@ -408,11 +464,17 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
     yield* cbw.blankLine();
 
     // DatabaseReader
-    yield* cbw.writeLine("export const DatabaseReader =");
+    yield* cbw.writeLine(
+      "export const DatabaseReader: DatabaseReader_.DatabaseReaderTag<",
+    );
     yield* cbw.indent(
-      cbw.writeLine(
-        "DatabaseReader_.DatabaseReader<typeof schemaDefinition>();",
-      ),
+      Effect.gen(function* () {
+        yield* cbw.writeLine("typeof schemaDefinition,");
+        yield* cbw.writeLine("Docs");
+      }),
+    );
+    yield* cbw.writeLine(
+      "> = DatabaseReader_.DatabaseReader<typeof schemaDefinition, Docs>();",
     );
     yield* cbw.writeLine(
       "export type DatabaseReader = typeof DatabaseReader.Identifier;",
@@ -420,11 +482,17 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
     yield* cbw.blankLine();
 
     // DatabaseWriter
-    yield* cbw.writeLine("export const DatabaseWriter =");
+    yield* cbw.writeLine(
+      "export const DatabaseWriter: DatabaseWriter_.DatabaseWriterTag<",
+    );
     yield* cbw.indent(
-      cbw.writeLine(
-        "DatabaseWriter_.DatabaseWriter<typeof schemaDefinition>();",
-      ),
+      Effect.gen(function* () {
+        yield* cbw.writeLine("typeof schemaDefinition,");
+        yield* cbw.writeLine("Docs");
+      }),
+    );
+    yield* cbw.writeLine(
+      "> = DatabaseWriter_.DatabaseWriter<typeof schemaDefinition, Docs>();",
     );
     yield* cbw.writeLine(
       "export type DatabaseWriter = typeof DatabaseWriter.Identifier;",
@@ -459,52 +527,57 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
     yield* cbw.blankLine();
 
     // QueryCtx
-    yield* cbw.writeLine("export const QueryCtx =");
+    yield* cbw.writeLine("export const QueryCtx: QueryCtx_.QueryCtxTag<");
     yield* cbw.indent(
-      Effect.gen(function* () {
-        yield* cbw.writeLine("QueryCtx_.QueryCtx<");
-        yield* cbw.indent(
-          cbw.writeLine(
-            "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
-          ),
-        );
-        yield* cbw.writeLine(">();");
-      }),
+      cbw.writeLine(
+        "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
+      ),
     );
+    yield* cbw.writeLine("> = QueryCtx_.QueryCtx<");
+    yield* cbw.indent(
+      cbw.writeLine(
+        "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
+      ),
+    );
+    yield* cbw.writeLine(">();");
     yield* cbw.writeLine("export type QueryCtx = typeof QueryCtx.Identifier;");
     yield* cbw.blankLine();
 
     // MutationCtx
-    yield* cbw.writeLine("export const MutationCtx =");
-    yield* cbw.indent(
-      Effect.gen(function* () {
-        yield* cbw.writeLine("MutationCtx_.MutationCtx<");
-        yield* cbw.indent(
-          cbw.writeLine(
-            "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
-          ),
-        );
-        yield* cbw.writeLine(">();");
-      }),
+    yield* cbw.writeLine(
+      "export const MutationCtx: MutationCtx_.MutationCtxTag<",
     );
+    yield* cbw.indent(
+      cbw.writeLine(
+        "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
+      ),
+    );
+    yield* cbw.writeLine("> = MutationCtx_.MutationCtx<");
+    yield* cbw.indent(
+      cbw.writeLine(
+        "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
+      ),
+    );
+    yield* cbw.writeLine(">();");
     yield* cbw.writeLine(
       "export type MutationCtx = typeof MutationCtx.Identifier;",
     );
     yield* cbw.blankLine();
 
     // ActionCtx
-    yield* cbw.writeLine("export const ActionCtx =");
+    yield* cbw.writeLine("export const ActionCtx: ActionCtx_.ActionCtxTag<");
     yield* cbw.indent(
-      Effect.gen(function* () {
-        yield* cbw.writeLine("ActionCtx_.ActionCtx<");
-        yield* cbw.indent(
-          cbw.writeLine(
-            "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
-          ),
-        );
-        yield* cbw.writeLine(">();");
-      }),
+      cbw.writeLine(
+        "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
+      ),
     );
+    yield* cbw.writeLine("> = ActionCtx_.ActionCtx<");
+    yield* cbw.indent(
+      cbw.writeLine(
+        "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
+      ),
+    );
+    yield* cbw.writeLine(">();");
     yield* cbw.writeLine(
       "export type ActionCtx = typeof ActionCtx.Identifier;",
     );
