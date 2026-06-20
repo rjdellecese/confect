@@ -69,8 +69,6 @@ describe("SpecAssemblyNode", () => {
     "assembledSpec imports GroupSpec whenever there are groups (for the annotation's NamedAt references)",
     () =>
       Effect.gen(function* () {
-        // Even all-leaf specs need `GroupSpec`: the default export's type
-        // annotation references `GroupSpec.NamedAt<…>` for every root group.
         const nodes = assemblyNodesFromLeaves([
           leaf("notes.spec.ts", ["notes"]),
           leaf("notes/archived.spec.ts", ["notes", "archived"]),
@@ -80,7 +78,6 @@ describe("SpecAssemblyNode", () => {
         expect(contents).toContain(
           'import { GroupSpec, Spec } from "@confect/core";',
         );
-        // The binding-with-children case is annotated via `GroupSpec.AddGroups`.
         expect(contents).toContain(
           'GroupSpec.AddGroups<typeof notes, GroupSpec.NamedAt<typeof notes_archived, "archived">>',
         );

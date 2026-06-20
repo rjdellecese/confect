@@ -94,29 +94,16 @@ layer(NodePath.layer)("declaration emit", (it) => {
     60_000,
   );
 
-  // The aggregate modules (`refs.ts`, `schema.ts`, `spec.ts`) export the result
-  // of a Confect builder call. Without an alias-headed annotation, declaration
-  // emit must infer and serialize the fully-expanded result type, which trips
-  // TS7056 ("inferred type ... exceeds the maximum length the compiler will
-  // serialize") at scale. These tests assert clean emit (no diagnostics) and
-  // snapshot the compact, reference-based `.d.ts` so a regression that
-  // re-introduced expansion would change the snapshot.
-  for (const entry of ["refs.ts", "schema.ts", "spec.ts"] as const) {
-    it.effect(
-      `${entry.replace(/\.ts$/, ".d.ts")} emits compact types without TS7056`,
-      () =>
-        Effect.gen(function* () {
-          const { host, diagnostics } = yield* compile(entry);
+  it.effect.each(["refs.ts", "schema.ts", "spec.ts"])(
+    "%s emits a declaration without TS7056",
+    (entry) =>
+      Effect.gen(function* () {
+        const { host, emitted, declarationPath, diagnostics } =
+          yield* compile(entry);
 
-          expect(
-            ts.formatDiagnostics(diagnostics, host),
-            `${entry} must emit declarations cleanly (no TS7056) — the default export needs an alias-headed annotation`,
-          ).toBe("");
-
-          const declaration = yield* emitDeclaration(entry);
-          expect(declaration).toMatchSnapshot();
-        }),
-      60_000,
-    );
-  }
+        expect(ts.formatDiagnostics(diagnostics, host)).toBe("");
+        expect(emitted.get(declarationPath)).toMatchSnapshot();
+      }),
+    60_000,
+  );
 });

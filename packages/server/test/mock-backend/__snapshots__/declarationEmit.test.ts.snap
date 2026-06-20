@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`declaration emit > refs.d.ts emits compact types without TS7056 1`] = `
+exports[`declaration emit > refs.ts emits a declaration without TS7056 1`] = `
 "import { Refs } from "@confect/core";
 import spec from "./spec";
 declare const refs: Refs.FromSpec<typeof spec>;
@@ -8,14 +8,14 @@ export default refs;
 "
 `;
 
-exports[`declaration emit > schema.d.ts emits compact types without TS7056 1`] = `
+exports[`declaration emit > schema.ts emits a declaration without TS7056 1`] = `
 "import { DatabaseSchema as $DatabaseSchema } from "@confect/server";
 import events from "./tables/events";
 import notes from "./tables/notes";
 import tags from "./tables/tags";
 import users from "./tables/users";
-declare const schemaDefinition: $DatabaseSchema.DatabaseSchema<typeof events | typeof notes | typeof tags | typeof users>;
-export default schemaDefinition;
+declare const databaseSchema: $DatabaseSchema.DatabaseSchema<typeof events | typeof notes | typeof tags | typeof users>;
+export default databaseSchema;
 "
 `;
 
@@ -60,7 +60,7 @@ export type ActionCtx = typeof ActionCtx.Identifier;
 "
 `;
 
-exports[`declaration emit > spec.d.ts emits compact types without TS7056 1`] = `
+exports[`declaration emit > spec.ts emits a declaration without TS7056 1`] = `
 "import { GroupSpec, Spec } from "@confect/core";
 import databaseReader from "../databaseReader.spec";
 import groups_aliasImporter from "../groups/aliasImporter.spec";
