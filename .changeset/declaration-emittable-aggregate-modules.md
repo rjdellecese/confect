@@ -3,14 +3,8 @@
 "@confect/cli": minor
 ---
 
-Make the generated `_generated/refs.ts`, `schema.ts`, and `spec.ts` modules declaration-emittable, fixing `TS7056` ("inferred type … exceeds the maximum length the compiler will serialize") under `tsc --build` with `composite`/`declaration` at scale.
+You can now compile a Confect backend with TypeScript declaration emit and consume it as a project reference.
 
-These aggregate modules previously exported the _un-annotated_ result of a Confect builder call, so declaration emit had to infer and serialize the fully-expanded result type — every ref for `refs.ts`, the whole schema for `schema.ts`, and every function's arg/return schema for `spec.ts` — which trips `TS7056` once a backend has dozens of tables and functions. This blocked consuming a Confect backend as a referenced TypeScript project (so every consumer recompiled the backend's source).
+Previously, enabling `composite`/`declaration` on a project that included your generated `confect/_generated` modules failed with `TS7056` ("inferred type … exceeds the maximum length the compiler will serialize") once the backend had more than a handful of tables and functions. As a result, a Confect backend couldn't be a referenced/composite TypeScript project — every consumer had to pull in and recompile its source, hurting editor responsiveness and incremental typecheck times in larger workspaces.
 
-Codegen now annotates each aggregate export with a compact, alias-headed type reference (mirroring `services.ts`/`docs.ts`), so declaration emit prints the reference by name instead of re-expanding it:
-
-- `refs.ts` is typed with the new `Refs.FromSpec<typeof spec>`.
-- `schema.ts` is typed with `DatabaseSchema.DatabaseSchema<…>` over the `typeof <table>` union.
-- `spec.ts` is typed with a reconstructed `Spec.Spec<…>` whose groups are referenced by `typeof`; the new `GroupSpec.AddGroups` helper covers a leaf spec module that also has nested subgroups.
-
-`@confect/core` gains two additive public types: `Refs.FromSpec` and `GroupSpec.AddGroups`.
+Regenerating your backend (`confect codegen`) now produces `_generated` modules that emit declarations cleanly, so you can turn on `composite`/`declaration` for the backend and have downstream packages depend on it via project references (`.d.ts`) instead of source.
