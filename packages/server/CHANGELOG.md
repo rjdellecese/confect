@@ -1,5 +1,12 @@
 # @confect/server
 
+## 9.1.3
+
+### Patch Changes
+
+- Updated dependencies [8d63382]
+  - @confect/core@9.1.3
+
 ## 9.1.2
 
 ### Patch Changes
