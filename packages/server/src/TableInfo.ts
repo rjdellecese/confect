@@ -1,5 +1,4 @@
 import type {
-  Expand,
   GenericDocument,
   GenericFieldPaths,
   GenericTableIndexes,
@@ -20,7 +19,7 @@ export type TypeId = typeof TypeId;
 export type TableInfo<Table_ extends Table.AnyWithProps> =
   Table_ extends Table.Table<
     infer TableName,
-    infer _TableSchema,
+    infer TableSchema_,
     infer TableValidator,
     infer Indexes,
     infer SearchIndexes,
@@ -28,8 +27,14 @@ export type TableInfo<Table_ extends Table.AnyWithProps> =
   >
     ? {
         readonly [TypeId]: TypeId;
-        readonly document: Table_["Doc"]["Type"];
-        readonly encodedDocument: Table_["Doc"]["Encoded"];
+        readonly document: WithSystemFields<
+          TableName,
+          Schema.Schema.Type<TableSchema_>
+        >;
+        readonly encodedDocument: WithSystemFields<
+          TableName,
+          Schema.Schema.Encoded<TableSchema_>
+        >;
         readonly convexDocument: ExtractConvexDocument<
           TableName,
           TableValidator
@@ -72,6 +77,10 @@ export type TableSchema<TableInfo_ extends AnyWithProps> = Schema.Schema<
 
 export type Document<TableInfo_ extends AnyWithProps> = TableInfo_["document"];
 
+type WithSystemFields<TableName extends string, Doc> = Doc extends unknown
+  ? IdField<TableName> & SystemFields & Doc
+  : never;
+
 // Vendored types from convex-js, partially modified.
 // See https://github.com/get-convex/convex-js/pull/14
 
@@ -83,8 +92,8 @@ type ExtractConvexDocument<
   TableName extends string,
   T extends GenericValidator,
 > =
-  Expand<IdField<TableName> & SystemFields & T["type"]> extends GenericDocument
-    ? Expand<IdField<TableName> & SystemFields & T["type"]>
+  WithSystemFields<TableName, T["type"]> extends GenericDocument
+    ? WithSystemFields<TableName, T["type"]>
     : never;
 
 // End of vendored types from convex-js, partially modified.

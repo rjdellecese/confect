@@ -15,7 +15,9 @@ export type Document<
   TableName extends DatabaseSchema.TableNames<Schema_>,
 > = DataModel.DocumentByName<DataModel.FromSchema<Schema_>, TableName>;
 
-export type WithoutSystemFields<Doc> = Omit<Doc, "_creationTime" | "_id">;
+export type WithoutSystemFields<Doc> = Doc extends unknown
+  ? Omit<Doc, "_creationTime" | "_id">
+  : never;
 
 export type Any = any;
 export type AnyEncoded = ReadonlyRecord<string, ReadonlyValue>;

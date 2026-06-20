@@ -123,7 +123,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
     const patch = (
       id: GenericId<TableName>,
       patchedValues: Partial<
-        WithoutSystemFields<DocumentByName_<DataModel_, TableName>>
+        Document.WithoutSystemFields<DocumentByName_<DataModel_, TableName>>
       >,
     ) =>
       Effect.gen(function* () {
@@ -162,7 +162,9 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
 
     const replace = (
       id: GenericId<TableName>,
-      value: WithoutSystemFields<DocumentByName_<DataModel_, TableName>>,
+      value: Document.WithoutSystemFields<
+        DocumentByName_<DataModel_, TableName>
+      >,
     ) =>
       Effect.gen(function* () {
         const updatedEncodedDoc = yield* Document.encode(

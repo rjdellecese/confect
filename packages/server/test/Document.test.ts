@@ -2,8 +2,10 @@ import type { GenericId } from "@confect/core/GenericId";
 import * as SystemFields from "@confect/core/SystemFields";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
-import { describe, expect, it } from "@effect/vitest";
+import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Document from "@confect/server/Document";
+import type * as TableInfo from "@confect/server/TableInfo";
+import unnamedEvents from "./mock-backend/fixtures/confect/tables/events";
 
 const NoteSchema = Schema.Struct({
   content: Schema.String,
@@ -118,5 +120,17 @@ describe("Document.encode", () => {
 
     expect(second).toEqual(first);
     expect(third).toEqual(first);
+  });
+});
+
+describe("Document.Document", () => {
+  it("distributes system fields over union-schema tables", () => {
+    const events = unnamedEvents("events");
+    type Doc = TableInfo.TableInfo<typeof events>["document"];
+
+    expectTypeOf<Document.WithoutSystemFields<Doc>>().toEqualTypeOf<
+      | { readonly kind: "a"; readonly a: string }
+      | { readonly kind: "b"; readonly b: number }
+    >();
   });
 });
