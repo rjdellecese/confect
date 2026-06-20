@@ -1,7 +1,7 @@
 {
   "name": "@confect/react",
   "description": "Client-side bindings for React apps",
-  "version": "9.0.2",
+  "version": "9.1.0",
   "author": "RJ Dellecese",
   "bugs": {
     "url": "https://github.com/rjdellecese/confect/issues"

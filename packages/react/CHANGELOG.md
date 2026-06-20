@@ -1,5 +1,16 @@
 # @confect/react
 
+## 9.1.0
+
+### Minor Changes
+
+- 4d8a568: Add `withOptimisticUpdate` to `@confect/react`'s `useMutation`, mirroring Convex's API. The mutation handle returned by `useMutation` is now both callable and exposes `.withOptimisticUpdate(fn)` for attaching an optimistic update. Inside the callback, the `OptimisticLocalStore`'s `getQuery`/`setQuery`/`getAllQueries` accept Confect query `Ref`s and operate on decoded (Effect Schema) values wrapped in `Option`; the wrapper handles encoding/decoding against Convex's local store.
+
+### Patch Changes
+
+- Updated dependencies [4d8a568]
+  - @confect/core@9.1.0
+
 ## 9.0.2
 
 ### Patch Changes
