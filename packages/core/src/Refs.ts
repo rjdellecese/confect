@@ -12,6 +12,11 @@ export type Refs<
   Predicate extends Ref.Any = Ref.Any,
 > = Types.Simplify<OmitEmpty<Helper<Spec.Groups<Spec_>, Predicate>>>;
 
+export interface FromSpec<Spec_ extends Spec.AnyWithProps> {
+  public: Refs<Spec_, Ref.AnyPublic>;
+  internal: Refs<Spec_, Ref.AnyInternal>;
+}
+
 type GroupRefs<
   Group extends GroupSpec.AnyWithProps,
   Predicate extends Ref.Any,
@@ -74,10 +79,7 @@ type Any =
 
 export const make = <Spec_ extends Spec.AnyWithProps>(
   spec: Spec_,
-): {
-  public: Refs<Spec_, Ref.AnyPublic>;
-  internal: Refs<Spec_, Ref.AnyInternal>;
-} => {
+): FromSpec<Spec_> => {
   const refs = makeHelper(spec.groups);
   return {
     public: refs as Refs<Spec_, Ref.AnyPublic>,

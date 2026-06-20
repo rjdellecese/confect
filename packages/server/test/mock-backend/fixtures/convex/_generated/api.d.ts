@@ -145,6 +145,9 @@ export declare const api: {
     };
     random: {
       getNumber: FunctionReference<"action", "public", {}, number>;
+      stats: {
+        count: FunctionReference<"query", "public", {}, number>;
+      };
     };
     runners: {
       countNotesViaRunner: FunctionReference<"action", "public", {}, number>;

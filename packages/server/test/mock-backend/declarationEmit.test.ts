@@ -93,4 +93,17 @@ layer(NodePath.layer)("declaration emit", (it) => {
       }),
     60_000,
   );
+
+  it.effect.each(["refs.ts", "schema.ts", "spec.ts"])(
+    "%s emits a declaration without TS7056",
+    (entry) =>
+      Effect.gen(function* () {
+        const { host, emitted, declarationPath, diagnostics } =
+          yield* compile(entry);
+
+        expect(ts.formatDiagnostics(diagnostics, host)).toBe("");
+        expect(emitted.get(declarationPath)).toMatchSnapshot();
+      }),
+    60_000,
+  );
 });

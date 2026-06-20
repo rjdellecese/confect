@@ -106,9 +106,24 @@ export const runtimeSchema = ({
     yield* cbw.blankLine();
 
     if (tableModules.length === 0) {
-      yield* cbw.writeLine(`export default $DatabaseSchema.make({});`);
+      yield* cbw.writeLine(
+        `const databaseSchema: $DatabaseSchema.DatabaseSchema = $DatabaseSchema.make({});`,
+      );
     } else {
-      yield* cbw.writeLine(`export default $DatabaseSchema.make({`);
+      yield* cbw.writeLine(
+        `const databaseSchema: $DatabaseSchema.DatabaseSchema<`,
+      );
+      yield* cbw.indent(
+        Effect.forEach(
+          tableModules,
+          ({ tableName }, i) =>
+            cbw.writeLine(
+              `typeof ${tableName}${i === tableModules.length - 1 ? "" : " |"}`,
+            ),
+          { discard: true },
+        ),
+      );
+      yield* cbw.writeLine(`> = $DatabaseSchema.make({`);
       yield* cbw.indent(
         Effect.gen(function* () {
           for (const { tableName } of tableModules) {
@@ -118,6 +133,9 @@ export const runtimeSchema = ({
       );
       yield* cbw.writeLine(`});`);
     }
+
+    yield* cbw.blankLine();
+    yield* cbw.writeLine(`export default databaseSchema;`);
 
     return yield* cbw.toString();
   });
@@ -272,7 +290,11 @@ export const refs = ({ specImportPath }: { specImportPath: string }) =>
     yield* cbw.writeLine(`import { Refs } from "@confect/core";`);
     yield* cbw.writeLine(`import spec from "${specImportPath}";`);
     yield* cbw.blankLine();
-    yield* cbw.writeLine(`export default Refs.make(spec);`);
+    yield* cbw.writeLine(
+      `const refs: Refs.FromSpec<typeof spec> = Refs.make(spec);`,
+    );
+    yield* cbw.blankLine();
+    yield* cbw.writeLine(`export default refs;`);
 
     return yield* cbw.toString();
   });
@@ -648,6 +670,25 @@ const writeRootAddAt = (
     yield* cbw.write(")");
   });
 
+const groupTypeExpr = (node: SpecAssemblyNode): string => {
+  const childUnion = Array.map(
+    node.children,
+    (child) => `GroupSpec.NamedAt<${groupTypeExpr(child)}, "${child.segment}">`,
+  ).join(" | ");
+
+  return Option.match(node.importBinding, {
+    onNone: () =>
+      `GroupSpec.GroupSpec<"Convex", "${node.segment}", never, ${childUnion}>`,
+    onSome: (binding) =>
+      node.children.length === 0
+        ? `typeof ${binding.localName}`
+        : `GroupSpec.AddGroups<typeof ${binding.localName}, ${childUnion}>`,
+  });
+};
+
+const rootGroupTypeMember = (node: SpecAssemblyNode): string =>
+  `GroupSpec.NamedAt<${groupTypeExpr(node)}, "${node.segment}">`;
+
 export const assembledSpec = ({
   nodes,
 }: {
@@ -656,13 +697,8 @@ export const assembledSpec = ({
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-    const nodeRequiresGroupFactory = (node: SpecAssemblyNode): boolean =>
-      Option.isNone(node.importBinding) ||
-      Array.some(node.children, nodeRequiresGroupFactory);
-
-    const needsGroupSpec = Array.some(nodes, nodeRequiresGroupFactory);
     yield* cbw.writeLine(
-      needsGroupSpec
+      nodes.length > 0
         ? `import { GroupSpec, Spec } from "@confect/core";`
         : `import { Spec } from "@confect/core";`,
     );
@@ -675,16 +711,33 @@ export const assembledSpec = ({
 
     yield* cbw.blankLine();
 
+    yield* cbw.write(`const spec: `);
+    if (nodes.length === 0) {
+      yield* cbw.write(`Spec.Spec`);
+    } else {
+      yield* cbw.write(`Spec.Spec<`);
+      yield* cbw.newLine();
+      yield* cbw.indent(
+        Effect.gen(function* () {
+          for (const node of nodes) {
+            yield* cbw.writeLine(`| ${rootGroupTypeMember(node)}`);
+          }
+        }),
+      );
+      yield* cbw.write(`>`);
+    }
     // The assembled spec is runtime-agnostic: a Node group's `makeNode()` is
     // already baked into its imported leaf spec, so the root is always
     // `Spec.make()` and binding-less container groups always use
     // `GroupSpec.makeAt` (containers register no functions and carry no runtime).
-    yield* cbw.write(`export default Spec.make()`);
+    yield* cbw.write(` = Spec.make()`);
     yield* Effect.forEach(nodes, (node) =>
       writeRootAddAt(cbw, node, "GroupSpec.makeAt"),
     );
     yield* cbw.write(";");
     yield* cbw.newLine();
+    yield* cbw.blankLine();
+    yield* cbw.writeLine(`export default spec;`);
 
     return yield* cbw.toString();
   });

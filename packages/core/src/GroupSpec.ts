@@ -93,6 +93,19 @@ export type NamedAt<Group extends Any, Name_ extends string> = Omit<
   readonly name: Name_;
 };
 
+export type AddGroups<
+  Group extends AnyWithProps,
+  ExtraGroups extends AnyWithProps,
+> =
+  Group extends GroupSpec<
+    infer Runtime,
+    infer Name_,
+    infer Functions_,
+    infer Groups_
+  >
+    ? GroupSpec<Runtime, Name_, Functions_, Groups_ | ExtraGroups>
+    : never;
+
 const Proto = {
   [TypeId]: TypeId,
 

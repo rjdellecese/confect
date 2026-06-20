@@ -5,9 +5,16 @@ import notes from "./tables/notes";
 import tags from "./tables/tags";
 import users from "./tables/users";
 
-export default $DatabaseSchema.make({
+const databaseSchema: $DatabaseSchema.DatabaseSchema<
+  typeof events |
+  typeof notes |
+  typeof tags |
+  typeof users
+> = $DatabaseSchema.make({
   events,
   notes,
   tags,
   users,
 });
+
+export default databaseSchema;
