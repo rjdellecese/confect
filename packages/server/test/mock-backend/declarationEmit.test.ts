@@ -49,7 +49,7 @@ const emitDeclaration = (entry: string) =>
 
     const entryPath = path.resolve(
       import.meta.dirname,
-      "../mock-backend/fixtures/confect/_generated",
+      "fixtures/confect/_generated",
       entry,
     );
     const program = ts.createProgram([entryPath], options, host);

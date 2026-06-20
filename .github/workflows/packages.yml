@@ -59,14 +59,6 @@ jobs:
       - uses: ./.github/actions/confect-setup
       - run: cd packages/${{ matrix.package }} && pnpm test
 
-  test-declarations:
-    name: Test (declarations)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: ./.github/actions/confect-setup
-      - run: pnpm --filter @confect/server test:declarations
-
   test-mock-backend:
     name: Test (mock-backend)
     runs-on: ubuntu-latest
