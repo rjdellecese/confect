@@ -4,7 +4,7 @@ import { pipe } from "effect/Function";
 import * as String from "effect/String";
 
 /**
- * The name of a table's generated document interface in
+ * The name of a table's generated document type in
  * `confect/_generated/docs.ts` (e.g. `UserProfilesDoc`). Branded so it can't be
  * confused with an arbitrary string — construct it with {@link fromTableName}.
  */
@@ -13,7 +13,7 @@ export type DocName = string & Brand.Brand<"DocName">;
 const DocName = Brand.nominal<DocName>();
 
 /**
- * Convert a Convex table name to the name of its generated document interface
+ * Convert a Convex table name to the name of its generated document type
  * in `confect/_generated/docs.ts`.
  *
  * The table name is split on underscores and the first letter of each segment

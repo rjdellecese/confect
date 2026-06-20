@@ -7,7 +7,7 @@ import { pipe } from "effect/Function";
 import * as String from "effect/String";
 import * as ts from "typescript";
 
-const emitDeclaration = (entry: string) =>
+const compile = (entry: string) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
 
@@ -44,13 +44,23 @@ const emitDeclaration = (entry: string) =>
     const declarationPath = path.normalize(
       pipe(entryPath, String.replace(/\.ts$/, ".d.ts")),
     );
+
+    const diagnostics = Array.appendAll(
+      ts.getPreEmitDiagnostics(program),
+      result.diagnostics,
+    );
+
+    return { host, emitted, declarationPath, diagnostics };
+  });
+
+const emitDeclaration = (entry: string) =>
+  Effect.gen(function* () {
+    const { host, emitted, declarationPath, diagnostics } =
+      yield* compile(entry);
+
     const declaration = emitted.get(declarationPath);
 
     if (declaration === undefined) {
-      const diagnostics = Array.appendAll(
-        ts.getPreEmitDiagnostics(program),
-        result.diagnostics,
-      );
       return yield* Effect.dieMessage(
         `${entry} produced no declaration emit:\n${ts.formatDiagnostics(diagnostics, host)}`,
       );
@@ -66,6 +76,26 @@ layer(NodePath.layer)("declaration emit", (it) => {
       Effect.gen(function* () {
         const declaration = yield* emitDeclaration("services.ts");
         expect(declaration).toMatchSnapshot();
+      }),
+    60_000,
+  );
+
+  // The `events` fixture's schema is a `Schema.Union`, so its document type is a
+  // union rather than a single object. Codegen must emit `EventsDoc` as a `type`
+  // alias — an `interface EventsDoc extends Document.Document<…>` would trip
+  // TS2312 ("an interface can only extend an object type"). Plain declaration
+  // emit tolerates type errors, so we assert there are *no* diagnostics rather
+  // than merely that a `.d.ts` was produced.
+  it.effect(
+    "docs.d.ts emits non-object (union) document types without error",
+    () =>
+      Effect.gen(function* () {
+        const { host, diagnostics } = yield* compile("docs.ts");
+
+        expect(
+          ts.formatDiagnostics(diagnostics, host),
+          "docs.ts must typecheck cleanly — non-object doc types require `type` aliases, not `interface … extends`",
+        ).toBe("");
       }),
     60_000,
   );

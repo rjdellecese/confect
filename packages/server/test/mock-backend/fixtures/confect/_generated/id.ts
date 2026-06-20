@@ -1,6 +1,6 @@
 import { GenericId } from "@confect/core";
 
-export type TableNames = "notes" | "tags" | "users";
+export type TableNames = "events" | "notes" | "tags" | "users";
 
 export const Id = <const TableName extends TableNames>(
   tableName: TableName,
