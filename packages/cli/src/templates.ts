@@ -278,13 +278,16 @@ export const refs = ({ specImportPath }: { specImportPath: string }) =>
   });
 
 /**
- * Emit `_generated/docs.ts`: one nominal `interface <table>` per table plus a
- * `Docs` registry. Each interface `extends Document.Document<typeof
- * schemaDefinition, "<table>">`, so it stays structurally exact while giving
- * the document a *name* — declaration emit then prints e.g. `NotesDoc` instead
- * of expanding the row structure. The registry is threaded into the generated
- * `DatabaseReader`/`DatabaseWriter` tags so query/mutation helpers print named
- * documents with no user annotations.
+ * Emit `_generated/docs.ts`: one named `type <table>` alias per table plus a
+ * `Docs` registry. Each alias is `Document.Document<typeof schemaDefinition,
+ * "<table>">`, so it stays structurally exact while giving the document a
+ * *name* — declaration emit then prints e.g. `NotesDoc` instead of expanding
+ * the row structure. A `type` alias (rather than an extending `interface`) is
+ * used so it works for every document shape: object tables, but also union
+ * schemas (`Schema.Union`) and other non-object documents, which an `interface
+ * … extends` cannot represent (TS2312). The registry is threaded into the
+ * generated `DatabaseReader`/`DatabaseWriter` tags so query/mutation helpers
+ * print named documents with no user annotations.
  */
 export const docs = ({
   schemaImportPath,
@@ -311,7 +314,7 @@ export const docs = ({
 
     for (const { tableName, docName } of tables) {
       yield* cbw.writeLine(
-        `export interface ${docName} extends Document.Document<typeof schemaDefinition, "${tableName}"> {}`,
+        `export type ${docName} = Document.Document<typeof schemaDefinition, "${tableName}">;`,
       );
     }
     yield* cbw.blankLine();

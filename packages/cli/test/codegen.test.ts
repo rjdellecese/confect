@@ -33,6 +33,7 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
     Effect.gen(function* () {
       const tables = yield* discoverTables;
       expect(tables.map((t) => t.tableName).sort()).toEqual([
+        "events",
         "notes",
         "tags",
         "users",

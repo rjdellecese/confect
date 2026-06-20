@@ -1,9 +1,9 @@
 import type { Document } from "@confect/server";
 import type schemaDefinition from "./schema";
 
-export interface NotesDoc extends Document.Document<typeof schemaDefinition, "notes"> {}
-export interface TagsDoc extends Document.Document<typeof schemaDefinition, "tags"> {}
-export interface UsersDoc extends Document.Document<typeof schemaDefinition, "users"> {}
+export type NotesDoc = Document.Document<typeof schemaDefinition, "notes">;
+export type TagsDoc = Document.Document<typeof schemaDefinition, "tags">;
+export type UsersDoc = Document.Document<typeof schemaDefinition, "users">;
 
 export interface Docs {
   notes: NotesDoc;
