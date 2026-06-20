@@ -88,6 +88,7 @@
     "postpack": "rm ./README.md && ln -s ../../README.md ./README.md",
     "prepack": "rm -f ./README.md && cp ../../README.md ./README.md",
     "test": "vitest run",
+    "test:declarations": "vitest run --config vitest.declaration.config.ts",
     "test:local-backend": "vitest run --config vitest.local-backend.config.ts",
     "test:mock-backend": "vitest run --config vitest.mock-backend.config.ts",
     "typecheck": "tsc -b tsconfig.src.json"

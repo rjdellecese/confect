@@ -25,7 +25,7 @@ const emitDeclaration = (entry: string) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
 
-    const configPath = path.resolve(import.meta.dirname, "../tsconfig.json");
+    const configPath = path.resolve(import.meta.dirname, "../../tsconfig.json");
     const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
     const parsed = ts.parseJsonConfigFileContent(
       configFile.config,
@@ -49,7 +49,7 @@ const emitDeclaration = (entry: string) =>
 
     const entryPath = path.resolve(
       import.meta.dirname,
-      "mock-backend/fixtures/confect/_generated",
+      "../mock-backend/fixtures/confect/_generated",
       entry,
     );
     const program = ts.createProgram([entryPath], options, host);
