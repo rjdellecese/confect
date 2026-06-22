@@ -13,6 +13,7 @@ import {
 import type { Value } from "convex/values";
 import { pipe } from "effect/Function";
 import * as Clock from "effect/Clock";
+import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Match from "effect/Match";
@@ -116,16 +117,13 @@ export const make = (
  * used internally by Effect (logging, span events, scheduler) return constants
  * so they never touch the tracker—caching is not broken by default.
  */
-const unpatchedClock = (realDateNow: () => number): Clock.Clock => {
-  const defaultClock = Clock.make();
-  return {
-    ...defaultClock,
-    unsafeCurrentTimeMillis: () => 0,
-    unsafeCurrentTimeNanos: () => 0n,
-    currentTimeMillis: Effect.sync(() => realDateNow()),
-    currentTimeNanos: Effect.sync(() => BigInt(realDateNow()) * 1_000_000n),
-  };
-};
+const unpatchedClock = (realDateNow: () => number): Clock.Clock => ({
+  currentTimeMillisUnsafe: () => 0,
+  currentTimeNanosUnsafe: () => 0n,
+  currentTimeMillis: Effect.sync(() => realDateNow()),
+  currentTimeNanos: Effect.sync(() => BigInt(realDateNow()) * 1_000_000n),
+  sleep: (duration) => Effect.sleep(duration),
+});
 
 const withStubbedDateNow = async <T>(
   queryHandler: (clock: Clock.Clock) => Promise<T>,
@@ -155,9 +153,9 @@ const queryFunction = <
   handler,
 }: {
   databaseSchema: DatabaseSchema_;
-  args: Schema.Schema<Args, ConvexArgs>;
-  returns: Schema.Schema<Returns, ConvexReturns>;
-  error: Schema.Schema<Error, Value> | undefined;
+  args: Schema.Codec<Args, ConvexArgs>;
+  returns: Schema.Codec<Returns, ConvexReturns>;
+  error: Schema.Codec<Error, Value> | undefined;
   handler: (
     a: Args,
   ) => Effect.Effect<
@@ -184,7 +182,7 @@ const queryFunction = <
       Effect.gen(function* () {
         const decodedArgs = yield* pipe(
           actualArgs,
-          Schema.decode(args),
+          Schema.decodeUnknownEffect(args),
           Effect.orDie,
         );
         const decodedReturns = yield* handler(decodedArgs).pipe(
@@ -200,17 +198,17 @@ const queryFunction = <
                 >(),
                 ctx,
               ),
-              Layer.setConfigProvider(ConvexConfigProvider.make()),
+              Layer.succeed(ConfigProvider.ConfigProvider, ConvexConfigProvider.make()),
             ),
           ),
         );
         return yield* pipe(
           decodedReturns,
-          Schema.encode(returns),
+          Schema.encodeEffect(returns),
           Effect.orDie,
         );
       }).pipe(
-        Effect.withClock(clock),
+        Effect.provideService(Clock.Clock, clock),
         RegisteredFunction.runHandlerPromise(error),
       ),
     ),
@@ -235,7 +233,7 @@ export const mutationLayer = <Schema extends DatabaseSchema.AnyWithProps>(
       >(),
       ctx,
     ),
-    Layer.setConfigProvider(ConvexConfigProvider.make()),
+    Layer.succeed(ConfigProvider.ConfigProvider, ConvexConfigProvider.make()),
   );
 
 export type MutationServices<Schema extends DatabaseSchema.AnyWithProps> =
@@ -264,9 +262,9 @@ const mutationFunction = <
   handler,
 }: {
   databaseSchema: DatabaseSchema_;
-  args: Schema.Schema<Args, ConvexArgs>;
-  returns: Schema.Schema<Returns, ConvexReturns>;
-  error: Schema.Schema<Error, Value> | undefined;
+  args: Schema.Codec<Args, ConvexArgs>;
+  returns: Schema.Codec<Returns, ConvexReturns>;
+  error: Schema.Codec<Error, Value> | undefined;
   handler: (
     a: Args,
   ) => Effect.Effect<Returns, E, MutationServices<DatabaseSchema_>>;
@@ -282,13 +280,17 @@ const mutationFunction = <
     Effect.gen(function* () {
       const decodedArgs = yield* pipe(
         actualArgs,
-        Schema.decode(args),
+        Schema.decodeUnknownEffect(args),
         Effect.orDie,
       );
       const decodedReturns = yield* handler(decodedArgs).pipe(
         Effect.provide(mutationLayer(databaseSchema, ctx)),
       );
-      return yield* pipe(decodedReturns, Schema.encode(returns), Effect.orDie);
+      return yield* pipe(
+        decodedReturns,
+        Schema.encodeEffect(returns),
+        Effect.orDie,
+      );
     }).pipe(RegisteredFunction.runHandlerPromise(error)),
 });
 
@@ -307,9 +309,9 @@ const convexActionFunction = <
     error,
     handler,
   }: {
-    args: Schema.Schema<Args, ConvexArgs>;
-    returns: Schema.Schema<Returns, ConvexReturns>;
-    error: Schema.Schema.AnyNoContext | undefined;
+    args: Schema.Codec<Args, ConvexArgs>;
+    returns: Schema.Codec<Returns, ConvexReturns>;
+    error: Schema.Codec<any, any> | undefined;
     handler: (
       a: Args,
     ) => Effect.Effect<
@@ -327,6 +329,6 @@ const convexActionFunction = <
     createLayer: (ctx) =>
       Layer.mergeAll(
         RegisteredFunction.actionLayer(schema, ctx),
-        Layer.setConfigProvider(ConvexConfigProvider.make()),
+        Layer.succeed(ConfigProvider.ConfigProvider, ConvexConfigProvider.make()),
       ),
   });

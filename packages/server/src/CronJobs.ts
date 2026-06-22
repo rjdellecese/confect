@@ -101,7 +101,7 @@ const setToField = (set: ReadonlySet<number>): string => {
   if (set.size === 0) return "*";
   return pipe(
     set,
-    Array.sort(Order.number),
+    Array.sort(Order.Number),
     Array.map((n) => n.toString()),
     Array.join(","),
   );

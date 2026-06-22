@@ -33,7 +33,7 @@ export type TableInfo<Table_ extends Table.AnyWithProps> =
         >;
         readonly encodedDocument: WithSystemFields<
           TableName,
-          Schema.Schema.Encoded<TableSchema_>
+          Schema.Codec.Encoded<TableSchema_>
         >;
         readonly convexDocument: ExtractConvexDocument<
           TableName,
@@ -70,7 +70,7 @@ export type ConvexTableInfo<TableInfo_ extends AnyWithProps> = {
   vectorIndexes: TableInfo_["vectorIndexes"];
 };
 
-export type TableSchema<TableInfo_ extends AnyWithProps> = Schema.Schema<
+export type TableSchema<TableInfo_ extends AnyWithProps> = Schema.Codec<
   TableInfo_["document"],
   TableInfo_["encodedDocument"]
 >;

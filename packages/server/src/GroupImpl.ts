@@ -98,7 +98,7 @@ export const make = <
   >;
 
 const isFunctionShaped = (value: unknown): boolean =>
-  Predicate.isRecord(value) && "functionSpec" in value;
+  Predicate.hasProperty(value, "functionSpec");
 
 /**
  * Return the names of the function-shaped entries in a group's (flat,
@@ -111,15 +111,14 @@ const collectFunctionNames = (
 ): ReadonlyArray<string> =>
   pipe(
     Record.toEntries(items),
-    Array.filterMap(([name, value]) =>
-      isFunctionShaped(value) ? Option.some(name) : Option.none(),
-    ),
+    Array.filter(([, value]) => isFunctionShaped(value)),
+    Array.map(([name]) => name),
   );
 
 const findUnfinalizedGroupImpl = <S>(
   context: Context.Context<S>,
 ): Option.Option<AnyUnfinalized> =>
-  Array.findFirst(context.unsafeMap.values(), isUnfinalizedGroupImpl);
+  Array.findFirst(context.mapUnsafe.values(), isUnfinalizedGroupImpl);
 
 /**
  * Mark a `GroupImpl` layer as fully implemented. The parameter type defaults
@@ -143,9 +142,12 @@ export const finalize = (
       findUnfinalizedGroupImpl(context).pipe(
         Option.match({
           onNone: () =>
-            Layer.die(
-              new Error(
-                "GroupImpl.finalize: no Unfinalized GroupImpl service was found in the layer's context.",
+            Layer.effect(
+              GroupImpl<"Finalized">({ finalizationStatus: "Finalized" }),
+              Effect.die(
+                new Error(
+                  "GroupImpl.finalize: no Unfinalized GroupImpl service was found in the layer's context.",
+                ),
               ),
             ),
           onSome: () =>

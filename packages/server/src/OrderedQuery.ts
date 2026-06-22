@@ -6,7 +6,6 @@ import type {
 } from "convex/server";
 import { identity, pipe } from "effect/Function";
 import type { Option } from "effect";
-import * as Chunk from "effect/Chunk";
 import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
 import * as Document from "./Document";
@@ -66,15 +65,10 @@ export const make = <
     pipe(stream(), Stream.take(1), Stream.runHead);
 
   const take: OrderedQueryFunction<"take"> = (n: number) =>
-    pipe(
-      stream(),
-      Stream.take(n),
-      Stream.runCollect,
-      Effect.map((chunk) => Chunk.toReadonlyArray(chunk)),
-    );
+    pipe(stream(), Stream.take(n), Stream.runCollect);
 
   const collect: OrderedQueryFunction<"collect"> = () =>
-    pipe(stream(), Stream.runCollect, Effect.map(Chunk.toReadonlyArray));
+    pipe(stream(), Stream.runCollect);
 
   const paginate: OrderedQueryFunction<"paginate"> = (options, filter) =>
     Effect.gen(function* () {

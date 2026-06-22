@@ -137,14 +137,17 @@ export const make = <
           )
           .unique(),
       ),
-      Effect.andThen(
-        Result.fromNullishOr(
-          () =>
-            new GetByIndexFailure({
-              tableName,
-              indexName: indexName as string,
-              indexFieldValues,
-            }),
+      Effect.andThen((value) =>
+        Effect.fromResult(
+          Result.fromNullishOr(
+            value,
+            () =>
+              new GetByIndexFailure({
+                tableName,
+                indexName: indexName as string,
+                indexFieldValues,
+              }),
+          ),
         ),
       ),
       Effect.andThen(Document.decode(tableName, table.Fields)),
@@ -281,8 +284,13 @@ export const getById =
   (id: GenericId<TableName>) =>
     pipe(
       Effect.promise(() => convexDatabaseReader.get(id)),
-      Effect.andThen(
-        Result.fromNullishOr(() => new GetByIdFailure({ tableName, id })),
+      Effect.andThen((value) =>
+        Effect.fromResult(
+          Result.fromNullishOr(
+            value,
+            () => new GetByIdFailure({ tableName, id }),
+          ),
+        ),
       ),
       Effect.andThen(Document.decode(tableName, table.Fields)),
     );
