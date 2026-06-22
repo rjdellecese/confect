@@ -1,56 +1,27 @@
-import { pipe } from "effect/Function";
-import * as Array from "effect/Array";
-import * as ConfigError from "effect/ConfigError";
 import * as ConfigProvider from "effect/ConfigProvider";
-import * as ConfigProviderPathPatch from "effect/ConfigProviderPathPatch";
 import * as Effect from "effect/Effect";
 
 declare const process: { env: Record<string, string | undefined> };
 
-export const make = (
-  options?: Partial<ConfigProvider.ConfigProvider.FromEnvConfig>,
-): ConfigProvider.ConfigProvider => {
+/**
+ * A `ConfigProvider` that reads configuration directly from `process.env` by
+ * exact path lookup.
+ *
+ * The Convex runtime exposes `process.env` for direct key access but does not
+ * make it enumerable, so the built-in `ConfigProvider.fromEnv` (which walks the
+ * environment to build the config tree) cannot be used. This provider resolves
+ * each requested path to a single environment variable instead.
+ */
+export const make = (options?: {
+  readonly pathDelim?: string;
+}): ConfigProvider.ConfigProvider => {
   const pathDelim = options?.pathDelim ?? "_";
-  const seqDelim = options?.seqDelim ?? ",";
 
-  return ConfigProvider.fromFlat(
-    ConfigProvider.makeFlat({
-      load: (path, primitive, split = true) => {
-        const pathString = Array.join(path, pathDelim);
-        const value = process.env[pathString];
+  return ConfigProvider.make((path) => {
+    const value = process.env[path.join(pathDelim)];
 
-        if (value === undefined) {
-          return Effect.fail(
-            ConfigError.MissingData(
-              [...path],
-              `Expected ${pathString} to exist in the process context`,
-            ),
-          );
-        }
-
-        const parse = (text: string) =>
-          pipe(
-            primitive.parse(text.trim()),
-            Effect.mapError(ConfigError.prefixed([...path])),
-          );
-
-        if (!split) {
-          return pipe(parse(value), Effect.map(Array.of));
-        } else {
-          return pipe(
-            value.split(seqDelim),
-            Effect.forEach((v) => parse(v)),
-          );
-        }
-      },
-      enumerateChildren: (path) =>
-        Effect.fail(
-          ConfigError.Unsupported(
-            [...path],
-            "process.env is not enumerable in the Convex runtime",
-          ),
-        ),
-      patch: ConfigProviderPathPatch.empty,
-    }),
-  );
+    return Effect.succeed(
+      value === undefined ? undefined : ConfigProvider.makeValue(value),
+    );
+  });
 };
