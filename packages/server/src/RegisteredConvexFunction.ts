@@ -12,7 +12,6 @@ import {
 } from "convex/server";
 import type { Value } from "convex/values";
 import { pipe } from "effect/Function";
-import * as Clock from "effect/Clock";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -103,41 +102,6 @@ export const make = (
     Match.exhaustive,
   );
 
-/**
- * Convex's query cache is invalidated by any Date.now() call during handler
- * execution. Effect's unsafeFork calls Date.now() when constructing a
- * FiberId.Runtime, which trips the cache for every confect-wrapped query. We
- * stub Date.now to 0 for the span of the handler; queries are forbidden from
- * relying on real time for correctness anyway.
- *
- * Users who explicitly want the real timestamp can still reach it via Effect's
- * Clock service (Clock.currentTimeMillis/Clock.currentTimeNanos). We provide a
- * Clock whose user-facing Effects call realDateNow (Convex's tracker) directly,
- * making Clock an explicit opt-in to cache invalidation. The unsafe methods
- * used internally by Effect (logging, span events, scheduler) return constants
- * so they never touch the tracker—caching is not broken by default.
- */
-const unpatchedClock = (realDateNow: () => number): Clock.Clock => ({
-  currentTimeMillisUnsafe: () => 0,
-  currentTimeNanosUnsafe: () => 0n,
-  currentTimeMillis: Effect.sync(() => realDateNow()),
-  currentTimeNanos: Effect.sync(() => BigInt(realDateNow()) * 1_000_000n),
-  sleep: (duration) => Effect.sleep(duration),
-});
-
-const withStubbedDateNow = async <T>(
-  queryHandler: (clock: Clock.Clock) => Promise<T>,
-): Promise<T> => {
-  const realDateNow = Date.now;
-  const clock = unpatchedClock(realDateNow);
-  Date.now = () => 0;
-  try {
-    return await queryHandler(clock);
-  } finally {
-    Date.now = realDateNow;
-  }
-};
-
 const queryFunction = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Args,
@@ -178,40 +142,38 @@ const queryFunction = <
     >,
     actualArgs: ConvexArgs,
   ): Promise<ConvexReturns> =>
-    withStubbedDateNow((clock) =>
-      Effect.gen(function* () {
-        const decodedArgs = yield* pipe(
-          actualArgs,
-          Schema.decodeUnknownEffect(args),
-          Effect.orDie,
-        );
-        const decodedReturns = yield* handler(decodedArgs).pipe(
-          Effect.provide(
-            Layer.mergeAll(
-              DatabaseReader.layer(databaseSchema, ctx.db),
-              Auth.layer(ctx.auth),
-              StorageReader.layer(ctx.storage),
-              QueryRunner.layer(ctx.runQuery),
-              Layer.succeed(
-                QueryCtx.QueryCtx<
-                  DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
-                >(),
-                ctx,
-              ),
-              Layer.succeed(ConfigProvider.ConfigProvider, ConvexConfigProvider.make()),
+    Effect.gen(function* () {
+      const decodedArgs = yield* pipe(
+        actualArgs,
+        Schema.decodeUnknownEffect(args),
+        Effect.orDie,
+      );
+      const decodedReturns = yield* handler(decodedArgs).pipe(
+        Effect.provide(
+          Layer.mergeAll(
+            DatabaseReader.layer(databaseSchema, ctx.db),
+            Auth.layer(ctx.auth),
+            StorageReader.layer(ctx.storage),
+            QueryRunner.layer(ctx.runQuery),
+            Layer.succeed(
+              QueryCtx.QueryCtx<
+                DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+              >(),
+              ctx,
+            ),
+            Layer.succeed(
+              ConfigProvider.ConfigProvider,
+              ConvexConfigProvider.make(),
             ),
           ),
-        );
-        return yield* pipe(
-          decodedReturns,
-          Schema.encodeEffect(returns),
-          Effect.orDie,
-        );
-      }).pipe(
-        Effect.provideService(Clock.Clock, clock),
-        RegisteredFunction.runHandlerPromise(error),
-      ),
-    ),
+        ),
+      );
+      return yield* pipe(
+        decodedReturns,
+        Schema.encodeEffect(returns),
+        Effect.orDie,
+      );
+    }).pipe(RegisteredFunction.runHandlerPromise(error)),
 });
 
 export const mutationLayer = <Schema extends DatabaseSchema.AnyWithProps>(
