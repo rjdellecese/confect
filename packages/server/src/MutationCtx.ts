@@ -1,7 +1,7 @@
 import type { GenericDataModel, GenericMutationCtx } from "convex/server";
 import * as Context from "effect/Context";
 
-export type MutationCtxTag<DataModel extends GenericDataModel> = Context.Tag<
+export type MutationCtxTag<DataModel extends GenericDataModel> = Context.Service<
   GenericMutationCtx<DataModel>,
   GenericMutationCtx<DataModel>
 >;
@@ -9,7 +9,7 @@ export type MutationCtxTag<DataModel extends GenericDataModel> = Context.Tag<
 export const MutationCtx = <
   DataModel extends GenericDataModel,
 >(): MutationCtxTag<DataModel> =>
-  Context.GenericTag<GenericMutationCtx<DataModel>>(
+  Context.Service<GenericMutationCtx<DataModel>>(
     "@confect/server/MutationCtx",
   );
 

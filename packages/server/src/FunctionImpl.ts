@@ -19,7 +19,7 @@ export const FunctionImpl = <FunctionName extends string>({
 }: {
   functionName: FunctionName;
 }) =>
-  Context.GenericTag<FunctionImpl<FunctionName>>(
+  Context.Service<FunctionImpl<FunctionName>>(
     `@confect/server/FunctionImpl/${functionName}`,
   );
 

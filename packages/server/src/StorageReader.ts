@@ -1,5 +1,6 @@
 import type { StorageReader as ConvexStorageReader } from "convex/server";
 import type { GenericId } from "convex/values";
+import * as Context from "effect/Context";
 import { flow, pipe } from "effect/Function";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -12,20 +13,21 @@ const make = (storageReader: ConvexStorageReader) => ({
     Effect.promise(() => storageReader.getUrl(storageId)).pipe(
       Effect.andThen(
         flow(
-          Option.fromNullable,
+          Option.fromNullishOr,
           Option.match({
             onNone: () => Effect.fail(new BlobNotFoundError({ id: storageId })),
-            onSome: (doc) => pipe(doc, Schema.decode(Schema.URL), Effect.orDie),
+            onSome: (doc) =>
+              pipe(doc, Schema.decodeUnknownEffect(Schema.URL), Effect.orDie),
           }),
         ),
       ),
     ),
 });
 
-export class StorageReader extends Effect.Tag("@confect/server/StorageReader")<
+export class StorageReader extends Context.Service<
   StorageReader,
   ReturnType<typeof make>
->() {
+>()("@confect/server/StorageReader") {
   static readonly layer = (storageReader: ConvexStorageReader) =>
     Layer.succeed(this, make(storageReader));
 }

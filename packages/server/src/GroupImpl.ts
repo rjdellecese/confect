@@ -62,7 +62,7 @@ export const GroupImpl = <FinalizationStatus_ extends FinalizationStatus>({
 }: {
   finalizationStatus: FinalizationStatus_;
 }) =>
-  Context.GenericTag<GroupImpl<FinalizationStatus_>>(
+  Context.Service<GroupImpl<FinalizationStatus_>>(
     `@confect/server/GroupImpl/${finalizationStatus}`,
   );
 

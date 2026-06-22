@@ -2,7 +2,6 @@ import * as SystemFields from "@confect/core/SystemFields";
 import { pipe } from "effect/Function";
 import * as Effect from "effect/Effect";
 import * as Function from "effect/Function";
-import * as ParseResult from "effect/ParseResult";
 import * as Schema from "effect/Schema";
 import type { ReadonlyRecord } from "effect/Record";
 import type * as DatabaseSchema from "./DatabaseSchema";
@@ -22,16 +21,16 @@ export type WithoutSystemFields<Doc> = Doc extends unknown
 export type Any = any;
 export type AnyEncoded = ReadonlyRecord<string, ReadonlyValue>;
 
-type Decode = (doc: unknown) => Effect.Effect<unknown, ParseResult.ParseError>;
+type Decode = (doc: unknown) => Effect.Effect<unknown, Schema.SchemaError>;
 
 const decoderCache = new WeakMap<
-  Schema.Schema.AnyNoContext,
+  Schema.Codec<any, any>,
   Map<string, Decode>
 >();
 
 const getDecoder = (
   tableName: string,
-  tableSchema: Schema.Schema.AnyNoContext,
+  tableSchema: Schema.Codec<any, any>,
 ): Decode => {
   const byTable =
     decoderCache.get(tableSchema) ??
@@ -44,7 +43,7 @@ const getDecoder = (
   return (
     byTable.get(tableName) ??
     (() => {
-      const decoder = Schema.decode(
+      const decoder = Schema.decodeUnknownEffect(
         SystemFields.extendWithSystemFields(tableName, tableSchema),
       ) as Decode;
       byTable.set(tableName, decoder);
@@ -99,17 +98,14 @@ export const decode = Function.dual<
     pipe(
       self,
       getDecoder(tableName, tableSchema),
-      Effect.catchIf(ParseResult.isParseError, (parseError) =>
-        Effect.gen(function* () {
-          const formattedParseError =
-            yield* ParseResult.TreeFormatter.formatError(parseError);
-
-          return yield* new DocumentDecodeError({
+      Effect.catchIf(Schema.isSchemaError, (schemaError) =>
+        Effect.fail(
+          new DocumentDecodeError({
             tableName,
             id: self._id,
-            parseError: formattedParseError,
-          });
-        }),
+            parseError: schemaError.message,
+          }),
+        ),
       ),
       Effect.map(
         (decodedDoc) =>
@@ -121,14 +117,14 @@ export const decode = Function.dual<
     ),
 );
 
-type Encode = (doc: unknown) => Effect.Effect<unknown, ParseResult.ParseError>;
+type Encode = (doc: unknown) => Effect.Effect<unknown, Schema.SchemaError>;
 
-const encoderCache = new WeakMap<Schema.Schema.AnyNoContext, Encode>();
+const encoderCache = new WeakMap<Schema.Codec<any, any>, Encode>();
 
-const getEncoder = (tableSchema: Schema.Schema.AnyNoContext): Encode =>
+const getEncoder = (tableSchema: Schema.Codec<any, any>): Encode =>
   encoderCache.get(tableSchema) ??
   (() => {
-    const encoder = Schema.encode(tableSchema) as Encode;
+    const encoder = Schema.encodeEffect(tableSchema) as Encode;
     encoderCache.set(tableSchema, encoder);
     return encoder;
   })();
@@ -179,17 +175,14 @@ export const encode = Function.dual<
     pipe(
       self,
       getEncoder(tableSchema),
-      Effect.catchIf(ParseResult.isParseError, (parseError) =>
-        Effect.gen(function* () {
-          const formattedParseError =
-            yield* ParseResult.TreeFormatter.formatError(parseError);
-
-          return yield* new DocumentEncodeError({
+      Effect.catchIf(Schema.isSchemaError, (schemaError) =>
+        Effect.fail(
+          new DocumentEncodeError({
             tableName,
             id: self._id,
-            parseError: formattedParseError,
-          });
-        }),
+            parseError: schemaError.message,
+          }),
+        ),
       ),
       Effect.map(
         (encodedDoc) =>
@@ -201,7 +194,7 @@ export const encode = Function.dual<
     ),
 );
 
-export class DocumentDecodeError extends Schema.TaggedError<DocumentDecodeError>()(
+export class DocumentDecodeError extends Schema.TaggedErrorClass<DocumentDecodeError>()(
   "DocumentDecodeError",
   {
     tableName: Schema.String,
@@ -218,7 +211,7 @@ export class DocumentDecodeError extends Schema.TaggedError<DocumentDecodeError>
   }
 }
 
-export class DocumentEncodeError extends Schema.TaggedError<DocumentEncodeError>()(
+export class DocumentEncodeError extends Schema.TaggedErrorClass<DocumentEncodeError>()(
   "DocumentEncodeError",
   {
     tableName: Schema.String,

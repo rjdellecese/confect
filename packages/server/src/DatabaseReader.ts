@@ -87,7 +87,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
 export type DatabaseReaderTag<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Docs = {},
-> = Context.Tag<
+> = Context.Service<
   DatabaseReaderService<DatabaseSchema_>,
   DatabaseReaderService<DatabaseSchema_, Docs>
 >;
@@ -96,7 +96,7 @@ export const DatabaseReader = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Docs = {},
 >(): DatabaseReaderTag<DatabaseSchema_, Docs> =>
-  Context.GenericTag<
+  Context.Service<
     DatabaseReaderService<DatabaseSchema_>,
     DatabaseReaderService<DatabaseSchema_, Docs>
   >("@confect/server/DatabaseReader");
