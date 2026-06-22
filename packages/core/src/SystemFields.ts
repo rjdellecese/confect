@@ -26,9 +26,11 @@ export const SystemFields = <TableName extends string>(
 /**
  * Extend a table schema with Convex system fields.
  *
- * Effect v4 has no general `Schema.extend`, so we merge the system fields into
- * the table schema directly: spreading them into a `Struct`, or distributing
- * across the members of a `Union` (for tables defined as a union of variants).
+ * Effect v4 has no general `Schema.extend`; the documented replacement is
+ * `Schema.fieldsAssign` (a shortcut for `struct.mapFields(Struct.assign(...))`,
+ * which preserves the struct's annotations). It applies to a `Struct`, so we
+ * distribute it across the members of a `Union` for tables defined as a union
+ * of variants.
  */
 export const extendWithSystemFields = <
   TableName extends string,
@@ -46,10 +48,9 @@ export const extendWithSystemFields = <
             extend,
           ),
         )
-      : Schema.Struct({
-          ...(s as unknown as Schema.Struct<Schema.Struct.Fields>).fields,
-          ...system,
-        });
+      : Schema.fieldsAssign(system)(
+          s as unknown as Schema.Struct<Schema.Struct.Fields>,
+        );
 
   return extend(schema) as unknown as ExtendWithSystemFields<
     TableName,
