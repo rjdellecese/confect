@@ -5,9 +5,9 @@ import * as Lazy from "./Lazy";
 
 export type FunctionProvenance = Data.TaggedEnum<{
   Confect: {
-    args: Schema.Schema.AnyNoContext;
-    returns: Schema.Schema.AnyNoContext;
-    error?: Schema.Schema.AnyNoContext;
+    args: Schema.Codec<any, any>;
+    returns: Schema.Codec<any, any>;
+    error?: Schema.Codec<any, any>;
   };
   Convex: {
     /** @internal */
@@ -18,9 +18,9 @@ export type FunctionProvenance = Data.TaggedEnum<{
 }>;
 
 export interface Confect<
-  Args extends Schema.Schema.AnyNoContext,
-  Returns extends Schema.Schema.AnyNoContext,
-  Error extends Schema.Schema.AnyNoContext = never,
+  Args extends Schema.Codec<any, any>,
+  Returns extends Schema.Codec<any, any>,
+  Error extends Schema.Codec<any, any> = never,
 > {
   readonly _tag: "Confect";
   readonly args: Args;
@@ -29,9 +29,9 @@ export interface Confect<
 }
 
 export interface AnyConfect extends Confect<
-  Schema.Schema.AnyNoContext,
-  Schema.Schema.AnyNoContext,
-  Schema.Schema.AnyNoContext
+  Schema.Codec<any, any>,
+  Schema.Codec<any, any>,
+  Schema.Codec<any, any>
 > {}
 
 export interface Convex<Args extends DefaultFunctionArgs, Returns> {
@@ -61,9 +61,9 @@ export const FunctionProvenance = Data.taggedEnum<FunctionProvenance>();
  * relies on `Data`'s structural `Equal`/`Hash` for provenance values.
  */
 export const Confect = <
-  Args extends Schema.Schema.AnyNoContext,
-  Returns extends Schema.Schema.AnyNoContext,
-  Error extends Schema.Schema.AnyNoContext = never,
+  Args extends Schema.Codec<any, any>,
+  Returns extends Schema.Codec<any, any>,
+  Error extends Schema.Codec<any, any> = never,
 >(
   args: () => Args,
   returns: () => Returns,

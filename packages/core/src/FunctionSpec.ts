@@ -93,7 +93,7 @@ export type Name<FunctionSpec_ extends AnyWithProps> = FunctionSpec_["name"];
 export type Args<FunctionSpec_ extends AnyWithProps> = FunctionSpec_ extends {
   functionProvenance: {
     _tag: "Confect";
-    args: infer ArgsSchema_ extends Schema.Schema.AnyNoContext;
+    args: infer ArgsSchema_ extends Schema.Codec<any, any>;
   };
 }
   ? ArgsSchema_["Type"]
@@ -107,7 +107,7 @@ export type Returns<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
     functionProvenance: {
       _tag: "Confect";
-      returns: infer ReturnsSchema_ extends Schema.Schema.AnyNoContext;
+      returns: infer ReturnsSchema_ extends Schema.Codec<any, any>;
     };
   }
     ? ReturnsSchema_["Type"]
@@ -121,7 +121,7 @@ export type EncodedArgs<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
     functionProvenance: {
       _tag: "Confect";
-      args: infer ArgsSchema_ extends Schema.Schema.AnyNoContext;
+      args: infer ArgsSchema_ extends Schema.Codec<any, any>;
     };
   }
     ? ArgsSchema_["Encoded"]
@@ -135,7 +135,7 @@ export type EncodedReturns<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
     functionProvenance: {
       _tag: "Confect";
-      returns: infer ReturnsSchema_ extends Schema.Schema.AnyNoContext;
+      returns: infer ReturnsSchema_ extends Schema.Codec<any, any>;
     };
   }
     ? ReturnsSchema_["Encoded"]
@@ -149,7 +149,7 @@ export type Error<FunctionSpec_ extends AnyWithProps> = FunctionSpec_ extends {
   functionProvenance: FunctionProvenance.Confect<
     any,
     any,
-    infer ErrorSchema_ extends Schema.Schema.AnyNoContext
+    infer ErrorSchema_ extends Schema.Codec<any, any>
   >;
 }
   ? ErrorSchema_["Type"]
@@ -160,7 +160,7 @@ export type EncodedError<FunctionSpec_ extends AnyWithProps> =
     functionProvenance: FunctionProvenance.Confect<
       any,
       any,
-      infer ErrorSchema_ extends Schema.Schema.AnyNoContext
+      infer ErrorSchema_ extends Schema.Codec<any, any>
     >;
   }
     ? ErrorSchema_["Encoded"]
@@ -215,9 +215,9 @@ const make =
   ) =>
   <
     const Name_ extends string,
-    Args_ extends Schema.Schema.AnyNoContext,
-    Returns_ extends Schema.Schema.AnyNoContext,
-    Error_ extends Schema.Schema.AnyNoContext = never,
+    Args_ extends Schema.Codec<any, any>,
+    Returns_ extends Schema.Codec<any, any>,
+    Error_ extends Schema.Codec<any, any> = never,
   >({
     name,
     args,

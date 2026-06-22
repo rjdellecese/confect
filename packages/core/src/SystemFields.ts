@@ -4,14 +4,11 @@ import type {
   SystemFields as NonIdSystemFields,
 } from "convex/server";
 import * as Schema from "effect/Schema";
+import * as SchemaAST from "effect/SchemaAST";
 import * as GenericId from "./GenericId";
 
 type SystemFieldsSchema<TableName extends string> = Schema.Struct<{
-  _id: Schema.Schema<
-    GenericId.GenericId<TableName>,
-    GenericId.GenericId<TableName>,
-    never
-  >;
+  _id: Schema.Schema<GenericId.GenericId<TableName>>;
   _creationTime: typeof Schema.Number;
 }>;
 
@@ -28,23 +25,48 @@ export const SystemFields = <TableName extends string>(
 
 /**
  * Extend a table schema with Convex system fields.
+ *
+ * Effect v4 has no general `Schema.extend`, so we merge the system fields into
+ * the table schema directly: spreading them into a `Struct`, or distributing
+ * across the members of a `Union` (for tables defined as a union of variants).
  */
 export const extendWithSystemFields = <
   TableName extends string,
-  TableSchema extends Schema.Schema.AnyNoContext,
+  TableSchema extends Schema.Codec<any, any>,
 >(
   tableName: TableName,
   schema: TableSchema,
-): ExtendWithSystemFields<TableName, TableSchema> =>
-  Schema.extend(SystemFields(tableName), schema);
+): ExtendWithSystemFields<TableName, TableSchema> => {
+  const system = SystemFields(tableName).fields;
+
+  const extend = (s: Schema.Top): Schema.Top =>
+    SchemaAST.isUnion(s.ast)
+      ? Schema.Union(
+          (s as unknown as Schema.Union<ReadonlyArray<Schema.Top>>).members.map(
+            extend,
+          ),
+        )
+      : Schema.Struct({
+          ...(s as unknown as Schema.Struct<Schema.Struct.Fields>).fields,
+          ...system,
+        });
+
+  return extend(schema) as unknown as ExtendWithSystemFields<
+    TableName,
+    TableSchema
+  >;
+};
 
 /**
  * Extend a table schema with Convex system fields at the type level.
  */
 export type ExtendWithSystemFields<
   TableName extends string,
-  TableSchema extends Schema.Schema.AnyNoContext,
-> = Schema.extend<SystemFieldsSchema<TableName>, TableSchema>;
+  TableSchema extends Schema.Codec<any, any>,
+> = Schema.Codec<
+  WithSystemFields<TableName, TableSchema["Type"]>,
+  WithSystemFields<TableName, TableSchema["Encoded"]>
+>;
 
 export type WithSystemFields<TableName extends string, Document> = Expand<
   Readonly<IdField<TableName>> & Readonly<NonIdSystemFields> & Document

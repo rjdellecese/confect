@@ -22,9 +22,9 @@ export interface RegistryItems {
  * Effect's global default-value cache to align two separately-defined tags
  * by string key.
  */
-export class Registry extends Context.Reference<Registry>()(
+export const Registry = Context.Reference<Ref.Ref<RegistryItems>>(
   "@confect/core/Registry",
   {
-    defaultValue: () => Ref.unsafeMake<RegistryItems>({}),
+    defaultValue: () => Ref.makeUnsafe<RegistryItems>({}),
   },
-) {}
+);
