@@ -8,7 +8,7 @@
   },
   "devDependencies": {
     "@types/node": "25.3.3",
-    "effect": "3.21.2",
+    "effect": "4.0.0-beta.85",
     "tsdown": "0.20.3",
     "typescript": "5.9.3"
   },
@@ -49,7 +49,7 @@
     "@confect/server": "workspace:^",
     "convex": "^1.32.0",
     "convex-test": ">=0.0.50 <0.1.0",
-    "effect": "^3.21.2"
+    "effect": "^4.0.0-beta.85"
   },
   "repository": {
     "type": "git",
