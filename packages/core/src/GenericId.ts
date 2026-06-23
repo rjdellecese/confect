@@ -7,10 +7,10 @@ const ConvexId = "~@confect/core/ConvexId";
 
 export const GenericId = <TableName extends string>(
   tableName: TableName,
-): Schema.Schema<ConvexGenericId<TableName>> =>
+): Schema.Codec<ConvexGenericId<TableName>> =>
   Schema.String.annotate({
     [ConvexId]: tableName,
-  }) as unknown as Schema.Schema<ConvexGenericId<TableName>>;
+  }) as unknown as Schema.Codec<ConvexGenericId<TableName>>;
 
 export type GenericId<TableName extends string> = ConvexGenericId<TableName>;
 
