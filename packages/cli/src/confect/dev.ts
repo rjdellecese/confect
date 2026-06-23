@@ -28,6 +28,7 @@ import {
   tsconfigPathsToRegExp,
 } from "bundle-require";
 import * as esbuild from "esbuild";
+import * as Bundler from "../Bundler";
 import { logCoalescedBuildErrors } from "../BuildError";
 import * as CodegenError from "../CodegenError";
 import { ConfectDirectory } from "../ConfectDirectory";
@@ -442,6 +443,7 @@ const discoverEntryPoints = Effect.gen(function* () {
 });
 
 const esbuildOptions = (
+  path: Path.Path,
   entry: EntryPoint,
   notExternal: ReadonlyArray<RegExp>,
   signal: Queue.Queue<void>,
@@ -465,6 +467,7 @@ const esbuildOptions = (
     format: "esm" as const,
     logLevel: "silent" as const,
     plugins: [
+      Bundler.bundleWorkspacePlugin(path, notExternal),
       externalPlugin({ notExternal: [...notExternal] }),
       {
         name: "notify-rebuild",
@@ -502,6 +505,7 @@ const esbuildOptions = (
 };
 
 const createEntryPointWatcher = (
+  path: Path.Path,
   entry: EntryPoint,
   notExternal: ReadonlyArray<RegExp>,
   signal: Queue.Queue<void>,
@@ -512,6 +516,7 @@ const createEntryPointWatcher = (
     Effect.promise(async () => {
       const ctx = await esbuild.context(
         esbuildOptions(
+          path,
           entry,
           notExternal,
           signal,
@@ -555,6 +560,7 @@ const entryPointsWatcher = (
   Effect.gen(function* () {
     const parentScope = yield* Effect.scope;
     const scopesRef = yield* Ref.make(new Map<string, Scope.CloseableScope>());
+    const path = yield* Path.Path;
     const projectRoot = yield* ProjectRoot.get;
     // Discover the user's `tsconfig.json#paths` once at watcher startup so
     // `~/...`-style aliases pointing into the user's source tree get bundled
@@ -600,6 +606,7 @@ const entryPointsWatcher = (
             ExecutionStrategy.sequential,
           );
           yield* createEntryPointWatcher(
+            path,
             entry,
             notExternal,
             signal,
