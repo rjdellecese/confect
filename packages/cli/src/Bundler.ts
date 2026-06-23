@@ -1,6 +1,5 @@
 import { realpathSync } from "node:fs";
 import { createRequire, isBuiltin } from "node:module";
-import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import * as Path from "@effect/platform/Path";
 import {
   bundleRequire,
@@ -29,10 +28,12 @@ export interface Bundled {
  * cwd was used during bundling.
  */
 const absolutizeMetafile = (
+  path: Path.Path,
   metafile: esbuild.Metafile,
   cwd: string,
 ): esbuild.Metafile => {
-  const absolutize = (p: string) => (isAbsolute(p) ? p : resolve(cwd, p));
+  const absolutize = (p: string) =>
+    path.isAbsolute(p) ? p : path.resolve(cwd, p);
   const inputs: esbuild.Metafile["inputs"] = {};
   for (const [key, value] of Object.entries(metafile.inputs)) {
     inputs[absolutize(key)] = {
@@ -67,19 +68,20 @@ const realPath = Option.liftThrowable((path: string) => realpathSync(path));
  * esbuild's own `paths` resolution.
  */
 export const bundleWorkspacePlugin = (
+  path: Path.Path,
   skipPatterns: ReadonlyArray<RegExp>,
 ): esbuild.Plugin => ({
   name: "confect:bundle-workspace",
   setup(build) {
     build.onResolve({ filter: /^[^./]/ }, (args) => {
       if (args.namespace !== "file" && args.namespace !== "") return undefined;
-      if (isBuiltin(args.path) || isAbsolute(args.path)) return undefined;
+      if (isBuiltin(args.path) || path.isAbsolute(args.path)) return undefined;
       if (Array.some(skipPatterns, (pattern) => pattern.test(args.path))) {
         return undefined;
       }
 
       const importer =
-        args.importer !== "" ? args.importer : join(args.resolveDir, "_");
+        args.importer !== "" ? args.importer : path.join(args.resolveDir, "_");
 
       return pipe(
         resolveModule(args.path, importer),
@@ -88,7 +90,7 @@ export const bundleWorkspacePlugin = (
         ),
         Option.filter(
           (real) =>
-            !pipe(real, String.split(sep), Array.contains("node_modules")),
+            !pipe(real, String.split(path.sep), Array.contains("node_modules")),
         ),
         Option.map((real) => ({ path: real })),
         Option.getOrUndefined,
@@ -117,8 +119,10 @@ export const bundleWorkspacePlugin = (
  */
 export const bundle = (
   entryPoint: string,
-): Effect.Effect<Bundled, BundlerError> =>
+): Effect.Effect<Bundled, BundlerError, Path.Path> =>
   Effect.gen(function* () {
+    const path = yield* Path.Path;
+
     let metafile: esbuild.Metafile | undefined;
     const captureMetafile: esbuild.Plugin = {
       name: "confect:capture-metafile",
@@ -129,7 +133,7 @@ export const bundle = (
       },
     };
 
-    const cwd = dirname(entryPoint);
+    const cwd = path.dirname(entryPoint);
     const skipPatterns = tsconfigPathsToRegExp(
       loadTsConfig(cwd)?.data.compilerOptions?.paths ?? {},
     );
@@ -140,7 +144,10 @@ export const bundle = (
           cwd,
           format: "esm",
           esbuildOptions: {
-            plugins: [bundleWorkspacePlugin(skipPatterns), captureMetafile],
+            plugins: [
+              bundleWorkspacePlugin(path, skipPatterns),
+              captureMetafile,
+            ],
             logLevel: "silent",
           },
         }),
@@ -151,7 +158,10 @@ export const bundle = (
       return yield* Effect.dieMessage("esbuild metafile missing");
     }
 
-    return { module: result.mod, metafile: absolutizeMetafile(metafile, cwd) };
+    return {
+      module: result.mod,
+      metafile: absolutizeMetafile(path, metafile, cwd),
+    };
   });
 
 const findMetafileInputKey = (
