@@ -1,5 +1,15 @@
 # @confect/cli
 
+## 9.1.4
+
+### Patch Changes
+
+- cc44c2e: Fix `confect codegen` and `confect dev` failing with `ERR_MODULE_NOT_FOUND` when your spec or impl files import a workspace package from the same monorepo.
+
+  Codegen now handles workspace dependencies whose compiled output uses extensionless or directory-style relative imports — output that already works everywhere else (Vite, esbuild, Vitest). You no longer need extension-rewriting tooling such as `tsc-alias` or `rewriteRelativeImportExtensions` just to make codegen succeed.
+  - @confect/core@9.1.4
+  - @confect/server@9.1.4
+
 ## 9.1.3
 
 ### Patch Changes

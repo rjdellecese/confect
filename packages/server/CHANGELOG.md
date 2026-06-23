@@ -1,5 +1,11 @@
 # @confect/server
 
+## 9.1.4
+
+### Patch Changes
+
+- @confect/core@9.1.4
+
 ## 9.1.3
 
 ### Patch Changes
