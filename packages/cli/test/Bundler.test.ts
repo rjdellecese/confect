@@ -57,9 +57,6 @@ layer(BundlerLayer)("bundle", (it) => {
         const path = yield* Path.Path;
         const tempDir = yield* fs.makeTempDirectoryScoped();
 
-        // A workspace package living OUTSIDE node_modules, consumed via
-        // `exports`→`dist`, whose emitted `dist` uses an extensionless relative
-        // import (valid for bundlers, invalid for Node's native ESM resolver).
         const pkgDir = path.join(tempDir, "pkg");
         yield* fs.makeDirectory(path.join(pkgDir, "dist", "Scenario"), {
           recursive: true,
@@ -77,9 +74,8 @@ layer(BundlerLayer)("bundle", (it) => {
           `export const value = "bundled";\n`,
         );
 
-        // Symlink it into node_modules the way pnpm/npm/yarn link a workspace
-        // dep. `realpathSync` must follow this back to `pkg/` (outside
-        // node_modules) for it to be recognized as first-party and bundled.
+        // Symlink into node_modules the way pnpm/npm/yarn link a workspace dep;
+        // realpath must follow it back to `pkg/` to recognize it as first-party.
         yield* fs.makeDirectory(path.join(tempDir, "node_modules", "@scope"), {
           recursive: true,
         });
@@ -103,10 +99,8 @@ layer(BundlerLayer)("bundle", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      // Create the entry under the repo so the externalized `effect` resolves
-      // via Node from the temp `.mjs` (externals load relative to it, not
-      // bundled). `effect` resolves to a real path under node_modules, so it
-      // must stay external — guards against over-bundling.
+      // Entry lives under the repo so the externalized `effect` resolves from
+      // the temp `.mjs` (externals load relative to it, not bundled).
       const tempDir = yield* fs.makeTempDirectoryScoped({
         directory: process.cwd(),
       });

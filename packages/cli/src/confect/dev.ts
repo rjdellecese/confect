@@ -466,9 +466,6 @@ const esbuildOptions = (
     format: "esm" as const,
     logLevel: "silent" as const,
     plugins: [
-      // Bundle first-party workspace deps (see `Bundler.bundleWorkspacePlugin`)
-      // so the dev watchers track them identically to `Bundler.bundle`; the
-      // tsconfig `paths` regexes double as its skip list.
       Bundler.bundleWorkspacePlugin(notExternal),
       externalPlugin({ notExternal: [...notExternal] }),
       {
