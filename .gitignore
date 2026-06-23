@@ -10,3 +10,4 @@ node_modules/
 opensrc/
 tsconfig.vitest-temp.json
 *.tsbuildinfo
+*.bundled_*.mjs
