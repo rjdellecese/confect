@@ -6,8 +6,8 @@ import * as Effect from "effect/Effect";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import { BuildError, isBuildError, renderBuildError } from "./BuildError";
-import { formatPathDoc } from "./log";
+import { BuildError, isBuildError } from "./BuildError";
+import { formatPathDoc, renderBuildError } from "./log";
 
 // --- Variants ---
 

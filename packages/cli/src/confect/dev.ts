@@ -29,10 +29,6 @@ import {
 } from "bundle-require";
 import * as esbuild from "esbuild";
 import * as Bundler from "../Bundler";
-import {
-  logCoalescedBuildErrors,
-  logCoalescedBuildWarnings,
-} from "../BuildError";
 import * as CodegenError from "../CodegenError";
 import { ConfectDirectory } from "../ConfectDirectory";
 import { ConvexDirectory } from "../ConvexDirectory";
@@ -44,6 +40,8 @@ import {
   isLeafSpecPath,
 } from "../LeafModule";
 import {
+  logCoalescedBuildErrors,
+  logCoalescedBuildWarnings,
   logFunctionAdded,
   logFunctionRemoved,
   logPending,

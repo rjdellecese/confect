@@ -14,7 +14,8 @@ import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
 import * as String from "effect/String";
 import type * as esbuild from "esbuild";
-import { BundlerError, logCoalescedBuildWarnings } from "./BuildError";
+import { BundlerError } from "./BuildError";
+import { logCoalescedBuildWarnings } from "./log";
 
 export interface Bundled {
   readonly module: any;
