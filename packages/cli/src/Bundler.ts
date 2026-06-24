@@ -6,13 +6,14 @@ import {
   loadTsConfig,
   tsconfigPathsToRegExp,
 } from "bundle-require";
+import { resolveModulePath } from "exsolve";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as String from "effect/String";
 import type * as esbuild from "esbuild";
-import { BundlerError } from "./BuildError";
+import { BundlerError, logCoalescedBuildWarnings } from "./BuildError";
 
 export interface Bundled {
   readonly module: any;
@@ -50,10 +51,34 @@ const absolutizeMetafile = (
   return { inputs, outputs };
 };
 
-const resolveModule = Option.liftThrowable(
-  (specifier: string, importer: string) =>
-    createRequire(importer).resolve(specifier),
+const resolveEsm = Option.liftThrowable((specifier: string, importer: string) =>
+  resolveModulePath(specifier, {
+    from: importer,
+    conditions: ["node", "import"],
+  }),
 );
+
+const resolveCjs = Option.liftThrowable((specifier: string, importer: string) =>
+  createRequire(importer).resolve(specifier),
+);
+
+/**
+ * Resolve a bare specifier from `importer`, honoring ESM `import` export
+ * conditions first and falling back to CommonJS resolution. `createRequire`
+ * alone can't see an `exports` map that declares only `import` (no
+ * `require`/`default`): it throws `ERR_PACKAGE_PATH_NOT_EXPORTED`, which
+ * previously forced ESM-only workspace deps to be externalized and then fail
+ * under raw Node ESM. {@link resolveEsm} (exsolve, the same algorithm Node uses
+ * for ESM) resolves those, while the {@link resolveCjs} fallback still covers
+ * packages reachable only through a `require` condition.
+ */
+const resolveModule = (
+  specifier: string,
+  importer: string,
+): Option.Option<string> =>
+  Option.orElse(resolveEsm(specifier, importer), () =>
+    resolveCjs(specifier, importer),
+  );
 
 const realPath = Option.liftThrowable((path: string) => realpathSync(path));
 
@@ -83,18 +108,34 @@ export const bundleWorkspacePlugin = (
       const importer =
         args.importer !== "" ? args.importer : path.join(args.resolveDir, "_");
 
-      return pipe(
-        resolveModule(args.path, importer),
-        Option.map((resolved) =>
-          Option.getOrElse(realPath(resolved), () => resolved),
-        ),
-        Option.filter(
-          (real) =>
-            !pipe(real, String.split(path.sep), Array.contains("node_modules")),
-        ),
-        Option.map((real) => ({ path: real })),
-        Option.getOrUndefined,
-      );
+      return Option.match(resolveModule(args.path, importer), {
+        // Neither ESM nor CJS resolution found the specifier. Externalizing
+        // silently (the previous behavior) hands it to raw Node ESM, which
+        // fails later with an opaque `ERR_MODULE_NOT_FOUND` against the dep's
+        // internals. Warn about the dependency we couldn't bundle, then still
+        // externalize so a genuinely-external specifier keeps working.
+        onNone: () => ({
+          path: args.path,
+          external: true,
+          warnings: [
+            {
+              text: `Confect could not resolve workspace dependency "${args.path}" (imported from ${importer}) to bundle it; leaving it external.`,
+            },
+          ],
+        }),
+        onSome: (resolved) => {
+          const real = Option.getOrElse(realPath(resolved), () => resolved);
+          return pipe(
+            real,
+            String.split(path.sep),
+            Array.contains("node_modules"),
+          )
+            ? // Third-party: defer to the external plugin.
+              undefined
+            : // First-party workspace dep: bundle it.
+              { path: real };
+        },
+      });
     });
   },
 });
@@ -124,11 +165,13 @@ export const bundle = (
     const path = yield* Path.Path;
 
     let metafile: esbuild.Metafile | undefined;
-    const captureMetafile: esbuild.Plugin = {
-      name: "confect:capture-metafile",
+    let warnings: ReadonlyArray<esbuild.Message> = [];
+    const captureBuildResult: esbuild.Plugin = {
+      name: "confect:capture-build-result",
       setup(build) {
         build.onEnd((result) => {
           metafile = result.metafile;
+          warnings = result.warnings;
         });
       },
     };
@@ -146,13 +189,24 @@ export const bundle = (
           esbuildOptions: {
             plugins: [
               bundleWorkspacePlugin(path, skipPatterns),
-              captureMetafile,
+              captureBuildResult,
             ],
             logLevel: "silent",
           },
         }),
       catch: (cause) => new BundlerError({ cause }),
-    });
+    }).pipe(
+      // Surface any warnings bundleWorkspacePlugin emitted (e.g. a workspace
+      // dependency it couldn't resolve and had to leave external) whether or
+      // not the build/import succeeds — `bundle-require` `import()`s the result,
+      // so the import can fail *because* of the dependency we warned about.
+      // `captureBuildResult`'s `onEnd` runs during the esbuild build (before
+      // that import), so `warnings` is populated by the time this finalizer
+      // reads it.
+      Effect.ensuring(
+        Effect.suspend(() => logCoalescedBuildWarnings(warnings)),
+      ),
+    );
 
     if (!metafile) {
       return yield* Effect.dieMessage("esbuild metafile missing");

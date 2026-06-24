@@ -95,6 +95,54 @@ layer(BundlerLayer)("bundle", (it) => {
       }).pipe(Effect.scoped),
   );
 
+  it.effect(
+    "bundles first-party workspace deps whose exports declare only the import condition",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const tempDir = yield* fs.makeTempDirectoryScoped();
+
+        const pkgDir = path.join(tempDir, "pkg");
+        yield* fs.makeDirectory(path.join(pkgDir, "dist", "Widget"), {
+          recursive: true,
+        });
+        // Conditional `exports` with only `import`/`types` — no
+        // `require`/`default`. CommonJS resolution (`createRequire`) throws
+        // ERR_PACKAGE_PATH_NOT_EXPORTED for this shape, so it only bundles
+        // once resolution honors the ESM `import` condition.
+        yield* fs.writeFileString(
+          path.join(pkgDir, "package.json"),
+          `{ "name": "@scope/esm-lib", "type": "module", "exports": { "./*": { "types": "./dist/*.d.ts", "import": "./dist/*.js" } } }\n`,
+        );
+        yield* fs.writeFileString(
+          path.join(pkgDir, "dist", "Widget.js"),
+          `export { value } from "./Widget/Inner";\n`,
+        );
+        yield* fs.writeFileString(
+          path.join(pkgDir, "dist", "Widget", "Inner.js"),
+          `export const value = "bundled";\n`,
+        );
+
+        yield* fs.makeDirectory(path.join(tempDir, "node_modules", "@scope"), {
+          recursive: true,
+        });
+        yield* fs.symlink(
+          pkgDir,
+          path.join(tempDir, "node_modules", "@scope", "esm-lib"),
+        );
+
+        const entry = path.join(tempDir, "entry.ts");
+        yield* fs.writeFileString(
+          entry,
+          `import { value } from "@scope/esm-lib/Widget";\nexport default value;\n`,
+        );
+
+        const bundled = yield* Bundler.bundle(entry);
+        expect(bundled.module.default).toBe("bundled");
+      }).pipe(Effect.scoped),
+  );
+
   it.effect("keeps true third-party node_modules deps external", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;

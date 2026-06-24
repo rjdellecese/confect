@@ -66,21 +66,30 @@ export const fromBundlerError = (
 
 const cross = pipe(AnsiDoc.char("✘"), AnsiDoc.annotate(Ansi.red));
 
-const errorGutter = pipe(
-  AnsiDoc.char("│"),
-  AnsiDoc.annotate(Ansi.red),
-  AnsiDoc.render({ style: "pretty" }),
-);
+const warningSign = pipe(AnsiDoc.char("⚠"), AnsiDoc.annotate(Ansi.yellow));
 
-const withErrorGutterBlock = (output: string): string =>
+const gutter = (color: Ansi.Ansi): string =>
   pipe(
-    String.split(output, "\n"),
-    Array.map((line) =>
-      pipe(line, String.trim) === "" ? errorGutter : `${errorGutter} ${line}`,
-    ),
-    Array.join("\n"),
-    (guttered) => `${errorGutter}\n${guttered}\n${errorGutter}`,
+    AnsiDoc.char("│"),
+    AnsiDoc.annotate(color),
+    AnsiDoc.render({ style: "pretty" }),
   );
+
+const errorGutter = gutter(Ansi.red);
+
+const withGutterBlock =
+  (gutterDoc: string) =>
+  (output: string): string =>
+    pipe(
+      String.split(output, "\n"),
+      Array.map((line) =>
+        pipe(line, String.trim) === "" ? gutterDoc : `${gutterDoc} ${line}`,
+      ),
+      Array.join("\n"),
+      (guttered) => `${gutterDoc}\n${guttered}\n${gutterDoc}`,
+    );
+
+const withErrorGutterBlock = withGutterBlock(errorGutter);
 
 const formatBuildMessage = (
   error: esbuild.Message | undefined,
@@ -214,4 +223,42 @@ export const logCoalescedBuildErrors = (messages: readonly esbuild.Message[]) =>
   Effect.sync(() => {
     if (messages.length === 0) return;
     console.error(renderCoalescedBuildErrors(messages));
+  });
+
+/**
+ * Render a flat list of esbuild warnings as a single warning block with a
+ * `⚠ Build warnings` header. Unlike errors, warnings never block a build;
+ * they surface non-fatal diagnostics such as a workspace dependency that
+ * {@link import("./Bundler").bundleWorkspacePlugin} couldn't resolve and had
+ * to leave external. esbuild's own `formatMessagesSync` already styles each
+ * message in yellow, so (unlike the error path) we don't re-annotate the text.
+ */
+const renderCoalescedBuildWarnings = (
+  messages: readonly esbuild.Message[],
+): string => {
+  const formatted = esbuild.formatMessagesSync(messages as esbuild.Message[], {
+    kind: "warning",
+    color: true,
+    terminalWidth: 80,
+  });
+  const header = pipe(
+    warningSign,
+    AnsiDoc.catWithSpace(AnsiDoc.text("Build warnings")),
+    AnsiDoc.render({ style: "pretty" }),
+  );
+  const body = pipe(
+    formatted,
+    Array.join(""),
+    String.trimEnd,
+    withGutterBlock(gutter(Ansi.yellow)),
+  );
+  return `${header}\n${body}`;
+};
+
+export const logCoalescedBuildWarnings = (
+  messages: readonly esbuild.Message[],
+) =>
+  Effect.sync(() => {
+    if (messages.length === 0) return;
+    console.error(renderCoalescedBuildWarnings(messages));
   });

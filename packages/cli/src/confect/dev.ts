@@ -29,7 +29,10 @@ import {
 } from "bundle-require";
 import * as esbuild from "esbuild";
 import * as Bundler from "../Bundler";
-import { logCoalescedBuildErrors } from "../BuildError";
+import {
+  logCoalescedBuildErrors,
+  logCoalescedBuildWarnings,
+} from "../BuildError";
 import * as CodegenError from "../CodegenError";
 import { ConfectDirectory } from "../ConfectDirectory";
 import { ConvexDirectory } from "../ConvexDirectory";
@@ -208,6 +211,8 @@ export const dev = Command.make("dev", {}, () =>
     const signal = yield* Queue.sliding<void>(1);
     const restartQueue = yield* Queue.sliding<void>(1);
     const watcherErrorsRef = yield* Ref.make<WatcherErrors>(emptyWatcherErrors);
+    const watcherWarningsRef =
+      yield* Ref.make<WatcherErrors>(emptyWatcherErrors);
 
     yield* Effect.all(
       [
@@ -217,10 +222,17 @@ export const dev = Command.make("dev", {}, () =>
             pendingRef,
             restartQueue,
             watcherErrorsRef,
+            watcherWarningsRef,
           ),
         ),
         confectStructureWatcher(signal, pendingRef, restartQueue),
-        syncLoop(signal, pendingRef, initialFunctionPaths, watcherErrorsRef),
+        syncLoop(
+          signal,
+          pendingRef,
+          initialFunctionPaths,
+          watcherErrorsRef,
+          watcherWarningsRef,
+        ),
       ],
       { concurrency: "unbounded" },
     );
@@ -254,23 +266,24 @@ const watcherErrorsSignature = (errors: WatcherErrors): string =>
   );
 
 /**
- * Log any watcher errors that haven't already been logged at their
- * current signature. Suppresses the per-watcher fanout that happens
- * when one root cause (e.g. a missing import) breaks every entry
+ * Log any watcher messages (errors or warnings) that haven't already been
+ * logged at their current signature. Suppresses the per-watcher fanout that
+ * happens when one root cause (e.g. a missing import) breaks every entry
  * point's build at the same source location.
  */
-const logChangedWatcherErrors = (
-  watcherErrorsRef: Ref.Ref<WatcherErrors>,
+const logChangedWatcherMessages = (
+  messagesRef: Ref.Ref<WatcherErrors>,
   lastLoggedSignatureRef: Ref.Ref<string>,
+  log: (messages: ReadonlyArray<esbuild.Message>) => Effect.Effect<void>,
 ) =>
   Effect.gen(function* () {
-    const errors = yield* Ref.get(watcherErrorsRef);
-    const signature = watcherErrorsSignature(errors);
+    const messages = yield* Ref.get(messagesRef);
+    const signature = watcherErrorsSignature(messages);
     const previous = yield* Ref.get(lastLoggedSignatureRef);
     if (signature === previous) return;
     yield* Ref.set(lastLoggedSignatureRef, signature);
-    if (errors.size === 0) return;
-    yield* logCoalescedBuildErrors(dedupeWatcherErrors(errors));
+    if (messages.size === 0) return;
+    yield* log(dedupeWatcherErrors(messages));
   });
 
 /**
@@ -306,10 +319,12 @@ const syncLoop = (
   pendingRef: Ref.Ref<Pending>,
   initialFunctionPaths: FunctionPaths.FunctionPaths,
   watcherErrorsRef: Ref.Ref<WatcherErrors>,
+  watcherWarningsRef: Ref.Ref<WatcherErrors>,
 ) =>
   Effect.gen(function* () {
     const functionPathsRef = yield* Ref.make(initialFunctionPaths);
     const lastLoggedErrorsRef = yield* Ref.make<string>("");
+    const lastLoggedWarningsRef = yield* Ref.make<string>("");
 
     return yield* Effect.forever(
       Effect.gen(function* () {
@@ -324,7 +339,16 @@ const syncLoop = (
           COALESCE_MAX_WAIT,
         );
 
-        yield* logChangedWatcherErrors(watcherErrorsRef, lastLoggedErrorsRef);
+        yield* logChangedWatcherMessages(
+          watcherErrorsRef,
+          lastLoggedErrorsRef,
+          logCoalescedBuildErrors,
+        );
+        yield* logChangedWatcherMessages(
+          watcherWarningsRef,
+          lastLoggedWarningsRef,
+          logCoalescedBuildWarnings,
+        );
 
         const pending = yield* Ref.getAndSet(pendingRef, pendingInit);
 
@@ -449,6 +473,7 @@ const esbuildOptions = (
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
   watcherErrorsRef: Ref.Ref<WatcherErrors>,
+  watcherWarningsRef: Ref.Ref<WatcherErrors>,
 ) => {
   // First `onEnd` fires when esbuild finishes the watcher's initial
   // build. At startup that's an echo of the just-completed initial
@@ -489,6 +514,15 @@ const esbuildOptions = (
                   }
                   return next;
                 });
+                yield* Ref.update(watcherWarningsRef, (current) => {
+                  const next = new Map(current);
+                  if (result.warnings.length > 0) {
+                    next.set(entry.absolutePath, result.warnings);
+                  } else {
+                    next.delete(entry.absolutePath);
+                  }
+                  return next;
+                });
                 if (isInitial && result.errors.length === 0) return;
                 yield* Ref.update(pendingRef, (p) => ({
                   ...p,
@@ -511,6 +545,7 @@ const createEntryPointWatcher = (
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
   watcherErrorsRef: Ref.Ref<WatcherErrors>,
+  watcherWarningsRef: Ref.Ref<WatcherErrors>,
 ) =>
   Effect.acquireRelease(
     Effect.promise(async () => {
@@ -522,6 +557,7 @@ const createEntryPointWatcher = (
           signal,
           pendingRef,
           watcherErrorsRef,
+          watcherWarningsRef,
         ),
       );
       await ctx.watch();
@@ -530,14 +566,16 @@ const createEntryPointWatcher = (
     (ctx) =>
       Effect.gen(function* () {
         yield* Effect.promise(() => ctx.dispose());
-        // Clear any errors recorded by this watcher so a disposed
-        // watcher can't leave stale errors visible to the sync loop.
-        yield* Ref.update(watcherErrorsRef, (current) => {
+        // Clear any errors and warnings recorded by this watcher so a
+        // disposed watcher can't leave stale messages visible to the sync loop.
+        const clearEntry = (current: WatcherErrors) => {
           if (!current.has(entry.absolutePath)) return current;
           const next = new Map(current);
           next.delete(entry.absolutePath);
           return next;
-        });
+        };
+        yield* Ref.update(watcherErrorsRef, clearEntry);
+        yield* Ref.update(watcherWarningsRef, clearEntry);
         yield* Effect.logDebug(
           `esbuild watcher disposed: ${entry.displayPath}`,
         );
@@ -556,6 +594,7 @@ const entryPointsWatcher = (
   pendingRef: Ref.Ref<Pending>,
   restartQueue: Queue.Queue<void>,
   watcherErrorsRef: Ref.Ref<WatcherErrors>,
+  watcherWarningsRef: Ref.Ref<WatcherErrors>,
 ) =>
   Effect.gen(function* () {
     const parentScope = yield* Effect.scope;
@@ -612,6 +651,7 @@ const entryPointsWatcher = (
             signal,
             pendingRef,
             watcherErrorsRef,
+            watcherWarningsRef,
           ).pipe(Scope.extend(childScope));
           yield* Ref.update(scopesRef, (scopes) => {
             const updated = new Map(scopes);
