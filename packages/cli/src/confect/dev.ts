@@ -98,9 +98,9 @@ const pendingInit: Pending = {
 const isPendingDirty = (p: Pending): boolean =>
   p.specDirty || p.httpDirty || p.cronsDirty || p.authDirty;
 
-type WatcherErrors = ReadonlyMap<string, readonly esbuild.Message[]>;
+type WatcherMessages = ReadonlyMap<string, readonly esbuild.Message[]>;
 
-const emptyWatcherErrors: WatcherErrors = new Map();
+const emptyWatcherMessages: WatcherMessages = new Map();
 
 const changeChar = (change: "Added" | "Removed" | "Modified") =>
   Match.value(change).pipe(
@@ -210,9 +210,10 @@ export const dev = Command.make("dev", {}, () =>
     const pendingRef = yield* Ref.make<Pending>(pendingInit);
     const signal = yield* Queue.sliding<void>(1);
     const restartQueue = yield* Queue.sliding<void>(1);
-    const watcherErrorsRef = yield* Ref.make<WatcherErrors>(emptyWatcherErrors);
+    const watcherErrorsRef =
+      yield* Ref.make<WatcherMessages>(emptyWatcherMessages);
     const watcherWarningsRef =
-      yield* Ref.make<WatcherErrors>(emptyWatcherErrors);
+      yield* Ref.make<WatcherMessages>(emptyWatcherMessages);
 
     yield* Effect.all(
       [
@@ -242,23 +243,25 @@ export const dev = Command.make("dev", {}, () =>
 const esbuildMessageKey = (m: esbuild.Message): string =>
   `${m.location?.file ?? ""}:${m.location?.line ?? ""}:${m.location?.column ?? ""}:${m.text}`;
 
-const allMessages = (errors: WatcherErrors): ReadonlyArray<esbuild.Message> =>
-  pipe(Array.fromIterable(errors.values()), Array.flatten);
+const allMessages = (
+  messages: WatcherMessages,
+): ReadonlyArray<esbuild.Message> =>
+  pipe(Array.fromIterable(messages.values()), Array.flatten);
 
-const dedupeWatcherErrors = (
-  errors: WatcherErrors,
+const dedupeWatcherMessages = (
+  messages: WatcherMessages,
 ): ReadonlyArray<esbuild.Message> =>
   pipe(
-    allMessages(errors),
+    allMessages(messages),
     Array.dedupeWith(
       (messageA, messageB) =>
         esbuildMessageKey(messageA) === esbuildMessageKey(messageB),
     ),
   );
 
-const watcherErrorsSignature = (errors: WatcherErrors): string =>
+const watcherMessagesSignature = (messages: WatcherMessages): string =>
   pipe(
-    allMessages(errors),
+    allMessages(messages),
     Array.map(esbuildMessageKey),
     Array.dedupe,
     Array.sort(Order.string),
@@ -272,18 +275,18 @@ const watcherErrorsSignature = (errors: WatcherErrors): string =>
  * point's build at the same source location.
  */
 const logChangedWatcherMessages = (
-  messagesRef: Ref.Ref<WatcherErrors>,
+  messagesRef: Ref.Ref<WatcherMessages>,
   lastLoggedSignatureRef: Ref.Ref<string>,
   log: (messages: ReadonlyArray<esbuild.Message>) => Effect.Effect<void>,
 ) =>
   Effect.gen(function* () {
     const messages = yield* Ref.get(messagesRef);
-    const signature = watcherErrorsSignature(messages);
+    const signature = watcherMessagesSignature(messages);
     const previous = yield* Ref.get(lastLoggedSignatureRef);
     if (signature === previous) return;
     yield* Ref.set(lastLoggedSignatureRef, signature);
     if (messages.size === 0) return;
-    yield* log(dedupeWatcherErrors(messages));
+    yield* log(dedupeWatcherMessages(messages));
   });
 
 /**
@@ -318,8 +321,8 @@ const syncLoop = (
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
   initialFunctionPaths: FunctionPaths.FunctionPaths,
-  watcherErrorsRef: Ref.Ref<WatcherErrors>,
-  watcherWarningsRef: Ref.Ref<WatcherErrors>,
+  watcherErrorsRef: Ref.Ref<WatcherMessages>,
+  watcherWarningsRef: Ref.Ref<WatcherMessages>,
 ) =>
   Effect.gen(function* () {
     const functionPathsRef = yield* Ref.make(initialFunctionPaths);
@@ -472,8 +475,8 @@ const esbuildOptions = (
   notExternal: ReadonlyArray<RegExp>,
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
-  watcherErrorsRef: Ref.Ref<WatcherErrors>,
-  watcherWarningsRef: Ref.Ref<WatcherErrors>,
+  watcherErrorsRef: Ref.Ref<WatcherMessages>,
+  watcherWarningsRef: Ref.Ref<WatcherMessages>,
 ) => {
   // First `onEnd` fires when esbuild finishes the watcher's initial
   // build. At startup that's an echo of the just-completed initial
@@ -544,8 +547,8 @@ const createEntryPointWatcher = (
   notExternal: ReadonlyArray<RegExp>,
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
-  watcherErrorsRef: Ref.Ref<WatcherErrors>,
-  watcherWarningsRef: Ref.Ref<WatcherErrors>,
+  watcherErrorsRef: Ref.Ref<WatcherMessages>,
+  watcherWarningsRef: Ref.Ref<WatcherMessages>,
 ) =>
   Effect.acquireRelease(
     Effect.promise(async () => {
@@ -568,7 +571,7 @@ const createEntryPointWatcher = (
         yield* Effect.promise(() => ctx.dispose());
         // Clear any errors and warnings recorded by this watcher so a
         // disposed watcher can't leave stale messages visible to the sync loop.
-        const clearEntry = (current: WatcherErrors) => {
+        const clearEntry = (current: WatcherMessages) => {
           if (!current.has(entry.absolutePath)) return current;
           const next = new Map(current);
           next.delete(entry.absolutePath);
@@ -593,8 +596,8 @@ const entryPointsWatcher = (
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
   restartQueue: Queue.Queue<void>,
-  watcherErrorsRef: Ref.Ref<WatcherErrors>,
-  watcherWarningsRef: Ref.Ref<WatcherErrors>,
+  watcherErrorsRef: Ref.Ref<WatcherMessages>,
+  watcherWarningsRef: Ref.Ref<WatcherMessages>,
 ) =>
   Effect.gen(function* () {
     const parentScope = yield* Effect.scope;

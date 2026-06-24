@@ -11,6 +11,7 @@ import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
+import * as Ref from "effect/Ref";
 import * as String from "effect/String";
 import type * as esbuild from "esbuild";
 import { BundlerError, logCoalescedBuildWarnings } from "./BuildError";
@@ -140,6 +141,34 @@ export const bundleWorkspacePlugin = (
   },
 });
 
+interface CapturedBuildResult {
+  readonly metafile: esbuild.Metafile | undefined;
+  readonly warnings: ReadonlyArray<esbuild.Message>;
+}
+
+/**
+ * `bundle-require` only exposes a flat `dependencies: string[]`, so this small
+ * plugin captures the esbuild build result (metafile and warnings) into `ref`
+ * via `onEnd`. Defined outside {@link bundle}'s `Effect.gen` so the
+ * `onEnd` callback's `Effect.runSync` doesn't nest inside the surrounding
+ * Effect — the ref is a plain mutable cell, safe to set from the callback.
+ */
+const captureBuildResultPlugin = (
+  ref: Ref.Ref<CapturedBuildResult>,
+): esbuild.Plugin => ({
+  name: "confect:capture-build-result",
+  setup(build) {
+    build.onEnd((result) => {
+      Effect.runSync(
+        Ref.set(ref, {
+          metafile: result.metafile,
+          warnings: result.warnings,
+        }),
+      );
+    });
+  },
+});
+
 /**
  * Bundle a TypeScript entry point with esbuild via {@link bundleRequire} and
  * import the result. `bundle-require` writes a temp `.mjs` next to the source,
@@ -164,17 +193,10 @@ export const bundle = (
   Effect.gen(function* () {
     const path = yield* Path.Path;
 
-    let metafile: esbuild.Metafile | undefined;
-    let warnings: ReadonlyArray<esbuild.Message> = [];
-    const captureBuildResult: esbuild.Plugin = {
-      name: "confect:capture-build-result",
-      setup(build) {
-        build.onEnd((result) => {
-          metafile = result.metafile;
-          warnings = result.warnings;
-        });
-      },
-    };
+    const buildResultRef = yield* Ref.make<CapturedBuildResult>({
+      metafile: undefined,
+      warnings: [],
+    });
 
     const cwd = path.dirname(entryPoint);
     const skipPatterns = tsconfigPathsToRegExp(
@@ -189,7 +211,7 @@ export const bundle = (
           esbuildOptions: {
             plugins: [
               bundleWorkspacePlugin(path, skipPatterns),
-              captureBuildResult,
+              captureBuildResultPlugin(buildResultRef),
             ],
             logLevel: "silent",
           },
@@ -200,14 +222,17 @@ export const bundle = (
       // dependency it couldn't resolve and had to leave external) whether or
       // not the build/import succeeds — `bundle-require` `import()`s the result,
       // so the import can fail *because* of the dependency we warned about.
-      // `captureBuildResult`'s `onEnd` runs during the esbuild build (before
-      // that import), so `warnings` is populated by the time this finalizer
-      // reads it.
+      // `captureBuildResultPlugin`'s `onEnd` runs during the esbuild build
+      // (before that import), so `buildResultRef` is populated by the time this
+      // finalizer reads it.
       Effect.ensuring(
-        Effect.suspend(() => logCoalescedBuildWarnings(warnings)),
+        Effect.flatMap(Ref.get(buildResultRef), (captured) =>
+          logCoalescedBuildWarnings(captured.warnings),
+        ),
       ),
     );
 
+    const { metafile } = yield* Ref.get(buildResultRef);
     if (!metafile) {
       return yield* Effect.dieMessage("esbuild metafile missing");
     }
