@@ -167,12 +167,6 @@ const formatBuildMessage = (
   return pipe(replaced, Array.join("\n"));
 };
 
-/**
- * Render a list of esbuild messages into a styled, gutter-prefixed block.
- * Used by both {@link renderBundleFailedError} and the dev-mode esbuild
- * watcher's `onEnd` hook (where the messages don't flow through the
- * tagged-error pipeline).
- */
 export const formatEsbuildMessages = (
   errors: readonly esbuild.Message[],
   formattedMessages: readonly string[],
