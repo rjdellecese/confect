@@ -64,16 +64,6 @@ const resolveCjs = Option.liftThrowable((specifier: string, importer: string) =>
   createRequire(importer).resolve(specifier),
 );
 
-/**
- * Resolve a bare specifier from `importer`, honoring ESM `import` export
- * conditions first and falling back to CommonJS resolution. `createRequire`
- * alone can't see an `exports` map that declares only `import` (no
- * `require`/`default`): it throws `ERR_PACKAGE_PATH_NOT_EXPORTED`, which
- * previously forced ESM-only workspace deps to be externalized and then fail
- * under raw Node ESM. {@link resolveEsm} (exsolve, the same algorithm Node uses
- * for ESM) resolves those, while the {@link resolveCjs} fallback still covers
- * packages reachable only through a `require` condition.
- */
 const resolveModule = (
   specifier: string,
   importer: string,
@@ -111,11 +101,6 @@ export const bundleWorkspacePlugin = (
         args.importer !== "" ? args.importer : path.join(args.resolveDir, "_");
 
       return Option.match(resolveModule(args.path, importer), {
-        // Neither ESM nor CJS resolution found the specifier. Externalizing
-        // silently (the previous behavior) hands it to raw Node ESM, which
-        // fails later with an opaque `ERR_MODULE_NOT_FOUND` against the dep's
-        // internals. Warn about the dependency we couldn't bundle, then still
-        // externalize so a genuinely-external specifier keeps working.
         onNone: () => ({
           path: args.path,
           external: true,
@@ -132,10 +117,8 @@ export const bundleWorkspacePlugin = (
             String.split(path.sep),
             Array.contains("node_modules"),
           )
-            ? // Third-party: defer to the external plugin.
-              undefined
-            : // First-party workspace dep: bundle it.
-              { path: real };
+            ? undefined
+            : { path: real };
         },
       });
     });
@@ -147,13 +130,6 @@ interface CapturedBuildResult {
   readonly warnings: ReadonlyArray<esbuild.Message>;
 }
 
-/**
- * `bundle-require` only exposes a flat `dependencies: string[]`, so this small
- * plugin captures the esbuild build result (metafile and warnings) into `ref`
- * via `onEnd`. Defined outside {@link bundle}'s `Effect.gen` so the
- * `onEnd` callback's `Effect.runSync` doesn't nest inside the surrounding
- * Effect — the ref is a plain mutable cell, safe to set from the callback.
- */
 const captureBuildResultPlugin = (
   ref: Ref.Ref<CapturedBuildResult>,
 ): esbuild.Plugin => ({
@@ -219,15 +195,8 @@ export const bundle = (
         }),
       catch: (cause) => new BundlerError({ cause }),
     }).pipe(
-      // Surface any warnings bundleWorkspacePlugin emitted (e.g. a workspace
-      // dependency it couldn't resolve and had to leave external) whether or
-      // not the build/import succeeds — `bundle-require` `import()`s the result,
-      // so the import can fail *because* of the dependency we warned about.
-      // `captureBuildResultPlugin`'s `onEnd` runs during the esbuild build
-      // (before that import), so `buildResultRef` is populated by the time this
-      // finalizer reads it.
       Effect.ensuring(
-        Effect.flatMap(Ref.get(buildResultRef), (captured) =>
+        Effect.andThen(Ref.get(buildResultRef), (captured) =>
           logCoalescedBuildWarnings(captured.warnings),
         ),
       ),

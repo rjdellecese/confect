@@ -281,14 +281,6 @@ export const logCoalescedBuildErrors = (messages: readonly esbuild.Message[]) =>
     console.error(renderCoalescedBuildErrors(messages));
   });
 
-/**
- * Render a flat list of esbuild warnings as a single warning block with a
- * `⚠ Build warnings` header. Unlike errors, warnings never block a build;
- * they surface non-fatal diagnostics such as a workspace dependency that
- * {@link import("./Bundler").bundleWorkspacePlugin} couldn't resolve and had
- * to leave external. esbuild's own `formatMessagesSync` already styles each
- * message in yellow, so (unlike the error path) we don't re-annotate the text.
- */
 const renderCoalescedBuildWarnings = (
   messages: readonly esbuild.Message[],
 ): string => {
