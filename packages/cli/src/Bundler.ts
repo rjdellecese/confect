@@ -6,13 +6,16 @@ import {
   loadTsConfig,
   tsconfigPathsToRegExp,
 } from "bundle-require";
+import { resolveModulePath } from "exsolve";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
+import * as Ref from "effect/Ref";
 import * as String from "effect/String";
 import type * as esbuild from "esbuild";
 import { BundlerError } from "./BuildError";
+import { logCoalescedBuildWarnings } from "./log";
 
 export interface Bundled {
   readonly module: any;
@@ -50,10 +53,24 @@ const absolutizeMetafile = (
   return { inputs, outputs };
 };
 
-const resolveModule = Option.liftThrowable(
-  (specifier: string, importer: string) =>
-    createRequire(importer).resolve(specifier),
+const resolveEsm = Option.liftThrowable((specifier: string, importer: string) =>
+  resolveModulePath(specifier, {
+    from: importer,
+    conditions: ["node", "import"],
+  }),
 );
+
+const resolveCjs = Option.liftThrowable((specifier: string, importer: string) =>
+  createRequire(importer).resolve(specifier),
+);
+
+const resolveModule = (
+  specifier: string,
+  importer: string,
+): Option.Option<string> =>
+  Option.orElse(resolveEsm(specifier, importer), () =>
+    resolveCjs(specifier, importer),
+  );
 
 const realPath = Option.liftThrowable((path: string) => realpathSync(path));
 
@@ -83,17 +100,47 @@ export const bundleWorkspacePlugin = (
       const importer =
         args.importer !== "" ? args.importer : path.join(args.resolveDir, "_");
 
-      return pipe(
-        resolveModule(args.path, importer),
-        Option.map((resolved) =>
-          Option.getOrElse(realPath(resolved), () => resolved),
-        ),
-        Option.filter(
-          (real) =>
-            !pipe(real, String.split(path.sep), Array.contains("node_modules")),
-        ),
-        Option.map((real) => ({ path: real })),
-        Option.getOrUndefined,
+      return Option.match(resolveModule(args.path, importer), {
+        onNone: () => ({
+          path: args.path,
+          external: true,
+          warnings: [
+            {
+              text: `Confect could not resolve workspace dependency "${args.path}" (imported from ${importer}) to bundle it; leaving it external.`,
+            },
+          ],
+        }),
+        onSome: (resolved) => {
+          const real = Option.getOrElse(realPath(resolved), () => resolved);
+          return pipe(
+            real,
+            String.split(path.sep),
+            Array.contains("node_modules"),
+          )
+            ? undefined
+            : { path: real };
+        },
+      });
+    });
+  },
+});
+
+interface CapturedBuildResult {
+  readonly metafile: esbuild.Metafile | undefined;
+  readonly warnings: ReadonlyArray<esbuild.Message>;
+}
+
+const captureBuildResultPlugin = (
+  ref: Ref.Ref<CapturedBuildResult>,
+): esbuild.Plugin => ({
+  name: "confect:capture-build-result",
+  setup(build) {
+    build.onEnd((result) => {
+      Effect.runSync(
+        Ref.set(ref, {
+          metafile: result.metafile,
+          warnings: result.warnings,
+        }),
       );
     });
   },
@@ -123,15 +170,10 @@ export const bundle = (
   Effect.gen(function* () {
     const path = yield* Path.Path;
 
-    let metafile: esbuild.Metafile | undefined;
-    const captureMetafile: esbuild.Plugin = {
-      name: "confect:capture-metafile",
-      setup(build) {
-        build.onEnd((result) => {
-          metafile = result.metafile;
-        });
-      },
-    };
+    const buildResultRef = yield* Ref.make<CapturedBuildResult>({
+      metafile: undefined,
+      warnings: [],
+    });
 
     const cwd = path.dirname(entryPoint);
     const skipPatterns = tsconfigPathsToRegExp(
@@ -146,14 +188,21 @@ export const bundle = (
           esbuildOptions: {
             plugins: [
               bundleWorkspacePlugin(path, skipPatterns),
-              captureMetafile,
+              captureBuildResultPlugin(buildResultRef),
             ],
             logLevel: "silent",
           },
         }),
       catch: (cause) => new BundlerError({ cause }),
-    });
+    }).pipe(
+      Effect.ensuring(
+        Effect.andThen(Ref.get(buildResultRef), (captured) =>
+          logCoalescedBuildWarnings(captured.warnings),
+        ),
+      ),
+    );
 
+    const { metafile } = yield* Ref.get(buildResultRef);
     if (!metafile) {
       return yield* Effect.dieMessage("esbuild metafile missing");
     }

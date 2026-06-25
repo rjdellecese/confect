@@ -29,7 +29,6 @@ import {
 } from "bundle-require";
 import * as esbuild from "esbuild";
 import * as Bundler from "../Bundler";
-import { logCoalescedBuildErrors } from "../BuildError";
 import * as CodegenError from "../CodegenError";
 import { ConfectDirectory } from "../ConfectDirectory";
 import { ConvexDirectory } from "../ConvexDirectory";
@@ -41,6 +40,8 @@ import {
   isLeafSpecPath,
 } from "../LeafModule";
 import {
+  logCoalescedBuildErrors,
+  logCoalescedBuildWarnings,
   logFunctionAdded,
   logFunctionRemoved,
   logPending,
@@ -95,9 +96,9 @@ const pendingInit: Pending = {
 const isPendingDirty = (p: Pending): boolean =>
   p.specDirty || p.httpDirty || p.cronsDirty || p.authDirty;
 
-type WatcherErrors = ReadonlyMap<string, readonly esbuild.Message[]>;
+type WatcherMessages = ReadonlyMap<string, readonly esbuild.Message[]>;
 
-const emptyWatcherErrors: WatcherErrors = new Map();
+const emptyWatcherMessages: WatcherMessages = new Map();
 
 const changeChar = (change: "Added" | "Removed" | "Modified") =>
   Match.value(change).pipe(
@@ -207,7 +208,10 @@ export const dev = Command.make("dev", {}, () =>
     const pendingRef = yield* Ref.make<Pending>(pendingInit);
     const signal = yield* Queue.sliding<void>(1);
     const restartQueue = yield* Queue.sliding<void>(1);
-    const watcherErrorsRef = yield* Ref.make<WatcherErrors>(emptyWatcherErrors);
+    const watcherErrorsRef =
+      yield* Ref.make<WatcherMessages>(emptyWatcherMessages);
+    const watcherWarningsRef =
+      yield* Ref.make<WatcherMessages>(emptyWatcherMessages);
 
     yield* Effect.all(
       [
@@ -217,10 +221,17 @@ export const dev = Command.make("dev", {}, () =>
             pendingRef,
             restartQueue,
             watcherErrorsRef,
+            watcherWarningsRef,
           ),
         ),
         confectStructureWatcher(signal, pendingRef, restartQueue),
-        syncLoop(signal, pendingRef, initialFunctionPaths, watcherErrorsRef),
+        syncLoop(
+          signal,
+          pendingRef,
+          initialFunctionPaths,
+          watcherErrorsRef,
+          watcherWarningsRef,
+        ),
       ],
       { concurrency: "unbounded" },
     );
@@ -230,23 +241,25 @@ export const dev = Command.make("dev", {}, () =>
 const esbuildMessageKey = (m: esbuild.Message): string =>
   `${m.location?.file ?? ""}:${m.location?.line ?? ""}:${m.location?.column ?? ""}:${m.text}`;
 
-const allMessages = (errors: WatcherErrors): ReadonlyArray<esbuild.Message> =>
-  pipe(Array.fromIterable(errors.values()), Array.flatten);
+const allMessages = (
+  messages: WatcherMessages,
+): ReadonlyArray<esbuild.Message> =>
+  pipe(Array.fromIterable(messages.values()), Array.flatten);
 
-const dedupeWatcherErrors = (
-  errors: WatcherErrors,
+const dedupeWatcherMessages = (
+  messages: WatcherMessages,
 ): ReadonlyArray<esbuild.Message> =>
   pipe(
-    allMessages(errors),
+    allMessages(messages),
     Array.dedupeWith(
       (messageA, messageB) =>
         esbuildMessageKey(messageA) === esbuildMessageKey(messageB),
     ),
   );
 
-const watcherErrorsSignature = (errors: WatcherErrors): string =>
+const watcherMessagesSignature = (messages: WatcherMessages): string =>
   pipe(
-    allMessages(errors),
+    allMessages(messages),
     Array.map(esbuildMessageKey),
     Array.dedupe,
     Array.sort(Order.string),
@@ -254,23 +267,24 @@ const watcherErrorsSignature = (errors: WatcherErrors): string =>
   );
 
 /**
- * Log any watcher errors that haven't already been logged at their
- * current signature. Suppresses the per-watcher fanout that happens
- * when one root cause (e.g. a missing import) breaks every entry
+ * Log any watcher messages (errors or warnings) that haven't already been
+ * logged at their current signature. Suppresses the per-watcher fanout that
+ * happens when one root cause (e.g. a missing import) breaks every entry
  * point's build at the same source location.
  */
-const logChangedWatcherErrors = (
-  watcherErrorsRef: Ref.Ref<WatcherErrors>,
+const logChangedWatcherMessages = (
+  messagesRef: Ref.Ref<WatcherMessages>,
   lastLoggedSignatureRef: Ref.Ref<string>,
+  log: (messages: ReadonlyArray<esbuild.Message>) => Effect.Effect<void>,
 ) =>
   Effect.gen(function* () {
-    const errors = yield* Ref.get(watcherErrorsRef);
-    const signature = watcherErrorsSignature(errors);
+    const messages = yield* Ref.get(messagesRef);
+    const signature = watcherMessagesSignature(messages);
     const previous = yield* Ref.get(lastLoggedSignatureRef);
     if (signature === previous) return;
     yield* Ref.set(lastLoggedSignatureRef, signature);
-    if (errors.size === 0) return;
-    yield* logCoalescedBuildErrors(dedupeWatcherErrors(errors));
+    if (messages.size === 0) return;
+    yield* log(dedupeWatcherMessages(messages));
   });
 
 /**
@@ -305,11 +319,13 @@ const syncLoop = (
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
   initialFunctionPaths: FunctionPaths.FunctionPaths,
-  watcherErrorsRef: Ref.Ref<WatcherErrors>,
+  watcherErrorsRef: Ref.Ref<WatcherMessages>,
+  watcherWarningsRef: Ref.Ref<WatcherMessages>,
 ) =>
   Effect.gen(function* () {
     const functionPathsRef = yield* Ref.make(initialFunctionPaths);
     const lastLoggedErrorsRef = yield* Ref.make<string>("");
+    const lastLoggedWarningsRef = yield* Ref.make<string>("");
 
     return yield* Effect.forever(
       Effect.gen(function* () {
@@ -324,7 +340,16 @@ const syncLoop = (
           COALESCE_MAX_WAIT,
         );
 
-        yield* logChangedWatcherErrors(watcherErrorsRef, lastLoggedErrorsRef);
+        yield* logChangedWatcherMessages(
+          watcherErrorsRef,
+          lastLoggedErrorsRef,
+          logCoalescedBuildErrors,
+        );
+        yield* logChangedWatcherMessages(
+          watcherWarningsRef,
+          lastLoggedWarningsRef,
+          logCoalescedBuildWarnings,
+        );
 
         const pending = yield* Ref.getAndSet(pendingRef, pendingInit);
 
@@ -448,7 +473,8 @@ const esbuildOptions = (
   notExternal: ReadonlyArray<RegExp>,
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
-  watcherErrorsRef: Ref.Ref<WatcherErrors>,
+  watcherErrorsRef: Ref.Ref<WatcherMessages>,
+  watcherWarningsRef: Ref.Ref<WatcherMessages>,
 ) => {
   // First `onEnd` fires when esbuild finishes the watcher's initial
   // build. At startup that's an echo of the just-completed initial
@@ -489,6 +515,15 @@ const esbuildOptions = (
                   }
                   return next;
                 });
+                yield* Ref.update(watcherWarningsRef, (current) => {
+                  const next = new Map(current);
+                  if (result.warnings.length > 0) {
+                    next.set(entry.absolutePath, result.warnings);
+                  } else {
+                    next.delete(entry.absolutePath);
+                  }
+                  return next;
+                });
                 if (isInitial && result.errors.length === 0) return;
                 yield* Ref.update(pendingRef, (p) => ({
                   ...p,
@@ -510,7 +545,8 @@ const createEntryPointWatcher = (
   notExternal: ReadonlyArray<RegExp>,
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
-  watcherErrorsRef: Ref.Ref<WatcherErrors>,
+  watcherErrorsRef: Ref.Ref<WatcherMessages>,
+  watcherWarningsRef: Ref.Ref<WatcherMessages>,
 ) =>
   Effect.acquireRelease(
     Effect.promise(async () => {
@@ -522,6 +558,7 @@ const createEntryPointWatcher = (
           signal,
           pendingRef,
           watcherErrorsRef,
+          watcherWarningsRef,
         ),
       );
       await ctx.watch();
@@ -530,14 +567,16 @@ const createEntryPointWatcher = (
     (ctx) =>
       Effect.gen(function* () {
         yield* Effect.promise(() => ctx.dispose());
-        // Clear any errors recorded by this watcher so a disposed
-        // watcher can't leave stale errors visible to the sync loop.
-        yield* Ref.update(watcherErrorsRef, (current) => {
+        // Clear any errors and warnings recorded by this watcher so a
+        // disposed watcher can't leave stale messages visible to the sync loop.
+        const clearEntry = (current: WatcherMessages) => {
           if (!current.has(entry.absolutePath)) return current;
           const next = new Map(current);
           next.delete(entry.absolutePath);
           return next;
-        });
+        };
+        yield* Ref.update(watcherErrorsRef, clearEntry);
+        yield* Ref.update(watcherWarningsRef, clearEntry);
         yield* Effect.logDebug(
           `esbuild watcher disposed: ${entry.displayPath}`,
         );
@@ -555,7 +594,8 @@ const entryPointsWatcher = (
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
   restartQueue: Queue.Queue<void>,
-  watcherErrorsRef: Ref.Ref<WatcherErrors>,
+  watcherErrorsRef: Ref.Ref<WatcherMessages>,
+  watcherWarningsRef: Ref.Ref<WatcherMessages>,
 ) =>
   Effect.gen(function* () {
     const parentScope = yield* Effect.scope;
@@ -612,6 +652,7 @@ const entryPointsWatcher = (
             signal,
             pendingRef,
             watcherErrorsRef,
+            watcherWarningsRef,
           ).pipe(Scope.extend(childScope));
           yield* Ref.update(scopesRef, (scopes) => {
             const updated = new Map(scopes);
