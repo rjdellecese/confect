@@ -1,5 +1,6 @@
 import { FunctionSpec, Ref } from "@confect/core";
 import * as Cron from "effect/Cron";
+import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Schema from "effect/Schema";
 import { describe, expect, test } from "vitest";
@@ -46,7 +47,9 @@ describe("cronToConvexCronString", () => {
       weekdays: [],
     });
 
-    expect(CronJobs.cronToConvexCronString(cron)).toBe("0 4 * * *");
+    expect(CronJobs.cronToConvexCronString(cron)).toMatchInlineSnapshot(
+      `"0 4 * * *"`,
+    );
   });
 
   test("every minute", () => {
@@ -58,12 +61,16 @@ describe("cronToConvexCronString", () => {
       weekdays: [],
     });
 
-    expect(CronJobs.cronToConvexCronString(cron)).toBe("* * * * *");
+    expect(CronJobs.cronToConvexCronString(cron)).toMatchInlineSnapshot(
+      `"* * * * *"`,
+    );
   });
 
   test("every 15 minutes roundtrips", () => {
     const cron = Cron.unsafeParse("*/15 * * * *");
-    expect(CronJobs.cronToConvexCronString(cron)).toBe("0,15,30,45 * * * *");
+    expect(CronJobs.cronToConvexCronString(cron)).toMatchInlineSnapshot(
+      `"0,15,30,45 * * * *"`,
+    );
   });
 
   test("specific weekdays", () => {
@@ -75,7 +82,9 @@ describe("cronToConvexCronString", () => {
       weekdays: [1, 3, 5],
     });
 
-    expect(CronJobs.cronToConvexCronString(cron)).toBe("0 9 * * 1,3,5");
+    expect(CronJobs.cronToConvexCronString(cron)).toMatchInlineSnapshot(
+      `"0 9 * * 1,3,5"`,
+    );
   });
 
   test("complex multi-field schedule", () => {
@@ -87,8 +96,8 @@ describe("cronToConvexCronString", () => {
       weekdays: [],
     });
 
-    expect(CronJobs.cronToConvexCronString(cron)).toBe(
-      "0,30 8,12,18 1,15 1,6 *",
+    expect(CronJobs.cronToConvexCronString(cron)).toMatchInlineSnapshot(
+      `"0,30 8,12,18 1,15 1,6 *"`,
     );
   });
 
@@ -101,8 +110,8 @@ describe("cronToConvexCronString", () => {
       weekdays: [5, 1, 3],
     });
 
-    expect(CronJobs.cronToConvexCronString(cron)).toBe(
-      "0,15,30,45 6,12,18 * * 1,3,5",
+    expect(CronJobs.cronToConvexCronString(cron)).toMatchInlineSnapshot(
+      `"0,15,30,45 6,12,18 * * 1,3,5"`,
     );
   });
 
@@ -116,8 +125,10 @@ describe("cronToConvexCronString", () => {
       weekdays: [],
     });
 
-    expect(() => CronJobs.cronToConvexCronString(cron)).toThrow(
-      "seconds field",
+    expect(() =>
+      CronJobs.cronToConvexCronString(cron),
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Convex cron expressions do not support a seconds field. The seconds field must be the default {0}. Sub-minute scheduling is supported only by interval schedules defined using a Duration.]`,
     );
   });
 
@@ -131,8 +142,10 @@ describe("cronToConvexCronString", () => {
       weekdays: [],
     });
 
-    expect(() => CronJobs.cronToConvexCronString(cron)).toThrow(
-      "seconds field",
+    expect(() =>
+      CronJobs.cronToConvexCronString(cron),
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Convex cron expressions do not support a seconds field. The seconds field must be the default {0}. Sub-minute scheduling is supported only by interval schedules defined using a Duration.]`,
     );
   });
 
@@ -146,84 +159,176 @@ describe("cronToConvexCronString", () => {
       weekdays: [],
     });
 
-    expect(() => CronJobs.cronToConvexCronString(cron)).not.toThrow();
+    expect(CronJobs.cronToConvexCronString(cron)).toMatchInlineSnapshot(
+      `"0 12 * * *"`,
+    );
+  });
+
+  test("accepts an explicit UTC offset time zone", () => {
+    const cron = Cron.make({
+      minutes: [0],
+      hours: [9],
+      days: [],
+      months: [],
+      weekdays: [],
+      tz: DateTime.zoneMakeOffset(0),
+    });
+
+    expect(CronJobs.cronToConvexCronString(cron)).toMatchInlineSnapshot(
+      `"0 9 * * *"`,
+    );
+  });
+
+  test("accepts a named UTC time zone", () => {
+    const cron = Cron.make({
+      minutes: [0],
+      hours: [9],
+      days: [],
+      months: [],
+      weekdays: [],
+      tz: DateTime.zoneUnsafeMakeNamed("UTC"),
+    });
+
+    expect(CronJobs.cronToConvexCronString(cron)).toMatchInlineSnapshot(
+      `"0 9 * * *"`,
+    );
+  });
+
+  test("accepts a named Etc/UTC time zone", () => {
+    const cron = Cron.make({
+      minutes: [0],
+      hours: [9],
+      days: [],
+      months: [],
+      weekdays: [],
+      tz: DateTime.zoneUnsafeMakeNamed("Etc/UTC"),
+    });
+
+    expect(CronJobs.cronToConvexCronString(cron)).toMatchInlineSnapshot(
+      `"0 9 * * *"`,
+    );
+  });
+
+  test("throws on a non-UTC named time zone", () => {
+    const cron = Cron.make({
+      minutes: [0],
+      hours: [9],
+      days: [],
+      months: [],
+      weekdays: [],
+      tz: DateTime.zoneUnsafeMakeNamed("America/New_York"),
+    });
+
+    expect(() =>
+      CronJobs.cronToConvexCronString(cron),
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Convex cron expressions are always evaluated in UTC, but this cron specifies the time zone "America/New_York". Either omit the timezone or use UTC.]`,
+    );
+  });
+
+  test("throws on a non-zero offset time zone", () => {
+    const cron = Cron.make({
+      minutes: [0],
+      hours: [9],
+      days: [],
+      months: [],
+      weekdays: [],
+      tz: DateTime.zoneMakeOffset(3 * 60 * 60 * 1000),
+    });
+
+    expect(() =>
+      CronJobs.cronToConvexCronString(cron),
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Convex cron expressions are always evaluated in UTC, but this cron specifies the time zone "+03:00". Either omit the timezone or use UTC.]`,
+    );
   });
 });
 
 describe("durationToConvexIntervalSchedule", () => {
   test("converts seconds to interval seconds", () => {
-    expect(
-      CronJobs.durationToConvexIntervalSchedule(Duration.seconds(30)),
-    ).toEqual({
-      type: "interval",
-      seconds: 30,
-    });
+    expect(CronJobs.durationToConvexIntervalSchedule(Duration.seconds(30)))
+      .toMatchInlineSnapshot(`
+      {
+        "seconds": 30,
+        "type": "interval",
+      }
+    `);
   });
 
   test("converts minutes to interval minutes", () => {
-    expect(
-      CronJobs.durationToConvexIntervalSchedule(Duration.minutes(5)),
-    ).toEqual({
-      type: "interval",
-      minutes: 5,
-    });
+    expect(CronJobs.durationToConvexIntervalSchedule(Duration.minutes(5)))
+      .toMatchInlineSnapshot(`
+      {
+        "minutes": 5,
+        "type": "interval",
+      }
+    `);
   });
 
   test("converts hours to interval hours", () => {
-    expect(
-      CronJobs.durationToConvexIntervalSchedule(Duration.hours(2)),
-    ).toEqual({
-      type: "interval",
-      hours: 2,
-    });
+    expect(CronJobs.durationToConvexIntervalSchedule(Duration.hours(2)))
+      .toMatchInlineSnapshot(`
+      {
+        "hours": 2,
+        "type": "interval",
+      }
+    `);
   });
 
   test("prefers hours when evenly divisible", () => {
-    expect(
-      CronJobs.durationToConvexIntervalSchedule(Duration.seconds(3600)),
-    ).toEqual({
-      type: "interval",
-      hours: 1,
-    });
+    expect(CronJobs.durationToConvexIntervalSchedule(Duration.seconds(3600)))
+      .toMatchInlineSnapshot(`
+      {
+        "hours": 1,
+        "type": "interval",
+      }
+    `);
   });
 
   test("prefers minutes over seconds when evenly divisible", () => {
-    expect(
-      CronJobs.durationToConvexIntervalSchedule(Duration.seconds(120)),
-    ).toEqual({
-      type: "interval",
-      minutes: 2,
-    });
+    expect(CronJobs.durationToConvexIntervalSchedule(Duration.seconds(120)))
+      .toMatchInlineSnapshot(`
+      {
+        "minutes": 2,
+        "type": "interval",
+      }
+    `);
   });
 
   test("falls back to seconds when not divisible by minutes", () => {
-    expect(
-      CronJobs.durationToConvexIntervalSchedule(Duration.seconds(45)),
-    ).toEqual({
-      type: "interval",
-      seconds: 45,
-    });
+    expect(CronJobs.durationToConvexIntervalSchedule(Duration.seconds(45)))
+      .toMatchInlineSnapshot(`
+      {
+        "seconds": 45,
+        "type": "interval",
+      }
+    `);
   });
 
   test("handles large hour values", () => {
-    expect(
-      CronJobs.durationToConvexIntervalSchedule(Duration.hours(720)),
-    ).toEqual({
-      type: "interval",
-      hours: 720,
-    });
+    expect(CronJobs.durationToConvexIntervalSchedule(Duration.hours(720)))
+      .toMatchInlineSnapshot(`
+      {
+        "hours": 720,
+        "type": "interval",
+      }
+    `);
   });
 
   test("throws on zero duration", () => {
     expect(() =>
       CronJobs.durationToConvexIntervalSchedule(Duration.seconds(0)),
-    ).toThrow("positive duration");
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Interval must be a positive duration.]`,
+    );
   });
 
   test("throws on sub-second duration", () => {
     expect(() =>
       CronJobs.durationToConvexIntervalSchedule(Duration.millis(500)),
-    ).toThrow("whole number of seconds, minutes, or hours");
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Interval must be a whole number of seconds, minutes, or hours.]`,
+    );
   });
 });
 
@@ -232,8 +337,8 @@ describe("CronJobs.make", () => {
     const jobs = CronJobs.make();
 
     expect(CronJobs.isCronJobs(jobs)).toBe(true);
-    expect(jobs.cronJobs).toEqual({});
-    expect(jobs.convexCronJobs.crons).toEqual({});
+    expect(jobs.cronJobs).toMatchInlineSnapshot(`{}`);
+    expect(jobs.convexCronJobs.crons).toMatchInlineSnapshot(`{}`);
   });
 });
 
@@ -252,11 +357,19 @@ describe("CronJobs.add", () => {
     const result = CronJobs.make().add(cronJob);
 
     expect(CronJob.isCronJob(result.cronJobs["clear sessions"]!)).toBe(true);
-    expect(result.convexCronJobs.crons["clear sessions"]).toEqual({
-      name: "sessions:clearStale",
-      args: [{}],
-      schedule: { type: "cron", cron: "0 * * * *" },
-    });
+    expect(result.convexCronJobs.crons["clear sessions"])
+      .toMatchInlineSnapshot(`
+      {
+        "args": [
+          {},
+        ],
+        "name": "sessions:clearStale",
+        "schedule": {
+          "cron": "0 * * * *",
+          "type": "cron",
+        },
+      }
+    `);
   });
 
   test("chains multiple add calls", () => {
@@ -291,19 +404,30 @@ describe("CronJobs.add", () => {
         ),
       );
 
-    expect(Object.keys(result.cronJobs)).toEqual([
-      "clear sessions",
-      "send digest",
-    ]);
-    expect(Object.keys(result.convexCronJobs.crons)).toEqual([
-      "clear sessions",
-      "send digest",
-    ]);
-    expect(result.convexCronJobs.crons["send digest"]).toEqual({
-      name: "emails:sendDigest",
-      args: [{}],
-      schedule: { type: "cron", cron: "0 9 * * 1" },
-    });
+    expect(Object.keys(result.cronJobs)).toMatchInlineSnapshot(`
+      [
+        "clear sessions",
+        "send digest",
+      ]
+    `);
+    expect(Object.keys(result.convexCronJobs.crons)).toMatchInlineSnapshot(`
+      [
+        "clear sessions",
+        "send digest",
+      ]
+    `);
+    expect(result.convexCronJobs.crons["send digest"]).toMatchInlineSnapshot(`
+      {
+        "args": [
+          {},
+        ],
+        "name": "emails:sendDigest",
+        "schedule": {
+          "cron": "0 9 * * 1",
+          "type": "cron",
+        },
+      }
+    `);
   });
 
   test("does not mutate previous CronJobs instance", () => {
@@ -319,12 +443,18 @@ describe("CronJobs.add", () => {
     const empty = CronJobs.make();
     const withJob = empty.add(CronJob.make("clear sessions", cron, ref));
 
-    expect(Object.keys(empty.cronJobs)).toEqual([]);
-    expect(Object.keys(empty.convexCronJobs.crons)).toEqual([]);
-    expect(Object.keys(withJob.cronJobs)).toEqual(["clear sessions"]);
-    expect(Object.keys(withJob.convexCronJobs.crons)).toEqual([
-      "clear sessions",
-    ]);
+    expect(Object.keys(empty.cronJobs)).toMatchInlineSnapshot(`[]`);
+    expect(Object.keys(empty.convexCronJobs.crons)).toMatchInlineSnapshot(`[]`);
+    expect(Object.keys(withJob.cronJobs)).toMatchInlineSnapshot(`
+      [
+        "clear sessions",
+      ]
+    `);
+    expect(Object.keys(withJob.convexCronJobs.crons)).toMatchInlineSnapshot(`
+      [
+        "clear sessions",
+      ]
+    `);
   });
 
   test("adds an interval job and populates convexCronJobs", () => {
@@ -335,11 +465,18 @@ describe("CronJobs.add", () => {
     const result = CronJobs.make().add(cronJob);
 
     expect(CronJob.isCronJob(result.cronJobs["ping"]!)).toBe(true);
-    expect(result.convexCronJobs.crons["ping"]).toEqual({
-      name: "health:ping",
-      args: [{}],
-      schedule: { type: "interval", seconds: 30 },
-    });
+    expect(result.convexCronJobs.crons["ping"]).toMatchInlineSnapshot(`
+      {
+        "args": [
+          {},
+        ],
+        "name": "health:ping",
+        "schedule": {
+          "seconds": 30,
+          "type": "interval",
+        },
+      }
+    `);
   });
 
   test("mixes cron and interval jobs", () => {
@@ -362,14 +499,20 @@ describe("CronJobs.add", () => {
       )
       .add(CronJob.make("ping", Duration.seconds(30), ref2));
 
-    expect(result.convexCronJobs.crons["clear sessions"]!.schedule).toEqual({
-      type: "cron",
-      cron: "0 * * * *",
-    });
-    expect(result.convexCronJobs.crons["ping"]!.schedule).toEqual({
-      type: "interval",
-      seconds: 30,
-    });
+    expect(result.convexCronJobs.crons["clear sessions"]!.schedule)
+      .toMatchInlineSnapshot(`
+      {
+        "cron": "0 * * * *",
+        "type": "cron",
+      }
+    `);
+    expect(result.convexCronJobs.crons["ping"]!.schedule)
+      .toMatchInlineSnapshot(`
+      {
+        "seconds": 30,
+        "type": "interval",
+      }
+    `);
   });
 
   test("convexCronJobs.export() serializes all jobs", () => {
@@ -387,13 +530,20 @@ describe("CronJobs.add", () => {
     );
     const parsed = JSON.parse(JSON.stringify(result.convexCronJobs.crons));
 
-    expect(parsed).toEqual({
-      "clear sessions": {
-        name: "sessions:clearStale",
-        args: [{}],
-        schedule: { type: "cron", cron: "0 * * * *" },
-      },
-    });
+    expect(parsed).toMatchInlineSnapshot(`
+      {
+        "clear sessions": {
+          "args": [
+            {},
+          ],
+          "name": "sessions:clearStale",
+          "schedule": {
+            "cron": "0 * * * *",
+            "type": "cron",
+          },
+        },
+      }
+    `);
   });
 
   test("passes encoded args to convexCronJobs for a cron schedule", () => {
@@ -407,11 +557,21 @@ describe("CronJobs.add", () => {
 
     const result = CronJobs.make().add(cronJob);
 
-    expect(result.convexCronJobs.crons["payment reminder"]).toEqual({
-      name: "payments:sendEmail",
-      args: [{ email: "billing@example.com" }],
-      schedule: { type: "cron", cron: "0 16 1 * *" },
-    });
+    expect(result.convexCronJobs.crons["payment reminder"])
+      .toMatchInlineSnapshot(`
+      {
+        "args": [
+          {
+            "email": "billing@example.com",
+          },
+        ],
+        "name": "payments:sendEmail",
+        "schedule": {
+          "cron": "0 16 1 * *",
+          "type": "cron",
+        },
+      }
+    `);
   });
 
   test("passes encoded args to convexCronJobs for an interval schedule", () => {
@@ -422,10 +582,20 @@ describe("CronJobs.add", () => {
 
     const result = CronJobs.make().add(cronJob);
 
-    expect(result.convexCronJobs.crons["send notification"]).toEqual({
-      name: "notifications:send",
-      args: [{ email: "user@example.com" }],
-      schedule: { type: "interval", hours: 1 },
-    });
+    expect(result.convexCronJobs.crons["send notification"])
+      .toMatchInlineSnapshot(`
+      {
+        "args": [
+          {
+            "email": "user@example.com",
+          },
+        ],
+        "name": "notifications:send",
+        "schedule": {
+          "hours": 1,
+          "type": "interval",
+        },
+      }
+    `);
   });
 });
