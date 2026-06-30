@@ -86,7 +86,7 @@ export const cronToConvexCronString = (cron: Cron.Cron): string => {
         Match.value,
         Match.tag("Offset", ({ offset }) => offset !== 0),
         Match.tag("Named", ({ id }) => id !== "UTC" && id !== "Etc/UTC"),
-        Match.exhaustive
+        Match.exhaustive,
       ),
     ),
     Option.map((tz) => {
