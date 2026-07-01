@@ -1,20 +1,13 @@
 import type { IdField, SystemFields as NonIdSystemFields } from "convex/server";
 import * as Schema from "effect/Schema";
 import * as SchemaAST from "effect/SchemaAST";
-import * as Struct from "effect/Struct";
+import type * as Struct from "effect/Struct";
 import * as GenericId from "./GenericId";
 
-type SystemFieldsSchema<TableName extends string> = Schema.Struct<{
-  _id: ReturnType<typeof GenericId.GenericId<TableName>>;
-  _creationTime: typeof Schema.Number;
-}>;
-
 /**
- * Produces a schema for Convex system fields.
+ * Produces a schema for Convex system fields. In Confect, system fields include `_id`.
  */
-export const SystemFields = <TableName extends string>(
-  tableName: TableName,
-): SystemFieldsSchema<TableName> =>
+export const SystemFields = <TableName extends string>(tableName: TableName) =>
   Schema.Struct({
     _id: GenericId.GenericId(tableName),
     _creationTime: Schema.Number,
@@ -24,18 +17,12 @@ export const SystemFields = <TableName extends string>(
  * The field map added to a table schema, derived from {@link SystemFields} so it
  * stays in lockstep with the runtime schema.
  */
-type SystemFieldsOf<TableName extends string> =
-  SystemFieldsSchema<TableName>["fields"];
+type SystemFieldsFor<TableName extends string> = ReturnType<
+  typeof SystemFields<TableName>
+>["fields"];
 
 /**
  * Extend a table schema with Convex system fields.
- *
- * Effect v4 has no general `Schema.extend`; the documented replacement is
- * `Schema.fieldsAssign` (a shortcut for `struct.mapFields(Struct.assign(...))`,
- * which preserves the struct's annotations). It applies to a `Struct`, so we
- * distribute it across the members of a `Union` for tables defined as a union
- * of variants. {@link ExtendWithSystemFields} mirrors this operation at the type
- * level so the declared result stays faithful to what is actually built.
  */
 export const extendWithSystemFields = <
   TableName extends string,
@@ -48,19 +35,10 @@ export const extendWithSystemFields = <
 
   const extend = (s: Schema.Top): Schema.Top =>
     SchemaAST.isUnion(s.ast)
-      ? Schema.Union(
-          (s as unknown as Schema.Union<ReadonlyArray<Schema.Top>>).members.map(
-            extend,
-          ),
-        )
-      : Schema.fieldsAssign(system)(
-          s as unknown as Schema.Struct<Schema.Struct.Fields>,
-        );
+      ? Schema.Union((s as unknown as Schema.Union<ReadonlyArray<Schema.Top>>).members.map(extend))
+      : Schema.fieldsAssign(system)(s as unknown as Schema.Struct<Schema.Struct.Fields>);
 
-  return extend(schema) as unknown as ExtendWithSystemFields<
-    TableName,
-    TableSchema
-  >;
+  return extend(schema) as unknown as ExtendWithSystemFields<TableName, TableSchema>;
 };
 
 /**
@@ -68,16 +46,12 @@ export const extendWithSystemFields = <
  * Any other (already-extended or opaque) schema falls back to a `Codec` carrying
  * the system-field document shape.
  */
-type ApplySystemFields<TableName extends string, S> = S extends Schema.Struct<
-  infer Fields extends Schema.Struct.Fields
->
-  ? Schema.Struct<Struct.Simplify<Struct.Assign<Fields, SystemFieldsOf<TableName>>>>
-  : S extends Schema.Codec<infer Type, infer Encoded>
-    ? Schema.Codec<
-        WithSystemFields<TableName, Type>,
-        WithSystemFields<TableName, Encoded>
-      >
-    : never;
+type ApplySystemFields<TableName extends string, S> =
+  S extends Schema.Struct<infer Fields extends Schema.Struct.Fields>
+    ? Schema.Struct<Struct.Simplify<Struct.Assign<Fields, SystemFieldsFor<TableName>>>>
+    : S extends Schema.Codec<infer Type, infer Encoded>
+      ? Schema.Codec<WithSystemFields<TableName, Type>, WithSystemFields<TableName, Encoded>>
+      : never;
 
 /**
  * Extend a table schema with Convex system fields at the type level.
@@ -88,18 +62,16 @@ type ApplySystemFields<TableName extends string, S> = S extends Schema.Struct<
  * `union.mapMembers(Tuple.map(Schema.fieldsAssign(...)))`). The `Struct`/`Union`
  * structure is preserved rather than collapsed to a bare `Codec`.
  */
-export type ExtendWithSystemFields<
-  TableName extends string,
-  TableSchema extends Schema.Top,
-> = TableSchema extends Schema.Union<infer Members extends ReadonlyArray<Schema.Top>>
-  ? Schema.Union<
-      Struct.Simplify<
-        Readonly<{
-          [K in keyof Members]: ExtendWithSystemFields<TableName, Members[K]>;
-        }>
+export type ExtendWithSystemFields<TableName extends string, TableSchema extends Schema.Top> =
+  TableSchema extends Schema.Union<infer Members extends ReadonlyArray<Schema.Top>>
+    ? Schema.Union<
+        Struct.Simplify<
+          Readonly<{
+            [K in keyof Members]: ExtendWithSystemFields<TableName, Members[K]>;
+          }>
+        >
       >
-    >
-  : ApplySystemFields<TableName, TableSchema>;
+    : ApplySystemFields<TableName, TableSchema>;
 
 /**
  * The decoded/encoded document shape: a table's fields plus Convex's system
@@ -108,9 +80,6 @@ export type ExtendWithSystemFields<
  * `Document` is still an unresolved generic, which breaks structural
  * comparability in the database reader/writer plumbing.
  */
-export type WithSystemFields<
-  TableName extends string,
-  Document,
-> = Document extends unknown
+export type WithSystemFields<TableName extends string, Document> = Document extends unknown
   ? IdField<TableName> & NonIdSystemFields & Document
   : never;
