@@ -64,7 +64,7 @@ const resolveCjs = Option.liftThrowable((specifier: string, importer: string) =>
   createRequire(importer).resolve(specifier),
 );
 
-const resolveModule = (
+export const resolveModule = (
   specifier: string,
   importer: string,
 ): Option.Option<string> =>
@@ -163,9 +163,15 @@ const captureBuildResultPlugin = (
  * so callers can inspect the import graph (see {@link directlyImports}); the
  * metafile is captured via a small `onEnd` plugin because `bundle-require`
  * itself only exposes a flat `dependencies: string[]`.
+ *
+ * `options.plugins` are registered ahead of every other plugin — including
+ * `bundle-require`'s own `externalPlugin` — so a caller-supplied plugin can
+ * claim resolutions (e.g. `convex.config` imports) before the workspace and
+ * externalization heuristics see them.
  */
 export const bundle = (
   entryPoint: string,
+  options?: { readonly plugins?: ReadonlyArray<esbuild.Plugin> },
 ): Effect.Effect<Bundled, BundlerError, Path.Path> =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
@@ -187,6 +193,7 @@ export const bundle = (
           format: "esm",
           esbuildOptions: {
             plugins: [
+              ...(options?.plugins ?? []),
               bundleWorkspacePlugin(path, skipPatterns),
               captureBuildResultPlugin(buildResultRef),
             ],

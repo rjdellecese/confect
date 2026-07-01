@@ -125,6 +125,14 @@ export class ConflictingDocNameError extends Schema.TaggedError<ConflictingDocNa
   },
 ) {}
 
+export class InvalidConvexConfigError extends Schema.TaggedError<InvalidConvexConfigError>()(
+  "InvalidConvexConfigError",
+  {
+    configPath: Schema.String,
+    reason: Schema.String,
+  },
+) {}
+
 export const CodegenError = Schema.Union(
   BuildError,
   MissingImplFileError,
@@ -140,6 +148,7 @@ export const CodegenError = Schema.Union(
   DuplicateTableNameError,
   LegacySchemaFileError,
   ConflictingDocNameError,
+  InvalidConvexConfigError,
 );
 export type CodegenError = typeof CodegenError.Type;
 
@@ -306,6 +315,15 @@ const renderConflictingDocNameError = (
   );
 };
 
+const renderInvalidConvexConfigError = (
+  error: InvalidConvexConfigError,
+): AnsiDoc.AnsiDoc =>
+  singleLine(
+    AnsiDoc.text("Convex config "),
+    formatPathDoc(error.configPath),
+    AnsiDoc.text(` could not be evaluated: ${error.reason}`),
+  );
+
 const renderLegacySchemaFileError = (
   error: LegacySchemaFileError,
 ): AnsiDoc.AnsiDoc =>
@@ -404,6 +422,12 @@ export const renderCodegenError = (error: CodegenError): string => {
     Match.tag("ConflictingDocNameError", (e) =>
       pipe(
         renderConflictingDocNameError(e),
+        AnsiDoc.render({ style: "pretty" }),
+      ),
+    ),
+    Match.tag("InvalidConvexConfigError", (e) =>
+      pipe(
+        renderInvalidConvexConfigError(e),
         AnsiDoc.render({ style: "pretty" }),
       ),
     ),

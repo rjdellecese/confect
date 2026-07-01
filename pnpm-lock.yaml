@@ -181,6 +181,9 @@ importers:
         specifier: ^1.1.0
         version: 1.1.0
     devDependencies:
+      '@convex-dev/workpool':
+        specifier: 0.4.6
+        version: 0.4.6(convex-helpers@0.1.118(@standard-schema/spec@1.1.0)(convex@1.40.0(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(convex@1.40.0(react@19.2.4))
       '@effect/language-service':
         specifier: 0.86.1
         version: 0.86.1
@@ -193,6 +196,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 3.2.4
         version: 3.2.4(vitest@3.2.4(@types/debug@4.1.12)(@types/node@25.3.3)(happy-dom@15.11.7)(jiti@1.21.7)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.6.0))
+      convex:
+        specifier: 1.40.0
+        version: 1.40.0(react@19.2.4)
       effect:
         specifier: 3.21.2
         version: 3.21.2
