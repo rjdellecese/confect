@@ -19,9 +19,7 @@ class CompiledProgram extends Context.Service<
     readonly program: ts.Program;
     readonly emitResult: ts.EmitResult;
   }
->()(
-  "@confect/server/test/mock-backend/declarationEmit.test/CompiledProgram",
-) {}
+>()("@confect/server/test/mock-backend/declarationEmit.test/CompiledProgram") {}
 
 const buildProgram = Effect.gen(function* () {
   const path = yield* Path.Path;

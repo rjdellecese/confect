@@ -35,10 +35,19 @@ export const extendWithSystemFields = <
 
   const extend = (s: Schema.Top): Schema.Top =>
     SchemaAST.isUnion(s.ast)
-      ? Schema.Union((s as unknown as Schema.Union<ReadonlyArray<Schema.Top>>).members.map(extend))
-      : Schema.fieldsAssign(system)(s as unknown as Schema.Struct<Schema.Struct.Fields>);
+      ? Schema.Union(
+          (s as unknown as Schema.Union<ReadonlyArray<Schema.Top>>).members.map(
+            extend,
+          ),
+        )
+      : Schema.fieldsAssign(system)(
+          s as unknown as Schema.Struct<Schema.Struct.Fields>,
+        );
 
-  return extend(schema) as unknown as ExtendWithSystemFields<TableName, TableSchema>;
+  return extend(schema) as unknown as ExtendWithSystemFields<
+    TableName,
+    TableSchema
+  >;
 };
 
 /**
@@ -48,9 +57,14 @@ export const extendWithSystemFields = <
  */
 type ApplySystemFields<TableName extends string, S> =
   S extends Schema.Struct<infer Fields extends Schema.Struct.Fields>
-    ? Schema.Struct<Struct.Simplify<Struct.Assign<Fields, SystemFieldsFor<TableName>>>>
+    ? Schema.Struct<
+        Struct.Simplify<Struct.Assign<Fields, SystemFieldsFor<TableName>>>
+      >
     : S extends Schema.Codec<infer Type, infer Encoded>
-      ? Schema.Codec<WithSystemFields<TableName, Type>, WithSystemFields<TableName, Encoded>>
+      ? Schema.Codec<
+          WithSystemFields<TableName, Type>,
+          WithSystemFields<TableName, Encoded>
+        >
       : never;
 
 /**
@@ -62,8 +76,13 @@ type ApplySystemFields<TableName extends string, S> =
  * `union.mapMembers(Tuple.map(Schema.fieldsAssign(...)))`). The `Struct`/`Union`
  * structure is preserved rather than collapsed to a bare `Codec`.
  */
-export type ExtendWithSystemFields<TableName extends string, TableSchema extends Schema.Top> =
-  TableSchema extends Schema.Union<infer Members extends ReadonlyArray<Schema.Top>>
+export type ExtendWithSystemFields<
+  TableName extends string,
+  TableSchema extends Schema.Top,
+> =
+  TableSchema extends Schema.Union<
+    infer Members extends ReadonlyArray<Schema.Top>
+  >
     ? Schema.Union<
         Struct.Simplify<
           Readonly<{
@@ -80,6 +99,9 @@ export type ExtendWithSystemFields<TableName extends string, TableSchema extends
  * `Document` is still an unresolved generic, which breaks structural
  * comparability in the database reader/writer plumbing.
  */
-export type WithSystemFields<TableName extends string, Document> = Document extends unknown
+export type WithSystemFields<
+  TableName extends string,
+  Document,
+> = Document extends unknown
   ? IdField<TableName> & NonIdSystemFields & Document
   : never;

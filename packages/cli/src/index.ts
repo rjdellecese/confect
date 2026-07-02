@@ -17,7 +17,4 @@ process.on("exit", () => {
   }
 });
 
-cliApp.pipe(
-  Effect.provide(NodeServices.layer),
-  NodeRuntime.runMain,
-);
+cliApp.pipe(Effect.provide(NodeServices.layer), NodeRuntime.runMain);

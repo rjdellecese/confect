@@ -1,5 +1,6 @@
 import { FunctionImpl, GroupImpl } from "@confect/server";
-import * as Command from "@effect/platform/Command";
+import * as ChildProcess from "effect/unstable/process/ChildProcess";
+import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
 import * as Console from "effect/Console";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -12,10 +13,14 @@ const send = FunctionImpl.make(
   email,
   "send",
   Effect.fn(function* ({ to, subject, body }) {
-    const result = yield* Command.make(
-      "echo",
-      `Sending email to ${to} with subject ${subject} and body ${body}…`,
-    ).pipe(Command.stdout("pipe"), Command.string, Effect.orDie);
+    const spawner = yield* ChildProcessSpawner;
+    const result = yield* spawner
+      .string(
+        ChildProcess.make("echo", [
+          `Sending email to ${to} with subject ${subject} and body ${body}…`,
+        ]),
+      )
+      .pipe(Effect.orDie);
 
     yield* Console.log(result);
 

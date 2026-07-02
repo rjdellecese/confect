@@ -174,10 +174,12 @@ describe(compileAst, () => {
 
     effect("union with four elements", () =>
       Effect.gen(function* () {
-        const schema = Schema.Union([Schema.String,
+        const schema = Schema.Union([
+          Schema.String,
           Schema.Number,
           Schema.Boolean,
-          Schema.Struct({})]);
+          Schema.Struct({}),
+        ]);
         const validator = v.union(
           v.string(),
           v.float64(),
@@ -218,9 +220,11 @@ describe(compileAst, () => {
 
     effect("tuple with three elements", () =>
       Effect.gen(function* () {
-        const schema = Schema.Tuple([Schema.String,
+        const schema = Schema.Tuple([
+          Schema.String,
           Schema.Number,
-          Schema.Boolean]);
+          Schema.Boolean,
+        ]);
         const expectedValidator = v.array(
           v.union(v.string(), v.float64(), v.boolean()),
         );
@@ -291,8 +295,10 @@ describe(compileAst, () => {
       effect("tuple with recursive element", () =>
         Effect.gen(function* () {
           type Foo = readonly [string, Foo];
-          const Foo = Schema.Tuple([Schema.String,
-            Schema.suspend((): Schema.Codec<Foo> => Foo)]);
+          const Foo = Schema.Tuple([
+            Schema.String,
+            Schema.suspend((): Schema.Codec<Foo> => Foo),
+          ]);
 
           const expectedValidator = v.any();
           const compiledValidator = yield* compileAst(
@@ -308,10 +314,12 @@ describe(compileAst, () => {
           type Foo = {
             foos: readonly Foo[];
           } | null;
-          const Foo = Schema.Union([Schema.Struct({
+          const Foo = Schema.Union([
+            Schema.Struct({
               foos: Schema.Array(Schema.suspend((): Schema.Codec<Foo> => Foo)),
             }),
-            Schema.Null]);
+            Schema.Null,
+          ]);
 
           const expectedValidator = v.any();
           const compiledValidator = yield* compileAst(
@@ -771,8 +779,10 @@ describe("suspend", () => {
     type ExpectedValidator = typeof expectedValidator;
 
     type Foo = readonly [Foo, string];
-    const Foo = Schema.Tuple([Schema.suspend((): Schema.Codec<Foo> => Foo),
-      Schema.String]);
+    const Foo = Schema.Tuple([
+      Schema.suspend((): Schema.Codec<Foo> => Foo),
+      Schema.String,
+    ]);
     const compiledValidator = compileSchema(Foo);
     type CompiledValidator = typeof compiledValidator;
 
@@ -787,10 +797,12 @@ describe("suspend", () => {
     type Foo = {
       foos: readonly Foo[];
     } | null;
-    const Foo = Schema.Union([Schema.Struct({
+    const Foo = Schema.Union([
+      Schema.Struct({
         foos: Schema.Array(Schema.suspend((): Schema.Codec<Foo> => Foo)),
       }),
-      Schema.Null]);
+      Schema.Null,
+    ]);
     const compiledValidator = compileSchema(Foo);
     type CompiledValidator = typeof compiledValidator;
 

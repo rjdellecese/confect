@@ -291,6 +291,9 @@ const convexActionFunction = <
     createLayer: (ctx) =>
       Layer.mergeAll(
         RegisteredFunction.actionLayer(schema, ctx),
-        Layer.succeed(ConfigProvider.ConfigProvider, ConvexConfigProvider.make()),
+        Layer.succeed(
+          ConfigProvider.ConfigProvider,
+          ConvexConfigProvider.make(),
+        ),
       ),
   });

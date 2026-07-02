@@ -30,15 +30,16 @@ export default GroupSpec.makeNode().addFunction(
 
 ## Node Impl
 
-A node impl default-imports its sibling spec and passes the database schema from `_generated/schema` to `FunctionImpl.make` and `GroupImpl.make` — exactly like a non-node impl; only the spec differs (`GroupSpec.makeNode()`). Each handler runs in the Node.js runtime, so it has access to [`NodeContext` services](https://effect-ts.github.io/effect/platform-node/NodeContext.ts.html#nodecontext-type-alias) from the `@effect/platform` package.
+A node impl default-imports its sibling spec and passes the database schema from `_generated/schema` to `FunctionImpl.make` and `GroupImpl.make` — exactly like a non-node impl; only the spec differs (`GroupSpec.makeNode()`). Each handler runs in the Node.js runtime, so it has access to `NodeServices` from the `@effect/platform-node` package (filesystem, path, child processes, and more).
 
 ```ts confect/email.impl.ts
 import { FunctionImpl, GroupImpl } from "@confect/server";
-import { Command } from "@effect/platform";
 import * as Console from "effect/Console";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as ChildProcess from "effect/unstable/process/ChildProcess";
+import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
 import databaseSchema from "./_generated/schema";
 import email from "./email.spec";
 
@@ -47,10 +48,14 @@ const send = FunctionImpl.make(
   email,
   "send",
   Effect.fn(function* ({ to, subject, body }) {
-    const result = yield* Command.make(
-      "echo",
-      `Sending email to ${to} with subject ${subject} and body ${body}…`,
-    ).pipe(Command.stdout("pipe"), Command.string, Effect.orDie);
+    const spawner = yield* ChildProcessSpawner;
+    const result = yield* spawner
+      .string(
+        ChildProcess.make("echo", [
+          `Sending email to ${to} with subject ${subject} and body ${body}…`,
+        ]),
+      )
+      .pipe(Effect.orDie);
 
     yield* Console.log(result);
     yield* Effect.sleep(Duration.seconds(1));

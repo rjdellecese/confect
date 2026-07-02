@@ -361,8 +361,8 @@ export const writeGroups = (
       const path = yield* Path.Path;
       const convexDirectory = yield* ConvexDirectory.get;
       const group = yield* Effect.fromOption(
-          GroupPath.getGroupSpec(spec, groupPath),
-        );
+        GroupPath.getGroupSpec(spec, groupPath),
+      );
 
       const functionNames = pipe(
         group.functions,

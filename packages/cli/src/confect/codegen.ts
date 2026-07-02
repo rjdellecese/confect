@@ -452,7 +452,9 @@ const generateGroupRegisteredFunctions = (leaves: ReadonlyArray<LeafModule>) =>
         const runtime = yield* Option.match(leaf.runtime, {
           onNone: () =>
             Effect.die(
-              new Error(`Runtime for '${leaf.relativePath}' was not resolved before registry generation.`),
+              new Error(
+                `Runtime for '${leaf.relativePath}' was not resolved before registry generation.`,
+              ),
             ),
           onSome: Effect.succeed,
         });

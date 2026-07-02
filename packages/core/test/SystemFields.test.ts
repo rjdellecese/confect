@@ -1,7 +1,7 @@
 import * as Schema from "effect/Schema";
 import * as Tuple from "effect/Tuple";
 import { describe, expect, expectTypeOf, test } from "vitest";
-import { GenericId } from "@confect/core/GenericId";
+import type { GenericId } from "@confect/core/GenericId";
 import * as SystemFields from "@confect/core/SystemFields";
 
 describe("extendWithSystemFields", () => {
@@ -89,7 +89,9 @@ describe("extendWithSystemFields", () => {
 
     test("has the same type as the mapMembers + Tuple.map(fieldsAssign) combinator builds — a Union with every member extended — so the declared type cannot drift from the runtime", () => {
       const ViaMapMembers = ItemSchema.mapMembers(
-        Tuple.map(Schema.fieldsAssign(SystemFields.SystemFields("items").fields)),
+        Tuple.map(
+          Schema.fieldsAssign(SystemFields.SystemFields("items").fields),
+        ),
       );
 
       expectTypeOf<typeof ExtendedItemSchema>().toEqualTypeOf<

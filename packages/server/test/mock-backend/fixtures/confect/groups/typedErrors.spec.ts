@@ -7,9 +7,12 @@ export class NotFound extends Schema.TaggedErrorClass<NotFound>()("NotFound", {
   id: Schema.String,
 }) {}
 
-export class Forbidden extends Schema.TaggedErrorClass<Forbidden>()("Forbidden", {
-  reason: Schema.String,
-}) {}
+export class Forbidden extends Schema.TaggedErrorClass<Forbidden>()(
+  "Forbidden",
+  {
+    reason: Schema.String,
+  },
+) {}
 
 const NoteError = Schema.Union([NotFound, Forbidden]);
 

@@ -37,7 +37,10 @@ const queryOnce = <R extends Ref.AnyPublicQuery>(
   });
 
 // `MAX_CACHE_AGE` plus 1s of slack for scheduling jitter.
-const SLEEP_PAST_CACHE = Duration.sum(LocalBackend.maxCacheAge, Duration.seconds(1));
+const SLEEP_PAST_CACHE = Duration.sum(
+  LocalBackend.maxCacheAge,
+  Duration.seconds(1),
+);
 
 const captureAcrossEvictionWindow = <PublicQueryRef extends Ref.AnyPublicQuery>(
   ref: PublicQueryRef,

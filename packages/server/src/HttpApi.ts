@@ -92,10 +92,7 @@ const makeHandler =
       StorageWriter.layer(ctx.storage),
       StorageActionWriter.layer(ctx.storage),
       Layer.succeed(ActionCtx.ActionCtx<DataModel>(), ctx),
-      Layer.succeed(
-        ConfigProvider.ConfigProvider,
-        ConvexConfigProvider.make(),
-      ),
+      Layer.succeed(ConfigProvider.ConfigProvider, ConvexConfigProvider.make()),
     );
 
     const apiDefinition = api as HttpApi.AnyWithProps;
@@ -128,10 +125,7 @@ const makeHandler =
       },
     );
 
-    return handler(
-      request,
-      Context.empty() as Context.Context<any>,
-    );
+    return handler(request, Context.empty() as Context.Context<any>);
   };
 
 const makeHttpAction = <DataModel extends GenericDataModel>(

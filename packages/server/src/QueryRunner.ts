@@ -10,10 +10,7 @@ const make =
   <Query extends Ref.AnyQuery>(
     query: Query,
     ...args: Ref.OptionalArgs<Query>
-  ): Effect.Effect<
-    Ref.Returns<Query>,
-    Ref.Error<Query> | Schema.SchemaError
-  > =>
+  ): Effect.Effect<Ref.Returns<Query>, Ref.Error<Query> | Schema.SchemaError> =>
     Ref.runWithCodec(
       query,
       (args[0] ?? {}) as Ref.Args<Query>,

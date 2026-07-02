@@ -286,7 +286,9 @@ export const decodeReturnsSync = <Ref_ extends Any>(
 ): Returns<Ref_> =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag("Confect", (confectFunctionProvenance) =>
-      Schema.decodeUnknownSync(confectFunctionProvenance.returns)(encodedReturns),
+      Schema.decodeUnknownSync(confectFunctionProvenance.returns)(
+        encodedReturns,
+      ),
     ),
     Match.tag("Convex", () => encodedReturns),
     Match.exhaustive,
@@ -336,7 +338,9 @@ export const decodeError = <Ref_ extends Any>(
     Match.tag("Confect", (confectFunctionProvenance) =>
       "error" in confectFunctionProvenance
         ? Effect.map(
-            Schema.decodeUnknownEffect(confectFunctionProvenance.error)(encodedError),
+            Schema.decodeUnknownEffect(confectFunctionProvenance.error)(
+              encodedError,
+            ),
             Option.some,
           )
         : Effect.succeed(Option.none<Error<Ref_>>()),
@@ -375,7 +379,9 @@ export const maybeDecodeErrorSync = <Ref_ extends Any>(
     ? Match.value(ref.functionSpec.functionProvenance).pipe(
         Match.tag("Confect", (confectFunctionProvenance) =>
           "error" in confectFunctionProvenance
-            ? Schema.decodeUnknownSync(confectFunctionProvenance.error)(error.data)
+            ? Schema.decodeUnknownSync(confectFunctionProvenance.error)(
+                error.data,
+              )
             : error,
         ),
         Match.tag("Convex", () => error),
@@ -428,9 +434,9 @@ export const runWithCodec = <Ref_ extends Any, E = never>(
             confectFunctionProvenance.args,
           )(args);
           const encodedReturns = yield* invoke(encodedArgs);
-          return yield* Schema.decodeUnknownEffect(confectFunctionProvenance.returns)(
-            encodedReturns,
-          );
+          return yield* Schema.decodeUnknownEffect(
+            confectFunctionProvenance.returns,
+          )(encodedReturns);
         }),
       ),
       Match.tag("Convex", () => invoke(args)),

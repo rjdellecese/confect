@@ -5,11 +5,11 @@ import { Id } from "../_generated/id";
 export default Table.make(() =>
   Schema.Struct({
     userId: Schema.optional(Id("users")),
-    text: Schema.String.pipe(Schema.maxLength(100)),
+    text: Schema.String.check(Schema.isMaxLength(100)),
     tag: Schema.optional(Schema.String),
     author: Schema.optional(
       Schema.Struct({
-        role: Schema.Literal("admin", "user"),
+        role: Schema.Literals(["admin", "user"]),
         name: Schema.String,
       }),
     ),

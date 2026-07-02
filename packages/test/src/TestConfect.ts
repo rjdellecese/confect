@@ -77,8 +77,7 @@ export type TestConfect<ConfectSchema extends DatabaseSchema.AnyWithProps> = {
 
 export const TestConfect = <
   ConfectSchema extends DatabaseSchema.AnyWithProps,
->() =>
-  Context.Service<TestConfect<ConfectSchema>>("@confect/test/TestConfect");
+>() => Context.Service<TestConfect<ConfectSchema>>("@confect/test/TestConfect");
 
 class TestConfectImplWithoutIdentity<
   ConfectSchema extends DatabaseSchema.AnyWithProps,

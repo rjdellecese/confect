@@ -23,10 +23,7 @@ export type AnyEncoded = ReadonlyRecord<string, ReadonlyValue>;
 
 type Decode = (doc: unknown) => Effect.Effect<unknown, Schema.SchemaError>;
 
-const decoderCache = new WeakMap<
-  Schema.Codec<any, any>,
-  Map<string, Decode>
->();
+const decoderCache = new WeakMap<Schema.Codec<any, any>, Map<string, Decode>>();
 
 const getDecoder = (
   tableName: string,

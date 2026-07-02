@@ -83,9 +83,7 @@ export type TableSchemaToTableValidator<
     ? Vd
     : never;
 
-export const compileTableSchema = <
-  TableSchema extends Schema.Codec<any, any>,
->(
+export const compileTableSchema = <TableSchema extends Schema.Codec<any, any>>(
   schema: TableSchema,
 ): TableSchemaToTableValidator<TableSchema> => {
   const ast = Schema.toEncoded(schema).ast;
@@ -422,8 +420,7 @@ const handleObjects = (objectsAst: SchemaAST.Objects) =>
     objectsAst.indexSignatures,
     Array.head,
     Option.match({
-      onNone: () =>
-        Effect.map(handlePropertySignatures(objectsAst), v.object),
+      onNone: () => Effect.map(handlePropertySignatures(objectsAst), v.object),
       onSome: ({ parameter, type }) =>
         pipe(
           objectsAst.propertySignatures,

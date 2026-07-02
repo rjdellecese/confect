@@ -4,23 +4,22 @@ title: "HTTP API"
 description: "Define HTTP endpoints using Effect's HTTP API modules."
 ---
 
-Confect's HTTP API integration lets you define HTTP endpoints using [`@effect/platform`'s HTTP API modules](https://github.com/Effect-TS/effect/blob/main/packages/platform/README.md#http-api) and mount them onto Convex's HTTP router. It includes built-in interactive API documentation powered by [Scalar](https://github.com/scalar/scalar).
+Confect's HTTP API integration lets you define HTTP endpoints using Effect's `effect/unstable/httpapi` modules and mount them onto Convex's HTTP router. It includes built-in interactive API documentation powered by [Scalar](https://github.com/scalar/scalar).
 
 ## Defining endpoints
 
-Define your API groups and endpoints using `@effect/platform`.
+Define your API groups and endpoints using `effect/unstable/httpapi`.
 
 ```ts confect/http/notes.ts
+import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 import {
   HttpApi,
   HttpApiBuilder,
   HttpApiEndpoint,
   HttpApiGroup,
   OpenApi,
-} from "@effect/platform";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Schema from "effect/Schema";
+} from "effect/unstable/httpapi";
 
 import refs from "../_generated/refs";
 import { QueryRunner } from "../_generated/services";
@@ -28,9 +27,9 @@ import notes from "../_generated/tables/notes";
 
 class NotesGroup extends HttpApiGroup.make("notes")
   .add(
-    HttpApiEndpoint.get("getFirst", "/get-first")
-      .annotate(OpenApi.Description, "Get the first note, if there is one.")
-      .addSuccess(Schema.Option(notes.Doc)),
+    HttpApiEndpoint.get("getFirst", "/get-first", {
+      success: Schema.OptionFromNullOr(notes.Doc),
+    }).annotate(OpenApi.Description, "Get the first note, if there is one."),
   )
   .annotate(OpenApi.Title, "Notes")
   .annotate(OpenApi.Description, "Operations on notes.") {}
@@ -56,10 +55,10 @@ const NotesGroupLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
   ),
 );
 
-export const ApiLive = HttpApiBuilder.api(Api).pipe(
-  Layer.provide(NotesGroupLive),
-);
+export const ApiLive = NotesGroupLive;
 ```
+
+There is no `HttpApiBuilder.api` layer to wrap the group layers in — Confect registers the routes itself from the `api` definition — so export the group layer(s) directly (merge multiple groups with `Layer.mergeAll`).
 
 ## Creating the router
 
@@ -67,13 +66,14 @@ Create the Convex HTTP router in `confect/http.ts` using `HttpApi.make` from `@c
 
 ```ts confect/http.ts
 import { HttpApi } from "@confect/server";
-import { HttpMiddleware } from "@effect/platform";
 import { flow } from "effect/Function";
+import { HttpMiddleware } from "effect/unstable/http";
 
-import { ApiLive } from "./http/notes";
+import { Api, ApiLive } from "./http/notes";
 
 export default HttpApi.make({
   "/api/": {
+    api: Api,
     apiLive: ApiLive,
     middleware: flow(HttpMiddleware.cors(), HttpMiddleware.logger),
   },

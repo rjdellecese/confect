@@ -165,9 +165,7 @@ const stemFromSpecPath = (specPath: string): string => {
 const singleLine = (...parts: ReadonlyArray<string>): string =>
   `${cross} ${parts.join("")}`;
 
-const renderMissingImplFileError = (
-  error: MissingImplFileError,
-): string =>
+const renderMissingImplFileError = (error: MissingImplFileError): string =>
   singleLine(
     "Spec ",
     formatPath(error.specPath),
@@ -176,9 +174,7 @@ const renderMissingImplFileError = (
     " and default-export a GroupImpl layer from it.",
   );
 
-const renderMissingSpecFileError = (
-  error: MissingSpecFileError,
-): string =>
+const renderMissingSpecFileError = (error: MissingSpecFileError): string =>
   singleLine(
     "Impl ",
     formatPath(error.implPath),
@@ -216,9 +212,7 @@ const renderImplMissingDefaultLayerError = (
     " must default-export a GroupImpl layer; wrap your handlers with `GroupImpl.make(databaseSchema, groupSpec).pipe(Layer.provide(...))` and `export default` it.",
   );
 
-const renderImplNotFinalizedError = (
-  error: ImplNotFinalizedError,
-): string =>
+const renderImplNotFinalizedError = (error: ImplNotFinalizedError): string =>
   singleLine(
     "Impl ",
     formatPath(error.implPath),
@@ -284,9 +278,7 @@ const renderConflictingDocNameError = (
   );
 };
 
-const renderLegacySchemaFileError = (
-  error: LegacySchemaFileError,
-): string =>
+const renderLegacySchemaFileError = (error: LegacySchemaFileError): string =>
   singleLine(
     "Found a legacy ",
     formatPath(error.schemaPath),
