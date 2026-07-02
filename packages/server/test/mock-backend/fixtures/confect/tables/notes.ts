@@ -4,19 +4,16 @@ import { Id } from "../_generated/id";
 
 export default Table.make(() =>
   Schema.Struct({
-    userId: Schema.optionalWith(Id("users"), { exact: true }),
+    userId: Schema.optionalKey(Id("users")),
     text: Schema.String.pipe(Schema.maxLength(100)),
-    tag: Schema.optionalWith(Schema.String, { exact: true }),
-    author: Schema.optionalWith(
+    tag: Schema.optionalKey(Schema.String),
+    author: Schema.optionalKey(
       Schema.Struct({
-        role: Schema.Literal("admin", "user"),
+        role: Schema.Literals(["admin", "user"]),
         name: Schema.String,
       }),
-      { exact: true },
     ),
-    embedding: Schema.optionalWith(Schema.Array(Schema.Number), {
-      exact: true,
-    }),
+    embedding: Schema.optionalKey(Schema.Array(Schema.Number)),
   }),
 )
   .index("by_text", ["text"])
