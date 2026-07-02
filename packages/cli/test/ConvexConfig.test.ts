@@ -57,18 +57,18 @@ layer(TestLayer)("discoverInstalledComponents", (it) => {
         expect(components).toEqual([
           {
             name: "secondPool",
-            componentDefinitionPath: "@convex-dev/workpool/convex.config",
+            componentDefinitionPath: "@convex-dev/workpool",
           },
           {
             name: "workpool",
-            componentDefinitionPath: "@convex-dev/workpool/convex.config",
+            componentDefinitionPath: "@convex-dev/workpool",
           },
         ]);
       }),
   );
 
   it.effect(
-    "records locally-defined components as resolved absolute paths",
+    "records locally-defined components as resolved absolute directories",
     () =>
       Effect.gen(function* () {
         const path = yield* Path.Path;
@@ -81,12 +81,9 @@ layer(TestLayer)("discoverInstalledComponents", (it) => {
         const [waitlist] = components;
         assert(waitlist !== undefined);
         expect(waitlist.name).toBe("waitlist");
-        expect(path.isAbsolute(waitlist.componentDefinitionPath)).toBe(true);
-        expect(
-          waitlist.componentDefinitionPath.endsWith(
-            path.join("local", "convex", "waitlist", "convex.config.ts"),
-          ),
-        ).toBe(true);
+        expect(waitlist.componentDefinitionPath).toBe(
+          path.join(fixturesRoot, "local", "convex", "waitlist"),
+        );
 
         const importPath = typeImportPath(
           path,
@@ -110,6 +107,24 @@ layer(TestLayer)("discoverInstalledComponents", (it) => {
       assert(Either.isLeft(result));
       expect(result.left._tag).toBe("ImportFailedError");
     }),
+  );
+
+  it.effect(
+    "fails with InvalidConvexConfigError when a component name is invalid",
+    () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const result = yield* Effect.either(
+          discoverInstalledComponents(
+            path.join(fixturesRoot, "badName", "convex", "convex.config.ts"),
+            "convex/convex.config.ts",
+          ),
+        );
+
+        assert(Either.isLeft(result));
+        assert(result.left._tag === "InvalidConvexConfigError");
+        expect(result.left.reason).toContain('"not a valid name"');
+      }),
   );
 
   it.effect(

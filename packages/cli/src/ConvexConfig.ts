@@ -24,10 +24,12 @@ export interface InstalledComponent {
    */
   readonly name: string;
   /**
-   * Where the component's definition was imported from: the original import
-   * specifier when it was bare (e.g. `@convex-dev/workpool/convex.config`),
-   * or the resolved absolute path when it was relative (a locally-defined
-   * component).
+   * The directory the component's definition lives in, mirroring the Convex
+   * runtime's convention (a `componentDefinitionPath` identifies the
+   * definition's directory): the import specifier minus its trailing
+   * `convex.config` segment when it was bare (e.g. `@convex-dev/workpool`),
+   * or the resolved absolute directory when it was relative (a
+   * locally-defined component).
    */
   readonly componentDefinitionPath: string;
 }
@@ -101,13 +103,21 @@ export const componentConfigPlugin = (path: Path.Path): esbuild.Plugin => ({
       { filter: /.*/, namespace: COMPONENT_CONFIG_NAMESPACE },
       (args) => {
         const specifier = (args.pluginData as { specifier: string }).specifier;
-        // Convex's codegen doesn't trust relative specifiers as identifiers
-        // (the importer's location is lost after bundling), so record the
-        // resolved absolute path for those; bare specifiers are kept verbatim
-        // so the generated type import stays a package specifier.
+        // The injected path is the definition's *directory*, matching the
+        // Convex runtime's convention — so even if a future convex version
+        // stops reading `defaultName`, `app.use`'s last-resort fallback
+        // (`componentDefinitionPath.split("/").pop()`) still yields the
+        // conventional component name rather than `convex.config`. Convex's
+        // codegen doesn't trust relative specifiers as identifiers (the
+        // importer's location is lost after bundling), so those are recorded
+        // as the resolved absolute directory; bare specifiers keep their
+        // package prefix so the generated type import stays a package
+        // specifier.
         const isBareSpecifier =
           !specifier.startsWith(".") && !path.isAbsolute(specifier);
-        const componentDefinitionPath = isBareSpecifier ? specifier : args.path;
+        const componentDefinitionPath = isBareSpecifier
+          ? specifier.replace(CONVEX_CONFIG_SUFFIX, "")
+          : path.dirname(args.path);
 
         // The real module is imported (not inlined) so that an npm component
         // definition is externalized by `bundle-require` and evaluated from
@@ -146,6 +156,16 @@ const byName = Order.mapInput(
   Order.string,
   (component: InstalledComponent) => component.name,
 );
+
+/**
+ * Convex component names must be alphanumeric plus underscores (see
+ * `defineComponent`'s docs). Beyond rejecting genuinely invalid names, this
+ * is a drift tripwire: if a future convex version stopped resolving names
+ * the way we rely on (e.g. `defaultName` disappearing), the fallback name
+ * would be a path segment like `convex.config` — caught here as a clear
+ * error instead of silently emitting a broken registry.
+ */
+const VALID_COMPONENT_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 /**
  * Bundle and evaluate `convex/convex.config.ts` and list the components
@@ -217,6 +237,22 @@ export const discoverInstalledComponents = (
       Array.sort(byName),
     );
 
+    const invalidNames = pipe(
+      components,
+      Array.map(({ name }) => name),
+      Array.filter((name) => !VALID_COMPONENT_NAME.test(name)),
+    );
+    if (Array.isNonEmptyReadonlyArray(invalidNames)) {
+      return yield* new InvalidConvexConfigError({
+        configPath: displayPath,
+        reason: `component names must be alphanumeric plus underscores, but got: ${pipe(
+          invalidNames,
+          Array.map((name) => `"${name}"`),
+          Array.join(", "),
+        )}. Pass a valid \`name\` to \`app.use\`.`,
+      });
+    }
+
     const duplicateNames = pipe(
       components,
       Array.groupBy(({ name }) => name),
@@ -237,22 +273,20 @@ export const discoverInstalledComponents = (
 /**
  * The module specifier the generated registry's `ComponentApi` type import
  * should use for a component, following Convex's own codegen convention:
- * `<definition path minus the trailing convex.config segment>/_generated/component.js`.
- * Bare (npm) definition paths are used verbatim; locally-defined components
- * (recorded as absolute paths) become a relative path from
- * `confect/_generated`.
+ * `<definition directory>/_generated/component.js`. Bare (npm) definition
+ * directories are used verbatim; locally-defined components (recorded as
+ * absolute directories) become a relative path from `confect/_generated`.
  */
 export const typeImportPath = (
   path: Path.Path,
   componentDefinitionPath: string,
   confectGeneratedDirectory: string,
 ): string => {
-  const stripped = componentDefinitionPath.replace(CONVEX_CONFIG_SUFFIX, "");
-  if (!path.isAbsolute(stripped)) {
-    return stripped;
+  if (!path.isAbsolute(componentDefinitionPath)) {
+    return componentDefinitionPath;
   }
   const relative = path
-    .relative(confectGeneratedDirectory, stripped)
+    .relative(confectGeneratedDirectory, componentDefinitionPath)
     .split(path.sep)
     .join("/");
   return relative.startsWith(".") ? relative : `./${relative}`;
