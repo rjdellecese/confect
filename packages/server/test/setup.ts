@@ -1,24 +1,24 @@
-import type { CommandExecutor } from "@effect/platform";
-import * as Command from "@effect/platform/Command";
-import * as FileSystem from "@effect/platform/FileSystem";
-import * as Path from "@effect/platform/Path";
-import * as NodeContext from "@effect/platform-node/NodeContext";
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import { pipe } from "effect/Function";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
+import * as ChildProcess from "effect/unstable/process/ChildProcess";
+import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
 
 const runCommand = (
   command: string,
   args: string[],
-): Effect.Effect<void, never, CommandExecutor.CommandExecutor> =>
-  Command.make(command, ...args).pipe(
-    Command.exitCode,
-    Effect.andThen((exitCode) =>
-      exitCode !== 0
-        ? Effect.dieMessage(`${command} failed (exit code ${exitCode})`)
-        : Effect.void,
-    ),
-    Effect.orDie,
-  );
+): Effect.Effect<void, never, ChildProcessSpawner> =>
+  Effect.gen(function* () {
+    const spawner = yield* ChildProcessSpawner;
+    const exitCode = yield* spawner.exitCode(ChildProcess.make(command, args));
+    if (exitCode !== 0) {
+      return yield* Effect.die(
+        new Error(`${command} failed (exit code ${exitCode})`),
+      );
+    }
+  }).pipe(Effect.orDie);
 
 // Absolute path to the @confect/cli entry point. Resolved from this file's
 // location rather than relying on a `confect` bin in `node_modules/.bin/`,
@@ -69,10 +69,12 @@ export const setupForFixture =
         // (vacuously) signal that requirement, but the cycle-breaking
         // refactor above means it's now only enforced by `pnpm build`.
         if (!(yield* fs.exists(cliEntry))) {
-          return yield* Effect.dieMessage(
-            `@confect/cli's build output is missing at ${cliEntry}. ` +
-              `Run \`pnpm build\` from the repo root (or \`vp run --filter @confect/cli dev\` ` +
-              `for a watcher) before running this test suite.`,
+          return yield* Effect.die(
+            new Error(
+              `@confect/cli's build output is missing at ${cliEntry}. ` +
+                `Run \`pnpm build\` from the repo root (or \`vp run --filter @confect/cli dev\` ` +
+                `for a watcher) before running this test suite.`,
+            ),
           );
         }
 
@@ -81,6 +83,6 @@ export const setupForFixture =
           yield* runCommand(process.execPath, [cliEntry, "codegen"]);
         }).pipe(Effect.ensuring(Effect.sync(() => process.chdir(originalCwd))));
       }),
-      Effect.provide(NodeContext.layer),
+      Effect.provide(NodeServices.layer),
       Effect.runPromise,
     );

@@ -143,8 +143,8 @@ const tryFailingAction = FunctionImpl.make(
 
       yield* runAction(refs.public.groups.typedErrors.failingAction, { kind });
 
-      return yield* Effect.dieMessage(
-        "failingAction was expected to fail with a typed error",
+      return yield* Effect.die(
+        new Error("failingAction was expected to fail with a typed error"),
       );
     }).pipe(
       Effect.catchTags({

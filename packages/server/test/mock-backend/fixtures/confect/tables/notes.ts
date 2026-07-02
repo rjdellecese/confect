@@ -5,7 +5,7 @@ import { Id } from "../_generated/id";
 export default Table.make(() =>
   Schema.Struct({
     userId: Schema.optionalKey(Id("users")),
-    text: Schema.String.pipe(Schema.maxLength(100)),
+    text: Schema.String.check(Schema.isMaxLength(100)),
     tag: Schema.optionalKey(Schema.String),
     author: Schema.optionalKey(
       Schema.Struct({
