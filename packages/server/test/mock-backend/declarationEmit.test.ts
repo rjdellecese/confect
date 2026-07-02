@@ -1,4 +1,4 @@
-import * as Path from "@effect/platform/Path";
+import * as Path from "effect/Path";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { expect, layer } from "@effect/vitest";
 import * as Array from "effect/Array";
@@ -11,9 +11,7 @@ import * as ts from "typescript";
 
 const entries = ["services.ts", "docs.ts", "refs.ts", "schema.ts", "spec.ts"];
 
-class CompiledProgram extends Context.Tag(
-  "@confect/server/test/mock-backend/declarationEmit.test/CompiledProgram",
-)<
+class CompiledProgram extends Context.Service<
   CompiledProgram,
   {
     readonly host: ts.CompilerHost;
@@ -21,7 +19,9 @@ class CompiledProgram extends Context.Tag(
     readonly program: ts.Program;
     readonly emitResult: ts.EmitResult;
   }
->() {}
+>()(
+  "@confect/server/test/mock-backend/declarationEmit.test/CompiledProgram",
+) {}
 
 const buildProgram = Effect.gen(function* () {
   const path = yield* Path.Path;
@@ -101,8 +101,10 @@ const emitDeclaration = (entry: string) =>
     const declaration = emitted.get(declarationPath);
 
     if (declaration === undefined) {
-      return yield* Effect.dieMessage(
-        `${entry} produced no declaration emit:\n${ts.formatDiagnostics(diagnostics, host)}`,
+      return yield* Effect.die(
+        new Error(
+          `${entry} produced no declaration emit:\n${ts.formatDiagnostics(diagnostics, host)}`,
+        ),
       );
     }
 

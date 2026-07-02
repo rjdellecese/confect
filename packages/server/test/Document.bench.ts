@@ -5,13 +5,12 @@ import * as Schema from "effect/Schema";
 
 const NoteSchema = Schema.Struct({
   content: Schema.String,
-  tag: Schema.optionalWith(Schema.String, { exact: true }),
-  author: Schema.optionalWith(
+  tag: Schema.optionalKey(Schema.String),
+  author: Schema.optionalKey(
     Schema.Struct({
-      role: Schema.Literal("admin", "user"),
+      role: Schema.Literals(["admin", "user"]),
       name: Schema.String,
     }),
-    { exact: true },
   ),
 });
 
