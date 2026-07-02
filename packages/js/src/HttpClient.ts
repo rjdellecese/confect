@@ -1,12 +1,11 @@
 import * as Ref from "@confect/core/Ref";
 import { ConvexHttpClient } from "convex/browser";
-import type { ParseResult } from "effect";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
-export class HttpClientError extends Schema.TaggedError<HttpClientError>()(
+export class HttpClientError extends Schema.TaggedErrorClass<HttpClientError>()(
   "HttpClientError",
   {
     cause: Schema.Unknown,
@@ -37,7 +36,7 @@ const make = (
     ...rest: Ref.OptionalArgs<Query>
   ): Effect.Effect<
     Ref.Returns<Query>,
-    Ref.Error<Query> | HttpClientError | ParseResult.ParseError
+    Ref.Error<Query> | HttpClientError | Schema.SchemaError
   > => {
     const args = (rest[0] ?? {}) as Ref.Args<Query>;
     return Ref.runWithCodec(
@@ -54,7 +53,7 @@ const make = (
     ...rest: Ref.OptionalArgs<Mutation>
   ): Effect.Effect<
     Ref.Returns<Mutation>,
-    Ref.Error<Mutation> | HttpClientError | ParseResult.ParseError
+    Ref.Error<Mutation> | HttpClientError | Schema.SchemaError
   > => {
     const args = (rest[0] ?? {}) as Ref.Args<Mutation>;
     return Ref.runWithCodec(
@@ -71,7 +70,7 @@ const make = (
     ...rest: Ref.OptionalArgs<Action>
   ): Effect.Effect<
     Ref.Returns<Action>,
-    Ref.Error<Action> | HttpClientError | ParseResult.ParseError
+    Ref.Error<Action> | HttpClientError | Schema.SchemaError
   > => {
     const args = (rest[0] ?? {}) as Ref.Args<Action>;
     return Ref.runWithCodec(
@@ -96,7 +95,7 @@ const make = (
 /**
  * A Confect client which uses HTTP to communicate with your Convex backend. Works in any JS runtime that supports `fetch`. Wraps [ConvexHttpClient](https://docs.convex.dev/api/classes/browser.ConvexHttpClient).
  */
-export const HttpClient = Context.GenericTag<ReturnType<typeof make>>(
+export const HttpClient = Context.Service<ReturnType<typeof make>>(
   "@confect/js/HttpClient",
 );
 

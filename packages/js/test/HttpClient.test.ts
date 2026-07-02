@@ -2,7 +2,7 @@ import { FunctionSpec, Ref } from "@confect/core";
 import { assert, describe, expect, layer } from "@effect/vitest";
 import { ConvexError } from "convex/values";
 import * as Effect from "effect/Effect";
-import * as Either from "effect/Either";
+import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import { beforeEach, vi } from "vitest";
 import * as HttpClient from "@confect/js/HttpClient";
@@ -146,7 +146,7 @@ layer(HttpClientLayer)("HttpClient optional args", (it) => {
   });
 });
 
-class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+class NotFound extends Schema.TaggedErrorClass<NotFound>()("NotFound", {
   id: Schema.String,
 }) {}
 
@@ -189,12 +189,12 @@ layer(HttpClientLayer)("HttpClient error decoding", (it) => {
         );
         const client = yield* HttpClient.HttpClient;
 
-        const result = yield* Effect.either(
+        const result = yield* Effect.result(
           client.query(queryWithError, { id: "abc" }),
         );
-        assert(Either.isLeft(result));
-        assert(result.left instanceof NotFound);
-        expect(result.left.id).toBe("abc");
+        assert(Result.isFailure(result));
+        assert(result.failure instanceof NotFound);
+        expect(result.failure.id).toBe("abc");
       }),
     );
 
@@ -204,12 +204,12 @@ layer(HttpClientLayer)("HttpClient error decoding", (it) => {
         mockQuery.mockRejectedValue(transport);
         const client = yield* HttpClient.HttpClient;
 
-        const result = yield* Effect.either(
+        const result = yield* Effect.result(
           client.query(queryWithError, { id: "abc" }),
         );
-        assert(Either.isLeft(result));
-        assert(result.left instanceof HttpClient.HttpClientError);
-        expect(result.left.cause).toBe(transport);
+        assert(Result.isFailure(result));
+        assert(result.failure instanceof HttpClient.HttpClientError);
+        expect(result.failure.cause).toBe(transport);
       }),
     );
   });
@@ -222,11 +222,11 @@ layer(HttpClientLayer)("HttpClient error decoding", (it) => {
         );
         const client = yield* HttpClient.HttpClient;
 
-        const result = yield* Effect.either(
+        const result = yield* Effect.result(
           client.mutation(mutationWithError, { id: "abc" }),
         );
-        assert(Either.isLeft(result));
-        expect(result.left).toBeInstanceOf(NotFound);
+        assert(Result.isFailure(result));
+        expect(result.failure).toBeInstanceOf(NotFound);
       }),
     );
 
@@ -235,11 +235,11 @@ layer(HttpClientLayer)("HttpClient error decoding", (it) => {
         mockMutation.mockRejectedValue(new Error("oops"));
         const client = yield* HttpClient.HttpClient;
 
-        const result = yield* Effect.either(
+        const result = yield* Effect.result(
           client.mutation(mutationWithError, { id: "abc" }),
         );
-        assert(Either.isLeft(result));
-        expect(result.left).toBeInstanceOf(HttpClient.HttpClientError);
+        assert(Result.isFailure(result));
+        expect(result.failure).toBeInstanceOf(HttpClient.HttpClientError);
       }),
     );
   });
@@ -252,11 +252,11 @@ layer(HttpClientLayer)("HttpClient error decoding", (it) => {
         );
         const client = yield* HttpClient.HttpClient;
 
-        const result = yield* Effect.either(
+        const result = yield* Effect.result(
           client.action(actionWithError, { id: "abc" }),
         );
-        assert(Either.isLeft(result));
-        expect(result.left).toBeInstanceOf(NotFound);
+        assert(Result.isFailure(result));
+        expect(result.failure).toBeInstanceOf(NotFound);
       }),
     );
 
@@ -265,11 +265,11 @@ layer(HttpClientLayer)("HttpClient error decoding", (it) => {
         mockAction.mockRejectedValue(new Error("oops"));
         const client = yield* HttpClient.HttpClient;
 
-        const result = yield* Effect.either(
+        const result = yield* Effect.result(
           client.action(actionWithError, { id: "abc" }),
         );
-        assert(Either.isLeft(result));
-        expect(result.left).toBeInstanceOf(HttpClient.HttpClientError);
+        assert(Result.isFailure(result));
+        expect(result.failure).toBeInstanceOf(HttpClient.HttpClientError);
       }),
     );
   });
