@@ -10,7 +10,7 @@ import type { FunctionReference } from "convex/server";
 import type { Value } from "convex/values";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
-import * as Either from "effect/Either";
+import * as Result from "effect/Result";
 import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
 import { useCallback, useMemo } from "react";
@@ -24,7 +24,7 @@ export type InvokeReturn<Ref_ extends Ref.Any> = [Ref.Error<Ref_>] extends [
   never,
 ]
   ? Promise<Ref.Returns<Ref_>>
-  : Promise<Either.Either<Ref.Returns<Ref_>, Ref.Error<Ref_>>>;
+  : Promise<Result.Result<Ref.Returns<Ref_>, Ref.Error<Ref_>>>;
 
 type UseQueryArgs<Query extends Ref.AnyPublicQuery> =
   keyof Ref.Args<Query> extends never
@@ -44,25 +44,25 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
 
   // `useConvexQuery` returns a referentially stable value while the underlying
   // Convex result is unchanged, and throws a stable error when the query
-  // fails. We capture either outcome as an `Either` and decode/wrap it inside
+  // fails. We capture either outcome as a `Result` and decode/wrap it inside
   // `useMemo` so that the returned `QueryResult` keeps a stable identity across
   // renders when nothing has actually changed. Decoding on every render would
   // hand consumers a fresh object each time, breaking effects and memoization
   // that depend on the result's identity.
-  const encodedReturnsOrError: Either.Either<unknown, unknown> = Either.try(
+  const encodedReturnsOrError: Result.Result<unknown, unknown> = Result.try(
     () => useConvexQuery(functionReference, encodedArgs),
   );
 
   return useMemo(
     () =>
-      Either.match(encodedReturnsOrError, {
-        onRight: (encodedReturnsOrUndefined) =>
+      Result.match(encodedReturnsOrError, {
+        onSuccess: (encodedReturnsOrUndefined) =>
           encodedReturnsOrUndefined === undefined
             ? QueryResult.load(skipped)
             : QueryResult.succeed(
                 Ref.decodeReturnsSync(ref, encodedReturnsOrUndefined),
               ),
-        onLeft: (error) => {
+        onFailure: (error) => {
           if (Ref.isConvexError(error)) {
             const decoded = Ref.decodeErrorSync(ref, error.data);
             if (Option.isSome(decoded)) {
@@ -72,11 +72,11 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
           throw error;
         },
       }),
-    // `Either.try` allocates a fresh wrapper each render, so we key the memo on
+    // `Result.try` allocates a fresh wrapper each render, so we key the memo on
     // the stable value it carries (the Convex result or thrown error) rather
     // than the wrapper itself; the decoded result is a function of that value,
     // `ref`, and `skipped`.
-    [ref, skipped, Either.merge(encodedReturnsOrError)],
+    [ref, skipped, Result.merge(encodedReturnsOrError)],
   );
 };
 
@@ -110,12 +110,12 @@ const makeReactMutation = <Mutation extends Ref.AnyPublicMutation>(
   >,
 ): ReactMutation<Mutation> => {
   const callable = ((...args: Ref.OptionalArgs<Mutation>) =>
-    invokeAsEither(
+    invokeAsResult(
       ref,
       (_, encodedArgs) => convexReactMutation(encodedArgs as never),
       args,
-    ).then((either) =>
-      Ref.hasErrorSchema(ref) ? either : Either.getOrThrow(either),
+    ).then((result) =>
+      Ref.hasErrorSchema(ref) ? result : Result.getOrThrow(result),
     )) as (...args: Ref.OptionalArgs<Mutation>) => InvokeReturn<Mutation>;
 
   const withOptimisticUpdate = (
@@ -145,9 +145,9 @@ const makeReactMutation = <Mutation extends Ref.AnyPublicMutation>(
  * for attaching an optimistic update, mirroring `useMutation` from
  * `convex/react`.
  *
- * If the `Ref` declares an `error` schema, the returned promise resolves to an
- * `Either` with the decoded `returns` value on the right and the decoded error
- * on the left.
+ * If the `Ref` declares an `error` schema, the returned promise resolves to a
+ * `Result` with the decoded `returns` value in the `Success` and the decoded
+ * error in the `Failure`.
  *
  * If the `Ref` does not declare an `error` schema, the promise resolves
  * directly to the decoded `returns` value, matching the behavior of
@@ -176,9 +176,9 @@ export const useMutation = <Mutation extends Ref.AnyPublicMutation>(
 /**
  * Returns a function that invokes the provided `Ref`'s action.
  *
- * If the `Ref` declares an `error` schema, the returned promise resolves to an
- * `Either` with the decoded `returns` value on the right and the decoded error
- * on the left.
+ * If the `Ref` declares an `error` schema, the returned promise resolves to a
+ * `Result` with the decoded `returns` value in the `Success` and the decoded
+ * error in the `Failure`.
  *
  * If the `Ref` does not declare an `error` schema, the promise resolves
  * directly to the decoded `returns` value, matching the behavior of
@@ -194,29 +194,29 @@ export const useAction = <Action extends Ref.AnyPublicAction>(
 
   return useCallback(
     ((...args: Ref.OptionalArgs<Action>) =>
-      invokeAsEither(
+      invokeAsResult(
         ref,
         (_, encodedArgs) => actualAction(encodedArgs),
         args,
-      ).then((either) =>
-        Ref.hasErrorSchema(ref) ? either : Either.getOrThrow(either),
+      ).then((result) =>
+        Ref.hasErrorSchema(ref) ? result : Result.getOrThrow(result),
       )) as (...args: Ref.OptionalArgs<Action>) => InvokeReturn<Action>,
     [ref, actualAction],
   );
 };
 
-const invokeAsEither = async <Ref_ extends Ref.Any>(
+const invokeAsResult = async <Ref_ extends Ref.Any>(
   ref: Ref_,
   invoke: (
     fnRef: Ref.FunctionReference<Ref_>,
     encodedArgs: unknown,
   ) => PromiseLike<unknown>,
   args: Ref.OptionalArgs<Ref_>,
-): Promise<Either.Either<Ref.Returns<Ref_>, Ref.Error<Ref_>>> => {
+): Promise<Result.Result<Ref.Returns<Ref_>, Ref.Error<Ref_>>> => {
   const exit = await Effect.runPromiseExit(
     Ref.runWithCodec(ref, (args[0] ?? {}) as Ref.Args<Ref_>, invoke).pipe(
-      Effect.catchTag("ParseError", Effect.die),
-      Effect.either,
+      Effect.catchTag("SchemaError", Effect.die),
+      Effect.result,
     ),
   );
   if (Exit.isSuccess(exit)) return exit.value;
