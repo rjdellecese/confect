@@ -1,5 +1,3 @@
-import * as Ansi from "@effect/printer-ansi/Ansi";
-import * as AnsiDoc from "@effect/printer-ansi/AnsiDoc";
 import * as Array from "effect/Array";
 import { pipe } from "effect/Function";
 import * as Effect from "effect/Effect";
@@ -7,11 +5,12 @@ import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { BuildError, isBuildError, renderBuildError } from "./BuildError";
-import { formatPathDoc } from "./log";
+import * as Ansi from "./Ansi";
+import { formatPath } from "./log";
 
 // --- Variants ---
 
-export class MissingImplFileError extends Schema.TaggedError<MissingImplFileError>()(
+export class MissingImplFileError extends Schema.TaggedErrorClass<MissingImplFileError>()(
   "MissingImplFileError",
   {
     specPath: Schema.String,
@@ -19,7 +18,7 @@ export class MissingImplFileError extends Schema.TaggedError<MissingImplFileErro
   },
 ) {}
 
-export class MissingSpecFileError extends Schema.TaggedError<MissingSpecFileError>()(
+export class MissingSpecFileError extends Schema.TaggedErrorClass<MissingSpecFileError>()(
   "MissingSpecFileError",
   {
     implPath: Schema.String,
@@ -27,14 +26,14 @@ export class MissingSpecFileError extends Schema.TaggedError<MissingSpecFileErro
   },
 ) {}
 
-export class SpecMissingDefaultGroupSpecError extends Schema.TaggedError<SpecMissingDefaultGroupSpecError>()(
+export class SpecMissingDefaultGroupSpecError extends Schema.TaggedErrorClass<SpecMissingDefaultGroupSpecError>()(
   "SpecMissingDefaultGroupSpecError",
   {
     specPath: Schema.String,
   },
 ) {}
 
-export class ImplMissingSpecImportError extends Schema.TaggedError<ImplMissingSpecImportError>()(
+export class ImplMissingSpecImportError extends Schema.TaggedErrorClass<ImplMissingSpecImportError>()(
   "ImplMissingSpecImportError",
   {
     implPath: Schema.String,
@@ -42,21 +41,21 @@ export class ImplMissingSpecImportError extends Schema.TaggedError<ImplMissingSp
   },
 ) {}
 
-export class ImplMissingDefaultLayerError extends Schema.TaggedError<ImplMissingDefaultLayerError>()(
+export class ImplMissingDefaultLayerError extends Schema.TaggedErrorClass<ImplMissingDefaultLayerError>()(
   "ImplMissingDefaultLayerError",
   {
     implPath: Schema.String,
   },
 ) {}
 
-export class ImplNotFinalizedError extends Schema.TaggedError<ImplNotFinalizedError>()(
+export class ImplNotFinalizedError extends Schema.TaggedErrorClass<ImplNotFinalizedError>()(
   "ImplNotFinalizedError",
   {
     implPath: Schema.String,
   },
 ) {}
 
-export class ImplMissingFunctionsError extends Schema.TaggedError<ImplMissingFunctionsError>()(
+export class ImplMissingFunctionsError extends Schema.TaggedErrorClass<ImplMissingFunctionsError>()(
   "ImplMissingFunctionsError",
   {
     implPath: Schema.String,
@@ -65,24 +64,24 @@ export class ImplMissingFunctionsError extends Schema.TaggedError<ImplMissingFun
   },
 ) {}
 
-export class ParentChildNameCollisionError extends Schema.TaggedError<ParentChildNameCollisionError>()(
+export class ParentChildNameCollisionError extends Schema.TaggedErrorClass<ParentChildNameCollisionError>()(
   "ParentChildNameCollisionError",
   {
     parentSpecPath: Schema.String,
     childSpecPath: Schema.String,
     collisionName: Schema.String,
-    collisionKind: Schema.Literal("function", "group"),
+    collisionKind: Schema.Literals(["function", "group"]),
   },
 ) {}
 
-export class InvalidTableDefaultExportError extends Schema.TaggedError<InvalidTableDefaultExportError>()(
+export class InvalidTableDefaultExportError extends Schema.TaggedErrorClass<InvalidTableDefaultExportError>()(
   "InvalidTableDefaultExportError",
   {
     tablePath: Schema.String,
   },
 ) {}
 
-export class InvalidTableFilenameError extends Schema.TaggedError<InvalidTableFilenameError>()(
+export class InvalidTableFilenameError extends Schema.TaggedErrorClass<InvalidTableFilenameError>()(
   "InvalidTableFilenameError",
   {
     tablePath: Schema.String,
@@ -90,7 +89,7 @@ export class InvalidTableFilenameError extends Schema.TaggedError<InvalidTableFi
   },
 ) {}
 
-export class DuplicateTableNameError extends Schema.TaggedError<DuplicateTableNameError>()(
+export class DuplicateTableNameError extends Schema.TaggedErrorClass<DuplicateTableNameError>()(
   "DuplicateTableNameError",
   {
     // Every table name that more than one file resolves to, each paired with
@@ -106,14 +105,14 @@ export class DuplicateTableNameError extends Schema.TaggedError<DuplicateTableNa
   },
 ) {}
 
-export class LegacySchemaFileError extends Schema.TaggedError<LegacySchemaFileError>()(
+export class LegacySchemaFileError extends Schema.TaggedErrorClass<LegacySchemaFileError>()(
   "LegacySchemaFileError",
   {
     schemaPath: Schema.String,
   },
 ) {}
 
-export class ConflictingDocNameError extends Schema.TaggedError<ConflictingDocNameError>()(
+export class ConflictingDocNameError extends Schema.TaggedErrorClass<ConflictingDocNameError>()(
   "ConflictingDocNameError",
   {
     collisions: Schema.Array(
@@ -125,7 +124,7 @@ export class ConflictingDocNameError extends Schema.TaggedError<ConflictingDocNa
   },
 ) {}
 
-export const CodegenError = Schema.Union(
+export const CodegenError = Schema.Union([
   BuildError,
   MissingImplFileError,
   MissingSpecFileError,
@@ -140,7 +139,7 @@ export const CodegenError = Schema.Union(
   DuplicateTableNameError,
   LegacySchemaFileError,
   ConflictingDocNameError,
-);
+]);
 export type CodegenError = typeof CodegenError.Type;
 
 export const isCodegenError = (error: unknown): error is CodegenError => {
@@ -150,7 +149,7 @@ export const isCodegenError = (error: unknown): error is CodegenError => {
 
 // --- Per-variant rendering ---
 
-const cross = pipe(AnsiDoc.char("✘"), AnsiDoc.annotate(Ansi.red));
+const cross = Ansi.red("✘");
 
 const stemFromSpecPath = (specPath: string): string => {
   const lastSep = Math.max(
@@ -163,118 +162,101 @@ const stemFromSpecPath = (specPath: string): string => {
     : basename;
 };
 
-const singleLine = (
-  ...parts: ReadonlyArray<AnsiDoc.AnsiDoc>
-): AnsiDoc.AnsiDoc => pipe(cross, AnsiDoc.catWithSpace(AnsiDoc.hcat(parts)));
+const singleLine = (...parts: ReadonlyArray<string>): string =>
+  `${cross} ${parts.join("")}`;
 
 const renderMissingImplFileError = (
   error: MissingImplFileError,
-): AnsiDoc.AnsiDoc =>
+): string =>
   singleLine(
-    AnsiDoc.text("Spec "),
-    formatPathDoc(error.specPath),
-    AnsiDoc.text(" has no sibling impl; create "),
-    formatPathDoc(error.expectedImplPath),
-    AnsiDoc.text(" and default-export a GroupImpl layer from it."),
+    "Spec ",
+    formatPath(error.specPath),
+    " has no sibling impl; create ",
+    formatPath(error.expectedImplPath),
+    " and default-export a GroupImpl layer from it.",
   );
 
 const renderMissingSpecFileError = (
   error: MissingSpecFileError,
-): AnsiDoc.AnsiDoc =>
+): string =>
   singleLine(
-    AnsiDoc.text("Impl "),
-    formatPathDoc(error.implPath),
-    AnsiDoc.text(" has no sibling spec; create "),
-    formatPathDoc(error.expectedSpecPath),
-    AnsiDoc.text(
-      " and default-export a GroupSpec from it, or remove the impl.",
-    ),
+    "Impl ",
+    formatPath(error.implPath),
+    " has no sibling spec; create ",
+    formatPath(error.expectedSpecPath),
+    " and default-export a GroupSpec from it, or remove the impl.",
   );
 
 const renderSpecMissingDefaultGroupSpecError = (
   error: SpecMissingDefaultGroupSpecError,
-): AnsiDoc.AnsiDoc =>
+): string =>
   singleLine(
-    AnsiDoc.text("Spec "),
-    formatPathDoc(error.specPath),
-    AnsiDoc.text(
-      " must default-export a GroupSpec; build it with GroupSpec.make() or GroupSpec.makeNode().",
-    ),
+    "Spec ",
+    formatPath(error.specPath),
+    " must default-export a GroupSpec; build it with GroupSpec.make() or GroupSpec.makeNode().",
   );
 
 const renderImplMissingSpecImportError = (
   error: ImplMissingSpecImportError,
-): AnsiDoc.AnsiDoc => {
+): string => {
   const stem = stemFromSpecPath(error.expectedSpecPath);
   return singleLine(
-    AnsiDoc.text("Impl "),
-    formatPathDoc(error.implPath),
-    AnsiDoc.text(
-      ` does not import its sibling spec; add \`import ${stem} from "./${stem}.spec"\` and pass it to FunctionImpl.make / GroupImpl.make.`,
-    ),
+    "Impl ",
+    formatPath(error.implPath),
+    ` does not import its sibling spec; add \`import ${stem} from "./${stem}.spec"\` and pass it to FunctionImpl.make / GroupImpl.make.`,
   );
 };
 
 const renderImplMissingDefaultLayerError = (
   error: ImplMissingDefaultLayerError,
-): AnsiDoc.AnsiDoc =>
+): string =>
   singleLine(
-    AnsiDoc.text("Impl "),
-    formatPathDoc(error.implPath),
-    AnsiDoc.text(
-      " must default-export a GroupImpl layer; wrap your handlers with `GroupImpl.make(databaseSchema, groupSpec).pipe(Layer.provide(...))` and `export default` it.",
-    ),
+    "Impl ",
+    formatPath(error.implPath),
+    " must default-export a GroupImpl layer; wrap your handlers with `GroupImpl.make(databaseSchema, groupSpec).pipe(Layer.provide(...))` and `export default` it.",
   );
 
 const renderImplNotFinalizedError = (
   error: ImplNotFinalizedError,
-): AnsiDoc.AnsiDoc =>
+): string =>
   singleLine(
-    AnsiDoc.text("Impl "),
-    formatPathDoc(error.implPath),
-    AnsiDoc.text(
-      " is not finalized; append `GroupImpl.finalize` to the end of the pipeline (e.g. `GroupImpl.make(databaseSchema, group).pipe(Layer.provide(...), GroupImpl.finalize)`).",
-    ),
+    "Impl ",
+    formatPath(error.implPath),
+    " is not finalized; append `GroupImpl.finalize` to the end of the pipeline (e.g. `GroupImpl.make(databaseSchema, group).pipe(Layer.provide(...), GroupImpl.finalize)`).",
   );
 
 const renderImplMissingFunctionsError = (
   error: ImplMissingFunctionsError,
-): AnsiDoc.AnsiDoc => {
+): string => {
   const names = error.missingFunctionNames.join(", ");
   return singleLine(
-    AnsiDoc.text("Impl "),
-    formatPathDoc(error.implPath),
-    AnsiDoc.text(
-      ` does not implement every function declared by group \`${error.groupPath}\`; missing: ${names}. Add a \`FunctionImpl.make\` for each missing function and provide it to the group layer.`,
-    ),
+    "Impl ",
+    formatPath(error.implPath),
+    ` does not implement every function declared by group \`${error.groupPath}\`; missing: ${names}. Add a \`FunctionImpl.make\` for each missing function and provide it to the group layer.`,
   );
 };
 
 const renderInvalidTableDefaultExportError = (
   error: InvalidTableDefaultExportError,
-): AnsiDoc.AnsiDoc =>
+): string =>
   singleLine(
-    AnsiDoc.text("Table "),
-    formatPathDoc(error.tablePath),
-    AnsiDoc.text(
-      " must default-export a Table (e.g. `export default Table.make({ ... })`); convert any named export to a default export.",
-    ),
+    "Table ",
+    formatPath(error.tablePath),
+    " must default-export a Table (e.g. `export default Table.make({ ... })`); convert any named export to a default export.",
   );
 
 const renderInvalidTableFilenameError = (
   error: InvalidTableFilenameError,
-): AnsiDoc.AnsiDoc =>
+): string =>
   singleLine(
-    AnsiDoc.text("Table "),
-    formatPathDoc(error.tablePath),
-    AnsiDoc.text(
-      ` has an invalid filename: ${error.reason} Convex table names must start with a letter and contain only letters, numbers, and underscores; leading underscores are reserved for system tables.`,
-    ),
+    "Table ",
+    formatPath(error.tablePath),
+    ` has an invalid filename: ${error.reason} Convex table names must start with a letter and contain only letters, numbers, and underscores; leading underscores are reserved for system tables.`,
   );
 
 const renderDuplicateTableNameError = (
   error: DuplicateTableNameError,
-): AnsiDoc.AnsiDoc => {
+): string => {
   const conflicts = error.collisions
     .map(
       ({ tableName, tablePaths }) =>
@@ -282,15 +264,13 @@ const renderDuplicateTableNameError = (
     )
     .join("; ");
   return singleLine(
-    AnsiDoc.text(
-      `Multiple files under \`confect/tables/\` resolve to the same table name. Table names are derived from filenames, so each must be unique across the directory (including subdirectories); rename or remove all but one. Conflicts: ${conflicts}.`,
-    ),
+    `Multiple files under \`confect/tables/\` resolve to the same table name. Table names are derived from filenames, so each must be unique across the directory (including subdirectories); rename or remove all but one. Conflicts: ${conflicts}.`,
   );
 };
 
 const renderConflictingDocNameError = (
   error: ConflictingDocNameError,
-): AnsiDoc.AnsiDoc => {
+): string => {
   const conflicts = pipe(
     error.collisions,
     Array.map(
@@ -300,36 +280,28 @@ const renderConflictingDocNameError = (
     Array.join("; "),
   );
   return singleLine(
-    AnsiDoc.text(
-      `Multiple tables fold to the same generated document type name. Table names are converted to PascalCase (so \`user_profiles\` and \`userProfiles\` both become \`UserProfilesDoc\`); rename all but one of each colliding group. Conflicts: ${conflicts}.`,
-    ),
+    `Multiple tables fold to the same generated document type name. Table names are converted to PascalCase (so \`user_profiles\` and \`userProfiles\` both become \`UserProfilesDoc\`); rename all but one of each colliding group. Conflicts: ${conflicts}.`,
   );
 };
 
 const renderLegacySchemaFileError = (
   error: LegacySchemaFileError,
-): AnsiDoc.AnsiDoc =>
+): string =>
   singleLine(
-    AnsiDoc.text("Found a legacy "),
-    formatPathDoc(error.schemaPath),
-    AnsiDoc.text(
-      ". Delete it: tables in `confect/tables/*.ts` are now the single source of truth, and the runtime schema is generated as `confect/_generated/schema.ts`.",
-    ),
+    "Found a legacy ",
+    formatPath(error.schemaPath),
+    ". Delete it: tables in `confect/tables/*.ts` are now the single source of truth, and the runtime schema is generated as `confect/_generated/schema.ts`.",
   );
 
 const renderParentChildNameCollisionError = (
   error: ParentChildNameCollisionError,
-): AnsiDoc.AnsiDoc =>
+): string =>
   singleLine(
-    AnsiDoc.text("Spec "),
-    formatPathDoc(error.parentSpecPath),
-    AnsiDoc.text(
-      ` declares a ${error.collisionKind} \`${error.collisionName}\` whose name collides with the sibling subdirectory spec `,
-    ),
-    formatPathDoc(error.childSpecPath),
-    AnsiDoc.text(
-      `. Rename one of them so the assembled spec has a unique key at this path.`,
-    ),
+    "Spec ",
+    formatPath(error.parentSpecPath),
+    ` declares a ${error.collisionKind} \`${error.collisionName}\` whose name collides with the sibling subdirectory spec `,
+    formatPath(error.childSpecPath),
+    `. Rename one of them so the assembled spec has a unique key at this path.`,
   );
 
 /**
@@ -341,72 +313,31 @@ const renderParentChildNameCollisionError = (
 export const renderCodegenError = (error: CodegenError): string => {
   if (isBuildError(error)) return renderBuildError(error);
   return Match.value(error).pipe(
-    Match.tag("MissingImplFileError", (e) =>
-      pipe(renderMissingImplFileError(e), AnsiDoc.render({ style: "pretty" })),
+    Match.tag("MissingImplFileError", renderMissingImplFileError),
+    Match.tag("MissingSpecFileError", renderMissingSpecFileError),
+    Match.tag(
+      "SpecMissingDefaultGroupSpecError",
+      renderSpecMissingDefaultGroupSpecError,
     ),
-    Match.tag("MissingSpecFileError", (e) =>
-      pipe(renderMissingSpecFileError(e), AnsiDoc.render({ style: "pretty" })),
+    Match.tag("ImplMissingSpecImportError", renderImplMissingSpecImportError),
+    Match.tag(
+      "ImplMissingDefaultLayerError",
+      renderImplMissingDefaultLayerError,
     ),
-    Match.tag("SpecMissingDefaultGroupSpecError", (e) =>
-      pipe(
-        renderSpecMissingDefaultGroupSpecError(e),
-        AnsiDoc.render({ style: "pretty" }),
-      ),
+    Match.tag("ImplNotFinalizedError", renderImplNotFinalizedError),
+    Match.tag("ImplMissingFunctionsError", renderImplMissingFunctionsError),
+    Match.tag(
+      "ParentChildNameCollisionError",
+      renderParentChildNameCollisionError,
     ),
-    Match.tag("ImplMissingSpecImportError", (e) =>
-      pipe(
-        renderImplMissingSpecImportError(e),
-        AnsiDoc.render({ style: "pretty" }),
-      ),
+    Match.tag(
+      "InvalidTableDefaultExportError",
+      renderInvalidTableDefaultExportError,
     ),
-    Match.tag("ImplMissingDefaultLayerError", (e) =>
-      pipe(
-        renderImplMissingDefaultLayerError(e),
-        AnsiDoc.render({ style: "pretty" }),
-      ),
-    ),
-    Match.tag("ImplNotFinalizedError", (e) =>
-      pipe(renderImplNotFinalizedError(e), AnsiDoc.render({ style: "pretty" })),
-    ),
-    Match.tag("ImplMissingFunctionsError", (e) =>
-      pipe(
-        renderImplMissingFunctionsError(e),
-        AnsiDoc.render({ style: "pretty" }),
-      ),
-    ),
-    Match.tag("ParentChildNameCollisionError", (e) =>
-      pipe(
-        renderParentChildNameCollisionError(e),
-        AnsiDoc.render({ style: "pretty" }),
-      ),
-    ),
-    Match.tag("InvalidTableDefaultExportError", (e) =>
-      pipe(
-        renderInvalidTableDefaultExportError(e),
-        AnsiDoc.render({ style: "pretty" }),
-      ),
-    ),
-    Match.tag("InvalidTableFilenameError", (e) =>
-      pipe(
-        renderInvalidTableFilenameError(e),
-        AnsiDoc.render({ style: "pretty" }),
-      ),
-    ),
-    Match.tag("DuplicateTableNameError", (e) =>
-      pipe(
-        renderDuplicateTableNameError(e),
-        AnsiDoc.render({ style: "pretty" }),
-      ),
-    ),
-    Match.tag("LegacySchemaFileError", (e) =>
-      pipe(renderLegacySchemaFileError(e), AnsiDoc.render({ style: "pretty" })),
-    ),
-    Match.tag("ConflictingDocNameError", (e) =>
-      pipe(
-        renderConflictingDocNameError(e),
-        AnsiDoc.render({ style: "pretty" }),
-      ),
-    ),
+    Match.tag("InvalidTableFilenameError", renderInvalidTableFilenameError),
+    Match.tag("DuplicateTableNameError", renderDuplicateTableNameError),
+    Match.tag("LegacySchemaFileError", renderLegacySchemaFileError),
+    Match.tag("ConflictingDocNameError", renderConflictingDocNameError),
     Match.exhaustive,
   );
 };

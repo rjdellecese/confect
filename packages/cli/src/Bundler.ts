@@ -1,5 +1,5 @@
 import { dirname, isAbsolute, resolve } from "node:path";
-import * as Path from "@effect/platform/Path";
+import * as Path from "effect/Path";
 import { bundleRequire } from "bundle-require";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
@@ -89,7 +89,7 @@ export const bundle = (
     });
 
     if (!metafile) {
-      return yield* Effect.dieMessage("esbuild metafile missing");
+      return yield* Effect.die(new Error("esbuild metafile missing"));
     }
 
     return { module: result.mod, metafile: absolutizeMetafile(metafile, cwd) };
@@ -132,7 +132,7 @@ export const directlyImports = (
     return pipe(
       Option.all([sourceKey, targetKey]),
       Option.flatMap(([sourceKey_, targetKey_]) =>
-        Option.fromNullable(bundled.metafile.inputs[sourceKey_]).pipe(
+        Option.fromNullishOr(bundled.metafile.inputs[sourceKey_]).pipe(
           Option.map((sourceInput) => {
             const targetResolved = path.resolve(targetKey_);
             return sourceInput.imports.some(

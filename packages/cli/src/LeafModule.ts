@@ -1,7 +1,7 @@
 import { GroupSpec, Registry } from "@confect/core";
 import * as GroupImpl from "@confect/server/GroupImpl";
-import * as FileSystem from "@effect/platform/FileSystem";
-import * as Path from "@effect/platform/Path";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
 import type { Context } from "effect";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
@@ -220,7 +220,7 @@ export const validateSpec = (leaf: LeafModule) =>
 const findFinalizedGroupImpl = <S>(
   context: Context.Context<S>,
 ): Option.Option<GroupImpl.AnyFinalized> =>
-  Array.findFirst(context.unsafeMap.values(), GroupImpl.isFinalizedGroupImpl);
+  Array.findFirst(context.mapUnsafe.values(), GroupImpl.isFinalizedGroupImpl);
 
 /**
  * Build the impl layer with a fresh `Registry` so each validation is
@@ -233,7 +233,7 @@ const findFinalizedGroupImpl = <S>(
  */
 const buildImplLayer = (implLayer: Layer.Layer<unknown>) =>
   Effect.gen(function* () {
-    const registry = Ref.unsafeMake<Registry.RegistryItems>({});
+    const registry = Ref.makeUnsafe<Registry.RegistryItems>({});
     return yield* Layer.build(
       implLayer as Layer.Layer<unknown, never, never>,
     ).pipe(Effect.provideService(Registry.Registry, registry));

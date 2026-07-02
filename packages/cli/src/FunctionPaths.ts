@@ -8,7 +8,7 @@ import * as FunctionPath from "./FunctionPath";
 import * as GroupPath from "./GroupPath";
 import * as GroupPaths from "./GroupPaths";
 
-export const FunctionPaths = Schema.HashSetFromSelf(
+export const FunctionPaths = Schema.HashSet(
   FunctionPath.FunctionPath,
 ).pipe(Schema.brand("@confect/cli/FunctionPaths"));
 export type FunctionPaths = typeof FunctionPaths.Type;

@@ -1,5 +1,3 @@
-import * as Ansi from "@effect/printer-ansi/Ansi";
-import * as AnsiDoc from "@effect/printer-ansi/AnsiDoc";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
@@ -8,11 +6,12 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as String from "effect/String";
 import * as esbuild from "esbuild";
-import { formatPathDoc } from "./log";
+import * as Ansi from "./Ansi";
+import { formatPath } from "./log";
 
 // --- Variants ---
 
-export class BundleFailedError extends Schema.TaggedError<BundleFailedError>()(
+export class BundleFailedError extends Schema.TaggedErrorClass<BundleFailedError>()(
   "BundleFailedError",
   {
     file: Schema.String,
@@ -20,7 +19,7 @@ export class BundleFailedError extends Schema.TaggedError<BundleFailedError>()(
   },
 ) {}
 
-export class ImportFailedError extends Schema.TaggedError<ImportFailedError>()(
+export class ImportFailedError extends Schema.TaggedErrorClass<ImportFailedError>()(
   "ImportFailedError",
   {
     file: Schema.String,
@@ -28,7 +27,7 @@ export class ImportFailedError extends Schema.TaggedError<ImportFailedError>()(
   },
 ) {}
 
-export const BuildError = Schema.Union(BundleFailedError, ImportFailedError);
+export const BuildError = Schema.Union([BundleFailedError, ImportFailedError]);
 export type BuildError = typeof BuildError.Type;
 
 export const isBuildError = (error: unknown): error is BuildError =>
@@ -41,7 +40,7 @@ export const isBuildError = (error: unknown): error is BuildError =>
  * remapped to a {@link BuildError} (which carries enough context for the CLI
  * to render it) before reaching a user-surface boundary.
  */
-export class BundlerError extends Schema.TaggedError<BundlerError>()(
+export class BundlerError extends Schema.TaggedErrorClass<BundlerError>()(
   "BundlerError",
   {
     cause: Schema.Unknown,
@@ -64,13 +63,9 @@ export const fromBundlerError = (
 
 // --- Rendering ---
 
-const cross = pipe(AnsiDoc.char("✘"), AnsiDoc.annotate(Ansi.red));
+const cross = Ansi.red("✘");
 
-const errorGutter = pipe(
-  AnsiDoc.char("│"),
-  AnsiDoc.annotate(Ansi.red),
-  AnsiDoc.render({ style: "pretty" }),
-);
+const errorGutter = Ansi.red("│");
 
 const withErrorGutterBlock = (output: string): string =>
   pipe(
@@ -87,17 +82,11 @@ const formatBuildMessage = (
   formattedMessage: string,
 ): string => {
   const lines = String.split(formattedMessage, "\n");
-  const redErrorText = pipe(
-    AnsiDoc.text(error?.text ?? ""),
-    AnsiDoc.annotate(Ansi.red),
-    AnsiDoc.render({ style: "pretty" }),
-  );
+  const redErrorText = Ansi.red(error?.text ?? "");
   const replaced = pipe(
     Array.findFirstIndex(lines, (l) => pipe(l, String.trim, String.isNonEmpty)),
-    Option.match({
-      onNone: () => lines,
-      onSome: (index) => Array.modify(lines, index, () => redErrorText),
-    }),
+    Option.flatMap((index) => Array.modify(lines, index, () => redErrorText)),
+    Option.getOrElse(() => lines),
   );
   return pipe(replaced, Array.join("\n"));
 };
@@ -120,7 +109,7 @@ export const formatEsbuildMessages = (
     withErrorGutterBlock,
   );
 
-const renderImportFailedError = (error: ImportFailedError): AnsiDoc.AnsiDoc => {
+const renderImportFailedError = (error: ImportFailedError): string => {
   const causeMessage =
     error.cause instanceof Error
       ? error.cause.message
@@ -133,18 +122,9 @@ const renderImportFailedError = (error: ImportFailedError): AnsiDoc.AnsiDoc => {
     Option.map(String.trim),
     Option.getOrElse(() => "unknown error"),
   );
-  return pipe(
-    cross,
-    AnsiDoc.catWithSpace(
-      AnsiDoc.hcat([
-        AnsiDoc.text("Failed to load bundled module "),
-        formatPathDoc(error.file),
-        AnsiDoc.text(
-          `: ${oneLineCause}; check the file's top-level imports and side effects.`,
-        ),
-      ]),
-    ),
-  );
+  return `${cross} Failed to load bundled module ${formatPath(
+    error.file,
+  )}: ${oneLineCause}; check the file's top-level imports and side effects.`;
 };
 
 /**
@@ -161,13 +141,7 @@ const renderBundleFailedError = (error: BundleFailedError): string => {
     color: true,
     terminalWidth: 80,
   });
-  const header = pipe(
-    cross,
-    AnsiDoc.catWithSpace(
-      AnsiDoc.hcat([formatPathDoc(error.file), AnsiDoc.text(": build errors")]),
-    ),
-    AnsiDoc.render({ style: "pretty" }),
-  );
+  const header = `${cross} ${formatPath(error.file)}: build errors`;
   return `${header}\n${formatEsbuildMessages(messages, formatted)}`;
 };
 
@@ -179,9 +153,7 @@ const renderBundleFailedError = (error: BundleFailedError): string => {
 export const renderBuildError = (error: BuildError): string =>
   Match.value(error).pipe(
     Match.tag("BundleFailedError", renderBundleFailedError),
-    Match.tag("ImportFailedError", (e) =>
-      pipe(renderImportFailedError(e), AnsiDoc.render({ style: "pretty" })),
-    ),
+    Match.tag("ImportFailedError", renderImportFailedError),
     Match.exhaustive,
   );
 
@@ -202,11 +174,7 @@ const renderCoalescedBuildErrors = (
     color: true,
     terminalWidth: 80,
   });
-  const header = pipe(
-    cross,
-    AnsiDoc.catWithSpace(AnsiDoc.text("Build errors")),
-    AnsiDoc.render({ style: "pretty" }),
-  );
+  const header = `${cross} Build errors`;
   return `${header}\n${formatEsbuildMessages(messages, formatted)}`;
 };
 

@@ -1,6 +1,6 @@
 import { FunctionSpec, GroupSpec, Spec } from "@confect/core";
-import * as FileSystem from "@effect/platform/FileSystem";
-import * as Path from "@effect/platform/Path";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { assert, expect, layer } from "@effect/vitest";
@@ -22,11 +22,9 @@ const RemoveGroupsLayer = Layer.mergeAll(
   NodePath.layer,
   NodeFileSystem.layer,
   Layer.mock(ConfectDirectory, {
-    _tag: "@confect/cli/ConfectDirectory",
     get: Effect.succeed(`${fixtureRoot}/confect`),
   }),
   Layer.mock(ConvexDirectory, {
-    _tag: "@confect/cli/ConvexDirectory",
     get: Effect.succeed(fixtureConvex),
   }),
 );
@@ -101,15 +99,12 @@ const runGenerateForNodeGroup = ({
 
     const TempDirsLayer = Layer.mergeAll(
       Layer.mock(ProjectRoot, {
-        _tag: "@confect/cli/ProjectRoot",
         get: Effect.succeed(root),
       }),
       Layer.mock(ConvexDirectory, {
-        _tag: "@confect/cli/ConvexDirectory",
         get: Effect.succeed(convexDir),
       }),
       Layer.mock(ConfectDirectory, {
-        _tag: "@confect/cli/ConfectDirectory",
         get: Effect.succeed(confectDir),
       }),
     );

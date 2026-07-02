@@ -1,10 +1,10 @@
-import * as FileSystem from "@effect/platform/FileSystem";
-import * as Path from "@effect/platform/Path";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { assert, expect, layer } from "@effect/vitest";
 import * as Effect from "effect/Effect";
-import * as Either from "effect/Either";
+import * as Result from "effect/Result";
 import * as Layer from "effect/Layer";
 import type { CodegenError } from "@confect/cli/CodegenError";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
@@ -27,7 +27,6 @@ const LeafModuleLayer = Layer.mergeAll(
   NodePath.layer,
   NodeFileSystem.layer,
   Layer.mock(ConfectDirectory, {
-    _tag: "@confect/cli/ConfectDirectory",
     get: Effect.succeed(fixtureConfect),
   }),
 );
@@ -179,7 +178,7 @@ layer(LeafModuleLayer)("validateSpec", (it) => {
   it.effect("rejects a spec without a GroupSpec default export", () =>
     Effect.gen(function* () {
       const leaf = yield* toLeafModule("groups/_invalid.spec.ts");
-      const result = yield* Effect.either(
+      const result = yield* Effect.result(
         withTempFile(
           "groups/_invalid.spec.ts",
           "export default {};\n",
@@ -187,15 +186,15 @@ layer(LeafModuleLayer)("validateSpec", (it) => {
         ),
       );
 
-      assert(Either.isLeft(result));
-      expect(result.left._tag).toBe("SpecMissingDefaultGroupSpecError");
+      assert(Result.isFailure(result));
+      expect(result.failure._tag).toBe("SpecMissingDefaultGroupSpecError");
     }),
   );
 
   it.effect("rejects a spec with a syntax error", () =>
     Effect.gen(function* () {
       const leaf = yield* toLeafModule("groups/_brokenSyntax.spec.ts");
-      const result = yield* Effect.either(
+      const result = yield* Effect.result(
         withTempFile(
           "groups/_brokenSyntax.spec.ts",
           "export default GroupSpec.make(\n",
@@ -203,9 +202,9 @@ layer(LeafModuleLayer)("validateSpec", (it) => {
         ),
       );
 
-      assert(Either.isLeft(result));
-      assert(result.left._tag === "BundleFailedError");
-      expect(result.left.errors.length).toBeGreaterThan(0);
+      assert(Result.isFailure(result));
+      assert(result.failure._tag === "BundleFailedError");
+      expect(result.failure.errors.length).toBeGreaterThan(0);
     }),
   );
 });
@@ -227,7 +226,7 @@ layer(LeafModuleLayer)("validateImpl", (it) => {
 
   it.effect("rejects impl that does not directly import the sibling spec", () =>
     Effect.gen(function* () {
-      const result = yield* Effect.either(
+      const result = yield* Effect.result(
         withTempLeaf(
           "_mismatch",
           // Imports `./notes.spec` instead of its sibling `./_mismatch.spec`.
@@ -240,14 +239,14 @@ export default Layer.empty;
         ),
       );
 
-      assert(Either.isLeft(result));
-      expect(result.left._tag).toBe("ImplMissingSpecImportError");
+      assert(Result.isFailure(result));
+      expect(result.failure._tag).toBe("ImplMissingSpecImportError");
     }),
   );
 
   it.effect("rejects impl without a layer default export", () =>
     Effect.gen(function* () {
-      const result = yield* Effect.either(
+      const result = yield* Effect.result(
         withTempLeaf(
           "_notLayer",
           `import notes from "./_notLayer.spec";
@@ -257,14 +256,14 @@ export default notes;
         ),
       );
 
-      assert(Either.isLeft(result));
-      expect(result.left._tag).toBe("ImplMissingDefaultLayerError");
+      assert(Result.isFailure(result));
+      expect(result.failure._tag).toBe("ImplMissingDefaultLayerError");
     }),
   );
 
   it.effect("rejects impl with a syntax error", () =>
     Effect.gen(function* () {
-      const result = yield* Effect.either(
+      const result = yield* Effect.result(
         withTempLeaf(
           "_brokenSyntax",
           `import notes from "./_brokenSyntax.spec";
@@ -274,9 +273,9 @@ export default GroupImpl.make(
         ),
       );
 
-      assert(Either.isLeft(result));
-      assert(result.left._tag === "BundleFailedError");
-      expect(result.left.errors.length).toBeGreaterThan(0);
+      assert(Result.isFailure(result));
+      assert(result.failure._tag === "BundleFailedError");
+      expect(result.failure.errors.length).toBeGreaterThan(0);
     }),
   );
 
@@ -284,7 +283,7 @@ export default GroupImpl.make(
     "rejects impl whose default export is not piped through GroupImpl.finalize",
     () =>
       Effect.gen(function* () {
-        const result = yield* Effect.either(
+        const result = yield* Effect.result(
           withTempLeaf(
             "_unfinalized",
             `import { FunctionImpl, GroupImpl } from "@confect/server";
@@ -345,8 +344,8 @@ export default GroupImpl.make(databaseSchema, notes).pipe(
           ),
         );
 
-        assert(Either.isLeft(result));
-        expect(result.left._tag).toBe("ImplNotFinalizedError");
+        assert(Result.isFailure(result));
+        expect(result.failure._tag).toBe("ImplNotFinalizedError");
       }),
   );
 
@@ -354,7 +353,7 @@ export default GroupImpl.make(databaseSchema, notes).pipe(
     "rejects impl that does not provide every function declared by its spec",
     () =>
       Effect.gen(function* () {
-        const result = yield* Effect.either(
+        const result = yield* Effect.result(
           withTempLeaf(
             "_incomplete",
             `import { FunctionImpl, GroupImpl } from "@confect/server";
@@ -386,12 +385,12 @@ export default GroupImpl.make(databaseSchema, notes).pipe(
           ),
         );
 
-        assert(Either.isLeft(result));
-        assert(result.left._tag === "ImplMissingFunctionsError");
+        assert(Result.isFailure(result));
+        assert(result.failure._tag === "ImplMissingFunctionsError");
         // The reported group path is the impl/spec leaf's own filesystem
         // location, which points at the file that is missing functions.
-        expect(result.left.groupPath).toBe("groups._incomplete");
-        expect([...result.left.missingFunctionNames].sort()).toEqual(
+        expect(result.failure.groupPath).toBe("groups._incomplete");
+        expect([...result.failure.missingFunctionNames].sort()).toEqual(
           ["delete_", "getFirst", "internalGetFirst", "list"].sort(),
         );
       }),
