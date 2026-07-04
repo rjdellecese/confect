@@ -674,9 +674,9 @@ describe(compileSchema, () => {
       });
 
       test("struct with index signatures", () => {
-        // v4 rejects mixed index and property signatures at the type level,
-        // but the runtime error from Confect's compiler is still worth
-        // pinning for schemas that evade the static check.
+        // `Schema.StructWithRest` rejects mixed index and property signatures
+        // at the type level, but the runtime error from Confect's compiler is
+        // still worth pinning for schemas that evade the static check.
         const schema = Schema.StructWithRest(
           Schema.Struct({
             foo: Schema.String,

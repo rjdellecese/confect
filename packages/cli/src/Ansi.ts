@@ -1,9 +1,7 @@
 /**
- * Minimal ANSI styling helpers for CLI output, replacing the retired
- * `@effect/printer-ansi` dependency (Effect v4 folds the CLI into
- * `effect/unstable/cli` and keeps its ANSI helpers internal). Styles are
- * functions from text to a styled string with a trailing reset, mirroring how
- * the v4 CLI internals compose escape sequences.
+ * Minimal ANSI styling helpers for CLI output (Effect's own ANSI helpers in
+ * `effect/unstable/cli` are internal). Styles are functions from text to a
+ * styled string with a trailing reset.
  */
 
 const ESC = "\x1B[";

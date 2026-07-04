@@ -34,9 +34,8 @@ See Scalar's documentation on [markdown support](https://github.com/scalar/scala
   .prefix("/path-prefix") {}
 
 /**
- * The group handler layers for {@link Api}. Effect v4's `HttpApiBuilder` has
- * no `api` layer to wrap these in — Confect registers the routes itself from
- * the `api` definition — so the group layer(s) are exported directly.
+ * The group handler layers for {@link Api}, exported directly — Confect
+ * registers the routes itself from the `api` definition.
  */
 export const ApiLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
   handlers.handle("getFirst", () =>

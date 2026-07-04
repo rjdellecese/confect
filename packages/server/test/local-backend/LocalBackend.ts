@@ -66,8 +66,8 @@ const make = Effect.gen(function* () {
     ],
     {
       cwd: fixturesDir,
-      // v3's Command.env merged with the parent environment by default; v4
-      // replaces it unless extendEnv is set, and `pnpm` must stay on PATH.
+      // Without extendEnv, `env` replaces the child's entire environment and
+      // `pnpm` falls off PATH.
       extendEnv: true,
       env: {
         CONVEX_AGENT_MODE: "anonymous",

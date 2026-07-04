@@ -31,8 +31,8 @@ import { StorageReader } from "./StorageReader";
 import { StorageWriter } from "./StorageWriter";
 
 /**
- * Request-level middleware applied to the handler effect (Effect v4's
- * `HttpMiddleware` shape). Replaces the v3 `HttpApp`-wrapping middleware.
+ * Request-level middleware applied to the handler effect. See Effect's
+ * `HttpMiddleware` module for built-in middleware such as `cors` and `logger`.
  */
 export type Middleware = HttpMiddleware.HttpMiddleware;
 
@@ -52,13 +52,11 @@ type ConfectHttpServices =
 /**
  * An Effect `HttpApi` mounted at a path prefix.
  *
- * Effect v4 has no `HttpApi.Api` service, so the API definition can no longer
- * be tunneled through a layer: `api` carries the `HttpApi` definition (used to
- * register routes and to derive the OpenAPI document for the Scalar docs
- * page), and `apiLive` provides the group handler services built with
- * `HttpApiBuilder.group(api, ...)`. Handlers may use any
- * {@link ConfectHttpServices}, whether required directly by the group layer or
- * surfaced as request-level `Requires` markers.
+ * `api` carries the `HttpApi` definition, used to register routes and to
+ * derive the OpenAPI document for the Scalar docs page. `apiLive` provides the
+ * group handler services built with `HttpApiBuilder.group(api, ...)`. Handlers
+ * may use any {@link ConfectHttpServices}, whether required directly by the
+ * group layer or surfaced as request-level `Requires` markers.
  */
 export type HttpApi_ = {
   api: HttpApi.Any;

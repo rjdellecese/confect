@@ -58,7 +58,7 @@ const NotesGroupLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
 export const ApiLive = NotesGroupLive;
 ```
 
-There is no `HttpApiBuilder.api` layer to wrap the group layers in — Confect registers the routes itself from the `api` definition — so export the group layer(s) directly (merge multiple groups with `Layer.mergeAll`).
+Export the group layer(s) directly (merge multiple groups with `Layer.mergeAll`); Confect registers the routes itself from the `api` definition.
 
 ## Creating the router
 
