@@ -174,7 +174,7 @@ export type Components = {
   "workpool": import("@convex-dev/workpool/_generated/component.js").ComponentApi<"workpool">;
 };
 
-export const components: Components = componentsGeneric() as unknown as Components;
+export const components: Components = componentsGeneric() as any;
 `,
       );
     }).pipe(Effect.scoped),
@@ -206,7 +206,7 @@ export const components: Components = componentsGeneric() as unknown as Componen
 
 export type Components = {};
 
-export const components: Components = componentsGeneric() as unknown as Components;
+export const components: Components = componentsGeneric() as any;
 `,
       );
     }).pipe(Effect.scoped),

@@ -295,9 +295,10 @@ export const authConfig = ({ authImportPath }: { authImportPath: string }) =>
  * evaluates each impl's import graph, and `convex/_generated/api` doesn't
  * exist yet at that point.
  *
- * The `as unknown as` cast is confined here: `componentsGeneric()` is typed
+ * The `as any` cast is confined here: `componentsGeneric()` is typed
  * `AnyChildComponents`, which deliberately doesn't overlap the precise
- * registry type.
+ * registry type; the `Components` annotation on the const supplies the
+ * real type.
  */
 export const components = ({
   components: installedComponents,
@@ -329,7 +330,7 @@ export const components = ({
     yield* cbw.blankLine();
 
     yield* cbw.writeLine(
-      `export const components: Components = componentsGeneric() as unknown as Components;`,
+      `export const components: Components = componentsGeneric() as any;`,
     );
 
     return yield* cbw.toString();

@@ -18,9 +18,7 @@ export default app;
 
 ## Referencing components
 
-Component clients (like `Workpool`) take a component reference. Convex generates a typed `components` registry in `convex/_generated/api`, but importing that file from a module that a Confect impl imports breaks `confect codegen`: Confect bundles and evaluates each impl's import graph, and `convex/_generated/api` doesn't exist yet at that point (Convex generates it from the `convex/` modules that Confect codegen itself produces).
-
-Instead, import the registry that Confect generates at `confect/_generated/components.ts`. It has the same shape and types as Convex's, but it is derived directly from `convex/convex.config.ts`, so it exists before Convex codegen runs and is safe to import anywhere in your `confect/` directory.
+Component clients (like `Workpool`) take a component reference. Import the typed `components` registry that Confect generates at `confect/_generated/components.ts`:
 
 ```ts confect/workpool.ts
 import { Workpool } from "@convex-dev/workpool";
@@ -32,11 +30,19 @@ const pool = new Workpool(components.workpool, {
 ```
 
 <Note>
-  The generated registry types each component with the `ComponentApi` type that
-  component packages export from `_generated/component.js`. Recently published
-  versions of the official `@convex-dev/*` components all follow this
-  convention; a component that predates it will still work at runtime but won't
-  get precise types.
+  Use this registry rather than the `components` export of
+  `convex/_generated/api`, which doesn't exist yet when `confect codegen`
+  evaluates your code and so breaks codegen on a clean checkout. Confect's
+  registry is equivalent, but is derived directly from
+  `convex/convex.config.ts`, so it is safe to import anywhere in your `confect/`
+  directory.
+</Note>
+
+<Note>
+  Each component is typed with the `ComponentApi` type that component packages
+  export from `_generated/component.js`. Recently published versions of the
+  official `@convex-dev/*` components all follow this convention; a component
+  that predates it will still work at runtime but won't get precise types.
 </Note>
 
 ## Defining functions for components
