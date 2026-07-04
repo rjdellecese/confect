@@ -45,7 +45,7 @@ export default app;
 
 ### Write the Convex functions
 
-Write standard Convex functions using the Convex API and place them in your `confect/` directory. By [convention](/concepts/file-naming-conventions), they go adjacent to their corresponding spec and impl files—for example, `workpool.ts` alongside `workpool.spec.ts` and `workpool.impl.ts`.
+Write standard Convex functions using the Convex API and place them in your `confect/` directory. By [convention](/concepts/file-naming-conventions), they go adjacent to their corresponding spec and impl files—for example, `workpool.ts` alongside `workpool.spec.ts` and `workpool.impl.ts`. The component reference comes from Confect's generated [components registry](/server/components#referencing-components).
 
 ```ts confect/workpool.ts
 import {
@@ -55,13 +55,14 @@ import {
   vOnCompleteArgs,
 } from "@convex-dev/workpool";
 import { v } from "convex/values";
-import { components, internal } from "../convex/_generated/api";
+import { internal } from "../convex/_generated/api";
 import {
   internalAction,
   internalMutation,
   mutation,
   query,
 } from "../convex/_generated/server";
+import { components } from "./_generated/components";
 
 const pool = new Workpool(components.workpool, {
   maxParallelism: 3,

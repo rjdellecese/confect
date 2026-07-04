@@ -31,6 +31,7 @@ import * as esbuild from "esbuild";
 import * as Bundler from "../Bundler";
 import * as CodegenError from "../CodegenError";
 import { ConfectDirectory } from "../ConfectDirectory";
+import { CONVEX_CONFIG_FILENAME } from "../ConvexConfig";
 import { ConvexDirectory } from "../ConvexDirectory";
 import * as FunctionPaths from "../FunctionPaths";
 import type * as GroupPaths from "../GroupPaths";
@@ -225,6 +226,7 @@ export const dev = Command.make("dev", {}, () =>
           ),
         ),
         confectStructureWatcher(signal, pendingRef, restartQueue),
+        convexConfigStructureWatcher(signal, pendingRef, restartQueue),
         syncLoop(
           signal,
           pendingRef,
@@ -464,7 +466,28 @@ const discoverEntryPoints = Effect.gen(function* () {
     (relativePath) => tryEntry(relativePath, "specDirty"),
   );
 
-  return Array.getSomes([...fixedEntryOptions, ...implEntryOptions]);
+  // `convex/convex.config.ts` feeds the generated components registry, so
+  // edits to it (or to a locally-defined component definition it imports —
+  // npm component definitions are externalized and not watched) must re-run
+  // codegen.
+  const convexDirectory = yield* ConvexDirectory.get;
+  const convexConfigEntryOption = yield* Effect.gen(function* () {
+    const absolutePath = path.join(convexDirectory, CONVEX_CONFIG_FILENAME);
+    if (!(yield* fs.exists(absolutePath))) {
+      return Option.none<EntryPoint>();
+    }
+    return Option.some<EntryPoint>({
+      absolutePath,
+      displayPath: path.relative(projectRoot, absolutePath),
+      pendingKey: "specDirty",
+    });
+  });
+
+  return Array.getSomes([
+    ...fixedEntryOptions,
+    convexConfigEntryOption,
+    ...implEntryOptions,
+  ]);
 });
 
 const esbuildOptions = (
@@ -698,6 +721,41 @@ const confectStructureWatcher = (
           pendingRef,
           restartQueue,
         }),
+      ),
+    );
+  });
+
+/**
+ * Non-recursive `fs.watch` on the convex directory, reacting only to
+ * `convex.config.ts`. Recursion is deliberately avoided: codegen (Confect's
+ * and Convex's) writes into `convex/` and `convex/_generated/` constantly,
+ * and reacting to those writes would loop. Create/Remove offers to
+ * `restartQueue` so the entry-point watcher set picks up (or drops) the
+ * config's esbuild watcher.
+ */
+const convexConfigStructureWatcher = (
+  signal: Queue.Queue<void>,
+  pendingRef: Ref.Ref<Pending>,
+  restartQueue: Queue.Queue<void>,
+) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const convexDirectory = yield* ConvexDirectory.get;
+
+    yield* pipe(
+      fs.watch(convexDirectory),
+      Stream.debounce(Duration.millis(200)),
+      Stream.runForEach((event) =>
+        path.relative(convexDirectory, event.path) === CONVEX_CONFIG_FILENAME
+          ? flipDirtyAndSignal(
+              pendingRef,
+              signal,
+              "specDirty",
+              restartQueue,
+              event._tag !== "Update",
+            )
+          : Effect.void,
       ),
     );
   });

@@ -283,6 +283,59 @@ export const authConfig = ({ authImportPath }: { authImportPath: string }) =>
     return yield* cbw.toString();
   });
 
+/**
+ * Emit `confect/_generated/components.ts` — a typed registry of the Convex
+ * components installed via `app.use(...)` in `convex/convex.config.ts`.
+ * Mirrors the `components` export of Convex's generated
+ * `convex/_generated/api`: the runtime value is `componentsGeneric()` (a
+ * name-preserving proxy), and each entry is typed with the `ComponentApi`
+ * that component packages export from `_generated/component.js`. Unlike
+ * `convex/_generated/api`, this file exists before `convex codegen` ever
+ * runs, so impl modules can import it safely — `confect codegen` bundles and
+ * evaluates each impl's import graph, and `convex/_generated/api` doesn't
+ * exist yet at that point.
+ *
+ * The `as any` cast is confined here: `componentsGeneric()` is typed
+ * `AnyChildComponents`, which deliberately doesn't overlap the precise
+ * registry type; the `Components` annotation on the const supplies the
+ * real type.
+ */
+export const components = ({
+  components: installedComponents,
+}: {
+  components: ReadonlyArray<{ name: string; typeImportPath: string }>;
+}) =>
+  Effect.gen(function* () {
+    const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+
+    yield* cbw.writeLine(`import { componentsGeneric } from "convex/server";`);
+    yield* cbw.blankLine();
+
+    if (installedComponents.length === 0) {
+      yield* cbw.writeLine(`export type Components = {};`);
+    } else {
+      yield* cbw.writeLine(`export type Components = {`);
+      yield* cbw.indent(
+        Effect.forEach(
+          installedComponents,
+          ({ name, typeImportPath }) =>
+            cbw.writeLine(
+              `"${name}": import("${typeImportPath}/_generated/component.js").ComponentApi<"${name}">;`,
+            ),
+          { discard: true },
+        ),
+      );
+      yield* cbw.writeLine(`};`);
+    }
+    yield* cbw.blankLine();
+
+    yield* cbw.writeLine(
+      `export const components: Components = componentsGeneric() as any;`,
+    );
+
+    return yield* cbw.toString();
+  });
+
 export const refs = ({ specImportPath }: { specImportPath: string }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });

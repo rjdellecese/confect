@@ -5,13 +5,14 @@ import {
   vWorkId,
 } from "@convex-dev/workpool";
 import { v } from "convex/values";
-import { components, internal } from "../convex/_generated/api";
+import { internal } from "../convex/_generated/api";
 import {
   internalAction,
   internalMutation,
   mutation,
   query,
 } from "../convex/_generated/server";
+import { components } from "./_generated/components";
 
 const pool = new Workpool(components.workpool, {
   maxParallelism: 3,

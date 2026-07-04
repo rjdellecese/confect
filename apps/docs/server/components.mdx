@@ -4,15 +4,48 @@ title: "Components"
 description: "Use Convex components in your Confect app."
 ---
 
-Convex [components](https://docs.convex.dev/components) are configured in `convex/convex.config.ts`, which is one of the files in the `convex/` directory that Confect does not manage. Configure and use components using the vanilla Convex API.
+Convex [components](https://docs.convex.dev/components) are configured in `convex/convex.config.ts`, which is one of the files in the `convex/` directory that Confect does not manage. Configure components using the vanilla Convex API.
 
 ```ts convex/convex.config.ts
 import { defineApp } from "convex/server";
+import workpool from "@convex-dev/workpool/convex.config";
 
 const app = defineApp();
+app.use(workpool, { name: "workpool" });
 
 export default app;
 ```
+
+## Referencing components
+
+Component clients (like `Workpool`) take a component reference. Import the typed `components` registry that Confect generates at `confect/_generated/components.ts`:
+
+```ts confect/workpool.ts
+import { Workpool } from "@convex-dev/workpool";
+import { components } from "./_generated/components";
+
+const pool = new Workpool(components.workpool, {
+  maxParallelism: 3,
+});
+```
+
+<Note>
+  Use this registry rather than the `components` export of
+  `convex/_generated/api`, which doesn't exist yet when `confect codegen`
+  evaluates your code and so breaks codegen on a clean checkout. Confect's
+  registry is equivalent, but is derived directly from
+  `convex/convex.config.ts`, so it is safe to import anywhere in your `confect/`
+  directory.
+</Note>
+
+<Note>
+  Each component is typed with the `ComponentApi` type that component packages
+  export from `_generated/component.js`. Recently published versions of the
+  official `@convex-dev/*` components all follow this convention; a component
+  that predates it will still work at runtime but won't get precise types.
+</Note>
+
+## Defining functions for components
 
 Some components (such as [Workflow](https://www.convex.dev/components/workflow), [Migrations](https://www.convex.dev/components/migrations), and [Workpool](https://www.convex.dev/components/workpool)) expect you to define Convex functions in your project that they can reference. You can integrate these into your Confect spec and impl using [plain Convex functions](/server/plain-convex-functions).
 
