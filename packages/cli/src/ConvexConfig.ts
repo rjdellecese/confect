@@ -6,6 +6,7 @@ import * as Option from "effect/Option";
 import * as Order from "effect/Order";
 import * as Record from "effect/Record";
 import * as Schema from "effect/Schema";
+import * as String from "effect/String";
 import type * as esbuild from "esbuild";
 import { fromBundlerError, type BuildError } from "./BuildError";
 import * as Bundler from "./Bundler";
@@ -75,7 +76,7 @@ export const componentConfigPlugin = (path: Path.Path): esbuild.Plugin => ({
       const candidates = [
         args.path,
         ...(extension === ".js"
-          ? [args.path.slice(0, -".js".length) + ".ts"]
+          ? [String.slice(0, -".js".length)(args.path) + ".ts"]
           : []),
         ...(extension !== ".js" && extension !== ".ts"
           ? [args.path + ".js", args.path + ".ts"]
@@ -114,9 +115,9 @@ export const componentConfigPlugin = (path: Path.Path): esbuild.Plugin => ({
         // package prefix so the generated type import stays a package
         // specifier.
         const isBareSpecifier =
-          !specifier.startsWith(".") && !path.isAbsolute(specifier);
+          !String.startsWith(".")(specifier) && !path.isAbsolute(specifier);
         const componentDefinitionPath = isBareSpecifier
-          ? specifier.replace(CONVEX_CONFIG_SUFFIX, "")
+          ? String.replace(CONVEX_CONFIG_SUFFIX, "")(specifier)
           : path.dirname(args.path);
 
         // The real module is imported (not inlined) so that an npm component
@@ -128,10 +129,13 @@ export const componentConfigPlugin = (path: Path.Path): esbuild.Plugin => ({
         return {
           loader: "js",
           resolveDir: path.dirname(args.path),
-          contents: [
-            `import real from ${JSON.stringify(args.path)};`,
-            `export default { ...real, componentDefinitionPath: ${JSON.stringify(componentDefinitionPath)}, defaultName: real._name };`,
-          ].join("\n"),
+          contents: Array.join(
+            [
+              `import real from ${JSON.stringify(args.path)};`,
+              `export default { ...real, componentDefinitionPath: ${JSON.stringify(componentDefinitionPath)}, defaultName: real._name };`,
+            ],
+            "\n",
+          ),
         };
       },
     );
@@ -210,7 +214,7 @@ export const discoverInstalledComponents = (
       catch: (cause) =>
         new InvalidConvexConfigError({
           configPath: displayPath,
-          reason: `exporting the app definition threw: ${String(cause)}.`,
+          reason: `exporting the app definition threw: ${globalThis.String(cause)}.`,
         }),
     });
 
@@ -240,7 +244,9 @@ export const discoverInstalledComponents = (
     const invalidNames = pipe(
       components,
       Array.map(({ name }) => name),
-      Array.filter((name) => !VALID_COMPONENT_NAME.test(name)),
+      Array.filter((name) =>
+        Option.isNone(String.match(VALID_COMPONENT_NAME)(name)),
+      ),
     );
     if (Array.isNonEmptyReadonlyArray(invalidNames)) {
       return yield* new InvalidConvexConfigError({
@@ -285,9 +291,10 @@ export const typeImportPath = (
   if (!path.isAbsolute(componentDefinitionPath)) {
     return componentDefinitionPath;
   }
-  const relative = path
-    .relative(confectGeneratedDirectory, componentDefinitionPath)
-    .split(path.sep)
-    .join("/");
-  return relative.startsWith(".") ? relative : `./${relative}`;
+  const relative = pipe(
+    path.relative(confectGeneratedDirectory, componentDefinitionPath),
+    String.split(path.sep),
+    Array.join("/"),
+  );
+  return String.startsWith(".")(relative) ? relative : `./${relative}`;
 };
