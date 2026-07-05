@@ -1,4 +1,5 @@
 import * as ConfigProvider from "effect/ConfigProvider";
+import * as Layer from "effect/Layer";
 import * as Effect from "effect/Effect";
 
 declare const process: { env: Record<string, string | undefined> };
@@ -22,3 +23,11 @@ export const make = (): ConfigProvider.ConfigProvider =>
       value === undefined ? undefined : ConfigProvider.makeValue(value),
     );
   });
+
+/**
+ * Installs the Convex-aware `ConfigProvider` as the ambient provider.
+ */
+export const layer: Layer.Layer<never> = Layer.succeed(
+  ConfigProvider.ConfigProvider,
+  make(),
+);

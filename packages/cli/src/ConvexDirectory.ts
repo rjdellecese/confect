@@ -34,6 +34,18 @@ const ConvexJsonConfig = Schema.fromJsonString(
   }),
 );
 
+export class InvalidConvexJsonError extends Schema.TaggedErrorClass<InvalidConvexJsonError>()(
+  "InvalidConvexJsonError",
+  {
+    cause: Schema.Unknown,
+  },
+) {
+  override get message(): string {
+    const detail = this.cause instanceof Error ? `: ${this.cause.message}` : "";
+    return `Failed to parse convex.json${detail}`;
+  }
+}
+
 const findConvexDirectory = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -46,9 +58,13 @@ const findConvexDirectory = Effect.gen(function* () {
 
   const convexDirectory = (yield* fs.exists(convexJsonPath))
     ? yield* fs.readFileString(convexJsonPath).pipe(
-        Effect.map((json) =>
-          Schema.decodeOption(ConvexJsonConfig)(json).pipe(
-            Option.flatMap((config) => Option.fromNullishOr(config.functions)),
+        Effect.flatMap((json) =>
+          Schema.decodeEffect(ConvexJsonConfig)(json).pipe(
+            Effect.mapError((cause) => new InvalidConvexJsonError({ cause })),
+          ),
+        ),
+        Effect.map((config) =>
+          Option.fromNullishOr(config.functions).pipe(
             Option.map((functionsDir) => path.join(projectRoot, functionsDir)),
             Option.getOrElse(() => defaultPath),
           ),

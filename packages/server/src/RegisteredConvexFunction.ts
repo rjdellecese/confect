@@ -12,7 +12,6 @@ import {
 } from "convex/server";
 import type { Value } from "convex/values";
 import { pipe } from "effect/Function";
-import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Match from "effect/Match";
@@ -161,10 +160,7 @@ const queryFunction = <
               >(),
               ctx,
             ),
-            Layer.succeed(
-              ConfigProvider.ConfigProvider,
-              ConvexConfigProvider.make(),
-            ),
+            ConvexConfigProvider.layer,
           ),
         ),
       );
@@ -195,7 +191,7 @@ export const mutationLayer = <Schema extends DatabaseSchema.AnyWithProps>(
       >(),
       ctx,
     ),
-    Layer.succeed(ConfigProvider.ConfigProvider, ConvexConfigProvider.make()),
+    ConvexConfigProvider.layer,
   );
 
 export type MutationServices<Schema extends DatabaseSchema.AnyWithProps> =
@@ -291,9 +287,6 @@ const convexActionFunction = <
     createLayer: (ctx) =>
       Layer.mergeAll(
         RegisteredFunction.actionLayer(schema, ctx),
-        Layer.succeed(
-          ConfigProvider.ConfigProvider,
-          ConvexConfigProvider.make(),
-        ),
+        ConvexConfigProvider.layer,
       ),
   });

@@ -309,6 +309,7 @@ export const compileAst = (
   | MixedIndexAndPropertySignaturesAreNotSupportedError
   | OptionalTupleElementsAreNotSupportedError
   | EmptyTupleIsNotSupportedError
+  | EmptyUnionIsNotSupportedError
 > =>
   isRecursive(ast)
     ? Effect.succeed(v.any())
@@ -385,29 +386,21 @@ export const compileAst = (
       );
 
 const handleUnion = (
-  { types: [first, second, ...rest] }: SchemaAST.Union,
+  { types }: SchemaAST.Union,
   isOptionalPropertyOfTypeLiteral: boolean,
 ) =>
   Effect.gen(function* () {
-    const validatorEffects = isOptionalPropertyOfTypeLiteral
-      ? pipe(
-          [first, second, ...rest],
-          Array.filter((type) => Predicate.not(SchemaAST.isUndefined)(type)),
-          Array.map((type) => compileAst(type)),
+    const members = isOptionalPropertyOfTypeLiteral
+      ? Array.filter(types, (type) =>
+          Predicate.not(SchemaAST.isUndefined)(type),
         )
-      : Array.map([first, second, ...rest], (type) => compileAst(type));
+      : types;
 
     const [firstValidator, secondValidator, ...restValidators] =
-      yield* Effect.all(validatorEffects);
+      yield* Effect.all(Array.map(members, (type) => compileAst(type)));
 
-    /* v8 ignore start */
     if (firstValidator === undefined) {
-      return yield* Effect.die(
-        new Error(
-          "First validator of union is undefined; this should be impossible.",
-        ),
-      );
-      /* v8 ignore stop */
+      return yield* Effect.fail(new EmptyUnionIsNotSupportedError());
     } else if (secondValidator === undefined) {
       return firstValidator;
     } else {
@@ -571,6 +564,16 @@ export class EmptyTupleIsNotSupportedError extends Data.TaggedError(
   /* v8 ignore start */
   override get message() {
     return "Tuple must have at least one element";
+  }
+  /* v8 ignore stop */
+}
+
+export class EmptyUnionIsNotSupportedError extends Data.TaggedError(
+  "EmptyUnionIsNotSupportedError",
+) {
+  /* v8 ignore start */
+  override get message() {
+    return "Union must have at least one member that compiles to a validator";
   }
   /* v8 ignore stop */
 }

@@ -11,6 +11,7 @@ import {
   compileSchema,
   compileTableSchema,
   EmptyTupleIsNotSupportedError,
+  EmptyUnionIsNotSupportedError,
   IndexSignaturesAreNotSupportedError,
   OptionalTupleElementsAreNotSupportedError,
   TopLevelMustBeObjectError,
@@ -163,6 +164,18 @@ describe(compileAst, () => {
         const validator = v.object({
           foo: v.object({ bar: v.object({ baz: v.string() }) }),
         });
+        const compiledValidator = yield* compileAst(
+          Schema.toEncoded(schema).ast,
+        );
+
+        expect(compiledValidator).toStrictEqual(validator);
+      }),
+    );
+
+    effect("union with one member", () =>
+      Effect.gen(function* () {
+        const schema = Schema.Union([Schema.String]);
+        const validator = v.string();
         const compiledValidator = yield* compileAst(
           Schema.toEncoded(schema).ast,
         );
@@ -420,6 +433,36 @@ describe(compileAst, () => {
 
         expect(exit).toStrictEqual(
           Exit.fail(new EmptyTupleIsNotSupportedError()),
+        );
+      }),
+    );
+
+    effect("empty union", () =>
+      Effect.gen(function* () {
+        const schema = Schema.Union([]);
+
+        const exit = yield* Effect.exit(
+          compileAst(Schema.toEncoded(schema).ast),
+        );
+
+        expect(exit).toStrictEqual(
+          Exit.fail(new EmptyUnionIsNotSupportedError()),
+        );
+      }),
+    );
+
+    effect("optional property whose union contains only Undefined", () =>
+      Effect.gen(function* () {
+        const schema = Schema.Struct({
+          foo: Schema.optional(Schema.Undefined),
+        });
+
+        const exit = yield* Effect.exit(
+          compileAst(Schema.toEncoded(schema).ast),
+        );
+
+        expect(exit).toStrictEqual(
+          Exit.fail(new EmptyUnionIsNotSupportedError()),
         );
       }),
     );

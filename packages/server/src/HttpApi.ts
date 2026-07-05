@@ -9,7 +9,6 @@ import {
 } from "convex/server";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
-import * as ConfigProvider from "effect/ConfigProvider";
 import * as Context from "effect/Context";
 import * as Layer from "effect/Layer";
 import * as Record from "effect/Record";
@@ -19,16 +18,16 @@ import * as HttpServer from "effect/unstable/http/HttpServer";
 import type * as HttpApi from "effect/unstable/httpapi/HttpApi";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 import * as HttpApiScalar from "effect/unstable/httpapi/HttpApiScalar";
-import * as ActionCtx from "./ActionCtx";
-import * as ActionRunner from "./ActionRunner";
-import * as Auth from "./Auth";
+import type * as ActionRunner from "./ActionRunner";
+import type * as Auth from "./Auth";
 import * as ConvexConfigProvider from "./ConvexConfigProvider";
-import * as MutationRunner from "./MutationRunner";
-import * as QueryRunner from "./QueryRunner";
-import * as Scheduler from "./Scheduler";
-import { StorageActionWriter } from "./StorageActionWriter";
-import { StorageReader } from "./StorageReader";
-import { StorageWriter } from "./StorageWriter";
+import * as RegisteredFunction from "./RegisteredFunction";
+import type * as MutationRunner from "./MutationRunner";
+import type * as QueryRunner from "./QueryRunner";
+import type * as Scheduler from "./Scheduler";
+import type { StorageActionWriter } from "./StorageActionWriter";
+import type { StorageReader } from "./StorageReader";
+import type { StorageWriter } from "./StorageWriter";
 
 /**
  * Request-level middleware applied to the handler effect. See Effect's
@@ -81,16 +80,8 @@ const makeHandler =
   }: HttpApi_ & { pathPrefix: RoutePath }) =>
   (ctx: GenericActionCtx<DataModel>, request: Request): Promise<Response> => {
     const ConfectServicesLive = Layer.mergeAll(
-      QueryRunner.layer(ctx.runQuery),
-      MutationRunner.layer(ctx.runMutation),
-      ActionRunner.layer(ctx.runAction),
-      Scheduler.layer(ctx.scheduler),
-      Auth.layer(ctx.auth),
-      StorageReader.layer(ctx.storage),
-      StorageWriter.layer(ctx.storage),
-      StorageActionWriter.layer(ctx.storage),
-      Layer.succeed(ActionCtx.ActionCtx<DataModel>(), ctx),
-      Layer.succeed(ConfigProvider.ConfigProvider, ConvexConfigProvider.make()),
+      RegisteredFunction.baseActionLayer(ctx),
+      ConvexConfigProvider.layer,
     );
 
     const apiDefinition = api as HttpApi.AnyWithProps;
