@@ -4,6 +4,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
+import * as Predicate from "effect/Predicate";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as ProjectRoot from "./ProjectRoot";
@@ -41,7 +42,9 @@ export class InvalidConvexJsonError extends Schema.TaggedErrorClass<InvalidConve
   },
 ) {
   override get message(): string {
-    const detail = this.cause instanceof Error ? `: ${this.cause.message}` : "";
+    const detail = Predicate.isError(this.cause)
+      ? `: ${this.cause.message}`
+      : "";
     return `Failed to parse convex.json${detail}`;
   }
 }

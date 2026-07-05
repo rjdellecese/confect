@@ -391,9 +391,7 @@ const handleUnion = (
 ) =>
   Effect.gen(function* () {
     const members = isOptionalPropertyOfTypeLiteral
-      ? Array.filter(types, (type) =>
-          Predicate.not(SchemaAST.isUndefined)(type),
-        )
+      ? Array.filter(types, Predicate.not(SchemaAST.isUndefined))
       : types;
 
     const [firstValidator, secondValidator, ...restValidators] =

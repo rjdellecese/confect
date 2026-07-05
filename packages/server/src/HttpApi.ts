@@ -126,9 +126,9 @@ const makeHandler = ({
           ...scalar,
         },
       }),
-      ...(middleware
-        ? [HttpRouter.middleware(middleware, { global: true })]
-        : []),
+      ...Array.map(Array.fromNullishOr(middleware), (middleware_) =>
+        HttpRouter.middleware(middleware_, { global: true }),
+      ),
       // Merged (not just provided) so it is part of the built context that
       // request fibers — endpoint handlers and middleware alike — run in.
       ConvexConfigProvider.layer,

@@ -8,7 +8,7 @@ import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner
 
 const runCommand = (
   command: string,
-  args: string[],
+  args: ReadonlyArray<string>,
 ): Effect.Effect<void, never, ChildProcessSpawner> =>
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner;

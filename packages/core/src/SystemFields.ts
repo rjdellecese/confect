@@ -1,12 +1,15 @@
 import type { IdField, SystemFields as NonIdSystemFields } from "convex/server";
+import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
+import * as Record from "effect/Record";
 import * as Schema from "effect/Schema";
 import * as SchemaAST from "effect/SchemaAST";
 import * as SchemaGetter from "effect/SchemaGetter";
 import * as SchemaTransformation from "effect/SchemaTransformation";
-import type * as Struct from "effect/Struct";
+import * as Struct from "effect/Struct";
 import * as GenericId from "./GenericId";
 
 /**
@@ -30,21 +33,23 @@ type SystemFieldsFor<TableName extends string> = ReturnType<
  * The system field names, derived from {@link SystemFields} so they stay in
  * lockstep with the schema.
  */
-const systemFieldNames: ReadonlyArray<string> = Object.keys(
+const systemFieldNames: ReadonlyArray<string> = Record.keys(
   SystemFields("").fields,
 );
 
-const splitSystemFields = (input: Record<PropertyKey, unknown>) => {
-  const system: Record<string, unknown> = {};
-  const rest: Record<PropertyKey, unknown> = {};
-  for (const key of Reflect.ownKeys(input)) {
-    if (typeof key === "string" && systemFieldNames.includes(key)) {
-      system[key] = input[key];
-    } else {
-      rest[key] = input[key];
-    }
-  }
-  return { system, rest };
+const isSystemFieldKey = (key: string | symbol): key is string =>
+  Predicate.isString(key) && Array.contains(systemFieldNames, key);
+
+const splitSystemFields = (input: { [key: PropertyKey]: unknown }) => {
+  const keys = Reflect.ownKeys(input);
+  const pick = (pickedKeys: ReadonlyArray<string | symbol>) =>
+    Record.fromEntries(
+      Array.map(pickedKeys, (key) => [key, input[key]] as const),
+    );
+  return {
+    system: pick(Array.filter(keys, isSystemFieldKey)),
+    rest: pick(Array.filter(keys, Predicate.not(isSystemFieldKey))),
+  };
 };
 
 /**
@@ -57,24 +62,16 @@ const wrapGetter = (
   getter: SchemaGetter.Getter<any, any, any>,
 ): SchemaGetter.Getter<any, any, any> =>
   new SchemaGetter.Getter((input, options) => {
-    if (
-      Option.isNone(input) ||
-      typeof input.value !== "object" ||
-      input.value === null
-    ) {
+    if (Option.isNone(input) || !Predicate.isObject(input.value)) {
       return getter.run(input, options);
     }
-    const { system, rest } = splitSystemFields(
-      input.value as Record<PropertyKey, unknown>,
-    );
+    const { system, rest } = splitSystemFields(input.value);
     return getter
       .run(Option.some(rest), options)
       .pipe(
         Effect.map(
           Option.map((output) =>
-            typeof output === "object" && output !== null
-              ? Object.assign({}, output, system)
-              : output,
+            Predicate.isObject(output) ? Struct.assign(output, system) : output,
           ),
         ),
       );
@@ -115,7 +112,7 @@ const makeExtendAst = (
   const extendAst = (ast: SchemaAST.AST): SchemaAST.AST => {
     if (SchemaAST.isUnion(ast)) {
       return new SchemaAST.Union(
-        ast.types.map(extendAst),
+        Array.map(ast.types, extendAst),
         ast.mode,
         ast.annotations,
         ast.checks,
@@ -135,7 +132,7 @@ const makeExtendAst = (
     }
     if (SchemaAST.isObjects(ast)) {
       return new SchemaAST.Objects(
-        [...ast.propertySignatures, ...systemPropertySignatures],
+        Array.appendAll(ast.propertySignatures, systemPropertySignatures),
         ast.indexSignatures,
         ast.annotations,
         ast.checks,
@@ -181,8 +178,12 @@ export const extendWithSystemFields = <
   const system = SystemFields(tableName).fields;
 
   const extendAst = makeExtendAst(
-    Object.entries(system).map(
-      ([name, field]) => new SchemaAST.PropertySignature(name, field.ast),
+    pipe(
+      system,
+      Record.toEntries,
+      Array.map(
+        ([name, field]) => new SchemaAST.PropertySignature(name, field.ast),
+      ),
     ),
   );
 
@@ -190,12 +191,15 @@ export const extendWithSystemFields = <
     if (
       s.ast.encoding === undefined &&
       SchemaAST.isUnion(s.ast) &&
-      globalThis.Array.isArray(
+      Array.isArray(
         (s as Partial<Schema.Union<ReadonlyArray<Schema.Top>>>).members,
       )
     ) {
       return Schema.Union(
-        (s as Schema.Union<ReadonlyArray<Schema.Top>>).members.map(extend),
+        Array.map(
+          (s as Schema.Union<ReadonlyArray<Schema.Top>>).members,
+          extend,
+        ),
       );
     }
     if (

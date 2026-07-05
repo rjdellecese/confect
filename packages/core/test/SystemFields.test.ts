@@ -1,5 +1,7 @@
+import { pipe } from "effect/Function";
 import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
+import * as String from "effect/String";
 import * as Tuple from "effect/Tuple";
 import { describe, expect, expectTypeOf, test } from "vitest";
 import type { GenericId } from "@confect/core/GenericId";
@@ -131,7 +133,7 @@ describe("extendWithSystemFields", () => {
           length: stored.content.length,
         })),
         encode: SchemaGetter.transform((note: { length: number }) => ({
-          content: "x".repeat(note.length),
+          content: pipe("x", String.repeat(note.length)),
         })),
       }),
     );
@@ -221,7 +223,7 @@ describe("extendWithSystemFields", () => {
           length: stored.content.length,
         })),
         encode: SchemaGetter.transform((note: { length: number }) => ({
-          content: "x".repeat(note.length),
+          content: pipe("x", String.repeat(note.length)),
         })),
       }),
     );

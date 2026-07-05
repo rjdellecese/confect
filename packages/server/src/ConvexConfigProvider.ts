@@ -1,6 +1,8 @@
+import { pipe } from "effect/Function";
+import * as Array from "effect/Array";
 import * as ConfigProvider from "effect/ConfigProvider";
-import * as Layer from "effect/Layer";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 
 declare const process: { env: Record<string, string | undefined> };
 
@@ -17,7 +19,7 @@ declare const process: { env: Record<string, string | undefined> };
  */
 export const make = (): ConfigProvider.ConfigProvider =>
   ConfigProvider.make((path) => {
-    const value = process.env[path.map(String).join("_")];
+    const value = process.env[pipe(path, Array.map(String), Array.join("_"))];
 
     return Effect.succeed(
       value === undefined ? undefined : ConfigProvider.makeValue(value),
