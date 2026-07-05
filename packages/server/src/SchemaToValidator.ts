@@ -400,7 +400,7 @@ const handleUnion = (
       yield* Effect.all(Array.map(members, (type) => compileAst(type)));
 
     if (firstValidator === undefined) {
-      return yield* Effect.fail(new EmptyUnionIsNotSupportedError());
+      return yield* new EmptyUnionIsNotSupportedError();
     } else if (secondValidator === undefined) {
       return firstValidator;
     } else {

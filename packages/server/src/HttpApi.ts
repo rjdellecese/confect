@@ -9,7 +9,7 @@ import {
 } from "convex/server";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
-import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Record from "effect/Record";
 import type * as HttpMiddleware from "effect/unstable/http/HttpMiddleware";
@@ -17,21 +17,25 @@ import * as HttpRouter from "effect/unstable/http/HttpRouter";
 import * as HttpServer from "effect/unstable/http/HttpServer";
 import type * as HttpApi from "effect/unstable/httpapi/HttpApi";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
+import type * as HttpApiGroup from "effect/unstable/httpapi/HttpApiGroup";
 import * as HttpApiScalar from "effect/unstable/httpapi/HttpApiScalar";
 import type * as ActionRunner from "./ActionRunner";
 import type * as Auth from "./Auth";
 import * as ConvexConfigProvider from "./ConvexConfigProvider";
-import * as RegisteredFunction from "./RegisteredFunction";
 import type * as MutationRunner from "./MutationRunner";
 import type * as QueryRunner from "./QueryRunner";
+import * as RegisteredFunction from "./RegisteredFunction";
 import type * as Scheduler from "./Scheduler";
 import type { StorageActionWriter } from "./StorageActionWriter";
 import type { StorageReader } from "./StorageReader";
 import type { StorageWriter } from "./StorageWriter";
 
 /**
- * Request-level middleware applied to the handler effect. See Effect's
- * `HttpMiddleware` module for built-in middleware such as `cors` and `logger`.
+ * Middleware applied to every route of a mounted API. Registered as global
+ * route middleware, so returned response modifications take effect and the
+ * middleware runs with Confect's services (including the Convex-aware
+ * `ConfigProvider`) in context. See Effect's `HttpMiddleware` module for
+ * built-in middleware such as `cors` and `logger`.
  */
 export type Middleware = HttpMiddleware.HttpMiddleware;
 
@@ -49,44 +53,71 @@ type ConfectHttpServices =
   | StorageActionWriter;
 
 /**
- * An Effect `HttpApi` mounted at a path prefix.
+ * Options for {@link mount}: an Effect `HttpApi` definition paired with its
+ * group handler layers.
  *
- * `api` carries the `HttpApi` definition, used to register routes and to
- * derive the OpenAPI document for the Scalar docs page. `apiLive` provides the
- * group handler services built with `HttpApiBuilder.group(api, ...)`. Handlers
- * may use any {@link ConfectHttpServices}, whether required directly by the
- * group layer or surfaced as request-level `Requires` markers.
+ * `api` is used to register routes and to derive the OpenAPI document for the
+ * Scalar docs page. `apiLive` provides the group handler services built with
+ * `HttpApiBuilder.group(api, ...)` — one per group in `api`, merged with
+ * `Layer.mergeAll` when there are several. Handlers may require any
+ * {@link ConfectHttpServices}, which Confect supplies per request; group
+ * *construction* (an effectful `HttpApiBuilder.group` build) cannot use them,
+ * since the groups are built once per environment rather than per request.
+ */
+export interface MountOptions<
+  Id extends string,
+  Groups extends HttpApiGroup.Any,
+> {
+  api: HttpApi.HttpApi<Id, Groups>;
+  apiLive: Layer.Layer<
+    HttpApiGroup.ToService<Id, Groups>,
+    never,
+    HttpRouter.Request<"Requires", ConfectHttpServices>
+  >;
+  middleware?: Middleware;
+  scalar?: HttpApiScalar.ScalarConfig;
+}
+
+/**
+ * An API entry accepted by {@link make}, with the `api`/`apiLive` pairing
+ * erased. Build entries with {@link mount}, which checks that `apiLive`
+ * provides a group handler layer for every group in `api` — a mismatch
+ * otherwise only surfaces as a defect on the first request.
  */
 export type HttpApi_ = {
   api: HttpApi.Any;
-  apiLive: Layer.Layer<
-    any,
-    never,
-    ConfectHttpServices | HttpRouter.Request<"Requires", ConfectHttpServices>
-  >;
+  apiLive: Layer.Layer<any, never, any>;
   middleware?: Middleware;
   scalar?: HttpApiScalar.ScalarConfig;
 };
 
+/**
+ * Pair an `HttpApi` definition with its group handler layers, checking at
+ * compile time that every group declared by `api` has a corresponding
+ * `HttpApiBuilder.group` layer in `apiLive`.
+ */
+export const mount = <Id extends string, Groups extends HttpApiGroup.Any>(
+  options: MountOptions<Id, Groups>,
+): HttpApi_ => options as HttpApi_;
+
 export type RoutePath = "/" | `/${string}/`;
 
-const makeHandler =
-  <DataModel extends GenericDataModel>({
-    pathPrefix,
-    api,
-    apiLive,
-    middleware,
-    scalar,
-  }: HttpApi_ & { pathPrefix: RoutePath }) =>
-  (ctx: GenericActionCtx<DataModel>, request: Request): Promise<Response> => {
-    const ConfectServicesLive = Layer.mergeAll(
-      RegisteredFunction.baseActionLayer(ctx),
-      ConvexConfigProvider.layer,
-    );
+const makeHandler = ({
+  pathPrefix,
+  api,
+  apiLive,
+  middleware,
+  scalar,
+}: HttpApi_ & { pathPrefix: RoutePath }) => {
+  const apiDefinition = api as HttpApi.AnyWithProps;
 
-    const apiDefinition = api as HttpApi.AnyWithProps;
-
-    const AppLayer = Layer.mergeAll(
+  // Everything request-independent — route registration, OpenAPI/Scalar
+  // derivation, platform services — lives in one layer that the web handler
+  // builds once per environment (lazily, on the first request) and shares
+  // across requests. `Layer.suspend` defers the `process.env` read to that
+  // first build.
+  const AppLayer = Layer.suspend(() =>
+    Layer.mergeAll(
       HttpApiBuilder.layer(apiDefinition),
       HttpApiScalar.layer(apiDefinition, {
         path: `${pathPrefix}docs`,
@@ -95,44 +126,44 @@ const makeHandler =
           ...scalar,
         },
       }),
-    ).pipe(
-      Layer.provide(apiLive),
-      Layer.provide(ConfectServicesLive),
-      Layer.provide(HttpServer.layerServices),
-    );
-
-    // Endpoint-handler requirements are baked into the routes when the group
-    // layer builds (`HttpApiBuilder.group` captures its build context and
-    // provides it to every handler), so any request-level `Requires` markers
-    // left in the layer type are already satisfied at runtime — drop them so
-    // the web handler doesn't demand a per-request context.
-    const { handler } = HttpRouter.toWebHandler(
-      AppLayer as Layer.Layer<never, never, never>,
-      {
-        disableLogger: true,
-        ...(middleware ? { middleware } : {}),
-      },
-    );
-
-    return handler(request, Context.empty() as Context.Context<any>);
-  };
-
-const makeHttpAction = <DataModel extends GenericDataModel>(
-  options: HttpApi_ & { pathPrefix: RoutePath },
-) =>
-  httpActionGeneric(
-    makeHandler<DataModel>(options) as unknown as (
-      ctx: GenericActionCtx<GenericDataModel>,
-      request: Request,
-    ) => Promise<Response>,
+      ...(middleware
+        ? [HttpRouter.middleware(middleware, { global: true })]
+        : []),
+      // Merged (not just provided) so it is part of the built context that
+      // request fibers — endpoint handlers and middleware alike — run in.
+      ConvexConfigProvider.layer,
+    ).pipe(Layer.provide(apiLive), Layer.provide(HttpServer.layerServices)),
   );
 
+  // Handlers' Confect service requirements surface as request-level
+  // `Requires` markers on the layer, which the web handler exposes as a
+  // per-request context argument.
+  const { handler } = HttpRouter.toWebHandler(
+    AppLayer as Layer.Layer<
+      never,
+      never,
+      HttpRouter.Request<"Requires", ConfectHttpServices>
+    >,
+    { disableLogger: true },
+  );
+
+  return (
+    ctx: GenericActionCtx<GenericDataModel>,
+    request: Request,
+  ): Promise<Response> => {
+    // The ctx-backed service layers are all synchronous and finalizer-free,
+    // so the scope can close as soon as the context is built.
+    const services = Effect.runSync(
+      Effect.scoped(Layer.build(RegisteredFunction.baseActionLayer(ctx))),
+    );
+    return handler(request, services);
+  };
+};
+
 const mountEffectHttpApi =
-  <DataModel extends GenericDataModel>(
-    options: HttpApi_ & { pathPrefix: RoutePath },
-  ) =>
+  (options: HttpApi_ & { pathPrefix: RoutePath }) =>
   (convexHttpRouter: ConvexHttpRouter): ConvexHttpRouter => {
-    const handler = makeHttpAction<DataModel>(options);
+    const handler = httpActionGeneric(makeHandler(options));
 
     Array.forEach(ROUTABLE_HTTP_METHODS, (method) => {
       const routeSpec: RouteSpecWithPathPrefix = {

@@ -4,9 +4,9 @@ import { flow } from "effect/Function";
 import { Api, ApiLive } from "./http/pathPrefix";
 
 export default HttpApi.make({
-  "/path-prefix/": {
+  "/path-prefix/": HttpApi.mount({
     api: Api,
     apiLive: ApiLive,
     middleware: flow(HttpMiddleware.cors(), HttpMiddleware.logger),
-  },
+  }),
 });

@@ -62,7 +62,7 @@ Export the group layer(s) directly (merge multiple groups with `Layer.mergeAll`)
 
 ## Creating the router
 
-Create the Convex HTTP router in `confect/http.ts` using `HttpApi.make` from `@confect/server`. Each key is a path prefix that must be either `"/"` or end with a trailing slash (e.g. `"/api/"`).
+Create the Convex HTTP router in `confect/http.ts` using `HttpApi.make` from `@confect/server`. Each key is a path prefix that must be either `"/"` or end with a trailing slash (e.g. `"/api/"`), and each entry is built with `HttpApi.mount`, which checks at compile time that `apiLive` provides a group handler layer for every group declared by `api`.
 
 ```ts confect/http.ts
 import { HttpApi } from "@confect/server";
@@ -72,21 +72,22 @@ import { HttpMiddleware } from "effect/unstable/http";
 import { Api, ApiLive } from "./http/notes";
 
 export default HttpApi.make({
-  "/api/": {
+  "/api/": HttpApi.mount({
     api: Api,
     apiLive: ApiLive,
     middleware: flow(HttpMiddleware.cors(), HttpMiddleware.logger),
-  },
+  }),
 });
 ```
 
-Each path prefix entry accepts:
+`HttpApi.mount` accepts:
 
-| Property     | Description                                                                                             |
-| ------------ | ------------------------------------------------------------------------------------------------------- |
-| `apiLive`    | A `Layer` providing `HttpApi.Api`, built with `HttpApiBuilder.api`                                      |
-| `middleware` | Optional middleware function (e.g. `HttpMiddleware.cors()`, `HttpMiddleware.logger`)                    |
-| `scalar`     | Optional [Scalar configuration](https://github.com/scalar/scalar) to customize the interactive API docs |
+| Property     | Description                                                                                               |
+| ------------ | --------------------------------------------------------------------------------------------------------- |
+| `api`        | The `HttpApi` definition, used to register routes and derive the OpenAPI document                         |
+| `apiLive`    | The group handler layers, built with `HttpApiBuilder.group` (merge multiple groups with `Layer.mergeAll`) |
+| `middleware` | Optional middleware applied to every route (e.g. `flow(HttpMiddleware.cors(), HttpMiddleware.logger)`)    |
+| `scalar`     | Optional [Scalar configuration](https://github.com/scalar/scalar) to customize the interactive API docs   |
 
 ## API documentation
 
