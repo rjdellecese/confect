@@ -1,5 +1,11 @@
 # @confect/react
 
+## 9.2.0
+
+### Patch Changes
+
+- @confect/core@9.2.0
+
 ## 9.1.5
 
 ### Patch Changes
