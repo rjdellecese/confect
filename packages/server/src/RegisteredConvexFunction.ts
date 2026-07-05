@@ -12,6 +12,8 @@ import {
 } from "convex/server";
 import type { Value } from "convex/values";
 import { pipe } from "effect/Function";
+import * as Clock from "effect/Clock";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Match from "effect/Match";
@@ -101,6 +103,34 @@ export const make = (
     Match.exhaustive,
   );
 
+/**
+ * Convex evicts a query from its cache once the execution observes the current
+ * time (every `Date.now()` read is tracked). Effect's logging and span
+ * machinery read timestamps through the ambient `Clock`'s unsafe accessors,
+ * which would silently opt any logging query out of the cache. Queries
+ * therefore run with a `Clock` whose unsafe accessors return constants —
+ * logging and spans never touch the tracker — while the effectful accessors
+ * (`Clock.currentTimeMillis`/`currentTimeNanos`) read the real time, making
+ * them an explicit opt-in to cache eviction. Raw `Date.now()` calls in handler
+ * code likewise opt out honestly.
+ */
+const queryClock: Clock.Clock = {
+  currentTimeMillisUnsafe: () => 0,
+  currentTimeNanosUnsafe: () => 0n,
+  currentTimeMillis: Effect.sync(() => Date.now()),
+  currentTimeNanos: Effect.sync(() => BigInt(Date.now()) * 1_000_000n),
+  // `Effect.sleep` resolves the ambient clock, so it cannot be used here — it
+  // would recurse straight back into this `sleep`.
+  sleep: (duration) =>
+    Effect.callback<void>((resume) => {
+      const handle = setTimeout(
+        () => resume(Effect.void),
+        Duration.toMillis(duration),
+      );
+      return Effect.sync(() => clearTimeout(handle));
+    }),
+};
+
 const queryFunction = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Args,
@@ -169,7 +199,10 @@ const queryFunction = <
         Schema.encodeEffect(returns),
         Effect.orDie,
       );
-    }).pipe(RegisteredFunction.runHandlerPromise(error)),
+    }).pipe(
+      Effect.provideService(Clock.Clock, queryClock),
+      RegisteredFunction.runHandlerPromise(error),
+    ),
 });
 
 export const mutationLayer = <Schema extends DatabaseSchema.AnyWithProps>(

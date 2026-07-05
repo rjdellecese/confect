@@ -16,4 +16,4 @@ Breaking changes for users:
 - **`@confect/react`**: `useMutation`/`useAction` handles with an `error` schema now resolve to `Result` (v4's replacement for `Either`), and decode failures surface as `SchemaError` rather than `ParseError`.
 - **HTTP APIs** are defined with `effect/unstable/httpapi`. Each mounted API now passes its `HttpApi` definition as `api` alongside the group handler layers as `apiLive`, and `middleware` uses v4's `HttpMiddleware` shape.
 - **Node actions** use `effect/unstable/process` (`ChildProcessSpawner`) and `@effect/platform-node`'s `NodeServices` in place of `@effect/platform` `Command`/`NodeContext`.
-- Confect queries no longer stub `Date.now`: reading the current time (directly or via the ambient `Clock`) opts that query out of Convex's query cache.
+- Confect queries no longer stub the global `Date.now`. Queries run with a `Clock` whose unsafe accessors return constants, so Effect-internal reads (log timestamps, spans) never evict a query from Convex's cache; explicit time reads — `Clock.currentTimeMillis`/`currentTimeNanos` or a raw `Date.now()` call — opt the query out and evict as they honestly should.
