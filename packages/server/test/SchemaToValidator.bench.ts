@@ -71,21 +71,21 @@ bench('ValueToValidator<GenericId<"users">>', () => {
 
 bench("ValueToValidator<string[]>", () => {
   return {} as ValueToValidator<string[]>;
-}).types([3143, "instantiations"]);
+}).types([3333, "instantiations"]);
 
 bench("ValueToValidator<string[][]>", () => {
   return {} as ValueToValidator<string[][]>;
-}).types([3693, "instantiations"]);
+}).types([3883, "instantiations"]);
 
 bench("ValueToValidator<any[]>", () => {
   return {} as ValueToValidator<any[]>;
-}).types([3105, "instantiations"]);
+}).types([3295, "instantiations"]);
 
 // --- Objects (small/medium/large) ---
 
 bench("small object", () => {
   return {} as ValueToValidator<{ foo: string }>;
-}).types([739, "instantiations"]);
+}).types([740, "instantiations"]);
 
 bench("medium object", () => {
   return {} as ValueToValidator<{
@@ -94,7 +94,7 @@ bench("medium object", () => {
     baz: boolean;
     items: string[];
   }>;
-}).types([4207, "instantiations"]);
+}).types([4397, "instantiations"]);
 
 bench("large object", () => {
   return {} as ValueToValidator<{
@@ -109,37 +109,37 @@ bench("large object", () => {
     i?: string | undefined;
     j: "admin" | "user";
   }>;
-}).types([6801, "instantiations"]);
+}).types([6991, "instantiations"]);
 
 // --- Optional fields ---
 
 bench("ValueToValidator<{ foo?: string | undefined }>", () => {
   return {} as ValueToValidator<{ foo?: string | undefined }>;
-}).types([1005, "instantiations"]);
+}).types([1006, "instantiations"]);
 
 bench("ValueToValidator<{ foo?: { bar?: number | undefined } | undefined }>", () => {
   return {} as ValueToValidator<{
     foo?: { bar?: number | undefined } | undefined;
   }>;
-}).types([9381, "instantiations"]);
+}).types([9373, "instantiations"]);
 
 // --- Unions ---
 
 bench("ValueToValidator<string | number>", () => {
   return {} as ValueToValidator<string | number>;
-}).types([1295, "instantiations"]);
+}).types([1296, "instantiations"]);
 
 bench('ValueToValidator<"admin" | "user">', () => {
   return {} as ValueToValidator<"admin" | "user">;
-}).types([1300, "instantiations"]);
+}).types([1301, "instantiations"]);
 
 bench("ValueToValidator<string | number | boolean[]>", () => {
   return {} as ValueToValidator<string | number | boolean[]>;
-}).types([4555, "instantiations"]);
+}).types([4745, "instantiations"]);
 
 bench("ValueToValidator<{ foo: string } | { bar: number }>", () => {
   return {} as ValueToValidator<{ foo: string } | { bar: number }>;
-}).types([9901, "instantiations"]);
+}).types([9893, "instantiations"]);
 
 // --- Recursive types ---
 
@@ -147,13 +147,13 @@ type RecursiveObj = { foo: RecursiveObj };
 
 bench("ValueToValidator<RecursiveObj> (recursive object)", () => {
   return {} as ValueToValidator<RecursiveObj>;
-}).types([173, "instantiations"]);
+}).types([174, "instantiations"]);
 
 type RecursiveArr = RecursiveArr[];
 
 bench("ValueToValidator<RecursiveArr> (recursive array)", () => {
   return {} as ValueToValidator<RecursiveArr>;
-}).types([141, "instantiations"]);
+}).types([142, "instantiations"]);
 
 // --- TableSchemaToTableValidator ---
 
@@ -166,7 +166,7 @@ type SmallTableSchema = typeof SmallTableSchema;
 
 bench("TableSchemaToTableValidator (small struct)", () => {
   return {} as TableSchemaToTableValidator<SmallTableSchema>;
-}).types([9536, "instantiations"]);
+}).types([10566, "instantiations"]);
 
 const MediumTableSchema = Schema.Struct({
   text: Schema.String,
@@ -185,7 +185,7 @@ type MediumTableSchema = typeof MediumTableSchema;
 
 bench("TableSchemaToTableValidator (medium struct with optional)", () => {
   return {} as TableSchemaToTableValidator<MediumTableSchema>;
-}).types([14456, "instantiations"]);
+}).types([15013, "instantiations"]);
 
 const LargeTableSchema = Schema.Struct({
   name: Schema.String,
@@ -208,4 +208,4 @@ type LargeTableSchema = typeof LargeTableSchema;
 
 bench("TableSchemaToTableValidator (large struct)", () => {
   return {} as TableSchemaToTableValidator<LargeTableSchema>;
-}).types([17075, "instantiations"]);
+}).types([17367, "instantiations"]);
