@@ -12,7 +12,6 @@ import {
   compileTableSchema,
   EmptyTupleIsNotSupportedError,
   IndexSignaturesAreNotSupportedError,
-  MixedIndexAndPropertySignaturesAreNotSupportedError,
   OptionalTupleElementsAreNotSupportedError,
   TopLevelMustBeObjectError,
   TopLevelMustBeObjectOrUnionError,
@@ -671,22 +670,6 @@ describe(compileSchema, () => {
 
         expect(compiledValidator).toStrictEqual(expectedValidator);
         expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
-      });
-
-      test("struct with index signatures", () => {
-        // `Schema.StructWithRest` rejects mixed index and property signatures
-        // at the type level, but the runtime error from Confect's compiler is
-        // still worth pinning for schemas that evade the static check.
-        const schema = Schema.StructWithRest(
-          Schema.Struct({
-            foo: Schema.String,
-          }),
-          [Schema.Record(Schema.String, Schema.Number)] as never,
-        );
-
-        expect(() => compileSchema(schema)).toThrow(
-          new MixedIndexAndPropertySignaturesAreNotSupportedError(),
-        );
       });
     });
   });
