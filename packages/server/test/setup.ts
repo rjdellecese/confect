@@ -12,9 +12,6 @@ const runCommand = (
 ): Effect.Effect<void, never, ChildProcessSpawner> =>
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner;
-    // Inherit stdio so the command's own output (in particular its error
-    // output) reaches the terminal — otherwise a failure surfaces only as an
-    // opaque exit code.
     const exitCode = yield* spawner.exitCode(
       ChildProcess.make(command, args, {
         stdout: "inherit",
