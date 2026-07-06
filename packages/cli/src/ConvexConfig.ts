@@ -63,14 +63,11 @@ export const componentConfigPlugin = (path: Path.Path): esbuild.Plugin => ({
       // *component* definitions get wrapped.
       if (args.kind === "entry-point") return undefined;
 
-      // A wrapper's import of the real definition (its importer lives in
-      // this plugin's namespace) is claimed into the file namespace so the
-      // definition gets bundled: its own nested `convex.config` imports then
-      // re-enter this plugin and get stamped too, matching the Convex CLI's
-      // own `componentPlugin`. Left to `bundle-require`'s externalizer, an
-      // npm definition would be evaluated natively by Node — where no plugin
-      // can stamp its nested definitions, so a component that nests other
-      // components would throw from its top-level `component.use(...)`.
+      // Claim a wrapper's import of the real definition into the file
+      // namespace: bundled, the definition's own nested `convex.config`
+      // imports re-enter this plugin and get stamped; externalized, an npm
+      // definition would be evaluated natively by Node, where its top-level
+      // `component.use(...)` of unstamped nested definitions throws.
       if (args.namespace === COMPONENT_CONFIG_NAMESPACE) {
         return { path: args.path };
       }
@@ -130,11 +127,11 @@ export const componentConfigPlugin = (path: Path.Path): esbuild.Plugin => ({
           ? String.replace(CONVEX_CONFIG_SUFFIX, "")(specifier)
           : path.dirname(args.path);
 
-        // The real module is imported (not inlined) so it's loaded as its
-        // own file-namespace module: its nested `convex.config` imports then
-        // come from a file-namespace importer and re-enter this plugin.
-        // `defaultName` comes from `defineComponent(name)`'s `_name`, keeping
-        // `app.use`'s name resolution identical to the Convex runtime's.
+        // The real module is imported (not inlined) so any nested
+        // `convex.config` imports resolve from the definition's own file
+        // rather than from this virtual wrapper. `defaultName` comes from
+        // `defineComponent(name)`'s `_name`, keeping `app.use`'s name
+        // resolution identical to the Convex runtime's.
         return {
           loader: "js",
           resolveDir: path.dirname(args.path),

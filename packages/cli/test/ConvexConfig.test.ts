@@ -104,9 +104,8 @@ layer(TestLayer)("discoverInstalledComponents", (it) => {
           "convex/convex.config.ts",
         );
 
-        // Only directly installed components appear in the app's registry;
-        // the component nested inside `test-nested`'s definition is mounted
-        // on the component, not on the app.
+        // The workpool nested inside `test-nested` mounts on that component,
+        // not on the app, so it isn't listed.
         expect(components).toEqual([
           { name: "nested", componentDefinitionPath: "test-nested" },
         ]);
