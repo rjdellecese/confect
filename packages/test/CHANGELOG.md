@@ -1,5 +1,12 @@
 # @confect/test
 
+## 9.2.1
+
+### Patch Changes
+
+- @confect/core@9.2.1
+- @confect/server@9.2.1
+
 ## 9.2.0
 
 ### Patch Changes
