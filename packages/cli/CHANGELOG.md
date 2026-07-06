@@ -1,5 +1,15 @@
 # @confect/cli
 
+## 9.2.1
+
+### Patch Changes
+
+- 060385d: Fix `confect codegen` and `confect dev` failing to load `convex/convex.config.ts` when an installed component's own definition installs other components (e.g. `@convex-dev/resend`, which nests rate-limiter and workpool components).
+
+  Previously, evaluating the config threw "Component definition does not have the required componentDefinitionPath property. This code only works in Convex runtime." Component definitions are now recognized recursively, so components may nest other components to any depth.
+  - @confect/core@9.2.1
+  - @confect/server@9.2.1
+
 ## 9.2.0
 
 ### Minor Changes
