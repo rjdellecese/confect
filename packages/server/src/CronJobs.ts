@@ -93,7 +93,7 @@ export const cronToConvexCronString = (cron: Cron.Cron): string => {
       throw new Error(
         `Convex cron expressions are always evaluated in UTC, but this cron ` +
           `specifies the time zone "${DateTime.zoneToString(tz)}". ` +
-          `Either omit the timezone or use UTC.`,
+          `Either omit the timezone or specify UTC.`,
       );
     }),
   );
