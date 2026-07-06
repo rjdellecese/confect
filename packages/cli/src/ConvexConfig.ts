@@ -60,10 +60,17 @@ export const componentConfigPlugin = (path: Path.Path): esbuild.Plugin => ({
   setup(build) {
     build.onResolve({ filter: /convex\.config/ }, (args) => {
       // The app's own `convex.config.ts` is the entry point; only imports of
-      // *component* definitions get wrapped. Skipping non-file namespaces
-      // also stops the wrapper's own import of the real module (whose
-      // importer lives in this plugin's namespace) from recursing.
+      // *component* definitions get wrapped.
       if (args.kind === "entry-point") return undefined;
+
+      // Claim a wrapper's import of the real definition into the file
+      // namespace: bundled, the definition's own nested `convex.config`
+      // imports re-enter this plugin and get stamped; externalized, an npm
+      // definition would be evaluated natively by Node, where its top-level
+      // `component.use(...)` of unstamped nested definitions throws.
+      if (args.namespace === COMPONENT_CONFIG_NAMESPACE) {
+        return { path: args.path };
+      }
       if (args.namespace !== "file" && args.namespace !== "") return undefined;
 
       const importer =
@@ -120,12 +127,11 @@ export const componentConfigPlugin = (path: Path.Path): esbuild.Plugin => ({
           ? String.replace(CONVEX_CONFIG_SUFFIX, "")(specifier)
           : path.dirname(args.path);
 
-        // The real module is imported (not inlined) so that an npm component
-        // definition is externalized by `bundle-require` and evaluated from
-        // its own on-disk location, while a locally-defined `.ts` component
-        // gets bundled. `defaultName` comes from `defineComponent(name)`'s
-        // `_name`, keeping `app.use`'s name resolution identical to the
-        // Convex runtime's.
+        // The real module is imported (not inlined) so any nested
+        // `convex.config` imports resolve from the definition's own file
+        // rather than from this virtual wrapper. `defaultName` comes from
+        // `defineComponent(name)`'s `_name`, keeping `app.use`'s name
+        // resolution identical to the Convex runtime's.
         return {
           loader: "js",
           resolveDir: path.dirname(args.path),

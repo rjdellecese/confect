@@ -7,6 +7,9 @@ coverage/
 dist/
 node-compile-cache/
 node_modules/
+# Fake npm packages that component-discovery test fixtures resolve against.
+!packages/cli/test/fixtures/components/*/node_modules/
+!packages/cli/test/fixtures/components/*/node_modules/**/dist/
 opensrc/
 tsconfig.vitest-temp.json
 *.tsbuildinfo

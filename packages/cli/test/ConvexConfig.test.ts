@@ -94,6 +94,24 @@ layer(TestLayer)("discoverInstalledComponents", (it) => {
       }),
   );
 
+  it.effect(
+    "discovers a component whose own definition installs other components",
+    () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const components = yield* discoverInstalledComponents(
+          path.join(fixturesRoot, "nested", "convex", "convex.config.ts"),
+          "convex/convex.config.ts",
+        );
+
+        // The workpool nested inside `test-nested` mounts on that component,
+        // not on the app, so it isn't listed.
+        expect(components).toEqual([
+          { name: "nested", componentDefinitionPath: "test-nested" },
+        ]);
+      }),
+  );
+
   it.effect("fails with a BuildError when the config throws on import", () =>
     Effect.gen(function* () {
       const path = yield* Path.Path;
