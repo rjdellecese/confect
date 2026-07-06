@@ -94,6 +94,25 @@ layer(TestLayer)("discoverInstalledComponents", (it) => {
       }),
   );
 
+  it.effect(
+    "discovers a component whose own definition installs other components",
+    () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const components = yield* discoverInstalledComponents(
+          path.join(fixturesRoot, "nested", "convex", "convex.config.ts"),
+          "convex/convex.config.ts",
+        );
+
+        // Only directly installed components appear in the app's registry;
+        // the component nested inside `test-nested`'s definition is mounted
+        // on the component, not on the app.
+        expect(components).toEqual([
+          { name: "nested", componentDefinitionPath: "test-nested" },
+        ]);
+      }),
+  );
+
   it.effect("fails with a BuildError when the config throws on import", () =>
     Effect.gen(function* () {
       const path = yield* Path.Path;
