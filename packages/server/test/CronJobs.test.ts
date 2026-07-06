@@ -206,7 +206,7 @@ describe("cronToConvexCronString", () => {
     expect(() =>
       CronJobs.cronToConvexCronString(cron),
     ).toThrowErrorMatchingInlineSnapshot(
-      `[Error: Convex cron expressions are always evaluated in UTC, but this cron specifies the time zone "America/New_York". Define the schedule in UTC (omit the time zone or use "UTC").]`,
+      `[Error: Convex cron expressions are always evaluated in UTC, but this cron specifies the time zone "America/New_York". Either omit the timezone or specify UTC.]`,
     );
   });
 
@@ -223,7 +223,7 @@ describe("cronToConvexCronString", () => {
     expect(() =>
       CronJobs.cronToConvexCronString(cron),
     ).toThrowErrorMatchingInlineSnapshot(
-      `[Error: Convex cron expressions are always evaluated in UTC, but this cron specifies the time zone "+03:00". Define the schedule in UTC (omit the time zone or use "UTC").]`,
+      `[Error: Convex cron expressions are always evaluated in UTC, but this cron specifies the time zone "+03:00". Either omit the timezone or specify UTC.]`,
     );
   });
 });
