@@ -61,7 +61,7 @@ These are from the Changesets docs but are easy to miss:
    pnpm changeset pre enter next
    ```
 
-4. **Extend `release.yml` to publish from `vN`.** Add the release branch to the existing workflow's `push.branches`, pass the triggering branch to `changesets/action`, and gate any stable-only post-publish steps (such as the docs `release` branch push) to `main` only:
+4. **Extend `release.yml` to publish from `vN`.** Add the release branch to the existing workflow's `push.branches`:
 
    ```diff
     on:
@@ -71,21 +71,7 @@ These are from the Changesets docs but are easy to miss:
    +      - v9
    ```
 
-   ```diff
-        - uses: changesets/action@v1
-          with:
-            publish: pnpm release
-   -        branch: main
-   +        branch: ${{ github.ref_name }}
-   ```
-
-   ```diff
-        - name: Update docs deployment branch
-   -      if: steps.changesets.outputs.published == 'true'
-   +      if: steps.changesets.outputs.published == 'true' && github.ref_name == 'main'
-   ```
-
-   The prerelease cycle must not touch the docs `release` branch — that tracks the stable line.
+   The other two pieces of branch-awareness are permanent fixtures of `release.yml` (kept in place between prerelease cycles) — verify they are still present rather than adding them: `changesets/action` receives `branch: ${{ github.ref_name }}`, and the docs deployment step is gated with `if: steps.changesets.outputs.published == 'true' && github.ref_name == 'main'`. The prerelease cycle must not touch the docs `release` branch — that tracks the stable line.
 
 5. **Mirror the branch into the other CI workflows.** Add `- v9` to the `push.branches` and `pull_request.branches` lists in any CI workflows that gate `main` (typically `docs.yml`, `example.yml`, `packages.yml`) so PRs against `v9` run the same checks as PRs against `main`.
 
@@ -116,14 +102,13 @@ There is no required cadence; ship as many `next.N`s as the major needs.
    ```bash
    git switch v9 && git pull
    pnpm changeset pre exit
-   pnpm changeset version
-   pnpm format
+   pnpm version-packages
    git add .
    git commit -m "Exit prerelease mode and version packages"
    git push
    ```
 
-   `pre exit` deletes `.changeset/pre.json`. `changeset version` then consumes every changeset accumulated during the prerelease cycle and writes the final stable versions (e.g. `9.0.0`) into each `package.json`. Run `pnpm format` before committing — `changeset version` writes CHANGELOG entries in its own Markdown style, which fails the Format CI job otherwise. Pushing triggers `release.yml`; with no remaining changesets, `changesets/action` skips opening a Version Packages PR and goes straight to `pnpm release`, publishing the final stable to `latest`.
+   `pre exit` deletes `.changeset/pre.json`. `pnpm version-packages` (`changeset version && pnpm format`, the same script `release.yml` passes to `changesets/action`) then consumes every changeset accumulated during the prerelease cycle and writes the final stable versions (e.g. `9.0.0`) into each `package.json`; the format pass matters because `changeset version` writes CHANGELOG entries in its own Markdown style, which fails the Format CI job otherwise. Pushing triggers `release.yml`; with no remaining changesets, `changesets/action` skips opening a Version Packages PR and goes straight to `pnpm release`, publishing the final stable to `latest`.
 
 2. **Open a PR merging `vN` back into `main`** with the major as the title (e.g. `v9`). Use a merge commit so the prerelease history is preserved in `main` — merge commits are enabled repo-wide for exactly this case, even though squash is the norm for regular PRs. If the merge-commit option is missing from the UI (or the API returns `405 Merge commits are not allowed`), check that "Allow merge commits" is still enabled in the repository settings and that no "Require linear history" rule exists on `main` — the rule overrides the repo-level toggle and hides the option.
 
@@ -155,7 +140,7 @@ There is no required cadence; ship as many `next.N`s as the major needs.
 | ------------------------------------------------------ | ------------------------------- |
 | Enter pre mode                                         | `pnpm changeset pre enter next` |
 | Author a changeset                                     | `pnpm changeset`                |
-| Apply versions locally (the action normally does this) | `pnpm changeset version`        |
+| Apply versions locally (the action normally does this) | `pnpm version-packages`         |
 | Exit pre mode                                          | `pnpm changeset pre exit`       |
 | Publish manually (the action normally does this)       | `pnpm release`                  |
 | Install a prerelease                                   | `pnpm add @confect/server@next` |

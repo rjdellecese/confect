@@ -1,0 +1,17 @@
+{
+  "mode": "pre",
+  "tag": "next",
+  "initialVersions": {
+    "docs": "0.0.1",
+    "example": "0.0.0",
+    "@confect/cli": "9.2.1",
+    "@confect/core": "9.2.1",
+    "@confect/js": "9.2.1",
+    "@confect/react": "9.2.1",
+    "@confect/server": "9.2.1",
+    "@confect/server-local-backend-fixtures": "0.0.0",
+    "@confect/server-mock-backend-fixtures": "0.0.0",
+    "@confect/test": "9.2.1"
+  },
+  "changesets": []
+}
