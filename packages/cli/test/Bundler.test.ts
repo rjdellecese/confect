@@ -50,6 +50,121 @@ layer(BundlerLayer)("bundle", (it) => {
   );
 
   it.effect(
+    "bundles first-party workspace deps whose dist uses extensionless relative imports",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const tempDir = yield* fs.makeTempDirectoryScoped();
+
+        const pkgDir = path.join(tempDir, "pkg");
+        yield* fs.makeDirectory(path.join(pkgDir, "dist", "Scenario"), {
+          recursive: true,
+        });
+        yield* fs.writeFileString(
+          path.join(pkgDir, "package.json"),
+          `{ "name": "@scope/lib", "type": "module", "exports": { "./Scenario": "./dist/Scenario.js" } }\n`,
+        );
+        yield* fs.writeFileString(
+          path.join(pkgDir, "dist", "Scenario.js"),
+          `export { value } from "./Scenario/Inner";\n`,
+        );
+        yield* fs.writeFileString(
+          path.join(pkgDir, "dist", "Scenario", "Inner.js"),
+          `export const value = "bundled";\n`,
+        );
+
+        // Symlink into node_modules the way pnpm/npm/yarn link a workspace dep;
+        // realpath must follow it back to `pkg/` to recognize it as first-party.
+        yield* fs.makeDirectory(path.join(tempDir, "node_modules", "@scope"), {
+          recursive: true,
+        });
+        yield* fs.symlink(
+          pkgDir,
+          path.join(tempDir, "node_modules", "@scope", "lib"),
+        );
+
+        const entry = path.join(tempDir, "entry.ts");
+        yield* fs.writeFileString(
+          entry,
+          `import { value } from "@scope/lib/Scenario";\nexport default value;\n`,
+        );
+
+        const bundled = yield* Bundler.bundle(entry);
+        expect(bundled.module.default).toBe("bundled");
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect(
+    "bundles first-party workspace deps whose exports declare only the import condition",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const tempDir = yield* fs.makeTempDirectoryScoped();
+
+        const pkgDir = path.join(tempDir, "pkg");
+        yield* fs.makeDirectory(path.join(pkgDir, "dist", "Widget"), {
+          recursive: true,
+        });
+        // Conditional `exports` with only `import`/`types` — no
+        // `require`/`default`. CommonJS resolution (`createRequire`) throws
+        // ERR_PACKAGE_PATH_NOT_EXPORTED for this shape, so it only bundles
+        // once resolution honors the ESM `import` condition.
+        yield* fs.writeFileString(
+          path.join(pkgDir, "package.json"),
+          `{ "name": "@scope/esm-lib", "type": "module", "exports": { "./*": { "types": "./dist/*.d.ts", "import": "./dist/*.js" } } }\n`,
+        );
+        yield* fs.writeFileString(
+          path.join(pkgDir, "dist", "Widget.js"),
+          `export { value } from "./Widget/Inner";\n`,
+        );
+        yield* fs.writeFileString(
+          path.join(pkgDir, "dist", "Widget", "Inner.js"),
+          `export const value = "bundled";\n`,
+        );
+
+        yield* fs.makeDirectory(path.join(tempDir, "node_modules", "@scope"), {
+          recursive: true,
+        });
+        yield* fs.symlink(
+          pkgDir,
+          path.join(tempDir, "node_modules", "@scope", "esm-lib"),
+        );
+
+        const entry = path.join(tempDir, "entry.ts");
+        yield* fs.writeFileString(
+          entry,
+          `import { value } from "@scope/esm-lib/Widget";\nexport default value;\n`,
+        );
+
+        const bundled = yield* Bundler.bundle(entry);
+        expect(bundled.module.default).toBe("bundled");
+      }).pipe(Effect.scoped),
+  );
+
+  it.effect("keeps true third-party node_modules deps external", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      // Entry lives under the repo so the externalized `effect` resolves from
+      // the temp `.mjs` (externals load relative to it, not bundled).
+      const tempDir = yield* fs.makeTempDirectoryScoped({
+        directory: process.cwd(),
+      });
+
+      const entry = path.join(tempDir, "entry.ts");
+      yield* fs.writeFileString(
+        entry,
+        `import { pipe } from "effect/Function";\nexport default pipe(1, (n) => n + 1);\n`,
+      );
+
+      const bundled = yield* Bundler.bundle(entry);
+      expect(bundled.module.default).toBe(2);
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect(
     "rewrites import.meta.url inside the bundle to the original source path",
     () =>
       Effect.gen(function* () {

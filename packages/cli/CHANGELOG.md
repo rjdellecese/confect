@@ -1,5 +1,60 @@
 # @confect/cli
 
+## 9.2.1
+
+### Patch Changes
+
+- 060385d: Fix `confect codegen` and `confect dev` failing to load `convex/convex.config.ts` when an installed component's own definition installs other components (e.g. `@convex-dev/resend`, which nests rate-limiter and workpool components).
+
+  Previously, evaluating the config threw "Component definition does not have the required componentDefinitionPath property. This code only works in Convex runtime." Component definitions are now recognized recursively, so components may nest other components to any depth.
+  - @confect/core@9.2.1
+  - @confect/server@9.2.1
+
+## 9.2.0
+
+### Minor Changes
+
+- 9462f11: Generate a typed Convex components registry at `confect/_generated/components.ts`
+
+  `confect codegen` and `confect dev` now evaluate `convex/convex.config.ts` and generate a typed `components` registry with one entry per installed component (`app.use(...)`). Import it from anywhere in your `confect/` directory to pass typed component references to component clients:
+
+  ```ts
+  import { components } from "./_generated/components";
+
+  const pool = new Workpool(components.workpool, { maxParallelism: 3 });
+  ```
+
+  Previously the only typed registry was the `components` export of `convex/_generated/api`, which cannot be imported from a Confect impl's import graph: `confect codegen` bundles and evaluates each impl, and `convex/_generated/api` doesn't exist yet at that point (Convex generates it from the `convex/` modules Confect codegen itself produces). The workaround — `componentsGeneric().workpool as unknown as ComponentApi` — required an unsafe cast at every call site.
+
+  Each entry is typed with the `ComponentApi` type that component packages export from `_generated/component.js` (the convention Convex's own codegen uses), so no cast is needed. Components installed from npm are typed via their package specifier; locally-defined components are typed via a relative path. Edits to `convex.config.ts` re-run codegen in `confect dev`.
+
+### Patch Changes
+
+- @confect/core@9.2.0
+- @confect/server@9.2.0
+
+## 9.1.5
+
+### Patch Changes
+
+- 101a11c: Bundle workspace dependencies whose `exports` declare only the `import` condition
+
+  `confect codegen` and `confect dev` now bundle first-party workspace dependencies that are ESM-only — those whose `package.json` `exports` map declares the `import` condition but no `require`/`default`. Previously such a dependency was silently left external and then failed to load, breaking codegen and dev for any project that imported it.
+
+  When a workspace dependency genuinely can't be resolved, you now get a clear build warning naming the dependency instead of an opaque failure later on.
+  - @confect/core@9.1.5
+  - @confect/server@9.1.5
+
+## 9.1.4
+
+### Patch Changes
+
+- cc44c2e: Fix `confect codegen` and `confect dev` failing with `ERR_MODULE_NOT_FOUND` when your spec or impl files import a workspace package from the same monorepo.
+
+  Codegen now handles workspace dependencies whose compiled output uses extensionless or directory-style relative imports — output that already works everywhere else (Vite, esbuild, Vitest). You no longer need extension-rewriting tooling such as `tsc-alias` or `rewriteRelativeImportExtensions` just to make codegen succeed.
+  - @confect/core@9.1.4
+  - @confect/server@9.1.4
+
 ## 9.1.3
 
 ### Patch Changes

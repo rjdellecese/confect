@@ -158,7 +158,13 @@ importers:
       esbuild:
         specifier: ^0.27.3
         version: 0.27.3
+      exsolve:
+        specifier: ^1.1.0
+        version: 1.1.0
     devDependencies:
+      '@convex-dev/workpool':
+        specifier: 0.4.6
+        version: 0.4.6(convex-helpers@0.1.118(@standard-schema/spec@1.1.0)(convex@1.40.0(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(convex@1.40.0(react@19.2.4))
       '@effect/language-service':
         specifier: 0.86.2
         version: 0.86.2
@@ -171,6 +177,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 3.2.4
         version: 3.2.4(vitest@3.2.4(@types/debug@4.1.12)(@types/node@25.3.3)(happy-dom@15.11.7)(jiti@1.21.7)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
+      convex:
+        specifier: 1.40.0
+        version: 1.40.0(react@19.2.4)
       effect:
         specifier: 4.0.0-beta.93
         version: 4.0.0-beta.93
@@ -3959,6 +3968,9 @@ packages:
   express@4.18.2:
     resolution: {integrity: sha512-5/PsL6iGPdfQ/lKM1UuielYgv3BUoJfz1aUwU9vHZ+J7gyvwdQXFEBIEIaxeGf0GIcreATNyBExtalisDbuMqQ==}
     engines: {node: '>= 0.10.0'}
+
+  exsolve@1.1.0:
+    resolution: {integrity: sha512-D+42+T12DdIlJM3uepa55qGiL3sYdLBOxIl2ifQCzCHz4c7eiolaHsi3BIqEr7JxBzxv2pYZQX9kw16ziMcEmw==}
 
   extend@3.0.2:
     resolution: {integrity: sha512-fjquC59cD7CyW6urNXK0FBufkZcoiGG80wTuPujX590cB5Ttln20E2UB4S/WARVqhXffZl2LNgS+gQdPIIim/g==}
@@ -10498,6 +10510,8 @@ snapshots:
       vary: 1.1.2
     transitivePeerDependencies:
       - supports-color
+
+  exsolve@1.1.0: {}
 
   extend@3.0.2: {}
 

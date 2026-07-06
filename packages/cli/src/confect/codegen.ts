@@ -20,6 +20,7 @@ import {
   ParentChildNameCollisionError,
 } from "../CodegenError";
 import { ConfectDirectory } from "../ConfectDirectory";
+import * as ConvexConfig from "../ConvexConfig";
 import { ConvexDirectory } from "../ConvexDirectory";
 import * as DocName from "../DocName";
 import * as FunctionPaths from "../FunctionPaths";
@@ -42,6 +43,7 @@ import {
   logSuccess,
   logWarn,
 } from "../log";
+import { ProjectRoot } from "../ProjectRoot";
 import {
   assemblyNodesFromLeaves,
   type SpecAssemblyNode,
@@ -73,6 +75,9 @@ const GENERATED_CONVEX_SCHEMA_PATH = Effect.map(Path.Path, (path) =>
 );
 const GENERATED_ID_PATH = Effect.map(Path.Path, (path) =>
   path.join(GENERATED_DIRNAME, "id.ts"),
+);
+const GENERATED_COMPONENTS_PATH = Effect.map(Path.Path, (path) =>
+  path.join(GENERATED_DIRNAME, "components.ts"),
 );
 const GENERATED_TABLES_DIRNAME = Effect.map(Path.Path, (path) =>
   path.join(GENERATED_DIRNAME, "tables"),
@@ -160,6 +165,9 @@ const runCodegen = Effect.gen(function* () {
       generateDocs(tableModules),
       generateServices,
       generateConvexSchema(tableModules),
+      // Must land before impl validation: impls may import the generated
+      // components registry, so it has to exist when their bundles are built.
+      generateComponents,
     ],
     { concurrency: "unbounded" },
   );
@@ -893,6 +901,57 @@ const generateRefs = Effect.gen(function* () {
   const refsContents = yield* templates.refs({ specImportPath });
 
   yield* writeFileStringAndLog(refsPath, refsContents);
+});
+
+/**
+ * Generate `confect/_generated/components.ts` — the typed registry of Convex
+ * components installed in `convex/convex.config.ts` (see
+ * {@link templates.components}). The file is emitted even when there is no
+ * `convex.config.ts` (as an empty registry) so the import surface stays
+ * stable. It must exist before impl validation because impl modules may
+ * import it.
+ */
+export const generateComponents = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
+  const convexDirectory = yield* ConvexDirectory.get;
+  const projectRoot = yield* ProjectRoot.get;
+
+  const confectGeneratedDirectory = path.join(
+    confectDirectory,
+    GENERATED_DIRNAME,
+  );
+  const generatedComponentsPath = yield* GENERATED_COMPONENTS_PATH;
+  const componentsPath = path.join(confectDirectory, generatedComponentsPath);
+
+  const convexConfigPath = path.join(
+    convexDirectory,
+    ConvexConfig.CONVEX_CONFIG_FILENAME,
+  );
+
+  const installedComponents = (yield* fs.exists(convexConfigPath))
+    ? yield* ConvexConfig.discoverInstalledComponents(
+        convexConfigPath,
+        path.relative(projectRoot, convexConfigPath),
+      )
+    : [];
+
+  const contents = yield* templates.components({
+    components: Array.map(
+      installedComponents,
+      ({ name, componentDefinitionPath }) => ({
+        name,
+        typeImportPath: ConvexConfig.typeImportPath(
+          path,
+          componentDefinitionPath,
+          confectGeneratedDirectory,
+        ),
+      }),
+    ),
+  });
+
+  yield* writeFileStringAndLog(componentsPath, contents);
 });
 
 const logGenerated = (effect: typeof generateHttp) =>

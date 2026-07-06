@@ -4,9 +4,9 @@ import * as Effect from "effect/Effect";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import { BuildError, isBuildError, renderBuildError } from "./BuildError";
+import { BuildError, isBuildError } from "./BuildError";
 import * as Ansi from "./Ansi";
-import { formatPath } from "./log";
+import { formatPath, renderBuildError } from "./log";
 
 // --- Variants ---
 
@@ -124,6 +124,14 @@ export class ConflictingDocNameError extends Schema.TaggedErrorClass<Conflicting
   },
 ) {}
 
+export class InvalidConvexConfigError extends Schema.TaggedErrorClass<InvalidConvexConfigError>()(
+  "InvalidConvexConfigError",
+  {
+    configPath: Schema.String,
+    reason: Schema.String,
+  },
+) {}
+
 export const CodegenError = Schema.Union([
   BuildError,
   MissingImplFileError,
@@ -139,6 +147,7 @@ export const CodegenError = Schema.Union([
   DuplicateTableNameError,
   LegacySchemaFileError,
   ConflictingDocNameError,
+  InvalidConvexConfigError,
 ]);
 export type CodegenError = typeof CodegenError.Type;
 
@@ -278,6 +287,15 @@ const renderConflictingDocNameError = (
   );
 };
 
+const renderInvalidConvexConfigError = (
+  error: InvalidConvexConfigError,
+): string =>
+  singleLine(
+    "Convex config ",
+    formatPath(error.configPath),
+    ` could not be evaluated: ${error.reason}`,
+  );
+
 const renderLegacySchemaFileError = (error: LegacySchemaFileError): string =>
   singleLine(
     "Found a legacy ",
@@ -330,6 +348,7 @@ export const renderCodegenError = (error: CodegenError): string => {
     Match.tag("DuplicateTableNameError", renderDuplicateTableNameError),
     Match.tag("LegacySchemaFileError", renderLegacySchemaFileError),
     Match.tag("ConflictingDocNameError", renderConflictingDocNameError),
+    Match.tag("InvalidConvexConfigError", renderInvalidConvexConfigError),
     Match.exhaustive,
   );
 };

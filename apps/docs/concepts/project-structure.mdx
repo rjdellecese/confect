@@ -7,6 +7,7 @@ description: "Understand the structure of a Confect project."
 <Tree>
   <Tree.Folder name="confect" defaultOpen>
     <Tree.Folder name="_generated" defaultOpen>
+      <Tree.File name="components.ts" />
       <Tree.File name="convexSchema.ts" />
       <Tree.File name="docs.ts" />
       <Tree.File name="id.ts" />
@@ -51,6 +52,10 @@ description: "Understand the structure of a Confect project."
 ## `confect/`
 
 ### `_generated/`
+
+#### `components.ts`
+
+Contains a typed `components` registry with one entry per Convex [component](https://docs.convex.dev/components) installed via `app.use(...)` in `convex/convex.config.ts`. Use it wherever a component client expects a component reference (e.g. `new Workpool(components.workpool, ...)`). Unlike the `components` export of `convex/_generated/api`, this file is safe to import from your impl files' import graphs. See [Components](/server/components).
 
 #### `convexSchema.ts`
 

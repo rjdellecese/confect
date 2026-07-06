@@ -25,9 +25,10 @@ import {
 } from "bundle-require";
 import * as esbuild from "esbuild";
 import * as Ansi from "../Ansi";
-import { logCoalescedBuildErrors } from "../BuildError";
+import * as Bundler from "../Bundler";
 import * as CodegenError from "../CodegenError";
 import { ConfectDirectory } from "../ConfectDirectory";
+import { CONVEX_CONFIG_FILENAME } from "../ConvexConfig";
 import { ConvexDirectory } from "../ConvexDirectory";
 import * as FunctionPaths from "../FunctionPaths";
 import type * as GroupPaths from "../GroupPaths";
@@ -37,6 +38,8 @@ import {
   isLeafSpecPath,
 } from "../LeafModule";
 import {
+  logCoalescedBuildErrors,
+  logCoalescedBuildWarnings,
   logFunctionAdded,
   logFunctionRemoved,
   logPending,
@@ -91,9 +94,9 @@ const pendingInit: Pending = {
 const isPendingDirty = (p: Pending): boolean =>
   p.specDirty || p.httpDirty || p.cronsDirty || p.authDirty;
 
-type WatcherErrors = ReadonlyMap<string, readonly esbuild.Message[]>;
+type WatcherMessages = ReadonlyMap<string, readonly esbuild.Message[]>;
 
-const emptyWatcherErrors: WatcherErrors = new Map();
+const emptyWatcherMessages: WatcherMessages = new Map();
 
 const changeChar = (change: "Added" | "Removed" | "Modified") =>
   Match.value(change).pipe(
@@ -193,7 +196,10 @@ export const dev = Command.make("dev", {}, () =>
     const pendingRef = yield* Ref.make<Pending>(pendingInit);
     const signal = yield* Queue.sliding<void>(1);
     const restartQueue = yield* Queue.sliding<void>(1);
-    const watcherErrorsRef = yield* Ref.make<WatcherErrors>(emptyWatcherErrors);
+    const watcherErrorsRef =
+      yield* Ref.make<WatcherMessages>(emptyWatcherMessages);
+    const watcherWarningsRef =
+      yield* Ref.make<WatcherMessages>(emptyWatcherMessages);
 
     yield* Effect.all(
       [
@@ -203,10 +209,18 @@ export const dev = Command.make("dev", {}, () =>
             pendingRef,
             restartQueue,
             watcherErrorsRef,
+            watcherWarningsRef,
           ),
         ),
         confectStructureWatcher(signal, pendingRef, restartQueue),
-        syncLoop(signal, pendingRef, initialFunctionPaths, watcherErrorsRef),
+        convexConfigStructureWatcher(signal, pendingRef, restartQueue),
+        syncLoop(
+          signal,
+          pendingRef,
+          initialFunctionPaths,
+          watcherErrorsRef,
+          watcherWarningsRef,
+        ),
       ],
       { concurrency: "unbounded" },
     );
@@ -216,23 +230,25 @@ export const dev = Command.make("dev", {}, () =>
 const esbuildMessageKey = (m: esbuild.Message): string =>
   `${m.location?.file ?? ""}:${m.location?.line ?? ""}:${m.location?.column ?? ""}:${m.text}`;
 
-const allMessages = (errors: WatcherErrors): ReadonlyArray<esbuild.Message> =>
-  pipe(Array.fromIterable(errors.values()), Array.flatten);
+const allMessages = (
+  messages: WatcherMessages,
+): ReadonlyArray<esbuild.Message> =>
+  pipe(Array.fromIterable(messages.values()), Array.flatten);
 
-const dedupeWatcherErrors = (
-  errors: WatcherErrors,
+const dedupeWatcherMessages = (
+  messages: WatcherMessages,
 ): ReadonlyArray<esbuild.Message> =>
   pipe(
-    allMessages(errors),
+    allMessages(messages),
     Array.dedupeWith(
       (messageA, messageB) =>
         esbuildMessageKey(messageA) === esbuildMessageKey(messageB),
     ),
   );
 
-const watcherErrorsSignature = (errors: WatcherErrors): string =>
+const watcherMessagesSignature = (messages: WatcherMessages): string =>
   pipe(
-    allMessages(errors),
+    allMessages(messages),
     Array.map(esbuildMessageKey),
     Array.dedupe,
     Array.sort(Order.String),
@@ -240,23 +256,24 @@ const watcherErrorsSignature = (errors: WatcherErrors): string =>
   );
 
 /**
- * Log any watcher errors that haven't already been logged at their
- * current signature. Suppresses the per-watcher fanout that happens
- * when one root cause (e.g. a missing import) breaks every entry
+ * Log any watcher messages (errors or warnings) that haven't already been
+ * logged at their current signature. Suppresses the per-watcher fanout that
+ * happens when one root cause (e.g. a missing import) breaks every entry
  * point's build at the same source location.
  */
-const logChangedWatcherErrors = (
-  watcherErrorsRef: Ref.Ref<WatcherErrors>,
+const logChangedWatcherMessages = (
+  messagesRef: Ref.Ref<WatcherMessages>,
   lastLoggedSignatureRef: Ref.Ref<string>,
+  log: (messages: ReadonlyArray<esbuild.Message>) => Effect.Effect<void>,
 ) =>
   Effect.gen(function* () {
-    const errors = yield* Ref.get(watcherErrorsRef);
-    const signature = watcherErrorsSignature(errors);
+    const messages = yield* Ref.get(messagesRef);
+    const signature = watcherMessagesSignature(messages);
     const previous = yield* Ref.get(lastLoggedSignatureRef);
     if (signature === previous) return;
     yield* Ref.set(lastLoggedSignatureRef, signature);
-    if (errors.size === 0) return;
-    yield* logCoalescedBuildErrors(dedupeWatcherErrors(errors));
+    if (messages.size === 0) return;
+    yield* log(dedupeWatcherMessages(messages));
   });
 
 /**
@@ -290,11 +307,13 @@ const syncLoop = (
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
   initialFunctionPaths: FunctionPaths.FunctionPaths,
-  watcherErrorsRef: Ref.Ref<WatcherErrors>,
+  watcherErrorsRef: Ref.Ref<WatcherMessages>,
+  watcherWarningsRef: Ref.Ref<WatcherMessages>,
 ) =>
   Effect.gen(function* () {
     const functionPathsRef = yield* Ref.make(initialFunctionPaths);
     const lastLoggedErrorsRef = yield* Ref.make<string>("");
+    const lastLoggedWarningsRef = yield* Ref.make<string>("");
 
     return yield* Effect.forever(
       Effect.gen(function* () {
@@ -309,7 +328,16 @@ const syncLoop = (
           COALESCE_MAX_WAIT,
         );
 
-        yield* logChangedWatcherErrors(watcherErrorsRef, lastLoggedErrorsRef);
+        yield* logChangedWatcherMessages(
+          watcherErrorsRef,
+          lastLoggedErrorsRef,
+          logCoalescedBuildErrors,
+        );
+        yield* logChangedWatcherMessages(
+          watcherWarningsRef,
+          lastLoggedWarningsRef,
+          logCoalescedBuildWarnings,
+        );
 
         const pending = yield* Ref.getAndSet(pendingRef, pendingInit);
 
@@ -424,15 +452,38 @@ const discoverEntryPoints = Effect.gen(function* () {
     (relativePath) => tryEntry(relativePath, "specDirty"),
   );
 
-  return Array.getSomes([...fixedEntryOptions, ...implEntryOptions]);
+  // `convex/convex.config.ts` feeds the generated components registry, so
+  // edits to it (or to a locally-defined component definition it imports —
+  // npm component definitions are externalized and not watched) must re-run
+  // codegen.
+  const convexDirectory = yield* ConvexDirectory.get;
+  const convexConfigEntryOption = yield* Effect.gen(function* () {
+    const absolutePath = path.join(convexDirectory, CONVEX_CONFIG_FILENAME);
+    if (!(yield* fs.exists(absolutePath))) {
+      return Option.none<EntryPoint>();
+    }
+    return Option.some<EntryPoint>({
+      absolutePath,
+      displayPath: path.relative(projectRoot, absolutePath),
+      pendingKey: "specDirty",
+    });
+  });
+
+  return Array.getSomes([
+    ...fixedEntryOptions,
+    convexConfigEntryOption,
+    ...implEntryOptions,
+  ]);
 });
 
 const esbuildOptions = (
+  path: Path.Path,
   entry: EntryPoint,
   notExternal: ReadonlyArray<RegExp>,
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
-  watcherErrorsRef: Ref.Ref<WatcherErrors>,
+  watcherErrorsRef: Ref.Ref<WatcherMessages>,
+  watcherWarningsRef: Ref.Ref<WatcherMessages>,
 ) => {
   // First `onEnd` fires when esbuild finishes the watcher's initial
   // build. At startup that's an echo of the just-completed initial
@@ -451,6 +502,7 @@ const esbuildOptions = (
     format: "esm" as const,
     logLevel: "silent" as const,
     plugins: [
+      Bundler.bundleWorkspacePlugin(path, notExternal),
       externalPlugin({ notExternal: [...notExternal] }),
       {
         name: "notify-rebuild",
@@ -472,6 +524,15 @@ const esbuildOptions = (
                   }
                   return next;
                 });
+                yield* Ref.update(watcherWarningsRef, (current) => {
+                  const next = new Map(current);
+                  if (result.warnings.length > 0) {
+                    next.set(entry.absolutePath, result.warnings);
+                  } else {
+                    next.delete(entry.absolutePath);
+                  }
+                  return next;
+                });
                 if (isInitial && result.errors.length === 0) return;
                 yield* Ref.update(pendingRef, (p) => ({
                   ...p,
@@ -488,21 +549,25 @@ const esbuildOptions = (
 };
 
 const createEntryPointWatcher = (
+  path: Path.Path,
   entry: EntryPoint,
   notExternal: ReadonlyArray<RegExp>,
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
-  watcherErrorsRef: Ref.Ref<WatcherErrors>,
+  watcherErrorsRef: Ref.Ref<WatcherMessages>,
+  watcherWarningsRef: Ref.Ref<WatcherMessages>,
 ) =>
   Effect.acquireRelease(
     Effect.promise(async () => {
       const ctx = await esbuild.context(
         esbuildOptions(
+          path,
           entry,
           notExternal,
           signal,
           pendingRef,
           watcherErrorsRef,
+          watcherWarningsRef,
         ),
       );
       await ctx.watch();
@@ -511,14 +576,16 @@ const createEntryPointWatcher = (
     (ctx) =>
       Effect.gen(function* () {
         yield* Effect.promise(() => ctx.dispose());
-        // Clear any errors recorded by this watcher so a disposed
-        // watcher can't leave stale errors visible to the sync loop.
-        yield* Ref.update(watcherErrorsRef, (current) => {
+        // Clear any errors and warnings recorded by this watcher so a
+        // disposed watcher can't leave stale messages visible to the sync loop.
+        const clearEntry = (current: WatcherMessages) => {
           if (!current.has(entry.absolutePath)) return current;
           const next = new Map(current);
           next.delete(entry.absolutePath);
           return next;
-        });
+        };
+        yield* Ref.update(watcherErrorsRef, clearEntry);
+        yield* Ref.update(watcherWarningsRef, clearEntry);
         yield* Effect.logDebug(
           `esbuild watcher disposed: ${entry.displayPath}`,
         );
@@ -536,11 +603,13 @@ const entryPointsWatcher = (
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
   restartQueue: Queue.Queue<void>,
-  watcherErrorsRef: Ref.Ref<WatcherErrors>,
+  watcherErrorsRef: Ref.Ref<WatcherMessages>,
+  watcherWarningsRef: Ref.Ref<WatcherMessages>,
 ) =>
   Effect.gen(function* () {
     const parentScope = yield* Effect.scope;
     const scopesRef = yield* Ref.make(new Map<string, Scope.Closeable>());
+    const path = yield* Path.Path;
     const projectRoot = yield* ProjectRoot.get;
     // Discover the user's `tsconfig.json#paths` once at watcher startup so
     // `~/...`-style aliases pointing into the user's source tree get bundled
@@ -583,11 +652,13 @@ const entryPointsWatcher = (
 
           const childScope = yield* Scope.fork(parentScope, "sequential");
           yield* createEntryPointWatcher(
+            path,
             entry,
             notExternal,
             signal,
             pendingRef,
             watcherErrorsRef,
+            watcherWarningsRef,
           ).pipe(Scope.provide(childScope));
           yield* Ref.update(scopesRef, (scopes) => {
             const updated = new Map(scopes);
@@ -633,6 +704,41 @@ const confectStructureWatcher = (
           pendingRef,
           restartQueue,
         }),
+      ),
+    );
+  });
+
+/**
+ * Non-recursive `fs.watch` on the convex directory, reacting only to
+ * `convex.config.ts`. Recursion is deliberately avoided: codegen (Confect's
+ * and Convex's) writes into `convex/` and `convex/_generated/` constantly,
+ * and reacting to those writes would loop. Create/Remove offers to
+ * `restartQueue` so the entry-point watcher set picks up (or drops) the
+ * config's esbuild watcher.
+ */
+const convexConfigStructureWatcher = (
+  signal: Queue.Queue<void>,
+  pendingRef: Ref.Ref<Pending>,
+  restartQueue: Queue.Queue<void>,
+) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const convexDirectory = yield* ConvexDirectory.get;
+
+    yield* pipe(
+      fs.watch(convexDirectory),
+      Stream.debounce(Duration.millis(200)),
+      Stream.runForEach((event) =>
+        path.relative(convexDirectory, event.path) === CONVEX_CONFIG_FILENAME
+          ? flipDirtyAndSignal(
+              pendingRef,
+              signal,
+              "specDirty",
+              restartQueue,
+              event._tag !== "Update",
+            )
+          : Effect.void,
       ),
     );
   });
