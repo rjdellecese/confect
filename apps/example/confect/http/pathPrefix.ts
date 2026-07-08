@@ -34,8 +34,8 @@ See Scalar's documentation on [markdown support](https://github.com/scalar/scala
   .prefix("/path-prefix") {}
 
 /**
- * The group handler layers for {@link Api}, exported directly — Confect
- * registers the routes itself from the `api` definition.
+ * The group handler layers for {@link Api}, provided to
+ * `HttpApiBuilder.layer(Api)` where the API is mounted.
  */
 export const ApiLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
   handlers.handle("getFirst", () =>
