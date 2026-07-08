@@ -62,7 +62,7 @@ type ConfectHttpServices =
  * `Layer.mergeAll` when there are several. Handlers may require any
  * {@link ConfectHttpServices}, which Confect supplies per request; group
  * *construction* (an effectful `HttpApiBuilder.group` build) cannot use them,
- * since the groups are built once per environment rather than per request.
+ * since groups are built with the layer, before any request's services exist.
  */
 export interface MountOptions<
   Id extends string,
@@ -113,8 +113,11 @@ const makeHandler = ({
 
   // Everything request-independent — route registration, OpenAPI/Scalar
   // derivation, platform services — lives in one layer that the web handler
-  // builds once per environment (lazily, on the first request) and shares
-  // across requests. `Layer.suspend` defers the `process.env` read to that
+  // builds lazily on its first call and reuses for the lifetime of the JS
+  // environment. The Convex runtime evaluates modules in a fresh environment
+  // for every HTTP action request, so there that lifetime is a single
+  // request; the reuse materializes where an environment serves many requests
+  // (e.g. convex-test). `Layer.suspend` defers the `process.env` read to that
   // first build.
   const AppLayer = Layer.suspend(() =>
     Layer.mergeAll(
