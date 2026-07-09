@@ -8,7 +8,7 @@ Confect's HTTP integration mounts an Effect HTTP router onto Convex: you registe
 
 ## Defining an API
 
-Define API groups and endpoints using `effect/unstable/httpapi`, implement the endpoint handlers with `HttpApiBuilder.group`, and export a `layer` that registers the API's routes. All Confect action [services](/concepts/services) (`QueryRunner`, `MutationRunner`, `ActionRunner`, `Scheduler`, `Auth`, `StorageReader`, `StorageWriter`, `StorageActionWriter`) are available to handlers.
+Define API groups and endpoints using `effect/unstable/httpapi`, implement the endpoint handlers with `HttpApiBuilder.group`, and export a `layer` that registers the API's routes. Handlers have access to the Confect [services](/concepts/services) available in the HTTP action context.
 
 Endpoint paths are absolute; place an API under a path prefix with `.prefix(...)`.
 
@@ -16,19 +16,16 @@ Endpoint paths are absolute; place an API under a path prefix with `.prefix(...)
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import {
-  HttpApi,
-  HttpApiBuilder,
-  HttpApiEndpoint,
-  HttpApiGroup,
-  OpenApi,
-} from "effect/unstable/httpapi";
-
+import * as HttpApi from "effect/unstable/httpapi/HttpApi";
+import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
+import * as HttpApiEndpoint from "effect/unstable/httpapi/HttpApiEndpoint";
+import * as HttpApiGroup from "effect/unstable/httpapi/HttpApiGroup";
+import * as OpenApi from "effect/unstable/httpapi/OpenApi";
 import refs from "../_generated/refs";
 import { QueryRunner } from "../_generated/services";
 import notes from "../_generated/tables/notes";
 
-class NotesGroup extends HttpApiGroup.make("notes")
+class ApiGroup extends HttpApiGroup.make("notes")
   .add(
     HttpApiEndpoint.get("getFirst", "/get-first", {
       success: Schema.OptionFromNullOr(notes.Doc),
@@ -38,20 +35,28 @@ class NotesGroup extends HttpApiGroup.make("notes")
   .annotate(OpenApi.Description, "Operations on notes.") {}
 
 export class Api extends HttpApi.make("Api")
-  .annotate(OpenApi.Title, "My App")
-  .add(NotesGroup)
-  .prefix("/api") {}
+  .annotate(OpenApi.Title, "Confect Example")
+  .add(ApiGroup)
+  .prefix("/path-prefix") {}
 
 const ApiLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
   handlers.handle("getFirst", () =>
     Effect.gen(function* () {
       const runQuery = yield* QueryRunner;
 
-      return yield* runQuery(refs.public.notes.getFirst, {});
+      const firstNote = yield* runQuery(
+        refs.public.notes_and_random.notes.getFirst,
+        {},
+      );
+
+      return firstNote;
     }).pipe(Effect.orDie),
   ),
 );
 
+/**
+ * Registers {@link Api}'s routes, with its group handlers provided.
+ */
 export const layer = HttpApiBuilder.layer(Api).pipe(Layer.provide(ApiLive));
 ```
 
@@ -65,16 +70,19 @@ export const layer = HttpApiBuilder.layer(Api).pipe(Layer.provide(ApiLive));
 import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { HttpApiScalar } from "effect/unstable/httpapi";
-
+import * as HttpApiScalar from "effect/unstable/httpapi/HttpApiScalar";
 import { Api } from "./NotesApi";
 
+/**
+ * Serves interactive API documentation for {@link Api}, powered by
+ * [Scalar](https://github.com/scalar/scalar).
+ */
 export const layer = Layer.unwrap(
   Effect.gen(function* () {
     const siteUrl = yield* Effect.orDie(Config.string("CONVEX_SITE_URL"));
 
     return HttpApiScalar.layer(Api, {
-      path: "/api/docs",
+      path: "/path-prefix/docs",
       scalar: { baseServerURL: siteUrl },
     });
   }),
@@ -94,12 +102,9 @@ Confect's `HttpRouter` module collides with Effect's, so alias it on import:
 import { HttpRouter as ConfectHttpRouter } from "@confect/server";
 import { flow } from "effect/Function";
 import * as Layer from "effect/Layer";
-import {
-  HttpMiddleware,
-  HttpRouter,
-  HttpServerResponse,
-} from "effect/unstable/http";
-
+import * as HttpMiddleware from "effect/unstable/http/HttpMiddleware";
+import * as HttpRouter from "effect/unstable/http/HttpRouter";
+import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 import * as NotesApi from "./http/NotesApi";
 import * as ScalarDocs from "./http/ScalarDocs";
 
