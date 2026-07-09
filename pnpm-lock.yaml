@@ -6,7 +6,7 @@ settings:
 
 overrides:
   convex: 1.40.0
-  effect: 4.0.0-beta.93
+  effect: 4.0.0-beta.94
   react: 19.2.4
   react-dom: 19.2.4
 
@@ -26,11 +26,11 @@ importers:
         specifier: 0.86.2
         version: 0.86.2
       '@effect/platform-bun':
-        specifier: 4.0.0-beta.93
-        version: 4.0.0-beta.93(effect@4.0.0-beta.93)
+        specifier: 4.0.0-beta.94
+        version: 4.0.0-beta.94(effect@4.0.0-beta.94)
       '@effect/platform-node':
-        specifier: 4.0.0-beta.93
-        version: 4.0.0-beta.93(effect@4.0.0-beta.93)(ioredis@5.11.1)
+        specifier: 4.0.0-beta.94
+        version: 4.0.0-beta.94(effect@4.0.0-beta.94)(ioredis@5.11.1)
       '@types/node':
         specifier: 25.3.3
         version: 25.3.3
@@ -41,8 +41,8 @@ importers:
         specifier: 4.2.0
         version: 4.2.0
       effect:
-        specifier: 4.0.0-beta.93
-        version: 4.0.0-beta.93
+        specifier: 4.0.0-beta.94
+        version: 4.0.0-beta.94
       opensrc:
         specifier: 0.7.2
         version: 0.7.2
@@ -107,8 +107,8 @@ importers:
         specifier: 0.1.118
         version: 0.1.118(@standard-schema/spec@1.1.0)(convex@1.40.0(react@19.2.4))(react@19.2.4)(typescript@5.9.3)
       effect:
-        specifier: 4.0.0-beta.93
-        version: 4.0.0-beta.93
+        specifier: 4.0.0-beta.94
+        version: 4.0.0-beta.94
       react:
         specifier: 19.2.4
         version: 19.2.4
@@ -147,8 +147,8 @@ importers:
         specifier: workspace:^
         version: link:../server
       '@effect/platform-node':
-        specifier: ^4.0.0-beta.93
-        version: 4.0.0-beta.93(effect@4.0.0-beta.93)(ioredis@5.11.1)
+        specifier: ^4.0.0-beta.94
+        version: 4.0.0-beta.94(effect@4.0.0-beta.94)(ioredis@5.11.1)
       bundle-require:
         specifier: ^5.1.0
         version: 5.1.0(esbuild@0.27.3)
@@ -169,8 +169,8 @@ importers:
         specifier: 0.86.2
         version: 0.86.2
       '@effect/vitest':
-        specifier: 4.0.0-beta.93
-        version: 4.0.0-beta.93(effect@4.0.0-beta.93)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@25.3.3)(happy-dom@15.11.7)(jiti@1.21.7)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
+        specifier: 4.0.0-beta.94
+        version: 4.0.0-beta.94(effect@4.0.0-beta.94)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@25.3.3)(happy-dom@15.11.7)(jiti@1.21.7)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
       '@types/node':
         specifier: 25.3.3
         version: 25.3.3
@@ -181,8 +181,8 @@ importers:
         specifier: 1.40.0
         version: 1.40.0(react@19.2.4)
       effect:
-        specifier: 4.0.0-beta.93
-        version: 4.0.0-beta.93
+        specifier: 4.0.0-beta.94
+        version: 4.0.0-beta.94
       tsdown:
         specifier: 0.20.3
         version: 0.20.3(typescript@5.9.3)
@@ -209,14 +209,14 @@ importers:
         specifier: 0.56.0
         version: 0.56.0(typescript@5.9.3)
       '@effect/vitest':
-        specifier: 4.0.0-beta.93
-        version: 4.0.0-beta.93(effect@4.0.0-beta.93)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@25.3.3)(happy-dom@15.11.7)(jiti@1.21.7)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
+        specifier: 4.0.0-beta.94
+        version: 4.0.0-beta.94(effect@4.0.0-beta.94)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@25.3.3)(happy-dom@15.11.7)(jiti@1.21.7)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
       '@types/node':
         specifier: 25.3.3
         version: 25.3.3
       effect:
-        specifier: 4.0.0-beta.93
-        version: 4.0.0-beta.93
+        specifier: 4.0.0-beta.94
+        version: 4.0.0-beta.94
       tsdown:
         specifier: 0.20.3
         version: 0.20.3(typescript@5.9.3)
@@ -240,14 +240,14 @@ importers:
         version: 1.40.0(react@19.2.4)
     devDependencies:
       '@effect/vitest':
-        specifier: 4.0.0-beta.93
-        version: 4.0.0-beta.93(effect@4.0.0-beta.93)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@25.3.3)(happy-dom@15.11.7)(jiti@1.21.7)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
+        specifier: 4.0.0-beta.94
+        version: 4.0.0-beta.94(effect@4.0.0-beta.94)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@25.3.3)(happy-dom@15.11.7)(jiti@1.21.7)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
       '@types/node':
         specifier: 25.3.3
         version: 25.3.3
       effect:
-        specifier: 4.0.0-beta.93
-        version: 4.0.0-beta.93
+        specifier: 4.0.0-beta.94
+        version: 4.0.0-beta.94
       tsdown:
         specifier: 0.20.3
         version: 0.20.3(typescript@5.9.3)
@@ -265,8 +265,8 @@ importers:
         version: link:../core
     devDependencies:
       '@effect/vitest':
-        specifier: 4.0.0-beta.93
-        version: 4.0.0-beta.93(effect@4.0.0-beta.93)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@25.3.3)(happy-dom@15.11.7)(jiti@1.21.7)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
+        specifier: 4.0.0-beta.94
+        version: 4.0.0-beta.94(effect@4.0.0-beta.94)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@25.3.3)(happy-dom@15.11.7)(jiti@1.21.7)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
       '@testing-library/react':
         specifier: 16.3.2
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -283,8 +283,8 @@ importers:
         specifier: 1.40.0
         version: 1.40.0(react@19.2.4)
       effect:
-        specifier: 4.0.0-beta.93
-        version: 4.0.0-beta.93
+        specifier: 4.0.0-beta.94
+        version: 4.0.0-beta.94
       happy-dom:
         specifier: 15.11.7
         version: 15.11.7
@@ -320,11 +320,11 @@ importers:
         specifier: 0.56.0
         version: 0.56.0(typescript@5.9.3)
       '@effect/platform-node':
-        specifier: 4.0.0-beta.93
-        version: 4.0.0-beta.93(effect@4.0.0-beta.93)(ioredis@5.11.1)
+        specifier: 4.0.0-beta.94
+        version: 4.0.0-beta.94(effect@4.0.0-beta.94)(ioredis@5.11.1)
       '@effect/vitest':
-        specifier: 4.0.0-beta.93
-        version: 4.0.0-beta.93(effect@4.0.0-beta.93)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@25.3.3)(happy-dom@15.11.7)(jiti@1.21.7)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
+        specifier: 4.0.0-beta.94
+        version: 4.0.0-beta.94(effect@4.0.0-beta.94)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@25.3.3)(happy-dom@15.11.7)(jiti@1.21.7)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))
       '@swc/jest':
         specifier: 0.2.39
         version: 0.2.39(@swc/core@1.4.1)
@@ -341,8 +341,8 @@ importers:
         specifier: 17.3.1
         version: 17.3.1
       effect:
-        specifier: 4.0.0-beta.93
-        version: 4.0.0-beta.93
+        specifier: 4.0.0-beta.94
+        version: 4.0.0-beta.94
       tsdown:
         specifier: 0.20.3
         version: 0.20.3(typescript@5.9.3)
@@ -374,8 +374,8 @@ importers:
         specifier: 1.40.0
         version: 1.40.0(react@19.2.4)
       effect:
-        specifier: 4.0.0-beta.93
-        version: 4.0.0-beta.93
+        specifier: 4.0.0-beta.94
+        version: 4.0.0-beta.94
     devDependencies:
       '@confect/cli':
         specifier: workspace:*
@@ -393,8 +393,8 @@ importers:
         specifier: 1.40.0
         version: 1.40.0(react@19.2.4)
       effect:
-        specifier: 4.0.0-beta.93
-        version: 4.0.0-beta.93
+        specifier: 4.0.0-beta.94
+        version: 4.0.0-beta.94
       luxon:
         specifier: ^3.7.1
         version: 3.7.2
@@ -425,8 +425,8 @@ importers:
         specifier: 25.3.3
         version: 25.3.3
       effect:
-        specifier: 4.0.0-beta.93
-        version: 4.0.0-beta.93
+        specifier: 4.0.0-beta.94
+        version: 4.0.0-beta.94
       tsdown:
         specifier: 0.20.3
         version: 0.20.3(typescript@5.9.3)
@@ -664,28 +664,28 @@ packages:
     resolution: {integrity: sha512-SaPln+8srOqDJDUwNTDmP5e+IYpEDr9+1epGznnsLqu8xvo6VnxyWARdeLpqvZJlb0Pgy9ca7ppqvvdWbHPXAg==}
     hasBin: true
 
-  '@effect/platform-bun@4.0.0-beta.93':
-    resolution: {integrity: sha512-pny29d1NhJ7XLv19as7A0pIZr+QFi5KejnwB/lLW1c8P63t+PDMPEn21toy2vx2yzl9xRTo8heyiXPXRsqPN5w==}
+  '@effect/platform-bun@4.0.0-beta.94':
+    resolution: {integrity: sha512-+jCvnlSlCDmxJ9sv0yw6FQ4wlM8HYzvFugIJ8w2jD85k4iJwS4rQIHiJ9OfUo2hVwaufVS52jOHXaLrBpoq+Yg==}
     peerDependencies:
-      effect: 4.0.0-beta.93
+      effect: 4.0.0-beta.94
 
-  '@effect/platform-node-shared@4.0.0-beta.93':
-    resolution: {integrity: sha512-XUqZ2u5GglBqY8q2jj4Q7GjN5K/enedk8auZM9rY/l5a/myaQTrQp3QnvpIK4/Yg0WFjLGuctGPMKWRk3OLIrA==}
+  '@effect/platform-node-shared@4.0.0-beta.94':
+    resolution: {integrity: sha512-8mCen8dhL4ockkkxevKdFOXqR8sksuZcPwyqkKZv3w30TIdj4TKXG5sQODmpPFI0+/quwm5T78kodqf/QlZwoA==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
-      effect: 4.0.0-beta.93
+      effect: 4.0.0-beta.94
 
-  '@effect/platform-node@4.0.0-beta.93':
-    resolution: {integrity: sha512-QagsCGR0ZOXaCQqS5qGR2mcDng4LiP2bYhiiX1D6UC8cT9vsusVVOHiJWn8CupeDx+yVnPcu81QmA/SDt6GM1w==}
+  '@effect/platform-node@4.0.0-beta.94':
+    resolution: {integrity: sha512-3WhV5ZN2pTPcOtEQlM66Ve0/B4EzF88sYBml97NnRV7BA5Kx0FYLSslc/4aWoaXj6XwuWOxmoXeGGeFzw4gbMQ==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
-      effect: 4.0.0-beta.93
+      effect: 4.0.0-beta.94
       ioredis: ^5.7.0
 
-  '@effect/vitest@4.0.0-beta.93':
-    resolution: {integrity: sha512-gMAnZ9PiMeJMDED9s0jWgCOhc2JccrTCxowhur/KriImsHnHIRj4VG/vK0xLw0Axe4AkTWzXNdRsFrYOjBTl3A==}
+  '@effect/vitest@4.0.0-beta.94':
+    resolution: {integrity: sha512-pCjcUMTBizn2wibiyP9Tl3VvGEkplvIA33iCvmK3y/toi54IWE3PNL7d0JkZvEaKV2OoaKVTaH1dOybRtpBuQw==}
     peerDependencies:
-      effect: 4.0.0-beta.93
+      effect: 4.0.0-beta.94
       vitest: ^3.0.0 || ^4.0.0
 
   '@emnapi/core@1.7.1':
@@ -3788,8 +3788,8 @@ packages:
   ee-first@1.1.1:
     resolution: {integrity: sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow==}
 
-  effect@4.0.0-beta.93:
-    resolution: {integrity: sha512-wNS5MKFa3C42uBfIDik2oJ78lhpoYz2hN4oBR0229BeeDCIrkg/FiOvoiPGdCVlWa7MEKxEL5I0f8AILVHSD9A==}
+  effect@4.0.0-beta.94:
+    resolution: {integrity: sha512-Q8BrCNbp/3Uh+7xQYHphZBkNfm2SJnl1frQ+8yWfd/j3SU3cL13D38cBMLcnULupwza2Nt4DrjZoMzHWL3CoxQ==}
 
   electron-to-chromium@1.5.194:
     resolution: {integrity: sha512-SdnWJwSUot04UR51I2oPD8kuP2VI37/CADR1OHsFOUzZIvfWJBO6q11k5P/uKNyTT3cdOsnyjkrZ+DDShqYqJA==}
@@ -7275,27 +7275,27 @@ snapshots:
 
   '@effect/language-service@0.86.2': {}
 
-  '@effect/platform-bun@4.0.0-beta.93(effect@4.0.0-beta.93)':
+  '@effect/platform-bun@4.0.0-beta.94(effect@4.0.0-beta.94)':
     dependencies:
-      '@effect/platform-node-shared': 4.0.0-beta.93(effect@4.0.0-beta.93)
-      effect: 4.0.0-beta.93
+      '@effect/platform-node-shared': 4.0.0-beta.94(effect@4.0.0-beta.94)
+      effect: 4.0.0-beta.94
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@effect/platform-node-shared@4.0.0-beta.93(effect@4.0.0-beta.93)':
+  '@effect/platform-node-shared@4.0.0-beta.94(effect@4.0.0-beta.94)':
     dependencies:
       '@types/ws': 8.18.1
-      effect: 4.0.0-beta.93
+      effect: 4.0.0-beta.94
       ws: 8.20.1
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@effect/platform-node@4.0.0-beta.93(effect@4.0.0-beta.93)(ioredis@5.11.1)':
+  '@effect/platform-node@4.0.0-beta.94(effect@4.0.0-beta.94)(ioredis@5.11.1)':
     dependencies:
-      '@effect/platform-node-shared': 4.0.0-beta.93(effect@4.0.0-beta.93)
-      effect: 4.0.0-beta.93
+      '@effect/platform-node-shared': 4.0.0-beta.94(effect@4.0.0-beta.94)
+      effect: 4.0.0-beta.94
       ioredis: 5.11.1
       mime: 4.1.0
       undici: 8.5.0
@@ -7303,9 +7303,9 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@effect/vitest@4.0.0-beta.93(effect@4.0.0-beta.93)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@25.3.3)(happy-dom@15.11.7)(jiti@1.21.7)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))':
+  '@effect/vitest@4.0.0-beta.94(effect@4.0.0-beta.94)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@25.3.3)(happy-dom@15.11.7)(jiti@1.21.7)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0))':
     dependencies:
-      effect: 4.0.0-beta.93
+      effect: 4.0.0-beta.94
       vitest: 3.2.4(@types/debug@4.1.12)(@types/node@25.3.3)(happy-dom@15.11.7)(jiti@1.21.7)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.9.0)
 
   '@emnapi/core@1.7.1':
@@ -10182,7 +10182,7 @@ snapshots:
 
   ee-first@1.1.1: {}
 
-  effect@4.0.0-beta.93:
+  effect@4.0.0-beta.94:
     dependencies:
       '@standard-schema/spec': 1.1.0
       fast-check: 4.8.0
