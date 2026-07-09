@@ -6,12 +6,15 @@ description: "Define HTTP endpoints using Effect's HTTP modules."
 
 Confect's HTTP integration mounts an Effect HTTP router onto Convex: you register routes with Effect's `effect/unstable/http` and `effect/unstable/httpapi` modules — `HttpApi` endpoints, plain routes, interactive [Scalar](https://github.com/scalar/scalar) docs, middleware — and Confect serves them from a single Convex HTTP action, supplying its [services](/concepts/services) to your handlers on every request.
 
-## Defining endpoints
+## Defining an API
 
-Define API groups and endpoints using `effect/unstable/httpapi`. Endpoint paths are absolute; place an API under a path prefix with `.prefix(...)`.
+Define API groups and endpoints using `effect/unstable/httpapi`, implement the endpoint handlers with `HttpApiBuilder.group`, and export a `layer` that registers the API's routes. All Confect action [services](/concepts/services) (`QueryRunner`, `MutationRunner`, `ActionRunner`, `Scheduler`, `Auth`, `StorageReader`, `StorageWriter`, `StorageActionWriter`) are available to handlers.
 
-```ts confect/http/notes.ts
+Endpoint paths are absolute; place an API under a path prefix with `.prefix(...)`.
+
+```ts confect/http/NotesApi.ts
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import {
   HttpApi,
@@ -38,14 +41,8 @@ export class Api extends HttpApi.make("Api")
   .annotate(OpenApi.Title, "My App")
   .add(NotesGroup)
   .prefix("/api") {}
-```
 
-## Implementing handlers
-
-Implement your endpoint handlers in the same file using `HttpApiBuilder.group`. All Confect action [services](/concepts/services) (`QueryRunner`, `MutationRunner`, `ActionRunner`, `Scheduler`, `Auth`, `StorageReader`, `StorageWriter`, `StorageActionWriter`) are available to handlers.
-
-```ts confect/http/notes.ts (continued)
-export const ApiLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
+const ApiLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
   handlers.handle("getFirst", () =>
     Effect.gen(function* () {
       const runQuery = yield* QueryRunner;
@@ -54,37 +51,25 @@ export const ApiLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
     }).pipe(Effect.orDie),
   ),
 );
+
+export const layer = HttpApiBuilder.layer(Api).pipe(Layer.provide(ApiLive));
 ```
 
-## Creating the router
+`HttpApiBuilder.layer(Api)` registers the API's routes; `Layer.provide(ApiLive)` supplies its group handlers. Forgetting a group is a **compile-time error** — the unprovided group requirement is rejected where the layer is mounted.
 
-Create the Convex HTTP router in `confect/http.ts` with `HttpRouter.make` from `@confect/server`. It takes a single `Layer` that registers your routes — compose it from Effect's own building blocks with `Layer.mergeAll`:
+## API documentation
 
-- `HttpApiBuilder.layer(api)` registers an `HttpApi`'s endpoints. Provide its group handler layers with `Layer.provide` — forgetting a group is a **compile-time error**, since the unprovided group requirement is rejected by `HttpRouter.make`.
-- `HttpApiScalar.layer(api, ...)` serves interactive API docs.
-- `HttpRouter.add(method, path, handler)` registers a plain route.
-- `HttpRouter.middleware(fn, { global: true })` applies middleware to every route.
+`HttpApiScalar.layer` serves interactive docs, powered by Scalar and generated from your endpoint definitions and `OpenApi` annotations. Set `baseServerURL` to your deployment's [site URL](https://docs.convex.dev/production/environment-variables#system-environment-variables) so the docs page's "try it" requests target the right host — Confect installs a Convex-aware `ConfigProvider`, so `Config` reads (in layer construction, route handlers, and middleware alike) resolve against your [Convex environment variables](https://docs.convex.dev/production/environment-variables).
 
-Confect's `HttpRouter` module collides with Effect's, so alias it on import:
-
-```ts confect/http.ts
-import { HttpRouter as ConfectHttpRouter } from "@confect/server";
-import { flow } from "effect/Function";
+```ts confect/http/ScalarDocs.ts
 import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import {
-  HttpMiddleware,
-  HttpRouter,
-  HttpServerResponse,
-} from "effect/unstable/http";
-import { HttpApiBuilder, HttpApiScalar } from "effect/unstable/httpapi";
+import { HttpApiScalar } from "effect/unstable/httpapi";
 
-import { Api, ApiLive } from "./http/notes";
+import { Api } from "./NotesApi";
 
-const ApiRoutes = HttpApiBuilder.layer(Api).pipe(Layer.provide(ApiLive));
-
-const DocsRoutes = Layer.unwrap(
+export const layer = Layer.unwrap(
   Effect.gen(function* () {
     const siteUrl = yield* Effect.orDie(Config.string("CONVEX_SITE_URL"));
 
@@ -94,11 +79,34 @@ const DocsRoutes = Layer.unwrap(
     });
   }),
 );
+```
+
+## Creating the router
+
+Create the Convex HTTP router in `confect/http.ts` with `HttpRouter.make` from `@confect/server`. It takes a single `Layer` that registers your routes — merge your API and docs layers with any other building blocks from Effect's `effect/unstable/http`:
+
+- `HttpRouter.add(method, path, handler)` registers a plain route.
+- `HttpRouter.middleware(fn, { global: true })` applies middleware to every route.
+
+Confect's `HttpRouter` module collides with Effect's, so alias it on import:
+
+```ts confect/http.ts
+import { HttpRouter as ConfectHttpRouter } from "@confect/server";
+import { flow } from "effect/Function";
+import * as Layer from "effect/Layer";
+import {
+  HttpMiddleware,
+  HttpRouter,
+  HttpServerResponse,
+} from "effect/unstable/http";
+
+import * as NotesApi from "./http/NotesApi";
+import * as ScalarDocs from "./http/ScalarDocs";
 
 export default ConfectHttpRouter.make(
   Layer.mergeAll(
-    ApiRoutes,
-    DocsRoutes,
+    NotesApi.layer,
+    ScalarDocs.layer,
     HttpRouter.add("GET", "/health", HttpServerResponse.text("OK")),
     HttpRouter.middleware(flow(HttpMiddleware.cors(), HttpMiddleware.logger), {
       global: true,
@@ -106,8 +114,6 @@ export default ConfectHttpRouter.make(
   ),
 );
 ```
-
-Because Confect installs a Convex-aware `ConfigProvider`, `Config` reads — in route handlers, middleware, and layer construction (like `DocsRoutes` above) — resolve against your [Convex environment variables](https://docs.convex.dev/production/environment-variables).
 
 ## Routing semantics
 
@@ -130,7 +136,3 @@ http.route({
 
 export default http;
 ```
-
-## API documentation
-
-`HttpApiScalar.layer` serves interactive docs (at `/api/docs` in the example above), powered by Scalar and generated from your endpoint definitions and `OpenApi` annotations. Set `baseServerURL` to your deployment's [site URL](https://docs.convex.dev/production/environment-variables#system-environment-variables) so the docs page's "try it" requests target the right host.

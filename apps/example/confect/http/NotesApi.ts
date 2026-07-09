@@ -1,4 +1,5 @@
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import * as HttpApi from "effect/unstable/httpapi/HttpApi";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
@@ -33,11 +34,7 @@ See Scalar's documentation on [markdown support](https://github.com/scalar/scala
   .add(ApiGroup)
   .prefix("/path-prefix") {}
 
-/**
- * The group handler layers for {@link Api}, provided to
- * `HttpApiBuilder.layer(Api)` where the API is mounted.
- */
-export const ApiLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
+const ApiLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
   handlers.handle("getFirst", () =>
     Effect.gen(function* () {
       const runQuery = yield* QueryRunner;
@@ -51,3 +48,8 @@ export const ApiLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
     }).pipe(Effect.orDie),
   ),
 );
+
+/**
+ * Registers {@link Api}'s routes, with its group handlers provided.
+ */
+export const layer = HttpApiBuilder.layer(Api).pipe(Layer.provide(ApiLive));

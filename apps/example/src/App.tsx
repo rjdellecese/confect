@@ -10,7 +10,7 @@ import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
 import { useEffect, useState } from "react";
 import refs from "../confect/_generated/refs";
-import { Api } from "../confect/http/pathPrefix";
+import { Api } from "../confect/http/NotesApi";
 
 const App = () => {
   const convexClient = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
