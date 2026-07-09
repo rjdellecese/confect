@@ -6,7 +6,7 @@ import registeredFunctions from "./mock-backend/fixtures/confect/_generated/regi
 // Imported as a value (not `import type`) because its type parameterizes
 // `buildForGroup` via `typeof notesSpec`, and `typeof` requires a value
 // binding.
-// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+// oxlint-disable-next-line typescript/consistent-type-imports
 import notesSpec from "./mock-backend/fixtures/confect/groups/notes.spec";
 import notes from "./mock-backend/fixtures/confect/groups/notes.impl";
 

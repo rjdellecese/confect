@@ -145,7 +145,6 @@ const applyMonkeyPatches = () => {
     }
   })();
   if (urlCredentialsBroken) {
-    // eslint-disable-next-line no-global-assign
     URL = class extends URL {
       override get username() {
         return "";
