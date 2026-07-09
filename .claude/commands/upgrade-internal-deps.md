@@ -1,5 +1,5 @@
 ---
-description: Upgrade internal-only dependencies (toolchain devDependencies and the private apps' deps) and open a PR — no changeset
+description: Upgrade internal-only dependencies (toolchain devDependencies and the private workspace packages' deps) and open a PR — no changeset
 ---
 
 Upgrade the dependencies that consumers of the `@confect/*` packages can never
@@ -7,12 +7,14 @@ see, and open a PR for review. Never merge it yourself.
 
 ## Scope
 
-Every `package.json` dependency that is **not** in the `dependencies` or
-`peerDependencies` of a published `@confect/*` package: the workspace's
-devDependencies (build/test/lint toolchain, types) and the private apps'
-dependencies (`apps/docs`, `apps/example`). Dependencies on the published
-surface belong to `/upgrade-published-deps` — skip them here even where they
-appear as devDependency pins, since their pins move with their ranges.
+Every `package.json` dependency that is **not** claimed by
+`/upgrade-published-deps` (whose scope covers the published packages'
+`dependencies`/`peerDependencies` plus their lockstep companions, such as
+`react-dom` with `react`): the workspace's devDependencies (build/test/lint
+toolchain, types) and the dependencies of every private workspace package —
+the apps under `apps/*` and the server-test fixture workspaces. Skip
+published-surface deps here even where they appear as devDependency pins,
+since their pins move with their ranges.
 
 ## Rules
 
@@ -21,7 +23,8 @@ appear as devDependency pins, since their pins move with their ranges.
   run `pnpm lint:fix` (Syncpack) to normalize.
 - Majors are fair game: attempt them, and if one requires more than mechanical
   changes to get green, drop it from the batch and explain what it would take
-  in the PR description.
+  in the PR description (or in your final report, if the run ends up applying
+  nothing and opens no PR).
 - These upgrades are not user-facing: **no changeset**.
 
 ## Delivering
