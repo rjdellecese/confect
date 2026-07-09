@@ -20,13 +20,15 @@ appear as devDependency pins, since their pins move with their ranges.
   or hand-enforce the workspace's pinning conventions — apply the bumps, then
   run `pnpm lint:fix` (Syncpack) to normalize.
 - Majors are fair game: attempt them, and if one requires more than mechanical
-  changes to get green, drop it from the batch and note it in the PR body (or
-  file a GitHub issue if it needs real planning).
+  changes to get green, drop it from the batch and explain what it would take
+  in the PR description.
 - These upgrades are not user-facing: **no changeset**.
 
 ## Delivering
 
-1. If nothing in scope is outdated, say so and stop — no branch, no PR.
+1. If nothing gets applied, say so and stop — no branch, no PR, even if some
+   upgrades were spotted and deferred; the next scheduled run will surface
+   them again.
 2. Verify with the full repo checks (`pnpm check`, `pnpm test`, `pnpm build`).
    Anything the local environment genuinely can't run, leave to the PR's CI —
    and get it green.

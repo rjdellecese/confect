@@ -17,15 +17,17 @@ devcontainer versions).
 
 - Bump within each tool's current major line. Take a major line (a new Node
   LTS, a pnpm or bun major) only if the release notes show nothing that
-  affects this repo and the checks stay green; otherwise file a GitHub issue
-  describing the jump.
+  affects this repo and the checks stay green; otherwise describe the
+  available jump in the PR description.
 - **Never change `engines` floors** in the published packages — those are
   published-surface policy and belong to a deliberate, changeset-recorded
   decision, not this routine.
 
 ## Delivering
 
-1. If everything is already current, say so and stop — no branch, no PR.
+1. If nothing gets applied, say so and stop — no branch, no PR, even if a
+   major-line jump was spotted and deferred; the next scheduled run will
+   surface it again.
 2. Verify by reinstalling with the new versions and running the full repo
    checks (`pnpm check`, `pnpm test`, `pnpm build`). Anything the local
    environment genuinely can't run, leave to the PR's CI — and get it green.

@@ -23,12 +23,12 @@ catch any that drifted.
 - Read the release notes/changelogs for each pending update before applying
   it. Treat minor bumps of `0.x` packages (most of the `@effect/*` ecosystem,
   `convex-test`) as potentially breaking, not routine.
-- **Never attempt a major of a peer ecosystem** (effect, convex, react). File
-  a GitHub issue instead, summarizing what's available, what it breaks, and a
-  rough migration scope.
+- **Never attempt a major of a peer ecosystem** (effect, convex, react).
+  Instead, summarize in the PR description what's available, what it breaks,
+  and a rough migration scope.
 - If a non-major upgrade snowballs into a real migration (API rewrites,
-  behavioral changes beyond mechanical fixes), drop it from the batch and file
-  an issue the same way.
+  behavioral changes beyond mechanical fixes), drop it from the batch and
+  document it in the PR description the same way.
 - Leave peer ranges alone unless the upgraded code actually requires raising a
   floor. Raising or widening a published range is a deliberate act that must
   be called out in the changeset.
@@ -39,7 +39,9 @@ catch any that drifted.
 
 ## Delivering
 
-1. If nothing in scope is outdated, say so and stop — no branch, no PR.
+1. If nothing gets applied, say so and stop — no branch, no PR, even if
+   deferred upgrades (e.g. a peer-ecosystem major) were spotted; the next
+   scheduled run will surface them again.
 2. Add a changeset iff any published `package.json` changed — patch for the
    fixed group unless behavior warrants more. Follow the existing changelog
    convention of stating which upstream versions the new range was validated
