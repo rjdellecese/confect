@@ -7,7 +7,7 @@
 "@confect/test": major
 ---
 
-Migrate to Effect v4. All `@confect/*` packages now require `effect@^4.0.0-beta.94`; `@effect/platform` and `@effect/cli` are no longer dependencies (their functionality moved into `effect` core and `effect/unstable/*`).
+Migrate to Effect v4. All `@confect/*` packages now require `effect@^4.0.0-beta.97`; `@effect/platform` and `@effect/cli` are no longer dependencies (their functionality moved into `effect` core and `effect/unstable/*`).
 
 Breaking changes for users:
 
