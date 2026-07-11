@@ -15,14 +15,18 @@ declare const process: { env: Record<string, string | undefined> };
  * trie over the environment to resolve and enumerate config paths) cannot be
  * used. This provider resolves each requested path to a single environment
  * variable, joining the path segments with `"_"` to match the key convention
- * `fromEnv` uses.
+ * `fromEnv` uses. As with the built-in providers, an empty string is treated
+ * as a missing value, so `Config.withDefault` and `Config.option` recover
+ * from it.
  */
 export const make = (): ConfigProvider.ConfigProvider =>
   ConfigProvider.make((path) => {
     const value = process.env[pipe(path, Array.map(String), Array.join("_"))];
 
     return Effect.succeed(
-      value === undefined ? undefined : ConfigProvider.makeValue(value),
+      value === undefined || value === ""
+        ? undefined
+        : ConfigProvider.makeValue(value),
     );
   });
 
