@@ -7,14 +7,15 @@
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "devDependencies": {
-    "@ark/attest": "0.56.0",
+    "@ark/attest": "0.56.3",
     "@effect/vitest": "0.29.0",
-    "@types/node": "25.3.3",
+    "@types/node": "26.1.1",
     "effect": "3.21.2",
-    "tsdown": "0.20.3",
-    "tsx": "4.21.0",
+    "tsdown": "0.22.4",
+    "tsx": "4.23.0",
     "typescript": "5.9.3",
-    "vitest": "3.2.4"
+    "unrun": "0.3.1",
+    "vitest": "4.1.10"
   },
   "engines": {
     "node": ">=22"

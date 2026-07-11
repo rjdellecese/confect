@@ -6,8 +6,10 @@ packages:
 
 allowBuilds:
   "@parcel/watcher": false
+  "@scarf/scarf": false
   "@swc/core": false
   esbuild: false
+  keytar: false
   msgpackr-extract: false
   opensrc: false
   puppeteer: false
