@@ -1,5 +1,11 @@
 # @confect/js
 
+## 9.2.2
+
+### Patch Changes
+
+- @confect/core@9.2.2
+
 ## 9.2.1
 
 ### Patch Changes
