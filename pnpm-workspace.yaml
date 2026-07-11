@@ -4,11 +4,6 @@ packages:
   - packages/server/test/mock-backend/fixtures
   - packages/server/test/local-backend/fixtures
 
-# Supply-chain protection: a compromised release is usually yanked within
-# hours, so hold new registry versions for 3 days (in minutes) before
-# installing. pnpm 11 defaults this to 1440 (1 day); we widen it. Workspace
-# (`workspace:`) deps are unaffected. To take a blocked version deliberately
-# (e.g. a fresh security fix), override per-install: `--config.minimumReleaseAge=0`.
 minimumReleaseAge: 4320
 
 allowBuilds:
