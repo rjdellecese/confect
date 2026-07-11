@@ -17,7 +17,7 @@
     "@effect/workflow": "0.18.2",
     "@swc/jest": "0.2.39",
     "@types/node": "26.1.1",
-    "@vitest/coverage-v8": "3.2.4",
+    "@vitest/coverage-v8": "4.1.10",
     "convex-test": "0.0.50",
     "dotenv": "17.4.2",
     "effect": "3.21.2",
@@ -27,7 +27,7 @@
     "unrun": "0.3.1",
     "vite": "7.3.1",
     "vite-tsconfig-paths": "6.1.1",
-    "vitest": "3.2.4"
+    "vitest": "4.1.10"
   },
   "engines": {
     "node": ">=22"
