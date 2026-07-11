@@ -1,5 +1,13 @@
 # @confect/test
 
+## 9.2.2
+
+### Patch Changes
+
+- Updated dependencies [7e7b2a4]
+  - @confect/server@9.2.2
+  - @confect/core@9.2.2
+
 ## 9.2.1
 
 ### Patch Changes
