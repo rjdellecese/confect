@@ -4,8 +4,10 @@ import { cronJobs as makeConvexCrons, type Crons } from "convex/server";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Cron from "effect/Cron";
+import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Match from "effect/Match";
+import * as Option from "effect/Option";
 import * as Order from "effect/Order";
 import * as Predicate from "effect/Predicate";
 import * as Record from "effect/Record";
@@ -76,6 +78,26 @@ export const make = (): CronJobs => makeProto({}, makeConvexCrons());
 
 /** @internal */
 export const cronToConvexCronString = (cron: Cron.Cron): string => {
+  pipe(
+    cron.tz,
+    Option.filter((tz) =>
+      pipe(
+        tz,
+        Match.value,
+        Match.tag("Offset", ({ offset }) => offset !== 0),
+        Match.tag("Named", ({ id }) => id !== "UTC" && id !== "Etc/UTC"),
+        Match.exhaustive,
+      ),
+    ),
+    Option.map((tz) => {
+      throw new Error(
+        `Convex cron expressions are always evaluated in UTC, but this cron ` +
+          `specifies the time zone "${DateTime.zoneToString(tz)}". ` +
+          `Either omit the timezone or specify UTC.`,
+      );
+    }),
+  );
+
   const hasNonDefaultSeconds = cron.seconds.size !== 1 || !cron.seconds.has(0);
   if (hasNonDefaultSeconds) {
     throw new Error(
