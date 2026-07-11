@@ -1,8 +1,7 @@
 import { type GroupSpec, type Spec } from "@confect/core";
-import * as Path from "@effect/platform/Path";
+import * as Path from "effect/Path";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
-import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Record from "effect/Record";
@@ -13,14 +12,14 @@ import * as String from "effect/String";
  * The path to a group in the Confect API.
  */
 export class GroupPath extends Schema.Class<GroupPath>("GroupPath")({
-  pathSegments: Schema.Data(Schema.NonEmptyArray(Schema.NonEmptyString)),
+  pathSegments: Schema.NonEmptyArray(Schema.NonEmptyString),
 }) {}
 
 /**
  * Create a GroupPath from path segments.
  */
 export const make = (pathSegments: readonly [string, ...string[]]): GroupPath =>
-  GroupPath.make({ pathSegments: Data.array(pathSegments) });
+  GroupPath.make({ pathSegments });
 
 /**
  * Append a group name to a GroupPath to create a new GroupPath.
@@ -73,7 +72,7 @@ export const getGroupSpec = (
         pipe(
           Record.get(spec.groups, head),
           Option.flatMap((group) =>
-            Array.isNonEmptyArray(tail)
+            Array.isArrayNonEmpty(tail)
               ? getGroupSpecHelper(group, tail)
               : Option.some(group),
           ),
@@ -93,7 +92,7 @@ const getGroupSpecHelper = (
         pipe(
           Record.get(group.groups, head),
           Option.flatMap((subGroup) =>
-            Array.isNonEmptyArray(tail)
+            Array.isArrayNonEmpty(tail)
               ? getGroupSpecHelper(subGroup, tail)
               : Option.some(subGroup),
           ),
@@ -104,7 +103,7 @@ const getGroupSpecHelper = (
 export const toString = (groupPath: GroupPath) =>
   Array.join(groupPath.pathSegments, ".");
 
-export class GroupModulePathIsNotATypeScriptFileError extends Schema.TaggedError<GroupModulePathIsNotATypeScriptFileError>()(
+export class GroupModulePathIsNotATypeScriptFileError extends Schema.TaggedErrorClass<GroupModulePathIsNotATypeScriptFileError>()(
   "GroupModulePathIsNotATypeScriptFileError",
   {
     path: Schema.NonEmptyString,

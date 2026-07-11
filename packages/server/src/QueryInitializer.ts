@@ -19,7 +19,7 @@ import type { GenericId } from "convex/values";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
-import * as Either from "effect/Either";
+import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import type {
   BaseDatabaseReader,
@@ -137,14 +137,17 @@ export const make = <
           )
           .unique(),
       ),
-      Effect.andThen(
-        Either.fromNullable(
-          () =>
-            new GetByIndexFailure({
-              tableName,
-              indexName: indexName as string,
-              indexFieldValues,
-            }),
+      Effect.andThen((value) =>
+        Effect.fromResult(
+          Result.fromNullishOr(
+            value,
+            () =>
+              new GetByIndexFailure({
+                tableName,
+                indexName: indexName as string,
+                indexFieldValues,
+              }),
+          ),
         ),
       ),
       Effect.andThen(Document.decode(tableName, table.Fields)),
@@ -281,13 +284,18 @@ export const getById =
   (id: GenericId<TableName>) =>
     pipe(
       Effect.promise(() => convexDatabaseReader.get(id)),
-      Effect.andThen(
-        Either.fromNullable(() => new GetByIdFailure({ tableName, id })),
+      Effect.andThen((value) =>
+        Effect.fromResult(
+          Result.fromNullishOr(
+            value,
+            () => new GetByIdFailure({ tableName, id }),
+          ),
+        ),
       ),
       Effect.andThen(Document.decode(tableName, table.Fields)),
     );
 
-export class GetByIdFailure extends Schema.TaggedError<GetByIdFailure>()(
+export class GetByIdFailure extends Schema.TaggedErrorClass<GetByIdFailure>()(
   "GetByIdFailure",
   {
     id: Schema.String,
@@ -303,7 +311,7 @@ export class GetByIdFailure extends Schema.TaggedError<GetByIdFailure>()(
   }
 }
 
-export class GetByIndexFailure extends Schema.TaggedError<GetByIndexFailure>()(
+export class GetByIndexFailure extends Schema.TaggedErrorClass<GetByIndexFailure>()(
   "GetByIndexFailure",
   {
     tableName: Schema.String,

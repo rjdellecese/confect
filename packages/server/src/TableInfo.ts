@@ -10,6 +10,7 @@ import type {
 } from "convex/server";
 import type { GenericValidator } from "convex/values";
 import type { Schema, Types } from "effect";
+import type { WithSystemFields } from "@confect/core/SystemFields";
 import type * as Document_ from "./Document";
 import type * as Table from "./Table";
 
@@ -33,7 +34,7 @@ export type TableInfo<Table_ extends Table.AnyWithProps> =
         >;
         readonly encodedDocument: WithSystemFields<
           TableName,
-          Schema.Schema.Encoded<TableSchema_>
+          Schema.Codec.Encoded<TableSchema_>
         >;
         readonly convexDocument: ExtractConvexDocument<
           TableName,
@@ -70,16 +71,12 @@ export type ConvexTableInfo<TableInfo_ extends AnyWithProps> = {
   vectorIndexes: TableInfo_["vectorIndexes"];
 };
 
-export type TableSchema<TableInfo_ extends AnyWithProps> = Schema.Schema<
+export type TableSchema<TableInfo_ extends AnyWithProps> = Schema.Codec<
   TableInfo_["document"],
   TableInfo_["encodedDocument"]
 >;
 
 export type Document<TableInfo_ extends AnyWithProps> = TableInfo_["document"];
-
-type WithSystemFields<TableName extends string, Doc> = Doc extends unknown
-  ? IdField<TableName> & SystemFields & Doc
-  : never;
 
 // Vendored types from convex-js, partially modified.
 // See https://github.com/get-convex/convex-js/pull/14

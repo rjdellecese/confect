@@ -12,11 +12,12 @@ export class CodeBlockWriter {
   indent<E = never, R = never>(
     effect: Effect.Effect<void, E, R>,
   ): Effect.Effect<void, E, R> {
-    return Effect.gen(this, function* () {
-      const indentationLevel = this.writer.getIndentationLevel();
-      this.writer.setIndentationLevel(indentationLevel + 1);
+    const writer = this.writer;
+    return Effect.gen(function* () {
+      const indentationLevel = writer.getIndentationLevel();
+      writer.setIndentationLevel(indentationLevel + 1);
       yield* effect;
-      this.writer.setIndentationLevel(indentationLevel);
+      writer.setIndentationLevel(indentationLevel);
     });
   }
 

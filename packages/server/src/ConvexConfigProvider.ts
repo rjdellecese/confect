@@ -1,56 +1,39 @@
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
-import * as ConfigError from "effect/ConfigError";
 import * as ConfigProvider from "effect/ConfigProvider";
-import * as ConfigProviderPathPatch from "effect/ConfigProviderPathPatch";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 
 declare const process: { env: Record<string, string | undefined> };
 
-export const make = (
-  options?: Partial<ConfigProvider.ConfigProvider.FromEnvConfig>,
-): ConfigProvider.ConfigProvider => {
-  const pathDelim = options?.pathDelim ?? "_";
-  const seqDelim = options?.seqDelim ?? ",";
+/**
+ * A `ConfigProvider` that reads configuration directly from `process.env` by
+ * exact path lookup.
+ *
+ * The Convex runtime exposes `process.env` for direct key access but does not
+ * make it enumerable, so the built-in `ConfigProvider.fromEnv` (which builds a
+ * trie over the environment to resolve and enumerate config paths) cannot be
+ * used. This provider resolves each requested path to a single environment
+ * variable, joining the path segments with `"_"` to match the key convention
+ * `fromEnv` uses. As with the built-in providers, an empty string is treated
+ * as a missing value, so `Config.withDefault` and `Config.option` recover
+ * from it.
+ */
+export const make = (): ConfigProvider.ConfigProvider =>
+  ConfigProvider.make((path) => {
+    const value = process.env[pipe(path, Array.map(String), Array.join("_"))];
 
-  return ConfigProvider.fromFlat(
-    ConfigProvider.makeFlat({
-      load: (path, primitive, split = true) => {
-        const pathString = Array.join(path, pathDelim);
-        const value = process.env[pathString];
+    return Effect.succeed(
+      value === undefined || value === ""
+        ? undefined
+        : ConfigProvider.makeValue(value),
+    );
+  });
 
-        if (value === undefined) {
-          return Effect.fail(
-            ConfigError.MissingData(
-              [...path],
-              `Expected ${pathString} to exist in the process context`,
-            ),
-          );
-        }
-
-        const parse = (text: string) =>
-          pipe(
-            primitive.parse(text.trim()),
-            Effect.mapError(ConfigError.prefixed([...path])),
-          );
-
-        if (!split) {
-          return pipe(parse(value), Effect.map(Array.of));
-        } else {
-          return pipe(
-            value.split(seqDelim),
-            Effect.forEach((v) => parse(v)),
-          );
-        }
-      },
-      enumerateChildren: (path) =>
-        Effect.fail(
-          ConfigError.Unsupported(
-            [...path],
-            "process.env is not enumerable in the Convex runtime",
-          ),
-        ),
-      patch: ConfigProviderPathPatch.empty,
-    }),
-  );
-};
+/**
+ * Installs the Convex-aware `ConfigProvider` as the ambient provider.
+ */
+export const layer: Layer.Layer<never> = Layer.succeed(
+  ConfigProvider.ConfigProvider,
+  make(),
+);

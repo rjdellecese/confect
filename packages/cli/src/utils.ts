@@ -1,7 +1,7 @@
 import type { FunctionSpec, Spec } from "@confect/core";
-import * as FileSystem from "@effect/platform/FileSystem";
-import * as Path from "@effect/platform/Path";
-import type { PlatformError } from "@effect/platform/Error";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
+import type { PlatformError } from "effect/PlatformError";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Context from "effect/Context";
@@ -28,10 +28,10 @@ import * as templates from "./templates";
  * codegen pass hit the cached default `Ref` and need not interact with
  * the tracker.
  */
-export class WriteTracker extends Context.Reference<WriteTracker>()(
+export const WriteTracker = Context.Reference<Ref.Ref<boolean>>(
   "@confect/cli/WriteTracker",
-  { defaultValue: () => Ref.unsafeMake(false) },
-) {}
+  { defaultValue: () => Ref.makeUnsafe(false) },
+);
 
 const markWritten = Effect.gen(function* () {
   const tracker = yield* WriteTracker;
@@ -125,8 +125,8 @@ export const removePathIfExists = (
     yield* fs
       .remove(filePath)
       .pipe(
-        Effect.catchTag("SystemError", (error) =>
-          error.reason === "NotFound" ? Effect.void : Effect.fail(error),
+        Effect.catchTag("PlatformError", (error) =>
+          error.reason._tag === "NotFound" ? Effect.void : Effect.fail(error),
         ),
       );
   });
@@ -255,13 +255,15 @@ export const generateFunctions = (spec: Spec.AnyWithProps) =>
     );
     yield* Effect.forEach(overlappingGroupPaths, (groupPath) =>
       Effect.gen(function* () {
-        const group = yield* GroupPath.getGroupSpec(spec, groupPath);
+        const group = yield* Effect.fromOption(
+          GroupPath.getGroupSpec(spec, groupPath),
+        );
         const functionNames = pipe(
           group.functions,
           Record.values,
           Array.sortBy(
             Order.mapInput(
-              Order.string,
+              Order.String,
               (fn: FunctionSpec.AnyWithProps) => fn.name,
             ),
           ),
@@ -358,14 +360,16 @@ export const writeGroups = (
     Effect.gen(function* () {
       const path = yield* Path.Path;
       const convexDirectory = yield* ConvexDirectory.get;
-      const group = yield* GroupPath.getGroupSpec(spec, groupPath);
+      const group = yield* Effect.fromOption(
+        GroupPath.getGroupSpec(spec, groupPath),
+      );
 
       const functionNames = pipe(
         group.functions,
         Record.values,
         Array.sortBy(
           Order.mapInput(
-            Order.string,
+            Order.String,
             (fn: FunctionSpec.AnyWithProps) => fn.name,
           ),
         ),

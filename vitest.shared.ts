@@ -1,12 +1,12 @@
-import * as FileSystem from "@effect/platform/FileSystem";
-import * as Path from "@effect/platform/Path";
-import * as NodeContext from "@effect/platform-node/NodeContext";
+import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { configDefaults, defineConfig } from "vitest/config";
 
-const PackageManifest = Schema.parseJson(
+const PackageManifest = Schema.fromJsonString(
   Schema.Struct({ name: Schema.String }),
 );
 
@@ -31,7 +31,7 @@ const discoverPackageAliases = Effect.gen(function* () {
         return [];
       }
 
-      const { name } = yield* Schema.decode(PackageManifest)(
+      const { name } = yield* Schema.decodeUnknownEffect(PackageManifest)(
         yield* fs.readFileString(path.join(packagesDir, entry, "package.json")),
       );
 
@@ -50,7 +50,7 @@ const discoverPackageAliases = Effect.gen(function* () {
 });
 
 const packageAliases = await discoverPackageAliases.pipe(
-  Effect.provide(NodeContext.layer),
+  Effect.provide(NodeServices.layer),
   Effect.runPromise,
 );
 

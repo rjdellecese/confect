@@ -27,10 +27,10 @@ export declare namespace QueryResult {
     };
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-shadow
+  // oxlint-disable-next-line no-shadow
   export type Success<R> = R extends QueryResult<infer A, infer _E> ? A : never;
 
-  // eslint-disable-next-line @typescript-eslint/no-shadow
+  // oxlint-disable-next-line no-shadow
   export type Failure<R> = R extends QueryResult<infer _A, infer E> ? E : never;
 }
 
@@ -83,14 +83,11 @@ const QueryResultProto = {
     const tagHash = Hash.string(this._tag);
     switch (this._tag) {
       case "Loading":
-        return Hash.cached(
-          this,
-          Hash.combine(tagHash)(Hash.hash(this.skipped)),
-        );
+        return Hash.combine(tagHash)(Hash.hash(this.skipped));
       case "Success":
-        return Hash.cached(this, Hash.combine(tagHash)(Hash.hash(this.value)));
+        return Hash.combine(tagHash)(Hash.hash(this.value));
       case "Failure":
-        return Hash.cached(this, Hash.combine(tagHash)(Hash.hash(this.error)));
+        return Hash.combine(tagHash)(Hash.hash(this.error));
     }
   },
 };

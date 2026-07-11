@@ -1,8 +1,9 @@
 import * as Ref from "@confect/core/Ref";
 import { type GenericMutationCtx } from "convex/server";
-import type { ParseResult, Effect } from "effect";
+import type { Effect } from "effect";
 import * as Context from "effect/Context";
 import * as Layer from "effect/Layer";
+import type * as Schema from "effect/Schema";
 
 const make =
   (runMutation: GenericMutationCtx<any>["runMutation"]) =>
@@ -11,7 +12,7 @@ const make =
     ...args: Ref.OptionalArgs<Mutation>
   ): Effect.Effect<
     Ref.Returns<Mutation>,
-    Ref.Error<Mutation> | ParseResult.ParseError
+    Ref.Error<Mutation> | Schema.SchemaError
   > =>
     Ref.runWithCodec(
       mutation,
@@ -20,7 +21,7 @@ const make =
         runMutation(functionReference, encodedArgs),
     );
 
-export const MutationRunner = Context.GenericTag<ReturnType<typeof make>>(
+export const MutationRunner = Context.Service<ReturnType<typeof make>>(
   "@confect/server/MutationRunner",
 );
 export type MutationRunner = typeof MutationRunner.Identifier;

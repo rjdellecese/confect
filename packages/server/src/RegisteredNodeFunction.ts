@@ -1,5 +1,5 @@
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
-import * as NodeContext from "@effect/platform-node/NodeContext";
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import {
   actionGeneric,
   type DefaultFunctionArgs,
@@ -57,16 +57,16 @@ const nodeActionFunction = <
     error,
     handler,
   }: {
-    args: Schema.Schema<Args, ConvexArgs>;
-    returns: Schema.Schema<Returns, ConvexReturns>;
-    error: Schema.Schema.AnyNoContext | undefined;
+    args: Schema.Codec<Args, ConvexArgs>;
+    returns: Schema.Codec<Returns, ConvexReturns>;
+    error: Schema.Codec<any, any> | undefined;
     handler: (
       a: Args,
     ) => Effect.Effect<
       Returns,
       E,
       | RegisteredFunction.ActionServices<DatabaseSchema_>
-      | NodeContext.NodeContext
+      | NodeServices.NodeServices
     >;
   },
 ) =>
@@ -78,6 +78,6 @@ const nodeActionFunction = <
     createLayer: (ctx) =>
       Layer.mergeAll(
         RegisteredFunction.actionLayer(databaseSchema, ctx),
-        NodeContext.layer,
+        NodeServices.layer,
       ),
   });

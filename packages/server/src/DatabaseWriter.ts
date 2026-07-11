@@ -75,7 +75,7 @@ export interface DatabaseWriterService<
 export type DatabaseWriterTag<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Docs = {},
-> = Context.Tag<
+> = Context.Service<
   DatabaseWriterService<DatabaseSchema_>,
   DatabaseWriterService<DatabaseSchema_, Docs>
 >;
@@ -206,7 +206,7 @@ export const DatabaseWriter = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Docs = {},
 >(): DatabaseWriterTag<DatabaseSchema_, Docs> =>
-  Context.GenericTag<
+  Context.Service<
     DatabaseWriterService<DatabaseSchema_>,
     DatabaseWriterService<DatabaseSchema_, Docs>
   >("@confect/server/DatabaseWriter");

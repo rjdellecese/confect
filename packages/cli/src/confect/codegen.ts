@@ -1,10 +1,10 @@
 import { Spec, type GroupSpec } from "@confect/core";
-import * as Command from "@effect/cli/Command";
-import * as FileSystem from "@effect/platform/FileSystem";
-import * as Path from "@effect/platform/Path";
+import * as Command from "effect/unstable/cli/Command";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
-import * as Either from "effect/Either";
+import * as Result from "effect/Result";
 import { pipe } from "effect/Function";
 import * as HashSet from "effect/HashSet";
 import * as Match from "effect/Match";
@@ -64,22 +64,22 @@ import {
 
 const GENERATED_DIRNAME = "_generated";
 
-const GENERATED_SPEC_PATH = Effect.andThen(Path.Path, (path) =>
+const GENERATED_SPEC_PATH = Effect.map(Path.Path, (path) =>
   path.join(GENERATED_DIRNAME, "spec.ts"),
 );
-const GENERATED_SCHEMA_PATH = Effect.andThen(Path.Path, (path) =>
+const GENERATED_SCHEMA_PATH = Effect.map(Path.Path, (path) =>
   path.join(GENERATED_DIRNAME, "schema.ts"),
 );
-const GENERATED_CONVEX_SCHEMA_PATH = Effect.andThen(Path.Path, (path) =>
+const GENERATED_CONVEX_SCHEMA_PATH = Effect.map(Path.Path, (path) =>
   path.join(GENERATED_DIRNAME, "convexSchema.ts"),
 );
-const GENERATED_ID_PATH = Effect.andThen(Path.Path, (path) =>
+const GENERATED_ID_PATH = Effect.map(Path.Path, (path) =>
   path.join(GENERATED_DIRNAME, "id.ts"),
 );
-const GENERATED_COMPONENTS_PATH = Effect.andThen(Path.Path, (path) =>
+const GENERATED_COMPONENTS_PATH = Effect.map(Path.Path, (path) =>
   path.join(GENERATED_DIRNAME, "components.ts"),
 );
-const GENERATED_TABLES_DIRNAME = Effect.andThen(Path.Path, (path) =>
+const GENERATED_TABLES_DIRNAME = Effect.map(Path.Path, (path) =>
   path.join(GENERATED_DIRNAME, "tables"),
 );
 
@@ -459,8 +459,10 @@ const generateGroupRegisteredFunctions = (leaves: ReadonlyArray<LeafModule>) =>
         // validated spec — so `None` here means that invariant was broken.
         const runtime = yield* Option.match(leaf.runtime, {
           onNone: () =>
-            Effect.dieMessage(
-              `Runtime for '${leaf.relativePath}' was not resolved before registry generation.`,
+            Effect.die(
+              new Error(
+                `Runtime for '${leaf.relativePath}' was not resolved before registry generation.`,
+              ),
             ),
           onSome: Effect.succeed,
         });
@@ -531,8 +533,8 @@ const loadGeneratedSpec = Effect.gen(function* () {
   const spec = specModule.default;
 
   if (!Spec.isSpec(spec)) {
-    return yield* Effect.dieMessage(
-      "_generated/spec.ts does not export a valid Spec",
+    return yield* Effect.die(
+      new Error("_generated/spec.ts does not export a valid Spec"),
     );
   }
 
@@ -549,11 +551,11 @@ export const loadPreviousFunctionPaths = Effect.gen(function* () {
     return emptyFunctionPaths;
   }
 
-  const specEither = yield* loadGeneratedSpec.pipe(Effect.either);
+  const specResult = yield* loadGeneratedSpec.pipe(Effect.result);
 
-  return Either.match(specEither, {
-    onLeft: () => emptyFunctionPaths,
-    onRight: (spec) => FunctionPaths.make(spec),
+  return Result.match(specResult, {
+    onFailure: () => emptyFunctionPaths,
+    onSuccess: (spec) => FunctionPaths.make(spec),
   });
 });
 
@@ -851,7 +853,7 @@ const validateNoDocNameCollisions = (
       })),
     );
 
-    if (Array.isNonEmptyReadonlyArray(collisions)) {
+    if (Array.isReadonlyArrayNonEmpty(collisions)) {
       return yield* new CodegenError.ConflictingDocNameError({ collisions });
     }
   });

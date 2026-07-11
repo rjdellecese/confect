@@ -1,7 +1,7 @@
 import { FunctionSpec, Ref } from "@confect/core";
 import { renderHook } from "@testing-library/react";
 import { ConvexError } from "convex/values";
-import * as Either from "effect/Either";
+import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import {
   assert,
@@ -25,7 +25,7 @@ vi.mock("convex/react", () => ({
   useAction: (...args: unknown[]) => useConvexActionMock(...args),
 }));
 
-class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+class NotFound extends Schema.TaggedErrorClass<NotFound>()("NotFound", {
   id: Schema.String,
 }) {}
 
@@ -252,7 +252,7 @@ describe("useMutation", () => {
       Promise<string>
     >();
     expectTypeOf<InvokeReturn<typeof mutationWithError>>().toEqualTypeOf<
-      Promise<Either.Either<null, NotFound>>
+      Promise<Result.Result<null, NotFound>>
     >();
   });
 
@@ -264,29 +264,29 @@ describe("useMutation", () => {
     await expect(result.current({ text: "hi" })).resolves.toBe("note-1");
   });
 
-  test("resolves to Either.Right with decoded result when error schema succeeds", async () => {
+  test("resolves to Result.Success with decoded result when error schema succeeds", async () => {
     const inner = vi.fn().mockResolvedValue(null);
     useConvexMutationMock.mockReturnValue(inner);
 
     const { result } = renderHook(() => useMutation(mutationWithError));
-    const either = await result.current({ id: "abc" });
+    const result_ = await result.current({ id: "abc" });
 
-    assert(Either.isRight(either));
-    expect(either.right).toBeNull();
+    assert(Result.isSuccess(result_));
+    expect(result_.success).toBeNull();
   });
 
-  test("resolves to Either.Left with the decoded typed error for a matching ConvexError", async () => {
+  test("resolves to Result.Failure with the decoded typed error for a matching ConvexError", async () => {
     const inner = vi
       .fn()
       .mockRejectedValue(new ConvexError({ _tag: "NotFound", id: "abc" }));
     useConvexMutationMock.mockReturnValue(inner);
 
     const { result } = renderHook(() => useMutation(mutationWithError));
-    const either = await result.current({ id: "abc" });
+    const result_ = await result.current({ id: "abc" });
 
-    assert(Either.isLeft(either));
-    assert(either.left instanceof NotFound);
-    expect(either.left.id).toBe("abc");
+    assert(Result.isFailure(result_));
+    assert(result_.failure instanceof NotFound);
+    expect(result_.failure.id).toBe("abc");
   });
 
   test("rejects with the original error for a non-ConvexError", async () => {
@@ -328,7 +328,7 @@ describe("useAction", () => {
       Promise<string>
     >();
     expectTypeOf<InvokeReturn<typeof actionWithError>>().toEqualTypeOf<
-      Promise<Either.Either<null, NotFound>>
+      Promise<Result.Result<null, NotFound>>
     >();
   });
 
@@ -340,29 +340,29 @@ describe("useAction", () => {
     await expect(result.current({})).resolves.toBe("pong");
   });
 
-  test("resolves to Either.Right with decoded result when error schema succeeds", async () => {
+  test("resolves to Result.Success with decoded result when error schema succeeds", async () => {
     const inner = vi.fn().mockResolvedValue(null);
     useConvexActionMock.mockReturnValue(inner);
 
     const { result } = renderHook(() => useAction(actionWithError));
-    const either = await result.current({ id: "abc" });
+    const result_ = await result.current({ id: "abc" });
 
-    assert(Either.isRight(either));
-    expect(either.right).toBeNull();
+    assert(Result.isSuccess(result_));
+    expect(result_.success).toBeNull();
   });
 
-  test("resolves to Either.Left with the decoded typed error for a matching ConvexError", async () => {
+  test("resolves to Result.Failure with the decoded typed error for a matching ConvexError", async () => {
     const inner = vi
       .fn()
       .mockRejectedValue(new ConvexError({ _tag: "NotFound", id: "abc" }));
     useConvexActionMock.mockReturnValue(inner);
 
     const { result } = renderHook(() => useAction(actionWithError));
-    const either = await result.current({ id: "abc" });
+    const result_ = await result.current({ id: "abc" });
 
-    assert(Either.isLeft(either));
-    assert(either.left instanceof NotFound);
-    expect(either.left.id).toBe("abc");
+    assert(Result.isFailure(result_));
+    assert(result_.failure instanceof NotFound);
+    expect(result_.failure.id).toBe("abc");
   });
 
   test("rejects with the original error for a non-ConvexError", async () => {

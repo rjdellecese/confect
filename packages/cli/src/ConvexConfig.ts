@@ -1,9 +1,9 @@
-import * as Path from "@effect/platform/Path";
+import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
-import { pipe } from "effect/Function";
 import * as Option from "effect/Option";
 import * as Order from "effect/Order";
+import * as Path from "effect/Path";
 import * as Record from "effect/Record";
 import * as Schema from "effect/Schema";
 import * as String from "effect/String";
@@ -92,10 +92,8 @@ export const componentConfigPlugin = (path: Path.Path): esbuild.Plugin => ({
 
       return pipe(
         candidates,
-        Array.filterMap((candidate) =>
-          Bundler.resolveModule(candidate, importer),
-        ),
-        Array.head,
+        Array.map((candidate) => Bundler.resolveModule(candidate, importer)),
+        Option.firstSomeOf,
         Option.match({
           onNone: () => undefined,
           onSome: (resolved) => ({
@@ -163,7 +161,7 @@ const AppDefinitionAnalysis = Schema.Struct({
 });
 
 const byName = Order.mapInput(
-  Order.string,
+  Order.String,
   (component: InstalledComponent) => component.name,
 );
 
@@ -224,7 +222,7 @@ export const discoverInstalledComponents = (
         }),
     });
 
-    const decoded = yield* Schema.decodeUnknown(AppDefinitionAnalysis)(
+    const decoded = yield* Schema.decodeUnknownEffect(AppDefinitionAnalysis)(
       analysis,
     ).pipe(
       Effect.mapError(
@@ -254,7 +252,7 @@ export const discoverInstalledComponents = (
         Option.isNone(String.match(VALID_COMPONENT_NAME)(name)),
       ),
     );
-    if (Array.isNonEmptyReadonlyArray(invalidNames)) {
+    if (Array.isArrayNonEmpty(invalidNames)) {
       return yield* new InvalidConvexConfigError({
         configPath: displayPath,
         reason: `component names must be alphanumeric plus underscores, but got: ${pipe(
@@ -272,7 +270,7 @@ export const discoverInstalledComponents = (
       Array.filter(([, group]) => group.length > 1),
       Array.map(([name]) => name),
     );
-    if (Array.isNonEmptyReadonlyArray(duplicateNames)) {
+    if (Array.isArrayNonEmpty(duplicateNames)) {
       return yield* new InvalidConvexConfigError({
         configPath: displayPath,
         reason: `multiple components are installed under the same name (${Array.join(duplicateNames, ", ")}); pass a unique \`name\` to \`app.use\` for each.`,

@@ -3,7 +3,7 @@ import type * as esbuild from "esbuild";
 
 // --- Variants ---
 
-export class BundleFailedError extends Schema.TaggedError<BundleFailedError>()(
+export class BundleFailedError extends Schema.TaggedErrorClass<BundleFailedError>()(
   "BundleFailedError",
   {
     file: Schema.String,
@@ -11,7 +11,7 @@ export class BundleFailedError extends Schema.TaggedError<BundleFailedError>()(
   },
 ) {}
 
-export class ImportFailedError extends Schema.TaggedError<ImportFailedError>()(
+export class ImportFailedError extends Schema.TaggedErrorClass<ImportFailedError>()(
   "ImportFailedError",
   {
     file: Schema.String,
@@ -19,7 +19,7 @@ export class ImportFailedError extends Schema.TaggedError<ImportFailedError>()(
   },
 ) {}
 
-export const BuildError = Schema.Union(BundleFailedError, ImportFailedError);
+export const BuildError = Schema.Union([BundleFailedError, ImportFailedError]);
 export type BuildError = typeof BuildError.Type;
 
 export const isBuildError = (error: unknown): error is BuildError =>
@@ -32,7 +32,7 @@ export const isBuildError = (error: unknown): error is BuildError =>
  * remapped to a {@link BuildError} (which carries enough context for the CLI
  * to render it) before reaching a user-surface boundary.
  */
-export class BundlerError extends Schema.TaggedError<BundlerError>()(
+export class BundlerError extends Schema.TaggedErrorClass<BundlerError>()(
   "BundlerError",
   {
     cause: Schema.Unknown,

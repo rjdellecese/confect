@@ -5,7 +5,6 @@ import type {
 import { makeFunctionReference } from "convex/server";
 import type { Value } from "convex/values";
 import { ConvexError } from "convex/values";
-import type { ParseResult } from "effect";
 import * as Effect from "effect/Effect";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
@@ -224,10 +223,10 @@ export const hasErrorSchema = (ref: Any): boolean =>
 export const encodeArgs = <Ref_ extends Any>(
   ref: Ref_,
   args: Args<Ref_>,
-): Effect.Effect<unknown, ParseResult.ParseError> =>
+): Effect.Effect<unknown, Schema.SchemaError> =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag("Confect", (confectFunctionProvenance) =>
-      Schema.encode(confectFunctionProvenance.args)(args),
+      Schema.encodeEffect(confectFunctionProvenance.args)(args),
     ),
     Match.tag("Convex", () => Effect.succeed(args)),
     Match.exhaustive,
@@ -236,10 +235,10 @@ export const encodeArgs = <Ref_ extends Any>(
 export const decodeReturns = <Ref_ extends Any>(
   ref: Ref_,
   returns: unknown,
-): Effect.Effect<Returns<Ref_>, ParseResult.ParseError> =>
+): Effect.Effect<Returns<Ref_>, Schema.SchemaError> =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag("Confect", (confectFunctionProvenance) =>
-      Schema.decode(confectFunctionProvenance.returns)(returns),
+      Schema.decodeUnknownEffect(confectFunctionProvenance.returns)(returns),
     ),
     Match.tag("Convex", () => Effect.succeed(returns)),
     Match.exhaustive,
@@ -263,7 +262,7 @@ export const decodeArgsSync = <Ref_ extends Any>(
 ): Args<Ref_> =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag("Confect", (confectFunctionProvenance) =>
-      Schema.decodeSync(confectFunctionProvenance.args)(encodedArgs),
+      Schema.decodeUnknownSync(confectFunctionProvenance.args)(encodedArgs),
     ),
     Match.tag("Convex", () => encodedArgs),
     Match.exhaustive,
@@ -287,7 +286,9 @@ export const decodeReturnsSync = <Ref_ extends Any>(
 ): Returns<Ref_> =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag("Confect", (confectFunctionProvenance) =>
-      Schema.decodeSync(confectFunctionProvenance.returns)(encodedReturns),
+      Schema.decodeUnknownSync(confectFunctionProvenance.returns)(
+        encodedReturns,
+      ),
     ),
     Match.tag("Convex", () => encodedReturns),
     Match.exhaustive,
@@ -332,12 +333,14 @@ export const decodeErrorOrElse =
 export const decodeError = <Ref_ extends Any>(
   ref: Ref_,
   encodedError: unknown,
-): Effect.Effect<Option.Option<Error<Ref_>>, ParseResult.ParseError> =>
+): Effect.Effect<Option.Option<Error<Ref_>>, Schema.SchemaError> =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag("Confect", (confectFunctionProvenance) =>
       "error" in confectFunctionProvenance
         ? Effect.map(
-            Schema.decode(confectFunctionProvenance.error)(encodedError),
+            Schema.decodeUnknownEffect(confectFunctionProvenance.error)(
+              encodedError,
+            ),
             Option.some,
           )
         : Effect.succeed(Option.none<Error<Ref_>>()),
@@ -358,7 +361,7 @@ export const decodeErrorSync = <Ref_ extends Any>(
     Match.tag("Confect", (confectFunctionProvenance) =>
       "error" in confectFunctionProvenance
         ? Option.some(
-            Schema.decodeSync(confectFunctionProvenance.error)(
+            Schema.decodeUnknownSync(confectFunctionProvenance.error)(
               encodedError,
             ) as Error<Ref_>,
           )
@@ -376,7 +379,9 @@ export const maybeDecodeErrorSync = <Ref_ extends Any>(
     ? Match.value(ref.functionSpec.functionProvenance).pipe(
         Match.tag("Confect", (confectFunctionProvenance) =>
           "error" in confectFunctionProvenance
-            ? Schema.decodeSync(confectFunctionProvenance.error)(error.data)
+            ? Schema.decodeUnknownSync(confectFunctionProvenance.error)(
+                error.data,
+              )
             : error,
         ),
         Match.tag("Convex", () => error),
@@ -400,7 +405,7 @@ export const runWithCodec = <Ref_ extends Any, E = never>(
     encodedArgs: unknown,
   ) => PromiseLike<unknown>,
   mapUnknownError?: (error: unknown) => E,
-): Effect.Effect<Returns<Ref_>, E | Error<Ref_> | ParseResult.ParseError> =>
+): Effect.Effect<Returns<Ref_>, E | Error<Ref_> | Schema.SchemaError> =>
   Effect.gen(function* () {
     const functionReference = getFunctionReference(ref);
     const functionProvenance = ref.functionSpec.functionProvenance;
@@ -425,13 +430,13 @@ export const runWithCodec = <Ref_ extends Any, E = never>(
     return yield* Match.value(functionProvenance).pipe(
       Match.tag("Confect", (confectFunctionProvenance) =>
         Effect.gen(function* () {
-          const encodedArgs = yield* Schema.encode(
+          const encodedArgs = yield* Schema.encodeEffect(
             confectFunctionProvenance.args,
           )(args);
           const encodedReturns = yield* invoke(encodedArgs);
-          return yield* Schema.decode(confectFunctionProvenance.returns)(
-            encodedReturns,
-          );
+          return yield* Schema.decodeUnknownEffect(
+            confectFunctionProvenance.returns,
+          )(encodedReturns);
         }),
       ),
       Match.tag("Convex", () => invoke(args)),

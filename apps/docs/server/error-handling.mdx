@@ -12,7 +12,7 @@ Error schemas are optional. When omitted, the error type defaults to `never` and
 
 ## Declaring an error schema
 
-Add an `error` field to any `FunctionSpec` constructor. The schema is an ordinary Effect `Schema`, so a `Schema.TaggedError` class works well for a single failure mode.
+Add an `error` field to any `FunctionSpec` constructor. The schema is an ordinary Effect `Schema`, so a `Schema.TaggedErrorClass` class works well for a single failure mode.
 
 ```ts confect/notes.spec.ts
 import { FunctionSpec, GroupSpec } from "@confect/core";
@@ -21,7 +21,7 @@ import * as Schema from "effect/Schema";
 import { Id } from "./_generated/id";
 import notes from "./_generated/tables/notes";
 
-export class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
+export class NoteNotFound extends Schema.TaggedErrorClass<NoteNotFound>()(
   "NoteNotFound",
   { noteId: Id("notes") },
 ) {}
@@ -43,12 +43,12 @@ import * as Schema from "effect/Schema";
 
 import { Id } from "./_generated/id";
 
-export class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
+export class NoteNotFound extends Schema.TaggedErrorClass<NoteNotFound>()(
   "NoteNotFound",
   { noteId: Id("notes") },
 ) {}
 
-export class Forbidden extends Schema.TaggedError<Forbidden>()(
+export class Forbidden extends Schema.TaggedErrorClass<Forbidden>()(
   "Forbidden",
   {},
 ) {}
@@ -57,7 +57,7 @@ FunctionSpec.publicMutation({
   name: "deleteOrFail",
   args: () => Schema.Struct({ noteId: Id("notes") }),
   returns: () => Schema.Null,
-  error: () => Schema.Union(NoteNotFound, Forbidden),
+  error: () => Schema.Union([NoteNotFound, Forbidden]),
 });
 ```
 

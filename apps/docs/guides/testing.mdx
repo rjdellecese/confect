@@ -105,7 +105,7 @@ When a ref's spec declares an `error` schema, the decoded error is added to the 
 
 ```ts
 import { describe, it } from "@effect/vitest";
-import { assertLeft } from "@effect/vitest/utils";
+import { assertFailure } from "@effect/vitest/utils";
 import type { GenericId } from "convex/values";
 import * as Effect from "effect/Effect";
 
@@ -122,9 +122,9 @@ describe("notes", () => {
         .query(refs.public.notes.getOrFail, {
           noteId: "missing" as GenericId<"notes">,
         })
-        .pipe(Effect.either);
+        .pipe(Effect.result);
 
-      assertLeft(result, new NoteNotFound({ noteId: "missing" }));
+      assertFailure(result, new NoteNotFound({ noteId: "missing" }));
     }).pipe(Effect.provide(TestConfect.layer())),
   );
 });

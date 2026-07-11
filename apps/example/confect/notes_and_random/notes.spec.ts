@@ -3,7 +3,7 @@ import * as Schema from "effect/Schema";
 import { Id } from "../_generated/id";
 import notes from "../_generated/tables/notes";
 
-export class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
+export class NoteNotFound extends Schema.TaggedErrorClass<NoteNotFound>()(
   "NoteNotFound",
   { noteId: Id("notes") },
 ) {}
@@ -42,14 +42,14 @@ export default GroupSpec.make()
     FunctionSpec.publicQuery({
       name: "getFirst",
       args: () => Schema.Struct({}),
-      returns: () => Schema.Option(notes.Doc),
+      returns: () => Schema.OptionFromNullOr(notes.Doc),
     }),
   )
   .addFunction(
     FunctionSpec.internalQuery({
       name: "internalGetFirst",
       args: () => Schema.Struct({}),
-      returns: () => Schema.Option(notes.Doc),
+      returns: () => Schema.OptionFromNullOr(notes.Doc),
     }),
   )
   .addFunction(

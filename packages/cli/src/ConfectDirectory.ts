@@ -1,26 +1,20 @@
-import * as FileSystem from "@effect/platform/FileSystem";
-import * as Path from "@effect/platform/Path";
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
+import * as Layer from "effect/Layer";
+import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
-import { ConvexDirectory } from "./ConvexDirectory";
+import * as ConvexDirectory from "./ConvexDirectory";
 
-export class ConfectDirectory extends Effect.Service<ConfectDirectory>()(
-  "@confect/cli/ConfectDirectory",
-  {
-    effect: Effect.gen(function* () {
-      const convexDirectory = yield* findConfectDirectory;
+export class ConfectDirectory extends Context.Service<
+  ConfectDirectory,
+  { readonly get: Effect.Effect<string> }
+>()("@confect/cli/ConfectDirectory") {
+  static readonly get = ConfectDirectory.use((service) => service.get);
+}
 
-      const ref = yield* Ref.make<string>(convexDirectory);
-
-      return { get: Ref.get(ref) } as const;
-    }),
-    dependencies: [ConvexDirectory.Default],
-    accessors: true,
-  },
-) {}
-
-export class ConfectDirectoryNotFoundError extends Schema.TaggedError<ConfectDirectoryNotFoundError>()(
+export class ConfectDirectoryNotFoundError extends Schema.TaggedErrorClass<ConfectDirectoryNotFoundError>()(
   "ConfectDirectoryNotFoundError",
   {},
 ) {
@@ -33,7 +27,7 @@ export const findConfectDirectory = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
 
-  const convexDirectory = yield* ConvexDirectory.get;
+  const convexDirectory = yield* ConvexDirectory.ConvexDirectory.get;
 
   const confectDirectory = path.join(path.dirname(convexDirectory), "confect");
 
@@ -43,3 +37,14 @@ export const findConfectDirectory = Effect.gen(function* () {
     return yield* new ConfectDirectoryNotFoundError();
   }
 });
+
+export const layer = Layer.effect(
+  ConfectDirectory,
+  Effect.gen(function* () {
+    const confectDirectory = yield* findConfectDirectory;
+
+    const ref = yield* Ref.make<string>(confectDirectory);
+
+    return { get: Ref.get(ref) } as const;
+  }),
+).pipe(Layer.provide(ConvexDirectory.layer));

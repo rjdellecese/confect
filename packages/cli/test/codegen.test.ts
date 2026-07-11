@@ -1,11 +1,11 @@
 import { FunctionSpec, GroupSpec } from "@confect/core";
-import * as FileSystem from "@effect/platform/FileSystem";
-import * as Path from "@effect/platform/Path";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { assert, expect, layer } from "@effect/vitest";
 import * as Effect from "effect/Effect";
-import * as Either from "effect/Either";
+import * as Result from "effect/Result";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -23,7 +23,6 @@ const CodegenLayer = Layer.mergeAll(
   NodePath.layer,
   NodeFileSystem.layer,
   Layer.mock(ConfectDirectory, {
-    _tag: "@confect/cli/ConfectDirectory",
     get: Effect.succeed(fixtureConfect),
   }),
 );
@@ -55,10 +54,10 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
         yield* Effect.gen(function* () {
           yield* fs.writeFileString(stowedPath, "export default {};\n");
           const tables = yield* discoverTables;
-          const result = yield* Effect.either(validateTables(tables));
+          const result = yield* Effect.result(validateTables(tables));
 
-          assert(Either.isLeft(result));
-          expect(result.left._tag).toBe("InvalidTableDefaultExportError");
+          assert(Result.isFailure(result));
+          expect(result.failure._tag).toBe("InvalidTableDefaultExportError");
         }).pipe(Effect.ensuring(fs.remove(stowedPath).pipe(Effect.orDie)));
       }),
   );
@@ -80,10 +79,10 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
 
         yield* Effect.gen(function* () {
           yield* fs.writeFileString(invalidPath, "export default {};\n");
-          const result = yield* Effect.either(discoverTables);
+          const result = yield* Effect.result(discoverTables);
 
-          assert(Either.isLeft(result));
-          expect(result.left._tag).toBe("InvalidTableFilenameError");
+          assert(Result.isFailure(result));
+          expect(result.failure._tag).toBe("InvalidTableFilenameError");
         }).pipe(Effect.ensuring(fs.remove(invalidPath).pipe(Effect.orDie)));
       }),
   );
@@ -119,21 +118,20 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
         "export default {};\n",
       );
 
-      const result = yield* Effect.either(
+      const result = yield* Effect.result(
         discoverTables.pipe(
           Effect.provide(
             Layer.mock(ConfectDirectory, {
-              _tag: "@confect/cli/ConfectDirectory",
               get: Effect.succeed(tempDir),
             }),
           ),
         ),
       );
 
-      assert(Either.isLeft(result));
-      assert(result.left._tag === "DuplicateTableNameError");
+      assert(Result.isFailure(result));
+      assert(result.failure._tag === "DuplicateTableNameError");
       const byName = Object.fromEntries(
-        result.left.collisions.map((c) => [
+        result.failure.collisions.map((c) => [
           c.tableName,
           [...c.tablePaths].sort(),
         ]),
@@ -159,7 +157,6 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
       const tables = yield* discoverTables.pipe(
         Effect.provide(
           Layer.mock(ConfectDirectory, {
-            _tag: "@confect/cli/ConfectDirectory",
             get: Effect.succeed(tempDir),
           }),
         ),
@@ -192,7 +189,6 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
         const tables = yield* discoverTables.pipe(
           Effect.provide(
             Layer.mock(ConfectDirectory, {
-              _tag: "@confect/cli/ConfectDirectory",
               get: Effect.succeed(tempDir),
             }),
           ),
@@ -252,19 +248,19 @@ layer(Layer.empty)("validateNoParentChildNameCollisions", (it) => {
           }),
         );
 
-        const result = yield* Effect.either(
+        const result = yield* Effect.result(
           validateNoParentChildNameCollisions(
             [parent, child],
             new Map([[parent.relativePath, parentGroupSpec]]),
           ),
         );
 
-        assert(Either.isLeft(result));
-        expect(result.left._tag).toBe("ParentChildNameCollisionError");
-        expect(result.left.collisionKind).toBe("function");
-        expect(result.left.collisionName).toBe("archived");
-        expect(result.left.parentSpecPath).toBe("notes.spec.ts");
-        expect(result.left.childSpecPath).toBe("notes/archived.spec.ts");
+        assert(Result.isFailure(result));
+        expect(result.failure._tag).toBe("ParentChildNameCollisionError");
+        expect(result.failure.collisionKind).toBe("function");
+        expect(result.failure.collisionName).toBe("archived");
+        expect(result.failure.parentSpecPath).toBe("notes.spec.ts");
+        expect(result.failure.childSpecPath).toBe("notes/archived.spec.ts");
       }),
   );
 
@@ -283,17 +279,17 @@ layer(Layer.empty)("validateNoParentChildNameCollisions", (it) => {
         );
         const parentGroupSpec = GroupSpec.make().addGroupAt("archived", inner);
 
-        const result = yield* Effect.either(
+        const result = yield* Effect.result(
           validateNoParentChildNameCollisions(
             [parent, child],
             new Map([[parent.relativePath, parentGroupSpec]]),
           ),
         );
 
-        assert(Either.isLeft(result));
-        expect(result.left._tag).toBe("ParentChildNameCollisionError");
-        expect(result.left.collisionKind).toBe("group");
-        expect(result.left.collisionName).toBe("archived");
+        assert(Result.isFailure(result));
+        expect(result.failure._tag).toBe("ParentChildNameCollisionError");
+        expect(result.failure.collisionKind).toBe("group");
+        expect(result.failure.collisionName).toBe("archived");
       }),
   );
 

@@ -30,7 +30,7 @@ const assemblyNodesAtDepth = (
   pipe(
     Array.groupBy(leaves, (leaf) => leaf.pathSegments[depth]!),
     Record.toEntries,
-    Array.sortBy(Order.mapInput(Order.string, ([segment]) => segment)),
+    Array.sortBy(Order.mapInput(Order.String, ([segment]) => segment)),
     Array.map(([segment, groupLeaves]) => {
       const terminal = Array.findFirst(
         groupLeaves,
@@ -71,5 +71,5 @@ export const collectImportBindings = (
       Record.fromIterableBy(bindings, (binding) => binding.importPath),
     Record.toEntries,
     Array.map(([, binding]) => binding),
-    Array.sortBy(Order.mapInput(Order.string, (binding) => binding.localName)),
+    Array.sortBy(Order.mapInput(Order.String, (binding) => binding.localName)),
   );

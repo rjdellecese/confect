@@ -3,31 +3,34 @@ import * as Schema from "effect/Schema";
 import { Id } from "../_generated/id";
 import notes from "../_generated/tables/notes";
 
-export class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+export class NotFound extends Schema.TaggedErrorClass<NotFound>()("NotFound", {
   id: Schema.String,
 }) {}
 
-export class Forbidden extends Schema.TaggedError<Forbidden>()("Forbidden", {
-  reason: Schema.String,
-}) {}
+export class Forbidden extends Schema.TaggedErrorClass<Forbidden>()(
+  "Forbidden",
+  {
+    reason: Schema.String,
+  },
+) {}
 
-const NoteError = Schema.Union(NotFound, Forbidden);
+const NoteError = Schema.Union([NotFound, Forbidden]);
 
-const TryGetResult = Schema.Union(
+const TryGetResult = Schema.Union([
   Schema.TaggedStruct("Ok", { text: Schema.String }),
   Schema.TaggedStruct("NotFound", { id: Schema.String }),
-);
+]);
 
-const TryDeleteResult = Schema.Union(
+const TryDeleteResult = Schema.Union([
   Schema.TaggedStruct("Ok", {}),
   Schema.TaggedStruct("NotFound", { id: Schema.String }),
   Schema.TaggedStruct("Forbidden", { reason: Schema.String }),
-);
+]);
 
-const TryFailingActionResult = Schema.Union(
+const TryFailingActionResult = Schema.Union([
   Schema.TaggedStruct("NotFound", { id: Schema.String }),
   Schema.TaggedStruct("Forbidden", { reason: Schema.String }),
-);
+]);
 
 export default GroupSpec.make()
   .addFunction(
@@ -55,7 +58,7 @@ export default GroupSpec.make()
       name: "failingAction",
       args: () =>
         Schema.Struct({
-          kind: Schema.Literal("notFound", "forbidden"),
+          kind: Schema.Literals(["notFound", "forbidden"]),
         }),
       returns: () => Schema.Null,
       error: () => NoteError,
@@ -92,7 +95,7 @@ export default GroupSpec.make()
       name: "tryFailingAction",
       args: () =>
         Schema.Struct({
-          kind: Schema.Literal("notFound", "forbidden"),
+          kind: Schema.Literals(["notFound", "forbidden"]),
         }),
       returns: () => TryFailingActionResult,
     }),

@@ -46,7 +46,7 @@ export const isUnnamedTable = (u: unknown): u is UnnamedAny =>
 
 export interface Table<
   Name_ extends string,
-  TableSchema_ extends Schema.Schema.AnyNoContext,
+  TableSchema_ extends Schema.Codec<any, any>,
   TableValidator_ extends GenericValidator =
     TableSchemaToTableValidator<TableSchema_>,
   Indexes_ extends GenericTableIndexes = {},
@@ -73,7 +73,7 @@ export interface Any {
 
 export type AnyWithProps = Table<
   any,
-  Schema.Schema.AnyNoContext,
+  Schema.Codec<any, any>,
   GenericValidator,
   GenericTableIndexes,
   GenericTableSearchIndexes,
@@ -94,7 +94,7 @@ export type AnyWithProps = Table<
 // simply invokes the unnamed callable with the filename basename.
 
 export interface UnnamedTable<
-  TableSchema_ extends Schema.Schema.AnyNoContext,
+  TableSchema_ extends Schema.Codec<any, any>,
   TableValidator_ extends GenericValidator =
     TableSchemaToTableValidator<TableSchema_>,
   Indexes_ extends GenericTableIndexes = {},
@@ -191,7 +191,7 @@ export interface UnnamedAny {
 }
 
 export type UnnamedAnyWithProps = UnnamedTable<
-  Schema.Schema.AnyNoContext,
+  Schema.Codec<any, any>,
   GenericValidator,
   GenericTableIndexes,
   GenericTableSearchIndexes,
@@ -323,7 +323,7 @@ export type TablesRecord<Tables extends AnyWithProps> = {
 // overhead.
 
 interface UnnamedState<
-  TableSchema_ extends Schema.Schema.AnyNoContext,
+  TableSchema_ extends Schema.Codec<any, any>,
   Indexes_ extends GenericTableIndexes,
   SearchIndexes_ extends GenericTableSearchIndexes,
   VectorIndexes_ extends GenericTableVectorIndexes,
@@ -336,7 +336,7 @@ interface UnnamedState<
 
 const makeBound = <
   Name_ extends string,
-  TableSchema_ extends Schema.Schema.AnyNoContext,
+  TableSchema_ extends Schema.Codec<any, any>,
   TableValidator_ extends Validator<any, any, any>,
   Indexes_ extends GenericTableIndexes,
   SearchIndexes_ extends GenericTableSearchIndexes,
@@ -401,7 +401,7 @@ const makeBound = <
 };
 
 const makeUnnamed = <
-  TableSchema_ extends Schema.Schema.AnyNoContext,
+  TableSchema_ extends Schema.Codec<any, any>,
   TableValidator_ extends Validator<any, any, any>,
   Indexes_ extends GenericTableIndexes,
   SearchIndexes_ extends GenericTableSearchIndexes,
@@ -493,7 +493,7 @@ const makeUnnamed = <
   }) satisfies UnnamedTable_;
 };
 
-export const make = <const TableSchema_ extends Schema.Schema.AnyNoContext>(
+export const make = <const TableSchema_ extends Schema.Codec<any, any>>(
   lazyFields: () => TableSchema_,
 ): UnnamedTable<TableSchema_, TableSchemaToTableValidator<TableSchema_>> => {
   type TableValidator_ = TableSchemaToTableValidator<TableSchema_>;
@@ -516,8 +516,8 @@ export const scheduledFunctionsTable = make(() =>
     name: Schema.String,
     args: Schema.Array(Schema.Any),
     scheduledTime: Schema.Number,
-    completedTime: Schema.optionalWith(Schema.Number, { exact: true }),
-    state: Schema.Union(
+    completedTime: Schema.optionalKey(Schema.Number),
+    state: Schema.Union([
       Schema.Struct({ kind: Schema.Literal("pending") }),
       Schema.Struct({ kind: Schema.Literal("inProgress") }),
       Schema.Struct({ kind: Schema.Literal("success") }),
@@ -526,7 +526,7 @@ export const scheduledFunctionsTable = make(() =>
         error: Schema.String,
       }),
       Schema.Struct({ kind: Schema.Literal("canceled") }),
-    ),
+    ]),
   }),
 )("_scheduled_functions");
 
@@ -534,7 +534,7 @@ export const storageTable = make(() =>
   Schema.Struct({
     sha256: Schema.String,
     size: Schema.Number,
-    contentType: Schema.optionalWith(Schema.String, { exact: true }),
+    contentType: Schema.optionalKey(Schema.String),
   }),
 )("_storage");
 

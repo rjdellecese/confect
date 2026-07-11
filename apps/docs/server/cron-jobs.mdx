@@ -42,7 +42,7 @@ export default CronJobs.make()
   .add(
     CronJob.make(
       "send weekly digest",
-      Cron.unsafeParse("0 9 * * 1"),
+      Cron.parseUnsafe("0 9 * * 1"),
       refs.internal.emails.sendDigest,
     ),
   )
@@ -56,7 +56,7 @@ export default CronJobs.make()
   .add(
     CronJob.make(
       "payment reminder",
-      Cron.unsafeParse("0 16 1 * *"),
+      Cron.parseUnsafe("0 16 1 * *"),
       refs.internal.payments.sendPaymentEmail,
       { email: "billing@example.com" },
     ),

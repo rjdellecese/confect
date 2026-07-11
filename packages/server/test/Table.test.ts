@@ -15,21 +15,16 @@ describe("Table", () => {
   it("tableDefinition property should extend a generic Convex TableDefinition", () => {
     const confectNotesTableDefinition = Table.make(() =>
       Schema.Struct({
-        userId: Schema.optionalWith(GenericId.GenericId("users"), {
-          exact: true,
-        }),
-        text: Schema.String.pipe(Schema.maxLength(100)),
-        tag: Schema.optionalWith(Schema.String, { exact: true }),
-        author: Schema.optionalWith(
+        userId: Schema.optionalKey(GenericId.GenericId("users")),
+        text: Schema.String.check(Schema.isMaxLength(100)),
+        tag: Schema.optionalKey(Schema.String),
+        author: Schema.optionalKey(
           Schema.Struct({
-            role: Schema.Literal("admin", "user"),
+            role: Schema.Literals(["admin", "user"]),
             name: Schema.String,
           }),
-          { exact: true },
         ),
-        embedding: Schema.optionalWith(Schema.Array(Schema.Number), {
-          exact: true,
-        }),
+        embedding: Schema.optionalKey(Schema.Array(Schema.Number)),
       }),
     )
       .index("by_text", ["text"])

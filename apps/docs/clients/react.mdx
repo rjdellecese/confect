@@ -156,7 +156,7 @@ const InsertNote = () => {
 
 ### With an `error` schema
 
-When the spec declares an `error` schema, the function returns `Promise<Either<A, E>>`. Unwrap with `Either.match` (or another `Either` combinator) to handle both branches. Undeclared failures still reject the promise.
+When the spec declares an `error` schema, the function returns `Promise<Result<A, E>>`. Unwrap with `Result.match` (or another `Result` combinator) to handle both branches. Undeclared failures still reject the promise.
 
 ```ts confect/notes.spec.ts
 import { Id } from "./_generated/id";
@@ -165,13 +165,13 @@ FunctionSpec.publicMutation({
   name: "deleteOrFail",
   args: () => Schema.Struct({ noteId: Id("notes") }),
   returns: () => Schema.Null,
-  error: () => Schema.Union(NoteNotFound, Forbidden),
+  error: () => Schema.Union([NoteNotFound, Forbidden]),
 });
 ```
 
 ```tsx
 import { useMutation } from "@confect/react";
-import * as Either from "effect/Either";
+import * as Result from "effect/Result";
 import refs from "../confect/_generated/refs";
 
 const DeleteNote = ({ noteId }: { noteId: string }) => {
@@ -179,9 +179,9 @@ const DeleteNote = ({ noteId }: { noteId: string }) => {
 
   const handleClick = async () => {
     const result = await deleteOrFail({ noteId });
-    Either.match(result, {
-      onLeft: (error) => console.error(error._tag, error),
-      onRight: () => console.log("deleted"),
+    Result.match(result, {
+      onFailure: (error) => console.error(error._tag, error),
+      onSuccess: () => console.log("deleted"),
     });
   };
 
@@ -191,7 +191,7 @@ const DeleteNote = ({ noteId }: { noteId: string }) => {
 
 ## `useAction`
 
-Same shape as `useMutation`: returns `Promise<A>` when the ref has no `error` schema, and `Promise<Either<A, E>>` when it does.
+Same shape as `useMutation`: returns `Promise<A>` when the ref has no `error` schema, and `Promise<Result<A, E>>` when it does.
 
 ```ts confect/random.spec.ts
 FunctionSpec.publicAction({
@@ -225,5 +225,5 @@ const RandomNumber = () => {
 | Return values received directly from Convex as-is    | Return values are schema-decoded from `Encoded` to `Type` before returning                             |
 | `useQuery` returns `T \| undefined`                  | `useQuery` returns `QueryResult<A, E>`                                                                 |
 | Cannot distinguish loading from skipped              | `Loading` carries a `skipped: boolean` flag                                                            |
-| `useMutation`/`useAction` always return `Promise<T>` | Refs with an `error` schema return `Promise<Either<A, E>>`; refs without one still return `Promise<A>` |
+| `useMutation`/`useAction` always return `Promise<T>` | Refs with an `error` schema return `Promise<Result<A, E>>`; refs without one still return `Promise<A>` |
 | Pass `"skip"` to disable query subscription          | Same—pass `"skip"` to disable query subscription                                                       |

@@ -51,9 +51,12 @@ import * as Schema from "effect/Schema";
 import { Id } from "./_generated/id";
 import notes from "./_generated/tables/notes";
 
-class NoteNotFound extends Schema.TaggedError<NoteNotFound>()("NoteNotFound", {
-  noteId: Id("notes"),
-}) {}
+class NoteNotFound extends Schema.TaggedErrorClass<NoteNotFound>()(
+  "NoteNotFound",
+  {
+    noteId: Id("notes"),
+  },
+) {}
 
 FunctionSpec.publicQuery({
   name: "getOrFail",

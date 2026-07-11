@@ -1,7 +1,7 @@
 import { Identifier } from "@confect/core";
 import * as Table from "@confect/server/Table";
-import * as FileSystem from "@effect/platform/FileSystem";
-import * as Path from "@effect/platform/Path";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
@@ -59,7 +59,7 @@ const listTableFiles = Effect.gen(function* () {
 });
 
 const byTableName = Order.mapInput(
-  Order.string,
+  Order.String,
   (tableModule: TableModule) => tableModule.tableName,
 );
 

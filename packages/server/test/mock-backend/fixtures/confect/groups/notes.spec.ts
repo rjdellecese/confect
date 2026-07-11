@@ -29,13 +29,13 @@ export default GroupSpec.make()
     FunctionSpec.publicQuery({
       name: "getFirst",
       args: () => Schema.Struct({}),
-      returns: () => Schema.Option(notes.Doc),
+      returns: () => Schema.OptionFromNullOr(notes.Doc),
     }),
   )
   .addFunction(
     FunctionSpec.internalQuery({
       name: "internalGetFirst",
       args: () => Schema.Struct({}),
-      returns: () => Schema.Option(notes.Doc),
+      returns: () => Schema.OptionFromNullOr(notes.Doc),
     }),
   );

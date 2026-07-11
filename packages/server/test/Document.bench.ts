@@ -5,13 +5,12 @@ import * as Schema from "effect/Schema";
 
 const NoteSchema = Schema.Struct({
   content: Schema.String,
-  tag: Schema.optionalWith(Schema.String, { exact: true }),
-  author: Schema.optionalWith(
+  tag: Schema.optionalKey(Schema.String),
+  author: Schema.optionalKey(
     Schema.Struct({
-      role: Schema.Literal("admin", "user"),
+      role: Schema.Literals(["admin", "user"]),
       name: Schema.String,
     }),
-    { exact: true },
   ),
 });
 
@@ -40,16 +39,16 @@ bench("decode document (recompile decoder each call)", () => {
   Schema.decodeUnknownSync(
     SystemFields.extendWithSystemFields(tableName, NoteSchema),
   )(convexNote);
-}).median([46.06, "us"]);
+}).median([21.71, "us"]);
 
 bench("decode document (cached decoder)", () => {
   cachedDecoder(convexNote);
-}).median([741.33, "ns"]);
+}).median([2.34, "us"]);
 
 bench("encode document (recompile encoder each call)", () => {
   Schema.encodeSync(NoteSchema)(decodedNote);
-}).median([0.59, "us"]);
+}).median([2.18, "us"]);
 
 bench("encode document (cached encoder)", () => {
   cachedEncoder(decodedNote);
-}).median([541.55, "ns"]);
+}).median([2.09, "us"]);

@@ -95,7 +95,7 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
     Effect.provide(groupLayer),
     Effect.provideService(
       Registry.Registry,
-      Ref.unsafeMake<Registry.RegistryItems>({}),
+      Ref.makeUnsafe<Registry.RegistryItems>({}),
     ),
     Effect.runSync,
   );

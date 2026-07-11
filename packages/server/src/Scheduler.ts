@@ -41,7 +41,7 @@ const make = (scheduler: ConvexScheduler) => ({
   },
 });
 
-export const Scheduler = Context.GenericTag<ReturnType<typeof make>>(
+export const Scheduler = Context.Service<ReturnType<typeof make>>(
   "@confect/server/Scheduler",
 );
 export type Scheduler = typeof Scheduler.Identifier;

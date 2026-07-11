@@ -1,17 +1,13 @@
-import * as Command from "@effect/cli/Command";
-import * as FileSystem from "@effect/platform/FileSystem";
-import * as Path from "@effect/platform/Path";
-import * as Ansi from "@effect/printer-ansi/Ansi";
-import * as AnsiDoc from "@effect/printer-ansi/AnsiDoc";
+import * as Command from "effect/unstable/cli/Command";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
-import * as Chunk from "effect/Chunk";
 import * as Clock from "effect/Clock";
 import * as Console from "effect/Console";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Equal from "effect/Equal";
-import * as ExecutionStrategy from "effect/ExecutionStrategy";
 import * as Exit from "effect/Exit";
 import * as HashSet from "effect/HashSet";
 import * as Match from "effect/Match";
@@ -28,6 +24,7 @@ import {
   tsconfigPathsToRegExp,
 } from "bundle-require";
 import * as esbuild from "esbuild";
+import * as Ansi from "../Ansi";
 import * as Bundler from "../Bundler";
 import * as CodegenError from "../CodegenError";
 import { ConfectDirectory } from "../ConfectDirectory";
@@ -54,7 +51,7 @@ import { codegenHandler, loadPreviousFunctionPaths } from "./codegen";
 
 const GENERATED_DIRNAME = "_generated";
 
-const GENERATED_SPEC_PATH = Effect.andThen(Path.Path, (path) =>
+const GENERATED_SPEC_PATH = Effect.map(Path.Path, (path) =>
   path.join(GENERATED_DIRNAME, "spec.ts"),
 );
 
@@ -125,17 +122,7 @@ const logFileChangeIndented = (
     const { char, color } = changeChar(change);
 
     yield* Console.log(
-      pipe(
-        AnsiDoc.char(char),
-        AnsiDoc.annotate(color),
-        AnsiDoc.catWithSpace(
-          AnsiDoc.hcat([
-            pipe(AnsiDoc.text(prefix), AnsiDoc.annotate(Ansi.blackBright)),
-            pipe(AnsiDoc.text(suffix), AnsiDoc.annotate(color)),
-          ]),
-        ),
-        AnsiDoc.render({ style: "pretty" }),
-      ),
+      `${color(char)} ${Ansi.blackBright(prefix)}${color(suffix)}`,
     );
   });
 
@@ -264,7 +251,7 @@ const watcherMessagesSignature = (messages: WatcherMessages): string =>
     allMessages(messages),
     Array.map(esbuildMessageKey),
     Array.dedupe,
-    Array.sort(Order.string),
+    Array.sort(Order.String),
     Array.join("\n"),
   );
 
@@ -304,17 +291,16 @@ const drainUntilQuiescent = (
   Effect.gen(function* () {
     const start = yield* Clock.currentTimeMillis;
     const maxMillis = Duration.toMillis(maxWait);
-    yield* Effect.iterate(true as boolean, {
-      while: (keepGoing) => keepGoing,
-      body: () =>
-        Effect.gen(function* () {
-          yield* Effect.sleep(quiescence);
-          const drained = yield* Queue.takeAll(signal);
-          if (Chunk.isEmpty(drained)) return false;
-          const now = yield* Clock.currentTimeMillis;
-          return now - start < maxMillis;
-        }),
+    const loop: Effect.Effect<void> = Effect.gen(function* () {
+      yield* Effect.sleep(quiescence);
+      const drained = yield* Queue.clear(signal);
+      if (drained.length === 0) return;
+      const now = yield* Clock.currentTimeMillis;
+      if (now - start < maxMillis) {
+        yield* loop;
+      }
     });
+    yield* loop;
   });
 
 const syncLoop = (
@@ -405,7 +391,7 @@ const syncLoop = (
             : []),
         ];
 
-        yield* Array.isNonEmptyReadonlyArray(dirtyOptionalFiles)
+        yield* Array.isReadonlyArrayNonEmpty(dirtyOptionalFiles)
           ? Effect.all(dirtyOptionalFiles, { concurrency: "unbounded" })
           : Effect.void;
 
@@ -506,7 +492,7 @@ const esbuildOptions = (
   // restart. Either way, the entry's contents were already accounted
   // for, so we record any errors but don't flip dirty or push a
   // signal — only genuine subsequent rebuilds should do that.
-  const initialBuildSeenRef = Ref.unsafeMake(false);
+  const initialBuildSeenRef = Ref.makeUnsafe(false);
   return {
     entryPoints: [entry.absolutePath],
     bundle: true,
@@ -622,7 +608,7 @@ const entryPointsWatcher = (
 ) =>
   Effect.gen(function* () {
     const parentScope = yield* Effect.scope;
-    const scopesRef = yield* Ref.make(new Map<string, Scope.CloseableScope>());
+    const scopesRef = yield* Ref.make(new Map<string, Scope.Closeable>());
     const path = yield* Path.Path;
     const projectRoot = yield* ProjectRoot.get;
     // Discover the user's `tsconfig.json#paths` once at watcher startup so
@@ -664,10 +650,7 @@ const entryPointsWatcher = (
           const existing = yield* Ref.get(scopesRef);
           if (existing.has(entry.absolutePath)) return;
 
-          const childScope = yield* Scope.fork(
-            parentScope,
-            ExecutionStrategy.sequential,
-          );
+          const childScope = yield* Scope.fork(parentScope, "sequential");
           yield* createEntryPointWatcher(
             path,
             entry,
@@ -676,7 +659,7 @@ const entryPointsWatcher = (
             pendingRef,
             watcherErrorsRef,
             watcherWarningsRef,
-          ).pipe(Scope.extend(childScope));
+          ).pipe(Scope.provide(childScope));
           yield* Ref.update(scopesRef, (scopes) => {
             const updated = new Map(scopes);
             updated.set(entry.absolutePath, childScope);
@@ -711,7 +694,7 @@ const confectStructureWatcher = (
     const confectDirectory = yield* ConfectDirectory.get;
 
     yield* pipe(
-      fs.watch(confectDirectory, { recursive: true }),
+      fs.watch(confectDirectory),
       Stream.debounce(Duration.millis(200)),
       Stream.runForEach((event) =>
         handleConfectChange({

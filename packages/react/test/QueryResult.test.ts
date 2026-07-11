@@ -69,12 +69,15 @@ describe("Equal", () => {
     expect(Equal.equals(QueryResult.succeed(1), QueryResult.succeed(2))).toBe(
       false,
     );
-    const err = new Error("x");
+    const err = { _tag: "NotFound", id: "a" };
     expect(Equal.equals(QueryResult.fail(err), QueryResult.fail(err))).toBe(
       true,
     );
     expect(
-      Equal.equals(QueryResult.fail(new Error("x")), QueryResult.fail(err)),
+      Equal.equals(
+        QueryResult.fail({ _tag: "NotFound", id: "b" }),
+        QueryResult.fail(err),
+      ),
     ).toBe(false);
   });
 

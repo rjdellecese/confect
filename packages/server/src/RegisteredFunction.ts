@@ -4,6 +4,7 @@ import {
   type DefaultFunctionArgs,
   type FunctionVisibility,
   type GenericActionCtx,
+  type GenericDataModel,
   type RegisteredAction,
   type RegisteredMutation,
   type RegisteredQuery,
@@ -12,7 +13,7 @@ import type { Value } from "convex/values";
 import { ConvexError } from "convex/values";
 import { pipe } from "effect/Function";
 import * as Effect from "effect/Effect";
-import * as Either from "effect/Either";
+import * as Result from "effect/Result";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import * as ActionCtx from "./ActionCtx";
@@ -133,15 +134,15 @@ export type RegisteredFunction<
  * `runPromise` rejects with a generic failure.
  */
 export const runHandlerPromise =
-  (errorSchema: Schema.Schema.AnyNoContext | undefined) =>
+  (errorSchema: Schema.Codec<any, any> | undefined) =>
   <A, E>(effect: Effect.Effect<A, E>): Promise<A> => {
     if (errorSchema === undefined) {
       return Effect.runPromise(Effect.orDie(effect));
     }
     const withConvexError = effect.pipe(
-      Effect.catchAll((typedError) =>
+      Effect.catch((typedError) =>
         pipe(
-          Schema.encode(errorSchema)(typedError),
+          Schema.encodeEffect(errorSchema)(typedError),
           Effect.orDie,
           Effect.andThen((encodedError) =>
             Effect.fail(new ConvexError(encodedError)),
@@ -149,12 +150,12 @@ export const runHandlerPromise =
         ),
       ),
     );
-    return Effect.runPromise(Effect.either(withConvexError)).then(
-      Either.match({
-        onLeft: (error) => {
+    return Effect.runPromise(Effect.result(withConvexError)).then(
+      Result.match({
+        onFailure: (error) => {
           throw error;
         },
-        onRight: (value) => value,
+        onSuccess: (value) => value,
       }),
     );
   };
@@ -174,9 +175,9 @@ export const actionFunctionBase = <
   handler,
   createLayer,
 }: {
-  args: Schema.Schema<Args, ConvexArgs>;
-  returns: Schema.Schema<Returns, ConvexReturns>;
-  error: Schema.Schema<Error, Value> | undefined;
+  args: Schema.Codec<Args, ConvexArgs>;
+  returns: Schema.Codec<Returns, ConvexReturns>;
+  error: Schema.Codec<Error, Value> | undefined;
   handler: (a: Args) => Effect.Effect<Returns, E, R>;
   createLayer: (
     ctx: GenericActionCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
@@ -191,13 +192,17 @@ export const actionFunctionBase = <
     Effect.gen(function* () {
       const decodedArgs = yield* pipe(
         actualArgs,
-        Schema.decode(args),
+        Schema.decodeUnknownEffect(args),
         Effect.orDie,
       );
       const decodedReturns = yield* handler(decodedArgs).pipe(
         Effect.provide(createLayer(ctx)),
       );
-      return yield* pipe(decodedReturns, Schema.encode(returns), Effect.orDie);
+      return yield* pipe(
+        decodedReturns,
+        Schema.encodeEffect(returns),
+        Effect.orDie,
+      );
     }).pipe(runHandlerPromise(error)),
 });
 
@@ -217,13 +222,13 @@ export type ActionServices<
       DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
     >;
 
-export const actionLayer = <
-  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
->(
-  databaseSchema: DatabaseSchema_,
-  ctx: GenericActionCtx<
-    DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
-  >,
+/**
+ * The ctx-backed action services that don't depend on a Confect database
+ * schema. {@link actionLayer} adds the schema-typed `VectorSearch` on top;
+ * the HTTP API handler uses this base directly.
+ */
+export const baseActionLayer = <ConvexDataModel extends GenericDataModel>(
+  ctx: GenericActionCtx<ConvexDataModel>,
 ) =>
   Layer.mergeAll(
     Scheduler.layer(ctx.scheduler),
@@ -234,11 +239,14 @@ export const actionLayer = <
     QueryRunner.layer(ctx.runQuery),
     MutationRunner.layer(ctx.runMutation),
     ActionRunner.layer(ctx.runAction),
-    VectorSearch.layer(ctx.vectorSearch),
-    Layer.succeed(
-      ActionCtx.ActionCtx<
-        DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
-      >(),
-      ctx,
-    ),
+    Layer.succeed(ActionCtx.ActionCtx<ConvexDataModel>(), ctx),
   );
+
+export const actionLayer = <
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+>(
+  databaseSchema: DatabaseSchema_,
+  ctx: GenericActionCtx<
+    DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+  >,
+) => Layer.mergeAll(baseActionLayer(ctx), VectorSearch.layer(ctx.vectorSearch));

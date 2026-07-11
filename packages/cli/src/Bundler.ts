@@ -1,6 +1,6 @@
 import { realpathSync } from "node:fs";
 import { createRequire, isBuiltin } from "node:module";
-import * as Path from "@effect/platform/Path";
+import * as Path from "effect/Path";
 import {
   bundleRequire,
   loadTsConfig,
@@ -211,7 +211,7 @@ export const bundle = (
 
     const { metafile } = yield* Ref.get(buildResultRef);
     if (!metafile) {
-      return yield* Effect.dieMessage("esbuild metafile missing");
+      return yield* Effect.die(new Error("esbuild metafile missing"));
     }
 
     return {
@@ -257,7 +257,7 @@ export const directlyImports = (
     return pipe(
       Option.all([sourceKey, targetKey]),
       Option.flatMap(([sourceKey_, targetKey_]) =>
-        Option.fromNullable(bundled.metafile.inputs[sourceKey_]).pipe(
+        Option.fromNullishOr(bundled.metafile.inputs[sourceKey_]).pipe(
           Option.map((sourceInput) => {
             const targetResolved = path.resolve(targetKey_);
             return sourceInput.imports.some(

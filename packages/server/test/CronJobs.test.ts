@@ -62,7 +62,7 @@ describe("cronToConvexCronString", () => {
   });
 
   test("every 15 minutes roundtrips", () => {
-    const cron = Cron.unsafeParse("*/15 * * * *");
+    const cron = Cron.parseUnsafe("*/15 * * * *");
     expect(CronJobs.cronToConvexCronString(cron)).toBe("0,15,30,45 * * * *");
   });
 
@@ -400,7 +400,7 @@ describe("CronJobs.add", () => {
     const ref = makeMutationRefWithArgs("payments", "sendEmail");
     const cronJob = CronJob.make(
       "payment reminder",
-      Cron.unsafeParse("0 16 1 * *"),
+      Cron.parseUnsafe("0 16 1 * *"),
       ref,
       { email: "billing@example.com" },
     );

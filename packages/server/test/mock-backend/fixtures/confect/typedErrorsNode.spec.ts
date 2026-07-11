@@ -1,7 +1,7 @@
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 
-export class NodeNotFound extends Schema.TaggedError<NodeNotFound>()(
+export class NodeNotFound extends Schema.TaggedErrorClass<NodeNotFound>()(
   "NodeNotFound",
   { id: Schema.String },
 ) {}

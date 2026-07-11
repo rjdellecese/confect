@@ -1,11 +1,11 @@
-import * as FileSystem from "@effect/platform/FileSystem";
-import * as Path from "@effect/platform/Path";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { assert, expect, layer } from "@effect/vitest";
 import * as Effect from "effect/Effect";
-import * as Either from "effect/Either";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Path from "effect/Path";
+import * as Result from "effect/Result";
 import { generateComponents } from "@confect/cli/confect/codegen";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import {
@@ -30,15 +30,12 @@ const directoriesLayer = ({
 }) =>
   Layer.mergeAll(
     Layer.mock(ConfectDirectory, {
-      _tag: "@confect/cli/ConfectDirectory",
       get: Effect.succeed(confectDirectory),
     }),
     Layer.mock(ConvexDirectory, {
-      _tag: "@confect/cli/ConvexDirectory",
       get: Effect.succeed(convexDirectory),
     }),
     Layer.mock(ProjectRoot, {
-      _tag: "@confect/cli/ProjectRoot",
       get: Effect.succeed(projectRoot),
     }),
   );
@@ -115,15 +112,15 @@ layer(TestLayer)("discoverInstalledComponents", (it) => {
   it.effect("fails with a BuildError when the config throws on import", () =>
     Effect.gen(function* () {
       const path = yield* Path.Path;
-      const result = yield* Effect.either(
+      const result = yield* Effect.result(
         discoverInstalledComponents(
           path.join(fixturesRoot, "throwing", "convex", "convex.config.ts"),
           "convex/convex.config.ts",
         ),
       );
 
-      assert(Either.isLeft(result));
-      expect(result.left._tag).toBe("ImportFailedError");
+      assert(Result.isFailure(result));
+      expect(result.failure._tag).toBe("ImportFailedError");
     }),
   );
 
@@ -132,16 +129,16 @@ layer(TestLayer)("discoverInstalledComponents", (it) => {
     () =>
       Effect.gen(function* () {
         const path = yield* Path.Path;
-        const result = yield* Effect.either(
+        const result = yield* Effect.result(
           discoverInstalledComponents(
             path.join(fixturesRoot, "badName", "convex", "convex.config.ts"),
             "convex/convex.config.ts",
           ),
         );
 
-        assert(Either.isLeft(result));
-        assert(result.left._tag === "InvalidConvexConfigError");
-        expect(result.left.reason).toContain('"not a valid name"');
+        assert(Result.isFailure(result));
+        assert(result.failure._tag === "InvalidConvexConfigError");
+        expect(result.failure.reason).toContain('"not a valid name"');
       }),
   );
 
@@ -150,15 +147,15 @@ layer(TestLayer)("discoverInstalledComponents", (it) => {
     () =>
       Effect.gen(function* () {
         const path = yield* Path.Path;
-        const result = yield* Effect.either(
+        const result = yield* Effect.result(
           discoverInstalledComponents(
             path.join(fixturesRoot, "invalid", "convex", "convex.config.ts"),
             "convex/convex.config.ts",
           ),
         );
 
-        assert(Either.isLeft(result));
-        expect(result.left._tag).toBe("InvalidConvexConfigError");
+        assert(Result.isFailure(result));
+        expect(result.failure._tag).toBe("InvalidConvexConfigError");
       }),
   );
 });

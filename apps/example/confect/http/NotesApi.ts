@@ -1,20 +1,20 @@
-import * as HttpApi from "@effect/platform/HttpApi";
-import * as HttpApiBuilder from "@effect/platform/HttpApiBuilder";
-import * as HttpApiEndpoint from "@effect/platform/HttpApiEndpoint";
-import * as HttpApiGroup from "@effect/platform/HttpApiGroup";
-import * as OpenApi from "@effect/platform/OpenApi";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
+import * as HttpApi from "effect/unstable/httpapi/HttpApi";
+import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
+import * as HttpApiEndpoint from "effect/unstable/httpapi/HttpApiEndpoint";
+import * as HttpApiGroup from "effect/unstable/httpapi/HttpApiGroup";
+import * as OpenApi from "effect/unstable/httpapi/OpenApi";
 import refs from "../_generated/refs";
 import { QueryRunner } from "../_generated/services";
 import notes from "../_generated/tables/notes";
 
 class ApiGroup extends HttpApiGroup.make("notes")
   .add(
-    HttpApiEndpoint.get("getFirst", "/get-first")
-      .annotate(OpenApi.Description, "Get the first note, if there is one.")
-      .addSuccess(Schema.Option(notes.Doc)),
+    HttpApiEndpoint.get("getFirst", "/get-first", {
+      success: Schema.OptionFromNullOr(notes.Doc),
+    }).annotate(OpenApi.Description, "Get the first note, if there is one."),
   )
   .annotate(OpenApi.Title, "Notes")
   .annotate(OpenApi.Description, "Operations on notes.") {}
@@ -24,7 +24,7 @@ export class Api extends HttpApi.make("Api")
   .annotate(
     OpenApi.Description,
     `
-An example API built with Confect and powered by [Scalar](https://github.com/scalar/scalar). 
+An example API built with Confect and powered by [Scalar](https://github.com/scalar/scalar).
 
 # Learn More
 
@@ -34,7 +34,7 @@ See Scalar's documentation on [markdown support](https://github.com/scalar/scala
   .add(ApiGroup)
   .prefix("/path-prefix") {}
 
-const ApiGroupLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
+const ApiLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
   handlers.handle("getFirst", () =>
     Effect.gen(function* () {
       const runQuery = yield* QueryRunner;
@@ -49,6 +49,7 @@ const ApiGroupLive = HttpApiBuilder.group(Api, "notes", (handlers) =>
   ),
 );
 
-export const ApiLive = HttpApiBuilder.api(Api).pipe(
-  Layer.provide(ApiGroupLive),
-);
+/**
+ * Registers {@link Api}'s routes, with its group handlers provided.
+ */
+export const layer = HttpApiBuilder.layer(Api).pipe(Layer.provide(ApiLive));

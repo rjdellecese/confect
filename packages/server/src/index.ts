@@ -13,7 +13,7 @@ export * as Document from "./Document";
 export * as FunctionImpl from "./FunctionImpl";
 export * as GroupImpl from "./GroupImpl";
 export * as Handler from "./Handler";
-export * as HttpApi from "./HttpApi";
+export * as HttpRouter from "./HttpRouter";
 export * as MutationCtx from "./MutationCtx";
 export * as MutationRunner from "./MutationRunner";
 export * as OrderedQuery from "./OrderedQuery";
