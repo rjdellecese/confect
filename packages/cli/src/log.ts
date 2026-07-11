@@ -23,7 +23,7 @@ import { ProjectRoot } from "./ProjectRoot";
 /**
  * Render a relative path with the directory portion dimmed
  * (`Ansi.blackBright`) and the file leaf rendered in the default terminal
- * color. Used inline anywhere a file path appears in a CLI message.
+ * color.
  */
 export const formatPath = (relativePath: string): string => {
   const lastSep = Math.max(
@@ -126,9 +126,6 @@ const formatBuildMessage = (
 
 /**
  * Render a list of esbuild messages into a styled, gutter-prefixed block.
- * Used by both {@link renderBundleFailedError} and the dev-mode esbuild
- * watcher's `onEnd` hook (where the messages don't flow through the
- * tagged-error pipeline).
  */
 export const formatEsbuildMessages = (
   errors: readonly esbuild.Message[],
@@ -194,9 +191,7 @@ export const logBuildError = (error: BuildError) =>
 
 /**
  * Render a flat list of esbuild messages as a single error block with a
- * generic `✘ Build errors` header. Used by dev-mode when multiple
- * watchers surface the same underlying error and we want to log the
- * coalesced set rather than one block per watcher.
+ * generic `✘ Build errors` header.
  */
 const renderCoalescedBuildErrors = (
   messages: readonly esbuild.Message[],

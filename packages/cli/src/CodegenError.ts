@@ -360,9 +360,7 @@ export const logCodegenError = (error: CodegenError) =>
 
 /**
  * Log any {@link CodegenError} thrown by `effect` and propagate the failure
- * unchanged so the caller's error channel is preserved (used by the
- * `codegen` command, which needs the failure to surface as a non-zero exit
- * code).
+ * unchanged so the caller's error channel is preserved.
  */
 export const tapAndLog = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
@@ -375,9 +373,7 @@ export const tapAndLog = <A, E, R>(
 
 /**
  * Catch any {@link CodegenError} thrown by `effect`, log it, and resolve to
- * `Option.none()` (used by the `dev` command's sync loop, which continues
- * after a failed sync rather than exiting). Success resolves to
- * `Option.some(value)`.
+ * `Option.none()`. Success resolves to `Option.some(value)`.
  */
 export const catchAndLog = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
