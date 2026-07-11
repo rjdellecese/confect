@@ -1,5 +1,5 @@
 ---
-"@confect/server": major
+"@confect/server": patch
 ---
 
 Throw an error when a cron schedule specifies a non-UTC timezone
