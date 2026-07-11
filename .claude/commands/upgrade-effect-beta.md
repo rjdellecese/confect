@@ -1,21 +1,21 @@
 ---
-description: Bump the active vN prerelease branch to the latest Effect v4 beta, migrating source as needed, with a changeset and a PR against the prerelease branch
+description: Bump the v10 prerelease branch to the latest Effect v4 beta, migrating source as needed, with a changeset and a PR against v10
 ---
 
-Keep the active prerelease line on the latest Effect v4 beta, and open a PR
-for review against the prerelease branch. Never merge it yourself. (The
-managing-prereleases skill explains how the prerelease line itself works.)
+Keep the `v10` prerelease line on the latest Effect v4 beta, and open a PR
+for review against `v10`. Never merge it yourself. (The managing-prereleases
+skill explains how the prerelease line itself works.)
 
 ## Scope
 
-- **Target branch:** the newest `v[0-9]+` head on origin whose
-  `.changeset/pre.json` (read via `git show origin/<vN>:.changeset/pre.json`)
-  has `"mode": "pre"`. If no such branch exists, say so and stop — that's the
-  normal end state once a prerelease line graduates to stable.
+- **Target branch:** `v10`. If it's gone, or
+  `git show origin/v10:.changeset/pre.json` no longer says `"mode": "pre"`,
+  the prerelease line has graduated: say so, stop, and suggest deleting this
+  command and its routine — they only exist for the v10 cycle.
 - **Latest beta:** effect publishes v4 betas under the npm `beta` dist-tag,
   so `npm view effect@beta version` is the lookup. Compare it against the
   branch's current pin (`overrides.effect` in
-  `origin/<vN>:pnpm-workspace.yaml`). Already current → say so and stop — no
+  `origin/v10:pnpm-workspace.yaml`). Already current → say so and stop — no
   branch, no PR.
 - **In-scope packages:** `effect` plus its lockstep companions from the
   effect monorepo already present in the workspace (`@effect/platform-node`,
@@ -25,9 +25,9 @@ managing-prereleases skill explains how the prerelease line itself works.)
 
 ## Rules
 
-- Work on `deps/effect-v4-beta`, reset from `origin/<vN>` at the start of
+- Work on `deps/effect-v4-beta`, reset from `origin/v10` at the start of
   each run and pushed with `--force-with-lease`, so successive runs update
-  the same open PR instead of stacking new ones. The PR targets `<vN>`,
+  the same open PR instead of stacking new ones. The PR targets `v10`,
   never `main`.
 - Bump every occurrence by searching the repo for the old beta string rather
   than enumerating locations from memory — that catches the
@@ -64,7 +64,7 @@ managing-prereleases skill explains how the prerelease line itself works.)
    version. State the new required beta and any consumer-visible
    consequences of the API changes.
 3. Push `deps/effect-v4-beta` (unless this session was assigned a branch)
-   and open a PR against `<vN>` — if a previous run's PR is still open,
+   and open a PR against `v10` — if a previous run's PR is still open,
    refresh its title and body for the new beta. In the body: old → new
    beta, links to the release notes covered, and a summary of the source
    migrations made.
