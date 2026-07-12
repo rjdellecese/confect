@@ -12,6 +12,7 @@ import * as Effect from "effect/Effect";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
+import * as SchemaAST from "effect/SchemaAST";
 import type * as FunctionSpec from "./FunctionSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
@@ -54,7 +55,8 @@ export interface AnyPublicPaginatedQuery extends Ref<
     [key: string]: any;
     paginationOpts: PaginationOptions;
   },
-  PaginationResult<any>
+  PaginationResult<any>,
+  any
 > {}
 
 export interface AnyMutation extends Ref<
@@ -396,25 +398,126 @@ export const maybeDecodeErrorSync = <Ref_ extends Any>(
       )
     : error;
 
-type PaginationResultSchema = Schema.Struct<{
-  page: Schema.mutable<Schema.Array$<Schema.Schema.AnyNoContext>>;
-}>;
+/**
+ * Resolve a schema to the type literal at its core, looking through
+ * refinements (e.g. `Schema.filter`) and suspensions. Returns `None` for
+ * schemas that don't bottom out at a type literal (e.g. transformations,
+ * unions), whose property schemas can't be identified structurally.
+ */
+const findTypeLiteral = (
+  schema: Schema.Schema.AnyNoContext,
+): Option.Option<SchemaAST.TypeLiteral> => {
+  let ast: SchemaAST.AST = schema.ast;
+  while (true) {
+    switch (ast._tag) {
+      case "Refinement":
+        ast = ast.from;
+        break;
+      case "Suspend":
+        ast = ast.f();
+        break;
+      case "TypeLiteral":
+        return Option.some(ast);
+      default:
+        return Option.none();
+    }
+  }
+};
 
+const getPropertySchema = (
+  schema: Schema.Schema.AnyNoContext,
+  propertyName: string,
+): Option.Option<Schema.Schema.AnyNoContext> =>
+  Option.flatMap(findTypeLiteral(schema), (typeLiteralAst) =>
+    Option.map(
+      Option.fromNullable(
+        typeLiteralAst.propertySignatures.find(
+          (propertySignature) => propertySignature.name === propertyName,
+        ),
+      ),
+      (propertySignature) => Schema.make(propertySignature.type),
+    ),
+  );
+
+const omitProperty = (
+  schema: Schema.Schema.AnyNoContext,
+  propertyName: string,
+): Option.Option<Schema.Schema.AnyNoContext> =>
+  Option.map(
+    findTypeLiteral(schema),
+    (typeLiteralAst) =>
+      Schema.make(
+        new SchemaAST.TypeLiteral(
+          typeLiteralAst.propertySignatures.filter(
+            (propertySignature) => propertySignature.name !== propertyName,
+          ),
+          typeLiteralAst.indexSignatures,
+        ),
+      ) as Schema.Schema.AnyNoContext,
+  );
+
+const unsupportedPaginatedSchemaError = (which: "args" | "returns") =>
+  new globalThis.Error(
+    `Expected the paginated query ref's ${which} schema to be a struct` +
+      (which === "returns"
+        ? " with a `page` field (e.g. `PaginationResult`)"
+        : "") +
+      ", possibly wrapped in refinements or suspensions",
+  );
+
+/**
+ * Encode the args of a paginated query ref, excluding `paginationOpts` — the
+ * pagination protocol fields are managed by the client (e.g. `usePaginatedQuery`
+ * from `convex/react`), not by the caller, so they are neither expected in
+ * `args` nor validated here.
+ */
+export const encodePaginatedQueryArgsSync = <
+  Ref_ extends AnyPublicPaginatedQuery,
+>(
+  ref: Ref_,
+  args: Omit<Args<Ref_>, "paginationOpts">,
+): unknown =>
+  Match.value(ref.functionSpec.functionProvenance).pipe(
+    Match.tag("Confect", (confectFunctionProvenance) =>
+      Option.match(
+        omitProperty(confectFunctionProvenance.args, "paginationOpts"),
+        {
+          onSome: (argsSchemaWithoutPaginationOpts) =>
+            Schema.encodeUnknownSync(argsSchemaWithoutPaginationOpts)(args),
+          onNone: () => {
+            throw unsupportedPaginatedSchemaError("args");
+          },
+        },
+      ),
+    ),
+    Match.tag("Convex", () => args),
+    Match.exhaustive,
+  );
+
+/**
+ * Decode a page of a paginated query's results via the `page` element schema
+ * of the ref's returns schema (e.g. the `page` field of `PaginationResult`).
+ */
 export const decodePaginationPageSync = <Ref_ extends AnyPublicPaginatedQuery>(
   ref: Ref_,
-  encodedResults: unknown,
-): Returns<Ref_>["page"] => {
-  return Match.value(ref.functionSpec.functionProvenance).pipe(
-    Match.tag("Confect", (c) => {
-      // Since `ref` is a paginated query reference we know that the return type
-      // includes a mutable array called `page` of the document type.
-      const pageSchema = (c.returns as PaginationResultSchema).fields.page;
-      return Schema.decodeUnknownSync(pageSchema)(encodedResults);
-    }),
-    Match.tag("Convex", () => encodedResults),
+  encodedPage: unknown,
+): Returns<Ref_>["page"] =>
+  Match.value(ref.functionSpec.functionProvenance).pipe(
+    Match.tag("Confect", (confectFunctionProvenance) =>
+      Option.match(
+        getPropertySchema(confectFunctionProvenance.returns, "page"),
+        {
+          onSome: (pageSchema) =>
+            Schema.decodeUnknownSync(pageSchema)(encodedPage),
+          onNone: () => {
+            throw unsupportedPaginatedSchemaError("returns");
+          },
+        },
+      ),
+    ),
+    Match.tag("Convex", () => encodedPage),
     Match.exhaustive,
   ) as Returns<Ref_>["page"];
-};
 
 /**
  * Encode args via the ref's args schema, invoke `call`, decode returns via the

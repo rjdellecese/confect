@@ -1,10 +1,12 @@
 import { describe, effect, expect, expectTypeOf, test } from "@effect/vitest";
+import { paginationOptsValidator } from "convex/server";
 import { v, type VBoolean, type VString, type VUnion } from "convex/values";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Schema from "effect/Schema";
 
 import { GenericId } from "@confect/core/GenericId";
+import * as PaginationOptions from "@confect/core/PaginationOptions";
 import {
   compileArgsSchema,
   compileAst,
@@ -1492,6 +1494,21 @@ describe(compileArgsSchema, () => {
     };
 
     expect(compiledArgsValidator).toStrictEqual(expectedArgsValidator);
+  });
+
+  test("PaginationOptions compiles to Convex's paginationOptsValidator", () => {
+    // Paginated queries must accept the protocol fields Convex's client
+    // sends (`id`, `endCursor`, ...), so the args schema must produce the
+    // exact validator Convex prescribes for `paginationOpts`.
+    const compiledArgsValidator = compileArgsSchema(
+      Schema.Struct({
+        paginationOpts: PaginationOptions.PaginationOptions,
+      }),
+    );
+
+    expect(compiledArgsValidator).toStrictEqual({
+      paginationOpts: paginationOptsValidator,
+    });
   });
 
   effect("fails if provided Schema contains index signatures", () =>

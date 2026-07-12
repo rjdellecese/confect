@@ -83,74 +83,110 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
 };
 
 /**
- * Convex's `usePaginatedQuery` removes the need for `paginationOpts` from the args.
+ * Like `Omit`, but implemented with key remapping so that optional modifiers
+ * are preserved and index signatures don't reintroduce the omitted key's
+ * literal type. Mirrors `BetterOmit` from `convex/server`.
  */
-export type PaginatedQueryArgs<TQuery extends Ref.AnyPublicPaginatedQuery> =
-  Omit<Ref.Args<TQuery>, "paginationOpts">;
+type OmitKey<T, K extends PropertyKey> = {
+  [P in keyof T as P extends K ? never : P]: T[P];
+};
 
 /**
- * The item type for a paginated query.
+ * The args accepted by {@link usePaginatedQuery}: the ref's args without
+ * `paginationOpts`, which the underlying Convex hook manages itself. When no
+ * args remain, resolves to `Record<string, never>` (only the empty object is
+ * accepted) rather than `{}`, which would accept any non-nullish value.
  */
-export type PaginatedQueryItem<TQuery extends Ref.AnyPublicPaginatedQuery> =
-  Ref.Returns<TQuery>["page"][number];
+export type PaginatedQueryArgs<Query extends Ref.AnyPublicPaginatedQuery> =
+  OmitKey<Ref.Args<Query>, "paginationOpts"> extends infer Args_
+    ? keyof Args_ extends never
+      ? Record<string, never>
+      : Args_
+    : never;
 
 /**
- * The args type for a paginated query.
+ * The item type for a paginated query: the element type of the `page` field
+ * of the ref's returns.
+ */
+export type PaginatedQueryItem<Query extends Ref.AnyPublicPaginatedQuery> =
+  Ref.Returns<Query>["page"][number];
+
+/**
+ * The args parameter of {@link usePaginatedQuery}: the ref's args without
+ * `paginationOpts`, or `"skip"` to skip the query.
  */
 export type UsePaginatedQueryArgs<Query extends Ref.AnyPublicPaginatedQuery> =
-  keyof Ref.Args<Query> extends never ? {} : PaginatedQueryArgs<Query> | "skip";
+  | PaginatedQueryArgs<Query>
+  | "skip";
 
 export type PaginatedQueryOptions = Parameters<
   typeof useConvexPaginatedQuery
 >[2];
 
-function getEncodedArgs<TPaginatedQuery extends Ref.AnyPublicPaginatedQuery>(
-  ref: TPaginatedQuery,
-  args: UsePaginatedQueryArgs<TPaginatedQuery>,
-): "skip" | UsePaginatedQueryArgs<TPaginatedQuery> {
-  if (args === "skip") {
-    return "skip" as const;
-  }
-  const toEncode = {
-    ...(args as PaginatedQueryArgs<TPaginatedQuery>),
-    // `paginationOpts` are only added so that encoding arguments validate.
-    // They aren't passed to the query function.
-    paginationOpts: { numItems: 10, cursor: null },
-  } as Ref.Args<TPaginatedQuery>;
-
-  const encoded = Ref.encodeArgsSync(ref, toEncode);
-  if (
-    typeof encoded !== "object" ||
-    encoded === null ||
-    !("paginationOpts" in encoded)
-  ) {
-    throw new Error(
-      "Encoded args is not an object or does not contain `paginationOpts`",
-    );
-  }
-  const { paginationOpts: _paginationOpts, ...encodedArgs } = encoded;
-  return encodedArgs as UsePaginatedQueryArgs<TPaginatedQuery>;
-}
-
-export const usePaginatedQuery = <
-  TPaginatedQuery extends Ref.AnyPublicPaginatedQuery,
->(
-  ref: TPaginatedQuery,
-  args: UsePaginatedQueryArgs<TPaginatedQuery>,
+/**
+ * Load data reactively from a paginated query, mirroring `usePaginatedQuery`
+ * from `convex/react`.
+ *
+ * Args are encoded via the ref's args schema (minus `paginationOpts`, which
+ * the Convex hook manages itself), and each loaded page is decoded via the
+ * `page` element schema of the ref's returns schema. For this to work
+ * end-to-end, the ref's args schema must declare `paginationOpts` with
+ * Convex's pagination protocol fields — use `PaginationOptions` from
+ * `@confect/core`.
+ *
+ * The underlying Convex hook throws query errors during render; if the `Ref`
+ * declares an `error` schema and the query fails with that typed error, the
+ * decoded error is thrown instead, to be caught by an error boundary.
+ */
+export const usePaginatedQuery = <Query extends Ref.AnyPublicPaginatedQuery>(
+  ref: Query,
+  args: UsePaginatedQueryArgs<Query>,
   options: PaginatedQueryOptions,
-): UsePaginatedQueryResult<PaginatedQueryItem<TPaginatedQuery>> => {
+): UsePaginatedQueryResult<PaginatedQueryItem<Query>> => {
   const functionReference = Ref.getFunctionReference(ref);
-  const encodedArgs = getEncodedArgs(ref, args);
-  const { results, ...rest } = useConvexPaginatedQuery(
-    functionReference,
-    encodedArgs,
-    options,
+
+  // The encoded output is the wire form Convex's hook forwards verbatim, not
+  // the ref's decoded args type.
+  const encodedArgs = useMemo(
+    () =>
+      args === "skip"
+        ? ("skip" as const)
+        : (Ref.encodePaginatedQueryArgsSync(
+            ref,
+            args as unknown as Omit<Ref.Args<Query>, "paginationOpts">,
+          ) as Record<string, Value>),
+    [ref, args],
   );
-  const decodedResults = Ref.decodePaginationPageSync(ref, results);
-  return {
-    results: decodedResults,
-    ...rest,
-  };
+
+  // The Convex hook throws query errors during render (its positional
+  // overload enables throwOnError), so translate a typed ConvexError into the
+  // ref's decoded error at the same point.
+  const convexResultOrError = Either.try(() =>
+    useConvexPaginatedQuery(functionReference, encodedArgs, options),
+  );
+  if (Either.isLeft(convexResultOrError)) {
+    throw Ref.maybeDecodeErrorSync(ref, convexResultOrError.left);
+  }
+  const { results, ...rest } = convexResultOrError.right;
+
+  // Decoding allocates fresh items, so key on the referentially stable
+  // `results` the Convex hook provides — the same identity-preservation
+  // rationale as in `useQuery` above.
+  const decodedResults = useMemo(
+    () => Ref.decodePaginationPageSync(ref, results),
+    [ref, results],
+  );
+
+  return useMemo(
+    () =>
+      ({
+        results: decodedResults,
+        ...rest,
+      }) as UsePaginatedQueryResult<PaginatedQueryItem<Query>>,
+    // `rest` is rebuilt by the destructure each render; key on the stable
+    // values it carries.
+    [decodedResults, rest.status, rest.isLoading, rest.loadMore],
+  );
 };
 
 /**
