@@ -21,7 +21,7 @@
     "convex-test": "0.0.50",
     "dotenv": "17.4.2",
     "effect": "3.21.2",
-    "tsdown": "0.22.4",
+    "tsdown": "0.22.7",
     "tsx": "4.23.0",
     "typescript": "5.9.3",
     "unrun": "0.3.1",
