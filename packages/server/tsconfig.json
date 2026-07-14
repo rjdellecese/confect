@@ -11,7 +11,6 @@
     "target": "ESNext",
     "moduleResolution": "Bundler",
     "module": "ESNext",
-    "baseUrl": ".",
     "paths": {
       "@confect/server": ["./src/index.ts"],
       "@confect/server/*": ["./src/*"],

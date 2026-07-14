@@ -7,12 +7,11 @@
     "target": "ESNext",
     "moduleResolution": "Bundler",
     "module": "ESNext",
-    "baseUrl": ".",
     "jsx": "react-jsx",
     "skipLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "paths": { "~/*": ["*"] }
+    "paths": { "~/*": ["./*"] }
   },
   "include": ["src/**/*", "confect/**/*", "env.d.ts"],
   "exclude": ["node_modules", "convex/_generated"],

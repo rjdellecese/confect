@@ -127,7 +127,11 @@ type MutableValue<T> =
   T extends ReadonlyArray<infer El>
     ? MutableValue<El>[]
     : T extends ReadonlyRecordValue
-      ? { -readonly [K in keyof T]: MutableValue<T[K]> }
+      ? {
+          -readonly [K in keyof T]: undefined extends T[K]
+            ? MutableValue<Exclude<T[K], undefined>>
+            : MutableValue<T[K]>;
+        }
       : T;
 
 export type ValueToValidator<Vl> = [Vl] extends [never]
