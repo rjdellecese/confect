@@ -40,3 +40,24 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/example-setup
       - run: pnpm --filter example build
+
+  codegen:
+    name: Codegen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/example-setup
+      # Regenerate the example app's Confect codegen output
+      # (`confect/_generated/` and the wrapper modules under `convex/`).
+      # The CLI entry point is invoked by path rather than via the `confect`
+      # bin link, which can dangle in CI because `pnpm install` runs before
+      # the workspace packages are built.
+      - run: node ../../packages/cli/dist/index.mjs codegen
+        working-directory: apps/example
+      - name: Verify codegen output is committed
+        # `--intent-to-add` makes newly generated (untracked) files visible to
+        # `git diff`, so codegen outputs that don't exist in the snapshot yet
+        # fail the check instead of slipping through.
+        run: |
+          git add --all --intent-to-add -- apps/example
+          git diff --exit-code -- apps/example

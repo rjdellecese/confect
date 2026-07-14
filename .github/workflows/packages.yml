@@ -67,7 +67,12 @@ jobs:
       - uses: ./.github/actions/confect-setup
       - run: pnpm --filter @confect/server test:mock-backend
       - name: Verify codegen output is committed
-        run: git diff --exit-code -- packages/server/test/mock-backend/fixtures
+        # `--intent-to-add` makes newly generated (untracked) files visible to
+        # `git diff`, so codegen outputs that don't exist in the snapshot yet
+        # fail the check instead of slipping through.
+        run: |
+          git add --all --intent-to-add -- packages/server/test/mock-backend/fixtures
+          git diff --exit-code -- packages/server/test/mock-backend/fixtures
 
   test-local-backend:
     name: Test (local-backend)
@@ -84,7 +89,12 @@ jobs:
             convex-local-backend-${{ runner.os }}-
       - run: pnpm --filter @confect/server test:local-backend
       - name: Verify codegen output is committed
-        run: git diff --exit-code -- packages/server/test/local-backend/fixtures
+        # `--intent-to-add` makes newly generated (untracked) files visible to
+        # `git diff`, so codegen outputs that don't exist in the snapshot yet
+        # fail the check instead of slipping through.
+        run: |
+          git add --all --intent-to-add -- packages/server/test/local-backend/fixtures
+          git diff --exit-code -- packages/server/test/local-backend/fixtures
 
   bench:
     name: Bench
