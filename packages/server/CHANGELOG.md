@@ -1,5 +1,16 @@
 # @confect/server
 
+## 10.0.0-next.1
+
+### Patch Changes
+
+- 4d98ea8: Raise the required `effect` peer version to `^4.0.0-beta.98` (from `^4.0.0-beta.97`).
+
+  `effect`'s `SchemaError` is now exposed as its own public module (`effect/SchemaError`), which changes the import path TypeScript picks when Confect emits `.d.ts` declarations that reference `Schema.SchemaError` (for example in generated `services.d.ts`). Existing `Schema.SchemaError` / `Schema.isSchemaError` usage is unaffected — this is purely a declaration-emit detail that consumers relying on generated types may notice.
+
+- Updated dependencies [4d98ea8]
+  - @confect/core@10.0.0-next.1
+
 ## 10.0.0-next.0
 
 ### Major Changes
