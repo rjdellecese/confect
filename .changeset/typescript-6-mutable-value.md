@@ -2,6 +2,6 @@
 "@confect/server": patch
 ---
 
-Strip explicit `undefined` from nested optional properties in `ValueToValidator`'s computed document types, restoring agreement with Convex's own validator types under TypeScript 6.
+Fix a TypeScript 6 type mismatch for schemas with nested optional fields.
 
-Under TypeScript 5.x with `exactOptionalPropertyTypes`, homomorphic mapped types silently dropped `undefined` from optional property types, so `ValueToValidator<{ foo: { bar?: number | undefined } }>` already produced a validator over `{ foo: { bar?: number } }` — the same shape `v.object()` infers. TypeScript 6 preserves the explicit `| undefined`, which made the two types diverge for schemas with nested optional fields. The internal `MutableValue` type now excludes `undefined` from optional properties explicitly, matching the behavior on both compiler versions.
+When compiled with TypeScript 6, the document types Confect derives for schemas containing nested optional fields (e.g. `{ foo: { bar?: number | undefined } }`) picked up a stray `| undefined` on those fields, so they no longer lined up with the types Convex infers for the equivalent validators. This could surface as type errors wherever a Confect-derived validator or document type meets a Convex one. The derived types are now identical under TypeScript 5.x and 6.x.
