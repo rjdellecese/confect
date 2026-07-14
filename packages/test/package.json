@@ -8,7 +8,7 @@
   },
   "devDependencies": {
     "@types/node": "26.1.1",
-    "effect": "3.21.2",
+    "effect": "3.22.0",
     "tsdown": "0.22.4",
     "typescript": "5.9.3",
     "unrun": "0.3.1"

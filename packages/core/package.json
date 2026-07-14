@@ -10,7 +10,7 @@
     "@ark/attest": "0.56.3",
     "@effect/vitest": "0.29.0",
     "@types/node": "26.1.1",
-    "effect": "3.21.2",
+    "effect": "3.22.0",
     "tsdown": "0.22.4",
     "tsx": "4.23.0",
     "typescript": "5.9.3",

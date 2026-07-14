@@ -1,11 +1,11 @@
 import * as Ref from "@confect/core/Ref";
-import { type GenericQueryCtx } from "convex/server";
+import { type GenericActionCtx } from "convex/server";
 import type { ParseResult, Effect } from "effect";
 import * as Context from "effect/Context";
 import * as Layer from "effect/Layer";
 
 const make =
-  (runQuery: GenericQueryCtx<any>["runQuery"]) =>
+  (runQuery: GenericActionCtx<any>["runQuery"]) =>
   <Query extends Ref.AnyQuery>(
     query: Query,
     ...args: Ref.OptionalArgs<Query>
@@ -25,5 +25,5 @@ export const QueryRunner = Context.GenericTag<ReturnType<typeof make>>(
 );
 export type QueryRunner = typeof QueryRunner.Identifier;
 
-export const layer = (runQuery: GenericQueryCtx<any>["runQuery"]) =>
+export const layer = (runQuery: GenericActionCtx<any>["runQuery"]) =>
   Layer.succeed(QueryRunner, make(runQuery));
