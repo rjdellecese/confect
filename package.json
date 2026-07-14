@@ -14,7 +14,7 @@
     "oxfmt": "0.58.0",
     "oxlint": "1.68.0",
     "syncpack": "15.3.2",
-    "tsdown": "0.22.4",
+    "tsdown": "0.22.7",
     "typescript": "5.9.3",
     "unrun": "0.3.1",
     "vite-plus": "0.2.4",
