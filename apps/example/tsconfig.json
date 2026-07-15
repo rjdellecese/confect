@@ -9,8 +9,6 @@
     "module": "ESNext",
     "jsx": "react-jsx",
     "skipLibCheck": true,
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
     "paths": { "~/*": ["./*"] }
   },
   "include": ["src/**/*", "confect/**/*", "env.d.ts"],
