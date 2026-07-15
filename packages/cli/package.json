@@ -4,7 +4,7 @@
   "version": "9.2.3",
   "author": "RJ Dellecese",
   "bin": {
-    "confect": "./dist/index.mjs"
+    "confect": "./bin/confect.mjs"
   },
   "bugs": {
     "url": "https://github.com/rjdellecese/confect/issues"
@@ -45,6 +45,7 @@
     "CHANGELOG.md",
     "LICENSE",
     "README.md",
+    "bin",
     "dist",
     "package.json"
   ],

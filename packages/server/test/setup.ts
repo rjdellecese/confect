@@ -20,11 +20,8 @@ const runCommand = (
     Effect.orDie,
   );
 
-// Absolute path to the @confect/cli entry point. Resolved from this file's
-// location rather than relying on a `confect` bin in `node_modules/.bin/`,
-// which is brittle in CI: `pnpm install` runs before workspace packages are
-// built, so the bin link for `confect` ends up dangling until something
-// re-links it.
+// Absolute path to the @confect/cli entry point, resolved from this file's
+// location rather than via a `confect` bin in `node_modules/.bin/`.
 //
 // Note: `@confect/cli` is intentionally NOT declared as a (dev)dependency of
 // `@confect/server`. The CLI peer-depends on `@confect/server` (its codegen
