@@ -47,9 +47,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/example-setup
-      # Regenerate the example app's Confect codegen output
-      # (`confect/_generated/` and the wrapper modules under `convex/`).
-      - run: pnpm --filter example exec confect codegen
+      - run: pnpm exec vp run --filter example codegen
       - name: Verify codegen output is committed
         run: |
           git add --all --intent-to-add -- apps/example
