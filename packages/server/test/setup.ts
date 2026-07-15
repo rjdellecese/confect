@@ -10,8 +10,6 @@ const runCommand = (
   args: string[],
 ): Effect.Effect<void, never, CommandExecutor.CommandExecutor> =>
   Command.make(command, ...args).pipe(
-    // Surface the CLI's own error output (e.g. the bin shim's "build output
-    // is missing" hint) instead of discarding it in an unread pipe.
     Command.stderr("inherit"),
     Command.exitCode,
     Effect.andThen((exitCode) =>

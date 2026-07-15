@@ -127,10 +127,7 @@ type MutableValue<T> =
   T extends ReadonlyArray<infer El>
     ? MutableValue<El>[]
     : T extends ReadonlyRecordValue
-      ? // Optional properties strip their explicit `| undefined` (`Exclude` is
-        // the identity for the rest), matching the document types Convex's own
-        // validators infer.
-        { -readonly [K in keyof T]: MutableValue<Exclude<T[K], undefined>> }
+      ? { -readonly [K in keyof T]: MutableValue<Exclude<T[K], undefined>> }
       : T;
 
 export type ValueToValidator<Vl> = [Vl] extends [never]
