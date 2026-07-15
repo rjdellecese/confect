@@ -137,6 +137,24 @@ describe("DeepMutable", () => {
     }>();
   });
 
+  test("optional property strips explicit `| undefined`", () => {
+    expectTypeOf<
+      DeepMutable<{ readonly foo?: number | undefined }>
+    >().toEqualTypeOf<{ foo?: number }>();
+  });
+
+  test("nested optional property strips explicit `| undefined`", () => {
+    expectTypeOf<
+      DeepMutable<{ readonly foo: { readonly bar?: number | undefined } }>
+    >().toEqualTypeOf<{ foo: { bar?: number } }>();
+  });
+
+  test("required property keeps `| undefined`", () => {
+    expectTypeOf<
+      DeepMutable<{ readonly foo: number | undefined }>
+    >().toEqualTypeOf<{ foo: number | undefined }>();
+  });
+
   test("branded string", () => {
     type BrandedString = number & Brand.Brand<"BrandedString">;
 

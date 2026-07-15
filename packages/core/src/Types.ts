@@ -66,7 +66,14 @@ export type DeepMutable<T> =
           ? Set<DeepMutable<V>>
           : [keyof T] extends [never]
             ? T
-            : { -readonly [K in keyof T]: DeepMutable<T[K]> };
+            : {
+                // Optional properties strip their explicit `| undefined`
+                // (restoring what TypeScript ≤5.9 mapped types did
+                // implicitly); required properties keep their declared type.
+                -readonly [K in keyof T]: IsOptional<T, K> extends true
+                  ? DeepMutable<Exclude<T[K], undefined>>
+                  : DeepMutable<T[K]>;
+              };
 
 export type TypeError<Message extends string, T = never> = [Message, T];
 
