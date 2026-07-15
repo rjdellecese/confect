@@ -8,20 +8,17 @@
  *
  * @module
  */
-try {
-  await import("../dist/index.mjs");
-} catch (error) {
-  if (
-    error instanceof Error &&
-    "code" in error &&
-    error.code === "ERR_MODULE_NOT_FOUND" &&
-    error.message.includes("dist/index.mjs")
-  ) {
-    console.error(
-      "@confect/cli's build output is missing. Run `pnpm build` from the repo root " +
-        "(or `vp run --filter @confect/cli dev` for a watcher) first.",
-    );
-    process.exit(1);
-  }
-  throw error;
+
+import { existsSync } from "node:fs";
+
+const entry = new URL("../dist/index.mjs", import.meta.url);
+
+if (!existsSync(entry)) {
+  console.error(
+    "@confect/cli's build output is missing. Run `pnpm build` from the repo root " +
+      "(or `vp run --filter @confect/cli dev` for a watcher) first.",
+  );
+  process.exit(1);
 }
+
+await import(entry.href);
