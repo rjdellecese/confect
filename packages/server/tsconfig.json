@@ -5,13 +5,11 @@
     "isolatedDeclarations": false,
     "noEmit": true,
     "skipLibCheck": true,
-    "importsNotUsedAsValues": "remove",
     "exactOptionalPropertyTypes": true,
     "lib": ["ESNext", "DOM"],
     "target": "ESNext",
     "moduleResolution": "Bundler",
     "module": "ESNext",
-    "baseUrl": ".",
     "paths": {
       "@confect/server": ["./src/index.ts"],
       "@confect/server/*": ["./src/*"],
