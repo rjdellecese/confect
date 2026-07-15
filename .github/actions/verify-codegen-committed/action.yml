@@ -1,0 +1,22 @@
+name: "Verify Codegen Committed"
+description: "Fails if the given path contains uncommitted codegen output (modified, deleted, or untracked files)"
+author: "Confect"
+
+inputs:
+  path:
+    description: "Path whose committed state must match the working tree"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Verify codegen output is committed
+      shell: bash
+      run: |
+        status=$(git status --porcelain -- '${{ inputs.path }}')
+        if [ -n "$status" ]; then
+          echo "Codegen output under '${{ inputs.path }}' does not match what is committed:"
+          echo "$status"
+          git diff -- '${{ inputs.path }}'
+          exit 1
+        fi

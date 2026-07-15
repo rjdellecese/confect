@@ -48,7 +48,6 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/example-setup
       - run: pnpm exec vp run --filter example codegen
-      - name: Verify codegen output is committed
-        run: |
-          git add --all --intent-to-add -- apps/example
-          git diff --exit-code -- apps/example
+      - uses: ./.github/actions/verify-codegen-committed
+        with:
+          path: apps/example
