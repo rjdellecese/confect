@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 
-// The `confect` bin points at this committed shim rather than at the tsdown
-// output directly: pnpm only creates command shims for bin targets that exist
-// at install time, and in a fresh checkout `pnpm install` runs before `dist/`
-// is built, which would otherwise leave the bin missing until a re-install.
+/**
+ * The `confect` bin points at this committed shim rather than at the tsdown
+ * output directly: pnpm only creates command shims for bin targets that exist
+ * at install time, and in a fresh checkout `pnpm install` runs before `dist/`
+ * is built, which would otherwise leave the bin missing until a re-install.
+ *
+ * @module
+ */
 try {
   await import("../dist/index.mjs");
 } catch (error) {
