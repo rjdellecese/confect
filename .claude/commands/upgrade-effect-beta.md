@@ -1,10 +1,11 @@
 ---
-description: Bump the v10 prerelease branch to the latest Effect v4 beta, migrating source as needed, with a changeset and a PR against v10
+description: Bump the v10 prerelease branch to the latest Effect v4 beta and propagate main, migrating source as needed, with a changeset and a PR against v10
 ---
 
-Keep the `v10` prerelease line on the latest Effect v4 beta, and open a PR
-for review against `v10`. Never merge it yourself. (The managing-prereleases
-skill explains how the prerelease line itself works.)
+Keep the `v10` prerelease line on the latest Effect v4 beta and current with
+`main`, and open a PR for review against `v10`. Never merge it yourself.
+(The managing-prereleases skill explains how the prerelease line itself
+works.)
 
 ## Scope
 
@@ -15,8 +16,13 @@ skill explains how the prerelease line itself works.)
 - **Latest beta:** effect publishes v4 betas under the npm `beta` dist-tag,
   so `npm view effect@beta version` is the lookup. Compare it against the
   branch's current pin (`overrides.effect` in
-  `origin/v10:pnpm-workspace.yaml`). Already current → say so and stop — no
-  branch, no PR.
+  `origin/v10:pnpm-workspace.yaml`). Already current → no bump to do, but
+  still check for `main` changes to propagate before stopping.
+- **Changes from `main`:** the prerelease line absorbs `main` continuously
+  so the eventual `v10` → `main` merge stays small. Every run also merges
+  `origin/main` into the branch. No beta to bump **and**
+  `git log origin/v10..origin/main` empty → say so and stop — no branch,
+  no PR.
 - **In-scope packages:** `effect` plus its lockstep companions from the
   effect monorepo already present in the workspace (`@effect/platform-node`,
   `@effect/platform-bun`, `@effect/vitest`) — all move to the same beta
@@ -29,6 +35,17 @@ skill explains how the prerelease line itself works.)
   each run and pushed with `--force-with-lease`, so successive runs update
   the same open PR instead of stacking new ones. The PR targets `v10`,
   never `main`.
+- Right after the reset, merge `origin/main` into the branch — a true merge,
+  not a rebase or cherry-picks, so the histories stay converged for the
+  eventual `v10` → `main` merge (see the managing-prereleases skill). Take
+  `main`'s side of conflicts except where it would undo the prerelease
+  line: keep `.changeset/pre.json`, `"baseBranch": "v10"` in
+  `.changeset/config.json`, the `v10` entries in the workflow branch lists,
+  the `X.0.0-next.N` versions and their changelog entries, and the Effect
+  v4 pins (`main` is still on v3 — its Effect version bumps never apply
+  here). Never hand-merge `pnpm-lock.yaml`; take either side and let
+  `pnpm install` regenerate it. Changesets arriving with the merge ship
+  as-is — don't fold them into this run's changeset.
 - Bump every occurrence by searching the repo for the old beta string rather
   than enumerating locations from memory — that catches the
   `pnpm-workspace.yaml` `overrides` entry (which nothing lints, and a stale
@@ -62,9 +79,11 @@ skill explains how the prerelease line itself works.)
    ranges changed, so this is user-facing. Use `patch`: the prerelease
    line's pending major changeset already governs the `X.0.0-next.N`
    version. State the new required beta and any consumer-visible
-   consequences of the API changes.
+   consequences of the API changes. On a merge-only run (no beta bump),
+   skip this step — the merged commits already carry their changesets.
 3. Push `deps/effect-v4-beta` (unless this session was assigned a branch)
    and open a PR against `v10` — if a previous run's PR is still open,
-   refresh its title and body for the new beta. In the body: old → new
-   beta, links to the release notes covered, and a summary of the source
-   migrations made.
+   refresh its title and body for this run. In the body: old → new beta,
+   links to the release notes covered, a summary of the source migrations
+   made, and the `main` commits the merge brought in (or a note that `v10`
+   already contained all of `main`).
