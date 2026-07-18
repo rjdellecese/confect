@@ -1,5 +1,6 @@
 import { FunctionSpec, Ref } from "@confect/core";
 import * as Cron from "effect/Cron";
+import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Schema from "effect/Schema";
 import { describe, expect, test } from "vitest";
@@ -116,8 +117,10 @@ describe("cronToConvexCronString", () => {
       weekdays: [],
     });
 
-    expect(() => CronJobs.cronToConvexCronString(cron)).toThrow(
-      "seconds field",
+    expect(() =>
+      CronJobs.cronToConvexCronString(cron),
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Convex cron expressions do not support a seconds field. The seconds field must be the default {0}. Sub-minute scheduling is supported only by interval schedules defined using a Duration.]`,
     );
   });
 
@@ -131,8 +134,10 @@ describe("cronToConvexCronString", () => {
       weekdays: [],
     });
 
-    expect(() => CronJobs.cronToConvexCronString(cron)).toThrow(
-      "seconds field",
+    expect(() =>
+      CronJobs.cronToConvexCronString(cron),
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Convex cron expressions do not support a seconds field. The seconds field must be the default {0}. Sub-minute scheduling is supported only by interval schedules defined using a Duration.]`,
     );
   });
 
@@ -146,7 +151,80 @@ describe("cronToConvexCronString", () => {
       weekdays: [],
     });
 
-    expect(() => CronJobs.cronToConvexCronString(cron)).not.toThrow();
+    expect(CronJobs.cronToConvexCronString(cron)).toBe("0 12 * * *");
+  });
+
+  test("accepts an explicit UTC offset time zone", () => {
+    const cron = Cron.make({
+      minutes: [0],
+      hours: [9],
+      days: [],
+      months: [],
+      weekdays: [],
+      tz: DateTime.zoneMakeOffset(0),
+    });
+
+    expect(CronJobs.cronToConvexCronString(cron)).toBe("0 9 * * *");
+  });
+
+  test("accepts a named UTC time zone", () => {
+    const cron = Cron.make({
+      minutes: [0],
+      hours: [9],
+      days: [],
+      months: [],
+      weekdays: [],
+      tz: DateTime.zoneMakeNamedUnsafe("UTC"),
+    });
+
+    expect(CronJobs.cronToConvexCronString(cron)).toBe("0 9 * * *");
+  });
+
+  test("accepts a named Etc/UTC time zone", () => {
+    const cron = Cron.make({
+      minutes: [0],
+      hours: [9],
+      days: [],
+      months: [],
+      weekdays: [],
+      tz: DateTime.zoneMakeNamedUnsafe("Etc/UTC"),
+    });
+
+    expect(CronJobs.cronToConvexCronString(cron)).toBe("0 9 * * *");
+  });
+
+  test("throws on a non-UTC named time zone", () => {
+    const cron = Cron.make({
+      minutes: [0],
+      hours: [9],
+      days: [],
+      months: [],
+      weekdays: [],
+      tz: DateTime.zoneMakeNamedUnsafe("America/New_York"),
+    });
+
+    expect(() =>
+      CronJobs.cronToConvexCronString(cron),
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Convex cron expressions are always evaluated in UTC, but this cron specifies the time zone "America/New_York". Either omit the timezone or specify UTC.]`,
+    );
+  });
+
+  test("throws on a non-zero offset time zone", () => {
+    const cron = Cron.make({
+      minutes: [0],
+      hours: [9],
+      days: [],
+      months: [],
+      weekdays: [],
+      tz: DateTime.zoneMakeOffset(3 * 60 * 60 * 1000),
+    });
+
+    expect(() =>
+      CronJobs.cronToConvexCronString(cron),
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Convex cron expressions are always evaluated in UTC, but this cron specifies the time zone "+03:00". Either omit the timezone or specify UTC.]`,
+    );
   });
 });
 
@@ -217,13 +295,17 @@ describe("durationToConvexIntervalSchedule", () => {
   test("throws on zero duration", () => {
     expect(() =>
       CronJobs.durationToConvexIntervalSchedule(Duration.seconds(0)),
-    ).toThrow("positive duration");
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Interval must be a positive duration.]`,
+    );
   });
 
   test("throws on sub-second duration", () => {
     expect(() =>
       CronJobs.durationToConvexIntervalSchedule(Duration.millis(500)),
-    ).toThrow("whole number of seconds, minutes, or hours");
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Interval must be a whole number of seconds, minutes, or hours.]`,
+    );
   });
 });
 

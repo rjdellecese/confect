@@ -15,6 +15,11 @@ Schedules are either an Effect [`Cron`](https://effect.website/docs/scheduling/c
 </Note>
 
 <Note>
+  Non-UTC timezones are not supported by Convex. A schedule with no timezone is
+  treated as UTC.
+</Note>
+
+<Note>
   `Duration` intervals must be a positive, whole number of seconds, minutes, or
   hours. Sub-second durations (e.g. `Duration.millis(500)`) are not supported.
 </Note>

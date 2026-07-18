@@ -6,21 +6,22 @@
     "@confect/core": "workspace:*",
     "@confect/react": "workspace:*",
     "@confect/server": "workspace:*",
-    "@convex-dev/workpool": "0.4.6",
+    "@convex-dev/workpool": "0.4.7",
     "convex": "1.40.0",
-    "convex-helpers": "0.1.118",
+    "convex-helpers": "0.1.120",
     "effect": "4.0.0-beta.98",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "vite": "7.3.1"
+    "vite": "8.1.4"
   },
   "devDependencies": {
-    "@types/node": "25.3.3",
-    "@types/react": "19.2.14",
+    "@types/node": "26.1.1",
+    "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
-    "@vitejs/plugin-react": "5.1.4",
-    "concurrently": "9.2.1",
-    "typescript": "5.9.3"
+    "@vitejs/plugin-react": "6.0.3",
+    "concurrently": "10.0.3",
+    "typescript": "6.0.3",
+    "vite-plus": "0.2.4"
   },
   "private": true,
   "scripts": {

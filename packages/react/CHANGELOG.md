@@ -33,6 +33,20 @@
 - Updated dependencies [70e313e]
   - @confect/core@10.0.0-next.0
 
+## 9.2.4
+
+## 9.2.3
+
+### Patch Changes
+
+- @confect/core@9.2.3
+
+## 9.2.2
+
+### Patch Changes
+
+- @confect/core@9.2.2
+
 ## 9.2.1
 
 ### Patch Changes

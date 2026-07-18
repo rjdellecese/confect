@@ -35,6 +35,23 @@
   - @confect/core@10.0.0-next.0
   - @confect/server@10.0.0-next.0
 
+## 9.2.4
+
+## 9.2.3
+
+### Patch Changes
+
+- @confect/core@9.2.3
+- @confect/server@9.2.3
+
+## 9.2.2
+
+### Patch Changes
+
+- Updated dependencies [7e7b2a4]
+  - @confect/server@9.2.2
+  - @confect/core@9.2.2
+
 ## 9.2.1
 
 ### Patch Changes

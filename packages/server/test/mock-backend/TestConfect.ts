@@ -18,5 +18,9 @@ export const TestConfect = TestConfect_.TestConfect<typeof confectSchema>();
 export const layer = TestConfect_.layer(
   confectSchema,
   convexSchema,
-  import.meta.glob("./fixtures/convex/**/!(*.*.*)*.*s"),
+  import.meta.glob([
+    "./fixtures/convex/**/*.ts",
+    "./fixtures/convex/**/*.js",
+    "!./fixtures/convex/**/*.*.*",
+  ]),
 );
