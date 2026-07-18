@@ -4,7 +4,7 @@
   "version": "10.0.0-next.1",
   "author": "RJ Dellecese",
   "bin": {
-    "confect": "./dist/index.mjs"
+    "confect": "./bin/confect.mjs"
   },
   "bugs": {
     "url": "https://github.com/rjdellecese/confect/issues"
@@ -13,22 +13,23 @@
     "@effect/platform-node": "^4.0.0-beta.98",
     "bundle-require": "^5.1.0",
     "code-block-writer": "^13.0.3",
-    "esbuild": "^0.27.3",
+    "esbuild": "0.27.0 - 0.27.3 || ^0.27.5 || ^0.28.0",
     "exsolve": "^1.1.0"
   },
   "devDependencies": {
-    "@convex-dev/workpool": "0.4.6",
-    "@effect/language-service": "0.86.2",
+    "@convex-dev/workpool": "0.4.7",
+    "@effect/language-service": "0.86.6",
     "@effect/vitest": "4.0.0-beta.98",
-    "@types/node": "25.3.3",
-    "@vitest/coverage-v8": "3.2.4",
+    "@types/node": "26.1.1",
+    "@vitest/coverage-v8": "4.1.10",
     "convex": "1.40.0",
     "effect": "4.0.0-beta.98",
-    "tsdown": "0.20.3",
-    "typescript": "5.9.3",
-    "vite": "7.3.1",
+    "tsdown": "0.22.7",
+    "typescript": "6.0.3",
+    "unrun": "0.3.1",
+    "vite": "8.1.4",
     "vite-tsconfig-paths": "6.1.1",
-    "vitest": "3.2.4"
+    "vitest": "4.1.10"
   },
   "engines": {
     "node": ">=22"
@@ -40,6 +41,7 @@
     "CHANGELOG.md",
     "LICENSE",
     "README.md",
+    "bin",
     "dist",
     "package.json"
   ],

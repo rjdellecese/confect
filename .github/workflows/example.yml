@@ -42,3 +42,14 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/example-setup
       - run: pnpm --filter example build
+
+  codegen:
+    name: Codegen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/example-setup
+      - run: pnpm exec vp run --filter example codegen
+      - uses: ./.github/actions/verify-codegen-committed
+        with:
+          path: apps/example

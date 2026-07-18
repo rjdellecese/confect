@@ -24,6 +24,11 @@
   - **Configuration**: Confect's Convex-aware `ConfigProvider` treats empty-string environment variables as missing values (matching Effect v4's built-in providers), so `Config.withDefault` and `Config.option` recover from them.
   - **CLI**: a malformed `convex.json` now fails codegen with a descriptive error instead of being silently ignored.
   - Confect queries no longer stub the global `Date.now`. Queries run with a `Clock` whose unsafe accessors return constants, so Effect-internal reads (log timestamps, spans) never evict a query from Convex's cache; explicit time reads — `Clock.currentTimeMillis`/`currentTimeNanos` or a raw `Date.now()` call — opt the query out and evict as they honestly should.
+## 9.2.4
+
+## 9.2.3
+
+## 9.2.2
 
 ## 9.2.1
 
