@@ -174,7 +174,7 @@ describe("cronToConvexCronString", () => {
       days: [],
       months: [],
       weekdays: [],
-      tz: DateTime.zoneUnsafeMakeNamed("UTC"),
+      tz: DateTime.zoneMakeNamedUnsafe("UTC"),
     });
 
     expect(CronJobs.cronToConvexCronString(cron)).toBe("0 9 * * *");
@@ -187,7 +187,7 @@ describe("cronToConvexCronString", () => {
       days: [],
       months: [],
       weekdays: [],
-      tz: DateTime.zoneUnsafeMakeNamed("Etc/UTC"),
+      tz: DateTime.zoneMakeNamedUnsafe("Etc/UTC"),
     });
 
     expect(CronJobs.cronToConvexCronString(cron)).toBe("0 9 * * *");
@@ -200,7 +200,7 @@ describe("cronToConvexCronString", () => {
       days: [],
       months: [],
       weekdays: [],
-      tz: DateTime.zoneUnsafeMakeNamed("America/New_York"),
+      tz: DateTime.zoneMakeNamedUnsafe("America/New_York"),
     });
 
     expect(() =>
