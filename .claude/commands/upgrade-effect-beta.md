@@ -19,11 +19,17 @@ works.)
   `origin/v10:pnpm-workspace.yaml`). Already current → no bump to do, but
   still check for `main` changes to propagate before stopping.
 - **Changes from `main`:** the prerelease line absorbs `main` continuously
-  so the eventual `v10` → `main` merge stays small. Every run checks
-  `git log origin/v10..origin/main`; when it's non-empty, the run
-  propagates those commits in a dedicated sync PR (see Branches and PRs).
-  No beta to bump **and** nothing to propagate → say so and stop — no
-  branch, no PR.
+  so the eventual `v10` → `main` merge stays small. Whether there's
+  anything to absorb is a **content** question, never an ancestry one:
+  sync PRs get squash-merged like every other PR in this repo, so
+  `git log origin/v10..origin/main` reports already-absorbed commits
+  forever and must not be used as the trigger. Instead, every run
+  performs the sync merge locally per the merge rules and keeps it only
+  if it changes content: `git diff origin/v10 HEAD` non-empty → deliver
+  it as a sync PR (see Branches and PRs); empty → `main` has nothing
+  new, discard the merge. Never open a PR whose only effect would be
+  recording merge ancestry. No beta to bump **and** no content to
+  propagate → say so and stop — no branch, no PR.
 - **In-scope packages:** `effect` plus its lockstep companions from the
   effect monorepo already present in the workspace (`@effect/platform-node`,
   `@effect/platform-bun`, `@effect/vitest`) — all move to the same beta
@@ -36,10 +42,10 @@ A run produces up to two PRs, stacked when both are needed, so the merge is
 reviewed as what it is and the bump PR's diff shows only the bump and its
 migration:
 
-- **Sync PR** — branch `sync/main-into-v10`, only when
-  `git log origin/v10..origin/main` is non-empty. Reset from `origin/v10`
-  at the start of the run, then merge `origin/main` into it per the merge
-  rules below. The PR targets `v10`.
+- **Sync PR** — branch `sync/main-into-v10`, only when the sync merge
+  changes content (see Scope). Reset from `origin/v10` at the start of
+  the run, then merge `origin/main` into it per the merge rules below.
+  The PR targets `v10`.
 - **Bump PR** — branch `deps/effect-v4-beta`, only when there's a beta to
   bump. Reset from the tip of `sync/main-into-v10` when that branch is in
   play this run, otherwise from `origin/v10`. In the stacked case the PR
@@ -54,10 +60,14 @@ targets `main`.
 
 ## Rules
 
-- The sync merge is a true merge of `origin/main`, not a rebase or
-  cherry-picks, so the histories stay converged for the eventual
-  `v10` → `main` merge (see the managing-prereleases skill). Take `main`'s
-  side of conflicts except where it would undo the prerelease line: keep
+- Perform the sync merge as a real `git merge` of `origin/main` — not a
+  rebase or cherry-picks — so each conflict is resolved exactly once.
+  But expect the PR to be squash-merged: the merge commit's second
+  parent won't survive, ancestry won't converge, and that's fine — what
+  the sync keeps converged is content, not history. Don't request
+  "Create a merge commit" for sync PRs, and don't re-merge to repair
+  ancestry. Take `main`'s side of conflicts except where it would undo
+  the prerelease line: keep
   `.changeset/pre.json`, `"baseBranch": "v10"` in `.changeset/config.json`,
   the `v10` entries in the workflow branch lists, the `X.0.0-next.N`
   versions and their changelog entries, and the Effect v4 pins (`main` is
@@ -73,10 +83,14 @@ targets `main`.
   `patch` changeset on the sync branch naming the stable range absorbed,
   e.g. "Sync with `main`: this prerelease line now includes all changes
   released in `@confect/*` 9.3.2–9.4.0 — see those versions' changelog
-  entries." Derive the range mechanically: compare the `@confect/*`
-  version at `git merge-base origin/v10 origin/main` (computed before
-  merging) with `main`'s current version. Equal versions → no released
-  changes absorbed → skip this changeset.
+  entries." Derive the range mechanically from changelogs, not from
+  `git merge-base` (squash merges leave the merge base permanently
+  stale): the versions absorbed are the stable `## 9.x.y` headings
+  present in `origin/main`'s CHANGELOG for a `@confect/*` package but
+  absent from `origin/v10`'s copy of the same file before the merge —
+  the fixed group versions together, so any one package's CHANGELOG
+  suffices. No missing headings → no released changes absorbed → skip
+  this changeset.
 - If code arriving from `main` doesn't compile against the branch's
   current Effect v4 pin (`main` is on v3), migrate it on the sync branch:
   the sync PR must be green at the current pin on its own, since it merges
@@ -122,8 +136,10 @@ targets `main`.
    changeset states the new required beta and any consumer-visible
    consequences of the API changes.
 3. Push the branches (unless this session was assigned a branch) and
-   open or refresh the PRs per Branches and PRs. Sync PR body: the `main`
-   commits brought in, the stable version range absorbed (matching the
-   changeset), and any migrations needed to keep the merge green at the
-   current pin. Bump PR body: old → new beta, links to the release notes
-   covered, and a summary of the source migrations made.
+   open or refresh the PRs per Branches and PRs. Sync PR body: what the
+   merge changes, summarized from the content diff against `origin/v10`
+   (not from `git log`, which lists already-absorbed commits), the
+   stable version range absorbed (matching the changeset), and any
+   migrations needed to keep the merge green at the current pin. Bump PR
+   body: old → new beta, links to the release notes covered, and a
+   summary of the source migrations made.
