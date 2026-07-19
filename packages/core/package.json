@@ -8,9 +8,9 @@
   },
   "devDependencies": {
     "@ark/attest": "0.56.3",
-    "@effect/vitest": "4.0.0-beta.98",
+    "@effect/vitest": "4.0.0-beta.99",
     "@types/node": "26.1.1",
-    "effect": "4.0.0-beta.98",
+    "effect": "4.0.0-beta.99",
     "tsdown": "0.22.7",
     "tsx": "4.23.0",
     "typescript": "6.0.3",
@@ -50,7 +50,7 @@
   "module": "./dist/index.js",
   "peerDependencies": {
     "convex": "^1.32.0",
-    "effect": "^4.0.0-beta.98"
+    "effect": "^4.0.0-beta.99"
   },
   "repository": {
     "type": "git",

@@ -10,7 +10,7 @@
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "dependencies": {
-    "@effect/platform-node": "^4.0.0-beta.98",
+    "@effect/platform-node": "^4.0.0-beta.99",
     "bundle-require": "^5.1.0",
     "code-block-writer": "^13.0.3",
     "esbuild": "0.27.0 - 0.27.3 || ^0.27.5 || ^0.28.0",
@@ -19,11 +19,11 @@
   "devDependencies": {
     "@convex-dev/workpool": "0.4.7",
     "@effect/language-service": "0.86.6",
-    "@effect/vitest": "4.0.0-beta.98",
+    "@effect/vitest": "4.0.0-beta.99",
     "@types/node": "26.1.1",
     "@vitest/coverage-v8": "4.1.10",
     "convex": "1.40.0",
-    "effect": "4.0.0-beta.98",
+    "effect": "4.0.0-beta.99",
     "tsdown": "0.22.7",
     "typescript": "6.0.3",
     "unrun": "0.3.1",
@@ -55,7 +55,7 @@
   "peerDependencies": {
     "@confect/core": "workspace:^",
     "@confect/server": "workspace:^",
-    "effect": "^4.0.0-beta.98"
+    "effect": "^4.0.0-beta.99"
   },
   "repository": {
     "type": "git",
