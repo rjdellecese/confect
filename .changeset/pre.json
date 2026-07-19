@@ -13,5 +13,10 @@
     "@confect/server-mock-backend-fixtures": "0.0.0",
     "@confect/test": "9.2.1"
   },
-  "changesets": ["bump-effect-beta-98", "effect-v4"]
+  "changesets": [
+    "bump-effect-beta-98",
+    "bump-effect-beta-99",
+    "effect-v4",
+    "sync-main-into-v10-9-2-2-9-2-4"
+  ]
 }
