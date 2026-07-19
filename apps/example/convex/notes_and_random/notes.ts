@@ -8,3 +8,4 @@ export const insert = registeredFunctions.insert;
 export const insertDefault = registeredFunctions.insertDefault;
 export const internalGetFirst = registeredFunctions.internalGetFirst;
 export const list = registeredFunctions.list;
+export const listPaginated = registeredFunctions.listPaginated;

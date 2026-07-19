@@ -1,6 +1,9 @@
 ---
 "@confect/core": minor
 "@confect/react": minor
+"@confect/server": minor
 ---
 
-Add typed paginated query support to `@confect/react` with `usePaginatedQuery`, including typed paginated args, result items, and pagination options. Add supporting pieces to `@confect/core`: a `PaginationOptions` schema for declaring the `paginationOpts` arg (including the protocol fields Convex's client sends, like `id` and `endCursor`), the `AnyPublicPaginatedQuery` ref type, and helpers for encoding paginated args and decoding result pages.
+Add first-class paginated queries. Define them with `FunctionSpec.publicPaginatedQuery` (or `internalPaginatedQuery`), passing your own `args` struct (without `paginationOpts`) and an `item` schema — Confect composes the Convex-facing schemas for you, including the `paginationOpts` argument with all of Convex's pagination protocol fields (via the new `PaginationOptions` schema in `@confect/core`) and a `PaginationResult` returns schema. Handlers receive the decoded `paginationOpts` and can forward it directly to `paginate`, whose options parameter in `@confect/server` now accepts Convex's full `PaginationOptions`.
+
+On the client, `usePaginatedQuery` in `@confect/react` consumes refs built with these constructors and returns a `PaginatedQueryResult<Item, E>` — the loaded variants (`LoadingFirstPage`/`LoadingMore`/`CanLoadMore`/`Exhausted`) all carry `results`, `isLoading`, and `loadMore`, and a declared `error` schema surfaces as a decoded `Failure` variant instead of a render-time throw. When no `error` schema is declared, the `Failure` variant is excluded from the type entirely. `@confect/react` now requires `convex` >= 1.36.0.

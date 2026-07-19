@@ -1,7 +1,12 @@
-import { FunctionSpec, GroupSpec, PaginationResult } from "@confect/core";
+import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 import { Id } from "./_generated/id";
 import notes from "./_generated/tables/notes";
+
+export class PaginationDenied extends Schema.TaggedError<PaginationDenied>()(
+  "PaginationDenied",
+  { reason: Schema.String },
+) {}
 
 export default GroupSpec.make()
   .addFunction(
@@ -19,25 +24,23 @@ export default GroupSpec.make()
     }),
   )
   .addFunction(
-    FunctionSpec.publicQuery({
+    FunctionSpec.publicPaginatedQuery({
       name: "paginateNotes",
-      args: () =>
-        Schema.Struct({
-          cursor: Schema.NullOr(Schema.String),
-          numItems: Schema.Number,
-        }),
-      returns: () => PaginationResult.PaginationResult(notes.Doc),
+      item: () => notes.Doc,
     }),
   )
   .addFunction(
-    FunctionSpec.publicQuery({
+    FunctionSpec.publicPaginatedQuery({
       name: "paginateNotesWithFilter",
-      args: () =>
-        Schema.Struct({
-          cursor: Schema.NullOr(Schema.String),
-          numItems: Schema.Number,
-          tag: Schema.String,
-        }),
-      returns: () => PaginationResult.PaginationResult(notes.Doc),
+      args: () => Schema.Struct({ tag: Schema.String }),
+      item: () => notes.Doc,
+    }),
+  )
+  .addFunction(
+    FunctionSpec.publicPaginatedQuery({
+      name: "paginateNotesOrFail",
+      args: () => Schema.Struct({ shouldFail: Schema.Boolean }),
+      item: () => notes.Doc,
+      error: () => PaginationDenied,
     }),
   );

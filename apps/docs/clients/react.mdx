@@ -121,6 +121,66 @@ const NoteDetail = ({ selectedId }: { selectedId: string | undefined }) => {
 };
 ```
 
+## `usePaginatedQuery`
+
+Loads data reactively from a [paginated query](/server/functions#paginated-queries), mirroring the ergonomics of `usePaginatedQuery` from `convex/react`. The ref must come from a spec defined with `FunctionSpec.publicPaginatedQuery` — passing any other ref fails at runtime with an error pointing at the constructor.
+
+Args are encoded using the spec's user-args schema (`paginationOpts` is managed by the hook, not the caller), and each loaded page is decoded using the spec's `item` schema. Pass `"skip"` instead of args to disable the query, like `useQuery`.
+
+Returns a `PaginatedQueryResult<Item, E>`. The loaded variants — `LoadingFirstPage`, `LoadingMore`, `CanLoadMore`, and `Exhausted` — all carry `results`, `isLoading`, and `loadMore`, so the common UI needs only field access and a couple of predicates:
+
+```tsx
+import { PaginatedQueryResult, usePaginatedQuery } from "@confect/react";
+import refs from "../confect/_generated/refs";
+
+const PaginatedNoteList = () => {
+  const notes = usePaginatedQuery(
+    refs.public.notes.listByAuthor,
+    { author: "ada" },
+    { initialNumItems: 10 },
+  );
+
+  return (
+    <div>
+      <ul>
+        {notes.results.map((note) => (
+          <li key={note._id}>{note.text}</li>
+        ))}
+      </ul>
+      {notes.isLoading && <p>Loading…</p>}
+      {PaginatedQueryResult.isCanLoadMore(notes) && (
+        <button type="button" onClick={() => notes.loadMore(10)}>
+          Load more
+        </button>
+      )}
+    </div>
+  );
+};
+```
+
+`PaginatedQueryResult` also provides `match` for exhaustive pattern matching, and the predicates `isLoadingFirstPage`, `isLoadingMore`, `isExhausted`, `isLoading`, `isLoaded`, and `isFailure`.
+
+### Typed errors
+
+When the spec declares an `error` schema, the result type gains a `Failure` variant carrying the decoded typed error — errors are values, consistent with `useQuery`. Narrow with `PaginatedQueryResult.isFailure` (or handle `onFailure` in `match`) before accessing `results`:
+
+```tsx
+const notes = usePaginatedQuery(
+  refs.public.notes.listOrFail,
+  {},
+  { initialNumItems: 10 },
+);
+
+if (PaginatedQueryResult.isFailure(notes)) {
+  return <p>Failed: {notes.error.reason}</p>;
+}
+// notes: Loaded — results/isLoading/loadMore are available.
+```
+
+Without an `error` schema, the `Failure` variant is excluded from the type entirely, so no narrowing is needed. Failures not declared in the `error` schema are thrown during render and propagate to the nearest [error boundary](https://react.dev/reference/react/Component#catching-rendering-errors-with-an-error-boundary).
+
+<Note>`usePaginatedQuery` requires `convex` 1.36.0 or newer.</Note>
+
 ## `useMutation`
 
 Returns a function that encodes args using the spec's `args` schema, calls the Convex mutation, and decodes the result using the spec's `returns` schema. The returned promise's shape depends on whether the spec declares an `error` schema.
@@ -218,12 +278,13 @@ const RandomNumber = () => {
 
 ## Differences from vanilla Convex hooks
 
-| Vanilla Convex                                       | Confect                                                                                                |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Functions referenced via `api.module.fn`             | Functions referenced via `refs`                                                                        |
-| Args passed directly to Convex as-is                 | Args are schema-encoded from `Type` to `Encoded` before sending to Convex                              |
-| Return values received directly from Convex as-is    | Return values are schema-decoded from `Encoded` to `Type` before returning                             |
-| `useQuery` returns `T \| undefined`                  | `useQuery` returns `QueryResult<A, E>`                                                                 |
-| Cannot distinguish loading from skipped              | `Loading` carries a `skipped: boolean` flag                                                            |
-| `useMutation`/`useAction` always return `Promise<T>` | Refs with an `error` schema return `Promise<Either<A, E>>`; refs without one still return `Promise<A>` |
-| Pass `"skip"` to disable query subscription          | Same—pass `"skip"` to disable query subscription                                                       |
+| Vanilla Convex                                        | Confect                                                                                                 |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Functions referenced via `api.module.fn`              | Functions referenced via `refs`                                                                         |
+| Args passed directly to Convex as-is                  | Args are schema-encoded from `Type` to `Encoded` before sending to Convex                               |
+| Return values received directly from Convex as-is     | Return values are schema-decoded from `Encoded` to `Type` before returning                              |
+| `useQuery` returns `T \| undefined`                   | `useQuery` returns `QueryResult<A, E>`                                                                  |
+| Cannot distinguish loading from skipped               | `Loading` carries a `skipped: boolean` flag                                                             |
+| `useMutation`/`useAction` always return `Promise<T>`  | Refs with an `error` schema return `Promise<Either<A, E>>`; refs without one still return `Promise<A>`  |
+| `usePaginatedQuery` throws query errors during render | `usePaginatedQuery` returns `PaginatedQueryResult<Item, E>` with declared errors as a `Failure` variant |
+| Pass `"skip"` to disable query subscription           | Same—pass `"skip"` to disable query subscription                                                        |

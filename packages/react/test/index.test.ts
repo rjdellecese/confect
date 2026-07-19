@@ -1,9 +1,4 @@
-import {
-  FunctionSpec,
-  PaginationOptions,
-  PaginationResult,
-  Ref,
-} from "@confect/core";
+import { FunctionSpec, Ref } from "@confect/core";
 import { renderHook } from "@testing-library/react";
 import { ConvexError } from "convex/values";
 import * as Either from "effect/Either";
@@ -19,6 +14,7 @@ import {
 } from "vitest";
 import type { InvokeReturn, UsePaginatedQueryArgs } from "@confect/react";
 import {
+  PaginatedQueryResult,
   QueryResult,
   useAction,
   useMutation,
@@ -29,14 +25,17 @@ import {
 const useConvexQueryMock = vi.fn();
 const useConvexMutationMock = vi.fn();
 const useConvexActionMock = vi.fn();
-const useConvexPaginatedQueryMock = vi.fn();
+const useConvexPaginatedQueryInternalMock = vi.fn();
 
 vi.mock("convex/react", () => ({
   useQuery: (...args: unknown[]) => useConvexQueryMock(...args),
   useMutation: (...args: unknown[]) => useConvexMutationMock(...args),
   useAction: (...args: unknown[]) => useConvexActionMock(...args),
-  usePaginatedQuery: (...args: unknown[]) =>
-    useConvexPaginatedQueryMock(...args),
+  usePaginatedQuery: () => {
+    throw new Error("unexpected call to the public usePaginatedQuery");
+  },
+  usePaginatedQueryInternal: (...args: unknown[]) =>
+    useConvexPaginatedQueryInternalMock(...args),
 }));
 
 class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
@@ -104,7 +103,7 @@ beforeEach(() => {
   useConvexQueryMock.mockReset();
   useConvexMutationMock.mockReset();
   useConvexActionMock.mockReset();
-  useConvexPaginatedQueryMock.mockReset();
+  useConvexPaginatedQueryInternalMock.mockReset();
 });
 
 describe("useQuery", () => {
@@ -408,24 +407,18 @@ describe("usePaginatedQuery", () => {
 
   const paginatedQuery = Ref.make(
     "notes",
-    FunctionSpec.publicQuery({
+    FunctionSpec.publicPaginatedQuery({
       name: "listPaginated",
-      args: () =>
-        Schema.Struct({
-          count: Schema.NumberFromString,
-          paginationOpts: PaginationOptions.PaginationOptions,
-        }),
-      returns: () => PaginationResult.PaginationResult(paginatedDoc),
+      args: () => Schema.Struct({ count: Schema.NumberFromString }),
+      item: () => paginatedDoc,
     }),
   );
 
   const paginatedQueryNoExtraArgs = Ref.make(
     "notes",
-    FunctionSpec.publicQuery({
+    FunctionSpec.publicPaginatedQuery({
       name: "listAllPaginated",
-      args: () =>
-        Schema.Struct({ paginationOpts: PaginationOptions.PaginationOptions }),
-      returns: () => PaginationResult.PaginationResult(paginatedDoc),
+      item: () => paginatedDoc,
     }),
   );
 
@@ -436,65 +429,103 @@ describe("usePaginatedQuery", () => {
 
   const paginatedQueryWithError = Ref.make(
     "notes",
-    FunctionSpec.publicQuery({
+    FunctionSpec.publicPaginatedQuery({
       name: "listPaginatedOrFail",
-      args: () =>
-        Schema.Struct({ paginationOpts: PaginationOptions.PaginationOptions }),
-      returns: () => PaginationResult.PaginationResult(paginatedDoc),
+      item: () => paginatedDoc,
       error: () => PaginationFailed,
     }),
   );
 
-  const canLoadMore = (results: unknown[]) => ({
-    results,
-    status: "CanLoadMore" as const,
-    isLoading: false as const,
-    loadMore: vi.fn(),
+  const user = (
+    partial: Partial<{
+      results: unknown[];
+      status: string;
+      isLoading: boolean;
+      loadMore: (numItems: number) => void;
+      error: unknown;
+    }>,
+  ) => ({
+    user: {
+      results: [],
+      status: "CanLoadMore",
+      isLoading: false,
+      loadMore: vi.fn(),
+      ...partial,
+    },
   });
 
-  test("encodes args via the args schema, without paginationOpts", () => {
-    useConvexPaginatedQueryMock.mockReturnValue(canLoadMore([]));
+  test("encodes args via the user-args schema and disables throwOnError", () => {
+    useConvexPaginatedQueryInternalMock.mockReturnValue(user({}));
 
     renderHook(() =>
       usePaginatedQuery(paginatedQuery, { count: 42 }, { initialNumItems: 10 }),
     );
 
-    expect(useConvexPaginatedQueryMock).toHaveBeenLastCalledWith(
+    expect(useConvexPaginatedQueryInternalMock).toHaveBeenLastCalledWith(
       expect.anything(),
       { count: "42" },
       { initialNumItems: 10 },
+      false,
     );
   });
 
-  test("passes `skip` through", () => {
-    useConvexPaginatedQueryMock.mockReturnValue(canLoadMore([]));
+  test("passes `skip` through and reports it on LoadingFirstPage", () => {
+    useConvexPaginatedQueryInternalMock.mockReturnValue(
+      user({ status: "LoadingFirstPage", isLoading: true }),
+    );
 
-    renderHook(() =>
+    const { result } = renderHook(() =>
       usePaginatedQuery(paginatedQuery, "skip", { initialNumItems: 10 }),
     );
 
-    expect(useConvexPaginatedQueryMock).toHaveBeenLastCalledWith(
+    expect(useConvexPaginatedQueryInternalMock).toHaveBeenLastCalledWith(
       expect.anything(),
       "skip",
       { initialNumItems: 10 },
+      false,
     );
+    assert(PaginatedQueryResult.isLoadingFirstPage(result.current));
+    expect(result.current.skipped).toBe(true);
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.results).toEqual([]);
   });
 
-  test("decodes the results via the returns schema's page element schema", () => {
-    useConvexPaginatedQueryMock.mockReturnValue(
-      canLoadMore([{ value: "1" }, { value: "2" }]),
+  test("decodes the results via the ref's item schema", () => {
+    useConvexPaginatedQueryInternalMock.mockReturnValue(
+      user({ results: [{ value: "1" }, { value: "2" }] }),
     );
 
     const { result } = renderHook(() =>
       usePaginatedQuery(paginatedQueryNoExtraArgs, {}, { initialNumItems: 10 }),
     );
 
+    assert(PaginatedQueryResult.isCanLoadMore(result.current));
     expect(result.current.results).toEqual([{ value: 1 }, { value: 2 }]);
-    expect(result.current.status).toBe("CanLoadMore");
+  });
+
+  test.each([
+    ["LoadingFirstPage", true],
+    ["LoadingMore", true],
+    ["CanLoadMore", false],
+    ["Exhausted", false],
+  ] as const)("maps status %s to its variant", (status, isLoading) => {
+    useConvexPaginatedQueryInternalMock.mockReturnValue(
+      user({ status, isLoading, results: [{ value: "1" }] }),
+    );
+
+    const { result } = renderHook(() =>
+      usePaginatedQuery(paginatedQueryNoExtraArgs, {}, { initialNumItems: 10 }),
+    );
+
+    expect(result.current._tag).toBe(status);
+    assert(PaginatedQueryResult.isLoaded(result.current));
+    expect(result.current.isLoading).toBe(isLoading);
   });
 
   test("preserves result identity across rerenders for an unchanged convex result", () => {
-    useConvexPaginatedQueryMock.mockReturnValue(canLoadMore([{ value: "1" }]));
+    useConvexPaginatedQueryInternalMock.mockReturnValue(
+      user({ results: [{ value: "1" }] }),
+    );
 
     const { result, rerender } = renderHook(() =>
       usePaginatedQuery(paginatedQueryNoExtraArgs, {}, { initialNumItems: 10 }),
@@ -504,43 +535,53 @@ describe("usePaginatedQuery", () => {
     rerender();
 
     expect(result.current).toBe(first);
+    assert(PaginatedQueryResult.isLoaded(result.current));
+    assert(PaginatedQueryResult.isLoaded(first));
     expect(result.current.results).toBe(first.results);
   });
 
   test("produces new results when the convex results identity changes", () => {
-    useConvexPaginatedQueryMock.mockReturnValue(canLoadMore([{ value: "1" }]));
+    useConvexPaginatedQueryInternalMock.mockReturnValue(
+      user({ results: [{ value: "1" }] }),
+    );
 
     const { result, rerender } = renderHook(() =>
       usePaginatedQuery(paginatedQueryNoExtraArgs, {}, { initialNumItems: 10 }),
     );
     const first = result.current;
 
-    useConvexPaginatedQueryMock.mockReturnValue(
-      canLoadMore([{ value: "1" }, { value: "2" }]),
+    useConvexPaginatedQueryInternalMock.mockReturnValue(
+      user({ results: [{ value: "1" }, { value: "2" }] }),
     );
     rerender();
 
     expect(result.current).not.toBe(first);
+    assert(PaginatedQueryResult.isLoaded(result.current));
     expect(result.current.results).toEqual([{ value: 1 }, { value: 2 }]);
   });
 
-  test("throws the decoded typed error for a matching ConvexError", () => {
-    useConvexPaginatedQueryMock.mockImplementation(() => {
-      throw new ConvexError({ _tag: "PaginationFailed", reason: "oops" });
-    });
+  test("returns Failure with the decoded typed error for a matching ConvexError", () => {
+    useConvexPaginatedQueryInternalMock.mockReturnValue(
+      user({
+        status: "Error",
+        error: new ConvexError({ _tag: "PaginationFailed", reason: "oops" }),
+      }),
+    );
 
-    expect(() =>
-      renderHook(() =>
-        usePaginatedQuery(paginatedQueryWithError, {}, { initialNumItems: 10 }),
-      ),
-    ).toThrow(PaginationFailed);
+    const { result } = renderHook(() =>
+      usePaginatedQuery(paginatedQueryWithError, {}, { initialNumItems: 10 }),
+    );
+
+    assert(PaginatedQueryResult.isFailure(result.current));
+    expect(result.current.error).toBeInstanceOf(PaginationFailed);
+    expect(result.current.error.reason).toBe("oops");
   });
 
-  test("rethrows a ConvexError from a ref without an error schema", () => {
+  test("throws a ConvexError from a ref without an error schema", () => {
     const convexError = new ConvexError({ code: "ERR" });
-    useConvexPaginatedQueryMock.mockImplementation(() => {
-      throw convexError;
-    });
+    useConvexPaginatedQueryInternalMock.mockReturnValue(
+      user({ status: "Error", error: convexError }),
+    );
 
     expect(() =>
       renderHook(() =>
@@ -553,11 +594,11 @@ describe("usePaginatedQuery", () => {
     ).toThrow(convexError);
   });
 
-  test("rethrows a non-ConvexError unchanged", () => {
+  test("throws a non-ConvexError unchanged", () => {
     const transportError = new Error("network down");
-    useConvexPaginatedQueryMock.mockImplementation(() => {
-      throw transportError;
-    });
+    useConvexPaginatedQueryInternalMock.mockReturnValue(
+      user({ status: "Error", error: transportError }),
+    );
 
     expect(() =>
       renderHook(() =>
@@ -566,8 +607,41 @@ describe("usePaginatedQuery", () => {
     ).toThrow(transportError);
   });
 
+  describe("types", () => {
+    test("the result type carries the item and error types", () => {
+      useConvexPaginatedQueryInternalMock.mockReturnValue(user({}));
+
+      const { result } = renderHook(() =>
+        usePaginatedQuery(paginatedQueryWithError, {}, { initialNumItems: 10 }),
+      );
+
+      expectTypeOf(result.current).toEqualTypeOf<
+        PaginatedQueryResult.PaginatedQueryResult<
+          { readonly value: number },
+          PaginationFailed
+        >
+      >();
+    });
+
+    test("the error type is never without an error schema", () => {
+      useConvexPaginatedQueryInternalMock.mockReturnValue(user({}));
+
+      const { result } = renderHook(() =>
+        usePaginatedQuery(
+          paginatedQueryNoExtraArgs,
+          {},
+          { initialNumItems: 10 },
+        ),
+      );
+
+      expectTypeOf(result.current).toEqualTypeOf<
+        PaginatedQueryResult.PaginatedQueryResult<{ readonly value: number }>
+      >();
+    });
+  });
+
   describe("UsePaginatedQueryArgs", () => {
-    test("accepts the args minus paginationOpts, or `skip`", () => {
+    test("accepts the user args, or `skip`", () => {
       expectTypeOf<{ count: number }>().toExtend<
         UsePaginatedQueryArgs<typeof paginatedQuery>
       >();
@@ -576,7 +650,7 @@ describe("usePaginatedQuery", () => {
       >();
     });
 
-    test("accepts only the empty object or `skip` when paginationOpts is the only arg", () => {
+    test("accepts only the empty object or `skip` when there are no user args", () => {
       expectTypeOf<{}>().toExtend<
         UsePaginatedQueryArgs<typeof paginatedQueryNoExtraArgs>
       >();

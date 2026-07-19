@@ -1,10 +1,10 @@
 import { Ref } from "@confect/core";
 import type { OptimisticUpdate as ConvexOptimisticUpdate } from "convex/browser";
-import type { UsePaginatedQueryResult } from "convex/react";
+import * as ConvexReact from "convex/react";
+import type { usePaginatedQuery as useConvexPaginatedQuery } from "convex/react";
 import {
   useAction as useConvexAction,
   useMutation as useConvexMutation,
-  usePaginatedQuery as useConvexPaginatedQuery,
   useQuery as useConvexQuery,
   type ReactMutation as ConvexReactMutation,
 } from "convex/react";
@@ -18,9 +18,10 @@ import * as Option from "effect/Option";
 import { useCallback, useMemo } from "react";
 
 import * as OptimisticLocalStore from "./OptimisticLocalStore";
+import * as PaginatedQueryResult from "./PaginatedQueryResult";
 import * as QueryResult from "./QueryResult";
 
-export { OptimisticLocalStore, QueryResult };
+export { OptimisticLocalStore, PaginatedQueryResult, QueryResult };
 
 export type InvokeReturn<Ref_ extends Ref.Any> = [Ref.Error<Ref_>] extends [
   never,
@@ -124,26 +125,71 @@ export type PaginatedQueryOptions = Parameters<
 >[2];
 
 /**
- * Load data reactively from a paginated query, mirroring `usePaginatedQuery`
- * from `convex/react`.
+ * The `user`-facing result of `usePaginatedQueryInternal` from `convex/react`,
+ * including the `"Error"` status its non-throwing mode can return.
+ */
+interface ConvexPaginatedQueryInternalUser {
+  readonly results: ReadonlyArray<unknown>;
+  readonly status:
+    | "LoadingFirstPage"
+    | "LoadingMore"
+    | "CanLoadMore"
+    | "Exhausted"
+    | "Error";
+  readonly isLoading: boolean;
+  readonly loadMore: (numItems: number) => void;
+  readonly error?: unknown;
+}
+
+type UseConvexPaginatedQueryInternal = (
+  query: FunctionReference<"query">,
+  args: Record<string, Value> | "skip",
+  options: PaginatedQueryOptions,
+  throwOnError: boolean,
+) => { user: ConvexPaginatedQueryInternalUser };
+
+// `usePaginatedQueryInternal` is runtime-exported by convex/react but absent
+// from its public type declarations. It is the only way to observe query
+// errors as values: the public positional `usePaginatedQuery` hard-codes
+// throwOnError and throws mid-hook-sequence, which cannot be caught without
+// breaking React's hook-order invariant. The non-throwing mode (the fourth
+// parameter) exists since convex 1.36.0 — the peer floor of this package.
+const useConvexPaginatedQueryInternal = (
+  ConvexReact as unknown as Record<string, unknown>
+).usePaginatedQueryInternal as UseConvexPaginatedQueryInternal | undefined;
+
+/**
+ * Load data reactively from a paginated query defined with
+ * `FunctionSpec.publicPaginatedQuery`, mirroring the ergonomics of
+ * `usePaginatedQuery` from `convex/react`.
  *
- * Args are encoded via the ref's args schema (minus `paginationOpts`, which
- * the Convex hook manages itself), and each loaded page is decoded via the
- * `page` element schema of the ref's returns schema. For this to work
- * end-to-end, the ref's args schema must declare `paginationOpts` with
- * Convex's pagination protocol fields — use `PaginationOptions` from
- * `@confect/core`.
+ * Args are encoded via the ref's user-args schema (`paginationOpts` is managed
+ * by the Convex hook, not the caller), and each loaded page is decoded via the
+ * ref's item schema.
  *
- * The underlying Convex hook throws query errors during render; if the `Ref`
- * declares an `error` schema and the query fails with that typed error, the
- * decoded error is thrown instead, to be caught by an error boundary.
+ * Returns a {@link PaginatedQueryResult.PaginatedQueryResult}: the loaded
+ * variants carry `results`, `isLoading`, and `loadMore`; if the `Ref` declares
+ * an `error` schema and the query fails with that typed error, the decoded
+ * error is returned as the `Failure` variant. Unknown errors are thrown, to be
+ * caught by an error boundary.
  */
 export const usePaginatedQuery = <Query extends Ref.AnyPublicPaginatedQuery>(
   ref: Query,
   args: UsePaginatedQueryArgs<Query>,
   options: PaginatedQueryOptions,
-): UsePaginatedQueryResult<PaginatedQueryItem<Query>> => {
+): PaginatedQueryResult.PaginatedQueryResult<
+  PaginatedQueryItem<Query>,
+  Ref.Error<Query>
+> => {
+  if (useConvexPaginatedQueryInternal === undefined) {
+    throw new Error(
+      "usePaginatedQuery requires `usePaginatedQueryInternal` from convex/react, " +
+        "which ships with convex >= 1.36.0 — upgrade the `convex` package",
+    );
+  }
+
   const functionReference = Ref.getFunctionReference(ref);
+  const skipped = args === "skip";
 
   // The encoded output is the wire form Convex's hook forwards verbatim, not
   // the ref's decoded args type.
@@ -158,35 +204,78 @@ export const usePaginatedQuery = <Query extends Ref.AnyPublicPaginatedQuery>(
     [ref, args],
   );
 
-  // The Convex hook throws query errors during render (its positional
-  // overload enables throwOnError), so translate a typed ConvexError into the
-  // ref's decoded error at the same point.
-  const convexResultOrError = Either.try(() =>
-    useConvexPaginatedQuery(functionReference, encodedArgs, options),
+  const { user: convexResult } = useConvexPaginatedQueryInternal(
+    functionReference,
+    encodedArgs,
+    options,
+    false,
   );
-  if (Either.isLeft(convexResultOrError)) {
-    throw Ref.maybeDecodeErrorSync(ref, convexResultOrError.left);
-  }
-  const { results, ...rest } = convexResultOrError.right;
+
+  const encodedResults =
+    convexResult.status === "Error" ? undefined : convexResult.results;
 
   // Decoding allocates fresh items, so key on the referentially stable
   // `results` the Convex hook provides — the same identity-preservation
   // rationale as in `useQuery` above.
   const decodedResults = useMemo(
-    () => Ref.decodePaginationPageSync(ref, results),
-    [ref, results],
+    () =>
+      encodedResults === undefined
+        ? undefined
+        : Ref.decodePaginationPageSync(ref, encodedResults),
+    [ref, encodedResults],
   );
 
-  return useMemo(
-    () =>
-      ({
-        results: decodedResults,
-        ...rest,
-      }) as UsePaginatedQueryResult<PaginatedQueryItem<Query>>,
-    // `rest` is rebuilt by the destructure each render; key on the stable
-    // values it carries.
-    [decodedResults, rest.status, rest.isLoading, rest.loadMore],
-  );
+  const { status, loadMore } = convexResult;
+  const error = status === "Error" ? convexResult.error : undefined;
+
+  return useMemo((): PaginatedQueryResult.Variants<
+    PaginatedQueryItem<Query>,
+    Ref.Error<Query>
+  > => {
+    switch (status) {
+      case "Error": {
+        if (Ref.isConvexError(error)) {
+          const decoded = Ref.decodeErrorSync(ref, error.data);
+          if (Option.isSome(decoded)) {
+            return PaginatedQueryResult.fail(decoded.value);
+          }
+        }
+        // Unknown errors still throw. All hooks have run by this point, so an
+        // aborted render here is hook-order-safe.
+        throw error;
+      }
+      case "LoadingFirstPage":
+        return PaginatedQueryResult.loadingFirstPage({ skipped, loadMore });
+      case "LoadingMore":
+        return PaginatedQueryResult.loadingMore({
+          results: decodedResults ?? [],
+          loadMore,
+        });
+      case "CanLoadMore":
+        return PaginatedQueryResult.canLoadMore({
+          results: decodedResults ?? [],
+          loadMore,
+        });
+      case "Exhausted":
+        return PaginatedQueryResult.exhausted({
+          results: decodedResults ?? [],
+          loadMore,
+        });
+    }
+    // The memo produces `Variants`, the conditional return type's superset —
+    // when `E` is `never` the `Failure` arm is unreachable at runtime, which
+    // is exactly what the conditional encodes.
+  }, [
+    ref,
+    skipped,
+    decodedResults,
+    status,
+    loadMore,
+    error,
+  ]) as PaginatedQueryResult.PaginatedQueryResult<
+    PaginatedQueryItem<Query>,
+    Ref.Error<Query>
+  >;
 };
 
 /**

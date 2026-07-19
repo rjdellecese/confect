@@ -1,6 +1,8 @@
 import { describe, expect, it } from "@effect/vitest";
+import { expectTypeOf } from "vitest";
 import * as MutableRef from "effect/MutableRef";
 import * as Schema from "effect/Schema";
+import type * as FunctionProvenance from "@confect/core/FunctionProvenance";
 import * as FunctionSpec from "@confect/core/FunctionSpec";
 import * as Ref from "@confect/core/Ref";
 
@@ -141,5 +143,171 @@ describe("laziness invariant", () => {
 
     expect(MutableRef.get(argsCalls)).toBe(1);
     expect(second).toBe(first);
+  });
+});
+
+describe("paginated queries", () => {
+  const item = Schema.Struct({ value: Schema.NumberFromString });
+
+  describe("laziness invariant", () => {
+    const makePaginatedSpec = (track: {
+      args?: () => void;
+      item?: () => void;
+      error?: () => void;
+    }) =>
+      FunctionSpec.publicPaginatedQuery({
+        name: "tracked",
+        args: () => {
+          track.args?.();
+          return Schema.Struct({});
+        },
+        item: () => {
+          track.item?.();
+          return item;
+        },
+        error: () => {
+          track.error?.();
+          return Schema.String;
+        },
+      });
+
+    it("constructing a paginated FunctionSpec does not evaluate any schema thunk", () => {
+      const argsBuilt = MutableRef.make(false);
+      const itemBuilt = MutableRef.make(false);
+      const errorBuilt = MutableRef.make(false);
+
+      makePaginatedSpec({
+        args: () => MutableRef.set(argsBuilt, true),
+        item: () => MutableRef.set(itemBuilt, true),
+        error: () => MutableRef.set(errorBuilt, true),
+      });
+
+      expect(MutableRef.get(argsBuilt)).toBe(false);
+      expect(MutableRef.get(itemBuilt)).toBe(false);
+      expect(MutableRef.get(errorBuilt)).toBe(false);
+    });
+
+    it("presence checks observe the paginated fields without forcing them", () => {
+      const argsBuilt = MutableRef.make(false);
+      const itemBuilt = MutableRef.make(false);
+      const spec = makePaginatedSpec({
+        args: () => MutableRef.set(argsBuilt, true),
+        item: () => MutableRef.set(itemBuilt, true),
+      });
+
+      expect("paginatedUserArgs" in spec.functionProvenance).toBe(true);
+      expect("paginatedItem" in spec.functionProvenance).toBe(true);
+      expect("paginatedPage" in spec.functionProvenance).toBe(true);
+      expect(MutableRef.get(argsBuilt)).toBe(false);
+      expect(MutableRef.get(itemBuilt)).toBe(false);
+    });
+
+    it("Ref.hasErrorSchema checks presence without forcing the error thunk", () => {
+      const errorBuilt = MutableRef.make(false);
+      const spec = makePaginatedSpec({
+        error: () => MutableRef.set(errorBuilt, true),
+      });
+      const ref = Ref.make("ns", spec);
+
+      expect(Ref.hasErrorSchema(ref)).toBe(true);
+      expect(MutableRef.get(errorBuilt)).toBe(false);
+    });
+
+    it("accessing `args` forces the user-args thunk exactly once and memoises", () => {
+      const argsCalls = MutableRef.make(0);
+      const spec = makePaginatedSpec({
+        args: () => MutableRef.increment(argsCalls),
+      });
+
+      const first = spec.functionProvenance.args;
+      const second = spec.functionProvenance.args;
+
+      expect(MutableRef.get(argsCalls)).toBe(1);
+      expect(second).toBe(first);
+    });
+  });
+
+  describe("composed schemas", () => {
+    it("composes `paginationOpts` into the args schema", () => {
+      const spec = FunctionSpec.publicPaginatedQuery({
+        name: "listPaginated",
+        args: () => Schema.Struct({ author: Schema.String }),
+        item: () => item,
+      });
+
+      const args = spec.functionProvenance
+        .args as unknown as FunctionProvenance.AnyUserArgs;
+      expect(Object.keys(args.fields)).toEqual(["author", "paginationOpts"]);
+    });
+
+    it("defaults to paginationOpts-only args when `args` is omitted", () => {
+      const spec = FunctionSpec.publicPaginatedQuery({
+        name: "listPaginated",
+        item: () => item,
+      });
+
+      const args = spec.functionProvenance
+        .args as unknown as FunctionProvenance.AnyUserArgs;
+      expect(Object.keys(args.fields)).toEqual(["paginationOpts"]);
+    });
+
+    it("composes the returns schema as a PaginationResult of the item", () => {
+      const spec = FunctionSpec.publicPaginatedQuery({
+        name: "listPaginated",
+        item: () => item,
+      });
+
+      const returns = spec.functionProvenance
+        .returns as unknown as FunctionProvenance.AnyUserArgs;
+      expect(Object.keys(returns.fields)).toEqual([
+        "page",
+        "isDone",
+        "continueCursor",
+        "splitCursor",
+        "pageStatus",
+      ]);
+    });
+
+    it("throws when the user args schema declares paginationOpts", () => {
+      const spec = FunctionSpec.publicPaginatedQuery({
+        name: "listPaginated",
+        // @ts-expect-error — paginationOpts must not be declared in user args
+        args: () =>
+          Schema.Struct({
+            paginationOpts: Schema.Struct({ numItems: Schema.Number }),
+          }),
+        item: () => item,
+      });
+
+      expect(
+        () => spec.functionProvenance.args,
+      ).toThrowErrorMatchingInlineSnapshot(
+        `[Error: A paginated query's args schema must not declare \`paginationOpts\` — it is added automatically from the \`PaginationOptions\` schema]`,
+      );
+    });
+  });
+
+  describe("types", () => {
+    it("derives Args/Returns/Error from the composed schemas", () => {
+      const _spec = FunctionSpec.publicPaginatedQuery({
+        name: "listPaginated",
+        args: () => Schema.Struct({ author: Schema.String }),
+        item: () => item,
+        error: () => Schema.String,
+      });
+      type Spec = typeof _spec;
+
+      expectTypeOf<
+        FunctionSpec.Args<Spec>["paginationOpts"]["numItems"]
+      >().toEqualTypeOf<number>();
+      expectTypeOf<FunctionSpec.Args<Spec>["author"]>().toEqualTypeOf<string>();
+      expectTypeOf<FunctionSpec.Returns<Spec>["page"][number]>().toEqualTypeOf<{
+        readonly value: number;
+      }>();
+      expectTypeOf<FunctionSpec.Error<Spec>>().toEqualTypeOf<string>();
+      expectTypeOf<
+        FunctionSpec.EncodedReturns<Spec>["page"][number]
+      >().toEqualTypeOf<{ readonly value: string }>();
+    });
   });
 });
