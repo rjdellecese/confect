@@ -614,7 +614,9 @@ const rejectLegacySchemaFile = Effect.gen(function* () {
  * are legal — but the warning catches the much more common case of a
  * typoed directory or files placed under the wrong root.
  */
-const warnIfNoTables = (tableModules: ReadonlyArray<TableModule.TableModule>) =>
+const warnIfNoTables = (
+  tableModules: ReadonlyArray<TableModule.TableModule>,
+) =>
   tableModules.length === 0
     ? logWarn(
         `No tables discovered in \`confect/${TableModule.TABLES_DIRNAME}/\`. ` +
