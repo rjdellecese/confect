@@ -425,12 +425,12 @@ export const encodePaginatedQueryArgsSync = <
 ): unknown =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag("Confect", (confectFunctionProvenance) => {
-      if (!("paginatedUserArgs" in confectFunctionProvenance)) {
+      if (confectFunctionProvenance.kind._tag !== "Paginated") {
         throw missingPaginatedProvenanceError(ref);
       }
-      return Schema.encodeUnknownSync(
-        confectFunctionProvenance.paginatedUserArgs as Schema.Schema.AnyNoContext,
-      )(args);
+      return Schema.encodeUnknownSync(confectFunctionProvenance.kind.userArgs)(
+        args,
+      );
     }),
     Match.tag("Convex", () => args),
     Match.exhaustive,
@@ -447,12 +447,12 @@ export const decodePaginationPageSync = <Ref_ extends AnyPublicPaginatedQuery>(
 ): Returns<Ref_>["page"] =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag("Confect", (confectFunctionProvenance) => {
-      if (!("paginatedPage" in confectFunctionProvenance)) {
+      if (confectFunctionProvenance.kind._tag !== "Paginated") {
         throw missingPaginatedProvenanceError(ref);
       }
-      return Schema.decodeUnknownSync(
-        confectFunctionProvenance.paginatedPage as Schema.Schema.AnyNoContext,
-      )(encodedPage);
+      return Schema.decodeUnknownSync(confectFunctionProvenance.kind.page)(
+        encodedPage,
+      );
     }),
     Match.tag("Convex", () => encodedPage),
     Match.exhaustive,

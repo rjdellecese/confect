@@ -10,12 +10,7 @@ export type FunctionProvenance = Data.TaggedEnum<{
     args: Schema.Schema.AnyNoContext;
     returns: Schema.Schema.AnyNoContext;
     error?: Schema.Schema.AnyNoContext;
-    /** User-declared args of a paginated query — no `paginationOpts`. */
-    paginatedUserArgs?: Schema.Schema.AnyNoContext;
-    /** Page element schema of a paginated query. */
-    paginatedItem?: Schema.Schema.AnyNoContext;
-    /** Array-of-items schema of a paginated query — the page decode target. */
-    paginatedPage?: Schema.Schema.AnyNoContext;
+    kind: ConfectKind;
   };
   Convex: {
     /** @internal */
@@ -25,15 +20,43 @@ export type FunctionProvenance = Data.TaggedEnum<{
   };
 }>;
 
+/**
+ * The declaration shape of a Confect function — orthogonal to both the
+ * provenance origin (Confect vs Convex) and the function type
+ * (query/mutation/action). A `Standard` function declares its `args` and
+ * `returns` schemas directly; a `Paginated` function declares `userArgs` and
+ * `item` schemas from which the Convex-facing `args`/`returns` are composed.
+ */
+export type ConfectKind = Standard | Paginated;
+
+export interface Standard {
+  readonly _tag: "Standard";
+}
+
+export interface Paginated<
+  UserArgs extends AnyUserArgs = AnyUserArgs,
+  Item extends Schema.Schema.AnyNoContext = Schema.Schema.AnyNoContext,
+> {
+  readonly _tag: "Paginated";
+  /** User-declared args — no `paginationOpts`. */
+  readonly userArgs: UserArgs;
+  /** Page element schema. */
+  readonly item: Item;
+  /** Mutable array of items — the page decode target. */
+  readonly page: Schema.Schema.AnyNoContext;
+}
+
 export interface Confect<
   Args extends Schema.Schema.AnyNoContext,
   Returns extends Schema.Schema.AnyNoContext,
   Error extends Schema.Schema.AnyNoContext = never,
+  Kind extends ConfectKind = ConfectKind,
 > {
   readonly _tag: "Confect";
   readonly args: Args;
   readonly returns: Returns;
   readonly error?: Error;
+  readonly kind: Kind;
 }
 
 export interface AnyConfect extends Confect<
@@ -51,6 +74,8 @@ export interface Convex<Args extends DefaultFunctionArgs, Returns> {
 export interface AnyConvex extends Convex<DefaultFunctionArgs, any> {}
 
 export const FunctionProvenance = Data.taggedEnum<FunctionProvenance>();
+
+const Standard: Standard = { _tag: "Standard" };
 
 /**
  * Build a `Confect` provenance from lazy schema thunks. `args`, `returns`,
@@ -76,8 +101,8 @@ export const Confect = <
   args: () => Args,
   returns: () => Returns,
   error?: () => Error,
-): Confect<Args, Returns, Error> => {
-  const provenance = { _tag: "Confect" as const };
+): Confect<Args, Returns, Error, Standard> => {
+  const provenance = { _tag: "Confect" as const, kind: Standard };
 
   Lazy.defineProperty(provenance, "args", args);
   Lazy.defineProperty(provenance, "returns", returns);
@@ -85,7 +110,7 @@ export const Confect = <
     Lazy.defineProperty(provenance, "error", error);
   }
 
-  return provenance as Confect<Args, Returns, Error>;
+  return provenance as Confect<Args, Returns, Error, Standard>;
 };
 
 /**
@@ -130,11 +155,12 @@ export interface ConfectPaginated<
   UserArgs extends AnyUserArgs,
   Item extends Schema.Schema.AnyNoContext,
   Error extends Schema.Schema.AnyNoContext = never,
-> extends Confect<PaginatedArgs<UserArgs>, PaginatedReturns<Item>, Error> {
-  readonly paginatedUserArgs: UserArgs;
-  readonly paginatedItem: Item;
-  readonly paginatedPage: Schema.Schema.AnyNoContext;
-}
+> extends Confect<
+  PaginatedArgs<UserArgs>,
+  PaginatedReturns<Item>,
+  Error,
+  Paginated<UserArgs, Item>
+> {}
 
 export interface AnyConfectPaginated extends ConfectPaginated<
   AnyUserArgs,
@@ -144,12 +170,13 @@ export interface AnyConfectPaginated extends ConfectPaginated<
 
 /**
  * Build the provenance of a paginated query from lazy schema thunks, with the
- * same laziness contract as {@link Confect}. The user-facing schemas
- * (`paginatedUserArgs`, `paginatedItem`) are stored alongside the composed
- * Convex-facing ones (`args`, `returns`), which are derived lazily: `args`
- * spreads the user fields plus `paginationOpts`, and `returns` wraps the item
- * in `PaginationResult`. Composition living here means the composed schemas
- * can never drift from the stored user schemas.
+ * same laziness contract as {@link Confect}. The user-facing schemas live on
+ * the `Paginated` kind (`kind.userArgs`, `kind.item`, `kind.page`) — the kind
+ * container is built eagerly (it is cheap) while the schemas inside it stay
+ * lazy. The composed Convex-facing `args`/`returns` are derived lazily from
+ * them: `args` spreads the user fields plus `paginationOpts`, and `returns`
+ * wraps the item in `PaginationResult`. Composition living here means the
+ * composed schemas can never drift from the stored user schemas.
  */
 export const ConfectPaginated = <
   UserArgs extends AnyUserArgs,
@@ -160,16 +187,20 @@ export const ConfectPaginated = <
   item: () => Item,
   error?: () => Error,
 ): ConfectPaginated<UserArgs, Item, Error> => {
-  const provenance = { _tag: "Confect" as const };
+  const kind = { _tag: "Paginated" as const };
+  const paginatedKind = kind as Paginated<UserArgs, Item>;
+
+  Lazy.defineProperty(kind, "userArgs", userArgs);
+  Lazy.defineProperty(kind, "item", item);
+  Lazy.defineProperty(kind, "page", () =>
+    Schema.mutable(Schema.Array(paginatedKind.item)),
+  );
+
+  const provenance = { _tag: "Confect" as const, kind: paginatedKind };
   const self = provenance as ConfectPaginated<UserArgs, Item, Error>;
 
-  Lazy.defineProperty(provenance, "paginatedUserArgs", userArgs);
-  Lazy.defineProperty(provenance, "paginatedItem", item);
-  Lazy.defineProperty(provenance, "paginatedPage", () =>
-    Schema.mutable(Schema.Array(self.paginatedItem)),
-  );
   Lazy.defineProperty(provenance, "args", () => {
-    const fields = self.paginatedUserArgs.fields;
+    const fields = paginatedKind.userArgs.fields;
     if ("paginationOpts" in fields) {
       throw new globalThis.Error(
         "A paginated query's args schema must not declare `paginationOpts` — " +
@@ -182,7 +213,7 @@ export const ConfectPaginated = <
     });
   });
   Lazy.defineProperty(provenance, "returns", () =>
-    PaginationResult.PaginationResult(self.paginatedItem),
+    PaginationResult.PaginationResult(paginatedKind.item),
   );
   if (error !== undefined) {
     Lazy.defineProperty(provenance, "error", error);

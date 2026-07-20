@@ -187,7 +187,7 @@ describe("paginated queries", () => {
       expect(MutableRef.get(errorBuilt)).toBe(false);
     });
 
-    it("presence checks observe the paginated fields without forcing them", () => {
+    it("the kind tag is observable without forcing the schema thunks", () => {
       const argsBuilt = MutableRef.make(false);
       const itemBuilt = MutableRef.make(false);
       const spec = makePaginatedSpec({
@@ -195,11 +195,19 @@ describe("paginated queries", () => {
         item: () => MutableRef.set(itemBuilt, true),
       });
 
-      expect("paginatedUserArgs" in spec.functionProvenance).toBe(true);
-      expect("paginatedItem" in spec.functionProvenance).toBe(true);
-      expect("paginatedPage" in spec.functionProvenance).toBe(true);
+      expect(spec.functionProvenance.kind._tag).toBe("Paginated");
       expect(MutableRef.get(argsBuilt)).toBe(false);
       expect(MutableRef.get(itemBuilt)).toBe(false);
+    });
+
+    it("a standard spec's kind is Standard", () => {
+      const spec = FunctionSpec.publicQuery({
+        name: "list",
+        args: () => Schema.Struct({}),
+        returns: () => Schema.Null,
+      });
+
+      expect(spec.functionProvenance.kind._tag).toBe("Standard");
     });
 
     it("Ref.hasErrorSchema checks presence without forcing the error thunk", () => {
