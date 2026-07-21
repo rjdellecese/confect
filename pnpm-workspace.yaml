@@ -16,11 +16,11 @@ allowBuilds:
   sharp: true
 
 overrides:
-  convex: 1.40.0
-  effect: 3.21.2
+  convex: 1.42.3
+  effect: 3.22.0
   "@effect/typeclass": 0.40.0
-  react: 19.2.4
-  react-dom: 19.2.4
+  react: 19.2.7
+  react-dom: 19.2.7
 
 packageExtensions:
   "@mintlify/mdx":
