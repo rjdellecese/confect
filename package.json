@@ -1,8 +1,8 @@
 {
   "devDependencies": {
-    "@changesets/cli": "2.31.0",
+    "@changesets/cli": "2.31.1",
     "@changesets/config": "3.1.4",
-    "@effect/language-service": "0.86.6",
+    "@effect/language-service": "0.87.0",
     "@effect/platform-bun": "4.0.0-beta.99",
     "@effect/platform-node": "4.0.0-beta.99",
     "@types/node": "26.1.1",
@@ -10,13 +10,13 @@
     "dpdm": "4.2.0",
     "effect": "4.0.0-beta.99",
     "opensrc": "0.7.3",
-    "oxfmt": "0.58.0",
+    "oxfmt": "0.59.0",
     "oxlint": "1.68.0",
     "syncpack": "15.3.2",
-    "tsdown": "0.22.7",
+    "tsdown": "0.22.12",
     "typescript": "6.0.3",
     "unrun": "0.3.1",
-    "vite-plus": "0.2.4",
+    "vite-plus": "0.2.5",
     "vite-tsconfig-paths": "6.1.1",
     "vitest": "4.1.10"
   },
