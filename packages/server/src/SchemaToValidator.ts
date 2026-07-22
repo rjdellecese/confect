@@ -19,10 +19,8 @@ import type {
 import { v } from "convex/values";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
-import * as Cause from "effect/Cause";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
-import * as Exit from "effect/Exit";
 import * as Match from "effect/Match";
 import * as Number from "effect/Number";
 import * as Option from "effect/Option";
@@ -32,6 +30,7 @@ import * as SchemaAST from "effect/SchemaAST";
 import * as String from "effect/String";
 
 import * as GenericId from "@confect/core/GenericId";
+import { runSyncThrowInIsolate } from "./internal/runSyncInIsolate";
 import type {
   IsAny,
   IsOptional,
@@ -58,7 +57,7 @@ export const compileArgsSchema = <ConfectValue, ConvexValue>(
         : Effect.fail(new IndexSignaturesAreNotSupportedError()),
     ),
     Match.orElse(() => Effect.fail(new TopLevelMustBeObjectError())),
-    runSyncThrow,
+    runSyncThrowInIsolate,
   );
 };
 
@@ -67,7 +66,7 @@ export const compileArgsSchema = <ConfectValue, ConvexValue>(
 export const compileReturnsSchema = <ConfectValue, ConvexValue>(
   schema: Schema.Codec<ConfectValue, ConvexValue>,
 ): Validator<any, any, any> =>
-  runSyncThrow(compileAst(Schema.toEncoded(schema).ast));
+  runSyncThrowInIsolate(compileAst(Schema.toEncoded(schema).ast));
 
 // Table
 
@@ -98,7 +97,7 @@ export const compileTableSchema = <TableSchema extends Schema.Codec<any, any>>(
     ),
     Match.tag("Union", (unionAst) => compileAst(unionAst)),
     Match.orElse(() => Effect.fail(new TopLevelMustBeObjectOrUnionError())),
-    runSyncThrow,
+    runSyncThrowInIsolate,
   );
 };
 
@@ -252,7 +251,7 @@ type ValueTupleToValidatorTuple<VlTuple extends ReadonlyArray<ReadonlyValue>> =
 export const compileSchema = <T, E>(
   schema: Schema.Codec<T, E>,
 ): ValueToValidator<(typeof schema)["Encoded"]> =>
-  runSyncThrow(compileAst(schema.ast)) as any;
+  runSyncThrowInIsolate(compileAst(schema.ast)) as any;
 
 export const isRecursive = (ast: SchemaAST.AST): boolean =>
   pipe(
@@ -507,18 +506,6 @@ const handlePropertySignatures = (objectsAst: SchemaAST.Objects) =>
   );
 
 // Errors
-
-const runSyncThrow = <A, E>(effect: Effect.Effect<A, E>) =>
-  pipe(
-    effect,
-    Effect.runSyncExit,
-    Exit.match({
-      onSuccess: (validator) => validator,
-      onFailure: (cause) => {
-        throw Cause.squash(cause);
-      },
-    }),
-  );
 
 export class TopLevelMustBeObjectError extends Data.TaggedError(
   "TopLevelMustBeObjectError",
