@@ -159,6 +159,10 @@ export declare const api: {
         Id<"notes">
       >;
     };
+    scheduling: {
+      manyOpsMutation: FunctionReference<"mutation", "public", {}, number>;
+      manyOpsQuery: FunctionReference<"query", "public", {}, number>;
+    };
     typedErrors: {
       deleteNoteOrFail: FunctionReference<
         "mutation",

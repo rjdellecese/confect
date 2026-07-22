@@ -16,6 +16,7 @@ import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
+import type * as EffectScheduler from "effect/Scheduler";
 import * as ActionCtx from "./ActionCtx";
 import * as ActionRunner from "./ActionRunner";
 import * as Auth from "./Auth";
@@ -132,12 +133,24 @@ export type RegisteredFunction<
  * `Effect.orDie`, so nothing—not even a `ConvexError` the handler placed in its
  * error channel—reaches the client as a `ConvexError`. The fiber dies and
  * `runPromise` rejects with a generic failure.
+ *
+ * A `scheduler` in `runOptions` must be passed here as a run option rather
+ * than provided via `Effect.provideService` inside `effect`: the run option
+ * lands in the fiber's root context, while a service provided within `effect`
+ * pops before the `orDie`/`catch`/`result` wrappers this function adds. The
+ * fiber's op counter survives context pops, so a cooperative yield can fire
+ * inside those wrappers — only a root-context scheduler covers them.
  */
 export const runHandlerPromise =
-  (errorSchema: Schema.Codec<any, any> | undefined) =>
+  (
+    errorSchema: Schema.Codec<any, any> | undefined,
+    runOptions?: {
+      readonly scheduler?: EffectScheduler.Scheduler | undefined;
+    },
+  ) =>
   <A, E>(effect: Effect.Effect<A, E>): Promise<A> => {
     if (errorSchema === undefined) {
-      return Effect.runPromise(Effect.orDie(effect));
+      return Effect.runPromise(Effect.orDie(effect), runOptions);
     }
     const withConvexError = effect.pipe(
       Effect.catch((typedError) =>
@@ -150,7 +163,7 @@ export const runHandlerPromise =
         ),
       ),
     );
-    return Effect.runPromise(Effect.result(withConvexError)).then(
+    return Effect.runPromise(Effect.result(withConvexError), runOptions).then(
       Result.match({
         onFailure: (error) => {
           throw error;

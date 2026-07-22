@@ -31,6 +31,10 @@ export declare const api: {
       confectWithRawDateNow: FunctionReference<"query", "public", {}, number>;
       confectWithSpan: FunctionReference<"query", "public", {}, number>;
     };
+    scheduling: {
+      manyOpsMutation: FunctionReference<"mutation", "public", {}, number>;
+      manyOpsQuery: FunctionReference<"query", "public", {}, number>;
+    };
   };
 };
 
