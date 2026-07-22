@@ -16,7 +16,7 @@ allowBuilds:
   sharp: true
 
 overrides:
-  convex: 1.42.1
+  convex: 1.42.3
   convex-test: 0.0.54
   effect: 3.22.0
   "@effect/typeclass": 0.41.0

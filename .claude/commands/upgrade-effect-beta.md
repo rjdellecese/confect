@@ -1,10 +1,11 @@
 ---
-description: Bump the v10 prerelease branch to the latest Effect v4 beta, migrating source as needed, with a changeset and a PR against v10
+description: Bump the v10 prerelease branch to the latest Effect v4 beta and propagate main, migrating source as needed, with changesets and stacked PRs against v10
 ---
 
-Keep the `v10` prerelease line on the latest Effect v4 beta, and open a PR
-for review against `v10`. Never merge it yourself. (The managing-prereleases
-skill explains how the prerelease line itself works.)
+Keep the `v10` prerelease line on the latest Effect v4 beta and current with
+`main`, and open PRs for review against `v10`. Never merge them yourself.
+(The managing-prereleases skill explains how the prerelease line itself
+works.)
 
 ## Scope
 
@@ -15,36 +16,103 @@ skill explains how the prerelease line itself works.)
 - **Latest beta:** effect publishes v4 betas under the npm `beta` dist-tag,
   so `npm view effect@beta version` is the lookup. Compare it against the
   branch's current pin (`overrides.effect` in
-  `origin/v10:pnpm-workspace.yaml`). Already current → say so and stop — no
-  branch, no PR.
+  `origin/v10:pnpm-workspace.yaml`). Already current → no bump to do, but
+  still check for `main` changes to propagate before stopping.
+- **Changes from `main`:** the prerelease line absorbs `main` continuously
+  so the eventual `v10` → `main` merge stays small. Whether there's
+  anything to absorb is a **content** question, never an ancestry one:
+  sync PRs get squash-merged like every other PR in this repo, so
+  `git log origin/v10..origin/main` reports already-absorbed commits
+  forever and must not be used as the trigger. Instead, every run
+  performs the sync merge locally per the merge rules and keeps it only
+  if it changes content: `git diff origin/v10 HEAD` non-empty → deliver
+  it as a sync PR (see Branches and PRs); empty → `main` has nothing
+  new, discard the merge. Never open a PR whose only effect would be
+  recording merge ancestry. No beta to bump **and** no content to
+  propagate → say so and stop — no branch, no PR.
 - **In-scope packages:** `effect` plus its lockstep companions from the
   effect monorepo already present in the workspace (`@effect/platform-node`,
   `@effect/platform-bun`, `@effect/vitest`) — all move to the same beta
   number together. Everything else, including `@effect/language-service`
   (which versions independently), belongs to the other upgrade commands.
 
+## Branches and PRs
+
+A run produces up to two PRs, stacked when both are needed, so the merge is
+reviewed as what it is and the bump PR's diff shows only the bump and its
+migration:
+
+- **Sync PR** — branch `sync/main-into-v10`, only when the sync merge
+  changes content (see Scope). Reset from `origin/v10` at the start of
+  the run, then merge `origin/main` into it per the merge rules below.
+  The PR targets `v10`.
+- **Bump PR** — branch `deps/effect-v4-beta`, only when there's a beta to
+  bump. Reset from the tip of `sync/main-into-v10` when that branch is in
+  play this run, otherwise from `origin/v10`. In the stacked case the PR
+  targets `sync/main-into-v10` — merge the sync PR first, and when its
+  branch is deleted GitHub retargets the bump PR to `v10` automatically —
+  otherwise it targets `v10`.
+
+Push both branches with `--force-with-lease` so successive runs update the
+same open PRs instead of stacking new ones; refresh an existing PR's title,
+body, and base branch to match the current run's shape. Neither PR ever
+targets `main`.
+
 ## Rules
 
-- Work on `deps/effect-v4-beta`, reset from `origin/v10` at the start of
-  each run and pushed with `--force-with-lease`, so successive runs update
-  the same open PR instead of stacking new ones. The PR targets `v10`,
-  never `main`.
-- Bump every occurrence by searching the repo for the old beta string rather
-  than enumerating locations from memory — that catches the
-  `pnpm-workspace.yaml` `overrides` entry (which nothing lints, and a stale
-  entry silently forces the old version at install time), the exact
-  devDependency pins, and the `^4.0.0-beta.N` peer ranges. Raising the peer
-  floor is deliberate and correct here: the source is compiled against the
-  new beta's APIs. Then `pnpm install`, `pnpm lint:fix` (Syncpack) to
-  normalize, and confirm the new version actually resolved with
-  `pnpm why effect`.
+- Perform the sync merge as a real `git merge` of `origin/main` — not a
+  rebase or cherry-picks — so each conflict is resolved exactly once.
+  But expect the PR to be squash-merged: the merge commit's second
+  parent won't survive, ancestry won't converge, and that's fine — what
+  the sync keeps converged is content, not history. Don't request
+  "Create a merge commit" for sync PRs, and don't re-merge to repair
+  ancestry. Take `main`'s side of conflicts except where it would undo
+  the prerelease line: keep
+  `.changeset/pre.json`, `"baseBranch": "v10"` in `.changeset/config.json`,
+  the `v10` entries in the workflow branch lists, the `X.0.0-next.N`
+  versions and their changelog entries, and the Effect v4 pins (`main` is
+  still on v3 — its Effect version bumps never apply here). Never
+  hand-merge `pnpm-lock.yaml`; take either side and let `pnpm install`
+  regenerate it.
+- Changes reaching `v10` through the merge fall into two cases for
+  changelog purposes. Commits whose changesets are still pending on `main`
+  (merged there but not yet released) arrive with their changeset files
+  and ship as-is — don't fold or re-document them. Commits already
+  released on `main` arrive with their changesets consumed, so nothing
+  would mention them in the next `X.0.0-next.N` changelog entry — add a
+  `patch` changeset on the sync branch naming the stable range absorbed,
+  e.g. "Sync with `main`: this prerelease line now includes all changes
+  released in `@confect/*` 9.3.2–9.4.0 — see those versions' changelog
+  entries." Derive the range mechanically from changelogs, not from
+  `git merge-base` (squash merges leave the merge base permanently
+  stale): the versions absorbed are the stable `## 9.x.y` headings
+  present in `origin/main`'s CHANGELOG for a `@confect/*` package but
+  absent from `origin/v10`'s copy of the same file before the merge —
+  the fixed group versions together, so any one package's CHANGELOG
+  suffices. No missing headings → no released changes absorbed → skip
+  this changeset.
+- If code arriving from `main` doesn't compile against the branch's
+  current Effect v4 pin (`main` is on v3), migrate it on the sync branch:
+  the sync PR must be green at the current pin on its own, since it merges
+  into `v10` before — and independently of — the bump.
+- On the bump branch, bump every occurrence by searching the repo for the
+  old beta string rather than enumerating locations from memory — that
+  catches the `pnpm-workspace.yaml` `overrides` entry (which nothing
+  lints, and a stale entry silently forces the old version at install
+  time), the exact devDependency pins, and the `^4.0.0-beta.N` peer
+  ranges. Raising the peer floor is deliberate and correct here: the
+  source is compiled against the new beta's APIs. Then `pnpm install`,
+  `pnpm lint:fix` (Syncpack) to normalize, and confirm the new version
+  actually resolved with `pnpm why effect`.
 - Read the effect changelogs for every beta between old and new **before**
   touching source, then migrate the Confect source to the new APIs until
-  checks pass. Betas break APIs routinely; that migration is this command's
-  job, not a reason to bail.
-- If the migration genuinely can't be brought green with reasonable effort,
-  stop: no branch, no PR. Report what's blocking and the rough scope — the
-  next scheduled run will retry.
+  checks pass. Betas break APIs routinely; that migration is this
+  command's job, not a reason to bail.
+- If a migration genuinely can't be brought green with reasonable effort,
+  stop that PR: a blocked sync means no branches and no PRs at all (the
+  bump would build on a broken base); a blocked bump still delivers the
+  sync PR on its own. Either way, report what's blocking and the rough
+  scope — the next scheduled run will retry.
 - If the convex codegen surface is affected, re-run the server codegen
   scripts (`pnpm codegen:server:mock-backend` /
   `codegen:server:local-backend`) and commit the complete fixture output —
@@ -56,15 +124,22 @@ skill explains how the prerelease line itself works.)
 1. Verify with the full repo checks (`pnpm check`, `pnpm test`,
    `pnpm build`) plus the server backend suites
    (`pnpm test:server:mock-backend` and `pnpm test:server:local-backend`).
-   Anything the local environment genuinely can't run, leave to the PR's
-   CI — and get it green.
-2. Add a changeset with the create-changeset agent — the published peer
-   ranges changed, so this is user-facing. Use `patch`: the prerelease
-   line's pending major changeset already governs the `X.0.0-next.N`
-   version. State the new required beta and any consumer-visible
+   In the stacked case, run them on the sync branch before building the
+   bump on top, then again on the bump branch. Anything the local
+   environment genuinely can't run, leave to the PRs' CI — and get it
+   green.
+2. Author the changesets with the create-changeset agent. The sync
+   changeset (rules above) lives on the sync branch. The bump branch gets
+   its own changeset — the published peer ranges changed, so this is
+   user-facing. Use `patch` for both: the prerelease line's pending major
+   changeset already governs the `X.0.0-next.N` version. The bump
+   changeset states the new required beta and any consumer-visible
    consequences of the API changes.
-3. Push `deps/effect-v4-beta` (unless this session was assigned a branch)
-   and open a PR against `v10` — if a previous run's PR is still open,
-   refresh its title and body for the new beta. In the body: old → new
-   beta, links to the release notes covered, and a summary of the source
-   migrations made.
+3. Push the branches (unless this session was assigned a branch) and
+   open or refresh the PRs per Branches and PRs. Sync PR body: what the
+   merge changes, summarized from the content diff against `origin/v10`
+   (not from `git log`, which lists already-absorbed commits), the
+   stable version range absorbed (matching the changeset), and any
+   migrations needed to keep the merge green at the current pin. Bump PR
+   body: old → new beta, links to the release notes covered, and a
+   summary of the source migrations made.

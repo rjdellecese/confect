@@ -1,7 +1,7 @@
 {
   "name": "@confect/server",
   "description": "Backend bindings to the Convex platform",
-  "version": "9.2.3",
+  "version": "9.2.4",
   "author": "RJ Dellecese",
   "bugs": {
     "url": "https://github.com/rjdellecese/confect/issues"
@@ -13,7 +13,7 @@
     "@effect/platform": "0.97.0",
     "@effect/rpc": "0.75.1",
     "@effect/sql": "0.51.1",
-    "@effect/vitest": "0.29.0",
+    "@effect/vitest": "0.30.0",
     "@effect/workflow": "0.18.2",
     "@swc/jest": "0.2.39",
     "@types/node": "26.1.1",
@@ -21,11 +21,11 @@
     "convex-test": "0.0.54",
     "dotenv": "17.4.2",
     "effect": "3.22.0",
-    "tsdown": "0.22.4",
-    "tsx": "4.23.0",
-    "typescript": "5.9.3",
+    "tsdown": "0.22.12",
+    "tsx": "4.23.1",
+    "typescript": "6.0.3",
     "unrun": "0.3.1",
-    "vite": "8.1.4",
+    "vite": "8.1.5",
     "vite-tsconfig-paths": "6.1.1",
     "vitest": "4.1.10"
   },

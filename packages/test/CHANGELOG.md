@@ -1,5 +1,7 @@
 # @confect/test
 
+## 9.2.4
+
 ## 9.2.3
 
 ### Patch Changes

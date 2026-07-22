@@ -1,6 +1,5 @@
 import type { CommandExecutor } from "@effect/platform";
 import * as Command from "@effect/platform/Command";
-import * as FileSystem from "@effect/platform/FileSystem";
 import * as Path from "@effect/platform/Path";
 import * as NodeContext from "@effect/platform-node/NodeContext";
 import { pipe } from "effect/Function";
@@ -11,6 +10,7 @@ const runCommand = (
   args: string[],
 ): Effect.Effect<void, never, CommandExecutor.CommandExecutor> =>
   Command.make(command, ...args).pipe(
+    Command.stderr("inherit"),
     Command.exitCode,
     Effect.andThen((exitCode) =>
       exitCode !== 0
@@ -20,11 +20,10 @@ const runCommand = (
     Effect.orDie,
   );
 
-// Absolute path to the @confect/cli entry point. Resolved from this file's
-// location rather than relying on a `confect` bin in `node_modules/.bin/`,
-// which is brittle in CI: `pnpm install` runs before workspace packages are
-// built, so the bin link for `confect` ends up dangling until something
-// re-links it.
+// Absolute path to the `confect` bin shim, resolved from this file's
+// location rather than via a `confect` bin in `node_modules/.bin/`. The shim
+// owns the "build output is missing, run `pnpm build`" pre-flight, so this
+// file doesn't need its own existence check on the CLI's `dist/`.
 //
 // Note: `@confect/cli` is intentionally NOT declared as a (dev)dependency of
 // `@confect/server`. The CLI peer-depends on `@confect/server` (its codegen
@@ -34,7 +33,10 @@ const runCommand = (
 // `@confect/cli` themselves for the `pnpm confect codegen` calls in this
 // package's `codegen:*` scripts; this `globalSetup` resolves the binary by
 // filesystem path instead, so it does not require the dep graph either.
-const confectCliEntryUrl = new URL("../../cli/dist/index.mjs", import.meta.url);
+const confectCliEntryUrl = new URL(
+  "../../cli/bin/confect.mjs",
+  import.meta.url,
+);
 
 /**
  * Build a Vitest `globalSetup` that runs `confect codegen` against the
@@ -48,33 +50,18 @@ const confectCliEntryUrl = new URL("../../cli/dist/index.mjs", import.meta.url);
  *
  * Codegen runs both locally and on CI. The fixtures' generated outputs
  * (`confect/_generated/` and the wrapper files under `convex/`) are committed
- * to the repo, and CI verifies via `git diff --exit-code` that codegen
- * produces no changes—i.e. that the committed outputs are up-to-date.
+ * to the repo, and CI verifies (via the `verify-codegen-committed` action)
+ * that codegen produces no changes—i.e. that the committed outputs are
+ * up-to-date.
  */
 export const setupForFixture =
   (baseDir: string, fixtureSubpath: string) => () =>
     pipe(
       Effect.gen(function* () {
         const path = yield* Path.Path;
-        const fs = yield* FileSystem.FileSystem;
         const fixtureDir = path.resolve(baseDir, fixtureSubpath);
         const originalCwd = process.cwd();
         const cliEntry = yield* path.fromFileUrl(confectCliEntryUrl);
-
-        // Verify the @confect/cli build output exists before invoking it,
-        // so a fresh checkout that hasn't run `pnpm build` yet gets a clear
-        // remediation hint instead of an opaque ENOENT from `process.chdir`
-        // / `node <missing-path>`. This package's tests need `@confect/cli`'s
-        // `dist/` to exist as a workspace invariant; the dep graph used to
-        // (vacuously) signal that requirement, but the cycle-breaking
-        // refactor above means it's now only enforced by `pnpm build`.
-        if (!(yield* fs.exists(cliEntry))) {
-          return yield* Effect.dieMessage(
-            `@confect/cli's build output is missing at ${cliEntry}. ` +
-              `Run \`pnpm build\` from the repo root (or \`vp run --filter @confect/cli dev\` ` +
-              `for a watcher) before running this test suite.`,
-          );
-        }
 
         yield* Effect.gen(function* () {
           process.chdir(fixtureDir);

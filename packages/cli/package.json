@@ -1,10 +1,10 @@
 {
   "name": "@confect/cli",
   "description": "Developer tooling for codegen and sync",
-  "version": "9.2.3",
+  "version": "9.2.4",
   "author": "RJ Dellecese",
   "bin": {
-    "confect": "./dist/index.mjs"
+    "confect": "./bin/confect.mjs"
   },
   "bugs": {
     "url": "https://github.com/rjdellecese/confect/issues"
@@ -21,17 +21,17 @@
     "exsolve": "^1.1.0"
   },
   "devDependencies": {
-    "@convex-dev/workpool": "0.4.7",
-    "@effect/language-service": "0.86.6",
-    "@effect/vitest": "0.29.0",
+    "@convex-dev/workpool": "0.4.8",
+    "@effect/language-service": "0.87.0",
+    "@effect/vitest": "0.30.0",
     "@types/node": "26.1.1",
     "@vitest/coverage-v8": "4.1.10",
-    "convex": "1.42.1",
+    "convex": "1.42.3",
     "effect": "3.22.0",
-    "tsdown": "0.22.4",
-    "typescript": "5.9.3",
+    "tsdown": "0.22.12",
+    "typescript": "6.0.3",
     "unrun": "0.3.1",
-    "vite": "8.1.4",
+    "vite": "8.1.5",
     "vite-tsconfig-paths": "6.1.1",
     "vitest": "4.1.10"
   },
@@ -45,6 +45,7 @@
     "CHANGELOG.md",
     "LICENSE",
     "README.md",
+    "bin",
     "dist",
     "package.json"
   ],

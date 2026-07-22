@@ -1,26 +1,26 @@
 {
   "name": "@confect/react",
   "description": "Client-side bindings for React apps",
-  "version": "9.2.3",
+  "version": "9.2.4",
   "author": "RJ Dellecese",
   "bugs": {
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "devDependencies": {
-    "@effect/vitest": "0.29.0",
+    "@effect/vitest": "0.30.0",
     "@testing-library/react": "16.3.2",
     "@types/node": "26.1.1",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
-    "convex": "1.42.1",
+    "convex": "1.42.3",
     "effect": "3.22.0",
-    "happy-dom": "20.10.6",
+    "happy-dom": "20.11.0",
     "react": "19.2.7",
     "react-dom": "19.2.7",
-    "tsdown": "0.22.4",
-    "typescript": "5.9.3",
+    "tsdown": "0.22.12",
+    "typescript": "6.0.3",
     "unrun": "0.3.1",
-    "vite": "8.1.4",
+    "vite": "8.1.5",
     "vitest": "4.1.10"
   },
   "engines": {
