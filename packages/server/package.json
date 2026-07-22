@@ -13,7 +13,7 @@
     "@swc/jest": "0.2.39",
     "@types/node": "26.1.1",
     "@vitest/coverage-v8": "4.1.10",
-    "convex-test": "0.0.50",
+    "convex-test": "0.0.54",
     "dotenv": "17.4.2",
     "effect": "4.0.0-beta.100",
     "tsdown": "0.22.12",
