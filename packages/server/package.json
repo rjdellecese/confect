@@ -10,7 +10,7 @@
     "@ark/attest": "0.56.3",
     "@effect/cluster": "0.59.0",
     "@effect/experimental": "0.60.0",
-    "@effect/platform": "0.96.3",
+    "@effect/platform": "0.97.0",
     "@effect/rpc": "0.75.1",
     "@effect/sql": "0.51.1",
     "@effect/vitest": "0.30.0",
@@ -66,8 +66,8 @@
   "module": "./dist/index.js",
   "peerDependencies": {
     "@confect/core": "workspace:^",
-    "@effect/platform": "^0.96.1",
-    "@effect/platform-node": "^0.106.0",
+    "@effect/platform": "^0.97.0",
+    "@effect/platform-node": "^0.108.0",
     "convex": "^1.32.0",
     "effect": "^3.21.2"
   },
