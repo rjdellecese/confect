@@ -21,6 +21,7 @@ export default defineConfig({
     name: "@confect/server (local-backend)",
     include: ["test/local-backend/**/*.test.ts"],
     exclude: [...configDefaults.exclude, "**/*.spec.ts"],
+    fileParallelism: false,
     globalSetup: ["./test/local-backend/setup.ts"],
     testTimeout: 60_000,
     hookTimeout: 120_000,
