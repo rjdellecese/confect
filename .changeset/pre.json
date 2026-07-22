@@ -14,6 +14,7 @@
     "@confect/test": "9.2.1"
   },
   "changesets": [
+    "bump-effect-beta-100",
     "bump-effect-beta-98",
     "bump-effect-beta-99",
     "effect-v4",
