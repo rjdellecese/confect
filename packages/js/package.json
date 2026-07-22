@@ -1,7 +1,7 @@
 {
   "name": "@confect/js",
   "description": "JavaScript client bindings for any JS runtime",
-  "version": "10.0.0-next.3",
+  "version": "10.0.0-next.4",
   "author": "RJ Dellecese",
   "bugs": {
     "url": "https://github.com/rjdellecese/confect/issues"
