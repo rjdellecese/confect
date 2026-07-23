@@ -6,7 +6,7 @@ settings:
 
 overrides:
   convex: 1.42.3
-  effect: 4.0.0-beta.100
+  effect: 4.0.0-beta.101
   react: 19.2.7
   react-dom: 19.2.7
 
@@ -26,11 +26,11 @@ importers:
         specifier: 0.87.0
         version: 0.87.0
       '@effect/platform-bun':
-        specifier: 4.0.0-beta.100
-        version: 4.0.0-beta.100(effect@4.0.0-beta.100)
+        specifier: 4.0.0-beta.101
+        version: 4.0.0-beta.101(effect@4.0.0-beta.101)
       '@effect/platform-node':
-        specifier: 4.0.0-beta.100
-        version: 4.0.0-beta.100(effect@4.0.0-beta.100)(ioredis@5.11.1)
+        specifier: 4.0.0-beta.101
+        version: 4.0.0-beta.101(effect@4.0.0-beta.101)(ioredis@5.11.1)
       '@types/node':
         specifier: 26.1.1
         version: 26.1.1
@@ -41,8 +41,8 @@ importers:
         specifier: 4.2.0
         version: 4.2.0
       effect:
-        specifier: 4.0.0-beta.100
-        version: 4.0.0-beta.100
+        specifier: 4.0.0-beta.101
+        version: 4.0.0-beta.101
       opensrc:
         specifier: 0.7.3
         version: 0.7.3
@@ -110,8 +110,8 @@ importers:
         specifier: 0.1.120
         version: 0.1.120(@standard-schema/spec@1.1.0)(convex@1.42.3(react@19.2.7))(react@19.2.7)(typescript@6.0.3)(zod@4.3.6)
       effect:
-        specifier: 4.0.0-beta.100
-        version: 4.0.0-beta.100
+        specifier: 4.0.0-beta.101
+        version: 4.0.0-beta.101
       react:
         specifier: 19.2.7
         version: 19.2.7
@@ -153,8 +153,8 @@ importers:
         specifier: workspace:^
         version: link:../server
       '@effect/platform-node':
-        specifier: ^4.0.0-beta.100
-        version: 4.0.0-beta.100(effect@4.0.0-beta.100)(ioredis@5.11.1)
+        specifier: ^4.0.0-beta.101
+        version: 4.0.0-beta.101(effect@4.0.0-beta.101)(ioredis@5.11.1)
       bundle-require:
         specifier: ^5.1.0
         version: 5.1.0(esbuild@0.28.1)
@@ -175,8 +175,8 @@ importers:
         specifier: 0.87.0
         version: 0.87.0
       '@effect/vitest':
-        specifier: 4.0.0-beta.100
-        version: 4.0.0-beta.100(effect@4.0.0-beta.100)(vitest@4.1.10)
+        specifier: 4.0.0-beta.101
+        version: 4.0.0-beta.101(effect@4.0.0-beta.101)(vitest@4.1.10)
       '@types/node':
         specifier: 26.1.1
         version: 26.1.1
@@ -187,8 +187,8 @@ importers:
         specifier: 1.42.3
         version: 1.42.3(react@19.2.7)
       effect:
-        specifier: 4.0.0-beta.100
-        version: 4.0.0-beta.100
+        specifier: 4.0.0-beta.101
+        version: 4.0.0-beta.101
       tsdown:
         specifier: 0.22.12
         version: 0.22.12(tsx@4.23.1)(typescript@6.0.3)(unrun@0.3.1)
@@ -218,14 +218,14 @@ importers:
         specifier: 0.56.3
         version: 0.56.3(typescript@6.0.3)
       '@effect/vitest':
-        specifier: 4.0.0-beta.100
-        version: 4.0.0-beta.100(effect@4.0.0-beta.100)(vitest@4.1.10)
+        specifier: 4.0.0-beta.101
+        version: 4.0.0-beta.101(effect@4.0.0-beta.101)(vitest@4.1.10)
       '@types/node':
         specifier: 26.1.1
         version: 26.1.1
       effect:
-        specifier: 4.0.0-beta.100
-        version: 4.0.0-beta.100
+        specifier: 4.0.0-beta.101
+        version: 4.0.0-beta.101
       tsdown:
         specifier: 0.22.12
         version: 0.22.12(tsx@4.23.1)(typescript@6.0.3)(unrun@0.3.1)
@@ -252,14 +252,14 @@ importers:
         version: 1.42.3(react@19.2.7)
     devDependencies:
       '@effect/vitest':
-        specifier: 4.0.0-beta.100
-        version: 4.0.0-beta.100(effect@4.0.0-beta.100)(vitest@4.1.10)
+        specifier: 4.0.0-beta.101
+        version: 4.0.0-beta.101(effect@4.0.0-beta.101)(vitest@4.1.10)
       '@types/node':
         specifier: 26.1.1
         version: 26.1.1
       effect:
-        specifier: 4.0.0-beta.100
-        version: 4.0.0-beta.100
+        specifier: 4.0.0-beta.101
+        version: 4.0.0-beta.101
       tsdown:
         specifier: 0.22.12
         version: 0.22.12(tsx@4.23.1)(typescript@6.0.3)(unrun@0.3.1)
@@ -280,8 +280,8 @@ importers:
         version: link:../core
     devDependencies:
       '@effect/vitest':
-        specifier: 4.0.0-beta.100
-        version: 4.0.0-beta.100(effect@4.0.0-beta.100)(vitest@4.1.10)
+        specifier: 4.0.0-beta.101
+        version: 4.0.0-beta.101(effect@4.0.0-beta.101)(vitest@4.1.10)
       '@testing-library/react':
         specifier: 16.3.2
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -298,8 +298,8 @@ importers:
         specifier: 1.42.3
         version: 1.42.3(react@19.2.7)
       effect:
-        specifier: 4.0.0-beta.100
-        version: 4.0.0-beta.100
+        specifier: 4.0.0-beta.101
+        version: 4.0.0-beta.101
       happy-dom:
         specifier: 20.11.0
         version: 20.11.0
@@ -338,11 +338,11 @@ importers:
         specifier: 0.56.3
         version: 0.56.3(typescript@6.0.3)
       '@effect/platform-node':
-        specifier: 4.0.0-beta.100
-        version: 4.0.0-beta.100(effect@4.0.0-beta.100)(ioredis@5.11.1)
+        specifier: 4.0.0-beta.101
+        version: 4.0.0-beta.101(effect@4.0.0-beta.101)(ioredis@5.11.1)
       '@effect/vitest':
-        specifier: 4.0.0-beta.100
-        version: 4.0.0-beta.100(effect@4.0.0-beta.100)(vitest@4.1.10)
+        specifier: 4.0.0-beta.101
+        version: 4.0.0-beta.101(effect@4.0.0-beta.101)(vitest@4.1.10)
       '@swc/jest':
         specifier: 0.2.39
         version: 0.2.39(@swc/core@1.15.43)
@@ -359,8 +359,8 @@ importers:
         specifier: 17.4.2
         version: 17.4.2
       effect:
-        specifier: 4.0.0-beta.100
-        version: 4.0.0-beta.100
+        specifier: 4.0.0-beta.101
+        version: 4.0.0-beta.101
       tsdown:
         specifier: 0.22.12
         version: 0.22.12(tsx@4.23.1)(typescript@6.0.3)(unrun@0.3.1)
@@ -395,8 +395,8 @@ importers:
         specifier: 1.42.3
         version: 1.42.3(react@19.2.7)
       effect:
-        specifier: 4.0.0-beta.100
-        version: 4.0.0-beta.100
+        specifier: 4.0.0-beta.101
+        version: 4.0.0-beta.101
     devDependencies:
       '@confect/cli':
         specifier: workspace:*
@@ -414,8 +414,8 @@ importers:
         specifier: 1.42.3
         version: 1.42.3(react@19.2.7)
       effect:
-        specifier: 4.0.0-beta.100
-        version: 4.0.0-beta.100
+        specifier: 4.0.0-beta.101
+        version: 4.0.0-beta.101
       luxon:
         specifier: ^3.7.1
         version: 3.7.2
@@ -446,8 +446,8 @@ importers:
         specifier: 26.1.1
         version: 26.1.1
       effect:
-        specifier: 4.0.0-beta.100
-        version: 4.0.0-beta.100
+        specifier: 4.0.0-beta.101
+        version: 4.0.0-beta.101
       tsdown:
         specifier: 0.22.12
         version: 0.22.12(tsx@4.23.1)(typescript@6.0.3)(unrun@0.3.1)
@@ -595,28 +595,28 @@ packages:
     resolution: {integrity: sha512-GwZtEwBaOMyKea6YAtN0T0OGBtzJ8/y0KUIfyg29u3hnMRiXKlR2BRDqJmi+SbgaODJNNB3YOd6KuRB/vsxnWw==}
     hasBin: true
 
-  '@effect/platform-bun@4.0.0-beta.100':
-    resolution: {integrity: sha512-UyH4bgzlV3aJOXbUr/3Zej3MBPe9TDrdkwStLDpVn9Yc6dKIKOJBd0G/8+OQhunGAuCL9a4SaNvwhkMJajahrg==}
+  '@effect/platform-bun@4.0.0-beta.101':
+    resolution: {integrity: sha512-7cSiwufNCjO1d296KMjHjqFA1oDRVZMZEyYMzdqPvAdIhNQj16U+xZfMdeJuUb6/WouEWWultkhcCK5ysdxIcQ==}
     peerDependencies:
-      effect: 4.0.0-beta.100
+      effect: 4.0.0-beta.101
 
-  '@effect/platform-node-shared@4.0.0-beta.100':
-    resolution: {integrity: sha512-PMsCXQeK2wnlmnqGCc79oqK9CX8ipZvoHxAy/CRojMF+zHIluxh61L3pzWAYEbMb19Be4Bxgqs7gK2hiV8H8Pg==}
+  '@effect/platform-node-shared@4.0.0-beta.101':
+    resolution: {integrity: sha512-g4L7XiyJSNJLJVhlslyg2zBCQsoKQf1y1gd+Yfd+3wD9ymC+m7ymbd/5FGqnT1aXV6E2AwRr4D/R1eyRUikvWQ==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
-      effect: 4.0.0-beta.100
+      effect: 4.0.0-beta.101
 
-  '@effect/platform-node@4.0.0-beta.100':
-    resolution: {integrity: sha512-nH5xgxOLfPj5Bi0/o4OaDsR98Z59lHKGty+TDqckg7zRz6jry82hGW982NRPduzX0MJloDsGp/3rfeN4Hu7Keg==}
+  '@effect/platform-node@4.0.0-beta.101':
+    resolution: {integrity: sha512-pClk7dmMtHgM6Byu7CzGfrPvZ1/4BwmrRlCg2Op+iJozMkwVUxq8v4beK8b9SvxsliJjHZFznjvkVLX7LQjBqw==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
-      effect: 4.0.0-beta.100
+      effect: 4.0.0-beta.101
       ioredis: ^5.7.0
 
-  '@effect/vitest@4.0.0-beta.100':
-    resolution: {integrity: sha512-WoxrzPuxc+4QXb+7D1j8PwaBb9zVxHM2yw0sDz7fXij1Sx7X7T6LkYJ7m2xzWbfskIXxIdXVA+NnDSF8qAOGsw==}
+  '@effect/vitest@4.0.0-beta.101':
+    resolution: {integrity: sha512-F5Ur8pZYti0xkZFyb4hPZt8RrKQ1XBoC28ZkKxc7N1iPbhE9fWOvlWA1NC2XlN2wWG08yb5g5jR53LdOxjlhpQ==}
     peerDependencies:
-      effect: 4.0.0-beta.100
+      effect: 4.0.0-beta.101
       vitest: ^3.0.0 || ^4.0.0
 
   '@emnapi/core@1.11.1':
@@ -3903,8 +3903,8 @@ packages:
   ee-first@1.1.1:
     resolution: {integrity: sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow==}
 
-  effect@4.0.0-beta.100:
-    resolution: {integrity: sha512-K4ed+BS3HyE+NoAZ8pJss2DpuK41mb856IO7ZlPfnwBXbq8oTtAAurrsVnwe2hzPamIuaZp/Pq4/xp9qORYv8Q==}
+  effect@4.0.0-beta.101:
+    resolution: {integrity: sha512-HjowumlIo+orthn4jMlEJPuzIYPBV+uq/XiciHWhiedLsXQpWHdNJHO5d59BVDP5s1LPuvERcktwFqRXnJqnhA==}
 
   emoji-regex@10.6.0:
     resolution: {integrity: sha512-toUI84YS5YmxW219erniWD0CIVOo46xGKColeNQRgOzDorgBi1v4D71/OFzgD9GO2UGKIv1C3Sp8DAn0+j5w7A==}
@@ -7285,27 +7285,27 @@ snapshots:
 
   '@effect/language-service@0.87.0': {}
 
-  '@effect/platform-bun@4.0.0-beta.100(effect@4.0.0-beta.100)':
+  '@effect/platform-bun@4.0.0-beta.101(effect@4.0.0-beta.101)':
     dependencies:
-      '@effect/platform-node-shared': 4.0.0-beta.100(effect@4.0.0-beta.100)
-      effect: 4.0.0-beta.100
+      '@effect/platform-node-shared': 4.0.0-beta.101(effect@4.0.0-beta.101)
+      effect: 4.0.0-beta.101
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@effect/platform-node-shared@4.0.0-beta.100(effect@4.0.0-beta.100)':
+  '@effect/platform-node-shared@4.0.0-beta.101(effect@4.0.0-beta.101)':
     dependencies:
       '@types/ws': 8.18.1
-      effect: 4.0.0-beta.100
+      effect: 4.0.0-beta.101
       ws: 8.21.0
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@effect/platform-node@4.0.0-beta.100(effect@4.0.0-beta.100)(ioredis@5.11.1)':
+  '@effect/platform-node@4.0.0-beta.101(effect@4.0.0-beta.101)(ioredis@5.11.1)':
     dependencies:
-      '@effect/platform-node-shared': 4.0.0-beta.100(effect@4.0.0-beta.100)
-      effect: 4.0.0-beta.100
+      '@effect/platform-node-shared': 4.0.0-beta.101(effect@4.0.0-beta.101)
+      effect: 4.0.0-beta.101
       ioredis: 5.11.1
       mime: 4.1.0
       undici: 8.8.0
@@ -7313,9 +7313,9 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@effect/vitest@4.0.0-beta.100(effect@4.0.0-beta.100)(vitest@4.1.10)':
+  '@effect/vitest@4.0.0-beta.101(effect@4.0.0-beta.101)(vitest@4.1.10)':
     dependencies:
-      effect: 4.0.0-beta.100
+      effect: 4.0.0-beta.101
       vitest: 4.1.10(@types/node@26.1.1)(@vitest/browser-preview@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.0)(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))
 
   '@emnapi/core@1.11.1':
@@ -10156,7 +10156,7 @@ snapshots:
 
   ee-first@1.1.1: {}
 
-  effect@4.0.0-beta.100:
+  effect@4.0.0-beta.101:
     dependencies:
       '@standard-schema/spec': 1.1.0
       fast-check: 4.9.0
