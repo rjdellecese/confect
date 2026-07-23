@@ -20,6 +20,7 @@
     "effect-v4",
     "microtask-scheduler-in-queries-and-mutations",
     "prevent-scheduler-yield-in-module-scope-runs",
+    "spotty-carrots-brake",
     "sync-main-into-v10-9-2-2-9-2-4",
     "upgrade-effect-convex-react"
   ]
