@@ -6,7 +6,6 @@ import {
   type RouteSpecWithPathPrefix,
 } from "convex/server";
 import * as Array from "effect/Array";
-import * as Effect from "effect/Effect";
 import type * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import type * as Path from "effect/Path";
@@ -17,7 +16,6 @@ import * as HttpServer from "effect/unstable/http/HttpServer";
 import type * as ActionRunner from "./ActionRunner";
 import type * as Auth from "./Auth";
 import * as ConvexConfigProvider from "./ConvexConfigProvider";
-import { runSyncInIsolate } from "./internal/runSyncInIsolate";
 import type * as MutationRunner from "./MutationRunner";
 import type * as QueryRunner from "./QueryRunner";
 import * as RegisteredFunction from "./RegisteredFunction";
@@ -109,14 +107,13 @@ export const make = (routes: Routes): ConvexHttpRouter => {
     disableLogger: true,
   });
 
-  const httpAction = httpActionGeneric((ctx, request): Promise<Response> => {
-    // The ctx-backed service layers are all synchronous and finalizer-free,
-    // so the scope can close as soon as the context is built.
-    const services = runSyncInIsolate(
-      Effect.scoped(Layer.build(RegisteredFunction.baseActionLayer(ctx))),
-    );
-    return handler(request, services);
-  });
+  const httpAction = httpActionGeneric(
+    (ctx, request): Promise<Response> =>
+      // The ctx-backed services are plain synchronous constructors, so the
+      // per-request context needs no Effect run of its own — the only Effect
+      // execution for an HTTP request is the web handler's internal fork.
+      handler(request, RegisteredFunction.baseActionContext(ctx)),
+  );
 
   const convexHttpRouter = httpRouter();
 

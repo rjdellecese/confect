@@ -28,3 +28,6 @@ export type ActionRunner = typeof ActionRunner.Identifier;
 
 export const layer = (runAction: GenericActionCtx<any>["runAction"]) =>
   Layer.succeed(ActionRunner, make(runAction));
+
+export const context = (runAction: GenericActionCtx<any>["runAction"]) =>
+  Context.make(ActionRunner, make(runAction));

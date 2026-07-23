@@ -30,7 +30,6 @@ import * as SchemaAST from "effect/SchemaAST";
 import * as String from "effect/String";
 
 import * as GenericId from "@confect/core/GenericId";
-import { runSyncThrowInIsolate } from "./internal/runSyncInIsolate";
 import type {
   IsAny,
   IsOptional,
@@ -45,7 +44,10 @@ import type {
 
 export const compileArgsSchema = <ConfectValue, ConvexValue>(
   argsSchema: Schema.Codec<ConfectValue, ConvexValue>,
-): PropertyValidators => {
+): Effect.Effect<
+  PropertyValidators,
+  CompileAstError | TopLevelMustBeObjectError
+> => {
   const ast = Schema.toEncoded(argsSchema).ast;
 
   return pipe(
@@ -57,7 +59,6 @@ export const compileArgsSchema = <ConfectValue, ConvexValue>(
         : Effect.fail(new IndexSignaturesAreNotSupportedError()),
     ),
     Match.orElse(() => Effect.fail(new TopLevelMustBeObjectError())),
-    runSyncThrowInIsolate,
   );
 };
 
@@ -65,8 +66,8 @@ export const compileArgsSchema = <ConfectValue, ConvexValue>(
 
 export const compileReturnsSchema = <ConfectValue, ConvexValue>(
   schema: Schema.Codec<ConfectValue, ConvexValue>,
-): Validator<any, any, any> =>
-  runSyncThrowInIsolate(compileAst(Schema.toEncoded(schema).ast));
+): Effect.Effect<Validator<any, any, any>, CompileAstError> =>
+  compileAst(Schema.toEncoded(schema).ast);
 
 // Table
 
@@ -84,7 +85,10 @@ export type TableSchemaToTableValidator<
 
 export const compileTableSchema = <TableSchema extends Schema.Codec<any, any>>(
   schema: TableSchema,
-): TableSchemaToTableValidator<TableSchema> => {
+): Effect.Effect<
+  TableSchemaToTableValidator<TableSchema>,
+  CompileAstError | TopLevelMustBeObjectOrUnionError
+> => {
   const ast = Schema.toEncoded(schema).ast;
 
   return pipe(
@@ -92,13 +96,15 @@ export const compileTableSchema = <TableSchema extends Schema.Codec<any, any>>(
     Match.value,
     Match.tag("Objects", ({ indexSignatures }) =>
       Array.isReadonlyArrayEmpty(indexSignatures)
-        ? (compileAst(ast) as Effect.Effect<any>)
+        ? compileAst(ast)
         : Effect.fail(new IndexSignaturesAreNotSupportedError()),
     ),
     Match.tag("Union", (unionAst) => compileAst(unionAst)),
     Match.orElse(() => Effect.fail(new TopLevelMustBeObjectOrUnionError())),
-    runSyncThrowInIsolate,
-  );
+  ) as Effect.Effect<
+    TableSchemaToTableValidator<TableSchema>,
+    CompileAstError | TopLevelMustBeObjectOrUnionError
+  >;
 };
 
 // Compiler
@@ -250,8 +256,10 @@ type ValueTupleToValidatorTuple<VlTuple extends ReadonlyArray<ReadonlyValue>> =
 
 export const compileSchema = <T, E>(
   schema: Schema.Codec<T, E>,
-): ValueToValidator<(typeof schema)["Encoded"]> =>
-  runSyncThrowInIsolate(compileAst(schema.ast)) as any;
+): Effect.Effect<
+  ValueToValidator<(typeof schema)["Encoded"]>,
+  CompileAstError
+> => compileAst(schema.ast) as any;
 
 export const isRecursive = (ast: SchemaAST.AST): boolean =>
   pipe(
@@ -296,16 +304,7 @@ export const isRecursive = (ast: SchemaAST.AST): boolean =>
 export const compileAst = (
   ast: SchemaAST.AST,
   isOptionalPropertyOfTypeLiteral = false,
-): Effect.Effect<
-  Validator<any, any, any>,
-  | UnsupportedSchemaTypeError
-  | UnsupportedPropertySignatureKeyTypeError
-  | IndexSignaturesAreNotSupportedError
-  | MixedIndexAndPropertySignaturesAreNotSupportedError
-  | OptionalTupleElementsAreNotSupportedError
-  | EmptyTupleIsNotSupportedError
-  | EmptyUnionIsNotSupportedError
-> =>
+): Effect.Effect<Validator<any, any, any>, CompileAstError> =>
   isRecursive(ast)
     ? Effect.succeed(v.any())
     : pipe(
@@ -600,3 +599,19 @@ export class OptionalTupleElementsAreNotSupportedError extends Data.TaggedError(
   }
   /* v8 ignore stop */
 }
+
+/** Every failure `compileAst` can produce. */
+export type CompileAstError =
+  | UnsupportedSchemaTypeError
+  | UnsupportedPropertySignatureKeyTypeError
+  | IndexSignaturesAreNotSupportedError
+  | MixedIndexAndPropertySignaturesAreNotSupportedError
+  | OptionalTupleElementsAreNotSupportedError
+  | EmptyTupleIsNotSupportedError
+  | EmptyUnionIsNotSupportedError;
+
+/** Every failure the schema→validator compilers can produce. */
+export type CompileError =
+  | CompileAstError
+  | TopLevelMustBeObjectError
+  | TopLevelMustBeObjectOrUnionError;

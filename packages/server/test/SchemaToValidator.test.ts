@@ -519,322 +519,372 @@ describe(compileAst, () => {
 });
 
 describe(compileSchema, () => {
-  test("any", () => {
-    const expectedValidator = v.any();
+  effect("any", () =>
+    Effect.gen(function* () {
+      const expectedValidator = v.any();
 
-    const schema = Schema.Any;
-    const compiledValidator = compileSchema(schema);
+      const schema = Schema.Any;
+      const compiledValidator = yield* compileSchema(schema);
 
-    expect(compiledValidator).toStrictEqual(expectedValidator);
-    expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
-  });
+      expect(compiledValidator).toStrictEqual(expectedValidator);
+      expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
+    }),
+  );
 
-  test("literal", () => {
-    const expectedValidator = v.literal("LiteralString");
+  effect("literal", () =>
+    Effect.gen(function* () {
+      const expectedValidator = v.literal("LiteralString");
 
-    const schema = Schema.Literal("LiteralString");
-    const compiledValidator = compileSchema(schema);
+      const schema = Schema.Literal("LiteralString");
+      const compiledValidator = yield* compileSchema(schema);
 
-    expect(compiledValidator).toStrictEqual(expectedValidator);
-    expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
-  });
+      expect(compiledValidator).toStrictEqual(expectedValidator);
+      expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
+    }),
+  );
 
-  test("id", () => {
-    const expectedValidator = v.id("users");
+  effect("id", () =>
+    Effect.gen(function* () {
+      const expectedValidator = v.id("users");
 
-    const schema = GenericId("users");
-    const compiledValidator = compileSchema(schema);
+      const schema = GenericId("users");
+      const compiledValidator = yield* compileSchema(schema);
 
-    expect(compiledValidator).toStrictEqual(expectedValidator);
-  });
+      expect(compiledValidator).toStrictEqual(expectedValidator);
+    }),
+  );
 
-  test("boolean", () => {
-    const expectedValidator = v.boolean();
+  effect("boolean", () =>
+    Effect.gen(function* () {
+      const expectedValidator = v.boolean();
 
-    const schema = Schema.Boolean;
-    const compiledValidator = compileSchema(schema);
+      const schema = Schema.Boolean;
+      const compiledValidator = yield* compileSchema(schema);
 
-    expect(compiledValidator).toStrictEqual(expectedValidator);
-    expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
-  });
+      expect(compiledValidator).toStrictEqual(expectedValidator);
+      expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
+    }),
+  );
 
-  test("string", () => {
-    const expectedValidator = v.string();
+  effect("string", () =>
+    Effect.gen(function* () {
+      const expectedValidator = v.string();
 
-    const schema = Schema.String;
-    const compiledValidator = compileSchema(schema);
+      const schema = Schema.String;
+      const compiledValidator = yield* compileSchema(schema);
 
-    expect(compiledValidator).toStrictEqual(expectedValidator);
-    expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
-  });
+      expect(compiledValidator).toStrictEqual(expectedValidator);
+      expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
+    }),
+  );
 
-  test("branded string", () => {
-    const expectedValidator = v.string();
+  effect("branded string", () =>
+    Effect.gen(function* () {
+      const expectedValidator = v.string();
 
-    const schema = Schema.String.pipe(Schema.brand("BrandedString"));
-    const compiledValidator = compileSchema(schema);
+      const schema = Schema.String.pipe(Schema.brand("BrandedString"));
+      const compiledValidator = yield* compileSchema(schema);
 
-    expect(compiledValidator).toStrictEqual(expectedValidator);
-    expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
-  });
+      expect(compiledValidator).toStrictEqual(expectedValidator);
+      expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
+    }),
+  );
 
-  test("number", () => {
-    const expectedValidator = v.float64();
+  effect("number", () =>
+    Effect.gen(function* () {
+      const expectedValidator = v.float64();
 
-    const schema = Schema.Number;
-    const compiledValidator = compileSchema(schema);
+      const schema = Schema.Number;
+      const compiledValidator = yield* compileSchema(schema);
 
-    expect(compiledValidator).toStrictEqual(expectedValidator);
-    expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
-  });
+      expect(compiledValidator).toStrictEqual(expectedValidator);
+      expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
+    }),
+  );
 
-  test("array buffer", () => {
-    const expectedValidator = v.bytes();
+  effect("array buffer", () =>
+    Effect.gen(function* () {
+      const expectedValidator = v.bytes();
 
-    const schema = Schema.instanceOf(ArrayBuffer);
-    const compiledValidator = compileSchema(schema);
+      const schema = Schema.instanceOf(ArrayBuffer);
+      const compiledValidator = yield* compileSchema(schema);
 
-    expect(compiledValidator).toStrictEqual(expectedValidator);
-    expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
-  });
+      expect(compiledValidator).toStrictEqual(expectedValidator);
+      expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
+    }),
+  );
 
-  test("empty object", () => {
-    const expectedValidator = v.object({});
+  effect("empty object", () =>
+    Effect.gen(function* () {
+      const expectedValidator = v.object({});
 
-    const schema = Schema.Struct({});
-    const compiledValidator = compileSchema(schema);
+      const schema = Schema.Struct({});
+      const compiledValidator = yield* compileSchema(schema);
 
-    expect(compiledValidator).toStrictEqual(expectedValidator);
-    expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
-  });
+      expect(compiledValidator).toStrictEqual(expectedValidator);
+      expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
+    }),
+  );
 
-  test("simple object", () => {
-    const expectedValidator = v.object({ foo: v.string(), bar: v.float64() });
+  effect("simple object", () =>
+    Effect.gen(function* () {
+      const expectedValidator = v.object({ foo: v.string(), bar: v.float64() });
 
-    const schema = Schema.Struct({ foo: Schema.String, bar: Schema.Number });
-    const compiledValidator = compileSchema(schema);
+      const schema = Schema.Struct({ foo: Schema.String, bar: Schema.Number });
+      const compiledValidator = yield* compileSchema(schema);
 
-    expect(compiledValidator).toStrictEqual(expectedValidator);
-    expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
-  });
+      expect(compiledValidator).toStrictEqual(expectedValidator);
+      expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
+    }),
+  );
 
-  test("object with optional field", () => {
-    const expectedValidator = v.object({ foo: v.optional(v.string()) });
+  effect("object with optional field", () =>
+    Effect.gen(function* () {
+      const expectedValidator = v.object({ foo: v.optional(v.string()) });
 
-    const schema = Schema.Struct({
-      foo: Schema.optional(Schema.String),
-    });
-    const compiledValidator = compileSchema(schema);
+      const schema = Schema.Struct({
+        foo: Schema.optional(Schema.String),
+      });
+      const compiledValidator = yield* compileSchema(schema);
 
-    expect(compiledValidator).toStrictEqual(expectedValidator);
-    expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
-  });
+      expect(compiledValidator).toStrictEqual(expectedValidator);
+      expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
+    }),
+  );
 
-  test("nested objects", () => {
-    const expectedValidator = v.object({
-      foo: v.object({ bar: v.object({ baz: v.string() }) }),
-    });
+  effect("nested objects", () =>
+    Effect.gen(function* () {
+      const expectedValidator = v.object({
+        foo: v.object({ bar: v.object({ baz: v.string() }) }),
+      });
 
-    const schema = Schema.Struct({
-      foo: Schema.Struct({ bar: Schema.Struct({ baz: Schema.String }) }),
-    });
-    const compiledValidator = compileSchema(schema);
+      const schema = Schema.Struct({
+        foo: Schema.Struct({ bar: Schema.Struct({ baz: Schema.String }) }),
+      });
+      const compiledValidator = yield* compileSchema(schema);
 
-    expect(compiledValidator).toStrictEqual(expectedValidator);
-    expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
-  });
+      expect(compiledValidator).toStrictEqual(expectedValidator);
+      expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
+    }),
+  );
 
-  test("array", () => {
-    const expectedValidator = v.array(v.string());
+  effect("array", () =>
+    Effect.gen(function* () {
+      const expectedValidator = v.array(v.string());
 
-    const schema = Schema.Array(Schema.String);
-    const compiledValidator = compileSchema(schema);
+      const schema = Schema.Array(Schema.String);
+      const compiledValidator = yield* compileSchema(schema);
 
-    expect(compiledValidator).toStrictEqual(expectedValidator);
-    expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
-  });
+      expect(compiledValidator).toStrictEqual(expectedValidator);
+      expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
+    }),
+  );
 
-  test("array of union", () => {
-    const expectedValidator = v.array(v.union(v.string(), v.float64()));
+  effect("array of union", () =>
+    Effect.gen(function* () {
+      const expectedValidator = v.array(v.union(v.string(), v.float64()));
 
-    const schema = Schema.Array(Schema.Union([Schema.String, Schema.Number]));
-    const compiledValidator = compileSchema(schema);
+      const schema = Schema.Array(Schema.Union([Schema.String, Schema.Number]));
+      const compiledValidator = yield* compileSchema(schema);
 
-    expect(compiledValidator).toStrictEqual(expectedValidator);
-    expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
-  });
+      expect(compiledValidator).toStrictEqual(expectedValidator);
+      expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
+    }),
+  );
 
-  test("non-empty array", () => {
-    const expectedValidator = v.array(v.string());
-    type ExpectedValidator = typeof expectedValidator;
+  effect("non-empty array", () =>
+    Effect.gen(function* () {
+      const expectedValidator = v.array(v.string());
+      type ExpectedValidator = typeof expectedValidator;
 
-    const schema = Schema.NonEmptyArray(Schema.String);
-    const compiledValidator = compileSchema(schema);
-    type CompiledValidator = typeof compiledValidator;
+      const schema = Schema.NonEmptyArray(Schema.String);
+      const compiledValidator = yield* compileSchema(schema);
+      type CompiledValidator = typeof compiledValidator;
 
-    expect(compiledValidator).toStrictEqual(expectedValidator);
-    expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
-  });
+      expect(compiledValidator).toStrictEqual(expectedValidator);
+      expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+    }),
+  );
 
   describe("refinements", () => {
-    test("int", () => {
-      const expectedValidator = v.number();
-      type ExpectedValidator = typeof expectedValidator;
-
-      const compiledValidator = compileSchema(Schema.Int);
-      type CompiledValidator = typeof compiledValidator;
-
-      expect(compiledValidator).toStrictEqual(expectedValidator);
-      expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
-    });
-
-    test("filter", () => {
-      const expectedValidator = v.string();
-      type ExpectedValidator = typeof expectedValidator;
-
-      const compiledValidator = compileSchema(
-        Schema.String.check(Schema.makeFilter((s: string) => s.length > 1)),
-      );
-      type CompiledValidator = typeof compiledValidator;
-
-      expect(compiledValidator).toStrictEqual(expectedValidator);
-      expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
-    });
-
-    describe("record", () => {
-      test("simple record", () => {
-        const expectedValidator = v.record(v.string(), v.number());
+    effect("int", () =>
+      Effect.gen(function* () {
+        const expectedValidator = v.number();
         type ExpectedValidator = typeof expectedValidator;
 
-        const compiledValidator = compileSchema(
-          Schema.Record(Schema.String, Schema.Number),
+        const compiledValidator = yield* compileSchema(Schema.Int);
+        type CompiledValidator = typeof compiledValidator;
+
+        expect(compiledValidator).toStrictEqual(expectedValidator);
+        expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+      }),
+    );
+
+    effect("filter", () =>
+      Effect.gen(function* () {
+        const expectedValidator = v.string();
+        type ExpectedValidator = typeof expectedValidator;
+
+        const compiledValidator = yield* compileSchema(
+          Schema.String.check(Schema.makeFilter((s: string) => s.length > 1)),
         );
         type CompiledValidator = typeof compiledValidator;
 
         expect(compiledValidator).toStrictEqual(expectedValidator);
         expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
-      });
+      }),
+    );
+
+    describe("record", () => {
+      effect("simple record", () =>
+        Effect.gen(function* () {
+          const expectedValidator = v.record(v.string(), v.number());
+          type ExpectedValidator = typeof expectedValidator;
+
+          const compiledValidator = yield* compileSchema(
+            Schema.Record(Schema.String, Schema.Number),
+          );
+          type CompiledValidator = typeof compiledValidator;
+
+          expect(compiledValidator).toStrictEqual(expectedValidator);
+          expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+        }),
+      );
     });
   });
 
   describe("optional GenericId (Schema.optional, not exact)", () => {
-    test("object with optional GenericId field (not exact)", () => {
-      const expectedValidator = v.object({
-        userId: v.optional(v.id("users")),
-      });
-      type ExpectedValidator = typeof expectedValidator;
+    effect("object with optional GenericId field (not exact)", () =>
+      Effect.gen(function* () {
+        const expectedValidator = v.object({
+          userId: v.optional(v.id("users")),
+        });
+        type ExpectedValidator = typeof expectedValidator;
 
-      const schema = Schema.Struct({
-        userId: Schema.optional(GenericId("users")),
-      });
-      const compiledValidator = compileSchema(schema);
-      type CompiledValidator = typeof compiledValidator;
+        const schema = Schema.Struct({
+          userId: Schema.optional(GenericId("users")),
+        });
+        const compiledValidator = yield* compileSchema(schema);
+        type CompiledValidator = typeof compiledValidator;
 
-      expect(compiledValidator).toStrictEqual(expectedValidator);
-      expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
-    });
+        expect(compiledValidator).toStrictEqual(expectedValidator);
+        expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+      }),
+    );
 
-    test("object with optional GenericId field (exact)", () => {
-      const expectedValidator = v.object({
-        userId: v.optional(v.id("users")),
-      });
-      type ExpectedValidator = typeof expectedValidator;
+    effect("object with optional GenericId field (exact)", () =>
+      Effect.gen(function* () {
+        const expectedValidator = v.object({
+          userId: v.optional(v.id("users")),
+        });
+        type ExpectedValidator = typeof expectedValidator;
 
-      const schema = Schema.Struct({
-        userId: Schema.optionalKey(GenericId("users")),
-      });
-      const compiledValidator = compileSchema(schema);
-      type CompiledValidator = typeof compiledValidator;
+        const schema = Schema.Struct({
+          userId: Schema.optionalKey(GenericId("users")),
+        });
+        const compiledValidator = yield* compileSchema(schema);
+        type CompiledValidator = typeof compiledValidator;
 
-      expect(compiledValidator).toStrictEqual(expectedValidator);
-      expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
-    });
+        expect(compiledValidator).toStrictEqual(expectedValidator);
+        expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+      }),
+    );
   });
 });
 
 describe("suspend", () => {
-  test("object with optional recursive field", () => {
-    const expectedValidator = v.any();
-    type ExpectedValidator = typeof expectedValidator;
+  effect("object with optional recursive field", () =>
+    Effect.gen(function* () {
+      const expectedValidator = v.any();
+      type ExpectedValidator = typeof expectedValidator;
 
-    type foo = {
-      foo?: foo | undefined;
-    };
-    const Foo = Schema.Struct({
-      foo: Schema.suspend((): Schema.Codec<foo> => Foo).pipe(Schema.optional),
-    });
-    const compiledValidator = compileSchema(Foo);
-    type CompiledValidator = typeof compiledValidator;
+      type foo = {
+        foo?: foo | undefined;
+      };
+      const Foo = Schema.Struct({
+        foo: Schema.suspend((): Schema.Codec<foo> => Foo).pipe(Schema.optional),
+      });
+      const compiledValidator = yield* compileSchema(Foo);
+      type CompiledValidator = typeof compiledValidator;
 
-    expect(compiledValidator).toStrictEqual(expectedValidator);
-    expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
-  });
+      expect(compiledValidator).toStrictEqual(expectedValidator);
+      expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
+    }),
+  );
 
-  test("object with required recursive field", () => {
-    const expectedValidator = v.any();
-    type ExpectedValidator = typeof expectedValidator;
+  effect("object with required recursive field", () =>
+    Effect.gen(function* () {
+      const expectedValidator = v.any();
+      type ExpectedValidator = typeof expectedValidator;
 
-    type Foo = {
-      foo: Foo;
-    };
-    const Foo = Schema.Struct({
-      foo: Schema.suspend((): Schema.Codec<Foo> => Foo),
-    });
-    const compiledValidator = compileSchema(Foo);
-    type CompiledValidator = typeof compiledValidator;
+      type Foo = {
+        foo: Foo;
+      };
+      const Foo = Schema.Struct({
+        foo: Schema.suspend((): Schema.Codec<Foo> => Foo),
+      });
+      const compiledValidator = yield* compileSchema(Foo);
+      type CompiledValidator = typeof compiledValidator;
 
-    expect(compiledValidator).toStrictEqual(expectedValidator);
-    expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
-  });
+      expect(compiledValidator).toStrictEqual(expectedValidator);
+      expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
+    }),
+  );
 
-  test("array with recursive element", () => {
-    const expectedValidator = v.any();
-    type ExpectedValidator = typeof expectedValidator;
+  effect("array with recursive element", () =>
+    Effect.gen(function* () {
+      const expectedValidator = v.any();
+      type ExpectedValidator = typeof expectedValidator;
 
-    type Foo = readonly Foo[];
-    const Foo = Schema.Array(Schema.suspend((): Schema.Codec<Foo> => Foo));
-    const compiledValidator = compileSchema(Foo);
-    type CompiledValidator = typeof compiledValidator;
+      type Foo = readonly Foo[];
+      const Foo = Schema.Array(Schema.suspend((): Schema.Codec<Foo> => Foo));
+      const compiledValidator = yield* compileSchema(Foo);
+      type CompiledValidator = typeof compiledValidator;
 
-    expect(compiledValidator).toStrictEqual(expectedValidator);
-    expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
-  });
+      expect(compiledValidator).toStrictEqual(expectedValidator);
+      expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
+    }),
+  );
 
-  test("tuple with recursive element", () => {
-    const expectedValidator = v.any();
-    type ExpectedValidator = typeof expectedValidator;
+  effect("tuple with recursive element", () =>
+    Effect.gen(function* () {
+      const expectedValidator = v.any();
+      type ExpectedValidator = typeof expectedValidator;
 
-    type Foo = readonly [Foo, string];
-    const Foo = Schema.Tuple([
-      Schema.suspend((): Schema.Codec<Foo> => Foo),
-      Schema.String,
-    ]);
-    const compiledValidator = compileSchema(Foo);
-    type CompiledValidator = typeof compiledValidator;
+      type Foo = readonly [Foo, string];
+      const Foo = Schema.Tuple([
+        Schema.suspend((): Schema.Codec<Foo> => Foo),
+        Schema.String,
+      ]);
+      const compiledValidator = yield* compileSchema(Foo);
+      type CompiledValidator = typeof compiledValidator;
 
-    expect(compiledValidator).toStrictEqual(expectedValidator);
-    expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
-  });
+      expect(compiledValidator).toStrictEqual(expectedValidator);
+      expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
+    }),
+  );
 
-  test("union with recursive element", () => {
-    const expectedValidator = v.any();
-    type ExpectedValidator = typeof expectedValidator;
+  effect("union with recursive element", () =>
+    Effect.gen(function* () {
+      const expectedValidator = v.any();
+      type ExpectedValidator = typeof expectedValidator;
 
-    type Foo = {
-      foos: readonly Foo[];
-    } | null;
-    const Foo = Schema.Union([
-      Schema.Struct({
-        foos: Schema.Array(Schema.suspend((): Schema.Codec<Foo> => Foo)),
-      }),
-      Schema.Null,
-    ]);
-    const compiledValidator = compileSchema(Foo);
-    type CompiledValidator = typeof compiledValidator;
+      type Foo = {
+        foos: readonly Foo[];
+      } | null;
+      const Foo = Schema.Union([
+        Schema.Struct({
+          foos: Schema.Array(Schema.suspend((): Schema.Codec<Foo> => Foo)),
+        }),
+        Schema.Null,
+      ]);
+      const compiledValidator = yield* compileSchema(Foo);
+      type CompiledValidator = typeof compiledValidator;
 
-    expect(compiledValidator).toStrictEqual(expectedValidator);
-    expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
-  });
+      expect(compiledValidator).toStrictEqual(expectedValidator);
+      expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
+    }),
+  );
 });
 
 describe("ValueToValidator", () => {
@@ -1365,109 +1415,127 @@ describe("ValueToValidator", () => {
 });
 
 describe(compileTableSchema, () => {
-  test("succeeds if provided Schema is a Struct", () => {
-    const compiledValidator = compileTableSchema(
-      Schema.Struct({
-        foo: Schema.String,
-        bar: Schema.optional(Schema.Struct({ bar: Schema.Number })),
+  effect("succeeds if provided Schema is a Struct", () =>
+    Effect.gen(function* () {
+      const compiledValidator = yield* compileTableSchema(
+        Schema.Struct({
+          foo: Schema.String,
+          bar: Schema.optional(Schema.Struct({ bar: Schema.Number })),
+        }),
+      );
+
+      const expectedValidator = v.object({
+        foo: v.string(),
+        bar: v.optional(v.object({ bar: v.float64() })),
+      });
+
+      expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
+      expect(compiledValidator).toStrictEqual(expectedValidator);
+    }),
+  );
+
+  effect("succeeds if provided Schema is Schema.optional", () =>
+    Effect.gen(function* () {
+      const compiledValidator = yield* compileTableSchema(
+        Schema.Struct({
+          text: Schema.String,
+          userId: Schema.optional(GenericId("users")),
+        }),
+      );
+
+      const expectedValidator = v.object({
+        text: v.string(),
+        userId: v.optional(v.id("users")),
+      });
+
+      expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
+      expect(compiledValidator).toStrictEqual(expectedValidator);
+    }),
+  );
+
+  effect("succeeds if provided Schema has a name field and optional ID", () =>
+    Effect.gen(function* () {
+      const compiledValidator = yield* compileTableSchema(
+        Schema.Struct({
+          name: Schema.String,
+          userId: Schema.optional(GenericId("users")),
+        }),
+      );
+
+      const expectedValidator = v.object({
+        name: v.string(),
+        userId: v.optional(v.id("users")),
+      });
+
+      expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
+      expect(compiledValidator).toStrictEqual(expectedValidator);
+    }),
+  );
+
+  effect(
+    "succeeds if provided Schema has a name field and optional bytes",
+    () =>
+      Effect.gen(function* () {
+        const compiledValidator = yield* compileTableSchema(
+          Schema.Struct({
+            name: Schema.String,
+            bytes: Schema.optional(Schema.instanceOf(ArrayBuffer)),
+          }),
+        );
+
+        const expectedValidator = v.object({
+          name: v.string(),
+          bytes: v.optional(v.bytes()),
+        });
+
+        expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
+        expect(compiledValidator).toStrictEqual(expectedValidator);
       }),
-    );
+  );
 
-    const expectedValidator = v.object({
-      foo: v.string(),
-      bar: v.optional(v.object({ bar: v.float64() })),
-    });
+  effect(
+    "succeeds if provided Schema is Schema.optionalWith(…, { exact: true })",
+    () =>
+      Effect.gen(function* () {
+        const compiledValidator = yield* compileTableSchema(
+          Schema.Struct({
+            text: Schema.String,
+            userId: Schema.optionalKey(GenericId("users")),
+          }),
+        );
 
-    expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
-    expect(compiledValidator).toStrictEqual(expectedValidator);
-  });
+        const expectedValidator = v.object({
+          text: v.string(),
+          userId: v.optional(v.id("users")),
+        });
 
-  test("succeeds if provided Schema is Schema.optional", () => {
-    const compiledValidator = compileTableSchema(
-      Schema.Struct({
-        text: Schema.String,
-        userId: Schema.optional(GenericId("users")),
+        expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
+        expect(compiledValidator).toStrictEqual(expectedValidator);
       }),
-    );
+  );
 
-    const expectedValidator = v.object({
-      text: v.string(),
-      userId: v.optional(v.id("users")),
-    });
+  effect("succeeds if provided Schema is a Union", () =>
+    Effect.gen(function* () {
+      const compiledValidator = yield* compileTableSchema(
+        Schema.Union([Schema.String, Schema.Number]),
+      );
 
-    expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
-    expect(compiledValidator).toStrictEqual(expectedValidator);
-  });
+      const expectedValidator = v.union(v.string(), v.number());
 
-  test("succeeds if provided Schema has a name field and optional ID", () => {
-    const compiledValidator = compileTableSchema(
-      Schema.Struct({
-        name: Schema.String,
-        userId: Schema.optional(GenericId("users")),
-      }),
-    );
+      expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
+      expect(compiledValidator).toStrictEqual(expectedValidator);
+    }),
+  );
 
-    const expectedValidator = v.object({
-      name: v.string(),
-      userId: v.optional(v.id("users")),
-    });
+  effect("fails if provided Schema is neither a Struct nor a Union", () =>
+    Effect.gen(function* () {
+      const exit = yield* Effect.exit(compileTableSchema(Schema.String));
 
-    expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
-    expect(compiledValidator).toStrictEqual(expectedValidator);
-  });
-
-  test("succeeds if provided Schema has a name field and optional bytes", () => {
-    const compiledValidator = compileTableSchema(
-      Schema.Struct({
-        name: Schema.String,
-        bytes: Schema.optional(Schema.instanceOf(ArrayBuffer)),
-      }),
-    );
-
-    const expectedValidator = v.object({
-      name: v.string(),
-      bytes: v.optional(v.bytes()),
-    });
-
-    expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
-    expect(compiledValidator).toStrictEqual(expectedValidator);
-  });
-
-  test("succeeds if provided Schema is Schema.optionalWith(…, { exact: true })", () => {
-    const compiledValidator = compileTableSchema(
-      Schema.Struct({
-        text: Schema.String,
-        userId: Schema.optionalKey(GenericId("users")),
-      }),
-    );
-
-    const expectedValidator = v.object({
-      text: v.string(),
-      userId: v.optional(v.id("users")),
-    });
-
-    expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
-    expect(compiledValidator).toStrictEqual(expectedValidator);
-  });
-
-  test("succeeds if provided Schema is a Union", () => {
-    const compiledValidator = compileTableSchema(
-      Schema.Union([Schema.String, Schema.Number]),
-    );
-
-    const expectedValidator = v.union(v.string(), v.number());
-
-    expectTypeOf(compiledValidator).toEqualTypeOf(expectedValidator);
-    expect(compiledValidator).toStrictEqual(expectedValidator);
-  });
-
-  test("fails if provided Schema is neither a Struct nor a Union", () => {
-    const stringSchema = Schema.String;
-
-    expect(() => compileTableSchema(stringSchema)).toThrow(
-      new TopLevelMustBeObjectOrUnionError(),
-    );
-  });
+      expect(exit).toStrictEqual(
+        Exit.fail(new TopLevelMustBeObjectOrUnionError()),
+      );
+    }),
+  );
 
   test("fails if provided Schema requires context", () => {
     expectTypeOf<Schema.Codec<any, any> & Schema.Struct<any>>().toExtend<
@@ -1479,46 +1547,41 @@ describe(compileTableSchema, () => {
     >().not.toExtend<Parameters<typeof compileTableSchema>[0]>();
   });
 
-  test("fails if provided Schema contains index signatures", () => {
-    const structWithIndexSignatures = Schema.StructWithRest(
-      Schema.Struct({ foo: Schema.String }),
-      [Schema.Record(Schema.String, Schema.String)],
-    );
-
-    expect(() => compileTableSchema(structWithIndexSignatures)).toThrow(
-      new IndexSignaturesAreNotSupportedError(),
-    );
-  });
-
-  effect("fails if provided Schema is not a Struct or a Union", () =>
+  effect("fails if provided Schema contains index signatures", () =>
     Effect.gen(function* () {
-      const exit = yield* Effect.try({
-        try: () => compileTableSchema(Schema.String),
-        catch: (e) => e as TopLevelMustBeObjectOrUnionError,
-      }).pipe(Effect.exit);
+      const structWithIndexSignatures = Schema.StructWithRest(
+        Schema.Struct({ foo: Schema.String }),
+        [Schema.Record(Schema.String, Schema.String)],
+      );
+
+      const exit = yield* Effect.exit(
+        compileTableSchema(structWithIndexSignatures),
+      );
 
       expect(exit).toStrictEqual(
-        Exit.fail(new TopLevelMustBeObjectOrUnionError()),
+        Exit.fail(new IndexSignaturesAreNotSupportedError()),
       );
     }),
   );
 });
 
 describe(compileArgsSchema, () => {
-  test("extracts the wrapping schema and returns the object", () => {
-    const compiledArgsValidator = compileArgsSchema(
-      Schema.Struct({
-        foo: Schema.String,
-        bar: Schema.optional(Schema.Number),
-      }),
-    );
-    const expectedArgsValidator = {
-      foo: v.string(),
-      bar: v.optional(v.number()),
-    };
+  effect("extracts the wrapping schema and returns the object", () =>
+    Effect.gen(function* () {
+      const compiledArgsValidator = yield* compileArgsSchema(
+        Schema.Struct({
+          foo: Schema.String,
+          bar: Schema.optional(Schema.Number),
+        }),
+      );
+      const expectedArgsValidator = {
+        foo: v.string(),
+        bar: v.optional(v.number()),
+      };
 
-    expect(compiledArgsValidator).toStrictEqual(expectedArgsValidator);
-  });
+      expect(compiledArgsValidator).toStrictEqual(expectedArgsValidator);
+    }),
+  );
 
   effect("fails if provided Schema contains index signatures", () =>
     Effect.gen(function* () {
@@ -1527,10 +1590,9 @@ describe(compileArgsSchema, () => {
         [Schema.Record(Schema.String, Schema.String)],
       );
 
-      const exit = yield* Effect.try({
-        try: () => compileArgsSchema(structWithIndexSignatures),
-        catch: (e) => e as IndexSignaturesAreNotSupportedError,
-      }).pipe(Effect.exit);
+      const exit = yield* Effect.exit(
+        compileArgsSchema(structWithIndexSignatures),
+      );
 
       expect(exit).toStrictEqual(
         Exit.fail(new IndexSignaturesAreNotSupportedError()),
@@ -1540,10 +1602,7 @@ describe(compileArgsSchema, () => {
 
   effect("fails if provided Schema is not a Struct", () =>
     Effect.gen(function* () {
-      const exit = yield* Effect.try({
-        try: () => compileArgsSchema(Schema.String),
-        catch: (e) => e as TopLevelMustBeObjectError,
-      }).pipe(Effect.exit);
+      const exit = yield* Effect.exit(compileArgsSchema(Schema.String));
 
       expect(exit).toStrictEqual(Exit.fail(new TopLevelMustBeObjectError()));
     }),

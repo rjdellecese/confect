@@ -28,3 +28,6 @@ export type MutationRunner = typeof MutationRunner.Identifier;
 
 export const layer = (runMutation: GenericActionCtx<any>["runMutation"]) =>
   Layer.succeed(MutationRunner, make(runMutation));
+
+export const context = (runMutation: GenericActionCtx<any>["runMutation"]) =>
+  Context.make(MutationRunner, make(runMutation));

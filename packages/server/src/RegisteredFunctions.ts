@@ -7,10 +7,11 @@ import * as Effect from "effect/Effect";
 import * as Ref from "effect/Ref";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as GroupImpl from "./GroupImpl";
-import { runSyncInIsolate } from "./internal/runSyncInIsolate";
-import { mapLeaves } from "./internal/utils";
+import { runSyncThrowInIsolate } from "./internal/runSyncInIsolate";
+import { mapLeavesEffect } from "./internal/utils";
 import type * as RegisteredFunction from "./RegisteredFunction";
 import * as RegistryItem from "./RegistryItem";
+import type * as SchemaToValidator from "./SchemaToValidator";
 
 export type RegisteredFunctions<Spec_ extends Spec.AnyWithProps> =
   Types.Simplify<RegisteredFunctionsHelper<Spec.Groups<Spec_>>>;
@@ -74,6 +75,11 @@ export interface AnyWithProps {
  * with any other group built in the same process — the built registry holds
  * exactly this group's functions at the top level.
  *
+ * The layer build and every function's construction (including its
+ * args/returns validator compilation) run under a single isolate-safe
+ * execution boundary — the one Effect run for a generated group module.
+ * Compile failures throw their tagged error at module load.
+ *
  * Only the runtime `databaseSchema` value is needed at runtime (it is forwarded
  * to `makeRegisteredFunction` to build each function's ctx services); the
  * group's `GroupSpec` is supplied purely as the `Group` type parameter to shape
@@ -87,23 +93,28 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
   makeRegisteredFunction: (
     databaseSchema: DatabaseSchema.AnyWithProps,
     registryItem: RegistryItem.AnyWithProps,
-  ) => RegisteredFunction.Any,
-): RegisteredFunctionsForGroupSpec<Group> => {
-  const registryItems = Effect.gen(function* () {
-    const registry = yield* Registry.Registry;
-    return yield* Ref.get(registry);
-  }).pipe(
-    Effect.provide(groupLayer),
-    Effect.provideService(
-      Registry.Registry,
-      Ref.makeUnsafe<Registry.RegistryItems>({}),
-    ),
-    runSyncInIsolate,
-  );
+  ) => Effect.Effect<RegisteredFunction.Any, SchemaToValidator.CompileError>,
+): RegisteredFunctionsForGroupSpec<Group> =>
+  Effect.gen(function* () {
+    const registryItems = yield* Effect.gen(function* () {
+      const registry = yield* Registry.Registry;
+      return yield* Ref.get(registry);
+    }).pipe(
+      Effect.provide(groupLayer),
+      Effect.provideService(
+        Registry.Registry,
+        Ref.makeUnsafe<Registry.RegistryItems>({}),
+      ),
+    );
 
-  return mapLeaves<RegistryItem.AnyWithProps, RegisteredFunction.Any>(
-    registryItems as { [key: string]: RegistryItem.AnyWithProps },
-    RegistryItem.isRegistryItem,
-    (registryItem) => makeRegisteredFunction(databaseSchema, registryItem),
-  ) as RegisteredFunctionsForGroupSpec<Group>;
-};
+    return yield* mapLeavesEffect<
+      RegistryItem.AnyWithProps,
+      RegisteredFunction.Any,
+      SchemaToValidator.CompileError,
+      never
+    >(
+      registryItems as { [key: string]: RegistryItem.AnyWithProps },
+      RegistryItem.isRegistryItem,
+      (registryItem) => makeRegisteredFunction(databaseSchema, registryItem),
+    );
+  }).pipe(runSyncThrowInIsolate) as RegisteredFunctionsForGroupSpec<Group>;

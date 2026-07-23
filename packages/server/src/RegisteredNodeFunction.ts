@@ -5,21 +5,24 @@ import {
   type DefaultFunctionArgs,
   internalActionGeneric,
 } from "convex/server";
-import type { Effect } from "effect";
 import type { Schema } from "effect";
+import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Match from "effect/Match";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as Handler from "./Handler";
 import * as RegisteredFunction from "./RegisteredFunction";
 import type * as RegistryItem from "./RegistryItem";
+import type * as SchemaToValidator from "./SchemaToValidator";
 
 export const make = (
   databaseSchema: DatabaseSchema.AnyWithProps,
   { functionSpec, handler }: RegistryItem.AnyWithProps,
-): RegisteredFunction.Any =>
+): Effect.Effect<RegisteredFunction.Any, SchemaToValidator.CompileError> =>
   Match.value(functionSpec.functionProvenance).pipe(
-    Match.tag("Convex", () => handler as RegisteredFunction.Any),
+    Match.tag("Convex", () =>
+      Effect.succeed(handler as RegisteredFunction.Any),
+    ),
     Match.tag("Confect", () => {
       const { functionVisibility, functionProvenance } =
         functionSpec as FunctionSpec.AnyConfect;
@@ -30,13 +33,14 @@ export const make = (
         Match.exhaustive,
       );
 
-      return genericFunction(
+      return Effect.map(
         nodeActionFunction(databaseSchema, {
           args: functionProvenance.args,
           returns: functionProvenance.returns,
           error: functionProvenance.error,
           handler: handler as Handler.AnyConfectProvenance,
         }),
+        (definition) => genericFunction(definition),
       );
     }),
     Match.exhaustive,

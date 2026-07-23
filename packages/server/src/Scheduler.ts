@@ -48,3 +48,6 @@ export type Scheduler = typeof Scheduler.Identifier;
 
 export const layer = (scheduler: ConvexScheduler) =>
   Layer.succeed(Scheduler, make(scheduler));
+
+export const context = (scheduler: ConvexScheduler) =>
+  Context.make(Scheduler, make(scheduler));

@@ -30,4 +30,9 @@ export class StorageReader extends Context.Service<
 >()("@confect/server/StorageReader") {
   static readonly layer = (storageReader: ConvexStorageReader) =>
     Layer.succeed(this, make(storageReader));
+
+  // Named `makeContext` because the `Context.Service` base class already
+  // declares an incompatible `context` static.
+  static readonly makeContext = (storageReader: ConvexStorageReader) =>
+    Context.make(this, make(storageReader));
 }

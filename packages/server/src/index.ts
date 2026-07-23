@@ -3,6 +3,12 @@ export * as ActionRunner from "./ActionRunner";
 export * as Auth from "./Auth";
 export * as BlobNotFoundError from "./BlobNotFoundError";
 export * as ConvexConfigProvider from "./ConvexConfigProvider";
+// `ConvexSchema` is deliberately NOT re-exported here: it imports
+// `convex/server`'s `defineSchema`, and the generated function-group modules
+// import this barrel — re-exporting it would pull the deploy-schema artifact
+// into every function bundle (see REVIEW.md, bundle isolation). The generated
+// `convexSchema.ts` imports the `@confect/server/ConvexSchema` subpath
+// directly.
 export * as CronJob from "./CronJob";
 export * as CronJobs from "./CronJobs";
 export * as DatabaseReader from "./DatabaseReader";

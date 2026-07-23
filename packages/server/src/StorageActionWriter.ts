@@ -30,4 +30,10 @@ export class StorageActionWriter extends Context.Service<
 >()("@confect/server/StorageActionWriter") {
   static readonly layer = (storageActionWriter: ConvexStorageActionWriter) =>
     Layer.succeed(this, make(storageActionWriter));
+
+  // Named `makeContext` because the `Context.Service` base class already
+  // declares an incompatible `context` static.
+  static readonly makeContext = (
+    storageActionWriter: ConvexStorageActionWriter,
+  ) => Context.make(this, make(storageActionWriter));
 }

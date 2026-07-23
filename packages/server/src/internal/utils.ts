@@ -27,6 +27,31 @@ export const mapLeaves = <T, U>(
   return result;
 };
 
+export const mapLeavesEffect = <T, U, E, R>(
+  obj: NestedObject<T>,
+  leafRefinement: Predicate.Refinement<unknown, T>,
+  f: (value: T) => Effect.Effect<U, E, R>,
+): Effect.Effect<NestedObject<U>, E, R> =>
+  Effect.gen(function* () {
+    const result: NestedObject<U> = {};
+
+    for (const key in obj) {
+      const value = obj[key];
+
+      if (leafRefinement(value)) {
+        result[key] = yield* f(value as T);
+      } else {
+        result[key] = yield* mapLeavesEffect(
+          value as NestedObject<T>,
+          leafRefinement,
+          f,
+        );
+      }
+    }
+
+    return result;
+  });
+
 const collectBranchLeaves = <T>(
   obj: NestedObject<T>,
   leafRefinement: Predicate.Refinement<unknown, T>,

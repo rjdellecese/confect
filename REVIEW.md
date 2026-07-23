@@ -45,10 +45,13 @@ Important any change (chiefly in `packages/cli/src/templates.ts`, the generated
 2. **Deploy schema stays out of the runtime bundle.** `_generated/schema.ts`
    (the runtime `DatabaseSchema`) must import `@confect/server` and never
    `convex/server`; `_generated/convexSchema.ts` (the deploy `SchemaDefinition`)
-   must import `convex/server`'s `defineSchema` and never `@confect/server`.
-   Flag any runtime code path or template that makes a function bundle reach
-   `convex/server`'s `defineSchema`, or that merges the two schema artifacts
-   back into a single module.
+   must import only the dedicated `@confect/server/ConvexSchema` subpath —
+   never the `@confect/server` barrel. The reverse also holds: the barrel
+   (`index.ts`) must never re-export `ConvexSchema`, because the generated
+   function-group modules import the barrel and `ConvexSchema` reaches
+   `convex/server`'s `defineSchema`. Flag any runtime code path or template
+   that makes a function bundle reach `defineSchema`, or that merges the two
+   schema artifacts back into a single module.
 
 ## Always check: spec / group / table builders stay pure
 
@@ -60,6 +63,28 @@ mutating its input in place — load-bearing for one code path and broken for
 another. Flag as 🔴 Important any builder that mutates an input or `this` in
 place, relies on such mutation for object identity, or runs side effects when a
 `*.spec.ts` / `confect/tables/*.ts` module is merely imported.
+
+## Always check: one Effect execution boundary per Convex host entry point
+
+Convex evaluates function modules — and runs queries/mutations — inside an
+isolate that bans `setTimeout` and lacks `setImmediate`, which Effect's default
+scheduler and `Effect.runSync` can touch when a fiber crosses its op budget.
+All Effect execution in `@confect/server` therefore flows through audited
+runners, exactly one per host entry point:
+
+| Host entry point                                                     | Boundary                                                                                                       |
+| -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Function-group module (`_generated/registeredFunctions/groups/*.ts`) | one `runSyncThrowInIsolate` in `RegisteredFunctions.buildForGroup`                                             |
+| Schema module (`_generated/convexSchema.ts`)                         | one `runSyncThrowInIsolate` in `ConvexSchema.make`                                                             |
+| Direct `table.tableDefinition` access                                | one `runSyncThrowInIsolate` in the lazy getter (`Table.ts`)                                                    |
+| Handler invocation                                                   | `Effect.runPromise` in `RegisteredFunction.runHandlerPromise` (queries/mutations pass the microtask scheduler) |
+| HTTP request                                                         | none of Confect's — only the web handler's internal fork                                                       |
+
+Flag as 🔴 Important any new `Effect.runSync*`/`runPromise*`/`runFork*` call in
+`packages/server/src/` outside `internal/runSyncInIsolate.ts` and
+`runHandlerPromise`, and any new `runSync*InIsolate` call site that executes
+_inside_ the flow of an existing boundary (an interior boundary) — helpers
+below a boundary should return `Effect`s, not run them.
 
 ## Verification bar
 

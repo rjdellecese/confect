@@ -25,3 +25,6 @@ export type QueryRunner = typeof QueryRunner.Identifier;
 
 export const layer = (runQuery: GenericActionCtx<any>["runQuery"]) =>
   Layer.succeed(QueryRunner, make(runQuery));
+
+export const context = (runQuery: GenericActionCtx<any>["runQuery"]) =>
+  Context.make(QueryRunner, make(runQuery));

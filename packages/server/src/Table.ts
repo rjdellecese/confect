@@ -15,7 +15,10 @@ import {
 import type { GenericValidator, Validator } from "convex/values";
 import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
+import * as Effect from "effect/Effect";
+import { runSyncThrowInIsolate } from "./internal/runSyncInIsolate";
 import {
+  type CompileError,
   compileTableSchema,
   type TableSchemaToTableValidator,
 } from "./SchemaToValidator";
@@ -374,31 +377,73 @@ const makeBound = <
     ),
   );
 
-  Lazy.defineProperty(bound, "tableDefinition", () => {
-    const fields = (bound as { Fields: TableSchema_ }).Fields;
-    let definition: TableDefinition<any, any, any, any> = defineTable(
-      compileTableSchema(fields),
+  const computeTableDefinition = (): Effect.Effect<
+    TableDefinition<any, any, any, any>,
+    CompileError
+  > =>
+    Effect.map(
+      compileTableSchema((bound as { Fields: TableSchema_ }).Fields),
+      (validator) => {
+        let definition: TableDefinition<any, any, any, any> =
+          defineTable(validator);
+        for (const [name, indexFields] of Object.entries(
+          state.indexes as Record<string, any>,
+        )) {
+          definition = definition.index(name, indexFields);
+        }
+        for (const [name, config] of Object.entries(
+          state.searchIndexes as Record<string, any>,
+        )) {
+          definition = definition.searchIndex(name, config);
+        }
+        for (const [name, config] of Object.entries(
+          state.vectorIndexes as Record<string, any>,
+        )) {
+          definition = definition.vectorIndex(name, config);
+        }
+        return definition;
+      },
     );
-    for (const [name, indexFields] of Object.entries(
-      state.indexes as Record<string, any>,
-    )) {
-      definition = definition.index(name, indexFields);
-    }
-    for (const [name, config] of Object.entries(
-      state.searchIndexes as Record<string, any>,
-    )) {
-      definition = definition.searchIndex(name, config);
-    }
-    for (const [name, config] of Object.entries(
-      state.vectorIndexes as Record<string, any>,
-    )) {
-      definition = definition.vectorIndex(name, config);
-    }
-    return definition;
+
+  // Memoised outside the Lazy getter so the Effect path (`ConvexSchema.make`)
+  // and the getter share one computation: whichever runs first caches, and
+  // both return the identical `TableDefinition` instance. On failure nothing
+  // is cached (and the Lazy property is never installed), so both paths retry
+  // — the same semantics the getter had when it compiled directly.
+  let cachedTableDefinition: TableDefinition<any, any, any, any> | undefined;
+  const tableDefinitionEffect = Effect.suspend(() =>
+    cachedTableDefinition !== undefined
+      ? Effect.succeed(cachedTableDefinition)
+      : Effect.map(computeTableDefinition(), (definition) => {
+          cachedTableDefinition = definition;
+          return definition;
+        }),
+  );
+
+  Object.defineProperty(bound, TableDefinitionEffectKey, {
+    value: tableDefinitionEffect,
+    enumerable: false,
   });
+
+  Lazy.defineProperty(bound, "tableDefinition", () =>
+    runSyncThrowInIsolate(tableDefinitionEffect),
+  );
 
   return bound;
 };
+
+const TableDefinitionEffectKey = "~confect/server/Table/tableDefinitionEffect";
+
+/**
+ * The `Effect` that compiles a bound table's Convex `TableDefinition`. Shares
+ * its memo with the `tableDefinition` getter, so both paths yield the same
+ * instance. Consumed by `ConvexSchema.make` to compile a whole schema's
+ * tables under a single isolate-safe execution boundary.
+ */
+export const compileTableDefinition = (
+  table: AnyWithProps,
+): Effect.Effect<TableDefinition<any, any, any, any>, CompileError> =>
+  (table as any)[TableDefinitionEffectKey];
 
 const makeUnnamed = <
   TableSchema_ extends Schema.Codec<any, any>,
