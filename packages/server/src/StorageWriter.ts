@@ -6,12 +6,18 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import { BlobNotFoundError } from "./BlobNotFoundError";
+// oxlint-disable-next-line import/no-unassigned-import
+import "./internal/urlCanParsePolyfill";
 
 const make = (storageWriter: ConvexStorageWriter) => ({
   generateUploadUrl: () =>
     Effect.promise(() => storageWriter.generateUploadUrl()).pipe(
       Effect.andThen((url) =>
-        pipe(url, Schema.decodeUnknownEffect(Schema.URL), Effect.orDie),
+        pipe(
+          url,
+          Schema.decodeUnknownEffect(Schema.URLFromString),
+          Effect.orDie,
+        ),
       ),
     ),
   delete: (storageId: GenericId<"_storage">) =>

@@ -35,6 +35,15 @@ export declare const api: {
       manyOpsMutation: FunctionReference<"mutation", "public", {}, number>;
       manyOpsQuery: FunctionReference<"query", "public", {}, number>;
     };
+    storage: {
+      generateUploadUrl: FunctionReference<"mutation", "public", {}, string>;
+      getUrl: FunctionReference<
+        "query",
+        "public",
+        { storageId: Id<"_storage"> },
+        string
+      >;
+    };
   };
 };
 

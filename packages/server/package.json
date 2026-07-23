@@ -87,7 +87,9 @@
     "test:mock-backend": "vitest run --config vitest.mock-backend.config.ts",
     "typecheck": "tsc -b tsconfig.src.json"
   },
-  "sideEffects": false,
+  "sideEffects": [
+    "**/urlCanParsePolyfill.*"
+  ],
   "type": "module",
   "types": "./dist/index.d.ts"
 }
