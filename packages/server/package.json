@@ -8,14 +8,14 @@
   },
   "devDependencies": {
     "@ark/attest": "0.56.3",
-    "@effect/platform-node": "4.0.0-beta.100",
-    "@effect/vitest": "4.0.0-beta.100",
+    "@effect/platform-node": "4.0.0-beta.101",
+    "@effect/vitest": "4.0.0-beta.101",
     "@swc/jest": "0.2.39",
     "@types/node": "26.1.1",
     "@vitest/coverage-v8": "4.1.10",
     "convex-test": "0.0.54",
     "dotenv": "17.4.2",
-    "effect": "4.0.0-beta.100",
+    "effect": "4.0.0-beta.101",
     "tsdown": "0.22.12",
     "tsx": "4.23.1",
     "typescript": "6.0.3",
@@ -61,9 +61,9 @@
   "module": "./dist/index.js",
   "peerDependencies": {
     "@confect/core": "workspace:^",
-    "@effect/platform-node": "^4.0.0-beta.100",
+    "@effect/platform-node": "^4.0.0-beta.101",
     "convex": "^1.32.0",
-    "effect": "^4.0.0-beta.100"
+    "effect": "^4.0.0-beta.101"
   },
   "peerDependenciesMeta": {
     "@effect/platform-node": {
