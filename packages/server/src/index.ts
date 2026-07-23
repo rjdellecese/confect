@@ -1,3 +1,6 @@
+// oxlint-disable-next-line import/no-unassigned-import
+import "./internal/urlCanParsePolyfill";
+
 export * as ActionCtx from "./ActionCtx";
 export * as ActionRunner from "./ActionRunner";
 export * as Auth from "./Auth";
