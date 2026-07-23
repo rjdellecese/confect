@@ -1,7 +1,7 @@
 {
   "name": "@confect/server",
   "description": "Backend bindings to the Convex platform",
-  "version": "10.0.0-next.7",
+  "version": "10.0.0-next.8",
   "author": "RJ Dellecese",
   "bugs": {
     "url": "https://github.com/rjdellecese/confect/issues"
