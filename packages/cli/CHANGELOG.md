@@ -1,5 +1,7 @@
 # @confect/cli
 
+## 10.0.0-next.6
+
 ## 10.0.0-next.5
 
 ## 10.0.0-next.4
