@@ -69,6 +69,8 @@
   - @confect/core@10.0.0-next.0
   - @confect/server@10.0.0-next.0
 
+## 9.2.5
+
 ## 9.2.4
 
 ## 9.2.3
