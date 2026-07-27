@@ -191,9 +191,7 @@ export const extendWithSystemFields = <
     if (
       s.ast.encoding === undefined &&
       SchemaAST.isUnion(s.ast) &&
-      Array.isArray(
-        (s as Partial<Schema.Union<ReadonlyArray<Schema.Top>>>).members,
-      )
+      Array.isArray((s as { readonly members?: unknown }).members)
     ) {
       return Schema.Union(
         Array.map(
@@ -205,8 +203,7 @@ export const extendWithSystemFields = <
     if (
       s.ast.encoding === undefined &&
       SchemaAST.isObjects(s.ast) &&
-      typeof (s as Partial<Schema.Struct<Schema.Struct.Fields>>).mapFields ===
-        "function"
+      typeof (s as { readonly mapFields?: unknown }).mapFields === "function"
     ) {
       return Schema.fieldsAssign(system)(
         s as Schema.Struct<Schema.Struct.Fields>,
