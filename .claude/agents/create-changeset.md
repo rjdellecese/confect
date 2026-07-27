@@ -18,92 +18,120 @@ A changeset is a `.changeset/<name>.md` file with YAML frontmatter listing affec
 Description of the change for the changelog.
 ```
 
+## The rule everything else serves
+
+**A changeset is not a summary of the diff.** It is release-note prose for a package consumer who will read it once, in their `CHANGELOG.md`, and decide whether and how to upgrade. That reader has never seen your branch, cannot see your source tree, and only ever interacts with the package through its published API, its CLI, and the files it generates.
+
+The diff is _evidence_ you consult to answer consumer questions. It is not the subject. Every failure mode this document guards against — naming internal classes, narrating pipeline steps, describing refactors nobody can observe — comes from writing the diff up rather than writing the consumer's experience down.
+
 ## Workflow
 
 ### 1. Gather project context
 
 - Read `.changeset/config.json` for the base branch, fixed/linked package groups, and ignored packages.
-- Discover published package names from workspace `package.json` files.
-- Read existing `.changeset/*.md` files (excluding `README.md`) to learn the project's conventions for naming, style, and level of detail.
+- Read existing `.changeset/*.md` files (excluding `README.md`), and the top ~100 lines of the affected packages' `CHANGELOG.md`, to match the project's established voice and level of detail.
 
-### 2. Analyze branch changes
+### 2. Establish the public surface of each affected package
 
-Run `git diff <baseBranch>...HEAD` and `git log <baseBranch>..HEAD --oneline` (using the base branch from the config) to understand all changes on the branch.
+Do this **before** reading the diff closely, so you know what to look for.
 
-### 3. Determine affected packages and bump types
+For each package with changes, read its `package.json` `exports` map. Then classify every name you might mention into one of three tiers:
 
-Identify which published packages have user-facing changes and pick the appropriate bump for each:
+**Tier 1 — name freely.** Appears in `apps/docs/**/*.mdx`, or is imported/called by `apps/example/`. This is the API the project actively teaches; it is what the reader recognizes.
 
-- `major`—breaking changes to the package's public API
-- `minor`—new features, new exports, new capabilities
-- `patch`—bug fixes, internal refactors, documentation fixes, dependency updates
+**Tier 2 — name only if the consumer calls it directly.** Reachable through the package's `exports` map (the `.` root or a `./*` subpath) but absent from docs and the example app. Being exported is necessary but _not_ sufficient: `@confect/core` exports every top-level module through `./*`, including plumbing like `Registry`, `Types`, `RuntimeAndFunctionType`, `Lazy`, and `FunctionProvenance`. Mention a Tier 2 name only when the consumer's own code would contain that identifier.
 
-### 4. Pick a filename
+**Tier 3 — never name.** Specifically:
 
-Use a short kebab-case slug describing the change (e.g., `add-cron-jobs`, `fix-pagination-cursor`). Check existing files in `.changeset/` to avoid collisions.
+- Anything under an `./internal/*` subpath (`@confect/core`, `@confect/server`, and `@confect/test` all export one). Exported for cross-package use, not for consumers. This is the single most common leak.
+- Anything not reachable through the `exports` map at all.
+- **Every symbol in `packages/cli/src/`.** `@confect/cli` exports only `./package.json` — it ships a binary and nothing else. Its entire consumer surface is the behavior of `confect codegen` and `confect dev`, the files written under `confect/_generated/`, and what appears on the terminal. `Bundler`, `SpecAssemblyNode`, `LeafModule`, `CodegenError`, `ConfectDirectory` and friends are invisible to users.
+- Internal error/exception class names. The consumer reads a _formatted message_, not a class.
+- Generated-file internals the user never imports by name.
+- Test utilities, fixtures, and build tooling.
 
-### 5. Write the changeset
+### 3. Read the branch changes to answer consumer questions
 
-Create `.changeset/<name>.md` with the YAML frontmatter and description body. List each affected published package with its bump type, one per line. The description body is where the craft lies—see "Writing the description" below.
+Run `git diff <baseBranch>...HEAD` and `git log <baseBranch>..HEAD --oneline`. Read them looking for the answers to exactly three questions — not for a narrative of what the code now does:
+
+1. **What can the consumer do, or observe, that differs from before?** New export, changed signature, different return value, different generated file, different terminal output, different error, a case that used to fail and now works.
+2. **How does an affected consumer recognize themselves?** What layout, schema shape, call pattern, or version combination triggers it. This is what lets a reader skip the entry or act on it.
+3. **What, if anything, must they change?** Usually nothing; when something, be concrete.
+
+If a change produces no answer to question 1, it needs no changeset — see "When to skip" below.
+
+### 4. Write the fact list, then the prose
+
+Before drafting, write out (for yourself, not in the file) the answers to those three questions as flat statements in the consumer's vocabulary. Then compose the entry **only from that list**. Do not draft directly from the diff; that is how mechanics get in.
+
+If a fact on your list can only be stated using a Tier 3 name, it is not a consumer fact. Either restate it in terms of what the consumer observes, or drop it.
+
+### 5. Determine bump types
+
+See "Bump heuristics" below. In a fixed-version group like `@confect/*`, list every package whose own surface or behavior changed — the group versions together regardless, but the frontmatter is what routes the entry into each package's changelog.
+
+### 6. Pick a filename
+
+A short kebab-case slug describing the change (`add-cron-jobs`, `fix-pagination-cursor`). Check `.changeset/` to avoid collisions.
+
+### 7. Audit before saving
+
+This step is not optional, and it is where most bad changesets get caught.
+
+**Identifier check.** List every backticked identifier in your draft. For each, run:
+
+```bash
+grep -rn "SymbolName" apps/docs apps/example packages/*/src/index.ts
+```
+
+Hits in `apps/docs` or `apps/example` → Tier 1, keep. Hits only in a package `index.ts` → Tier 2, keep only if the consumer writes that name themselves. No hits, or hits only under `src/internal/` or `packages/cli/src/` → Tier 3. Delete it and rewrite the sentence around what the consumer observes instead. Do not "soften" a Tier 3 name by paraphrasing it — remove the fact or restate it as behavior.
+
+**Sentence check.** Every sentence must answer one of the three questions from step 3: what changed for me, how do I know if I'm affected, what do I do about it. A sentence that answers none of them is implementation narration. Cut it. Common offenders:
+
+- "The X now delegates to Y" / "…now starts from Z and chains…" — how it was built.
+- "Refactored/extracted/moved …" with no observable consequence.
+- "Added tests for …" — never belongs in a changelog.
+- "Renamed the internal …" — invisible.
+- Motivation backstory that doesn't change how the reader should react.
+
+**Length check.** If the entry runs past a paragraph, confirm each additional paragraph is earned by the escalation ladder below rather than by detail that accumulated from the diff.
 
 ## Writing the description
 
-The body is **release-note prose for package consumers reading the auto-generated `CHANGELOG.md`**—not commit-message context for code reviewers. Optimise every entry for the user who will see it once, in their changelog, and decide whether and how to upgrade.
+### Length, by default
 
-### What is "consumer-facing"?
-
-Before writing, settle whether the change is user-visible at all. The library's public API is whatever the documentation and example app actively teach:
-
-- **Documented:** anything mentioned in `apps/docs/` (`.mdx` pages and code samples).
-- **Demonstrated:** anything imported from a `@confect/*` package by `apps/example/`.
-
-If a change touches _only_ names that appear in neither tree (registry plumbing, validator compilation, codegen internals, `internal/*` helpers, type utilities not surfaced through hooks/services/clients), it most likely doesn't need a changeset—or warrants only a one-line `patch` if it has any chance of an observable effect.
-
-### Structure
-
-The default entry is a **single sentence** that names the affected API and states what changed:
+The default entry is **one sentence** naming the affected API and stating what changed:
 
 ```md
-Add `Cron.prev` and reverse iteration support, aligning next/prev lookup tables, fixing DST handling symmetry, and expanding cron backward/forward test coverage.
+Add `Cron.prev` and reverse iteration support, aligning next/prev lookup tables and fixing DST handling symmetry.
 ```
 
-```md
-Fix `--log-level=value` equals syntax incorrectly swallowing the next argument. Only skip the next arg when the previous arg is exactly `--log-level` (space-separated form).
-```
+Escalate only for a reason:
 
-Add a **short second paragraph** only when the symptom, root cause, or new behavior isn't obvious from the summary alone:
+- **A second short paragraph** when the symptom, trigger condition, or new behavior isn't obvious from the summary — i.e. when the reader can't tell whether they're affected.
+- **A third paragraph or a fenced code sample** only when the consumer must rewrite call sites, or when a concrete snippet is genuinely shorter than the prose describing it.
 
-```md
-Schema: fix `Schema.omit` producing wrong result on Struct with `optionalWith({ default })` and index signatures.
-
-`getIndexSignatures` now handles `Transformation` AST nodes by delegating to `ast.to`, matching the existing behavior of `getPropertyKeys` and `getPropertyKeyIndexedAccess`. Previously, `Schema.omit` on a struct combining `Schema.optionalWith` (with `{ default }`, `{ as: "Option" }`, etc.) and `Schema.Record` would silently take the wrong code path…
-```
-
-Reserve **multi-paragraph entries with fenced code samples** for behavioral changes that consumers must rewrite around—see "Before/After" below.
+Every escalation must be traceable to a fact on your list from step 4. Length that comes from "there was more in the diff" is the failure this document exists to prevent.
 
 ### Tone
 
-- **Imperative, present-tense summary.** "Add", "Fix", "Remove", "Replace"—not "Added", "Fixed".
+- **Imperative, present-tense summary.** "Add", "Fix", "Remove", "Replace" — not "Added", "Fixed".
 - **Present tense for explanation.** "Now …", "Previously …", "When X happens, Y …".
-- **Plain technical prose.** No marketing language, no emojis on routine entries, no exclamation points. (The Effect-TS repos reserve emojis exclusively for celebratory major-version release headers.)
-- **Rationale belongs in the body, not the summary.** The summary states _what_; an optional second paragraph explains _why_ when it isn't self-evident.
+- **Plain technical prose.** No marketing language, no emojis, no exclamation points.
+- **Rationale in the body, not the summary.** The summary states _what_; a second paragraph explains _why_ only when it isn't self-evident.
 
 ### Naming things
 
-Lead with the API the consumer recognises, not the internal symbol that implements it. Names like `FunctionSpec.publicQuery`, `useQuery(refs.public.<group>.<fn>)`, `HttpClient.layer`, `TestConfect.layer`, `Impl.finalize`, `HttpApi.make`, the generated `services` (e.g. `DatabaseReader`, `QueryRunner`)—these are what readers see in docs and example code. Mentioning a class like `RegisteredConvexFunction` or `SchemaToValidator` in a changelog summary is almost always wrong; reach for the wrapper the consumer actually calls.
+Lead with the API the consumer recognizes. `FunctionSpec.publicQuery`, `useQuery(refs.public.<group>.<fn>)`, `HttpClient.layer`, `TestConfect.layer`, `HttpApi.make`, the generated services (`DatabaseReader`, `QueryRunner`) — these appear in docs and example code. `RegisteredConvexFunction`, `SchemaToValidator`, `writeGroupAssembly`, `Refs.make` do not.
 
-If a refactor only changes how a public API is implemented (no surface change, no behavior change), say so in patch-level prose without naming the internal moving parts.
+In the consumer's terms, that means:
 
-### Behavior, not mechanics
+- **Layouts the user writes** (`confect/notes.spec.ts` beside a sibling `confect/notes/` directory), not the pipeline's model of them (import bindings, assembly chains, `_generated/*` artifacts they never name).
+- **Refs, hooks, types, and CLI commands the user calls** (`refs.notes.list`, `useQuery(refs.notes.list)`, `confect codegen`, `confect dev`), not the builders that produce them.
+- **Error messages the user reads in their terminal** — "child segment `notes` collides with a function on the parent spec" — not the exception class that carries them.
+- **CLI behavioral splits when user-visible**: whether `confect codegen` exits non-zero while `confect dev` logs and keeps watching decides whether someone's CI catches a regression. State both, in command-line terms.
 
-"Naming things" above keeps internal classes out of summaries; this rule extends past identifiers to the _shape_ of the entry. Even with public API names in backticks, an entry that narrates _how_ a fix was implemented — the pipeline step that changed, the internal exception class that was renamed, the intermediate representation that's now built differently — is still implementation-facing. Frame entries entirely around **what the user authors, what they get back, and what they see on stdout/stderr.**
-
-In practice:
-
-- **Layouts the user writes** (e.g. `confect/notes.spec.ts` next to a sibling `confect/notes/` subdirectory), not the pipeline's internal model of them (import bindings, assembly chains, `_generated/*` artifacts they never import by name).
-- **Refs, hooks, types, and CLI commands the user calls** (`refs.notes.list`, `useQuery(refs.notes.list)`, `confect codegen`, `confect dev`), not the internal builders that produce them (`writeGroupAssembly`, `Refs.make`, `GroupSpec`).
-- **Error messages the user reads in their terminal**, not the internal exception class. The formatted message ("child segment `notes` collides with a function on the parent spec") is what the user sees; an internal name like `` `ParentChildNameCollisionError` `` only appears in maintainer-facing stack traces and does not belong in a changelog.
-- **CLI subcommand behavioral splits** when they're user-visible — whether `confect codegen` exits non-zero versus `confect dev` logs and keeps watching determines whether someone's CI will catch a regression. State both, in the user's command-line terms.
+If a refactor only changes how a public API is implemented, with no surface or behavior change, either skip the changeset or write one patch-level sentence that names no internal moving parts.
 
 **Bad — internal symbols and pipeline mechanics:**
 
@@ -118,72 +146,70 @@ Allow a `confect/{path}.spec.ts` file to declare functions even when a sibling `
 
 Previously, every function on the parent spec silently disappeared from the generated api and refs in this layout: `refs.{path}.{fn}` was not defined, while `refs.{path}.{child}.{fn}` (from the subdirectory specs) worked.
 
-Both `confect codegen` and `confect dev` now generate the parent's functions and the subdirectory's groups side by side, as `refs.{path}.{fn}` and `refs.{path}.{child}.{fn}`. Codegen also reports a clear error when the parent spec declares a function or subgroup whose name matches one of the subdirectory's child segments — `confect codegen` exits non-zero, while `confect dev` logs it and keeps watching.
+Both `confect codegen` and `confect dev` now generate the parent's functions and the subdirectory's groups side by side. Codegen also reports a clear error when the parent spec declares a function or subgroup whose name matches one of the subdirectory's child segments — `confect codegen` exits non-zero, while `confect dev` logs it and keeps watching.
 ```
+
+Note what survives the rewrite: the layout the user authors, the refs they access, the commands they run, and the exit behavior. Every internal name is gone, and the entry is _more_ useful, not less.
+
+### When internal detail is allowed
+
+Only when it is the shortest way to explain something the consumer will observe or must act on. A type-level cause the user hits as a compile error, a version-compatibility mechanism that determines which versions to install, an upstream bug whose number they'll want — these earn a clause. The test is whether removing the detail would leave the reader unable to recognize their situation or decide what to do. If removing it costs the reader nothing, it was for you, not them.
 
 ### Code and API references
 
-- **Backtick every symbol the user might search for**—types, functions, classes, hooks, module names, flag names, environment variables, file paths.
-- **Module-qualify names** in prose (`Effect.fork`, `Schema.decode`, `Cause.fail`) so the reader can find them in their editor.
-- **Fenced code blocks** for examples—TypeScript by default, `bash` for CLI behavior. Include the `import` line when the import path is non-obvious.
-- **No prose paraphrases of identifiers.** Write `` `useQuery` `` not `the query hook`.
+- **Backtick every symbol the reader might search for** — types, functions, hooks, module names, flags, env vars, file paths.
+- **Module-qualify names** (`Effect.fork`, `Schema.decode`) so they're findable in an editor.
+- **No prose paraphrases of identifiers.** Write `` `useQuery` ``, not "the query hook".
+- **Fenced blocks** for examples — TypeScript by default, `bash` for CLI behavior; include the import line when the path is non-obvious.
 
 ### Before/After for behavioral changes
 
-When a change requires consumers to rewrite call sites, show two adjacent fenced blocks labelled **Before** and **After** (or "Instead of:"/"You should now write:"). Don't rely on prose alone for migration guidance.
+When consumers must rewrite call sites, show two adjacent fenced blocks labelled **Before** and **After**. Don't rely on prose alone for migration guidance.
 
 ````md
 **Before:**
 
 ```ts
-Effect.if(true, {
-  onTrue: Effect.succeed("true"),
-  onFalse: Effect.succeed("false"),
-});
+Effect.if(true, { onTrue: Effect.succeed("true") });
 ```
 
 **After:**
 
 ```ts
-Effect.if(true, {
-  onTrue: () => Effect.succeed("true"),
-  onFalse: () => Effect.succeed("false"),
-});
+Effect.if(true, { onTrue: () => Effect.succeed("true") });
 ```
 ````
 
 ### Breaking changes
 
-For non-trivial breaks, the body should include:
+For non-trivial breaks, include a one-line summary naming what broke, a `### Breaking Changes` section listing removed/renamed/retyped **public** surfaces as bullets, and a short migration paragraph with steps the user can follow without reading the diff. Pair with `### New Features` if the same change adds APIs.
 
-1. A **one-line summary** that names what broke.
-2. A **`### Breaking Changes`** (or `**Breaking Changes**`) section listing the removed/renamed/retyped surfaces as bullets.
-3. A short **migration** paragraph or checklist ("To migrate, …") with concrete steps users can follow without reading the diff.
-
-If the same change also adds new APIs, pair with a parallel `### New Features` section.
+A break in a Tier 3 name is not a breaking change for consumers — it's not a changeset at all.
 
 ### Multi-package entries
 
-Use **one body paragraph** that describes the change across all listed packages. Don't repeat the description per package—the frontmatter conveys _which_ packages were bumped; the body tells the reader _what_ changed in user-visible terms.
-
-If different packages need substantively different consumer guidance (e.g. a server-side breaking change with a separate, optional client-side opt-in), prefer **two changesets** over one mixed body.
+Use **one body paragraph** describing the change across all listed packages; the frontmatter conveys _which_ packages, the body conveys _what_ changed. If different packages need substantively different consumer guidance, prefer two changesets over one mixed body.
 
 ### What to omit
 
-- **No PR or commit links** in the body—Changesets' GitHub adapter (or equivalent) injects those at release time.
-- **No `Thanks @author`**—automation adds it.
-- **No "this commit", "this PR", "in this change"**—write release-note prose, not code-review prose.
-- **No internal-implementation detail** unless it explains a behavior consumers will observe.
-- **No motivation backstory** unless it directly affects how the consumer should react.
-- **No vague summaries** ("Improve performance", "Fix bug", "Update types")—name the affected API.
+- **No PR or commit links** — automation injects those.
+- **No `Thanks @author`** — automation adds it.
+- **No "this commit", "this PR", "in this change"** — release-note prose, not code-review prose.
+- **No file paths into `packages/*/src/`** — consumers don't have that tree.
+- **No vague summaries** ("Improve performance", "Fix bug", "Update types") — name the affected API.
 
-`closes #1234`/`Fixes #1234` may be appended inline to the summary or first paragraph if the issue link adds context for the reader; otherwise omit.
+`closes #1234` may be appended inline when the issue adds context for the reader; otherwise omit.
 
-### Bump heuristics, in practice
+## Bump heuristics
 
-- **`major`**—removed exports, renamed exports, or runtime behavior changes that break existing call sites. In a fixed-version group (like `@confect/*`), a single major bumps the whole group; reserve for genuine breaking releases.
-- **`minor`**—new consumer-facing exports (functions, types, hooks, services), new optional parameters, new capabilities on existing APIs, or behavior refinements that are observable but backward-compatible.
-- **`patch`**—bug fixes, typing refinements that don't change call-site shape, performance improvements, internal refactors that _do_ surface in some way, dependency bumps, JSDoc/docs fixes, deprecation notices.
-- **No changeset**—pure internal refactors that don't touch any name in `apps/docs/` or `apps/example/`, repository tooling, test-only changes, comment-only changes.
+- **`major`** — removed or renamed public exports, or runtime behavior changes that break existing call sites. In a fixed-version group, one major bumps the whole group; reserve it for genuine breaking releases.
+- **`minor`** — new consumer-facing exports, new optional parameters, new capabilities, or observable but backward-compatible behavior refinements.
+- **`patch`** — bug fixes, typing refinements that don't change call-site shape, performance improvements, dependency range changes, deprecation notices, internal changes that surface observably.
 
-When in doubt, **err toward minor for new things and patch for fixes**; reach for major only when the consumer actually has to change their code.
+When in doubt, err toward minor for new things and patch for fixes; reach for major only when the consumer must change their code.
+
+## When to skip
+
+No changeset for: pure internal refactors with no observable consequence, changes confined to Tier 3 names, repository tooling, CI, test-only changes, comment or JSDoc-only changes that don't ship, and changes to `apps/example` or `apps/docs` alone.
+
+Reaching "no changeset" is a legitimate and common outcome. Say so plainly rather than manufacturing an entry — a changelog line describing something no consumer can observe is worse than no line, because every reader pays to read it.
