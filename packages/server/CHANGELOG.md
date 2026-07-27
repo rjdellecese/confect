@@ -1,5 +1,12 @@
 # @confect/server
 
+## 10.0.0-next.9
+
+### Patch Changes
+
+- 0dcc0fb: Raise the required `effect` peer version to `^4.0.0-beta.102` (from `^4.0.0-beta.101`), and `@confect/server`'s optional `@effect/platform-node` peer version likewise.
+- 25e8d19: Sync with `main`: this prerelease line now includes all changes released in `@confect/*` 9.2.5 — see that version's changelog entries.
+
 ## 10.0.0-next.8
 
 ### Patch Changes
