@@ -104,6 +104,10 @@ Hits in `apps/docs` or `apps/example` → Tier 1, keep. Hits only in a package `
 - "Renamed the internal …" — invisible.
 - Motivation backstory that doesn't change how the reader should react.
 
+**Export-list check.** Look at the last sentence of every paragraph for a trailing inventory of secondary exports — "`FooArgs`, `FooItem`, and `FooOptions` are also exported", "the supporting types … are exported alongside it", "along with the types needed to …". **Delete it.** No rewrite, no trimming to the two most useful names.
+
+This check is separate because the two above cannot catch it. Every name in such a sentence is a real export, so the identifier check passes; the sentence looks like it answers "what changed for me", so the sentence check passes. It survives on those technicalities and is the single most common way supporting type surface gets back into a finished entry. A consumer meets those names through autocomplete and the docs at the moment they need them, which is the only moment they mean anything.
+
 **Length check.** If the entry runs past a paragraph, confirm each additional paragraph is earned by the escalation ladder below rather than by detail that accumulated from the diff.
 
 ## Writing the description
