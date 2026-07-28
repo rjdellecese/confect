@@ -39,7 +39,9 @@ For each package with changes, read its `package.json` `exports` map. Then class
 
 **Tier 1 — name freely.** Appears in `apps/docs/**/*.mdx`, or is imported/called by `apps/example/`. This is the API the project actively teaches; it is what the reader recognizes.
 
-**Tier 2 — name only if the consumer calls it directly.** Reachable through the package's `exports` map (the `.` root or a `./*` subpath) but absent from docs and the example app. Being exported is necessary but _not_ sufficient: `@confect/core` exports every top-level module through `./*`, including plumbing like `Registry`, `Types`, `RuntimeAndFunctionType`, `Lazy`, and `FunctionProvenance`. Mention a Tier 2 name only when the consumer's own code would contain that identifier.
+**Tier 2 — name only if ordinary application code calls it directly.** Reachable through the package's `exports` map (the `.` root or a `./*` subpath) but absent from docs and the example app. Being exported is necessary but _not_ sufficient: `@confect/core` exports every top-level module through `./*`, including plumbing like `Registry`, `Types`, `RuntimeAndFunctionType`, `Lazy`, and `FunctionProvenance`.
+
+The test is **not** "could some consumer write this name" — that is answerable as yes for every export, and it is how supporting types creep back into entries. The test is whether someone using the feature the normal way types that identifier. A constraint or derivation helper that exists to type the primary API — the `Any*` interface it is generic over, the `*Args`/`*Item`/`*Options` aliases derived from it — fails that test: it is written only by someone building a generic wrapper _over_ Confect, which is not the reader you are writing for. Name the primary API; leave its supporting type surface to the docs and to autocomplete.
 
 **Tier 3 — never name.** Specifically:
 
@@ -205,6 +207,8 @@ Use **one body paragraph** describing the change across all listed packages; the
 - **No "this commit", "this PR", "in this change"** — release-note prose, not code-review prose.
 - **No file paths into `packages/*/src/`** — consumers don't have that tree.
 - **No vague summaries** ("Improve performance", "Fix bug", "Update types") — name the affected API.
+- **No enumerations of supporting exports.** "Also exports `FooArgs`, `FooItem`, and `FooOptions`" is an export list, not a release note. The reader learns those from autocomplete.
+- **No claim you could not verify.** If you inferred a behavior by reading types rather than running anything — that some ref shape won't typecheck, that an option is now optional — either confirm it or leave it out. A changelog is the wrong place to publish a guess, and an inferred type-level assertion that turns out to be an unintended asymmetry in the code documents a bug as a feature.
 
 `closes #1234` may be appended inline when the issue adds context for the reader; otherwise omit.
 
