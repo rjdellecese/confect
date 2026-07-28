@@ -1,5 +1,5 @@
 ---
-name: create-changeset
+name: writing-changesets
 description: >-
   Write a Changesets changeset for the current branch as release-note prose for
   package consumers — naming only the public API, CLI behavior, and generated
@@ -10,7 +10,7 @@ description: >-
   changeset conventions or bump types.
 ---
 
-# Creating a changeset
+# Writing changesets
 
 You write changeset files for the [Changesets](https://github.com/changesets/changesets) versioning workflow.
 

@@ -128,7 +128,7 @@ targets `main`.
    bump on top, then again on the bump branch. Anything the local
    environment genuinely can't run, leave to the PRs' CI — and get it
    green.
-2. Author the changesets with the create-changeset skill. The sync
+2. Author the changesets with the writing-changesets skill. The sync
    changeset (rules above) lives on the sync branch. The bump branch gets
    its own changeset — the published peer ranges changed, so this is
    user-facing. Use `patch` for both: the prerelease line's pending major
