@@ -104,6 +104,12 @@ Hits in `apps/docs` or `apps/example` → Tier 1, keep. Hits only in a package `
 - "Renamed the internal …" — invisible.
 - Motivation backstory that doesn't change how the reader should react.
 
+**Mechanism check.** The sentence check above catches narration that carries an internal name. It misses narration that doesn't — and that is what actually survives into finished entries. "Resolution now honors the `import` condition first and falls back to CommonJS", "the values are now compared before the cache is consulted": no internal identifier anywhere, every word true, and still a description of the algorithm rather than of anything the reader can see.
+
+Test each sentence by asking **where the reader would observe this**. If the answer is a source file rather than their editor, their terminal, or their app's behavior, the sentence is mechanism. Replace it with the symptom it produces — a fix's entry needs the condition that triggered the bug and the fact that it no longer does, not the strategy that fixed it.
+
+**Lead check.** The first sentence should name the thing the consumer _calls_ — the hook, the command, the writer method — before any type or helper that supports it. A supporting type can be perfectly documented and still be the wrong opening: readers scan for the operation they perform, not the type that constrains it. If your first sentence's subject is a type, try moving the operation into that slot and see whether the entry gets easier to recognize.
+
 **Export-list check.** Look at the last sentence of every paragraph for a trailing inventory of secondary exports — "`FooArgs`, `FooItem`, and `FooOptions` are also exported", "the supporting types … are exported alongside it", "along with the types needed to …". **Delete it.** No rewrite, no trimming to the two most useful names.
 
 This check is separate because the two above cannot catch it. Every name in such a sentence is a real export, so the identifier check passes; the sentence looks like it answers "what changed for me", so the sentence check passes. It survives on those technicalities and is the single most common way supporting type surface gets back into a finished entry. A consumer meets those names through autocomplete and the docs at the moment they need them, which is the only moment they mean anything.
@@ -146,6 +152,18 @@ In the consumer's terms, that means:
 - **CLI behavioral splits when user-visible**: whether `confect codegen` exits non-zero while `confect dev` logs and keeps watching decides whether someone's CI catches a regression. State both, in command-line terms.
 
 If a refactor only changes how a public API is implemented, with no surface or behavior change, either skip the changeset or write one patch-level sentence that names no internal moving parts.
+
+### Name the workaround being retired
+
+The tiers govern what you call the **new** API. They do not govern what the consumer currently has in their own code, and that is a separate question with the opposite answer.
+
+When a change removes the need for a workaround — an unsafe cast, a duplicated declaration, a pinned version, an extra build step — name the workaround as they wrote it, even when it involves generated or otherwise unglamorous names they'd never see in docs:
+
+```md
+The workaround — `componentsGeneric().workpool as unknown as ComponentApi` — required an unsafe cast at every call site.
+```
+
+That line is doing work no restated version can: a reader greps their repo for it, finds three hits, and deletes them. Restating it as "previously this required a cast" leaves them to work out whether they're one of the affected. This is question 2 — how do I recognize myself — and code the consumer already owns is the sharpest possible answer to it. Reach for it whenever a change retires something, and keep it to what they actually typed.
 
 **Bad — internal symbols and pipeline mechanics:**
 
