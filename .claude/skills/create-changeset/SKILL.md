@@ -1,11 +1,18 @@
 ---
 name: create-changeset
 description: >-
-  Creates a Changesets changeset file for the current branch. Use when the user
-  asks to add a changeset, write a changeset, or prepare changes for release.
+  Write a Changesets changeset for the current branch as release-note prose for
+  package consumers — naming only the public API, CLI behavior, and generated
+  files they can actually observe, never internal or `internal/*` symbols. Use
+  this skill whenever adding or revising a changeset, preparing a branch for
+  release, or deciding whether a change warrants one at all — including when the
+  user doesn't explicitly ask for changeset help. Also use when asked about
+  changeset conventions or bump types.
 ---
 
-You create changeset files for the [Changesets](https://github.com/changesets/changesets) versioning workflow.
+# Creating a changeset
+
+You write changeset files for the [Changesets](https://github.com/changesets/changesets) versioning workflow.
 
 A changeset is a `.changeset/<name>.md` file with YAML frontmatter listing affected packages and their semver bump types, followed by a changelog description.
 
@@ -52,9 +59,15 @@ The test is **not** "could some consumer write this name" — that is answerable
 - Generated-file internals the user never imports by name.
 - Test utilities, fixtures, and build tooling.
 
-### 3. Read the branch changes to answer consumer questions
+### 3. Start from what you already know, then read the diff
 
-Run `git diff <baseBranch>...HEAD` and `git log <baseBranch>..HEAD --oneline`. Read them looking for the answers to exactly three questions — not for a narrative of what the code now does:
+If you made these changes in this session, **you are holding better evidence than the diff** and should spend it before opening one. You know what the user asked for, which parts were the point and which were scaffolding to get there, what you tried and abandoned, and what the user said when they reviewed it. That is the consumer's story; the diff is only its residue.
+
+Write those answers down first. Then read `git diff <baseBranch>...HEAD` and `git log <baseBranch>..HEAD --oneline` to **confirm and fill gaps** — not to derive the story from scratch.
+
+This matters because deriving intent from a diff is how implementation detail gets in. A diff shows a 200-line module you added; it cannot show that the module was scaffolding for a one-line warning the user will see. You know that. Use it, and say the one-line thing.
+
+When you did _not_ author the change — reviewing someone's branch, writing a changeset after the fact — you have only the diff, so read it looking for the answers to exactly three questions, and be correspondingly more suspicious of your first draft:
 
 1. **What can the consumer do, or observe, that differs from before?** New export, changed signature, different return value, different generated file, different terminal output, different error, a case that used to fail and now works.
 2. **How does an affected consumer recognize themselves?** What layout, schema shape, call pattern, or version combination triggers it. This is what lets a reader skip the entry or act on it.
