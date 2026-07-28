@@ -60,6 +60,8 @@ Run `git diff <baseBranch>...HEAD` and `git log <baseBranch>..HEAD --oneline`. R
 
 If a change produces no answer to question 1, it needs no changeset — see "When to skip" below.
 
+**Ignore release automation in the range.** If the diff sweeps in a "Version Packages" commit — version bumps, `CHANGELOG.md` additions, and a _deleted_ `.changeset/*.md` — that is the release bot, not your branch. A deleted changeset file means an entry was already published, not that one is missing. Never re-author it. Scope your reading to the commits that are actually the branch's work.
+
 ### 4. Write the fact list, then the prose
 
 Before drafting, write out (for yourself, not in the file) the answers to those three questions as flat statements in the consumer's vocabulary. Then compose the entry **only from that list**. Do not draft directly from the diff; that is how mechanics get in.
@@ -68,11 +70,17 @@ If a fact on your list can only be stated using a Tier 3 name, it is not a consu
 
 ### 5. Determine bump types
 
-See "Bump heuristics" below. In a fixed-version group like `@confect/*`, list every package whose own surface or behavior changed — the group versions together regardless, but the frontmatter is what routes the entry into each package's changelog.
+See "Bump heuristics" below.
+
+The frontmatter routes the entry into each listed package's `CHANGELOG.md`, so list a package when a consumer **of that package** observes something. In a fixed-version group like `@confect/*` every package's version moves regardless, which means adding a package to the frontmatter buys nothing but a changelog entry its readers didn't need.
+
+In particular: if a package's only changed surface is Tier 3, leave it out, even though its source changed. A hook shipped in `@confect/react` that happens to rest on new plumbing in `@confect/core` is a `@confect/react` entry. Someone reading `@confect/core`'s changelog and finding a paragraph about a React hook has been given noise.
 
 ### 6. Pick a filename
 
 A short kebab-case slug describing the change (`add-cron-jobs`, `fix-pagination-cursor`). Check `.changeset/` to avoid collisions.
+
+If the branch **already contains a changeset** covering this change, revise that file in place rather than adding a second one — two files mean two changelog entries for one change. Add a separate file only when the branch genuinely carries two independent changes.
 
 ### 7. Audit before saving
 
@@ -108,7 +116,7 @@ Add `Cron.prev` and reverse iteration support, aligning next/prev lookup tables 
 
 Escalate only for a reason:
 
-- **A second short paragraph** when the symptom, trigger condition, or new behavior isn't obvious from the summary — i.e. when the reader can't tell whether they're affected.
+- **A second short paragraph** when the symptom, trigger condition, or new behavior isn't obvious from the summary — i.e. when the reader can't tell whether they're affected. A brand-new API whose eligibility condition is non-obvious ("this hook only applies to a query whose args include …") earns this paragraph: stating the condition is answering question 2, not padding.
 - **A third paragraph or a fenced code sample** only when the consumer must rewrite call sites, or when a concrete snippet is genuinely shorter than the prose describing it.
 
 Every escalation must be traceable to a fact on your list from step 4. Length that comes from "there was more in the diff" is the failure this document exists to prevent.
@@ -210,6 +218,10 @@ When in doubt, err toward minor for new things and patch for fixes; reach for ma
 
 ## When to skip
 
-No changeset for: pure internal refactors with no observable consequence, changes confined to Tier 3 names, repository tooling, CI, test-only changes, comment or JSDoc-only changes that don't ship, and changes to `apps/example` or `apps/docs` alone.
+No changeset for: pure internal refactors with no observable consequence, changes confined to Tier 3 names, repository tooling, CI, test-only changes, and changes to `apps/example` or `apps/docs` alone.
+
+Also no changeset for comment-only changes — including comments that exist to steer tooling rather than to document, such as lint suppressions, `@ts-expect-error`, and formatter pragmas. The test isn't whether the comment does something; it's whether the built artifact and the type surface are identical in every way a consumer can observe.
+
+**Dependency changes split on where they land.** A bump confined to `devDependencies`, root toolchain packages, or the private workspaces (`apps/docs`, `apps/example`) is invisible — consumers never install those. A change to any published package's `dependencies` or `peerDependencies` range _is_ consumer-facing (it decides what resolves in their tree, and can conflict with their own pins) and gets a patch entry naming the old and new ranges. Diff `packages/*/package.json` specifically before concluding a dependency PR is internal.
 
 Reaching "no changeset" is a legitimate and common outcome. Say so plainly rather than manufacturing an entry — a changelog line describing something no consumer can observe is worse than no line, because every reader pays to read it.
