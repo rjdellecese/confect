@@ -108,6 +108,14 @@ Hits in `apps/docs` or `apps/example` → Tier 1, keep. Hits only in a package `
 
 Test each sentence by asking **where the reader would observe this**. If the answer is a source file rather than their editor, their terminal, or their app's behavior, the sentence is mechanism. Replace it with the symptom it produces — a fix's entry needs the condition that triggered the bug and the fact that it no longer does, not the strategy that fixed it.
 
+**Retirement check.** Ask whether this change lets the consumer delete something they currently write — an unsafe cast, a duplicated declaration, a version pin, an extra build step. If so, your draft must **quote that code as they wrote it**, even when it contains generated or internal-looking names the tiers would otherwise exclude:
+
+```md
+The workaround — `componentsGeneric().workpool as unknown as ComponentApi` — required an unsafe cast at every call site.
+```
+
+The tiers govern what you call the **new** API. Code already sitting in the consumer's repo is the opposite question: quoting it verbatim is what lets someone grep, find their three call sites, and delete them, and "previously this required a cast" leaves them to work that out alone. This is the sharpest available answer to question 2, so it outranks the tier rules whenever the two disagree. Keep it to exactly what they typed.
+
 **Lead check.** The first sentence should name the thing the consumer _calls_ — the hook, the command, the writer method — before any type or helper that supports it. A supporting type can be perfectly documented and still be the wrong opening: readers scan for the operation they perform, not the type that constrains it. If your first sentence's subject is a type, try moving the operation into that slot and see whether the entry gets easier to recognize.
 
 **Export-list check.** Look at the last sentence of every paragraph for a trailing inventory of secondary exports — "`FooArgs`, `FooItem`, and `FooOptions` are also exported", "the supporting types … are exported alongside it", "along with the types needed to …". **Delete it.** No rewrite, no trimming to the two most useful names.
@@ -152,18 +160,6 @@ In the consumer's terms, that means:
 - **CLI behavioral splits when user-visible**: whether `confect codegen` exits non-zero while `confect dev` logs and keeps watching decides whether someone's CI catches a regression. State both, in command-line terms.
 
 If a refactor only changes how a public API is implemented, with no surface or behavior change, either skip the changeset or write one patch-level sentence that names no internal moving parts.
-
-### Name the workaround being retired
-
-The tiers govern what you call the **new** API. They do not govern what the consumer currently has in their own code, and that is a separate question with the opposite answer.
-
-When a change removes the need for a workaround — an unsafe cast, a duplicated declaration, a pinned version, an extra build step — name the workaround as they wrote it, even when it involves generated or otherwise unglamorous names they'd never see in docs:
-
-```md
-The workaround — `componentsGeneric().workpool as unknown as ComponentApi` — required an unsafe cast at every call site.
-```
-
-That line is doing work no restated version can: a reader greps their repo for it, finds three hits, and deletes them. Restating it as "previously this required a cast" leaves them to work out whether they're one of the affected. This is question 2 — how do I recognize myself — and code the consumer already owns is the sharpest possible answer to it. Reach for it whenever a change retires something, and keep it to what they actually typed.
 
 **Bad — internal symbols and pipeline mechanics:**
 
