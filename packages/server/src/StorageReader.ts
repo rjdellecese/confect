@@ -7,8 +7,6 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { BlobNotFoundError } from "./BlobNotFoundError";
-// oxlint-disable-next-line import/no-unassigned-import
-import "./internal/urlCanParsePolyfill";
 
 const make = (storageReader: ConvexStorageReader) => ({
   getUrl: (storageId: GenericId<"_storage">) =>

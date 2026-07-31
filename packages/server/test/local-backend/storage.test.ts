@@ -1,10 +1,8 @@
 /**
  * End-to-end test of Confect's storage services inside Convex's real UDF
- * isolate. Convex returns storage URLs as plain strings, and the isolate's
- * `URL` polyfill lacks the static `URL.canParse` that Effect's
- * `Schema.URLFromString` decode relies on — so these only pass if the
- * `URL.canParse` polyfill `@confect/server` installs takes effect in the
- * isolate and the string→URL decode succeeds there.
+ * isolate. Convex returns storage URLs as plain strings, which the storage
+ * services decode with Effect's `Schema.URLFromString` — so these only pass
+ * if that string→URL decode succeeds in the isolate.
  */
 
 import { Ref } from "@confect/core";
