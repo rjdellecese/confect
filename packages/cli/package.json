@@ -11,8 +11,8 @@
   },
   "dependencies": {
     "@effect/cli": "^0.76.0",
-    "@effect/platform": "^0.97.0",
-    "@effect/platform-node": "^0.108.0",
+    "@effect/platform": "^0.97.1",
+    "@effect/platform-node": "^0.108.1",
     "@effect/printer": "^0.50.0",
     "@effect/printer-ansi": "^0.50.0",
     "bundle-require": "^5.1.0",
