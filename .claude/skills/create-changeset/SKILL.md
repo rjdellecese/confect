@@ -44,6 +44,8 @@ Confect's public API is what the documentation and example app teach. Every iden
 - **Demonstrated**: used via a `@confect/*` import in `apps/example/`
 - **New in this branch**: added by this change, exported from the package's public entry point, and something a consumer will type in their own code
 
+Names that are consumer-observable by nature also pass without a grep hit: npm package names in dependency/peer range changes, web-platform globals, and fields of the published `package.json` (e.g. `sideEffects`, `exports`).
+
 Verify — don't assume:
 
 ```bash
@@ -53,15 +55,15 @@ grep -rn "TheName" apps/example/src apps/example/confect
 
 A name that fails the test doesn't get prose about it — it gets **replaced by the consumer-facing wrapper it serves**, or the sentence is cut. If you cannot state the change without naming an internal symbol, that's strong evidence the change isn't user-facing; drop to a one-line `patch` or no changeset.
 
-The same test applies to *mechanics*, not just identifiers: a sentence narrating how the fix works internally (what now decodes what, which step of the pipeline changed, what was renamed) is implementation-facing even if every noun is public. Frame every sentence around what the consumer authors, calls, gets back, or sees in their terminal.
+The same test applies to _mechanics_, not just identifiers: a sentence narrating how the fix works internally (what now decodes what, which step of the pipeline changed, what was renamed) is implementation-facing even if every noun is public. Frame every sentence around what the consumer authors, calls, gets back, or sees in their terminal.
 
 ## 3. Frontmatter and bump
 
-Read `.changeset/config.json` for `baseBranch` and the fixed group. All `@confect/*` packages version together, so the frontmatter's job is accuracy, not storytelling: list each published package whose *own surface or behavior* changed. Don't add a package just because it contains supporting plumbing for another package's feature.
+Read `.changeset/config.json` for `baseBranch` and the fixed group. All `@confect/*` packages version together, so the frontmatter's job is accuracy, not storytelling: list each published package whose _own surface or behavior_ changed. Don't add a package just because it contains supporting plumbing for another package's feature.
 
 - **`major`** — removed/renamed exports or behavior changes that break existing consumer code. One major bumps the whole fixed group; reserve for genuine breaks.
-- **`minor`** — new consumer-facing exports, new optional parameters, new capabilities, backward-compatible observable refinements.
-- **`patch`** — bug fixes, typing fixes that don't change call-site shape, performance, dependency bumps, docs/JSDoc fixes.
+- **`minor`** — new consumer-facing exports, new optional parameters, new capabilities, backward-compatible observable refinements, raised peer-dependency floors (consumers must upgrade the peer alongside).
+- **`patch`** — bug fixes, typing fixes that don't change call-site shape, performance, dependency bumps requiring no consumer action, docs/JSDoc fixes.
 
 When in doubt: minor for new things, patch for fixes; major only when consumers must change their code.
 
@@ -103,7 +105,7 @@ Add `usePaginatedQuery` to `@confect/react` — a typed wrapper around Convex's 
 import { usePaginatedQuery } from "@confect/react";
 
 const { results, status, loadMore } = usePaginatedQuery(
-  refs.notes.list,
+  refs.public.notes.list,
   { author },
   { initialNumItems: 10 },
 );
