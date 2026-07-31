@@ -54,8 +54,8 @@ bumping, confirm the new versions actually resolved (e.g. `pnpm why <dep>`).
    `pnpm test:server:local-backend`). Anything the local environment genuinely
    can't run, leave to the PR's CI — and get it green. Drop upgrades that fail
    here before moving on.
-3. Add a changeset iff any published `package.json` changed — use the
-   create-changeset agent.
+3. Add a changeset iff any published `package.json` changed — follow the
+   create-changeset skill.
 4. Push a branch (`deps/<short-description>`, unless this session was assigned
    a branch) and open a PR against `main`. In the body, list what was bumped
    with links to release notes, and note anything deliberately skipped and why.
