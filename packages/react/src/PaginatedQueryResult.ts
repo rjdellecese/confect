@@ -225,7 +225,7 @@ export const exhausted = <Item, E = never>(options: {
     loadMore: options.loadMore,
   });
 
-export const fail = <E, Item = never>(options: {
+export const failure = <E, Item = never>(options: {
   error: E;
   results: ReadonlyArray<Item>;
 }): Failure<Item, E> =>

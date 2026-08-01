@@ -236,7 +236,7 @@ export const usePaginatedQuery = <Query extends Ref.AnyPublicPaginatedQuery>(
         if (Ref.isConvexError(error)) {
           const decoded = Ref.decodeErrorSync(ref, error.data);
           if (Option.isSome(decoded)) {
-            return PaginatedQueryResult.fail({
+            return PaginatedQueryResult.failure({
               error: decoded.value,
               results: decodedResults,
             });
