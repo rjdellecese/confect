@@ -170,8 +170,9 @@ const useConvexPaginatedQueryInternal = (
  * Returns a {@link PaginatedQueryResult.PaginatedQueryResult}: the loaded
  * variants carry `results`, `isLoading`, and `loadMore`; if the `Ref` declares
  * an `error` schema and the query fails with that typed error, the decoded
- * error is returned as the `Failure` variant. Unknown errors are thrown, to be
- * caught by an error boundary.
+ * error is returned as the `Failure` variant, which also carries the pages
+ * loaded before the failure. Unknown errors are thrown, to be caught by an
+ * error boundary.
  */
 export const usePaginatedQuery = <Query extends Ref.AnyPublicPaginatedQuery>(
   ref: Query,
@@ -211,17 +212,15 @@ export const usePaginatedQuery = <Query extends Ref.AnyPublicPaginatedQuery>(
     false,
   );
 
-  const encodedResults =
-    convexResult.status === "Error" ? undefined : convexResult.results;
-
+  // The Convex hook carries the pages loaded so far on every status,
+  // failures included, so results are decoded unconditionally.
+  //
   // Decoding allocates fresh items, so key on the referentially stable
   // `results` the Convex hook provides — the same identity-preservation
   // rationale as in `useQuery` above.
+  const { results: encodedResults } = convexResult;
   const decodedResults = useMemo(
-    () =>
-      encodedResults === undefined
-        ? undefined
-        : Ref.decodePaginationPageSync(ref, encodedResults),
+    () => Ref.decodePaginationPageSync(ref, encodedResults),
     [ref, encodedResults],
   );
 
@@ -237,7 +236,10 @@ export const usePaginatedQuery = <Query extends Ref.AnyPublicPaginatedQuery>(
         if (Ref.isConvexError(error)) {
           const decoded = Ref.decodeErrorSync(ref, error.data);
           if (Option.isSome(decoded)) {
-            return PaginatedQueryResult.fail(decoded.value);
+            return PaginatedQueryResult.fail({
+              error: decoded.value,
+              results: decodedResults,
+            });
           }
         }
         // Unknown errors still throw. All hooks have run by this point, so an
@@ -248,17 +250,17 @@ export const usePaginatedQuery = <Query extends Ref.AnyPublicPaginatedQuery>(
         return PaginatedQueryResult.loadingFirstPage({ skipped, loadMore });
       case "LoadingMore":
         return PaginatedQueryResult.loadingMore({
-          results: decodedResults ?? [],
+          results: decodedResults,
           loadMore,
         });
       case "CanLoadMore":
         return PaginatedQueryResult.canLoadMore({
-          results: decodedResults ?? [],
+          results: decodedResults,
           loadMore,
         });
       case "Exhausted":
         return PaginatedQueryResult.exhausted({
-          results: decodedResults ?? [],
+          results: decodedResults,
           loadMore,
         });
     }

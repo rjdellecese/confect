@@ -14,11 +14,17 @@ type TypeId = typeof TypeId;
  * `convex/react` and all carry `results`, `isLoading`, and `loadMore`, so the
  * common UI shape — render the list, show a spinner while loading, offer a
  * load-more button — needs only an {@link isFailure} early-out and plain field
- * access. The `Failure` variant carries the query's decoded typed error.
+ * access.
+ *
+ * Every variant carries `results`, including `Failure`: when a later page
+ * fails, the pages already loaded are still worth rendering alongside the
+ * error, so they are not discarded. `Failure` additionally carries the
+ * query's decoded typed error, and omits `loadMore`, which cannot make
+ * progress from a failed state.
  *
  * When the query declares no `error` schema (`E` is `never`), the `Failure`
- * variant is excluded from the type entirely, so `results` and friends are
- * accessible without any narrowing.
+ * variant is excluded from the type entirely, so `isLoading` and `loadMore`
+ * are accessible without any narrowing.
  *
  * @typeParam Item - The type of a decoded page item.
  * @typeParam E - The type of the decoded typed error in the `Failure` variant.
@@ -28,7 +34,8 @@ export type PaginatedQueryResult<Item, E = never> = [E] extends [never]
   : Loaded<Item, E> | Failure<Item, E>;
 
 /**
- * The non-`Failure` variants: `results` (and `loadMore`) are always available.
+ * The non-`Failure` variants — those where the query is still making
+ * progress, so `isLoading` and `loadMore` are available.
  */
 export type Loaded<Item, E = never> =
   | LoadingFirstPage<Item, E>
@@ -105,6 +112,8 @@ export interface Failure<Item, E = never> extends PaginatedQueryResult.Proto<
 > {
   readonly _tag: "Failure";
   readonly error: E;
+  /** The pages loaded before the failure. */
+  readonly results: ReadonlyArray<Item>;
 }
 
 export const isPaginatedQueryResult = (
@@ -137,7 +146,10 @@ const PaginatedQueryResultProto = {
       case "Exhausted":
         return Equal.equals(this.results, (that as Loaded<any, any>).results);
       case "Failure":
-        return Equal.equals(this.error, (that as Failure<any, any>).error);
+        return (
+          Equal.equals(this.error, (that as Failure<any, any>).error) &&
+          Equal.equals(this.results, (that as Failure<any, any>).results)
+        );
     }
   },
   [Hash.symbol](this: Variants<any, any>): number {
@@ -156,7 +168,12 @@ const PaginatedQueryResultProto = {
           Hash.combine(tagHash)(Hash.hash(this.results)),
         );
       case "Failure":
-        return Hash.cached(this, Hash.combine(tagHash)(Hash.hash(this.error)));
+        return Hash.cached(
+          this,
+          Hash.combine(tagHash)(
+            Hash.combine(Hash.hash(this.error))(Hash.hash(this.results)),
+          ),
+        );
     }
   },
 };
@@ -208,10 +225,14 @@ export const exhausted = <Item, E = never>(options: {
     loadMore: options.loadMore,
   });
 
-export const fail = <E, Item = never>(error: E): Failure<Item, E> =>
+export const fail = <E, Item = never>(options: {
+  error: E;
+  results: ReadonlyArray<Item>;
+}): Failure<Item, E> =>
   Object.assign(Object.create(PaginatedQueryResultProto), {
     _tag: "Failure" as const,
-    error,
+    error: options.error,
+    results: options.results,
   });
 
 export const isLoadingFirstPage = <Item, E>(
@@ -251,7 +272,11 @@ type MatchOptions<Item, E, V, W, X, Y, Z> = {
     loadMore: (numItems: number) => void,
   ) => X;
   readonly onExhausted: (results: ReadonlyArray<Item>) => Y;
-} & ([E] extends [never] ? {} : { readonly onFailure: (error: E) => Z });
+} & ([E] extends [never]
+  ? {}
+  : {
+      readonly onFailure: (error: E, results: ReadonlyArray<Item>) => Z;
+    });
 
 type MatchReturns<E, V, W, X, Y, Z> = [E] extends [never]
   ? V | W | X | Y
@@ -287,7 +312,7 @@ export const match: {
         return options.onExhausted(self.results);
       case "Failure": {
         if (Predicate.hasProperty(options, "onFailure")) {
-          return options.onFailure(self.error) as MatchReturns<
+          return options.onFailure(self.error, self.results) as MatchReturns<
             E,
             V,
             W,

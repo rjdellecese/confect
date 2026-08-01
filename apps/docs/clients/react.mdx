@@ -162,7 +162,7 @@ const PaginatedNoteList = () => {
 
 ### Typed errors
 
-When the spec declares an `error` schema, the result type gains a `Failure` variant carrying the decoded typed error — errors are values, consistent with `useQuery`. Narrow with `PaginatedQueryResult.isFailure` (or handle `onFailure` in `match`) before accessing `results`:
+When the spec declares an `error` schema, the result type gains a `Failure` variant carrying the decoded typed error — errors are values, consistent with `useQuery`. Narrow with `PaginatedQueryResult.isFailure` (or handle `onFailure` in `match`) to reach it:
 
 ```tsx
 const notes = usePaginatedQuery(
@@ -172,10 +172,19 @@ const notes = usePaginatedQuery(
 );
 
 if (PaginatedQueryResult.isFailure(notes)) {
-  return <p>Failed: {notes.error.reason}</p>;
+  // `results` holds the pages loaded before the failure, so they can still
+  // be rendered alongside the error.
+  return (
+    <div>
+      <NoteList notes={notes.results} />
+      <p>Failed to load more: {notes.error.reason}</p>
+    </div>
+  );
 }
-// notes: Loaded — results/isLoading/loadMore are available.
+// notes: Loaded — isLoading and loadMore are available too.
 ```
+
+Every variant carries `results`, `Failure` included: when a later page fails, the pages already loaded are not discarded. `Failure` omits `loadMore`, which cannot make progress from a failed state.
 
 Without an `error` schema, the `Failure` variant is excluded from the type entirely, so no narrowing is needed. Failures not declared in the `error` schema are thrown during render and propagate to the nearest [error boundary](https://react.dev/reference/react/Component#catching-rendering-errors-with-an-error-boundary).
 

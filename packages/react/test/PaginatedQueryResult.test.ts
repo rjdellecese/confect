@@ -55,12 +55,13 @@ describe("constructors", () => {
     expect(PaginatedQueryResult.isExhausted(r)).toBe(true);
   });
 
-  test("fail carries the error", () => {
+  test("fail carries the error and the pages loaded before it", () => {
     const err = new Error("boom");
-    const r = PaginatedQueryResult.fail(err);
+    const r = PaginatedQueryResult.fail({ error: err, results: [1, 2] });
 
     expect(r._tag).toBe("Failure");
     expect(r.error).toBe(err);
+    expect(r.results).toEqual([1, 2]);
     expect(PaginatedQueryResult.isFailure(r)).toBe(true);
     expect(PaginatedQueryResult.isLoaded(r)).toBe(false);
   });
@@ -70,7 +71,7 @@ describe("isPaginatedQueryResult", () => {
   test("is true for values from constructors and false otherwise", () => {
     expect(
       PaginatedQueryResult.isPaginatedQueryResult(
-        PaginatedQueryResult.fail("e"),
+        PaginatedQueryResult.fail({ error: "e", results: [] }),
       ),
     ).toBe(true);
     expect(PaginatedQueryResult.isPaginatedQueryResult({})).toBe(false);
@@ -92,17 +93,25 @@ describe("Equal", () => {
     expect(Equal.equals(a, c)).toBe(false);
   });
 
-  test("failures compare by error", () => {
+  test("failures compare by error and results", () => {
+    const results = [1, 2];
+
     expect(
       Equal.equals(
-        PaginatedQueryResult.fail("e"),
-        PaginatedQueryResult.fail("e"),
+        PaginatedQueryResult.fail({ error: "e", results }),
+        PaginatedQueryResult.fail({ error: "e", results }),
       ),
     ).toBe(true);
     expect(
       Equal.equals(
-        PaginatedQueryResult.fail("e"),
-        PaginatedQueryResult.fail("f"),
+        PaginatedQueryResult.fail({ error: "e", results }),
+        PaginatedQueryResult.fail({ error: "f", results }),
+      ),
+    ).toBe(false);
+    expect(
+      Equal.equals(
+        PaginatedQueryResult.fail({ error: "e", results }),
+        PaginatedQueryResult.fail({ error: "e", results: [3] }),
       ),
     ).toBe(false);
   });
@@ -179,14 +188,14 @@ describe("match", () => {
 
   test("onFailure is required only when the result can fail", () => {
     const failing: PaginatedQueryResult.PaginatedQueryResult<number, string> =
-      PaginatedQueryResult.fail("boom");
+      PaginatedQueryResult.fail({ error: "boom", results: [1, 2] });
 
     expect(
       PaginatedQueryResult.match(failing, {
         ...handlers,
-        onFailure: (error) => `failure:${error}`,
+        onFailure: (error, results) => `failure:${error}:${results.length}`,
       }),
-    ).toBe("failure:boom");
+    ).toBe("failure:boom:2");
 
     const infallible: PaginatedQueryResult.PaginatedQueryResult<number> =
       PaginatedQueryResult.exhausted({ results: [1], loadMore: noop });

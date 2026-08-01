@@ -577,6 +577,23 @@ describe("usePaginatedQuery", () => {
     expect(result.current.error.reason).toBe("oops");
   });
 
+  test("Failure keeps the pages loaded before the failure", () => {
+    useConvexPaginatedQueryInternalMock.mockReturnValue(
+      user({
+        status: "Error",
+        results: [{ value: "1" }, { value: "2" }],
+        error: new ConvexError({ _tag: "PaginationFailed", reason: "oops" }),
+      }),
+    );
+
+    const { result } = renderHook(() =>
+      usePaginatedQuery(paginatedQueryWithError, {}, { initialNumItems: 10 }),
+    );
+
+    assert(PaginatedQueryResult.isFailure(result.current));
+    expect(result.current.results).toEqual([{ value: 1 }, { value: 2 }]);
+  });
+
   test("throws a ConvexError from a ref without an error schema", () => {
     const convexError = new ConvexError({ code: "ERR" });
     useConvexPaginatedQueryInternalMock.mockReturnValue(
