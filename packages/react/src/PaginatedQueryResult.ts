@@ -2,6 +2,7 @@ import { identity } from "effect/Function";
 import * as Equal from "effect/Equal";
 import * as Function from "effect/Function";
 import * as Hash from "effect/Hash";
+import * as Match from "effect/Match";
 import * as Pipeable from "effect/Pipeable";
 import * as Predicate from "effect/Predicate";
 
@@ -138,43 +139,42 @@ const PaginatedQueryResultProto = {
     if (this._tag !== that._tag) {
       return false;
     }
-    switch (this._tag) {
-      case "LoadingFirstPage":
-        return this.skipped === (that as LoadingFirstPage<any, any>).skipped;
-      case "LoadingMore":
-      case "CanLoadMore":
-      case "Exhausted":
-        return Equal.equals(this.results, (that as Loaded<any, any>).results);
-      case "Failure":
-        return (
-          Equal.equals(this.error, (that as Failure<any, any>).error) &&
-          Equal.equals(this.results, (that as Failure<any, any>).results)
-        );
-    }
+    return Match.value(this).pipe(
+      Match.tag(
+        "LoadingFirstPage",
+        (self) => self.skipped === (that as LoadingFirstPage<any, any>).skipped,
+      ),
+      Match.tag("LoadingMore", "CanLoadMore", "Exhausted", (self) =>
+        Equal.equals(self.results, (that as Loaded<any, any>).results),
+      ),
+      Match.tag(
+        "Failure",
+        (self) =>
+          Equal.equals(self.error, (that as Failure<any, any>).error) &&
+          Equal.equals(self.results, (that as Failure<any, any>).results),
+      ),
+      Match.exhaustive,
+    );
   },
   [Hash.symbol](this: Variants<any, any>): number {
     const tagHash = Hash.string(this._tag);
-    switch (this._tag) {
-      case "LoadingFirstPage":
-        return Hash.cached(
-          this,
-          Hash.combine(tagHash)(Hash.hash(this.skipped)),
-        );
-      case "LoadingMore":
-      case "CanLoadMore":
-      case "Exhausted":
-        return Hash.cached(
-          this,
-          Hash.combine(tagHash)(Hash.hash(this.results)),
-        );
-      case "Failure":
-        return Hash.cached(
-          this,
+    return Match.value(this).pipe(
+      Match.tag("LoadingFirstPage", (self) =>
+        Hash.cached(self, Hash.combine(tagHash)(Hash.hash(self.skipped))),
+      ),
+      Match.tag("LoadingMore", "CanLoadMore", "Exhausted", (self) =>
+        Hash.cached(self, Hash.combine(tagHash)(Hash.hash(self.results))),
+      ),
+      Match.tag("Failure", (self) =>
+        Hash.cached(
+          self,
           Hash.combine(tagHash)(
-            Hash.combine(Hash.hash(this.error))(Hash.hash(this.results)),
+            Hash.combine(Hash.hash(self.error))(Hash.hash(self.results)),
           ),
-        );
-    }
+        ),
+      ),
+      Match.exhaustive,
+    );
   },
 };
 
@@ -300,31 +300,28 @@ export const match: {
   <Item, E, V, W, X, Y, Z = never>(
     self: Variants<Item, E>,
     options: MatchOptions<Item, E, V, W, X, Y, Z>,
-  ): MatchReturns<E, V, W, X, Y, Z> => {
-    switch (self._tag) {
-      case "LoadingFirstPage":
-        return options.onLoadingFirstPage(self.skipped);
-      case "LoadingMore":
-        return options.onLoadingMore(self.results);
-      case "CanLoadMore":
-        return options.onCanLoadMore(self.results, self.loadMore);
-      case "Exhausted":
-        return options.onExhausted(self.results);
-      case "Failure": {
+  ): MatchReturns<E, V, W, X, Y, Z> =>
+    Match.value(self).pipe(
+      Match.tag("LoadingFirstPage", (loadingFirstPage_) =>
+        options.onLoadingFirstPage(loadingFirstPage_.skipped),
+      ),
+      Match.tag("LoadingMore", (loadingMore_) =>
+        options.onLoadingMore(loadingMore_.results),
+      ),
+      Match.tag("CanLoadMore", (canLoadMore_) =>
+        options.onCanLoadMore(canLoadMore_.results, canLoadMore_.loadMore),
+      ),
+      Match.tag("Exhausted", (exhausted_) =>
+        options.onExhausted(exhausted_.results),
+      ),
+      Match.tag("Failure", (failure_) => {
         if (Predicate.hasProperty(options, "onFailure")) {
-          return options.onFailure(self.error, self.results) as MatchReturns<
-            E,
-            V,
-            W,
-            X,
-            Y,
-            Z
-          >;
+          return options.onFailure(failure_.error, failure_.results);
         }
         throw new Error(
           "`onFailure` is required when error schema is provided",
         );
-      }
-    }
-  },
+      }),
+      Match.exhaustive,
+    ) as MatchReturns<E, V, W, X, Y, Z>,
 );

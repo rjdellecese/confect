@@ -14,6 +14,7 @@ import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Either from "effect/Either";
 import * as Exit from "effect/Exit";
+import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import { useCallback, useMemo } from "react";
 
@@ -227,54 +228,56 @@ export const usePaginatedQuery = <Query extends Ref.AnyPublicPaginatedQuery>(
   const { status, loadMore } = convexResult;
   const error = status === "Error" ? convexResult.error : undefined;
 
-  return useMemo((): PaginatedQueryResult.Variants<
-    PaginatedQueryItem<Query>,
-    Ref.Error<Query>
-  > => {
-    switch (status) {
-      case "Error": {
-        if (Ref.isConvexError(error)) {
-          const decoded = Ref.decodeErrorSync(ref, error.data);
-          if (Option.isSome(decoded)) {
-            return PaginatedQueryResult.failure({
-              error: decoded.value,
-              results: decodedResults,
-            });
+  return useMemo(
+    (): PaginatedQueryResult.Variants<
+      PaginatedQueryItem<Query>,
+      Ref.Error<Query>
+    > =>
+      // `status` is a bare string union rather than a tagged one, so the arms
+      // match on literals.
+      Match.value(status).pipe(
+        Match.when("Error", () => {
+          if (Ref.isConvexError(error)) {
+            const decoded = Ref.decodeErrorSync(ref, error.data);
+            if (Option.isSome(decoded)) {
+              return PaginatedQueryResult.failure({
+                error: decoded.value,
+                results: decodedResults,
+              });
+            }
           }
-        }
-        // Unknown errors still throw. All hooks have run by this point, so an
-        // aborted render here is hook-order-safe.
-        throw error;
-      }
-      case "LoadingFirstPage":
-        return PaginatedQueryResult.loadingFirstPage({ skipped, loadMore });
-      case "LoadingMore":
-        return PaginatedQueryResult.loadingMore({
-          results: decodedResults,
-          loadMore,
-        });
-      case "CanLoadMore":
-        return PaginatedQueryResult.canLoadMore({
-          results: decodedResults,
-          loadMore,
-        });
-      case "Exhausted":
-        return PaginatedQueryResult.exhausted({
-          results: decodedResults,
-          loadMore,
-        });
-    }
+          // Unknown errors still throw. All hooks have run by this point, so
+          // an aborted render here is hook-order-safe.
+          throw error;
+        }),
+        Match.when("LoadingFirstPage", () =>
+          PaginatedQueryResult.loadingFirstPage({ skipped, loadMore }),
+        ),
+        Match.when("LoadingMore", () =>
+          PaginatedQueryResult.loadingMore({
+            results: decodedResults,
+            loadMore,
+          }),
+        ),
+        Match.when("CanLoadMore", () =>
+          PaginatedQueryResult.canLoadMore({
+            results: decodedResults,
+            loadMore,
+          }),
+        ),
+        Match.when("Exhausted", () =>
+          PaginatedQueryResult.exhausted({
+            results: decodedResults,
+            loadMore,
+          }),
+        ),
+        Match.exhaustive,
+      ),
     // The memo produces `Variants`, the conditional return type's superset —
     // when `E` is `never` the `Failure` arm is unreachable at runtime, which
     // is exactly what the conditional encodes.
-  }, [
-    ref,
-    skipped,
-    decodedResults,
-    status,
-    loadMore,
-    error,
-  ]) as PaginatedQueryResult.PaginatedQueryResult<
+    [ref, skipped, decodedResults, status, loadMore, error],
+  ) as PaginatedQueryResult.PaginatedQueryResult<
     PaginatedQueryItem<Query>,
     Ref.Error<Query>
   >;

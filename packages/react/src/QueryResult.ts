@@ -2,6 +2,7 @@ import { identity } from "effect/Function";
 import * as Equal from "effect/Equal";
 import * as Function from "effect/Function";
 import * as Hash from "effect/Hash";
+import * as Match from "effect/Match";
 import * as Pipeable from "effect/Pipeable";
 import * as Predicate from "effect/Predicate";
 
@@ -71,28 +72,34 @@ const QueryResultProto = {
     if (this._tag !== that._tag) {
       return false;
     }
-    switch (this._tag) {
-      case "Loading":
-        return this.skipped === (that as Loading<any, any>).skipped;
-      case "Success":
-        return Equal.equals(this.value, (that as Success<any, any>).value);
-      case "Failure":
-        return Equal.equals(this.error, (that as Failure<any, any>).error);
-    }
+    return Match.value(this).pipe(
+      Match.tag(
+        "Loading",
+        (self) => self.skipped === (that as Loading<any, any>).skipped,
+      ),
+      Match.tag("Success", (self) =>
+        Equal.equals(self.value, (that as Success<any, any>).value),
+      ),
+      Match.tag("Failure", (self) =>
+        Equal.equals(self.error, (that as Failure<any, any>).error),
+      ),
+      Match.exhaustive,
+    );
   },
   [Hash.symbol](this: QueryResult<any, any>): number {
     const tagHash = Hash.string(this._tag);
-    switch (this._tag) {
-      case "Loading":
-        return Hash.cached(
-          this,
-          Hash.combine(tagHash)(Hash.hash(this.skipped)),
-        );
-      case "Success":
-        return Hash.cached(this, Hash.combine(tagHash)(Hash.hash(this.value)));
-      case "Failure":
-        return Hash.cached(this, Hash.combine(tagHash)(Hash.hash(this.error)));
-    }
+    return Match.value(this).pipe(
+      Match.tag("Loading", (self) =>
+        Hash.cached(self, Hash.combine(tagHash)(Hash.hash(self.skipped))),
+      ),
+      Match.tag("Success", (self) =>
+        Hash.cached(self, Hash.combine(tagHash)(Hash.hash(self.value))),
+      ),
+      Match.tag("Failure", (self) =>
+        Hash.cached(self, Hash.combine(tagHash)(Hash.hash(self.error))),
+      ),
+      Match.exhaustive,
+    );
   },
 };
 
@@ -159,20 +166,18 @@ export const match: {
   <A, E, X, Y, Z = never>(
     self: QueryResult<A, E>,
     options: MatchOptions<A, E, X, Y, Z>,
-  ): MatchReturns<E, X, Y, Z> => {
-    switch (self._tag) {
-      case "Loading":
-        return options.onLoading(self.skipped);
-      case "Success":
-        return options.onSuccess(self.value);
-      case "Failure": {
+  ): MatchReturns<E, X, Y, Z> =>
+    Match.value(self).pipe(
+      Match.tag("Loading", (loading) => options.onLoading(loading.skipped)),
+      Match.tag("Success", (success) => options.onSuccess(success.value)),
+      Match.tag("Failure", (failure) => {
         if (Predicate.hasProperty(options, "onFailure")) {
-          return options.onFailure(self.error) as MatchReturns<E, X, Y, Z>;
+          return options.onFailure(failure.error);
         }
         throw new Error(
           "`onFailure` is required when error schema is provided",
         );
-      }
-    }
-  },
+      }),
+      Match.exhaustive,
+    ) as MatchReturns<E, X, Y, Z>,
 );
