@@ -16,7 +16,7 @@
     "convex-test": "0.0.54",
     "dotenv": "17.4.2",
     "effect": "4.0.0-beta.102",
-    "tsdown": "0.22.12",
+    "tsdown": "0.22.14",
     "tsx": "4.23.1",
     "typescript": "6.0.3",
     "unrun": "0.3.1",

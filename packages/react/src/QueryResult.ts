@@ -20,6 +20,7 @@ export type QueryResult<A, E = never> =
   | Failure<A, E>;
 
 export declare namespace QueryResult {
+  // eslint-disable-next-line import/namespace -- oxlint's namespace resolution misses type-only exports, and `Pipeable` is an interface
   export interface Proto<A, E> extends Pipeable.Pipeable {
     readonly [TypeId]: {
       readonly E: (_: never) => E;
