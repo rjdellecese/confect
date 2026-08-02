@@ -11,45 +11,54 @@ type TypeId = typeof TypeId;
 
 /**
  * A `PaginatedQueryResult` represents the result of a Confect paginated query.
- * The loaded variants mirror the statuses of `usePaginatedQuery` from
- * `convex/react` and all carry `results`, `isLoading`, and `loadMore`, so the
- * common UI shape — render the list, show a spinner while loading, offer a
- * load-more button — needs only an {@link isFailure} early-out and plain field
- * access.
+ * The non-`Failure` variants mirror the statuses of `usePaginatedQuery` from
+ * `convex/react` and all carry `results` and `isLoading`, so the common UI
+ * shape — render the list, show a spinner while loading — needs only an
+ * {@link isFailure} early-out and plain field access.
  *
  * Every variant carries `results`, including `Failure`: when a later page
  * fails, the pages already loaded are still worth rendering alongside the
  * error, so they are not discarded. `Failure` additionally carries the
- * query's decoded typed error, and omits `loadMore`, which cannot make
- * progress from a failed state.
+ * query's decoded typed error.
+ *
+ * `loadMore` appears only on `CanLoadMore`, the one state it can make
+ * progress from. The underlying Convex hook exposes it on every status, but
+ * calling it while a page is in flight, once the list is exhausted, or after
+ * a failure is an intentional no-op there; narrowing to `CanLoadMore` — via
+ * {@link isCanLoadMore} or {@link match} — makes that statically apparent
+ * instead of silently dropping the call.
  *
  * When the query declares no `error` schema (`E` is `never`), the `Failure`
- * variant is excluded from the type entirely, so `isLoading` and `loadMore`
- * are accessible without any narrowing.
+ * variant is excluded from the type entirely, so `isLoading` is accessible
+ * without any narrowing.
  *
  * @typeParam Item - The type of a decoded page item.
  * @typeParam E - The type of the decoded typed error in the `Failure` variant.
  */
 export type PaginatedQueryResult<Item, E = never> = [E] extends [never]
-  ? Loaded<Item, E>
-  : Loaded<Item, E> | Failure<Item, E>;
-
-/**
- * The non-`Failure` variants — those where the query is still making
- * progress, so `isLoading` and `loadMore` are available.
- */
-export type Loaded<Item, E = never> =
-  | LoadingFirstPage<Item, E>
-  | LoadingMore<Item, E>
-  | CanLoadMore<Item, E>
-  | Exhausted<Item, E>;
+  ?
+      | LoadingFirstPage<Item, E>
+      | LoadingMore<Item, E>
+      | CanLoadMore<Item, E>
+      | Exhausted<Item, E>
+  :
+      | LoadingFirstPage<Item, E>
+      | LoadingMore<Item, E>
+      | CanLoadMore<Item, E>
+      | Exhausted<Item, E>
+      | Failure<Item, E>;
 
 /**
  * Every variant regardless of `E` — the parameter type for guards and
  * {@link match}, since `PaginatedQueryResult` itself excludes `Failure` when
  * `E` is `never`.
  */
-export type Variants<Item, E = never> = Loaded<Item, E> | Failure<Item, E>;
+export type Variants<Item, E = never> =
+  | LoadingFirstPage<Item, E>
+  | LoadingMore<Item, E>
+  | CanLoadMore<Item, E>
+  | Exhausted<Item, E>
+  | Failure<Item, E>;
 
 export declare namespace PaginatedQueryResult {
   // eslint-disable-next-line @typescript-eslint/no-shadow, import/namespace -- oxlint's namespace resolution misses type-only exports, and `Pipeable` is an interface
@@ -74,7 +83,6 @@ export interface LoadingFirstPage<
   readonly skipped: boolean;
   readonly results: ReadonlyArray<Item>;
   readonly isLoading: true;
-  readonly loadMore: (numItems: number) => void;
 }
 
 export interface LoadingMore<
@@ -84,7 +92,6 @@ export interface LoadingMore<
   readonly _tag: "LoadingMore";
   readonly results: ReadonlyArray<Item>;
   readonly isLoading: true;
-  readonly loadMore: (numItems: number) => void;
 }
 
 export interface CanLoadMore<
@@ -104,7 +111,6 @@ export interface Exhausted<Item, E = never> extends PaginatedQueryResult.Proto<
   readonly _tag: "Exhausted";
   readonly results: ReadonlyArray<Item>;
   readonly isLoading: false;
-  readonly loadMore: (numItems: number) => void;
 }
 
 export interface Failure<Item, E = never> extends PaginatedQueryResult.Proto<
@@ -132,9 +138,11 @@ const PaginatedQueryResultProto = {
       args as unknown as Parameters<typeof Pipeable.pipeArguments>[1],
     );
   },
-  // `loadMore` is excluded from equality and hashing, like function fields
-  // generally: two results that render identically are equal even though their
-  // callbacks differ by identity.
+  /**
+   * `CanLoadMore`'s `loadMore` is excluded from equality and hashing, like
+   * function fields generally: two results that render identically are equal
+   * even though their callbacks differ by identity.
+   */
   [Equal.symbol](this: Variants<any, any>, that: Variants<any, any>): boolean {
     if (this._tag !== that._tag) {
       return false;
@@ -145,7 +153,7 @@ const PaginatedQueryResultProto = {
         (self) => self.skipped === (that as LoadingFirstPage<any, any>).skipped,
       ),
       Match.tag("LoadingMore", "CanLoadMore", "Exhausted", (self) =>
-        Equal.equals(self.results, (that as Loaded<any, any>).results),
+        Equal.equals(self.results, that.results),
       ),
       Match.tag(
         "Failure",
@@ -182,25 +190,21 @@ const noResults: ReadonlyArray<never> = [];
 
 export const loadingFirstPage = <Item = never, E = never>(options: {
   skipped: boolean;
-  loadMore: (numItems: number) => void;
 }): LoadingFirstPage<Item, E> =>
   Object.assign(Object.create(PaginatedQueryResultProto), {
     _tag: "LoadingFirstPage" as const,
     skipped: options.skipped,
     results: noResults,
     isLoading: true as const,
-    loadMore: options.loadMore,
   });
 
 export const loadingMore = <Item, E = never>(options: {
   results: ReadonlyArray<Item>;
-  loadMore: (numItems: number) => void;
 }): LoadingMore<Item, E> =>
   Object.assign(Object.create(PaginatedQueryResultProto), {
     _tag: "LoadingMore" as const,
     results: options.results,
     isLoading: true as const,
-    loadMore: options.loadMore,
   });
 
 export const canLoadMore = <Item, E = never>(options: {
@@ -216,13 +220,11 @@ export const canLoadMore = <Item, E = never>(options: {
 
 export const exhausted = <Item, E = never>(options: {
   results: ReadonlyArray<Item>;
-  loadMore: (numItems: number) => void;
 }): Exhausted<Item, E> =>
   Object.assign(Object.create(PaginatedQueryResultProto), {
     _tag: "Exhausted" as const,
     results: options.results,
     isLoading: false as const,
-    loadMore: options.loadMore,
   });
 
 export const failure = <E, Item = never>(options: {
@@ -259,10 +261,6 @@ export const isLoading = <Item, E>(
   result: Variants<Item, E>,
 ): result is LoadingFirstPage<Item, E> | LoadingMore<Item, E> =>
   result._tag === "LoadingFirstPage" || result._tag === "LoadingMore";
-
-export const isLoaded = <Item, E>(
-  result: Variants<Item, E>,
-): result is Loaded<Item, E> => result._tag !== "Failure";
 
 type MatchOptions<Item, E, V, W, X, Y, Z> = {
   readonly onLoadingFirstPage: (skipped: boolean) => V;

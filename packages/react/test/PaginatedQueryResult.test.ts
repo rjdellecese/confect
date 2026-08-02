@@ -8,30 +8,25 @@ const noop = (_numItems: number) => {};
 
 describe("constructors", () => {
   test("loadingFirstPage sets skipped, empty results, and isLoading", () => {
-    const r = PaginatedQueryResult.loadingFirstPage({
-      skipped: true,
-      loadMore: noop,
-    });
+    const r = PaginatedQueryResult.loadingFirstPage({ skipped: true });
 
     expect(r._tag).toBe("LoadingFirstPage");
     expect(r.skipped).toBe(true);
     expect(r.results).toEqual([]);
     expect(r.isLoading).toBe(true);
+    expect("loadMore" in r).toBe(false);
     expect(PaginatedQueryResult.isLoadingFirstPage(r)).toBe(true);
     expect(PaginatedQueryResult.isLoading(r)).toBe(true);
-    expect(PaginatedQueryResult.isLoaded(r)).toBe(true);
     expect(PaginatedQueryResult.isFailure(r)).toBe(false);
   });
 
   test("loadingMore carries results and isLoading", () => {
-    const r = PaginatedQueryResult.loadingMore({
-      results: [1, 2],
-      loadMore: noop,
-    });
+    const r = PaginatedQueryResult.loadingMore({ results: [1, 2] });
 
     expect(r._tag).toBe("LoadingMore");
     expect(r.results).toEqual([1, 2]);
     expect(r.isLoading).toBe(true);
+    expect("loadMore" in r).toBe(false);
     expect(PaginatedQueryResult.isLoadingMore(r)).toBe(true);
     expect(PaginatedQueryResult.isLoading(r)).toBe(true);
   });
@@ -48,10 +43,11 @@ describe("constructors", () => {
   });
 
   test("exhausted carries results", () => {
-    const r = PaginatedQueryResult.exhausted({ results: [1], loadMore: noop });
+    const r = PaginatedQueryResult.exhausted({ results: [1] });
 
     expect(r._tag).toBe("Exhausted");
     expect(r.isLoading).toBe(false);
+    expect("loadMore" in r).toBe(false);
     expect(PaginatedQueryResult.isExhausted(r)).toBe(true);
   });
 
@@ -63,7 +59,6 @@ describe("constructors", () => {
     expect(r.error).toBe(err);
     expect(r.results).toEqual([1, 2]);
     expect(PaginatedQueryResult.isFailure(r)).toBe(true);
-    expect(PaginatedQueryResult.isLoaded(r)).toBe(false);
   });
 });
 
@@ -87,7 +82,7 @@ describe("Equal", () => {
       results,
       loadMore: (_n) => {},
     });
-    const c = PaginatedQueryResult.exhausted({ results, loadMore: noop });
+    const c = PaginatedQueryResult.exhausted({ results });
 
     expect(Equal.equals(a, b)).toBe(true);
     expect(Equal.equals(a, c)).toBe(false);
@@ -119,26 +114,14 @@ describe("Equal", () => {
   test("loadingFirstPage compares by skipped", () => {
     expect(
       Equal.equals(
-        PaginatedQueryResult.loadingFirstPage({
-          skipped: true,
-          loadMore: noop,
-        }),
-        PaginatedQueryResult.loadingFirstPage({
-          skipped: true,
-          loadMore: noop,
-        }),
+        PaginatedQueryResult.loadingFirstPage({ skipped: true }),
+        PaginatedQueryResult.loadingFirstPage({ skipped: true }),
       ),
     ).toBe(true);
     expect(
       Equal.equals(
-        PaginatedQueryResult.loadingFirstPage({
-          skipped: true,
-          loadMore: noop,
-        }),
-        PaginatedQueryResult.loadingFirstPage({
-          skipped: false,
-          loadMore: noop,
-        }),
+        PaginatedQueryResult.loadingFirstPage({ skipped: true }),
+        PaginatedQueryResult.loadingFirstPage({ skipped: false }),
       ),
     ).toBe(false);
   });
@@ -146,7 +129,7 @@ describe("Equal", () => {
 
 describe("pipe", () => {
   test("results are pipeable", () => {
-    const r = PaginatedQueryResult.exhausted({ results: [1], loadMore: noop });
+    const r = PaginatedQueryResult.exhausted({ results: [1] });
 
     expect(pipe(r, PaginatedQueryResult.isExhausted)).toBe(true);
   });
@@ -168,10 +151,7 @@ describe("match", () => {
   test("dispatches to the matching handler", () => {
     expect(
       PaginatedQueryResult.match(
-        PaginatedQueryResult.loadingFirstPage<number>({
-          skipped: false,
-          loadMore: noop,
-        }),
+        PaginatedQueryResult.loadingFirstPage<number>({ skipped: false }),
         handlers,
       ),
     ).toBe("loading-first:false");
@@ -198,7 +178,7 @@ describe("match", () => {
     ).toBe("failure:boom:2");
 
     const infallible: PaginatedQueryResult.PaginatedQueryResult<number> =
-      PaginatedQueryResult.exhausted({ results: [1], loadMore: noop });
+      PaginatedQueryResult.exhausted({ results: [1] });
 
     // No onFailure needed when E = never.
     expect(PaginatedQueryResult.match(infallible, handlers)).toBe(

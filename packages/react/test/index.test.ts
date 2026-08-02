@@ -518,9 +518,39 @@ describe("usePaginatedQuery", () => {
     );
 
     expect(result.current._tag).toBe(status);
-    assert(PaginatedQueryResult.isLoaded(result.current));
+    assert(!PaginatedQueryResult.isFailure(result.current));
     expect(result.current.isLoading).toBe(isLoading);
   });
+
+  test.each([
+    ["LoadingFirstPage", false],
+    ["LoadingMore", false],
+    ["CanLoadMore", true],
+    ["Exhausted", false],
+    ["Error", false],
+  ] as const)(
+    "carries convex's loadMore on %s: %s",
+    (status, carriesLoadMore) => {
+      const loadMore = vi.fn();
+      useConvexPaginatedQueryInternalMock.mockReturnValue(
+        user({
+          status,
+          results: [{ value: "1" }],
+          loadMore,
+          error: new ConvexError({ _tag: "PaginationFailed", reason: "oops" }),
+        }),
+      );
+
+      const { result } = renderHook(() =>
+        usePaginatedQuery(paginatedQueryWithError, {}, { initialNumItems: 10 }),
+      );
+
+      expect("loadMore" in result.current).toBe(carriesLoadMore);
+      if (PaginatedQueryResult.isCanLoadMore(result.current)) {
+        expect(result.current.loadMore).toBe(loadMore);
+      }
+    },
+  );
 
   test("preserves result identity across rerenders for an unchanged convex result", () => {
     useConvexPaginatedQueryInternalMock.mockReturnValue(
@@ -535,8 +565,8 @@ describe("usePaginatedQuery", () => {
     rerender();
 
     expect(result.current).toBe(first);
-    assert(PaginatedQueryResult.isLoaded(result.current));
-    assert(PaginatedQueryResult.isLoaded(first));
+    assert(!PaginatedQueryResult.isFailure(result.current));
+    assert(!PaginatedQueryResult.isFailure(first));
     expect(result.current.results).toBe(first.results);
   });
 
@@ -556,7 +586,7 @@ describe("usePaginatedQuery", () => {
     rerender();
 
     expect(result.current).not.toBe(first);
-    assert(PaginatedQueryResult.isLoaded(result.current));
+    assert(!PaginatedQueryResult.isFailure(result.current));
     expect(result.current.results).toEqual([{ value: 1 }, { value: 2 }]);
   });
 

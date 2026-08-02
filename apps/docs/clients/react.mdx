@@ -127,7 +127,7 @@ Loads data reactively from a [paginated query](/server/functions#paginated-queri
 
 Args are encoded using the spec's user-args schema (`paginationOpts` is managed by the hook, not the caller), and each loaded page is decoded using the spec's `item` schema. Pass `"skip"` instead of args to disable the query, like `useQuery`.
 
-Returns a `PaginatedQueryResult<Item, E>`. The loaded variants — `LoadingFirstPage`, `LoadingMore`, `CanLoadMore`, and `Exhausted` — all carry `results`, `isLoading`, and `loadMore`, so the common UI needs only field access and a couple of predicates:
+Returns a `PaginatedQueryResult<Item, E>`. The loaded variants — `LoadingFirstPage`, `LoadingMore`, `CanLoadMore`, and `Exhausted` — all carry `results` and `isLoading`, and `CanLoadMore` additionally carries `loadMore`, so the common UI needs only field access and a couple of predicates:
 
 ```tsx
 import { PaginatedQueryResult, usePaginatedQuery } from "@confect/react";
@@ -158,7 +158,9 @@ const PaginatedNoteList = () => {
 };
 ```
 
-`PaginatedQueryResult` also provides `match` for exhaustive pattern matching, and the predicates `isLoadingFirstPage`, `isLoadingMore`, `isExhausted`, `isLoading`, `isLoaded`, and `isFailure`.
+`loadMore` lives only on `CanLoadMore`, the one state it can make progress from — the underlying Convex hook exposes it on every status, but calling it while a page is in flight, once the list is exhausted, or after a failure is an intentional no-op there. Narrowing with `isCanLoadMore` (or `match`'s `onCanLoadMore`) makes that statically apparent instead of silently dropping the call.
+
+`PaginatedQueryResult` also provides `match` for exhaustive pattern matching, and the predicates `isLoadingFirstPage`, `isLoadingMore`, `isExhausted`, `isLoading`, and `isFailure`.
 
 ### Typed errors
 
@@ -181,10 +183,10 @@ if (PaginatedQueryResult.isFailure(notes)) {
     </div>
   );
 }
-// notes: Loaded — isLoading and loadMore are available too.
+// notes: narrowed to the non-`Failure` variants — isLoading is available too.
 ```
 
-Every variant carries `results`, `Failure` included: when a later page fails, the pages already loaded are not discarded. `Failure` omits `loadMore`, which cannot make progress from a failed state.
+Every variant carries `results`, `Failure` included: when a later page fails, the pages already loaded are not discarded.
 
 Without an `error` schema, the `Failure` variant is excluded from the type entirely, so no narrowing is needed. Failures not declared in the `error` schema are thrown during render and propagate to the nearest [error boundary](https://react.dev/reference/react/Component#catching-rendering-errors-with-an-error-boundary).
 

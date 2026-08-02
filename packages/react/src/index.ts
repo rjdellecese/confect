@@ -200,11 +200,11 @@ const supportsErrorsAsValues = ((): boolean => {
  * ref's item schema.
  *
  * Returns a {@link PaginatedQueryResult.PaginatedQueryResult}: the loaded
- * variants carry `results`, `isLoading`, and `loadMore`; if the `Ref` declares
- * an `error` schema and the query fails with that typed error, the decoded
- * error is returned as the `Failure` variant, which also carries the pages
- * loaded before the failure. Unknown errors are thrown, to be caught by an
- * error boundary.
+ * variants carry `results` and `isLoading`, and `CanLoadMore` additionally
+ * carries `loadMore`; if the `Ref` declares an `error` schema and the query
+ * fails with that typed error, the decoded error is returned as the `Failure`
+ * variant, which also carries the pages loaded before the failure. Unknown
+ * errors are thrown, to be caught by an error boundary.
  */
 export const usePaginatedQuery = <Query extends Ref.AnyPublicPaginatedQuery>(
   ref: Query,
@@ -287,14 +287,14 @@ export const usePaginatedQuery = <Query extends Ref.AnyPublicPaginatedQuery>(
           throw error;
         }),
         Match.when("LoadingFirstPage", () =>
-          PaginatedQueryResult.loadingFirstPage({ skipped, loadMore }),
+          PaginatedQueryResult.loadingFirstPage({ skipped }),
         ),
         Match.when("LoadingMore", () =>
-          PaginatedQueryResult.loadingMore({
-            results: decodedResults,
-            loadMore,
-          }),
+          PaginatedQueryResult.loadingMore({ results: decodedResults }),
         ),
+        // `CanLoadMore` is the only status whose `loadMore` does anything —
+        // the Convex hook returns an intentional no-op for all the others, so
+        // they carry no callback at all.
         Match.when("CanLoadMore", () =>
           PaginatedQueryResult.canLoadMore({
             results: decodedResults,
@@ -302,10 +302,7 @@ export const usePaginatedQuery = <Query extends Ref.AnyPublicPaginatedQuery>(
           }),
         ),
         Match.when("Exhausted", () =>
-          PaginatedQueryResult.exhausted({
-            results: decodedResults,
-            loadMore,
-          }),
+          PaginatedQueryResult.exhausted({ results: decodedResults }),
         ),
         Match.exhaustive,
       ),
