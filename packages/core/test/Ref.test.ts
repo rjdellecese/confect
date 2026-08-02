@@ -343,6 +343,60 @@ describe("decodeError", () => {
   });
 });
 
+describe("decodeErrorSync", () => {
+  class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+    id: Schema.String,
+  }) {}
+
+  const refWithError = Ref.make(
+    "test/mod",
+    FunctionSpec.publicQuery({
+      name: "getOrFail",
+      args: () => Schema.Struct({}),
+      returns: () => Schema.Void,
+      error: () => NotFound,
+    }),
+  );
+
+  test("decodes error data matching the error schema", () => {
+    const decoded = Ref.decodeErrorSync(refWithError, {
+      _tag: "NotFound",
+      id: "abc",
+    });
+
+    expect(Option.isSome(decoded)).toBe(true);
+    expect(Option.getOrThrow(decoded)).toBeInstanceOf(NotFound);
+  });
+
+  test("returns None — rather than throwing — for data that does not match", () => {
+    // Convex raises its own `ConvexError`s (this is the shape of a pagination
+    // `InvalidCursor`), which never match a user-declared error schema.
+    // Throwing here would replace the real error with an opaque `ParseError`,
+    // so callers could never surface the original.
+    const decoded = Ref.decodeErrorSync(refWithError, {
+      isConvexSystemError: true,
+      paginationError: "InvalidCursor",
+    });
+
+    expect(Option.isNone(decoded)).toBe(true);
+  });
+
+  test("returns None when the ref has no error schema", () => {
+    const ref = Ref.make(
+      "test/mod",
+      FunctionSpec.publicQuery({
+        name: "get",
+        args: () => Schema.Struct({}),
+        returns: () => Schema.Void,
+      }),
+    );
+
+    expect(Option.isNone(Ref.decodeErrorSync(ref, { anything: "goes" }))).toBe(
+      true,
+    );
+  });
+});
+
 describe("decodeErrorOrElse", () => {
   class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
     id: Schema.String,

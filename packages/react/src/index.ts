@@ -1,4 +1,5 @@
 import { Ref } from "@confect/core";
+import { version as convexVersion } from "convex";
 import type { OptimisticUpdate as ConvexOptimisticUpdate } from "convex/browser";
 import * as ConvexReact from "convex/react";
 import type { usePaginatedQuery as useConvexPaginatedQuery } from "convex/react";
@@ -153,11 +154,41 @@ type UseConvexPaginatedQueryInternal = (
 // from its public type declarations. It is the only way to observe query
 // errors as values: the public positional `usePaginatedQuery` hard-codes
 // throwOnError and throws mid-hook-sequence, which cannot be caught without
-// breaking React's hook-order invariant. The non-throwing mode (the fourth
-// parameter) exists since convex 1.36.0 — the peer floor of this package.
+// breaking React's hook-order invariant.
 const useConvexPaginatedQueryInternal = (
   ConvexReact as unknown as Record<string, unknown>
 ).usePaginatedQueryInternal as UseConvexPaginatedQueryInternal | undefined;
+
+const MINIMUM_CONVEX_VERSION = "1.36.0";
+
+/**
+ * The non-throwing mode of `usePaginatedQueryInternal` — its fourth,
+ * `throwOnError` parameter — arrived in convex 1.36.0. Convex 1.32 through
+ * 1.35 export the same symbol taking only three parameters, where a fourth
+ * argument is silently ignored and errors are always thrown.
+ *
+ * The function itself cannot be interrogated for this: `Function.length`
+ * counts parameters up to the first one with a default, and 1.36.0 declares
+ * `throwOnError = true`, so both shapes report an arity of 3. The package
+ * version is the only reliable signal.
+ */
+const supportsErrorsAsValues = ((): boolean => {
+  const [major, minor] = String(convexVersion).split(".").map(Number);
+  if (
+    major === undefined ||
+    minor === undefined ||
+    Number.isNaN(major) ||
+    Number.isNaN(minor)
+  ) {
+    return false;
+  }
+  const [minimumMajor, minimumMinor] = MINIMUM_CONVEX_VERSION.split(".").map(
+    Number,
+  ) as [number, number];
+  return (
+    major > minimumMajor || (major === minimumMajor && minor >= minimumMinor)
+  );
+})();
 
 /**
  * Load data reactively from a paginated query defined with
@@ -183,10 +214,15 @@ export const usePaginatedQuery = <Query extends Ref.AnyPublicPaginatedQuery>(
   PaginatedQueryItem<Query>,
   Ref.Error<Query>
 > => {
-  if (useConvexPaginatedQueryInternal === undefined) {
+  if (
+    useConvexPaginatedQueryInternal === undefined ||
+    !supportsErrorsAsValues
+  ) {
     throw new Error(
-      "usePaginatedQuery requires `usePaginatedQueryInternal` from convex/react, " +
-        "which ships with convex >= 1.36.0 — upgrade the `convex` package",
+      `usePaginatedQuery requires convex >= ${MINIMUM_CONVEX_VERSION}, but found ` +
+        `${convexVersion}. Earlier versions always throw paginated query errors ` +
+        "instead of returning them, so a declared `error` schema cannot be " +
+        "surfaced as a `Failure` — upgrade the `convex` package.",
     );
   }
 

@@ -360,8 +360,16 @@ export const decodeError = <Ref_ extends Any>(
   );
 
 /**
- * Synchronous counterpart to `decodeError`. Throws on schema decode failure;
- * returns `None` when the ref doesn't declare a typed error.
+ * Synchronous counterpart to `decodeError`. Returns `None` when the value is
+ * not this ref's typed error — either because the ref declares no `error`
+ * schema, or because `encodedError` doesn't match the one it declares.
+ *
+ * The second case is reachable in normal operation: Convex raises its own
+ * `ConvexError`s (an `InvalidCursor` pagination error, for instance), and
+ * those never match a user-declared error schema. Callers pair this with a
+ * fallback that surfaces the original error, so failing to decode must not
+ * throw — a `ParseError` here would replace the real error with an opaque one
+ * and lose the only useful diagnostic.
  */
 export const decodeErrorSync = <Ref_ extends Any>(
   ref: Ref_,
@@ -370,11 +378,9 @@ export const decodeErrorSync = <Ref_ extends Any>(
   Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag("Confect", (confectFunctionProvenance) =>
       "error" in confectFunctionProvenance
-        ? Option.some(
-            Schema.decodeSync(confectFunctionProvenance.error)(
-              encodedError,
-            ) as Error<Ref_>,
-          )
+        ? (Schema.decodeUnknownOption(confectFunctionProvenance.error)(
+            encodedError,
+          ) as Option.Option<Error<Ref_>>)
         : Option.none<Error<Ref_>>(),
     ),
     Match.tag("Convex", () => Option.none<Error<Ref_>>()),

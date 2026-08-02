@@ -624,6 +624,25 @@ describe("usePaginatedQuery", () => {
     ).toThrow(transportError);
   });
 
+  test("throws the original ConvexError when it does not match the error schema", () => {
+    // Convex raises its own `ConvexError`s, which never match a user-declared
+    // error schema. The original must survive rather than being replaced by a
+    // decode failure.
+    const systemError = new ConvexError({
+      isConvexSystemError: true,
+      paginationError: "InvalidCursor",
+    });
+    useConvexPaginatedQueryInternalMock.mockReturnValue(
+      user({ status: "Error", error: systemError }),
+    );
+
+    expect(() =>
+      renderHook(() =>
+        usePaginatedQuery(paginatedQueryWithError, {}, { initialNumItems: 10 }),
+      ),
+    ).toThrow(systemError);
+  });
+
   describe("types", () => {
     test("the result type carries the item and error types", () => {
       useConvexPaginatedQueryInternalMock.mockReturnValue(user({}));
