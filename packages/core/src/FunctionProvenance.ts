@@ -119,6 +119,7 @@ export const Confect = <
  * because `Schema.Struct` is not covariant in its fields parameter — concrete
  * structs do not extend `Schema.Struct<Schema.Struct.Fields>`.
  */
+// eslint-disable-next-line import/namespace -- oxlint's namespace resolution misses type-only exports, and `Schema` is an interface/namespace
 export interface AnyUserArgs extends Schema.Schema.AnyNoContext {
   readonly fields: Schema.Struct.Fields;
 }

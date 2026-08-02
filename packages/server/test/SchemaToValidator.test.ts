@@ -1208,24 +1208,41 @@ describe("ValueToValidator", () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
+    // The two literal-union cases below cannot compare the whole validator
+    // with `toEqualTypeOf`: that pins the `VUnion` member *tuple*, which
+    // `ValueToValidator` derives via `UnionToTuple`. Its element order follows
+    // TypeScript's internal interning of the union — not stable across
+    // compiler versions or unrelated code elsewhere in the program — while
+    // `v.union(...)` fixes the order of its arguments. So they assert the
+    // members as an unordered set instead. (Union *types* are order-insensitive
+    // to TypeScript, so `["type"]` can still be compared directly.)
     test("'admin' | 'user'", () => {
-      const _expectedValidator = v.union(v.literal("admin"), v.literal("user"));
-      type ExpectedValidator = typeof _expectedValidator;
-
       type CompiledValidator = ValueToValidator<"admin" | "user">;
 
-      expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+      expectTypeOf<CompiledValidator["kind"]>().toEqualTypeOf<"union">();
+      expectTypeOf<CompiledValidator["type"]>().toEqualTypeOf<
+        "admin" | "user"
+      >();
+      expectTypeOf<
+        CompiledValidator["members"][number]["kind"]
+      >().toEqualTypeOf<"literal">();
+      expectTypeOf<
+        CompiledValidator["members"][number]["value"]
+      >().toEqualTypeOf<"admin" | "user">();
     });
 
     test("{ foo: 'admin' | 'user' }", () => {
-      const _expectedValidator = v.object({
-        foo: v.union(v.literal("admin"), v.literal("user")),
-      });
-      type ExpectedValidator = typeof _expectedValidator;
-
       type CompiledValidator = ValueToValidator<{ foo: "admin" | "user" }>;
+      type FooValidator = CompiledValidator["fields"]["foo"];
 
-      expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+      expectTypeOf<CompiledValidator["kind"]>().toEqualTypeOf<"object">();
+      expectTypeOf<CompiledValidator["type"]>().toEqualTypeOf<{
+        foo: "admin" | "user";
+      }>();
+      expectTypeOf<FooValidator["kind"]>().toEqualTypeOf<"union">();
+      expectTypeOf<FooValidator["members"][number]["value"]>().toEqualTypeOf<
+        "admin" | "user"
+      >();
     });
   });
 

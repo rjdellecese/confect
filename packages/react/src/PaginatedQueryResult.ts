@@ -52,7 +52,7 @@ export type Loaded<Item, E = never> =
 export type Variants<Item, E = never> = Loaded<Item, E> | Failure<Item, E>;
 
 export declare namespace PaginatedQueryResult {
-  // eslint-disable-next-line @typescript-eslint/no-shadow
+  // eslint-disable-next-line @typescript-eslint/no-shadow, import/namespace -- oxlint's namespace resolution misses type-only exports, and `Pipeable` is an interface
   export interface Proto<Item, E> extends Pipeable.Pipeable {
     readonly [TypeId]: {
       readonly E: (_: never) => E;
