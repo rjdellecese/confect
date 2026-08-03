@@ -69,7 +69,7 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
               ),
         onLeft: (error) => {
           if (Ref.isConvexError(error)) {
-            const decoded = Ref.decodeErrorSync(ref, error.data);
+            const decoded = Ref.decodeErrorOption(ref, error.data);
             if (Option.isSome(decoded)) {
               return QueryResult.fail(decoded.value);
             }
@@ -274,7 +274,7 @@ export const usePaginatedQuery = <Query extends Ref.AnyPublicPaginatedQuery>(
       Match.value(status).pipe(
         Match.when("Error", () => {
           if (Ref.isConvexError(error)) {
-            const decoded = Ref.decodeErrorSync(ref, error.data);
+            const decoded = Ref.decodeErrorOption(ref, error.data);
             if (Option.isSome(decoded)) {
               return PaginatedQueryResult.failure({
                 error: decoded.value,

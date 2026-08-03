@@ -343,7 +343,7 @@ describe("decodeError", () => {
   });
 });
 
-describe("decodeErrorSync", () => {
+describe("decodeErrorOption", () => {
   class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
     id: Schema.String,
   }) {}
@@ -359,7 +359,7 @@ describe("decodeErrorSync", () => {
   );
 
   test("decodes error data matching the error schema", () => {
-    const decoded = Ref.decodeErrorSync(refWithError, {
+    const decoded = Ref.decodeErrorOption(refWithError, {
       _tag: "NotFound",
       id: "abc",
     });
@@ -373,7 +373,7 @@ describe("decodeErrorSync", () => {
     // `InvalidCursor`), which never match a user-declared error schema.
     // Throwing here would replace the real error with an opaque `ParseError`,
     // so callers could never surface the original.
-    const decoded = Ref.decodeErrorSync(refWithError, {
+    const decoded = Ref.decodeErrorOption(refWithError, {
       isConvexSystemError: true,
       paginationError: "InvalidCursor",
     });
@@ -391,9 +391,9 @@ describe("decodeErrorSync", () => {
       }),
     );
 
-    expect(Option.isNone(Ref.decodeErrorSync(ref, { anything: "goes" }))).toBe(
-      true,
-    );
+    expect(
+      Option.isNone(Ref.decodeErrorOption(ref, { anything: "goes" })),
+    ).toBe(true);
   });
 });
 

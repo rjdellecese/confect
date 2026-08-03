@@ -327,7 +327,7 @@ export const decodeErrorOrElse =
   <Ref_ extends Any, E>(ref: Ref_, mapUnknownError: (error: unknown) => E) =>
   (error: unknown): Error<Ref_> | E => {
     if (isConvexError(error)) {
-      const decoded = decodeErrorSync(ref, error.data);
+      const decoded = decodeErrorOption(ref, error.data);
       if (Option.isSome(decoded)) {
         return decoded.value;
       }
@@ -369,9 +369,12 @@ export const decodeError = <Ref_ extends Any>(
  * those never match a user-declared error schema. Callers pair this with a
  * fallback that surfaces the original error, so failing to decode must not
  * throw — a `ParseError` here would replace the real error with an opaque one
- * and lose the only useful diagnostic.
+ * and lose the only useful diagnostic. Hence the `Option` suffix rather than
+ * `Sync`, matching `Schema.decodeUnknownOption`: the sibling `*Sync` helpers
+ * in this module all throw on a parse failure, and this one deliberately
+ * doesn't.
  */
-export const decodeErrorSync = <Ref_ extends Any>(
+export const decodeErrorOption = <Ref_ extends Any>(
   ref: Ref_,
   encodedError: unknown,
 ): Option.Option<Error<Ref_>> =>
@@ -491,7 +494,7 @@ export const runWithCodec = <Ref_ extends Any, E = never>(
         try: () => Promise.resolve(call(functionReference, encodedArgs)),
         catch: (error): Error<Ref_> | E => {
           if (isConvexError(error)) {
-            const decoded = decodeErrorSync(ref, error.data);
+            const decoded = decodeErrorOption(ref, error.data);
             if (Option.isSome(decoded)) {
               return decoded.value;
             }
