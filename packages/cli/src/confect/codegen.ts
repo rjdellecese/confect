@@ -57,6 +57,7 @@ import {
   generateHttp,
   removePathIfExists,
   toModuleImportPath,
+  toPosixPath,
   touchConvexSchema,
   writeFileStringAndLog,
   WriteTracker,
@@ -233,8 +234,18 @@ const loadAndValidateLeafModules = Effect.gen(function* () {
   yield* validateOrphanImpls(specFiles);
 
   const leaves = Array.map(results, ({ leaf }) => leaf);
+  // Keyed on the POSIX form because the only reader, `bindingToRelativeSpecPath`,
+  // recovers its key from a module specifier (which is always POSIX) rather than
+  // from a filesystem path. Keying on the raw `leaf.relativePath` would make
+  // every lookup miss on Windows — and since a miss is a silent `return`,
+  // `validateNoParentChildNameCollisions` would stop firing without a trace.
   const groupSpecsByRelativePath = new Map(
-    Array.map(results, ({ leaf, groupSpec }) => [leaf.relativePath, groupSpec]),
+    yield* Effect.forEach(results, ({ leaf, groupSpec }) =>
+      Effect.map(
+        toPosixPath(leaf.relativePath),
+        (posixPath) => [posixPath, groupSpec] as const,
+      ),
+    ),
   );
 
   return { leaves, groupSpecsByRelativePath };

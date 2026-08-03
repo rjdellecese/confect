@@ -45,10 +45,30 @@ export const removePathExtension = (pathStr: string) =>
     return String.slice(0, -path.extname(pathStr).length)(pathStr);
   });
 
+/**
+ * Convert a filesystem path to its POSIX form.
+ *
+ * Module specifiers are POSIX values, not filesystem paths: `import` accepts
+ * only `/`, on every platform. Everything that computes a specifier does the
+ * arithmetic with the injected `Path` (whose `relative`/`join` need the real
+ * platform separator to work on real paths) and then crosses into POSIX space
+ * here, once, at the boundary. Without this, codegen on Windows emits
+ * `import x from "..\_generated\schema"` — not just unresolvable, but a string
+ * literal whose `\_` is a bogus escape.
+ */
+export const toPosixPathWith = (path: Path.Path, pathStr: string): string =>
+  pipe(String.split(pathStr, path.sep), Array.join("/"));
+
+/** {@link toPosixPathWith}, reading `Path` from context. */
+export const toPosixPath = (pathStr: string) =>
+  Effect.map(Path.Path, (path) => toPosixPathWith(path, pathStr));
+
 /** Ensures a relative path is a valid ESM/TS module specifier (e.g. `spec` → `./spec`). */
 export const toModuleImportPath = (relativePath: string) =>
   Effect.gen(function* () {
-    const withoutExt = yield* removePathExtension(relativePath);
+    const withoutExt = yield* toPosixPath(
+      yield* removePathExtension(relativePath),
+    );
     return withoutExt.startsWith(".") ? withoutExt : `./${withoutExt}`;
   });
 
@@ -410,8 +430,9 @@ const generateOptionalFile = (
       path.dirname(convexFilePath),
       confectFilePath,
     );
-    const importPathWithoutExt = yield* removePathExtension(relativeImportPath);
-    const contents = yield* generateContents(importPathWithoutExt);
+    const contents = yield* generateContents(
+      yield* toModuleImportPath(relativeImportPath),
+    );
     const change = yield* writeFileString(convexFilePath, contents);
     return Option.some({ change, convexFilePath });
   });

@@ -41,9 +41,18 @@ jobs:
       - uses: ./.github/actions/example-setup
       - run: pnpm --filter example build
 
+  # Matrixed over OS because the example is the only project that exercises the
+  # full codegen surface — `confect/http.ts`, `confect/crons.ts`, and component
+  # discovery from `convex/convex.config.ts` — and every generated import
+  # specifier must come out identical on every platform. Committed output is
+  # `/`-separated, so a regression to platform separators fails the verify step.
   codegen:
     name: Codegen
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/example-setup

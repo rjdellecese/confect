@@ -108,55 +108,77 @@ const withTempLeaf = (
     );
   });
 
-layer(LeafModuleLayer)("LeafModule paths", (it) => {
-  it.effect("groupPathFromRelativeModulePath maps nested spec files", () =>
-    Effect.gen(function* () {
-      expect(
-        yield* groupPathFromRelativeModulePath("notesAndRandom/notes.spec.ts"),
-      ).toEqual({
-        pathSegments: ["notesAndRandom", "notes"],
-        groupPathDot: "notesAndRandom.notes",
-      });
-    }),
-  );
+// These functions are pure path arithmetic over the injected `Path`, so they
+// can be exercised against Windows semantics from any host by swapping in
+// `NodePath.layerWin32`. Inputs are built with the platform's own separator
+// because that is what `fs.readDirectory` hands them in production; the
+// distinction the suite is really pinning down is that *filesystem* results
+// stay platform-native while *module specifiers* are always POSIX.
+const PLATFORMS = [
+  { name: "posix", pathLayer: NodePath.layerPosix, sep: "/" },
+  { name: "win32", pathLayer: NodePath.layerWin32, sep: "\\" },
+] as const;
 
-  it.effect("specPathForImpl maps impl paths to sibling spec paths", () =>
-    Effect.gen(function* () {
-      expect(yield* specPathForImpl("notesAndRandom/notes.impl.ts")).toBe(
-        "notesAndRandom/notes.spec.ts",
-      );
-    }),
-  );
+for (const { name, pathLayer, sep } of PLATFORMS) {
+  const p = (...segments: ReadonlyArray<string>) => segments.join(sep);
 
-  it.effect("implPathForSpec maps spec paths to sibling impl paths", () =>
-    Effect.gen(function* () {
-      expect(yield* implPathForSpec("notesAndRandom/notes.spec.ts")).toBe(
-        "notesAndRandom/notes.impl.ts",
-      );
-    }),
-  );
-
-  it.effect(
-    "specImportPathFromGenerated builds import paths for _generated",
-    () =>
+  layer(pathLayer)(`LeafModule paths (${name})`, (it) => {
+    it.effect("groupPathFromRelativeModulePath maps nested spec files", () =>
       Effect.gen(function* () {
         expect(
-          yield* specImportPathFromGenerated("notesAndRandom/notes.spec.ts"),
-        ).toBe("../notesAndRandom/notes.spec");
+          yield* groupPathFromRelativeModulePath(
+            p("notesAndRandom", "notes.spec.ts"),
+          ),
+        ).toEqual({
+          pathSegments: ["notesAndRandom", "notes"],
+          groupPathDot: "notesAndRandom.notes",
+        });
       }),
-  );
+    );
 
-  it.effect(
-    "isLeafSpecPath and isLeafImplPath detect leaf module suffixes",
-    () =>
-      Effect.sync(() => {
-        expect(isLeafSpecPath("notes.spec.ts")).toBe(true);
-        expect(isLeafSpecPath("notes.impl.ts")).toBe(false);
-        expect(isLeafImplPath("notes.impl.ts")).toBe(true);
-        expect(isLeafImplPath("notes.spec.ts")).toBe(false);
+    it.effect("specPathForImpl maps impl paths to sibling spec paths", () =>
+      Effect.gen(function* () {
+        expect(
+          yield* specPathForImpl(p("notesAndRandom", "notes.impl.ts")),
+        ).toBe(p("notesAndRandom", "notes.spec.ts"));
       }),
-  );
-});
+    );
+
+    it.effect("implPathForSpec maps spec paths to sibling impl paths", () =>
+      Effect.gen(function* () {
+        expect(
+          yield* implPathForSpec(p("notesAndRandom", "notes.spec.ts")),
+        ).toBe(p("notesAndRandom", "notes.impl.ts"));
+      }),
+    );
+
+    // The load-bearing one: whatever the host separator, the emitted specifier
+    // is POSIX. A backslash here would be both unresolvable and an invalid
+    // escape in the generated string literal.
+    it.effect(
+      "specImportPathFromGenerated builds POSIX import paths for _generated",
+      () =>
+        Effect.gen(function* () {
+          expect(
+            yield* specImportPathFromGenerated(
+              p("notesAndRandom", "notes.spec.ts"),
+            ),
+          ).toBe("../notesAndRandom/notes.spec");
+        }),
+    );
+
+    it.effect(
+      "isLeafSpecPath and isLeafImplPath detect leaf module suffixes",
+      () =>
+        Effect.sync(() => {
+          expect(isLeafSpecPath("notes.spec.ts")).toBe(true);
+          expect(isLeafSpecPath("notes.impl.ts")).toBe(false);
+          expect(isLeafImplPath("notes.impl.ts")).toBe(true);
+          expect(isLeafImplPath("notes.spec.ts")).toBe(false);
+        }),
+    );
+  });
+}
 
 layer(LeafModuleLayer)("validateSpec", (it) => {
   it.effect("accepts a valid leaf spec", () =>

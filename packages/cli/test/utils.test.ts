@@ -13,7 +13,12 @@ import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
 import * as GroupPath from "@confect/cli/GroupPath";
 import * as GroupPaths from "@confect/cli/GroupPaths";
 import { ProjectRoot } from "@confect/cli/ProjectRoot";
-import { generateFunctions, removeGroups } from "@confect/cli/utils";
+import {
+  generateFunctions,
+  removeGroups,
+  toModuleImportPath,
+  toPosixPath,
+} from "@confect/cli/utils";
 
 const fixtureRoot = `${import.meta.dirname}/../../server/test/mock-backend/fixtures`;
 const fixtureConvex = `${fixtureRoot}/convex`;
@@ -171,3 +176,48 @@ layer(GenerateFunctionsLayer)("generateFunctions", (it) => {
     }),
   );
 });
+
+// Module specifiers are POSIX values on every platform: `import` accepts only
+// `/`, and a backslash in a generated specifier is additionally an invalid
+// string escape (`"..\_generated\schema"`). Exercising the win32 `Path` layer
+// pins that down without needing a Windows host — see `toPosixPath`.
+const SPECIFIER_PLATFORMS = [
+  { name: "posix", pathLayer: NodePath.layerPosix, sep: "/" },
+  { name: "win32", pathLayer: NodePath.layerWin32, sep: "\\" },
+] as const;
+
+for (const { name, pathLayer, sep } of SPECIFIER_PLATFORMS) {
+  const p = (...segments: ReadonlyArray<string>) => segments.join(sep);
+
+  layer(pathLayer)(`module specifiers (${name})`, (it) => {
+    it.effect("toPosixPath rewrites the platform separator", () =>
+      Effect.gen(function* () {
+        expect(yield* toPosixPath(p("_generated", "tables", "notes.ts"))).toBe(
+          "_generated/tables/notes.ts",
+        );
+      }),
+    );
+
+    it.effect("toPosixPath leaves a separator-free path alone", () =>
+      Effect.gen(function* () {
+        expect(yield* toPosixPath("notes.ts")).toBe("notes.ts");
+      }),
+    );
+
+    it.effect("toModuleImportPath emits a POSIX relative specifier", () =>
+      Effect.gen(function* () {
+        expect(
+          yield* toModuleImportPath(p("..", "_generated", "schema.ts")),
+        ).toBe("../_generated/schema");
+      }),
+    );
+
+    it.effect("toModuleImportPath prefixes a bare sibling path with ./", () =>
+      Effect.gen(function* () {
+        expect(yield* toModuleImportPath(p("tables", "notes.ts"))).toBe(
+          "./tables/notes",
+        );
+      }),
+    );
+  });
+}

@@ -1,7 +1,11 @@
-import { describe, expect, it } from "@effect/vitest";
+import * as NodePath from "@effect/platform-node/NodePath";
+import { describe, expect, it, layer } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
-import type { LeafModule } from "@confect/cli/LeafModule";
+import {
+  specImportPathFromGenerated,
+  type LeafModule,
+} from "@confect/cli/LeafModule";
 import { assemblyNodesFromLeaves } from "@confect/cli/SpecAssemblyNode";
 import * as templates from "@confect/cli/templates";
 
@@ -251,3 +255,58 @@ describe("SpecAssemblyNode", () => {
       }),
   );
 });
+
+// The suite above hand-builds `specImportPath` from POSIX literals, so it can
+// only ever prove the template renders what it was handed. This one closes the
+// loop end-to-end: discovery hands `_generated/spec.ts` a platform-native
+// relative path, and the emitted module must still be valid TypeScript — i.e.
+// forward slashes — no matter which platform ran codegen.
+for (const { name, pathLayer, sep } of [
+  { name: "posix", pathLayer: NodePath.layerPosix, sep: "/" },
+  { name: "win32", pathLayer: NodePath.layerWin32, sep: "\\" },
+] as const) {
+  // Named `test` rather than `it` to avoid shadowing the file-level `it` import.
+  layer(pathLayer)(`SpecAssemblyNode (${name} discovery)`, (test) => {
+    test.effect("assembledSpec emits POSIX import specifiers", () =>
+      Effect.gen(function* () {
+        const discovered = (
+          relativePath: string,
+          pathSegments: [string, ...string[]],
+        ) =>
+          Effect.map(
+            specImportPathFromGenerated(relativePath),
+            (specImportPath): LeafModule => ({
+              relativePath,
+              pathSegments,
+              groupPathDot: pathSegments.join("."),
+              exportName: pathSegments[pathSegments.length - 1]!,
+              runtime: Option.none(),
+              specImportPath,
+            }),
+          );
+
+        const nodes = assemblyNodesFromLeaves([
+          yield* discovered(`notesAndRandom${sep}notes.spec.ts`, [
+            "notesAndRandom",
+            "notes",
+          ]),
+          yield* discovered(
+            `scripts${sep}operational${sep}seed${sep}mutations.spec.ts`,
+            ["scripts", "operational", "seed", "mutations"],
+          ),
+          yield* discovered("env.spec.ts", ["env"]),
+        ]);
+        const contents = yield* templates.assembledSpec({ nodes });
+
+        expect(contents).toContain(
+          'import notesAndRandom_notes from "../notesAndRandom/notes.spec";',
+        );
+        expect(contents).toContain(
+          'import scripts_operational_seed_mutations from "../scripts/operational/seed/mutations.spec";',
+        );
+        expect(contents).toContain('import env from "../env.spec";');
+        expect(contents).not.toContain("\\");
+      }),
+    );
+  });
+}

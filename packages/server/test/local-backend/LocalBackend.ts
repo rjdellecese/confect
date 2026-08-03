@@ -60,6 +60,11 @@ const make = Effect.gen(function* () {
     "--codegen=disable",
     "--tail-logs=disable",
   ).pipe(
+    // `pnpm` is a `.cmd` shim on Windows, which `child_process.spawn` cannot
+    // exec directly. This suite is excluded from the Windows CI matrix anyway
+    // (no `convex-local-backend` binary is published for Windows), but the
+    // command itself shouldn't be the reason why.
+    Command.runInShell(true),
     Command.workingDirectory(fixturesDir),
     Command.env({
       CONVEX_AGENT_MODE: "anonymous",

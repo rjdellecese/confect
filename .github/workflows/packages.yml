@@ -48,20 +48,34 @@ jobs:
       # cross-package `@confect/*` imports resolve.
       - run: pnpm circular
 
+  # The OS matrix is deliberately limited to the three jobs whose behaviour can
+  # actually differ by platform (path handling, codegen output, the build).
+  # Format, lint, circular, and bench are platform-independent, and Windows
+  # runners bill at a higher rate, so they stay on Ubuntu.
   test:
     name: Test
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest]
         package: [cli, core, js, server]
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
       - run: cd packages/${{ matrix.package }} && pnpm test
 
+  # The job that proves codegen emits valid, stable output on Windows: it runs
+  # the full pipeline against the fixtures and then fails if anything differs
+  # from what is committed. Backslashes in generated import specifiers, or a
+  # CRLF checkout defeating the content-unchanged check, both surface here.
   test-mock-backend:
     name: Test (mock-backend)
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
@@ -70,6 +84,10 @@ jobs:
         with:
           path: packages/server/test/mock-backend/fixtures
 
+  # Ubuntu only: this suite drives a real `convex-local-backend`, and Convex
+  # publishes no Windows build of it (their README notes Convex "is battle
+  # tested most thoroughly on Linux and Mac"; Windows users are pointed at WSL
+  # or Docker). The mock-backend job above is what covers Windows.
   test-local-backend:
     name: Test (local-backend)
     runs-on: ubuntu-latest
@@ -101,9 +119,11 @@ jobs:
 
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest]
         package:
           [
             "@confect/cli",

@@ -1,0 +1,15 @@
+# Normalize line endings to LF in the working tree on every platform.
+#
+# Codegen always writes LF (`code-block-writer`'s default), and the write path
+# compares generated content against the file on disk byte-for-byte. Without
+# `eol=lf`, Windows Git's default `core.autocrlf=true` checks the committed
+# `confect/_generated/**` files out as CRLF, so every `confect codegen` run
+# reports every file as modified — which makes `confect dev` churn through its
+# write/watch/regenerate loop forever and leaves `verify-codegen-committed`
+# permanently failing.
+* text=auto eol=lf
+
+*.png binary
+*.ico binary
+*.woff binary
+*.woff2 binary

@@ -51,10 +51,10 @@
     "url": "https://github.com/rjdellecese/confect.git"
   },
   "scripts": {
-    "clean": "rm -rf dist coverage node_modules",
+    "clean": "shx rm -rf dist coverage node_modules",
     "dev": "tsdown --watch --config-loader unrun",
-    "postpack": "rm ./README.md && ln -s ../../README.md ./README.md",
-    "prepack": "rm -f ./README.md && cp ../../README.md ./README.md",
+    "postpack": "shx rm ./README.md && shx ln -s ../../README.md ./README.md",
+    "prepack": "shx rm -f ./README.md && shx cp ../../README.md ./README.md",
     "test": "vitest run",
     "typecheck": "tsc -b tsconfig.src.json"
   },
