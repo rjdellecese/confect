@@ -78,7 +78,35 @@ describe("Table", () => {
         GenericTableVectorIndexes
       >
     >();
-    expectTypeOf<ConfectNotesTableDefinition>().toEqualTypeOf<ConvexNotesTableDefinition>();
+
+    // The two definitions cannot be compared with `toEqualTypeOf` as a whole:
+    // `ValueToValidator` derives `VUnion` member tuples via `UnionToTuple`,
+    // whose element order follows TypeScript's internal union interning and is
+    // not stable across programs (vitest vs `tsc -b`) or unrelated code
+    // changes, while `v.union(...)` fixes the tuple in argument order. Compare
+    // the order-insensitive projections instead; the runtime `toStrictEqual`
+    // below still pins the exact validator structure (member order included).
+    type Projections<TableDefinition_> =
+      TableDefinition_ extends TableDefinition<
+        infer Validator_,
+        infer Indexes_,
+        infer SearchIndexes_,
+        infer VectorIndexes_
+      >
+        ? {
+            documentType: Validator_["type"];
+            fieldPaths: Validator_["fieldPaths"];
+            isOptional: Validator_["isOptional"];
+            indexes: Indexes_;
+            searchIndexes: SearchIndexes_;
+            vectorIndexes: VectorIndexes_;
+          }
+        : never;
+
+    expectTypeOf<Projections<ConfectNotesTableDefinition>>().toEqualTypeOf<
+      Projections<ConvexNotesTableDefinition>
+    >();
+
     expect(convexNotesTableDefinition).toStrictEqual(
       confectNotesTableDefinition,
     );

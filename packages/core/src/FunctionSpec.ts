@@ -5,7 +5,7 @@ import type {
   RegisteredMutation,
   RegisteredQuery,
 } from "convex/server";
-import type { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import * as Predicate from "effect/Predicate";
 import * as FunctionProvenance from "./FunctionProvenance";
 import { validateConfectFunctionIdentifier } from "./Identifier";
@@ -244,8 +244,74 @@ const make =
     });
   };
 
+/**
+ * `Schema.Struct` fields that must not declare `paginationOpts`. Used to
+ * reject a user args schema that redeclares the field the paginated
+ * constructors add themselves; the check reports at the `args` thunk with an
+ * unsatisfiable type when violated.
+ */
+type ForbidPaginationOpts<UserArgs extends FunctionProvenance.AnyUserArgs> =
+  "paginationOpts" extends keyof UserArgs["fields"]
+    ? { readonly fields: { readonly paginationOpts: never } }
+    : unknown;
+
+const makePaginated =
+  <
+    RuntimeAndFunctionType_ extends
+      RuntimeAndFunctionType.RuntimeAndFunctionType,
+    FunctionVisibility_ extends FunctionVisibility,
+  >(
+    runtimeAndFunctionType: RuntimeAndFunctionType_,
+    functionVisibility: FunctionVisibility_,
+  ) =>
+  <
+    const Name_ extends string,
+    Item_ extends Schema.Schema.AnyNoContext,
+    UserArgs_ extends FunctionProvenance.AnyUserArgs = Schema.Struct<{}>,
+    Error_ extends Schema.Schema.AnyNoContext = never,
+  >({
+    name,
+    args,
+    item,
+    error,
+  }: {
+    name: Name_;
+    /** User-declared args, without `paginationOpts` — it is added automatically. */
+    args?: (() => UserArgs_) & ForbidPaginationOpts<UserArgs_>;
+    /** The page element schema. */
+    item: () => Item_;
+    error?: () => Error_;
+  }): FunctionSpec<
+    RuntimeAndFunctionType_,
+    FunctionVisibility_,
+    Name_,
+    FunctionProvenance.ConfectPaginated<UserArgs_, Item_, Error_>
+  > => {
+    validateConfectFunctionIdentifier(name);
+
+    return Object.assign(Object.create(Proto), {
+      runtimeAndFunctionType,
+      functionVisibility,
+      name,
+      functionProvenance: FunctionProvenance.ConfectPaginated(
+        // When `args` is omitted, `UserArgs_` is its `Schema.Struct<{}>` default.
+        args ?? ((() => Schema.Struct({})) as unknown as () => UserArgs_),
+        item,
+        error,
+      ),
+    });
+  };
+
 export const publicQuery = make(RuntimeAndFunctionType.ConvexQuery, "public");
 export const internalQuery = make(
+  RuntimeAndFunctionType.ConvexQuery,
+  "internal",
+);
+export const publicPaginatedQuery = makePaginated(
+  RuntimeAndFunctionType.ConvexQuery,
+  "public",
+);
+export const internalPaginatedQuery = makePaginated(
   RuntimeAndFunctionType.ConvexQuery,
   "internal",
 );

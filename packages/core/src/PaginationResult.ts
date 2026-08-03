@@ -1,5 +1,8 @@
 import * as Schema from "effect/Schema";
 
+export type PaginationResult<Doc extends Schema.Schema.AnyNoContext> =
+  ReturnType<typeof PaginationResult<Doc>>;
+
 export const PaginationResult = <Doc extends Schema.Schema.AnyNoContext>(
   Doc: Doc,
 ) =>

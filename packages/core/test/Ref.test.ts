@@ -1,7 +1,10 @@
 import type {
   FunctionReference,
   FunctionVisibility,
+  PaginationOptions as ConvexPaginationOptions,
+  PaginationResult as ConvexPaginationResult,
   RegisteredMutation,
+  RegisteredQuery,
 } from "convex/server";
 import { ConvexError } from "convex/values";
 import * as Effect from "effect/Effect";
@@ -11,6 +14,8 @@ import * as Schema from "effect/Schema";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
 import * as FunctionSpec from "@confect/core/FunctionSpec";
+import * as PaginationOptions from "@confect/core/PaginationOptions";
+import * as PaginationResult from "@confect/core/PaginationResult";
 import * as Ref from "@confect/core/Ref";
 
 describe("FunctionReference", () => {
@@ -338,6 +343,60 @@ describe("decodeError", () => {
   });
 });
 
+describe("decodeErrorOption", () => {
+  class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+    id: Schema.String,
+  }) {}
+
+  const refWithError = Ref.make(
+    "test/mod",
+    FunctionSpec.publicQuery({
+      name: "getOrFail",
+      args: () => Schema.Struct({}),
+      returns: () => Schema.Void,
+      error: () => NotFound,
+    }),
+  );
+
+  test("decodes error data matching the error schema", () => {
+    const decoded = Ref.decodeErrorOption(refWithError, {
+      _tag: "NotFound",
+      id: "abc",
+    });
+
+    expect(Option.isSome(decoded)).toBe(true);
+    expect(Option.getOrThrow(decoded)).toBeInstanceOf(NotFound);
+  });
+
+  test("returns None — rather than throwing — for data that does not match", () => {
+    // Convex raises its own `ConvexError`s (this is the shape of a pagination
+    // `InvalidCursor`), which never match a user-declared error schema.
+    // Throwing here would replace the real error with an opaque `ParseError`,
+    // so callers could never surface the original.
+    const decoded = Ref.decodeErrorOption(refWithError, {
+      isConvexSystemError: true,
+      paginationError: "InvalidCursor",
+    });
+
+    expect(Option.isNone(decoded)).toBe(true);
+  });
+
+  test("returns None when the ref has no error schema", () => {
+    const ref = Ref.make(
+      "test/mod",
+      FunctionSpec.publicQuery({
+        name: "get",
+        args: () => Schema.Struct({}),
+        returns: () => Schema.Void,
+      }),
+    );
+
+    expect(
+      Option.isNone(Ref.decodeErrorOption(ref, { anything: "goes" })),
+    ).toBe(true);
+  });
+});
+
 describe("decodeErrorOrElse", () => {
   class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
     id: Schema.String,
@@ -432,5 +491,130 @@ describe("hasErrorSchema", () => {
     const ref = Ref.make("workpool", convexSpec);
 
     expect(Ref.hasErrorSchema(ref)).toBe(false);
+  });
+});
+
+describe("paginated queries", () => {
+  const paginatedDoc = Schema.Struct({ value: Schema.NumberFromString });
+
+  const paginatedRef = Ref.make(
+    "notes",
+    FunctionSpec.publicPaginatedQuery({
+      name: "listPaginated",
+      args: () => Schema.Struct({ count: Schema.NumberFromString }),
+      item: () => paginatedDoc,
+    }),
+  );
+
+  const convexPaginatedRef = Ref.make(
+    "notes",
+    FunctionSpec.convexPublicQuery<
+      RegisteredQuery<
+        "public",
+        { paginationOpts: ConvexPaginationOptions },
+        ConvexPaginationResult<{ value: number }>
+      >
+    >()("listPaginated"),
+  );
+
+  // A plain publicQuery that merely LOOKS paginated: it satisfies the
+  // structural AnyPublicPaginatedQuery type, but carries no paginated
+  // provenance, so the runtime helpers reject it.
+  const handRolledRef = Ref.make(
+    "notes",
+    FunctionSpec.publicQuery({
+      name: "listPaginated",
+      args: () =>
+        Schema.Struct({
+          count: Schema.NumberFromString,
+          paginationOpts: PaginationOptions.PaginationOptions,
+        }),
+      returns: () => PaginationResult.PaginationResult(paginatedDoc),
+    }),
+  );
+
+  describe("AnyPublicPaginatedQuery", () => {
+    test("is satisfied by a constructor-built paginated query ref", () => {
+      expectTypeOf(paginatedRef).toExtend<Ref.AnyPublicPaginatedQuery>();
+    });
+
+    test("is satisfied by a paginated query ref with an error schema", () => {
+      class PaginationFailed extends Schema.TaggedError<PaginationFailed>()(
+        "PaginationFailed",
+        {},
+      ) {}
+
+      const refWithError = Ref.make(
+        "notes",
+        FunctionSpec.publicPaginatedQuery({
+          name: "listPaginatedOrFail",
+          item: () => paginatedDoc,
+          error: () => PaginationFailed,
+        }),
+      );
+
+      expectTypeOf(refWithError).toExtend<Ref.AnyPublicPaginatedQuery>();
+      expectTypeOf<
+        Ref.Error<typeof refWithError>
+      >().toEqualTypeOf<PaginationFailed>();
+    });
+
+    test("is satisfied by a Convex-provenance paginated query ref", () => {
+      expectTypeOf(convexPaginatedRef).toExtend<Ref.AnyPublicPaginatedQuery>();
+    });
+  });
+
+  describe("decodePaginationPageSync", () => {
+    test("decodes a page via the ref's item schema", () => {
+      const decoded = Ref.decodePaginationPageSync(paginatedRef, [
+        { value: "1" },
+        { value: "2" },
+      ]);
+
+      expect(decoded).toEqual([{ value: 1 }, { value: 2 }]);
+    });
+
+    test("throws a constructor-pointing error for a hand-rolled paginated ref", () => {
+      expect(() =>
+        Ref.decodePaginationPageSync(handRolledRef, [{ value: "1" }]),
+      ).toThrow(/was not built with .*publicPaginatedQuery/);
+    });
+
+    test("passes the page through unchanged for a Convex-provenance ref", () => {
+      const page = [{ value: 1 }];
+
+      expect(Ref.decodePaginationPageSync(convexPaginatedRef, page)).toBe(page);
+    });
+  });
+
+  describe("encodePaginatedQueryArgsSync", () => {
+    test("encodes args via the user-args schema", () => {
+      expect(
+        Ref.encodePaginatedQueryArgsSync(paginatedRef, { count: 42 }),
+      ).toEqual({ count: "42" });
+    });
+
+    test("drops a stray paginationOpts key instead of sending it", () => {
+      const encoded = Ref.encodePaginatedQueryArgsSync(paginatedRef, {
+        count: 42,
+        paginationOpts: { numItems: 50, cursor: null },
+      } as never);
+
+      expect(encoded).toEqual({ count: "42" });
+    });
+
+    test("throws a constructor-pointing error for a hand-rolled paginated ref", () => {
+      expect(() =>
+        Ref.encodePaginatedQueryArgsSync(handRolledRef, { count: 42 }),
+      ).toThrow(/was not built with .*publicPaginatedQuery/);
+    });
+
+    test("passes args through unchanged for a Convex-provenance ref", () => {
+      const args = {};
+
+      expect(Ref.encodePaginatedQueryArgsSync(convexPaginatedRef, args)).toBe(
+        args,
+      );
+    });
   });
 });

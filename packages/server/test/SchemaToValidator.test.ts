@@ -1,10 +1,12 @@
 import { describe, effect, expect, expectTypeOf, test } from "@effect/vitest";
+import { paginationOptsValidator } from "convex/server";
 import { v, type VBoolean, type VString, type VUnion } from "convex/values";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Schema from "effect/Schema";
 
 import { GenericId } from "@confect/core/GenericId";
+import * as PaginationOptions from "@confect/core/PaginationOptions";
 import {
   compileArgsSchema,
   compileAst,
@@ -1206,24 +1208,37 @@ describe("ValueToValidator", () => {
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
 
+    // The two literal-union cases below assert `members` as an unordered set
+    // rather than comparing the whole validator with `toEqualTypeOf`: the
+    // `VUnion` member *tuple* order comes from `UnionToTuple`, which follows
+    // TypeScript's internal interning of the union and is not stable.
     test("'admin' | 'user'", () => {
-      const _expectedValidator = v.union(v.literal("admin"), v.literal("user"));
-      type ExpectedValidator = typeof _expectedValidator;
+      type Role = "admin" | "user";
 
-      type CompiledValidator = ValueToValidator<"admin" | "user">;
+      type CompiledValidator = ValueToValidator<Role>;
 
-      expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+      expectTypeOf<CompiledValidator["kind"]>().toEqualTypeOf<"union">();
+      expectTypeOf<CompiledValidator["type"]>().toEqualTypeOf<Role>();
+      expectTypeOf<
+        CompiledValidator["members"][number]["kind"]
+      >().toEqualTypeOf<"literal">();
+      expectTypeOf<
+        CompiledValidator["members"][number]["value"]
+      >().toEqualTypeOf<Role>();
     });
 
     test("{ foo: 'admin' | 'user' }", () => {
-      const _expectedValidator = v.object({
-        foo: v.union(v.literal("admin"), v.literal("user")),
-      });
-      type ExpectedValidator = typeof _expectedValidator;
+      type Role = "admin" | "user";
 
-      type CompiledValidator = ValueToValidator<{ foo: "admin" | "user" }>;
+      type CompiledValidator = ValueToValidator<{ foo: Role }>;
+      type FooValidator = CompiledValidator["fields"]["foo"];
 
-      expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
+      expectTypeOf<CompiledValidator["kind"]>().toEqualTypeOf<"object">();
+      expectTypeOf<CompiledValidator["type"]>().toEqualTypeOf<{ foo: Role }>();
+      expectTypeOf<FooValidator["kind"]>().toEqualTypeOf<"union">();
+      expectTypeOf<
+        FooValidator["members"][number]["value"]
+      >().toEqualTypeOf<Role>();
     });
   });
 
@@ -1492,6 +1507,21 @@ describe(compileArgsSchema, () => {
     };
 
     expect(compiledArgsValidator).toStrictEqual(expectedArgsValidator);
+  });
+
+  test("PaginationOptions compiles to Convex's paginationOptsValidator", () => {
+    // Paginated queries must accept the protocol fields Convex's client
+    // sends (`id`, `endCursor`, ...), so the args schema must produce the
+    // exact validator Convex prescribes for `paginationOpts`.
+    const compiledArgsValidator = compileArgsSchema(
+      Schema.Struct({
+        paginationOpts: PaginationOptions.PaginationOptions,
+      }),
+    );
+
+    expect(compiledArgsValidator).toStrictEqual({
+      paginationOpts: paginationOptsValidator,
+    });
   });
 
   effect("fails if provided Schema contains index signatures", () =>
