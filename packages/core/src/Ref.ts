@@ -252,7 +252,7 @@ export const decodeReturns = <Ref_ extends Any>(
 ): Effect.Effect<Returns<Ref_>, ParseResult.ParseError> =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag("Confect", (confectFunctionProvenance) =>
-      Schema.decode(confectFunctionProvenance.returns)(returns),
+      Schema.decodeUnknown(confectFunctionProvenance.returns)(returns),
     ),
     Match.tag("Convex", () => Effect.succeed(returns)),
     Match.exhaustive,
@@ -276,7 +276,7 @@ export const decodeArgsSync = <Ref_ extends Any>(
 ): Args<Ref_> =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag("Confect", (confectFunctionProvenance) =>
-      Schema.decodeSync(confectFunctionProvenance.args)(encodedArgs),
+      Schema.decodeUnknownSync(confectFunctionProvenance.args)(encodedArgs),
     ),
     Match.tag("Convex", () => encodedArgs),
     Match.exhaustive,
@@ -300,7 +300,9 @@ export const decodeReturnsSync = <Ref_ extends Any>(
 ): Returns<Ref_> =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag("Confect", (confectFunctionProvenance) =>
-      Schema.decodeSync(confectFunctionProvenance.returns)(encodedReturns),
+      Schema.decodeUnknownSync(confectFunctionProvenance.returns)(
+        encodedReturns,
+      ),
     ),
     Match.tag("Convex", () => encodedReturns),
     Match.exhaustive,
@@ -350,7 +352,7 @@ export const decodeError = <Ref_ extends Any>(
     Match.tag("Confect", (confectFunctionProvenance) =>
       "error" in confectFunctionProvenance
         ? Effect.map(
-            Schema.decode(confectFunctionProvenance.error)(encodedError),
+            Schema.decodeUnknown(confectFunctionProvenance.error)(encodedError),
             Option.some,
           )
         : Effect.succeed(Option.none<Error<Ref_>>()),
@@ -512,7 +514,7 @@ export const runWithCodec = <Ref_ extends Any, E = never>(
             confectFunctionProvenance.args,
           )(args);
           const encodedReturns = yield* invoke(encodedArgs);
-          return yield* Schema.decode(confectFunctionProvenance.returns)(
+          return yield* Schema.decodeUnknown(confectFunctionProvenance.returns)(
             encodedReturns,
           );
         }),
