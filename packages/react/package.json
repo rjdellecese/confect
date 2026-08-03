@@ -9,9 +9,9 @@
   "devDependencies": {
     "@effect/vitest": "0.30.0",
     "@testing-library/react": "16.3.2",
-    "@types/node": "26.1.1",
-    "@types/react": "19.2.17",
-    "@types/react-dom": "19.2.3",
+    "@types/node": "26.1.2",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
     "convex": "1.42.3",
     "effect": "3.22.0",
     "happy-dom": "20.11.1",
@@ -20,7 +20,7 @@
     "tsdown": "0.22.14",
     "typescript": "6.0.3",
     "unrun": "0.3.1",
-    "vite": "8.1.5",
+    "vite": "8.2.0",
     "vitest": "4.1.10"
   },
   "engines": {
