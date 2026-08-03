@@ -97,17 +97,11 @@ export const groupPathFromRelativeModulePath = (relativePath: string) =>
     };
   });
 
-/**
- * The specifier `_generated/spec.ts` uses to import a leaf's spec module. The
- * `..` escapes `_generated/`; the rest is the leaf's confect-relative path
- * crossed into POSIX space, since this is a module specifier rather than a
- * filesystem path (see `toPosixPath`). `bindingToRelativeSpecPath` in
- * `confect/codegen.ts` inverts this, and keys its lookup map on the POSIX form
- * to match.
- */
 export const specImportPathFromGenerated = (specRelativePath: string) =>
   Effect.gen(function* () {
-    const withoutExt = yield* toPosixPath(
+    const path = yield* Path.Path;
+    const withoutExt = toPosixPath(
+      path,
       yield* removePathExtension(specRelativePath),
     );
     return `../${withoutExt}`;

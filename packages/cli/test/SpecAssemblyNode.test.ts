@@ -256,17 +256,11 @@ describe("SpecAssemblyNode", () => {
   );
 });
 
-// The suite above hand-builds `specImportPath` from POSIX literals, so it can
-// only ever prove the template renders what it was handed. This one closes the
-// loop end-to-end: discovery hands `_generated/spec.ts` a platform-native
-// relative path, and the emitted module must still be valid TypeScript — i.e.
-// forward slashes — no matter which platform ran codegen.
 for (const { name, pathLayer, sep } of [
   { name: "posix", pathLayer: NodePath.layerPosix, sep: "/" },
   { name: "win32", pathLayer: NodePath.layerWin32, sep: "\\" },
 ] as const) {
-  // Named `test` rather than `it` to avoid shadowing the file-level `it` import.
-  layer(pathLayer)(`SpecAssemblyNode (${name} discovery)`, (test) => {
+  layer(pathLayer)(`SpecAssemblyNode, discovered as ${name}`, (test) => {
     test.effect("assembledSpec emits POSIX import specifiers", () =>
       Effect.gen(function* () {
         const discovered = (

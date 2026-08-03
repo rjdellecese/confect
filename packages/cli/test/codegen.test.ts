@@ -44,8 +44,6 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
         "users",
       ]);
       for (const table of tables) {
-        // `relativePath` is a filesystem path, not a specifier — it keeps the
-        // platform separator, so compare against a `path.join`-built prefix.
         expect(table.relativePath.startsWith(`tables${path.sep}`)).toBe(true);
       }
     }),
@@ -313,14 +311,6 @@ layer(Layer.empty)("validateNoParentChildNameCollisions", (it) => {
   );
 });
 
-// `bindingToRelativeSpecPath` recovers a leaf's key by inverting
-// `specImportPathFromGenerated`, so it always yields a POSIX path — while
-// `leaf.relativePath` comes from `fs.readDirectory` and is platform-native.
-// `loadAndValidateLeafModules` therefore keys `groupSpecsByRelativePath` on the
-// POSIX form. If that ever drifts back, every lookup misses on Windows and the
-// collision check silently stops firing (a miss is a bare `return`, not an
-// error), so this reconstructs the production wiring rather than hand-writing
-// the key.
 const leafFor = (relativePath: string, pathSegments: [string, ...string[]]) =>
   Effect.gen(function* () {
     const specImportPath = yield* specImportPathFromGenerated(relativePath);
@@ -339,36 +329,39 @@ for (const { name, pathLayer, sep } of [
   { name: "win32", pathLayer: NodePath.layerWin32, sep: "\\" },
 ] as const) {
   layer(pathLayer)(
-    `validateNoParentChildNameCollisions (${name} paths)`,
+    `validateNoParentChildNameCollisions, discovered as ${name}`,
     (it) => {
-      it.effect("still detects a collision across the separator boundary", () =>
-        Effect.gen(function* () {
-          const parent = yield* leafFor("notes.spec.ts", ["notes"]);
-          const child = yield* leafFor(`notes${sep}archived.spec.ts`, [
-            "notes",
-            "archived",
-          ]);
-          const parentGroupSpec = GroupSpec.make().addFunction(
-            FunctionSpec.publicQuery({
-              name: "archived",
-              args: () => emptyArgs,
-              returns: () => emptyReturns,
-            }),
-          );
+      it.effect(
+        "detects a collision when the leaf path and its specifier differ in separator",
+        () =>
+          Effect.gen(function* () {
+            const parent = yield* leafFor("notes.spec.ts", ["notes"]);
+            const child = yield* leafFor(`notes${sep}archived.spec.ts`, [
+              "notes",
+              "archived",
+            ]);
+            const parentGroupSpec = GroupSpec.make().addFunction(
+              FunctionSpec.publicQuery({
+                name: "archived",
+                args: () => emptyArgs,
+                returns: () => emptyReturns,
+              }),
+            );
 
-          const result = yield* Effect.either(
-            validateNoParentChildNameCollisions(
-              [parent, child],
-              new Map([
-                [yield* toPosixPath(parent.relativePath), parentGroupSpec],
-              ]),
-            ),
-          );
+            const path = yield* Path.Path;
+            const result = yield* Effect.either(
+              validateNoParentChildNameCollisions(
+                [parent, child],
+                new Map([
+                  [toPosixPath(path, parent.relativePath), parentGroupSpec],
+                ]),
+              ),
+            );
 
-          assert(Either.isLeft(result));
-          expect(result.left._tag).toBe("ParentChildNameCollisionError");
-          expect(result.left.collisionName).toBe("archived");
-        }),
+            assert(Either.isLeft(result));
+            expect(result.left._tag).toBe("ParentChildNameCollisionError");
+            expect(result.left.collisionName).toBe("archived");
+          }),
       );
     },
   );

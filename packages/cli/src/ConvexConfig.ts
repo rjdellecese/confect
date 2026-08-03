@@ -11,7 +11,7 @@ import type * as esbuild from "esbuild";
 import { fromBundlerError, type BuildError } from "./BuildError";
 import * as Bundler from "./Bundler";
 import { InvalidConvexConfigError } from "./CodegenError";
-import { toPosixPathWith } from "./utils";
+import { toPosixPath } from "./utils";
 
 export const CONVEX_CONFIG_FILENAME = "convex.config.ts";
 
@@ -298,7 +298,7 @@ export const typeImportPath = (
   if (!path.isAbsolute(componentDefinitionPath)) {
     return componentDefinitionPath;
   }
-  const relative = toPosixPathWith(
+  const relative = toPosixPath(
     path,
     path.relative(confectGeneratedDirectory, componentDefinitionPath),
   );

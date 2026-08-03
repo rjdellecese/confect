@@ -177,10 +177,6 @@ layer(GenerateFunctionsLayer)("generateFunctions", (it) => {
   );
 });
 
-// Module specifiers are POSIX values on every platform: `import` accepts only
-// `/`, and a backslash in a generated specifier is additionally an invalid
-// string escape (`"..\_generated\schema"`). Exercising the win32 `Path` layer
-// pins that down without needing a Windows host — see `toPosixPath`.
 const SPECIFIER_PLATFORMS = [
   { name: "posix", pathLayer: NodePath.layerPosix, sep: "/" },
   { name: "win32", pathLayer: NodePath.layerWin32, sep: "\\" },
@@ -189,10 +185,11 @@ const SPECIFIER_PLATFORMS = [
 for (const { name, pathLayer, sep } of SPECIFIER_PLATFORMS) {
   const p = (...segments: ReadonlyArray<string>) => segments.join(sep);
 
-  layer(pathLayer)(`module specifiers (${name})`, (it) => {
+  layer(pathLayer)(`module specifiers, built from ${name} paths`, (it) => {
     it.effect("toPosixPath rewrites the platform separator", () =>
       Effect.gen(function* () {
-        expect(yield* toPosixPath(p("_generated", "tables", "notes.ts"))).toBe(
+        const path = yield* Path.Path;
+        expect(toPosixPath(path, p("_generated", "tables", "notes.ts"))).toBe(
           "_generated/tables/notes.ts",
         );
       }),
@@ -200,7 +197,8 @@ for (const { name, pathLayer, sep } of SPECIFIER_PLATFORMS) {
 
     it.effect("toPosixPath leaves a separator-free path alone", () =>
       Effect.gen(function* () {
-        expect(yield* toPosixPath("notes.ts")).toBe("notes.ts");
+        const path = yield* Path.Path;
+        expect(toPosixPath(path, "notes.ts")).toBe("notes.ts");
       }),
     );
 

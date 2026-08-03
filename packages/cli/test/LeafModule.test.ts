@@ -108,12 +108,6 @@ const withTempLeaf = (
     );
   });
 
-// These functions are pure path arithmetic over the injected `Path`, so they
-// can be exercised against Windows semantics from any host by swapping in
-// `NodePath.layerWin32`. Inputs are built with the platform's own separator
-// because that is what `fs.readDirectory` hands them in production; the
-// distinction the suite is really pinning down is that *filesystem* results
-// stay platform-native while *module specifiers* are always POSIX.
 const PLATFORMS = [
   { name: "posix", pathLayer: NodePath.layerPosix, sep: "/" },
   { name: "win32", pathLayer: NodePath.layerWin32, sep: "\\" },
@@ -122,7 +116,7 @@ const PLATFORMS = [
 for (const { name, pathLayer, sep } of PLATFORMS) {
   const p = (...segments: ReadonlyArray<string>) => segments.join(sep);
 
-  layer(pathLayer)(`LeafModule paths (${name})`, (it) => {
+  layer(pathLayer)(`LeafModule paths, discovered as ${name}`, (it) => {
     it.effect("groupPathFromRelativeModulePath maps nested spec files", () =>
       Effect.gen(function* () {
         expect(
@@ -136,27 +130,28 @@ for (const { name, pathLayer, sep } of PLATFORMS) {
       }),
     );
 
-    it.effect("specPathForImpl maps impl paths to sibling spec paths", () =>
-      Effect.gen(function* () {
-        expect(
-          yield* specPathForImpl(p("notesAndRandom", "notes.impl.ts")),
-        ).toBe(p("notesAndRandom", "notes.spec.ts"));
-      }),
-    );
-
-    it.effect("implPathForSpec maps spec paths to sibling impl paths", () =>
-      Effect.gen(function* () {
-        expect(
-          yield* implPathForSpec(p("notesAndRandom", "notes.spec.ts")),
-        ).toBe(p("notesAndRandom", "notes.impl.ts"));
-      }),
-    );
-
-    // The load-bearing one: whatever the host separator, the emitted specifier
-    // is POSIX. A backslash here would be both unresolvable and an invalid
-    // escape in the generated string literal.
     it.effect(
-      "specImportPathFromGenerated builds POSIX import paths for _generated",
+      "specPathForImpl maps impl paths to sibling spec paths, keeping the platform separator",
+      () =>
+        Effect.gen(function* () {
+          expect(
+            yield* specPathForImpl(p("notesAndRandom", "notes.impl.ts")),
+          ).toBe(p("notesAndRandom", "notes.spec.ts"));
+        }),
+    );
+
+    it.effect(
+      "implPathForSpec maps spec paths to sibling impl paths, keeping the platform separator",
+      () =>
+        Effect.gen(function* () {
+          expect(
+            yield* implPathForSpec(p("notesAndRandom", "notes.spec.ts")),
+          ).toBe(p("notesAndRandom", "notes.impl.ts"));
+        }),
+    );
+
+    it.effect(
+      "specImportPathFromGenerated builds a POSIX specifier, not a filesystem path",
       () =>
         Effect.gen(function* () {
           expect(
