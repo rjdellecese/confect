@@ -49,7 +49,7 @@ jobs:
       - run: pnpm circular
 
   test:
-    name: Test
+    name: Test (${{ matrix.package }}, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -62,7 +62,7 @@ jobs:
       - run: cd packages/${{ matrix.package }} && pnpm test
 
   test-mock-backend:
-    name: Test (mock-backend)
+    name: Test (mock-backend, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -106,7 +106,7 @@ jobs:
       - run: pnpm --filter ${{ matrix.package }} bench
 
   build:
-    name: Build
+    name: Build (${{ matrix.package }}, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false

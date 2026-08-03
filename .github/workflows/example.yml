@@ -42,7 +42,7 @@ jobs:
       - run: pnpm --filter example build
 
   codegen:
-    name: Codegen
+    name: Codegen (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
