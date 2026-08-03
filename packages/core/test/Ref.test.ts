@@ -251,60 +251,6 @@ describe("isConvexError", () => {
   });
 });
 
-describe("maybeDecodeErrorSync", () => {
-  test("decodes ConvexError when error schema is present", () => {
-    class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
-      id: Schema.String,
-    }) {}
-
-    const spec = FunctionSpec.publicMutation({
-      name: "update",
-      args: () => Schema.Struct({}),
-      returns: () => Schema.Void,
-      error: () => NotFound,
-    });
-    const ref = Ref.make("test/mod", spec);
-
-    const convexError = new ConvexError({
-      _tag: "NotFound",
-      id: "abc",
-    });
-    const decoded = Ref.maybeDecodeErrorSync(ref, convexError);
-    expect(decoded).toBeInstanceOf(NotFound);
-    expect((decoded as NotFound).id).toBe("abc");
-  });
-
-  test("returns original error when no error schema", () => {
-    const spec = FunctionSpec.publicMutation({
-      name: "create",
-      args: () => Schema.Struct({}),
-      returns: () => Schema.Void,
-    });
-    const ref = Ref.make("test/mod", spec);
-
-    const convexError = new ConvexError({ code: "ERR" });
-    const result = Ref.maybeDecodeErrorSync(ref, convexError);
-    expect(result).toBe(convexError);
-  });
-
-  test("returns non-ConvexError errors unchanged", () => {
-    class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
-      id: Schema.String,
-    }) {}
-
-    const spec = FunctionSpec.publicMutation({
-      name: "update",
-      args: () => Schema.Struct({}),
-      returns: () => Schema.Void,
-      error: () => NotFound,
-    });
-    const ref = Ref.make("test/mod", spec);
-
-    const plainError = new Error("network error");
-    expect(Ref.maybeDecodeErrorSync(ref, plainError)).toBe(plainError);
-  });
-});
-
 describe("decodeError", () => {
   test("decodes error data using the error schema", async () => {
     class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {

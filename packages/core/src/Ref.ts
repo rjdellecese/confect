@@ -390,22 +390,6 @@ export const decodeErrorOption = <Ref_ extends Any>(
     Match.exhaustive,
   );
 
-export const maybeDecodeErrorSync = <Ref_ extends Any>(
-  ref: Ref_,
-  error: unknown,
-): unknown =>
-  isConvexError(error)
-    ? Match.value(ref.functionSpec.functionProvenance).pipe(
-        Match.tag("Confect", (confectFunctionProvenance) =>
-          "error" in confectFunctionProvenance
-            ? Schema.decodeSync(confectFunctionProvenance.error)(error.data)
-            : error,
-        ),
-        Match.tag("Convex", () => error),
-        Match.exhaustive,
-      )
-    : error;
-
 const missingPaginatedProvenanceError = (ref: Any) =>
   new globalThis.Error(
     `Paginated query ref "${getConvexFunctionName(ref)}" was not built with ` +
