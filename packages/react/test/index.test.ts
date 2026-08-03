@@ -12,17 +12,30 @@ import {
   test,
   vi,
 } from "vitest";
-import type { InvokeReturn } from "@confect/react";
-import { QueryResult, useAction, useMutation, useQuery } from "@confect/react";
+import type { InvokeReturn, UsePaginatedQueryArgs } from "@confect/react";
+import {
+  PaginatedQueryResult,
+  QueryResult,
+  useAction,
+  useMutation,
+  usePaginatedQuery,
+  useQuery,
+} from "@confect/react";
 
 const useConvexQueryMock = vi.fn();
 const useConvexMutationMock = vi.fn();
 const useConvexActionMock = vi.fn();
+const useConvexPaginatedQueryInternalMock = vi.fn();
 
 vi.mock("convex/react", () => ({
   useQuery: (...args: unknown[]) => useConvexQueryMock(...args),
   useMutation: (...args: unknown[]) => useConvexMutationMock(...args),
   useAction: (...args: unknown[]) => useConvexActionMock(...args),
+  usePaginatedQuery: () => {
+    throw new Error("unexpected call to the public usePaginatedQuery");
+  },
+  usePaginatedQueryInternal: (...args: unknown[]) =>
+    useConvexPaginatedQueryInternalMock(...args),
 }));
 
 class NotFound extends Schema.TaggedErrorClass<NotFound>()("NotFound", {
@@ -90,6 +103,7 @@ beforeEach(() => {
   useConvexQueryMock.mockReset();
   useConvexMutationMock.mockReset();
   useConvexActionMock.mockReset();
+  useConvexPaginatedQueryInternalMock.mockReset();
 });
 
 describe("useQuery", () => {
@@ -385,5 +399,353 @@ describe("useAction", () => {
     rerender();
 
     expect(result.current).toBe(first);
+  });
+});
+
+describe("usePaginatedQuery", () => {
+  const paginatedDoc = Schema.Struct({ value: Schema.NumberFromString });
+
+  const paginatedQuery = Ref.make(
+    "notes",
+    FunctionSpec.publicPaginatedQuery({
+      name: "listPaginated",
+      args: () => Schema.Struct({ count: Schema.NumberFromString }),
+      item: () => paginatedDoc,
+    }),
+  );
+
+  const paginatedQueryNoExtraArgs = Ref.make(
+    "notes",
+    FunctionSpec.publicPaginatedQuery({
+      name: "listAllPaginated",
+      item: () => paginatedDoc,
+    }),
+  );
+
+  class PaginationFailed extends Schema.TaggedErrorClass<PaginationFailed>()(
+    "PaginationFailed",
+    { reason: Schema.String },
+  ) {}
+
+  const paginatedQueryWithError = Ref.make(
+    "notes",
+    FunctionSpec.publicPaginatedQuery({
+      name: "listPaginatedOrFail",
+      item: () => paginatedDoc,
+      error: () => PaginationFailed,
+    }),
+  );
+
+  const user = (
+    partial: Partial<{
+      results: unknown[];
+      status: string;
+      isLoading: boolean;
+      loadMore: (numItems: number) => void;
+      error: unknown;
+    }>,
+  ) => ({
+    user: {
+      results: [],
+      status: "CanLoadMore",
+      isLoading: false,
+      loadMore: vi.fn(),
+      ...partial,
+    },
+  });
+
+  test("encodes args via the user-args schema and disables throwOnError", () => {
+    useConvexPaginatedQueryInternalMock.mockReturnValue(user({}));
+
+    renderHook(() =>
+      usePaginatedQuery(paginatedQuery, { count: 42 }, { initialNumItems: 10 }),
+    );
+
+    expect(useConvexPaginatedQueryInternalMock).toHaveBeenLastCalledWith(
+      expect.anything(),
+      { count: "42" },
+      { initialNumItems: 10 },
+      false,
+    );
+  });
+
+  test("passes `skip` through and reports it on LoadingFirstPage", () => {
+    useConvexPaginatedQueryInternalMock.mockReturnValue(
+      user({ status: "LoadingFirstPage", isLoading: true }),
+    );
+
+    const { result } = renderHook(() =>
+      usePaginatedQuery(paginatedQuery, "skip", { initialNumItems: 10 }),
+    );
+
+    expect(useConvexPaginatedQueryInternalMock).toHaveBeenLastCalledWith(
+      expect.anything(),
+      "skip",
+      { initialNumItems: 10 },
+      false,
+    );
+    assert(PaginatedQueryResult.isLoadingFirstPage(result.current));
+    expect(result.current.skipped).toBe(true);
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.results).toEqual([]);
+  });
+
+  test("decodes the results via the ref's item schema", () => {
+    useConvexPaginatedQueryInternalMock.mockReturnValue(
+      user({ results: [{ value: "1" }, { value: "2" }] }),
+    );
+
+    const { result } = renderHook(() =>
+      usePaginatedQuery(paginatedQueryNoExtraArgs, {}, { initialNumItems: 10 }),
+    );
+
+    assert(PaginatedQueryResult.isCanLoadMore(result.current));
+    expect(result.current.results).toEqual([{ value: 1 }, { value: 2 }]);
+  });
+
+  test.each([
+    ["LoadingFirstPage", true],
+    ["LoadingMore", true],
+    ["CanLoadMore", false],
+    ["Exhausted", false],
+  ] as const)("maps status %s to its variant", (status, isLoading) => {
+    useConvexPaginatedQueryInternalMock.mockReturnValue(
+      user({ status, isLoading, results: [{ value: "1" }] }),
+    );
+
+    const { result } = renderHook(() =>
+      usePaginatedQuery(paginatedQueryNoExtraArgs, {}, { initialNumItems: 10 }),
+    );
+
+    expect(result.current._tag).toBe(status);
+    assert(!PaginatedQueryResult.isFailure(result.current));
+    expect(result.current.isLoading).toBe(isLoading);
+  });
+
+  test.each([
+    ["LoadingFirstPage", false],
+    ["LoadingMore", false],
+    ["CanLoadMore", true],
+    ["Exhausted", false],
+    ["Error", false],
+  ] as const)(
+    "carries convex's loadMore on %s: %s",
+    (status, carriesLoadMore) => {
+      const loadMore = vi.fn();
+      useConvexPaginatedQueryInternalMock.mockReturnValue(
+        user({
+          status,
+          results: [{ value: "1" }],
+          loadMore,
+          error: new ConvexError({ _tag: "PaginationFailed", reason: "oops" }),
+        }),
+      );
+
+      const { result } = renderHook(() =>
+        usePaginatedQuery(paginatedQueryWithError, {}, { initialNumItems: 10 }),
+      );
+
+      expect("loadMore" in result.current).toBe(carriesLoadMore);
+      if (PaginatedQueryResult.isCanLoadMore(result.current)) {
+        expect(result.current.loadMore).toBe(loadMore);
+      }
+    },
+  );
+
+  test("preserves result identity across rerenders for an unchanged convex result", () => {
+    useConvexPaginatedQueryInternalMock.mockReturnValue(
+      user({ results: [{ value: "1" }] }),
+    );
+
+    const { result, rerender } = renderHook(() =>
+      usePaginatedQuery(paginatedQueryNoExtraArgs, {}, { initialNumItems: 10 }),
+    );
+    const first = result.current;
+
+    rerender();
+
+    expect(result.current).toBe(first);
+    assert(!PaginatedQueryResult.isFailure(result.current));
+    assert(!PaginatedQueryResult.isFailure(first));
+    expect(result.current.results).toBe(first.results);
+  });
+
+  test("produces new results when the convex results identity changes", () => {
+    useConvexPaginatedQueryInternalMock.mockReturnValue(
+      user({ results: [{ value: "1" }] }),
+    );
+
+    const { result, rerender } = renderHook(() =>
+      usePaginatedQuery(paginatedQueryNoExtraArgs, {}, { initialNumItems: 10 }),
+    );
+    const first = result.current;
+
+    useConvexPaginatedQueryInternalMock.mockReturnValue(
+      user({ results: [{ value: "1" }, { value: "2" }] }),
+    );
+    rerender();
+
+    expect(result.current).not.toBe(first);
+    assert(!PaginatedQueryResult.isFailure(result.current));
+    expect(result.current.results).toEqual([{ value: 1 }, { value: 2 }]);
+  });
+
+  test("returns Failure with the decoded typed error for a matching ConvexError", () => {
+    useConvexPaginatedQueryInternalMock.mockReturnValue(
+      user({
+        status: "Error",
+        error: new ConvexError({ _tag: "PaginationFailed", reason: "oops" }),
+      }),
+    );
+
+    const { result } = renderHook(() =>
+      usePaginatedQuery(paginatedQueryWithError, {}, { initialNumItems: 10 }),
+    );
+
+    assert(PaginatedQueryResult.isFailure(result.current));
+    expect(result.current.error).toBeInstanceOf(PaginationFailed);
+    expect(result.current.error.reason).toBe("oops");
+  });
+
+  test("Failure keeps the pages loaded before the failure", () => {
+    useConvexPaginatedQueryInternalMock.mockReturnValue(
+      user({
+        status: "Error",
+        results: [{ value: "1" }, { value: "2" }],
+        error: new ConvexError({ _tag: "PaginationFailed", reason: "oops" }),
+      }),
+    );
+
+    const { result } = renderHook(() =>
+      usePaginatedQuery(paginatedQueryWithError, {}, { initialNumItems: 10 }),
+    );
+
+    assert(PaginatedQueryResult.isFailure(result.current));
+    expect(result.current.results).toEqual([{ value: 1 }, { value: 2 }]);
+  });
+
+  test("throws a ConvexError from a ref without an error schema", () => {
+    const convexError = new ConvexError({ code: "ERR" });
+    useConvexPaginatedQueryInternalMock.mockReturnValue(
+      user({ status: "Error", error: convexError }),
+    );
+
+    expect(() =>
+      renderHook(() =>
+        usePaginatedQuery(
+          paginatedQueryNoExtraArgs,
+          {},
+          { initialNumItems: 10 },
+        ),
+      ),
+    ).toThrow(convexError);
+  });
+
+  test("throws a non-ConvexError unchanged", () => {
+    const transportError = new Error("network down");
+    useConvexPaginatedQueryInternalMock.mockReturnValue(
+      user({ status: "Error", error: transportError }),
+    );
+
+    expect(() =>
+      renderHook(() =>
+        usePaginatedQuery(paginatedQueryWithError, {}, { initialNumItems: 10 }),
+      ),
+    ).toThrow(transportError);
+  });
+
+  test("throws the original ConvexError when it does not match the error schema", () => {
+    // Convex raises its own `ConvexError`s, which never match a user-declared
+    // error schema. The original must survive rather than being replaced by a
+    // decode failure.
+    const systemError = new ConvexError({
+      isConvexSystemError: true,
+      paginationError: "InvalidCursor",
+    });
+    useConvexPaginatedQueryInternalMock.mockReturnValue(
+      user({ status: "Error", error: systemError }),
+    );
+
+    expect(() =>
+      renderHook(() =>
+        usePaginatedQuery(paginatedQueryWithError, {}, { initialNumItems: 10 }),
+      ),
+    ).toThrow(systemError);
+  });
+
+  describe("types", () => {
+    test("the result type carries the item and error types", () => {
+      useConvexPaginatedQueryInternalMock.mockReturnValue(user({}));
+
+      const { result } = renderHook(() =>
+        usePaginatedQuery(paginatedQueryWithError, {}, { initialNumItems: 10 }),
+      );
+
+      expectTypeOf(result.current).toEqualTypeOf<
+        PaginatedQueryResult.PaginatedQueryResult<
+          { readonly value: number },
+          PaginationFailed
+        >
+      >();
+    });
+
+    test("the error type is never without an error schema", () => {
+      useConvexPaginatedQueryInternalMock.mockReturnValue(user({}));
+
+      const { result } = renderHook(() =>
+        usePaginatedQuery(
+          paginatedQueryNoExtraArgs,
+          {},
+          { initialNumItems: 10 },
+        ),
+      );
+
+      expectTypeOf(result.current).toEqualTypeOf<
+        PaginatedQueryResult.PaginatedQueryResult<{ readonly value: number }>
+      >();
+    });
+  });
+
+  describe("UsePaginatedQueryArgs", () => {
+    test("accepts the user args, or `skip`", () => {
+      expectTypeOf<{ count: number }>().toExtend<
+        UsePaginatedQueryArgs<typeof paginatedQuery>
+      >();
+      expectTypeOf<"skip">().toExtend<
+        UsePaginatedQueryArgs<typeof paginatedQuery>
+      >();
+    });
+
+    test("accepts only the empty object or `skip` when there are no user args", () => {
+      expectTypeOf<{}>().toExtend<
+        UsePaginatedQueryArgs<typeof paginatedQueryNoExtraArgs>
+      >();
+      expectTypeOf<"skip">().toExtend<
+        UsePaginatedQueryArgs<typeof paginatedQueryNoExtraArgs>
+      >();
+      // `{} | "skip"` would absorb these; `Record<string, never> | "skip"`
+      // rejects them.
+      expectTypeOf<"skipp">().not.toExtend<
+        UsePaginatedQueryArgs<typeof paginatedQueryNoExtraArgs>
+      >();
+      expectTypeOf<number>().not.toExtend<
+        UsePaginatedQueryArgs<typeof paginatedQueryNoExtraArgs>
+      >();
+    });
+
+    test("rejects paginationOpts in an args literal", () => {
+      const check = () =>
+        usePaginatedQuery(
+          paginatedQuery,
+          {
+            count: 42,
+            // @ts-expect-error — paginationOpts is managed by the hook, not the caller
+            paginationOpts: { numItems: 10, cursor: null },
+          },
+          { initialNumItems: 10 },
+        );
+
+      expect(check).toBeDefined();
+    });
   });
 });

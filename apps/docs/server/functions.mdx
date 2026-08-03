@@ -8,14 +8,16 @@ Confect functions are defined as a [spec and impl](/concepts/spec-impl-model) pa
 
 ## Function types
 
-| Constructor                     | Description                |
-| ------------------------------- | -------------------------- |
-| `FunctionSpec.publicQuery`      | Public query function      |
-| `FunctionSpec.publicMutation`   | Public mutation function   |
-| `FunctionSpec.publicAction`     | Public action function     |
-| `FunctionSpec.internalQuery`    | Internal query function    |
-| `FunctionSpec.internalMutation` | Internal mutation function |
-| `FunctionSpec.internalAction`   | Internal action function   |
+| Constructor                           | Description                                             |
+| ------------------------------------- | ------------------------------------------------------- |
+| `FunctionSpec.publicQuery`            | Public query function                                   |
+| `FunctionSpec.publicPaginatedQuery`   | Public [paginated query](#paginated-queries) function   |
+| `FunctionSpec.publicMutation`         | Public mutation function                                |
+| `FunctionSpec.publicAction`           | Public action function                                  |
+| `FunctionSpec.internalQuery`          | Internal query function                                 |
+| `FunctionSpec.internalPaginatedQuery` | Internal [paginated query](#paginated-queries) function |
+| `FunctionSpec.internalMutation`       | Internal mutation function                              |
+| `FunctionSpec.internalAction`         | Internal action function                                |
 
 For Node.js actions, see [Node Actions](/server/node-actions). To integrate plain Convex functions (for use with Convex components or other libraries), see [Plain Convex Functions](/server/plain-convex-functions).
 
@@ -65,6 +67,46 @@ FunctionSpec.publicQuery({
   error: () => NoteNotFound,
 });
 ```
+
+### Paginated queries
+
+Define a paginated query with `FunctionSpec.publicPaginatedQuery` (or `internalPaginatedQuery`). Instead of `returns`, pass an `item` schema — the type of one element in a page. The optional `args` schema declares only your own arguments; Confect composes the Convex-facing schemas for you, adding the `paginationOpts` argument (with all of Convex's [pagination protocol fields](https://docs.convex.dev/database/pagination)) and wrapping `item` in a `PaginationResult` returns schema.
+
+```ts confect/notes.spec.ts
+import { FunctionSpec } from "@confect/core";
+import * as Schema from "effect/Schema";
+
+import notes from "./_generated/tables/notes";
+
+FunctionSpec.publicPaginatedQuery({
+  name: "listByAuthor",
+  args: () => Schema.Struct({ author: Schema.String }), // optional; omit for no extra args
+  item: () => notes.Doc,
+});
+```
+
+Do not declare `paginationOpts` in `args` — it is added automatically, and declaring it yourself is a type (and runtime) error.
+
+The handler receives the decoded args including `paginationOpts`, which it typically forwards directly to [`paginate`](/server/database/reading#paginate):
+
+```ts confect/notes.impl.ts
+FunctionImpl.make(
+  databaseSchema,
+  notes,
+  "listByAuthor",
+  ({ author, paginationOpts }) =>
+    Effect.gen(function* () {
+      const reader = yield* DatabaseReader;
+
+      return yield* reader
+        .table("notes")
+        .index("by_creation_time", "desc")
+        .paginate(paginationOpts, (q) => q.eq(q.field("author"), author));
+    }).pipe(Effect.orDie),
+);
+```
+
+Paginated queries support the optional `error` schema like any other function. On the client, consume them with [`usePaginatedQuery`](/clients/react#usepaginatedquery).
 
 ## Implementing functions
 

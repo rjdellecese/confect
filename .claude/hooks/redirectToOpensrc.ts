@@ -1,6 +1,5 @@
-import * as BunContext from "@effect/platform-bun/BunContext";
 import * as BunRuntime from "@effect/platform-bun/BunRuntime";
-import * as BunStream from "@effect/platform-bun/BunStream";
+import * as BunServices from "@effect/platform-bun/BunServices";
 import * as Array from "effect/Array";
 import * as Cause from "effect/Cause";
 import * as Console from "effect/Console";
@@ -8,6 +7,7 @@ import * as Effect from "effect/Effect";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
+import { Stdio } from "effect/Stdio";
 import * as Stream from "effect/Stream";
 
 /**
@@ -38,8 +38,8 @@ const GlobInput = Schema.Struct({
   }),
 });
 
-const PreToolUseInput = Schema.parseJson(
-  Schema.Union(ReadInput, GrepInput, GlobInput),
+const PreToolUseInput = Schema.fromJsonString(
+  Schema.Union([ReadInput, GrepInput, GlobInput]),
 );
 
 type PreToolUseInput = typeof PreToolUseInput.Type;
@@ -47,14 +47,15 @@ type PreToolUseInput = typeof PreToolUseInput.Type;
 const BLOCKED_PATH_PATTERN = /node_modules|\.pnpm-store|\.pnpm(?:\/|$)/;
 
 const program = Effect.gen(function* () {
-  const jsonString = yield* BunStream.stdin.pipe(
+  const stdio = yield* Stdio;
+  const jsonString = yield* stdio.stdin.pipe(
     Stream.decodeText(),
     Stream.mkString,
   );
 
-  const inputOption = yield* Schema.decode(PreToolUseInput)(jsonString).pipe(
-    Effect.option,
-  );
+  const inputOption = yield* Schema.decodeEffect(PreToolUseInput)(
+    jsonString,
+  ).pipe(Effect.option);
 
   if (Option.isNone(inputOption)) {
     yield* Console.log("{}");
@@ -65,16 +66,16 @@ const program = Effect.gen(function* () {
 
   const pathValues = Match.value(input).pipe(
     Match.when({ tool_name: "Read" }, ({ tool_input }) =>
-      Array.filterMap([tool_input.path], Option.fromNullable),
+      Array.getSomes([Option.fromNullishOr(tool_input.path)]),
     ),
     Match.when({ tool_name: "Grep" }, ({ tool_input }) =>
-      Array.filterMap([tool_input.path], Option.fromNullable),
+      Array.getSomes([Option.fromNullishOr(tool_input.path)]),
     ),
     Match.when({ tool_name: "Glob" }, ({ tool_input }) =>
-      Array.filterMap(
-        [tool_input.glob_pattern, tool_input.target_directory],
-        Option.fromNullable,
-      ),
+      Array.getSomes([
+        Option.fromNullishOr(tool_input.glob_pattern),
+        Option.fromNullishOr(tool_input.target_directory),
+      ]),
     ),
     Match.exhaustive,
   );
@@ -109,7 +110,7 @@ const program = Effect.gen(function* () {
 
 BunRuntime.runMain(
   program.pipe(
-    Effect.tapErrorCause((cause) => Console.error(Cause.pretty(cause))),
-    Effect.provide(BunContext.layer),
+    Effect.tapCause((cause) => Console.error(Cause.pretty(cause))),
+    Effect.provide(BunServices.layer),
   ),
 );

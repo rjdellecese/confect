@@ -31,6 +31,12 @@ export default GroupSpec.make()
     }),
   )
   .addFunction(
+    FunctionSpec.publicPaginatedQuery({
+      name: "listPaginated",
+      item: () => notes.Doc,
+    }),
+  )
+  .addFunction(
     FunctionSpec.publicQuery({
       name: "getOrFail",
       args: () => Schema.Struct({ noteId: Id("notes") }),
