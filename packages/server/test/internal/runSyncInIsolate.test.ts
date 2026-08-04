@@ -51,15 +51,21 @@ const withConvexIsolateTimers = <A>(run: () => A): A => {
 };
 
 describe("runSyncInIsolate", () => {
-  // Documents why these runners exist: `Effect.runSync` forks with its own
-  // `MixedScheduler("sync")` whose dispatcher eagerly arms
-  // `setImmediate`/`setTimeout` when the fiber's op budget forces a yield. If
-  // this test ever fails, Effect has made `runSync` timer-free and the
-  // isolate-safe runners can be retired.
-  test("Effect.runSync uses banned timer APIs past the fiber op budget", () => {
-    expect(() =>
-      withConvexIsolateTimers(() => Effect.runSync(sumToN(5000))),
-    ).toThrow(/Can't use set(Timeout|Immediate)/);
+  // `Effect.runSync` forks with its own `MixedScheduler("sync")`, whose
+  // dispatcher used to arm `setImmediate`/`setTimeout` when the fiber's op
+  // budget forced a yield — the crash these runners were written to avoid.
+  // effect 4.0.0-beta.103 dispatches sync-mode yields through cancellable
+  // microtasks instead, so plain `runSync` now survives the isolate on its
+  // own. The runners stay because they don't depend on that: they suppress the
+  // yield outright rather than trusting whatever the sync scheduler's
+  // dispatcher happens to be, which is what makes them safe across beta
+  // churn. This test pins the upstream behavior so a regression in it — or a
+  // deliberate return to timers — surfaces here rather than in a deployed
+  // isolate.
+  test("Effect.runSync stays off banned timer APIs past the fiber op budget", () => {
+    expect(withConvexIsolateTimers(() => Effect.runSync(sumToN(5000)))).toBe(
+      expectedSum,
+    );
   });
 
   test("runSyncInIsolate runs past the fiber op budget without timers", () => {

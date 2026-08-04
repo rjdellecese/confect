@@ -114,12 +114,22 @@ export const make = (
  * (`Clock.currentTimeMillis`/`currentTimeNanos`) read the real time, making
  * them an explicit opt-in to cache eviction. Raw `Date.now()` calls in handler
  * code likewise opt out honestly.
+ *
+ * The same split applies to the monotonic accessors. `Effect.timed` and
+ * duration metrics measure elapsed time through `monotonicTimeNanosUnsafe`,
+ * and the Convex isolate exposes no untracked monotonic source to serve it
+ * from — Effect's own live clock falls back to `Date.now()` when neither
+ * `process.hrtime` nor `performance.now` exists. A constant keeps those
+ * measurements (which report a zero duration, as they already did when the
+ * unsafe wall-clock accessors were the ones being read) out of the tracker.
  */
 const queryClock: Clock.Clock = {
   currentTimeMillisUnsafe: () => 0,
   currentTimeNanosUnsafe: () => 0n,
+  monotonicTimeNanosUnsafe: () => 0n,
   currentTimeMillis: Effect.sync(() => Date.now()),
   currentTimeNanos: Effect.sync(() => BigInt(Date.now()) * 1_000_000n),
+  monotonicTimeNanos: Effect.sync(() => BigInt(Date.now()) * 1_000_000n),
   // `Effect.sleep` resolves the ambient clock, so it cannot be used here — it
   // would recurse straight back into this `sleep`.
   sleep: (duration) =>

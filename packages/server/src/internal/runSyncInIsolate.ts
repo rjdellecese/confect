@@ -11,14 +11,16 @@ import * as Scheduler from "effect/Scheduler";
  * isolate, so Effects run at module scope (registration layer builds, schema →
  * validator compiles) face the same restrictions as handlers.
  *
- * `Effect.runSync` is unsafe there: it forks its fiber with its own
- * `MixedScheduler("sync")` (passed as a run option, so it overrides any
- * scheduler provided within the effect), and once a synchronous fiber exhausts
- * its op budget (`MaxOpsBeforeYield`, 2048 operations) the run loop injects a
- * cooperative yield whose dispatcher eagerly arms `setImmediate`/`setTimeout`
- * — crashing the isolate even though `runSync`'s trailing flush would have
- * drained the task. Registration work scales with app size, so large apps
- * cross the budget while small ones never do.
+ * `Effect.runSync` forks its fiber with its own `MixedScheduler("sync")`
+ * (passed as a run option, so it overrides any scheduler provided within the
+ * effect), and once a synchronous fiber exhausts its op budget
+ * (`MaxOpsBeforeYield`, 2048 operations) the run loop injects a cooperative
+ * yield through that scheduler's dispatcher. Registration work scales with app
+ * size, so large apps cross the budget while small ones never do. Through
+ * effect 4.0.0-beta.102 the sync dispatcher armed `setImmediate`/`setTimeout`,
+ * which crashed the isolate outright; beta.103 dispatches those yields on the
+ * microtask queue instead, so the crash is gone but the yield still costs a
+ * round trip that a module-scope computation has no use for.
  *
  * These runners instead put `Scheduler.PreventSchedulerYield` in the fiber's
  * base context via `Effect.runSyncWith`: it sits in the root context (below
