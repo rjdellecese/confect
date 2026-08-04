@@ -27,6 +27,18 @@ import type { GenericId } from "convex/values";
  */
 
 export type DataModel = {
+  events: {
+    document:
+      | { a: string; kind: "a"; _id: Id<"events">; _creationTime: number }
+      | { b: number; kind: "b"; _id: Id<"events">; _creationTime: number };
+    fieldPaths: "_creationTime" | "_id" | "a" | "b" | "kind";
+    indexes: {
+      by_id: ["_id"];
+      by_creation_time: ["_creationTime"];
+    };
+    searchIndexes: {};
+    vectorIndexes: {};
+  };
   notes: {
     document: {
       author?: { name: string; role: "admin" | "user" };
