@@ -1,7 +1,12 @@
 version: 2
 updates:
+  # `directory: "/"` reaches only `.github/workflows` and a root `action.yml`,
+  # so the composite actions under `.github/actions/*` went unscanned — which
+  # is how they drifted to v4 while `release.yml` was kept current.
   - package-ecosystem: "github-actions"
-    directory: "/"
+    directories:
+      - "/"
+      - "/.github/actions/*"
     schedule:
       interval: "weekly"
 
