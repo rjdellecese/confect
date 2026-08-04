@@ -1,6 +1,8 @@
 import type {
   FunctionReference as ConvexFunctionReference,
   FunctionVisibility,
+  PaginationOptions,
+  PaginationResult,
 } from "convex/server";
 import { makeFunctionReference } from "convex/server";
 import type { Value } from "convex/values";
@@ -41,6 +43,17 @@ export interface AnyQuery extends Ref<
   FunctionVisibility,
   any,
   any,
+  any
+> {}
+
+export interface AnyPublicPaginatedQuery extends Ref<
+  RuntimeAndFunctionType.AnyQuery,
+  "public",
+  {
+    [key: string]: any;
+    paginationOpts: PaginationOptions;
+  },
+  PaginationResult<any>,
   any
 > {}
 
@@ -315,7 +328,7 @@ export const decodeErrorOrElse =
   <Ref_ extends Any, E>(ref: Ref_, mapUnknownError: (error: unknown) => E) =>
   (error: unknown): Error<Ref_> | E => {
     if (isConvexError(error)) {
-      const decoded = decodeErrorSync(ref, error.data);
+      const decoded = decodeErrorOption(ref, error.data);
       if (Option.isSome(decoded)) {
         return decoded.value;
       }
@@ -350,44 +363,96 @@ export const decodeError = <Ref_ extends Any>(
   );
 
 /**
- * Synchronous counterpart to `decodeError`. Throws on schema decode failure;
- * returns `None` when the ref doesn't declare a typed error.
+ * Synchronous counterpart to `decodeError`. Returns `None` when the value is
+ * not this ref's typed error — either because the ref declares no `error`
+ * schema, or because `encodedError` doesn't match the one it declares.
+ *
+ * The second case is reachable in normal operation: Convex raises its own
+ * `ConvexError`s (an `InvalidCursor` pagination error, for instance), and
+ * those never match a user-declared error schema. Callers pair this with a
+ * fallback that surfaces the original error, so failing to decode must not
+ * throw — a `ParseError` here would replace the real error with an opaque one
+ * and lose the only useful diagnostic. Hence the `Option` suffix rather than
+ * `Sync`, matching `Schema.decodeUnknownOption`: the sibling `*Sync` helpers
+ * in this module all throw on a parse failure, and this one deliberately
+ * doesn't.
  */
-export const decodeErrorSync = <Ref_ extends Any>(
+export const decodeErrorOption = <Ref_ extends Any>(
   ref: Ref_,
   encodedError: unknown,
 ): Option.Option<Error<Ref_>> =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag("Confect", (confectFunctionProvenance) =>
       "error" in confectFunctionProvenance
-        ? Option.some(
-            Schema.decodeUnknownSync(confectFunctionProvenance.error)(
-              encodedError,
-            ) as Error<Ref_>,
-          )
+        ? (Schema.decodeUnknownOption(confectFunctionProvenance.error)(
+            encodedError,
+          ) as Option.Option<Error<Ref_>>)
         : Option.none<Error<Ref_>>(),
     ),
     Match.tag("Convex", () => Option.none<Error<Ref_>>()),
     Match.exhaustive,
   );
 
-export const maybeDecodeErrorSync = <Ref_ extends Any>(
+const missingPaginatedProvenanceError = (ref: Any) =>
+  new globalThis.Error(
+    `Paginated query ref "${getConvexFunctionName(ref)}" was not built with ` +
+      "`FunctionSpec.publicPaginatedQuery` (or `FunctionSpec.internalPaginatedQuery`). " +
+      "Paginated encoding and decoding require the user-args and item schemas " +
+      "those constructors store. Define the function as, e.g.:\n\n" +
+      "  FunctionSpec.publicPaginatedQuery({\n" +
+      '    name: "...",\n' +
+      "    args: () => Schema.Struct({ ... }), // optional; without paginationOpts\n" +
+      "    item: () => ItemSchema,\n" +
+      "  })",
+  );
+
+/**
+ * Encode the args of a paginated query ref via its user-args schema —
+ * `paginationOpts` is excluded, since the pagination protocol fields are
+ * managed by the client (e.g. `usePaginatedQuery` from `convex/react`), not by
+ * the caller. Requires a ref built with `FunctionSpec.publicPaginatedQuery`
+ * (or `internalPaginatedQuery`).
+ */
+export const encodePaginatedQueryArgsSync = <
+  Ref_ extends AnyPublicPaginatedQuery,
+>(
   ref: Ref_,
-  error: unknown,
+  args: Omit<Args<Ref_>, "paginationOpts">,
 ): unknown =>
-  isConvexError(error)
-    ? Match.value(ref.functionSpec.functionProvenance).pipe(
-        Match.tag("Confect", (confectFunctionProvenance) =>
-          "error" in confectFunctionProvenance
-            ? Schema.decodeUnknownSync(confectFunctionProvenance.error)(
-                error.data,
-              )
-            : error,
-        ),
-        Match.tag("Convex", () => error),
-        Match.exhaustive,
-      )
-    : error;
+  Match.value(ref.functionSpec.functionProvenance).pipe(
+    Match.tag("Confect", (confectFunctionProvenance) => {
+      if (confectFunctionProvenance.kind._tag !== "Paginated") {
+        throw missingPaginatedProvenanceError(ref);
+      }
+      return Schema.encodeUnknownSync(confectFunctionProvenance.kind.userArgs)(
+        args,
+      );
+    }),
+    Match.tag("Convex", () => args),
+    Match.exhaustive,
+  );
+
+/**
+ * Decode a page of a paginated query's results via the ref's item schema.
+ * Requires a ref built with `FunctionSpec.publicPaginatedQuery` (or
+ * `internalPaginatedQuery`).
+ */
+export const decodePaginationPageSync = <Ref_ extends AnyPublicPaginatedQuery>(
+  ref: Ref_,
+  encodedPage: unknown,
+): Returns<Ref_>["page"] =>
+  Match.value(ref.functionSpec.functionProvenance).pipe(
+    Match.tag("Confect", (confectFunctionProvenance) => {
+      if (confectFunctionProvenance.kind._tag !== "Paginated") {
+        throw missingPaginatedProvenanceError(ref);
+      }
+      return Schema.decodeUnknownSync(confectFunctionProvenance.kind.page)(
+        encodedPage,
+      );
+    }),
+    Match.tag("Convex", () => encodedPage),
+    Match.exhaustive,
+  ) as Returns<Ref_>["page"];
 
 /**
  * Encode args via the ref's args schema, invoke `call`, decode returns via the
@@ -416,7 +481,7 @@ export const runWithCodec = <Ref_ extends Any, E = never>(
         try: () => Promise.resolve(call(functionReference, encodedArgs)),
         catch: (error): Error<Ref_> | E => {
           if (isConvexError(error)) {
-            const decoded = decodeErrorSync(ref, error.data);
+            const decoded = decodeErrorOption(ref, error.data);
             if (Option.isSome(decoded)) {
               return decoded.value;
             }

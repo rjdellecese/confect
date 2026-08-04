@@ -24,6 +24,21 @@ const list = FunctionImpl.make(databaseSchema, notes, "list", () =>
   }).pipe(Effect.orDie),
 );
 
+const listPaginated = FunctionImpl.make(
+  databaseSchema,
+  notes,
+  "listPaginated",
+  ({ paginationOpts }) =>
+    Effect.gen(function* () {
+      const reader = yield* DatabaseReader;
+
+      return yield* reader
+        .table("notes")
+        .index("by_creation_time", "desc")
+        .paginate(paginationOpts);
+    }).pipe(Effect.orDie),
+);
+
 const delete_ = FunctionImpl.make(
   databaseSchema,
   notes,
@@ -107,6 +122,7 @@ const insertDefault = FunctionImpl.make(
 export default GroupImpl.make(databaseSchema, notes).pipe(
   Layer.provide(insert),
   Layer.provide(list),
+  Layer.provide(listPaginated),
   Layer.provide(delete_),
   Layer.provide(getFirst),
   Layer.provide(getOrFail),

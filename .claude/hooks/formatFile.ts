@@ -1,19 +1,20 @@
-import * as Command from "@effect/platform/Command";
-import * as Path from "@effect/platform/Path";
-import * as BunContext from "@effect/platform-bun/BunContext";
 import * as BunRuntime from "@effect/platform-bun/BunRuntime";
-import * as BunStream from "@effect/platform-bun/BunStream";
+import * as BunServices from "@effect/platform-bun/BunServices";
 import * as Cause from "effect/Cause";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
+import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
+import { Stdio } from "effect/Stdio";
 import * as Stream from "effect/Stream";
 import * as String from "effect/String";
+import * as ChildProcess from "effect/unstable/process/ChildProcess";
+import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
 
 /**
  * @see https://docs.claude.com/en/docs/claude-code/hooks
  */
-const PostToolUseInput = Schema.parseJson(
+const PostToolUseInput = Schema.fromJsonString(
   Schema.Struct({
     tool_input: Schema.Struct({
       file_path: Schema.String,
@@ -73,20 +74,23 @@ const isSupportedFileType = (filePath: string) =>
   });
 
 const program = Effect.gen(function* () {
-  const jsonString = yield* BunStream.stdin.pipe(
+  const stdio = yield* Stdio;
+  const jsonString = yield* stdio.stdin.pipe(
     Stream.decodeText(),
     Stream.mkString,
   );
 
-  const input = yield* Schema.decode(PostToolUseInput)(jsonString);
+  const input = yield* Schema.decodeEffect(PostToolUseInput)(jsonString);
   const filePath = input.tool_input.file_path;
 
   if ((yield* isSupportedFileType(filePath)) === true) {
-    const command = Command.make("pnpm", "oxfmt", "--write", filePath).pipe(
-      Command.stderr("inherit"),
-    );
+    const spawner = yield* ChildProcessSpawner;
 
-    const exitCode = yield* Command.exitCode(command);
+    const exitCode = yield* spawner.exitCode(
+      ChildProcess.make("pnpm", ["oxfmt", "--write", filePath], {
+        stderr: "inherit",
+      }),
+    );
 
     if (exitCode === 0) {
       yield* Console.log("{}");
@@ -96,7 +100,7 @@ const program = Effect.gen(function* () {
 
 BunRuntime.runMain(
   program.pipe(
-    Effect.tapErrorCause((cause) => Console.error(Cause.pretty(cause))),
-    Effect.provide(BunContext.layer),
+    Effect.tapCause((cause) => Console.error(Cause.pretty(cause))),
+    Effect.provide(BunServices.layer),
   ),
 );

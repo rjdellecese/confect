@@ -1,4 +1,11 @@
-import { QueryResult, useAction, useMutation, useQuery } from "@confect/react";
+import {
+  PaginatedQueryResult,
+  QueryResult,
+  useAction,
+  useMutation,
+  usePaginatedQuery,
+  useQuery,
+} from "@confect/react";
 import type { WorkId } from "@convex-dev/workpool";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 import * as HttpApiClient from "effect/unstable/httpapi/HttpApiClient";
@@ -105,6 +112,7 @@ const Page = () => {
       </button>
 
       <NoteList />
+      <PaginatedNoteList />
       <NoteLookup />
       <HttpEndpoints />
     </div>
@@ -277,6 +285,34 @@ const NoteList = () => {
       </ul>
     ),
   });
+};
+
+const PaginatedNoteList = () => {
+  const paginatedNotes = usePaginatedQuery(
+    refs.public.notes_and_random.notes.listPaginated,
+    {},
+    { initialNumItems: 3 },
+  );
+
+  return (
+    <div>
+      <h2>Paginated notes</h2>
+      <ul>
+        {Array.map(paginatedNotes.results, (note) => (
+          <li key={note._id}>{note.text}</li>
+        ))}
+      </ul>
+      {paginatedNotes.isLoading && <p>Loading…</p>}
+      {PaginatedQueryResult.isCanLoadMore(paginatedNotes) && (
+        <button type="button" onClick={() => paginatedNotes.loadMore(3)}>
+          Load more
+        </button>
+      )}
+      {PaginatedQueryResult.isExhausted(paginatedNotes) && (
+        <p>All notes loaded.</p>
+      )}
+    </div>
+  );
 };
 
 const ApiClient = HttpApiClient.make(Api, {

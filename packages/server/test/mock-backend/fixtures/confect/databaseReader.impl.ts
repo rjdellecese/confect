@@ -3,7 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import databaseSchema from "./_generated/schema";
 import { DatabaseReader } from "./_generated/services";
-import databaseReader from "./databaseReader.spec";
+import databaseReader, { PaginationDenied } from "./databaseReader.spec";
 
 export default GroupImpl.make(databaseSchema, databaseReader).pipe(
   Layer.provide(
@@ -33,29 +33,48 @@ export default GroupImpl.make(databaseSchema, databaseReader).pipe(
         databaseSchema,
         databaseReader,
         "paginateNotes",
-        ({ cursor, numItems }) =>
+        ({ paginationOpts }) =>
           Effect.gen(function* () {
             const reader = yield* DatabaseReader;
 
             return yield* reader
               .table("notes")
               .index("by_creation_time")
-              .paginate({ cursor, numItems });
+              .paginate(paginationOpts);
           }).pipe(Effect.orDie),
       ),
       FunctionImpl.make(
         databaseSchema,
         databaseReader,
         "paginateNotesWithFilter",
-        ({ cursor, numItems, tag }) =>
+        ({ paginationOpts, tag }) =>
           Effect.gen(function* () {
             const reader = yield* DatabaseReader;
 
             return yield* reader
               .table("notes")
               .index("by_creation_time")
-              .paginate({ cursor, numItems }, (q) => q.eq(q.field("tag"), tag));
+              .paginate(paginationOpts, (q) => q.eq(q.field("tag"), tag));
           }).pipe(Effect.orDie),
+      ),
+      FunctionImpl.make(
+        databaseSchema,
+        databaseReader,
+        "paginateNotesOrFail",
+        ({ paginationOpts, shouldFail }) =>
+          Effect.gen(function* () {
+            if (shouldFail) {
+              return yield* new PaginationDenied({ reason: "denied" });
+            }
+
+            const reader = yield* DatabaseReader;
+
+            return yield* reader
+              .table("notes")
+              .index("by_creation_time")
+              .paginate(paginationOpts)
+              .pipe(Effect.orDie);
+          }),
       ),
     ),
   ),

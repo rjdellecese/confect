@@ -7,6 +7,7 @@ import refs from "./fixtures/confect/_generated/refs";
 import { DatabaseWriter } from "./fixtures/confect/_generated/services";
 import { Id } from "./fixtures/confect/_generated/id";
 import type notes from "./fixtures/confect/_generated/tables/notes";
+import { PaginationDenied } from "./fixtures/confect/databaseReader.spec";
 import {
   Forbidden,
   NotFound,
@@ -135,20 +136,44 @@ describe("paginate", () => {
       );
 
       const result = yield* c.query(refs.public.databaseReader.paginateNotes, {
-        cursor: null,
-        numItems: 3,
+        paginationOpts: { cursor: null, numItems: 3 },
       });
 
       assertEquals(result.page.length, 3);
       assertEquals(result.isDone, false);
 
       const result2 = yield* c.query(refs.public.databaseReader.paginateNotes, {
-        cursor: result.continueCursor,
-        numItems: 3,
+        paginationOpts: { cursor: result.continueCursor, numItems: 3 },
       });
 
       assertEquals(result2.page.length, 2);
       assertEquals(result2.isDone, true);
+    }).pipe(Effect.provide(TestConfect.layer())),
+  );
+
+  it.effect("accepts the protocol fields Convex's client sends", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          const writer = yield* DatabaseWriter;
+
+          yield* Effect.forEach(Array.range(1, 3), (i) =>
+            writer.table("notes").insert({ text: `note ${i}` }),
+          );
+        }),
+      );
+
+      // `usePaginatedQuery` from `convex/react` always includes `id`; the
+      // composed args schema must accept it (and the other optional protocol
+      // fields) for real requests to pass validation.
+      const result = yield* c.query(refs.public.databaseReader.paginateNotes, {
+        paginationOpts: { cursor: null, numItems: 10, id: 1 },
+      });
+
+      assertEquals(result.page.length, 3);
+      assertEquals(result.isDone, true);
     }).pipe(Effect.provide(TestConfect.layer())),
   );
 
@@ -170,7 +195,7 @@ describe("paginate", () => {
 
       const result = yield* c.query(
         refs.public.databaseReader.paginateNotesWithFilter,
-        { cursor: null, numItems: 10, tag: "important" },
+        { paginationOpts: { cursor: null, numItems: 10 }, tag: "important" },
       );
 
       assertEquals(result.page.length, 3);
@@ -198,7 +223,7 @@ describe("paginate", () => {
 
       const result = yield* c.query(
         refs.public.databaseReader.paginateNotesWithFilter,
-        { cursor: null, numItems: 10, tag: "important" },
+        { paginationOpts: { cursor: null, numItems: 10 }, tag: "important" },
       );
 
       assertEquals(result.page.length, 0);
@@ -224,7 +249,7 @@ describe("paginate", () => {
 
       const page1 = yield* c.query(
         refs.public.databaseReader.paginateNotesWithFilter,
-        { cursor: null, numItems: 2, tag: "even" },
+        { paginationOpts: { cursor: null, numItems: 2 }, tag: "even" },
       );
 
       assertEquals(page1.page.length, 2);
@@ -232,6 +257,33 @@ describe("paginate", () => {
       for (const note of page1.page) {
         assertEquals(note.tag, "even");
       }
+    }).pipe(Effect.provide(TestConfect.layer())),
+  );
+
+  it.effect("surfaces the declared typed error", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      const failure = yield* c
+        .query(refs.public.databaseReader.paginateNotesOrFail, {
+          paginationOpts: { cursor: null, numItems: 3 },
+          shouldFail: true,
+        })
+        .pipe(Effect.result, Effect.map(expectFailure));
+
+      assert(failure instanceof PaginationDenied);
+      assertEquals(failure.reason, "denied");
+
+      const result = yield* c.query(
+        refs.public.databaseReader.paginateNotesOrFail,
+        {
+          paginationOpts: { cursor: null, numItems: 3 },
+          shouldFail: false,
+        },
+      );
+
+      assertEquals(result.page.length, 0);
+      assertEquals(result.isDone, true);
     }).pipe(Effect.provide(TestConfect.layer())),
   );
 });

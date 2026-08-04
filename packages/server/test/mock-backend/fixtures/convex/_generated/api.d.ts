@@ -52,7 +52,46 @@ export declare const api: {
     paginateNotes: FunctionReference<
       "query",
       "public",
-      { cursor: string | null; numItems: number },
+      {
+        paginationOpts: {
+          cursor: string | null;
+          endCursor?: string | null;
+          id?: number;
+          maximumBytesRead?: number;
+          maximumRowsRead?: number;
+          numItems: number;
+        };
+      },
+      {
+        continueCursor: string;
+        isDone: boolean;
+        page: Array<{
+          _creationTime: number;
+          _id: Id<"notes">;
+          author?: { name: string; role: "admin" | "user" };
+          embedding?: Array<number>;
+          tag?: string;
+          text: string;
+          userId?: Id<"users">;
+        }>;
+        pageStatus?: "SplitRecommended" | "SplitRequired" | null;
+        splitCursor?: string | null;
+      }
+    >;
+    paginateNotesOrFail: FunctionReference<
+      "query",
+      "public",
+      {
+        paginationOpts: {
+          cursor: string | null;
+          endCursor?: string | null;
+          id?: number;
+          maximumBytesRead?: number;
+          maximumRowsRead?: number;
+          numItems: number;
+        };
+        shouldFail: boolean;
+      },
       {
         continueCursor: string;
         isDone: boolean;
@@ -72,7 +111,17 @@ export declare const api: {
     paginateNotesWithFilter: FunctionReference<
       "query",
       "public",
-      { cursor: string | null; numItems: number; tag: string },
+      {
+        paginationOpts: {
+          cursor: string | null;
+          endCursor?: string | null;
+          id?: number;
+          maximumBytesRead?: number;
+          maximumRowsRead?: number;
+          numItems: number;
+        };
+        tag: string;
+      },
       {
         continueCursor: string;
         isDone: boolean;
@@ -108,19 +157,15 @@ export declare const api: {
         "query",
         "public",
         {},
-        | { _tag: "None" }
-        | {
-            _tag: "Some";
-            value: {
-              _creationTime: number;
-              _id: Id<"notes">;
-              author?: { name: string; role: "admin" | "user" };
-              embedding?: Array<number>;
-              tag?: string;
-              text: string;
-              userId?: Id<"users">;
-            };
-          }
+        {
+          _creationTime: number;
+          _id: Id<"notes">;
+          author?: { name: string; role: "admin" | "user" };
+          embedding?: Array<number>;
+          tag?: string;
+          text: string;
+          userId?: Id<"users">;
+        } | null
       >;
       insert: FunctionReference<
         "mutation",
@@ -249,19 +294,15 @@ export declare const internal: {
         "query",
         "internal",
         {},
-        | { _tag: "None" }
-        | {
-            _tag: "Some";
-            value: {
-              _creationTime: number;
-              _id: Id<"notes">;
-              author?: { name: string; role: "admin" | "user" };
-              embedding?: Array<number>;
-              tag?: string;
-              text: string;
-              userId?: Id<"users">;
-            };
-          }
+        {
+          _creationTime: number;
+          _id: Id<"notes">;
+          author?: { name: string; role: "admin" | "user" };
+          embedding?: Array<number>;
+          tag?: string;
+          text: string;
+          userId?: Id<"users">;
+        } | null
       >;
     };
     typedErrors: {

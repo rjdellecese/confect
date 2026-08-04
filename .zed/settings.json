@@ -13,7 +13,7 @@
     "oxfmt": {
       "initialization_options": {
         "settings": {
-          "fmt.configPath": "./vite.config.ts",
+          "fmt.configPath": "./.oxfmtrc.json",
           "run": "onSave"
         }
       }
@@ -40,19 +40,8 @@
       },
       "formatter": [
         {
-          "language_server": {
-            "name": "oxfmt"
-          }
-        }
-      ],
-      "code_action": "source.fixAll.oxc"
-    },
-    "JSX": {
-      "format_on_save": "on",
-      "prettier": {
-        "allowed": false
-      },
-      "formatter": [
+          "code_action": "source.fixAll.oxc"
+        },
         {
           "language_server": {
             "name": "oxfmt"
@@ -61,19 +50,6 @@
       ]
     },
     "JSON": {
-      "format_on_save": "on",
-      "prettier": {
-        "allowed": false
-      },
-      "formatter": [
-        {
-          "language_server": {
-            "name": "oxfmt"
-          }
-        }
-      ]
-    },
-    "JSON5": {
       "format_on_save": "on",
       "prettier": {
         "allowed": false
@@ -132,6 +108,9 @@
       },
       "formatter": [
         {
+          "code_action": "source.fixAll.oxc"
+        },
+        {
           "language_server": {
             "name": "oxfmt"
           }
@@ -144,6 +123,9 @@
         "allowed": false
       },
       "formatter": [
+        {
+          "code_action": "source.fixAll.oxc"
+        },
         {
           "language_server": {
             "name": "oxfmt"
