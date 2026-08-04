@@ -15,6 +15,17 @@ allowBuilds:
   puppeteer: false
   sharp: true
 
+# pnpm's supply-chain policy rejects a lockfile referencing anything published
+# within `minimumReleaseAge` (24 hours by default), which every same-day Effect
+# beta bump trips. These entries are the escape hatch pnpm writes itself; they
+# are safe to delete once the versions named here have aged past the cutoff.
+minimumReleaseAgeExclude:
+  - "@effect/platform-bun@4.0.0-beta.103"
+  - "@effect/platform-node-shared@4.0.0-beta.103"
+  - "@effect/platform-node@4.0.0-beta.103"
+  - "@effect/vitest@4.0.0-beta.103"
+  - effect@4.0.0-beta.103
+
 overrides:
   convex: 1.42.3
   effect: 4.0.0-beta.103
