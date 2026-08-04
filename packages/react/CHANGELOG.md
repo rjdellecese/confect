@@ -1,5 +1,11 @@
 # @confect/react
 
+## 10.0.0-next.10
+
+### Patch Changes
+
+- Sync with `main`: this prerelease line now includes all changes released in `@confect/*` 9.3.0 — see that version's changelog entries.
+
 ## 10.0.0-next.9
 
 ### Patch Changes
