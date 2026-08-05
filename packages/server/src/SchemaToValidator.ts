@@ -30,7 +30,6 @@ import * as SchemaAST from "effect/SchemaAST";
 import * as String from "effect/String";
 
 import * as GenericId from "@confect/core/GenericId";
-import { runSyncThrowInIsolate } from "./internal/runSyncInIsolate";
 import type {
   IsAny,
   IsOptional,
@@ -57,7 +56,7 @@ export const compileArgsSchema = <ConfectValue, ConvexValue>(
         : Effect.fail(new IndexSignaturesAreNotSupportedError()),
     ),
     Match.orElse(() => Effect.fail(new TopLevelMustBeObjectError())),
-    runSyncThrowInIsolate,
+    Effect.runSync,
   );
 };
 
@@ -66,7 +65,7 @@ export const compileArgsSchema = <ConfectValue, ConvexValue>(
 export const compileReturnsSchema = <ConfectValue, ConvexValue>(
   schema: Schema.Codec<ConfectValue, ConvexValue>,
 ): Validator<any, any, any> =>
-  runSyncThrowInIsolate(compileAst(Schema.toEncoded(schema).ast));
+  Effect.runSync(compileAst(Schema.toEncoded(schema).ast));
 
 // Table
 
@@ -97,7 +96,7 @@ export const compileTableSchema = <TableSchema extends Schema.Codec<any, any>>(
     ),
     Match.tag("Union", (unionAst) => compileAst(unionAst)),
     Match.orElse(() => Effect.fail(new TopLevelMustBeObjectOrUnionError())),
-    runSyncThrowInIsolate,
+    Effect.runSync,
   );
 };
 
@@ -251,7 +250,7 @@ type ValueTupleToValidatorTuple<VlTuple extends ReadonlyArray<ReadonlyValue>> =
 export const compileSchema = <T, E>(
   schema: Schema.Codec<T, E>,
 ): ValueToValidator<(typeof schema)["Encoded"]> =>
-  runSyncThrowInIsolate(compileAst(schema.ast)) as any;
+  Effect.runSync(compileAst(schema.ast)) as any;
 
 export const isRecursive = (ast: SchemaAST.AST): boolean =>
   pipe(

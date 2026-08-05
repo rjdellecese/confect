@@ -17,7 +17,6 @@ import * as HttpServer from "effect/unstable/http/HttpServer";
 import type * as ActionRunner from "./ActionRunner";
 import type * as Auth from "./Auth";
 import * as ConvexConfigProvider from "./ConvexConfigProvider";
-import { runSyncInIsolate } from "./internal/runSyncInIsolate";
 import type * as MutationRunner from "./MutationRunner";
 import type * as QueryRunner from "./QueryRunner";
 import * as RegisteredFunction from "./RegisteredFunction";
@@ -112,7 +111,7 @@ export const make = (routes: Routes): ConvexHttpRouter => {
   const httpAction = httpActionGeneric((ctx, request): Promise<Response> => {
     // The ctx-backed service layers are all synchronous and finalizer-free,
     // so the scope can close as soon as the context is built.
-    const services = runSyncInIsolate(
+    const services = Effect.runSync(
       Effect.scoped(Layer.build(RegisteredFunction.baseActionLayer(ctx))),
     );
     return handler(request, services);
