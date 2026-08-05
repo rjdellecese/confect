@@ -61,9 +61,6 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
       - run: pnpm --filter @confect/server test:mock-backend
-      - uses: ./.github/actions/verify-codegen-committed
-        with:
-          path: packages/server/test/mock-backend/fixtures
 
   test-local-backend:
     name: Test (local-backend)
@@ -79,17 +76,7 @@ jobs:
           restore-keys: |
             convex-local-backend-${{ runner.os }}-
       - run: pnpm --filter @confect/server test:local-backend
-      - uses: ./.github/actions/verify-codegen-committed
-        with:
-          path: packages/server/test/local-backend/fixtures
 
-  # The `verify-codegen-committed` steps on the two test jobs above only see
-  # what those jobs regenerate, and the test `globalSetup` runs `confect
-  # codegen` alone — which writes `confect/_generated/` and the `convex/`
-  # wrapper files. The Convex-side `convex/_generated/api.d.ts` and
-  # `dataModel.d.ts` come from the `convex dev` half of the `codegen:*`
-  # scripts, which nothing in CI ran, so drift in them was structurally
-  # invisible and accumulated silently. This job runs the scripts in full.
   codegen-fixtures:
     name: Codegen (server fixtures)
     runs-on: ubuntu-latest
