@@ -106,22 +106,18 @@ export const make = (
 
 /**
  * Convex evicts a query from its cache once the execution observes the current
- * time (every `Date.now()` read is tracked). Effect's logging and span
- * machinery read timestamps through the ambient `Clock`'s unsafe accessors,
- * which would silently opt any logging query out of the cache. Queries
- * therefore run with a `Clock` whose unsafe accessors return constants —
- * logging and spans never touch the tracker — while the effectful accessors
- * (`Clock.currentTimeMillis`/`currentTimeNanos`) read the real time, making
- * them an explicit opt-in to cache eviction. Raw `Date.now()` calls in handler
- * code likewise opt out honestly.
- *
- * The same split applies to the monotonic accessors. `Effect.timed` and
- * duration metrics measure elapsed time through `monotonicTimeNanosUnsafe`,
- * and the Convex isolate exposes no untracked monotonic source to serve it
- * from — Effect's own live clock falls back to `Date.now()` when neither
- * `process.hrtime` nor `performance.now` exists. A constant keeps those
- * measurements (which report a zero duration, as they already did when the
- * unsafe wall-clock accessors were the ones being read) out of the tracker.
+ * time (every `Date.now()` read is tracked). Effect's logging, span, and
+ * elapsed-time machinery reads timestamps through the ambient `Clock`'s unsafe
+ * accessors, which would silently opt any logging or timing query out of the
+ * cache — and there is no untracked time source in the isolate to serve them
+ * from, since Effect's own live clock falls back to `Date.now()` for monotonic
+ * time when neither `process.hrtime` nor `performance.now` exists. Queries
+ * therefore run with a `Clock` whose unsafe accessors all return constants, so
+ * logging and spans never touch the tracker and `Effect.timed` and duration
+ * metrics report a zero elapsed time, while the effectful accessors
+ * (`Clock.currentTimeMillis`/`currentTimeNanos`/`monotonicTimeNanos`) read the
+ * real time, making them an explicit opt-in to cache eviction. Raw `Date.now()`
+ * calls in handler code likewise opt out honestly.
  */
 const queryClock: Clock.Clock = {
   currentTimeMillisUnsafe: () => 0,

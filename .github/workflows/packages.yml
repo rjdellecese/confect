@@ -25,8 +25,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
-      # `tsc -b` typechecks the whole project-references graph in dependency
-      # order (and emits the .d.ts that tsdown no longer does).
       - run: pnpm typecheck
 
   lint:
@@ -35,8 +33,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
-      # Oxlint lints the whole workspace in one fast pass; `pnpm lint` also runs
-      # the Syncpack and package-metadata checks.
       - run: pnpm lint
 
   circular:
@@ -45,9 +41,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
-      # dpdm fails on real (runtime) import cycles; type-only `import type`
-      # cycles are ignored. confect-setup builds the packages first so
-      # cross-package `@confect/*` imports resolve.
       - run: pnpm circular
 
   test:
