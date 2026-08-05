@@ -1,8 +1,8 @@
 /**
  * Handlers exercise Confect's storage services inside the real Convex
- * isolate, whose `URL` polyfill lacks `URL.canParse`. Both decode Convex's
- * string return values with `Schema.URLFromString`, so they only succeed if
- * the `URL.canParse` polyfill `@confect/server` installs is in effect.
+ * isolate. Both decode Convex's string return values with
+ * `Schema.URLFromString`, so they only succeed if that string→URL decode
+ * works in the isolate.
  */
 
 import { FunctionImpl, GroupImpl } from "@confect/server";
