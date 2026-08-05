@@ -14,7 +14,7 @@
     "bundle-require": "^5.1.0",
     "code-block-writer": "^13.0.3",
     "esbuild": "0.27.0 - 0.27.3 || ^0.27.5 || ^0.28.0",
-    "exsolve": "^1.1.0"
+    "exsolve": "^1.1.1"
   },
   "devDependencies": {
     "@convex-dev/workpool": "0.4.8",
@@ -22,7 +22,7 @@
     "@effect/vitest": "4.0.0-beta.103",
     "@types/node": "26.1.1",
     "@vitest/coverage-v8": "4.1.10",
-    "convex": "1.42.3",
+    "convex": "1.43.0",
     "effect": "4.0.0-beta.103",
     "tsdown": "0.22.14",
     "typescript": "6.0.3",

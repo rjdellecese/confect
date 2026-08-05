@@ -16,10 +16,10 @@ allowBuilds:
   sharp: true
 
 overrides:
-  convex: 1.42.3
+  convex: 1.43.0
   effect: 4.0.0-beta.103
-  react: 19.2.7
-  react-dom: 19.2.7
+  react: 19.2.8
+  react-dom: 19.2.8
 
 packageExtensions:
   "@mintlify/mdx":

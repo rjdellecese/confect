@@ -7,11 +7,11 @@
     "@confect/react": "workspace:*",
     "@confect/server": "workspace:*",
     "@convex-dev/workpool": "0.4.8",
-    "convex": "1.42.3",
+    "convex": "1.43.0",
     "convex-helpers": "0.1.120",
     "effect": "4.0.0-beta.103",
-    "react": "19.2.7",
-    "react-dom": "19.2.7",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "vite": "8.1.5"
   },
   "devDependencies": {
