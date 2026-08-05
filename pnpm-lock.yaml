@@ -5,11 +5,12 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  convex: 1.42.3
-  effect: 3.22.0
-  '@effect/typeclass': 0.40.0
-  react: 19.2.7
-  react-dom: 19.2.7
+  convex: 1.43.0
+  effect: 3.22.1
+  '@effect/platform-node-shared': 0.61.1
+  '@effect/typeclass': 0.41.0
+  react: 19.2.8
+  react-dom: 19.2.8
 
 packageExtensionsChecksum: sha256-aTtyxRBq3Rq7VXnPimfnXvf81OaowNnW9XT2ZCuWw28=
 
@@ -27,14 +28,14 @@ importers:
         specifier: 0.87.1
         version: 0.87.1
       '@effect/platform':
-        specifier: 0.96.3
-        version: 0.96.3(effect@3.22.0)
+        specifier: 0.97.1
+        version: 0.97.1(effect@3.22.1)
       '@effect/platform-bun':
-        specifier: 0.90.0
-        version: 0.90.0(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)
+        specifier: 0.91.2
+        version: 0.91.2(@effect/cluster@0.60.2(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/workflow@0.19.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1)
       '@effect/platform-node':
-        specifier: 0.106.0
-        version: 0.106.0(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)
+        specifier: 0.108.1
+        version: 0.108.1(@effect/cluster@0.60.2(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/workflow@0.19.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1)
       '@types/node':
         specifier: 26.1.1
         version: 26.1.1
@@ -48,8 +49,8 @@ importers:
         specifier: 4.2.0
         version: 4.2.0
       effect:
-        specifier: 3.22.0
-        version: 3.22.0
+        specifier: 3.22.1
+        version: 3.22.1
       opensrc:
         specifier: 0.7.3
         version: 0.7.3
@@ -88,13 +89,13 @@ importers:
     devDependencies:
       '@mintlify/scraping':
         specifier: 4.0.911
-        version: 4.0.911(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(supports-color@10.2.2)(typescript@6.0.3)
+        version: 4.0.911(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
       mintlify:
         specifier: 4.2.742
-        version: 4.2.742(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/node@26.1.1)(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(supports-color@10.2.2)(typescript@6.0.3)
+        version: 4.2.742(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.1)(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(supports-color@10.2.2)(typescript@6.0.3)
       react:
-        specifier: 19.2.7
-        version: 19.2.7
+        specifier: 19.2.8
+        version: 19.2.8
 
   apps/example:
     dependencies:
@@ -112,25 +113,25 @@ importers:
         version: link:../../packages/server
       '@convex-dev/workpool':
         specifier: 0.4.8
-        version: 0.4.8(convex-helpers@0.1.120(@standard-schema/spec@1.1.0)(convex@1.42.3(react@19.2.7))(react@19.2.7)(typescript@6.0.3)(zod@4.3.6))(convex@1.42.3(react@19.2.7))
+        version: 0.4.8(convex-helpers@0.1.120(@standard-schema/spec@1.1.0)(convex@1.43.0(react@19.2.8))(react@19.2.8)(typescript@6.0.3)(zod@4.3.6))(convex@1.43.0(react@19.2.8))
       '@effect/platform':
-        specifier: 0.96.3
-        version: 0.96.3(effect@3.22.0)
+        specifier: 0.97.1
+        version: 0.97.1(effect@3.22.1)
       convex:
-        specifier: 1.42.3
-        version: 1.42.3(react@19.2.7)
+        specifier: 1.43.0
+        version: 1.43.0(react@19.2.8)
       convex-helpers:
         specifier: 0.1.120
-        version: 0.1.120(@standard-schema/spec@1.1.0)(convex@1.42.3(react@19.2.7))(react@19.2.7)(typescript@6.0.3)(zod@4.3.6)
+        version: 0.1.120(@standard-schema/spec@1.1.0)(convex@1.43.0(react@19.2.8))(react@19.2.8)(typescript@6.0.3)(zod@4.3.6)
       effect:
-        specifier: 3.22.0
-        version: 3.22.0
+        specifier: 3.22.1
+        version: 3.22.1
       react:
-        specifier: 19.2.7
-        version: 19.2.7
+        specifier: 19.2.8
+        version: 19.2.8
       react-dom:
-        specifier: 19.2.7
-        version: 19.2.7(react@19.2.7)
+        specifier: 19.2.8
+        version: 19.2.8(react@19.2.8)
       vite:
         specifier: 8.1.5
         version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0)
@@ -166,20 +167,20 @@ importers:
         specifier: workspace:^
         version: link:../server
       '@effect/cli':
-        specifier: ^0.75.1
-        version: 0.75.2(@effect/platform@0.96.3(effect@3.22.0))(@effect/printer-ansi@0.49.0(@effect/typeclass@0.40.0(effect@3.22.0))(effect@3.22.0))(@effect/printer@0.49.0(@effect/typeclass@0.40.0(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)
+        specifier: ^0.77.0
+        version: 0.77.0(@effect/platform@0.97.1(effect@3.22.1))(@effect/printer-ansi@0.51.0(@effect/typeclass@0.41.0(effect@3.22.1))(effect@3.22.1))(@effect/printer@0.51.0(@effect/typeclass@0.41.0(effect@3.22.1))(effect@3.22.1))(effect@3.22.1)
       '@effect/platform':
-        specifier: ^0.96.1
-        version: 0.96.3(effect@3.22.0)
+        specifier: ^0.97.1
+        version: 0.97.1(effect@3.22.1)
       '@effect/platform-node':
-        specifier: ^0.106.0
-        version: 0.106.0(@effect/cluster@0.58.2(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)
+        specifier: ^0.108.1
+        version: 0.108.1(@effect/cluster@0.60.2(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/workflow@0.19.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1)
       '@effect/printer':
-        specifier: ^0.49.0
-        version: 0.49.0(@effect/typeclass@0.40.0(effect@3.22.0))(effect@3.22.0)
+        specifier: ^0.51.0
+        version: 0.51.0(@effect/typeclass@0.41.0(effect@3.22.1))(effect@3.22.1)
       '@effect/printer-ansi':
-        specifier: ^0.49.0
-        version: 0.49.0(@effect/typeclass@0.40.0(effect@3.22.0))(effect@3.22.0)
+        specifier: ^0.51.0
+        version: 0.51.0(@effect/typeclass@0.41.0(effect@3.22.1))(effect@3.22.1)
       bundle-require:
         specifier: ^5.1.0
         version: 5.1.0(esbuild@0.28.1)
@@ -190,18 +191,18 @@ importers:
         specifier: 0.27.0 - 0.27.3 || ^0.27.5 || ^0.28.0
         version: 0.28.1
       exsolve:
-        specifier: ^1.1.0
-        version: 1.1.0
+        specifier: ^1.1.1
+        version: 1.1.1
     devDependencies:
       '@convex-dev/workpool':
         specifier: 0.4.8
-        version: 0.4.8(convex-helpers@0.1.120(@standard-schema/spec@1.1.0)(convex@1.42.3(react@19.2.7))(react@19.2.7)(typescript@6.0.3)(zod@4.3.6))(convex@1.42.3(react@19.2.7))
+        version: 0.4.8(convex-helpers@0.1.120(@standard-schema/spec@1.1.0)(convex@1.43.0(react@19.2.8))(react@19.2.8)(typescript@6.0.3)(zod@4.3.6))(convex@1.43.0(react@19.2.8))
       '@effect/language-service':
         specifier: 0.87.1
         version: 0.87.1
       '@effect/vitest':
         specifier: 0.30.0
-        version: 0.30.0(effect@3.22.0)(vitest@4.1.10)
+        version: 0.30.0(effect@3.22.1)(vitest@4.1.10)
       '@types/node':
         specifier: 26.1.1
         version: 26.1.1
@@ -209,11 +210,11 @@ importers:
         specifier: 4.1.10
         version: 4.1.10(@vitest/browser@4.1.10)(vitest@4.1.10)
       convex:
-        specifier: 1.42.3
-        version: 1.42.3(react@19.2.7)
+        specifier: 1.43.0
+        version: 1.43.0(react@19.2.8)
       effect:
-        specifier: 3.22.0
-        version: 3.22.0
+        specifier: 3.22.1
+        version: 3.22.1
       tsdown:
         specifier: 0.22.14
         version: 0.22.14(tsx@4.23.1)(typescript@6.0.3)(unrun@0.3.1)
@@ -236,21 +237,21 @@ importers:
   packages/core:
     dependencies:
       convex:
-        specifier: 1.42.3
-        version: 1.42.3(react@19.2.7)
+        specifier: 1.43.0
+        version: 1.43.0(react@19.2.8)
     devDependencies:
       '@ark/attest':
         specifier: 0.56.3
         version: 0.56.3(supports-color@10.2.2)(typescript@6.0.3)
       '@effect/vitest':
         specifier: 0.30.0
-        version: 0.30.0(effect@3.22.0)(vitest@4.1.10)
+        version: 0.30.0(effect@3.22.1)(vitest@4.1.10)
       '@types/node':
         specifier: 26.1.1
         version: 26.1.1
       effect:
-        specifier: 3.22.0
-        version: 3.22.0
+        specifier: 3.22.1
+        version: 3.22.1
       tsdown:
         specifier: 0.22.14
         version: 0.22.14(tsx@4.23.1)(typescript@6.0.3)(unrun@0.3.1)
@@ -273,18 +274,18 @@ importers:
         specifier: workspace:^
         version: link:../core
       convex:
-        specifier: 1.42.3
-        version: 1.42.3(react@19.2.7)
+        specifier: 1.43.0
+        version: 1.43.0(react@19.2.8)
     devDependencies:
       '@effect/vitest':
         specifier: 0.30.0
-        version: 0.30.0(effect@3.22.0)(vitest@4.1.10)
+        version: 0.30.0(effect@3.22.1)(vitest@4.1.10)
       '@types/node':
         specifier: 26.1.1
         version: 26.1.1
       effect:
-        specifier: 3.22.0
-        version: 3.22.0
+        specifier: 3.22.1
+        version: 3.22.1
       tsdown:
         specifier: 0.22.14
         version: 0.22.14(tsx@4.23.1)(typescript@6.0.3)(unrun@0.3.1)
@@ -306,10 +307,10 @@ importers:
     devDependencies:
       '@effect/vitest':
         specifier: 0.30.0
-        version: 0.30.0(effect@3.22.0)(vitest@4.1.10)
+        version: 0.30.0(effect@3.22.1)(vitest@4.1.10)
       '@testing-library/react':
         specifier: 16.3.2
-        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@types/node':
         specifier: 26.1.1
         version: 26.1.1
@@ -320,20 +321,20 @@ importers:
         specifier: 19.2.3
         version: 19.2.3(@types/react@19.2.17)
       convex:
-        specifier: 1.42.3
-        version: 1.42.3(react@19.2.7)
+        specifier: 1.43.0
+        version: 1.43.0(react@19.2.8)
       effect:
-        specifier: 3.22.0
-        version: 3.22.0
+        specifier: 3.22.1
+        version: 3.22.1
       happy-dom:
         specifier: 20.11.1
         version: 20.11.1
       react:
-        specifier: 19.2.7
-        version: 19.2.7
+        specifier: 19.2.8
+        version: 19.2.8
       react-dom:
-        specifier: 19.2.7
-        version: 19.2.7(react@19.2.7)
+        specifier: 19.2.8
+        version: 19.2.8(react@19.2.8)
       tsdown:
         specifier: 0.22.14
         version: 0.22.14(tsx@4.23.1)(typescript@6.0.3)(unrun@0.3.1)
@@ -356,36 +357,36 @@ importers:
         specifier: workspace:^
         version: link:../core
       '@effect/platform-node':
-        specifier: ^0.106.0
-        version: 0.106.0(@effect/cluster@0.59.0(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)
+        specifier: ^0.108.1
+        version: 0.108.1(@effect/cluster@0.60.2(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/workflow@0.19.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1)
       convex:
-        specifier: 1.42.3
-        version: 1.42.3(react@19.2.7)
+        specifier: 1.43.0
+        version: 1.43.0(react@19.2.8)
     devDependencies:
       '@ark/attest':
         specifier: 0.56.3
         version: 0.56.3(supports-color@10.2.2)(typescript@6.0.3)
       '@effect/cluster':
-        specifier: 0.59.0
-        version: 0.59.0(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)
+        specifier: 0.60.2
+        version: 0.60.2(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/workflow@0.19.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(effect@3.22.1)
       '@effect/experimental':
-        specifier: 0.60.0
-        version: 0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)
+        specifier: 0.61.1
+        version: 0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1)
       '@effect/platform':
-        specifier: 0.96.3
-        version: 0.96.3(effect@3.22.0)
+        specifier: 0.97.1
+        version: 0.97.1(effect@3.22.1)
       '@effect/rpc':
-        specifier: 0.75.1
-        version: 0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)
+        specifier: 0.76.2
+        version: 0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1)
       '@effect/sql':
-        specifier: 0.51.1
-        version: 0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)
+        specifier: 0.52.1
+        version: 0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1)
       '@effect/vitest':
         specifier: 0.30.0
-        version: 0.30.0(effect@3.22.0)(vitest@4.1.10)
+        version: 0.30.0(effect@3.22.1)(vitest@4.1.10)
       '@effect/workflow':
-        specifier: 0.18.2
-        version: 0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)
+        specifier: 0.19.1
+        version: 0.19.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1)
       '@swc/jest':
         specifier: 0.2.39
         version: 0.2.39(@swc/core@1.15.43)
@@ -397,13 +398,13 @@ importers:
         version: 4.1.10(@vitest/browser@4.1.10)(vitest@4.1.10)
       convex-test:
         specifier: 0.0.54
-        version: 0.0.54(convex@1.42.3(react@19.2.7))
+        version: 0.0.54(convex@1.43.0(react@19.2.8))
       dotenv:
         specifier: 17.4.2
         version: 17.4.2
       effect:
-        specifier: 3.22.0
-        version: 3.22.0
+        specifier: 3.22.1
+        version: 3.22.1
       tsdown:
         specifier: 0.22.14
         version: 0.22.14(tsx@4.23.1)(typescript@6.0.3)(unrun@0.3.1)
@@ -435,11 +436,11 @@ importers:
         specifier: workspace:*
         version: link:../../..
       convex:
-        specifier: 1.42.3
-        version: 1.42.3(react@19.2.7)
+        specifier: 1.43.0
+        version: 1.43.0(react@19.2.8)
       effect:
-        specifier: 3.22.0
-        version: 3.22.0
+        specifier: 3.22.1
+        version: 3.22.1
     devDependencies:
       '@confect/cli':
         specifier: workspace:*
@@ -454,11 +455,11 @@ importers:
         specifier: workspace:*
         version: link:../../..
       convex:
-        specifier: 1.42.3
-        version: 1.42.3(react@19.2.7)
+        specifier: 1.43.0
+        version: 1.43.0(react@19.2.8)
       effect:
-        specifier: 3.22.0
-        version: 3.22.0
+        specifier: 3.22.1
+        version: 3.22.1
       luxon:
         specifier: ^3.7.1
         version: 3.7.2
@@ -479,18 +480,18 @@ importers:
         specifier: workspace:^
         version: link:../server
       convex:
-        specifier: 1.42.3
-        version: 1.42.3(react@19.2.7)
+        specifier: 1.43.0
+        version: 1.43.0(react@19.2.8)
       convex-test:
         specifier: '>=0.0.50 <0.1.0'
-        version: 0.0.50(convex@1.42.3(react@19.2.7))
+        version: 0.0.50(convex@1.43.0(react@19.2.8))
     devDependencies:
       '@types/node':
         specifier: 26.1.1
         version: 26.1.1
       effect:
-        specifier: 3.22.0
-        version: 3.22.0
+        specifier: 3.22.1
+        version: 3.22.1
       tsdown:
         specifier: 0.22.14
         version: 0.22.14(tsx@4.23.1)(typescript@6.0.3)(unrun@0.3.1)
@@ -631,40 +632,31 @@ packages:
   '@convex-dev/workpool@0.4.8':
     resolution: {integrity: sha512-ExUV3dVxUK/m2gQGB0PGuTNX/8pNtJM1T2Z+iprEhu7/4UBKM5flmu5odKBcffDnTzlGTPUQ2X+dwzy8l9T19g==}
     peerDependencies:
-      convex: 1.42.3
+      convex: 1.43.0
       convex-helpers: ^0.1.94
 
-  '@effect/cli@0.75.2':
-    resolution: {integrity: sha512-+cMn/ZtFB+jEvgB6phrTT6XyPkIUnmX4G0nUSln7yj3lwyiHQ578Iwr8nHeU1CKEtlh4Xt+mYc0yiT912xu7YA==}
+  '@effect/cli@0.77.0':
+    resolution: {integrity: sha512-uVw33bcqPaSu6YZqGf6MyM2CbYsE79mrAnQsDzSFnP8jmnjNfXWrfmWUGK2yy0jXD0wWmVbmvwm4xVFv2Utsog==}
     peerDependencies:
-      '@effect/platform': ^0.96.1
-      '@effect/printer': ^0.49.0
-      '@effect/printer-ansi': ^0.49.0
-      effect: 3.22.0
+      '@effect/platform': ^0.97.1
+      '@effect/printer': ^0.51.0
+      '@effect/printer-ansi': ^0.51.0
+      effect: 3.22.1
 
-  '@effect/cluster@0.58.2':
-    resolution: {integrity: sha512-oxQ3zUhXq0mJA7Y4TliALMP39Bx0LtAIxcqOW1Bdjh6uk+nG7kul/Puw80SwlcYGv3ul50SG+gvSRUTXB8d3JQ==}
+  '@effect/cluster@0.60.2':
+    resolution: {integrity: sha512-GEODN5kvFJ0L0XSkANcS8s6lfhjrrA8x/ezYUV/lXerqCHf5xo3ZTPUanGMHu5Byvikng0mZDcyNvke2sGjfSQ==}
     peerDependencies:
-      '@effect/platform': ^0.96.1
-      '@effect/rpc': ^0.75.1
-      '@effect/sql': ^0.51.1
-      '@effect/workflow': ^0.18.0
-      effect: 3.22.0
+      '@effect/platform': ^0.97.1
+      '@effect/rpc': ^0.76.2
+      '@effect/sql': ^0.52.1
+      '@effect/workflow': ^0.19.1
+      effect: 3.22.1
 
-  '@effect/cluster@0.59.0':
-    resolution: {integrity: sha512-rxtJ0zlcdDDtn9wau0z/PFfwPP2FsYPB2/tSK4tT8DkTYQmACJ5AwRwZm3Ea83iL/gv3df63lRe94oMiS8bFfg==}
+  '@effect/experimental@0.61.1':
+    resolution: {integrity: sha512-+P+PgGQeE2fXmsm63YoyENNcQIc7OiCkY4/HLkEdTvq93syfGIpwDfQD8u3xODMHJhZ5ZtRZHH4+UedFO0tLiA==}
     peerDependencies:
-      '@effect/platform': ^0.96.1
-      '@effect/rpc': ^0.75.1
-      '@effect/sql': ^0.51.1
-      '@effect/workflow': ^0.18.2
-      effect: 3.22.0
-
-  '@effect/experimental@0.60.0':
-    resolution: {integrity: sha512-i5zIg7Xup2KgHyqHlYtkgqSE1bNzCL0GbbTQxrpIzKF0q/ebknOk/ox8B/gIq2vImjoEE81h/oxU+6i1NH210g==}
-    peerDependencies:
-      '@effect/platform': ^0.96.0
-      effect: 3.22.0
+      '@effect/platform': ^0.97.1
+      effect: 3.22.1
       ioredis: ^5
       lmdb: ^3
     peerDependenciesMeta:
@@ -677,90 +669,81 @@ packages:
     resolution: {integrity: sha512-kcljlJmEgqg5mFAM6UShJYJjMqJb3TbHHxrK8Qoubvwugc0aVWpRkbdgQvK5b17puOt3BKXXKOmcV+oQt0oQqQ==}
     hasBin: true
 
-  '@effect/platform-bun@0.90.0':
-    resolution: {integrity: sha512-s+5l3ca/RfQlJciLX9lLuo9RJbZIb3XYHPiBuIR4xy50oYz+b24yK5OBm1Pz01LVauVSEc8t5L/tl+V5n0A6TA==}
+  '@effect/platform-bun@0.91.2':
+    resolution: {integrity: sha512-lISuYdx54uX6BIu0AIwvIqG6mbFkT0UlqGWZm7Jn2V6Ni3nCumnaBfMxYrdGWJzkoGIi1xEkvmRRk5Ff7r6NEA==}
     peerDependencies:
-      '@effect/cluster': ^0.59.0
-      '@effect/platform': ^0.96.1
-      '@effect/rpc': ^0.75.1
-      '@effect/sql': ^0.51.1
-      effect: 3.22.0
+      '@effect/cluster': ^0.60.2
+      '@effect/platform': ^0.97.1
+      '@effect/rpc': ^0.76.2
+      '@effect/sql': ^0.52.1
+      effect: 3.22.1
 
-  '@effect/platform-node-shared@0.59.0':
-    resolution: {integrity: sha512-3bq2YKKfLY7UFauZSxqZUneCXoA3SMSls82V+0RKunvRlfPuPQW0hVn6t1RkvEdh0PDoygWG2mZXYQa6Iqgp9A==}
+  '@effect/platform-node-shared@0.61.1':
+    resolution: {integrity: sha512-MJAJ1Nc43pYJb5ulFtdNID8klNyRLcbQ0zZ7XYRcBAlT/DrCyN4yAD89AzosmUyfOU+LMHdc8LTMt4rKNEMFaA==}
     peerDependencies:
-      '@effect/cluster': ^0.58.0
-      '@effect/platform': ^0.96.0
-      '@effect/rpc': ^0.75.0
-      '@effect/sql': ^0.51.0
-      effect: 3.22.0
+      '@effect/cluster': ^0.60.1
+      '@effect/platform': ^0.97.1
+      '@effect/rpc': ^0.76.1
+      '@effect/sql': ^0.52.1
+      effect: 3.22.1
 
-  '@effect/platform-node-shared@0.60.0':
-    resolution: {integrity: sha512-obT8Mau/guSYjehF9pg09FHM/ERXAAVBl/FXRXEyvTc7ZiDGTYnPBihytGNccsfNsgqBdvCE24sflwK6j5nFXA==}
+  '@effect/platform-node@0.108.1':
+    resolution: {integrity: sha512-BlPW+k/AaVS2ofPGZY1IV3HfLQ3gKGTfkY/jPVOJNOB9NiWb6ufAKOsuNTSAIYP8EzYxTH8tKOENXUXUcANoZA==}
     peerDependencies:
-      '@effect/cluster': ^0.59.0
-      '@effect/platform': ^0.96.1
-      '@effect/rpc': ^0.75.1
-      '@effect/sql': ^0.51.1
-      effect: 3.22.0
+      '@effect/cluster': ^0.60.2
+      '@effect/platform': ^0.97.1
+      '@effect/rpc': ^0.76.2
+      '@effect/sql': ^0.52.1
+      effect: 3.22.1
 
-  '@effect/platform-node@0.106.0':
-    resolution: {integrity: sha512-mpsJK2jNLVd0jQAjHKBo8j3wdKWznSGvfnKBcAuG/9Rr4mb8bMRZFLXHHT9wUP7EvnZ0tDZJgEDxkC+j+ByRag==}
+  '@effect/platform@0.97.1':
+    resolution: {integrity: sha512-IevWxwmrxCdeXxbXDx/hiOstHtERRigd1nhZSuHgiFEl7NkBmS/5GVWsRacq4NfJN2uCXqggETKNwij15VEpew==}
     peerDependencies:
-      '@effect/cluster': ^0.58.0
-      '@effect/platform': ^0.96.0
-      '@effect/rpc': ^0.75.0
-      '@effect/sql': ^0.51.0
-      effect: 3.22.0
+      effect: 3.22.1
 
-  '@effect/platform@0.96.3':
-    resolution: {integrity: sha512-LzvIj4HYE++TcTv/cVTCI/GRvQTV0ymwRmgjZMzNB5dU4OS05pTN36RKN0npiOm5orLJgw4yjIv1dNZoYGh/vg==}
+  '@effect/printer-ansi@0.51.0':
+    resolution: {integrity: sha512-tV36FU7q+3/avuctRl7Gt4u2RsVJ2x2b0n82s6SLUcXxDZ0G1dkE2feQL0UeSjPRZhgq36CaVAEDyhDPkSK8XQ==}
     peerDependencies:
-      effect: 3.22.0
+      '@effect/typeclass': 0.41.0
+      effect: 3.22.1
 
-  '@effect/printer-ansi@0.49.0':
-    resolution: {integrity: sha512-N2OyqDTqcGLKeUy2URowThoU5issZQwG/Ihv5qOYWJD0neq9qBIgC57/9BkFpTRPNSMtPHyCOk1TFj297HGLLQ==}
+  '@effect/printer@0.51.0':
+    resolution: {integrity: sha512-TdUPaEKwLbo9lpl+atjJvcQqNGM5/sH5Y+iulaLw3uvArHrZSx+HHwa0q0ptuNmOfuEG5j/RRAJHcKFmUyOi8Q==}
     peerDependencies:
-      '@effect/typeclass': 0.40.0
-      effect: 3.22.0
+      '@effect/typeclass': 0.41.0
+      effect: 3.22.1
 
-  '@effect/printer@0.49.0':
-    resolution: {integrity: sha512-hrjTuExF87wuWjOnnND1c2fKcCWhleQBVaoA7JlrU3rC7s+RYPETDOXtpgAK3/uuMCRnDhfVFQMevtKT8MBdKg==}
+  '@effect/rpc@0.76.2':
+    resolution: {integrity: sha512-x/4jvjufr1m3QWAace7G5Xh09DDcaeU7ijvS0Qumkan/hM89n19JClYnlV3IW93RACZInbgdyOVA+4kOQJ+JQQ==}
     peerDependencies:
-      '@effect/typeclass': 0.40.0
-      effect: 3.22.0
+      '@effect/platform': ^0.97.1
+      effect: 3.22.1
 
-  '@effect/rpc@0.75.1':
-    resolution: {integrity: sha512-8yxF8+mMGGEbF8BUCp34HjdJj7CvTpGeZxBcpsDF6v7zPiGbJL1UDLzA8ZqYjmcngBHhPecbmeONTk/LiLAaEg==}
+  '@effect/sql@0.52.1':
+    resolution: {integrity: sha512-dUVPjlUgpga6sDa/MtYipHAqzHx2St41hxI00nXTBt4IBBJaf2lTGaOvlEoBg/q6PHVAgSoKnxe19pWUvabC9g==}
     peerDependencies:
-      '@effect/platform': ^0.96.1
-      effect: 3.22.0
+      '@effect/experimental': ^0.61.1
+      '@effect/platform': ^0.97.1
+      effect: 3.22.1
 
-  '@effect/sql@0.51.1':
-    resolution: {integrity: sha512-iPDAefrJcI0HcTk9keP9Gq8Pg08K1HmpnmZZt85AqyTcvorhoNsXDFiKBbPldfV2CortwVkacX8KjO9GPpSYCA==}
+  '@effect/typeclass@0.41.0':
+    resolution: {integrity: sha512-Tsv94iDPUWgmz/JsYUh7awx5mmFukEJZB+duyzlLRlCHxNUz5LHBBzTaEfUPNMzAE1s8FTUSVwdPSpL0DznXKg==}
     peerDependencies:
-      '@effect/experimental': ^0.60.0
-      '@effect/platform': ^0.96.1
-      effect: 3.22.0
-
-  '@effect/typeclass@0.40.0':
-    resolution: {integrity: sha512-L/2o2ImeqbemFlqH0b3y2PqQTFc+E0/DUnffCU8bkJUGh0yUZmh2RXuXhR8QOpfNCe718JQjI+mLnpVF2MMmaQ==}
-    peerDependencies:
-      effect: 3.22.0
+      effect: 3.22.1
 
   '@effect/vitest@0.30.0':
     resolution: {integrity: sha512-2qcK7F4XSwOn7Ye9vgEkrndHiiHVf9Nl+U5jvvLBKeYx4+8++O5Y8RFezaQzs/rWx8GkdlStv/s+HYMHZ/2/AQ==}
     peerDependencies:
-      effect: 3.22.0
+      effect: 3.22.1
       vitest: ^3.2.0
 
-  '@effect/workflow@0.18.2':
-    resolution: {integrity: sha512-2av0TexhxHnapQa3eLn6TkniokUFRZKf8dlWlLqbODMpXAJ3mm+DOHWM0ozMGkg9K/+zGCtiL3dMqJyJ8r7G8g==}
+  '@effect/workflow@0.19.1':
+    resolution: {integrity: sha512-irU6ddHdIxYOhv0cJiJTk2AUxRmPYjRJ5JdB5UCvpJC4vLCyR2XyKspiCNDiEX1aSGPhVWEXhVMWXR1cErMS3A==}
     peerDependencies:
-      '@effect/experimental': ^0.60.0
-      '@effect/platform': ^0.96.1
-      '@effect/rpc': ^0.75.1
-      effect: 3.22.0
+      '@effect/experimental': ^0.61.1
+      '@effect/platform': ^0.97.1
+      '@effect/rpc': ^0.76.2
+      effect: 3.22.1
 
   '@emnapi/core@1.11.1':
     resolution: {integrity: sha512-RSvbQmHzdKzNsLYa/wHrbc3KN4sYLKAdPZxqiM2HATqv/SBk2/ENSHpvXGaLOMcsAyz0poEGqkmmKYG3OWiJEQ==}
@@ -1104,8 +1087,8 @@ packages:
   '@floating-ui/react-dom@2.1.9':
     resolution: {integrity: sha512-JDjEFGCpImxDCA7JJKviA0M9+RtmJdj0m/NVU5IMgBK+AmZouAQQ7/+2GLH0GXXY0YMw9oXPB8hKdbPYg5QLYg==}
     peerDependencies:
-      react: 19.2.7
-      react-dom: 19.2.7
+      react: 19.2.8
+      react-dom: 19.2.8
 
   '@floating-ui/utils@0.2.12':
     resolution: {integrity: sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww==}
@@ -1428,7 +1411,7 @@ packages:
     resolution: {integrity: sha512-f++rKLQgUVYDAtECQ6fn/is15GkEH9+nZPM3MS0RcxVqoTfawHvDlSCH7JbMhAM6uJ32v3eXLvLmLvjGu7PTQw==}
     peerDependencies:
       '@types/react': '>=16'
-      react: 19.2.7
+      react: 19.2.8
 
   '@mintlify/cli@4.0.1345':
     resolution: {integrity: sha512-gseRIsPiOIZXTUt6K72Vl5ywh5MVNZFNEpVgqTq/m1yJmxSb97v/VBDEk6ntHlkEiOC0vpEESiMX3OnzDhV92Q==}
@@ -1446,8 +1429,8 @@ packages:
     resolution: {integrity: sha512-tJhdpnM5ReJLNJ2fuDRIEr0zgVd6id7/oAIfs26V46QlygiLsc8qx4Rz3LWIX51rUXW/cfakjj0EATxIciIw+g==}
     peerDependencies:
       '@radix-ui/react-popover': ^1.1.15
-      react: 19.2.7
-      react-dom: 19.2.7
+      react: 19.2.8
+      react-dom: 19.2.8
 
   '@mintlify/models@0.0.343':
     resolution: {integrity: sha512-OWGJqJmYSPKRBe+e82+zhSnClbDkR0cVkqLFKxo4ZCQXNmtERLqfRsDNxSoItoRwfxc1pxOh6upUn/AOR6+m7g==}
@@ -1932,8 +1915,8 @@ packages:
     peerDependencies:
       '@types/react': '*'
       '@types/react-dom': '*'
-      react: 19.2.7
-      react-dom: 19.2.7
+      react: 19.2.8
+      react-dom: 19.2.8
     peerDependenciesMeta:
       '@types/react':
         optional: true
@@ -1944,7 +1927,7 @@ packages:
     resolution: {integrity: sha512-rYOP8OMnuuPMQF1uhPVlGNcCDlkokKqGFE3JcxFViIkAXP7EvFWUliJAstrapypaBLJNHbZL6jGhbVDGTwmVhA==}
     peerDependencies:
       '@types/react': '*'
-      react: 19.2.7
+      react: 19.2.8
     peerDependenciesMeta:
       '@types/react':
         optional: true
@@ -1953,7 +1936,7 @@ packages:
     resolution: {integrity: sha512-fOE+JtN9rygNZkCnHRBEP0TAvLldlhyOxMsbwFvTP4nAs+nBmfnna+o/Zski2wkmY1YMrFC0aSzsHoLY47iLrg==}
     peerDependencies:
       '@types/react': '*'
-      react: 19.2.7
+      react: 19.2.8
     peerDependenciesMeta:
       '@types/react':
         optional: true
@@ -1963,8 +1946,8 @@ packages:
     peerDependencies:
       '@types/react': '*'
       '@types/react-dom': '*'
-      react: 19.2.7
-      react-dom: 19.2.7
+      react: 19.2.8
+      react-dom: 19.2.8
     peerDependenciesMeta:
       '@types/react':
         optional: true
@@ -1975,7 +1958,7 @@ packages:
     resolution: {integrity: sha512-cot/aB/mOm0IYVYTTmQcEEK1M48lZWi8FlYe5nDPQQ8NYZUlXEFgncJ9p2Kzer3RKSrY7cTTpEMLZKNo9QoP5Q==}
     peerDependencies:
       '@types/react': '*'
-      react: 19.2.7
+      react: 19.2.8
     peerDependenciesMeta:
       '@types/react':
         optional: true
@@ -1985,8 +1968,8 @@ packages:
     peerDependencies:
       '@types/react': '*'
       '@types/react-dom': '*'
-      react: 19.2.7
-      react-dom: 19.2.7
+      react: 19.2.8
+      react-dom: 19.2.8
     peerDependenciesMeta:
       '@types/react':
         optional: true
@@ -1997,7 +1980,7 @@ packages:
     resolution: {integrity: sha512-orBC88futVpqCmhX1p4cvquNHsELQ+w+vBJnuj3ftETI5bJb0bZn3Tqu3SWN2IOcPycTnMGnhwoermvISt72sA==}
     peerDependencies:
       '@types/react': '*'
-      react: 19.2.7
+      react: 19.2.8
     peerDependenciesMeta:
       '@types/react':
         optional: true
@@ -2007,8 +1990,8 @@ packages:
     peerDependencies:
       '@types/react': '*'
       '@types/react-dom': '*'
-      react: 19.2.7
-      react-dom: 19.2.7
+      react: 19.2.8
+      react-dom: 19.2.8
     peerDependenciesMeta:
       '@types/react':
         optional: true
@@ -2020,8 +2003,8 @@ packages:
     peerDependencies:
       '@types/react': '*'
       '@types/react-dom': '*'
-      react: 19.2.7
-      react-dom: 19.2.7
+      react: 19.2.8
+      react-dom: 19.2.8
     peerDependenciesMeta:
       '@types/react':
         optional: true
@@ -2033,8 +2016,8 @@ packages:
     peerDependencies:
       '@types/react': '*'
       '@types/react-dom': '*'
-      react: 19.2.7
-      react-dom: 19.2.7
+      react: 19.2.8
+      react-dom: 19.2.8
     peerDependenciesMeta:
       '@types/react':
         optional: true
@@ -2046,8 +2029,8 @@ packages:
     peerDependencies:
       '@types/react': '*'
       '@types/react-dom': '*'
-      react: 19.2.7
-      react-dom: 19.2.7
+      react: 19.2.8
+      react-dom: 19.2.8
     peerDependenciesMeta:
       '@types/react':
         optional: true
@@ -2059,8 +2042,8 @@ packages:
     peerDependencies:
       '@types/react': '*'
       '@types/react-dom': '*'
-      react: 19.2.7
-      react-dom: 19.2.7
+      react: 19.2.8
+      react-dom: 19.2.8
     peerDependenciesMeta:
       '@types/react':
         optional: true
@@ -2071,7 +2054,7 @@ packages:
     resolution: {integrity: sha512-MojKku4U/miO8Av4Dkb+ctMAQx7JmY96LmtDQlAarCRtd7rN52QCSzBF+XAvr5S6coSVj9HEPBgHAHKEJVk/WA==}
     peerDependencies:
       '@types/react': '*'
-      react: 19.2.7
+      react: 19.2.8
     peerDependenciesMeta:
       '@types/react':
         optional: true
@@ -2080,7 +2063,7 @@ packages:
     resolution: {integrity: sha512-xCso9j1/u8sEgP1RNHjFrXJLApL8LiqOkI1R4ywuN00rxWdYg4oQXuwKLS3i0j5NWLromUD27/4nlxj2UFVvIw==}
     peerDependencies:
       '@types/react': '*'
-      react: 19.2.7
+      react: 19.2.8
     peerDependenciesMeta:
       '@types/react':
         optional: true
@@ -2089,7 +2072,7 @@ packages:
     resolution: {integrity: sha512-PLzC90MS+ReootmjC597dvopoelpZ8Q61HJkDXZSExitIq7PL55vHNnesAHwguHK0aPfBnpdNzQtv1uliaqQrA==}
     peerDependencies:
       '@types/react': '*'
-      react: 19.2.7
+      react: 19.2.8
     peerDependenciesMeta:
       '@types/react':
         optional: true
@@ -2098,7 +2081,7 @@ packages:
     resolution: {integrity: sha512-6c8ZqvPTWILEKnyVkP53EGRCcpnJiKTC21sS/6R1GF5xKyHJJWQEPfkqlcgUkdRQivd6tb23abUwe4ngWmY0JA==}
     peerDependencies:
       '@types/react': '*'
-      react: 19.2.7
+      react: 19.2.8
     peerDependenciesMeta:
       '@types/react':
         optional: true
@@ -2107,7 +2090,7 @@ packages:
     resolution: {integrity: sha512-jrBWOxZITuGcnjRCM2t2U5ZPkCLxD+Ym6DjfssS5haTj2iiak/DOb64JeN6OdLfLgptb6/e2kKR+ZuTrGoZTPA==}
     peerDependencies:
       '@types/react': '*'
-      react: 19.2.7
+      react: 19.2.8
     peerDependenciesMeta:
       '@types/react':
         optional: true
@@ -2116,7 +2099,7 @@ packages:
     resolution: {integrity: sha512-d8a+bBY/FxikNPlgJJoaBHZX+zKVbWHYJGTLnLvveQgFSTntkGdEKv3JDtHrMS0DNYpllz2nRsTLGLKYttbpmw==}
     peerDependencies:
       '@types/react': '*'
-      react: 19.2.7
+      react: 19.2.8
     peerDependenciesMeta:
       '@types/react':
         optional: true
@@ -2125,7 +2108,7 @@ packages:
     resolution: {integrity: sha512-giWQp+4mxjBPt4KZ0MmyuykFNWfbDxKt4x+fPkRYmgRFJSbCZFzUglvMb/Kjn38tm10YP4ufiQZDx3zna4LU6w==}
     peerDependencies:
       '@types/react': '*'
-      react: 19.2.7
+      react: 19.2.8
     peerDependenciesMeta:
       '@types/react':
         optional: true
@@ -2562,8 +2545,8 @@ packages:
       '@testing-library/dom': ^10.0.0
       '@types/react': ^18.0.0 || ^19.0.0
       '@types/react-dom': ^18.0.0 || ^19.0.0
-      react: 19.2.7
-      react-dom: 19.2.7
+      react: 19.2.8
+      react-dom: 19.2.8
     peerDependenciesMeta:
       '@types/react':
         optional: true
@@ -3643,9 +3626,9 @@ packages:
     hasBin: true
     peerDependencies:
       '@standard-schema/spec': ^1.0.0
-      convex: 1.42.3
+      convex: 1.43.0
       hono: ^4.0.5
-      react: 19.2.7
+      react: 19.2.8
       typescript: ^5.5 || ^6.0.0
       zod: ^3.25.0 || ^4.0.0
     peerDependenciesMeta:
@@ -3663,22 +3646,22 @@ packages:
   convex-test@0.0.50:
     resolution: {integrity: sha512-rMNfrgcKJGToYDqNns2n1AO9KUP1NyC/AF9ldYEuWwTfRbgC9RQiHjlZsZQ/sOjLIVPUyKKIjoI/fNJUzy1urw==}
     peerDependencies:
-      convex: 1.42.3
+      convex: 1.43.0
 
   convex-test@0.0.54:
     resolution: {integrity: sha512-C0v2SQcuxrELAJRNzE6fQ686XDPor7UFoC22jcoJXeCRqhLo8ZIMZ4jyUHoo1UdAL2enCb0AbiprCVpLDN8u9Q==}
     peerDependencies:
-      convex: 1.42.3
+      convex: 1.43.0
 
-  convex@1.42.3:
-    resolution: {integrity: sha512-7Tz/lH6UlZdiqzLPF/zrlH6Rlo/DOp836dL+GZkUMEQ2jaGGNnBIiIDcOOiEqtfSehuQ65r/rdNMnb4LupowaA==}
+  convex@1.43.0:
+    resolution: {integrity: sha512-huZWEUZQYxIRG104o22ZI99HkviSEVltwezZRDi+pQDPrQbc5EoCPa4Y7pJDqUBQw9dc/iEEXj2/rLZg1j7Dww==}
     engines: {node: '>=18.0.0', npm: '>=7.0.0'}
     hasBin: true
     peerDependencies:
       '@auth0/auth0-react': ^2.0.1
       '@clerk/clerk-react': ^4.12.8 || ^5.0.0
       '@clerk/react': ^6.4.3
-      react: 19.2.7
+      react: 19.2.8
     peerDependenciesMeta:
       '@auth0/auth0-react':
         optional: true
@@ -3903,8 +3886,8 @@ packages:
   ee-first@1.1.1:
     resolution: {integrity: sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow==}
 
-  effect@3.22.0:
-    resolution: {integrity: sha512-jhYFe0zTlIRqYFrKTS+6luhmS/Tm0f+JLo0K9KUxvtFab1SUGEszQi2ehOP6QzAZvy831lDmTwwzvVDZSPNz3g==}
+  effect@3.22.1:
+    resolution: {integrity: sha512-TNoXushmPOBAjJlthF5d2QwnX2xBPEtcNJr5XKNKbRLbDvBcOYkXlYDfvGfSA0zriwLFuCll5MDtNMAdZL17PQ==}
 
   emoji-regex@10.6.0:
     resolution: {integrity: sha512-toUI84YS5YmxW219erniWD0CIVOo46xGKColeNQRgOzDorgBi1v4D71/OFzgD9GO2UGKIv1C3Sp8DAn0+j5w7A==}
@@ -4093,8 +4076,8 @@ packages:
     resolution: {integrity: sha512-c2iPh3xp5vvCLgaHK03+mWLFPhox7j1LwyxcZwFVApEv5i0X+IjPpbT50SJJwwLpdBVfp45AkK/v+AFgv/XlfQ==}
     engines: {node: '>= 0.10.0'}
 
-  exsolve@1.1.0:
-    resolution: {integrity: sha512-D+42+T12DdIlJM3uepa55qGiL3sYdLBOxIl2ifQCzCHz4c7eiolaHsi3BIqEr7JxBzxv2pYZQX9kw16ziMcEmw==}
+  exsolve@1.1.1:
+    resolution: {integrity: sha512-9U/jZUgjnSGyntRr6y5Muu1MJcwFl6kPu7k8qLF0IMNfLqvw0NZ4nnVDq0RVoZ0RvCyumib4Ez3KYrVfilrw+g==}
 
   extend@3.0.2:
     resolution: {integrity: sha512-fjquC59cD7CyW6urNXK0FBufkZcoiGG80wTuPujX590cB5Ttln20E2UB4S/WARVqhXffZl2LNgS+gQdPIIim/g==}
@@ -4546,14 +4529,14 @@ packages:
     engines: {node: '>=14.16'}
     peerDependencies:
       ink: '>=4.0.0'
-      react: 19.2.7
+      react: 19.2.8
 
   ink@6.3.0:
     resolution: {integrity: sha512-2CbJAa7XeziZYe6pDS5RVLirRY28iSGMQuEV8jRU5NQsONQNfcR/BZHHc9vkMg2lGYTHTM2pskxC1YmY28p6bQ==}
     engines: {node: '>=20'}
     peerDependencies:
       '@types/react': '>=19.0.0'
-      react: 19.2.7
+      react: 19.2.8
       react-devtools-core: ^4.19.1
     peerDependenciesMeta:
       '@types/react':
@@ -5351,8 +5334,8 @@ packages:
     resolution: {integrity: sha512-IElOrn02JjGQZxx+re7wMx/1AUG+Arte9aDImAtxjAfMw6xuSCaH5mTCunKelkWzFyFdRb565jO8jRICvvh96g==}
     engines: {node: '>=20.9.0'}
     peerDependencies:
-      react: 19.2.7
-      react-dom: 19.2.7
+      react: 19.2.8
+      react-dom: 19.2.8
 
   nice-try@1.0.5:
     resolution: {integrity: sha512-1nh45deeb5olNY7eX82BkPO7SSxR5SSYJiPTrTdFUVYwAl8CKMA5N9PjTYkHiRjisVcxcQ1HXdLhx2qxxJzLNQ==}
@@ -5833,10 +5816,10 @@ packages:
     resolution: {integrity: sha512-y3bGgqKj3QBdxLbLkomlohkvsA8gdAiUQlSBJnBhfn+BPxg4bc62d8TcBW15wavDfgexCgccckhcZvywyQYPOw==}
     hasBin: true
 
-  react-dom@19.2.7:
-    resolution: {integrity: sha512-t0BRVXvbiE/o20Hfw669rLbMCDWtYZLvmJigy2f0MxsXF+71pxhR3xOkspmsO8h3ZlNzyibAmtCa3l4lYKk6gQ==}
+  react-dom@19.2.8:
+    resolution: {integrity: sha512-rVprimfGBG3DR+Tq0IQG2DT5PxKth1WIGDmj5yPmlzr4YBe7uyE+Du4oVqTDXZSHGGGXRtTJEGSSePyQCMBglQ==}
     peerDependencies:
-      react: 19.2.7
+      react: 19.2.8
 
   react-is@17.0.2:
     resolution: {integrity: sha512-w2GsyukL62IJnlaff/nRegPQR94C/XXamvMWmSHRJ4y7Ts/4ocGRmTHvOs8PSE6pB3dWOrD/nueuU5sduBsQ4w==}
@@ -5845,14 +5828,14 @@ packages:
     resolution: {integrity: sha512-2NPMOzgTlG0ZWdIf3qG+dcbLSoAc/uLfOwckc3ofy5sSK0pLJqnQLpUFxvGcN2rlXSjnVtGeeFLNimCQEj5gOQ==}
     engines: {node: '>=0.10.0'}
     peerDependencies:
-      react: 19.2.7
+      react: 19.2.8
 
   react-remove-scroll-bar@2.3.8:
     resolution: {integrity: sha512-9r+yi9+mgU33AKcj6IbT9oRCO78WriSj6t/cF8DWBZJ9aOGPOTEDvdUDz1FwKim7QXWwmHqtdHnRJfhAxEG46Q==}
     engines: {node: '>=10'}
     peerDependencies:
       '@types/react': '*'
-      react: 19.2.7
+      react: 19.2.8
     peerDependenciesMeta:
       '@types/react':
         optional: true
@@ -5862,7 +5845,7 @@ packages:
     engines: {node: '>=10'}
     peerDependencies:
       '@types/react': '*'
-      react: 19.2.7
+      react: 19.2.8
     peerDependenciesMeta:
       '@types/react':
         optional: true
@@ -5872,13 +5855,13 @@ packages:
     engines: {node: '>=10'}
     peerDependencies:
       '@types/react': '*'
-      react: 19.2.7
+      react: 19.2.8
     peerDependenciesMeta:
       '@types/react':
         optional: true
 
-  react@19.2.7:
-    resolution: {integrity: sha512-HNe9WslTbXmFK8o8cmwgAeJFSBvt1bPdHCVKtaaV+WlAN36mpT4hcRpwbf3fY56ar2oIXzsBpOAiIRHAdY0OlQ==}
+  react@19.2.8:
+    resolution: {integrity: sha512-PWaYA1L/q9u2u7xYQi+Y3L3Yfnie7XyLeaJICV1MGD6LprsBxcAqGjYyr0eY3p+QdsA+x/Irkt4Qif8D63+Sbw==}
     engines: {node: '>=0.10.0'}
 
   read-cache@1.0.0:
@@ -6759,7 +6742,7 @@ packages:
     engines: {node: '>=10'}
     peerDependencies:
       '@types/react': '*'
-      react: 19.2.7
+      react: 19.2.8
     peerDependenciesMeta:
       '@types/react':
         optional: true
@@ -6769,7 +6752,7 @@ packages:
     engines: {node: '>=10'}
     peerDependencies:
       '@types/react': '*'
-      react: 19.2.7
+      react: 19.2.8
     peerDependenciesMeta:
       '@types/react':
         optional: true
@@ -7340,203 +7323,126 @@ snapshots:
       human-id: 4.2.0
       prettier: 2.8.8
 
-  '@convex-dev/workpool@0.4.8(convex-helpers@0.1.120(@standard-schema/spec@1.1.0)(convex@1.42.3(react@19.2.7))(react@19.2.7)(typescript@6.0.3)(zod@4.3.6))(convex@1.42.3(react@19.2.7))':
+  '@convex-dev/workpool@0.4.8(convex-helpers@0.1.120(@standard-schema/spec@1.1.0)(convex@1.43.0(react@19.2.8))(react@19.2.8)(typescript@6.0.3)(zod@4.3.6))(convex@1.43.0(react@19.2.8))':
     dependencies:
-      convex: 1.42.3(react@19.2.7)
-      convex-helpers: 0.1.120(@standard-schema/spec@1.1.0)(convex@1.42.3(react@19.2.7))(react@19.2.7)(typescript@6.0.3)(zod@4.3.6)
+      convex: 1.43.0(react@19.2.8)
+      convex-helpers: 0.1.120(@standard-schema/spec@1.1.0)(convex@1.43.0(react@19.2.8))(react@19.2.8)(typescript@6.0.3)(zod@4.3.6)
 
-  '@effect/cli@0.75.2(@effect/platform@0.96.3(effect@3.22.0))(@effect/printer-ansi@0.49.0(@effect/typeclass@0.40.0(effect@3.22.0))(effect@3.22.0))(@effect/printer@0.49.0(@effect/typeclass@0.40.0(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)':
+  '@effect/cli@0.77.0(@effect/platform@0.97.1(effect@3.22.1))(@effect/printer-ansi@0.51.0(@effect/typeclass@0.41.0(effect@3.22.1))(effect@3.22.1))(@effect/printer@0.51.0(@effect/typeclass@0.41.0(effect@3.22.1))(effect@3.22.1))(effect@3.22.1)':
     dependencies:
-      '@effect/platform': 0.96.3(effect@3.22.0)
-      '@effect/printer': 0.49.0(@effect/typeclass@0.40.0(effect@3.22.0))(effect@3.22.0)
-      '@effect/printer-ansi': 0.49.0(@effect/typeclass@0.40.0(effect@3.22.0))(effect@3.22.0)
-      effect: 3.22.0
+      '@effect/platform': 0.97.1(effect@3.22.1)
+      '@effect/printer': 0.51.0(@effect/typeclass@0.41.0(effect@3.22.1))(effect@3.22.1)
+      '@effect/printer-ansi': 0.51.0(@effect/typeclass@0.41.0(effect@3.22.1))(effect@3.22.1)
+      effect: 3.22.1
       ini: 4.1.3
       toml: 3.0.0
       yaml: 2.9.0
 
-  '@effect/cluster@0.58.2(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)':
+  '@effect/cluster@0.60.2(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/workflow@0.19.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(effect@3.22.1)':
     dependencies:
-      '@effect/platform': 0.96.3(effect@3.22.0)
-      '@effect/rpc': 0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)
-      '@effect/sql': 0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)
-      '@effect/workflow': 0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)
-      effect: 3.22.0
+      '@effect/platform': 0.97.1(effect@3.22.1)
+      '@effect/rpc': 0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1)
+      '@effect/sql': 0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1)
+      '@effect/workflow': 0.19.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1)
+      effect: 3.22.1
       kubernetes-types: 1.30.0
 
-  '@effect/cluster@0.59.0(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)':
+  '@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1)':
     dependencies:
-      '@effect/platform': 0.96.3(effect@3.22.0)
-      '@effect/rpc': 0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)
-      '@effect/sql': 0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)
-      '@effect/workflow': 0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)
-      effect: 3.22.0
-      kubernetes-types: 1.30.0
-
-  '@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)':
-    dependencies:
-      '@effect/platform': 0.96.3(effect@3.22.0)
-      effect: 3.22.0
+      '@effect/platform': 0.97.1(effect@3.22.1)
+      effect: 3.22.1
       uuid: 11.1.1
 
   '@effect/language-service@0.87.1': {}
 
-  '@effect/platform-bun@0.90.0(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)':
+  '@effect/platform-bun@0.91.2(@effect/cluster@0.60.2(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/workflow@0.19.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1)':
     dependencies:
-      '@effect/platform': 0.96.3(effect@3.22.0)
-      '@effect/platform-node-shared': 0.60.0(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)
-      '@effect/rpc': 0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)
-      '@effect/sql': 0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)
-      effect: 3.22.0
+      '@effect/cluster': 0.60.2(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/workflow@0.19.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(effect@3.22.1)
+      '@effect/platform': 0.97.1(effect@3.22.1)
+      '@effect/platform-node-shared': 0.61.1(@effect/cluster@0.60.2(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/workflow@0.19.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1)
+      '@effect/rpc': 0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1)
+      '@effect/sql': 0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1)
+      effect: 3.22.1
       multipasta: 0.2.8
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@effect/platform-node-shared@0.59.0(@effect/cluster@0.58.2(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)':
+  '@effect/platform-node-shared@0.61.1(@effect/cluster@0.60.2(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/workflow@0.19.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1)':
     dependencies:
-      '@effect/cluster': 0.58.2(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)
-      '@effect/platform': 0.96.3(effect@3.22.0)
-      '@effect/rpc': 0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)
-      '@effect/sql': 0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)
+      '@effect/cluster': 0.60.2(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/workflow@0.19.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(effect@3.22.1)
+      '@effect/platform': 0.97.1(effect@3.22.1)
+      '@effect/rpc': 0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1)
+      '@effect/sql': 0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1)
       '@parcel/watcher': 2.5.6
-      effect: 3.22.0
+      effect: 3.22.1
       multipasta: 0.2.8
-      ws: 8.21.0
+      ws: 8.21.1
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@effect/platform-node-shared@0.59.0(@effect/cluster@0.59.0(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)':
+  '@effect/platform-node@0.108.1(@effect/cluster@0.60.2(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/workflow@0.19.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1)':
     dependencies:
-      '@effect/cluster': 0.59.0(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)
-      '@effect/platform': 0.96.3(effect@3.22.0)
-      '@effect/rpc': 0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)
-      '@effect/sql': 0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)
-      '@parcel/watcher': 2.5.6
-      effect: 3.22.0
-      multipasta: 0.2.8
-      ws: 8.21.0
-    transitivePeerDependencies:
-      - bufferutil
-      - utf-8-validate
-
-  '@effect/platform-node-shared@0.59.0(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)':
-    dependencies:
-      '@effect/platform': 0.96.3(effect@3.22.0)
-      '@effect/rpc': 0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)
-      '@effect/sql': 0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)
-      '@parcel/watcher': 2.5.6
-      effect: 3.22.0
-      multipasta: 0.2.8
-      ws: 8.21.0
-    transitivePeerDependencies:
-      - bufferutil
-      - utf-8-validate
-
-  '@effect/platform-node-shared@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)':
-    dependencies:
-      '@effect/platform': 0.96.3(effect@3.22.0)
-      '@effect/rpc': 0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)
-      '@effect/sql': 0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)
-      '@parcel/watcher': 2.5.6
-      effect: 3.22.0
-      multipasta: 0.2.8
-      ws: 8.21.0
-    transitivePeerDependencies:
-      - bufferutil
-      - utf-8-validate
-
-  '@effect/platform-node@0.106.0(@effect/cluster@0.58.2(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)':
-    dependencies:
-      '@effect/cluster': 0.58.2(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)
-      '@effect/platform': 0.96.3(effect@3.22.0)
-      '@effect/platform-node-shared': 0.59.0(@effect/cluster@0.58.2(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)
-      '@effect/rpc': 0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)
-      '@effect/sql': 0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)
-      effect: 3.22.0
+      '@effect/cluster': 0.60.2(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/workflow@0.19.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(effect@3.22.1)
+      '@effect/platform': 0.97.1(effect@3.22.1)
+      '@effect/platform-node-shared': 0.61.1(@effect/cluster@0.60.2(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/workflow@0.19.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1)
+      '@effect/rpc': 0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1)
+      '@effect/sql': 0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1)
+      effect: 3.22.1
       mime: 3.0.0
       undici: 7.28.0
-      ws: 8.21.0
+      ws: 8.21.1
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@effect/platform-node@0.106.0(@effect/cluster@0.59.0(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)':
+  '@effect/platform@0.97.1(effect@3.22.1)':
     dependencies:
-      '@effect/cluster': 0.59.0(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)
-      '@effect/platform': 0.96.3(effect@3.22.0)
-      '@effect/platform-node-shared': 0.59.0(@effect/cluster@0.59.0(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)
-      '@effect/rpc': 0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)
-      '@effect/sql': 0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)
-      effect: 3.22.0
-      mime: 3.0.0
-      undici: 7.28.0
-      ws: 8.21.0
-    transitivePeerDependencies:
-      - bufferutil
-      - utf-8-validate
-
-  '@effect/platform-node@0.106.0(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)':
-    dependencies:
-      '@effect/platform': 0.96.3(effect@3.22.0)
-      '@effect/platform-node-shared': 0.59.0(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)
-      '@effect/rpc': 0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)
-      '@effect/sql': 0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)
-      effect: 3.22.0
-      mime: 3.0.0
-      undici: 7.28.0
-      ws: 8.21.0
-    transitivePeerDependencies:
-      - bufferutil
-      - utf-8-validate
-
-  '@effect/platform@0.96.3(effect@3.22.0)':
-    dependencies:
-      effect: 3.22.0
+      effect: 3.22.1
       find-my-way-ts: 0.1.6
       msgpackr: 1.12.1
       multipasta: 0.2.8
 
-  '@effect/printer-ansi@0.49.0(@effect/typeclass@0.40.0(effect@3.22.0))(effect@3.22.0)':
+  '@effect/printer-ansi@0.51.0(@effect/typeclass@0.41.0(effect@3.22.1))(effect@3.22.1)':
     dependencies:
-      '@effect/printer': 0.49.0(@effect/typeclass@0.40.0(effect@3.22.0))(effect@3.22.0)
-      '@effect/typeclass': 0.40.0(effect@3.22.0)
-      effect: 3.22.0
+      '@effect/printer': 0.51.0(@effect/typeclass@0.41.0(effect@3.22.1))(effect@3.22.1)
+      '@effect/typeclass': 0.41.0(effect@3.22.1)
+      effect: 3.22.1
 
-  '@effect/printer@0.49.0(@effect/typeclass@0.40.0(effect@3.22.0))(effect@3.22.0)':
+  '@effect/printer@0.51.0(@effect/typeclass@0.41.0(effect@3.22.1))(effect@3.22.1)':
     dependencies:
-      '@effect/typeclass': 0.40.0(effect@3.22.0)
-      effect: 3.22.0
+      '@effect/typeclass': 0.41.0(effect@3.22.1)
+      effect: 3.22.1
 
-  '@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)':
+  '@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1)':
     dependencies:
-      '@effect/platform': 0.96.3(effect@3.22.0)
-      effect: 3.22.0
+      '@effect/platform': 0.97.1(effect@3.22.1)
+      effect: 3.22.1
       msgpackr: 1.12.1
 
-  '@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)':
+  '@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1)':
     dependencies:
-      '@effect/experimental': 0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)
-      '@effect/platform': 0.96.3(effect@3.22.0)
-      effect: 3.22.0
+      '@effect/experimental': 0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1)
+      '@effect/platform': 0.97.1(effect@3.22.1)
+      effect: 3.22.1
       uuid: 11.1.1
 
-  '@effect/typeclass@0.40.0(effect@3.22.0)':
+  '@effect/typeclass@0.41.0(effect@3.22.1)':
     dependencies:
-      effect: 3.22.0
+      effect: 3.22.1
 
-  '@effect/vitest@0.30.0(effect@3.22.0)(vitest@4.1.10)':
+  '@effect/vitest@0.30.0(effect@3.22.1)(vitest@4.1.10)':
     dependencies:
-      effect: 3.22.0
+      effect: 3.22.1
       vitest: 4.1.10(@types/node@26.1.1)(@vitest/browser-preview@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.1)(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))
 
-  '@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(@effect/platform@0.96.3(effect@3.22.0))(@effect/rpc@0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0))(effect@3.22.0)':
+  '@effect/workflow@0.19.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1)':
     dependencies:
-      '@effect/experimental': 0.60.0(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)
-      '@effect/platform': 0.96.3(effect@3.22.0)
-      '@effect/rpc': 0.75.1(@effect/platform@0.96.3(effect@3.22.0))(effect@3.22.0)
-      effect: 3.22.0
+      '@effect/experimental': 0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1)
+      '@effect/platform': 0.97.1(effect@3.22.1)
+      '@effect/rpc': 0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1)
+      effect: 3.22.1
 
   '@emnapi/core@1.11.1':
     dependencies:
@@ -7737,11 +7643,11 @@ snapshots:
       '@floating-ui/core': 1.8.0
       '@floating-ui/utils': 0.2.12
 
-  '@floating-ui/react-dom@2.1.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+  '@floating-ui/react-dom@2.1.9(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
       '@floating-ui/dom': 1.8.0
-      react: 19.2.7
-      react-dom: 19.2.7(react@19.2.7)
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
 
   '@floating-ui/utils@0.2.12': {}
 
@@ -8046,28 +7952,28 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@mdx-js/react@3.1.1(@types/react@19.2.17)(react@19.2.7)':
+  '@mdx-js/react@3.1.1(@types/react@19.2.17)(react@19.2.8)':
     dependencies:
       '@types/mdx': 2.0.14
       '@types/react': 19.2.17
-      react: 19.2.7
+      react: 19.2.8
 
-  '@mintlify/cli@4.0.1345(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/node@26.1.1)(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(supports-color@10.2.2)(typescript@6.0.3)':
+  '@mintlify/cli@4.0.1345(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.1)(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(supports-color@10.2.2)(typescript@6.0.3)':
     dependencies:
       '@inquirer/prompts': 7.9.0(@types/node@26.1.1)
-      '@mintlify/common': 1.0.1046(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(supports-color@10.2.2)(typescript@6.0.3)
-      '@mintlify/link-rot': 3.0.1239(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/common': 1.0.1046(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/link-rot': 3.0.1239(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
       '@mintlify/models': 0.0.343(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
-      '@mintlify/prebuild': 1.0.1194(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(supports-color@10.2.2)(typescript@6.0.3)
-      '@mintlify/previewing': 4.0.1263(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(supports-color@10.2.2)(typescript@6.0.3)
-      '@mintlify/validation': 0.1.801(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/prebuild': 1.0.1194(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/previewing': 4.0.1263(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/validation': 0.1.801(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
       adm-zip: 0.5.16
       chalk: 5.2.0
       color: 4.2.3
       detect-port: 1.5.1(supports-color@10.2.2)
       front-matter: 4.0.2
       fs-extra: 11.2.0
-      ink: 6.3.0(@types/react@19.2.17)(react@19.2.7)
+      ink: 6.3.0(@types/react@19.2.17)(react@19.2.8)
       inquirer: 12.3.0(@types/node@26.1.1)
       js-yaml: 4.1.1
       mdast-util-mdx-jsx: 3.2.0(supports-color@10.2.2)
@@ -8075,7 +7981,7 @@ snapshots:
       openid-client: 6.8.2
       posthog-node: 5.17.2
       prosemirror-model: 1.25.11
-      react: 19.2.7
+      react: 19.2.8
       remark: 15.0.1(supports-color@10.2.2)
       remark-frontmatter: 5.0.0(supports-color@10.2.2)
       remark-gfm: 4.0.1(supports-color@10.2.2)
@@ -8107,14 +8013,14 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@mintlify/common@1.0.1046(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(supports-color@10.2.2)(typescript@6.0.3)':
+  '@mintlify/common@1.0.1046(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)':
     dependencies:
       '@asyncapi/parser': 3.4.0
       '@asyncapi/specs': 6.8.1
-      '@mintlify/mdx': 3.0.4(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/mdx': 3.0.4(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
       '@mintlify/models': 0.0.343(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
       '@mintlify/openapi-parser': 0.0.8
-      '@mintlify/validation': 0.1.801(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/validation': 0.1.801(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
       '@sindresorhus/slugify': 2.2.0
       '@types/mdast': 4.0.4
       acorn: 8.11.2
@@ -8170,14 +8076,14 @@ snapshots:
       - ts-node
       - typescript
 
-  '@mintlify/link-rot@3.0.1239(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(supports-color@10.2.2)(typescript@6.0.3)':
+  '@mintlify/link-rot@3.0.1239(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)':
     dependencies:
-      '@mintlify/common': 1.0.1046(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/common': 1.0.1046(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
       '@mintlify/models': 0.0.343(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
-      '@mintlify/prebuild': 1.0.1194(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(supports-color@10.2.2)(typescript@6.0.3)
-      '@mintlify/previewing': 4.0.1263(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(supports-color@10.2.2)(typescript@6.0.3)
-      '@mintlify/scraping': 4.0.911(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(supports-color@10.2.2)(typescript@6.0.3)
-      '@mintlify/validation': 0.1.801(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/prebuild': 1.0.1194(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/previewing': 4.0.1263(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/scraping': 4.0.911(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/validation': 0.1.801(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
       fs-extra: 11.1.0
       unist-util-visit: 4.1.2
     transitivePeerDependencies:
@@ -8197,9 +8103,9 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@mintlify/mdx@3.0.4(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(supports-color@10.2.2)(typescript@6.0.3)':
+  '@mintlify/mdx@3.0.4(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)':
     dependencies:
-      '@radix-ui/react-popover': 1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@radix-ui/react-popover': 1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@shikijs/transformers': 3.23.0
       '@shikijs/twoslash': 3.23.0(supports-color@10.2.2)(typescript@6.0.3)
       arktype: 2.2.3
@@ -8208,9 +8114,9 @@ snapshots:
       mdast-util-gfm: 3.1.0(supports-color@10.2.2)
       mdast-util-mdx-jsx: 3.2.0(supports-color@10.2.2)
       mdast-util-to-hast: 13.2.1
-      next-mdx-remote-client: 1.1.8(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(supports-color@10.2.2)(unified@11.0.5)
-      react: 19.2.7
-      react-dom: 19.2.7(react@19.2.7)
+      next-mdx-remote-client: 1.1.8(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(unified@11.0.5)
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
       rehype-katex: 7.0.1
       remark-gfm: 4.0.0(supports-color@10.2.2)
       remark-math: 6.0.0(supports-color@10.2.2)
@@ -8240,12 +8146,12 @@ snapshots:
       leven: 4.1.0
       yaml: 2.9.0
 
-  '@mintlify/prebuild@1.0.1194(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(supports-color@10.2.2)(typescript@6.0.3)':
+  '@mintlify/prebuild@1.0.1194(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)':
     dependencies:
-      '@mintlify/common': 1.0.1046(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/common': 1.0.1046(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
       '@mintlify/openapi-parser': 0.0.8
-      '@mintlify/scraping': 4.0.911(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(supports-color@10.2.2)(typescript@6.0.3)
-      '@mintlify/validation': 0.1.801(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/scraping': 4.0.911(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/validation': 0.1.801(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
       chalk: 5.3.0
       favicons: 7.2.0
       fflate: 0.8.3
@@ -8273,11 +8179,11 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@mintlify/previewing@4.0.1263(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(supports-color@10.2.2)(typescript@6.0.3)':
+  '@mintlify/previewing@4.0.1263(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(supports-color@10.2.2)(typescript@6.0.3)':
     dependencies:
-      '@mintlify/common': 1.0.1046(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(supports-color@10.2.2)(typescript@6.0.3)
-      '@mintlify/prebuild': 1.0.1194(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(supports-color@10.2.2)(typescript@6.0.3)
-      '@mintlify/validation': 0.1.801(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/common': 1.0.1046(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/prebuild': 1.0.1194(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/validation': 0.1.801(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
       adm-zip: 0.5.16
       better-opn: 3.0.2
       chalk: 5.2.0
@@ -8286,12 +8192,12 @@ snapshots:
       front-matter: 4.0.2
       fs-extra: 11.1.0
       got: 13.0.0
-      ink: 6.3.0(@types/react@19.2.17)(react@19.2.7)
-      ink-spinner: 5.0.0(ink@6.3.0(@types/react@19.2.17)(react@19.2.7))(react@19.2.7)
+      ink: 6.3.0(@types/react@19.2.17)(react@19.2.8)
+      ink-spinner: 5.0.0(ink@6.3.0(@types/react@19.2.17)(react@19.2.8))(react@19.2.8)
       is-online: 10.0.0
       js-yaml: 4.1.1
       openapi-types: 12.1.3
-      react: 19.2.7
+      react: 19.2.8
       socket.io: 4.8.0(supports-color@10.2.2)
       tar: 7.5.15
       unist-util-visit: 4.1.2
@@ -8312,9 +8218,9 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@mintlify/scraping@4.0.911(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(supports-color@10.2.2)(typescript@6.0.3)':
+  '@mintlify/scraping@4.0.911(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)':
     dependencies:
-      '@mintlify/common': 1.0.1046(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/common': 1.0.1046(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
       '@mintlify/openapi-parser': 0.0.8
       fast-xml-parser: 5.7.3
       fs-extra: 11.1.1
@@ -8349,9 +8255,9 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@mintlify/validation@0.1.801(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(supports-color@10.2.2)(typescript@6.0.3)':
+  '@mintlify/validation@0.1.801(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)':
     dependencies:
-      '@mintlify/mdx': 3.0.4(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/mdx': 3.0.4(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
       '@mintlify/models': 0.0.343(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
       arktype: 2.1.27
       fractional-indexing: 3.2.0
@@ -8657,178 +8563,178 @@ snapshots:
 
   '@radix-ui/primitive@1.1.5': {}
 
-  '@radix-ui/react-arrow@1.1.11(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+  '@radix-ui/react-arrow@1.1.11(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
-      '@radix-ui/react-primitive': 2.1.7(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      react: 19.2.7
-      react-dom: 19.2.7(react@19.2.7)
+      '@radix-ui/react-primitive': 2.1.7(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
     optionalDependencies:
       '@types/react': 19.2.17
       '@types/react-dom': 19.2.3(@types/react@19.2.17)
 
-  '@radix-ui/react-compose-refs@1.1.3(@types/react@19.2.17)(react@19.2.7)':
+  '@radix-ui/react-compose-refs@1.1.3(@types/react@19.2.17)(react@19.2.8)':
     dependencies:
-      react: 19.2.7
+      react: 19.2.8
     optionalDependencies:
       '@types/react': 19.2.17
 
-  '@radix-ui/react-context@1.2.0(@types/react@19.2.17)(react@19.2.7)':
+  '@radix-ui/react-context@1.2.0(@types/react@19.2.17)(react@19.2.8)':
     dependencies:
-      react: 19.2.7
+      react: 19.2.8
     optionalDependencies:
       '@types/react': 19.2.17
 
-  '@radix-ui/react-dismissable-layer@1.1.15(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+  '@radix-ui/react-dismissable-layer@1.1.15(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
       '@radix-ui/primitive': 1.1.5
-      '@radix-ui/react-compose-refs': 1.1.3(@types/react@19.2.17)(react@19.2.7)
-      '@radix-ui/react-primitive': 2.1.7(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@radix-ui/react-use-callback-ref': 1.1.2(@types/react@19.2.17)(react@19.2.7)
-      '@radix-ui/react-use-effect-event': 0.0.3(@types/react@19.2.17)(react@19.2.7)
-      react: 19.2.7
-      react-dom: 19.2.7(react@19.2.7)
+      '@radix-ui/react-compose-refs': 1.1.3(@types/react@19.2.17)(react@19.2.8)
+      '@radix-ui/react-primitive': 2.1.7(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@radix-ui/react-use-callback-ref': 1.1.2(@types/react@19.2.17)(react@19.2.8)
+      '@radix-ui/react-use-effect-event': 0.0.3(@types/react@19.2.17)(react@19.2.8)
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
     optionalDependencies:
       '@types/react': 19.2.17
       '@types/react-dom': 19.2.3(@types/react@19.2.17)
 
-  '@radix-ui/react-focus-guards@1.1.4(@types/react@19.2.17)(react@19.2.7)':
+  '@radix-ui/react-focus-guards@1.1.4(@types/react@19.2.17)(react@19.2.8)':
     dependencies:
-      react: 19.2.7
+      react: 19.2.8
     optionalDependencies:
       '@types/react': 19.2.17
 
-  '@radix-ui/react-focus-scope@1.1.12(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+  '@radix-ui/react-focus-scope@1.1.12(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
-      '@radix-ui/react-compose-refs': 1.1.3(@types/react@19.2.17)(react@19.2.7)
-      '@radix-ui/react-primitive': 2.1.7(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@radix-ui/react-use-callback-ref': 1.1.2(@types/react@19.2.17)(react@19.2.7)
-      react: 19.2.7
-      react-dom: 19.2.7(react@19.2.7)
+      '@radix-ui/react-compose-refs': 1.1.3(@types/react@19.2.17)(react@19.2.8)
+      '@radix-ui/react-primitive': 2.1.7(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@radix-ui/react-use-callback-ref': 1.1.2(@types/react@19.2.17)(react@19.2.8)
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
     optionalDependencies:
       '@types/react': 19.2.17
       '@types/react-dom': 19.2.3(@types/react@19.2.17)
 
-  '@radix-ui/react-id@1.1.2(@types/react@19.2.17)(react@19.2.7)':
+  '@radix-ui/react-id@1.1.2(@types/react@19.2.17)(react@19.2.8)':
     dependencies:
-      '@radix-ui/react-use-layout-effect': 1.1.2(@types/react@19.2.17)(react@19.2.7)
-      react: 19.2.7
+      '@radix-ui/react-use-layout-effect': 1.1.2(@types/react@19.2.17)(react@19.2.8)
+      react: 19.2.8
     optionalDependencies:
       '@types/react': 19.2.17
 
-  '@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+  '@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
       '@radix-ui/primitive': 1.1.5
-      '@radix-ui/react-compose-refs': 1.1.3(@types/react@19.2.17)(react@19.2.7)
-      '@radix-ui/react-context': 1.2.0(@types/react@19.2.17)(react@19.2.7)
-      '@radix-ui/react-dismissable-layer': 1.1.15(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@radix-ui/react-focus-guards': 1.1.4(@types/react@19.2.17)(react@19.2.7)
-      '@radix-ui/react-focus-scope': 1.1.12(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@radix-ui/react-id': 1.1.2(@types/react@19.2.17)(react@19.2.7)
-      '@radix-ui/react-popper': 1.3.3(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@radix-ui/react-portal': 1.1.13(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@radix-ui/react-presence': 1.1.7(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@radix-ui/react-primitive': 2.1.7(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@radix-ui/react-slot': 1.3.0(@types/react@19.2.17)(react@19.2.7)
-      '@radix-ui/react-use-controllable-state': 1.2.3(@types/react@19.2.17)(react@19.2.7)
+      '@radix-ui/react-compose-refs': 1.1.3(@types/react@19.2.17)(react@19.2.8)
+      '@radix-ui/react-context': 1.2.0(@types/react@19.2.17)(react@19.2.8)
+      '@radix-ui/react-dismissable-layer': 1.1.15(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@radix-ui/react-focus-guards': 1.1.4(@types/react@19.2.17)(react@19.2.8)
+      '@radix-ui/react-focus-scope': 1.1.12(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@radix-ui/react-id': 1.1.2(@types/react@19.2.17)(react@19.2.8)
+      '@radix-ui/react-popper': 1.3.3(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@radix-ui/react-portal': 1.1.13(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@radix-ui/react-presence': 1.1.7(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@radix-ui/react-primitive': 2.1.7(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@radix-ui/react-slot': 1.3.0(@types/react@19.2.17)(react@19.2.8)
+      '@radix-ui/react-use-controllable-state': 1.2.3(@types/react@19.2.17)(react@19.2.8)
       aria-hidden: 1.2.6
-      react: 19.2.7
-      react-dom: 19.2.7(react@19.2.7)
-      react-remove-scroll: 2.7.2(@types/react@19.2.17)(react@19.2.7)
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
+      react-remove-scroll: 2.7.2(@types/react@19.2.17)(react@19.2.8)
     optionalDependencies:
       '@types/react': 19.2.17
       '@types/react-dom': 19.2.3(@types/react@19.2.17)
 
-  '@radix-ui/react-popper@1.3.3(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+  '@radix-ui/react-popper@1.3.3(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
-      '@floating-ui/react-dom': 2.1.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@radix-ui/react-arrow': 1.1.11(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@radix-ui/react-compose-refs': 1.1.3(@types/react@19.2.17)(react@19.2.7)
-      '@radix-ui/react-context': 1.2.0(@types/react@19.2.17)(react@19.2.7)
-      '@radix-ui/react-primitive': 2.1.7(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@radix-ui/react-use-callback-ref': 1.1.2(@types/react@19.2.17)(react@19.2.7)
-      '@radix-ui/react-use-layout-effect': 1.1.2(@types/react@19.2.17)(react@19.2.7)
-      '@radix-ui/react-use-rect': 1.1.2(@types/react@19.2.17)(react@19.2.7)
-      '@radix-ui/react-use-size': 1.1.2(@types/react@19.2.17)(react@19.2.7)
+      '@floating-ui/react-dom': 2.1.9(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@radix-ui/react-arrow': 1.1.11(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@radix-ui/react-compose-refs': 1.1.3(@types/react@19.2.17)(react@19.2.8)
+      '@radix-ui/react-context': 1.2.0(@types/react@19.2.17)(react@19.2.8)
+      '@radix-ui/react-primitive': 2.1.7(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@radix-ui/react-use-callback-ref': 1.1.2(@types/react@19.2.17)(react@19.2.8)
+      '@radix-ui/react-use-layout-effect': 1.1.2(@types/react@19.2.17)(react@19.2.8)
+      '@radix-ui/react-use-rect': 1.1.2(@types/react@19.2.17)(react@19.2.8)
+      '@radix-ui/react-use-size': 1.1.2(@types/react@19.2.17)(react@19.2.8)
       '@radix-ui/rect': 1.1.2
-      react: 19.2.7
-      react-dom: 19.2.7(react@19.2.7)
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
     optionalDependencies:
       '@types/react': 19.2.17
       '@types/react-dom': 19.2.3(@types/react@19.2.17)
 
-  '@radix-ui/react-portal@1.1.13(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+  '@radix-ui/react-portal@1.1.13(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
-      '@radix-ui/react-primitive': 2.1.7(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@radix-ui/react-use-layout-effect': 1.1.2(@types/react@19.2.17)(react@19.2.7)
-      react: 19.2.7
-      react-dom: 19.2.7(react@19.2.7)
+      '@radix-ui/react-primitive': 2.1.7(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@radix-ui/react-use-layout-effect': 1.1.2(@types/react@19.2.17)(react@19.2.8)
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
     optionalDependencies:
       '@types/react': 19.2.17
       '@types/react-dom': 19.2.3(@types/react@19.2.17)
 
-  '@radix-ui/react-presence@1.1.7(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+  '@radix-ui/react-presence@1.1.7(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
-      '@radix-ui/react-use-layout-effect': 1.1.2(@types/react@19.2.17)(react@19.2.7)
-      react: 19.2.7
-      react-dom: 19.2.7(react@19.2.7)
+      '@radix-ui/react-use-layout-effect': 1.1.2(@types/react@19.2.17)(react@19.2.8)
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
     optionalDependencies:
       '@types/react': 19.2.17
       '@types/react-dom': 19.2.3(@types/react@19.2.17)
 
-  '@radix-ui/react-primitive@2.1.7(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+  '@radix-ui/react-primitive@2.1.7(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
-      '@radix-ui/react-slot': 1.3.0(@types/react@19.2.17)(react@19.2.7)
-      react: 19.2.7
-      react-dom: 19.2.7(react@19.2.7)
+      '@radix-ui/react-slot': 1.3.0(@types/react@19.2.17)(react@19.2.8)
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
     optionalDependencies:
       '@types/react': 19.2.17
       '@types/react-dom': 19.2.3(@types/react@19.2.17)
 
-  '@radix-ui/react-slot@1.3.0(@types/react@19.2.17)(react@19.2.7)':
+  '@radix-ui/react-slot@1.3.0(@types/react@19.2.17)(react@19.2.8)':
     dependencies:
-      '@radix-ui/react-compose-refs': 1.1.3(@types/react@19.2.17)(react@19.2.7)
-      react: 19.2.7
+      '@radix-ui/react-compose-refs': 1.1.3(@types/react@19.2.17)(react@19.2.8)
+      react: 19.2.8
     optionalDependencies:
       '@types/react': 19.2.17
 
-  '@radix-ui/react-use-callback-ref@1.1.2(@types/react@19.2.17)(react@19.2.7)':
+  '@radix-ui/react-use-callback-ref@1.1.2(@types/react@19.2.17)(react@19.2.8)':
     dependencies:
-      react: 19.2.7
+      react: 19.2.8
     optionalDependencies:
       '@types/react': 19.2.17
 
-  '@radix-ui/react-use-controllable-state@1.2.3(@types/react@19.2.17)(react@19.2.7)':
+  '@radix-ui/react-use-controllable-state@1.2.3(@types/react@19.2.17)(react@19.2.8)':
     dependencies:
-      '@radix-ui/react-use-effect-event': 0.0.3(@types/react@19.2.17)(react@19.2.7)
-      '@radix-ui/react-use-layout-effect': 1.1.2(@types/react@19.2.17)(react@19.2.7)
-      react: 19.2.7
+      '@radix-ui/react-use-effect-event': 0.0.3(@types/react@19.2.17)(react@19.2.8)
+      '@radix-ui/react-use-layout-effect': 1.1.2(@types/react@19.2.17)(react@19.2.8)
+      react: 19.2.8
     optionalDependencies:
       '@types/react': 19.2.17
 
-  '@radix-ui/react-use-effect-event@0.0.3(@types/react@19.2.17)(react@19.2.7)':
+  '@radix-ui/react-use-effect-event@0.0.3(@types/react@19.2.17)(react@19.2.8)':
     dependencies:
-      '@radix-ui/react-use-layout-effect': 1.1.2(@types/react@19.2.17)(react@19.2.7)
-      react: 19.2.7
+      '@radix-ui/react-use-layout-effect': 1.1.2(@types/react@19.2.17)(react@19.2.8)
+      react: 19.2.8
     optionalDependencies:
       '@types/react': 19.2.17
 
-  '@radix-ui/react-use-layout-effect@1.1.2(@types/react@19.2.17)(react@19.2.7)':
+  '@radix-ui/react-use-layout-effect@1.1.2(@types/react@19.2.17)(react@19.2.8)':
     dependencies:
-      react: 19.2.7
+      react: 19.2.8
     optionalDependencies:
       '@types/react': 19.2.17
 
-  '@radix-ui/react-use-rect@1.1.2(@types/react@19.2.17)(react@19.2.7)':
+  '@radix-ui/react-use-rect@1.1.2(@types/react@19.2.17)(react@19.2.8)':
     dependencies:
       '@radix-ui/rect': 1.1.2
-      react: 19.2.7
+      react: 19.2.8
     optionalDependencies:
       '@types/react': 19.2.17
 
-  '@radix-ui/react-use-size@1.1.2(@types/react@19.2.17)(react@19.2.7)':
+  '@radix-ui/react-use-size@1.1.2(@types/react@19.2.17)(react@19.2.8)':
     dependencies:
-      '@radix-ui/react-use-layout-effect': 1.1.2(@types/react@19.2.17)(react@19.2.7)
-      react: 19.2.7
+      '@radix-ui/react-use-layout-effect': 1.1.2(@types/react@19.2.17)(react@19.2.8)
+      react: 19.2.8
     optionalDependencies:
       '@types/react': 19.2.17
 
@@ -9227,12 +9133,12 @@ snapshots:
       picocolors: 1.1.1
       pretty-format: 27.5.1
 
-  '@testing-library/react@16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+  '@testing-library/react@16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
       '@babel/runtime': 7.29.7
       '@testing-library/dom': 10.4.1
-      react: 19.2.7
-      react-dom: 19.2.7(react@19.2.7)
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
     optionalDependencies:
       '@types/react': 19.2.17
       '@types/react-dom': 19.2.3(@types/react@19.2.17)
@@ -10136,30 +10042,30 @@ snapshots:
 
   convert-to-spaces@2.0.1: {}
 
-  convex-helpers@0.1.120(@standard-schema/spec@1.1.0)(convex@1.42.3(react@19.2.7))(react@19.2.7)(typescript@6.0.3)(zod@4.3.6):
+  convex-helpers@0.1.120(@standard-schema/spec@1.1.0)(convex@1.43.0(react@19.2.8))(react@19.2.8)(typescript@6.0.3)(zod@4.3.6):
     dependencies:
-      convex: 1.42.3(react@19.2.7)
+      convex: 1.43.0(react@19.2.8)
     optionalDependencies:
       '@standard-schema/spec': 1.1.0
-      react: 19.2.7
+      react: 19.2.8
       typescript: 6.0.3
       zod: 4.3.6
 
-  convex-test@0.0.50(convex@1.42.3(react@19.2.7)):
+  convex-test@0.0.50(convex@1.43.0(react@19.2.8)):
     dependencies:
-      convex: 1.42.3(react@19.2.7)
+      convex: 1.43.0(react@19.2.8)
 
-  convex-test@0.0.54(convex@1.42.3(react@19.2.7)):
+  convex-test@0.0.54(convex@1.43.0(react@19.2.8)):
     dependencies:
-      convex: 1.42.3(react@19.2.7)
+      convex: 1.43.0(react@19.2.8)
 
-  convex@1.42.3(react@19.2.7):
+  convex@1.43.0(react@19.2.8):
     dependencies:
       esbuild: 0.27.0
       prettier: 3.9.5
       ws: 8.21.0
     optionalDependencies:
-      react: 19.2.7
+      react: 19.2.8
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
@@ -10360,7 +10266,7 @@ snapshots:
 
   ee-first@1.1.1: {}
 
-  effect@3.22.0:
+  effect@3.22.1:
     dependencies:
       '@standard-schema/spec': 1.1.0
       fast-check: 3.23.2
@@ -10706,7 +10612,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  exsolve@1.1.0: {}
+  exsolve@1.1.1: {}
 
   extend@3.0.2: {}
 
@@ -11323,13 +11229,13 @@ snapshots:
 
   ini@4.1.3: {}
 
-  ink-spinner@5.0.0(ink@6.3.0(@types/react@19.2.17)(react@19.2.7))(react@19.2.7):
+  ink-spinner@5.0.0(ink@6.3.0(@types/react@19.2.17)(react@19.2.8))(react@19.2.8):
     dependencies:
       cli-spinners: 2.9.2
-      ink: 6.3.0(@types/react@19.2.17)(react@19.2.7)
-      react: 19.2.7
+      ink: 6.3.0(@types/react@19.2.17)(react@19.2.8)
+      react: 19.2.8
 
-  ink@6.3.0(@types/react@19.2.17)(react@19.2.7):
+  ink@6.3.0(@types/react@19.2.17)(react@19.2.8):
     dependencies:
       '@alcalzone/ansi-tokenize': 0.2.5
       ansi-escapes: 7.3.0
@@ -11344,8 +11250,8 @@ snapshots:
       indent-string: 5.0.0
       is-in-ci: 2.0.0
       patch-console: 2.0.0
-      react: 19.2.7
-      react-reconciler: 0.32.0(react@19.2.7)
+      react: 19.2.8
+      react-reconciler: 0.32.0(react@19.2.8)
       signal-exit: 3.0.7
       slice-ansi: 7.1.2
       stack-utils: 2.0.6
@@ -12339,9 +12245,9 @@ snapshots:
     dependencies:
       minipass: 7.1.3
 
-  mintlify@4.2.742(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/node@26.1.1)(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(supports-color@10.2.2)(typescript@6.0.3):
+  mintlify@4.2.742(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.1)(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(supports-color@10.2.2)(typescript@6.0.3):
     dependencies:
-      '@mintlify/cli': 4.0.1345(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/node@26.1.1)(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.7(react@19.2.7))(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/cli': 4.0.1345(@radix-ui/react-popover@1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.1)(@types/react@19.2.17)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(supports-color@10.2.2)(typescript@6.0.3)
     transitivePeerDependencies:
       - '@radix-ui/react-popover'
       - '@types/node'
@@ -12409,14 +12315,14 @@ snapshots:
 
   netmask@2.1.1: {}
 
-  next-mdx-remote-client@1.1.8(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(supports-color@10.2.2)(unified@11.0.5):
+  next-mdx-remote-client@1.1.8(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(unified@11.0.5):
     dependencies:
       '@babel/code-frame': 7.29.7
       '@mdx-js/mdx': 3.1.1(supports-color@10.2.2)
-      '@mdx-js/react': 3.1.1(@types/react@19.2.17)(react@19.2.7)
+      '@mdx-js/react': 3.1.1(@types/react@19.2.17)(react@19.2.8)
       '@types/mdx': 2.0.14
-      react: 19.2.7
-      react-dom: 19.2.7(react@19.2.7)
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
       remark-mdx-remove-esm: 1.3.2(unified@11.0.5)
       serialize-error: 13.0.1
       vfile: 6.0.3
@@ -12943,46 +12849,46 @@ snapshots:
       strip-json-comments: 2.0.1
     optional: true
 
-  react-dom@19.2.7(react@19.2.7):
+  react-dom@19.2.8(react@19.2.8):
     dependencies:
-      react: 19.2.7
+      react: 19.2.8
       scheduler: 0.27.0
 
   react-is@17.0.2: {}
 
-  react-reconciler@0.32.0(react@19.2.7):
+  react-reconciler@0.32.0(react@19.2.8):
     dependencies:
-      react: 19.2.7
+      react: 19.2.8
       scheduler: 0.26.0
 
-  react-remove-scroll-bar@2.3.8(@types/react@19.2.17)(react@19.2.7):
+  react-remove-scroll-bar@2.3.8(@types/react@19.2.17)(react@19.2.8):
     dependencies:
-      react: 19.2.7
-      react-style-singleton: 2.2.3(@types/react@19.2.17)(react@19.2.7)
+      react: 19.2.8
+      react-style-singleton: 2.2.3(@types/react@19.2.17)(react@19.2.8)
       tslib: 2.8.1
     optionalDependencies:
       '@types/react': 19.2.17
 
-  react-remove-scroll@2.7.2(@types/react@19.2.17)(react@19.2.7):
+  react-remove-scroll@2.7.2(@types/react@19.2.17)(react@19.2.8):
     dependencies:
-      react: 19.2.7
-      react-remove-scroll-bar: 2.3.8(@types/react@19.2.17)(react@19.2.7)
-      react-style-singleton: 2.2.3(@types/react@19.2.17)(react@19.2.7)
+      react: 19.2.8
+      react-remove-scroll-bar: 2.3.8(@types/react@19.2.17)(react@19.2.8)
+      react-style-singleton: 2.2.3(@types/react@19.2.17)(react@19.2.8)
       tslib: 2.8.1
-      use-callback-ref: 1.3.3(@types/react@19.2.17)(react@19.2.7)
-      use-sidecar: 1.1.3(@types/react@19.2.17)(react@19.2.7)
+      use-callback-ref: 1.3.3(@types/react@19.2.17)(react@19.2.8)
+      use-sidecar: 1.1.3(@types/react@19.2.17)(react@19.2.8)
     optionalDependencies:
       '@types/react': 19.2.17
 
-  react-style-singleton@2.2.3(@types/react@19.2.17)(react@19.2.7):
+  react-style-singleton@2.2.3(@types/react@19.2.17)(react@19.2.8):
     dependencies:
       get-nonce: 1.0.1
-      react: 19.2.7
+      react: 19.2.8
       tslib: 2.8.1
     optionalDependencies:
       '@types/react': 19.2.17
 
-  react@19.2.7: {}
+  react@19.2.8: {}
 
   read-cache@1.0.0:
     dependencies:
@@ -14163,17 +14069,17 @@ snapshots:
 
   urijs@1.19.11: {}
 
-  use-callback-ref@1.3.3(@types/react@19.2.17)(react@19.2.7):
+  use-callback-ref@1.3.3(@types/react@19.2.17)(react@19.2.8):
     dependencies:
-      react: 19.2.7
+      react: 19.2.8
       tslib: 2.8.1
     optionalDependencies:
       '@types/react': 19.2.17
 
-  use-sidecar@1.1.3(@types/react@19.2.17)(react@19.2.7):
+  use-sidecar@1.1.3(@types/react@19.2.17)(react@19.2.8):
     dependencies:
       detect-node-es: 1.1.0
-      react: 19.2.7
+      react: 19.2.8
       tslib: 2.8.1
     optionalDependencies:
       '@types/react': 19.2.17

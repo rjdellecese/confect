@@ -4,7 +4,7 @@
   "devDependencies": {
     "@mintlify/scraping": "4.0.911",
     "mintlify": "4.2.742",
-    "react": "19.2.7"
+    "react": "19.2.8"
   },
   "private": true,
   "scripts": {
