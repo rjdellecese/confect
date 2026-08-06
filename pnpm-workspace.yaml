@@ -15,9 +15,16 @@ allowBuilds:
   puppeteer: false
   sharp: true
 
+minimumReleaseAgeExclude:
+  - "@effect/platform-bun@4.0.0-beta.104"
+  - "@effect/platform-node-shared@4.0.0-beta.104"
+  - "@effect/platform-node@4.0.0-beta.104"
+  - "@effect/vitest@4.0.0-beta.104"
+  - effect@4.0.0-beta.104
+
 overrides:
   convex: 1.43.0
-  effect: 4.0.0-beta.103
+  effect: 4.0.0-beta.104
   react: 19.2.8
   react-dom: 19.2.8
 

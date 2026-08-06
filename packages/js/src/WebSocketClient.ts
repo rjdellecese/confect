@@ -8,7 +8,7 @@ import * as Queue from "effect/Queue";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
-export class WebSocketClientError extends Schema.TaggedErrorClass<WebSocketClientError>()(
+export class WebSocketClientError extends Schema.TaggedError<WebSocketClientError>()(
   "WebSocketClientError",
   {
     cause: Schema.Unknown,

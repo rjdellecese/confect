@@ -10,7 +10,7 @@ import { formatPath, renderBuildError } from "./log";
 
 // --- Variants ---
 
-export class MissingImplFileError extends Schema.TaggedErrorClass<MissingImplFileError>()(
+export class MissingImplFileError extends Schema.TaggedError<MissingImplFileError>()(
   "MissingImplFileError",
   {
     specPath: Schema.String,
@@ -18,7 +18,7 @@ export class MissingImplFileError extends Schema.TaggedErrorClass<MissingImplFil
   },
 ) {}
 
-export class MissingSpecFileError extends Schema.TaggedErrorClass<MissingSpecFileError>()(
+export class MissingSpecFileError extends Schema.TaggedError<MissingSpecFileError>()(
   "MissingSpecFileError",
   {
     implPath: Schema.String,
@@ -26,14 +26,14 @@ export class MissingSpecFileError extends Schema.TaggedErrorClass<MissingSpecFil
   },
 ) {}
 
-export class SpecMissingDefaultGroupSpecError extends Schema.TaggedErrorClass<SpecMissingDefaultGroupSpecError>()(
+export class SpecMissingDefaultGroupSpecError extends Schema.TaggedError<SpecMissingDefaultGroupSpecError>()(
   "SpecMissingDefaultGroupSpecError",
   {
     specPath: Schema.String,
   },
 ) {}
 
-export class ImplMissingSpecImportError extends Schema.TaggedErrorClass<ImplMissingSpecImportError>()(
+export class ImplMissingSpecImportError extends Schema.TaggedError<ImplMissingSpecImportError>()(
   "ImplMissingSpecImportError",
   {
     implPath: Schema.String,
@@ -41,21 +41,21 @@ export class ImplMissingSpecImportError extends Schema.TaggedErrorClass<ImplMiss
   },
 ) {}
 
-export class ImplMissingDefaultLayerError extends Schema.TaggedErrorClass<ImplMissingDefaultLayerError>()(
+export class ImplMissingDefaultLayerError extends Schema.TaggedError<ImplMissingDefaultLayerError>()(
   "ImplMissingDefaultLayerError",
   {
     implPath: Schema.String,
   },
 ) {}
 
-export class ImplNotFinalizedError extends Schema.TaggedErrorClass<ImplNotFinalizedError>()(
+export class ImplNotFinalizedError extends Schema.TaggedError<ImplNotFinalizedError>()(
   "ImplNotFinalizedError",
   {
     implPath: Schema.String,
   },
 ) {}
 
-export class ImplMissingFunctionsError extends Schema.TaggedErrorClass<ImplMissingFunctionsError>()(
+export class ImplMissingFunctionsError extends Schema.TaggedError<ImplMissingFunctionsError>()(
   "ImplMissingFunctionsError",
   {
     implPath: Schema.String,
@@ -64,7 +64,7 @@ export class ImplMissingFunctionsError extends Schema.TaggedErrorClass<ImplMissi
   },
 ) {}
 
-export class ParentChildNameCollisionError extends Schema.TaggedErrorClass<ParentChildNameCollisionError>()(
+export class ParentChildNameCollisionError extends Schema.TaggedError<ParentChildNameCollisionError>()(
   "ParentChildNameCollisionError",
   {
     parentSpecPath: Schema.String,
@@ -74,14 +74,14 @@ export class ParentChildNameCollisionError extends Schema.TaggedErrorClass<Paren
   },
 ) {}
 
-export class InvalidTableDefaultExportError extends Schema.TaggedErrorClass<InvalidTableDefaultExportError>()(
+export class InvalidTableDefaultExportError extends Schema.TaggedError<InvalidTableDefaultExportError>()(
   "InvalidTableDefaultExportError",
   {
     tablePath: Schema.String,
   },
 ) {}
 
-export class InvalidTableFilenameError extends Schema.TaggedErrorClass<InvalidTableFilenameError>()(
+export class InvalidTableFilenameError extends Schema.TaggedError<InvalidTableFilenameError>()(
   "InvalidTableFilenameError",
   {
     tablePath: Schema.String,
@@ -89,7 +89,7 @@ export class InvalidTableFilenameError extends Schema.TaggedErrorClass<InvalidTa
   },
 ) {}
 
-export class DuplicateTableNameError extends Schema.TaggedErrorClass<DuplicateTableNameError>()(
+export class DuplicateTableNameError extends Schema.TaggedError<DuplicateTableNameError>()(
   "DuplicateTableNameError",
   {
     // Every table name that more than one file resolves to, each paired with
@@ -105,14 +105,14 @@ export class DuplicateTableNameError extends Schema.TaggedErrorClass<DuplicateTa
   },
 ) {}
 
-export class LegacySchemaFileError extends Schema.TaggedErrorClass<LegacySchemaFileError>()(
+export class LegacySchemaFileError extends Schema.TaggedError<LegacySchemaFileError>()(
   "LegacySchemaFileError",
   {
     schemaPath: Schema.String,
   },
 ) {}
 
-export class ConflictingDocNameError extends Schema.TaggedErrorClass<ConflictingDocNameError>()(
+export class ConflictingDocNameError extends Schema.TaggedError<ConflictingDocNameError>()(
   "ConflictingDocNameError",
   {
     collisions: Schema.Array(
@@ -124,7 +124,7 @@ export class ConflictingDocNameError extends Schema.TaggedErrorClass<Conflicting
   },
 ) {}
 
-export class InvalidConvexConfigError extends Schema.TaggedErrorClass<InvalidConvexConfigError>()(
+export class InvalidConvexConfigError extends Schema.TaggedError<InvalidConvexConfigError>()(
   "InvalidConvexConfigError",
   {
     configPath: Schema.String,

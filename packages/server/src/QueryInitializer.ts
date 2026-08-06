@@ -295,7 +295,7 @@ export const getById =
       Effect.andThen(Document.decode(tableName, table.Fields)),
     );
 
-export class GetByIdFailure extends Schema.TaggedErrorClass<GetByIdFailure>()(
+export class GetByIdFailure extends Schema.TaggedError<GetByIdFailure>()(
   "GetByIdFailure",
   {
     id: Schema.String,
@@ -311,7 +311,7 @@ export class GetByIdFailure extends Schema.TaggedErrorClass<GetByIdFailure>()(
   }
 }
 
-export class GetByIndexFailure extends Schema.TaggedErrorClass<GetByIndexFailure>()(
+export class GetByIndexFailure extends Schema.TaggedError<GetByIndexFailure>()(
   "GetByIndexFailure",
   {
     tableName: Schema.String,
