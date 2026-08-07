@@ -1,5 +1,21 @@
 # @confect/cli
 
+## 9.4.0
+
+### Minor Changes
+
+- 5ac7a74: Support Windows. `confect codegen` and `confect dev` now run natively on Windows, alongside Linux and macOS.
+
+  Previously, generated files under `confect/_generated/` and `convex/` were written with Windows path separators in their `import` statements (`import databaseSchema from "..\_generated\schema";`). Because `\_` and `\s` are identity escapes, that specifier silently reads as `.._generatedschema` rather than failing to parse — so every generated file broke with an unresolved-module error pointing at a path that appears nowhere in the source. Generated import specifiers are now always `/`-separated regardless of the platform that ran codegen, so the same generated files are produced — and stay byte-identical — on every OS.
+
+  Convex's own [local deployments](https://docs.convex.dev/cli/local-deployments) (anonymous development and self-hosting) still require WSL or Docker on Windows, because Convex publishes no Windows build of `convex-local-backend`. Developing against a Convex cloud deployment is unaffected.
+
+### Patch Changes
+
+- 0526b5f: Raise `@confect/server`'s `@effect/platform` peer dependency floor to `^0.97.1`, and its optional `@effect/platform-node` peer to `^0.108.1`. If you are on `@effect/platform` 0.96.x, upgrade it alongside this release: the Effect ecosystem treats each `0.x` minor as its own compatibility line, so a project resolving both 0.96 and 0.97 gets duplicate-package type errors rather than a working install.
+
+  `@confect/cli` moves its own dependencies onto the same line — `@effect/cli` `^0.77.0`, `@effect/platform` `^0.97.1`, `@effect/platform-node` `^0.108.1`, `@effect/printer` and `@effect/printer-ansi` `^0.51.0`, and `exsolve` `^1.1.1`. No action is needed unless you depend on those packages directly.
+
 ## 9.3.0
 
 ## 9.2.5

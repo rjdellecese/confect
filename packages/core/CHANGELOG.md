@@ -1,5 +1,7 @@
 # @confect/core
 
+## 9.4.0
+
 ## 9.3.0
 
 ### Minor Changes
