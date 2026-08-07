@@ -10,7 +10,7 @@
     "@ark/attest": "0.56.3",
     "@effect/vitest": "0.30.0",
     "@types/node": "26.1.2",
-    "effect": "3.22.0",
+    "effect": "3.22.1",
     "tsdown": "0.22.14",
     "tsx": "4.23.4",
     "typescript": "6.0.3",
@@ -58,10 +58,10 @@
   },
   "scripts": {
     "bench": "tsx test/Refs.bench.ts",
-    "clean": "rm -rf dist coverage node_modules",
+    "clean": "shx rm -rf dist coverage node_modules",
     "dev": "tsdown --watch --config-loader unrun",
-    "postpack": "rm ./README.md && ln -s ../../README.md ./README.md",
-    "prepack": "rm -f ./README.md && cp ../../README.md ./README.md",
+    "postpack": "git checkout -- README.md",
+    "prepack": "shx rm -f ./README.md && shx cp ../../README.md ./README.md",
     "test": "vitest run",
     "typecheck": "tsc -b tsconfig.src.json"
   },

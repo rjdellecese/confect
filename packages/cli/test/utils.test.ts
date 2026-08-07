@@ -4,6 +4,7 @@ import * as Path from "@effect/platform/Path";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { assert, expect, layer } from "@effect/vitest";
+import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as HashSet from "effect/HashSet";
 import * as Layer from "effect/Layer";
@@ -13,7 +14,12 @@ import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
 import * as GroupPath from "@confect/cli/GroupPath";
 import * as GroupPaths from "@confect/cli/GroupPaths";
 import { ProjectRoot } from "@confect/cli/ProjectRoot";
-import { generateFunctions, removeGroups } from "@confect/cli/utils";
+import {
+  generateFunctions,
+  removeGroups,
+  toModuleImportPath,
+  toPosixPath,
+} from "@confect/cli/utils";
 
 const fixtureRoot = `${import.meta.dirname}/../../server/test/mock-backend/fixtures`;
 const fixtureConvex = `${fixtureRoot}/convex`;
@@ -171,3 +177,46 @@ layer(GenerateFunctionsLayer)("generateFunctions", (it) => {
     }),
   );
 });
+
+const SPECIFIER_PLATFORMS = [
+  { name: "posix", pathLayer: NodePath.layerPosix, sep: "/" },
+  { name: "win32", pathLayer: NodePath.layerWin32, sep: "\\" },
+] as const;
+
+for (const { name, pathLayer, sep } of SPECIFIER_PLATFORMS) {
+  const p = (...segments: ReadonlyArray<string>) => Array.join(segments, sep);
+
+  layer(pathLayer)(`module specifiers, built from ${name} paths`, (it) => {
+    it.effect("toPosixPath rewrites the platform separator", () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        expect(toPosixPath(path, p("_generated", "tables", "notes.ts"))).toBe(
+          "_generated/tables/notes.ts",
+        );
+      }),
+    );
+
+    it.effect("toPosixPath leaves a separator-free path alone", () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        expect(toPosixPath(path, "notes.ts")).toBe("notes.ts");
+      }),
+    );
+
+    it.effect("toModuleImportPath emits a POSIX relative specifier", () =>
+      Effect.gen(function* () {
+        expect(
+          yield* toModuleImportPath(p("..", "_generated", "schema.ts")),
+        ).toBe("../_generated/schema");
+      }),
+    );
+
+    it.effect("toModuleImportPath prefixes a bare sibling path with ./", () =>
+      Effect.gen(function* () {
+        expect(yield* toModuleImportPath(p("tables", "notes.ts"))).toBe(
+          "./tables/notes",
+        );
+      }),
+    );
+  });
+}

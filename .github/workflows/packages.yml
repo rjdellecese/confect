@@ -49,10 +49,12 @@ jobs:
       - run: pnpm circular
 
   test:
-    name: Test
-    runs-on: ubuntu-latest
+    name: Test (${{ matrix.package }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest]
         package: [cli, core, js, server]
     steps:
       - uses: actions/checkout@v7
@@ -60,8 +62,12 @@ jobs:
       - run: cd packages/${{ matrix.package }} && pnpm test
 
   test-mock-backend:
-    name: Test (mock-backend)
-    runs-on: ubuntu-latest
+    name: Test (mock-backend, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
@@ -88,6 +94,32 @@ jobs:
         with:
           path: packages/server/test/local-backend/fixtures
 
+  # The `verify-codegen-committed` steps on the two test jobs above only see
+  # what those jobs regenerate, and the test `globalSetup` runs `confect
+  # codegen` alone — which writes `confect/_generated/` and the `convex/`
+  # wrapper files. The Convex-side `convex/_generated/api.d.ts` and
+  # `dataModel.d.ts` come from the `convex dev` half of the `codegen:*`
+  # scripts, which nothing in CI ran, so drift in them was structurally
+  # invisible and accumulated silently. This job runs the scripts in full.
+  codegen-fixtures:
+    name: Codegen (server fixtures)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/confect-setup
+      - name: Cache convex local-backend binary
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/convex/binaries
+          key: convex-local-backend-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            convex-local-backend-${{ runner.os }}-
+      - run: pnpm codegen:server:mock-backend
+      - run: pnpm codegen:server:local-backend
+      - uses: ./.github/actions/verify-codegen-committed
+        with:
+          path: packages/server/test
+
   bench:
     name: Bench
     runs-on: ubuntu-latest
@@ -100,10 +132,12 @@ jobs:
       - run: pnpm --filter ${{ matrix.package }} bench
 
   build:
-    name: Build
-    runs-on: ubuntu-latest
+    name: Build (${{ matrix.package }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest]
         package:
           [
             "@confect/cli",

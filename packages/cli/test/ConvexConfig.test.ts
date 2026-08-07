@@ -81,8 +81,8 @@ layer(TestLayer)("discoverInstalledComponents", (it) => {
         const [waitlist] = components;
         assert(waitlist !== undefined);
         expect(waitlist.name).toBe("waitlist");
-        expect(waitlist.componentDefinitionPath).toBe(
-          path.join(fixturesRoot, "local", "convex", "waitlist"),
+        expect(path.resolve(waitlist.componentDefinitionPath)).toBe(
+          path.resolve(path.join(fixturesRoot, "local", "convex", "waitlist")),
         );
 
         const importPath = typeImportPath(

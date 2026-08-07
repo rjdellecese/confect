@@ -10,15 +10,15 @@
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "dependencies": {
-    "@effect/cli": "^0.75.1",
-    "@effect/platform": "^0.96.1",
-    "@effect/platform-node": "^0.106.0",
-    "@effect/printer": "^0.49.0",
-    "@effect/printer-ansi": "^0.49.0",
+    "@effect/cli": "^0.77.0",
+    "@effect/platform": "^0.97.1",
+    "@effect/platform-node": "^0.108.1",
+    "@effect/printer": "^0.51.0",
+    "@effect/printer-ansi": "^0.51.0",
     "bundle-require": "^5.1.0",
     "code-block-writer": "^13.0.3",
     "esbuild": "0.27.0 - 0.27.3 || ^0.27.5 || ^0.28.0",
-    "exsolve": "^1.1.0"
+    "exsolve": "^1.1.1"
   },
   "devDependencies": {
     "@convex-dev/workpool": "0.4.9",
@@ -26,8 +26,8 @@
     "@effect/vitest": "0.30.0",
     "@types/node": "26.1.2",
     "@vitest/coverage-v8": "4.1.10",
-    "convex": "1.42.3",
-    "effect": "3.22.0",
+    "convex": "1.43.0",
+    "effect": "3.22.1",
     "tsdown": "0.22.14",
     "typescript": "6.0.3",
     "unrun": "0.3.1",
@@ -66,10 +66,10 @@
     "url": "https://github.com/rjdellecese/confect.git"
   },
   "scripts": {
-    "clean": "rm -rf dist coverage node_modules",
+    "clean": "shx rm -rf dist coverage node_modules",
     "dev": "tsdown --watch --config-loader unrun",
-    "postpack": "rm ./README.md && ln -s ../../README.md ./README.md",
-    "prepack": "rm -f ./README.md && cp ../../README.md ./README.md",
+    "postpack": "git checkout -- README.md",
+    "prepack": "shx rm -f ./README.md && shx cp ../../README.md ./README.md",
     "test": "vitest run",
     "typecheck": "tsc --noEmit --project tsconfig.json"
   },

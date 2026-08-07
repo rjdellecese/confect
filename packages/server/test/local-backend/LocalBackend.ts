@@ -60,6 +60,7 @@ const make = Effect.gen(function* () {
     "--codegen=disable",
     "--tail-logs=disable",
   ).pipe(
+    Command.runInShell(true),
     Command.workingDirectory(fixturesDir),
     Command.env({
       CONVEX_AGENT_MODE: "anonymous",

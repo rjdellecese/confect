@@ -33,8 +33,17 @@
   // binary, so it has no composite `tsconfig.src.json` in the
   // `tsconfig.packages.json` graph, and this project is what typechecks its
   // sources (not all of which are reachable from its tests).
+  //
+  // `.claude/hooks` is included because nothing else covers it: the hooks are
+  // standalone Bun scripts, not part of any package, and they went a full
+  // major version dead — every Effect call in them resolving to `undefined`
+  // at runtime — without a single check going red. Only a new oxlint rule
+  // eventually noticed. They import from the workspace's pinned `effect`, so
+  // typechecking them here fails loudly the next time an upgrade moves an API
+  // out from under them.
   "include": [
     "*.ts",
+    ".claude/hooks/**/*.ts",
     "packages/*/*.ts",
     "packages/*/test/**/*",
     "packages/cli/src/**/*"
