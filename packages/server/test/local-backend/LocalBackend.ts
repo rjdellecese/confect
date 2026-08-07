@@ -66,6 +66,9 @@ const make = Effect.gen(function* () {
     ],
     {
       cwd: fixturesDir,
+      // `pnpm` is a `.cmd` shim on Windows, which `spawn` cannot execute
+      // directly.
+      shell: true,
       // Without extendEnv, `env` replaces the child's entire environment and
       // `pnpm` falls off PATH.
       extendEnv: true,

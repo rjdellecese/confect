@@ -9,10 +9,10 @@
   "devDependencies": {
     "@ark/attest": "0.56.3",
     "@effect/vitest": "4.0.0-beta.103",
-    "@types/node": "26.1.1",
+    "@types/node": "26.1.2",
     "effect": "4.0.0-beta.103",
     "tsdown": "0.22.14",
-    "tsx": "4.23.1",
+    "tsx": "4.23.8",
     "typescript": "6.0.3",
     "unrun": "0.3.1",
     "vitest": "4.1.10"
@@ -58,10 +58,10 @@
   },
   "scripts": {
     "bench": "tsx test/Refs.bench.ts",
-    "clean": "rm -rf dist coverage node_modules",
+    "clean": "shx rm -rf dist coverage node_modules",
     "dev": "tsdown --watch --config-loader unrun",
-    "postpack": "rm ./README.md && ln -s ../../README.md ./README.md",
-    "prepack": "rm -f ./README.md && cp ../../README.md ./README.md",
+    "postpack": "shx rm -f ./README.md && shx mv ./.README.md.bak ./README.md",
+    "prepack": "shx mv ./README.md ./.README.md.bak && shx cp ../../README.md ./README.md",
     "test": "vitest run",
     "typecheck": "tsc -b tsconfig.src.json"
   },

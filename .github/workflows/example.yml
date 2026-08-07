@@ -44,8 +44,12 @@ jobs:
       - run: pnpm --filter example build
 
   codegen:
-    name: Codegen
-    runs-on: ubuntu-latest
+    name: Codegen (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/example-setup
