@@ -7,20 +7,20 @@
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "devDependencies": {
-    "@effect/vitest": "4.0.0-beta.103",
+    "@effect/vitest": "4.0.0-beta.105",
     "@testing-library/react": "16.3.2",
-    "@types/node": "26.1.1",
-    "@types/react": "19.2.17",
-    "@types/react-dom": "19.2.3",
-    "convex": "1.42.3",
-    "effect": "4.0.0-beta.103",
+    "@types/node": "26.1.2",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "convex": "1.43.0",
+    "effect": "4.0.0-beta.105",
     "happy-dom": "20.11.1",
-    "react": "19.2.7",
-    "react-dom": "19.2.7",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "tsdown": "0.22.14",
     "typescript": "6.0.3",
     "unrun": "0.3.1",
-    "vite": "8.1.5",
+    "vite": "8.2.0",
     "vitest": "4.1.10"
   },
   "engines": {
@@ -57,7 +57,7 @@
   "peerDependencies": {
     "@confect/core": "workspace:^",
     "convex": "^1.36.0",
-    "effect": "^4.0.0-beta.103",
+    "effect": "^4.0.0-beta.105",
     "react": "^18.0.0 || ^19.0.0"
   },
   "repository": {
@@ -65,10 +65,10 @@
     "url": "https://github.com/rjdellecese/confect.git"
   },
   "scripts": {
-    "clean": "rm -rf dist coverage node_modules",
+    "clean": "shx rm -rf dist coverage node_modules",
     "dev": "tsdown --watch --config-loader unrun",
-    "postpack": "rm ./README.md && ln -s ../../README.md ./README.md",
-    "prepack": "rm -f ./README.md && cp ../../README.md ./README.md",
+    "postpack": "shx rm -f ./README.md && shx mv ./.README.md.bak ./README.md",
+    "prepack": "shx mv ./README.md ./.README.md.bak && shx cp ../../README.md ./README.md",
     "typecheck": "tsc -b tsconfig.src.json"
   },
   "sideEffects": false,

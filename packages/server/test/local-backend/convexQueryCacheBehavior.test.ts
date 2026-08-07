@@ -16,7 +16,7 @@ import * as Schema from "effect/Schema";
 import refs from "./fixtures/confect/_generated/refs";
 import * as LocalBackend from "./LocalBackend";
 
-class ConvexQueryError extends Schema.TaggedErrorClass<ConvexQueryError>()(
+class ConvexQueryError extends Schema.TaggedError<ConvexQueryError>()(
   "ConvexQueryError",
   { message: Schema.String },
 ) {}

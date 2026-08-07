@@ -14,7 +14,7 @@ export class ConfectDirectory extends Context.Service<
   static readonly get = ConfectDirectory.use((service) => service.get);
 }
 
-export class ConfectDirectoryNotFoundError extends Schema.TaggedErrorClass<ConfectDirectoryNotFoundError>()(
+export class ConfectDirectoryNotFoundError extends Schema.TaggedError<ConfectDirectoryNotFoundError>()(
   "ConfectDirectoryNotFoundError",
   {},
 ) {

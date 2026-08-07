@@ -8,19 +8,19 @@
   },
   "devDependencies": {
     "@ark/attest": "0.56.3",
-    "@effect/platform-node": "4.0.0-beta.103",
-    "@effect/vitest": "4.0.0-beta.103",
+    "@effect/platform-node": "4.0.0-beta.105",
+    "@effect/vitest": "4.0.0-beta.105",
     "@swc/jest": "0.2.39",
-    "@types/node": "26.1.1",
+    "@types/node": "26.1.2",
     "@vitest/coverage-v8": "4.1.10",
     "convex-test": "0.0.54",
     "dotenv": "17.4.2",
-    "effect": "4.0.0-beta.103",
+    "effect": "4.0.0-beta.105",
     "tsdown": "0.22.14",
-    "tsx": "4.23.1",
+    "tsx": "4.23.8",
     "typescript": "6.0.3",
     "unrun": "0.3.1",
-    "vite": "8.1.5",
+    "vite": "8.2.0",
     "vite-tsconfig-paths": "6.1.1",
     "vitest": "4.1.10"
   },
@@ -61,9 +61,9 @@
   "module": "./dist/index.js",
   "peerDependencies": {
     "@confect/core": "workspace:^",
-    "@effect/platform-node": "^4.0.0-beta.103",
+    "@effect/platform-node": "^4.0.0-beta.105",
     "convex": "^1.32.0",
-    "effect": "^4.0.0-beta.103"
+    "effect": "^4.0.0-beta.105"
   },
   "peerDependenciesMeta": {
     "@effect/platform-node": {
@@ -76,12 +76,12 @@
   },
   "scripts": {
     "bench": "tsx test/SchemaToValidator.bench.ts && tsx test/Document.bench.ts",
-    "clean": "rm -rf dist coverage node_modules",
-    "codegen:local-backend": "cd test/local-backend/fixtures && pnpm confect codegen && CONVEX_AGENT_MODE=anonymous pnpm convex dev --once --typecheck=disable --tail-logs=disable",
-    "codegen:mock-backend": "cd test/mock-backend/fixtures && pnpm confect codegen && CONVEX_AGENT_MODE=anonymous pnpm convex dev --once --typecheck=disable --tail-logs=disable",
+    "clean": "shx rm -rf dist coverage node_modules",
+    "codegen:local-backend": "cd test/local-backend/fixtures && pnpm confect codegen && cross-env CONVEX_AGENT_MODE=anonymous pnpm convex dev --once --typecheck=disable --tail-logs=disable",
+    "codegen:mock-backend": "cd test/mock-backend/fixtures && pnpm confect codegen && cross-env CONVEX_AGENT_MODE=anonymous pnpm convex dev --once --typecheck=disable --tail-logs=disable",
     "dev": "tsdown --watch --config-loader unrun",
-    "postpack": "rm ./README.md && ln -s ../../README.md ./README.md",
-    "prepack": "rm -f ./README.md && cp ../../README.md ./README.md",
+    "postpack": "shx rm -f ./README.md && shx mv ./.README.md.bak ./README.md",
+    "prepack": "shx mv ./README.md ./.README.md.bak && shx cp ../../README.md ./README.md",
     "test": "vitest run",
     "test:local-backend": "vitest run --config vitest.local-backend.config.ts",
     "test:mock-backend": "vitest run --config vitest.mock-backend.config.ts",

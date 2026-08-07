@@ -5,7 +5,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
-export class HttpClientError extends Schema.TaggedErrorClass<HttpClientError>()(
+export class HttpClientError extends Schema.TaggedError<HttpClientError>()(
   "HttpClientError",
   {
     cause: Schema.Unknown,

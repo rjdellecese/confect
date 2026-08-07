@@ -1,6 +1,6 @@
 import * as Schema from "effect/Schema";
 
-export class BlobNotFoundError extends Schema.TaggedErrorClass<BlobNotFoundError>()(
+export class BlobNotFoundError extends Schema.TaggedError<BlobNotFoundError>()(
   "BlobNotFoundError",
   {
     id: Schema.String,

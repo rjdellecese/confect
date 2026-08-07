@@ -19,7 +19,7 @@ import {
   SpecMissingDefaultGroupSpecError,
 } from "./CodegenError";
 import { ConfectDirectory } from "./ConfectDirectory";
-import { removePathExtension } from "./utils";
+import { removePathExtension, toPosixPath } from "./utils";
 
 export interface LeafModule {
   readonly relativePath: string;
@@ -99,7 +99,11 @@ export const groupPathFromRelativeModulePath = (relativePath: string) =>
 
 export const specImportPathFromGenerated = (specRelativePath: string) =>
   Effect.gen(function* () {
-    const withoutExt = yield* removePathExtension(specRelativePath);
+    const path = yield* Path.Path;
+    const withoutExt = toPosixPath(
+      path,
+      yield* removePathExtension(specRelativePath),
+    );
     return `../${withoutExt}`;
   });
 

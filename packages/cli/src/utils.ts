@@ -45,11 +45,18 @@ export const removePathExtension = (pathStr: string) =>
     return String.slice(0, -path.extname(pathStr).length)(pathStr);
   });
 
+export const toPosixPath = (path: Path.Path, pathStr: string): string =>
+  pipe(String.split(pathStr, path.sep), Array.join("/"));
+
 /** Ensures a relative path is a valid ESM/TS module specifier (e.g. `spec` → `./spec`). */
 export const toModuleImportPath = (relativePath: string) =>
   Effect.gen(function* () {
-    const withoutExt = yield* removePathExtension(relativePath);
-    return withoutExt.startsWith(".") ? withoutExt : `./${withoutExt}`;
+    const path = yield* Path.Path;
+    const withoutExt = toPosixPath(
+      path,
+      yield* removePathExtension(relativePath),
+    );
+    return String.startsWith(".")(withoutExt) ? withoutExt : `./${withoutExt}`;
   });
 
 export const writeFileStringAndLog = (filePath: string, contents: string) =>
@@ -414,8 +421,9 @@ const generateOptionalFile = (
       path.dirname(convexFilePath),
       confectFilePath,
     );
-    const importPathWithoutExt = yield* removePathExtension(relativeImportPath);
-    const contents = yield* generateContents(importPathWithoutExt);
+    const contents = yield* generateContents(
+      yield* toModuleImportPath(relativeImportPath),
+    );
     const change = yield* writeFileString(convexFilePath, contents);
     return Option.some({ change, convexFilePath });
   });

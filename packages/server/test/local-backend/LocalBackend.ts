@@ -11,7 +11,7 @@ import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/unstable/process/ChildProcess";
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
 
-class BackendNotReadyError extends Schema.TaggedErrorClass<BackendNotReadyError>()(
+class BackendNotReadyError extends Schema.TaggedError<BackendNotReadyError>()(
   "BackendNotReadyError",
   { message: Schema.String },
 ) {}
@@ -66,6 +66,9 @@ const make = Effect.gen(function* () {
     ],
     {
       cwd: fixturesDir,
+      // `pnpm` is a `.cmd` shim on Windows, which `spawn` cannot execute
+      // directly.
+      shell: true,
       // Without extendEnv, `env` replaces the child's entire environment and
       // `pnpm` falls off PATH.
       extendEnv: true,

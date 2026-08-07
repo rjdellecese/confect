@@ -50,7 +50,7 @@ export const layer = Layer.effect(
   }),
 ).pipe(Layer.provide(NodeFileSystem.layer));
 
-export class ProjectRootNotFoundError extends Schema.TaggedErrorClass<ProjectRootNotFoundError>()(
+export class ProjectRootNotFoundError extends Schema.TaggedError<ProjectRootNotFoundError>()(
   "ProjectRootNotFoundError",
   {},
 ) {

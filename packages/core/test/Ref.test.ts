@@ -201,7 +201,7 @@ describe("Error type extraction", () => {
   });
 
   test("error schema extracts the error type", () => {
-    class NotFound extends Schema.TaggedErrorClass<NotFound>()("NotFound", {
+    class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
       id: Schema.String,
     }) {}
 
@@ -216,10 +216,10 @@ describe("Error type extraction", () => {
   });
 
   test("union error schema extracts the union type", () => {
-    class NotFound extends Schema.TaggedErrorClass<NotFound>()("NotFound", {
+    class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
       id: Schema.String,
     }) {}
-    class Forbidden extends Schema.TaggedErrorClass<Forbidden>()("Forbidden", {
+    class Forbidden extends Schema.TaggedError<Forbidden>()("Forbidden", {
       reason: Schema.String,
     }) {}
 
@@ -253,7 +253,7 @@ describe("isConvexError", () => {
 
 describe("decodeError", () => {
   test("decodes error data using the error schema", async () => {
-    class NotFound extends Schema.TaggedErrorClass<NotFound>()("NotFound", {
+    class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
       id: Schema.String,
     }) {}
 
@@ -290,7 +290,7 @@ describe("decodeError", () => {
 });
 
 describe("decodeErrorOption", () => {
-  class NotFound extends Schema.TaggedErrorClass<NotFound>()("NotFound", {
+  class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
     id: Schema.String,
   }) {}
 
@@ -344,7 +344,7 @@ describe("decodeErrorOption", () => {
 });
 
 describe("decodeErrorOrElse", () => {
-  class NotFound extends Schema.TaggedErrorClass<NotFound>()("NotFound", {
+  class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
     id: Schema.String,
   }) {}
 
@@ -399,7 +399,7 @@ describe("decodeErrorOrElse", () => {
 
 describe("hasErrorSchema", () => {
   test("returns true for Confect ref with an error schema", () => {
-    class NotFound extends Schema.TaggedErrorClass<NotFound>()("NotFound", {
+    class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
       id: Schema.String,
     }) {}
 
@@ -485,7 +485,7 @@ describe("paginated queries", () => {
     });
 
     test("is satisfied by a paginated query ref with an error schema", () => {
-      class PaginationFailed extends Schema.TaggedErrorClass<PaginationFailed>()(
+      class PaginationFailed extends Schema.TaggedError<PaginationFailed>()(
         "PaginationFailed",
         {},
       ) {}

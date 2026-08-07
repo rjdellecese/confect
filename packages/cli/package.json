@@ -10,24 +10,24 @@
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "dependencies": {
-    "@effect/platform-node": "^4.0.0-beta.103",
+    "@effect/platform-node": "^4.0.0-beta.105",
     "bundle-require": "^5.1.0",
     "code-block-writer": "^13.0.3",
     "esbuild": "0.27.0 - 0.27.3 || ^0.27.5 || ^0.28.0",
-    "exsolve": "^1.1.0"
+    "exsolve": "^1.1.1"
   },
   "devDependencies": {
-    "@convex-dev/workpool": "0.4.8",
+    "@convex-dev/workpool": "0.4.9",
     "@effect/language-service": "0.87.1",
-    "@effect/vitest": "4.0.0-beta.103",
-    "@types/node": "26.1.1",
+    "@effect/vitest": "4.0.0-beta.105",
+    "@types/node": "26.1.2",
     "@vitest/coverage-v8": "4.1.10",
-    "convex": "1.42.3",
-    "effect": "4.0.0-beta.103",
+    "convex": "1.43.0",
+    "effect": "4.0.0-beta.105",
     "tsdown": "0.22.14",
     "typescript": "6.0.3",
     "unrun": "0.3.1",
-    "vite": "8.1.5",
+    "vite": "8.2.0",
     "vite-tsconfig-paths": "6.1.1",
     "vitest": "4.1.10"
   },
@@ -55,17 +55,17 @@
   "peerDependencies": {
     "@confect/core": "workspace:^",
     "@confect/server": "workspace:^",
-    "effect": "^4.0.0-beta.103"
+    "effect": "^4.0.0-beta.105"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/rjdellecese/confect.git"
   },
   "scripts": {
-    "clean": "rm -rf dist coverage node_modules",
+    "clean": "shx rm -rf dist coverage node_modules",
     "dev": "tsdown --watch --config-loader unrun",
-    "postpack": "rm ./README.md && ln -s ../../README.md ./README.md",
-    "prepack": "rm -f ./README.md && cp ../../README.md ./README.md",
+    "postpack": "shx rm -f ./README.md && shx mv ./.README.md.bak ./README.md",
+    "prepack": "shx mv ./README.md ./.README.md.bak && shx cp ../../README.md ./README.md",
     "test": "vitest run",
     "typecheck": "tsc --noEmit --project tsconfig.json"
   },
