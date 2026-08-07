@@ -56,7 +56,7 @@ export const toModuleImportPath = (relativePath: string) =>
       path,
       yield* removePathExtension(relativePath),
     );
-    return withoutExt.startsWith(".") ? withoutExt : `./${withoutExt}`;
+    return String.startsWith(".")(withoutExt) ? withoutExt : `./${withoutExt}`;
   });
 
 export const writeFileStringAndLog = (filePath: string, contents: string) =>

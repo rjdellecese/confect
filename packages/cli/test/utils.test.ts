@@ -4,6 +4,7 @@ import * as Path from "@effect/platform/Path";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { assert, expect, layer } from "@effect/vitest";
+import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as HashSet from "effect/HashSet";
 import * as Layer from "effect/Layer";
@@ -183,7 +184,7 @@ const SPECIFIER_PLATFORMS = [
 ] as const;
 
 for (const { name, pathLayer, sep } of SPECIFIER_PLATFORMS) {
-  const p = (...segments: ReadonlyArray<string>) => segments.join(sep);
+  const p = (...segments: ReadonlyArray<string>) => Array.join(segments, sep);
 
   layer(pathLayer)(`module specifiers, built from ${name} paths`, (it) => {
     it.effect("toPosixPath rewrites the platform separator", () =>

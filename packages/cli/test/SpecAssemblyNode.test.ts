@@ -1,5 +1,6 @@
 import * as NodePath from "@effect/platform-node/NodePath";
 import { describe, expect, it, layer } from "@effect/vitest";
+import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import {
@@ -272,7 +273,7 @@ for (const { name, pathLayer, sep } of [
             (specImportPath): LeafModule => ({
               relativePath,
               pathSegments,
-              groupPathDot: pathSegments.join("."),
+              groupPathDot: Array.join(pathSegments, "."),
               exportName: pathSegments[pathSegments.length - 1]!,
               runtime: Option.none(),
               specImportPath,

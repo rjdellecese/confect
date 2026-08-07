@@ -4,11 +4,13 @@ import * as Path from "@effect/platform/Path";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { assert, expect, layer } from "@effect/vitest";
+import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Either from "effect/Either";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
+import * as String from "effect/String";
 import { validateNoParentChildNameCollisions } from "@confect/cli/confect/codegen";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import {
@@ -44,7 +46,9 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
         "users",
       ]);
       for (const table of tables) {
-        expect(table.relativePath.startsWith(`tables${path.sep}`)).toBe(true);
+        expect(String.startsWith(`tables${path.sep}`)(table.relativePath)).toBe(
+          true,
+        );
       }
     }),
   );
@@ -317,7 +321,7 @@ const leafFor = (relativePath: string, pathSegments: [string, ...string[]]) =>
     return {
       relativePath,
       pathSegments,
-      groupPathDot: pathSegments.join("."),
+      groupPathDot: Array.join(pathSegments, "."),
       exportName: pathSegments[pathSegments.length - 1]!,
       runtime: Option.none(),
       specImportPath,
