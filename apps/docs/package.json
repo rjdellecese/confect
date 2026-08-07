@@ -8,7 +8,7 @@
   },
   "private": true,
   "scripts": {
-    "clean": "rm -rf .mintlify node_modules",
+    "clean": "shx rm -rf .mintlify node_modules",
     "dev": "mintlify dev",
     "preview": "mintlify dev"
   },
