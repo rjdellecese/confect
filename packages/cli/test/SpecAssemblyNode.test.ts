@@ -1,7 +1,12 @@
-import { describe, expect, it } from "@effect/vitest";
+import * as NodePath from "@effect/platform-node/NodePath";
+import { describe, expect, it, layer } from "@effect/vitest";
+import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
-import type { LeafModule } from "@confect/cli/LeafModule";
+import {
+  specImportPathFromGenerated,
+  type LeafModule,
+} from "@confect/cli/LeafModule";
 import { assemblyNodesFromLeaves } from "@confect/cli/SpecAssemblyNode";
 import * as templates from "@confect/cli/templates";
 
@@ -251,3 +256,52 @@ describe("SpecAssemblyNode", () => {
       }),
   );
 });
+
+for (const { name, pathLayer, sep } of [
+  { name: "posix", pathLayer: NodePath.layerPosix, sep: "/" },
+  { name: "win32", pathLayer: NodePath.layerWin32, sep: "\\" },
+] as const) {
+  layer(pathLayer)(`SpecAssemblyNode, discovered as ${name}`, (test) => {
+    test.effect("assembledSpec emits POSIX import specifiers", () =>
+      Effect.gen(function* () {
+        const discovered = (
+          relativePath: string,
+          pathSegments: [string, ...string[]],
+        ) =>
+          Effect.map(
+            specImportPathFromGenerated(relativePath),
+            (specImportPath): LeafModule => ({
+              relativePath,
+              pathSegments,
+              groupPathDot: Array.join(pathSegments, "."),
+              exportName: pathSegments[pathSegments.length - 1]!,
+              runtime: Option.none(),
+              specImportPath,
+            }),
+          );
+
+        const nodes = assemblyNodesFromLeaves([
+          yield* discovered(`notesAndRandom${sep}notes.spec.ts`, [
+            "notesAndRandom",
+            "notes",
+          ]),
+          yield* discovered(
+            `scripts${sep}operational${sep}seed${sep}mutations.spec.ts`,
+            ["scripts", "operational", "seed", "mutations"],
+          ),
+          yield* discovered("env.spec.ts", ["env"]),
+        ]);
+        const contents = yield* templates.assembledSpec({ nodes });
+
+        expect(contents).toContain(
+          'import notesAndRandom_notes from "../notesAndRandom/notes.spec";',
+        );
+        expect(contents).toContain(
+          'import scripts_operational_seed_mutations from "../scripts/operational/seed/mutations.spec";',
+        );
+        expect(contents).toContain('import env from "../env.spec";');
+        expect(contents).not.toContain("\\");
+      }),
+    );
+  });
+}

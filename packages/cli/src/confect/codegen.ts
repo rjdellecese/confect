@@ -57,6 +57,7 @@ import {
   generateHttp,
   removePathIfExists,
   toModuleImportPath,
+  toPosixPath,
   touchConvexSchema,
   writeFileStringAndLog,
   WriteTracker,
@@ -148,10 +149,13 @@ const runCodegen = Effect.gen(function* () {
   yield* generateTableWrappers(tableModules);
   yield* removeObsoleteTableWrappers(tableModules);
   yield* generateRuntimeSchema(tableModules);
-  const { leaves, groupSpecsByRelativePath } =
+  const { leaves, groupSpecsByPosixRelativePath } =
     yield* loadAndValidateLeafModules;
   yield* removeLegacyFiles;
-  yield* validateNoParentChildNameCollisions(leaves, groupSpecsByRelativePath);
+  yield* validateNoParentChildNameCollisions(
+    leaves,
+    groupSpecsByPosixRelativePath,
+  );
   yield* generateAssembledSpecs(leaves);
   // `_generated/api.ts` / `nodeApi.ts` are no longer imported by generated or
   // impl code (impls take the database schema from `_generated/schema`
@@ -233,11 +237,14 @@ const loadAndValidateLeafModules = Effect.gen(function* () {
   yield* validateOrphanImpls(specFiles);
 
   const leaves = Array.map(results, ({ leaf }) => leaf);
-  const groupSpecsByRelativePath = new Map(
-    Array.map(results, ({ leaf, groupSpec }) => [leaf.relativePath, groupSpec]),
+  const groupSpecsByPosixRelativePath = new Map(
+    Array.map(results, ({ leaf, groupSpec }) => [
+      toPosixPath(path, leaf.relativePath),
+      groupSpec,
+    ]),
   );
 
-  return { leaves, groupSpecsByRelativePath };
+  return { leaves, groupSpecsByPosixRelativePath };
 });
 
 /**
@@ -250,7 +257,7 @@ const loadAndValidateLeafModules = Effect.gen(function* () {
  */
 export const validateNoParentChildNameCollisions = (
   leaves: ReadonlyArray<LeafModule>,
-  groupSpecsByRelativePath: ReadonlyMap<string, GroupSpec.AnyWithProps>,
+  groupSpecsByPosixRelativePath: ReadonlyMap<string, GroupSpec.AnyWithProps>,
 ) =>
   Effect.gen(function* () {
     // Convex and Node groups share one namespace, so they assemble into a
@@ -258,13 +265,13 @@ export const validateNoParentChildNameCollisions = (
     // caught here by the parent/child collision check.
     const nodes = assemblyNodesFromLeaves(leaves);
     yield* Effect.forEach(nodes, (n) =>
-      checkAssemblyNodeForCollisions(n, groupSpecsByRelativePath),
+      checkAssemblyNodeForCollisions(n, groupSpecsByPosixRelativePath),
     );
   });
 
 const checkAssemblyNodeForCollisions = (
   node: SpecAssemblyNode,
-  groupSpecsByRelativePath: ReadonlyMap<string, GroupSpec.AnyWithProps>,
+  groupSpecsByPosixRelativePath: ReadonlyMap<string, GroupSpec.AnyWithProps>,
 ): Effect.Effect<void, ParentChildNameCollisionError> =>
   Effect.gen(function* () {
     yield* Option.match(node.importBinding, {
@@ -276,7 +283,7 @@ const checkAssemblyNodeForCollisions = (
             binding.importPath,
           );
           const parentGroupSpec =
-            groupSpecsByRelativePath.get(parentRelativePath);
+            groupSpecsByPosixRelativePath.get(parentRelativePath);
           if (parentGroupSpec === undefined) return;
           yield* Effect.forEach(node.children, (child) => {
             if (
@@ -314,7 +321,7 @@ const checkAssemblyNodeForCollisions = (
         }),
     });
     yield* Effect.forEach(node.children, (child) =>
-      checkAssemblyNodeForCollisions(child, groupSpecsByRelativePath),
+      checkAssemblyNodeForCollisions(child, groupSpecsByPosixRelativePath),
     );
   });
 
@@ -323,7 +330,7 @@ const checkAssemblyNodeForCollisions = (
  * generated `_generated/spec.ts` (e.g. `"../notes.spec"`). Strip the
  * `../` prefix and re-add the `.ts` extension to recover the leaf's
  * confect-relative spec path used as the key in
- * `groupSpecsByRelativePath`.
+ * `groupSpecsByPosixRelativePath`.
  */
 const bindingToRelativeSpecPath = (importPath: string): string => {
   const withoutDotDot = importPath.startsWith("../")

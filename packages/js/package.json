@@ -8,7 +8,7 @@
   },
   "devDependencies": {
     "@effect/vitest": "4.0.0-beta.103",
-    "@types/node": "26.1.1",
+    "@types/node": "26.1.2",
     "effect": "4.0.0-beta.103",
     "tsdown": "0.22.14",
     "typescript": "6.0.3",
@@ -51,10 +51,10 @@
     "url": "https://github.com/rjdellecese/confect.git"
   },
   "scripts": {
-    "clean": "rm -rf dist coverage node_modules",
+    "clean": "shx rm -rf dist coverage node_modules",
     "dev": "tsdown --watch --config-loader unrun",
-    "postpack": "rm ./README.md && ln -s ../../README.md ./README.md",
-    "prepack": "rm -f ./README.md && cp ../../README.md ./README.md",
+    "postpack": "git checkout -- README.md",
+    "prepack": "shx rm -f ./README.md && shx cp ../../README.md ./README.md",
     "test": "vitest run",
     "typecheck": "tsc -b tsconfig.src.json"
   },

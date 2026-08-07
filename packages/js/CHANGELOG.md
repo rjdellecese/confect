@@ -80,6 +80,8 @@
 - Updated dependencies [70e313e]
   - @confect/core@10.0.0-next.0
 
+## 9.4.0
+
 ## 9.3.0
 
 ## 9.2.5

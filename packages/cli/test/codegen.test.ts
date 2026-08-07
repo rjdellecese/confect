@@ -4,18 +4,24 @@ import * as Path from "effect/Path";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { assert, expect, layer } from "@effect/vitest";
+import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
+import * as String from "effect/String";
 import { validateNoParentChildNameCollisions } from "@confect/cli/confect/codegen";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
-import type { LeafModule } from "@confect/cli/LeafModule";
+import {
+  specImportPathFromGenerated,
+  type LeafModule,
+} from "@confect/cli/LeafModule";
 import {
   discover as discoverTables,
   validate as validateTables,
 } from "@confect/cli/TableModule";
+import { toPosixPath } from "@confect/cli/utils";
 
 const fixtureConfect = `${import.meta.dirname}/../../server/test/mock-backend/fixtures/confect`;
 
@@ -30,6 +36,7 @@ const CodegenLayer = Layer.mergeAll(
 layer(CodegenLayer)("TableModule.discover", (it) => {
   it.effect("discovers the fixture tables", () =>
     Effect.gen(function* () {
+      const path = yield* Path.Path;
       const tables = yield* discoverTables;
       expect(tables.map((t) => t.tableName).sort()).toEqual([
         "events",
@@ -38,7 +45,9 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
         "users",
       ]);
       for (const table of tables) {
-        expect(table.relativePath.startsWith("tables/")).toBe(true);
+        expect(String.startsWith(`tables${path.sep}`)(table.relativePath)).toBe(
+          true,
+        );
       }
     }),
   );
@@ -301,3 +310,59 @@ layer(Layer.empty)("validateNoParentChildNameCollisions", (it) => {
     }),
   );
 });
+
+const leafFor = (relativePath: string, pathSegments: [string, ...string[]]) =>
+  Effect.gen(function* () {
+    const specImportPath = yield* specImportPathFromGenerated(relativePath);
+    return {
+      relativePath,
+      pathSegments,
+      groupPathDot: Array.join(pathSegments, "."),
+      exportName: pathSegments[pathSegments.length - 1]!,
+      runtime: Option.none(),
+      specImportPath,
+    } satisfies LeafModule;
+  });
+
+for (const { name, pathLayer, sep } of [
+  { name: "posix", pathLayer: NodePath.layerPosix, sep: "/" },
+  { name: "win32", pathLayer: NodePath.layerWin32, sep: "\\" },
+] as const) {
+  layer(pathLayer)(
+    `validateNoParentChildNameCollisions, discovered as ${name}`,
+    (it) => {
+      it.effect(
+        "detects a collision when the leaf path and its specifier differ in separator",
+        () =>
+          Effect.gen(function* () {
+            const parent = yield* leafFor("notes.spec.ts", ["notes"]);
+            const child = yield* leafFor(`notes${sep}archived.spec.ts`, [
+              "notes",
+              "archived",
+            ]);
+            const parentGroupSpec = GroupSpec.make().addFunction(
+              FunctionSpec.publicQuery({
+                name: "archived",
+                args: () => emptyArgs,
+                returns: () => emptyReturns,
+              }),
+            );
+
+            const path = yield* Path.Path;
+            const result = yield* Effect.result(
+              validateNoParentChildNameCollisions(
+                [parent, child],
+                new Map([
+                  [toPosixPath(path, parent.relativePath), parentGroupSpec],
+                ]),
+              ),
+            );
+
+            assert(Result.isFailure(result));
+            expect(result.failure._tag).toBe("ParentChildNameCollisionError");
+            expect(result.failure.collisionName).toBe("archived");
+          }),
+      );
+    },
+  );
+}

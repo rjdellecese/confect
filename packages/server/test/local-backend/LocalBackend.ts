@@ -69,6 +69,9 @@ const make = Effect.gen(function* () {
       // Without extendEnv, `env` replaces the child's entire environment and
       // `pnpm` falls off PATH.
       extendEnv: true,
+      // On Windows `pnpm` is a `.cmd` shim, which CreateProcess won't execute
+      // directly.
+      shell: true,
       env: {
         CONVEX_AGENT_MODE: "anonymous",
         DATABASE_UDF_USER_TIMEOUT_SECONDS: USER_TIMEOUT_SECONDS.toString(),

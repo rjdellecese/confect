@@ -2,13 +2,13 @@
   "name": "docs",
   "version": "0.0.1",
   "devDependencies": {
-    "@mintlify/scraping": "4.0.911",
-    "mintlify": "4.2.742",
-    "react": "19.2.7"
+    "@mintlify/scraping": "4.0.939",
+    "mintlify": "4.2.778",
+    "react": "19.2.8"
   },
   "private": true,
   "scripts": {
-    "clean": "rm -rf .mintlify node_modules",
+    "clean": "shx rm -rf .mintlify node_modules",
     "dev": "mintlify dev",
     "preview": "mintlify dev"
   },
