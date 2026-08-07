@@ -11,7 +11,7 @@ import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/unstable/process/ChildProcess";
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
 
-class BackendNotReadyError extends Schema.TaggedErrorClass<BackendNotReadyError>()(
+class BackendNotReadyError extends Schema.TaggedError<BackendNotReadyError>()(
   "BackendNotReadyError",
   { message: Schema.String },
 ) {}

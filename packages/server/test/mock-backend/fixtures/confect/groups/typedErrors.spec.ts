@@ -3,16 +3,13 @@ import * as Schema from "effect/Schema";
 import { Id } from "../_generated/id";
 import notes from "../_generated/tables/notes";
 
-export class NotFound extends Schema.TaggedErrorClass<NotFound>()("NotFound", {
+export class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
   id: Schema.String,
 }) {}
 
-export class Forbidden extends Schema.TaggedErrorClass<Forbidden>()(
-  "Forbidden",
-  {
-    reason: Schema.String,
-  },
-) {}
+export class Forbidden extends Schema.TaggedError<Forbidden>()("Forbidden", {
+  reason: Schema.String,
+}) {}
 
 const NoteError = Schema.Union([NotFound, Forbidden]);
 

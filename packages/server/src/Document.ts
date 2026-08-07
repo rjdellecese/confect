@@ -191,7 +191,7 @@ export const encode = Function.dual<
     ),
 );
 
-export class DocumentDecodeError extends Schema.TaggedErrorClass<DocumentDecodeError>()(
+export class DocumentDecodeError extends Schema.TaggedError<DocumentDecodeError>()(
   "DocumentDecodeError",
   {
     tableName: Schema.String,
@@ -208,7 +208,7 @@ export class DocumentDecodeError extends Schema.TaggedErrorClass<DocumentDecodeE
   }
 }
 
-export class DocumentEncodeError extends Schema.TaggedErrorClass<DocumentEncodeError>()(
+export class DocumentEncodeError extends Schema.TaggedError<DocumentEncodeError>()(
   "DocumentEncodeError",
   {
     tableName: Schema.String,

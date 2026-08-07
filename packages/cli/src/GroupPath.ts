@@ -103,7 +103,7 @@ const getGroupSpecHelper = (
 export const toString = (groupPath: GroupPath) =>
   Array.join(groupPath.pathSegments, ".");
 
-export class GroupModulePathIsNotATypeScriptFileError extends Schema.TaggedErrorClass<GroupModulePathIsNotATypeScriptFileError>()(
+export class GroupModulePathIsNotATypeScriptFileError extends Schema.TaggedError<GroupModulePathIsNotATypeScriptFileError>()(
   "GroupModulePathIsNotATypeScriptFileError",
   {
     path: Schema.NonEmptyString,

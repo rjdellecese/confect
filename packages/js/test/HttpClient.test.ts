@@ -146,7 +146,7 @@ layer(HttpClientLayer)("HttpClient optional args", (it) => {
   });
 });
 
-class NotFound extends Schema.TaggedErrorClass<NotFound>()("NotFound", {
+class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
   id: Schema.String,
 }) {}
 

@@ -38,7 +38,7 @@ vi.mock("convex/react", () => ({
     useConvexPaginatedQueryInternalMock(...args),
 }));
 
-class NotFound extends Schema.TaggedErrorClass<NotFound>()("NotFound", {
+class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
   id: Schema.String,
 }) {}
 
@@ -422,7 +422,7 @@ describe("usePaginatedQuery", () => {
     }),
   );
 
-  class PaginationFailed extends Schema.TaggedErrorClass<PaginationFailed>()(
+  class PaginationFailed extends Schema.TaggedError<PaginationFailed>()(
     "PaginationFailed",
     { reason: Schema.String },
   ) {}

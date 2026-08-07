@@ -16,7 +16,7 @@ export class ConvexDirectory extends Context.Service<
   static readonly get = ConvexDirectory.use((service) => service.get);
 }
 
-export class ConvexDirectoryNotFoundError extends Schema.TaggedErrorClass<ConvexDirectoryNotFoundError>()(
+export class ConvexDirectoryNotFoundError extends Schema.TaggedError<ConvexDirectoryNotFoundError>()(
   "ConvexDirectoryNotFoundError",
   {},
 ) {
@@ -35,7 +35,7 @@ const ConvexJsonConfig = Schema.fromJsonString(
   }),
 );
 
-export class InvalidConvexJsonError extends Schema.TaggedErrorClass<InvalidConvexJsonError>()(
+export class InvalidConvexJsonError extends Schema.TaggedError<InvalidConvexJsonError>()(
   "InvalidConvexJsonError",
   {
     cause: Schema.Unknown,

@@ -3,7 +3,7 @@ import * as Schema from "effect/Schema";
 import { Id } from "../_generated/id";
 import notes from "../_generated/tables/notes";
 
-export class NoteNotFound extends Schema.TaggedErrorClass<NoteNotFound>()(
+export class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
   "NoteNotFound",
   { noteId: Id("notes") },
 ) {}
