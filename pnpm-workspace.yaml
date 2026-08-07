@@ -15,6 +15,16 @@ allowBuilds:
   puppeteer: false
   sharp: true
 
+minimumReleaseAgeExclude:
+  - "@effect/tsgo-darwin-arm64@0.33.0"
+  - "@effect/tsgo-darwin-x64@0.33.0"
+  - "@effect/tsgo-linux-arm64@0.33.0"
+  - "@effect/tsgo-linux-arm@0.33.0"
+  - "@effect/tsgo-linux-x64@0.33.0"
+  - "@effect/tsgo-win32-arm64@0.33.0"
+  - "@effect/tsgo-win32-x64@0.33.0"
+  - "@effect/tsgo@0.33.0"
+
 overrides:
   convex: 1.43.0
   effect: 3.22.1

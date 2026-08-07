@@ -24,9 +24,6 @@ importers:
       '@changesets/config':
         specifier: 3.1.4
         version: 3.1.4
-      '@effect/language-service':
-        specifier: 0.87.1
-        version: 0.87.1
       '@effect/platform':
         specifier: 0.97.1
         version: 0.97.1(effect@3.22.1)
@@ -36,6 +33,9 @@ importers:
       '@effect/platform-node':
         specifier: 0.108.1
         version: 0.108.1(@effect/cluster@0.60.2(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/workflow@0.19.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1)
+      '@effect/tsgo':
+        specifier: 0.33.0
+        version: 0.33.0
       '@types/node':
         specifier: 26.1.2
         version: 26.1.2
@@ -56,10 +56,10 @@ importers:
         version: 0.7.3
       oxfmt:
         specifier: 0.62.0
-        version: 0.62.0(vite-plus@0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@6.0.3)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0))
+        version: 0.62.0(vite-plus@0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0))
       oxlint:
         specifier: 1.77.0
-        version: 1.77.0(oxlint-tsgolint@7.0.2001)(vite-plus@0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@6.0.3)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0))
+        version: 1.77.0(oxlint-tsgolint@7.0.2001)(vite-plus@0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0))
       shx:
         specifier: 0.4.0
         version: 0.4.0
@@ -68,19 +68,19 @@ importers:
         version: 15.3.2
       tsdown:
         specifier: 0.22.14
-        version: 0.22.14(tsx@4.23.8)(typescript@6.0.3)(unrun@0.3.1)
+        version: 0.22.14(tsx@4.23.8)(typescript@7.0.2)(unrun@0.3.1)
       typescript:
-        specifier: 6.0.3
-        version: 6.0.3
+        specifier: 7.0.2
+        version: 7.0.2
       unrun:
         specifier: 0.3.1
         version: 0.3.1
       vite-plus:
         specifier: 0.2.8
-        version: 0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@6.0.3)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0)
+        version: 0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0)
       vite-tsconfig-paths:
         specifier: 6.1.1
-        version: 6.1.1(supports-color@10.2.2)(typescript@6.0.3)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))
+        version: 6.1.1(supports-color@10.2.2)(typescript@7.0.2)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))
       vitest:
         specifier: 4.1.10
         version: 4.1.10(@types/node@26.1.2)(@vitest/browser-preview@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))
@@ -89,10 +89,10 @@ importers:
     devDependencies:
       '@mintlify/scraping':
         specifier: 4.0.939
-        version: 4.0.939(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
+        version: 4.0.939(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@7.0.2)
       mintlify:
         specifier: 4.2.778
-        version: 4.2.778(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.2)(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(supports-color@10.2.2)(typescript@6.0.3)
+        version: 4.2.778(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.2)(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(supports-color@10.2.2)(typescript@7.0.2)
       react:
         specifier: 19.2.8
         version: 19.2.8
@@ -113,7 +113,7 @@ importers:
         version: link:../../packages/server
       '@convex-dev/workpool':
         specifier: 0.4.9
-        version: 0.4.9(convex-helpers@0.1.122(@standard-schema/spec@1.1.0)(convex@1.43.0(react@19.2.8))(react@19.2.8)(typescript@6.0.3)(zod@4.3.6))(convex@1.43.0(react@19.2.8))(react@19.2.8)
+        version: 0.4.9(convex-helpers@0.1.122(@standard-schema/spec@1.1.0)(convex@1.43.0(react@19.2.8))(react@19.2.8)(typescript@7.0.2)(zod@4.3.6))(convex@1.43.0(react@19.2.8))(react@19.2.8)
       '@effect/platform':
         specifier: 0.97.1
         version: 0.97.1(effect@3.22.1)
@@ -122,7 +122,7 @@ importers:
         version: 1.43.0(react@19.2.8)
       convex-helpers:
         specifier: 0.1.122
-        version: 0.1.122(@standard-schema/spec@1.1.0)(convex@1.43.0(react@19.2.8))(react@19.2.8)(typescript@6.0.3)(zod@4.3.6)
+        version: 0.1.122(@standard-schema/spec@1.1.0)(convex@1.43.0(react@19.2.8))(react@19.2.8)(typescript@7.0.2)(zod@4.3.6)
       effect:
         specifier: 3.22.1
         version: 3.22.1
@@ -152,11 +152,11 @@ importers:
         specifier: 10.0.4
         version: 10.0.4
       typescript:
-        specifier: 6.0.3
-        version: 6.0.3
+        specifier: 7.0.2
+        version: 7.0.2
       vite-plus:
         specifier: 0.2.8
-        version: 0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@6.0.3)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0)
+        version: 0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0)
 
   packages/cli:
     dependencies:
@@ -196,10 +196,10 @@ importers:
     devDependencies:
       '@convex-dev/workpool':
         specifier: 0.4.9
-        version: 0.4.9(convex-helpers@0.1.122(@standard-schema/spec@1.1.0)(convex@1.43.0(react@19.2.8))(react@19.2.8)(typescript@6.0.3)(zod@4.3.6))(convex@1.43.0(react@19.2.8))(react@19.2.8)
-      '@effect/language-service':
-        specifier: 0.87.1
-        version: 0.87.1
+        version: 0.4.9(convex-helpers@0.1.122(@standard-schema/spec@1.1.0)(convex@1.43.0(react@19.2.8))(react@19.2.8)(typescript@7.0.2)(zod@4.3.6))(convex@1.43.0(react@19.2.8))(react@19.2.8)
+      '@effect/tsgo':
+        specifier: 0.33.0
+        version: 0.33.0
       '@effect/vitest':
         specifier: 0.30.0
         version: 0.30.0(effect@3.22.1)(vitest@4.1.10)
@@ -217,10 +217,10 @@ importers:
         version: 3.22.1
       tsdown:
         specifier: 0.22.14
-        version: 0.22.14(tsx@4.23.8)(typescript@6.0.3)(unrun@0.3.1)
+        version: 0.22.14(tsx@4.23.8)(typescript@7.0.2)(unrun@0.3.1)
       typescript:
-        specifier: 6.0.3
-        version: 6.0.3
+        specifier: 7.0.2
+        version: 7.0.2
       unrun:
         specifier: 0.3.1
         version: 0.3.1
@@ -229,7 +229,7 @@ importers:
         version: 8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0)
       vite-tsconfig-paths:
         specifier: 6.1.1
-        version: 6.1.1(supports-color@10.2.2)(typescript@6.0.3)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))
+        version: 6.1.1(supports-color@10.2.2)(typescript@7.0.2)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))
       vitest:
         specifier: 4.1.10
         version: 4.1.10(@types/node@26.1.2)(@vitest/browser-preview@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))
@@ -242,7 +242,7 @@ importers:
     devDependencies:
       '@ark/attest':
         specifier: 0.56.3
-        version: 0.56.3(supports-color@10.2.2)(typescript@6.0.3)
+        version: 0.56.3(supports-color@10.2.2)(typescript@7.0.2)
       '@effect/vitest':
         specifier: 0.30.0
         version: 0.30.0(effect@3.22.1)(vitest@4.1.10)
@@ -254,13 +254,13 @@ importers:
         version: 3.22.1
       tsdown:
         specifier: 0.22.14
-        version: 0.22.14(tsx@4.23.8)(typescript@6.0.3)(unrun@0.3.1)
+        version: 0.22.14(tsx@4.23.8)(typescript@7.0.2)(unrun@0.3.1)
       tsx:
         specifier: 4.23.8
         version: 4.23.8
       typescript:
-        specifier: 6.0.3
-        version: 6.0.3
+        specifier: 7.0.2
+        version: 7.0.2
       unrun:
         specifier: 0.3.1
         version: 0.3.1
@@ -288,10 +288,10 @@ importers:
         version: 3.22.1
       tsdown:
         specifier: 0.22.14
-        version: 0.22.14(tsx@4.23.8)(typescript@6.0.3)(unrun@0.3.1)
+        version: 0.22.14(tsx@4.23.8)(typescript@7.0.2)(unrun@0.3.1)
       typescript:
-        specifier: 6.0.3
-        version: 6.0.3
+        specifier: 7.0.2
+        version: 7.0.2
       unrun:
         specifier: 0.3.1
         version: 0.3.1
@@ -337,10 +337,10 @@ importers:
         version: 19.2.8(react@19.2.8)
       tsdown:
         specifier: 0.22.14
-        version: 0.22.14(tsx@4.23.8)(typescript@6.0.3)(unrun@0.3.1)
+        version: 0.22.14(tsx@4.23.8)(typescript@7.0.2)(unrun@0.3.1)
       typescript:
-        specifier: 6.0.3
-        version: 6.0.3
+        specifier: 7.0.2
+        version: 7.0.2
       unrun:
         specifier: 0.3.1
         version: 0.3.1
@@ -365,7 +365,7 @@ importers:
     devDependencies:
       '@ark/attest':
         specifier: 0.56.3
-        version: 0.56.3(supports-color@10.2.2)(typescript@6.0.3)
+        version: 0.56.3(supports-color@10.2.2)(typescript@7.0.2)
       '@effect/cluster':
         specifier: 0.60.2
         version: 0.60.2(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/workflow@0.19.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(effect@3.22.1)
@@ -407,13 +407,13 @@ importers:
         version: 3.22.1
       tsdown:
         specifier: 0.22.14
-        version: 0.22.14(tsx@4.23.8)(typescript@6.0.3)(unrun@0.3.1)
+        version: 0.22.14(tsx@4.23.8)(typescript@7.0.2)(unrun@0.3.1)
       tsx:
         specifier: 4.23.8
         version: 4.23.8
       typescript:
-        specifier: 6.0.3
-        version: 6.0.3
+        specifier: 7.0.2
+        version: 7.0.2
       unrun:
         specifier: 0.3.1
         version: 0.3.1
@@ -422,7 +422,7 @@ importers:
         version: 8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0)
       vite-tsconfig-paths:
         specifier: 6.1.1
-        version: 6.1.1(supports-color@10.2.2)(typescript@6.0.3)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))
+        version: 6.1.1(supports-color@10.2.2)(typescript@7.0.2)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))
       vitest:
         specifier: 4.1.10
         version: 4.1.10(@types/node@26.1.2)(@vitest/browser-preview@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))
@@ -494,10 +494,10 @@ importers:
         version: 3.22.1
       tsdown:
         specifier: 0.22.14
-        version: 0.22.14(tsx@4.23.8)(typescript@6.0.3)(unrun@0.3.1)
+        version: 0.22.14(tsx@4.23.8)(typescript@7.0.2)(unrun@0.3.1)
       typescript:
-        specifier: 6.0.3
-        version: 6.0.3
+        specifier: 7.0.2
+        version: 7.0.2
       unrun:
         specifier: 0.3.1
         version: 0.3.1
@@ -692,10 +692,6 @@ packages:
       lmdb:
         optional: true
 
-  '@effect/language-service@0.87.1':
-    resolution: {integrity: sha512-kcljlJmEgqg5mFAM6UShJYJjMqJb3TbHHxrK8Qoubvwugc0aVWpRkbdgQvK5b17puOt3BKXXKOmcV+oQt0oQqQ==}
-    hasBin: true
-
   '@effect/platform-bun@0.91.2':
     resolution: {integrity: sha512-lISuYdx54uX6BIu0AIwvIqG6mbFkT0UlqGWZm7Jn2V6Ni3nCumnaBfMxYrdGWJzkoGIi1xEkvmRRk5Ff7r6NEA==}
     peerDependencies:
@@ -752,6 +748,45 @@ packages:
       '@effect/experimental': ^0.61.1
       '@effect/platform': ^0.97.1
       effect: 3.22.1
+
+  '@effect/tsgo-darwin-arm64@0.33.0':
+    resolution: {integrity: sha512-L2dBd2d+mORd4+v1c43AW7fRkxrO6CNM7ROc7dfy4jqB/3Oeq/PxNIbvnC+k0ST/xWsol2K/j+yg9wHYN8qSZw==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@effect/tsgo-darwin-x64@0.33.0':
+    resolution: {integrity: sha512-W8ebnRhbIeOPvL5E3Vnrv8xwOVEcIcT3+p4QpzUGA37pE0JgkM05RgcZYdoLdwiFVnPkKYMN6L+iZmvWz4sIMA==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@effect/tsgo-linux-arm64@0.33.0':
+    resolution: {integrity: sha512-9O3kscD8zQZtNqo9Hj4uYlQh38cg+r8yDvCHUY5eZuhBEPnTflZpu5y5RmIC9FdPso5/ycd5KEtjRRwOJMQfzg==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@effect/tsgo-linux-arm@0.33.0':
+    resolution: {integrity: sha512-pN8jLPLH1D/Jag1DkyYeVfzZDQL8AVmRBZ8KnUHTnTQvyFKNBp6XrJBX+Q/Rb4YO3IJP2ycu3aNUgXoCoMFfiw==}
+    cpu: [arm]
+    os: [linux]
+
+  '@effect/tsgo-linux-x64@0.33.0':
+    resolution: {integrity: sha512-KQyNIL/VAmGfRpJIdcuKn8SxVtj1T+X2uSl3qFH33tN3xQN5n2Pu0tOpRIw7Xw4Tij7wByMXYgvPUwOKDpI/Aw==}
+    cpu: [x64]
+    os: [linux]
+
+  '@effect/tsgo-win32-arm64@0.33.0':
+    resolution: {integrity: sha512-6i/LXjV/KkBrv+97q5g8+iiOCaJ2epqGZ60aUreF/s7IeV6MdXzOocA5v2QJblFLhss26T8IyzHIeXvVgmYC8w==}
+    cpu: [arm64]
+    os: [win32]
+
+  '@effect/tsgo-win32-x64@0.33.0':
+    resolution: {integrity: sha512-k9oWfXHOxLjWp3UYQ81MzJyXB+U5PPx6xenEXX2w2a+85PvJd0fiT1TqE2X9CmUzDN49mvqHAIdBEUP8lChkrw==}
+    cpu: [x64]
+    os: [win32]
+
+  '@effect/tsgo@0.33.0':
+    resolution: {integrity: sha512-08RZaL/eoqbUv4CaRor8rN/qfYFyDKAAnSJze24LcCGVoNFYlQS+/I+LEfDFiDa3jQBPfUv9aUT/qMx8Bd/p5w==}
+    hasBin: true
 
   '@effect/typeclass@0.41.0':
     resolution: {integrity: sha512-Tsv94iDPUWgmz/JsYUh7awx5mmFukEJZB+duyzlLRlCHxNUz5LHBBzTaEfUPNMzAE1s8FTUSVwdPSpL0DznXKg==}
@@ -2903,6 +2938,126 @@ packages:
   '@typescript/analyze-trace@0.10.1':
     resolution: {integrity: sha512-RnlSOPh14QbopGCApgkSx5UBgGda5MX1cHqp2fsqfiDyCwGL/m1jaeB9fzu7didVS81LQqGZZuxFBcg8YU8EVw==}
     hasBin: true
+
+  '@typescript/typescript-aix-ppc64@7.0.2':
+    resolution: {integrity: sha512-MTKKkWB7p/0E9xi1d1tHtZ5PiLkGEMIq88pK2CubZjOsLtYTLqhgIgi6zepFa+9GHZ6h05NMCkQxGKiPXMxXtQ==}
+    engines: {node: '>=16.20.0'}
+    cpu: [ppc64]
+    os: [aix]
+
+  '@typescript/typescript-darwin-arm64@7.0.2':
+    resolution: {integrity: sha512-gowzar9MwS/aRWp6f3a4KUqzRjAZjOsmGNCM6LcTgXum+dBfgsBVMN+AgvOCCbguXyick6LJhpBszxMebJ8syA==}
+    engines: {node: '>=16.20.0'}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@typescript/typescript-darwin-x64@7.0.2':
+    resolution: {integrity: sha512-SZ9xZInqApNlNGc9s0W1VSsktYSOe9cFqNOIqmN1Gs8SmkjKZYFt017G4VwPxASInODuAdbTW7sXiFUf893RgA==}
+    engines: {node: '>=16.20.0'}
+    cpu: [x64]
+    os: [darwin]
+
+  '@typescript/typescript-freebsd-arm64@7.0.2':
+    resolution: {integrity: sha512-W5NH4y/J0plIIS5b2xvTEkU7JFxyqdMAOgf+Ilhl0vHQXKO5dZoxd+C/jEtq56c4F3wk71RB4BMRQ2XdI+bwYQ==}
+    engines: {node: '>=16.20.0'}
+    cpu: [arm64]
+    os: [freebsd]
+
+  '@typescript/typescript-freebsd-x64@7.0.2':
+    resolution: {integrity: sha512-UMGDx5sTpzNw3WiPebH7l90IWfJggEd+egHt/q6p7/Cm3zqoV7VxkGXt+3DxPIw8CcmvAB0j3sVVfbhX+M4Tpw==}
+    engines: {node: '>=16.20.0'}
+    cpu: [x64]
+    os: [freebsd]
+
+  '@typescript/typescript-linux-arm64@7.0.2':
+    resolution: {integrity: sha512-Qh4eU4/y3yDjnfjjyPYihMj5/ODIlmt+Bzu17OI+fiSRDW57QmU5SiN63exPRNJPKUzcc1INa1NXdrJ+MqHjUQ==}
+    engines: {node: '>=16.20.0'}
+    cpu: [arm64]
+    os: [linux]
+
+  '@typescript/typescript-linux-arm@7.0.2':
+    resolution: {integrity: sha512-gffT3xPz9sR7j/YJExkyPntrI0P2EP9XbOyWzth2/Gs0RstK+90RBcO0ncXoXy/beYll1SXw846Nf2zdnEz0QQ==}
+    engines: {node: '>=16.20.0'}
+    cpu: [arm]
+    os: [linux]
+
+  '@typescript/typescript-linux-loong64@7.0.2':
+    resolution: {integrity: sha512-uEHck9i8hoAzXPiYRib1O7miOnz23SxIeVl6F4LXox+qov1K35jHcEW6VHKvZI+pyvl7fZEP4MCU5LYvIq1GuQ==}
+    engines: {node: '>=16.20.0'}
+    cpu: [loong64]
+    os: [linux]
+
+  '@typescript/typescript-linux-mips64el@7.0.2':
+    resolution: {integrity: sha512-R4KvAMnE43W5Qeqb0Ly56O3mWMWIAgsMyz36DCaycd5nbg/9kzm0liw3JocfRqyJY0KPmzFjbswozXyW0DnIYA==}
+    engines: {node: '>=16.20.0'}
+    cpu: [mips64el]
+    os: [linux]
+
+  '@typescript/typescript-linux-ppc64@7.0.2':
+    resolution: {integrity: sha512-DORx5b3sd/4S7eayxm4FQv+A7CrkUIGRaHiwI8oiHTAI1fAPWhF4J0vAlkC8biAlHSVVwxMQ3tjZ2/DVbnQiiA==}
+    engines: {node: '>=16.20.0'}
+    cpu: [ppc64]
+    os: [linux]
+
+  '@typescript/typescript-linux-riscv64@7.0.2':
+    resolution: {integrity: sha512-wf0jqEDOjrPRnKwYRyyJDRo11KMbvMFrU+q4zqKyChODBzvlkbhNQfKvLxQCcwTpdDaXSHZTVuh0JoCrKCUMHQ==}
+    engines: {node: '>=16.20.0'}
+    cpu: [riscv64]
+    os: [linux]
+
+  '@typescript/typescript-linux-s390x@7.0.2':
+    resolution: {integrity: sha512-IkwJc3L7yhytWd/ewjyxNDfOmswCm9GWMJT/ue/dU4aZNbwZeYAetq42VyLmsmSjvoX7z74X6ZaYCtzAr0EuGw==}
+    engines: {node: '>=16.20.0'}
+    cpu: [s390x]
+    os: [linux]
+
+  '@typescript/typescript-linux-x64@7.0.2':
+    resolution: {integrity: sha512-EYdf2cNg7rgCWJnxCdJ+F3V39O8ihb37eHAu1LK8oAFizgTQbPOK7zHHXbPt8rX24COqODXeI3sIf0fCXG7H/A==}
+    engines: {node: '>=16.20.0'}
+    cpu: [x64]
+    os: [linux]
+
+  '@typescript/typescript-netbsd-arm64@7.0.2':
+    resolution: {integrity: sha512-+polYF4MF04aPpO5FTkHran9yUQDSXqy5GiSDKpsll5jy3l3+g9QLhpf39T+ePtefhXLOGrLl0QIjkQP6VnelA==}
+    engines: {node: '>=16.20.0'}
+    cpu: [arm64]
+    os: [netbsd]
+
+  '@typescript/typescript-netbsd-x64@7.0.2':
+    resolution: {integrity: sha512-8YIT0EHM/3dq10ZOVF/A7pc/YSMtbcecct4rWtexrnSCHOPcpC2KTLXfTCR6vDpnSiY12heNb1GiN/wu+T/FyA==}
+    engines: {node: '>=16.20.0'}
+    cpu: [x64]
+    os: [netbsd]
+
+  '@typescript/typescript-openbsd-arm64@7.0.2':
+    resolution: {integrity: sha512-APT8+ClYnuYm1u9+kgGXoMj2VzWzcymwh2gNSQVySHfkRDGOTVkoWLjCmOQSaO+PoqQ57B0flRp9SA+7GnnkzQ==}
+    engines: {node: '>=16.20.0'}
+    cpu: [arm64]
+    os: [openbsd]
+
+  '@typescript/typescript-openbsd-x64@7.0.2':
+    resolution: {integrity: sha512-yX7s+Q0Dln0Dt9tEzZsAjXXR/+ytBM7AlglaqyeMPxQszJ1JhlJdZ6jLA+IzldHtflX81em7lDao1xXu+aRRkg==}
+    engines: {node: '>=16.20.0'}
+    cpu: [x64]
+    os: [openbsd]
+
+  '@typescript/typescript-sunos-x64@7.0.2':
+    resolution: {integrity: sha512-dLJDGaLZ1D4HPQn62u1n8mBDkJREwMsAkCdkwd4Ieqw+x3TUyTsqY0YiBCtE6H6OzzgGk3iuZ3vFWRS+E8/d1g==}
+    engines: {node: '>=16.20.0'}
+    cpu: [x64]
+    os: [sunos]
+
+  '@typescript/typescript-win32-arm64@7.0.2':
+    resolution: {integrity: sha512-Gyl1Vy6OsWesLzmq+EP0Fb7b4Nid5232AvcA2SFcdYreldpNtYFFofPjnt62y9hQy7VTaZp65ICJjuAQRaVcIQ==}
+    engines: {node: '>=16.20.0'}
+    cpu: [arm64]
+    os: [win32]
+
+  '@typescript/typescript-win32-x64@7.0.2':
+    resolution: {integrity: sha512-0BQ3HkAHHlKLSp1qRvf3SUhGpGsDuhB/jgFw75guyqbxJqEaS0Cw/VFO8i2nHglJUzQCRtMMR/IBAKE3ETMC4g==}
+    engines: {node: '>=16.20.0'}
+    cpu: [x64]
+    os: [win32]
 
   '@typescript/vfs@1.6.1':
     resolution: {integrity: sha512-JwoxboBh7Oz1v38tPbkrZ62ZXNHAk9bJ7c9x0eI5zBfBnBYGhURdbnh7Z4smN/MV48Y5OCcZb58n972UtbazsA==}
@@ -5524,11 +5679,6 @@ packages:
   mz@2.7.0:
     resolution: {integrity: sha512-z81GNO7nnYMEhrGh9LeymoE4+Yr0Wn5McHIZMK5cfQCl+NDX08sCZgUc9/6MHni9IWuFLm1Z3HTCXu2z9fN62Q==}
 
-  nanoid@3.3.16:
-    resolution: {integrity: sha512-bzlKTyNJ7+LdGIIwy8ijFpIqEQIvafahV7eYykJ8Cvh42EdJeODoJ6gUJXpQJvej1BddH8OqTXZNE/KfbWAu8Q==}
-    engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
-    hasBin: true
-
   nanoid@3.3.17:
     resolution: {integrity: sha512-xQLf0A3HOMlgHq0n247/LRuAOYmB7dXJ/DvAxGvsSBij45XtBSmQycu+F8ODbHwns/XyFZagyL1+J0Offw1E0g==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
@@ -5945,10 +6095,6 @@ packages:
 
   postcss@8.5.14:
     resolution: {integrity: sha512-SoSL4+OSEtR99LHFZQiJLkT59C5B1amGO1NzTwj7TT1qCUgUO6hxOvzkOYxD+vMrXBM3XJIKzokoERdqQq/Zmg==}
-    engines: {node: ^10 || ^12 || >=14}
-
-  postcss@8.5.23:
-    resolution: {integrity: sha512-g50586zr4bZmwFiTlflMu8E0bDTb5I5gertgwAKmsdUlTQIhZtunzUlD1WSzwcVWPoAVpsrA6vlfCD7oXvRwgg==}
     engines: {node: ^10 || ^12 || >=14}
 
   postcss@8.5.25:
@@ -6872,9 +7018,9 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
-  typescript@6.0.3:
-    resolution: {integrity: sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==}
-    engines: {node: '>=14.17'}
+  typescript@7.0.2:
+    resolution: {integrity: sha512-8FYau96o3NKOhbjKi/qNvG/W5jhzxkbdm5sj9AbZ/5T5sWqn3hJgLfGx27sRKZWTvyzCP8dLRBTf5tBTSRVUNA==}
+    engines: {node: '>=16.20.0'}
     hasBin: true
 
   unbox-primitive@1.1.0:
@@ -7330,17 +7476,17 @@ snapshots:
 
   '@alloc/quick-lru@5.2.0': {}
 
-  '@ark/attest@0.56.3(supports-color@10.2.2)(typescript@6.0.3)':
+  '@ark/attest@0.56.3(supports-color@10.2.2)(typescript@7.0.2)':
     dependencies:
       '@ark/fs': 0.56.2
       '@ark/schema': 0.56.2
       '@ark/util': 0.56.2
       '@prettier/sync': 0.6.1(prettier@3.6.2)
       '@typescript/analyze-trace': 0.10.1
-      '@typescript/vfs': 1.6.1(supports-color@10.2.2)(typescript@6.0.3)
+      '@typescript/vfs': 1.6.1(supports-color@10.2.2)(typescript@7.0.2)
       arktype: 2.2.3
       prettier: 3.6.2
-      typescript: 6.0.3
+      typescript: 7.0.2
     transitivePeerDependencies:
       - supports-color
 
@@ -7578,11 +7724,11 @@ snapshots:
       convex: 1.43.0(react@19.2.8)
       react: 19.2.8
 
-  '@convex-dev/workpool@0.4.9(convex-helpers@0.1.122(@standard-schema/spec@1.1.0)(convex@1.43.0(react@19.2.8))(react@19.2.8)(typescript@6.0.3)(zod@4.3.6))(convex@1.43.0(react@19.2.8))(react@19.2.8)':
+  '@convex-dev/workpool@0.4.9(convex-helpers@0.1.122(@standard-schema/spec@1.1.0)(convex@1.43.0(react@19.2.8))(react@19.2.8)(typescript@7.0.2)(zod@4.3.6))(convex@1.43.0(react@19.2.8))(react@19.2.8)':
     dependencies:
       '@convex-dev/batch-worker': 0.2.0(convex@1.43.0(react@19.2.8))(react@19.2.8)
       convex: 1.43.0(react@19.2.8)
-      convex-helpers: 0.1.122(@standard-schema/spec@1.1.0)(convex@1.43.0(react@19.2.8))(react@19.2.8)(typescript@6.0.3)(zod@4.3.6)
+      convex-helpers: 0.1.122(@standard-schema/spec@1.1.0)(convex@1.43.0(react@19.2.8))(react@19.2.8)(typescript@7.0.2)(zod@4.3.6)
     transitivePeerDependencies:
       - react
 
@@ -7610,8 +7756,6 @@ snapshots:
       '@effect/platform': 0.97.1(effect@3.22.1)
       effect: 3.22.1
       uuid: 11.1.1
-
-  '@effect/language-service@0.87.1': {}
 
   '@effect/platform-bun@0.91.2(@effect/cluster@0.60.2(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/workflow@0.19.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1)':
     dependencies:
@@ -7685,6 +7829,37 @@ snapshots:
       '@effect/platform': 0.97.1(effect@3.22.1)
       effect: 3.22.1
       uuid: 11.1.1
+
+  '@effect/tsgo-darwin-arm64@0.33.0':
+    optional: true
+
+  '@effect/tsgo-darwin-x64@0.33.0':
+    optional: true
+
+  '@effect/tsgo-linux-arm64@0.33.0':
+    optional: true
+
+  '@effect/tsgo-linux-arm@0.33.0':
+    optional: true
+
+  '@effect/tsgo-linux-x64@0.33.0':
+    optional: true
+
+  '@effect/tsgo-win32-arm64@0.33.0':
+    optional: true
+
+  '@effect/tsgo-win32-x64@0.33.0':
+    optional: true
+
+  '@effect/tsgo@0.33.0':
+    optionalDependencies:
+      '@effect/tsgo-darwin-arm64': 0.33.0
+      '@effect/tsgo-darwin-x64': 0.33.0
+      '@effect/tsgo-linux-arm': 0.33.0
+      '@effect/tsgo-linux-arm64': 0.33.0
+      '@effect/tsgo-linux-x64': 0.33.0
+      '@effect/tsgo-win32-arm64': 0.33.0
+      '@effect/tsgo-win32-x64': 0.33.0
 
   '@effect/typeclass@0.41.0(effect@3.22.1)':
     dependencies:
@@ -8337,15 +8512,15 @@ snapshots:
       '@types/react': 19.2.18
       react: 19.2.8
 
-  '@mintlify/cli@4.0.1381(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.2)(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(supports-color@10.2.2)(typescript@6.0.3)':
+  '@mintlify/cli@4.0.1381(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.2)(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(supports-color@10.2.2)(typescript@7.0.2)':
     dependencies:
       '@inquirer/prompts': 7.9.0(@types/node@26.1.2)
-      '@mintlify/common': 1.0.1072(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
-      '@mintlify/link-rot': 3.0.1269(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.2)(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/common': 1.0.1072(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@7.0.2)
+      '@mintlify/link-rot': 3.0.1269(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.2)(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@7.0.2)
       '@mintlify/models': 0.0.344(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
-      '@mintlify/prebuild': 1.0.1223(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.2)(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
-      '@mintlify/previewing': 4.0.1293(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.2)(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(supports-color@10.2.2)(typescript@6.0.3)
-      '@mintlify/validation': 0.1.817(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/prebuild': 1.0.1223(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.2)(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@7.0.2)
+      '@mintlify/previewing': 4.0.1293(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.2)(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(supports-color@10.2.2)(typescript@7.0.2)
+      '@mintlify/validation': 0.1.817(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@7.0.2)
       adm-zip: 0.5.16
       chalk: 5.2.0
       color: 4.2.3
@@ -8391,13 +8566,13 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@mintlify/common@1.0.1072(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)':
+  '@mintlify/common@1.0.1072(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@7.0.2)':
     dependencies:
       '@asyncapi/parser': 3.4.0
-      '@mintlify/mdx': 4.0.1(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/mdx': 4.0.1(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@7.0.2)
       '@mintlify/models': 0.0.344(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
       '@mintlify/openapi-parser': 0.0.8
-      '@mintlify/validation': 0.1.817(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/validation': 0.1.817(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@7.0.2)
       '@sindresorhus/slugify': 2.2.0
       '@types/mdast': 4.0.4
       acorn: 8.11.2
@@ -8449,14 +8624,14 @@ snapshots:
       - ts-node
       - typescript
 
-  '@mintlify/link-rot@3.0.1269(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.2)(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)':
+  '@mintlify/link-rot@3.0.1269(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.2)(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@7.0.2)':
     dependencies:
-      '@mintlify/common': 1.0.1072(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/common': 1.0.1072(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@7.0.2)
       '@mintlify/models': 0.0.344(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
-      '@mintlify/prebuild': 1.0.1223(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.2)(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
-      '@mintlify/previewing': 4.0.1293(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.2)(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(supports-color@10.2.2)(typescript@6.0.3)
-      '@mintlify/scraping': 4.0.939(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
-      '@mintlify/validation': 0.1.817(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/prebuild': 1.0.1223(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.2)(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@7.0.2)
+      '@mintlify/previewing': 4.0.1293(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.2)(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(supports-color@10.2.2)(typescript@7.0.2)
+      '@mintlify/scraping': 4.0.939(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@7.0.2)
+      '@mintlify/validation': 0.1.817(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@7.0.2)
       fs-extra: 11.1.0
       unist-util-visit: 4.1.2
     transitivePeerDependencies:
@@ -8477,11 +8652,11 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@mintlify/mdx@4.0.1(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)':
+  '@mintlify/mdx@4.0.1(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@7.0.2)':
     dependencies:
       '@base-ui/react': 1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@shikijs/transformers': 3.23.0
-      '@shikijs/twoslash': 3.23.0(supports-color@10.2.2)(typescript@6.0.3)
+      '@shikijs/twoslash': 3.23.0(supports-color@10.2.2)(typescript@7.0.2)
       arktype: 2.2.3
       hast-util-to-string: 3.0.1
       mdast-util-from-markdown: 2.0.3(supports-color@10.2.2)
@@ -8496,7 +8671,7 @@ snapshots:
       remark-math: 6.0.0(supports-color@10.2.2)
       remark-smartypants: 3.0.3
       shiki: 3.23.0
-      twoslash: 0.3.9(supports-color@10.2.2)(typescript@6.0.3)
+      twoslash: 0.3.9(supports-color@10.2.2)(typescript@7.0.2)
       unified: 11.0.5
       unist-util-visit: 5.1.0
     transitivePeerDependencies:
@@ -8521,11 +8696,11 @@ snapshots:
       leven: 4.1.0
       yaml: 2.9.0
 
-  '@mintlify/prebuild@1.0.1223(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.2)(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)':
+  '@mintlify/prebuild@1.0.1223(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.2)(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@7.0.2)':
     dependencies:
-      '@mintlify/common': 1.0.1072(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
-      '@mintlify/scraping': 4.0.939(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
-      '@mintlify/validation': 0.1.817(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/common': 1.0.1072(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@7.0.2)
+      '@mintlify/scraping': 4.0.939(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@7.0.2)
+      '@mintlify/validation': 0.1.817(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@7.0.2)
       chalk: 5.3.0
       favicons: 7.2.0
       fflate: 0.8.3
@@ -8552,11 +8727,11 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@mintlify/previewing@4.0.1293(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.2)(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(supports-color@10.2.2)(typescript@6.0.3)':
+  '@mintlify/previewing@4.0.1293(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.2)(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(supports-color@10.2.2)(typescript@7.0.2)':
     dependencies:
-      '@mintlify/common': 1.0.1072(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
-      '@mintlify/prebuild': 1.0.1223(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.2)(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
-      '@mintlify/validation': 0.1.817(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/common': 1.0.1072(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@7.0.2)
+      '@mintlify/prebuild': 1.0.1223(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.2)(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@7.0.2)
+      '@mintlify/validation': 0.1.817(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@7.0.2)
       adm-zip: 0.5.16
       better-opn: 3.0.2
       chalk: 5.2.0
@@ -8589,9 +8764,9 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@mintlify/scraping@4.0.939(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)':
+  '@mintlify/scraping@4.0.939(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@7.0.2)':
     dependencies:
-      '@mintlify/common': 1.0.1072(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/common': 1.0.1072(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@7.0.2)
       fast-xml-parser: 5.7.3
       fs-extra: 11.1.1
       graphql: 16.11.0
@@ -8599,7 +8774,7 @@ snapshots:
       js-yaml: 4.1.1
       mdast-util-mdx-jsx: 3.1.3(supports-color@10.2.2)
       neotraverse: 0.6.18
-      puppeteer: 24.3.1(supports-color@10.2.2)(typescript@6.0.3)
+      puppeteer: 24.3.1(supports-color@10.2.2)(typescript@7.0.2)
       rehype-parse: 9.0.1
       remark-gfm: 4.0.0(supports-color@10.2.2)
       remark-mdx: 3.0.1(supports-color@10.2.2)
@@ -8625,9 +8800,9 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@mintlify/validation@0.1.817(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)':
+  '@mintlify/validation@0.1.817(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@7.0.2)':
     dependencies:
-      '@mintlify/mdx': 4.0.1(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/mdx': 4.0.1(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@10.2.2)(typescript@7.0.2)
       '@mintlify/models': 0.0.344(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
       fractional-indexing: 3.2.0
       js-yaml: 4.1.1
@@ -9177,12 +9352,12 @@ snapshots:
       '@shikijs/core': 3.23.0
       '@shikijs/types': 3.23.0
 
-  '@shikijs/twoslash@3.23.0(supports-color@10.2.2)(typescript@6.0.3)':
+  '@shikijs/twoslash@3.23.0(supports-color@10.2.2)(typescript@7.0.2)':
     dependencies:
       '@shikijs/core': 3.23.0
       '@shikijs/types': 3.23.0
-      twoslash: 0.3.9(supports-color@10.2.2)(typescript@6.0.3)
-      typescript: 6.0.3
+      twoslash: 0.3.9(supports-color@10.2.2)(typescript@7.0.2)
+      typescript: 7.0.2
     transitivePeerDependencies:
       - supports-color
 
@@ -9576,17 +9751,77 @@ snapshots:
       treeify: 1.1.0
       yargs: 16.2.2
 
-  '@typescript/vfs@1.6.1(supports-color@10.2.2)(typescript@6.0.3)':
+  '@typescript/typescript-aix-ppc64@7.0.2':
+    optional: true
+
+  '@typescript/typescript-darwin-arm64@7.0.2':
+    optional: true
+
+  '@typescript/typescript-darwin-x64@7.0.2':
+    optional: true
+
+  '@typescript/typescript-freebsd-arm64@7.0.2':
+    optional: true
+
+  '@typescript/typescript-freebsd-x64@7.0.2':
+    optional: true
+
+  '@typescript/typescript-linux-arm64@7.0.2':
+    optional: true
+
+  '@typescript/typescript-linux-arm@7.0.2':
+    optional: true
+
+  '@typescript/typescript-linux-loong64@7.0.2':
+    optional: true
+
+  '@typescript/typescript-linux-mips64el@7.0.2':
+    optional: true
+
+  '@typescript/typescript-linux-ppc64@7.0.2':
+    optional: true
+
+  '@typescript/typescript-linux-riscv64@7.0.2':
+    optional: true
+
+  '@typescript/typescript-linux-s390x@7.0.2':
+    optional: true
+
+  '@typescript/typescript-linux-x64@7.0.2':
+    optional: true
+
+  '@typescript/typescript-netbsd-arm64@7.0.2':
+    optional: true
+
+  '@typescript/typescript-netbsd-x64@7.0.2':
+    optional: true
+
+  '@typescript/typescript-openbsd-arm64@7.0.2':
+    optional: true
+
+  '@typescript/typescript-openbsd-x64@7.0.2':
+    optional: true
+
+  '@typescript/typescript-sunos-x64@7.0.2':
+    optional: true
+
+  '@typescript/typescript-win32-arm64@7.0.2':
+    optional: true
+
+  '@typescript/typescript-win32-x64@7.0.2':
+    optional: true
+
+  '@typescript/vfs@1.6.1(supports-color@10.2.2)(typescript@7.0.2)':
     dependencies:
       debug: 4.4.3(supports-color@10.2.2)
-      typescript: 6.0.3
+      typescript: 7.0.2
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript/vfs@1.6.4(supports-color@10.2.2)(typescript@6.0.3)':
+  '@typescript/vfs@1.6.4(supports-color@10.2.2)(typescript@7.0.2)':
     dependencies:
       debug: 4.4.3(supports-color@10.2.2)
-      typescript: 6.0.3
+      typescript: 7.0.2
     transitivePeerDependencies:
       - supports-color
 
@@ -9617,9 +9852,9 @@ snapshots:
       magic-string: 0.30.21
       pngjs: 7.0.0
       sirv: 3.0.2
-      tinyrainbow: 3.1.0
+      tinyrainbow: 3.1.1
       vitest: 4.1.10(@types/node@26.1.2)(@vitest/browser-preview@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))
-      ws: 8.21.1
+      ws: 8.21.2
     transitivePeerDependencies:
       - bufferutil
       - msw
@@ -9681,9 +9916,9 @@ snapshots:
     dependencies:
       '@vitest/pretty-format': 4.1.10
       convert-source-map: 2.0.0
-      tinyrainbow: 3.1.0
+      tinyrainbow: 3.1.1
 
-  '@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@6.0.3)(unrun@0.3.1)(yaml@2.9.0)':
+  '@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@7.0.2)(unrun@0.3.1)(yaml@2.9.0)':
     dependencies:
       '@oxc-project/runtime': 0.142.0
       '@oxc-project/types': 0.142.0
@@ -9705,7 +9940,7 @@ snapshots:
       fsevents: 2.3.3
       jiti: 1.21.7
       tsx: 4.23.8
-      typescript: 6.0.3
+      typescript: 7.0.2
       unrun: 0.3.1
       yaml: 2.9.0
 
@@ -10343,13 +10578,13 @@ snapshots:
 
   convert-to-spaces@2.0.1: {}
 
-  convex-helpers@0.1.122(@standard-schema/spec@1.1.0)(convex@1.43.0(react@19.2.8))(react@19.2.8)(typescript@6.0.3)(zod@4.3.6):
+  convex-helpers@0.1.122(@standard-schema/spec@1.1.0)(convex@1.43.0(react@19.2.8))(react@19.2.8)(typescript@7.0.2)(zod@4.3.6):
     dependencies:
       convex: 1.43.0(react@19.2.8)
     optionalDependencies:
       '@standard-schema/spec': 1.1.0
       react: 19.2.8
-      typescript: 6.0.3
+      typescript: 7.0.2
       zod: 4.3.6
 
   convex-test@0.0.50(convex@1.43.0(react@19.2.8)):
@@ -10380,14 +10615,14 @@ snapshots:
       object-assign: 4.1.1
       vary: 1.1.2
 
-  cosmiconfig@9.0.2(typescript@6.0.3):
+  cosmiconfig@9.0.2(typescript@7.0.2):
     dependencies:
       env-paths: 2.2.1
       import-fresh: 3.3.1
       js-yaml: 4.3.1
       parse-json: 5.2.0
     optionalDependencies:
-      typescript: 6.0.3
+      typescript: 7.0.2
 
   cross-env@10.1.0:
     dependencies:
@@ -11234,7 +11469,7 @@ snapshots:
       buffer-image-size: 0.6.4
       entities: 7.0.1
       whatwg-mimetype: 3.0.0
-      ws: 8.21.1
+      ws: 8.21.2
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
@@ -12535,9 +12770,9 @@ snapshots:
     dependencies:
       minipass: 7.1.3
 
-  mintlify@4.2.778(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.2)(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(supports-color@10.2.2)(typescript@6.0.3):
+  mintlify@4.2.778(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.2)(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(supports-color@10.2.2)(typescript@7.0.2):
     dependencies:
-      '@mintlify/cli': 4.0.1381(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.2)(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(supports-color@10.2.2)(typescript@6.0.3)
+      '@mintlify/cli': 4.0.1381(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/node@26.1.2)(@types/react@19.2.18)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(supports-color@10.2.2)(typescript@7.0.2)
     transitivePeerDependencies:
       - '@base-ui/react'
       - '@types/node'
@@ -12593,8 +12828,6 @@ snapshots:
       any-promise: 1.3.0
       object-assign: 4.1.1
       thenify-all: 1.6.0
-
-  nanoid@3.3.16: {}
 
   nanoid@3.3.17: {}
 
@@ -12757,7 +12990,7 @@ snapshots:
       object-keys: 1.1.1
       safe-push-apply: 1.0.0
 
-  oxfmt@0.61.0(vite-plus@0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@6.0.3)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0)):
+  oxfmt@0.61.0(vite-plus@0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0)):
     dependencies:
       tinypool: 2.1.0
     optionalDependencies:
@@ -12780,9 +13013,9 @@ snapshots:
       '@oxfmt/binding-win32-arm64-msvc': 0.61.0
       '@oxfmt/binding-win32-ia32-msvc': 0.61.0
       '@oxfmt/binding-win32-x64-msvc': 0.61.0
-      vite-plus: 0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@6.0.3)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0)
+      vite-plus: 0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0)
 
-  oxfmt@0.62.0(vite-plus@0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@6.0.3)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0)):
+  oxfmt@0.62.0(vite-plus@0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0)):
     dependencies:
       tinypool: 2.1.0
     optionalDependencies:
@@ -12805,7 +13038,7 @@ snapshots:
       '@oxfmt/binding-win32-arm64-msvc': 0.62.0
       '@oxfmt/binding-win32-ia32-msvc': 0.62.0
       '@oxfmt/binding-win32-x64-msvc': 0.62.0
-      vite-plus: 0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@6.0.3)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0)
+      vite-plus: 0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0)
 
   oxlint-tsgolint@7.0.2001:
     optionalDependencies:
@@ -12816,7 +13049,7 @@ snapshots:
       '@oxlint-tsgolint/win32-arm64': 7.0.2001
       '@oxlint-tsgolint/win32-x64': 7.0.2001
 
-  oxlint@1.76.0(oxlint-tsgolint@7.0.2001)(vite-plus@0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@6.0.3)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0)):
+  oxlint@1.76.0(oxlint-tsgolint@7.0.2001)(vite-plus@0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0)):
     optionalDependencies:
       '@oxlint/binding-android-arm-eabi': 1.76.0
       '@oxlint/binding-android-arm64': 1.76.0
@@ -12838,9 +13071,9 @@ snapshots:
       '@oxlint/binding-win32-ia32-msvc': 1.76.0
       '@oxlint/binding-win32-x64-msvc': 1.76.0
       oxlint-tsgolint: 7.0.2001
-      vite-plus: 0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@6.0.3)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0)
+      vite-plus: 0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0)
 
-  oxlint@1.77.0(oxlint-tsgolint@7.0.2001)(vite-plus@0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@6.0.3)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0)):
+  oxlint@1.77.0(oxlint-tsgolint@7.0.2001)(vite-plus@0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0)):
     optionalDependencies:
       '@oxlint/binding-android-arm-eabi': 1.77.0
       '@oxlint/binding-android-arm64': 1.77.0
@@ -12862,7 +13095,7 @@ snapshots:
       '@oxlint/binding-win32-ia32-msvc': 1.77.0
       '@oxlint/binding-win32-x64-msvc': 1.77.0
       oxlint-tsgolint: 7.0.2001
-      vite-plus: 0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@6.0.3)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0)
+      vite-plus: 0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0)
 
   p-any@4.0.0:
     dependencies:
@@ -13040,12 +13273,6 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
-  postcss@8.5.23:
-    dependencies:
-      nanoid: 3.3.16
-      picocolors: 1.1.1
-      source-map-js: 1.2.1
-
   postcss@8.5.25:
     dependencies:
       nanoid: 3.3.17
@@ -13143,11 +13370,11 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  puppeteer@24.3.1(supports-color@10.2.2)(typescript@6.0.3):
+  puppeteer@24.3.1(supports-color@10.2.2)(typescript@7.0.2):
     dependencies:
       '@puppeteer/browsers': 2.7.1(supports-color@10.2.2)
       chromium-bidi: 2.1.2(devtools-protocol@0.0.1402036)
-      cosmiconfig: 9.0.2(typescript@6.0.3)
+      cosmiconfig: 9.0.2(typescript@7.0.2)
       devtools-protocol: 0.0.1402036
       puppeteer-core: 24.3.1(supports-color@10.2.2)
       typed-query-selector: 2.12.2
@@ -13505,7 +13732,7 @@ snapshots:
 
   reusify@1.1.0: {}
 
-  rolldown-plugin-dts@0.27.14(rolldown@1.2.0)(typescript@6.0.3):
+  rolldown-plugin-dts@0.27.14(rolldown@1.2.0)(typescript@7.0.2):
     dependencies:
       dts-resolver: 3.0.0
       get-tsconfig: 5.0.0-beta.5
@@ -13515,7 +13742,7 @@ snapshots:
       yuku-codegen: 0.8.0
       yuku-parser: 0.8.0
     optionalDependencies:
-      typescript: 6.0.3
+      typescript: 7.0.2
     transitivePeerDependencies:
       - oxc-resolver
 
@@ -14208,11 +14435,11 @@ snapshots:
 
   ts-interface-checker@0.1.13: {}
 
-  tsconfck@3.1.6(typescript@6.0.3):
+  tsconfck@3.1.6(typescript@7.0.2):
     optionalDependencies:
-      typescript: 6.0.3
+      typescript: 7.0.2
 
-  tsdown@0.22.14(tsx@4.23.8)(typescript@6.0.3)(unrun@0.3.1):
+  tsdown@0.22.14(tsx@4.23.8)(typescript@7.0.2)(unrun@0.3.1):
     dependencies:
       ansis: 4.3.1
       cac: 7.0.0
@@ -14223,7 +14450,7 @@ snapshots:
       obug: 2.1.4
       picomatch: 4.0.5
       rolldown: 1.2.0
-      rolldown-plugin-dts: 0.27.14(rolldown@1.2.0)(typescript@6.0.3)
+      rolldown-plugin-dts: 0.27.14(rolldown@1.2.0)(typescript@7.0.2)
       tinyexec: 1.2.4
       tinyglobby: 0.2.17
       tree-kill: 1.2.2
@@ -14231,7 +14458,7 @@ snapshots:
       verkit: 0.3.0
     optionalDependencies:
       tsx: 4.23.8
-      typescript: 6.0.3
+      typescript: 7.0.2
       unrun: 0.3.1
     transitivePeerDependencies:
       - '@typescript/native-preview'
@@ -14256,11 +14483,11 @@ snapshots:
 
   twoslash-protocol@0.3.9: {}
 
-  twoslash@0.3.9(supports-color@10.2.2)(typescript@6.0.3):
+  twoslash@0.3.9(supports-color@10.2.2)(typescript@7.0.2):
     dependencies:
-      '@typescript/vfs': 1.6.4(supports-color@10.2.2)(typescript@6.0.3)
+      '@typescript/vfs': 1.6.4(supports-color@10.2.2)(typescript@7.0.2)
       twoslash-protocol: 0.3.9
-      typescript: 6.0.3
+      typescript: 7.0.2
     transitivePeerDependencies:
       - supports-color
 
@@ -14314,7 +14541,28 @@ snapshots:
 
   typescript@5.9.3: {}
 
-  typescript@6.0.3: {}
+  typescript@7.0.2:
+    optionalDependencies:
+      '@typescript/typescript-aix-ppc64': 7.0.2
+      '@typescript/typescript-darwin-arm64': 7.0.2
+      '@typescript/typescript-darwin-x64': 7.0.2
+      '@typescript/typescript-freebsd-arm64': 7.0.2
+      '@typescript/typescript-freebsd-x64': 7.0.2
+      '@typescript/typescript-linux-arm': 7.0.2
+      '@typescript/typescript-linux-arm64': 7.0.2
+      '@typescript/typescript-linux-loong64': 7.0.2
+      '@typescript/typescript-linux-mips64el': 7.0.2
+      '@typescript/typescript-linux-ppc64': 7.0.2
+      '@typescript/typescript-linux-riscv64': 7.0.2
+      '@typescript/typescript-linux-s390x': 7.0.2
+      '@typescript/typescript-linux-x64': 7.0.2
+      '@typescript/typescript-netbsd-arm64': 7.0.2
+      '@typescript/typescript-netbsd-x64': 7.0.2
+      '@typescript/typescript-openbsd-arm64': 7.0.2
+      '@typescript/typescript-openbsd-x64': 7.0.2
+      '@typescript/typescript-sunos-x64': 7.0.2
+      '@typescript/typescript-win32-arm64': 7.0.2
+      '@typescript/typescript-win32-x64': 7.0.2
 
   unbox-primitive@1.1.0:
     dependencies:
@@ -14476,7 +14724,7 @@ snapshots:
       '@types/unist': 3.0.3
       vfile-message: 4.0.3
 
-  vite-plus@0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@6.0.3)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0):
+  vite-plus@0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0):
     dependencies:
       '@oxc-project/types': 0.142.0
       '@oxlint/plugins': 1.73.0
@@ -14489,9 +14737,9 @@ snapshots:
       '@vitest/snapshot': 4.1.10
       '@vitest/spy': 4.1.10
       '@vitest/utils': 4.1.10
-      '@voidzero-dev/vite-plus-core': 0.2.8(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@6.0.3)(unrun@0.3.1)(yaml@2.9.0)
-      oxfmt: 0.61.0(vite-plus@0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@6.0.3)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0))
-      oxlint: 1.76.0(oxlint-tsgolint@7.0.2001)(vite-plus@0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@6.0.3)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0))
+      '@voidzero-dev/vite-plus-core': 0.2.8(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@7.0.2)(unrun@0.3.1)(yaml@2.9.0)
+      oxfmt: 0.61.0(vite-plus@0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0))
+      oxlint: 1.76.0(oxlint-tsgolint@7.0.2001)(vite-plus@0.2.8(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(happy-dom@20.11.1)(jiti@1.21.7)(tsx@4.23.8)(typescript@7.0.2)(unrun@0.3.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))(yaml@2.9.0))
       oxlint-tsgolint: 7.0.2001
       vitest: 4.1.10(@types/node@26.1.2)(@vitest/browser-preview@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0))
     optionalDependencies:
@@ -14534,11 +14782,11 @@ snapshots:
       - vite
       - yaml
 
-  vite-tsconfig-paths@6.1.1(supports-color@10.2.2)(typescript@6.0.3)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0)):
+  vite-tsconfig-paths@6.1.1(supports-color@10.2.2)(typescript@7.0.2)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0)):
     dependencies:
       debug: 4.4.3(supports-color@10.2.2)
       globrex: 0.1.2
-      tsconfck: 3.1.6(typescript@6.0.3)
+      tsconfck: 3.1.6(typescript@7.0.2)
       vite: 8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@1.21.7)(tsx@4.23.8)(yaml@2.9.0)
     transitivePeerDependencies:
       - supports-color
@@ -14548,7 +14796,7 @@ snapshots:
     dependencies:
       lightningcss: 1.33.0
       picomatch: 4.0.5
-      postcss: 8.5.23
+      postcss: 8.5.25
       rolldown: 1.2.0
       tinyglobby: 0.2.17
     optionalDependencies:
