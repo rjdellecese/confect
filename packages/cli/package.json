@@ -21,17 +21,17 @@
     "exsolve": "^1.1.1"
   },
   "devDependencies": {
-    "@convex-dev/workpool": "0.4.8",
+    "@convex-dev/workpool": "0.4.9",
     "@effect/language-service": "0.87.1",
     "@effect/vitest": "0.30.0",
-    "@types/node": "26.1.1",
+    "@types/node": "26.1.2",
     "@vitest/coverage-v8": "4.1.10",
     "convex": "1.43.0",
     "effect": "3.22.1",
     "tsdown": "0.22.14",
     "typescript": "6.0.3",
     "unrun": "0.3.1",
-    "vite": "8.1.5",
+    "vite": "8.2.0",
     "vite-tsconfig-paths": "6.1.1",
     "vitest": "4.1.10"
   },

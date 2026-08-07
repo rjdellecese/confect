@@ -137,32 +137,30 @@ const findUnfinalizedGroupImpl = <S>(
 export const finalize = (
   group: Layer.Layer<GroupImpl<"Unfinalized">>,
 ): Layer.Layer<GroupImpl<"Finalized">> =>
-  Layer.flatMap(
-    group,
-    (context): Layer.Layer<GroupImpl<"Finalized">> =>
-      findUnfinalizedGroupImpl(context).pipe(
-        Option.match({
-          onNone: () =>
-            Layer.die(
-              new Error(
-                "GroupImpl.finalize: no Unfinalized GroupImpl service was found in the layer's context.",
-              ),
+  Layer.flatMap(group, (context): Layer.Layer<GroupImpl<"Finalized">> =>
+    findUnfinalizedGroupImpl(context).pipe(
+      Option.match({
+        onNone: () =>
+          Layer.die(
+            new Error(
+              "GroupImpl.finalize: no Unfinalized GroupImpl service was found in the layer's context.",
             ),
-          onSome: () =>
-            Layer.effect(
-              GroupImpl<"Finalized">({ finalizationStatus: "Finalized" }),
-              Effect.gen(function* () {
-                const registry = yield* Registry.Registry;
-                const items = yield* Ref.get(registry);
-                return {
-                  [TypeId]: TypeId,
-                  finalizationStatus: "Finalized" as const,
-                  registeredFunctionNames: collectFunctionNames(items),
-                };
-              }),
-            ),
-        }),
-      ),
+          ),
+        onSome: () =>
+          Layer.effect(
+            GroupImpl<"Finalized">({ finalizationStatus: "Finalized" }),
+            Effect.gen(function* () {
+              const registry = yield* Registry.Registry;
+              const items = yield* Ref.get(registry);
+              return {
+                [TypeId]: TypeId,
+                finalizationStatus: "Finalized" as const,
+                registeredFunctionNames: collectFunctionNames(items),
+              };
+            }),
+          ),
+      }),
+    ),
   );
 
 export type FromGroupSpec<Group extends GroupSpec.AnyWithProps> =
