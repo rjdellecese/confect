@@ -9,7 +9,7 @@
     "@convex-dev/workpool": "0.4.9",
     "@effect/platform": "0.97.1",
     "convex": "1.43.0",
-    "convex-helpers": "0.1.120",
+    "convex-helpers": "0.1.122",
     "effect": "3.22.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
@@ -22,7 +22,7 @@
     "@vitejs/plugin-react": "6.0.5",
     "concurrently": "10.0.4",
     "typescript": "6.0.3",
-    "vite-plus": "0.2.7"
+    "vite-plus": "0.2.8"
   },
   "private": true,
   "scripts": {
