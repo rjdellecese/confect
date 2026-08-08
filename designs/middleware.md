@@ -1,6 +1,6 @@
 # Middleware for Confect: design proposals
 
-**Status:** Draft for discussion
+**Status:** Proposal A accepted; key decisions resolved (§8)
 **Relates to:** [#395 — RFC: Pipeable middleware for Confect function implementations](https://github.com/rjdellecese/confect/issues/395)
 
 This document surveys how middleware could work in Confect. It starts from the
@@ -69,14 +69,20 @@ _implementation_ must be a value constructed once at group-build time whose
 _execution_ happens per invocation with per-invocation services in scope — an
 `Effect` stored in the registry, not a `Layer` memoized across calls.
 
-**(e) Function kinds differ in services — but `QueryRunner` is everywhere.**
-The query/mutation/action ctx unions differ, but all three include
-`QueryRunner` (and mutation/action include `MutationRunner`). A middleware
-that loads the current user via an internal query (`runQuery`) works
-identically in all three kinds. This substantially defuses #395's "maybe
-middleware needs `{query, mutation, action}` triples" concern: kind-generic
-middleware is expressible today with one implementation, and per-kind
-implementations can be an additive convenience rather than the core mechanism.
+**(e) Function kinds differ in services, and kind-generic database access is
+constrained.** The query/mutation/action ctx unions differ. All three do
+include `QueryRunner`, but that is not a license to build kind-generic
+middleware on `runQuery`: [Convex best practices](https://docs.convex.dev/understanding/best-practices/#use-ctxrunquery-and-ctxrunmutation-sparingly-in-queries-and-mutations)
+say `ctx.runQuery`/`ctx.runMutation` should be used sparingly inside queries
+and mutations — they add overhead and run in an isolated sub-environment, and
+are only warranted across component boundaries (or for genuine
+partial-rollback semantics). So a middleware that needs database access should
+use `DatabaseReader`/`DatabaseWriter` in queries and mutations, and reserve
+`runQuery` for actions, where it is the only route to the database.
+Consequence for the design: #395's instinct that middleware may need
+`{query, mutation, action}` implementations is correct for the flagship
+(database-touching auth) case — per-kind implementations of a single
+middleware must be a first-class part of the API, not an afterthought.
 
 **(f) The codegen boundary.** `_generated/registeredFunctions/*` calls
 `RegisteredFunctions.buildForGroup(databaseSchema, implLayer, RegisteredConvexFunction.make)`,
@@ -219,10 +225,13 @@ export class NotSignedIn extends Schema.TaggedError<NotSignedIn>()(
   {},
 ) {}
 
-export class CurrentUser extends Context.Tag("CurrentUser")<
+// Effect v4 service class (v3 equivalent: Context.Tag("CurrentUser")<...>)
+export class CurrentUser extends Context.Service<
   CurrentUser,
-  { readonly user: typeof users.Doc.Type }
->() {}
+  {
+    readonly user: typeof users.Doc.Type;
+  }
+>()("CurrentUser") {}
 
 export class RequireUser extends MiddlewareSpec.Service<
   RequireUser,
@@ -277,8 +286,11 @@ Type-level changes:
   `FunctionSpec` likewise. `.middleware()` are ordinary builder methods like
   `addFunction`, accumulating into those parameters.
 - **Effective middleware** for a function = group's middleware (in attachment
-  order) then the function's own. Deduplicated by tag identity, keeping the
-  innermost (function-level) position — same rule `HttpApi` uses.
+  order) then the function's own. Attaching the same tag at both levels (or
+  twice at one level) is a type error rather than a silent dedupe — a
+  duplicate attachment is always a mistake, and erroring keeps the effective
+  chain readable off the spec. (`HttpApi` silently dedupes via its
+  `ReadonlySet`; we deliberately diverge.)
 
 ### 4.3 Client-side effect: the error union
 
@@ -367,6 +379,10 @@ const RequireUserLive = MiddlewareImpl.make(
 );
 ```
 
+(This implementation uses `DatabaseReader`, so it type-checks for a
+`RequireUser` declared with `kinds: ["query", "mutation"]`; the all-kinds
+version appears below.)
+
 The implementation function is typed (borrowing v4's two safety brands):
 
 ```ts
@@ -386,18 +402,34 @@ The implementation function is typed (borrowing v4's two safety brands):
 - Short-circuiting is simply returning `Effect.fail(new NotSignedIn())`
   without running `effect`.
 - `R` must be a subset of the **intersection of the ctx-service unions of the
-  tag's declared `kinds`** (computed against the app's `databaseSchema`). For
-  the default all-kinds tag that intersection is
-  `Auth | StorageReader | QueryRunner` — which is exactly enough for the
-  canonical kind-generic strategy: load the user via `QueryRunner` and an
-  internal query, one implementation for all three kinds (constraint (e)). A
-  `kinds: ["query", "mutation"]` tag may additionally use `DatabaseReader`
-  (which is what makes the example above legal); a mutation-only tag may use
-  `DatabaseWriter`.
+  tag's declared `kinds`** (computed against the app's `databaseSchema`). A
+  `kinds: ["query", "mutation"]` tag may use `DatabaseReader` (which is what
+  makes the example above legal); a mutation-only tag may use
+  `DatabaseWriter`; the default all-kinds intersection is
+  `Auth | StorageReader | QueryRunner`.
+
+For an all-kinds middleware that needs the database — the flagship auth case —
+a single implementation would have to lean on `QueryRunner`, which best
+practices reserve for actions (constraint (e)). So the recommended shape for
+kind-generic, database-touching middleware is **per-kind implementations of
+the one tag** (#395's triple, realized as an impl-side constructor; each entry
+gets that kind's full ctx union):
+
+```ts
+const RequireUserLive = MiddlewareImpl.makeByKind(databaseSchema, RequireUser, {
+  query: viaDatabaseReader, // shared: both run the DatabaseReader strategy
+  mutation: viaDatabaseReader,
+  action: viaQueryRunner, // runQuery of an internal query — the only DB route in actions
+});
+```
+
+The single-strategy `MiddlewareImpl.make` remains the right tool for
+middleware that stays within the kinds-intersection (pure `Auth` checks,
+logging, rate-limit headers, …) or that declares narrower `kinds`.
 
 Since the flagship use case (auth) is "run something, provide a service",
-a provides-shaped constructor is worth offering as sugar over the wrap
-primitive:
+a provides-shaped constructor is also worth offering as sugar over the wrap
+primitive (composing with both `make` and `makeByKind`):
 
 ```ts
 const RequireUserLive = MiddlewareImpl.provides(
@@ -414,18 +446,6 @@ const RequireUserLive = MiddlewareImpl.provides(
 which desugars to `(effect) => Effect.provideServiceEffect(effect, CurrentUser, body)`.
 (The `CurrentUser` tag is passed explicitly because, per v4, the spec class
 only knows `provides` at the type level.)
-
-A second convenience for when one strategy doesn't fit all kinds (the RFC's
-per-kind triple, as sugar rather than core mechanism — each entry may use that
-kind's full ctx union):
-
-```ts
-const RequireUserLive = MiddlewareImpl.makeByKind(databaseSchema, RequireUser, {
-  query: viaDatabaseReader,
-  mutation: viaDatabaseReader,
-  action: viaQueryRunner,
-});
-```
 
 ### 4.6 Group assembly and enforcement
 
@@ -517,10 +537,10 @@ inline.)
 
 - **Convex-provenance functions** (`FunctionSpec.convexPublicQuery` etc.):
   their handlers are raw `RegisteredFunction`s that Confect passes through
-  untouched; middleware doesn't apply. Type-level: attaching middleware to a
-  group affects only Confect-provenance functions; whether to make attaching
-  to a convex-provenance function's group a type error or a silent skip is an
-  open question (§7).
+  untouched; middleware doesn't apply. Attaching middleware to a group that
+  contains a matching-kind convex-provenance function is a type error rather
+  than a silent skip (resolved decision 3, §8), so a policy can't silently
+  not cover part of a group.
 - **HTTP API middleware**: Confect's HTTP API already exposes Effect's own
   `HttpApp`/`HttpApiMiddleware` machinery; nothing new needed.
 - **Client-side middleware** (Rpc's `requiredForClient`): the Convex client
@@ -603,27 +623,30 @@ public concept.
 
 ## 7. Comparison and recommendation
 
-|                                                                | A: spec-declared                                                      | B: impl-pipeable                      | C: provider layers                   |
-| -------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------- | ------------------------------------ |
-| Typed middleware errors on the client                          | ✅ automatic                                                          | ❌ die or per-function re-declaration | ❌ defects only                      |
-| Handler `R` narrowed per function, at definition site          | ✅                                                                    | ⚠️ at `finalize`                      | ✅                                   |
-| Missing-impl caught at compile time                            | ✅ via `finalize` (existing pattern)                                  | ✅                                    | n/a                                  |
-| Group + function level, ordered                                | ✅                                                                    | ✅                                    | ⚠️ group-level natural, ordering n/a |
-| Function kinds                                                 | `kinds` on tag + R-subset check; `QueryRunner` for kind-generic impls | same idea possible                    | same idea possible                   |
-| Wrap (logging/timing/retry)                                    | ✅ core primitive                                                     | ✅                                    | ❌                                   |
-| Alignment with Effect v4 (`HttpApiMiddleware`/`RpcMiddleware`) | ✅ same architecture                                                  | ❌ novel                              | ❌ novel                             |
-| Spec surface growth                                            | new `MiddlewareSpec` + 2 builder methods                              | none                                  | none                                 |
-| Client/codegen changes                                         | error-union type plumbing only                                        | none                                  | none                                 |
+|                                                                | A: spec-declared                                                     | B: impl-pipeable                      | C: provider layers                   |
+| -------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------- | ------------------------------------ |
+| Typed middleware errors on the client                          | ✅ automatic                                                         | ❌ die or per-function re-declaration | ❌ defects only                      |
+| Handler `R` narrowed per function, at definition site          | ✅                                                                   | ⚠️ at `finalize`                      | ✅                                   |
+| Missing-impl caught at compile time                            | ✅ via `finalize` (existing pattern)                                 | ✅                                    | n/a                                  |
+| Group + function level, ordered                                | ✅                                                                   | ✅                                    | ⚠️ group-level natural, ordering n/a |
+| Function kinds                                                 | `kinds` on tag + R-subset check; `makeByKind` for kind-generic impls | same idea possible                    | same idea possible                   |
+| Wrap (logging/timing/retry)                                    | ✅ core primitive                                                    | ✅                                    | ❌                                   |
+| Alignment with Effect v4 (`HttpApiMiddleware`/`RpcMiddleware`) | ✅ same architecture                                                 | ❌ novel                              | ❌ novel                             |
+| Spec surface growth                                            | new `MiddlewareSpec` + 2 builder methods                             | none                                  | none                                 |
+| Client/codegen changes                                         | error-union type plumbing only                                       | none                                  | none                                 |
 
-**Recommendation: Proposal A**, delivered in phases:
+**Recommendation: Proposal A**, built on the v10 line (Effect v4 — see
+resolved decision 5) and delivered in phases:
 
 1. **Phase 1**: `MiddlewareSpec.Service` (provides + error + kinds), the
-   wrap-style primitive with the `MiddlewareImpl.provides` sugar,
-   `GroupSpec.middleware`, registry/build wiring, error-union plumbing through
-   `Ref`/`Refs`, handler `R` widening. This alone satisfies nearly every
-   requirement in §1.
-2. **Phase 2**: function-level `.middleware()` on `FunctionSpec`,
-   `makeByKind`.
+   wrap-style primitive with the `MiddlewareImpl.provides` sugar **and
+   `makeByKind`**, `GroupSpec.middleware`, registry/build wiring, error-union
+   plumbing through `Ref`/`Refs`, handler `R` widening. `makeByKind` moved
+   into Phase 1 because, per constraint (e), it is the recommended shape for
+   the flagship database-touching auth middleware — shipping without it would
+   push users toward `runQuery`-in-queries, against Convex best practices.
+   This phase alone satisfies nearly every requirement in §1.
+2. **Phase 2**: function-level `.middleware()` on `FunctionSpec`.
 3. **Phase 3** (as demand appears): cross-middleware dependencies (a
    `requires` slot in the `Config` type parameter, as in v4's
    `ApplyServices`). Note v4 deliberately dropped `optional` middleware — a
@@ -636,36 +659,40 @@ argue that departure is forced by Confect's own end-to-end typing goals — the
 spec half of a middleware is precisely its client-relevant interface (name +
 error + provides), while every server detail stays in the impl half.
 
-## 8. Open questions
+## 8. Resolved decisions
 
-1. **Subgroup propagation.** Should `GroupSpec.middleware` apply to subgroups
-   added via `addGroup`/`addGroupAt`? Leaf groups are implemented and built in
-   isolation (per-group `Registry`), so inherited middleware would complicate
-   the codegen boundary. Suggested initial answer: no propagation — middleware
-   applies to the declaring group's own functions; revisit if group nesting
-   grows into a namespacing-plus-policy mechanism.
-2. **Duplicate attachment semantics.** Same tag at group and function level:
-   dedupe keeping innermost (proposed, matches `HttpApi`), or error?
-3. **Convex-provenance functions in a middleware-bearing group**: type error
-   or documented no-op? (Suggested: type error on `.middleware()` when the
-   group contains any convex-provenance function whose kind matches, to avoid
-   silent policy holes; needs ergonomics validation.)
-4. **Middleware ordering across group→function boundary when a wrap
+Decided with the maintainer (2026-08-08):
+
+1. **Subgroup propagation: no.** `GroupSpec.middleware` applies only to the
+   declaring group's own functions, not to subgroups added via
+   `addGroup`/`addGroupAt`. Leaf groups are implemented and built in isolation
+   (per-group `Registry`), so inherited middleware would complicate the
+   codegen boundary. Revisit only if group nesting grows into a
+   namespacing-plus-policy mechanism.
+2. **Duplicate attachment: type error.** Attaching the same tag at both group
+   and function level (or twice at one level) is rejected rather than
+   silently deduped (diverging from `HttpApi`'s `ReadonlySet` behavior).
+3. **Convex-provenance functions in a middleware-bearing group: type error.**
+   `.middleware()` is rejected when the group contains a convex-provenance
+   function whose kind matches the middleware's `kinds`, to avoid silent
+   policy holes. (Exact ergonomics — e.g. the error message and whether the
+   check runs on `.middleware()` or `addFunction` — to be validated during
+   implementation.)
+4. **Effect version target: build on Confect v10, using Effect v4.** Nothing
+   in the design requires v4, but building there first avoids implementing
+   the type plumbing twice against two Schema majors, and the implementation
+   can borrow v4's own machinery (`Context.Key`-based service classes, the
+   `unhandled` brand) directly.
+5. **Naming: `MiddlewareSpec`/`MiddlewareImpl`**, following the repo's
+   existing Spec/Impl vocabulary rather than Effect's single-module layout.
+6. **Group-attachment semantics: declarative.** Group middleware is its own
+   type parameter on `GroupSpec` — order-independent, applying to all of the
+   group's functions — rather than v4's fan-out (which only affects endpoints
+   added _before_ the `.middleware()` call).
+
+## 9. Open questions
+
+1. **Middleware ordering across the group→function boundary when a wrap
    middleware provides a service consumed by a later provides-middleware.**
    Phase-3 concern; likely resolved by validating attachment order against
    declared `requires`.
-5. **Effect version target.** Nothing here requires v4 — `Context.Tag`,
-   `Layer`, and `Effect.provideServiceEffect` all exist in v3 — but the
-   feature is a natural headline for the v10 line (Effect v4), and building it
-   there first avoids implementing the type plumbing twice against two Schema
-   majors. Worth deciding before Phase 1 starts.
-6. **Naming.** `MiddlewareSpec`/`MiddlewareImpl` follows the repo's existing
-   Spec/Impl vocabulary; a single `Middleware` module with `.Service` +
-   `Layer`-based provision would follow Effect v4's. The former seems more at
-   home in Confect.
-7. **Group-attachment semantics.** This proposal keeps group middleware as its
-   own type parameter on `GroupSpec` (order-independent, applies to all of the
-   group's functions), whereas v4's group `.middleware()` is a fan-out that
-   only affects endpoints added _before_ the call. The declarative variant
-   seems less surprising for Confect specs, but following v4 exactly is a
-   defensible alternative — worth a deliberate decision.
