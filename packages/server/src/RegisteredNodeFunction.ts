@@ -17,6 +17,7 @@ import type * as RegistryItem from "./RegistryItem";
 export const make = (
   databaseSchema: DatabaseSchema.AnyWithProps,
   { functionSpec, handler }: RegistryItem.AnyWithProps,
+  middlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware> = [],
 ): RegisteredFunction.Any =>
   Match.value(functionSpec.functionProvenance).pipe(
     Match.tag("Convex", () => handler as RegisteredFunction.Any),
@@ -32,10 +33,12 @@ export const make = (
 
       return genericFunction(
         nodeActionFunction(databaseSchema, {
+          functionSpec,
           args: functionProvenance.args,
           returns: functionProvenance.returns,
           error: functionProvenance.error,
           handler: handler as Handler.AnyConfectProvenance,
+          middlewares,
         }),
       );
     }),
@@ -52,11 +55,14 @@ const nodeActionFunction = <
 >(
   databaseSchema: DatabaseSchema_,
   {
+    functionSpec,
     args,
     returns,
     error,
     handler,
+    middlewares,
   }: {
+    functionSpec: FunctionSpec.AnyWithProps;
     args: Schema.Codec<Args, ConvexArgs>;
     returns: Schema.Codec<Returns, ConvexReturns>;
     error: Schema.Codec<any, any> | undefined;
@@ -68,13 +74,16 @@ const nodeActionFunction = <
       | RegisteredFunction.ActionServices<DatabaseSchema_>
       | NodeServices.NodeServices
     >;
+    middlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>;
   },
 ) =>
   RegisteredFunction.actionFunctionBase({
+    functionSpec,
     args,
     returns,
     error,
     handler,
+    middlewares,
     createLayer: (ctx) =>
       Layer.mergeAll(
         RegisteredFunction.actionLayer(databaseSchema, ctx),

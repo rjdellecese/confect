@@ -64,6 +64,15 @@ export class ImplMissingFunctionsError extends Schema.TaggedError<ImplMissingFun
   },
 ) {}
 
+export class ImplMissingMiddlewareError extends Schema.TaggedError<ImplMissingMiddlewareError>()(
+  "ImplMissingMiddlewareError",
+  {
+    implPath: Schema.String,
+    groupPath: Schema.String,
+    missingMiddlewareKeys: Schema.Array(Schema.String),
+  },
+) {}
+
 export class ParentChildNameCollisionError extends Schema.TaggedError<ParentChildNameCollisionError>()(
   "ParentChildNameCollisionError",
   {
@@ -141,6 +150,7 @@ export const CodegenError = Schema.Union([
   ImplMissingDefaultLayerError,
   ImplNotFinalizedError,
   ImplMissingFunctionsError,
+  ImplMissingMiddlewareError,
   ParentChildNameCollisionError,
   InvalidTableDefaultExportError,
   InvalidTableFilenameError,
@@ -236,6 +246,17 @@ const renderImplMissingFunctionsError = (
     "Impl ",
     formatPath(error.implPath),
     ` does not implement every function declared by group \`${error.groupPath}\`; missing: ${names}. Add a \`FunctionImpl.make\` for each missing function and provide it to the group layer.`,
+  );
+};
+
+const renderImplMissingMiddlewareError = (
+  error: ImplMissingMiddlewareError,
+): string => {
+  const keys = error.missingMiddlewareKeys.join(", ");
+  return singleLine(
+    "Impl ",
+    formatPath(error.implPath),
+    ` does not implement every middleware attached to group \`${error.groupPath}\`; missing: ${keys}. Provide a \`MiddlewareImpl.make\` (or \`makeByKind\`/\`provides\`) layer for each missing middleware to the group layer.`,
   );
 };
 
@@ -336,6 +357,7 @@ export const renderCodegenError = (error: CodegenError): string => {
     ),
     Match.tag("ImplNotFinalizedError", renderImplNotFinalizedError),
     Match.tag("ImplMissingFunctionsError", renderImplMissingFunctionsError),
+    Match.tag("ImplMissingMiddlewareError", renderImplMissingMiddlewareError),
     Match.tag(
       "ParentChildNameCollisionError",
       renderParentChildNameCollisionError,

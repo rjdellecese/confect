@@ -40,6 +40,7 @@ import { StorageWriter } from "./StorageWriter";
 export const make = (
   databaseSchema: DatabaseSchema.AnyWithProps,
   { functionSpec, handler }: RegistryItem.AnyWithProps,
+  middlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware> = [],
 ): RegisteredFunction.Any =>
   Match.value(functionSpec.functionProvenance).pipe(
     Match.tag("Convex", () => handler as RegisteredFunction.Any),
@@ -58,10 +59,12 @@ export const make = (
           return genericFunction(
             queryFunction({
               databaseSchema,
+              functionSpec,
               args: functionProvenance.args,
               returns: functionProvenance.returns,
               error: functionProvenance.error,
               handler: handler as Handler.AnyConfectProvenance,
+              middlewares,
             }),
           );
         }),
@@ -75,10 +78,12 @@ export const make = (
           return genericFunction(
             mutationFunction({
               databaseSchema,
+              functionSpec,
               args: functionProvenance.args,
               returns: functionProvenance.returns,
               error: functionProvenance.error,
               handler: handler as Handler.AnyConfectProvenance,
+              middlewares,
             }),
           );
         }),
@@ -91,10 +96,12 @@ export const make = (
 
           return genericFunction(
             convexActionFunction(databaseSchema, {
+              functionSpec,
               args: functionProvenance.args,
               returns: functionProvenance.returns,
               error: functionProvenance.error,
               handler: handler as Handler.AnyConfectProvenance,
+              middlewares,
             }),
           );
         }),
@@ -183,12 +190,15 @@ const queryFunction = <
   E,
 >({
   databaseSchema,
+  functionSpec,
   args,
   returns,
   error,
   handler,
+  middlewares,
 }: {
   databaseSchema: DatabaseSchema_;
+  functionSpec: FunctionSpec.AnyWithProps;
   args: Schema.Codec<Args, ConvexArgs>;
   returns: Schema.Codec<Returns, ConvexReturns>;
   error: Schema.Codec<Error, Value> | undefined;
@@ -205,6 +215,7 @@ const queryFunction = <
         DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
       >
   >;
+  middlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>;
 }) => ({
   args: SchemaToValidator.compileArgsSchema(args),
   returns: SchemaToValidator.compileReturnsSchema(returns),
@@ -220,7 +231,11 @@ const queryFunction = <
         Schema.decodeUnknownEffect(args),
         Effect.orDie,
       );
-      const decodedReturns = yield* handler(decodedArgs).pipe(
+      const decodedReturns = yield* RegisteredFunction.applyMiddleware(
+        handler(decodedArgs),
+        middlewares,
+        { spec: functionSpec, args: decodedArgs },
+      ).pipe(
         Effect.provide(
           Layer.mergeAll(
             DatabaseReader.layer(databaseSchema, ctx.db),
@@ -244,9 +259,12 @@ const queryFunction = <
       );
     }).pipe(
       Effect.provideService(Clock.Clock, queryClock),
-      RegisteredFunction.runHandlerPromise(error, {
-        scheduler: microtaskScheduler,
-      }),
+      RegisteredFunction.runHandlerPromise(
+        RegisteredFunction.combineErrorSchemas(error, middlewares),
+        {
+          scheduler: microtaskScheduler,
+        },
+      ),
     ),
 });
 
@@ -292,18 +310,22 @@ const mutationFunction = <
   E,
 >({
   databaseSchema,
+  functionSpec,
   args,
   returns,
   error,
   handler,
+  middlewares,
 }: {
   databaseSchema: DatabaseSchema_;
+  functionSpec: FunctionSpec.AnyWithProps;
   args: Schema.Codec<Args, ConvexArgs>;
   returns: Schema.Codec<Returns, ConvexReturns>;
   error: Schema.Codec<Error, Value> | undefined;
   handler: (
     a: Args,
   ) => Effect.Effect<Returns, E, MutationServices<DatabaseSchema_>>;
+  middlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>;
 }) => ({
   args: SchemaToValidator.compileArgsSchema(args),
   returns: SchemaToValidator.compileReturnsSchema(returns),
@@ -319,18 +341,23 @@ const mutationFunction = <
         Schema.decodeUnknownEffect(args),
         Effect.orDie,
       );
-      const decodedReturns = yield* handler(decodedArgs).pipe(
-        Effect.provide(mutationLayer(databaseSchema, ctx)),
-      );
+      const decodedReturns = yield* RegisteredFunction.applyMiddleware(
+        handler(decodedArgs),
+        middlewares,
+        { spec: functionSpec, args: decodedArgs },
+      ).pipe(Effect.provide(mutationLayer(databaseSchema, ctx)));
       return yield* pipe(
         decodedReturns,
         Schema.encodeEffect(returns),
         Effect.orDie,
       );
     }).pipe(
-      RegisteredFunction.runHandlerPromise(error, {
-        scheduler: microtaskScheduler,
-      }),
+      RegisteredFunction.runHandlerPromise(
+        RegisteredFunction.combineErrorSchemas(error, middlewares),
+        {
+          scheduler: microtaskScheduler,
+        },
+      ),
     ),
 });
 
@@ -344,11 +371,14 @@ const convexActionFunction = <
 >(
   schema: DatabaseSchema_,
   {
+    functionSpec,
     args,
     returns,
     error,
     handler,
+    middlewares,
   }: {
+    functionSpec: FunctionSpec.AnyWithProps;
     args: Schema.Codec<Args, ConvexArgs>;
     returns: Schema.Codec<Returns, ConvexReturns>;
     error: Schema.Codec<any, any> | undefined;
@@ -359,13 +389,16 @@ const convexActionFunction = <
       E,
       RegisteredFunction.ActionServices<DatabaseSchema_>
     >;
+    middlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>;
   },
 ) =>
   RegisteredFunction.actionFunctionBase({
+    functionSpec,
     args,
     returns,
     error,
     handler,
+    middlewares,
     createLayer: (ctx) =>
       Layer.mergeAll(
         RegisteredFunction.actionLayer(schema, ctx),

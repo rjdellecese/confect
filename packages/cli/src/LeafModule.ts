@@ -14,6 +14,7 @@ import * as Bundler from "./Bundler";
 import {
   ImplMissingDefaultLayerError,
   ImplMissingFunctionsError,
+  ImplMissingMiddlewareError,
   ImplMissingSpecImportError,
   ImplNotFinalizedError,
   SpecMissingDefaultGroupSpecError,
@@ -304,6 +305,24 @@ export const validateImpl = (leaf: LeafModule) =>
         implPath: implRelativePath,
         groupPath: leaf.groupPathDot,
         missingFunctionNames: missing,
+      });
+    }
+
+    const expectedMiddlewareKeys = (groupSpec.middlewares ?? []).map(
+      (middleware) => middleware.key,
+    );
+    const registeredMiddlewareKeys = new Set(
+      finalizedGroupImpl.registeredMiddlewareKeys ?? [],
+    );
+    const missingMiddleware = expectedMiddlewareKeys.filter(
+      (key) => !registeredMiddlewareKeys.has(key),
+    );
+
+    if (missingMiddleware.length > 0) {
+      return yield* new ImplMissingMiddlewareError({
+        implPath: implRelativePath,
+        groupPath: leaf.groupPathDot,
+        missingMiddlewareKeys: missingMiddleware,
       });
     }
   });

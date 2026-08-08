@@ -1,5 +1,6 @@
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import type * as GroupSpec from "@confect/core/GroupSpec";
+import type * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import * as Registry from "@confect/core/Registry";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -47,10 +48,15 @@ export const make = <
   _databaseSchema: DatabaseSchema_,
   group: Group,
   functionName: FunctionName,
+  // The group's attached middleware widen the handler's environment with the
+  // services they provide — that's the whole type-safety story: a handler
+  // consuming `CurrentUser` type-checks exactly when a middleware providing
+  // it is attached to the group in the spec.
   handler: Handler.WithName<
     DatabaseSchema_,
     GroupSpec.Functions<Group>,
-    FunctionName
+    FunctionName,
+    MiddlewareSpec.Provides<GroupSpec.Middlewares<Group>>
   >,
 ): Layer.Layer<FunctionImpl<FunctionName>> => {
   const functionSpec = group.functions[functionName]!;
@@ -67,6 +73,10 @@ export const make = <
           RegistryItem.make({
             functionSpec,
             handler,
+            middlewareSpecs:
+              functionSpec.functionProvenance._tag === "Confect"
+                ? group.middlewares
+                : [],
           }),
         ),
       );

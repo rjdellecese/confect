@@ -11,6 +11,7 @@ import * as Record from "effect/Record";
 import * as Ref from "effect/Ref";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as FunctionImpl from "./FunctionImpl";
+import * as MiddlewareImpl from "./MiddlewareImpl";
 
 export const TypeId = "@confect/server/GroupImpl";
 export type TypeId = typeof TypeId;
@@ -29,6 +30,14 @@ export interface GroupImpl<
    * since the list is only known once `finalize` snapshots the registry.
    */
   readonly registeredFunctionNames: ReadonlyArray<string>;
+  /**
+   * Keys of every middleware whose implementation registered into this
+   * group's layer scope via `MiddlewareImpl.make` (and friends). Same
+   * authoritativeness caveat as `registeredFunctionNames`. Lets consumers
+   * (the CLI's `validateImpl`) verify middleware-impl completeness against a
+   * `GroupSpec`'s attached middleware without inspecting the `Registry`.
+   */
+  readonly registeredMiddlewareKeys: ReadonlyArray<string>;
 }
 
 export interface Any extends GroupImpl<FinalizationStatus> {}
@@ -82,7 +91,7 @@ export const make = <
 ): Layer.Layer<
   GroupImpl<"Unfinalized">,
   never,
-  FunctionImpl.FromGroupSpec<Group>
+  FunctionImpl.FromGroupSpec<Group> | MiddlewareImpl.FromGroupSpec<Group>
 > =>
   Layer.succeed(
     GroupImpl<"Unfinalized">({ finalizationStatus: "Unfinalized" }),
@@ -90,11 +99,12 @@ export const make = <
       [TypeId]: TypeId,
       finalizationStatus: "Unfinalized" as const,
       registeredFunctionNames: [],
+      registeredMiddlewareKeys: [],
     },
   ) as Layer.Layer<
     GroupImpl<"Unfinalized">,
     never,
-    FunctionImpl.FromGroupSpec<Group>
+    FunctionImpl.FromGroupSpec<Group> | MiddlewareImpl.FromGroupSpec<Group>
   >;
 
 const isFunctionShaped = (value: unknown): boolean =>
@@ -113,6 +123,20 @@ const collectFunctionNames = (
     Record.toEntries(items),
     Array.filter(([, value]) => isFunctionShaped(value)),
     Array.map(([name]) => name),
+  );
+
+/**
+ * Return the keys of the middleware implementations registered into a
+ * group's registry (stored under `middleware:<key>` entries by
+ * `MiddlewareImpl`).
+ */
+const collectMiddlewareKeys = (
+  items: Registry.RegistryItems,
+): ReadonlyArray<string> =>
+  pipe(
+    Record.values(items),
+    Array.filter(MiddlewareImpl.isRegistryItem),
+    Array.map((item) => item.middleware.key),
   );
 
 const findUnfinalizedGroupImpl = <S>(
@@ -158,6 +182,7 @@ export const finalize = (
                 [TypeId]: TypeId,
                 finalizationStatus: "Finalized" as const,
                 registeredFunctionNames: collectFunctionNames(items),
+                registeredMiddlewareKeys: collectMiddlewareKeys(items),
               };
             }),
           ),
@@ -166,4 +191,5 @@ export const finalize = (
   );
 
 export type FromGroupSpec<Group extends GroupSpec.AnyWithProps> =
-  FunctionImpl.FromGroupSpec<Group>;
+  | FunctionImpl.FromGroupSpec<Group>
+  | MiddlewareImpl.FromGroupSpec<Group>;

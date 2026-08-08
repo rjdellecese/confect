@@ -8,6 +8,7 @@ import * as Ref from "effect/Ref";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as GroupImpl from "./GroupImpl";
 import { mapLeaves } from "./internal/utils";
+import * as MiddlewareImpl from "./MiddlewareImpl";
 import type * as RegisteredFunction from "./RegisteredFunction";
 import * as RegistryItem from "./RegistryItem";
 
@@ -86,6 +87,7 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
   makeRegisteredFunction: (
     databaseSchema: DatabaseSchema.AnyWithProps,
     registryItem: RegistryItem.AnyWithProps,
+    middlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>,
   ) => RegisteredFunction.Any,
 ): RegisteredFunctionsForGroupSpec<Group> => {
   const registryItems = Effect.gen(function* () {
@@ -100,9 +102,61 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
     Effect.runSync,
   );
 
+  // Middleware implementations register under `middleware:<key>` entries
+  // alongside the group's functions; split them out so only function items
+  // reach `mapLeaves`, and resolve each function's attached middleware specs
+  // against them.
+  const middlewareItems = new Map<string, MiddlewareImpl.RegistryItem>();
+  const functionItems: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(registryItems)) {
+    if (MiddlewareImpl.isRegistryItem(value)) {
+      middlewareItems.set(value.middleware.key, value);
+    } else {
+      functionItems[key] = value;
+    }
+  }
+
   return mapLeaves<RegistryItem.AnyWithProps, RegisteredFunction.Any>(
-    registryItems as { [key: string]: RegistryItem.AnyWithProps },
+    functionItems as { [key: string]: RegistryItem.AnyWithProps },
     RegistryItem.isRegistryItem,
-    (registryItem) => makeRegisteredFunction(databaseSchema, registryItem),
+    (registryItem) =>
+      makeRegisteredFunction(
+        databaseSchema,
+        registryItem,
+        resolveMiddlewares(registryItem, middlewareItems),
+      ),
   ) as RegisteredFunctionsForGroupSpec<Group>;
 };
+
+/**
+ * Pair each middleware spec attached to a function with its registered
+ * implementation for the function's kind. Both misses are ruled out by the
+ * type system (`GroupImpl.finalize` demands every attached middleware's
+ * `MiddlewareImpl` service; `MiddlewareImpl.make`/`makeByKind` cover exactly
+ * the declared kinds, which `GroupSpec.middleware` requires to cover every
+ * function) — these throws are the runtime backstop for builds that ignored
+ * type errors.
+ */
+const resolveMiddlewares = (
+  registryItem: RegistryItem.AnyWithProps,
+  middlewareItems: ReadonlyMap<string, MiddlewareImpl.RegistryItem>,
+): ReadonlyArray<RegistryItem.ResolvedMiddleware> =>
+  registryItem.middlewareSpecs.map((middleware) => {
+    const registered = middlewareItems.get(middleware.key);
+    if (registered === undefined) {
+      throw new Error(
+        `Middleware "${middleware.key}" is attached to this group's spec, but no implementation was provided — pipe the group's impl through \`Layer.provide(MiddlewareImpl.make(...))\` (or \`makeByKind\`/\`provides\`).`,
+      );
+    }
+
+    const functionType =
+      registryItem.functionSpec.runtimeAndFunctionType.functionType;
+    const impl = registered.impls[functionType];
+    if (impl === undefined) {
+      throw new Error(
+        `Middleware "${middleware.key}" has no implementation for kind "${functionType}", the kind of function "${registryItem.functionSpec.name}". Declare the kind in the middleware's \`kinds\` and cover it in \`MiddlewareImpl.makeByKind\`.`,
+      );
+    }
+
+    return { middleware, impl };
+  });

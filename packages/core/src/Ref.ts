@@ -12,6 +12,8 @@ import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import type * as FunctionSpec from "./FunctionSpec";
+import * as Lazy from "./Lazy";
+import * as MiddlewareSpec from "./MiddlewareSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
 export interface Ref<
@@ -30,6 +32,23 @@ export interface Ref<
   readonly functionSpec: FunctionSpec.AnyWithProps;
   /** @internal */
   readonly functionNamespace: string;
+  /**
+   * The middleware covering this function (its group's, in attachment
+   * order). Their error schemas join the function's own in this ref's
+   * error-decoding union. Empty for Convex-provenance functions, which
+   * middleware never covers.
+   *
+   * @internal
+   */
+  readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyService>;
+  /**
+   * The full error-decoding schema — the function's declared `error` schema
+   * unioned with every covering middleware's error schema — or `undefined`
+   * when neither declares one. Lazily computed and memoised.
+   *
+   * @internal
+   */
+  readonly errorSchema: Schema.Codec<any, any> | undefined;
 }
 
 export interface Any extends Ref<any, any, any, any, any> {}
@@ -183,14 +202,16 @@ export type FunctionReference<Ref_ extends Any> = ConvexFunctionReference<
   GetFunctionVisibility<Ref_>
 >;
 
-export type FromFunctionSpec<FunctionSpec_ extends FunctionSpec.AnyWithProps> =
-  Ref<
-    FunctionSpec.GetRuntimeAndFunctionType<FunctionSpec_>,
-    FunctionSpec.GetFunctionVisibility<FunctionSpec_>,
-    FunctionSpec.Args<FunctionSpec_>,
-    FunctionSpec.Returns<FunctionSpec_>,
-    FunctionSpec.Error<FunctionSpec_>
-  >;
+export type FromFunctionSpec<
+  FunctionSpec_ extends FunctionSpec.AnyWithProps,
+  MiddlewareError = never,
+> = Ref<
+  FunctionSpec.GetRuntimeAndFunctionType<FunctionSpec_>,
+  FunctionSpec.GetFunctionVisibility<FunctionSpec_>,
+  FunctionSpec.Args<FunctionSpec_>,
+  FunctionSpec.Returns<FunctionSpec_>,
+  FunctionSpec.Error<FunctionSpec_> | MiddlewareError
+>;
 
 export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
   /**
@@ -200,7 +221,36 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
    */
   functionNamespace: string,
   functionSpec: FunctionSpec_,
-): FromFunctionSpec<FunctionSpec_> => ({ functionSpec, functionNamespace });
+  /**
+   * The middleware covering this function. Ignored (stored empty) for
+   * Convex-provenance functions, which middleware never covers.
+   */
+  middlewares: ReadonlyArray<MiddlewareSpec.AnyService> = [],
+): FromFunctionSpec<FunctionSpec_> => {
+  const middlewareSpecs =
+    functionSpec.functionProvenance._tag === "Confect" ? middlewares : [];
+
+  const ref = { functionSpec, functionNamespace, middlewareSpecs };
+
+  Lazy.defineProperty(ref, "errorSchema", () => {
+    const provenance = functionSpec.functionProvenance;
+    const functionError =
+      provenance._tag === "Confect" && "error" in provenance
+        ? [provenance.error as Schema.Codec<any, any>]
+        : [];
+    const schemas = [
+      ...functionError,
+      ...MiddlewareSpec.errorSchemas(middlewareSpecs),
+    ];
+    return schemas.length === 0
+      ? undefined
+      : schemas.length === 1
+        ? schemas[0]
+        : Schema.Union(schemas);
+  });
+
+  return ref as unknown as FromFunctionSpec<FunctionSpec_>;
+};
 
 export const getConvexFunctionName = (ref: Any): string =>
   `${ref.functionNamespace}:${ref.functionSpec.name}`;
@@ -223,11 +273,16 @@ export const getFunctionReference = <Ref_ extends Any>(
   return functionReference as FunctionReference<Ref_>;
 };
 
+// A presence check only — must not read `ref.errorSchema`, whose lazy
+// computation would force the error thunks this check promises to leave
+// untouched.
 export const hasErrorSchema = (ref: Any): boolean =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag(
       "Confect",
-      (confectFunctionProvenance) => "error" in confectFunctionProvenance,
+      (confectFunctionProvenance) =>
+        "error" in confectFunctionProvenance ||
+        ref.middlewareSpecs.some((middleware) => "error" in middleware),
     ),
     Match.tag("Convex", () => false),
     Match.exhaustive,
@@ -337,9 +392,11 @@ export const decodeErrorOrElse =
   };
 
 /**
- * Decode `encodedError` against the ref's error schema. Returns `None` if the
- * ref doesn't declare a typed error (Confect ref without an `error` schema, or
- * a Convex-provenance ref)—by definition there's nothing to decode the value
+ * Decode `encodedError` against the ref's error schema — the function's
+ * declared `error` schema unioned with its covering middlewares' error
+ * schemas. Returns `None` if the ref declares no typed error at all (Confect
+ * ref without an `error` schema and without failing middleware, or a
+ * Convex-provenance ref)—by definition there's nothing to decode the value
  * into, and the caller is responsible for deciding what to do (typically:
  * surface the original value as a defect).
  */
@@ -347,20 +404,12 @@ export const decodeError = <Ref_ extends Any>(
   ref: Ref_,
   encodedError: unknown,
 ): Effect.Effect<Option.Option<Error<Ref_>>, Schema.SchemaError> =>
-  Match.value(ref.functionSpec.functionProvenance).pipe(
-    Match.tag("Confect", (confectFunctionProvenance) =>
-      "error" in confectFunctionProvenance
-        ? Effect.map(
-            Schema.decodeUnknownEffect(confectFunctionProvenance.error)(
-              encodedError,
-            ),
-            Option.some,
-          )
-        : Effect.succeed(Option.none<Error<Ref_>>()),
-    ),
-    Match.tag("Convex", () => Effect.succeed(Option.none<Error<Ref_>>())),
-    Match.exhaustive,
-  );
+  ref.errorSchema !== undefined
+    ? Effect.map(
+        Schema.decodeUnknownEffect(ref.errorSchema)(encodedError),
+        Option.some,
+      )
+    : Effect.succeed(Option.none<Error<Ref_>>());
 
 /**
  * Synchronous counterpart to `decodeError`. Returns `None` when the value is
@@ -381,17 +430,11 @@ export const decodeErrorOption = <Ref_ extends Any>(
   ref: Ref_,
   encodedError: unknown,
 ): Option.Option<Error<Ref_>> =>
-  Match.value(ref.functionSpec.functionProvenance).pipe(
-    Match.tag("Confect", (confectFunctionProvenance) =>
-      "error" in confectFunctionProvenance
-        ? (Schema.decodeUnknownOption(confectFunctionProvenance.error)(
-            encodedError,
-          ) as Option.Option<Error<Ref_>>)
-        : Option.none<Error<Ref_>>(),
-    ),
-    Match.tag("Convex", () => Option.none<Error<Ref_>>()),
-    Match.exhaustive,
-  );
+  ref.errorSchema !== undefined
+    ? (Schema.decodeUnknownOption(ref.errorSchema)(
+        encodedError,
+      ) as Option.Option<Error<Ref_>>)
+    : Option.none<Error<Ref_>>();
 
 const missingPaginatedProvenanceError = (ref: Any) =>
   new globalThis.Error(

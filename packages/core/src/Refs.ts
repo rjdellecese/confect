@@ -4,6 +4,7 @@ import * as Option from "effect/Option";
 import * as Record from "effect/Record";
 import type * as FunctionSpec from "./FunctionSpec";
 import type * as GroupSpec from "./GroupSpec";
+import type * as MiddlewareSpec from "./MiddlewareSpec";
 import * as Ref from "./Ref";
 import type * as Spec from "./Spec";
 
@@ -22,7 +23,11 @@ type GroupRefs<
   Predicate extends Ref.Any,
 > = Types.Simplify<
   OmitEmpty<Helper<GroupSpec.Groups<Group>, Predicate>> &
-    FilteredFunctions<GroupSpec.Functions<Group>, Predicate>
+    FilteredFunctions<
+      GroupSpec.Functions<Group>,
+      Predicate,
+      MiddlewareSpec.Error<GroupSpec.Middlewares<Group>>
+    >
 >;
 
 type OmitEmpty<T> = {
@@ -45,6 +50,7 @@ type FunctionSpecMatchesPredicate<
 type FilteredFunctions<
   FunctionSpecs extends FunctionSpec.AnyWithProps,
   Predicate extends Ref.Any,
+  MiddlewareError,
 > = {
   [Name in FunctionSpec.Name<FunctionSpecs> as FunctionSpec.WithName<
     FunctionSpecs,
@@ -55,7 +61,16 @@ type FilteredFunctions<
       : never
     : never]: FunctionSpec.WithName<FunctionSpecs, Name> extends infer F extends
     FunctionSpec.AnyWithProps
-    ? Ref.FromFunctionSpec<F>
+    ? Ref.FromFunctionSpec<
+        F,
+        // Middleware never covers Convex-provenance functions, so their refs
+        // don't take on the group middleware's error union.
+        F extends {
+          readonly functionProvenance: { readonly _tag: "Confect" };
+        }
+          ? MiddlewareError
+          : never
+      >
     : never;
 };
 
@@ -102,7 +117,7 @@ const makeHelper = (
       return Record.union(
         makeHelper(group.groups, Option.some(currentFunctionNamespace)),
         Record.map(group.functions, (function_) =>
-          Ref.make(currentFunctionNamespace, function_),
+          Ref.make(currentFunctionNamespace, function_, group.middlewares),
         ),
         (_subGroup, _function) => {
           throw new Error(

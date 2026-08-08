@@ -1,5 +1,6 @@
 import type { FunctionSpec, RuntimeAndFunctionType } from "@confect/core";
 import type * as FunctionProvenance from "@confect/core/FunctionProvenance";
+import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import {
   type DefaultFunctionArgs,
   type FunctionVisibility,
@@ -24,6 +25,7 @@ import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
 import * as MutationRunner from "./MutationRunner";
 import * as QueryRunner from "./QueryRunner";
+import type * as RegistryItem from "./RegistryItem";
 import * as Scheduler from "./Scheduler";
 import * as SchemaToValidator from "./SchemaToValidator";
 import * as StorageActionWriter from "./StorageActionWriter";
@@ -141,6 +143,58 @@ export type RegisteredFunction<
  * fiber's op counter survives context pops, so a cooperative yield can fire
  * inside those wrappers — only a root-context scheduler covers them.
  */
+/**
+ * Wrap a function's handler effect in its resolved middleware chain, per
+ * invocation, after args decode. Iterated innermost-first so that the
+ * first-attached (group-level, in attachment order) middleware ends up
+ * outermost and runs first. Erased types: the public safety story lives at
+ * the `MiddlewareSpec.Middleware` / `MiddlewareImpl.make` signatures, and
+ * the composed effect's error channel is re-accounted by
+ * {@link combineErrorSchemas}.
+ */
+export const applyMiddleware = <A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+  middlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>,
+  options: {
+    readonly spec: FunctionSpec.AnyWithProps;
+    readonly args: unknown;
+  },
+  // The composed effect's success and environment are preserved (middleware
+  // returns the handler's opaque `SuccessValue`, and its own requirements
+  // are bounded by `MiddlewareImpl.CommonServices`, a subset of every
+  // covered kind's ctx union — i.e. of `R`); only the error channel widens,
+  // by the middlewares' declared errors.
+): Effect.Effect<A, any, R> => {
+  let wrapped: Effect.Effect<any, any, any> = effect;
+  for (let index = middlewares.length - 1; index >= 0; index--) {
+    wrapped = middlewares[index]!.impl(wrapped as any, options) as any;
+  }
+  return wrapped as Effect.Effect<A, any, R>;
+};
+
+/**
+ * The error-schema allowlist for a function with middleware: the function's
+ * own declared `error` schema unioned with every covering middleware's
+ * error schema. `undefined` (⇒ every failure dies) only when neither
+ * declares one — mirroring the ref-side union clients decode against.
+ */
+export const combineErrorSchemas = (
+  error: Schema.Codec<any, any> | undefined,
+  middlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>,
+): Schema.Codec<any, any> | undefined => {
+  const schemas = [
+    ...(error !== undefined ? [error] : []),
+    ...MiddlewareSpec.errorSchemas(
+      middlewares.map(({ middleware }) => middleware),
+    ),
+  ];
+  return schemas.length === 0
+    ? undefined
+    : schemas.length === 1
+      ? schemas[0]
+      : Schema.Union(schemas);
+};
+
 export const runHandlerPromise =
   (
     errorSchema: Schema.Codec<any, any> | undefined,
@@ -182,16 +236,20 @@ export const actionFunctionBase = <
   E,
   R,
 >({
+  functionSpec,
   args,
   returns,
   error,
   handler,
+  middlewares = [],
   createLayer,
 }: {
+  functionSpec: FunctionSpec.AnyWithProps;
   args: Schema.Codec<Args, ConvexArgs>;
   returns: Schema.Codec<Returns, ConvexReturns>;
   error: Schema.Codec<Error, Value> | undefined;
   handler: (a: Args) => Effect.Effect<Returns, E, R>;
+  middlewares?: ReadonlyArray<RegistryItem.ResolvedMiddleware>;
   createLayer: (
     ctx: GenericActionCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
   ) => Layer.Layer<R>;
@@ -208,15 +266,17 @@ export const actionFunctionBase = <
         Schema.decodeUnknownEffect(args),
         Effect.orDie,
       );
-      const decodedReturns = yield* handler(decodedArgs).pipe(
-        Effect.provide(createLayer(ctx)),
-      );
+      const decodedReturns = yield* applyMiddleware(
+        handler(decodedArgs),
+        middlewares,
+        { spec: functionSpec, args: decodedArgs },
+      ).pipe(Effect.provide(createLayer(ctx)));
       return yield* pipe(
         decodedReturns,
         Schema.encodeEffect(returns),
         Effect.orDie,
       );
-    }).pipe(runHandlerPromise(error)),
+    }).pipe(runHandlerPromise(combineErrorSchemas(error, middlewares))),
 });
 
 export type ActionServices<
