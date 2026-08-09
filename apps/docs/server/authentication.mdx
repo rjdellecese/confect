@@ -21,6 +21,8 @@ Effect.gen(function* () {
 
 `getUserIdentity` succeeds with the user's [`UserIdentity`](https://docs.convex.dev/api/interfaces/server.UserIdentity) or fails with `NoUserIdentityFoundError`.
 
+To require an authenticated user across a whole group of functions — and provide the loaded user to every handler — use [middleware](/server/middleware) instead of repeating the lookup in each handler.
+
 ## Handling unauthenticated requests
 
 Use `Effect.catchTag` to handle the case where no user is logged in.
