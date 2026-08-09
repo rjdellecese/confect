@@ -156,9 +156,10 @@ export declare const api: {
       record: FunctionReference<
         "mutation",
         "public",
-        { blocked: boolean },
+        { blocked: boolean; blockedAtFunction: boolean },
         null
       >;
+      recordPlain: FunctionReference<"mutation", "public", {}, null>;
     };
     notes: {
       delete_: FunctionReference<

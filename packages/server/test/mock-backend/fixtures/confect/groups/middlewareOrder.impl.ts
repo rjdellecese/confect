@@ -4,9 +4,11 @@ import * as Layer from "effect/Layer";
 import databaseSchema from "../_generated/schema";
 import { DatabaseWriter } from "../_generated/services";
 import middlewareOrder, {
+  FunctionGateClosed,
   Gate,
   GateClosed,
   RecordFirst,
+  RecordFunctionLevel,
   RecordSecond,
 } from "./middlewareOrder.spec";
 
@@ -40,6 +42,17 @@ const RecordSecondLive = MiddlewareImpl.make(
   (effect) => insertMarker("second").pipe(Effect.andThen(effect)),
 );
 
+const RecordFunctionLevelLive = MiddlewareImpl.make(
+  databaseSchema,
+  RecordFunctionLevel,
+  (effect, { args }) =>
+    typeof args === "object" &&
+    args !== null &&
+    (args as { blockedAtFunction?: boolean }).blockedAtFunction === true
+      ? Effect.fail(new FunctionGateClosed())
+      : insertMarker("function").pipe(Effect.andThen(effect)),
+);
+
 const record = FunctionImpl.make(
   databaseSchema,
   middlewareOrder,
@@ -54,10 +67,26 @@ const record = FunctionImpl.make(
     }).pipe(Effect.orDie),
 );
 
+const recordPlain = FunctionImpl.make(
+  databaseSchema,
+  middlewareOrder,
+  "recordPlain",
+  () =>
+    Effect.gen(function* () {
+      const writer = yield* DatabaseWriter;
+
+      yield* writer.table("notes").insert({ text: "handler" });
+
+      return null;
+    }).pipe(Effect.orDie),
+);
+
 export default GroupImpl.make(databaseSchema, middlewareOrder).pipe(
   Layer.provide(record),
+  Layer.provide(recordPlain),
   Layer.provide(GateLive),
   Layer.provide(RecordFirstLive),
   Layer.provide(RecordSecondLive),
+  Layer.provide(RecordFunctionLevelLive),
   GroupImpl.finalize,
 );

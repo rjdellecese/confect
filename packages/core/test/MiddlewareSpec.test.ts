@@ -155,6 +155,87 @@ describe("GroupSpec.middleware", () => {
   });
 });
 
+describe("FunctionSpec.middleware", () => {
+  it("appends middleware to the function in attachment order", () => {
+    const covered = mutation.middleware(MutationOnly).middleware(RequireUser);
+
+    expect(covered.middlewares.map((m) => m.key)).toStrictEqual([
+      "MutationOnly",
+      "RequireUser",
+    ]);
+    expectTypeOf<FunctionSpec.Middlewares<typeof covered>>().toEqualTypeOf<
+      typeof MutationOnly | typeof RequireUser
+    >();
+  });
+
+  it("throws on duplicate attachment at runtime", () => {
+    expect(() =>
+      mutation
+        .middleware(MutationOnly)
+        // @ts-expect-error — duplicate attachment is also a type error
+        .middleware(MutationOnly),
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Middleware "MutationOnly" is already attached to function "setThing"]`,
+    );
+  });
+
+  it("rejects middleware whose kinds don't include the function's kind", () => {
+    expect(() =>
+      // @ts-expect-error — MutationOnly does not declare kind "query"
+      query.middleware(MutationOnly),
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Middleware "MutationOnly" does not declare kind "query" of function "getThing"]`,
+    );
+  });
+
+  it("rejects middleware on plain Convex functions", () => {
+    const convexQuery = FunctionSpec.convexPublicQuery<any>()("plainQuery");
+
+    expect(() =>
+      // @ts-expect-error — plain Convex functions cannot have middleware
+      convexQuery.middleware(RequireUser),
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Plain Convex function "plainQuery" cannot have middleware]`,
+    );
+  });
+
+  it("rejects attaching a group middleware already attached to a function", () => {
+    const covered = mutation.middleware(MutationOnly);
+
+    expect(() =>
+      GroupSpec.make()
+        .addFunction(covered)
+        // @ts-expect-error — MutationOnly is already attached to setThing
+        .middleware(MutationOnly),
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Middleware "MutationOnly" is attached to both function "setThing" and its group]`,
+    );
+  });
+
+  it("rejects adding a function carrying a group-attached middleware", () => {
+    const covered = mutation.middleware(MutationOnly);
+
+    expect(() =>
+      GroupSpec.make()
+        .middleware(MutationOnly)
+        // @ts-expect-error — MutationOnly is already attached to the group
+        .addFunction(covered),
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Middleware "MutationOnly" is attached to both function "setThing" and its group]`,
+    );
+  });
+
+  it("allows distinct middleware at group and function level", () => {
+    const group = GroupSpec.make()
+      .middleware(RequireUser)
+      .addFunction(mutation.middleware(MutationOnly));
+
+    expectTypeOf<GroupSpec.Middlewares<typeof group>>().toEqualTypeOf<
+      typeof RequireUser
+    >();
+  });
+});
+
 describe("Ref error union", () => {
   it("decodes both the function's error and its middleware's error", () => {
     const ref = Ref.make("ns", queryWithError, [RequireUser]);

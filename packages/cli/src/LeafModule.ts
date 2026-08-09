@@ -308,9 +308,14 @@ export const validateImpl = (leaf: LeafModule) =>
       });
     }
 
-    const expectedMiddlewareKeys = (groupSpec.middlewares ?? []).map(
-      (middleware) => middleware.key,
-    );
+    const expectedMiddlewareKeys = [
+      ...new Set([
+        ...(groupSpec.middlewares ?? []).map((middleware) => middleware.key),
+        ...Object.values(groupSpec.functions).flatMap((function_) =>
+          (function_.middlewares ?? []).map((middleware) => middleware.key),
+        ),
+      ]),
+    ];
     const registeredMiddlewareKeys = new Set(
       finalizedGroupImpl.registeredMiddlewareKeys ?? [],
     );

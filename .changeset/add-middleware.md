@@ -50,4 +50,10 @@ export default GroupImpl.make(databaseSchema, group).pipe(
 
 Middleware runs per invocation, after args are decoded and before the handler, in attachment order; a middleware failure short-circuits the rest of the chain. Its errors join the covered functions' error unions end to end: `useQuery`/`useMutation` and the `@confect/js` clients surface them as typed errors with no client-side changes.
 
-Attaching the same middleware twice, attaching one whose `kinds` don't cover a declared function, or attaching to a group containing a matching-kind plain-Convex function are all type errors. Middleware does not propagate to subgroups. `confect codegen` fails with an explicit error when a group's spec attaches a middleware its impl never provides.
+Middleware can also attach to a single function with `.middleware()` on the function spec — it runs inside the group-attached chain, immediately around the handler, and its errors join only that function's error union:
+
+```ts
+FunctionSpec.publicMutation({ name: "deleteAll", ... }).middleware(RequireAdmin);
+```
+
+Attaching the same middleware twice (including once at group level and once at function level), attaching one whose `kinds` don't cover a covered function, attaching any middleware to a plain-Convex function, or attaching to a group containing a matching-kind plain-Convex function are all type errors. Middleware does not propagate to subgroups. `confect codegen` fails with an explicit error when a group's spec attaches a middleware its impl never provides.

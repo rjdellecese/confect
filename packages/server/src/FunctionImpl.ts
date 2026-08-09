@@ -48,15 +48,21 @@ export const make = <
   _databaseSchema: DatabaseSchema_,
   group: Group,
   functionName: FunctionName,
-  // The group's attached middleware widen the handler's environment with the
-  // services they provide — that's the whole type-safety story: a handler
-  // consuming `CurrentUser` type-checks exactly when a middleware providing
-  // it is attached to the group in the spec.
+  // The middleware covering this function — the group's plus the function's
+  // own — widen the handler's environment with the services they provide.
+  // That's the whole type-safety story: a handler consuming `CurrentUser`
+  // type-checks exactly when a middleware providing it is attached in the
+  // spec.
   handler: Handler.WithName<
     DatabaseSchema_,
     GroupSpec.Functions<Group>,
     FunctionName,
-    MiddlewareSpec.Provides<GroupSpec.Middlewares<Group>>
+    MiddlewareSpec.Provides<
+      | GroupSpec.Middlewares<Group>
+      | FunctionSpec.Middlewares<
+          FunctionSpec.WithName<GroupSpec.Functions<Group>, FunctionName>
+        >
+    >
   >,
 ): Layer.Layer<FunctionImpl<FunctionName>> => {
   const functionSpec = group.functions[functionName]!;
@@ -75,7 +81,7 @@ export const make = <
             handler,
             middlewareSpecs:
               functionSpec.functionProvenance._tag === "Confect"
-                ? group.middlewares
+                ? [...group.middlewares, ...functionSpec.middlewares]
                 : [],
           }),
         ),

@@ -9,6 +9,7 @@ import * as Schema from "effect/Schema";
 import * as Predicate from "effect/Predicate";
 import * as FunctionProvenance from "./FunctionProvenance";
 import { validateConfectFunctionIdentifier } from "./Identifier";
+import type * as MiddlewareSpec from "./MiddlewareSpec";
 import * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
 export const TypeId = "@confect/core/FunctionSpec";
@@ -22,12 +23,62 @@ export interface FunctionSpec<
   FunctionVisibility_ extends FunctionVisibility,
   Name_ extends string,
   FunctionProvenance_ extends FunctionProvenance.FunctionProvenance,
+  Middlewares_ extends MiddlewareSpec.AnyService = never,
 > {
   readonly [TypeId]: TypeId;
   readonly runtimeAndFunctionType: RuntimeAndFunctionType_;
   readonly functionVisibility: FunctionVisibility_;
   readonly name: Name_;
   readonly functionProvenance: FunctionProvenance_;
+  /** Middleware attached to this function specifically, in attachment order. */
+  readonly middlewares: ReadonlyArray<Middlewares_>;
+}
+
+/**
+ * The shape the `FunctionSpec` constructors return: a `FunctionSpec` plus
+ * its builder method(s). Kept separate from {@link FunctionSpec} itself so
+ * the erased `Any*` constraint types stay method-free — the generic
+ * `middleware` signature would otherwise defeat the `Extract`-based
+ * narrowing that `Handler` and friends perform over function-spec unions.
+ */
+export interface Builder<
+  RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
+  FunctionVisibility_ extends FunctionVisibility,
+  Name_ extends string,
+  FunctionProvenance_ extends FunctionProvenance.FunctionProvenance,
+  Middlewares_ extends MiddlewareSpec.AnyService = never,
+> extends FunctionSpec<
+  RuntimeAndFunctionType_,
+  FunctionVisibility_,
+  Name_,
+  FunctionProvenance_,
+  Middlewares_
+> {
+  /**
+   * Attach a middleware to this function specifically. It runs after (inside)
+   * any group-attached middleware, immediately around the handler. Attaching
+   * to a plain Convex function, attaching a middleware whose `kinds` don't
+   * include this function's kind, or attaching the same middleware twice are
+   * type errors — see {@link MiddlewareSpec.ValidateFunctionAttach}. A
+   * duplicate against the enclosing group's middleware is rejected where
+   * group and function meet, at `GroupSpec.addFunction` /
+   * `GroupSpec.middleware`.
+   */
+  middleware<Middleware extends MiddlewareSpec.AnyService>(
+    middleware: Middleware &
+      MiddlewareSpec.ValidateFunctionAttach<
+        Middleware,
+        RuntimeAndFunctionType_,
+        FunctionProvenance_,
+        Middlewares_
+      >,
+  ): Builder<
+    RuntimeAndFunctionType_,
+    FunctionVisibility_,
+    Name_,
+    FunctionProvenance_,
+    Middlewares_ | Middleware
+  >;
 }
 
 export interface Any {
@@ -38,21 +89,24 @@ export interface AnyWithProps extends FunctionSpec<
   RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility,
   string,
-  FunctionProvenance.FunctionProvenance
+  FunctionProvenance.FunctionProvenance,
+  MiddlewareSpec.AnyService
 > {}
 
 export interface AnyConfect extends FunctionSpec<
   RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility,
   string,
-  FunctionProvenance.AnyConfect
+  FunctionProvenance.AnyConfect,
+  MiddlewareSpec.AnyService
 > {}
 
 export interface AnyConvex extends FunctionSpec<
   RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility,
   string,
-  FunctionProvenance.AnyConvex
+  FunctionProvenance.AnyConvex,
+  MiddlewareSpec.AnyService
 > {}
 
 export interface AnyWithPropsWithRuntime<
@@ -61,7 +115,8 @@ export interface AnyWithPropsWithRuntime<
   RuntimeAndFunctionType.WithRuntime<Runtime>,
   FunctionVisibility,
   string,
-  FunctionProvenance.FunctionProvenance
+  FunctionProvenance.FunctionProvenance,
+  MiddlewareSpec.AnyService
 > {}
 
 export interface AnyWithPropsWithFunctionType<
@@ -70,7 +125,8 @@ export interface AnyWithPropsWithFunctionType<
   RuntimeAndFunctionType_,
   FunctionVisibility,
   string,
-  FunctionProvenance.FunctionProvenance
+  FunctionProvenance.FunctionProvenance,
+  MiddlewareSpec.AnyService
 > {}
 
 export interface AnyWithPropsWithFunctionProvenance<
@@ -79,7 +135,8 @@ export interface AnyWithPropsWithFunctionProvenance<
   RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility,
   string,
-  FunctionProvenance_
+  FunctionProvenance_,
+  MiddlewareSpec.AnyService
 > {}
 
 export type GetRuntimeAndFunctionType<FunctionSpec_ extends AnyWithProps> =
@@ -89,6 +146,10 @@ export type GetFunctionVisibility<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_["functionVisibility"];
 
 export type Name<FunctionSpec_ extends AnyWithProps> = FunctionSpec_["name"];
+
+/** The union of middleware attached to a function (never when none are). */
+export type Middlewares<FunctionSpec_ extends AnyWithProps> =
+  FunctionSpec_["middlewares"][number];
 
 export type Args<FunctionSpec_ extends AnyWithProps> = FunctionSpec_ extends {
   functionProvenance: {
@@ -202,6 +263,33 @@ export type WithoutName<
 
 const Proto = {
   [TypeId]: TypeId,
+
+  middleware(this: AnyWithProps, middleware: MiddlewareSpec.AnyService) {
+    if (this.functionProvenance._tag === "Convex") {
+      throw new Error(
+        `Plain Convex function "${this.name}" cannot have middleware`,
+      );
+    }
+    const kind = this.runtimeAndFunctionType.functionType;
+    if (!middleware.kinds.includes(kind)) {
+      throw new Error(
+        `Middleware "${middleware.key}" does not declare kind "${kind}" of function "${this.name}"`,
+      );
+    }
+    if (this.middlewares.some((existing) => existing.key === middleware.key)) {
+      throw new Error(
+        `Middleware "${middleware.key}" is already attached to function "${this.name}"`,
+      );
+    }
+
+    return Object.assign(Object.create(Proto), {
+      runtimeAndFunctionType: this.runtimeAndFunctionType,
+      functionVisibility: this.functionVisibility,
+      name: this.name,
+      functionProvenance: this.functionProvenance,
+      middlewares: [...this.middlewares, middleware],
+    });
+  },
 };
 
 const make =
@@ -228,7 +316,7 @@ const make =
     args: () => Args_;
     returns: () => Returns_;
     error?: () => Error_;
-  }): FunctionSpec<
+  }): Builder<
     RuntimeAndFunctionType_,
     FunctionVisibility_,
     Name_,
@@ -241,6 +329,7 @@ const make =
       functionVisibility,
       name,
       functionProvenance: FunctionProvenance.Confect(args, returns, error),
+      middlewares: [],
     });
   };
 
@@ -281,7 +370,7 @@ const makePaginated =
     /** The page element schema. */
     item: () => Item_;
     error?: () => Error_;
-  }): FunctionSpec<
+  }): Builder<
     RuntimeAndFunctionType_,
     FunctionVisibility_,
     Name_,
@@ -299,6 +388,7 @@ const makePaginated =
         item,
         error,
       ),
+      middlewares: [],
     });
   };
 
@@ -385,7 +475,7 @@ const makeConvex =
   >() =>
   <const Name_ extends string>(
     name: Name_,
-  ): FunctionSpec<
+  ): Builder<
     RuntimeAndFunctionType_,
     FunctionVisibility_,
     Name_,
@@ -401,6 +491,7 @@ const makeConvex =
         ExtractArgs<F>,
         ExtractReturns<F>
       >(),
+      middlewares: [],
     }) as any;
   };
 

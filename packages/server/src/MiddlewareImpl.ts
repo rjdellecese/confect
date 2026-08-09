@@ -1,3 +1,4 @@
+import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import type * as GroupSpec from "@confect/core/GroupSpec";
 import type * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import * as Registry from "@confect/core/Registry";
@@ -39,14 +40,18 @@ export const MiddlewareImpl = <MiddlewareKey extends string>({
   );
 
 /**
- * The `MiddlewareImpl` services a group spec's attached middleware require.
+ * The `MiddlewareImpl` services a group spec's attached middleware require —
+ * both group-level attachments and each function's own.
  */
 export type FromGroupSpec<Group extends GroupSpec.AnyWithProps> =
-  GroupSpec.Middlewares<Group> extends infer Middleware
-    ? Middleware extends MiddlewareSpec.AnyService
-      ? MiddlewareImpl<MiddlewareSpec.Key<Middleware>>
-      : never
-    : never;
+  | GroupSpec.Middlewares<Group>
+  | FunctionSpec.Middlewares<
+      GroupSpec.Functions<Group>
+    > extends infer Middleware
+  ? Middleware extends MiddlewareSpec.AnyService
+    ? MiddlewareImpl<MiddlewareSpec.Key<Middleware>>
+    : never
+  : never;
 
 /** The full ctx-service union for one function kind. */
 export type KindServices<

@@ -147,6 +147,17 @@ const Proto = {
   ) {
     const this_ = this as AnyWithProps;
 
+    const overlapping = function_.middlewares.find((functionMiddleware) =>
+      this_.middlewares.some(
+        (groupMiddleware) => groupMiddleware.key === functionMiddleware.key,
+      ),
+    );
+    if (overlapping !== undefined) {
+      throw new Error(
+        `Middleware "${overlapping.key}" is attached to both function "${function_.name}" and its group`,
+      );
+    }
+
     return makeProto({
       runtime: this_.runtime,
       name: this_.name,
@@ -192,6 +203,18 @@ const Proto = {
       throw new Error(
         `Middleware "${middleware.key}" is already attached to this group`,
       );
+    }
+
+    for (const function_ of Object.values(this_.functions)) {
+      if (
+        function_.middlewares.some(
+          (existing) => existing.key === middleware.key,
+        )
+      ) {
+        throw new Error(
+          `Middleware "${middleware.key}" is attached to both function "${function_.name}" and its group`,
+        );
+      }
     }
 
     return makeProto({

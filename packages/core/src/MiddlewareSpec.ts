@@ -2,8 +2,10 @@ import type * as Effect from "effect/Effect";
 import * as Predicate from "effect/Predicate";
 import type * as Schema from "effect/Schema";
 import type { unhandled } from "effect/Types";
+import type * as FunctionProvenance from "./FunctionProvenance";
 import type * as FunctionSpec from "./FunctionSpec";
 import * as Lazy from "./Lazy";
+import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
 export const TypeId = "@confect/core/MiddlewareSpec";
 export type TypeId = typeof TypeId;
@@ -229,9 +231,13 @@ export type ValidateFunction<
       ? FunctionKindOf<F> extends Kinds<M>
         ? AttachmentError<`Convex-provenance function "${F["name"]}" cannot be covered by middleware "${Key<M>}" — attach middleware only to groups whose matching-kind functions are all Confect-provenance`>
         : never
-      : FunctionKindOf<F> extends Kinds<M>
-        ? never
-        : AttachmentError<`Middleware "${Key<M>}" does not declare kind "${FunctionKindOf<F>}", the kind of function "${F["name"]}"`>
+      : [
+            Extract<FunctionSpec.Middlewares<F>, { readonly key: Key<M> }>,
+          ] extends [never]
+        ? FunctionKindOf<F> extends Kinds<M>
+          ? never
+          : AttachmentError<`Middleware "${Key<M>}" does not declare kind "${FunctionKindOf<F>}", the kind of function "${F["name"]}"`>
+        : AttachmentError<`Middleware "${Key<M>}" is already attached to function "${F["name"]}"`>
     : never
   : never;
 
@@ -255,11 +261,47 @@ export type ValidateAttach<
  * group carries middleware: the incoming function must be valid against
  * every attached middleware (the declarative group-attachment semantics are
  * order-independent, so functions added after `.middleware()` are checked
- * just like ones added before).
+ * just like ones added before), and none of the function's own middleware
+ * may duplicate a group-attached one.
  */
 export type ValidateAddedFunction<
   F extends FunctionSpec.AnyWithProps,
   Middlewares_ extends AnyService,
 > = [Middlewares_] extends [never]
   ? unknown
-  : ValidationResult<ValidateFunction<F, Middlewares_>>;
+  : ValidationResult<
+      ValidateFunction<F, Middlewares_> | GroupOverlap<F, Middlewares_>
+    >;
+
+type GroupOverlap<
+  F extends FunctionSpec.AnyWithProps,
+  Middlewares_ extends AnyService,
+> =
+  FunctionSpec.Middlewares<F> extends infer FunctionMiddleware
+    ? FunctionMiddleware extends AnyService
+      ? [
+          Extract<Middlewares_, { readonly key: Key<FunctionMiddleware> }>,
+        ] extends [never]
+        ? never
+        : AttachmentError<`Middleware "${Key<FunctionMiddleware>}" is attached to both function "${F["name"]}" and its group`>
+      : never
+    : never;
+
+/**
+ * The parameter-type validation applied by `FunctionSpec`'s `.middleware()`:
+ * plain Convex functions cannot carry middleware, the middleware must
+ * declare the function's kind, and it must not already be attached to the
+ * function.
+ */
+export type ValidateFunctionAttach<
+  M extends AnyService,
+  RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
+  FunctionProvenance_ extends FunctionProvenance.FunctionProvenance,
+  Middlewares_ extends AnyService,
+> = FunctionProvenance_ extends { readonly _tag: "Convex" }
+  ? AttachmentError<`Plain Convex functions cannot have middleware — their raw handlers are passed through untouched`>
+  : [Extract<Middlewares_, { readonly key: Key<M> }>] extends [never]
+    ? RuntimeAndFunctionType_["functionType"] extends Kinds<M>
+      ? unknown
+      : AttachmentError<`Middleware "${Key<M>}" does not declare kind "${RuntimeAndFunctionType_["functionType"]}"`>
+    : AttachmentError<`Middleware "${Key<M>}" is already attached to this function`>;

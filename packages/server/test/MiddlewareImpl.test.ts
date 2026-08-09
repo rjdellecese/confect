@@ -66,6 +66,41 @@ describe("handler environment widening", () => {
       Extract<EnvironmentOf<HandlerFor<typeof bareGroup>>, Viewer>
     >().toBeNever();
   });
+
+  it("widens the handler environment with function-level middleware provides", () => {
+    const functionCoveredGroup = GroupSpec.make().addFunction(
+      viewerName.middleware(ProvideViewer),
+    );
+
+    type FunctionLevelExtra = MiddlewareSpec.Provides<
+      | GroupSpec.Middlewares<typeof functionCoveredGroup>
+      | FunctionSpec.Middlewares<
+          GroupSpec.Functions<typeof functionCoveredGroup>
+        >
+    >;
+
+    expectTypeOf<FunctionLevelExtra>().toEqualTypeOf<Viewer>();
+
+    FunctionImpl.make(databaseSchema, functionCoveredGroup, "viewerName", () =>
+      Effect.gen(function* () {
+        const viewer = yield* Viewer;
+
+        return viewer.username;
+      }),
+    );
+  });
+});
+
+describe("function-level implementation requirements", () => {
+  it("requires implementations for function-level middleware too", () => {
+    const functionCoveredGroup = GroupSpec.make().addFunction(
+      viewerName.middleware(ProvideViewer),
+    );
+
+    expectTypeOf<
+      MiddlewareImpl.FromGroupSpec<typeof functionCoveredGroup>
+    >().toEqualTypeOf<MiddlewareImpl.MiddlewareImpl<"ProvideViewer">>();
+  });
 });
 
 describe("implementation service bounds", () => {

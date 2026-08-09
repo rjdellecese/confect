@@ -78,6 +78,26 @@ Middleware does not propagate to subgroups: `GroupSpec.middleware` covers only t
 
 When a group attaches more than one middleware, they run in attachment order — the first-attached middleware is outermost. If an earlier middleware short-circuits, later middleware and the handler never run.
 
+## Attaching to a single function
+
+When one function needs a stricter check than its group, attach middleware to the function spec itself with `.middleware()`. Function-level middleware runs after (inside) the group-attached chain, immediately around the handler, and its error joins only that function's error union — the group's other functions are unaffected. Given a second middleware `RequireAdmin`, declared like `RequireUser` above:
+
+```ts confect/notes.spec.ts
+export default GroupSpec.make()
+  .middleware(RequireUser)
+  .addFunction(
+    FunctionSpec.publicMutation({
+      name: "deleteAll",
+      args: () => Schema.Struct({}),
+      returns: () => Schema.Null,
+    }).middleware(RequireAdmin), // RequireUser → RequireAdmin → handler
+  );
+```
+
+The same rules apply as at the group level, at the same authoring sites: attaching a middleware whose `kinds` don't include the function's kind, attaching to a [plain Convex function](/server/plain-convex-functions), or attaching the same middleware twice — including once at each level, in either order — are all type errors. Implementations are provided to the group's impl layer exactly like group-level ones, and `GroupImpl.finalize` demands them just the same.
+
+Note that a failed mutation still rolls back its whole transaction: if a function-level middleware short-circuits after a group middleware has written something, those writes are rolled back with it.
+
 ## Using provided services in handlers
 
 Handlers of covered functions consume the provided service like any other. This is the type-safety contract: a handler requiring `CurrentUser` type-checks exactly when a middleware providing it is attached to the group — remove the `.middleware(RequireUser)` call and the handler below stops compiling.

@@ -5,6 +5,11 @@ export class GateClosed extends Schema.TaggedError<GateClosed>()("GateClosed", {
   reason: Schema.String,
 }) {}
 
+export class FunctionGateClosed extends Schema.TaggedError<FunctionGateClosed>()(
+  "FunctionGateClosed",
+  {},
+) {}
+
 /**
  * Short-circuits (without running anything downstream) when the decoded args
  * carry `blocked: true`. Attached first, so it is outermost and runs before
@@ -27,6 +32,19 @@ export class RecordSecond extends MiddlewareSpec.Service<RecordSecond>()(
   { kinds: ["mutation"] },
 ) {}
 
+/**
+ * Function-level middleware on `record` only: runs inside the group-attached
+ * chain, inserts a `"function"` marker, and short-circuits with
+ * `FunctionGateClosed` when the decoded args carry `blockedAtFunction: true`.
+ */
+export class RecordFunctionLevel extends MiddlewareSpec.Service<RecordFunctionLevel>()(
+  "RecordFunctionLevel",
+  {
+    error: () => FunctionGateClosed,
+    kinds: ["mutation"],
+  },
+) {}
+
 export default GroupSpec.make()
   .middleware(Gate)
   .middleware(RecordFirst)
@@ -34,7 +52,18 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicMutation({
       name: "record",
-      args: () => Schema.Struct({ blocked: Schema.Boolean }),
+      args: () =>
+        Schema.Struct({
+          blocked: Schema.Boolean,
+          blockedAtFunction: Schema.Boolean,
+        }),
+      returns: () => Schema.Null,
+    }).middleware(RecordFunctionLevel),
+  )
+  .addFunction(
+    FunctionSpec.publicMutation({
+      name: "recordPlain",
+      args: () => Schema.Struct({}),
       returns: () => Schema.Null,
     }),
   );

@@ -68,7 +68,7 @@ type FilteredFunctions<
         F extends {
           readonly functionProvenance: { readonly _tag: "Confect" };
         }
-          ? MiddlewareError
+          ? MiddlewareError | MiddlewareSpec.Error<FunctionSpec.Middlewares<F>>
           : never
       >
     : never;
@@ -117,7 +117,10 @@ const makeHelper = (
       return Record.union(
         makeHelper(group.groups, Option.some(currentFunctionNamespace)),
         Record.map(group.functions, (function_) =>
-          Ref.make(currentFunctionNamespace, function_, group.middlewares),
+          Ref.make(currentFunctionNamespace, function_, [
+            ...group.middlewares,
+            ...function_.middlewares,
+          ]),
         ),
         (_subGroup, _function) => {
           throw new Error(

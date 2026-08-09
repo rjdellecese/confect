@@ -10,7 +10,10 @@ import {
   DatabaseWriter,
 } from "./fixtures/confect/_generated/services";
 import { NoNotes, NoViewer } from "./fixtures/confect/groups/middleware.spec";
-import { GateClosed } from "./fixtures/confect/groups/middlewareOrder.spec";
+import {
+  FunctionGateClosed,
+  GateClosed,
+} from "./fixtures/confect/groups/middlewareOrder.spec";
 import * as TestConfect from "./TestConfect";
 
 const expectFailure = <A, E>(result: Result.Result<A, E>): E => {
@@ -147,17 +150,25 @@ describe("middleware", () => {
   });
 
   describe("ordering and short-circuiting", () => {
-    it.effect("middleware run in attachment order, before the handler", () =>
-      Effect.gen(function* () {
-        const c = yield* TestConfect.TestConfect;
+    it.effect(
+      "group middleware run in attachment order, then function-level middleware, then the handler",
+      () =>
+        Effect.gen(function* () {
+          const c = yield* TestConfect.TestConfect;
 
-        yield* c.mutation(refs.public.groups.middlewareOrder.record, {
-          blocked: false,
-        });
+          yield* c.mutation(refs.public.groups.middlewareOrder.record, {
+            blocked: false,
+            blockedAtFunction: false,
+          });
 
-        const texts = yield* listNoteTexts;
-        expect(texts).toStrictEqual(["first", "second", "handler"]);
-      }).pipe(Effect.provide(TestConfect.layer())),
+          const texts = yield* listNoteTexts;
+          expect(texts).toStrictEqual([
+            "first",
+            "second",
+            "function",
+            "handler",
+          ]);
+        }).pipe(Effect.provide(TestConfect.layer())),
     );
 
     it.effect(
@@ -169,6 +180,7 @@ describe("middleware", () => {
           const result = yield* Effect.result(
             c.mutation(refs.public.groups.middlewareOrder.record, {
               blocked: true,
+              blockedAtFunction: false,
             }),
           );
 
@@ -180,5 +192,50 @@ describe("middleware", () => {
           expect(texts).toStrictEqual([]);
         }).pipe(Effect.provide(TestConfect.layer())),
     );
+  });
+
+  describe("function-level middleware", () => {
+    it.effect(
+      "runs inside the group chain and short-circuits with its typed error",
+      () =>
+        Effect.gen(function* () {
+          const c = yield* TestConfect.TestConfect;
+
+          const result = yield* Effect.result(
+            c.mutation(refs.public.groups.middlewareOrder.record, {
+              blocked: false,
+              blockedAtFunction: true,
+            }),
+          );
+
+          expect(expectFailure(result)).toBeInstanceOf(FunctionGateClosed);
+
+          // The group middleware ran first (the ordering test above observes
+          // that), but a failed mutation rolls back its whole transaction —
+          // the markers they inserted are rolled back along with it.
+          const texts = yield* listNoteTexts;
+          expect(texts).toStrictEqual([]);
+        }).pipe(Effect.provide(TestConfect.layer())),
+    );
+
+    it.effect("does not cover the group's other functions", () =>
+      Effect.gen(function* () {
+        const c = yield* TestConfect.TestConfect;
+
+        yield* c.mutation(refs.public.groups.middlewareOrder.recordPlain);
+
+        const texts = yield* listNoteTexts;
+        expect(texts).toStrictEqual(["first", "second", "handler"]);
+      }).pipe(Effect.provide(TestConfect.layer())),
+    );
+
+    it("adds its error to the covered function's ref union only", () => {
+      expectTypeOf<
+        Ref.Error<typeof refs.public.groups.middlewareOrder.record>
+      >().toEqualTypeOf<GateClosed | FunctionGateClosed>();
+      expectTypeOf<
+        Ref.Error<typeof refs.public.groups.middlewareOrder.recordPlain>
+      >().toEqualTypeOf<GateClosed>();
+    });
   });
 });
