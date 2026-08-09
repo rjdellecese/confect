@@ -146,9 +146,13 @@ const queryClock: Clock.Clock = {
  * (`MaxOpsBeforeYield`, 2048 operations) — through `setImmediate`, falling
  * back to `setTimeout(f, 0)`, so any handler that runs long enough to yield
  * would crash. Queries and mutations therefore run on a `MixedScheduler` that
- * dispatches on the microtask queue, which the isolate supports (Promises
- * work everywhere Convex functions run). Actions keep the default scheduler —
- * timers are allowed there.
+ * dispatches on the microtask queue. The isolate also lacks `queueMicrotask`
+ * (a query running under `new MixedScheduler("sync")`, whose dispatch calls
+ * it bare, dies with `ReferenceError: queueMicrotask is not defined` on the
+ * local backend), so the only microtask primitive available there is
+ * `Promise.resolve().then` — which is why this stays hand-rolled rather than
+ * reusing sync-mode dispatch, and why the fallback below is load-bearing, not
+ * defensive. Actions keep the default scheduler — timers are allowed there.
  *
  * Sharing one instance across invocations is safe: `MixedScheduler` holds
  * only immutable fields, and each fiber creates its own dispatcher via
