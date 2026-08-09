@@ -142,7 +142,7 @@ const RequireUserLive = MiddlewareImpl.provides(
       .pipe(Effect.orDie);
 
     if (Option.isNone(user)) {
-      return yield* Effect.fail(new NotSignedIn());
+      return yield* new NotSignedIn();
     }
 
     return { user: user.value };

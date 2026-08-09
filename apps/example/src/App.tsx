@@ -15,6 +15,7 @@ import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
+import * as Result from "effect/Result";
 import { useEffect, useState } from "react";
 import refs from "../confect/_generated/refs";
 import { Api } from "../confect/http/NotesApi";
@@ -97,6 +98,10 @@ const Page = () => {
 
       <br />
 
+      <ViewerDemo />
+
+      <br />
+
       <textarea
         rows={4}
         cols={50}
@@ -115,6 +120,73 @@ const Page = () => {
       <PaginatedNoteList />
       <NoteLookup />
       <HttpEndpoints />
+    </div>
+  );
+};
+
+const ViewerDemo = () => {
+  const [username, setUsername] = useState("");
+  const [viewerNote, setViewerNote] = useState("");
+  const [postStatus, setPostStatus] = useState<string | null>(null);
+
+  // `whoAmI` is covered by the `RequireViewer` middleware: it provides the
+  // current viewer to the handler, or fails with the typed `NotSignedIn`
+  // error — which surfaces here, decoded, in `onFailure`.
+  const whoAmI = useQuery(refs.public.viewer.whoAmI, {});
+  const createUser = useMutation(refs.public.users.create);
+  const clearUsers = useMutation(refs.public.users.clearAll);
+  const postNote = useMutation(refs.public.viewer.postNote);
+
+  const handlePostNote = () => {
+    void postNote({ text: viewerNote }).then((result) => {
+      setPostStatus(
+        Result.match(result, {
+          onSuccess: () => "Posted!",
+          onFailure: () => "Not signed in — create a user first.",
+        }),
+      );
+      setViewerNote("");
+      return null;
+    });
+  };
+
+  return (
+    <div>
+      <strong>Middleware (viewer)</strong>
+      <div>
+        {QueryResult.match(whoAmI, {
+          onLoading: () => "Loading…",
+          onSuccess: (name) => `Signed in as ${name}`,
+          onFailure: () => "Not signed in — create a user below.",
+        })}
+      </div>
+      <input
+        value={username}
+        onChange={(e) => setUsername(e.target.value)}
+        placeholder="username"
+      />
+      <button
+        type="button"
+        onClick={() =>
+          void createUser({ username }).then(() => setUsername(""))
+        }
+      >
+        Create user
+      </button>
+      <button type="button" onClick={() => void clearUsers({})}>
+        Clear users
+      </button>
+      <div>
+        <input
+          value={viewerNote}
+          onChange={(e) => setViewerNote(e.target.value)}
+          placeholder="note text"
+        />
+        <button type="button" onClick={handlePostNote}>
+          Post note as viewer
+        </button>
+        {postStatus && <span style={{ marginLeft: 8 }}>{postStatus}</span>}
+      </div>
     </div>
   );
 };
