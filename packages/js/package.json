@@ -8,7 +8,7 @@
   },
   "devDependencies": {
     "@effect/vitest": "0.30.0",
-    "@types/node": "26.1.2",
+    "@types/node": "26.2.0",
     "effect": "3.22.1",
     "tsdown": "0.22.14",
     "typescript": "6.0.3",
