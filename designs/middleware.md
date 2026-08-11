@@ -1,6 +1,6 @@
 # Middleware for Confect: design proposals
 
-**Status:** Proposal A accepted; key decisions resolved (§8)
+**Status:** Implemented (all three phases, on the v10 line)
 **Relates to:** [#395 — RFC: Pipeable middleware for Confect function implementations](https://github.com/rjdellecese/confect/issues/395)
 
 This document surveys how middleware could work in Confect. It starts from the
@@ -692,7 +692,16 @@ Decided with the maintainer (2026-08-08):
 
 ## 9. Open questions
 
+_None remaining — all three phases are implemented on the v10 line._
+
 1. **Middleware ordering across the group→function boundary when a wrap
    middleware provides a service consumed by a later provides-middleware.**
-   Phase-3 concern; likely resolved by validating attachment order against
-   declared `requires`.
+   ~~Phase-3 concern; likely resolved by validating attachment order against
+   declared `requires`.~~ Resolved as designed: a middleware declares
+   `requires` in its `Config` type parameter, and satisfaction is validated
+   where ordering is known — at `GroupSpec.middleware` for group attachments
+   (attachment order is chain order) and at `GroupImpl.make` for the
+   assembled group (function-level middleware may depend on group provides).
+   Because `provides` has no runtime representation, ordering within a single
+   function's own middleware list is not checkable; misordering there
+   surfaces as a missing-service defect at runtime, and is documented.
