@@ -18,7 +18,7 @@
     "@swc/jest": "0.2.39",
     "@types/node": "26.2.0",
     "@vitest/coverage-v8": "4.1.10",
-    "convex-test": "0.0.54",
+    "convex-test": "0.0.55",
     "dotenv": "17.4.2",
     "effect": "3.22.1",
     "tsdown": "0.22.14",
