@@ -98,6 +98,39 @@ The same rules apply as at the group level, at the same authoring sites: attachi
 
 Note that a failed mutation still rolls back its whole transaction: if a function-level middleware short-circuits after a group middleware has written something, those writes are rolled back with it.
 
+## Depending on another middleware
+
+A middleware can consume a service provided by middleware that runs earlier in the chain. Declare the dependency in the `Config` type parameter's `requires` slot; the implementation's environment then includes it alongside the ctx services:
+
+```ts
+export class RequireAdmin extends MiddlewareSpec.Service<
+  RequireAdmin,
+  {
+    requires: CurrentUser;
+  }
+>()("RequireAdmin", {
+  error: () => NotAnAdmin,
+}) {}
+
+const RequireAdminLive = MiddlewareImpl.make(
+  databaseSchema,
+  RequireAdmin,
+  (effect) =>
+    Effect.gen(function* () {
+      const { user } = yield* CurrentUser; // from RequireUser, earlier in the chain
+
+      return user.role === "admin" ? yield* effect : yield* new NotAnAdmin();
+    }),
+);
+```
+
+Satisfaction is checked where the ordering is known:
+
+- Attaching a middleware to a **group** requires its `requires` to be provided by middleware attached to that group earlier — attachment order is chain order, so the check happens right at `GroupSpec.middleware`.
+- A **function-level** middleware's `requires` may be satisfied by the group's middleware, which the function spec can't see, so the whole-group check happens at `GroupImpl.make`: every function's middleware must have its `requires` provided by some middleware covering that function.
+
+Like `provides`, `requires` is type-level only, so ordering _within one function's own middleware list_ cannot be checked — attach a function-level middleware after its same-level provider, or the missing service surfaces as a defect at runtime.
+
 ## Using provided services in handlers
 
 Handlers of covered functions consume the provided service like any other. This is the type-safety contract: a handler requiring `CurrentUser` type-checks exactly when a middleware providing it is attached to the group — remove the `.middleware(RequireUser)` call and the handler below stops compiling.

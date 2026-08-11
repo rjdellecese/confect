@@ -79,6 +79,7 @@ export interface ServiceClass<
   in out Self,
   Key_ extends string,
   Provides_,
+  Requires_,
   ErrorSchema_ extends Schema.Codec<any, any>,
   Kinds_ extends ReadonlyArray<FunctionKind>,
 > {
@@ -96,6 +97,7 @@ export interface ServiceClass<
    */
   readonly error?: ErrorSchema_;
   readonly "~Provides": Provides_;
+  readonly "~Requires": Requires_;
   readonly "~Error": ErrorSchema_;
   readonly "~Self": Self;
 }
@@ -106,6 +108,7 @@ export interface AnyService {
   readonly kinds: ReadonlyArray<FunctionKind>;
   readonly error?: Schema.Codec<any, any>;
   readonly "~Provides": any;
+  readonly "~Requires": any;
   readonly "~Error": any;
 }
 
@@ -113,6 +116,14 @@ export type Key<M extends AnyService> = M["key"];
 
 export type Provides<M extends AnyService> = M extends AnyService
   ? M["~Provides"]
+  : never;
+
+/**
+ * The services a middleware's implementation may consume from middleware
+ * that runs earlier in the same chain (type-level only, like `provides`).
+ */
+export type Requires<M extends AnyService> = M extends AnyService
+  ? M["~Requires"]
   : never;
 
 export type ErrorSchema<M extends AnyService> = M extends AnyService
@@ -150,7 +161,7 @@ export type Kinds<M extends AnyService> = M extends AnyService
  * `MiddlewareImpl.make` (or `makeByKind`/`provides`) in `@confect/server`.
  */
 export const Service =
-  <Self, Config extends { provides?: any } = {}>() =>
+  <Self, Config extends { provides?: any; requires?: any } = {}>() =>
   <
     const Key_ extends string,
     ErrorSchema_ extends Schema.Codec<any, any> = never,
@@ -167,6 +178,7 @@ export const Service =
     Self,
     Key_,
     "provides" extends keyof Config ? Config["provides"] : never,
+    "requires" extends keyof Config ? Config["requires"] : never,
     ErrorSchema_,
     Kinds_
   > => {
@@ -243,17 +255,22 @@ export type ValidateFunction<
 
 /**
  * The parameter-type validation applied by `GroupSpec.middleware`:
- * rejects a duplicate attachment (same key), then validates every function
- * already declared on the group against the incoming middleware. Resolves to
- * `unknown` when the attachment is legal, so intersecting with the
- * middleware type is a no-op.
+ * rejects a duplicate attachment (same key), requires the middleware's
+ * `requires` services to be provided by middleware attached to the group
+ * earlier (attachment order is chain order, so "already attached" is
+ * exactly "runs earlier"), then validates every function already declared
+ * on the group against the incoming middleware. Resolves to `unknown` when
+ * the attachment is legal, so intersecting with the middleware type is a
+ * no-op.
  */
 export type ValidateAttach<
   M extends AnyService,
   Functions_ extends FunctionSpec.AnyWithProps,
   Middlewares_ extends AnyService,
 > = [Extract<Middlewares_, { readonly key: Key<M> }>] extends [never]
-  ? ValidationResult<ValidateFunction<Functions_, M>>
+  ? [Exclude<Requires<M>, Provides<Middlewares_>>] extends [never]
+    ? ValidationResult<ValidateFunction<Functions_, M>>
+    : AttachmentError<`Middleware "${Key<M>}" requires services that no middleware attached earlier to this group provides — attach the providing middleware first`>
   : AttachmentError<`Middleware "${Key<M>}" is already attached to this group`>;
 
 /**
@@ -286,6 +303,37 @@ type GroupOverlap<
         : AttachmentError<`Middleware "${Key<FunctionMiddleware>}" is attached to both function "${F["name"]}" and its group`>
       : never
     : never;
+
+/**
+ * The parameter-type validation applied to the group spec at
+ * `GroupImpl.make`: every function's attached middleware must have its
+ * `requires` services provided by some middleware covering that function
+ * (the group's or the function's own). Checked here — with the group fully
+ * assembled — rather than at the spec builders, because a function-level
+ * middleware's `requires` may legitimately be satisfied by a group
+ * middleware the function spec never sees, and group attachment is
+ * declaratively order-independent with respect to `addFunction`.
+ *
+ * This check is order-insensitive within a single function's own middleware
+ * list (`provides` has no runtime representation to check against);
+ * attaching a function-level middleware before its same-level provider
+ * fails at runtime with a missing-service defect.
+ */
+export type ValidateImplRequires<
+  Functions_ extends FunctionSpec.AnyWithProps,
+  GroupMiddlewares_ extends AnyService,
+> = ValidationResult<
+  Functions_ extends any
+    ? [
+        Exclude<
+          Requires<FunctionSpec.Middlewares<Functions_>>,
+          Provides<GroupMiddlewares_ | FunctionSpec.Middlewares<Functions_>>
+        >,
+      ] extends [never]
+      ? never
+      : AttachmentError<`Function "${Functions_["name"]}" has middleware requiring services that no middleware covering it provides`>
+    : never
+>;
 
 /**
  * The parameter-type validation applied by `FunctionSpec`'s `.middleware()`:

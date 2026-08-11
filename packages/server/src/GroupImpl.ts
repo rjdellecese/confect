@@ -1,4 +1,5 @@
 import type * as GroupSpec from "@confect/core/GroupSpec";
+import type * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import * as Registry from "@confect/core/Registry";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
@@ -87,7 +88,14 @@ export const make = <
   Group extends GroupSpec.AnyWithProps,
 >(
   _databaseSchema: DatabaseSchema_,
-  _group: Group,
+  // Intersected with the cross-middleware `requires` validation: with the
+  // group fully assembled, every function's middleware must have its
+  // `requires` provided by some middleware covering that function.
+  _group: Group &
+    MiddlewareSpec.ValidateImplRequires<
+      GroupSpec.Functions<Group>,
+      GroupSpec.Middlewares<Group>
+    >,
 ): Layer.Layer<
   GroupImpl<"Unfinalized">,
   never,

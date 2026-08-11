@@ -165,7 +165,8 @@ const layerFromImpls = <Middleware extends MiddlewareSpec.AnyService>(
  * Provide a middleware's implementation with a single strategy shared by
  * every kind the middleware declares. The implementation's environment is
  * bounded by {@link CommonServices} — the intersection of the declared
- * kinds' ctx services — so it is valid wherever it can be invoked. Reach for
+ * kinds' ctx services — plus the middleware's declared `requires`, which
+ * middleware running earlier in the chain provide. Reach for
  * {@link makeByKind} when one strategy can't fit all declared kinds (the
  * usual case for database-touching middleware attached to actions).
  *
@@ -180,7 +181,8 @@ export const make = <
   impl: MiddlewareSpec.Middleware<
     MiddlewareSpec.Provides<Middleware>,
     MiddlewareSpec.Error<Middleware>,
-    CommonServices<DatabaseSchema_, MiddlewareSpec.Kinds<Middleware>>
+    | CommonServices<DatabaseSchema_, MiddlewareSpec.Kinds<Middleware>>
+    | MiddlewareSpec.Requires<Middleware>
   >,
 ): Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<Middleware>>> =>
   layerFromImpls(
@@ -210,7 +212,7 @@ export const makeByKind = <
     readonly [Kind in MiddlewareSpec.Kinds<Middleware>]: MiddlewareSpec.Middleware<
       MiddlewareSpec.Provides<Middleware>,
       MiddlewareSpec.Error<Middleware>,
-      KindServices<DatabaseSchema_, Kind>
+      KindServices<DatabaseSchema_, Kind> | MiddlewareSpec.Requires<Middleware>
     >;
   },
 ): Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<Middleware>>> =>
@@ -234,7 +236,8 @@ export const provides = <
   effect: Effect.Effect<
     Shape,
     MiddlewareSpec.Error<Middleware>,
-    CommonServices<DatabaseSchema_, MiddlewareSpec.Kinds<Middleware>>
+    | CommonServices<DatabaseSchema_, MiddlewareSpec.Kinds<Middleware>>
+    | MiddlewareSpec.Requires<Middleware>
   >,
 ): Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<Middleware>>> =>
   make(databaseSchema, middleware, ((handlerEffect: Effect.Effect<any>) =>

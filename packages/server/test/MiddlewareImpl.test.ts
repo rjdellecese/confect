@@ -8,8 +8,7 @@ import {
 import type * as DatabaseReaderModule from "@confect/server/DatabaseReader";
 import type * as DatabaseWriterModule from "@confect/server/DatabaseWriter";
 import type * as Handler from "@confect/server/Handler";
-import type { MiddlewareSpec } from "@confect/core";
-import { FunctionSpec, GroupSpec } from "@confect/core";
+import { FunctionSpec, GroupSpec, MiddlewareSpec } from "@confect/core";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import type { Effect as EffectNamespace } from "effect";
 import * as Effect from "effect/Effect";
@@ -88,6 +87,40 @@ describe("handler environment widening", () => {
         return viewer.username;
       }),
     );
+  });
+});
+
+describe("cross-middleware requires", () => {
+  class NeedsViewer extends MiddlewareSpec.Service<
+    NeedsViewer,
+    { requires: Viewer }
+  >()("NeedsViewer") {}
+
+  it("lets an implementation consume its declared requires", () => {
+    MiddlewareImpl.make(databaseSchema, NeedsViewer, (effect) =>
+      Effect.gen(function* () {
+        const viewer = yield* Viewer;
+
+        return viewer.username.length > 0 ? yield* effect : yield* effect;
+      }),
+    );
+  });
+
+  it("rejects a group whose function middleware has unsatisfied requires", () => {
+    const unsatisfied = GroupSpec.make().addFunction(
+      viewerName.middleware(NeedsViewer),
+    );
+
+    // @ts-expect-error — nothing covering viewerName provides Viewer
+    GroupImpl.make(databaseSchema, unsatisfied);
+  });
+
+  it("accepts a group whose provider middleware covers the requirement", () => {
+    const satisfied = GroupSpec.make()
+      .middleware(ProvideViewer)
+      .addFunction(viewerName.middleware(NeedsViewer));
+
+    GroupImpl.make(databaseSchema, satisfied);
   });
 });
 

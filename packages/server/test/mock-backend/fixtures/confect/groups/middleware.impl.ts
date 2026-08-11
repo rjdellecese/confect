@@ -6,9 +6,11 @@ import databaseSchema from "../_generated/schema";
 import refs from "../_generated/refs";
 import { DatabaseReader, QueryRunner } from "../_generated/services";
 import middleware, {
+  NameTooShort,
   NoNotes,
   NoViewer,
   ProvideViewer,
+  RequireLongName,
   Viewer,
 } from "./middleware.spec";
 
@@ -53,6 +55,23 @@ const ProvideViewerLive = MiddlewareImpl.makeByKind(
     action: (effect) =>
       Effect.provideServiceEffect(effect, Viewer, viewerViaRunQuery),
   },
+);
+
+// Consumes the `Viewer` that `ProvideViewer` — earlier in the chain —
+// provides, per this middleware's declared `requires`.
+const RequireLongNameLive = MiddlewareImpl.make(
+  databaseSchema,
+  RequireLongName,
+  (effect) =>
+    Effect.gen(function* () {
+      const { username } = yield* Viewer;
+
+      if (username.length < 3) {
+        return yield* new NameTooShort();
+      }
+
+      return yield* effect;
+    }),
 );
 
 const viewerUsername = Effect.gen(function* () {
@@ -105,11 +124,25 @@ const firstNoteForViewer = FunctionImpl.make(
     }),
 );
 
+const shoutName = FunctionImpl.make(
+  databaseSchema,
+  middleware,
+  "shoutName",
+  () =>
+    Effect.gen(function* () {
+      const { username } = yield* Viewer;
+
+      return username.toUpperCase();
+    }),
+);
+
 export default GroupImpl.make(databaseSchema, middleware).pipe(
   Layer.provide(viewerName),
   Layer.provide(viewerNameMutation),
   Layer.provide(viewerNameAction),
   Layer.provide(firstNoteForViewer),
+  Layer.provide(shoutName),
   Layer.provide(ProvideViewerLive),
+  Layer.provide(RequireLongNameLive),
   GroupImpl.finalize,
 );

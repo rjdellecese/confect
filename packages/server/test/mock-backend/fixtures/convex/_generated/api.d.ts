@@ -148,6 +148,7 @@ export declare const api: {
     };
     middleware: {
       firstNoteForViewer: FunctionReference<"query", "public", {}, string>;
+      shoutName: FunctionReference<"query", "public", {}, string>;
       viewerName: FunctionReference<"query", "public", {}, string>;
       viewerNameAction: FunctionReference<"action", "public", {}, string>;
       viewerNameMutation: FunctionReference<"mutation", "public", {}, string>;

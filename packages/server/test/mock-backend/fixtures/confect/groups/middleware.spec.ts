@@ -13,6 +13,11 @@ export class NoViewer extends Schema.TaggedError<NoViewer>()("NoViewer", {}) {}
 
 export class NoNotes extends Schema.TaggedError<NoNotes>()("NoNotes", {}) {}
 
+export class NameTooShort extends Schema.TaggedError<NameTooShort>()(
+  "NameTooShort",
+  {},
+) {}
+
 /**
  * The flagship middleware shape: provides `Viewer` to downstream handlers,
  * short-circuiting with the typed `NoViewer` error when no user exists.
@@ -24,6 +29,19 @@ export class ProvideViewer extends MiddlewareSpec.Service<
   { provides: Viewer }
 >()("ProvideViewer", {
   error: () => NoViewer,
+}) {}
+
+/**
+ * Cross-middleware dependency: `requires` the `Viewer` provided by
+ * `ProvideViewer`, which runs earlier in the chain (group-attached, while
+ * this one is function-attached). Fails with `NameTooShort` when the
+ * viewer's username has fewer than three characters.
+ */
+export class RequireLongName extends MiddlewareSpec.Service<
+  RequireLongName,
+  { requires: Viewer }
+>()("RequireLongName", {
+  error: () => NameTooShort,
 }) {}
 
 export default GroupSpec.make()
@@ -58,4 +76,11 @@ export default GroupSpec.make()
       returns: () => Schema.String,
       error: () => NoNotes,
     }),
+  )
+  .addFunction(
+    FunctionSpec.publicQuery({
+      name: "shoutName",
+      args: () => Schema.Struct({}),
+      returns: () => Schema.String,
+    }).middleware(RequireLongName),
   );

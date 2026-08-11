@@ -9,7 +9,11 @@ import {
   DatabaseReader,
   DatabaseWriter,
 } from "./fixtures/confect/_generated/services";
-import { NoNotes, NoViewer } from "./fixtures/confect/groups/middleware.spec";
+import {
+  NameTooShort,
+  NoNotes,
+  NoViewer,
+} from "./fixtures/confect/groups/middleware.spec";
 import {
   FunctionGateClosed,
   GateClosed,
@@ -146,6 +150,54 @@ describe("middleware", () => {
       expectTypeOf<
         Ref.Error<typeof refs.public.groups.middleware.viewerName>
       >().toEqualTypeOf<NoViewer>();
+    });
+  });
+
+  describe("cross-middleware requires", () => {
+    it.effect(
+      "a middleware consumes a service provided by an earlier middleware",
+      () =>
+        Effect.gen(function* () {
+          const c = yield* TestConfect.TestConfect;
+          yield* insertUser("ada");
+
+          const shouted = yield* c.query(
+            refs.public.groups.middleware.shoutName,
+          );
+
+          expect(shouted).toBe("ADA");
+        }).pipe(Effect.provide(TestConfect.layer())),
+    );
+
+    it.effect("fails with its own typed error using the required service", () =>
+      Effect.gen(function* () {
+        const c = yield* TestConfect.TestConfect;
+        yield* insertUser("ab");
+
+        const result = yield* Effect.result(
+          c.query(refs.public.groups.middleware.shoutName),
+        );
+
+        expect(expectFailure(result)).toBeInstanceOf(NameTooShort);
+      }).pipe(Effect.provide(TestConfect.layer())),
+    );
+
+    it.effect("the providing middleware's short-circuit still runs first", () =>
+      Effect.gen(function* () {
+        const c = yield* TestConfect.TestConfect;
+
+        const result = yield* Effect.result(
+          c.query(refs.public.groups.middleware.shoutName),
+        );
+
+        expect(expectFailure(result)).toBeInstanceOf(NoViewer);
+      }).pipe(Effect.provide(TestConfect.layer())),
+    );
+
+    it("joins both middlewares' errors in the covered function's ref union", () => {
+      expectTypeOf<
+        Ref.Error<typeof refs.public.groups.middleware.shoutName>
+      >().toEqualTypeOf<NoViewer | NameTooShort>();
     });
   });
 

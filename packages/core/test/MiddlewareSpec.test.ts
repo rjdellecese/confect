@@ -155,6 +155,67 @@ describe("GroupSpec.middleware", () => {
   });
 });
 
+describe("requires", () => {
+  class ProvideUser extends MiddlewareSpec.Service<
+    ProvideUser,
+    { provides: CurrentUser }
+  >()("ProvideUser") {}
+
+  class NeedsUser extends MiddlewareSpec.Service<
+    NeedsUser,
+    { requires: CurrentUser }
+  >()("NeedsUser") {}
+
+  it("extracts Requires at the type level", () => {
+    expectTypeOf<
+      MiddlewareSpec.Requires<typeof NeedsUser>
+    >().toEqualTypeOf<CurrentUser>();
+    expectTypeOf<MiddlewareSpec.Requires<typeof ProvideUser>>().toBeNever();
+  });
+
+  it("accepts a requiring middleware attached after its provider", () => {
+    const group = GroupSpec.make()
+      .middleware(ProvideUser)
+      .middleware(NeedsUser)
+      .addFunction(mutation);
+
+    expectTypeOf<GroupSpec.Middlewares<typeof group>>().toEqualTypeOf<
+      typeof ProvideUser | typeof NeedsUser
+    >();
+  });
+
+  it("rejects a requiring middleware attached before its provider", () => {
+    GroupSpec.make()
+      // @ts-expect-error — nothing attached earlier provides CurrentUser
+      .middleware(NeedsUser)
+      .middleware(ProvideUser);
+  });
+
+  it("validates whole-group satisfaction for function-level middleware", () => {
+    const covered = mutation.middleware(NeedsUser);
+
+    const satisfied = GroupSpec.make()
+      .middleware(ProvideUser)
+      .addFunction(covered);
+    const unsatisfied = GroupSpec.make().addFunction(covered);
+
+    expectTypeOf<
+      MiddlewareSpec.ValidateImplRequires<
+        GroupSpec.Functions<typeof satisfied>,
+        GroupSpec.Middlewares<typeof satisfied>
+      >
+    >().toEqualTypeOf<unknown>();
+    expectTypeOf<
+      MiddlewareSpec.ValidateImplRequires<
+        GroupSpec.Functions<typeof unsatisfied>,
+        GroupSpec.Middlewares<typeof unsatisfied>
+      >
+    >().toEqualTypeOf<
+      MiddlewareSpec.AttachmentError<`Function "setThing" has middleware requiring services that no middleware covering it provides`>
+    >();
+  });
+});
+
 describe("FunctionSpec.middleware", () => {
   it("appends middleware to the function in attachment order", () => {
     const covered = mutation.middleware(MutationOnly).middleware(RequireUser);

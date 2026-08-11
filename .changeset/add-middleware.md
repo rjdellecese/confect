@@ -56,4 +56,6 @@ Middleware can also attach to a single function with `.middleware()` on the func
 FunctionSpec.publicMutation({ name: "deleteAll", ... }).middleware(RequireAdmin);
 ```
 
+A middleware can depend on one that runs earlier in the chain by declaring `requires` in its `Config` type parameter — its implementation may then consume the required service (e.g. `RequireAdmin` reading the `CurrentUser` that `RequireUser` provides). Satisfaction is type-checked at `GroupSpec.middleware` for group attachments and at `GroupImpl.make` for whole groups.
+
 Attaching the same middleware twice (including once at group level and once at function level), attaching one whose `kinds` don't cover a covered function, attaching any middleware to a plain-Convex function, or attaching to a group containing a matching-kind plain-Convex function are all type errors. Middleware does not propagate to subgroups. `confect codegen` fails with an explicit error when a group's spec attaches a middleware its impl never provides.
