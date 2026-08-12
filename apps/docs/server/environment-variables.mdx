@@ -4,7 +4,9 @@ title: "Environment Variables"
 description: "Read environment variables using Effect's Config module."
 ---
 
-Confect provides a `ConfigProvider` that is compatible with the Convex runtime, where `process.env` is not enumerable. This provider is automatically set for all Confect functions (queries, mutations, actions, and HTTP API handlers), so Effect's [`Config`](https://effect.website/docs/configuration/) module works out of the box.
+Confect provides a `ConfigProvider` that is compatible with the Convex runtime, where `process.env` is not enumerable. Confect sets it automatically for every function that runs in the Convex runtime—queries, mutations, actions, and HTTP API handlers—so Effect's [`Config`](https://effect.website/docs/configuration/) module works out of the box.
+
+[Node actions](/server/node-actions) are the exception. They run in the Node.js runtime, where `process.env` behaves like an ordinary object, so they use Effect's default [`ConfigProvider.fromEnv`](https://effect.website/docs/configuration/#loading-configuration-from-environment-variables) instead. Reading environment variables works the same way in both runtimes.
 
 ## Reading environment variables
 
@@ -32,6 +34,8 @@ Config.integer("MAX_RESULTS").pipe(Config.withDefault(100));
 ## Limitations
 
 Config operations that require enumerating `process.env` are unsupported in the Convex runtime. This includes `Config.hashMap` and other combinators that need to discover keys dynamically. Attempting to use them will result in an `Unsupported` config error.
+
+These combinators do work in [Node actions](/server/node-actions), since Effect's default provider can enumerate `process.env` in the Node.js runtime. Avoid depending on that if the handler might later move to the Convex runtime.
 
 ## Custom config provider
 
