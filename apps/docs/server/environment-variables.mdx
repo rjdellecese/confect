@@ -4,7 +4,9 @@ title: "Environment Variables"
 description: "Read environment variables using Effect's Config module."
 ---
 
-Confect provides a `ConfigProvider` that is compatible with the Convex runtime, where `process.env` is not enumerable. This provider is automatically set for all Confect functions (queries, mutations, actions, and HTTP API handlers), so Effect's [`Config`](https://effect.website/docs/configuration/) module works out of the box.
+Confect provides a `ConfigProvider` that is compatible with the Convex runtime, where `process.env` is not enumerable. Confect sets it automatically for every function that runs in the Convex runtime—queries, mutations, actions, and HTTP API handlers—so Effect's [`Config`](https://effect.website/docs/configuration/) module works out of the box.
+
+[Node actions](/server/node-actions) are the exception. They run in the Node.js runtime, where `process.env` behaves like an ordinary object, so they use Effect's default [`ConfigProvider.fromEnv`](https://effect.website/docs/configuration/#loading-configuration-from-environment-variables) instead. Reading environment variables works the same way in both runtimes.
 
 ## Reading environment variables
 
@@ -23,7 +25,7 @@ const getApiKey = FunctionImpl.make(databaseSchema, settings, "getApiKey", () =>
 );
 ```
 
-All of Effect's `Config` combinators work as expected—`Config.string`, `Config.number`, `Config.boolean`, `Config.withDefault`, `Config.option`, etc.
+Combinators that read a single variable work as expected—`Config.string`, `Config.number`, `Config.boolean`, `Config.withDefault`, `Config.option`, and `Config.nested`, among others.
 
 ```ts
 Config.integer("MAX_RESULTS").pipe(Config.withDefault(100));
@@ -31,26 +33,52 @@ Config.integer("MAX_RESULTS").pipe(Config.withDefault(100));
 
 ## Limitations
 
-Config operations that require enumerating `process.env` are unsupported in the Convex runtime. This includes `Config.hashMap` and other combinators that need to discover keys dynamically. Attempting to use them will result in an `Unsupported` config error.
+Config operations that enumerate `process.env` are unsupported in the Convex runtime, and fail with an `Unsupported` config error. This covers every combinator that resolves a collection of keys rather than a single one:
+
+- `Config.array`, `Config.chunk`, and `Config.hashSet`
+- `Config.hashMap`
+
+`Config.array` is the surprising member of that list, since it looks like a way to read one comma-separated variable. Effect resolves a sequence by first looking for indexed keys (`ALLOWED_ORIGINS[0]`, `ALLOWED_ORIGINS[1]`, and so on), which requires enumeration, so it fails before it can fall back to splitting a delimited value.
+
+To read a delimited variable, parse it yourself:
+
+```ts
+Config.string("ALLOWED_ORIGINS").pipe(
+  Config.map((origins) => origins.split(",").map((origin) => origin.trim())),
+);
+```
+
+These combinators do work in [Node actions](/server/node-actions), since Effect's default provider can enumerate `process.env` in the Node.js runtime. Avoid depending on that if the handler might later move to the Convex runtime.
 
 ## Custom config provider
 
-The `ConvexConfigProvider` module is exported from `@confect/server` if you need to create a provider with custom options. It supports the same options as Effect's default [`ConfigProvider.fromEnv`](https://effect.website/docs/configuration/#loading-configuration-from-environment-variables).
+The `ConvexConfigProvider` module is exported from `@confect/server`. `ConvexConfigProvider.make()` takes the same options as Effect's [`ConfigProvider.fromEnv`](https://effect.website/docs/configuration/#loading-configuration-from-environment-variables), and both are optional—calling it with no arguments returns the provider Confect already installs for you.
 
 ```ts
 import { ConvexConfigProvider } from "@confect/server";
 
-const provider = ConvexConfigProvider.make({
-  pathDelim: "__",
-  seqDelim: ";",
-});
+const provider = ConvexConfigProvider.make({ pathDelim: "__" });
 ```
+
+| Option      | Default | Description                                                                                                                                                                   |
+| ----------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pathDelim` | `"_"`   | Joins the segments of a nested config path into a variable name. With `"__"`, `Config.nested(Config.string("HOST"), "DB")` reads `DB__HOST`.                                  |
+| `seqDelim`  | `","`   | Separates the elements of a sequence. This has no effect in the Convex runtime, because the sequence combinators that would consume it are [unsupported](#limitations) there. |
 
 To use a custom provider in a function handler, pass it to `Effect.withConfigProvider`.
 
-```ts
+```ts confect/settings.impl.ts
+import { ConvexConfigProvider, FunctionImpl } from "@confect/server";
+import * as Config from "effect/Config";
+import * as Effect from "effect/Effect";
+
+import databaseSchema from "./_generated/schema";
+import settings from "./settings.spec";
+
+const provider = ConvexConfigProvider.make({ pathDelim: "__" });
+
 const getApiKey = FunctionImpl.make(databaseSchema, settings, "getApiKey", () =>
-  Config.string("API_KEY").pipe(
+  Config.nested(Config.string("KEY"), "API").pipe(
     Effect.withConfigProvider(provider),
     Effect.orDie,
   ),
