@@ -359,8 +359,8 @@ importers:
         specifier: 4.1.10
         version: 4.1.10(@vitest/browser@4.1.10)(vitest@4.1.10)
       convex-test:
-        specifier: 0.0.54
-        version: 0.0.54(convex@1.43.0(react@19.2.8))
+        specifier: 0.0.55
+        version: 0.0.55(convex@1.43.0(react@19.2.8))
       dotenv:
         specifier: 17.4.2
         version: 17.4.2
@@ -3595,8 +3595,8 @@ packages:
     peerDependencies:
       convex: 1.43.0
 
-  convex-test@0.0.54:
-    resolution: {integrity: sha512-C0v2SQcuxrELAJRNzE6fQ686XDPor7UFoC22jcoJXeCRqhLo8ZIMZ4jyUHoo1UdAL2enCb0AbiprCVpLDN8u9Q==}
+  convex-test@0.0.55:
+    resolution: {integrity: sha512-ablJ6vR3WUpyTaYrrRQf8yxInGrhHyqBEQsCFzloda3G0MDEu2RMKNGUkvlBXYWPiiEP0UIKPS7gZuLbqGnvQw==}
     peerDependencies:
       convex: 1.43.0
 
@@ -9002,7 +9002,7 @@ snapshots:
 
   '@types/ws@8.18.1':
     dependencies:
-      '@types/node': 26.1.2
+      '@types/node': 26.2.0
 
   '@types/yargs-parser@21.0.3': {}
 
@@ -9589,7 +9589,7 @@ snapshots:
 
   buffer-image-size@0.6.4:
     dependencies:
-      '@types/node': 26.1.2
+      '@types/node': 26.2.0
 
   buffer@5.7.1:
     dependencies:
@@ -9814,7 +9814,7 @@ snapshots:
     dependencies:
       convex: 1.43.0(react@19.2.8)
 
-  convex-test@0.0.54(convex@1.43.0(react@19.2.8)):
+  convex-test@0.0.55(convex@1.43.0(react@19.2.8)):
     dependencies:
       convex: 1.43.0(react@19.2.8)
 
@@ -10689,7 +10689,7 @@ snapshots:
 
   happy-dom@20.11.2:
     dependencies:
-      '@types/node': 26.1.2
+      '@types/node': 26.2.0
       '@types/whatwg-mimetype': 3.0.2
       '@types/ws': 8.18.1
       buffer-image-size: 0.6.4
