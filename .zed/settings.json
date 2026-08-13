@@ -17,10 +17,16 @@
           "run": "onSave"
         }
       }
+    },
+    "effect-tsgo": {
+      "settings": {
+        "package_version": "0.36.4"
+      }
     }
   },
   "languages": {
     "HTML": {
+      "language_servers": ["!tailwindcss-language-server", "..."],
       "format_on_save": "on",
       "prettier": {
         "allowed": false
@@ -34,6 +40,14 @@
       ]
     },
     "JavaScript": {
+      "language_servers": [
+        "effect-tsgo",
+        "!vtsls",
+        "!typescript-language-server",
+        "!eslint",
+        "!tailwindcss-language-server",
+        "..."
+      ],
       "format_on_save": "on",
       "prettier": {
         "allowed": false
@@ -89,6 +103,7 @@
       ]
     },
     "MDX": {
+      "language_servers": ["!tailwindcss-language-server", "..."],
       "format_on_save": "on",
       "prettier": {
         "allowed": false
@@ -102,6 +117,14 @@
       ]
     },
     "TypeScript": {
+      "language_servers": [
+        "effect-tsgo",
+        "!vtsls",
+        "!typescript-language-server",
+        "!eslint",
+        "!tailwindcss-language-server",
+        "..."
+      ],
       "format_on_save": "on",
       "prettier": {
         "allowed": false
@@ -118,6 +141,14 @@
       ]
     },
     "TSX": {
+      "language_servers": [
+        "effect-tsgo",
+        "!vtsls",
+        "!typescript-language-server",
+        "!eslint",
+        "!tailwindcss-language-server",
+        "..."
+      ],
       "format_on_save": "on",
       "prettier": {
         "allowed": false

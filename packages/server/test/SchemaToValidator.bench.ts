@@ -1,4 +1,4 @@
-import { bench } from "@ark/attest";
+import { bench } from "confect-bench-harness";
 import type { GenericId } from "@confect/core/GenericId";
 import * as Schema from "effect/Schema";
 import type {

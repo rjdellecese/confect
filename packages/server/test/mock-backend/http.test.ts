@@ -106,8 +106,8 @@ describe("HttpRouter.make type-level guarantees", () => {
     // services; without Layer.provide(NotesApiLive) the layer does not satisfy
     // Routes.
     const _missingGroupLayerIsRejected = () =>
-      // @effect-diagnostics-next-line effect/missingLayerContext:off
       // @ts-expect-error
+      // @effect-diagnostics-next-line missingLayerContext:off
       ConfectHttpRouter.make(HttpApiBuilder.layer(NotesApi));
 
     expect(_missingGroupLayerIsRejected).toBeDefined();
