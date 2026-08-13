@@ -7,7 +7,6 @@
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "devDependencies": {
-    "@ark/attest": "0.56.3",
     "@effect/cluster": "0.60.2",
     "@effect/experimental": "0.61.1",
     "@effect/platform": "0.97.1",
@@ -18,12 +17,13 @@
     "@swc/jest": "0.2.39",
     "@types/node": "26.2.0",
     "@vitest/coverage-v8": "4.1.10",
+    "confect-bench-harness": "workspace:*",
     "convex-test": "0.0.55",
     "dotenv": "17.4.2",
     "effect": "3.22.1",
     "tsdown": "0.22.14",
     "tsx": "4.23.11",
-    "typescript": "6.0.3",
+    "typescript": "7.0.2",
     "unrun": "0.3.1",
     "vite": "8.2.1",
     "vite-tsconfig-paths": "6.1.1",

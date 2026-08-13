@@ -36,7 +36,7 @@ works.)
 - **In-scope packages:** `effect` plus its lockstep companions from the
   effect monorepo already present in the workspace (`@effect/platform-node`,
   `@effect/platform-bun`, `@effect/vitest`) — all move to the same beta
-  number together. Everything else, including `@effect/language-service`
+  number together. Everything else, including `@effect/tsgo`
   (which versions independently), belongs to the other upgrade commands.
 
 ## Branches and PRs
