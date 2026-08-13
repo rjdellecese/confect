@@ -9,7 +9,6 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Record from "effect/Record";
 import * as String from "effect/String";
-import { fileURLToPath } from "node:url";
 
 const entries = ["services.ts", "docs.ts", "refs.ts", "schema.ts", "spec.ts"];
 
@@ -68,7 +67,9 @@ const emitDeclarations = Effect.gen(function* () {
   );
 
   const typescript = path.dirname(
-    fileURLToPath(import.meta.resolve("typescript/package.json")),
+    yield* path.fromFileUrl(
+      new URL(import.meta.resolve("typescript/package.json")),
+    ),
   );
 
   const diagnostics = yield* Command.string(
