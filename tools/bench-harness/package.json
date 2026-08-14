@@ -10,5 +10,8 @@
     ".": "./src/index.ts"
   },
   "private": true,
+  "scripts": {
+    "clean": "shx rm -rf node_modules"
+  },
   "type": "module"
 }
