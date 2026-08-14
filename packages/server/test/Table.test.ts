@@ -24,7 +24,7 @@ describe("Table", () => {
             name: Schema.String,
           }),
         ),
-        embedding: Schema.optionalKey(Schema.Array(Schema.Number)),
+        embedding: Schema.optionalKey(Schema.Array(Schema.Finite)),
       }),
     )
       .index("by_text", ["text"])
@@ -274,7 +274,7 @@ describe("Table", () => {
         Schema.Struct({
           text: Schema.String,
           tag: Schema.optional(Schema.String),
-          embedding: Schema.optional(Schema.Array(Schema.Number)),
+          embedding: Schema.optional(Schema.Array(Schema.Finite)),
         }),
       )
         .index("by_text", ["text"])

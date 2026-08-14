@@ -138,42 +138,6 @@ const queryClock: Clock.Clock = {
     }),
 };
 
-/**
- * Convex bans `setTimeout` in queries and mutations ("Can't use setTimeout in
- * queries and mutations. Please consider using an action.") and their isolate
- * has no `setImmediate`. Effect's default `MixedScheduler` dispatches
- * cooperative fiber yields — injected once a fiber exhausts its op budget
- * (`MaxOpsBeforeYield`, 2048 operations) — through `setImmediate`, falling
- * back to `setTimeout(f, 0)`, so any handler that runs long enough to yield
- * would crash. Queries and mutations therefore run on a `MixedScheduler` that
- * dispatches on the microtask queue, which the isolate supports (Promises
- * work everywhere Convex functions run). Actions keep the default scheduler —
- * timers are allowed there.
- *
- * Sharing one instance across invocations is safe: `MixedScheduler` holds
- * only immutable fields, and each fiber creates its own dispatcher via
- * `makeDispatcher()`.
- */
-const scheduleMicrotask: (f: () => void) => void =
-  typeof globalThis.queueMicrotask === "function"
-    ? globalThis.queueMicrotask.bind(globalThis)
-    : (f) => void Promise.resolve().then(f);
-
-const setImmediateMicrotask = (f: () => void): (() => void) => {
-  let cancelled = false;
-  scheduleMicrotask(() => {
-    if (!cancelled) {
-      f();
-    }
-  });
-  return () => {
-    cancelled = true;
-  };
-};
-
-const microtaskScheduler: EffectScheduler.Scheduler =
-  new EffectScheduler.MixedScheduler("async", setImmediateMicrotask);
-
 const queryFunction = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Args,
@@ -245,7 +209,7 @@ const queryFunction = <
     }).pipe(
       Effect.provideService(Clock.Clock, queryClock),
       RegisteredFunction.runHandlerPromise(error, {
-        scheduler: microtaskScheduler,
+        scheduler: new EffectScheduler.MixedScheduler("sync"),
       }),
     ),
 });
@@ -329,7 +293,7 @@ const mutationFunction = <
       );
     }).pipe(
       RegisteredFunction.runHandlerPromise(error, {
-        scheduler: microtaskScheduler,
+        scheduler: new EffectScheduler.MixedScheduler("sync"),
       }),
     ),
 });

@@ -147,7 +147,7 @@ describe("laziness invariant", () => {
 });
 
 describe("paginated queries", () => {
-  const item = Schema.Struct({ value: Schema.NumberFromString });
+  const item = Schema.Struct({ value: Schema.FiniteFromString });
 
   describe("laziness invariant", () => {
     const makePaginatedSpec = (track: {
@@ -282,7 +282,7 @@ describe("paginated queries", () => {
         // @ts-expect-error — paginationOpts must not be declared in user args
         args: () =>
           Schema.Struct({
-            paginationOpts: Schema.Struct({ numItems: Schema.Number }),
+            paginationOpts: Schema.Struct({ numItems: Schema.Finite }),
           }),
         item: () => item,
       });

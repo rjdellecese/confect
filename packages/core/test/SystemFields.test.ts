@@ -26,7 +26,7 @@ describe("extendWithSystemFields", () => {
       };
 
       expect(() =>
-        Schema.decodeUnknownSync(ExtendedNoteSchema)(extendedNote),
+        Schema.decodeSync(ExtendedNoteSchema)(extendedNote),
       ).not.toThrow();
     });
 
@@ -83,10 +83,10 @@ describe("extendWithSystemFields", () => {
       };
 
       expect(() =>
-        Schema.decodeUnknownSync(ExtendedItemSchema)(extendedNote),
+        Schema.decodeSync(ExtendedItemSchema)(extendedNote),
       ).not.toThrow();
       expect(() =>
-        Schema.decodeUnknownSync(ExtendedItemSchema)(extendedImage),
+        Schema.decodeSync(ExtendedItemSchema)(extendedImage),
       ).not.toThrow();
     });
 
@@ -125,7 +125,7 @@ describe("extendWithSystemFields", () => {
 
   describe("a transformed table (Schema.decodeTo)", () => {
     const StoredNote = Schema.Struct({ content: Schema.String });
-    const Note = Schema.Struct({ length: Schema.Number });
+    const Note = Schema.Struct({ length: Schema.Finite });
 
     const NoteSchema = StoredNote.pipe(
       Schema.decodeTo(Note, {
@@ -150,7 +150,7 @@ describe("extendWithSystemFields", () => {
 
     test("carries the system fields through the transformation when decoding", () => {
       expect(
-        Schema.decodeUnknownSync(ExtendedNoteSchema)({
+        Schema.decodeSync(ExtendedNoteSchema)({
           content: "Hello",
           ...systemFields,
         }),
@@ -199,7 +199,7 @@ describe("extendWithSystemFields", () => {
 
     test("decodes from the encoded key, keeping the system fields", () => {
       expect(
-        Schema.decodeUnknownSync(ExtendedNoteSchema)({
+        Schema.decodeSync(ExtendedNoteSchema)({
           full_name: "Ada",
           ...systemFields,
         }),
@@ -218,7 +218,7 @@ describe("extendWithSystemFields", () => {
 
   describe("a union containing a transformed member", () => {
     const TransformedMember = Schema.Struct({ content: Schema.String }).pipe(
-      Schema.decodeTo(Schema.Struct({ length: Schema.Number }), {
+      Schema.decodeTo(Schema.Struct({ length: Schema.Finite }), {
         decode: SchemaGetter.transform((stored: { content: string }) => ({
           length: stored.content.length,
         })),
@@ -245,13 +245,13 @@ describe("extendWithSystemFields", () => {
 
     test("decodes a document for each union member", () => {
       expect(
-        Schema.decodeUnknownSync(ExtendedItemSchema)({
+        Schema.decodeSync(ExtendedItemSchema)({
           content: "Hello",
           ...systemFields,
         }),
       ).toStrictEqual({ length: 5, ...systemFields });
       expect(
-        Schema.decodeUnknownSync(ExtendedItemSchema)({
+        Schema.decodeSync(ExtendedItemSchema)({
           url: "https://example.com",
           ...systemFields,
         }),

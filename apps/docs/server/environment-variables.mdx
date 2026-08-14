@@ -4,7 +4,9 @@ title: "Environment Variables"
 description: "Read environment variables using Effect's Config module."
 ---
 
-Confect provides a `ConfigProvider` that is compatible with the Convex runtime, where `process.env` is not enumerable. This provider is automatically set for all Confect functions (queries, mutations, actions, and HTTP API handlers), so Effect's [`Config`](https://effect.website/docs/configuration/) module works out of the box.
+Confect provides a `ConfigProvider` that is compatible with the Convex runtime, where `process.env` is not enumerable. Confect sets it automatically for every function that runs in the Convex runtime—queries, mutations, actions, and HTTP API handlers—so Effect's [`Config`](https://effect.website/docs/configuration/) module works out of the box.
+
+[Node actions](/server/node-actions) are the exception. They run in the Node.js runtime, where `process.env` behaves like an ordinary object, so they use Effect's default [`ConfigProvider.fromEnv`](https://effect.website/docs/configuration/#loading-configuration-from-environment-variables) instead. Reading environment variables works the same way in both runtimes.
 
 ## Reading environment variables
 
@@ -23,35 +25,65 @@ const getApiKey = FunctionImpl.make(databaseSchema, settings, "getApiKey", () =>
 );
 ```
 
-All of Effect's `Config` combinators work as expected—`Config.string`, `Config.number`, `Config.boolean`, `Config.withDefault`, `Config.option`, etc.
+Combinators that read a single variable work as expected—`Config.string`, `Config.number`, `Config.boolean`, `Config.withDefault`, `Config.option`, and `Config.nested`, among others.
 
 ```ts
-Config.integer("MAX_RESULTS").pipe(Config.withDefault(100));
+Config.int("MAX_RESULTS").pipe(Config.withDefault(100));
 ```
 
-## Limitations
+## Collections
 
-Config operations that require enumerating `process.env` are unsupported in the Convex runtime. This includes `Config.hashMap` and other combinators that need to discover keys dynamically. Attempting to use them will result in an `Unsupported` config error.
+`Config.Array` and `Config.Record` read a collection from a single delimited variable, so they work in the Convex runtime like any other combinator. Pass them to `Config.schema` with the variable's name.
+
+Given `ALLOWED_ORIGINS="https://a.example,https://b.example"`:
+
+```ts
+import * as Schema from "effect/Schema";
+
+Config.schema(Config.Array(Schema.String), "ALLOWED_ORIGINS");
+// ["https://a.example", "https://b.example"]
+```
+
+Given `FEATURE_LIMITS="uploads=10,exports=5"`:
+
+```ts
+Config.schema(Config.Record(Schema.String, Schema.String), "FEATURE_LIMITS");
+// { uploads: "10", exports: "5" }
+```
+
+Both default to `","` as the separator, and `Config.Record` to `"="` between key and value; pass `separator` or `keyValueSeparator` to change them. Neither trims whitespace around elements, so write the variable without spaces after the separator, or map over the result to trim.
+
+The collection has to live in one variable. Effect's default provider can also assemble one from several variables—`ORIGINS_0` and `ORIGINS_1` for an array, `FEATURE_LIMITS_UPLOADS` for a record—because it reads the whole environment and discovers the keys under a prefix. Confect's provider resolves each config path to a single variable and never reports child keys, so that spread-out form fails with `Expected array at ["ORIGINS"]` or `Expected object at ["FEATURE_LIMITS"]`. It works in [Node actions](/server/node-actions), which use the default provider; avoid it if the handler might later move to the Convex runtime.
 
 ## Custom config provider
 
-The `ConvexConfigProvider` module is exported from `@confect/server` if you need to create a provider with custom options. It supports the same options as Effect's default [`ConfigProvider.fromEnv`](https://effect.website/docs/configuration/#loading-configuration-from-environment-variables).
+The `ConvexConfigProvider` module is exported from `@confect/server`. `ConvexConfigProvider.make()` takes no arguments and returns the provider Confect already installs for you.
 
 ```ts
 import { ConvexConfigProvider } from "@confect/server";
 
-const provider = ConvexConfigProvider.make({
-  pathDelim: "__",
-  seqDelim: ";",
-});
+const provider = ConvexConfigProvider.make();
 ```
 
-To use a custom provider in a function handler, pass it to `Effect.withConfigProvider`.
+It resolves each config path to a single environment variable, joining the path segments with `"_"`. `Config.nested(Config.string("KEY"), "API")` therefore reads `API_KEY`. An empty string counts as a missing value, so `Config.withDefault` and `Config.option` recover from it.
 
-```ts
+To override the provider for part of a handler, provide `ConfigProvider.ConfigProvider` as a service.
+
+```ts confect/settings.impl.ts
+import { ConvexConfigProvider, FunctionImpl } from "@confect/server";
+import * as Config from "effect/Config";
+import * as ConfigProvider from "effect/ConfigProvider";
+import * as Effect from "effect/Effect";
+
+import databaseSchema from "./_generated/schema";
+import settings from "./settings.spec";
+
 const getApiKey = FunctionImpl.make(databaseSchema, settings, "getApiKey", () =>
-  Config.string("API_KEY").pipe(
-    Effect.withConfigProvider(provider),
+  Config.nested(Config.string("KEY"), "API").pipe(
+    Effect.provideService(
+      ConfigProvider.ConfigProvider,
+      ConvexConfigProvider.make(),
+    ),
     Effect.orDie,
   ),
 );

@@ -25,6 +25,12 @@ since their pins move with their ranges.
   changes to get green, drop it from the batch and explain what it would take
   in the PR description (or in your final report, if the run ends up applying
   nothing and opens no PR).
+- Bumping `@effect/tsgo` also means updating
+  `lsp.effect-tsgo.settings.package_version` in `.zed/settings.json` to the same
+  version. That pins the copy of the binary Zed's `effect-tsgo` extension
+  downloads, and it lives outside any dependency map, so `pnpm outdated` will
+  never surface the drift. Left stale, the editor reports Effect diagnostics
+  from a different version than `tsc` does.
 - These upgrades are not user-facing: **no changeset**.
 
 ## Delivering

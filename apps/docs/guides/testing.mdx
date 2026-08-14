@@ -76,7 +76,7 @@ describe("notes", () => {
 
       assertEquals(notes.length, 1);
       assertEquals(notes[0]?.text, "Hello");
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 });
 ```
@@ -125,7 +125,7 @@ describe("notes", () => {
         .pipe(Effect.result);
 
       assertFailure(result, new NoteNotFound({ noteId: "missing" }));
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 });
 ```

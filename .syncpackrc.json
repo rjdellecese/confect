@@ -56,6 +56,13 @@
       "pinVersion": "workspace:*"
     },
     {
+      "label": "The bench harness deliberately lags TypeScript, see tools/bench-harness/README.md",
+      "packages": ["confect-bench-harness"],
+      "dependencies": ["typescript"],
+      "dependencyTypes": ["dev"],
+      "isIgnored": true
+    },
+    {
       "label": "devDependencies must use the same version across the workspace",
       "dependencyTypes": ["dev"]
     },

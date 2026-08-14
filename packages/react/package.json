@@ -7,18 +7,18 @@
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "devDependencies": {
-    "@effect/vitest": "4.0.0-beta.107",
+    "@effect/vitest": "4.0.0-rc.108",
     "@testing-library/react": "16.3.2",
     "@types/node": "26.2.0",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
     "convex": "1.43.0",
-    "effect": "4.0.0-beta.107",
+    "effect": "4.0.0-rc.108",
     "happy-dom": "20.11.2",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "tsdown": "0.22.14",
-    "typescript": "6.0.3",
+    "typescript": "7.0.2",
     "unrun": "0.3.1",
     "vite": "8.2.1",
     "vitest": "4.1.10"
@@ -57,7 +57,7 @@
   "peerDependencies": {
     "@confect/core": "workspace:^",
     "convex": "^1.36.0",
-    "effect": "^4.0.0-beta.107",
+    "effect": "^4.0.0-rc.108",
     "react": "^18.0.0 || ^19.0.0"
   },
   "repository": {

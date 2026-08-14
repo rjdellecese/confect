@@ -171,7 +171,7 @@ describe("FunctionPaths.make", () => {
       FunctionSpec.publicQuery({
         name: "deepQuery",
         args: () => Schema.Struct({}),
-        returns: () => Schema.Number,
+        returns: () => Schema.Finite,
       }),
     );
 
@@ -214,7 +214,7 @@ describe("FunctionPaths.make", () => {
       FunctionSpec.publicAction({
         name: "getNumber",
         args: () => Schema.Struct({}),
-        returns: () => Schema.Number,
+        returns: () => Schema.Finite,
       }),
     );
 
