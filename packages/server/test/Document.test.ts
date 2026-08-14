@@ -22,7 +22,7 @@ const decodeUncached = (
   tableSchema: typeof NoteSchema,
   convexDocument: typeof convexNote,
 ) =>
-  Schema.decodeUnknownSync(
+  Schema.decodeSync(
     SystemFields.extendWithSystemFields(tableName, tableSchema),
   )(convexDocument);
 
@@ -74,7 +74,7 @@ describe("Document.decode", () => {
       Document.decode(convexPost, "posts", SharedSchema),
     );
 
-    const expectedPost = Schema.decodeUnknownSync(
+    const expectedPost = Schema.decodeSync(
       SystemFields.extendWithSystemFields("posts", SharedSchema),
     )(convexPost);
 

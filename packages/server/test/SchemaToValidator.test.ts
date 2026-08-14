@@ -1,3 +1,4 @@
+// @effect-diagnostics schemaNumber:off
 import { describe, effect, expect, expectTypeOf, test } from "@effect/vitest";
 import { paginationOptsValidator } from "convex/server";
 import { v, type VBoolean, type VString, type VUnion } from "convex/values";

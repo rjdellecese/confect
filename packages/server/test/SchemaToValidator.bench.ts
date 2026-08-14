@@ -1,3 +1,4 @@
+// @effect-diagnostics schemaNumber:off
 import { bench } from "confect-bench-harness";
 import type { GenericId } from "@confect/core/GenericId";
 import * as Schema from "effect/Schema";

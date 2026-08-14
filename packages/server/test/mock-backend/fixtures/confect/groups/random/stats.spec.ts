@@ -5,6 +5,6 @@ export default GroupSpec.make().addFunction(
   FunctionSpec.publicQuery({
     name: "count",
     args: () => Schema.Struct({}),
-    returns: () => Schema.Number,
+    returns: () => Schema.Finite,
   }),
 );

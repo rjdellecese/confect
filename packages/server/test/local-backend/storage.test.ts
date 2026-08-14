@@ -44,9 +44,7 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
             }).then((response) => response.text()),
           );
           const { storageId } =
-            yield* Schema.decodeUnknownEffect(UploadResponse)(
-              uploadResponseBody,
-            );
+            yield* Schema.decodeEffect(UploadResponse)(uploadResponseBody);
 
           const blobUrl = yield* Effect.promise(() =>
             client.query(

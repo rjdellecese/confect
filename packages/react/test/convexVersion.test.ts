@@ -30,7 +30,7 @@ const paginatedQuery = Ref.make(
   "notes",
   FunctionSpec.publicPaginatedQuery({
     name: "listPaginated",
-    item: () => Schema.Struct({ value: Schema.Number }),
+    item: () => Schema.Struct({ value: Schema.Finite }),
   }),
 );
 

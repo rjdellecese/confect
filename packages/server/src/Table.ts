@@ -515,8 +515,8 @@ export const scheduledFunctionsTable = make(() =>
   Schema.Struct({
     name: Schema.String,
     args: Schema.Array(Schema.Any),
-    scheduledTime: Schema.Number,
-    completedTime: Schema.optionalKey(Schema.Number),
+    scheduledTime: Schema.Finite,
+    completedTime: Schema.optionalKey(Schema.Finite),
     state: Schema.Union([
       Schema.Struct({ kind: Schema.Literal("pending") }),
       Schema.Struct({ kind: Schema.Literal("inProgress") }),
@@ -533,7 +533,7 @@ export const scheduledFunctionsTable = make(() =>
 export const storageTable = make(() =>
   Schema.Struct({
     sha256: Schema.String,
-    size: Schema.Number,
+    size: Schema.Finite,
     contentType: Schema.optionalKey(Schema.String),
   }),
 )("_storage");

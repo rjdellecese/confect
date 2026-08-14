@@ -20,7 +20,7 @@ const generateUploadUrl = FunctionImpl.make(
     Effect.gen(function* () {
       const storageWriter = yield* StorageWriter;
 
-      const url = yield* storageWriter.generateUploadUrl();
+      const url = yield* storageWriter.generateUploadUrl;
 
       return url.toString();
     }),
