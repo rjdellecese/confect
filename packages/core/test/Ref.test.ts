@@ -95,7 +95,7 @@ describe("FunctionReference", () => {
     const _spec = FunctionSpec.publicQuery({
       name: "get",
       args: () => Schema.Struct({ id: Schema.String }),
-      returns: () => Schema.Array(Schema.Number),
+      returns: () => Schema.Array(Schema.Finite),
     });
     type Ref_ = Ref.FromFunctionSpec<typeof _spec>;
     expectTypeOf<Ref.Args<Ref_>>().toEqualTypeOf<{ readonly id: string }>();
@@ -441,13 +441,13 @@ describe("hasErrorSchema", () => {
 });
 
 describe("paginated queries", () => {
-  const paginatedDoc = Schema.Struct({ value: Schema.NumberFromString });
+  const paginatedDoc = Schema.Struct({ value: Schema.FiniteFromString });
 
   const paginatedRef = Ref.make(
     "notes",
     FunctionSpec.publicPaginatedQuery({
       name: "listPaginated",
-      args: () => Schema.Struct({ count: Schema.NumberFromString }),
+      args: () => Schema.Struct({ count: Schema.FiniteFromString }),
       item: () => paginatedDoc,
     }),
   );
@@ -472,7 +472,7 @@ describe("paginated queries", () => {
       name: "listPaginated",
       args: () =>
         Schema.Struct({
-          count: Schema.NumberFromString,
+          count: Schema.FiniteFromString,
           paginationOpts: PaginationOptions.PaginationOptions,
         }),
       returns: () => PaginationResult.PaginationResult(paginatedDoc),

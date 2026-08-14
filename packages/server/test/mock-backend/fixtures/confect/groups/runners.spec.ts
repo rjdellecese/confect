@@ -14,13 +14,13 @@ export default GroupSpec.make()
     FunctionSpec.publicAction({
       name: "getNumberViaRunner",
       args: () => Schema.Struct({}),
-      returns: () => Schema.Number,
+      returns: () => Schema.Finite,
     }),
   )
   .addFunction(
     FunctionSpec.publicAction({
       name: "countNotesViaRunner",
       args: () => Schema.Struct({}),
-      returns: () => Schema.Number,
+      returns: () => Schema.Finite,
     }),
   );

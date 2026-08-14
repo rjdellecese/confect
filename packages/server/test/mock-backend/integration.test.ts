@@ -38,7 +38,7 @@ describe("DatabaseReader", () => {
         .pipe(Effect.map((note) => note.text));
 
       assertEquals(retrievedText, text);
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 
   it.effect("collect", () =>
@@ -62,7 +62,7 @@ describe("DatabaseReader", () => {
       assertEquals(notes.length, 10);
       assertEquals(notes[0]?.text, "10");
       assertEquals(notes[9]?.text, "1");
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 });
 
@@ -83,7 +83,7 @@ describe("MutationRunner", () => {
       });
       expectTypeOf(note).toEqualTypeOf<(typeof notes.Doc)["Type"]>();
       assertEquals(note.text, text);
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 });
 
@@ -98,7 +98,7 @@ describe("ActionRunner", () => {
 
       expectTypeOf(result).toEqualTypeOf<number>();
       assertEquals(typeof result, "number");
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 });
 
@@ -116,7 +116,7 @@ describe("QueryRunner", () => {
 
       expectTypeOf(count).toEqualTypeOf<number>();
       assertEquals(count, 2);
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 });
 
@@ -148,7 +148,7 @@ describe("paginate", () => {
 
       assertEquals(result2.page.length, 2);
       assertEquals(result2.isDone, true);
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 
   it.effect("accepts the protocol fields Convex's client sends", () =>
@@ -174,7 +174,7 @@ describe("paginate", () => {
 
       assertEquals(result.page.length, 3);
       assertEquals(result.isDone, true);
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 
   it.effect("paginate with filter", () =>
@@ -205,7 +205,7 @@ describe("paginate", () => {
       assertEquals(texts.has("a"), true);
       assertEquals(texts.has("c"), true);
       assertEquals(texts.has("e"), true);
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 
   it.effect("paginate with filter returns empty when no matches", () =>
@@ -228,7 +228,7 @@ describe("paginate", () => {
 
       assertEquals(result.page.length, 0);
       assertEquals(result.isDone, true);
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 
   it.effect("paginate with filter paginates correctly", () =>
@@ -257,7 +257,7 @@ describe("paginate", () => {
       for (const note of page1.page) {
         assertEquals(note.tag, "even");
       }
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 
   it.effect("surfaces the declared typed error", () =>
@@ -284,7 +284,7 @@ describe("paginate", () => {
 
       assertEquals(result.page.length, 0);
       assertEquals(result.isDone, true);
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 });
 
@@ -325,7 +325,7 @@ describe("typed errors", () => {
         const error = expectFailure(result);
         expect(error).toBeInstanceOf(NotFound);
         expect((error as NotFound).id).toBe(missingId);
-      }).pipe(Effect.provide(TestConfect.layer())),
+      }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it.effect(
@@ -345,7 +345,7 @@ describe("typed errors", () => {
           const error = expectFailure(result);
           expect(error).toBeInstanceOf(NotFound);
           expect((error as NotFound).id).toBe(missingId);
-        }).pipe(Effect.provide(TestConfect.layer())),
+        }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it.effect(
@@ -365,7 +365,7 @@ describe("typed errors", () => {
           const error = expectFailure(result);
           expect(error).toBeInstanceOf(Forbidden);
           expect((error as Forbidden).reason).toBe("admin required");
-        }).pipe(Effect.provide(TestConfect.layer())),
+        }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it.effect("action handler typed error surfaces as the typed error", () =>
@@ -381,7 +381,7 @@ describe("typed errors", () => {
         const error = expectFailure(result);
         expect(error).toBeInstanceOf(Forbidden);
         expect((error as Forbidden).reason).toBe("no access");
-      }).pipe(Effect.provide(TestConfect.layer())),
+      }).pipe(Effect.provide(TestConfect.layer)),
     );
   });
 
@@ -397,7 +397,7 @@ describe("typed errors", () => {
         );
 
         expect(result).toStrictEqual({ _tag: "NotFound", id: missingId });
-      }).pipe(Effect.provide(TestConfect.layer())),
+      }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it.effect("QueryRunner Ok path: returns the decoded note text", () =>
@@ -418,7 +418,7 @@ describe("typed errors", () => {
         );
 
         expect(result).toStrictEqual({ _tag: "Ok", text: "hello" });
-      }).pipe(Effect.provide(TestConfect.layer())),
+      }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it.effect("MutationRunner decodes NotFound to tagged result", () =>
@@ -432,7 +432,7 @@ describe("typed errors", () => {
         );
 
         expect(result).toStrictEqual({ _tag: "NotFound", id: missingId });
-      }).pipe(Effect.provide(TestConfect.layer())),
+      }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it.effect("MutationRunner decodes Forbidden to tagged result", () =>
@@ -449,7 +449,7 @@ describe("typed errors", () => {
           _tag: "Forbidden",
           reason: "admin required",
         });
-      }).pipe(Effect.provide(TestConfect.layer())),
+      }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it.effect("MutationRunner Ok path: deletes the existing note", () =>
@@ -473,7 +473,7 @@ describe("typed errors", () => {
 
         const remaining = yield* c.query(refs.public.databaseReader.listNotes);
         assertEquals(remaining.length, 0);
-      }).pipe(Effect.provide(TestConfect.layer())),
+      }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it.effect("ActionRunner decodes NotFound to tagged result", () =>
@@ -486,7 +486,7 @@ describe("typed errors", () => {
         );
 
         expect(result).toStrictEqual({ _tag: "NotFound", id: "missing" });
-      }).pipe(Effect.provide(TestConfect.layer())),
+      }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it.effect("ActionRunner decodes Forbidden to tagged result", () =>
@@ -502,7 +502,7 @@ describe("typed errors", () => {
           _tag: "Forbidden",
           reason: "no access",
         });
-      }).pipe(Effect.provide(TestConfect.layer())),
+      }).pipe(Effect.provide(TestConfect.layer)),
     );
   });
 
@@ -532,7 +532,7 @@ describe("typed errors", () => {
           const forbidden = expectFailure(mutationResult);
           expect(forbidden).toBeInstanceOf(Forbidden);
           expect((forbidden as Forbidden).reason).toBe("admin required");
-        }).pipe(Effect.provide(TestConfect.layer())),
+        }).pipe(Effect.provide(TestConfect.layer)),
     );
   });
 
@@ -555,7 +555,7 @@ describe("typed errors", () => {
 
           const notes = yield* c.query(refs.public.databaseReader.listNotes);
           assertEquals(notes.length, 0);
-        }).pipe(Effect.provide(TestConfect.layer())),
+        }).pipe(Effect.provide(TestConfect.layer)),
     );
   });
 
@@ -573,7 +573,7 @@ describe("typed errors", () => {
           );
 
           expect(result).toStrictEqual({ _tag: "NotFound", id: missingId });
-        }).pipe(Effect.provide(TestConfect.layer())),
+        }).pipe(Effect.provide(TestConfect.layer)),
     );
   });
 
@@ -593,7 +593,7 @@ describe("typed errors", () => {
           const error = expectFailure(result);
           expect(error).toBeInstanceOf(NodeNotFound);
           expect((error as NodeNotFound).id).toBe("abc");
-        }).pipe(Effect.provide(TestConfect.layer())),
+        }).pipe(Effect.provide(TestConfect.layer)),
     );
   });
 });

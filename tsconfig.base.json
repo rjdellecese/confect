@@ -28,6 +28,7 @@
     "plugins": [
       {
         "name": "@effect/language-service",
+        "ignoreEffectSuggestionsInTscExitCode": false,
         "diagnosticSeverity": {
           "deterministicKeys": "error"
         }

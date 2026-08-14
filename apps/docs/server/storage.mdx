@@ -38,8 +38,10 @@ Effect.gen(function* () {
 
 #### Generate an upload URL
 
+`generateUploadUrl` is an `Effect`, not a method — yield it directly.
+
 ```ts
-storage.generateUploadUrl();
+yield * storage.generateUploadUrl;
 ```
 
 #### Delete a blob

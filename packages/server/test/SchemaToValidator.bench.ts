@@ -1,3 +1,7 @@
+// These benchmarks measure `Schema.Number`'s compilation to a Convex
+// validator, so the finiteness advice does not apply — and the committed
+// baselines below were measured against it.
+// @effect-diagnostics schemaNumber:off
 import { bench } from "confect-bench-harness";
 import type { GenericId } from "@confect/core/GenericId";
 import * as Schema from "effect/Schema";

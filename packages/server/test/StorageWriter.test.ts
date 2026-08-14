@@ -15,7 +15,7 @@ describe("StorageWriter", () => {
     Effect.gen(function* () {
       const storageWriter = yield* StorageWriter;
 
-      const url = yield* storageWriter.generateUploadUrl();
+      const url = yield* storageWriter.generateUploadUrl;
 
       expect(url).toBeInstanceOf(URL);
       expect(url.href).toBe(uploadUrl);

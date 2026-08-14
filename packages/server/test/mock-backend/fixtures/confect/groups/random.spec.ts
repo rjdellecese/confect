@@ -5,6 +5,6 @@ export default GroupSpec.make().addFunction(
   FunctionSpec.publicAction({
     name: "getNumber",
     args: () => Schema.Struct({}),
-    returns: () => Schema.Number,
+    returns: () => Schema.Finite,
   }),
 );

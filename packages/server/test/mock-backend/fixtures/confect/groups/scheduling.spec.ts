@@ -6,13 +6,13 @@ export default GroupSpec.make()
     FunctionSpec.publicQuery({
       name: "manyOpsQuery",
       args: () => Schema.Struct({}),
-      returns: () => Schema.Number,
+      returns: () => Schema.Finite,
     }),
   )
   .addFunction(
     FunctionSpec.publicMutation({
       name: "manyOpsMutation",
       args: () => Schema.Struct({}),
-      returns: () => Schema.Number,
+      returns: () => Schema.Finite,
     }),
   );

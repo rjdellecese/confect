@@ -1,3 +1,7 @@
+// `Schema.Number` is the subject here: these cases assert how it and the
+// other number APIs compile to Convex validators, so the finiteness advice
+// does not apply — swapping in `Schema.Finite` would test something else.
+// @effect-diagnostics schemaNumber:off
 import { describe, effect, expect, expectTypeOf, test } from "@effect/vitest";
 import { paginationOptsValidator } from "convex/server";
 import { v, type VBoolean, type VString, type VUnion } from "convex/values";
