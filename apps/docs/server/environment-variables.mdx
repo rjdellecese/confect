@@ -31,24 +31,27 @@ Combinators that read a single variable work as expected—`Config.string`, `Con
 Config.int("MAX_RESULTS").pipe(Config.withDefault(100));
 ```
 
-## Limitations
+## Collections
 
-Config operations that enumerate `process.env` are unsupported in the Convex runtime, and fail with an `Unsupported` config error. This covers every combinator that resolves a collection of keys rather than a single one:
+`Config.Array` and `Config.Record` read a collection from a single delimited variable, so they work in the Convex runtime like any other combinator. Pass them to `Config.schema` with the variable's name.
 
-- `Config.array`, `Config.chunk`, and `Config.hashSet`
-- `Config.hashMap`
-
-`Config.array` is the surprising member of that list, since it looks like a way to read one comma-separated variable. Effect resolves a sequence by first looking for indexed keys (`ALLOWED_ORIGINS[0]`, `ALLOWED_ORIGINS[1]`, and so on), which requires enumeration, so it fails before it can fall back to splitting a delimited value.
-
-To read a delimited variable, parse it yourself:
+Given `ALLOWED_ORIGINS="https://a.example,https://b.example"`:
 
 ```ts
-Config.string("ALLOWED_ORIGINS").pipe(
-  Config.map((origins) => origins.split(",").map((origin) => origin.trim())),
-);
+import * as Schema from "effect/Schema";
+
+Config.schema(Config.Array(Schema.String), "ALLOWED_ORIGINS");
+// ["https://a.example", "https://b.example"]
 ```
 
-These combinators do work in [Node actions](/server/node-actions), since Effect's default provider can enumerate `process.env` in the Node.js runtime. Avoid depending on that if the handler might later move to the Convex runtime.
+Given `FEATURE_LIMITS="uploads=10,exports=5"`:
+
+```ts
+Config.schema(Config.Record(Schema.String, Schema.String), "FEATURE_LIMITS");
+// { uploads: "10", exports: "5" }
+```
+
+Both default to `","` as the separator, and `Config.Record` to `"="` between key and value; pass `separator` or `keyValueSeparator` to change them. Neither trims whitespace around elements, so write the variable without spaces after the separator, or map over the result to trim.
 
 ## Custom config provider
 
