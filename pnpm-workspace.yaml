@@ -18,18 +18,19 @@ allowBuilds:
 
 # pnpm's supply-chain policy rejects a lockfile referencing anything published
 # within `minimumReleaseAge` (24 hours by default), which every same-day Effect
-# beta bump trips. These entries are the escape hatch pnpm writes itself; they
-# are safe to delete once the versions named here have aged past the cutoff.
+# prerelease bump trips. These entries are the escape hatch pnpm writes itself;
+# they are safe to delete once the versions named here have aged past the
+# cutoff.
 minimumReleaseAgeExclude:
-  - "@effect/platform-bun@4.0.0-beta.107"
-  - "@effect/platform-node-shared@4.0.0-beta.107"
-  - "@effect/platform-node@4.0.0-beta.107"
-  - "@effect/vitest@4.0.0-beta.107"
-  - effect@4.0.0-beta.107
+  - "@effect/platform-bun@4.0.0-rc.108"
+  - "@effect/platform-node-shared@4.0.0-rc.108"
+  - "@effect/platform-node@4.0.0-rc.108"
+  - "@effect/vitest@4.0.0-rc.108"
+  - effect@4.0.0-rc.108
 
 overrides:
   convex: 1.43.0
-  effect: 4.0.0-beta.107
+  effect: 4.0.0-rc.108
   react: 19.2.8
   react-dom: 19.2.8
 
