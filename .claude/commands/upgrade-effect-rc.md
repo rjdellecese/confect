@@ -38,9 +38,10 @@ resolving and goes quiet.
 - **Changes from `main`:** the prerelease line absorbs `main` continuously
   so the eventual `v10` → `main` merge stays small. Whether there's
   anything to absorb is a **content** question, never an ancestry one.
-  Sync PRs land with their merge commit intact (see the merge rules), so
-  ancestry converges from here on — but the line still carries a long
-  tail of earlier squash-merged syncs, and `git log origin/v10..origin/main`
+  Sync PRs land with their merge commit intact (the repo's merge settings
+  enforce it), so ancestry converges from here on — but the line still
+  carries a long tail of earlier squash-merged syncs, and
+  `git log origin/v10..origin/main`
   cannot tell the two regimes apart. It is therefore not the trigger:
   wrong for the squashed tail, and merely redundant once ancestry has
   caught up. Instead, every run performs the sync merge locally per the
@@ -83,21 +84,10 @@ targets `main`.
 
 - Perform the sync merge as a real `git merge` of `origin/main` — not a
   rebase or cherry-picks — so each conflict is resolved exactly once and
-  the resulting commit carries `main`'s tip as its second parent. Sync
-  PRs land with **"Create a merge commit"** — never squashed or rebased,
-  both of which discard that second parent, which is what has kept
-  `merge-base(v10, main)` pinned to an ancient commit and made every
-  sync PR's commit list open with ~20 commits it already absorbed.
-  Landing the merge intact moves the merge base up to `main`'s tip, so
-  the next sync PR lists only genuinely new work. State that requirement
-  in the sync PR body — you still never merge these yourself, and the
-  reviewer needs to know which button to press. Don't re-merge
-  afterwards to repair ancestry: the content is already correct, and a
-  second merge would only add noise.
-  Take `main`'s side of conflicts except where it would undo
-  the prerelease line: keep
-  `.changeset/pre.json`, `"baseBranch": "v10"` in `.changeset/config.json`,
-  the `v10` entries in the workflow branch lists, the `X.0.0-next.N`
+  the resulting commit carries `main`'s tip as its second parent.
+  Take `main`'s side of conflicts except where it would undo the
+  prerelease line: keep `.changeset/pre.json`, `"baseBranch": "v10"` in
+  `.changeset/config.json`, the `v10` entries in the workflow branch lists, the `X.0.0-next.N`
   versions and their changelog entries, and the Effect v4 pins (`main` is
   still on v3 — its Effect version bumps never apply here). Never
   hand-merge `pnpm-lock.yaml`; take either side and let `pnpm install`
@@ -112,8 +102,8 @@ targets `main`.
   e.g. "Sync with `main`: this prerelease line now includes all changes
   released in `@confect/*` 9.3.2–9.4.0 — see those versions' changelog
   entries." Derive the range mechanically from changelogs, not from
-  `git merge-base` (which is only as current as the last sync that was
-  merged with its merge commit intact): the versions absorbed are the
+  `git merge-base` (which the line's tail of squash-merged syncs still
+  holds back at an ancient commit): the versions absorbed are the
   stable `## 9.x.y` headings present in `origin/main`'s CHANGELOG for a
   `@confect/*` package but absent from `origin/v10`'s copy of the same
   file before the merge —
@@ -173,8 +163,7 @@ targets `main`.
    merge changes, summarized from the content diff against `origin/v10`
    rather than from `git log` (which still lists the commits absorbed by
    earlier squash-merged syncs), the stable version range absorbed
-   (matching the changeset), the requirement to merge with "Create a
-   merge commit" per the merge rules, and any migrations needed to keep
-   the merge green at the current pin. Bump PR body: old → new version,
+   (matching the changeset), and any migrations needed to keep the merge
+   green at the current pin. Bump PR body: old → new version,
    links to the release notes covered, and a summary of the source
    migrations made (or a note that none were needed).
