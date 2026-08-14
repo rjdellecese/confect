@@ -28,7 +28,7 @@ const getApiKey = FunctionImpl.make(databaseSchema, settings, "getApiKey", () =>
 Combinators that read a single variable work as expected—`Config.string`, `Config.number`, `Config.boolean`, `Config.withDefault`, `Config.option`, and `Config.nested`, among others.
 
 ```ts
-Config.integer("MAX_RESULTS").pipe(Config.withDefault(100));
+Config.int("MAX_RESULTS").pipe(Config.withDefault(100));
 ```
 
 ## Limitations
