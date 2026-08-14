@@ -138,39 +138,6 @@ const queryClock: Clock.Clock = {
     }),
 };
 
-/**
- * Convex bans `setTimeout` in queries and mutations ("Can't use setTimeout in
- * queries and mutations. Please consider using an action.") and their isolate
- * has no `setImmediate`. Effect's default `MixedScheduler` dispatches
- * cooperative fiber yields — injected once a fiber exhausts its op budget
- * (`MaxOpsBeforeYield`, 2048 operations) — through `setImmediate`, falling
- * back to `setTimeout(f, 0)`, so any handler that runs long enough to yield
- * would crash. Queries and mutations therefore run in `"sync"` execution
- * mode, whose dispatch is a cancellable `Promise.resolve().then` microtask.
- * Actions keep the default scheduler — timers are allowed there.
- *
- * `Promise.resolve().then` rather than `queueMicrotask` is the load-bearing
- * detail: the isolate has neither timer, and it has no `queueMicrotask`
- * either. Sync-mode dispatch called `queueMicrotask` bare until
- * effect#7178 (`4.0.0-rc.108`), which is why this was a hand-rolled
- * dispatcher before then — a query running under stock sync mode died with
- * `ReferenceError: queueMicrotask is not defined`. Node has
- * `queueMicrotask`, so only `schedulerIsolation.test.ts` on the local
- * backend can catch a regression here; the mock backend cannot. Don't lower
- * the `effect` peer floor below `rc.108` without restoring the hand-rolled
- * dispatcher.
- *
- * `executionMode` selects nothing but that dispatch function — the runtime
- * reads it nowhere else — so this is only a scheduler swap, not a change to
- * how handlers execute.
- *
- * Sharing one instance across invocations is safe: `MixedScheduler` holds
- * only immutable fields, and each fiber creates its own dispatcher via
- * `makeDispatcher()`.
- */
-const microtaskScheduler: EffectScheduler.Scheduler =
-  new EffectScheduler.MixedScheduler("sync");
-
 const queryFunction = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Args,
@@ -242,7 +209,7 @@ const queryFunction = <
     }).pipe(
       Effect.provideService(Clock.Clock, queryClock),
       RegisteredFunction.runHandlerPromise(error, {
-        scheduler: microtaskScheduler,
+        scheduler: new EffectScheduler.MixedScheduler("sync"),
       }),
     ),
 });
@@ -326,7 +293,7 @@ const mutationFunction = <
       );
     }).pipe(
       RegisteredFunction.runHandlerPromise(error, {
-        scheduler: microtaskScheduler,
+        scheduler: new EffectScheduler.MixedScheduler("sync"),
       }),
     ),
 });
