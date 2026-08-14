@@ -53,6 +53,8 @@ Config.schema(Config.Record(Schema.String, Schema.String), "FEATURE_LIMITS");
 
 Both default to `","` as the separator, and `Config.Record` to `"="` between key and value; pass `separator` or `keyValueSeparator` to change them. Neither trims whitespace around elements, so write the variable without spaces after the separator, or map over the result to trim.
 
+The collection has to live in one variable. Effect's default provider can also assemble one from several variables—`ORIGINS_0` and `ORIGINS_1` for an array, `FEATURE_LIMITS_UPLOADS` for a record—because it reads the whole environment and discovers the keys under a prefix. Confect's provider resolves each config path to a single variable and never reports child keys, so that spread-out form fails with `Expected array at ["ORIGINS"]` or `Expected object at ["FEATURE_LIMITS"]`. It works in [Node actions](/server/node-actions), which use the default provider; avoid it if the handler might later move to the Convex runtime.
+
 ## Custom config provider
 
 The `ConvexConfigProvider` module is exported from `@confect/server`. `ConvexConfigProvider.make()` takes no arguments and returns the provider Confect already installs for you.
