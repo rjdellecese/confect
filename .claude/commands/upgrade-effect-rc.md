@@ -7,9 +7,10 @@ current with `main`, and open PRs for review against `v10`. Never merge them
 yourself. (The managing-prereleases skill explains how the prerelease line
 itself works.)
 
-Effect v4 left beta for release candidates in August 2026; this file is still
-named `upgrade-effect-beta` only so the scheduled routine that invokes
-`/upgrade-effect-beta` keeps resolving. Rename both together or neither.
+A scheduled routine invokes this command by name, and the name is resolved
+against this directory when the routine fires. Renaming this file therefore
+means updating that schedule in the same pass — otherwise the routine stops
+resolving and goes quiet.
 
 ## Scope
 
