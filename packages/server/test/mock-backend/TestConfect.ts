@@ -15,9 +15,6 @@ import confectSchema from "./fixtures/confect/_generated/schema";
 
 export const TestConfect = TestConfect_.TestConfect<typeof confectSchema>();
 
-// `TestConfect_.layer(…)` returns a thunk over `Layer.sync`, which is already
-// lazy — nothing is constructed until the layer is built — so the thunk is
-// called here and this module exports the `Layer` itself.
 export const layer = TestConfect_.layer(
   confectSchema,
   convexSchema,
@@ -26,4 +23,4 @@ export const layer = TestConfect_.layer(
     "./fixtures/convex/**/*.js",
     "!./fixtures/convex/**/*.*.*",
   ]),
-)();
+);
