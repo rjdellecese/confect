@@ -14,10 +14,10 @@ import * as Schema from "effect/Schema";
  * `paginate`.
  */
 export const PaginationOptions = Schema.Struct({
-  numItems: Schema.Number,
+  numItems: Schema.Finite,
   cursor: Schema.Union([Schema.String, Schema.Null]),
   endCursor: Schema.optionalKey(Schema.Union([Schema.String, Schema.Null])),
-  id: Schema.optionalKey(Schema.Number),
-  maximumRowsRead: Schema.optionalKey(Schema.Number),
-  maximumBytesRead: Schema.optionalKey(Schema.Number),
+  id: Schema.optionalKey(Schema.Finite),
+  maximumRowsRead: Schema.optionalKey(Schema.Finite),
+  maximumBytesRead: Schema.optionalKey(Schema.Finite),
 });
