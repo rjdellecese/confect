@@ -20,7 +20,7 @@ allowBuilds:
 # within `minimumReleaseAge` (24 hours by default), which every same-day Effect
 # prerelease bump trips. These entries are the escape hatch pnpm writes itself;
 # they are safe to delete once the versions named here have aged past the
-# cutoff — as `4.0.0-rc.108` already has.
+# cutoff.
 minimumReleaseAgeExclude:
   - "@effect/platform-bun@4.0.0-rc.108"
   - "@effect/platform-node-shared@4.0.0-rc.108"

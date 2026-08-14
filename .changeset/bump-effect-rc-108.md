@@ -24,3 +24,5 @@ import type { SchemaError } from "effect/Schema";
 ```
 
 Also worth knowing if you serve an `HttpApi`: a query parameter declared as an array now decodes correctly when a request supplies exactly one value for it.
+
+One internal change rides along. Queries and mutations that run long enough to trigger a cooperative fiber yield now take that yield from Effect's own scheduler, which `rc.108` made usable inside Convex's isolate for the first time. The underlying microtask primitive is identical, so behavior should not change — but it is the thing to look at if a long-running query or mutation regresses on this release.
