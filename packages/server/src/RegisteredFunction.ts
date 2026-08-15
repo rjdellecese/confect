@@ -167,7 +167,10 @@ export const applyMiddleware = <A, E, R>(
 ): Effect.Effect<A, any, R> => {
   let wrapped: Effect.Effect<any, any, any> = effect;
   for (let index = middlewares.length - 1; index >= 0; index--) {
-    wrapped = middlewares[index]!.impl(wrapped as any, options) as any;
+    wrapped = middlewares[index]!.middlewareImpl(
+      wrapped as any,
+      options,
+    ) as any;
   }
   return wrapped as Effect.Effect<A, any, R>;
 };
@@ -185,7 +188,7 @@ export const combineErrorSchemas = (
   const schemas = [
     ...(error !== undefined ? [error] : []),
     ...MiddlewareSpec.errorSchemas(
-      middlewares.map(({ middleware }) => middleware),
+      middlewares.map(({ middlewareSpec }) => middlewareSpec),
     ),
   ];
   return schemas.length === 0

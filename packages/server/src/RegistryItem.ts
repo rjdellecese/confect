@@ -20,22 +20,15 @@ export interface RegistryItem<
 > {
   readonly [TypeId]: TypeId;
   readonly functionSpec: FunctionSpec_;
-  readonly handler: Handler.Handler<DatabaseSchema_, FunctionSpec_>;
-  /**
-   * The middleware covering this function (its group's, in attachment
-   * order), as spec classes. Implementations are registered separately (by
-   * `MiddlewareImpl.make` and friends) and resolved against these at
-   * `RegisteredFunctions.buildForGroup` time. Always empty for
-   * Convex-provenance functions, which middleware never covers.
-   */
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyService>;
+  readonly handler: Handler.Handler<DatabaseSchema_, FunctionSpec_>;
 }
 
 export interface AnyWithProps {
   readonly [TypeId]: TypeId;
   readonly functionSpec: FunctionSpec.AnyWithProps;
-  readonly handler: Handler.Any;
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyService>;
+  readonly handler: Handler.Any;
 }
 
 /**
@@ -43,8 +36,8 @@ export interface AnyWithProps {
  * the resolved form `buildForGroup` hands to `makeRegisteredFunction`.
  */
 export interface ResolvedMiddleware {
-  readonly middleware: MiddlewareSpec.AnyService;
-  readonly impl: MiddlewareSpec.AnyMiddleware;
+  readonly middlewareSpec: MiddlewareSpec.AnyService;
+  readonly middlewareImpl: MiddlewareSpec.AnyMiddleware;
 }
 
 export const make = ({

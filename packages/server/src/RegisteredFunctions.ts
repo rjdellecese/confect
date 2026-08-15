@@ -141,22 +141,22 @@ const resolveMiddlewares = (
   registryItem: RegistryItem.AnyWithProps,
   middlewareItems: ReadonlyMap<string, MiddlewareImpl.RegistryItem>,
 ): ReadonlyArray<RegistryItem.ResolvedMiddleware> =>
-  registryItem.middlewareSpecs.map((middleware) => {
-    const registered = middlewareItems.get(middleware.key);
+  registryItem.middlewareSpecs.map((middlewareSpec) => {
+    const registered = middlewareItems.get(middlewareSpec.key);
     if (registered === undefined) {
       throw new Error(
-        `Middleware "${middleware.key}" is attached to this group's spec, but no implementation was provided — pipe the group's impl through \`Layer.provide(MiddlewareImpl.make(...))\` (or \`makeByFunctionType\`/\`provides\`).`,
+        `Middleware "${middlewareSpec.key}" is attached to this group's spec, but no implementation was provided — pipe the group's impl through \`Layer.provide(MiddlewareImpl.make(...))\` (or \`makeByFunctionType\`/\`provides\`).`,
       );
     }
 
     const functionType =
       registryItem.functionSpec.runtimeAndFunctionType.functionType;
-    const impl = registered.impls[functionType];
-    if (impl === undefined) {
+    const middlewareImpl = registered.impls[functionType];
+    if (middlewareImpl === undefined) {
       throw new Error(
-        `Middleware "${middleware.key}" has no implementation for function type "${functionType}", the type of function "${registryItem.functionSpec.name}". Declare the function type in the middleware's \`functionTypes\` and cover it in \`MiddlewareImpl.makeByFunctionType\`.`,
+        `Middleware "${middlewareSpec.key}" has no implementation for function type "${functionType}", the type of function "${registryItem.functionSpec.name}". Declare the function type in the middleware's \`functionTypes\` and cover it in \`MiddlewareImpl.makeByFunctionType\`.`,
       );
     }
 
-    return { middleware, impl };
+    return { middlewareSpec, middlewareImpl };
   });
