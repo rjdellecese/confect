@@ -132,7 +132,7 @@ export type FunctionTypes<Middleware_ extends AnyService> =
 /**
  * Declare a middleware's client-safe interface: its identifying key, the
  * service it provides to downstream handlers, the error schema its failures
- * encode through, and the function functionTypes it may attach to.
+ * encode through, and the function types it may attach to.
  *
  * ```ts
  * class RequireUser extends MiddlewareSpec.Service<RequireUser, {

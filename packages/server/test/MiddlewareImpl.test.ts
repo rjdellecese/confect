@@ -143,7 +143,7 @@ describe("implementation service bounds", () => {
     typeof databaseSchema
   >;
 
-  type AllKinds = MiddlewareImpl.CommonServices<
+  type AllFunctionTypes = MiddlewareImpl.CommonServices<
     typeof databaseSchema,
     "query" | "mutation" | "action"
   >;
@@ -156,9 +156,9 @@ describe("implementation service bounds", () => {
     "mutation"
   >;
 
-  it("bounds all-functionTypes middleware to the auth/storage/runQuery intersection", () => {
-    expectTypeOf<Extract<AllKinds, ReaderService>>().toBeNever();
-    expectTypeOf<Extract<AllKinds, WriterService>>().toBeNever();
+  it("bounds all-function-types middleware to the auth/storage/runQuery intersection", () => {
+    expectTypeOf<Extract<AllFunctionTypes, ReaderService>>().toBeNever();
+    expectTypeOf<Extract<AllFunctionTypes, WriterService>>().toBeNever();
   });
 
   it("allows the database reader for query+mutation middleware, but never the writer", () => {
