@@ -6,6 +6,7 @@ import { assert, expect, layer } from "@effect/vitest";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
+import * as String from "effect/String";
 import * as Layer from "effect/Layer";
 import type { CodegenError } from "@confect/cli/CodegenError";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
@@ -310,28 +311,42 @@ layer(LeafModuleLayer)("validateSpec", (it) => {
   );
 });
 
+// Discovery returns paths joined with the host separator, so these compare by
+// path segment rather than against POSIX literals — a substring check for
+// "middleware/" is vacuously true on Windows and asserts nothing there.
 layer(LeafModuleLayer)("discovery", (it) => {
   it.effect("excludes `middleware/` from leaf spec discovery", () =>
     Effect.gen(function* () {
+      const path = yield* Path.Path;
       const specFiles = yield* discoverLeafSpecFiles;
 
       // The fixtures do have middleware specs there — they must not be
       // discovered as groups.
       expect(
-        Array.some(specFiles, (file) => file.includes("middleware/")),
-      ).toBe(false);
-      expect(specFiles).toContain("groups/middleware.spec.ts");
+        Array.filter(specFiles, (file) =>
+          Array.contains(String.split(file, path.sep), "middleware"),
+        ),
+      ).toStrictEqual([]);
+      // A group whose *name* starts with "middleware" is still discovered.
+      expect(specFiles).toContain(
+        Array.join(["groups", "middleware.spec.ts"], path.sep),
+      );
     }),
   );
 
   it.effect("excludes `middleware/` from leaf impl discovery", () =>
     Effect.gen(function* () {
+      const path = yield* Path.Path;
       const implFiles = yield* discoverLeafImplFiles;
 
       expect(
-        Array.some(implFiles, (file) => file.includes("middleware/")),
-      ).toBe(false);
-      expect(implFiles).toContain("groups/middleware.impl.ts");
+        Array.filter(implFiles, (file) =>
+          Array.contains(String.split(file, path.sep), "middleware"),
+        ),
+      ).toStrictEqual([]);
+      expect(implFiles).toContain(
+        Array.join(["groups", "middleware.impl.ts"], path.sep),
+      );
     }),
   );
 });
