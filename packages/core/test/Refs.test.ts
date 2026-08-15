@@ -257,7 +257,7 @@ describe("make", () => {
     type ConvexQueryArgs = { cursor: string };
     type ConvexQueryReturns = string[];
 
-    const ConfectQueryArgs = Schema.Struct({ limit: Schema.Number });
+    const ConfectQueryArgs = Schema.Struct({ limit: Schema.Finite });
     type ConfectQueryArgs = typeof ConfectQueryArgs.Type;
 
     const ConfectQueryReturns = Schema.Array(Schema.String);

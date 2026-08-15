@@ -1,5 +1,67 @@
 # @confect/cli
 
+## 10.0.0-next.14
+
+### Patch Changes
+
+- 9d51bd3: Raise the required `effect` peer version to `^4.0.0-rc.108` (from `^4.0.0-beta.107`), and `@confect/server`'s optional `@effect/platform-node` peer version likewise. Effect v4 has left beta for release candidates, so `effect@rc` is now the tag to install alongside `@confect/*`.
+
+  No Confect API changed, and no call-site edits are needed for Confect itself. One Effect change can reach your code: the standalone `effect/SchemaError` module is gone, and `SchemaError` is now exported from `Schema`. Confect still fails decoding with the same error, so this only matters if you name the type when handling it.
+
+  Before:
+
+  ```ts
+  import type { SchemaError } from "effect/SchemaError";
+  ```
+
+  After:
+
+  ```ts
+  import type { SchemaError } from "effect/Schema";
+  ```
+
+  Also worth knowing if you serve an `HttpApi`: a query parameter declared as an array now decodes correctly when a request supplies exactly one value for it.
+
+  One internal change rides along. Queries and mutations that run long enough to trigger a cooperative fiber yield now take that yield from Effect's own scheduler, which `rc.108` made usable inside Convex's isolate for the first time. The underlying microtask primitive is identical, so behavior should not change — but it is the thing to look at if a long-running query or mutation regresses on this release.
+
+- a4054ab: The published type declarations are now emitted by TypeScript 7 rather than TypeScript 6. No API changed, but the declaration text differs in places, so an inferred type printed in your editor or in a type error may read slightly differently than before.
+
+## 10.0.0-next.13
+
+### Patch Changes
+
+- 5a73763: Raise the required `effect` peer version to `^4.0.0-beta.107` (from `^4.0.0-beta.106`), and `@confect/server`'s optional `@effect/platform-node` peer version likewise.
+
+  `beta.107` is a patch-only Effect release, so no Confect API changes and no call-site edits are needed — upgrade `effect` alongside `@confect/*` and everything you have written keeps compiling. Your table, argument, and returns schemas still produce the same Convex validators.
+
+  Two Effect fixes are worth knowing about if they touch your code. HTTP actions written with `HttpRouter` now collect uploaded file contents far faster on large multipart bodies, and a file part whose stream is cut short — because a parser limit was exceeded or the request body ended early — now fails instead of hanging. Separately, `Duration` values that are equal now hash equally, so a `Duration` used as a `HashMap` key or a `HashSet` member is found regardless of which constructor built it.
+
+## 10.0.0-next.12
+
+### Patch Changes
+
+- 661ee9b: Raise the required `effect` peer version to `^4.0.0-beta.106` (from `^4.0.0-beta.105`), and `@confect/server`'s optional `@effect/platform-node` peer version likewise.
+
+  `beta.106` is a patch-only Effect release. Nothing in Confect's own API changes, and your table, argument, and returns schemas still compile to the same Convex validators.
+
+  One Effect change needs a call-site edit if you derive property-test generators from those schemas: `Schema.toArbitrary` now returns a factory that takes the `fast-check` module instead of returning an arbitrary directly, and `Schema.toArbitraryLazy` and the `{ report: true }` option are gone.
+
+  **Before:**
+
+  ```ts
+  const NoteArbitrary = Schema.toArbitrary(Note);
+  ```
+
+  **After:**
+
+  ```ts
+  import * as FastCheck from "fast-check";
+
+  const NoteArbitrary = Schema.toArbitrary(Note)(FastCheck);
+  ```
+
+  HTTP actions written against `HttpRouter` also inherit Effect's stricter multipart handling: a request that exceeds the configured part count, part size, or field size limits now stops being parsed at the limit rather than being read to completion first.
+
 ## 10.0.0-next.11
 
 ### Patch Changes

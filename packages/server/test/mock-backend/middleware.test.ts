@@ -61,7 +61,7 @@ describe("middleware", () => {
         const name = yield* c.query(refs.public.groups.middleware.viewerName);
 
         expect(name).toBe("ada");
-      }).pipe(Effect.provide(TestConfect.layer())),
+      }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it.effect("provides a service to a mutation handler", () =>
@@ -74,7 +74,7 @@ describe("middleware", () => {
         );
 
         expect(name).toBe("grace");
-      }).pipe(Effect.provide(TestConfect.layer())),
+      }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it.effect(
@@ -89,7 +89,7 @@ describe("middleware", () => {
           );
 
           expect(name).toBe("alan");
-        }).pipe(Effect.provide(TestConfect.layer())),
+        }).pipe(Effect.provide(TestConfect.layer)),
     );
   });
 
@@ -105,7 +105,7 @@ describe("middleware", () => {
           );
 
           expect(expectFailure(result)).toBeInstanceOf(NoViewer);
-        }).pipe(Effect.provide(TestConfect.layer())),
+        }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it.effect(
@@ -119,7 +119,7 @@ describe("middleware", () => {
           );
 
           expect(expectFailure(result)).toBeInstanceOf(NoViewer);
-        }).pipe(Effect.provide(TestConfect.layer())),
+        }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it.effect(
@@ -140,7 +140,7 @@ describe("middleware", () => {
             c.query(refs.public.groups.middleware.firstNoteForViewer),
           );
           expect(expectFailure(noNotes)).toBeInstanceOf(NoNotes);
-        }).pipe(Effect.provide(TestConfect.layer())),
+        }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it("types a covered function's ref error as the union of its own and its middleware's errors", () => {
@@ -166,7 +166,7 @@ describe("middleware", () => {
           );
 
           expect(shouted).toBe("ADA");
-        }).pipe(Effect.provide(TestConfect.layer())),
+        }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it.effect("fails with its own typed error using the required service", () =>
@@ -179,7 +179,7 @@ describe("middleware", () => {
         );
 
         expect(expectFailure(result)).toBeInstanceOf(NameTooShort);
-      }).pipe(Effect.provide(TestConfect.layer())),
+      }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it.effect("the providing middleware's short-circuit still runs first", () =>
@@ -191,7 +191,7 @@ describe("middleware", () => {
         );
 
         expect(expectFailure(result)).toBeInstanceOf(NoViewer);
-      }).pipe(Effect.provide(TestConfect.layer())),
+      }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it("joins both middlewares' errors in the covered function's ref union", () => {
@@ -220,7 +220,7 @@ describe("middleware", () => {
             "function",
             "handler",
           ]);
-        }).pipe(Effect.provide(TestConfect.layer())),
+        }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it.effect(
@@ -242,7 +242,7 @@ describe("middleware", () => {
 
           const texts = yield* listNoteTexts;
           expect(texts).toStrictEqual([]);
-        }).pipe(Effect.provide(TestConfect.layer())),
+        }).pipe(Effect.provide(TestConfect.layer)),
     );
   });
 
@@ -267,7 +267,7 @@ describe("middleware", () => {
           // the markers they inserted are rolled back along with it.
           const texts = yield* listNoteTexts;
           expect(texts).toStrictEqual([]);
-        }).pipe(Effect.provide(TestConfect.layer())),
+        }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it.effect("does not cover the group's other functions", () =>
@@ -278,7 +278,7 @@ describe("middleware", () => {
 
         const texts = yield* listNoteTexts;
         expect(texts).toStrictEqual(["first", "second", "handler"]);
-      }).pipe(Effect.provide(TestConfect.layer())),
+      }).pipe(Effect.provide(TestConfect.layer)),
     );
 
     it("adds its error to the covered function's ref union only", () => {

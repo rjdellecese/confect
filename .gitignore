@@ -1,6 +1,5 @@
 .attest/
 .env.local
-.eslintcache
 .pnpm-store/
 .tsup
 coverage/

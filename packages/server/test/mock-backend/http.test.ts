@@ -34,7 +34,7 @@ describe("HttpRouter", () => {
         }>;
         assertEquals(body.length, 1);
         assertEquals(body[0]?.text, text);
-      }).pipe(Effect.provide(TestConfect.layer())),
+      }).pipe(Effect.provide(TestConfect.layer)),
   );
 
   it.effect("serves a second HttpApi merged onto the same router", () =>
@@ -44,7 +44,7 @@ describe("HttpRouter", () => {
       const response = yield* c.fetch("/meta/ping");
       assertEquals(response.status, 200);
       assertEquals(yield* Effect.promise(() => response.json()), "pong");
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 
   it.effect("serves a plain HttpRouter.add route", () =>
@@ -54,7 +54,7 @@ describe("HttpRouter", () => {
       const response = yield* c.fetch("/health");
       assertEquals(response.status, 200);
       assertEquals(yield* Effect.promise(() => response.text()), "OK");
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 
   it.effect("global middleware modifies responses", () =>
@@ -63,7 +63,7 @@ describe("HttpRouter", () => {
 
       const response = yield* c.fetch("/health");
       assertEquals(response.headers.get("x-confect-middleware"), "applied");
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 
   it.effect("serves the Scalar docs page", () =>
@@ -73,7 +73,7 @@ describe("HttpRouter", () => {
       const response = yield* c.fetch("/api/docs");
       assertEquals(response.status, 200);
       expect(response.headers.get("content-type")).toContain("text/html");
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 
   it.effect(
@@ -87,7 +87,7 @@ describe("HttpRouter", () => {
         assertEquals(yield* Effect.promise(() => response.text()), "native");
         // The Effect router (and so its global middleware) never ran.
         assertEquals(response.headers.get("x-confect-middleware"), null);
-      }).pipe(Effect.provide(TestConfect.layer())),
+      }).pipe(Effect.provide(TestConfect.layer)),
   );
 
   it.effect("unmatched paths get the Effect router's 404", () =>
@@ -96,7 +96,7 @@ describe("HttpRouter", () => {
 
       const response = yield* c.fetch("/no-such-route");
       assertEquals(response.status, 404);
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 });
 
@@ -106,8 +106,8 @@ describe("HttpRouter.make type-level guarantees", () => {
     // services; without Layer.provide(NotesApiLive) the layer does not satisfy
     // Routes.
     const _missingGroupLayerIsRejected = () =>
-      // @effect-diagnostics-next-line effect/missingLayerContext:off
       // @ts-expect-error
+      // @effect-diagnostics-next-line missingLayerContext:off
       ConfectHttpRouter.make(HttpApiBuilder.layer(NotesApi));
 
     expect(_missingGroupLayerIsRejected).toBeDefined();

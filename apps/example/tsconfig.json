@@ -1,6 +1,11 @@
 {
   "compilerOptions": {
-    "plugins": [{ "name": "@effect/language-service" }],
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        "ignoreEffectSuggestionsInTscExitCode": false
+      }
+    ],
     "composite": true,
     "lib": ["ESNext", "DOM"],
     "types": ["node"],

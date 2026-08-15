@@ -1,4 +1,4 @@
-import { bench } from "@ark/attest";
+import { bench } from "confect-bench-harness";
 import type { GenericId } from "@confect/core/GenericId";
 import * as SystemFields from "@confect/core/SystemFields";
 import * as Schema from "effect/Schema";
@@ -31,14 +31,14 @@ const extendedSchema = SystemFields.extendWithSystemFields(
 
 const cachedDecoder = Schema.decodeUnknownSync(extendedSchema);
 
-const decodedNote = Schema.decodeUnknownSync(extendedSchema)(convexNote);
+const decodedNote = Schema.decodeSync(extendedSchema)(convexNote);
 
 const cachedEncoder = Schema.encodeSync(NoteSchema);
 
 bench("decode document (recompile decoder each call)", () => {
-  Schema.decodeUnknownSync(
-    SystemFields.extendWithSystemFields(tableName, NoteSchema),
-  )(convexNote);
+  Schema.decodeSync(SystemFields.extendWithSystemFields(tableName, NoteSchema))(
+    convexNote,
+  );
 }).median([21.71, "us"]);
 
 bench("decode document (cached decoder)", () => {

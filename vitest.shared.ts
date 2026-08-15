@@ -31,7 +31,7 @@ const discoverPackageAliases = Effect.gen(function* () {
         return [];
       }
 
-      const { name } = yield* Schema.decodeUnknownEffect(PackageManifest)(
+      const { name } = yield* Schema.decodeEffect(PackageManifest)(
         yield* fs.readFileString(path.join(packagesDir, entry, "package.json")),
       );
 

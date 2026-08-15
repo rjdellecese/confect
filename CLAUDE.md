@@ -16,6 +16,14 @@ Confect is a library that integrates Effect with the Convex backend platform. It
 - `apps/example` - Vite + React example app demonstrating Confect usage
 - `apps/docs` - Documentation site powered by Mintlify
 
+## Tools
+
+- `tools/bench-harness` - Private package that hands `@ark/attest` the TypeScript version the type benchmarks need; see its README
+
+## TypeScript
+
+The workspace is on TypeScript 7, so `tsc` is a native binary and the `typescript` package no longer exports a JavaScript compiler API — anything that needs to _drive_ the compiler rather than _run_ it has to either spawn `tsc` or use `typescript/unstable/*`. Effect's language service comes from `@effect/tsgo` (not `@effect/language-service`, which supports only TypeScript 5 and 6): the root `prepare` script runs `effect-tsgo patch --typescript`, which swaps in a `tsc` that also reports Effect diagnostics, so the `deterministicKeys: "error"` severity in `tsconfig.base.json` fails a build and not just an editor.
+
 ## Build System
 
 Packages are built with tsdown (JavaScript output) plus TypeScript project references: each package has a composite `tsconfig.src.json`, and `tsc -b` typechecks the graph in dependency order and emits the `.d.ts` declarations (tsdown is configured with `dts: false`). The exception is `@confect/cli`, which ships only a binary: it has no `tsconfig.src.json` and emits no declarations; its build is tsdown-only and its sources are typechecked by the root `tsconfig.json`.

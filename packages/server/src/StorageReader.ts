@@ -19,7 +19,7 @@ const make = (storageReader: ConvexStorageReader) => ({
             onSome: (doc) =>
               pipe(
                 doc,
-                Schema.decodeUnknownEffect(Schema.URLFromString),
+                Schema.decodeEffect(Schema.URLFromString),
                 Effect.orDie,
               ),
           }),

@@ -24,7 +24,7 @@ const viewerFromDatabase = Effect.gen(function* () {
     .pipe(Effect.orDie);
 
   if (Option.isNone(user)) {
-    return yield* Effect.fail(new NoViewer());
+    return yield* new NoViewer();
   }
 
   return { username: user.value.username };
@@ -38,7 +38,7 @@ const viewerViaRunQuery = Effect.gen(function* () {
   ).pipe(Effect.catchTag("SchemaError", (error) => Effect.die(error)));
 
   if (username === null) {
-    return yield* Effect.fail(new NoViewer());
+    return yield* new NoViewer();
   }
 
   return { username };
@@ -117,7 +117,7 @@ const firstNoteForViewer = FunctionImpl.make(
         .pipe(Effect.orDie);
 
       if (Option.isNone(note)) {
-        return yield* Effect.fail(new NoNotes());
+        return yield* new NoNotes();
       }
 
       return `${viewer.username}: ${note.value.text}`;

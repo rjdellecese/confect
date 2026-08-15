@@ -8,16 +8,13 @@ import * as Schema from "effect/Schema";
 import { BlobNotFoundError } from "./BlobNotFoundError";
 
 const make = (storageWriter: ConvexStorageWriter) => ({
-  generateUploadUrl: () =>
-    Effect.promise(() => storageWriter.generateUploadUrl()).pipe(
-      Effect.andThen((url) =>
-        pipe(
-          url,
-          Schema.decodeUnknownEffect(Schema.URLFromString),
-          Effect.orDie,
-        ),
-      ),
+  generateUploadUrl: Effect.promise(() =>
+    storageWriter.generateUploadUrl(),
+  ).pipe(
+    Effect.andThen((url) =>
+      pipe(url, Schema.decodeEffect(Schema.URLFromString), Effect.orDie),
     ),
+  ),
   delete: (storageId: GenericId<"_storage">) =>
     Effect.tryPromise({
       try: () => storageWriter.delete(storageId),

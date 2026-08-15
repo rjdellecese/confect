@@ -403,13 +403,13 @@ describe("useAction", () => {
 });
 
 describe("usePaginatedQuery", () => {
-  const paginatedDoc = Schema.Struct({ value: Schema.NumberFromString });
+  const paginatedDoc = Schema.Struct({ value: Schema.FiniteFromString });
 
   const paginatedQuery = Ref.make(
     "notes",
     FunctionSpec.publicPaginatedQuery({
       name: "listPaginated",
-      args: () => Schema.Struct({ count: Schema.NumberFromString }),
+      args: () => Schema.Struct({ count: Schema.FiniteFromString }),
       item: () => paginatedDoc,
     }),
   );

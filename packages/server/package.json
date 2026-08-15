@@ -1,26 +1,26 @@
 {
   "name": "@confect/server",
   "description": "Backend bindings to the Convex platform",
-  "version": "10.0.0-next.11",
+  "version": "10.0.0-next.14",
   "author": "RJ Dellecese",
   "bugs": {
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "devDependencies": {
-    "@ark/attest": "0.56.3",
-    "@effect/platform-node": "4.0.0-beta.106",
-    "@effect/vitest": "4.0.0-beta.106",
+    "@effect/platform-node": "4.0.0-rc.108",
+    "@effect/vitest": "4.0.0-rc.108",
     "@swc/jest": "0.2.39",
-    "@types/node": "26.1.2",
+    "@types/node": "26.2.0",
     "@vitest/coverage-v8": "4.1.10",
-    "convex-test": "0.0.54",
+    "confect-bench-harness": "workspace:*",
+    "convex-test": "0.0.55",
     "dotenv": "17.4.2",
-    "effect": "4.0.0-beta.106",
+    "effect": "4.0.0-rc.108",
     "tsdown": "0.22.14",
-    "tsx": "4.23.8",
-    "typescript": "6.0.3",
+    "tsx": "4.23.11",
+    "typescript": "7.0.2",
     "unrun": "0.3.1",
-    "vite": "8.2.0",
+    "vite": "8.2.1",
     "vite-tsconfig-paths": "6.1.1",
     "vitest": "4.1.10"
   },
@@ -61,9 +61,9 @@
   "module": "./dist/index.js",
   "peerDependencies": {
     "@confect/core": "workspace:^",
-    "@effect/platform-node": "^4.0.0-beta.106",
+    "@effect/platform-node": "^4.0.0-rc.108",
     "convex": "^1.32.0",
-    "effect": "^4.0.0-beta.106"
+    "effect": "^4.0.0-rc.108"
   },
   "peerDependenciesMeta": {
     "@effect/platform-node": {

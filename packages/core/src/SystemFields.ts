@@ -18,7 +18,7 @@ import * as GenericId from "./GenericId";
 export const SystemFields = <TableName extends string>(tableName: TableName) =>
   Schema.Struct({
     _id: GenericId.GenericId(tableName),
-    _creationTime: Schema.Number,
+    _creationTime: Schema.Finite,
   });
 
 /**
