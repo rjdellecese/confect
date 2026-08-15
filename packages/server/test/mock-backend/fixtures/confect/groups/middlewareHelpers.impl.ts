@@ -19,7 +19,10 @@ const firstUsername = FunctionImpl.make(
         .index("by_creation_time")
         .first();
 
-      return Option.isNone(user) ? null : user.value.username;
+      return Option.match(user, {
+        onNone: () => null,
+        onSome: (user_) => user_.username,
+      });
     }).pipe(Effect.orDie),
 );
 
