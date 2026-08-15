@@ -15,11 +15,10 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import databaseSchema from "./mock-backend/fixtures/confect/_generated/schema";
-import type { NoViewer } from "./mock-backend/fixtures/confect/groups/middleware.spec";
-import {
-  ProvideViewer,
+import type { NoViewer } from "./mock-backend/fixtures/confect/middleware/ProvideViewer.spec";
+import ProvideViewer, {
   Viewer,
-} from "./mock-backend/fixtures/confect/groups/middleware.spec";
+} from "./mock-backend/fixtures/confect/middleware/ProvideViewer.spec";
 
 const viewerName = FunctionSpec.publicQuery({
   name: "viewerName",

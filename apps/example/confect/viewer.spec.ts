@@ -1,30 +1,6 @@
-import { FunctionSpec, GroupSpec, MiddlewareSpec } from "@confect/core";
-import * as Context from "effect/Context";
+import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
-import type users from "./_generated/tables/users";
-
-export class Viewer extends Context.Service<
-  Viewer,
-  { readonly user: typeof users.Doc.Type }
->()("example/confect/viewer.spec/Viewer") {}
-
-export class NotSignedIn extends Schema.TaggedError<NotSignedIn>()(
-  "NotSignedIn",
-  {},
-) {}
-
-/**
- * Provides the current viewer (in this auth-less example: the most recently
- * created user) to every function in this group, failing with the typed
- * `NotSignedIn` error when no user exists.
- */
-export class RequireViewer extends MiddlewareSpec.Service<
-  RequireViewer,
-  { provides: Viewer }
->()("RequireViewer", {
-  error: () => NotSignedIn,
-  functionTypes: ["query", "mutation"],
-}) {}
+import RequireViewer from "./middleware/RequireViewer.spec";
 
 export default GroupSpec.make()
   .middleware(RequireViewer)

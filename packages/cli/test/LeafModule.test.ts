@@ -10,6 +10,8 @@ import * as Layer from "effect/Layer";
 import type { CodegenError } from "@confect/cli/CodegenError";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import {
+  discoverLeafImplFiles,
+  discoverLeafSpecFiles,
   groupPathFromRelativeModulePath,
   implPathForSpec,
   isLeafImplPath,
@@ -223,6 +225,113 @@ layer(LeafModuleLayer)("validateSpec", (it) => {
       assert(Result.isFailure(result));
       assert(result.failure._tag === "BundleFailedError");
       expect(result.failure.errors.length).toBeGreaterThan(0);
+    }),
+  );
+
+  // `groups/notes.spec.ts` reaches `tables/notes.ts` (via its generated
+  // wrapper), which must value-import `@confect/server` for `Table.make`.
+  // Both directories are exempt from the client-safety check for that reason;
+  // the "accepts a valid leaf spec" case above would fail without it.
+  it.effect(
+    "exempts `tables/` and `_generated/` from the server-import check",
+    () =>
+      Effect.gen(function* () {
+        const leaf = yield* toLeafModule("groups/notes.spec.ts");
+        yield* validateSpec(leaf);
+      }),
+  );
+
+  it.effect("rejects a spec that value-imports `@confect/server`", () =>
+    Effect.gen(function* () {
+      const leaf = yield* toLeafModule("groups/_leaky.spec.ts");
+      const result = yield* Effect.result(
+        withTempFile(
+          "groups/_leaky.spec.ts",
+          `import { MiddlewareImpl } from "@confect/server";\nexport { default } from "./notes.spec";\nexport const leaked = MiddlewareImpl;\n`,
+          validateSpec(leaf),
+        ),
+      );
+
+      assert(Result.isFailure(result));
+      assert(result.failure._tag === "SpecImportsServerError");
+      expect(result.failure.importerPaths).toStrictEqual([
+        "groups/_leaky.spec.ts",
+      ]);
+    }),
+  );
+
+  // The case the reserved `middleware/` directory creates: codegen never
+  // validates those modules as leaves, so the only thing that catches a
+  // middleware implementation co-located with its declaration is walking the
+  // group spec's transitive imports.
+  it.effect(
+    "rejects a spec reaching a `middleware/` module that value-imports `@confect/server`",
+    () =>
+      Effect.gen(function* () {
+        const leaf = yield* toLeafModule("groups/_leakyViaMiddleware.spec.ts");
+        const result = yield* Effect.result(
+          withTempFiles(
+            [
+              {
+                relativePath: "middleware/_Leaky.spec.ts",
+                contents: `import { MiddlewareImpl } from "@confect/server";\nexport const leaked = MiddlewareImpl;\n`,
+              },
+              {
+                relativePath: "groups/_leakyViaMiddleware.spec.ts",
+                contents: `import { leaked } from "../middleware/_Leaky.spec";\nexport { default } from "./notes.spec";\nexport const used = leaked;\n`,
+              },
+            ],
+            validateSpec(leaf),
+          ),
+        );
+
+        assert(Result.isFailure(result));
+        assert(result.failure._tag === "SpecImportsServerError");
+        expect(result.failure.specPath).toBe(
+          "groups/_leakyViaMiddleware.spec.ts",
+        );
+        expect(result.failure.importerPaths).toStrictEqual([
+          "middleware/_Leaky.spec.ts",
+        ]);
+      }),
+  );
+
+  // esbuild erases `import type` before it produces the metafile, so type-only
+  // imports of server modules cost the client nothing and stay legal.
+  it.effect("accepts a spec whose `@confect/server` import is type-only", () =>
+    Effect.gen(function* () {
+      const leaf = yield* toLeafModule("groups/_typeOnly.spec.ts");
+      yield* withTempFile(
+        "groups/_typeOnly.spec.ts",
+        `import type * as MiddlewareImpl from "@confect/server/MiddlewareImpl";\nexport { default } from "./notes.spec";\nexport type Make = typeof MiddlewareImpl.make;\n`,
+        validateSpec(leaf),
+      );
+    }),
+  );
+});
+
+layer(LeafModuleLayer)("discovery", (it) => {
+  it.effect("excludes `middleware/` from leaf spec discovery", () =>
+    Effect.gen(function* () {
+      const specFiles = yield* discoverLeafSpecFiles;
+
+      // The fixtures do have middleware specs there — they must not be
+      // discovered as groups.
+      expect(
+        Array.some(specFiles, (file) => file.includes("middleware/")),
+      ).toBe(false);
+      expect(specFiles).toContain("groups/middleware.spec.ts");
+    }),
+  );
+
+  it.effect("excludes `middleware/` from leaf impl discovery", () =>
+    Effect.gen(function* () {
+      const implFiles = yield* discoverLeafImplFiles;
+
+      expect(
+        Array.some(implFiles, (file) => file.includes("middleware/")),
+      ).toBe(false);
+      expect(implFiles).toContain("groups/middleware.impl.ts");
     }),
   );
 });

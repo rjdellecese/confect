@@ -33,6 +33,14 @@ export class SpecMissingDefaultGroupSpecError extends Schema.TaggedError<SpecMis
   },
 ) {}
 
+export class SpecImportsServerError extends Schema.TaggedError<SpecImportsServerError>()(
+  "SpecImportsServerError",
+  {
+    specPath: Schema.String,
+    importerPaths: Schema.Array(Schema.String),
+  },
+) {}
+
 export class ImplMissingSpecImportError extends Schema.TaggedError<ImplMissingSpecImportError>()(
   "ImplMissingSpecImportError",
   {
@@ -146,6 +154,7 @@ export const CodegenError = Schema.Union([
   MissingImplFileError,
   MissingSpecFileError,
   SpecMissingDefaultGroupSpecError,
+  SpecImportsServerError,
   ImplMissingSpecImportError,
   ImplMissingDefaultLayerError,
   ImplNotFinalizedError,
@@ -210,6 +219,17 @@ const renderSpecMissingDefaultGroupSpecError = (
     formatPath(error.specPath),
     " must default-export a GroupSpec; build it with GroupSpec.make() or GroupSpec.makeNode().",
   );
+
+const renderSpecImportsServerError = (
+  error: SpecImportsServerError,
+): string => {
+  const importers = error.importerPaths.join(", ");
+  return singleLine(
+    "Spec ",
+    formatPath(error.specPath),
+    ` reaches a module that imports \`@confect/server\`: ${importers}. Spec modules are bundled into your client, so anything they import ships to the browser — move the server logic into a \`*.impl.ts\` module, or use \`import type\` if you only need the types.`,
+  );
+};
 
 const renderImplMissingSpecImportError = (
   error: ImplMissingSpecImportError,
@@ -350,6 +370,7 @@ export const renderCodegenError = (error: CodegenError): string => {
       "SpecMissingDefaultGroupSpecError",
       renderSpecMissingDefaultGroupSpecError,
     ),
+    Match.tag("SpecImportsServerError", renderSpecImportsServerError),
     Match.tag("ImplMissingSpecImportError", renderImplMissingSpecImportError),
     Match.tag(
       "ImplMissingDefaultLayerError",

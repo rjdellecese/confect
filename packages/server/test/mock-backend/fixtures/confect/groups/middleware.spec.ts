@@ -1,48 +1,9 @@
-import { FunctionSpec, GroupSpec, MiddlewareSpec } from "@confect/core";
-import * as Context from "effect/Context";
+import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
-
-export class Viewer extends Context.Service<
-  Viewer,
-  { readonly username: string }
->()(
-  "@confect/server-mock-backend-fixtures/confect/groups/middleware.spec/Viewer",
-) {}
-
-export class NoViewer extends Schema.TaggedError<NoViewer>()("NoViewer", {}) {}
+import ProvideViewer from "../middleware/ProvideViewer.spec";
+import RequireLongName from "../middleware/RequireLongName.spec";
 
 export class NoNotes extends Schema.TaggedError<NoNotes>()("NoNotes", {}) {}
-
-export class NameTooShort extends Schema.TaggedError<NameTooShort>()(
-  "NameTooShort",
-  {},
-) {}
-
-/**
- * The flagship middleware shape: provides `Viewer` to downstream handlers,
- * short-circuiting with the typed `NoViewer` error when no user exists.
- * Declares all three functionTypes; the impl uses `makeByFunctionType` (`DatabaseReader` in
- * queries/mutations, `QueryRunner` of an internal query in actions).
- */
-export class ProvideViewer extends MiddlewareSpec.Service<
-  ProvideViewer,
-  { provides: Viewer }
->()("ProvideViewer", {
-  error: () => NoViewer,
-}) {}
-
-/**
- * Cross-middleware dependency: `requires` the `Viewer` provided by
- * `ProvideViewer`, which runs earlier in the chain (group-attached, while
- * this one is function-attached). Fails with `NameTooShort` when the
- * viewer's username has fewer than three characters.
- */
-export class RequireLongName extends MiddlewareSpec.Service<
-  RequireLongName,
-  { requires: Viewer }
->()("RequireLongName", {
-  error: () => NameTooShort,
-}) {}
 
 export default GroupSpec.make()
   .middleware(ProvideViewer)

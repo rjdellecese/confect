@@ -8,28 +8,54 @@ Middleware is reusable logic that runs around every function in a group — the 
 
 Like functions, middleware is split into a [spec and impl](/concepts/spec-impl-model): the spec half declares the middleware's client-safe interface (its name, the service it provides, how it can fail), while the impl half holds the server-only logic (database lookups, identity resolution). Because the interface lives in the spec, a middleware's errors join the error unions of the functions it covers, and clients decode them with no extra wiring.
 
+## Where middleware lives
+
+Middleware goes in `confect/middleware/`, one middleware per pair of modules, named after the middleware itself:
+
+```
+confect/
+  middleware/
+    RequireUser.spec.ts   ← the declaration: client-safe
+    RequireUser.impl.ts   ← the implementation: server-only
+  notes.spec.ts
+  notes.impl.ts
+  tables/
+```
+
+`confect/middleware/` is reserved: Confect does not scan it for function groups, so the `*.spec.ts` / `*.impl.ts` pair there means "middleware" rather than "group". A middleware is shared, so it belongs to no single group — putting it in a group's spec would force unrelated groups to import from it.
+
+<Warning>
+  Keep implementations out of `*.spec.ts` modules. Every spec is reachable from
+  `_generated/refs.ts`, which your client imports, so a spec's entire import
+  graph is bundled into the browser — including any middleware implementation
+  co-located with its declaration, and everything it closes over (table names,
+  index names, your authorization logic). `confect codegen` fails when a module
+  a spec reaches value-imports `@confect/server`; when a spec needs a server
+  type, reach for it with `import type`, which costs the client nothing.
+</Warning>
+
 ## Declaring a middleware
 
-Declare a middleware with `MiddlewareSpec.Service` in shared code (typically alongside the group spec that uses it). The `Config` type parameter's `provides` slot names the service the middleware provides to handlers — type-level only; the runtime tag is passed to the impl separately. The optional `error` schema declares how the middleware can fail, lazily like a function spec's `error`.
+Declare a middleware with `MiddlewareSpec.Service`. The `Config` type parameter's `provides` slot names the service the middleware provides to handlers — type-level only; the runtime tag is passed to the impl separately. The optional `error` schema declares how the middleware can fail, lazily like a function spec's `error`.
 
-```ts confect/currentUser.ts
+```ts confect/middleware/RequireUser.spec.ts
 import { MiddlewareSpec } from "@confect/core";
 import * as Context from "effect/Context";
 import * as Schema from "effect/Schema";
 
-import users from "./_generated/tables/users";
+import type users from "../_generated/tables/users";
 
 export class CurrentUser extends Context.Service<
   CurrentUser,
   { readonly user: typeof users.Doc.Type }
->()("confect/currentUser/CurrentUser") {}
+>()("confect/middleware/RequireUser.spec/CurrentUser") {}
 
 export class NotSignedIn extends Schema.TaggedError<NotSignedIn>()(
   "NotSignedIn",
   {},
 ) {}
 
-export class RequireUser extends MiddlewareSpec.Service<
+export default class RequireUser extends MiddlewareSpec.Service<
   RequireUser,
   { provides: CurrentUser }
 >()("RequireUser", {
@@ -37,6 +63,8 @@ export class RequireUser extends MiddlewareSpec.Service<
   functionTypes: ["query", "mutation"],
 }) {}
 ```
+
+Default-export the middleware and name the errors and services it provides as named exports, so both halves of the pair — and the groups that attach it — import it the same way.
 
 Both `provides` and `error` are optional: a middleware may only observe (logging, timing), only guard (short-circuit without providing anything), or both provide and fail.
 
@@ -55,7 +83,7 @@ import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 
 import { Id } from "./_generated/id";
-import { RequireUser } from "./currentUser";
+import RequireUser from "./middleware/RequireUser.spec";
 
 export default GroupSpec.make()
   .middleware(RequireUser)
@@ -102,8 +130,10 @@ Note that a failed mutation still rolls back its whole transaction: if a functio
 
 A middleware can consume a service provided by middleware that runs earlier in the chain. Declare the dependency in the `Config` type parameter's `requires` slot; the implementation's environment then includes it alongside the ctx services:
 
-```ts
-export class RequireAdmin extends MiddlewareSpec.Service<
+```ts confect/middleware/RequireAdmin.spec.ts
+import type { CurrentUser } from "./RequireUser.spec";
+
+export default class RequireAdmin extends MiddlewareSpec.Service<
   RequireAdmin,
   {
     requires: CurrentUser;
@@ -111,18 +141,22 @@ export class RequireAdmin extends MiddlewareSpec.Service<
 >()("RequireAdmin", {
   error: () => NotAnAdmin,
 }) {}
+```
 
-const RequireAdminLive = MiddlewareImpl.make(
-  databaseSchema,
-  RequireAdmin,
-  (effect) =>
-    Effect.gen(function* () {
-      const { user } = yield* CurrentUser; // from RequireUser, earlier in the chain
+```ts confect/middleware/RequireAdmin.impl.ts
+import RequireAdmin, { NotAnAdmin } from "./RequireAdmin.spec";
+import { CurrentUser } from "./RequireUser.spec";
 
-      return user.role === "admin" ? yield* effect : yield* new NotAnAdmin();
-    }),
+export default MiddlewareImpl.make(databaseSchema, RequireAdmin, (effect) =>
+  Effect.gen(function* () {
+    const { user } = yield* CurrentUser; // from RequireUser, earlier in the chain
+
+    return user.role === "admin" ? yield* effect : yield* new NotAnAdmin();
+  }),
 );
 ```
+
+Note the `import type` in the spec half: `CurrentUser` is only ever named in a type position there, so the import is erased and the declaration stays client-safe.
 
 Satisfaction is checked where the ordering is known:
 
@@ -141,7 +175,7 @@ import * as Effect from "effect/Effect";
 
 import databaseSchema from "./_generated/schema";
 import { DatabaseWriter } from "./_generated/services";
-import { CurrentUser } from "./currentUser";
+import { CurrentUser } from "./middleware/RequireUser.spec";
 import notes from "./notes.spec";
 
 const create = FunctionImpl.make(databaseSchema, notes, "create", ({ text }) =>
@@ -166,16 +200,16 @@ A middleware implementation wraps the downstream effect (any remaining middlewar
 
 For the common "run something, provide a service" shape, use the `MiddlewareImpl.provides` shorthand, passing the runtime tag for the spec's type-level `provides`:
 
-```ts confect/notes.impl.ts
+```ts confect/middleware/RequireUser.impl.ts
 import { MiddlewareImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 
-import databaseSchema from "./_generated/schema";
-import { Auth, DatabaseReader } from "./_generated/services";
-import { CurrentUser, NotSignedIn, RequireUser } from "./currentUser";
+import databaseSchema from "../_generated/schema";
+import { Auth, DatabaseReader } from "../_generated/services";
+import RequireUser, { CurrentUser, NotSignedIn } from "./RequireUser.spec";
 
-const RequireUserLive = MiddlewareImpl.provides(
+export default MiddlewareImpl.provides(
   databaseSchema,
   RequireUser,
   CurrentUser,
@@ -210,7 +244,7 @@ class Timed extends MiddlewareSpec.Service<Timed>()("Timed", {
   functionTypes: ["mutation", "action"],
 }) {}
 
-const TimedLive = MiddlewareImpl.make(
+const TimedImpl = MiddlewareImpl.make(
   databaseSchema,
   Timed,
   (effect, { spec }) =>
@@ -249,18 +283,14 @@ An implementation provided with `MiddlewareImpl.make` uses one strategy for ever
 The all-function-types intersection leaves `QueryRunner` as the only database route, but Convex best practices say to [use `ctx.runQuery` sparingly in queries and mutations](https://docs.convex.dev/understanding/best-practices/#use-ctxrunquery-and-ctxrunmutation-sparingly-in-queries-and-mutations). So for database-touching middleware that should also cover actions — say, extending `RequireUser` above with `functionTypes: ["query", "mutation", "action"]` — implement per function type with `MiddlewareImpl.makeByFunctionType` instead: each entry gets that function type's full service set. Read directly in queries and mutations, and call an internal query (defined in a middleware-free group) in actions, where `runQuery` is the only route to the database:
 
 ```ts
-const RequireUserLive = MiddlewareImpl.makeByFunctionType(
-  databaseSchema,
-  RequireUser,
-  {
-    query: (effect) =>
-      Effect.provideServiceEffect(effect, CurrentUser, viaDatabaseReader),
-    mutation: (effect) =>
-      Effect.provideServiceEffect(effect, CurrentUser, viaDatabaseReader),
-    action: (effect) =>
-      Effect.provideServiceEffect(effect, CurrentUser, viaRunQuery),
-  },
-);
+export default MiddlewareImpl.makeByFunctionType(databaseSchema, RequireUser, {
+  query: (effect) =>
+    Effect.provideServiceEffect(effect, CurrentUser, viaDatabaseReader),
+  mutation: (effect) =>
+    Effect.provideServiceEffect(effect, CurrentUser, viaDatabaseReader),
+  action: (effect) =>
+    Effect.provideServiceEffect(effect, CurrentUser, viaRunQuery),
+});
 ```
 
 ### Providing to the group layer
@@ -268,14 +298,16 @@ const RequireUserLive = MiddlewareImpl.makeByFunctionType(
 Provide the middleware implementation to the group's impl layer like any function implementation. `GroupImpl.finalize` only typechecks once every attached middleware's implementation has been provided, and `confect codegen` reports a missing one by name.
 
 ```ts confect/notes.impl.ts
+import RequireUser from "./middleware/RequireUser.impl";
+
 export default GroupImpl.make(databaseSchema, notes).pipe(
   Layer.provide(create),
-  Layer.provide(RequireUserLive),
+  Layer.provide(RequireUser),
   GroupImpl.finalize,
 );
 ```
 
-A middleware implementation is just an exported layer — share one across groups by providing it to each group's pipeline.
+A middleware implementation is just a layer — share one across groups by providing it to each group's pipeline.
 
 ## Middleware errors at call sites
 

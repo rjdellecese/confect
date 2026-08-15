@@ -1,78 +1,13 @@
-import { FunctionImpl, GroupImpl, MiddlewareImpl } from "@confect/server";
+import { FunctionImpl, GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import databaseSchema from "../_generated/schema";
-import refs from "../_generated/refs";
-import { DatabaseReader, QueryRunner } from "../_generated/services";
-import middleware, {
-  NameTooShort,
-  NoNotes,
-  NoViewer,
-  ProvideViewer,
-  RequireLongName,
-  Viewer,
-} from "./middleware.spec";
-
-const viewerFromDatabase = Effect.gen(function* () {
-  const reader = yield* DatabaseReader;
-
-  const user = yield* reader
-    .table("users")
-    .index("by_creation_time")
-    .first()
-    .pipe(Effect.orDie);
-
-  if (Option.isNone(user)) {
-    return yield* new NoViewer();
-  }
-
-  return { username: user.value.username };
-});
-
-const viewerViaRunQuery = Effect.gen(function* () {
-  const runQuery = yield* QueryRunner;
-
-  const username = yield* runQuery(
-    refs.internal.groups.middlewareHelpers.firstUsername,
-  ).pipe(Effect.catchTag("SchemaError", (error) => Effect.die(error)));
-
-  if (username === null) {
-    return yield* new NoViewer();
-  }
-
-  return { username };
-});
-
-const ProvideViewerLive = MiddlewareImpl.makeByFunctionType(
-  databaseSchema,
-  ProvideViewer,
-  {
-    query: (effect) =>
-      Effect.provideServiceEffect(effect, Viewer, viewerFromDatabase),
-    mutation: (effect) =>
-      Effect.provideServiceEffect(effect, Viewer, viewerFromDatabase),
-    action: (effect) =>
-      Effect.provideServiceEffect(effect, Viewer, viewerViaRunQuery),
-  },
-);
-
-// Consumes the `Viewer` that `ProvideViewer` — earlier in the chain —
-// provides, per this middleware's declared `requires`.
-const RequireLongNameLive = MiddlewareImpl.make(
-  databaseSchema,
-  RequireLongName,
-  (effect) =>
-    Effect.gen(function* () {
-      const { username } = yield* Viewer;
-
-      if (username.length < 3) {
-        return yield* new NameTooShort();
-      }
-
-      return yield* effect;
-    }),
-);
+import { DatabaseReader } from "../_generated/services";
+import ProvideViewer from "../middleware/ProvideViewer.impl";
+import { Viewer } from "../middleware/ProvideViewer.spec";
+import RequireLongName from "../middleware/RequireLongName.impl";
+import middleware, { NoNotes } from "./middleware.spec";
 
 const viewerUsername = Effect.gen(function* () {
   const viewer = yield* Viewer;
@@ -142,7 +77,7 @@ export default GroupImpl.make(databaseSchema, middleware).pipe(
   Layer.provide(viewerNameAction),
   Layer.provide(firstNoteForViewer),
   Layer.provide(shoutName),
-  Layer.provide(ProvideViewerLive),
-  Layer.provide(RequireLongNameLive),
+  Layer.provide(ProvideViewer),
+  Layer.provide(RequireLongName),
   GroupImpl.finalize,
 );

@@ -9,15 +9,11 @@ import {
   DatabaseReader,
   DatabaseWriter,
 } from "./fixtures/confect/_generated/services";
-import {
-  NameTooShort,
-  NoNotes,
-  NoViewer,
-} from "./fixtures/confect/groups/middleware.spec";
-import {
-  FunctionGateClosed,
-  GateClosed,
-} from "./fixtures/confect/groups/middlewareOrder.spec";
+import { NoNotes } from "./fixtures/confect/groups/middleware.spec";
+import { GateClosed } from "./fixtures/confect/middleware/Gate.spec";
+import { NoViewer } from "./fixtures/confect/middleware/ProvideViewer.spec";
+import { FunctionGateClosed } from "./fixtures/confect/middleware/RecordFunctionLevel.spec";
+import { NameTooShort } from "./fixtures/confect/middleware/RequireLongName.spec";
 import * as TestConfect from "./TestConfect";
 
 const expectFailure = <A, E>(result: Result.Result<A, E>): E => {

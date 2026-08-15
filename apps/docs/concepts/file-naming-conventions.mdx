@@ -80,6 +80,28 @@ confect/
   workpool.impl.ts     ← impl (runtime imports from workpool.ts)
 ```
 
+## Middleware
+
+[Middleware](/server/middleware) is declared and implemented as a `*.spec.ts`/`*.impl.ts` pair too, but it belongs to no single group, so it lives in the reserved `confect/middleware/` directory — one pair per middleware, each named after the middleware in PascalCase. Confect does not scan that directory for groups, so nothing is emitted into `convex/` for it.
+
+```
+confect/
+  middleware/
+    RequireUser.spec.ts   ← declaration: MiddlewareSpec.Service (client-safe)
+    RequireUser.impl.ts   ← implementation: MiddlewareImpl layer (server-only)
+```
+
+Each spec module default-exports its middleware and names the errors and services it provides as named exports; each impl module default-exports its layer, the same shape as a group impl.
+
+<Warning>
+  Nothing a `*.spec.ts` reaches may value-import `@confect/server`. Specs are
+  reachable from `_generated/refs.ts`, which your client imports, so their whole
+  import graph is bundled into the browser — a middleware implementation left in
+  a spec module ships your authorization logic to users. `confect codegen` fails
+  when this happens; `import type` is always fine, since it is erased before
+  bundling.
+</Warning>
+
 ## Node actions
 
 [Node action](/server/node-actions) groups follow the same `.spec.ts`/`.impl.ts` naming and nesting conventions as any other group. A group is Node-runtime when its spec is built with `GroupSpec.makeNode()` (rather than `GroupSpec.make()`); its impl is otherwise identical to a non-node impl, passing the database schema from `_generated/schema`. Confect emits Convex's `"use node"` directive into the generated module based on the spec.
@@ -135,6 +157,10 @@ Putting it all together, a project using all of these conventions might look lik
       <Tree.File name="notes.impl.ts" />
       <Tree.File name="random.spec.ts" />
       <Tree.File name="random.impl.ts" />
+    </Tree.Folder>
+    <Tree.Folder name="middleware" defaultOpen>
+      <Tree.File name="RequireUser.spec.ts" />
+      <Tree.File name="RequireUser.impl.ts" />
     </Tree.Folder>
     <Tree.Folder name="tables" defaultOpen>
       <Tree.File name="notes.ts" />
