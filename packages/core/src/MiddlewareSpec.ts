@@ -105,41 +105,34 @@ export interface AnyService {
   readonly "~Error": any;
 }
 
-export type Key<M extends AnyService> = M["key"];
+export type Key<Middleware_ extends AnyService> = Middleware_["key"];
 
-export type Provides<M extends AnyService> = M extends AnyService
-  ? M["~Provides"]
-  : never;
+export type Provides<Middleware_ extends AnyService> =
+  Middleware_ extends AnyService ? Middleware_["~Provides"] : never;
 
 /**
  * The services a middleware's implementation may consume from middleware
  * that runs earlier in the same chain (type-level only, like `provides`).
  */
-export type Requires<M extends AnyService> = M extends AnyService
-  ? M["~Requires"]
-  : never;
+export type Requires<Middleware_ extends AnyService> =
+  Middleware_ extends AnyService ? Middleware_["~Requires"] : never;
 
-export type ErrorSchema<M extends AnyService> = M extends AnyService
-  ? M["~Error"]
-  : never;
+export type ErrorSchema<Middleware_ extends AnyService> =
+  Middleware_ extends AnyService ? Middleware_["~Error"] : never;
 
-export type Error<M extends AnyService> = M extends AnyService
-  ? M["~Error"]["Type"]
-  : never;
+export type Error<Middleware_ extends AnyService> =
+  Middleware_ extends AnyService ? Middleware_["~Error"]["Type"] : never;
 
-export type EncodedError<M extends AnyService> = M extends AnyService
-  ? M["~Error"]["Encoded"]
-  : never;
+export type EncodedError<Middleware_ extends AnyService> =
+  Middleware_ extends AnyService ? Middleware_["~Error"]["Encoded"] : never;
 
-export type FunctionTypes<M extends AnyService> = M extends AnyService
-  ? M["functionTypes"][number]
-  : never;
+export type FunctionTypes<Middleware_ extends AnyService> =
+  Middleware_ extends AnyService ? Middleware_["functionTypes"][number] : never;
 
 /**
  * Declare a middleware's client-safe interface: its identifying key, the
- * service it provides to downstream handlers (type-level only, following
- * Effect v4's `RpcMiddleware.Service`), the error schema its failures encode
- * through, and the function functionTypes it may attach to.
+ * service it provides to downstream handlers, the error schema its failures
+ * encode through, and the function functionTypes it may attach to.
  *
  * ```ts
  * class RequireUser extends MiddlewareSpec.Service<RequireUser, {
@@ -180,8 +173,8 @@ export const Service =
     ErrorSchema_,
     FunctionTypes_
   > => {
-    function MiddlewareService() {}
-    const class_ = MiddlewareService as any;
+    function Middleware_() {}
+    const class_ = Middleware_ as any;
     class_[TypeId] = TypeId;
     class_.key = key;
     class_.functionTypes = options?.functionTypes ?? allFunctionTypes;
@@ -214,8 +207,8 @@ export interface AttachmentError<Message extends string> {
   readonly "~confect/MiddlewareSpec/AttachmentError": Message;
 }
 
-type FunctionTypeOf<F extends FunctionSpec.AnyWithProps> =
-  F["runtimeAndFunctionType"]["functionType"];
+type FunctionTypeOf<FunctionSpec_ extends FunctionSpec.AnyWithProps> =
+  FunctionSpec_["runtimeAndFunctionType"]["functionType"];
 
 type ValidationResult<Errors> = [Errors] extends [never] ? unknown : Errors;
 
@@ -233,21 +226,26 @@ type ValidationResult<Errors> = [Errors] extends [never] ? unknown : Errors;
  *   middleware's `functionTypes`.
  */
 export type ValidateFunction<
-  F extends FunctionSpec.AnyWithProps,
-  M extends AnyService,
-> = F extends any
-  ? M extends any
-    ? F extends { readonly functionProvenance: { readonly _tag: "Convex" } }
-      ? FunctionTypeOf<F> extends FunctionTypes<M>
-        ? AttachmentError<`Convex-provenance function "${F["name"]}" cannot be covered by middleware "${Key<M>}" — attach middleware only to groups whose matching-type functions are all Confect-provenance`>
+  FunctionSpec_ extends FunctionSpec.AnyWithProps,
+  Middleware_ extends AnyService,
+> = FunctionSpec_ extends any
+  ? Middleware_ extends any
+    ? FunctionSpec_ extends {
+        readonly functionProvenance: { readonly _tag: "Convex" };
+      }
+      ? FunctionTypeOf<FunctionSpec_> extends FunctionTypes<Middleware_>
+        ? AttachmentError<`Convex-provenance function "${FunctionSpec_["name"]}" cannot be covered by middleware "${Key<Middleware_>}" — attach middleware only to groups whose matching-type functions are all Confect-provenance`>
         : never
       : [
-            Extract<FunctionSpec.Middlewares<F>, { readonly key: Key<M> }>,
+            Extract<
+              FunctionSpec.Middlewares<FunctionSpec_>,
+              { readonly key: Key<Middleware_> }
+            >,
           ] extends [never]
-        ? FunctionTypeOf<F> extends FunctionTypes<M>
+        ? FunctionTypeOf<FunctionSpec_> extends FunctionTypes<Middleware_>
           ? never
-          : AttachmentError<`Middleware "${Key<M>}" does not declare function type "${FunctionTypeOf<F>}", the type of function "${F["name"]}"`>
-        : AttachmentError<`Middleware "${Key<M>}" is already attached to function "${F["name"]}"`>
+          : AttachmentError<`Middleware "${Key<Middleware_>}" does not declare function type "${FunctionTypeOf<FunctionSpec_>}", the type of function "${FunctionSpec_["name"]}"`>
+        : AttachmentError<`Middleware "${Key<Middleware_>}" is already attached to function "${FunctionSpec_["name"]}"`>
     : never
   : never;
 
@@ -262,14 +260,14 @@ export type ValidateFunction<
  * no-op.
  */
 export type ValidateAttach<
-  M extends AnyService,
+  Middleware_ extends AnyService,
   Functions_ extends FunctionSpec.AnyWithProps,
   Middlewares_ extends AnyService,
-> = [Extract<Middlewares_, { readonly key: Key<M> }>] extends [never]
-  ? [Exclude<Requires<M>, Provides<Middlewares_>>] extends [never]
-    ? ValidationResult<ValidateFunction<Functions_, M>>
-    : AttachmentError<`Middleware "${Key<M>}" requires services that no middleware attached earlier to this group provides — attach the providing middleware first`>
-  : AttachmentError<`Middleware "${Key<M>}" is already attached to this group`>;
+> = [Extract<Middlewares_, { readonly key: Key<Middleware_> }>] extends [never]
+  ? [Exclude<Requires<Middleware_>, Provides<Middlewares_>>] extends [never]
+    ? ValidationResult<ValidateFunction<Functions_, Middleware_>>
+    : AttachmentError<`Middleware "${Key<Middleware_>}" requires services that no middleware attached earlier to this group provides — attach the providing middleware first`>
+  : AttachmentError<`Middleware "${Key<Middleware_>}" is already attached to this group`>;
 
 /**
  * The parameter-type validation applied by `GroupSpec.addFunction` once a
@@ -280,25 +278,26 @@ export type ValidateAttach<
  * may duplicate a group-attached one.
  */
 export type ValidateAddedFunction<
-  F extends FunctionSpec.AnyWithProps,
+  FunctionSpec_ extends FunctionSpec.AnyWithProps,
   Middlewares_ extends AnyService,
 > = [Middlewares_] extends [never]
   ? unknown
   : ValidationResult<
-      ValidateFunction<F, Middlewares_> | GroupOverlap<F, Middlewares_>
+      | ValidateFunction<FunctionSpec_, Middlewares_>
+      | GroupOverlap<FunctionSpec_, Middlewares_>
     >;
 
 type GroupOverlap<
-  F extends FunctionSpec.AnyWithProps,
+  FunctionSpec_ extends FunctionSpec.AnyWithProps,
   Middlewares_ extends AnyService,
 > =
-  FunctionSpec.Middlewares<F> extends infer FunctionMiddleware
+  FunctionSpec.Middlewares<FunctionSpec_> extends infer FunctionMiddleware
     ? FunctionMiddleware extends AnyService
       ? [
           Extract<Middlewares_, { readonly key: Key<FunctionMiddleware> }>,
         ] extends [never]
         ? never
-        : AttachmentError<`Middleware "${Key<FunctionMiddleware>}" is attached to both function "${F["name"]}" and its group`>
+        : AttachmentError<`Middleware "${Key<FunctionMiddleware>}" is attached to both function "${FunctionSpec_["name"]}" and its group`>
       : never
     : never;
 
@@ -340,14 +339,14 @@ export type ValidateImplRequires<
  * function.
  */
 export type ValidateFunctionAttach<
-  M extends AnyService,
+  Middleware_ extends AnyService,
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionProvenance_ extends FunctionProvenance.FunctionProvenance,
   Middlewares_ extends AnyService,
 > = FunctionProvenance_ extends { readonly _tag: "Convex" }
   ? AttachmentError<`Plain Convex functions cannot have middleware — their raw handlers are passed through untouched`>
-  : [Extract<Middlewares_, { readonly key: Key<M> }>] extends [never]
-    ? RuntimeAndFunctionType_["functionType"] extends FunctionTypes<M>
+  : [Extract<Middlewares_, { readonly key: Key<Middleware_> }>] extends [never]
+    ? RuntimeAndFunctionType_["functionType"] extends FunctionTypes<Middleware_>
       ? unknown
-      : AttachmentError<`Middleware "${Key<M>}" does not declare function type "${RuntimeAndFunctionType_["functionType"]}"`>
-    : AttachmentError<`Middleware "${Key<M>}" is already attached to this function`>;
+      : AttachmentError<`Middleware "${Key<Middleware_>}" does not declare function type "${RuntimeAndFunctionType_["functionType"]}"`>
+    : AttachmentError<`Middleware "${Key<Middleware_>}" is already attached to this function`>;

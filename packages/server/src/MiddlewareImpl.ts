@@ -57,12 +57,12 @@ export type FromGroupSpec<Group extends GroupSpec.AnyWithProps> =
 /** The full ctx-service union for one function type. */
 export type FunctionTypeServices<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  Kind extends FunctionType,
-> = Kind extends "query"
+  FunctionType_ extends FunctionType,
+> = FunctionType_ extends "query"
   ? Handler.QueryServices<DatabaseSchema_>
-  : Kind extends "mutation"
+  : FunctionType_ extends "mutation"
     ? Handler.MutationServices<DatabaseSchema_>
-    : Kind extends "action"
+    : FunctionType_ extends "action"
       ? Handler.ActionServices<DatabaseSchema_>
       : never;
 
