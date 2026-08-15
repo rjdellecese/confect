@@ -23,7 +23,7 @@ export class RequireViewer extends MiddlewareSpec.Service<
   { provides: Viewer }
 >()("RequireViewer", {
   error: () => NotSignedIn,
-  kinds: ["query", "mutation"],
+  functionTypes: ["query", "mutation"],
 }) {}
 
 export default GroupSpec.make()

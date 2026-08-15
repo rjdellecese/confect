@@ -6,7 +6,7 @@
 
 Add middleware: reusable logic that runs around a group's function handlers, provides Effect services to them, and fails with typed errors that reach clients.
 
-Declare a middleware's client-safe interface with `MiddlewareSpec.Service` — its `provides` service (type-level), its `error` schema, and the function `kinds` it may cover — and attach it in the spec with `GroupSpec.middleware`:
+Declare a middleware's client-safe interface with `MiddlewareSpec.Service` — its `provides` service (type-level), its `error` schema, and the function `functionTypes` it may cover — and attach it in the spec with `GroupSpec.middleware`:
 
 ```ts
 import { MiddlewareSpec } from "@confect/core";
@@ -26,7 +26,7 @@ export default GroupSpec.make()
   .addFunction(FunctionSpec.publicMutation({ ... }));
 ```
 
-Handlers of covered functions can then consume the provided service — a handler requiring `CurrentUser` type-checks exactly when a middleware providing it is attached to the group. Implement the middleware server-side with `MiddlewareImpl.make` (one strategy for all declared kinds), `MiddlewareImpl.makeByKind` (one per kind — the recommended shape for database-touching middleware that also covers actions), or the `MiddlewareImpl.provides` shorthand, and provide it to the group's impl layer like any function implementation:
+Handlers of covered functions can then consume the provided service — a handler requiring `CurrentUser` type-checks exactly when a middleware providing it is attached to the group. Implement the middleware server-side with `MiddlewareImpl.make` (one strategy for all declared function types), `MiddlewareImpl.makeByFunctionType` (one per function type — the recommended shape for database-touching middleware that also covers actions), or the `MiddlewareImpl.provides` shorthand, and provide it to the group's impl layer like any function implementation:
 
 ```ts
 import { MiddlewareImpl } from "@confect/server";
@@ -58,4 +58,4 @@ FunctionSpec.publicMutation({ name: "deleteAll", ... }).middleware(RequireAdmin)
 
 A middleware can depend on one that runs earlier in the chain by declaring `requires` in its `Config` type parameter — its implementation may then consume the required service (e.g. `RequireAdmin` reading the `CurrentUser` that `RequireUser` provides). Satisfaction is type-checked at `GroupSpec.middleware` for group attachments and at `GroupImpl.make` for whole groups.
 
-Attaching the same middleware twice (including once at group level and once at function level), attaching one whose `kinds` don't cover a covered function, attaching any middleware to a plain-Convex function, or attaching to a group containing a matching-kind plain-Convex function are all type errors. Middleware does not propagate to subgroups. `confect codegen` fails with an explicit error when a group's spec attaches a middleware its impl never provides.
+Attaching the same middleware twice (including once at group level and once at function level), attaching one whose `functionTypes` don't cover a covered function's type, attaching any middleware to a plain-Convex function, or attaching to a group containing a matching-type plain-Convex function are all type errors. Middleware does not propagate to subgroups. `confect codegen` fails with an explicit error when a group's spec attaches a middleware its impl never provides.

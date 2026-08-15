@@ -251,10 +251,10 @@ const Proto = {
         `Plain Convex function "${this.name}" cannot have middleware`,
       );
     }
-    const kind = this.runtimeAndFunctionType.functionType;
-    if (!middleware.kinds.includes(kind)) {
+    const functionType = this.runtimeAndFunctionType.functionType;
+    if (!middleware.functionTypes.includes(functionType)) {
       throw new Error(
-        `Middleware "${middleware.key}" does not declare kind "${kind}" of function "${this.name}"`,
+        `Middleware "${middleware.key}" does not declare function type "${functionType}" of function "${this.name}"`,
       );
     }
     if (this.middlewares.some((existing) => existing.key === middleware.key)) {

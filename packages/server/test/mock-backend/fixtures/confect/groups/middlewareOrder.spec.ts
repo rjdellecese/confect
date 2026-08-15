@@ -17,19 +17,19 @@ export class FunctionGateClosed extends Schema.TaggedError<FunctionGateClosed>()
  */
 export class Gate extends MiddlewareSpec.Service<Gate>()("Gate", {
   error: () => GateClosed,
-  kinds: ["mutation"],
+  functionTypes: ["mutation"],
 }) {}
 
 /** Inserts a `"first"` marker note before running the rest of the chain. */
 export class RecordFirst extends MiddlewareSpec.Service<RecordFirst>()(
   "RecordFirst",
-  { kinds: ["mutation"] },
+  { functionTypes: ["mutation"] },
 ) {}
 
 /** Inserts a `"second"` marker note before running the rest of the chain. */
 export class RecordSecond extends MiddlewareSpec.Service<RecordSecond>()(
   "RecordSecond",
-  { kinds: ["mutation"] },
+  { functionTypes: ["mutation"] },
 ) {}
 
 /**
@@ -41,7 +41,7 @@ export class RecordFunctionLevel extends MiddlewareSpec.Service<RecordFunctionLe
   "RecordFunctionLevel",
   {
     error: () => FunctionGateClosed,
-    kinds: ["mutation"],
+    functionTypes: ["mutation"],
   },
 ) {}
 

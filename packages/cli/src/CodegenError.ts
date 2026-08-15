@@ -256,7 +256,7 @@ const renderImplMissingMiddlewareError = (
   return singleLine(
     "Impl ",
     formatPath(error.implPath),
-    ` does not implement every middleware attached to group \`${error.groupPath}\`; missing: ${keys}. Provide a \`MiddlewareImpl.make\` (or \`makeByKind\`/\`provides\`) layer for each missing middleware to the group layer.`,
+    ` does not implement every middleware attached to group \`${error.groupPath}\`; missing: ${keys}. Provide a \`MiddlewareImpl.make\` (or \`makeByFunctionType\`/\`provides\`) layer for each missing middleware to the group layer.`,
   );
 };
 

@@ -14,9 +14,9 @@ export type TypeId = typeof TypeId;
 export const isMiddlewareSpec = (u: unknown): u is AnyService =>
   Predicate.hasProperty(u, TypeId);
 
-export type AllFunctionKinds = ["query", "mutation", "action"];
+export type AllFunctionTypes = ["query", "mutation", "action"];
 
-export const allFunctionKinds: AllFunctionKinds = [
+export const allFunctionTypes: AllFunctionTypes = [
   "query",
   "mutation",
   "action",
@@ -63,7 +63,7 @@ export interface AnyMiddleware extends Middleware<any, any, any> {}
 /**
  * The class shape produced by {@link Service}. Only the static side is ever
  * used — the class is a value-level carrier for the middleware's key, its
- * declared kinds, and its (lazily-evaluated) error schema, plus the
+ * declared functionTypes, and its (lazily-evaluated) error schema, plus the
  * type-level `Provides`/`Error` metadata. It is deliberately not a
  * `Context.Tag`: implementations are registered through the group `Registry`
  * (like `FunctionImpl`s), not resolved from a Layer context.
@@ -74,7 +74,7 @@ export interface ServiceClass<
   Provides_,
   Requires_,
   ErrorSchema_ extends Schema.Codec<any, any>,
-  Kinds_ extends ReadonlyArray<FunctionType>,
+  FunctionTypes_ extends ReadonlyArray<FunctionType>,
 > {
   new (_: never): {
     readonly [TypeId]: TypeId;
@@ -82,7 +82,7 @@ export interface ServiceClass<
   };
   readonly [TypeId]: TypeId;
   readonly key: Key_;
-  readonly kinds: Kinds_;
+  readonly functionTypes: FunctionTypes_;
   /**
    * The declared error schema. Installed as a lazy memoised property only
    * when the `error` option was provided, so `"error" in middleware`
@@ -98,7 +98,7 @@ export interface ServiceClass<
 export interface AnyService {
   readonly [TypeId]: TypeId;
   readonly key: string;
-  readonly kinds: ReadonlyArray<FunctionType>;
+  readonly functionTypes: ReadonlyArray<FunctionType>;
   readonly error?: Schema.Codec<any, any>;
   readonly "~Provides": any;
   readonly "~Requires": any;
@@ -131,46 +131,46 @@ export type EncodedError<M extends AnyService> = M extends AnyService
   ? M["~Error"]["Encoded"]
   : never;
 
-export type Kinds<M extends AnyService> = M extends AnyService
-  ? M["kinds"][number]
+export type FunctionTypes<M extends AnyService> = M extends AnyService
+  ? M["functionTypes"][number]
   : never;
 
 /**
  * Declare a middleware's client-safe interface: its identifying key, the
  * service it provides to downstream handlers (type-level only, following
  * Effect v4's `RpcMiddleware.Service`), the error schema its failures encode
- * through, and the function kinds it may attach to.
+ * through, and the function functionTypes it may attach to.
  *
  * ```ts
  * class RequireUser extends MiddlewareSpec.Service<RequireUser, {
  *   provides: CurrentUser
  * }>()("RequireUser", {
  *   error: () => NotSignedIn,
- *   kinds: ["query", "mutation"],
+ *   functionTypes: ["query", "mutation"],
  * }) {}
  * ```
  *
  * The implementation is server-only and supplied separately via
- * `MiddlewareImpl.make` (or `makeByKind`/`provides`) in `@confect/server`.
+ * `MiddlewareImpl.make` (or `makeByFunctionType`/`provides`) in `@confect/server`.
  */
 export const Service =
   <Self, Config extends { provides?: any; requires?: any } = {}>() =>
   <
     const Key_ extends string,
     ErrorSchema_ extends Schema.Codec<any, any> = never,
-    const Kinds_ extends ReadonlyArray<FunctionType> = AllFunctionKinds,
+    const FunctionTypes_ extends ReadonlyArray<FunctionType> = AllFunctionTypes,
   >(
     key: Key_,
     options?: {
       /** Lazily-evaluated error schema, like `FunctionSpec`'s `error`. */
       readonly error?: () => ErrorSchema_;
       /**
-       * Function kinds this middleware may attach to. Default: all three.
+       * Function functionTypes this middleware may attach to. Default: all three.
        * Node actions fall under `"action"`, so an `"action"` implementation
-       * must be valid in both action runtimes — which is why that kind's
+       * must be valid in both action runtimes — which is why that function type's
        * service bound excludes the Node-only services.
        */
-      readonly kinds?: Kinds_;
+      readonly functionTypes?: FunctionTypes_;
     },
   ): ServiceClass<
     Self,
@@ -178,13 +178,13 @@ export const Service =
     "provides" extends keyof Config ? Config["provides"] : never,
     "requires" extends keyof Config ? Config["requires"] : never,
     ErrorSchema_,
-    Kinds_
+    FunctionTypes_
   > => {
     function MiddlewareService() {}
     const class_ = MiddlewareService as any;
     class_[TypeId] = TypeId;
     class_.key = key;
-    class_.kinds = options?.kinds ?? allFunctionKinds;
+    class_.functionTypes = options?.functionTypes ?? allFunctionTypes;
     if (options?.error !== undefined) {
       Lazy.defineProperty(class_, "error", options.error);
     }
@@ -214,7 +214,7 @@ export interface AttachmentError<Message extends string> {
   readonly "~confect/MiddlewareSpec/AttachmentError": Message;
 }
 
-type FunctionKindOf<F extends FunctionSpec.AnyWithProps> =
+type FunctionTypeOf<F extends FunctionSpec.AnyWithProps> =
   F["runtimeAndFunctionType"]["functionType"];
 
 type ValidationResult<Errors> = [Errors] extends [never] ? unknown : Errors;
@@ -223,14 +223,14 @@ type ValidationResult<Errors> = [Errors] extends [never] ? unknown : Errors;
  * Validate one or more functions against one or more middleware
  * (distributing over both unions):
  *
- * - A Convex-provenance function whose kind is among the middleware's
- *   declared `kinds` is rejected — its raw handler is passed through
+ * - A Convex-provenance function whose function type is among the middleware's
+ *   declared `functionTypes` is rejected — its raw handler is passed through
  *   untouched, so the middleware could not actually cover it, and silently
- *   skipping it would be a policy hole. (One whose kind is *not* declared is
+ *   skipping it would be a policy hole. (One whose function type is *not* declared is
  *   fine: the middleware makes no claim about it.)
- * - A Confect-provenance function whose kind the middleware does not declare
- *   is rejected — every covered function's kind must be among the
- *   middleware's `kinds`.
+ * - A Confect-provenance function whose function type the middleware does not declare
+ *   is rejected — every covered function's type must be among the
+ *   middleware's `functionTypes`.
  */
 export type ValidateFunction<
   F extends FunctionSpec.AnyWithProps,
@@ -238,15 +238,15 @@ export type ValidateFunction<
 > = F extends any
   ? M extends any
     ? F extends { readonly functionProvenance: { readonly _tag: "Convex" } }
-      ? FunctionKindOf<F> extends Kinds<M>
-        ? AttachmentError<`Convex-provenance function "${F["name"]}" cannot be covered by middleware "${Key<M>}" — attach middleware only to groups whose matching-kind functions are all Confect-provenance`>
+      ? FunctionTypeOf<F> extends FunctionTypes<M>
+        ? AttachmentError<`Convex-provenance function "${F["name"]}" cannot be covered by middleware "${Key<M>}" — attach middleware only to groups whose matching-type functions are all Confect-provenance`>
         : never
       : [
             Extract<FunctionSpec.Middlewares<F>, { readonly key: Key<M> }>,
           ] extends [never]
-        ? FunctionKindOf<F> extends Kinds<M>
+        ? FunctionTypeOf<F> extends FunctionTypes<M>
           ? never
-          : AttachmentError<`Middleware "${Key<M>}" does not declare kind "${FunctionKindOf<F>}", the kind of function "${F["name"]}"`>
+          : AttachmentError<`Middleware "${Key<M>}" does not declare function type "${FunctionTypeOf<F>}", the type of function "${F["name"]}"`>
         : AttachmentError<`Middleware "${Key<M>}" is already attached to function "${F["name"]}"`>
     : never
   : never;
@@ -336,7 +336,7 @@ export type ValidateImplRequires<
 /**
  * The parameter-type validation applied by `FunctionSpec`'s `.middleware()`:
  * plain Convex functions cannot carry middleware, the middleware must
- * declare the function's kind, and it must not already be attached to the
+ * declare the function's type, and it must not already be attached to the
  * function.
  */
 export type ValidateFunctionAttach<
@@ -347,7 +347,7 @@ export type ValidateFunctionAttach<
 > = FunctionProvenance_ extends { readonly _tag: "Convex" }
   ? AttachmentError<`Plain Convex functions cannot have middleware — their raw handlers are passed through untouched`>
   : [Extract<Middlewares_, { readonly key: Key<M> }>] extends [never]
-    ? RuntimeAndFunctionType_["functionType"] extends Kinds<M>
+    ? RuntimeAndFunctionType_["functionType"] extends FunctionTypes<M>
       ? unknown
-      : AttachmentError<`Middleware "${Key<M>}" does not declare kind "${RuntimeAndFunctionType_["functionType"]}"`>
+      : AttachmentError<`Middleware "${Key<M>}" does not declare function type "${RuntimeAndFunctionType_["functionType"]}"`>
     : AttachmentError<`Middleware "${Key<M>}" is already attached to this function`>;

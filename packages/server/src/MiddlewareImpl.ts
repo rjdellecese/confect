@@ -54,8 +54,8 @@ export type FromGroupSpec<Group extends GroupSpec.AnyWithProps> =
     : never
   : never;
 
-/** The full ctx-service union for one function kind. */
-export type KindServices<
+/** The full ctx-service union for one function type. */
+export type FunctionTypeServices<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Kind extends FunctionType,
 > = Kind extends "query"
@@ -69,32 +69,32 @@ export type KindServices<
 /**
  * The services a single middleware implementation may use: the set-theoretic
  * intersection of the ctx-service unions of the middleware's declared
- * `kinds`, so one implementation is valid in every runtime it can be invoked
+ * `functionTypes`, so one implementation is valid in every runtime it can be invoked
  * in. Enumerated by hand rather than derived with `Exclude`/`Extract` —
  * several ctx services are structurally typed (e.g. the raw
  * `GenericQueryCtx`/`GenericMutationCtx` tags), so conditional-type set
  * arithmetic over them is not reliable.
  *
- * Note the singleton cases resolve to that kind's full union, and every
+ * Note the singleton cases resolve to that function type's full union, and every
  * combination involving both `"query"` and `"action"` bottoms out at
  * `Auth | StorageReader | QueryRunner`. A database-touching middleware that
- * declares all three kinds should use {@link makeByKind} rather than lean on
+ * declares all three functionTypes should use {@link makeByFunctionType} rather than lean on
  * `QueryRunner` — Convex best practices reserve `runQuery` for actions.
  */
 export type CommonServices<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  Kinds extends FunctionType,
-> = [Kinds] extends ["query"]
+  FunctionTypes extends FunctionType,
+> = [FunctionTypes] extends ["query"]
   ? Handler.QueryServices<DatabaseSchema_>
-  : [Kinds] extends ["mutation"]
+  : [FunctionTypes] extends ["mutation"]
     ? Handler.MutationServices<DatabaseSchema_>
-    : [Kinds] extends ["action"]
+    : [FunctionTypes] extends ["action"]
       ? Handler.ActionServices<DatabaseSchema_>
-      : [Kinds] extends ["query" | "mutation"]
+      : [FunctionTypes] extends ["query" | "mutation"]
         ? QueryMutationCommonServices<DatabaseSchema_>
-        : [Kinds] extends ["mutation" | "action"]
+        : [FunctionTypes] extends ["mutation" | "action"]
           ? MutationActionCommonServices
-          : AllKindsCommonServices;
+          : AllFunctionTypesCommonServices;
 
 type QueryMutationCommonServices<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
@@ -112,7 +112,7 @@ type MutationActionCommonServices =
   | QueryRunner.QueryRunner
   | MutationRunner.MutationRunner;
 
-type AllKindsCommonServices =
+type AllFunctionTypesCommonServices =
   | Auth.Auth
   | StorageReader.StorageReader
   | QueryRunner.QueryRunner;
@@ -162,11 +162,11 @@ const layerFromImpls = <Middleware extends MiddlewareSpec.AnyService>(
 
 /**
  * Provide a middleware's implementation with a single strategy shared by
- * every kind the middleware declares. The implementation's environment is
+ * every function type the middleware declares. The implementation's environment is
  * bounded by {@link CommonServices} — the intersection of the declared
- * kinds' ctx services — plus the middleware's declared `requires`, which
+ * functionTypes' ctx services — plus the middleware's declared `requires`, which
  * middleware running earlier in the chain provide. Reach for
- * {@link makeByKind} when one strategy can't fit all declared kinds (the
+ * {@link makeByFunctionType} when one strategy can't fit all declared functionTypes (the
  * usual case for database-touching middleware attached to actions).
  *
  * Like `FunctionImpl.make`, `databaseSchema` is a type-level carrier only.
@@ -180,38 +180,39 @@ export const make = <
   impl: MiddlewareSpec.Middleware<
     MiddlewareSpec.Provides<Middleware>,
     MiddlewareSpec.Error<Middleware>,
-    | CommonServices<DatabaseSchema_, MiddlewareSpec.Kinds<Middleware>>
+    | CommonServices<DatabaseSchema_, MiddlewareSpec.FunctionTypes<Middleware>>
     | MiddlewareSpec.Requires<Middleware>
   >,
 ): Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<Middleware>>> =>
   layerFromImpls(
     middleware,
     Object.fromEntries(
-      middleware.kinds.map((kind) => [
-        kind,
+      middleware.functionTypes.map((functionType) => [
+        functionType,
         impl as MiddlewareSpec.AnyMiddleware,
       ]),
     ),
   );
 
 /**
- * Provide a middleware's implementation with one strategy per declared kind.
- * Each entry may use that kind's full ctx-service union — the recommended
+ * Provide a middleware's implementation with one strategy per declared function type.
+ * Each entry may use that function type's full ctx-service union — the recommended
  * shape for database-touching middleware that also covers actions: use
  * `DatabaseReader`/`DatabaseWriter` in queries and mutations, and `runQuery`
  * of an internal query in actions.
  */
-export const makeByKind = <
+export const makeByFunctionType = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Middleware extends MiddlewareSpec.AnyService,
 >(
   _databaseSchema: DatabaseSchema_,
   middleware: Middleware,
   impls: {
-    readonly [Kind in MiddlewareSpec.Kinds<Middleware>]: MiddlewareSpec.Middleware<
+    readonly [Kind in MiddlewareSpec.FunctionTypes<Middleware>]: MiddlewareSpec.Middleware<
       MiddlewareSpec.Provides<Middleware>,
       MiddlewareSpec.Error<Middleware>,
-      KindServices<DatabaseSchema_, Kind> | MiddlewareSpec.Requires<Middleware>
+      | FunctionTypeServices<DatabaseSchema_, Kind>
+      | MiddlewareSpec.Requires<Middleware>
     >;
   },
 ): Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<Middleware>>> =>
@@ -235,7 +236,7 @@ export const provides = <
   effect: Effect.Effect<
     Shape,
     MiddlewareSpec.Error<Middleware>,
-    | CommonServices<DatabaseSchema_, MiddlewareSpec.Kinds<Middleware>>
+    | CommonServices<DatabaseSchema_, MiddlewareSpec.FunctionTypes<Middleware>>
     | MiddlewareSpec.Requires<Middleware>
   >,
 ): Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<Middleware>>> =>

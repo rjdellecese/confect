@@ -32,7 +32,7 @@ class RequireUser extends MiddlewareSpec.Service<
 
 class MutationOnly extends MiddlewareSpec.Service<MutationOnly>()(
   "MutationOnly",
-  { kinds: ["mutation"] },
+  { functionTypes: ["mutation"] },
 ) {}
 
 const query = FunctionSpec.publicQuery({
@@ -101,13 +101,17 @@ describe("`middleware` lives on `Builder`, not `FunctionSpec`", () => {
 });
 
 describe("Service", () => {
-  it("stores the key and defaults kinds to all three", () => {
+  it("stores the key and defaults functionTypes to all three", () => {
     expect(RequireUser.key).toBe("RequireUser");
-    expect(RequireUser.kinds).toStrictEqual(["query", "mutation", "action"]);
+    expect(RequireUser.functionTypes).toStrictEqual([
+      "query",
+      "mutation",
+      "action",
+    ]);
   });
 
-  it("stores declared kinds", () => {
-    expect(MutationOnly.kinds).toStrictEqual(["mutation"]);
+  it("stores declared functionTypes", () => {
+    expect(MutationOnly.functionTypes).toStrictEqual(["mutation"]);
   });
 
   it("installs the error schema lazily, observable via presence checks", () => {
@@ -131,7 +135,7 @@ describe("Service", () => {
     expect("error" in MutationOnly).toBe(false);
   });
 
-  it("extracts Provides, Error, and Kinds at the type level", () => {
+  it("extracts Provides, Error, and FunctionTypes at the type level", () => {
     expectTypeOf<
       MiddlewareSpec.Provides<typeof RequireUser>
     >().toEqualTypeOf<CurrentUser>();
@@ -141,11 +145,11 @@ describe("Service", () => {
     expectTypeOf<MiddlewareSpec.Provides<typeof MutationOnly>>().toBeNever();
     expectTypeOf<MiddlewareSpec.Error<typeof MutationOnly>>().toBeNever();
     expectTypeOf<
-      MiddlewareSpec.Kinds<typeof MutationOnly>
+      MiddlewareSpec.FunctionTypes<typeof MutationOnly>
     >().toEqualTypeOf<"mutation">();
-    expectTypeOf<MiddlewareSpec.Kinds<typeof RequireUser>>().toEqualTypeOf<
-      "query" | "mutation" | "action"
-    >();
+    expectTypeOf<
+      MiddlewareSpec.FunctionTypes<typeof RequireUser>
+    >().toEqualTypeOf<"query" | "mutation" | "action">();
   });
 });
 
@@ -184,13 +188,13 @@ describe("GroupSpec.middleware", () => {
     >();
   });
 
-  it("rejects attaching middleware whose kinds don't cover a declared function", () => {
-    // @ts-expect-error — MutationOnly does not declare kind "query"
+  it("rejects attaching middleware whose functionTypes don't cover a declared function", () => {
+    // @ts-expect-error — MutationOnly does not declare function type "query"
     GroupSpec.make().addFunction(query).middleware(MutationOnly);
   });
 
-  it("rejects adding a function whose kind an attached middleware doesn't declare", () => {
-    // @ts-expect-error — MutationOnly does not declare kind "query"
+  it("rejects adding a function whose type an attached middleware doesn't declare", () => {
+    // @ts-expect-error — MutationOnly does not declare function type "query"
     GroupSpec.make().middleware(MutationOnly).addFunction(query);
   });
 
@@ -287,12 +291,12 @@ describe("FunctionSpec.middleware", () => {
     );
   });
 
-  it("rejects middleware whose kinds don't include the function's kind", () => {
+  it("rejects middleware whose functionTypes don't include the function's type", () => {
     expect(() =>
-      // @ts-expect-error — MutationOnly does not declare kind "query"
+      // @ts-expect-error — MutationOnly does not declare function type "query"
       query.middleware(MutationOnly),
     ).toThrowErrorMatchingInlineSnapshot(
-      `[Error: Middleware "MutationOnly" does not declare kind "query" of function "getThing"]`,
+      `[Error: Middleware "MutationOnly" does not declare function type "query" of function "getThing"]`,
     );
   });
 

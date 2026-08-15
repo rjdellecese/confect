@@ -130,10 +130,10 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
 
 /**
  * Pair each middleware spec attached to a function with its registered
- * implementation for the function's kind. Both misses are ruled out by the
+ * implementation for the function's type. Both misses are ruled out by the
  * type system (`GroupImpl.finalize` demands every attached middleware's
- * `MiddlewareImpl` service; `MiddlewareImpl.make`/`makeByKind` cover exactly
- * the declared kinds, which `GroupSpec.middleware` requires to cover every
+ * `MiddlewareImpl` service; `MiddlewareImpl.make`/`makeByFunctionType` cover exactly
+ * the declared functionTypes, which `GroupSpec.middleware` requires to cover every
  * function) — these throws are the runtime backstop for builds that ignored
  * type errors.
  */
@@ -145,7 +145,7 @@ const resolveMiddlewares = (
     const registered = middlewareItems.get(middleware.key);
     if (registered === undefined) {
       throw new Error(
-        `Middleware "${middleware.key}" is attached to this group's spec, but no implementation was provided — pipe the group's impl through \`Layer.provide(MiddlewareImpl.make(...))\` (or \`makeByKind\`/\`provides\`).`,
+        `Middleware "${middleware.key}" is attached to this group's spec, but no implementation was provided — pipe the group's impl through \`Layer.provide(MiddlewareImpl.make(...))\` (or \`makeByFunctionType\`/\`provides\`).`,
       );
     }
 
@@ -154,7 +154,7 @@ const resolveMiddlewares = (
     const impl = registered.impls[functionType];
     if (impl === undefined) {
       throw new Error(
-        `Middleware "${middleware.key}" has no implementation for kind "${functionType}", the kind of function "${registryItem.functionSpec.name}". Declare the kind in the middleware's \`kinds\` and cover it in \`MiddlewareImpl.makeByKind\`.`,
+        `Middleware "${middleware.key}" has no implementation for function type "${functionType}", the type of function "${registryItem.functionSpec.name}". Declare the function type in the middleware's \`functionTypes\` and cover it in \`MiddlewareImpl.makeByFunctionType\`.`,
       );
     }
 

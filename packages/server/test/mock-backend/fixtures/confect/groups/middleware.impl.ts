@@ -44,7 +44,7 @@ const viewerViaRunQuery = Effect.gen(function* () {
   return { username };
 });
 
-const ProvideViewerLive = MiddlewareImpl.makeByKind(
+const ProvideViewerLive = MiddlewareImpl.makeByFunctionType(
   databaseSchema,
   ProvideViewer,
   {

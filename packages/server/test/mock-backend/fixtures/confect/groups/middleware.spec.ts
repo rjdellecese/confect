@@ -21,7 +21,7 @@ export class NameTooShort extends Schema.TaggedError<NameTooShort>()(
 /**
  * The flagship middleware shape: provides `Viewer` to downstream handlers,
  * short-circuiting with the typed `NoViewer` error when no user exists.
- * Declares all three kinds; the impl uses `makeByKind` (`DatabaseReader` in
+ * Declares all three functionTypes; the impl uses `makeByFunctionType` (`DatabaseReader` in
  * queries/mutations, `QueryRunner` of an internal query in actions).
  */
 export class ProvideViewer extends MiddlewareSpec.Service<

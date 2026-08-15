@@ -78,7 +78,7 @@ describe("middleware", () => {
     );
 
     it.effect(
-      "provides a service to an action handler via the per-kind QueryRunner strategy",
+      "provides a service to an action handler via the per-function-type QueryRunner strategy",
       () =>
         Effect.gen(function* () {
           const c = yield* TestConfect.TestConfect;

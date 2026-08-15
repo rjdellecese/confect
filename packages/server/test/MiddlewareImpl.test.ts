@@ -157,7 +157,7 @@ describe("implementation service bounds", () => {
     "mutation"
   >;
 
-  it("bounds all-kinds middleware to the auth/storage/runQuery intersection", () => {
+  it("bounds all-functionTypes middleware to the auth/storage/runQuery intersection", () => {
     expectTypeOf<Extract<AllKinds, ReaderService>>().toBeNever();
     expectTypeOf<Extract<AllKinds, WriterService>>().toBeNever();
   });
@@ -169,7 +169,7 @@ describe("implementation service bounds", () => {
     expectTypeOf<Extract<QueryMutation, WriterService>>().toBeNever();
   });
 
-  it("gives single-kind middleware that kind's full ctx union", () => {
+  it("gives single-function-type middleware that type's full ctx union", () => {
     expectTypeOf<MutationOnly>().toEqualTypeOf<
       Handler.MutationServices<typeof databaseSchema>
     >();
