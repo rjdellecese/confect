@@ -1,4 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
+import type * as FunctionProvenance from "@confect/core/FunctionProvenance";
 import * as FunctionSpec from "@confect/core/FunctionSpec";
 import * as GroupSpec from "@confect/core/GroupSpec";
 import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
@@ -51,6 +52,52 @@ const mutation = FunctionSpec.publicMutation({
   name: "setThing",
   args: () => Schema.Struct({}),
   returns: () => Schema.Null,
+});
+
+describe("`middleware` lives on `Builder`, not `FunctionSpec`", () => {
+  it("keeps the erased constraint type method-free", () => {
+    expectTypeOf<
+      "middleware" extends keyof FunctionSpec.AnyWithProps ? true : false
+    >().toEqualTypeOf<false>();
+    expectTypeOf<
+      "middleware" extends keyof typeof mutation ? true : false
+    >().toEqualTypeOf<true>();
+  });
+
+  it("keeps `Extract`-narrowed generics satisfying the erased bound", () => {
+    // This mirrors what `Handler` does and is the reason the method is on
+    // `Builder`: narrow a *generic* spec parameter with `Extract`, then hand
+    // the result to a type that re-imposes the erased bound. Adding a
+    // generic `middleware` method to `FunctionSpec` makes the narrowed
+    // `Extract<F, …> & F` stop satisfying that bound, and this alias alone
+    // fails to compile (as `Handler.ts` did, with six TS2344s).
+    type NeedsErasedBound<
+      F extends
+        FunctionSpec.AnyWithPropsWithFunctionProvenance<FunctionProvenance.AnyConfect>,
+    > = FunctionSpec.Returns<F>;
+
+    type LikeHandler<F extends FunctionSpec.AnyWithProps> =
+      F extends FunctionSpec.WithFunctionProvenance<
+        F,
+        FunctionProvenance.AnyConfect
+      >
+        ? NeedsErasedBound<F>
+        : never;
+
+    expectTypeOf<LikeHandler<typeof mutation>>().toEqualTypeOf<null>();
+    expectTypeOf<LikeHandler<typeof query>>().toEqualTypeOf<string>();
+  });
+
+  it("still narrows a spec union by name and by function type", () => {
+    type Union = typeof query | typeof mutation;
+
+    expectTypeOf<FunctionSpec.WithName<Union, "setThing">>().toEqualTypeOf<
+      typeof mutation
+    >();
+    expectTypeOf<FunctionSpec.WithFunctionType<Union, "query">>().toEqualTypeOf<
+      typeof query
+    >();
+  });
 });
 
 describe("Service", () => {

@@ -30,17 +30,9 @@ export interface FunctionSpec<
   readonly functionVisibility: FunctionVisibility_;
   readonly name: Name_;
   readonly functionProvenance: FunctionProvenance_;
-  /** Middleware attached to this function specifically, in attachment order. */
   readonly middlewares: ReadonlyArray<Middlewares_>;
 }
 
-/**
- * The shape the `FunctionSpec` constructors return: a `FunctionSpec` plus
- * its builder method(s). Kept separate from {@link FunctionSpec} itself so
- * the erased `Any*` constraint types stay method-free — the generic
- * `middleware` signature would otherwise defeat the `Extract`-based
- * narrowing that `Handler` and friends perform over function-spec unions.
- */
 export interface Builder<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility_ extends FunctionVisibility,
@@ -54,16 +46,6 @@ export interface Builder<
   FunctionProvenance_,
   Middlewares_
 > {
-  /**
-   * Attach a middleware to this function specifically. It runs after (inside)
-   * any group-attached middleware, immediately around the handler. Attaching
-   * to a plain Convex function, attaching a middleware whose `kinds` don't
-   * include this function's kind, or attaching the same middleware twice are
-   * type errors — see {@link MiddlewareSpec.ValidateFunctionAttach}. A
-   * duplicate against the enclosing group's middleware is rejected where
-   * group and function meet, at `GroupSpec.addFunction` /
-   * `GroupSpec.middleware`.
-   */
   middleware<Middleware extends MiddlewareSpec.AnyService>(
     middleware: Middleware &
       MiddlewareSpec.ValidateFunctionAttach<
@@ -147,7 +129,6 @@ export type GetFunctionVisibility<FunctionSpec_ extends AnyWithProps> =
 
 export type Name<FunctionSpec_ extends AnyWithProps> = FunctionSpec_["name"];
 
-/** The union of middleware attached to a function (never when none are). */
 export type Middlewares<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_["middlewares"][number];
 

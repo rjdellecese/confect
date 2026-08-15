@@ -2,6 +2,7 @@ import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import type * as GroupSpec from "@confect/core/GroupSpec";
 import type * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import * as Registry from "@confect/core/Registry";
+import type { FunctionType } from "convex/server";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -56,7 +57,7 @@ export type FromGroupSpec<Group extends GroupSpec.AnyWithProps> =
 /** The full ctx-service union for one function kind. */
 export type KindServices<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  Kind extends MiddlewareSpec.FunctionKind,
+  Kind extends FunctionType,
 > = Kind extends "query"
   ? Handler.QueryServices<DatabaseSchema_>
   : Kind extends "mutation"
@@ -82,7 +83,7 @@ export type KindServices<
  */
 export type CommonServices<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  Kinds extends MiddlewareSpec.FunctionKind,
+  Kinds extends FunctionType,
 > = [Kinds] extends ["query"]
   ? Handler.QueryServices<DatabaseSchema_>
   : [Kinds] extends ["mutation"]
@@ -127,9 +128,7 @@ export type RegistryItemTypeId = typeof RegistryItemTypeId;
 export interface RegistryItem {
   readonly [RegistryItemTypeId]: RegistryItemTypeId;
   readonly middleware: MiddlewareSpec.AnyService;
-  readonly impls: Partial<
-    Record<MiddlewareSpec.FunctionKind, MiddlewareSpec.AnyMiddleware>
-  >;
+  readonly impls: Partial<Record<FunctionType, MiddlewareSpec.AnyMiddleware>>;
 }
 
 export const isRegistryItem = (u: unknown): u is RegistryItem =>

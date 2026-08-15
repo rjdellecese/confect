@@ -33,7 +33,6 @@ export interface GroupSpec<
   readonly groups: {
     [GroupName in Name<Groups_>]: WithName<Groups_, GroupName>;
   };
-  /** Middleware attached to this group, in attachment order. */
   readonly middlewares: ReadonlyArray<Middlewares_>;
 
   addFunction<Function extends FunctionSpec.AnyWithPropsWithRuntime<Runtime>>(
@@ -56,15 +55,6 @@ export interface GroupSpec<
     Middlewares_
   >;
 
-  /**
-   * Attach a middleware to this group. Declarative and order-independent: it
-   * applies to every Confect-provenance function the group declares, whether
-   * added before or after this call. Middleware does not propagate to
-   * subgroups. Attaching the same middleware twice, attaching one whose
-   * `kinds` don't cover a declared function's kind, or attaching to a group
-   * containing a matching-kind Convex-provenance function are all type
-   * errors — see {@link MiddlewareSpec.ValidateAttach}.
-   */
   middleware<Middleware extends MiddlewareSpec.AnyService>(
     middleware: Middleware &
       MiddlewareSpec.ValidateAttach<Middleware, Functions_, Middlewares_>,
@@ -101,7 +91,6 @@ export type Functions<Group extends AnyWithProps> =
 export type Groups<Group extends AnyWithProps> =
   Group["groups"][keyof Group["groups"]];
 
-/** The union of middleware attached to a group (never when none are). */
 export type Middlewares<Group extends AnyWithProps> =
   Group["middlewares"][number];
 

@@ -1,3 +1,4 @@
+import type { FunctionType } from "convex/server";
 import type * as Effect from "effect/Effect";
 import * as Predicate from "effect/Predicate";
 import type * as Schema from "effect/Schema";
@@ -12,14 +13,6 @@ export type TypeId = typeof TypeId;
 
 export const isMiddlewareSpec = (u: unknown): u is AnyService =>
   Predicate.hasProperty(u, TypeId);
-
-/**
- * The function kinds a middleware may attach to. Node actions fall under
- * `"action"` — a middleware implementation for the `"action"` kind must be
- * valid in both the Convex and Node action runtimes, which is why the
- * `"action"` service bound excludes the Node-only services.
- */
-export type FunctionKind = "query" | "mutation" | "action";
 
 export type AllFunctionKinds = ["query", "mutation", "action"];
 
@@ -81,7 +74,7 @@ export interface ServiceClass<
   Provides_,
   Requires_,
   ErrorSchema_ extends Schema.Codec<any, any>,
-  Kinds_ extends ReadonlyArray<FunctionKind>,
+  Kinds_ extends ReadonlyArray<FunctionType>,
 > {
   new (_: never): {
     readonly [TypeId]: TypeId;
@@ -105,7 +98,7 @@ export interface ServiceClass<
 export interface AnyService {
   readonly [TypeId]: TypeId;
   readonly key: string;
-  readonly kinds: ReadonlyArray<FunctionKind>;
+  readonly kinds: ReadonlyArray<FunctionType>;
   readonly error?: Schema.Codec<any, any>;
   readonly "~Provides": any;
   readonly "~Requires": any;
@@ -165,13 +158,18 @@ export const Service =
   <
     const Key_ extends string,
     ErrorSchema_ extends Schema.Codec<any, any> = never,
-    const Kinds_ extends ReadonlyArray<FunctionKind> = AllFunctionKinds,
+    const Kinds_ extends ReadonlyArray<FunctionType> = AllFunctionKinds,
   >(
     key: Key_,
     options?: {
       /** Lazily-evaluated error schema, like `FunctionSpec`'s `error`. */
       readonly error?: () => ErrorSchema_;
-      /** Function kinds this middleware may attach to. Default: all three. */
+      /**
+       * Function kinds this middleware may attach to. Default: all three.
+       * Node actions fall under `"action"`, so an `"action"` implementation
+       * must be valid in both action runtimes — which is why that kind's
+       * service bound excludes the Node-only services.
+       */
       readonly kinds?: Kinds_;
     },
   ): ServiceClass<
