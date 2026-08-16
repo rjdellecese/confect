@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+step() {
+  local description=$1
+  shift
+  local started=$SECONDS
+
+  printf '\n==> %s\n' "$description"
+  "$@"
+  printf '==> Finished in %ss\n' "$((SECONDS - started))"
+}
+
+repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+mise_bin="$HOME/.local/bin/mise"
+
+if ! command -v curl >/dev/null 2>&1; then
+  step "Updating apt metadata" sudo apt-get update
+  step "Installing curl" sudo apt-get install -y curl ca-certificates
+fi
+
+if [[ ! -x "$mise_bin" ]]; then
+  step "Installing mise" bash -c \
+    'curl -fsSL https://mise.run | MISE_INSTALL_PATH="$1" sh' _ "$mise_bin"
+fi
+
+profile_marker="# Confect orb toolchain"
+if ! grep -Fqx "$profile_marker" "$HOME/.bash_profile" 2>/dev/null; then
+  cat >>"$HOME/.bash_profile" <<EOF
+
+$profile_marker
+eval "\$("$mise_bin" activate bash --shims)"
+EOF
+fi
+
+step "Trusting the repository mise config" "$mise_bin" trust "$repo_root/mise.toml"
+step "Installing pinned toolchains" "$mise_bin" install
+step "Installing workspace dependencies" \
+  "$mise_bin" exec -- pnpm install --frozen-lockfile
+step "Building workspace packages" "$mise_bin" exec -- pnpm build
+
+printf '\nOrb setup complete.\n'

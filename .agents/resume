@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# This repository has no external services or tunnels to repair on wake.
+printf 'No orb resume work required.\n'
