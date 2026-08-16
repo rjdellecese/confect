@@ -1,5 +1,6 @@
 ---
-description: Upgrade internal-only dependencies (toolchain devDependencies and the private workspace packages' deps) and open a PR — no changeset
+name: upgrading-internal-dependencies
+description: Upgrades internal-only dependencies, including toolchain devDependencies and private workspace package dependencies, and opens a PR without a changeset. Use for internal dependency maintenance.
 ---
 
 Upgrade the dependencies that consumers of the `@confect/*` packages can never
@@ -8,7 +9,7 @@ see, and open a PR for review. Never merge it yourself.
 ## Scope
 
 Every `package.json` dependency that is **not** claimed by
-`/upgrade-published-deps` (whose scope covers the published packages'
+the `upgrading-published-dependencies` skill (whose scope covers the published packages'
 `dependencies`/`peerDependencies` plus their lockstep companions, such as
 `react-dom` with `react`): the workspace's devDependencies (build/test/lint
 toolchain, types) and the dependencies of every private workspace package —

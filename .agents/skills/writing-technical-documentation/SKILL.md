@@ -5,6 +5,12 @@ description: >-
   Mintlify's best practices (Diátaxis framework, audience awareness, style/tone,
   navigation, SEO/AEO). Use when writing, reviewing, or improving documentation,
   guides, tutorials, API references, or any user-facing technical content.
+mcpServers:
+  mintlify:
+    url: https://www.mintlify.com/docs/mcp
+    includeTools:
+      - search_mintlify
+      - query_docs_filesystem_mintlify
 ---
 
 # Writing technical documentation

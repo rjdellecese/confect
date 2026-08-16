@@ -6,6 +6,8 @@ description: >-
   and before opening a PR that changes published @confect/* code.
 ---
 
+# Creating changesets
+
 A changeset is a `.changeset/<name>.md` file: YAML frontmatter listing affected packages with semver bump types, then a changelog entry.
 
 ```md

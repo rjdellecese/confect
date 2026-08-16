@@ -1,5 +1,6 @@
 ---
-description: Upgrade the runtime version pins that live outside package.json dependency maps (Node, pnpm, bun) and open a PR
+name: upgrading-runtime-pins
+description: Upgrades Node, pnpm, and Bun runtime pins that live outside package.json dependency maps and opens a PR. Use for repository runtime and package-manager version maintenance.
 ---
 
 Upgrade the repo's pinned runtime versions and open a PR for review. Never

@@ -1,5 +1,6 @@
 ---
-description: Bump the v10 prerelease branch to the latest Effect v4 release candidate and propagate main, migrating source as needed, with changesets and stacked PRs against v10
+name: upgrading-effect-rc
+description: Updates the v10 prerelease branch to the latest Effect v4 release candidate, propagates main, migrates source, and creates changesets and stacked PRs. Use for scheduled or manual maintenance of the Effect v4 RC line.
 ---
 
 Keep the `v10` prerelease line on the latest Effect v4 release candidate and
@@ -7,8 +8,8 @@ current with `main`, and open PRs for review against `v10`. Never merge them
 yourself. (The managing-prereleases skill explains how the prerelease line
 itself works.)
 
-A scheduled routine invokes this command by name, and the name is resolved
-against this directory when the routine fires. Renaming this file therefore
+A scheduled routine invokes this skill by name, and the name is resolved
+against this directory when the routine fires. Renaming this skill therefore
 means updating that schedule in the same pass — otherwise the routine stops
 resolving and goes quiet.
 
@@ -17,7 +18,7 @@ resolving and goes quiet.
 - **Target branch:** `v10`. If it's gone, or
   `git show origin/v10:.changeset/pre.json` no longer says `"mode": "pre"`,
   the prerelease line has graduated: say so, stop, and suggest deleting this
-  command and its routine — they only exist for the v10 cycle.
+  skill and its routine — they only exist for the v10 cycle.
 - **Latest release candidate:** effect publishes v4 release candidates under
   the npm `rc` dist-tag, so `npm view effect@rc version` is the lookup.
   Compare it against the branch's current pin (`overrides.effect` in

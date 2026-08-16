@@ -1,5 +1,6 @@
 ---
-description: Upgrade dependencies on the published surface of the @confect/* packages (their dependencies/peerDependencies), with a changeset and a PR
+name: upgrading-published-dependencies
+description: Upgrades dependencies on the published surface of the @confect/* packages, including dependencies and peerDependencies, with a changeset and PR. Use for consumer-visible dependency maintenance.
 ---
 
 Upgrade the dependencies that consumers of the `@confect/*` packages can see,
@@ -14,7 +15,8 @@ by the field, not the name. A dependency is in scope iff it appears in the
 its lockstep companions: packages that must match its version (e.g.
 `react-dom` with `react`) and any `overrides` entry in `pnpm-workspace.yaml`
 that pins one of its transitive dependencies (e.g. `@effect/typeclass` with
-`effect`). Everything else is handled by `/upgrade-internal-deps`.
+`effect`). Everything else is handled by the `upgrading-internal-dependencies`
+skill.
 
 When bumping an in-scope dependency, move every occurrence across the
 workspace together — search the repo for the dependency's name rather than
