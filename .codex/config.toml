@@ -1,0 +1,6 @@
+[mcp_servers.Mintlify]
+url = "https://www.mintlify.com/docs/mcp"
+
+[mcp_servers.Lucide]
+command = "pnpm"
+args = ["dlx", "lucide-icons-mcp", "--stdio"]

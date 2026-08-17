@@ -1,4 +1,5 @@
 ---
+name: upgrade-internal-deps
 description: Upgrade internal-only dependencies (toolchain devDependencies and the private workspace packages' deps) and open a PR — no changeset
 ---
 
@@ -8,7 +9,7 @@ see, and open a PR for review. Never merge it yourself.
 ## Scope
 
 Every `package.json` dependency that is **not** claimed by
-`/upgrade-published-deps` (whose scope covers the published packages'
+the `upgrade-published-deps` skill (whose scope covers the published packages'
 `dependencies`/`peerDependencies` plus their lockstep companions, such as
 `react-dom` with `react`): the workspace's devDependencies (build/test/lint
 toolchain, types) and the dependencies of every private workspace package —

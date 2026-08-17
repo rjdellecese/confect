@@ -56,7 +56,14 @@ Run `pnpm test` to run all suites at once, or target a single package with `vite
 
 All @confect packages are in a fixed version group via Changesets, meaning they are always versioned and released together. Use `pnpm changeset` to create a changeset before merging a PR with user-facing changes.
 
-## Cursor Cloud specific instructions
+## Agent safety and edit checks
+
+- Never read `.env.local` files.
+- Do not read dependency source from `node_modules`, `.pnpm`, or `.pnpm-store`. Run `pnpm opensrc path <package-name>` and inspect the returned source directory instead. Cached dependency sources are indexed in `~/.opensrc/sources.json`.
+- After editing a file supported by Oxfmt, run `pnpm oxfmt --write <file>`.
+- After editing a JavaScript or TypeScript file, run `pnpm oxlint --fix <file>` and report any remaining diagnostics.
+
+## Cloud development environment
 
 ### Running the example app
 

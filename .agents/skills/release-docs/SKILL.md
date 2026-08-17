@@ -1,9 +1,9 @@
 ---
+name: release-docs
 description: Deploy docs for the current release by updating the release branch, without publishing a new version
-allowed-tools: Bash(git fetch:*), Bash(git log:*), Bash(git diff:*), Bash(gh workflow run:*), Bash(gh run list:*), Bash(gh run watch:*)
 ---
 
-Deploy the docs on `main` (or the ref given in $ARGUMENTS, if any) by triggering
+Deploy the docs on `main` (or a ref provided by the user, if any) by triggering
 the "Docs Release" workflow (`.github/workflows/docs-release.yml`), which
 force-pushes that ref to the `release` branch. Mintlify deploys docs from
 `release`, so this publishes docs updates without cutting a new npm release.

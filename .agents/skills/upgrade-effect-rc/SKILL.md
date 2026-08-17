@@ -1,4 +1,5 @@
 ---
+name: upgrade-effect-rc
 description: Bump the v10 prerelease branch to the latest Effect v4 release candidate and propagate main, migrating source as needed, with changesets and stacked PRs against v10
 ---
 
@@ -7,7 +8,7 @@ current with `main`, and open PRs for review against `v10`. Never merge them
 yourself. (The managing-prereleases skill explains how the prerelease line
 itself works.)
 
-A scheduled routine invokes this command by name, and the name is resolved
+A scheduled routine invokes this skill by name, and the name is resolved
 against this directory when the routine fires. Renaming this file therefore
 means updating that schedule in the same pass — otherwise the routine stops
 resolving and goes quiet.
@@ -17,7 +18,7 @@ resolving and goes quiet.
 - **Target branch:** `v10`. If it's gone, or
   `git show origin/v10:.changeset/pre.json` no longer says `"mode": "pre"`,
   the prerelease line has graduated: say so, stop, and suggest deleting this
-  command and its routine — they only exist for the v10 cycle.
+  skill and its routine — they only exist for the v10 cycle.
 - **Latest release candidate:** effect publishes v4 release candidates under
   the npm `rc` dist-tag, so `npm view effect@rc version` is the lookup.
   Compare it against the branch's current pin (`overrides.effect` in
@@ -30,7 +31,7 @@ resolving and goes quiet.
   changes at the boundary but its ordering doesn't.
 - **When 4.0 goes stable:** the RC phase is expected to end in Q3/Q4 2026,
   at which point `rc` stops moving and `npm view effect version` (the
-  `latest` tag) reads `4.x` instead of `3.x`. That's not a bump this command
+  `latest` tag) reads `4.x` instead of `3.x`. That's not a bump this skill
   can do on its own — pinning a stable `effect` is an ordinary dependency
   upgrade and the peer ranges want rethinking. Say so, do the `main`
   propagation if there is any, and stop; this file needs rewriting before
@@ -56,7 +57,7 @@ resolving and goes quiet.
   `@effect/platform-bun`, `@effect/vitest`) — all carry the same `rc`
   dist-tag and move to the same prerelease number together. Everything else,
   including `@effect/tsgo` (which versions independently), belongs to the
-  other upgrade commands.
+  other upgrade skills.
 
 ## Branches and PRs
 
@@ -129,7 +130,7 @@ targets `main`.
   APIs until checks pass. Effect considers its v4 interfaces final as of
   the RC, so breakage should now be rare and narrow rather than routine —
   but "rare" is not "none", and when it happens the migration is this
-  command's job, not a reason to bail. A bump that needs no source changes
+  skill's job, not a reason to bail. A bump that needs no source changes
   at all is the expected shape from here on.
 - If a migration genuinely can't be brought green with reasonable effort,
   stop that PR: a blocked sync means no branches and no PRs at all (the

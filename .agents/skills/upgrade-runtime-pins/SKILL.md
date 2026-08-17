@@ -1,4 +1,5 @@
 ---
+name: upgrade-runtime-pins
 description: Upgrade the runtime version pins that live outside package.json dependency maps (Node, pnpm, bun) and open a PR
 ---
 
