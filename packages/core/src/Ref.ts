@@ -8,7 +8,6 @@ import { makeFunctionReference } from "convex/server";
 import type { Value } from "convex/values";
 import { ConvexError } from "convex/values";
 import * as Effect from "effect/Effect";
-import { identity } from "effect/Function";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import type * as FunctionProvenance from "./FunctionProvenance";
@@ -199,128 +198,75 @@ export type FromFunctionSpec<
   FunctionSpec.Error<FunctionSpec_> | MiddlewareError
 >;
 
-interface DecodingOps {
-  readonly hasErrorSchema: boolean;
-  readonly errorSchema: Schema.Codec<any, any> | undefined;
-  readonly encodeArgs: (
-    args: unknown,
-  ) => Effect.Effect<unknown, Schema.SchemaError>;
-  readonly decodeReturns: (
-    returns: unknown,
-  ) => Effect.Effect<unknown, Schema.SchemaError>;
-  readonly encodeArgsSync: (args: unknown) => unknown;
-  readonly decodeArgsSync: (encodedArgs: unknown) => unknown;
-  readonly encodeReturnsSync: (returns: unknown) => unknown;
-  readonly decodeReturnsSync: (encodedReturns: unknown) => unknown;
-  readonly encodePaginatedQueryArgsSync: (args: unknown) => unknown;
-  readonly decodePaginationPageSync: (encodedPage: unknown) => unknown;
-}
-
 /**
- * A ref's wire-boundary codec surface, built once per ref from its spec's
- * `FunctionProvenance`. Only the `Confect` arm carries middleware and error
- * data; a `Convex`-provenance ref has nowhere to put either, so the pairing
- * (Convex provenance, covering middleware) is unrepresentable by construction.
+ * A ref's wire-boundary codec data, built once per ref from its spec's
+ * `FunctionProvenance`. Only the `Confect` arm carries schemas, middleware,
+ * and error data; a `Convex`-provenance ref has nowhere to put any of them,
+ * so states like (Convex provenance, covering middleware) are unrepresentable
+ * by construction. Presence and content of the error union are one value:
+ * `errorSchema` is `Some` exactly when decoding can succeed, with the
+ * schema itself built lazily inside the box (forcing the spec's error
+ * thunks only when it is first read).
  *
  * @internal
  */
 export type Decoding = ConfectDecoding | ConvexDecoding;
 
 /** @internal */
-export interface ConfectDecoding extends DecodingOps {
+export interface ConfectDecoding {
   readonly _tag: "Confect";
+  readonly provenance: ConfectProvenance;
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyService>;
+  readonly errorSchema: Option.Option<{
+    readonly schema: Schema.Codec<any, any>;
+  }>;
 }
 
 /** @internal */
-export interface ConvexDecoding extends DecodingOps {
+export interface ConvexDecoding {
   readonly _tag: "Convex";
 }
 
-const missingPaginatedProvenanceError = (functionName: string) =>
-  new globalThis.Error(
-    `Paginated query ref "${functionName}" was not built with ` +
-      "`FunctionSpec.publicPaginatedQuery` (or `FunctionSpec.internalPaginatedQuery`). " +
-      "Paginated encoding and decoding require the user-args and item schemas " +
-      "those constructors store. Define the function as, e.g.:\n\n" +
-      "  FunctionSpec.publicPaginatedQuery({\n" +
-      '    name: "...",\n' +
-      "    args: () => Schema.Struct({ ... }), // optional; without paginationOpts\n" +
-      "    item: () => ItemSchema,\n" +
-      "  })",
-  );
+type ConfectProvenance = Extract<
+  FunctionProvenance.FunctionProvenance,
+  { _tag: "Confect" }
+>;
 
-// The ops read `provenance`'s schemas inside their bodies, never at
-// construction — the provenance's properties are lazy self-memoising getters,
-// and building a ref must not force them. `"error" in` is the one safe
-// construction-time read: presence checks don't invoke getters (see `Lazy`).
+const convexDecoding: ConvexDecoding = { _tag: "Convex" };
+
+// `"error" in` presence checks don't invoke the provenance's lazy getters
+// (see `Lazy`), so `Some`/`None` is decided eagerly while the schema inside
+// the box stays lazy. The `Some` arm's schema list is non-empty by
+// construction — no undefined branch.
 const makeConfectDecoding = (
-  functionName: string,
-  provenance: Extract<
-    FunctionProvenance.FunctionProvenance,
-    { _tag: "Confect" }
-  >,
+  provenance: ConfectProvenance,
   middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyService>,
 ): ConfectDecoding => {
-  const paginatedKind = () => {
-    const kind = provenance.kind;
-    if (kind._tag !== "Paginated") {
-      throw missingPaginatedProvenanceError(functionName);
-    }
-    return kind;
-  };
+  const hasError =
+    "error" in provenance ||
+    middlewareSpecs.some((middleware) => "error" in middleware);
 
-  const decoding = {
-    _tag: "Confect" as const,
-    middlewareSpecs,
-    hasErrorSchema:
-      "error" in provenance ||
-      middlewareSpecs.some((middleware) => "error" in middleware),
-    encodeArgs: (args: unknown) => Schema.encodeEffect(provenance.args)(args),
-    decodeReturns: (returns: unknown) =>
-      Schema.decodeUnknownEffect(provenance.returns)(returns),
-    encodeArgsSync: (args: unknown) => Schema.encodeSync(provenance.args)(args),
-    decodeArgsSync: (encodedArgs: unknown) =>
-      Schema.decodeUnknownSync(provenance.args)(encodedArgs),
-    encodeReturnsSync: (returns: unknown) =>
-      Schema.encodeSync(provenance.returns)(returns),
-    decodeReturnsSync: (encodedReturns: unknown) =>
-      Schema.decodeUnknownSync(provenance.returns)(encodedReturns),
-    encodePaginatedQueryArgsSync: (args: unknown) =>
-      Schema.encodeUnknownSync(paginatedKind().userArgs)(args),
-    decodePaginationPageSync: (encodedPage: unknown) =>
-      Schema.decodeUnknownSync(paginatedKind().page)(encodedPage),
-  };
-
-  Lazy.defineProperty(decoding, "errorSchema", () => {
+  const errorSchemaBox = {};
+  Lazy.defineProperty(errorSchemaBox, "schema", () => {
     const schemas = [
       ...("error" in provenance
         ? [provenance.error as Schema.Codec<any, any>]
         : []),
       ...MiddlewareSpec.errorSchemas(middlewareSpecs),
     ];
-    return schemas.length === 0
-      ? undefined
-      : schemas.length === 1
-        ? schemas[0]
-        : Schema.Union(schemas);
+    return schemas.length === 1 ? schemas[0] : Schema.Union(schemas);
   });
 
-  return decoding as ConfectDecoding;
-};
-
-const convexDecoding: ConvexDecoding = {
-  _tag: "Convex",
-  hasErrorSchema: false,
-  errorSchema: undefined,
-  encodeArgs: Effect.succeed,
-  decodeReturns: Effect.succeed,
-  encodeArgsSync: identity,
-  decodeArgsSync: identity,
-  encodeReturnsSync: identity,
-  decodeReturnsSync: identity,
-  encodePaginatedQueryArgsSync: identity,
-  decodePaginationPageSync: identity,
+  return {
+    _tag: "Confect",
+    provenance,
+    middlewareSpecs,
+    errorSchema: hasError
+      ? Option.some(
+          errorSchemaBox as { readonly schema: Schema.Codec<any, any> },
+        )
+      : Option.none(),
+  };
 };
 
 export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
@@ -337,11 +283,7 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
   const provenance = functionSpec.functionProvenance;
   const decoding =
     provenance._tag === "Confect"
-      ? makeConfectDecoding(
-          `${functionNamespace}:${functionSpec.name}`,
-          provenance,
-          middlewares,
-        )
+      ? makeConfectDecoding(provenance, middlewares)
       : convexDecoding;
 
   const ref = { functionSpec, functionNamespace, decoding };
@@ -371,42 +313,55 @@ export const getFunctionReference = <Ref_ extends Any>(
 };
 
 export const hasErrorSchema = (ref: Any): boolean =>
-  ref.decoding.hasErrorSchema;
+  ref.decoding._tag === "Confect" && Option.isSome(ref.decoding.errorSchema);
 
 export const encodeArgs = <Ref_ extends Any>(
   ref: Ref_,
   args: Args<Ref_>,
-): Effect.Effect<unknown, Schema.SchemaError> => ref.decoding.encodeArgs(args);
+): Effect.Effect<unknown, Schema.SchemaError> =>
+  ref.decoding._tag === "Confect"
+    ? Schema.encodeEffect(ref.decoding.provenance.args)(args)
+    : Effect.succeed(args);
 
 export const decodeReturns = <Ref_ extends Any>(
   ref: Ref_,
   returns: unknown,
 ): Effect.Effect<Returns<Ref_>, Schema.SchemaError> =>
-  ref.decoding.decodeReturns(returns) as Effect.Effect<
-    Returns<Ref_>,
-    Schema.SchemaError
-  >;
+  ref.decoding._tag === "Confect"
+    ? Schema.decodeUnknownEffect(ref.decoding.provenance.returns)(returns)
+    : Effect.succeed(returns as Returns<Ref_>);
 
 export const encodeArgsSync = <Ref_ extends Any>(
   ref: Ref_,
   args: Args<Ref_>,
-): unknown => ref.decoding.encodeArgsSync(args);
+): unknown =>
+  ref.decoding._tag === "Confect"
+    ? Schema.encodeSync(ref.decoding.provenance.args)(args)
+    : args;
 
 export const decodeArgsSync = <Ref_ extends Any>(
   ref: Ref_,
   encodedArgs: unknown,
-): Args<Ref_> => ref.decoding.decodeArgsSync(encodedArgs) as Args<Ref_>;
+): Args<Ref_> =>
+  (ref.decoding._tag === "Confect"
+    ? Schema.decodeUnknownSync(ref.decoding.provenance.args)(encodedArgs)
+    : encodedArgs) as Args<Ref_>;
 
 export const encodeReturnsSync = <Ref_ extends Any>(
   ref: Ref_,
   returns: Returns<Ref_>,
-): unknown => ref.decoding.encodeReturnsSync(returns);
+): unknown =>
+  ref.decoding._tag === "Confect"
+    ? Schema.encodeSync(ref.decoding.provenance.returns)(returns)
+    : returns;
 
 export const decodeReturnsSync = <Ref_ extends Any>(
   ref: Ref_,
   encodedReturns: unknown,
 ): Returns<Ref_> =>
-  ref.decoding.decodeReturnsSync(encodedReturns) as Returns<Ref_>;
+  (ref.decoding._tag === "Confect"
+    ? Schema.decodeUnknownSync(ref.decoding.provenance.returns)(encodedReturns)
+    : encodedReturns) as Returns<Ref_>;
 
 const ConvexErrorIdentifier = Symbol.for("ConvexError");
 
@@ -446,16 +401,23 @@ export const decodeErrorOrElse =
  * into, and the caller is responsible for deciding what to do (typically:
  * surface the original value as a defect).
  */
+const errorSchemaOf = (ref: Any): Option.Option<Schema.Codec<any, any>> =>
+  ref.decoding._tag === "Confect"
+    ? Option.map(ref.decoding.errorSchema, (box) => box.schema)
+    : Option.none();
+
 export const decodeError = <Ref_ extends Any>(
   ref: Ref_,
   encodedError: unknown,
 ): Effect.Effect<Option.Option<Error<Ref_>>, Schema.SchemaError> =>
-  ref.decoding.errorSchema !== undefined
-    ? Effect.map(
-        Schema.decodeUnknownEffect(ref.decoding.errorSchema)(encodedError),
+  Option.match(errorSchemaOf(ref), {
+    onNone: () => Effect.succeed(Option.none<Error<Ref_>>()),
+    onSome: (schema) =>
+      Effect.map(
+        Schema.decodeUnknownEffect(schema)(encodedError),
         Option.some,
-      )
-    : Effect.succeed(Option.none<Error<Ref_>>());
+      ) as Effect.Effect<Option.Option<Error<Ref_>>, Schema.SchemaError>,
+  });
 
 /**
  * Synchronous counterpart to `decodeError`. Returns `None` when the value is
@@ -476,11 +438,37 @@ export const decodeErrorOption = <Ref_ extends Any>(
   ref: Ref_,
   encodedError: unknown,
 ): Option.Option<Error<Ref_>> =>
-  ref.decoding.errorSchema !== undefined
-    ? (Schema.decodeUnknownOption(ref.decoding.errorSchema)(
-        encodedError,
-      ) as Option.Option<Error<Ref_>>)
-    : Option.none<Error<Ref_>>();
+  Option.flatMap(
+    errorSchemaOf(ref),
+    (schema) =>
+      Schema.decodeUnknownOption(schema)(encodedError) as Option.Option<
+        Error<Ref_>
+      >,
+  );
+
+const missingPaginatedProvenanceError = (ref: Any) =>
+  new globalThis.Error(
+    `Paginated query ref "${getConvexFunctionName(ref)}" was not built with ` +
+      "`FunctionSpec.publicPaginatedQuery` (or `FunctionSpec.internalPaginatedQuery`). " +
+      "Paginated encoding and decoding require the user-args and item schemas " +
+      "those constructors store. Define the function as, e.g.:\n\n" +
+      "  FunctionSpec.publicPaginatedQuery({\n" +
+      '    name: "...",\n' +
+      "    args: () => Schema.Struct({ ... }), // optional; without paginationOpts\n" +
+      "    item: () => ItemSchema,\n" +
+      "  })",
+  );
+
+const paginatedKind = (
+  ref: Any,
+  decoding: ConfectDecoding,
+): Extract<FunctionProvenance.ConfectKind, { _tag: "Paginated" }> => {
+  const kind = decoding.provenance.kind;
+  if (kind._tag !== "Paginated") {
+    throw missingPaginatedProvenanceError(ref);
+  }
+  return kind;
+};
 
 /**
  * Encode the args of a paginated query ref via its user-args schema —
@@ -494,7 +482,10 @@ export const encodePaginatedQueryArgsSync = <
 >(
   ref: Ref_,
   args: Omit<Args<Ref_>, "paginationOpts">,
-): unknown => ref.decoding.encodePaginatedQueryArgsSync(args);
+): unknown =>
+  ref.decoding._tag === "Confect"
+    ? Schema.encodeUnknownSync(paginatedKind(ref, ref.decoding).userArgs)(args)
+    : args;
 
 /**
  * Decode a page of a paginated query's results via the ref's item schema.
@@ -505,7 +496,11 @@ export const decodePaginationPageSync = <Ref_ extends AnyPublicPaginatedQuery>(
   ref: Ref_,
   encodedPage: unknown,
 ): Returns<Ref_>["page"] =>
-  ref.decoding.decodePaginationPageSync(encodedPage) as Returns<Ref_>["page"];
+  (ref.decoding._tag === "Confect"
+    ? Schema.decodeUnknownSync(paginatedKind(ref, ref.decoding).page)(
+        encodedPage,
+      )
+    : encodedPage) as Returns<Ref_>["page"];
 
 /**
  * Encode args via the ref's args schema, invoke `call`, decode returns via the
@@ -545,7 +540,7 @@ export const runWithCodec = <Ref_ extends Any, E = never>(
         },
       });
 
-    const encodedArgs = yield* ref.decoding.encodeArgs(args);
+    const encodedArgs = yield* encodeArgs(ref, args);
     const encodedReturns = yield* invoke(encodedArgs);
-    return (yield* ref.decoding.decodeReturns(encodedReturns)) as Returns<Ref_>;
+    return yield* decodeReturns(ref, encodedReturns);
   });
