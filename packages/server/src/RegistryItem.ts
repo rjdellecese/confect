@@ -1,7 +1,7 @@
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import type * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
+import * as Match from "effect/Match";
 import * as Predicate from "effect/Predicate";
-import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as Handler from "./Handler";
 
 export const TypeId = "@confect/server/RegistryItem";
@@ -14,21 +14,28 @@ const RegistryItemProto = {
   [TypeId]: TypeId,
 };
 
-export interface RegistryItem<
-  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  FunctionSpec_ extends FunctionSpec.AnyWithProps,
-> {
+/**
+ * A function registered by `FunctionImpl.make`, one of two shapes keyed by
+ * the spec's provenance. Only the `Confect` arm carries covering middleware —
+ * a plain Convex function's raw registered handler passes through Confect
+ * untouched, so the pairing (Convex item, covering middleware) is
+ * unrepresentable.
+ */
+export type AnyWithProps = ConfectRegistryItem | ConvexRegistryItem;
+
+export interface ConfectRegistryItem {
   readonly [TypeId]: TypeId;
-  readonly functionSpec: FunctionSpec_;
+  readonly _tag: "Confect";
+  readonly functionSpec: FunctionSpec.AnyConfect;
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyService>;
-  readonly handler: Handler.Handler<DatabaseSchema_, FunctionSpec_>;
+  readonly handler: Handler.AnyConfectProvenance;
 }
 
-export interface AnyWithProps {
+export interface ConvexRegistryItem {
   readonly [TypeId]: TypeId;
-  readonly functionSpec: FunctionSpec.AnyWithProps;
-  readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyService>;
-  readonly handler: Handler.Any;
+  readonly _tag: "Convex";
+  readonly functionSpec: FunctionSpec.AnyConvex;
+  readonly handler: Handler.AnyConvexProvenance;
 }
 
 /**
@@ -46,11 +53,25 @@ export const make = ({
   middlewareSpecs,
 }: {
   functionSpec: FunctionSpec.AnyWithProps;
-  handler: AnyWithProps["handler"];
-  middlewareSpecs: AnyWithProps["middlewareSpecs"];
+  handler: Handler.Any;
+  /** The middleware covering this function. */
+  middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyService>;
 }): AnyWithProps =>
-  Object.assign(Object.create(RegistryItemProto), {
-    functionSpec,
-    handler,
-    middlewareSpecs,
-  });
+  Match.value(functionSpec.functionProvenance).pipe(
+    Match.tag("Convex", (): AnyWithProps =>
+      Object.assign(Object.create(RegistryItemProto), {
+        _tag: "Convex" as const,
+        functionSpec: functionSpec as FunctionSpec.AnyConvex,
+        handler: handler as Handler.AnyConvexProvenance,
+      }),
+    ),
+    Match.tag("Confect", (): AnyWithProps =>
+      Object.assign(Object.create(RegistryItemProto), {
+        _tag: "Confect" as const,
+        functionSpec: functionSpec as FunctionSpec.AnyConfect,
+        middlewareSpecs,
+        handler: handler as Handler.AnyConfectProvenance,
+      }),
+    ),
+    Match.exhaustive,
+  );

@@ -10,40 +10,33 @@ import type { Schema } from "effect";
 import * as Layer from "effect/Layer";
 import * as Match from "effect/Match";
 import type * as DatabaseSchema from "./DatabaseSchema";
-import type * as Handler from "./Handler";
 import * as RegisteredFunction from "./RegisteredFunction";
 import type * as RegistryItem from "./RegistryItem";
 
 export const make = (
   databaseSchema: DatabaseSchema.AnyWithProps,
-  { functionSpec, handler }: RegistryItem.AnyWithProps,
+  { functionSpec, handler }: RegistryItem.ConfectRegistryItem,
   middlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware> = [],
-): RegisteredFunction.Any =>
-  Match.value(functionSpec.functionProvenance).pipe(
-    Match.tag("Convex", () => handler as RegisteredFunction.Any),
-    Match.tag("Confect", () => {
-      const { functionVisibility, functionProvenance } =
-        functionSpec as FunctionSpec.AnyConfect;
+): RegisteredFunction.Any => {
+  const { functionVisibility, functionProvenance } = functionSpec;
 
-      const genericFunction = Match.value(functionVisibility).pipe(
-        Match.when("public", () => actionGeneric),
-        Match.when("internal", () => internalActionGeneric),
-        Match.exhaustive,
-      );
-
-      return genericFunction(
-        nodeActionFunction(databaseSchema, {
-          functionSpec,
-          args: functionProvenance.args,
-          returns: functionProvenance.returns,
-          error: functionProvenance.error,
-          handler: handler as Handler.AnyConfectProvenance,
-          middlewares,
-        }),
-      );
-    }),
+  const genericFunction = Match.value(functionVisibility).pipe(
+    Match.when("public", () => actionGeneric),
+    Match.when("internal", () => internalActionGeneric),
     Match.exhaustive,
   );
+
+  return genericFunction(
+    nodeActionFunction(databaseSchema, {
+      functionSpec,
+      args: functionProvenance.args,
+      returns: functionProvenance.returns,
+      error: functionProvenance.error,
+      handler,
+      middlewares,
+    }),
+  );
+};
 
 const nodeActionFunction = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,

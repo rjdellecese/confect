@@ -74,10 +74,10 @@ export const make = <
           RegistryItem.make({
             functionSpec,
             handler,
-            middlewareSpecs:
-              functionSpec.functionProvenance._tag === "Confect"
-                ? [...group.middlewares, ...functionSpec.middlewares]
-                : [],
+            middlewareSpecs: [
+              ...group.middlewares,
+              ...functionSpec.middlewares,
+            ],
           }),
         ),
       );

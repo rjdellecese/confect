@@ -4,6 +4,7 @@ import * as Registry from "@confect/core/Registry";
 import type * as Spec from "@confect/core/Spec";
 import type { Layer, Types } from "effect";
 import * as Effect from "effect/Effect";
+import * as Match from "effect/Match";
 import * as Ref from "effect/Ref";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as GroupImpl from "./GroupImpl";
@@ -86,7 +87,7 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
   groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,
   makeRegisteredFunction: (
     databaseSchema: DatabaseSchema.AnyWithProps,
-    registryItem: RegistryItem.AnyWithProps,
+    registryItem: RegistryItem.ConfectRegistryItem,
     middlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>,
   ) => RegisteredFunction.Any,
 ): RegisteredFunctionsForGroupSpec<Group> => {
@@ -120,10 +121,16 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
     functionItems as { [key: string]: RegistryItem.AnyWithProps },
     RegistryItem.isRegistryItem,
     (registryItem) =>
-      makeRegisteredFunction(
-        databaseSchema,
-        registryItem,
-        resolveMiddlewares(registryItem, middlewareItems),
+      Match.value(registryItem).pipe(
+        Match.tag("Convex", (item) => item.handler),
+        Match.tag("Confect", (item) =>
+          makeRegisteredFunction(
+            databaseSchema,
+            item,
+            resolveMiddlewares(item, middlewareItems),
+          ),
+        ),
+        Match.exhaustive,
       ),
   ) as RegisteredFunctionsForGroupSpec<Group>;
 };
@@ -138,7 +145,7 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
  * type errors.
  */
 const resolveMiddlewares = (
-  registryItem: RegistryItem.AnyWithProps,
+  registryItem: RegistryItem.ConfectRegistryItem,
   middlewareItems: ReadonlyMap<string, MiddlewareImpl.RegistryItem>,
 ): ReadonlyArray<RegistryItem.ResolvedMiddleware> =>
   registryItem.middlewareSpecs.map((middlewareSpec) => {
