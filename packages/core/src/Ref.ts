@@ -88,21 +88,16 @@ export interface ConfectRef<
   /** @internal */
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyService>;
   /**
-   * The schema for decoding this function's typed errors — the function's
-   * declared `error` schema unioned with each covering middleware's.
-   *
-   * Whether a ref has a typed error at all is knowable cheaply when the ref
-   * is built (the spec and its middleware either declare `error` thunks or
-   * don't), but the schemas themselves are user code behind those lazy
-   * thunks, which must stay unforced until genuinely needed. Hence the
-   * split: the `Option` is decided eagerly, and the codec inside the box
-   * materialises only when `schema` is first read.
+   * The function's declared error schema. Installed as a lazy memoised
+   * property only when the spec declares one, so `"error" in ref` checks
+   * presence without building the schema — the same shape as the spec's
+   * provenance and `MiddlewareSpec`. The full decoding union (this plus each
+   * covering middleware's error schema) is assembled just in time at the
+   * decode sites.
    *
    * @internal
    */
-  readonly errorSchema: Option.Option<{
-    readonly schema: Schema.Codec<any, any>;
-  }>;
+  readonly error?: Schema.Codec<any, any>;
 }
 
 export interface ConvexRef<
@@ -345,35 +340,18 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
       functionName,
     })),
     Match.tag("Confect", (provenance): Any => {
-      const hasError =
-        "error" in provenance ||
-        middlewares.some((middleware) => "error" in middleware);
-
-      const errorSchemaBox = {};
-      Lazy.defineProperty(errorSchemaBox, "schema", () => {
-        const schemas = [
-          ...("error" in provenance
-            ? [provenance.error as Schema.Codec<any, any>]
-            : []),
-          ...MiddlewareSpec.errorSchemas(middlewares),
-        ];
-        return schemas.length === 1 ? schemas[0] : Schema.Union(schemas);
-      });
-
       const ref = {
         _tag: "Confect" as const,
         functionName,
         kind: provenance.kind,
         middlewareSpecs: middlewares,
-        errorSchema: hasError
-          ? Option.some(
-              errorSchemaBox as { readonly schema: Schema.Codec<any, any> },
-            )
-          : Option.none(),
       };
 
       Lazy.defineProperty(ref, "args", () => provenance.args);
       Lazy.defineProperty(ref, "returns", () => provenance.returns);
+      if ("error" in provenance) {
+        Lazy.defineProperty(ref, "error", () => provenance.error);
+      }
 
       return ref as unknown as Any;
     }),
@@ -403,7 +381,12 @@ export const getFunctionReference = <Ref_ extends Any>(
 
 export const hasErrorSchema = (ref: Any): boolean =>
   Match.value(ref).pipe(
-    Match.tag("Confect", (confectRef) => Option.isSome(confectRef.errorSchema)),
+    Match.tag(
+      "Confect",
+      (confectRef) =>
+        "error" in confectRef ||
+        confectRef.middlewareSpecs.some((middleware) => "error" in middleware),
+    ),
     Match.tag("Convex", () => false),
     Match.exhaustive,
   );
@@ -509,11 +492,27 @@ export const decodeErrorOrElse =
     return mapUnknownError(error);
   };
 
+/**
+ * Assemble the ref's full error-decoding schema — the function's declared
+ * `error` schema unioned with each covering middleware's — just in time.
+ * Reading the lazy schema properties here is the point: this runs only when
+ * an error is actually being decoded.
+ */
 const errorSchemaOf = (ref: Any): Option.Option<Schema.Codec<any, any>> =>
   Match.value(ref).pipe(
-    Match.tag("Confect", (confectRef) =>
-      Option.map(confectRef.errorSchema, (box) => box.schema),
-    ),
+    Match.tag("Confect", (confectRef) => {
+      const schemas = [
+        ...("error" in confectRef && confectRef.error !== undefined
+          ? [confectRef.error]
+          : []),
+        ...MiddlewareSpec.errorSchemas(confectRef.middlewareSpecs),
+      ];
+      return schemas.length === 0
+        ? Option.none<Schema.Codec<any, any>>()
+        : Option.some(
+            schemas.length === 1 ? schemas[0]! : Schema.Union(schemas),
+          );
+    }),
     Match.tag("Convex", () => Option.none<Schema.Codec<any, any>>()),
     Match.exhaustive,
   );

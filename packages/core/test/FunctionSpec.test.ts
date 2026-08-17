@@ -140,6 +140,12 @@ describe("laziness invariant", () => {
     expect(MutableRef.get(argsBuilt)).toBe(true);
     expect(ref.returns).toBe(spec.functionProvenance.returns);
     expect(MutableRef.get(returnsBuilt)).toBe(true);
+
+    // `error` is present without forcing, and delegates like the others.
+    expect("error" in ref).toBe(true);
+    expect(MutableRef.get(errorBuilt)).toBe(false);
+    expect(ref.error).toBe(spec.functionProvenance.error);
+    expect(MutableRef.get(errorBuilt)).toBe(true);
   });
 
   it("a spec without an error schema reports no error without defining the key", () => {
