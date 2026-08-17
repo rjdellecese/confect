@@ -94,8 +94,7 @@ export type MutationServices<
     >;
 
 /**
- * The ctx services available to an action handler in both action runtimes —
- * a Node action additionally has `NodeServices.NodeServices`.
+ * The ctx services available to an action handler in both action runtimes.
  */
 export type ActionServices<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,

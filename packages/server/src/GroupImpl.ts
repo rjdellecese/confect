@@ -88,9 +88,6 @@ export const make = <
   Group extends GroupSpec.AnyWithProps,
 >(
   _databaseSchema: DatabaseSchema_,
-  // Intersected with the cross-middleware `requires` validation: with the
-  // group fully assembled, every function's middleware must have its
-  // `requires` provided by some middleware covering that function.
   _group: Group &
     MiddlewareSpec.ValidateImplRequires<
       GroupSpec.Functions<Group>,

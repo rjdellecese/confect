@@ -32,22 +32,9 @@ export interface Ref<
   readonly functionSpec: FunctionSpec.AnyWithProps;
   /** @internal */
   readonly functionNamespace: string;
-  /**
-   * The middleware covering this function (its group's, in attachment
-   * order). Their error schemas join the function's own in this ref's
-   * error-decoding union. Empty for Convex-provenance functions, which
-   * middleware never covers.
-   *
-   * @internal
-   */
+  /** @internal */
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyService>;
-  /**
-   * The full error-decoding schema — the function's declared `error` schema
-   * unioned with every covering middleware's error schema — or `undefined`
-   * when neither declares one. Lazily computed and memoised.
-   *
-   * @internal
-   */
+  /** @internal */
   readonly errorSchema: Schema.Codec<any, any> | undefined;
 }
 
