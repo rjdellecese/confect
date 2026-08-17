@@ -156,12 +156,10 @@ const resolveMiddlewares = (
       );
     }
 
-    const functionType =
-      registryItem.functionSpec.runtimeAndFunctionType.functionType;
-    const middlewareImpl = registered.impls[functionType];
+    const middlewareImpl = registered.impls[registryItem.functionType];
     if (middlewareImpl === undefined) {
       throw new Error(
-        `Middleware "${middlewareSpec.key}" has no implementation for function type "${functionType}", the type of function "${registryItem.functionSpec.name}". Declare the function type in the middleware's \`functionTypes\` and cover it in \`MiddlewareImpl.makeByFunctionType\`.`,
+        `Middleware "${middlewareSpec.key}" has no implementation for function type "${registryItem.functionType}", the type of function "${registryItem.name}". Declare the function type in the middleware's \`functionTypes\` and cover it in \`MiddlewareImpl.makeByFunctionType\`.`,
       );
     }
 

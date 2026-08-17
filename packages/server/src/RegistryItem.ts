@@ -1,7 +1,10 @@
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
+import * as Lazy from "@confect/core/Lazy";
 import type * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
+import type { FunctionType, FunctionVisibility } from "convex/server";
 import * as Match from "effect/Match";
 import * as Predicate from "effect/Predicate";
+import type * as Schema from "effect/Schema";
 import type * as Handler from "./Handler";
 
 export const TypeId = "@confect/server/RegistryItem";
@@ -16,17 +19,33 @@ const RegistryItemProto = {
 
 /**
  * A function registered by `FunctionImpl.make`, one of two shapes keyed by
- * the spec's provenance. Only the `Confect` arm carries covering middleware —
- * a plain Convex function's raw registered handler passes through Confect
- * untouched, so the pairing (Convex item, covering middleware) is
- * unrepresentable.
+ * the spec's provenance. `ConfectRegistryItem` carries the aspects of the
+ * spec the registration path uses plus the covering middleware;
+ * `ConvexRegistryItem` carries only the raw registered handler, which passes
+ * through Confect untouched — so the pairing (Convex item, covering
+ * middleware) is unrepresentable.
  */
 export type AnyWithProps = ConfectRegistryItem | ConvexRegistryItem;
 
 export interface ConfectRegistryItem {
   readonly [TypeId]: TypeId;
   readonly _tag: "Confect";
-  readonly functionSpec: FunctionSpec.AnyConfect;
+  readonly name: string;
+  readonly functionVisibility: FunctionVisibility;
+  readonly functionType: FunctionType;
+  readonly args: Schema.Codec<any, any>;
+  readonly returns: Schema.Codec<any, any>;
+  /**
+   * The function's declared error schema. Installed as a lazy memoised
+   * property only when the spec declares one, so `"error" in item` checks
+   * presence without building the schema — the same shape as the spec's
+   * provenance and `Ref`.
+   */
+  readonly error?: Schema.Codec<any, any>;
+  /**
+   * The middleware covering this function: group-attached first (in
+   * attachment order, outermost), then the function's own.
+   */
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyService>;
   readonly handler: Handler.AnyConfectProvenance;
 }
@@ -34,7 +53,6 @@ export interface ConfectRegistryItem {
 export interface ConvexRegistryItem {
   readonly [TypeId]: TypeId;
   readonly _tag: "Convex";
-  readonly functionSpec: FunctionSpec.AnyConvex;
   readonly handler: Handler.AnyConvexProvenance;
 }
 
@@ -61,17 +79,26 @@ export const make = ({
     Match.tag("Convex", (): AnyWithProps =>
       Object.assign(Object.create(RegistryItemProto), {
         _tag: "Convex" as const,
-        functionSpec: functionSpec as FunctionSpec.AnyConvex,
         handler: handler as Handler.AnyConvexProvenance,
       }),
     ),
-    Match.tag("Confect", (): AnyWithProps =>
-      Object.assign(Object.create(RegistryItemProto), {
+    Match.tag("Confect", (provenance): AnyWithProps => {
+      const item = Object.assign(Object.create(RegistryItemProto), {
         _tag: "Confect" as const,
-        functionSpec: functionSpec as FunctionSpec.AnyConfect,
+        name: functionSpec.name,
+        functionVisibility: functionSpec.functionVisibility,
+        functionType: functionSpec.runtimeAndFunctionType.functionType,
         middlewareSpecs,
         handler: handler as Handler.AnyConfectProvenance,
-      }),
-    ),
+      });
+
+      Lazy.defineProperty(item, "args", () => provenance.args);
+      Lazy.defineProperty(item, "returns", () => provenance.returns);
+      if ("error" in provenance) {
+        Lazy.defineProperty(item, "error", () => provenance.error);
+      }
+
+      return item as AnyWithProps;
+    }),
     Match.exhaustive,
   );

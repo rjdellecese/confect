@@ -1,4 +1,4 @@
-import type { FunctionType } from "convex/server";
+import type { FunctionType, FunctionVisibility } from "convex/server";
 import type * as Effect from "effect/Effect";
 import * as Predicate from "effect/Predicate";
 import type * as Schema from "effect/Schema";
@@ -46,16 +46,25 @@ export interface SuccessValue {
  * through as the branded `unhandled` type and cannot be absorbed.
  *
  * Mirrors `RpcMiddleware.RpcMiddleware` in Effect, with Confect's invocation
- * metadata: the function's spec and its decoded args.
+ * metadata: the covered function's name, type, and visibility, and its
+ * decoded args.
  */
 export interface Middleware<Provides_, E, R> {
   (
     effect: Effect.Effect<SuccessValue, E | unhandled, Provides_>,
-    options: {
-      readonly spec: FunctionSpec.AnyWithProps;
-      readonly args: unknown;
-    },
+    options: MiddlewareOptions,
   ): Effect.Effect<SuccessValue, E | unhandled, R>;
+}
+
+/**
+ * The per-invocation metadata a middleware implementation receives alongside
+ * the downstream effect.
+ */
+export interface MiddlewareOptions {
+  readonly name: string;
+  readonly functionType: FunctionType;
+  readonly functionVisibility: FunctionVisibility;
+  readonly args: unknown;
 }
 
 export interface AnyMiddleware extends Middleware<any, any, any> {}

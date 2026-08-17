@@ -13,6 +13,7 @@ import * as Ref from "effect/Ref";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as FunctionImpl from "./FunctionImpl";
 import * as MiddlewareImpl from "./MiddlewareImpl";
+import * as RegistryItem from "./RegistryItem";
 
 export const TypeId = "@confect/server/GroupImpl";
 export type TypeId = typeof TypeId;
@@ -112,9 +113,6 @@ export const make = <
     FunctionImpl.FromGroupSpec<Group> | MiddlewareImpl.FromGroupSpec<Group>
   >;
 
-const isFunctionShaped = (value: unknown): boolean =>
-  Predicate.hasProperty(value, "functionSpec");
-
 /**
  * Return the names of the function-shaped entries in a group's (flat,
  * isolated) registry. `FunctionImpl.make` registers each function under a
@@ -126,7 +124,7 @@ const collectFunctionNames = (
 ): ReadonlyArray<string> =>
   pipe(
     Record.toEntries(items),
-    Array.filter(([, value]) => isFunctionShaped(value)),
+    Array.filter(([, value]) => RegistryItem.isRegistryItem(value)),
     Array.map(([name]) => name),
   );
 

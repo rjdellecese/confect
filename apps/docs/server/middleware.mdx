@@ -192,7 +192,7 @@ Since handlers depend only on the service, unit tests don't need middleware at a
 
 ## Implementing a middleware
 
-A middleware implementation wraps the downstream effect (any remaining middleware plus the handler). It receives that effect together with the function's spec and decoded args, and decides whether and how to run it:
+A middleware implementation wraps the downstream effect (any remaining middleware plus the handler). It receives that effect together with metadata about the invocation — the covered function's `name`, `functionType`, and `functionVisibility`, plus its decoded `args` — and decides whether and how to run it:
 
 - **Provide** the declared service to it with `Effect.provideService` — the types require this (or never running the effect at all): the downstream effect's environment carries the provided service as an obligation the implementation must discharge.
 - **Short-circuit** by returning `Effect.fail` with the declared error instead of running the effect.
@@ -247,13 +247,13 @@ class Timed extends MiddlewareSpec.Service<Timed>()("Timed", {
 const TimedImpl = MiddlewareImpl.make(
   databaseSchema,
   Timed,
-  (effect, { spec }) =>
+  (effect, { name }) =>
     Effect.gen(function* () {
       const start = yield* Clock.currentTimeMillis;
       const result = yield* effect;
       const end = yield* Clock.currentTimeMillis;
 
-      yield* Effect.log(`${spec.name} took ${end - start}ms`);
+      yield* Effect.log(`${name} took ${end - start}ms`);
 
       return result;
     }),

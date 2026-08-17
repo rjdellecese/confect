@@ -1,8 +1,8 @@
-import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import {
   actionGeneric,
   type DefaultFunctionArgs,
+  type FunctionVisibility,
   internalActionGeneric,
 } from "convex/server";
 import type { Effect } from "effect";
@@ -15,12 +15,10 @@ import type * as RegistryItem from "./RegistryItem";
 
 export const make = (
   databaseSchema: DatabaseSchema.AnyWithProps,
-  { functionSpec, handler }: RegistryItem.ConfectRegistryItem,
+  item: RegistryItem.ConfectRegistryItem,
   middlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware> = [],
 ): RegisteredFunction.Any => {
-  const { functionVisibility, functionProvenance } = functionSpec;
-
-  const genericFunction = Match.value(functionVisibility).pipe(
+  const genericFunction = Match.value(item.functionVisibility).pipe(
     Match.when("public", () => actionGeneric),
     Match.when("internal", () => internalActionGeneric),
     Match.exhaustive,
@@ -28,11 +26,12 @@ export const make = (
 
   return genericFunction(
     nodeActionFunction(databaseSchema, {
-      functionSpec,
-      args: functionProvenance.args,
-      returns: functionProvenance.returns,
-      error: functionProvenance.error,
-      handler,
+      functionName: item.name,
+      functionVisibility: item.functionVisibility,
+      args: item.args,
+      returns: item.returns,
+      error: item.error,
+      handler: item.handler,
       middlewares,
     }),
   );
@@ -48,14 +47,16 @@ const nodeActionFunction = <
 >(
   databaseSchema: DatabaseSchema_,
   {
-    functionSpec,
+    functionName,
+    functionVisibility,
     args,
     returns,
     error,
     handler,
     middlewares,
   }: {
-    functionSpec: FunctionSpec.AnyWithProps;
+    functionName: string;
+    functionVisibility: FunctionVisibility;
     args: Schema.Codec<Args, ConvexArgs>;
     returns: Schema.Codec<Returns, ConvexReturns>;
     error: Schema.Codec<any, any> | undefined;
@@ -71,7 +72,8 @@ const nodeActionFunction = <
   },
 ) =>
   RegisteredFunction.actionFunctionBase({
-    functionSpec,
+    functionName,
+    functionVisibility,
     args,
     returns,
     error,

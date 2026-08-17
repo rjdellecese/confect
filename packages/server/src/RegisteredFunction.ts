@@ -155,10 +155,7 @@ export type RegisteredFunction<
 export const applyMiddleware = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
   middlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>,
-  options: {
-    readonly spec: FunctionSpec.AnyWithProps;
-    readonly args: unknown;
-  },
+  options: MiddlewareSpec.MiddlewareOptions,
   // The composed effect's success and environment are preserved (middleware
   // returns the handler's opaque `SuccessValue`, and its own requirements
   // are bounded by `MiddlewareImpl.CommonServices`, a subset of every
@@ -239,7 +236,8 @@ export const actionFunctionBase = <
   E,
   R,
 >({
-  functionSpec,
+  functionName,
+  functionVisibility,
   args,
   returns,
   error,
@@ -247,7 +245,8 @@ export const actionFunctionBase = <
   middlewares = [],
   createLayer,
 }: {
-  functionSpec: FunctionSpec.AnyWithProps;
+  functionName: string;
+  functionVisibility: FunctionVisibility;
   args: Schema.Codec<Args, ConvexArgs>;
   returns: Schema.Codec<Returns, ConvexReturns>;
   error: Schema.Codec<Error, Value> | undefined;
@@ -272,7 +271,12 @@ export const actionFunctionBase = <
       const decodedReturns = yield* applyMiddleware(
         handler(decodedArgs),
         middlewares,
-        { spec: functionSpec, args: decodedArgs },
+        {
+          name: functionName,
+          functionType: "action",
+          functionVisibility,
+          args: decodedArgs,
+        },
       ).pipe(Effect.provide(createLayer(ctx)));
       return yield* pipe(
         decodedReturns,
