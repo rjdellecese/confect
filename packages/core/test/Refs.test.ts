@@ -37,7 +37,7 @@ describe("make", () => {
     expect(Ref.getConvexFunctionName(actualRef)).toStrictEqual(
       Ref.getConvexFunctionName(expectedRef),
     );
-    expect(actualRef.functionSpec).toStrictEqual(expectedRef.functionSpec);
+    expect(actualRef).toStrictEqual(expectedRef);
     expectTypeOf(actualRef).toEqualTypeOf(expectedRef);
   });
 
@@ -82,7 +82,7 @@ describe("make", () => {
     const refs = Refs.make(spec);
 
     expectTypeOf(refs.internal.notes.internalList).toEqualTypeOf<
-      Ref.Ref<
+      Ref.ConfectRef<
         RuntimeAndFunctionType.ConvexQuery,
         "internal",
         typeof FnArgs.Type,
@@ -121,7 +121,7 @@ describe("make", () => {
     const refs = Refs.make(spec);
 
     expectTypeOf(refs.internal.internalOnly.list).toEqualTypeOf<
-      Ref.Ref<
+      Ref.ConfectRef<
         RuntimeAndFunctionType.ConvexQuery,
         "internal",
         typeof FnArgs.Type,
@@ -157,7 +157,7 @@ describe("make", () => {
     const refs = Refs.make(spec);
 
     expectTypeOf(refs.public.notes.publicList).toEqualTypeOf<
-      Ref.Ref<
+      Ref.ConfectRef<
         RuntimeAndFunctionType.ConvexQuery,
         "public",
         typeof FnArgs.Type,
@@ -189,11 +189,11 @@ describe("make", () => {
     expect(Ref.getConvexFunctionName(actualRef)).toStrictEqual(
       Ref.getConvexFunctionName(expectedRef),
     );
-    expect(actualRef.functionSpec).toStrictEqual(expectedRef.functionSpec);
+    expect(actualRef).toStrictEqual(expectedRef);
     expectTypeOf(actualRef).toEqualTypeOf(expectedRef);
 
     expectTypeOf(actualRef).toEqualTypeOf<
-      Ref.Ref<
+      Ref.ConvexRef<
         RuntimeAndFunctionType.ConvexQuery,
         "public",
         ListQueryArgs,
@@ -229,7 +229,7 @@ describe("make", () => {
     const refs = Refs.make(spec);
 
     expectTypeOf(refs.public.notes.get).toEqualTypeOf<
-      Ref.Ref<
+      Ref.ConvexRef<
         RuntimeAndFunctionType.ConvexQuery,
         "public",
         GetQueryArgs,
@@ -238,7 +238,7 @@ describe("make", () => {
     >();
 
     expectTypeOf(refs.internal.notes.remove).toEqualTypeOf<
-      Ref.Ref<
+      Ref.ConvexRef<
         RuntimeAndFunctionType.ConvexMutation,
         "internal",
         RemoveMutationArgs,
@@ -285,7 +285,7 @@ describe("make", () => {
     const refs = Refs.make(spec);
 
     expectTypeOf(refs.public.notes.list).toEqualTypeOf<
-      Ref.Ref<
+      Ref.ConfectRef<
         RuntimeAndFunctionType.ConvexQuery,
         "public",
         ConfectQueryArgs,
@@ -294,7 +294,7 @@ describe("make", () => {
     >();
 
     expectTypeOf(refs.public.notes.search).toEqualTypeOf<
-      Ref.Ref<
+      Ref.ConvexRef<
         RuntimeAndFunctionType.ConvexQuery,
         "public",
         ConvexQueryArgs,

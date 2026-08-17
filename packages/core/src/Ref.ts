@@ -16,7 +16,7 @@ import * as Lazy from "./Lazy";
 import * as MiddlewareSpec from "./MiddlewareSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
-export interface Ref<
+export interface Base<
   _RuntimeAndFunctionType extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   _FunctionVisibility extends FunctionVisibility,
   _Args,
@@ -29,28 +29,106 @@ export interface Ref<
   readonly _Returns?: _Returns;
   readonly _Error?: _Error;
   /** @internal */
-  readonly functionSpec: FunctionSpec.AnyWithProps;
-  /** @internal */
-  readonly functionNamespace: string;
-  /** @internal */
-  readonly decoding: Decoding;
+  readonly functionName: string;
 }
 
-export interface Any extends Ref<any, any, any, any, any> {}
+/**
+ * A reference to a single Convex function, as callers see it: the wire name
+ * plus the data needed to encode args, decode returns, and decode typed
+ * errors. A ref is one of two shapes, keyed by the spec's provenance.
+ * `ConfectRef` carries the codec schemas, the covering middleware, and the
+ * error union; `ConvexRef` carries none of them — a plain Convex function's
+ * values pass through untouched, so states like (Convex ref, covering
+ * middleware) are unrepresentable.
+ */
+export type Ref<
+  _RuntimeAndFunctionType extends RuntimeAndFunctionType.RuntimeAndFunctionType,
+  _FunctionVisibility extends FunctionVisibility,
+  _Args,
+  _Returns,
+  _Error = never,
+> =
+  | ConfectRef<
+      _RuntimeAndFunctionType,
+      _FunctionVisibility,
+      _Args,
+      _Returns,
+      _Error
+    >
+  | ConvexRef<
+      _RuntimeAndFunctionType,
+      _FunctionVisibility,
+      _Args,
+      _Returns,
+      _Error
+    >;
 
-export interface AnyInternal extends Ref<any, "internal", any, any, any> {}
+export interface ConfectRef<
+  _RuntimeAndFunctionType extends RuntimeAndFunctionType.RuntimeAndFunctionType,
+  _FunctionVisibility extends FunctionVisibility,
+  _Args,
+  _Returns,
+  _Error = never,
+> extends Base<
+  _RuntimeAndFunctionType,
+  _FunctionVisibility,
+  _Args,
+  _Returns,
+  _Error
+> {
+  /** @internal */
+  readonly _tag: "Confect";
+  /** @internal */
+  readonly args: Schema.Codec<any, any>;
+  /** @internal */
+  readonly returns: Schema.Codec<any, any>;
+  /** @internal */
+  readonly kind: FunctionProvenance.ConfectKind;
+  /** @internal */
+  readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyService>;
+  /**
+   * `Some` exactly when the function or a covering middleware declares an
+   * error schema; the union inside the box is built lazily on first read.
+   *
+   * @internal
+   */
+  readonly errorSchema: Option.Option<{
+    readonly schema: Schema.Codec<any, any>;
+  }>;
+}
 
-export interface AnyPublic extends Ref<any, "public", any, any, any> {}
+export interface ConvexRef<
+  _RuntimeAndFunctionType extends RuntimeAndFunctionType.RuntimeAndFunctionType,
+  _FunctionVisibility extends FunctionVisibility,
+  _Args,
+  _Returns,
+  _Error = never,
+> extends Base<
+  _RuntimeAndFunctionType,
+  _FunctionVisibility,
+  _Args,
+  _Returns,
+  _Error
+> {
+  /** @internal */
+  readonly _tag: "Convex";
+}
 
-export interface AnyQuery extends Ref<
+export type Any = Ref<any, any, any, any, any>;
+
+export type AnyInternal = Ref<any, "internal", any, any, any>;
+
+export type AnyPublic = Ref<any, "public", any, any, any>;
+
+export type AnyQuery = Ref<
   RuntimeAndFunctionType.AnyQuery,
   FunctionVisibility,
   any,
   any,
   any
-> {}
+>;
 
-export interface AnyPublicPaginatedQuery extends Ref<
+export type AnyPublicPaginatedQuery = Ref<
   RuntimeAndFunctionType.AnyQuery,
   "public",
   {
@@ -59,50 +137,50 @@ export interface AnyPublicPaginatedQuery extends Ref<
   },
   PaginationResult<any>,
   any
-> {}
+>;
 
-export interface AnyMutation extends Ref<
+export type AnyMutation = Ref<
   RuntimeAndFunctionType.AnyMutation,
   FunctionVisibility,
   any,
   any,
   any
-> {}
+>;
 
-export interface AnyAction extends Ref<
+export type AnyAction = Ref<
   RuntimeAndFunctionType.AnyAction,
   FunctionVisibility,
   any,
   any,
   any
-> {}
+>;
 
-export interface AnyPublicQuery extends Ref<
+export type AnyPublicQuery = Ref<
   RuntimeAndFunctionType.AnyQuery,
   "public",
   any,
   any,
   any
-> {}
+>;
 
-export interface AnyPublicMutation extends Ref<
+export type AnyPublicMutation = Ref<
   RuntimeAndFunctionType.AnyMutation,
   "public",
   any,
   any,
   any
-> {}
+>;
 
-export interface AnyPublicAction extends Ref<
+export type AnyPublicAction = Ref<
   RuntimeAndFunctionType.AnyAction,
   "public",
   any,
   any,
   any
-> {}
+>;
 
 export type GetRuntimeAndFunctionType<Ref_> =
-  Ref_ extends Ref<
+  Ref_ extends Base<
     infer RuntimeAndFunctionType_,
     infer _FunctionVisibility,
     infer _Args,
@@ -113,7 +191,7 @@ export type GetRuntimeAndFunctionType<Ref_> =
     : never;
 
 export type GetRuntime<Ref_> =
-  Ref_ extends Ref<
+  Ref_ extends Base<
     infer RuntimeAndFunctionType_,
     infer _FunctionVisibility,
     infer _Args,
@@ -124,7 +202,7 @@ export type GetRuntime<Ref_> =
     : never;
 
 export type GetFunctionType<Ref_> =
-  Ref_ extends Ref<
+  Ref_ extends Base<
     infer RuntimeAndFunctionType_,
     infer _FunctionVisibility,
     infer _Args,
@@ -135,7 +213,7 @@ export type GetFunctionType<Ref_> =
     : never;
 
 export type GetFunctionVisibility<Ref_> =
-  Ref_ extends Ref<
+  Ref_ extends Base<
     infer _RuntimeAndFunctionType,
     infer FunctionVisibility_,
     infer _Args,
@@ -146,7 +224,7 @@ export type GetFunctionVisibility<Ref_> =
     : never;
 
 export type Args<Ref_> =
-  Ref_ extends Ref<
+  Ref_ extends Base<
     infer _RuntimeAndFunctionType,
     infer _FunctionVisibility,
     infer Args_,
@@ -161,7 +239,7 @@ export type OptionalArgs<Ref_ extends Any> = keyof Args<Ref_> extends never
   : [args: Args<Ref_>];
 
 export type Returns<Ref_> =
-  Ref_ extends Ref<
+  Ref_ extends Base<
     infer _RuntimeAndFunctionType,
     infer _FunctionVisibility,
     infer _Args,
@@ -172,7 +250,7 @@ export type Returns<Ref_> =
     : never;
 
 export type Error<Ref_> =
-  Ref_ extends Ref<
+  Ref_ extends Base<
     infer _RuntimeAndFunctionType,
     infer _FunctionVisibility,
     infer _Args,
@@ -190,7 +268,8 @@ export type FunctionReference<Ref_ extends Any> = ConvexFunctionReference<
 export type FromFunctionSpec<
   FunctionSpec_ extends FunctionSpec.AnyWithProps,
   MiddlewareError = never,
-> = Ref<
+> = ArmFromFunctionSpec<
+  FunctionSpec_,
   FunctionSpec.GetRuntimeAndFunctionType<FunctionSpec_>,
   FunctionSpec.GetFunctionVisibility<FunctionSpec_>,
   FunctionSpec.Args<FunctionSpec_>,
@@ -198,76 +277,43 @@ export type FromFunctionSpec<
   FunctionSpec.Error<FunctionSpec_> | MiddlewareError
 >;
 
-/**
- * A ref's wire-boundary codec data, built once per ref from its spec's
- * `FunctionProvenance`. Only the `Confect` arm carries schemas, middleware,
- * and error data; a `Convex`-provenance ref has nowhere to put any of them,
- * so states like (Convex provenance, covering middleware) are unrepresentable
- * by construction. Presence and content of the error union are one value:
- * `errorSchema` is `Some` exactly when decoding can succeed, with the
- * schema itself built lazily inside the box (forcing the spec's error
- * thunks only when it is first read).
- *
- * @internal
- */
-export type Decoding = ConfectDecoding | ConvexDecoding;
-
-/** @internal */
-export interface ConfectDecoding {
-  readonly _tag: "Confect";
-  readonly provenance: ConfectProvenance;
-  readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyService>;
-  readonly errorSchema: Option.Option<{
-    readonly schema: Schema.Codec<any, any>;
-  }>;
-}
-
-/** @internal */
-export interface ConvexDecoding {
-  readonly _tag: "Convex";
-}
-
-type ConfectProvenance = Extract<
-  FunctionProvenance.FunctionProvenance,
-  { _tag: "Confect" }
->;
-
-const convexDecoding: ConvexDecoding = { _tag: "Convex" };
-
-// `"error" in` presence checks don't invoke the provenance's lazy getters
-// (see `Lazy`), so `Some`/`None` is decided eagerly while the schema inside
-// the box stays lazy. The `Some` arm's schema list is non-empty by
-// construction — no undefined branch.
-const makeConfectDecoding = (
-  provenance: ConfectProvenance,
-  middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyService>,
-): ConfectDecoding => {
-  const hasError =
-    "error" in provenance ||
-    middlewareSpecs.some((middleware) => "error" in middleware);
-
-  const errorSchemaBox = {};
-  Lazy.defineProperty(errorSchemaBox, "schema", () => {
-    const schemas = [
-      ...("error" in provenance
-        ? [provenance.error as Schema.Codec<any, any>]
-        : []),
-      ...MiddlewareSpec.errorSchemas(middlewareSpecs),
-    ];
-    return schemas.length === 1 ? schemas[0] : Schema.Union(schemas);
-  });
-
-  return {
-    _tag: "Confect",
-    provenance,
-    middlewareSpecs,
-    errorSchema: hasError
-      ? Option.some(
-          errorSchemaBox as { readonly schema: Schema.Codec<any, any> },
-        )
-      : Option.none(),
-  };
-};
+type ArmFromFunctionSpec<
+  FunctionSpec_ extends FunctionSpec.AnyWithProps,
+  RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
+  FunctionVisibility_ extends FunctionVisibility,
+  Args_,
+  Returns_,
+  Error_,
+> =
+  FunctionSpec_ extends FunctionSpec.WithFunctionProvenance<
+    FunctionSpec_,
+    FunctionProvenance.AnyConvex
+  >
+    ? ConvexRef<
+        RuntimeAndFunctionType_,
+        FunctionVisibility_,
+        Args_,
+        Returns_,
+        Error_
+      >
+    : FunctionSpec_ extends FunctionSpec.WithFunctionProvenance<
+          FunctionSpec_,
+          FunctionProvenance.AnyConfect
+        >
+      ? ConfectRef<
+          RuntimeAndFunctionType_,
+          FunctionVisibility_,
+          Args_,
+          Returns_,
+          Error_
+        >
+      : Ref<
+          RuntimeAndFunctionType_,
+          FunctionVisibility_,
+          Args_,
+          Returns_,
+          Error_
+        >;
 
 export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
   /**
@@ -280,19 +326,58 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
   /** The middleware covering this function. */
   middlewares: ReadonlyArray<MiddlewareSpec.AnyService> = [],
 ): FromFunctionSpec<FunctionSpec_> => {
+  const functionName = `${functionNamespace}:${functionSpec.name}`;
   const provenance = functionSpec.functionProvenance;
-  const decoding =
-    provenance._tag === "Confect"
-      ? makeConfectDecoding(provenance, middlewares)
-      : convexDecoding;
 
-  const ref = { functionSpec, functionNamespace, decoding };
+  if (provenance._tag === "Convex") {
+    const ref: ConvexRef<any, any, any, any, any> = {
+      _tag: "Convex",
+      functionName,
+    };
+    return ref as FromFunctionSpec<FunctionSpec_>;
+  }
+
+  // `"error" in` presence checks don't invoke the provenance's lazy getters
+  // (see `Lazy`), so `Some`/`None` is decided eagerly while the union inside
+  // the box stays lazy — and the `Some` arm's schema list is non-empty by
+  // construction.
+  const hasError =
+    "error" in provenance ||
+    middlewares.some((middleware) => "error" in middleware);
+
+  const errorSchemaBox = {};
+  Lazy.defineProperty(errorSchemaBox, "schema", () => {
+    const schemas = [
+      ...("error" in provenance
+        ? [provenance.error as Schema.Codec<any, any>]
+        : []),
+      ...MiddlewareSpec.errorSchemas(middlewares),
+    ];
+    return schemas.length === 1 ? schemas[0] : Schema.Union(schemas);
+  });
+
+  const ref = {
+    _tag: "Confect" as const,
+    functionName,
+    kind: provenance.kind,
+    middlewareSpecs: middlewares,
+    errorSchema: hasError
+      ? Option.some(
+          errorSchemaBox as { readonly schema: Schema.Codec<any, any> },
+        )
+      : Option.none(),
+  };
+
+  // The ref's schemas delegate to the provenance's self-memoising getters on
+  // first access, so building a ref never forces the spec's thunks — and both
+  // slots memoise the same schema object, so the projection cannot drift.
+  Lazy.defineProperty(ref, "args", () => provenance.args);
+  Lazy.defineProperty(ref, "returns", () => provenance.returns);
 
   return ref as unknown as FromFunctionSpec<FunctionSpec_>;
 };
 
-export const getConvexFunctionName = (ref: Any): string =>
-  `${ref.functionNamespace}:${ref.functionSpec.name}`;
+export const getConvexFunctionName = (ref: Any): string => ref.functionName;
 
 const functionReferenceCache = new Map<string, FunctionReference<Any>>();
 
@@ -313,55 +398,69 @@ export const getFunctionReference = <Ref_ extends Any>(
 };
 
 export const hasErrorSchema = (ref: Any): boolean =>
-  ref.decoding._tag === "Confect" && Option.isSome(ref.decoding.errorSchema);
+  ref._tag === "Confect" && Option.isSome(ref.errorSchema);
 
 export const encodeArgs = <Ref_ extends Any>(
   ref: Ref_,
   args: Args<Ref_>,
-): Effect.Effect<unknown, Schema.SchemaError> =>
-  ref.decoding._tag === "Confect"
-    ? Schema.encodeEffect(ref.decoding.provenance.args)(args)
+): Effect.Effect<unknown, Schema.SchemaError> => {
+  const ref_: Any = ref;
+  return ref_._tag === "Confect"
+    ? Schema.encodeEffect(ref_.args)(args)
     : Effect.succeed(args);
+};
 
 export const decodeReturns = <Ref_ extends Any>(
   ref: Ref_,
   returns: unknown,
-): Effect.Effect<Returns<Ref_>, Schema.SchemaError> =>
-  ref.decoding._tag === "Confect"
-    ? Schema.decodeUnknownEffect(ref.decoding.provenance.returns)(returns)
+): Effect.Effect<Returns<Ref_>, Schema.SchemaError> => {
+  const ref_: Any = ref;
+  return ref_._tag === "Confect"
+    ? Schema.decodeUnknownEffect(ref_.returns)(returns)
     : Effect.succeed(returns as Returns<Ref_>);
+};
 
 export const encodeArgsSync = <Ref_ extends Any>(
   ref: Ref_,
   args: Args<Ref_>,
-): unknown =>
-  ref.decoding._tag === "Confect"
-    ? Schema.encodeSync(ref.decoding.provenance.args)(args)
-    : args;
+): unknown => {
+  const ref_: Any = ref;
+  return ref_._tag === "Confect" ? Schema.encodeSync(ref_.args)(args) : args;
+};
 
 export const decodeArgsSync = <Ref_ extends Any>(
   ref: Ref_,
   encodedArgs: unknown,
-): Args<Ref_> =>
-  (ref.decoding._tag === "Confect"
-    ? Schema.decodeUnknownSync(ref.decoding.provenance.args)(encodedArgs)
-    : encodedArgs) as Args<Ref_>;
+): Args<Ref_> => {
+  const ref_: Any = ref;
+  return (
+    ref_._tag === "Confect"
+      ? Schema.decodeUnknownSync(ref_.args)(encodedArgs)
+      : encodedArgs
+  ) as Args<Ref_>;
+};
 
 export const encodeReturnsSync = <Ref_ extends Any>(
   ref: Ref_,
   returns: Returns<Ref_>,
-): unknown =>
-  ref.decoding._tag === "Confect"
-    ? Schema.encodeSync(ref.decoding.provenance.returns)(returns)
+): unknown => {
+  const ref_: Any = ref;
+  return ref_._tag === "Confect"
+    ? Schema.encodeSync(ref_.returns)(returns)
     : returns;
+};
 
 export const decodeReturnsSync = <Ref_ extends Any>(
   ref: Ref_,
   encodedReturns: unknown,
-): Returns<Ref_> =>
-  (ref.decoding._tag === "Confect"
-    ? Schema.decodeUnknownSync(ref.decoding.provenance.returns)(encodedReturns)
-    : encodedReturns) as Returns<Ref_>;
+): Returns<Ref_> => {
+  const ref_: Any = ref;
+  return (
+    ref_._tag === "Confect"
+      ? Schema.decodeUnknownSync(ref_.returns)(encodedReturns)
+      : encodedReturns
+  ) as Returns<Ref_>;
+};
 
 const ConvexErrorIdentifier = Symbol.for("ConvexError");
 
@@ -392,6 +491,11 @@ export const decodeErrorOrElse =
     return mapUnknownError(error);
   };
 
+const errorSchemaOf = (ref: Any): Option.Option<Schema.Codec<any, any>> =>
+  ref._tag === "Confect"
+    ? Option.map(ref.errorSchema, (box) => box.schema)
+    : Option.none();
+
 /**
  * Decode `encodedError` against the ref's error schema — the function's
  * declared `error` schema unioned with its covering middlewares' error
@@ -401,11 +505,6 @@ export const decodeErrorOrElse =
  * into, and the caller is responsible for deciding what to do (typically:
  * surface the original value as a defect).
  */
-const errorSchemaOf = (ref: Any): Option.Option<Schema.Codec<any, any>> =>
-  ref.decoding._tag === "Confect"
-    ? Option.map(ref.decoding.errorSchema, (box) => box.schema)
-    : Option.none();
-
 export const decodeError = <Ref_ extends Any>(
   ref: Ref_,
   encodedError: unknown,
@@ -460,10 +559,9 @@ const missingPaginatedProvenanceError = (ref: Any) =>
   );
 
 const paginatedKind = (
-  ref: Any,
-  decoding: ConfectDecoding,
-): Extract<FunctionProvenance.ConfectKind, { _tag: "Paginated" }> => {
-  const kind = decoding.provenance.kind;
+  ref: ConfectRef<any, any, any, any, any>,
+): FunctionProvenance.Paginated => {
+  const kind = ref.kind;
   if (kind._tag !== "Paginated") {
     throw missingPaginatedProvenanceError(ref);
   }
@@ -482,10 +580,12 @@ export const encodePaginatedQueryArgsSync = <
 >(
   ref: Ref_,
   args: Omit<Args<Ref_>, "paginationOpts">,
-): unknown =>
-  ref.decoding._tag === "Confect"
-    ? Schema.encodeUnknownSync(paginatedKind(ref, ref.decoding).userArgs)(args)
+): unknown => {
+  const ref_: Any = ref;
+  return ref_._tag === "Confect"
+    ? Schema.encodeUnknownSync(paginatedKind(ref_).userArgs)(args)
     : args;
+};
 
 /**
  * Decode a page of a paginated query's results via the ref's item schema.
@@ -495,12 +595,14 @@ export const encodePaginatedQueryArgsSync = <
 export const decodePaginationPageSync = <Ref_ extends AnyPublicPaginatedQuery>(
   ref: Ref_,
   encodedPage: unknown,
-): Returns<Ref_>["page"] =>
-  (ref.decoding._tag === "Confect"
-    ? Schema.decodeUnknownSync(paginatedKind(ref, ref.decoding).page)(
-        encodedPage,
-      )
-    : encodedPage) as Returns<Ref_>["page"];
+): Returns<Ref_>["page"] => {
+  const ref_: Any = ref;
+  return (
+    ref_._tag === "Confect"
+      ? Schema.decodeUnknownSync(paginatedKind(ref_).page)(encodedPage)
+      : encodedPage
+  ) as Returns<Ref_>["page"];
+};
 
 /**
  * Encode args via the ref's args schema, invoke `call`, decode returns via the
