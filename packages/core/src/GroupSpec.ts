@@ -24,9 +24,11 @@ export interface GroupSpec<
   readonly runtime: Runtime;
   readonly name: Name_;
   readonly functions: {
-    [FunctionName in FunctionSpec.Name<
-      FunctionSpec.AnyWithPropsWithRuntime<Runtime>
-    >]: FunctionSpec.WithName<Functions_, FunctionName>;
+    [
+      FunctionName in FunctionSpec.Name<
+        FunctionSpec.AnyWithPropsWithRuntime<Runtime>
+      >
+    ]: FunctionSpec.WithName<Functions_, FunctionName>;
   };
   readonly groups: {
     [GroupName in Name<Groups_>]: WithName<Groups_, GroupName>;
