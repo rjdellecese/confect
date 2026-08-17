@@ -35,17 +35,7 @@ export interface ConfectRegistryItem {
   readonly functionType: FunctionType;
   readonly args: Schema.Codec<any, any>;
   readonly returns: Schema.Codec<any, any>;
-  /**
-   * The function's declared error schema. Installed as a lazy memoised
-   * property only when the spec declares one, so `"error" in item` checks
-   * presence without building the schema — the same shape as the spec's
-   * provenance and `Ref`.
-   */
   readonly error?: Schema.Codec<any, any>;
-  /**
-   * The middleware covering this function: group-attached first (in
-   * attachment order, outermost), then the function's own.
-   */
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyService>;
   readonly handler: Handler.AnyConfectProvenance;
 }
