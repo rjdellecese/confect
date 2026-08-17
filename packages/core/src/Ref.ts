@@ -310,10 +310,7 @@ type FromFunctionSpecHelper<
           Returns_,
           Error_
         >
-      : // Reached when the spec's provenance is not statically narrowed (e.g.
-        // `FunctionSpec.AnyWithProps` in generic code) — the arm is genuinely
-        // undetermined, so the union is the honest type.
-        Ref<
+      : Ref<
           RuntimeAndFunctionType_,
           FunctionVisibility_,
           Args_,
