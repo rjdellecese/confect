@@ -4,3 +4,21 @@ url = "https://www.mintlify.com/docs/mcp"
 [mcp_servers.Lucide]
 command = "pnpm"
 args = ["dlx", "lucide-icons-mcp", "--stdio"]
+
+[[hooks.PreToolUse]]
+matcher = "^Bash$"
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = 'mise exec -- bun "$(git rev-parse --show-toplevel)/.codex/hooks/redirectToOpensrc.ts"'
+timeout = 5
+statusMessage = "Checking repository read policy"
+
+[[hooks.PostToolUse]]
+matcher = "^apply_patch$"
+
+[[hooks.PostToolUse.hooks]]
+type = "command"
+command = 'mise exec -- bun "$(git rev-parse --show-toplevel)/.codex/hooks/formatAndLintFiles.ts"'
+timeout = 30
+statusMessage = "Formatting and linting edited files"
