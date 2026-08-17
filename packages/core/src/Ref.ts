@@ -276,7 +276,7 @@ export type FunctionReference<Ref_ extends Any> = ConvexFunctionReference<
 export type FromFunctionSpec<
   FunctionSpec_ extends FunctionSpec.AnyWithProps,
   MiddlewareError = never,
-> = ArmFromFunctionSpec<
+> = FromFunctionSpecHelper<
   FunctionSpec_,
   FunctionSpec.GetRuntimeAndFunctionType<FunctionSpec_>,
   FunctionSpec.GetFunctionVisibility<FunctionSpec_>,
@@ -285,7 +285,7 @@ export type FromFunctionSpec<
   FunctionSpec.Error<FunctionSpec_> | MiddlewareError
 >;
 
-type ArmFromFunctionSpec<
+type FromFunctionSpecHelper<
   FunctionSpec_ extends FunctionSpec.AnyWithProps,
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility_ extends FunctionVisibility,
@@ -345,10 +345,6 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
       functionName,
     })),
     Match.tag("Confect", (provenance): Any => {
-      // `"error" in` presence checks don't invoke the provenance's lazy
-      // getters (see `Lazy`), so `Some`/`None` is decided eagerly while the
-      // union inside the box stays lazy — and the `Some` arm's schema list is
-      // non-empty by construction.
       const hasError =
         "error" in provenance ||
         middlewares.some((middleware) => "error" in middleware);
