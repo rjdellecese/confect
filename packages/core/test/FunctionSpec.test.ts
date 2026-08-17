@@ -120,6 +120,28 @@ describe("laziness invariant", () => {
     expect(MutableRef.get(errorBuilt)).toBe(false);
   });
 
+  it("Ref.make forces no schema thunks, and the ref's schemas are the spec's own", () => {
+    const argsBuilt = MutableRef.make(false);
+    const returnsBuilt = MutableRef.make(false);
+    const errorBuilt = MutableRef.make(false);
+
+    const spec = makeSpec({
+      args: () => MutableRef.set(argsBuilt, true),
+      returns: () => MutableRef.set(returnsBuilt, true),
+      error: () => MutableRef.set(errorBuilt, true),
+    });
+    const ref = Ref.make("ns", spec);
+
+    expect(MutableRef.get(argsBuilt)).toBe(false);
+    expect(MutableRef.get(returnsBuilt)).toBe(false);
+    expect(MutableRef.get(errorBuilt)).toBe(false);
+
+    expect(ref.args).toBe(spec.functionProvenance.args);
+    expect(MutableRef.get(argsBuilt)).toBe(true);
+    expect(ref.returns).toBe(spec.functionProvenance.returns);
+    expect(MutableRef.get(returnsBuilt)).toBe(true);
+  });
+
   it("a spec without an error schema reports no error without defining the key", () => {
     const spec = FunctionSpec.publicQuery({
       name: "noError",
