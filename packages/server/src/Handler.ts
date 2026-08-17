@@ -23,7 +23,7 @@ import type * as VectorSearch from "./VectorSearch";
 export type Handler<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   FunctionSpec_ extends FunctionSpec.AnyWithProps,
-  ExtraR = never,
+  R = never,
 > =
   FunctionSpec_ extends FunctionSpec.WithFunctionProvenance<
     FunctionSpec_,
@@ -34,7 +34,7 @@ export type Handler<
           FunctionSpec_,
           FunctionProvenance.AnyConfect
         >
-      ? ConfectProvenanceHandler<DatabaseSchema_, FunctionSpec_, ExtraR>
+      ? ConfectProvenanceHandler<DatabaseSchema_, FunctionSpec_, R>
       : never;
 
 type ConvexProvenanceHandler<
@@ -46,25 +46,25 @@ type ConfectProvenanceHandler<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   FunctionSpec_ extends
     FunctionSpec.AnyWithPropsWithFunctionProvenance<FunctionProvenance.AnyConfect>,
-  ExtraR = never,
+  R = never,
 > =
   FunctionSpec_ extends FunctionSpec.WithFunctionType<FunctionSpec_, "query">
-    ? ConfectProvenanceQuery<DatabaseSchema_, FunctionSpec_, ExtraR>
+    ? ConfectProvenanceQuery<DatabaseSchema_, FunctionSpec_, R>
     : FunctionSpec_ extends FunctionSpec.WithFunctionType<
           FunctionSpec_,
           "mutation"
         >
-      ? ConfectProvenanceMutation<DatabaseSchema_, FunctionSpec_, ExtraR>
+      ? ConfectProvenanceMutation<DatabaseSchema_, FunctionSpec_, R>
       : FunctionSpec_ extends FunctionSpec.WithRuntimeAndFunctionType<
             FunctionSpec_,
             RuntimeAndFunctionType.ConvexAction
           >
-        ? ConvexRuntimeAction<DatabaseSchema_, FunctionSpec_, ExtraR>
+        ? ConvexRuntimeAction<DatabaseSchema_, FunctionSpec_, R>
         : FunctionSpec_ extends FunctionSpec.WithRuntimeAndFunctionType<
               FunctionSpec_,
               RuntimeAndFunctionType.NodeAction
             >
-          ? NodeRuntimeAction<DatabaseSchema_, FunctionSpec_, ExtraR>
+          ? NodeRuntimeAction<DatabaseSchema_, FunctionSpec_, R>
           : never;
 
 /** The ctx services available to a query handler. */
@@ -116,31 +116,31 @@ export type ConfectProvenanceQuery<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   FunctionSpec_ extends
     FunctionSpec.AnyWithPropsWithFunctionType<RuntimeAndFunctionType.AnyQuery>,
-  ExtraR = never,
-> = Base<FunctionSpec_, QueryServices<DatabaseSchema_> | ExtraR>;
+  R = never,
+> = Base<FunctionSpec_, QueryServices<DatabaseSchema_> | R>;
 
 export type ConfectProvenanceMutation<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   FunctionSpec_ extends
     FunctionSpec.AnyWithPropsWithFunctionType<RuntimeAndFunctionType.AnyMutation>,
-  ExtraR = never,
-> = Base<FunctionSpec_, MutationServices<DatabaseSchema_> | ExtraR>;
+  R = never,
+> = Base<FunctionSpec_, MutationServices<DatabaseSchema_> | R>;
 
 export type ConvexRuntimeAction<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   FunctionSpec_ extends
     FunctionSpec.AnyWithPropsWithFunctionType<RuntimeAndFunctionType.AnyAction>,
-  ExtraR = never,
-> = Base<FunctionSpec_, ActionServices<DatabaseSchema_> | ExtraR>;
+  R = never,
+> = Base<FunctionSpec_, ActionServices<DatabaseSchema_> | R>;
 
 export type NodeRuntimeAction<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   FunctionSpec_ extends
     FunctionSpec.AnyWithPropsWithFunctionType<RuntimeAndFunctionType.NodeAction>,
-  ExtraR = never,
+  R = never,
 > = Base<
   FunctionSpec_,
-  ActionServices<DatabaseSchema_> | NodeServices.NodeServices | ExtraR
+  ActionServices<DatabaseSchema_> | NodeServices.NodeServices | R
 >;
 
 type Base<FunctionSpec_ extends FunctionSpec.AnyWithProps, R> = (
@@ -161,9 +161,9 @@ export type WithName<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   FunctionSpec_ extends FunctionSpec.AnyWithProps,
   FunctionName extends string,
-  ExtraR = never,
+  R = never,
 > = Handler<
   DatabaseSchema_,
   FunctionSpec.WithName<FunctionSpec_, FunctionName>,
-  ExtraR
+  R
 >;

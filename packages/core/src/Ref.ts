@@ -260,9 +260,6 @@ export const getFunctionReference = <Ref_ extends Any>(
   return functionReference as FunctionReference<Ref_>;
 };
 
-// A presence check only — must not read `ref.errorSchema`, whose lazy
-// computation would force the error thunks this check promises to leave
-// untouched.
 export const hasErrorSchema = (ref: Any): boolean =>
   Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag(
