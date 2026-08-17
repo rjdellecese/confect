@@ -182,6 +182,12 @@
   - @confect/core@10.0.0-next.0
   - @confect/server@10.0.0-next.0
 
+## 9.4.1
+
+### Patch Changes
+
+- a4054ab: The published type declarations are now emitted by TypeScript 7 rather than TypeScript 6. No API changed, but the declaration text differs in places, so an inferred type printed in your editor or in a type error may read slightly differently than before.
+
 ## 9.4.0
 
 ### Minor Changes
