@@ -8,7 +8,7 @@ Add middleware: reusable logic that runs around a group's function handlers, pro
 
 Middleware lives in a reserved `confect/middleware/` directory, one `<Name>.spec.ts`/`<Name>.impl.ts` pair per middleware. Confect no longer scans that directory for function groups, so a group can no longer be defined at `confect/middleware/...`.
 
-Declare a middleware's client-safe interface with `MiddlewareSpec.Service` — its `provides` service (type-level), its `error` schema, and the function types it may cover (`functionTypes`, one boolean flag per function type, each defaulting to `true`; `{ action: false }` declares queries and mutations) — and attach it in a group spec with `GroupSpec.middleware`:
+Declare a middleware's client-safe interface with `MiddlewareSpec.Service` — its `provides` service (type-level), its `error` schema, and the function types it may cover (`functionTypes`, one required boolean flag per function type, so every spec states its coverage outright) — and attach it in a group spec with `GroupSpec.middleware`:
 
 ```ts confect/middleware/RequireUser.spec.ts
 import { MiddlewareSpec } from "@confect/core";
@@ -30,7 +30,10 @@ export default class RequireUser extends MiddlewareSpec.Service<
   {
     provides: CurrentUser;
   }
->()("RequireUser", { error: () => NotSignedIn }) {}
+>()("RequireUser", {
+  error: () => NotSignedIn,
+  functionTypes: { query: true, mutation: true, action: false },
+}) {}
 ```
 
 ```ts confect/notes.spec.ts

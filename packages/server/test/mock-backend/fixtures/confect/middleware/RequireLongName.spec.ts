@@ -18,4 +18,5 @@ export default class RequireLongName extends MiddlewareSpec.Service<
   { requires: Viewer }
 >()("RequireLongName", {
   error: () => NameTooShort,
+  functionTypes: { query: true, mutation: true, action: true },
 }) {}

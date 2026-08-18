@@ -15,6 +15,6 @@ export default class RecordFunctionLevel extends MiddlewareSpec.Service<RecordFu
   "RecordFunctionLevel",
   {
     error: () => FunctionGateClosed,
-    functionTypes: { query: false, action: false },
+    functionTypes: { query: false, mutation: true, action: false },
   },
 ) {}

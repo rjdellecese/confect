@@ -93,7 +93,9 @@ describe("cross-middleware requires", () => {
   class NeedsViewer extends MiddlewareSpec.Service<
     NeedsViewer,
     { requires: Viewer }
-  >()("NeedsViewer") {}
+  >()("NeedsViewer", {
+    functionTypes: { query: true, mutation: true, action: true },
+  }) {}
 
   it("lets an implementation consume its declared requires", () => {
     MiddlewareImpl.make(databaseSchema, NeedsViewer, (effect) =>

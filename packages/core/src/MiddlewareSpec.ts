@@ -21,11 +21,12 @@ export const allFunctionTypes: ReadonlyArray<FunctionType> = [
 ];
 
 /**
- * The runtime representation of the set of function types a middleware
- * declares: the set's characteristic function, so every state of the record
- * is a meaningful subset. Constructed only by {@link Service}, normalized
- * from the boolean flags accepted there; the type-level counterpart is the
- * `~FunctionTypes` union read by {@link FunctionTypes}.
+ * The set of function types a middleware declares, as the set's
+ * characteristic function — one flag per function type, so every state of
+ * the record is a meaningful subset. This is both the shape {@link Service}
+ * requires for its `functionTypes` option and the runtime representation
+ * stored on the class; the type-level counterpart is the `~FunctionTypes`
+ * union read by {@link FunctionTypes}.
  */
 export interface SupportedFunctionTypes {
   readonly query: boolean;
@@ -152,7 +153,7 @@ export type FunctionTypes<Middleware_ extends AnyService> =
  *   provides: CurrentUser
  * }>()("RequireUser", {
  *   error: () => NotSignedIn,
- *   functionTypes: { action: false },
+ *   functionTypes: { query: true, mutation: true, action: false },
  * }) {}
  * ```
  *
@@ -163,19 +164,13 @@ export const Service =
   <Self, Config extends { provides?: any; requires?: any } = {}>() =>
   <
     const Key_ extends string,
+    const FunctionTypesConfig_ extends SupportedFunctionTypes,
     ErrorSchema_ extends Schema.Codec<any, any> = never,
-    const FunctionTypesConfig_ extends Partial<SupportedFunctionTypes> = {},
   >(
     key: Key_,
-    options?: {
+    options: {
       readonly error?: () => ErrorSchema_;
-      /**
-       * Boolean flags selecting the function types this middleware may
-       * attach to. Every flag defaults to `true`, so omit the option to
-       * declare all three and set a flag to `false` to opt a function type
-       * out (e.g. `{ action: false }` declares queries and mutations).
-       */
-      readonly functionTypes?: FunctionTypesConfig_ &
+      readonly functionTypes: FunctionTypesConfig_ &
         ValidateFunctionTypesConfig<FunctionTypesConfig_>;
     },
   ): ServiceClass<
@@ -186,49 +181,54 @@ export const Service =
     ErrorSchema_,
     FunctionTypesFromConfig<FunctionTypesConfig_>
   > => {
+    const { query, mutation, action } = options.functionTypes;
+    if (!query && !mutation && !action) {
+      throw new Error(
+        `Middleware "${key}" must declare at least one function type`,
+      );
+    }
+
     function Middleware_() {}
     const class_ = Middleware_ as any;
     class_[TypeId] = TypeId;
     class_.key = key;
     class_.functionTypes = {
-      query: options?.functionTypes?.query !== false,
-      mutation: options?.functionTypes?.mutation !== false,
-      action: options?.functionTypes?.action !== false,
+      query,
+      mutation,
+      action,
     } satisfies SupportedFunctionTypes;
-    if (options?.error !== undefined) {
+    if (options.error !== undefined) {
       Lazy.defineProperty(class_, "error", options.error);
     }
     return class_;
   };
 
-/**
- * The union of function types a `functionTypes` config declares: every
- * function type except those whose flag is explicitly `false`.
- */
-type FunctionTypesFromConfig<Config extends Partial<SupportedFunctionTypes>> =
-  Exclude<
-    FunctionType,
-    { [K in keyof Config]: Config[K] extends false ? K : never }[keyof Config]
-  >;
+/** The union of function types a `functionTypes` config declares. */
+type FunctionTypesFromConfig<Config extends SupportedFunctionTypes> = {
+  [K in FunctionType]: Config[K] extends true ? K : never;
+}[FunctionType];
 
 /**
  * The parameter-type validation applied to `Service`'s `functionTypes`
- * option: each flag must be a literal `true` or `false`. The flags determine
- * the middleware's declared function types at the type level — everything
- * from attachment validation to `MiddlewareImpl.makeByFunctionType`'s
- * required keys is computed from them — so a flag the type checker only
- * knows as `boolean` would let the type-level declaration diverge from the
- * runtime one.
+ * option: each flag must be a literal `true` or `false`, and at least one
+ * must be `true`. The flags determine the middleware's declared function
+ * types at the type level — everything from attachment validation to
+ * `MiddlewareImpl.makeByFunctionType`'s required keys is computed from them
+ * — so a flag the type checker only knows as `boolean` would let the
+ * type-level declaration diverge from the runtime one, and an all-`false`
+ * declaration would produce a middleware attachable to nothing.
  */
-type ValidateFunctionTypesConfig<
-  Config extends Partial<SupportedFunctionTypes>,
-> = ValidationResult<
-  {
-    [K in keyof Config]: boolean extends Config[K]
-      ? AttachmentError<`Function type flag "${K & string}" must be a literal \`true\` or \`false\`, not a computed \`boolean\``>
-      : never;
-  }[keyof Config]
->;
+type ValidateFunctionTypesConfig<Config extends SupportedFunctionTypes> =
+  ValidationResult<
+    | {
+        [K in keyof Config]: boolean extends Config[K]
+          ? AttachmentError<`Function type flag "${K & string}" must be a literal \`true\` or \`false\`, not a computed \`boolean\``>
+          : never;
+      }[keyof Config]
+    | ([FunctionTypesFromConfig<Config>] extends [never]
+        ? AttachmentError<`A middleware must declare at least one function type`>
+        : never)
+  >;
 
 /**
  * The error schemas contributed by a set of middleware, in no particular

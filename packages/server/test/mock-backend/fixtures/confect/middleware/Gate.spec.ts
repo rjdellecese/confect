@@ -12,5 +12,5 @@ export class GateClosed extends Schema.TaggedError<GateClosed>()("GateClosed", {
  */
 export default class Gate extends MiddlewareSpec.Service<Gate>()("Gate", {
   error: () => GateClosed,
-  functionTypes: { query: false, action: false },
+  functionTypes: { query: false, mutation: true, action: false },
 }) {}

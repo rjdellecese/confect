@@ -60,7 +60,7 @@ export default class RequireUser extends MiddlewareSpec.Service<
   { provides: CurrentUser }
 >()("RequireUser", {
   error: () => NotSignedIn,
-  functionTypes: { action: false },
+  functionTypes: { query: true, mutation: true, action: false },
 }) {}
 ```
 
@@ -70,7 +70,7 @@ Both `provides` and `error` are optional: a middleware may only observe (logging
 
 ### Function types
 
-A middleware declares which function types it may cover with the optional `functionTypes` option — a boolean flag for each of `query`, `mutation`, and `action` (Node actions count as `action`). Every flag defaults to `true`, so omitting the option declares all three; set a flag to `false` to opt a function type out. The flags must be literal `true` or `false` — they determine the declared function types at the type level, so a computed `boolean` is rejected with a type error. Attaching a middleware to a group is a type error unless every function's type is among the middleware's declared function types, so the `RequireUser` above (`{ action: false }`) only fits groups of queries and mutations, and a `{ query: false, action: false }` middleware only fits all-mutation groups.
+A middleware declares which function types it may cover with the required `functionTypes` option — a boolean flag for each of `query`, `mutation`, and `action` (Node actions count as `action`). Every flag must be specified, so each spec states its coverage outright, the way Convex itself keeps the three function types explicit and separate. The flags must be literal `true` or `false` — they determine the declared function types at the type level, so a computed `boolean` is rejected with a type error, as is declaring all three `false` (a middleware attachable to nothing). Attaching a middleware to a group is a type error unless every function's type is among the middleware's declared function types, so the `RequireUser` above (`action: false`) only fits groups of queries and mutations, and a mutation-only middleware only fits all-mutation groups.
 
 The declared function types also determine which services the middleware's implementation may use — see [below](#services-available-to-an-implementation).
 
@@ -241,7 +241,7 @@ The general wrap form takes the downstream effect explicitly — here, timing mi
 
 ```ts
 class Timed extends MiddlewareSpec.Service<Timed>()("Timed", {
-  functionTypes: { query: false },
+  functionTypes: { query: false, mutation: true, action: true },
 }) {}
 
 const TimedImpl = MiddlewareImpl.make(
@@ -271,16 +271,16 @@ const TimedImpl = MiddlewareImpl.make(
 
 An implementation provided with `MiddlewareImpl.make` uses one strategy for every function type the middleware declares, so its environment is limited to the services available in _all_ of those function types:
 
-| Declared function types                     | Services available to `make`                                                           |
-| ------------------------------------------- | -------------------------------------------------------------------------------------- |
-| One function type                           | That function type's full service set                                                  |
-| Queries and mutations (`{ action: false }`) | `DatabaseReader`, `Auth`, `StorageReader`, `QueryRunner`                               |
-| Mutations and actions (`{ query: false }`)  | `Auth`, `Scheduler`, `StorageReader`, `StorageWriter`, `QueryRunner`, `MutationRunner` |
-| Any set including both queries and actions  | `Auth`, `StorageReader`, `QueryRunner`                                                 |
+| Declared function types                    | Services available to `make`                                                           |
+| ------------------------------------------ | -------------------------------------------------------------------------------------- |
+| One function type                          | That function type's full service set                                                  |
+| Queries and mutations                      | `DatabaseReader`, `Auth`, `StorageReader`, `QueryRunner`                               |
+| Mutations and actions                      | `Auth`, `Scheduler`, `StorageReader`, `StorageWriter`, `QueryRunner`, `MutationRunner` |
+| Any set including both queries and actions | `Auth`, `StorageReader`, `QueryRunner`                                                 |
 
 ### Per-function-type implementations
 
-The all-function-types intersection leaves `QueryRunner` as the only database route, but Convex best practices say to [use `ctx.runQuery` sparingly in queries and mutations](https://docs.convex.dev/understanding/best-practices/#use-ctxrunquery-and-ctxrunmutation-sparingly-in-queries-and-mutations). So for database-touching middleware that should also cover actions — say, extending `RequireUser` above to cover all three function types (dropping its `action: false`) — implement per function type with `MiddlewareImpl.makeByFunctionType` instead: each entry gets that function type's full service set. Read directly in queries and mutations, and call an internal query (defined in a middleware-free group) in actions, where `runQuery` is the only route to the database:
+The all-function-types intersection leaves `QueryRunner` as the only database route, but Convex best practices say to [use `ctx.runQuery` sparingly in queries and mutations](https://docs.convex.dev/understanding/best-practices/#use-ctxrunquery-and-ctxrunmutation-sparingly-in-queries-and-mutations). So for database-touching middleware that should also cover actions — say, extending `RequireUser` above to cover all three function types (flipping its `action` flag to `true`) — implement per function type with `MiddlewareImpl.makeByFunctionType` instead: each entry gets that function type's full service set. Read directly in queries and mutations, and call an internal query (defined in a middleware-free group) in actions, where `runQuery` is the only route to the database:
 
 ```ts
 export default MiddlewareImpl.makeByFunctionType(databaseSchema, RequireUser, {

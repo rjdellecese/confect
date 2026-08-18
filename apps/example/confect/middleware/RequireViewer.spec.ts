@@ -23,5 +23,5 @@ export default class RequireViewer extends MiddlewareSpec.Service<
   { provides: Viewer }
 >()("RequireViewer", {
   error: () => NotSignedIn,
-  functionTypes: { action: false },
+  functionTypes: { query: true, mutation: true, action: false },
 }) {}

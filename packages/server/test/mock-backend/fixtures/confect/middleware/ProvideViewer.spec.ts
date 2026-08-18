@@ -23,4 +23,5 @@ export default class ProvideViewer extends MiddlewareSpec.Service<
   { provides: Viewer }
 >()("ProvideViewer", {
   error: () => NoViewer,
+  functionTypes: { query: true, mutation: true, action: true },
 }) {}
