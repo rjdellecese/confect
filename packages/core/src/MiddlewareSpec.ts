@@ -56,10 +56,6 @@ export interface Middleware<Provides_, E, R> {
   ): Effect.Effect<SuccessValue, E | unhandled, R>;
 }
 
-/**
- * The per-invocation metadata a middleware implementation receives alongside
- * the downstream effect.
- */
 export interface MiddlewareOptions {
   readonly name: string;
   readonly functionType: FunctionType;
@@ -92,11 +88,6 @@ export interface ServiceClass<
   readonly [TypeId]: TypeId;
   readonly key: Key_;
   readonly functionTypes: FunctionTypes_;
-  /**
-   * The declared error schema. Installed as a lazy memoised property only
-   * when the `error` option was provided, so `"error" in middleware`
-   * observes its presence without forcing the thunk.
-   */
   readonly error?: ErrorSchema_;
   readonly "~Provides": Provides_;
   readonly "~Requires": Requires_;
@@ -164,14 +155,7 @@ export const Service =
   >(
     key: Key_,
     options?: {
-      /** Lazily-evaluated error schema, like `FunctionSpec`'s `error`. */
       readonly error?: () => ErrorSchema_;
-      /**
-       * Function functionTypes this middleware may attach to. Default: all three.
-       * Node actions fall under `"action"`, so an `"action"` implementation
-       * must be valid in both action runtimes — which is why that function type's
-       * service bound excludes the Node-only services.
-       */
       readonly functionTypes?: FunctionTypes_;
     },
   ): ServiceClass<
