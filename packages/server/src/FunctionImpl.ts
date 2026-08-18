@@ -72,12 +72,12 @@ export const make = <
           registryItems,
           [functionName],
           RegistryItem.make({
-            functionSpec,
-            handler,
-            middlewareSpecs: [
+            coveringMiddlewareSpecs: [
               ...group.middlewares,
               ...functionSpec.middlewares,
             ],
+            functionSpec,
+            handler,
           }),
         ),
       );

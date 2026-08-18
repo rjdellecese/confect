@@ -267,3 +267,39 @@ describe("group assembly enforcement", () => {
     expect(registered.viewerName).toBeDefined();
   });
 });
+
+describe("registry key namespacing", () => {
+  it("registers a middleware keyed like a function name without collision", () => {
+    class Clash extends MiddlewareSpec.Service<Clash>()("clash", {
+      functionTypes: { query: true, mutation: true, action: true },
+    }) {}
+
+    const clashFunction = FunctionSpec.publicQuery({
+      name: "clash",
+      args: () => Schema.Struct({}),
+      returns: () => Schema.String,
+    });
+
+    const group = GroupSpec.make().middleware(Clash).addFunction(clashFunction);
+
+    const groupLayer = GroupImpl.make(databaseSchema, group).pipe(
+      Layer.provide(
+        FunctionImpl.make(databaseSchema, group, "clash", () =>
+          Effect.succeed("ok"),
+        ),
+      ),
+      Layer.provide(
+        MiddlewareImpl.make(databaseSchema, Clash, (effect) => effect),
+      ),
+      GroupImpl.finalize,
+    );
+
+    const registered = RegisteredFunctions.buildForGroup<typeof group>(
+      databaseSchema,
+      groupLayer,
+      RegisteredConvexFunction.make,
+    );
+
+    expect(registered.clash).toBeDefined();
+  });
+});

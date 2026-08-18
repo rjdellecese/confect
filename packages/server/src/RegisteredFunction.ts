@@ -156,11 +156,6 @@ export const applyMiddleware = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
   middlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>,
   options: MiddlewareSpec.MiddlewareOptions,
-  // The composed effect's success and environment are preserved (middleware
-  // returns the handler's opaque `SuccessValue`, and its own requirements
-  // are bounded by `MiddlewareImpl.CommonServices`, a subset of every
-  // covered function type's ctx union — i.e. of `R`); only the error channel widens,
-  // by the middlewares' declared errors.
 ): Effect.Effect<A, any, R> => {
   let wrapped: Effect.Effect<any, any, any> = effect;
   for (let index = middlewares.length - 1; index >= 0; index--) {

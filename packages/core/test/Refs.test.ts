@@ -3,6 +3,7 @@ import type { RegisteredMutation, RegisteredQuery } from "convex/server";
 import * as Schema from "effect/Schema";
 import * as FunctionSpec from "@confect/core/FunctionSpec";
 import * as GroupSpec from "@confect/core/GroupSpec";
+import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import * as Ref from "@confect/core/Ref";
 import * as Refs from "@confect/core/Refs";
 import type * as RuntimeAndFunctionType from "@confect/core/RuntimeAndFunctionType";
@@ -301,5 +302,42 @@ describe("make", () => {
         ConvexQueryReturns
       >
     >();
+  });
+});
+
+describe("middleware error unions", () => {
+  it("adds them to Confect refs and keeps them off plain Convex refs", () => {
+    class Blocked extends Schema.TaggedError<Blocked>()("Blocked", {}) {}
+
+    class GateMutations extends MiddlewareSpec.Service<GateMutations>()(
+      "GateMutations",
+      {
+        error: () => Blocked,
+        functionTypes: { query: false, mutation: true, action: false },
+      },
+    ) {}
+
+    const spec = Spec.make().add(
+      GroupSpec.makeAt("mixed")
+        .middleware(GateMutations)
+        .addFunction(
+          FunctionSpec.publicMutation({
+            name: "update",
+            args: () => Schema.Struct({}),
+            returns: () => Schema.Null,
+          }),
+        )
+        .addFunction(
+          FunctionSpec.convexPublicQuery<
+            RegisteredQuery<"public", { cursor: string }, Promise<string[]>>
+          >()("search"),
+        ),
+    );
+    const refs = Refs.make(spec);
+
+    expectTypeOf<
+      Ref.Error<typeof refs.public.mixed.update>
+    >().toEqualTypeOf<Blocked>();
+    expectTypeOf<Ref.Error<typeof refs.public.mixed.search>>().toBeNever();
   });
 });

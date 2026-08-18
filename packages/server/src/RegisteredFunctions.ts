@@ -103,19 +103,8 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
     Effect.runSync,
   );
 
-  // Middleware implementations register under `middleware:<key>` entries
-  // alongside the group's functions; split them out so only function items
-  // reach `mapLeaves`, and resolve each function's attached middleware specs
-  // against them.
-  const middlewareItems = new Map<string, MiddlewareImpl.RegistryItem>();
-  const functionItems: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(registryItems)) {
-    if (MiddlewareImpl.isRegistryItem(value)) {
-      middlewareItems.set(value.middleware.key, value);
-    } else {
-      functionItems[key] = value;
-    }
-  }
+  const { functionItems, middlewareItems } =
+    partitionMiddlewareItems(registryItems);
 
   return mapLeaves<RegistryItem.AnyWithProps, RegisteredFunction.Any>(
     functionItems as { [key: string]: RegistryItem.AnyWithProps },
@@ -133,6 +122,19 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
         Match.exhaustive,
       ),
   ) as RegisteredFunctionsForGroupSpec<Group>;
+};
+
+const partitionMiddlewareItems = (registryItems: Registry.RegistryItems) => {
+  const middlewareItems = new Map<string, MiddlewareImpl.RegistryItem>();
+  const functionItems: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(registryItems)) {
+    if (MiddlewareImpl.isRegistryItem(value)) {
+      middlewareItems.set(value.middleware.key, value);
+    } else {
+      functionItems[key] = value;
+    }
+  }
+  return { functionItems, middlewareItems };
 };
 
 /**

@@ -19,11 +19,7 @@ const RegistryItemProto = {
 
 /**
  * A function registered by `FunctionImpl.make`, one of two shapes keyed by
- * the spec's provenance. `ConfectRegistryItem` carries the aspects of the
- * spec the registration path uses plus the covering middleware;
- * `ConvexRegistryItem` carries only the raw registered handler, which passes
- * through Confect untouched — so the pairing (Convex item, covering
- * middleware) is unrepresentable.
+ * the spec's provenance.
  */
 export type AnyWithProps = ConfectRegistryItem | ConvexRegistryItem;
 
@@ -56,14 +52,13 @@ export interface ResolvedMiddleware {
 }
 
 export const make = ({
+  coveringMiddlewareSpecs,
   functionSpec,
   handler,
-  middlewareSpecs,
 }: {
+  coveringMiddlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyService>;
   functionSpec: FunctionSpec.AnyWithProps;
   handler: Handler.Any;
-  /** The middleware covering this function. */
-  middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyService>;
 }): AnyWithProps =>
   Match.value(functionSpec.functionProvenance).pipe(
     Match.tag("Convex", (): AnyWithProps =>
@@ -78,7 +73,7 @@ export const make = ({
         name: functionSpec.name,
         functionVisibility: functionSpec.functionVisibility,
         functionType: functionSpec.runtimeAndFunctionType.functionType,
-        middlewareSpecs,
+        middlewareSpecs: coveringMiddlewareSpecs,
         handler: handler as Handler.AnyConfectProvenance,
       });
 

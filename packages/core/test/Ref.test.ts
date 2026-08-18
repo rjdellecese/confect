@@ -14,6 +14,7 @@ import * as Schema from "effect/Schema";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
 import * as FunctionSpec from "@confect/core/FunctionSpec";
+import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import * as PaginationOptions from "@confect/core/PaginationOptions";
 import * as PaginationResult from "@confect/core/PaginationResult";
 import * as Ref from "@confect/core/Ref";
@@ -562,5 +563,60 @@ describe("paginated queries", () => {
         args,
       );
     });
+  });
+});
+
+describe("ConvexRef", () => {
+  test("carries no codec schemas or middleware surface", () => {
+    expectTypeOf<
+      Extract<
+        keyof Ref.ConvexRef<any, any, any, any>,
+        "args" | "returns" | "error" | "kind" | "middlewareSpecs"
+      >
+    >().toBeNever();
+  });
+});
+
+describe("error schema laziness at decode time", () => {
+  test("forces error schema thunks only when an error is decoded", () => {
+    const specErrorBuilt = MutableRef.make(false);
+    const middlewareErrorBuilt = MutableRef.make(false);
+
+    class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {}) {}
+    class Blocked extends Schema.TaggedError<Blocked>()("Blocked", {}) {}
+
+    class Gate extends MiddlewareSpec.Service<Gate>()("LazyDecodeGate", {
+      functionTypes: { query: true, mutation: true, action: true },
+      error: () => {
+        MutableRef.set(middlewareErrorBuilt, true);
+        return Blocked;
+      },
+    }) {}
+
+    const ref = Ref.make(
+      "test/mod",
+      FunctionSpec.publicQuery({
+        name: "get",
+        args: () => Schema.Struct({}),
+        returns: () => Schema.String,
+        error: () => {
+          MutableRef.set(specErrorBuilt, true);
+          return NotFound;
+        },
+      }),
+      [Gate],
+    );
+
+    Ref.encodeArgsSync(ref, {});
+    Ref.decodeReturnsSync(ref, "value");
+
+    expect(MutableRef.get(specErrorBuilt)).toBe(false);
+    expect(MutableRef.get(middlewareErrorBuilt)).toBe(false);
+
+    const decoded = Ref.decodeErrorOption(ref, { _tag: "Blocked" });
+
+    expect(Option.isSome(decoded)).toBe(true);
+    expect(MutableRef.get(specErrorBuilt)).toBe(true);
+    expect(MutableRef.get(middlewareErrorBuilt)).toBe(true);
   });
 });

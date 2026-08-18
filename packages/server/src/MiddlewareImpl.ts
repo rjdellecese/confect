@@ -40,10 +40,6 @@ export const MiddlewareImpl = <MiddlewareKey extends string>({
     `@confect/server/MiddlewareImpl/${middlewareKey}`,
   );
 
-/**
- * The `MiddlewareImpl` services a group spec's attached middleware require —
- * both group-level attachments and each function's own.
- */
 export type FromGroupSpec<Group extends GroupSpec.AnyWithProps> =
   | GroupSpec.Middlewares<Group>
   | FunctionSpec.Middlewares<
@@ -54,7 +50,6 @@ export type FromGroupSpec<Group extends GroupSpec.AnyWithProps> =
     : never
   : never;
 
-/** The full ctx-service union for one function type. */
 export type FunctionTypeServices<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   FunctionType_ extends FunctionType,
@@ -74,12 +69,6 @@ export type FunctionTypeServices<
  * several ctx services are structurally typed (e.g. the raw
  * `GenericQueryCtx`/`GenericMutationCtx` tags), so conditional-type set
  * arithmetic over them is not reliable.
- *
- * Note the singleton cases resolve to that function type's full union, and every
- * combination involving both `"query"` and `"action"` bottoms out at
- * `Auth | StorageReader | QueryRunner`. A database-touching middleware that
- * declares all three functionTypes should use {@link makeByFunctionType} rather than lean on
- * `QueryRunner` — Convex best practices reserve `runQuery` for actions.
  */
 export type CommonServices<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
@@ -120,11 +109,6 @@ type AllFunctionTypesCommonServices =
 export const RegistryItemTypeId = "@confect/server/MiddlewareImpl/RegistryItem";
 export type RegistryItemTypeId = typeof RegistryItemTypeId;
 
-/**
- * The registry entry a middleware implementation registers under
- * `middleware:<key>` — a key shape no `FunctionImpl` can collide with, since
- * function names are validated identifiers and cannot contain `:`.
- */
 export interface RegistryItem {
   readonly [RegistryItemTypeId]: RegistryItemTypeId;
   readonly middleware: MiddlewareSpec.AnyService;

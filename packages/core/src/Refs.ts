@@ -63,8 +63,6 @@ type FilteredFunctions<
     FunctionSpec.AnyWithProps
     ? Ref.FromFunctionSpec<
         F,
-        // Middleware never covers Convex-provenance functions, so their refs
-        // don't take on the group middleware's error union.
         F extends {
           readonly functionProvenance: { readonly _tag: "Confect" };
         }

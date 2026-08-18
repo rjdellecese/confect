@@ -20,14 +20,6 @@ export const allFunctionTypes: ReadonlyArray<FunctionType> = [
   "action",
 ];
 
-/**
- * The set of function types a middleware declares, as the set's
- * characteristic function — one flag per function type, so every state of
- * the record is a meaningful subset. This is both the shape {@link Service}
- * requires for its `functionTypes` option and the runtime representation
- * stored on the class; the type-level counterpart is the `~FunctionTypes`
- * union read by {@link FunctionTypes}.
- */
 export interface SupportedFunctionTypes {
   readonly query: boolean;
   readonly mutation: boolean;
@@ -36,9 +28,7 @@ export interface SupportedFunctionTypes {
 
 /**
  * Marker success type used by middleware to represent the handler's outcome
- * without exposing its concrete success value. A middleware implementation
- * can only obtain a `SuccessValue` by running the downstream effect, so it
- * cannot fabricate or alter the function's return value.
+ * without exposing its concrete success value.
  *
  * Mirrors `RpcMiddleware.SuccessValue` in Effect.
  */
@@ -47,19 +37,12 @@ export interface SuccessValue {
 }
 
 /**
- * The wrap-style middleware implementation shape.
+ * The wrap-style middleware implementation shape: receives the downstream
+ * effect (the remaining middleware plus the function handler) and the
+ * covered invocation's metadata, and returns the effect that runs in its
+ * place.
  *
- * The downstream effect (remaining middleware plus the function handler)
- * arrives as `effect`; its environment carries `Provides`, so the type
- * checker forces the implementation to discharge the obligation with
- * `Effect.provideService` (or to never run `effect` at all — that is how a
- * middleware short-circuits, by returning `Effect.fail` with its declared
- * error instead). Handler errors the middleware does not declare flow
- * through as the branded `unhandled` type and cannot be absorbed.
- *
- * Mirrors `RpcMiddleware.RpcMiddleware` in Effect, with Confect's invocation
- * metadata: the covered function's name, type, and visibility, and its
- * decoded args.
+ * Mirrors `RpcMiddleware.RpcMiddleware` in Effect.
  */
 export interface Middleware<Provides_, E, R> {
   (
@@ -203,21 +186,10 @@ export const Service =
     return class_;
   };
 
-/** The union of function types a `functionTypes` config declares. */
 type FunctionTypesFromConfig<Config extends SupportedFunctionTypes> = {
   [K in FunctionType]: Config[K] extends true ? K : never;
 }[FunctionType];
 
-/**
- * The parameter-type validation applied to `Service`'s `functionTypes`
- * option: each flag must be a literal `true` or `false`, and at least one
- * must be `true`. The flags determine the middleware's declared function
- * types at the type level — everything from attachment validation to
- * `MiddlewareImpl.makeByFunctionType`'s required keys is computed from them
- * — so a flag the type checker only knows as `boolean` would let the
- * type-level declaration diverge from the runtime one, and an all-`false`
- * declaration would produce a middleware attachable to nothing.
- */
 type ValidateFunctionTypesConfig<Config extends SupportedFunctionTypes> =
   ValidationResult<
     | {
@@ -230,11 +202,6 @@ type ValidateFunctionTypesConfig<Config extends SupportedFunctionTypes> =
         : never)
   >;
 
-/**
- * The error schemas contributed by a set of middleware, in no particular
- * order — presence-checked at runtime via the lazily-installed `error`
- * property.
- */
 export const errorSchemas = (
   middlewares: ReadonlyArray<AnyService>,
 ): ReadonlyArray<Schema.Codec<any, any>> =>
@@ -259,17 +226,10 @@ type FunctionTypeOf<FunctionSpec_ extends FunctionSpec.AnyWithProps> =
 type ValidationResult<Errors> = [Errors] extends [never] ? unknown : Errors;
 
 /**
- * Validate one or more functions against one or more middleware
- * (distributing over both unions):
- *
- * - A Convex-provenance function whose function type is among the middleware's
- *   declared `functionTypes` is rejected — its raw handler is passed through
- *   untouched, so the middleware could not actually cover it, and silently
- *   skipping it would be a policy hole. (One whose function type is *not* declared is
- *   fine: the middleware makes no claim about it.)
- * - A Confect-provenance function whose function type the middleware does not declare
- *   is rejected — every covered function's type must be among the
- *   middleware's `functionTypes`.
+ * A matching-type Convex-provenance function is rejected rather than
+ * silently skipped: its raw handler passes through Confect untouched, so
+ * the middleware could not actually cover it, and skipping it would be a
+ * policy hole.
  */
 export type ValidateFunction<
   FunctionSpec_ extends FunctionSpec.AnyWithProps,
@@ -296,14 +256,9 @@ export type ValidateFunction<
   : never;
 
 /**
- * The parameter-type validation applied by `GroupSpec.middleware`:
- * rejects a duplicate attachment (same key), requires the middleware's
- * `requires` services to be provided by middleware attached to the group
- * earlier (attachment order is chain order, so "already attached" is
- * exactly "runs earlier"), then validates every function already declared
- * on the group against the incoming middleware. Resolves to `unknown` when
- * the attachment is legal, so intersecting with the middleware type is a
- * no-op.
+ * Attachment order is chain order, so requiring `requires` to be satisfied
+ * by already-attached middleware is exactly requiring the provider to run
+ * earlier.
  */
 export type ValidateAttach<
   Middleware_ extends AnyService,
@@ -315,14 +270,6 @@ export type ValidateAttach<
     : AttachmentError<`Middleware "${Key<Middleware_>}" requires services that no middleware attached earlier to this group provides — attach the providing middleware first`>
   : AttachmentError<`Middleware "${Key<Middleware_>}" is already attached to this group`>;
 
-/**
- * The parameter-type validation applied by `GroupSpec.addFunction` once a
- * group carries middleware: the incoming function must be valid against
- * every attached middleware (the declarative group-attachment semantics are
- * order-independent, so functions added after `.middleware()` are checked
- * just like ones added before), and none of the function's own middleware
- * may duplicate a group-attached one.
- */
 export type ValidateAddedFunction<
   FunctionSpec_ extends FunctionSpec.AnyWithProps,
   Middlewares_ extends AnyService,
@@ -356,11 +303,6 @@ type GroupOverlap<
  * middleware's `requires` may legitimately be satisfied by a group
  * middleware the function spec never sees, and group attachment is
  * declaratively order-independent with respect to `addFunction`.
- *
- * This check is order-insensitive within a single function's own middleware
- * list (`provides` has no runtime representation to check against);
- * attaching a function-level middleware before its same-level provider
- * fails at runtime with a missing-service defect.
  */
 export type ValidateImplRequires<
   Functions_ extends FunctionSpec.AnyWithProps,
@@ -378,12 +320,6 @@ export type ValidateImplRequires<
     : never
 >;
 
-/**
- * The parameter-type validation applied by `FunctionSpec`'s `.middleware()`:
- * plain Convex functions cannot carry middleware, the middleware must
- * declare the function's type, and it must not already be attached to the
- * function.
- */
 export type ValidateFunctionAttach<
   Middleware_ extends AnyService,
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,

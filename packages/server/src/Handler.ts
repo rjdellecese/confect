@@ -67,7 +67,6 @@ type ConfectProvenanceHandler<
           ? NodeRuntimeAction<DatabaseSchema_, FunctionSpec_, R>
           : never;
 
-/** The ctx services available to a query handler. */
 export type QueryServices<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
     | DatabaseReader.DatabaseReader<DatabaseSchema_>
     | Auth.Auth
@@ -77,7 +76,6 @@ export type QueryServices<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
         DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
       >;
 
-/** The ctx services available to a mutation handler. */
 export type MutationServices<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > =
@@ -93,9 +91,7 @@ export type MutationServices<
       DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
     >;
 
-/**
- * The ctx services available to an action handler in both action runtimes.
- */
+/** Shared by both action runtimes. */
 export type ActionServices<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > =
