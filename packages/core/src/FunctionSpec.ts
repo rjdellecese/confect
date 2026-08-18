@@ -252,7 +252,7 @@ const Proto = {
       );
     }
     const functionType = this.runtimeAndFunctionType.functionType;
-    if (!middleware.functionTypes.includes(functionType)) {
+    if (!middleware.functionTypes[functionType]) {
       throw new Error(
         `Middleware "${middleware.key}" does not declare function type "${functionType}" of function "${this.name}"`,
       );

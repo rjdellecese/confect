@@ -32,7 +32,7 @@ class RequireUser extends MiddlewareSpec.Service<
 
 class MutationOnly extends MiddlewareSpec.Service<MutationOnly>()(
   "MutationOnly",
-  { functionTypes: ["mutation"] },
+  { functionTypes: { query: false, action: false } },
 ) {}
 
 const query = FunctionSpec.publicQuery({
@@ -101,17 +101,21 @@ describe("`middleware` lives on `Builder`, not `FunctionSpec`", () => {
 });
 
 describe("Service", () => {
-  it("stores the key and defaults functionTypes to all three", () => {
+  it("stores the key and defaults every function type flag to true", () => {
     expect(RequireUser.key).toBe("RequireUser");
-    expect(RequireUser.functionTypes).toStrictEqual([
-      "query",
-      "mutation",
-      "action",
-    ]);
+    expect(RequireUser.functionTypes).toStrictEqual({
+      query: true,
+      mutation: true,
+      action: true,
+    });
   });
 
-  it("stores declared functionTypes", () => {
-    expect(MutationOnly.functionTypes).toStrictEqual(["mutation"]);
+  it("stores declared functionTypes, defaulting unlisted flags to true", () => {
+    expect(MutationOnly.functionTypes).toStrictEqual({
+      query: false,
+      mutation: true,
+      action: false,
+    });
   });
 
   it("installs the error schema lazily, observable via presence checks", () => {
@@ -150,6 +154,33 @@ describe("Service", () => {
     expectTypeOf<
       MiddlewareSpec.FunctionTypes<typeof RequireUser>
     >().toEqualTypeOf<"query" | "mutation" | "action">();
+  });
+
+  it("treats an explicit true flag as the default", () => {
+    class ExplicitTrue extends MiddlewareSpec.Service<ExplicitTrue>()(
+      "ExplicitTrue",
+      { functionTypes: { query: true, action: false } },
+    ) {}
+
+    expectTypeOf<
+      MiddlewareSpec.FunctionTypes<typeof ExplicitTrue>
+    >().toEqualTypeOf<"query" | "mutation">();
+    expect(ExplicitTrue.functionTypes).toStrictEqual({
+      query: true,
+      mutation: true,
+      action: false,
+    });
+  });
+
+  it("rejects a function type flag the type checker only knows as boolean", () => {
+    const computed: boolean = Math.random() > 0.5;
+
+    class Computed extends MiddlewareSpec.Service<Computed>()("Computed", {
+      // @ts-expect-error - flags must be literal true or false
+      functionTypes: { action: computed },
+    }) {}
+
+    expect(Computed.key).toBe("Computed");
   });
 });
 

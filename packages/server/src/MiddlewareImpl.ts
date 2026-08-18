@@ -1,6 +1,6 @@
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import type * as GroupSpec from "@confect/core/GroupSpec";
-import type * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
+import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import * as Registry from "@confect/core/Registry";
 import type { FunctionType } from "convex/server";
 import * as Context from "effect/Context";
@@ -187,10 +187,12 @@ export const make = <
   layerFromImpls(
     middleware,
     Object.fromEntries(
-      middleware.functionTypes.map((functionType) => [
-        functionType,
-        impl as MiddlewareSpec.AnyMiddleware,
-      ]),
+      MiddlewareSpec.allFunctionTypes
+        .filter((functionType) => middleware.functionTypes[functionType])
+        .map((functionType) => [
+          functionType,
+          impl as MiddlewareSpec.AnyMiddleware,
+        ]),
     ),
   );
 

@@ -14,13 +14,24 @@ export type TypeId = typeof TypeId;
 export const isMiddlewareSpec = (u: unknown): u is AnyService =>
   Predicate.hasProperty(u, TypeId);
 
-export type AllFunctionTypes = ["query", "mutation", "action"];
-
-export const allFunctionTypes: AllFunctionTypes = [
+export const allFunctionTypes: ReadonlyArray<FunctionType> = [
   "query",
   "mutation",
   "action",
 ];
+
+/**
+ * The runtime representation of the set of function types a middleware
+ * declares: the set's characteristic function, so every state of the record
+ * is a meaningful subset. Constructed only by {@link Service}, normalized
+ * from the boolean flags accepted there; the type-level counterpart is the
+ * `~FunctionTypes` union read by {@link FunctionTypes}.
+ */
+export interface SupportedFunctionTypes {
+  readonly query: boolean;
+  readonly mutation: boolean;
+  readonly action: boolean;
+}
 
 /**
  * Marker success type used by middleware to represent the handler's outcome
@@ -79,7 +90,7 @@ export interface ServiceClass<
   Provides_,
   Requires_,
   ErrorSchema_ extends Schema.Codec<any, any>,
-  FunctionTypes_ extends ReadonlyArray<FunctionType>,
+  FunctionTypes_ extends FunctionType,
 > {
   new (_: never): {
     readonly [TypeId]: TypeId;
@@ -87,22 +98,24 @@ export interface ServiceClass<
   };
   readonly [TypeId]: TypeId;
   readonly key: Key_;
-  readonly functionTypes: FunctionTypes_;
+  readonly functionTypes: SupportedFunctionTypes;
   readonly error?: ErrorSchema_;
   readonly "~Provides": Provides_;
   readonly "~Requires": Requires_;
   readonly "~Error": ErrorSchema_;
+  readonly "~FunctionTypes": FunctionTypes_;
   readonly "~Self": Self;
 }
 
 export interface AnyService {
   readonly [TypeId]: TypeId;
   readonly key: string;
-  readonly functionTypes: ReadonlyArray<FunctionType>;
+  readonly functionTypes: SupportedFunctionTypes;
   readonly error?: Schema.Codec<any, any>;
   readonly "~Provides": any;
   readonly "~Requires": any;
   readonly "~Error": any;
+  readonly "~FunctionTypes": FunctionType;
 }
 
 export type Key<Middleware_ extends AnyService> = Middleware_["key"];
@@ -127,7 +140,7 @@ export type EncodedError<Middleware_ extends AnyService> =
   Middleware_ extends AnyService ? Middleware_["~Error"]["Encoded"] : never;
 
 export type FunctionTypes<Middleware_ extends AnyService> =
-  Middleware_ extends AnyService ? Middleware_["functionTypes"][number] : never;
+  Middleware_ extends AnyService ? Middleware_["~FunctionTypes"] : never;
 
 /**
  * Declare a middleware's client-safe interface: its identifying key, the
@@ -139,7 +152,7 @@ export type FunctionTypes<Middleware_ extends AnyService> =
  *   provides: CurrentUser
  * }>()("RequireUser", {
  *   error: () => NotSignedIn,
- *   functionTypes: ["query", "mutation"],
+ *   functionTypes: { action: false },
  * }) {}
  * ```
  *
@@ -151,12 +164,19 @@ export const Service =
   <
     const Key_ extends string,
     ErrorSchema_ extends Schema.Codec<any, any> = never,
-    const FunctionTypes_ extends ReadonlyArray<FunctionType> = AllFunctionTypes,
+    const FunctionTypesConfig_ extends Partial<SupportedFunctionTypes> = {},
   >(
     key: Key_,
     options?: {
       readonly error?: () => ErrorSchema_;
-      readonly functionTypes?: FunctionTypes_;
+      /**
+       * Boolean flags selecting the function types this middleware may
+       * attach to. Every flag defaults to `true`, so omit the option to
+       * declare all three and set a flag to `false` to opt a function type
+       * out (e.g. `{ action: false }` declares queries and mutations).
+       */
+      readonly functionTypes?: FunctionTypesConfig_ &
+        ValidateFunctionTypesConfig<FunctionTypesConfig_>;
     },
   ): ServiceClass<
     Self,
@@ -164,18 +184,51 @@ export const Service =
     "provides" extends keyof Config ? Config["provides"] : never,
     "requires" extends keyof Config ? Config["requires"] : never,
     ErrorSchema_,
-    FunctionTypes_
+    FunctionTypesFromConfig<FunctionTypesConfig_>
   > => {
     function Middleware_() {}
     const class_ = Middleware_ as any;
     class_[TypeId] = TypeId;
     class_.key = key;
-    class_.functionTypes = options?.functionTypes ?? allFunctionTypes;
+    class_.functionTypes = {
+      query: options?.functionTypes?.query !== false,
+      mutation: options?.functionTypes?.mutation !== false,
+      action: options?.functionTypes?.action !== false,
+    } satisfies SupportedFunctionTypes;
     if (options?.error !== undefined) {
       Lazy.defineProperty(class_, "error", options.error);
     }
     return class_;
   };
+
+/**
+ * The union of function types a `functionTypes` config declares: every
+ * function type except those whose flag is explicitly `false`.
+ */
+type FunctionTypesFromConfig<Config extends Partial<SupportedFunctionTypes>> =
+  Exclude<
+    FunctionType,
+    { [K in keyof Config]: Config[K] extends false ? K : never }[keyof Config]
+  >;
+
+/**
+ * The parameter-type validation applied to `Service`'s `functionTypes`
+ * option: each flag must be a literal `true` or `false`. The flags determine
+ * the middleware's declared function types at the type level — everything
+ * from attachment validation to `MiddlewareImpl.makeByFunctionType`'s
+ * required keys is computed from them — so a flag the type checker only
+ * knows as `boolean` would let the type-level declaration diverge from the
+ * runtime one.
+ */
+type ValidateFunctionTypesConfig<
+  Config extends Partial<SupportedFunctionTypes>,
+> = ValidationResult<
+  {
+    [K in keyof Config]: boolean extends Config[K]
+      ? AttachmentError<`Function type flag "${K & string}" must be a literal \`true\` or \`false\`, not a computed \`boolean\``>
+      : never;
+  }[keyof Config]
+>;
 
 /**
  * The error schemas contributed by a set of middleware, in no particular
