@@ -1,5 +1,11 @@
 # @confect/react
 
+## 9.4.2
+
+### Patch Changes
+
+- 3f0255c: Build and test against `convex` 1.44.0. The published `convex` peer ranges are unchanged, so no consumer action is required.
+
 ## 9.4.1
 
 ### Patch Changes
