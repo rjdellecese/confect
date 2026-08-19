@@ -1,5 +1,138 @@
 # @confect/cli
 
+## 10.0.0-next.16
+
+### Major Changes
+
+- Migrate to Effect v4. All `@confect/*` packages now require `effect@^4.0.0-beta.97`; `@effect/platform` and `@effect/cli` are no longer dependencies (their functionality moved into `effect` core and `effect/unstable/*`).
+
+  Breaking changes for users:
+
+  - **Schemas** follow Effect v4's Schema API: `Schema.Union([a, b])` (array form), `Schema.Literals([...])` for literal unions, `Schema.optionalKey` in place of `optionalWith({ exact: true })`, and checks like `Schema.String.check(Schema.isMaxLength(...))` in place of piped filters.
+  - **Option-returning functions** must use a codec with a serializable encoded form, such as `Schema.OptionFromNullOr(...)` — v4's `Schema.Option` encodes to an `Option` instance, which is not a Convex value.
+  - **Table schemas** may now be transformations (`Schema.decodeTo` chains, `Schema.encodeKeys`), branded structs, suspended schemas, or unions of these — Convex's system fields are carried through the whole encoding chain. Schemas that do not resolve to an object shape at every step (such as `Schema.Class`) are rejected with a descriptive error when the table is defined.
+  - **Clients**: decode failures surface as `SchemaError` rather than `ParseError` in `@confect/js` and `@confect/react`, and `@confect/react`'s `useMutation`/`useAction` handles with an `error` schema now resolve to `Result` (v4's replacement for `Either`).
+  - **HTTP** is now mounted through the renamed `HttpRouter` module (formerly `HttpApi`). `HttpRouter.make(routes)` takes a single route-registering `Layer` composed from Effect's own `effect/unstable/http` and `effect/unstable/httpapi` modules — `HttpApiBuilder.layer(api)` (with group handler layers supplied via `Layer.provide`; a missing group is a compile-time error), `HttpApiScalar.layer` for docs, `HttpRouter.add` for plain routes, and `HttpRouter.middleware(fn, { global: true })` for middleware, merged with `Layer.mergeAll`. The per-path-prefix record and its `api`/`apiLive`/`middleware`/`scalar` options are gone; Confect registers one catch-all Convex HTTP action at `/`, and plain Convex routes added to the returned router still take precedence. Handlers, middleware, and route-layer construction all run with Confect's Convex-aware `ConfigProvider` in context.
+  - **Node actions** use `effect/unstable/process` (`ChildProcessSpawner`) and `@effect/platform-node`'s `NodeServices` in place of `@effect/platform` `Command`/`NodeContext`.
+  - **Configuration**: Confect's Convex-aware `ConfigProvider` treats empty-string environment variables as missing values (matching Effect v4's built-in providers), so `Config.withDefault` and `Config.option` recover from them.
+  - **CLI**: a malformed `convex.json` now fails codegen with a descriptive error instead of being silently ignored.
+  - Confect queries no longer stub the global `Date.now`. Queries run with a `Clock` whose unsafe accessors return constants, so Effect-internal reads (log timestamps, spans) never evict a query from Convex's cache; explicit time reads — `Clock.currentTimeMillis`/`currentTimeNanos` or a raw `Date.now()` call — opt the query out and evict as they honestly should.
+
+### Patch Changes
+
+- Raise the required `effect` peer version to `^4.0.0-beta.100` (from `^4.0.0-beta.99`).
+
+  This is a peer-range-only change with no consumer-visible API consequences. The `beta.100` release only touches `Cron` internals (month/weekday alias normalization, day/weekday rollover, and equality/hashing), CLI error message formatting (`InvalidValue` prefixes), and `Schema.toTaggedUnion` discriminants that Confect doesn't use.
+
+- Raise the required `effect` peer version to `^4.0.0-beta.101` (from `^4.0.0-beta.100`).
+
+  This is a peer-range-only change with no consumer-visible API consequences. The `beta.101` release only touches fiber/concurrency internals (interrupt handling in concurrent traversal, stack frame annotations, `awaitAllChildren` linearization, `interruptibleMask` interrupt delivery), a `MutableList.filter` fix for empty buckets, a `Schema.Struct` required-readonly-field type display simplification, and an `HttpRouter.toWebHandler` middleware type-inference tightening that Confect doesn't need to accommodate.
+
+- Raise the required `effect` peer version to `^4.0.0-beta.102` (from `^4.0.0-beta.101`), and `@confect/server`'s optional `@effect/platform-node` peer version likewise.
+- Raise the required `effect` peer version to `^4.0.0-beta.105` (from `^4.0.0-beta.102`), and `@confect/server`'s optional `@effect/platform-node` peer version likewise.
+
+  `beta.103` separates wall-clock time from monotonic elapsed time: `Clock.Clock` now also requires `monotonicTimeNanos` and `monotonicTimeNanosUnsafe`, so a custom `Clock` provided to a Confect function has to supply both. Effects that measure elapsed time — `Effect.timed`, duration metrics, `Sink.withDuration` — read the monotonic accessors instead of the wall clock, and continue to report a zero duration inside queries and mutations, where Confect pins the unsafe accessors to constants to keep Convex's query cache from evicting on every logged span.
+
+  `beta.103` also moves synchronous Effect runs off `setImmediate`/`setTimeout` and onto the microtask queue, which Convex's query and mutation isolate permits. Confect no longer suppresses cooperative fiber yielding for the synchronous work it performs while your modules load — registration and schema-to-validator compilation — and relies on that scheduling instead. Neither the "Can't use `setTimeout` in queries and mutations" crash nor any other consumer-visible behavior changes, but this is the area to look at if module loading starts misbehaving.
+
+  `beta.104` renames Effect's schema error constructors to match their `Data` counterparts, which affects any error schema you declare for a Confect function:
+
+  **Before:**
+
+  ```ts
+  export class NoteNotFound extends Schema.TaggedErrorClass<NoteNotFound>()(
+    "NoteNotFound",
+    { noteId: Id("notes") },
+  ) {}
+  ```
+
+  **After:**
+
+  ```ts
+  export class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
+    "NoteNotFound",
+    { noteId: Id("notes") },
+  ) {}
+  ```
+
+  `Schema.ErrorClass` is likewise now `Schema.Error`; the schema for JavaScript `Error` instances that previously went by `Schema.Error` is now `Schema.ErrorInstance`, and `Schema.ErrorReviver` is now `Schema.ErrorInstanceReviver`. Confect's own error types — `DocumentDecodeError`, `BlobNotFoundError`, and the rest — are unchanged in name, shape, and message.
+
+  `beta.105` restructures how schema validation failures are reported, but not on the path Confect puts you on: decode and encode failures still surface as `Schema.SchemaError` with a formatted `message`, so error text from `@confect/js`, `@confect/react`, and document decoding is unchanged.
+
+- Raise the required `effect` peer version to `^4.0.0-beta.106` (from `^4.0.0-beta.105`), and `@confect/server`'s optional `@effect/platform-node` peer version likewise.
+
+  `beta.106` is a patch-only Effect release. Nothing in Confect's own API changes, and your table, argument, and returns schemas still compile to the same Convex validators.
+
+  One Effect change needs a call-site edit if you derive property-test generators from those schemas: `Schema.toArbitrary` now returns a factory that takes the `fast-check` module instead of returning an arbitrary directly, and `Schema.toArbitraryLazy` and the `{ report: true }` option are gone.
+
+  **Before:**
+
+  ```ts
+  const NoteArbitrary = Schema.toArbitrary(Note);
+  ```
+
+  **After:**
+
+  ```ts
+  import * as FastCheck from "fast-check";
+
+  const NoteArbitrary = Schema.toArbitrary(Note)(FastCheck);
+  ```
+
+  HTTP actions written against `HttpRouter` also inherit Effect's stricter multipart handling: a request that exceeds the configured part count, part size, or field size limits now stops being parsed at the limit rather than being read to completion first.
+
+- Raise the required `effect` peer version to `^4.0.0-beta.107` (from `^4.0.0-beta.106`), and `@confect/server`'s optional `@effect/platform-node` peer version likewise.
+
+  `beta.107` is a patch-only Effect release, so no Confect API changes and no call-site edits are needed — upgrade `effect` alongside `@confect/*` and everything you have written keeps compiling. Your table, argument, and returns schemas still produce the same Convex validators.
+
+  Two Effect fixes are worth knowing about if they touch your code. HTTP actions written with `HttpRouter` now collect uploaded file contents far faster on large multipart bodies, and a file part whose stream is cut short — because a parser limit was exceeded or the request body ended early — now fails instead of hanging. Separately, `Duration` values that are equal now hash equally, so a `Duration` used as a `HashMap` key or a `HashSet` member is found regardless of which constructor built it.
+
+- Raise the required `effect` peer version to `^4.0.0-beta.98` (from `^4.0.0-beta.97`).
+
+  `effect`'s `SchemaError` is now exposed as its own public module (`effect/SchemaError`), which changes the import path TypeScript picks when Confect emits `.d.ts` declarations that reference `Schema.SchemaError` (for example in generated `services.d.ts`). Existing `Schema.SchemaError` / `Schema.isSchemaError` usage is unaffected — this is purely a declaration-emit detail that consumers relying on generated types may notice.
+
+- Raise the required `effect` peer version to `^4.0.0-beta.99` (from `^4.0.0-beta.98`).
+
+  This is a peer-range-only change with no consumer-visible API consequences. The `beta.99` release only touches `Graph`, CLI (`Command`/`CliConfig`/wizard mode), `Tool` cloning, Redis script eval, and multipart parser internals that Confect doesn't use.
+
+- Raise the required `effect` peer version to `^4.0.0-rc.108` (from `^4.0.0-beta.107`), and `@confect/server`'s optional `@effect/platform-node` peer version likewise. Effect v4 has left beta for release candidates, so `effect@rc` is now the tag to install alongside `@confect/*`.
+
+  No Confect API changed, and no call-site edits are needed for Confect itself. One Effect change can reach your code: the standalone `effect/SchemaError` module is gone, and `SchemaError` is now exported from `Schema`. Confect still fails decoding with the same error, so this only matters if you name the type when handling it.
+
+  Before:
+
+  ```ts
+  import type { SchemaError } from "effect/SchemaError";
+  ```
+
+  After:
+
+  ```ts
+  import type { SchemaError } from "effect/Schema";
+  ```
+
+  Also worth knowing if you serve an `HttpApi`: a query parameter declared as an array now decodes correctly when a request supplies exactly one value for it.
+
+  One internal change rides along. Queries and mutations that run long enough to trigger a cooperative fiber yield now take that yield from Effect's own scheduler, which `rc.108` made usable inside Convex's isolate for the first time. The underlying microtask primitive is identical, so behavior should not change — but it is the thing to look at if a long-running query or mutation regresses on this release.
+
+- Raise the required `effect` peer version to `^4.0.0-rc.109` (from `^4.0.0-rc.108`), and `@confect/server`'s optional `@effect/platform-node` peer version likewise.
+
+  No Confect API changed, and no call-site edits are needed. `rc.109` is a patch release of Effect with nothing removed or renamed, so upgrading is a matter of installing it alongside `@confect/*`.
+
+- 8e4962e: Raise the required `effect` peer version to `^4.0.0-rc.110` (from `^4.0.0-rc.109`), and `@confect/server`'s optional `@effect/platform-node` peer version likewise.
+
+  No Confect API changed, and no call-site edits are needed. `rc.110` is a patch release of Effect with nothing removed or renamed, so upgrading is a matter of installing it alongside `@confect/*`.
+
+- 3f0255c: Build and test against `convex` 1.44.0. The published `convex` peer ranges are unchanged, so no consumer action is required.
+- Sync with `main`: this prerelease line now includes all changes released in `@confect/*` 9.2.2–9.2.4 — see those versions' changelog entries.
+- Sync with `main`: this prerelease line now includes all changes released in `@confect/*` 9.2.5 — see that version's changelog entries.
+- Sync with `main`: this prerelease line now includes all changes released in `@confect/*` 9.3.0 — see that version's changelog entries.
+- Sync with `main`: this prerelease line now includes all changes released in `@confect/*` 9.4.0 — see that version's changelog entries.
+
+  The `@effect/platform` and `@effect/cli` peer and dependency floors that 9.4.0 raises do not apply here: this line runs on Effect v4, where those packages are not dependencies at all.
+
+- The published type declarations are now emitted by TypeScript 7 rather than TypeScript 6. No API changed, but the declaration text differs in places, so an inferred type printed in your editor or in a type error may read slightly differently than before.
+
 ## 10.0.0-next.15
 
 ### Patch Changes
