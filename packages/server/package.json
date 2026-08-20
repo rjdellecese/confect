@@ -7,15 +7,15 @@
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "devDependencies": {
-    "@effect/platform-node": "4.0.0-rc.110",
-    "@effect/vitest": "4.0.0-rc.110",
+    "@effect/platform-node": "4.0.0-rc.111",
+    "@effect/vitest": "4.0.0-rc.111",
     "@swc/jest": "0.2.39",
     "@types/node": "22.20.1",
     "@vitest/coverage-v8": "4.1.10",
     "confect-bench-harness": "workspace:*",
     "convex-test": "0.0.55",
     "dotenv": "17.4.2",
-    "effect": "4.0.0-rc.110",
+    "effect": "4.0.0-rc.111",
     "tsdown": "0.22.14",
     "tsx": "4.23.12",
     "typescript": "7.0.2",
@@ -62,9 +62,9 @@
   "module": "./dist/index.js",
   "peerDependencies": {
     "@confect/core": "workspace:^",
-    "@effect/platform-node": "^4.0.0-rc.110",
+    "@effect/platform-node": "^4.0.0-rc.111",
     "convex": "^1.32.0",
-    "effect": "^4.0.0-rc.110"
+    "effect": "^4.0.0-rc.111"
   },
   "peerDependenciesMeta": {
     "@effect/platform-node": {

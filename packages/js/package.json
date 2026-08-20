@@ -7,9 +7,9 @@
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "devDependencies": {
-    "@effect/vitest": "4.0.0-rc.110",
+    "@effect/vitest": "4.0.0-rc.111",
     "@types/node": "22.20.1",
-    "effect": "4.0.0-rc.110",
+    "effect": "4.0.0-rc.111",
     "tsdown": "0.22.14",
     "typescript": "7.0.2",
     "unrun": "0.3.1",
@@ -45,7 +45,7 @@
   "peerDependencies": {
     "@confect/core": "workspace:^",
     "convex": "^1.32.0",
-    "effect": "^4.0.0-rc.110"
+    "effect": "^4.0.0-rc.111"
   },
   "repository": {
     "type": "git",
