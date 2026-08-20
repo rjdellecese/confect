@@ -1,5 +1,13 @@
 # @confect/js
 
+## 10.0.0-next.17
+
+### Patch Changes
+
+- 8e4962e: Raise the required `effect` peer version to `^4.0.0-rc.111` (from `^4.0.0-rc.110`), and `@confect/server`'s optional `@effect/platform-node` peer version likewise.
+
+  No Confect API changed, and no call-site edits are needed. `rc.111` is a patch release of Effect with nothing removed or renamed, so upgrading is a matter of installing it alongside `@confect/*`.
+
 ## 10.0.0-next.16
 
 ### Major Changes
