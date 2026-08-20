@@ -117,10 +117,7 @@ const makeHelper = (
       return Record.union(
         makeHelper(group.groups, Option.some(currentFunctionNamespace)),
         Record.map(group.functions, (function_) =>
-          Ref.make(currentFunctionNamespace, function_, [
-            ...group.middlewares,
-            ...function_.middlewares,
-          ]),
+          Ref.make(currentFunctionNamespace, function_, group.middlewares),
         ),
         (_subGroup, _function) => {
           throw new Error(

@@ -313,7 +313,7 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
    */
   functionNamespace: string,
   functionSpec: FunctionSpec_,
-  coveringMiddlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyService> = [],
+  groupMiddlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyService> = [],
 ): FromFunctionSpec<FunctionSpec_> => {
   const functionName = `${functionNamespace}:${functionSpec.name}`;
 
@@ -327,7 +327,7 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
         _tag: "Confect" as const,
         functionName,
         kind: provenance.kind,
-        middlewareSpecs: coveringMiddlewareSpecs,
+        middlewareSpecs: [...groupMiddlewareSpecs, ...functionSpec.middlewares],
       };
 
       Lazy.defineProperty(ref, "args", () => provenance.args);

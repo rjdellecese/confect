@@ -52,12 +52,12 @@ export interface ResolvedMiddleware {
 }
 
 export const make = ({
-  coveringMiddlewareSpecs,
   functionSpec,
+  groupMiddlewareSpecs,
   handler,
 }: {
-  coveringMiddlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyService>;
   functionSpec: FunctionSpec.AnyWithProps;
+  groupMiddlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyService>;
   handler: Handler.Any;
 }): AnyWithProps =>
   Match.value(functionSpec.functionProvenance).pipe(
@@ -73,7 +73,7 @@ export const make = ({
         name: functionSpec.name,
         functionVisibility: functionSpec.functionVisibility,
         functionType: functionSpec.runtimeAndFunctionType.functionType,
-        middlewareSpecs: coveringMiddlewareSpecs,
+        middlewareSpecs: [...groupMiddlewareSpecs, ...functionSpec.middlewares],
         handler: handler as Handler.AnyConfectProvenance,
       });
 

@@ -72,11 +72,8 @@ export const make = <
           registryItems,
           [functionName],
           RegistryItem.make({
-            coveringMiddlewareSpecs: [
-              ...group.middlewares,
-              ...functionSpec.middlewares,
-            ],
             functionSpec,
+            groupMiddlewareSpecs: group.middlewares,
             handler,
           }),
         ),
