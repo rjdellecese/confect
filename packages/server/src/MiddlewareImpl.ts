@@ -194,7 +194,9 @@ export const makeByFunctionType = <
   _databaseSchema: DatabaseSchema_,
   middleware: Middleware,
   impls: {
-    readonly [FunctionType_ in MiddlewareSpec.FunctionTypes<Middleware>]: MiddlewareSpec.Middleware<
+    readonly [
+      FunctionType_ in MiddlewareSpec.FunctionTypes<Middleware>
+    ]: MiddlewareSpec.Middleware<
       MiddlewareSpec.Provides<Middleware>,
       MiddlewareSpec.Error<Middleware>,
       | FunctionTypeServices<DatabaseSchema_, FunctionType_>
