@@ -1,7 +1,7 @@
 {
   "name": "@confect/cli",
   "description": "Developer tooling for codegen and sync",
-  "version": "10.0.0-next.14",
+  "version": "10.0.0-next.16",
   "author": "RJ Dellecese",
   "bin": {
     "confect": "./bin/confect.mjs"
@@ -10,7 +10,7 @@
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "dependencies": {
-    "@effect/platform-node": "^4.0.0-rc.108",
+    "@effect/platform-node": "^4.0.0-rc.110",
     "bundle-require": "^5.1.0",
     "code-block-writer": "^13.0.3",
     "esbuild": "0.27.0 - 0.27.3 || ^0.27.5 || ^0.28.0",
@@ -18,12 +18,12 @@
   },
   "devDependencies": {
     "@convex-dev/workpool": "0.4.9",
-    "@effect/tsgo": "0.36.4",
-    "@effect/vitest": "4.0.0-rc.108",
+    "@effect/tsgo": "0.36.5",
+    "@effect/vitest": "4.0.0-rc.110",
     "@types/node": "26.2.0",
     "@vitest/coverage-v8": "4.1.10",
-    "convex": "1.43.0",
-    "effect": "4.0.0-rc.108",
+    "convex": "1.44.0",
+    "effect": "4.0.0-rc.110",
     "tsdown": "0.22.14",
     "typescript": "7.0.2",
     "unrun": "0.3.1",
@@ -55,7 +55,7 @@
   "peerDependencies": {
     "@confect/core": "workspace:^",
     "@confect/server": "workspace:^",
-    "effect": "^4.0.0-rc.108"
+    "effect": "^4.0.0-rc.110"
   },
   "repository": {
     "type": "git",

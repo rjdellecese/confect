@@ -52,14 +52,16 @@ type FilteredFunctions<
   Predicate extends Ref.Any,
   MiddlewareError,
 > = {
-  [Name in FunctionSpec.Name<FunctionSpecs> as FunctionSpec.WithName<
-    FunctionSpecs,
-    Name
-  > extends infer FunctionSpec_ extends FunctionSpec.AnyWithProps
-    ? FunctionSpecMatchesPredicate<FunctionSpec_, Predicate> extends true
-      ? Name
+  [
+    Name in FunctionSpec.Name<FunctionSpecs> as FunctionSpec.WithName<
+      FunctionSpecs,
+      Name
+    > extends infer FunctionSpec_ extends FunctionSpec.AnyWithProps
+      ? FunctionSpecMatchesPredicate<FunctionSpec_, Predicate> extends true
+        ? Name
+        : never
       : never
-    : never]: FunctionSpec.WithName<FunctionSpecs, Name> extends infer F extends
+  ]: FunctionSpec.WithName<FunctionSpecs, Name> extends infer F extends
     FunctionSpec.AnyWithProps
     ? Ref.FromFunctionSpec<
         F,

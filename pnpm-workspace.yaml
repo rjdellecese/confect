@@ -22,15 +22,15 @@ allowBuilds:
 # they are safe to delete once the versions named here have aged past the
 # cutoff.
 minimumReleaseAgeExclude:
-  - "@effect/platform-bun@4.0.0-rc.108"
-  - "@effect/platform-node-shared@4.0.0-rc.108"
-  - "@effect/platform-node@4.0.0-rc.108"
-  - "@effect/vitest@4.0.0-rc.108"
-  - effect@4.0.0-rc.108
+  - "@effect/platform-bun@4.0.0-rc.110"
+  - "@effect/platform-node-shared@4.0.0-rc.110"
+  - "@effect/platform-node@4.0.0-rc.110"
+  - "@effect/vitest@4.0.0-rc.110"
+  - effect@4.0.0-rc.110
 
 overrides:
-  convex: 1.43.0
-  effect: 4.0.0-rc.108
+  convex: 1.44.0
+  effect: 4.0.0-rc.110
   react: 19.2.8
   react-dom: 19.2.8
 

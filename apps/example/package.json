@@ -7,9 +7,9 @@
     "@confect/react": "workspace:*",
     "@confect/server": "workspace:*",
     "@convex-dev/workpool": "0.4.9",
-    "convex": "1.43.0",
-    "convex-helpers": "0.1.122",
-    "effect": "4.0.0-rc.108",
+    "convex": "1.44.0",
+    "convex-helpers": "0.1.123",
+    "effect": "4.0.0-rc.110",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "vite": "8.2.1"
@@ -19,9 +19,9 @@
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
     "@vitejs/plugin-react": "6.0.5",
-    "concurrently": "10.0.4",
+    "concurrently": "10.0.5",
     "typescript": "7.0.2",
-    "vite-plus": "0.2.8"
+    "vite-plus": "0.2.9"
   },
   "private": true,
   "scripts": {
