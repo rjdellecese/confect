@@ -37,10 +37,6 @@ export interface Base<
  * A reference to a single Convex function, as callers see it: the wire name
  * plus the data needed to encode args, decode returns, and decode typed
  * errors. A ref is one of two shapes, keyed by the spec's provenance.
- * `ConfectRef` carries the codec schemas, the covering middleware, and the
- * error union; `ConvexRef` carries none of them — a plain Convex function's
- * values pass through untouched, so states like (Convex ref, covering
- * middleware) are unrepresentable.
  */
 export type Ref<
   _RuntimeAndFunctionType extends RuntimeAndFunctionType.RuntimeAndFunctionType,
@@ -87,16 +83,7 @@ export interface ConfectRef<
   readonly kind: FunctionProvenance.ConfectKind;
   /** @internal */
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyService>;
-  /**
-   * The function's declared error schema. Installed as a lazy memoised
-   * property only when the spec declares one, so `"error" in ref` checks
-   * presence without building the schema — the same shape as the spec's
-   * provenance and `MiddlewareSpec`. The full decoding union (this plus each
-   * covering middleware's error schema) is assembled just in time at the
-   * decode sites.
-   *
-   * @internal
-   */
+  /** @internal */
   readonly error?: Schema.Codec<any, any>;
 }
 
@@ -326,8 +313,7 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
    */
   functionNamespace: string,
   functionSpec: FunctionSpec_,
-  /** The middleware covering this function. */
-  middlewares: ReadonlyArray<MiddlewareSpec.AnyService> = [],
+  coveringMiddlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyService> = [],
 ): FromFunctionSpec<FunctionSpec_> => {
   const functionName = `${functionNamespace}:${functionSpec.name}`;
 
@@ -341,7 +327,7 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
         _tag: "Confect" as const,
         functionName,
         kind: provenance.kind,
-        middlewareSpecs: middlewares,
+        middlewareSpecs: coveringMiddlewareSpecs,
       };
 
       Lazy.defineProperty(ref, "args", () => provenance.args);
@@ -489,12 +475,6 @@ export const decodeErrorOrElse =
     return mapUnknownError(error);
   };
 
-/**
- * Assemble the ref's full error-decoding schema — the function's declared
- * `error` schema unioned with each covering middleware's — just in time.
- * Reading the lazy schema properties here is the point: this runs only when
- * an error is actually being decoded.
- */
 const errorSchemaOf = (ref: Any): Option.Option<Schema.Codec<any, any>> =>
   Match.value(ref).pipe(
     Match.tag("Confect", (confectRef) => {
