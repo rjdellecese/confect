@@ -177,8 +177,8 @@ export const Service =
       );
     }
 
-    function MiddlewareSpecCtor() {}
-    const class_ = MiddlewareSpecCtor as any;
+    function MiddlewareSpecClass() {}
+    const class_ = MiddlewareSpecClass as any;
     class_[TypeId] = TypeId;
     class_.key = key;
     class_.functionTypes = {
