@@ -1,20 +1,17 @@
 import type * as GroupSpec from "@confect/core/GroupSpec";
 import type * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
-import * as Registry from "@confect/core/Registry";
-import { pipe } from "effect/Function";
+import * as Registry from "./Registry";
+import * as RegistryItems from "./RegistryItems";
 import * as Array from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
-import * as Record from "effect/Record";
 import * as Ref from "effect/Ref";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as FunctionImpl from "./FunctionImpl";
 import type * as MiddlewareImpl from "./MiddlewareImpl";
-import * as MiddlewareRegistryItem from "./MiddlewareRegistryItem";
-import * as FunctionRegistryItem from "./FunctionRegistryItem";
 
 export const TypeId = "@confect/server/GroupImpl";
 export type TypeId = typeof TypeId;
@@ -114,37 +111,6 @@ export const make = <
     FunctionImpl.FromGroupSpec<Group> | MiddlewareImpl.FromGroupSpec<Group>
   >;
 
-/**
- * Return the names of the function-shaped entries in a group's (flat,
- * isolated) registry. `FunctionImpl.make` registers each function under a
- * single-segment key, so the registry built for one group contains exactly
- * that group's functions at the top level.
- */
-const collectFunctionNames = (
-  items: Registry.RegistryItems,
-): ReadonlyArray<string> =>
-  pipe(
-    Record.toEntries(items),
-    Array.filter(([, value]) =>
-      FunctionRegistryItem.isFunctionRegistryItem(value),
-    ),
-    Array.map(([name]) => name),
-  );
-
-/**
- * Return the keys of the middleware implementations registered into a
- * group's registry (stored under `middleware:<key>` entries by
- * `MiddlewareImpl`).
- */
-const collectMiddlewareKeys = (
-  items: Registry.RegistryItems,
-): ReadonlyArray<string> =>
-  pipe(
-    Record.values(items),
-    Array.filter(MiddlewareRegistryItem.isMiddlewareRegistryItem),
-    Array.map((item) => item.middlewareSpec.key),
-  );
-
 const findUnfinalizedGroupImpl = <S>(
   context: Context.Context<S>,
 ): Option.Option<AnyUnfinalized> =>
@@ -187,8 +153,8 @@ export const finalize = (
               return {
                 [TypeId]: TypeId,
                 finalizationStatus: "Finalized" as const,
-                registeredFunctionNames: collectFunctionNames(items),
-                registeredMiddlewareKeys: collectMiddlewareKeys(items),
+                registeredFunctionNames: RegistryItems.functionNames(items),
+                registeredMiddlewareKeys: RegistryItems.middlewareKeys(items),
               };
             }),
           ),

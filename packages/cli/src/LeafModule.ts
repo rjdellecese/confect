@@ -1,4 +1,5 @@
-import { GroupSpec, Registry } from "@confect/core";
+import { GroupSpec } from "@confect/core";
+import { Registry, type RegistryItems } from "@confect/server";
 import * as GroupImpl from "@confect/server/GroupImpl";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -297,7 +298,7 @@ const findFinalizedGroupImpl = <S>(
  */
 const buildImplLayer = (implLayer: Layer.Layer<unknown>) =>
   Effect.gen(function* () {
-    const registry = Ref.makeUnsafe<Registry.RegistryItems>({});
+    const registry = Ref.makeUnsafe<RegistryItems.RegistryItems>({});
     return yield* Layer.build(
       implLayer as Layer.Layer<unknown, never, never>,
     ).pipe(Effect.provideService(Registry.Registry, registry));

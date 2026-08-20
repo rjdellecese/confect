@@ -1,6 +1,7 @@
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import type * as GroupSpec from "@confect/core/GroupSpec";
-import * as Registry from "@confect/core/Registry";
+import * as Registry from "./Registry";
+import type * as RegistryItems from "./RegistryItems";
 import type * as Spec from "@confect/core/Spec";
 import type { Layer, Types } from "effect";
 import * as Effect from "effect/Effect";
@@ -99,7 +100,7 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
     Effect.provide(groupLayer),
     Effect.provideService(
       Registry.Registry,
-      Ref.makeUnsafe<Registry.RegistryItems>({}),
+      Ref.makeUnsafe<RegistryItems.RegistryItems>({}),
     ),
     Effect.runSync,
   );
@@ -126,7 +127,7 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
 };
 
 const partitionMiddlewareImplItems = (
-  registryItems: Registry.RegistryItems,
+  registryItems: RegistryItems.RegistryItems,
 ) => {
   const middlewareImplItems = new Map<
     string,
