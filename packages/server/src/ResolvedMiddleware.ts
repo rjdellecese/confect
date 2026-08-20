@@ -5,6 +5,6 @@ import type * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
  * the resolved form `buildForGroup` hands to `makeRegisteredFunction`.
  */
 export interface ResolvedMiddleware {
-  readonly middlewareSpec: MiddlewareSpec.AnyService;
+  readonly middlewareSpec: MiddlewareSpec.AnyMiddlewareSpec;
   readonly middlewareImpl: MiddlewareSpec.AnyMiddlewareImpl;
 }

@@ -45,7 +45,7 @@ export type FromGroupSpec<Group extends GroupSpec.AnyWithProps> =
   | FunctionSpec.MiddlewareSpecs<
       GroupSpec.Functions<Group>
     > extends infer MiddlewareSpec_
-  ? MiddlewareSpec_ extends MiddlewareSpec.AnyService
+  ? MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec
     ? MiddlewareImpl<MiddlewareSpec.Key<MiddlewareSpec_>>
     : never
   : never;
@@ -106,7 +106,9 @@ type AllFunctionTypesCommonServices =
   | StorageReader.StorageReader
   | QueryRunner.QueryRunner;
 
-const layerFromImpls = <MiddlewareSpec_ extends MiddlewareSpec.AnyService>(
+const layerFromImpls = <
+  MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec,
+>(
   middlewareSpec: MiddlewareSpec_,
   impls: MiddlewareRegistryItem.MiddlewareRegistryItem["impls"],
 ): Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<MiddlewareSpec_>>> =>
@@ -146,7 +148,7 @@ const layerFromImpls = <MiddlewareSpec_ extends MiddlewareSpec.AnyService>(
  */
 export const make = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  MiddlewareSpec_ extends MiddlewareSpec.AnyService,
+  MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec,
 >(
   _databaseSchema: DatabaseSchema_,
   middlewareSpec: MiddlewareSpec_,
@@ -181,7 +183,7 @@ export const make = <
  */
 export const makeByFunctionType = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  MiddlewareSpec_ extends MiddlewareSpec.AnyService,
+  MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec,
 >(
   _databaseSchema: DatabaseSchema_,
   middlewareSpec: MiddlewareSpec_,
@@ -210,7 +212,7 @@ export const makeByFunctionType = <
  */
 export const provides = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  MiddlewareSpec_ extends MiddlewareSpec.AnyService,
+  MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec,
   Shape,
 >(
   databaseSchema: DatabaseSchema_,

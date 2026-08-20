@@ -18,7 +18,7 @@ export class NotSignedIn extends Schema.TaggedError<NotSignedIn>()(
  * created user) to every function in the groups it is attached to, failing with
  * the typed `NotSignedIn` error when no user exists.
  */
-export default class RequireViewer extends MiddlewareSpec.Service<
+export default class RequireViewer extends MiddlewareSpec.MiddlewareSpec<
   RequireViewer,
   { provides: Viewer }
 >()("RequireViewer", {

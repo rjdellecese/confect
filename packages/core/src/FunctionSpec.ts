@@ -23,7 +23,7 @@ export interface FunctionSpec<
   FunctionVisibility_ extends FunctionVisibility,
   Name_ extends string,
   FunctionProvenance_ extends FunctionProvenance.FunctionProvenance,
-  MiddlewareSpecs_ extends MiddlewareSpec.AnyService = never,
+  MiddlewareSpecs_ extends MiddlewareSpec.AnyMiddlewareSpec = never,
 > {
   readonly [TypeId]: TypeId;
   readonly runtimeAndFunctionType: RuntimeAndFunctionType_;
@@ -38,7 +38,7 @@ export interface Builder<
   FunctionVisibility_ extends FunctionVisibility,
   Name_ extends string,
   FunctionProvenance_ extends FunctionProvenance.FunctionProvenance,
-  MiddlewareSpecs_ extends MiddlewareSpec.AnyService = never,
+  MiddlewareSpecs_ extends MiddlewareSpec.AnyMiddlewareSpec = never,
 > extends FunctionSpec<
   RuntimeAndFunctionType_,
   FunctionVisibility_,
@@ -46,7 +46,7 @@ export interface Builder<
   FunctionProvenance_,
   MiddlewareSpecs_
 > {
-  middleware<MiddlewareSpec_ extends MiddlewareSpec.AnyService>(
+  middleware<MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec>(
     middlewareSpec: MiddlewareSpec_ &
       MiddlewareSpec.ValidateFunctionAttach<
         MiddlewareSpec_,
@@ -72,7 +72,7 @@ export interface AnyWithProps extends FunctionSpec<
   FunctionVisibility,
   string,
   FunctionProvenance.FunctionProvenance,
-  MiddlewareSpec.AnyService
+  MiddlewareSpec.AnyMiddlewareSpec
 > {}
 
 export interface AnyConfect extends FunctionSpec<
@@ -80,7 +80,7 @@ export interface AnyConfect extends FunctionSpec<
   FunctionVisibility,
   string,
   FunctionProvenance.AnyConfect,
-  MiddlewareSpec.AnyService
+  MiddlewareSpec.AnyMiddlewareSpec
 > {}
 
 export interface AnyConvex extends FunctionSpec<
@@ -88,7 +88,7 @@ export interface AnyConvex extends FunctionSpec<
   FunctionVisibility,
   string,
   FunctionProvenance.AnyConvex,
-  MiddlewareSpec.AnyService
+  MiddlewareSpec.AnyMiddlewareSpec
 > {}
 
 export interface AnyWithPropsWithRuntime<
@@ -98,7 +98,7 @@ export interface AnyWithPropsWithRuntime<
   FunctionVisibility,
   string,
   FunctionProvenance.FunctionProvenance,
-  MiddlewareSpec.AnyService
+  MiddlewareSpec.AnyMiddlewareSpec
 > {}
 
 export interface AnyWithPropsWithFunctionType<
@@ -108,7 +108,7 @@ export interface AnyWithPropsWithFunctionType<
   FunctionVisibility,
   string,
   FunctionProvenance.FunctionProvenance,
-  MiddlewareSpec.AnyService
+  MiddlewareSpec.AnyMiddlewareSpec
 > {}
 
 export interface AnyWithPropsWithFunctionProvenance<
@@ -118,7 +118,7 @@ export interface AnyWithPropsWithFunctionProvenance<
   FunctionVisibility,
   string,
   FunctionProvenance_,
-  MiddlewareSpec.AnyService
+  MiddlewareSpec.AnyMiddlewareSpec
 > {}
 
 export type GetRuntimeAndFunctionType<FunctionSpec_ extends AnyWithProps> =
@@ -245,7 +245,10 @@ export type WithoutName<
 const Proto = {
   [TypeId]: TypeId,
 
-  middleware(this: AnyWithProps, middlewareSpec: MiddlewareSpec.AnyService) {
+  middleware(
+    this: AnyWithProps,
+    middlewareSpec: MiddlewareSpec.AnyMiddlewareSpec,
+  ) {
     if (this.functionProvenance._tag === "Convex") {
       throw new Error(
         `Plain Convex function "${this.name}" cannot have middleware`,

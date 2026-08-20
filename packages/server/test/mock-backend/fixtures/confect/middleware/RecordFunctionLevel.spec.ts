@@ -11,7 +11,7 @@ export class FunctionGateClosed extends Schema.TaggedError<FunctionGateClosed>()
  * group-attached chain, inserts a `"function"` marker, and short-circuits with
  * `FunctionGateClosed` when the decoded args carry `blockedAtFunction: true`.
  */
-export default class RecordFunctionLevel extends MiddlewareSpec.Service<RecordFunctionLevel>()(
+export default class RecordFunctionLevel extends MiddlewareSpec.MiddlewareSpec<RecordFunctionLevel>()(
   "RecordFunctionLevel",
   {
     error: () => FunctionGateClosed,

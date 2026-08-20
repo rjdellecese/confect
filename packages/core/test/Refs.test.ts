@@ -309,7 +309,7 @@ describe("middleware error unions", () => {
   it("adds them to Confect refs and keeps them off plain Convex refs", () => {
     class Blocked extends Schema.TaggedError<Blocked>()("Blocked", {}) {}
 
-    class GateMutations extends MiddlewareSpec.Service<GateMutations>()(
+    class GateMutations extends MiddlewareSpec.MiddlewareSpec<GateMutations>()(
       "GateMutations",
       {
         error: () => Blocked,

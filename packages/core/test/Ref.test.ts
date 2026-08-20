@@ -585,7 +585,7 @@ describe("error schema laziness at decode time", () => {
     class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {}) {}
     class Blocked extends Schema.TaggedError<Blocked>()("Blocked", {}) {}
 
-    class Gate extends MiddlewareSpec.Service<Gate>()("LazyDecodeGate", {
+    class Gate extends MiddlewareSpec.MiddlewareSpec<Gate>()("LazyDecodeGate", {
       functionTypes: { query: true, mutation: true, action: true },
       error: () => {
         MutableRef.set(middlewareErrorBuilt, true);

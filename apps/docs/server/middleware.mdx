@@ -36,7 +36,7 @@ confect/
 
 ## Declaring a middleware
 
-Declare a middleware with `MiddlewareSpec.Service`. The `Config` type parameter's `provides` slot names the service the middleware provides to handlers — type-level only; the runtime tag is passed to the impl separately. The optional `error` schema declares how the middleware can fail, lazily like a function spec's `error`.
+Declare a middleware with `MiddlewareSpec.MiddlewareSpec`. The `Config` type parameter's `provides` slot names the service the middleware provides to handlers — type-level only; the runtime tag is passed to the impl separately. The optional `error` schema declares how the middleware can fail, lazily like a function spec's `error`.
 
 ```ts confect/middleware/RequireUser.spec.ts
 import { MiddlewareSpec } from "@confect/core";
@@ -55,7 +55,7 @@ export class NotSignedIn extends Schema.TaggedError<NotSignedIn>()(
   {},
 ) {}
 
-export default class RequireUser extends MiddlewareSpec.Service<
+export default class RequireUser extends MiddlewareSpec.MiddlewareSpec<
   RequireUser,
   { provides: CurrentUser }
 >()("RequireUser", {
@@ -133,7 +133,7 @@ A middleware can consume a service provided by middleware that runs earlier in t
 ```ts confect/middleware/RequireAdmin.spec.ts
 import type { CurrentUser } from "./RequireUser.spec";
 
-export default class RequireAdmin extends MiddlewareSpec.Service<
+export default class RequireAdmin extends MiddlewareSpec.MiddlewareSpec<
   RequireAdmin,
   {
     requires: CurrentUser;
@@ -240,7 +240,7 @@ export default MiddlewareImpl.provides(
 The general wrap form takes the downstream effect explicitly — here, timing middleware that runs code on both sides of the handler:
 
 ```ts
-class Timed extends MiddlewareSpec.Service<Timed>()("Timed", {
+class Timed extends MiddlewareSpec.MiddlewareSpec<Timed>()("Timed", {
   functionTypes: { query: false, mutation: true, action: true },
 }) {}
 

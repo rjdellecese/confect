@@ -90,7 +90,7 @@ describe("handler environment widening", () => {
 });
 
 describe("cross-middleware requires", () => {
-  class NeedsViewer extends MiddlewareSpec.Service<
+  class NeedsViewer extends MiddlewareSpec.MiddlewareSpec<
     NeedsViewer,
     { requires: Viewer }
   >()("NeedsViewer", {
@@ -270,7 +270,7 @@ describe("group assembly enforcement", () => {
 
 describe("registry key namespacing", () => {
   it("registers a middleware keyed like a function name without collision", () => {
-    class Clash extends MiddlewareSpec.Service<Clash>()("clash", {
+    class Clash extends MiddlewareSpec.MiddlewareSpec<Clash>()("clash", {
       functionTypes: { query: true, mutation: true, action: true },
     }) {}
 

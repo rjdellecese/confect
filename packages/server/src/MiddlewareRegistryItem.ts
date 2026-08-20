@@ -7,7 +7,7 @@ export type TypeId = typeof TypeId;
 
 export interface MiddlewareRegistryItem {
   readonly [TypeId]: TypeId;
-  readonly middlewareSpec: MiddlewareSpec.AnyService;
+  readonly middlewareSpec: MiddlewareSpec.AnyMiddlewareSpec;
   readonly impls: Partial<
     Record<FunctionType, MiddlewareSpec.AnyMiddlewareImpl>
   >;

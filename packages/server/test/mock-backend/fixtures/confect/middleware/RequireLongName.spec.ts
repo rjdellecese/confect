@@ -13,7 +13,7 @@ export class NameTooShort extends Schema.TaggedError<NameTooShort>()(
  * one is function-attached). Fails with `NameTooShort` when the viewer's
  * username has fewer than three characters.
  */
-export default class RequireLongName extends MiddlewareSpec.Service<
+export default class RequireLongName extends MiddlewareSpec.MiddlewareSpec<
   RequireLongName,
   { requires: Viewer }
 >()("RequireLongName", {

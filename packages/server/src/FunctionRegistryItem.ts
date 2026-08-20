@@ -34,7 +34,7 @@ export interface ConfectFunctionRegistryItem {
   readonly args: Schema.Codec<any, any>;
   readonly returns: Schema.Codec<any, any>;
   readonly error?: Schema.Codec<any, any>;
-  readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyService>;
+  readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyMiddlewareSpec>;
   readonly handler: Handler.AnyConfectProvenance;
 }
 
@@ -50,7 +50,7 @@ export const make = ({
   handler,
 }: {
   functionSpec: FunctionSpec.AnyWithProps;
-  groupMiddlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyService>;
+  groupMiddlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyMiddlewareSpec>;
   handler: Handler.Any;
 }): AnyWithProps =>
   Match.value(functionSpec.functionProvenance).pipe(

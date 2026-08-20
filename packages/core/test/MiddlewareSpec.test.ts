@@ -23,7 +23,7 @@ class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
   id: Schema.String,
 }) {}
 
-class RequireUser extends MiddlewareSpec.Service<
+class RequireUser extends MiddlewareSpec.MiddlewareSpec<
   RequireUser,
   { provides: CurrentUser }
 >()("RequireUser", {
@@ -31,7 +31,7 @@ class RequireUser extends MiddlewareSpec.Service<
   functionTypes: { query: true, mutation: true, action: true },
 }) {}
 
-class MutationOnly extends MiddlewareSpec.Service<MutationOnly>()(
+class MutationOnly extends MiddlewareSpec.MiddlewareSpec<MutationOnly>()(
   "MutationOnly",
   { functionTypes: { query: false, mutation: true, action: false } },
 ) {}
@@ -101,7 +101,7 @@ describe("`middleware` lives on `Builder`, not `FunctionSpec`", () => {
   });
 });
 
-describe("Service", () => {
+describe("MiddlewareSpec", () => {
   it("stores the key and the declared function types", () => {
     expect(RequireUser.key).toBe("RequireUser");
     expect(RequireUser.functionTypes).toStrictEqual({
@@ -122,7 +122,7 @@ describe("Service", () => {
   it("installs the error schema lazily, observable via presence checks", () => {
     const errorBuilt = MutableRef.make(false);
 
-    class Lazy extends MiddlewareSpec.Service<Lazy>()("Lazy", {
+    class Lazy extends MiddlewareSpec.MiddlewareSpec<Lazy>()("Lazy", {
       functionTypes: { query: true, mutation: true, action: true },
       error: () => {
         MutableRef.set(errorBuilt, true);
@@ -159,7 +159,7 @@ describe("Service", () => {
   });
 
   it("requires every function type flag to be specified", () => {
-    class Unspecified extends MiddlewareSpec.Service<Unspecified>()(
+    class Unspecified extends MiddlewareSpec.MiddlewareSpec<Unspecified>()(
       "Unspecified",
       {
         // @ts-expect-error - every flag must be specified
@@ -172,10 +172,13 @@ describe("Service", () => {
 
   it("rejects an all-false declaration", () => {
     expect(() => {
-      class NoTypes extends MiddlewareSpec.Service<NoTypes>()("NoTypes", {
-        // @ts-expect-error - at least one flag must be true
-        functionTypes: { query: false, mutation: false, action: false },
-      }) {}
+      class NoTypes extends MiddlewareSpec.MiddlewareSpec<NoTypes>()(
+        "NoTypes",
+        {
+          // @ts-expect-error - at least one flag must be true
+          functionTypes: { query: false, mutation: false, action: false },
+        },
+      ) {}
 
       return NoTypes;
     }).toThrowError(
@@ -186,10 +189,13 @@ describe("Service", () => {
   it("rejects a function type flag the type checker only knows as boolean", () => {
     const computed: boolean = Math.random() > 0.5;
 
-    class Computed extends MiddlewareSpec.Service<Computed>()("Computed", {
-      // @ts-expect-error - flags must be literal true or false
-      functionTypes: { query: true, mutation: true, action: computed },
-    }) {}
+    class Computed extends MiddlewareSpec.MiddlewareSpec<Computed>()(
+      "Computed",
+      {
+        // @ts-expect-error - flags must be literal true or false
+        functionTypes: { query: true, mutation: true, action: computed },
+      },
+    ) {}
 
     expect(Computed.key).toBe("Computed");
   });
@@ -249,14 +255,14 @@ describe("GroupSpec.middleware", () => {
 });
 
 describe("requires", () => {
-  class ProvideUser extends MiddlewareSpec.Service<
+  class ProvideUser extends MiddlewareSpec.MiddlewareSpec<
     ProvideUser,
     { provides: CurrentUser }
   >()("ProvideUser", {
     functionTypes: { query: true, mutation: true, action: true },
   }) {}
 
-  class NeedsUser extends MiddlewareSpec.Service<
+  class NeedsUser extends MiddlewareSpec.MiddlewareSpec<
     NeedsUser,
     { requires: CurrentUser }
   >()("NeedsUser", {
@@ -428,7 +434,7 @@ describe("Ref error union", () => {
   it("hasErrorSchema checks middleware error presence without forcing the thunk", () => {
     const errorBuilt = MutableRef.make(false);
 
-    class Lazy extends MiddlewareSpec.Service<Lazy>()("LazyForRef", {
+    class Lazy extends MiddlewareSpec.MiddlewareSpec<Lazy>()("LazyForRef", {
       functionTypes: { query: true, mutation: true, action: true },
       error: () => {
         MutableRef.set(errorBuilt, true);

@@ -82,7 +82,7 @@ export interface ConfectRef<
   /** @internal */
   readonly kind: FunctionProvenance.ConfectKind;
   /** @internal */
-  readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyService>;
+  readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyMiddlewareSpec>;
   /** @internal */
   readonly error?: Schema.Codec<any, any>;
 }
@@ -313,7 +313,7 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
    */
   functionNamespace: string,
   functionSpec: FunctionSpec_,
-  groupMiddlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyService> = [],
+  groupMiddlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyMiddlewareSpec> = [],
 ): FromFunctionSpec<FunctionSpec_> => {
   const functionName = `${functionNamespace}:${functionSpec.name}`;
 

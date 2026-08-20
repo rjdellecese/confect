@@ -20,7 +20,7 @@ export interface GroupSpec<
   // modules. Functions, by contrast, stay homogeneous (a Node group only accepts
   // Node actions) — `addFunction` keeps the `<Runtime>` bound below.
   Groups_ extends AnyWithProps = never,
-  MiddlewareSpecs_ extends MiddlewareSpec.AnyService = never,
+  MiddlewareSpecs_ extends MiddlewareSpec.AnyMiddlewareSpec = never,
 > {
   readonly [TypeId]: TypeId;
   readonly runtime: Runtime;
@@ -63,7 +63,7 @@ export interface GroupSpec<
     MiddlewareSpecs_
   >;
 
-  middleware<MiddlewareSpec_ extends MiddlewareSpec.AnyService>(
+  middleware<MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec>(
     middlewareSpec: MiddlewareSpec_ &
       MiddlewareSpec.ValidateAttach<
         MiddlewareSpec_,
@@ -88,7 +88,7 @@ export interface AnyWithProps extends GroupSpec<
   string,
   FunctionSpec.AnyWithProps,
   AnyWithProps,
-  MiddlewareSpec.AnyService
+  MiddlewareSpec.AnyMiddlewareSpec
 > {}
 
 export interface AnyWithPropsWithRuntime<
@@ -98,7 +98,7 @@ export interface AnyWithPropsWithRuntime<
   string,
   FunctionSpec.AnyWithPropsWithRuntime<Runtime>,
   AnyWithPropsWithRuntime<Runtime>,
-  MiddlewareSpec.AnyService
+  MiddlewareSpec.AnyMiddlewareSpec
 > {}
 
 export type Name<Group extends AnyWithProps> = Group["name"];
@@ -208,7 +208,7 @@ const Proto = {
     });
   },
 
-  middleware<MiddlewareSpec_ extends MiddlewareSpec.AnyService>(
+  middleware<MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec>(
     this: Any,
     middlewareSpec: MiddlewareSpec_,
   ) {
@@ -251,7 +251,7 @@ const makeProto = <
   Name_ extends string,
   Functions_ extends FunctionSpec.AnyWithPropsWithRuntime<Runtime>,
   Groups_ extends AnyWithPropsWithRuntime<Runtime>,
-  MiddlewareSpecs_ extends MiddlewareSpec.AnyService,
+  MiddlewareSpecs_ extends MiddlewareSpec.AnyMiddlewareSpec,
 >({
   runtime,
   name,

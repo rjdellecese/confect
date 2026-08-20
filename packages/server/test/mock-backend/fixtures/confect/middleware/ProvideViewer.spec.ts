@@ -18,7 +18,7 @@ export class NoViewer extends Schema.TaggedError<NoViewer>()("NoViewer", {}) {}
  * (`DatabaseReader` in queries/mutations, `QueryRunner` of an internal query in
  * actions).
  */
-export default class ProvideViewer extends MiddlewareSpec.Service<
+export default class ProvideViewer extends MiddlewareSpec.MiddlewareSpec<
   ProvideViewer,
   { provides: Viewer }
 >()("ProvideViewer", {

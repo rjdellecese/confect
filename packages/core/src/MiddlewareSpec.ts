@@ -11,7 +11,7 @@ import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 export const TypeId = "@confect/core/MiddlewareSpec";
 export type TypeId = typeof TypeId;
 
-export const isMiddlewareSpec = (u: unknown): u is AnyService =>
+export const isMiddlewareSpec = (u: unknown): u is AnyMiddlewareSpec =>
   Predicate.hasProperty(u, TypeId);
 
 export const allFunctionTypes: ReadonlyArray<FunctionType> = [
@@ -61,14 +61,14 @@ export interface MiddlewareOptions {
 export interface AnyMiddlewareImpl extends MiddlewareImpl<any, any, any> {}
 
 /**
- * The class shape produced by {@link Service}. Only the static side is ever
+ * The class shape produced by {@link MiddlewareSpec}. Only the static side is ever
  * used — the class is a value-level carrier for the middleware's key, its
  * declared functionTypes, and its (lazily-evaluated) error schema, plus the
  * type-level `Provides`/`Error` metadata. It is deliberately not a
  * `Context.Tag`: implementations are registered through the group `Registry`
  * (like `FunctionImpl`s), not resolved from a Layer context.
  */
-export interface ServiceClass<
+export interface MiddlewareSpec<
   in out Self,
   Key_ extends string,
   Provides_,
@@ -91,7 +91,7 @@ export interface ServiceClass<
   readonly "~Self": Self;
 }
 
-export interface AnyService {
+export interface AnyMiddlewareSpec {
   readonly [TypeId]: TypeId;
   readonly key: string;
   readonly functionTypes: SupportedFunctionTypes;
@@ -102,33 +102,38 @@ export interface AnyService {
   readonly "~FunctionTypes": FunctionType;
 }
 
-export type Key<MiddlewareSpec_ extends AnyService> = MiddlewareSpec_["key"];
+export type Key<MiddlewareSpec_ extends AnyMiddlewareSpec> =
+  MiddlewareSpec_["key"];
 
-export type Provides<MiddlewareSpec_ extends AnyService> =
-  MiddlewareSpec_ extends AnyService ? MiddlewareSpec_["~Provides"] : never;
+export type Provides<MiddlewareSpec_ extends AnyMiddlewareSpec> =
+  MiddlewareSpec_ extends AnyMiddlewareSpec
+    ? MiddlewareSpec_["~Provides"]
+    : never;
 
 /**
  * The services a middleware's implementation may consume from middleware
  * that runs earlier in the same chain (type-level only, like `provides`).
  */
-export type Requires<MiddlewareSpec_ extends AnyService> =
-  MiddlewareSpec_ extends AnyService ? MiddlewareSpec_["~Requires"] : never;
+export type Requires<MiddlewareSpec_ extends AnyMiddlewareSpec> =
+  MiddlewareSpec_ extends AnyMiddlewareSpec
+    ? MiddlewareSpec_["~Requires"]
+    : never;
 
-export type ErrorSchema<MiddlewareSpec_ extends AnyService> =
-  MiddlewareSpec_ extends AnyService ? MiddlewareSpec_["~Error"] : never;
+export type ErrorSchema<MiddlewareSpec_ extends AnyMiddlewareSpec> =
+  MiddlewareSpec_ extends AnyMiddlewareSpec ? MiddlewareSpec_["~Error"] : never;
 
-export type Error<MiddlewareSpec_ extends AnyService> =
-  MiddlewareSpec_ extends AnyService
+export type Error<MiddlewareSpec_ extends AnyMiddlewareSpec> =
+  MiddlewareSpec_ extends AnyMiddlewareSpec
     ? MiddlewareSpec_["~Error"]["Type"]
     : never;
 
-export type EncodedError<MiddlewareSpec_ extends AnyService> =
-  MiddlewareSpec_ extends AnyService
+export type EncodedError<MiddlewareSpec_ extends AnyMiddlewareSpec> =
+  MiddlewareSpec_ extends AnyMiddlewareSpec
     ? MiddlewareSpec_["~Error"]["Encoded"]
     : never;
 
-export type FunctionTypes<MiddlewareSpec_ extends AnyService> =
-  MiddlewareSpec_ extends AnyService
+export type FunctionTypes<MiddlewareSpec_ extends AnyMiddlewareSpec> =
+  MiddlewareSpec_ extends AnyMiddlewareSpec
     ? MiddlewareSpec_["~FunctionTypes"]
     : never;
 
@@ -138,7 +143,7 @@ export type FunctionTypes<MiddlewareSpec_ extends AnyService> =
  * encode through, and the function types it may attach to.
  *
  * ```ts
- * class RequireUser extends MiddlewareSpec.Service<RequireUser, {
+ * class RequireUser extends MiddlewareSpec.MiddlewareSpec<RequireUser, {
  *   provides: CurrentUser
  * }>()("RequireUser", {
  *   error: () => NotSignedIn,
@@ -149,7 +154,7 @@ export type FunctionTypes<MiddlewareSpec_ extends AnyService> =
  * The implementation is server-only and supplied separately via
  * `MiddlewareImpl.make` (or `makeByFunctionType`/`provides`) in `@confect/server`.
  */
-export const Service =
+export const MiddlewareSpec =
   <Self, Config extends { provides?: any; requires?: any } = {}>() =>
   <
     const Key_ extends string,
@@ -162,7 +167,7 @@ export const Service =
       readonly functionTypes: FunctionTypesConfig_ &
         ValidateFunctionTypesConfig<FunctionTypesConfig_>;
     },
-  ): ServiceClass<
+  ): MiddlewareSpec<
     Self,
     Key_,
     "provides" extends keyof Config ? Config["provides"] : never,
@@ -209,7 +214,7 @@ type ValidateFunctionTypesConfig<Config extends SupportedFunctionTypes> =
   >;
 
 export const errorSchemas = (
-  middlewareSpecs: ReadonlyArray<AnyService>,
+  middlewareSpecs: ReadonlyArray<AnyMiddlewareSpec>,
 ): ReadonlyArray<Schema.Codec<any, any>> =>
   middlewareSpecs.flatMap((middlewareSpec) =>
     "error" in middlewareSpec && middlewareSpec.error !== undefined
@@ -239,7 +244,7 @@ type ValidationResult<Errors> = [Errors] extends [never] ? unknown : Errors;
  */
 export type ValidateFunction<
   FunctionSpec_ extends FunctionSpec.AnyWithProps,
-  MiddlewareSpec_ extends AnyService,
+  MiddlewareSpec_ extends AnyMiddlewareSpec,
 > = FunctionSpec_ extends any
   ? MiddlewareSpec_ extends any
     ? FunctionSpec_ extends {
@@ -267,9 +272,9 @@ export type ValidateFunction<
  * earlier.
  */
 export type ValidateAttach<
-  MiddlewareSpec_ extends AnyService,
+  MiddlewareSpec_ extends AnyMiddlewareSpec,
   Functions_ extends FunctionSpec.AnyWithProps,
-  MiddlewareSpecs_ extends AnyService,
+  MiddlewareSpecs_ extends AnyMiddlewareSpec,
 > = [
   Extract<MiddlewareSpecs_, { readonly key: Key<MiddlewareSpec_> }>,
 ] extends [never]
@@ -282,7 +287,7 @@ export type ValidateAttach<
 
 export type ValidateAddedFunction<
   FunctionSpec_ extends FunctionSpec.AnyWithProps,
-  MiddlewareSpecs_ extends AnyService,
+  MiddlewareSpecs_ extends AnyMiddlewareSpec,
 > = [MiddlewareSpecs_] extends [never]
   ? unknown
   : ValidationResult<
@@ -292,10 +297,10 @@ export type ValidateAddedFunction<
 
 type GroupOverlap<
   FunctionSpec_ extends FunctionSpec.AnyWithProps,
-  MiddlewareSpecs_ extends AnyService,
+  MiddlewareSpecs_ extends AnyMiddlewareSpec,
 > =
   FunctionSpec.MiddlewareSpecs<FunctionSpec_> extends infer FunctionMiddlewareSpec
-    ? FunctionMiddlewareSpec extends AnyService
+    ? FunctionMiddlewareSpec extends AnyMiddlewareSpec
       ? [
           Extract<
             MiddlewareSpecs_,
@@ -319,7 +324,7 @@ type GroupOverlap<
  */
 export type ValidateImplRequires<
   Functions_ extends FunctionSpec.AnyWithProps,
-  GroupMiddlewareSpecs_ extends AnyService,
+  GroupMiddlewareSpecs_ extends AnyMiddlewareSpec,
 > = ValidationResult<
   Functions_ extends any
     ? [
@@ -336,10 +341,10 @@ export type ValidateImplRequires<
 >;
 
 export type ValidateFunctionAttach<
-  MiddlewareSpec_ extends AnyService,
+  MiddlewareSpec_ extends AnyMiddlewareSpec,
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionProvenance_ extends FunctionProvenance.FunctionProvenance,
-  MiddlewareSpecs_ extends AnyService,
+  MiddlewareSpecs_ extends AnyMiddlewareSpec,
 > = FunctionProvenance_ extends { readonly _tag: "Convex" }
   ? AttachmentError<`Plain Convex functions cannot have middleware — their raw handlers are passed through untouched`>
   : [
