@@ -1,4 +1,3 @@
-import type * as MiddlewareKey from "@confect/core/MiddlewareKey";
 import * as Array from "effect/Array";
 import { pipe } from "effect/Function";
 import * as Record from "effect/Record";
@@ -34,9 +33,7 @@ export const functionNames = (items: RegistryItems): ReadonlyArray<string> =>
  * The keys of the middleware implementations registered into a group's
  * registry (stored under `middleware:<key>` entries by `MiddlewareImpl`).
  */
-export const middlewareKeys = (
-  items: RegistryItems,
-): ReadonlyArray<MiddlewareKey.MiddlewareKey> =>
+export const middlewareKeys = (items: RegistryItems): ReadonlyArray<string> =>
   pipe(
     Record.values(items),
     Array.filter(MiddlewareRegistryItem.isMiddlewareRegistryItem),

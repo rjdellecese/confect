@@ -6,7 +6,6 @@ import type { unhandled } from "effect/Types";
 import type * as FunctionProvenance from "./FunctionProvenance";
 import type * as FunctionSpec from "./FunctionSpec";
 import * as Lazy from "./Lazy";
-import * as MiddlewareKey from "./MiddlewareKey";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
 export const TypeId = "@confect/core/MiddlewareSpec";
@@ -79,13 +78,12 @@ export interface MiddlewareSpec<
 > {
   new (_: never): {
     readonly [TypeId]: TypeId;
-    readonly key: Key_ & MiddlewareKey.MiddlewareKey;
+    readonly key: Key_;
   };
   readonly [TypeId]: TypeId;
-  readonly key: Key_ & MiddlewareKey.MiddlewareKey;
+  readonly key: Key_;
   readonly functionTypes: SupportedFunctionTypes;
   readonly error?: ErrorSchema_;
-  readonly "~Key": Key_;
   readonly "~Provides": Provides_;
   readonly "~Requires": Requires_;
   readonly "~Error": ErrorSchema_;
@@ -95,26 +93,17 @@ export interface MiddlewareSpec<
 
 export interface AnyMiddlewareSpec {
   readonly [TypeId]: TypeId;
-  readonly key: MiddlewareKey.MiddlewareKey;
+  readonly key: string;
   readonly functionTypes: SupportedFunctionTypes;
   readonly error?: Schema.Codec<any, any>;
-  readonly "~Key": string;
   readonly "~Provides": any;
   readonly "~Requires": any;
   readonly "~Error": any;
   readonly "~FunctionTypes": FunctionType;
 }
 
-/**
- * The middleware's key as its bare string literal, read from the `~Key`
- * phantom rather than the branded `key` field: a branded literal neither
- * reduces inside a template-literal type (so interpolating it into
- * `AttachmentError` messages would render the brand, not the key) nor
- * matches an `extends \`${infer L}\`` unbrand against `effect/Brand`'s
- * symbol-keyed shape.
- */
 export type Key<MiddlewareSpec_ extends AnyMiddlewareSpec> =
-  MiddlewareSpec_["~Key"];
+  MiddlewareSpec_["key"];
 
 export type Provides<MiddlewareSpec_ extends AnyMiddlewareSpec> =
   MiddlewareSpec_ extends AnyMiddlewareSpec
@@ -196,7 +185,7 @@ export const MiddlewareSpec =
     function MiddlewareSpecClass() {}
     const class_ = MiddlewareSpecClass as any;
     class_[TypeId] = TypeId;
-    class_.key = MiddlewareKey.make(key);
+    class_.key = key;
     class_.functionTypes = {
       query,
       mutation,

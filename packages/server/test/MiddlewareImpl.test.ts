@@ -133,9 +133,7 @@ describe("function-level implementation requirements", () => {
 
     expectTypeOf<
       MiddlewareImpl.FromGroupSpec<typeof functionCoveredGroup>
-    >().toEqualTypeOf<
-      MiddlewareImpl.MiddlewareImpl<MiddlewareSpec.Key<typeof ProvideViewer>>
-    >();
+    >().toEqualTypeOf<MiddlewareImpl.MiddlewareImpl<"ProvideViewer">>();
   });
 });
 
@@ -228,13 +226,8 @@ describe("group assembly enforcement", () => {
     // requirement is exactly what rejects an unprovided middleware at the
     // impl author's site.
     expectTypeOf<
-      Extract<
-        Requirements,
-        MiddlewareImpl.MiddlewareImpl<MiddlewareSpec.Key<typeof ProvideViewer>>
-      >
-    >().toEqualTypeOf<
-      MiddlewareImpl.MiddlewareImpl<MiddlewareSpec.Key<typeof ProvideViewer>>
-    >();
+      Extract<Requirements, MiddlewareImpl.MiddlewareImpl<"ProvideViewer">>
+    >().toEqualTypeOf<MiddlewareImpl.MiddlewareImpl<"ProvideViewer">>();
   });
 
   it("throws at build time when a middleware implementation is missing", () => {

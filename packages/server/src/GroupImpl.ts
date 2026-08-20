@@ -1,5 +1,4 @@
 import type * as GroupSpec from "@confect/core/GroupSpec";
-import type * as MiddlewareKey from "@confect/core/MiddlewareKey";
 import type * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import * as Registry from "./Registry";
 import * as RegistryItems from "./RegistryItems";
@@ -38,7 +37,7 @@ export interface GroupImpl<
    * (the CLI's `validateImpl`) verify middleware-impl completeness against a
    * `GroupSpec`'s attached middleware without inspecting the `Registry`.
    */
-  readonly registeredMiddlewareKeys: ReadonlyArray<MiddlewareKey.MiddlewareKey>;
+  readonly registeredMiddlewareKeys: ReadonlyArray<string>;
 }
 
 export interface Any extends GroupImpl<FinalizationStatus> {}

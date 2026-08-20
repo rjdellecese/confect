@@ -1,6 +1,5 @@
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import type * as GroupSpec from "@confect/core/GroupSpec";
-import type * as MiddlewareKey from "@confect/core/MiddlewareKey";
 import * as Registry from "./Registry";
 import type * as RegistryItems from "./RegistryItems";
 import type * as Spec from "@confect/core/Spec";
@@ -14,7 +13,7 @@ import { mapLeaves } from "./internal/utils";
 import type * as RegisteredFunction from "./RegisteredFunction";
 import * as FunctionRegistryItem from "./FunctionRegistryItem";
 import * as MiddlewareRegistryItem from "./MiddlewareRegistryItem";
-import type * as ResolvedMiddleware from "./ResolvedMiddleware";
+import * as ResolvedMiddleware from "./ResolvedMiddleware";
 
 export type RegisteredFunctions<Spec_ extends Spec.AnyWithProps> =
   Types.Simplify<RegisteredFunctionsHelper<Spec.Groups<Spec_>>>;
@@ -106,20 +105,22 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
     Effect.runSync,
   );
 
-  const { functionItems, middlewareImplItems } =
-    partitionMiddlewareImplItems(registryItems);
+  const { functionRegistryItems, middlewareRegistryItems } =
+    partitionRegistryItems(registryItems);
 
   return mapLeaves<FunctionRegistryItem.AnyWithProps, RegisteredFunction.Any>(
-    functionItems as { [key: string]: FunctionRegistryItem.AnyWithProps },
+    functionRegistryItems as {
+      [key: string]: FunctionRegistryItem.AnyWithProps;
+    },
     FunctionRegistryItem.isFunctionRegistryItem,
-    (registryItem) =>
-      Match.value(registryItem).pipe(
+    (functionRegistryItem) =>
+      Match.value(functionRegistryItem).pipe(
         Match.tag("Convex", (item) => item.handler),
         Match.tag("Confect", (item) =>
           makeRegisteredFunction(
             databaseSchema,
             item,
-            resolveMiddlewares(item, middlewareImplItems),
+            ResolvedMiddleware.resolve(item, middlewareRegistryItems),
           ),
         ),
         Match.exhaustive,
@@ -127,54 +128,18 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
   ) as RegisteredFunctionsForGroupSpec<Group>;
 };
 
-const partitionMiddlewareImplItems = (
-  registryItems: RegistryItems.RegistryItems,
-) => {
-  const middlewareImplItems = new Map<
-    MiddlewareKey.MiddlewareKey,
+const partitionRegistryItems = (registryItems: RegistryItems.RegistryItems) => {
+  const middlewareRegistryItems = new Map<
+    string,
     MiddlewareRegistryItem.MiddlewareRegistryItem
   >();
-  const functionItems: Record<string, unknown> = {};
+  const functionRegistryItems: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(registryItems)) {
     if (MiddlewareRegistryItem.isMiddlewareRegistryItem(value)) {
-      middlewareImplItems.set(value.middlewareSpec.key, value);
+      middlewareRegistryItems.set(value.middlewareSpec.key, value);
     } else {
-      functionItems[key] = value;
+      functionRegistryItems[key] = value;
     }
   }
-  return { functionItems, middlewareImplItems };
+  return { functionRegistryItems, middlewareRegistryItems };
 };
-
-/**
- * Pair each middleware spec attached to a function with its registered
- * implementation for the function's type. Both misses are ruled out by the
- * type system (`GroupImpl.finalize` demands every attached middleware's
- * `MiddlewareImpl` service; `MiddlewareImpl.make`/`makeByFunctionType` cover exactly
- * the declared functionTypes, which `GroupSpec.middleware` requires to cover every
- * function) — these throws are the runtime backstop for builds that ignored
- * type errors.
- */
-const resolveMiddlewares = (
-  registryItem: FunctionRegistryItem.ConfectFunctionRegistryItem,
-  middlewareImplItems: ReadonlyMap<
-    MiddlewareKey.MiddlewareKey,
-    MiddlewareRegistryItem.MiddlewareRegistryItem
-  >,
-): ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware> =>
-  registryItem.middlewareSpecs.map((middlewareSpec) => {
-    const registered = middlewareImplItems.get(middlewareSpec.key);
-    if (registered === undefined) {
-      throw new Error(
-        `Middleware "${middlewareSpec.key}" is attached to this group's spec, but no implementation was provided — pipe the group's impl through \`Layer.provide(MiddlewareImpl.make(...))\` (or \`makeByFunctionType\`/\`provides\`).`,
-      );
-    }
-
-    const middlewareImpl = registered.impls[registryItem.functionType];
-    if (middlewareImpl === undefined) {
-      throw new Error(
-        `Middleware "${middlewareSpec.key}" has no implementation for function type "${registryItem.functionType}", the type of function "${registryItem.name}". Declare the function type in the middleware's \`functionTypes\` and cover it in \`MiddlewareImpl.makeByFunctionType\`.`,
-      );
-    }
-
-    return { middlewareSpec, middlewareImpl };
-  });
