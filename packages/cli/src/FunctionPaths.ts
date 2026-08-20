@@ -32,13 +32,13 @@ const makeHelper = (
     const accWithFunctions = Record.reduce(
       group.functions,
       acc,
-      (acc_, _fn, functionName) =>
+      (acc_, _fn, name) =>
         FunctionPaths.make(
           HashSet.add(
             acc_,
             FunctionPath.FunctionPath.make({
               groupPath,
-              name: functionName,
+              name,
             }),
           ),
         ),

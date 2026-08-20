@@ -28,10 +28,8 @@ export const functions = ({
       `import registeredFunctions from "${registeredFunctionsImportPath}";`,
     );
     yield* cbw.newLine();
-    yield* Effect.forEach(functionNames, (functionName) =>
-      cbw.writeLine(
-        `export const ${functionName} = registeredFunctions.${functionName};`,
-      ),
+    yield* Effect.forEach(functionNames, (name) =>
+      cbw.writeLine(`export const ${name} = registeredFunctions.${name};`),
     );
 
     return yield* cbw.toString();

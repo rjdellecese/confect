@@ -11,24 +11,18 @@ import type * as Handler from "./Handler";
 import { setNestedProperty } from "./internal/utils";
 import * as FunctionRegistryItem from "./FunctionRegistryItem";
 
-export interface FunctionImpl<FunctionName extends string> {
-  readonly functionName: FunctionName;
+export interface FunctionImpl<Name_ extends string> {
+  readonly name: Name_;
 }
 
-export const FunctionImpl = <FunctionName extends string>({
-  functionName,
-}: {
-  functionName: FunctionName;
-}) =>
-  Context.Service<FunctionImpl<FunctionName>>(
-    `@confect/server/FunctionImpl/${functionName}`,
-  );
+export const FunctionImpl = <Name_ extends string>({ name }: { name: Name_ }) =>
+  Context.Service<FunctionImpl<Name_>>(`@confect/server/FunctionImpl/${name}`);
 
 /**
  * Register a single function's implementation into the group's `Registry`.
  *
  * The function is registered under a flat, single-segment key (its own
- * `functionName`), not a project-wide dot-path. Each group's impl layer is
+ * `name`), not a project-wide dot-path. Each group's impl layer is
  * built in isolation — `RegisteredFunctions.buildForGroup` (and the CLI's
  * `validateImpl`) provide a fresh `Registry` per group — so function names
  * only need to be unique within their own group.
@@ -43,34 +37,34 @@ export const FunctionImpl = <FunctionName extends string>({
 export const make = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Group extends GroupSpec.AnyWithProps,
-  const FunctionName extends FunctionSpec.Name<GroupSpec.Functions<Group>>,
+  const Name_ extends FunctionSpec.Name<GroupSpec.Functions<Group>>,
 >(
   _databaseSchema: DatabaseSchema_,
   group: Group,
-  functionName: FunctionName,
+  name: Name_,
   handler: Handler.WithName<
     DatabaseSchema_,
     GroupSpec.Functions<Group>,
-    FunctionName,
+    Name_,
     MiddlewareSpec.Provides<
       | GroupSpec.MiddlewareSpecs<Group>
       | FunctionSpec.MiddlewareSpecs<
-          FunctionSpec.WithName<GroupSpec.Functions<Group>, FunctionName>
+          FunctionSpec.WithName<GroupSpec.Functions<Group>, Name_>
         >
     >
   >,
-): Layer.Layer<FunctionImpl<FunctionName>> => {
-  const functionSpec = group.functions[functionName]!;
+): Layer.Layer<FunctionImpl<Name_>> => {
+  const functionSpec = group.functions[name]!;
 
   return Layer.effect(
-    FunctionImpl<FunctionName>({ functionName }),
+    FunctionImpl<Name_>({ name }),
     Effect.gen(function* () {
       const registry = yield* Registry.Registry;
 
       yield* Ref.update(registry, (registryItems) =>
         setNestedProperty(
           registryItems,
-          [functionName],
+          [name],
           FunctionRegistryItem.make({
             functionSpec,
             groupMiddlewareSpecs: group.middlewareSpecs,
@@ -79,7 +73,7 @@ export const make = <
         ),
       );
 
-      return { functionName };
+      return { name };
     }),
   );
 };
@@ -87,8 +81,7 @@ export const make = <
 /**
  * Get the function implementation service type for a specific function name.
  */
-export type ForFunction<FunctionName extends string> =
-  FunctionImpl<FunctionName>;
+export type ForFunction<Name_ extends string> = FunctionImpl<Name_>;
 
 /**
  * Get all function implementation services required for a group spec.
