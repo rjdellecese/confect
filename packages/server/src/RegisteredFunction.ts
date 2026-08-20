@@ -25,7 +25,7 @@ import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
 import * as MutationRunner from "./MutationRunner";
 import * as QueryRunner from "./QueryRunner";
-import type * as RegistryItem from "./RegistryItem";
+import type * as ResolvedMiddleware from "./ResolvedMiddleware";
 import * as Scheduler from "./Scheduler";
 import * as SchemaToValidator from "./SchemaToValidator";
 import * as StorageActionWriter from "./StorageActionWriter";
@@ -132,7 +132,7 @@ export type RegisteredFunction<
  */
 export const applyMiddleware = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
-  resolvedMiddlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>,
+  resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
   options: MiddlewareSpec.MiddlewareOptions,
 ): Effect.Effect<A, any, R> => {
   let wrapped: Effect.Effect<any, any, any> = effect;
@@ -153,7 +153,7 @@ export const applyMiddleware = <A, E, R>(
  */
 export const combineErrorSchemas = (
   error: Schema.Codec<any, any> | undefined,
-  resolvedMiddlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>,
+  resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
 ): Schema.Codec<any, any> | undefined => {
   const schemas = [
     ...(error !== undefined ? [error] : []),
@@ -246,7 +246,7 @@ export const actionFunctionBase = <
   returns: Schema.Codec<Returns, ConvexReturns>;
   error: Schema.Codec<Error, Value> | undefined;
   handler: (a: Args) => Effect.Effect<Returns, E, R>;
-  resolvedMiddlewares?: ReadonlyArray<RegistryItem.ResolvedMiddleware>;
+  resolvedMiddlewares?: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
   createLayer: (
     ctx: GenericActionCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
   ) => Layer.Layer<R>;

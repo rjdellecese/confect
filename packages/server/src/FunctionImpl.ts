@@ -9,7 +9,7 @@ import * as Ref from "effect/Ref";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as Handler from "./Handler";
 import { setNestedProperty } from "./internal/utils";
-import * as RegistryItem from "./RegistryItem";
+import * as FunctionRegistryItem from "./FunctionRegistryItem";
 
 export interface FunctionImpl<FunctionName extends string> {
   readonly functionName: FunctionName;
@@ -71,7 +71,7 @@ export const make = <
         setNestedProperty(
           registryItems,
           [functionName],
-          RegistryItem.make({
+          FunctionRegistryItem.make({
             functionSpec,
             groupMiddlewareSpecs: group.middlewareSpecs,
             handler,

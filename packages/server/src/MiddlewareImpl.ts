@@ -6,7 +6,6 @@ import type { FunctionType } from "convex/server";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Predicate from "effect/Predicate";
 import * as Ref from "effect/Ref";
 import type * as Auth from "./Auth";
 import type * as DatabaseReader from "./DatabaseReader";
@@ -17,6 +16,7 @@ import type * as QueryRunner from "./QueryRunner";
 import type * as Scheduler from "./Scheduler";
 import type * as StorageReader from "./StorageReader";
 import type * as StorageWriter from "./StorageWriter";
+import * as MiddlewareRegistryItem from "./MiddlewareRegistryItem";
 import { setNestedProperty } from "./internal/utils";
 
 /**
@@ -106,26 +106,9 @@ type AllFunctionTypesCommonServices =
   | StorageReader.StorageReader
   | QueryRunner.QueryRunner;
 
-export const RegistryItemTypeId = "@confect/server/MiddlewareImpl/RegistryItem";
-export type RegistryItemTypeId = typeof RegistryItemTypeId;
-
-export interface RegistryItem {
-  readonly [RegistryItemTypeId]: RegistryItemTypeId;
-  readonly middlewareSpec: MiddlewareSpec.AnyService;
-  readonly impls: Partial<
-    Record<FunctionType, MiddlewareSpec.AnyMiddlewareImpl>
-  >;
-}
-
-export const isRegistryItem = (u: unknown): u is RegistryItem =>
-  Predicate.hasProperty(u, RegistryItemTypeId);
-
-export const registryKey = (middlewareKey: string): string =>
-  `middleware:${middlewareKey}`;
-
 const layerFromImpls = <MiddlewareSpec_ extends MiddlewareSpec.AnyService>(
   middlewareSpec: MiddlewareSpec_,
-  impls: RegistryItem["impls"],
+  impls: MiddlewareRegistryItem.MiddlewareRegistryItem["impls"],
 ): Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<MiddlewareSpec_>>> =>
   Layer.effect(
     MiddlewareImpl<MiddlewareSpec.Key<MiddlewareSpec_>>({
@@ -135,11 +118,15 @@ const layerFromImpls = <MiddlewareSpec_ extends MiddlewareSpec.AnyService>(
       const registry = yield* Registry.Registry;
 
       yield* Ref.update(registry, (registryItems) =>
-        setNestedProperty(registryItems, [registryKey(middlewareSpec.key)], {
-          [RegistryItemTypeId]: RegistryItemTypeId,
-          middlewareSpec,
-          impls,
-        } satisfies RegistryItem),
+        setNestedProperty(
+          registryItems,
+          [MiddlewareRegistryItem.registryKey(middlewareSpec.key)],
+          {
+            [MiddlewareRegistryItem.TypeId]: MiddlewareRegistryItem.TypeId,
+            middlewareSpec,
+            impls,
+          } satisfies MiddlewareRegistryItem.MiddlewareRegistryItem,
+        ),
       );
 
       return { middlewareKey: middlewareSpec.key };
@@ -209,7 +196,10 @@ export const makeByFunctionType = <
     >;
   },
 ): Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<MiddlewareSpec_>>> =>
-  layerFromImpls(middlewareSpec, impls as RegistryItem["impls"]);
+  layerFromImpls(
+    middlewareSpec,
+    impls as MiddlewareRegistryItem.MiddlewareRegistryItem["impls"],
+  );
 
 /**
  * Sugar over {@link make} for the flagship "run something, provide a

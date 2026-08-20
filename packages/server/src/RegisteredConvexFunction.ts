@@ -30,7 +30,8 @@ import * as MutationRunner from "./MutationRunner";
 import * as QueryCtx from "./QueryCtx";
 import * as QueryRunner from "./QueryRunner";
 import * as RegisteredFunction from "./RegisteredFunction";
-import type * as RegistryItem from "./RegistryItem";
+import type * as FunctionRegistryItem from "./FunctionRegistryItem";
+import type * as ResolvedMiddleware from "./ResolvedMiddleware";
 import * as Scheduler from "./Scheduler";
 import * as SchemaToValidator from "./SchemaToValidator";
 import { StorageReader } from "./StorageReader";
@@ -38,8 +39,8 @@ import { StorageWriter } from "./StorageWriter";
 
 export const make = (
   databaseSchema: DatabaseSchema.AnyWithProps,
-  item: RegistryItem.ConfectRegistryItem,
-  resolvedMiddlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware> = [],
+  item: FunctionRegistryItem.ConfectFunctionRegistryItem,
+  resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware> = [],
 ): RegisteredFunction.Any => {
   const { name, functionVisibility, handler } = item;
 
@@ -177,7 +178,7 @@ const queryFunction = <
         DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
       >
   >;
-  resolvedMiddlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>;
+  resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
 }) => ({
   args: SchemaToValidator.compileArgsSchema(args),
   returns: SchemaToValidator.compileReturnsSchema(returns),
@@ -294,7 +295,7 @@ const mutationFunction = <
   handler: (
     a: Args,
   ) => Effect.Effect<Returns, E, MutationServices<DatabaseSchema_>>;
-  resolvedMiddlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>;
+  resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
 }) => ({
   args: SchemaToValidator.compileArgsSchema(args),
   returns: SchemaToValidator.compileReturnsSchema(returns),
@@ -365,7 +366,7 @@ const convexActionFunction = <
       E,
       RegisteredFunction.ActionServices<DatabaseSchema_>
     >;
-    resolvedMiddlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>;
+    resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
   },
 ) =>
   RegisteredFunction.actionFunctionBase({

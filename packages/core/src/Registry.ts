@@ -5,7 +5,7 @@ import * as Ref from "effect/Ref";
  * Recursive tree that mirrors a `Spec`'s group structure. Leaves are the
  * per-function items written by each `FunctionImpl`'s layer initializer. The
  * leaf type is intentionally `unknown` here so `@confect/core` does not need
- * to know about `@confect/server`'s `RegistryItem` shape; producers and
+ * to know about `@confect/server`'s registry-item shapes; producers and
  * consumers (the server runtime and the CLI's `implValidation`) narrow as
  * needed.
  */

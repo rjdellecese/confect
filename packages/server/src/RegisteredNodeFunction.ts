@@ -11,12 +11,13 @@ import * as Layer from "effect/Layer";
 import * as Match from "effect/Match";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import * as RegisteredFunction from "./RegisteredFunction";
-import type * as RegistryItem from "./RegistryItem";
+import type * as FunctionRegistryItem from "./FunctionRegistryItem";
+import type * as ResolvedMiddleware from "./ResolvedMiddleware";
 
 export const make = (
   databaseSchema: DatabaseSchema.AnyWithProps,
-  item: RegistryItem.ConfectRegistryItem,
-  resolvedMiddlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware> = [],
+  item: FunctionRegistryItem.ConfectFunctionRegistryItem,
+  resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware> = [],
 ): RegisteredFunction.Any => {
   const genericFunction = Match.value(item.functionVisibility).pipe(
     Match.when("public", () => actionGeneric),
@@ -68,7 +69,7 @@ const nodeActionFunction = <
       | RegisteredFunction.ActionServices<DatabaseSchema_>
       | NodeServices.NodeServices
     >;
-    resolvedMiddlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>;
+    resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
   },
 ) =>
   RegisteredFunction.actionFunctionBase({

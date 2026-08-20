@@ -1,11 +1,11 @@
-import type * as RegistryItem from "@confect/server/RegistryItem";
+import type * as FunctionRegistryItem from "@confect/server/FunctionRegistryItem";
 import { describe, expectTypeOf, it } from "@effect/vitest";
 
-describe("ConvexRegistryItem", () => {
+describe("ConvexFunctionRegistryItem", () => {
   it("carries no spec aspects or middleware surface", () => {
     expectTypeOf<
       Extract<
-        keyof RegistryItem.ConvexRegistryItem,
+        keyof FunctionRegistryItem.ConvexFunctionRegistryItem,
         | "name"
         | "functionVisibility"
         | "functionType"

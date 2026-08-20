@@ -9,9 +9,10 @@ import * as Ref from "effect/Ref";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as GroupImpl from "./GroupImpl";
 import { mapLeaves } from "./internal/utils";
-import * as MiddlewareImpl from "./MiddlewareImpl";
 import type * as RegisteredFunction from "./RegisteredFunction";
-import * as RegistryItem from "./RegistryItem";
+import * as FunctionRegistryItem from "./FunctionRegistryItem";
+import * as MiddlewareRegistryItem from "./MiddlewareRegistryItem";
+import type * as ResolvedMiddleware from "./ResolvedMiddleware";
 
 export type RegisteredFunctions<Spec_ extends Spec.AnyWithProps> =
   Types.Simplify<RegisteredFunctionsHelper<Spec.Groups<Spec_>>>;
@@ -87,8 +88,8 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
   groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,
   makeRegisteredFunction: (
     databaseSchema: DatabaseSchema.AnyWithProps,
-    registryItem: RegistryItem.ConfectRegistryItem,
-    resolvedMiddlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>,
+    registryItem: FunctionRegistryItem.ConfectFunctionRegistryItem,
+    resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
   ) => RegisteredFunction.Any,
 ): RegisteredFunctionsForGroupSpec<Group> => {
   const registryItems = Effect.gen(function* () {
@@ -106,9 +107,9 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
   const { functionItems, middlewareImplItems } =
     partitionMiddlewareImplItems(registryItems);
 
-  return mapLeaves<RegistryItem.AnyWithProps, RegisteredFunction.Any>(
-    functionItems as { [key: string]: RegistryItem.AnyWithProps },
-    RegistryItem.isRegistryItem,
+  return mapLeaves<FunctionRegistryItem.AnyWithProps, RegisteredFunction.Any>(
+    functionItems as { [key: string]: FunctionRegistryItem.AnyWithProps },
+    FunctionRegistryItem.isFunctionRegistryItem,
     (registryItem) =>
       Match.value(registryItem).pipe(
         Match.tag("Convex", (item) => item.handler),
@@ -127,10 +128,13 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
 const partitionMiddlewareImplItems = (
   registryItems: Registry.RegistryItems,
 ) => {
-  const middlewareImplItems = new Map<string, MiddlewareImpl.RegistryItem>();
+  const middlewareImplItems = new Map<
+    string,
+    MiddlewareRegistryItem.MiddlewareRegistryItem
+  >();
   const functionItems: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(registryItems)) {
-    if (MiddlewareImpl.isRegistryItem(value)) {
+    if (MiddlewareRegistryItem.isMiddlewareRegistryItem(value)) {
       middlewareImplItems.set(value.middlewareSpec.key, value);
     } else {
       functionItems[key] = value;
@@ -149,9 +153,12 @@ const partitionMiddlewareImplItems = (
  * type errors.
  */
 const resolveMiddlewares = (
-  registryItem: RegistryItem.ConfectRegistryItem,
-  middlewareImplItems: ReadonlyMap<string, MiddlewareImpl.RegistryItem>,
-): ReadonlyArray<RegistryItem.ResolvedMiddleware> =>
+  registryItem: FunctionRegistryItem.ConfectFunctionRegistryItem,
+  middlewareImplItems: ReadonlyMap<
+    string,
+    MiddlewareRegistryItem.MiddlewareRegistryItem
+  >,
+): ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware> =>
   registryItem.middlewareSpecs.map((middlewareSpec) => {
     const registered = middlewareImplItems.get(middlewareSpec.key);
     if (registered === undefined) {

@@ -7,13 +7,13 @@ import * as Predicate from "effect/Predicate";
 import type * as Schema from "effect/Schema";
 import type * as Handler from "./Handler";
 
-export const TypeId = "@confect/server/RegistryItem";
+export const TypeId = "@confect/server/FunctionRegistryItem";
 export type TypeId = typeof TypeId;
 
-export const isRegistryItem = (value: unknown): value is AnyWithProps =>
+export const isFunctionRegistryItem = (value: unknown): value is AnyWithProps =>
   Predicate.hasProperty(value, TypeId);
 
-const RegistryItemProto = {
+const FunctionRegistryItemProto = {
   [TypeId]: TypeId,
 };
 
@@ -21,9 +21,11 @@ const RegistryItemProto = {
  * A function registered by `FunctionImpl.make`, one of two shapes keyed by
  * the spec's provenance.
  */
-export type AnyWithProps = ConfectRegistryItem | ConvexRegistryItem;
+export type AnyWithProps =
+  | ConfectFunctionRegistryItem
+  | ConvexFunctionRegistryItem;
 
-export interface ConfectRegistryItem {
+export interface ConfectFunctionRegistryItem {
   readonly [TypeId]: TypeId;
   readonly _tag: "Confect";
   readonly name: string;
@@ -36,19 +38,10 @@ export interface ConfectRegistryItem {
   readonly handler: Handler.AnyConfectProvenance;
 }
 
-export interface ConvexRegistryItem {
+export interface ConvexFunctionRegistryItem {
   readonly [TypeId]: TypeId;
   readonly _tag: "Convex";
   readonly handler: Handler.AnyConvexProvenance;
-}
-
-/**
- * A middleware spec paired with its implementation for one function's type —
- * the resolved form `buildForGroup` hands to `makeRegisteredFunction`.
- */
-export interface ResolvedMiddleware {
-  readonly middlewareSpec: MiddlewareSpec.AnyService;
-  readonly middlewareImpl: MiddlewareSpec.AnyMiddlewareImpl;
 }
 
 export const make = ({
@@ -62,13 +55,13 @@ export const make = ({
 }): AnyWithProps =>
   Match.value(functionSpec.functionProvenance).pipe(
     Match.tag("Convex", (): AnyWithProps =>
-      Object.assign(Object.create(RegistryItemProto), {
+      Object.assign(Object.create(FunctionRegistryItemProto), {
         _tag: "Convex" as const,
         handler: handler as Handler.AnyConvexProvenance,
       }),
     ),
     Match.tag("Confect", (provenance): AnyWithProps => {
-      const item = Object.assign(Object.create(RegistryItemProto), {
+      const item = Object.assign(Object.create(FunctionRegistryItemProto), {
         _tag: "Confect" as const,
         name: functionSpec.name,
         functionVisibility: functionSpec.functionVisibility,

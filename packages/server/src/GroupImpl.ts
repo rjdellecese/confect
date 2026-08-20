@@ -12,8 +12,9 @@ import * as Record from "effect/Record";
 import * as Ref from "effect/Ref";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as FunctionImpl from "./FunctionImpl";
-import * as MiddlewareImpl from "./MiddlewareImpl";
-import * as RegistryItem from "./RegistryItem";
+import type * as MiddlewareImpl from "./MiddlewareImpl";
+import * as MiddlewareRegistryItem from "./MiddlewareRegistryItem";
+import * as FunctionRegistryItem from "./FunctionRegistryItem";
 
 export const TypeId = "@confect/server/GroupImpl";
 export type TypeId = typeof TypeId;
@@ -124,7 +125,9 @@ const collectFunctionNames = (
 ): ReadonlyArray<string> =>
   pipe(
     Record.toEntries(items),
-    Array.filter(([, value]) => RegistryItem.isRegistryItem(value)),
+    Array.filter(([, value]) =>
+      FunctionRegistryItem.isFunctionRegistryItem(value),
+    ),
     Array.map(([name]) => name),
   );
 
@@ -138,7 +141,7 @@ const collectMiddlewareKeys = (
 ): ReadonlyArray<string> =>
   pipe(
     Record.values(items),
-    Array.filter(MiddlewareImpl.isRegistryItem),
+    Array.filter(MiddlewareRegistryItem.isMiddlewareRegistryItem),
     Array.map((item) => item.middlewareSpec.key),
   );
 
