@@ -12,8 +12,6 @@ export const createConfig = ({
   entry,
   platform,
   outDir,
-  // Clean only tsdown's own JavaScript artifacts: the .d.ts files in dist are
-  // emitted by `tsc -b`, whose incremental tsbuildinfo assumes they persist.
   clean: [
     `${outDir}/**/*.js`,
     `${outDir}/**/*.mjs`,
