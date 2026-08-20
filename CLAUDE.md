@@ -7,6 +7,7 @@ Confect is a library that integrates Effect with the Convex backend platform. It
 - `@confect/core` - Shared specs, schemas, and types (no workspace deps)
 - `@confect/server` - Backend bindings to Convex (depends on core)
 - `@confect/js` - Runtime-agnostic JavaScript client (depends on core)
+- `@confect/foldkit` - Client-side bindings for Foldkit apps (depends on core, js)
 - `@confect/react` - Client-side React hooks (depends on core)
 - `@confect/cli` - CLI tooling for codegen and dev-mode watching (depends on core, server)
 - `@confect/test` - Testing utilities via convex-test (depends on core, server)
@@ -46,7 +47,7 @@ Build, lint, and format run through Vite+ (`vp`), which orders packages by their
 
 ## Testing
 
-Tests use Vitest with a root-level `vitest.config.ts` (which uses `projects: ["packages/*"]` to discover per-package test projects) and shared config in `vitest.shared.ts`. The core, js, react, server, and cli packages all have tests. The @confect/server package has integration tests using convex-test.
+Tests use Vitest with a root-level `vitest.config.ts` (which uses `projects: ["packages/*"]` to discover per-package test projects) and shared config in `vitest.shared.ts`. The core, foldkit, js, react, server, and cli packages all have tests. The @confect/server package has integration tests using convex-test.
 
 Tests import the public package specifiers (e.g. `@confect/core/Ref`); `vitest.shared.ts` aliases those to each package's `src/` so suites run against source rather than built `dist/`.
 

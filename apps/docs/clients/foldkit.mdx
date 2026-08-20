@@ -1,0 +1,259 @@
+---
+icon: "origami"
+title: "Foldkit"
+description: "Use Confect's Foldkit bindings to call your functions from a Foldkit app."
+---
+
+`@confect/foldkit` bridges Confect into [Foldkit](https://foldkit.dev), The Elm
+Architecture in TypeScript powered by Effect. It maps Confect's client surface
+onto Foldkit's three integration seams: the `WebSocketClient` service (from
+[`@confect/js`](/clients/js/websocket)) becomes a
+[resource](https://foldkit.dev/core/resources), reactive queries become
+[Subscription](https://foldkit.dev/core/subscriptions) entries, and queries,
+mutations, and actions become
+[Commands](https://foldkit.dev/core/commands). Args and return values are
+encoded and decoded through the [Effect
+Schemas](/concepts/schema-restrictions) in your [function
+specs](/concepts/spec-impl-model), and every failure is folded into a Message,
+so Command and Subscription error channels stay `never` as Foldkit requires.
+
+Functions are referenced via `refs` (from `confect/_generated/refs`) instead
+of Convex's `api` object, the same as with the other Confect clients.
+
+## Installation
+
+```bash
+pnpm add @confect/foldkit @confect/js @confect/core foldkit
+```
+
+<Note>
+  Foldkit pins an exact `effect` version in its `peerDependencies`. When
+  Confect tracks a newer Effect release than Foldkit does, tell your package
+  manager to accept the mismatch — with pnpm, in `pnpm-workspace.yaml`:
+
+```yaml
+peerDependencyRules:
+  allowedVersions:
+    "foldkit>effect": "4"
+```
+
+With npm, use an [`overrides`](https://docs.npmjs.com/cli/configuring-npm/package-json#overrides)
+entry that pins `effect` to the version your app uses.
+
+</Note>
+
+## Setup
+
+Pass the `WebSocketClient` layer to your application's `resources`. The client
+lives for the lifetime of the app, and the layer closes the WebSocket at
+teardown.
+
+```ts src/entry.ts
+import { WebSocketClient } from "@confect/foldkit";
+import { Runtime } from "foldkit";
+
+const application = Runtime.makeApplication({
+  Model,
+  init,
+  update,
+  view,
+  subscriptions,
+  resources: WebSocketClient.layer(import.meta.env.VITE_CONVEX_URL),
+  container: document.getElementById("root"),
+});
+
+Runtime.run(application);
+```
+
+Commands and subscription entries built by `@confect/foldkit` require the
+`WebSocketClient.WebSocketClient` service, which this layer satisfies.
+
+## Reactive queries as Subscriptions
+
+`Subscription.reactiveQuery` builds a complete Foldkit subscription entry for
+a query ref. Its dependencies are the query args wrapped in an `Option`
+extracted from your Model: `None` closes the subscription, a change from one
+`Some` to another resubscribes with the new args, and structurally equal args
+leave the subscription running (dependency equivalence is derived from the
+ref's `args` schema).
+
+```ts src/subscription.ts
+import { Subscription, WebSocketClient } from "@confect/foldkit";
+import * as Option from "effect/Option";
+import * as FoldkitSubscription from "foldkit/subscription";
+
+import refs from "../confect/_generated/refs";
+import { FailedGetNote, GotNote, type Message, type Model } from "./model";
+
+export const subscriptions = FoldkitSubscription.make<
+  Model,
+  Message,
+  WebSocketClient.WebSocketClient
+>()(() => ({
+  note: Subscription.reactiveQuery(refs.public.notes.get, {
+    args: (model: Model) =>
+      Option.map(model.selectedNoteId, (noteId) => ({ noteId })),
+    onSuccess: (note) => GotNote({ note }),
+    onError: (error) => FailedGetNote({ message: String(error) }),
+  }),
+}));
+```
+
+`onSuccess` receives the decoded return value on every server update;
+`onError` receives the ref's decoded typed error (see [Error
+Handling](/server/error-handling)), a transport-level `WebSocketClientError`,
+or a `SchemaError`. After an error the stream ends — Convex terminates the
+server subscription — so retrying is `update`'s decision, typically by
+toggling the entry's args through `None` and back.
+
+Queries without args may omit the `args` extractor, which leaves the
+subscription always open:
+
+```ts
+Subscription.reactiveQuery(refs.public.notes.list, {
+  onSuccess: (notes) => GotNotes({ notes }),
+  onError: (error) => FailedGetNotes({ message: String(error) }),
+});
+```
+
+### Custom entries
+
+`Subscription.reactiveQuery` requires a ref built with
+`FunctionSpec.publicQuery`, since the dependency equivalence comes from the
+ref's args schema. For a Convex-provenance ref, or when the entry needs extra
+dependencies or custom gating, write the entry by hand and use
+`Subscription.reactiveQueryStream` as its `dependenciesToStream` body:
+
+```ts
+import * as Schema from "effect/Schema";
+
+FoldkitSubscription.make<Model, Message, WebSocketClient.WebSocketClient>()(
+  (entry) => ({
+    note: entry(
+      { noteId: Schema.Option(Schema.String) },
+      {
+        modelToDependencies: (model) => ({ noteId: model.selectedNoteId }),
+        dependenciesToStream: ({ noteId }) =>
+          Option.match(noteId, {
+            onNone: () => Stream.empty,
+            onSome: (noteId) =>
+              Subscription.reactiveQueryStream(refs.public.notes.get, {
+                onSuccess: (note) => GotNote({ note }),
+                onError: (error) => FailedGetNote({ message: String(error) }),
+              })({ noteId }),
+          }),
+      },
+    ),
+  }),
+);
+```
+
+## Commands
+
+`Command.query`, `Command.mutation`, and `Command.action` build Foldkit
+Command definitions whose Command args are the ref's args. Call the
+definition from `update` to construct a Command instance — nothing runs until
+the Foldkit runtime executes it.
+
+```ts src/command.ts
+import { Command } from "@confect/foldkit";
+
+import refs from "../confect/_generated/refs";
+import { FailedSaveNote, SucceededSaveNote } from "./model";
+
+export const SaveNote = Command.mutation("SaveNote", refs.public.notes.insert, {
+  onSuccess: (noteId) => SucceededSaveNote({ noteId }),
+  onError: (error) => FailedSaveNote({ message: String(error) }),
+});
+```
+
+```ts src/update.ts
+// In update:
+case "ClickedSave":
+  return [model, [SaveNote({ text: model.draft })]];
+```
+
+Follow Foldkit's [naming convention](https://foldkit.dev/core/commands):
+Commands are verb-first imperatives, result Messages are past-tense facts
+(`SucceededSaveNote` / `FailedSaveNote`). `onError` receives the same error
+union as subscriptions — `Command.Error<typeof ref>` names it when you want
+to factor a handler out.
+
+### Effect helpers
+
+`Command.queryEffect`, `Command.mutationEffect`, and `Command.actionEffect`
+return an execute body — an `Effect` whose failures are already folded into
+Messages — for hand-written `Command.define` calls. Reach for them when the
+Command needs a custom args schema, [interruption](https://foldkit.dev/api-reference/command),
+or several calls in one Command:
+
+```ts
+import { Command } from "@confect/foldkit";
+import * as FoldkitCommand from "foldkit/command";
+import * as Schema from "effect/Schema";
+
+const saveNote = Command.mutationEffect(refs.public.notes.insert, {
+  onSuccess: (noteId) => SucceededSaveDraft({ noteId }),
+  onError: (error) => FailedSaveDraft({ message: String(error) }),
+});
+
+export const SaveDraft = FoldkitCommand.define("SaveDraft", {
+  args: { text: Schema.String },
+  messages: [SucceededSaveDraft, FailedSaveDraft],
+  interrupt: true,
+  execute: (args) => saveNote(args),
+});
+```
+
+## Query state in the Model
+
+Foldkit's [`AsyncData`](https://foldkit.dev/core/async-data) is the idiomatic
+Model representation for query state. Map errors to a view-ready schema type
+in your `onError` handler, then settle the `AsyncData` field in `update`:
+
+```ts src/model.ts
+import { AsyncData } from "foldkit";
+import { m } from "foldkit/message";
+import * as Schema from "effect/Schema";
+
+const Notes = AsyncData.Schema(Schema.Array(Note), Schema.String);
+
+export const Model = Schema.Struct({ notes: Notes.schema });
+
+export const GotNotes = m("GotNotes", { notes: Schema.Array(Note) });
+export const FailedGetNotes = m("FailedGetNotes", { message: Schema.String });
+```
+
+```ts src/update.ts
+// In update:
+case "GotNotes":
+  return [evo(model, { notes: () => Notes.Success({ data: message.notes }) }), []];
+case "FailedGetNotes":
+  return [evo(model, { notes: () => Notes.Failure({ error: message.message }) }), []];
+```
+
+## Authentication
+
+`setAuth` is available on the `WebSocketClient` service. Wire it up as a
+Command:
+
+```ts
+import { WebSocketClient } from "@confect/foldkit";
+import * as Effect from "effect/Effect";
+import * as FoldkitCommand from "foldkit/command";
+
+const SetAuth = FoldkitCommand.define("SetAuth", {
+  messages: [CompletedSetAuth],
+  execute: Effect.flatMap(WebSocketClient.WebSocketClient, (client) =>
+    client.setAuth(({ forceRefreshToken }) => fetchToken(forceRefreshToken)),
+  ).pipe(Effect.as(CompletedSetAuth())),
+});
+```
+
+## Not yet covered
+
+Paginated queries (`usePaginatedQuery`'s Foldkit counterpart) and `interrupt`
+support on the Command factories are not yet built in. Both have escape
+hatches: paginated refs can be called through the
+[`WebSocketClient`](/clients/js/websocket) service directly, and interruption
+composes through the [effect helpers](#effect-helpers) as shown above.
