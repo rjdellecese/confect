@@ -53,8 +53,8 @@ export const make = <
     GroupSpec.Functions<Group>,
     FunctionName,
     MiddlewareSpec.Provides<
-      | GroupSpec.Middlewares<Group>
-      | FunctionSpec.Middlewares<
+      | GroupSpec.MiddlewareSpecs<Group>
+      | FunctionSpec.MiddlewareSpecs<
           FunctionSpec.WithName<GroupSpec.Functions<Group>, FunctionName>
         >
     >
@@ -73,7 +73,7 @@ export const make = <
           [functionName],
           RegistryItem.make({
             functionSpec,
-            groupMiddlewareSpecs: group.middlewares,
+            groupMiddlewareSpecs: group.middlewareSpecs,
             handler,
           }),
         ),

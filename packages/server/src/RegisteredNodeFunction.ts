@@ -16,7 +16,7 @@ import type * as RegistryItem from "./RegistryItem";
 export const make = (
   databaseSchema: DatabaseSchema.AnyWithProps,
   item: RegistryItem.ConfectRegistryItem,
-  middlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware> = [],
+  resolvedMiddlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware> = [],
 ): RegisteredFunction.Any => {
   const genericFunction = Match.value(item.functionVisibility).pipe(
     Match.when("public", () => actionGeneric),
@@ -32,7 +32,7 @@ export const make = (
       returns: item.returns,
       error: item.error,
       handler: item.handler,
-      middlewares,
+      resolvedMiddlewares,
     }),
   );
 };
@@ -53,7 +53,7 @@ const nodeActionFunction = <
     returns,
     error,
     handler,
-    middlewares,
+    resolvedMiddlewares,
   }: {
     functionName: string;
     functionVisibility: FunctionVisibility;
@@ -68,7 +68,7 @@ const nodeActionFunction = <
       | RegisteredFunction.ActionServices<DatabaseSchema_>
       | NodeServices.NodeServices
     >;
-    middlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>;
+    resolvedMiddlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>;
   },
 ) =>
   RegisteredFunction.actionFunctionBase({
@@ -78,7 +78,7 @@ const nodeActionFunction = <
     returns,
     error,
     handler,
-    middlewares,
+    resolvedMiddlewares,
     createLayer: (ctx) =>
       Layer.mergeAll(
         RegisteredFunction.actionLayer(databaseSchema, ctx),

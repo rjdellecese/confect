@@ -26,7 +26,7 @@ type GroupRefs<
     FilteredFunctions<
       GroupSpec.Functions<Group>,
       Predicate,
-      MiddlewareSpec.Error<GroupSpec.Middlewares<Group>>
+      MiddlewareSpec.Error<GroupSpec.MiddlewareSpecs<Group>>
     >
 >;
 
@@ -68,7 +68,9 @@ type FilteredFunctions<
         F extends {
           readonly functionProvenance: { readonly _tag: "Confect" };
         }
-          ? MiddlewareError | MiddlewareSpec.Error<FunctionSpec.Middlewares<F>>
+          ?
+              | MiddlewareError
+              | MiddlewareSpec.Error<FunctionSpec.MiddlewareSpecs<F>>
           : never
       >
     : never;
@@ -117,7 +119,7 @@ const makeHelper = (
       return Record.union(
         makeHelper(group.groups, Option.some(currentFunctionNamespace)),
         Record.map(group.functions, (function_) =>
-          Ref.make(currentFunctionNamespace, function_, group.middlewares),
+          Ref.make(currentFunctionNamespace, function_, group.middlewareSpecs),
         ),
         (_subGroup, _function) => {
           throw new Error(

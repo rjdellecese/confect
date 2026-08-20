@@ -48,7 +48,7 @@ export interface ConvexRegistryItem {
  */
 export interface ResolvedMiddleware {
   readonly middlewareSpec: MiddlewareSpec.AnyService;
-  readonly middlewareImpl: MiddlewareSpec.AnyMiddleware;
+  readonly middlewareImpl: MiddlewareSpec.AnyMiddlewareImpl;
 }
 
 export const make = ({
@@ -73,7 +73,10 @@ export const make = ({
         name: functionSpec.name,
         functionVisibility: functionSpec.functionVisibility,
         functionType: functionSpec.runtimeAndFunctionType.functionType,
-        middlewareSpecs: [...groupMiddlewareSpecs, ...functionSpec.middlewares],
+        middlewareSpecs: [
+          ...groupMiddlewareSpecs,
+          ...functionSpec.middlewareSpecs,
+        ],
         handler: handler as Handler.AnyConfectProvenance,
       });
 

@@ -92,7 +92,7 @@ export const make = <
   _group: Group &
     MiddlewareSpec.ValidateImplRequires<
       GroupSpec.Functions<Group>,
-      GroupSpec.Middlewares<Group>
+      GroupSpec.MiddlewareSpecs<Group>
     >,
 ): Layer.Layer<
   GroupImpl<"Unfinalized">,
@@ -139,7 +139,7 @@ const collectMiddlewareKeys = (
   pipe(
     Record.values(items),
     Array.filter(MiddlewareImpl.isRegistryItem),
-    Array.map((item) => item.middleware.key),
+    Array.map((item) => item.middlewareSpec.key),
   );
 
 const findUnfinalizedGroupImpl = <S>(

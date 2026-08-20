@@ -88,7 +88,7 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
   makeRegisteredFunction: (
     databaseSchema: DatabaseSchema.AnyWithProps,
     registryItem: RegistryItem.ConfectRegistryItem,
-    middlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>,
+    resolvedMiddlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>,
   ) => RegisteredFunction.Any,
 ): RegisteredFunctionsForGroupSpec<Group> => {
   const registryItems = Effect.gen(function* () {
@@ -103,8 +103,8 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
     Effect.runSync,
   );
 
-  const { functionItems, middlewareItems } =
-    partitionMiddlewareItems(registryItems);
+  const { functionItems, middlewareImplItems } =
+    partitionMiddlewareImplItems(registryItems);
 
   return mapLeaves<RegistryItem.AnyWithProps, RegisteredFunction.Any>(
     functionItems as { [key: string]: RegistryItem.AnyWithProps },
@@ -116,7 +116,7 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
           makeRegisteredFunction(
             databaseSchema,
             item,
-            resolveMiddlewares(item, middlewareItems),
+            resolveMiddlewares(item, middlewareImplItems),
           ),
         ),
         Match.exhaustive,
@@ -124,17 +124,19 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
   ) as RegisteredFunctionsForGroupSpec<Group>;
 };
 
-const partitionMiddlewareItems = (registryItems: Registry.RegistryItems) => {
-  const middlewareItems = new Map<string, MiddlewareImpl.RegistryItem>();
+const partitionMiddlewareImplItems = (
+  registryItems: Registry.RegistryItems,
+) => {
+  const middlewareImplItems = new Map<string, MiddlewareImpl.RegistryItem>();
   const functionItems: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(registryItems)) {
     if (MiddlewareImpl.isRegistryItem(value)) {
-      middlewareItems.set(value.middleware.key, value);
+      middlewareImplItems.set(value.middlewareSpec.key, value);
     } else {
       functionItems[key] = value;
     }
   }
-  return { functionItems, middlewareItems };
+  return { functionItems, middlewareImplItems };
 };
 
 /**
@@ -148,10 +150,10 @@ const partitionMiddlewareItems = (registryItems: Registry.RegistryItems) => {
  */
 const resolveMiddlewares = (
   registryItem: RegistryItem.ConfectRegistryItem,
-  middlewareItems: ReadonlyMap<string, MiddlewareImpl.RegistryItem>,
+  middlewareImplItems: ReadonlyMap<string, MiddlewareImpl.RegistryItem>,
 ): ReadonlyArray<RegistryItem.ResolvedMiddleware> =>
   registryItem.middlewareSpecs.map((middlewareSpec) => {
-    const registered = middlewareItems.get(middlewareSpec.key);
+    const registered = middlewareImplItems.get(middlewareSpec.key);
     if (registered === undefined) {
       throw new Error(
         `Middleware "${middlewareSpec.key}" is attached to this group's spec, but no implementation was provided — pipe the group's impl through \`Layer.provide(MiddlewareImpl.make(...))\` (or \`makeByFunctionType\`/\`provides\`).`,

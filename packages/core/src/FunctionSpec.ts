@@ -23,14 +23,14 @@ export interface FunctionSpec<
   FunctionVisibility_ extends FunctionVisibility,
   Name_ extends string,
   FunctionProvenance_ extends FunctionProvenance.FunctionProvenance,
-  Middlewares_ extends MiddlewareSpec.AnyService = never,
+  MiddlewareSpecs_ extends MiddlewareSpec.AnyService = never,
 > {
   readonly [TypeId]: TypeId;
   readonly runtimeAndFunctionType: RuntimeAndFunctionType_;
   readonly functionVisibility: FunctionVisibility_;
   readonly name: Name_;
   readonly functionProvenance: FunctionProvenance_;
-  readonly middlewares: ReadonlyArray<Middlewares_>;
+  readonly middlewareSpecs: ReadonlyArray<MiddlewareSpecs_>;
 }
 
 export interface Builder<
@@ -38,28 +38,28 @@ export interface Builder<
   FunctionVisibility_ extends FunctionVisibility,
   Name_ extends string,
   FunctionProvenance_ extends FunctionProvenance.FunctionProvenance,
-  Middlewares_ extends MiddlewareSpec.AnyService = never,
+  MiddlewareSpecs_ extends MiddlewareSpec.AnyService = never,
 > extends FunctionSpec<
   RuntimeAndFunctionType_,
   FunctionVisibility_,
   Name_,
   FunctionProvenance_,
-  Middlewares_
+  MiddlewareSpecs_
 > {
-  middleware<Middleware extends MiddlewareSpec.AnyService>(
-    middleware: Middleware &
+  middleware<MiddlewareSpec_ extends MiddlewareSpec.AnyService>(
+    middlewareSpec: MiddlewareSpec_ &
       MiddlewareSpec.ValidateFunctionAttach<
-        Middleware,
+        MiddlewareSpec_,
         RuntimeAndFunctionType_,
         FunctionProvenance_,
-        Middlewares_
+        MiddlewareSpecs_
       >,
   ): Builder<
     RuntimeAndFunctionType_,
     FunctionVisibility_,
     Name_,
     FunctionProvenance_,
-    Middlewares_ | Middleware
+    MiddlewareSpecs_ | MiddlewareSpec_
   >;
 }
 
@@ -129,8 +129,8 @@ export type GetFunctionVisibility<FunctionSpec_ extends AnyWithProps> =
 
 export type Name<FunctionSpec_ extends AnyWithProps> = FunctionSpec_["name"];
 
-export type Middlewares<FunctionSpec_ extends AnyWithProps> =
-  FunctionSpec_["middlewares"][number];
+export type MiddlewareSpecs<FunctionSpec_ extends AnyWithProps> =
+  FunctionSpec_["middlewareSpecs"][number];
 
 export type Args<FunctionSpec_ extends AnyWithProps> = FunctionSpec_ extends {
   functionProvenance: {
@@ -245,21 +245,25 @@ export type WithoutName<
 const Proto = {
   [TypeId]: TypeId,
 
-  middleware(this: AnyWithProps, middleware: MiddlewareSpec.AnyService) {
+  middleware(this: AnyWithProps, middlewareSpec: MiddlewareSpec.AnyService) {
     if (this.functionProvenance._tag === "Convex") {
       throw new Error(
         `Plain Convex function "${this.name}" cannot have middleware`,
       );
     }
     const functionType = this.runtimeAndFunctionType.functionType;
-    if (!middleware.functionTypes[functionType]) {
+    if (!middlewareSpec.functionTypes[functionType]) {
       throw new Error(
-        `Middleware "${middleware.key}" does not declare function type "${functionType}" of function "${this.name}"`,
+        `Middleware "${middlewareSpec.key}" does not declare function type "${functionType}" of function "${this.name}"`,
       );
     }
-    if (this.middlewares.some((existing) => existing.key === middleware.key)) {
+    if (
+      this.middlewareSpecs.some(
+        (existing) => existing.key === middlewareSpec.key,
+      )
+    ) {
       throw new Error(
-        `Middleware "${middleware.key}" is already attached to function "${this.name}"`,
+        `Middleware "${middlewareSpec.key}" is already attached to function "${this.name}"`,
       );
     }
 
@@ -268,7 +272,7 @@ const Proto = {
       functionVisibility: this.functionVisibility,
       name: this.name,
       functionProvenance: this.functionProvenance,
-      middlewares: [...this.middlewares, middleware],
+      middlewareSpecs: [...this.middlewareSpecs, middlewareSpec],
     });
   },
 };
@@ -310,7 +314,7 @@ const make =
       functionVisibility,
       name,
       functionProvenance: FunctionProvenance.Confect(args, returns, error),
-      middlewares: [],
+      middlewareSpecs: [],
     });
   };
 
@@ -369,7 +373,7 @@ const makePaginated =
         item,
         error,
       ),
-      middlewares: [],
+      middlewareSpecs: [],
     });
   };
 
@@ -472,7 +476,7 @@ const makeConvex =
         ExtractArgs<F>,
         ExtractReturns<F>
       >(),
-      middlewares: [],
+      middlewareSpecs: [],
     }) as any;
   };
 

@@ -148,18 +148,18 @@ export type RegisteredFunction<
  * invocation, after args decode. Iterated innermost-first so that the
  * first-attached (group-level, in attachment order) middleware ends up
  * outermost and runs first. Erased types: the public safety story lives at
- * the `MiddlewareSpec.Middleware` / `MiddlewareImpl.make` signatures, and
+ * the `MiddlewareSpec.MiddlewareImpl` / `MiddlewareImpl.make` signatures, and
  * the composed effect's error channel is re-accounted by
  * {@link combineErrorSchemas}.
  */
 export const applyMiddleware = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
-  middlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>,
+  resolvedMiddlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>,
   options: MiddlewareSpec.MiddlewareOptions,
 ): Effect.Effect<A, any, R> => {
   let wrapped: Effect.Effect<any, any, any> = effect;
-  for (let index = middlewares.length - 1; index >= 0; index--) {
-    wrapped = middlewares[index]!.middlewareImpl(
+  for (let index = resolvedMiddlewares.length - 1; index >= 0; index--) {
+    wrapped = resolvedMiddlewares[index]!.middlewareImpl(
       wrapped as any,
       options,
     ) as any;
@@ -175,12 +175,12 @@ export const applyMiddleware = <A, E, R>(
  */
 export const combineErrorSchemas = (
   error: Schema.Codec<any, any> | undefined,
-  middlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>,
+  resolvedMiddlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>,
 ): Schema.Codec<any, any> | undefined => {
   const schemas = [
     ...(error !== undefined ? [error] : []),
     ...MiddlewareSpec.errorSchemas(
-      middlewares.map(({ middlewareSpec }) => middlewareSpec),
+      resolvedMiddlewares.map(({ middlewareSpec }) => middlewareSpec),
     ),
   ];
   return schemas.length === 0
@@ -237,7 +237,7 @@ export const actionFunctionBase = <
   returns,
   error,
   handler,
-  middlewares = [],
+  resolvedMiddlewares = [],
   createLayer,
 }: {
   functionName: string;
@@ -246,7 +246,7 @@ export const actionFunctionBase = <
   returns: Schema.Codec<Returns, ConvexReturns>;
   error: Schema.Codec<Error, Value> | undefined;
   handler: (a: Args) => Effect.Effect<Returns, E, R>;
-  middlewares?: ReadonlyArray<RegistryItem.ResolvedMiddleware>;
+  resolvedMiddlewares?: ReadonlyArray<RegistryItem.ResolvedMiddleware>;
   createLayer: (
     ctx: GenericActionCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
   ) => Layer.Layer<R>;
@@ -265,7 +265,7 @@ export const actionFunctionBase = <
       );
       const decodedReturns = yield* applyMiddleware(
         handler(decodedArgs),
-        middlewares,
+        resolvedMiddlewares,
         {
           name: functionName,
           functionType: "action",
@@ -278,7 +278,7 @@ export const actionFunctionBase = <
         Schema.encodeEffect(returns),
         Effect.orDie,
       );
-    }).pipe(runHandlerPromise(combineErrorSchemas(error, middlewares))),
+    }).pipe(runHandlerPromise(combineErrorSchemas(error, resolvedMiddlewares))),
 });
 
 export type ActionServices<

@@ -36,7 +36,7 @@ type HandlerFor<Group extends GroupSpec.AnyWithProps> = Handler.WithName<
   typeof databaseSchema,
   GroupSpec.Functions<Group>,
   "viewerName",
-  MiddlewareSpec.Provides<GroupSpec.Middlewares<Group>>
+  MiddlewareSpec.Provides<GroupSpec.MiddlewareSpecs<Group>>
 >;
 
 type EnvironmentOf<H> = H extends (
@@ -71,8 +71,8 @@ describe("handler environment widening", () => {
     );
 
     type FunctionLevelExtra = MiddlewareSpec.Provides<
-      | GroupSpec.Middlewares<typeof functionCoveredGroup>
-      | FunctionSpec.Middlewares<
+      | GroupSpec.MiddlewareSpecs<typeof functionCoveredGroup>
+      | FunctionSpec.MiddlewareSpecs<
           GroupSpec.Functions<typeof functionCoveredGroup>
         >
     >;
@@ -180,7 +180,7 @@ describe("implementation service bounds", () => {
     // The incoming effect requires `Viewer`, so an implementation that never
     // provides it cannot eliminate the requirement — its output environment
     // would keep `Viewer`, which `CommonServices` excludes.
-    type Impl = MiddlewareSpec.Middleware<Viewer, NoViewer, never>;
+    type Impl = MiddlewareSpec.MiddlewareImpl<Viewer, NoViewer, never>;
     type IncomingEnvironment =
       Parameters<Impl>[0] extends EffectNamespace.Effect<any, any, infer R>
         ? R

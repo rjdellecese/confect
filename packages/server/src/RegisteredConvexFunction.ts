@@ -39,7 +39,7 @@ import { StorageWriter } from "./StorageWriter";
 export const make = (
   databaseSchema: DatabaseSchema.AnyWithProps,
   item: RegistryItem.ConfectRegistryItem,
-  middlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware> = [],
+  resolvedMiddlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware> = [],
 ): RegisteredFunction.Any => {
   const { name, functionVisibility, handler } = item;
 
@@ -60,7 +60,7 @@ export const make = (
           returns: item.returns,
           error: item.error,
           handler,
-          middlewares,
+          resolvedMiddlewares,
         }),
       );
     }),
@@ -80,7 +80,7 @@ export const make = (
           returns: item.returns,
           error: item.error,
           handler,
-          middlewares,
+          resolvedMiddlewares,
         }),
       );
     }),
@@ -99,7 +99,7 @@ export const make = (
           returns: item.returns,
           error: item.error,
           handler,
-          middlewares,
+          resolvedMiddlewares,
         }),
       );
     }),
@@ -156,7 +156,7 @@ const queryFunction = <
   returns,
   error,
   handler,
-  middlewares,
+  resolvedMiddlewares,
 }: {
   databaseSchema: DatabaseSchema_;
   functionName: string;
@@ -177,7 +177,7 @@ const queryFunction = <
         DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
       >
   >;
-  middlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>;
+  resolvedMiddlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>;
 }) => ({
   args: SchemaToValidator.compileArgsSchema(args),
   returns: SchemaToValidator.compileReturnsSchema(returns),
@@ -195,7 +195,7 @@ const queryFunction = <
       );
       const decodedReturns = yield* RegisteredFunction.applyMiddleware(
         handler(decodedArgs),
-        middlewares,
+        resolvedMiddlewares,
         {
           name: functionName,
           functionType: "query",
@@ -227,7 +227,7 @@ const queryFunction = <
     }).pipe(
       Effect.provideService(Clock.Clock, queryClock),
       RegisteredFunction.runHandlerPromise(
-        RegisteredFunction.combineErrorSchemas(error, middlewares),
+        RegisteredFunction.combineErrorSchemas(error, resolvedMiddlewares),
         {
           scheduler: new EffectScheduler.MixedScheduler("sync"),
         },
@@ -283,7 +283,7 @@ const mutationFunction = <
   returns,
   error,
   handler,
-  middlewares,
+  resolvedMiddlewares,
 }: {
   databaseSchema: DatabaseSchema_;
   functionName: string;
@@ -294,7 +294,7 @@ const mutationFunction = <
   handler: (
     a: Args,
   ) => Effect.Effect<Returns, E, MutationServices<DatabaseSchema_>>;
-  middlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>;
+  resolvedMiddlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>;
 }) => ({
   args: SchemaToValidator.compileArgsSchema(args),
   returns: SchemaToValidator.compileReturnsSchema(returns),
@@ -312,7 +312,7 @@ const mutationFunction = <
       );
       const decodedReturns = yield* RegisteredFunction.applyMiddleware(
         handler(decodedArgs),
-        middlewares,
+        resolvedMiddlewares,
         {
           name: functionName,
           functionType: "mutation",
@@ -327,7 +327,7 @@ const mutationFunction = <
       );
     }).pipe(
       RegisteredFunction.runHandlerPromise(
-        RegisteredFunction.combineErrorSchemas(error, middlewares),
+        RegisteredFunction.combineErrorSchemas(error, resolvedMiddlewares),
         {
           scheduler: new EffectScheduler.MixedScheduler("sync"),
         },
@@ -351,7 +351,7 @@ const convexActionFunction = <
     returns,
     error,
     handler,
-    middlewares,
+    resolvedMiddlewares,
   }: {
     functionName: string;
     functionVisibility: FunctionVisibility;
@@ -365,7 +365,7 @@ const convexActionFunction = <
       E,
       RegisteredFunction.ActionServices<DatabaseSchema_>
     >;
-    middlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>;
+    resolvedMiddlewares: ReadonlyArray<RegistryItem.ResolvedMiddleware>;
   },
 ) =>
   RegisteredFunction.actionFunctionBase({
@@ -375,7 +375,7 @@ const convexActionFunction = <
     returns,
     error,
     handler,
-    middlewares,
+    resolvedMiddlewares,
     createLayer: (ctx) =>
       Layer.mergeAll(
         RegisteredFunction.actionLayer(schema, ctx),

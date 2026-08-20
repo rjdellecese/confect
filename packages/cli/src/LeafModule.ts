@@ -369,9 +369,13 @@ export const validateImpl = (leaf: LeafModule) =>
 
     const expectedMiddlewareKeys = [
       ...new Set([
-        ...(groupSpec.middlewares ?? []).map((middleware) => middleware.key),
+        ...(groupSpec.middlewareSpecs ?? []).map(
+          (middlewareSpec) => middlewareSpec.key,
+        ),
         ...Object.values(groupSpec.functions).flatMap((function_) =>
-          (function_.middlewares ?? []).map((middleware) => middleware.key),
+          (function_.middlewareSpecs ?? []).map(
+            (middlewareSpec) => middlewareSpec.key,
+          ),
         ),
       ]),
     ];

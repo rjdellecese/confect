@@ -327,7 +327,10 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
         _tag: "Confect" as const,
         functionName,
         kind: provenance.kind,
-        middlewareSpecs: [...groupMiddlewareSpecs, ...functionSpec.middlewares],
+        middlewareSpecs: [
+          ...groupMiddlewareSpecs,
+          ...functionSpec.middlewareSpecs,
+        ],
       };
 
       Lazy.defineProperty(ref, "args", () => provenance.args);

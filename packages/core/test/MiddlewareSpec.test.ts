@@ -202,7 +202,7 @@ describe("GroupSpec.middleware", () => {
       .addFunction(mutation)
       .middleware(MutationOnly);
 
-    expect(group.middlewares.map((m) => m.key)).toStrictEqual([
+    expect(group.middlewareSpecs.map((m) => m.key)).toStrictEqual([
       "RequireUser",
       "MutationOnly",
     ]);
@@ -225,7 +225,7 @@ describe("GroupSpec.middleware", () => {
       .addFunction(mutation)
       .middleware(MutationOnly);
 
-    expectTypeOf<GroupSpec.Middlewares<typeof group>>().toEqualTypeOf<
+    expectTypeOf<GroupSpec.MiddlewareSpecs<typeof group>>().toEqualTypeOf<
       typeof RequireUser | typeof MutationOnly
     >();
   });
@@ -276,7 +276,7 @@ describe("requires", () => {
       .middleware(NeedsUser)
       .addFunction(mutation);
 
-    expectTypeOf<GroupSpec.Middlewares<typeof group>>().toEqualTypeOf<
+    expectTypeOf<GroupSpec.MiddlewareSpecs<typeof group>>().toEqualTypeOf<
       typeof ProvideUser | typeof NeedsUser
     >();
   });
@@ -299,13 +299,13 @@ describe("requires", () => {
     expectTypeOf<
       MiddlewareSpec.ValidateImplRequires<
         GroupSpec.Functions<typeof satisfied>,
-        GroupSpec.Middlewares<typeof satisfied>
+        GroupSpec.MiddlewareSpecs<typeof satisfied>
       >
     >().toEqualTypeOf<unknown>();
     expectTypeOf<
       MiddlewareSpec.ValidateImplRequires<
         GroupSpec.Functions<typeof unsatisfied>,
-        GroupSpec.Middlewares<typeof unsatisfied>
+        GroupSpec.MiddlewareSpecs<typeof unsatisfied>
       >
     >().toEqualTypeOf<
       MiddlewareSpec.AttachmentError<`Function "setThing" has middleware requiring services that no middleware covering it provides`>
@@ -317,11 +317,11 @@ describe("FunctionSpec.middleware", () => {
   it("appends middleware to the function in attachment order", () => {
     const covered = mutation.middleware(MutationOnly).middleware(RequireUser);
 
-    expect(covered.middlewares.map((m) => m.key)).toStrictEqual([
+    expect(covered.middlewareSpecs.map((m) => m.key)).toStrictEqual([
       "MutationOnly",
       "RequireUser",
     ]);
-    expectTypeOf<FunctionSpec.Middlewares<typeof covered>>().toEqualTypeOf<
+    expectTypeOf<FunctionSpec.MiddlewareSpecs<typeof covered>>().toEqualTypeOf<
       typeof MutationOnly | typeof RequireUser
     >();
   });
@@ -388,7 +388,7 @@ describe("FunctionSpec.middleware", () => {
       .middleware(RequireUser)
       .addFunction(mutation.middleware(MutationOnly));
 
-    expectTypeOf<GroupSpec.Middlewares<typeof group>>().toEqualTypeOf<
+    expectTypeOf<GroupSpec.MiddlewareSpecs<typeof group>>().toEqualTypeOf<
       typeof RequireUser
     >();
   });
