@@ -372,7 +372,9 @@ export const hasErrorSchema = (ref: Any): boolean =>
       "Confect",
       (confectRef) =>
         "error" in confectRef ||
-        confectRef.middlewareSpecs.some((middleware) => "error" in middleware),
+        confectRef.middlewareSpecs.some(
+          (middlewareSpec) => "error" in middlewareSpec,
+        ),
     ),
     Match.tag("Convex", () => false),
     Match.exhaustive,

@@ -140,6 +140,7 @@ export default class RequireAdmin extends MiddlewareSpec.MiddlewareSpec<
   }
 >()("RequireAdmin", {
   error: () => NotAnAdmin,
+  functionTypes: { query: true, mutation: true, action: false },
 }) {}
 ```
 
