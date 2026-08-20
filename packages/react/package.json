@@ -67,7 +67,7 @@
   },
   "scripts": {
     "clean": "shx rm -rf dist coverage node_modules",
-    "dev": "tsdown --watch --config-loader unrun",
+    "dev": "tsdown --watch --no-clean --config-loader unrun",
     "postpack": "shx rm -f ./README.md && shx mv ./.README.md.bak ./README.md",
     "prepack": "shx mv ./README.md ./.README.md.bak && shx cp ../../README.md ./README.md",
     "typecheck": "tsc -b tsconfig.src.json"
