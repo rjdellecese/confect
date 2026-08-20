@@ -7,13 +7,13 @@
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "devDependencies": {
-    "@effect/vitest": "4.0.0-rc.110",
+    "@effect/vitest": "4.0.0-rc.111",
     "@testing-library/react": "16.3.2",
-    "@types/node": "26.2.0",
+    "@types/node": "22.20.1",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
     "convex": "1.44.0",
-    "effect": "4.0.0-rc.110",
+    "effect": "4.0.0-rc.111",
     "happy-dom": "20.11.2",
     "react": "19.2.8",
     "react-dom": "19.2.8",
@@ -42,6 +42,7 @@
     "LICENSE",
     "README.md",
     "dist",
+    "!dist/*.tsbuildinfo",
     "package.json",
     "src"
   ],
@@ -57,16 +58,16 @@
   "peerDependencies": {
     "@confect/core": "workspace:^",
     "convex": "^1.36.0",
-    "effect": "^4.0.0-rc.110",
+    "effect": "^4.0.0-rc.111",
     "react": "^18.0.0 || ^19.0.0"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/rjdellecese/confect.git"
+    "url": "git+https://github.com/rjdellecese/confect.git"
   },
   "scripts": {
     "clean": "shx rm -rf dist coverage node_modules",
-    "dev": "tsdown --watch --config-loader unrun",
+    "dev": "tsdown --watch --no-clean --config-loader unrun",
     "postpack": "shx rm -f ./README.md && shx mv ./.README.md.bak ./README.md",
     "prepack": "shx mv ./README.md ./.README.md.bak && shx cp ../../README.md ./README.md",
     "typecheck": "tsc -b tsconfig.src.json"

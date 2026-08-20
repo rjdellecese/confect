@@ -9,13 +9,13 @@
     "@convex-dev/workpool": "0.4.9",
     "convex": "1.44.0",
     "convex-helpers": "0.1.123",
-    "effect": "4.0.0-rc.110",
+    "effect": "4.0.0-rc.111",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "vite": "8.2.1"
   },
   "devDependencies": {
-    "@types/node": "26.2.0",
+    "@types/node": "22.20.1",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
     "@vitejs/plugin-react": "6.0.5",

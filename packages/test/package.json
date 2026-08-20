@@ -7,8 +7,8 @@
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "devDependencies": {
-    "@types/node": "26.2.0",
-    "effect": "4.0.0-rc.110",
+    "@types/node": "22.20.1",
+    "effect": "4.0.0-rc.111",
     "tsdown": "0.22.14",
     "typescript": "7.0.2",
     "unrun": "0.3.1"
@@ -33,6 +33,7 @@
     "LICENSE",
     "README.md",
     "dist",
+    "!dist/*.tsbuildinfo",
     "package.json",
     "src"
   ],
@@ -50,15 +51,15 @@
     "@confect/server": "workspace:^",
     "convex": "^1.32.0",
     "convex-test": ">=0.0.50 <0.1.0",
-    "effect": "^4.0.0-rc.110"
+    "effect": "^4.0.0-rc.111"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/rjdellecese/confect.git"
+    "url": "git+https://github.com/rjdellecese/confect.git"
   },
   "scripts": {
     "clean": "shx rm -rf dist coverage node_modules",
-    "dev": "tsdown --watch --config-loader unrun",
+    "dev": "tsdown --watch --no-clean --config-loader unrun",
     "postpack": "shx rm -f ./README.md && shx mv ./.README.md.bak ./README.md",
     "prepack": "shx mv ./README.md ./.README.md.bak && shx cp ../../README.md ./README.md",
     "typecheck": "tsc -b tsconfig.src.json"

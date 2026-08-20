@@ -10,7 +10,7 @@
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "dependencies": {
-    "@effect/platform-node": "^4.0.0-rc.110",
+    "@effect/platform-node": "^4.0.0-rc.111",
     "bundle-require": "^5.1.0",
     "code-block-writer": "^13.0.3",
     "esbuild": "0.27.0 - 0.27.3 || ^0.27.5 || ^0.28.0",
@@ -19,11 +19,11 @@
   "devDependencies": {
     "@convex-dev/workpool": "0.4.9",
     "@effect/tsgo": "0.36.5",
-    "@effect/vitest": "4.0.0-rc.110",
-    "@types/node": "26.2.0",
+    "@effect/vitest": "4.0.0-rc.111",
+    "@types/node": "22.20.1",
     "@vitest/coverage-v8": "4.1.10",
     "convex": "1.44.0",
-    "effect": "4.0.0-rc.110",
+    "effect": "4.0.0-rc.111",
     "tsdown": "0.22.14",
     "typescript": "7.0.2",
     "unrun": "0.3.1",
@@ -55,15 +55,15 @@
   "peerDependencies": {
     "@confect/core": "workspace:^",
     "@confect/server": "workspace:^",
-    "effect": "^4.0.0-rc.110"
+    "effect": "^4.0.0-rc.111"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/rjdellecese/confect.git"
+    "url": "git+https://github.com/rjdellecese/confect.git"
   },
   "scripts": {
     "clean": "shx rm -rf dist coverage node_modules",
-    "dev": "tsdown --watch --config-loader unrun",
+    "dev": "tsdown --watch --no-clean --config-loader unrun",
     "postpack": "shx rm -f ./README.md && shx mv ./.README.md.bak ./README.md",
     "prepack": "shx mv ./README.md ./.README.md.bak && shx cp ../../README.md ./README.md",
     "test": "vitest run",

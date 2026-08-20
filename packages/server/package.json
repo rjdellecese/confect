@@ -7,15 +7,15 @@
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "devDependencies": {
-    "@effect/platform-node": "4.0.0-rc.110",
-    "@effect/vitest": "4.0.0-rc.110",
+    "@effect/platform-node": "4.0.0-rc.111",
+    "@effect/vitest": "4.0.0-rc.111",
     "@swc/jest": "0.2.39",
-    "@types/node": "26.2.0",
+    "@types/node": "22.20.1",
     "@vitest/coverage-v8": "4.1.10",
     "confect-bench-harness": "workspace:*",
     "convex-test": "0.0.55",
     "dotenv": "17.4.2",
-    "effect": "4.0.0-rc.110",
+    "effect": "4.0.0-rc.111",
     "tsdown": "0.22.14",
     "tsx": "4.23.12",
     "typescript": "7.0.2",
@@ -48,6 +48,7 @@
     "LICENSE",
     "README.md",
     "dist",
+    "!dist/*.tsbuildinfo",
     "package.json",
     "src"
   ],
@@ -61,9 +62,9 @@
   "module": "./dist/index.js",
   "peerDependencies": {
     "@confect/core": "workspace:^",
-    "@effect/platform-node": "^4.0.0-rc.110",
+    "@effect/platform-node": "^4.0.0-rc.111",
     "convex": "^1.32.0",
-    "effect": "^4.0.0-rc.110"
+    "effect": "^4.0.0-rc.111"
   },
   "peerDependenciesMeta": {
     "@effect/platform-node": {
@@ -72,14 +73,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/rjdellecese/confect.git"
+    "url": "git+https://github.com/rjdellecese/confect.git"
   },
   "scripts": {
     "bench": "tsx test/SchemaToValidator.bench.ts && tsx test/Document.bench.ts",
     "clean": "shx rm -rf dist coverage node_modules",
     "codegen:local-backend": "cd test/local-backend/fixtures && pnpm confect codegen && cross-env CONVEX_AGENT_MODE=anonymous pnpm convex dev --once --typecheck=disable --tail-logs=disable",
     "codegen:mock-backend": "cd test/mock-backend/fixtures && pnpm confect codegen && cross-env CONVEX_AGENT_MODE=anonymous pnpm convex dev --once --typecheck=disable --tail-logs=disable",
-    "dev": "tsdown --watch --config-loader unrun",
+    "dev": "tsdown --watch --no-clean --config-loader unrun",
     "postpack": "shx rm -f ./README.md && shx mv ./.README.md.bak ./README.md",
     "prepack": "shx mv ./README.md ./.README.md.bak && shx cp ../../README.md ./README.md",
     "test": "vitest run",
