@@ -1,4 +1,5 @@
-import { FunctionSpec, GroupSpec, Registry } from "@confect/core";
+import { FunctionSpec, GroupSpec } from "@confect/core";
+import { Registry, type RegistryItems } from "@confect/server";
 import { DatabaseSchema, FunctionImpl, GroupImpl } from "@confect/server";
 import { describe, expect, it } from "@effect/vitest";
 import * as Context from "effect/Context";
@@ -30,9 +31,9 @@ const handler = (() => Effect.succeed(null)) as never;
  */
 const collectRegistry = <RIn>(
   layer: Layer.Layer<RIn, never, never>,
-): Effect.Effect<Registry.RegistryItems> =>
+): Effect.Effect<RegistryItems.RegistryItems> =>
   Effect.gen(function* () {
-    const ref = yield* Ref.make<Registry.RegistryItems>({});
+    const ref = yield* Ref.make<RegistryItems.RegistryItems>({});
     yield* Layer.build(layer).pipe(
       Effect.scoped,
       Effect.provideService(Registry.Registry, ref),
@@ -107,7 +108,7 @@ describe("GroupImpl.finalize", () => {
         );
 
         const registeredFunctionNames = yield* Effect.gen(function* () {
-          const ref = yield* Ref.make<Registry.RegistryItems>({});
+          const ref = yield* Ref.make<RegistryItems.RegistryItems>({});
           const context = yield* Layer.build(groupLayer).pipe(
             Effect.provideService(Registry.Registry, ref),
           );

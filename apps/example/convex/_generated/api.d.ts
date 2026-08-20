@@ -14,6 +14,8 @@ import type * as env from "../env.js";
 import type * as http from "../http.js";
 import type * as notes_and_random_notes from "../notes_and_random/notes.js";
 import type * as notes_and_random_random from "../notes_and_random/random.js";
+import type * as users from "../users.js";
+import type * as viewer from "../viewer.js";
 import type * as workpool from "../workpool.js";
 
 import type {
@@ -29,6 +31,8 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   "notes_and_random/notes": typeof notes_and_random_notes;
   "notes_and_random/random": typeof notes_and_random_random;
+  users: typeof users;
+  viewer: typeof viewer;
   workpool: typeof workpool;
 }>;
 

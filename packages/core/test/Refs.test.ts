@@ -3,6 +3,7 @@ import type { RegisteredMutation, RegisteredQuery } from "convex/server";
 import * as Schema from "effect/Schema";
 import * as FunctionSpec from "@confect/core/FunctionSpec";
 import * as GroupSpec from "@confect/core/GroupSpec";
+import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import * as Ref from "@confect/core/Ref";
 import * as Refs from "@confect/core/Refs";
 import type * as RuntimeAndFunctionType from "@confect/core/RuntimeAndFunctionType";
@@ -37,7 +38,7 @@ describe("make", () => {
     expect(Ref.getConvexFunctionName(actualRef)).toStrictEqual(
       Ref.getConvexFunctionName(expectedRef),
     );
-    expect(actualRef.functionSpec).toStrictEqual(expectedRef.functionSpec);
+    expect(actualRef).toStrictEqual(expectedRef);
     expectTypeOf(actualRef).toEqualTypeOf(expectedRef);
   });
 
@@ -82,7 +83,7 @@ describe("make", () => {
     const refs = Refs.make(spec);
 
     expectTypeOf(refs.internal.notes.internalList).toEqualTypeOf<
-      Ref.Ref<
+      Ref.ConfectRef<
         RuntimeAndFunctionType.ConvexQuery,
         "internal",
         typeof FnArgs.Type,
@@ -121,7 +122,7 @@ describe("make", () => {
     const refs = Refs.make(spec);
 
     expectTypeOf(refs.internal.internalOnly.list).toEqualTypeOf<
-      Ref.Ref<
+      Ref.ConfectRef<
         RuntimeAndFunctionType.ConvexQuery,
         "internal",
         typeof FnArgs.Type,
@@ -157,7 +158,7 @@ describe("make", () => {
     const refs = Refs.make(spec);
 
     expectTypeOf(refs.public.notes.publicList).toEqualTypeOf<
-      Ref.Ref<
+      Ref.ConfectRef<
         RuntimeAndFunctionType.ConvexQuery,
         "public",
         typeof FnArgs.Type,
@@ -189,11 +190,11 @@ describe("make", () => {
     expect(Ref.getConvexFunctionName(actualRef)).toStrictEqual(
       Ref.getConvexFunctionName(expectedRef),
     );
-    expect(actualRef.functionSpec).toStrictEqual(expectedRef.functionSpec);
+    expect(actualRef).toStrictEqual(expectedRef);
     expectTypeOf(actualRef).toEqualTypeOf(expectedRef);
 
     expectTypeOf(actualRef).toEqualTypeOf<
-      Ref.Ref<
+      Ref.ConvexRef<
         RuntimeAndFunctionType.ConvexQuery,
         "public",
         ListQueryArgs,
@@ -229,7 +230,7 @@ describe("make", () => {
     const refs = Refs.make(spec);
 
     expectTypeOf(refs.public.notes.get).toEqualTypeOf<
-      Ref.Ref<
+      Ref.ConvexRef<
         RuntimeAndFunctionType.ConvexQuery,
         "public",
         GetQueryArgs,
@@ -238,7 +239,7 @@ describe("make", () => {
     >();
 
     expectTypeOf(refs.internal.notes.remove).toEqualTypeOf<
-      Ref.Ref<
+      Ref.ConvexRef<
         RuntimeAndFunctionType.ConvexMutation,
         "internal",
         RemoveMutationArgs,
@@ -285,7 +286,7 @@ describe("make", () => {
     const refs = Refs.make(spec);
 
     expectTypeOf(refs.public.notes.list).toEqualTypeOf<
-      Ref.Ref<
+      Ref.ConfectRef<
         RuntimeAndFunctionType.ConvexQuery,
         "public",
         ConfectQueryArgs,
@@ -294,12 +295,49 @@ describe("make", () => {
     >();
 
     expectTypeOf(refs.public.notes.search).toEqualTypeOf<
-      Ref.Ref<
+      Ref.ConvexRef<
         RuntimeAndFunctionType.ConvexQuery,
         "public",
         ConvexQueryArgs,
         ConvexQueryReturns
       >
     >();
+  });
+});
+
+describe("middleware error unions", () => {
+  it("adds them to Confect refs and keeps them off plain Convex refs", () => {
+    class Blocked extends Schema.TaggedError<Blocked>()("Blocked", {}) {}
+
+    class GateMutations extends MiddlewareSpec.MiddlewareSpec<GateMutations>()(
+      "GateMutations",
+      {
+        error: () => Blocked,
+        functionTypes: { query: false, mutation: true, action: false },
+      },
+    ) {}
+
+    const spec = Spec.make().add(
+      GroupSpec.makeAt("mixed")
+        .middleware(GateMutations)
+        .addFunction(
+          FunctionSpec.publicMutation({
+            name: "update",
+            args: () => Schema.Struct({}),
+            returns: () => Schema.Null,
+          }),
+        )
+        .addFunction(
+          FunctionSpec.convexPublicQuery<
+            RegisteredQuery<"public", { cursor: string }, Promise<string[]>>
+          >()("search"),
+        ),
+    );
+    const refs = Refs.make(spec);
+
+    expectTypeOf<
+      Ref.Error<typeof refs.public.mixed.update>
+    >().toEqualTypeOf<Blocked>();
+    expectTypeOf<Ref.Error<typeof refs.public.mixed.search>>().toBeNever();
   });
 });

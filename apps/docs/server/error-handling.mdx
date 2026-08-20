@@ -10,6 +10,8 @@ Typed errors are transported as Convex's native [`ConvexError`](https://docs.con
 
 Error schemas are optional. When omitted, the error type defaults to `never` and every call site keeps its prior shape.
 
+[Middleware](/server/middleware) can declare error schemas too; a middleware's errors join the error union of every function it covers, alongside the function's own `error` schema.
+
 ## Declaring an error schema
 
 Add an `error` field to any `FunctionSpec` constructor. The schema is an ordinary Effect `Schema`, so a `Schema.TaggedError` class works well for a single failure mode.

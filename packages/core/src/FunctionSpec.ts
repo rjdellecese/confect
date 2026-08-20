@@ -9,6 +9,7 @@ import * as Schema from "effect/Schema";
 import * as Predicate from "effect/Predicate";
 import * as FunctionProvenance from "./FunctionProvenance";
 import { validateConfectFunctionIdentifier } from "./Identifier";
+import type * as MiddlewareSpec from "./MiddlewareSpec";
 import * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
 export const TypeId = "@confect/core/FunctionSpec";
@@ -22,12 +23,44 @@ export interface FunctionSpec<
   FunctionVisibility_ extends FunctionVisibility,
   Name_ extends string,
   FunctionProvenance_ extends FunctionProvenance.FunctionProvenance,
+  MiddlewareSpecs_ extends MiddlewareSpec.AnyMiddlewareSpec = never,
 > {
   readonly [TypeId]: TypeId;
   readonly runtimeAndFunctionType: RuntimeAndFunctionType_;
   readonly functionVisibility: FunctionVisibility_;
   readonly name: Name_;
   readonly functionProvenance: FunctionProvenance_;
+  readonly middlewareSpecs: ReadonlyArray<MiddlewareSpecs_>;
+}
+
+export interface Builder<
+  RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
+  FunctionVisibility_ extends FunctionVisibility,
+  Name_ extends string,
+  FunctionProvenance_ extends FunctionProvenance.FunctionProvenance,
+  MiddlewareSpecs_ extends MiddlewareSpec.AnyMiddlewareSpec = never,
+> extends FunctionSpec<
+  RuntimeAndFunctionType_,
+  FunctionVisibility_,
+  Name_,
+  FunctionProvenance_,
+  MiddlewareSpecs_
+> {
+  middleware<MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec>(
+    middlewareSpec: MiddlewareSpec_ &
+      MiddlewareSpec.ValidateFunctionAttach<
+        MiddlewareSpec_,
+        RuntimeAndFunctionType_,
+        FunctionProvenance_,
+        MiddlewareSpecs_
+      >,
+  ): Builder<
+    RuntimeAndFunctionType_,
+    FunctionVisibility_,
+    Name_,
+    FunctionProvenance_,
+    MiddlewareSpecs_ | MiddlewareSpec_
+  >;
 }
 
 export interface Any {
@@ -38,21 +71,24 @@ export interface AnyWithProps extends FunctionSpec<
   RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility,
   string,
-  FunctionProvenance.FunctionProvenance
+  FunctionProvenance.FunctionProvenance,
+  MiddlewareSpec.AnyMiddlewareSpec
 > {}
 
 export interface AnyConfect extends FunctionSpec<
   RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility,
   string,
-  FunctionProvenance.AnyConfect
+  FunctionProvenance.AnyConfect,
+  MiddlewareSpec.AnyMiddlewareSpec
 > {}
 
 export interface AnyConvex extends FunctionSpec<
   RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility,
   string,
-  FunctionProvenance.AnyConvex
+  FunctionProvenance.AnyConvex,
+  MiddlewareSpec.AnyMiddlewareSpec
 > {}
 
 export interface AnyWithPropsWithRuntime<
@@ -61,7 +97,8 @@ export interface AnyWithPropsWithRuntime<
   RuntimeAndFunctionType.WithRuntime<Runtime>,
   FunctionVisibility,
   string,
-  FunctionProvenance.FunctionProvenance
+  FunctionProvenance.FunctionProvenance,
+  MiddlewareSpec.AnyMiddlewareSpec
 > {}
 
 export interface AnyWithPropsWithFunctionType<
@@ -70,7 +107,8 @@ export interface AnyWithPropsWithFunctionType<
   RuntimeAndFunctionType_,
   FunctionVisibility,
   string,
-  FunctionProvenance.FunctionProvenance
+  FunctionProvenance.FunctionProvenance,
+  MiddlewareSpec.AnyMiddlewareSpec
 > {}
 
 export interface AnyWithPropsWithFunctionProvenance<
@@ -79,7 +117,8 @@ export interface AnyWithPropsWithFunctionProvenance<
   RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility,
   string,
-  FunctionProvenance_
+  FunctionProvenance_,
+  MiddlewareSpec.AnyMiddlewareSpec
 > {}
 
 export type GetRuntimeAndFunctionType<FunctionSpec_ extends AnyWithProps> =
@@ -89,6 +128,9 @@ export type GetFunctionVisibility<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_["functionVisibility"];
 
 export type Name<FunctionSpec_ extends AnyWithProps> = FunctionSpec_["name"];
+
+export type MiddlewareSpecs<FunctionSpec_ extends AnyWithProps> =
+  FunctionSpec_["middlewareSpecs"][number];
 
 export type Args<FunctionSpec_ extends AnyWithProps> = FunctionSpec_ extends {
   functionProvenance: {
@@ -202,6 +244,40 @@ export type WithoutName<
 
 const Proto = {
   [TypeId]: TypeId,
+
+  middleware(
+    this: AnyWithProps,
+    middlewareSpec: MiddlewareSpec.AnyMiddlewareSpec,
+  ) {
+    if (this.functionProvenance._tag === "Convex") {
+      throw new Error(
+        `Plain Convex function "${this.name}" cannot have middleware`,
+      );
+    }
+    const functionType = this.runtimeAndFunctionType.functionType;
+    if (!middlewareSpec.functionTypes[functionType]) {
+      throw new Error(
+        `Middleware "${middlewareSpec.key}" does not declare function type "${functionType}" of function "${this.name}"`,
+      );
+    }
+    if (
+      this.middlewareSpecs.some(
+        (existing) => existing.key === middlewareSpec.key,
+      )
+    ) {
+      throw new Error(
+        `Middleware "${middlewareSpec.key}" is already attached to function "${this.name}"`,
+      );
+    }
+
+    return Object.assign(Object.create(Proto), {
+      runtimeAndFunctionType: this.runtimeAndFunctionType,
+      functionVisibility: this.functionVisibility,
+      name: this.name,
+      functionProvenance: this.functionProvenance,
+      middlewareSpecs: [...this.middlewareSpecs, middlewareSpec],
+    });
+  },
 };
 
 const make =
@@ -228,7 +304,7 @@ const make =
     args: () => Args_;
     returns: () => Returns_;
     error?: () => Error_;
-  }): FunctionSpec<
+  }): Builder<
     RuntimeAndFunctionType_,
     FunctionVisibility_,
     Name_,
@@ -241,6 +317,7 @@ const make =
       functionVisibility,
       name,
       functionProvenance: FunctionProvenance.Confect(args, returns, error),
+      middlewareSpecs: [],
     });
   };
 
@@ -281,7 +358,7 @@ const makePaginated =
     /** The page element schema. */
     item: () => Item_;
     error?: () => Error_;
-  }): FunctionSpec<
+  }): Builder<
     RuntimeAndFunctionType_,
     FunctionVisibility_,
     Name_,
@@ -299,6 +376,7 @@ const makePaginated =
         item,
         error,
       ),
+      middlewareSpecs: [],
     });
   };
 
@@ -385,7 +463,7 @@ const makeConvex =
   >() =>
   <const Name_ extends string>(
     name: Name_,
-  ): FunctionSpec<
+  ): Builder<
     RuntimeAndFunctionType_,
     FunctionVisibility_,
     Name_,
@@ -401,6 +479,7 @@ const makeConvex =
         ExtractArgs<F>,
         ExtractReturns<F>
       >(),
+      middlewareSpecs: [],
     }) as any;
   };
 
