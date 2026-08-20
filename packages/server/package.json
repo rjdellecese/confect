@@ -15,7 +15,7 @@
     "@effect/vitest": "0.30.0",
     "@effect/workflow": "0.19.1",
     "@swc/jest": "0.2.39",
-    "@types/node": "26.2.0",
+    "@types/node": "22.20.1",
     "@vitest/coverage-v8": "4.1.10",
     "confect-bench-harness": "workspace:*",
     "convex-test": "0.0.55",
@@ -53,9 +53,9 @@
     "LICENSE",
     "README.md",
     "dist",
+    "!dist/*.tsbuildinfo",
     "package.json",
-    "src",
-    "!dist/.tsbuildinfo"
+    "src"
   ],
   "homepage": "https://confect.dev",
   "keywords": [
@@ -79,7 +79,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/rjdellecese/confect.git"
+    "url": "git+https://github.com/rjdellecese/confect.git"
   },
   "scripts": {
     "bench": "tsx test/SchemaToValidator.bench.ts && tsx test/Document.bench.ts",
