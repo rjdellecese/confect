@@ -55,7 +55,7 @@ export const make = (
       return genericFunction(
         queryFunction({
           databaseSchema,
-          functionName: name,
+          name,
           functionVisibility,
           args: item.args,
           returns: item.returns,
@@ -75,7 +75,7 @@ export const make = (
       return genericFunction(
         mutationFunction({
           databaseSchema,
-          functionName: name,
+          name,
           functionVisibility,
           args: item.args,
           returns: item.returns,
@@ -94,7 +94,7 @@ export const make = (
 
       return genericFunction(
         convexActionFunction(databaseSchema, {
-          functionName: name,
+          name,
           functionVisibility,
           args: item.args,
           returns: item.returns,
@@ -151,7 +151,7 @@ const queryFunction = <
   E,
 >({
   databaseSchema,
-  functionName,
+  name,
   functionVisibility,
   args,
   returns,
@@ -160,7 +160,7 @@ const queryFunction = <
   resolvedMiddlewares,
 }: {
   databaseSchema: DatabaseSchema_;
-  functionName: string;
+  name: string;
   functionVisibility: FunctionVisibility;
   args: Schema.Codec<Args, ConvexArgs>;
   returns: Schema.Codec<Returns, ConvexReturns>;
@@ -198,7 +198,7 @@ const queryFunction = <
         handler(decodedArgs),
         resolvedMiddlewares,
         {
-          name: functionName,
+          name,
           functionType: "query",
           functionVisibility,
           args: decodedArgs,
@@ -278,7 +278,7 @@ const mutationFunction = <
   E,
 >({
   databaseSchema,
-  functionName,
+  name,
   functionVisibility,
   args,
   returns,
@@ -287,7 +287,7 @@ const mutationFunction = <
   resolvedMiddlewares,
 }: {
   databaseSchema: DatabaseSchema_;
-  functionName: string;
+  name: string;
   functionVisibility: FunctionVisibility;
   args: Schema.Codec<Args, ConvexArgs>;
   returns: Schema.Codec<Returns, ConvexReturns>;
@@ -315,7 +315,7 @@ const mutationFunction = <
         handler(decodedArgs),
         resolvedMiddlewares,
         {
-          name: functionName,
+          name,
           functionType: "mutation",
           functionVisibility,
           args: decodedArgs,
@@ -346,7 +346,7 @@ const convexActionFunction = <
 >(
   schema: DatabaseSchema_,
   {
-    functionName,
+    name,
     functionVisibility,
     args,
     returns,
@@ -354,7 +354,7 @@ const convexActionFunction = <
     handler,
     resolvedMiddlewares,
   }: {
-    functionName: string;
+    name: string;
     functionVisibility: FunctionVisibility;
     args: Schema.Codec<Args, ConvexArgs>;
     returns: Schema.Codec<Returns, ConvexReturns>;
@@ -370,7 +370,7 @@ const convexActionFunction = <
   },
 ) =>
   RegisteredFunction.actionFunctionBase({
-    functionName,
+    name,
     functionVisibility,
     args,
     returns,

@@ -231,7 +231,7 @@ export const actionFunctionBase = <
   E,
   R,
 >({
-  functionName,
+  name,
   functionVisibility,
   args,
   returns,
@@ -240,7 +240,7 @@ export const actionFunctionBase = <
   resolvedMiddlewares = [],
   createLayer,
 }: {
-  functionName: string;
+  name: string;
   functionVisibility: FunctionVisibility;
   args: Schema.Codec<Args, ConvexArgs>;
   returns: Schema.Codec<Returns, ConvexReturns>;
@@ -267,7 +267,7 @@ export const actionFunctionBase = <
         handler(decodedArgs),
         resolvedMiddlewares,
         {
-          name: functionName,
+          name,
           functionType: "action",
           functionVisibility,
           args: decodedArgs,

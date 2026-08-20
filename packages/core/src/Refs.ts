@@ -106,20 +106,27 @@ export const make = <Spec_ extends Spec.AnyWithProps>(
 
 const makeHelper = (
   groups: Record.ReadonlyRecord<string, GroupSpec.Any>,
-  functionNamespace: Option.Option<string> = Option.none(),
+  convexFunctionNamespace: Option.Option<string> = Option.none(),
 ): Any =>
   pipe(
     groups as Record.ReadonlyRecord<string, GroupSpec.AnyWithProps>,
     Record.map((group, name) => {
-      const currentFunctionNamespace = Option.match(functionNamespace, {
-        onNone: () => name,
-        onSome: (parentNamespace) => `${parentNamespace}/${name}`,
-      });
+      const currentConvexFunctionNamespace = Option.match(
+        convexFunctionNamespace,
+        {
+          onNone: () => name,
+          onSome: (parentNamespace) => `${parentNamespace}/${name}`,
+        },
+      );
 
       return Record.union(
-        makeHelper(group.groups, Option.some(currentFunctionNamespace)),
+        makeHelper(group.groups, Option.some(currentConvexFunctionNamespace)),
         Record.map(group.functions, (function_) =>
-          Ref.make(currentFunctionNamespace, function_, group.middlewareSpecs),
+          Ref.make(
+            currentConvexFunctionNamespace,
+            function_,
+            group.middlewareSpecs,
+          ),
         ),
         (_subGroup, _function) => {
           throw new Error(

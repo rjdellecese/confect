@@ -27,7 +27,7 @@ export const make = (
 
   return genericFunction(
     nodeActionFunction(databaseSchema, {
-      functionName: item.name,
+      name: item.name,
       functionVisibility: item.functionVisibility,
       args: item.args,
       returns: item.returns,
@@ -48,7 +48,7 @@ const nodeActionFunction = <
 >(
   databaseSchema: DatabaseSchema_,
   {
-    functionName,
+    name,
     functionVisibility,
     args,
     returns,
@@ -56,7 +56,7 @@ const nodeActionFunction = <
     handler,
     resolvedMiddlewares,
   }: {
-    functionName: string;
+    name: string;
     functionVisibility: FunctionVisibility;
     args: Schema.Codec<Args, ConvexArgs>;
     returns: Schema.Codec<Returns, ConvexReturns>;
@@ -73,7 +73,7 @@ const nodeActionFunction = <
   },
 ) =>
   RegisteredFunction.actionFunctionBase({
-    functionName,
+    name,
     functionVisibility,
     args,
     returns,

@@ -30,7 +30,7 @@ export interface Base<
   readonly _Returns?: _Returns;
   readonly _Error?: _Error;
   /** @internal */
-  readonly functionName: string;
+  readonly convexFunctionName: string;
 }
 
 /**
@@ -311,21 +311,21 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
    * colon. For example, for `myGroupDir/myGroupMod:myFunc` this would be
    * `myGroupDir/myGroupMod`.
    */
-  functionNamespace: string,
+  convexFunctionNamespace: string,
   functionSpec: FunctionSpec_,
   groupMiddlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyMiddlewareSpec> = [],
 ): FromFunctionSpec<FunctionSpec_> => {
-  const functionName = `${functionNamespace}:${functionSpec.name}`;
+  const convexFunctionName = `${convexFunctionNamespace}:${functionSpec.name}`;
 
   return Match.value(functionSpec.functionProvenance).pipe(
     Match.tag("Convex", (): Any => ({
       _tag: "Convex",
-      functionName,
+      convexFunctionName,
     })),
     Match.tag("Confect", (provenance): Any => {
       const ref = {
         _tag: "Confect" as const,
-        functionName,
+        convexFunctionName,
         kind: provenance.kind,
         middlewareSpecs: [
           ...groupMiddlewareSpecs,
@@ -345,22 +345,23 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
   ) as FromFunctionSpec<FunctionSpec_>;
 };
 
-export const getConvexFunctionName = (ref: Any): string => ref.functionName;
+export const getConvexFunctionName = (ref: Any): string =>
+  ref.convexFunctionName;
 
 const functionReferenceCache = new Map<string, FunctionReference<Any>>();
 
 export const getFunctionReference = <Ref_ extends Any>(
   ref: Ref_,
 ): FunctionReference<Ref_> => {
-  const functionName = getConvexFunctionName(ref);
+  const convexFunctionName = getConvexFunctionName(ref);
 
-  const cached = functionReferenceCache.get(functionName);
+  const cached = functionReferenceCache.get(convexFunctionName);
   if (cached !== undefined) {
     return cached as FunctionReference<Ref_>;
   }
 
-  const functionReference = makeFunctionReference(functionName);
-  functionReferenceCache.set(functionName, functionReference);
+  const functionReference = makeFunctionReference(convexFunctionName);
+  functionReferenceCache.set(convexFunctionName, functionReference);
 
   return functionReference as FunctionReference<Ref_>;
 };
