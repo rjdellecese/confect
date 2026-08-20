@@ -6,6 +6,7 @@ import type { unhandled } from "effect/Types";
 import type * as FunctionProvenance from "./FunctionProvenance";
 import type * as FunctionSpec from "./FunctionSpec";
 import * as Lazy from "./Lazy";
+import * as MiddlewareKey from "./MiddlewareKey";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
 export const TypeId = "@confect/core/MiddlewareSpec";
@@ -78,10 +79,10 @@ export interface MiddlewareSpec<
 > {
   new (_: never): {
     readonly [TypeId]: TypeId;
-    readonly key: Key_;
+    readonly key: Key_ & MiddlewareKey.MiddlewareKey;
   };
   readonly [TypeId]: TypeId;
-  readonly key: Key_;
+  readonly key: Key_ & MiddlewareKey.MiddlewareKey;
   readonly functionTypes: SupportedFunctionTypes;
   readonly error?: ErrorSchema_;
   readonly "~Provides": Provides_;
@@ -93,7 +94,7 @@ export interface MiddlewareSpec<
 
 export interface AnyMiddlewareSpec {
   readonly [TypeId]: TypeId;
-  readonly key: string;
+  readonly key: MiddlewareKey.MiddlewareKey;
   readonly functionTypes: SupportedFunctionTypes;
   readonly error?: Schema.Codec<any, any>;
   readonly "~Provides": any;
@@ -185,7 +186,7 @@ export const MiddlewareSpec =
     function MiddlewareSpecClass() {}
     const class_ = MiddlewareSpecClass as any;
     class_[TypeId] = TypeId;
-    class_.key = key;
+    class_.key = MiddlewareKey.make(key);
     class_.functionTypes = {
       query,
       mutation,

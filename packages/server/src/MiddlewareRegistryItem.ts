@@ -1,3 +1,4 @@
+import type * as MiddlewareKey from "@confect/core/MiddlewareKey";
 import type * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import type { FunctionType } from "convex/server";
 import * as Predicate from "effect/Predicate";
@@ -17,5 +18,6 @@ export const isMiddlewareRegistryItem = (
   u: unknown,
 ): u is MiddlewareRegistryItem => Predicate.hasProperty(u, TypeId);
 
-export const registryKey = (middlewareKey: string): string =>
-  `middleware:${middlewareKey}`;
+export const registryKey = (
+  middlewareKey: MiddlewareKey.MiddlewareKey,
+): string => `middleware:${middlewareKey}`;

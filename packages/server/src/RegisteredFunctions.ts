@@ -1,5 +1,6 @@
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import type * as GroupSpec from "@confect/core/GroupSpec";
+import type * as MiddlewareKey from "@confect/core/MiddlewareKey";
 import * as Registry from "./Registry";
 import type * as RegistryItems from "./RegistryItems";
 import type * as Spec from "@confect/core/Spec";
@@ -130,7 +131,7 @@ const partitionMiddlewareImplItems = (
   registryItems: RegistryItems.RegistryItems,
 ) => {
   const middlewareImplItems = new Map<
-    string,
+    MiddlewareKey.MiddlewareKey,
     MiddlewareRegistryItem.MiddlewareRegistryItem
   >();
   const functionItems: Record<string, unknown> = {};
@@ -156,7 +157,7 @@ const partitionMiddlewareImplItems = (
 const resolveMiddlewares = (
   registryItem: FunctionRegistryItem.ConfectFunctionRegistryItem,
   middlewareImplItems: ReadonlyMap<
-    string,
+    MiddlewareKey.MiddlewareKey,
     MiddlewareRegistryItem.MiddlewareRegistryItem
   >,
 ): ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware> =>
