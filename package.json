@@ -32,6 +32,7 @@
   "scripts": {
     "build": "vp run --cache --filter \"@confect/*\" build",
     "check": "vp check",
+    "check:pack-contents": "node scripts/checkPackContents.mjs",
     "circular": "dpdm --no-warning --no-tree --exit-code circular:1 -T \"packages/*/src/**/*.ts\"",
     "clean": "pnpm -r run clean && node scripts/clean.mjs node_modules",
     "codegen:server:local-backend": "pnpm --filter @confect/server codegen:local-backend",
