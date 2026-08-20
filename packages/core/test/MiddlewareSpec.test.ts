@@ -214,6 +214,18 @@ describe("GroupSpec.middleware", () => {
     ]);
   });
 
+  it("renders attachment diagnostics with the bare key, not the brand", () => {
+    expectTypeOf<
+      MiddlewareSpec.ValidateAttach<
+        typeof RequireUser,
+        never,
+        typeof RequireUser
+      >
+    >().toEqualTypeOf<
+      MiddlewareSpec.AttachmentError<'Middleware "RequireUser" is already attached to this group'>
+    >();
+  });
+
   it("throws on duplicate attachment at runtime", () => {
     expect(() =>
       GroupSpec.make()

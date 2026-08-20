@@ -85,6 +85,7 @@ export interface MiddlewareSpec<
   readonly key: Key_ & MiddlewareKey.MiddlewareKey;
   readonly functionTypes: SupportedFunctionTypes;
   readonly error?: ErrorSchema_;
+  readonly "~Key": Key_;
   readonly "~Provides": Provides_;
   readonly "~Requires": Requires_;
   readonly "~Error": ErrorSchema_;
@@ -97,14 +98,23 @@ export interface AnyMiddlewareSpec {
   readonly key: MiddlewareKey.MiddlewareKey;
   readonly functionTypes: SupportedFunctionTypes;
   readonly error?: Schema.Codec<any, any>;
+  readonly "~Key": string;
   readonly "~Provides": any;
   readonly "~Requires": any;
   readonly "~Error": any;
   readonly "~FunctionTypes": FunctionType;
 }
 
+/**
+ * The middleware's key as its bare string literal, read from the `~Key`
+ * phantom rather than the branded `key` field: a branded literal neither
+ * reduces inside a template-literal type (so interpolating it into
+ * `AttachmentError` messages would render the brand, not the key) nor
+ * matches an `extends \`${infer L}\`` unbrand against `effect/Brand`'s
+ * symbol-keyed shape.
+ */
 export type Key<MiddlewareSpec_ extends AnyMiddlewareSpec> =
-  MiddlewareSpec_["key"];
+  MiddlewareSpec_["~Key"];
 
 export type Provides<MiddlewareSpec_ extends AnyMiddlewareSpec> =
   MiddlewareSpec_ extends AnyMiddlewareSpec
