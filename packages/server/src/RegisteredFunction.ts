@@ -122,28 +122,6 @@ export type RegisteredFunction<
       : never;
 
 /**
- * Run the `Effect` as a `Promise`. The error schema acts as an allowlist of
- * failures that may be surfaced to the client as a `ConvexError`:
- *
- * - With a schema: typed errors are schema-encoded and wrapped in a
- * `ConvexError`, then thrown so Convex surfaces the data to the client.
- * `Effect.either` escapes the failure channel before `runPromise` so the thrown
- * `ConvexError` retains its `Symbol.for("ConvexError")` identity instead of
- * being wrapped in Effect's `FiberFailure`.
- *
- * - Without a schema: every failure is converted to a defect via
- * `Effect.orDie`, so nothing—not even a `ConvexError` the handler placed in its
- * error channel—reaches the client as a `ConvexError`. The fiber dies and
- * `runPromise` rejects with a generic failure.
- *
- * A `scheduler` in `runOptions` must be passed here as a run option rather
- * than provided via `Effect.provideService` inside `effect`: the run option
- * lands in the fiber's root context, while a service provided within `effect`
- * pops before the `orDie`/`catch`/`result` wrappers this function adds. The
- * fiber's op counter survives context pops, so a cooperative yield can fire
- * inside those wrappers — only a root-context scheduler covers them.
- */
-/**
  * Wrap a function's handler effect in its resolved middleware chain, per
  * invocation, after args decode. Iterated innermost-first so that the
  * first-attached (group-level, in attachment order) middleware ends up
@@ -190,6 +168,28 @@ export const combineErrorSchemas = (
       : Schema.Union(schemas);
 };
 
+/**
+ * Run the `Effect` as a `Promise`. The error schema acts as an allowlist of
+ * failures that may be surfaced to the client as a `ConvexError`:
+ *
+ * - With a schema: typed errors are schema-encoded and wrapped in a
+ * `ConvexError`, then thrown so Convex surfaces the data to the client.
+ * `Effect.either` escapes the failure channel before `runPromise` so the thrown
+ * `ConvexError` retains its `Symbol.for("ConvexError")` identity instead of
+ * being wrapped in Effect's `FiberFailure`.
+ *
+ * - Without a schema: every failure is converted to a defect via
+ * `Effect.orDie`, so nothing—not even a `ConvexError` the handler placed in its
+ * error channel—reaches the client as a `ConvexError`. The fiber dies and
+ * `runPromise` rejects with a generic failure.
+ *
+ * A `scheduler` in `runOptions` must be passed here as a run option rather
+ * than provided via `Effect.provideService` inside `effect`: the run option
+ * lands in the fiber's root context, while a service provided within `effect`
+ * pops before the `orDie`/`catch`/`result` wrappers this function adds. The
+ * fiber's op counter survives context pops, so a cooperative yield can fire
+ * inside those wrappers — only a root-context scheduler covers them.
+ */
 export const runHandlerPromise =
   (
     errorSchema: Schema.Codec<any, any> | undefined,
