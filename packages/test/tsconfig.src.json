@@ -7,7 +7,7 @@
     "emitDeclarationOnly": true,
     "declaration": true,
     "declarationMap": true,
-    "tsBuildInfoFile": "dist/tsconfig.src.tsbuildinfo",
+    "tsBuildInfoFile": "node_modules/.cache/tsc/tsconfig.src.tsbuildinfo",
     "isolatedDeclarations": false,
     "skipLibCheck": true,
     "exactOptionalPropertyTypes": true,
