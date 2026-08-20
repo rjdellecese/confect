@@ -1,6 +1,8 @@
 import { FunctionSpec, Ref } from "@confect/core";
 import { describe, expect, layer } from "@effect/vitest";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
@@ -251,6 +253,88 @@ layer(StubLayer)("Command", (it) => {
         expect(failure._tag).toBe("FailedSaveNote");
       }),
     );
+
+    it("supports interrupt: true, keyed by the Command name", () => {
+      const SaveDraft = Command.mutation("SaveDraft", insertMutationRef, {
+        onSuccess: (note) => SucceededSaveNote({ note }),
+        onError: (error) => FailedSaveNote({ error }),
+        interrupt: true,
+      });
+
+      const command = SaveDraft({ text: "hello" });
+      expect(command.key).toBe("SaveDraft");
+
+      const interrupt = SaveDraft.Interrupt((outcome) => outcome);
+      expect(interrupt.name).toBe("SaveDraft.Interrupt");
+      expect(interrupt.interruptsKey).toBe("SaveDraft");
+    });
+
+    it("supports interrupt keyed by the ref's args", () => {
+      const DeleteNote = Command.mutation("DeleteNote", deleteMutationRef, {
+        onSuccess: () => SucceededSaveNote({ note: null }),
+        onError: (error) => FailedSaveNote({ error }),
+        interrupt: {
+          keyFields: ["id"],
+          toKey: ({ id }) => id,
+        },
+      });
+
+      const command = DeleteNote({ id: "abc" });
+      expect(command.key).toBe("DeleteNote:abc");
+
+      const interrupt = DeleteNote.Interrupt(
+        { id: "abc" },
+        (outcome) => outcome,
+      );
+      expect(interrupt.name).toBe("DeleteNote.Interrupt");
+      expect(interrupt.interruptsKey).toBe("DeleteNote:abc");
+
+      Command.mutation("DeleteNote", deleteMutationRef, {
+        onSuccess: () => SucceededSaveNote({ note: null }),
+        onError: (error) => FailedSaveNote({ error }),
+        // @ts-expect-error — keyFields must name fields of the ref's args
+        interrupt: { keyFields: ["nope"], toKey: () => "" },
+      });
+    });
+
+    it.effect("Interrupt stops an in-flight invocation", () =>
+      Effect.gen(function* () {
+        const started = yield* Deferred.make<void>();
+        nextResult = Deferred.succeed(started, undefined).pipe(
+          Effect.andThen(() => Effect.never),
+        );
+
+        const SaveDraft = Command.mutation("SaveDraft", insertMutationRef, {
+          onSuccess: (note) => SucceededSaveNote({ note }),
+          onError: (error) => FailedSaveNote({ error }),
+          interrupt: true,
+        });
+
+        const fiber = yield* Effect.forkChild(
+          SaveDraft({ text: "hello" }).effect,
+        );
+        yield* Deferred.await(started);
+
+        const outcome = yield* SaveDraft.Interrupt((o) => o).effect;
+        expect(outcome._tag).toBe("Interrupted");
+        yield* Fiber.await(fiber);
+
+        const secondOutcome = yield* SaveDraft.Interrupt((o) => o).effect;
+        expect(secondOutcome._tag).toBe("NotFound");
+      }),
+    );
+
+    it("an interruptible Command's error channel is still never", () => {
+      const SaveDraft = Command.mutation("SaveDraft", insertMutationRef, {
+        onSuccess: (note) => SucceededSaveNote({ note }),
+        onError: (error) => FailedSaveNote({ error }),
+        interrupt: true,
+      });
+
+      expectTypeOf(SaveDraft({ text: "hello" }).effect).toEqualTypeOf<
+        Effect.Effect<Message, never, WebSocketClient.WebSocketClient>
+      >();
+    });
 
     it("composes inside a hand-written interruptible Command.define", () => {
       const saveNote = Command.mutationEffect(insertMutationRef, {

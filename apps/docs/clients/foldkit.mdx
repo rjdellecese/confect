@@ -179,13 +179,78 @@ Commands are verb-first imperatives, result Messages are past-tense facts
 union as subscriptions — `Command.Error<typeof ref>` names it when you want
 to factor a handler out.
 
+### Interruption
+
+Pass `interrupt` to make a factory-built Command
+[interruptible](https://foldkit.dev/core/commands). The returned definition
+gains an `Interrupt` constructor that builds an ordinary Command: it stops
+every in-flight invocation and results in `toMessage(outcome)`, where the
+outcome is `Interrupted` (at least one invocation was stopped — its result
+Messages are guaranteed never to dispatch) or `NotFound` (nothing was in
+flight).
+
+`interrupt: true` keys every invocation by the Command name — right when at
+most one invocation is meaningfully in flight:
+
+```ts
+export const SaveDraft = Command.mutation(
+  "SaveDraft",
+  refs.public.notes.insert,
+  {
+    onSuccess: (noteId) => SucceededSaveDraft({ noteId }),
+    onError: (error) => FailedSaveDraft({ message: String(error) }),
+    interrupt: true,
+  },
+);
+```
+
+```ts
+// In update:
+case "ClickedCancel":
+  return [
+    model,
+    [SaveDraft.Interrupt((outcome) => CompletedCancelSaveDraft({ outcome }))],
+  ];
+```
+
+`interrupt: { keyFields, toKey }` derives the key from the ref's args, so
+concurrent invocations can be interrupted independently. `Interrupt` then
+requires the key args:
+
+```ts
+export const DeleteNote = Command.mutation(
+  "DeleteNote",
+  refs.public.notes.delete,
+  {
+    onSuccess: () => SucceededDeleteNote(),
+    onError: (error) => FailedDeleteNote({ message: String(error) }),
+    interrupt: {
+      keyFields: ["noteId"],
+      toKey: ({ noteId }) => noteId,
+    },
+  },
+);
+
+// In update:
+// [model, [DeleteNote.Interrupt({ noteId }, (outcome) => CompletedCancelDeleteNote({ outcome }))]]
+```
+
+<Note>
+  Interruption stops the client-side Effect and guarantees the invocation's
+  result Messages never dispatch — it does not cancel the Convex function on the
+  server. Once a mutation or action is on the wire, it runs to completion;
+  interruption means its result is ignored. Foldkit also runs a batch of
+  Commands concurrently with no ordering guarantee, so to cancel and replace,
+  dispatch the replacement from the Interrupt's result Message rather than
+  returning both Commands in one batch.
+</Note>
+
 ### Effect helpers
 
 `Command.queryEffect`, `Command.mutationEffect`, and `Command.actionEffect`
 return an execute body — an `Effect` whose failures are already folded into
 Messages — for hand-written `Command.define` calls. Reach for them when the
-Command needs a custom args schema, [interruption](https://foldkit.dev/api-reference/command),
-or several calls in one Command:
+Command needs a custom args schema or several calls in one Command:
 
 ```ts
 import { Command } from "@confect/foldkit";
@@ -198,10 +263,9 @@ const saveNote = Command.mutationEffect(refs.public.notes.insert, {
 });
 
 export const SaveDraft = FoldkitCommand.define("SaveDraft", {
-  args: { text: Schema.String },
+  args: { text: Schema.String, localDraftId: Schema.String },
   messages: [SucceededSaveDraft, FailedSaveDraft],
-  interrupt: true,
-  execute: (args) => saveNote(args),
+  execute: ({ text }) => saveNote({ text }),
 });
 ```
 
@@ -252,8 +316,6 @@ const SetAuth = FoldkitCommand.define("SetAuth", {
 
 ## Not yet covered
 
-Paginated queries (`usePaginatedQuery`'s Foldkit counterpart) and `interrupt`
-support on the Command factories are not yet built in. Both have escape
-hatches: paginated refs can be called through the
-[`WebSocketClient`](/clients/js/websocket) service directly, and interruption
-composes through the [effect helpers](#effect-helpers) as shown above.
+Paginated queries (`usePaginatedQuery`'s Foldkit counterpart) are not yet
+built in. As an escape hatch, paginated refs can be called through the
+[`WebSocketClient`](/clients/js/websocket) service directly.

@@ -25,4 +25,4 @@ const subscriptions = FoldkitSubscription.make<
 }));
 ```
 
-`Command.queryEffect`, `Command.mutationEffect`, and `Command.actionEffect` return execute bodies for hand-written `Command.define` calls (custom args schemas, `interrupt`), and `Subscription.reactiveQueryStream` is the `dependenciesToStream` escape hatch for hand-written subscription entries.
+The Command factories accept Foldkit's `interrupt` option — `true` keys invocations by the Command name, `{ keyFields, toKey }` by a part derived from the ref's args — and the returned definition gains the `Interrupt` constructor for stopping in-flight invocations. `Command.queryEffect`, `Command.mutationEffect`, and `Command.actionEffect` return execute bodies for hand-written `Command.define` calls (custom args schemas, multi-call Commands), and `Subscription.reactiveQueryStream` is the `dependenciesToStream` escape hatch for hand-written subscription entries.
