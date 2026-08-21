@@ -26,3 +26,25 @@ const subscriptions = FoldkitSubscription.make<
 ```
 
 The Command factories accept Foldkit's `interrupt` option — `true` keys invocations by the Command name, `{ keyFields, toKey }` by a part derived from the ref's args — and the returned definition gains the `Interrupt` constructor for stopping in-flight invocations. `Command.queryEffect`, `Command.mutationEffect`, and `Command.actionEffect` return execute bodies for hand-written `Command.define` calls (custom args schemas, multi-call Commands), and `Subscription.reactiveQueryStream` is the `dependenciesToStream` escape hatch for hand-written subscription entries.
+
+`PaginatedQuery` navigates a paginated query one page at a time (next/previous) over Convex's cursor pagination: `PaginatedQuery.make(ref)` returns the machine's Model schema and `init` constructor, the pure transitions `next`, `prev`, `settle`, `fail`, `retry`, and `reset` drive it from `update`, and view accessors (`page`, `pageNum`, `canNext`, `canPrev`, `isFirst`, `isLast`, `match`, …) read it. `Subscription.paginatedQuery` keeps exactly one live, reactive page subscription in sync with the machine state. Page splits are handled transparently (the current page re-pins and reloads as a range query), the last loaded page stays visible while the next one loads, and `PaginatedQuery.isInvalidCursor` identifies the error whose recovery is `reset`.
+
+```ts
+const Notes = PaginatedQuery.make(refs.public.notes.paginate);
+
+// Model: notes: Schema.Option(Notes.schema)
+// init:  Option.some(Notes.init({ channel }, { numItems: 20 }))
+// update: PaginatedQuery.settle(message.result), PaginatedQuery.next(state), ...
+
+const subscriptions = FoldkitSubscription.make<
+  Model,
+  Message,
+  WebSocketClient.WebSocketClient
+>()(() => ({
+  notesPage: Subscription.paginatedQuery(refs.public.notes.paginate, {
+    state: (model: Model) => model.notes,
+    onResult: (result) => SettledNotesPage({ result }),
+    onError: (error) => FailedNotesPage({ error }),
+  }),
+}));
+```

@@ -4,6 +4,7 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import type * as FoldkitSubscription from "foldkit/subscription";
+import type * as PaginatedQuery from "./PaginatedQuery";
 import * as WebSocketClient from "./WebSocketClient";
 
 /**
@@ -101,7 +102,11 @@ const missingConfectProvenanceError = (ref: Ref.Any) =>
 interface WithFunctionProvenance {
   readonly functionSpec: {
     readonly functionProvenance:
-      | { readonly _tag: "Confect"; readonly args: Schema.Codec<any, any> }
+      | {
+          readonly _tag: "Confect";
+          readonly args: Schema.Codec<any, any>;
+          readonly kind: { readonly _tag: "Standard" | "Paginated" };
+        }
       | { readonly _tag: "Convex" };
   };
 }
@@ -111,6 +116,28 @@ const argsSchemaOrThrow = (ref: Ref.AnyPublicQuery): Schema.Codec<any, any> => {
     .functionSpec;
   if (functionProvenance._tag === "Convex") {
     throw missingConfectProvenanceError(ref);
+  }
+  return functionProvenance.args;
+};
+
+const missingPaginatedProvenanceError = (ref: Ref.Any) =>
+  new globalThis.Error(
+    `Paginated query ref "${Ref.getConvexFunctionName(ref)}" was not built ` +
+      "with `FunctionSpec.publicPaginatedQuery`. `Subscription.paginatedQuery` " +
+      "derives its dependency equivalence and pagination options from the " +
+      "schemas that constructor stores.",
+  );
+
+const paginatedArgsSchemaOrThrow = (
+  ref: Ref.AnyPublicPaginatedQuery,
+): Schema.Codec<any, any> => {
+  const { functionProvenance } = (ref as unknown as WithFunctionProvenance)
+    .functionSpec;
+  if (
+    functionProvenance._tag === "Convex" ||
+    functionProvenance.kind._tag !== "Paginated"
+  ) {
+    throw missingPaginatedProvenanceError(ref);
   }
   return functionProvenance.args;
 };
@@ -194,6 +221,120 @@ export const reactiveQuery = <
             ref,
             config,
           )(...([someArgs] as Ref.OptionalArgs<Query>)),
+      }),
+  };
+};
+
+/**
+ * A complete Foldkit subscription entry that keeps exactly one live reactive
+ * page subscription in sync with a `PaginatedQuery` machine in the Model.
+ * The machine state is the single source of truth: navigating, retrying, and
+ * split-pinning change the derived args, which restarts the subscription;
+ * a `Failed` machine (or a `None` from `state`) closes it.
+ *
+ * ```ts
+ * const subscriptions = FoldkitSubscription.make<
+ *   Model,
+ *   Message,
+ *   WebSocketClient.WebSocketClient
+ * >()(() => ({
+ *   notesPage: Subscription.paginatedQuery(refs.public.notes.paginate, {
+ *     state: (model: Model) => model.notes,
+ *     onResult: (result) => SettledNotesPage({ result }),
+ *     onError: (error) => FailedNotesPage({ message: String(error) }),
+ *   }),
+ * }))
+ * ```
+ *
+ * `onResult` receives a `PaginatedQuery.PageResult` — pass it to
+ * `PaginatedQuery.settle` in `update`. Requires a ref built with
+ * `FunctionSpec.publicPaginatedQuery`.
+ */
+export const paginatedQuery = <
+  Query extends Ref.AnyPublicPaginatedQuery,
+  Model,
+  ResultMessage,
+  ErrorMessage,
+>(
+  ref: Query,
+  config: {
+    readonly state: (
+      model: Model,
+    ) => Option.Option<
+      PaginatedQuery.State<
+        PaginatedQuery.Item<Query>,
+        PaginatedQuery.UserArgs<Query>
+      >
+    >;
+    readonly onResult: (
+      result: PaginatedQuery.PageResult<PaginatedQuery.Item<Query>>,
+    ) => ResultMessage;
+    readonly onError: (error: Error<Query>) => ErrorMessage;
+  },
+): FoldkitSubscription.EntryWithoutKeepAlive<
+  Model,
+  ResultMessage | ErrorMessage,
+  Dependencies<Query>,
+  WebSocketClient.WebSocketClient
+> => {
+  const composedArgsSchema = paginatedArgsSchemaOrThrow(ref);
+
+  return {
+    dependenciesSchema: Schema.Struct({
+      args: Schema.Option(composedArgsSchema),
+    }) as unknown as FoldkitSubscription.EntryWithoutKeepAlive<
+      Model,
+      ResultMessage | ErrorMessage,
+      Dependencies<Query>,
+      WebSocketClient.WebSocketClient
+    >["dependenciesSchema"],
+    modelToDependencies: (model) => ({
+      args: Option.flatMap(config.state(model), (state) =>
+        state.phase._tag === "Failed"
+          ? Option.none()
+          : Option.some({
+              ...state.args,
+              paginationOpts: {
+                numItems: state.numItems,
+                cursor: state.phase.current.cursor,
+                ...Option.match(state.phase.current.endCursor, {
+                  onNone: () => ({}),
+                  onSome: (endCursor) => ({ endCursor }),
+                }),
+              },
+            } as Ref.Args<Query>),
+      ),
+    }),
+    dependenciesToStream: ({ args }) =>
+      Option.match(args, {
+        onNone: () =>
+          Stream.empty as Stream.Stream<
+            ResultMessage | ErrorMessage,
+            never,
+            WebSocketClient.WebSocketClient
+          >,
+        onSome: (composedArgs) => {
+          const paginationOpts = (
+            composedArgs as {
+              readonly paginationOpts: {
+                readonly cursor: string | null;
+                readonly endCursor?: string | null;
+              };
+            }
+          ).paginationOpts;
+          const descriptor: PaginatedQuery.PageDescriptor = {
+            cursor: paginationOpts.cursor,
+            endCursor: Option.fromNullishOr(paginationOpts.endCursor),
+          };
+          return reactiveQueryStream(ref, {
+            onSuccess: (returns) =>
+              config.onResult({
+                descriptor,
+                ...(returns as Ref.Returns<Query>),
+              }),
+            onError: config.onError,
+          })(...([composedArgs] as Ref.OptionalArgs<Query>));
+        },
       }),
   };
 };

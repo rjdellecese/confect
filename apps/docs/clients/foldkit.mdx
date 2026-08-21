@@ -296,6 +296,131 @@ case "FailedGetNotes":
   return [evo(model, { notes: () => Notes.Failure({ error: message.message }) }), []];
 ```
 
+## Paginated queries
+
+`PaginatedQuery` navigates a [paginated
+query](/server/functions#paginated-queries) one page at a time — next and
+previous — over Convex's cursor-based pagination. The machine lives in your
+Model and is the single source of truth for one live, reactive page
+subscription: navigating, retrying, and page-split handling are all pure
+Model transitions, and `Subscription.paginatedQuery` keeps the subscription
+in sync with them.
+
+`PaginatedQuery.make` takes the ref and returns the machine's Model schema
+and its `init` constructor. Query args and the page size are fixed when the
+machine is created — cursors are only valid for the exact query and args
+they came from, so changing either means creating a fresh machine.
+
+```ts src/model.ts
+import { PaginatedQuery } from "@confect/foldkit";
+import { m } from "foldkit/message";
+import * as Schema from "effect/Schema";
+
+import refs from "../confect/_generated/refs";
+
+export const Notes = PaginatedQuery.make(refs.public.notes.paginate);
+
+export const Model = Schema.Struct({
+  notes: Schema.Option(Notes.schema),
+});
+
+export const SettledNotesPage = m("SettledNotesPage", {
+  result: Notes.pageResult,
+});
+export const FailedNotesPage = m("FailedNotesPage", { error: Schema.Unknown });
+```
+
+Wire the subscription entry to the machine state:
+
+```ts src/subscription.ts
+import { Subscription, WebSocketClient } from "@confect/foldkit";
+import * as FoldkitSubscription from "foldkit/subscription";
+
+export const subscriptions = FoldkitSubscription.make<
+  Model,
+  Message,
+  WebSocketClient.WebSocketClient
+>()(() => ({
+  notesPage: Subscription.paginatedQuery(refs.public.notes.paginate, {
+    state: (model: Model) => model.notes,
+    onResult: (result) => SettledNotesPage({ result }),
+    onError: (error) => FailedNotesPage({ error }),
+  }),
+}));
+```
+
+In `update`, start the machine with `init`, fold results in with `settle`,
+and navigate with `next`/`prev` — both return an `Option` that is `None`
+when the move is illegal (already loading, first/last page), so `update`
+just keeps the Model unchanged:
+
+```ts src/update.ts
+// Start (or restart with different args / page size):
+case "OpenedNotes":
+  return [
+    evo(model, {
+      notes: () => Option.some(Notes.init({ channel }, { numItems: 20 })),
+    }),
+    [],
+  ];
+
+case "SettledNotesPage":
+  return [
+    evo(model, {
+      notes: Option.map(PaginatedQuery.settle(message.result)),
+    }),
+    [],
+  ];
+
+case "ClickedNextPage":
+  return [
+    evo(model, {
+      notes: Option.map((state) =>
+        Option.getOrElse(PaginatedQuery.next(state), () => state),
+      ),
+    }),
+    [],
+  ];
+
+case "FailedNotesPage":
+  return [
+    evo(model, {
+      notes: Option.map((state) =>
+        PaginatedQuery.isInvalidCursor(message.error)
+          ? PaginatedQuery.reset(state) // held cursors are dead; back to page 1
+          : PaginatedQuery.fail(state), // closes the subscription; reopen with retry
+      ),
+    }),
+    [],
+  ];
+```
+
+In the view, `page` returns the current items — and keeps returning the
+last loaded page while the next one loads, so navigation never blanks the
+list. `canNext`/`canPrev` gate the controls, and `pageNum`, `isFirst`,
+`isLast`, `isLoading`, and `match` cover the rest:
+
+```ts
+const items = PaginatedQuery.page(state);
+const label = `Page ${PaginatedQuery.pageNum(state)}`;
+const nextDisabled = !PaginatedQuery.canNext(state);
+const prevDisabled = !PaginatedQuery.canPrev(state);
+```
+
+After a failure the machine closes the subscription and keeps its position;
+`PaginatedQuery.retry` reopens it at the same page, and
+`PaginatedQuery.reset` returns to page one. `isInvalidCursor` identifies the
+one error where `reset` is the only correct recovery: Convex reporting that
+a held cursor is no longer valid.
+
+<Note>
+  Convex may signal that a page has grown too large by recommending or requiring
+  a page split. The machine handles the full protocol transparently: the current
+  page is pinned to end at the split point and reloads as a range query, and the
+  next page picks up from there. Users see at most a brief reload of the current
+  page — never a torn or incomplete one.
+</Note>
+
 ## Authentication
 
 `setAuth` is available on the `WebSocketClient` service. Wire it up as a
@@ -316,6 +441,8 @@ const SetAuth = FoldkitCommand.define("SetAuth", {
 
 ## Not yet covered
 
-Paginated queries (`usePaginatedQuery`'s Foldkit counterpart) are not yet
-built in. As an escape hatch, paginated refs can be called through the
+An infinite-scroll, load-more counterpart to `@confect/react`'s
+`usePaginatedQuery` (a growing list of concurrently-live pages) is not yet
+built in. `PaginatedQuery` covers page-at-a-time navigation; for a growing
+list, paginated refs can be called through the
 [`WebSocketClient`](/clients/js/websocket) service directly.
