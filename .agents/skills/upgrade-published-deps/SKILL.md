@@ -1,4 +1,5 @@
 ---
+name: upgrade-published-deps
 description: Upgrade dependencies on the published surface of the @confect/* packages (their dependencies/peerDependencies), with a changeset and a PR
 ---
 
@@ -14,7 +15,7 @@ by the field, not the name. A dependency is in scope iff it appears in the
 its lockstep companions: packages that must match its version (e.g.
 `react-dom` with `react`) and any `overrides` entry in `pnpm-workspace.yaml`
 that pins one of its transitive dependencies (e.g. `@effect/typeclass` with
-`effect`). Everything else is handled by `/upgrade-internal-deps`.
+`effect`). Everything else is handled by the upgrade-internal-deps skill.
 
 When bumping an in-scope dependency, move every occurrence across the
 workspace together — search the repo for the dependency's name rather than
@@ -56,6 +57,8 @@ bumping, confirm the new versions actually resolved (e.g. `pnpm why <dep>`).
    here before moving on.
 3. Add a changeset iff any published `package.json` changed — follow the
    create-changeset skill.
-4. Push a branch (`deps/<short-description>`, unless this session was assigned
-   a branch) and open a PR against `main`. In the body, list what was bumped
-   with links to release notes, and note anything deliberately skipped and why.
+4. Publish a Capy-owned PR against `main`; do not open it with `gh`. In the
+   body, list what was bumped with links to release notes, and note anything
+   deliberately skipped and why. If an earlier PR from this automation is
+   still open, update it when safe or stop and report it rather than creating a
+   duplicate.

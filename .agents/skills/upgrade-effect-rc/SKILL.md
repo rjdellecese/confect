@@ -1,4 +1,5 @@
 ---
+name: upgrade-effect-rc
 description: Bump the v10 prerelease branch to the latest Effect v4 release candidate and propagate main, migrating source as needed, with changesets and stacked PRs against v10
 ---
 
@@ -7,17 +8,12 @@ current with `main`, and open PRs for review against `v10`. Never merge them
 yourself. (The managing-prereleases skill explains how the prerelease line
 itself works.)
 
-A scheduled routine invokes this command by name, and the name is resolved
-against this directory when the routine fires. Renaming this file therefore
-means updating that schedule in the same pass — otherwise the routine stops
-resolving and goes quiet.
-
 ## Scope
 
 - **Target branch:** `v10`. If it's gone, or
   `git show origin/v10:.changeset/pre.json` no longer says `"mode": "pre"`,
   the prerelease line has graduated: say so, stop, and suggest deleting this
-  command and its routine — they only exist for the v10 cycle.
+  skill and its automation — they only exist for the v10 cycle.
 - **Latest release candidate:** effect publishes v4 release candidates under
   the npm `rc` dist-tag, so `npm view effect@rc version` is the lookup.
   Compare it against the branch's current pin (`overrides.effect` in
@@ -30,7 +26,7 @@ resolving and goes quiet.
   changes at the boundary but its ordering doesn't.
 - **When 4.0 goes stable:** the RC phase is expected to end in Q3/Q4 2026,
   at which point `rc` stops moving and `npm view effect version` (the
-  `latest` tag) reads `4.x` instead of `3.x`. That's not a bump this command
+  `latest` tag) reads `4.x` instead of `3.x`. That's not a bump this skill
   can do on its own — pinning a stable `effect` is an ordinary dependency
   upgrade and the peer ranges want rethinking. Say so, do the `main`
   propagation if there is any, and stop; this file needs rewriting before
@@ -53,32 +49,30 @@ resolving and goes quiet.
   stop — no branch, no PR.
 - **In-scope packages:** `effect` plus its lockstep companions from the
   effect monorepo already present in the workspace (`@effect/platform-node`,
-  `@effect/platform-bun`, `@effect/vitest`) — all carry the same `rc`
+  `@effect/vitest`) — all carry the same `rc`
   dist-tag and move to the same prerelease number together. Everything else,
   including `@effect/tsgo` (which versions independently), belongs to the
   other upgrade commands.
 
 ## Branches and PRs
 
-A run produces up to two PRs, stacked when both are needed, so the merge is
-reviewed as what it is and the bump PR's diff shows only the bump and its
-migration:
+A run produces up to two Capy-owned PRs, stacked when both are needed, so the
+merge is reviewed as what it is and the bump PR's diff shows only the bump and
+its migration. Before changing anything, inspect open PRs from an earlier run.
+Continue an open stack owned by this automation instead of creating a duplicate;
+if it cannot be updated safely, report that and stop.
 
-- **Sync PR** — branch `sync/main-into-v10`, only when the sync merge
-  changes content (see Scope). Reset from `origin/v10` at the start of
-  the run, then merge `origin/main` into it per the merge rules below.
-  The PR targets `v10`.
-- **Bump PR** — branch `deps/effect-v4-rc`, only when there's a release
-  candidate to bump. Reset from the tip of `sync/main-into-v10` when that
-  branch is in play this run, otherwise from `origin/v10`. In the stacked
-  case the PR targets `sync/main-into-v10` — merge the sync PR first, and
-  when its branch is deleted GitHub retargets the bump PR to `v10`
-  automatically — otherwise it targets `v10`.
+- **Sync PR** — only when the sync merge changes content (see Scope). Start
+  from `origin/v10`, merge `origin/main` per the rules below, and publish it
+  through Capy's PR flow with `v10` as the base.
+- **Bump PR** — only when there's a release candidate to bump. Build it from
+  the sync PR's tip when a sync is in play, otherwise from `origin/v10`. In
+  the stacked case, publish it with the sync PR's branch as its base; otherwise
+  use `v10`.
 
-Push both branches with `--force-with-lease` so successive runs update the
-same open PRs instead of stacking new ones; refresh an existing PR's title,
-body, and base branch to match the current run's shape. Neither PR ever
-targets `main`.
+Let Capy create and own the branches and PRs so CI, review, comments, and merge
+events return to the automation thread. Do not open a PR with `gh`. Neither PR
+ever targets `main`.
 
 ## Rules
 
@@ -129,7 +123,7 @@ targets `main`.
   APIs until checks pass. Effect considers its v4 interfaces final as of
   the RC, so breakage should now be rare and narrow rather than routine —
   but "rare" is not "none", and when it happens the migration is this
-  command's job, not a reason to bail. A bump that needs no source changes
+  skill's job, not a reason to bail. A bump that needs no source changes
   at all is the expected shape from here on.
 - If a migration genuinely can't be brought green with reasonable effort,
   stop that PR: a blocked sync means no branches and no PRs at all (the
@@ -158,9 +152,9 @@ targets `main`.
    changeset already governs the `X.0.0-next.N` version. The bump
    changeset states the new required release candidate and any
    consumer-visible consequences of the API changes.
-3. Push the branches (unless this session was assigned a branch) and
-   open or refresh the PRs per Branches and PRs. Sync PR body: what the
-   merge changes, summarized from the content diff against `origin/v10`
+3. Publish or refresh the PRs through Capy per Branches and PRs. The sync PR
+   body explains what the merge changes, summarized from the content diff
+   against `origin/v10`
    rather than from `git log` (which still lists the commits absorbed by
    earlier squash-merged syncs), the stable version range absorbed
    (matching the changeset), and any migrations needed to keep the merge

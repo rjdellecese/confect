@@ -1,4 +1,4 @@
-# Technical writing reference
+# Technical documentation reference
 
 Detailed reference material from [Mintlify's Guide to Technical Writing](https://www.mintlify.com/guides/introduction). This supplements the main SKILL.md with expert quotes, expanded guidance, and full examples.
 
