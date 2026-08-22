@@ -1,4 +1,4 @@
-import { Table } from "@confect/server";
+import { Table } from "@confect/core";
 import * as Schema from "effect/Schema";
 import { Id } from "../_generated/id";
 

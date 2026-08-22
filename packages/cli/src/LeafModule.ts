@@ -195,14 +195,6 @@ const absoluteModulePath = (relativePath: string) =>
   });
 
 /**
- * Directories under `confect/` whose modules are allowed to import
- * `@confect/server` even though a spec reaches them: table modules need
- * `Table.make`, and the generated table wrappers re-export them. See
- * {@link validateClientSafety}.
- */
-const CLIENT_SAFETY_EXEMPT_DIRS = ["_generated", "tables"];
-
-/**
  * Every `*.spec.ts` is reachable from `_generated/spec.ts`, which the client
  * imports through `_generated/refs.ts` — so a spec's whole import graph is
  * bundled into the browser whether or not the client calls those functions.
@@ -210,11 +202,14 @@ const CLIENT_SAFETY_EXEMPT_DIRS = ["_generated", "tables"];
  *
  * `@confect/server` is a sound proxy for "server logic lives here": an
  * implementation can't be written without `FunctionImpl` / `MiddlewareImpl`,
- * both of which live there. The check runs over the spec bundle's transitive
- * inputs rather than the spec module alone, so it also covers middleware
- * declarations under `confect/middleware/` (which codegen otherwise never
- * visits) and any shared helper a spec pulls in — while only ever flagging
- * modules that genuinely reach the client.
+ * both of which live there. Table `Doc` / `Fields` schemas live in
+ * `@confect/core`, so the documented `notes.Doc` pattern in a spec must not
+ * reach `@confect/server` even through `tables/` or `_generated/`. The check
+ * runs over the spec bundle's transitive inputs rather than the spec module
+ * alone, so it also covers middleware declarations under
+ * `confect/middleware/` (which codegen otherwise never visits) and any
+ * shared helper a spec pulls in — while only ever flagging modules that
+ * genuinely reach the client.
  */
 const validateClientSafety = (leaf: LeafModule, bundled: Bundler.Bundled) =>
   Effect.gen(function* () {
@@ -223,13 +218,7 @@ const validateClientSafety = (leaf: LeafModule, bundled: Bundler.Bundled) =>
 
     const isCheckedUserModule = (absolutePath: string) => {
       const relative = path.relative(confectDirectory, absolutePath);
-      if (relative.startsWith("..") || path.isAbsolute(relative)) {
-        return false;
-      }
-      const segments = String.split(relative, path.sep);
-      return !Array.some(segments, (segment) =>
-        Array.contains(CLIENT_SAFETY_EXEMPT_DIRS, segment),
-      );
+      return !relative.startsWith("..") && !path.isAbsolute(relative);
     };
 
     const importers = Bundler.importersOfPackage(

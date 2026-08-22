@@ -13,5 +13,6 @@ export * as Refs from "./Refs";
 export * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 export * as Spec from "./Spec";
 export * as SystemFields from "./SystemFields";
+export * as Table from "./Table";
 export * as Types from "./Types";
 export * as UserIdentity from "./UserIdentity";
