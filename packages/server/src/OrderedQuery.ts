@@ -14,7 +14,6 @@ import type * as TableInfo from "./TableInfo";
 
 export type OrderedQuery<
   TableInfo_ extends TableInfo.AnyWithProps,
-  _TableName extends string,
   Doc = TableInfo_["document"],
 > = {
   readonly first: () => Effect.Effect<
@@ -44,10 +43,10 @@ export const make = <
   query: ConvexOrderedQuery<TableInfo.ConvexTableInfo<TableInfo_>>,
   tableName: TableName,
   tableSchema: TableInfo.TableSchema<TableInfo_>,
-): OrderedQuery<TableInfo_, TableName> => {
+): OrderedQuery<TableInfo_> => {
   type OrderedQueryFunction<
-    FunctionName extends keyof OrderedQuery<TableInfo_, TableName>,
-  > = OrderedQuery<TableInfo_, TableName>[FunctionName];
+    FunctionName extends keyof OrderedQuery<TableInfo_>,
+  > = OrderedQuery<TableInfo_>[FunctionName];
 
   const streamEncoded = Stream.fromAsyncIterable(query, identity).pipe(
     Stream.orDie,

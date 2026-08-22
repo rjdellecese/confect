@@ -1,4 +1,3 @@
-import { identity } from "effect/Function";
 import * as Equal from "effect/Equal";
 import * as Function from "effect/Function";
 import * as Hash from "effect/Hash";
@@ -6,7 +5,7 @@ import * as Match from "effect/Match";
 import * as Pipeable from "effect/Pipeable";
 import * as Predicate from "effect/Predicate";
 
-const TypeId = "@confect/react/QueryResult";
+const TypeId = "~@confect/react/QueryResult";
 type TypeId = typeof TypeId;
 
 /**
@@ -22,18 +21,17 @@ export type QueryResult<A, E = never> =
 
 export declare namespace QueryResult {
   // eslint-disable-next-line import/namespace -- oxlint's namespace resolution misses type-only exports, and `Pipeable` is an interface
-  export interface Proto<A, E> extends Pipeable.Pipeable {
-    readonly [TypeId]: {
-      readonly E: (_: never) => E;
-      readonly A: (_: never) => A;
-    };
+  export interface Proto<out A, out E> extends Pipeable.Pipeable {
+    readonly [TypeId]: TypeId;
+    readonly "~A": A;
+    readonly "~E": E;
   }
 
   // eslint-disable-next-line @typescript-eslint/no-shadow
-  export type Success<R> = R extends QueryResult<infer A, infer _E> ? A : never;
+  export type Success<R> = R extends { readonly "~A": infer A } ? A : never;
 
   // eslint-disable-next-line @typescript-eslint/no-shadow
-  export type Failure<R> = R extends QueryResult<infer _A, infer E> ? E : never;
+  export type Failure<R> = R extends { readonly "~E": infer E } ? E : never;
 }
 
 export interface Loading<A, E = never> extends QueryResult.Proto<A, E> {
@@ -55,10 +53,7 @@ export const isQueryResult = (u: unknown): u is QueryResult<unknown, unknown> =>
   Predicate.hasProperty(u, TypeId);
 
 const QueryResultProto = {
-  [TypeId]: {
-    E: identity,
-    A: identity,
-  },
+  [TypeId]: TypeId,
   pipe(this: QueryResult<any, any>, ...args: ReadonlyArray<unknown>) {
     return Pipeable.pipeArguments(
       this,

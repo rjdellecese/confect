@@ -14,9 +14,9 @@ export type FunctionProvenance = Data.TaggedEnum<{
   };
   Convex: {
     /** @internal */
-    _args: DefaultFunctionArgs;
+    "~args": DefaultFunctionArgs;
     /** @internal */
-    _returns: any;
+    "~returns": any;
   };
 }>;
 
@@ -67,8 +67,8 @@ export interface AnyConfect extends Confect<
 
 export interface Convex<Args extends DefaultFunctionArgs, Returns> {
   readonly _tag: "Convex";
-  readonly _args: Args;
-  readonly _returns: Returns;
+  readonly "~args": Args;
+  readonly "~returns": Returns;
 }
 
 export interface AnyConvex extends Convex<DefaultFunctionArgs, any> {}
@@ -223,10 +223,10 @@ export const ConfectPaginated = <
   return self;
 };
 
-export const Convex = <_Args extends DefaultFunctionArgs, _Returns>() =>
+export const Convex = <Args extends DefaultFunctionArgs, Returns>() =>
   FunctionProvenance.Convex(
     {} as {
-      _args: _Args;
-      _returns: _Returns;
+      "~args": Args;
+      "~returns": Returns;
     },
   );

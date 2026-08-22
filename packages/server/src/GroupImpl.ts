@@ -13,7 +13,7 @@ import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as FunctionImpl from "./FunctionImpl";
 import type * as MiddlewareImpl from "./MiddlewareImpl";
 
-export const TypeId = "@confect/server/GroupImpl";
+export const TypeId = "~@confect/server/GroupImpl";
 export type TypeId = typeof TypeId;
 
 export type FinalizationStatus = "Unfinalized" | "Finalized";

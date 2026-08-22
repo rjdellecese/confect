@@ -8,7 +8,7 @@ import type * as FunctionSpec from "./FunctionSpec";
 import * as Lazy from "./Lazy";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
-export const TypeId = "@confect/core/MiddlewareSpec";
+export const TypeId = "~@confect/core/MiddlewareSpec";
 export type TypeId = typeof TypeId;
 
 export const isMiddlewareSpec = (u: unknown): u is AnyMiddlewareSpec =>
@@ -228,7 +228,7 @@ export const errorSchemas = (
  * problem at the `.middleware()` / `.addFunction()` call site.
  */
 export interface AttachmentError<Message extends string> {
-  readonly "~confect/MiddlewareSpec/AttachmentError": Message;
+  readonly "~@confect/core/MiddlewareSpec/AttachmentError": Message;
 }
 
 type FunctionTypeOf<FunctionSpec_ extends FunctionSpec.AnyWithProps> =

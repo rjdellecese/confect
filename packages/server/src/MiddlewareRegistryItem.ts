@@ -2,7 +2,7 @@ import type * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import type { FunctionType } from "convex/server";
 import * as Predicate from "effect/Predicate";
 
-export const TypeId = "@confect/server/MiddlewareRegistryItem";
+export const TypeId = "~@confect/server/MiddlewareRegistryItem";
 export type TypeId = typeof TypeId;
 
 export interface MiddlewareRegistryItem {

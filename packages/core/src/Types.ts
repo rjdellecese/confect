@@ -72,9 +72,15 @@ export type DeepMutable<T> =
                   : DeepMutable<T[K]>;
               };
 
-export type TypeError<Message extends string, T = never> = [Message, T];
+export interface TypeError<Message extends string, T = never> {
+  readonly "~@confect/core/Types/TypeError": Message;
+  readonly "~value"?: T;
+}
 
-export type TypeDefect<Message extends string, T = never> = [Message, T];
+export interface TypeDefect<Message extends string, T = never> {
+  readonly "~@confect/core/Types/TypeDefect": Message;
+  readonly "~value"?: T;
+}
 
 export type IsRecursive<T> = true extends DetectCycle<T> ? true : false;
 

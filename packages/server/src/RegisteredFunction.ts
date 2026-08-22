@@ -75,8 +75,8 @@ export type ConvexRegisteredFunction<
 > = FunctionSpec_ extends {
   functionProvenance: {
     _tag: "Convex";
-    _args: infer Args_ extends DefaultFunctionArgs;
-    _returns: infer Returns_;
+    "~args": infer Args_ extends DefaultFunctionArgs;
+    "~returns": infer Returns_;
   };
 }
   ? RuntimeAndFunctionType.GetFunctionType<

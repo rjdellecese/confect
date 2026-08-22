@@ -1,7 +1,7 @@
 import * as Predicate from "effect/Predicate";
 import type * as Table from "./Table";
 
-export const TypeId = "@confect/server/DatabaseSchema";
+export const TypeId = "~@confect/server/DatabaseSchema";
 export type TypeId = typeof TypeId;
 
 export interface Any {
@@ -26,15 +26,17 @@ export interface DatabaseSchema<Tables_ extends Table.AnyWithProps = never> {
       TableName
     >;
   };
+  readonly "~Tables": Tables_;
 }
 
 export interface AnyWithProps {
   readonly [TypeId]: TypeId;
   readonly tables: Record<string, Table.AnyWithProps>;
+  readonly "~Tables": Table.AnyWithProps;
 }
 
 export type Tables<DatabaseSchema_ extends AnyWithProps> =
-  DatabaseSchema_ extends DatabaseSchema<infer Tables_> ? Tables_ : never;
+  DatabaseSchema_["~Tables"];
 
 export type TableNames<DatabaseSchema_ extends AnyWithProps> = Table.Name<
   Tables<DatabaseSchema_>
@@ -66,9 +68,10 @@ export const make = <
   const TablesRecord extends Record<string, Table.AnyWithProps>,
 >(
   tables: TablesRecord,
-): DatabaseSchema<TablesRecord[keyof TablesRecord]> => ({
-  [TypeId]: TypeId,
-  tables: tables as unknown as DatabaseSchema<
-    TablesRecord[keyof TablesRecord]
-  >["tables"],
-});
+): DatabaseSchema<TablesRecord[keyof TablesRecord]> =>
+  ({
+    [TypeId]: TypeId,
+    tables: tables as unknown as DatabaseSchema<
+      TablesRecord[keyof TablesRecord]
+    >["tables"],
+  }) as DatabaseSchema<TablesRecord[keyof TablesRecord]>;
