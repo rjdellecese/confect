@@ -30,12 +30,12 @@ import * as OrderedQuery from "./OrderedQuery";
 import type * as Table from "./Table";
 import type * as TableInfo from "./TableInfo";
 
-type ConvexTableInfoOf<
+type ConvexTableInfoFor<
   DataModel_ extends DataModel.AnyWithProps,
   TableName extends DataModel.TableNames<DataModel_>,
 > = DataModel.TableInfoWithName<DataModel_, TableName>;
 
-type TableInfoOf<
+type TableInfoFor<
   DataModel_ extends DataModel.AnyWithProps,
   TableName extends DataModel.TableNames<DataModel_>,
 > = DataModel.TableInfoWithName_<DataModel_, TableName>;
@@ -49,44 +49,44 @@ export interface QueryInitializer<
     (
       id: GenericId<TableName>,
     ): Effect.Effect<Doc, Document.DocumentDecodeError | GetByIdFailure>;
-    <IndexName extends keyof Indexes<ConvexTableInfoOf<DataModel_, TableName>>>(
+    <IndexName extends keyof Indexes<ConvexTableInfoFor<DataModel_, TableName>>>(
       indexName: IndexName,
       ...indexFieldValues: IndexFieldTypesForEq<
         DataModel.ToConvex<DataModel_>,
         TableName,
-        Indexes<ConvexTableInfoOf<DataModel_, TableName>>[IndexName]
+        Indexes<ConvexTableInfoFor<DataModel_, TableName>>[IndexName]
       >
     ): Effect.Effect<Doc, Document.DocumentDecodeError | GetByIndexFailure>;
   };
   readonly index: {
-    <IndexName extends keyof Indexes<ConvexTableInfoOf<DataModel_, TableName>>>(
+    <IndexName extends keyof Indexes<ConvexTableInfoFor<DataModel_, TableName>>>(
       indexName: IndexName,
       indexRange?: (
         q: IndexRangeBuilder<
-          TableInfoOf<DataModel_, TableName>["convexDocument"],
-          NamedIndex<ConvexTableInfoOf<DataModel_, TableName>, IndexName>
+          TableInfoFor<DataModel_, TableName>["convexDocument"],
+          NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>
         >,
       ) => IndexRange,
       order?: "asc" | "desc",
-    ): OrderedQuery.OrderedQuery<TableInfoOf<DataModel_, TableName>, Doc>;
-    <IndexName extends keyof Indexes<ConvexTableInfoOf<DataModel_, TableName>>>(
+    ): OrderedQuery.OrderedQuery<TableInfoFor<DataModel_, TableName>, Doc>;
+    <IndexName extends keyof Indexes<ConvexTableInfoFor<DataModel_, TableName>>>(
       indexName: IndexName,
       order?: "asc" | "desc",
-    ): OrderedQuery.OrderedQuery<TableInfoOf<DataModel_, TableName>, Doc>;
+    ): OrderedQuery.OrderedQuery<TableInfoFor<DataModel_, TableName>, Doc>;
   };
   readonly search: <
     IndexName extends keyof SearchIndexes<
-      ConvexTableInfoOf<DataModel_, TableName>
+      ConvexTableInfoFor<DataModel_, TableName>
     >,
   >(
     indexName: IndexName,
     searchFilter: (
       q: SearchFilterBuilder<
-        DocumentByInfo<ConvexTableInfoOf<DataModel_, TableName>>,
-        NamedSearchIndex<ConvexTableInfoOf<DataModel_, TableName>, IndexName>
+        DocumentByInfo<ConvexTableInfoFor<DataModel_, TableName>>,
+        NamedSearchIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>
       >,
     ) => SearchFilter,
-  ) => OrderedQuery.OrderedQuery<TableInfoOf<DataModel_, TableName>, Doc>;
+  ) => OrderedQuery.OrderedQuery<TableInfoFor<DataModel_, TableName>, Doc>;
 }
 
 export const make = <
