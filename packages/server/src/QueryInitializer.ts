@@ -3,7 +3,6 @@ import type {
   QueryInitializer as ConvexQueryInitializer,
   DocumentByInfo,
   GenericTableIndexes,
-  GenericTableInfo,
   Indexes,
   IndexRange,
   IndexRangeBuilder,
@@ -31,51 +30,63 @@ import * as OrderedQuery from "./OrderedQuery";
 import type * as Table from "./Table";
 import type * as TableInfo from "./TableInfo";
 
+type ConvexTableInfoOf<
+  DataModel_ extends DataModel.AnyWithProps,
+  TableName extends DataModel.TableNames<DataModel_>,
+> = DataModel.TableInfoWithName<DataModel_, TableName>;
+
+type TableInfoOf<
+  DataModel_ extends DataModel.AnyWithProps,
+  TableName extends DataModel.TableNames<DataModel_>,
+> = DataModel.TableInfoWithName_<DataModel_, TableName>;
+
 export interface QueryInitializer<
   DataModel_ extends DataModel.AnyWithProps,
   TableName extends DataModel.TableNames<DataModel_>,
-  ConvexTableInfo_ extends GenericTableInfo,
-  TableInfo_ extends TableInfo.AnyWithProps,
-  Doc = TableInfo_["document"],
+  Doc = DataModel.DocumentWithName<DataModel_, TableName>,
 > {
   readonly get: {
     (
       id: GenericId<TableName>,
     ): Effect.Effect<Doc, Document.DocumentDecodeError | GetByIdFailure>;
-    <IndexName extends keyof Indexes<ConvexTableInfo_>>(
+    <IndexName extends keyof Indexes<ConvexTableInfoOf<DataModel_, TableName>>>(
       indexName: IndexName,
       ...indexFieldValues: IndexFieldTypesForEq<
         DataModel.ToConvex<DataModel_>,
         TableName,
-        Indexes<ConvexTableInfo_>[IndexName]
+        Indexes<ConvexTableInfoOf<DataModel_, TableName>>[IndexName]
       >
     ): Effect.Effect<Doc, Document.DocumentDecodeError | GetByIndexFailure>;
   };
   readonly index: {
-    <IndexName extends keyof Indexes<ConvexTableInfo_>>(
+    <IndexName extends keyof Indexes<ConvexTableInfoOf<DataModel_, TableName>>>(
       indexName: IndexName,
       indexRange?: (
         q: IndexRangeBuilder<
-          TableInfo_["convexDocument"],
-          NamedIndex<ConvexTableInfo_, IndexName>
+          TableInfoOf<DataModel_, TableName>["convexDocument"],
+          NamedIndex<ConvexTableInfoOf<DataModel_, TableName>, IndexName>
         >,
       ) => IndexRange,
       order?: "asc" | "desc",
-    ): OrderedQuery.OrderedQuery<TableInfo_, TableName, Doc>;
-    <IndexName extends keyof Indexes<ConvexTableInfo_>>(
+    ): OrderedQuery.OrderedQuery<TableInfoOf<DataModel_, TableName>, Doc>;
+    <IndexName extends keyof Indexes<ConvexTableInfoOf<DataModel_, TableName>>>(
       indexName: IndexName,
       order?: "asc" | "desc",
-    ): OrderedQuery.OrderedQuery<TableInfo_, TableName, Doc>;
+    ): OrderedQuery.OrderedQuery<TableInfoOf<DataModel_, TableName>, Doc>;
   };
-  readonly search: <IndexName extends keyof SearchIndexes<ConvexTableInfo_>>(
+  readonly search: <
+    IndexName extends keyof SearchIndexes<
+      ConvexTableInfoOf<DataModel_, TableName>
+    >,
+  >(
     indexName: IndexName,
     searchFilter: (
       q: SearchFilterBuilder<
-        DocumentByInfo<ConvexTableInfo_>,
-        NamedSearchIndex<ConvexTableInfo_, IndexName>
+        DocumentByInfo<ConvexTableInfoOf<DataModel_, TableName>>,
+        NamedSearchIndex<ConvexTableInfoOf<DataModel_, TableName>, IndexName>
       >,
     ) => SearchFilter,
-  ) => OrderedQuery.OrderedQuery<TableInfo_, TableName, Doc>;
+  ) => OrderedQuery.OrderedQuery<TableInfoOf<DataModel_, TableName>, Doc>;
 }
 
 export const make = <
@@ -87,20 +98,10 @@ export const make = <
     DataModel.ToConvex<DataModel.FromTables<Tables>>
   >,
   table: Table.WithName<Tables, TableName>,
-): QueryInitializer<
-  DataModel.DataModel<Tables>,
-  TableName,
-  DataModel.TableInfoWithName<DataModel.DataModel<Tables>, TableName>,
-  DataModel.TableInfoWithName_<DataModel.DataModel<Tables>, TableName>
-> => {
+): QueryInitializer<DataModel.DataModel<Tables>, TableName> => {
   type DataModel_ = DataModel.DataModel<Tables>;
   type ConvexDataModel_ = DataModel.ToConvex<DataModel_>;
-  type ThisQueryInitializer = QueryInitializer<
-    DataModel_,
-    TableName,
-    DataModel.TableInfoWithName<DataModel_, TableName>,
-    DataModel.TableInfoWithName_<DataModel_, TableName>
-  >;
+  type ThisQueryInitializer = QueryInitializer<DataModel_, TableName>;
   type QueryInitializerFunction<
     FunctionName extends keyof ThisQueryInitializer,
   > = ThisQueryInitializer[FunctionName];
