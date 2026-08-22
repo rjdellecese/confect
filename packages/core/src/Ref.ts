@@ -18,17 +18,17 @@ import * as MiddlewareSpec from "./MiddlewareSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
 export interface Base<
-  _RuntimeAndFunctionType extends RuntimeAndFunctionType.RuntimeAndFunctionType,
-  _FunctionVisibility extends FunctionVisibility,
-  _Args,
-  _Returns,
-  _Error = never,
+  RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
+  FunctionVisibility_ extends FunctionVisibility,
+  Args_,
+  Returns_,
+  Error_ = never,
 > {
-  readonly _RuntimeAndFunctionType?: _RuntimeAndFunctionType;
-  readonly _FunctionVisibility?: _FunctionVisibility;
-  readonly _Args?: _Args;
-  readonly _Returns?: _Returns;
-  readonly _Error?: _Error;
+  readonly "~RuntimeAndFunctionType": RuntimeAndFunctionType_;
+  readonly "~FunctionVisibility": FunctionVisibility_;
+  readonly "~Args": Args_;
+  readonly "~Returns": Returns_;
+  readonly "~Error": Error_;
   /** @internal */
   readonly convexFunctionName: string;
 }
@@ -39,39 +39,39 @@ export interface Base<
  * errors. A ref is one of two shapes, keyed by the spec's provenance.
  */
 export type Ref<
-  _RuntimeAndFunctionType extends RuntimeAndFunctionType.RuntimeAndFunctionType,
-  _FunctionVisibility extends FunctionVisibility,
-  _Args,
-  _Returns,
-  _Error = never,
+  RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
+  FunctionVisibility_ extends FunctionVisibility,
+  Args_,
+  Returns_,
+  Error_ = never,
 > =
   | ConfectRef<
-      _RuntimeAndFunctionType,
-      _FunctionVisibility,
-      _Args,
-      _Returns,
-      _Error
+      RuntimeAndFunctionType_,
+      FunctionVisibility_,
+      Args_,
+      Returns_,
+      Error_
     >
   | ConvexRef<
-      _RuntimeAndFunctionType,
-      _FunctionVisibility,
-      _Args,
-      _Returns,
-      _Error
+      RuntimeAndFunctionType_,
+      FunctionVisibility_,
+      Args_,
+      Returns_,
+      Error_
     >;
 
 export interface ConfectRef<
-  _RuntimeAndFunctionType extends RuntimeAndFunctionType.RuntimeAndFunctionType,
-  _FunctionVisibility extends FunctionVisibility,
-  _Args,
-  _Returns,
-  _Error = never,
+  RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
+  FunctionVisibility_ extends FunctionVisibility,
+  Args_,
+  Returns_,
+  Error_ = never,
 > extends Base<
-  _RuntimeAndFunctionType,
-  _FunctionVisibility,
-  _Args,
-  _Returns,
-  _Error
+  RuntimeAndFunctionType_,
+  FunctionVisibility_,
+  Args_,
+  Returns_,
+  Error_
 > {
   /** @internal */
   readonly _tag: "Confect";
@@ -88,17 +88,17 @@ export interface ConfectRef<
 }
 
 export interface ConvexRef<
-  _RuntimeAndFunctionType extends RuntimeAndFunctionType.RuntimeAndFunctionType,
-  _FunctionVisibility extends FunctionVisibility,
-  _Args,
-  _Returns,
-  _Error = never,
+  RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
+  FunctionVisibility_ extends FunctionVisibility,
+  Args_,
+  Returns_,
+  Error_ = never,
 > extends Base<
-  _RuntimeAndFunctionType,
-  _FunctionVisibility,
-  _Args,
-  _Returns,
-  _Error
+  RuntimeAndFunctionType_,
+  FunctionVisibility_,
+  Args_,
+  Returns_,
+  Error_
 > {
   /** @internal */
   readonly _tag: "Convex";
@@ -169,86 +169,42 @@ export type AnyPublicAction = Ref<
   any
 >;
 
-export type GetRuntimeAndFunctionType<Ref_> =
-  Ref_ extends Base<
-    infer RuntimeAndFunctionType_,
-    infer _FunctionVisibility,
-    infer _Args,
-    infer _Returns,
-    infer _Error
-  >
-    ? RuntimeAndFunctionType_
-    : never;
+export type GetRuntimeAndFunctionType<Ref_> = Ref_ extends {
+  readonly "~RuntimeAndFunctionType": infer RuntimeAndFunctionType_ extends
+    RuntimeAndFunctionType.RuntimeAndFunctionType;
+}
+  ? RuntimeAndFunctionType_
+  : never;
 
-export type GetRuntime<Ref_> =
-  Ref_ extends Base<
-    infer RuntimeAndFunctionType_,
-    infer _FunctionVisibility,
-    infer _Args,
-    infer _Returns,
-    infer _Error
-  >
-    ? RuntimeAndFunctionType.GetRuntime<RuntimeAndFunctionType_>
-    : never;
+export type GetRuntime<Ref_> = RuntimeAndFunctionType.GetRuntime<
+  GetRuntimeAndFunctionType<Ref_>
+>;
 
-export type GetFunctionType<Ref_> =
-  Ref_ extends Base<
-    infer RuntimeAndFunctionType_,
-    infer _FunctionVisibility,
-    infer _Args,
-    infer _Returns,
-    infer _Error
-  >
-    ? RuntimeAndFunctionType.GetFunctionType<RuntimeAndFunctionType_>
-    : never;
+export type GetFunctionType<Ref_> = RuntimeAndFunctionType.GetFunctionType<
+  GetRuntimeAndFunctionType<Ref_>
+>;
 
-export type GetFunctionVisibility<Ref_> =
-  Ref_ extends Base<
-    infer _RuntimeAndFunctionType,
-    infer FunctionVisibility_,
-    infer _Args,
-    infer _Returns,
-    infer _Error
-  >
-    ? FunctionVisibility_
-    : never;
+export type GetFunctionVisibility<Ref_> = Ref_ extends {
+  readonly "~FunctionVisibility": infer FunctionVisibility_;
+}
+  ? FunctionVisibility_
+  : never;
 
-export type Args<Ref_> =
-  Ref_ extends Base<
-    infer _RuntimeAndFunctionType,
-    infer _FunctionVisibility,
-    infer Args_,
-    infer _Returns,
-    infer _Error
-  >
-    ? Args_
-    : never;
+export type Args<Ref_> = Ref_ extends { readonly "~Args": infer Args_ }
+  ? Args_
+  : never;
 
 export type OptionalArgs<Ref_ extends Any> = keyof Args<Ref_> extends never
   ? [args?: Args<Ref_>]
   : [args: Args<Ref_>];
 
-export type Returns<Ref_> =
-  Ref_ extends Base<
-    infer _RuntimeAndFunctionType,
-    infer _FunctionVisibility,
-    infer _Args,
-    infer Returns_,
-    infer _Error
-  >
-    ? Returns_
-    : never;
+export type Returns<Ref_> = Ref_ extends { readonly "~Returns": infer Returns_ }
+  ? Returns_
+  : never;
 
-export type Error<Ref_> =
-  Ref_ extends Base<
-    infer _RuntimeAndFunctionType,
-    infer _FunctionVisibility,
-    infer _Args,
-    infer _Returns,
-    infer Error_
-  >
-    ? Error_
-    : never;
+export type Error<Ref_> = Ref_ extends { readonly "~Error": infer Error_ }
+  ? Error_
+  : never;
 
 export type FunctionReference<Ref_ extends Any> = ConvexFunctionReference<
   GetFunctionType<Ref_>,
@@ -318,10 +274,14 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
   const convexFunctionName = `${convexFunctionNamespace}:${functionSpec.name}`;
 
   return Match.value(functionSpec.functionProvenance).pipe(
-    Match.tag("Convex", (): Any => ({
-      _tag: "Convex",
-      convexFunctionName,
-    })),
+    Match.tag(
+      "Convex",
+      (): Any =>
+        ({
+          _tag: "Convex",
+          convexFunctionName,
+        }) as Any,
+    ),
     Match.tag("Confect", (provenance): Any => {
       const ref = {
         _tag: "Confect" as const,

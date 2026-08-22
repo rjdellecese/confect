@@ -2,7 +2,7 @@ import * as Predicate from "effect/Predicate";
 import * as Record from "effect/Record";
 import * as GroupSpec from "./GroupSpec";
 
-export const TypeId = "@confect/core/Spec";
+export const TypeId = "~@confect/core/Spec";
 export type TypeId = typeof TypeId;
 
 export const isSpec = (u: unknown): u is AnyWithProps =>

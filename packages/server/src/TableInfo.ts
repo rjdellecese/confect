@@ -14,7 +14,7 @@ import type { WithSystemFields } from "@confect/core/SystemFields";
 import type * as Document_ from "./Document";
 import type * as Table from "./Table";
 
-export declare const TypeId: "@confect/server/TableInfo";
+export declare const TypeId: "~@confect/server/TableInfo";
 export type TypeId = typeof TypeId;
 
 export type TableInfo<Table_ extends Table.AnyWithProps> =

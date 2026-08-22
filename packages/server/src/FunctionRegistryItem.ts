@@ -7,7 +7,7 @@ import * as Predicate from "effect/Predicate";
 import type * as Schema from "effect/Schema";
 import type * as Handler from "./Handler";
 
-export const TypeId = "@confect/server/FunctionRegistryItem";
+export const TypeId = "~@confect/server/FunctionRegistryItem";
 export type TypeId = typeof TypeId;
 
 export const isFunctionRegistryItem = (value: unknown): value is AnyWithProps =>

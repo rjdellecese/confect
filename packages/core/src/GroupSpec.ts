@@ -5,7 +5,7 @@ import type * as MiddlewareSpec from "./MiddlewareSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 import { validateConfectFunctionIdentifier } from "./Identifier";
 
-export const TypeId = "@confect/core/GroupSpec";
+export const TypeId = "~@confect/core/GroupSpec";
 export type TypeId = typeof TypeId;
 
 export const isGroupSpec = (u: unknown): u is AnyWithProps =>

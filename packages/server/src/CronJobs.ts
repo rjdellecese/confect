@@ -13,7 +13,7 @@ import * as Predicate from "effect/Predicate";
 import * as Record from "effect/Record";
 import type * as CronJob from "./CronJob";
 
-export const TypeId = "@confect/server/CronJobs";
+export const TypeId = "~@confect/server/CronJobs";
 export type TypeId = typeof TypeId;
 
 export interface CronJobs {

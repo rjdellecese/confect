@@ -12,7 +12,7 @@ import { validateConfectFunctionIdentifier } from "./Identifier";
 import type * as MiddlewareSpec from "./MiddlewareSpec";
 import * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
-export const TypeId = "@confect/core/FunctionSpec";
+export const TypeId = "~@confect/core/FunctionSpec";
 export type TypeId = typeof TypeId;
 
 export const isFunctionSpec = (u: unknown): u is AnyWithProps =>
@@ -140,7 +140,7 @@ export type Args<FunctionSpec_ extends AnyWithProps> = FunctionSpec_ extends {
 }
   ? ArgsSchema_["Type"]
   : FunctionSpec_ extends {
-        functionProvenance: { _tag: "Convex"; _args: infer Args_ };
+        functionProvenance: { _tag: "Convex"; "~args": infer Args_ };
       }
     ? Args_
     : never;
@@ -154,7 +154,7 @@ export type Returns<FunctionSpec_ extends AnyWithProps> =
   }
     ? ReturnsSchema_["Type"]
     : FunctionSpec_ extends {
-          functionProvenance: { _tag: "Convex"; _returns: infer Returns_ };
+          functionProvenance: { _tag: "Convex"; "~returns": infer Returns_ };
         }
       ? Awaited<Returns_>
       : never;
@@ -168,7 +168,7 @@ export type EncodedArgs<FunctionSpec_ extends AnyWithProps> =
   }
     ? ArgsSchema_["Encoded"]
     : FunctionSpec_ extends {
-          functionProvenance: { _tag: "Convex"; _args: infer Args_ };
+          functionProvenance: { _tag: "Convex"; "~args": infer Args_ };
         }
       ? Args_
       : never;
@@ -182,7 +182,7 @@ export type EncodedReturns<FunctionSpec_ extends AnyWithProps> =
   }
     ? ReturnsSchema_["Encoded"]
     : FunctionSpec_ extends {
-          functionProvenance: { _tag: "Convex"; _returns: infer Returns_ };
+          functionProvenance: { _tag: "Convex"; "~returns": infer Returns_ };
         }
       ? Returns_
       : never;
