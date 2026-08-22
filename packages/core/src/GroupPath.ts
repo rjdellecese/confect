@@ -1,4 +1,3 @@
-import type { Record } from "effect";
 import type * as GroupSpec from "./GroupSpec";
 
 /**
@@ -41,11 +40,7 @@ export type GroupAt<
 > = Group extends GroupSpec.AnyWithProps
   ? Path extends `${infer Head}.${infer Tail}`
     ? Group extends { readonly name: Head }
-      ? Group extends {
-          readonly groups: Record.ReadonlyRecord<string, infer SubGroup>;
-        }
-        ? GroupAt<SubGroup, Tail>
-        : never
+      ? GroupAt<GroupSpec.Groups<Group>, Tail>
       : never
     : GroupSpec.WithName<Group, Path>
   : never;
