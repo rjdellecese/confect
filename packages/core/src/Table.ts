@@ -13,7 +13,7 @@ import type {
 } from "convex/server";
 import type { GenericValidator, Validator } from "convex/values";
 import * as Predicate from "effect/Predicate";
-import * as Schema from "effect/Schema";
+import type * as Schema from "effect/Schema";
 
 export const TypeId = "@confect/core/Table";
 export type TypeId = typeof TypeId;
@@ -47,7 +47,7 @@ export const isUnnamedTable = (u: unknown): u is UnnamedAny =>
 export interface Table<
   Name_ extends string,
   TableSchema_ extends Schema.Codec<any, any>,
-  TableValidator_ extends GenericValidator =
+  _TableValidator_ extends GenericValidator =
     TableSchemaToTableValidator<TableSchema_>,
   Indexes_ extends GenericTableIndexes = {},
   SearchIndexes_ extends GenericTableSearchIndexes = {},

@@ -271,7 +271,9 @@ layer(LeafModuleLayer)("validateSpec", (it) => {
         assert(Result.isFailure(result));
         assert(result.failure._tag === "SpecImportsServerError");
         expect(result.failure.specPath).toBe("groups/_leakyTable.spec.ts");
-        expect(result.failure.importerPaths).toStrictEqual(["tables/_leaky.ts"]);
+        expect(result.failure.importerPaths).toStrictEqual([
+          "tables/_leaky.ts",
+        ]);
       }),
   );
 

@@ -1,13 +1,6 @@
 import * as CoreTable from "@confect/core/Table";
 import * as Schema from "effect/Schema";
-import {
-  defineTable,
-  type GenericTableIndexes,
-  type GenericTableSearchIndexes,
-  type GenericTableVectorIndexes,
-  type TableDefinition,
-} from "convex/server";
-import type { GenericValidator } from "convex/values";
+import { defineTable, type TableDefinition } from "convex/server";
 import { compileTableSchema } from "./SchemaToValidator";
 
 export {
@@ -47,35 +40,21 @@ const tableDefinitionCache = new WeakMap<
   TableDefinition<any, any, any, any>
 >();
 
-export const tableDefinition = <
-  Name_ extends string,
-  TableSchema_ extends Schema.Codec<any, any>,
-  TableValidator_ extends GenericValidator,
-  Indexes_ extends GenericTableIndexes,
-  SearchIndexes_ extends GenericTableSearchIndexes,
-  VectorIndexes_ extends GenericTableVectorIndexes,
->(
-  table: CoreTable.Table<
-    Name_,
-    TableSchema_,
-    TableValidator_,
-    Indexes_,
-    SearchIndexes_,
-    VectorIndexes_
-  >,
+export const tableDefinition = <Table_ extends CoreTable.AnyWithProps>(
+  table: Table_,
 ): TableDefinition<
-  TableValidator_,
-  Indexes_,
-  SearchIndexes_,
-  VectorIndexes_
+  CoreTable.TableValidator<Table_>,
+  CoreTable.Indexes<Table_>,
+  CoreTable.SearchIndexes<Table_>,
+  CoreTable.VectorIndexes<Table_>
 > => {
   const cached = tableDefinitionCache.get(table);
   if (cached !== undefined) {
     return cached as TableDefinition<
-      TableValidator_,
-      Indexes_,
-      SearchIndexes_,
-      VectorIndexes_
+      CoreTable.TableValidator<Table_>,
+      CoreTable.Indexes<Table_>,
+      CoreTable.SearchIndexes<Table_>,
+      CoreTable.VectorIndexes<Table_>
     >;
   }
 
@@ -100,10 +79,10 @@ export const tableDefinition = <
 
   tableDefinitionCache.set(table, definition);
   return definition as TableDefinition<
-    TableValidator_,
-    Indexes_,
-    SearchIndexes_,
-    VectorIndexes_
+    CoreTable.TableValidator<Table_>,
+    CoreTable.Indexes<Table_>,
+    CoreTable.SearchIndexes<Table_>,
+    CoreTable.VectorIndexes<Table_>
   >;
 };
 
