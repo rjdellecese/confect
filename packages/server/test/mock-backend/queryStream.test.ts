@@ -53,6 +53,43 @@ describe("QueryStream", () => {
     }).pipe(Effect.provide(TestConfect.layer())),
   );
 
+  it.effect("is a reusable description backed by leaf reflection", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          yield* insertNotes(["banana", "apple"]);
+
+          const reader = yield* DatabaseReader;
+
+          const stream = reader
+            .table("notes")
+            .stream("by_text", (q) => q.gte("text", "a"));
+
+          // The leaf stores the query recipe, not a (one-shot) Convex
+          // query object…
+          expect(stream.reflection?.tableName).toBe("notes");
+          expect(stream.reflection?.indexName).toBe("by_text");
+          expect(stream.reflection?.indexFields).toEqual([
+            "text",
+            "_creationTime",
+          ]);
+          expect(stream.reflection?.spec.eqCount).toBe(0);
+          expect(stream.reflection?.spec.ops).toEqual([
+            { _tag: "gte", field: "text", value: "a" },
+          ]);
+
+          // …so one stream value can be run any number of times.
+          const first = yield* collectTexts(stream);
+          const second = yield* collectTexts(stream);
+          expect(first).toEqual(["apple", "banana"]);
+          expect(second).toEqual(first);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer())),
+  );
+
   it.effect("supports plain Stream combinators", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
@@ -208,20 +245,22 @@ describe("QueryStream", () => {
             yield* writer.table("notes").insert({ text, tag });
           }
 
-          const composed = () =>
-            QueryStream.merge([
-              reader.table("notes").stream("by_text", (q) => q.eq("text", "a")),
-              reader.table("notes").stream("by_text", (q) => q.eq("text", "b")),
-            ]).pipe(
-              QueryStream.filterEffect((note) =>
-                Effect.succeed(note.tag !== "3"),
-              ),
-            );
+          // One stream value serves every page: a QueryStream is a
+          // description, and leaves rebuild their (one-shot) Convex query
+          // from stored reflection data on each run.
+          const composed = QueryStream.merge([
+            reader.table("notes").stream("by_text", (q) => q.eq("text", "a")),
+            reader.table("notes").stream("by_text", (q) => q.eq("text", "b")),
+          ]).pipe(
+            QueryStream.filterEffect((note) =>
+              Effect.succeed(note.tag !== "3"),
+            ),
+          );
 
           const tagsOf = (page: ReadonlyArray<{ tag?: string }>) =>
             page.map((doc) => doc.tag);
 
-          const page1 = yield* QueryStream.paginate(composed(), {
+          const page1 = yield* QueryStream.paginate(composed, {
             numItems: 2,
             cursor: null,
           });
@@ -230,14 +269,14 @@ describe("QueryStream", () => {
 
           // The second page starts after the first page's cursor and skips
           // the filtered-out element (which still advanced the cursor).
-          const page2 = yield* QueryStream.paginate(composed(), {
+          const page2 = yield* QueryStream.paginate(composed, {
             numItems: 2,
             cursor: page1.continueCursor,
           });
           expect(tagsOf(page2.page)).toEqual(["4", "5"]);
           assertEquals(page2.isDone, false);
 
-          const page3 = yield* QueryStream.paginate(composed(), {
+          const page3 = yield* QueryStream.paginate(composed, {
             numItems: 2,
             cursor: page2.continueCursor,
           });
@@ -258,9 +297,9 @@ describe("QueryStream", () => {
           yield* insertNotes(["a", "b", "c", "d"]);
 
           const reader = yield* DatabaseReader;
-          const stream = () => reader.table("notes").stream("by_text");
+          const stream = reader.table("notes").stream("by_text");
 
-          const page1 = yield* QueryStream.paginate(stream(), {
+          const page1 = yield* QueryStream.paginate(stream, {
             numItems: 2,
             cursor: null,
           });
@@ -270,7 +309,7 @@ describe("QueryStream", () => {
           // is ignored and the page runs exactly to the pinned endpoint —
           // the range-defined page the reactive pagination articles call
           // for.
-          const pinned = yield* QueryStream.paginate(stream(), {
+          const pinned = yield* QueryStream.paginate(stream, {
             numItems: 1,
             cursor: null,
             endCursor: page1.continueCursor,

@@ -300,13 +300,15 @@ export const make = <
         ? indexRangeOrOrder
         : (maybeOrder ?? "asc");
 
-    const spec = rangeFn?.(QueryStream.rangeBuilder());
+    // With no range callback, the leaf gets an empty spec (no ops, no
+    // pinned fields).
+    const spec =
+      rangeFn?.(QueryStream.rangeBuilder()) ?? QueryStream.rangeBuilder();
 
     // The type-level field tuple appends the `_creationTime` tiebreaker, but
     // the runtime `table.indexes` record stores only the declared fields —
-    // append it here, along with the implicit `_id` tiebreaker that makes
-    // order keys strictly ordered.
-    const declaredFields: ReadonlyArray<string> =
+    // append it here.
+    const indexFields: ReadonlyArray<string> =
       indexName === "by_id"
         ? ["_id"]
         : indexName === "by_creation_time"
@@ -317,26 +319,15 @@ export const make = <
               ] ?? []),
               "_creationTime",
             ];
-    const remainingFields = declaredFields.slice(spec?.eqCount ?? 0);
-    const keyFields =
-      remainingFields[remainingFields.length - 1] === "_id"
-        ? remainingFields
-        : [...remainingFields, "_id"];
 
-    const makeQuery = () =>
-      (spec === undefined
-        ? convexDatabaseReader.query(tableName).withIndex(indexName as any)
-        : convexDatabaseReader
-            .query(tableName)
-            .withIndex(indexName as any, (q) => QueryStream.applyRange(spec, q))
-      ).order(order);
-
-    return QueryStream.fromQuery({
-      makeQuery,
+    return QueryStream.fromReflection({
+      reader: convexDatabaseReader as QueryStream.ReflectionReader,
       tableName,
       tableSchema: table.Fields,
+      indexName,
+      indexFields,
+      spec,
       order,
-      keyFields,
     });
   }) as QueryInitializerFunction<"stream">;
 

@@ -403,6 +403,10 @@ The core of §4 is now implemented as a working prototype:
   `merge` (k-way ordered, `Key`-invariant so mismatches are type errors),
   `filterEffect`, `mapEffect`, `narrow`, `unique`, and `paginate` with
   `cursor`/`endCursor`/`maximumRowsRead` semantics matching `convex-helpers`.
+  Leaf streams store a **`Reflection`** — the query recipe (reader handle,
+  table, index, recorded range ops, order), the Effect formulation of
+  `convex-helpers`' `reflect()` — and rebuild the (one-shot) Convex query
+  from it on every run, so a `QueryStream` value is a reusable description.
 - **`QueryInitializer.stream(...)`** — `reader.table("notes").stream("by_text",
 (q) => q.eq("text", "a"), "desc")` returns
   `QueryStream<Doc, ["_creationTime"], DocumentDecodeError>`.
@@ -418,8 +422,12 @@ recommendation but deferring the heaviest piece:
 
 - `narrow` filters the annotated stream **in memory** (`dropWhile`/`takeWhile`
   on order keys) instead of pushing bounds into `withIndex` ranges, so
-  resuming from a cursor re-reads the range from its start. Production needs
-  the `splitRange` decomposition from `convex-helpers` at the leaves.
+  resuming from a cursor re-reads the range from its start. The leaf
+  `Reflection` now carries everything the `splitRange` decomposition needs to
+  rebuild a leaf with tighter bounds; what remains is the decomposition
+  itself, plus making `narrow` recurse through composed streams (merge
+  narrows every branch, a filter narrows the stream beneath it) as
+  `convex-helpers` does.
 - Cursors serialize only the _remaining_ (order-key) fields — a deliberate
   improvement over `convex-helpers`' full index keys: equality-pinned values
   never leak into cursors, and merged streams with different pins share a

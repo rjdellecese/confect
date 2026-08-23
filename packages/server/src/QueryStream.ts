@@ -335,6 +335,14 @@ export class QueryStream<
     readonly keyFields: ReadonlyArray<string>,
     /** The annotated elements; `None` = read but filtered out. */
     readonly annotated: Stream.Stream<Element<Doc>, E, R>,
+    /**
+     * Present on leaf streams only: the recipe this stream's underlying
+     * Convex query is (re)built from on every run. Derived streams
+     * (`merge`, `filterEffect`, …) don't carry one — rebuilding them would
+     * also require replaying their combinator, which is the recursive
+     * `narrow` architecture of `convex-helpers`, not yet ported.
+     */
+    readonly reflection?: Reflection,
   ) {}
 
   toStream(): Stream.Stream<Doc, E, R> {
@@ -376,37 +384,90 @@ export type Any = QueryStream<any, ReadonlyArray<string>, any, any>;
 // -----------------------------------------------------------------------------
 
 /**
- * Build a `QueryStream` from a Convex ordered query. `makeQuery` is a thunk
- * so each run of the stream issues a fresh query. Order keys are extracted
- * from the *encoded* document before schema decoding.
+ * The subset of a Convex database reader a leaf stream needs to (re)build
+ * its query. (Method syntax keeps the parameter types bivariant, so the
+ * strongly-typed readers Confect holds assign to it structurally.)
  */
-export const fromQuery = <Doc>(options: {
-  readonly makeQuery: () => AsyncIterable<unknown>;
+export interface ReflectionReader {
+  query(tableName: string): {
+    withIndex(
+      indexName: string,
+      indexRange?: (q: any) => any,
+    ): {
+      order(order: "asc" | "desc"): AsyncIterable<unknown>;
+    };
+  };
+}
+
+/**
+ * What a leaf stream stores instead of a constructed query: everything
+ * needed to rebuild `db.query(table).withIndex(index, range).order(order)`.
+ * A Convex query object is one-shot (its first iteration consumes it), so a
+ * leaf holds this *recipe* and re-executes it on every run of the stream —
+ * the Effect formulation of `convex-helpers`' `reflect()`. It is also the
+ * data a future `splitRange`-style `narrow` needs in order to rebuild the
+ * leaf with tighter index bounds instead of filtering in memory.
+ */
+export interface Reflection {
+  readonly reader: ReflectionReader;
   readonly tableName: string;
   readonly tableSchema: Schema.Schema.AnyNoContext;
+  readonly indexName: string;
+  /**
+   * All of the index's fields in order, including the `_creationTime`
+   * tiebreaker (for `by_id`, just `["_id"]`).
+   */
+  readonly indexFields: ReadonlyArray<string>;
+  /** The recorded range: `eq` pins the first `spec.eqCount` index fields. */
+  readonly spec: AnyIndexRangeSpec;
   readonly order: "asc" | "desc";
-  readonly keyFields: ReadonlyArray<string>;
-}): QueryStream<Doc, ReadonlyArray<string>, Document.DocumentDecodeError> => {
+}
+
+/** Rebuild the Convex ordered query a reflection describes. */
+const buildQuery = (reflection: Reflection): AsyncIterable<unknown> =>
+  (reflection.spec.ops.length === 0
+    ? reflection.reader
+        .query(reflection.tableName)
+        .withIndex(reflection.indexName)
+    : reflection.reader
+        .query(reflection.tableName)
+        .withIndex(reflection.indexName, (q) => applyRange(reflection.spec, q))
+  ).order(reflection.order);
+
+/**
+ * Build a leaf `QueryStream` from reflection data. Each run of the stream
+ * rebuilds the Convex query from the reflection; order keys are extracted
+ * from the *encoded* document before schema decoding.
+ */
+export const fromReflection = <Doc>(
+  reflection: Reflection,
+): QueryStream<Doc, ReadonlyArray<string>, Document.DocumentDecodeError> => {
+  // The order key is the index fields that still vary — everything after
+  // the eq-pinned prefix — plus the implicit `_id` tiebreaker that makes
+  // order keys strictly ordered.
+  const remainingFields = reflection.indexFields.slice(reflection.spec.eqCount);
+  const keyFields =
+    remainingFields[remainingFields.length - 1] === "_id"
+      ? remainingFields
+      : [...remainingFields, "_id"];
+
   const annotated = Stream.suspend(() =>
-    Stream.fromAsyncIterable(options.makeQuery(), identity),
+    Stream.fromAsyncIterable(buildQuery(reflection), identity),
   ).pipe(
     Stream.orDie,
     Stream.mapEffect((encoded) =>
       Effect.map(
-        Document.decode(options.tableName, options.tableSchema)(encoded),
+        Document.decode(reflection.tableName, reflection.tableSchema)(encoded),
         (doc) =>
           [
             Option.some(doc as Doc),
-            extractOrderKey(
-              encoded as Record<string, unknown>,
-              options.keyFields,
-            ),
+            extractOrderKey(encoded as Record<string, unknown>, keyFields),
           ] as const,
       ),
     ),
   );
 
-  return new QueryStream(options.order, options.keyFields, annotated);
+  return new QueryStream(reflection.order, keyFields, annotated, reflection);
 };
 
 const extractOrderKey = (
@@ -588,8 +649,12 @@ export const mapEffect = dual<
 
 /**
  * Restrict a stream to order keys strictly after `after` and at-or-before
- * `until` (in stream order). Prototype: filters in memory; production would
- * push these bounds down into `withIndex` ranges.
+ * `until` (in stream order). Prototype: filters in memory. Production would
+ * push these bounds down into `withIndex` ranges: a leaf's `reflection`
+ * carries everything needed to rebuild it with tighter bounds
+ * (`splitRange`-style decomposition of a composite-key bound into a concat
+ * of Convex-expressible ranges); composed streams then narrow recursively,
+ * as in `convex-helpers`.
  */
 export const narrow = dual<
   (bounds: {
