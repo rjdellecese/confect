@@ -1,5 +1,6 @@
 import { FunctionSpec, Ref } from "@confect/core";
-import { assert, describe, expect, layer } from "@effect/vitest";
+import { assert, beforeEach, describe, expect, layer } from "@effect/vitest";
+import { vi } from "vitest";
 import { ConvexError } from "convex/values";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -9,7 +10,6 @@ import * as Layer from "effect/Layer";
 import * as MutableRef from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
-import { beforeEach, vi } from "vitest";
 import * as WebSocketClient from "@confect/js/WebSocketClient";
 
 const mockQuery = vi.fn().mockResolvedValue({});

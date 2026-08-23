@@ -1,5 +1,4 @@
-import { describe, expect, it } from "@effect/vitest";
-import { expectTypeOf } from "vitest";
+import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as MutableRef from "effect/MutableRef";
 import * as Schema from "effect/Schema";
 import type * as FunctionProvenance from "@confect/core/FunctionProvenance";

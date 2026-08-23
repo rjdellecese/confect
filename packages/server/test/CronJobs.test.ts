@@ -3,7 +3,7 @@ import * as Cron from "effect/Cron";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Schema from "effect/Schema";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "@effect/vitest";
 import * as CronJob from "@confect/server/CronJob";
 import * as CronJobs from "@confect/server/CronJobs";
 

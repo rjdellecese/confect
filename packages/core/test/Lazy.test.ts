@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "@effect/vitest";
 import * as Lazy from "@confect/core/Lazy";
 
 describe("Lazy.defineProperty", () => {

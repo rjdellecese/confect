@@ -10,8 +10,8 @@ import {
   expect,
   expectTypeOf,
   test,
-  vi,
-} from "vitest";
+} from "@effect/vitest";
+import { vi } from "vitest";
 import type { InvokeReturn, UsePaginatedQueryArgs } from "@confect/react";
 import {
   PaginatedQueryResult,

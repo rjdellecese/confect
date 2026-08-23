@@ -1,5 +1,5 @@
 import * as Effect from "effect/Effect";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "@effect/vitest";
 import {
   forEachBranchLeaves,
   setNestedProperty,

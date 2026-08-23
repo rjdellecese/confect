@@ -17,7 +17,7 @@
 
 import { Ref } from "@confect/core";
 import { convexTest } from "convex-test";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "@effect/vitest";
 import convexSchema from "./fixtures/confect/_generated/convexSchema";
 import refs from "./fixtures/confect/_generated/refs";
 

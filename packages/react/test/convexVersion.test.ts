@@ -1,7 +1,8 @@
 import { FunctionSpec, Ref } from "@confect/core";
 import { renderHook } from "@testing-library/react";
 import * as Schema from "effect/Schema";
-import { expect, test, vi } from "vitest";
+import { expect, test } from "@effect/vitest";
+import { vi } from "vitest";
 import { usePaginatedQuery } from "@confect/react";
 
 // Convex 1.32–1.35 export `usePaginatedQueryInternal` with only three

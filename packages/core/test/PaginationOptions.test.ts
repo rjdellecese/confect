@@ -1,6 +1,6 @@
 import type { PaginationOptions as ConvexPaginationOptions } from "convex/server";
 import * as Schema from "effect/Schema";
-import { expect, expectTypeOf, test } from "vitest";
+import { expect, expectTypeOf, test } from "@effect/vitest";
 import * as PaginationOptions from "@confect/core/PaginationOptions";
 
 test("PaginationOptions' type extends Convex type", () => {
