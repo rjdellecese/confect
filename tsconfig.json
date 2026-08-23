@@ -34,6 +34,9 @@
     ".claude/hooks/**/*.ts",
     "packages/*/*.ts",
     "packages/*/test/**/*",
-    "packages/cli/src/**/*"
+    "packages/cli/src/**/*",
+    "tools/*/*.ts",
+    "tools/*/src/**/*",
+    "tools/*/test/**/*"
   ]
 }

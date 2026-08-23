@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["typescript", "unicorn", "import", "promise", "node", "oxc"],
+  "jsPlugins": ["confect-oxlint-rules"],
   "categories": {
     "correctness": "error",
     "suspicious": "error",
@@ -100,6 +101,12 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "files": ["**/*.test.{ts,tsx,mts,cts}"],
+      "rules": {
+        "confect/prefer-effect-vitest": "error"
       }
     }
   ]

@@ -8,6 +8,7 @@
     "@types/node": "22.20.1",
     "@vitest/coverage-v8": "4.1.10",
     "concurrently": "10.0.5",
+    "confect-oxlint-rules": "workspace:*",
     "cross-env": "10.1.0",
     "dpdm": "4.3.0",
     "effect": "4.0.0-rc.111",

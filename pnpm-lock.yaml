@@ -40,6 +40,9 @@ importers:
       concurrently:
         specifier: 10.0.5
         version: 10.0.5
+      confect-oxlint-rules:
+        specifier: workspace:*
+        version: link:tools/oxlint-rules
       cross-env:
         specifier: 10.1.0
         version: 10.1.0
@@ -475,6 +478,24 @@ importers:
       typescript:
         specifier: 6.0.3
         version: 6.0.3
+
+  tools/oxlint-rules:
+    devDependencies:
+      '@effect/vitest':
+        specifier: 4.0.0-rc.111
+        version: 4.0.0-rc.111(effect@4.0.0-rc.111)(vitest@4.1.10)
+      effect:
+        specifier: 4.0.0-rc.111
+        version: 4.0.0-rc.111
+      effect-oxlint:
+        specifier: 0.3.3
+        version: 0.3.3(effect@4.0.0-rc.111)
+      shx:
+        specifier: 0.4.0
+        version: 0.4.0
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@types/node@22.20.1)(@vitest/browser-preview@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.2)(vite@8.2.1(@types/node@22.20.1)(esbuild@0.28.2)(jiti@1.21.7)(tsx@4.23.12)(yaml@2.9.0))
 
 packages:
 
@@ -4195,6 +4216,11 @@ packages:
 
   ee-first@1.1.1:
     resolution: {integrity: sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow==}
+
+  effect-oxlint@0.3.3:
+    resolution: {integrity: sha512-J1+0nr0S4mOkPq54Lj2jNpq2iu9UKB+ChhxfT9HANKHKiQaOqjycZqaq8iiZHRGqT36Ir+Lv02LoVLsuA+NfGA==}
+    peerDependencies:
+      effect: 4.0.0-rc.111
 
   effect@4.0.0-rc.111:
     resolution: {integrity: sha512-ASd5L58EIR0CUNueZNKKjSsyOCd+2alxOAIaTcHaqkJkPsaYSsw5Cg/cfANk5K4Jr2YsX756xvX11shzqsreWA==}
@@ -9581,7 +9607,7 @@ snapshots:
       sirv: 3.0.2
       tinyrainbow: 3.1.1
       vitest: 4.1.10(@types/node@22.20.1)(@vitest/browser-preview@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.2)(vite@8.2.1(@types/node@22.20.1)(esbuild@0.28.2)(jiti@1.21.7)(tsx@4.23.12)(yaml@2.9.0))
-      ws: 8.21.2
+      ws: 8.21.3
     transitivePeerDependencies:
       - bufferutil
       - msw
@@ -10515,6 +10541,11 @@ snapshots:
 
   ee-first@1.1.1: {}
 
+  effect-oxlint@0.3.3(effect@4.0.0-rc.111):
+    dependencies:
+      '@oxlint/plugins': 1.73.0
+      effect: 4.0.0-rc.111
+
   effect@4.0.0-rc.111:
     dependencies:
       '@standard-schema/spec': 1.1.0
@@ -11160,7 +11191,7 @@ snapshots:
       buffer-image-size: 0.6.4
       entities: 7.0.1
       whatwg-mimetype: 3.0.0
-      ws: 8.21.2
+      ws: 8.21.3
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
