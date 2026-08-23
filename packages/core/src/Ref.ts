@@ -29,7 +29,6 @@ export interface Base<
   readonly "~Args": Args_;
   readonly "~Returns": Returns_;
   readonly "~Error": Error_;
-  /** @internal */
   readonly convexFunctionName: string;
 }
 
@@ -73,17 +72,11 @@ export interface ConfectRef<
   Returns_,
   Error_
 > {
-  /** @internal */
   readonly _tag: "Confect";
-  /** @internal */
   readonly args: Schema.Codec<any, any>;
-  /** @internal */
   readonly returns: Schema.Codec<any, any>;
-  /** @internal */
   readonly kind: FunctionProvenance.ConfectKind;
-  /** @internal */
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyMiddlewareSpec>;
-  /** @internal */
   readonly error?: Schema.Codec<any, any>;
 }
 
@@ -100,7 +93,6 @@ export interface ConvexRef<
   Returns_,
   Error_
 > {
-  /** @internal */
   readonly _tag: "Convex";
 }
 
