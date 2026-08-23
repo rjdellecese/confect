@@ -718,6 +718,65 @@ describe("QueryStream", () => {
     }).pipe(Effect.provide(TestConfect.layer)),
   );
 
+  it.effect("orderBy relabels order keys so foreign streams merge", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          const writer = yield* DatabaseWriter;
+          const reader = yield* DatabaseReader;
+
+          yield* writer.table("notes").insert({ text: "a", tag: "ta1" });
+          yield* writer.table("notes").insert({
+            author: { name: "A", role: "admin" },
+            tag: "tr1",
+            text: "x1",
+          });
+          yield* writer.table("notes").insert({ text: "m", tag: "ta2" });
+          yield* writer.table("notes").insert({
+            author: { name: "U", role: "user" },
+            tag: "tr2",
+            text: "x2",
+          });
+
+          // Two different indexes over the same table: the range bounds
+          // keep their document sets disjoint.
+          const byText = reader
+            .table("notes")
+            .stream("by_text", (q) => q.lt("text", "x"));
+          const byRole = reader
+            .table("notes")
+            .stream("by_role", (q) => q.gte("author.role", "admin"));
+
+          // `by_role`'s key is ["author.role", "_creationTime"]; relabel
+          // it to merge positionally with `by_text`. Convex's string order
+          // interleaves the values: "a" < "admin" < "m" < "user".
+          const merged = QueryStream.merge([
+            byText,
+            byRole.pipe(QueryStream.orderBy(["text", "_creationTime"])),
+          ]);
+
+          const tags = yield* Stream.runCollect(merged).pipe(
+            Effect.map((docs) => docs.map((doc) => doc.tag)),
+          );
+          expect(tags).toEqual(["ta1", "tr1", "ta2", "tr2"]);
+
+          // Pagination narrows through the relabeling into both leaves:
+          // bounds are positional values, so the relabeled branch's leaf
+          // receives them against its own fields.
+          const pages = yield* paginateAll(merged, 1);
+          expect(pages.map((page) => page.map((doc) => doc.tag))).toEqual([
+            ["ta1"],
+            ["tr1"],
+            ["ta2"],
+            ["tr2"],
+          ]);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
   it.effect("resumes a fully eq-pinned by_id stream from its cursor", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
@@ -1031,6 +1090,16 @@ describe("QueryStream types", () => {
       // @ts-expect-error — "text" is pinned away on this stream's key.
       const distinctPinnedAway = QueryStream.distinct(pinned, ["text"]);
       void distinctPinnedAway;
+
+      // orderBy relabels the order key position-for-position.
+      const relabeled = QueryStream.orderBy(full, ["renamed", "_creationTime"]);
+      expectTypeOf<KeyOf<typeof relabeled>>().toEqualTypeOf<
+        ["renamed", "_creationTime"]
+      >();
+
+      // @ts-expect-error — the new key must have as many fields as the old.
+      const relabeledTooShort = QueryStream.orderBy(full, ["_creationTime"]);
+      void relabeledTooShort;
     });
     void _typeChecks;
   });
