@@ -441,6 +441,15 @@ The core of §4 is now implemented as a working prototype:
   type-level constraint (`Key` must extend `readonly [...Fields,
 ...rest]`); narrowing truncates bound keys to the distinct prefix, as in
   `convex-helpers`.
+- **`orderBy`** — re-keying: a position-for-position relabeling of the
+  order key (tuple-length-checked at the type level) that makes streams
+  from different indexes or tables mergeable when their keys align
+  positionally. Because order keys and bounds are pure _values_, the
+  relabeling is transparent to narrowing — bounds pass straight through to
+  the underlying stream, with none of the static-prefix bookkeeping
+  `convex-helpers`' `OrderByStream` needs (its other job, dropping
+  equality-pinned prefix fields, is already the leaf's remaining-field key
+  convention here).
 - **`QueryInitializer.stream(...)`** — `reader.table("notes").stream("by_text",
 (q) => q.eq("text", "a"), "desc")` returns
   `QueryStream<Doc, ["_creationTime"], DocumentDecodeError>`.

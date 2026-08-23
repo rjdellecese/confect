@@ -16,7 +16,7 @@
  *
  * Prototype limitations (all called out in the design doc):
  *
- * - No `orderBy` (re-keying) yet.
+ * - No `maximumBytesRead` accounting; NaN ordering subtleties are skipped.
  * - Cursors serialize only the *remaining* (order-key) fields, not the full
  *   index key — equality-pinned values never leak into cursors.
  */
@@ -1372,6 +1372,81 @@ export const distinct = dual<
   }
   return makeDistinct(self, fields.length);
 });
+
+/**
+ * Re-key a stream: declare that its order key should be regarded as `key`,
+ * a position-for-position relabeling of the order-key fields (the trailing
+ * `_id` tiebreaker keeps its name). Order keys are *values*, so relabeling
+ * changes only the names used for compatibility validation — the element
+ * order is untouched, and narrowing passes bounds through to the
+ * underlying stream unchanged. Use it to make streams from different
+ * indexes or tables mergeable when their keys align positionally; the
+ * caller asserts the *semantic* alignment of the relabeled fields.
+ *
+ * (This is `convex-helpers`' `.orderBy()`. There it may also drop
+ * equality-pinned prefix fields from the key — Confect's remaining-field
+ * order keys already drop those at the leaf.)
+ *
+ * `key` must have as many fields as the stream's order key, enforced at
+ * the type level via tuple length. One caveat: a `flatMap` result's
+ * runtime key carries interior `_id` tiebreakers that its type-level key
+ * omits, so relabeling one is rejected by the runtime length validation.
+ */
+export const orderBy = dual<
+  <const NewKey extends ReadonlyArray<string>>(
+    key: NewKey,
+  ) => <
+    Doc,
+    Key extends ReadonlyArray<string> & {
+      readonly length: NewKey["length"];
+    },
+    E,
+    R,
+  >(
+    self: QueryStream<Doc, Key, E, R>,
+  ) => QueryStream<Doc, Types.Mutable<NewKey>, E, R>,
+  <
+    const NewKey extends ReadonlyArray<string>,
+    Doc,
+    Key extends ReadonlyArray<string> & {
+      readonly length: NewKey["length"];
+    },
+    E,
+    R,
+  >(
+    self: QueryStream<Doc, Key, E, R>,
+    key: NewKey,
+  ) => QueryStream<Doc, Types.Mutable<NewKey>, E, R>
+>(2, (self, key) => orderByImpl(self, key));
+
+const orderByImpl = <
+  Doc,
+  Key extends ReadonlyArray<string>,
+  E,
+  R,
+  NewKey extends ReadonlyArray<string>,
+>(
+  self: QueryStream<Doc, Key, E, R>,
+  key: NewKey,
+): QueryStream<Doc, Types.Mutable<NewKey>, E, R> => {
+  const keyFields = Option.exists(Array.last(key), (field) => field === "_id")
+    ? key
+    : Array.append(key, "_id");
+  if (keyFields.length !== self.keyFields.length) {
+    throw new Error(
+      `QueryStream.orderBy: key ([${Array.join(key, ", ")}]) must have as many fields as the stream's order key ([${Array.join(self.keyFields, ", ")}])`,
+    );
+  }
+  return new QueryStream(
+    self.order,
+    keyFields,
+    self.annotated,
+    undefined,
+    // Bounds are positional values, so they apply to the underlying
+    // stream as-is.
+    (bounds) => orderByImpl(narrowByKeyBounds(self, bounds), key),
+  );
+};
 
 const makeDistinct = <Doc, Key extends ReadonlyArray<string>, E, R>(
   self: QueryStream<Doc, Key, E, R>,
