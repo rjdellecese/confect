@@ -16,7 +16,7 @@
  *
  * Known limitations (all called out in the design doc):
  *
- * - No `distinct` (loose index scan) or `orderBy` (re-keying) yet.
+ * - No `orderBy` (re-keying) yet.
  * - Cursors serialize only the *remaining* (order-key) fields, not the full
  *   index key — equality-pinned values never leak into cursors.
  */
@@ -1310,6 +1310,122 @@ const makeFlatMap = <
         },
       );
     },
+  );
+};
+
+/**
+ * Keep the first document for each distinct value of a *prefix* of the
+ * order key — a loose index scan: after a group's first document, the
+ * underlying stream is narrowed past the entire group, so each group costs
+ * one index seek instead of a scan.
+ *
+ * `fields` must be a prefix of the stream's order key — enforced at the
+ * type level (`Key` must extend `readonly [...Fields, ...rest]`) and
+ * validated at runtime.
+ *
+ * Filtered-out elements pass through (still advancing cursors) without
+ * claiming their group, so the first *present* document of each group is
+ * kept. As with `convex-helpers`, prefer applying `filterEffect` *after*
+ * `distinct`: narrowing a distinct stream truncates bounds to the distinct
+ * prefix, so a cursor that lands on a filtered element before its group's
+ * first present document resumes at the next group.
+ */
+export const distinct = dual<
+  <const Fields extends ReadonlyArray<string>>(
+    fields: Fields,
+  ) => <Doc, Key extends readonly [...Fields, ...ReadonlyArray<string>], E, R>(
+    self: QueryStream<Doc, Key, E, R>,
+  ) => QueryStream<Doc, Key, E, R>,
+  <
+    const Fields extends ReadonlyArray<string>,
+    Doc,
+    Key extends readonly [...Fields, ...ReadonlyArray<string>],
+    E,
+    R,
+  >(
+    self: QueryStream<Doc, Key, E, R>,
+    fields: Fields,
+  ) => QueryStream<Doc, Key, E, R>
+>(2, (self, fields) => {
+  if (
+    !keyFieldsEquivalence(fields, Array.take(self.keyFields, fields.length))
+  ) {
+    throw new Error(
+      `QueryStream.distinct: fields ([${Array.join(fields, ", ")}]) must be a prefix of the stream's order-key fields ([${Array.join(self.keyFields, ", ")}])`,
+    );
+  }
+  return makeDistinct(self, fields.length);
+});
+
+const makeDistinct = <Doc, Key extends ReadonlyArray<string>, E, R>(
+  self: QueryStream<Doc, Key, E, R>,
+  distinctLength: number,
+): QueryStream<Doc, Key, E, R> => {
+  /** Bounds that skip past the group of the given key, in stream order. */
+  const skipGroupBounds = (key: OrderKey): KeyBounds => {
+    const pastGroup: KeyBound = {
+      key: Array.take(key, distinctLength),
+      inclusive: false,
+    };
+    return self.order === "asc"
+      ? { lower: Option.some(pastGroup), upper: Option.none() }
+      : { lower: Option.none(), upper: Option.some(pastGroup) };
+  };
+
+  // Each step reads one group: everything up to and including the group's
+  // first present document (filtered elements pass through), then the next
+  // step continues from a stream narrowed past the whole group.
+  const annotated: Stream.Stream<Element<Doc>, E, R> = Stream.paginate(
+    self,
+    (current) =>
+      current.annotated.pipe(
+        Stream.takeUntil(([doc, _key]) => Option.isSome(doc)),
+        Stream.runCollect,
+        Effect.map((elements) =>
+          Array.isReadonlyArrayNonEmpty(elements)
+            ? ([
+                elements,
+                pipe(Array.lastNonEmpty(elements), ([doc, key]) =>
+                  Option.isSome(doc)
+                    ? Option.some(
+                        narrowByKeyBounds(current, skipGroupBounds(key)),
+                      )
+                    : // The stream ended on a filtered element: no
+                      // present document remains.
+                      Option.none<QueryStream<Doc, Key, E, R>>(),
+                ),
+              ] as const)
+            : ([
+                Array.empty<Element<Doc>>(),
+                Option.none<QueryStream<Doc, Key, E, R>>(),
+              ] as const),
+        ),
+      ),
+  );
+
+  // Narrowing truncates bound keys to the distinct prefix (as in
+  // `convex-helpers`): a cursor at a group's kept document resumes at the
+  // next group, and an inclusive bound re-reads its whole group so the
+  // group's first present document is re-found.
+  const truncated = (bound: Option.Option<KeyBound>): Option.Option<KeyBound> =>
+    Option.map(bound, ({ inclusive, key }) => ({
+      key: Array.take(key, distinctLength),
+      inclusive,
+    }));
+
+  return new QueryStream(
+    self.order,
+    self.keyFields,
+    annotated,
+    undefined,
+    (bounds) =>
+      makeDistinct(
+        narrowByKeyBounds(self, {
+          lower: truncated(bounds.lower),
+          upper: truncated(bounds.upper),
+        }),
+        distinctLength,
+      ),
   );
 };
 

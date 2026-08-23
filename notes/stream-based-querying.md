@@ -434,6 +434,13 @@ The core of §4 is now implemented as an experimental API:
   `FlatMapStream.narrow` applies inner bounds to every row's inner stream
   and so drops legitimate elements from non-boundary rows when resuming
   from a mid-row cursor.
+- **`distinct`** — the loose index scan: the first document per distinct
+  value of a _prefix_ of the order key, one index seek per group (each
+  group's first present document narrows the underlying stream past the
+  whole group via a prefix-successor cut). The prefix requirement is a
+  type-level constraint (`Key` must extend `readonly [...Fields,
+...rest]`); narrowing truncates bound keys to the distinct prefix, as in
+  `convex-helpers`.
 - **`QueryInitializer.stream(...)`** — `reader.table("notes").stream("by_text",
 (q) => q.eq("text", "a"), "desc")` returns
   `QueryStream<Doc, ["_creationTime"], DocumentDecodeError>`.
@@ -453,8 +460,8 @@ recommendation:
   improvement over `convex-helpers`' full index keys: equality-pinned values
   never leak into cursors, and merged streams with different pins share a
   cursor space by construction.
-- No `distinct` (loose index scan) or `orderBy` (re-keying) yet; no
-  `maximumBytesRead` accounting; NaN ordering subtleties are skipped.
+- No `orderBy` (re-keying) yet; no `maximumBytesRead` accounting; NaN
+  ordering subtleties are skipped.
 
 ## 8. Open questions
 
