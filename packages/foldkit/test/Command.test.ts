@@ -8,7 +8,7 @@ import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as FoldkitCommand from "foldkit/command";
 import { m } from "foldkit/message";
-import { beforeEach, expectTypeOf } from "vitest";
+import { beforeEach, expectTypeOf, test } from "vitest";
 import * as Command from "@confect/foldkit/Command";
 import * as WebSocketClient from "@confect/foldkit/WebSocketClient";
 
@@ -352,5 +352,78 @@ layer(StubLayer)("Command", (it) => {
       expect(SaveDraft.name).toBe("SaveDraft");
       expect(typeof SaveDraft.Interrupt).toBe("function");
     });
+  });
+});
+
+// Mirrors foldkit/test's internal `ResolvableCommandDefinition` — the
+// constraint Story/Scene `Command.resolve` and `expectExact` place on the
+// definitions they accept. Factory-built definitions must stay assignable to
+// it, or user test suites can't match Confect-built Commands.
+type ResolvableCommandDefinition<Name extends string, ResultMessage> =
+  | FoldkitCommand.CommandDefinition<Name, ResultMessage>
+  | FoldkitCommand.Interruptible.DefinitionNoArgs<
+      Name,
+      Effect.Effect<ResultMessage, any, any>
+    >
+  | FoldkitCommand.Interruptible.DefinitionWithArgs<
+      Name,
+      any,
+      any,
+      Effect.Effect<ResultMessage, any, any>
+    >
+  | FoldkitCommand.Interruptible.DefinitionWithArgsNameKeyed<
+      Name,
+      any,
+      Effect.Effect<ResultMessage, any, any>
+    >;
+
+describe("Foldkit test-tooling compatibility", () => {
+  const asResolvable = <Name extends string, ResultMessage>(
+    definition: ResolvableCommandDefinition<Name, ResultMessage>,
+  ): ResolvableCommandDefinition<Name, ResultMessage> => definition;
+
+  test("factory definitions satisfy the Story/Scene resolve constraint", () => {
+    const SaveNote = Command.mutation(
+      "SaveNote",
+      insertMutationRef,
+      saveNoteHandlers,
+    );
+    const SaveDraft = Command.mutation("SaveDraft", insertMutationRef, {
+      ...saveNoteHandlers,
+      interrupt: true,
+    });
+    const DeleteNote = Command.mutation("DeleteNote", deleteMutationRef, {
+      onSuccess: () => SucceededSaveNote({ note: null }),
+      onError: (error) => FailedSaveNote({ error }),
+      interrupt: { keyFields: ["id"], toKey: ({ id }) => id },
+    });
+    const FetchNotes = Command.query("FetchNotes", listQueryRef, {
+      onSuccess: (notes) => SucceededSaveNote({ note: notes }),
+      onError: (error) => FailedSaveNote({ error }),
+    });
+
+    expect(asResolvable(SaveNote)).toBe(SaveNote);
+    expect(asResolvable(SaveDraft)).toBe(SaveDraft);
+    expect(asResolvable(DeleteNote)).toBe(DeleteNote);
+    expect(asResolvable(FetchNotes)).toBe(FetchNotes);
+  });
+
+  test("the resolve constraint infers the definition's Message type", () => {
+    const SaveNote = Command.mutation(
+      "SaveNote",
+      insertMutationRef,
+      saveNoteHandlers,
+    );
+
+    const resolve = <Name extends string, ResultMessage>(
+      _definition: ResolvableCommandDefinition<Name, ResultMessage>,
+      resultMessage: ResultMessage,
+    ): ResultMessage => resultMessage;
+
+    const resolved = resolve(SaveNote, SucceededSaveNote({ note: null }));
+    expectTypeOf(resolved).toEqualTypeOf<Message>();
+
+    // @ts-expect-error — a Message outside the definition's union is rejected
+    resolve(SaveNote, { _tag: "Unrelated" as const });
   });
 });

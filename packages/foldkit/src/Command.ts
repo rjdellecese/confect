@@ -1,5 +1,6 @@
 import type * as Ref from "@confect/core/Ref";
 import * as Effect from "effect/Effect";
+import type * as Schema from "effect/Schema";
 import * as FoldkitCommand from "foldkit/command";
 import * as WebSocketClient from "./WebSocketClient";
 
@@ -21,45 +22,56 @@ export interface Handlers<Ref_ extends Ref.Any, SuccessMessage, ErrorMessage> {
   readonly onError: (error: Error<Ref_>) => ErrorMessage;
 }
 
-/**
- * A Foldkit Command definition whose args are the ref's args. Carries the
- * `CommandDefinitionTypeId` brand, so it is assignable to Foldkit's
- * `CommandDefinition` and matchable in Story/Scene tests. Call it from
- * `update` — with the ref's args, or with none when the ref declares none —
- * to construct a Command instance; nothing runs until the Foldkit runtime
- * executes it.
- */
-export interface Definition<
-  Name extends string,
-  Ref_ extends Ref.Any,
+type Eff<Message> = Effect.Effect<
   Message,
-> {
-  readonly [FoldkitCommand.CommandDefinitionTypeId]: FoldkitCommand.CommandDefinitionTypeId;
-  readonly name: Name;
-  (
-    ...args: Ref.OptionalArgs<Ref_>
-  ): FoldkitCommand.Command<Message, never, WebSocketClient.WebSocketClient>;
-}
+  never,
+  WebSocketClient.WebSocketClient
+>;
 
 /**
- * Keys each invocation by a part derived from the ref's args, so concurrent
- * invocations can be interrupted independently. `keyFields` declares the args
- * the `Interrupt` constructor requires; `toKey` derives the key part from
- * them.
+ * A phantom field map whose `Schema.Struct.Type` is the ref's decoded args.
+ * It exists only so a definition can instantiate Foldkit's own definition
+ * interfaces, which are generic in a `Schema.Struct.Fields`; the ergonomic
+ * call signature intersected alongside is what call sites actually resolve
+ * against.
  */
-export interface KeyedInterrupt<
-  Ref_ extends Ref.Any,
-  KeyField extends keyof Ref.Args<Ref_> & string,
-> {
-  readonly keyFields: readonly [KeyField, ...ReadonlyArray<KeyField>];
-  readonly toKey: (keyArgs: Pick<Ref.Args<Ref_>, KeyField>) => string;
-}
+type ArgsFields<Args> = {
+  readonly [K in keyof Args]-?: Schema.Schema<Args[K]>;
+};
 
 /**
- * Makes a factory-built Command interruptible. `true` keys every invocation
- * by the Command name — right when at most one invocation is meaningfully in
- * flight. A `KeyedInterrupt` derives the key part from the ref's args, so
- * concurrent invocations can be targeted independently.
+ * The Command instance a definition call constructs.
+ */
+type Instance<Name extends string, Ref_ extends Ref.Any, Message> = Readonly<{
+  name: Name;
+  args: Ref.Args<Ref_>;
+  effect: Eff<Message>;
+}>;
+
+/**
+ * A Foldkit Command definition whose args are the ref's args: our
+ * ref-derived call signature (args optional when the ref declares none)
+ * intersected with Foldkit's own `CommandDefinitionWithArgs`, which supplies
+ * the `CommandDefinitionTypeId` brand and makes the definition assignable
+ * wherever Foldkit accepts one — including Story/Scene `Command.resolve`
+ * and `expectExact` matchers. Call it from `update` to construct a Command
+ * instance; nothing runs until the Foldkit runtime executes it.
+ */
+export type Definition<Name extends string, Ref_ extends Ref.Any, Message> = ((
+  ...args: Ref.OptionalArgs<Ref_>
+) => Instance<Name, Ref_, Message>) &
+  FoldkitCommand.CommandDefinitionWithArgs<
+    Name,
+    ArgsFields<Ref.Args<Ref_>>,
+    Eff<Message>
+  >;
+
+/**
+ * Makes a factory-built Command interruptible — Foldkit's `InterruptOption`
+ * applied to the ref's args. `true` keys every invocation by the Command
+ * name — right when at most one invocation is meaningfully in flight; a
+ * `KeyedInterrupt` derives the key part from the ref's args, so concurrent
+ * invocations can be targeted independently.
  *
  * Interrupting stops the client-side Effect and guarantees the invocation's
  * result Messages never dispatch — it does not cancel the Convex function on
@@ -69,47 +81,56 @@ export type InterruptOption<
   Ref_ extends Ref.Any,
   KeyField extends keyof Ref.Args<Ref_> & string = keyof Ref.Args<Ref_> &
     string,
-> = true | KeyedInterrupt<Ref_, KeyField>;
+> = FoldkitCommand.InterruptOption<Ref.Args<Ref_>, KeyField>;
 
 /**
- * An interruptible Command definition whose key is the Command name. Its
- * `Interrupt` constructor builds an ordinary Command that stops every
- * in-flight invocation and results in `toMessage(outcome)`.
+ * The keyed arm of `InterruptOption`: `keyFields` declares the args the
+ * `Interrupt` constructor requires; `toKey` derives the key part from them.
  */
-export interface InterruptibleDefinition<
+export type KeyedInterrupt<
+  Ref_ extends Ref.Any,
+  KeyField extends keyof Ref.Args<Ref_> & string,
+> = Exclude<InterruptOption<Ref_, KeyField>, true>;
+
+/**
+ * An interruptible Command definition whose key is the Command name — the
+ * ref-derived call signature intersected with Foldkit's
+ * `Interruptible.DefinitionWithArgsNameKeyed`, which supplies the brand and
+ * the `Interrupt` constructor.
+ */
+export type InterruptibleDefinition<
   Name extends string,
   Ref_ extends Ref.Any,
   Message,
-> {
-  readonly [FoldkitCommand.CommandDefinitionTypeId]: FoldkitCommand.CommandDefinitionTypeId;
-  readonly name: Name;
-  readonly Interrupt: FoldkitCommand.Interruptible.InterruptDefinitionNoArgs<Name>;
-  (
-    ...args: Ref.OptionalArgs<Ref_>
-  ): FoldkitCommand.Command<Message, never, WebSocketClient.WebSocketClient>;
-}
+> = ((
+  ...args: Ref.OptionalArgs<Ref_>
+) => Instance<Name, Ref_, Message> & Readonly<{ key: string }>) &
+  FoldkitCommand.Interruptible.DefinitionWithArgsNameKeyed<
+    Name,
+    ArgsFields<Ref.Args<Ref_>>,
+    Eff<Message>
+  >;
 
 /**
  * An interruptible Command definition whose key is derived from the ref's
- * args. Its `Interrupt` constructor takes the declared key args and builds an
- * ordinary Command that stops every in-flight invocation under that key.
+ * args — the ref-derived call signature intersected with Foldkit's
+ * `Interruptible.DefinitionWithArgs`, which supplies the brand and the
+ * key-args-taking `Interrupt` constructor.
  */
-export interface KeyedInterruptibleDefinition<
+export type KeyedInterruptibleDefinition<
   Name extends string,
   Ref_ extends Ref.Any,
   KeyField extends keyof Ref.Args<Ref_> & string,
   Message,
-> {
-  readonly [FoldkitCommand.CommandDefinitionTypeId]: FoldkitCommand.CommandDefinitionTypeId;
-  readonly name: Name;
-  readonly Interrupt: FoldkitCommand.Interruptible.InterruptDefinitionWithArgs<
+> = ((
+  ...args: Ref.OptionalArgs<Ref_>
+) => Instance<Name, Ref_, Message> & Readonly<{ key: string }>) &
+  FoldkitCommand.Interruptible.DefinitionWithArgs<
     Name,
-    Pick<Ref.Args<Ref_>, KeyField>
+    ArgsFields<Ref.Args<Ref_>>,
+    Pick<Ref.Args<Ref_>, KeyField>,
+    Eff<Message>
   >;
-  (
-    ...args: Ref.OptionalArgs<Ref_>
-  ): FoldkitCommand.Command<Message, never, WebSocketClient.WebSocketClient>;
-}
 
 const run = <Ref_ extends Ref.Any, SuccessMessage, ErrorMessage>(
   handlers: Handlers<Ref_, SuccessMessage, ErrorMessage>,
