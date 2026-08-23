@@ -596,6 +596,102 @@ describe("QueryStream", () => {
     }).pipe(Effect.provide(TestConfect.layer())),
   );
 
+  it.effect("distinct keeps the first document per group", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          const writer = yield* DatabaseWriter;
+          const reader = yield* DatabaseReader;
+
+          for (const [text, tag] of [
+            ["a", "a1"],
+            ["a", "a2"],
+            ["b", "b1"],
+            ["b", "b2"],
+            ["c", "c1"],
+          ] as const) {
+            yield* writer.table("notes").insert({ text, tag });
+          }
+
+          const tagsOf = <E, R>(
+            stream: Stream.Stream<{ tag?: string }, E, R>,
+          ): Effect.Effect<ReadonlyArray<string | undefined>, E, R> =>
+            Stream.runCollect(stream).pipe(
+              Effect.map((chunk) =>
+                Chunk.toReadonlyArray(chunk).map((doc) => doc.tag),
+              ),
+            );
+
+          const firstPerText = yield* tagsOf(
+            reader
+              .table("notes")
+              .stream("by_text")
+              .pipe(QueryStream.distinct(["text"])),
+          );
+          expect(firstPerText).toEqual(["a1", "b1", "c1"]);
+
+          // In descending order, the first document of each group is the
+          // group's last in ascending order.
+          const firstPerTextDesc = yield* tagsOf(
+            reader
+              .table("notes")
+              .stream("by_text", "desc")
+              .pipe(QueryStream.distinct(["text"])),
+          );
+          expect(firstPerTextDesc).toEqual(["c1", "b2", "a2"]);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer())),
+  );
+
+  it.effect("distinct paginates group by group", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          const writer = yield* DatabaseWriter;
+          const reader = yield* DatabaseReader;
+
+          for (const [text, tag] of [
+            ["a", "a1"],
+            ["a", "a2"],
+            ["b", "b1"],
+            ["b", "b2"],
+            ["c", "c1"],
+          ] as const) {
+            yield* writer.table("notes").insert({ text, tag });
+          }
+
+          const distinctTexts = reader
+            .table("notes")
+            .stream("by_text")
+            .pipe(QueryStream.distinct(["text"]));
+
+          const pages = yield* paginateAll(distinctTexts, 1);
+          expect(pages.map((page) => page.map((doc) => doc.tag))).toEqual([
+            ["a1"],
+            ["b1"],
+            ["c1"],
+          ]);
+
+          // Filtering *after* distinct filters the kept documents.
+          const filtered = distinctTexts.pipe(
+            QueryStream.filterEffect((note) =>
+              Effect.succeed(note.tag !== "b1"),
+            ),
+          );
+          const filteredPages = yield* paginateAll(filtered, 1);
+          expect(
+            filteredPages.map((page) => page.map((doc) => doc.tag)),
+          ).toEqual([["a1"], ["c1"]]);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer())),
+  );
+
   it.effect("unique succeeds on zero or one and fails on two", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
@@ -748,6 +844,20 @@ describe("QueryStream types", () => {
         innerKey: ["text", "_creationTime"],
       });
       void joinedMismatched;
+
+      // distinct preserves the order key and requires a prefix of it.
+      const distinctTexts = QueryStream.distinct(full, ["text"]);
+      expectTypeOf<KeyOf<typeof distinctTexts>>().toEqualTypeOf<
+        ["text", "_creationTime"]
+      >();
+
+      // @ts-expect-error — fields must be a prefix of the order key.
+      const distinctNonPrefix = QueryStream.distinct(full, ["_creationTime"]);
+      void distinctNonPrefix;
+
+      // @ts-expect-error — "text" is pinned away on this stream's key.
+      const distinctPinnedAway = QueryStream.distinct(pinned, ["text"]);
+      void distinctPinnedAway;
     });
     void _typeChecks;
   });
