@@ -128,26 +128,22 @@ const initialPhase = <Item_>(): Loading<Item_> => ({
 });
 
 /**
- * The slice of a ref's internal function spec the machine reads. The
- * `functionSpec` property is `@internal` on `Ref.Ref` and stripped from
+ * The slice of a ref's internals the machine reads. The `_tag` and `kind`
+ * properties are `@internal` on `Ref.Ref` and stripped from
  * `@confect/core`'s published declarations, hence the structural cast.
  */
-interface WithPaginatedProvenance {
-  readonly functionSpec: {
-    readonly functionProvenance:
-      | {
-          readonly _tag: "Confect";
-          readonly kind:
-            | { readonly _tag: "Standard" }
-            | {
-                readonly _tag: "Paginated";
-                readonly userArgs: Schema.Codec<any, any>;
-                readonly page: Schema.Codec<any, any>;
-              };
-        }
-      | { readonly _tag: "Convex" };
-  };
-}
+type StructuralRef =
+  | {
+      readonly _tag: "Confect";
+      readonly kind:
+        | { readonly _tag: "Standard" }
+        | {
+            readonly _tag: "Paginated";
+            readonly userArgs: Schema.Codec<any, any>;
+            readonly page: Schema.Codec<any, any>;
+          };
+    }
+  | { readonly _tag: "Convex" };
 
 const missingPaginatedProvenanceError = (ref: Ref.Any) =>
   new globalThis.Error(
@@ -157,15 +153,14 @@ const missingPaginatedProvenanceError = (ref: Ref.Any) =>
   );
 
 const paginatedKindOrThrow = (ref: Ref.AnyPublicPaginatedQuery) => {
-  const { functionProvenance } = (ref as unknown as WithPaginatedProvenance)
-    .functionSpec;
+  const structuralRef = ref as unknown as StructuralRef;
   if (
-    functionProvenance._tag === "Convex" ||
-    functionProvenance.kind._tag !== "Paginated"
+    structuralRef._tag === "Convex" ||
+    structuralRef.kind._tag !== "Paginated"
   ) {
     throw missingPaginatedProvenanceError(ref);
   }
-  return functionProvenance.kind;
+  return structuralRef.kind;
 };
 
 /**
