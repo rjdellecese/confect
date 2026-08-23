@@ -1676,6 +1676,12 @@ export const deserializeCursor = (cursor: string): OrderKey =>
 /** The cursor denoting the end of the stream. */
 export const END_CURSOR = "[]";
 
+/**
+ * Reading this many rows into one page earns a `SplitRecommended` — half of
+ * `convex-helpers`' `MAX_DOCUMENT_SCAN_LEN` (32000), as there.
+ */
+const SOFT_MAX_SCAN_LENGTH = 16000;
+
 export interface PaginateOptions {
   readonly numItems: number;
   readonly cursor: string | null;
@@ -1830,12 +1836,39 @@ export const paginate = dual<
                   },
             // The narrowed stream was exhausted: either we reached the
             // pinned end cursor (more may follow it) or the true end of
-            // the stream.
-            onNone: () => ({
-              page,
-              isDone: Option.isNone(pinnedEnd),
-              continueCursor: Option.getOrElse(pinnedEnd, () => END_CURSOR),
-            }),
+            // the stream. An endCursor-pinned page that has grown well
+            // past its requested size recommends a split, so reactive
+            // clients can subdivide it (as `convex-helpers` does).
+            onNone: () => {
+              const shouldRecommendSplit =
+                Option.isSome(pinnedEnd) &&
+                (Chunk.size(state.readKeys) >= SOFT_MAX_SCAN_LENGTH ||
+                  Chunk.size(state.page) > options.numItems + 1);
+              return shouldRecommendSplit && Chunk.size(state.readKeys) > 0
+                ? {
+                    page,
+                    isDone: false,
+                    continueCursor: Option.getOrElse(
+                      pinnedEnd,
+                      () => END_CURSOR,
+                    ),
+                    pageStatus: "SplitRecommended" as const,
+                    splitCursor: serializeCursor(
+                      Chunk.unsafeGet(
+                        state.readKeys,
+                        Math.floor((Chunk.size(state.readKeys) - 1) / 2),
+                      ),
+                    ),
+                  }
+                : {
+                    page,
+                    isDone: Option.isNone(pinnedEnd),
+                    continueCursor: Option.getOrElse(
+                      pinnedEnd,
+                      () => END_CURSOR,
+                    ),
+                  };
+            },
           });
         }),
       );
