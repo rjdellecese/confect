@@ -450,6 +450,18 @@ The core of §4 is now implemented as an experimental API:
   `convex-helpers`' `OrderByStream` needs (its other job, dropping
   equality-pinned prefix fields, is already the leaf's remaining-field key
   convention here).
+- **`useStreamPaginatedQuery`** (`@confect/react`) — the client half of
+  §4.5: endCursor-pinned reactive pagination, built as a pure
+  `StreamPagination` state machine (pages, ongoing splits, load-more and
+  split transitions, and a per-render interpretation of the subscribed
+  pages' results) driven by a thin hook over `convex/react`'s
+  `useQueries`. Each loaded page re-subscribes with its `continueCursor`
+  echoed back as `endCursor`, so pages grow and shrink reactively but
+  always meet exactly; overgrown pages split (the server's `paginate` now
+  emits `SplitRecommended` with a midpoint `splitCursor` when a pinned
+  page outgrows its requested size); invalid cursors reset pagination.
+  Args, items, and typed errors flow through the ref's schemas into the
+  same `PaginatedQueryResult` ADT as `usePaginatedQuery`.
 - **`QueryInitializer.stream(...)`** — `reader.table("notes").stream("by_text",
 (q) => q.eq("text", "a"), "desc")` returns
   `QueryStream<Doc, ["_creationTime"], DocumentDecodeError>`.

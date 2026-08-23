@@ -6,24 +6,31 @@ import type { usePaginatedQuery as useConvexPaginatedQuery } from "convex/react"
 import {
   useAction as useConvexAction,
   useMutation as useConvexMutation,
+  useQueries as useConvexQueries,
   useQuery as useConvexQuery,
   type ReactMutation as ConvexReactMutation,
 } from "convex/react";
-import type { FunctionReference } from "convex/server";
-import type { Value } from "convex/values";
+import { getFunctionName, type FunctionReference } from "convex/server";
+import { ConvexError, convexToJson, type Value } from "convex/values";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
 import * as Exit from "effect/Exit";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import * as OptimisticLocalStore from "./OptimisticLocalStore";
 import * as PaginatedQueryResult from "./PaginatedQueryResult";
 import * as QueryResult from "./QueryResult";
+import * as StreamPagination from "./StreamPagination";
 
-export { OptimisticLocalStore, PaginatedQueryResult, QueryResult };
+export {
+  OptimisticLocalStore,
+  PaginatedQueryResult,
+  QueryResult,
+  StreamPagination,
+};
 
 export type InvokeReturn<Ref_ extends Ref.Any> = [Ref.Error<Ref_>] extends [
   never,
@@ -311,6 +318,219 @@ export const usePaginatedQuery = <Query extends Ref.AnyPublicPaginatedQuery>(
     // is exactly what the conditional encodes.
     [ref, skipped, decodedResults, status, loadMore, error],
   ) as PaginatedQueryResult.PaginatedQueryResult<
+    PaginatedQueryItem<Query>,
+    Ref.Error<Query>
+  >;
+};
+
+/**
+ * Whether a paginated query error means the stored cursors no longer match
+ * the query (a data-dependent query changed underneath us), calling for a
+ * full pagination reset rather than a failure.
+ */
+const isInvalidCursorError = (error: Error): boolean =>
+  error.message.includes("InvalidCursor") ||
+  (error instanceof ConvexError &&
+    typeof error.data === "object" &&
+    error.data !== null &&
+    (error.data as { isConvexSystemError?: unknown }).isConvexSystemError ===
+      true &&
+    (error.data as { paginationError?: unknown }).paginationError ===
+      "InvalidCursor");
+
+const NO_ITEMS: ReadonlyArray<unknown> = [];
+
+/**
+ * PROTOTYPE — endCursor-pinned reactive pagination (see
+ * `notes/stream-based-querying.md`). Use it with paginated queries whose
+ * handlers paginate via `QueryStream.paginate`: those don't write the query
+ * journal that {@link usePaginatedQuery}'s built-in reactivity relies on,
+ * so gap-free pages must be maintained by the client instead. (It works
+ * with any paginated query honoring the `endCursor` protocol field,
+ * including the built-in `paginate`.)
+ *
+ * Each loaded page is pinned to a fixed index range by re-subscribing it
+ * with its `continueCursor` echoed back as `endCursor` — pages then grow
+ * and shrink reactively but always meet exactly, and a page that outgrows
+ * `initialNumItems` is split in two. This is the mechanism of
+ * `convex-helpers/react`'s `usePaginatedQuery`, re-expressed over the pure
+ * {@link StreamPagination} state machine, with args/items/errors codec'd
+ * through the ref's schemas exactly like {@link usePaginatedQuery}.
+ */
+export const useStreamPaginatedQuery = <
+  Query extends Ref.AnyPublicPaginatedQuery,
+>(
+  ref: Query,
+  args: UsePaginatedQueryArgs<Query>,
+  options: { readonly initialNumItems: number },
+): PaginatedQueryResult.PaginatedQueryResult<
+  PaginatedQueryItem<Query>,
+  Ref.Error<Query>
+> => {
+  const functionReference = Ref.getFunctionReference(ref);
+  const skipped = args === "skip";
+
+  const encodedArgs = useMemo(
+    () =>
+      args === "skip"
+        ? undefined
+        : (Ref.encodePaginatedQueryArgsSync(
+            ref,
+            args as unknown as Omit<Ref.Args<Query>, "paginationOpts">,
+          ) as Record<string, Value>),
+    [ref, args],
+  );
+
+  // A change of query, args, skippedness, or page size restarts pagination
+  // from scratch.
+  const resetKey = useMemo(
+    () =>
+      JSON.stringify([
+        getFunctionName(functionReference),
+        encodedArgs === undefined ? "skip" : convexToJson(encodedArgs),
+        options.initialNumItems,
+      ]),
+    [functionReference, encodedArgs, options.initialNumItems],
+  );
+
+  const freshState = () =>
+    skipped
+      ? StreamPagination.empty
+      : StreamPagination.initial(options.initialNumItems);
+
+  const [tracked, setTracked] = useState(() => ({
+    resetKey,
+    state: freshState(),
+  }));
+  // Render-phase reset — the React-sanctioned derived-state-from-props
+  // pattern, also how `convex/react`'s own paginated hook resets.
+  let current = tracked;
+  if (current.resetKey !== resetKey) {
+    current = { resetKey, state: freshState() };
+    setTracked(current);
+  }
+
+  const applyTransitions = useCallback(
+    (
+      transitions: ReadonlyArray<
+        (state: StreamPagination.State) => StreamPagination.State
+      >,
+    ) =>
+      setTracked((previous) => ({
+        resetKey: previous.resetKey,
+        state: transitions.reduce(
+          (state, transition) => transition(state),
+          previous.state,
+        ),
+      })),
+    [],
+  );
+
+  const queries = useMemo(
+    () =>
+      StreamPagination.pageRequests(current.state, (page) => ({
+        query: functionReference,
+        args: { ...encodedArgs, paginationOpts: page },
+      })),
+    [current.state, functionReference, encodedArgs],
+  );
+
+  const resultsObject = useConvexQueries(
+    queries as unknown as Parameters<typeof useConvexQueries>[0],
+  );
+
+  const interpretation = useMemo(
+    () =>
+      StreamPagination.interpret(
+        current.state,
+        resultsObject as StreamPagination.Results,
+        { initialNumItems: options.initialNumItems, isInvalidCursorError },
+      ),
+    [current.state, resultsObject, options.initialNumItems],
+  );
+
+  // Apply the transitions this render discovered (completed split swaps,
+  // new splits of overgrown pages) or restart after an invalid cursor —
+  // render-phase state updates, as in `convex-helpers`' hook. Both settle:
+  // the updated state no longer produces the same discovery.
+  if (interpretation._tag === "ResetRequired") {
+    setTracked((previous) => ({
+      resetKey: previous.resetKey,
+      state: freshState(),
+    }));
+  } else if (
+    interpretation._tag === "Interpreted" &&
+    interpretation.transitions.length > 0
+  ) {
+    applyTransitions(interpretation.transitions);
+  }
+
+  const encodedItems =
+    interpretation._tag === "ResetRequired" ? NO_ITEMS : interpretation.items;
+  const decodedResults = useMemo(
+    () => Ref.decodePaginationPageSync(ref, encodedItems),
+    [ref, encodedItems],
+  );
+
+  return useMemo((): PaginatedQueryResult.Variants<
+    PaginatedQueryItem<Query>,
+    Ref.Error<Query>
+  > => {
+    if (interpretation._tag === "ResetRequired") {
+      return PaginatedQueryResult.loadingFirstPage({ skipped });
+    }
+    if (interpretation._tag === "Failed") {
+      const error = interpretation.error;
+      if (Ref.isConvexError(error)) {
+        const decoded = Ref.decodeErrorOption(ref, error.data);
+        if (Option.isSome(decoded)) {
+          return PaginatedQueryResult.failure({
+            error: decoded.value,
+            results: decodedResults,
+          });
+        }
+      }
+      // Unknown errors still throw, to be caught by an error boundary.
+      throw error;
+    }
+
+    const { lastResult } = interpretation;
+    if (Option.isNone(lastResult) && current.state.pageKeys.length <= 1) {
+      return PaginatedQueryResult.loadingFirstPage({ skipped });
+    }
+    if (
+      Option.isNone(lastResult) ||
+      StreamPagination.isLastPageSplitting(current.state)
+    ) {
+      return PaginatedQueryResult.loadingMore({ results: decodedResults });
+    }
+    if (lastResult.value.isDone) {
+      return PaginatedQueryResult.exhausted({ results: decodedResults });
+    }
+
+    const continueCursor = lastResult.value.continueCursor;
+    // A per-result guard, as in `convex-helpers`: calling `loadMore`
+    // repeatedly before the next render is a single load.
+    let alreadyLoadingMore = false;
+    return PaginatedQueryResult.canLoadMore({
+      results: decodedResults,
+      loadMore: (numItems: number) => {
+        if (!alreadyLoadingMore) {
+          alreadyLoadingMore = true;
+          applyTransitions([
+            StreamPagination.loadMore(continueCursor, numItems),
+          ]);
+        }
+      },
+    });
+  }, [
+    interpretation,
+    decodedResults,
+    current.state,
+    skipped,
+    ref,
+    applyTransitions,
+  ]) as PaginatedQueryResult.PaginatedQueryResult<
     PaginatedQueryItem<Query>,
     Ref.Error<Query>
   >;
