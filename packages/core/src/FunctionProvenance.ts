@@ -13,9 +13,7 @@ export type FunctionProvenance = Data.TaggedEnum<{
     kind: ConfectKind;
   };
   Convex: {
-    /** @internal */
     "~args": DefaultFunctionArgs;
-    /** @internal */
     "~returns": any;
   };
 }>;

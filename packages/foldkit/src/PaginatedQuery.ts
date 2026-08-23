@@ -127,24 +127,6 @@ const initialPhase = <Item_>(): Loading<Item_> => ({
   direction: "First",
 });
 
-/**
- * The slice of a ref's internals the machine reads. The `_tag` and `kind`
- * properties are `@internal` on `Ref.Ref` and stripped from
- * `@confect/core`'s published declarations, hence the structural cast.
- */
-type StructuralRef =
-  | {
-      readonly _tag: "Confect";
-      readonly kind:
-        | { readonly _tag: "Standard" }
-        | {
-            readonly _tag: "Paginated";
-            readonly userArgs: Schema.Codec<any, any>;
-            readonly page: Schema.Codec<any, any>;
-          };
-    }
-  | { readonly _tag: "Convex" };
-
 const missingPaginatedProvenanceError = (ref: Ref.Any) =>
   new globalThis.Error(
     `Paginated query ref "${Ref.getConvexFunctionName(ref)}" was not built ` +
@@ -153,14 +135,10 @@ const missingPaginatedProvenanceError = (ref: Ref.Any) =>
   );
 
 const paginatedKindOrThrow = (ref: Ref.AnyPublicPaginatedQuery) => {
-  const structuralRef = ref as unknown as StructuralRef;
-  if (
-    structuralRef._tag === "Convex" ||
-    structuralRef.kind._tag !== "Paginated"
-  ) {
+  if (ref._tag === "Convex" || ref.kind._tag !== "Paginated") {
     throw missingPaginatedProvenanceError(ref);
   }
-  return structuralRef.kind;
+  return ref.kind;
 };
 
 /**

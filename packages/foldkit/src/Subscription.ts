@@ -94,25 +94,11 @@ const missingConfectProvenanceError = (ref: Ref.Any) =>
       "`Subscription.reactiveQueryStream` instead.",
   );
 
-/**
- * The slice of a ref's internals the entry builders read. The `_tag`, `args`,
- * and `kind` properties are `@internal` on `Ref.Ref` and stripped from
- * `@confect/core`'s published declarations, hence the structural cast.
- */
-type StructuralRef =
-  | {
-      readonly _tag: "Confect";
-      readonly args: Schema.Codec<any, any>;
-      readonly kind: { readonly _tag: "Standard" | "Paginated" };
-    }
-  | { readonly _tag: "Convex" };
-
 const argsSchemaOrThrow = (ref: Ref.AnyPublicQuery): Schema.Codec<any, any> => {
-  const structuralRef = ref as unknown as StructuralRef;
-  if (structuralRef._tag === "Convex") {
+  if (ref._tag === "Convex") {
     throw missingConfectProvenanceError(ref);
   }
-  return structuralRef.args;
+  return ref.args;
 };
 
 const missingPaginatedProvenanceError = (ref: Ref.Any) =>
@@ -126,14 +112,10 @@ const missingPaginatedProvenanceError = (ref: Ref.Any) =>
 const paginatedArgsSchemaOrThrow = (
   ref: Ref.AnyPublicPaginatedQuery,
 ): Schema.Codec<any, any> => {
-  const structuralRef = ref as unknown as StructuralRef;
-  if (
-    structuralRef._tag === "Convex" ||
-    structuralRef.kind._tag !== "Paginated"
-  ) {
+  if (ref._tag === "Convex" || ref.kind._tag !== "Paginated") {
     throw missingPaginatedProvenanceError(ref);
   }
-  return structuralRef.args;
+  return ref.args;
 };
 
 /**
