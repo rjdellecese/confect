@@ -422,6 +422,18 @@ The core of §4 is now implemented as a working prototype:
   re-apply, and externally constructed streams fall back to in-memory
   filtering. `paginate` composes with this automatically, so resuming from
   a cursor reads only the remaining range.
+- **`flatMap`** — the join: each outer document expands into an inner
+  stream, ordered by (outer key, then inner key), with the concatenated
+  order key tracked _at the type level_ (`readonly [...OuterKey,
+...InnerKey]`) and the `innerKey` argument checked against `f`'s return
+  type. Outer documents that contribute no inner elements (filtered out,
+  or an empty inner stream) emit a `null`-padded filtered element so
+  cursors advance past their cost. Narrowing splits bounds at the
+  outer/inner seam; the inner bound applies only to the _boundary_ outer
+  row — a deliberate correctness deviation from `convex-helpers`, whose
+  `FlatMapStream.narrow` applies inner bounds to every row's inner stream
+  and so drops legitimate elements from non-boundary rows when resuming
+  from a mid-row cursor.
 - **`QueryInitializer.stream(...)`** — `reader.table("notes").stream("by_text",
 (q) => q.eq("text", "a"), "desc")` returns
   `QueryStream<Doc, ["_creationTime"], DocumentDecodeError>`.
@@ -441,8 +453,8 @@ recommendation:
   improvement over `convex-helpers`' full index keys: equality-pinned values
   never leak into cursors, and merged streams with different pins share a
   cursor space by construction.
-- No `flatMap` (join), `distinct` (loose index scan), or `orderBy` (re-keying)
-  yet; no `maximumBytesRead` accounting; NaN ordering subtleties are skipped.
+- No `distinct` (loose index scan) or `orderBy` (re-keying) yet; no
+  `maximumBytesRead` accounting; NaN ordering subtleties are skipped.
 
 ## 8. Open questions
 
