@@ -513,6 +513,117 @@ describe("QueryStream", () => {
     }).pipe(Effect.provide(TestConfect.layer)),
   );
 
+  it.effect("flatMap joins each outer document to an inner stream", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          const writer = yield* DatabaseWriter;
+          const reader = yield* DatabaseReader;
+
+          // Inner rows, keyed by text; outer rows reference them via `tag`.
+          for (const [text, tag] of [
+            ["a", "a1"],
+            ["a", "a2"],
+            ["b", "b1"],
+            ["x1", "a"],
+            ["x2", "b"],
+            ["x3", "none"],
+          ] as const) {
+            yield* writer.table("notes").insert({ text, tag });
+          }
+
+          const outer = reader
+            .table("notes")
+            .stream("by_text", (q) => q.gte("text", "x"));
+          const joined = outer.pipe(
+            QueryStream.flatMap(
+              (note) =>
+                reader
+                  .table("notes")
+                  .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
+              { innerKey: ["_creationTime"] },
+            ),
+          );
+
+          const tags = yield* Stream.runCollect(joined).pipe(
+            Effect.map((docs) => docs.map((doc) => doc.tag)),
+          );
+          // x1 → the "a" rows in creation order, x2 → the "b" row, and
+          // x3's empty inner stream contributes nothing visible.
+          expect(tags).toEqual(["a1", "a2", "b1"]);
+
+          // Filtered-out outer documents contribute nothing visible either.
+          const filteredJoin = outer.pipe(
+            QueryStream.filterEffect((note) =>
+              Effect.succeed(note.text !== "x2"),
+            ),
+            QueryStream.flatMap(
+              (note) =>
+                reader
+                  .table("notes")
+                  .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
+              { innerKey: ["_creationTime"] },
+            ),
+          );
+          const filteredTags = yield* Stream.runCollect(filteredJoin).pipe(
+            Effect.map((docs) => docs.map((doc) => doc.tag)),
+          );
+          expect(filteredTags).toEqual(["a1", "a2"]);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect("flatMap paginates across inner-stream boundaries", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          const writer = yield* DatabaseWriter;
+          const reader = yield* DatabaseReader;
+
+          // The "b" row is inserted *first*, so its creation time is the
+          // smallest: if resuming wrongly applied the boundary row's inner
+          // bound to every row (as `convex-helpers` does), the "b" row
+          // would be skipped on the page after a mid-"a" cursor.
+          for (const [text, tag] of [
+            ["b", "b1"],
+            ["a", "a1"],
+            ["a", "a2"],
+            ["x0", "none"],
+            ["x1", "a"],
+            ["x2", "b"],
+          ] as const) {
+            yield* writer.table("notes").insert({ text, tag });
+          }
+
+          const joined = reader
+            .table("notes")
+            .stream("by_text", (q) => q.gte("text", "x"))
+            .pipe(
+              QueryStream.flatMap(
+                (note) =>
+                  reader
+                    .table("notes")
+                    .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
+                { innerKey: ["_creationTime"] },
+              ),
+            );
+
+          const pages = yield* paginateAll(joined, 1);
+          expect(pages.map((page) => page.map((doc) => doc.tag))).toEqual([
+            ["a1"],
+            ["a2"],
+            ["b1"],
+          ]);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
   it.effect("resumes a fully eq-pinned by_id stream from its cursor", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
@@ -798,6 +909,20 @@ describe("QueryStream types", () => {
           ? R
           : never
       >().toEqualTypeOf<SomeService>();
+
+      // flatMap concatenates order keys at the type level.
+      const joined = QueryStream.flatMap(bounded, (_note) => pinned, {
+        innerKey: ["_creationTime"],
+      });
+      expectTypeOf<KeyOf<typeof joined>>().toEqualTypeOf<
+        readonly ["text", "_creationTime", "_creationTime"]
+      >();
+
+      const joinedMismatched = QueryStream.flatMap(bounded, (_note) => pinned, {
+        // @ts-expect-error — innerKey must match the inner stream's order key.
+        innerKey: ["text", "_creationTime"],
+      });
+      void joinedMismatched;
     });
     void _typeChecks;
   });

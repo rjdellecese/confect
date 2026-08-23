@@ -16,10 +16,7 @@
  *
  * Known limitations (all called out in the design doc):
  *
- * - `narrow` filters the annotated stream in memory rather than pushing
- *   bounds down into `withIndex` ranges (`splitRange` in `convex-helpers`),
- *   so resuming from a cursor re-reads the range from its start.
- * - No `flatMap` (join) or `distinct` (loose index scan) yet.
+ * - No `distinct` (loose index scan) or `orderBy` (re-keying) yet.
  * - Cursors serialize only the *remaining* (order-key) fields, not the full
  *   index key — equality-pinned values never leak into cursors.
  */
@@ -1087,6 +1084,236 @@ export const mapEffect = dual<
 );
 
 /**
+ * A join: for each outer document, stream the documents of the inner stream
+ * produced by `f`, ordered by (outer key, then inner key) — SQL's `LATERAL`
+ * join shape, `flatMap` on `convex-helpers` streams.
+ *
+ * `options.innerKey` is the order key shared by *every* inner stream —
+ * checked against `f`'s return type, so a mismatched literal is a type
+ * error; each produced stream is also validated at runtime (a defect on
+ * mismatch, like `merge`).
+ *
+ * Cursor accounting: an outer document whose inner stream is empty — or
+ * that was filtered out upstream — still contributes one filtered element
+ * whose inner key components are `null`s, so cursors advance past the cost
+ * of reading it. Narrowing splits bounds at the outer/inner seam: the outer
+ * stream is narrowed by the bounds' outer components, and the inner bound
+ * applies only to the *boundary* outer row (the row whose outer key equals
+ * the bound's outer prefix) — other rows' inner streams run in full. (This
+ * deliberately deviates from `convex-helpers`, which narrows every row's
+ * inner stream and so drops legitimate elements from non-boundary rows.)
+ */
+export const flatMap = dual<
+  <Doc, Doc2, InnerKey extends ReadonlyArray<string>, E2, R2>(
+    f: (doc: Doc) => QueryStream<Doc2, InnerKey, E2, R2>,
+    options: { readonly innerKey: NoInfer<InnerKey> },
+  ) => <Key extends ReadonlyArray<string>, E, R>(
+    self: QueryStream<Doc, Key, E, R>,
+  ) => QueryStream<Doc2, readonly [...Key, ...InnerKey], E | E2, R | R2>,
+  <
+    Doc,
+    Key extends ReadonlyArray<string>,
+    E,
+    R,
+    Doc2,
+    InnerKey extends ReadonlyArray<string>,
+    E2,
+    R2,
+  >(
+    self: QueryStream<Doc, Key, E, R>,
+    f: (doc: Doc) => QueryStream<Doc2, InnerKey, E2, R2>,
+    options: { readonly innerKey: NoInfer<InnerKey> },
+  ) => QueryStream<Doc2, readonly [...Key, ...InnerKey], E | E2, R | R2>
+>(3, (self, f, options) =>
+  makeFlatMap(
+    self,
+    f,
+    // Runtime inner key fields follow the same convention as leaves: the
+    // type-level key plus the implicit `_id` tiebreaker.
+    Option.exists(Array.last(options.innerKey), (field) => field === "_id")
+      ? options.innerKey
+      : Array.append(options.innerKey, "_id"),
+    {},
+  ),
+);
+
+/** Inner bounds that apply only to the outer row whose key is `outer`. */
+interface InnerRefinement {
+  readonly outer: OrderKey;
+  readonly inner: KeyBound;
+}
+
+interface InnerRefinements {
+  readonly lower?: InnerRefinement | undefined;
+  readonly upper?: InnerRefinement | undefined;
+}
+
+/** Of two lower refinements, the one at the later boundary row wins. */
+const combineLowerRefinements = (
+  existing: InnerRefinement | undefined,
+  incoming: InnerRefinement | undefined,
+): InnerRefinement | undefined =>
+  existing === undefined
+    ? incoming
+    : incoming === undefined
+      ? existing
+      : Order.isGreaterThan(OrderKeyOrder)(existing.outer, incoming.outer)
+        ? existing
+        : Order.isLessThan(OrderKeyOrder)(existing.outer, incoming.outer)
+          ? incoming
+          : {
+              outer: existing.outer,
+              inner: tightestLower(existing.inner, incoming.inner),
+            };
+
+/** Of two upper refinements, the one at the earlier boundary row wins. */
+const combineUpperRefinements = (
+  existing: InnerRefinement | undefined,
+  incoming: InnerRefinement | undefined,
+): InnerRefinement | undefined =>
+  existing === undefined
+    ? incoming
+    : incoming === undefined
+      ? existing
+      : Order.isLessThan(OrderKeyOrder)(existing.outer, incoming.outer)
+        ? existing
+        : Order.isGreaterThan(OrderKeyOrder)(existing.outer, incoming.outer)
+          ? incoming
+          : {
+              outer: existing.outer,
+              inner: tightestUpper(existing.inner, incoming.inner),
+            };
+
+const makeFlatMap = <
+  Doc,
+  Key extends ReadonlyArray<string>,
+  E,
+  R,
+  Doc2,
+  InnerKey extends ReadonlyArray<string>,
+  E2,
+  R2,
+>(
+  self: QueryStream<Doc, Key, E, R>,
+  f: (doc: Doc) => QueryStream<Doc2, InnerKey, E2, R2>,
+  innerKeyFields: ReadonlyArray<string>,
+  refinements: InnerRefinements,
+): QueryStream<Doc2, readonly [...Key, ...InnerKey], E | E2, R | R2> => {
+  const outerLength = self.keyFields.length;
+  const keyFields = Array.appendAll(self.keyFields, innerKeyFields);
+  // The inner key of an outer document that contributes no inner elements
+  // (filtered out, or an empty inner stream).
+  const nullPadding: OrderKey = Array.makeBy(innerKeyFields.length, () => null);
+
+  const validated = (
+    inner: QueryStream<Doc2, InnerKey, E2, R2>,
+  ): QueryStream<Doc2, InnerKey, E2, R2> => {
+    if (inner.order !== self.order) {
+      throw new Error(
+        `QueryStream.flatMap: inner stream order (${inner.order}) differs from the outer stream's (${self.order})`,
+      );
+    }
+    if (!keyFieldsEquivalence(inner.keyFields, innerKeyFields)) {
+      throw new Error(
+        `QueryStream.flatMap: inner stream order-key fields ([${Array.join(inner.keyFields, ", ")}]) differ from innerKey ([${Array.join(innerKeyFields, ", ")}])`,
+      );
+    }
+    return inner;
+  };
+
+  const innerBoundsFor = (outerKey: OrderKey): KeyBounds => ({
+    lower:
+      refinements.lower !== undefined &&
+      OrderKeyOrder(outerKey, refinements.lower.outer) === 0
+        ? Option.some(refinements.lower.inner)
+        : Option.none(),
+    upper:
+      refinements.upper !== undefined &&
+      OrderKeyOrder(outerKey, refinements.upper.outer) === 0
+        ? Option.some(refinements.upper.inner)
+        : Option.none(),
+  });
+
+  const markerStream = (
+    outerKey: OrderKey,
+    innerBounds: KeyBounds,
+  ): Stream.Stream<Element<Doc2>> =>
+    admittedByLower(innerBounds.lower)(nullPadding) &&
+    admittedByUpper(innerBounds.upper)(nullPadding)
+      ? Stream.succeed([
+          Option.none<Doc2>(),
+          Array.appendAll(outerKey, nullPadding),
+        ] as const)
+      : Stream.empty;
+
+  const annotated: Stream.Stream<
+    Element<Doc2>,
+    E | E2,
+    R | R2
+  > = self.annotated.pipe(
+    Stream.flatMap(([outerDoc, outerKey]) => {
+      const innerBounds = innerBoundsFor(outerKey);
+      return Option.match(outerDoc, {
+        onNone: () => markerStream(outerKey, innerBounds),
+        onSome: (doc) =>
+          narrowByKeyBounds(validated(f(doc)), innerBounds).annotated.pipe(
+            Stream.map(
+              ([innerDoc, innerKey]) =>
+                [innerDoc, Array.appendAll(outerKey, innerKey)] as const,
+            ),
+            Stream.orElseIfEmpty(() => markerStream(outerKey, innerBounds)),
+          ),
+      });
+    }),
+  );
+
+  const split = (
+    bound: Option.Option<KeyBound>,
+  ): {
+    readonly outer: Option.Option<KeyBound>;
+    readonly refinement: InnerRefinement | undefined;
+  } =>
+    Option.match(bound, {
+      onNone: () => ({ outer: Option.none(), refinement: undefined }),
+      onSome: ({ inclusive, key }) =>
+        key.length <= outerLength
+          ? { outer: Option.some({ key, inclusive }), refinement: undefined }
+          : {
+              // The boundary outer row must be included so its inner
+              // stream can be narrowed by the bound's inner components.
+              outer: Option.some({
+                key: Array.take(key, outerLength),
+                inclusive: true,
+              }),
+              refinement: {
+                outer: Array.take(key, outerLength),
+                inner: { key: Array.drop(key, outerLength), inclusive },
+              },
+            },
+    });
+
+  return new QueryStream(
+    self.order,
+    keyFields,
+    annotated,
+    undefined,
+    (bounds) => {
+      const lower = split(bounds.lower);
+      const upper = split(bounds.upper);
+      return makeFlatMap(
+        narrowByKeyBounds(self, { lower: lower.outer, upper: upper.outer }),
+        f,
+        innerKeyFields,
+        {
+          lower: combineLowerRefinements(refinements.lower, lower.refinement),
+          upper: combineUpperRefinements(refinements.upper, upper.refinement),
+        },
+      );
+    },
+  );
+};
+
+/**
  * Restrict a stream to order keys strictly after `after` and at-or-before
  * `until` (in stream order). Bounds are pushed down through the stream's
  * structure via `narrowWith`: leaves rebuild their Convex queries with the
@@ -1146,6 +1373,24 @@ const narrowByKeyBounds = <Doc, Key extends ReadonlyArray<string>, E, R>(
       ? self.narrowWith(bounds)
       : narrowInMemory(self, bounds);
 
+/** Whether a key sits after the lower bound (always, when unbounded). */
+const admittedByLower =
+  (lower: Option.Option<KeyBound>) =>
+  (key: OrderKey): boolean =>
+    Option.match(lower, {
+      onNone: () => true,
+      onSome: (bound) => KeyCutOrder(exactCut(key), lowerCut(bound)) > 0,
+    });
+
+/** Whether a key sits before the upper bound (always, when unbounded). */
+const admittedByUpper =
+  (upper: Option.Option<KeyBound>) =>
+  (key: OrderKey): boolean =>
+    Option.match(upper, {
+      onNone: () => true,
+      onSome: (bound) => KeyCutOrder(exactCut(key), upperCut(bound)) < 0,
+    });
+
 /** The fallback for streams that don't know how to rebuild themselves. */
 const narrowInMemory = <Doc, Key extends ReadonlyArray<string>, E, R>(
   self: QueryStream<Doc, Key, E, R>,
@@ -1155,25 +1400,17 @@ const narrowInMemory = <Doc, Key extends ReadonlyArray<string>, E, R>(
     annotated: Stream.Stream<Element<Doc>, E, R>,
   ) => Stream.Stream<Element<Doc>, E, R>;
 
-  const admittedByLower = (key: OrderKey): boolean =>
-    Option.match(bounds.lower, {
-      onNone: () => true,
-      onSome: (bound) => KeyCutOrder(exactCut(key), lowerCut(bound)) > 0,
-    });
-  const admittedByUpper = (key: OrderKey): boolean =>
-    Option.match(bounds.upper, {
-      onNone: () => true,
-      onSome: (bound) => KeyCutOrder(exactCut(key), upperCut(bound)) < 0,
-    });
+  const aboveLower = admittedByLower(bounds.lower);
+  const belowUpper = admittedByUpper(bounds.upper);
 
   const dropOutOfRange: Narrower =
     self.order === "asc"
-      ? Stream.dropWhile(([, key]) => !admittedByLower(key))
-      : Stream.dropWhile(([, key]) => !admittedByUpper(key));
+      ? Stream.dropWhile(([, key]) => !aboveLower(key))
+      : Stream.dropWhile(([, key]) => !belowUpper(key));
   const takeInRange: Narrower =
     self.order === "asc"
-      ? Stream.takeWhile(([, key]) => admittedByUpper(key))
-      : Stream.takeWhile(([, key]) => admittedByLower(key));
+      ? Stream.takeWhile(([, key]) => belowUpper(key))
+      : Stream.takeWhile(([, key]) => aboveLower(key));
 
   return new QueryStream(
     self.order,
