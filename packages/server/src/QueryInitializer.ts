@@ -28,6 +28,7 @@ import type {
 import type * as DataModel from "./DataModel";
 import * as Document from "./Document";
 import * as OrderedQuery from "./OrderedQuery";
+import * as QueryStream from "./QueryStream";
 import type * as Table from "./Table";
 import type * as TableInfo from "./TableInfo";
 
@@ -76,6 +77,42 @@ export interface QueryInitializer<
       >,
     ) => SearchFilter,
   ) => OrderedQuery.OrderedQuery<TableInfo_, TableName, Doc>;
+  /**
+   * PROTOTYPE — stream-first querying (see `notes/stream-based-querying.md`).
+   *
+   * Like `index`, but returns a {@link QueryStream.QueryStream}: a genuine
+   * Effect `Stream` of documents in index order that stays mergeable and
+   * paginable. The typed range builder consumes `eq`-pinned fields from the
+   * index's field tuple at the type level, so the stream's order-key type is
+   * exactly the fields that still vary.
+   */
+  readonly stream: {
+    <
+      IndexName extends keyof Indexes<ConvexTableInfo_> & string,
+      Spec extends QueryStream.AnyIndexRangeSpec,
+    >(
+      indexName: IndexName,
+      indexRange: (
+        q: QueryStream.RangeBuilder<
+          TableInfo_["convexDocument"],
+          NamedIndex<ConvexTableInfo_, IndexName>
+        >,
+      ) => Spec,
+      order?: "asc" | "desc",
+    ): QueryStream.QueryStream<
+      Doc,
+      QueryStream.Remaining<Spec>,
+      Document.DocumentDecodeError
+    >;
+    <IndexName extends keyof Indexes<ConvexTableInfo_> & string>(
+      indexName: IndexName,
+      order?: "asc" | "desc",
+    ): QueryStream.QueryStream<
+      Doc,
+      NamedIndex<ConvexTableInfo_, IndexName>,
+      Document.DocumentDecodeError
+    >;
+  };
 }
 
 export const make = <
@@ -246,6 +283,63 @@ export const make = <
     );
   };
 
+  const stream: QueryInitializerFunction<"stream"> = ((
+    indexName: string,
+    indexRangeOrOrder?:
+      | ((
+          q: QueryStream.RangeBuilder<any, any>,
+        ) => QueryStream.AnyIndexRangeSpec)
+      | "asc"
+      | "desc",
+    maybeOrder?: "asc" | "desc",
+  ) => {
+    const rangeFn =
+      typeof indexRangeOrOrder === "function" ? indexRangeOrOrder : undefined;
+    const order =
+      typeof indexRangeOrOrder === "string"
+        ? indexRangeOrOrder
+        : (maybeOrder ?? "asc");
+
+    const spec = rangeFn?.(QueryStream.rangeBuilder());
+
+    // The type-level field tuple appends the `_creationTime` tiebreaker, but
+    // the runtime `table.indexes` record stores only the declared fields —
+    // append it here, along with the implicit `_id` tiebreaker that makes
+    // order keys strictly ordered.
+    const declaredFields: ReadonlyArray<string> =
+      indexName === "by_id"
+        ? ["_id"]
+        : indexName === "by_creation_time"
+          ? ["_creationTime"]
+          : [
+              ...((table.indexes as Record<string, ReadonlyArray<string>>)[
+                indexName
+              ] ?? []),
+              "_creationTime",
+            ];
+    const remainingFields = declaredFields.slice(spec?.eqCount ?? 0);
+    const keyFields =
+      remainingFields[remainingFields.length - 1] === "_id"
+        ? remainingFields
+        : [...remainingFields, "_id"];
+
+    const makeQuery = () =>
+      (spec === undefined
+        ? convexDatabaseReader.query(tableName).withIndex(indexName as any)
+        : convexDatabaseReader
+            .query(tableName)
+            .withIndex(indexName as any, (q) => QueryStream.applyRange(spec, q))
+      ).order(order);
+
+    return QueryStream.fromQuery({
+      makeQuery,
+      tableName,
+      tableSchema: table.Fields,
+      order,
+      keyFields,
+    });
+  }) as QueryInitializerFunction<"stream">;
+
   const search: QueryInitializerFunction<"search"> = (
     indexName,
     searchFilter,
@@ -267,6 +361,7 @@ export const make = <
     get,
     index,
     search,
+    stream,
   };
 };
 
