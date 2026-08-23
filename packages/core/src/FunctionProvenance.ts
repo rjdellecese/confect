@@ -81,7 +81,7 @@ const Standard: Standard = { _tag: "Standard" };
  * Build a `Confect` provenance from lazy schema thunks. `args`, `returns`,
  * and `error` are exposed as sync lazy memoised getters (via {@link Lazy.defineProperty})
  * that only evaluate their thunk on first access, mirroring how `Table`
- * defers `Fields`/`Doc`/`tableDefinition`. This keeps importing the assembled
+ * defers `Fields`/`Doc`. This keeps importing the assembled
  * `_generated/spec.ts` cheap — no `Schema.Struct(...)` / `Schema.Array(...)`
  * work runs at module load; it is deferred to the first invocation that
  * actually compiles validators or runs a codec.

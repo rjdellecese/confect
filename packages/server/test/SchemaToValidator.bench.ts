@@ -5,7 +5,7 @@ import * as Schema from "effect/Schema";
 import type {
   TableSchemaToTableValidator,
   ValueToValidator,
-} from "@confect/server/SchemaToValidator";
+} from "@confect/core/SchemaToValidator";
 
 // Force module-level instantiations so they are excluded from individual benchmarks.
 void ({} as ValueToValidator<any>);

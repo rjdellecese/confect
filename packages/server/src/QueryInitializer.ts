@@ -49,7 +49,11 @@ export interface QueryInitializer<
     (
       id: GenericId<TableName>,
     ): Effect.Effect<Doc, Document.DocumentDecodeError | GetByIdFailure>;
-    <IndexName extends keyof Indexes<ConvexTableInfoFor<DataModel_, TableName>>>(
+    <
+      IndexName extends keyof Indexes<
+        ConvexTableInfoFor<DataModel_, TableName>
+      >,
+    >(
       indexName: IndexName,
       ...indexFieldValues: IndexFieldTypesForEq<
         DataModel.ToConvex<DataModel_>,
@@ -59,7 +63,11 @@ export interface QueryInitializer<
     ): Effect.Effect<Doc, Document.DocumentDecodeError | GetByIndexFailure>;
   };
   readonly index: {
-    <IndexName extends keyof Indexes<ConvexTableInfoFor<DataModel_, TableName>>>(
+    <
+      IndexName extends keyof Indexes<
+        ConvexTableInfoFor<DataModel_, TableName>
+      >,
+    >(
       indexName: IndexName,
       indexRange?: (
         q: IndexRangeBuilder<
@@ -69,7 +77,11 @@ export interface QueryInitializer<
       ) => IndexRange,
       order?: "asc" | "desc",
     ): OrderedQuery.OrderedQuery<TableInfoFor<DataModel_, TableName>, Doc>;
-    <IndexName extends keyof Indexes<ConvexTableInfoFor<DataModel_, TableName>>>(
+    <
+      IndexName extends keyof Indexes<
+        ConvexTableInfoFor<DataModel_, TableName>
+      >,
+    >(
       indexName: IndexName,
       order?: "asc" | "desc",
     ): OrderedQuery.OrderedQuery<TableInfoFor<DataModel_, TableName>, Doc>;

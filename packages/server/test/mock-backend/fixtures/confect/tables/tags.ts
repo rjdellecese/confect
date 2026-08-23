@@ -1,4 +1,4 @@
-import { Table } from "@confect/server";
+import { Table } from "@confect/core";
 import * as Schema from "effect/Schema";
 
 // Exported (as a type only — there is no `Tags` value export here) so the

@@ -6,10 +6,10 @@ description: "Define your database schema using Effect schemas."
 
 Your database schema lives in `confect/tables/`: one file per table, each default-exporting a `Table.make(...)` value, where the **filename is the table name** (`confect/tables/notes.ts` defines a table called `notes`). The Confect CLI's codegen combines these files into a single schema behind the scenes — and generates the per-table helpers your code imports — so you never assemble or edit a schema definition by hand. (For the full layout of what codegen emits, see [Project Structure](/concepts/project-structure).)
 
-Each table is defined with `Table.make`, which takes a callback returning the table's fields. The callback runs lazily — only the first time the table's `Fields`, `Doc`, or `tableDefinition` is accessed — so a function that never touches a table pays no schema-construction cost for it at cold start. Indexes are defined on tables the same way as in the base Convex APIs. Cross-table `Id` references are constructed with the codegen-emitted `Id` helper from `confect/_generated/id.ts`, whose argument is type-constrained to the set of declared table names.
+Each table is defined with `Table.make`, which takes a callback returning the table's fields. The callback runs lazily — only the first time the table's `Fields` or `Doc` is accessed — so a function that never touches a table pays no schema-construction cost for it at cold start. Indexes are defined on tables the same way as in the base Convex APIs. Cross-table `Id` references are constructed with the codegen-emitted `Id` helper from `confect/_generated/id.ts`, whose argument is type-constrained to the set of declared table names.
 
 ```ts confect/tables/notes.ts
-import { Table } from "@confect/server";
+import { Table } from "@confect/core";
 import * as Schema from "effect/Schema";
 import { Id } from "../_generated/id";
 
@@ -41,7 +41,7 @@ export default Table.make(() =>
 ```
 
 ```ts confect/tables/users.ts
-import { Table } from "@confect/server";
+import { Table } from "@confect/core";
 import * as Schema from "effect/Schema";
 
 export default Table.make(() =>

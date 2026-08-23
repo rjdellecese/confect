@@ -1,447 +1,96 @@
-import * as Lazy from "@confect/core/Lazy";
-import * as SystemFields from "@confect/core/SystemFields";
-import {
-  defineTable,
-  type SystemFields as ConvexSystemFields,
-  type Expand,
-  type GenericTableIndexes,
-  type GenericTableSearchIndexes,
-  type GenericTableVectorIndexes,
-  type IndexTiebreakerField,
-  type SearchIndexConfig,
-  type TableDefinition,
-  type VectorIndexConfig,
-} from "convex/server";
-import type { GenericValidator, Validator } from "convex/values";
-import * as Predicate from "effect/Predicate";
+import { compileTableSchema } from "@confect/core/SchemaToValidator";
+import * as Table_ from "@confect/core/Table";
 import * as Schema from "effect/Schema";
-import {
-  compileTableSchema,
-  type TableSchemaToTableValidator,
-} from "./SchemaToValidator";
+import { defineTable, type TableDefinition } from "convex/server";
 
-export const TypeId = "~@confect/server/Table";
-export type TypeId = typeof TypeId;
-
-// -----------------------------------------------------------------------------
-// Predicates
-// -----------------------------------------------------------------------------
-//
-// Both bound `Table`s and `UnnamedTable` callables share the same `[TypeId]`
-// brand. They disambiguate by whether a `tableName` property is set: bound
-// tables have one, unnamed callables do not.
-//
-// The discriminator is `tableName` (not `name`) so it does not collide with
-// the built-in `Function.prototype.name` that every JS function carries.
-
-export const isTable = (u: unknown): u is Any =>
-  Predicate.hasProperty(u, TypeId) && Predicate.hasProperty(u, "tableName");
-
-export const isUnnamedTable = (u: unknown): u is UnnamedAny =>
-  Predicate.hasProperty(u, TypeId) && !Predicate.hasProperty(u, "tableName");
-
-// -----------------------------------------------------------------------------
-// Bound Table
-// -----------------------------------------------------------------------------
-
-export interface Table<
-  Name_ extends string,
-  TableSchema_ extends Schema.Codec<any, any>,
-  TableValidator_ extends GenericValidator =
-    TableSchemaToTableValidator<TableSchema_>,
-  Indexes_ extends GenericTableIndexes = {},
-  SearchIndexes_ extends GenericTableSearchIndexes = {},
-  VectorIndexes_ extends GenericTableVectorIndexes = {},
-> {
-  readonly [TypeId]: TypeId;
-  readonly tableName: Name_;
-  readonly tableDefinition: TableDefinition<
-    TableValidator_,
-    Indexes_,
-    SearchIndexes_,
-    VectorIndexes_
-  >;
-  readonly Fields: TableSchema_;
-  readonly Doc: SystemFields.ExtendWithSystemFields<Name_, TableSchema_>;
-  readonly indexes: Indexes_;
-  readonly "~TableValidator": TableValidator_;
-  readonly "~SearchIndexes": SearchIndexes_;
-  readonly "~VectorIndexes": VectorIndexes_;
-}
-
-export interface Any {
-  readonly [TypeId]: TypeId;
-  readonly tableName: string;
-}
-
-export type AnyWithProps = Table<
-  any,
-  Schema.Codec<any, any>,
-  GenericValidator,
-  GenericTableIndexes,
-  GenericTableSearchIndexes,
-  GenericTableVectorIndexes
->;
+export {
+  TypeId,
+  isTable,
+  isUnnamedTable,
+  make,
+  type Table,
+  type Any,
+  type AnyWithProps,
+  type UnnamedTable,
+  type UnnamedAny,
+  type UnnamedAnyWithProps,
+  type Name,
+  type TableSchema,
+  type TableValidator,
+  type Indexes,
+  type SearchIndexes,
+  type VectorIndexes,
+  type Doc,
+  type Fields,
+  type WithName,
+  type TablesRecord,
+} from "@confect/core/Table";
 
 // -----------------------------------------------------------------------------
-// UnnamedTable (callable)
+// tableDefinition
 // -----------------------------------------------------------------------------
 //
-// `Table.make(lazyFields)` returns an `UnnamedTable`: a callable that
-// produces a fully bound `Table` when invoked with a name. Chaining methods
-// (`.index`, `.searchIndex`, `.vectorIndex`) live here and return new
-// `UnnamedTable`s, accumulating plain index metadata records. Neither the
-// field-schema nor the deploy-time `tableDefinition` is constructed at this
-// stage — the user-supplied `lazyFields` callback is just carried through.
-// The codegen pipeline emits a wrapper file per user-authored table that
-// simply invokes the unnamed callable with the filename basename.
+// The deploy-time Convex `TableDefinition` is the part of a table that
+// belongs on the server: it value-imports `defineTable` from `convex/server`.
+// Specs and generated refs reach `Fields` / `Doc` through `@confect/core`,
+// so this helper is only called from `_generated/convexSchema.ts`.
 
-export interface UnnamedTable<
-  TableSchema_ extends Schema.Codec<any, any>,
-  TableValidator_ extends GenericValidator =
-    TableSchemaToTableValidator<TableSchema_>,
-  Indexes_ extends GenericTableIndexes = {},
-  SearchIndexes_ extends GenericTableSearchIndexes = {},
-  VectorIndexes_ extends GenericTableVectorIndexes = {},
-> {
-  <const Name_ extends string>(
-    tableName: Name_,
-  ): Table<
-    Name_,
-    TableSchema_,
-    TableValidator_,
-    Indexes_,
-    SearchIndexes_,
-    VectorIndexes_
-  >;
+const tableDefinitionCache = new WeakMap<
+  Table_.AnyWithProps,
+  TableDefinition<any, any, any, any>
+>();
 
-  readonly [TypeId]: TypeId;
-  readonly indexes: Indexes_;
-  readonly "~TableValidator": TableValidator_;
-  readonly "~SearchIndexes": SearchIndexes_;
-  readonly "~VectorIndexes": VectorIndexes_;
-
-  index<
-    IndexName extends string,
-    FirstFieldPath extends ExtractFieldPaths<TableValidator_>,
-    RestFieldPaths extends ExtractFieldPaths<TableValidator_>[],
-  >(
-    name: IndexName,
-    fields: [FirstFieldPath, ...RestFieldPaths],
-  ): UnnamedTable<
-    TableSchema_,
-    TableValidator_,
-    Expand<
-      Indexes_ &
-        Record<
-          IndexName,
-          [FirstFieldPath, ...RestFieldPaths, IndexTiebreakerField]
-        >
-    >,
-    SearchIndexes_,
-    VectorIndexes_
-  >;
-
-  searchIndex<
-    IndexName extends string,
-    SearchField extends ExtractFieldPaths<TableValidator_>,
-    FilterFields extends ExtractFieldPaths<TableValidator_> = never,
-  >(
-    name: IndexName,
-    indexConfig: Expand<SearchIndexConfig<SearchField, FilterFields>>,
-  ): UnnamedTable<
-    TableSchema_,
-    TableValidator_,
-    Indexes_,
-    Expand<
-      SearchIndexes_ &
-        Record<
-          IndexName,
-          {
-            searchField: SearchField;
-            filterFields: FilterFields;
-          }
-        >
-    >,
-    VectorIndexes_
-  >;
-
-  vectorIndex<
-    IndexName extends string,
-    VectorField extends ExtractFieldPaths<TableValidator_>,
-    FilterFields extends ExtractFieldPaths<TableValidator_> = never,
-  >(
-    name: IndexName,
-    indexConfig: Expand<VectorIndexConfig<VectorField, FilterFields>>,
-  ): UnnamedTable<
-    TableSchema_,
-    TableValidator_,
-    Indexes_,
-    SearchIndexes_,
-    Expand<
-      VectorIndexes_ &
-        Record<
-          IndexName,
-          {
-            vectorField: VectorField;
-            dimensions: number;
-            filterFields: FilterFields;
-          }
-        >
-    >
-  >;
-}
-
-export interface UnnamedAny {
-  readonly [TypeId]: TypeId;
-}
-
-export type UnnamedAnyWithProps = UnnamedTable<
-  Schema.Codec<any, any>,
-  GenericValidator,
-  GenericTableIndexes,
-  GenericTableSearchIndexes,
-  GenericTableVectorIndexes
->;
-
-// -----------------------------------------------------------------------------
-// Type extractors
-// -----------------------------------------------------------------------------
-
-export type Name<TableDef extends AnyWithProps> = TableDef["tableName"] &
-  string;
-
-export type TableSchema<TableDef extends AnyWithProps> = TableDef["Fields"];
-
-export type TableValidator<TableDef extends AnyWithProps> =
-  TableDef["~TableValidator"];
-
-export type Indexes<TableDef extends AnyWithProps> = TableDef["indexes"];
-
-export type SearchIndexes<TableDef extends AnyWithProps> =
-  TableDef["~SearchIndexes"];
-
-export type VectorIndexes<TableDef extends AnyWithProps> =
-  TableDef["~VectorIndexes"];
-
-export type Doc<TableDef extends AnyWithProps> = TableDef["Doc"];
-
-export type Fields<TableDef extends AnyWithProps> = TableDef["Fields"];
-
-export type WithName<
-  TableDef extends AnyWithProps,
-  Name_ extends string,
-> = TableDef extends { readonly tableName: Name_ } ? TableDef : never;
-
-export type TablesRecord<Tables extends AnyWithProps> = {
-  readonly [TableName_ in Name<Tables>]: WithName<Tables, TableName_>;
-};
-
-// -----------------------------------------------------------------------------
-// Construction
-// -----------------------------------------------------------------------------
-//
-// `make` only stores the user-supplied `lazyFields` callback alongside any
-// chained index metadata. Neither `Fields` nor `Doc` nor `tableDefinition`
-// is constructed until first access on a bound `Table`. Each chain step is
-// O(1) (plain object spread of the metadata records) and never invokes the
-// callback. Binding via `unnamed(tableName)` installs lazy memoised getters
-// for `Fields`, `Doc`, and `tableDefinition` via `Lazy.defineProperty`, so the
-// first access materialises the value and replaces the getter with a plain
-// data property — second-and-subsequent accesses are observably
-// indistinguishable from a plain property and avoid all function-call
-// overhead.
-
-interface UnnamedState<
-  TableSchema_ extends Schema.Codec<any, any>,
-  Indexes_ extends GenericTableIndexes,
-  SearchIndexes_ extends GenericTableSearchIndexes,
-  VectorIndexes_ extends GenericTableVectorIndexes,
-> {
-  readonly lazyFields: () => TableSchema_;
-  readonly indexes: Indexes_;
-  readonly searchIndexes: SearchIndexes_;
-  readonly vectorIndexes: VectorIndexes_;
-}
-
-const makeBound = <
-  Name_ extends string,
-  TableSchema_ extends Schema.Codec<any, any>,
-  TableValidator_ extends Validator<any, any, any>,
-  Indexes_ extends GenericTableIndexes,
-  SearchIndexes_ extends GenericTableSearchIndexes,
-  VectorIndexes_ extends GenericTableVectorIndexes,
->(
-  tableName: Name_,
-  state: UnnamedState<TableSchema_, Indexes_, SearchIndexes_, VectorIndexes_>,
-): Table<
-  Name_,
-  TableSchema_,
-  TableValidator_,
-  Indexes_,
-  SearchIndexes_,
-  VectorIndexes_
+export const tableDefinition = <Table extends Table_.AnyWithProps>(
+  table: Table,
+): TableDefinition<
+  Table_.TableValidator<Table>,
+  Table_.Indexes<Table>,
+  Table_.SearchIndexes<Table>,
+  Table_.VectorIndexes<Table>
 > => {
-  const bound = {
-    [TypeId]: TypeId as TypeId,
-    tableName,
-    indexes: state.indexes,
-  } as Table<
-    Name_,
-    TableSchema_,
-    TableValidator_,
-    Indexes_,
-    SearchIndexes_,
-    VectorIndexes_
-  >;
+  const cached = tableDefinitionCache.get(table);
+  if (cached !== undefined) {
+    return cached as TableDefinition<
+      Table_.TableValidator<Table>,
+      Table_.Indexes<Table>,
+      Table_.SearchIndexes<Table>,
+      Table_.VectorIndexes<Table>
+    >;
+  }
 
-  Lazy.defineProperty(bound, "Fields", () => state.lazyFields());
-
-  Lazy.defineProperty(bound, "Doc", () =>
-    SystemFields.extendWithSystemFields(
-      tableName,
-      (bound as { Fields: TableSchema_ }).Fields,
-    ),
+  let definition: TableDefinition<any, any, any, any> = defineTable(
+    compileTableSchema(table.Fields),
   );
+  for (const [name, indexFields] of Object.entries(
+    table.indexes as Record<string, any>,
+  )) {
+    definition = definition.index(name, indexFields);
+  }
+  for (const [name, config] of Object.entries(
+    table.searchIndexes as Record<string, any>,
+  )) {
+    definition = definition.searchIndex(name, config);
+  }
+  for (const [name, config] of Object.entries(
+    table.vectorIndexes as Record<string, any>,
+  )) {
+    definition = definition.vectorIndex(name, config);
+  }
 
-  Lazy.defineProperty(bound, "tableDefinition", () => {
-    const fields = (bound as { Fields: TableSchema_ }).Fields;
-    let definition: TableDefinition<any, any, any, any> = defineTable(
-      compileTableSchema(fields),
-    );
-    for (const [name, indexFields] of Object.entries(
-      state.indexes as Record<string, any>,
-    )) {
-      definition = definition.index(name, indexFields);
-    }
-    for (const [name, config] of Object.entries(
-      state.searchIndexes as Record<string, any>,
-    )) {
-      definition = definition.searchIndex(name, config);
-    }
-    for (const [name, config] of Object.entries(
-      state.vectorIndexes as Record<string, any>,
-    )) {
-      definition = definition.vectorIndex(name, config);
-    }
-    return definition;
-  });
-
-  return bound;
-};
-
-const makeUnnamed = <
-  TableSchema_ extends Schema.Codec<any, any>,
-  TableValidator_ extends Validator<any, any, any>,
-  Indexes_ extends GenericTableIndexes,
-  SearchIndexes_ extends GenericTableSearchIndexes,
-  VectorIndexes_ extends GenericTableVectorIndexes,
->(
-  state: UnnamedState<TableSchema_, Indexes_, SearchIndexes_, VectorIndexes_>,
-): UnnamedTable<
-  TableSchema_,
-  TableValidator_,
-  Indexes_,
-  SearchIndexes_,
-  VectorIndexes_
-> => {
-  type UnnamedTable_ = UnnamedTable<
-    TableSchema_,
-    TableValidator_,
-    Indexes_,
-    SearchIndexes_,
-    VectorIndexes_
+  tableDefinitionCache.set(table, definition);
+  return definition as TableDefinition<
+    Table_.TableValidator<Table>,
+    Table_.Indexes<Table>,
+    Table_.SearchIndexes<Table>,
+    Table_.VectorIndexes<Table>
   >;
-
-  type UnnamedTableFunction<FunctionName extends keyof UnnamedTable_> =
-    UnnamedTable_[FunctionName];
-
-  const bind = <const Name_ extends string>(
-    tableName: Name_,
-  ): Table<
-    Name_,
-    TableSchema_,
-    TableValidator_,
-    Indexes_,
-    SearchIndexes_,
-    VectorIndexes_
-  > =>
-    makeBound<
-      Name_,
-      TableSchema_,
-      TableValidator_,
-      Indexes_,
-      SearchIndexes_,
-      VectorIndexes_
-    >(tableName, state);
-
-  const index: UnnamedTableFunction<"index"> = (name, fields) =>
-    makeUnnamed({
-      lazyFields: state.lazyFields,
-      indexes: {
-        ...state.indexes,
-        [name]: fields,
-      } as any,
-      searchIndexes: state.searchIndexes,
-      vectorIndexes: state.vectorIndexes,
-    });
-
-  const searchIndex: UnnamedTableFunction<"searchIndex"> = (
-    name,
-    indexConfig,
-  ) =>
-    makeUnnamed({
-      lazyFields: state.lazyFields,
-      indexes: state.indexes,
-      searchIndexes: {
-        ...state.searchIndexes,
-        [name]: indexConfig,
-      } as any,
-      vectorIndexes: state.vectorIndexes,
-    });
-
-  const vectorIndex: UnnamedTableFunction<"vectorIndex"> = (
-    name,
-    indexConfig,
-  ) =>
-    makeUnnamed({
-      lazyFields: state.lazyFields,
-      indexes: state.indexes,
-      searchIndexes: state.searchIndexes,
-      vectorIndexes: {
-        ...state.vectorIndexes,
-        [name]: indexConfig,
-      } as any,
-    });
-
-  return Object.assign(bind, {
-    [TypeId]: TypeId as TypeId,
-    indexes: state.indexes,
-    index,
-    searchIndex,
-    vectorIndex,
-  }) as UnnamedTable_;
-};
-
-export const make = <const TableSchema_ extends Schema.Codec<any, any>>(
-  lazyFields: () => TableSchema_,
-): UnnamedTable<TableSchema_, TableSchemaToTableValidator<TableSchema_>> => {
-  type TableValidator_ = TableSchemaToTableValidator<TableSchema_>;
-  type UnnamedTable_ = UnnamedTable<TableSchema_, TableValidator_>;
-
-  return makeUnnamed<TableSchema_, TableValidator_, {}, {}, {}>({
-    lazyFields,
-    indexes: {},
-    searchIndexes: {},
-    vectorIndexes: {},
-  }) as UnnamedTable_;
 };
 
 // -----------------------------------------------------------------------------
 // System tables
 // -----------------------------------------------------------------------------
 
-export const scheduledFunctionsTable = make(() =>
+export const scheduledFunctionsTable = Table_.make(() =>
   Schema.Struct({
     name: Schema.String,
     args: Schema.Array(Schema.Any),
@@ -460,7 +109,7 @@ export const scheduledFunctionsTable = make(() =>
   }),
 )("_scheduled_functions");
 
-export const storageTable = make(() =>
+export const storageTable = Table_.make(() =>
   Schema.Struct({
     sha256: Schema.String,
     size: Schema.Finite,
@@ -474,17 +123,3 @@ export const systemTables = {
 } as const;
 
 export type SystemTables = typeof scheduledFunctionsTable | typeof storageTable;
-
-// Vendored types from convex-js, partially modified. Ideally we could use these directly. See https://github.com/get-convex/convex-js/pull/14
-
-/**
- * Extract all of the index field paths within a {@link Validator}.
- *
- * This is used within {@link defineTable}.
- * @public
- */
-type ExtractFieldPaths<T extends Validator<any, any, any>> =
-  // Add in the system fields available in index definitions.
-  // This should be everything except for `_id` because thats added to indexes
-  // automatically.
-  T["fieldPaths"] | keyof ConvexSystemFields;
