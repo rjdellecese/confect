@@ -31,6 +31,7 @@ import * as Array from "effect/Array";
 import * as Chunk from "effect/Chunk";
 import * as Effect from "effect/Effect";
 import * as Equivalence from "effect/Equivalence";
+import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Order from "effect/Order";
 import * as Predicate from "effect/Predicate";
@@ -203,58 +204,88 @@ export const applyRange = (spec: AnyIndexRangeSpec, q: any): any =>
 // undefined < null < bigint < number < boolean < string < bytes < array
 // < object. (NaN subtleties are simplified in this prototype.)
 
-const typeRank = (value: Value | undefined): number =>
-  value === undefined
-    ? 0
-    : value === null
-      ? 1
-      : Predicate.isBigInt(value)
-        ? 2
-        : Predicate.isNumber(value)
-          ? 3
-          : Predicate.isBoolean(value)
-            ? 4
-            : Predicate.isString(value)
-              ? 5
-              : value instanceof ArrayBuffer
-                ? 6
-                : Array.isArray(value)
-                  ? 7
-                  : 8;
+type ValueType =
+  | "undefined"
+  | "null"
+  | "bigint"
+  | "number"
+  | "boolean"
+  | "string"
+  | "bytes"
+  | "array"
+  | "object";
 
-/** `Order` over Convex values, matching Convex's index ordering. */
-export const valueOrder: Order.Order<Value | undefined> = Order.make(
-  (self, that) => {
-    const rankOrdering = Order.number(typeRank(self), typeRank(that));
-    if (rankOrdering !== 0) {
-      return rankOrdering;
-    }
-    switch (typeRank(self)) {
-      case 0:
-      case 1:
-        return 0;
-      case 2:
-        return Order.bigint(self as bigint, that as bigint);
-      case 3:
-        return Order.number(self as number, that as number);
-      case 4:
-        return Order.boolean(self as boolean, that as boolean);
-      case 5:
-        return Order.string(self as string, that as string);
-      case 6:
-        return bytesOrder(self as ArrayBuffer, that as ArrayBuffer);
-      case 7:
-        return orderKeyOrder(
+const valueType = (value: Value | undefined): ValueType =>
+  value === undefined
+    ? "undefined"
+    : value === null
+      ? "null"
+      : Predicate.isBigInt(value)
+        ? "bigint"
+        : Predicate.isNumber(value)
+          ? "number"
+          : Predicate.isBoolean(value)
+            ? "boolean"
+            : Predicate.isString(value)
+              ? "string"
+              : value instanceof ArrayBuffer
+                ? "bytes"
+                : Array.isArray(value)
+                  ? "array"
+                  : "object";
+
+const valueTypeRank: Record.ReadonlyRecord<ValueType, number> = {
+  undefined: 0,
+  null: 1,
+  bigint: 2,
+  number: 3,
+  boolean: 4,
+  string: 5,
+  bytes: 6,
+  array: 7,
+  object: 8,
+};
+
+const byValueType: Order.Order<Value | undefined> = Order.mapInput(
+  Order.number,
+  (value: Value | undefined) => valueTypeRank[valueType(value)],
+);
+
+const withinValueType: Order.Order<Value | undefined> = Order.make(
+  (self, that) =>
+    // Only consulted when `byValueType` ties, so `self` and `that` have the
+    // same `ValueType` and the per-branch casts of `that` are safe.
+    Match.value(valueType(self)).pipe(
+      Match.whenOr("undefined", "null", () => 0 as const),
+      Match.when("bigint", () => Order.bigint(self as bigint, that as bigint)),
+      Match.when("number", () => Order.number(self as number, that as number)),
+      Match.when("boolean", () =>
+        Order.boolean(self as boolean, that as boolean),
+      ),
+      Match.when("string", () => Order.string(self as string, that as string)),
+      Match.when("bytes", () =>
+        bytesOrder(self as ArrayBuffer, that as ArrayBuffer),
+      ),
+      Match.when("array", () =>
+        orderKeyOrder(
           self as ReadonlyArray<Value>,
           that as ReadonlyArray<Value>,
-        );
-      default:
-        return objectOrder(
+        ),
+      ),
+      Match.when("object", () =>
+        objectOrder(
           self as Record.ReadonlyRecord<string, Value>,
           that as Record.ReadonlyRecord<string, Value>,
-        );
-    }
-  },
+        ),
+      ),
+      Match.exhaustive,
+    ),
+);
+
+/** `Order` over Convex values, matching Convex's index ordering. */
+export const valueOrder: Order.Order<Value | undefined> = Order.combine(
+  byValueType,
+  withinValueType,
 );
 
 /**
@@ -812,12 +843,21 @@ export interface PaginateOptions {
   readonly maximumBytesRead?: number | undefined;
 }
 
+/**
+ * `page` stays a *mutable array type* (its property is still `readonly`):
+ * paginated query handlers return this value where the Convex pagination
+ * protocol's result type is expected — `PaginationResult` from
+ * `convex/server` and the `@confect/core` `PaginationResult` schema type
+ * (`Schema.mutable(Schema.Array(...))`) both declare `page` mutable, and a
+ * `ReadonlyArray` is not assignable to a mutable array. Readonly
+ * *properties* assign to mutable ones, so everything else is `readonly`.
+ */
 export interface PaginationResult<Doc> {
-  page: Doc[];
-  isDone: boolean;
-  continueCursor: string;
-  splitCursor?: string;
-  pageStatus?: "SplitRecommended" | "SplitRequired";
+  readonly page: Doc[];
+  readonly isDone: boolean;
+  readonly continueCursor: string;
+  readonly splitCursor?: string;
+  readonly pageStatus?: "SplitRecommended" | "SplitRequired";
 }
 
 interface PaginateState<Doc> {
