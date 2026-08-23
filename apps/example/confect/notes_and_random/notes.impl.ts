@@ -1,4 +1,4 @@
-import { FunctionImpl, GroupImpl } from "@confect/server";
+import { FunctionImpl, GroupImpl, QueryStream } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import databaseSchema from "../_generated/schema";
@@ -36,6 +36,53 @@ const listPaginated = FunctionImpl.make(
         .table("notes")
         .index("by_creation_time", "desc")
         .paginate(paginationOpts);
+    }).pipe(Effect.orDie),
+);
+
+const insertAuthored = FunctionImpl.make(
+  databaseSchema,
+  notes,
+  "insertAuthored",
+  ({ hidden, role, text }) =>
+    Effect.gen(function* () {
+      const writer = yield* DatabaseWriter;
+
+      return yield* writer.table("notes").insert({
+        text,
+        author: { role, name: role === "admin" ? "Ada" : "Uma" },
+        ...(hidden === true ? { tag: "hidden" } : {}),
+      });
+    }).pipe(Effect.orDie),
+);
+
+// A stream-first feed: the union of the admin- and user-authored note
+// streams (two ranges of the `by_role` index), merged newest-first by
+// creation time, with an effectful filter that hides tagged notes without
+// breaking pagination. Cursors resume via index-range narrowing, and pages
+// stay gap-free on the client via `useStreamPaginatedQuery`'s
+// endCursor pinning.
+const feed = FunctionImpl.make(
+  databaseSchema,
+  notes,
+  "feed",
+  ({ paginationOpts }) =>
+    Effect.gen(function* () {
+      const reader = yield* DatabaseReader;
+
+      const authoredBy = (role: "admin" | "user") =>
+        reader
+          .table("notes")
+          .stream("by_role", (q) => q.eq("author.role", role), "desc");
+
+      return yield* QueryStream.merge([
+        authoredBy("admin"),
+        authoredBy("user"),
+      ]).pipe(
+        QueryStream.filterEffect((note) =>
+          Effect.succeed(note.tag !== "hidden"),
+        ),
+        QueryStream.paginate(paginationOpts),
+      );
     }).pipe(Effect.orDie),
 );
 
@@ -121,8 +168,10 @@ const insertDefault = FunctionImpl.make(
 
 export default GroupImpl.make(databaseSchema, notes).pipe(
   Layer.provide(insert),
+  Layer.provide(insertAuthored),
   Layer.provide(list),
   Layer.provide(listPaginated),
+  Layer.provide(feed),
   Layer.provide(delete_),
   Layer.provide(getFirst),
   Layer.provide(getOrFail),
