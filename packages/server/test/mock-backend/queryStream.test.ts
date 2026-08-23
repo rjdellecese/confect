@@ -19,6 +19,27 @@ const collectTexts = <E, R>(
     Effect.map((chunk) => Chunk.toReadonlyArray(chunk).map((doc) => doc.text)),
   );
 
+/** Walk a stream page by page until exhausted, returning the pages. */
+const paginateAll = <Doc, Key extends ReadonlyArray<string>, E, R>(
+  stream: QueryStream.QueryStream<Doc, Key, E, R>,
+  numItems: number,
+): Effect.Effect<ReadonlyArray<ReadonlyArray<Doc>>, E, R> => {
+  const go = (
+    cursor: string | null,
+    pages: ReadonlyArray<ReadonlyArray<Doc>>,
+  ): Effect.Effect<ReadonlyArray<ReadonlyArray<Doc>>, E, R> =>
+    QueryStream.paginate(stream, { numItems, cursor }).pipe(
+      Effect.flatMap((result) => {
+        const collected =
+          result.page.length === 0 ? pages : [...pages, result.page];
+        return result.isDone
+          ? Effect.succeed(collected)
+          : go(result.continueCursor, collected);
+      }),
+    );
+  return go(null, []);
+};
+
 const insertNotes = (texts: ReadonlyArray<string>) =>
   Effect.gen(function* () {
     const writer = yield* DatabaseWriter;
@@ -344,6 +365,117 @@ describe("QueryStream", () => {
           assertEquals(result.isDone, false);
           assertEquals(result.pageStatus, "SplitRequired");
           expect(result.splitCursor).toBeDefined();
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer())),
+  );
+
+  it.effect("narrow pushes cursor bounds into the leaf query", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          yield* insertNotes(["a", "b", "c", "b"]);
+
+          const reader = yield* DatabaseReader;
+          const leaf = reader
+            .table("notes")
+            .stream("by_text", (q) => q.eq("text", "b"));
+
+          const page1 = yield* QueryStream.paginate(leaf, {
+            numItems: 1,
+            cursor: null,
+          });
+          const afterKey = QueryStream.deserializeCursor(page1.continueCursor);
+
+          const narrowed = QueryStream.narrow(leaf, { after: afterKey });
+
+          // The narrowed stream is a rebuilt *leaf* — not an in-memory
+          // fallback — whose lower bound is the pinned prefix plus the
+          // cursor key, exclusive.
+          expect(narrowed.reflection?.bounds?.lower).toEqual({
+            key: ["b", ...afterKey],
+            inclusive: false,
+          });
+          expect(narrowed.reflection?.bounds?.upper).toEqual({
+            key: ["b"],
+            inclusive: true,
+          });
+
+          const rest = yield* collectTexts(narrowed);
+          expect(rest).toEqual(["b"]);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer())),
+  );
+
+  it.effect("paginates through duplicate index values", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          // Duplicate "banana"s make cursors land *between* rows that share
+          // the first order-key component, so resuming exercises the
+          // composite-key range decomposition (text, then `_creationTime`,
+          // then `_id`).
+          yield* insertNotes(["banana", "apple", "banana"]);
+
+          const reader = yield* DatabaseReader;
+          const stream = reader.table("notes").stream("by_text");
+
+          const pages = yield* paginateAll(stream, 1);
+          expect(pages.map((page) => page.map((doc) => doc.text))).toEqual([
+            ["apple"],
+            ["banana"],
+            ["banana"],
+          ]);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer())),
+  );
+
+  it.effect("paginates descending streams with pushed-down cursors", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          yield* insertNotes(["a", "b", "c"]);
+
+          const reader = yield* DatabaseReader;
+          const stream = reader.table("notes").stream("by_text", "desc");
+
+          const pages = yield* paginateAll(stream, 1);
+          expect(pages.map((page) => page.map((doc) => doc.text))).toEqual([
+            ["c"],
+            ["b"],
+            ["a"],
+          ]);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer())),
+  );
+
+  it.effect("cursors compose with range bounds from the query spec", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          yield* insertNotes(["banana", "apple", "cherry"]);
+
+          const reader = yield* DatabaseReader;
+          const stream = reader
+            .table("notes")
+            .stream("by_text", (q) => q.gte("text", "b"));
+
+          const pages = yield* paginateAll(stream, 1);
+          expect(pages.map((page) => page.map((doc) => doc.text))).toEqual([
+            ["banana"],
+            ["cherry"],
+          ]);
         }),
       );
     }).pipe(Effect.provide(TestConfect.layer())),
