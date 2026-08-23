@@ -2,6 +2,10 @@ import type { FunctionSpec, RuntimeAndFunctionType } from "@confect/core";
 import type * as FunctionProvenance from "@confect/core/FunctionProvenance";
 import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import {
+  compileArgsSchema,
+  compileReturnsSchema,
+} from "@confect/core/SchemaToValidator";
+import {
   type DefaultFunctionArgs,
   type FunctionVisibility,
   type GenericActionCtx,
@@ -27,10 +31,6 @@ import * as MutationRunner from "./MutationRunner";
 import * as QueryRunner from "./QueryRunner";
 import type * as ResolvedMiddleware from "./ResolvedMiddleware";
 import * as Scheduler from "./Scheduler";
-import {
-  compileArgsSchema,
-  compileReturnsSchema,
-} from "./SchemaToValidator";
 import * as StorageActionWriter from "./StorageActionWriter";
 import * as StorageReader from "./StorageReader";
 import * as StorageWriter from "./StorageWriter";

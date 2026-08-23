@@ -30,7 +30,6 @@ export * as Registry from "./Registry";
 export * as RegistryItems from "./RegistryItems";
 export * as ResolvedMiddleware from "./ResolvedMiddleware";
 export * as Scheduler from "./Scheduler";
-export * as SchemaToValidator from "./SchemaToValidator";
 export * as StorageActionWriter from "./StorageActionWriter";
 export * as StorageReader from "./StorageReader";
 export * as StorageWriter from "./StorageWriter";

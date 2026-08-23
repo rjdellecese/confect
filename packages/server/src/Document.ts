@@ -1,3 +1,4 @@
+import type { ReadonlyValue } from "@confect/core/SchemaToValidator";
 import * as SystemFields from "@confect/core/SystemFields";
 import { pipe } from "effect/Function";
 import * as Effect from "effect/Effect";
@@ -6,7 +7,6 @@ import * as Schema from "effect/Schema";
 import type { ReadonlyRecord } from "effect/Record";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
-import type { ReadonlyValue } from "./SchemaToValidator";
 import type * as TableInfo from "./TableInfo";
 
 export type Document<

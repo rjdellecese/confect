@@ -1,4 +1,8 @@
 import {
+  compileArgsSchema,
+  compileReturnsSchema,
+} from "@confect/core/SchemaToValidator";
+import {
   actionGeneric,
   type DefaultFunctionArgs,
   type FunctionVisibility,
@@ -33,10 +37,6 @@ import * as RegisteredFunction from "./RegisteredFunction";
 import type * as FunctionRegistryItem from "./FunctionRegistryItem";
 import type * as ResolvedMiddleware from "./ResolvedMiddleware";
 import * as Scheduler from "./Scheduler";
-import {
-  compileArgsSchema,
-  compileReturnsSchema,
-} from "./SchemaToValidator";
 import { StorageReader } from "./StorageReader";
 import { StorageWriter } from "./StorageWriter";
 

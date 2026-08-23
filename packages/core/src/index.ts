@@ -11,6 +11,7 @@ export * as PaginationResult from "./PaginationResult";
 export * as Ref from "./Ref";
 export * as Refs from "./Refs";
 export * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
+export * as SchemaToValidator from "./SchemaToValidator";
 export * as Spec from "./Spec";
 export * as SystemFields from "./SystemFields";
 export * as Table from "./Table";

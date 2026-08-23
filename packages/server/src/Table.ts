@@ -1,7 +1,7 @@
+import { compileTableSchema } from "@confect/core/SchemaToValidator";
 import * as CoreTable from "@confect/core/Table";
 import * as Schema from "effect/Schema";
 import { defineTable, type TableDefinition } from "convex/server";
-import { compileTableSchema } from "./SchemaToValidator";
 
 export {
   TypeId,
