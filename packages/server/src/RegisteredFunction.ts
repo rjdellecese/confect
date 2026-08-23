@@ -27,7 +27,10 @@ import * as MutationRunner from "./MutationRunner";
 import * as QueryRunner from "./QueryRunner";
 import type * as ResolvedMiddleware from "./ResolvedMiddleware";
 import * as Scheduler from "./Scheduler";
-import * as SchemaToValidator from "./SchemaToValidator";
+import {
+  compileArgsSchema,
+  compileReturnsSchema,
+} from "./SchemaToValidator";
 import * as StorageActionWriter from "./StorageActionWriter";
 import * as StorageReader from "./StorageReader";
 import * as StorageWriter from "./StorageWriter";
@@ -251,8 +254,8 @@ export const actionFunctionBase = <
     ctx: GenericActionCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
   ) => Layer.Layer<R>;
 }) => ({
-  args: SchemaToValidator.compileArgsSchema(args),
-  returns: SchemaToValidator.compileReturnsSchema(returns),
+  args: compileArgsSchema(args),
+  returns: compileReturnsSchema(returns),
   handler: (
     ctx: GenericActionCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
     actualArgs: ConvexArgs,
