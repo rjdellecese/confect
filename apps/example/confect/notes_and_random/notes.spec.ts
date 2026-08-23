@@ -37,6 +37,24 @@ export default GroupSpec.make()
     }),
   )
   .addFunction(
+    FunctionSpec.publicMutation({
+      name: "insertAuthored",
+      args: () =>
+        Schema.Struct({
+          text: Schema.String,
+          role: Schema.Literal("admin", "user"),
+          hidden: Schema.optional(Schema.Boolean),
+        }),
+      returns: () => Id("notes"),
+    }),
+  )
+  .addFunction(
+    FunctionSpec.publicPaginatedQuery({
+      name: "feed",
+      item: () => notes.Doc,
+    }),
+  )
+  .addFunction(
     FunctionSpec.publicQuery({
       name: "getOrFail",
       args: () => Schema.Struct({ noteId: Id("notes") }),

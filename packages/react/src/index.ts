@@ -367,18 +367,33 @@ export const useStreamPaginatedQuery = <
   PaginatedQueryItem<Query>,
   Ref.Error<Query>
 > => {
-  const functionReference = Ref.getFunctionReference(ref);
+  // `useQueries` requires a *referentially stable* queries object while
+  // nothing has changed: its subscription memo keys on identity, and its
+  // `useSubscription` re-runs a render-phase state update whenever the
+  // subscription changes — an unstable input loops the render. Callers
+  // typically pass a fresh `args` literal each render, so everything that
+  // feeds the queries object is stabilized by *value* here: the function
+  // reference by `ref`, and the encoded args by their serialized form (as
+  // `convex/react`'s own paginated hook does).
+  const functionReference = useMemo(() => Ref.getFunctionReference(ref), [ref]);
   const skipped = args === "skip";
 
+  const rawEncodedArgs =
+    args === "skip"
+      ? undefined
+      : (Ref.encodePaginatedQueryArgsSync(
+          ref,
+          args as unknown as Omit<Ref.Args<Query>, "paginationOpts">,
+        ) as Record<string, Value>);
+  const encodedArgsKey =
+    rawEncodedArgs === undefined
+      ? "skip"
+      : JSON.stringify(convexToJson(rawEncodedArgs));
   const encodedArgs = useMemo(
-    () =>
-      args === "skip"
-        ? undefined
-        : (Ref.encodePaginatedQueryArgsSync(
-            ref,
-            args as unknown as Omit<Ref.Args<Query>, "paginationOpts">,
-          ) as Record<string, Value>),
-    [ref, args],
+    () => rawEncodedArgs,
+    // The serialized form stands in for the freshly allocated object.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ref, encodedArgsKey],
   );
 
   // A change of query, args, skippedness, or page size restarts pagination
@@ -387,10 +402,10 @@ export const useStreamPaginatedQuery = <
     () =>
       JSON.stringify([
         getFunctionName(functionReference),
-        encodedArgs === undefined ? "skip" : convexToJson(encodedArgs),
+        encodedArgsKey,
         options.initialNumItems,
       ]),
-    [functionReference, encodedArgs, options.initialNumItems],
+    [functionReference, encodedArgsKey, options.initialNumItems],
   );
 
   const freshState = () =>
