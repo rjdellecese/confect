@@ -29,7 +29,7 @@ import * as Schema from "effect/Schema";
 import * as SchemaAST from "effect/SchemaAST";
 import * as String from "effect/String";
 
-import * as GenericId from "@confect/core/GenericId";
+import * as GenericId from "./GenericId";
 import type {
   IsAny,
   IsOptional,
@@ -38,7 +38,7 @@ import type {
   IsUnion,
   TypeError,
   UnionToTuple,
-} from "@confect/core/Types";
+} from "./Types";
 
 // Args
 

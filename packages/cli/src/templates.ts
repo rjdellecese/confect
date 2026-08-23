@@ -28,10 +28,8 @@ export const functions = ({
       `import registeredFunctions from "${registeredFunctionsImportPath}";`,
     );
     yield* cbw.newLine();
-    yield* Effect.forEach(functionNames, (functionName) =>
-      cbw.writeLine(
-        `export const ${functionName} = registeredFunctions.${functionName};`,
-      ),
+    yield* Effect.forEach(functionNames, (name) =>
+      cbw.writeLine(`export const ${name} = registeredFunctions.${name};`),
     );
 
     return yield* cbw.toString();
@@ -70,8 +68,8 @@ interface TableModuleBinding {
  * bundles for codec lookup). Every table wrapper at
  * `confect/_generated/tables/<name>.ts` is imported statically and
  * registered as a value entry on the `DatabaseSchema.make({...})` call.
- * Per-table laziness lives inside each `Table`: its `Fields`, `Doc`, and
- * `tableDefinition` are lazy memoised getters that only evaluate the
+ * Per-table laziness lives inside each `Table`: its `Fields` and `Doc`
+ * are lazy memoised getters that only evaluate the
  * user-supplied field-schema callback on first access, so unused tables in
  * a function bundle never pay schema-construction cost despite the
  * static import.
@@ -144,17 +142,17 @@ export const runtimeSchema = ({
  * Emit `confect/_generated/convexSchema.ts` — the Convex deploy-time
  * `SchemaDefinition`. Imports every table from its generated wrapper at
  * `_generated/tables/<name>` and calls `defineSchema({...})` exactly once.
- * The file deliberately avoids any `@confect/server` import so that the
- * deploy artifact's import graph stays decoupled from the runtime
- * `DatabaseSchema` machinery.
+ * `Table.tableDefinition` lives in `@confect/server` because it is the
+ * `defineTable` binding; the generated table wrappers themselves stay
+ * client-safe (`Fields` / `Doc` from `@confect/core`).
  *
- * The `defineSchema` import is aliased to `$defineSchema` because each table
- * is imported under its own (filename-derived) name; a table named
- * `defineSchema` would otherwise collide with the library import and emit a
- * duplicate-binding file. The leading `$` makes the alias collision-proof:
+ * The `defineSchema` and `Table` imports are aliased with a leading `$`
+ * because each table is imported under its own (filename-derived) name; a
+ * table named `defineSchema` or `Table` would otherwise collide with the
+ * library import and emit a duplicate-binding file.
  * `validateConfectTableIdentifier` requires names to match
  * `/^[a-zA-Z][a-zA-Z0-9_]*$/`, which forbids `$`, so no valid table import
- * can ever shadow it.
+ * can ever shadow them.
  */
 export const convexSchema = ({
   tableModules,
@@ -169,6 +167,9 @@ export const convexSchema = ({
     );
 
     if (tableModules.length > 0) {
+      yield* cbw.writeLine(
+        `import { Table as $Table } from "@confect/server";`,
+      );
       yield* cbw.blankLine();
       yield* Effect.forEach(tableModules, ({ tableName, importPath }) =>
         cbw.writeLine(`import ${tableName} from "${importPath}";`),
@@ -184,7 +185,9 @@ export const convexSchema = ({
       yield* cbw.indent(
         Effect.gen(function* () {
           for (const { tableName } of tableModules) {
-            yield* cbw.writeLine(`${tableName}: ${tableName}.tableDefinition,`);
+            yield* cbw.writeLine(
+              `${tableName}: $Table.tableDefinition(${tableName}),`,
+            );
           }
         }),
       );

@@ -1,15 +1,19 @@
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import type * as GroupSpec from "@confect/core/GroupSpec";
-import * as Registry from "@confect/core/Registry";
+import * as Registry from "./Registry";
+import type * as RegistryItems from "./RegistryItems";
 import type * as Spec from "@confect/core/Spec";
 import type { Layer, Types } from "effect";
 import * as Effect from "effect/Effect";
+import * as Match from "effect/Match";
 import * as Ref from "effect/Ref";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as GroupImpl from "./GroupImpl";
 import { mapLeaves } from "./internal/utils";
 import type * as RegisteredFunction from "./RegisteredFunction";
-import * as RegistryItem from "./RegistryItem";
+import * as FunctionRegistryItem from "./FunctionRegistryItem";
+import * as MiddlewareRegistryItem from "./MiddlewareRegistryItem";
+import * as ResolvedMiddleware from "./ResolvedMiddleware";
 
 export type RegisteredFunctions<Spec_ extends Spec.AnyWithProps> =
   Types.Simplify<RegisteredFunctionsHelper<Spec.Groups<Spec_>>>;
@@ -85,7 +89,8 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
   groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,
   makeRegisteredFunction: (
     databaseSchema: DatabaseSchema.AnyWithProps,
-    registryItem: RegistryItem.AnyWithProps,
+    registryItem: FunctionRegistryItem.ConfectFunctionRegistryItem,
+    resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
   ) => RegisteredFunction.Any,
 ): RegisteredFunctionsForGroupSpec<Group> => {
   const registryItems = Effect.gen(function* () {
@@ -95,14 +100,46 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
     Effect.provide(groupLayer),
     Effect.provideService(
       Registry.Registry,
-      Ref.makeUnsafe<Registry.RegistryItems>({}),
+      Ref.makeUnsafe<RegistryItems.RegistryItems>({}),
     ),
     Effect.runSync,
   );
 
-  return mapLeaves<RegistryItem.AnyWithProps, RegisteredFunction.Any>(
-    registryItems as { [key: string]: RegistryItem.AnyWithProps },
-    RegistryItem.isRegistryItem,
-    (registryItem) => makeRegisteredFunction(databaseSchema, registryItem),
+  const { functionRegistryItems, middlewareRegistryItems } =
+    partitionRegistryItems(registryItems);
+
+  return mapLeaves<FunctionRegistryItem.AnyWithProps, RegisteredFunction.Any>(
+    functionRegistryItems as {
+      [key: string]: FunctionRegistryItem.AnyWithProps;
+    },
+    FunctionRegistryItem.isFunctionRegistryItem,
+    (functionRegistryItem) =>
+      Match.value(functionRegistryItem).pipe(
+        Match.tag("Convex", (item) => item.handler),
+        Match.tag("Confect", (item) =>
+          makeRegisteredFunction(
+            databaseSchema,
+            item,
+            ResolvedMiddleware.resolve(item, middlewareRegistryItems),
+          ),
+        ),
+        Match.exhaustive,
+      ),
   ) as RegisteredFunctionsForGroupSpec<Group>;
+};
+
+const partitionRegistryItems = (registryItems: RegistryItems.RegistryItems) => {
+  const middlewareRegistryItems = new Map<
+    string,
+    MiddlewareRegistryItem.MiddlewareRegistryItem
+  >();
+  const functionRegistryItems: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(registryItems)) {
+    if (MiddlewareRegistryItem.isMiddlewareRegistryItem(value)) {
+      middlewareRegistryItems.set(value.middlewareSpec.key, value);
+    } else {
+      functionRegistryItems[key] = value;
+    }
+  }
+  return { functionRegistryItems, middlewareRegistryItems };
 };

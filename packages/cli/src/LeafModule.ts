@@ -1,4 +1,5 @@
-import { GroupSpec, Registry } from "@confect/core";
+import { GroupSpec } from "@confect/core";
+import { Registry, type RegistryItems } from "@confect/server";
 import * as GroupImpl from "@confect/server/GroupImpl";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -14,8 +15,10 @@ import * as Bundler from "./Bundler";
 import {
   ImplMissingDefaultLayerError,
   ImplMissingFunctionsError,
+  ImplMissingMiddlewareError,
   ImplMissingSpecImportError,
   ImplNotFinalizedError,
+  SpecImportsServerError,
   SpecMissingDefaultGroupSpecError,
 } from "./CodegenError";
 import { ConfectDirectory } from "./ConfectDirectory";
@@ -124,7 +127,7 @@ export const discoverLeafSpecFiles = Effect.gen(function* () {
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
 
-  const excludedDirs = new Set(["_generated", "tables"]);
+  const excludedDirs = new Set(["_generated", "tables", "middleware"]);
   const excludedFiles = new Set(["nodeSpec.ts", "spec.ts"]);
 
   const allPaths = yield* fs.readDirectory(confectDirectory, {
@@ -150,7 +153,7 @@ export const discoverLeafImplFiles = Effect.gen(function* () {
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
 
-  const excludedDirs = new Set(["_generated", "tables"]);
+  const excludedDirs = new Set(["_generated", "tables", "middleware"]);
 
   const allPaths = yield* fs.readDirectory(confectDirectory, {
     recursive: true,
@@ -192,26 +195,73 @@ const absoluteModulePath = (relativePath: string) =>
   });
 
 /**
- * Validate that the leaf's spec file default-exports a `GroupSpec`. Returns the
- * validated `GroupSpec` so callers can read its runtime and avoid re-bundling for
- * later inspection (e.g. stamping `leaf.runtime` and parent/child name-collision
- * checks at codegen time). The group's runtime (`Convex` vs `Node`) is whatever
- * the spec declares — it is not constrained by the file's location.
+ * Every `*.spec.ts` is reachable from `_generated/spec.ts`, which the client
+ * imports through `_generated/refs.ts` — so a spec's whole import graph is
+ * bundled into the browser whether or not the client calls those functions.
+ * Server logic co-located with a declaration therefore ships to users, silently.
+ *
+ * `@confect/server` is a sound proxy for "server logic lives here": an
+ * implementation can't be written without `FunctionImpl` / `MiddlewareImpl`,
+ * both of which live there. Table `Doc` / `Fields` schemas live in
+ * `@confect/core`, so the documented `notes.Doc` pattern in a spec must not
+ * reach `@confect/server` even through `tables/` or `_generated/`. The check
+ * runs over the spec bundle's transitive inputs rather than the spec module
+ * alone, so it also covers middleware declarations under
+ * `confect/middleware/` (which codegen otherwise never visits) and any
+ * shared helper a spec pulls in — while only ever flagging modules that
+ * genuinely reach the client.
+ */
+const validateClientSafety = (leaf: LeafModule, bundled: Bundler.Bundled) =>
+  Effect.gen(function* () {
+    const path = yield* Path.Path;
+    const confectDirectory = path.resolve(yield* ConfectDirectory.get);
+
+    const isCheckedUserModule = (absolutePath: string) => {
+      const relative = path.relative(confectDirectory, absolutePath);
+      return !relative.startsWith("..") && !path.isAbsolute(relative);
+    };
+
+    const importers = Bundler.importersOfPackage(
+      bundled,
+      "@confect/server",
+      isCheckedUserModule,
+    );
+
+    if (importers.length > 0) {
+      return yield* new SpecImportsServerError({
+        specPath: leaf.relativePath,
+        importerPaths: Array.map(importers, (absolutePath) =>
+          toPosixPath(path, path.relative(confectDirectory, absolutePath)),
+        ),
+      });
+    }
+  });
+
+/**
+ * Validate that the leaf's spec file default-exports a `GroupSpec`, and that
+ * nothing it reaches drags server code into the client (see
+ * {@link validateClientSafety}). Returns the validated `GroupSpec` so callers
+ * can read its runtime and avoid re-bundling for later inspection (e.g.
+ * stamping `leaf.runtime` and parent/child name-collision checks at codegen
+ * time). The group's runtime (`Convex` vs `Node`) is whatever the spec
+ * declares — it is not constrained by the file's location.
  */
 export const validateSpec = (leaf: LeafModule) =>
   Effect.gen(function* () {
     const absolutePath = yield* absoluteModulePath(leaf.relativePath);
-    const { module } = yield* Bundler.bundle(absolutePath).pipe(
+    const bundled = yield* Bundler.bundle(absolutePath).pipe(
       Effect.mapError((error) => fromBundlerError(leaf.relativePath, error)),
     );
 
-    const groupSpec = module.default;
+    const groupSpec = bundled.module.default;
 
     if (!GroupSpec.isGroupSpec(groupSpec)) {
       return yield* new SpecMissingDefaultGroupSpecError({
         specPath: leaf.relativePath,
       });
     }
+
+    yield* validateClientSafety(leaf, bundled);
 
     return groupSpec;
   });
@@ -237,7 +287,7 @@ const findFinalizedGroupImpl = <S>(
  */
 const buildImplLayer = (implLayer: Layer.Layer<unknown>) =>
   Effect.gen(function* () {
-    const registry = Ref.makeUnsafe<Registry.RegistryItems>({});
+    const registry = Ref.makeUnsafe<RegistryItems.RegistryItems>({});
     return yield* Layer.build(
       implLayer as Layer.Layer<unknown, never, never>,
     ).pipe(Effect.provideService(Registry.Registry, registry));
@@ -304,6 +354,33 @@ export const validateImpl = (leaf: LeafModule) =>
         implPath: implRelativePath,
         groupPath: leaf.groupPathDot,
         missingFunctionNames: missing,
+      });
+    }
+
+    const expectedMiddlewareKeys = [
+      ...new Set([
+        ...(groupSpec.middlewareSpecs ?? []).map(
+          (middlewareSpec) => middlewareSpec.key,
+        ),
+        ...Object.values(groupSpec.functions).flatMap((function_) =>
+          (function_.middlewareSpecs ?? []).map(
+            (middlewareSpec) => middlewareSpec.key,
+          ),
+        ),
+      ]),
+    ];
+    const registeredMiddlewareKeys = new Set(
+      finalizedGroupImpl.registeredMiddlewareKeys ?? [],
+    );
+    const missingMiddleware = expectedMiddlewareKeys.filter(
+      (key) => !registeredMiddlewareKeys.has(key),
+    );
+
+    if (missingMiddleware.length > 0) {
+      return yield* new ImplMissingMiddlewareError({
+        implPath: implRelativePath,
+        groupPath: leaf.groupPathDot,
+        missingMiddlewareKeys: missingMiddleware,
       });
     }
   });

@@ -14,9 +14,9 @@ export type FunctionProvenance = Data.TaggedEnum<{
   };
   Convex: {
     /** @internal */
-    _args: DefaultFunctionArgs;
+    "~args": DefaultFunctionArgs;
     /** @internal */
-    _returns: any;
+    "~returns": any;
   };
 }>;
 
@@ -67,8 +67,8 @@ export interface AnyConfect extends Confect<
 
 export interface Convex<Args extends DefaultFunctionArgs, Returns> {
   readonly _tag: "Convex";
-  readonly _args: Args;
-  readonly _returns: Returns;
+  readonly "~args": Args;
+  readonly "~returns": Returns;
 }
 
 export interface AnyConvex extends Convex<DefaultFunctionArgs, any> {}
@@ -81,7 +81,7 @@ const Standard: Standard = { _tag: "Standard" };
  * Build a `Confect` provenance from lazy schema thunks. `args`, `returns`,
  * and `error` are exposed as sync lazy memoised getters (via {@link Lazy.defineProperty})
  * that only evaluate their thunk on first access, mirroring how `Table`
- * defers `Fields`/`Doc`/`tableDefinition`. This keeps importing the assembled
+ * defers `Fields`/`Doc`. This keeps importing the assembled
  * `_generated/spec.ts` cheap — no `Schema.Struct(...)` / `Schema.Array(...)`
  * work runs at module load; it is deferred to the first invocation that
  * actually compiles validators or runs a codec.
@@ -223,10 +223,10 @@ export const ConfectPaginated = <
   return self;
 };
 
-export const Convex = <_Args extends DefaultFunctionArgs, _Returns>() =>
+export const Convex = <Args extends DefaultFunctionArgs, Returns>() =>
   FunctionProvenance.Convex(
     {} as {
-      _args: _Args;
-      _returns: _Returns;
+      "~args": Args;
+      "~returns": Returns;
     },
   );

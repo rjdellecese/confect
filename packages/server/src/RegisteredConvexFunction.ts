@@ -1,7 +1,11 @@
-import type * as FunctionSpec from "@confect/core/FunctionSpec";
+import {
+  compileArgsSchema,
+  compileReturnsSchema,
+} from "@confect/core/SchemaToValidator";
 import {
   actionGeneric,
   type DefaultFunctionArgs,
+  type FunctionVisibility,
   type GenericMutationCtx,
   type GenericQueryCtx,
   internalActionGeneric,
@@ -25,84 +29,87 @@ import * as DatabaseReader from "./DatabaseReader";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import * as DatabaseWriter from "./DatabaseWriter";
 import type * as DataModel from "./DataModel";
-import type * as Handler from "./Handler";
 import * as MutationCtx from "./MutationCtx";
 import * as MutationRunner from "./MutationRunner";
 import * as QueryCtx from "./QueryCtx";
 import * as QueryRunner from "./QueryRunner";
 import * as RegisteredFunction from "./RegisteredFunction";
-import type * as RegistryItem from "./RegistryItem";
+import type * as FunctionRegistryItem from "./FunctionRegistryItem";
+import type * as ResolvedMiddleware from "./ResolvedMiddleware";
 import * as Scheduler from "./Scheduler";
-import * as SchemaToValidator from "./SchemaToValidator";
 import { StorageReader } from "./StorageReader";
 import { StorageWriter } from "./StorageWriter";
 
 export const make = (
   databaseSchema: DatabaseSchema.AnyWithProps,
-  { functionSpec, handler }: RegistryItem.AnyWithProps,
-): RegisteredFunction.Any =>
-  Match.value(functionSpec.functionProvenance).pipe(
-    Match.tag("Convex", () => handler as RegisteredFunction.Any),
-    Match.tag("Confect", () => {
-      const { functionVisibility, functionProvenance } =
-        functionSpec as FunctionSpec.AnyConfect;
+  item: FunctionRegistryItem.ConfectFunctionRegistryItem,
+  resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware> = [],
+): RegisteredFunction.Any => {
+  const { name, functionVisibility, handler } = item;
 
-      return Match.value(functionSpec.runtimeAndFunctionType.functionType).pipe(
-        Match.when("query", () => {
-          const genericFunction = Match.value(functionVisibility).pipe(
-            Match.when("public", () => queryGeneric),
-            Match.when("internal", () => internalQueryGeneric),
-            Match.exhaustive,
-          );
-
-          return genericFunction(
-            queryFunction({
-              databaseSchema,
-              args: functionProvenance.args,
-              returns: functionProvenance.returns,
-              error: functionProvenance.error,
-              handler: handler as Handler.AnyConfectProvenance,
-            }),
-          );
-        }),
-        Match.when("mutation", () => {
-          const genericFunction = Match.value(functionVisibility).pipe(
-            Match.when("public", () => mutationGeneric),
-            Match.when("internal", () => internalMutationGeneric),
-            Match.exhaustive,
-          );
-
-          return genericFunction(
-            mutationFunction({
-              databaseSchema,
-              args: functionProvenance.args,
-              returns: functionProvenance.returns,
-              error: functionProvenance.error,
-              handler: handler as Handler.AnyConfectProvenance,
-            }),
-          );
-        }),
-        Match.when("action", () => {
-          const genericFunction = Match.value(functionVisibility).pipe(
-            Match.when("public", () => actionGeneric),
-            Match.when("internal", () => internalActionGeneric),
-            Match.exhaustive,
-          );
-
-          return genericFunction(
-            convexActionFunction(databaseSchema, {
-              args: functionProvenance.args,
-              returns: functionProvenance.returns,
-              error: functionProvenance.error,
-              handler: handler as Handler.AnyConfectProvenance,
-            }),
-          );
-        }),
+  return Match.value(item.functionType).pipe(
+    Match.when("query", () => {
+      const genericFunction = Match.value(functionVisibility).pipe(
+        Match.when("public", () => queryGeneric),
+        Match.when("internal", () => internalQueryGeneric),
         Match.exhaustive,
+      );
+
+      return genericFunction(
+        queryFunction({
+          databaseSchema,
+          name,
+          functionVisibility,
+          args: item.args,
+          returns: item.returns,
+          error: item.error,
+          handler,
+          resolvedMiddlewares,
+        }),
+      );
+    }),
+    Match.when("mutation", () => {
+      const genericFunction = Match.value(functionVisibility).pipe(
+        Match.when("public", () => mutationGeneric),
+        Match.when("internal", () => internalMutationGeneric),
+        Match.exhaustive,
+      );
+
+      return genericFunction(
+        mutationFunction({
+          databaseSchema,
+          name,
+          functionVisibility,
+          args: item.args,
+          returns: item.returns,
+          error: item.error,
+          handler,
+          resolvedMiddlewares,
+        }),
+      );
+    }),
+    Match.when("action", () => {
+      const genericFunction = Match.value(functionVisibility).pipe(
+        Match.when("public", () => actionGeneric),
+        Match.when("internal", () => internalActionGeneric),
+        Match.exhaustive,
+      );
+
+      return genericFunction(
+        convexActionFunction(databaseSchema, {
+          name,
+          functionVisibility,
+          args: item.args,
+          returns: item.returns,
+          error: item.error,
+          handler,
+          resolvedMiddlewares,
+        }),
       );
     }),
     Match.exhaustive,
   );
+};
 
 /**
  * Convex evicts a query from its cache once the execution observes the current
@@ -147,12 +154,17 @@ const queryFunction = <
   E,
 >({
   databaseSchema,
+  name,
+  functionVisibility,
   args,
   returns,
   error,
   handler,
+  resolvedMiddlewares,
 }: {
   databaseSchema: DatabaseSchema_;
+  name: string;
+  functionVisibility: FunctionVisibility;
   args: Schema.Codec<Args, ConvexArgs>;
   returns: Schema.Codec<Returns, ConvexReturns>;
   error: Schema.Codec<Error, Value> | undefined;
@@ -169,9 +181,10 @@ const queryFunction = <
         DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
       >
   >;
+  resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
 }) => ({
-  args: SchemaToValidator.compileArgsSchema(args),
-  returns: SchemaToValidator.compileReturnsSchema(returns),
+  args: compileArgsSchema(args),
+  returns: compileReturnsSchema(returns),
   handler: (
     ctx: GenericQueryCtx<
       DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
@@ -184,7 +197,16 @@ const queryFunction = <
         Schema.decodeUnknownEffect(args),
         Effect.orDie,
       );
-      const decodedReturns = yield* handler(decodedArgs).pipe(
+      const decodedReturns = yield* RegisteredFunction.applyMiddleware(
+        handler(decodedArgs),
+        resolvedMiddlewares,
+        {
+          name,
+          functionType: "query",
+          functionVisibility,
+          args: decodedArgs,
+        },
+      ).pipe(
         Effect.provide(
           Layer.mergeAll(
             DatabaseReader.layer(databaseSchema, ctx.db),
@@ -208,9 +230,12 @@ const queryFunction = <
       );
     }).pipe(
       Effect.provideService(Clock.Clock, queryClock),
-      RegisteredFunction.runHandlerPromise(error, {
-        scheduler: new EffectScheduler.MixedScheduler("sync"),
-      }),
+      RegisteredFunction.runHandlerPromise(
+        RegisteredFunction.combineErrorSchemas(error, resolvedMiddlewares),
+        {
+          scheduler: new EffectScheduler.MixedScheduler("sync"),
+        },
+      ),
     ),
 });
 
@@ -256,21 +281,27 @@ const mutationFunction = <
   E,
 >({
   databaseSchema,
+  name,
+  functionVisibility,
   args,
   returns,
   error,
   handler,
+  resolvedMiddlewares,
 }: {
   databaseSchema: DatabaseSchema_;
+  name: string;
+  functionVisibility: FunctionVisibility;
   args: Schema.Codec<Args, ConvexArgs>;
   returns: Schema.Codec<Returns, ConvexReturns>;
   error: Schema.Codec<Error, Value> | undefined;
   handler: (
     a: Args,
   ) => Effect.Effect<Returns, E, MutationServices<DatabaseSchema_>>;
+  resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
 }) => ({
-  args: SchemaToValidator.compileArgsSchema(args),
-  returns: SchemaToValidator.compileReturnsSchema(returns),
+  args: compileArgsSchema(args),
+  returns: compileReturnsSchema(returns),
   handler: (
     ctx: GenericMutationCtx<
       DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
@@ -283,18 +314,28 @@ const mutationFunction = <
         Schema.decodeUnknownEffect(args),
         Effect.orDie,
       );
-      const decodedReturns = yield* handler(decodedArgs).pipe(
-        Effect.provide(mutationLayer(databaseSchema, ctx)),
-      );
+      const decodedReturns = yield* RegisteredFunction.applyMiddleware(
+        handler(decodedArgs),
+        resolvedMiddlewares,
+        {
+          name,
+          functionType: "mutation",
+          functionVisibility,
+          args: decodedArgs,
+        },
+      ).pipe(Effect.provide(mutationLayer(databaseSchema, ctx)));
       return yield* pipe(
         decodedReturns,
         Schema.encodeEffect(returns),
         Effect.orDie,
       );
     }).pipe(
-      RegisteredFunction.runHandlerPromise(error, {
-        scheduler: new EffectScheduler.MixedScheduler("sync"),
-      }),
+      RegisteredFunction.runHandlerPromise(
+        RegisteredFunction.combineErrorSchemas(error, resolvedMiddlewares),
+        {
+          scheduler: new EffectScheduler.MixedScheduler("sync"),
+        },
+      ),
     ),
 });
 
@@ -308,11 +349,16 @@ const convexActionFunction = <
 >(
   schema: DatabaseSchema_,
   {
+    name,
+    functionVisibility,
     args,
     returns,
     error,
     handler,
+    resolvedMiddlewares,
   }: {
+    name: string;
+    functionVisibility: FunctionVisibility;
     args: Schema.Codec<Args, ConvexArgs>;
     returns: Schema.Codec<Returns, ConvexReturns>;
     error: Schema.Codec<any, any> | undefined;
@@ -323,13 +369,17 @@ const convexActionFunction = <
       E,
       RegisteredFunction.ActionServices<DatabaseSchema_>
     >;
+    resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
   },
 ) =>
   RegisteredFunction.actionFunctionBase({
+    name,
+    functionVisibility,
     args,
     returns,
     error,
     handler,
+    resolvedMiddlewares,
     createLayer: (ctx) =>
       Layer.mergeAll(
         RegisteredFunction.actionLayer(schema, ctx),

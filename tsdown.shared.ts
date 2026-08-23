@@ -12,7 +12,12 @@ export const createConfig = ({
   entry,
   platform,
   outDir,
-  clean: true,
+  clean: [
+    `${outDir}/**/*.js`,
+    `${outDir}/**/*.mjs`,
+    `${outDir}/**/*.js.map`,
+    `${outDir}/**/*.mjs.map`,
+  ],
   dts: false,
   sourcemap: true,
   format: ["esm"],

@@ -185,3 +185,110 @@ layer(BundlerLayer)("bundle", (it) => {
       }).pipe(Effect.scoped),
   );
 });
+
+layer(BundlerLayer)("importersOfPackage", (it) => {
+  // The two shapes `@confect/server` takes in the wild: externalized in a
+  // published install, bundled in this monorepo (a symlinked workspace dep whose
+  // realpath is outside `node_modules`). Matching on the resolved path would
+  // only ever catch one of them, so the lookup reads the original specifier.
+  it.effect("finds an importer of an externalized package", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      // Under the repo so the externalized `effect` resolves from the temp
+      // `.mjs` that `bundle-require` writes beside the entry.
+      const tempDir = yield* fs.makeTempDirectoryScoped({
+        directory: process.cwd(),
+      });
+
+      const entry = path.join(tempDir, "entry.ts");
+      yield* fs.writeFileString(
+        entry,
+        `import { pipe } from "effect/Function";\nexport default pipe(1, (n) => n + 1);\n`,
+      );
+
+      const bundled = yield* Bundler.bundle(entry);
+
+      expect(
+        Bundler.importersOfPackage(bundled, "effect", () => true),
+      ).toStrictEqual([yield* fs.realPath(entry)]);
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("finds an importer of a bundled workspace package", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const tempDir = yield* fs.makeTempDirectoryScoped();
+
+      const pkgDir = path.join(tempDir, "pkg");
+      yield* fs.makeDirectory(path.join(pkgDir, "dist"), { recursive: true });
+      yield* fs.writeFileString(
+        path.join(pkgDir, "package.json"),
+        `{ "name": "@scope/lib", "type": "module", "exports": { ".": "./dist/index.js" } }\n`,
+      );
+      yield* fs.writeFileString(
+        path.join(pkgDir, "dist", "index.js"),
+        `export const value = "bundled";\n`,
+      );
+
+      yield* fs.makeDirectory(path.join(tempDir, "node_modules", "@scope"), {
+        recursive: true,
+      });
+      yield* fs.symlink(
+        pkgDir,
+        path.join(tempDir, "node_modules", "@scope", "lib"),
+      );
+
+      const entry = path.join(tempDir, "entry.ts");
+      yield* fs.writeFileString(
+        entry,
+        `import { value } from "@scope/lib";\nexport default value;\n`,
+      );
+
+      const bundled = yield* Bundler.bundle(entry);
+
+      // The import resolved to an absolute path inside `pkg/dist`, yet the
+      // package is still found by name.
+      expect(
+        Bundler.importersOfPackage(bundled, "@scope/lib", () => true),
+      ).toStrictEqual([yield* fs.realPath(entry)]);
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("matches subpath imports and honours the `where` filter", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const tempDir = yield* fs.makeTempDirectoryScoped({
+        directory: process.cwd(),
+      });
+
+      // Only the sibling imports `effect/*`; the entry re-exports it.
+      const sibling = path.join(tempDir, "sibling.ts");
+      yield* fs.writeFileString(
+        sibling,
+        `import { pipe } from "effect/Function";\nexport default pipe(1, (n) => n + 1);\n`,
+      );
+      const entry = path.join(tempDir, "entry.ts");
+      yield* fs.writeFileString(
+        entry,
+        `export { default } from "./sibling";\n`,
+      );
+
+      const bundled = yield* Bundler.bundle(entry);
+      const realSibling = yield* fs.realPath(sibling);
+
+      expect(
+        Bundler.importersOfPackage(bundled, "effect", () => true),
+      ).toStrictEqual([realSibling]);
+      expect(
+        Bundler.importersOfPackage(
+          bundled,
+          "effect",
+          (absolutePath) => absolutePath !== realSibling,
+        ),
+      ).toStrictEqual([]);
+    }).pipe(Effect.scoped),
+  );
+});

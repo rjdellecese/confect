@@ -2,12 +2,13 @@ import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as Table from "./Table";
 import type * as TableInfo from "./TableInfo";
 
-export declare const TypeId: "@confect/server/DataModel";
+export declare const TypeId: "~@confect/server/DataModel";
 export type TypeId = typeof TypeId;
 
 export interface DataModel<Tables_ extends Table.AnyWithProps> {
   readonly [TypeId]: TypeId;
   readonly tables: Table.TablesRecord<Tables_>;
+  readonly "~Tables": Tables_;
 }
 
 export interface Any {
@@ -16,6 +17,7 @@ export interface Any {
 
 export interface AnyWithProps extends Any {
   readonly tables: Record<string, Table.AnyWithProps>;
+  readonly "~Tables": Table.AnyWithProps;
 }
 
 export type FromSchema<Schema extends DatabaseSchema.AnyWithProps> = DataModel<
@@ -31,8 +33,7 @@ export type ToConvex<DataModel_ extends AnyWithProps> = {
   >;
 };
 
-export type Tables<DataModel_ extends AnyWithProps> =
-  DataModel_ extends DataModel<infer Tables_> ? Tables_ : never;
+export type Tables<DataModel_ extends AnyWithProps> = DataModel_["~Tables"];
 
 export type TableNames<DataModel_ extends AnyWithProps> = Table.Name<
   Tables<DataModel_>

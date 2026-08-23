@@ -71,7 +71,7 @@ These are from the Changesets docs but are easy to miss:
    +      - v9
    ```
 
-   The other two pieces of branch-awareness are permanent fixtures of `release.yml` (kept in place between prerelease cycles) — verify they are still present rather than adding them: `changesets/action` receives `branch: ${{ github.ref_name }}`, and the docs deployment step is gated with `if: steps.changesets.outputs.published == 'true' && github.ref_name == 'main'`. The prerelease cycle must not touch the docs `release` branch — that tracks the stable line.
+   The other pieces of branch-awareness are permanent fixtures of `release.yml` (kept in place between prerelease cycles) — verify they are still present rather than adding them: `changesets/action@v2` opens its Version Packages PR against the pushed branch by default (its `pr-base-branch` input defaults to `github.ref_name`, so no explicit input is needed), and the docs deployment step is gated with `if: steps.changesets.outputs.published == 'true' && github.ref_name == 'main'`. The prerelease cycle must not touch the docs `release` branch — that tracks the stable line.
 
 5. **Mirror the branch into the other CI workflows.** Add `- v9` to the `push.branches` and `pull_request.branches` lists in any CI workflows that gate `main` (typically `docs.yml`, `example.yml`, `packages.yml`) so PRs against `v9` run the same checks as PRs against `main`.
 
@@ -91,7 +91,7 @@ While `.changeset/pre.json` exists on `v9`:
 
 - Author changesets normally with `pnpm changeset` on feature branches targeting `v9`. Each merged PR is appended to the open `Version Packages (next)` PR.
 - Merging the `Version Packages (next)` PR bumps the next `X.0.0-next.N` and publishes under the `next` dist-tag.
-- The merged changeset files are kept around — Changesets needs them to compose the final stable changelog on exit. Do not delete them manually.
+- The merged changeset files are kept around (Changesets v3 moves consumed ones into `.changeset/pre/`) — Changesets needs them to compose the final stable changelog on exit. Do not delete them manually.
 
 There is no required cadence; ship as many `next.N`s as the major needs.
 

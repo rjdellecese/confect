@@ -29,14 +29,14 @@ The workspace is on TypeScript 7, so `tsc` is a native binary and the `typescrip
 
 Packages are built with tsdown (JavaScript output) plus TypeScript project references: each package has a composite `tsconfig.src.json`, and `tsc -b` typechecks the graph in dependency order and emits the `.d.ts` declarations (tsdown is configured with `dts: false`). The exception is `@confect/cli`, which ships only a binary: it has no `tsconfig.src.json` and emits no declarations; its build is tsdown-only and its sources are typechecked by the root `tsconfig.json`.
 
-**Critical: packages must be rebuilt with `pnpm build` after source changes for those changes to be reflected outside their package directory.** Consumers import from `dist/`, not `src/`. During development, use `pnpm dev` to run tsdown in watch mode across all packages so rebuilds happen automatically.
+**Critical: packages must be rebuilt with `pnpm build` after source changes for those changes to be reflected outside their package directory.** Consumers import from `dist/`, not `src/`. During development, use `pnpm dev` to watch-rebuild all packages automatically: it runs tsdown in watch mode in every package (JavaScript output) alongside a single root `tsc -b --watch` over the project-reference graph (declaration output, in dependency order).
 
 Build, lint, and format run through Vite+ (`vp`), which orders packages by their dependency graph and caches results. There are no per-package script variants at the root; target a single package ad hoc with `vp run --filter <pkg> <task>` (e.g. `vp run --filter @confect/core build`). Tests run through Vitest directly (not `vp`); target one package's suite with `vitest run --project @confect/core`.
 
 ### Key Commands (run from repo root)
 
 - `pnpm build` - Build all @confect packages (cached, dependency-ordered)
-- `pnpm dev` - Watch-rebuild all packages in parallel
+- `pnpm dev` - Watch-rebuild all packages (tsdown watchers + `tsc -b --watch` for declarations)
 - `pnpm dev:example` / `pnpm dev:docs` - Run the example app / docs site
 - `pnpm test` - Run all package test suites via Vitest (`vitest run`)
 - `pnpm typecheck` - Typecheck the package graph and test suites via `tsc -b` (project references, incremental)

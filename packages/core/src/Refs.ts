@@ -4,6 +4,7 @@ import * as Option from "effect/Option";
 import * as Record from "effect/Record";
 import type * as FunctionSpec from "./FunctionSpec";
 import type * as GroupSpec from "./GroupSpec";
+import type * as MiddlewareSpec from "./MiddlewareSpec";
 import * as Ref from "./Ref";
 import type * as Spec from "./Spec";
 
@@ -22,7 +23,11 @@ type GroupRefs<
   Predicate extends Ref.Any,
 > = Types.Simplify<
   OmitEmpty<Helper<GroupSpec.Groups<Group>, Predicate>> &
-    FilteredFunctions<GroupSpec.Functions<Group>, Predicate>
+    FilteredFunctions<
+      GroupSpec.Functions<Group>,
+      Predicate,
+      MiddlewareSpec.Error<GroupSpec.MiddlewareSpecs<Group>>
+    >
 >;
 
 type OmitEmpty<T> = {
@@ -45,6 +50,7 @@ type FunctionSpecMatchesPredicate<
 type FilteredFunctions<
   FunctionSpecs extends FunctionSpec.AnyWithProps,
   Predicate extends Ref.Any,
+  MiddlewareError,
 > = {
   [
     Name in FunctionSpec.Name<FunctionSpecs> as FunctionSpec.WithName<
@@ -57,7 +63,16 @@ type FilteredFunctions<
       : never
   ]: FunctionSpec.WithName<FunctionSpecs, Name> extends infer F extends
     FunctionSpec.AnyWithProps
-    ? Ref.FromFunctionSpec<F>
+    ? Ref.FromFunctionSpec<
+        F,
+        F extends {
+          readonly functionProvenance: { readonly _tag: "Confect" };
+        }
+          ?
+              | MiddlewareError
+              | MiddlewareSpec.Error<FunctionSpec.MiddlewareSpecs<F>>
+          : never
+      >
     : never;
 };
 
@@ -91,20 +106,27 @@ export const make = <Spec_ extends Spec.AnyWithProps>(
 
 const makeHelper = (
   groups: Record.ReadonlyRecord<string, GroupSpec.Any>,
-  functionNamespace: Option.Option<string> = Option.none(),
+  convexFunctionNamespace: Option.Option<string> = Option.none(),
 ): Any =>
   pipe(
     groups as Record.ReadonlyRecord<string, GroupSpec.AnyWithProps>,
     Record.map((group, name) => {
-      const currentFunctionNamespace = Option.match(functionNamespace, {
-        onNone: () => name,
-        onSome: (parentNamespace) => `${parentNamespace}/${name}`,
-      });
+      const currentConvexFunctionNamespace = Option.match(
+        convexFunctionNamespace,
+        {
+          onNone: () => name,
+          onSome: (parentNamespace) => `${parentNamespace}/${name}`,
+        },
+      );
 
       return Record.union(
-        makeHelper(group.groups, Option.some(currentFunctionNamespace)),
+        makeHelper(group.groups, Option.some(currentConvexFunctionNamespace)),
         Record.map(group.functions, (function_) =>
-          Ref.make(currentFunctionNamespace, function_),
+          Ref.make(
+            currentConvexFunctionNamespace,
+            function_,
+            group.middlewareSpecs,
+          ),
         ),
         (_subGroup, _function) => {
           throw new Error(

@@ -1,7 +1,7 @@
 import * as Predicate from "effect/Predicate";
 import type * as Table from "./Table";
 
-export const TypeId = "@confect/server/DatabaseSchema";
+export const TypeId = "~@confect/server/DatabaseSchema";
 export type TypeId = typeof TypeId;
 
 export interface Any {
@@ -14,8 +14,8 @@ export const isDatabaseSchema = (u: unknown): u is Any =>
 /**
  * A schema definition holding a record of bound `Table`s keyed by table
  * name. Codegen emits a single static `DatabaseSchema.make({ ... })` call;
- * laziness lives entirely on each `Table` (its `Fields`, `Doc`, and
- * `tableDefinition` are lazy memoised getters), so this layer is a plain
+ * laziness lives entirely on each `Table` (its `Fields` and `Doc` are lazy
+ * memoised getters), so this layer is a plain
  * record indirection with no module-loading or async machinery.
  */
 export interface DatabaseSchema<Tables_ extends Table.AnyWithProps = never> {
@@ -26,15 +26,17 @@ export interface DatabaseSchema<Tables_ extends Table.AnyWithProps = never> {
       TableName
     >;
   };
+  readonly "~Tables": Tables_;
 }
 
 export interface AnyWithProps {
   readonly [TypeId]: TypeId;
   readonly tables: Record<string, Table.AnyWithProps>;
+  readonly "~Tables": Table.AnyWithProps;
 }
 
 export type Tables<DatabaseSchema_ extends AnyWithProps> =
-  DatabaseSchema_ extends DatabaseSchema<infer Tables_> ? Tables_ : never;
+  DatabaseSchema_["~Tables"];
 
 export type TableNames<DatabaseSchema_ extends AnyWithProps> = Table.Name<
   Tables<DatabaseSchema_>
@@ -66,9 +68,10 @@ export const make = <
   const TablesRecord extends Record<string, Table.AnyWithProps>,
 >(
   tables: TablesRecord,
-): DatabaseSchema<TablesRecord[keyof TablesRecord]> => ({
-  [TypeId]: TypeId,
-  tables: tables as unknown as DatabaseSchema<
-    TablesRecord[keyof TablesRecord]
-  >["tables"],
-});
+): DatabaseSchema<TablesRecord[keyof TablesRecord]> =>
+  ({
+    [TypeId]: TypeId,
+    tables: tables as unknown as DatabaseSchema<
+      TablesRecord[keyof TablesRecord]
+    >["tables"],
+  }) as DatabaseSchema<TablesRecord[keyof TablesRecord]>;

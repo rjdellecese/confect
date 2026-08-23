@@ -14,9 +14,8 @@
  * forcing the computation.
  *
  * This is the single shared implementation consumed across packages (e.g.
- * `@confect/core`'s lazy `FunctionSpec` schemas and `@confect/server`'s lazy
- * `Table` `Fields` / `Doc` / `tableDefinition`), so there is no chance of the
- * two drifting apart.
+ * `@confect/core`'s lazy `FunctionSpec` schemas and lazy `Table` `Fields` /
+ * `Doc`), so there is no chance of the two drifting apart.
  */
 export const defineProperty = <T extends object, K extends PropertyKey>(
   target: T,

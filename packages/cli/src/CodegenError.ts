@@ -33,6 +33,14 @@ export class SpecMissingDefaultGroupSpecError extends Schema.TaggedError<SpecMis
   },
 ) {}
 
+export class SpecImportsServerError extends Schema.TaggedError<SpecImportsServerError>()(
+  "SpecImportsServerError",
+  {
+    specPath: Schema.String,
+    importerPaths: Schema.Array(Schema.String),
+  },
+) {}
+
 export class ImplMissingSpecImportError extends Schema.TaggedError<ImplMissingSpecImportError>()(
   "ImplMissingSpecImportError",
   {
@@ -61,6 +69,15 @@ export class ImplMissingFunctionsError extends Schema.TaggedError<ImplMissingFun
     implPath: Schema.String,
     groupPath: Schema.String,
     missingFunctionNames: Schema.Array(Schema.String),
+  },
+) {}
+
+export class ImplMissingMiddlewareError extends Schema.TaggedError<ImplMissingMiddlewareError>()(
+  "ImplMissingMiddlewareError",
+  {
+    implPath: Schema.String,
+    groupPath: Schema.String,
+    missingMiddlewareKeys: Schema.Array(Schema.String),
   },
 ) {}
 
@@ -137,10 +154,12 @@ export const CodegenError = Schema.Union([
   MissingImplFileError,
   MissingSpecFileError,
   SpecMissingDefaultGroupSpecError,
+  SpecImportsServerError,
   ImplMissingSpecImportError,
   ImplMissingDefaultLayerError,
   ImplNotFinalizedError,
   ImplMissingFunctionsError,
+  ImplMissingMiddlewareError,
   ParentChildNameCollisionError,
   InvalidTableDefaultExportError,
   InvalidTableFilenameError,
@@ -201,6 +220,17 @@ const renderSpecMissingDefaultGroupSpecError = (
     " must default-export a GroupSpec; build it with GroupSpec.make() or GroupSpec.makeNode().",
   );
 
+const renderSpecImportsServerError = (
+  error: SpecImportsServerError,
+): string => {
+  const importers = error.importerPaths.join(", ");
+  return singleLine(
+    "Spec ",
+    formatPath(error.specPath),
+    ` reaches a module that imports \`@confect/server\`: ${importers}. Spec modules are bundled into your client, so anything they import ships to the browser — move the server logic into a \`*.impl.ts\` module, or use \`import type\` if you only need the types.`,
+  );
+};
+
 const renderImplMissingSpecImportError = (
   error: ImplMissingSpecImportError,
 ): string => {
@@ -236,6 +266,17 @@ const renderImplMissingFunctionsError = (
     "Impl ",
     formatPath(error.implPath),
     ` does not implement every function declared by group \`${error.groupPath}\`; missing: ${names}. Add a \`FunctionImpl.make\` for each missing function and provide it to the group layer.`,
+  );
+};
+
+const renderImplMissingMiddlewareError = (
+  error: ImplMissingMiddlewareError,
+): string => {
+  const keys = error.missingMiddlewareKeys.join(", ");
+  return singleLine(
+    "Impl ",
+    formatPath(error.implPath),
+    ` does not implement every middleware attached to group \`${error.groupPath}\`; missing: ${keys}. Provide a \`MiddlewareImpl.make\` (or \`makeByFunctionType\`/\`provides\`) layer for each missing middleware to the group layer.`,
   );
 };
 
@@ -329,6 +370,7 @@ export const renderCodegenError = (error: CodegenError): string => {
       "SpecMissingDefaultGroupSpecError",
       renderSpecMissingDefaultGroupSpecError,
     ),
+    Match.tag("SpecImportsServerError", renderSpecImportsServerError),
     Match.tag("ImplMissingSpecImportError", renderImplMissingSpecImportError),
     Match.tag(
       "ImplMissingDefaultLayerError",
@@ -336,6 +378,7 @@ export const renderCodegenError = (error: CodegenError): string => {
     ),
     Match.tag("ImplNotFinalizedError", renderImplNotFinalizedError),
     Match.tag("ImplMissingFunctionsError", renderImplMissingFunctionsError),
+    Match.tag("ImplMissingMiddlewareError", renderImplMissingMiddlewareError),
     Match.tag(
       "ParentChildNameCollisionError",
       renderParentChildNameCollisionError,

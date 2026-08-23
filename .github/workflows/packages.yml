@@ -113,6 +113,15 @@ jobs:
       - uses: ./.github/actions/confect-setup
       - run: pnpm --filter ${{ matrix.package }} bench
 
+  pack-contents:
+    name: Pack contents
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/confect-setup
+      - run: pnpm build
+      - run: pnpm check:pack-contents
+
   build:
     name: Build (${{ matrix.package }}, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}

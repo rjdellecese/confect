@@ -29,6 +29,13 @@ export interface Bundled {
  * (e.g. {@link directlyImports}), so we normalize every key/import path to
  * absolute up front. That way the lookup logic stays oblivious to whatever
  * cwd was used during bundling.
+ *
+ * `original` (the specifier as written, before resolution) is filled in from
+ * `path` when esbuild omits it — esbuild only sets it when it differs from the
+ * resolved path, which is exactly the externalized-bare-specifier case that
+ * absolutizing `path` would otherwise mangle into `<cwd>/@confect/server`.
+ * {@link importersOfPackage} relies on `original` always being the raw
+ * specifier.
  */
 const absolutizeMetafile = (
   path: Path.Path,
@@ -42,7 +49,10 @@ const absolutizeMetafile = (
     inputs[absolutize(key)] = {
       ...value,
       imports: value.imports.map((i) =>
-        Object.assign({}, i, { path: absolutize(i.path) }),
+        Object.assign({}, i, {
+          path: absolutize(i.path),
+          original: i.original ?? i.path,
+        }),
       ),
     };
   }
@@ -270,3 +280,36 @@ export const directlyImports = (
       Option.getOrElse(() => false),
     );
   });
+
+/**
+ * Returns the absolute paths of every module in the bundle that declares a
+ * direct import of `packageName` (the package itself or one of its subpaths)
+ * and satisfies `where`. Use `where` to restrict the search to the modules you
+ * care about — the bundle's inputs include every transitive dependency.
+ *
+ * Matching is on the specifier as written rather than the resolved path,
+ * because {@link bundleWorkspacePlugin} bundles first-party workspace
+ * dependencies (so `@confect/server` resolves to a path inside the monorepo)
+ * while a published install externalizes them (so it stays a bare specifier).
+ * esbuild erases `import type` before it produces the metafile, so type-only
+ * imports are not reported.
+ */
+export const importersOfPackage = (
+  bundled: Bundled,
+  packageName: string,
+  where: (absolutePath: string) => boolean,
+): ReadonlyArray<string> => {
+  const subpathPrefix = `${packageName}/`;
+
+  return Object.entries(bundled.metafile.inputs)
+    .filter(
+      ([absolutePath, input]) =>
+        where(absolutePath) &&
+        input.imports.some(
+          (imported) =>
+            imported.original === packageName ||
+            imported.original?.startsWith(subpathPrefix) === true,
+        ),
+    )
+    .map(([absolutePath]) => absolutePath);
+};

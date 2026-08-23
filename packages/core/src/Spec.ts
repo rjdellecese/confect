@@ -2,7 +2,7 @@ import * as Predicate from "effect/Predicate";
 import * as Record from "effect/Record";
 import * as GroupSpec from "./GroupSpec";
 
-export const TypeId = "@confect/core/Spec";
+export const TypeId = "~@confect/core/Spec";
 export type TypeId = typeof TypeId;
 
 export const isSpec = (u: unknown): u is AnyWithProps =>
@@ -23,6 +23,7 @@ export interface Spec<Groups_ extends GroupSpec.AnyWithProps = never> {
       GroupName
     >;
   };
+  readonly "~Groups": Groups_;
 
   add<Group extends GroupSpec.AnyWithProps>(
     group: Group,
@@ -40,8 +41,7 @@ export interface Any {
 
 export interface AnyWithProps extends Spec<GroupSpec.AnyWithProps> {}
 
-export type Groups<Spec_ extends AnyWithProps> =
-  Spec_["groups"][keyof Spec_["groups"]];
+export type Groups<Spec_ extends AnyWithProps> = Spec_["~Groups"];
 
 const Proto = {
   [TypeId]: TypeId,
@@ -70,6 +70,6 @@ const makeProto = <Groups_ extends GroupSpec.AnyWithProps>({
 }): Spec<Groups_> =>
   Object.assign(Object.create(Proto), {
     groups,
-  });
+  }) as Spec<Groups_>;
 
 export const make = (): Spec => makeProto({ groups: {} });

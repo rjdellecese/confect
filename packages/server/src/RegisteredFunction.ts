@@ -1,5 +1,10 @@
 import type { FunctionSpec, RuntimeAndFunctionType } from "@confect/core";
 import type * as FunctionProvenance from "@confect/core/FunctionProvenance";
+import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
+import {
+  compileArgsSchema,
+  compileReturnsSchema,
+} from "@confect/core/SchemaToValidator";
 import {
   type DefaultFunctionArgs,
   type FunctionVisibility,
@@ -24,8 +29,8 @@ import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
 import * as MutationRunner from "./MutationRunner";
 import * as QueryRunner from "./QueryRunner";
+import type * as ResolvedMiddleware from "./ResolvedMiddleware";
 import * as Scheduler from "./Scheduler";
-import * as SchemaToValidator from "./SchemaToValidator";
 import * as StorageActionWriter from "./StorageActionWriter";
 import * as StorageReader from "./StorageReader";
 import * as StorageWriter from "./StorageWriter";
@@ -73,8 +78,8 @@ export type ConvexRegisteredFunction<
 > = FunctionSpec_ extends {
   functionProvenance: {
     _tag: "Convex";
-    _args: infer Args_ extends DefaultFunctionArgs;
-    _returns: infer Returns_;
+    "~args": infer Args_ extends DefaultFunctionArgs;
+    "~returns": infer Returns_;
   };
 }
   ? RuntimeAndFunctionType.GetFunctionType<
@@ -118,6 +123,53 @@ export type RegisteredFunction<
         >
       ? ConfectRegisteredFunction<FunctionSpec_>
       : never;
+
+/**
+ * Wrap a function's handler effect in its resolved middleware chain, per
+ * invocation, after args decode. Iterated innermost-first so that the
+ * first-attached (group-level, in attachment order) middleware ends up
+ * outermost and runs first. Erased types: the public safety story lives at
+ * the `MiddlewareSpec.MiddlewareImpl` / `MiddlewareImpl.make` signatures, and
+ * the composed effect's error channel is re-accounted by
+ * {@link combineErrorSchemas}.
+ */
+export const applyMiddleware = <A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+  resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
+  options: MiddlewareSpec.MiddlewareOptions,
+): Effect.Effect<A, any, R> => {
+  let wrapped: Effect.Effect<any, any, any> = effect;
+  for (let index = resolvedMiddlewares.length - 1; index >= 0; index--) {
+    wrapped = resolvedMiddlewares[index]!.middlewareImpl(
+      wrapped as any,
+      options,
+    ) as any;
+  }
+  return wrapped as Effect.Effect<A, any, R>;
+};
+
+/**
+ * The error-schema allowlist for a function with middleware: the function's
+ * own declared `error` schema unioned with every covering middleware's
+ * error schema. `undefined` (⇒ every failure dies) only when neither
+ * declares one — mirroring the ref-side union clients decode against.
+ */
+export const combineErrorSchemas = (
+  error: Schema.Codec<any, any> | undefined,
+  resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
+): Schema.Codec<any, any> | undefined => {
+  const schemas = [
+    ...(error !== undefined ? [error] : []),
+    ...MiddlewareSpec.errorSchemas(
+      resolvedMiddlewares.map(({ middlewareSpec }) => middlewareSpec),
+    ),
+  ];
+  return schemas.length === 0
+    ? undefined
+    : schemas.length === 1
+      ? schemas[0]
+      : Schema.Union(schemas);
+};
 
 /**
  * Run the `Effect` as a `Promise`. The error schema acts as an allowlist of
@@ -182,22 +234,28 @@ export const actionFunctionBase = <
   E,
   R,
 >({
+  name,
+  functionVisibility,
   args,
   returns,
   error,
   handler,
+  resolvedMiddlewares = [],
   createLayer,
 }: {
+  name: string;
+  functionVisibility: FunctionVisibility;
   args: Schema.Codec<Args, ConvexArgs>;
   returns: Schema.Codec<Returns, ConvexReturns>;
   error: Schema.Codec<Error, Value> | undefined;
   handler: (a: Args) => Effect.Effect<Returns, E, R>;
+  resolvedMiddlewares?: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
   createLayer: (
     ctx: GenericActionCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
   ) => Layer.Layer<R>;
 }) => ({
-  args: SchemaToValidator.compileArgsSchema(args),
-  returns: SchemaToValidator.compileReturnsSchema(returns),
+  args: compileArgsSchema(args),
+  returns: compileReturnsSchema(returns),
   handler: (
     ctx: GenericActionCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
     actualArgs: ConvexArgs,
@@ -208,15 +266,22 @@ export const actionFunctionBase = <
         Schema.decodeUnknownEffect(args),
         Effect.orDie,
       );
-      const decodedReturns = yield* handler(decodedArgs).pipe(
-        Effect.provide(createLayer(ctx)),
-      );
+      const decodedReturns = yield* applyMiddleware(
+        handler(decodedArgs),
+        resolvedMiddlewares,
+        {
+          name,
+          functionType: "action",
+          functionVisibility,
+          args: decodedArgs,
+        },
+      ).pipe(Effect.provide(createLayer(ctx)));
       return yield* pipe(
         decodedReturns,
         Schema.encodeEffect(returns),
         Effect.orDie,
       );
-    }).pipe(runHandlerPromise(error)),
+    }).pipe(runHandlerPromise(combineErrorSchemas(error, resolvedMiddlewares))),
 });
 
 export type ActionServices<

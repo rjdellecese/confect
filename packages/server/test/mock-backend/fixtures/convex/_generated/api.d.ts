@@ -146,6 +146,22 @@ export declare const api: {
     cjsImporter: {
       now: FunctionReference<"query", "public", {}, string>;
     };
+    middleware: {
+      firstNoteForViewer: FunctionReference<"query", "public", {}, string>;
+      shoutName: FunctionReference<"query", "public", {}, string>;
+      viewerName: FunctionReference<"query", "public", {}, string>;
+      viewerNameAction: FunctionReference<"action", "public", {}, string>;
+      viewerNameMutation: FunctionReference<"mutation", "public", {}, string>;
+    };
+    middlewareOrder: {
+      record: FunctionReference<
+        "mutation",
+        "public",
+        { blocked: boolean; blockedAtFunction: boolean },
+        null
+      >;
+      recordPlain: FunctionReference<"mutation", "public", {}, null>;
+    };
     notes: {
       delete_: FunctionReference<
         "mutation",
@@ -289,6 +305,9 @@ export declare const api: {
  */
 export declare const internal: {
   groups: {
+    middlewareHelpers: {
+      firstUsername: FunctionReference<"query", "internal", {}, string | null>;
+    };
     notes: {
       internalGetFirst: FunctionReference<
         "query",
