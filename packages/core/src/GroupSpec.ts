@@ -5,7 +5,7 @@ import type * as MiddlewareSpec from "./MiddlewareSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 import { validateConfectFunctionIdentifier } from "./Identifier";
 
-export const TypeId = "@confect/core/GroupSpec";
+export const TypeId = "~@confect/core/GroupSpec";
 export type TypeId = typeof TypeId;
 
 export const isGroupSpec = (u: unknown): u is AnyWithProps =>
@@ -36,6 +36,8 @@ export interface GroupSpec<
     [GroupName in Name<Groups_>]: WithName<Groups_, GroupName>;
   };
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpecs_>;
+  readonly "~Functions": Functions_;
+  readonly "~Groups": Groups_;
 
   addFunction<Function extends FunctionSpec.AnyWithPropsWithRuntime<Runtime>>(
     function_: Function &
@@ -103,11 +105,9 @@ export interface AnyWithPropsWithRuntime<
 
 export type Name<Group extends AnyWithProps> = Group["name"];
 
-export type Functions<Group extends AnyWithProps> =
-  Group["functions"][keyof Group["functions"]];
+export type Functions<Group extends AnyWithProps> = Group["~Functions"];
 
-export type Groups<Group extends AnyWithProps> =
-  Group["groups"][keyof Group["groups"]];
+export type Groups<Group extends AnyWithProps> = Group["~Groups"];
 
 export type MiddlewareSpecs<Group extends AnyWithProps> =
   Group["middlewareSpecs"][number];
@@ -271,7 +271,7 @@ const makeProto = <
     functions,
     groups,
     middlewareSpecs,
-  });
+  }) as GroupSpec<Runtime, Name_, Functions_, Groups_, MiddlewareSpecs_>;
 
 export const make = (): GroupSpec<"Convex", ""> =>
   makeProto({

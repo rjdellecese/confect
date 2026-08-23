@@ -1,4 +1,3 @@
-import { identity } from "effect/Function";
 import * as Equal from "effect/Equal";
 import * as Function from "effect/Function";
 import * as Hash from "effect/Hash";
@@ -6,7 +5,7 @@ import * as Match from "effect/Match";
 import * as Pipeable from "effect/Pipeable";
 import * as Predicate from "effect/Predicate";
 
-const TypeId = "@confect/react/PaginatedQueryResult";
+const TypeId = "~@confect/react/PaginatedQueryResult";
 type TypeId = typeof TypeId;
 
 /**
@@ -62,17 +61,18 @@ export type Variants<Item, E = never> =
 
 export declare namespace PaginatedQueryResult {
   // eslint-disable-next-line @typescript-eslint/no-shadow, import/namespace -- oxlint's namespace resolution misses type-only exports, and `Pipeable` is an interface
-  export interface Proto<Item, E> extends Pipeable.Pipeable {
-    readonly [TypeId]: {
-      readonly E: (_: never) => E;
-      readonly Item: (_: never) => Item;
-    };
+  export interface Proto<out Item, out E> extends Pipeable.Pipeable {
+    readonly [TypeId]: TypeId;
+    readonly "~Item": Item;
+    readonly "~E": E;
   }
 
-  export type Item<R> = R extends Proto<infer Item_, infer _E> ? Item_ : never;
+  export type Item<R> = R extends { readonly "~Item": infer Item_ }
+    ? Item_
+    : never;
 
   // eslint-disable-next-line @typescript-eslint/no-shadow
-  export type Failure<R> = R extends Proto<infer _Item, infer E> ? E : never;
+  export type Failure<R> = R extends { readonly "~E": infer E } ? E : never;
 }
 
 export interface LoadingFirstPage<
@@ -128,10 +128,7 @@ export const isPaginatedQueryResult = (
 ): u is Variants<unknown, unknown> => Predicate.hasProperty(u, TypeId);
 
 const PaginatedQueryResultProto = {
-  [TypeId]: {
-    E: identity,
-    Item: identity,
-  },
+  [TypeId]: TypeId,
   pipe(this: Variants<any, any>, ...args: ReadonlyArray<unknown>) {
     return Pipeable.pipeArguments(
       this,

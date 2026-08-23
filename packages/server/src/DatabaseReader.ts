@@ -25,8 +25,6 @@ export interface DatabaseReaderService<
   ) => QueryInitializer.QueryInitializer<
     IncludedDataModel<DatabaseSchema_>,
     TableName,
-    DataModel.TableInfoWithName<IncludedDataModel<DatabaseSchema_>, TableName>,
-    DataModel.TableInfoWithName_<IncludedDataModel<DatabaseSchema_>, TableName>,
     TableName extends keyof Docs
       ? Docs[TableName]
       : DataModel.DocumentWithName<

@@ -15,7 +15,7 @@ import type { GenericValidator, Validator } from "convex/values";
 import * as Predicate from "effect/Predicate";
 import type * as Schema from "effect/Schema";
 
-export const TypeId = "@confect/core/Table";
+export const TypeId = "~@confect/core/Table";
 export type TypeId = typeof TypeId;
 
 // -----------------------------------------------------------------------------
@@ -47,7 +47,7 @@ export const isUnnamedTable = (u: unknown): u is UnnamedAny =>
 export interface Table<
   Name_ extends string,
   TableSchema_ extends Schema.Codec<any, any>,
-  _TableValidator_ extends GenericValidator =
+  TableValidator_ extends GenericValidator =
     TableSchemaToTableValidator<TableSchema_>,
   Indexes_ extends GenericTableIndexes = {},
   SearchIndexes_ extends GenericTableSearchIndexes = {},
@@ -60,6 +60,7 @@ export interface Table<
   readonly indexes: Indexes_;
   readonly searchIndexes: SearchIndexes_;
   readonly vectorIndexes: VectorIndexes_;
+  readonly "~TableValidator": TableValidator_;
 }
 
 export interface Any {
@@ -112,6 +113,7 @@ export interface UnnamedTable<
   readonly indexes: Indexes_;
   readonly searchIndexes: SearchIndexes_;
   readonly vectorIndexes: VectorIndexes_;
+  readonly "~TableValidator": TableValidator_;
 
   index<
     IndexName extends string,
@@ -200,101 +202,25 @@ export type UnnamedAnyWithProps = UnnamedTable<
 // Type extractors
 // -----------------------------------------------------------------------------
 
-export type Name<TableDef extends AnyWithProps> =
-  TableDef extends Table<
-    infer TableName,
-    infer _TableSchema,
-    infer _TableValidator,
-    infer _Indexes,
-    infer _SearchIndexes,
-    infer _VectorIndexes
-  >
-    ? TableName & string
-    : never;
+export type Name<TableDef extends AnyWithProps> = TableDef["tableName"] &
+  string;
 
-export type TableSchema<TableDef extends AnyWithProps> =
-  TableDef extends Table<
-    infer _TableName,
-    infer TableSchema_,
-    infer _TableValidator,
-    infer _Indexes,
-    infer _SearchIndexes,
-    infer _VectorIndexes
-  >
-    ? TableSchema_
-    : never;
+export type TableSchema<TableDef extends AnyWithProps> = TableDef["Fields"];
 
 export type TableValidator<TableDef extends AnyWithProps> =
-  TableDef extends Table<
-    infer _TableName,
-    infer _TableSchema,
-    infer TableValidator_,
-    infer _Indexes,
-    infer _SearchIndexes,
-    infer _VectorIndexes
-  >
-    ? TableValidator_
-    : never;
+  TableDef["~TableValidator"];
 
-export type Indexes<TableDef extends AnyWithProps> =
-  TableDef extends Table<
-    infer _TableName,
-    infer _TableSchema,
-    infer _TableValidator,
-    infer Indexes_,
-    infer _SearchIndexes,
-    infer _VectorIndexes
-  >
-    ? Indexes_
-    : never;
+export type Indexes<TableDef extends AnyWithProps> = TableDef["indexes"];
 
 export type SearchIndexes<TableDef extends AnyWithProps> =
-  TableDef extends Table<
-    infer _TableName,
-    infer _TableSchema,
-    infer _TableValidator,
-    infer _Indexes,
-    infer SearchIndexes_,
-    infer _VectorIndexes
-  >
-    ? SearchIndexes_
-    : never;
+  TableDef["searchIndexes"];
 
 export type VectorIndexes<TableDef extends AnyWithProps> =
-  TableDef extends Table<
-    infer _TableName,
-    infer _TableSchema,
-    infer _TableValidator,
-    infer _Indexes,
-    infer _SearchIndexes,
-    infer VectorIndexes_
-  >
-    ? VectorIndexes_
-    : never;
+  TableDef["vectorIndexes"];
 
-export type Doc<TableDef extends AnyWithProps> =
-  TableDef extends Table<
-    infer TableName,
-    infer TableSchema_,
-    infer _TableValidator,
-    infer _Indexes,
-    infer _SearchIndexes,
-    infer _VectorIndexes
-  >
-    ? SystemFields.ExtendWithSystemFields<TableName, TableSchema_>
-    : never;
+export type Doc<TableDef extends AnyWithProps> = TableDef["Doc"];
 
-export type Fields<TableDef extends AnyWithProps> =
-  TableDef extends Table<
-    infer _TableName,
-    infer TableSchema_,
-    infer _TableValidator,
-    infer _Indexes,
-    infer _SearchIndexes,
-    infer _VectorIndexes
-  >
-    ? TableSchema_
-    : never;
+export type Fields<TableDef extends AnyWithProps> = TableDef["Fields"];
 
 export type WithName<
   TableDef extends AnyWithProps,
@@ -468,7 +394,7 @@ const makeUnnamed = <
     index,
     searchIndex,
     vectorIndex,
-  }) satisfies UnnamedTable_;
+  }) as UnnamedTable_;
 };
 
 export const make = <const TableSchema_ extends Schema.Codec<any, any>>(
@@ -482,7 +408,7 @@ export const make = <const TableSchema_ extends Schema.Codec<any, any>>(
     indexes: {},
     searchIndexes: {},
     vectorIndexes: {},
-  }) satisfies UnnamedTable_;
+  }) as UnnamedTable_;
 };
 
 // Vendored types from convex-js, partially modified. Ideally we could use these directly. See https://github.com/get-convex/convex-js/pull/14
