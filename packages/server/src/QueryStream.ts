@@ -25,13 +25,19 @@
  */
 import type { GenericDocument, FieldTypeFromFieldPath } from "convex/server";
 import { convexToJson, jsonToConvex, type Value } from "convex/values";
-import { identity, dual } from "effect/Function";
+import { identity, dual, pipe } from "effect/Function";
 import { pipeArguments, type Pipeable } from "effect/Pipeable";
+import * as Array from "effect/Array";
 import * as Chunk from "effect/Chunk";
 import * as Effect from "effect/Effect";
+import * as Equivalence from "effect/Equivalence";
 import * as Option from "effect/Option";
+import * as Order from "effect/Order";
+import * as Predicate from "effect/Predicate";
+import * as Record from "effect/Record";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
+import * as String from "effect/String";
 import type * as Types from "effect/Types";
 import * as Document from "./Document";
 
@@ -157,7 +163,10 @@ const makeRangeBuilder = (
   const push =
     (tag: RangeOp["_tag"], nextEqCount: number) =>
     (field: string, value: Value | undefined) =>
-      makeRangeBuilder(nextEqCount, [...ops, { _tag: tag, field, value }]);
+      makeRangeBuilder(
+        nextEqCount,
+        Array.append(ops, { _tag: tag, field, value }),
+      );
 
   return {
     [RangeSpecTypeId]: {
@@ -182,7 +191,9 @@ export const rangeBuilder = <
 
 /** Replay a recorded range spec onto Convex's real `IndexRangeBuilder`. */
 export const applyRange = (spec: AnyIndexRangeSpec, q: any): any =>
-  spec.ops.reduce((builder, op) => builder[op._tag](op.field, op.value), q);
+  Array.reduce(spec.ops, q, (builder, op) =>
+    builder[op._tag](op.field, op.value),
+  );
 
 // -----------------------------------------------------------------------------
 // Convex value ordering
@@ -192,107 +203,84 @@ export const applyRange = (spec: AnyIndexRangeSpec, q: any): any =>
 // undefined < null < bigint < number < boolean < string < bytes < array
 // < object. (NaN subtleties are simplified in this prototype.)
 
-const typeRank = (v: Value | undefined): number =>
-  v === undefined
+const typeRank = (value: Value | undefined): number =>
+  value === undefined
     ? 0
-    : v === null
+    : value === null
       ? 1
-      : typeof v === "bigint"
+      : Predicate.isBigInt(value)
         ? 2
-        : typeof v === "number"
+        : Predicate.isNumber(value)
           ? 3
-          : typeof v === "boolean"
+          : Predicate.isBoolean(value)
             ? 4
-            : typeof v === "string"
+            : Predicate.isString(value)
               ? 5
-              : v instanceof ArrayBuffer
+              : value instanceof ArrayBuffer
                 ? 6
-                : Array.isArray(v)
+                : Array.isArray(value)
                   ? 7
                   : 8;
 
-export const compareValues = (
-  a: Value | undefined,
-  b: Value | undefined,
-): number => {
-  const rankA = typeRank(a);
-  const rankB = typeRank(b);
-  if (rankA !== rankB) {
-    return rankA < rankB ? -1 : 1;
-  }
-  switch (rankA) {
-    case 0:
-    case 1:
-      return 0;
-    case 2:
-    case 3: {
-      const numA = a as number | bigint;
-      const numB = b as number | bigint;
-      return numA < numB ? -1 : numA > numB ? 1 : 0;
+/** `Order` over Convex values, matching Convex's index ordering. */
+export const valueOrder: Order.Order<Value | undefined> = Order.make(
+  (self, that) => {
+    const rankOrdering = Order.number(typeRank(self), typeRank(that));
+    if (rankOrdering !== 0) {
+      return rankOrdering;
     }
-    case 4:
-      return a === b ? 0 : a === false ? -1 : 1;
-    case 5: {
-      const strA = a as string;
-      const strB = b as string;
-      return strA < strB ? -1 : strA > strB ? 1 : 0;
+    switch (typeRank(self)) {
+      case 0:
+      case 1:
+        return 0;
+      case 2:
+        return Order.bigint(self as bigint, that as bigint);
+      case 3:
+        return Order.number(self as number, that as number);
+      case 4:
+        return Order.boolean(self as boolean, that as boolean);
+      case 5:
+        return Order.string(self as string, that as string);
+      case 6:
+        return bytesOrder(self as ArrayBuffer, that as ArrayBuffer);
+      case 7:
+        return orderKeyOrder(
+          self as ReadonlyArray<Value>,
+          that as ReadonlyArray<Value>,
+        );
+      default:
+        return objectOrder(
+          self as Record.ReadonlyRecord<string, Value>,
+          that as Record.ReadonlyRecord<string, Value>,
+        );
     }
-    case 6: {
-      const bytesA = new Uint8Array(a as ArrayBuffer);
-      const bytesB = new Uint8Array(b as ArrayBuffer);
-      for (let i = 0; i < Math.min(bytesA.length, bytesB.length); i++) {
-        if (bytesA[i] !== bytesB[i]) {
-          return bytesA[i]! < bytesB[i]! ? -1 : 1;
-        }
-      }
-      return bytesA.length - bytesB.length;
-    }
-    case 7:
-      return compareArrays(
-        a as ReadonlyArray<Value>,
-        b as ReadonlyArray<Value>,
-      );
-    default: {
-      const entriesA = Object.entries(a as Record<string, Value>).sort(
-        ([keyA], [keyB]) => (keyA < keyB ? -1 : keyA > keyB ? 1 : 0),
-      );
-      const entriesB = Object.entries(b as Record<string, Value>).sort(
-        ([keyA], [keyB]) => (keyA < keyB ? -1 : keyA > keyB ? 1 : 0),
-      );
-      for (let i = 0; i < Math.min(entriesA.length, entriesB.length); i++) {
-        const [keyA, valueA] = entriesA[i]!;
-        const [keyB, valueB] = entriesB[i]!;
-        if (keyA !== keyB) {
-          return keyA < keyB ? -1 : 1;
-        }
-        const cmp = compareValues(valueA, valueB);
-        if (cmp !== 0) {
-          return cmp;
-        }
-      }
-      return entriesA.length - entriesB.length;
-    }
-  }
-};
+  },
+);
 
-const compareArrays = (
-  a: ReadonlyArray<Value | undefined>,
-  b: ReadonlyArray<Value | undefined>,
-): number => {
-  for (let i = 0; i < Math.min(a.length, b.length); i++) {
-    const cmp = compareValues(a[i], b[i]);
-    if (cmp !== 0) {
-      return cmp;
-    }
-  }
-  return a.length - b.length;
-};
+/**
+ * `Order` over order keys: lexicographic by `valueOrder`, then by length —
+ * also the ordering of Convex array values.
+ */
+export const orderKeyOrder: Order.Order<OrderKey> = Order.array(valueOrder);
 
-export const compareOrderKeys = compareArrays;
+const bytesOrder: Order.Order<ArrayBuffer> = Order.mapInput(
+  Order.array(Order.number),
+  (bytes: ArrayBuffer) => Array.fromIterable(new Uint8Array(bytes)),
+);
 
-/** Compare positions in stream order: for `desc`, later keys are smaller. */
-const positionCompare = (order: "asc" | "desc") => (a: OrderKey, b: OrderKey) =>
-  order === "asc" ? compareOrderKeys(a, b) : -compareOrderKeys(a, b);
+const objectEntryOrder = Order.tuple(Order.string, valueOrder);
+
+const objectOrder: Order.Order<Record.ReadonlyRecord<string, Value>> =
+  Order.mapInput(Order.array(objectEntryOrder), (record) =>
+    pipe(
+      Record.toEntries(record),
+      Array.sortBy(Order.mapInput(Order.string, (entry) => entry[0])),
+    ),
+  );
+
+/** Order of positions in stream order: for `desc`, later keys are smaller. */
+const positionOrder = (order: "asc" | "desc"): Order.Order<OrderKey> =>
+  order === "asc" ? orderKeyOrder : Order.reverse(orderKeyOrder);
 
 // -----------------------------------------------------------------------------
 // QueryStream
@@ -356,8 +344,12 @@ const streamVariance = {
   _A: identity,
 };
 
-// (`prototype` is widened so the Effect language service doesn't flag the
-// `defineProperties` return value — an Effect-able — as floating.)
+// Runtime wiring for the `declare`d members above. This is deliberately
+// non-FP: implementing the `Streamable` protocol requires prototype-level
+// JS (an `arguments`-based `pipe`, an internal `channel` getter the Stream
+// runtime unwraps). (`prototype` is widened so the Effect language service
+// doesn't flag the `defineProperties` return value — an Effect-able — as
+// floating.)
 const queryStreamPrototype: object = QueryStream.prototype;
 
 Object.defineProperties(queryStreamPrototype, {
@@ -368,8 +360,6 @@ Object.defineProperties(queryStreamPrototype, {
       return pipeArguments(this, arguments);
     },
   },
-  // The Stream runtime unwraps implementations through this internal getter
-  // (the `Streamable` protocol).
   channel: {
     get(this: QueryStream<unknown>) {
       return Stream.toChannel(this.toStream());
@@ -425,7 +415,7 @@ export interface Reflection {
 
 /** Rebuild the Convex ordered query a reflection describes. */
 const buildQuery = (reflection: Reflection): AsyncIterable<unknown> =>
-  (reflection.spec.ops.length === 0
+  (Array.isEmptyReadonlyArray(reflection.spec.ops)
     ? reflection.reader
         .query(reflection.tableName)
         .withIndex(reflection.indexName)
@@ -445,11 +435,16 @@ export const fromReflection = <Doc>(
   // The order key is the index fields that still vary — everything after
   // the eq-pinned prefix — plus the implicit `_id` tiebreaker that makes
   // order keys strictly ordered.
-  const remainingFields = reflection.indexFields.slice(reflection.spec.eqCount);
-  const keyFields =
-    remainingFields[remainingFields.length - 1] === "_id"
-      ? remainingFields
-      : [...remainingFields, "_id"];
+  const remainingFields = Array.drop(
+    reflection.indexFields,
+    reflection.spec.eqCount,
+  );
+  const keyFields = Option.exists(
+    Array.last(remainingFields),
+    (field) => field === "_id",
+  )
+    ? remainingFields
+    : Array.append(remainingFields, "_id");
 
   const annotated = Stream.suspend(() =>
     Stream.fromAsyncIterable(buildQuery(reflection), identity),
@@ -461,7 +456,10 @@ export const fromReflection = <Doc>(
         (doc) =>
           [
             Option.some(doc as Doc),
-            extractOrderKey(encoded as Record<string, unknown>, keyFields),
+            extractOrderKey(
+              encoded as Record.ReadonlyRecord<string, unknown>,
+              keyFields,
+            ),
           ] as const,
       ),
     ),
@@ -471,22 +469,122 @@ export const fromReflection = <Doc>(
 };
 
 const extractOrderKey = (
-  encoded: Record<string, unknown>,
+  encoded: Record.ReadonlyRecord<string, unknown>,
   keyFields: ReadonlyArray<string>,
 ): OrderKey =>
-  keyFields.map((fieldPath) =>
-    fieldPath
-      .split(".")
-      .reduce<unknown>(
-        (value, segment) =>
-          (value as Record<string, unknown> | undefined)?.[segment],
-        encoded,
-      ),
+  Array.map(keyFields, (fieldPath) =>
+    Array.reduce(
+      String.split(fieldPath, "."),
+      encoded as unknown,
+      (value, segment) =>
+        (value as Record.ReadonlyRecord<string, unknown> | undefined)?.[
+          segment
+        ],
+    ),
   ) as OrderKey;
 
 // -----------------------------------------------------------------------------
 // Combinators
 // -----------------------------------------------------------------------------
+
+const keyFieldsEquivalence = Array.getEquivalence(Equivalence.string);
+
+/**
+ * One input to a k-way merge: its pull effect, the chunk pulled so far, and
+ * whether the underlying stream is exhausted.
+ */
+interface MergeSource<Doc, E, R> {
+  readonly pull: Effect.Effect<Chunk.Chunk<Element<Doc>>, Option.Option<E>, R>;
+  readonly buffer: Chunk.Chunk<Element<Doc>>;
+  readonly done: boolean;
+}
+
+const makeMergeSource = <Doc, E, R>(
+  pull: MergeSource<Doc, E, R>["pull"],
+  buffer: Chunk.Chunk<Element<Doc>>,
+  done: boolean,
+): MergeSource<Doc, E, R> => ({ pull, buffer, done });
+
+/**
+ * Refill an empty source from its pull, translating the pull's
+ * end-of-stream signal (a `None` failure) into `done`.
+ */
+const fillMergeSource = <Doc, E, R>(
+  source: MergeSource<Doc, E, R>,
+): Effect.Effect<MergeSource<Doc, E, R>, E, R> =>
+  source.done || Chunk.isNonEmpty(source.buffer)
+    ? Effect.succeed(source)
+    : source.pull.pipe(
+        Effect.map(Option.some),
+        Effect.catchAll(
+          Option.match({
+            onNone: () =>
+              Effect.succeed(Option.none<Chunk.Chunk<Element<Doc>>>()),
+            onSome: (error: E) => Effect.fail(error),
+          }),
+        ),
+        Effect.flatMap(
+          Option.match({
+            onNone: () =>
+              Effect.succeed(makeMergeSource(source.pull, source.buffer, true)),
+            onSome: (chunk) =>
+              fillMergeSource(makeMergeSource(source.pull, chunk, false)),
+          }),
+        ),
+      );
+
+/**
+ * One step of the k-way merge as a pure unfold: fill every source, emit the
+ * earliest head (ties go to the earliest source, keeping the merge stable),
+ * and return the sources with that head consumed. `None` when every source
+ * is exhausted.
+ */
+const mergeStep =
+  <Doc, E, R>(position: Order.Order<OrderKey>) =>
+  (
+    sources: ReadonlyArray<MergeSource<Doc, E, R>>,
+  ): Effect.Effect<
+    Option.Option<
+      readonly [Element<Doc>, ReadonlyArray<MergeSource<Doc, E, R>>]
+    >,
+    E,
+    R
+  > =>
+    Effect.map(Effect.forEach(sources, fillMergeSource), (filled) => {
+      const isEarlier = Order.lessThan(position);
+
+      const earliest = Array.reduce(
+        filled,
+        Option.none<readonly [number, Element<Doc>]>(),
+        (best, source, index) =>
+          Option.match(Chunk.head(source.buffer), {
+            onNone: () => best,
+            onSome: (head) =>
+              Option.match(best, {
+                onNone: () => Option.some([index, head] as const),
+                onSome: ([, bestElement]) =>
+                  isEarlier(head[1], bestElement[1])
+                    ? Option.some([index, head] as const)
+                    : best,
+              }),
+          }),
+      );
+
+      return Option.map(
+        earliest,
+        ([index, element]) =>
+          [
+            element,
+            Array.modify(filled, index, (source) =>
+              makeMergeSource(
+                source.pull,
+                Chunk.drop(source.buffer, 1),
+                source.done,
+              ),
+            ),
+          ] as const,
+      );
+    });
 
 /**
  * Merge streams ordered by the same key into one ordered stream — SQL's
@@ -500,78 +598,29 @@ export const merge = <Doc, Key extends ReadonlyArray<string>, E, R>(
     ...ReadonlyArray<QueryStream<Doc, Key, E, R>>,
   ],
 ): QueryStream<Doc, Key, E, R> => {
-  const [head, ...rest] = streams;
-  for (const other of rest) {
-    if (other.order !== head.order) {
-      throw new Error(
-        "QueryStream.merge: all streams must have the same order",
-      );
-    }
-    if (
-      other.keyFields.length !== head.keyFields.length ||
-      other.keyFields.some((field, i) => field !== head.keyFields[i])
-    ) {
-      throw new Error(
-        `QueryStream.merge: all streams must share order-key fields (got [${head.keyFields.join(", ")}] and [${other.keyFields.join(", ")}])`,
-      );
-    }
+  const head = Array.headNonEmpty(streams);
+  const incompatible = Array.findFirst(
+    Array.tailNonEmpty(streams),
+    (stream) =>
+      stream.order !== head.order ||
+      !keyFieldsEquivalence(stream.keyFields, head.keyFields),
+  );
+  if (Option.isSome(incompatible)) {
+    throw new Error(
+      `QueryStream.merge: all streams must share an order and order-key fields (got ${head.order} [${Array.join(head.keyFields, ", ")}] and ${incompatible.value.order} [${Array.join(incompatible.value.keyFields, ", ")}])`,
+    );
   }
-
-  const cmp = positionCompare(head.order);
 
   const annotated: Stream.Stream<Element<Doc>, E, R> = Stream.unwrapScoped(
     Effect.map(
-      Effect.all(streams.map((s) => Stream.toPull(s.annotated))),
-      (pulls) => {
-        const sources = pulls.map((pull) => ({
-          pull,
-          buffer: [] as Array<Element<Doc>>,
-          done: false,
-        }));
-
-        return Stream.repeatEffectOption(
-          Effect.gen(function* () {
-            for (const source of sources) {
-              while (!source.done && source.buffer.length === 0) {
-                yield* source.pull.pipe(
-                  Effect.map((chunk) => {
-                    for (const element of chunk) {
-                      source.buffer.push(element);
-                    }
-                  }),
-                  Effect.catchAll(
-                    Option.match({
-                      onNone: () =>
-                        Effect.sync(() => {
-                          source.done = true;
-                        }),
-                      onSome: (error: E) => Effect.fail(Option.some(error)),
-                    }),
-                  ),
-                );
-              }
-            }
-
-            let best: (typeof sources)[number] | undefined;
-            for (const source of sources) {
-              if (source.buffer.length === 0) {
-                continue;
-              }
-              if (
-                best === undefined ||
-                cmp(source.buffer[0]![1], best.buffer[0]![1]) < 0
-              ) {
-                best = source;
-              }
-            }
-
-            if (best === undefined) {
-              return yield* Effect.fail(Option.none());
-            }
-            return best.buffer.shift()!;
-          }),
-        );
-      },
+      Effect.forEach(streams, (stream) => Stream.toPull(stream.annotated)),
+      (pulls) =>
+        Stream.unfoldEffect(
+          Array.map(pulls, (pull) =>
+            makeMergeSource<Doc, E, R>(pull, Chunk.empty(), false),
+          ),
+          mergeStep<Doc, E, R>(positionOrder(head.order)),
+        ),
     ),
   );
 
@@ -670,19 +719,39 @@ export const narrow = dual<
       readonly until?: OrderKey | undefined;
     },
   ) => QueryStream<Doc, Key, E, R>
->(2, (self, bounds) => {
-  const cmp = positionCompare(self.order);
-  let annotated = self.annotated;
-  const after = bounds.after;
-  if (after !== undefined) {
-    annotated = Stream.dropWhile(annotated, ([, key]) => cmp(key, after) <= 0);
-  }
-  const until = bounds.until;
-  if (until !== undefined) {
-    annotated = Stream.takeWhile(annotated, ([, key]) => cmp(key, until) <= 0);
-  }
-  return new QueryStream(self.order, self.keyFields, annotated);
-});
+>(
+  2,
+  <Doc, Key extends ReadonlyArray<string>, E, R>(
+    self: QueryStream<Doc, Key, E, R>,
+    bounds: {
+      readonly after?: OrderKey | undefined;
+      readonly until?: OrderKey | undefined;
+    },
+  ) => {
+    type Narrower = (
+      annotated: Stream.Stream<Element<Doc>, E, R>,
+    ) => Stream.Stream<Element<Doc>, E, R>;
+
+    const notPast = Order.lessThanOrEqualTo(positionOrder(self.order));
+    const after = bounds.after;
+    const until = bounds.until;
+
+    const dropUpToAfter: Narrower =
+      after === undefined
+        ? identity
+        : Stream.dropWhile(([, key]) => notPast(key, after));
+    const takeUpToUntil: Narrower =
+      until === undefined
+        ? identity
+        : Stream.takeWhile(([, key]) => notPast(key, until));
+
+    return new QueryStream(
+      self.order,
+      self.keyFields,
+      pipe(self.annotated, dropUpToAfter, takeUpToUntil),
+    );
+  },
+);
 
 // -----------------------------------------------------------------------------
 // Sinks
@@ -719,14 +788,14 @@ const UNDEFINED_SENTINEL = { $undefined: true } as const;
 
 export const serializeCursor = (key: OrderKey): string =>
   JSON.stringify(
-    key.map((value) =>
+    Array.map(key, (value) =>
       value === undefined ? UNDEFINED_SENTINEL : convexToJson(value),
     ),
   );
 
 export const deserializeCursor = (cursor: string): OrderKey =>
-  (JSON.parse(cursor) as ReadonlyArray<unknown>).map((value) =>
-    typeof value === "object" && value !== null && "$undefined" in value
+  Array.map(JSON.parse(cursor) as ReadonlyArray<unknown>, (value) =>
+    Predicate.hasProperty(value, "$undefined")
       ? undefined
       : jsonToConvex(value as Parameters<typeof jsonToConvex>[0]),
   );
@@ -744,7 +813,7 @@ export interface PaginateOptions {
 }
 
 export interface PaginationResult<Doc> {
-  page: Array<Doc>;
+  page: Doc[];
   isDone: boolean;
   continueCursor: string;
   splitCursor?: string;
@@ -752,11 +821,18 @@ export interface PaginationResult<Doc> {
 }
 
 interface PaginateState<Doc> {
-  readonly page: Array<Doc>;
-  readonly readKeys: Array<OrderKey>;
-  stopped: boolean;
-  hitLimit: boolean;
+  readonly page: Chunk.Chunk<Doc>;
+  readonly readKeys: Chunk.Chunk<OrderKey>;
+  readonly stopped: boolean;
+  readonly hitLimit: boolean;
 }
+
+const initialPaginateState = <Doc>(): PaginateState<Doc> => ({
+  page: Chunk.empty(),
+  readKeys: Chunk.empty(),
+  stopped: false,
+  hitLimit: false,
+});
 
 /**
  * Consume one page of a stream. Semantics follow
@@ -800,69 +876,85 @@ export const paginate = dual<
         });
       }
 
-      const after =
-        options.cursor === null ? undefined : deserializeCursor(options.cursor);
-      const hasEndCursor =
-        options.endCursor !== null &&
-        options.endCursor !== undefined &&
-        options.endCursor !== END_CURSOR;
-      const until = hasEndCursor
-        ? deserializeCursor(options.endCursor!)
-        : undefined;
-      const narrowed = narrow(self, { after, until });
+      const after = Option.map(
+        Option.fromNullable(options.cursor),
+        deserializeCursor,
+      );
+      const endCursor = Option.fromNullable(options.endCursor);
+      // An end cursor of `END_CURSOR` pins the page to the end of the
+      // stream rather than to a key.
+      const pinnedEnd = Option.filter(
+        endCursor,
+        (cursor) => cursor !== END_CURSOR,
+      );
+      const until = Option.map(pinnedEnd, deserializeCursor);
+      const narrowed = narrow(self, {
+        after: Option.getOrUndefined(after),
+        until: Option.getOrUndefined(until),
+      });
       // With an endCursor the page runs to it, however many items that is.
-      const maxRows =
-        options.endCursor !== null && options.endCursor !== undefined
-          ? undefined
-          : options.numItems;
+      const maxRows = Option.isSome(endCursor) ? undefined : options.numItems;
       const maximumRowsRead = options.maximumRowsRead;
 
       return Stream.runFoldWhile(
         narrowed.annotated,
-        {
-          page: [],
-          readKeys: [],
-          stopped: false,
-          hitLimit: false,
-        } as PaginateState<Doc>,
+        initialPaginateState<Doc>(),
         (state) => !state.stopped,
-        (state, [doc, key]) => {
-          state.readKeys.push(key);
-          if (Option.isSome(doc)) {
-            state.page.push(doc.value);
-          }
-          state.hitLimit =
+        (state, [doc, key]): PaginateState<Doc> => {
+          const readKeys = Chunk.append(state.readKeys, key);
+          const page = Option.match(doc, {
+            onNone: () => state.page,
+            onSome: (value) => Chunk.append(state.page, value),
+          });
+          const hitLimit =
             maximumRowsRead !== undefined &&
-            state.readKeys.length >= maximumRowsRead;
-          state.stopped =
-            state.hitLimit ||
-            (maxRows !== undefined && state.page.length >= maxRows);
-          return state;
+            Chunk.size(readKeys) >= maximumRowsRead;
+          return {
+            page,
+            readKeys,
+            hitLimit,
+            stopped:
+              hitLimit ||
+              (maxRows !== undefined && Chunk.size(page) >= maxRows),
+          };
         },
       ).pipe(
         Effect.map((state): PaginationResult<Doc> => {
-          const lastReadKey = state.readKeys[state.readKeys.length - 1];
-          if (state.stopped && lastReadKey !== undefined) {
-            const result: PaginationResult<Doc> = {
-              page: state.page,
-              isDone: false,
-              continueCursor: serializeCursor(lastReadKey),
-            };
-            if (state.hitLimit) {
-              result.pageStatus = "SplitRequired";
-              result.splitCursor = serializeCursor(
-                state.readKeys[Math.floor((state.readKeys.length - 1) / 2)]!,
-              );
-            }
-            return result;
-          }
-          // The narrowed stream was exhausted: either we reached the end
-          // cursor (more may follow it) or the true end of the stream.
-          return {
-            page: state.page,
-            isDone: !hasEndCursor,
-            continueCursor: hasEndCursor ? options.endCursor! : END_CURSOR,
-          };
+          const page = Chunk.toArray(state.page);
+          // `stopped` implies at least one element was read, so the last
+          // read key exists exactly when the fold stopped early.
+          const stoppedAt = state.stopped
+            ? Chunk.last(state.readKeys)
+            : Option.none<OrderKey>();
+          return Option.match(stoppedAt, {
+            onSome: (lastKey) =>
+              state.hitLimit
+                ? {
+                    page,
+                    isDone: false,
+                    continueCursor: serializeCursor(lastKey),
+                    pageStatus: "SplitRequired" as const,
+                    splitCursor: serializeCursor(
+                      Chunk.unsafeGet(
+                        state.readKeys,
+                        Math.floor((Chunk.size(state.readKeys) - 1) / 2),
+                      ),
+                    ),
+                  }
+                : {
+                    page,
+                    isDone: false,
+                    continueCursor: serializeCursor(lastKey),
+                  },
+            // The narrowed stream was exhausted: either we reached the
+            // pinned end cursor (more may follow it) or the true end of
+            // the stream.
+            onNone: () => ({
+              page,
+              isDone: Option.isNone(pinnedEnd),
+              continueCursor: Option.getOrElse(pinnedEnd, () => END_CURSOR),
+            }),
+          });
         }),
       );
     }),

@@ -20,6 +20,9 @@ import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Either from "effect/Either";
+import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
+import type { ReadonlyRecord } from "effect/Record";
 import * as Schema from "effect/Schema";
 import type {
   BaseDatabaseReader,
@@ -248,7 +251,7 @@ export const make = <
             applyWithIndex: (q) => q.withIndex(indexName),
             applyOrder: (q) => q.order("asc"),
           }
-        : typeof indexRangeOrOrder === "function"
+        : Predicate.isFunction(indexRangeOrOrder)
           ? order === undefined
             ? {
                 applyWithIndex: (q) =>
@@ -293,17 +296,15 @@ export const make = <
       | "desc",
     maybeOrder?: "asc" | "desc",
   ) => {
-    const rangeFn =
-      typeof indexRangeOrOrder === "function" ? indexRangeOrOrder : undefined;
-    const order =
-      typeof indexRangeOrOrder === "string"
-        ? indexRangeOrOrder
-        : (maybeOrder ?? "asc");
+    const order = Predicate.isString(indexRangeOrOrder)
+      ? indexRangeOrOrder
+      : (maybeOrder ?? "asc");
 
     // With no range callback, the leaf gets an empty spec (no ops, no
     // pinned fields).
-    const spec =
-      rangeFn?.(QueryStream.rangeBuilder()) ?? QueryStream.rangeBuilder();
+    const spec = Predicate.isFunction(indexRangeOrOrder)
+      ? indexRangeOrOrder(QueryStream.rangeBuilder())
+      : QueryStream.rangeBuilder();
 
     // The type-level field tuple appends the `_creationTime` tiebreaker, but
     // the runtime `table.indexes` record stores only the declared fields —
@@ -313,12 +314,15 @@ export const make = <
         ? ["_id"]
         : indexName === "by_creation_time"
           ? ["_creationTime"]
-          : [
-              ...((table.indexes as Record<string, ReadonlyArray<string>>)[
-                indexName
-              ] ?? []),
-              "_creationTime",
-            ];
+          : pipe(
+              Option.fromNullable(
+                (
+                  table.indexes as ReadonlyRecord<string, ReadonlyArray<string>>
+                )[indexName],
+              ),
+              Option.getOrElse(() => Array.empty<string>()),
+              Array.append("_creationTime"),
+            );
 
     return QueryStream.fromReflection({
       reader: convexDatabaseReader as QueryStream.ReflectionReader,
