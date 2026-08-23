@@ -76,7 +76,6 @@ const makeProto = (
 
 export const make = (): CronJobs => makeProto({}, makeConvexCrons());
 
-/** @internal */
 export const cronToConvexCronString = (cron: Cron.Cron): string => {
   pipe(
     cron.tz,
@@ -129,7 +128,6 @@ const setToField = (set: ReadonlySet<number>): string => {
   );
 };
 
-/** @internal */
 export const durationToConvexIntervalSchedule = (
   duration: Duration.Duration,
 ): IntervalSchedule => {
