@@ -10,6 +10,7 @@ import * as String from "effect/String";
 import * as Layer from "effect/Layer";
 import type { CodegenError } from "@confect/cli/CodegenError";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
+import * as Bundler from "@confect/cli/Bundler";
 import {
   discoverLeafImplFiles,
   discoverLeafSpecFiles,
@@ -229,16 +230,50 @@ layer(LeafModuleLayer)("validateSpec", (it) => {
     }),
   );
 
-  // `groups/notes.spec.ts` reaches `tables/notes.ts` (via its generated
-  // wrapper), which must value-import `@confect/server` for `Table.make`.
-  // Both directories are exempt from the client-safety check for that reason;
-  // the "accepts a valid leaf spec" case above would fail without it.
+  // `groups/notes.spec.ts` uses `notes.Doc` from the generated table wrapper,
+  // which binds `confect/tables/notes.ts`. Both must stay free of
+  // `@confect/server` so the spec (and thus `_generated/refs.ts`) can ship
+  // to the client.
   it.effect(
-    "exempts `tables/` and `_generated/` from the server-import check",
+    "accepts a spec that uses `notes.Doc` from `_generated/tables/`",
     () =>
       Effect.gen(function* () {
         const leaf = yield* toLeafModule("groups/notes.spec.ts");
         yield* validateSpec(leaf);
+      }),
+  );
+
+  it.effect(
+    "rejects a spec that reaches `@confect/server` through `tables/`",
+    () =>
+      Effect.gen(function* () {
+        const leaf = yield* toLeafModule("groups/_leakyTable.spec.ts");
+        const result = yield* Effect.result(
+          withTempFiles(
+            [
+              {
+                relativePath: "tables/_leaky.ts",
+                contents: `import { Table } from "@confect/server";\nexport default Table.make(() => {\n  throw new Error("unreachable");\n});\n`,
+              },
+              {
+                relativePath: "_generated/tables/_leaky.ts",
+                contents: `import unnamed from "../../tables/_leaky";\nexport default unnamed("_leaky");\n`,
+              },
+              {
+                relativePath: "groups/_leakyTable.spec.ts",
+                contents: `import { FunctionSpec, GroupSpec } from "@confect/core";\nimport * as Schema from "effect/Schema";\nimport leaky from "../_generated/tables/_leaky";\nexport default GroupSpec.make().addFunction(FunctionSpec.publicQuery({ name: "get", args: () => Schema.Struct({}), returns: () => leaky.Doc }));\n`,
+              },
+            ],
+            validateSpec(leaf),
+          ),
+        );
+
+        assert(Result.isFailure(result));
+        assert(result.failure._tag === "SpecImportsServerError");
+        expect(result.failure.specPath).toBe("groups/_leakyTable.spec.ts");
+        expect(result.failure.importerPaths).toStrictEqual([
+          "tables/_leaky.ts",
+        ]);
       }),
   );
 
@@ -308,6 +343,21 @@ layer(LeafModuleLayer)("validateSpec", (it) => {
         validateSpec(leaf),
       );
     }),
+  );
+});
+
+layer(LeafModuleLayer)("refs import graph", (it) => {
+  it.effect(
+    "does not value-import `@confect/server` through generated tables",
+    () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const refsPath = path.join(fixtureConfect, "_generated", "refs.ts");
+        const bundled = yield* Bundler.bundle(refsPath);
+        expect(
+          Bundler.importersOfPackage(bundled, "@confect/server", () => true),
+        ).toStrictEqual([]);
+      }),
   );
 });
 

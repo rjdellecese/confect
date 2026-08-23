@@ -1,5 +1,5 @@
 import { Identifier } from "@confect/core";
-import * as Table from "@confect/server/Table";
+import * as Table from "@confect/core/Table";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import { pipe } from "effect/Function";

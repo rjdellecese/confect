@@ -22,7 +22,7 @@ import {
   UnsupportedPropertySignatureKeyTypeError,
   UnsupportedSchemaTypeError,
   type ValueToValidator,
-} from "@confect/server/SchemaToValidator";
+} from "@confect/core/SchemaToValidator";
 
 describe(compileAst, () => {
   describe("allowed", () => {
