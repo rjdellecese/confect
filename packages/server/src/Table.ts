@@ -1,5 +1,5 @@
 import { compileTableSchema } from "@confect/core/SchemaToValidator";
-import * as CoreTable from "@confect/core/Table";
+import * as Table_ from "@confect/core/Table";
 import * as Schema from "effect/Schema";
 import { defineTable, type TableDefinition } from "convex/server";
 
@@ -36,25 +36,25 @@ export {
 // so this helper is only called from `_generated/convexSchema.ts`.
 
 const tableDefinitionCache = new WeakMap<
-  CoreTable.AnyWithProps,
+  Table_.AnyWithProps,
   TableDefinition<any, any, any, any>
 >();
 
-export const tableDefinition = <Table_ extends CoreTable.AnyWithProps>(
-  table: Table_,
+export const tableDefinition = <Table extends Table_.AnyWithProps>(
+  table: Table,
 ): TableDefinition<
-  CoreTable.TableValidator<Table_>,
-  CoreTable.Indexes<Table_>,
-  CoreTable.SearchIndexes<Table_>,
-  CoreTable.VectorIndexes<Table_>
+  Table_.TableValidator<Table>,
+  Table_.Indexes<Table>,
+  Table_.SearchIndexes<Table>,
+  Table_.VectorIndexes<Table>
 > => {
   const cached = tableDefinitionCache.get(table);
   if (cached !== undefined) {
     return cached as TableDefinition<
-      CoreTable.TableValidator<Table_>,
-      CoreTable.Indexes<Table_>,
-      CoreTable.SearchIndexes<Table_>,
-      CoreTable.VectorIndexes<Table_>
+      Table_.TableValidator<Table>,
+      Table_.Indexes<Table>,
+      Table_.SearchIndexes<Table>,
+      Table_.VectorIndexes<Table>
     >;
   }
 
@@ -79,10 +79,10 @@ export const tableDefinition = <Table_ extends CoreTable.AnyWithProps>(
 
   tableDefinitionCache.set(table, definition);
   return definition as TableDefinition<
-    CoreTable.TableValidator<Table_>,
-    CoreTable.Indexes<Table_>,
-    CoreTable.SearchIndexes<Table_>,
-    CoreTable.VectorIndexes<Table_>
+    Table_.TableValidator<Table>,
+    Table_.Indexes<Table>,
+    Table_.SearchIndexes<Table>,
+    Table_.VectorIndexes<Table>
   >;
 };
 
@@ -90,7 +90,7 @@ export const tableDefinition = <Table_ extends CoreTable.AnyWithProps>(
 // System tables
 // -----------------------------------------------------------------------------
 
-export const scheduledFunctionsTable = CoreTable.make(() =>
+export const scheduledFunctionsTable = Table_.make(() =>
   Schema.Struct({
     name: Schema.String,
     args: Schema.Array(Schema.Any),
@@ -109,7 +109,7 @@ export const scheduledFunctionsTable = CoreTable.make(() =>
   }),
 )("_scheduled_functions");
 
-export const storageTable = CoreTable.make(() =>
+export const storageTable = Table_.make(() =>
   Schema.Struct({
     sha256: Schema.String,
     size: Schema.Finite,
