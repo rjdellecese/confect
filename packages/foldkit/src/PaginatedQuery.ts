@@ -1,6 +1,7 @@
 import * as Ref from "@confect/core/Ref";
 import { WebSocketClientError } from "@confect/js/WebSocketClient";
 import * as Function from "effect/Function";
+import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
@@ -136,12 +137,14 @@ const missingPaginatedProvenanceError = (ref: Ref.AnyConfect) =>
       "requires the user-args and item schemas that constructor stores.",
   );
 
-const paginatedKindOrThrow = (ref: Ref.AnyConfectPublicPaginatedQuery) => {
-  if (ref.kind._tag !== "Paginated") {
-    throw missingPaginatedProvenanceError(ref);
-  }
-  return ref.kind;
-};
+const paginatedKindOrThrow = (ref: Ref.AnyConfectPublicPaginatedQuery) =>
+  Match.value(ref.kind).pipe(
+    Match.tag("Paginated", (kind) => kind),
+    Match.tag("Standard", () => {
+      throw missingPaginatedProvenanceError(ref);
+    }),
+    Match.exhaustive,
+  );
 
 /**
  * Builds the schema-and-constructor bundle for a paginated query ref:
@@ -252,28 +255,31 @@ const descriptorEquals = (a: PageDescriptor, b: PageDescriptor): boolean =>
  */
 export const next = <Item_, UserArgs_>(
   state: State<Item_, UserArgs_>,
-): Option.Option<State<Item_, UserArgs_>> => {
-  const phase = state.phase;
-  if (phase._tag !== "Loaded" || phase.isDone) {
-    return Option.none();
-  }
-  return Option.some({
-    ...state,
-    phase: {
-      _tag: "Loading",
-      current: {
-        cursor: Option.getOrElse(
-          phase.current.endCursor,
-          () => phase.continueCursor,
-        ),
-        endCursor: Option.none(),
-      },
-      prevStack: [...phase.prevStack, phase.current],
-      previousItems: Option.some(phase.items),
-      direction: "Next",
-    },
-  });
-};
+): Option.Option<State<Item_, UserArgs_>> =>
+  Match.value(state.phase).pipe(
+    Match.tag("Loaded", (phase): Option.Option<State<Item_, UserArgs_>> =>
+      phase.isDone
+        ? Option.none()
+        : Option.some({
+            ...state,
+            phase: {
+              _tag: "Loading",
+              current: {
+                cursor: Option.getOrElse(
+                  phase.current.endCursor,
+                  () => phase.continueCursor,
+                ),
+                endCursor: Option.none(),
+              },
+              prevStack: [...phase.prevStack, phase.current],
+              previousItems: Option.some(phase.items),
+              direction: "Next",
+            },
+          }),
+    ),
+    Match.tag("Loading", "Failed", () => Option.none()),
+    Match.exhaustive,
+  );
 
 /**
  * Navigate to the previous page by popping the back-stack. A previously
@@ -282,22 +288,25 @@ export const next = <Item_, UserArgs_>(
  */
 export const prev = <Item_, UserArgs_>(
   state: State<Item_, UserArgs_>,
-): Option.Option<State<Item_, UserArgs_>> => {
-  const phase = state.phase;
-  if (phase._tag !== "Loaded" || phase.prevStack.length === 0) {
-    return Option.none();
-  }
-  return Option.some({
-    ...state,
-    phase: {
-      _tag: "Loading",
-      current: phase.prevStack[phase.prevStack.length - 1]!,
-      prevStack: phase.prevStack.slice(0, -1),
-      previousItems: Option.some(phase.items),
-      direction: "Prev",
-    },
-  });
-};
+): Option.Option<State<Item_, UserArgs_>> =>
+  Match.value(state.phase).pipe(
+    Match.tag("Loaded", (phase): Option.Option<State<Item_, UserArgs_>> =>
+      phase.prevStack.length === 0
+        ? Option.none()
+        : Option.some({
+            ...state,
+            phase: {
+              _tag: "Loading",
+              current: phase.prevStack[phase.prevStack.length - 1]!,
+              prevStack: phase.prevStack.slice(0, -1),
+              previousItems: Option.some(phase.items),
+              direction: "Prev",
+            },
+          }),
+    ),
+    Match.tag("Loading", "Failed", () => Option.none()),
+    Match.exhaustive,
+  );
 
 /**
  * Reopen the subscription after a failure, at the same page. `None` when the
@@ -305,22 +314,23 @@ export const prev = <Item_, UserArgs_>(
  */
 export const retry = <Item_, UserArgs_>(
   state: State<Item_, UserArgs_>,
-): Option.Option<State<Item_, UserArgs_>> => {
-  const phase = state.phase;
-  if (phase._tag !== "Failed") {
-    return Option.none();
-  }
-  return Option.some({
-    ...state,
-    phase: {
-      _tag: "Loading",
-      current: phase.current,
-      prevStack: phase.prevStack,
-      previousItems: phase.previousItems,
-      direction: "Retry",
-    },
-  });
-};
+): Option.Option<State<Item_, UserArgs_>> =>
+  Match.value(state.phase).pipe(
+    Match.tag("Failed", (phase): Option.Option<State<Item_, UserArgs_>> =>
+      Option.some({
+        ...state,
+        phase: {
+          _tag: "Loading",
+          current: phase.current,
+          prevStack: phase.prevStack,
+          previousItems: phase.previousItems,
+          direction: "Retry",
+        },
+      }),
+    ),
+    Match.tag("Loading", "Loaded", () => Option.none()),
+    Match.exhaustive,
+  );
 
 /**
  * Go back to page one, discarding the back-stack and every held cursor. Use
@@ -340,24 +350,29 @@ export const reset = <Item_, UserArgs_>(
  */
 export const fail = <Item_, UserArgs_>(
   state: State<Item_, UserArgs_>,
-): State<Item_, UserArgs_> => {
-  const phase = state.phase;
-  if (phase._tag === "Failed") {
-    return state;
-  }
-  return {
-    ...state,
-    phase: {
-      _tag: "Failed",
-      current: phase.current,
-      prevStack: phase.prevStack,
-      previousItems:
-        phase._tag === "Loaded"
-          ? Option.some(phase.items)
-          : phase.previousItems,
-    },
-  };
-};
+): State<Item_, UserArgs_> =>
+  Match.value(state.phase).pipe(
+    Match.tag("Failed", () => state),
+    Match.tag("Loaded", (phase): State<Item_, UserArgs_> => ({
+      ...state,
+      phase: {
+        _tag: "Failed",
+        current: phase.current,
+        prevStack: phase.prevStack,
+        previousItems: Option.some(phase.items),
+      },
+    })),
+    Match.tag("Loading", (phase): State<Item_, UserArgs_> => ({
+      ...state,
+      phase: {
+        _tag: "Failed",
+        current: phase.current,
+        prevStack: phase.prevStack,
+        previousItems: phase.previousItems,
+      },
+    })),
+    Match.exhaustive,
+  );
 
 /**
  * Fold a page subscription result into the machine.
@@ -385,58 +400,65 @@ export const settle: {
   <Item_, UserArgs_>(
     state: State<Item_, UserArgs_>,
     result: PageResult<Item_>,
-  ): State<Item_, UserArgs_> => {
-    const phase = state.phase;
-    if (
-      phase._tag === "Failed" ||
-      !descriptorEquals(result.descriptor, phase.current)
-    ) {
-      return state;
-    }
+  ): State<Item_, UserArgs_> =>
+    Match.value(state.phase).pipe(
+      Match.tag("Failed", () => state),
+      Match.tag("Loading", "Loaded", (phase): State<Item_, UserArgs_> => {
+        if (!descriptorEquals(result.descriptor, phase.current)) {
+          return state;
+        }
 
-    const splitCursor = result.splitCursor;
-    const shouldSplit =
-      typeof splitCursor === "string" &&
-      (result.pageStatus === "SplitRecommended" ||
-        result.pageStatus === "SplitRequired" ||
-        result.page.length > 2 * state.numItems);
+        const splitCursor = result.splitCursor;
+        const splitSignaled = Match.value(result.pageStatus).pipe(
+          Match.whenOr("SplitRecommended", "SplitRequired", () => true),
+          Match.orElse(() => false),
+        );
+        const shouldSplit =
+          typeof splitCursor === "string" &&
+          (splitSignaled || result.page.length > 2 * state.numItems);
 
-    if (shouldSplit) {
-      return {
-        ...state,
-        phase: {
-          _tag: "Loading",
-          current: {
-            cursor: phase.current.cursor,
-            endCursor: Option.some(splitCursor),
+        if (shouldSplit) {
+          return {
+            ...state,
+            phase: {
+              _tag: "Loading",
+              current: {
+                cursor: phase.current.cursor,
+                endCursor: Option.some(splitCursor),
+              },
+              prevStack: phase.prevStack,
+              // A `SplitRequired` page may be incomplete, so keep showing
+              // what was already on screen; otherwise the delivered page is
+              // complete (just large) and is the freshest thing to show.
+              previousItems: Match.value(result.pageStatus).pipe(
+                Match.when("SplitRequired", () =>
+                  Match.value(phase).pipe(
+                    Match.tag("Loaded", (loaded) => Option.some(loaded.items)),
+                    Match.tag("Loading", (loading) => loading.previousItems),
+                    Match.exhaustive,
+                  ),
+                ),
+                Match.orElse(() => Option.some(result.page)),
+              ),
+              direction: "Split",
+            },
+          };
+        }
+
+        return {
+          ...state,
+          phase: {
+            _tag: "Loaded",
+            current: phase.current,
+            prevStack: phase.prevStack,
+            items: result.page,
+            continueCursor: result.continueCursor,
+            isDone: result.isDone,
           },
-          prevStack: phase.prevStack,
-          // A `SplitRequired` page may be incomplete, so keep showing what
-          // was already on screen; otherwise the delivered page is complete
-          // (just large) and is the freshest thing to show.
-          previousItems:
-            result.pageStatus === "SplitRequired"
-              ? phase._tag === "Loaded"
-                ? Option.some(phase.items)
-                : phase.previousItems
-              : Option.some(result.page),
-          direction: "Split",
-        },
-      };
-    }
-
-    return {
-      ...state,
-      phase: {
-        _tag: "Loaded",
-        current: phase.current,
-        prevStack: phase.prevStack,
-        items: result.page,
-        continueCursor: result.continueCursor,
-        isDone: result.isDone,
-      },
-    };
-  },
+        };
+      }),
+      Match.exhaustive,
+    ),
 );
 
 /**
@@ -447,12 +469,13 @@ export const settle: {
 export const page = <Item_, UserArgs_>(
   state: State<Item_, UserArgs_>,
 ): ReadonlyArray<Item_> =>
-  state.phase._tag === "Loaded"
-    ? state.phase.items
-    : Option.getOrElse(
-        state.phase.previousItems,
-        (): ReadonlyArray<Item_> => [],
-      );
+  Match.value(state.phase).pipe(
+    Match.tag("Loaded", (phase) => phase.items),
+    Match.tag("Loading", "Failed", (phase) =>
+      Option.getOrElse(phase.previousItems, (): ReadonlyArray<Item_> => []),
+    ),
+    Match.exhaustive,
+  );
 
 /** The 1-indexed number of the current (or currently loading) page. */
 export const pageNum = <Item_, UserArgs_>(
@@ -465,7 +488,12 @@ export const isFirst = <Item_, UserArgs_>(
 
 export const isLast = <Item_, UserArgs_>(
   state: State<Item_, UserArgs_>,
-): boolean => state.phase._tag === "Loaded" && state.phase.isDone;
+): boolean =>
+  Match.value(state.phase).pipe(
+    Match.tag("Loaded", (phase) => phase.isDone),
+    Match.tag("Loading", "Failed", () => false),
+    Match.exhaustive,
+  );
 
 export const isLoading = <Item_, UserArgs_>(
   state: State<Item_, UserArgs_>,
@@ -482,12 +510,22 @@ export const isFailed = <Item_, UserArgs_>(
 /** Whether `next` would navigate — useful for enabling a "next page" control. */
 export const canNext = <Item_, UserArgs_>(
   state: State<Item_, UserArgs_>,
-): boolean => state.phase._tag === "Loaded" && !state.phase.isDone;
+): boolean =>
+  Match.value(state.phase).pipe(
+    Match.tag("Loaded", (phase) => !phase.isDone),
+    Match.tag("Loading", "Failed", () => false),
+    Match.exhaustive,
+  );
 
 /** Whether `prev` would navigate — useful for enabling a "previous page" control. */
 export const canPrev = <Item_, UserArgs_>(
   state: State<Item_, UserArgs_>,
-): boolean => state.phase._tag === "Loaded" && state.phase.prevStack.length > 0;
+): boolean =>
+  Match.value(state.phase).pipe(
+    Match.tag("Loaded", (phase) => phase.prevStack.length > 0),
+    Match.tag("Loading", "Failed", () => false),
+    Match.exhaustive,
+  );
 
 /** Pattern-match on the machine's phase. */
 export const match: {
@@ -513,20 +551,16 @@ export const match: {
       readonly onLoaded: (loaded: Loaded<Item_>) => B;
       readonly onFailed: (failed: Failed<Item_>) => C;
     },
-  ): A | B | C => {
-    const phase = state.phase;
-    switch (phase._tag) {
-      case "Loading": {
-        return handlers.onLoading(phase);
-      }
-      case "Loaded": {
-        return handlers.onLoaded(phase);
-      }
-      case "Failed": {
-        return handlers.onFailed(phase);
-      }
-    }
-  },
+  ): A | B | C =>
+    // `Match.exhaustive` returns `Unify<A | B | C>`, which collapses bare
+    // type parameters to `unknown` — the cast restores what the arms
+    // provably return.
+    Match.value(state.phase).pipe(
+      Match.tag("Loading", handlers.onLoading),
+      Match.tag("Loaded", handlers.onLoaded),
+      Match.tag("Failed", handlers.onFailed),
+      Match.exhaustive,
+    ) as A | B | C,
 );
 
 const matchesInvalidCursor = (error: unknown): boolean => {

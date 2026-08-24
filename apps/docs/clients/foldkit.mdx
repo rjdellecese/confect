@@ -93,9 +93,8 @@ export const subscriptions = FoldkitSubscription.make<
   Message,
   WebSocketClient.WebSocketClient
 >()(() => ({
-  note: Subscription.reactiveQuery(refs.public.notes.get, {
-    args: (model: Model) =>
-      Option.map(model.selectedNoteId, (noteId) => ({ noteId })),
+  note: Subscription.reactiveQuery<Model>()(refs.public.notes.get, {
+    args: (model) => Option.map(model.selectedNoteId, (noteId) => ({ noteId })),
     onSuccess: (note) => GotNote({ note }),
     onError: (error) => FailedGetNote({ message: String(error) }),
   }),
@@ -113,7 +112,7 @@ Queries without args may omit the `args` extractor, which leaves the
 subscription always open:
 
 ```ts
-Subscription.reactiveQuery(refs.public.notes.list, {
+Subscription.reactiveQuery<Model>()(refs.public.notes.list, {
   onSuccess: (notes) => GotNotes({ notes }),
   onError: (error) => FailedGetNotes({ message: String(error) }),
 });

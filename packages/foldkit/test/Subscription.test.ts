@@ -85,8 +85,8 @@ const noteHandlers = {
 };
 
 const makeNoteEntry = () =>
-  Subscription.reactiveQuery(getQueryRef, {
-    args: (model: Model) => Option.map(model.noteId, (id) => ({ id })),
+  Subscription.reactiveQuery<Model>()(getQueryRef, {
+    args: (model) => Option.map(model.noteId, (id) => ({ id })),
     onSuccess: (note) => GotNote({ note }),
     onError: (error) => FailedGetNote({ error }),
   });
@@ -105,9 +105,12 @@ layer(StubLayer)("Subscription", (it) => {
     });
 
     it("defaults to an always-open subscription when args is omitted", () => {
-      const entry = Subscription.reactiveQuery(listQueryRef, noteHandlers);
+      const entry = Subscription.reactiveQuery<Model>()(
+        listQueryRef,
+        noteHandlers,
+      );
 
-      expect(entry.modelToDependencies({})).toEqual({
+      expect(entry.modelToDependencies({ noteId: Option.none() })).toEqual({
         args: Option.some({}),
       });
     });
@@ -201,7 +204,7 @@ layer(StubLayer)("Subscription", (it) => {
     it("rejects Convex-provenance refs at the type level", () => {
       const makeConvexEntry = () =>
         // @ts-expect-error — only Confect-provenance refs are supported
-        Subscription.reactiveQuery(convexGetQueryRef, noteHandlers);
+        Subscription.reactiveQuery<Model>()(convexGetQueryRef, noteHandlers);
 
       expect(typeof makeConvexEntry).toBe("function");
     });
@@ -222,7 +225,7 @@ layer(StubLayer)("Subscription", (it) => {
     it("requires the args extractor when the query declares args", () => {
       const requiresArgs = () =>
         // @ts-expect-error — `args` is required for a query that declares args
-        Subscription.reactiveQuery(getQueryRef, noteHandlers);
+        Subscription.reactiveQuery<Model>()(getQueryRef, noteHandlers);
 
       expect(typeof requiresArgs).toBe("function");
     });

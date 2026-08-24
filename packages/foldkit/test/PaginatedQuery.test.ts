@@ -63,6 +63,15 @@ const pageResult = (
 const initial = (): State =>
   Notes.init({ channel: "general" }, { numItems: 2 });
 
+const loadingPhase = (
+  state: State,
+): PaginatedQuery.Loading<typeof Note.Type> | undefined =>
+  PaginatedQuery.match(state, {
+    onLoading: (loading) => loading,
+    onLoaded: () => undefined,
+    onFailed: () => undefined,
+  });
+
 const loadedPageOne = (): State =>
   PaginatedQuery.settle(
     initial(),
@@ -279,9 +288,7 @@ describe("PaginatedQuery", () => {
       );
 
       expect(state.phase._tag).toBe("Loading");
-      expect(
-        state.phase._tag === "Loading" ? state.phase.current : undefined,
-      ).toEqual(descriptor(null, "s"));
+      expect(loadingPhase(state)?.current).toEqual(descriptor(null, "s"));
     });
 
     it("does not split without a splitCursor, even when SplitRequired", () => {
@@ -312,12 +319,8 @@ describe("PaginatedQuery", () => {
 
       const state = Option.getOrThrow(PaginatedQuery.next(pinned));
 
-      expect(
-        state.phase._tag === "Loading" ? state.phase.current : undefined,
-      ).toEqual(descriptor("s"));
-      expect(
-        state.phase._tag === "Loading" ? state.phase.prevStack : undefined,
-      ).toEqual([descriptor(null, "s")]);
+      expect(loadingPhase(state)?.current).toEqual(descriptor("s"));
+      expect(loadingPhase(state)?.prevStack).toEqual([descriptor(null, "s")]);
     });
 
     it("prev re-runs a previously split page with its pinned range", () => {
@@ -338,9 +341,7 @@ describe("PaginatedQuery", () => {
 
       const state = Option.getOrThrow(PaginatedQuery.prev(pageTwo));
 
-      expect(
-        state.phase._tag === "Loading" ? state.phase.current : undefined,
-      ).toEqual(descriptor(null, "s"));
+      expect(loadingPhase(state)?.current).toEqual(descriptor(null, "s"));
     });
 
     it("a second split re-pins an already-pinned page", () => {
@@ -363,9 +364,7 @@ describe("PaginatedQuery", () => {
         }),
       );
 
-      expect(
-        state.phase._tag === "Loading" ? state.phase.current : undefined,
-      ).toEqual(descriptor(null, "s2"));
+      expect(loadingPhase(state)?.current).toEqual(descriptor(null, "s2"));
       // SplitRequired keeps the last complete render.
       expect(PaginatedQuery.page(state)).toEqual(bigPage);
     });

@@ -101,16 +101,20 @@ const paginatedArgsSchemaOrThrow = <
   Query extends Ref.AnyConfectPublicPaginatedQuery,
 >(
   ref: Query,
-): Ref.ArgsSchema<Query> => {
-  if (ref.kind._tag !== "Paginated") {
-    throw missingPaginatedProvenanceError(ref);
-  }
-  return ref.args as Ref.ArgsSchema<Query>;
-};
+): Ref.ArgsSchema<Query> =>
+  Match.value(ref.kind).pipe(
+    Match.tag("Paginated", () => ref.args),
+    Match.tag("Standard", () => {
+      throw missingPaginatedProvenanceError(ref);
+    }),
+    Match.exhaustive,
+  ) as Ref.ArgsSchema<Query>;
 
 /**
- * A complete Foldkit subscription entry for a Confect reactive query. Pass it
- * as an entry value to `Subscription.make`:
+ * A complete Foldkit subscription entry for a Confect reactive query. The
+ * leading thunk fixes the `Model` type (TypeScript cannot partially infer
+ * type arguments), so the `args` extractor's parameter is already typed.
+ * Pass the result as an entry value to `Subscription.make`:
  *
  * ```ts
  * const subscriptions = Subscription.make<
@@ -118,9 +122,8 @@ const paginatedArgsSchemaOrThrow = <
  *   Message,
  *   WebSocketClient.WebSocketClient
  * >()(() => ({
- *   note: Subscription.reactiveQuery(refs.public.notes.get, {
- *     args: (model: Model) =>
- *       Option.map(model.noteId, (noteId) => ({ noteId })),
+ *   note: Subscription.reactiveQuery<Model>()(refs.public.notes.get, {
+ *     args: (model) => Option.map(model.noteId, (noteId) => ({ noteId })),
  *     onSuccess: (note) => GotNote({ note }),
  *     onError: (error) => FailedGetNote({ message: String(error) }),
  *   }),
@@ -133,48 +136,45 @@ const paginatedArgsSchemaOrThrow = <
  * subscription running (equivalence is derived from the ref's args schema).
  * Queries without args may omit `args`, leaving the subscription always open.
  */
-export const reactiveQuery = <
-  Query extends Ref.AnyConfectPublicQuery,
-  Model,
-  SuccessMessage,
-  ErrorMessage,
->(
-  ref: Query,
-  config: Handlers<Query, SuccessMessage, ErrorMessage> &
-    ArgsConfig<Query, Model>,
-): FoldkitSubscription.EntryWithoutKeepAlive<
-  Model,
-  SuccessMessage | ErrorMessage,
-  Dependencies<Query>,
-  WebSocketClient.WebSocketClient
-> => {
-  const modelToArgs = (
-    config as {
-      readonly args?: (model: Model) => Option.Option<Ref.Args<Query>>;
-    }
-  ).args;
+export const reactiveQuery =
+  <Model>() =>
+  <Query extends Ref.AnyConfectPublicQuery, SuccessMessage, ErrorMessage>(
+    ref: Query,
+    config: Handlers<Query, SuccessMessage, ErrorMessage> &
+      ArgsConfig<Query, Model>,
+  ): FoldkitSubscription.EntryWithoutKeepAlive<
+    Model,
+    SuccessMessage | ErrorMessage,
+    Dependencies<Query>,
+    WebSocketClient.WebSocketClient
+  > => {
+    const modelToArgs = (
+      config as {
+        readonly args?: (model: Model) => Option.Option<Ref.Args<Query>>;
+      }
+    ).args;
 
-  return {
-    dependenciesSchema: Schema.Struct({
-      args: Schema.Option(ref.args),
-    }),
-    modelToDependencies: (model) => ({
-      args:
-        modelToArgs === undefined
-          ? Option.some({} as Ref.Args<Query>)
-          : modelToArgs(model),
-    }),
-    dependenciesToStream: ({ args }) =>
-      Option.match(args, {
-        onNone: () => Stream.empty,
-        onSome: (someArgs) =>
-          reactiveQueryStream(
-            ref,
-            config,
-          )(...([someArgs] as Ref.OptionalArgs<Query>)),
+    return {
+      dependenciesSchema: Schema.Struct({
+        args: Schema.Option(ref.args),
       }),
+      modelToDependencies: (model) => ({
+        args:
+          modelToArgs === undefined
+            ? Option.some({} as Ref.Args<Query>)
+            : modelToArgs(model),
+      }),
+      dependenciesToStream: ({ args }) =>
+        Option.match(args, {
+          onNone: () => Stream.empty,
+          onSome: (someArgs) =>
+            reactiveQueryStream(
+              ref,
+              config,
+            )(...([someArgs] as Ref.OptionalArgs<Query>)),
+        }),
+    };
   };
-};
 
 /**
  * A complete Foldkit subscription entry that keeps exactly one live reactive
@@ -236,19 +236,23 @@ export const paginatedQuery = <
     }),
     modelToDependencies: (model) => ({
       args: Option.flatMap(config.state(model), (state) =>
-        state.phase._tag === "Failed"
-          ? Option.none()
-          : Option.some({
+        Match.value(state.phase).pipe(
+          Match.tag("Failed", () => Option.none<Ref.Args<PaginatedQueryRef>>()),
+          Match.tag("Loading", "Loaded", (phase) =>
+            Option.some({
               ...state.args,
               paginationOpts: {
                 numItems: state.numItems,
-                cursor: state.phase.current.cursor,
-                ...Option.match(state.phase.current.endCursor, {
+                cursor: phase.current.cursor,
+                ...Option.match(phase.current.endCursor, {
                   onNone: () => ({}),
                   onSome: (endCursor) => ({ endCursor }),
                 }),
               },
             } as Ref.Args<PaginatedQueryRef>),
+          ),
+          Match.exhaustive,
+        ),
       ),
     }),
     dependenciesToStream: ({ args }) =>

@@ -18,8 +18,8 @@ const subscriptions = FoldkitSubscription.make<
   Message,
   WebSocketClient.WebSocketClient
 >()(() => ({
-  note: Subscription.reactiveQuery(refs.public.notes.get, {
-    args: (model: Model) => Option.map(model.noteId, (noteId) => ({ noteId })),
+  note: Subscription.reactiveQuery<Model>()(refs.public.notes.get, {
+    args: (model) => Option.map(model.noteId, (noteId) => ({ noteId })),
     onSuccess: (note) => GotNote({ note }),
     onError: (error) => FailedGetNote({ message: String(error) }),
   }),
