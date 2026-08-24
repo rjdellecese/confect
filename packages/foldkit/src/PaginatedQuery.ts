@@ -175,7 +175,7 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
   };
   const previousItems = Schema.Option(kind.page);
 
-  const schema = Schema.Struct({
+  const schema: PaginatedQuery<Query>["schema"] = Schema.Struct({
     args: kind.userArgs,
     numItems: Schema.Finite,
     phase: Schema.Union([
@@ -195,9 +195,9 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
         previousItems,
       }),
     ]),
-  }) as unknown as PaginatedQuery<Query>["schema"];
+  });
 
-  const pageResult = Schema.Struct({
+  const pageResult: PaginatedQuery<Query>["pageResult"] = Schema.Struct({
     descriptor: PageDescriptor,
     page: kind.page,
     isDone: Schema.Boolean,
@@ -210,9 +210,9 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
         Schema.Null,
       ]),
     ),
-  }) as unknown as PaginatedQuery<Query>["pageResult"];
+  });
 
-  const init = ((
+  const init: PaginatedQuery<Query>["init"] = (
     argsOrOptions: UserArgs<Query> | { readonly numItems: number },
     options?: { readonly numItems: number },
   ): State<Item<Query>, UserArgs<Query>> => {
@@ -230,7 +230,7 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
       numItems: resolvedOptions.numItems,
       phase: initialPhase(),
     };
-  }) as PaginatedQuery<Query>["init"];
+  };
 
   return { schema, pageResult, init };
 };
@@ -257,7 +257,8 @@ export const next = <Item_, UserArgs_>(
   state: State<Item_, UserArgs_>,
 ): Option.Option<State<Item_, UserArgs_>> =>
   Match.value(state.phase).pipe(
-    Match.tag("Loaded", (phase): Option.Option<State<Item_, UserArgs_>> =>
+    Match.withReturnType<Option.Option<State<Item_, UserArgs_>>>(),
+    Match.tag("Loaded", (phase) =>
       phase.isDone
         ? Option.none()
         : Option.some({
@@ -290,20 +291,22 @@ export const prev = <Item_, UserArgs_>(
   state: State<Item_, UserArgs_>,
 ): Option.Option<State<Item_, UserArgs_>> =>
   Match.value(state.phase).pipe(
-    Match.tag("Loaded", (phase): Option.Option<State<Item_, UserArgs_>> =>
-      phase.prevStack.length === 0
+    Match.withReturnType<Option.Option<State<Item_, UserArgs_>>>(),
+    Match.tag("Loaded", (phase) => {
+      const current = phase.prevStack.at(-1);
+      return current === undefined
         ? Option.none()
         : Option.some({
             ...state,
             phase: {
               _tag: "Loading",
-              current: phase.prevStack[phase.prevStack.length - 1]!,
+              current,
               prevStack: phase.prevStack.slice(0, -1),
               previousItems: Option.some(phase.items),
               direction: "Prev",
             },
-          }),
-    ),
+          });
+    }),
     Match.tag("Loading", "Failed", () => Option.none()),
     Match.exhaustive,
   );
@@ -316,7 +319,8 @@ export const retry = <Item_, UserArgs_>(
   state: State<Item_, UserArgs_>,
 ): Option.Option<State<Item_, UserArgs_>> =>
   Match.value(state.phase).pipe(
-    Match.tag("Failed", (phase): Option.Option<State<Item_, UserArgs_>> =>
+    Match.withReturnType<Option.Option<State<Item_, UserArgs_>>>(),
+    Match.tag("Failed", (phase) =>
       Option.some({
         ...state,
         phase: {
@@ -352,8 +356,9 @@ export const fail = <Item_, UserArgs_>(
   state: State<Item_, UserArgs_>,
 ): State<Item_, UserArgs_> =>
   Match.value(state.phase).pipe(
+    Match.withReturnType<State<Item_, UserArgs_>>(),
     Match.tag("Failed", () => state),
-    Match.tag("Loaded", (phase): State<Item_, UserArgs_> => ({
+    Match.tag("Loaded", (phase) => ({
       ...state,
       phase: {
         _tag: "Failed",
@@ -362,7 +367,7 @@ export const fail = <Item_, UserArgs_>(
         previousItems: Option.some(phase.items),
       },
     })),
-    Match.tag("Loading", (phase): State<Item_, UserArgs_> => ({
+    Match.tag("Loading", (phase) => ({
       ...state,
       phase: {
         _tag: "Failed",
@@ -402,8 +407,9 @@ export const settle: {
     result: PageResult<Item_>,
   ): State<Item_, UserArgs_> =>
     Match.value(state.phase).pipe(
+      Match.withReturnType<State<Item_, UserArgs_>>(),
       Match.tag("Failed", () => state),
-      Match.tag("Loading", "Loaded", (phase): State<Item_, UserArgs_> => {
+      Match.tag("Loading", "Loaded", (phase) => {
         if (!descriptorEquals(result.descriptor, phase.current)) {
           return state;
         }
@@ -553,8 +559,7 @@ export const match: {
     },
   ): A | B | C =>
     // `Match.exhaustive` returns `Unify<A | B | C>`, which collapses bare
-    // type parameters to `unknown` — the cast restores what the arms
-    // provably return.
+    // type parameters to `unknown` — the cast restores what the arms return.
     Match.value(state.phase).pipe(
       Match.tag("Loading", handlers.onLoading),
       Match.tag("Loaded", handlers.onLoaded),
@@ -565,14 +570,14 @@ export const match: {
 
 const matchesInvalidCursor = (error: unknown): boolean => {
   if (Ref.isConvexError(error)) {
-    const data: unknown = (error as { readonly data?: unknown }).data;
+    const data: unknown = error.data;
     return (
       typeof data === "object" &&
       data !== null &&
-      (data as { readonly isConvexSystemError?: unknown })
-        .isConvexSystemError === true &&
-      (data as { readonly paginationError?: unknown }).paginationError ===
-        "InvalidCursor"
+      "isConvexSystemError" in data &&
+      data.isConvexSystemError === true &&
+      "paginationError" in data &&
+      data.paginationError === "InvalidCursor"
     );
   }
   return (

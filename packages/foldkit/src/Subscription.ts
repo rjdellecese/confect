@@ -47,16 +47,13 @@ export interface Handlers<
  * The `args` extractor is required whenever the query declares args; queries
  * without args may omit it, in which case the subscription is always open.
  */
-type ArgsConfig<
-  Query extends Ref.AnyConfectPublicQuery,
-  Model,
-> = keyof Ref.Args<Query> extends never
-  ? {
-      readonly args?: (model: Model) => Option.Option<Ref.Args<Query>>;
-    }
+type ArgsConfig<Query extends Ref.AnyConfectPublicQuery, Model> = {
+  readonly args?: (model: Model) => Option.Option<Ref.Args<Query>>;
+} & (keyof Ref.Args<Query> extends never
+  ? unknown
   : {
       readonly args: (model: Model) => Option.Option<Ref.Args<Query>>;
-    };
+    });
 
 /**
  * A `dependenciesToStream` body for a hand-written subscription entry: runs
@@ -101,14 +98,16 @@ const paginatedArgsSchemaOrThrow = <
   Query extends Ref.AnyConfectPublicPaginatedQuery,
 >(
   ref: Query,
-): Ref.ArgsSchema<Query> =>
+): Query["args"] =>
+  // `Match.exhaustive` returns `Unify<Query["args"]>`, which loses the exact
+  // generic schema type carried by the ref.
   Match.value(ref.kind).pipe(
     Match.tag("Paginated", () => ref.args),
     Match.tag("Standard", () => {
       throw missingPaginatedProvenanceError(ref);
     }),
     Match.exhaustive,
-  ) as Ref.ArgsSchema<Query>;
+  ) as Query["args"];
 
 /**
  * A complete Foldkit subscription entry for a Confect reactive query. The
@@ -148,11 +147,7 @@ export const reactiveQuery =
     Dependencies<Query>,
     WebSocketClient.WebSocketClient
   > => {
-    const modelToArgs = (
-      config as {
-        readonly args?: (model: Model) => Option.Option<Ref.Args<Query>>;
-      }
-    ).args;
+    const modelToArgs = config.args;
 
     return {
       dependenciesSchema: Schema.Struct({
@@ -167,11 +162,7 @@ export const reactiveQuery =
       dependenciesToStream: ({ args }) =>
         Option.match(args, {
           onNone: () => Stream.empty,
-          onSome: (someArgs) =>
-            reactiveQueryStream(
-              ref,
-              config,
-            )(...([someArgs] as Ref.OptionalArgs<Query>)),
+          onSome: (someArgs) => reactiveQueryStream(ref, config)(someArgs),
         }),
     };
   };
@@ -244,21 +235,22 @@ export const paginatedQuery =
       modelToDependencies: (model) => ({
         args: Option.flatMap(config.state(model), (state) =>
           Match.value(state.phase).pipe(
-            Match.tag("Failed", () =>
-              Option.none<Ref.Args<PaginatedQueryRef>>(),
-            ),
+            Match.withReturnType<Option.Option<Ref.Args<PaginatedQueryRef>>>(),
+            Match.tag("Failed", () => Option.none()),
             Match.tag("Loading", "Loaded", (phase) =>
-              Option.some({
-                ...state.args,
-                paginationOpts: {
-                  numItems: state.numItems,
-                  cursor: phase.current.cursor,
-                  ...Option.match(phase.current.endCursor, {
-                    onNone: () => ({}),
-                    onSome: (endCursor) => ({ endCursor }),
-                  }),
-                },
-              } as Ref.Args<PaginatedQueryRef>),
+              Option.some(
+                composedArgsSchema.make({
+                  ...state.args,
+                  paginationOpts: {
+                    numItems: state.numItems,
+                    cursor: phase.current.cursor,
+                    ...Option.match(phase.current.endCursor, {
+                      onNone: () => ({}),
+                      onSome: (endCursor) => ({ endCursor }),
+                    }),
+                  },
+                }),
+              ),
             ),
             Match.exhaustive,
           ),
@@ -268,8 +260,7 @@ export const paginatedQuery =
         Option.match(args, {
           onNone: () => Stream.empty,
           onSome: (composedArgs) => {
-            const { paginationOpts } =
-              composedArgs as Ref.Args<Ref.AnyPublicPaginatedQuery>;
+            const { paginationOpts } = composedArgs;
             const descriptor: PaginatedQuery.PageDescriptor = {
               cursor: paginationOpts.cursor,
               endCursor: Option.fromNullishOr(paginationOpts.endCursor),
@@ -278,10 +269,10 @@ export const paginatedQuery =
               onSuccess: (returns) =>
                 config.onResult({
                   descriptor,
-                  ...(returns as Ref.Returns<Ref.AnyPublicPaginatedQuery>),
+                  ...returns,
                 }),
               onError: config.onError,
-            })(...([composedArgs] as Ref.OptionalArgs<PaginatedQueryRef>));
+            })(composedArgs);
           },
         }),
     };
