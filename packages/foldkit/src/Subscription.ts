@@ -81,11 +81,9 @@ export const reactiveQueryStream =
     never,
     WebSocketClient.WebSocketClient
   > =>
-    Stream.unwrap(
-      Effect.map(WebSocketClient.WebSocketClient, (client) =>
-        client.reactiveQuery(ref, ...args),
-      ),
-    ).pipe(
+    WebSocketClient.WebSocketClient.pipe(
+      Effect.map((client) => client.reactiveQuery(ref, ...args)),
+      Stream.unwrap,
       Stream.map(handlers.onSuccess),
       Stream.catch((error) => Stream.succeed(handlers.onError(error))),
     );
