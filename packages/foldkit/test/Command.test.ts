@@ -86,7 +86,7 @@ const deleteMutationRef = Ref.make(
   "notes",
   FunctionSpec.publicMutation({
     name: "deleteOrFail",
-    args: () => Schema.Struct({ id: Schema.String }),
+    args: () => Schema.Struct({ id: Schema.String, scope: Schema.String }),
     returns: () => Schema.Null,
     error: () => NotFound,
   }),
@@ -197,7 +197,7 @@ layer(StubLayer)("Command", (it) => {
           onError: (error) => FailedSaveNote({ error }),
         });
 
-        const message = yield* DeleteNote({ id: "abc" }).effect;
+        const message = yield* DeleteNote({ id: "abc", scope: "notes" }).effect;
 
         expect(message._tag).toBe("FailedSaveNote");
         expect((message as typeof FailedSaveNote.Type).error).toBeInstanceOf(
@@ -230,6 +230,14 @@ layer(StubLayer)("Command", (it) => {
     it("requires messages to be declared", () => {
       // @ts-expect-error — messages is required
       Command.mutation("SaveNote", insertMutationRef, saveNoteHandlers);
+    });
+
+    it("rejects an explicitly undefined interrupt option", () => {
+      // @ts-expect-error — absence and `interrupt: undefined` are distinct
+      Command.mutation("SaveNote", insertMutationRef, {
+        ...saveNoteConfig,
+        interrupt: undefined,
+      });
     });
 
     it("rejects a handler Message not declared in messages", () => {
@@ -303,7 +311,7 @@ layer(StubLayer)("Command", (it) => {
         },
       });
 
-      const command = DeleteNote({ id: "abc" });
+      const command = DeleteNote({ id: "abc", scope: "notes" });
       expect(command.key).toBe("DeleteNote:abc");
 
       const interrupt = DeleteNote.Interrupt(

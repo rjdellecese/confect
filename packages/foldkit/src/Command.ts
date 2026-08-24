@@ -44,6 +44,10 @@ type Instance<
   effect: Effect.Effect<Message, never, WebSocketClient.WebSocketClient>;
 }>;
 
+type SchemaArgs<Ref_ extends Ref.AnyConfect> = Schema.Schema.Type<
+  Schema.Struct<Ref.ArgsSchema<Ref_>["fields"]>
+>;
+
 /**
  * A Foldkit Command definition whose args are the ref's args: our
  * ref-derived call signature (args optional when the ref declares none)
@@ -77,9 +81,9 @@ export type Definition<
  */
 export type InterruptOption<
   Ref_ extends Ref.AnyConfect,
-  KeyField extends keyof Ref.Args<Ref_> & string = keyof Ref.Args<Ref_> &
+  KeyField extends keyof SchemaArgs<Ref_> & string = keyof SchemaArgs<Ref_> &
     string,
-> = FoldkitCommand.InterruptOption<Ref.Args<Ref_>, KeyField>;
+> = FoldkitCommand.InterruptOption<SchemaArgs<Ref_>, KeyField>;
 
 /**
  * The keyed arm of `InterruptOption`: `keyFields` declares the args the
@@ -87,7 +91,7 @@ export type InterruptOption<
  */
 export type KeyedInterrupt<
   Ref_ extends Ref.AnyConfect,
-  KeyField extends keyof Ref.Args<Ref_> & string,
+  KeyField extends keyof SchemaArgs<Ref_> & string,
 > = Exclude<InterruptOption<Ref_, KeyField>, true>;
 
 /**
@@ -118,7 +122,7 @@ export type InterruptibleDefinition<
 export type KeyedInterruptibleDefinition<
   Name extends string,
   Ref_ extends Ref.AnyConfect,
-  KeyField extends keyof Ref.Args<Ref_> & string,
+  KeyField extends keyof SchemaArgs<Ref_> & string,
   Message,
 > = ((
   ...args: Ref.OptionalArgs<Ref_>
@@ -126,7 +130,7 @@ export type KeyedInterruptibleDefinition<
   FoldkitCommand.Interruptible.DefinitionWithArgs<
     Name,
     Ref.ArgsSchema<Ref_>["fields"],
-    Pick<Ref.Args<Ref_>, KeyField>,
+    Pick<SchemaArgs<Ref_>, KeyField>,
     Effect.Effect<Message, never, WebSocketClient.WebSocketClient>
   >;
 
@@ -202,73 +206,141 @@ export const actionEffect =
   > =>
     run(handlers, (client) => client.action(ref, ...args));
 
-const makeDefinition = <
+type RunWithArgs<Ref_ extends Ref.AnyConfect, Message> = (
+  ...args: Ref.OptionalArgs<Ref_>
+) => Effect.Effect<Message, never, WebSocketClient.WebSocketClient>;
+
+function makeDefinition<
   Name extends string,
   Ref_ extends Ref.AnyConfect,
   SuccessMessage,
   ErrorMessage,
+  KeyField extends keyof SchemaArgs<Ref_> & string = keyof SchemaArgs<Ref_> &
+    string,
 >(
   name: Name,
   ref: Ref_,
   messages: ReadonlyArray<Schema.Top>,
-  runWithArgs: (
-    ...args: Ref.OptionalArgs<Ref_>
-  ) => Effect.Effect<
-    SuccessMessage | ErrorMessage,
-    never,
-    WebSocketClient.WebSocketClient
-  >,
-  interrupt: InterruptOption<Ref_> | undefined,
-): Definition<Name, Ref_, SuccessMessage | ErrorMessage> =>
+  runWithArgs: RunWithArgs<Ref_, SuccessMessage | ErrorMessage>,
+  interrupt?: InterruptOption<Ref_, KeyField>,
+): Definition<Name, Ref_, SuccessMessage | ErrorMessage> {
+  type Fields = Ref.ArgsSchema<Ref_>["fields"];
+  type FoldkitArgs = SchemaArgs<Ref_>;
+
+  const fields: Fields = ref.args.fields;
+  const execute = (args: FoldkitArgs | undefined) =>
+    runWithArgs(
+      ...((args === undefined ? [] : [args]) as Ref.OptionalArgs<Ref_>),
+    );
+
   // Delegating to Foldkit's `define` keeps the `CommandDefinitionTypeId`
   // brand, the `Effect.suspend` around `execute`, the `messageMappers` chain
   // that Story/Scene test resolution replays, and — with `interrupt` — the
   // registry wiring behind the `Interrupt` constructor. `args` is the ref's
   // own args schema fields and `messages` is the caller's declaration; a
-  // keyed interrupt's `toKey` receives the invocation's actual args. The
-  // casts change no runtime behavior — they only substitute the ref-derived
-  // call signature (args optional when the ref declares none) for the one
-  // `define` would declare.
-  FoldkitCommand.define(name, {
-    args: ref.args.fields,
+  // keyed interrupt's `toKey` receives the invocation's actual args.
+  // Confect makes the args optional when a ref's fields are empty; Foldkit
+  // sees the supplied `args` object and consequently declares them required.
+  if (interrupt === undefined) {
+    return FoldkitCommand.define(name, {
+      args: fields,
+      messages,
+      execute,
+    }) as Definition<Name, Ref_, SuccessMessage | ErrorMessage>;
+  }
+  if (interrupt === true) {
+    return FoldkitCommand.define(name, {
+      args: fields,
+      messages,
+      interrupt,
+      execute,
+    }) as InterruptibleDefinition<Name, Ref_, SuccessMessage | ErrorMessage>;
+  }
+  const definition: FoldkitCommand.CommandDefinitionWithArgs<
+    Name,
+    Fields,
+    ReturnType<typeof execute>
+  > = FoldkitCommand.define(name, {
+    args: fields,
     messages,
     interrupt,
-    execute: (args: Ref.Args<Ref_> | undefined) =>
-      runWithArgs(
-        ...((args === undefined ? [] : [args]) as Ref.OptionalArgs<Ref_>),
-      ),
-  } as never) as never;
+    execute,
+  });
+  return definition as Definition<Name, Ref_, SuccessMessage | ErrorMessage>;
+}
+
+type FactoryConfig<
+  Ref_ extends Ref.AnyConfect,
+  Messages extends ReadonlyArray<Schema.Top>,
+  SuccessMessage,
+  ErrorMessage,
+> = Handlers<Ref_, SuccessMessage, ErrorMessage> & {
+  readonly messages: Messages;
+};
+
+type KeyedFactoryConfig<
+  Ref_ extends Ref.AnyConfect,
+  Messages extends ReadonlyArray<Schema.Top>,
+  SuccessMessage,
+  ErrorMessage,
+  KeyField extends keyof SchemaArgs<Ref_> & string,
+> = FactoryConfig<Ref_, Messages, SuccessMessage, ErrorMessage> & {
+  readonly interrupt: KeyedInterrupt<Ref_, KeyField>;
+};
+
+type NameKeyedFactoryConfig<
+  Ref_ extends Ref.AnyConfect,
+  Messages extends ReadonlyArray<Schema.Top>,
+  SuccessMessage,
+  ErrorMessage,
+> = FactoryConfig<Ref_, Messages, SuccessMessage, ErrorMessage> & {
+  readonly interrupt: true;
+};
+
+type StandardFactoryConfig<
+  Ref_ extends Ref.AnyConfect,
+  Messages extends ReadonlyArray<Schema.Top>,
+  SuccessMessage,
+  ErrorMessage,
+> = FactoryConfig<Ref_, Messages, SuccessMessage, ErrorMessage> & {
+  readonly interrupt?: never;
+};
 
 /**
- * The overload set of a Command definition factory bound to `BoundRef`: a keyed
- * interrupt yields a `KeyedInterruptibleDefinition`, `interrupt: true` an
- * `InterruptibleDefinition`, and no `interrupt` a plain `Definition`. Every
- * call declares `messages` — the schemas of the Messages the Command can
- * produce, as in Foldkit's own `Command.define` — and the handlers' Messages
- * must be instances of them.
+ * Builds the overload set for one ref kind. Each arm preserves whether
+ * `interrupt` is absent, `true`, or args-keyed all the way to
+ * `makeDefinition`.
  */
-interface Factory<BoundRef extends Ref.AnyConfect> {
-  <
+const makeFactory = <BoundRef extends Ref.AnyConfect>(
+  effectHelper: <Ref_ extends BoundRef, SuccessMessage, ErrorMessage>(
+    ref: Ref_,
+    handlers: Handlers<Ref_, SuccessMessage, ErrorMessage>,
+  ) => RunWithArgs<Ref_, SuccessMessage | ErrorMessage>,
+) => {
+  function factory<
     const Name extends string,
     Ref_ extends BoundRef,
     const Messages extends ReadonlyArray<Schema.Top>,
     SuccessMessage extends Schema.Schema.Type<Messages[number]>,
     ErrorMessage extends Schema.Schema.Type<Messages[number]>,
-    KeyField extends keyof Ref.Args<Ref_> & string,
+    KeyField extends keyof SchemaArgs<Ref_> & string,
   >(
     name: Name,
     ref: Ref_,
-    config: Handlers<Ref_, SuccessMessage, ErrorMessage> & {
-      readonly messages: Messages;
-      readonly interrupt: KeyedInterrupt<Ref_, KeyField>;
-    },
+    config: KeyedFactoryConfig<
+      Ref_,
+      Messages,
+      SuccessMessage,
+      ErrorMessage,
+      KeyField
+    >,
   ): KeyedInterruptibleDefinition<
     Name,
     Ref_,
     KeyField,
     SuccessMessage | ErrorMessage
   >;
-  <
+  function factory<
     const Name extends string,
     Ref_ extends BoundRef,
     const Messages extends ReadonlyArray<Schema.Top>,
@@ -277,12 +349,14 @@ interface Factory<BoundRef extends Ref.AnyConfect> {
   >(
     name: Name,
     ref: Ref_,
-    config: Handlers<Ref_, SuccessMessage, ErrorMessage> & {
-      readonly messages: Messages;
-      readonly interrupt: true;
-    },
+    config: NameKeyedFactoryConfig<
+      Ref_,
+      Messages,
+      SuccessMessage,
+      ErrorMessage
+    >,
   ): InterruptibleDefinition<Name, Ref_, SuccessMessage | ErrorMessage>;
-  <
+  function factory<
     const Name extends string,
     Ref_ extends BoundRef,
     const Messages extends ReadonlyArray<Schema.Top>,
@@ -291,36 +365,50 @@ interface Factory<BoundRef extends Ref.AnyConfect> {
   >(
     name: Name,
     ref: Ref_,
-    config: Handlers<Ref_, SuccessMessage, ErrorMessage> & {
-      readonly messages: Messages;
-      readonly interrupt?: never;
-    },
+    config: StandardFactoryConfig<Ref_, Messages, SuccessMessage, ErrorMessage>,
   ): Definition<Name, Ref_, SuccessMessage | ErrorMessage>;
-}
-
-const makeFactory = <BoundRef extends Ref.AnyConfect>(
-  effectHelper: (
-    ref: BoundRef,
-    handlers: Handlers<BoundRef, unknown, unknown>,
-  ) => (
-    ...args: Ref.OptionalArgs<BoundRef>
-  ) => Effect.Effect<unknown, never, WebSocketClient.WebSocketClient>,
-): Factory<BoundRef> =>
-  ((
-    name: string,
-    ref: BoundRef,
-    config: Handlers<BoundRef, unknown, unknown> & {
-      readonly messages: ReadonlyArray<Schema.Top>;
-      readonly interrupt?: InterruptOption<BoundRef>;
+  function factory<
+    const Name extends string,
+    Ref_ extends BoundRef,
+    SuccessMessage,
+    ErrorMessage,
+    KeyField extends keyof SchemaArgs<Ref_> & string,
+  >(
+    name: Name,
+    ref: Ref_,
+    config: FactoryConfig<
+      Ref_,
+      ReadonlyArray<Schema.Top>,
+      SuccessMessage,
+      ErrorMessage
+    > & {
+      readonly interrupt?: InterruptOption<Ref_, KeyField>;
     },
-  ) =>
-    makeDefinition(
+  ): Definition<Name, Ref_, SuccessMessage | ErrorMessage> {
+    const runWithArgs = effectHelper(ref, config);
+    if (config.interrupt === undefined) {
+      return makeDefinition(name, ref, config.messages, runWithArgs);
+    }
+    if (config.interrupt === true) {
+      return makeDefinition(
+        name,
+        ref,
+        config.messages,
+        runWithArgs,
+        config.interrupt,
+      );
+    }
+    return makeDefinition(
       name,
       ref,
       config.messages,
-      effectHelper(ref, config),
+      runWithArgs,
       config.interrupt,
-    )) as Factory<BoundRef>;
+    );
+  }
+
+  return factory;
+};
 
 /**
  * A Foldkit Command definition for a Confect query whose Command args are the
@@ -351,19 +439,17 @@ const makeFactory = <BoundRef extends Ref.AnyConfect>(
  * // [model, [SaveDraft.Interrupt((outcome) => CompletedCancelSaveDraft({ outcome }))]]
  * ```
  */
-export const query: Factory<Ref.AnyConfectPublicQuery> =
-  makeFactory(queryEffect);
+export const query = makeFactory<Ref.AnyConfectPublicQuery>(queryEffect);
 
 /**
  * A Foldkit Command definition for a Confect mutation whose Command args are
  * the ref's args. See `query`.
  */
-export const mutation: Factory<Ref.AnyConfectPublicMutation> =
-  makeFactory(mutationEffect);
+export const mutation =
+  makeFactory<Ref.AnyConfectPublicMutation>(mutationEffect);
 
 /**
  * A Foldkit Command definition for a Confect action whose Command args are
  * the ref's args. See `query`.
  */
-export const action: Factory<Ref.AnyConfectPublicAction> =
-  makeFactory(actionEffect);
+export const action = makeFactory<Ref.AnyConfectPublicAction>(actionEffect);
