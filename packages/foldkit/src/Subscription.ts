@@ -13,7 +13,7 @@ import * as WebSocketClient from "./WebSocketClient";
  * `WebSocketClientError`, or a `SchemaError` from encoding args or decoding
  * returns.
  */
-export type Error<Query extends Ref.AnyPublicQuery> =
+export type Error<Query extends Ref.AnyConfectPublicQuery> =
   | Ref.Error<Query>
   | WebSocketClient.WebSocketClientError
   | Schema.SchemaError;
@@ -23,7 +23,7 @@ export type Error<Query extends Ref.AnyPublicQuery> =
  * subscription is closed; a change from one `Some` to another tears the
  * server subscription down and reopens it with the new args.
  */
-export interface Dependencies<Query extends Ref.AnyPublicQuery> {
+export interface Dependencies<Query extends Ref.AnyConfectPublicQuery> {
   readonly args: Option.Option<Ref.Args<Query>>;
 }
 
@@ -34,7 +34,7 @@ export interface Dependencies<Query extends Ref.AnyPublicQuery> {
  * requires.
  */
 export interface Handlers<
-  Query extends Ref.AnyPublicQuery,
+  Query extends Ref.AnyConfectPublicQuery,
   SuccessMessage,
   ErrorMessage,
 > {
@@ -47,7 +47,7 @@ export interface Handlers<
  * without args may omit it, in which case the subscription is always open.
  */
 type ArgsConfig<
-  Query extends Ref.AnyPublicQuery,
+  Query extends Ref.AnyConfectPublicQuery,
   Model,
 > = keyof Ref.Args<Query> extends never
   ? {
@@ -67,10 +67,10 @@ type ArgsConfig<
  *
  * Prefer `reactiveQuery`, which builds the whole entry; reach for this when
  * you need control over the entry's dependencies (custom gating, extra
- * dependencies, or a Convex-provenance ref).
+ * dependencies).
  */
 export const reactiveQueryStream =
-  <Query extends Ref.AnyPublicQuery, SuccessMessage, ErrorMessage>(
+  <Query extends Ref.AnyConfectPublicQuery, SuccessMessage, ErrorMessage>(
     ref: Query,
     handlers: Handlers<Query, SuccessMessage, ErrorMessage>,
   ) =>
@@ -90,25 +90,7 @@ export const reactiveQueryStream =
       Stream.catch((error) => Stream.succeed(handlers.onError(error))),
     );
 
-const missingConfectProvenanceError = (ref: Ref.Any) =>
-  new globalThis.Error(
-    `Reactive query ref "${Ref.getConvexFunctionName(ref)}" was not built ` +
-      "with `FunctionSpec.publicQuery`. `Subscription.reactiveQuery` derives " +
-      "its dependency equivalence from the ref's args schema, which " +
-      "Convex-provenance refs don't carry. Write the entry by hand with " +
-      "`Subscription.reactiveQueryStream` instead.",
-  );
-
-const argsSchemaOrThrow = <Query extends Ref.AnyPublicQuery>(
-  ref: Query,
-): Ref.ArgsSchema<Query> => {
-  if (ref._tag === "Convex") {
-    throw missingConfectProvenanceError(ref);
-  }
-  return ref.args as Ref.ArgsSchema<Query>;
-};
-
-const missingPaginatedProvenanceError = (ref: Ref.Any) =>
+const missingPaginatedProvenanceError = (ref: Ref.AnyConfect) =>
   new globalThis.Error(
     `Paginated query ref "${Ref.getConvexFunctionName(ref)}" was not built ` +
       "with `FunctionSpec.publicPaginatedQuery`. `Subscription.paginatedQuery` " +
@@ -116,10 +98,12 @@ const missingPaginatedProvenanceError = (ref: Ref.Any) =>
       "schemas that constructor stores.",
   );
 
-const paginatedArgsSchemaOrThrow = <Query extends Ref.AnyPublicPaginatedQuery>(
+const paginatedArgsSchemaOrThrow = <
+  Query extends Ref.AnyConfectPublicPaginatedQuery,
+>(
   ref: Query,
 ): Ref.ArgsSchema<Query> => {
-  if (ref._tag === "Convex" || ref.kind._tag !== "Paginated") {
+  if (ref.kind._tag !== "Paginated") {
     throw missingPaginatedProvenanceError(ref);
   }
   return ref.args as Ref.ArgsSchema<Query>;
@@ -149,13 +133,9 @@ const paginatedArgsSchemaOrThrow = <Query extends Ref.AnyPublicPaginatedQuery>(
  * and resubscribes with the new args, and structurally equal args leave the
  * subscription running (equivalence is derived from the ref's args schema).
  * Queries without args may omit `args`, leaving the subscription always open.
- *
- * Requires a ref built with `FunctionSpec.publicQuery` — for Convex-provenance
- * refs (which carry no args schema) write the entry by hand with
- * `reactiveQueryStream`.
  */
 export const reactiveQuery = <
-  Query extends Ref.AnyPublicQuery,
+  Query extends Ref.AnyConfectPublicQuery,
   Model,
   SuccessMessage,
   ErrorMessage,
@@ -169,7 +149,6 @@ export const reactiveQuery = <
   Dependencies<Query>,
   WebSocketClient.WebSocketClient
 > => {
-  const argsSchema = argsSchemaOrThrow(ref);
   const modelToArgs = (
     config as {
       readonly args?: (model: Model) => Option.Option<Ref.Args<Query>>;
@@ -178,7 +157,7 @@ export const reactiveQuery = <
 
   return {
     dependenciesSchema: Schema.Struct({
-      args: Schema.Option(argsSchema),
+      args: Schema.Option(ref.args),
     }),
     modelToDependencies: (model) => ({
       args:
@@ -224,7 +203,7 @@ export const reactiveQuery = <
  * `FunctionSpec.publicPaginatedQuery`.
  */
 export const paginatedQuery = <
-  Query extends Ref.AnyPublicPaginatedQuery,
+  Query extends Ref.AnyConfectPublicPaginatedQuery,
   Model,
   ResultMessage,
   ErrorMessage,

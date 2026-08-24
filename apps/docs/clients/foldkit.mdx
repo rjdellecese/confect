@@ -18,7 +18,10 @@ specs](/concepts/spec-impl-model), and every failure is folded into a Message,
 so Command and Subscription error channels stay `never` as Foldkit requires.
 
 Functions are referenced via `refs` (from `confect/_generated/refs`) instead
-of Convex's `api` object, the same as with the other Confect clients.
+of Convex's `api` object, the same as with the other Confect clients. The
+bindings work with Confect functions only — refs for [plain Convex
+functions](/server/plain-convex-functions) carry no schemas, so they aren't
+accepted.
 
 ## Installation
 
@@ -118,11 +121,8 @@ Subscription.reactiveQuery(refs.public.notes.list, {
 
 ### Custom entries
 
-`Subscription.reactiveQuery` requires a ref built with
-`FunctionSpec.publicQuery`, since the dependency equivalence comes from the
-ref's args schema. For a Convex-provenance ref, or when the entry needs extra
-dependencies or custom gating, write the entry by hand and use
-`Subscription.reactiveQueryStream` as its `dependenciesToStream` body:
+When an entry needs extra dependencies or custom gating, write it by hand and
+use `Subscription.reactiveQueryStream` as its `dependenciesToStream` body:
 
 ```ts
 import * as Schema from "effect/Schema";

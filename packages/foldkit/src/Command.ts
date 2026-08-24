@@ -10,7 +10,7 @@ import * as WebSocketClient from "./WebSocketClient";
  * schema), a transport-level `WebSocketClientError`, or a `SchemaError` from
  * encoding args or decoding returns.
  */
-export type Error<Ref_ extends Ref.Any> =
+export type Error<Ref_ extends Ref.AnyConfect> =
   | Ref.Error<Ref_>
   | WebSocketClient.WebSocketClientError
   | Schema.SchemaError;
@@ -22,7 +22,11 @@ export type Error<Ref_ extends Ref.Any> =
  * requires. Follow Foldkit's naming convention: past-tense facts like
  * `SucceededSaveNote` / `FailedSaveNote`.
  */
-export interface Handlers<Ref_ extends Ref.Any, SuccessMessage, ErrorMessage> {
+export interface Handlers<
+  Ref_ extends Ref.AnyConfect,
+  SuccessMessage,
+  ErrorMessage,
+> {
   readonly onSuccess: (returns: Ref.Returns<Ref_>) => SuccessMessage;
   readonly onError: (error: Error<Ref_>) => ErrorMessage;
 }
@@ -31,13 +35,12 @@ export interface Handlers<Ref_ extends Ref.Any, SuccessMessage, ErrorMessage> {
  * The `Schema.Struct.Fields` a definition hands Foldkit's own definition
  * interfaces, which are generic in one: the fields of the ref's own `args`
  * schema when its type carries them, or a phantom field map built from the
- * decoded args type when it doesn't — Convex provenance, or a ref typed by
- * one of the `Any` aliases, whose args schema type is the loose default.
- * Either way `Schema.Struct.Type` of the fields is the ref's decoded args;
- * the ergonomic call signature intersected alongside is what call sites
- * actually resolve against.
+ * decoded args type for a ref typed by one of the `Any` aliases, whose args
+ * schema type is the loose default. Either way `Schema.Struct.Type` of the
+ * fields is the ref's decoded args; the ergonomic call signature intersected
+ * alongside is what call sites actually resolve against.
  */
-type ArgsFields<Ref_ extends Ref.Any> =
+type ArgsFields<Ref_ extends Ref.AnyConfect> =
   Ref.ArgsSchema<Ref_> extends {
     readonly fields: infer Fields extends Schema.Struct.Fields;
   }
@@ -51,7 +54,11 @@ type ArgsFields<Ref_ extends Ref.Any> =
 /**
  * The Command instance a definition call constructs.
  */
-type Instance<Name extends string, Ref_ extends Ref.Any, Message> = Readonly<{
+type Instance<
+  Name extends string,
+  Ref_ extends Ref.AnyConfect,
+  Message,
+> = Readonly<{
   name: Name;
   args: Ref.Args<Ref_>;
   effect: Effect.Effect<Message, never, WebSocketClient.WebSocketClient>;
@@ -66,9 +73,11 @@ type Instance<Name extends string, Ref_ extends Ref.Any, Message> = Readonly<{
  * and `expectExact` matchers. Call it from `update` to construct a Command
  * instance; nothing runs until the Foldkit runtime executes it.
  */
-export type Definition<Name extends string, Ref_ extends Ref.Any, Message> = ((
-  ...args: Ref.OptionalArgs<Ref_>
-) => Instance<Name, Ref_, Message>) &
+export type Definition<
+  Name extends string,
+  Ref_ extends Ref.AnyConfect,
+  Message,
+> = ((...args: Ref.OptionalArgs<Ref_>) => Instance<Name, Ref_, Message>) &
   FoldkitCommand.CommandDefinitionWithArgs<
     Name,
     ArgsFields<Ref_>,
@@ -87,7 +96,7 @@ export type Definition<Name extends string, Ref_ extends Ref.Any, Message> = ((
  * the server, which runs to completion once the call is on the wire.
  */
 export type InterruptOption<
-  Ref_ extends Ref.Any,
+  Ref_ extends Ref.AnyConfect,
   KeyField extends keyof Ref.Args<Ref_> & string = keyof Ref.Args<Ref_> &
     string,
 > = FoldkitCommand.InterruptOption<Ref.Args<Ref_>, KeyField>;
@@ -97,7 +106,7 @@ export type InterruptOption<
  * `Interrupt` constructor requires; `toKey` derives the key part from them.
  */
 export type KeyedInterrupt<
-  Ref_ extends Ref.Any,
+  Ref_ extends Ref.AnyConfect,
   KeyField extends keyof Ref.Args<Ref_> & string,
 > = Exclude<InterruptOption<Ref_, KeyField>, true>;
 
@@ -109,7 +118,7 @@ export type KeyedInterrupt<
  */
 export type InterruptibleDefinition<
   Name extends string,
-  Ref_ extends Ref.Any,
+  Ref_ extends Ref.AnyConfect,
   Message,
 > = ((
   ...args: Ref.OptionalArgs<Ref_>
@@ -128,7 +137,7 @@ export type InterruptibleDefinition<
  */
 export type KeyedInterruptibleDefinition<
   Name extends string,
-  Ref_ extends Ref.Any,
+  Ref_ extends Ref.AnyConfect,
   KeyField extends keyof Ref.Args<Ref_> & string,
   Message,
 > = ((
@@ -141,7 +150,7 @@ export type KeyedInterruptibleDefinition<
     Effect.Effect<Message, never, WebSocketClient.WebSocketClient>
   >;
 
-const run = <Ref_ extends Ref.Any, SuccessMessage, ErrorMessage>(
+const run = <Ref_ extends Ref.AnyConfect, SuccessMessage, ErrorMessage>(
   handlers: Handlers<Ref_, SuccessMessage, ErrorMessage>,
   invoke: (
     client: WebSocketClient.WebSocketClient,
@@ -164,7 +173,7 @@ const run = <Ref_ extends Ref.Any, SuccessMessage, ErrorMessage>(
  * a custom args schema, `interrupt`, or a Command that makes several calls.
  */
 export const queryEffect =
-  <Query extends Ref.AnyPublicQuery, SuccessMessage, ErrorMessage>(
+  <Query extends Ref.AnyConfectPublicQuery, SuccessMessage, ErrorMessage>(
     ref: Query,
     handlers: Handlers<Query, SuccessMessage, ErrorMessage>,
   ) =>
@@ -182,7 +191,7 @@ export const queryEffect =
  * folded into a Message. See `queryEffect`.
  */
 export const mutationEffect =
-  <Mutation extends Ref.AnyPublicMutation, SuccessMessage, ErrorMessage>(
+  <Mutation extends Ref.AnyConfectPublicMutation, SuccessMessage, ErrorMessage>(
     ref: Mutation,
     handlers: Handlers<Mutation, SuccessMessage, ErrorMessage>,
   ) =>
@@ -200,7 +209,7 @@ export const mutationEffect =
  * folded into a Message. See `queryEffect`.
  */
 export const actionEffect =
-  <Action extends Ref.AnyPublicAction, SuccessMessage, ErrorMessage>(
+  <Action extends Ref.AnyConfectPublicAction, SuccessMessage, ErrorMessage>(
     ref: Action,
     handlers: Handlers<Action, SuccessMessage, ErrorMessage>,
   ) =>
@@ -215,7 +224,7 @@ export const actionEffect =
 
 const makeDefinition = <
   Name extends string,
-  Ref_ extends Ref.Any,
+  Ref_ extends Ref.AnyConfect,
   SuccessMessage,
   ErrorMessage,
 >(
@@ -252,7 +261,7 @@ const makeDefinition = <
  * interrupt yields a `KeyedInterruptibleDefinition`, `interrupt: true` an
  * `InterruptibleDefinition`, and no `interrupt` a plain `Definition`.
  */
-interface Factory<Bound extends Ref.Any> {
+interface Factory<Bound extends Ref.AnyConfect> {
   <
     const Name extends string,
     Ref_ extends Bound,
@@ -287,7 +296,7 @@ interface Factory<Bound extends Ref.Any> {
   ): Definition<Name, Ref_, SuccessMessage | ErrorMessage>;
 }
 
-const makeFactory = <Bound extends Ref.Any>(
+const makeFactory = <Bound extends Ref.AnyConfect>(
   effectHelper: (
     ref: Bound,
     handlers: Handlers<Bound, unknown, unknown>,
@@ -335,17 +344,19 @@ const makeFactory = <Bound extends Ref.Any>(
  * // [model, [SaveDraft.Interrupt((outcome) => CompletedCancelSaveDraft({ outcome }))]]
  * ```
  */
-export const query: Factory<Ref.AnyPublicQuery> = makeFactory(queryEffect);
+export const query: Factory<Ref.AnyConfectPublicQuery> =
+  makeFactory(queryEffect);
 
 /**
  * A Foldkit Command definition for a Confect mutation whose Command args are
  * the ref's args. See `query`.
  */
-export const mutation: Factory<Ref.AnyPublicMutation> =
+export const mutation: Factory<Ref.AnyConfectPublicMutation> =
   makeFactory(mutationEffect);
 
 /**
  * A Foldkit Command definition for a Confect action whose Command args are
  * the ref's args. See `query`.
  */
-export const action: Factory<Ref.AnyPublicAction> = makeFactory(actionEffect);
+export const action: Factory<Ref.AnyConfectPublicAction> =
+  makeFactory(actionEffect);

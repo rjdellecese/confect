@@ -198,14 +198,12 @@ layer(StubLayer)("Subscription", (it) => {
       ).toBe(true);
     });
 
-    it("rejects Convex-provenance refs at construction time", () => {
-      expect(() =>
-        Subscription.reactiveQuery(convexGetQueryRef, {
-          args: (model: Model) => Option.map(model.noteId, (id) => ({ id })),
-          onSuccess: (note) => GotNote({ note }),
-          onError: (error) => FailedGetNote({ error }),
-        }),
-      ).toThrow(/was not built with `FunctionSpec.publicQuery`/);
+    it("rejects Convex-provenance refs at the type level", () => {
+      const makeConvexEntry = () =>
+        // @ts-expect-error — only Confect-provenance refs are supported
+        Subscription.reactiveQuery(convexGetQueryRef, noteHandlers);
+
+      expect(typeof makeConvexEntry).toBe("function");
     });
 
     it("is accepted by Foldkit's Subscription.make", () => {
@@ -231,13 +229,13 @@ layer(StubLayer)("Subscription", (it) => {
   });
 
   describe("reactiveQueryStream", () => {
-    it.effect("works with Convex-provenance refs", () =>
+    it.effect("maps emissions to Messages and forwards args", () =>
       Effect.gen(function* () {
         reactiveQueryResults = Stream.make({ text: "raw" });
 
         const messages = yield* Stream.runCollect(
           Subscription.reactiveQueryStream(
-            convexGetQueryRef,
+            getQueryRef,
             noteHandlers,
           )({
             id: "abc",
@@ -250,6 +248,14 @@ layer(StubLayer)("Subscription", (it) => {
         ]);
       }),
     );
+
+    it("rejects Convex-provenance refs at the type level", () => {
+      const makeConvexStream = () =>
+        // @ts-expect-error — only Confect-provenance refs are supported
+        Subscription.reactiveQueryStream(convexGetQueryRef, noteHandlers);
+
+      expect(typeof makeConvexStream).toBe("function");
+    });
   });
 });
 
@@ -502,7 +508,7 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
     it("rejects refs without paginated provenance", () => {
       expect(() =>
         Subscription.paginatedQuery(
-          getQueryRef as unknown as Ref.AnyPublicPaginatedQuery,
+          getQueryRef as unknown as Ref.AnyConfectPublicPaginatedQuery,
           {
             state: (model: PaginatedModel) => model.notes,
             onResult: (result) => SettledNotesPage({ result }),

@@ -101,6 +101,8 @@ export interface ConvexRef<
 
 export type Any = Ref<any, any, any, any, any>;
 
+export type AnyConfect = ConfectRef<any, any, any, any, any>;
+
 export type AnyInternal = Ref<any, "internal", any, any, any>;
 
 export type AnyPublic = Ref<any, "public", any, any, any>;
@@ -114,6 +116,17 @@ export type AnyQuery = Ref<
 >;
 
 export type AnyPublicPaginatedQuery = Ref<
+  RuntimeAndFunctionType.AnyQuery,
+  "public",
+  {
+    [key: string]: any;
+    paginationOpts: PaginationOptions;
+  },
+  PaginationResult<any>,
+  any
+>;
+
+export type AnyConfectPublicPaginatedQuery = ConfectRef<
   RuntimeAndFunctionType.AnyQuery,
   "public",
   {
@@ -148,6 +161,14 @@ export type AnyPublicQuery = Ref<
   any
 >;
 
+export type AnyConfectPublicQuery = ConfectRef<
+  RuntimeAndFunctionType.AnyQuery,
+  "public",
+  any,
+  any,
+  any
+>;
+
 export type AnyPublicMutation = Ref<
   RuntimeAndFunctionType.AnyMutation,
   "public",
@@ -156,7 +177,23 @@ export type AnyPublicMutation = Ref<
   any
 >;
 
+export type AnyConfectPublicMutation = ConfectRef<
+  RuntimeAndFunctionType.AnyMutation,
+  "public",
+  any,
+  any,
+  any
+>;
+
 export type AnyPublicAction = Ref<
+  RuntimeAndFunctionType.AnyAction,
+  "public",
+  any,
+  any,
+  any
+>;
+
+export type AnyConfectPublicAction = ConfectRef<
   RuntimeAndFunctionType.AnyAction,
   "public",
   any,

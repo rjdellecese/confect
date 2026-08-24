@@ -94,16 +94,18 @@ export interface PageResult<Item_> {
   readonly pageStatus?: "SplitRecommended" | "SplitRequired" | null;
 }
 
-export type Item<Query extends Ref.AnyPublicPaginatedQuery> =
+export type Item<Query extends Ref.AnyConfectPublicPaginatedQuery> =
   Ref.Returns<Query>["page"][number];
 
-export type UserArgs<Query extends Ref.AnyPublicPaginatedQuery> = Omit<
+export type UserArgs<Query extends Ref.AnyConfectPublicPaginatedQuery> = Omit<
   Ref.Args<Query>,
   "paginationOpts"
 >;
 
 /** The schema-and-constructor bundle returned by `make`. */
-export interface PaginatedQuery<Query extends Ref.AnyPublicPaginatedQuery> {
+export interface PaginatedQuery<
+  Query extends Ref.AnyConfectPublicPaginatedQuery,
+> {
   /** The machine state schema — embed in the Model, typically inside `Schema.Option(...)`. */
   readonly schema: Schema.Codec<State<Item<Query>, UserArgs<Query>>, unknown>;
   /** The `PageResult` schema, for declaring the Message that carries results. */
@@ -127,15 +129,15 @@ const initialPhase = <Item_>(): Loading<Item_> => ({
   direction: "First",
 });
 
-const missingPaginatedProvenanceError = (ref: Ref.Any) =>
+const missingPaginatedProvenanceError = (ref: Ref.AnyConfect) =>
   new globalThis.Error(
     `Paginated query ref "${Ref.getConvexFunctionName(ref)}" was not built ` +
       "with `FunctionSpec.publicPaginatedQuery`. `PaginatedQuery.make` " +
       "requires the user-args and item schemas that constructor stores.",
   );
 
-const paginatedKindOrThrow = (ref: Ref.AnyPublicPaginatedQuery) => {
-  if (ref._tag === "Convex" || ref.kind._tag !== "Paginated") {
+const paginatedKindOrThrow = (ref: Ref.AnyConfectPublicPaginatedQuery) => {
+  if (ref.kind._tag !== "Paginated") {
     throw missingPaginatedProvenanceError(ref);
   }
   return ref.kind;
@@ -159,7 +161,7 @@ const paginatedKindOrThrow = (ref: Ref.AnyPublicPaginatedQuery) => {
  * user-args and item schemas back the state schema, and mismatched schemas
  * are unrepresentable.
  */
-export const make = <Query extends Ref.AnyPublicPaginatedQuery>(
+export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
   ref: Query,
 ): PaginatedQuery<Query> => {
   const kind = paginatedKindOrThrow(ref);
