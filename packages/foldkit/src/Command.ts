@@ -209,6 +209,8 @@ const makeDefinition = <
   ErrorMessage,
 >(
   name: Name,
+  ref: Ref_,
+  messages: ReadonlyArray<Schema.Top>,
   runWithArgs: (
     ...args: Ref.OptionalArgs<Ref_>
   ) => Effect.Effect<
@@ -221,14 +223,15 @@ const makeDefinition = <
   // Delegating to Foldkit's `define` keeps the `CommandDefinitionTypeId`
   // brand, the `Effect.suspend` around `execute`, the `messageMappers` chain
   // that Story/Scene test resolution replays, and — with `interrupt` — the
-  // registry wiring behind the `Interrupt` constructor. `messages` is
-  // typing-only, `args` is only checked for presence, and a keyed
-  // interrupt's `toKey` receives the invocation's actual args, so the casts
-  // don't change runtime behavior — they substitute the ref-derived call
-  // signature for the schema-derived one `define` would declare.
+  // registry wiring behind the `Interrupt` constructor. `args` is the ref's
+  // own args schema fields and `messages` is the caller's declaration; a
+  // keyed interrupt's `toKey` receives the invocation's actual args. The
+  // casts change no runtime behavior — they only substitute the ref-derived
+  // call signature (args optional when the ref declares none) for the one
+  // `define` would declare.
   FoldkitCommand.define(name, {
-    args: {},
-    messages: [],
+    args: ref.args.fields,
+    messages,
     interrupt,
     execute: (args: Ref.Args<Ref_> | undefined) =>
       runWithArgs(
@@ -239,19 +242,24 @@ const makeDefinition = <
 /**
  * The overload set of a Command definition factory bound to `Bound`: a keyed
  * interrupt yields a `KeyedInterruptibleDefinition`, `interrupt: true` an
- * `InterruptibleDefinition`, and no `interrupt` a plain `Definition`.
+ * `InterruptibleDefinition`, and no `interrupt` a plain `Definition`. Every
+ * call declares `messages` — the schemas of the Messages the Command can
+ * produce, as in Foldkit's own `Command.define` — and the handlers' Messages
+ * must be instances of them.
  */
 interface Factory<Bound extends Ref.AnyConfect> {
   <
     const Name extends string,
     Ref_ extends Bound,
-    SuccessMessage,
-    ErrorMessage,
+    const Messages extends ReadonlyArray<Schema.Top>,
+    SuccessMessage extends Schema.Schema.Type<Messages[number]>,
+    ErrorMessage extends Schema.Schema.Type<Messages[number]>,
     KeyField extends keyof Ref.Args<Ref_> & string,
   >(
     name: Name,
     ref: Ref_,
     config: Handlers<Ref_, SuccessMessage, ErrorMessage> & {
+      readonly messages: Messages;
       readonly interrupt: KeyedInterrupt<Ref_, KeyField>;
     },
   ): KeyedInterruptibleDefinition<
@@ -260,17 +268,31 @@ interface Factory<Bound extends Ref.AnyConfect> {
     KeyField,
     SuccessMessage | ErrorMessage
   >;
-  <const Name extends string, Ref_ extends Bound, SuccessMessage, ErrorMessage>(
+  <
+    const Name extends string,
+    Ref_ extends Bound,
+    const Messages extends ReadonlyArray<Schema.Top>,
+    SuccessMessage extends Schema.Schema.Type<Messages[number]>,
+    ErrorMessage extends Schema.Schema.Type<Messages[number]>,
+  >(
     name: Name,
     ref: Ref_,
     config: Handlers<Ref_, SuccessMessage, ErrorMessage> & {
+      readonly messages: Messages;
       readonly interrupt: true;
     },
   ): InterruptibleDefinition<Name, Ref_, SuccessMessage | ErrorMessage>;
-  <const Name extends string, Ref_ extends Bound, SuccessMessage, ErrorMessage>(
+  <
+    const Name extends string,
+    Ref_ extends Bound,
+    const Messages extends ReadonlyArray<Schema.Top>,
+    SuccessMessage extends Schema.Schema.Type<Messages[number]>,
+    ErrorMessage extends Schema.Schema.Type<Messages[number]>,
+  >(
     name: Name,
     ref: Ref_,
     config: Handlers<Ref_, SuccessMessage, ErrorMessage> & {
+      readonly messages: Messages;
       readonly interrupt?: never;
     },
   ): Definition<Name, Ref_, SuccessMessage | ErrorMessage>;
@@ -288,11 +310,14 @@ const makeFactory = <Bound extends Ref.AnyConfect>(
     name: string,
     ref: Bound,
     config: Handlers<Bound, unknown, unknown> & {
+      readonly messages: ReadonlyArray<Schema.Top>;
       readonly interrupt?: InterruptOption<Bound>;
     },
   ) =>
     makeDefinition(
       name,
+      ref,
+      config.messages,
       effectHelper(ref, config),
       config.interrupt,
     )) as Factory<Bound>;
@@ -303,6 +328,7 @@ const makeFactory = <Bound extends Ref.AnyConfect>(
  *
  * ```ts
  * const FetchNote = Command.query("FetchNote", refs.public.notes.get, {
+ *   messages: [GotNote, FailedGetNote],
  *   onSuccess: (note) => GotNote({ note }),
  *   onError: (error) => FailedGetNote({ message: String(error) }),
  * })
@@ -316,6 +342,7 @@ const makeFactory = <Bound extends Ref.AnyConfect>(
  *
  * ```ts
  * const SaveDraft = Command.mutation("SaveDraft", refs.public.notes.insert, {
+ *   messages: [SucceededSaveDraft, FailedSaveDraft],
  *   onSuccess: (noteId) => SucceededSaveDraft({ noteId }),
  *   onError: (error) => FailedSaveDraft({ message: String(error) }),
  *   interrupt: true,

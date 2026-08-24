@@ -101,13 +101,18 @@ const saveNoteHandlers = {
   onError: (error: unknown) => FailedSaveNote({ error }),
 };
 
+const saveNoteConfig = {
+  messages: [SucceededSaveNote, FailedSaveNote],
+  ...saveNoteHandlers,
+};
+
 layer(StubLayer)("Command", (it) => {
   describe("definition factories", () => {
     it("carry the Command name and the CommandDefinitionTypeId brand", () => {
       const SaveNote = Command.mutation(
         "SaveNote",
         insertMutationRef,
-        saveNoteHandlers,
+        saveNoteConfig,
       );
 
       expect(SaveNote.name).toBe("SaveNote");
@@ -118,7 +123,7 @@ layer(StubLayer)("Command", (it) => {
       const SaveNote = Command.mutation(
         "SaveNote",
         insertMutationRef,
-        saveNoteHandlers,
+        saveNoteConfig,
       );
 
       const command = SaveNote({ text: "hello" });
@@ -132,7 +137,7 @@ layer(StubLayer)("Command", (it) => {
         const SaveNote = Command.mutation(
           "SaveNote",
           insertMutationRef,
-          saveNoteHandlers,
+          saveNoteConfig,
         );
 
         const message = yield* SaveNote({ text: "hello" }).effect;
@@ -147,6 +152,7 @@ layer(StubLayer)("Command", (it) => {
     it.effect("no-args query is callable without args", () =>
       Effect.gen(function* () {
         const FetchNotes = Command.query("FetchNotes", listQueryRef, {
+          messages: [SucceededSaveNote, FailedSaveNote],
           onSuccess: (notes) => SucceededSaveNote({ note: notes }),
           onError: (error) => FailedSaveNote({ error }),
         });
@@ -163,6 +169,7 @@ layer(StubLayer)("Command", (it) => {
     it.effect("action success produces the onSuccess Message", () =>
       Effect.gen(function* () {
         const SendEmail = Command.action("SendEmail", sendActionRef, {
+          messages: [SucceededSaveNote, FailedSaveNote],
           onSuccess: () => SucceededSaveNote({ note: null }),
           onError: (error) => FailedSaveNote({ error }),
         });
@@ -185,6 +192,7 @@ layer(StubLayer)("Command", (it) => {
         nextResult = Effect.fail(new NotFound({ id: "abc" }));
 
         const DeleteNote = Command.mutation("DeleteNote", deleteMutationRef, {
+          messages: [SucceededSaveNote, FailedSaveNote],
           onSuccess: () => SucceededSaveNote({ note: null }),
           onError: (error) => FailedSaveNote({ error }),
         });
@@ -207,7 +215,7 @@ layer(StubLayer)("Command", (it) => {
         const SaveNote = Command.mutation(
           "SaveNote",
           insertMutationRef,
-          saveNoteHandlers,
+          saveNoteConfig,
         );
 
         const message = yield* SaveNote({ text: "hello" }).effect;
@@ -219,11 +227,25 @@ layer(StubLayer)("Command", (it) => {
       }),
     );
 
+    it("requires messages to be declared", () => {
+      // @ts-expect-error — messages is required
+      Command.mutation("SaveNote", insertMutationRef, saveNoteHandlers);
+    });
+
+    it("rejects a handler Message not declared in messages", () => {
+      Command.mutation("SaveNote", insertMutationRef, {
+        messages: [FailedSaveNote],
+        // @ts-expect-error — onSuccess must produce a declared Message
+        onSuccess: (note: unknown) => SucceededSaveNote({ note }),
+        onError: (error: unknown) => FailedSaveNote({ error }),
+      });
+    });
+
     it("the Command's error channel is never", () => {
       const SaveNote = Command.mutation(
         "SaveNote",
         insertMutationRef,
-        saveNoteHandlers,
+        saveNoteConfig,
       );
 
       expectTypeOf(SaveNote({ text: "hello" }).effect).toEqualTypeOf<
@@ -256,6 +278,7 @@ layer(StubLayer)("Command", (it) => {
 
     it("supports interrupt: true, keyed by the Command name", () => {
       const SaveDraft = Command.mutation("SaveDraft", insertMutationRef, {
+        messages: [SucceededSaveNote, FailedSaveNote],
         onSuccess: (note) => SucceededSaveNote({ note }),
         onError: (error) => FailedSaveNote({ error }),
         interrupt: true,
@@ -271,6 +294,7 @@ layer(StubLayer)("Command", (it) => {
 
     it("supports interrupt keyed by the ref's args", () => {
       const DeleteNote = Command.mutation("DeleteNote", deleteMutationRef, {
+        messages: [SucceededSaveNote, FailedSaveNote],
         onSuccess: () => SucceededSaveNote({ note: null }),
         onError: (error) => FailedSaveNote({ error }),
         interrupt: {
@@ -290,6 +314,7 @@ layer(StubLayer)("Command", (it) => {
       expect(interrupt.interruptsKey).toBe("DeleteNote:abc");
 
       Command.mutation("DeleteNote", deleteMutationRef, {
+        messages: [SucceededSaveNote, FailedSaveNote],
         onSuccess: () => SucceededSaveNote({ note: null }),
         onError: (error) => FailedSaveNote({ error }),
         // @ts-expect-error — keyFields must name fields of the ref's args
@@ -305,6 +330,7 @@ layer(StubLayer)("Command", (it) => {
         );
 
         const SaveDraft = Command.mutation("SaveDraft", insertMutationRef, {
+          messages: [SucceededSaveNote, FailedSaveNote],
           onSuccess: (note) => SucceededSaveNote({ note }),
           onError: (error) => FailedSaveNote({ error }),
           interrupt: true,
@@ -326,6 +352,7 @@ layer(StubLayer)("Command", (it) => {
 
     it("an interruptible Command's error channel is still never", () => {
       const SaveDraft = Command.mutation("SaveDraft", insertMutationRef, {
+        messages: [SucceededSaveNote, FailedSaveNote],
         onSuccess: (note) => SucceededSaveNote({ note }),
         onError: (error) => FailedSaveNote({ error }),
         interrupt: true,
@@ -386,18 +413,20 @@ describe("Foldkit test-tooling compatibility", () => {
     const SaveNote = Command.mutation(
       "SaveNote",
       insertMutationRef,
-      saveNoteHandlers,
+      saveNoteConfig,
     );
     const SaveDraft = Command.mutation("SaveDraft", insertMutationRef, {
-      ...saveNoteHandlers,
+      ...saveNoteConfig,
       interrupt: true,
     });
     const DeleteNote = Command.mutation("DeleteNote", deleteMutationRef, {
+      messages: [SucceededSaveNote, FailedSaveNote],
       onSuccess: () => SucceededSaveNote({ note: null }),
       onError: (error) => FailedSaveNote({ error }),
       interrupt: { keyFields: ["id"], toKey: ({ id }) => id },
     });
     const FetchNotes = Command.query("FetchNotes", listQueryRef, {
+      messages: [SucceededSaveNote, FailedSaveNote],
       onSuccess: (notes) => SucceededSaveNote({ note: notes }),
       onError: (error) => FailedSaveNote({ error }),
     });
@@ -412,7 +441,7 @@ describe("Foldkit test-tooling compatibility", () => {
     const SaveNote = Command.mutation(
       "SaveNote",
       insertMutationRef,
-      saveNoteHandlers,
+      saveNoteConfig,
     );
 
     const resolve = <Name extends string, ResultMessage>(

@@ -151,9 +151,11 @@ FoldkitSubscription.make<Model, Message, WebSocketClient.WebSocketClient>()(
 ## Commands
 
 `Command.query`, `Command.mutation`, and `Command.action` build Foldkit
-Command definitions whose Command args are the ref's args. Call the
-definition from `update` to construct a Command instance — nothing runs until
-the Foldkit runtime executes it.
+Command definitions whose Command args are the ref's args. `messages`
+declares the Messages the Command can produce — the same declaration
+Foldkit's own `Command.define` takes — and the handlers must produce
+instances of them. Call the definition from `update` to construct a Command
+instance — nothing runs until the Foldkit runtime executes it.
 
 ```ts src/command.ts
 import { Command } from "@confect/foldkit";
@@ -162,6 +164,7 @@ import refs from "../confect/_generated/refs";
 import { FailedSaveNote, SucceededSaveNote } from "./model";
 
 export const SaveNote = Command.mutation("SaveNote", refs.public.notes.insert, {
+  messages: [SucceededSaveNote, FailedSaveNote],
   onSuccess: (noteId) => SucceededSaveNote({ noteId }),
   onError: (error) => FailedSaveNote({ message: String(error) }),
 });
@@ -197,6 +200,7 @@ export const SaveDraft = Command.mutation(
   "SaveDraft",
   refs.public.notes.insert,
   {
+    messages: [SucceededSaveDraft, FailedSaveDraft],
     onSuccess: (noteId) => SucceededSaveDraft({ noteId }),
     onError: (error) => FailedSaveDraft({ message: String(error) }),
     interrupt: true,
@@ -222,6 +226,7 @@ export const DeleteNote = Command.mutation(
   "DeleteNote",
   refs.public.notes.delete,
   {
+    messages: [SucceededDeleteNote, FailedDeleteNote],
     onSuccess: () => SucceededDeleteNote(),
     onError: (error) => FailedDeleteNote({ message: String(error) }),
     interrupt: {
