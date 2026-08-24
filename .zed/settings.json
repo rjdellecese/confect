@@ -28,9 +28,6 @@
     "HTML": {
       "language_servers": ["!tailwindcss-language-server", "..."],
       "format_on_save": "on",
-      "prettier": {
-        "allowed": false
-      },
       "formatter": [
         {
           "language_server": {
@@ -49,9 +46,6 @@
         "..."
       ],
       "format_on_save": "on",
-      "prettier": {
-        "allowed": false
-      },
       "formatter": [
         {
           "code_action": "source.fixAll.oxc"
@@ -65,9 +59,6 @@
     },
     "JSON": {
       "format_on_save": "on",
-      "prettier": {
-        "allowed": false
-      },
       "formatter": [
         {
           "language_server": {
@@ -78,9 +69,6 @@
     },
     "JSONC": {
       "format_on_save": "on",
-      "prettier": {
-        "allowed": false
-      },
       "formatter": [
         {
           "language_server": {
@@ -91,9 +79,6 @@
     },
     "Markdown": {
       "format_on_save": "on",
-      "prettier": {
-        "allowed": false
-      },
       "formatter": [
         {
           "language_server": {
@@ -105,9 +90,6 @@
     "MDX": {
       "language_servers": ["!tailwindcss-language-server", "..."],
       "format_on_save": "on",
-      "prettier": {
-        "allowed": false
-      },
       "formatter": [
         {
           "language_server": {
@@ -126,9 +108,6 @@
         "..."
       ],
       "format_on_save": "on",
-      "prettier": {
-        "allowed": false
-      },
       "formatter": [
         {
           "code_action": "source.fixAll.oxc"
@@ -150,9 +129,6 @@
         "..."
       ],
       "format_on_save": "on",
-      "prettier": {
-        "allowed": false
-      },
       "formatter": [
         {
           "code_action": "source.fixAll.oxc"
@@ -166,9 +142,6 @@
     },
     "YAML": {
       "format_on_save": "on",
-      "prettier": {
-        "allowed": false
-      },
       "formatter": [
         {
           "language_server": {
