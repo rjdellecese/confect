@@ -6,9 +6,14 @@ import * as WebSocketClient from "./WebSocketClient";
 
 /**
  * Everything a Command against `Ref_` can fail with before it is folded into
- * an `onError` Message.
+ * an `onError` Message: the ref's typed error (if it declares an `error`
+ * schema), a transport-level `WebSocketClientError`, or a `SchemaError` from
+ * encoding args or decoding returns.
  */
-export type Error<Ref_ extends Ref.Any> = WebSocketClient.Error<Ref_>;
+export type Error<Ref_ extends Ref.Any> =
+  | Ref.Error<Ref_>
+  | WebSocketClient.WebSocketClientError
+  | Schema.SchemaError;
 
 /**
  * Maps a Confect function's outcome into the app's Messages. Every failure —
@@ -22,22 +27,25 @@ export interface Handlers<Ref_ extends Ref.Any, SuccessMessage, ErrorMessage> {
   readonly onError: (error: Error<Ref_>) => ErrorMessage;
 }
 
-type Eff<Message> = Effect.Effect<
-  Message,
-  never,
-  WebSocketClient.WebSocketClient
->;
-
 /**
- * A phantom field map whose `Schema.Struct.Type` is the ref's decoded args.
- * It exists only so a definition can instantiate Foldkit's own definition
- * interfaces, which are generic in a `Schema.Struct.Fields`; the ergonomic
- * call signature intersected alongside is what call sites actually resolve
- * against.
+ * The `Schema.Struct.Fields` a definition hands Foldkit's own definition
+ * interfaces, which are generic in one: the fields of the ref's args schema
+ * (`Ref.ArgsSchema`) when the ref carries them, or a phantom field map built
+ * from the decoded args type for refs that don't (Convex provenance). Either
+ * way `Schema.Struct.Type` of the fields is the ref's decoded args; the
+ * ergonomic call signature intersected alongside is what call sites actually
+ * resolve against.
  */
-type ArgsFields<Args> = {
-  readonly [K in keyof Args]-?: Schema.Schema<Args[K]>;
-};
+type ArgsFields<Ref_ extends Ref.Any> =
+  Ref.ArgsSchema<Ref_> extends {
+    readonly fields: infer Fields extends Schema.Struct.Fields;
+  }
+    ? Fields
+    : {
+        readonly [K in keyof Ref.Args<Ref_>]-?: Schema.Schema<
+          Ref.Args<Ref_>[K]
+        >;
+      };
 
 /**
  * The Command instance a definition call constructs.
@@ -45,7 +53,7 @@ type ArgsFields<Args> = {
 type Instance<Name extends string, Ref_ extends Ref.Any, Message> = Readonly<{
   name: Name;
   args: Ref.Args<Ref_>;
-  effect: Eff<Message>;
+  effect: Effect.Effect<Message, never, WebSocketClient.WebSocketClient>;
 }>;
 
 /**
@@ -62,8 +70,8 @@ export type Definition<Name extends string, Ref_ extends Ref.Any, Message> = ((
 ) => Instance<Name, Ref_, Message>) &
   FoldkitCommand.CommandDefinitionWithArgs<
     Name,
-    ArgsFields<Ref.Args<Ref_>>,
-    Eff<Message>
+    ArgsFields<Ref_>,
+    Effect.Effect<Message, never, WebSocketClient.WebSocketClient>
   >;
 
 /**
@@ -107,8 +115,8 @@ export type InterruptibleDefinition<
 ) => Instance<Name, Ref_, Message> & Readonly<{ key: string }>) &
   FoldkitCommand.Interruptible.DefinitionWithArgsNameKeyed<
     Name,
-    ArgsFields<Ref.Args<Ref_>>,
-    Eff<Message>
+    ArgsFields<Ref_>,
+    Effect.Effect<Message, never, WebSocketClient.WebSocketClient>
   >;
 
 /**
@@ -127,9 +135,9 @@ export type KeyedInterruptibleDefinition<
 ) => Instance<Name, Ref_, Message> & Readonly<{ key: string }>) &
   FoldkitCommand.Interruptible.DefinitionWithArgs<
     Name,
-    ArgsFields<Ref.Args<Ref_>>,
+    ArgsFields<Ref_>,
     Pick<Ref.Args<Ref_>, KeyField>,
-    Eff<Message>
+    Effect.Effect<Message, never, WebSocketClient.WebSocketClient>
   >;
 
 const run = <Ref_ extends Ref.Any, SuccessMessage, ErrorMessage>(

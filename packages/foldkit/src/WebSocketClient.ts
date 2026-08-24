@@ -1,10 +1,8 @@
-import type * as Ref from "@confect/core/Ref";
 import {
   layer,
   WebSocketClient,
   WebSocketClientError,
 } from "@confect/js/WebSocketClient";
-import type * as Schema from "effect/Schema";
 
 /**
  * The Confect WebSocket client, re-exported from `@confect/js` for use as a
@@ -20,14 +18,3 @@ import type * as Schema from "effect/Schema";
  * ```
  */
 export { layer, WebSocketClient, WebSocketClientError };
-
-/**
- * Everything a `WebSocketClient` call against `Ref_` can fail with: the ref's
- * typed error (if it declares an `error` schema), a transport-level
- * `WebSocketClientError`, or a `SchemaError` from encoding args or decoding
- * returns.
- */
-export type Error<Ref_ extends Ref.Any> =
-  | Ref.Error<Ref_>
-  | WebSocketClientError
-  | Schema.SchemaError;

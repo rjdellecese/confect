@@ -8,10 +8,15 @@ import type * as PaginatedQuery from "./PaginatedQuery";
 import * as WebSocketClient from "./WebSocketClient";
 
 /**
- * Everything a reactive query subscription against `Query` can fail with.
+ * Everything a reactive query subscription against `Query` can fail with: the
+ * ref's typed error (if it declares an `error` schema), a transport-level
+ * `WebSocketClientError`, or a `SchemaError` from encoding args or decoding
+ * returns.
  */
 export type Error<Query extends Ref.AnyPublicQuery> =
-  WebSocketClient.Error<Query>;
+  | Ref.Error<Query>
+  | WebSocketClient.WebSocketClientError
+  | Schema.SchemaError;
 
 /**
  * The dependency record of a `reactiveQuery` entry. `None` means the

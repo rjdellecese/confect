@@ -87,7 +87,9 @@ describe("make", () => {
         RuntimeAndFunctionType.ConvexQuery,
         "internal",
         typeof FnArgs.Type,
-        typeof FnReturns.Type
+        typeof FnReturns.Type,
+        never,
+        typeof FnArgs
       >
     >();
 
@@ -126,7 +128,9 @@ describe("make", () => {
         RuntimeAndFunctionType.ConvexQuery,
         "internal",
         typeof FnArgs.Type,
-        typeof FnReturns.Type
+        typeof FnReturns.Type,
+        never,
+        typeof FnArgs
       >
     >();
 
@@ -162,7 +166,9 @@ describe("make", () => {
         RuntimeAndFunctionType.ConvexQuery,
         "public",
         typeof FnArgs.Type,
-        typeof FnReturns.Type
+        typeof FnReturns.Type,
+        never,
+        typeof FnArgs
       >
     >();
 
@@ -290,7 +296,9 @@ describe("make", () => {
         RuntimeAndFunctionType.ConvexQuery,
         "public",
         ConfectQueryArgs,
-        ConfectQueryReturns
+        ConfectQueryReturns,
+        never,
+        typeof ConfectQueryArgs
       >
     >();
 

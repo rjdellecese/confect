@@ -65,6 +65,7 @@ export interface ConfectRef<
   Args_,
   Returns_,
   Error_ = never,
+  ArgsSchema_ extends Schema.Codec<any, any> = Schema.Codec<any, any>,
 > extends Base<
   RuntimeAndFunctionType_,
   FunctionVisibility_,
@@ -73,6 +74,7 @@ export interface ConfectRef<
   Error_
 > {
   readonly _tag: "Confect";
+  readonly "~ArgsSchema": ArgsSchema_;
   readonly args: Schema.Codec<any, any>;
   readonly returns: Schema.Codec<any, any>;
   readonly kind: FunctionProvenance.ConfectKind;
@@ -186,6 +188,16 @@ export type Args<Ref_> = Ref_ extends { readonly "~Args": infer Args_ }
   ? Args_
   : never;
 
+/**
+ * The args schema of a Confect-provenance ref, as declared in its
+ * `FunctionSpec`. `never` for Convex-provenance refs, which carry no schema.
+ */
+export type ArgsSchema<Ref_> = Ref_ extends {
+  readonly "~ArgsSchema": infer ArgsSchema_ extends Schema.Codec<any, any>;
+}
+  ? ArgsSchema_
+  : never;
+
 export type OptionalArgs<Ref_ extends Any> = keyof Args<Ref_> extends never
   ? [args?: Args<Ref_>]
   : [args: Args<Ref_>];
@@ -212,7 +224,11 @@ export type FromFunctionSpec<
   FunctionSpec.GetFunctionVisibility<FunctionSpec_>,
   FunctionSpec.Args<FunctionSpec_>,
   FunctionSpec.Returns<FunctionSpec_>,
-  FunctionSpec.Error<FunctionSpec_> | MiddlewareError
+  FunctionSpec.Error<FunctionSpec_> | MiddlewareError,
+  FunctionSpec.ArgsSchema<FunctionSpec_> extends infer ArgsSchema_ extends
+    Schema.Codec<any, any>
+    ? ArgsSchema_
+    : Schema.Codec<any, any>
 >;
 
 type FromFunctionSpecHelper<
@@ -222,6 +238,7 @@ type FromFunctionSpecHelper<
   Args_,
   Returns_,
   Error_,
+  ArgsSchema_ extends Schema.Codec<any, any>,
 > =
   FunctionSpec_ extends FunctionSpec.WithFunctionProvenance<
     FunctionSpec_,
@@ -243,7 +260,8 @@ type FromFunctionSpecHelper<
           FunctionVisibility_,
           Args_,
           Returns_,
-          Error_
+          Error_,
+          ArgsSchema_
         >
       : Ref<
           RuntimeAndFunctionType_,
