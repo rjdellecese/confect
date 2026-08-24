@@ -240,17 +240,17 @@ const makeDefinition = <
   } as never) as never;
 
 /**
- * The overload set of a Command definition factory bound to `Bound`: a keyed
+ * The overload set of a Command definition factory bound to `BoundRef`: a keyed
  * interrupt yields a `KeyedInterruptibleDefinition`, `interrupt: true` an
  * `InterruptibleDefinition`, and no `interrupt` a plain `Definition`. Every
  * call declares `messages` — the schemas of the Messages the Command can
  * produce, as in Foldkit's own `Command.define` — and the handlers' Messages
  * must be instances of them.
  */
-interface Factory<Bound extends Ref.AnyConfect> {
+interface Factory<BoundRef extends Ref.AnyConfect> {
   <
     const Name extends string,
-    Ref_ extends Bound,
+    Ref_ extends BoundRef,
     const Messages extends ReadonlyArray<Schema.Top>,
     SuccessMessage extends Schema.Schema.Type<Messages[number]>,
     ErrorMessage extends Schema.Schema.Type<Messages[number]>,
@@ -270,7 +270,7 @@ interface Factory<Bound extends Ref.AnyConfect> {
   >;
   <
     const Name extends string,
-    Ref_ extends Bound,
+    Ref_ extends BoundRef,
     const Messages extends ReadonlyArray<Schema.Top>,
     SuccessMessage extends Schema.Schema.Type<Messages[number]>,
     ErrorMessage extends Schema.Schema.Type<Messages[number]>,
@@ -284,7 +284,7 @@ interface Factory<Bound extends Ref.AnyConfect> {
   ): InterruptibleDefinition<Name, Ref_, SuccessMessage | ErrorMessage>;
   <
     const Name extends string,
-    Ref_ extends Bound,
+    Ref_ extends BoundRef,
     const Messages extends ReadonlyArray<Schema.Top>,
     SuccessMessage extends Schema.Schema.Type<Messages[number]>,
     ErrorMessage extends Schema.Schema.Type<Messages[number]>,
@@ -298,20 +298,20 @@ interface Factory<Bound extends Ref.AnyConfect> {
   ): Definition<Name, Ref_, SuccessMessage | ErrorMessage>;
 }
 
-const makeFactory = <Bound extends Ref.AnyConfect>(
+const makeFactory = <BoundRef extends Ref.AnyConfect>(
   effectHelper: (
-    ref: Bound,
-    handlers: Handlers<Bound, unknown, unknown>,
+    ref: BoundRef,
+    handlers: Handlers<BoundRef, unknown, unknown>,
   ) => (
-    ...args: Ref.OptionalArgs<Bound>
+    ...args: Ref.OptionalArgs<BoundRef>
   ) => Effect.Effect<unknown, never, WebSocketClient.WebSocketClient>,
-): Factory<Bound> =>
+): Factory<BoundRef> =>
   ((
     name: string,
-    ref: Bound,
-    config: Handlers<Bound, unknown, unknown> & {
+    ref: BoundRef,
+    config: Handlers<BoundRef, unknown, unknown> & {
       readonly messages: ReadonlyArray<Schema.Top>;
-      readonly interrupt?: InterruptOption<Bound>;
+      readonly interrupt?: InterruptOption<BoundRef>;
     },
   ) =>
     makeDefinition(
@@ -320,7 +320,7 @@ const makeFactory = <Bound extends Ref.AnyConfect>(
       config.messages,
       effectHelper(ref, config),
       config.interrupt,
-    )) as Factory<Bound>;
+    )) as Factory<BoundRef>;
 
 /**
  * A Foldkit Command definition for a Confect query whose Command args are the
