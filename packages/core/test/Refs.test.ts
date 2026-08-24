@@ -89,7 +89,9 @@ describe("make", () => {
         typeof FnArgs.Type,
         typeof FnReturns.Type,
         never,
-        typeof FnArgs
+        typeof FnArgs,
+        typeof FnReturns,
+        never
       >
     >();
 
@@ -130,7 +132,9 @@ describe("make", () => {
         typeof FnArgs.Type,
         typeof FnReturns.Type,
         never,
-        typeof FnArgs
+        typeof FnArgs,
+        typeof FnReturns,
+        never
       >
     >();
 
@@ -168,7 +172,9 @@ describe("make", () => {
         typeof FnArgs.Type,
         typeof FnReturns.Type,
         never,
-        typeof FnArgs
+        typeof FnArgs,
+        typeof FnReturns,
+        never
       >
     >();
 
@@ -298,7 +304,9 @@ describe("make", () => {
         ConfectQueryArgs,
         ConfectQueryReturns,
         never,
-        typeof ConfectQueryArgs
+        typeof ConfectQueryArgs,
+        typeof ConfectQueryReturns,
+        never
       >
     >();
 

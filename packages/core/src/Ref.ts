@@ -66,6 +66,8 @@ export interface ConfectRef<
   Returns_,
   Error_ = never,
   ArgsSchema_ extends Schema.Codec<any, any> = Schema.Codec<any, any>,
+  ReturnsSchema_ extends Schema.Codec<any, any> = Schema.Codec<any, any>,
+  ErrorSchema_ extends Schema.Codec<any, any> = Schema.Codec<any, any>,
 > extends Base<
   RuntimeAndFunctionType_,
   FunctionVisibility_,
@@ -74,12 +76,11 @@ export interface ConfectRef<
   Error_
 > {
   readonly _tag: "Confect";
-  readonly "~ArgsSchema": ArgsSchema_;
-  readonly args: Schema.Codec<any, any>;
-  readonly returns: Schema.Codec<any, any>;
+  readonly args: ArgsSchema_;
+  readonly returns: ReturnsSchema_;
   readonly kind: FunctionProvenance.ConfectKind;
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyMiddlewareSpec>;
-  readonly error?: Schema.Codec<any, any>;
+  readonly error?: ErrorSchema_;
 }
 
 export interface ConvexRef<
@@ -193,7 +194,8 @@ export type Args<Ref_> = Ref_ extends { readonly "~Args": infer Args_ }
  * `FunctionSpec`. `never` for Convex-provenance refs, which carry no schema.
  */
 export type ArgsSchema<Ref_> = Ref_ extends {
-  readonly "~ArgsSchema": infer ArgsSchema_ extends Schema.Codec<any, any>;
+  readonly _tag: "Confect";
+  readonly args: infer ArgsSchema_ extends Schema.Codec<any, any>;
 }
   ? ArgsSchema_
   : never;
@@ -228,6 +230,14 @@ export type FromFunctionSpec<
   FunctionSpec.ArgsSchema<FunctionSpec_> extends infer ArgsSchema_ extends
     Schema.Codec<any, any>
     ? ArgsSchema_
+    : Schema.Codec<any, any>,
+  FunctionSpec.ReturnsSchema<FunctionSpec_> extends infer ReturnsSchema_ extends
+    Schema.Codec<any, any>
+    ? ReturnsSchema_
+    : Schema.Codec<any, any>,
+  FunctionSpec.ErrorSchema<FunctionSpec_> extends infer ErrorSchema_ extends
+    Schema.Codec<any, any>
+    ? ErrorSchema_
     : Schema.Codec<any, any>
 >;
 
@@ -239,6 +249,8 @@ type FromFunctionSpecHelper<
   Returns_,
   Error_,
   ArgsSchema_ extends Schema.Codec<any, any>,
+  ReturnsSchema_ extends Schema.Codec<any, any>,
+  ErrorSchema_ extends Schema.Codec<any, any>,
 > =
   FunctionSpec_ extends FunctionSpec.WithFunctionProvenance<
     FunctionSpec_,
@@ -261,7 +273,9 @@ type FromFunctionSpecHelper<
           Args_,
           Returns_,
           Error_,
-          ArgsSchema_
+          ArgsSchema_,
+          ReturnsSchema_,
+          ErrorSchema_
         >
       : Ref<
           RuntimeAndFunctionType_,

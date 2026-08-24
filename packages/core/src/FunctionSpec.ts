@@ -159,6 +159,35 @@ export type ArgsSchema<FunctionSpec_ extends AnyWithProps> =
     ? ArgsSchema_
     : never;
 
+/**
+ * The returns schema a Confect-provenance spec declares. `never` for
+ * Convex-provenance specs, which carry no schema.
+ */
+export type ReturnsSchema<FunctionSpec_ extends AnyWithProps> =
+  FunctionSpec_ extends {
+    functionProvenance: {
+      _tag: "Confect";
+      returns: infer ReturnsSchema_ extends Schema.Codec<any, any>;
+    };
+  }
+    ? ReturnsSchema_
+    : never;
+
+/**
+ * The error schema a Confect-provenance spec declares. `never` when the spec
+ * declares none, and for Convex-provenance specs, which carry no schema.
+ */
+export type ErrorSchema<FunctionSpec_ extends AnyWithProps> =
+  FunctionSpec_ extends {
+    functionProvenance: FunctionProvenance.Confect<
+      any,
+      any,
+      infer ErrorSchema_ extends Schema.Codec<any, any>
+    >;
+  }
+    ? ErrorSchema_
+    : never;
+
 export type Returns<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
     functionProvenance: {
