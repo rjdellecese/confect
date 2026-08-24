@@ -1,5 +1,6 @@
 import * as Ref from "@confect/core/Ref";
 import * as Effect from "effect/Effect";
+import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
@@ -201,30 +202,30 @@ export const reactiveQuery = <
  * `FunctionSpec.publicPaginatedQuery`.
  */
 export const paginatedQuery = <
-  Query extends Ref.AnyConfectPublicPaginatedQuery,
+  PaginatedQueryRef extends Ref.AnyConfectPublicPaginatedQuery,
   Model,
   ResultMessage,
   ErrorMessage,
 >(
-  ref: Query,
+  ref: PaginatedQueryRef,
   config: {
     readonly state: (
       model: Model,
     ) => Option.Option<
       PaginatedQuery.State<
-        PaginatedQuery.Item<Query>,
-        PaginatedQuery.UserArgs<Query>
+        PaginatedQuery.Item<PaginatedQueryRef>,
+        PaginatedQuery.UserArgs<PaginatedQueryRef>
       >
     >;
     readonly onResult: (
-      result: PaginatedQuery.PageResult<PaginatedQuery.Item<Query>>,
+      result: PaginatedQuery.PageResult<PaginatedQuery.Item<PaginatedQueryRef>>,
     ) => ResultMessage;
-    readonly onError: (error: Error<Query>) => ErrorMessage;
+    readonly onError: (error: Error<PaginatedQueryRef>) => ErrorMessage;
   },
 ): FoldkitSubscription.EntryWithoutKeepAlive<
   Model,
   ResultMessage | ErrorMessage,
-  Dependencies<Query>,
+  Dependencies<PaginatedQueryRef>,
   WebSocketClient.WebSocketClient
 > => {
   const composedArgsSchema = paginatedArgsSchemaOrThrow(ref);
@@ -247,7 +248,7 @@ export const paginatedQuery = <
                   onSome: (endCursor) => ({ endCursor }),
                 }),
               },
-            } as Ref.Args<Query>),
+            } as Ref.Args<PaginatedQueryRef>),
       ),
     }),
     dependenciesToStream: ({ args }) =>
@@ -267,7 +268,7 @@ export const paginatedQuery = <
                 ...(returns as Ref.Returns<Ref.AnyPublicPaginatedQuery>),
               }),
             onError: config.onError,
-          })(...([composedArgs] as Ref.OptionalArgs<Query>));
+          })(...([composedArgs] as Ref.OptionalArgs<PaginatedQueryRef>));
         },
       }),
   };
