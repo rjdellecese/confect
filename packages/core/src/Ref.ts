@@ -65,7 +65,7 @@ export interface ConfectRef<
   Args_,
   Returns_,
   Error_ = never,
-  ArgsSchema_ extends Schema.Codec<any, any> = Schema.Codec<any, any>,
+  ArgsSchema_ extends FunctionProvenance.AnyArgs = FunctionProvenance.AnyArgs,
   ReturnsSchema_ extends Schema.Codec<any, any> = Schema.Codec<any, any>,
   ErrorSchema_ extends Schema.Codec<any, any> = Schema.Codec<any, any>,
 > extends Base<
@@ -232,7 +232,7 @@ export type Args<Ref_> = Ref_ extends { readonly "~Args": infer Args_ }
  */
 export type ArgsSchema<Ref_> = Ref_ extends {
   readonly _tag: "Confect";
-  readonly args: infer ArgsSchema_ extends Schema.Codec<any, any>;
+  readonly args: infer ArgsSchema_ extends FunctionProvenance.AnyArgs;
 }
   ? ArgsSchema_
   : never;
@@ -265,9 +265,9 @@ export type FromFunctionSpec<
   FunctionSpec.Returns<FunctionSpec_>,
   FunctionSpec.Error<FunctionSpec_> | MiddlewareError,
   FunctionSpec.ArgsSchema<FunctionSpec_> extends infer ArgsSchema_ extends
-    Schema.Codec<any, any>
+    FunctionProvenance.AnyArgs
     ? ArgsSchema_
-    : Schema.Codec<any, any>,
+    : FunctionProvenance.AnyArgs,
   FunctionSpec.ReturnsSchema<FunctionSpec_> extends infer ReturnsSchema_ extends
     Schema.Codec<any, any>
     ? ReturnsSchema_
@@ -285,7 +285,7 @@ type FromFunctionSpecHelper<
   Args_,
   Returns_,
   Error_,
-  ArgsSchema_ extends Schema.Codec<any, any>,
+  ArgsSchema_ extends FunctionProvenance.AnyArgs,
   ReturnsSchema_ extends Schema.Codec<any, any>,
   ErrorSchema_ extends Schema.Codec<any, any>,
 > =

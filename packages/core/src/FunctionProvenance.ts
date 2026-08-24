@@ -7,7 +7,7 @@ import * as PaginationResult from "./PaginationResult";
 
 export type FunctionProvenance = Data.TaggedEnum<{
   Confect: {
-    args: Schema.Codec<any, any>;
+    args: AnyArgs;
     returns: Schema.Codec<any, any>;
     error?: Schema.Codec<any, any>;
     kind: ConfectKind;
@@ -17,6 +17,20 @@ export type FunctionProvenance = Data.TaggedEnum<{
     "~returns": any;
   };
 }>;
+
+/**
+ * Any struct-shaped, context-free schema usable as a Confect function's args.
+ * Convex function args must be objects, and consumers read the schema's
+ * type-level `fields` (e.g. `@confect/foldkit` hands them to Foldkit's
+ * Command definition interfaces). A structural bound rather than
+ * `Schema.Struct<Schema.Struct.Fields>` because `Schema.Struct` is not
+ * covariant in its fields parameter — concrete structs do not extend
+ * `Schema.Struct<Schema.Struct.Fields>`.
+ */
+// eslint-disable-next-line import/namespace -- oxlint's namespace resolution misses type-only exports, and `Schema` is an interface/namespace
+export interface AnyArgs extends Schema.Codec<any, any> {
+  readonly fields: Schema.Struct.Fields;
+}
 
 /**
  * The declaration shape of a Confect function — orthogonal to both the
@@ -45,7 +59,7 @@ export interface Paginated<
 }
 
 export interface Confect<
-  Args extends Schema.Codec<any, any>,
+  Args extends AnyArgs,
   Returns extends Schema.Codec<any, any>,
   Error extends Schema.Codec<any, any> = never,
   Kind extends ConfectKind = ConfectKind,
@@ -58,7 +72,7 @@ export interface Confect<
 }
 
 export interface AnyConfect extends Confect<
-  Schema.Codec<any, any>,
+  AnyArgs,
   Schema.Codec<any, any>,
   Schema.Codec<any, any>
 > {}
@@ -92,7 +106,7 @@ const Standard: Standard = { _tag: "Standard" };
  * relies on `Data`'s structural `Equal`/`Hash` for provenance values.
  */
 export const Confect = <
-  Args extends Schema.Codec<any, any>,
+  Args extends AnyArgs,
   Returns extends Schema.Codec<any, any>,
   Error extends Schema.Codec<any, any> = never,
 >(
@@ -113,14 +127,10 @@ export const Confect = <
 
 /**
  * Any struct-shaped, context-free schema usable as a paginated query's user
- * args. A structural bound rather than `Schema.Struct<Schema.Struct.Fields>`
- * because `Schema.Struct` is not covariant in its fields parameter — concrete
- * structs do not extend `Schema.Struct<Schema.Struct.Fields>`.
+ * args — the same bound as {@link AnyArgs}, declared without
+ * `paginationOpts`.
  */
-// eslint-disable-next-line import/namespace -- oxlint's namespace resolution misses type-only exports, and `Schema` is an interface/namespace
-export interface AnyUserArgs extends Schema.Codec<any, any> {
-  readonly fields: Schema.Struct.Fields;
-}
+export interface AnyUserArgs extends AnyArgs {}
 
 /**
  * The composed args schema of a paginated query: the user-declared fields
@@ -136,7 +146,7 @@ export type PaginatedArgs<UserArgs extends AnyUserArgs> =
     UserArgs["fields"] & {
       paginationOpts: typeof PaginationOptions.PaginationOptions;
     }
-  > extends infer ComposedArgs extends Schema.Codec<any, any>
+  > extends infer ComposedArgs extends AnyArgs
     ? ComposedArgs
     : never;
 

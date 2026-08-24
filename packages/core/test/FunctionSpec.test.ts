@@ -54,6 +54,18 @@ describe("make", () => {
       `[Error: Expected a valid Confect function identifier, but received: "schema". "schema" is a reserved Convex file name.]`,
     );
   });
+
+  it("rejects a non-struct args schema at the type level", () => {
+    const makeSpec = () =>
+      FunctionSpec.publicQuery({
+        name: "get",
+        // @ts-expect-error — args must be struct-shaped: Convex args are objects
+        args: () => Schema.String,
+        returns: () => Schema.Null,
+      });
+
+    expect(typeof makeSpec).toBe("function");
+  });
 });
 
 // LAZINESS INVARIANT — DO NOT REGRESS.

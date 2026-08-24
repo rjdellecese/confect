@@ -153,7 +153,7 @@ export type ArgsSchema<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
     functionProvenance: {
       _tag: "Confect";
-      args: infer ArgsSchema_ extends Schema.Codec<any, any>;
+      args: infer ArgsSchema_ extends FunctionProvenance.AnyArgs;
     };
   }
     ? ArgsSchema_
@@ -334,7 +334,7 @@ const make =
   ) =>
   <
     const Name_ extends string,
-    Args_ extends Schema.Codec<any, any>,
+    Args_ extends FunctionProvenance.AnyArgs,
     Returns_ extends Schema.Codec<any, any>,
     Error_ extends Schema.Codec<any, any> = never,
   >({

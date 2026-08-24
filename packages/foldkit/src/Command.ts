@@ -32,26 +32,6 @@ export interface Handlers<
 }
 
 /**
- * The `Schema.Struct.Fields` a definition hands Foldkit's own definition
- * interfaces, which are generic in one: the fields of the ref's own `args`
- * schema when its type carries them, or a phantom field map built from the
- * decoded args type for a ref typed by one of the `Any` aliases, whose args
- * schema type is the loose default. Either way `Schema.Struct.Type` of the
- * fields is the ref's decoded args; the ergonomic call signature intersected
- * alongside is what call sites actually resolve against.
- */
-type ArgsFields<Ref_ extends Ref.AnyConfect> =
-  Ref.ArgsSchema<Ref_> extends {
-    readonly fields: infer Fields extends Schema.Struct.Fields;
-  }
-    ? Fields
-    : {
-        readonly [K in keyof Ref.Args<Ref_>]-?: Schema.Schema<
-          Ref.Args<Ref_>[K]
-        >;
-      };
-
-/**
  * The Command instance a definition call constructs.
  */
 type Instance<
@@ -80,7 +60,7 @@ export type Definition<
 > = ((...args: Ref.OptionalArgs<Ref_>) => Instance<Name, Ref_, Message>) &
   FoldkitCommand.CommandDefinitionWithArgs<
     Name,
-    ArgsFields<Ref_>,
+    Ref.ArgsSchema<Ref_>["fields"],
     Effect.Effect<Message, never, WebSocketClient.WebSocketClient>
   >;
 
@@ -125,7 +105,7 @@ export type InterruptibleDefinition<
 ) => Instance<Name, Ref_, Message> & Readonly<{ key: string }>) &
   FoldkitCommand.Interruptible.DefinitionWithArgsNameKeyed<
     Name,
-    ArgsFields<Ref_>,
+    Ref.ArgsSchema<Ref_>["fields"],
     Effect.Effect<Message, never, WebSocketClient.WebSocketClient>
   >;
 
@@ -145,7 +125,7 @@ export type KeyedInterruptibleDefinition<
 ) => Instance<Name, Ref_, Message> & Readonly<{ key: string }>) &
   FoldkitCommand.Interruptible.DefinitionWithArgs<
     Name,
-    ArgsFields<Ref_>,
+    Ref.ArgsSchema<Ref_>["fields"],
     Pick<Ref.Args<Ref_>, KeyField>,
     Effect.Effect<Message, never, WebSocketClient.WebSocketClient>
   >;
