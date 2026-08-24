@@ -29,12 +29,13 @@ export interface Handlers<Ref_ extends Ref.Any, SuccessMessage, ErrorMessage> {
 
 /**
  * The `Schema.Struct.Fields` a definition hands Foldkit's own definition
- * interfaces, which are generic in one: the fields of the ref's args schema
- * (`Ref.ArgsSchema`) when the ref carries them, or a phantom field map built
- * from the decoded args type for refs that don't (Convex provenance). Either
- * way `Schema.Struct.Type` of the fields is the ref's decoded args; the
- * ergonomic call signature intersected alongside is what call sites actually
- * resolve against.
+ * interfaces, which are generic in one: the fields of the ref's own `args`
+ * schema when its type carries them, or a phantom field map built from the
+ * decoded args type when it doesn't — Convex provenance, or a ref typed by
+ * one of the `Any` aliases, whose args schema type is the loose default.
+ * Either way `Schema.Struct.Type` of the fields is the ref's decoded args;
+ * the ergonomic call signature intersected alongside is what call sites
+ * actually resolve against.
  */
 type ArgsFields<Ref_ extends Ref.Any> =
   Ref.ArgsSchema<Ref_> extends {

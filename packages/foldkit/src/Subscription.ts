@@ -99,11 +99,13 @@ const missingConfectProvenanceError = (ref: Ref.Any) =>
       "`Subscription.reactiveQueryStream` instead.",
   );
 
-const argsSchemaOrThrow = (ref: Ref.AnyPublicQuery): Schema.Codec<any, any> => {
+const argsSchemaOrThrow = <Query extends Ref.AnyPublicQuery>(
+  ref: Query,
+): Ref.ArgsSchema<Query> => {
   if (ref._tag === "Convex") {
     throw missingConfectProvenanceError(ref);
   }
-  return ref.args;
+  return ref.args as Ref.ArgsSchema<Query>;
 };
 
 const missingPaginatedProvenanceError = (ref: Ref.Any) =>
@@ -114,13 +116,13 @@ const missingPaginatedProvenanceError = (ref: Ref.Any) =>
       "schemas that constructor stores.",
   );
 
-const paginatedArgsSchemaOrThrow = (
-  ref: Ref.AnyPublicPaginatedQuery,
-): Schema.Codec<any, any> => {
+const paginatedArgsSchemaOrThrow = <Query extends Ref.AnyPublicPaginatedQuery>(
+  ref: Query,
+): Ref.ArgsSchema<Query> => {
   if (ref._tag === "Convex" || ref.kind._tag !== "Paginated") {
     throw missingPaginatedProvenanceError(ref);
   }
-  return ref.args;
+  return ref.args as Ref.ArgsSchema<Query>;
 };
 
 /**
@@ -177,12 +179,7 @@ export const reactiveQuery = <
   return {
     dependenciesSchema: Schema.Struct({
       args: Schema.Option(argsSchema),
-    }) as unknown as FoldkitSubscription.EntryWithoutKeepAlive<
-      Model,
-      SuccessMessage | ErrorMessage,
-      Dependencies<Query>,
-      WebSocketClient.WebSocketClient
-    >["dependenciesSchema"],
+    }),
     modelToDependencies: (model) => ({
       args:
         modelToArgs === undefined
@@ -191,12 +188,7 @@ export const reactiveQuery = <
     }),
     dependenciesToStream: ({ args }) =>
       Option.match(args, {
-        onNone: () =>
-          Stream.empty as Stream.Stream<
-            SuccessMessage | ErrorMessage,
-            never,
-            WebSocketClient.WebSocketClient
-          >,
+        onNone: () => Stream.empty,
         onSome: (someArgs) =>
           reactiveQueryStream(
             ref,
@@ -263,12 +255,7 @@ export const paginatedQuery = <
   return {
     dependenciesSchema: Schema.Struct({
       args: Schema.Option(composedArgsSchema),
-    }) as unknown as FoldkitSubscription.EntryWithoutKeepAlive<
-      Model,
-      ResultMessage | ErrorMessage,
-      Dependencies<Query>,
-      WebSocketClient.WebSocketClient
-    >["dependenciesSchema"],
+    }),
     modelToDependencies: (model) => ({
       args: Option.flatMap(config.state(model), (state) =>
         state.phase._tag === "Failed"
@@ -288,21 +275,10 @@ export const paginatedQuery = <
     }),
     dependenciesToStream: ({ args }) =>
       Option.match(args, {
-        onNone: () =>
-          Stream.empty as Stream.Stream<
-            ResultMessage | ErrorMessage,
-            never,
-            WebSocketClient.WebSocketClient
-          >,
+        onNone: () => Stream.empty,
         onSome: (composedArgs) => {
-          const paginationOpts = (
-            composedArgs as {
-              readonly paginationOpts: {
-                readonly cursor: string | null;
-                readonly endCursor?: string | null;
-              };
-            }
-          ).paginationOpts;
+          const { paginationOpts } =
+            composedArgs as Ref.Args<Ref.AnyPublicPaginatedQuery>;
           const descriptor: PaginatedQuery.PageDescriptor = {
             cursor: paginationOpts.cursor,
             endCursor: Option.fromNullishOr(paginationOpts.endCursor),
@@ -311,7 +287,7 @@ export const paginatedQuery = <
             onSuccess: (returns) =>
               config.onResult({
                 descriptor,
-                ...(returns as Ref.Returns<Query>),
+                ...(returns as Ref.Returns<Ref.AnyPublicPaginatedQuery>),
               }),
             onError: config.onError,
           })(...([composedArgs] as Ref.OptionalArgs<Query>));
