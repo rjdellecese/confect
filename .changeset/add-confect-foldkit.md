@@ -42,8 +42,8 @@ const subscriptions = FoldkitSubscription.make<
   Message,
   WebSocketClient.WebSocketClient
 >()(() => ({
-  notesPage: Subscription.paginatedQuery(refs.public.notes.paginate, {
-    state: (model: Model) => model.notes,
+  notesPage: Subscription.paginatedQuery<Model>()(refs.public.notes.paginate, {
+    state: (model) => model.notes,
     onResult: (result) => SettledNotesPage({ result }),
     onError: (error) => FailedNotesPage({ error }),
   }),

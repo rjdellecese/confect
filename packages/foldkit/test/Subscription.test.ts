@@ -288,8 +288,8 @@ const SettledNotesPage = m("SettledNotesPage", { result: Schema.Unknown });
 const FailedNotesPage = m("FailedNotesPage", { error: Schema.Unknown });
 
 const makePaginatedEntry = () =>
-  Subscription.paginatedQuery(paginateRef, {
-    state: (model: PaginatedModel) => model.notes,
+  Subscription.paginatedQuery<PaginatedModel>()(paginateRef, {
+    state: (model) => model.notes,
     onResult: (result) => SettledNotesPage({ result }),
     onError: (error) => FailedNotesPage({ error }),
   });
@@ -510,10 +510,10 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
   describe("construction", () => {
     it("rejects refs without paginated provenance", () => {
       expect(() =>
-        Subscription.paginatedQuery(
+        Subscription.paginatedQuery<PaginatedModel>()(
           getQueryRef as unknown as Ref.AnyConfectPublicPaginatedQuery,
           {
-            state: (model: PaginatedModel) => model.notes,
+            state: (model) => model.notes,
             onResult: (result) => SettledNotesPage({ result }),
             onError: (error) => FailedNotesPage({ error }),
           },

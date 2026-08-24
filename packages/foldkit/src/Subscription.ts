@@ -183,14 +183,18 @@ export const reactiveQuery =
  * split-pinning change the derived args, which restarts the subscription;
  * a `Failed` machine (or a `None` from `state`) closes it.
  *
+ * The leading thunk fixes the `Model` type (TypeScript cannot partially
+ * infer type arguments), so the `state` extractor's parameter is already
+ * typed:
+ *
  * ```ts
  * const subscriptions = FoldkitSubscription.make<
  *   Model,
  *   Message,
  *   WebSocketClient.WebSocketClient
  * >()(() => ({
- *   notesPage: Subscription.paginatedQuery(refs.public.notes.paginate, {
- *     state: (model: Model) => model.notes,
+ *   notesPage: Subscription.paginatedQuery<Model>()(refs.public.notes.paginate, {
+ *     state: (model) => model.notes,
  *     onResult: (result) => SettledNotesPage({ result }),
  *     onError: (error) => FailedNotesPage({ message: String(error) }),
  *   }),
@@ -201,79 +205,84 @@ export const reactiveQuery =
  * `PaginatedQuery.settle` in `update`. Requires a ref built with
  * `FunctionSpec.publicPaginatedQuery`.
  */
-export const paginatedQuery = <
-  PaginatedQueryRef extends Ref.AnyConfectPublicPaginatedQuery,
-  Model,
-  ResultMessage,
-  ErrorMessage,
->(
-  ref: PaginatedQueryRef,
-  config: {
-    readonly state: (
-      model: Model,
-    ) => Option.Option<
-      PaginatedQuery.State<
-        PaginatedQuery.Item<PaginatedQueryRef>,
-        PaginatedQuery.UserArgs<PaginatedQueryRef>
-      >
-    >;
-    readonly onResult: (
-      result: PaginatedQuery.PageResult<PaginatedQuery.Item<PaginatedQueryRef>>,
-    ) => ResultMessage;
-    readonly onError: (error: Error<PaginatedQueryRef>) => ErrorMessage;
-  },
-): FoldkitSubscription.EntryWithoutKeepAlive<
-  Model,
-  ResultMessage | ErrorMessage,
-  Dependencies<PaginatedQueryRef>,
-  WebSocketClient.WebSocketClient
-> => {
-  const composedArgsSchema = paginatedArgsSchemaOrThrow(ref);
+export const paginatedQuery =
+  <Model>() =>
+  <
+    PaginatedQueryRef extends Ref.AnyConfectPublicPaginatedQuery,
+    ResultMessage,
+    ErrorMessage,
+  >(
+    ref: PaginatedQueryRef,
+    config: {
+      readonly state: (
+        model: Model,
+      ) => Option.Option<
+        PaginatedQuery.State<
+          PaginatedQuery.Item<PaginatedQueryRef>,
+          PaginatedQuery.UserArgs<PaginatedQueryRef>
+        >
+      >;
+      readonly onResult: (
+        result: PaginatedQuery.PageResult<
+          PaginatedQuery.Item<PaginatedQueryRef>
+        >,
+      ) => ResultMessage;
+      readonly onError: (error: Error<PaginatedQueryRef>) => ErrorMessage;
+    },
+  ): FoldkitSubscription.EntryWithoutKeepAlive<
+    Model,
+    ResultMessage | ErrorMessage,
+    Dependencies<PaginatedQueryRef>,
+    WebSocketClient.WebSocketClient
+  > => {
+    const composedArgsSchema = paginatedArgsSchemaOrThrow(ref);
 
-  return {
-    dependenciesSchema: Schema.Struct({
-      args: Schema.Option(composedArgsSchema),
-    }),
-    modelToDependencies: (model) => ({
-      args: Option.flatMap(config.state(model), (state) =>
-        Match.value(state.phase).pipe(
-          Match.tag("Failed", () => Option.none<Ref.Args<PaginatedQueryRef>>()),
-          Match.tag("Loading", "Loaded", (phase) =>
-            Option.some({
-              ...state.args,
-              paginationOpts: {
-                numItems: state.numItems,
-                cursor: phase.current.cursor,
-                ...Option.match(phase.current.endCursor, {
-                  onNone: () => ({}),
-                  onSome: (endCursor) => ({ endCursor }),
-                }),
-              },
-            } as Ref.Args<PaginatedQueryRef>),
-          ),
-          Match.exhaustive,
-        ),
-      ),
-    }),
-    dependenciesToStream: ({ args }) =>
-      Option.match(args, {
-        onNone: () => Stream.empty,
-        onSome: (composedArgs) => {
-          const { paginationOpts } =
-            composedArgs as Ref.Args<Ref.AnyPublicPaginatedQuery>;
-          const descriptor: PaginatedQuery.PageDescriptor = {
-            cursor: paginationOpts.cursor,
-            endCursor: Option.fromNullishOr(paginationOpts.endCursor),
-          };
-          return reactiveQueryStream(ref, {
-            onSuccess: (returns) =>
-              config.onResult({
-                descriptor,
-                ...(returns as Ref.Returns<Ref.AnyPublicPaginatedQuery>),
-              }),
-            onError: config.onError,
-          })(...([composedArgs] as Ref.OptionalArgs<PaginatedQueryRef>));
-        },
+    return {
+      dependenciesSchema: Schema.Struct({
+        args: Schema.Option(composedArgsSchema),
       }),
+      modelToDependencies: (model) => ({
+        args: Option.flatMap(config.state(model), (state) =>
+          Match.value(state.phase).pipe(
+            Match.tag("Failed", () =>
+              Option.none<Ref.Args<PaginatedQueryRef>>(),
+            ),
+            Match.tag("Loading", "Loaded", (phase) =>
+              Option.some({
+                ...state.args,
+                paginationOpts: {
+                  numItems: state.numItems,
+                  cursor: phase.current.cursor,
+                  ...Option.match(phase.current.endCursor, {
+                    onNone: () => ({}),
+                    onSome: (endCursor) => ({ endCursor }),
+                  }),
+                },
+              } as Ref.Args<PaginatedQueryRef>),
+            ),
+            Match.exhaustive,
+          ),
+        ),
+      }),
+      dependenciesToStream: ({ args }) =>
+        Option.match(args, {
+          onNone: () => Stream.empty,
+          onSome: (composedArgs) => {
+            const { paginationOpts } =
+              composedArgs as Ref.Args<Ref.AnyPublicPaginatedQuery>;
+            const descriptor: PaginatedQuery.PageDescriptor = {
+              cursor: paginationOpts.cursor,
+              endCursor: Option.fromNullishOr(paginationOpts.endCursor),
+            };
+            return reactiveQueryStream(ref, {
+              onSuccess: (returns) =>
+                config.onResult({
+                  descriptor,
+                  ...(returns as Ref.Returns<Ref.AnyPublicPaginatedQuery>),
+                }),
+              onError: config.onError,
+            })(...([composedArgs] as Ref.OptionalArgs<PaginatedQueryRef>));
+          },
+        }),
+    };
   };
-};
