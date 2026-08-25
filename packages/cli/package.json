@@ -26,7 +26,7 @@
     "@effect/vitest": "0.30.0",
     "@types/node": "22.20.1",
     "@vitest/coverage-v8": "4.1.10",
-    "convex": "1.44.0",
+    "convex": "1.45.0",
     "effect": "3.22.1",
     "tsdown": "0.22.14",
     "typescript": "7.0.2",
