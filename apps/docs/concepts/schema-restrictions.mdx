@@ -30,6 +30,8 @@ FunctionSpec.publicQuery({
 
 Confect lazily wraps that field map in `Schema.Struct`. A full schema such as `args: () => Schema.String` or `args: () => Schema.Struct(...)` is therefore not accepted. Top-level struct checks and annotations cannot be attached directly to function args; if you need a cross-field check, nest the checked struct under an argument field.
 
+For a function with no arguments, omit `args`; Confect defaults it to an empty field map (`{}`).
+
 ## Additional caveats
 
 ### No-op returns from Convex functions
@@ -39,7 +41,6 @@ Unlike the vanilla APIs, Convex functions defined with Confect may not return `u
 ```typescript ✅
 FunctionSpec.publicQuery({
   name: "myQuery",
-  args: () => ({}),
   returns: () => Schema.Null,
 });
 ```

@@ -356,26 +356,26 @@ const Proto = {
   },
 };
 
-const make =
-  <
-    RuntimeAndFunctionType_ extends
-      RuntimeAndFunctionType.RuntimeAndFunctionType,
-    FunctionVisibility_ extends FunctionVisibility,
-  >(
-    runtimeAndFunctionType: RuntimeAndFunctionType_,
-    functionVisibility: FunctionVisibility_,
-  ) =>
-  <
+interface AnyOptions {
+  readonly name: string;
+  readonly args?: () => FunctionProvenance.ArgsFields;
+  readonly returns: () => Schema.Codec<any, any>;
+  readonly error?: () => Schema.Codec<any, any>;
+}
+
+const make = <
+  RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
+  FunctionVisibility_ extends FunctionVisibility,
+>(
+  runtimeAndFunctionType: RuntimeAndFunctionType_,
+  functionVisibility: FunctionVisibility_,
+) => {
+  function makeSpec<
     const Name_ extends string,
     const ArgsFields_ extends FunctionProvenance.ArgsFields,
     Returns_ extends Schema.Codec<any, any>,
     Error_ extends Schema.Codec<any, any> = never,
-  >({
-    name,
-    args,
-    returns,
-    error,
-  }: {
+  >(options: {
     name: Name_;
     args: () => ArgsFields_;
     returns: () => Returns_;
@@ -385,17 +385,39 @@ const make =
     FunctionVisibility_,
     Name_,
     FunctionProvenance.Confect<ArgsFields_, Returns_, Error_>
-  > => {
+  >;
+  function makeSpec<
+    const Name_ extends string,
+    Returns_ extends Schema.Codec<any, any>,
+    Error_ extends Schema.Codec<any, any> = never,
+  >(options: {
+    name: Name_;
+    args?: never;
+    returns: () => Returns_;
+    error?: () => Error_;
+  }): Builder<
+    RuntimeAndFunctionType_,
+    FunctionVisibility_,
+    Name_,
+    FunctionProvenance.Confect<{}, Returns_, Error_>
+  >;
+  function makeSpec({ name, args, returns, error }: AnyOptions) {
     validateConfectFunctionIdentifier(name);
 
     return Object.assign(Object.create(Proto), {
       runtimeAndFunctionType,
       functionVisibility,
       name,
-      functionProvenance: FunctionProvenance.Confect(args, returns, error),
+      functionProvenance:
+        args === undefined
+          ? FunctionProvenance.Confect(() => ({}), returns, error)
+          : FunctionProvenance.Confect(args, returns, error),
       middlewareSpecs: [],
     });
-  };
+  }
+
+  return makeSpec;
+};
 
 /**
  * `Schema.Struct` fields that must not declare `paginationOpts`. Used to
