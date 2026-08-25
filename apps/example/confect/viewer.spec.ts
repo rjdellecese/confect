@@ -7,14 +7,13 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicQuery({
       name: "whoAmI",
-      args: () => Schema.Struct({}),
       returns: () => Schema.String,
     }),
   )
   .addFunction(
     FunctionSpec.publicMutation({
       name: "postNote",
-      args: () => Schema.Struct({ text: Schema.String }),
+      args: () => ({ text: Schema.String }),
       returns: () => Schema.Null,
     }),
   );

@@ -1,4 +1,5 @@
 import type {
+  DefaultFunctionArgs,
   FunctionReference as ConvexFunctionReference,
   FunctionVisibility,
   PaginationOptions,
@@ -20,7 +21,7 @@ import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 export interface Base<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility_ extends FunctionVisibility,
-  Args_,
+  Args_ extends DefaultFunctionArgs,
   Returns_,
   Error_ = never,
 > {
@@ -40,13 +41,14 @@ export interface Base<
 export type Ref<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility_ extends FunctionVisibility,
-  Args_,
+  Args_ extends DefaultFunctionArgs,
   Returns_,
   Error_ = never,
 > =
-  | ConfectRef<
+  | ConfectRefWithTypes<
       RuntimeAndFunctionType_,
       FunctionVisibility_,
+      FunctionProvenance.ArgsFields,
       Args_,
       Returns_,
       Error_
@@ -59,12 +61,35 @@ export type Ref<
       Error_
     >;
 
-export interface ConfectRef<
+export type ConfectRef<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility_ extends FunctionVisibility,
-  Args_,
+  ArgsFields_ extends FunctionProvenance.ArgsFields,
+  ReturnsSchema_ extends Schema.Codec<any, any>,
+  ErrorSchema_ extends Schema.Codec<any, any> = never,
+  MiddlewareError_ = never,
+> = ConfectRefWithTypes<
+  RuntimeAndFunctionType_,
+  FunctionVisibility_,
+  ArgsFields_,
+  Schema.Struct.Type<ArgsFields_>,
+  ReturnsSchema_["Type"],
+  ErrorSchema_["Type"] | MiddlewareError_
+>;
+
+/**
+ * Internal form used while mapping a spec to a ref. Supplying the already
+ * derived value types avoids repeatedly expanding `Schema.Struct` for every
+ * leaf in a generated ref tree; the public `ConfectRef` alias still derives
+ * the same values from its fields and schemas.
+ */
+interface ConfectRefWithTypes<
+  RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
+  FunctionVisibility_ extends FunctionVisibility,
+  ArgsFields_ extends FunctionProvenance.ArgsFields,
+  Args_ extends DefaultFunctionArgs,
   Returns_,
-  Error_ = never,
+  Error_,
 > extends Base<
   RuntimeAndFunctionType_,
   FunctionVisibility_,
@@ -73,7 +98,7 @@ export interface ConfectRef<
   Error_
 > {
   readonly _tag: "Confect";
-  readonly args: Schema.Codec<any, any>;
+  readonly args: FunctionProvenance.ArgsSchema<ArgsFields_>;
   readonly returns: Schema.Codec<any, any>;
   readonly kind: FunctionProvenance.ConfectKind;
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyMiddlewareSpec>;
@@ -83,7 +108,7 @@ export interface ConfectRef<
 export interface ConvexRef<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility_ extends FunctionVisibility,
-  Args_,
+  Args_ extends DefaultFunctionArgs,
   Returns_,
   Error_ = never,
 > extends Base<
@@ -98,6 +123,9 @@ export interface ConvexRef<
 
 export type Any = Ref<any, any, any, any, any>;
 
+/** Erased Confect-provenance ref used by provenance-specific APIs. */
+export type AnyConfect = Extract<Any, { readonly _tag: "Confect" }>;
+
 export type AnyInternal = Ref<any, "internal", any, any, any>;
 
 export type AnyPublic = Ref<any, "public", any, any, any>;
@@ -110,16 +138,17 @@ export type AnyQuery = Ref<
   any
 >;
 
-export type AnyPublicPaginatedQuery = Ref<
-  RuntimeAndFunctionType.AnyQuery,
-  "public",
-  {
-    [key: string]: any;
-    paginationOpts: PaginationOptions;
-  },
-  PaginationResult<any>,
-  any
->;
+export type AnyPublicPaginatedQuery = AnyPublicQuery &
+  Base<
+    RuntimeAndFunctionType.AnyQuery,
+    "public",
+    {
+      [key: string]: any;
+      paginationOpts: PaginationOptions;
+    },
+    PaginationResult<any>,
+    any
+  >;
 
 export type AnyMutation = Ref<
   RuntimeAndFunctionType.AnyMutation,
@@ -186,6 +215,24 @@ export type Args<Ref_> = Ref_ extends { readonly "~Args": infer Args_ }
   ? Args_
   : never;
 
+/** The field map captured by a Confect-provenance ref. */
+export type ArgsFields<Ref_> = Ref_ extends {
+  readonly _tag: "Confect";
+  readonly args: {
+    readonly fields: infer ArgsFields_ extends FunctionProvenance.ArgsFields;
+  };
+}
+  ? ArgsFields_
+  : never;
+
+/** The assembled args schema carried by a Confect-provenance ref. */
+export type ArgsSchema<Ref_> = Ref_ extends {
+  readonly _tag: "Confect";
+  readonly args: infer ArgsSchema_ extends FunctionProvenance.AnyArgsSchema;
+}
+  ? ArgsSchema_
+  : never;
+
 export type OptionalArgs<Ref_ extends Any> = keyof Args<Ref_> extends never
   ? [args?: Args<Ref_>]
   : [args: Args<Ref_>];
@@ -210,6 +257,7 @@ export type FromFunctionSpec<
   FunctionSpec_,
   FunctionSpec.GetRuntimeAndFunctionType<FunctionSpec_>,
   FunctionSpec.GetFunctionVisibility<FunctionSpec_>,
+  FunctionSpec.ArgsFields<FunctionSpec_>,
   FunctionSpec.Args<FunctionSpec_>,
   FunctionSpec.Returns<FunctionSpec_>,
   FunctionSpec.Error<FunctionSpec_> | MiddlewareError
@@ -219,7 +267,8 @@ type FromFunctionSpecHelper<
   FunctionSpec_ extends FunctionSpec.AnyWithProps,
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility_ extends FunctionVisibility,
-  Args_,
+  ArgsFields_ extends FunctionProvenance.ArgsFields,
+  Args_ extends DefaultFunctionArgs,
   Returns_,
   Error_,
 > =
@@ -230,17 +279,18 @@ type FromFunctionSpecHelper<
     ? ConvexRef<
         RuntimeAndFunctionType_,
         FunctionVisibility_,
-        Args_,
+        Args_ extends DefaultFunctionArgs ? Args_ : never,
         Returns_,
-        Error_
+        never
       >
     : FunctionSpec_ extends FunctionSpec.WithFunctionProvenance<
           FunctionSpec_,
           FunctionProvenance.AnyConfect
         >
-      ? ConfectRef<
+      ? ConfectRefWithTypes<
           RuntimeAndFunctionType_,
           FunctionVisibility_,
+          ArgsFields_,
           Args_,
           Returns_,
           Error_
@@ -509,14 +559,12 @@ const missingPaginatedProvenanceError = (ref: Any) =>
       "those constructors store. Define the function as, e.g.:\n\n" +
       "  FunctionSpec.publicPaginatedQuery({\n" +
       '    name: "...",\n' +
-      "    args: () => Schema.Struct({ ... }), // optional; without paginationOpts\n" +
+      "    args: () => ({ ... }), // optional; without paginationOpts\n" +
       "    item: () => ItemSchema,\n" +
       "  })",
   );
 
-const paginatedKind = (
-  ref: ConfectRef<any, any, any, any, any>,
-): FunctionProvenance.Paginated =>
+const paginatedKind = (ref: AnyConfect): FunctionProvenance.Paginated =>
   Match.value(ref.kind).pipe(
     Match.tag("Paginated", (kind) => kind),
     Match.tag("Standard", () => {

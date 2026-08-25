@@ -261,7 +261,7 @@ layer(LeafModuleLayer)("validateSpec", (it) => {
               },
               {
                 relativePath: "groups/_leakyTable.spec.ts",
-                contents: `import { FunctionSpec, GroupSpec } from "@confect/core";\nimport * as Schema from "effect/Schema";\nimport leaky from "../_generated/tables/_leaky";\nexport default GroupSpec.make().addFunction(FunctionSpec.publicQuery({ name: "get", args: () => Schema.Struct({}), returns: () => leaky.Doc }));\n`,
+                contents: `import { FunctionSpec, GroupSpec } from "@confect/core";\nimport leaky from "../_generated/tables/_leaky";\nexport default GroupSpec.make().addFunction(FunctionSpec.publicQuery({ name: "get", returns: () => leaky.Doc }));\n`,
               },
             ],
             validateSpec(leaf),

@@ -220,7 +220,6 @@ const leaf = (
   specImportPath: `../${relativePath.slice(0, -".ts".length)}`,
 });
 
-const emptyArgs = Schema.Struct({});
 const emptyReturns = Schema.Null;
 
 layer(Layer.empty)("validateNoParentChildNameCollisions", (it) => {
@@ -231,7 +230,6 @@ layer(Layer.empty)("validateNoParentChildNameCollisions", (it) => {
       const parentGroupSpec = GroupSpec.make().addFunction(
         FunctionSpec.publicQuery({
           name: "list",
-          args: () => emptyArgs,
           returns: () => emptyReturns,
         }),
       );
@@ -252,7 +250,6 @@ layer(Layer.empty)("validateNoParentChildNameCollisions", (it) => {
         const parentGroupSpec = GroupSpec.make().addFunction(
           FunctionSpec.publicQuery({
             name: "archived",
-            args: () => emptyArgs,
             returns: () => emptyReturns,
           }),
         );
@@ -282,7 +279,6 @@ layer(Layer.empty)("validateNoParentChildNameCollisions", (it) => {
         const inner = GroupSpec.makeAt("inner").addFunction(
           FunctionSpec.publicQuery({
             name: "list",
-            args: () => emptyArgs,
             returns: () => emptyReturns,
           }),
         );
@@ -343,7 +339,6 @@ for (const { name, pathLayer, sep } of [
             const parentGroupSpec = GroupSpec.make().addFunction(
               FunctionSpec.publicQuery({
                 name: "archived",
-                args: () => emptyArgs,
                 returns: () => emptyReturns,
               }),
             );

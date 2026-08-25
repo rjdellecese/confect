@@ -75,38 +75,37 @@ type ConfectRegisteredFunction<
 
 export type ConvexRegisteredFunction<
   FunctionSpec_ extends FunctionSpec.AnyWithProps,
-> = FunctionSpec_ extends {
-  functionProvenance: {
-    _tag: "Convex";
-    "~args": infer Args_ extends DefaultFunctionArgs;
-    "~returns": infer Returns_;
-  };
-}
-  ? RuntimeAndFunctionType.GetFunctionType<
-      FunctionSpec_["runtimeAndFunctionType"]
-    > extends "query"
-    ? RegisteredQuery<
-        FunctionSpec.GetFunctionVisibility<FunctionSpec_>,
-        Args_,
-        Returns_
-      >
-    : RuntimeAndFunctionType.GetFunctionType<
-          FunctionSpec_["runtimeAndFunctionType"]
-        > extends "mutation"
-      ? RegisteredMutation<
+> = FunctionSpec_ extends FunctionSpec.AnyWithProps
+  ? FunctionSpec.GetFunctionProvenance<FunctionSpec_> extends FunctionProvenance.Convex<
+      infer Args_ extends DefaultFunctionArgs,
+      infer Returns_
+    >
+    ? RuntimeAndFunctionType.GetFunctionType<
+        FunctionSpec_["runtimeAndFunctionType"]
+      > extends "query"
+      ? RegisteredQuery<
           FunctionSpec.GetFunctionVisibility<FunctionSpec_>,
           Args_,
           Returns_
         >
       : RuntimeAndFunctionType.GetFunctionType<
             FunctionSpec_["runtimeAndFunctionType"]
-          > extends "action"
-        ? RegisteredAction<
+          > extends "mutation"
+        ? RegisteredMutation<
             FunctionSpec.GetFunctionVisibility<FunctionSpec_>,
             Args_,
             Returns_
           >
-        : never
+        : RuntimeAndFunctionType.GetFunctionType<
+              FunctionSpec_["runtimeAndFunctionType"]
+            > extends "action"
+          ? RegisteredAction<
+              FunctionSpec.GetFunctionVisibility<FunctionSpec_>,
+              Args_,
+              Returns_
+            >
+          : never
+    : never
   : never;
 
 export type RegisteredFunction<

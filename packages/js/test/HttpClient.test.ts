@@ -32,7 +32,6 @@ const noArgsQueryRef = Ref.make(
   "notes",
   FunctionSpec.publicQuery({
     name: "list",
-    args: () => Schema.Struct({}),
     returns: () => Schema.Struct({}),
   }),
 );
@@ -41,7 +40,7 @@ const argsQueryRef = Ref.make(
   "notes",
   FunctionSpec.publicQuery({
     name: "get",
-    args: () => Schema.Struct({ id: Schema.String }),
+    args: () => ({ id: Schema.String }),
     returns: () => Schema.Struct({}),
   }),
 );
@@ -50,7 +49,6 @@ const noArgsMutationRef = Ref.make(
   "tasks",
   FunctionSpec.publicMutation({
     name: "cleanup",
-    args: () => Schema.Struct({}),
     returns: () => Schema.Struct({}),
   }),
 );
@@ -59,7 +57,7 @@ const argsMutationRef = Ref.make(
   "notes",
   FunctionSpec.publicMutation({
     name: "insert",
-    args: () => Schema.Struct({ text: Schema.String }),
+    args: () => ({ text: Schema.String }),
     returns: () => Schema.Struct({}),
   }),
 );
@@ -68,7 +66,6 @@ const noArgsActionRef = Ref.make(
   "random",
   FunctionSpec.publicAction({
     name: "getNumber",
-    args: () => Schema.Struct({}),
     returns: () => Schema.Struct({}),
   }),
 );
@@ -77,7 +74,7 @@ const argsActionRef = Ref.make(
   "email",
   FunctionSpec.publicAction({
     name: "send",
-    args: () => Schema.Struct({ to: Schema.String }),
+    args: () => ({ to: Schema.String }),
     returns: () => Schema.Struct({}),
   }),
 );
@@ -154,7 +151,7 @@ const queryWithError = Ref.make(
   "notes",
   FunctionSpec.publicQuery({
     name: "getOrFail",
-    args: () => Schema.Struct({ id: Schema.String }),
+    args: () => ({ id: Schema.String }),
     returns: () => Schema.Struct({ text: Schema.String }),
     error: () => NotFound,
   }),
@@ -164,7 +161,7 @@ const mutationWithError = Ref.make(
   "notes",
   FunctionSpec.publicMutation({
     name: "deleteOrFail",
-    args: () => Schema.Struct({ id: Schema.String }),
+    args: () => ({ id: Schema.String }),
     returns: () => Schema.Null,
     error: () => NotFound,
   }),
@@ -174,7 +171,7 @@ const actionWithError = Ref.make(
   "tasks",
   FunctionSpec.publicAction({
     name: "runOrFail",
-    args: () => Schema.Struct({ id: Schema.String }),
+    args: () => ({ id: Schema.String }),
     returns: () => Schema.Null,
     error: () => NotFound,
   }),

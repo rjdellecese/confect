@@ -46,7 +46,7 @@ const queryWithError = Ref.make(
   "notes",
   FunctionSpec.publicQuery({
     name: "getOrFail",
-    args: () => Schema.Struct({ id: Schema.String }),
+    args: () => ({ id: Schema.String }),
     returns: () => Schema.Struct({ text: Schema.String }),
     error: () => NotFound,
   }),
@@ -56,7 +56,6 @@ const queryNoError = Ref.make(
   "notes",
   FunctionSpec.publicQuery({
     name: "list",
-    args: () => Schema.Struct({}),
     returns: () => Schema.Array(Schema.Struct({ text: Schema.String })),
   }),
 );
@@ -65,7 +64,7 @@ const mutationWithError = Ref.make(
   "notes",
   FunctionSpec.publicMutation({
     name: "deleteOrFail",
-    args: () => Schema.Struct({ id: Schema.String }),
+    args: () => ({ id: Schema.String }),
     returns: () => Schema.Null,
     error: () => NotFound,
   }),
@@ -75,7 +74,7 @@ const mutationNoError = Ref.make(
   "notes",
   FunctionSpec.publicMutation({
     name: "insert",
-    args: () => Schema.Struct({ text: Schema.String }),
+    args: () => ({ text: Schema.String }),
     returns: () => Schema.String,
   }),
 );
@@ -84,7 +83,7 @@ const actionWithError = Ref.make(
   "tasks",
   FunctionSpec.publicAction({
     name: "runOrFail",
-    args: () => Schema.Struct({ id: Schema.String }),
+    args: () => ({ id: Schema.String }),
     returns: () => Schema.Null,
     error: () => NotFound,
   }),
@@ -94,7 +93,6 @@ const actionNoError = Ref.make(
   "tasks",
   FunctionSpec.publicAction({
     name: "ping",
-    args: () => Schema.Struct({}),
     returns: () => Schema.String,
   }),
 );
@@ -409,7 +407,7 @@ describe("usePaginatedQuery", () => {
     "notes",
     FunctionSpec.publicPaginatedQuery({
       name: "listPaginated",
-      args: () => Schema.Struct({ count: Schema.FiniteFromString }),
+      args: () => ({ count: Schema.FiniteFromString }),
       item: () => paginatedDoc,
     }),
   );

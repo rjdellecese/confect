@@ -2,15 +2,15 @@ import { describe, expect, it } from "@effect/vitest";
 import { expectTypeOf } from "vitest";
 import * as MutableRef from "effect/MutableRef";
 import * as Schema from "effect/Schema";
-import type * as FunctionProvenance from "@confect/core/FunctionProvenance";
 import * as FunctionSpec from "@confect/core/FunctionSpec";
 import * as Ref from "@confect/core/Ref";
+
+declare const ServicefulString: Schema.Codec<string, string, "RequiredService">;
 
 describe("isFunctionSpec", () => {
   it("checks whether a value is a function spec", () => {
     const functionSpec: unknown = FunctionSpec.publicQuery({
       name: "myFunction",
-      args: () => Schema.Struct({}),
       returns: () => Schema.String,
     });
 
@@ -19,11 +19,75 @@ describe("isFunctionSpec", () => {
 });
 
 describe("make", () => {
+  it("defaults omitted args to an empty field map", () => {
+    const spec = FunctionSpec.publicQuery({
+      name: "withoutArgs",
+      returns: () => Schema.String,
+      error: () => Schema.Finite,
+    });
+
+    expectTypeOf<FunctionSpec.Args<typeof spec>>().toEqualTypeOf<{}>();
+    expectTypeOf<FunctionSpec.EncodedArgs<typeof spec>>().toEqualTypeOf<{}>();
+    expectTypeOf<FunctionSpec.ReturnsSchema<typeof spec>>().toEqualTypeOf<
+      typeof Schema.String
+    >();
+    expectTypeOf<FunctionSpec.ErrorSchema<typeof spec>>().toEqualTypeOf<
+      typeof Schema.Finite
+    >();
+    expectTypeOf<FunctionSpec.Error<typeof spec>>().toEqualTypeOf<number>();
+    expectTypeOf<
+      Ref.OptionalArgs<Ref.FromFunctionSpec<typeof spec>>
+    >().toEqualTypeOf<[args?: {}]>();
+    expect(spec.functionProvenance.args.fields).toStrictEqual({});
+  });
+
+  it("keeps erased Confect specs safely generic", () => {
+    expectTypeOf<FunctionSpec.Args<FunctionSpec.AnyConfect>>().toBeAny();
+    expectTypeOf<FunctionSpec.Returns<FunctionSpec.AnyConfect>>().toBeAny();
+    expectTypeOf<FunctionSpec.Error<FunctionSpec.AnyConfect>>().toBeAny();
+    expectTypeOf<
+      FunctionSpec.ArgsSchema<FunctionSpec.AnyConfect>
+    >().toMatchTypeOf<Schema.Codec<any, any>>();
+    expectTypeOf<
+      FunctionSpec.ReturnsSchema<FunctionSpec.AnyConfect>
+    >().toMatchTypeOf<Schema.Codec<any, any>>();
+    expectTypeOf<
+      FunctionSpec.ErrorSchema<FunctionSpec.AnyConfect>
+    >().toMatchTypeOf<Schema.Codec<any, any>>();
+  });
+
+  it("extracts no error schema when none is declared", () => {
+    const spec = FunctionSpec.publicQuery({
+      name: "withoutError",
+      returns: () => Schema.String,
+    });
+
+    expectTypeOf<FunctionSpec.ErrorSchema<typeof spec>>().toBeNever();
+    expectTypeOf<FunctionSpec.Error<typeof spec>>().toBeNever();
+  });
+
+  it("only accepts context-free struct fields as args", () => {
+    const nonStruct = FunctionSpec.publicQuery({
+      name: "nonStruct",
+      // @ts-expect-error — function args must be a struct field map
+      args: () => Schema.String,
+      returns: () => Schema.String,
+    });
+    const serviceful = FunctionSpec.publicQuery({
+      name: "serviceful",
+      // @ts-expect-error — function args must be synchronously encodable and decodable
+      args: () => ({ value: ServicefulString }),
+      returns: () => Schema.String,
+    });
+
+    void nonStruct;
+    void serviceful;
+  });
+
   it("disallows invalid JS identifiers as function names", () => {
     expect(() =>
       FunctionSpec.publicQuery({
         name: "123",
-        args: () => Schema.Struct({}),
         returns: () => Schema.String,
       }),
     ).toThrowErrorMatchingInlineSnapshot(
@@ -35,7 +99,6 @@ describe("make", () => {
     expect(() =>
       FunctionSpec.publicQuery({
         name: "if",
-        args: () => Schema.Struct({}),
         returns: () => Schema.String,
       }),
     ).toThrowErrorMatchingInlineSnapshot(
@@ -47,7 +110,6 @@ describe("make", () => {
     expect(() =>
       FunctionSpec.publicQuery({
         name: "schema",
-        args: () => Schema.Struct({}),
         returns: () => Schema.String,
       }),
     ).toThrowErrorMatchingInlineSnapshot(
@@ -58,10 +120,11 @@ describe("make", () => {
 
 // LAZINESS INVARIANT — DO NOT REGRESS.
 //
-// `args`/`returns`/`error` are passed as `() => Schema` thunks and exposed as
-// lazy memoised getters so that importing the assembled `_generated/spec.ts`
-// (which transitively references every function in the project) does not build
-// any schemas at module load. The cold-start win depends on two rules:
+// `args` fields and `returns`/`error` schemas are passed as thunks and exposed
+// as lazy memoised schema getters so that importing the assembled
+// `_generated/spec.ts` (which transitively references every function in the
+// project) does not build any schemas at module load. The cold-start win
+// depends on two rules:
 //
 //   1. Constructing a `FunctionSpec` must NOT evaluate any schema thunk.
 //   2. Code that only needs to know WHETHER an `error` schema exists must use a
@@ -81,7 +144,7 @@ describe("laziness invariant", () => {
       name: "tracked",
       args: () => {
         track.args?.();
-        return Schema.Struct({});
+        return { tracked: Schema.Boolean };
       },
       returns: () => {
         track.returns?.();
@@ -151,7 +214,6 @@ describe("laziness invariant", () => {
   it("a spec without an error schema reports no error without defining the key", () => {
     const spec = FunctionSpec.publicQuery({
       name: "noError",
-      args: () => Schema.Struct({}),
       returns: () => Schema.Null,
     });
     const ref = Ref.make("ns", spec);
@@ -187,7 +249,7 @@ describe("paginated queries", () => {
         name: "tracked",
         args: () => {
           track.args?.();
-          return Schema.Struct({});
+          return { tracked: Schema.Boolean };
         },
         item: () => {
           track.item?.();
@@ -231,7 +293,6 @@ describe("paginated queries", () => {
     it("a standard spec's kind is Standard", () => {
       const spec = FunctionSpec.publicQuery({
         name: "list",
-        args: () => Schema.Struct({}),
         returns: () => Schema.Null,
       });
 
@@ -267,12 +328,11 @@ describe("paginated queries", () => {
     it("composes `paginationOpts` into the args schema", () => {
       const spec = FunctionSpec.publicPaginatedQuery({
         name: "listPaginated",
-        args: () => Schema.Struct({ author: Schema.String }),
+        args: () => ({ author: Schema.String }),
         item: () => item,
       });
 
-      const args = spec.functionProvenance
-        .args as unknown as FunctionProvenance.AnyUserArgs;
+      const args = spec.functionProvenance.args;
       expect(Object.keys(args.fields)).toEqual(["author", "paginationOpts"]);
     });
 
@@ -282,8 +342,7 @@ describe("paginated queries", () => {
         item: () => item,
       });
 
-      const args = spec.functionProvenance
-        .args as unknown as FunctionProvenance.AnyUserArgs;
+      const args = spec.functionProvenance.args;
       expect(Object.keys(args.fields)).toEqual(["paginationOpts"]);
     });
 
@@ -293,8 +352,7 @@ describe("paginated queries", () => {
         item: () => item,
       });
 
-      const returns = spec.functionProvenance
-        .returns as unknown as FunctionProvenance.AnyUserArgs;
+      const returns = spec.functionProvenance.returns;
       expect(Object.keys(returns.fields)).toEqual([
         "page",
         "isDone",
@@ -308,10 +366,9 @@ describe("paginated queries", () => {
       const spec = FunctionSpec.publicPaginatedQuery({
         name: "listPaginated",
         // @ts-expect-error — paginationOpts must not be declared in user args
-        args: () =>
-          Schema.Struct({
-            paginationOpts: Schema.Struct({ numItems: Schema.Finite }),
-          }),
+        args: () => ({
+          paginationOpts: Schema.Struct({ numItems: Schema.Finite }),
+        }),
         item: () => item,
       });
 
@@ -327,7 +384,7 @@ describe("paginated queries", () => {
     it("derives Args/Returns/Error from the composed schemas", () => {
       const _spec = FunctionSpec.publicPaginatedQuery({
         name: "listPaginated",
-        args: () => Schema.Struct({ author: Schema.String }),
+        args: () => ({ author: Schema.String }),
         item: () => item,
         error: () => Schema.String,
       });
@@ -337,6 +394,9 @@ describe("paginated queries", () => {
         FunctionSpec.Args<Spec>["paginationOpts"]["numItems"]
       >().toEqualTypeOf<number>();
       expectTypeOf<FunctionSpec.Args<Spec>["author"]>().toEqualTypeOf<string>();
+      expectTypeOf<
+        FunctionSpec.ArgsSchema<Spec>["fields"]["author"]
+      >().toEqualTypeOf<typeof Schema.String>();
       expectTypeOf<FunctionSpec.Returns<Spec>["page"][number]>().toEqualTypeOf<{
         readonly value: number;
       }>();

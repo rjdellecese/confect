@@ -12,21 +12,20 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicMutation({
       name: "insert",
-      args: () => Schema.Struct({ text: Schema.String }),
+      args: () => ({ text: Schema.String }),
       returns: () => Id("notes"),
     }),
   )
   .addFunction(
     FunctionSpec.publicQuery({
       name: "list",
-      args: () => Schema.Struct({}),
       returns: () => Schema.Array(notes.Doc),
     }),
   )
   .addFunction(
     FunctionSpec.publicMutation({
       name: "delete_",
-      args: () => Schema.Struct({ noteId: Id("notes") }),
+      args: () => ({ noteId: Id("notes") }),
       returns: () => Schema.Null,
     }),
   )
@@ -39,7 +38,7 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicQuery({
       name: "getOrFail",
-      args: () => Schema.Struct({ noteId: Id("notes") }),
+      args: () => ({ noteId: Id("notes") }),
       returns: () => notes.Doc,
       error: () => NoteNotFound,
     }),
@@ -47,28 +46,25 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicQuery({
       name: "getFirst",
-      args: () => Schema.Struct({}),
       returns: () => Schema.OptionFromNullOr(notes.Doc),
     }),
   )
   .addFunction(
     FunctionSpec.internalQuery({
       name: "internalGetFirst",
-      args: () => Schema.Struct({}),
       returns: () => Schema.OptionFromNullOr(notes.Doc),
     }),
   )
   .addFunction(
     FunctionSpec.internalMutation({
       name: "clearAll",
-      args: () => Schema.Struct({}),
       returns: () => Schema.Null,
     }),
   )
   .addFunction(
     FunctionSpec.internalMutation({
       name: "insertDefault",
-      args: () => Schema.Struct({ text: Schema.String }),
+      args: () => ({ text: Schema.String }),
       returns: () => Schema.Null,
     }),
   );
