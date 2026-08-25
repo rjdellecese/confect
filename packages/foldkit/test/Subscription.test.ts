@@ -4,6 +4,7 @@ import type { RegisteredQuery } from "convex/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import { m } from "foldkit/message";
@@ -273,54 +274,71 @@ const paginateRef = Ref.make(
   }),
 );
 
-const NotesMachine = PaginatedQuery.make(paginateRef);
+const NotesMachine = PaginatedQuery.make(paginateRef, Schema.String);
 
 interface PaginatedModel {
-  readonly notes: Option.Option<
-    PaginatedQuery.State<
-      { readonly text: string },
-      { readonly channel: string }
-    >
-  >;
+  readonly notes: Option.Option<typeof NotesMachine.schema.Type>;
 }
 
-const SucceededGetNotesPage = m("SucceededGetNotesPage", {
-  result: Schema.Unknown,
+const SettledGetNotesPage = m("SettledGetNotesPage", {
+  settlement: NotesMachine.settlement,
 });
-const FailedGetNotesPage = m("FailedGetNotesPage", { error: Schema.Unknown });
 
 const makePaginatedEntry = () =>
-  Subscription.paginatedQuery<PaginatedModel>()(paginateRef, {
+  Subscription.paginatedQuery<PaginatedModel>()(NotesMachine, {
     state: (model) => model.notes,
-    onResult: (result) => SucceededGetNotesPage({ result }),
-    onError: (error) => FailedGetNotesPage({ error }),
+    mapError: String,
+    onSettled: (settlement) => SettledGetNotesPage({ settlement }),
   });
 
 const initialMachine = () =>
-  NotesMachine.init({ channel: "general" }, { numItems: 2 });
+  NotesMachine.init(
+    { channel: "general" },
+    {
+      initialNumItems: 2,
+      maximumRowsRead: 100,
+      maximumBytesRead: 1_000,
+    },
+  );
+
+const settlePage = (
+  state: typeof NotesMachine.schema.Type,
+  overrides: Partial<PaginatedQuery.PageResult<{ readonly text: string }>> = {},
+) =>
+  PaginatedQuery.settle(state, {
+    request: PaginatedQuery.getRequest(state),
+    result: Result.succeed({
+      page: [{ text: "a" }],
+      isDone: false,
+      continueCursor: "c1",
+      ...overrides,
+    }),
+  });
+
+const failPage = (state: typeof NotesMachine.schema.Type, error = "offline") =>
+  PaginatedQuery.settle(state, {
+    request: PaginatedQuery.getRequest(state),
+    result: Result.fail(error),
+  });
 
 layer(StubLayer)("Subscription.paginatedQuery", (it) => {
   describe("modelToDependencies", () => {
-    it("derives composed args from the machine state", () => {
+    it("derives a correlated request from the machine state", () => {
       const entry = makePaginatedEntry();
+      const state = initialMachine();
 
-      expect(
-        entry.modelToDependencies({ notes: Option.some(initialMachine()) }),
-      ).toEqual({
-        args: Option.some({
-          channel: "general",
-          paginationOpts: { numItems: 2, cursor: null },
-        }),
+      expect(entry.modelToDependencies({ notes: Option.some(state) })).toEqual({
+        request: Option.some(PaginatedQuery.getRequest(state)),
       });
       expect(entry.modelToDependencies({ notes: Option.none() })).toEqual({
-        args: Option.none(),
+        request: Option.none(),
       });
     });
 
-    it("includes endCursor only when the page is pinned", () => {
+    it("tracks a split-pinned descriptor", () => {
       const entry = makePaginatedEntry();
-      const pinned = PaginatedQuery.settle(initialMachine(), {
-        descriptor: { cursor: null, endCursor: Option.none() },
+      const before = initialMachine();
+      const pinned = settlePage(before, {
         page: [
           { text: "a" },
           { text: "b" },
@@ -336,66 +354,80 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
 
       expect(entry.modelToDependencies({ notes: Option.some(pinned) })).toEqual(
         {
-          args: Option.some({
-            channel: "general",
-            paginationOpts: { numItems: 2, cursor: null, endCursor: "s" },
-          }),
+          request: Option.some(PaginatedQuery.getRequest(pinned)),
         },
       );
     });
 
-    it("closes the subscription when the machine has failed", () => {
+    it("closes the subscription for both error-bearing states", () => {
       const entry = makePaginatedEntry();
-      const failed = PaginatedQuery.fail(initialMachine());
-
+      const cold = initialMachine();
+      const failed = failPage(cold);
       expect(entry.modelToDependencies({ notes: Option.some(failed) })).toEqual(
-        { args: Option.none() },
+        {
+          request: Option.none(),
+        },
       );
+
+      const loaded = settlePage(initialMachine());
+      const stale = failPage(loaded);
+      expect(entry.modelToDependencies({ notes: Option.some(stale) })).toEqual({
+        request: Option.none(),
+      });
     });
   });
 
   describe("dependenciesToStream", () => {
-    it.effect("subscribes with the composed args and wraps results", () =>
-      Effect.gen(function* () {
-        reactiveQueryResults = Stream.make({
-          page: [{ text: "a" }],
-          isDone: false,
-          continueCursor: "c1",
-        });
-        const entry = makePaginatedEntry();
+    it.effect(
+      "passes all pagination options and emits a successful Result",
+      () =>
+        Effect.gen(function* () {
+          reactiveQueryResults = Stream.make({
+            page: [{ text: "a" }],
+            isDone: false,
+            continueCursor: "c1",
+          });
+          const entry = makePaginatedEntry();
+          const state = initialMachine();
+          const request = PaginatedQuery.getRequest(state);
 
-        const messages = yield* Stream.runCollect(
-          entry.dependenciesToStream({
-            args: Option.some({
-              channel: "general",
-              paginationOpts: { numItems: 2, cursor: null },
+          const messages = yield* Stream.runCollect(
+            entry.dependenciesToStream({
+              request: Option.some(request),
             }),
-          }),
-        );
+          );
 
-        expect(messages).toEqual([
-          SucceededGetNotesPage({
-            result: {
-              descriptor: { cursor: null, endCursor: Option.none() },
-              page: [{ text: "a" }],
-              isDone: false,
-              continueCursor: "c1",
+          expect(messages).toEqual([
+            SettledGetNotesPage({
+              settlement: {
+                request,
+                result: Result.succeed({
+                  page: [{ text: "a" }],
+                  isDone: false,
+                  continueCursor: "c1",
+                }),
+              },
+            }),
+          ]);
+          expect(reactiveQueryCalls).toEqual([
+            {
+              name: "notes:paginate",
+              args: {
+                channel: "general",
+                paginationOpts: {
+                  numItems: 2,
+                  cursor: null,
+                  id: state.paginationId,
+                  maximumRowsRead: 100,
+                  maximumBytesRead: 1_000,
+                },
+              },
             },
-          }),
-        ]);
-        expect(reactiveQueryCalls).toEqual([
-          {
-            name: "notes:paginate",
-            args: {
-              channel: "general",
-              paginationOpts: { numItems: 2, cursor: null },
-            },
-          },
-        ]);
-      }),
+          ]);
+        }),
     );
 
-    it.effect("derives the pinned descriptor from the deps", () =>
+    it.effect("passes endCursor only for a pinned request", () =>
       Effect.gen(function* () {
         reactiveQueryResults = Stream.make({
           page: [],
@@ -403,47 +435,99 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
           continueCursor: "s",
         });
         const entry = makePaginatedEntry();
+        const state = initialMachine();
+        const request = {
+          ...PaginatedQuery.getRequest(state),
+          descriptor: {
+            cursor: null,
+            endCursor: Option.some("s"),
+          },
+        };
 
-        const messages = yield* Stream.runCollect(
+        yield* Stream.runCollect(
           entry.dependenciesToStream({
-            args: Option.some({
-              channel: "general",
-              paginationOpts: { numItems: 2, cursor: null, endCursor: "s" },
-            }),
+            request: Option.some(request),
           }),
         );
 
-        expect(messages).toEqual([
-          SucceededGetNotesPage({
-            result: {
-              descriptor: { cursor: null, endCursor: Option.some("s") },
-              page: [],
-              isDone: false,
-              continueCursor: "s",
+        expect(reactiveQueryCalls).toEqual([
+          {
+            name: "notes:paginate",
+            args: {
+              channel: "general",
+              paginationOpts: {
+                numItems: 2,
+                cursor: null,
+                endCursor: "s",
+                id: state.paginationId,
+                maximumRowsRead: 100,
+                maximumBytesRead: 1_000,
+              },
             },
-          }),
+          },
         ]);
       }),
     );
 
-    it.effect("a stream error emits one onError Message and ends", () =>
+    it.effect("omits optional read limits when they are not configured", () =>
+      Effect.gen(function* () {
+        reactiveQueryResults = Stream.make({
+          page: [],
+          isDone: true,
+          continueCursor: "",
+        });
+        const entry = makePaginatedEntry();
+        const state = NotesMachine.init(
+          { channel: "general" },
+          { initialNumItems: 2 },
+        );
+
+        yield* Stream.runCollect(
+          entry.dependenciesToStream({
+            request: Option.some(PaginatedQuery.getRequest(state)),
+          }),
+        );
+
+        expect(reactiveQueryCalls).toEqual([
+          {
+            name: "notes:paginate",
+            args: {
+              channel: "general",
+              paginationOpts: {
+                numItems: 2,
+                cursor: null,
+                id: state.paginationId,
+              },
+            },
+          },
+        ]);
+      }),
+    );
+
+    it.effect("maps an error into the same correlated settlement shape", () =>
       Effect.gen(function* () {
         const error = new WebSocketClient.WebSocketClientError({
           cause: "connection lost",
         });
         reactiveQueryResults = Stream.fail(error);
         const entry = makePaginatedEntry();
+        const state = initialMachine();
+        const request = PaginatedQuery.getRequest(state);
 
         const messages = yield* Stream.runCollect(
           entry.dependenciesToStream({
-            args: Option.some({
-              channel: "general",
-              paginationOpts: { numItems: 2, cursor: null },
-            }),
+            request: Option.some(request),
           }),
         );
 
-        expect(messages).toEqual([FailedGetNotesPage({ error })]);
+        expect(messages).toEqual([
+          SettledGetNotesPage({
+            settlement: {
+              request,
+              result: Result.fail(String(error)),
+            },
+          }),
+        ]);
       }),
     );
 
@@ -452,7 +536,7 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
         const entry = makePaginatedEntry();
 
         const messages = yield* Stream.runCollect(
-          entry.dependenciesToStream({ args: Option.none() }),
+          entry.dependenciesToStream({ request: Option.none() }),
         );
 
         expect(messages).toEqual([]);
@@ -462,71 +546,62 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
   });
 
   describe("dependency equivalence", () => {
-    it("discriminates on cursor, endCursor presence, user args, and numItems", () => {
+    it("discriminates every part of the request identity", () => {
       const entry = makePaginatedEntry();
       const equivalence = Schema.toEquivalence(entry.dependenciesSchema);
-      const deps = (
-        paginationOpts: {
-          numItems: number;
-          cursor: string | null;
-          endCursor?: string;
-        },
-        channel = "general",
-      ) => ({
-        args: Option.some({ channel, paginationOpts }),
+      const base = PaginatedQuery.getRequest(initialMachine());
+      const deps = (request: typeof base) => ({
+        request: Option.some(request),
       });
 
+      expect(equivalence(deps(base), deps(base))).toBe(true);
       expect(
         equivalence(
-          deps({ numItems: 2, cursor: "c1" }),
-          deps({ numItems: 2, cursor: "c1" }),
+          deps(base),
+          deps({ ...base, descriptor: { ...base.descriptor, cursor: "c2" } }),
         ),
-      ).toBe(true);
+      ).toBe(false);
+      expect(
+        equivalence(deps(base), deps({ ...base, args: { channel: "random" } })),
+      ).toBe(false);
       expect(
         equivalence(
-          deps({ numItems: 2, cursor: "c1" }),
-          deps({ numItems: 2, cursor: "c2" }),
+          deps(base),
+          deps({ ...base, options: { ...base.options, initialNumItems: 3 } }),
         ),
       ).toBe(false);
       expect(
         equivalence(
-          deps({ numItems: 2, cursor: "c1" }),
-          deps({ numItems: 2, cursor: "c1", endCursor: "s" }),
+          deps(base),
+          deps({ ...base, paginationId: base.paginationId + 1 }),
         ),
       ).toBe(false);
       expect(
         equivalence(
-          deps({ numItems: 2, cursor: "c1" }),
-          deps({ numItems: 2, cursor: "c1" }, "random"),
-        ),
-      ).toBe(false);
-      expect(
-        equivalence(
-          deps({ numItems: 2, cursor: "c1" }),
-          deps({ numItems: 3, cursor: "c1" }),
+          deps(base),
+          deps({ ...base, requestId: base.requestId + 1 }),
         ),
       ).toBe(false);
     });
   });
 
   describe("construction", () => {
-    it("rejects refs without paginated provenance", () => {
-      expect(() =>
-        Subscription.paginatedQuery<PaginatedModel>()(
-          getQueryRef as unknown as Ref.AnyConfectPublicPaginatedQuery,
-          {
-            state: (model) => model.notes,
-            onResult: (result) => SucceededGetNotesPage({ result }),
-            onError: (error) => FailedGetNotesPage({ error }),
-          },
-        ),
-      ).toThrow(/FunctionSpec.publicPaginatedQuery/);
+    it("requires a PaginatedQuery bundle rather than a bare ref", () => {
+      const invalid = () =>
+        // @ts-expect-error — the bundle owns the state and settlement schemas
+        Subscription.paginatedQuery<PaginatedModel>()(paginateRef, {
+          state: (model: PaginatedModel) => model.notes,
+          mapError: String,
+          onSettled: SettledGetNotesPage,
+        });
+
+      expect(typeof invalid).toBe("function");
     });
 
     it("is accepted by Foldkit's Subscription.make", () => {
       const subscriptions = FoldkitSubscription.make<
         PaginatedModel,
-        typeof SucceededGetNotesPage.Type | typeof FailedGetNotesPage.Type,
+        typeof SettledGetNotesPage.Type,
         WebSocketClient.WebSocketClient
       >()(() => ({
         notesPage: makePaginatedEntry(),

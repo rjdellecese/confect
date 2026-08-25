@@ -3,22 +3,10 @@ import { WebSocketClientError } from "@confect/js/WebSocketClient";
 import * as Function from "effect/Function";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
+import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
-/**
- * A pure page machine for Convex cursor pagination, navigated one page at a
- * time. The machine lives in the Model and is the single source of truth for
- * the one live page subscription: `Subscription.paginatedQuery` derives the
- * subscription's args from this state, so navigating (`next`/`prev`),
- * retrying, and split-pinning are all plain Model transitions that the
- * Foldkit runtime turns into subscription restarts.
- */
-
-/**
- * Identifies one page of results. A page starts just after `cursor` (`null`
- * means the start of the list) and runs to `endCursor` when pinned by a
- * split, or as far as the server's page size allows when not.
- */
+/** Identifies the cursor range fetched for one page. */
 export interface PageDescriptor {
   readonly cursor: string | null;
   readonly endCursor: Option.Option<string>;
@@ -29,70 +17,114 @@ export const PageDescriptor = Schema.Struct({
   endCursor: Schema.Option(Schema.String),
 });
 
-/** Why the machine is currently loading. */
-export type Direction = "First" | "Next" | "Prev" | "Split" | "Retry";
-
-/**
- * A page is being fetched. `previousItems` keeps the last page that finished
- * loading, so the view can keep rendering it instead of blanking.
- */
-export interface Loading<Item_> {
-  readonly _tag: "Loading";
-  readonly current: PageDescriptor;
-  readonly prevStack: ReadonlyArray<PageDescriptor>;
-  readonly previousItems: Option.Option<ReadonlyArray<Item_>>;
-  readonly direction: Direction;
+/** Options that remain fixed for one pagination session. */
+export interface Options {
+  readonly initialNumItems: number;
+  readonly maximumRowsRead?: number;
+  readonly maximumBytesRead?: number;
 }
 
-/** The current page is loaded and its subscription is live. */
-export interface Loaded<Item_> {
-  readonly _tag: "Loaded";
-  readonly current: PageDescriptor;
-  readonly prevStack: ReadonlyArray<PageDescriptor>;
+const PositiveInt = Schema.Int.check(Schema.isGreaterThan(0));
+
+export const Options = Schema.Struct({
+  initialNumItems: PositiveInt,
+  maximumRowsRead: Schema.optionalKey(PositiveInt),
+  maximumBytesRead: Schema.optionalKey(PositiveInt),
+});
+
+/** Why the machine is fetching its current target. */
+export type Direction =
+  | "Initial"
+  | "Next"
+  | "Previous"
+  | "First"
+  | "Split"
+  | "Retry"
+  | "Reset";
+
+/** A complete page that can remain on screen while another page is fetched. */
+export interface Page<Item_> {
+  readonly descriptor: PageDescriptor;
+  readonly number: number;
   readonly items: ReadonlyArray<Item_>;
   readonly continueCursor: string;
   readonly isDone: boolean;
 }
 
+export interface Loading {
+  readonly _tag: "Loading";
+  readonly direction: Direction;
+}
+
+export interface Refreshing<Item_> {
+  readonly _tag: "Refreshing";
+  readonly data: Page<Item_>;
+  readonly direction: Direction;
+}
+
+export interface Success<Item_> {
+  readonly _tag: "Success";
+  readonly data: Page<Item_>;
+}
+
+export interface Failure<Error_> {
+  readonly _tag: "Failure";
+  readonly error: Error_;
+}
+
+export interface Stale<Item_, Error_> {
+  readonly _tag: "Stale";
+  readonly data: Page<Item_>;
+  readonly error: Error_;
+}
+
 /**
- * The page subscription failed and is closed. The error itself is not stored
- * here — it already reached `update` through the subscription's `onError`
- * Message — but the machine must leave the subscription closed so that
- * `retry` (or `reset`) reopens it via a dependency change.
+ * The five `AsyncData` states applicable after a paginated query is opened.
+ * `Idle` is represented by the absence of the whole machine from the Model.
  */
-export interface Failed<Item_> {
-  readonly _tag: "Failed";
+export type Phase<Item_, Error_> =
+  | Loading
+  | Refreshing<Item_>
+  | Success<Item_>
+  | Failure<Error_>
+  | Stale<Item_, Error_>;
+
+/** A serializable cursor-pagination machine. */
+export interface State<Item_, UserArgs_, Error_> {
+  readonly args: UserArgs_;
+  readonly options: Options;
+  readonly paginationId: number;
+  readonly requestId: number;
   readonly current: PageDescriptor;
   readonly prevStack: ReadonlyArray<PageDescriptor>;
-  readonly previousItems: Option.Option<ReadonlyArray<Item_>>;
+  readonly phase: Phase<Item_, Error_>;
 }
 
-export type Phase<Item_> = Loading<Item_> | Loaded<Item_> | Failed<Item_>;
-
-/**
- * The machine state. `args` and `numItems` are fixed when the machine is
- * created — cursors are only valid for the exact query and args they were
- * produced by, so changing either means creating a fresh machine with
- * `init`.
- */
-export interface State<Item_, UserArgs_> {
+/** The complete identity of a live page request. */
+export interface Request<UserArgs_> {
   readonly args: UserArgs_;
-  readonly numItems: number;
-  readonly phase: Phase<Item_>;
+  readonly options: Options;
+  readonly paginationId: number;
+  readonly requestId: number;
+  readonly descriptor: PageDescriptor;
 }
 
-/**
- * One emission of the page subscription: the decoded `PaginationResult` plus
- * the descriptor it was fetched for. `settle` uses the descriptor to ignore
- * stale results from a subscription that navigation already superseded.
- */
+/** The successful payload returned by a Convex paginated query. */
 export interface PageResult<Item_> {
-  readonly descriptor: PageDescriptor;
   readonly page: ReadonlyArray<Item_>;
   readonly isDone: boolean;
   readonly continueCursor: string;
   readonly splitCursor?: string | null;
   readonly pageStatus?: "SplitRecommended" | "SplitRequired" | null;
+}
+
+/**
+ * One correlated subscription outcome. Both success and failure travel
+ * through this value so `settle` can mirror `AsyncData.settle`.
+ */
+export interface Settlement<Item_, UserArgs_, Error_> {
+  readonly request: Request<UserArgs_>;
+  readonly result: Result.Result<PageResult<Item_>, Error_>;
 }
 
 export type Item<Query extends Ref.AnyConfectPublicPaginatedQuery> =
@@ -103,31 +135,62 @@ export type UserArgs<Query extends Ref.AnyConfectPublicPaginatedQuery> = Omit<
   "paginationOpts"
 >;
 
+type MachineState<
+  Query extends Ref.AnyConfectPublicPaginatedQuery,
+  Error_,
+> = State<Item<Query>, UserArgs<Query>, Error_>;
+
 /** The schema-and-constructor bundle returned by `make`. */
 export interface PaginatedQuery<
   Query extends Ref.AnyConfectPublicPaginatedQuery,
+  Error_,
 > {
-  /** The machine state schema — embed in the Model, typically inside `Schema.Option(...)`. */
-  readonly schema: Schema.Codec<State<Item<Query>, UserArgs<Query>>, unknown>;
-  /** The `PageResult` schema, for declaring the Message that carries results. */
-  readonly pageResult: Schema.Codec<PageResult<Item<Query>>, unknown>;
-  /** Creates a machine loading page one. `args` is omitted when the query declares none. */
+  readonly ref: Query;
+  readonly schema: Schema.Codec<MachineState<Query, Error_>, unknown>;
+  readonly requestSchema: Schema.Codec<Request<UserArgs<Query>>, unknown>;
+  readonly settlement: Schema.Codec<
+    Settlement<Item<Query>, UserArgs<Query>, Error_>,
+    unknown
+  >;
   readonly init: keyof UserArgs<Query> extends never
-    ? (options: {
-        readonly numItems: number;
-      }) => State<Item<Query>, UserArgs<Query>>
+    ? (options: Options) => MachineState<Query, Error_>
+    : (args: UserArgs<Query>, options: Options) => MachineState<Query, Error_>;
+  readonly reinitialize: keyof UserArgs<Query> extends never
+    ? (
+        state: MachineState<Query, Error_>,
+        options?: Options,
+      ) => MachineState<Query, Error_>
     : (
+        state: MachineState<Query, Error_>,
         args: UserArgs<Query>,
-        options: { readonly numItems: number },
-      ) => State<Item<Query>, UserArgs<Query>>;
+        options?: Options,
+      ) => MachineState<Query, Error_>;
 }
 
-const initialPhase = <Item_>(): Loading<Item_> => ({
-  _tag: "Loading",
-  current: { cursor: null, endCursor: Option.none() },
+export type Any = PaginatedQuery<Ref.AnyConfectPublicPaginatedQuery, any>;
+
+const firstDescriptor = (): PageDescriptor => ({
+  cursor: null,
+  endCursor: Option.none(),
+});
+
+let paginationId = 0;
+const nextPaginationId = (): number => ++paginationId;
+
+const decodeOptions = Schema.decodeUnknownSync(Options);
+
+const initialState = <Item_, UserArgs_, Error_>(
+  args: UserArgs_,
+  options: Options,
+  requestId = 1,
+): State<Item_, UserArgs_, Error_> => ({
+  args,
+  options: decodeOptions(options),
+  paginationId: nextPaginationId(),
+  requestId,
+  current: firstDescriptor(),
   prevStack: [],
-  previousItems: Option.none(),
-  direction: "First",
+  phase: { _tag: "Loading", direction: "Initial" },
 });
 
 const missingPaginatedProvenanceError = (ref: Ref.AnyConfect) =>
@@ -147,58 +210,46 @@ const paginatedKindOrThrow = (ref: Ref.AnyConfectPublicPaginatedQuery) =>
   );
 
 /**
- * Builds the schema-and-constructor bundle for a paginated query ref:
- *
- * ```ts
- * const Notes = PaginatedQuery.make(refs.public.notes.paginate)
- *
- * const Model = Schema.Struct({
- *   notes: Schema.Option(Notes.schema),
- * })
- *
- * // In init or update:
- * Option.some(Notes.init({ numItems: 20 }))
- * ```
- *
- * Requires a ref built with `FunctionSpec.publicPaginatedQuery` — the ref's
- * user-args and item schemas back the state schema, and mismatched schemas
- * are unrepresentable.
+ * Builds a page machine from a paginated ref and the serializable application
+ * error used in the Model.
  */
-export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
+export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery, Error_>(
   ref: Query,
-): PaginatedQuery<Query> => {
+  errorSchema: Schema.Codec<Error_, any>,
+): PaginatedQuery<Query, Error_> => {
   const kind = paginatedKindOrThrow(ref);
-
-  const phaseFields = {
-    current: PageDescriptor,
-    prevStack: Schema.Array(PageDescriptor),
-  };
-  const previousItems = Schema.Option(kind.page);
-
-  const schema: PaginatedQuery<Query>["schema"] = Schema.Struct({
-    args: kind.userArgs,
-    numItems: Schema.Finite,
-    phase: Schema.Union([
-      Schema.TaggedStruct("Loading", {
-        ...phaseFields,
-        previousItems,
-        direction: Schema.Literals(["First", "Next", "Prev", "Split", "Retry"]),
-      }),
-      Schema.TaggedStruct("Loaded", {
-        ...phaseFields,
-        items: kind.page,
-        continueCursor: Schema.String,
-        isDone: Schema.Boolean,
-      }),
-      Schema.TaggedStruct("Failed", {
-        ...phaseFields,
-        previousItems,
-      }),
-    ]),
-  });
-
-  const pageResult: PaginatedQuery<Query>["pageResult"] = Schema.Struct({
+  const hasUserArgs = globalThis.Object.keys(kind.userArgs.fields).length > 0;
+  const directions = Schema.Literals([
+    "Initial",
+    "Next",
+    "Previous",
+    "First",
+    "Split",
+    "Retry",
+    "Reset",
+  ]);
+  const page = Schema.Struct({
     descriptor: PageDescriptor,
+    number: PositiveInt,
+    items: kind.page,
+    continueCursor: Schema.String,
+    isDone: Schema.Boolean,
+  });
+  const phase = Schema.Union([
+    Schema.TaggedStruct("Loading", { direction: directions }),
+    Schema.TaggedStruct("Refreshing", { data: page, direction: directions }),
+    Schema.TaggedStruct("Success", { data: page }),
+    Schema.TaggedStruct("Failure", { error: errorSchema }),
+    Schema.TaggedStruct("Stale", { data: page, error: errorSchema }),
+  ]);
+  const requestSchema = Schema.Struct({
+    args: kind.userArgs,
+    options: Options,
+    paginationId: PositiveInt,
+    requestId: PositiveInt,
+    descriptor: PageDescriptor,
+  });
+  const pageResult = Schema.Struct({
     page: kind.page,
     isDone: Schema.Boolean,
     continueCursor: Schema.String,
@@ -211,28 +262,55 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
       ]),
     ),
   });
+  const schema: PaginatedQuery<Query, Error_>["schema"] = Schema.Struct({
+    args: kind.userArgs,
+    options: Options,
+    paginationId: PositiveInt,
+    requestId: PositiveInt,
+    current: PageDescriptor,
+    prevStack: Schema.Array(PageDescriptor),
+    phase,
+  });
+  const settlement: PaginatedQuery<Query, Error_>["settlement"] = Schema.Struct(
+    {
+      request: requestSchema,
+      result: Schema.Result(pageResult, errorSchema),
+    },
+  );
 
-  const init: PaginatedQuery<Query>["init"] = (
-    argsOrOptions: UserArgs<Query> | { readonly numItems: number },
-    options?: { readonly numItems: number },
-  ): State<Item<Query>, UserArgs<Query>> => {
-    const [args, resolvedOptions] =
-      options === undefined
-        ? [{} as UserArgs<Query>, argsOrOptions as { numItems: number }]
-        : [argsOrOptions as UserArgs<Query>, options];
-    if (!(resolvedOptions.numItems > 0)) {
-      throw new globalThis.Error(
-        "`PaginatedQuery.init` requires `numItems` to be greater than zero",
+  const init: PaginatedQuery<Query, Error_>["init"] = (
+    argsOrOptions: UserArgs<Query> | Options,
+    options?: Options,
+  ): MachineState<Query, Error_> =>
+    options === undefined
+      ? initialState({} as UserArgs<Query>, argsOrOptions as Options)
+      : initialState(argsOrOptions as UserArgs<Query>, options);
+
+  const reinitialize: PaginatedQuery<Query, Error_>["reinitialize"] = (
+    state: MachineState<Query, Error_>,
+    argsOrOptions?: UserArgs<Query> | Options,
+    options?: Options,
+  ): MachineState<Query, Error_> => {
+    if (options !== undefined) {
+      return initialState(
+        argsOrOptions as UserArgs<Query>,
+        options,
+        state.requestId + 1,
       );
     }
-    return {
-      args,
-      numItems: resolvedOptions.numItems,
-      phase: initialPhase(),
-    };
+    if (argsOrOptions === undefined) {
+      return initialState(state.args, state.options, state.requestId + 1);
+    }
+    return hasUserArgs
+      ? initialState(
+          argsOrOptions as UserArgs<Query>,
+          state.options,
+          state.requestId + 1,
+        )
+      : initialState(state.args, argsOrOptions as Options, state.requestId + 1);
   };
 
-  return { schema, pageResult, init };
+  return { ref, schema, requestSchema, settlement, init, reinitialize };
 };
 
 const descriptorEquals = (a: PageDescriptor, b: PageDescriptor): boolean =>
@@ -246,326 +324,378 @@ const descriptorEquals = (a: PageDescriptor, b: PageDescriptor): boolean =>
       }),
   });
 
-/**
- * Navigate to the next page: the current descriptor is pushed onto the
- * back-stack and the machine starts loading the page that begins where the
- * current one ends — at `endCursor` when the page was pinned by a split, at
- * `continueCursor` otherwise. `None` when the current page isn't loaded or
- * is the last one; `update` should leave the Model unchanged.
- */
-export const next = <Item_, UserArgs_>(
-  state: State<Item_, UserArgs_>,
-): Option.Option<State<Item_, UserArgs_>> =>
-  Match.value(state.phase).pipe(
-    Match.withReturnType<Option.Option<State<Item_, UserArgs_>>>(),
-    Match.tag("Loaded", (phase) =>
-      phase.isDone
-        ? Option.none()
-        : Option.some({
-            ...state,
-            phase: {
-              _tag: "Loading",
-              current: {
-                cursor: Option.getOrElse(
-                  phase.current.endCursor,
-                  () => phase.continueCursor,
-                ),
-                endCursor: Option.none(),
-              },
-              prevStack: [...phase.prevStack, phase.current],
-              previousItems: Option.some(phase.items),
-              direction: "Next",
-            },
-          }),
+/** Returns the identity and arguments of the machine's current request. */
+export const getRequest = <Item_, UserArgs_, Error_>(
+  state: State<Item_, UserArgs_, Error_>,
+): Request<UserArgs_> => ({
+  args: state.args,
+  options: state.options,
+  paginationId: state.paginationId,
+  requestId: state.requestId,
+  descriptor: state.current,
+});
+
+const phaseData = <Item_, Error_>(
+  phase: Phase<Item_, Error_>,
+): Option.Option<Page<Item_>> =>
+  Match.value(phase).pipe(
+    Match.withReturnType<Option.Option<Page<Item_>>>(),
+    Match.tag("Refreshing", "Success", "Stale", (dataPhase) =>
+      Option.some(dataPhase.data),
     ),
-    Match.tag("Loading", "Failed", () => Option.none()),
+    Match.tag("Loading", "Failure", () => Option.none()),
     Match.exhaustive,
   );
 
-/**
- * Navigate to the previous page by popping the back-stack. A previously
- * split page is re-run with its pinned range. `None` when the current page
- * isn't loaded or is the first one.
- */
-export const prev = <Item_, UserArgs_>(
-  state: State<Item_, UserArgs_>,
-): Option.Option<State<Item_, UserArgs_>> =>
+const pendingPhase = <Item_>(
+  data: Option.Option<Page<Item_>>,
+  direction: Direction,
+): Loading | Refreshing<Item_> =>
+  Option.match(data, {
+    onNone: () => ({ _tag: "Loading", direction }),
+    onSome: (page) => ({ _tag: "Refreshing", data: page, direction }),
+  });
+
+/** Navigate to the next page, retaining the current page while it loads. */
+export const next = <Item_, UserArgs_, Error_>(
+  state: State<Item_, UserArgs_, Error_>,
+): Option.Option<State<Item_, UserArgs_, Error_>> =>
   Match.value(state.phase).pipe(
-    Match.withReturnType<Option.Option<State<Item_, UserArgs_>>>(),
-    Match.tag("Loaded", (phase) => {
-      const current = phase.prevStack.at(-1);
+    Match.withReturnType<Option.Option<State<Item_, UserArgs_, Error_>>>(),
+    Match.tag("Success", ({ data }) =>
+      data.isDone
+        ? Option.none()
+        : Option.some({
+            ...state,
+            requestId: state.requestId + 1,
+            current: {
+              cursor: Option.getOrElse(
+                data.descriptor.endCursor,
+                () => data.continueCursor,
+              ),
+              endCursor: Option.none(),
+            },
+            prevStack: [...state.prevStack, data.descriptor],
+            phase: { _tag: "Refreshing", data, direction: "Next" },
+          }),
+    ),
+    Match.tag("Loading", "Refreshing", "Failure", "Stale", () => Option.none()),
+    Match.exhaustive,
+  );
+
+/** Navigate to the previous page, retaining the current page while it loads. */
+export const prev = <Item_, UserArgs_, Error_>(
+  state: State<Item_, UserArgs_, Error_>,
+): Option.Option<State<Item_, UserArgs_, Error_>> =>
+  Match.value(state.phase).pipe(
+    Match.withReturnType<Option.Option<State<Item_, UserArgs_, Error_>>>(),
+    Match.tag("Success", ({ data }) => {
+      const current = state.prevStack.at(-1);
       return current === undefined
         ? Option.none()
         : Option.some({
             ...state,
-            phase: {
-              _tag: "Loading",
-              current,
-              prevStack: phase.prevStack.slice(0, -1),
-              previousItems: Option.some(phase.items),
-              direction: "Prev",
-            },
+            requestId: state.requestId + 1,
+            current,
+            prevStack: state.prevStack.slice(0, -1),
+            phase: { _tag: "Refreshing", data, direction: "Previous" },
           });
     }),
-    Match.tag("Loading", "Failed", () => Option.none()),
+    Match.tag("Loading", "Refreshing", "Failure", "Stale", () => Option.none()),
     Match.exhaustive,
   );
 
-/**
- * Reopen the subscription after a failure, at the same page. `None` when the
- * machine hasn't failed.
- */
-export const retry = <Item_, UserArgs_>(
-  state: State<Item_, UserArgs_>,
-): Option.Option<State<Item_, UserArgs_>> =>
+/** Navigate to page one without invalidating the current pagination session. */
+export const first = <Item_, UserArgs_, Error_>(
+  state: State<Item_, UserArgs_, Error_>,
+): Option.Option<State<Item_, UserArgs_, Error_>> =>
+  state.prevStack.length === 0 &&
+  descriptorEquals(state.current, firstDescriptor())
+    ? Option.none()
+    : Option.some({
+        ...state,
+        requestId: state.requestId + 1,
+        current: firstDescriptor(),
+        prevStack: [],
+        phase: pendingPhase(phaseData(state.phase), "First"),
+      });
+
+/** Reopen a failed request at the same page with a fresh pagination id. */
+export const retry = <Item_, UserArgs_, Error_>(
+  state: State<Item_, UserArgs_, Error_>,
+): Option.Option<State<Item_, UserArgs_, Error_>> =>
   Match.value(state.phase).pipe(
-    Match.withReturnType<Option.Option<State<Item_, UserArgs_>>>(),
-    Match.tag("Failed", (phase) =>
+    Match.withReturnType<Option.Option<State<Item_, UserArgs_, Error_>>>(),
+    Match.tag("Failure", () =>
       Option.some({
         ...state,
-        phase: {
-          _tag: "Loading",
-          current: phase.current,
-          prevStack: phase.prevStack,
-          previousItems: phase.previousItems,
-          direction: "Retry",
-        },
+        paginationId: nextPaginationId(),
+        requestId: state.requestId + 1,
+        phase: { _tag: "Loading", direction: "Retry" },
       }),
     ),
-    Match.tag("Loading", "Loaded", () => Option.none()),
+    Match.tag("Stale", ({ data }) =>
+      Option.some({
+        ...state,
+        paginationId: nextPaginationId(),
+        requestId: state.requestId + 1,
+        phase: { _tag: "Refreshing", data, direction: "Retry" },
+      }),
+    ),
+    Match.tag("Loading", "Refreshing", "Success", () => Option.none()),
     Match.exhaustive,
   );
 
 /**
- * Go back to page one, discarding the back-stack and every held cursor. Use
- * after an `isInvalidCursor` error, or as a "first page" control.
+ * Start a fresh pagination session at page one. Unlike `first`, this replaces
+ * Convex's pagination id, so it is the recovery for invalid or expired
+ * cursors. Any displayed page remains visible until page one settles.
  */
-export const reset = <Item_, UserArgs_>(
-  state: State<Item_, UserArgs_>,
-): State<Item_, UserArgs_> => ({
+export const reset = <Item_, UserArgs_, Error_>(
+  state: State<Item_, UserArgs_, Error_>,
+): State<Item_, UserArgs_, Error_> => ({
   ...state,
-  phase: initialPhase(),
+  paginationId: nextPaginationId(),
+  requestId: state.requestId + 1,
+  current: firstDescriptor(),
+  prevStack: [],
+  phase: pendingPhase(phaseData(state.phase), "Reset"),
+});
+
+/** Whether a request still names the machine's live pagination session/page. */
+export const isCurrentRequest = <Item_, UserArgs_, Error_>(
+  state: State<Item_, UserArgs_, Error_>,
+  candidate: Request<UserArgs_>,
+): boolean =>
+  state.phase._tag !== "Failure" &&
+  state.phase._tag !== "Stale" &&
+  state.paginationId === candidate.paginationId &&
+  state.requestId === candidate.requestId &&
+  descriptorEquals(state.current, candidate.descriptor);
+
+const pageFromResult = <Item_, UserArgs_, Error_>(
+  state: State<Item_, UserArgs_, Error_>,
+  result: PageResult<Item_>,
+): Page<Item_> => ({
+  descriptor: state.current,
+  number: state.prevStack.length + 1,
+  items: result.page,
+  continueCursor: result.continueCursor,
+  isDone: result.isDone,
+});
+
+const settleSuccess = <Item_, UserArgs_, Error_>(
+  state: State<Item_, UserArgs_, Error_>,
+  result: PageResult<Item_>,
+): State<Item_, UserArgs_, Error_> => {
+  const splitCursor = result.splitCursor;
+  const splitSignaled = Match.value(result.pageStatus).pipe(
+    Match.whenOr("SplitRecommended", "SplitRequired", () => true),
+    Match.orElse(() => false),
+  );
+  const shouldSplit =
+    typeof splitCursor === "string" &&
+    (splitSignaled || result.page.length > 2 * state.options.initialNumItems);
+
+  if (shouldSplit) {
+    const deliveredPage = pageFromResult(state, result);
+    const previous =
+      result.pageStatus === "SplitRequired"
+        ? phaseData(state.phase)
+        : Option.some(deliveredPage);
+    return {
+      ...state,
+      requestId: state.requestId + 1,
+      current: {
+        cursor: state.current.cursor,
+        endCursor: Option.some(splitCursor),
+      },
+      phase: pendingPhase(previous, "Split"),
+    };
+  }
+
+  if (result.page.length === 0 && result.isDone && state.prevStack.length > 0) {
+    return {
+      ...state,
+      requestId: state.requestId + 1,
+      current: state.prevStack[state.prevStack.length - 1],
+      prevStack: state.prevStack.slice(0, -1),
+      phase: pendingPhase(phaseData(state.phase), "Previous"),
+    };
+  }
+
+  return {
+    ...state,
+    phase: { _tag: "Success", data: pageFromResult(state, result) },
+  };
+};
+
+const settleFailure = <Item_, UserArgs_, Error_>(
+  state: State<Item_, UserArgs_, Error_>,
+  error: Error_,
+): State<Item_, UserArgs_, Error_> => ({
+  ...state,
+  phase: Option.match(phaseData(state.phase), {
+    onNone: () => ({ _tag: "Failure", error }),
+    onSome: (data) => ({ _tag: "Stale", error, data }),
+  }),
 });
 
 /**
- * Record that the page subscription failed and is closed, keeping the
- * machine's position and the last loaded items for display. Reopen with
- * `retry` or `reset`.
- */
-export const fail = <Item_, UserArgs_>(
-  state: State<Item_, UserArgs_>,
-): State<Item_, UserArgs_> =>
-  Match.value(state.phase).pipe(
-    Match.withReturnType<State<Item_, UserArgs_>>(),
-    Match.tag("Failed", () => state),
-    Match.tag("Loaded", (phase) => ({
-      ...state,
-      phase: {
-        _tag: "Failed",
-        current: phase.current,
-        prevStack: phase.prevStack,
-        previousItems: Option.some(phase.items),
-      },
-    })),
-    Match.tag("Loading", (phase) => ({
-      ...state,
-      phase: {
-        _tag: "Failed",
-        current: phase.current,
-        prevStack: phase.prevStack,
-        previousItems: phase.previousItems,
-      },
-    })),
-    Match.exhaustive,
-  );
-
-/**
- * Fold a page subscription result into the machine.
- *
- * Results for a descriptor other than the current one are ignored (they come
- * from a subscription that navigation already superseded), as are results
- * arriving after a failure. When the result signals a page split — a
- * `pageStatus` of `"SplitRecommended"` or `"SplitRequired"`, or a page
- * grown past twice `numItems`, with a `splitCursor` to act on — the current
- * page is pinned to end at the split cursor and reloads as a range query;
- * the page after it starts at the split cursor. Otherwise the result loads
- * the page in place (both when a navigation completes and when a live page
- * updates reactively).
+ * Fold a correlated `Result` into the machine. Like `AsyncData.settle`, a
+ * success becomes `Success`; a failure becomes `Stale` when a page is held,
+ * otherwise `Failure`. Outcomes from superseded requests and outcomes that
+ * arrive after the subscription closed are ignored.
  */
 export const settle: {
-  <Item_>(
-    result: PageResult<Item_>,
-  ): <UserArgs_>(state: State<Item_, UserArgs_>) => State<Item_, UserArgs_>;
-  <Item_, UserArgs_>(
-    state: State<Item_, UserArgs_>,
-    result: PageResult<Item_>,
-  ): State<Item_, UserArgs_>;
+  <Item_, UserArgs_, Error_>(
+    settlement: Settlement<Item_, UserArgs_, Error_>,
+  ): (
+    state: State<Item_, UserArgs_, Error_>,
+  ) => State<Item_, UserArgs_, Error_>;
+  <Item_, UserArgs_, Error_>(
+    state: State<Item_, UserArgs_, Error_>,
+    settlement: Settlement<Item_, UserArgs_, Error_>,
+  ): State<Item_, UserArgs_, Error_>;
 } = Function.dual(
   2,
-  <Item_, UserArgs_>(
-    state: State<Item_, UserArgs_>,
-    result: PageResult<Item_>,
-  ): State<Item_, UserArgs_> =>
-    Match.value(state.phase).pipe(
-      Match.withReturnType<State<Item_, UserArgs_>>(),
-      Match.tag("Failed", () => state),
-      Match.tag("Loading", "Loaded", (phase) => {
-        if (!descriptorEquals(result.descriptor, phase.current)) {
-          return state;
-        }
-
-        const splitCursor = result.splitCursor;
-        const splitSignaled = Match.value(result.pageStatus).pipe(
-          Match.whenOr("SplitRecommended", "SplitRequired", () => true),
-          Match.orElse(() => false),
-        );
-        const shouldSplit =
-          typeof splitCursor === "string" &&
-          (splitSignaled || result.page.length > 2 * state.numItems);
-
-        if (shouldSplit) {
-          return {
-            ...state,
-            phase: {
-              _tag: "Loading",
-              current: {
-                cursor: phase.current.cursor,
-                endCursor: Option.some(splitCursor),
-              },
-              prevStack: phase.prevStack,
-              // A `SplitRequired` page may be incomplete, so keep showing
-              // what was already on screen; otherwise the delivered page is
-              // complete (just large) and is the freshest thing to show.
-              previousItems: Match.value(result.pageStatus).pipe(
-                Match.when("SplitRequired", () =>
-                  Match.value(phase).pipe(
-                    Match.tag("Loaded", (loaded) => Option.some(loaded.items)),
-                    Match.tag("Loading", (loading) => loading.previousItems),
-                    Match.exhaustive,
-                  ),
-                ),
-                Match.orElse(() => Option.some(result.page)),
-              ),
-              direction: "Split",
-            },
-          };
-        }
-
-        return {
-          ...state,
-          phase: {
-            _tag: "Loaded",
-            current: phase.current,
-            prevStack: phase.prevStack,
-            items: result.page,
-            continueCursor: result.continueCursor,
-            isDone: result.isDone,
-          },
-        };
-      }),
-      Match.exhaustive,
-    ),
+  <Item_, UserArgs_, Error_>(
+    state: State<Item_, UserArgs_, Error_>,
+    settlement: Settlement<Item_, UserArgs_, Error_>,
+  ): State<Item_, UserArgs_, Error_> => {
+    if (!isCurrentRequest(state, settlement.request)) {
+      return state;
+    }
+    return Result.match(settlement.result, {
+      onSuccess: (result) => settleSuccess(state, result),
+      onFailure: (error) => settleFailure(state, error),
+    });
+  },
 );
 
-/**
- * The items to render: the loaded page, or — while loading or after a
- * failure — the last page that finished loading, or an empty array before
- * any page has.
- */
-export const page = <Item_, UserArgs_>(
-  state: State<Item_, UserArgs_>,
-): ReadonlyArray<Item_> =>
+/** The complete page currently available to render. */
+export const getPage = <Item_, UserArgs_, Error_>(
+  state: State<Item_, UserArgs_, Error_>,
+): Option.Option<Page<Item_>> => phaseData(state.phase);
+
+/** The items currently available to render. */
+export const getItems = <Item_, UserArgs_, Error_>(
+  state: State<Item_, UserArgs_, Error_>,
+): Option.Option<ReadonlyArray<Item_>> =>
+  Option.map(getPage(state), (page) => page.items);
+
+/** The error from the most recent failed request, if any. */
+export const getError = <Item_, UserArgs_, Error_>(
+  state: State<Item_, UserArgs_, Error_>,
+): Option.Option<Error_> =>
   Match.value(state.phase).pipe(
-    Match.tag("Loaded", (phase) => phase.items),
-    Match.tag("Loading", "Failed", (phase) =>
-      Option.getOrElse(phase.previousItems, (): ReadonlyArray<Item_> => []),
-    ),
+    Match.withReturnType<Option.Option<Error_>>(),
+    Match.tag("Failure", "Stale", ({ error }) => Option.some(error)),
+    Match.tag("Loading", "Refreshing", "Success", () => Option.none()),
     Match.exhaustive,
   );
 
-/** The 1-indexed number of the current (or currently loading) page. */
-export const pageNum = <Item_, UserArgs_>(
-  state: State<Item_, UserArgs_>,
-): number => state.phase.prevStack.length + 1;
+/** The 1-indexed page number currently targeted by the subscription. */
+export const targetPageNumber = <Item_, UserArgs_, Error_>(
+  state: State<Item_, UserArgs_, Error_>,
+): number => state.prevStack.length + 1;
 
-export const isFirst = <Item_, UserArgs_>(
-  state: State<Item_, UserArgs_>,
-): boolean => state.phase.prevStack.length === 0;
+export const hasPage = <Item_, UserArgs_, Error_>(
+  state: State<Item_, UserArgs_, Error_>,
+): boolean => Option.isSome(getPage(state));
 
-export const isLast = <Item_, UserArgs_>(
-  state: State<Item_, UserArgs_>,
-): boolean =>
-  Match.value(state.phase).pipe(
-    Match.tag("Loaded", (phase) => phase.isDone),
-    Match.tag("Loading", "Failed", () => false),
-    Match.exhaustive,
-  );
+export const hasError = <Item_, UserArgs_, Error_>(
+  state: State<Item_, UserArgs_, Error_>,
+): boolean => Option.isSome(getError(state));
 
-export const isLoading = <Item_, UserArgs_>(
-  state: State<Item_, UserArgs_>,
-): boolean => state.phase._tag === "Loading";
+export const isFirst = <Item_, UserArgs_, Error_>(
+  state: State<Item_, UserArgs_, Error_>,
+): boolean => state.prevStack.length === 0;
 
-export const isLoaded = <Item_, UserArgs_>(
-  state: State<Item_, UserArgs_>,
-): boolean => state.phase._tag === "Loaded";
+export const isLast = <Item_, UserArgs_, Error_>(
+  state: State<Item_, UserArgs_, Error_>,
+): boolean => state.phase._tag === "Success" && state.phase.data.isDone;
 
-export const isFailed = <Item_, UserArgs_>(
-  state: State<Item_, UserArgs_>,
-): boolean => state.phase._tag === "Failed";
+type WithPhase<State_, Phase_> = Omit<State_, "phase"> & {
+  readonly phase: Phase_;
+};
 
-/** Whether `next` would navigate — useful for enabling a "next page" control. */
-export const canNext = <Item_, UserArgs_>(
-  state: State<Item_, UserArgs_>,
-): boolean =>
-  Match.value(state.phase).pipe(
-    Match.tag("Loaded", (phase) => !phase.isDone),
-    Match.tag("Loading", "Failed", () => false),
-    Match.exhaustive,
-  );
+export const isLoading = <Item_, UserArgs_, Error_>(
+  state: State<Item_, UserArgs_, Error_>,
+): state is WithPhase<State<Item_, UserArgs_, Error_>, Loading> =>
+  state.phase._tag === "Loading";
 
-/** Whether `prev` would navigate — useful for enabling a "previous page" control. */
-export const canPrev = <Item_, UserArgs_>(
-  state: State<Item_, UserArgs_>,
-): boolean =>
-  Match.value(state.phase).pipe(
-    Match.tag("Loaded", (phase) => phase.prevStack.length > 0),
-    Match.tag("Loading", "Failed", () => false),
-    Match.exhaustive,
-  );
+export const isRefreshing = <Item_, UserArgs_, Error_>(
+  state: State<Item_, UserArgs_, Error_>,
+): state is WithPhase<State<Item_, UserArgs_, Error_>, Refreshing<Item_>> =>
+  state.phase._tag === "Refreshing";
 
-/** Pattern-match on the machine's phase. */
+export const isSuccess = <Item_, UserArgs_, Error_>(
+  state: State<Item_, UserArgs_, Error_>,
+): state is WithPhase<State<Item_, UserArgs_, Error_>, Success<Item_>> =>
+  state.phase._tag === "Success";
+
+export const isFailure = <Item_, UserArgs_, Error_>(
+  state: State<Item_, UserArgs_, Error_>,
+): state is WithPhase<State<Item_, UserArgs_, Error_>, Failure<Error_>> =>
+  state.phase._tag === "Failure";
+
+export const isStale = <Item_, UserArgs_, Error_>(
+  state: State<Item_, UserArgs_, Error_>,
+): state is WithPhase<State<Item_, UserArgs_, Error_>, Stale<Item_, Error_>> =>
+  state.phase._tag === "Stale";
+
+export const isPending = <Item_, UserArgs_, Error_>(
+  state: State<Item_, UserArgs_, Error_>,
+): boolean => isLoading(state) || isRefreshing(state);
+
+export const canNext = <Item_, UserArgs_, Error_>(
+  state: State<Item_, UserArgs_, Error_>,
+): boolean => state.phase._tag === "Success" && !state.phase.data.isDone;
+
+export const canPrev = <Item_, UserArgs_, Error_>(
+  state: State<Item_, UserArgs_, Error_>,
+): boolean => state.phase._tag === "Success" && state.prevStack.length > 0;
+
+/** Pattern-match exhaustively on the machine's AsyncData-style phase. */
 export const match: {
-  <Item_, A, B, C>(handlers: {
-    readonly onLoading: (loading: Loading<Item_>) => A;
-    readonly onLoaded: (loaded: Loaded<Item_>) => B;
-    readonly onFailed: (failed: Failed<Item_>) => C;
-  }): <UserArgs_>(state: State<Item_, UserArgs_>) => A | B | C;
-  <Item_, UserArgs_, A, B, C>(
-    state: State<Item_, UserArgs_>,
+  <Item_, Error_, A, B, C, D, E>(handlers: {
+    readonly onLoading: (loading: Loading) => A;
+    readonly onRefreshing: (refreshing: Refreshing<Item_>) => B;
+    readonly onFailure: (failure: Failure<Error_>) => C;
+    readonly onStale: (stale: Stale<Item_, Error_>) => D;
+    readonly onSuccess: (success: Success<Item_>) => E;
+  }): <UserArgs_>(state: State<Item_, UserArgs_, Error_>) => A | B | C | D | E;
+  <Item_, UserArgs_, Error_, A, B, C, D, E>(
+    state: State<Item_, UserArgs_, Error_>,
     handlers: {
-      readonly onLoading: (loading: Loading<Item_>) => A;
-      readonly onLoaded: (loaded: Loaded<Item_>) => B;
-      readonly onFailed: (failed: Failed<Item_>) => C;
+      readonly onLoading: (loading: Loading) => A;
+      readonly onRefreshing: (refreshing: Refreshing<Item_>) => B;
+      readonly onFailure: (failure: Failure<Error_>) => C;
+      readonly onStale: (stale: Stale<Item_, Error_>) => D;
+      readonly onSuccess: (success: Success<Item_>) => E;
     },
-  ): A | B | C;
+  ): A | B | C | D | E;
 } = Function.dual(
   2,
-  <Item_, UserArgs_, A, B, C>(
-    state: State<Item_, UserArgs_>,
+  <Item_, UserArgs_, Error_, A, B, C, D, E>(
+    state: State<Item_, UserArgs_, Error_>,
     handlers: {
-      readonly onLoading: (loading: Loading<Item_>) => A;
-      readonly onLoaded: (loaded: Loaded<Item_>) => B;
-      readonly onFailed: (failed: Failed<Item_>) => C;
+      readonly onLoading: (loading: Loading) => A;
+      readonly onRefreshing: (refreshing: Refreshing<Item_>) => B;
+      readonly onFailure: (failure: Failure<Error_>) => C;
+      readonly onStale: (stale: Stale<Item_, Error_>) => D;
+      readonly onSuccess: (success: Success<Item_>) => E;
     },
-  ): A | B | C =>
-    // `Match.exhaustive` returns `Unify<A | B | C>`, which collapses bare
-    // type parameters to `unknown` — the cast restores what the arms return.
+  ): A | B | C | D | E =>
     Match.value(state.phase).pipe(
       Match.tag("Loading", handlers.onLoading),
-      Match.tag("Loaded", handlers.onLoaded),
-      Match.tag("Failed", handlers.onFailed),
+      Match.tag("Refreshing", handlers.onRefreshing),
+      Match.tag("Failure", handlers.onFailure),
+      Match.tag("Stale", handlers.onStale),
+      Match.tag("Success", handlers.onSuccess),
       Match.exhaustive,
-    ) as A | B | C,
+    ) as A | B | C | D | E,
 );
 
 const matchesInvalidCursor = (error: unknown): boolean => {
@@ -585,18 +715,7 @@ const matchesInvalidCursor = (error: unknown): boolean => {
   );
 };
 
-/**
- * Whether an error from the page subscription is Convex reporting that a
- * held cursor is no longer valid. Every cursor the machine holds is then
- * dead, so the recovery is `reset`:
- *
- * ```ts
- * FailedGetNotesPage: ({ error }) =>
- *   PaginatedQuery.isInvalidCursor(error)
- *     ? PaginatedQuery.reset(state)
- *     : PaginatedQuery.fail(state)
- * ```
- */
+/** Whether a raw page-subscription error reports an invalid cursor. */
 export const isInvalidCursor = (error: unknown): boolean =>
   matchesInvalidCursor(error) ||
   (error instanceof WebSocketClientError && matchesInvalidCursor(error.cause));
