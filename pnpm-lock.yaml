@@ -261,8 +261,8 @@ importers:
         version: link:../js
     devDependencies:
       '@effect/vitest':
-        specifier: 4.0.0-rc.111
-        version: 4.0.0-rc.111(effect@4.0.0-rc.111)(vitest@4.1.10)
+        specifier: 4.0.0-rc.112
+        version: 4.0.0-rc.112(effect@4.0.0-rc.112)(vitest@4.1.10)
       '@types/node':
         specifier: 22.20.1
         version: 22.20.1
@@ -270,11 +270,11 @@ importers:
         specifier: 1.44.0
         version: 1.44.0(react@19.2.8)
       effect:
-        specifier: 4.0.0-rc.111
-        version: 4.0.0-rc.111
+        specifier: 4.0.0-rc.112
+        version: 4.0.0-rc.112
       foldkit:
         specifier: 0.148.1
-        version: 0.148.1(effect@4.0.0-rc.111)
+        version: 0.148.1(effect@4.0.0-rc.112)
       tsdown:
         specifier: 0.22.14
         version: 0.22.14(tsx@4.23.12)(typescript@7.0.2)(unrun@0.3.1)
@@ -4504,7 +4504,7 @@ packages:
     resolution: {integrity: sha512-/ktogH1h6KhIL2L83ASLJs208vJsUQneAutwN1iRhPDOVK40MqfGgXjt2qkky0APE7HW8lmd/PGZ69XhiWPO6w==}
     engines: {node: '>=20.19.0'}
     peerDependencies:
-      effect: 4.0.0-rc.111
+      effect: 4.0.0-rc.112
 
   follow-redirects@1.16.0:
     resolution: {integrity: sha512-y5rN/uOsadFT/JfYwhxRS5R7Qce+g3zG97+JrtFZlC9klX/W5hD7iiLzScI4nZqUS7DNUdhPgw4xI8W2LuXlUw==}
@@ -10982,9 +10982,9 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  foldkit@0.148.1(effect@4.0.0-rc.111):
+  foldkit@0.148.1(effect@4.0.0-rc.112):
     dependencies:
-      effect: 4.0.0-rc.111
+      effect: 4.0.0-rc.112
       parse5: 8.0.1
 
   follow-redirects@1.16.0(debug@4.4.3(supports-color@10.2.2)):
