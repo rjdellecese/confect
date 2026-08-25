@@ -154,7 +154,8 @@ Command definitions whose Command args are the ref's args. `messages`
 declares the Messages the Command can produce — the same declaration
 Foldkit's own `Command.define` takes — and the handlers must produce
 instances of them. Call the definition from `update` to construct a Command
-instance — nothing runs until the Foldkit runtime executes it.
+instance — nothing runs until the Foldkit runtime executes it. Add the handler
+to your exhaustive update Match with `Match.tag`:
 
 ```ts src/command.ts
 import { Command } from "@confect/foldkit";
@@ -170,9 +171,7 @@ export const SaveNote = Command.mutation("SaveNote", refs.public.notes.insert, {
 ```
 
 ```ts src/update.ts
-// In update:
-case "ClickedSave":
-  return [model, [SaveNote({ text: model.draft })]];
+Match.tag("ClickedSave", () => [model, [SaveNote({ text: model.draft })]]),
 ```
 
 Follow Foldkit's [naming convention](https://foldkit.dev/core/commands):
@@ -207,13 +206,13 @@ export const SaveDraft = Command.mutation(
 );
 ```
 
+Build the interrupt Command from its `Match.tag` update handler:
+
 ```ts
-// In update:
-case "ClickedCancel":
-  return [
+Match.tag("ClickedCancel", () => [
     model,
     [SaveDraft.Interrupt((outcome) => CompletedCancelSaveDraft({ outcome }))],
-  ];
+  ]),
 ```
 
 `interrupt: { keyFields, toKey }` derives the key from the ref's args, so
@@ -277,7 +276,8 @@ export const SaveDraft = FoldkitCommand.define("SaveDraft", {
 
 Foldkit's [`AsyncData`](https://foldkit.dev/core/async-data) is the idiomatic
 Model representation for query state. Map errors to a view-ready schema type
-in your `onError` handler, then settle the `AsyncData` field in `update`:
+in your `onError` handler, then settle the `AsyncData` field with `Match.tags`
+in `update`:
 
 ```ts src/model.ts
 import { AsyncData } from "foldkit";
@@ -293,11 +293,16 @@ export const FailedGetNotes = m("FailedGetNotes", { message: Schema.String });
 ```
 
 ```ts src/update.ts
-// In update:
-case "GotNotes":
-  return [evo(model, { notes: () => Notes.Success({ data: message.notes }) }), []];
-case "FailedGetNotes":
-  return [evo(model, { notes: () => Notes.Failure({ error: message.message }) }), []];
+Match.tags({
+  GotNotes: ({ notes }) => [
+    evo(model, { notes: () => Notes.Success({ data: notes }) }),
+    [],
+  ],
+  FailedGetNotes: ({ message }) => [
+    evo(model, { notes: () => Notes.Failure({ error: message }) }),
+    [],
+  ],
+}),
 ```
 
 ## Paginated queries
