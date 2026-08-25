@@ -127,7 +127,7 @@ describe("FunctionReference", () => {
     expectTypeOf<Ref.Args<Ref.AnyConfect>>().toBeAny();
     expectTypeOf<Ref.Returns<Ref.AnyConfect>>().toBeAny();
     expectTypeOf<Ref.Error<Ref.AnyConfect>>().toBeAny();
-    expectTypeOf<Ref.ArgsSchema<Ref.AnyConfect>>().toMatchTypeOf<
+    expectTypeOf<Ref.ArgsSchema<Ref.AnyConfect>>().toExtend<
       Schema.Codec<any, any>
     >();
   });
