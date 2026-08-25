@@ -57,7 +57,7 @@ const GenerateFunctionsLayer = Layer.mergeAll(
   NodeFileSystem.layer,
 );
 
-const emptyArgs = Schema.Struct({});
+const emptyArgs = {};
 const emptyReturns = Schema.Null;
 
 const nodeGroup = () =>

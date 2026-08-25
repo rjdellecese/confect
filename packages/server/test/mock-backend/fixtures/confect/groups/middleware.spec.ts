@@ -10,21 +10,21 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicQuery({
       name: "viewerName",
-      args: () => Schema.Struct({}),
+      args: () => ({}),
       returns: () => Schema.String,
     }),
   )
   .addFunction(
     FunctionSpec.publicMutation({
       name: "viewerNameMutation",
-      args: () => Schema.Struct({}),
+      args: () => ({}),
       returns: () => Schema.String,
     }),
   )
   .addFunction(
     FunctionSpec.publicAction({
       name: "viewerNameAction",
-      args: () => Schema.Struct({}),
+      args: () => ({}),
       returns: () => Schema.String,
     }),
   )
@@ -33,7 +33,7 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicQuery({
       name: "firstNoteForViewer",
-      args: () => Schema.Struct({}),
+      args: () => ({}),
       returns: () => Schema.String,
       error: () => NoNotes,
     }),
@@ -41,7 +41,7 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicQuery({
       name: "shoutName",
-      args: () => Schema.Struct({}),
+      args: () => ({}),
       returns: () => Schema.String,
     }).middleware(RequireLongName),
   );

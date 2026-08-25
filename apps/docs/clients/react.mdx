@@ -45,7 +45,7 @@ import notes from "./_generated/tables/notes";
 export default GroupSpec.make().addFunction(
   FunctionSpec.publicQuery({
     name: "list",
-    args: () => Schema.Struct({}),
+    args: () => ({}),
     returns: () => Schema.Array(notes.Doc),
   }),
 );
@@ -205,7 +205,7 @@ import { Id } from "./_generated/id";
 
 FunctionSpec.publicMutation({
   name: "insert",
-  args: () => Schema.Struct({ text: Schema.String }),
+  args: () => ({ text: Schema.String }),
   returns: () => Id("notes"),
 });
 ```
@@ -234,7 +234,7 @@ import { Id } from "./_generated/id";
 
 FunctionSpec.publicMutation({
   name: "deleteOrFail",
-  args: () => Schema.Struct({ noteId: Id("notes") }),
+  args: () => ({ noteId: Id("notes") }),
   returns: () => Schema.Null,
   error: () => Schema.Union([NoteNotFound, Forbidden]),
 });
@@ -267,7 +267,7 @@ Same shape as `useMutation`: returns `Promise<A>` when the ref has no `error` sc
 ```ts confect/random.spec.ts
 FunctionSpec.publicAction({
   name: "getNumber",
-  args: () => Schema.Struct({}),
+  args: () => ({}),
   returns: () => Schema.Number,
 });
 ```

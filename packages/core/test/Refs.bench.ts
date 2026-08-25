@@ -6,7 +6,7 @@ import type * as Ref from "@confect/core/Ref";
 import type * as Refs from "@confect/core/Refs";
 import * as Spec from "@confect/core/Spec";
 
-const Args = Schema.Struct({});
+const Args = {};
 const Returns = Schema.String;
 
 // --- Small spec: 1 group, 2 functions ---

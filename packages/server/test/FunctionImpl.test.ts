@@ -11,7 +11,7 @@ import * as Schema from "effect/Schema";
 const fnSpec = <const Name extends string>(name: Name) =>
   FunctionSpec.publicQuery({
     name,
-    args: () => Schema.Struct({}),
+    args: () => ({}),
     returns: () => Schema.Null,
   });
 

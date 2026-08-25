@@ -12,14 +12,14 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicQuery({
       name: "getNote",
-      args: () => Schema.Struct({ noteId: Id("notes") }),
+      args: () => ({ noteId: Id("notes") }),
       returns: () => notes.Doc,
     }),
   )
   .addFunction(
     FunctionSpec.publicQuery({
       name: "listNotes",
-      args: () => Schema.Struct({}),
+      args: () => ({}),
       returns: () => Schema.Array(notes.Doc),
     }),
   )
@@ -32,14 +32,14 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicPaginatedQuery({
       name: "paginateNotesWithFilter",
-      args: () => Schema.Struct({ tag: Schema.String }),
+      args: () => ({ tag: Schema.String }),
       item: () => notes.Doc,
     }),
   )
   .addFunction(
     FunctionSpec.publicPaginatedQuery({
       name: "paginateNotesOrFail",
-      args: () => Schema.Struct({ shouldFail: Schema.Boolean }),
+      args: () => ({ shouldFail: Schema.Boolean }),
       item: () => notes.Doc,
       error: () => PaginationDenied,
     }),

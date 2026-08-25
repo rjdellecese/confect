@@ -5,9 +5,27 @@ import * as Lazy from "./Lazy";
 import * as PaginationOptions from "./PaginationOptions";
 import * as PaginationResult from "./PaginationResult";
 
+/**
+ * A field map accepted as Confect function args. Restricting each field to a
+ * context-free codec means the struct assembled from the fields can always be
+ * encoded and decoded synchronously at a Convex boundary.
+ */
+// eslint-disable-next-line import/namespace -- oxlint's namespace resolution misses type-only exports, and `Schema` is an interface/namespace
+export type ArgsFields = {
+  readonly [key: PropertyKey]: Schema.ConstraintCodec<any, any>;
+};
+
+/**
+ * An erased, struct-shaped Confect args schema. This structural view is used
+ * only after a concrete field map has been captured by a provenance.
+ */
+export interface AnyArgs extends Schema.Codec<any, any> {
+  readonly fields: ArgsFields;
+}
+
 export type FunctionProvenance = Data.TaggedEnum<{
   Confect: {
-    args: Schema.Codec<any, any>;
+    args: AnyArgs;
     returns: Schema.Codec<any, any>;
     error?: Schema.Codec<any, any>;
     kind: ConfectKind;
@@ -21,47 +39,57 @@ export type FunctionProvenance = Data.TaggedEnum<{
 /**
  * The declaration shape of a Confect function — orthogonal to both the
  * provenance origin (Confect vs Convex) and the function type
- * (query/mutation/action). A `Standard` function declares its `args` and
- * `returns` schemas directly; a `Paginated` function declares `userArgs` and
- * `item` schemas from which the Convex-facing `args`/`returns` are composed.
+ * (query/mutation/action). A `Standard` function declares its args fields and
+ * returns schema directly; a `Paginated` function declares user-args fields
+ * and an item schema from which the Convex-facing `args`/`returns` are
+ * composed.
  */
-export type ConfectKind = Standard | Paginated;
+export type ConfectKind = Standard | AnyPaginated;
 
 export interface Standard {
   readonly _tag: "Standard";
 }
 
 export interface Paginated<
-  UserArgs extends AnyUserArgs = AnyUserArgs,
+  UserArgsFields_ extends ArgsFields,
   Item extends Schema.Codec<any, any> = Schema.Codec<any, any>,
 > {
   readonly _tag: "Paginated";
   /** User-declared args — no `paginationOpts`. */
-  readonly userArgs: UserArgs;
+  readonly userArgs: Schema.Struct<UserArgsFields_>;
   /** Page element schema. */
   readonly item: Item;
   /** Mutable array of items — the page decode target. */
   readonly page: Schema.Codec<any, any>;
 }
 
+export interface AnyPaginated {
+  readonly _tag: "Paginated";
+  readonly userArgs: AnyArgs;
+  readonly item: Schema.Codec<any, any>;
+  readonly page: Schema.Codec<any, any>;
+}
+
 export interface Confect<
-  Args extends Schema.Codec<any, any>,
+  ArgsFields_ extends ArgsFields,
   Returns extends Schema.Codec<any, any>,
   Error extends Schema.Codec<any, any> = never,
   Kind extends ConfectKind = ConfectKind,
 > {
   readonly _tag: "Confect";
-  readonly args: Args;
+  readonly args: Schema.Struct<ArgsFields_>;
   readonly returns: Returns;
   readonly error?: Error;
   readonly kind: Kind;
 }
 
-export interface AnyConfect extends Confect<
-  Schema.Codec<any, any>,
-  Schema.Codec<any, any>,
-  Schema.Codec<any, any>
-> {}
+export interface AnyConfect {
+  readonly _tag: "Confect";
+  readonly args: AnyArgs;
+  readonly returns: Schema.Codec<any, any>;
+  readonly error?: Schema.Codec<any, any>;
+  readonly kind: ConfectKind;
+}
 
 export interface Convex<Args extends DefaultFunctionArgs, Returns> {
   readonly _tag: "Convex";
@@ -76,13 +104,13 @@ export const FunctionProvenance = Data.taggedEnum<FunctionProvenance>();
 const Standard: Standard = { _tag: "Standard" };
 
 /**
- * Build a `Confect` provenance from lazy schema thunks. `args`, `returns`,
- * and `error` are exposed as sync lazy memoised getters (via {@link Lazy.defineProperty})
- * that only evaluate their thunk on first access, mirroring how `Table`
- * defers `Fields`/`Doc`. This keeps importing the assembled
- * `_generated/spec.ts` cheap — no `Schema.Struct(...)` / `Schema.Array(...)`
- * work runs at module load; it is deferred to the first invocation that
- * actually compiles validators or runs a codec.
+ * Build a `Confect` provenance from lazy args-fields and schema thunks.
+ * `args`, `returns`, and `error` are exposed as sync lazy memoised getters
+ * (via {@link Lazy.defineProperty}) that only evaluate their thunk on first
+ * access, mirroring how `Table` defers `Fields`/`Doc`. This keeps importing the
+ * assembled `_generated/spec.ts` cheap — no `Schema.Struct(...)` /
+ * `Schema.Array(...)` work runs at module load; it is deferred to the first
+ * invocation that actually compiles validators or runs a codec.
  *
  * The object is built by hand rather than through `FunctionProvenance.Confect`
  * because the `Data` constructor copies its input with `Object.assign`, which
@@ -92,53 +120,40 @@ const Standard: Standard = { _tag: "Standard" };
  * relies on `Data`'s structural `Equal`/`Hash` for provenance values.
  */
 export const Confect = <
-  Args extends Schema.Codec<any, any>,
+  const ArgsFields_ extends ArgsFields,
   Returns extends Schema.Codec<any, any>,
   Error extends Schema.Codec<any, any> = never,
 >(
-  args: () => Args,
+  args: () => ArgsFields_,
   returns: () => Returns,
   error?: () => Error,
-): Confect<Args, Returns, Error, Standard> => {
+): Confect<ArgsFields_, Returns, Error, Standard> => {
   const provenance = { _tag: "Confect" as const, kind: Standard };
 
-  Lazy.defineProperty(provenance, "args", args);
+  Lazy.defineProperty(provenance, "args", () => Schema.Struct(args()));
   Lazy.defineProperty(provenance, "returns", returns);
   if (error !== undefined) {
     Lazy.defineProperty(provenance, "error", error);
   }
 
-  return provenance as Confect<Args, Returns, Error, Standard>;
+  return provenance as Confect<ArgsFields_, Returns, Error, Standard>;
 };
-
-/**
- * Any struct-shaped, context-free schema usable as a paginated query's user
- * args. A structural bound rather than `Schema.Struct<Schema.Struct.Fields>`
- * because `Schema.Struct` is not covariant in its fields parameter — concrete
- * structs do not extend `Schema.Struct<Schema.Struct.Fields>`.
- */
-// eslint-disable-next-line import/namespace -- oxlint's namespace resolution misses type-only exports, and `Schema` is an interface/namespace
-export interface AnyUserArgs extends Schema.Codec<any, any> {
-  readonly fields: Schema.Struct.Fields;
-}
 
 /**
  * The composed args schema of a paginated query: the user-declared fields
  * plus the `paginationOpts` field managed by Convex's pagination protocol.
  *
- * The `extends infer ... extends` conditional lets TypeScript accept the
- * composed struct where `Schema.Codec<any, any>` is required even while
- * `UserArgs` is an unresolved type parameter; for concrete user args it
- * evaluates away entirely.
+ * The fields-first representation keeps the user-declared map available for
+ * type-level composition without reconstructing it from an erased schema.
  */
-export type PaginatedArgs<UserArgs extends AnyUserArgs> =
-  Schema.Struct<
-    UserArgs["fields"] & {
-      paginationOpts: typeof PaginationOptions.PaginationOptions;
-    }
-  > extends infer ComposedArgs extends Schema.Codec<any, any>
-    ? ComposedArgs
-    : never;
+export type PaginatedArgsFields<UserArgsFields extends ArgsFields> =
+  UserArgsFields & {
+    readonly paginationOpts: typeof PaginationOptions.PaginationOptions;
+  };
+
+export type PaginatedArgs<UserArgsFields extends ArgsFields> = Schema.Struct<
+  PaginatedArgsFields<UserArgsFields>
+>;
 
 /**
  * The composed returns schema of a paginated query: a `PaginationResult` of
@@ -151,21 +166,19 @@ export type PaginatedReturns<Item extends Schema.Codec<any, any>> =
     : never;
 
 export interface ConfectPaginated<
-  UserArgs extends AnyUserArgs,
+  UserArgsFields extends ArgsFields,
   Item extends Schema.Codec<any, any>,
   Error extends Schema.Codec<any, any> = never,
 > extends Confect<
-  PaginatedArgs<UserArgs>,
+  PaginatedArgsFields<UserArgsFields>,
   PaginatedReturns<Item>,
   Error,
-  Paginated<UserArgs, Item>
+  Paginated<UserArgsFields, Item>
 > {}
 
-export interface AnyConfectPaginated extends ConfectPaginated<
-  AnyUserArgs,
-  Schema.Codec<any, any>,
-  Schema.Codec<any, any>
-> {}
+export interface AnyConfectPaginated extends AnyConfect {
+  readonly kind: AnyPaginated;
+}
 
 /**
  * Build the provenance of a paginated query from lazy schema thunks, with the
@@ -178,25 +191,25 @@ export interface AnyConfectPaginated extends ConfectPaginated<
  * composed schemas can never drift from the stored user schemas.
  */
 export const ConfectPaginated = <
-  UserArgs extends AnyUserArgs,
+  const UserArgsFields_ extends ArgsFields,
   Item extends Schema.Codec<any, any>,
   Error extends Schema.Codec<any, any> = never,
 >(
-  userArgs: () => UserArgs,
+  userArgs: () => UserArgsFields_,
   item: () => Item,
   error?: () => Error,
-): ConfectPaginated<UserArgs, Item, Error> => {
+): ConfectPaginated<UserArgsFields_, Item, Error> => {
   const kind = { _tag: "Paginated" as const };
-  const paginatedKind = kind as Paginated<UserArgs, Item>;
+  const paginatedKind = kind as Paginated<UserArgsFields_, Item>;
 
-  Lazy.defineProperty(kind, "userArgs", userArgs);
+  Lazy.defineProperty(kind, "userArgs", () => Schema.Struct(userArgs()));
   Lazy.defineProperty(kind, "item", item);
   Lazy.defineProperty(kind, "page", () =>
     Schema.mutable(Schema.Array(paginatedKind.item)),
   );
 
   const provenance = { _tag: "Confect" as const, kind: paginatedKind };
-  const self = provenance as ConfectPaginated<UserArgs, Item, Error>;
+  const self = provenance as ConfectPaginated<UserArgsFields_, Item, Error>;
 
   Lazy.defineProperty(provenance, "args", () => {
     const fields = paginatedKind.userArgs.fields;

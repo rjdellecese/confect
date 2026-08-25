@@ -12,7 +12,7 @@ const makeMutationRef = (functionNamespace: string, name: string) =>
     functionNamespace,
     FunctionSpec.internalMutation({
       name,
-      args: () => Schema.Struct({}),
+      args: () => ({}),
       returns: () => Schema.Void,
     }),
   );
@@ -22,7 +22,7 @@ const makeActionRef = (functionNamespace: string, name: string) =>
     functionNamespace,
     FunctionSpec.internalAction({
       name,
-      args: () => Schema.Struct({}),
+      args: () => ({}),
       returns: () => Schema.Void,
     }),
   );
@@ -32,7 +32,7 @@ const makeMutationRefWithArgs = (functionNamespace: string, name: string) =>
     functionNamespace,
     FunctionSpec.internalMutation({
       name,
-      args: () => Schema.Struct({ email: Schema.String }),
+      args: () => ({ email: Schema.String }),
       returns: () => Schema.Void,
     }),
   );

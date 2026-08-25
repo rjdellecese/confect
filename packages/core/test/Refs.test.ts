@@ -11,29 +11,19 @@ import * as Spec from "@confect/core/Spec";
 
 describe("make", () => {
   it("turns a spec into refs", () => {
-    const FnArgs = Schema.Struct({});
+    const FnArgs = {};
     const FnReturns = Schema.Array(Schema.String);
+    const list = FunctionSpec.publicQuery({
+      name: "list",
+      args: () => FnArgs,
+      returns: () => FnReturns,
+    });
 
-    const spec = Spec.make().add(
-      GroupSpec.makeAt("notes").addFunction(
-        FunctionSpec.publicQuery({
-          name: "list",
-          args: () => FnArgs,
-          returns: () => FnReturns,
-        }),
-      ),
-    );
+    const spec = Spec.make().add(GroupSpec.makeAt("notes").addFunction(list));
     const refs = Refs.make(spec);
 
     const actualRef = refs.public.notes.list;
-    const expectedRef = Ref.make(
-      "notes",
-      FunctionSpec.publicQuery({
-        name: "list",
-        args: () => FnArgs,
-        returns: () => FnReturns,
-      }),
-    );
+    const expectedRef = Ref.make("notes", list);
 
     expect(Ref.getConvexFunctionName(actualRef)).toStrictEqual(
       Ref.getConvexFunctionName(expectedRef),
@@ -49,7 +39,7 @@ describe("make", () => {
         .addFunction(
           FunctionSpec.publicQuery({
             name: "list",
-            args: () => Schema.Struct({}),
+            args: () => ({}),
             returns: () => Schema.Array(Schema.String),
           }),
         ),
@@ -60,7 +50,7 @@ describe("make", () => {
   });
 
   it("filters internal refs to only internal functions", () => {
-    const FnArgs = Schema.Struct({});
+    const FnArgs = {};
     const FnReturns = Schema.String;
 
     const spec = Spec.make().add(
@@ -86,8 +76,8 @@ describe("make", () => {
       Ref.ConfectRef<
         RuntimeAndFunctionType.ConvexQuery,
         "internal",
-        typeof FnArgs.Type,
-        typeof FnReturns.Type
+        typeof FnArgs,
+        typeof FnReturns
       >
     >();
 
@@ -96,7 +86,7 @@ describe("make", () => {
   });
 
   it("filters out groups with no matching functions", () => {
-    const FnArgs = Schema.Struct({});
+    const FnArgs = {};
     const FnReturns = Schema.String;
 
     const spec = Spec.make()
@@ -125,8 +115,8 @@ describe("make", () => {
       Ref.ConfectRef<
         RuntimeAndFunctionType.ConvexQuery,
         "internal",
-        typeof FnArgs.Type,
-        typeof FnReturns.Type
+        typeof FnArgs,
+        typeof FnReturns
       >
     >();
 
@@ -135,7 +125,7 @@ describe("make", () => {
   });
 
   it("filters public refs to only public functions", () => {
-    const FnArgs = Schema.Struct({});
+    const FnArgs = {};
     const FnReturns = Schema.String;
 
     const spec = Spec.make().add(
@@ -161,8 +151,8 @@ describe("make", () => {
       Ref.ConfectRef<
         RuntimeAndFunctionType.ConvexQuery,
         "public",
-        typeof FnArgs.Type,
-        typeof FnReturns.Type
+        typeof FnArgs,
+        typeof FnReturns
       >
     >();
 
@@ -258,8 +248,8 @@ describe("make", () => {
     type ConvexQueryArgs = { cursor: string };
     type ConvexQueryReturns = string[];
 
-    const ConfectQueryArgs = Schema.Struct({ limit: Schema.Finite });
-    type ConfectQueryArgs = typeof ConfectQueryArgs.Type;
+    const ConfectQueryArgs = { limit: Schema.Finite };
+    type ConfectQueryArgs = Schema.Struct.Type<typeof ConfectQueryArgs>;
 
     const ConfectQueryReturns = Schema.Array(Schema.String);
     type ConfectQueryReturns = typeof ConfectQueryReturns.Type;
@@ -289,8 +279,8 @@ describe("make", () => {
       Ref.ConfectRef<
         RuntimeAndFunctionType.ConvexQuery,
         "public",
-        ConfectQueryArgs,
-        ConfectQueryReturns
+        typeof ConfectQueryArgs,
+        typeof ConfectQueryReturns
       >
     >();
 
@@ -323,7 +313,7 @@ describe("middleware error unions", () => {
         .addFunction(
           FunctionSpec.publicMutation({
             name: "update",
-            args: () => Schema.Struct({}),
+            args: () => ({}),
             returns: () => Schema.Null,
           }),
         )
