@@ -1,7 +1,7 @@
 {
-  "name": "@confect/js",
-  "description": "JavaScript client bindings for any JS runtime",
-  "version": "10.0.0-next.18",
+  "name": "@confect/foldkit",
+  "description": "Client-side bindings for Foldkit apps",
+  "version": "10.0.0-next.17",
   "author": "RJ Dellecese",
   "bugs": {
     "url": "https://github.com/rjdellecese/confect/issues"
@@ -9,7 +9,9 @@
   "devDependencies": {
     "@effect/vitest": "4.0.0-rc.111",
     "@types/node": "22.20.1",
+    "convex": "1.44.0",
     "effect": "4.0.0-rc.111",
+    "foldkit": "0.148.1",
     "tsdown": "0.22.14",
     "typescript": "7.0.2",
     "unrun": "0.3.1",
@@ -41,15 +43,17 @@
   "homepage": "https://confect.dev",
   "keywords": [
     "convex",
-    "effect"
+    "effect",
+    "foldkit"
   ],
   "license": "ISC",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "peerDependencies": {
     "@confect/core": "workspace:^",
-    "convex": "^1.32.0",
-    "effect": "^4.0.0-rc.111"
+    "@confect/js": "workspace:^",
+    "effect": "^4.0.0-rc.111",
+    "foldkit": "^0.148.0"
   },
   "repository": {
     "type": "git",

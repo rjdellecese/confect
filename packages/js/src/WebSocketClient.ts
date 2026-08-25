@@ -1,17 +1,17 @@
 import * as Ref from "@confect/core/Ref";
 import { ConvexClient } from "convex/browser";
-import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Queue from "effect/Queue";
+import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
 export class WebSocketClientError extends Schema.TaggedError<WebSocketClientError>()(
   "WebSocketClientError",
   {
-    cause: Schema.Unknown,
+    cause: Schema.Defect(),
   },
 ) {}
 
@@ -98,48 +98,76 @@ const make = (
         );
       };
 
-      const reactiveQuery = <Query extends Ref.AnyPublicQuery>(
+      type ReactiveQueryError<Query extends Ref.AnyPublicQuery> =
+        | Ref.Error<Query>
+        | WebSocketClientError
+        | Schema.SchemaError;
+
+      const reactiveQueryResult = <Query extends Ref.AnyPublicQuery>(
         ref: Query,
         ...rest: Ref.OptionalArgs<Query>
       ): Stream.Stream<
-        Ref.Returns<Query>,
-        Ref.Error<Query> | WebSocketClientError | Schema.SchemaError
+        Result.Result<Ref.Returns<Query>, ReactiveQueryError<Query>>
       > => {
+        type QueryResult = Result.Result<
+          Ref.Returns<Query>,
+          ReactiveQueryError<Query>
+        >;
         const args = (rest[0] ?? {}) as Ref.Args<Query>;
         const functionReference = Ref.getFunctionReference(ref);
         const onError = Ref.decodeErrorOrElse(ref, mapUnknownError);
 
         return Stream.unwrap(
-          Effect.gen(function* () {
-            const encodedArgs = yield* Ref.encodeArgs(ref, args);
-
-            return Stream.callback<
-              unknown,
-              Ref.Error<Query> | WebSocketClientError
-            >((queue) =>
-              Effect.gen(function* () {
-                const unsubscribe = convexClient.onUpdate(
-                  functionReference,
-                  encodedArgs,
-                  (result) => {
-                    Queue.offerUnsafe(queue, result);
-                  },
-                  (error) => {
-                    Queue.failCauseUnsafe(queue, Cause.fail(onError(error)));
-                  },
-                );
-                yield* Effect.addFinalizer(() =>
-                  Effect.sync(() => unsubscribe()),
-                );
-              }),
-            );
+          Effect.match(Ref.encodeArgs(ref, args), {
+            onFailure: (error) =>
+              Stream.succeed<QueryResult>(Result.fail(error)),
+            onSuccess: (encodedArgs) =>
+              Stream.callback<
+                Result.Result<unknown, ReactiveQueryError<Query>>
+              >((queue) =>
+                Effect.gen(function* () {
+                  const unsubscribe = convexClient.onUpdate(
+                    functionReference,
+                    encodedArgs,
+                    (result) => {
+                      Queue.offerUnsafe(queue, Result.succeed(result));
+                    },
+                    (error) => {
+                      Queue.offerUnsafe(queue, Result.fail(onError(error)));
+                    },
+                  );
+                  yield* Effect.addFinalizer(() =>
+                    Effect.sync(() => unsubscribe()),
+                  );
+                }),
+              ),
           }),
         ).pipe(
-          Stream.mapEffect((encodedReturns) =>
-            Ref.decodeReturns(ref, encodedReturns),
+          Stream.mapEffect((result): Effect.Effect<QueryResult> =>
+            Result.match(result, {
+              onFailure: (error) => Effect.succeed(Result.fail(error)),
+              onSuccess: (encodedReturns) =>
+                Effect.match(Ref.decodeReturns(ref, encodedReturns), {
+                  onFailure: Result.fail,
+                  onSuccess: Result.succeed,
+                }),
+            }),
           ),
         );
       };
+
+      const reactiveQuery = <Query extends Ref.AnyPublicQuery>(
+        ref: Query,
+        ...rest: Ref.OptionalArgs<Query>
+      ): Stream.Stream<Ref.Returns<Query>, ReactiveQueryError<Query>> =>
+        reactiveQueryResult(ref, ...rest).pipe(
+          Stream.mapEffect(
+            Result.match({
+              onFailure: Effect.fail,
+              onSuccess: Effect.succeed,
+            }),
+          ),
+        );
 
       return {
         url,
@@ -148,6 +176,7 @@ const make = (
         mutation,
         action,
         reactiveQuery,
+        reactiveQueryResult,
       };
     }),
   );
