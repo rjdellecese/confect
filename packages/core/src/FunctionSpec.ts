@@ -1,11 +1,12 @@
 import type {
+  DefaultFunctionArgs,
   FunctionType,
   FunctionVisibility,
   RegisteredAction,
   RegisteredMutation,
   RegisteredQuery,
 } from "convex/server";
-import * as Schema from "effect/Schema";
+import type * as Schema from "effect/Schema";
 import * as Predicate from "effect/Predicate";
 import * as FunctionProvenance from "./FunctionProvenance";
 import { validateConfectFunctionIdentifier } from "./Identifier";
@@ -132,61 +133,77 @@ export type Name<FunctionSpec_ extends AnyWithProps> = FunctionSpec_["name"];
 export type MiddlewareSpecs<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_["middlewareSpecs"][number];
 
-export type Args<FunctionSpec_ extends AnyWithProps> = FunctionSpec_ extends {
-  functionProvenance: {
-    _tag: "Confect";
-    args: infer ArgsSchema_ extends Schema.Codec<any, any>;
-  };
-}
-  ? ArgsSchema_["Type"]
-  : FunctionSpec_ extends {
-        functionProvenance: { _tag: "Convex"; "~args": infer Args_ };
-      }
-    ? Args_
+/** The field map declared by a Confect-provenance spec. */
+export type ArgsFields<FunctionSpec_ extends AnyWithProps> =
+  FunctionSpec_ extends {
+    functionProvenance: FunctionProvenance.Confect<
+      infer ArgsFields_ extends FunctionProvenance.ArgsFields,
+      any,
+      any,
+      any
+    >;
+  }
+    ? ArgsFields_
     : never;
 
-/**
- * The args schema a Confect-provenance spec declares. `never` for
- * Convex-provenance specs, which carry no schema.
- */
+/** The args schema assembled from a Confect-provenance spec's field map. */
 export type ArgsSchema<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
-    functionProvenance: {
-      _tag: "Confect";
-      args: infer ArgsSchema_ extends FunctionProvenance.AnyArgs;
-    };
+    functionProvenance: FunctionProvenance.Confect<
+      infer ArgsFields_ extends FunctionProvenance.ArgsFields,
+      any,
+      any,
+      any
+    >;
   }
-    ? ArgsSchema_
+    ? Schema.Struct<ArgsFields_>
     : never;
 
-/**
- * The returns schema a Confect-provenance spec declares. `never` for
- * Convex-provenance specs, which carry no schema.
- */
 export type ReturnsSchema<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
-    functionProvenance: {
-      _tag: "Confect";
-      returns: infer ReturnsSchema_ extends Schema.Codec<any, any>;
-    };
+    functionProvenance: FunctionProvenance.Confect<
+      any,
+      infer ReturnsSchema_ extends Schema.Codec<any, any>,
+      any,
+      any
+    >;
   }
     ? ReturnsSchema_
     : never;
 
-/**
- * The error schema a Confect-provenance spec declares. `never` when the spec
- * declares none, and for Convex-provenance specs, which carry no schema.
- */
 export type ErrorSchema<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
     functionProvenance: FunctionProvenance.Confect<
       any,
       any,
-      infer ErrorSchema_ extends Schema.Codec<any, any>
+      infer ErrorSchema_ extends Schema.Codec<any, any>,
+      any
     >;
   }
     ? ErrorSchema_
     : never;
+
+export type Args<FunctionSpec_ extends AnyWithProps> = FunctionSpec_ extends {
+  functionProvenance: FunctionProvenance.Confect<
+    infer ArgsFields_ extends FunctionProvenance.ArgsFields,
+    any,
+    any,
+    any
+  >;
+}
+  ? Schema.Struct.Type<ArgsFields_>
+  : FunctionSpec_ extends {
+        functionProvenance: {
+          _tag: "Confect";
+          args: infer ArgsSchema_ extends Schema.Codec<any, any>;
+        };
+      }
+    ? ArgsSchema_["Type"]
+    : FunctionSpec_ extends {
+          functionProvenance: { _tag: "Convex"; "~args": infer Args_ };
+        }
+      ? Args_
+      : never;
 
 export type Returns<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
@@ -204,17 +221,26 @@ export type Returns<FunctionSpec_ extends AnyWithProps> =
 
 export type EncodedArgs<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
-    functionProvenance: {
-      _tag: "Confect";
-      args: infer ArgsSchema_ extends Schema.Codec<any, any>;
-    };
+    functionProvenance: FunctionProvenance.Confect<
+      infer ArgsFields_ extends FunctionProvenance.ArgsFields,
+      any,
+      any,
+      any
+    >;
   }
-    ? ArgsSchema_["Encoded"]
+    ? Schema.Struct.Encoded<ArgsFields_>
     : FunctionSpec_ extends {
-          functionProvenance: { _tag: "Convex"; "~args": infer Args_ };
+          functionProvenance: {
+            _tag: "Confect";
+            args: infer ArgsSchema_ extends Schema.Codec<any, any>;
+          };
         }
-      ? Args_
-      : never;
+      ? ArgsSchema_["Encoded"]
+      : FunctionSpec_ extends {
+            functionProvenance: { _tag: "Convex"; "~args": infer Args_ };
+          }
+        ? Args_
+        : never;
 
 export type EncodedReturns<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
@@ -334,7 +360,7 @@ const make =
   ) =>
   <
     const Name_ extends string,
-    Args_ extends FunctionProvenance.AnyArgs,
+    const ArgsFields_ extends FunctionProvenance.ArgsFields,
     Returns_ extends Schema.Codec<any, any>,
     Error_ extends Schema.Codec<any, any> = never,
   >({
@@ -344,14 +370,14 @@ const make =
     error,
   }: {
     name: Name_;
-    args: () => Args_;
+    args: () => ArgsFields_;
     returns: () => Returns_;
     error?: () => Error_;
   }): Builder<
     RuntimeAndFunctionType_,
     FunctionVisibility_,
     Name_,
-    FunctionProvenance.Confect<Args_, Returns_, Error_>
+    FunctionProvenance.Confect<ArgsFields_, Returns_, Error_>
   > => {
     validateConfectFunctionIdentifier(name);
 
@@ -370,58 +396,74 @@ const make =
  * constructors add themselves; the check reports at the `args` thunk with an
  * unsatisfiable type when violated.
  */
-type ForbidPaginationOpts<UserArgs extends FunctionProvenance.AnyUserArgs> =
-  "paginationOpts" extends keyof UserArgs["fields"]
-    ? { readonly fields: { readonly paginationOpts: never } }
-    : unknown;
+type ForbidPaginationOpts<
+  UserArgsFields extends FunctionProvenance.ArgsFields,
+> = "paginationOpts" extends keyof UserArgsFields
+  ? { readonly paginationOpts: never }
+  : unknown;
 
-const makePaginated =
-  <
-    RuntimeAndFunctionType_ extends
-      RuntimeAndFunctionType.RuntimeAndFunctionType,
-    FunctionVisibility_ extends FunctionVisibility,
-  >(
-    runtimeAndFunctionType: RuntimeAndFunctionType_,
-    functionVisibility: FunctionVisibility_,
-  ) =>
-  <
+interface AnyPaginatedOptions {
+  readonly name: string;
+  readonly args?: () => FunctionProvenance.ArgsFields;
+  readonly item: () => Schema.Codec<any, any>;
+  readonly error?: () => Schema.Codec<any, any>;
+}
+
+const makePaginated = <
+  RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
+  FunctionVisibility_ extends FunctionVisibility,
+>(
+  runtimeAndFunctionType: RuntimeAndFunctionType_,
+  functionVisibility: FunctionVisibility_,
+) => {
+  function makeSpec<
     const Name_ extends string,
     Item_ extends Schema.Codec<any, any>,
-    UserArgs_ extends FunctionProvenance.AnyUserArgs = Schema.Struct<{}>,
     Error_ extends Schema.Codec<any, any> = never,
-  >({
-    name,
-    args,
-    item,
-    error,
-  }: {
+  >(options: {
     name: Name_;
-    /** User-declared args, without `paginationOpts` — it is added automatically. */
-    args?: (() => UserArgs_) & ForbidPaginationOpts<UserArgs_>;
-    /** The page element schema. */
+    args?: never;
     item: () => Item_;
     error?: () => Error_;
   }): Builder<
     RuntimeAndFunctionType_,
     FunctionVisibility_,
     Name_,
-    FunctionProvenance.ConfectPaginated<UserArgs_, Item_, Error_>
-  > => {
+    FunctionProvenance.ConfectPaginated<{}, Item_, Error_>
+  >;
+  function makeSpec<
+    const Name_ extends string,
+    const UserArgsFields_ extends FunctionProvenance.ArgsFields,
+    Item_ extends Schema.Codec<any, any>,
+    Error_ extends Schema.Codec<any, any> = never,
+  >(options: {
+    name: Name_;
+    args: () => UserArgsFields_ & ForbidPaginationOpts<UserArgsFields_>;
+    item: () => Item_;
+    error?: () => Error_;
+  }): Builder<
+    RuntimeAndFunctionType_,
+    FunctionVisibility_,
+    Name_,
+    FunctionProvenance.ConfectPaginated<UserArgsFields_, Item_, Error_>
+  >;
+  function makeSpec({ name, args, item, error }: AnyPaginatedOptions) {
     validateConfectFunctionIdentifier(name);
 
     return Object.assign(Object.create(Proto), {
       runtimeAndFunctionType,
       functionVisibility,
       name,
-      functionProvenance: FunctionProvenance.ConfectPaginated(
-        // When `args` is omitted, `UserArgs_` is its `Schema.Struct<{}>` default.
-        args ?? ((() => Schema.Struct({})) as unknown as () => UserArgs_),
-        item,
-        error,
-      ),
+      functionProvenance:
+        args === undefined
+          ? FunctionProvenance.ConfectPaginated(() => ({}), item, error)
+          : FunctionProvenance.ConfectPaginated(args, item, error),
       middlewareSpecs: [],
     });
-  };
+  }
+
+  return makeSpec;
+};
 
 export const publicQuery = make(RuntimeAndFunctionType.ConvexQuery, "public");
 export const internalQuery = make(
@@ -472,11 +514,19 @@ type MatchingRegisteredFunction<
         : never;
 
 type ExtractArgs<F> =
-  F extends RegisteredQuery<any, infer A, any>
+  F extends RegisteredQuery<any, infer A extends DefaultFunctionArgs, any>
     ? A
-    : F extends RegisteredMutation<any, infer A, any>
+    : F extends RegisteredMutation<
+          any,
+          infer A extends DefaultFunctionArgs,
+          any
+        >
       ? A
-      : F extends RegisteredAction<any, infer A, any>
+      : F extends RegisteredAction<
+            any,
+            infer A extends DefaultFunctionArgs,
+            any
+          >
         ? A
         : never;
 

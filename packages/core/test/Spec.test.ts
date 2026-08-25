@@ -15,7 +15,7 @@ describe("isSpec", () => {
 });
 
 it("infers refs from addAt-assembled spec", () => {
-  const FnArgs = Schema.Struct({});
+  const FnArgs = {};
   const FnReturns = Schema.Array(Schema.String);
 
   const notes = GroupSpec.make().addFunction(
@@ -48,7 +48,7 @@ it("infers refs from addAt-assembled spec", () => {
 });
 
 it("places a Node group alongside Convex groups, with no `node` namespace", () => {
-  const FnArgs = Schema.Struct({});
+  const FnArgs = {};
   const FnReturns = Schema.Null;
 
   const notes = GroupSpec.make().addFunction(

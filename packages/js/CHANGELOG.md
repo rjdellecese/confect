@@ -1,5 +1,7 @@
 # @confect/js
 
+## 10.0.0-next.18
+
 ## 10.0.0-next.17
 
 ### Patch Changes

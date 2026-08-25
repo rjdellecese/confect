@@ -9,7 +9,7 @@ import * as Schema from "effect/Schema";
 export default GroupSpec.make().addFunction(
   FunctionSpec.internalQuery({
     name: "firstUsername",
-    args: () => Schema.Struct({}),
+    args: () => ({}),
     returns: () => Schema.NullOr(Schema.String),
   }),
 );

@@ -12,18 +12,17 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicMutation({
       name: "record",
-      args: () =>
-        Schema.Struct({
-          blocked: Schema.Boolean,
-          blockedAtFunction: Schema.Boolean,
-        }),
+      args: () => ({
+        blocked: Schema.Boolean,
+        blockedAtFunction: Schema.Boolean,
+      }),
       returns: () => Schema.Null,
     }).middleware(RecordFunctionLevel),
   )
   .addFunction(
     FunctionSpec.publicMutation({
       name: "recordPlain",
-      args: () => Schema.Struct({}),
+      args: () => ({}),
       returns: () => Schema.Null,
     }),
   );

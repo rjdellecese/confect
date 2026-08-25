@@ -22,7 +22,7 @@ import ProvideViewer, {
 
 const viewerName = FunctionSpec.publicQuery({
   name: "viewerName",
-  args: () => Schema.Struct({}),
+  args: () => ({}),
   returns: () => Schema.String,
 });
 
@@ -276,7 +276,7 @@ describe("registry key namespacing", () => {
 
     const clashFunction = FunctionSpec.publicQuery({
       name: "clash",
-      args: () => Schema.Struct({}),
+      args: () => ({}),
       returns: () => Schema.String,
     });
 

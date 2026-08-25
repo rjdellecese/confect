@@ -55,7 +55,7 @@ const listQueryRef = Ref.make(
   "notes",
   FunctionSpec.publicQuery({
     name: "list",
-    args: () => Schema.Struct({}),
+    args: () => ({}),
     returns: () => Schema.Struct({}),
   }),
 );
@@ -64,7 +64,7 @@ const insertMutationRef = Ref.make(
   "notes",
   FunctionSpec.publicMutation({
     name: "insert",
-    args: () => Schema.Struct({ text: Schema.String }),
+    args: () => ({ text: Schema.String }),
     returns: () => Schema.Struct({}),
   }),
 );
@@ -73,7 +73,7 @@ const sendActionRef = Ref.make(
   "email",
   FunctionSpec.publicAction({
     name: "send",
-    args: () => Schema.Struct({ to: Schema.String }),
+    args: () => ({ to: Schema.String }),
     returns: () => Schema.Struct({}),
   }),
 );
@@ -86,7 +86,7 @@ const deleteMutationRef = Ref.make(
   "notes",
   FunctionSpec.publicMutation({
     name: "deleteOrFail",
-    args: () => Schema.Struct({ id: Schema.String, scope: Schema.String }),
+    args: () => ({ id: Schema.String, scope: Schema.String }),
     returns: () => Schema.Null,
     error: () => NotFound,
   }),

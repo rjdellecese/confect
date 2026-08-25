@@ -5,19 +5,18 @@ export default GroupSpec.makeNode()
   .addFunction(
     FunctionSpec.publicNodeAction({
       name: "send",
-      args: () =>
-        Schema.Struct({
-          to: Schema.String,
-          subject: Schema.String,
-          body: Schema.String,
-        }),
+      args: () => ({
+        to: Schema.String,
+        subject: Schema.String,
+        body: Schema.String,
+      }),
       returns: () => Schema.Null,
     }),
   )
   .addFunction(
     FunctionSpec.publicNodeAction({
       name: "getInbox",
-      args: () => Schema.Struct({}),
+      args: () => ({}),
       returns: () =>
         Schema.Array(
           Schema.Struct({

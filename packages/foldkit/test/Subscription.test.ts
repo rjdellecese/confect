@@ -50,7 +50,7 @@ const getQueryRef = Ref.make(
   "notes",
   FunctionSpec.publicQuery({
     name: "get",
-    args: () => Schema.Struct({ id: Schema.String }),
+    args: () => ({ id: Schema.String }),
     returns: () => Schema.Struct({ text: Schema.String }),
   }),
 );
@@ -59,7 +59,7 @@ const listQueryRef = Ref.make(
   "notes",
   FunctionSpec.publicQuery({
     name: "list",
-    args: () => Schema.Struct({}),
+    args: () => ({}),
     returns: () => Schema.Struct({}),
   }),
 );
@@ -268,7 +268,7 @@ const paginateRef = Ref.make(
   "notes",
   FunctionSpec.publicPaginatedQuery({
     name: "paginate",
-    args: () => Schema.Struct({ channel: Schema.String }),
+    args: () => ({ channel: Schema.String }),
     item: () => Note,
   }),
 );

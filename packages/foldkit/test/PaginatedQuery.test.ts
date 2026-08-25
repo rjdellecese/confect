@@ -13,7 +13,7 @@ const paginateRef = Ref.make(
   "notes",
   FunctionSpec.publicPaginatedQuery({
     name: "paginate",
-    args: () => Schema.Struct({ channel: Schema.String }),
+    args: () => ({ channel: Schema.String }),
     item: () => Note,
   }),
 );
@@ -30,7 +30,7 @@ const standardQueryRef = Ref.make(
   "notes",
   FunctionSpec.publicQuery({
     name: "list",
-    args: () => Schema.Struct({}),
+    args: () => ({}),
     returns: () => Schema.Struct({}),
   }),
 );
