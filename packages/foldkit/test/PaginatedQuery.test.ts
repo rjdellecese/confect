@@ -1,5 +1,6 @@
 import { FunctionSpec, PaginationError, Ref } from "@confect/core";
 import { describe, expect, it } from "@effect/vitest";
+import type * as Data from "effect/Data";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
@@ -116,9 +117,9 @@ const loadedPageOne = (): Active => {
 const getPhase = <Tag extends Active["phase"]["_tag"]>(
   state: Active,
   tag: Tag,
-): Extract<Active["phase"], { readonly _tag: Tag }> => {
+): Data.TaggedEnum.Value<Active["phase"], Tag> => {
   expect(state.phase._tag).toBe(tag);
-  return state.phase as Extract<Active["phase"], { readonly _tag: Tag }>;
+  return state.phase as Data.TaggedEnum.Value<Active["phase"], Tag>;
 };
 
 describe("PaginatedQuery", () => {

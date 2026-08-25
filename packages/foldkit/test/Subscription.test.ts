@@ -244,7 +244,11 @@ const paginateRef = Ref.make(
 
 const Notes = PaginatedQuery.make(paginateRef);
 type PaginatedState = typeof Notes.schema.Type;
-type PaginatedActive = Extract<PaginatedState, { readonly _tag: "Active" }>;
+type PaginatedActive = PaginatedQuery.Active<
+  PaginatedQuery.Item<typeof paginateRef>,
+  PaginatedQuery.UserArgs<typeof paginateRef>,
+  PaginatedQuery.Error<typeof paginateRef>
+>;
 
 interface PaginatedModel {
   readonly notes: PaginatedState;
@@ -443,7 +447,7 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
 
         expect(messages).toHaveLength(2);
         expect(messages[0]!.settlement.result).toEqual(
-          Result.fail({ _tag: "FunctionError", error }),
+          Result.fail(PaginatedQuery.FunctionError({ error })),
         );
         expect(messages[1]!.settlement.result).toEqual(
           Result.succeed({
@@ -551,7 +555,9 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
         throw new Error("expected schema decoding to fail");
       }
       const errors: ReadonlyArray<PaginatedQuery.Error<typeof paginateRef>> = [
-        { _tag: "FunctionError", error: new PageDenied({ reason: "private" }) },
+        PaginatedQuery.FunctionError({
+          error: new PageDenied({ reason: "private" }),
+        }),
         new PaginationError.InvalidCursor({ cause: "expired" }),
         new Client.WebSocketClientError({ cause: "offline" }),
         schemaResult.failure,

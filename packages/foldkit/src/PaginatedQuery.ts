@@ -1,6 +1,7 @@
 import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import * as PaginationError from "@confect/core/PaginationError";
 import * as Ref from "@confect/core/Ref";
+import * as Data from "effect/Data";
 import * as Function from "effect/Function";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
@@ -53,32 +54,25 @@ export interface Page<Item_> {
   readonly isDone: boolean;
 }
 
-export interface Loading {
-  readonly _tag: "Loading";
-  readonly direction: Direction;
-}
+export type Loading = Data.TaggedEnum<{
+  Loading: { readonly direction: Direction };
+}>;
 
-export interface Refreshing<Item_> {
-  readonly _tag: "Refreshing";
-  readonly data: Page<Item_>;
-  readonly direction: Direction;
-}
+export type Refreshing<Item_> = Data.TaggedEnum<{
+  Refreshing: { readonly data: Page<Item_>; readonly direction: Direction };
+}>;
 
-export interface Success<Item_> {
-  readonly _tag: "Success";
-  readonly data: Page<Item_>;
-}
+export type Success<Item_> = Data.TaggedEnum<{
+  Success: { readonly data: Page<Item_> };
+}>;
 
-export interface Failure<Error_> {
-  readonly _tag: "Failure";
-  readonly error: Error_;
-}
+export type Failure<Error_> = Data.TaggedEnum<{
+  Failure: { readonly error: Error_ };
+}>;
 
-export interface Stale<Item_, Error_> {
-  readonly _tag: "Stale";
-  readonly data: Page<Item_>;
-  readonly error: Error_;
-}
+export type Stale<Item_, Error_> = Data.TaggedEnum<{
+  Stale: { readonly data: Page<Item_>; readonly error: Error_ };
+}>;
 
 export type Phase<Item_, Error_> =
   | Loading
@@ -87,29 +81,41 @@ export type Phase<Item_, Error_> =
   | Failure<Error_>
   | Stale<Item_, Error_>;
 
-/** A closed machine that retains its generation for stale-result rejection. */
-export interface Idle {
-  readonly _tag: "Idle";
-  readonly generation: number;
+interface PhaseDefinition extends Data.TaggedEnum.WithGenerics<2> {
+  readonly taggedEnum: Phase<this["A"], this["B"]>;
 }
 
+const Phase = Data.taggedEnum<PhaseDefinition>();
+
+/** A closed machine that retains its generation for stale-result rejection. */
+export type Idle = Data.TaggedEnum<{
+  Idle: { readonly generation: number };
+}>;
+
 /** A live cursor-pagination session. */
-export interface Active<Item_, UserArgs_, Error_> {
-  readonly _tag: "Active";
-  readonly generation: number;
-  readonly args: UserArgs_;
-  readonly options: Options;
-  readonly paginationId: Option.Option<number>;
-  readonly requestId: number;
-  readonly current: PageDescriptor;
-  readonly prevStack: ReadonlyArray<PageDescriptor>;
-  readonly phase: Phase<Item_, Error_>;
-}
+export type Active<Item_, UserArgs_, Error_> = Data.TaggedEnum<{
+  Active: {
+    readonly generation: number;
+    readonly args: UserArgs_;
+    readonly options: Options;
+    readonly paginationId: Option.Option<number>;
+    readonly requestId: number;
+    readonly current: PageDescriptor;
+    readonly prevStack: ReadonlyArray<PageDescriptor>;
+    readonly phase: Phase<Item_, Error_>;
+  };
+}>;
 
 /** A schema-backed cursor-pagination machine. */
 export type State<Item_, UserArgs_, Error_> =
   | Idle
   | Active<Item_, UserArgs_, Error_>;
+
+interface StateDefinition extends Data.TaggedEnum.WithGenerics<3> {
+  readonly taggedEnum: State<this["A"], this["B"], this["C"]>;
+}
+
+const State = Data.taggedEnum<StateDefinition>();
 
 /** The logical request from which a subscription allocates a session id. */
 export interface SubscriptionRequest<UserArgs_> {
@@ -157,15 +163,24 @@ export type UserArgs<Query extends Ref.AnyConfectPublicPaginatedQuery> = Omit<
   "paginationOpts"
 >;
 
+type TaggedFunctionError<Error_> = Data.TaggedEnum<{
+  FunctionError: { readonly error: Error_ };
+}>;
+
+interface FunctionErrorDefinition extends Data.TaggedEnum.WithGenerics<1> {
+  readonly taggedEnum: TaggedFunctionError<this["A"]>;
+}
+
+/** Constructs a declared function or middleware failure envelope. */
+export const FunctionError =
+  Data.taggedEnum<FunctionErrorDefinition>().FunctionError;
+
 /** A declared function or middleware failure, kept distinct from client errors. */
 export type FunctionError<Query extends Ref.AnyConfectPublicPaginatedQuery> = [
   Ref.Error<Query>,
 ] extends [never]
   ? never
-  : {
-      readonly _tag: "FunctionError";
-      readonly error: Ref.Error<Query>;
-    };
+  : TaggedFunctionError<Ref.Error<Query>>;
 
 /** Every failure a paginated query subscription can settle with. */
 export type Error<Query extends Ref.AnyConfectPublicPaginatedQuery> =
@@ -233,17 +248,17 @@ const initialState = <Item_, UserArgs_, Error_>(
   generation: number,
   args: UserArgs_,
   options: Options,
-): Active<Item_, UserArgs_, Error_> => ({
-  _tag: "Active",
-  generation,
-  args,
-  options: decodeOptions(options),
-  paginationId: Option.none(),
-  requestId: 1,
-  current: firstDescriptor(),
-  prevStack: [],
-  phase: { _tag: "Loading", direction: "Initial" },
-});
+): Active<Item_, UserArgs_, Error_> =>
+  State.Active<Item_, UserArgs_, Error_>({
+    generation,
+    args,
+    options: decodeOptions(options),
+    paginationId: Option.none(),
+    requestId: 1,
+    current: firstDescriptor(),
+    prevStack: [],
+    phase: Phase.Loading<Item_, Error_>({ direction: "Initial" }),
+  });
 
 const missingPaginatedProvenanceError = (ref: Ref.AnyConfect) =>
   new globalThis.Error(
@@ -301,13 +316,13 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
     continueCursor: Schema.String,
     isDone: Schema.Boolean,
   });
-  const phase = Schema.Union([
-    Schema.TaggedStruct("Loading", { direction: directions }),
-    Schema.TaggedStruct("Refreshing", { data: page, direction: directions }),
-    Schema.TaggedStruct("Success", { data: page }),
-    Schema.TaggedStruct("Failure", { error: errorSchema }),
-    Schema.TaggedStruct("Stale", { data: page, error: errorSchema }),
-  ]);
+  const phase = Schema.TaggedUnion({
+    Loading: { direction: directions },
+    Refreshing: { data: page, direction: directions },
+    Success: { data: page },
+    Failure: { error: errorSchema },
+    Stale: { data: page, error: errorSchema },
+  });
   const subscriptionRequestSchema: PaginatedQuery<Query>["subscriptionRequestSchema"] =
     Schema.Struct({
       generation: PositiveInt,
@@ -338,9 +353,9 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
       ]),
     ),
   });
-  const schema: PaginatedQuery<Query>["schema"] = Schema.Union([
-    Schema.TaggedStruct("Idle", { generation: NonNegativeInt }),
-    Schema.TaggedStruct("Active", {
+  const schema: PaginatedQuery<Query>["schema"] = Schema.TaggedUnion({
+    Idle: { generation: NonNegativeInt },
+    Active: {
       generation: PositiveInt,
       args: kind.userArgs,
       options: Options,
@@ -349,8 +364,8 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
       current: PageDescriptor,
       prevStack: Schema.Array(PageDescriptor),
       phase,
-    }),
-  ]);
+    },
+  });
   const settlement: PaginatedQuery<Query>["settlement"] = Schema.Struct({
     request: requestSchema,
     result: Schema.Result(pageResult, errorSchema),
@@ -429,7 +444,7 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
   return {
     ref,
     schema,
-    idle: { _tag: "Idle", generation: 0 },
+    idle: State.Idle({ generation: 0 }),
     subscriptionRequestSchema,
     requestSchema,
     settlement,
@@ -487,14 +502,14 @@ const pendingPhase = <Item_>(
   direction: Direction,
 ): Loading | Refreshing<Item_> =>
   Option.match(data, {
-    onNone: () => ({ _tag: "Loading", direction }),
-    onSome: (page) => ({ _tag: "Refreshing", data: page, direction }),
+    onNone: () => Phase.Loading<Item_, never>({ direction }),
+    onSome: (page) => Phase.Refreshing<Item_, never>({ data: page, direction }),
   });
 
 /** Close the subscription while retaining its generation tombstone. */
 export const close = <Item_, UserArgs_, Error_>(
   state: Active<Item_, UserArgs_, Error_>,
-): Idle => ({ _tag: "Idle", generation: state.generation });
+): Idle => State.Idle({ generation: state.generation });
 
 /** Start a fresh pagination session at page one while retaining visible data. */
 export const reset = <Item_, UserArgs_, Error_>(
@@ -531,7 +546,10 @@ export const next = <Item_, UserArgs_, Error_>(
               endCursor: Option.none(),
             },
             prevStack: [...state.prevStack, data.descriptor],
-            phase: { _tag: "Refreshing", data, direction: "Next" },
+            phase: Phase.Refreshing<Item_, Error_>({
+              data,
+              direction: "Next",
+            }),
           }),
         ),
         Match.exhaustive,
@@ -558,7 +576,10 @@ export const prev = <Item_, UserArgs_, Error_>(
             requestId: state.requestId + 1,
             current: previous,
             prevStack: state.prevStack.slice(0, -1),
-            phase: { _tag: "Refreshing", data, direction: "Previous" },
+            phase: Phase.Refreshing<Item_, Error_>({
+              data,
+              direction: "Previous",
+            }),
           }),
         ),
         Match.exhaustive,
@@ -685,7 +706,9 @@ const settleSuccess = <Item_, UserArgs_, Error_>(
         })),
         Match.when(false, () => ({
           ...state,
-          phase: { _tag: "Success", data: pageFromResult(state, result) },
+          phase: Phase.Success<Item_, Error_>({
+            data: pageFromResult(state, result),
+          }),
         })),
         Match.exhaustive,
       ),
@@ -700,8 +723,8 @@ const settleFailure = <Item_, UserArgs_, Error_>(
 ): Active<Item_, UserArgs_, Error_> => ({
   ...state,
   phase: Option.match(phaseData(state.phase), {
-    onNone: () => ({ _tag: "Failure", error }),
-    onSome: (data) => ({ _tag: "Stale", error, data }),
+    onNone: () => Phase.Failure<Item_, Error_>({ error }),
+    onSome: (data) => Phase.Stale<Item_, Error_>({ error, data }),
   }),
 });
 

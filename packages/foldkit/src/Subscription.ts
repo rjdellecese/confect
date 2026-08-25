@@ -43,10 +43,9 @@ const paginatedError = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
           Match.instanceOf(Client.WebSocketClientError),
           (clientError) => clientError,
         ),
-        Match.when(Match.any, (functionError) => ({
-          _tag: "FunctionError" as const,
-          error: functionError,
-        })),
+        Match.when(Match.any, (functionError) =>
+          PaginatedQuery.FunctionError({ error: functionError }),
+        ),
         Match.exhaustive,
       ) as PaginatedQuery.Error<Query>,
   });
