@@ -165,7 +165,8 @@ export type ArgsSchema<FunctionSpec_ extends AnyWithProps> =
     : FunctionSpec_ extends {
           readonly functionProvenance: {
             readonly _tag: "Confect";
-            readonly args: infer ArgsSchema_ extends FunctionProvenance.AnyArgs;
+            readonly args: infer ArgsSchema_ extends
+              FunctionProvenance.AnyArgsSchema;
           };
         }
       ? ArgsSchema_
@@ -316,7 +317,7 @@ const Proto = {
   },
 };
 
-interface AnyOptions {
+interface Options {
   readonly name: string;
   readonly args?: () => FunctionProvenance.ArgsFields;
   readonly returns: () => Schema.Codec<any, any>;
@@ -361,7 +362,7 @@ const make = <
     Name_,
     FunctionProvenance.Confect<{}, Returns_, Error_>
   >;
-  function makeSpec({ name, args, returns, error }: AnyOptions) {
+  function makeSpec({ name, args, returns, error }: Options) {
     validateConfectFunctionIdentifier(name);
 
     return Object.assign(Object.create(Proto), {
@@ -391,7 +392,7 @@ type ForbidPaginationOpts<
   ? { readonly paginationOpts: never }
   : unknown;
 
-interface AnyPaginatedOptions {
+interface PaginatedOptions {
   readonly name: string;
   readonly args?: () => FunctionProvenance.ArgsFields;
   readonly item: () => Schema.Codec<any, any>;
@@ -405,21 +406,6 @@ const makePaginated = <
   runtimeAndFunctionType: RuntimeAndFunctionType_,
   functionVisibility: FunctionVisibility_,
 ) => {
-  function makeSpec<
-    const Name_ extends string,
-    Item_ extends Schema.Codec<any, any>,
-    Error_ extends Schema.Codec<any, any> = never,
-  >(options: {
-    name: Name_;
-    args?: never;
-    item: () => Item_;
-    error?: () => Error_;
-  }): Builder<
-    RuntimeAndFunctionType_,
-    FunctionVisibility_,
-    Name_,
-    FunctionProvenance.ConfectPaginated<{}, Item_, Error_>
-  >;
   function makeSpec<
     const Name_ extends string,
     const UserArgsFields_ extends FunctionProvenance.ArgsFields,
@@ -436,7 +422,22 @@ const makePaginated = <
     Name_,
     FunctionProvenance.ConfectPaginated<UserArgsFields_, Item_, Error_>
   >;
-  function makeSpec({ name, args, item, error }: AnyPaginatedOptions) {
+  function makeSpec<
+    const Name_ extends string,
+    Item_ extends Schema.Codec<any, any>,
+    Error_ extends Schema.Codec<any, any> = never,
+  >(options: {
+    name: Name_;
+    args?: never;
+    item: () => Item_;
+    error?: () => Error_;
+  }): Builder<
+    RuntimeAndFunctionType_,
+    FunctionVisibility_,
+    Name_,
+    FunctionProvenance.ConfectPaginated<{}, Item_, Error_>
+  >;
+  function makeSpec({ name, args, item, error }: PaginatedOptions) {
     validateConfectFunctionIdentifier(name);
 
     return Object.assign(Object.create(Proto), {

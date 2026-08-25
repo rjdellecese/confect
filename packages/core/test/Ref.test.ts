@@ -122,6 +122,15 @@ describe("FunctionReference", () => {
     expectTypeOf<Ref.Returns<Ref_>>().toEqualTypeOf<void>();
   });
 
+  test("AnyConfect", () => {
+    expectTypeOf<Ref.Args<Ref.AnyConfect>>().toBeAny();
+    expectTypeOf<Ref.Returns<Ref.AnyConfect>>().toBeAny();
+    expectTypeOf<Ref.Error<Ref.AnyConfect>>().toBeAny();
+    expectTypeOf<Ref.ArgsSchema<Ref.AnyConfect>>().toMatchTypeOf<
+      Schema.Codec<any, any>
+    >();
+  });
+
   test("AnyQuery", () => {
     expectTypeOf<Ref.FunctionReference<Ref.AnyQuery>>().toEqualTypeOf<
       FunctionReference<"query", FunctionVisibility>

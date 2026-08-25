@@ -29,11 +29,11 @@ export interface ArgsSchema<
 }
 
 /** Erased structural view used after the exact field map is no longer needed. */
-export type AnyArgs = ArgsSchema<ArgsFields>;
+export type AnyArgsSchema = ArgsSchema<ArgsFields>;
 
 export type FunctionProvenance = Data.TaggedEnum<{
   Confect: {
-    args: AnyArgs;
+    args: AnyArgsSchema;
     returns: Schema.Codec<any, any>;
     error?: Schema.Codec<any, any>;
     kind: ConfectKind;
@@ -87,7 +87,7 @@ export interface Confect<
 
 export interface AnyConfect {
   readonly _tag: "Confect";
-  readonly args: AnyArgs;
+  readonly args: AnyArgsSchema;
   readonly returns: Schema.Codec<any, any>;
   readonly error?: Schema.Codec<any, any>;
   readonly kind: ConfectKind;

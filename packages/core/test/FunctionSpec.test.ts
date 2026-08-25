@@ -365,8 +365,8 @@ describe("paginated queries", () => {
     it("throws when the user args schema declares paginationOpts", () => {
       const spec = FunctionSpec.publicPaginatedQuery({
         name: "listPaginated",
+        // @ts-expect-error — paginationOpts must not be declared in user args
         args: () => ({
-          // @ts-expect-error — paginationOpts must not be declared in user args
           paginationOpts: Schema.Struct({ numItems: Schema.Finite }),
         }),
         item: () => item,
