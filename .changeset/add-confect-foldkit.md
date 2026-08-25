@@ -6,6 +6,7 @@ Add `@confect/foldkit` — client-side bindings for [Foldkit](https://foldkit.de
 
 ```ts
 import * as Confect from "@confect/foldkit";
+import * as Subscription from "foldkit/subscription";
 
 const SaveNote = Confect.Command.mutation(
   "SaveNote",
@@ -17,7 +18,7 @@ const SaveNote = Confect.Command.mutation(
   },
 );
 
-const subscriptions = FoldkitSubscription.make<
+const subscriptions = Subscription.make<
   Model,
   Message,
   Confect.WebSocketClient.WebSocketClient
@@ -41,7 +42,7 @@ const Notes = Confect.PaginatedQuery.make(refs.public.notes.paginate);
 // init:  Option.some(Notes.init({ channel }, { numItems: 20 }))
 // update: Confect.PaginatedQuery.settle(message.result), Confect.PaginatedQuery.next(state), ...
 
-const subscriptions = FoldkitSubscription.make<
+const subscriptions = Subscription.make<
   Model,
   Message,
   Confect.WebSocketClient.WebSocketClient

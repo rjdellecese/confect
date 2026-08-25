@@ -116,12 +116,15 @@ const paginatedArgsSchemaOrThrow = <
  * Pass the result as an entry value to `Subscription.make`:
  *
  * ```ts
+ * import * as Confect from "@confect/foldkit"
+ * import * as Subscription from "foldkit/subscription"
+ *
  * const subscriptions = Subscription.make<
  *   Model,
  *   Message,
- *   WebSocketClient.WebSocketClient
+ *   Confect.WebSocketClient.WebSocketClient
  * >()(() => ({
- *   note: Subscription.reactiveQuery<Model>()(refs.public.notes.get, {
+ *   note: Confect.Subscription.reactiveQuery<Model>()(refs.public.notes.get, {
  *     args: (model) => Option.map(model.noteId, (noteId) => ({ noteId })),
  *     onSuccess: (note) => SucceededGetNote({ note }),
  *     onError: (error) => FailedGetNote({ message: String(error) }),
@@ -179,12 +182,15 @@ export const reactiveQuery =
  * typed:
  *
  * ```ts
- * const subscriptions = FoldkitSubscription.make<
+ * import * as Confect from "@confect/foldkit"
+ * import * as Subscription from "foldkit/subscription"
+ *
+ * const subscriptions = Subscription.make<
  *   Model,
  *   Message,
- *   WebSocketClient.WebSocketClient
+ *   Confect.WebSocketClient.WebSocketClient
  * >()(() => ({
- *   notesPage: Subscription.paginatedQuery<Model>()(refs.public.notes.paginate, {
+ *   notesPage: Confect.Subscription.paginatedQuery<Model>()(refs.public.notes.paginate, {
  *     state: (model) => model.notes,
  *     onResult: (result) => SucceededGetNotesPage({ result }),
  *     onError: (error) => FailedGetNotesPage({ message: String(error) }),

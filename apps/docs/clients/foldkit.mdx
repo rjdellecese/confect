@@ -83,7 +83,7 @@ ref's `args` schema).
 ```ts src/subscription.ts
 import * as Confect from "@confect/foldkit";
 import * as Option from "effect/Option";
-import * as FoldkitSubscription from "foldkit/subscription";
+import * as Subscription from "foldkit/subscription";
 
 import refs from "../confect/_generated/refs";
 import {
@@ -93,7 +93,7 @@ import {
   type Model,
 } from "./model";
 
-export const subscriptions = FoldkitSubscription.make<
+export const subscriptions = Subscription.make<
   Model,
   Message,
   Confect.WebSocketClient.WebSocketClient
@@ -131,27 +131,25 @@ use `Subscription.reactiveQueryStream` as its `dependenciesToStream` body:
 ```ts
 import * as Schema from "effect/Schema";
 
-FoldkitSubscription.make<
-  Model,
-  Message,
-  Confect.WebSocketClient.WebSocketClient
->()((entry) => ({
-  note: entry(
-    { noteId: Schema.Option(Schema.String) },
-    {
-      modelToDependencies: (model) => ({ noteId: model.selectedNoteId }),
-      dependenciesToStream: ({ noteId }) =>
-        Option.match(noteId, {
-          onNone: () => Stream.empty,
-          onSome: (noteId) =>
-            Confect.Subscription.reactiveQueryStream(refs.public.notes.get, {
-              onSuccess: (note) => SucceededGetNote({ note }),
-              onError: (error) => FailedGetNote({ message: String(error) }),
-            })({ noteId }),
-        }),
-    },
-  ),
-}));
+Subscription.make<Model, Message, Confect.WebSocketClient.WebSocketClient>()(
+  (entry) => ({
+    note: entry(
+      { noteId: Schema.Option(Schema.String) },
+      {
+        modelToDependencies: (model) => ({ noteId: model.selectedNoteId }),
+        dependenciesToStream: ({ noteId }) =>
+          Option.match(noteId, {
+            onNone: () => Stream.empty,
+            onSome: (noteId) =>
+              Confect.Subscription.reactiveQueryStream(refs.public.notes.get, {
+                onSuccess: (note) => SucceededGetNote({ note }),
+                onError: (error) => FailedGetNote({ message: String(error) }),
+              })({ noteId }),
+          }),
+      },
+    ),
+  }),
+);
 ```
 
 ## Commands
@@ -358,9 +356,9 @@ Wire the subscription entry to the machine state:
 
 ```ts src/subscription.ts
 import * as Confect from "@confect/foldkit";
-import * as FoldkitSubscription from "foldkit/subscription";
+import * as Subscription from "foldkit/subscription";
 
-export const subscriptions = FoldkitSubscription.make<
+export const subscriptions = Subscription.make<
   Model,
   Message,
   Confect.WebSocketClient.WebSocketClient
