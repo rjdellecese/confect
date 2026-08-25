@@ -136,28 +136,37 @@ export type MiddlewareSpecs<FunctionSpec_ extends AnyWithProps> =
 /** The field map declared by a Confect-provenance spec. */
 export type ArgsFields<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
-    functionProvenance: FunctionProvenance.Confect<
-      infer ArgsFields_ extends FunctionProvenance.ArgsFields,
-      any,
-      any,
-      any
-    >;
+    functionProvenance: {
+      readonly _tag: "Confect";
+      readonly "~ArgsFields": infer ArgsFields_ extends
+        FunctionProvenance.ArgsFields;
+    };
   }
     ? ArgsFields_
-    : never;
+    : FunctionSpec_ extends {
+          functionProvenance: { readonly _tag: "Confect" };
+        }
+      ? FunctionProvenance.ArgsFields
+      : never;
 
 /** The args schema assembled from a Confect-provenance spec's field map. */
 export type ArgsSchema<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
-    functionProvenance: FunctionProvenance.Confect<
-      infer ArgsFields_ extends FunctionProvenance.ArgsFields,
-      any,
-      any,
-      any
-    >;
+    functionProvenance: {
+      readonly _tag: "Confect";
+      readonly "~ArgsFields": infer ArgsFields_ extends
+        FunctionProvenance.ArgsFields;
+    };
   }
     ? Schema.Struct<ArgsFields_>
-    : never;
+    : FunctionSpec_ extends {
+          functionProvenance: {
+            readonly _tag: "Confect";
+            readonly args: infer ArgsSchema_ extends FunctionProvenance.AnyArgs;
+          };
+        }
+      ? ArgsSchema_
+      : never;
 
 export type ReturnsSchema<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
@@ -184,12 +193,11 @@ export type ErrorSchema<FunctionSpec_ extends AnyWithProps> =
     : never;
 
 export type Args<FunctionSpec_ extends AnyWithProps> = FunctionSpec_ extends {
-  functionProvenance: FunctionProvenance.Confect<
-    infer ArgsFields_ extends FunctionProvenance.ArgsFields,
-    any,
-    any,
-    any
-  >;
+  functionProvenance: {
+    readonly _tag: "Confect";
+    readonly "~ArgsFields": infer ArgsFields_ extends
+      FunctionProvenance.ArgsFields;
+  };
 }
   ? Schema.Struct.Type<ArgsFields_>
   : FunctionSpec_ extends {
@@ -221,12 +229,11 @@ export type Returns<FunctionSpec_ extends AnyWithProps> =
 
 export type EncodedArgs<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
-    functionProvenance: FunctionProvenance.Confect<
-      infer ArgsFields_ extends FunctionProvenance.ArgsFields,
-      any,
-      any,
-      any
-    >;
+    functionProvenance: {
+      readonly _tag: "Confect";
+      readonly "~ArgsFields": infer ArgsFields_ extends
+        FunctionProvenance.ArgsFields;
+    };
   }
     ? Schema.Struct.Encoded<ArgsFields_>
     : FunctionSpec_ extends {
