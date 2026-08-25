@@ -16,12 +16,20 @@ export type ArgsFields = {
 };
 
 /**
- * An erased, struct-shaped Confect args schema. This structural view is used
- * only after a concrete field map has been captured by a provenance.
+ * A struct-shaped Confect args schema that keeps its exact field map while
+ * erasing the rest of `Schema.Struct`'s large implementation type. Decoded and
+ * encoded args are derived directly from `ArgsFields_`; keeping the runtime
+ * codec structural prevents every ref lookup from expanding the full Effect
+ * schema type.
  */
-export interface AnyArgs extends Schema.Codec<any, any> {
-  readonly fields: ArgsFields;
+export interface ArgsSchema<
+  ArgsFields_ extends ArgsFields,
+> extends Schema.Codec<any, any> {
+  readonly fields: ArgsFields_;
 }
+
+/** Erased structural view used after the exact field map is no longer needed. */
+export type AnyArgs = ArgsSchema<ArgsFields>;
 
 export type FunctionProvenance = Data.TaggedEnum<{
   Confect: {
@@ -56,7 +64,7 @@ export interface Paginated<
 > {
   readonly _tag: "Paginated";
   /** User-declared args — no `paginationOpts`. */
-  readonly userArgs: Schema.Struct<UserArgsFields_>;
+  readonly userArgs: ArgsSchema<UserArgsFields_>;
   /** Page element schema. */
   readonly item: Item;
   /** Mutable array of items — the page decode target. */
@@ -77,7 +85,9 @@ export interface Confect<
   Kind extends ConfectKind = ConfectKind,
 > {
   readonly _tag: "Confect";
-  readonly args: Schema.Struct<ArgsFields_>;
+  /** @internal Type-only metadata; no corresponding runtime property. */
+  readonly "~ArgsFields": ArgsFields_;
+  readonly args: ArgsSchema<ArgsFields_>;
   readonly returns: Returns;
   readonly error?: Error;
   readonly kind: Kind;
