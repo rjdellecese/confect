@@ -359,6 +359,7 @@ Wire the subscription entry to the machine state:
 
 ```ts src/subscription.ts
 import * as Confect from "@confect/foldkit";
+import * as Match from "effect/Match";
 import * as Subscription from "foldkit/subscription";
 
 export const subscriptions = Subscription.make<
@@ -369,9 +370,12 @@ export const subscriptions = Subscription.make<
   notesPage: Confect.Subscription.paginatedQuery<Model>()(Notes, {
     state: (model) => model.notes,
     mapError: (error) =>
-      Confect.PaginatedQuery.isInvalidCursor(error)
-        ? "InvalidCursor"
-        : "Failed",
+      Match.value(Confect.PaginatedQuery.isInvalidCursor(error)).pipe(
+        Match.withReturnType<typeof PageError.Type>(),
+        Match.when(true, () => "InvalidCursor"),
+        Match.when(false, () => "Failed"),
+        Match.exhaustive,
+      ),
     onSettled: (settlement) => SettledGetNotesPage({ settlement }),
   }),
 }));
@@ -419,13 +423,19 @@ export const update = (model: Model, message: Message): UpdateReturn =>
           notes: Option.map((state) =>
             Match.value(settlement.result).pipe(
               Match.tag("Failure", ({ failure }) =>
-                failure === "InvalidCursor" &&
-                Confect.PaginatedQuery.isCurrentRequest(
-                  state,
-                  settlement.request,
-                )
-                  ? Confect.PaginatedQuery.reset(state)
-                  : Confect.PaginatedQuery.settle(state, settlement),
+                Match.value(
+                  failure === "InvalidCursor" &&
+                    Confect.PaginatedQuery.isCurrentRequest(
+                      state,
+                      settlement.request,
+                    ),
+                ).pipe(
+                  Match.when(true, () => Confect.PaginatedQuery.reset(state)),
+                  Match.when(false, () =>
+                    Confect.PaginatedQuery.settle(state, settlement),
+                  ),
+                  Match.exhaustive,
+                ),
               ),
               Match.tag("Success", () =>
                 Confect.PaginatedQuery.settle(state, settlement),

@@ -1,6 +1,7 @@
 import { FunctionSpec, Ref } from "@confect/core";
 import { describe, expect, it } from "@effect/vitest";
 import { ConvexError } from "convex/values";
+import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
@@ -46,7 +47,14 @@ const descriptor = (
   endCursor?: string,
 ): PaginatedQuery.PageDescriptor => ({
   cursor,
-  endCursor: endCursor === undefined ? Option.none() : Option.some(endCursor),
+  endCursor: Match.value(endCursor).pipe(
+    Match.withReturnType<Option.Option<string>>(),
+    Match.when(undefined, () => Option.none()),
+    Match.when(Match.defined, (definedEndCursor) =>
+      Option.some(definedEndCursor),
+    ),
+    Match.exhaustive,
+  ),
 });
 
 const pageResult = (
@@ -523,11 +531,10 @@ describe("PaginatedQuery", () => {
 
     it("exposes tag predicates as refinements", () => {
       const state = loadedPageOne();
-      if (PaginatedQuery.isSuccess(state)) {
-        expectTypeOf(state.phase.data).toEqualTypeOf<
-          PaginatedQuery.Page<Item>
-        >();
-      }
+      const successfulState = [state].find(PaginatedQuery.isSuccess)!;
+      expectTypeOf(successfulState.phase.data).toEqualTypeOf<
+        PaginatedQuery.Page<Item>
+      >();
       expect(PaginatedQuery.isLoading(initial())).toBe(true);
       expect(PaginatedQuery.isSuccess(state)).toBe(true);
       expect(PaginatedQuery.isRefreshing(state)).toBe(false);

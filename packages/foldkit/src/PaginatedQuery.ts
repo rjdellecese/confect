@@ -282,33 +282,62 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery, Error_>(
     argsOrOptions: UserArgs<Query> | Options,
     options?: Options,
   ): MachineState<Query, Error_> =>
-    options === undefined
-      ? initialState({} as UserArgs<Query>, argsOrOptions as Options)
-      : initialState(argsOrOptions as UserArgs<Query>, options);
+    Match.value(options).pipe(
+      Match.withReturnType<MachineState<Query, Error_>>(),
+      Match.when(undefined, () =>
+        initialState({} as UserArgs<Query>, argsOrOptions as Options),
+      ),
+      Match.when(Match.defined, (definedOptions) =>
+        initialState(argsOrOptions as UserArgs<Query>, definedOptions),
+      ),
+      Match.exhaustive,
+    );
 
   const reinitialize: PaginatedQuery<Query, Error_>["reinitialize"] = (
     state: MachineState<Query, Error_>,
     argsOrOptions?: UserArgs<Query> | Options,
     options?: Options,
-  ): MachineState<Query, Error_> => {
-    if (options !== undefined) {
-      return initialState(
-        argsOrOptions as UserArgs<Query>,
-        options,
-        state.requestId + 1,
-      );
-    }
-    if (argsOrOptions === undefined) {
-      return initialState(state.args, state.options, state.requestId + 1);
-    }
-    return hasUserArgs
-      ? initialState(
+  ): MachineState<Query, Error_> =>
+    Match.value(options).pipe(
+      Match.withReturnType<MachineState<Query, Error_>>(),
+      Match.when(Match.defined, (definedOptions) =>
+        initialState(
           argsOrOptions as UserArgs<Query>,
-          state.options,
+          definedOptions,
           state.requestId + 1,
-        )
-      : initialState(state.args, argsOrOptions as Options, state.requestId + 1);
-  };
+        ),
+      ),
+      Match.when(undefined, () =>
+        Match.value(argsOrOptions).pipe(
+          Match.withReturnType<MachineState<Query, Error_>>(),
+          Match.when(undefined, () =>
+            initialState(state.args, state.options, state.requestId + 1),
+          ),
+          Match.when(Match.defined, (definedArgsOrOptions) =>
+            Match.value(hasUserArgs).pipe(
+              Match.withReturnType<MachineState<Query, Error_>>(),
+              Match.when(true, () =>
+                initialState(
+                  definedArgsOrOptions as UserArgs<Query>,
+                  state.options,
+                  state.requestId + 1,
+                ),
+              ),
+              Match.when(false, () =>
+                initialState(
+                  state.args,
+                  definedArgsOrOptions as Options,
+                  state.requestId + 1,
+                ),
+              ),
+              Match.exhaustive,
+            ),
+          ),
+          Match.exhaustive,
+        ),
+      ),
+      Match.exhaustive,
+    );
 
   return { ref, schema, requestSchema, settlement, init, reinitialize };
 };
@@ -363,9 +392,11 @@ export const next = <Item_, UserArgs_, Error_>(
   Match.value(state.phase).pipe(
     Match.withReturnType<Option.Option<State<Item_, UserArgs_, Error_>>>(),
     Match.tag("Success", ({ data }) =>
-      data.isDone
-        ? Option.none()
-        : Option.some({
+      Match.value(data.isDone).pipe(
+        Match.withReturnType<Option.Option<State<Item_, UserArgs_, Error_>>>(),
+        Match.when(true, () => Option.none()),
+        Match.when(false, () =>
+          Option.some({
             ...state,
             requestId: state.requestId + 1,
             current: {
@@ -378,6 +409,9 @@ export const next = <Item_, UserArgs_, Error_>(
             prevStack: [...state.prevStack, data.descriptor],
             phase: { _tag: "Refreshing", data, direction: "Next" },
           }),
+        ),
+        Match.exhaustive,
+      ),
     ),
     Match.tag("Loading", "Refreshing", "Failure", "Stale", () => Option.none()),
     Match.exhaustive,
@@ -391,15 +425,20 @@ export const prev = <Item_, UserArgs_, Error_>(
     Match.withReturnType<Option.Option<State<Item_, UserArgs_, Error_>>>(),
     Match.tag("Success", ({ data }) => {
       const current = state.prevStack.at(-1);
-      return current === undefined
-        ? Option.none()
-        : Option.some({
+      return Match.value(current).pipe(
+        Match.withReturnType<Option.Option<State<Item_, UserArgs_, Error_>>>(),
+        Match.when(undefined, () => Option.none()),
+        Match.when(Match.defined, (previous) =>
+          Option.some({
             ...state,
             requestId: state.requestId + 1,
-            current,
+            current: previous,
             prevStack: state.prevStack.slice(0, -1),
             phase: { _tag: "Refreshing", data, direction: "Previous" },
-          });
+          }),
+        ),
+        Match.exhaustive,
+      );
     }),
     Match.tag("Loading", "Refreshing", "Failure", "Stale", () => Option.none()),
     Match.exhaustive,
@@ -409,16 +448,23 @@ export const prev = <Item_, UserArgs_, Error_>(
 export const first = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
 ): Option.Option<State<Item_, UserArgs_, Error_>> =>
-  state.prevStack.length === 0 &&
-  descriptorEquals(state.current, firstDescriptor())
-    ? Option.none()
-    : Option.some({
+  Match.value(
+    state.prevStack.length === 0 &&
+      descriptorEquals(state.current, firstDescriptor()),
+  ).pipe(
+    Match.withReturnType<Option.Option<State<Item_, UserArgs_, Error_>>>(),
+    Match.when(true, () => Option.none()),
+    Match.when(false, () =>
+      Option.some({
         ...state,
         requestId: state.requestId + 1,
         current: firstDescriptor(),
         prevStack: [],
         phase: pendingPhase(phaseData(state.phase), "First"),
-      });
+      }),
+    ),
+    Match.exhaustive,
+  );
 
 /** Reopen a failed request at the same page with a fresh pagination id. */
 export const retry = <Item_, UserArgs_, Error_>(
@@ -467,11 +513,19 @@ export const isCurrentRequest = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
   candidate: Request<UserArgs_>,
 ): boolean =>
-  state.phase._tag !== "Failure" &&
-  state.phase._tag !== "Stale" &&
-  state.paginationId === candidate.paginationId &&
-  state.requestId === candidate.requestId &&
-  descriptorEquals(state.current, candidate.descriptor);
+  Match.value(state.phase).pipe(
+    Match.tag("Failure", "Stale", () => false),
+    Match.tag(
+      "Loading",
+      "Refreshing",
+      "Success",
+      () =>
+        state.paginationId === candidate.paginationId &&
+        state.requestId === candidate.requestId &&
+        descriptorEquals(state.current, candidate.descriptor),
+    ),
+    Match.exhaustive,
+  );
 
 const pageFromResult = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
@@ -491,43 +545,56 @@ const settleSuccess = <Item_, UserArgs_, Error_>(
   const splitCursor = result.splitCursor;
   const splitSignaled = Match.value(result.pageStatus).pipe(
     Match.whenOr("SplitRecommended", "SplitRequired", () => true),
-    Match.orElse(() => false),
+    Match.whenOr(null, undefined, () => false),
+    Match.exhaustive,
   );
   const shouldSplit =
     typeof splitCursor === "string" &&
     (splitSignaled || result.page.length > 2 * state.options.initialNumItems);
+  const shouldRetreat =
+    result.page.length === 0 && result.isDone && state.prevStack.length > 0;
 
-  if (shouldSplit) {
-    const deliveredPage = pageFromResult(state, result);
-    const previous =
-      result.pageStatus === "SplitRequired"
-        ? phaseData(state.phase)
-        : Option.some(deliveredPage);
-    return {
-      ...state,
-      requestId: state.requestId + 1,
-      current: {
-        cursor: state.current.cursor,
-        endCursor: Option.some(splitCursor),
-      },
-      phase: pendingPhase(previous, "Split"),
-    };
-  }
-
-  if (result.page.length === 0 && result.isDone && state.prevStack.length > 0) {
-    return {
-      ...state,
-      requestId: state.requestId + 1,
-      current: state.prevStack[state.prevStack.length - 1],
-      prevStack: state.prevStack.slice(0, -1),
-      phase: pendingPhase(phaseData(state.phase), "Previous"),
-    };
-  }
-
-  return {
-    ...state,
-    phase: { _tag: "Success", data: pageFromResult(state, result) },
-  };
+  return Match.value(shouldSplit).pipe(
+    Match.withReturnType<State<Item_, UserArgs_, Error_>>(),
+    Match.when(true, () => {
+      const deliveredPage = pageFromResult(state, result);
+      const previous = Match.value(result.pageStatus).pipe(
+        Match.withReturnType<Option.Option<Page<Item_>>>(),
+        Match.when("SplitRequired", () => phaseData(state.phase)),
+        Match.whenOr("SplitRecommended", null, undefined, () =>
+          Option.some(deliveredPage),
+        ),
+        Match.exhaustive,
+      );
+      return {
+        ...state,
+        requestId: state.requestId + 1,
+        current: {
+          cursor: state.current.cursor,
+          endCursor: Option.fromNullishOr(splitCursor),
+        },
+        phase: pendingPhase(previous, "Split"),
+      };
+    }),
+    Match.when(false, () =>
+      Match.value(shouldRetreat).pipe(
+        Match.withReturnType<State<Item_, UserArgs_, Error_>>(),
+        Match.when(true, () => ({
+          ...state,
+          requestId: state.requestId + 1,
+          current: state.prevStack[state.prevStack.length - 1],
+          prevStack: state.prevStack.slice(0, -1),
+          phase: pendingPhase(phaseData(state.phase), "Previous"),
+        })),
+        Match.when(false, () => ({
+          ...state,
+          phase: { _tag: "Success", data: pageFromResult(state, result) },
+        })),
+        Match.exhaustive,
+      ),
+    ),
+    Match.exhaustive,
+  );
 };
 
 const settleFailure = <Item_, UserArgs_, Error_>(
@@ -562,15 +629,18 @@ export const settle: {
   <Item_, UserArgs_, Error_>(
     state: State<Item_, UserArgs_, Error_>,
     settlement: Settlement<Item_, UserArgs_, Error_>,
-  ): State<Item_, UserArgs_, Error_> => {
-    if (!isCurrentRequest(state, settlement.request)) {
-      return state;
-    }
-    return Result.match(settlement.result, {
-      onSuccess: (result) => settleSuccess(state, result),
-      onFailure: (error) => settleFailure(state, error),
-    });
-  },
+  ): State<Item_, UserArgs_, Error_> =>
+    Match.value(isCurrentRequest(state, settlement.request)).pipe(
+      Match.withReturnType<State<Item_, UserArgs_, Error_>>(),
+      Match.when(false, () => state),
+      Match.when(true, () =>
+        Result.match(settlement.result, {
+          onSuccess: (result) => settleSuccess(state, result),
+          onFailure: (error) => settleFailure(state, error),
+        }),
+      ),
+      Match.exhaustive,
+    ),
 );
 
 /** The complete page currently available to render. */
@@ -614,7 +684,12 @@ export const isFirst = <Item_, UserArgs_, Error_>(
 
 export const isLast = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
-): boolean => state.phase._tag === "Success" && state.phase.data.isDone;
+): boolean =>
+  Match.value(state.phase).pipe(
+    Match.tag("Success", ({ data }) => data.isDone),
+    Match.tag("Loading", "Refreshing", "Failure", "Stale", () => false),
+    Match.exhaustive,
+  );
 
 type WithPhase<State_, Phase_> = Omit<State_, "phase"> & {
   readonly phase: Phase_;
@@ -647,15 +722,30 @@ export const isStale = <Item_, UserArgs_, Error_>(
 
 export const isPending = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
-): boolean => isLoading(state) || isRefreshing(state);
+): boolean =>
+  Match.value(state.phase).pipe(
+    Match.tag("Loading", "Refreshing", () => true),
+    Match.tag("Success", "Failure", "Stale", () => false),
+    Match.exhaustive,
+  );
 
 export const canNext = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
-): boolean => state.phase._tag === "Success" && !state.phase.data.isDone;
+): boolean =>
+  Match.value(state.phase).pipe(
+    Match.tag("Success", ({ data }) => !data.isDone),
+    Match.tag("Loading", "Refreshing", "Failure", "Stale", () => false),
+    Match.exhaustive,
+  );
 
 export const canPrev = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,
-): boolean => state.phase._tag === "Success" && state.prevStack.length > 0;
+): boolean =>
+  Match.value(state.phase).pipe(
+    Match.tag("Success", () => state.prevStack.length > 0),
+    Match.tag("Loading", "Refreshing", "Failure", "Stale", () => false),
+    Match.exhaustive,
+  );
 
 /** Pattern-match exhaustively on the machine's AsyncData-style phase. */
 export const match: {
@@ -698,24 +788,35 @@ export const match: {
     ) as A | B | C | D | E,
 );
 
-const matchesInvalidCursor = (error: unknown): boolean => {
-  if (Ref.isConvexError(error)) {
-    const data: unknown = error.data;
-    return (
-      typeof data === "object" &&
-      data !== null &&
-      "isConvexSystemError" in data &&
-      data.isConvexSystemError === true &&
-      "paginationError" in data &&
-      data.paginationError === "InvalidCursor"
-    );
-  }
-  return (
-    error instanceof globalThis.Error && error.message.includes("InvalidCursor")
+const matchesInvalidCursor = (error: unknown): boolean =>
+  Match.value(error).pipe(
+    Match.when(Ref.isConvexError, ({ data }) => {
+      const value: unknown = data;
+      return (
+        typeof value === "object" &&
+        value !== null &&
+        "isConvexSystemError" in value &&
+        value.isConvexSystemError === true &&
+        "paginationError" in value &&
+        value.paginationError === "InvalidCursor"
+      );
+    }),
+    Match.when(Match.instanceOf(globalThis.Error), (cause) =>
+      cause.message.includes("InvalidCursor"),
+    ),
+    Match.when(Match.any, () => false),
+    Match.exhaustive,
   );
-};
 
 /** Whether a raw page-subscription error reports an invalid cursor. */
 export const isInvalidCursor = (error: unknown): boolean =>
-  matchesInvalidCursor(error) ||
-  (error instanceof WebSocketClientError && matchesInvalidCursor(error.cause));
+  Match.value(error).pipe(
+    Match.when(
+      Match.instanceOf(WebSocketClientError),
+      (webSocketError) =>
+        matchesInvalidCursor(webSocketError) ||
+        matchesInvalidCursor(webSocketError.cause),
+    ),
+    Match.when(Match.any, matchesInvalidCursor),
+    Match.exhaustive,
+  );

@@ -253,12 +253,20 @@ export const paginatedQuery =
                 numItems: options.initialNumItems,
                 cursor: descriptor.cursor,
                 id: paginationId,
-                ...(options.maximumRowsRead === undefined
-                  ? {}
-                  : { maximumRowsRead: options.maximumRowsRead }),
-                ...(options.maximumBytesRead === undefined
-                  ? {}
-                  : { maximumBytesRead: options.maximumBytesRead }),
+                ...Match.value(options.maximumRowsRead).pipe(
+                  Match.when(undefined, () => ({})),
+                  Match.when(Match.defined, (maximumRowsRead) => ({
+                    maximumRowsRead,
+                  })),
+                  Match.exhaustive,
+                ),
+                ...Match.value(options.maximumBytesRead).pipe(
+                  Match.when(undefined, () => ({})),
+                  Match.when(Match.defined, (maximumBytesRead) => ({
+                    maximumBytesRead,
+                  })),
+                  Match.exhaustive,
+                ),
                 ...Option.match(descriptor.endCursor, {
                   onNone: () => ({}),
                   onSome: (endCursor) => ({ endCursor }),
