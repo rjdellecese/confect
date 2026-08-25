@@ -284,14 +284,16 @@ interface PaginatedModel {
   >;
 }
 
-const SettledNotesPage = m("SettledNotesPage", { result: Schema.Unknown });
-const FailedNotesPage = m("FailedNotesPage", { error: Schema.Unknown });
+const SucceededGetNotesPage = m("SucceededGetNotesPage", {
+  result: Schema.Unknown,
+});
+const FailedGetNotesPage = m("FailedGetNotesPage", { error: Schema.Unknown });
 
 const makePaginatedEntry = () =>
   Subscription.paginatedQuery<PaginatedModel>()(paginateRef, {
     state: (model) => model.notes,
-    onResult: (result) => SettledNotesPage({ result }),
-    onError: (error) => FailedNotesPage({ error }),
+    onResult: (result) => SucceededGetNotesPage({ result }),
+    onError: (error) => FailedGetNotesPage({ error }),
   });
 
 const initialMachine = () =>
@@ -372,7 +374,7 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
         );
 
         expect(messages).toEqual([
-          SettledNotesPage({
+          SucceededGetNotesPage({
             result: {
               descriptor: { cursor: null, endCursor: Option.none() },
               page: [{ text: "a" }],
@@ -412,7 +414,7 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
         );
 
         expect(messages).toEqual([
-          SettledNotesPage({
+          SucceededGetNotesPage({
             result: {
               descriptor: { cursor: null, endCursor: Option.some("s") },
               page: [],
@@ -441,7 +443,7 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
           }),
         );
 
-        expect(messages).toEqual([FailedNotesPage({ error })]);
+        expect(messages).toEqual([FailedGetNotesPage({ error })]);
       }),
     );
 
@@ -514,8 +516,8 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
           getQueryRef as unknown as Ref.AnyConfectPublicPaginatedQuery,
           {
             state: (model) => model.notes,
-            onResult: (result) => SettledNotesPage({ result }),
-            onError: (error) => FailedNotesPage({ error }),
+            onResult: (result) => SucceededGetNotesPage({ result }),
+            onError: (error) => FailedGetNotesPage({ error }),
           },
         ),
       ).toThrow(/FunctionSpec.publicPaginatedQuery/);
@@ -524,7 +526,7 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
     it("is accepted by Foldkit's Subscription.make", () => {
       const subscriptions = FoldkitSubscription.make<
         PaginatedModel,
-        typeof SettledNotesPage.Type | typeof FailedNotesPage.Type,
+        typeof SucceededGetNotesPage.Type | typeof FailedGetNotesPage.Type,
         WebSocketClient.WebSocketClient
       >()(() => ({
         notesPage: makePaginatedEntry(),

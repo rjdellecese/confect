@@ -186,8 +186,8 @@ export const reactiveQuery =
  * >()(() => ({
  *   notesPage: Subscription.paginatedQuery<Model>()(refs.public.notes.paginate, {
  *     state: (model) => model.notes,
- *     onResult: (result) => SettledNotesPage({ result }),
- *     onError: (error) => FailedNotesPage({ message: String(error) }),
+ *     onResult: (result) => SucceededGetNotesPage({ result }),
+ *     onError: (error) => FailedGetNotesPage({ message: String(error) }),
  *   }),
  * }))
  * ```

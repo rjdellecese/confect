@@ -346,10 +346,12 @@ export const Model = Schema.Struct({
   notes: Schema.Option(Notes.schema),
 });
 
-export const SettledNotesPage = m("SettledNotesPage", {
+export const SucceededGetNotesPage = m("SucceededGetNotesPage", {
   result: Notes.pageResult,
 });
-export const FailedNotesPage = m("FailedNotesPage", { error: Schema.Unknown });
+export const FailedGetNotesPage = m("FailedGetNotesPage", {
+  error: Schema.Unknown,
+});
 ```
 
 Wire the subscription entry to the machine state:
@@ -367,8 +369,8 @@ export const subscriptions = FoldkitSubscription.make<
     refs.public.notes.paginate,
     {
       state: (model) => model.notes,
-      onResult: (result) => SettledNotesPage({ result }),
-      onError: (error) => FailedNotesPage({ error }),
+      onResult: (result) => SucceededGetNotesPage({ result }),
+      onError: (error) => FailedGetNotesPage({ error }),
     },
   ),
 }));
@@ -397,7 +399,7 @@ export const update = (model: Model, message: Message): UpdateReturn =>
         }),
         [],
       ],
-      SettledNotesPage: ({ result }) => [
+      SucceededGetNotesPage: ({ result }) => [
         evo(model, {
           notes: Option.map(Confect.PaginatedQuery.settle(result)),
         }),
@@ -411,7 +413,7 @@ export const update = (model: Model, message: Message): UpdateReturn =>
         }),
         [],
       ],
-      FailedNotesPage: ({ error }) => [
+      FailedGetNotesPage: ({ error }) => [
         evo(model, {
           notes: Option.map(
             (state) =>

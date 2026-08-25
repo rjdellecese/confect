@@ -50,8 +50,8 @@ const subscriptions = FoldkitSubscription.make<
     refs.public.notes.paginate,
     {
       state: (model) => model.notes,
-      onResult: (result) => SettledNotesPage({ result }),
-      onError: (error) => FailedNotesPage({ error }),
+      onResult: (result) => SucceededGetNotesPage({ result }),
+      onError: (error) => FailedGetNotesPage({ error }),
     },
   ),
 }));

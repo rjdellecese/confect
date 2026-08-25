@@ -591,7 +591,7 @@ const matchesInvalidCursor = (error: unknown): boolean => {
  * dead, so the recovery is `reset`:
  *
  * ```ts
- * FailedNotesPage: ({ error }) =>
+ * FailedGetNotesPage: ({ error }) =>
  *   PaginatedQuery.isInvalidCursor(error)
  *     ? PaginatedQuery.reset(state)
  *     : PaginatedQuery.fail(state)
