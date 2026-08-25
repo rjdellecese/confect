@@ -123,7 +123,7 @@ const paginatedArgsSchemaOrThrow = <
  * >()(() => ({
  *   note: Subscription.reactiveQuery<Model>()(refs.public.notes.get, {
  *     args: (model) => Option.map(model.noteId, (noteId) => ({ noteId })),
- *     onSuccess: (note) => GotNote({ note }),
+ *     onSuccess: (note) => SucceededGetNote({ note }),
  *     onError: (error) => FailedGetNote({ message: String(error) }),
  *   }),
  * }))

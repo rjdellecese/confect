@@ -75,19 +75,19 @@ interface Model {
   readonly noteId: Option.Option<string>;
 }
 
-const GotNote = m("GotNote", { note: Schema.Unknown });
+const SucceededGetNote = m("SucceededGetNote", { note: Schema.Unknown });
 const FailedGetNote = m("FailedGetNote", { error: Schema.Unknown });
-type Message = typeof GotNote.Type | typeof FailedGetNote.Type;
+type Message = typeof SucceededGetNote.Type | typeof FailedGetNote.Type;
 
 const noteHandlers = {
-  onSuccess: (note: unknown) => GotNote({ note }),
+  onSuccess: (note: unknown) => SucceededGetNote({ note }),
   onError: (error: unknown) => FailedGetNote({ error }),
 };
 
 const makeNoteEntry = () =>
   Subscription.reactiveQuery<Model>()(getQueryRef, {
     args: (model) => Option.map(model.noteId, (id) => ({ id })),
-    onSuccess: (note) => GotNote({ note }),
+    onSuccess: (note) => SucceededGetNote({ note }),
     onError: (error) => FailedGetNote({ error }),
   });
 
@@ -140,8 +140,8 @@ layer(StubLayer)("Subscription", (it) => {
           );
 
           expect(messages).toEqual([
-            GotNote({ note: { text: "a" } }),
-            GotNote({ note: { text: "b" } }),
+            SucceededGetNote({ note: { text: "a" } }),
+            SucceededGetNote({ note: { text: "b" } }),
           ]);
           expect(reactiveQueryCalls).toEqual([
             { name: "notes:get", args: { id: "abc" } },
@@ -165,7 +165,7 @@ layer(StubLayer)("Subscription", (it) => {
         );
 
         expect(messages).toEqual([
-          GotNote({ note: { text: "a" } }),
+          SucceededGetNote({ note: { text: "a" } }),
           FailedGetNote({ error }),
         ]);
       }),
@@ -245,7 +245,7 @@ layer(StubLayer)("Subscription", (it) => {
           }),
         );
 
-        expect(messages).toEqual([GotNote({ note: { text: "raw" } })]);
+        expect(messages).toEqual([SucceededGetNote({ note: { text: "raw" } })]);
         expect(reactiveQueryCalls).toEqual([
           { name: "notes:get", args: { id: "abc" } },
         ]);

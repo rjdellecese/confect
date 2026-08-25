@@ -425,8 +425,8 @@ const makeFactory = <BoundRef extends Ref.AnyConfect>(
  *
  * ```ts
  * const FetchNote = Command.query("FetchNote", refs.public.notes.get, {
- *   messages: [GotNote, FailedGetNote],
- *   onSuccess: (note) => GotNote({ note }),
+ *   messages: [SucceededGetNote, FailedGetNote],
+ *   onSuccess: (note) => SucceededGetNote({ note }),
  *   onError: (error) => FailedGetNote({ message: String(error) }),
  * })
  * // In update:

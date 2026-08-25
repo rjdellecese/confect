@@ -86,7 +86,12 @@ import * as Option from "effect/Option";
 import * as FoldkitSubscription from "foldkit/subscription";
 
 import refs from "../confect/_generated/refs";
-import { FailedGetNote, GotNote, type Message, type Model } from "./model";
+import {
+  FailedGetNote,
+  SucceededGetNote,
+  type Message,
+  type Model,
+} from "./model";
 
 export const subscriptions = FoldkitSubscription.make<
   Model,
@@ -95,7 +100,7 @@ export const subscriptions = FoldkitSubscription.make<
 >()(() => ({
   note: Subscription.reactiveQuery<Model>()(refs.public.notes.get, {
     args: (model) => Option.map(model.selectedNoteId, (noteId) => ({ noteId })),
-    onSuccess: (note) => GotNote({ note }),
+    onSuccess: (note) => SucceededGetNote({ note }),
     onError: (error) => FailedGetNote({ message: String(error) }),
   }),
 }));
@@ -113,7 +118,7 @@ subscription always open:
 
 ```ts
 Subscription.reactiveQuery<Model>()(refs.public.notes.list, {
-  onSuccess: (notes) => GotNotes({ notes }),
+  onSuccess: (notes) => SucceededGetNotes({ notes }),
   onError: (error) => FailedGetNotes({ message: String(error) }),
 });
 ```
@@ -137,7 +142,7 @@ FoldkitSubscription.make<Model, Message, WebSocketClient.WebSocketClient>()(
             onNone: () => Stream.empty,
             onSome: (noteId) =>
               Subscription.reactiveQueryStream(refs.public.notes.get, {
-                onSuccess: (note) => GotNote({ note }),
+                onSuccess: (note) => SucceededGetNote({ note }),
                 onError: (error) => FailedGetNote({ message: String(error) }),
               })({ noteId }),
           }),
@@ -288,13 +293,15 @@ const Notes = AsyncData.Schema(Schema.Array(Note), Schema.String);
 
 export const Model = Schema.Struct({ notes: Notes.schema });
 
-export const GotNotes = m("GotNotes", { notes: Schema.Array(Note) });
+export const SucceededGetNotes = m("SucceededGetNotes", {
+  notes: Schema.Array(Note),
+});
 export const FailedGetNotes = m("FailedGetNotes", { message: Schema.String });
 ```
 
 ```ts src/update.ts
 Match.tags({
-  GotNotes: ({ notes }) => [
+  SucceededGetNotes: ({ notes }) => [
     evo(model, { notes: () => Notes.Success({ data: notes }) }),
     [],
   ],
