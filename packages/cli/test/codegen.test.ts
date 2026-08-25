@@ -220,7 +220,7 @@ const leaf = (
   specImportPath: `../${relativePath.slice(0, -".ts".length)}`,
 });
 
-const emptyArgs = Schema.Struct({});
+const emptyArgs = {};
 const emptyReturns = Schema.Null;
 
 layer(Layer.empty)("validateNoParentChildNameCollisions", (it) => {

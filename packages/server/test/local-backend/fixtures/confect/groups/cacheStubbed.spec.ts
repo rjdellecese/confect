@@ -5,35 +5,35 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicQuery({
       name: "confectNoTime",
-      args: () => Schema.Struct({}),
+      args: () => ({}),
       returns: () => Schema.Finite,
     }),
   )
   .addFunction(
     FunctionSpec.publicQuery({
       name: "confectWithClock",
-      args: () => Schema.Struct({}),
+      args: () => ({}),
       returns: () => Schema.Finite,
     }),
   )
   .addFunction(
     FunctionSpec.publicQuery({
       name: "confectWithRawDateNow",
-      args: () => Schema.Struct({}),
+      args: () => ({}),
       returns: () => Schema.Finite,
     }),
   )
   .addFunction(
     FunctionSpec.publicQuery({
       name: "confectWithSpan",
-      args: () => Schema.Struct({}),
+      args: () => ({}),
       returns: () => Schema.Finite,
     }),
   )
   .addFunction(
     FunctionSpec.publicQuery({
       name: "confectWithLog",
-      args: () => Schema.Struct({}),
+      args: () => ({}),
       returns: () => Schema.Finite,
     }),
   );

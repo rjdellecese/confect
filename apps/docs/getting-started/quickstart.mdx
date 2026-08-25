@@ -71,14 +71,14 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
       .addFunction(
         FunctionSpec.publicQuery({
           name: "list",
-          args: () => Schema.Struct({}),
+          args: () => ({}),
           returns: () => Schema.Array(notes.Doc),
         }),
       )
       .addFunction(
         FunctionSpec.publicMutation({
           name: "create",
-          args: () => Schema.Struct({ text: Schema.String }),
+          args: () => ({ text: Schema.String }),
           returns: () => Id("notes"),
         }),
       );

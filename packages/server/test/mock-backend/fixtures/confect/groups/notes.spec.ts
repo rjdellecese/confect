@@ -7,35 +7,35 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicMutation({
       name: "insert",
-      args: () => Schema.Struct({ text: Schema.String }),
+      args: () => ({ text: Schema.String }),
       returns: () => Id("notes"),
     }),
   )
   .addFunction(
     FunctionSpec.publicQuery({
       name: "list",
-      args: () => Schema.Struct({}),
+      args: () => ({}),
       returns: () => Schema.Array(notes.Doc),
     }),
   )
   .addFunction(
     FunctionSpec.publicMutation({
       name: "delete_",
-      args: () => Schema.Struct({ noteId: Id("notes") }),
+      args: () => ({ noteId: Id("notes") }),
       returns: () => Schema.Null,
     }),
   )
   .addFunction(
     FunctionSpec.publicQuery({
       name: "getFirst",
-      args: () => Schema.Struct({}),
+      args: () => ({}),
       returns: () => Schema.OptionFromNullOr(notes.Doc),
     }),
   )
   .addFunction(
     FunctionSpec.internalQuery({
       name: "internalGetFirst",
-      args: () => Schema.Struct({}),
+      args: () => ({}),
       returns: () => Schema.OptionFromNullOr(notes.Doc),
     }),
   );
