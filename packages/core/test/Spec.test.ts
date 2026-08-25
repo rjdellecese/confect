@@ -75,5 +75,5 @@ it("places a Node group alongside Convex groups, with no `node` namespace", () =
 
   type PublicRefs = Refs.Refs<typeof spec, RefMod.AnyPublic>;
   expectTypeOf<keyof PublicRefs>().toEqualTypeOf<"notes" | "email">();
-  expectTypeOf<PublicRefs["email"]["send"]>().toMatchTypeOf<RefMod.AnyAction>();
+  expectTypeOf<PublicRefs["email"]["send"]>().toExtend<RefMod.AnyAction>();
 });

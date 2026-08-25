@@ -47,13 +47,13 @@ describe("make", () => {
     expectTypeOf<FunctionSpec.Error<FunctionSpec.AnyConfect>>().toBeAny();
     expectTypeOf<
       FunctionSpec.ArgsSchema<FunctionSpec.AnyConfect>
-    >().toMatchTypeOf<Schema.Codec<any, any>>();
+    >().toExtend<Schema.Codec<any, any>>();
     expectTypeOf<
       FunctionSpec.ReturnsSchema<FunctionSpec.AnyConfect>
-    >().toMatchTypeOf<Schema.Codec<any, any>>();
+    >().toExtend<Schema.Codec<any, any>>();
     expectTypeOf<
       FunctionSpec.ErrorSchema<FunctionSpec.AnyConfect>
-    >().toMatchTypeOf<Schema.Codec<any, any>>();
+    >().toExtend<Schema.Codec<any, any>>();
   });
 
   it("extracts no error schema when none is declared", () => {
