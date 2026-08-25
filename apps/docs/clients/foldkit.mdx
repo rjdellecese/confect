@@ -52,7 +52,7 @@ lives for the lifetime of the app, and the layer closes the WebSocket at
 teardown.
 
 ```ts src/entry.ts
-import { WebSocketClient } from "@confect/foldkit";
+import * as Confect from "@confect/foldkit";
 import { Runtime } from "foldkit";
 
 const application = Runtime.makeApplication({
@@ -61,7 +61,7 @@ const application = Runtime.makeApplication({
   update,
   view,
   subscriptions,
-  resources: WebSocketClient.layer(import.meta.env.VITE_CONVEX_URL),
+  resources: Confect.WebSocketClient.layer(import.meta.env.VITE_CONVEX_URL),
   container: document.getElementById("root"),
 });
 
@@ -69,7 +69,7 @@ Runtime.run(application);
 ```
 
 Commands and subscription entries built by `@confect/foldkit` require the
-`WebSocketClient.WebSocketClient` service, which this layer satisfies.
+`Confect.WebSocketClient.WebSocketClient` service, which this layer satisfies.
 
 ## Reactive queries as Subscriptions
 
@@ -81,7 +81,7 @@ leave the subscription running (dependency equivalence is derived from the
 ref's `args` schema).
 
 ```ts src/subscription.ts
-import { Subscription, WebSocketClient } from "@confect/foldkit";
+import * as Confect from "@confect/foldkit";
 import * as Option from "effect/Option";
 import * as FoldkitSubscription from "foldkit/subscription";
 
@@ -96,9 +96,9 @@ import {
 export const subscriptions = FoldkitSubscription.make<
   Model,
   Message,
-  WebSocketClient.WebSocketClient
+  Confect.WebSocketClient.WebSocketClient
 >()(() => ({
-  note: Subscription.reactiveQuery<Model>()(refs.public.notes.get, {
+  note: Confect.Subscription.reactiveQuery<Model>()(refs.public.notes.get, {
     args: (model) => Option.map(model.selectedNoteId, (noteId) => ({ noteId })),
     onSuccess: (note) => SucceededGetNote({ note }),
     onError: (error) => FailedGetNote({ message: String(error) }),
@@ -117,7 +117,7 @@ Queries without args may omit the `args` extractor, which leaves the
 subscription always open:
 
 ```ts
-Subscription.reactiveQuery<Model>()(refs.public.notes.list, {
+Confect.Subscription.reactiveQuery<Model>()(refs.public.notes.list, {
   onSuccess: (notes) => SucceededGetNotes({ notes }),
   onError: (error) => FailedGetNotes({ message: String(error) }),
 });
@@ -131,25 +131,27 @@ use `Subscription.reactiveQueryStream` as its `dependenciesToStream` body:
 ```ts
 import * as Schema from "effect/Schema";
 
-FoldkitSubscription.make<Model, Message, WebSocketClient.WebSocketClient>()(
-  (entry) => ({
-    note: entry(
-      { noteId: Schema.Option(Schema.String) },
-      {
-        modelToDependencies: (model) => ({ noteId: model.selectedNoteId }),
-        dependenciesToStream: ({ noteId }) =>
-          Option.match(noteId, {
-            onNone: () => Stream.empty,
-            onSome: (noteId) =>
-              Subscription.reactiveQueryStream(refs.public.notes.get, {
-                onSuccess: (note) => SucceededGetNote({ note }),
-                onError: (error) => FailedGetNote({ message: String(error) }),
-              })({ noteId }),
-          }),
-      },
-    ),
-  }),
-);
+FoldkitSubscription.make<
+  Model,
+  Message,
+  Confect.WebSocketClient.WebSocketClient
+>()((entry) => ({
+  note: entry(
+    { noteId: Schema.Option(Schema.String) },
+    {
+      modelToDependencies: (model) => ({ noteId: model.selectedNoteId }),
+      dependenciesToStream: ({ noteId }) =>
+        Option.match(noteId, {
+          onNone: () => Stream.empty,
+          onSome: (noteId) =>
+            Confect.Subscription.reactiveQueryStream(refs.public.notes.get, {
+              onSuccess: (note) => SucceededGetNote({ note }),
+              onError: (error) => FailedGetNote({ message: String(error) }),
+            })({ noteId }),
+        }),
+    },
+  ),
+}));
 ```
 
 ## Commands
@@ -163,16 +165,20 @@ instance — nothing runs until the Foldkit runtime executes it. Add the handler
 to your exhaustive update Match with `Match.tag`:
 
 ```ts src/command.ts
-import { Command } from "@confect/foldkit";
+import * as Confect from "@confect/foldkit";
 
 import refs from "../confect/_generated/refs";
 import { FailedSaveNote, SucceededSaveNote } from "./model";
 
-export const SaveNote = Command.mutation("SaveNote", refs.public.notes.insert, {
-  messages: [SucceededSaveNote, FailedSaveNote],
-  onSuccess: (noteId) => SucceededSaveNote({ noteId }),
-  onError: (error) => FailedSaveNote({ message: String(error) }),
-});
+export const SaveNote = Confect.Command.mutation(
+  "SaveNote",
+  refs.public.notes.insert,
+  {
+    messages: [SucceededSaveNote, FailedSaveNote],
+    onSuccess: (noteId) => SucceededSaveNote({ noteId }),
+    onError: (error) => FailedSaveNote({ message: String(error) }),
+  },
+);
 ```
 
 ```ts src/update.ts
@@ -182,8 +188,8 @@ Match.tag("ClickedSave", () => [model, [SaveNote({ text: model.draft })]]),
 Follow Foldkit's [naming convention](https://foldkit.dev/core/commands):
 Commands are verb-first imperatives, result Messages are past-tense facts
 (`SucceededSaveNote` / `FailedSaveNote`). `onError` receives the same error
-union as subscriptions — `Command.Error<typeof ref>` names it when you want
-to factor a handler out.
+union as subscriptions — `Confect.Command.Error<typeof ref>` names it when you
+want to factor a handler out.
 
 ### Interruption
 
@@ -199,7 +205,7 @@ flight).
 most one invocation is meaningfully in flight:
 
 ```ts
-export const SaveDraft = Command.mutation(
+export const SaveDraft = Confect.Command.mutation(
   "SaveDraft",
   refs.public.notes.insert,
   {
@@ -225,7 +231,7 @@ concurrent invocations can be interrupted independently. `Interrupt` then
 requires the key args:
 
 ```ts
-export const DeleteNote = Command.mutation(
+export const DeleteNote = Confect.Command.mutation(
   "DeleteNote",
   refs.public.notes.delete,
   {
@@ -261,11 +267,11 @@ Messages — for hand-written `Command.define` calls. Reach for them when the
 Command needs a custom args schema or several calls in one Command:
 
 ```ts
-import { Command } from "@confect/foldkit";
+import * as Confect from "@confect/foldkit";
 import * as FoldkitCommand from "foldkit/command";
 import * as Schema from "effect/Schema";
 
-const saveNote = Command.mutationEffect(refs.public.notes.insert, {
+const saveNote = Confect.Command.mutationEffect(refs.public.notes.insert, {
   onSuccess: (noteId) => SucceededSaveDraft({ noteId }),
   onError: (error) => FailedSaveDraft({ message: String(error) }),
 });
@@ -328,13 +334,13 @@ machine is created — cursors are only valid for the exact query and args
 they came from, so changing either means creating a fresh machine.
 
 ```ts src/model.ts
-import { PaginatedQuery } from "@confect/foldkit";
+import * as Confect from "@confect/foldkit";
 import { m } from "foldkit/message";
 import * as Schema from "effect/Schema";
 
 import refs from "../confect/_generated/refs";
 
-export const Notes = PaginatedQuery.make(refs.public.notes.paginate);
+export const Notes = Confect.PaginatedQuery.make(refs.public.notes.paginate);
 
 export const Model = Schema.Struct({
   notes: Schema.Option(Notes.schema),
@@ -349,19 +355,22 @@ export const FailedNotesPage = m("FailedNotesPage", { error: Schema.Unknown });
 Wire the subscription entry to the machine state:
 
 ```ts src/subscription.ts
-import { Subscription, WebSocketClient } from "@confect/foldkit";
+import * as Confect from "@confect/foldkit";
 import * as FoldkitSubscription from "foldkit/subscription";
 
 export const subscriptions = FoldkitSubscription.make<
   Model,
   Message,
-  WebSocketClient.WebSocketClient
+  Confect.WebSocketClient.WebSocketClient
 >()(() => ({
-  notesPage: Subscription.paginatedQuery<Model>()(refs.public.notes.paginate, {
-    state: (model) => model.notes,
-    onResult: (result) => SettledNotesPage({ result }),
-    onError: (error) => FailedNotesPage({ error }),
-  }),
+  notesPage: Confect.Subscription.paginatedQuery<Model>()(
+    refs.public.notes.paginate,
+    {
+      state: (model) => model.notes,
+      onResult: (result) => SettledNotesPage({ result }),
+      onError: (error) => FailedNotesPage({ error }),
+    },
+  ),
 }));
 ```
 
@@ -371,6 +380,7 @@ when the move is illegal (already loading, first/last page), so `update`
 just keeps the Model unchanged:
 
 ```ts src/update.ts
+import * as Confect from "@confect/foldkit";
 import * as Match from "effect/Match";
 import type * as Command from "foldkit/command";
 
@@ -389,14 +399,14 @@ export const update = (model: Model, message: Message): UpdateReturn =>
       ],
       SettledNotesPage: ({ result }) => [
         evo(model, {
-          notes: Option.map(PaginatedQuery.settle(result)),
+          notes: Option.map(Confect.PaginatedQuery.settle(result)),
         }),
         [],
       ],
       ClickedNextPage: () => [
         evo(model, {
           notes: Option.map((state) =>
-            Option.getOrElse(PaginatedQuery.next(state), () => state),
+            Option.getOrElse(Confect.PaginatedQuery.next(state), () => state),
           ),
         }),
         [],
@@ -405,9 +415,9 @@ export const update = (model: Model, message: Message): UpdateReturn =>
         evo(model, {
           notes: Option.map(
             (state) =>
-              PaginatedQuery.isInvalidCursor(error)
-                ? PaginatedQuery.reset(state) // held cursors are dead; back to page 1
-                : PaginatedQuery.fail(state), // closes the subscription; reopen with retry
+              Confect.PaginatedQuery.isInvalidCursor(error)
+                ? Confect.PaginatedQuery.reset(state) // held cursors are dead; back to page 1
+                : Confect.PaginatedQuery.fail(state), // closes the subscription; reopen with retry
           ),
         }),
         [],
@@ -422,10 +432,10 @@ list. `canNext`/`canPrev` gate the controls, and `pageNum`, `isFirst`,
 `isLast`, `isLoading`, and `match` cover the rest:
 
 ```ts
-const items = PaginatedQuery.page(state);
-const label = `Page ${PaginatedQuery.pageNum(state)}`;
-const nextDisabled = !PaginatedQuery.canNext(state);
-const prevDisabled = !PaginatedQuery.canPrev(state);
+const items = Confect.PaginatedQuery.page(state);
+const label = `Page ${Confect.PaginatedQuery.pageNum(state)}`;
+const nextDisabled = !Confect.PaginatedQuery.canNext(state);
+const prevDisabled = !Confect.PaginatedQuery.canPrev(state);
 ```
 
 After a failure the machine closes the subscription and keeps its position;
@@ -448,13 +458,13 @@ a held cursor is no longer valid.
 Command:
 
 ```ts
-import { WebSocketClient } from "@confect/foldkit";
+import * as Confect from "@confect/foldkit";
 import * as Effect from "effect/Effect";
 import * as FoldkitCommand from "foldkit/command";
 
 const SetAuth = FoldkitCommand.define("SetAuth", {
   messages: [CompletedSetAuth],
-  execute: Effect.flatMap(WebSocketClient.WebSocketClient, (client) =>
+  execute: Effect.flatMap(Confect.WebSocketClient.WebSocketClient, (client) =>
     client.setAuth(({ forceRefreshToken }) => fetchToken(forceRefreshToken)),
   ).pipe(Effect.as(CompletedSetAuth())),
 });
