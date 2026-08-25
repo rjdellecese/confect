@@ -23,7 +23,7 @@ For Node.js actions, see [Node Actions](/server/node-actions). To integrate plai
 
 ## Defining a spec
 
-Each function spec defines the function's name, argument fields, and returns schema. `args` is a callback returning a `Schema.Struct` field map, while `returns` and the optional `error` are callbacks returning schemas. All three are evaluated lazily the first time the function is invoked. Function specs are added to a `GroupSpec` and default-exported from a `*.spec.ts` file. See [The Spec/Impl Model](/concepts/spec-impl-model) for a full walkthrough.
+Each function spec defines the function's name, argument fields, and returns schema. The optional `args` callback returns a `Schema.Struct` field map and defaults to `{}` when omitted, while `returns` and the optional `error` are callbacks returning schemas. All provided callbacks are evaluated lazily the first time the function is invoked. Function specs are added to a `GroupSpec` and default-exported from a `*.spec.ts` file. See [The Spec/Impl Model](/concepts/spec-impl-model) for a full walkthrough.
 
 ```ts confect/notes.spec.ts
 import { GroupSpec, FunctionSpec } from "@confect/core";
@@ -33,7 +33,6 @@ import notes from "./_generated/tables/notes";
 
 const list = FunctionSpec.publicQuery({
   name: "list",
-  args: () => ({}),
   returns: () => Schema.Array(notes.Doc),
 });
 

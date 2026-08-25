@@ -20,6 +20,22 @@ describe("isFunctionSpec", () => {
 });
 
 describe("make", () => {
+  it("defaults omitted args to an empty field map", () => {
+    const spec = FunctionSpec.publicQuery({
+      name: "withoutArgs",
+      returns: () => Schema.String,
+      error: () => Schema.Finite,
+    });
+
+    expectTypeOf<FunctionSpec.Args<typeof spec>>().toEqualTypeOf<{}>();
+    expectTypeOf<FunctionSpec.EncodedArgs<typeof spec>>().toEqualTypeOf<{}>();
+    expectTypeOf<FunctionSpec.Error<typeof spec>>().toEqualTypeOf<number>();
+    expectTypeOf<
+      Ref.OptionalArgs<Ref.FromFunctionSpec<typeof spec>>
+    >().toEqualTypeOf<[args?: {}]>();
+    expect(spec.functionProvenance.args.fields).toStrictEqual({});
+  });
+
   it("keeps erased Confect specs safely generic", () => {
     expectTypeOf<FunctionSpec.Args<FunctionSpec.AnyConfect>>().toBeAny();
     expectTypeOf<

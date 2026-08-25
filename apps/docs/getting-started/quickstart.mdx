@@ -71,7 +71,6 @@ bun add convex @confect/core @confect/server @confect/cli @confect/react
       .addFunction(
         FunctionSpec.publicQuery({
           name: "list",
-          args: () => ({}),
           returns: () => Schema.Array(notes.Doc),
         }),
       )
