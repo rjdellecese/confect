@@ -3,6 +3,7 @@ import type { ConvexClient } from "convex/browser";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
 
 /**
@@ -16,7 +17,13 @@ export const make = (webSocketClient: WebSocketClient.WebSocketClient) =>
 
     return {
       ...webSocketClient,
-      nextPaginationId: Ref.updateAndGet(paginationId, (id) => id + 1),
+      resolvePaginationId: (restored: Option.Option<number>) =>
+        Ref.modify(paginationId, (current) =>
+          Option.match(restored, {
+            onNone: () => [current + 1, current + 1],
+            onSome: (id) => [id, Math.max(current, id)],
+          }),
+        ),
     };
   });
 

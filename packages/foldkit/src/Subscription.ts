@@ -298,12 +298,8 @@ export const paginatedQuery =
             Stream.unwrap(
               Effect.gen(function* () {
                 const client = yield* Client.Client;
-                const paginationId = yield* Option.match(
+                const paginationId = yield* client.resolvePaginationId(
                   subscriptionRequest.paginationId,
-                  {
-                    onNone: () => client.nextPaginationId,
-                    onSome: Effect.succeed,
-                  },
                 );
                 const allocatedRequest = PaginatedQuery.allocateRequest(
                   subscriptionRequest,

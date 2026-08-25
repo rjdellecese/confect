@@ -425,6 +425,34 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
       }),
     );
 
+    it.effect("reserves a restored id before allocating another session", () =>
+      Effect.gen(function* () {
+        reactiveQueryResults = Stream.make(
+          Result.succeed({ page: [], isDone: true, continueCursor: "" }),
+        );
+        const entry = makePaginatedEntry();
+        const restoredRequest = {
+          ...PaginatedQuery.getSubscriptionRequest(initialMachine()),
+          paginationId: Option.some(42_000),
+        };
+
+        const restoredMessages = yield* Stream.runCollect(
+          streamFor(entry, restoredRequest),
+        );
+        const freshMessages = yield* Stream.runCollect(
+          streamFor(
+            entry,
+            PaginatedQuery.getSubscriptionRequest(initialMachine()),
+          ),
+        );
+
+        expect(restoredMessages[0]!.settlement.request.paginationId).toBe(
+          42_000,
+        );
+        expect(freshMessages[0]!.settlement.request.paginationId).toBe(42_001);
+      }),
+    );
+
     it.effect("emits a failure and a later success from one live stream", () =>
       Effect.gen(function* () {
         const error = new PageDenied({ reason: "temporarily private" });
