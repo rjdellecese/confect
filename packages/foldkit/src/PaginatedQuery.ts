@@ -7,6 +7,8 @@ import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
+import * as SchemaGetter from "effect/SchemaGetter";
+import * as SchemaIssue from "effect/SchemaIssue";
 import * as Client from "./Client";
 
 /** Identifies the cursor range fetched for one page. */
@@ -276,6 +278,23 @@ const paginatedKindOrThrow = (ref: Ref.AnyConfectPublicPaginatedQuery) =>
     Match.exhaustive,
   );
 
+const SchemaErrorJson = Schema.TaggedStruct("SchemaError", {
+  message: Schema.String,
+});
+
+const SerializableSchemaError = Schema.instanceOf(Schema.SchemaError, {
+  toCodecJson: () =>
+    Schema.link<Schema.SchemaError>()(SchemaErrorJson, {
+      decode: SchemaGetter.transform(
+        ({ message }) =>
+          new Schema.SchemaError(new SchemaIssue.InvalidValue({ message })),
+      ),
+      encode: SchemaGetter.transform((error) =>
+        SchemaErrorJson.make({ message: error.message }),
+      ),
+    }),
+});
+
 /** Builds a page machine from a paginated ref. */
 export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
   ref: Query,
@@ -289,7 +308,7 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
   const errorSchema = Schema.Union([
     PaginationError.InvalidCursor,
     Client.WebSocketClientError,
-    Schema.instanceOf(Schema.SchemaError),
+    SerializableSchemaError,
     ...(functionErrorSchemas.length === 0
       ? []
       : [

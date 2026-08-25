@@ -8,7 +8,7 @@ import * as Schema from "effect/Schema";
 export class InvalidCursor extends Schema.TaggedError<InvalidCursor>()(
   "InvalidCursor",
   {
-    cause: Schema.Unknown,
+    cause: Schema.Defect(),
   },
 ) {}
 

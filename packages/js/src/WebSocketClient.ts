@@ -11,7 +11,7 @@ import * as Stream from "effect/Stream";
 export class WebSocketClientError extends Schema.TaggedError<WebSocketClientError>()(
   "WebSocketClientError",
   {
-    cause: Schema.Unknown,
+    cause: Schema.Defect(),
   },
 ) {}
 

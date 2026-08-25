@@ -562,6 +562,58 @@ describe("PaginatedQuery", () => {
       }
     });
 
+    it("round-trips framework failures through the model's JSON codec", () => {
+      const jsonCodec = Schema.toCodecJson(Notes.schema);
+      const loading = initial();
+      const networkFailure = PaginatedQuery.settle(
+        loading,
+        failure(
+          loading,
+          new Client.WebSocketClientError({ cause: new Error("offline") }),
+        ),
+      );
+      const schemaResult = Schema.decodeUnknownResult(Schema.Finite)("bad");
+      if (Result.isSuccess(schemaResult)) {
+        throw new Error("expected schema decoding to fail");
+      }
+      const refreshing = Option.getOrThrow(
+        PaginatedQuery.next(loadedPageOne()),
+      );
+      const schemaFailure = PaginatedQuery.settle(
+        refreshing,
+        failure(refreshing, schemaResult.failure),
+      );
+
+      const decodedNetworkFailure = Schema.decodeSync(jsonCodec)(
+        Schema.encodeSync(jsonCodec)(networkFailure),
+      );
+      const decodedSchemaFailure = Schema.decodeSync(jsonCodec)(
+        Schema.encodeSync(jsonCodec)(schemaFailure),
+      );
+
+      expect(PaginatedQuery.isFailure(decodedNetworkFailure)).toBe(true);
+      if (PaginatedQuery.isFailure(decodedNetworkFailure)) {
+        const error = decodedNetworkFailure.phase.error;
+        if (!(error instanceof Client.WebSocketClientError)) {
+          throw new Error("expected a WebSocketClientError");
+        }
+        expect(error.cause).toBeInstanceOf(Error);
+        if (!(error.cause instanceof Error)) {
+          throw new Error("expected an Error cause");
+        }
+        expect(error.cause.message).toBe("offline");
+      }
+      expect(PaginatedQuery.isStale(decodedSchemaFailure)).toBe(true);
+      if (PaginatedQuery.isStale(decodedSchemaFailure)) {
+        expect(Schema.isSchemaError(decodedSchemaFailure.phase.error)).toBe(
+          true,
+        );
+        expect(String(decodedSchemaFailure.phase.error)).toBe(
+          String(schemaResult.failure),
+        );
+      }
+    });
+
     it("infers args, state, and helpers", () => {
       expectTypeOf(Notes.init).parameters.toEqualTypeOf<
         [PaginatedQuery.Idle, Args, PaginatedQuery.Options]
