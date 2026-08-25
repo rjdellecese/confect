@@ -359,44 +359,49 @@ when the move is illegal (already loading, first/last page), so `update`
 just keeps the Model unchanged:
 
 ```ts src/update.ts
-// Start (or restart with different args / page size):
-case "OpenedNotes":
-  return [
-    evo(model, {
-      notes: () => Option.some(Notes.init({ channel }, { numItems: 20 })),
-    }),
-    [],
-  ];
+import * as Match from "effect/Match";
+import type * as Command from "foldkit/command";
 
-case "SettledNotesPage":
-  return [
-    evo(model, {
-      notes: Option.map(PaginatedQuery.settle(message.result)),
-    }),
-    [],
-  ];
+type UpdateReturn = readonly [Model, ReadonlyArray<Command.Command<Message>>];
 
-case "ClickedNextPage":
-  return [
-    evo(model, {
-      notes: Option.map((state) =>
-        Option.getOrElse(PaginatedQuery.next(state), () => state),
-      ),
+export const update = (model: Model, message: Message): UpdateReturn =>
+  Match.value(message).pipe(
+    Match.withReturnType<UpdateReturn>(),
+    Match.tagsExhaustive({
+      // Start (or restart with different args / page size):
+      OpenedNotes: ({ channel }) => [
+        evo(model, {
+          notes: () => Option.some(Notes.init({ channel }, { numItems: 20 })),
+        }),
+        [],
+      ],
+      SettledNotesPage: ({ result }) => [
+        evo(model, {
+          notes: Option.map(PaginatedQuery.settle(result)),
+        }),
+        [],
+      ],
+      ClickedNextPage: () => [
+        evo(model, {
+          notes: Option.map((state) =>
+            Option.getOrElse(PaginatedQuery.next(state), () => state),
+          ),
+        }),
+        [],
+      ],
+      FailedNotesPage: ({ error }) => [
+        evo(model, {
+          notes: Option.map(
+            (state) =>
+              PaginatedQuery.isInvalidCursor(error)
+                ? PaginatedQuery.reset(state) // held cursors are dead; back to page 1
+                : PaginatedQuery.fail(state), // closes the subscription; reopen with retry
+          ),
+        }),
+        [],
+      ],
     }),
-    [],
-  ];
-
-case "FailedNotesPage":
-  return [
-    evo(model, {
-      notes: Option.map((state) =>
-        PaginatedQuery.isInvalidCursor(message.error)
-          ? PaginatedQuery.reset(state) // held cursors are dead; back to page 1
-          : PaginatedQuery.fail(state), // closes the subscription; reopen with retry
-      ),
-    }),
-    [],
-  ];
+  );
 ```
 
 In the view, `page` returns the current items — and keeps returning the
