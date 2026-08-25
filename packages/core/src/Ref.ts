@@ -138,10 +138,10 @@ export type AnyQuery = Ref<
   any
 >;
 
-export type AnyPublicPaginatedQuery = AnyPublicQuery &
+export type AnyPaginatedQuery = AnyQuery &
   Base<
     RuntimeAndFunctionType.AnyQuery,
-    "public",
+    FunctionVisibility,
     {
       [key: string]: any;
       paginationOpts: PaginationOptions;
@@ -174,6 +174,13 @@ export type AnyPublicQuery = Ref<
   any
 >;
 
+export type AnyConfectPublicQuery = Extract<AnyPublicQuery, AnyConfect>;
+
+export type AnyPublicPaginatedQuery = AnyPublicQuery & AnyPaginatedQuery;
+
+export type AnyConfectPublicPaginatedQuery = AnyConfectPublicQuery &
+  AnyPublicPaginatedQuery;
+
 export type AnyPublicMutation = Ref<
   RuntimeAndFunctionType.AnyMutation,
   "public",
@@ -182,6 +189,8 @@ export type AnyPublicMutation = Ref<
   any
 >;
 
+export type AnyConfectPublicMutation = Extract<AnyPublicMutation, AnyConfect>;
+
 export type AnyPublicAction = Ref<
   RuntimeAndFunctionType.AnyAction,
   "public",
@@ -189,6 +198,8 @@ export type AnyPublicAction = Ref<
   any,
   any
 >;
+
+export type AnyConfectPublicAction = Extract<AnyPublicAction, AnyConfect>;
 
 export type GetRuntimeAndFunctionType<Ref_> = Ref_ extends {
   readonly "~RuntimeAndFunctionType": infer RuntimeAndFunctionType_ extends

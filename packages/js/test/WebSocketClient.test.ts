@@ -492,4 +492,39 @@ layer(RealLayer)("WebSocketClient error decoding", (it) => {
       }),
     );
   });
+
+  describe("reactiveQueryResult", () => {
+    it.effect("keeps listening after an error result", () =>
+      Effect.gen(function* () {
+        const client = yield* WebSocketClient.WebSocketClient;
+        const fiber = yield* Effect.forkChild(
+          client
+            .reactiveQueryResult(queryWithError, { id: "abc" })
+            .pipe(Stream.take(2), Stream.runCollect),
+        );
+
+        yield* Effect.callback<void>((resume) => {
+          const tick = () => {
+            if (subscribers.length > 0) {
+              resume(Effect.void);
+            } else {
+              setTimeout(tick, 1);
+            }
+          };
+          tick();
+        });
+
+        subscribers[0]!.onError(
+          new ConvexError({ _tag: "NotFound", id: "abc" }),
+        );
+        subscribers[0]!.onUpdate({ text: "recovered" });
+
+        const results = yield* Fiber.join(fiber);
+        expect(results).toHaveLength(2);
+        assert(Result.isFailure(results[0]!));
+        expect(results[0].failure).toBeInstanceOf(NotFound);
+        expect(results[1]).toEqual(Result.succeed({ text: "recovered" }));
+      }),
+    );
+  });
 });

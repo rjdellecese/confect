@@ -3,6 +3,7 @@
 "@confect/server": patch
 "@confect/js": patch
 "@confect/react": patch
+"@confect/foldkit": patch
 "@confect/cli": patch
 "@confect/test": patch
 ---

@@ -27,6 +27,7 @@ minimumReleaseAgeExclude:
   - "@effect/platform-node@4.0.0-rc.112"
   - "@effect/vitest@4.0.0-rc.112"
   - effect@4.0.0-rc.112
+  - foldkit@0.148.1
 
 overrides:
   convex: 1.44.0
@@ -46,5 +47,8 @@ packageExtensions:
 
 peerDependencyRules:
   allowedVersions:
+    # foldkit pins an exact effect prerelease; the `overrides` entry above
+    # already forces every resolved effect instance to the workspace version.
+    "foldkit>effect": "4"
     react: "19"
     react-dom: "19"

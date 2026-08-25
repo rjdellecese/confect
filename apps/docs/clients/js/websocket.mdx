@@ -4,7 +4,7 @@ title: "WebSocket"
 description: "Call your Confect functions and subscribe to reactive queries over a persistent WebSocket connection."
 ---
 
-`WebSocketClient` is an [Effect service](https://effect.website/docs/requirements-management/services/) that wraps Convex's [`ConvexClient`](https://docs.convex.dev/api/classes/browser.ConvexClient). It provides the same `query`, `mutation`, and `action` methods as [`HttpClient`](/clients/js/http), plus a `reactiveQuery` method that returns a [`Stream`](https://effect.website/docs/stream/introduction/) of live results. It works in any JavaScript environment that supports `WebSocket`.
+`WebSocketClient` is an [Effect service](https://effect.website/docs/requirements-management/services/) that wraps Convex's [`ConvexClient`](https://docs.convex.dev/api/classes/browser.ConvexClient). It provides the same `query`, `mutation`, and `action` methods as [`HttpClient`](/clients/js/http), plus `reactiveQuery` and `reactiveQueryResult` methods that return [`Stream`](https://effect.website/docs/stream/introduction/) values. It works in any JavaScript environment that supports `WebSocket`.
 
 The WebSocket connection is managed as a [scoped resource](https://effect.website/docs/resource-management/scope/)—it is opened when the layer is provided and closed automatically when the scope ends.
 
@@ -88,11 +88,17 @@ const lookup = Effect.gen(function* () {
 // Effect.Effect<Note, NoteNotFound | WebSocketClientError | ParseError, WebSocketClient.WebSocketClient>
 ```
 
-For `reactiveQuery`, a typed failure terminates the `Stream` with the decoded value in its error channel—the subscription does not stay open across failures. Recover with `Stream.catchTag` (or any other `Stream` error combinator) to keep the stream alive across typed failures.
+`reactiveQuery` uses the ordinary `Stream` error channel, so a query failure
+terminates that stream. Use `reactiveQueryResult` when an error should instead
+be one event in a continuing subscription. It emits
+`Result<Returns, TypedError | WebSocketClientError | SchemaError>` values and
+keeps the underlying Convex listener open, allowing a later query result to
+recover naturally:
 
 ```ts
 import { WebSocketClient } from "@confect/js";
 import * as Effect from "effect/Effect";
+import * as Result from "effect/Result";
 import * as Stream from "effect/Stream";
 
 import refs from "./confect/_generated/refs";
@@ -101,10 +107,13 @@ const lookups = Effect.gen(function* () {
   const client = yield* WebSocketClient.WebSocketClient;
 
   return client
-    .reactiveQuery(refs.public.notes.getOrFail, { noteId })
+    .reactiveQueryResult(refs.public.notes.getOrFail, { noteId })
     .pipe(
-      Stream.catchTag("NoteNotFound", (error) =>
-        Stream.succeed(`Note ${error.noteId} not found.`),
+      Stream.map(
+        Result.match({
+          onSuccess: (note) => `Found: ${note.text}`,
+          onFailure: (error) => `Lookup failed: ${String(error)}`,
+        }),
       ),
     );
 });
@@ -164,6 +173,6 @@ Effect.runPromise(program.pipe(Effect.provide(WebSocketClientLive)));
 | Args passed directly to Convex as-is                          | Args are schema-encoded from `Type` to `Encoded` before sending |
 | Return values received directly as-is                         | Return values are schema-decoded from `Encoded` to `Type`       |
 | `query`/`mutation`/`action` return `Promise`                  | `query`/`mutation`/`action` return `Effect` with typed errors   |
-| `onUpdate` uses callbacks and returns an unsubscribe function | `reactiveQuery` returns a `Stream` with automatic cleanup       |
+| `onUpdate` uses callbacks and returns an unsubscribe function | Reactive-query methods return a `Stream` with automatic cleanup |
 | Must call `close()` manually                                  | Connection closed automatically when the layer's scope ends     |
 | `setAuth` takes a `Promise`-returning callback                | `setAuth` takes an `Effect`-returning function                  |

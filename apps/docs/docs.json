@@ -85,7 +85,8 @@
             "icon": "js",
             "group": "JS",
             "pages": ["clients/js/http", "clients/js/websocket"]
-          }
+          },
+          "clients/foldkit"
         ]
       },
       {

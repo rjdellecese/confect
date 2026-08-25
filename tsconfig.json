@@ -20,6 +20,8 @@
       "@confect/server/*": ["./packages/server/src/*"],
       "@confect/js": ["./packages/js/src/index.ts"],
       "@confect/js/*": ["./packages/js/src/*"],
+      "@confect/foldkit": ["./packages/foldkit/src/index.ts"],
+      "@confect/foldkit/*": ["./packages/foldkit/src/*"],
       "@confect/react": ["./packages/react/src/index.ts"],
       "@confect/react/*": ["./packages/react/src/*"],
       "@confect/cli": ["./packages/cli/src/index.ts"],
