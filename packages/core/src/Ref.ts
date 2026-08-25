@@ -121,23 +121,21 @@ export interface ConvexRef<
   readonly _tag: "Convex";
 }
 
-type ErasedRef<
-  RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
-  FunctionVisibility_ extends FunctionVisibility,
-> = Ref<RuntimeAndFunctionType_, FunctionVisibility_, any, any, any>;
-
 export type Any = Ref<any, any, any, any, any>;
 
 /** Erased Confect-provenance ref used by provenance-specific APIs. */
 export type AnyConfect = Extract<Any, { readonly _tag: "Confect" }>;
 
-export type AnyInternal = ErasedRef<any, "internal">;
+export type AnyInternal = Ref<any, "internal", any, any, any>;
 
-export type AnyPublic = ErasedRef<any, "public">;
+export type AnyPublic = Ref<any, "public", any, any, any>;
 
-export type AnyQuery = ErasedRef<
+export type AnyQuery = Ref<
   RuntimeAndFunctionType.AnyQuery,
-  FunctionVisibility
+  FunctionVisibility,
+  any,
+  any,
+  any
 >;
 
 export type AnyPublicPaginatedQuery = AnyPublicQuery &
@@ -152,29 +150,44 @@ export type AnyPublicPaginatedQuery = AnyPublicQuery &
     any
   >;
 
-export type AnyMutation = ErasedRef<
+export type AnyMutation = Ref<
   RuntimeAndFunctionType.AnyMutation,
-  FunctionVisibility
+  FunctionVisibility,
+  any,
+  any,
+  any
 >;
 
-export type AnyAction = ErasedRef<
+export type AnyAction = Ref<
   RuntimeAndFunctionType.AnyAction,
-  FunctionVisibility
+  FunctionVisibility,
+  any,
+  any,
+  any
 >;
 
-export type AnyPublicQuery = ErasedRef<
+export type AnyPublicQuery = Ref<
   RuntimeAndFunctionType.AnyQuery,
-  "public"
+  "public",
+  any,
+  any,
+  any
 >;
 
-export type AnyPublicMutation = ErasedRef<
+export type AnyPublicMutation = Ref<
   RuntimeAndFunctionType.AnyMutation,
-  "public"
+  "public",
+  any,
+  any,
+  any
 >;
 
-export type AnyPublicAction = ErasedRef<
+export type AnyPublicAction = Ref<
   RuntimeAndFunctionType.AnyAction,
-  "public"
+  "public",
+  any,
+  any,
+  any
 >;
 
 export type GetRuntimeAndFunctionType<Ref_> = Ref_ extends {
