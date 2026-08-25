@@ -322,14 +322,15 @@ Match.tags({
 query](/server/functions#paginated-queries) one page at a time — next and
 previous — over Convex's cursor-based pagination. The machine lives in your
 Model and is the single source of truth for one live, reactive page
-subscription: navigating, retrying, and page-split handling are all pure
-Model transitions, and `Subscription.paginatedQuery` keeps the subscription
-in sync with them.
+subscription: navigating, retrying, and page-split handling are all Model
+transitions, and `Subscription.paginatedQuery` keeps the subscription in sync
+with them.
 
-`PaginatedQuery.make` takes the ref and returns the machine's Model schema
-and its `init` constructor. Query args and the page size are fixed when the
-machine is created — cursors are only valid for the exact query and args
-they came from, so changing either means creating a fresh machine.
+`PaginatedQuery.make` takes the ref and an application error schema. It
+returns the machine's Model schema, its correlated settlement schema, and its
+constructors. The machine uses the same loaded-state vocabulary as Foldkit's
+`AsyncData`: `Loading`, `Refreshing`, `Success`, `Failure`, and `Stale`.
+`Refreshing` and `Stale` retain the complete last good page.
 
 ```ts src/model.ts
 import * as Confect from "@confect/foldkit";
@@ -338,17 +339,19 @@ import * as Schema from "effect/Schema";
 
 import refs from "../confect/_generated/refs";
 
-export const Notes = Confect.PaginatedQuery.make(refs.public.notes.paginate);
+export const PageError = Schema.Literals(["InvalidCursor", "Failed"]);
+
+export const Notes = Confect.PaginatedQuery.make(
+  refs.public.notes.paginate,
+  PageError,
+);
 
 export const Model = Schema.Struct({
   notes: Schema.Option(Notes.schema),
 });
 
-export const SucceededGetNotesPage = m("SucceededGetNotesPage", {
-  result: Notes.pageResult,
-});
-export const FailedGetNotesPage = m("FailedGetNotesPage", {
-  error: Schema.Unknown,
+export const SettledGetNotesPage = m("SettledGetNotesPage", {
+  settlement: Notes.settlement,
 });
 ```
 
@@ -363,21 +366,28 @@ export const subscriptions = Subscription.make<
   Message,
   Confect.WebSocketClient.WebSocketClient
 >()(() => ({
-  notesPage: Confect.Subscription.paginatedQuery<Model>()(
-    refs.public.notes.paginate,
-    {
-      state: (model) => model.notes,
-      onResult: (result) => SucceededGetNotesPage({ result }),
-      onError: (error) => FailedGetNotesPage({ error }),
-    },
-  ),
+  notesPage: Confect.Subscription.paginatedQuery<Model>()(Notes, {
+    state: (model) => model.notes,
+    mapError: (error) =>
+      Confect.PaginatedQuery.isInvalidCursor(error)
+        ? "InvalidCursor"
+        : "Failed",
+    onSettled: (settlement) => SettledGetNotesPage({ settlement }),
+  }),
 }));
 ```
 
-In `update`, start the machine with `init`, fold results in with `settle`,
-and navigate with `next`/`prev` — both return an `Option` that is `None`
-when the move is illegal (already loading, first/last page), so `update`
-just keeps the Model unchanged:
+The subscription emits one `Result`-based settlement for either success or
+failure. It includes the exact args, cursor range, page options, and pagination
+session id used by that request. `settle` therefore has the same behavior as
+`AsyncData.settle`—success becomes `Success`; failure becomes `Stale` when a
+page is held and `Failure` otherwise—while also ignoring outcomes superseded
+by navigation, new args, or a reset.
+
+In `update`, start the machine with `init`, fold the outcome in with `settle`,
+and navigate with `next`/`prev`. Both navigation functions return an `Option`
+that is `None` when the move is illegal, so `update` can keep the Model
+unchanged:
 
 ```ts src/update.ts
 import * as Confect from "@confect/foldkit";
@@ -390,16 +400,39 @@ export const update = (model: Model, message: Message): UpdateReturn =>
   Match.value(message).pipe(
     Match.withReturnType<UpdateReturn>(),
     Match.tagsExhaustive({
-      // Start (or restart with different args / page size):
+      // Start, or explicitly reinitialize when the query args change:
       OpenedNotes: ({ channel }) => [
         evo(model, {
-          notes: () => Option.some(Notes.init({ channel }, { numItems: 20 })),
+          notes: Option.match({
+            onNone: () =>
+              Option.some(Notes.init({ channel }, { initialNumItems: 20 })),
+            onSome: (state) =>
+              Option.some(
+                Notes.reinitialize(state, { channel }, { initialNumItems: 20 }),
+              ),
+          }),
         }),
         [],
       ],
-      SucceededGetNotesPage: ({ result }) => [
+      SettledGetNotesPage: ({ settlement }) => [
         evo(model, {
-          notes: Option.map(Confect.PaginatedQuery.settle(result)),
+          notes: Option.map((state) =>
+            Match.value(settlement.result).pipe(
+              Match.tag("Failure", ({ failure }) =>
+                failure === "InvalidCursor" &&
+                Confect.PaginatedQuery.isCurrentRequest(
+                  state,
+                  settlement.request,
+                )
+                  ? Confect.PaginatedQuery.reset(state)
+                  : Confect.PaginatedQuery.settle(state, settlement),
+              ),
+              Match.tag("Success", () =>
+                Confect.PaginatedQuery.settle(state, settlement),
+              ),
+              Match.exhaustive,
+            ),
+          ),
         }),
         [],
       ],
@@ -411,45 +444,49 @@ export const update = (model: Model, message: Message): UpdateReturn =>
         }),
         [],
       ],
-      FailedGetNotesPage: ({ error }) => [
-        evo(model, {
-          notes: Option.map(
-            (state) =>
-              Confect.PaginatedQuery.isInvalidCursor(error)
-                ? Confect.PaginatedQuery.reset(state) // held cursors are dead; back to page 1
-                : Confect.PaginatedQuery.fail(state), // closes the subscription; reopen with retry
-          ),
-        }),
-        [],
-      ],
     }),
   );
 ```
 
-In the view, `page` returns the current items — and keeps returning the
-last loaded page while the next one loads, so navigation never blanks the
-list. `canNext`/`canPrev` gate the controls, and `pageNum`, `isFirst`,
-`isLast`, `isLoading`, and `match` cover the rest:
+`getPage` and `getItems` return `Option`s because the initial load can have no
+data. Once a page succeeds, they keep returning that page while the next one
+loads and after a refresh fails. `Page.number` is the page being displayed;
+`targetPageNumber` is the page currently requested, which can differ during a
+navigation:
 
 ```ts
-const items = Confect.PaginatedQuery.page(state);
-const label = `Page ${Confect.PaginatedQuery.pageNum(state)}`;
+const items = Option.getOrElse(
+  Confect.PaginatedQuery.getItems(state),
+  () => [],
+);
+const label = Option.match(Confect.PaginatedQuery.getPage(state), {
+  onNone: () =>
+    `Loading page ${Confect.PaginatedQuery.targetPageNumber(state)}`,
+  onSome: (page) => `Page ${page.number}`,
+});
 const nextDisabled = !Confect.PaginatedQuery.canNext(state);
 const prevDisabled = !Confect.PaginatedQuery.canPrev(state);
 ```
 
-After a failure the machine closes the subscription and keeps its position;
-`PaginatedQuery.retry` reopens it at the same page, and
-`PaginatedQuery.reset` returns to page one. `isInvalidCursor` identifies the
-one error where `reset` is the only correct recovery: Convex reporting that
-a held cursor is no longer valid.
+`isLoading`, `isRefreshing`, `isSuccess`, `isFailure`, and `isStale` are
+refinements; `isPending`, `hasPage`, `hasError`, and the exhaustive `match`
+cover the common view branches. A `Failure` or `Stale` closes the subscription,
+and `retry` reopens it at the same page with a fresh pagination id.
+
+`first` is ordinary navigation back to page one within the current session.
+`reset` starts a fresh Convex pagination session at page one while retaining
+the displayed page; use it for `isInvalidCursor`. `reinitialize` is the
+deliberate operation for changing query args or page options. Options use
+Convex's names: `initialNumItems` is required, while `maximumRowsRead` and
+`maximumBytesRead` are optional positive integers.
 
 <Note>
   Convex may signal that a page has grown too large by recommending or requiring
   a page split. The machine handles the full protocol transparently: the current
   page is pinned to end at the split point and reloads as a range query, and the
   next page picks up from there. Users see at most a brief reload of the current
-  page — never a torn or incomplete one.
+  page — never a torn or incomplete one. If a reactive terminal page becomes
+  empty, the machine automatically retreats to the previous page.
 </Note>
 
 ## Authentication

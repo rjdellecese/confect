@@ -6,6 +6,7 @@ Add `@confect/foldkit` — client-side bindings for [Foldkit](https://foldkit.de
 
 ```ts
 import * as Confect from "@confect/foldkit";
+import * as Schema from "effect/Schema";
 import * as Subscription from "foldkit/subscription";
 
 const SaveNote = Confect.Command.mutation(
@@ -33,27 +34,30 @@ const subscriptions = Subscription.make<
 
 The Command factories accept Foldkit's `interrupt` option — `true` keys invocations by the Command name, `{ keyFields, toKey }` by a part derived from the ref's args — and the returned definition gains the `Interrupt` constructor for stopping in-flight invocations. Factory-built definitions instantiate Foldkit's own definition interfaces, so they are accepted wherever Foldkit accepts a Command definition — including Story/Scene `Command.resolve` and `expectExact` matchers. `Command.queryEffect`, `Command.mutationEffect`, and `Command.actionEffect` return execute bodies for hand-written `Command.define` calls (custom args schemas, multi-call Commands), and `Subscription.reactiveQueryStream` is the `dependenciesToStream` escape hatch for hand-written subscription entries.
 
-`PaginatedQuery` navigates a paginated query one page at a time (next/previous) over Convex's cursor pagination: `PaginatedQuery.make(ref)` returns the machine's Model schema and `init` constructor, the pure transitions `next`, `prev`, `settle`, `fail`, `retry`, and `reset` drive it from `update`, and view accessors (`page`, `pageNum`, `canNext`, `canPrev`, `isFirst`, `isLast`, `match`, …) read it. `Subscription.paginatedQuery` keeps exactly one live, reactive page subscription in sync with the machine state. Page splits are handled transparently (the current page re-pins and reloads as a range query), the last loaded page stays visible while the next one loads, and `PaginatedQuery.isInvalidCursor` identifies the error whose recovery is `reset`.
+`PaginatedQuery` navigates a paginated query one page at a time over Convex's cursor pagination. `PaginatedQuery.make(ref, errorSchema)` returns the Model schema, a correlated settlement schema, `init`, and `reinitialize`. Its phases use Foldkit `AsyncData`'s vocabulary and semantics: `Loading`, `Refreshing`, `Success`, `Failure`, and `Stale`. `settle` accepts a request-bound `Result`, turns a failed refresh into `Stale`, and ignores successes or failures from superseded requests. Transitions include `next`, `prev`, `first`, `retry`, and `reset`; view accessors include `getPage`, `getItems`, `getError`, refinements for every phase, and unambiguous displayed/target page numbers.
+
+`Subscription.paginatedQuery` keeps exactly one live, reactive page subscription in sync with the machine and emits one `onSettled` Message shape for either outcome. Each request sends Convex's pagination `id`, supports `maximumRowsRead` and `maximumBytesRead`, and uses `initialNumItems` for the initial page and split heuristic. Page splits remain transparent, the last complete page stays visible during navigation and after refresh failure, and an empty terminal page automatically retreats to the preceding page.
 
 ```ts
-const Notes = Confect.PaginatedQuery.make(refs.public.notes.paginate);
+const Notes = Confect.PaginatedQuery.make(
+  refs.public.notes.paginate,
+  Schema.String,
+);
 
 // Model: notes: Schema.Option(Notes.schema)
-// init:  Option.some(Notes.init({ channel }, { numItems: 20 }))
-// update: Confect.PaginatedQuery.settle(message.result), Confect.PaginatedQuery.next(state), ...
+// Message: settlement: Notes.settlement
+// init:  Option.some(Notes.init({ channel }, { initialNumItems: 20 }))
+// update: Confect.PaginatedQuery.settle(message.settlement), Confect.PaginatedQuery.next(state), ...
 
 const subscriptions = Subscription.make<
   Model,
   Message,
   Confect.WebSocketClient.WebSocketClient
 >()(() => ({
-  notesPage: Confect.Subscription.paginatedQuery<Model>()(
-    refs.public.notes.paginate,
-    {
-      state: (model) => model.notes,
-      onResult: (result) => SucceededGetNotesPage({ result }),
-      onError: (error) => FailedGetNotesPage({ error }),
-    },
-  ),
+  notesPage: Confect.Subscription.paginatedQuery<Model>()(Notes, {
+    state: (model) => model.notes,
+    mapError: String,
+    onSettled: (settlement) => SettledGetNotesPage({ settlement }),
+  }),
 }));
 ```
