@@ -21,7 +21,7 @@ import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 export interface Base<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility_ extends FunctionVisibility,
-  Args_,
+  Args_ extends DefaultFunctionArgs,
   Returns_,
   Error_ = never,
 > {
@@ -41,14 +41,24 @@ export interface Base<
 export type Ref<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility_ extends FunctionVisibility,
+  Args_ extends DefaultFunctionArgs,
+  Returns_,
+  Error_ = never,
 > =
-  | ErasedConfectRef<RuntimeAndFunctionType_, FunctionVisibility_>
+  | ConfectRefWithTypes<
+      RuntimeAndFunctionType_,
+      FunctionVisibility_,
+      FunctionProvenance.ArgsFields,
+      Args_,
+      Returns_,
+      Error_
+    >
   | ConvexRef<
       RuntimeAndFunctionType_,
       FunctionVisibility_,
-      DefaultFunctionArgs,
-      any,
-      any
+      Args_,
+      Returns_,
+      Error_
     >;
 
 export type ConfectRef<
@@ -77,7 +87,7 @@ interface ConfectRefWithTypes<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility_ extends FunctionVisibility,
   ArgsFields_ extends FunctionProvenance.ArgsFields,
-  Args_,
+  Args_ extends DefaultFunctionArgs,
   Returns_,
   Error_,
 > extends Base<
@@ -95,18 +105,6 @@ interface ConfectRefWithTypes<
   readonly error?: Schema.Codec<any, any>;
 }
 
-type ErasedConfectRef<
-  RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
-  FunctionVisibility_ extends FunctionVisibility,
-> = ConfectRefWithTypes<
-  RuntimeAndFunctionType_,
-  FunctionVisibility_,
-  FunctionProvenance.ArgsFields,
-  any,
-  any,
-  any
->;
-
 export interface ConvexRef<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility_ extends FunctionVisibility,
@@ -123,16 +121,24 @@ export interface ConvexRef<
   readonly _tag: "Convex";
 }
 
-export type Any = Ref<any, any>;
+type ErasedRef<
+  RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
+  FunctionVisibility_ extends FunctionVisibility,
+> = Ref<RuntimeAndFunctionType_, FunctionVisibility_, any, any, any>;
+
+export type Any = Ref<any, any, any, any, any>;
 
 /** Erased Confect-provenance ref used by provenance-specific APIs. */
-export type AnyConfect = ErasedConfectRef<any, any>;
+export type AnyConfect = Extract<Any, { readonly _tag: "Confect" }>;
 
-export type AnyInternal = Ref<any, "internal">;
+export type AnyInternal = ErasedRef<any, "internal">;
 
-export type AnyPublic = Ref<any, "public">;
+export type AnyPublic = ErasedRef<any, "public">;
 
-export type AnyQuery = Ref<RuntimeAndFunctionType.AnyQuery, FunctionVisibility>;
+export type AnyQuery = ErasedRef<
+  RuntimeAndFunctionType.AnyQuery,
+  FunctionVisibility
+>;
 
 export type AnyPublicPaginatedQuery = AnyPublicQuery &
   Base<
@@ -146,24 +152,30 @@ export type AnyPublicPaginatedQuery = AnyPublicQuery &
     any
   >;
 
-export type AnyMutation = Ref<
+export type AnyMutation = ErasedRef<
   RuntimeAndFunctionType.AnyMutation,
   FunctionVisibility
 >;
 
-export type AnyAction = Ref<
+export type AnyAction = ErasedRef<
   RuntimeAndFunctionType.AnyAction,
   FunctionVisibility
 >;
 
-export type AnyPublicQuery = Ref<RuntimeAndFunctionType.AnyQuery, "public">;
+export type AnyPublicQuery = ErasedRef<
+  RuntimeAndFunctionType.AnyQuery,
+  "public"
+>;
 
-export type AnyPublicMutation = Ref<
+export type AnyPublicMutation = ErasedRef<
   RuntimeAndFunctionType.AnyMutation,
   "public"
 >;
 
-export type AnyPublicAction = Ref<RuntimeAndFunctionType.AnyAction, "public">;
+export type AnyPublicAction = ErasedRef<
+  RuntimeAndFunctionType.AnyAction,
+  "public"
+>;
 
 export type GetRuntimeAndFunctionType<Ref_> = Ref_ extends {
   readonly "~RuntimeAndFunctionType": infer RuntimeAndFunctionType_ extends
@@ -243,7 +255,7 @@ type FromFunctionSpecHelper<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility_ extends FunctionVisibility,
   ArgsFields_ extends FunctionProvenance.ArgsFields,
-  Args_,
+  Args_ extends DefaultFunctionArgs,
   Returns_,
   Error_,
 > =
@@ -270,14 +282,13 @@ type FromFunctionSpecHelper<
           Returns_,
           Error_
         >
-      : Ref<RuntimeAndFunctionType_, FunctionVisibility_> &
-          Base<
-            RuntimeAndFunctionType_,
-            FunctionVisibility_,
-            Args_,
-            Returns_,
-            Error_
-          >;
+      : Ref<
+          RuntimeAndFunctionType_,
+          FunctionVisibility_,
+          Args_,
+          Returns_,
+          Error_
+        >;
 
 export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
   /**

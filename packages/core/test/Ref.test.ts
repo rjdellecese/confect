@@ -18,6 +18,7 @@ import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import * as PaginationOptions from "@confect/core/PaginationOptions";
 import * as PaginationResult from "@confect/core/PaginationResult";
 import * as Ref from "@confect/core/Ref";
+import type * as RuntimeAndFunctionType from "@confect/core/RuntimeAndFunctionType";
 
 describe("FunctionReference", () => {
   test("public query", () => {
@@ -128,6 +129,30 @@ describe("FunctionReference", () => {
     expectTypeOf<Ref.Error<Ref.AnyConfect>>().toBeAny();
     expectTypeOf<Ref.ArgsSchema<Ref.AnyConfect>>().toMatchTypeOf<
       Schema.Codec<any, any>
+    >();
+  });
+
+  test("Ref preserves its value types", () => {
+    type Ref_ = Ref.Ref<
+      RuntimeAndFunctionType.ConvexQuery,
+      "public",
+      { readonly id: string },
+      number,
+      "NotFound"
+    >;
+
+    expectTypeOf<Ref.Args<Ref_>>().toEqualTypeOf<{ readonly id: string }>();
+    expectTypeOf<Ref.Returns<Ref_>>().toEqualTypeOf<number>();
+    expectTypeOf<Ref.Error<Ref_>>().toEqualTypeOf<"NotFound">();
+
+    expectTypeOf<
+      Ref.Ref<
+        RuntimeAndFunctionType.ConvexQuery,
+        "public",
+        // @ts-expect-error — ref args must be struct-shaped
+        string,
+        number
+      >
     >();
   });
 

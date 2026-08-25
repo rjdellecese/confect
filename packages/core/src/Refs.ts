@@ -40,7 +40,10 @@ type FunctionSpecMatchesPredicate<
 > =
   Ref.Ref<
     FunctionSpec.GetRuntimeAndFunctionType<FunctionSpec_>,
-    FunctionSpec.GetFunctionVisibility<FunctionSpec_>
+    FunctionSpec.GetFunctionVisibility<FunctionSpec_>,
+    any,
+    any,
+    any
   > extends Predicate
     ? true
     : false;
