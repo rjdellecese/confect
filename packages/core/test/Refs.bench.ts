@@ -363,7 +363,7 @@ bench("Refs<Spec, AnyInternal> (internal-filtered)", () => {
 
 bench("resolve one leaf", () => {
   return {} as Refs.Refs<MediumSpec, Ref.AnyPublic>["users"]["list"];
-}).types([2428, "instantiations"]);
+}).types([2375, "instantiations"]);
 
 bench("resolve all leaves", () => {
   return [
@@ -374,7 +374,7 @@ bench("resolve all leaves", () => {
     {} as Refs.Refs<MediumSpec, Ref.AnyPublic>["comments"]["list"],
     {} as Refs.Refs<MediumSpec, Ref.AnyPublic>["comments"]["create"],
   ];
-}).types([3286, "instantiations"]);
+}).types([3228, "instantiations"]);
 
 // --- Small spec (1 group, 2 functions) ---
 
@@ -392,14 +392,14 @@ bench("small: Refs (internal-filtered)", () => {
 
 bench("small: Refs (resolve one leaf)", () => {
   return {} as Refs.Refs<SmallSpec, Ref.AnyPublic>["auth"]["login"];
-}).types([1150, "instantiations"]);
+}).types([1097, "instantiations"]);
 
 bench("small: Refs (resolve all leaves)", () => {
   return [
     {} as Refs.Refs<SmallSpec, Ref.AnyPublic>["auth"]["login"],
     {} as Refs.Refs<SmallSpec, Ref.AnyPublic>["auth"]["logout"],
   ];
-}).types([1520, "instantiations"]);
+}).types([1463, "instantiations"]);
 
 // --- Large spec (8 groups, 28 functions) ---
 
@@ -417,7 +417,7 @@ bench("large: Refs (internal-filtered)", () => {
 
 bench("large: Refs (resolve one leaf)", () => {
   return {} as Refs.Refs<LargeSpec, Ref.AnyPublic>["users"]["list"];
-}).types([4084, "instantiations"]);
+}).types([4031, "instantiations"]);
 
 bench("large: Refs (resolve all leaves)", () => {
   type PublicRefs = Refs.Refs<LargeSpec, Ref.AnyPublic>;
@@ -439,4 +439,4 @@ bench("large: Refs (resolve all leaves)", () => {
     {} as PublicRefs["settings"]["get"],
     {} as PublicRefs["settings"]["update"],
   ];
-}).types([6282, "instantiations"]);
+}).types([6219, "instantiations"]);

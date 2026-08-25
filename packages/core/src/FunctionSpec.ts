@@ -128,6 +128,9 @@ export type GetRuntimeAndFunctionType<FunctionSpec_ extends AnyWithProps> =
 export type GetFunctionVisibility<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_["functionVisibility"];
 
+export type GetFunctionProvenance<FunctionSpec_ extends AnyWithProps> =
+  FunctionSpec_["functionProvenance"];
+
 export type Name<FunctionSpec_ extends AnyWithProps> = FunctionSpec_["name"];
 
 export type MiddlewareSpecs<FunctionSpec_ extends AnyWithProps> =
@@ -136,7 +139,7 @@ export type MiddlewareSpecs<FunctionSpec_ extends AnyWithProps> =
 /** The field map declared by a Confect-provenance spec. */
 export type ArgsFields<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
-    functionProvenance: {
+    readonly functionProvenance: {
       readonly _tag: "Confect";
       readonly "~ArgsFields": infer ArgsFields_ extends
         FunctionProvenance.ArgsFields;
@@ -144,7 +147,7 @@ export type ArgsFields<FunctionSpec_ extends AnyWithProps> =
   }
     ? ArgsFields_
     : FunctionSpec_ extends {
-          functionProvenance: { readonly _tag: "Confect" };
+          readonly functionProvenance: { readonly _tag: "Confect" };
         }
       ? FunctionProvenance.ArgsFields
       : never;
@@ -152,7 +155,7 @@ export type ArgsFields<FunctionSpec_ extends AnyWithProps> =
 /** The args schema assembled from a Confect-provenance spec's field map. */
 export type ArgsSchema<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
-    functionProvenance: {
+    readonly functionProvenance: {
       readonly _tag: "Confect";
       readonly "~ArgsFields": infer ArgsFields_ extends
         FunctionProvenance.ArgsFields;
@@ -160,7 +163,7 @@ export type ArgsSchema<FunctionSpec_ extends AnyWithProps> =
   }
     ? Schema.Struct<ArgsFields_>
     : FunctionSpec_ extends {
-          functionProvenance: {
+          readonly functionProvenance: {
             readonly _tag: "Confect";
             readonly args: infer ArgsSchema_ extends FunctionProvenance.AnyArgs;
           };
@@ -170,119 +173,76 @@ export type ArgsSchema<FunctionSpec_ extends AnyWithProps> =
 
 export type ReturnsSchema<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
-    functionProvenance: FunctionProvenance.Confect<
-      any,
-      infer ReturnsSchema_ extends Schema.Codec<any, any>,
-      any,
-      any
-    >;
+    readonly functionProvenance: {
+      readonly _tag: "Confect";
+      readonly returns: infer ReturnsSchema_ extends Schema.Codec<any, any>;
+    };
   }
     ? ReturnsSchema_
     : never;
 
 export type ErrorSchema<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
-    functionProvenance: FunctionProvenance.Confect<
-      any,
-      any,
-      infer ErrorSchema_ extends Schema.Codec<any, any>,
-      any
-    >;
+    readonly functionProvenance: {
+      readonly _tag: "Confect";
+      readonly error?: infer ErrorSchema_ extends Schema.Codec<any, any>;
+    };
   }
     ? ErrorSchema_
     : never;
 
 export type Args<FunctionSpec_ extends AnyWithProps> = FunctionSpec_ extends {
-  functionProvenance: {
-    readonly _tag: "Confect";
-    readonly "~ArgsFields": infer ArgsFields_ extends
-      FunctionProvenance.ArgsFields;
-  };
+  readonly functionProvenance: { readonly _tag: "Confect" };
 }
-  ? Schema.Struct.Type<ArgsFields_>
-  : FunctionSpec_ extends {
-        functionProvenance: {
-          _tag: "Confect";
-          args: infer ArgsSchema_ extends Schema.Codec<any, any>;
-        };
-      }
-    ? ArgsSchema_["Type"]
-    : FunctionSpec_ extends {
-          functionProvenance: { _tag: "Convex"; "~args": infer Args_ };
-        }
-      ? Args_
-      : never;
+  ? ArgsSchema<FunctionSpec_>["Type"]
+  : GetFunctionProvenance<FunctionSpec_> extends FunctionProvenance.Convex<
+        infer Args_,
+        any
+      >
+    ? Args_
+    : never;
 
 export type Returns<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
-    functionProvenance: {
-      _tag: "Confect";
-      returns: infer ReturnsSchema_ extends Schema.Codec<any, any>;
-    };
+    readonly functionProvenance: { readonly _tag: "Confect" };
   }
-    ? ReturnsSchema_["Type"]
-    : FunctionSpec_ extends {
-          functionProvenance: { _tag: "Convex"; "~returns": infer Returns_ };
-        }
+    ? ReturnsSchema<FunctionSpec_>["Type"]
+    : GetFunctionProvenance<FunctionSpec_> extends FunctionProvenance.Convex<
+          any,
+          infer Returns_
+        >
       ? Awaited<Returns_>
       : never;
 
 export type EncodedArgs<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
-    functionProvenance: {
-      readonly _tag: "Confect";
-      readonly "~ArgsFields": infer ArgsFields_ extends
-        FunctionProvenance.ArgsFields;
-    };
+    readonly functionProvenance: { readonly _tag: "Confect" };
   }
-    ? Schema.Struct.Encoded<ArgsFields_>
-    : FunctionSpec_ extends {
-          functionProvenance: {
-            _tag: "Confect";
-            args: infer ArgsSchema_ extends Schema.Codec<any, any>;
-          };
-        }
-      ? ArgsSchema_["Encoded"]
-      : FunctionSpec_ extends {
-            functionProvenance: { _tag: "Convex"; "~args": infer Args_ };
-          }
-        ? Args_
-        : never;
+    ? ArgsSchema<FunctionSpec_>["Encoded"]
+    : GetFunctionProvenance<FunctionSpec_> extends FunctionProvenance.Convex<
+          infer Args_,
+          any
+        >
+      ? Args_
+      : never;
 
 export type EncodedReturns<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
-    functionProvenance: {
-      _tag: "Confect";
-      returns: infer ReturnsSchema_ extends Schema.Codec<any, any>;
-    };
+    readonly functionProvenance: { readonly _tag: "Confect" };
   }
-    ? ReturnsSchema_["Encoded"]
-    : FunctionSpec_ extends {
-          functionProvenance: { _tag: "Convex"; "~returns": infer Returns_ };
-        }
+    ? ReturnsSchema<FunctionSpec_>["Encoded"]
+    : GetFunctionProvenance<FunctionSpec_> extends FunctionProvenance.Convex<
+          any,
+          infer Returns_
+        >
       ? Returns_
       : never;
 
-export type Error<FunctionSpec_ extends AnyWithProps> = FunctionSpec_ extends {
-  functionProvenance: FunctionProvenance.Confect<
-    any,
-    any,
-    infer ErrorSchema_ extends Schema.Codec<any, any>
-  >;
-}
-  ? ErrorSchema_["Type"]
-  : never;
+export type Error<FunctionSpec_ extends AnyWithProps> =
+  ErrorSchema<FunctionSpec_>["Type"];
 
 export type EncodedError<FunctionSpec_ extends AnyWithProps> =
-  FunctionSpec_ extends {
-    functionProvenance: FunctionProvenance.Confect<
-      any,
-      any,
-      infer ErrorSchema_ extends Schema.Codec<any, any>
-    >;
-  }
-    ? ErrorSchema_["Encoded"]
-    : never;
+  ErrorSchema<FunctionSpec_>["Encoded"];
 
 export type WithName<
   FunctionSpec_ extends AnyWithProps,

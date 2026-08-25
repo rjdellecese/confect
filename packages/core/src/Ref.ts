@@ -542,7 +542,7 @@ const missingPaginatedProvenanceError = (ref: Any) =>
 
 const paginatedKind = (
   ref: AnyConfectRef<any, any>,
-): FunctionProvenance.AnyPaginated =>
+): FunctionProvenance.Paginated =>
   Match.value(ref.kind).pipe(
     Match.tag("Paginated", (kind) => kind),
     Match.tag("Standard", () => {
