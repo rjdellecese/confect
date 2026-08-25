@@ -132,6 +132,37 @@ describe("FunctionReference", () => {
     >();
   });
 
+  test("AnyPaginatedQuery", () => {
+    expectTypeOf<Ref.AnyPaginatedQuery>().not.toBeNever();
+    expectTypeOf<Ref.AnyPaginatedQuery>().toExtend<Ref.AnyQuery>();
+    expectTypeOf<Ref.AnyPublicPaginatedQuery>().toExtend<Ref.AnyPaginatedQuery>();
+    expectTypeOf<Ref.FunctionReference<Ref.AnyPaginatedQuery>>().toEqualTypeOf<
+      FunctionReference<"query", FunctionVisibility>
+    >();
+  });
+
+  test("AnyConfect public refs", () => {
+    expectTypeOf<Ref.AnyConfectPublicQuery>().not.toBeNever();
+    expectTypeOf<Ref.AnyConfectPublicQuery>().toExtend<Ref.AnyConfect>();
+    expectTypeOf<
+      Ref.FunctionReference<Ref.AnyConfectPublicQuery>
+    >().toEqualTypeOf<FunctionReference<"query", "public">>();
+
+    expectTypeOf<Ref.AnyConfectPublicPaginatedQuery>().not.toBeNever();
+    expectTypeOf<Ref.AnyConfectPublicPaginatedQuery>().toExtend<Ref.AnyConfectPublicQuery>();
+    expectTypeOf<Ref.AnyConfectPublicPaginatedQuery>().toExtend<Ref.AnyPublicPaginatedQuery>();
+
+    expectTypeOf<Ref.AnyConfectPublicMutation>().not.toBeNever();
+    expectTypeOf<
+      Ref.FunctionReference<Ref.AnyConfectPublicMutation>
+    >().toEqualTypeOf<FunctionReference<"mutation", "public">>();
+
+    expectTypeOf<Ref.AnyConfectPublicAction>().not.toBeNever();
+    expectTypeOf<
+      Ref.FunctionReference<Ref.AnyConfectPublicAction>
+    >().toEqualTypeOf<FunctionReference<"action", "public">>();
+  });
+
   test("Ref preserves its value types", () => {
     type Ref_ = Ref.Ref<
       RuntimeAndFunctionType.ConvexQuery,

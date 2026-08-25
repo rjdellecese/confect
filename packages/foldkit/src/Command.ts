@@ -1,12 +1,9 @@
 import type * as Ref from "@confect/core/Ref";
 import * as Effect from "effect/Effect";
+import * as Match from "effect/Match";
 import type * as Schema from "effect/Schema";
 import * as FoldkitCommand from "foldkit/command";
 import * as WebSocketClient from "./WebSocketClient";
-
-type AnyConfectPublicQuery = Extract<Ref.AnyPublicQuery, Ref.AnyConfect>;
-type AnyConfectPublicMutation = Extract<Ref.AnyPublicMutation, Ref.AnyConfect>;
-type AnyConfectPublicAction = Extract<Ref.AnyPublicAction, Ref.AnyConfect>;
 
 /**
  * Everything a Command against `Ref_` can fail with before it is folded into
@@ -161,7 +158,7 @@ const run = <Ref_ extends Ref.AnyConfect, SuccessMessage, ErrorMessage>(
  * a custom args schema, `interrupt`, or a Command that makes several calls.
  */
 export const queryEffect =
-  <Query extends AnyConfectPublicQuery, SuccessMessage, ErrorMessage>(
+  <Query extends Ref.AnyConfectPublicQuery, SuccessMessage, ErrorMessage>(
     ref: Query,
     handlers: Handlers<Query, SuccessMessage, ErrorMessage>,
   ) =>
@@ -179,7 +176,7 @@ export const queryEffect =
  * folded into a Message. See `queryEffect`.
  */
 export const mutationEffect =
-  <Mutation extends AnyConfectPublicMutation, SuccessMessage, ErrorMessage>(
+  <Mutation extends Ref.AnyConfectPublicMutation, SuccessMessage, ErrorMessage>(
     ref: Mutation,
     handlers: Handlers<Mutation, SuccessMessage, ErrorMessage>,
   ) =>
@@ -197,7 +194,7 @@ export const mutationEffect =
  * folded into a Message. See `queryEffect`.
  */
 export const actionEffect =
-  <Action extends AnyConfectPublicAction, SuccessMessage, ErrorMessage>(
+  <Action extends Ref.AnyConfectPublicAction, SuccessMessage, ErrorMessage>(
     ref: Action,
     handlers: Handlers<Action, SuccessMessage, ErrorMessage>,
   ) =>
@@ -237,40 +234,52 @@ function makeDefinition<
       ...((args === undefined ? [] : [args]) as Ref.OptionalArgs<Ref_>),
     );
 
-  // Delegating to Foldkit's `define` keeps the `CommandDefinitionTypeId`
-  // brand, the `Effect.suspend` around `execute`, the `messageMappers` chain
-  // that Story/Scene test resolution replays, and — with `interrupt` — the
-  // registry wiring behind the `Interrupt` constructor. `args` is the ref's
-  // own args schema fields and `messages` is the caller's declaration; a
-  // keyed interrupt's `toKey` receives the invocation's actual args.
-  // Confect makes the args optional when a ref's fields are empty; Foldkit
-  // sees the supplied `args` object and consequently declares them required.
-  if (interrupt === undefined) {
-    return FoldkitCommand.define(name, {
-      args: fields,
-      messages,
-      execute,
-    }) as Definition<Name, Ref_, SuccessMessage | ErrorMessage>;
-  }
-  if (interrupt === true) {
-    return FoldkitCommand.define(name, {
-      args: fields,
-      messages,
-      interrupt,
-      execute,
-    }) as InterruptibleDefinition<Name, Ref_, SuccessMessage | ErrorMessage>;
-  }
-  const definition: FoldkitCommand.CommandDefinitionWithArgs<
-    Name,
-    Fields,
-    ReturnType<typeof execute>
-  > = FoldkitCommand.define(name, {
-    args: fields,
-    messages,
-    interrupt,
-    execute,
-  });
-  return definition as Definition<Name, Ref_, SuccessMessage | ErrorMessage>;
+  return Match.value(interrupt).pipe(
+    Match.withReturnType<
+      Definition<Name, Ref_, SuccessMessage | ErrorMessage>
+    >(),
+    Match.when(
+      undefined,
+      () =>
+        FoldkitCommand.define(name, {
+          args: fields,
+          messages,
+          execute,
+        }) as Definition<Name, Ref_, SuccessMessage | ErrorMessage>,
+    ),
+    Match.when(
+      true,
+      (nameKeyedInterrupt) =>
+        FoldkitCommand.define(name, {
+          args: fields,
+          messages,
+          interrupt: nameKeyedInterrupt,
+          execute,
+        }) as InterruptibleDefinition<
+          Name,
+          Ref_,
+          SuccessMessage | ErrorMessage
+        >,
+    ),
+    Match.when(Match.defined, (keyedInterrupt) => {
+      const definition: FoldkitCommand.CommandDefinitionWithArgs<
+        Name,
+        Fields,
+        ReturnType<typeof execute>
+      > = FoldkitCommand.define(name, {
+        args: fields,
+        messages,
+        interrupt: keyedInterrupt,
+        execute,
+      });
+      return definition as Definition<
+        Name,
+        Ref_,
+        SuccessMessage | ErrorMessage
+      >;
+    }),
+    Match.exhaustive,
+  );
 }
 
 type FactoryConfig<
@@ -390,24 +399,20 @@ const makeFactory = <BoundRef extends Ref.AnyConfect>(
     },
   ): Definition<Name, Ref_, SuccessMessage | ErrorMessage> {
     const runWithArgs = effectHelper(ref, config);
-    if (config.interrupt === undefined) {
-      return makeDefinition(name, ref, config.messages, runWithArgs);
-    }
-    if (config.interrupt === true) {
-      return makeDefinition(
-        name,
-        ref,
-        config.messages,
-        runWithArgs,
-        config.interrupt,
-      );
-    }
-    return makeDefinition(
-      name,
-      ref,
-      config.messages,
-      runWithArgs,
-      config.interrupt,
+    return Match.value(config.interrupt).pipe(
+      Match.withReturnType<
+        Definition<Name, Ref_, SuccessMessage | ErrorMessage>
+      >(),
+      Match.when(undefined, () =>
+        makeDefinition(name, ref, config.messages, runWithArgs),
+      ),
+      Match.when(true, (interrupt) =>
+        makeDefinition(name, ref, config.messages, runWithArgs, interrupt),
+      ),
+      Match.when(Match.defined, (interrupt) =>
+        makeDefinition(name, ref, config.messages, runWithArgs, interrupt),
+      ),
+      Match.exhaustive,
     );
   }
 
@@ -443,7 +448,7 @@ const makeFactory = <BoundRef extends Ref.AnyConfect>(
  * // [model, [SaveDraft.Interrupt((outcome) => CompletedCancelSaveDraft({ outcome }))]]
  * ```
  */
-export const query: ReturnType<typeof makeFactory<AnyConfectPublicQuery>> =
+export const query: ReturnType<typeof makeFactory<Ref.AnyConfectPublicQuery>> =
   makeFactory(queryEffect);
 
 /**
@@ -451,12 +456,13 @@ export const query: ReturnType<typeof makeFactory<AnyConfectPublicQuery>> =
  * the ref's args. See `query`.
  */
 export const mutation: ReturnType<
-  typeof makeFactory<AnyConfectPublicMutation>
+  typeof makeFactory<Ref.AnyConfectPublicMutation>
 > = makeFactory(mutationEffect);
 
 /**
  * A Foldkit Command definition for a Confect action whose Command args are
  * the ref's args. See `query`.
  */
-export const action: ReturnType<typeof makeFactory<AnyConfectPublicAction>> =
-  makeFactory(actionEffect);
+export const action: ReturnType<
+  typeof makeFactory<Ref.AnyConfectPublicAction>
+> = makeFactory(actionEffect);
