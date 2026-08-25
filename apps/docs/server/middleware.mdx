@@ -116,7 +116,6 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicMutation({
       name: "deleteAll",
-      args: () => ({}),
       returns: () => Schema.Null,
     }).middleware(RequireAdmin), // RequireUser → RequireAdmin → handler
   );

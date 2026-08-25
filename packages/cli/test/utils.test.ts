@@ -57,14 +57,12 @@ const GenerateFunctionsLayer = Layer.mergeAll(
   NodeFileSystem.layer,
 );
 
-const emptyArgs = {};
 const emptyReturns = Schema.Null;
 
 const nodeGroup = () =>
   GroupSpec.makeNode().addFunction(
     FunctionSpec.publicNodeAction({
       name: "failingNodeAction",
-      args: () => emptyArgs,
       returns: () => emptyReturns,
     }),
   );

@@ -21,7 +21,7 @@ import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 export interface Base<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility_ extends FunctionVisibility,
-  Args_,
+  Args_ extends DefaultFunctionArgs,
   Returns_,
   Error_ = never,
 > {
@@ -41,14 +41,24 @@ export interface Base<
 export type Ref<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility_ extends FunctionVisibility,
+  Args_ extends DefaultFunctionArgs,
+  Returns_,
+  Error_ = never,
 > =
-  | AnyConfectRef<RuntimeAndFunctionType_, FunctionVisibility_>
+  | ConfectRefWithTypes<
+      RuntimeAndFunctionType_,
+      FunctionVisibility_,
+      FunctionProvenance.ArgsFields,
+      Args_,
+      Returns_,
+      Error_
+    >
   | ConvexRef<
       RuntimeAndFunctionType_,
       FunctionVisibility_,
-      DefaultFunctionArgs,
-      any,
-      any
+      Args_,
+      Returns_,
+      Error_
     >;
 
 export type ConfectRef<
@@ -58,7 +68,7 @@ export type ConfectRef<
   ReturnsSchema_ extends Schema.Codec<any, any>,
   ErrorSchema_ extends Schema.Codec<any, any> = never,
   MiddlewareError_ = never,
-> = ConfectRefWithArgs<
+> = ConfectRefWithTypes<
   RuntimeAndFunctionType_,
   FunctionVisibility_,
   ArgsFields_,
@@ -73,11 +83,11 @@ export type ConfectRef<
  * leaf in a generated ref tree; the public `ConfectRef` alias still derives
  * the same values from its fields and schemas.
  */
-interface ConfectRefWithArgs<
+interface ConfectRefWithTypes<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility_ extends FunctionVisibility,
   ArgsFields_ extends FunctionProvenance.ArgsFields,
-  Args_,
+  Args_ extends DefaultFunctionArgs,
   Returns_,
   Error_,
 > extends Base<
@@ -89,19 +99,6 @@ interface ConfectRefWithArgs<
 > {
   readonly _tag: "Confect";
   readonly args: FunctionProvenance.ArgsSchema<ArgsFields_>;
-  readonly returns: Schema.Codec<any, any>;
-  readonly kind: FunctionProvenance.ConfectKind;
-  readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyMiddlewareSpec>;
-  readonly error?: Schema.Codec<any, any>;
-}
-
-/** Erased structural view used by provenance-agnostic ref APIs. */
-export interface AnyConfectRef<
-  RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
-  FunctionVisibility_ extends FunctionVisibility,
-> extends Base<RuntimeAndFunctionType_, FunctionVisibility_, any, any, any> {
-  readonly _tag: "Confect";
-  readonly args: FunctionProvenance.AnyArgs;
   readonly returns: Schema.Codec<any, any>;
   readonly kind: FunctionProvenance.ConfectKind;
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyMiddlewareSpec>;
@@ -124,15 +121,24 @@ export interface ConvexRef<
   readonly _tag: "Convex";
 }
 
-export type Any = Ref<any, any>;
+type ErasedRef<
+  RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
+  FunctionVisibility_ extends FunctionVisibility,
+> = Ref<RuntimeAndFunctionType_, FunctionVisibility_, any, any, any>;
 
-export type AnyConfect = AnyConfectRef<any, any>;
+export type Any = Ref<any, any, any, any, any>;
 
-export type AnyInternal = Ref<any, "internal">;
+/** Erased Confect-provenance ref used by provenance-specific APIs. */
+export type AnyConfect = Extract<Any, { readonly _tag: "Confect" }>;
 
-export type AnyPublic = Ref<any, "public">;
+export type AnyInternal = ErasedRef<any, "internal">;
 
-export type AnyQuery = Ref<RuntimeAndFunctionType.AnyQuery, FunctionVisibility>;
+export type AnyPublic = ErasedRef<any, "public">;
+
+export type AnyQuery = ErasedRef<
+  RuntimeAndFunctionType.AnyQuery,
+  FunctionVisibility
+>;
 
 export type AnyPublicPaginatedQuery = AnyPublicQuery &
   Base<
@@ -146,48 +152,27 @@ export type AnyPublicPaginatedQuery = AnyPublicQuery &
     any
   >;
 
-export type AnyMutation = Ref<
+export type AnyMutation = ErasedRef<
   RuntimeAndFunctionType.AnyMutation,
   FunctionVisibility
 >;
 
-export type AnyAction = Ref<
+export type AnyAction = ErasedRef<
   RuntimeAndFunctionType.AnyAction,
   FunctionVisibility
 >;
 
-export type AnyPublicQuery = Ref<RuntimeAndFunctionType.AnyQuery, "public">;
-
-export type AnyConfectPublicQuery = AnyConfectRef<
+export type AnyPublicQuery = ErasedRef<
   RuntimeAndFunctionType.AnyQuery,
   "public"
 >;
 
-export type AnyConfectPublicPaginatedQuery = AnyConfectPublicQuery &
-  Base<
-    RuntimeAndFunctionType.AnyQuery,
-    "public",
-    {
-      [key: string]: any;
-      paginationOpts: PaginationOptions;
-    },
-    PaginationResult<any>,
-    any
-  >;
-
-export type AnyPublicMutation = Ref<
+export type AnyPublicMutation = ErasedRef<
   RuntimeAndFunctionType.AnyMutation,
   "public"
 >;
 
-export type AnyConfectPublicMutation = AnyConfectRef<
-  RuntimeAndFunctionType.AnyMutation,
-  "public"
->;
-
-export type AnyPublicAction = Ref<RuntimeAndFunctionType.AnyAction, "public">;
-
-export type AnyConfectPublicAction = AnyConfectRef<
+export type AnyPublicAction = ErasedRef<
   RuntimeAndFunctionType.AnyAction,
   "public"
 >;
@@ -230,7 +215,7 @@ export type ArgsFields<Ref_> = Ref_ extends {
 /** The assembled args schema carried by a Confect-provenance ref. */
 export type ArgsSchema<Ref_> = Ref_ extends {
   readonly _tag: "Confect";
-  readonly args: infer ArgsSchema_ extends FunctionProvenance.AnyArgs;
+  readonly args: infer ArgsSchema_ extends FunctionProvenance.AnyArgsSchema;
 }
   ? ArgsSchema_
   : never;
@@ -270,7 +255,7 @@ type FromFunctionSpecHelper<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility_ extends FunctionVisibility,
   ArgsFields_ extends FunctionProvenance.ArgsFields,
-  Args_,
+  Args_ extends DefaultFunctionArgs,
   Returns_,
   Error_,
 > =
@@ -289,7 +274,7 @@ type FromFunctionSpecHelper<
           FunctionSpec_,
           FunctionProvenance.AnyConfect
         >
-      ? ConfectRefWithArgs<
+      ? ConfectRefWithTypes<
           RuntimeAndFunctionType_,
           FunctionVisibility_,
           ArgsFields_,
@@ -297,14 +282,13 @@ type FromFunctionSpecHelper<
           Returns_,
           Error_
         >
-      : Ref<RuntimeAndFunctionType_, FunctionVisibility_> &
-          Base<
-            RuntimeAndFunctionType_,
-            FunctionVisibility_,
-            Args_,
-            Returns_,
-            Error_
-          >;
+      : Ref<
+          RuntimeAndFunctionType_,
+          FunctionVisibility_,
+          Args_,
+          Returns_,
+          Error_
+        >;
 
 export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
   /**
@@ -567,9 +551,7 @@ const missingPaginatedProvenanceError = (ref: Any) =>
       "  })",
   );
 
-const paginatedKind = (
-  ref: AnyConfectRef<any, any>,
-): FunctionProvenance.AnyPaginated =>
+const paginatedKind = (ref: AnyConfect): FunctionProvenance.Paginated =>
   Match.value(ref.kind).pipe(
     Match.tag("Paginated", (kind) => kind),
     Match.tag("Standard", () => {

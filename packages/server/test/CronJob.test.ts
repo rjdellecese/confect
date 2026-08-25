@@ -10,7 +10,6 @@ const makeMutationRef = (functionNamespace: string, name: string) =>
     functionNamespace,
     FunctionSpec.internalMutation({
       name,
-      args: () => ({}),
       returns: () => Schema.Void,
     }),
   );

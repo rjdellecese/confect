@@ -18,6 +18,7 @@ import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import * as PaginationOptions from "@confect/core/PaginationOptions";
 import * as PaginationResult from "@confect/core/PaginationResult";
 import * as Ref from "@confect/core/Ref";
+import type * as RuntimeAndFunctionType from "@confect/core/RuntimeAndFunctionType";
 
 describe("FunctionReference", () => {
   test("public query", () => {
@@ -115,12 +116,44 @@ describe("FunctionReference", () => {
   test("empty args", () => {
     const _spec = FunctionSpec.internalMutation({
       name: "reset",
-      args: () => ({}),
       returns: () => Schema.Void,
     });
     type Ref_ = Ref.FromFunctionSpec<typeof _spec>;
     expectTypeOf<Ref.Args<Ref_>>().toEqualTypeOf<{}>();
     expectTypeOf<Ref.Returns<Ref_>>().toEqualTypeOf<void>();
+  });
+
+  test("AnyConfect", () => {
+    expectTypeOf<Ref.Args<Ref.AnyConfect>>().toBeAny();
+    expectTypeOf<Ref.Returns<Ref.AnyConfect>>().toBeAny();
+    expectTypeOf<Ref.Error<Ref.AnyConfect>>().toBeAny();
+    expectTypeOf<Ref.ArgsSchema<Ref.AnyConfect>>().toMatchTypeOf<
+      Schema.Codec<any, any>
+    >();
+  });
+
+  test("Ref preserves its value types", () => {
+    type Ref_ = Ref.Ref<
+      RuntimeAndFunctionType.ConvexQuery,
+      "public",
+      { readonly id: string },
+      number,
+      "NotFound"
+    >;
+
+    expectTypeOf<Ref.Args<Ref_>>().toEqualTypeOf<{ readonly id: string }>();
+    expectTypeOf<Ref.Returns<Ref_>>().toEqualTypeOf<number>();
+    expectTypeOf<Ref.Error<Ref_>>().toEqualTypeOf<"NotFound">();
+
+    expectTypeOf<
+      Ref.Ref<
+        RuntimeAndFunctionType.ConvexQuery,
+        "public",
+        // @ts-expect-error — ref args must be struct-shaped
+        string,
+        number
+      >
+    >();
   });
 
   test("AnyQuery", () => {
@@ -146,7 +179,6 @@ describe("OptionalArgs", () => {
   test("optional tuple when args are empty", () => {
     const _spec = FunctionSpec.publicQuery({
       name: "list",
-      args: () => ({}),
       returns: () => Schema.Void,
     });
     type Ref_ = Ref.FromFunctionSpec<typeof _spec>;
@@ -171,7 +203,6 @@ describe("getFunctionReference", () => {
     "notes",
     FunctionSpec.publicQuery({
       name: "list",
-      args: () => ({}),
       returns: () => Schema.Void,
     }),
   );
@@ -185,7 +216,6 @@ describe("getFunctionReference", () => {
       "notes",
       FunctionSpec.publicQuery({
         name: "get",
-        args: () => ({}),
         returns: () => Schema.Void,
       }),
     );
@@ -266,7 +296,6 @@ describe("decodeError", () => {
 
     const spec = FunctionSpec.publicMutation({
       name: "update",
-      args: () => ({}),
       returns: () => Schema.Void,
       error: () => NotFound,
     });
@@ -284,7 +313,6 @@ describe("decodeError", () => {
   test("returns None when the ref has no error schema", async () => {
     const spec = FunctionSpec.publicMutation({
       name: "create",
-      args: () => ({}),
       returns: () => Schema.Void,
     });
     const ref = Ref.make("test/mod", spec);
@@ -305,7 +333,6 @@ describe("decodeErrorOption", () => {
     "test/mod",
     FunctionSpec.publicQuery({
       name: "getOrFail",
-      args: () => ({}),
       returns: () => Schema.Void,
       error: () => NotFound,
     }),
@@ -339,7 +366,6 @@ describe("decodeErrorOption", () => {
       "test/mod",
       FunctionSpec.publicQuery({
         name: "get",
-        args: () => ({}),
         returns: () => Schema.Void,
       }),
     );
@@ -359,7 +385,6 @@ describe("decodeErrorOrElse", () => {
     "test/mod",
     FunctionSpec.publicMutation({
       name: "update",
-      args: () => ({}),
       returns: () => Schema.Void,
       error: () => NotFound,
     }),
@@ -369,7 +394,6 @@ describe("decodeErrorOrElse", () => {
     "test/mod",
     FunctionSpec.publicMutation({
       name: "create",
-      args: () => ({}),
       returns: () => Schema.Void,
     }),
   );
@@ -414,7 +438,6 @@ describe("hasErrorSchema", () => {
       "test/mod",
       FunctionSpec.publicMutation({
         name: "update",
-        args: () => ({}),
         returns: () => Schema.Void,
         error: () => NotFound,
       }),
@@ -428,7 +451,6 @@ describe("hasErrorSchema", () => {
       "test/mod",
       FunctionSpec.publicMutation({
         name: "create",
-        args: () => ({}),
         returns: () => Schema.Void,
       }),
     );
@@ -602,7 +624,6 @@ describe("error schema laziness at decode time", () => {
       "test/mod",
       FunctionSpec.publicQuery({
         name: "get",
-        args: () => ({}),
         returns: () => Schema.String,
         error: () => {
           MutableRef.set(specErrorBuilt, true);

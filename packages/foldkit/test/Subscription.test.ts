@@ -511,7 +511,10 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
     it("rejects refs without paginated provenance", () => {
       expect(() =>
         Subscription.paginatedQuery<PaginatedModel>()(
-          getQueryRef as unknown as Ref.AnyConfectPublicPaginatedQuery,
+          getQueryRef as unknown as Extract<
+            Ref.AnyPublicPaginatedQuery,
+            Ref.AnyConfect
+          >,
           {
             state: (model) => model.notes,
             onResult: (result) => SettledNotesPage({ result }),

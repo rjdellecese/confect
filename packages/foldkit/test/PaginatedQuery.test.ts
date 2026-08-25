@@ -475,7 +475,10 @@ describe("PaginatedQuery", () => {
     it("rejects refs without paginated provenance", () => {
       expect(() =>
         PaginatedQuery.make(
-          standardQueryRef as unknown as Ref.AnyConfectPublicPaginatedQuery,
+          standardQueryRef as unknown as Extract<
+            Ref.AnyPublicPaginatedQuery,
+            Ref.AnyConfect
+          >,
         ),
       ).toThrow(/FunctionSpec.publicPaginatedQuery/);
     });

@@ -56,7 +56,6 @@ const queryNoError = Ref.make(
   "notes",
   FunctionSpec.publicQuery({
     name: "list",
-    args: () => ({}),
     returns: () => Schema.Array(Schema.Struct({ text: Schema.String })),
   }),
 );
@@ -94,7 +93,6 @@ const actionNoError = Ref.make(
   "tasks",
   FunctionSpec.publicAction({
     name: "ping",
-    args: () => ({}),
     returns: () => Schema.String,
   }),
 );

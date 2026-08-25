@@ -22,7 +22,6 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicMutation({
       name: "recordPlain",
-      args: () => ({}),
       returns: () => Schema.Null,
     }),
   );

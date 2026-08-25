@@ -8,13 +8,17 @@ import type * as FoldkitSubscription from "foldkit/subscription";
 import type * as PaginatedQuery from "./PaginatedQuery";
 import * as WebSocketClient from "./WebSocketClient";
 
+type AnyConfectPublicQuery = Extract<Ref.AnyPublicQuery, Ref.AnyConfect>;
+type AnyConfectPublicPaginatedQuery = AnyConfectPublicQuery &
+  Ref.AnyPublicPaginatedQuery;
+
 /**
  * Everything a reactive query subscription against `Query` can fail with: the
  * ref's typed error (if it declares an `error` schema), a transport-level
  * `WebSocketClientError`, or a `SchemaError` from encoding args or decoding
  * returns.
  */
-export type Error<Query extends Ref.AnyConfectPublicQuery> =
+export type Error<Query extends AnyConfectPublicQuery> =
   | Ref.Error<Query>
   | WebSocketClient.WebSocketClientError
   | Schema.SchemaError;
@@ -24,7 +28,7 @@ export type Error<Query extends Ref.AnyConfectPublicQuery> =
  * subscription is closed; a change from one `Some` to another tears the
  * server subscription down and reopens it with the new args.
  */
-export interface Dependencies<Query extends Ref.AnyConfectPublicQuery> {
+export interface Dependencies<Query extends AnyConfectPublicQuery> {
   readonly args: Option.Option<Ref.Args<Query>>;
 }
 
@@ -35,7 +39,7 @@ export interface Dependencies<Query extends Ref.AnyConfectPublicQuery> {
  * requires.
  */
 export interface Handlers<
-  Query extends Ref.AnyConfectPublicQuery,
+  Query extends AnyConfectPublicQuery,
   SuccessMessage,
   ErrorMessage,
 > {
@@ -47,7 +51,7 @@ export interface Handlers<
  * The `args` extractor is required whenever the query declares args; queries
  * without args may omit it, in which case the subscription is always open.
  */
-type ArgsConfig<Query extends Ref.AnyConfectPublicQuery, Model> = {
+type ArgsConfig<Query extends AnyConfectPublicQuery, Model> = {
   readonly args?: (model: Model) => Option.Option<Ref.Args<Query>>;
 } & (keyof Ref.Args<Query> extends never
   ? unknown
@@ -68,7 +72,7 @@ type ArgsConfig<Query extends Ref.AnyConfectPublicQuery, Model> = {
  * dependencies).
  */
 export const reactiveQueryStream =
-  <Query extends Ref.AnyConfectPublicQuery, SuccessMessage, ErrorMessage>(
+  <Query extends AnyConfectPublicQuery, SuccessMessage, ErrorMessage>(
     ref: Query,
     handlers: Handlers<Query, SuccessMessage, ErrorMessage>,
   ) =>
@@ -95,7 +99,7 @@ const missingPaginatedProvenanceError = (ref: Ref.AnyConfect) =>
   );
 
 const paginatedArgsSchemaOrThrow = <
-  Query extends Ref.AnyConfectPublicPaginatedQuery,
+  Query extends AnyConfectPublicPaginatedQuery,
 >(
   ref: Query,
 ): Query["args"] =>
@@ -137,7 +141,7 @@ const paginatedArgsSchemaOrThrow = <
  */
 export const reactiveQuery =
   <Model>() =>
-  <Query extends Ref.AnyConfectPublicQuery, SuccessMessage, ErrorMessage>(
+  <Query extends AnyConfectPublicQuery, SuccessMessage, ErrorMessage>(
     ref: Query,
     config: Handlers<Query, SuccessMessage, ErrorMessage> &
       ArgsConfig<Query, Model>,
@@ -199,7 +203,7 @@ export const reactiveQuery =
 export const paginatedQuery =
   <Model>() =>
   <
-    PaginatedQueryRef extends Ref.AnyConfectPublicPaginatedQuery,
+    PaginatedQueryRef extends AnyConfectPublicPaginatedQuery,
     ResultMessage,
     ErrorMessage,
   >(

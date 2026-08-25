@@ -19,7 +19,6 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicQuery({
       name: "list",
-      args: () => ({}),
       returns: () => Schema.Array(notes.Doc),
     }),
   )
@@ -47,21 +46,18 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicQuery({
       name: "getFirst",
-      args: () => ({}),
       returns: () => Schema.OptionFromNullOr(notes.Doc),
     }),
   )
   .addFunction(
     FunctionSpec.internalQuery({
       name: "internalGetFirst",
-      args: () => ({}),
       returns: () => Schema.OptionFromNullOr(notes.Doc),
     }),
   )
   .addFunction(
     FunctionSpec.internalMutation({
       name: "clearAll",
-      args: () => ({}),
       returns: () => Schema.Null,
     }),
   )

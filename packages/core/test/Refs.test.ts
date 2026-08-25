@@ -11,11 +11,9 @@ import * as Spec from "@confect/core/Spec";
 
 describe("make", () => {
   it("turns a spec into refs", () => {
-    const FnArgs = {};
     const FnReturns = Schema.Array(Schema.String);
     const list = FunctionSpec.publicQuery({
       name: "list",
-      args: () => FnArgs,
       returns: () => FnReturns,
     });
 
@@ -39,7 +37,6 @@ describe("make", () => {
         .addFunction(
           FunctionSpec.publicQuery({
             name: "list",
-            args: () => ({}),
             returns: () => Schema.Array(Schema.String),
           }),
         ),
@@ -50,7 +47,6 @@ describe("make", () => {
   });
 
   it("filters internal refs to only internal functions", () => {
-    const FnArgs = {};
     const FnReturns = Schema.String;
 
     const spec = Spec.make().add(
@@ -58,14 +54,12 @@ describe("make", () => {
         .addFunction(
           FunctionSpec.publicQuery({
             name: "publicList",
-            args: () => FnArgs,
             returns: () => FnReturns,
           }),
         )
         .addFunction(
           FunctionSpec.internalQuery({
             name: "internalList",
-            args: () => FnArgs,
             returns: () => FnReturns,
           }),
         ),
@@ -76,7 +70,7 @@ describe("make", () => {
       Ref.ConfectRef<
         RuntimeAndFunctionType.ConvexQuery,
         "internal",
-        typeof FnArgs,
+        {},
         typeof FnReturns
       >
     >();
@@ -86,7 +80,6 @@ describe("make", () => {
   });
 
   it("filters out groups with no matching functions", () => {
-    const FnArgs = {};
     const FnReturns = Schema.String;
 
     const spec = Spec.make()
@@ -94,7 +87,6 @@ describe("make", () => {
         GroupSpec.makeAt("publicOnly").addFunction(
           FunctionSpec.publicQuery({
             name: "list",
-            args: () => FnArgs,
             returns: () => FnReturns,
           }),
         ),
@@ -103,7 +95,6 @@ describe("make", () => {
         GroupSpec.makeAt("internalOnly").addFunction(
           FunctionSpec.internalQuery({
             name: "list",
-            args: () => FnArgs,
             returns: () => FnReturns,
           }),
         ),
@@ -115,7 +106,7 @@ describe("make", () => {
       Ref.ConfectRef<
         RuntimeAndFunctionType.ConvexQuery,
         "internal",
-        typeof FnArgs,
+        {},
         typeof FnReturns
       >
     >();
@@ -125,7 +116,6 @@ describe("make", () => {
   });
 
   it("filters public refs to only public functions", () => {
-    const FnArgs = {};
     const FnReturns = Schema.String;
 
     const spec = Spec.make().add(
@@ -133,14 +123,12 @@ describe("make", () => {
         .addFunction(
           FunctionSpec.publicQuery({
             name: "publicList",
-            args: () => FnArgs,
             returns: () => FnReturns,
           }),
         )
         .addFunction(
           FunctionSpec.internalQuery({
             name: "internalList",
-            args: () => FnArgs,
             returns: () => FnReturns,
           }),
         ),
@@ -151,7 +139,7 @@ describe("make", () => {
       Ref.ConfectRef<
         RuntimeAndFunctionType.ConvexQuery,
         "public",
-        typeof FnArgs,
+        {},
         typeof FnReturns
       >
     >();
@@ -313,7 +301,6 @@ describe("middleware error unions", () => {
         .addFunction(
           FunctionSpec.publicMutation({
             name: "update",
-            args: () => ({}),
             returns: () => Schema.Null,
           }),
         )

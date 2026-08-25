@@ -38,20 +38,17 @@ class MutationOnly extends MiddlewareSpec.MiddlewareSpec<MutationOnly>()(
 
 const query = FunctionSpec.publicQuery({
   name: "getThing",
-  args: () => ({}),
   returns: () => Schema.String,
 });
 
 const queryWithError = FunctionSpec.publicQuery({
   name: "getThingOrFail",
-  args: () => ({}),
   returns: () => Schema.String,
   error: () => NotFound,
 });
 
 const mutation = FunctionSpec.publicMutation({
   name: "setThing",
-  args: () => ({}),
   returns: () => Schema.Null,
 });
 

@@ -29,11 +29,11 @@ export interface ArgsSchema<
 }
 
 /** Erased structural view used after the exact field map is no longer needed. */
-export type AnyArgs = ArgsSchema<ArgsFields>;
+export type AnyArgsSchema = ArgsSchema<ArgsFields>;
 
 export type FunctionProvenance = Data.TaggedEnum<{
   Confect: {
-    args: AnyArgs;
+    args: AnyArgsSchema;
     returns: Schema.Codec<any, any>;
     error?: Schema.Codec<any, any>;
     kind: ConfectKind;
@@ -52,14 +52,14 @@ export type FunctionProvenance = Data.TaggedEnum<{
  * and an item schema from which the Convex-facing `args`/`returns` are
  * composed.
  */
-export type ConfectKind = Standard | AnyPaginated;
+export type ConfectKind = Standard | Paginated;
 
 export interface Standard {
   readonly _tag: "Standard";
 }
 
 export interface Paginated<
-  UserArgsFields_ extends ArgsFields,
+  UserArgsFields_ extends ArgsFields = ArgsFields,
   Item extends Schema.Codec<any, any> = Schema.Codec<any, any>,
 > {
   readonly _tag: "Paginated";
@@ -71,13 +71,6 @@ export interface Paginated<
   readonly page: Schema.Codec<any, any>;
 }
 
-export interface AnyPaginated {
-  readonly _tag: "Paginated";
-  readonly userArgs: AnyArgs;
-  readonly item: Schema.Codec<any, any>;
-  readonly page: Schema.Codec<any, any>;
-}
-
 export interface Confect<
   ArgsFields_ extends ArgsFields,
   Returns extends Schema.Codec<any, any>,
@@ -85,7 +78,6 @@ export interface Confect<
   Kind extends ConfectKind = ConfectKind,
 > {
   readonly _tag: "Confect";
-  /** @internal Type-only metadata; no corresponding runtime property. */
   readonly "~ArgsFields": ArgsFields_;
   readonly args: ArgsSchema<ArgsFields_>;
   readonly returns: Returns;
@@ -95,7 +87,7 @@ export interface Confect<
 
 export interface AnyConfect {
   readonly _tag: "Confect";
-  readonly args: AnyArgs;
+  readonly args: AnyArgsSchema;
   readonly returns: Schema.Codec<any, any>;
   readonly error?: Schema.Codec<any, any>;
   readonly kind: ConfectKind;
@@ -187,7 +179,7 @@ export interface ConfectPaginated<
 > {}
 
 export interface AnyConfectPaginated extends AnyConfect {
-  readonly kind: AnyPaginated;
+  readonly kind: Paginated;
 }
 
 /**

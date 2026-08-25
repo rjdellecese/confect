@@ -4,7 +4,6 @@ import * as Schema from "effect/Schema";
 export default GroupSpec.make().addFunction(
   FunctionSpec.publicQuery({
     name: "echo",
-    args: () => ({}),
     returns: () => Schema.String,
   }),
 );

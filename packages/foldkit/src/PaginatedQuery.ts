@@ -95,18 +95,20 @@ export interface PageResult<Item_> {
   readonly pageStatus?: "SplitRecommended" | "SplitRequired" | null;
 }
 
-export type Item<Query extends Ref.AnyConfectPublicPaginatedQuery> =
+type AnyConfectPublicQuery = Extract<Ref.AnyPublicQuery, Ref.AnyConfect>;
+type AnyConfectPublicPaginatedQuery = AnyConfectPublicQuery &
+  Ref.AnyPublicPaginatedQuery;
+
+export type Item<Query extends AnyConfectPublicPaginatedQuery> =
   Ref.Returns<Query>["page"][number];
 
-export type UserArgs<Query extends Ref.AnyConfectPublicPaginatedQuery> = Omit<
+export type UserArgs<Query extends AnyConfectPublicPaginatedQuery> = Omit<
   Ref.Args<Query>,
   "paginationOpts"
 >;
 
 /** The schema-and-constructor bundle returned by `make`. */
-export interface PaginatedQuery<
-  Query extends Ref.AnyConfectPublicPaginatedQuery,
-> {
+export interface PaginatedQuery<Query extends AnyConfectPublicPaginatedQuery> {
   /** The machine state schema — embed in the Model, typically inside `Schema.Option(...)`. */
   readonly schema: Schema.Codec<State<Item<Query>, UserArgs<Query>>, unknown>;
   /** The `PageResult` schema, for declaring the Message that carries results. */
@@ -137,7 +139,7 @@ const missingPaginatedProvenanceError = (ref: Ref.AnyConfect) =>
       "requires the user-args and item schemas that constructor stores.",
   );
 
-const paginatedKindOrThrow = (ref: Ref.AnyConfectPublicPaginatedQuery) =>
+const paginatedKindOrThrow = (ref: AnyConfectPublicPaginatedQuery) =>
   Match.value(ref.kind).pipe(
     Match.tag("Paginated", (kind) => kind),
     Match.tag("Standard", () => {
@@ -164,7 +166,7 @@ const paginatedKindOrThrow = (ref: Ref.AnyConfectPublicPaginatedQuery) =>
  * user-args and item schemas back the state schema, and mismatched schemas
  * are unrepresentable.
  */
-export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
+export const make = <Query extends AnyConfectPublicPaginatedQuery>(
   ref: Query,
 ): PaginatedQuery<Query> => {
   const kind = paginatedKindOrThrow(ref);

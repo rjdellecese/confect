@@ -4,6 +4,10 @@ import type * as Schema from "effect/Schema";
 import * as FoldkitCommand from "foldkit/command";
 import * as WebSocketClient from "./WebSocketClient";
 
+type AnyConfectPublicQuery = Extract<Ref.AnyPublicQuery, Ref.AnyConfect>;
+type AnyConfectPublicMutation = Extract<Ref.AnyPublicMutation, Ref.AnyConfect>;
+type AnyConfectPublicAction = Extract<Ref.AnyPublicAction, Ref.AnyConfect>;
+
 /**
  * Everything a Command against `Ref_` can fail with before it is folded into
  * an `onError` Message: the ref's typed error (if it declares an `error`
@@ -157,7 +161,7 @@ const run = <Ref_ extends Ref.AnyConfect, SuccessMessage, ErrorMessage>(
  * a custom args schema, `interrupt`, or a Command that makes several calls.
  */
 export const queryEffect =
-  <Query extends Ref.AnyConfectPublicQuery, SuccessMessage, ErrorMessage>(
+  <Query extends AnyConfectPublicQuery, SuccessMessage, ErrorMessage>(
     ref: Query,
     handlers: Handlers<Query, SuccessMessage, ErrorMessage>,
   ) =>
@@ -175,7 +179,7 @@ export const queryEffect =
  * folded into a Message. See `queryEffect`.
  */
 export const mutationEffect =
-  <Mutation extends Ref.AnyConfectPublicMutation, SuccessMessage, ErrorMessage>(
+  <Mutation extends AnyConfectPublicMutation, SuccessMessage, ErrorMessage>(
     ref: Mutation,
     handlers: Handlers<Mutation, SuccessMessage, ErrorMessage>,
   ) =>
@@ -193,7 +197,7 @@ export const mutationEffect =
  * folded into a Message. See `queryEffect`.
  */
 export const actionEffect =
-  <Action extends Ref.AnyConfectPublicAction, SuccessMessage, ErrorMessage>(
+  <Action extends AnyConfectPublicAction, SuccessMessage, ErrorMessage>(
     ref: Action,
     handlers: Handlers<Action, SuccessMessage, ErrorMessage>,
   ) =>
@@ -439,17 +443,20 @@ const makeFactory = <BoundRef extends Ref.AnyConfect>(
  * // [model, [SaveDraft.Interrupt((outcome) => CompletedCancelSaveDraft({ outcome }))]]
  * ```
  */
-export const query = makeFactory<Ref.AnyConfectPublicQuery>(queryEffect);
+export const query: ReturnType<typeof makeFactory<AnyConfectPublicQuery>> =
+  makeFactory(queryEffect);
 
 /**
  * A Foldkit Command definition for a Confect mutation whose Command args are
  * the ref's args. See `query`.
  */
-export const mutation =
-  makeFactory<Ref.AnyConfectPublicMutation>(mutationEffect);
+export const mutation: ReturnType<
+  typeof makeFactory<AnyConfectPublicMutation>
+> = makeFactory(mutationEffect);
 
 /**
  * A Foldkit Command definition for a Confect action whose Command args are
  * the ref's args. See `query`.
  */
-export const action = makeFactory<Ref.AnyConfectPublicAction>(actionEffect);
+export const action: ReturnType<typeof makeFactory<AnyConfectPublicAction>> =
+  makeFactory(actionEffect);
