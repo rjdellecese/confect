@@ -1,5 +1,7 @@
+import * as PaginationError from "@confect/core/PaginationError";
 import type * as Ref from "@confect/core/Ref";
 import * as Effect from "effect/Effect";
+import type * as Equivalence from "effect/Equivalence";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
@@ -7,7 +9,7 @@ import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import type * as FoldkitSubscription from "foldkit/subscription";
 import * as PaginatedQuery from "./PaginatedQuery";
-import * as WebSocketClient from "./WebSocketClient";
+import * as Client from "./Client";
 
 /**
  * Everything a reactive query subscription against `Query` can fail with: the
@@ -17,8 +19,38 @@ import * as WebSocketClient from "./WebSocketClient";
  */
 export type Error<Query extends Ref.AnyConfectPublicQuery> =
   | Ref.Error<Query>
-  | WebSocketClient.WebSocketClientError
+  | Client.WebSocketClientError
   | Schema.SchemaError;
+
+const paginatedError = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
+  error: Error<Query>,
+): PaginatedQuery.Error<Query> => {
+  const invalidCursor = Match.value(error).pipe(
+    Match.withReturnType<Option.Option<PaginationError.InvalidCursor>>(),
+    Match.when(Match.instanceOf(Client.WebSocketClientError), ({ cause }) =>
+      PaginationError.fromUnknown(cause),
+    ),
+    Match.when(Match.any, () => Option.none()),
+    Match.exhaustive,
+  );
+
+  return Option.match(invalidCursor, {
+    onSome: (invalidCursorError) => invalidCursorError,
+    onNone: () =>
+      Match.value(error).pipe(
+        Match.when(Schema.isSchemaError, (schemaError) => schemaError),
+        Match.when(
+          Match.instanceOf(Client.WebSocketClientError),
+          (clientError) => clientError,
+        ),
+        Match.when(Match.any, (functionError) => ({
+          _tag: "FunctionError" as const,
+          error: functionError,
+        })),
+        Match.exhaustive,
+      ) as PaginatedQuery.Error<Query>,
+  });
+};
 
 /**
  * The dependency record of a `reactiveQuery` entry. `None` means the
@@ -58,11 +90,9 @@ type ArgsConfig<Query extends Ref.AnyConfectPublicQuery, Model> = {
 
 /**
  * A `dependenciesToStream` body for a hand-written subscription entry: runs
- * the ref as a reactive query against the `WebSocketClient` resource and maps
- * every emission and every failure into a Message. The stream ends after
- * emitting the `onError` Message — Convex terminates the server subscription
- * on error — so retrying is `update`'s decision (typically by toggling the
- * entry's dependencies).
+ * the ref as a reactive query against the `Client` resource and maps
+ * every emission and every failure into a Message. Query failures are values,
+ * so the subscription remains live and can later emit a successful result.
  *
  * Prefer `reactiveQuery`, which builds the whole entry; reach for this when
  * you need control over the entry's dependencies (custom gating, extra
@@ -75,16 +105,16 @@ export const reactiveQueryStream =
   ) =>
   (
     ...args: Ref.OptionalArgs<Query>
-  ): Stream.Stream<
-    SuccessMessage | ErrorMessage,
-    never,
-    WebSocketClient.WebSocketClient
-  > =>
-    WebSocketClient.WebSocketClient.pipe(
-      Effect.map((client) => client.reactiveQuery(ref, ...args)),
+  ): Stream.Stream<SuccessMessage | ErrorMessage, never, Client.Client> =>
+    Client.Client.pipe(
+      Effect.map((client) => client.reactiveQueryResult(ref, ...args)),
       Stream.unwrap,
-      Stream.map(handlers.onSuccess),
-      Stream.catch((error) => Stream.succeed(handlers.onError(error))),
+      Stream.map(
+        Result.match({
+          onSuccess: handlers.onSuccess,
+          onFailure: handlers.onError,
+        }),
+      ),
     );
 
 /**
@@ -100,7 +130,7 @@ export const reactiveQueryStream =
  * const subscriptions = Subscription.make<
  *   Model,
  *   Message,
- *   Confect.WebSocketClient.WebSocketClient
+ *   Confect.Client.Client
  * >()(() => ({
  *   note: Confect.Subscription.reactiveQuery<Model>()(refs.public.notes.get, {
  *     args: (model) => Option.map(model.noteId, (noteId) => ({ noteId })),
@@ -126,7 +156,7 @@ export const reactiveQuery =
     Model,
     SuccessMessage | ErrorMessage,
     Dependencies<Query>,
-    WebSocketClient.WebSocketClient
+    Client.Client
   > => {
     const modelToArgs = config.args;
 
@@ -151,9 +181,9 @@ export const reactiveQuery =
 /**
  * A complete Foldkit subscription entry that keeps exactly one live reactive
  * page subscription in sync with a `PaginatedQuery` machine in the Model.
- * The machine state is the single source of truth: navigating, retrying, and
- * split-pinning change the derived args, which restarts the subscription;
- * a `Failure` or `Stale` machine (or a `None` from `state`) closes it.
+ * The machine state is the single source of truth: navigation and
+ * split-pinning change the derived args, while `Idle` closes the subscription.
+ * Pagination ids are allocated here and installed by the first settlement.
  *
  * The leading thunk fixes the `Model` type (TypeScript cannot partially
  * infer type arguments), so the `state` extractor's parameter is already
@@ -166,11 +196,10 @@ export const reactiveQuery =
  * const subscriptions = Subscription.make<
  *   Model,
  *   Message,
- *   Confect.WebSocketClient.WebSocketClient
+ *   Confect.Client.Client
  * >()(() => ({
  *   notesPage: Confect.Subscription.paginatedQuery<Model>()(Notes, {
  *     state: (model) => model.notes,
- *     mapError: String,
  *     onSettled: (settlement) => SettledGetNotesPage({ settlement }),
  *   }),
  * }))
@@ -178,114 +207,146 @@ export const reactiveQuery =
  *
  * Pass the settlement to `PaginatedQuery.settle` in `update`. The request
  * identity is included in both success and failure Messages, so superseded
- * outcomes cannot settle a newer page or pagination session.
+ * outcomes cannot settle a newer page or pagination session. Query failures
+ * do not close the Convex subscription; a later result can recover naturally.
  */
+type DependenciesSchema<Dependencies_> = Schema.Schema<Dependencies_> & {
+  readonly fields: Schema.Struct.Fields;
+};
+
+type EntryWithKeepAlive<Model, Message, Dependencies_, Services> = {
+  readonly dependenciesSchema: DependenciesSchema<Dependencies_>;
+  readonly modelToDependencies: (model: Model) => Dependencies_;
+  readonly keepAliveEquivalence: Equivalence.Equivalence<Dependencies_>;
+  readonly dependenciesToStream: (
+    dependencies: Dependencies_,
+    readDependencies: () => Dependencies_,
+  ) => Stream.Stream<Message, never, Services>;
+};
+
 export const paginatedQuery =
   <Model>() =>
   <
     PaginatedQueryRef extends Ref.AnyConfectPublicPaginatedQuery,
-    Error_,
     SettledMessage,
   >(
-    machine: PaginatedQuery.PaginatedQuery<PaginatedQueryRef, Error_>,
+    machine: PaginatedQuery.PaginatedQuery<PaginatedQueryRef>,
     config: {
       readonly state: (
         model: Model,
-      ) => Option.Option<
-        PaginatedQuery.State<
-          PaginatedQuery.Item<PaginatedQueryRef>,
-          PaginatedQuery.UserArgs<PaginatedQueryRef>,
-          Error_
-        >
+      ) => PaginatedQuery.State<
+        PaginatedQuery.Item<PaginatedQueryRef>,
+        PaginatedQuery.UserArgs<PaginatedQueryRef>,
+        PaginatedQuery.Error<PaginatedQueryRef>
       >;
-      readonly mapError: (error: Error<PaginatedQueryRef>) => Error_;
       readonly onSettled: (
         settlement: PaginatedQuery.Settlement<
           PaginatedQuery.Item<PaginatedQueryRef>,
           PaginatedQuery.UserArgs<PaginatedQueryRef>,
-          Error_
+          PaginatedQuery.Error<PaginatedQueryRef>
         >,
       ) => SettledMessage;
     },
-  ): FoldkitSubscription.EntryWithoutKeepAlive<
+  ): EntryWithKeepAlive<
     Model,
     SettledMessage,
     {
       readonly request: Option.Option<
-        PaginatedQuery.Request<PaginatedQuery.UserArgs<PaginatedQueryRef>>
+        PaginatedQuery.SubscriptionRequest<
+          PaginatedQuery.UserArgs<PaginatedQueryRef>
+        >
       >;
     },
-    WebSocketClient.WebSocketClient
+    Client.Client
   > => {
     const ref = machine.ref;
     const composedArgsSchema = ref.args;
+    const requestEquivalence = Schema.toEquivalence(
+      machine.subscriptionRequestSchema,
+    );
+    const optionalRequestEquivalence = Option.makeEquivalence<
+      PaginatedQuery.SubscriptionRequest<
+        PaginatedQuery.UserArgs<PaginatedQueryRef>
+      >
+    >((left, right) =>
+      requestEquivalence(
+        { ...left, paginationId: Option.none() },
+        { ...right, paginationId: Option.none() },
+      ),
+    );
 
     return {
       dependenciesSchema: Schema.Struct({
-        request: Schema.Option(machine.requestSchema),
+        request: Schema.Option(machine.subscriptionRequestSchema),
       }),
       modelToDependencies: (model) => ({
-        request: Option.flatMap(config.state(model), (state) =>
-          Match.value(state.phase).pipe(
-            Match.withReturnType<
-              Option.Option<
-                PaginatedQuery.Request<
-                  PaginatedQuery.UserArgs<PaginatedQueryRef>
-                >
-              >
-            >(),
-            Match.tag("Failure", "Stale", () => Option.none()),
-            Match.tag("Loading", "Refreshing", "Success", () =>
-              Option.some(PaginatedQuery.getRequest(state)),
-            ),
-            Match.exhaustive,
+        request: Match.value(config.state(model)).pipe(
+          Match.tag("Idle", () => Option.none()),
+          Match.tag("Active", (state) =>
+            Option.some(PaginatedQuery.getSubscriptionRequest(state)),
           ),
+          Match.exhaustive,
         ),
       }),
-      dependenciesToStream: ({ request }) =>
+      keepAliveEquivalence: (left, right) =>
+        optionalRequestEquivalence(left.request, right.request),
+      dependenciesToStream: ({
+        request,
+      }): Stream.Stream<SettledMessage, never, Client.Client> =>
         Option.match(request, {
           onNone: () => Stream.empty,
-          onSome: (pageRequest) => {
-            const { descriptor, options, paginationId } = pageRequest;
-            const composedArgs = composedArgsSchema.make({
-              ...pageRequest.args,
-              paginationOpts: {
-                numItems: options.initialNumItems,
-                cursor: descriptor.cursor,
-                id: paginationId,
-                ...Match.value(options.maximumRowsRead).pipe(
-                  Match.when(undefined, () => ({})),
-                  Match.when(Match.defined, (maximumRowsRead) => ({
-                    maximumRowsRead,
-                  })),
-                  Match.exhaustive,
-                ),
-                ...Match.value(options.maximumBytesRead).pipe(
-                  Match.when(undefined, () => ({})),
-                  Match.when(Match.defined, (maximumBytesRead) => ({
-                    maximumBytesRead,
-                  })),
-                  Match.exhaustive,
-                ),
-                ...Option.match(descriptor.endCursor, {
-                  onNone: () => ({}),
-                  onSome: (endCursor) => ({ endCursor }),
-                }),
-              },
-            });
-            return reactiveQueryStream(ref, {
-              onSuccess: (returns) =>
-                config.onSettled({
-                  request: pageRequest,
-                  result: Result.succeed(returns),
-                }),
-              onError: (error) =>
-                config.onSettled({
-                  request: pageRequest,
-                  result: Result.fail(config.mapError(error)),
-                }),
-            })(composedArgs);
-          },
+          onSome: (subscriptionRequest) =>
+            Stream.unwrap(
+              Effect.gen(function* () {
+                const client = yield* Client.Client;
+                const paginationId = yield* Option.match(
+                  subscriptionRequest.paginationId,
+                  {
+                    onNone: () => client.nextPaginationId,
+                    onSome: Effect.succeed,
+                  },
+                );
+                const allocatedRequest = PaginatedQuery.allocateRequest(
+                  subscriptionRequest,
+                  paginationId,
+                );
+                const { descriptor, options } = allocatedRequest;
+                const composedArgs = composedArgsSchema.make({
+                  ...allocatedRequest.args,
+                  paginationOpts: {
+                    numItems: options.initialNumItems,
+                    cursor: descriptor.cursor,
+                    id: paginationId,
+                    ...Match.value(options.maximumRowsRead).pipe(
+                      Match.when(undefined, () => ({})),
+                      Match.when(Match.defined, (maximumRowsRead) => ({
+                        maximumRowsRead,
+                      })),
+                      Match.exhaustive,
+                    ),
+                    ...Match.value(options.maximumBytesRead).pipe(
+                      Match.when(undefined, () => ({})),
+                      Match.when(Match.defined, (maximumBytesRead) => ({
+                        maximumBytesRead,
+                      })),
+                      Match.exhaustive,
+                    ),
+                    ...Option.match(descriptor.endCursor, {
+                      onNone: () => ({}),
+                      onSome: (endCursor) => ({ endCursor }),
+                    }),
+                  },
+                });
+                return client.reactiveQueryResult(ref, composedArgs).pipe(
+                  Stream.map((result) =>
+                    config.onSettled({
+                      request: allocatedRequest,
+                      result: Result.mapError(result, paginatedError),
+                    }),
+                  ),
+                );
+              }),
+            ),
         }),
     };
   };

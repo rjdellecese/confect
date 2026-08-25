@@ -1,13 +1,12 @@
-import { FunctionSpec, Ref } from "@confect/core";
+import { FunctionSpec, PaginationError, Ref } from "@confect/core";
 import { describe, expect, it } from "@effect/vitest";
-import { ConvexError } from "convex/values";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import { expectTypeOf } from "vitest";
+import * as Client from "@confect/foldkit/Client";
 import * as PaginatedQuery from "@confect/foldkit/PaginatedQuery";
-import * as WebSocketClient from "@confect/foldkit/WebSocketClient";
 
 const Note = Schema.Struct({ text: Schema.String });
 
@@ -36,11 +35,13 @@ const standardQueryRef = Ref.make(
   }),
 );
 
-const Notes = PaginatedQuery.make(paginateRef, Schema.String);
+const Notes = PaginatedQuery.make(paginateRef);
 
 type Item = { readonly text: string };
 type Args = { readonly channel: string };
-type State = PaginatedQuery.State<Item, Args, string>;
+type PageError = PaginatedQuery.Error<typeof paginateRef>;
+type State = PaginatedQuery.State<Item, Args, PageError>;
+type Active = PaginatedQuery.Active<Item, Args, PageError>;
 
 const descriptor = (
   cursor: string | null,
@@ -49,10 +50,8 @@ const descriptor = (
   cursor,
   endCursor: Match.value(endCursor).pipe(
     Match.withReturnType<Option.Option<string>>(),
-    Match.when(undefined, () => Option.none()),
-    Match.when(Match.defined, (definedEndCursor) =>
-      Option.some(definedEndCursor),
-    ),
+    Match.when(undefined, () => Option.none<string>()),
+    Match.when(Match.defined, (value: string) => Option.some(value)),
     Match.exhaustive,
   ),
 });
@@ -67,25 +66,37 @@ const pageResult = (
   ...overrides,
 });
 
+const request = (
+  state: Active,
+  paginationId = Option.getOrElse(state.paginationId, () => 1),
+): PaginatedQuery.Request<Args> =>
+  PaginatedQuery.allocateRequest(
+    PaginatedQuery.getSubscriptionRequest(state),
+    paginationId,
+  );
+
 const success = (
-  state: State,
+  state: Active,
   page: ReadonlyArray<Item>,
   overrides?: Partial<PaginatedQuery.PageResult<Item>>,
-): PaginatedQuery.Settlement<Item, Args, string> => ({
-  request: PaginatedQuery.getRequest(state),
+): PaginatedQuery.Settlement<Item, Args, PageError> => ({
+  request: request(state),
   result: Result.succeed(pageResult(page, overrides)),
 });
 
 const failure = (
-  state: State,
-  error: string,
-): PaginatedQuery.Settlement<Item, Args, string> => ({
-  request: PaginatedQuery.getRequest(state),
+  state: Active,
+  error: PageError,
+): PaginatedQuery.Settlement<Item, Args, PageError> => ({
+  request: request(state),
   result: Result.fail(error),
 });
 
-const initial = (): State =>
+const offline = () => new Client.WebSocketClientError({ cause: "offline" });
+
+const initial = (): Active =>
   Notes.init(
+    Notes.idle,
     { channel: "general" },
     {
       initialNumItems: 2,
@@ -94,34 +105,36 @@ const initial = (): State =>
     },
   );
 
-const loadedPageOne = (): State => {
+const loadedPageOne = (): Active => {
   const state = initial();
   return PaginatedQuery.settle(
     state,
     success(state, [{ text: "a" }, { text: "b" }]),
-  );
+  ) as Active;
 };
 
-const getPhase = <Tag extends State["phase"]["_tag"]>(
-  state: State,
+const getPhase = <Tag extends Active["phase"]["_tag"]>(
+  state: Active,
   tag: Tag,
-): Extract<State["phase"], { readonly _tag: Tag }> => {
+): Extract<Active["phase"], { readonly _tag: Tag }> => {
   expect(state.phase._tag).toBe(tag);
-  return state.phase as Extract<State["phase"], { readonly _tag: Tag }>;
+  return state.phase as Extract<Active["phase"], { readonly _tag: Tag }>;
 };
 
 describe("PaginatedQuery", () => {
   describe("construction", () => {
-    it("starts an identified request for page one", () => {
-      const state = initial();
+    it("starts idle and initializes page one without allocating a client id", () => {
+      expect(Notes.idle).toEqual({ _tag: "Idle", generation: 0 });
 
+      const state = initial();
       expect(state.args).toEqual({ channel: "general" });
       expect(state.options).toEqual({
         initialNumItems: 2,
         maximumRowsRead: 100,
         maximumBytesRead: 1_000,
       });
-      expect(state.paginationId).toBeGreaterThan(0);
+      expect(state.generation).toBe(1);
+      expect(state.paginationId).toEqual(Option.none());
       expect(state.current).toEqual(descriptor(null));
       expect(state.prevStack).toEqual([]);
       expect(state.phase).toEqual({
@@ -133,49 +146,72 @@ describe("PaginatedQuery", () => {
       expect(PaginatedQuery.isPending(state)).toBe(true);
     });
 
-    it("omits the args parameter for a query without args", () => {
-      const All = PaginatedQuery.make(paginateNoArgsRef, Schema.String);
-      const state = All.init({ initialNumItems: 3 });
+    it("retains a generation tombstone across close and reopen", () => {
+      const first = initial();
+      const idle = PaginatedQuery.close(first);
+      const reopened = Notes.init(
+        idle,
+        { channel: "general" },
+        { initialNumItems: 2 },
+      );
+
+      expect(idle).toEqual({ _tag: "Idle", generation: 1 });
+      expect(reopened.generation).toBe(2);
+      expect(PaginatedQuery.settle(reopened, success(first, []))).toEqual(
+        reopened,
+      );
+      expect(PaginatedQuery.settle(idle, success(first, []))).toEqual(idle);
+    });
+
+    it("omits the args parameter for a query without user args", () => {
+      const All = PaginatedQuery.make(paginateNoArgsRef);
+      const state = All.init(All.idle, { initialNumItems: 3 });
       const reinitialized = All.reinitialize(state, { initialNumItems: 4 });
 
       expect(state.args).toEqual({});
       expect(state.options.initialNumItems).toBe(3);
       expect(reinitialized.args).toEqual({});
       expect(reinitialized.options.initialNumItems).toBe(4);
+      expect(reinitialized.generation).toBe(2);
     });
 
-    it("validates page and read limits", () => {
+    it("validates page and read limits synchronously", () => {
       expect(() =>
-        Notes.init({ channel: "general" }, { initialNumItems: 0 }),
+        Notes.init(Notes.idle, { channel: "general" }, { initialNumItems: 0 }),
       ).toThrow(/greater than 0/);
       expect(() =>
-        Notes.init({ channel: "general" }, { initialNumItems: 1.5 }),
+        Notes.init(
+          Notes.idle,
+          { channel: "general" },
+          { initialNumItems: 1.5 },
+        ),
       ).toThrow(/integer/);
       expect(() =>
         Notes.init(
+          Notes.idle,
           { channel: "general" },
           { initialNumItems: 2, maximumRowsRead: -1 },
         ),
       ).toThrow(/greater than 0/);
     });
 
-    it("reinitializes with new args and a fresh request identity", () => {
+    it("reinitializes with new args and a fresh logical session", () => {
       const before = loadedPageOne();
       const state = Notes.reinitialize(before, { channel: "random" });
-
-      expect(state.args).toEqual({ channel: "random" });
-      expect(state.options).toEqual(before.options);
-      expect(state.paginationId).not.toBe(before.paginationId);
-      expect(state.phase).toEqual({
-        _tag: "Loading",
-        direction: "Initial",
-      });
-
       const resized = Notes.reinitialize(
         before,
         { channel: "random" },
         { initialNumItems: 5 },
       );
+
+      expect(state.args).toEqual({ channel: "random" });
+      expect(state.options).toEqual(before.options);
+      expect(state.generation).toBe(before.generation + 1);
+      expect(state.paginationId).toEqual(Option.none());
+      expect(state.phase).toEqual({
+        _tag: "Loading",
+        direction: "Initial",
+      });
       expect(resized.options).toEqual({ initialNumItems: 5 });
     });
 
@@ -183,17 +219,21 @@ describe("PaginatedQuery", () => {
       expect(() =>
         PaginatedQuery.make(
           standardQueryRef as unknown as Ref.AnyConfectPublicPaginatedQuery,
-          Schema.String,
         ),
       ).toThrow(/FunctionSpec.publicPaginatedQuery/);
     });
   });
 
   describe("settle", () => {
-    it("settles a success with a complete page", () => {
-      const state = loadedPageOne();
+    it("installs the allocated id and settles a complete page atomically", () => {
+      const before = initial();
+      const state = PaginatedQuery.settle(
+        before,
+        success(before, [{ text: "a" }, { text: "b" }]),
+      ) as Active;
       const phase = getPhase(state, "Success");
 
+      expect(state.paginationId).toEqual(Option.some(1));
       expect(phase.data).toEqual({
         descriptor: descriptor(null),
         number: 1,
@@ -204,108 +244,108 @@ describe("PaginatedQuery", () => {
       expect(PaginatedQuery.getItems(state)).toEqual(
         Option.some([{ text: "a" }, { text: "b" }]),
       );
-      expect(PaginatedQuery.hasPage(state)).toBe(true);
       expect(PaginatedQuery.canNext(state)).toBe(true);
     });
 
-    it("settles a cold failure as Failure and stores the error", () => {
+    it("keeps a failed request current so a later emission can recover", () => {
       const before = initial();
-      const state = PaginatedQuery.settle(before, failure(before, "offline"));
+      const subscribedRequest = request(before, 7);
+      const error = offline();
+      const failed = PaginatedQuery.settle(before, {
+        request: subscribedRequest,
+        result: Result.fail(error),
+      }) as Active;
 
-      expect(state.phase).toEqual({ _tag: "Failure", error: "offline" });
-      expect(PaginatedQuery.getError(state)).toEqual(Option.some("offline"));
-      expect(PaginatedQuery.hasPage(state)).toBe(false);
+      expect(failed.paginationId).toEqual(Option.some(7));
+      expect(failed.phase).toEqual({ _tag: "Failure", error });
+      expect(PaginatedQuery.isCurrentRequest(failed, subscribedRequest)).toBe(
+        true,
+      );
+
+      const recovered = PaginatedQuery.settle(failed, {
+        request: subscribedRequest,
+        result: Result.succeed(pageResult([{ text: "recovered" }])),
+      }) as Active;
+      expect(getPhase(recovered, "Success").data.items).toEqual([
+        { text: "recovered" },
+      ]);
     });
 
-    it("settles a refresh failure as Stale with the complete prior page", () => {
+    it("settles a refresh failure as Stale with the prior page", () => {
       const before = Option.getOrThrow(PaginatedQuery.next(loadedPageOne()));
-      const state = PaginatedQuery.settle(before, failure(before, "offline"));
-      const phase = getPhase(state, "Stale");
+      const error = offline();
+      const state = PaginatedQuery.settle(before, failure(before, error));
 
-      expect(phase.error).toBe("offline");
-      expect(phase.data.number).toBe(1);
-      expect(phase.data.items).toEqual([{ text: "a" }, { text: "b" }]);
-      expect(PaginatedQuery.hasError(state)).toBe(true);
+      expect(PaginatedQuery.isStale(state)).toBe(true);
+      if (PaginatedQuery.isStale(state)) {
+        expect(state.phase.error).toBe(error);
+        expect(state.phase.data.items).toEqual([{ text: "a" }, { text: "b" }]);
+      }
     });
 
-    it("supports the data-last form", () => {
-      const before = initial();
-      expect(
-        PaginatedQuery.settle(success(before, [{ text: "a" }]))(before).phase
-          ._tag,
-      ).toBe("Success");
+    it("automatically resets an invalid cursor into a fresh session", () => {
+      const before = Option.getOrThrow(PaginatedQuery.next(loadedPageOne()));
+      const settlement = failure(
+        before,
+        new PaginationError.InvalidCursor({ cause: "expired" }),
+      );
+      const decodedSettlement = Schema.decodeUnknownSync(Notes.settlement)(
+        Schema.encodeSync(Notes.settlement)(settlement),
+      );
+      const state = PaginatedQuery.settle(before, decodedSettlement) as Active;
+
+      expect(state.generation).toBe(before.generation + 1);
+      expect(state.paginationId).toEqual(Option.none());
+      expect(state.requestId).toBe(1);
+      expect(state.current).toEqual(descriptor(null));
+      expect(state.prevStack).toEqual([]);
+      expect(getPhase(state, "Refreshing").direction).toBe("Reset");
+      expect(PaginatedQuery.getError(state)).toEqual(Option.none());
     });
 
-    it("ignores both outcomes from a superseded request", () => {
+    it("ignores outcomes from superseded requests and sessions", () => {
       const pageOne = loadedPageOne();
-      const oldRequest = PaginatedQuery.getRequest(pageOne);
+      const oldSettlement = success(pageOne, [{ text: "late" }]);
       const navigated = Option.getOrThrow(PaginatedQuery.next(pageOne));
-      const staleSuccess = {
-        request: oldRequest,
-        result: Result.succeed(pageResult([{ text: "late" }])),
-      };
-      const staleFailure = {
-        request: oldRequest,
-        result: Result.fail("late failure"),
-      };
+      const reset = PaginatedQuery.reset(pageOne);
 
-      expect(PaginatedQuery.settle(navigated, staleSuccess)).toEqual(navigated);
-      expect(PaginatedQuery.settle(navigated, staleFailure)).toEqual(navigated);
-    });
-
-    it("ignores an outcome from an older pagination session", () => {
-      const before = loadedPageOne();
-      const oldSettlement = success(before, [{ text: "late" }]);
-      const reset = PaginatedQuery.reset(before);
-
+      expect(PaginatedQuery.settle(navigated, oldSettlement)).toEqual(
+        navigated,
+      );
       expect(PaginatedQuery.settle(reset, oldSettlement)).toEqual(reset);
     });
 
     it("distinguishes separate requests for the same cursor range", () => {
       const pageOne = loadedPageOne();
-      const firstPageOneRequest = PaginatedQuery.getRequest(pageOne);
+      const firstPageRequest = request(pageOne);
       const loadingTwo = Option.getOrThrow(PaginatedQuery.next(pageOne));
       const pageTwo = PaginatedQuery.settle(
         loadingTwo,
         success(loadingTwo, [{ text: "c" }]),
-      );
-      const returningToPageOne = Option.getOrThrow(
-        PaginatedQuery.prev(pageTwo),
-      );
-      const lateFirstPageOne = {
-        request: firstPageOneRequest,
-        result: Result.succeed(pageResult([{ text: "late" }])),
-      };
+      ) as Active;
+      const returning = Option.getOrThrow(PaginatedQuery.prev(pageTwo));
 
-      expect(returningToPageOne.current).toEqual(
-        firstPageOneRequest.descriptor,
-      );
-      expect(returningToPageOne.requestId).not.toBe(
-        firstPageOneRequest.requestId,
-      );
+      expect(returning.current).toEqual(firstPageRequest.descriptor);
+      expect(returning.requestId).not.toBe(firstPageRequest.requestId);
       expect(
-        PaginatedQuery.settle(returningToPageOne, lateFirstPageOne),
-      ).toEqual(returningToPageOne);
+        PaginatedQuery.settle(returning, {
+          request: firstPageRequest,
+          result: Result.succeed(pageResult([{ text: "late" }])),
+        }),
+      ).toEqual(returning);
     });
 
-    it("ignores late outcomes after a failure closes the subscription", () => {
-      const before = loadedPageOne();
-      const failed = PaginatedQuery.settle(before, failure(before, "offline"));
-
-      expect(
-        PaginatedQuery.isCurrentRequest(
-          failed,
-          PaginatedQuery.getRequest(before),
-        ),
-      ).toBe(false);
-      expect(PaginatedQuery.settle(failed, success(before, []))).toEqual(
-        failed,
+    it("supports the data-last form", () => {
+      const before = initial();
+      const state = PaginatedQuery.settle(success(before, [{ text: "a" }]))(
+        before,
       );
+      expect(PaginatedQuery.isSuccess(state)).toBe(true);
     });
   });
 
   describe("navigation", () => {
-    it("next targets the continuation cursor and refreshes over page one", () => {
+    it("next targets the continuation cursor while retaining page one", () => {
       const state = Option.getOrThrow(PaginatedQuery.next(loadedPageOne()));
       const phase = getPhase(state, "Refreshing");
 
@@ -314,9 +354,6 @@ describe("PaginatedQuery", () => {
       expect(phase.direction).toBe("Next");
       expect(phase.data.number).toBe(1);
       expect(PaginatedQuery.targetPageNumber(state)).toBe(2);
-      expect(PaginatedQuery.getItems(state)).toEqual(
-        Option.some([{ text: "a" }, { text: "b" }]),
-      );
     });
 
     it("prev pops the cursor stack", () => {
@@ -326,15 +363,12 @@ describe("PaginatedQuery", () => {
       const pageTwo = PaginatedQuery.settle(
         loadingTwo,
         success(loadingTwo, [{ text: "c" }], { continueCursor: "c2" }),
-      );
+      ) as Active;
       const state = Option.getOrThrow(PaginatedQuery.prev(pageTwo));
 
       expect(state.current).toEqual(descriptor(null));
       expect(state.prevStack).toEqual([]);
       expect(getPhase(state, "Refreshing").direction).toBe("Previous");
-      expect(PaginatedQuery.getItems(state)).toEqual(
-        Option.some([{ text: "c" }]),
-      );
     });
 
     it("first returns to page one without replacing the session", () => {
@@ -344,16 +378,16 @@ describe("PaginatedQuery", () => {
       const pageTwo = PaginatedQuery.settle(
         loadingTwo,
         success(loadingTwo, [{ text: "c" }]),
-      );
+      ) as Active;
       const state = Option.getOrThrow(PaginatedQuery.first(pageTwo));
 
-      expect(state.paginationId).toBe(pageTwo.paginationId);
+      expect(state.paginationId).toEqual(pageTwo.paginationId);
+      expect(state.generation).toBe(pageTwo.generation);
       expect(state.current).toEqual(descriptor(null));
-      expect(state.prevStack).toEqual([]);
       expect(PaginatedQuery.first(loadedPageOne())).toEqual(Option.none());
     });
 
-    it("does not navigate while pending or failed, or past either end", () => {
+    it("does not navigate while pending, failed, or past either end", () => {
       expect(PaginatedQuery.next(initial())).toEqual(Option.none());
       expect(PaginatedQuery.prev(loadedPageOne())).toEqual(Option.none());
 
@@ -361,26 +395,26 @@ describe("PaginatedQuery", () => {
       const last = PaginatedQuery.settle(
         beforeLast,
         success(beforeLast, [{ text: "a" }], { isDone: true }),
-      );
+      ) as Active;
       expect(PaginatedQuery.next(last)).toEqual(Option.none());
 
-      const beforeFailure = initial();
+      const cold = initial();
       const failed = PaginatedQuery.settle(
-        beforeFailure,
-        failure(beforeFailure, "offline"),
-      );
+        cold,
+        failure(cold, offline()),
+      ) as Active;
       expect(PaginatedQuery.next(failed)).toEqual(Option.none());
       expect(PaginatedQuery.prev(failed)).toEqual(Option.none());
     });
 
-    it("retreats automatically when a terminal page becomes empty", () => {
+    it("retreats when a terminal page becomes empty", () => {
       const loadingTwo = Option.getOrThrow(
         PaginatedQuery.next(loadedPageOne()),
       );
       const state = PaginatedQuery.settle(
         loadingTwo,
         success(loadingTwo, [], { isDone: true }),
-      );
+      ) as Active;
 
       expect(state.current).toEqual(descriptor(null));
       expect(state.prevStack).toEqual([]);
@@ -397,7 +431,7 @@ describe("PaginatedQuery", () => {
       { text: "e" },
     ];
 
-    it("pins a recommended split and displays the complete delivered page", () => {
+    it("pins a recommended split and shows the delivered page", () => {
       const before = loadedPageOne();
       const state = PaginatedQuery.settle(
         before,
@@ -405,7 +439,7 @@ describe("PaginatedQuery", () => {
           splitCursor: "s",
           pageStatus: "SplitRecommended",
         }),
-      );
+      ) as Active;
 
       expect(state.current).toEqual(descriptor(null, "s"));
       expect(getPhase(state, "Refreshing").data.items).toEqual(bigPage);
@@ -419,7 +453,7 @@ describe("PaginatedQuery", () => {
           splitCursor: "s",
           pageStatus: "SplitRequired",
         }),
-      );
+      ) as Active;
 
       expect(getPhase(state, "Refreshing").data.items).toEqual([
         { text: "a" },
@@ -427,144 +461,98 @@ describe("PaginatedQuery", () => {
       ]);
     });
 
-    it("uses the initial page size heuristic and requires a split cursor", () => {
+    it("uses the page-size heuristic and starts after a pin at its cursor", () => {
       const before = loadedPageOne();
       const split = PaginatedQuery.settle(
         before,
         success(before, bigPage, { splitCursor: "s" }),
-      );
+      ) as Active;
+      const pinned = PaginatedQuery.settle(
+        split,
+        success(split, [{ text: "a" }], { continueCursor: "server-cursor" }),
+      ) as Active;
+      const next = Option.getOrThrow(PaginatedQuery.next(pinned));
+
       expect(split.current).toEqual(descriptor(null, "s"));
+      expect(next.current).toEqual(descriptor("s"));
 
       const unsplit = PaginatedQuery.settle(
         before,
         success(before, bigPage, { pageStatus: "SplitRequired" }),
       );
-      expect(unsplit.phase._tag).toBe("Success");
-    });
-
-    it("starts the page after a pin at the pin cursor", () => {
-      const beforeSplit = loadedPageOne();
-      const split = PaginatedQuery.settle(
-        beforeSplit,
-        success(beforeSplit, bigPage, {
-          splitCursor: "s",
-          pageStatus: "SplitRecommended",
-        }),
-      );
-      const pinned = PaginatedQuery.settle(
-        split,
-        success(split, [{ text: "a" }], {
-          continueCursor: "server-cursor",
-        }),
-      );
-      const state = Option.getOrThrow(PaginatedQuery.next(pinned));
-
-      expect(state.current).toEqual(descriptor("s"));
-      expect(state.prevStack).toEqual([descriptor(null, "s")]);
+      expect(PaginatedQuery.isSuccess(unsplit)).toBe(true);
     });
   });
 
-  describe("recovery", () => {
-    it("retry reopens Failure and Stale with a fresh pagination id", () => {
-      const cold = initial();
-      const failed = PaginatedQuery.settle(cold, failure(cold, "offline"));
-      const retriedFailure = Option.getOrThrow(PaginatedQuery.retry(failed));
-      expect(retriedFailure.phase).toEqual({
-        _tag: "Loading",
-        direction: "Retry",
-      });
-      expect(retriedFailure.paginationId).not.toBe(failed.paginationId);
+  describe("reset, matching, and schemas", () => {
+    it("reset is pure and retains data while allocating a new session later", () => {
+      const page = loadedPageOne();
+      const state = PaginatedQuery.reset(page);
 
-      const loaded = loadedPageOne();
-      const stale = PaginatedQuery.settle(loaded, failure(loaded, "offline"));
-      const retriedStale = Option.getOrThrow(PaginatedQuery.retry(stale));
-      expect(getPhase(retriedStale, "Refreshing").data.items).toHaveLength(2);
-      expect(PaginatedQuery.retry(loadedPageOne())).toEqual(Option.none());
-    });
-
-    it("reset starts a new session at page one while retaining data", () => {
-      const loadingTwo = Option.getOrThrow(
-        PaginatedQuery.next(loadedPageOne()),
-      );
-      const pageTwo = PaginatedQuery.settle(
-        loadingTwo,
-        success(loadingTwo, [{ text: "c" }]),
-      );
-      const state = PaginatedQuery.reset(pageTwo);
-
-      expect(state.args).toEqual(pageTwo.args);
-      expect(state.options).toEqual(pageTwo.options);
-      expect(state.paginationId).not.toBe(pageTwo.paginationId);
+      expect(state.generation).toBe(page.generation + 1);
+      expect(state.paginationId).toEqual(Option.none());
       expect(state.current).toEqual(descriptor(null));
-      expect(state.prevStack).toEqual([]);
-      expect(getPhase(state, "Refreshing").data.items).toEqual([{ text: "c" }]);
+      expect(getPhase(state, "Refreshing").direction).toBe("Reset");
     });
-  });
 
-  describe("match and refinements", () => {
-    it("dispatches exhaustively across all five phases", () => {
+    it("matches all six states exhaustively", () => {
       const handlers = {
+        onIdle: (state: PaginatedQuery.Idle) => state._tag,
         onLoading: (phase: PaginatedQuery.Loading) => phase._tag,
         onRefreshing: (phase: PaginatedQuery.Refreshing<Item>) => phase._tag,
-        onFailure: (phase: PaginatedQuery.Failure<string>) => phase._tag,
-        onStale: (phase: PaginatedQuery.Stale<Item, string>) => phase._tag,
+        onFailure: (phase: PaginatedQuery.Failure<PageError>) => phase._tag,
+        onStale: (phase: PaginatedQuery.Stale<Item, PageError>) => phase._tag,
         onSuccess: (phase: PaginatedQuery.Success<Item>) => phase._tag,
       };
       const loading = initial();
-      const successState = loadedPageOne();
-      const refreshing = Option.getOrThrow(PaginatedQuery.next(successState));
-      const failureState = PaginatedQuery.settle(
+      const succeeded = loadedPageOne();
+      const refreshing = Option.getOrThrow(PaginatedQuery.next(succeeded));
+      const failed = PaginatedQuery.settle(
         loading,
-        failure(loading, "offline"),
+        failure(loading, offline()),
       );
-      const staleState = PaginatedQuery.settle(
-        successState,
-        failure(successState, "offline"),
+      const stale = PaginatedQuery.settle(
+        succeeded,
+        failure(succeeded, offline()),
       );
 
+      expect(PaginatedQuery.match(Notes.idle, handlers)).toBe("Idle");
       expect(PaginatedQuery.match(loading, handlers)).toBe("Loading");
       expect(PaginatedQuery.match(refreshing, handlers)).toBe("Refreshing");
-      expect(PaginatedQuery.match(failureState, handlers)).toBe("Failure");
-      expect(PaginatedQuery.match(staleState, handlers)).toBe("Stale");
-      expect(PaginatedQuery.match(successState, handlers)).toBe("Success");
+      expect(PaginatedQuery.match(failed, handlers)).toBe("Failure");
+      expect(PaginatedQuery.match(stale, handlers)).toBe("Stale");
+      expect(PaginatedQuery.match(succeeded, handlers)).toBe("Success");
     });
 
-    it("exposes tag predicates as refinements", () => {
-      const state = loadedPageOne();
-      const successfulState = [state].find(PaginatedQuery.isSuccess)!;
-      expectTypeOf(successfulState.phase.data).toEqualTypeOf<
+    it("exposes state predicates as refinements", () => {
+      const state: State = loadedPageOne();
+      const successful = [state].find(PaginatedQuery.isSuccess)!;
+      expectTypeOf(successful.phase.data).toEqualTypeOf<
         PaginatedQuery.Page<Item>
       >();
+      expect(PaginatedQuery.isIdle(Notes.idle)).toBe(true);
       expect(PaginatedQuery.isLoading(initial())).toBe(true);
       expect(PaginatedQuery.isSuccess(state)).toBe(true);
       expect(PaginatedQuery.isRefreshing(state)).toBe(false);
     });
-  });
 
-  describe("schemas and inference", () => {
-    it("round-trips every kind of state", () => {
+    it("round-trips idle, active states, and settlements", () => {
       const loading = initial();
-      const successState = PaginatedQuery.settle(
-        loading,
-        success(loading, [{ text: "a" }]),
-      );
-      const refreshing = Option.getOrThrow(PaginatedQuery.next(successState));
+      const succeeded = loadedPageOne();
+      const refreshing = Option.getOrThrow(PaginatedQuery.next(succeeded));
       const stale = PaginatedQuery.settle(
         refreshing,
-        failure(refreshing, "offline"),
+        failure(refreshing, offline()),
       );
 
-      for (const state of [loading, successState, refreshing, stale]) {
+      for (const state of [Notes.idle, loading, succeeded, refreshing, stale]) {
         const encoded = Schema.encodeSync(Notes.schema)(state);
         expect(Schema.decodeUnknownSync(Notes.schema)(encoded)).toEqual(state);
       }
-    });
 
-    it("round-trips Result-based settlements", () => {
-      const state = initial();
       for (const settlement of [
-        success(state, [{ text: "a" }]),
-        failure(state, "offline"),
+        success(loading, [{ text: "a" }]),
+        failure(loading, offline()),
       ]) {
         const encoded = Schema.encodeSync(Notes.settlement)(settlement);
         expect(Schema.decodeUnknownSync(Notes.settlement)(encoded)).toEqual(
@@ -573,38 +561,22 @@ describe("PaginatedQuery", () => {
       }
     });
 
-    it("infers item, args, error, and options", () => {
+    it("infers args, state, and helpers", () => {
       expectTypeOf(Notes.init).parameters.toEqualTypeOf<
-        [Args, PaginatedQuery.Options]
+        [PaginatedQuery.Idle, Args, PaginatedQuery.Options]
       >();
+      expectTypeOf(Notes.init).returns.toEqualTypeOf<Active>();
       expectTypeOf(Notes.schema.Type).toEqualTypeOf<State>();
       expectTypeOf(PaginatedQuery.getItems(loadedPageOne())).toEqualTypeOf<
         Option.Option<ReadonlyArray<Item>>
       >();
     });
-  });
 
-  describe("isInvalidCursor", () => {
-    const invalidCursorError = new ConvexError({
-      isConvexSystemError: true,
-      paginationError: "InvalidCursor",
-    });
-
-    it("detects bare and transport-wrapped forms", () => {
-      expect(PaginatedQuery.isInvalidCursor(invalidCursorError)).toBe(true);
-      expect(
-        PaginatedQuery.isInvalidCursor(
-          new WebSocketClient.WebSocketClientError({
-            cause: invalidCursorError,
-          }),
-        ),
-      ).toBe(true);
-      expect(
-        PaginatedQuery.isInvalidCursor(
-          new Error("InvalidCursor: cursor has expired"),
-        ),
-      ).toBe(true);
-      expect(PaginatedQuery.isInvalidCursor(new Error("offline"))).toBe(false);
+    it("includes the formal invalid-cursor settlement error", () => {
+      const error: PageError = new PaginatedQuery.InvalidCursor({
+        cause: "expired",
+      });
+      expect(error).toBeInstanceOf(PaginationError.InvalidCursor);
     });
   });
 });

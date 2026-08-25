@@ -3,7 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Match from "effect/Match";
 import type * as Schema from "effect/Schema";
 import * as FoldkitCommand from "foldkit/command";
-import * as WebSocketClient from "./WebSocketClient";
+import * as Client from "./Client";
 
 /**
  * Everything a Command against `Ref_` can fail with before it is folded into
@@ -13,7 +13,7 @@ import * as WebSocketClient from "./WebSocketClient";
  */
 export type Error<Ref_ extends Ref.AnyConfect> =
   | Ref.Error<Ref_>
-  | WebSocketClient.WebSocketClientError
+  | Client.WebSocketClientError
   | Schema.SchemaError;
 
 /**
@@ -42,7 +42,7 @@ type Instance<
 > = Readonly<{
   name: Name;
   args: Ref.Args<Ref_>;
-  effect: Effect.Effect<Message, never, WebSocketClient.WebSocketClient>;
+  effect: Effect.Effect<Message, never, Client.Client>;
 }>;
 
 type SchemaArgs<Ref_ extends Ref.AnyConfect> = Schema.Schema.Type<
@@ -66,7 +66,7 @@ export type Definition<
   FoldkitCommand.CommandDefinitionWithArgs<
     Name,
     Ref.ArgsSchema<Ref_>["fields"],
-    Effect.Effect<Message, never, WebSocketClient.WebSocketClient>
+    Effect.Effect<Message, never, Client.Client>
   >;
 
 /**
@@ -111,7 +111,7 @@ export type InterruptibleDefinition<
   FoldkitCommand.Interruptible.DefinitionWithArgsNameKeyed<
     Name,
     Ref.ArgsSchema<Ref_>["fields"],
-    Effect.Effect<Message, never, WebSocketClient.WebSocketClient>
+    Effect.Effect<Message, never, Client.Client>
   >;
 
 /**
@@ -132,20 +132,16 @@ export type KeyedInterruptibleDefinition<
     Name,
     Ref.ArgsSchema<Ref_>["fields"],
     Pick<SchemaArgs<Ref_>, KeyField>,
-    Effect.Effect<Message, never, WebSocketClient.WebSocketClient>
+    Effect.Effect<Message, never, Client.Client>
   >;
 
 const run = <Ref_ extends Ref.AnyConfect, SuccessMessage, ErrorMessage>(
   handlers: Handlers<Ref_, SuccessMessage, ErrorMessage>,
   invoke: (
-    client: WebSocketClient.WebSocketClient,
+    client: Client.Client,
   ) => Effect.Effect<Ref.Returns<Ref_>, Error<Ref_>>,
-): Effect.Effect<
-  SuccessMessage | ErrorMessage,
-  never,
-  WebSocketClient.WebSocketClient
-> =>
-  Effect.flatMap(WebSocketClient.WebSocketClient, invoke).pipe(
+): Effect.Effect<SuccessMessage | ErrorMessage, never, Client.Client> =>
+  Effect.flatMap(Client.Client, invoke).pipe(
     Effect.match({
       onSuccess: handlers.onSuccess,
       onFailure: handlers.onError,
@@ -164,11 +160,7 @@ export const queryEffect =
   ) =>
   (
     ...args: Ref.OptionalArgs<Query>
-  ): Effect.Effect<
-    SuccessMessage | ErrorMessage,
-    never,
-    WebSocketClient.WebSocketClient
-  > =>
+  ): Effect.Effect<SuccessMessage | ErrorMessage, never, Client.Client> =>
     run(handlers, (client) => client.query(ref, ...args));
 
 /**
@@ -182,11 +174,7 @@ export const mutationEffect =
   ) =>
   (
     ...args: Ref.OptionalArgs<Mutation>
-  ): Effect.Effect<
-    SuccessMessage | ErrorMessage,
-    never,
-    WebSocketClient.WebSocketClient
-  > =>
+  ): Effect.Effect<SuccessMessage | ErrorMessage, never, Client.Client> =>
     run(handlers, (client) => client.mutation(ref, ...args));
 
 /**
@@ -200,16 +188,12 @@ export const actionEffect =
   ) =>
   (
     ...args: Ref.OptionalArgs<Action>
-  ): Effect.Effect<
-    SuccessMessage | ErrorMessage,
-    never,
-    WebSocketClient.WebSocketClient
-  > =>
+  ): Effect.Effect<SuccessMessage | ErrorMessage, never, Client.Client> =>
     run(handlers, (client) => client.action(ref, ...args));
 
 type RunWithArgs<Ref_ extends Ref.AnyConfect, Message> = (
   ...args: Ref.OptionalArgs<Ref_>
-) => Effect.Effect<Message, never, WebSocketClient.WebSocketClient>;
+) => Effect.Effect<Message, never, Client.Client>;
 
 function makeDefinition<
   Name extends string,

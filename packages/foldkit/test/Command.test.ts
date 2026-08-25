@@ -10,7 +10,7 @@ import * as FoldkitCommand from "foldkit/command";
 import { m } from "foldkit/message";
 import { beforeEach, expectTypeOf, test } from "vitest";
 import * as Command from "@confect/foldkit/Command";
-import * as WebSocketClient from "@confect/foldkit/WebSocketClient";
+import * as Client from "@confect/foldkit/Client";
 
 interface Call {
   readonly method: "query" | "mutation" | "action";
@@ -38,17 +38,16 @@ const record =
       return nextResult;
     });
 
-const StubLayer = Layer.sync(
-  WebSocketClient.WebSocketClient,
-  () =>
-    ({
-      url: "https://test.convex.cloud",
-      setAuth: () => Effect.void,
-      query: record("query"),
-      mutation: record("mutation"),
-      action: record("action"),
-      reactiveQuery: () => Stream.empty,
-    }) as any,
+const StubLayer = Layer.effect(
+  Client.Client,
+  Client.make({
+    url: "https://test.convex.cloud",
+    setAuth: () => Effect.void,
+    query: record("query"),
+    mutation: record("mutation"),
+    action: record("action"),
+    reactiveQuery: () => Stream.empty,
+  } as any),
 );
 
 const listQueryRef = Ref.make(
@@ -209,7 +208,7 @@ layer(StubLayer)("Command", (it) => {
     it.effect("transport error is folded into the onError Message", () =>
       Effect.gen(function* () {
         nextResult = Effect.fail(
-          new WebSocketClient.WebSocketClientError({ cause: "network down" }),
+          new Client.WebSocketClientError({ cause: "network down" }),
         );
 
         const SaveNote = Command.mutation(
@@ -222,7 +221,7 @@ layer(StubLayer)("Command", (it) => {
 
         expect(message._tag).toBe("FailedSaveNote");
         expect((message as typeof FailedSaveNote.Type).error).toBeInstanceOf(
-          WebSocketClient.WebSocketClientError,
+          Client.WebSocketClientError,
         );
       }),
     );
@@ -257,7 +256,7 @@ layer(StubLayer)("Command", (it) => {
       );
 
       expectTypeOf(SaveNote({ text: "hello" }).effect).toEqualTypeOf<
-        Effect.Effect<Message, never, WebSocketClient.WebSocketClient>
+        Effect.Effect<Message, never, Client.Client>
       >();
 
       // @ts-expect-error — a mutation with args is not callable without them
@@ -277,7 +276,7 @@ layer(StubLayer)("Command", (it) => {
         expect(success).toEqual(SucceededSaveNote({ note: {} }));
 
         nextResult = Effect.fail(
-          new WebSocketClient.WebSocketClientError({ cause: "network down" }),
+          new Client.WebSocketClientError({ cause: "network down" }),
         );
         const failure = yield* saveNote({ text: "hello" });
         expect(failure._tag).toBe("FailedSaveNote");
@@ -367,7 +366,7 @@ layer(StubLayer)("Command", (it) => {
       });
 
       expectTypeOf(SaveDraft({ text: "hello" }).effect).toEqualTypeOf<
-        Effect.Effect<Message, never, WebSocketClient.WebSocketClient>
+        Effect.Effect<Message, never, Client.Client>
       >();
     });
 

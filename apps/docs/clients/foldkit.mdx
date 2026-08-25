@@ -6,9 +6,8 @@ description: "Use Confect's Foldkit bindings to call your functions from a Foldk
 
 `@confect/foldkit` bridges Confect into [Foldkit](https://foldkit.dev), The Elm
 Architecture in TypeScript powered by Effect. It maps Confect's client surface
-onto Foldkit's three integration seams: the `WebSocketClient` service (from
-[`@confect/js`](/clients/js/websocket)) becomes a
-[resource](https://foldkit.dev/core/resources), reactive queries become
+onto Foldkit's three integration seams: an application-scoped `Client` becomes
+a [resource](https://foldkit.dev/core/resources), reactive queries become
 [Subscription](https://foldkit.dev/core/subscriptions) entries, and queries,
 mutations, and actions become
 [Commands](https://foldkit.dev/core/commands). Args and return values are
@@ -47,9 +46,9 @@ entry that pins `effect` to the version your app uses.
 
 ## Setup
 
-Pass the `WebSocketClient` layer to your application's `resources`. The client
-lives for the lifetime of the app, and the layer closes the WebSocket at
-teardown.
+Pass the `Client` layer to your application's `resources`. The client combines
+the WebSocket API with the pagination-session allocator, lives for the lifetime
+of the app, and closes the WebSocket at teardown.
 
 ```ts src/entry.ts
 import * as Confect from "@confect/foldkit";
@@ -61,7 +60,7 @@ const application = Runtime.makeApplication({
   update,
   view,
   subscriptions,
-  resources: Confect.WebSocketClient.layer(import.meta.env.VITE_CONVEX_URL),
+  resources: Confect.Client.layer(import.meta.env.VITE_CONVEX_URL),
   container: document.getElementById("root"),
 });
 
@@ -69,7 +68,7 @@ Runtime.run(application);
 ```
 
 Commands and subscription entries built by `@confect/foldkit` require the
-`Confect.WebSocketClient.WebSocketClient` service, which this layer satisfies.
+`Confect.Client.Client` service, which this layer satisfies.
 
 ## Reactive queries as Subscriptions
 
@@ -96,7 +95,7 @@ import {
 export const subscriptions = Subscription.make<
   Model,
   Message,
-  Confect.WebSocketClient.WebSocketClient
+  Confect.Client.Client
 >()(() => ({
   note: Confect.Subscription.reactiveQuery<Model>()(refs.public.notes.get, {
     args: (model) => Option.map(model.selectedNoteId, (noteId) => ({ noteId })),
@@ -109,9 +108,9 @@ export const subscriptions = Subscription.make<
 `onSuccess` receives the decoded return value on every server update;
 `onError` receives the ref's decoded typed error (see [Error
 Handling](/server/error-handling)), a transport-level `WebSocketClientError`,
-or a `SchemaError`. After an error the stream ends — Convex terminates the
-server subscription — so retrying is `update`'s decision, typically by
-toggling the entry's args through `None` and back.
+or a `SchemaError`. Errors are emitted as Messages without ending the reactive
+query: Convex handles retryable infrastructure failures itself, and the same
+subscription can produce a later value if its query result recovers.
 
 Queries without args may omit the `args` extractor, which leaves the
 subscription always open:
@@ -131,25 +130,23 @@ use `Subscription.reactiveQueryStream` as its `dependenciesToStream` body:
 ```ts
 import * as Schema from "effect/Schema";
 
-Subscription.make<Model, Message, Confect.WebSocketClient.WebSocketClient>()(
-  (entry) => ({
-    note: entry(
-      { noteId: Schema.Option(Schema.String) },
-      {
-        modelToDependencies: (model) => ({ noteId: model.selectedNoteId }),
-        dependenciesToStream: ({ noteId }) =>
-          Option.match(noteId, {
-            onNone: () => Stream.empty,
-            onSome: (noteId) =>
-              Confect.Subscription.reactiveQueryStream(refs.public.notes.get, {
-                onSuccess: (note) => SucceededGetNote({ note }),
-                onError: (error) => FailedGetNote({ message: String(error) }),
-              })({ noteId }),
-          }),
-      },
-    ),
-  }),
-);
+Subscription.make<Model, Message, Confect.Client.Client>()((entry) => ({
+  note: entry(
+    { noteId: Schema.Option(Schema.String) },
+    {
+      modelToDependencies: (model) => ({ noteId: model.selectedNoteId }),
+      dependenciesToStream: ({ noteId }) =>
+        Option.match(noteId, {
+          onNone: () => Stream.empty,
+          onSome: (noteId) =>
+            Confect.Subscription.reactiveQueryStream(refs.public.notes.get, {
+              onSuccess: (note) => SucceededGetNote({ note }),
+              onError: (error) => FailedGetNote({ message: String(error) }),
+            })({ noteId }),
+        }),
+    },
+  ),
+}));
 ```
 
 ## Commands
@@ -322,15 +319,14 @@ Match.tags({
 query](/server/functions#paginated-queries) one page at a time — next and
 previous — over Convex's cursor-based pagination. The machine lives in your
 Model and is the single source of truth for one live, reactive page
-subscription: navigating, retrying, and page-split handling are all Model
-transitions, and `Subscription.paginatedQuery` keeps the subscription in sync
-with them.
+subscription. Navigation and page-split handling are pure Model transitions,
+and `Subscription.paginatedQuery` keeps the subscription in sync with them.
 
-`PaginatedQuery.make` takes the ref and an application error schema. It
-returns the machine's Model schema, its correlated settlement schema, and its
-constructors. The machine uses the same loaded-state vocabulary as Foldkit's
-`AsyncData`: `Loading`, `Refreshing`, `Success`, `Failure`, and `Stale`.
-`Refreshing` and `Stale` retain the complete last good page.
+`PaginatedQuery.make` takes the ref and returns the machine's Model and
+correlated-settlement schemas together with its operations. The machine uses
+the same vocabulary as Foldkit's `AsyncData`: `Idle`, `Loading`, `Refreshing`,
+`Success`, `Failure`, and `Stale`. `Refreshing` and `Stale` retain the complete
+last good page.
 
 ```ts src/model.ts
 import * as Confect from "@confect/foldkit";
@@ -339,16 +335,13 @@ import * as Schema from "effect/Schema";
 
 import refs from "../confect/_generated/refs";
 
-export const PageError = Schema.Literals(["InvalidCursor", "Failed"]);
-
-export const Notes = Confect.PaginatedQuery.make(
-  refs.public.notes.paginate,
-  PageError,
-);
+export const Notes = Confect.PaginatedQuery.make(refs.public.notes.paginate);
 
 export const Model = Schema.Struct({
-  notes: Schema.Option(Notes.schema),
+  notes: Notes.schema,
 });
+
+export const initialModel = Model.make({ notes: Notes.idle });
 
 export const SettledGetNotesPage = m("SettledGetNotesPage", {
   settlement: Notes.settlement,
@@ -359,43 +352,36 @@ Wire the subscription entry to the machine state:
 
 ```ts src/subscription.ts
 import * as Confect from "@confect/foldkit";
-import * as Match from "effect/Match";
 import * as Subscription from "foldkit/subscription";
 
 export const subscriptions = Subscription.make<
   Model,
   Message,
-  Confect.WebSocketClient.WebSocketClient
+  Confect.Client.Client
 >()(() => ({
   notesPage: Confect.Subscription.paginatedQuery<Model>()(Notes, {
     state: (model) => model.notes,
-    mapError: (error) =>
-      Match.value(Confect.PaginatedQuery.isInvalidCursor(error)).pipe(
-        Match.withReturnType<typeof PageError.Type>(),
-        Match.when(true, () => "InvalidCursor"),
-        Match.when(false, () => "Failed"),
-        Match.exhaustive,
-      ),
     onSettled: (settlement) => SettledGetNotesPage({ settlement }),
   }),
 }));
 ```
 
-The subscription emits one `Result`-based settlement for either success or
-failure. It includes the exact args, cursor range, page options, and pagination
-session id used by that request. `settle` therefore has the same behavior as
-`AsyncData.settle`—success becomes `Success`; failure becomes `Stale` when a
-page is held and `Failure` otherwise—while also ignoring outcomes superseded
-by navigation, new args, or a reset.
+When an active machine has no pagination id, the subscription allocates one
+from the application-scoped `Client`, opens the Convex query, and includes the
+id in its first `Result`-based settlement. `settle` installs the id and result
+atomically. Allocation is not a separate application event, and installing the
+id does not restart the live subscription.
 
-In `update`, start the machine with `init`, fold the outcome in with `settle`,
-and navigate with `next`/`prev`. Both navigation functions return an `Option`
-that is `None` when the move is illegal, so `update` can keep the Model
-unchanged:
+Like `AsyncData.settle`, a success becomes `Success`; a failure becomes `Stale`
+when a page is held and `Failure` otherwise. The request carries a logical
+generation as well as its cursor and page identity, so outcomes superseded by
+navigation, new args, close/reopen, or reset are ignored. All public machine
+operations remain pure:
 
 ```ts src/update.ts
 import * as Confect from "@confect/foldkit";
 import * as Match from "effect/Match";
+import * as Option from "effect/Option";
 import type * as Command from "foldkit/command";
 
 type UpdateReturn = readonly [Model, ReadonlyArray<Command.Command<Message>>];
@@ -404,56 +390,42 @@ export const update = (model: Model, message: Message): UpdateReturn =>
   Match.value(message).pipe(
     Match.withReturnType<UpdateReturn>(),
     Match.tagsExhaustive({
-      // Start, or explicitly reinitialize when the query args change:
-      OpenedNotes: ({ channel }) => [
-        evo(model, {
-          notes: Option.match({
-            onNone: () =>
-              Option.some(Notes.init({ channel }, { initialNumItems: 20 })),
-            onSome: (state) =>
-              Option.some(
-                Notes.reinitialize(state, { channel }, { initialNumItems: 20 }),
-              ),
-          }),
-        }),
-        [],
-      ],
+      OpenedNotes: ({ channel }) => {
+        const notes = Match.value(model.notes).pipe(
+          Match.tag("Idle", (idle) =>
+            Notes.init(idle, { channel }, { initialNumItems: 20 }),
+          ),
+          Match.tag("Active", (active) =>
+            Notes.reinitialize(active, { channel }, { initialNumItems: 20 }),
+          ),
+          Match.exhaustive,
+        );
+        return [evo(model, { notes: () => notes }), []];
+      },
       SettledGetNotesPage: ({ settlement }) => [
         evo(model, {
-          notes: Option.map((state) =>
-            Match.value(settlement.result).pipe(
-              Match.tag("Failure", ({ failure }) =>
-                Match.value(
-                  failure === "InvalidCursor" &&
-                    Confect.PaginatedQuery.isCurrentRequest(
-                      state,
-                      settlement.request,
-                    ),
-                ).pipe(
-                  Match.when(true, () => Confect.PaginatedQuery.reset(state)),
-                  Match.when(false, () =>
-                    Confect.PaginatedQuery.settle(state, settlement),
-                  ),
-                  Match.exhaustive,
-                ),
-              ),
-              Match.tag("Success", () =>
-                Confect.PaginatedQuery.settle(state, settlement),
-              ),
-              Match.exhaustive,
-            ),
-          ),
+          notes: Confect.PaginatedQuery.settle(settlement),
         }),
         [],
       ],
-      ClickedNextPage: () => [
-        evo(model, {
-          notes: Option.map((state) =>
-            Option.getOrElse(Confect.PaginatedQuery.next(state), () => state),
+      ClickedNextPage: () => {
+        const notes = Match.value(model.notes).pipe(
+          Match.tag("Idle", (idle) => idle),
+          Match.tag("Active", (active) =>
+            Option.getOrElse(Confect.PaginatedQuery.next(active), () => active),
           ),
-        }),
-        [],
-      ],
+          Match.exhaustive,
+        );
+        return [evo(model, { notes: () => notes }), []];
+      },
+      ClosedNotes: () => {
+        const notes = Match.value(model.notes).pipe(
+          Match.tag("Idle", (idle) => idle),
+          Match.tag("Active", Confect.PaginatedQuery.close),
+          Match.exhaustive,
+        );
+        return [evo(model, { notes: () => notes }), []];
+      },
     }),
   );
 ```
@@ -469,26 +441,44 @@ const items = Option.getOrElse(
   Confect.PaginatedQuery.getItems(state),
   () => [],
 );
-const label = Option.match(Confect.PaginatedQuery.getPage(state), {
-  onNone: () =>
-    `Loading page ${Confect.PaginatedQuery.targetPageNumber(state)}`,
-  onSome: (page) => `Page ${page.number}`,
-});
+const label = Match.value(state).pipe(
+  Match.tag("Idle", () => "Closed"),
+  Match.tag("Active", (active) =>
+    Option.match(Confect.PaginatedQuery.getPage(active), {
+      onNone: () =>
+        `Loading page ${Confect.PaginatedQuery.targetPageNumber(active)}`,
+      onSome: (page) => `Page ${page.number}`,
+    }),
+  ),
+  Match.exhaustive,
+);
 const nextDisabled = !Confect.PaginatedQuery.canNext(state);
 const prevDisabled = !Confect.PaginatedQuery.canPrev(state);
 ```
 
-`isLoading`, `isRefreshing`, `isSuccess`, `isFailure`, and `isStale` are
-refinements; `isPending`, `hasPage`, `hasError`, and the exhaustive `match`
-cover the common view branches. A `Failure` or `Stale` closes the subscription,
-and `retry` reopens it at the same page with a fresh pagination id.
+`isIdle`, `isLoading`, `isRefreshing`, `isSuccess`, `isFailure`, and `isStale`
+are refinements; `isPending`, `hasPage`, `hasError`, and the exhaustive `match`
+cover the common view branches. A `Failure` or `Stale` does not close the
+subscription: Convex query errors are deterministic rather than manually
+retryable, and the live query may recover after its data, arguments,
+authentication, or deployment changes.
+
+Failed settlements carry an exhaustive error union: `FunctionError` wraps an
+error declared by the query or its middleware, `WebSocketClientError`
+represents an unexpected client failure, and `SchemaError` is carried directly
+from argument encoding or result decoding. Convex's `InvalidCursor`
+pseudo-error is also represented explicitly in settlements, but `settle`
+handles it internally by starting a fresh session at page one while retaining
+the displayed page.
 
 `first` is ordinary navigation back to page one within the current session.
-`reset` starts a fresh Convex pagination session at page one while retaining
-the displayed page; use it for `isInvalidCursor`. `reinitialize` is the
-deliberate operation for changing query args or page options. Options use
-Convex's names: `initialNumItems` is required, while `maximumRowsRead` and
-`maximumBytesRead` are optional positive integers.
+`reset` purely requests a fresh session at page one while retaining the
+displayed page, and `reinitialize` changes query args or page options and starts
+again from page one. `close` returns to `Idle` while retaining a generation
+tombstone, so a later `init` cannot accept a late first settlement from an
+earlier identical session. Options use Convex's names: `initialNumItems` is
+required, while `maximumRowsRead` and `maximumBytesRead` are optional positive
+integers.
 
 <Note>
   Convex may signal that a page has grown too large by recommending or requiring
@@ -501,7 +491,7 @@ Convex's names: `initialNumItems` is required, while `maximumRowsRead` and
 
 ## Authentication
 
-`setAuth` is available on the `WebSocketClient` service. Wire it up as a
+`setAuth` is available on the `Client` service. Wire it up as a
 Command:
 
 ```ts
@@ -511,7 +501,7 @@ import * as FoldkitCommand from "foldkit/command";
 
 const SetAuth = FoldkitCommand.define("SetAuth", {
   messages: [CompletedSetAuth],
-  execute: Effect.flatMap(Confect.WebSocketClient.WebSocketClient, (client) =>
+  execute: Effect.flatMap(Confect.Client.Client, (client) =>
     client.setAuth(({ forceRefreshToken }) => fetchToken(forceRefreshToken)),
   ).pipe(Effect.as(CompletedSetAuth())),
 });
@@ -522,5 +512,5 @@ const SetAuth = FoldkitCommand.define("SetAuth", {
 An infinite-scroll, load-more counterpart to `@confect/react`'s
 `usePaginatedQuery` (a growing list of concurrently-live pages) is not yet
 built in. `PaginatedQuery` covers page-at-a-time navigation; for a growing
-list, paginated refs can be called through the
+list, paginated refs can be called through the underlying
 [`WebSocketClient`](/clients/js/websocket) service directly.
