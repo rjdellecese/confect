@@ -51,26 +51,48 @@ export type Ref<
       any
     >;
 
-export interface ConfectRef<
+export type ConfectRef<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility_ extends FunctionVisibility,
   ArgsFields_ extends FunctionProvenance.ArgsFields,
   ReturnsSchema_ extends Schema.Codec<any, any>,
   ErrorSchema_ extends Schema.Codec<any, any> = never,
   MiddlewareError_ = never,
-> extends Base<
+> = ConfectRefWithArgs<
   RuntimeAndFunctionType_,
   FunctionVisibility_,
+  ArgsFields_,
   Schema.Struct.Type<ArgsFields_>,
   ReturnsSchema_["Type"],
   ErrorSchema_["Type"] | MiddlewareError_
+>;
+
+/**
+ * Internal form used while mapping a spec to a ref. Supplying the already
+ * derived value types avoids repeatedly expanding `Schema.Struct` for every
+ * leaf in a generated ref tree; the public `ConfectRef` alias still derives
+ * the same values from its fields and schemas.
+ */
+interface ConfectRefWithArgs<
+  RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
+  FunctionVisibility_ extends FunctionVisibility,
+  ArgsFields_ extends FunctionProvenance.ArgsFields,
+  Args_,
+  Returns_,
+  Error_,
+> extends Base<
+  RuntimeAndFunctionType_,
+  FunctionVisibility_,
+  Args_,
+  Returns_,
+  Error_
 > {
   readonly _tag: "Confect";
-  readonly args: Schema.Struct<ArgsFields_>;
-  readonly returns: ReturnsSchema_;
+  readonly args: FunctionProvenance.ArgsSchema<ArgsFields_>;
+  readonly returns: Schema.Codec<any, any>;
   readonly kind: FunctionProvenance.ConfectKind;
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyMiddlewareSpec>;
-  readonly error?: ErrorSchema_;
+  readonly error?: Schema.Codec<any, any>;
 }
 
 /** Erased structural view used by provenance-agnostic ref APIs. */
@@ -210,14 +232,20 @@ export type FromFunctionSpec<
   FunctionSpec_,
   FunctionSpec.GetRuntimeAndFunctionType<FunctionSpec_>,
   FunctionSpec.GetFunctionVisibility<FunctionSpec_>,
-  MiddlewareError
+  FunctionSpec.ArgsFields<FunctionSpec_>,
+  FunctionSpec.Args<FunctionSpec_>,
+  FunctionSpec.Returns<FunctionSpec_>,
+  FunctionSpec.Error<FunctionSpec_> | MiddlewareError
 >;
 
 type FromFunctionSpecHelper<
   FunctionSpec_ extends FunctionSpec.AnyWithProps,
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility_ extends FunctionVisibility,
-  MiddlewareError_,
+  ArgsFields_ extends FunctionProvenance.ArgsFields,
+  Args_,
+  Returns_,
+  Error_,
 > =
   FunctionSpec_ extends FunctionSpec.WithFunctionProvenance<
     FunctionSpec_,
@@ -226,32 +254,29 @@ type FromFunctionSpecHelper<
     ? ConvexRef<
         RuntimeAndFunctionType_,
         FunctionVisibility_,
-        FunctionSpec.Args<FunctionSpec_> extends infer Args_ extends
-          DefaultFunctionArgs
-          ? Args_
-          : never,
-        FunctionSpec.Returns<FunctionSpec_>,
+        Args_ extends DefaultFunctionArgs ? Args_ : never,
+        Returns_,
         never
       >
     : FunctionSpec_ extends FunctionSpec.WithFunctionProvenance<
           FunctionSpec_,
           FunctionProvenance.AnyConfect
         >
-      ? ConfectRef<
+      ? ConfectRefWithArgs<
           RuntimeAndFunctionType_,
           FunctionVisibility_,
-          FunctionSpec.ArgsFields<FunctionSpec_>,
-          FunctionSpec.ReturnsSchema<FunctionSpec_>,
-          FunctionSpec.ErrorSchema<FunctionSpec_>,
-          MiddlewareError_
+          ArgsFields_,
+          Args_,
+          Returns_,
+          Error_
         >
       : Ref<RuntimeAndFunctionType_, FunctionVisibility_> &
           Base<
             RuntimeAndFunctionType_,
             FunctionVisibility_,
-            FunctionSpec.Args<FunctionSpec_>,
-            FunctionSpec.Returns<FunctionSpec_>,
-            FunctionSpec.Error<FunctionSpec_> | MiddlewareError_
+            Args_,
+            Returns_,
+            Error_
           >;
 
 export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(

@@ -20,6 +20,13 @@ describe("isFunctionSpec", () => {
 });
 
 describe("make", () => {
+  it("keeps erased Confect specs safely generic", () => {
+    expectTypeOf<FunctionSpec.Args<FunctionSpec.AnyConfect>>().toBeAny();
+    expectTypeOf<
+      FunctionSpec.ArgsSchema<FunctionSpec.AnyConfect>
+    >().toMatchTypeOf<Schema.Codec<any, any>>();
+  });
+
   it("only accepts context-free struct fields as args", () => {
     const nonStruct = FunctionSpec.publicQuery({
       name: "nonStruct",
