@@ -25,13 +25,17 @@ export type Error<Query extends Ref.AnyConfectPublicQuery> =
 const paginatedError = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
   error: Error<Query>,
 ): PaginatedQuery.Error<Query> => {
-  const invalidCursor = Match.value(error).pipe(
-    Match.withReturnType<Option.Option<PaginationError.InvalidCursor>>(),
-    Match.when(Match.instanceOf(Client.WebSocketClientError), ({ cause }) =>
-      PaginationError.fromUnknown(cause),
+  const invalidCursor = PaginationError.fromUnknown(error).pipe(
+    Option.orElse(() =>
+      Match.value(error).pipe(
+        Match.withReturnType<Option.Option<PaginationError.InvalidCursor>>(),
+        Match.when(Match.instanceOf(Client.WebSocketClientError), ({ cause }) =>
+          PaginationError.fromUnknown(cause),
+        ),
+        Match.when(Match.any, () => Option.none()),
+        Match.exhaustive,
+      ),
     ),
-    Match.when(Match.any, () => Option.none()),
-    Match.exhaustive,
   );
 
   return Option.match(invalidCursor, {

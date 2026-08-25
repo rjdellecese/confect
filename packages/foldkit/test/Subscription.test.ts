@@ -264,6 +264,21 @@ const makePaginatedEntry = () =>
     onSettled: (settlement) => SettledGetNotesPage({ settlement }),
   });
 
+const broadErrorPaginateRef = Ref.make(
+  "notes",
+  FunctionSpec.publicPaginatedQuery({
+    name: "paginateBroadError",
+    item: () => Note,
+    error: () => Schema.Unknown,
+  }),
+);
+
+const BroadErrorNotes = PaginatedQuery.make(broadErrorPaginateRef);
+
+interface BroadErrorPaginatedModel {
+  readonly notes: typeof BroadErrorNotes.schema.Type;
+}
+
 const initialMachine = (): PaginatedActive =>
   Notes.init(
     Notes.idle,
@@ -519,6 +534,49 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
           expect(messages[1]!.settlement.result).toEqual(
             Result.fail(decoded.failure),
           );
+        }),
+    );
+
+    it.effect(
+      "normalizes raw invalid cursors accepted by a broad function error schema",
+      () =>
+        Effect.gen(function* () {
+          const rawInvalidCursor = {
+            isConvexSystemError: true,
+            paginationError: "InvalidCursor",
+          } as const;
+          reactiveQueryResults = Stream.make(Result.fail(rawInvalidCursor));
+          const entry = Subscription.paginatedQuery<BroadErrorPaginatedModel>()(
+            BroadErrorNotes,
+            {
+              state: (model) => model.notes,
+              onSettled: (settlement) => settlement,
+            },
+          );
+          const state = BroadErrorNotes.init(BroadErrorNotes.idle, {
+            initialNumItems: 2,
+          });
+          const request = PaginatedQuery.getSubscriptionRequest(state);
+
+          const settlements = yield* Stream.runCollect(
+            entry.dependenciesToStream(
+              { request: Option.some(request) },
+              () => ({ request: Option.some(request) }),
+            ),
+          );
+          const settlement = settlements[0]!;
+
+          expect(settlement.result).toEqual(
+            Result.fail(
+              new PaginationError.InvalidCursor({ cause: rawInvalidCursor }),
+            ),
+          );
+          const reset = PaginatedQuery.settle(state, settlement);
+          expect(PaginatedQuery.isLoading(reset)).toBe(true);
+          if (!PaginatedQuery.isIdle(reset)) {
+            expect(reset.paginationId).toEqual(Option.none());
+            expect(reset.generation).toBe(state.generation + 1);
+          }
         }),
     );
 
