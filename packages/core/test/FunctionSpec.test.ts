@@ -11,7 +11,6 @@ describe("isFunctionSpec", () => {
   it("checks whether a value is a function spec", () => {
     const functionSpec: unknown = FunctionSpec.publicQuery({
       name: "myFunction",
-      args: () => ({}),
       returns: () => Schema.String,
     });
 
@@ -89,7 +88,6 @@ describe("make", () => {
     expect(() =>
       FunctionSpec.publicQuery({
         name: "123",
-        args: () => ({}),
         returns: () => Schema.String,
       }),
     ).toThrowErrorMatchingInlineSnapshot(
@@ -101,7 +99,6 @@ describe("make", () => {
     expect(() =>
       FunctionSpec.publicQuery({
         name: "if",
-        args: () => ({}),
         returns: () => Schema.String,
       }),
     ).toThrowErrorMatchingInlineSnapshot(
@@ -113,7 +110,6 @@ describe("make", () => {
     expect(() =>
       FunctionSpec.publicQuery({
         name: "schema",
-        args: () => ({}),
         returns: () => Schema.String,
       }),
     ).toThrowErrorMatchingInlineSnapshot(
@@ -148,7 +144,7 @@ describe("laziness invariant", () => {
       name: "tracked",
       args: () => {
         track.args?.();
-        return {};
+        return { tracked: Schema.Boolean };
       },
       returns: () => {
         track.returns?.();
@@ -218,7 +214,6 @@ describe("laziness invariant", () => {
   it("a spec without an error schema reports no error without defining the key", () => {
     const spec = FunctionSpec.publicQuery({
       name: "noError",
-      args: () => ({}),
       returns: () => Schema.Null,
     });
     const ref = Ref.make("ns", spec);
@@ -254,7 +249,7 @@ describe("paginated queries", () => {
         name: "tracked",
         args: () => {
           track.args?.();
-          return {};
+          return { tracked: Schema.Boolean };
         },
         item: () => {
           track.item?.();
@@ -298,7 +293,6 @@ describe("paginated queries", () => {
     it("a standard spec's kind is Standard", () => {
       const spec = FunctionSpec.publicQuery({
         name: "list",
-        args: () => ({}),
         returns: () => Schema.Null,
       });
 

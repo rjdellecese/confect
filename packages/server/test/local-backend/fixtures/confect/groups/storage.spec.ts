@@ -5,7 +5,6 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicMutation({
       name: "generateUploadUrl",
-      args: () => ({}),
       returns: () => Schema.String,
     }),
   )

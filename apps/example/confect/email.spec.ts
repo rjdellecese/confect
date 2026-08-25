@@ -16,7 +16,6 @@ export default GroupSpec.makeNode()
   .addFunction(
     FunctionSpec.publicNodeAction({
       name: "getInbox",
-      args: () => ({}),
       returns: () =>
         Schema.Array(
           Schema.Struct({

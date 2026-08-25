@@ -7,7 +7,6 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicQuery({
       name: "whoAmI",
-      args: () => ({}),
       returns: () => Schema.String,
     }),
   )

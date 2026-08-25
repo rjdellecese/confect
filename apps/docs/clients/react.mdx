@@ -45,7 +45,6 @@ import notes from "./_generated/tables/notes";
 export default GroupSpec.make().addFunction(
   FunctionSpec.publicQuery({
     name: "list",
-    args: () => ({}),
     returns: () => Schema.Array(notes.Doc),
   }),
 );
@@ -267,7 +266,6 @@ Same shape as `useMutation`: returns `Promise<A>` when the ref has no `error` sc
 ```ts confect/random.spec.ts
 FunctionSpec.publicAction({
   name: "getNumber",
-  args: () => ({}),
   returns: () => Schema.Number,
 });
 ```

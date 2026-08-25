@@ -12,7 +12,6 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicMutation({
       name: "clearAll",
-      args: () => ({}),
       returns: () => Schema.Null,
     }),
   );

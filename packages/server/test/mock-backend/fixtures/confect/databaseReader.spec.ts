@@ -19,7 +19,6 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicQuery({
       name: "listNotes",
-      args: () => ({}),
       returns: () => Schema.Array(notes.Doc),
     }),
   )

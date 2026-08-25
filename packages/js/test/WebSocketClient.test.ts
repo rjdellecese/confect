@@ -51,7 +51,6 @@ const noArgsQueryRef = Ref.make(
   "notes",
   FunctionSpec.publicQuery({
     name: "list",
-    args: () => ({}),
     returns: () => Schema.Struct({}),
   }),
 );
@@ -69,7 +68,6 @@ const noArgsMutationRef = Ref.make(
   "tasks",
   FunctionSpec.publicMutation({
     name: "cleanup",
-    args: () => ({}),
     returns: () => Schema.Struct({}),
   }),
 );
@@ -87,7 +85,6 @@ const noArgsActionRef = Ref.make(
   "random",
   FunctionSpec.publicAction({
     name: "getNumber",
-    args: () => ({}),
     returns: () => Schema.Struct({}),
   }),
 );
