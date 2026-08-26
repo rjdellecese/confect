@@ -1,5 +1,7 @@
 # @confect/server
 
+## 10.0.0-next.19
+
 ## 10.0.0-next.18
 
 ### Minor Changes
