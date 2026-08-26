@@ -1,5 +1,11 @@
 # @confect/react
 
+## 9.4.2
+
+### Patch Changes
+
+- c3e0c86: Validate `@confect/cli`, `@confect/react`, and `@confect/server` against `convex@1.45.0`.
+
 ## 9.4.1
 
 ### Patch Changes
