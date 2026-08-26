@@ -33,41 +33,39 @@ const isInvalidCursorData = (value: unknown): value is InvalidCursorData =>
   "paginationError" in value &&
   value.paginationError === "InvalidCursor";
 
-/**
- * Recognizes the structured Convex system error and the message-only fallback
- * used by Convex's own pagination clients.
- */
-export const fromUnknown = (error: unknown): Option.Option<InvalidCursor> =>
+const fromErrorMessage = (
+  error: globalThis.Error,
+): Option.Option<InvalidCursor> =>
+  error.message.includes("InvalidCursor")
+    ? Option.some(new InvalidCursor({ cause: error }))
+    : Option.none();
+
+/** Recognizes an invalid-cursor error emitted by a Convex query. */
+export const fromConvexQueryError = (
+  error: unknown,
+): Option.Option<InvalidCursor> =>
   Match.value(error).pipe(
-    Match.when(Match.instanceOf(InvalidCursor), (invalidCursor) =>
-      Option.some(invalidCursor),
-    ),
     Match.when(isConvexError, (convexError) =>
       Match.value(isInvalidCursorData(convexError.data)).pipe(
         Match.when(true, () =>
           Option.some(new InvalidCursor({ cause: error })),
         ),
-        Match.when(false, () =>
-          Match.value(convexError.message.includes("InvalidCursor")).pipe(
-            Match.when(true, () =>
-              Option.some(new InvalidCursor({ cause: error })),
-            ),
-            Match.when(false, () => Option.none<InvalidCursor>()),
-            Match.exhaustive,
-          ),
-        ),
+        Match.when(false, () => fromErrorMessage(convexError)),
         Match.exhaustive,
       ),
     ),
-    Match.when(isInvalidCursorData, () =>
-      Option.some(new InvalidCursor({ cause: error })),
-    ),
-    Match.when(Match.instanceOf(globalThis.Error), (cause) =>
-      Match.value(cause.message.includes("InvalidCursor")).pipe(
-        Match.when(true, () => Option.some(new InvalidCursor({ cause }))),
-        Match.when(false, () => Option.none<InvalidCursor>()),
-        Match.exhaustive,
-      ),
+    Match.when(Match.instanceOf(globalThis.Error), fromErrorMessage),
+    Match.when(Match.any, () => Option.none<InvalidCursor>()),
+    Match.exhaustive,
+  );
+
+/** Recognizes the error data attached to Convex's invalid-cursor error. */
+export const fromConvexErrorData = (
+  errorData: unknown,
+): Option.Option<InvalidCursor> =>
+  Match.value(errorData).pipe(
+    Match.when(isInvalidCursorData, (cause) =>
+      Option.some(new InvalidCursor({ cause })),
     ),
     Match.when(Match.any, () => Option.none<InvalidCursor>()),
     Match.exhaustive,

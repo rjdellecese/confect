@@ -504,12 +504,15 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
     );
 
     it.effect(
-      "normalizes invalid cursors and carries codec errors directly",
+      "normalizes invalid cursors and carries infrastructure errors directly",
       () =>
         Effect.gen(function* () {
           const cause = new ConvexError({
             isConvexSystemError: true,
             paginationError: "InvalidCursor",
+          });
+          const transportError = new Client.WebSocketClientError({
+            cause: new Error("offline"),
           });
           const decoded = Schema.decodeUnknownResult(Schema.Finite)("bad");
           if (Result.isSuccess(decoded)) {
@@ -517,6 +520,7 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
           }
           reactiveQueryResults = Stream.make(
             Result.fail(new Client.WebSocketClientError({ cause })),
+            Result.fail(transportError),
             Result.fail(decoded.failure),
           );
           const entry = makePaginatedEntry();
@@ -532,6 +536,9 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
             Result.fail(new PaginationError.InvalidCursor({ cause })),
           );
           expect(messages[1]!.settlement.result).toEqual(
+            Result.fail(transportError),
+          );
+          expect(messages[2]!.settlement.result).toEqual(
             Result.fail(decoded.failure),
           );
         }),

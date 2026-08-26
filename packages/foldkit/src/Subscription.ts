@@ -24,36 +24,23 @@ export type Error<Query extends Ref.AnyConfectPublicQuery> =
 
 const paginatedError = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
   error: Error<Query>,
-): PaginatedQuery.Error<Query> => {
-  const invalidCursor = PaginationError.fromUnknown(error).pipe(
-    Option.orElse(() =>
-      Match.value(error).pipe(
-        Match.withReturnType<Option.Option<PaginationError.InvalidCursor>>(),
-        Match.when(Match.instanceOf(Client.WebSocketClientError), ({ cause }) =>
-          PaginationError.fromUnknown(cause),
-        ),
-        Match.when(Match.any, () => Option.none()),
-        Match.exhaustive,
+): PaginatedQuery.Error<Query> =>
+  Match.value(error).pipe(
+    Match.when(Schema.isSchemaError, (schemaError) => schemaError),
+    Match.when(Match.instanceOf(Client.WebSocketClientError), (clientError) =>
+      PaginationError.fromConvexQueryError(clientError.cause).pipe(
+        Option.getOrElse(() => clientError),
       ),
     ),
-  );
-
-  return Option.match(invalidCursor, {
-    onSome: (invalidCursorError) => invalidCursorError,
-    onNone: () =>
-      Match.value(error).pipe(
-        Match.when(Schema.isSchemaError, (schemaError) => schemaError),
-        Match.when(
-          Match.instanceOf(Client.WebSocketClientError),
-          (clientError) => clientError,
-        ),
-        Match.when(Match.any, (functionError) =>
+    Match.when(Match.any, (functionError) =>
+      PaginationError.fromConvexErrorData(functionError).pipe(
+        Option.getOrElse(() =>
           PaginatedQuery.FunctionError({ error: functionError }),
         ),
-        Match.exhaustive,
-      ) as PaginatedQuery.Error<Query>,
-  });
-};
+      ),
+    ),
+    Match.exhaustive,
+  ) as PaginatedQuery.Error<Query>;
 
 /**
  * The dependency record of a `reactiveQuery` entry. `None` means the
