@@ -12,10 +12,16 @@ import { QueryStream } from "@confect/server";
 const inRange = (from: number, to: number) =>
   reader
     .table("events")
-    .stream("from_to", (q) => q.eq("kind", "meeting").gte("start", from).lt("start", to), "desc");
+    .stream(
+      "from_to",
+      (q) => q.eq("kind", "meeting").gte("start", from).lt("start", to),
+      "desc",
+    );
 
-const page = yield* QueryStream.merge([inRange(0, 10), inRange(20, 30)]).pipe(
-  QueryStream.filterEffect((event) => Effect.succeed(!event.cancelled)),
-  QueryStream.paginate(paginationOpts),
-);
+const page =
+  yield *
+  QueryStream.merge([inRange(0, 10), inRange(20, 30)]).pipe(
+    QueryStream.filterEffect((event) => Effect.succeed(!event.cancelled)),
+    QueryStream.paginate(paginationOpts),
+  );
 ```
