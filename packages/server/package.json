@@ -18,7 +18,7 @@
     "@types/node": "22.20.1",
     "@vitest/coverage-v8": "4.1.10",
     "confect-bench-harness": "workspace:*",
-    "convex-test": "0.0.55",
+    "convex-test": "0.0.56",
     "dotenv": "17.4.2",
     "effect": "3.22.1",
     "tsdown": "0.22.14",

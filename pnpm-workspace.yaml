@@ -17,7 +17,7 @@ allowBuilds:
   sharp: true
 
 overrides:
-  convex: 1.44.0
+  convex: 1.45.0
   effect: 3.22.1
   "@effect/platform-node-shared": 0.61.1
   "@effect/typeclass": 0.41.0
