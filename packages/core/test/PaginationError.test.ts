@@ -31,18 +31,14 @@ describe("PaginationError", () => {
       isConvexSystemError: true,
       paginationError: "InvalidCursor",
     } as const;
-    const error = Option.getOrThrow(
-      PaginationError.fromConvexErrorData(cause),
-    );
+    const error = Option.getOrThrow(PaginationError.fromConvexErrorData(cause));
 
     expect(error.cause).toBe(cause);
   });
 
   it("rejects unrelated errors", () => {
     expect(
-      Option.isNone(
-        PaginationError.fromConvexQueryError(new Error("offline")),
-      ),
+      Option.isNone(PaginationError.fromConvexQueryError(new Error("offline"))),
     ).toBe(true);
     expect(
       Option.isNone(

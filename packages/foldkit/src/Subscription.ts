@@ -27,12 +27,10 @@ const paginatedError = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
 ): PaginatedQuery.Error<Query> =>
   Match.value(error).pipe(
     Match.when(Schema.isSchemaError, (schemaError) => schemaError),
-    Match.when(
-      Match.instanceOf(Client.WebSocketClientError),
-      (clientError) =>
-        PaginationError.fromConvexQueryError(clientError.cause).pipe(
-          Option.getOrElse(() => clientError),
-        ),
+    Match.when(Match.instanceOf(Client.WebSocketClientError), (clientError) =>
+      PaginationError.fromConvexQueryError(clientError.cause).pipe(
+        Option.getOrElse(() => clientError),
+      ),
     ),
     Match.when(Match.any, (functionError) =>
       PaginationError.fromConvexErrorData(functionError).pipe(
