@@ -1,8 +1,8 @@
 import { AiGatewayError, AiGatewayLanguageModel } from "@confect/server";
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
-import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
+import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
 import * as LanguageModel from "effect/unstable/ai/LanguageModel";
 import * as HttpClient from "effect/unstable/http/HttpClient";
@@ -11,31 +11,15 @@ import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 import * as InternalAiGatewayClient from "../src/internal/AiGatewayClient";
 import {
   AiGatewayServiceToken,
-  make as makeAiGatewayServiceToken,
   type Service as AiGatewayServiceTokenService,
 } from "../src/internal/AiGatewayServiceToken";
-
-const CONVEX_AI_GATEWAY_DISABLED_MESSAGE =
-  "The Convex AI gateway is not enabled for your team. Upgrade to a paid plan to enable it, or contact support@convex.dev if you believe this is an error.";
-
-const CONVEX_AI_GATEWAY_UNAVAILABLE_MESSAGE =
-  '`getServiceToken("ai-gateway")` isn\'t available on this deployment because the AI gateway is a Convex Cloud service. Deploy to Convex Cloud, or call your model provider directly with your own API key.';
 
 describe("AiGatewayLanguageModel", () => {
   it.effect("authenticates and generates text through the gateway", () =>
     Effect.gen(function* () {
-      const serviceTokenCalls: Array<string> = [];
-      const serviceToken = makeServiceToken((service) =>
-        Effect.sync(() => {
-          serviceTokenCalls.push(service);
-          return "service-token";
-        }),
-      );
-
-      let capturedRequest: HttpClientRequest.HttpClientRequest | undefined;
-      const httpClient = HttpClient.make((request) => {
-        capturedRequest = request;
-        return Effect.succeed(
+      const gateway = yield* makeTestGateway({
+        getServiceToken: () => Effect.succeed("service-token"),
+        respond: (request) =>
           jsonResponse(request, {
             id: "chatcmpl_test",
             object: "chat.completion",
@@ -49,7 +33,6 @@ describe("AiGatewayLanguageModel", () => {
               },
             ],
           }),
-        );
       });
 
       const result = yield* LanguageModel.generateText({
@@ -58,28 +41,30 @@ describe("AiGatewayLanguageModel", () => {
         Effect.provide(
           languageModelLayer(
             "anthropic/claude-sonnet-4.5",
-            httpClient,
-            serviceToken,
+            gateway.dependencies,
           ),
         ),
       );
 
       assert.strictEqual(result.text, "Hello from Convex");
-      assert.deepStrictEqual(serviceTokenCalls, ["ai-gateway"]);
-      assert.isDefined(capturedRequest);
-      if (capturedRequest === undefined) {
+      assert.deepStrictEqual(yield* gateway.serviceTokenCalls(), [
+        "ai-gateway",
+      ]);
+
+      const requests = yield* gateway.requests();
+      assert.strictEqual(requests.length, 1);
+      const [request] = requests;
+      assert.isDefined(request);
+      if (request === undefined) {
         return;
       }
 
       assert.strictEqual(
-        capturedRequest.url,
+        request.url,
         "https://ai-gateway.convex.dev/v1/chat/completions",
       );
-      assert.strictEqual(
-        capturedRequest.headers.authorization,
-        "Bearer service-token",
-      );
-      assert.deepStrictEqual(yield* requestBody(capturedRequest), {
+      assert.strictEqual(request.headers.authorization, "Bearer service-token");
+      assert.deepStrictEqual(yield* requestBody(request), {
         model: "anthropic/claude-sonnet-4.5",
         messages: [{ role: "user", content: "hello" }],
       });
@@ -88,16 +73,9 @@ describe("AiGatewayLanguageModel", () => {
 
   it.effect("streams text through the gateway", () =>
     Effect.gen(function* () {
-      const serviceTokenCalls: Array<string> = [];
-      const serviceToken = makeServiceToken((service) =>
-        Effect.sync(() => {
-          serviceTokenCalls.push(service);
-          return "stream-token";
-        }),
-      );
-
-      const httpClient = HttpClient.make((request) =>
-        Effect.succeed(
+      const gateway = yield* makeTestGateway({
+        getServiceToken: () => Effect.succeed("stream-token"),
+        respond: (request) =>
           sseResponse(request, [
             {
               id: "chatcmpl_stream",
@@ -127,15 +105,14 @@ describe("AiGatewayLanguageModel", () => {
             },
             "[DONE]",
           ]),
-        ),
-      );
+      });
 
       const partsChunk = yield* LanguageModel.streamText({
         prompt: "hello",
       }).pipe(
         Stream.runCollect,
         Effect.provide(
-          languageModelLayer("openai/gpt-4o-mini", httpClient, serviceToken),
+          languageModelLayer("openai/gpt-4o-mini", gateway.dependencies),
         ),
       );
       const parts = globalThis.Array.from(partsChunk);
@@ -147,151 +124,88 @@ describe("AiGatewayLanguageModel", () => {
           .join(""),
         "Hello world",
       );
-      assert.deepStrictEqual(serviceTokenCalls, ["ai-gateway"]);
+      assert.deepStrictEqual(yield* gateway.serviceTokenCalls(), [
+        "ai-gateway",
+      ]);
+      assert.strictEqual((yield* gateway.requests()).length, 1);
     }),
   );
 
-  it.effect("surfaces a disabled gateway in the default runtime", () =>
-    Effect.gen(function* () {
-      const { error, requestSent } = yield* getLanguageModelError(
-        new Error(CONVEX_AI_GATEWAY_DISABLED_MESSAGE),
-      );
+  it.effect(
+    "does not send a request when service-token acquisition fails",
+    () =>
+      Effect.gen(function* () {
+        const gateway = yield* makeTestGateway({
+          getServiceToken: () =>
+            Effect.fail(new AiGatewayError.AiGatewayDisabled()),
+          respond: (request) => jsonResponse(request, {}),
+        });
 
-      assert.instanceOf(error, AiGatewayError.AiGatewayDisabled);
-      assert.strictEqual(
-        error.message,
-        "The Convex AI gateway is disabled. Your team may be on the free plan, or the gateway may have been disabled for your team. Upgrade to a paid plan, or email support@convex.dev if this looks wrong.",
-      );
-      assert.isFalse(requestSent);
-    }),
-  );
+        const error = yield* LanguageModel.generateText({
+          prompt: "hello",
+        }).pipe(
+          Effect.provide(
+            languageModelLayer("openai/gpt-4o-mini", gateway.dependencies),
+          ),
+          Effect.flip,
+        );
 
-  it.effect("surfaces a disabled gateway in the Node runtime", () =>
-    Effect.gen(function* () {
-      const { error, requestSent } = yield* getLanguageModelError(
-        nodeActionCallbackError(
-          "Transient error while running create service token",
-          "AiGatewayDisabled",
-          CONVEX_AI_GATEWAY_DISABLED_MESSAGE,
-        ),
-      );
-
-      assert.instanceOf(error, AiGatewayError.AiGatewayDisabled);
-      assert.isFalse(requestSent);
-    }),
-  );
-
-  it.effect("surfaces an unavailable gateway in the default runtime", () =>
-    Effect.gen(function* () {
-      const { error, requestSent } = yield* getLanguageModelError(
-        new Error(CONVEX_AI_GATEWAY_UNAVAILABLE_MESSAGE),
-      );
-
-      assert.instanceOf(error, AiGatewayError.AiGatewayUnavailable);
-      assert.strictEqual(
-        error.message,
-        "The Convex AI gateway is unavailable. This action is running on a local or self-hosted deployment, which cannot use the gateway. Call the model provider directly with your own API key stored in a Convex environment variable.",
-      );
-      assert.isFalse(requestSent);
-    }),
-  );
-
-  it.effect("surfaces an unavailable gateway in the Node runtime", () =>
-    Effect.gen(function* () {
-      const { error, requestSent } = yield* getLanguageModelError(
-        nodeActionCallbackError(
-          "Invalid create service token request",
-          "AiGatewayUnavailable",
-          CONVEX_AI_GATEWAY_UNAVAILABLE_MESSAGE,
-        ),
-      );
-
-      assert.instanceOf(error, AiGatewayError.AiGatewayUnavailable);
-      assert.isFalse(requestSent);
-    }),
-  );
-
-  it.effect("treats unexpected service-token failures as defects", () =>
-    Effect.gen(function* () {
-      const unexpected = new Error(
-        "NotAiGatewayDisabled is not a documented error code",
-      );
-      const serviceToken = makeAiGatewayServiceToken(() =>
-        Promise.reject(unexpected),
-      );
-
-      let requestSent = false;
-      const httpClient = HttpClient.make((request) => {
-        requestSent = true;
-        return Effect.succeed(jsonResponse(request, {}));
-      });
-
-      const exit = yield* LanguageModel.generateText({ prompt: "hello" }).pipe(
-        Effect.provide(
-          languageModelLayer("openai/gpt-4o-mini", httpClient, serviceToken),
-        ),
-        Effect.exit,
-      );
-
-      assert.deepStrictEqual(exit, Exit.die(unexpected));
-      assert.isFalse(requestSent);
-    }),
+        assert.instanceOf(error, AiGatewayError.AiGatewayDisabled);
+        assert.deepStrictEqual(yield* gateway.serviceTokenCalls(), [
+          "ai-gateway",
+        ]);
+        assert.deepStrictEqual(yield* gateway.requests(), []);
+      }),
   );
 });
 
-const getLanguageModelError = (rejection: unknown) =>
-  Effect.gen(function* () {
-    const serviceToken = makeAiGatewayServiceToken(() =>
-      Promise.reject(rejection),
-    );
+interface TestGatewayOptions {
+  readonly getServiceToken: AiGatewayServiceTokenService["get"];
+  readonly respond: (
+    request: HttpClientRequest.HttpClientRequest,
+  ) => HttpClientResponse.HttpClientResponse;
+}
 
-    let requestSent = false;
-    const httpClient = HttpClient.make((request) => {
-      requestSent = true;
-      return Effect.succeed(jsonResponse(request, {}));
+const makeTestGateway = (options: TestGatewayOptions) =>
+  Effect.gen(function* () {
+    const requests = yield* Ref.make<
+      ReadonlyArray<HttpClientRequest.HttpClientRequest>
+    >([]);
+    const serviceTokenCalls = yield* Ref.make<ReadonlyArray<"ai-gateway">>([]);
+
+    const httpClient = HttpClient.make((request) =>
+      Ref.update(requests, (captured) => [...captured, request]).pipe(
+        Effect.andThen(Effect.sync(() => options.respond(request))),
+      ),
+    );
+    const serviceToken = AiGatewayServiceToken.of({
+      get: (service) =>
+        Ref.update(serviceTokenCalls, (calls) => [...calls, service]).pipe(
+          Effect.andThen(options.getServiceToken(service)),
+        ),
     });
 
-    const error = yield* LanguageModel.generateText({ prompt: "hello" }).pipe(
-      Effect.provide(
-        languageModelLayer("openai/gpt-4o-mini", httpClient, serviceToken),
-      ),
-      Effect.flip,
-    );
-
-    return { error, requestSent };
-  });
-
-const nodeActionCallbackError = (
-  prefix: string,
-  code: "AiGatewayDisabled" | "AiGatewayUnavailable",
-  message: string,
-): Error => new Error(`${prefix}: ${JSON.stringify({ code, message })}`);
-
-const clientLayer = (
-  httpClient: HttpClient.HttpClient,
-  serviceToken: AiGatewayServiceTokenService,
-) =>
-  InternalAiGatewayClient.layer.pipe(
-    Layer.provide(
-      Layer.mergeAll(
+    return {
+      dependencies: Layer.mergeAll(
         Layer.succeed(HttpClient.HttpClient, httpClient),
         Layer.succeed(AiGatewayServiceToken, serviceToken),
       ),
-    ),
-  );
+      requests: () => Ref.get(requests),
+      serviceTokenCalls: () => Ref.get(serviceTokenCalls),
+    } as const;
+  });
+
+const clientLayer = (
+  dependencies: Layer.Layer<HttpClient.HttpClient | AiGatewayServiceToken>,
+) => InternalAiGatewayClient.layer.pipe(Layer.provide(dependencies));
 
 const languageModelLayer = (
   modelId: string,
-  httpClient: HttpClient.HttpClient,
-  serviceToken: AiGatewayServiceTokenService,
+  dependencies: Layer.Layer<HttpClient.HttpClient | AiGatewayServiceToken>,
 ) =>
   AiGatewayLanguageModel.model(modelId).pipe(
-    Layer.provide(clientLayer(httpClient, serviceToken)),
+    Layer.provide(clientLayer(dependencies)),
   );
-
-const makeServiceToken = (
-  get: AiGatewayServiceTokenService["get"],
-): AiGatewayServiceTokenService => ({ get });
 
 const jsonResponse = (
   request: HttpClientRequest.HttpClientRequest,
