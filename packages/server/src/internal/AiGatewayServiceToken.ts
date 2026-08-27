@@ -30,23 +30,23 @@ export interface Service {
   ) => Effect.Effect<string, AiGatewayError>;
 }
 
-const matchesErrorCode = (cause: unknown, code: AiGatewayErrorCode): boolean =>
-  (typeof cause === "object" &&
-    cause !== null &&
-    "code" in cause &&
-    cause.code === code) ||
-  (cause instanceof Error &&
-    (cause.message.includes(nodeRuntimeErrorCodeFragments[code]) ||
-      cause.message.includes(defaultRuntimeErrorMessagePrefixes[code])));
+const matchesErrorCode = (reason: unknown, code: AiGatewayErrorCode): boolean =>
+  (typeof reason === "object" &&
+    reason !== null &&
+    "code" in reason &&
+    reason.code === code) ||
+  (reason instanceof Error &&
+    (reason.message.includes(nodeRuntimeErrorCodeFragments[code]) ||
+      reason.message.includes(defaultRuntimeErrorMessagePrefixes[code])));
 
-const classifyError = (cause: unknown): AiGatewayError => {
-  if (matchesErrorCode(cause, "AiGatewayDisabled")) {
+const classifyError = (reason: unknown): AiGatewayError => {
+  if (matchesErrorCode(reason, "AiGatewayDisabled")) {
     return new AiGatewayDisabled();
   }
-  if (matchesErrorCode(cause, "AiGatewayUnavailable")) {
+  if (matchesErrorCode(reason, "AiGatewayUnavailable")) {
     return new AiGatewayUnavailable();
   }
-  throw cause;
+  throw reason;
 };
 
 export const make = (getServiceToken: GetServiceToken): Service => ({

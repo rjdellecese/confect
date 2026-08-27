@@ -239,9 +239,11 @@ describe("AiGatewayLanguageModel", () => {
   );
 });
 
-const getLanguageModelError = (cause: unknown) =>
+const getLanguageModelError = (reason: unknown) =>
   Effect.gen(function* () {
-    const serviceToken = makeAiGatewayServiceToken(() => Promise.reject(cause));
+    const serviceToken = makeAiGatewayServiceToken(() =>
+      Promise.reject(reason),
+    );
 
     let requestSent = false;
     const httpClient = HttpClient.make((request) => {
