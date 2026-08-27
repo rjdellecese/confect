@@ -1,6 +1,5 @@
-import { AiGatewayClient, AiGatewayLanguageModel } from "@confect/server";
-import { assert, beforeEach, describe, it } from "@effect/vitest";
-import * as ConvexServer from "convex/server";
+import { AiGatewayLanguageModel } from "@confect/server";
+import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Stream from "effect/Stream";
@@ -9,23 +8,23 @@ import * as LanguageModel from "effect/unstable/ai/LanguageModel";
 import * as HttpClient from "effect/unstable/http/HttpClient";
 import type * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
 import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
-import { vi } from "vitest";
-
-vi.mock("convex/server", async (importOriginal) => ({
-  ...(await importOriginal<typeof ConvexServer>()),
-  getServiceToken: vi.fn(),
-}));
-
-const getServiceTokenMock = vi.mocked(ConvexServer.getServiceToken);
-
-beforeEach(() => {
-  getServiceTokenMock.mockReset();
-});
+import * as InternalAiGatewayClient from "../src/internal/AiGatewayClient";
+import {
+  AiGatewayServiceToken,
+  AiGatewayServiceTokenError,
+  type Service as AiGatewayServiceTokenService,
+} from "../src/internal/AiGatewayServiceToken";
 
 describe("AiGatewayLanguageModel", () => {
   it.effect("authenticates and generates text through the gateway", () =>
     Effect.gen(function* () {
-      getServiceTokenMock.mockResolvedValue("service-token");
+      const serviceTokenCalls: Array<string> = [];
+      const serviceToken = makeServiceToken((service) =>
+        Effect.sync(() => {
+          serviceTokenCalls.push(service);
+          return "service-token";
+        }),
+      );
 
       let capturedRequest: HttpClientRequest.HttpClientRequest | undefined;
       const httpClient = HttpClient.make((request) => {
@@ -51,12 +50,16 @@ describe("AiGatewayLanguageModel", () => {
         prompt: "hello",
       }).pipe(
         Effect.provide(
-          languageModelLayer("anthropic/claude-sonnet-4.5", httpClient),
+          languageModelLayer(
+            "anthropic/claude-sonnet-4.5",
+            httpClient,
+            serviceToken,
+          ),
         ),
       );
 
       assert.strictEqual(result.text, "Hello from Convex");
-      assert.deepStrictEqual(getServiceTokenMock.mock.calls, [["ai-gateway"]]);
+      assert.deepStrictEqual(serviceTokenCalls, ["ai-gateway"]);
       assert.isDefined(capturedRequest);
       if (capturedRequest === undefined) {
         return;
@@ -79,7 +82,13 @@ describe("AiGatewayLanguageModel", () => {
 
   it.effect("streams text through the gateway", () =>
     Effect.gen(function* () {
-      getServiceTokenMock.mockResolvedValue("stream-token");
+      const serviceTokenCalls: Array<string> = [];
+      const serviceToken = makeServiceToken((service) =>
+        Effect.sync(() => {
+          serviceTokenCalls.push(service);
+          return "stream-token";
+        }),
+      );
 
       const httpClient = HttpClient.make((request) =>
         Effect.succeed(
@@ -119,7 +128,9 @@ describe("AiGatewayLanguageModel", () => {
         prompt: "hello",
       }).pipe(
         Stream.runCollect,
-        Effect.provide(languageModelLayer("openai/gpt-4o-mini", httpClient)),
+        Effect.provide(
+          languageModelLayer("openai/gpt-4o-mini", httpClient, serviceToken),
+        ),
       );
       const parts = globalThis.Array.from(partsChunk);
 
@@ -130,13 +141,19 @@ describe("AiGatewayLanguageModel", () => {
           .join(""),
         "Hello world",
       );
-      assert.deepStrictEqual(getServiceTokenMock.mock.calls, [["ai-gateway"]]);
+      assert.deepStrictEqual(serviceTokenCalls, ["ai-gateway"]);
     }),
   );
 
   it.effect("maps service-token failures to Effect AI errors", () =>
     Effect.gen(function* () {
-      getServiceTokenMock.mockRejectedValue(new Error("AiGatewayUnavailable"));
+      const serviceToken = makeServiceToken(() =>
+        Effect.fail(
+          new AiGatewayServiceTokenError({
+            cause: new Error("AiGatewayUnavailable"),
+          }),
+        ),
+      );
 
       let requestSent = false;
       const httpClient = HttpClient.make((request) => {
@@ -145,7 +162,9 @@ describe("AiGatewayLanguageModel", () => {
       });
 
       const error = yield* LanguageModel.generateText({ prompt: "hello" }).pipe(
-        Effect.provide(languageModelLayer("openai/gpt-4o-mini", httpClient)),
+        Effect.provide(
+          languageModelLayer("openai/gpt-4o-mini", httpClient, serviceToken),
+        ),
         Effect.flip,
       );
 
@@ -162,18 +181,31 @@ describe("AiGatewayLanguageModel", () => {
   );
 });
 
-const clientLayer = (httpClient: HttpClient.HttpClient) =>
-  AiGatewayClient.layer.pipe(
-    Layer.provide(Layer.succeed(HttpClient.HttpClient, httpClient)),
+const clientLayer = (
+  httpClient: HttpClient.HttpClient,
+  serviceToken: AiGatewayServiceTokenService,
+) =>
+  InternalAiGatewayClient.layer.pipe(
+    Layer.provide(
+      Layer.mergeAll(
+        Layer.succeed(HttpClient.HttpClient, httpClient),
+        Layer.succeed(AiGatewayServiceToken, serviceToken),
+      ),
+    ),
   );
 
 const languageModelLayer = (
   modelId: string,
   httpClient: HttpClient.HttpClient,
+  serviceToken: AiGatewayServiceTokenService,
 ) =>
   AiGatewayLanguageModel.model(modelId).pipe(
-    Layer.provide(clientLayer(httpClient)),
+    Layer.provide(clientLayer(httpClient, serviceToken)),
   );
+
+const makeServiceToken = (
+  get: AiGatewayServiceTokenService["get"],
+): AiGatewayServiceTokenService => ({ get });
 
 const jsonResponse = (
   request: HttpClientRequest.HttpClientRequest,
