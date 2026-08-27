@@ -31,10 +31,19 @@ export class AiGatewayUnavailable extends Schema.TaggedError<AiGatewayUnavailabl
 }
 
 /**
+ * A schema for the possible failures that can occur while obtaining a Convex
+ * AI gateway service token.
+ */
+export const AiGatewayError = Schema.Union([
+  AiGatewayDisabled,
+  AiGatewayUnavailable,
+]);
+
+/**
  * The possible failures that can occur while obtaining a Convex AI gateway
  * service token.
  */
-export type AiGatewayError = AiGatewayDisabled | AiGatewayUnavailable;
+export type AiGatewayError = typeof AiGatewayError.Type;
 
 type GetServiceToken = typeof getConvexServiceToken;
 type AiGatewayErrorCode = "AiGatewayDisabled" | "AiGatewayUnavailable";

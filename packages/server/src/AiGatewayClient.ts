@@ -10,7 +10,7 @@ import {
 
 export {
   AiGatewayDisabled,
-  type AiGatewayError,
+  AiGatewayError,
   AiGatewayUnavailable,
 } from "./internal/AiGatewayServiceToken";
 

@@ -2,6 +2,7 @@ import { AiGatewayClient } from "@confect/server";
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import * as Schema from "effect/Schema";
 import { make as makeAiGatewayServiceToken } from "../src/internal/AiGatewayServiceToken";
 
 const CONVEX_AI_GATEWAY_DISABLED_MESSAGE =
@@ -11,6 +12,14 @@ const CONVEX_AI_GATEWAY_UNAVAILABLE_MESSAGE =
   '`getServiceToken("ai-gateway")` isn\'t available on this deployment because the AI gateway is a Convex Cloud service. Deploy to Convex Cloud, or call your model provider directly with your own API key.';
 
 describe("AiGatewayServiceToken", () => {
+  it("exposes a schema for service-token failures", () => {
+    const isAiGatewayError = Schema.is(AiGatewayClient.AiGatewayError);
+
+    assert.isTrue(isAiGatewayError(new AiGatewayClient.AiGatewayDisabled()));
+    assert.isTrue(isAiGatewayError(new AiGatewayClient.AiGatewayUnavailable()));
+    assert.isFalse(isAiGatewayError(new Error("unexpected")));
+  });
+
   it.effect("maps a disabled gateway in the default runtime", () =>
     Effect.gen(function* () {
       const error = yield* getServiceTokenError(
