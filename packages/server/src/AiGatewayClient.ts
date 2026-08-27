@@ -2,9 +2,17 @@ import * as OpenAiClient from "@effect/ai-openai-compat/OpenAiClient";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import type * as HttpClient from "effect/unstable/http/HttpClient";
-import type { AiGatewayError } from "./AiGatewayError";
 import * as InternalAiGatewayClient from "./internal/AiGatewayClient";
-import { AiGatewayServiceToken } from "./internal/AiGatewayServiceToken";
+import {
+  AiGatewayServiceToken,
+  type AiGatewayError,
+} from "./internal/AiGatewayServiceToken";
+
+export {
+  AiGatewayDisabled,
+  type AiGatewayError,
+  AiGatewayUnavailable,
+} from "./internal/AiGatewayServiceToken";
 
 /**
  * The OpenAI-compatible client service configured for the Convex AI gateway.

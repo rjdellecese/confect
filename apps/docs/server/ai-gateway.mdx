@@ -70,8 +70,8 @@ Use `AiGatewayLanguageModel.withConfigOverride` when configuration should apply 
 
 `AiGatewayClient.layer` exposes the two documented service-token failures as tagged errors:
 
-- `AiGatewayError.AiGatewayDisabled` means your team is on the free plan or the gateway has been disabled for your team. Upgrade to a paid plan, or email support@convex.dev if this looks wrong.
-- `AiGatewayError.AiGatewayUnavailable` means the action is running on a local or self-hosted deployment. Call the model provider directly with your own API key stored in a Convex environment variable.
+- `AiGatewayClient.AiGatewayDisabled` means your team is on the free plan or the gateway has been disabled for your team. Upgrade to a paid plan, or email support@convex.dev if this looks wrong.
+- `AiGatewayClient.AiGatewayUnavailable` means the action is running on a local or self-hosted deployment. Call the model provider directly with your own API key stored in a Convex environment variable.
 
 Handle either tag after providing the client layer:
 

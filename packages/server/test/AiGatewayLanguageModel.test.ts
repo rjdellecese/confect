@@ -1,4 +1,4 @@
-import { AiGatewayError, AiGatewayLanguageModel } from "@confect/server";
+import { AiGatewayClient, AiGatewayLanguageModel } from "@confect/server";
 import { assert, describe, it } from "@effect/vitest";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -194,7 +194,7 @@ describe("AiGatewayLanguageModel", () => {
   it.layer(
     testAiGatewayLayer({
       getServiceToken: () =>
-        Effect.fail(new AiGatewayError.AiGatewayDisabled()),
+        Effect.fail(new AiGatewayClient.AiGatewayDisabled()),
       respond: (request) => jsonResponse(request, {}),
     }),
   )((test) => {
@@ -210,7 +210,7 @@ describe("AiGatewayLanguageModel", () => {
             Effect.flip,
           );
 
-          assert.instanceOf(error, AiGatewayError.AiGatewayDisabled);
+          assert.instanceOf(error, AiGatewayClient.AiGatewayDisabled);
           assert.deepStrictEqual(yield* gateway.serviceTokenCalls, [
             "ai-gateway",
           ]);
