@@ -1,9 +1,9 @@
-import { AiGatewayLanguageModel } from "@confect/server";
+import { AiGatewayError, AiGatewayLanguageModel } from "@confect/server";
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Stream from "effect/Stream";
-import * as AiError from "effect/unstable/ai/AiError";
 import * as LanguageModel from "effect/unstable/ai/LanguageModel";
 import * as HttpClient from "effect/unstable/http/HttpClient";
 import type * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
@@ -11,7 +11,7 @@ import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 import * as InternalAiGatewayClient from "../src/internal/AiGatewayClient";
 import {
   AiGatewayServiceToken,
-  AiGatewayServiceTokenError,
+  make as makeAiGatewayServiceToken,
   type Service as AiGatewayServiceTokenService,
 } from "../src/internal/AiGatewayServiceToken";
 
@@ -145,13 +145,13 @@ describe("AiGatewayLanguageModel", () => {
     }),
   );
 
-  it.effect("maps service-token failures to Effect AI errors", () =>
+  it.effect("surfaces a disabled gateway as a typed error", () =>
     Effect.gen(function* () {
-      const serviceToken = makeServiceToken(() =>
-        Effect.fail(
-          new AiGatewayServiceTokenError({
-            cause: new Error("AiGatewayUnavailable"),
-          }),
+      const serviceToken = makeAiGatewayServiceToken(() =>
+        Promise.reject(
+          new Error(
+            'Transient error while running create service token: {"code":"AiGatewayDisabled"}',
+          ),
         ),
       );
 
@@ -168,14 +168,62 @@ describe("AiGatewayLanguageModel", () => {
         Effect.flip,
       );
 
-      assert.isTrue(AiError.isAiError(error));
-      assert.strictEqual(error.reason._tag, "NetworkError");
-      if (error.reason._tag === "NetworkError") {
-        assert.match(
-          error.reason.description ?? "",
-          /service token: AiGatewayUnavailable/,
-        );
-      }
+      assert.instanceOf(error, AiGatewayError.AiGatewayDisabled);
+      assert.isFalse(requestSent);
+    }),
+  );
+
+  it.effect("surfaces an unavailable gateway as a typed error", () =>
+    Effect.gen(function* () {
+      const serviceToken = makeAiGatewayServiceToken(() =>
+        Promise.reject(
+          new Error(
+            'Invalid create service token request: {"code":"AiGatewayUnavailable"}',
+          ),
+        ),
+      );
+
+      let requestSent = false;
+      const httpClient = HttpClient.make((request) => {
+        requestSent = true;
+        return Effect.succeed(jsonResponse(request, {}));
+      });
+
+      const error = yield* LanguageModel.generateText({ prompt: "hello" }).pipe(
+        Effect.provide(
+          languageModelLayer("openai/gpt-4o-mini", httpClient, serviceToken),
+        ),
+        Effect.flip,
+      );
+
+      assert.instanceOf(error, AiGatewayError.AiGatewayUnavailable);
+      assert.isFalse(requestSent);
+    }),
+  );
+
+  it.effect("treats unexpected service-token failures as defects", () =>
+    Effect.gen(function* () {
+      const unexpected = new Error(
+        "NotAiGatewayDisabled is not a documented error code",
+      );
+      const serviceToken = makeAiGatewayServiceToken(() =>
+        Promise.reject(unexpected),
+      );
+
+      let requestSent = false;
+      const httpClient = HttpClient.make((request) => {
+        requestSent = true;
+        return Effect.succeed(jsonResponse(request, {}));
+      });
+
+      const exit = yield* LanguageModel.generateText({ prompt: "hello" }).pipe(
+        Effect.provide(
+          languageModelLayer("openai/gpt-4o-mini", httpClient, serviceToken),
+        ),
+        Effect.exit,
+      );
+
+      assert.deepStrictEqual(exit, Exit.die(unexpected));
       assert.isFalse(requestSent);
     }),
   );

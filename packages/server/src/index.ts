@@ -1,4 +1,5 @@
 export * as AiGatewayClient from "./AiGatewayClient";
+export * as AiGatewayError from "./AiGatewayError";
 export * as AiGatewayLanguageModel from "./AiGatewayLanguageModel";
 export * as ActionCtx from "./ActionCtx";
 export * as ActionRunner from "./ActionRunner";

@@ -16,3 +16,4 @@ const Claude = AiGatewayLanguageModel.model("anthropic/claude-sonnet-4.5").pipe(
 ```
 
 `@confect/server` now requires `convex ^1.45.0` for AI gateway service-token support.
+Service-token acquisition exposes Convex's documented `AiGatewayDisabled` and `AiGatewayUnavailable` conditions as tagged Effect errors; unexpected failures remain defects.

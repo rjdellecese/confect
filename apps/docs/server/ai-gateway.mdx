@@ -68,6 +68,23 @@ Use `AiGatewayLanguageModel.withConfigOverride` when configuration should apply 
 
 ## Handle errors
 
-Gateway HTTP responses and service-token failures use Effect AI's `AiError` channel. Handle that error before calling `Effect.orDie` when your action declares a recoverable error schema.
+`AiGatewayClient.layer` exposes the two documented service-token failures as tagged errors:
 
-Token creation fails when the gateway is disabled for the team or unavailable to the deployment. See [AI gateway availability](https://docs.convex.dev/ai-gateway/overview#who-can-use-it) for the supported deployment types.
+- `AiGatewayError.AiGatewayDisabled` means the gateway is not enabled for the team.
+- `AiGatewayError.AiGatewayUnavailable` means the deployment cannot use the Convex Cloud gateway, such as a local or self-hosted deployment.
+
+Handle either tag after providing the client layer:
+
+```ts
+const generatedText = LanguageModel.generateText({ prompt }).pipe(
+  Effect.map((response) => response.text),
+  Effect.provide(Claude),
+  Effect.catchTags({
+    AiGatewayDisabled: () => Effect.succeed("AI features are disabled."),
+    AiGatewayUnavailable: () =>
+      Effect.succeed("AI features are unavailable on this deployment."),
+  }),
+);
+```
+
+Unexpected `getServiceToken` failures are defects. Gateway HTTP and model failures remain in Effect AI's `AiError` channel. Handle those errors before calling `Effect.orDie` when your action declares a recoverable error schema. See [AI gateway availability](https://docs.convex.dev/ai-gateway/overview#who-can-use-it) for the supported deployment types.
