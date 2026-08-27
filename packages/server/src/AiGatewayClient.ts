@@ -6,7 +6,7 @@ import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientError from "effect/unstable/http/HttpClientError";
 import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
 
-const apiUrl = "https://ai-gateway.convex.dev/v1";
+const API_URL = "https://ai-gateway.convex.dev/v1";
 
 const describeTokenError = (cause: unknown): string =>
   cause instanceof Error
@@ -44,7 +44,7 @@ export const make: Effect.Effect<
   never,
   HttpClient.HttpClient
 > = OpenAiClient.make({
-  apiUrl,
+  apiUrl: API_URL,
   transformClient: withServiceToken,
 });
 
