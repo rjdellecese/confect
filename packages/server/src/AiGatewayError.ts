@@ -1,7 +1,8 @@
 import * as Schema from "effect/Schema";
 
 /**
- * The Convex AI gateway is not enabled for the current team.
+ * The current team is on the free plan or has the Convex AI gateway disabled.
+ * Upgrade to a paid plan, or contact Convex support if this looks wrong.
  */
 export class AiGatewayDisabled extends Schema.TaggedError<AiGatewayDisabled>()(
   "AiGatewayDisabled",
@@ -10,12 +11,13 @@ export class AiGatewayDisabled extends Schema.TaggedError<AiGatewayDisabled>()(
   },
 ) {
   override get message(): string {
-    return "The Convex AI gateway is not enabled for your team";
+    return "The Convex AI gateway is disabled. Your team may be on the free plan, or the gateway may have been disabled for your team. Upgrade to a paid plan, or email support@convex.dev if this looks wrong.";
   }
 }
 
 /**
- * The Convex AI gateway is not available on the current deployment.
+ * The current deployment is local or self-hosted and cannot use the Convex AI
+ * gateway. Call the model provider directly with your own API key instead.
  */
 export class AiGatewayUnavailable extends Schema.TaggedError<AiGatewayUnavailable>()(
   "AiGatewayUnavailable",
@@ -24,7 +26,7 @@ export class AiGatewayUnavailable extends Schema.TaggedError<AiGatewayUnavailabl
   },
 ) {
   override get message(): string {
-    return "The Convex AI gateway is unavailable on this deployment";
+    return "The Convex AI gateway is unavailable. This action is running on a local or self-hosted deployment, which cannot use the gateway. Call the model provider directly with your own API key stored in a Convex environment variable.";
   }
 }
 

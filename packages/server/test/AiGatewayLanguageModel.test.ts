@@ -169,6 +169,10 @@ describe("AiGatewayLanguageModel", () => {
       );
 
       assert.instanceOf(error, AiGatewayError.AiGatewayDisabled);
+      assert.strictEqual(
+        error.message,
+        "The Convex AI gateway is disabled. Your team may be on the free plan, or the gateway may have been disabled for your team. Upgrade to a paid plan, or email support@convex.dev if this looks wrong.",
+      );
       assert.isFalse(requestSent);
     }),
   );
@@ -197,6 +201,10 @@ describe("AiGatewayLanguageModel", () => {
       );
 
       assert.instanceOf(error, AiGatewayError.AiGatewayUnavailable);
+      assert.strictEqual(
+        error.message,
+        "The Convex AI gateway is unavailable. This action is running on a local or self-hosted deployment, which cannot use the gateway. Call the model provider directly with your own API key stored in a Convex environment variable.",
+      );
       assert.isFalse(requestSent);
     }),
   );
