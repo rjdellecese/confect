@@ -1,0 +1,73 @@
+---
+icon: "sparkles"
+title: "AI Gateway"
+description: "Use Convex's AI gateway as an Effect AI language-model provider."
+---
+
+Confect provides an Effect AI `LanguageModel` backed by the [Convex AI gateway](https://docs.convex.dev/ai-gateway/overview). The provider obtains a short-lived credential from the running Convex action, so you do not need to configure or rotate an upstream model-provider API key.
+
+The AI gateway is available from actions running on paid Convex Cloud deployments. It is not available on local or self-hosted backends.
+
+## Generate text
+
+Provide three layers to an Effect AI operation:
+
+- `AiGatewayLanguageModel.model(...)` selects a gateway model using its `provider/model` identifier.
+- `AiGatewayClient.layer` authenticates requests with the current Convex deployment.
+- `FetchHttpClient.layer` sends requests through the Fetch API available in both Convex action runtimes.
+
+```ts confect/assistant.impl.ts
+import {
+  AiGatewayClient,
+  AiGatewayLanguageModel,
+  FunctionImpl,
+} from "@confect/server";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as LanguageModel from "effect/unstable/ai/LanguageModel";
+import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
+import databaseSchema from "./_generated/schema";
+import assistant from "./assistant.spec";
+
+const Claude = AiGatewayLanguageModel.model("anthropic/claude-sonnet-4.5").pipe(
+  Layer.provide(AiGatewayClient.layer),
+  Layer.provide(FetchHttpClient.layer),
+);
+
+const answer = FunctionImpl.make(
+  databaseSchema,
+  assistant,
+  "answer",
+  ({ prompt }) =>
+    LanguageModel.generateText({ prompt }).pipe(
+      Effect.map((response) => response.text),
+      Effect.provide(Claude),
+      Effect.orDie,
+    ),
+);
+```
+
+Use the same model with Effect AI tools and structured responses. The selected upstream model determines which capabilities are available.
+
+## Configure requests
+
+Pass OpenAI-compatible request options as the second argument to `model`:
+
+```ts
+AiGatewayLanguageModel.model("openai/gpt-4o-mini", {
+  temperature: 0.2,
+  max_output_tokens: 500,
+});
+```
+
+Use `AiGatewayLanguageModel.withConfigOverride` when configuration should apply only within part of a larger Effect.
+
+## Stream responses
+
+`LanguageModel.streamText` consumes the gateway's server-sent event stream inside the action. A normal Convex action still returns one value to its caller; use a Convex HTTP action or persist partial output when a client must observe tokens as they arrive.
+
+## Handle errors
+
+Gateway HTTP responses and service-token failures use Effect AI's `AiError` channel. Handle that error before calling `Effect.orDie` when your action declares a recoverable error schema.
+
+Token creation fails when the gateway is disabled for the team or unavailable to the deployment. See [AI gateway availability](https://docs.convex.dev/ai-gateway/overview#who-can-use-it) for the supported deployment types.

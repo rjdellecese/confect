@@ -56,6 +56,7 @@
           "server/middleware",
           "server/plain-convex-functions",
           "server/node-actions",
+          "server/ai-gateway",
           {
             "icon": "database",
             "group": "Database",
