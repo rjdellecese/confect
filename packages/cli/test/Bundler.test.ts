@@ -249,9 +249,16 @@ layer(BundlerLayer)("importersOfPackage", (it) => {
       const bundled = yield* Bundler.bundle(entry);
 
       // The import resolved to an absolute path inside `pkg/dist`, yet the
-      // package is still found by name.
+      // package is still found by name. Canonicalize the returned path because
+      // macOS exposes the same temporary directory through both `/var` and
+      // `/private/var`.
+      const importers = Bundler.importersOfPackage(
+        bundled,
+        "@scope/lib",
+        () => true,
+      );
       expect(
-        Bundler.importersOfPackage(bundled, "@scope/lib", () => true),
+        yield* Effect.forEach(importers, (importer) => fs.realPath(importer)),
       ).toStrictEqual([yield* fs.realPath(entry)]);
     }).pipe(Effect.scoped),
   );
