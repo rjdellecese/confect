@@ -11,10 +11,9 @@ import {
 type GetServiceToken = typeof getConvexServiceToken;
 type AiGatewayErrorCode = "AiGatewayDisabled" | "AiGatewayUnavailable";
 
-const errorCodePatterns: Record<AiGatewayErrorCode, RegExp> = {
-  AiGatewayDisabled: /(?:^|[^A-Za-z0-9_])AiGatewayDisabled(?:$|[^A-Za-z0-9_])/u,
-  AiGatewayUnavailable:
-    /(?:^|[^A-Za-z0-9_])AiGatewayUnavailable(?:$|[^A-Za-z0-9_])/u,
+const nodeRuntimeErrorCodeFragments: Record<AiGatewayErrorCode, string> = {
+  AiGatewayDisabled: '"code":"AiGatewayDisabled"',
+  AiGatewayUnavailable: '"code":"AiGatewayUnavailable"',
 };
 
 // The default Convex runtime exposes only the human-readable ErrorMetadata
@@ -37,7 +36,7 @@ const matchesErrorCode = (cause: unknown, code: AiGatewayErrorCode): boolean =>
     "code" in cause &&
     cause.code === code) ||
   (cause instanceof Error &&
-    (errorCodePatterns[code].test(cause.message) ||
+    (cause.message.includes(nodeRuntimeErrorCodeFragments[code]) ||
       cause.message.includes(defaultRuntimeErrorMessagePrefixes[code])));
 
 const classifyError = (cause: unknown): AiGatewayError => {
