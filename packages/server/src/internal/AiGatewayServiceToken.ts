@@ -17,24 +17,34 @@ const errorCodePatterns: Record<AiGatewayErrorCode, RegExp> = {
     /(?:^|[^A-Za-z0-9_])AiGatewayUnavailable(?:$|[^A-Za-z0-9_])/u,
 };
 
+// The default Convex runtime exposes only the human-readable ErrorMetadata
+// message. Node actions preserve the short code in a wrapped JSON response.
+const defaultRuntimeErrorMessagePrefixes: Record<AiGatewayErrorCode, string> = {
+  AiGatewayDisabled: "The Convex AI gateway is not enabled for your team.",
+  AiGatewayUnavailable:
+    '`getServiceToken("ai-gateway")` isn\'t available on this deployment',
+};
+
 export interface Service {
   readonly get: (
     service: "ai-gateway",
   ) => Effect.Effect<string, AiGatewayError>;
 }
 
-const hasErrorCode = (cause: unknown, code: AiGatewayErrorCode): boolean =>
+const matchesErrorCode = (cause: unknown, code: AiGatewayErrorCode): boolean =>
   (typeof cause === "object" &&
     cause !== null &&
     "code" in cause &&
     cause.code === code) ||
-  (cause instanceof Error && errorCodePatterns[code].test(cause.message));
+  (cause instanceof Error &&
+    (errorCodePatterns[code].test(cause.message) ||
+      cause.message.includes(defaultRuntimeErrorMessagePrefixes[code])));
 
 const classifyError = (cause: unknown): AiGatewayError => {
-  if (hasErrorCode(cause, "AiGatewayDisabled")) {
+  if (matchesErrorCode(cause, "AiGatewayDisabled")) {
     return new AiGatewayDisabled();
   }
-  if (hasErrorCode(cause, "AiGatewayUnavailable")) {
+  if (matchesErrorCode(cause, "AiGatewayUnavailable")) {
     return new AiGatewayUnavailable();
   }
   throw cause;

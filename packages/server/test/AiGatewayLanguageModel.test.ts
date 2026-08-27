@@ -15,6 +15,12 @@ import {
   type Service as AiGatewayServiceTokenService,
 } from "../src/internal/AiGatewayServiceToken";
 
+const CONVEX_AI_GATEWAY_DISABLED_MESSAGE =
+  "The Convex AI gateway is not enabled for your team. Upgrade to a paid plan to enable it, or contact support@convex.dev if you believe this is an error.";
+
+const CONVEX_AI_GATEWAY_UNAVAILABLE_MESSAGE =
+  '`getServiceToken("ai-gateway")` isn\'t available on this deployment because the AI gateway is a Convex Cloud service. Deploy to Convex Cloud, or call your model provider directly with your own API key.';
+
 describe("AiGatewayLanguageModel", () => {
   it.effect("authenticates and generates text through the gateway", () =>
     Effect.gen(function* () {
@@ -145,27 +151,10 @@ describe("AiGatewayLanguageModel", () => {
     }),
   );
 
-  it.effect("surfaces a disabled gateway as a typed error", () =>
+  it.effect("surfaces a disabled gateway in the default runtime", () =>
     Effect.gen(function* () {
-      const serviceToken = makeAiGatewayServiceToken(() =>
-        Promise.reject(
-          new Error(
-            'Transient error while running create service token: {"code":"AiGatewayDisabled"}',
-          ),
-        ),
-      );
-
-      let requestSent = false;
-      const httpClient = HttpClient.make((request) => {
-        requestSent = true;
-        return Effect.succeed(jsonResponse(request, {}));
-      });
-
-      const error = yield* LanguageModel.generateText({ prompt: "hello" }).pipe(
-        Effect.provide(
-          languageModelLayer("openai/gpt-4o-mini", httpClient, serviceToken),
-        ),
-        Effect.flip,
+      const { error, requestSent } = yield* getLanguageModelError(
+        new Error(CONVEX_AI_GATEWAY_DISABLED_MESSAGE),
       );
 
       assert.instanceOf(error, AiGatewayError.AiGatewayDisabled);
@@ -177,27 +166,25 @@ describe("AiGatewayLanguageModel", () => {
     }),
   );
 
-  it.effect("surfaces an unavailable gateway as a typed error", () =>
+  it.effect("surfaces a disabled gateway in the Node runtime", () =>
     Effect.gen(function* () {
-      const serviceToken = makeAiGatewayServiceToken(() =>
-        Promise.reject(
-          new Error(
-            'Invalid create service token request: {"code":"AiGatewayUnavailable"}',
-          ),
+      const { error, requestSent } = yield* getLanguageModelError(
+        nodeActionCallbackError(
+          "Transient error while running create service token",
+          "AiGatewayDisabled",
+          CONVEX_AI_GATEWAY_DISABLED_MESSAGE,
         ),
       );
 
-      let requestSent = false;
-      const httpClient = HttpClient.make((request) => {
-        requestSent = true;
-        return Effect.succeed(jsonResponse(request, {}));
-      });
+      assert.instanceOf(error, AiGatewayError.AiGatewayDisabled);
+      assert.isFalse(requestSent);
+    }),
+  );
 
-      const error = yield* LanguageModel.generateText({ prompt: "hello" }).pipe(
-        Effect.provide(
-          languageModelLayer("openai/gpt-4o-mini", httpClient, serviceToken),
-        ),
-        Effect.flip,
+  it.effect("surfaces an unavailable gateway in the default runtime", () =>
+    Effect.gen(function* () {
+      const { error, requestSent } = yield* getLanguageModelError(
+        new Error(CONVEX_AI_GATEWAY_UNAVAILABLE_MESSAGE),
       );
 
       assert.instanceOf(error, AiGatewayError.AiGatewayUnavailable);
@@ -205,6 +192,21 @@ describe("AiGatewayLanguageModel", () => {
         error.message,
         "The Convex AI gateway is unavailable. This action is running on a local or self-hosted deployment, which cannot use the gateway. Call the model provider directly with your own API key stored in a Convex environment variable.",
       );
+      assert.isFalse(requestSent);
+    }),
+  );
+
+  it.effect("surfaces an unavailable gateway in the Node runtime", () =>
+    Effect.gen(function* () {
+      const { error, requestSent } = yield* getLanguageModelError(
+        nodeActionCallbackError(
+          "Invalid create service token request",
+          "AiGatewayUnavailable",
+          CONVEX_AI_GATEWAY_UNAVAILABLE_MESSAGE,
+        ),
+      );
+
+      assert.instanceOf(error, AiGatewayError.AiGatewayUnavailable);
       assert.isFalse(requestSent);
     }),
   );
@@ -236,6 +238,32 @@ describe("AiGatewayLanguageModel", () => {
     }),
   );
 });
+
+const getLanguageModelError = (cause: unknown) =>
+  Effect.gen(function* () {
+    const serviceToken = makeAiGatewayServiceToken(() => Promise.reject(cause));
+
+    let requestSent = false;
+    const httpClient = HttpClient.make((request) => {
+      requestSent = true;
+      return Effect.succeed(jsonResponse(request, {}));
+    });
+
+    const error = yield* LanguageModel.generateText({ prompt: "hello" }).pipe(
+      Effect.provide(
+        languageModelLayer("openai/gpt-4o-mini", httpClient, serviceToken),
+      ),
+      Effect.flip,
+    );
+
+    return { error, requestSent };
+  });
+
+const nodeActionCallbackError = (
+  prefix: string,
+  code: "AiGatewayDisabled" | "AiGatewayUnavailable",
+  message: string,
+): Error => new Error(`${prefix}: ${JSON.stringify({ code, message })}`);
 
 const clientLayer = (
   httpClient: HttpClient.HttpClient,
