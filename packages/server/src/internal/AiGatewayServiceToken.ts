@@ -32,10 +32,10 @@ const hasErrorCode = (cause: unknown, code: AiGatewayErrorCode): boolean =>
 
 const classifyError = (cause: unknown): AiGatewayError => {
   if (hasErrorCode(cause, "AiGatewayDisabled")) {
-    return new AiGatewayDisabled({ cause });
+    return new AiGatewayDisabled();
   }
   if (hasErrorCode(cause, "AiGatewayUnavailable")) {
-    return new AiGatewayUnavailable({ cause });
+    return new AiGatewayUnavailable();
   }
   throw cause;
 };
