@@ -148,7 +148,7 @@ describe("match", () => {
   test("data-last applies self last", () => {
     const f = QueryResult.match({
       onLoading: (s) => `L:${s}`,
-      onSuccess: (v) => `S:${v}`,
+      onSuccess: (v) => `S:${String(v)}`,
       onFailure: (e) => `F:${String(e)}`,
     });
 

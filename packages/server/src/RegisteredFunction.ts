@@ -313,9 +313,9 @@ export const baseActionLayer = <ConvexDataModel extends GenericDataModel>(
     StorageReader.StorageReader.layer(ctx.storage),
     StorageWriter.StorageWriter.layer(ctx.storage),
     StorageActionWriter.StorageActionWriter.layer(ctx.storage),
-    QueryRunner.layer(ctx.runQuery),
-    MutationRunner.layer(ctx.runMutation),
-    ActionRunner.layer(ctx.runAction),
+    QueryRunner.layer(ctx.runQuery.bind(ctx)),
+    MutationRunner.layer(ctx.runMutation.bind(ctx)),
+    ActionRunner.layer(ctx.runAction.bind(ctx)),
     Layer.succeed(ActionCtx.ActionCtx<ConvexDataModel>(), ctx),
   );
 
@@ -326,4 +326,8 @@ export const actionLayer = <
   ctx: GenericActionCtx<
     DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
   >,
-) => Layer.mergeAll(baseActionLayer(ctx), VectorSearch.layer(ctx.vectorSearch));
+) =>
+  Layer.mergeAll(
+    baseActionLayer(ctx),
+    VectorSearch.layer(ctx.vectorSearch.bind(ctx)),
+  );

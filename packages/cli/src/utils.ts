@@ -335,7 +335,7 @@ const getGroupPathsFromFs = Effect.gen(function* () {
       GroupPath.fromGroupModulePath(groupModulePath),
     ),
   );
-  return pipe(groupPathArray, HashSet.fromIterable, GroupPaths.GroupPaths.make);
+  return GroupPaths.GroupPaths.make(HashSet.fromIterable(groupPathArray));
 });
 
 export const removeGroups = (groupPaths: GroupPaths.GroupPaths) =>
@@ -388,14 +388,18 @@ export const writeGroups = (
       const registeredFunctionsImportPath =
         yield* registeredFunctionsImportPathForGroup(groupPath, modulePath);
 
-      yield* Effect.logDebug(`Generating group ${groupPath}...`);
+      yield* Effect.logDebug(
+        `Generating group ${GroupPath.toString(groupPath)}...`,
+      );
       yield* generateGroupModule({
         groupPath,
         functionNames,
         registeredFunctionsImportPath,
         useNode: group.runtime === "Node",
       });
-      yield* Effect.logDebug(`Group ${groupPath} generated`);
+      yield* Effect.logDebug(
+        `Group ${GroupPath.toString(groupPath)} generated`,
+      );
     }),
   );
 

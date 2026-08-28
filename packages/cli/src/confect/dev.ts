@@ -508,7 +508,7 @@ const esbuildOptions = (
         name: "notify-rebuild",
         setup(build: esbuild.PluginBuild) {
           build.onEnd((result) => {
-            Effect.runPromise(
+            return Effect.runPromise(
               Effect.gen(function* () {
                 const wasInitial = yield* Ref.getAndSet(
                   initialBuildSeenRef,

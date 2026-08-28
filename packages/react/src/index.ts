@@ -173,7 +173,7 @@ const MINIMUM_CONVEX_VERSION = "1.36.0";
  * version is the only reliable signal.
  */
 const supportsErrorsAsValues = ((): boolean => {
-  const [major, minor] = String(convexVersion).split(".").map(Number);
+  const [major, minor] = convexVersion.split(".").map(Number);
   if (
     major === undefined ||
     minor === undefined ||

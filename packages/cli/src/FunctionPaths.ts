@@ -50,10 +50,8 @@ const makeHelper = (
 export const groupPaths = (
   functionPaths: FunctionPaths,
 ): GroupPaths.GroupPaths =>
-  pipe(
-    functionPaths,
-    HashSet.map(FunctionPath.groupPath),
-    GroupPaths.GroupPaths.make,
+  pipe(functionPaths, HashSet.map(FunctionPath.groupPath), (paths) =>
+    GroupPaths.GroupPaths.make(paths),
   );
 
 export const diff = (
@@ -94,7 +92,7 @@ export const diff = (
     existingGroupsToWhichFunctionsWereAdded,
     HashSet.union(existingGroupsToWhichFunctionsWereRemoved),
     HashSet.difference(HashSet.union(groupsAdded, groupsRemoved)),
-    GroupPaths.GroupPaths.make,
+    (paths) => GroupPaths.GroupPaths.make(paths),
   );
 
   return {
