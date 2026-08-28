@@ -31,9 +31,10 @@ const fixtureConfect = `${import.meta.dirname}/../../server/test/mock-backend/fi
 const LeafModuleLayer = Layer.mergeAll(
   NodePath.layer,
   NodeFileSystem.layer,
-  Layer.mock(ConfectDirectory, {
-    get: Effect.succeed(fixtureConfect),
-  }),
+  Layer.succeed(
+    ConfectDirectory,
+    ConfectDirectory.of({ get: Effect.succeed(fixtureConfect) }),
+  ),
 );
 
 interface TempFile {

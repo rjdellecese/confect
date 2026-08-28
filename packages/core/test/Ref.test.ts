@@ -7,6 +7,7 @@ import type {
   RegisteredQuery,
 } from "convex/server";
 import { ConvexError } from "convex/values";
+import { it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as MutableRef from "effect/MutableRef";
 import * as Option from "effect/Option";
@@ -320,39 +321,42 @@ describe("isConvexError", () => {
 });
 
 describe("decodeError", () => {
-  test("decodes error data using the error schema", async () => {
-    class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
-      id: Schema.String,
-    }) {}
+  it.effect("decodes error data using the error schema", () =>
+    Effect.gen(function* () {
+      class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+        id: Schema.String,
+      }) {}
 
-    const spec = FunctionSpec.publicMutation({
-      name: "update",
-      returns: () => Schema.Void,
-      error: () => NotFound,
-    });
-    const ref = Ref.make("test/mod", spec);
+      const spec = FunctionSpec.publicMutation({
+        name: "update",
+        returns: () => Schema.Void,
+        error: () => NotFound,
+      });
+      const ref = Ref.make("test/mod", spec);
 
-    const result = await Effect.runPromise(
-      Ref.decodeError(ref, { _tag: "NotFound", id: "abc" }),
-    );
-    expect(Option.isSome(result)).toBe(true);
-    const decoded = Option.getOrThrow(result);
-    expect(decoded).toBeInstanceOf(NotFound);
-    expect(decoded.id).toBe("abc");
-  });
+      const result = yield* Ref.decodeError(ref, {
+        _tag: "NotFound",
+        id: "abc",
+      });
+      expect(Option.isSome(result)).toBe(true);
+      const decoded = Option.getOrThrow(result);
+      expect(decoded).toBeInstanceOf(NotFound);
+      expect(decoded.id).toBe("abc");
+    }),
+  );
 
-  test("returns None when the ref has no error schema", async () => {
-    const spec = FunctionSpec.publicMutation({
-      name: "create",
-      returns: () => Schema.Void,
-    });
-    const ref = Ref.make("test/mod", spec);
+  it.effect("returns None when the ref has no error schema", () =>
+    Effect.gen(function* () {
+      const spec = FunctionSpec.publicMutation({
+        name: "create",
+        returns: () => Schema.Void,
+      });
+      const ref = Ref.make("test/mod", spec);
 
-    const result = await Effect.runPromise(
-      Ref.decodeError(ref, { anything: "goes" }),
-    );
-    expect(Option.isNone(result)).toBe(true);
-  });
+      const result = yield* Ref.decodeError(ref, { anything: "goes" });
+      expect(Option.isNone(result)).toBe(true);
+    }),
+  );
 });
 
 describe("decodeErrorOption", () => {

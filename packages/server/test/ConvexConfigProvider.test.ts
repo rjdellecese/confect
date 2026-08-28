@@ -1,10 +1,10 @@
-import { describe, expect, it } from "@effect/vitest";
+import { expect, layer } from "@effect/vitest";
 import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as ConvexConfigProvider from "@confect/server/ConvexConfigProvider";
 
-describe("ConvexConfigProvider", () => {
+layer(ConvexConfigProvider.layer)("ConvexConfigProvider", (it) => {
   it.effect("resolves an environment variable by exact key", () =>
     Effect.gen(function* () {
       process.env["CONFECT_TEST_PRESENT"] = "value";
@@ -15,7 +15,6 @@ describe("ConvexConfigProvider", () => {
       Effect.ensuring(
         Effect.sync(() => delete process.env["CONFECT_TEST_PRESENT"]),
       ),
-      Effect.provide(ConvexConfigProvider.layer),
     ),
   );
 
@@ -31,7 +30,6 @@ describe("ConvexConfigProvider", () => {
       Effect.ensuring(
         Effect.sync(() => delete process.env["CONFECT_TEST_NESTED"]),
       ),
-      Effect.provide(ConvexConfigProvider.layer),
     ),
   );
 
@@ -54,7 +52,6 @@ describe("ConvexConfigProvider", () => {
         Effect.ensuring(
           Effect.sync(() => delete process.env["CONFECT_TEST_EMPTY"]),
         ),
-        Effect.provide(ConvexConfigProvider.layer),
       ),
   );
 
@@ -62,6 +59,6 @@ describe("ConvexConfigProvider", () => {
     Effect.gen(function* () {
       const option = yield* Config.option(Config.string("CONFECT_TEST_UNSET"));
       expect(Option.isNone(option)).toBe(true);
-    }).pipe(Effect.provide(ConvexConfigProvider.layer)),
+    }),
   );
 });
