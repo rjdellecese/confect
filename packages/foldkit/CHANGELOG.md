@@ -1,5 +1,7 @@
 # @confect/foldkit
 
+## 10.0.0-next.20
+
 ## 10.0.0-next.19
 
 ### Minor Changes

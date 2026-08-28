@@ -1,5 +1,26 @@
 # @confect/server
 
+## 10.0.0-next.20
+
+### Minor Changes
+
+- 0dc4816: Add `AiGatewayClient` and `AiGatewayLanguageModel`, an Effect AI `LanguageModel` provider for calling models through the Convex AI gateway from actions without configuring provider API keys.
+
+  ```ts
+  import { AiGatewayClient, AiGatewayLanguageModel } from "@confect/server";
+  import * as Layer from "effect/Layer";
+  import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
+
+  const Claude = AiGatewayLanguageModel.model(
+    "anthropic/claude-sonnet-4.5",
+  ).pipe(
+    Layer.provide(AiGatewayClient.layer),
+    Layer.provide(FetchHttpClient.layer),
+  );
+  ```
+
+  `@confect/server` now requires `convex ^1.45.0` for AI gateway service-token support.
+
 ## 10.0.0-next.19
 
 ## 10.0.0-next.18

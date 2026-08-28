@@ -1,7 +1,7 @@
 {
   "name": "@confect/foldkit",
   "description": "Client-side bindings for Foldkit apps",
-  "version": "10.0.0-next.19",
+  "version": "10.0.0-next.20",
   "author": "RJ Dellecese",
   "bugs": {
     "url": "https://github.com/rjdellecese/confect/issues"
