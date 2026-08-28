@@ -61,13 +61,9 @@ const emitDeclarations = Effect.gen(function* () {
         sourceMap: false,
         rootDir: packageRoot,
         outDir,
-        // Suggestion-level Effect diagnostics (`schemaNumber`, `lazyEffect`,
-        // …) are advice about the sources these entries pull in, not emit
-        // failures, and `tsc` prints them on the same stream the assertions
-        // below expect to be empty.
-        plugins: [
-          { name: "@effect/language-service", includeSuggestionsInTsc: false },
-        ],
+        // Oxlint owns Effect diagnostics; declaration emit should report only
+        // TypeScript diagnostics on the stream asserted below.
+        plugins: [{ name: "@effect/language-service", diagnostics: false }],
       },
       files: Array.map(entries, (entry) => path.join(generated, entry)),
     }),

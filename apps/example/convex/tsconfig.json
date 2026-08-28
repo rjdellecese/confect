@@ -8,7 +8,7 @@
     "plugins": [
       {
         "name": "@effect/language-service",
-        "ignoreEffectSuggestionsInTscExitCode": false
+        "diagnostics": false
       }
     ],
     "allowJs": true,

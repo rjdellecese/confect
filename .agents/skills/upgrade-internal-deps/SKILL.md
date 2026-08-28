@@ -30,8 +30,10 @@ since their pins move with their ranges.
   `lsp.effect-tsgo.settings.package_version` in `.zed/settings.json` to the same
   version. That pins the copy of the binary Zed's `effect-tsgo` extension
   downloads, and it lives outside any dependency map, so `pnpm outdated` will
-  never surface the drift. Left stale, the editor reports Effect diagnostics
-  from a different version than `tsc` does.
+  never surface the drift. Also verify that the pinned `oxlint` and
+  `oxlint-tsgolint` versions appear in that `@effect/tsgo` release's supported
+  component table; the patch command rejects incompatible integrations. Left
+  stale, the editor and CLI use different Effect language-service versions.
 - These upgrades are not user-facing: **no changeset**.
 
 ## Delivering
