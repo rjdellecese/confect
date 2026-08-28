@@ -1,1 +1,4 @@
+# skills-lock:start
+# Generated from skills-lock.json by `pnpm skills:sync-ignore`.
 .agents/skills/effect/
+# skills-lock:end
