@@ -1,53 +1,18 @@
 import { FunctionSpec, PaginationError, Ref } from "@confect/core";
-import { describe, expect, layer } from "@effect/vitest";
+import { describe, expect, it } from "@effect/vitest";
 import type { RegisteredQuery } from "convex/server";
 import { ConvexError } from "convex/values";
 import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import { m } from "foldkit/message";
 import * as FoldkitSubscription from "foldkit/subscription";
-import { beforeEach } from "vitest";
 import * as Client from "@confect/foldkit/Client";
 import * as PaginatedQuery from "@confect/foldkit/PaginatedQuery";
 import * as Subscription from "@confect/foldkit/Subscription";
-
-interface Call {
-  readonly name: string;
-  readonly args: unknown;
-}
-
-let reactiveQueryCalls: Array<Call> = [];
-let reactiveQueryResults: Stream.Stream<Result.Result<unknown, unknown>> =
-  Stream.empty;
-
-beforeEach(() => {
-  reactiveQueryCalls = [];
-  reactiveQueryResults = Stream.empty;
-});
-
-const StubLayer = Layer.effect(
-  Client.Client,
-  Client.make({
-    url: "https://test.convex.cloud",
-    setAuth: () => Effect.void,
-    query: () => Effect.succeed({}),
-    mutation: () => Effect.succeed({}),
-    action: () => Effect.succeed({}),
-    reactiveQuery: () => Stream.empty,
-    reactiveQueryResult: (ref: Ref.Any, ...rest: [unknown?]) =>
-      Stream.suspend(() => {
-        reactiveQueryCalls.push({
-          name: Ref.getConvexFunctionName(ref),
-          args: rest[0] ?? {},
-        });
-        return reactiveQueryResults;
-      }),
-  } as any),
-);
+import * as TestClient from "./TestClient";
 
 const getQueryRef = Ref.make(
   "notes",
@@ -93,7 +58,7 @@ const makeNoteEntry = () =>
     onError: (error) => FailedGetNote({ error }),
   });
 
-layer(StubLayer)("Subscription", (it) => {
+describe("Subscription", () => {
   describe("reactiveQuery", () => {
     it("extracts Option-wrapped args and defaults no-args queries open", () => {
       const entry = makeNoteEntry();
@@ -115,24 +80,28 @@ layer(StubLayer)("Subscription", (it) => {
 
     it.effect("None dependencies produce an empty stream", () =>
       Effect.gen(function* () {
+        const testClient = yield* TestClient.TestClient;
         const messages = yield* Stream.runCollect(
           makeNoteEntry().dependenciesToStream({ args: Option.none() }),
         );
 
         expect(messages).toEqual([]);
-        expect(reactiveQueryCalls).toEqual([]);
-      }),
+        expect(yield* testClient.calls()).toEqual([]);
+      }).pipe(Effect.provide(TestClient.layer)),
     );
 
     it.effect(
       "maps successes and failures without ending the subscription",
       () =>
         Effect.gen(function* () {
+          const testClient = yield* TestClient.TestClient;
           const error = new Client.WebSocketClientError({ cause: "bad query" });
-          reactiveQueryResults = Stream.make(
-            Result.succeed({ text: "a" }),
-            Result.fail(error),
-            Result.succeed({ text: "b" }),
+          yield* testClient.setReactiveQueryResults(
+            Stream.make(
+              Result.succeed({ text: "a" }),
+              Result.fail(error),
+              Result.succeed({ text: "b" }),
+            ),
           );
 
           const messages = yield* Stream.runCollect(
@@ -146,10 +115,14 @@ layer(StubLayer)("Subscription", (it) => {
             FailedGetNote({ error }),
             SucceededGetNote({ note: { text: "b" } }),
           ]);
-          expect(reactiveQueryCalls).toEqual([
-            { name: "notes:get", args: { id: "abc" } },
+          expect(yield* testClient.calls()).toEqual([
+            {
+              method: "reactiveQuery",
+              name: "notes:get",
+              args: { id: "abc" },
+            },
           ]);
-        }),
+        }).pipe(Effect.provide(TestClient.layer)),
     );
 
     it("derives dependency equivalence from the ref args schema", () => {
@@ -200,7 +173,10 @@ layer(StubLayer)("Subscription", (it) => {
   describe("reactiveQueryStream", () => {
     it.effect("maps a sequence of results and forwards args", () =>
       Effect.gen(function* () {
-        reactiveQueryResults = Stream.make(Result.succeed({ text: "raw" }));
+        const testClient = yield* TestClient.TestClient;
+        yield* testClient.setReactiveQueryResults(
+          Stream.make(Result.succeed({ text: "raw" })),
+        );
 
         const messages = yield* Stream.runCollect(
           Subscription.reactiveQueryStream(
@@ -210,10 +186,14 @@ layer(StubLayer)("Subscription", (it) => {
         );
 
         expect(messages).toEqual([SucceededGetNote({ note: { text: "raw" } })]);
-        expect(reactiveQueryCalls).toEqual([
-          { name: "notes:get", args: { id: "abc" } },
+        expect(yield* testClient.calls()).toEqual([
+          {
+            method: "reactiveQuery",
+            name: "notes:get",
+            args: { id: "abc" },
+          },
         ]);
-      }),
+      }).pipe(Effect.provide(TestClient.layer)),
     );
 
     it("rejects Convex-provenance refs at the type level", () => {
@@ -334,7 +314,7 @@ const streamFor = (
     request: Option.some(request),
   }));
 
-layer(StubLayer)("Subscription.paginatedQuery", (it) => {
+describe("Subscription.paginatedQuery", () => {
   describe("modelToDependencies", () => {
     it("opens Active and closes Idle machines", () => {
       const entry = makePaginatedEntry();
@@ -365,12 +345,15 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
   describe("dependenciesToStream", () => {
     it.effect("allocates an id and emits the first correlated settlement", () =>
       Effect.gen(function* () {
-        reactiveQueryResults = Stream.make(
-          Result.succeed({
-            page: [{ text: "a" }],
-            isDone: false,
-            continueCursor: "c1",
-          }),
+        const testClient = yield* TestClient.TestClient;
+        yield* testClient.setReactiveQueryResults(
+          Stream.make(
+            Result.succeed({
+              page: [{ text: "a" }],
+              isDone: false,
+              continueCursor: "c1",
+            }),
+          ),
         );
         const entry = makePaginatedEntry();
         const state = initialMachine();
@@ -391,8 +374,9 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
             continueCursor: "c1",
           }),
         );
-        expect(reactiveQueryCalls).toEqual([
+        expect(yield* testClient.calls()).toEqual([
           {
+            method: "reactiveQuery",
             name: "notes:paginate",
             args: {
               channel: "general",
@@ -406,13 +390,16 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
             },
           },
         ]);
-      }),
+      }).pipe(Effect.provide(TestClient.layer)),
     );
 
     it.effect("reuses an installed id and passes a pinned end cursor", () =>
       Effect.gen(function* () {
-        reactiveQueryResults = Stream.make(
-          Result.succeed({ page: [], isDone: false, continueCursor: "s" }),
+        const testClient = yield* TestClient.TestClient;
+        yield* testClient.setReactiveQueryResults(
+          Stream.make(
+            Result.succeed({ page: [], isDone: false, continueCursor: "s" }),
+          ),
         );
         const entry = makePaginatedEntry();
         const logicalRequest = {
@@ -426,7 +413,8 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
         );
 
         expect(messages[0]!.settlement.request.paginationId).toBe(42);
-        expect(reactiveQueryCalls[0]!.args).toEqual({
+        const calls = yield* testClient.calls();
+        expect(calls[0]!.args).toEqual({
           channel: "general",
           paginationOpts: {
             numItems: 2,
@@ -437,13 +425,16 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
             maximumBytesRead: 1_000,
           },
         });
-      }),
+      }).pipe(Effect.provide(TestClient.layer)),
     );
 
     it.effect("reserves a restored id before allocating another session", () =>
       Effect.gen(function* () {
-        reactiveQueryResults = Stream.make(
-          Result.succeed({ page: [], isDone: true, continueCursor: "" }),
+        const testClient = yield* TestClient.TestClient;
+        yield* testClient.setReactiveQueryResults(
+          Stream.make(
+            Result.succeed({ page: [], isDone: true, continueCursor: "" }),
+          ),
         );
         const entry = makePaginatedEntry();
         const restoredRequest = {
@@ -465,19 +456,22 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
           42_000,
         );
         expect(freshMessages[0]!.settlement.request.paginationId).toBe(42_001);
-      }),
+      }).pipe(Effect.provide(TestClient.layer)),
     );
 
     it.effect("emits a failure and a later success from one live stream", () =>
       Effect.gen(function* () {
+        const testClient = yield* TestClient.TestClient;
         const error = new PageDenied({ reason: "temporarily private" });
-        reactiveQueryResults = Stream.make(
-          Result.fail(error),
-          Result.succeed({
-            page: [{ text: "now visible" }],
-            isDone: true,
-            continueCursor: "",
-          }),
+        yield* testClient.setReactiveQueryResults(
+          Stream.make(
+            Result.fail(error),
+            Result.succeed({
+              page: [{ text: "now visible" }],
+              isDone: true,
+              continueCursor: "",
+            }),
+          ),
         );
         const entry = makePaginatedEntry();
 
@@ -499,14 +493,15 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
             continueCursor: "",
           }),
         );
-        expect(reactiveQueryCalls).toHaveLength(1);
-      }),
+        expect(yield* testClient.calls()).toHaveLength(1);
+      }).pipe(Effect.provide(TestClient.layer)),
     );
 
     it.effect(
       "normalizes invalid cursors and carries infrastructure errors directly",
       () =>
         Effect.gen(function* () {
+          const testClient = yield* TestClient.TestClient;
           const cause = new ConvexError({
             isConvexSystemError: true,
             paginationError: "InvalidCursor",
@@ -518,10 +513,12 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
           if (Result.isSuccess(decoded)) {
             throw new Error("expected schema decoding to fail");
           }
-          reactiveQueryResults = Stream.make(
-            Result.fail(new Client.WebSocketClientError({ cause })),
-            Result.fail(transportError),
-            Result.fail(decoded.failure),
+          yield* testClient.setReactiveQueryResults(
+            Stream.make(
+              Result.fail(new Client.WebSocketClientError({ cause })),
+              Result.fail(transportError),
+              Result.fail(decoded.failure),
+            ),
           );
           const entry = makePaginatedEntry();
 
@@ -541,18 +538,21 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
           expect(messages[2]!.settlement.result).toEqual(
             Result.fail(decoded.failure),
           );
-        }),
+        }).pipe(Effect.provide(TestClient.layer)),
     );
 
     it.effect(
       "normalizes raw invalid cursors accepted by a broad function error schema",
       () =>
         Effect.gen(function* () {
+          const testClient = yield* TestClient.TestClient;
           const rawInvalidCursor = {
             isConvexSystemError: true,
             paginationError: "InvalidCursor",
           } as const;
-          reactiveQueryResults = Stream.make(Result.fail(rawInvalidCursor));
+          yield* testClient.setReactiveQueryResults(
+            Stream.make(Result.fail(rawInvalidCursor)),
+          );
           const entry = Subscription.paginatedQuery<BroadErrorPaginatedModel>()(
             BroadErrorNotes,
             {
@@ -584,11 +584,12 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
             expect(reset.paginationId).toEqual(Option.none());
             expect(reset.generation).toBe(state.generation + 1);
           }
-        }),
+        }).pipe(Effect.provide(TestClient.layer)),
     );
 
     it.effect("None dependencies produce an empty stream", () =>
       Effect.gen(function* () {
+        const testClient = yield* TestClient.TestClient;
         const entry = makePaginatedEntry();
         const messages = yield* Stream.runCollect(
           entry.dependenciesToStream({ request: Option.none() }, () => ({
@@ -597,8 +598,8 @@ layer(StubLayer)("Subscription.paginatedQuery", (it) => {
         );
 
         expect(messages).toEqual([]);
-        expect(reactiveQueryCalls).toEqual([]);
-      }),
+        expect(yield* testClient.calls()).toEqual([]);
+      }).pipe(Effect.provide(TestClient.layer)),
     );
   });
 
