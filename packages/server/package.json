@@ -6,6 +6,9 @@
   "bugs": {
     "url": "https://github.com/rjdellecese/confect/issues"
   },
+  "dependencies": {
+    "@effect/ai-openai-compat": "4.0.0-rc.112"
+  },
   "devDependencies": {
     "@effect/platform-node": "4.0.0-rc.112",
     "@effect/vitest": "4.0.0-rc.112",
@@ -63,7 +66,7 @@
   "peerDependencies": {
     "@confect/core": "workspace:^",
     "@effect/platform-node": "^4.0.0-rc.112",
-    "convex": "^1.32.0",
+    "convex": "^1.45.0",
     "effect": "^4.0.0-rc.112"
   },
   "peerDependenciesMeta": {
