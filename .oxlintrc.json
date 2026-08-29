@@ -125,12 +125,6 @@
       }
     },
     {
-      "files": ["packages/server/test/local-backend/storage.test.ts"],
-      "rules": {
-        "effecttsgo/global-fetch-in-effect": "off"
-      }
-    },
-    {
       "files": ["apps/example/src/App.tsx"],
       "rules": {
         "effecttsgo/global-date": "off"
