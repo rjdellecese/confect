@@ -125,15 +125,6 @@
       }
     },
     {
-      "files": [
-        "packages/server/test/local-backend/fixtures/confect/groups/cacheStubbed.impl.ts"
-      ],
-      "rules": {
-        "effecttsgo/global-date-in-effect": "off",
-        "effecttsgo/global-random-in-effect": "off"
-      }
-    },
-    {
       "files": ["packages/server/test/local-backend/storage.test.ts"],
       "rules": {
         "effecttsgo/global-fetch-in-effect": "off"

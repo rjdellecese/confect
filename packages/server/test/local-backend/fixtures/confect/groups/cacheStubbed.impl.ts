@@ -1,7 +1,8 @@
 /**
- * Handlers return `Math.random()` as a per-execution witness: the test
+ * Handlers return `Random.next` as a per-execution witness: the test
  * compares two consecutive query results to detect whether the cache evicted
- * (different values) or held (same value). `Math.random` flips
+ * (different values) or held (same value). The live Random service delegates
+ * to `Math.random`, which flips
  * `observed_rng_during_execution` but that flag is not checked by
  * `MAX_CACHE_AGE` eviction, so it does not perturb the behavior under test.
  */
@@ -10,6 +11,7 @@ import { FunctionImpl, GroupImpl } from "@confect/server";
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Random from "effect/Random";
 import databaseSchema from "../_generated/schema";
 import cacheStubbed from "./cacheStubbed.spec";
 
@@ -17,7 +19,7 @@ const confectNoTime = FunctionImpl.make(
   databaseSchema,
   cacheStubbed,
   "confectNoTime",
-  () => Effect.sync(() => Math.random()),
+  () => Random.next,
 );
 
 const confectWithClock = FunctionImpl.make(
@@ -31,17 +33,16 @@ const confectWithRawDateNow = FunctionImpl.make(
   databaseSchema,
   cacheStubbed,
   "confectWithRawDateNow",
-  () => Effect.sync(() => Date.now()),
+  () =>
+    // oxlint-disable-next-line effecttsgo/global-date-in-effect -- This fixture verifies that raw time access evicts Convex's query cache.
+    Effect.sync(() => Date.now()),
 );
 
 const confectWithSpan = FunctionImpl.make(
   databaseSchema,
   cacheStubbed,
   "confectWithSpan",
-  () =>
-    Effect.sync(() => Math.random()).pipe(
-      Effect.withSpan("cacheStubbed.confectWithSpan"),
-    ),
+  () => Random.next.pipe(Effect.withSpan("cacheStubbed.confectWithSpan")),
 );
 
 const confectWithLog = FunctionImpl.make(
@@ -51,7 +52,7 @@ const confectWithLog = FunctionImpl.make(
   () =>
     Effect.gen(function* () {
       yield* Effect.logInfo("cacheStubbed.confectWithLog");
-      return Math.random();
+      return yield* Random.next;
     }),
 );
 
