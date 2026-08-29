@@ -50,3 +50,45 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/docs-setup
       - run: pnpm --filter docs exec mintlify a11y
+
+  versioned:
+    name: Versioned Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/docs-setup
+      - name: Fetch documentation sources
+        run: |
+          git fetch --force --tags origin \
+            refs/heads/main:refs/remotes/origin/main \
+            refs/heads/v10:refs/remotes/origin/v10 \
+            refs/heads/release:refs/remotes/origin/release
+      - name: Read deployed documentation sources
+        run: |
+          if git cat-file -e origin/release:.docs-release.json 2>/dev/null; then
+            git show origin/release:.docs-release.json > "$RUNNER_TEMP/docs-release.json"
+          fi
+      - name: Assemble versioned docs
+        env:
+          DOCS_BRANCH: ${{ github.base_ref || github.ref_name }}
+        run: |
+          if [[ "$DOCS_BRANCH" == "main" ]]; then
+            docs_version=v9
+          else
+            docs_version=v10
+          fi
+
+          node scripts/assembleDocs.mjs \
+            --allow-unpublished-source \
+            --manifest "$RUNNER_TEMP/docs-release.json" \
+            --manifest-output "$RUNNER_TEMP/docs-release.json" \
+            --output "$RUNNER_TEMP/versioned-docs" \
+            --update-version "$docs_version" \
+            --update-ref HEAD
+      - name: Validate versioned docs
+        working-directory: ${{ runner.temp }}/versioned-docs
+        run: |
+          "$GITHUB_WORKSPACE/apps/docs/node_modules/.bin/mintlify" validate
+          "$GITHUB_WORKSPACE/apps/docs/node_modules/.bin/mintlify" broken-links
