@@ -126,17 +126,6 @@
     },
     {
       "files": [
-        "**/vitest*.config.ts",
-        "packages/cli/bin/**/*.mjs",
-        "scripts/**/*.mjs"
-      ],
-      "rules": {
-        "effecttsgo/global-console": "off",
-        "effecttsgo/node-builtin-import": "off"
-      }
-    },
-    {
-      "files": [
         "apps/example/confect/workpool.ts",
         "packages/server/test/local-backend/fixtures/confect/groups/cacheControl.ts"
       ],
