@@ -16,6 +16,7 @@ const START_MARKER = "# skills-lock:start";
 const END_MARKER = "# skills-lock:end";
 const GENERATED_COMMENT =
   "# Generated from skills-lock.json by `pnpm skills:sync-ignore`.";
+const quoteJsonString = Schema.encodeSync(Schema.fromJsonString(Schema.String));
 
 export class SkillIgnoreError extends Data.TaggedError("SkillIgnoreError")<{
   readonly reason: string;
@@ -72,7 +73,7 @@ export const vendoredSkillDirectories = Effect.fn(
     const existing = directories.get(directory);
     if (existing !== undefined) {
       return yield* new SkillIgnoreError({
-        reason: `${LOCK_FILE} entries ${JSON.stringify(existing)} and ${JSON.stringify(skillName)} map to the same installed directory`,
+        reason: `${LOCK_FILE} entries ${quoteJsonString(existing)} and ${quoteJsonString(skillName)} map to the same installed directory`,
       });
     }
     directories.set(directory, skillName);

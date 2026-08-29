@@ -125,18 +125,6 @@
       }
     },
     {
-      "files": [
-        ".claude/hooks/redirectToOpensrc.ts",
-        "scripts/syncSkillIgnore.ts",
-        "scripts/syncSkillIgnore.test.ts",
-        "packages/server/test/AiGatewayLanguageModel.test.ts",
-        "packages/server/test/mock-backend/declarationEmit.test.ts"
-      ],
-      "rules": {
-        "effecttsgo/prefer-schema-over-json": "off"
-      }
-    },
-    {
       "files": ["packages/cli/src/Bundler.ts"],
       "rules": {
         "effecttsgo/node-builtin-import": "off"

@@ -3,6 +3,7 @@ import { expect, test } from "bun:test";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
+import * as Schema from "effect/Schema";
 import { shouldSyncSkillIgnore } from "./manageSkills";
 import {
   installedDirectoryName,
@@ -10,6 +11,8 @@ import {
   updateManagedBlock,
   vendoredSkillDirectories,
 } from "./syncSkillIgnore";
+
+const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
 
 const runTest = <A, E>(
   effect: Effect.Effect<A, E, BunServices.BunServices>,
@@ -19,7 +22,7 @@ const runTest = <A, E>(
 test("derives sorted installed directories from the lock", () =>
   runTest(
     Effect.gen(function* () {
-      const lock = JSON.stringify({
+      const lock = encodeJson({
         version: 1,
         skills: {
           zed: {},
@@ -51,7 +54,7 @@ test("rejects malformed, unsupported, and colliding lock entries", () =>
       );
 
       const collision = yield* vendoredSkillDirectories(
-        JSON.stringify({
+        encodeJson({
           version: 1,
           skills: { "same skill": {}, "same-skill": {} },
         }),
@@ -97,7 +100,7 @@ test("writes generated output and detects later drift", () =>
         const ignorePath = path.join(cwd, ".ignore");
         yield* fs.writeFileString(
           lockPath,
-          JSON.stringify({ version: 1, skills: { effect: {} } }),
+          encodeJson({ version: 1, skills: { effect: {} } }),
         );
         yield* fs.writeFileString(ignorePath, "dist/\n");
 
@@ -109,7 +112,7 @@ test("writes generated output and detects later drift", () =>
 
         yield* fs.writeFileString(
           lockPath,
-          JSON.stringify({
+          encodeJson({
             version: 1,
             skills: { effect: {}, vitest: {} },
           }),

@@ -4,6 +4,7 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
+import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as LanguageModel from "effect/unstable/ai/LanguageModel";
 import * as HttpClient from "effect/unstable/http/HttpClient";
@@ -253,10 +254,21 @@ const sseResponse = (
     ),
   );
 
+const RequestBody = Schema.fromJsonString(
+  Schema.Struct({
+    model: Schema.String,
+    messages: Schema.Array(
+      Schema.Struct({ role: Schema.String, content: Schema.String }),
+    ),
+  }),
+);
+
 const requestBody = (request: HttpClientRequest.HttpClientRequest) =>
   Effect.gen(function* () {
     if (request.body._tag !== "Uint8Array") {
       return yield* Effect.die(new Error("Expected a Uint8Array request body"));
     }
-    return JSON.parse(new TextDecoder().decode(request.body.body));
+    return yield* Schema.decodeEffect(RequestBody)(
+      new TextDecoder().decode(request.body.body),
+    );
   });
