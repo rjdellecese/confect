@@ -229,15 +229,11 @@ const NoteLookup = () => {
 };
 
 const WorkpoolDemo = () => {
-  const [jobs, setJobs] = useState<Array<{ id: WorkId; enqueuedAt: number }>>(
-    [],
-  );
+  const [jobs, setJobs] = useState<Array<WorkId>>([]);
   const enqueue = useMutation(refs.public.workpool.enqueue);
 
   const handleEnqueue = () => {
-    void enqueue({}).then((id) =>
-      setJobs((prev) => [...prev, { id, enqueuedAt: Date.now() }]),
-    );
+    void enqueue({}).then((id) => setJobs((prev) => [...prev, id]));
   };
 
   return (
@@ -259,11 +255,11 @@ const WorkpoolDemo = () => {
             {jobs
               .slice(-10)
               .toReversed()
-              .map((job, i) => (
+              .map((workId, i) => (
                 <WorkStatusRow
-                  key={job.id}
+                  key={workId}
                   index={jobs.length - i}
-                  workId={job.id}
+                  workId={workId}
                 />
               ))}
           </tbody>
