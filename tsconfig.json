@@ -42,5 +42,6 @@
     "tools/*/*.ts",
     "tools/*/src/**/*",
     "tools/*/test/**/*"
-  ]
+  ],
+  "exclude": ["tools/oxlint-rules"]
 }

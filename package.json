@@ -55,7 +55,7 @@
     "test": "bun test scripts/syncSkillIgnore.test.ts && vitest run",
     "test:server:local-backend": "pnpm --filter @confect/server test:local-backend",
     "test:server:mock-backend": "pnpm --filter @confect/server test:mock-backend",
-    "typecheck": "tsc -b tsconfig.packages.json tsconfig.json",
+    "typecheck": "tsc -b tsconfig.packages.json tsconfig.json tools/oxlint-rules/tsconfig.json",
     "version-packages": "changeset version && pnpm format"
   }
 }
