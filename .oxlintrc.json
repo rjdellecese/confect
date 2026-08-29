@@ -11,7 +11,9 @@
     "effecttsgo"
   ],
   "options": {
-    "typeAware": true
+    "typeAware": true,
+    "denyWarnings": true,
+    "reportUnusedDisableDirectives": "deny"
   },
   "categories": {
     "correctness": "error",

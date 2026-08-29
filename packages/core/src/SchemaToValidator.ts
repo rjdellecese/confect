@@ -350,7 +350,6 @@ export const compileAst = (
               new ArrayBuffer(0),
               declaration,
               {},
-              // oxlint-disable-next-line effecttsgo/unsafe-effect-type-assertion -- Schema declarations erase their parser effect's concrete channels.
             ) as Effect.Effect<ArrayBuffer, unknown, never>,
             {
               onSuccess: () => v.bytes(),
