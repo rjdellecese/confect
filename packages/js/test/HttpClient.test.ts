@@ -298,7 +298,7 @@ describe("HttpClient error decoding", () => {
         client.query(queryWithError, { id: "abc" }),
       );
       assert(Result.isFailure(result));
-      assert(result.failure instanceof NotFound);
+      assert(Schema.is(NotFound)(result.failure));
       expect(result.failure.id).toBe("abc");
     }).pipe(Effect.provide(TestHttpClientLayer)),
   );
@@ -314,7 +314,7 @@ describe("HttpClient error decoding", () => {
         client.query(queryWithError, { id: "abc" }),
       );
       assert(Result.isFailure(result));
-      assert(result.failure instanceof HttpClient.HttpClientError);
+      assert(Schema.is(HttpClient.HttpClientError)(result.failure));
       expect(result.failure.cause).toBe(rejection);
     }).pipe(Effect.provide(TestHttpClientLayer)),
   );

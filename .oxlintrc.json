@@ -48,7 +48,7 @@
     "typescript/no-unnecessary-type-assertion": "off",
     "typescript/no-unnecessary-type-arguments": "off",
     "typescript/no-unnecessary-type-parameters": "off",
-    "effecttsgo/any-unknown-in-error-context": "warn",
+    "effecttsgo/any-unknown-in-error-context": "error",
     "effecttsgo/deterministic-keys": "error",
     "effecttsgo/strict-effect-provide": "off"
   },
@@ -120,6 +120,102 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "files": [
+        "**/vitest*.config.ts",
+        "packages/cli/bin/**/*.mjs",
+        "scripts/**/*.mjs"
+      ],
+      "rules": {
+        "effecttsgo/global-console": "off",
+        "effecttsgo/node-builtin-import": "off"
+      }
+    },
+    {
+      "files": [
+        "apps/example/confect/workpool.ts",
+        "packages/server/test/local-backend/fixtures/confect/groups/cacheControl.ts"
+      ],
+      "rules": {
+        "effecttsgo/async-function": "off",
+        "effecttsgo/global-console": "off",
+        "effecttsgo/global-date": "off",
+        "effecttsgo/global-random": "off",
+        "effecttsgo/global-timers": "off",
+        "effecttsgo/new-promise": "off"
+      }
+    },
+    {
+      "files": [
+        "packages/react/test/index.test.ts",
+        "packages/server/test/Handler.test.ts",
+        "packages/server/test/mock-backend/schedulerIsolation.test.ts"
+      ],
+      "rules": {
+        "effecttsgo/async-function": "off"
+      }
+    },
+    {
+      "files": ["packages/server/test/ConvexConfigProvider.test.ts"],
+      "rules": {
+        "effecttsgo/process-env-in-effect": "off"
+      }
+    },
+    {
+      "files": [
+        "packages/server/test/local-backend/fixtures/confect/groups/cacheStubbed.impl.ts"
+      ],
+      "rules": {
+        "effecttsgo/global-date-in-effect": "off",
+        "effecttsgo/global-random-in-effect": "off"
+      }
+    },
+    {
+      "files": ["packages/server/test/local-backend/storage.test.ts"],
+      "rules": {
+        "effecttsgo/global-fetch-in-effect": "off"
+      }
+    },
+    {
+      "files": ["apps/example/src/App.tsx"],
+      "rules": {
+        "effecttsgo/global-date": "off"
+      }
+    },
+    {
+      "files": [
+        ".claude/hooks/redirectToOpensrc.ts",
+        "scripts/syncSkillIgnore.ts",
+        "scripts/syncSkillIgnore.test.ts",
+        "packages/server/test/AiGatewayLanguageModel.test.ts",
+        "packages/server/test/mock-backend/declarationEmit.test.ts"
+      ],
+      "rules": {
+        "effecttsgo/prefer-schema-over-json": "off"
+      }
+    },
+    {
+      "files": ["packages/cli/src/Bundler.ts"],
+      "rules": {
+        "effecttsgo/node-builtin-import": "off"
+      }
+    },
+    {
+      "files": [
+        "packages/core/src/SchemaToValidator.ts",
+        "packages/core/src/SystemFields.ts",
+        "packages/foldkit/test/TestClient.ts",
+        "packages/server/src/RegisteredConvexFunction.ts",
+        "packages/server/src/RegisteredFunction.ts",
+        "packages/server/test/Document.test.ts",
+        "packages/server/test/mock-backend/fixtures/confect/groups/runners.impl.ts",
+        "packages/server/test/mock-backend/fixtures/confect/http.ts",
+        "packages/server/test/mock-backend/fixtures/confect/middleware/ProvideViewer.impl.ts"
+      ],
+      "rules": {
+        "effecttsgo/any-unknown-in-error-context": "off"
       }
     }
   ]

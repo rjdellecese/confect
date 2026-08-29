@@ -558,19 +558,21 @@ const createEntryPointWatcher = (
   watcherWarningsRef: Ref.Ref<WatcherMessages>,
 ) =>
   Effect.acquireRelease(
-    Effect.promise(async () => {
-      const ctx = await esbuild.context(
-        esbuildOptions(
-          path,
-          entry,
-          notExternal,
-          signal,
-          pendingRef,
-          watcherErrorsRef,
-          watcherWarningsRef,
+    Effect.gen(function* () {
+      const ctx = yield* Effect.promise(() =>
+        esbuild.context(
+          esbuildOptions(
+            path,
+            entry,
+            notExternal,
+            signal,
+            pendingRef,
+            watcherErrorsRef,
+            watcherWarningsRef,
+          ),
         ),
       );
-      await ctx.watch();
+      yield* Effect.promise(() => ctx.watch());
       return ctx;
     }),
     (ctx) =>

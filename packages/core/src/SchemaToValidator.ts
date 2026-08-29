@@ -91,7 +91,8 @@ export const compileTableSchema = <TableSchema extends Schema.Codec<any, any>>(
     Match.value,
     Match.tag("Objects", ({ indexSignatures }) =>
       Array.isReadonlyArrayEmpty(indexSignatures)
-        ? (compileAst(ast) as Effect.Effect<any>)
+        ? // oxlint-disable-next-line effecttsgo/unsafe-effect-type-assertion -- The return type is derived from the input schema and cannot be recovered from the runtime AST.
+          (compileAst(ast) as Effect.Effect<any>)
         : Effect.fail(new IndexSignaturesAreNotSupportedError()),
     ),
     Match.tag("Union", (unionAst) => compileAst(unionAst)),
@@ -349,6 +350,7 @@ export const compileAst = (
               new ArrayBuffer(0),
               declaration,
               {},
+              // oxlint-disable-next-line effecttsgo/unsafe-effect-type-assertion -- Schema declarations erase their parser effect's concrete channels.
             ) as Effect.Effect<ArrayBuffer, unknown, never>,
             {
               onSuccess: () => v.bytes(),

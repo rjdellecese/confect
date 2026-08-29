@@ -187,7 +187,7 @@ export const renderBuildError = (error: BuildError): string =>
   );
 
 export const logBuildError = (error: BuildError) =>
-  Effect.sync(() => console.error(renderBuildError(error)));
+  Console.error(renderBuildError(error));
 
 /**
  * Render a flat list of esbuild messages as a single error block with a
@@ -205,11 +205,12 @@ const renderCoalescedBuildErrors = (
   return `${header}\n${formatEsbuildMessages(messages, formatted)}`;
 };
 
-export const logCoalescedBuildErrors = (messages: readonly esbuild.Message[]) =>
-  Effect.sync(() => {
-    if (messages.length === 0) return;
-    console.error(renderCoalescedBuildErrors(messages));
-  });
+export const logCoalescedBuildErrors = (
+  messages: readonly esbuild.Message[],
+) =>
+  messages.length === 0
+    ? Effect.void
+    : Console.error(renderCoalescedBuildErrors(messages));
 
 const renderCoalescedBuildWarnings = (
   messages: readonly esbuild.Message[],
@@ -232,7 +233,6 @@ const renderCoalescedBuildWarnings = (
 export const logCoalescedBuildWarnings = (
   messages: readonly esbuild.Message[],
 ) =>
-  Effect.sync(() => {
-    if (messages.length === 0) return;
-    console.error(renderCoalescedBuildWarnings(messages));
-  });
+  messages.length === 0
+    ? Effect.void
+    : Console.error(renderCoalescedBuildWarnings(messages));

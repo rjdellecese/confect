@@ -389,7 +389,7 @@ describe("WebSocketClient error decoding", () => {
         client.query(queryWithError, { id: "abc" }),
       );
       assert(Result.isFailure(result));
-      assert(result.failure instanceof NotFound);
+      assert(Schema.is(NotFound)(result.failure));
       expect(result.failure.id).toBe("abc");
     }).pipe(Effect.provide(TestWebSocketClientLayer)),
   );
@@ -464,7 +464,7 @@ describe("WebSocketClient error decoding", () => {
 
       const result = yield* Fiber.join(fiber);
       assert(Result.isFailure(result));
-      assert(result.failure instanceof NotFound);
+      assert(Schema.is(NotFound)(result.failure));
       expect(result.failure.id).toBe("abc");
     }).pipe(Effect.provide(TestWebSocketClientLayer)),
   );

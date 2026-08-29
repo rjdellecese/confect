@@ -297,7 +297,7 @@ describe("useMutation", () => {
     const result_ = await result.current({ id: "abc" });
 
     assert(Result.isFailure(result_));
-    assert(result_.failure instanceof NotFound);
+    assert(Schema.is(NotFound)(result_.failure));
     expect(result_.failure.id).toBe("abc");
   });
 
@@ -373,7 +373,7 @@ describe("useAction", () => {
     const result_ = await result.current({ id: "abc" });
 
     assert(Result.isFailure(result_));
-    assert(result_.failure instanceof NotFound);
+    assert(Schema.is(NotFound)(result_.failure));
     expect(result_.failure.id).toBe("abc");
   });
 

@@ -1,4 +1,5 @@
 import * as Array from "effect/Array";
+import * as Console from "effect/Console";
 import { pipe } from "effect/Function";
 import * as Effect from "effect/Effect";
 import * as Match from "effect/Match";
@@ -397,7 +398,7 @@ export const renderCodegenError = (error: CodegenError): string => {
 };
 
 export const logCodegenError = (error: CodegenError) =>
-  Effect.sync(() => console.error(renderCodegenError(error)));
+  Console.error(renderCodegenError(error));
 
 // --- Effect combinators ---
 
@@ -418,9 +419,11 @@ export const tapAndLog = <A, E, R>(
  * Catch any {@link CodegenError} thrown by `effect`, log it, and resolve to
  * `Option.none()`. Success resolves to `Option.some(value)`.
  */
+// oxlint-disable effecttsgo/unsafe-effect-type-assertion -- catchIf removes the error variant selected by this refinement.
 export const catchAndLog = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
 ): Effect.Effect<Option.Option<A>, Exclude<E, CodegenError>, R> =>
   Effect.catchIf(Effect.map(effect, Option.some<A>), isCodegenError, (error) =>
     logCodegenError(error).pipe(Effect.as(Option.none<A>())),
   ) as Effect.Effect<Option.Option<A>, Exclude<E, CodegenError>, R>;
+// oxlint-enable effecttsgo/unsafe-effect-type-assertion

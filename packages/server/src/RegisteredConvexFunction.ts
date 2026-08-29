@@ -130,13 +130,17 @@ const queryClock: Clock.Clock = {
   currentTimeMillisUnsafe: () => 0,
   currentTimeNanosUnsafe: () => 0n,
   monotonicTimeNanosUnsafe: () => 0n,
+  // oxlint-disable-next-line effecttsgo/global-date-in-effect -- This access intentionally notifies Convex's query-cache tracker.
   currentTimeMillis: Effect.sync(() => Date.now()),
+  // oxlint-disable-next-line effecttsgo/global-date-in-effect -- This access intentionally notifies Convex's query-cache tracker.
   currentTimeNanos: Effect.sync(() => BigInt(Date.now()) * 1_000_000n),
+  // oxlint-disable-next-line effecttsgo/global-date-in-effect -- This access intentionally notifies Convex's query-cache tracker.
   monotonicTimeNanos: Effect.sync(() => BigInt(Date.now()) * 1_000_000n),
   // `Effect.sleep` resolves the ambient clock, so it cannot be used here — it
   // would recurse straight back into this `sleep`.
   sleep: (duration) =>
     Effect.callback<void>((resume) => {
+      // oxlint-disable-next-line effecttsgo/global-timers-in-effect -- Effect.sleep would resolve this Clock and recurse.
       const handle = setTimeout(
         () => resume(Effect.void),
         Duration.toMillis(duration),

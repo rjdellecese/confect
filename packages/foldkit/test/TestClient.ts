@@ -41,7 +41,7 @@ const failRejection = <Ref_ extends CoreRef.Any>(
   never,
   CoreRef.Error<Ref_> | Client.WebSocketClientError | Schema.SchemaError
 > => {
-  if (rejection instanceof Client.WebSocketClientError) {
+  if (Schema.is(Client.WebSocketClientError)(rejection)) {
     return Effect.fail(rejection);
   }
   if (Schema.isSchemaError(rejection)) {

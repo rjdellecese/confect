@@ -184,7 +184,7 @@ describe("MiddlewareSpec", () => {
   });
 
   it("rejects a function type flag the type checker only knows as boolean", () => {
-    const computed: boolean = Math.random() > 0.5;
+    const computed: boolean = Reflect.has({}, "computed");
 
     class Computed extends MiddlewareSpec.MiddlewareSpec<Computed>()(
       "Computed",

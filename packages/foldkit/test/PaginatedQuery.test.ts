@@ -594,7 +594,7 @@ describe("PaginatedQuery", () => {
       expect(PaginatedQuery.isFailure(decodedNetworkFailure)).toBe(true);
       if (PaginatedQuery.isFailure(decodedNetworkFailure)) {
         const error = decodedNetworkFailure.phase.error;
-        if (!(error instanceof Client.WebSocketClientError)) {
+        if (!Schema.is(Client.WebSocketClientError)(error)) {
           throw new Error("expected a WebSocketClientError");
         }
         expect(error.cause).toBeInstanceOf(Error);
