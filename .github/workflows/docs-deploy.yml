@@ -1,0 +1,78 @@
+name: Deploy Docs
+
+on:
+  workflow_call:
+    inputs:
+      source_ref:
+        description: Git ref containing the documentation to update
+        required: true
+        type: string
+      version:
+        description: Documentation version to update
+        required: true
+        type: string
+
+jobs:
+  deploy-docs:
+    name: Deploy versioned docs
+    runs-on: ubuntu-latest
+    concurrency:
+      group: docs-deployment
+      queue: max
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout source repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Fetch documentation sources
+        run: |
+          git fetch --force --tags origin \
+            refs/heads/main:refs/remotes/origin/main \
+            refs/heads/v10:refs/remotes/origin/v10 \
+            refs/heads/release:refs/remotes/origin/release
+
+      - name: Checkout docs deployment branch
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          path: docs-release
+          ref: release
+
+      - uses: ./.github/actions/docs-setup
+
+      - name: Assemble versioned docs
+        env:
+          DOCS_SOURCE_REF: ${{ inputs.source_ref }}
+          DOCS_VERSION: ${{ inputs.version }}
+        run: |
+          node scripts/assembleDocs.mjs \
+            --manifest docs-release/.docs-release.json \
+            --manifest-output docs-release/.docs-release.json \
+            --output docs-release/apps/docs \
+            --update-version "$DOCS_VERSION" \
+            --update-ref "$DOCS_SOURCE_REF"
+
+      - name: Validate versioned docs
+        working-directory: docs-release/apps/docs
+        run: |
+          "$GITHUB_WORKSPACE/apps/docs/node_modules/.bin/mintlify" validate
+          "$GITHUB_WORKSPACE/apps/docs/node_modules/.bin/mintlify" broken-links
+
+      - name: Update docs deployment branch
+        env:
+          DOCS_VERSION: ${{ inputs.version }}
+        run: |
+          git -C docs-release add --all apps/docs .docs-release.json
+          if git -C docs-release diff --cached --quiet; then
+            echo "The versioned docs deployment is already up to date."
+            exit 0
+          fi
+
+          git -C docs-release config user.name "github-actions[bot]"
+          git -C docs-release config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C docs-release commit -m "Deploy ${DOCS_VERSION} documentation"
+          git -C docs-release push origin HEAD:refs/heads/release

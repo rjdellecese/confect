@@ -15,6 +15,9 @@ jobs:
       contents: write
       id-token: write
       pull-requests: write
+    outputs:
+      docs_version: ${{ steps.docs_version.outputs.version }}
+      published: ${{ steps.changesets.outputs.published }}
 
     steps:
       - name: Checkout repo
@@ -33,6 +36,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Determine docs version
+        id: docs_version
+        run: |
+          package_version=$(node -p "require('./packages/core/package.json').version")
+          echo "version=v${package_version%%.*}" >> "$GITHUB_OUTPUT"
+
       - name: Create release pull request or publish
         id: changesets
         uses: changesets/action@v2
@@ -40,8 +49,13 @@ jobs:
           version-script: pnpm version-packages
           publish-script: pnpm release
 
-      - name: Update docs deployment branch
-        if: steps.changesets.outputs.published == 'true' && github.ref_name == 'main'
-        run: |
-          git fetch origin release || true
-          git push --force-with-lease origin HEAD:refs/heads/release
+  deploy-docs:
+    name: Deploy docs
+    needs: release
+    if: needs.release.outputs.published == 'true'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/docs-deploy.yml
+    with:
+      source_ref: ${{ github.sha }}
+      version: ${{ needs.release.outputs.docs_version }}
