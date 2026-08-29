@@ -52,5 +52,14 @@ Follow these steps:
    ```
 
 7. Find and watch the new run with `gh run list --workflow=docs-release.yml`
-   and `gh run watch <run-id>`. Report the validation result and the new pinned
-   source SHA from `origin/release:.docs-release.json`.
+   and `gh run watch <run-id>`. After the run succeeds, refresh the deployment
+   branch before reporting its manifest:
+
+   ```bash
+   git fetch --force origin \
+     refs/heads/release:refs/remotes/origin/release
+   git show origin/release:.docs-release.json | jq -r \
+     '.versions.<v9-or-v10>.source'
+   ```
+
+   Report the validation result and the refreshed pinned source SHA.
