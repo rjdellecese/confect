@@ -126,20 +126,6 @@
     },
     {
       "files": [
-        "apps/example/confect/workpool.ts",
-        "packages/server/test/local-backend/fixtures/confect/groups/cacheControl.ts"
-      ],
-      "rules": {
-        "effecttsgo/async-function": "off",
-        "effecttsgo/global-console": "off",
-        "effecttsgo/global-date": "off",
-        "effecttsgo/global-random": "off",
-        "effecttsgo/global-timers": "off",
-        "effecttsgo/new-promise": "off"
-      }
-    },
-    {
-      "files": [
         "packages/react/test/index.test.ts",
         "packages/server/test/Handler.test.ts",
         "packages/server/test/mock-backend/schedulerIsolation.test.ts"
