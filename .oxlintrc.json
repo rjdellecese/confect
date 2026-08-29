@@ -125,12 +125,6 @@
       }
     },
     {
-      "files": ["packages/server/test/ConvexConfigProvider.test.ts"],
-      "rules": {
-        "effecttsgo/process-env-in-effect": "off"
-      }
-    },
-    {
       "files": [
         "packages/server/test/local-backend/fixtures/confect/groups/cacheStubbed.impl.ts"
       ],
