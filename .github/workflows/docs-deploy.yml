@@ -35,6 +35,39 @@ jobs:
             refs/heads/v10:refs/remotes/origin/v10 \
             refs/heads/release:refs/remotes/origin/release
 
+      - name: Require coordinated main deployment
+        run: |
+          required_paths=(
+            .github/workflows/docs-deploy.yml
+            scripts/assembleDocs.mjs
+          )
+          for required_path in "${required_paths[@]}"; do
+            if ! git cat-file -e "origin/main:${required_path}"; then
+              echo "::error file=${required_path}::Port the versioned docs deployment to main before deploying from v10."
+              exit 1
+            fi
+          done
+
+          callers=(
+            .github/workflows/docs-release.yml
+            .github/workflows/release.yml
+          )
+          for caller in "${callers[@]}"; do
+            if ! git grep --quiet --fixed-strings \
+              "uses: ./.github/workflows/docs-deploy.yml" \
+              origin/main -- "${caller}"; then
+              echo "::error file=${caller}::Make main delegate docs releases to the versioned deployment workflow before deploying from v10."
+              exit 1
+            fi
+          done
+
+          if git grep --quiet --fixed-strings \
+            "HEAD:refs/heads/release" \
+            origin/main -- "${callers[@]}"; then
+            echo "::error::Remove main's direct release-branch pushes before enabling versioned docs deployments."
+            exit 1
+          fi
+
       - name: Checkout docs deployment branch
         uses: actions/checkout@v7
         with:

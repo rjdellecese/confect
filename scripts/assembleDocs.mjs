@@ -23,10 +23,12 @@ const VERSION_DETAILS = {
   v9: {
     branches: ["main"],
     initialRef: "origin/release",
+    major: 9,
   },
   v10: {
     branches: ["v10", "main"],
     initialRef: undefined,
+    major: 10,
   },
 };
 
@@ -129,6 +131,11 @@ const latestV10PrereleaseRef = () => {
   return latestTag;
 };
 
+const readGitFile = (source, path) => gitBuffer(["show", `${source}:${path}`]);
+
+const readGitJson = (source, path) =>
+  JSON.parse(readGitFile(source, path).toString("utf8"));
+
 const initialManifest = () => ({
   schemaVersion: MANIFEST_SCHEMA_VERSION,
   defaultVersion: INITIAL_DEFAULT_VERSION,
@@ -184,6 +191,16 @@ if (updateVersion !== undefined && updateRef !== undefined) {
 
 for (const [version, details] of Object.entries(VERSION_DETAILS)) {
   const source = resolveCommit(manifest.versions[version].source);
+  const packageVersion = readGitJson(
+    source,
+    "packages/core/package.json",
+  ).version;
+  const packageMajor = Number.parseInt(packageVersion.split(".")[0], 10);
+  if (packageMajor !== details.major) {
+    throw new Error(
+      `${version} requires @confect/core major ${details.major}, but source ${source} contains ${packageVersion}; refusing to deploy it`,
+    );
+  }
   const belongsToSourceBranch = details.branches.some((branch) => {
     const ancestry = spawnSync(
       "git",
@@ -201,11 +218,6 @@ for (const [version, details] of Object.entries(VERSION_DETAILS)) {
   }
   manifest.versions[version].source = source;
 }
-
-const readGitFile = (source, path) => gitBuffer(["show", `${source}:${path}`]);
-
-const readGitJson = (source, path) =>
-  JSON.parse(readGitFile(source, path).toString("utf8"));
 
 const versionPath = (path, version) => {
   if (/^v\d+(?:\/|$)/u.test(path)) return path;
