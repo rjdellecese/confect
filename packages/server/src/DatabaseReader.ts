@@ -50,12 +50,16 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
 
       const baseDatabaseReader: BaseDatabaseReader<any> = isSystem
         ? {
-            get: convexDatabaseReader.system.get,
-            query: convexDatabaseReader.system.query,
+            get: convexDatabaseReader.system.get.bind(
+              convexDatabaseReader.system,
+            ),
+            query: convexDatabaseReader.system.query.bind(
+              convexDatabaseReader.system,
+            ),
           }
         : {
-            get: convexDatabaseReader.get,
-            query: convexDatabaseReader.query,
+            get: convexDatabaseReader.get.bind(convexDatabaseReader),
+            query: convexDatabaseReader.query.bind(convexDatabaseReader),
           };
 
       const table = (

@@ -1,5 +1,47 @@
 # @confect/server
 
+## 10.0.0-next.20
+
+### Minor Changes
+
+- 0dc4816: Add `AiGatewayClient` and `AiGatewayLanguageModel`, an Effect AI `LanguageModel` provider for calling models through the Convex AI gateway from actions without configuring provider API keys.
+
+  ```ts
+  import { AiGatewayClient, AiGatewayLanguageModel } from "@confect/server";
+  import * as Layer from "effect/Layer";
+  import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
+
+  const Claude = AiGatewayLanguageModel.model(
+    "anthropic/claude-sonnet-4.5",
+  ).pipe(
+    Layer.provide(AiGatewayClient.layer),
+    Layer.provide(FetchHttpClient.layer),
+  );
+  ```
+
+  `@confect/server` now requires `convex ^1.45.0` for AI gateway service-token support.
+
+## 10.0.0-next.19
+
+## 10.0.0-next.18
+
+### Minor Changes
+
+- 91aebe4: Move `Table.make` to `@confect/core` so a spec that returns `notes.Doc` from `_generated/tables/notes` no longer ships `@confect/server` to the client.
+
+  ```ts confect/tables/notes.ts
+  import { Table } from "@confect/core";
+  import * as Schema from "effect/Schema";
+
+  export default Table.make(() =>
+    Schema.Struct({
+      text: Schema.String,
+    }),
+  );
+  ```
+
+  `confect codegen` now fails if any module a spec reaches value-imports `@confect/server`, including `confect/tables/` and `_generated/`. Type-only imports remain allowed.
+
 ## 10.0.0-next.17
 
 ### Minor Changes

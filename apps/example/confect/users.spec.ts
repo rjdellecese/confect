@@ -5,14 +5,13 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.publicMutation({
       name: "create",
-      args: () => Schema.Struct({ username: Schema.String }),
+      args: () => ({ username: Schema.String }),
       returns: () => Schema.Null,
     }),
   )
   .addFunction(
     FunctionSpec.publicMutation({
       name: "clearAll",
-      args: () => Schema.Struct({}),
       returns: () => Schema.Null,
     }),
   );

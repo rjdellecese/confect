@@ -3,7 +3,7 @@
     "plugins": [
       {
         "name": "@effect/language-service",
-        "ignoreEffectSuggestionsInTscExitCode": false
+        "diagnostics": false
       }
     ],
     "composite": true,

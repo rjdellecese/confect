@@ -15,13 +15,11 @@ describe("isSpec", () => {
 });
 
 it("infers refs from addAt-assembled spec", () => {
-  const FnArgs = Schema.Struct({});
   const FnReturns = Schema.Array(Schema.String);
 
   const notes = GroupSpec.make().addFunction(
     FunctionSpec.publicQuery({
       name: "list",
-      args: () => FnArgs,
       returns: () => FnReturns,
     }),
   );
@@ -29,7 +27,6 @@ it("infers refs from addAt-assembled spec", () => {
   const databaseReader = GroupSpec.make().addFunction(
     FunctionSpec.publicQuery({
       name: "listNotes",
-      args: () => FnArgs,
       returns: () => FnReturns,
     }),
   );
@@ -48,13 +45,11 @@ it("infers refs from addAt-assembled spec", () => {
 });
 
 it("places a Node group alongside Convex groups, with no `node` namespace", () => {
-  const FnArgs = Schema.Struct({});
   const FnReturns = Schema.Null;
 
   const notes = GroupSpec.make().addFunction(
     FunctionSpec.publicQuery({
       name: "list",
-      args: () => FnArgs,
       returns: () => Schema.Array(Schema.String),
     }),
   );
@@ -64,7 +59,6 @@ it("places a Node group alongside Convex groups, with no `node` namespace", () =
   const email = GroupSpec.makeNode().addFunction(
     FunctionSpec.publicNodeAction({
       name: "send",
-      args: () => FnArgs,
       returns: () => FnReturns,
     }),
   );
@@ -81,5 +75,5 @@ it("places a Node group alongside Convex groups, with no `node` namespace", () =
 
   type PublicRefs = Refs.Refs<typeof spec, RefMod.AnyPublic>;
   expectTypeOf<keyof PublicRefs>().toEqualTypeOf<"notes" | "email">();
-  expectTypeOf<PublicRefs["email"]["send"]>().toMatchTypeOf<RefMod.AnyAction>();
+  expectTypeOf<PublicRefs["email"]["send"]>().toExtend<RefMod.AnyAction>();
 });

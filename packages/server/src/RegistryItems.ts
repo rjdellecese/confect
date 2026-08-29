@@ -5,13 +5,12 @@ import * as FunctionRegistryItem from "./FunctionRegistryItem";
 import * as MiddlewareRegistryItem from "./MiddlewareRegistryItem";
 
 /**
- * Recursive tree that mirrors a `Spec`'s group structure. Leaves are the
- * per-function items written by each `FunctionImpl`'s layer initializer. The
- * leaf type is intentionally `unknown` so producers and consumers (the
- * server runtime and the CLI's impl validation) narrow as needed.
+ * Runtime tree that mirrors a `Spec`'s group structure. Values remain unknown
+ * at this boundary so producers and consumers can narrow branches and registry
+ * items as needed.
  */
 export interface RegistryItems {
-  readonly [key: string]: unknown | RegistryItems;
+  readonly [key: string]: unknown;
 }
 
 /**

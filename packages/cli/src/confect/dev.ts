@@ -478,6 +478,7 @@ const discoverEntryPoints = Effect.gen(function* () {
 
 const esbuildOptions = (
   path: Path.Path,
+  fs: FileSystem.FileSystem,
   entry: EntryPoint,
   notExternal: ReadonlyArray<RegExp>,
   signal: Queue.Queue<void>,
@@ -502,13 +503,13 @@ const esbuildOptions = (
     format: "esm" as const,
     logLevel: "silent" as const,
     plugins: [
-      Bundler.bundleWorkspacePlugin(path, notExternal),
+      Bundler.bundleWorkspacePlugin(path, fs, notExternal),
       externalPlugin({ notExternal: [...notExternal] }),
       {
         name: "notify-rebuild",
         setup(build: esbuild.PluginBuild) {
           build.onEnd((result) => {
-            Effect.runPromise(
+            return Effect.runPromise(
               Effect.gen(function* () {
                 const wasInitial = yield* Ref.getAndSet(
                   initialBuildSeenRef,
@@ -550,6 +551,7 @@ const esbuildOptions = (
 
 const createEntryPointWatcher = (
   path: Path.Path,
+  fs: FileSystem.FileSystem,
   entry: EntryPoint,
   notExternal: ReadonlyArray<RegExp>,
   signal: Queue.Queue<void>,
@@ -558,19 +560,22 @@ const createEntryPointWatcher = (
   watcherWarningsRef: Ref.Ref<WatcherMessages>,
 ) =>
   Effect.acquireRelease(
-    Effect.promise(async () => {
-      const ctx = await esbuild.context(
-        esbuildOptions(
-          path,
-          entry,
-          notExternal,
-          signal,
-          pendingRef,
-          watcherErrorsRef,
-          watcherWarningsRef,
+    Effect.gen(function* () {
+      const ctx = yield* Effect.promise(() =>
+        esbuild.context(
+          esbuildOptions(
+            path,
+            fs,
+            entry,
+            notExternal,
+            signal,
+            pendingRef,
+            watcherErrorsRef,
+            watcherWarningsRef,
+          ),
         ),
       );
-      await ctx.watch();
+      yield* Effect.promise(() => ctx.watch());
       return ctx;
     }),
     (ctx) =>
@@ -610,6 +615,7 @@ const entryPointsWatcher = (
     const parentScope = yield* Effect.scope;
     const scopesRef = yield* Ref.make(new Map<string, Scope.Closeable>());
     const path = yield* Path.Path;
+    const fs = yield* FileSystem.FileSystem;
     const projectRoot = yield* ProjectRoot.get;
     // Discover the user's `tsconfig.json#paths` once at watcher startup so
     // `~/...`-style aliases pointing into the user's source tree get bundled
@@ -653,6 +659,7 @@ const entryPointsWatcher = (
           const childScope = yield* Scope.fork(parentScope, "sequential");
           yield* createEntryPointWatcher(
             path,
+            fs,
             entry,
             notExternal,
             signal,

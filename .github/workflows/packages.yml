@@ -50,7 +50,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        package: [cli, core, js, server]
+        package: [cli, core, foldkit, js, server]
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/confect-setup
@@ -133,6 +133,7 @@ jobs:
           [
             "@confect/cli",
             "@confect/core",
+            "@confect/foldkit",
             "@confect/js",
             "@confect/server",
             "@confect/react",

@@ -1,57 +1,166 @@
 import { FunctionSpec, Ref } from "@confect/core";
-import { assert, beforeEach, describe, expect, layer } from "@effect/vitest";
-import { vi } from "vitest";
+import { assert, describe, expect, it } from "@effect/vitest";
+import { getFunctionName, type FunctionType } from "convex/server";
 import { ConvexError } from "convex/values";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
-import * as Result from "effect/Result";
 import * as Layer from "effect/Layer";
-import * as MutableRef from "effect/Ref";
+import * as Option from "effect/Option";
+import * as Queue from "effect/Queue";
+import * as EffectRef from "effect/Ref";
+import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as WebSocketClient from "@confect/js/WebSocketClient";
+import * as InternalWebSocketClient from "../src/internal/WebSocketClient";
 
-const mockQuery = vi.fn().mockResolvedValue({});
-const mockMutation = vi.fn().mockResolvedValue({});
-const mockAction = vi.fn().mockResolvedValue({});
+type Operation = FunctionType | "reactiveQuery";
+type RequestOperation = FunctionType;
 
-type OnUpdate = (result: unknown) => void;
-type OnError = (error: unknown) => void;
+interface Call {
+  readonly name: string;
+  readonly args: unknown;
+}
 
-const subscribers: Array<{ onUpdate: OnUpdate; onError: OnError }> = [];
+interface TestSubscription {
+  readonly emit: (value: unknown) => Effect.Effect<void>;
+  readonly fail: (error: Error) => Effect.Effect<void>;
+}
 
-beforeEach(() => {
-  mockQuery.mockReset().mockResolvedValue({});
-  mockMutation.mockReset().mockResolvedValue({});
-  mockAction.mockReset().mockResolvedValue({});
-  subscribers.length = 0;
-});
+interface TestTransport extends InternalWebSocketClient.Transport {
+  readonly calls: (operation: Operation) => Effect.Effect<ReadonlyArray<Call>>;
+  readonly failNext: (
+    operation: RequestOperation,
+    rejection: unknown,
+  ) => Effect.Effect<void>;
+  readonly nextSubscription: () => Effect.Effect<TestSubscription>;
+  readonly closeCount: () => Effect.Effect<number>;
+  readonly unsubscribeCount: () => Effect.Effect<number>;
+}
 
-vi.mock("convex/browser", () => ({
-  ConvexClient: class {
-    setAuth() {}
-    close = vi.fn().mockResolvedValue(undefined);
-    query = mockQuery;
-    mutation = mockMutation;
-    action = mockAction;
-    onUpdate(
-      _ref: unknown,
-      _args: unknown,
-      onUpdate: OnUpdate,
-      onError: OnError,
-    ) {
-      subscribers.push({ onUpdate, onError });
-      return () => {};
-    }
-  },
-}));
+// Keep inspection and synchronization operations function-valued.
+// @effect-diagnostics-next-line lazyEffect:off
+class TestWebSocketTransport extends Context.Service<
+  TestWebSocketTransport,
+  TestTransport
+>()("@confect/js/test/WebSocketClient.test/TestWebSocketTransport") {}
+
+const TestWebSocketClientLayer = Layer.effectContext(
+  Effect.gen(function* () {
+    const context = yield* Effect.context<never>();
+    const runSync = Effect.runSyncWith(context);
+    const runPromise = Effect.runPromiseWith(context);
+    const calls = yield* EffectRef.make<
+      Readonly<Record<Operation, ReadonlyArray<Call>>>
+    >({ query: [], mutation: [], action: [], reactiveQuery: [] });
+    const rejections = yield* EffectRef.make<
+      Readonly<Record<RequestOperation, Option.Option<unknown>>>
+    >({
+      query: Option.none(),
+      mutation: Option.none(),
+      action: Option.none(),
+    });
+    const subscriptions = yield* Queue.unbounded<TestSubscription>();
+    const closed = yield* EffectRef.make(0);
+    const unsubscribed = yield* EffectRef.make(0);
+
+    const recordCall = (
+      operation: Operation,
+      functionReference: Parameters<
+        InternalWebSocketClient.Transport[RequestOperation | "onUpdate"]
+      >[0],
+      args: unknown,
+    ) =>
+      EffectRef.update(calls, (current) => ({
+        ...current,
+        [operation]: [
+          ...current[operation],
+          { name: getFunctionName(functionReference), args },
+        ],
+      }));
+
+    const invoke = (
+      operation: RequestOperation,
+      functionReference: Parameters<
+        InternalWebSocketClient.Transport[RequestOperation]
+      >[0],
+      args: unknown,
+    ): Promise<unknown> =>
+      Effect.gen(function* () {
+        yield* recordCall(operation, functionReference, args);
+        const rejection = yield* EffectRef.modify(rejections, (current) => [
+          current[operation],
+          { ...current, [operation]: Option.none() },
+        ]);
+        if (Option.isSome(rejection)) {
+          throw rejection.value;
+        }
+        return {};
+      }).pipe(runPromise);
+
+    const service = TestWebSocketTransport.of({
+      setAuth: () => {},
+      close: () =>
+        EffectRef.update(closed, (count) => count + 1).pipe(runPromise),
+      query: (functionReference, args) =>
+        invoke("query", functionReference, args),
+      mutation: (functionReference, args) =>
+        invoke("mutation", functionReference, args),
+      action: (functionReference, args) =>
+        invoke("action", functionReference, args),
+      onUpdate: (functionReference, args, onUpdate, onError) => {
+        runSync(recordCall("reactiveQuery", functionReference, args));
+        Queue.offerUnsafe(subscriptions, {
+          emit: (value) => Effect.sync(() => onUpdate(value)),
+          fail: (error) => Effect.sync(() => onError(error)),
+        });
+        return () => {
+          runSync(EffectRef.update(unsubscribed, (count) => count + 1));
+        };
+      },
+      calls: Effect.fn("TestWebSocketTransport.calls")(function* (operation) {
+        return (yield* EffectRef.get(calls))[operation];
+      }),
+      failNext: Effect.fn("TestWebSocketTransport.failNext")(
+        function* (operation, rejection) {
+          yield* EffectRef.update(rejections, (current) => ({
+            ...current,
+            [operation]: Option.some(rejection),
+          }));
+        },
+      ),
+      nextSubscription: Effect.fn("TestWebSocketTransport.nextSubscription")(
+        function* () {
+          return yield* Queue.take(subscriptions);
+        },
+      ),
+      closeCount: Effect.fn("TestWebSocketTransport.closeCount")(function* () {
+        return yield* EffectRef.get(closed);
+      }),
+      unsubscribeCount: Effect.fn("TestWebSocketTransport.unsubscribeCount")(
+        function* () {
+          return yield* EffectRef.get(unsubscribed);
+        },
+      ),
+    });
+
+    const client = yield* InternalWebSocketClient.makeScoped(
+      "https://test.convex.cloud",
+      Effect.succeed(service),
+    );
+
+    return Context.empty().pipe(
+      Context.add(TestWebSocketTransport, service),
+      Context.add(WebSocketClient.WebSocketClient, client),
+    );
+  }),
+);
 
 const noArgsQueryRef = Ref.make(
   "notes",
   FunctionSpec.publicQuery({
     name: "list",
-    args: () => Schema.Struct({}),
     returns: () => Schema.Struct({}),
   }),
 );
@@ -60,7 +169,7 @@ const argsQueryRef = Ref.make(
   "notes",
   FunctionSpec.publicQuery({
     name: "get",
-    args: () => Schema.Struct({ id: Schema.String }),
+    args: () => ({ id: Schema.String }),
     returns: () => Schema.Struct({}),
   }),
 );
@@ -69,7 +178,6 @@ const noArgsMutationRef = Ref.make(
   "tasks",
   FunctionSpec.publicMutation({
     name: "cleanup",
-    args: () => Schema.Struct({}),
     returns: () => Schema.Struct({}),
   }),
 );
@@ -78,7 +186,7 @@ const argsMutationRef = Ref.make(
   "notes",
   FunctionSpec.publicMutation({
     name: "insert",
-    args: () => Schema.Struct({ text: Schema.String }),
+    args: () => ({ text: Schema.String }),
     returns: () => Schema.Struct({}),
   }),
 );
@@ -87,7 +195,6 @@ const noArgsActionRef = Ref.make(
   "random",
   FunctionSpec.publicAction({
     name: "getNumber",
-    args: () => Schema.Struct({}),
     returns: () => Schema.Struct({}),
   }),
 );
@@ -96,232 +203,142 @@ const argsActionRef = Ref.make(
   "email",
   FunctionSpec.publicAction({
     name: "send",
-    args: () => Schema.Struct({ to: Schema.String }),
+    args: () => ({ to: Schema.String }),
     returns: () => Schema.Struct({}),
   }),
 );
 
-interface Call {
-  readonly name: string;
-  readonly args: unknown;
-}
-
-const WebSocketClientSpy = Context.Service<{
-  readonly queryCalls: MutableRef.Ref<ReadonlyArray<Call>>;
-  readonly mutationCalls: MutableRef.Ref<ReadonlyArray<Call>>;
-  readonly actionCalls: MutableRef.Ref<ReadonlyArray<Call>>;
-  readonly reactiveQueryCalls: MutableRef.Ref<ReadonlyArray<Call>>;
-  readonly reactiveQueryFinalizations: MutableRef.Ref<ReadonlyArray<string>>;
-}>("@test/WebSocketClientSpy");
-
-const SpyLayer = Layer.effect(
-  WebSocketClientSpy,
-  Effect.gen(function* () {
-    return {
-      queryCalls: yield* MutableRef.make<ReadonlyArray<Call>>([]),
-      mutationCalls: yield* MutableRef.make<ReadonlyArray<Call>>([]),
-      actionCalls: yield* MutableRef.make<ReadonlyArray<Call>>([]),
-      reactiveQueryCalls: yield* MutableRef.make<ReadonlyArray<Call>>([]),
-      reactiveQueryFinalizations: yield* MutableRef.make<ReadonlyArray<string>>(
-        [],
-      ),
-    };
-  }),
-);
-
-const TestWebSocketClientLayer = Layer.effect(
-  WebSocketClient.WebSocketClient,
-  Effect.gen(function* () {
-    const spy = yield* WebSocketClientSpy;
-
-    const recordCall = (
-      calls: MutableRef.Ref<ReadonlyArray<Call>>,
-      funcRef: Ref.Any,
-      rest: [unknown?],
-    ) =>
-      MutableRef.update(calls, (prev) => [
-        ...prev,
-        { name: Ref.getConvexFunctionName(funcRef), args: rest[0] ?? {} },
-      ]);
-
-    return {
-      url: "https://test.convex.cloud",
-      setAuth: () => Effect.void,
-
-      query: (funcRef: Ref.Any, ...rest: [unknown?]) =>
-        recordCall(spy.queryCalls, funcRef, rest).pipe(Effect.as({})),
-
-      mutation: (funcRef: Ref.Any, ...rest: [unknown?]) =>
-        recordCall(spy.mutationCalls, funcRef, rest).pipe(Effect.as({})),
-
-      action: (funcRef: Ref.Any, ...rest: [unknown?]) =>
-        recordCall(spy.actionCalls, funcRef, rest).pipe(Effect.as({})),
-
-      reactiveQuery: (funcRef: Ref.Any, ...rest: [unknown?]) => {
-        const name = Ref.getConvexFunctionName(funcRef);
-        return Stream.fromEffect(
-          recordCall(spy.reactiveQueryCalls, funcRef, rest).pipe(Effect.as({})),
-        ).pipe(
-          Stream.ensuring(
-            MutableRef.update(spy.reactiveQueryFinalizations, (prev) => [
-              ...prev,
-              name,
-            ]),
-          ),
-        );
-      },
-    } as any;
-  }),
-);
-
-const TestLayer = Layer.merge(
-  SpyLayer,
-  TestWebSocketClientLayer.pipe(Layer.provide(SpyLayer)),
-);
-
-const clearSpy = Effect.gen(function* () {
-  const spy = yield* WebSocketClientSpy;
-  yield* MutableRef.set(spy.queryCalls, []);
-  yield* MutableRef.set(spy.mutationCalls, []);
-  yield* MutableRef.set(spy.actionCalls, []);
-  yield* MutableRef.set(spy.reactiveQueryCalls, []);
-  yield* MutableRef.set(spy.reactiveQueryFinalizations, []);
-});
-
-const withFreshSpy = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-  clearSpy.pipe(Effect.andThen(() => effect));
-
-layer(TestLayer)("WebSocketClient", (it) => {
+describe("WebSocketClient", () => {
   describe("query", () => {
-    it.effect("args omitted when empty", () =>
-      withFreshSpy(
-        Effect.gen(function* () {
-          const client = yield* WebSocketClient.WebSocketClient;
-          const spy = yield* WebSocketClientSpy;
-          yield* client.query(noArgsQueryRef);
-          expect(yield* MutableRef.get(spy.queryCalls)).toEqual([
-            { name: "notes:list", args: {} },
-          ]);
-        }),
-      ),
+    it.effect("uses empty args when omitted", () =>
+      Effect.gen(function* () {
+        const client = yield* WebSocketClient.WebSocketClient;
+        const transport = yield* TestWebSocketTransport;
+        yield* client.query(noArgsQueryRef);
+        expect(yield* transport.calls("query")).toEqual([
+          { name: "notes:list", args: {} },
+        ]);
+      }).pipe(Effect.provide(TestWebSocketClientLayer)),
     );
 
-    it.effect("args passed when provided", () =>
-      withFreshSpy(
-        Effect.gen(function* () {
-          const client = yield* WebSocketClient.WebSocketClient;
-          const spy = yield* WebSocketClientSpy;
-          yield* client.query(argsQueryRef, { id: "abc" });
-          expect(yield* MutableRef.get(spy.queryCalls)).toEqual([
-            { name: "notes:get", args: { id: "abc" } },
-          ]);
-        }),
-      ),
+    it.effect("passes provided args", () =>
+      Effect.gen(function* () {
+        const client = yield* WebSocketClient.WebSocketClient;
+        const transport = yield* TestWebSocketTransport;
+        yield* client.query(argsQueryRef, { id: "abc" });
+        expect(yield* transport.calls("query")).toEqual([
+          { name: "notes:get", args: { id: "abc" } },
+        ]);
+      }).pipe(Effect.provide(TestWebSocketClientLayer)),
     );
   });
 
   describe("mutation", () => {
-    it.effect("args omitted when empty", () =>
-      withFreshSpy(
-        Effect.gen(function* () {
-          const client = yield* WebSocketClient.WebSocketClient;
-          const spy = yield* WebSocketClientSpy;
-          yield* client.mutation(noArgsMutationRef);
-          expect(yield* MutableRef.get(spy.mutationCalls)).toEqual([
-            { name: "tasks:cleanup", args: {} },
-          ]);
-        }),
-      ),
+    it.effect("uses empty args when omitted", () =>
+      Effect.gen(function* () {
+        const client = yield* WebSocketClient.WebSocketClient;
+        const transport = yield* TestWebSocketTransport;
+        yield* client.mutation(noArgsMutationRef);
+        expect(yield* transport.calls("mutation")).toEqual([
+          { name: "tasks:cleanup", args: {} },
+        ]);
+      }).pipe(Effect.provide(TestWebSocketClientLayer)),
     );
 
-    it.effect("args passed when provided", () =>
-      withFreshSpy(
-        Effect.gen(function* () {
-          const client = yield* WebSocketClient.WebSocketClient;
-          const spy = yield* WebSocketClientSpy;
-          yield* client.mutation(argsMutationRef, { text: "hello" });
-          expect(yield* MutableRef.get(spy.mutationCalls)).toEqual([
-            { name: "notes:insert", args: { text: "hello" } },
-          ]);
-        }),
-      ),
+    it.effect("passes provided args", () =>
+      Effect.gen(function* () {
+        const client = yield* WebSocketClient.WebSocketClient;
+        const transport = yield* TestWebSocketTransport;
+        yield* client.mutation(argsMutationRef, { text: "hello" });
+        expect(yield* transport.calls("mutation")).toEqual([
+          { name: "notes:insert", args: { text: "hello" } },
+        ]);
+      }).pipe(Effect.provide(TestWebSocketClientLayer)),
     );
   });
 
   describe("action", () => {
-    it.effect("args omitted when empty", () =>
-      withFreshSpy(
-        Effect.gen(function* () {
-          const client = yield* WebSocketClient.WebSocketClient;
-          const spy = yield* WebSocketClientSpy;
-          yield* client.action(noArgsActionRef);
-          expect(yield* MutableRef.get(spy.actionCalls)).toEqual([
-            { name: "random:getNumber", args: {} },
-          ]);
-        }),
-      ),
+    it.effect("uses empty args when omitted", () =>
+      Effect.gen(function* () {
+        const client = yield* WebSocketClient.WebSocketClient;
+        const transport = yield* TestWebSocketTransport;
+        yield* client.action(noArgsActionRef);
+        expect(yield* transport.calls("action")).toEqual([
+          { name: "random:getNumber", args: {} },
+        ]);
+      }).pipe(Effect.provide(TestWebSocketClientLayer)),
     );
 
-    it.effect("args passed when provided", () =>
-      withFreshSpy(
-        Effect.gen(function* () {
-          const client = yield* WebSocketClient.WebSocketClient;
-          const spy = yield* WebSocketClientSpy;
-          yield* client.action(argsActionRef, { to: "user@example.com" });
-          expect(yield* MutableRef.get(spy.actionCalls)).toEqual([
-            { name: "email:send", args: { to: "user@example.com" } },
-          ]);
-        }),
-      ),
+    it.effect("passes provided args", () =>
+      Effect.gen(function* () {
+        const client = yield* WebSocketClient.WebSocketClient;
+        const transport = yield* TestWebSocketTransport;
+        yield* client.action(argsActionRef, { to: "user@example.com" });
+        expect(yield* transport.calls("action")).toEqual([
+          { name: "email:send", args: { to: "user@example.com" } },
+        ]);
+      }).pipe(Effect.provide(TestWebSocketClientLayer)),
     );
   });
 
   describe("reactiveQuery", () => {
     it.effect("subscribes and emits values", () =>
-      withFreshSpy(
-        Effect.gen(function* () {
-          const client = yield* WebSocketClient.WebSocketClient;
-          const result = yield* client
-            .reactiveQuery(noArgsQueryRef)
-            .pipe(Stream.take(1), Stream.runCollect);
+      Effect.gen(function* () {
+        const client = yield* WebSocketClient.WebSocketClient;
+        const transport = yield* TestWebSocketTransport;
+        const fiber = yield* client
+          .reactiveQuery(noArgsQueryRef)
+          .pipe(Stream.take(1), Stream.runCollect, Effect.forkChild);
 
-          expect(result).toEqual([{}]);
-        }),
-      ),
+        const subscription = yield* transport.nextSubscription();
+        yield* subscription.emit({});
+
+        expect(yield* Fiber.join(fiber)).toEqual([{}]);
+      }).pipe(Effect.provide(TestWebSocketClientLayer)),
     );
 
-    it.effect("passes args", () =>
-      withFreshSpy(
-        Effect.gen(function* () {
-          const client = yield* WebSocketClient.WebSocketClient;
-          const spy = yield* WebSocketClientSpy;
-          yield* client
-            .reactiveQuery(argsQueryRef, { id: "abc" })
-            .pipe(Stream.take(1), Stream.runCollect);
+    it.effect("passes provided args", () =>
+      Effect.gen(function* () {
+        const client = yield* WebSocketClient.WebSocketClient;
+        const transport = yield* TestWebSocketTransport;
+        const fiber = yield* client
+          .reactiveQuery(argsQueryRef, { id: "abc" })
+          .pipe(Stream.take(1), Stream.runCollect, Effect.forkChild);
 
-          expect(yield* MutableRef.get(spy.reactiveQueryCalls)).toEqual([
-            { name: "notes:get", args: { id: "abc" } },
-          ]);
-        }),
-      ),
+        const subscription = yield* transport.nextSubscription();
+        expect(yield* transport.calls("reactiveQuery")).toEqual([
+          { name: "notes:get", args: { id: "abc" } },
+        ]);
+        yield* subscription.emit({});
+        yield* Fiber.join(fiber);
+      }).pipe(Effect.provide(TestWebSocketClientLayer)),
     );
 
-    it.effect("runs finalizer when stream is consumed", () =>
-      withFreshSpy(
-        Effect.gen(function* () {
-          const client = yield* WebSocketClient.WebSocketClient;
-          const spy = yield* WebSocketClientSpy;
-          yield* client
-            .reactiveQuery(noArgsQueryRef)
-            .pipe(Stream.take(1), Stream.runCollect);
+    it.effect("unsubscribes when stream consumption ends", () =>
+      Effect.gen(function* () {
+        const client = yield* WebSocketClient.WebSocketClient;
+        const transport = yield* TestWebSocketTransport;
+        const fiber = yield* client
+          .reactiveQuery(noArgsQueryRef)
+          .pipe(Stream.take(1), Stream.runDrain, Effect.forkChild);
 
-          expect(yield* MutableRef.get(spy.reactiveQueryFinalizations)).toEqual(
-            ["notes:list"],
-          );
-        }),
-      ),
+        const subscription = yield* transport.nextSubscription();
+        yield* subscription.emit({});
+        yield* Fiber.join(fiber);
+
+        expect(yield* transport.unsubscribeCount()).toBe(1);
+      }).pipe(Effect.provide(TestWebSocketClientLayer)),
     );
   });
+
+  it.effect("closes the raw client when its layer is released", () =>
+    Effect.gen(function* () {
+      const transport = yield* TestWebSocketTransport.pipe(
+        Effect.provide(TestWebSocketClientLayer),
+      );
+      expect(yield* transport.closeCount()).toBe(1);
+    }),
+  );
 });
 
 class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
@@ -332,7 +349,7 @@ const queryWithError = Ref.make(
   "notes",
   FunctionSpec.publicQuery({
     name: "getOrFail",
-    args: () => Schema.Struct({ id: Schema.String }),
+    args: () => ({ id: Schema.String }),
     returns: () => Schema.Struct({ text: Schema.String }),
     error: () => NotFound,
   }),
@@ -342,7 +359,7 @@ const mutationWithError = Ref.make(
   "notes",
   FunctionSpec.publicMutation({
     name: "deleteOrFail",
-    args: () => Schema.Struct({ id: Schema.String }),
+    args: () => ({ id: Schema.String }),
     returns: () => Schema.Null,
     error: () => NotFound,
   }),
@@ -352,147 +369,149 @@ const actionWithError = Ref.make(
   "tasks",
   FunctionSpec.publicAction({
     name: "runOrFail",
-    args: () => Schema.Struct({ id: Schema.String }),
+    args: () => ({ id: Schema.String }),
     returns: () => Schema.Null,
     error: () => NotFound,
   }),
 );
 
-const RealLayer = WebSocketClient.layer("https://test.convex.cloud");
+describe("WebSocketClient error decoding", () => {
+  it.effect("decodes a query ConvexError", () =>
+    Effect.gen(function* () {
+      const transport = yield* TestWebSocketTransport;
+      yield* transport.failNext(
+        "query",
+        new ConvexError({ _tag: "NotFound", id: "abc" }),
+      );
+      const client = yield* WebSocketClient.WebSocketClient;
 
-layer(RealLayer)("WebSocketClient error decoding", (it) => {
-  describe("query", () => {
-    it.effect("decodes a matching ConvexError into the typed error", () =>
-      Effect.gen(function* () {
-        mockQuery.mockRejectedValue(
-          new ConvexError({ _tag: "NotFound", id: "abc" }),
-        );
-        const client = yield* WebSocketClient.WebSocketClient;
+      const result = yield* Effect.result(
+        client.query(queryWithError, { id: "abc" }),
+      );
+      assert(Result.isFailure(result));
+      assert(Schema.is(NotFound)(result.failure));
+      expect(result.failure.id).toBe("abc");
+    }).pipe(Effect.provide(TestWebSocketClientLayer)),
+  );
 
-        const result = yield* Effect.result(
-          client.query(queryWithError, { id: "abc" }),
-        );
-        assert(Result.isFailure(result));
-        assert(result.failure instanceof NotFound);
-        expect(result.failure.id).toBe("abc");
-      }),
-    );
+  it.effect("wraps an unknown query rejection", () =>
+    Effect.gen(function* () {
+      const transport = yield* TestWebSocketTransport;
+      yield* transport.failNext("query", new Error("network down"));
+      const client = yield* WebSocketClient.WebSocketClient;
 
-    it.effect("wraps a non-ConvexError as WebSocketClientError", () =>
-      Effect.gen(function* () {
-        mockQuery.mockRejectedValue(new Error("network down"));
-        const client = yield* WebSocketClient.WebSocketClient;
+      const result = yield* Effect.result(
+        client.query(queryWithError, { id: "abc" }),
+      );
+      assert(Result.isFailure(result));
+      expect(result.failure).toBeInstanceOf(
+        WebSocketClient.WebSocketClientError,
+      );
+    }).pipe(Effect.provide(TestWebSocketClientLayer)),
+  );
 
-        const result = yield* Effect.result(
-          client.query(queryWithError, { id: "abc" }),
-        );
-        assert(Result.isFailure(result));
-        expect(result.failure).toBeInstanceOf(
-          WebSocketClient.WebSocketClientError,
-        );
-      }),
-    );
-  });
+  it.effect("decodes a mutation ConvexError", () =>
+    Effect.gen(function* () {
+      const transport = yield* TestWebSocketTransport;
+      yield* transport.failNext(
+        "mutation",
+        new ConvexError({ _tag: "NotFound", id: "abc" }),
+      );
+      const client = yield* WebSocketClient.WebSocketClient;
 
-  describe("mutation", () => {
-    it.effect("decodes a matching ConvexError into the typed error", () =>
-      Effect.gen(function* () {
-        mockMutation.mockRejectedValue(
-          new ConvexError({ _tag: "NotFound", id: "abc" }),
-        );
-        const client = yield* WebSocketClient.WebSocketClient;
+      const result = yield* Effect.result(
+        client.mutation(mutationWithError, { id: "abc" }),
+      );
+      assert(Result.isFailure(result));
+      expect(result.failure).toBeInstanceOf(NotFound);
+    }).pipe(Effect.provide(TestWebSocketClientLayer)),
+  );
 
-        const result = yield* Effect.result(
-          client.mutation(mutationWithError, { id: "abc" }),
-        );
-        assert(Result.isFailure(result));
-        expect(result.failure).toBeInstanceOf(NotFound);
-      }),
-    );
-  });
+  it.effect("decodes an action ConvexError", () =>
+    Effect.gen(function* () {
+      const transport = yield* TestWebSocketTransport;
+      yield* transport.failNext(
+        "action",
+        new ConvexError({ _tag: "NotFound", id: "abc" }),
+      );
+      const client = yield* WebSocketClient.WebSocketClient;
 
-  describe("action", () => {
-    it.effect("decodes a matching ConvexError into the typed error", () =>
-      Effect.gen(function* () {
-        mockAction.mockRejectedValue(
-          new ConvexError({ _tag: "NotFound", id: "abc" }),
-        );
-        const client = yield* WebSocketClient.WebSocketClient;
+      const result = yield* Effect.result(
+        client.action(actionWithError, { id: "abc" }),
+      );
+      assert(Result.isFailure(result));
+      expect(result.failure).toBeInstanceOf(NotFound);
+    }).pipe(Effect.provide(TestWebSocketClientLayer)),
+  );
 
-        const result = yield* Effect.result(
-          client.action(actionWithError, { id: "abc" }),
-        );
-        assert(Result.isFailure(result));
-        expect(result.failure).toBeInstanceOf(NotFound);
-      }),
-    );
-  });
-
-  describe("reactiveQuery", () => {
-    it.effect("emits the typed error when a matching ConvexError fires", () =>
-      Effect.gen(function* () {
-        const client = yield* WebSocketClient.WebSocketClient;
-        const fiber = yield* Effect.forkChild(
-          Effect.result(
-            client
-              .reactiveQuery(queryWithError, { id: "abc" })
-              .pipe(Stream.take(1), Stream.runCollect),
-          ),
-        );
-
-        // Wait for the subscription to register before firing.
-        yield* Effect.callback<void>((resume) => {
-          const tick = () => {
-            if (subscribers.length > 0) {
-              resume(Effect.void);
-            } else {
-              setTimeout(tick, 1);
-            }
-          };
-          tick();
-        });
-
-        subscribers[0]!.onError(
-          new ConvexError({ _tag: "NotFound", id: "abc" }),
+  it.effect("emits a typed reactive-query error", () =>
+    Effect.gen(function* () {
+      const client = yield* WebSocketClient.WebSocketClient;
+      const transport = yield* TestWebSocketTransport;
+      const fiber = yield* client
+        .reactiveQuery(queryWithError, { id: "abc" })
+        .pipe(
+          Stream.take(1),
+          Stream.runCollect,
+          Effect.result,
+          Effect.forkChild,
         );
 
-        const result = yield* Fiber.join(fiber);
-        assert(Result.isFailure(result));
-        assert(result.failure instanceof NotFound);
-        expect(result.failure.id).toBe("abc");
-      }),
-    );
+      const subscription = yield* transport.nextSubscription();
+      yield* subscription.fail(
+        new ConvexError({ _tag: "NotFound", id: "abc" }),
+      );
 
-    it.effect("emits a WebSocketClientError when a non-ConvexError fires", () =>
-      Effect.gen(function* () {
-        const client = yield* WebSocketClient.WebSocketClient;
-        const fiber = yield* Effect.forkChild(
-          Effect.result(
-            client
-              .reactiveQuery(queryWithError, { id: "abc" })
-              .pipe(Stream.take(1), Stream.runCollect),
-          ),
+      const result = yield* Fiber.join(fiber);
+      assert(Result.isFailure(result));
+      assert(Schema.is(NotFound)(result.failure));
+      expect(result.failure.id).toBe("abc");
+    }).pipe(Effect.provide(TestWebSocketClientLayer)),
+  );
+
+  it.effect("wraps an unknown reactive-query error", () =>
+    Effect.gen(function* () {
+      const client = yield* WebSocketClient.WebSocketClient;
+      const transport = yield* TestWebSocketTransport;
+      const fiber = yield* client
+        .reactiveQuery(queryWithError, { id: "abc" })
+        .pipe(
+          Stream.take(1),
+          Stream.runCollect,
+          Effect.result,
+          Effect.forkChild,
         );
 
-        yield* Effect.callback<void>((resume) => {
-          const tick = () => {
-            if (subscribers.length > 0) {
-              resume(Effect.void);
-            } else {
-              setTimeout(tick, 1);
-            }
-          };
-          tick();
-        });
+      const subscription = yield* transport.nextSubscription();
+      yield* subscription.fail(new Error("network down"));
 
-        subscribers[0]!.onError(new Error("network down"));
+      const result = yield* Fiber.join(fiber);
+      assert(Result.isFailure(result));
+      expect(result.failure).toBeInstanceOf(
+        WebSocketClient.WebSocketClientError,
+      );
+    }).pipe(Effect.provide(TestWebSocketClientLayer)),
+  );
 
-        const result = yield* Fiber.join(fiber);
-        assert(Result.isFailure(result));
-        expect(result.failure).toBeInstanceOf(
-          WebSocketClient.WebSocketClientError,
-        );
-      }),
-    );
-  });
+  it.effect("keeps listening after a reactive-query error result", () =>
+    Effect.gen(function* () {
+      const client = yield* WebSocketClient.WebSocketClient;
+      const transport = yield* TestWebSocketTransport;
+      const fiber = yield* client
+        .reactiveQueryResult(queryWithError, { id: "abc" })
+        .pipe(Stream.take(2), Stream.runCollect, Effect.forkChild);
+
+      const subscription = yield* transport.nextSubscription();
+      yield* subscription.fail(
+        new ConvexError({ _tag: "NotFound", id: "abc" }),
+      );
+      yield* subscription.emit({ text: "recovered" });
+
+      const results = yield* Fiber.join(fiber);
+      expect(results).toHaveLength(2);
+      assert(Result.isFailure(results[0]));
+      expect(results[0].failure).toBeInstanceOf(NotFound);
+      expect(results[1]).toEqual(Result.succeed({ text: "recovered" }));
+    }).pipe(Effect.provide(TestWebSocketClientLayer)),
+  );
 });

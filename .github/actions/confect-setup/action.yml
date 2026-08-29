@@ -14,6 +14,8 @@ runs:
         node-version-file: ".node-version"
         cache: "pnpm"
 
+    - uses: ./.github/actions/bun-setup
+
     - name: Install dependencies
       run: pnpm install
       shell: bash

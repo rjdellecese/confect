@@ -1,0 +1,73 @@
+{
+  "name": "@confect/foldkit",
+  "description": "Client-side bindings for Foldkit apps",
+  "version": "10.0.0-next.20",
+  "author": "RJ Dellecese",
+  "bugs": {
+    "url": "https://github.com/rjdellecese/confect/issues"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.0.0-rc.112",
+    "@types/node": "22.20.1",
+    "convex": "1.45.0",
+    "effect": "4.0.0-rc.112",
+    "foldkit": "0.148.1",
+    "tsdown": "0.22.14",
+    "typescript": "7.0.2",
+    "unrun": "0.3.1",
+    "vitest": "4.1.10"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md",
+    "dist",
+    "!dist/*.tsbuildinfo",
+    "package.json",
+    "src"
+  ],
+  "homepage": "https://confect.dev",
+  "keywords": [
+    "convex",
+    "effect",
+    "foldkit"
+  ],
+  "license": "ISC",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "peerDependencies": {
+    "@confect/core": "workspace:^",
+    "@confect/js": "workspace:^",
+    "effect": "^4.0.0-rc.112",
+    "foldkit": "^0.148.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rjdellecese/confect.git"
+  },
+  "scripts": {
+    "clean": "shx rm -rf dist coverage node_modules",
+    "dev": "tsdown --watch --no-clean --config-loader unrun",
+    "postpack": "shx rm -f ./README.md && shx mv ./.README.md.bak ./README.md",
+    "prepack": "shx mv ./README.md ./.README.md.bak && shx cp ../../README.md ./README.md",
+    "test": "vitest run",
+    "typecheck": "tsc -b tsconfig.src.json"
+  },
+  "sideEffects": false,
+  "type": "module",
+  "types": "./dist/index.d.ts"
+}

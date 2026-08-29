@@ -40,7 +40,7 @@ const importedName = (
   }
   const imported = specifier.imported;
   return Option.some(
-    imported.type === "Identifier" ? imported.name : String(imported.value),
+    imported.type === "Identifier" ? imported.name : imported.value,
   );
 };
 

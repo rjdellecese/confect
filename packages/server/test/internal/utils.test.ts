@@ -1,20 +1,45 @@
+import type { Predicate } from "effect";
+import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
-import { describe, expect, test } from "@effect/vitest";
+import * as Ref from "effect/Ref";
 import {
   forEachBranchLeaves,
   setNestedProperty,
 } from "../../src/internal/utils";
 
+type NestedObject<T> = {
+  readonly [key: string]: T | NestedObject<T>;
+};
+
+interface BranchLeaves<T> {
+  readonly path: string[];
+  readonly values: Record<string, T>;
+}
+
+const collectLeaves = <T>(
+  obj: NestedObject<T>,
+  refinement: Predicate.Refinement<unknown, T>,
+) =>
+  Effect.gen(function* () {
+    const results = yield* Ref.make<ReadonlyArray<BranchLeaves<T>>>([]);
+
+    yield* forEachBranchLeaves(obj, refinement, (branch) =>
+      Ref.update(results, (previous) => [...previous, branch]),
+    );
+
+    return yield* Ref.get(results);
+  });
+
 describe("setNestedProperty", () => {
   describe("single-level path", () => {
-    test("sets a top-level property", () => {
+    it("sets a top-level property", () => {
       const obj = { a: 1, b: 2 };
       const result = setNestedProperty(obj, ["a"], 10);
 
       expect(result).toEqual({ a: 10, b: 2 });
     });
 
-    test("does not mutate the original object", () => {
+    it("does not mutate the original object", () => {
       const obj = { a: 1, b: 2 };
       const original = { ...obj };
       setNestedProperty(obj, ["a"], 10);
@@ -22,7 +47,7 @@ describe("setNestedProperty", () => {
       expect(obj).toEqual(original);
     });
 
-    test("preserves other properties", () => {
+    it("preserves other properties", () => {
       const obj = { a: 1, b: 2, c: 3 };
       const result = setNestedProperty(obj, ["b"], 20);
 
@@ -31,14 +56,14 @@ describe("setNestedProperty", () => {
   });
 
   describe("two-level path", () => {
-    test("sets a nested property", () => {
+    it("sets a nested property", () => {
       const obj = { a: { x: 1, y: 2 }, b: 3 };
       const result = setNestedProperty(obj, ["a", "x"], 10);
 
       expect(result).toEqual({ a: { x: 10, y: 2 }, b: 3 });
     });
 
-    test("does not mutate the original object or nested objects", () => {
+    it("does not mutate the original object or nested objects", () => {
       const obj = { a: { x: 1, y: 2 }, b: 3 };
       const originalA = obj.a;
       const result = setNestedProperty(obj, ["a", "x"], 10);
@@ -48,7 +73,7 @@ describe("setNestedProperty", () => {
       expect(result.a).not.toBe(originalA); // New reference
     });
 
-    test("preserves sibling properties at both levels", () => {
+    it("preserves sibling properties at both levels", () => {
       const obj = { a: { x: 1, y: 2, z: 3 }, b: 4, c: 5 };
       const result = setNestedProperty(obj, ["a", "y"], 20);
 
@@ -57,14 +82,14 @@ describe("setNestedProperty", () => {
   });
 
   describe("three-level path", () => {
-    test("sets a deeply nested property", () => {
+    it("sets a deeply nested property", () => {
       const obj = { a: { b: { c: 1, d: 2 }, e: 3 }, f: 4 };
       const result = setNestedProperty(obj, ["a", "b", "c"], 10);
 
       expect(result).toEqual({ a: { b: { c: 10, d: 2 }, e: 3 }, f: 4 });
     });
 
-    test("maintains immutability at all levels", () => {
+    it("maintains immutability at all levels", () => {
       const obj = { a: { b: { c: 1 } } };
       const originalA = obj.a;
       const originalB = obj.a.b;
@@ -78,14 +103,14 @@ describe("setNestedProperty", () => {
   });
 
   describe("edge cases", () => {
-    test("handles empty objects at intermediate levels", () => {
+    it("handles empty objects at intermediate levels", () => {
       const obj = { a: {}, b: 2 };
       const result = setNestedProperty(obj, ["a", "x"], 10);
 
       expect(result).toEqual({ a: { x: 10 }, b: 2 });
     });
 
-    test("works with various value types", () => {
+    it("works with various value types", () => {
       const obj = { a: { b: "old" } };
 
       const result1 = setNestedProperty(obj, ["a", "b"], "new");
@@ -108,250 +133,206 @@ describe("forEachBranchLeaves", () => {
     typeof value === "string";
 
   describe("basic functionality", () => {
-    test("processes leaves at a single branch", async () => {
-      const obj = {
-        branch: {
-          leaf1: "value1",
-          leaf2: "value2",
-        },
-      };
-
-      const results: Array<{ path: string[]; values: Record<string, string> }> =
-        [];
-
-      await Effect.runPromise(
-        forEachBranchLeaves(obj, isString, ({ path, values }) =>
-          Effect.sync(() => {
-            results.push({ path, values });
-          }),
-        ),
-      );
-
-      expect(results).toHaveLength(1);
-      expect(results[0]).toEqual({
-        path: ["branch"],
-        values: { leaf1: "value1", leaf2: "value2" },
-      });
-    });
-
-    test("processes leaves at multiple branches", async () => {
-      const obj = {
-        branch1: {
-          leaf1: "a",
-          leaf2: "b",
-        },
-        branch2: {
-          leaf3: "c",
-          leaf4: "d",
-        },
-      };
-
-      const results: Array<{ path: string[]; values: Record<string, string> }> =
-        [];
-
-      await Effect.runPromise(
-        forEachBranchLeaves(obj, isString, ({ path, values }) =>
-          Effect.sync(() => {
-            results.push({ path, values });
-          }),
-        ),
-      );
-
-      expect(results).toHaveLength(2);
-      expect(results).toContainEqual({
-        path: ["branch1"],
-        values: { leaf1: "a", leaf2: "b" },
-      });
-      expect(results).toContainEqual({
-        path: ["branch2"],
-        values: { leaf3: "c", leaf4: "d" },
-      });
-    });
-
-    test("handles deeply nested branches", async () => {
-      const obj = {
-        level1: {
-          level2: {
-            leaf1: "deep",
-            leaf2: "value",
+    it.effect("processes leaves at a single branch", () =>
+      Effect.gen(function* () {
+        const results = yield* collectLeaves(
+          {
+            branch: {
+              leaf1: "value1",
+              leaf2: "value2",
+            },
           },
-        },
-      };
+          isString,
+        );
 
-      const results: Array<{ path: string[]; values: Record<string, string> }> =
-        [];
+        expect(results).toHaveLength(1);
+        expect(results[0]).toEqual({
+          path: ["branch"],
+          values: { leaf1: "value1", leaf2: "value2" },
+        });
+      }),
+    );
 
-      await Effect.runPromise(
-        forEachBranchLeaves(obj, isString, ({ path, values }) =>
-          Effect.sync(() => {
-            results.push({ path, values });
-          }),
-        ),
-      );
+    it.effect("processes leaves at multiple branches", () =>
+      Effect.gen(function* () {
+        const results = yield* collectLeaves(
+          {
+            branch1: {
+              leaf1: "a",
+              leaf2: "b",
+            },
+            branch2: {
+              leaf3: "c",
+              leaf4: "d",
+            },
+          },
+          isString,
+        );
 
-      expect(results).toHaveLength(1);
-      expect(results[0]).toEqual({
-        path: ["level1", "level2"],
-        values: { leaf1: "deep", leaf2: "value" },
-      });
-    });
+        expect(results).toHaveLength(2);
+        expect(results).toContainEqual({
+          path: ["branch1"],
+          values: { leaf1: "a", leaf2: "b" },
+        });
+        expect(results).toContainEqual({
+          path: ["branch2"],
+          values: { leaf3: "c", leaf4: "d" },
+        });
+      }),
+    );
+
+    it.effect("handles deeply nested branches", () =>
+      Effect.gen(function* () {
+        const results = yield* collectLeaves(
+          {
+            level1: {
+              level2: {
+                leaf1: "deep",
+                leaf2: "value",
+              },
+            },
+          },
+          isString,
+        );
+
+        expect(results).toHaveLength(1);
+        expect(results[0]).toEqual({
+          path: ["level1", "level2"],
+          values: { leaf1: "deep", leaf2: "value" },
+        });
+      }),
+    );
   });
 
   describe("filtering with refinement", () => {
-    test("only processes values matching the refinement", async () => {
-      const isNumber = (value: unknown): value is number =>
-        typeof value === "number";
+    it.effect("only processes values matching the refinement", () =>
+      Effect.gen(function* () {
+        const isNumber = (value: unknown): value is number =>
+          typeof value === "number";
 
-      const obj = {
-        branch: {
-          num1: 42,
-          str: "ignored",
-          num2: 100,
-        },
-      };
+        const results = yield* collectLeaves(
+          {
+            branch: {
+              num1: 42,
+              str: "ignored",
+              num2: 100,
+            },
+          },
+          isNumber,
+        );
 
-      const results: Array<{ path: string[]; values: Record<string, number> }> =
-        [];
-
-      await Effect.runPromise(
-        forEachBranchLeaves(obj, isNumber, ({ path, values }) =>
-          Effect.sync(() => {
-            results.push({ path, values: values as Record<string, number> });
-          }),
-        ),
-      );
-
-      expect(results).toHaveLength(1);
-      expect(results[0]).toEqual({
-        path: ["branch"],
-        values: { num1: 42, num2: 100 },
-      });
-      // "str" should not be in values
-      expect(results[0]!.values).not.toHaveProperty("str");
-    });
+        expect(results).toHaveLength(1);
+        expect(results[0]).toEqual({
+          path: ["branch"],
+          values: { num1: 42, num2: 100 },
+        });
+        expect(results[0]?.values).not.toHaveProperty("str");
+      }),
+    );
   });
 
   describe("edge cases", () => {
-    test("handles empty objects", async () => {
-      const obj = {};
+    it.effect("handles empty objects", () =>
+      Effect.gen(function* () {
+        const results = yield* collectLeaves({}, isString);
 
-      const results: Array<{ path: string[]; values: Record<string, string> }> =
-        [];
+        expect(results).toHaveLength(0);
+      }),
+    );
 
-      await Effect.runPromise(
-        forEachBranchLeaves(obj, isString, ({ path, values }) =>
-          Effect.sync(() => {
-            results.push({ path, values });
-          }),
-        ),
-      );
-
-      expect(results).toHaveLength(0);
-    });
-
-    test("handles objects with no matching leaves", async () => {
-      const obj = {
-        branch: {
-          nested: {
-            deep: {},
+    it.effect("handles objects with no matching leaves", () =>
+      Effect.gen(function* () {
+        const results = yield* collectLeaves(
+          {
+            branch: {
+              nested: {
+                deep: {},
+              },
+            },
           },
-        },
-      };
+          isString,
+        );
 
-      const results: Array<{ path: string[]; values: Record<string, string> }> =
-        [];
+        expect(results).toHaveLength(0);
+      }),
+    );
 
-      await Effect.runPromise(
-        forEachBranchLeaves(obj, isString, ({ path, values }) =>
-          Effect.sync(() => {
-            results.push({ path, values: values as Record<string, string> });
-          }),
-        ),
-      );
-
-      expect(results).toHaveLength(0);
-    });
-
-    test("handles branches with mixed leaf and non-leaf values", async () => {
-      const obj = {
-        branch: {
-          leaf: "value",
-          nested: {
-            deepLeaf: "deep",
+    it.effect("handles branches with mixed leaf and non-leaf values", () =>
+      Effect.gen(function* () {
+        const results = yield* collectLeaves(
+          {
+            branch: {
+              leaf: "value",
+              nested: {
+                deepLeaf: "deep",
+              },
+            },
           },
-        },
-      };
+          isString,
+        );
 
-      const results: Array<{ path: string[]; values: Record<string, string> }> =
-        [];
-
-      await Effect.runPromise(
-        forEachBranchLeaves(obj, isString, ({ path, values }) =>
-          Effect.sync(() => {
-            results.push({ path, values });
-          }),
-        ),
-      );
-
-      expect(results).toHaveLength(2);
-      expect(results).toContainEqual({
-        path: ["branch"],
-        values: { leaf: "value" },
-      });
-      expect(results).toContainEqual({
-        path: ["branch", "nested"],
-        values: { deepLeaf: "deep" },
-      });
-    });
+        expect(results).toHaveLength(2);
+        expect(results).toContainEqual({
+          path: ["branch"],
+          values: { leaf: "value" },
+        });
+        expect(results).toContainEqual({
+          path: ["branch", "nested"],
+          values: { deepLeaf: "deep" },
+        });
+      }),
+    );
   });
 
   describe("effect execution", () => {
-    test("executes effects for all branches", async () => {
-      const obj = {
-        a: { x: "1" },
-        b: { y: "2" },
-        c: { z: "3" },
-      };
+    it.effect("executes effects for all branches", () =>
+      Effect.gen(function* () {
+        const count = yield* Ref.make(0);
 
-      let count = 0;
+        yield* forEachBranchLeaves(
+          {
+            a: { x: "1" },
+            b: { y: "2" },
+            c: { z: "3" },
+          },
+          isString,
+          () => Ref.update(count, (value) => value + 1),
+        );
 
-      await Effect.runPromise(
-        forEachBranchLeaves(obj, isString, () =>
-          Effect.sync(() => {
-            count++;
-          }),
-        ),
-      );
+        expect(yield* Ref.get(count)).toBe(3);
+      }),
+    );
 
-      expect(count).toBe(3);
-    });
+    it.effect("handles effect errors", () =>
+      Effect.gen(function* () {
+        const effect = forEachBranchLeaves(
+          {
+            branch: {
+              leaf: "value",
+            },
+          },
+          isString,
+          () => Effect.fail("test error"),
+        );
 
-    test("handles effect errors", async () => {
-      const obj = {
-        branch: {
-          leaf: "value",
-        },
-      };
+        expect(yield* Effect.flip(effect)).toBe("test error");
+      }),
+    );
 
-      const effect = forEachBranchLeaves(obj, isString, () =>
-        Effect.fail("test error"),
-      );
+    it.effect("returns Effect<void>", () =>
+      Effect.gen(function* () {
+        const result = yield* forEachBranchLeaves(
+          {
+            branch: {
+              leaf: "value",
+            },
+          },
+          isString,
+          () => Effect.void,
+        );
 
-      await expect(Effect.runPromise(effect)).rejects.toThrow("test error");
-    });
-
-    test("returns Effect<void>", async () => {
-      const obj = {
-        branch: {
-          leaf: "value",
-        },
-      };
-
-      const result = await Effect.runPromise(
-        forEachBranchLeaves(obj, isString, () => Effect.void),
-      );
-
-      expect(result).toBeUndefined();
-    });
+        expect(result).toBeUndefined();
+      }),
+    );
   });
 });

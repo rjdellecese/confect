@@ -58,7 +58,7 @@ const program = Effect.gen(function* () {
   const input = yield* Schema.decodeEffect(PostToolUseInput)(jsonString);
   const filePath = input.tool_input.file_path;
 
-  if ((yield* isSupportedFileType(filePath)) === true) {
+  if (yield* isSupportedFileType(filePath)) {
     const spawner = yield* ChildProcessSpawner;
 
     // Oxlint exits non-zero when lint problems remain after fixing; that is not

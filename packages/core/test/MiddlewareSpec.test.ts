@@ -38,20 +38,17 @@ class MutationOnly extends MiddlewareSpec.MiddlewareSpec<MutationOnly>()(
 
 const query = FunctionSpec.publicQuery({
   name: "getThing",
-  args: () => Schema.Struct({}),
   returns: () => Schema.String,
 });
 
 const queryWithError = FunctionSpec.publicQuery({
   name: "getThingOrFail",
-  args: () => Schema.Struct({}),
   returns: () => Schema.String,
   error: () => NotFound,
 });
 
 const mutation = FunctionSpec.publicMutation({
   name: "setThing",
-  args: () => Schema.Struct({}),
   returns: () => Schema.Null,
 });
 
@@ -187,7 +184,7 @@ describe("MiddlewareSpec", () => {
   });
 
   it("rejects a function type flag the type checker only knows as boolean", () => {
-    const computed: boolean = Math.random() > 0.5;
+    const computed: boolean = Reflect.has({}, "computed");
 
     class Computed extends MiddlewareSpec.MiddlewareSpec<Computed>()(
       "Computed",

@@ -70,6 +70,7 @@ describe("IsUnion", () => {
   });
 
   test("string | never = false", () => {
+    // oxlint-disable-next-line typescript/no-redundant-type-constituents -- Exercises TypeScript's union normalization.
     expectTypeOf<IsUnion<string | never>>().toEqualTypeOf<false>();
   });
 
@@ -493,6 +494,7 @@ describe("IsRecursive", () => {
     });
 
     test("recursive with any", () => {
+      // oxlint-disable-next-line typescript/no-redundant-type-constituents -- Exercises TypeScript's union normalization.
       type RecursiveWithAny = any | { next: RecursiveWithAny };
       expectTypeOf<IsRecursive<RecursiveWithAny>>().toEqualTypeOf<false>();
     });
@@ -533,11 +535,13 @@ describe("IsRecursive", () => {
     });
 
     test("recursive with unknown", () => {
+      // oxlint-disable-next-line typescript/no-redundant-type-constituents -- Exercises TypeScript's intersection normalization.
       type RecursiveWithUnknown = unknown & { next: RecursiveWithUnknown };
       expectTypeOf<IsRecursive<RecursiveWithUnknown>>().toEqualTypeOf<true>();
     });
 
     test("recursive with never", () => {
+      // oxlint-disable-next-line typescript/no-redundant-type-constituents -- Exercises TypeScript's union normalization.
       type RecursiveWithNever = never | { next: RecursiveWithNever };
       expectTypeOf<IsRecursive<RecursiveWithNever>>().toEqualTypeOf<true>();
     });

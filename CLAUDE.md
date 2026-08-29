@@ -7,6 +7,7 @@ Confect is a library that integrates Effect with the Convex backend platform. It
 - `@confect/core` - Shared specs, schemas, and types (no workspace deps)
 - `@confect/server` - Backend bindings to Convex (depends on core)
 - `@confect/js` - Runtime-agnostic JavaScript client (depends on core)
+- `@confect/foldkit` - Client-side bindings for Foldkit apps (depends on core, js)
 - `@confect/react` - Client-side React hooks (depends on core)
 - `@confect/cli` - CLI tooling for codegen and dev-mode watching (depends on core, server)
 - `@confect/test` - Testing utilities via convex-test (depends on core, server)
@@ -22,7 +23,7 @@ Confect is a library that integrates Effect with the Convex backend platform. It
 
 ## TypeScript
 
-The workspace is on TypeScript 7, so `tsc` is a native binary and the `typescript` package no longer exports a JavaScript compiler API — anything that needs to _drive_ the compiler rather than _run_ it has to either spawn `tsc` or use `typescript/unstable/*`. Effect's language service comes from `@effect/tsgo` (not `@effect/language-service`, which supports only TypeScript 5 and 6): the root `prepare` script runs `effect-tsgo patch --typescript`, which swaps in a `tsc` that also reports Effect diagnostics, so the `deterministicKeys: "error"` severity in `tsconfig.base.json` fails a build and not just an editor.
+The workspace is on TypeScript 7, so `tsc` is a native binary and the `typescript` package no longer exports a JavaScript compiler API — anything that needs to _drive_ the compiler rather than _run_ it has to either spawn `tsc` or use `typescript/unstable/*`. Effect's language service comes from `@effect/tsgo` (not `@effect/language-service`, which supports only TypeScript 5 and 6): the root `prepare` script patches both TypeScript and Oxlint. TypeScript provides Effect editor features with duplicate diagnostics disabled, while Oxlint reports Effect diagnostics through the `effecttsgo` plugin; configure their severities in `.oxlintrc.json`.
 
 ## Build System
 
@@ -46,7 +47,7 @@ Build, lint, and format run through Vite+ (`vp`), which orders packages by their
 
 ## Testing
 
-Tests use Vitest with a root-level `vitest.config.ts` (which uses `projects: ["packages/*"]` to discover per-package test projects) and shared config in `vitest.shared.ts`. The core, js, react, server, and cli packages all have tests. The @confect/server package has integration tests using convex-test.
+Tests use Vitest with a root-level `vitest.config.ts` (which uses `projects: ["packages/*"]` to discover per-package test projects) and shared config in `vitest.shared.ts`. The core, foldkit, js, react, server, and cli packages all have tests. The @confect/server package has integration tests using convex-test.
 
 Tests import the public package specifiers (e.g. `@confect/core/Ref`); `vitest.shared.ts` aliases those to each package's `src/` so suites run against source rather than built `dist/`.
 

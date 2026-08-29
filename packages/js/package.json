@@ -1,15 +1,15 @@
 {
   "name": "@confect/js",
   "description": "JavaScript client bindings for any JS runtime",
-  "version": "10.0.0-next.17",
+  "version": "10.0.0-next.20",
   "author": "RJ Dellecese",
   "bugs": {
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "devDependencies": {
-    "@effect/vitest": "4.0.0-rc.111",
+    "@effect/vitest": "4.0.0-rc.112",
     "@types/node": "22.20.1",
-    "effect": "4.0.0-rc.111",
+    "effect": "4.0.0-rc.112",
     "tsdown": "0.22.14",
     "typescript": "7.0.2",
     "unrun": "0.3.1",
@@ -22,6 +22,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
     },
     "./package.json": "./package.json"
   },
@@ -45,7 +49,7 @@
   "peerDependencies": {
     "@confect/core": "workspace:^",
     "convex": "^1.32.0",
-    "effect": "^4.0.0-rc.111"
+    "effect": "^4.0.0-rc.112"
   },
   "repository": {
     "type": "git",

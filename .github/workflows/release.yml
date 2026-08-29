@@ -31,6 +31,8 @@ jobs:
           cache: "pnpm"
           registry-url: "https://registry.npmjs.org"
 
+      - uses: ./.github/actions/bun-setup
+
       - name: Install dependencies
         run: pnpm install
 

@@ -31,7 +31,7 @@ export class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
 export default GroupSpec.make().addFunction(
   FunctionSpec.publicQuery({
     name: "getOrFail",
-    args: () => Schema.Struct({ noteId: Id("notes") }),
+    args: () => ({ noteId: Id("notes") }),
     returns: () => notes.Doc,
     error: () => NoteNotFound,
   }),
@@ -57,7 +57,7 @@ export class Forbidden extends Schema.TaggedError<Forbidden>()(
 
 FunctionSpec.publicMutation({
   name: "deleteOrFail",
-  args: () => Schema.Struct({ noteId: Id("notes") }),
+  args: () => ({ noteId: Id("notes") }),
   returns: () => Schema.Null,
   error: () => Schema.Union([NoteNotFound, Forbidden]),
 });
@@ -126,7 +126,11 @@ HttpClient.query(refs.public.notes.getOrFail, { noteId });
 // Effect.Effect<Note, NoteNotFound | HttpClientError | ParseError>
 ```
 
-`WebSocketClient.reactiveQuery` carries typed errors too: when the subscribed query fails with a typed error, the returned `Stream` terminates with the decoded value in its error channel. See [HTTP](/clients/js/http) and [WebSocket](/clients/js/websocket).
+`WebSocketClient.reactiveQuery` carries typed errors too: when the subscribed
+query fails, its `Stream` terminates with the decoded value in the error
+channel. `reactiveQueryResult` instead emits successes and failures as `Result`
+values while leaving the Convex subscription open. See
+[HTTP](/clients/js/http) and [WebSocket](/clients/js/websocket).
 
 ### `@confect/test`
 

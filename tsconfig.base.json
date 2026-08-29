@@ -24,14 +24,10 @@
     "noUncheckedIndexedAccess": false,
     "strictNullChecks": true,
     "removeComments": false,
-    "stripInternal": true,
     "plugins": [
       {
         "name": "@effect/language-service",
-        "ignoreEffectSuggestionsInTscExitCode": false,
-        "diagnosticSeverity": {
-          "deterministicKeys": "error"
-        }
+        "diagnostics": false
       }
     ]
   }

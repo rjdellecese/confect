@@ -71,7 +71,7 @@ Contains a named TypeScript `interface` for each table's document — `NotesDoc`
 
 #### `id.ts`
 
-Contains a type-constrained `Id` constructor whose only argument is the union of your table names — for example, `Id("users")` returns the `Schema` for an `_id` value in the `users` table. Use this when defining cross-table references (e.g. a `userId: Id("users")` field) and inside spec `args`/`returns` schemas. The type-level constraint catches typos at compile time, replacing the loosely-typed `GenericId.GenericId("users")` form.
+Contains a type-constrained `Id` constructor whose only argument is the union of your table names — for example, `Id("users")` returns the `Schema` for an `_id` value in the `users` table. Use this when defining cross-table references (e.g. a `userId: Id("users")` field) and inside spec `args` fields or `returns` schemas. The type-level constraint catches typos at compile time, replacing the loosely-typed `GenericId.GenericId("users")` form.
 
 #### `registeredFunctions/`
 

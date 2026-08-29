@@ -6,8 +6,11 @@
 // every release until it was noticed by hand. This asks npm for the exact file
 // list it would pack and fails on anything that has no business being there.
 
+// oxlint-disable-next-line effecttsgo/node-builtin-import -- This build-time Node script runs outside an Effect application runtime.
 import { execFileSync } from "node:child_process";
+// oxlint-disable-next-line effecttsgo/node-builtin-import -- This build-time Node script runs outside an Effect application runtime.
 import { readdirSync, readFileSync } from "node:fs";
+// oxlint-disable-next-line effecttsgo/node-builtin-import -- This build-time Node script runs outside an Effect application runtime.
 import { join } from "node:path";
 
 const PACKAGES_DIR = "packages";
@@ -70,17 +73,22 @@ for (const dir of publishedPackages()) {
   }
 
   if (problems.length === 0) {
+    // oxlint-disable-next-line effecttsgo/global-console -- This standalone verification script reports directly to its caller.
     console.log(`ok  ${dir} (${files.length} files)`);
     continue;
   }
 
   failed = true;
+  // oxlint-disable-next-line effecttsgo/global-console -- This standalone verification script reports directly to its caller.
   console.error(`FAIL ${dir}`);
-  for (const [path, reason] of problems)
+  for (const [path, reason] of problems) {
+    // oxlint-disable-next-line effecttsgo/global-console -- This standalone verification script reports directly to its caller.
     console.error(`       ${path} — ${reason}`);
+  }
 }
 
 if (failed) {
+  // oxlint-disable-next-line effecttsgo/global-console -- This standalone verification script reports directly to its caller.
   console.error(
     "\nThese files would be published to npm. Keep build artifacts out of the packed directories,",
     "\nor narrow the `files` field in the offending package.json.",

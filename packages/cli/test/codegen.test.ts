@@ -28,9 +28,10 @@ const fixtureConfect = `${import.meta.dirname}/../../server/test/mock-backend/fi
 const CodegenLayer = Layer.mergeAll(
   NodePath.layer,
   NodeFileSystem.layer,
-  Layer.mock(ConfectDirectory, {
-    get: Effect.succeed(fixtureConfect),
-  }),
+  Layer.succeed(
+    ConfectDirectory,
+    ConfectDirectory.of({ get: Effect.succeed(fixtureConfect) }),
+  ),
 );
 
 layer(CodegenLayer)("TableModule.discover", (it) => {
@@ -130,9 +131,10 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
       const result = yield* Effect.result(
         discoverTables.pipe(
           Effect.provide(
-            Layer.mock(ConfectDirectory, {
-              get: Effect.succeed(tempDir),
-            }),
+            Layer.succeed(
+              ConfectDirectory,
+              ConfectDirectory.of({ get: Effect.succeed(tempDir) }),
+            ),
           ),
         ),
       );
@@ -165,9 +167,10 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
 
       const tables = yield* discoverTables.pipe(
         Effect.provide(
-          Layer.mock(ConfectDirectory, {
-            get: Effect.succeed(tempDir),
-          }),
+          Layer.succeed(
+            ConfectDirectory,
+            ConfectDirectory.of({ get: Effect.succeed(tempDir) }),
+          ),
         ),
       );
 
@@ -197,9 +200,10 @@ layer(CodegenLayer)("TableModule.discover", (it) => {
 
         const tables = yield* discoverTables.pipe(
           Effect.provide(
-            Layer.mock(ConfectDirectory, {
-              get: Effect.succeed(tempDir),
-            }),
+            Layer.succeed(
+              ConfectDirectory,
+              ConfectDirectory.of({ get: Effect.succeed(tempDir) }),
+            ),
           ),
         );
 
@@ -220,7 +224,6 @@ const leaf = (
   specImportPath: `../${relativePath.slice(0, -".ts".length)}`,
 });
 
-const emptyArgs = Schema.Struct({});
 const emptyReturns = Schema.Null;
 
 layer(Layer.empty)("validateNoParentChildNameCollisions", (it) => {
@@ -231,7 +234,6 @@ layer(Layer.empty)("validateNoParentChildNameCollisions", (it) => {
       const parentGroupSpec = GroupSpec.make().addFunction(
         FunctionSpec.publicQuery({
           name: "list",
-          args: () => emptyArgs,
           returns: () => emptyReturns,
         }),
       );
@@ -252,7 +254,6 @@ layer(Layer.empty)("validateNoParentChildNameCollisions", (it) => {
         const parentGroupSpec = GroupSpec.make().addFunction(
           FunctionSpec.publicQuery({
             name: "archived",
-            args: () => emptyArgs,
             returns: () => emptyReturns,
           }),
         );
@@ -282,7 +283,6 @@ layer(Layer.empty)("validateNoParentChildNameCollisions", (it) => {
         const inner = GroupSpec.makeAt("inner").addFunction(
           FunctionSpec.publicQuery({
             name: "list",
-            args: () => emptyArgs,
             returns: () => emptyReturns,
           }),
         );
@@ -343,7 +343,6 @@ for (const { name, pathLayer, sep } of [
             const parentGroupSpec = GroupSpec.make().addFunction(
               FunctionSpec.publicQuery({
                 name: "archived",
-                args: () => emptyArgs,
                 returns: () => emptyReturns,
               }),
             );

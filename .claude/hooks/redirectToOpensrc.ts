@@ -44,6 +44,14 @@ const PreToolUseInput = Schema.fromJsonString(
 
 type PreToolUseInput = typeof PreToolUseInput.Type;
 
+const PreToolUseOutput = Schema.fromJsonString(
+  Schema.Struct({
+    permission: Schema.Literal("deny"),
+    user_message: Schema.String,
+    agent_message: Schema.String,
+  }),
+);
+
 const BLOCKED_PATH_PATTERN = /node_modules|\.pnpm-store|\.pnpm(?:\/|$)/;
 
 const program = Effect.gen(function* () {
@@ -86,7 +94,7 @@ const program = Effect.gen(function* () {
 
   if (referencesBlockedPath) {
     yield* Console.log(
-      JSON.stringify({
+      yield* Schema.encodeEffect(PreToolUseOutput)({
         permission: "deny",
         user_message:
           "Use `pnpm opensrc path <package>` instead of reading from `node_modules` or `.pnpm-store`.",

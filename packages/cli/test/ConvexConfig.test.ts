@@ -29,15 +29,24 @@ const directoriesLayer = ({
   projectRoot: string;
 }) =>
   Layer.mergeAll(
-    Layer.mock(ConfectDirectory, {
-      get: Effect.succeed(confectDirectory),
-    }),
-    Layer.mock(ConvexDirectory, {
-      get: Effect.succeed(convexDirectory),
-    }),
-    Layer.mock(ProjectRoot, {
-      get: Effect.succeed(projectRoot),
-    }),
+    Layer.succeed(
+      ConfectDirectory,
+      ConfectDirectory.of({
+        get: Effect.succeed(confectDirectory),
+      }),
+    ),
+    Layer.succeed(
+      ConvexDirectory,
+      ConvexDirectory.of({
+        get: Effect.succeed(convexDirectory),
+      }),
+    ),
+    Layer.succeed(
+      ProjectRoot,
+      ProjectRoot.of({
+        get: Effect.succeed(projectRoot),
+      }),
+    ),
   );
 
 layer(TestLayer)("discoverInstalledComponents", (it) => {

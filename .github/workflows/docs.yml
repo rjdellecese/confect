@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: ./.github/actions/docs-setup
+      - uses: ./.github/actions/confect-setup
       - run: pnpm lint
 
   broken-links:

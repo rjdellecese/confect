@@ -233,8 +233,8 @@ describe("middleware", () => {
           );
 
           const error = expectFailure(result);
-          expect(error).toBeInstanceOf(GateClosed);
-          expect((error as GateClosed).reason).toBe("blocked by gate");
+          assert(Schema.is(GateClosed)(error));
+          expect(error.reason).toBe("blocked by gate");
 
           const texts = yield* listNoteTexts;
           expect(texts).toStrictEqual([]);

@@ -1,153 +1,38 @@
-import * as Ref from "@confect/core/Ref";
 import { ConvexClient } from "convex/browser";
-import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Queue from "effect/Queue";
-import * as Schema from "effect/Schema";
-import * as Stream from "effect/Stream";
+import * as InternalWebSocketClient from "./internal/WebSocketClient";
 
-export class WebSocketClientError extends Schema.TaggedError<WebSocketClientError>()(
-  "WebSocketClientError",
-  {
-    cause: Schema.Unknown,
-  },
-) {}
+export { WebSocketClientError } from "./internal/WebSocketClient";
 
 const make = (
   address: string,
   options?: ConstructorParameters<typeof ConvexClient>[1],
 ) =>
-  Effect.acquireRelease(
-    Effect.sync(() => new ConvexClient(address, options)),
-    (convexClient) => Effect.promise(() => convexClient.close()),
-  ).pipe(
-    Effect.map((convexClient) => {
-      const url = address;
-
-      const setAuth = (
-        fetchToken: (args: {
-          forceRefreshToken: boolean;
-        }) => Effect.Effect<string | null | undefined>,
-        onChange?: (isAuthenticated: boolean) => Effect.Effect<void>,
-      ) =>
-        Effect.sync(() => {
-          convexClient.setAuth(
-            (args) => Effect.runPromise(fetchToken(args)),
-            ...(onChange
-              ? [
-                  (isAuthenticated: boolean) =>
-                    Effect.runFork(onChange(isAuthenticated)),
-                ]
-              : []),
-          );
-        });
-
-      const mapUnknownError = (cause: unknown) =>
-        new WebSocketClientError({ cause });
-
-      const query = <Query extends Ref.AnyPublicQuery>(
-        ref: Query,
-        ...rest: Ref.OptionalArgs<Query>
-      ): Effect.Effect<
-        Ref.Returns<Query>,
-        Ref.Error<Query> | WebSocketClientError | Schema.SchemaError
-      > => {
-        const args = (rest[0] ?? {}) as Ref.Args<Query>;
-        return Ref.runWithCodec(
-          ref,
-          args,
-          (functionReference, encodedArgs) =>
-            convexClient.query(functionReference, encodedArgs),
-          mapUnknownError,
-        );
-      };
-
-      const mutation = <Mutation extends Ref.AnyPublicMutation>(
-        ref: Mutation,
-        ...rest: Ref.OptionalArgs<Mutation>
-      ): Effect.Effect<
-        Ref.Returns<Mutation>,
-        Ref.Error<Mutation> | WebSocketClientError | Schema.SchemaError
-      > => {
-        const args = (rest[0] ?? {}) as Ref.Args<Mutation>;
-        return Ref.runWithCodec(
-          ref,
-          args,
-          (functionReference, encodedArgs) =>
-            convexClient.mutation(functionReference, encodedArgs),
-          mapUnknownError,
-        );
-      };
-
-      const action = <Action extends Ref.AnyPublicAction>(
-        ref: Action,
-        ...rest: Ref.OptionalArgs<Action>
-      ): Effect.Effect<
-        Ref.Returns<Action>,
-        Ref.Error<Action> | WebSocketClientError | Schema.SchemaError
-      > => {
-        const args = (rest[0] ?? {}) as Ref.Args<Action>;
-        return Ref.runWithCodec(
-          ref,
-          args,
-          (functionReference, encodedArgs) =>
-            convexClient.action(functionReference, encodedArgs),
-          mapUnknownError,
-        );
-      };
-
-      const reactiveQuery = <Query extends Ref.AnyPublicQuery>(
-        ref: Query,
-        ...rest: Ref.OptionalArgs<Query>
-      ): Stream.Stream<
-        Ref.Returns<Query>,
-        Ref.Error<Query> | WebSocketClientError | Schema.SchemaError
-      > => {
-        const args = (rest[0] ?? {}) as Ref.Args<Query>;
-        const functionReference = Ref.getFunctionReference(ref);
-        const onError = Ref.decodeErrorOrElse(ref, mapUnknownError);
-
-        return Stream.unwrap(
-          Effect.gen(function* () {
-            const encodedArgs = yield* Ref.encodeArgs(ref, args);
-
-            return Stream.callback<
-              unknown,
-              Ref.Error<Query> | WebSocketClientError
-            >((queue) =>
-              Effect.gen(function* () {
-                const unsubscribe = convexClient.onUpdate(
-                  functionReference,
-                  encodedArgs,
-                  (result) => {
-                    Queue.offerUnsafe(queue, result);
-                  },
-                  (error) => {
-                    Queue.failCauseUnsafe(queue, Cause.fail(onError(error)));
-                  },
-                );
-                yield* Effect.addFinalizer(() =>
-                  Effect.sync(() => unsubscribe()),
-                );
-              }),
-            );
-          }),
-        ).pipe(
-          Stream.mapEffect((encodedReturns) =>
-            Ref.decodeReturns(ref, encodedReturns),
-          ),
-        );
-      };
-
+  InternalWebSocketClient.makeScoped(
+    address,
+    Effect.sync(() => {
+      const convexClient = new ConvexClient(address, options);
       return {
-        url,
-        setAuth,
-        query,
-        mutation,
-        action,
-        reactiveQuery,
+        setAuth: (fetchToken, onChange) =>
+          onChange === undefined
+            ? convexClient.setAuth(fetchToken)
+            : convexClient.setAuth(fetchToken, onChange),
+        close: () => convexClient.close(),
+        query: (functionReference, encodedArgs) =>
+          convexClient.query(functionReference, encodedArgs),
+        mutation: (functionReference, encodedArgs) =>
+          convexClient.mutation(functionReference, encodedArgs),
+        action: (functionReference, encodedArgs) =>
+          convexClient.action(functionReference, encodedArgs),
+        onUpdate: (functionReference, encodedArgs, onUpdate, onError) =>
+          convexClient.onUpdate(
+            functionReference,
+            encodedArgs,
+            onUpdate,
+            onError,
+          ),
       };
     }),
   );

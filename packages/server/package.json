@@ -1,21 +1,24 @@
 {
   "name": "@confect/server",
   "description": "Backend bindings to the Convex platform",
-  "version": "10.0.0-next.17",
+  "version": "10.0.0-next.20",
   "author": "RJ Dellecese",
   "bugs": {
     "url": "https://github.com/rjdellecese/confect/issues"
   },
+  "dependencies": {
+    "@effect/ai-openai-compat": "4.0.0-rc.112"
+  },
   "devDependencies": {
-    "@effect/platform-node": "4.0.0-rc.111",
-    "@effect/vitest": "4.0.0-rc.111",
+    "@effect/platform-node": "4.0.0-rc.112",
+    "@effect/vitest": "4.0.0-rc.112",
     "@swc/jest": "0.2.39",
     "@types/node": "22.20.1",
     "@vitest/coverage-v8": "4.1.10",
     "confect-bench-harness": "workspace:*",
     "convex-test": "0.0.55",
     "dotenv": "17.4.2",
-    "effect": "4.0.0-rc.111",
+    "effect": "4.0.0-rc.112",
     "tsdown": "0.22.14",
     "tsx": "4.23.12",
     "typescript": "7.0.2",
@@ -62,9 +65,9 @@
   "module": "./dist/index.js",
   "peerDependencies": {
     "@confect/core": "workspace:^",
-    "@effect/platform-node": "^4.0.0-rc.111",
-    "convex": "^1.32.0",
-    "effect": "^4.0.0-rc.111"
+    "@effect/platform-node": "^4.0.0-rc.112",
+    "convex": "^1.45.0",
+    "effect": "^4.0.0-rc.112"
   },
   "peerDependenciesMeta": {
     "@effect/platform-node": {

@@ -27,12 +27,14 @@ const fixtureConvex = `${fixtureRoot}/convex`;
 const RemoveGroupsLayer = Layer.mergeAll(
   NodePath.layer,
   NodeFileSystem.layer,
-  Layer.mock(ConfectDirectory, {
-    get: Effect.succeed(`${fixtureRoot}/confect`),
-  }),
-  Layer.mock(ConvexDirectory, {
-    get: Effect.succeed(fixtureConvex),
-  }),
+  Layer.succeed(
+    ConfectDirectory,
+    ConfectDirectory.of({ get: Effect.succeed(`${fixtureRoot}/confect`) }),
+  ),
+  Layer.succeed(
+    ConvexDirectory,
+    ConvexDirectory.of({ get: Effect.succeed(fixtureConvex) }),
+  ),
 );
 
 layer(RemoveGroupsLayer)("removeGroups", (it) => {
@@ -57,14 +59,12 @@ const GenerateFunctionsLayer = Layer.mergeAll(
   NodeFileSystem.layer,
 );
 
-const emptyArgs = Schema.Struct({});
 const emptyReturns = Schema.Null;
 
 const nodeGroup = () =>
   GroupSpec.makeNode().addFunction(
     FunctionSpec.publicNodeAction({
       name: "failingNodeAction",
-      args: () => emptyArgs,
       returns: () => emptyReturns,
     }),
   );
@@ -104,15 +104,15 @@ const runGenerateForNodeGroup = ({
     yield* fs.writeFileString(registryPath, "export default {};\n");
 
     const TempDirsLayer = Layer.mergeAll(
-      Layer.mock(ProjectRoot, {
-        get: Effect.succeed(root),
-      }),
-      Layer.mock(ConvexDirectory, {
-        get: Effect.succeed(convexDir),
-      }),
-      Layer.mock(ConfectDirectory, {
-        get: Effect.succeed(confectDir),
-      }),
+      Layer.succeed(ProjectRoot, ProjectRoot.of({ get: Effect.succeed(root) })),
+      Layer.succeed(
+        ConvexDirectory,
+        ConvexDirectory.of({ get: Effect.succeed(convexDir) }),
+      ),
+      Layer.succeed(
+        ConfectDirectory,
+        ConfectDirectory.of({ get: Effect.succeed(confectDir) }),
+      ),
     );
 
     yield* generateFunctions(spec).pipe(Effect.provide(TempDirsLayer));

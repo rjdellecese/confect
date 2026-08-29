@@ -58,9 +58,9 @@ const splitSystemFields = (input: { [key: PropertyKey]: unknown }) => {
  * output. Transformations construct fresh objects, so without this the system
  * fields would be dropped at every transformation step.
  */
-const wrapGetter = (
-  getter: SchemaGetter.Getter<any, any, any>,
-): SchemaGetter.Getter<any, any, any> =>
+const wrapGetter = <R>(
+  getter: SchemaGetter.Getter<any, any, R>,
+): SchemaGetter.Getter<any, any, R> =>
   new SchemaGetter.Getter((input, options) => {
     if (Option.isNone(input) || !Predicate.isObject(input.value)) {
       return getter.run(input, options);

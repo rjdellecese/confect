@@ -16,6 +16,22 @@ For `Schema`s used in Confect:
 - `Encoded` represents the value that is stored in the database or serialized as the argument/output of a Convex function. This must be a valid [Convex value](https://docs.convex.dev/database/types#convex-values).
 - `Context` is not currently supported. It should always be `never`.
 
+## Function argument fields
+
+Convex functions always receive an object, so Confect function specs declare `args` as a `Schema.Struct` field map rather than as an arbitrary schema:
+
+```typescript
+FunctionSpec.publicQuery({
+  name: "byAuthor",
+  args: () => ({ author: Schema.String }),
+  returns: () => Schema.Array(Schema.String),
+});
+```
+
+Confect lazily wraps that field map in `Schema.Struct`. A full schema such as `args: () => Schema.String` or `args: () => Schema.Struct(...)` is therefore not accepted. Top-level struct checks and annotations cannot be attached directly to function args; if you need a cross-field check, nest the checked struct under an argument field.
+
+For a function with no arguments, omit `args`; Confect defaults it to an empty field map (`{}`).
+
 ## Additional caveats
 
 ### No-op returns from Convex functions
@@ -25,7 +41,6 @@ Unlike the vanilla APIs, Convex functions defined with Confect may not return `u
 ```typescript ✅
 FunctionSpec.publicQuery({
   name: "myQuery",
-  args: () => Schema.Struct({}),
   returns: () => Schema.Null,
 });
 ```
@@ -33,7 +48,6 @@ FunctionSpec.publicQuery({
 ```typescript ❌
 FunctionSpec.publicQuery({
   name: "myQuery",
-  args: () => Schema.Struct({}),
   returns: () => Schema.Undefined,
 });
 ```
@@ -41,7 +55,6 @@ FunctionSpec.publicQuery({
 ```typescript ❌
 FunctionSpec.publicQuery({
   name: "myQuery",
-  args: () => Schema.Struct({}),
   returns: () => Schema.Void,
 });
 ```

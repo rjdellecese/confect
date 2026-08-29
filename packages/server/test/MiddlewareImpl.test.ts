@@ -22,7 +22,6 @@ import ProvideViewer, {
 
 const viewerName = FunctionSpec.publicQuery({
   name: "viewerName",
-  args: () => Schema.Struct({}),
   returns: () => Schema.String,
 });
 
@@ -71,10 +70,9 @@ describe("handler environment widening", () => {
     );
 
     type FunctionLevelExtra = MiddlewareSpec.Provides<
-      | GroupSpec.MiddlewareSpecs<typeof functionCoveredGroup>
-      | FunctionSpec.MiddlewareSpecs<
-          GroupSpec.Functions<typeof functionCoveredGroup>
-        >
+      FunctionSpec.MiddlewareSpecs<
+        GroupSpec.Functions<typeof functionCoveredGroup>
+      >
     >;
 
     expectTypeOf<FunctionLevelExtra>().toEqualTypeOf<Viewer>();
@@ -276,7 +274,6 @@ describe("registry key namespacing", () => {
 
     const clashFunction = FunctionSpec.publicQuery({
       name: "clash",
-      args: () => Schema.Struct({}),
       returns: () => Schema.String,
     });
 
