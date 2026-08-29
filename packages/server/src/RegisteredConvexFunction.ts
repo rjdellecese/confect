@@ -201,6 +201,7 @@ const queryFunction = <
         Schema.decodeUnknownEffect(args),
         Effect.orDie,
       );
+      // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Middleware errors are intentionally erased here and validated by runHandlerPromise against the combined error schema below.
       const decodedReturns = yield* RegisteredFunction.applyMiddleware(
         handler(decodedArgs),
         resolvedMiddlewares,
@@ -318,6 +319,7 @@ const mutationFunction = <
         Schema.decodeUnknownEffect(args),
         Effect.orDie,
       );
+      // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Middleware errors are intentionally erased here and validated by runHandlerPromise against the combined error schema below.
       const decodedReturns = yield* RegisteredFunction.applyMiddleware(
         handler(decodedArgs),
         resolvedMiddlewares,

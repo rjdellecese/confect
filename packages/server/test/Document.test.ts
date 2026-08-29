@@ -1,6 +1,7 @@
 import type { GenericId } from "@confect/core/GenericId";
 import * as SystemFields from "@confect/core/SystemFields";
 import * as Effect from "effect/Effect";
+import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Document from "@confect/server/Document";
@@ -92,11 +93,13 @@ describe("Document.decode", () => {
         content: 123,
       };
 
-      const error = yield* Document.decode(
-        invalidNote,
-        "notes",
-        NoteSchema,
-      ).pipe(Effect.flip);
+      const result = yield* Effect.result(
+        Document.decode("notes", NoteSchema)(invalidNote),
+      );
+      if (Result.isSuccess(result)) {
+        throw new Error("expected document decoding to fail");
+      }
+      const error = result.failure;
 
       expect(error).toBeInstanceOf(Document.DocumentDecodeError);
       expect(error.tableName).toBe("notes");

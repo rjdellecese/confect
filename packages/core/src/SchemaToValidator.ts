@@ -346,6 +346,7 @@ export const compileAst = (
         Match.tag("Unknown", "Any", () => Effect.succeed(v.any())),
         Match.tag("Declaration", (declaration) =>
           Effect.mapBoth(
+            // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Codec inputs are context-free, but Effect's SchemaAST.DeclarationRun erases their requirements to `any`.
             declaration.run(declaration.typeParameters)(
               new ArrayBuffer(0),
               declaration,

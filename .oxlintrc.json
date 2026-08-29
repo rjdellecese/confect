@@ -123,22 +123,6 @@
           }
         ]
       }
-    },
-    {
-      "files": [
-        "packages/core/src/SchemaToValidator.ts",
-        "packages/core/src/SystemFields.ts",
-        "packages/foldkit/test/TestClient.ts",
-        "packages/server/src/RegisteredConvexFunction.ts",
-        "packages/server/src/RegisteredFunction.ts",
-        "packages/server/test/Document.test.ts",
-        "packages/server/test/mock-backend/fixtures/confect/groups/runners.impl.ts",
-        "packages/server/test/mock-backend/fixtures/confect/http.ts",
-        "packages/server/test/mock-backend/fixtures/confect/middleware/ProvideViewer.impl.ts"
-      ],
-      "rules": {
-        "effecttsgo/any-unknown-in-error-context": "off"
-      }
     }
   ]
 }

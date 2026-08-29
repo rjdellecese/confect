@@ -30,6 +30,7 @@ const NotesApiLive = HttpApiBuilder.group(NotesApi, "notes", (handlers) =>
     Effect.gen(function* () {
       const runQuery = yield* QueryRunner;
 
+      // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Generated runner constraints erase the ref's error; this ref declares no domain error, so its SchemaError is defected here.
       return yield* runQuery(refs.public.databaseReader.listNotes, {});
     }).pipe(Effect.orDie),
   ),

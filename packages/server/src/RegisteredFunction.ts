@@ -139,11 +139,13 @@ export const applyMiddleware = <A, E, R>(
 ): Effect.Effect<A, any, R> => {
   let wrapped: Effect.Effect<any, any, any> = effect;
   for (let index = resolvedMiddlewares.length - 1; index >= 0; index--) {
+    // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Resolved middleware is type-erased after its public implementation boundary; its error and service channels are restored by the surrounding function contract.
     wrapped = resolvedMiddlewares[index]!.middlewareImpl(
       wrapped as any,
       options,
     ) as any;
   }
+  // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- The erased middleware error remains intact so runHandlerPromise can validate it against the combined error schema.
   return wrapped as Effect.Effect<A, any, R>;
 };
 
@@ -265,6 +267,7 @@ export const actionFunctionBase = <
         Schema.decodeUnknownEffect(args),
         Effect.orDie,
       );
+      // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Middleware errors are intentionally erased here and validated by runHandlerPromise against the combined error schema below.
       const decodedReturns = yield* applyMiddleware(
         handler(decodedArgs),
         resolvedMiddlewares,

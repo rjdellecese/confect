@@ -21,7 +21,10 @@ export interface Service extends Client.Client {
   // @effect-diagnostics-next-line lazyEffect:off
   readonly calls: () => Effect.Effect<ReadonlyArray<Call>>;
   readonly setNextResult: (
-    result: Effect.Effect<unknown, unknown>,
+    result: Result.Result<unknown, unknown>,
+  ) => Effect.Effect<void>;
+  readonly setNextResultEffect: (
+    result: Effect.Effect<Result.Result<unknown, unknown>>,
   ) => Effect.Effect<void>;
   readonly setReactiveQueryResults: (
     results: Stream.Stream<Result.Result<unknown, unknown>, never, never>,
@@ -57,9 +60,9 @@ const failRejection = <Ref_ extends CoreRef.Any>(
 export const layer = Layer.effectContext(
   Effect.gen(function* () {
     const recordedCalls = yield* Ref.make<ReadonlyArray<Call>>([]);
-    const nextResult = yield* Ref.make<Effect.Effect<unknown, unknown>>(
-      Effect.succeed({}),
-    );
+    const nextResult = yield* Ref.make<
+      Effect.Effect<Result.Result<unknown, unknown>>
+    >(Effect.succeed(Result.succeed({})));
     const nextReactiveQueryResults = yield* Ref.make<
       Stream.Stream<Result.Result<unknown, unknown>, never, never>
     >(Stream.empty);
@@ -79,9 +82,11 @@ export const layer = Layer.effectContext(
     >(method: "query" | "mutation" | "action", ref: Ref_, args: unknown) {
       yield* record(method, ref, args);
       const effect = yield* Ref.get(nextResult);
-      const encodedReturns = yield* effect.pipe(
-        Effect.catch((rejection) => failRejection(ref, rejection)),
-      );
+      const result = yield* effect;
+      const encodedReturns = yield* Result.match(result, {
+        onFailure: (rejection) => failRejection(ref, rejection),
+        onSuccess: Effect.succeed,
+      });
       return yield* CoreRef.decodeReturns(ref, encodedReturns);
     });
 
@@ -156,8 +161,13 @@ export const layer = Layer.effectContext(
         return yield* Ref.get(recordedCalls);
       }),
       setNextResult: Effect.fn("TestClient.setNextResult")(function* (result) {
-        yield* Ref.set(nextResult, result);
+        yield* Ref.set(nextResult, Effect.succeed(result));
       }),
+      setNextResultEffect: Effect.fn("TestClient.setNextResultEffect")(
+        function* (result) {
+          yield* Ref.set(nextResult, result);
+        },
+      ),
       setReactiveQueryResults: Effect.fn("TestClient.setReactiveQueryResults")(
         function* (results) {
           yield* Ref.set(nextReactiveQueryResults, results);

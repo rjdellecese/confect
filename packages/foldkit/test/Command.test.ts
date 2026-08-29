@@ -3,6 +3,7 @@ import { describe, expect, it } from "@effect/vitest";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
+import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as FoldkitCommand from "foldkit/command";
 import { m } from "foldkit/message";
@@ -157,7 +158,7 @@ describe("Command", () => {
       Effect.gen(function* () {
         const testClient = yield* TestClient.TestClient;
         yield* testClient.setNextResult(
-          Effect.fail(new NotFound({ id: "abc" })),
+          Result.fail(new NotFound({ id: "abc" })),
         );
 
         const DeleteNote = Command.mutation("DeleteNote", deleteMutationRef, {
@@ -179,7 +180,7 @@ describe("Command", () => {
       Effect.gen(function* () {
         const testClient = yield* TestClient.TestClient;
         yield* testClient.setNextResult(
-          Effect.fail(
+          Result.fail(
             new Client.WebSocketClientError({ cause: "network down" }),
           ),
         );
@@ -250,7 +251,7 @@ describe("Command", () => {
         expect(success).toEqual(SucceededSaveNote({ note: {} }));
 
         yield* testClient.setNextResult(
-          Effect.fail(
+          Result.fail(
             new Client.WebSocketClientError({ cause: "network down" }),
           ),
         );
@@ -309,7 +310,7 @@ describe("Command", () => {
       Effect.gen(function* () {
         const testClient = yield* TestClient.TestClient;
         const started = yield* Deferred.make<void>();
-        yield* testClient.setNextResult(
+        yield* testClient.setNextResultEffect(
           Deferred.succeed(started, undefined).pipe(
             Effect.andThen(() => Effect.never),
           ),
