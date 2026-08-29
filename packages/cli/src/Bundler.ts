@@ -1,6 +1,4 @@
-import { realpathSync } from "node:fs";
 import { createRequire, isBuiltin } from "node:module";
-import * as Path from "effect/Path";
 import {
   bundleRequire,
   loadTsConfig,
@@ -10,7 +8,9 @@ import { resolveModulePath } from "exsolve";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
+import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
 import * as String from "effect/String";
 import type * as esbuild from "esbuild";
@@ -82,8 +82,6 @@ export const resolveModule = (
     resolveCjs(specifier, importer),
   );
 
-const realPath = Option.liftThrowable((path: string) => realpathSync(path));
-
 /**
  * Bundles first-party workspace dependencies that `bundle-require` would
  * otherwise externalize and hand to Node's native ESM resolver. Resolves each
@@ -96,6 +94,7 @@ const realPath = Option.liftThrowable((path: string) => realpathSync(path));
  */
 export const bundleWorkspacePlugin = (
   path: Path.Path,
+  fs: FileSystem.FileSystem,
   skipPatterns: ReadonlyArray<RegExp>,
 ): esbuild.Plugin => ({
   name: "confect:bundle-workspace",
@@ -120,16 +119,14 @@ export const bundleWorkspacePlugin = (
             },
           ],
         }),
-        onSome: (resolved) => {
-          const real = Option.getOrElse(realPath(resolved), () => resolved);
-          return pipe(
-            real,
-            String.split(path.sep),
-            Array.contains("node_modules"),
-          )
-            ? undefined
-            : { path: real };
-        },
+        onSome: (resolved) =>
+          Effect.runPromise(
+            fs.realPath(resolved).pipe(Effect.orElseSucceed(() => resolved)),
+          ).then((real) =>
+            pipe(real, String.split(path.sep), Array.contains("node_modules"))
+              ? undefined
+              : { path: real },
+          ),
       });
     });
   },
@@ -182,9 +179,10 @@ const captureBuildResultPlugin = (
 export const bundle = (
   entryPoint: string,
   options?: { readonly plugins?: ReadonlyArray<esbuild.Plugin> },
-): Effect.Effect<Bundled, BundlerError, Path.Path> =>
+): Effect.Effect<Bundled, BundlerError, Path.Path | FileSystem.FileSystem> =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
+    const fs = yield* FileSystem.FileSystem;
 
     const buildResultRef = yield* Ref.make<CapturedBuildResult>({
       metafile: undefined,
@@ -204,7 +202,7 @@ export const bundle = (
           esbuildOptions: {
             plugins: [
               ...(options?.plugins ?? []),
-              bundleWorkspacePlugin(path, skipPatterns),
+              bundleWorkspacePlugin(path, fs, skipPatterns),
               captureBuildResultPlugin(buildResultRef),
             ],
             logLevel: "silent",

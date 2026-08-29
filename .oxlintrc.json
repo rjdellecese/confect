@@ -125,12 +125,6 @@
       }
     },
     {
-      "files": ["packages/cli/src/Bundler.ts"],
-      "rules": {
-        "effecttsgo/node-builtin-import": "off"
-      }
-    },
-    {
       "files": [
         "packages/core/src/SchemaToValidator.ts",
         "packages/core/src/SystemFields.ts",
