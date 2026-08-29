@@ -173,7 +173,7 @@ const MINIMUM_CONVEX_VERSION = "1.36.0";
  * version is the only reliable signal.
  */
 const supportsErrorsAsValues = ((): boolean => {
-  const [major, minor] = String(convexVersion).split(".").map(Number);
+  const [major, minor] = convexVersion.split(".").map(Number);
   if (
     major === undefined ||
     minor === undefined ||
@@ -441,7 +441,7 @@ export const useAction = <Action extends Ref.AnyPublicAction>(
   );
 };
 
-const invokeAsResult = async <Ref_ extends Ref.Any>(
+const invokeAsResult = <Ref_ extends Ref.Any>(
   ref: Ref_,
   invoke: (
     fnRef: Ref.FunctionReference<Ref_>,
@@ -449,12 +449,14 @@ const invokeAsResult = async <Ref_ extends Ref.Any>(
   ) => PromiseLike<unknown>,
   args: Ref.OptionalArgs<Ref_>,
 ): Promise<Result.Result<Ref.Returns<Ref_>, Ref.Error<Ref_>>> => {
-  const exit = await Effect.runPromiseExit(
+  const exitPromise = Effect.runPromiseExit(
     Ref.runWithCodec(ref, (args[0] ?? {}) as Ref.Args<Ref_>, invoke).pipe(
       Effect.catchTag("SchemaError", Effect.die),
       Effect.result,
     ),
   );
-  if (Exit.isSuccess(exit)) return exit.value;
-  throw Cause.squash(exit.cause);
+  return exitPromise.then((exit) => {
+    if (Exit.isSuccess(exit)) return exit.value;
+    throw Cause.squash(exit.cause);
+  });
 };

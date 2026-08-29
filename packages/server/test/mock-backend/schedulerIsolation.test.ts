@@ -39,9 +39,7 @@ const expectedSum = (5000 * 5001) / 2;
  * both via `globalThis` property lookup at dispatch time, so swapping the
  * properties intercepts it.
  */
-const withConvexIsolateTimers = async <A>(
-  run: () => Promise<A>,
-): Promise<A> => {
+const withConvexIsolateTimers = <A>(run: () => Promise<A>): Promise<A> => {
   const originalSetTimeout = globalThis.setTimeout;
   const originalSetImmediate = globalThis.setImmediate;
   const ban = (name: string) => () => {
@@ -51,34 +49,30 @@ const withConvexIsolateTimers = async <A>(
   };
   globalThis.setTimeout = ban("setTimeout") as never;
   globalThis.setImmediate = ban("setImmediate") as never;
-  try {
-    return await run();
-  } finally {
+  return run().finally(() => {
     globalThis.setTimeout = originalSetTimeout;
     globalThis.setImmediate = originalSetImmediate;
-  }
+  });
 };
 
 describe("Effect scheduler inside the Convex isolate", () => {
-  it("runs a query handler exceeding the fiber op budget without timers", async () => {
+  it("runs a query handler exceeding the fiber op budget without timers", () => {
     const t = convexTest(convexSchema, modules);
-    const result = await withConvexIsolateTimers(() =>
+    return withConvexIsolateTimers(() =>
       t.query(
         Ref.getFunctionReference(refs.public.groups.scheduling.manyOpsQuery),
         {},
       ),
-    );
-    expect(result).toBe(expectedSum);
+    ).then((result) => expect(result).toBe(expectedSum));
   });
 
-  it("runs a mutation handler exceeding the fiber op budget without timers", async () => {
+  it("runs a mutation handler exceeding the fiber op budget without timers", () => {
     const t = convexTest(convexSchema, modules);
-    const result = await withConvexIsolateTimers(() =>
+    return withConvexIsolateTimers(() =>
       t.mutation(
         Ref.getFunctionReference(refs.public.groups.scheduling.manyOpsMutation),
         {},
       ),
-    );
-    expect(result).toBe(expectedSum);
+    ).then((result) => expect(result).toBe(expectedSum));
   });
 });

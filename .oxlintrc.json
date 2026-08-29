@@ -1,6 +1,20 @@
 {
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "unicorn", "import", "promise", "node", "oxc"],
+  "$schema": "./node_modules/@effect/tsgo/oxlint-schema.json",
+  "extends": ["./node_modules/@effect/tsgo/oxlint-presets/recommended.json"],
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "import",
+    "promise",
+    "node",
+    "oxc",
+    "effecttsgo"
+  ],
+  "options": {
+    "typeAware": true,
+    "denyWarnings": true,
+    "reportUnusedDisableDirectives": "deny"
+  },
   "categories": {
     "correctness": "error",
     "suspicious": "error",
@@ -30,7 +44,15 @@
     "no-underscore-dangle": "off",
     "unicorn/consistent-function-scoping": "off",
     "unicorn/no-array-sort": "off",
-    "oxc/no-accumulating-spread": "off"
+    "oxc/no-accumulating-spread": "off",
+    "typescript/consistent-return": "off",
+    "typescript/no-unsafe-type-assertion": "off",
+    "typescript/no-unnecessary-type-assertion": "off",
+    "typescript/no-unnecessary-type-arguments": "off",
+    "typescript/no-unnecessary-type-parameters": "off",
+    "effecttsgo/any-unknown-in-error-context": "error",
+    "effecttsgo/deterministic-keys": "error",
+    "effecttsgo/strict-effect-provide": "off"
   },
   "overrides": [
     {
@@ -64,7 +86,7 @@
             ],
             "patterns": [
               {
-                "group": ["@effect/*", "!@effect/vitest"],
+                "group": ["@effect/*", "!@effect/vitest", "!@effect/tsgo/**"],
                 "message": "Import @effect/* modules from their submodule path so they tree-shake, e.g. `import * as Path from \"@effect/platform/Path\"`.",
                 "allowTypeImports": true
               }

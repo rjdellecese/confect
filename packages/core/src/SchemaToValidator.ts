@@ -91,7 +91,8 @@ export const compileTableSchema = <TableSchema extends Schema.Codec<any, any>>(
     Match.value,
     Match.tag("Objects", ({ indexSignatures }) =>
       Array.isReadonlyArrayEmpty(indexSignatures)
-        ? (compileAst(ast) as Effect.Effect<any>)
+        ? // oxlint-disable-next-line effecttsgo/unsafe-effect-type-assertion -- The return type is derived from the input schema and cannot be recovered from the runtime AST.
+          (compileAst(ast) as Effect.Effect<any>)
         : Effect.fail(new IndexSignaturesAreNotSupportedError()),
     ),
     Match.tag("Union", (unionAst) => compileAst(unionAst)),
@@ -345,6 +346,7 @@ export const compileAst = (
         Match.tag("Unknown", "Any", () => Effect.succeed(v.any())),
         Match.tag("Declaration", (declaration) =>
           Effect.mapBoth(
+            // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Codec inputs are context-free, but Effect's SchemaAST.DeclarationRun erases their requirements to `any`.
             declaration.run(declaration.typeParameters)(
               new ArrayBuffer(0),
               declaration,

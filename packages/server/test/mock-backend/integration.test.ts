@@ -3,6 +3,7 @@ import { assertEquals } from "@effect/vitest/utils";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
 import refs from "./fixtures/confect/_generated/refs";
 import { DatabaseWriter } from "./fixtures/confect/_generated/services";
 import { Id } from "./fixtures/confect/_generated/id";
@@ -271,7 +272,7 @@ describe("paginate", () => {
         })
         .pipe(Effect.result, Effect.map(expectFailure));
 
-      assert(failure instanceof PaginationDenied);
+      assert(Schema.is(PaginationDenied)(failure));
       assertEquals(failure.reason, "denied");
 
       const result = yield* c.query(
@@ -323,8 +324,8 @@ describe("typed errors", () => {
         );
 
         const error = expectFailure(result);
-        expect(error).toBeInstanceOf(NotFound);
-        expect((error as NotFound).id).toBe(missingId);
+        assert(Schema.is(NotFound)(error));
+        expect(error.id).toBe(missingId);
       }).pipe(Effect.provide(TestConfect.layer)),
     );
 
@@ -343,8 +344,8 @@ describe("typed errors", () => {
           );
 
           const error = expectFailure(result);
-          expect(error).toBeInstanceOf(NotFound);
-          expect((error as NotFound).id).toBe(missingId);
+          assert(Schema.is(NotFound)(error));
+          expect(error.id).toBe(missingId);
         }).pipe(Effect.provide(TestConfect.layer)),
     );
 
@@ -363,8 +364,8 @@ describe("typed errors", () => {
           );
 
           const error = expectFailure(result);
-          expect(error).toBeInstanceOf(Forbidden);
-          expect((error as Forbidden).reason).toBe("admin required");
+          assert(Schema.is(Forbidden)(error));
+          expect(error.reason).toBe("admin required");
         }).pipe(Effect.provide(TestConfect.layer)),
     );
 
@@ -379,8 +380,8 @@ describe("typed errors", () => {
         );
 
         const error = expectFailure(result);
-        expect(error).toBeInstanceOf(Forbidden);
-        expect((error as Forbidden).reason).toBe("no access");
+        assert(Schema.is(Forbidden)(error));
+        expect(error.reason).toBe("no access");
       }).pipe(Effect.provide(TestConfect.layer)),
     );
   });
@@ -520,8 +521,8 @@ describe("typed errors", () => {
             }),
           );
           const notFound = expectFailure(queryResult);
-          expect(notFound).toBeInstanceOf(NotFound);
-          expect((notFound as NotFound).id).toBe(missingId);
+          assert(Schema.is(NotFound)(notFound));
+          expect(notFound.id).toBe(missingId);
 
           const mutationResult = yield* Effect.result(
             c.mutation(refs.public.groups.typedErrors.deleteNoteOrFail, {
@@ -530,8 +531,8 @@ describe("typed errors", () => {
             }),
           );
           const forbidden = expectFailure(mutationResult);
-          expect(forbidden).toBeInstanceOf(Forbidden);
-          expect((forbidden as Forbidden).reason).toBe("admin required");
+          assert(Schema.is(Forbidden)(forbidden));
+          expect(forbidden.reason).toBe("admin required");
         }).pipe(Effect.provide(TestConfect.layer)),
     );
   });
@@ -550,8 +551,8 @@ describe("typed errors", () => {
           );
 
           const error = expectFailure(result);
-          expect(error).toBeInstanceOf(NotFound);
-          expect((error as NotFound).id).toBe("rolled-back");
+          assert(Schema.is(NotFound)(error));
+          expect(error.id).toBe("rolled-back");
 
           const notes = yield* c.query(refs.public.databaseReader.listNotes);
           assertEquals(notes.length, 0);
@@ -591,8 +592,8 @@ describe("typed errors", () => {
           );
 
           const error = expectFailure(result);
-          expect(error).toBeInstanceOf(NodeNotFound);
-          expect((error as NodeNotFound).id).toBe("abc");
+          assert(Schema.is(NodeNotFound)(error));
+          expect(error.id).toBe("abc");
         }).pipe(Effect.provide(TestConfect.layer)),
     );
   });

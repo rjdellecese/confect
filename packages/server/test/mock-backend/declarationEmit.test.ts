@@ -7,11 +7,31 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as Record from "effect/Record";
+import * as Schema from "effect/Schema";
 import * as String from "effect/String";
 import * as ChildProcess from "effect/unstable/process/ChildProcess";
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
 
 const entries = ["services.ts", "docs.ts", "refs.ts", "schema.ts", "spec.ts"];
+
+const TypeScriptConfig = Schema.fromJsonString(
+  Schema.Struct({
+    extends: Schema.String,
+    compilerOptions: Schema.Struct({
+      noEmit: Schema.Boolean,
+      emitDeclarationOnly: Schema.Boolean,
+      declaration: Schema.Boolean,
+      declarationMap: Schema.Boolean,
+      sourceMap: Schema.Boolean,
+      rootDir: Schema.String,
+      outDir: Schema.String,
+      plugins: Schema.Array(
+        Schema.Struct({ name: Schema.String, diagnostics: Schema.Boolean }),
+      ),
+    }),
+    files: Schema.Array(Schema.String),
+  }),
+);
 
 class DeclarationEmit extends Context.Service<
   DeclarationEmit,
@@ -49,29 +69,24 @@ const emitDeclarations = Effect.gen(function* () {
   const outDir = path.join(workDir, "out");
   const configPath = path.join(workDir, "tsconfig.json");
 
-  yield* fs.writeFileString(
-    configPath,
-    JSON.stringify({
-      extends: path.join(packageRoot, "tsconfig.json"),
-      compilerOptions: {
-        noEmit: false,
-        emitDeclarationOnly: true,
-        declaration: true,
-        declarationMap: false,
-        sourceMap: false,
-        rootDir: packageRoot,
-        outDir,
-        // Suggestion-level Effect diagnostics (`schemaNumber`, `lazyEffect`,
-        // …) are advice about the sources these entries pull in, not emit
-        // failures, and `tsc` prints them on the same stream the assertions
-        // below expect to be empty.
-        plugins: [
-          { name: "@effect/language-service", includeSuggestionsInTsc: false },
-        ],
-      },
-      files: Array.map(entries, (entry) => path.join(generated, entry)),
-    }),
-  );
+  const config = yield* Schema.encodeEffect(TypeScriptConfig)({
+    extends: path.join(packageRoot, "tsconfig.json"),
+    compilerOptions: {
+      noEmit: false,
+      emitDeclarationOnly: true,
+      declaration: true,
+      declarationMap: false,
+      sourceMap: false,
+      rootDir: packageRoot,
+      outDir,
+      // Oxlint owns Effect diagnostics; declaration emit should report only
+      // TypeScript diagnostics on the stream asserted below.
+      plugins: [{ name: "@effect/language-service", diagnostics: false }],
+    },
+    files: Array.map(entries, (entry) => path.join(generated, entry)),
+  });
+
+  yield* fs.writeFileString(configPath, config);
 
   const typescript = path.dirname(
     yield* path.fromFileUrl(

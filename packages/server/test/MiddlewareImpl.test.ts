@@ -70,10 +70,9 @@ describe("handler environment widening", () => {
     );
 
     type FunctionLevelExtra = MiddlewareSpec.Provides<
-      | GroupSpec.MiddlewareSpecs<typeof functionCoveredGroup>
-      | FunctionSpec.MiddlewareSpecs<
-          GroupSpec.Functions<typeof functionCoveredGroup>
-        >
+      FunctionSpec.MiddlewareSpecs<
+        GroupSpec.Functions<typeof functionCoveredGroup>
+      >
     >;
 
     expectTypeOf<FunctionLevelExtra>().toEqualTypeOf<Viewer>();

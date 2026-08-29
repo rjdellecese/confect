@@ -1,0 +1,22 @@
+name: "Bun Setup"
+description: "Installs the Bun version pinned in mise.toml"
+author: "Confect"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Read Bun version
+      id: bun-version
+      shell: bash
+      run: |
+        version=$(sed -n 's/^bun = "\([^"]*\)"$/\1/p' mise.toml)
+        if [ -z "$version" ]; then
+          echo "Could not read the Bun version from mise.toml" >&2
+          exit 1
+        fi
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: ${{ steps.bun-version.outputs.version }}

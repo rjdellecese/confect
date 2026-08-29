@@ -1,6 +1,8 @@
 import { FunctionSpec, Ref } from "@confect/core";
+import { it } from "@effect/vitest";
 import { renderHook } from "@testing-library/react";
 import { ConvexError } from "convex/values";
+import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import {
@@ -268,58 +270,84 @@ describe("useMutation", () => {
     >();
   });
 
-  test("resolves directly to decoded result without an error schema", async () => {
-    const inner = vi.fn().mockResolvedValue("note-1");
-    useConvexMutationMock.mockReturnValue(inner);
+  it.effect("resolves directly to decoded result without an error schema", () =>
+    Effect.gen(function* () {
+      const inner = vi.fn().mockResolvedValue("note-1");
+      useConvexMutationMock.mockReturnValue(inner);
 
-    const { result } = renderHook(() => useMutation(mutationNoError));
-    await expect(result.current({ text: "hi" })).resolves.toBe("note-1");
-  });
+      const { result } = renderHook(() => useMutation(mutationNoError));
+      yield* Effect.promise(() =>
+        expect(result.current({ text: "hi" })).resolves.toBe("note-1"),
+      );
+    }),
+  );
 
-  test("resolves to Result.Success with decoded result when error schema succeeds", async () => {
-    const inner = vi.fn().mockResolvedValue(null);
-    useConvexMutationMock.mockReturnValue(inner);
+  it.effect(
+    "resolves to Result.Success with decoded result when error schema succeeds",
+    () =>
+      Effect.gen(function* () {
+        const inner = vi.fn().mockResolvedValue(null);
+        useConvexMutationMock.mockReturnValue(inner);
 
-    const { result } = renderHook(() => useMutation(mutationWithError));
-    const result_ = await result.current({ id: "abc" });
+        const { result } = renderHook(() => useMutation(mutationWithError));
+        const result_ = yield* Effect.promise(() =>
+          result.current({ id: "abc" }),
+        );
 
-    assert(Result.isSuccess(result_));
-    expect(result_.success).toBeNull();
-  });
+        assert(Result.isSuccess(result_));
+        expect(result_.success).toBeNull();
+      }),
+  );
 
-  test("resolves to Result.Failure with the decoded typed error for a matching ConvexError", async () => {
-    const inner = vi
-      .fn()
-      .mockRejectedValue(new ConvexError({ _tag: "NotFound", id: "abc" }));
-    useConvexMutationMock.mockReturnValue(inner);
+  it.effect(
+    "resolves to Result.Failure with the decoded typed error for a matching ConvexError",
+    () =>
+      Effect.gen(function* () {
+        const inner = vi
+          .fn()
+          .mockRejectedValue(new ConvexError({ _tag: "NotFound", id: "abc" }));
+        useConvexMutationMock.mockReturnValue(inner);
 
-    const { result } = renderHook(() => useMutation(mutationWithError));
-    const result_ = await result.current({ id: "abc" });
+        const { result } = renderHook(() => useMutation(mutationWithError));
+        const result_ = yield* Effect.promise(() =>
+          result.current({ id: "abc" }),
+        );
 
-    assert(Result.isFailure(result_));
-    assert(result_.failure instanceof NotFound);
-    expect(result_.failure.id).toBe("abc");
-  });
+        assert(Result.isFailure(result_));
+        assert(Schema.is(NotFound)(result_.failure));
+        expect(result_.failure.id).toBe("abc");
+      }),
+  );
 
-  test("rejects with the original error for a non-ConvexError", async () => {
-    const transportError = new Error("network down");
-    const inner = vi.fn().mockRejectedValue(transportError);
-    useConvexMutationMock.mockReturnValue(inner);
+  it.effect("rejects with the original error for a non-ConvexError", () =>
+    Effect.gen(function* () {
+      const transportError = new Error("network down");
+      const inner = vi.fn().mockRejectedValue(transportError);
+      useConvexMutationMock.mockReturnValue(inner);
 
-    const { result } = renderHook(() => useMutation(mutationNoError));
+      const { result } = renderHook(() => useMutation(mutationNoError));
 
-    await expect(result.current({ text: "hi" })).rejects.toBe(transportError);
-  });
+      yield* Effect.promise(() =>
+        expect(result.current({ text: "hi" })).rejects.toBe(transportError),
+      );
+    }),
+  );
 
-  test("rejects with the original ConvexError for a ref without an error schema", async () => {
-    const convexError = new ConvexError({ _tag: "Anything", id: "abc" });
-    const inner = vi.fn().mockRejectedValue(convexError);
-    useConvexMutationMock.mockReturnValue(inner);
+  it.effect(
+    "rejects with the original ConvexError for a ref without an error schema",
+    () =>
+      Effect.gen(function* () {
+        const convexError = new ConvexError({ _tag: "Anything", id: "abc" });
+        const inner = vi.fn().mockRejectedValue(convexError);
+        useConvexMutationMock.mockReturnValue(inner);
 
-    const { result } = renderHook(() => useMutation(mutationNoError));
+        const { result } = renderHook(() => useMutation(mutationNoError));
 
-    await expect(result.current({ text: "hi" })).rejects.toBe(convexError);
-  });
+        yield* Effect.promise(() =>
+          expect(result.current({ text: "hi" })).rejects.toBe(convexError),
+        );
+      }),
+  );
 
   test("preserves callback identity across rerenders", () => {
     const inner = vi.fn().mockResolvedValue("note-1");
@@ -344,48 +372,68 @@ describe("useAction", () => {
     >();
   });
 
-  test("resolves directly to decoded result without an error schema", async () => {
-    const inner = vi.fn().mockResolvedValue("pong");
-    useConvexActionMock.mockReturnValue(inner);
+  it.effect("resolves directly to decoded result without an error schema", () =>
+    Effect.gen(function* () {
+      const inner = vi.fn().mockResolvedValue("pong");
+      useConvexActionMock.mockReturnValue(inner);
 
-    const { result } = renderHook(() => useAction(actionNoError));
-    await expect(result.current({})).resolves.toBe("pong");
-  });
+      const { result } = renderHook(() => useAction(actionNoError));
+      yield* Effect.promise(() =>
+        expect(result.current({})).resolves.toBe("pong"),
+      );
+    }),
+  );
 
-  test("resolves to Result.Success with decoded result when error schema succeeds", async () => {
-    const inner = vi.fn().mockResolvedValue(null);
-    useConvexActionMock.mockReturnValue(inner);
+  it.effect(
+    "resolves to Result.Success with decoded result when error schema succeeds",
+    () =>
+      Effect.gen(function* () {
+        const inner = vi.fn().mockResolvedValue(null);
+        useConvexActionMock.mockReturnValue(inner);
 
-    const { result } = renderHook(() => useAction(actionWithError));
-    const result_ = await result.current({ id: "abc" });
+        const { result } = renderHook(() => useAction(actionWithError));
+        const result_ = yield* Effect.promise(() =>
+          result.current({ id: "abc" }),
+        );
 
-    assert(Result.isSuccess(result_));
-    expect(result_.success).toBeNull();
-  });
+        assert(Result.isSuccess(result_));
+        expect(result_.success).toBeNull();
+      }),
+  );
 
-  test("resolves to Result.Failure with the decoded typed error for a matching ConvexError", async () => {
-    const inner = vi
-      .fn()
-      .mockRejectedValue(new ConvexError({ _tag: "NotFound", id: "abc" }));
-    useConvexActionMock.mockReturnValue(inner);
+  it.effect(
+    "resolves to Result.Failure with the decoded typed error for a matching ConvexError",
+    () =>
+      Effect.gen(function* () {
+        const inner = vi
+          .fn()
+          .mockRejectedValue(new ConvexError({ _tag: "NotFound", id: "abc" }));
+        useConvexActionMock.mockReturnValue(inner);
 
-    const { result } = renderHook(() => useAction(actionWithError));
-    const result_ = await result.current({ id: "abc" });
+        const { result } = renderHook(() => useAction(actionWithError));
+        const result_ = yield* Effect.promise(() =>
+          result.current({ id: "abc" }),
+        );
 
-    assert(Result.isFailure(result_));
-    assert(result_.failure instanceof NotFound);
-    expect(result_.failure.id).toBe("abc");
-  });
+        assert(Result.isFailure(result_));
+        assert(Schema.is(NotFound)(result_.failure));
+        expect(result_.failure.id).toBe("abc");
+      }),
+  );
 
-  test("rejects with the original error for a non-ConvexError", async () => {
-    const transportError = new Error("network down");
-    const inner = vi.fn().mockRejectedValue(transportError);
-    useConvexActionMock.mockReturnValue(inner);
+  it.effect("rejects with the original error for a non-ConvexError", () =>
+    Effect.gen(function* () {
+      const transportError = new Error("network down");
+      const inner = vi.fn().mockRejectedValue(transportError);
+      useConvexActionMock.mockReturnValue(inner);
 
-    const { result } = renderHook(() => useAction(actionNoError));
+      const { result } = renderHook(() => useAction(actionNoError));
 
-    await expect(result.current({})).rejects.toBe(transportError);
-  });
+      yield* Effect.promise(() =>
+        expect(result.current({})).rejects.toBe(transportError),
+      );
+    }),
+  );
 
   test("preserves callback identity across rerenders", () => {
     const inner = vi.fn().mockResolvedValue("pong");

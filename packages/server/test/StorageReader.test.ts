@@ -13,7 +13,8 @@ const blobUrl =
 const fakeConvexStorageReader = (url: string | null) =>
   ({
     getUrl: () => Promise.resolve(url),
-  }) as unknown as ConvexStorageReader;
+    getMetadata: () => Promise.resolve(null),
+  }) satisfies ConvexStorageReader;
 
 describe("StorageReader", () => {
   it.effect("getUrl decodes the string Convex returns", () =>

@@ -7,8 +7,11 @@ const uploadUrl =
   "https://happy-animal-123.convex.cloud/api/storage/upload?token=abc123";
 
 const fakeConvexStorageWriter = {
+  delete: () => Promise.resolve(),
   generateUploadUrl: () => Promise.resolve(uploadUrl),
-} as unknown as ConvexStorageWriter;
+  getMetadata: () => Promise.resolve(null),
+  getUrl: () => Promise.resolve(null),
+} satisfies ConvexStorageWriter;
 
 describe("StorageWriter", () => {
   it.effect("generateUploadUrl decodes the string Convex returns", () =>

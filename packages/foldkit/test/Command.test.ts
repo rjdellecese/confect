@@ -1,54 +1,16 @@
 import { FunctionSpec, Ref } from "@confect/core";
-import { describe, expect, layer } from "@effect/vitest";
+import { describe, expect, it } from "@effect/vitest";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
-import * as Layer from "effect/Layer";
+import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
-import * as Stream from "effect/Stream";
 import * as FoldkitCommand from "foldkit/command";
 import { m } from "foldkit/message";
-import { beforeEach, expectTypeOf, test } from "vitest";
+import { expectTypeOf, test } from "vitest";
 import * as Command from "@confect/foldkit/Command";
 import * as Client from "@confect/foldkit/Client";
-
-interface Call {
-  readonly method: "query" | "mutation" | "action";
-  readonly name: string;
-  readonly args: unknown;
-}
-
-let calls: Array<Call> = [];
-let nextResult: Effect.Effect<unknown, unknown> = Effect.succeed({});
-
-beforeEach(() => {
-  calls = [];
-  nextResult = Effect.succeed({});
-});
-
-const record =
-  (method: Call["method"]) =>
-  (ref: Ref.Any, ...rest: [unknown?]) =>
-    Effect.suspend(() => {
-      calls.push({
-        method,
-        name: Ref.getConvexFunctionName(ref),
-        args: rest[0] ?? {},
-      });
-      return nextResult;
-    });
-
-const StubLayer = Layer.effect(
-  Client.Client,
-  Client.make({
-    url: "https://test.convex.cloud",
-    setAuth: () => Effect.void,
-    query: record("query"),
-    mutation: record("mutation"),
-    action: record("action"),
-    reactiveQuery: () => Stream.empty,
-  } as any),
-);
+import * as TestClient from "./TestClient";
 
 const listQueryRef = Ref.make(
   "notes",
@@ -105,7 +67,7 @@ const saveNoteConfig = {
   ...saveNoteHandlers,
 };
 
-layer(StubLayer)("Command", (it) => {
+describe("Command", () => {
   describe("definition factories", () => {
     it("carry the Command name and the CommandDefinitionTypeId brand", () => {
       const SaveNote = Command.mutation(
@@ -118,21 +80,25 @@ layer(StubLayer)("Command", (it) => {
       expect(FoldkitCommand.CommandDefinitionTypeId in SaveNote).toBe(true);
     });
 
-    it("constructing a Command performs no client call", () => {
-      const SaveNote = Command.mutation(
-        "SaveNote",
-        insertMutationRef,
-        saveNoteConfig,
-      );
+    it.effect("constructing a Command performs no client call", () =>
+      Effect.gen(function* () {
+        const testClient = yield* TestClient.TestClient;
+        const SaveNote = Command.mutation(
+          "SaveNote",
+          insertMutationRef,
+          saveNoteConfig,
+        );
 
-      const command = SaveNote({ text: "hello" });
+        const command = SaveNote({ text: "hello" });
 
-      expect(command.name).toBe("SaveNote");
-      expect(calls).toEqual([]);
-    });
+        expect(command.name).toBe("SaveNote");
+        expect(yield* testClient.calls()).toEqual([]);
+      }).pipe(Effect.provide(TestClient.layer)),
+    );
 
     it.effect("mutation success produces the onSuccess Message", () =>
       Effect.gen(function* () {
+        const testClient = yield* TestClient.TestClient;
         const SaveNote = Command.mutation(
           "SaveNote",
           insertMutationRef,
@@ -142,14 +108,15 @@ layer(StubLayer)("Command", (it) => {
         const message = yield* SaveNote({ text: "hello" }).effect;
 
         expect(message).toEqual(SucceededSaveNote({ note: {} }));
-        expect(calls).toEqual([
+        expect(yield* testClient.calls()).toEqual([
           { method: "mutation", name: "notes:insert", args: { text: "hello" } },
         ]);
-      }),
+      }).pipe(Effect.provide(TestClient.layer)),
     );
 
     it.effect("no-args query is callable without args", () =>
       Effect.gen(function* () {
+        const testClient = yield* TestClient.TestClient;
         const FetchNotes = Command.query("FetchNotes", listQueryRef, {
           messages: [SucceededSaveNote, FailedSaveNote],
           onSuccess: (notes) => SucceededSaveNote({ note: notes }),
@@ -159,14 +126,15 @@ layer(StubLayer)("Command", (it) => {
         const message = yield* FetchNotes().effect;
 
         expect(message._tag).toBe("SucceededSaveNote");
-        expect(calls).toEqual([
+        expect(yield* testClient.calls()).toEqual([
           { method: "query", name: "notes:list", args: {} },
         ]);
-      }),
+      }).pipe(Effect.provide(TestClient.layer)),
     );
 
     it.effect("action success produces the onSuccess Message", () =>
       Effect.gen(function* () {
+        const testClient = yield* TestClient.TestClient;
         const SendEmail = Command.action("SendEmail", sendActionRef, {
           messages: [SucceededSaveNote, FailedSaveNote],
           onSuccess: () => SucceededSaveNote({ note: null }),
@@ -176,19 +144,22 @@ layer(StubLayer)("Command", (it) => {
         const message = yield* SendEmail({ to: "user@example.com" }).effect;
 
         expect(message._tag).toBe("SucceededSaveNote");
-        expect(calls).toEqual([
+        expect(yield* testClient.calls()).toEqual([
           {
             method: "action",
             name: "email:send",
             args: { to: "user@example.com" },
           },
         ]);
-      }),
+      }).pipe(Effect.provide(TestClient.layer)),
     );
 
     it.effect("typed error is folded into the onError Message", () =>
       Effect.gen(function* () {
-        nextResult = Effect.fail(new NotFound({ id: "abc" }));
+        const testClient = yield* TestClient.TestClient;
+        yield* testClient.setNextResult(
+          Result.fail(new NotFound({ id: "abc" })),
+        );
 
         const DeleteNote = Command.mutation("DeleteNote", deleteMutationRef, {
           messages: [SucceededSaveNote, FailedSaveNote],
@@ -202,13 +173,16 @@ layer(StubLayer)("Command", (it) => {
         expect((message as typeof FailedSaveNote.Type).error).toBeInstanceOf(
           NotFound,
         );
-      }),
+      }).pipe(Effect.provide(TestClient.layer)),
     );
 
     it.effect("transport error is folded into the onError Message", () =>
       Effect.gen(function* () {
-        nextResult = Effect.fail(
-          new Client.WebSocketClientError({ cause: "network down" }),
+        const testClient = yield* TestClient.TestClient;
+        yield* testClient.setNextResult(
+          Result.fail(
+            new Client.WebSocketClientError({ cause: "network down" }),
+          ),
         );
 
         const SaveNote = Command.mutation(
@@ -223,7 +197,7 @@ layer(StubLayer)("Command", (it) => {
         expect((message as typeof FailedSaveNote.Type).error).toBeInstanceOf(
           Client.WebSocketClientError,
         );
-      }),
+      }).pipe(Effect.provide(TestClient.layer)),
     );
 
     it("requires messages to be declared", () => {
@@ -267,6 +241,7 @@ layer(StubLayer)("Command", (it) => {
   describe("effect helpers", () => {
     it.effect("mutationEffect folds success and failure into Messages", () =>
       Effect.gen(function* () {
+        const testClient = yield* TestClient.TestClient;
         const saveNote = Command.mutationEffect(
           insertMutationRef,
           saveNoteHandlers,
@@ -275,12 +250,14 @@ layer(StubLayer)("Command", (it) => {
         const success = yield* saveNote({ text: "hello" });
         expect(success).toEqual(SucceededSaveNote({ note: {} }));
 
-        nextResult = Effect.fail(
-          new Client.WebSocketClientError({ cause: "network down" }),
+        yield* testClient.setNextResult(
+          Result.fail(
+            new Client.WebSocketClientError({ cause: "network down" }),
+          ),
         );
         const failure = yield* saveNote({ text: "hello" });
         expect(failure._tag).toBe("FailedSaveNote");
-      }),
+      }).pipe(Effect.provide(TestClient.layer)),
     );
 
     it("supports interrupt: true, keyed by the Command name", () => {
@@ -331,9 +308,12 @@ layer(StubLayer)("Command", (it) => {
 
     it.effect("Interrupt stops an in-flight invocation", () =>
       Effect.gen(function* () {
+        const testClient = yield* TestClient.TestClient;
         const started = yield* Deferred.make<void>();
-        nextResult = Deferred.succeed(started, undefined).pipe(
-          Effect.andThen(() => Effect.never),
+        yield* testClient.setNextResultEffect(
+          Deferred.succeed(started, undefined).pipe(
+            Effect.andThen(() => Effect.never),
+          ),
         );
 
         const SaveDraft = Command.mutation("SaveDraft", insertMutationRef, {
@@ -354,7 +334,7 @@ layer(StubLayer)("Command", (it) => {
 
         const secondOutcome = yield* SaveDraft.Interrupt((o) => o).effect;
         expect(secondOutcome._tag).toBe("NotFound");
-      }),
+      }).pipe(Effect.provide(TestClient.layer)),
     );
 
     it("an interruptible Command's error channel is still never", () => {

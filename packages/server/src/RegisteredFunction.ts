@@ -139,11 +139,13 @@ export const applyMiddleware = <A, E, R>(
 ): Effect.Effect<A, any, R> => {
   let wrapped: Effect.Effect<any, any, any> = effect;
   for (let index = resolvedMiddlewares.length - 1; index >= 0; index--) {
+    // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Resolved middleware is type-erased after its public implementation boundary; its error and service channels are restored by the surrounding function contract.
     wrapped = resolvedMiddlewares[index]!.middlewareImpl(
       wrapped as any,
       options,
     ) as any;
   }
+  // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- The erased middleware error remains intact so runHandlerPromise can validate it against the combined error schema.
   return wrapped as Effect.Effect<A, any, R>;
 };
 
@@ -265,6 +267,7 @@ export const actionFunctionBase = <
         Schema.decodeUnknownEffect(args),
         Effect.orDie,
       );
+      // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Middleware errors are intentionally erased here and validated by runHandlerPromise against the combined error schema below.
       const decodedReturns = yield* applyMiddleware(
         handler(decodedArgs),
         resolvedMiddlewares,
@@ -313,9 +316,9 @@ export const baseActionLayer = <ConvexDataModel extends GenericDataModel>(
     StorageReader.StorageReader.layer(ctx.storage),
     StorageWriter.StorageWriter.layer(ctx.storage),
     StorageActionWriter.StorageActionWriter.layer(ctx.storage),
-    QueryRunner.layer(ctx.runQuery),
-    MutationRunner.layer(ctx.runMutation),
-    ActionRunner.layer(ctx.runAction),
+    QueryRunner.layer(ctx.runQuery.bind(ctx)),
+    MutationRunner.layer(ctx.runMutation.bind(ctx)),
+    ActionRunner.layer(ctx.runAction.bind(ctx)),
     Layer.succeed(ActionCtx.ActionCtx<ConvexDataModel>(), ctx),
   );
 
@@ -326,4 +329,8 @@ export const actionLayer = <
   ctx: GenericActionCtx<
     DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
   >,
-) => Layer.mergeAll(baseActionLayer(ctx), VectorSearch.layer(ctx.vectorSearch));
+) =>
+  Layer.mergeAll(
+    baseActionLayer(ctx),
+    VectorSearch.layer(ctx.vectorSearch.bind(ctx)),
+  );

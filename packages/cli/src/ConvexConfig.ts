@@ -1,6 +1,7 @@
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
+import type * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 import * as Order from "effect/Order";
 import * as Path from "effect/Path";
@@ -187,7 +188,7 @@ export const discoverInstalledComponents = (
 ): Effect.Effect<
   ReadonlyArray<InstalledComponent>,
   BuildError | InvalidConvexConfigError,
-  Path.Path
+  Path.Path | FileSystem.FileSystem
 > =>
   Effect.gen(function* () {
     const path = yield* Path.Path;

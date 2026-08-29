@@ -6,6 +6,7 @@ import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as DateTime from "effect/DateTime";
 import * as HashSet from "effect/HashSet";
 import * as Option from "effect/Option";
 import * as Order from "effect/Order";
@@ -155,7 +156,7 @@ export const touchConvexSchema = Effect.gen(function* () {
     return;
   }
 
-  const now = new Date();
+  const now = yield* DateTime.nowAsDate;
   yield* fs.utimes(schemaPath, now, now);
 });
 
@@ -335,7 +336,7 @@ const getGroupPathsFromFs = Effect.gen(function* () {
       GroupPath.fromGroupModulePath(groupModulePath),
     ),
   );
-  return pipe(groupPathArray, HashSet.fromIterable, GroupPaths.GroupPaths.make);
+  return GroupPaths.GroupPaths.make(HashSet.fromIterable(groupPathArray));
 });
 
 export const removeGroups = (groupPaths: GroupPaths.GroupPaths) =>
@@ -388,14 +389,18 @@ export const writeGroups = (
       const registeredFunctionsImportPath =
         yield* registeredFunctionsImportPathForGroup(groupPath, modulePath);
 
-      yield* Effect.logDebug(`Generating group ${groupPath}...`);
+      yield* Effect.logDebug(
+        `Generating group ${GroupPath.toString(groupPath)}...`,
+      );
       yield* generateGroupModule({
         groupPath,
         functionNames,
         registeredFunctionsImportPath,
         useNode: group.runtime === "Node",
       });
-      yield* Effect.logDebug(`Group ${groupPath} generated`);
+      yield* Effect.logDebug(
+        `Group ${GroupPath.toString(groupPath)} generated`,
+      );
     }),
   );
 

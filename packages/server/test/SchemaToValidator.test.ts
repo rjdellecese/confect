@@ -910,18 +910,6 @@ describe("ValueToValidator", () => {
           [VString<string, "required">, VBoolean<boolean, "required">],
           "required",
           never
-        >
-      | VUnion<
-          boolean | string,
-          [VBoolean<boolean, "required">, VString<string, "required">],
-          "required",
-          never
-        >
-      | VUnion<
-          boolean | string,
-          [VString<string, "required">, VBoolean<boolean, "required">],
-          "required",
-          never
         >;
     expectTypeOf<Validator>().toExtend<AnyPermutationOfValidator>();
 

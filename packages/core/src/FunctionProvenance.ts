@@ -10,7 +10,6 @@ import * as PaginationResult from "./PaginationResult";
  * context-free codec means the struct assembled from the fields can always be
  * encoded and decoded synchronously at a Convex boundary.
  */
-// eslint-disable-next-line import/namespace -- oxlint's namespace resolution misses type-only exports, and `Schema` is an interface/namespace
 export type ArgsFields = {
   readonly [key: PropertyKey]: Schema.ConstraintCodec<any, any>;
 };
