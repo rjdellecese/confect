@@ -125,16 +125,6 @@
       }
     },
     {
-      "files": [
-        "packages/react/test/index.test.ts",
-        "packages/server/test/Handler.test.ts",
-        "packages/server/test/mock-backend/schedulerIsolation.test.ts"
-      ],
-      "rules": {
-        "effecttsgo/async-function": "off"
-      }
-    },
-    {
       "files": ["packages/server/test/ConvexConfigProvider.test.ts"],
       "rules": {
         "effecttsgo/process-env-in-effect": "off"

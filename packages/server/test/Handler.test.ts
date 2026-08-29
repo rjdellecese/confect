@@ -7,6 +7,7 @@ import type {
 } from "convex/server";
 import type { Infer } from "convex/values";
 import { v } from "convex/values";
+import * as Effect from "effect/Effect";
 import type * as Handler from "@confect/server/Handler";
 import type schema from "./mock-backend/fixtures/confect/_generated/schema";
 import {
@@ -38,7 +39,7 @@ describe("Handler", () => {
       const _myQuery = query({
         args: vQueryArgs,
         returns: vQueryReturns,
-        handler: async () => ["hello"],
+        handler: () => Effect.runPromise(Effect.succeed(["hello"])),
       });
 
       const _spec =
@@ -66,7 +67,7 @@ describe("Handler", () => {
       const _myMutation = mutation({
         args: vMutationArgs,
         returns: vMutationReturns,
-        handler: async () => null,
+        handler: () => Effect.runPromise(Effect.succeed(null)),
       });
 
       const _spec =
@@ -95,7 +96,7 @@ describe("Handler", () => {
       const _myAction = internalAction({
         args: vActionArgs,
         returns: vActionReturns,
-        handler: async () => ({ status: 200 }),
+        handler: () => Effect.runPromise(Effect.succeed({ status: 200 })),
       });
 
       const _spec =
