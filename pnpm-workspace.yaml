@@ -28,6 +28,7 @@ minimumReleaseAgeExclude:
   - "@effect/vitest@4.0.0-rc.112"
   - effect@4.0.0-rc.112
   - foldkit@0.148.1
+  - effect-oxlint@0.3.4
 
 overrides:
   convex: 1.45.0

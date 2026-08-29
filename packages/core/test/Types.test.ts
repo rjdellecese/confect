@@ -1,6 +1,6 @@
 import type { Brand } from "effect";
 import type { ReadonlyRecord } from "effect/Record";
-import { describe, expectTypeOf, test } from "vitest";
+import { describe, expectTypeOf, test } from "@effect/vitest";
 import type { GenericId } from "@confect/core/GenericId";
 
 import type {

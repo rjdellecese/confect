@@ -10,6 +10,7 @@
     "oxc",
     "effecttsgo"
   ],
+  "jsPlugins": ["confect-oxlint-rules"],
   "options": {
     "typeAware": true,
     "denyWarnings": true,
@@ -122,6 +123,12 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "files": ["**/*.test.{ts,tsx,mts,cts}"],
+      "rules": {
+        "confect/prefer-effect-vitest": "error"
       }
     }
   ]

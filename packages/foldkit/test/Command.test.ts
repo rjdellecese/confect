@@ -1,5 +1,5 @@
 import { FunctionSpec, Ref } from "@confect/core";
-import { describe, expect, it } from "@effect/vitest";
+import { describe, expect, expectTypeOf, it, test } from "@effect/vitest";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -7,7 +7,6 @@ import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as FoldkitCommand from "foldkit/command";
 import { m } from "foldkit/message";
-import { expectTypeOf, test } from "vitest";
 import * as Command from "@confect/foldkit/Command";
 import * as Client from "@confect/foldkit/Client";
 import * as TestClient from "./TestClient";

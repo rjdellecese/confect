@@ -43,6 +43,9 @@ importers:
       concurrently:
         specifier: 10.0.5
         version: 10.0.5
+      confect-oxlint-rules:
+        specifier: workspace:*
+        version: link:tools/oxlint-rules
       cross-env:
         specifier: 10.1.0
         version: 10.1.0
@@ -524,6 +527,24 @@ importers:
       typescript:
         specifier: 6.0.3
         version: 6.0.3
+
+  tools/oxlint-rules:
+    devDependencies:
+      '@effect/vitest':
+        specifier: 4.0.0-rc.112
+        version: 4.0.0-rc.112(effect@4.0.0-rc.112)(vitest@4.1.10)
+      effect:
+        specifier: 4.0.0-rc.112
+        version: 4.0.0-rc.112
+      effect-oxlint:
+        specifier: 0.3.4
+        version: 0.3.4(effect@4.0.0-rc.112)
+      shx:
+        specifier: 0.4.0
+        version: 0.4.0
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@types/node@22.20.1)(@vitest/browser-preview@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.2)(vite@8.2.1(@types/node@22.20.1)(esbuild@0.28.2)(jiti@1.21.7)(tsx@4.23.12)(yaml@2.9.0))
 
 packages:
 
@@ -2241,6 +2262,10 @@ packages:
 
   '@oxlint/plugins@1.73.0':
     resolution: {integrity: sha512-OhgMQeMmZA0dcFcX4/priaJZWdFECxiClgq6mRX6aatZEcV9PbKC3P3/v8U1hVjviT1i5U+vR8lAtBV6m4FXAA==}
+    engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
+
+  '@oxlint/plugins@1.80.0':
+    resolution: {integrity: sha512-QRgH1XqQEYNHa4f1vvPQ5fAdNdncHGIUG1ZWLlGIZHky3qwCEeAKYitZNbZMtaXtAQAAFFTOwqUfzESvimqZNA==}
     engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
 
   '@pnpm/deps.graph-sequencer@1100.0.1':
@@ -4252,6 +4277,11 @@ packages:
 
   ee-first@1.1.1:
     resolution: {integrity: sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow==}
+
+  effect-oxlint@0.3.4:
+    resolution: {integrity: sha512-VaI72NhDI+OBk8rkWBxR3D+k8iQN5KX4caiTRtWR/KDlif4KdxmjPelQqflwwprxkGldEpLry9fQvvzlBWY6bA==}
+    peerDependencies:
+      effect: 4.0.0-rc.112
 
   effect@4.0.0-rc.112:
     resolution: {integrity: sha512-wXxwuh1Ywnv4cPRM3Wfa0vDwuOHnZ1TsTgHJkG9XgzND6inhBH9n1vBxhg3iIXOia/OrpmvVmd3lrD4vq6bF3A==}
@@ -8914,6 +8944,8 @@ snapshots:
 
   '@oxlint/plugins@1.73.0': {}
 
+  '@oxlint/plugins@1.80.0': {}
+
   '@pnpm/deps.graph-sequencer@1100.0.1': {}
 
   '@polka/url@1.0.0-next.29': {}
@@ -10582,6 +10614,11 @@ snapshots:
       gopd: 1.2.0
 
   ee-first@1.1.1: {}
+
+  effect-oxlint@0.3.4(effect@4.0.0-rc.112):
+    dependencies:
+      '@oxlint/plugins': 1.80.0
+      effect: 4.0.0-rc.112
 
   effect@4.0.0-rc.112:
     dependencies:

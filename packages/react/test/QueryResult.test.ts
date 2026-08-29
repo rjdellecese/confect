@@ -1,7 +1,7 @@
 import { pipe } from "effect/Function";
 import * as Equal from "effect/Equal";
 import * as Hash from "effect/Hash";
-import { describe, expect, expectTypeOf, test } from "vitest";
+import { describe, expect, expectTypeOf, test } from "@effect/vitest";
 
 import * as QueryResult from "@confect/react/QueryResult";
 

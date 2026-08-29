@@ -1,6 +1,6 @@
 import { pipe } from "effect/Function";
 import * as Equal from "effect/Equal";
-import { describe, expect, expectTypeOf, test } from "vitest";
+import { describe, expect, expectTypeOf, test } from "@effect/vitest";
 
 import * as PaginatedQueryResult from "@confect/react/PaginatedQueryResult";
 

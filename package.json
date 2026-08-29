@@ -9,6 +9,7 @@
     "@types/node": "22.20.1",
     "@vitest/coverage-v8": "4.1.10",
     "concurrently": "10.0.5",
+    "confect-oxlint-rules": "workspace:*",
     "cross-env": "10.1.0",
     "dpdm": "4.3.0",
     "effect": "4.0.0-rc.112",
@@ -54,7 +55,7 @@
     "test": "bun test scripts/syncSkillIgnore.test.ts && vitest run",
     "test:server:local-backend": "pnpm --filter @confect/server test:local-backend",
     "test:server:mock-backend": "pnpm --filter @confect/server test:mock-backend",
-    "typecheck": "tsc -b tsconfig.packages.json tsconfig.json",
+    "typecheck": "tsc -b tsconfig.packages.json tsconfig.json tools/oxlint-rules/tsconfig.json",
     "version-packages": "changeset version && pnpm format"
   }
 }
