@@ -78,7 +78,7 @@ jobs:
             docs_version=v10
           fi
 
-          node scripts/assembleDocs.mjs \
+          bun run scripts/assembleDocs.ts \
             --allow-unpublished-source \
             --manifest "$RUNNER_TEMP/docs-release.json" \
             --manifest-output "$RUNNER_TEMP/docs-release.json" \
