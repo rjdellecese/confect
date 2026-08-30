@@ -39,7 +39,7 @@ jobs:
         run: |
           required_paths=(
             .github/workflows/docs-deploy.yml
-            scripts/assembleDocs.mjs
+            scripts/assembleDocs.ts
           )
           for required_path in "${required_paths[@]}"; do
             if ! git cat-file -e "origin/main:${required_path}"; then
@@ -82,7 +82,7 @@ jobs:
           DOCS_SOURCE_REF: ${{ inputs.source_ref }}
           DOCS_VERSION: ${{ inputs.version }}
         run: |
-          node scripts/assembleDocs.mjs \
+          bun run scripts/assembleDocs.ts \
             --manifest docs-release/.docs-release.json \
             --manifest-output docs-release/.docs-release.json \
             --output docs-release/apps/docs \
