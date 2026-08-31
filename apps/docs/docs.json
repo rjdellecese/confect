@@ -32,64 +32,154 @@
         }
       ]
     },
-    "groups": [
+    "versions": [
       {
-        "group": "Getting Started",
-        "pages": ["getting-started/introduction", "getting-started/quickstart"]
-      },
-      {
-        "group": "Concepts",
-        "pages": [
-          "concepts/packages",
-          "concepts/project-structure",
-          "concepts/spec-impl-model",
-          "concepts/file-naming-conventions",
-          "concepts/services",
-          "concepts/schema-restrictions"
-        ]
-      },
-      {
-        "group": "Server",
-        "pages": [
-          "server/functions",
-          "server/error-handling",
-          "server/plain-convex-functions",
-          "server/node-actions",
+        "version": "v9",
+        "default": true,
+        "tag": "Stable",
+        "groups": [
           {
-            "icon": "database",
-            "group": "Database",
+            "group": "Getting Started",
             "pages": [
-              "server/database/schema",
-              "server/database/reading",
-              "server/database/writing",
-              "server/database/system-tables",
-              "server/database/determinism"
+              "v9/getting-started/introduction",
+              "v9/getting-started/quickstart"
             ]
           },
-          "server/http-api",
-          "server/storage",
-          "server/scheduling",
-          "server/authentication",
-          "server/cron-jobs",
-          "server/search",
-          "server/components",
-          "server/environment-variables"
-        ]
-      },
-      {
-        "group": "Clients",
-        "pages": [
-          "clients/react",
           {
-            "icon": "js",
-            "group": "JS",
-            "pages": ["clients/js/http", "clients/js/websocket"]
+            "group": "Concepts",
+            "pages": [
+              "v9/concepts/packages",
+              "v9/concepts/project-structure",
+              "v9/concepts/spec-impl-model",
+              "v9/concepts/file-naming-conventions",
+              "v9/concepts/services",
+              "v9/concepts/schema-restrictions"
+            ]
+          },
+          {
+            "group": "Server",
+            "pages": [
+              "v9/server/functions",
+              "v9/server/error-handling",
+              "v9/server/plain-convex-functions",
+              "v9/server/node-actions",
+              {
+                "icon": "database",
+                "group": "Database",
+                "pages": [
+                  "v9/server/database/schema",
+                  "v9/server/database/reading",
+                  "v9/server/database/writing",
+                  "v9/server/database/system-tables",
+                  "v9/server/database/determinism"
+                ]
+              },
+              "v9/server/http-api",
+              "v9/server/storage",
+              "v9/server/scheduling",
+              "v9/server/authentication",
+              "v9/server/cron-jobs",
+              "v9/server/search",
+              "v9/server/components",
+              "v9/server/environment-variables"
+            ]
+          },
+          {
+            "group": "Clients",
+            "pages": [
+              "v9/clients/react",
+              {
+                "icon": "js",
+                "group": "JS",
+                "pages": [
+                  "v9/clients/js/http",
+                  "v9/clients/js/websocket"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "v9/guides/testing"
+            ]
           }
         ]
       },
       {
-        "group": "Guides",
-        "pages": ["guides/testing"]
+        "version": "v10",
+        "tag": "Prerelease",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "v10/getting-started/introduction",
+              "v10/getting-started/quickstart"
+            ]
+          },
+          {
+            "group": "Concepts",
+            "pages": [
+              "v10/concepts/packages",
+              "v10/concepts/project-structure",
+              "v10/concepts/spec-impl-model",
+              "v10/concepts/file-naming-conventions",
+              "v10/concepts/services",
+              "v10/concepts/schema-restrictions"
+            ]
+          },
+          {
+            "group": "Server",
+            "pages": [
+              "v10/server/functions",
+              "v10/server/error-handling",
+              "v10/server/middleware",
+              "v10/server/plain-convex-functions",
+              "v10/server/node-actions",
+              "v10/server/ai-gateway",
+              {
+                "icon": "database",
+                "group": "Database",
+                "pages": [
+                  "v10/server/database/schema",
+                  "v10/server/database/reading",
+                  "v10/server/database/writing",
+                  "v10/server/database/system-tables",
+                  "v10/server/database/determinism"
+                ]
+              },
+              "v10/server/http-api",
+              "v10/server/storage",
+              "v10/server/scheduling",
+              "v10/server/authentication",
+              "v10/server/cron-jobs",
+              "v10/server/search",
+              "v10/server/components",
+              "v10/server/environment-variables"
+            ]
+          },
+          {
+            "group": "Clients",
+            "pages": [
+              "v10/clients/react",
+              {
+                "icon": "js",
+                "group": "JS",
+                "pages": [
+                  "v10/clients/js/http",
+                  "v10/clients/js/websocket"
+                ]
+              },
+              "v10/clients/foldkit"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "v10/guides/testing"
+            ]
+          }
+        ]
       }
     ]
   },
@@ -113,5 +203,123 @@
       "cursor",
       "vscode"
     ]
-  }
+  },
+  "redirects": [
+    {
+      "source": "/getting-started/introduction",
+      "destination": "/v9/getting-started/introduction"
+    },
+    {
+      "source": "/getting-started/quickstart",
+      "destination": "/v9/getting-started/quickstart"
+    },
+    {
+      "source": "/concepts/packages",
+      "destination": "/v9/concepts/packages"
+    },
+    {
+      "source": "/concepts/project-structure",
+      "destination": "/v9/concepts/project-structure"
+    },
+    {
+      "source": "/concepts/spec-impl-model",
+      "destination": "/v9/concepts/spec-impl-model"
+    },
+    {
+      "source": "/concepts/file-naming-conventions",
+      "destination": "/v9/concepts/file-naming-conventions"
+    },
+    {
+      "source": "/concepts/services",
+      "destination": "/v9/concepts/services"
+    },
+    {
+      "source": "/concepts/schema-restrictions",
+      "destination": "/v9/concepts/schema-restrictions"
+    },
+    {
+      "source": "/server/functions",
+      "destination": "/v9/server/functions"
+    },
+    {
+      "source": "/server/error-handling",
+      "destination": "/v9/server/error-handling"
+    },
+    {
+      "source": "/server/plain-convex-functions",
+      "destination": "/v9/server/plain-convex-functions"
+    },
+    {
+      "source": "/server/node-actions",
+      "destination": "/v9/server/node-actions"
+    },
+    {
+      "source": "/server/database/schema",
+      "destination": "/v9/server/database/schema"
+    },
+    {
+      "source": "/server/database/reading",
+      "destination": "/v9/server/database/reading"
+    },
+    {
+      "source": "/server/database/writing",
+      "destination": "/v9/server/database/writing"
+    },
+    {
+      "source": "/server/database/system-tables",
+      "destination": "/v9/server/database/system-tables"
+    },
+    {
+      "source": "/server/database/determinism",
+      "destination": "/v9/server/database/determinism"
+    },
+    {
+      "source": "/server/http-api",
+      "destination": "/v9/server/http-api"
+    },
+    {
+      "source": "/server/storage",
+      "destination": "/v9/server/storage"
+    },
+    {
+      "source": "/server/scheduling",
+      "destination": "/v9/server/scheduling"
+    },
+    {
+      "source": "/server/authentication",
+      "destination": "/v9/server/authentication"
+    },
+    {
+      "source": "/server/cron-jobs",
+      "destination": "/v9/server/cron-jobs"
+    },
+    {
+      "source": "/server/search",
+      "destination": "/v9/server/search"
+    },
+    {
+      "source": "/server/components",
+      "destination": "/v9/server/components"
+    },
+    {
+      "source": "/server/environment-variables",
+      "destination": "/v9/server/environment-variables"
+    },
+    {
+      "source": "/clients/react",
+      "destination": "/v9/clients/react"
+    },
+    {
+      "source": "/clients/js/http",
+      "destination": "/v9/clients/js/http"
+    },
+    {
+      "source": "/clients/js/websocket",
+      "destination": "/v9/clients/js/websocket"
+    },
+    {
+      "source": "/guides/testing",
+      "destination": "/v9/guides/testing"
+    }
+  ]
 }

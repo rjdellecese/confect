@@ -1,0 +1,516 @@
+---
+icon: "origami"
+title: "Foldkit"
+description: "Use Confect's Foldkit bindings to call your functions from a Foldkit app."
+---
+
+`@confect/foldkit` bridges Confect into [Foldkit](https://foldkit.dev), The Elm
+Architecture in TypeScript powered by Effect. It maps Confect's client surface
+onto Foldkit's three integration seams: an application-scoped `Client` becomes
+a [resource](https://foldkit.dev/core/resources), reactive queries become
+[Subscription](https://foldkit.dev/core/subscriptions) entries, and queries,
+mutations, and actions become
+[Commands](https://foldkit.dev/core/commands). Args and return values are
+encoded and decoded through the [Effect
+Schemas](/v10/concepts/schema-restrictions) in your [function
+specs](/v10/concepts/spec-impl-model), and every failure is folded into a Message,
+so Command and Subscription error channels stay `never` as Foldkit requires.
+
+Functions are referenced via `refs` (from `confect/_generated/refs`) instead
+of Convex's `api` object, the same as with the other Confect clients. The
+bindings work with Confect functions only — refs for [plain Convex
+functions](/v10/server/plain-convex-functions) carry no schemas, so they aren't
+accepted.
+
+## Installation
+
+```bash
+pnpm add @confect/foldkit @confect/js @confect/core foldkit
+```
+
+<Note>
+  Foldkit pins an exact `effect` version in its `peerDependencies`. When
+  Confect tracks a newer Effect release than Foldkit does, tell your package
+  manager to accept the mismatch — with pnpm, in `pnpm-workspace.yaml`:
+
+```yaml
+peerDependencyRules:
+  allowedVersions:
+    "foldkit>effect": "4"
+```
+
+With npm, use an [`overrides`](https://docs.npmjs.com/cli/configuring-npm/package-json#overrides)
+entry that pins `effect` to the version your app uses.
+
+</Note>
+
+## Setup
+
+Pass the `Client` layer to your application's `resources`. The client combines
+the WebSocket API with the pagination-session allocator, lives for the lifetime
+of the app, and closes the WebSocket at teardown.
+
+```ts src/entry.ts
+import * as Confect from "@confect/foldkit";
+import { Runtime } from "foldkit";
+
+const application = Runtime.makeApplication({
+  Model,
+  init,
+  update,
+  view,
+  subscriptions,
+  resources: Confect.Client.layer(import.meta.env.VITE_CONVEX_URL),
+  container: document.getElementById("root"),
+});
+
+Runtime.run(application);
+```
+
+Commands and subscription entries built by `@confect/foldkit` require the
+`Confect.Client.Client` service, which this layer satisfies.
+
+## Reactive queries as Subscriptions
+
+`Subscription.reactiveQuery` builds a complete Foldkit subscription entry for
+a query ref. Its dependencies are the query args wrapped in an `Option`
+extracted from your Model: `None` closes the subscription, a change from one
+`Some` to another resubscribes with the new args, and structurally equal args
+leave the subscription running (dependency equivalence is derived from the
+ref's `args` schema).
+
+```ts src/subscription.ts
+import * as Confect from "@confect/foldkit";
+import * as Option from "effect/Option";
+import * as Subscription from "foldkit/subscription";
+
+import refs from "../confect/_generated/refs";
+import {
+  FailedGetNote,
+  SucceededGetNote,
+  type Message,
+  type Model,
+} from "./model";
+
+export const subscriptions = Subscription.make<
+  Model,
+  Message,
+  Confect.Client.Client
+>()(() => ({
+  note: Confect.Subscription.reactiveQuery<Model>()(refs.public.notes.get, {
+    args: (model) => Option.map(model.selectedNoteId, (noteId) => ({ noteId })),
+    onSuccess: (note) => SucceededGetNote({ note }),
+    onError: (error) => FailedGetNote({ message: String(error) }),
+  }),
+}));
+```
+
+`onSuccess` receives the decoded return value on every server update;
+`onError` receives the ref's decoded typed error (see [Error
+Handling](/v10/server/error-handling)), a transport-level `WebSocketClientError`,
+or a `SchemaError`. Errors are emitted as Messages without ending the reactive
+query: Convex handles retryable infrastructure failures itself, and the same
+subscription can produce a later value if its query result recovers.
+
+Queries without args may omit the `args` extractor, which leaves the
+subscription always open:
+
+```ts
+Confect.Subscription.reactiveQuery<Model>()(refs.public.notes.list, {
+  onSuccess: (notes) => SucceededGetNotes({ notes }),
+  onError: (error) => FailedGetNotes({ message: String(error) }),
+});
+```
+
+### Custom entries
+
+When an entry needs extra dependencies or custom gating, write it by hand and
+use `Subscription.reactiveQueryStream` as its `dependenciesToStream` body:
+
+```ts
+import * as Schema from "effect/Schema";
+
+Subscription.make<Model, Message, Confect.Client.Client>()((entry) => ({
+  note: entry(
+    { noteId: Schema.Option(Schema.String) },
+    {
+      modelToDependencies: (model) => ({ noteId: model.selectedNoteId }),
+      dependenciesToStream: ({ noteId }) =>
+        Option.match(noteId, {
+          onNone: () => Stream.empty,
+          onSome: (noteId) =>
+            Confect.Subscription.reactiveQueryStream(refs.public.notes.get, {
+              onSuccess: (note) => SucceededGetNote({ note }),
+              onError: (error) => FailedGetNote({ message: String(error) }),
+            })({ noteId }),
+        }),
+    },
+  ),
+}));
+```
+
+## Commands
+
+`Command.query`, `Command.mutation`, and `Command.action` build Foldkit
+Command definitions whose Command args are the ref's args. `messages`
+declares the Messages the Command can produce — the same declaration
+Foldkit's own `Command.define` takes — and the handlers must produce
+instances of them. Call the definition from `update` to construct a Command
+instance — nothing runs until the Foldkit runtime executes it. Add the handler
+to your exhaustive update Match with `Match.tag`:
+
+```ts src/command.ts
+import * as Confect from "@confect/foldkit";
+
+import refs from "../confect/_generated/refs";
+import { FailedSaveNote, SucceededSaveNote } from "./model";
+
+export const SaveNote = Confect.Command.mutation(
+  "SaveNote",
+  refs.public.notes.insert,
+  {
+    messages: [SucceededSaveNote, FailedSaveNote],
+    onSuccess: (noteId) => SucceededSaveNote({ noteId }),
+    onError: (error) => FailedSaveNote({ message: String(error) }),
+  },
+);
+```
+
+```ts src/update.ts
+Match.tag("ClickedSave", () => [model, [SaveNote({ text: model.draft })]]),
+```
+
+Follow Foldkit's [naming convention](https://foldkit.dev/core/commands):
+Commands are verb-first imperatives, result Messages are past-tense facts
+(`SucceededSaveNote` / `FailedSaveNote`). `onError` receives the same error
+union as subscriptions — `Confect.Command.Error<typeof ref>` names it when you
+want to factor a handler out.
+
+### Interruption
+
+Pass `interrupt` to make a factory-built Command
+[interruptible](https://foldkit.dev/core/commands). The returned definition
+gains an `Interrupt` constructor that builds an ordinary Command: it stops
+every in-flight invocation and results in `toMessage(outcome)`, where the
+outcome is `Interrupted` (at least one invocation was stopped — its result
+Messages are guaranteed never to dispatch) or `NotFound` (nothing was in
+flight).
+
+`interrupt: true` keys every invocation by the Command name — right when at
+most one invocation is meaningfully in flight:
+
+```ts
+export const SaveDraft = Confect.Command.mutation(
+  "SaveDraft",
+  refs.public.notes.insert,
+  {
+    messages: [SucceededSaveDraft, FailedSaveDraft],
+    onSuccess: (noteId) => SucceededSaveDraft({ noteId }),
+    onError: (error) => FailedSaveDraft({ message: String(error) }),
+    interrupt: true,
+  },
+);
+```
+
+Build the interrupt Command from its `Match.tag` update handler:
+
+```ts
+Match.tag("ClickedCancel", () => [
+    model,
+    [SaveDraft.Interrupt((outcome) => CompletedCancelSaveDraft({ outcome }))],
+  ]),
+```
+
+`interrupt: { keyFields, toKey }` derives the key from the ref's args, so
+concurrent invocations can be interrupted independently. `Interrupt` then
+requires the key args:
+
+```ts
+export const DeleteNote = Confect.Command.mutation(
+  "DeleteNote",
+  refs.public.notes.delete,
+  {
+    messages: [SucceededDeleteNote, FailedDeleteNote],
+    onSuccess: () => SucceededDeleteNote(),
+    onError: (error) => FailedDeleteNote({ message: String(error) }),
+    interrupt: {
+      keyFields: ["noteId"],
+      toKey: ({ noteId }) => noteId,
+    },
+  },
+);
+
+// In update:
+// [model, [DeleteNote.Interrupt({ noteId }, (outcome) => CompletedCancelDeleteNote({ outcome }))]]
+```
+
+<Note>
+  Interruption stops the client-side Effect and guarantees the invocation's
+  result Messages never dispatch — it does not cancel the Convex function on the
+  server. Once a mutation or action is on the wire, it runs to completion;
+  interruption means its result is ignored. Foldkit also runs a batch of
+  Commands concurrently with no ordering guarantee, so to cancel and replace,
+  dispatch the replacement from the Interrupt's result Message rather than
+  returning both Commands in one batch.
+</Note>
+
+### Effect helpers
+
+`Command.queryEffect`, `Command.mutationEffect`, and `Command.actionEffect`
+return an execute body — an `Effect` whose failures are already folded into
+Messages — for hand-written `Command.define` calls. Reach for them when the
+Command needs a custom args schema or several calls in one Command:
+
+```ts
+import * as Confect from "@confect/foldkit";
+import * as FoldkitCommand from "foldkit/command";
+import * as Schema from "effect/Schema";
+
+const saveNote = Confect.Command.mutationEffect(refs.public.notes.insert, {
+  onSuccess: (noteId) => SucceededSaveDraft({ noteId }),
+  onError: (error) => FailedSaveDraft({ message: String(error) }),
+});
+
+export const SaveDraft = FoldkitCommand.define("SaveDraft", {
+  args: { text: Schema.String, localDraftId: Schema.String },
+  messages: [SucceededSaveDraft, FailedSaveDraft],
+  execute: ({ text }) => saveNote({ text }),
+});
+```
+
+## Query state in the Model
+
+Foldkit's [`AsyncData`](https://foldkit.dev/core/async-data) is the idiomatic
+Model representation for query state. Map errors to a view-ready schema type
+in your `onError` handler, then settle the `AsyncData` field with `Match.tags`
+in `update`:
+
+```ts src/model.ts
+import { AsyncData } from "foldkit";
+import { m } from "foldkit/message";
+import * as Schema from "effect/Schema";
+
+const Notes = AsyncData.Schema(Schema.Array(Note), Schema.String);
+
+export const Model = Schema.Struct({ notes: Notes.schema });
+
+export const SucceededGetNotes = m("SucceededGetNotes", {
+  notes: Schema.Array(Note),
+});
+export const FailedGetNotes = m("FailedGetNotes", { message: Schema.String });
+```
+
+```ts src/update.ts
+Match.tags({
+  SucceededGetNotes: ({ notes }) => [
+    evo(model, { notes: () => Notes.Success({ data: notes }) }),
+    [],
+  ],
+  FailedGetNotes: ({ message }) => [
+    evo(model, { notes: () => Notes.Failure({ error: message }) }),
+    [],
+  ],
+}),
+```
+
+## Paginated queries
+
+`PaginatedQuery` navigates a [paginated
+query](/v10/server/functions#paginated-queries) one page at a time — next and
+previous — over Convex's cursor-based pagination. The machine lives in your
+Model and is the single source of truth for one live, reactive page
+subscription. Navigation and page-split handling are pure Model transitions,
+and `Subscription.paginatedQuery` keeps the subscription in sync with them.
+
+`PaginatedQuery.make` takes the ref and returns the machine's Model and
+correlated-settlement schemas together with its operations. The machine uses
+the same vocabulary as Foldkit's `AsyncData`: `Idle`, `Loading`, `Refreshing`,
+`Success`, `Failure`, and `Stale`. `Refreshing` and `Stale` retain the complete
+last good page.
+
+```ts src/model.ts
+import * as Confect from "@confect/foldkit";
+import { m } from "foldkit/message";
+import * as Schema from "effect/Schema";
+
+import refs from "../confect/_generated/refs";
+
+export const Notes = Confect.PaginatedQuery.make(refs.public.notes.paginate);
+
+export const Model = Schema.Struct({
+  notes: Notes.schema,
+});
+
+export const initialModel = Model.make({ notes: Notes.idle });
+
+export const SettledGetNotesPage = m("SettledGetNotesPage", {
+  settlement: Notes.settlement,
+});
+```
+
+Wire the subscription entry to the machine state:
+
+```ts src/subscription.ts
+import * as Confect from "@confect/foldkit";
+import * as Subscription from "foldkit/subscription";
+
+export const subscriptions = Subscription.make<
+  Model,
+  Message,
+  Confect.Client.Client
+>()(() => ({
+  notesPage: Confect.Subscription.paginatedQuery<Model>()(Notes, {
+    state: (model) => model.notes,
+    onSettled: (settlement) => SettledGetNotesPage({ settlement }),
+  }),
+}));
+```
+
+When an active machine has no pagination id, the subscription allocates one
+from the application-scoped `Client`, opens the Convex query, and includes the
+id in its first `Result`-based settlement. `settle` installs the id and result
+atomically. Allocation is not a separate application event, and installing the
+id does not restart the live subscription.
+
+Like `AsyncData.settle`, a success becomes `Success`; a failure becomes `Stale`
+when a page is held and `Failure` otherwise. The request carries a logical
+generation as well as its cursor and page identity, so outcomes superseded by
+navigation, new args, close/reopen, or reset are ignored. All public machine
+operations remain pure:
+
+```ts src/update.ts
+import * as Confect from "@confect/foldkit";
+import * as Match from "effect/Match";
+import * as Option from "effect/Option";
+import type * as Command from "foldkit/command";
+
+type UpdateReturn = readonly [Model, ReadonlyArray<Command.Command<Message>>];
+
+export const update = (model: Model, message: Message): UpdateReturn =>
+  Match.value(message).pipe(
+    Match.withReturnType<UpdateReturn>(),
+    Match.tagsExhaustive({
+      OpenedNotes: ({ channel }) => {
+        const notes = Match.value(model.notes).pipe(
+          Match.tag("Idle", (idle) =>
+            Notes.init(idle, { channel }, { initialNumItems: 20 }),
+          ),
+          Match.tag("Active", (active) =>
+            Notes.reinitialize(active, { channel }, { initialNumItems: 20 }),
+          ),
+          Match.exhaustive,
+        );
+        return [evo(model, { notes: () => notes }), []];
+      },
+      SettledGetNotesPage: ({ settlement }) => [
+        evo(model, {
+          notes: Confect.PaginatedQuery.settle(settlement),
+        }),
+        [],
+      ],
+      ClickedNextPage: () => {
+        const notes = Match.value(model.notes).pipe(
+          Match.tag("Idle", (idle) => idle),
+          Match.tag("Active", (active) =>
+            Option.getOrElse(Confect.PaginatedQuery.next(active), () => active),
+          ),
+          Match.exhaustive,
+        );
+        return [evo(model, { notes: () => notes }), []];
+      },
+      ClosedNotes: () => {
+        const notes = Match.value(model.notes).pipe(
+          Match.tag("Idle", (idle) => idle),
+          Match.tag("Active", Confect.PaginatedQuery.close),
+          Match.exhaustive,
+        );
+        return [evo(model, { notes: () => notes }), []];
+      },
+    }),
+  );
+```
+
+`getPage` and `getItems` return `Option`s because the initial load can have no
+data. Once a page succeeds, they keep returning that page while the next one
+loads and after a refresh fails. `Page.number` is the page being displayed;
+`targetPageNumber` is the page currently requested, which can differ during a
+navigation:
+
+```ts
+const items = Option.getOrElse(
+  Confect.PaginatedQuery.getItems(state),
+  () => [],
+);
+const label = Match.value(state).pipe(
+  Match.tag("Idle", () => "Closed"),
+  Match.tag("Active", (active) =>
+    Option.match(Confect.PaginatedQuery.getPage(active), {
+      onNone: () =>
+        `Loading page ${Confect.PaginatedQuery.targetPageNumber(active)}`,
+      onSome: (page) => `Page ${page.number}`,
+    }),
+  ),
+  Match.exhaustive,
+);
+const nextDisabled = !Confect.PaginatedQuery.canNext(state);
+const prevDisabled = !Confect.PaginatedQuery.canPrev(state);
+```
+
+`isIdle`, `isLoading`, `isRefreshing`, `isSuccess`, `isFailure`, and `isStale`
+are refinements; `isPending`, `hasPage`, `hasError`, and the exhaustive `match`
+cover the common view branches. A `Failure` or `Stale` does not close the
+subscription: Convex query errors are deterministic rather than manually
+retryable, and the live query may recover after its data, arguments,
+authentication, or deployment changes.
+
+Failed settlements carry an exhaustive error union: `FunctionError` wraps an
+error declared by the query or its middleware, `WebSocketClientError`
+represents an unexpected client failure, and `SchemaError` is carried directly
+from argument encoding or result decoding. Convex's `InvalidCursor`
+pseudo-error is also represented explicitly in settlements, but `settle`
+handles it internally by starting a fresh session at page one while retaining
+the displayed page.
+
+`first` is ordinary navigation back to page one within the current session.
+`reset` purely requests a fresh session at page one while retaining the
+displayed page, and `reinitialize` changes query args or page options and starts
+again from page one. `close` returns to `Idle` while retaining a generation
+tombstone, so a later `init` cannot accept a late first settlement from an
+earlier identical session. Options use Convex's names: `initialNumItems` is
+required, while `maximumRowsRead` and `maximumBytesRead` are optional positive
+integers.
+
+<Note>
+  Convex may signal that a page has grown too large by recommending or requiring
+  a page split. The machine handles the full protocol transparently: the current
+  page is pinned to end at the split point and reloads as a range query, and the
+  next page picks up from there. Users see at most a brief reload of the current
+  page — never a torn or incomplete one. If a reactive terminal page becomes
+  empty, the machine automatically retreats to the previous page.
+</Note>
+
+## Authentication
+
+`setAuth` is available on the `Client` service. Wire it up as a
+Command:
+
+```ts
+import * as Confect from "@confect/foldkit";
+import * as Effect from "effect/Effect";
+import * as FoldkitCommand from "foldkit/command";
+
+const SetAuth = FoldkitCommand.define("SetAuth", {
+  messages: [CompletedSetAuth],
+  execute: Effect.flatMap(Confect.Client.Client, (client) =>
+    client.setAuth(({ forceRefreshToken }) => fetchToken(forceRefreshToken)),
+  ).pipe(Effect.as(CompletedSetAuth())),
+});
+```
+
+## Not yet covered
+
+An infinite-scroll, load-more counterpart to `@confect/react`'s
+`usePaginatedQuery` (a growing list of concurrently-live pages) is not yet
+built in. `PaginatedQuery` covers page-at-a-time navigation; for a growing
+list, paginated refs can be called through the underlying
+[`WebSocketClient`](/v10/clients/js/websocket) service directly.

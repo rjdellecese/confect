@@ -1,0 +1,53 @@
+---
+icon: "door-open"
+title: "Introduction"
+description: "Confect deeply integrates Effect with Convex for end-to-end type-safe full-stack apps."
+---
+
+Confect is a framework that deeply integrates [Effect](https://effect.website) with [Convex](https://convex.dev). It's more than just Effect bindings! Confect allows you to:
+
+- Define your Convex database schema using Effect schemas.
+- Write Convex function args and returns validators using Effect's schema library.
+- Use Confect functions to automatically decode and encode your data according to your Effect schema definitions for end-to-end rich types, from client to function to database (and back).
+- Use Effect's HTTP API modules to define your HTTP API(s). Includes interactive OpenAPI documentation powered by [Scalar](https://github.com/scalar/scalar).
+- Access Convex platform capabilities via Effect services.
+
+## Prerequisites
+
+It's recommended that you have some familiarity with both Effect and Convex, including the vanilla `convex` APIs, before getting started with Confect.
+
+<CardGroup cols={2}>
+  <Card
+    title="Effect documentation"
+    icon="layers"
+    href="https://effect.website/docs"
+  >
+    Learn about Effect's core concepts.
+  </Card>
+  <Card
+    title="Convex documentation"
+    icon="database"
+    href="https://docs.convex.dev"
+  >
+    Learn about Convex's platform and APIs.
+  </Card>
+</CardGroup>
+
+## Supported platforms
+
+Confect requires Node.js 22 or later, and runs on Linux, macOS, and Windows.
+
+<Note>
+  On Windows, the `confect` CLI (`confect codegen`, `confect dev`) runs
+  natively. Convex's own [local
+  deployments](https://docs.convex.dev/cli/local-deployments) — anonymous
+  development and self-hosting — depend on a `convex-local-backend` binary that
+  Convex does not publish for Windows, so those workflows need WSL or Docker.
+  Developing against a Convex cloud deployment is unaffected.
+</Note>
+
+## Next steps
+
+<Card title="Quickstart" icon="rocket" href="/v10/getting-started/quickstart">
+  Install Confect and build your first app.
+</Card>

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "defaultVersion": "v9",
+  "versions": {
+    "v9": {
+      "source": "1cc8e7722e8cb2f46288449c50239c710af01838"
+    },
+    "v10": {
+      "source": "0d6a58e26d797cc7a6741c767023be72b472a915"
+    }
+  }
+}
