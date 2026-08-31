@@ -72,7 +72,7 @@ These are from the Changesets docs but are easy to miss:
    +      - v9
    ```
 
-   The other pieces of branch-awareness are permanent fixtures of `release.yml` (kept in place between prerelease cycles) — verify they are still present rather than adding them: `changesets/action@v2` opens its Version Packages PR against the pushed branch by default (its `pr-base-branch` input defaults to `github.ref_name`, so no explicit input is needed), and a successful publish calls the versioned docs deployment using the package's major version. Extend `scripts/assembleDocs.ts` and `docs-release.yml` for the new `vN` while retaining the current stable version; the generated `release` branch must never be replaced directly with either code branch.
+   The other pieces of branch-awareness are permanent fixtures of `release.yml` (kept in place between prerelease cycles) — verify they are still present rather than adding them: `changesets/action@v2` opens its Version Packages PR against the pushed branch by default (its `pr-base-branch` input defaults to `github.ref_name`, so no explicit input is needed), and a successful publish calls the versioned docs deployment using the package's major version. Extend `scripts/assembleDocs.mts` and `docs-release.yml` for the new `vN` while retaining the current stable version; the generated `release` branch must never be replaced directly with either code branch.
 
    When introducing versioned deployments for the first time, port the complete
    docs deployment machinery to `main` and merge it there before enabling it on
@@ -126,7 +126,7 @@ There is no required cadence; ship as many `next.N`s as the major needs.
 3. **In a follow-up PR against `main`, clean up the branch-specific machinery.** Direct pushes to `main` are disallowed, so branch off `main` and open a PR. In one commit:
    - Revert `.changeset/config.json` `baseBranch` back to `main`.
    - Remove `- v9` from `push.branches` and `pull_request.branches` in every workflow that referenced it (including `release.yml`).
-   - Remove the deleted prerelease branch from docs fetches and from that version's allowed source branches in `scripts/assembleDocs.ts`. Keep the previous stable docs entry and its pinned manifest source until those docs are intentionally retired.
+   - Remove the deleted prerelease branch from docs fetches and from that version's allowed source branches in `scripts/assembleDocs.mts`. Keep the previous stable docs entry and its pinned manifest source until those docs are intentionally retired.
    - `release.yml` continues to publish stable from `main` with no further changes.
 
    ```bash

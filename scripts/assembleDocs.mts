@@ -1,12 +1,12 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 
 // The source branches keep an ordinary, unversioned Mintlify tree so their
 // previews stay useful. This script is the boundary that turns those trees
 // into the versioned deployment artifact committed to `release`.
 
-// oxlint-disable-next-line effecttsgo/node-builtin-import -- Bun implements Node's process APIs, and this deployment tool must run on both the Effect 3 and Effect 4 branches.
+// oxlint-disable-next-line effecttsgo/node-builtin-import -- This standalone deployment tool must run on both the Effect 3 and Effect 4 branches.
 import { execFileSync, spawnSync } from "node:child_process";
-// oxlint-disable effecttsgo/node-builtin-import -- Bun implements these filesystem APIs; keeping the tool dependency-free lets both release branches run identical code.
+// oxlint-disable effecttsgo/node-builtin-import -- Keeping the tool dependency-free lets both release branches run identical code.
 import {
   existsSync,
   mkdirSync,
@@ -15,7 +15,7 @@ import {
   writeFileSync,
 } from "node:fs";
 // oxlint-enable effecttsgo/node-builtin-import
-// oxlint-disable-next-line effecttsgo/node-builtin-import -- Bun implements Node's portable path API.
+// oxlint-disable-next-line effecttsgo/node-builtin-import -- This standalone deployment tool uses Node's portable path API.
 import { dirname, extname, join, parse, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
