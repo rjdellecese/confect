@@ -414,8 +414,8 @@ importers:
         specifier: workspace:*
         version: link:../../tools/bench-harness
       convex-test:
-        specifier: 0.0.55
-        version: 0.0.55(convex@1.45.0(react@19.2.8))
+        specifier: 0.0.56
+        version: 0.0.56(convex@1.45.0(react@19.2.8))
       dotenv:
         specifier: 17.4.2
         version: 17.4.2
@@ -4051,8 +4051,8 @@ packages:
     peerDependencies:
       convex: 1.45.0
 
-  convex-test@0.0.55:
-    resolution: {integrity: sha512-ablJ6vR3WUpyTaYrrRQf8yxInGrhHyqBEQsCFzloda3G0MDEu2RMKNGUkvlBXYWPiiEP0UIKPS7gZuLbqGnvQw==}
+  convex-test@0.0.56:
+    resolution: {integrity: sha512-dLYXlQjKFoGqvjAmPzyLgb2HsYI7iLo1iuNTU2DZmSrMRLWosYk94erjSU67GG5ovfP6+MjX8RJO+ebhmL6QYA==}
     peerDependencies:
       convex: 1.45.0
 
@@ -10412,7 +10412,7 @@ snapshots:
     dependencies:
       convex: 1.45.0(react@19.2.8)
 
-  convex-test@0.0.55(convex@1.45.0(react@19.2.8)):
+  convex-test@0.0.56(convex@1.45.0(react@19.2.8)):
     dependencies:
       convex: 1.45.0(react@19.2.8)
 
