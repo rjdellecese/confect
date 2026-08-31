@@ -49,6 +49,17 @@ jobs:
           version-script: pnpm version-packages
           publish-script: pnpm release
 
+      - name: Close stale release pull request
+        if: steps.changesets.outputs['has-changesets'] == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version_branch="changeset-release/${GITHUB_REF_NAME}"
+          number=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --head "$version_branch" --json number --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh pr close "$number" --repo "$GITHUB_REPOSITORY" --comment "Closing because this branch no longer has pending changesets or unpublished packages."
+          fi
+
   deploy-docs:
     name: Deploy docs
     needs: release
