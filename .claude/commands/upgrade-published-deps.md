@@ -1,5 +1,5 @@
 ---
-description: Upgrade dependencies on the published surface of the @confect/* packages (their dependencies/peerDependencies), with a changeset and a PR
+description: Upgrade dependencies on the published surface of the @confect/* packages (their dependencies/peerDependencies), adding a changeset only when consumers are affected
 ---
 
 Upgrade the dependencies that consumers of the `@confect/*` packages can see,
@@ -54,8 +54,12 @@ bumping, confirm the new versions actually resolved (e.g. `pnpm why <dep>`).
    `pnpm test:server:local-backend`). Anything the local environment genuinely
    can't run, leave to the PR's CI — and get it green. Drop upgrades that fail
    here before moving on.
-3. Add a changeset iff any published `package.json` changed — follow the
-   create-changeset skill.
+3. Add a changeset iff the applied upgrade changes something consumers can
+   observe: a published package's `dependencies` or `peerDependencies`, a
+   consumer-facing range or override, shipped code, or runtime behavior. A
+   `devDependencies`-only edit does not become user-facing merely because its
+   `package.json` belongs to a published package; do not add a changeset for
+   that alone. Follow the create-changeset skill when a changeset is required.
 4. Push a branch (`deps/<short-description>`, unless this session was assigned
    a branch) and open a PR against `main`. In the body, list what was bumped
    with links to release notes, and note anything deliberately skipped and why.
