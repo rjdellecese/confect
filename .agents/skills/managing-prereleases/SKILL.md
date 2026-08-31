@@ -20,6 +20,7 @@ For Changesets-specific behavior and caveats, see the upstream [Changesets prere
 - All `@confect/*` packages version together via the `fixed` group in `.changeset/config.json`, so a single `pnpm changeset` covers every package being bumped for the major.
 - The release branch is named after the target major (`v9`, `v10`, …). `main` continues to receive patch releases of the current stable line while `vN` is in flight.
 - Prereleases publish through the existing [`.github/workflows/release.yml`](.github/workflows/release.yml), extended to trigger on `vN` alongside `main`. Do **not** add a separate `release-vN.yml` — npm trusted publishing (OIDC) is configured for `release.yml`, and a differently named workflow fails publish with a misleading `E404`.
+- Mintlify deploys the generated `release` branch, which contains both the current stable docs and the prerelease docs under versioned paths. A successful package publish updates only that version's pinned docs source; docs-only updates use `docs-release.yml`.
 - The Changesets `pre` tag is `next`, which also becomes the npm dist-tag. Consumers opt in with `pnpm add @confect/server@next`; `latest` continues to resolve to the current stable line.
 - `pnpm release` (defined in the root `package.json`) is `pnpm build && changeset publish`. It works the same in pre mode and stable mode — the difference is purely in what `.changeset/pre.json` / the changesets folder contain at publish time.
 
@@ -71,7 +72,15 @@ These are from the Changesets docs but are easy to miss:
    +      - v9
    ```
 
-   The other pieces of branch-awareness are permanent fixtures of `release.yml` (kept in place between prerelease cycles) — verify they are still present rather than adding them: `changesets/action@v2` opens its Version Packages PR against the pushed branch by default (its `pr-base-branch` input defaults to `github.ref_name`, so no explicit input is needed), and the docs deployment step is gated with `if: steps.changesets.outputs.published == 'true' && github.ref_name == 'main'`. The prerelease cycle must not touch the docs `release` branch — that tracks the stable line.
+   The other pieces of branch-awareness are permanent fixtures of `release.yml` (kept in place between prerelease cycles) — verify they are still present rather than adding them: `changesets/action@v2` opens its Version Packages PR against the pushed branch by default (its `pr-base-branch` input defaults to `github.ref_name`, so no explicit input is needed), and a successful publish calls the versioned docs deployment using the package's major version. Extend `scripts/assembleDocs.mts` and `docs-release.yml` for the new `vN` while retaining the current stable version; the generated `release` branch must never be replaced directly with either code branch.
+
+   When introducing versioned deployments for the first time, port the complete
+   docs deployment machinery to `main` and merge it there before enabling it on
+   `vN`. In particular, both `release.yml` and `docs-release.yml` on `main` must
+   delegate to `docs-deploy.yml` and must no longer push a branch head directly
+   to `release`. Otherwise, the next stable package or docs-only release can
+   replace the generated versioned tree. The reusable deployment workflow fails
+   closed until `main` satisfies these prerequisites.
 
 5. **Mirror the branch into the other CI workflows.** Add `- v9` to the `push.branches` and `pull_request.branches` lists in any CI workflows that gate `main` (typically `docs.yml`, `example.yml`, `packages.yml`) so PRs against `v9` run the same checks as PRs against `main`.
 
@@ -91,6 +100,7 @@ While `.changeset/pre.json` exists on `v9`:
 
 - Author changesets normally with `pnpm changeset` on feature branches targeting `v9`. Each merged PR is appended to the open `Version Packages (next)` PR.
 - Merging the `Version Packages (next)` PR bumps the next `X.0.0-next.N` and publishes under the `next` dist-tag.
+- After a successful prerelease publish, the release workflow pins that commit as the prerelease documentation source and rebuilds the stable and prerelease docs together.
 - The merged changeset files are kept around (Changesets v3 moves consumed ones into `.changeset/pre/`) — Changesets needs them to compose the final stable changelog on exit. Do not delete them manually.
 
 There is no required cadence; ship as many `next.N`s as the major needs.
@@ -109,13 +119,14 @@ There is no required cadence; ship as many `next.N`s as the major needs.
    git push
    ```
 
-   `pre exit` deletes `.changeset/pre.json`. `changeset version` then consumes every changeset accumulated during the prerelease cycle and writes the final stable versions (e.g. `9.0.0`) into each `package.json`. Run `pnpm format` before committing — `changeset version` writes CHANGELOG entries in its own Markdown style, which fails the Format CI job otherwise. Pushing triggers `release.yml`; with no remaining changesets, `changesets/action` skips opening a Version Packages PR and goes straight to `pnpm release`, publishing the final stable to `latest`.
+   `pre exit` deletes `.changeset/pre.json`. `changeset version` then consumes every changeset accumulated during the prerelease cycle and writes the final stable versions (e.g. `9.0.0`) into each `package.json`. Run `pnpm format` before committing — `changeset version` writes CHANGELOG entries in its own Markdown style, which fails the Format CI job otherwise. Pushing triggers `release.yml`; with no remaining changesets, `changesets/action` skips opening a Version Packages PR and goes straight to `pnpm release`, publishing the final stable to `latest`. The docs assembler recognizes that the published version no longer has a prerelease suffix, makes it the default `Stable` version, and repoints unversioned docs redirects to it.
 
 2. **Open a PR merging `vN` back into `main`** with the major as the title (e.g. `v9`). Use a merge commit so the prerelease history is preserved in `main` — merge commits are enabled repo-wide for exactly this case, even though squash is the norm for regular PRs. If the merge-commit option is missing from the UI (or the API returns `405 Merge commits are not allowed`), check that "Allow merge commits" is still enabled in the repository settings and that no "Require linear history" rule exists on `main` — the rule overrides the repo-level toggle and hides the option.
 
 3. **In a follow-up PR against `main`, clean up the branch-specific machinery.** Direct pushes to `main` are disallowed, so branch off `main` and open a PR. In one commit:
    - Revert `.changeset/config.json` `baseBranch` back to `main`.
    - Remove `- v9` from `push.branches` and `pull_request.branches` in every workflow that referenced it (including `release.yml`).
+   - Remove the deleted prerelease branch from docs fetches and from that version's allowed source branches in `scripts/assembleDocs.mts`. Keep the previous stable docs entry and its pinned manifest source until those docs are intentionally retired.
    - `release.yml` continues to publish stable from `main` with no further changes.
 
    ```bash
