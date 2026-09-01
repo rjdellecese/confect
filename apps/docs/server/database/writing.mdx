@@ -35,7 +35,7 @@ writer.table("notes").insert({
 
 ### Patch
 
-Shallow merge the provided object with the existing document. New fields are added. Existing fields are overwritten. Fields set to `undefined` are removed.
+Shallow merge the provided object with the existing document. New fields are added. Existing fields are overwritten. Optional fields set to `undefined` are removed; required fields can't be removed this way, and passing `undefined` for one is a type error.
 
 ```ts
 writer.table("notes").patch(noteId, {

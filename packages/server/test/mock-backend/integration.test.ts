@@ -66,6 +66,48 @@ describe("DatabaseReader", () => {
   );
 });
 
+describe("DatabaseWriter", () => {
+  it.effect("patch removes optional fields set to undefined", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      const noteId = yield* c.run(
+        Effect.gen(function* () {
+          const writer = yield* DatabaseWriter;
+
+          const id = yield* writer
+            .table("notes")
+            .insert({ text: "original", tag: "draft" });
+
+          yield* writer
+            .table("notes")
+            .patch(id, { text: "patched", tag: undefined });
+
+          return id;
+        }),
+        Id("notes"),
+      );
+
+      const note = yield* c.query(refs.public.databaseReader.getNote, {
+        noteId,
+      });
+
+      assertEquals(note.text, "patched");
+      assert.isFalse(Object.hasOwn(note, "tag"));
+    }).pipe(Effect.provide(TestConfect.layer())),
+  );
+
+  it("patch only accepts undefined for optional fields", () => {
+    const patchNote = (writer: DatabaseWriter) => writer.table("notes").patch;
+    type Patch = Parameters<ReturnType<typeof patchNote>>[1];
+
+    expectTypeOf<{ tag: undefined }>().toMatchTypeOf<Patch>();
+    expectTypeOf<{ author: undefined }>().toMatchTypeOf<Patch>();
+    expectTypeOf<{ text: undefined }>().not.toMatchTypeOf<Patch>();
+    expectTypeOf<{ text: string }>().toMatchTypeOf<Patch>();
+  });
+});
+
 describe("MutationRunner", () => {
   it.effect("insertNoteViaRunner", () =>
     Effect.gen(function* () {
