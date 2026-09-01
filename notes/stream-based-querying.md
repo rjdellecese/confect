@@ -117,8 +117,8 @@ interface QueryStream<
 }
 ```
 
-- It **is** a `Stream` (implementable via `effect/Streamable.Class`, or a `Pipeable` data
-  type with a `Stream` variance struct): `Stream.take`, `Stream.runCollect`,
+- It **is** a `Stream` (a `Pipeable` data type carrying the `Stream` variance
+  marker and channel): `Stream.take`, `Stream.runCollect`,
   `Stream.mapEffect`, `Stream.zip` … all just work. Consuming it as a `Stream` yields
   decoded documents in index order.
 - `Key` is the **type-level ordering witness**: the index fields that still vary, i.e. the
@@ -391,7 +391,51 @@ Docs impact is contained: `apps/docs/server/database/reading.mdx` becomes a stre
 queries" page for merge/flatMap/filter/distinct — which is a genuinely new capability
 Confect simply doesn't have a page for today, because it doesn't have the feature.
 
-## 7. Open questions
+## 7. Prototype (implemented on this branch)
+
+The core of §4 is now implemented as a working prototype:
+
+- **`packages/server/src/QueryStream.ts`** — the `QueryStream` class (a genuine
+  `Stream`, implementing the `Stream` protocol — variance marker, `pipe`, and
+  `channel` — directly on the class so `Stream.*` type inference stays
+  intact), the typed range builder with type-level
+  `eq`-prefix consumption, Convex value ordering, and the combinators/sinks:
+  `merge` (k-way ordered, `Key`-invariant so mismatches are type errors),
+  `filterEffect`, `mapEffect`, `narrow`, `unique`, and `paginate` with
+  `cursor`/`endCursor`/`maximumRowsRead` semantics matching `convex-helpers`.
+  Leaf streams store a **`Reflection`** — the query recipe (reader handle,
+  table, index, recorded range ops, order), the Effect formulation of
+  `convex-helpers`' `reflect()` — and rebuild the (one-shot) Convex query
+  from it on every run, so a `QueryStream` value is a reusable description.
+- **`QueryInitializer.stream(...)`** — `reader.table("notes").stream("by_text",
+(q) => q.eq("text", "a"), "desc")` returns
+  `QueryStream<Doc, ["_creationTime"], DocumentDecodeError>`.
+- **`packages/server/test/mock-backend/queryStream.test.ts`** — runtime tests
+  (ordering, plain `Stream` consumption, range bounds, merge interleaving,
+  effectful filtering, cursor-chained pagination over a merged+filtered
+  stream, endCursor pinning, `SplitRequired`, `unique`) and type-level tests
+  (order-key inference, merge mismatch rejection, range-builder misuse, `E`/`R`
+  channel propagation).
+
+Deliberate prototype simplifications, in line with §6.2's "port the core"
+recommendation but deferring the heaviest piece:
+
+- `narrow` filters the annotated stream **in memory** (`dropWhile`/`takeWhile`
+  on order keys) instead of pushing bounds into `withIndex` ranges, so
+  resuming from a cursor re-reads the range from its start. The leaf
+  `Reflection` now carries everything the `splitRange` decomposition needs to
+  rebuild a leaf with tighter bounds; what remains is the decomposition
+  itself, plus making `narrow` recurse through composed streams (merge
+  narrows every branch, a filter narrows the stream beneath it) as
+  `convex-helpers` does.
+- Cursors serialize only the _remaining_ (order-key) fields — a deliberate
+  improvement over `convex-helpers`' full index keys: equality-pinned values
+  never leak into cursors, and merged streams with different pins share a
+  cursor space by construction.
+- No `flatMap` (join), `distinct` (loose index scan), or `orderBy` (re-keying)
+  yet; no `maximumBytesRead` accounting; NaN ordering subtleties are skipped.
+
+## 8. Open questions
 
 1. **Key inference ergonomics** — how far to push the typed range builder. Full inference
    of the eq-pinned prefix (so `Key` is exact) vs. a simpler declared-`by` at merge sites

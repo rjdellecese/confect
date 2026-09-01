@@ -18,6 +18,9 @@ import type { GenericId } from "convex/values";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
+import type { ReadonlyRecord } from "effect/Record";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import type {
@@ -27,6 +30,7 @@ import type {
 import type * as DataModel from "./DataModel";
 import * as Document from "./Document";
 import * as OrderedQuery from "./OrderedQuery";
+import * as QueryStream from "./QueryStream";
 import type * as Table from "./Table";
 import type * as TableInfo from "./TableInfo";
 
@@ -99,6 +103,50 @@ export interface QueryInitializer<
       >,
     ) => SearchFilter,
   ) => OrderedQuery.OrderedQuery<TableInfoFor<DataModel_, TableName>, Doc>;
+  /**
+   * PROTOTYPE — stream-first querying (see `notes/stream-based-querying.md`).
+   *
+   * Like `index`, but returns a {@link QueryStream.QueryStream}: a genuine
+   * Effect `Stream` of documents in index order that stays mergeable and
+   * paginable. The typed range builder consumes `eq`-pinned fields from the
+   * index's field tuple at the type level, so the stream's order-key type is
+   * exactly the fields that still vary.
+   */
+  readonly stream: {
+    <
+      IndexName extends keyof Indexes<
+        ConvexTableInfoFor<DataModel_, TableName>
+      > &
+        string,
+      Spec extends QueryStream.AnyIndexRangeSpec,
+    >(
+      indexName: IndexName,
+      indexRange: (
+        q: QueryStream.RangeBuilder<
+          TableInfoFor<DataModel_, TableName>["convexDocument"],
+          NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>
+        >,
+      ) => Spec,
+      order?: "asc" | "desc",
+    ): QueryStream.QueryStream<
+      Doc,
+      QueryStream.Remaining<Spec>,
+      Document.DocumentDecodeError
+    >;
+    <
+      IndexName extends keyof Indexes<
+        ConvexTableInfoFor<DataModel_, TableName>
+      > &
+        string,
+    >(
+      indexName: IndexName,
+      order?: "asc" | "desc",
+    ): QueryStream.QueryStream<
+      Doc,
+      NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>,
+      Document.DocumentDecodeError
+    >;
+  };
 }
 
 export const make = <
@@ -262,6 +310,55 @@ export const make = <
     );
   };
 
+  const stream: QueryInitializerFunction<"stream"> = ((
+    indexName: string,
+    indexRangeOrOrder?:
+      | ((
+          q: QueryStream.RangeBuilder<any, any>,
+        ) => QueryStream.AnyIndexRangeSpec)
+      | "asc"
+      | "desc",
+    maybeOrder?: "asc" | "desc",
+  ) => {
+    const order = Predicate.isString(indexRangeOrOrder)
+      ? indexRangeOrOrder
+      : (maybeOrder ?? "asc");
+
+    // With no range callback, the leaf gets an empty spec (no ops, no
+    // pinned fields).
+    const spec = Predicate.isFunction(indexRangeOrOrder)
+      ? indexRangeOrOrder(QueryStream.rangeBuilder())
+      : QueryStream.rangeBuilder();
+
+    // The type-level field tuple appends the `_creationTime` tiebreaker, but
+    // the runtime `table.indexes` record stores only the declared fields —
+    // append it here.
+    const indexFields: ReadonlyArray<string> =
+      indexName === "by_id"
+        ? ["_id"]
+        : indexName === "by_creation_time"
+          ? ["_creationTime"]
+          : pipe(
+              Option.fromUndefinedOr(
+                (
+                  table.indexes as ReadonlyRecord<string, ReadonlyArray<string>>
+                )[indexName],
+              ),
+              Option.getOrElse(() => Array.empty<string>()),
+              Array.append("_creationTime"),
+            );
+
+    return QueryStream.fromReflection({
+      reader: convexDatabaseReader as QueryStream.ReflectionReader,
+      tableName,
+      tableSchema: table.Fields,
+      indexName,
+      indexFields,
+      spec,
+      order,
+    });
+  }) as QueryInitializerFunction<"stream">;
+
   const search: QueryInitializerFunction<"search"> = (
     indexName,
     searchFilter,
@@ -283,6 +380,7 @@ export const make = <
     get,
     index,
     search,
+    stream,
   };
 };
 

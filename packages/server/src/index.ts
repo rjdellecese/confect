@@ -25,6 +25,7 @@ export * as OrderedQuery from "./OrderedQuery";
 export * as QueryCtx from "./QueryCtx";
 export * as QueryInitializer from "./QueryInitializer";
 export * as QueryRunner from "./QueryRunner";
+export * as QueryStream from "./QueryStream";
 export * as RegisteredConvexFunction from "./RegisteredConvexFunction";
 export * as RegisteredFunction from "./RegisteredFunction";
 export * as RegisteredFunctions from "./RegisteredFunctions";
