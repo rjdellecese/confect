@@ -1,5 +1,22 @@
 # @confect/server
 
+## 10.0.0-next.21
+
+### Major Changes
+
+- a6425c5: Raise the minimum supported Node.js version to 24.
+
+  ### Breaking Changes
+  - `engines.node` is now `>=24` on every `@confect/*` package, raised from `>=22`.
+
+  Node 22 has entered maintenance, so Confect now targets Node 24, the active LTS line. To migrate, move the Node version your project builds and runs on to 24 or later — on Node 22, installing `@confect/*` now fails your package manager's engine check. No API changes accompany the raise: code already running on Node 24 needs no edits.
+
+### Patch Changes
+
+- d5bc6aa: Fix `patch` rejecting `undefined` for optional fields under `exactOptionalPropertyTypes`.
+
+  Setting an optional field to `undefined` unsets it, but `writer.table("notes").patch(noteId, { tag: undefined })` was a type error in projects with `exactOptionalPropertyTypes` enabled. Optional fields now accept `undefined`; required fields still don't, since unsetting one would leave a document the table's schema rejects.
+
 ## 10.0.0-next.20
 
 ### Minor Changes
