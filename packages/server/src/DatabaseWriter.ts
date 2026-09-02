@@ -19,6 +19,15 @@ import * as QueryInitializer from "./QueryInitializer";
 import type * as Table from "./Table";
 import type * as TableInfo from "./TableInfo";
 
+/**
+ * The argument accepted by `patch`: like `Partial<Doc>`, but the fields that
+ * are already optional also accept `undefined`, since setting a field to
+ * `undefined` unsets it.
+ */
+export type PatchValue<Doc> = {
+  [K in keyof Doc]?: undefined extends Doc[K] ? Doc[K] | undefined : Doc[K];
+};
+
 export interface DatabaseWriterTableAccessor<
   DataModel_ extends DataModel.AnyWithProps,
   TableName extends DataModel.TableNames<DataModel_>,
@@ -29,7 +38,7 @@ export interface DatabaseWriterTableAccessor<
   ) => Effect.Effect<GenericId<TableName>, Document.DocumentEncodeError>;
   readonly patch: (
     id: GenericId<TableName>,
-    patchedValues: Partial<Document.WithoutSystemFields<Doc>>,
+    patchedValues: PatchValue<Document.WithoutSystemFields<Doc>>,
   ) => Effect.Effect<
     void,
     | QueryInitializer.GetByIdFailure
@@ -122,7 +131,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
 
     const patch = (
       id: GenericId<TableName>,
-      patchedValues: Partial<
+      patchedValues: PatchValue<
         Document.WithoutSystemFields<DocumentByName_<DataModel_, TableName>>
       >,
     ) =>
