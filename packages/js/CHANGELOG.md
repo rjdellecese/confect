@@ -395,6 +395,8 @@
 - Updated dependencies [70e313e]
   - @confect/core@10.0.0-next.0
 
+## 9.4.2
+
 ## 9.4.1
 
 ### Patch Changes

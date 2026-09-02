@@ -14,7 +14,6 @@ Effect.gen(function* () {
   const writer = yield* DatabaseWriter;
 
   return yield* writer.table("notes").insert({
-    title: "My first note",
     text: "This is my first note",
   });
 });
@@ -28,20 +27,20 @@ Insert a new document.
 
 ```ts
 writer.table("notes").insert({
-  title: "My first note",
   text: "This is my first note",
+  tag: "drafts",
 });
 ```
 
 ### Patch
 
-Shallow merge the provided object with the existing document. New fields are added. Existing fields are overwritten. Fields set to `undefined` are removed.
+Shallow merge the provided object with the existing document. New fields are added. Existing fields are overwritten. Optional fields set to `undefined` are unset.
 
 ```ts
 writer.table("notes").patch(noteId, {
-  title: "Patched title",
-  author: "John Doe",
-  text: undefined,
+  text: "Patched text",
+  author: { role: "user", name: "John Doe" },
+  tag: undefined,
 });
 ```
 
@@ -51,7 +50,6 @@ Replace the entire document.
 
 ```ts
 writer.table("notes").replace(noteId, {
-  title: "Replaced title",
   text: "I'm replacing the whole document",
 });
 ```
