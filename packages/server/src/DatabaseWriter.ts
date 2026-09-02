@@ -22,7 +22,7 @@ import type * as TableInfo from "./TableInfo";
 /**
  * The argument accepted by `patch`: like `Partial<Doc>`, but the fields that
  * are already optional also accept `undefined`, since setting a field to
- * `undefined` removes it from the document.
+ * `undefined` unsets it.
  */
 export type PatchValue<Doc> = Doc extends unknown
   ? {

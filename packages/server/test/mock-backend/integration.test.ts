@@ -67,7 +67,7 @@ describe("DatabaseReader", () => {
 });
 
 describe("DatabaseWriter", () => {
-  it.effect("patch removes optional fields set to undefined", () =>
+  it.effect("patch unsets optional fields set to undefined", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
