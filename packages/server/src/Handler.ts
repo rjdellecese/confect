@@ -67,14 +67,16 @@ type ConfectProvenanceHandler<
           ? NodeRuntimeAction<DatabaseSchema_, FunctionSpec_, R>
           : never;
 
-export type QueryServices<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
-    | DatabaseReader.DatabaseReader<DatabaseSchema_>
-    | Auth.Auth
-    | StorageReader
-    | QueryRunner.QueryRunner
-    | QueryCtx.QueryCtx<
-        DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
-      >;
+export type QueryServices<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+> =
+  | DatabaseReader.DatabaseReader<DatabaseSchema_>
+  | Auth.Auth
+  | StorageReader
+  | QueryRunner.QueryRunner
+  | QueryCtx.QueryCtx<
+      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+    >;
 
 export type MutationServices<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,

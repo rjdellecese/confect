@@ -95,7 +95,7 @@ describe("DatabaseWriter", () => {
 
       assertEquals(note.text, "patched");
       assert.isFalse(Object.hasOwn(note, "tag"));
-    }).pipe(Effect.provide(TestConfect.layer())),
+    }).pipe(Effect.provide(TestConfect.layer)),
   );
 
   it("patch accepts undefined only where the field type allows it", () => {

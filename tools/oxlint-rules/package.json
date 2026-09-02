@@ -7,7 +7,7 @@
     "effect": "4.0.0-rc.112",
     "effect-oxlint": "0.3.4",
     "shx": "0.4.0",
-    "vitest": "4.1.10"
+    "vitest": "4.1.11"
   },
   "exports": {
     ".": "./src/index.ts"
