@@ -97,14 +97,14 @@ describe("DatabaseWriter", () => {
     }).pipe(Effect.provide(TestConfect.layer())),
   );
 
-  it("patch only accepts undefined for optional fields", () => {
+  it("patch accepts undefined only where the field type allows it", () => {
     const patchNote = (writer: DatabaseWriter) => writer.table("notes").patch;
     type Patch = Parameters<ReturnType<typeof patchNote>>[1];
 
-    expectTypeOf<{ tag: undefined }>().toMatchTypeOf<Patch>();
-    expectTypeOf<{ author: undefined }>().toMatchTypeOf<Patch>();
-    expectTypeOf<{ text: undefined }>().not.toMatchTypeOf<Patch>();
-    expectTypeOf<{ text: string }>().toMatchTypeOf<Patch>();
+    expectTypeOf<{ tag: undefined }>().toExtend<Patch>();
+    expectTypeOf<{ author: undefined }>().toExtend<Patch>();
+    expectTypeOf<{ text: undefined }>().not.toExtend<Patch>();
+    expectTypeOf<{ text: string }>().toExtend<Patch>();
   });
 });
 

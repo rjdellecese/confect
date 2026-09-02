@@ -24,11 +24,9 @@ import type * as TableInfo from "./TableInfo";
  * are already optional also accept `undefined`, since setting a field to
  * `undefined` unsets it.
  */
-export type PatchValue<Doc> = Doc extends unknown
-  ? {
-      [K in keyof Doc]?: undefined extends Doc[K] ? Doc[K] | undefined : Doc[K];
-    }
-  : never;
+export type PatchValue<Doc> = {
+  [K in keyof Doc]?: undefined extends Doc[K] ? Doc[K] | undefined : Doc[K];
+};
 
 export interface DatabaseWriterTableAccessor<
   DataModel_ extends DataModel.AnyWithProps,
