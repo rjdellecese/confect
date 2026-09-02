@@ -17,19 +17,19 @@
     "exsolve": "^1.1.1"
   },
   "devDependencies": {
-    "@convex-dev/workpool": "0.4.9",
-    "@effect/tsgo": "0.36.5",
+    "@convex-dev/workpool": "0.4.10",
+    "@effect/tsgo": "0.38.0",
     "@effect/vitest": "4.0.0-rc.112",
     "@types/node": "24.13.3",
-    "@vitest/coverage-v8": "4.1.10",
+    "@vitest/coverage-v8": "4.1.11",
     "convex": "1.45.0",
     "effect": "4.0.0-rc.112",
     "tsdown": "0.22.14",
     "typescript": "7.0.2",
     "unrun": "0.3.1",
-    "vite": "8.2.1",
+    "vite": "8.2.2",
     "vite-tsconfig-paths": "6.1.1",
-    "vitest": "4.1.10"
+    "vitest": "4.1.11"
   },
   "engines": {
     "node": ">=24"

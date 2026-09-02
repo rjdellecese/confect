@@ -1,21 +1,21 @@
 {
   "devDependencies": {
-    "@changesets/cli": "3.0.0",
+    "@changesets/cli": "3.0.1",
     "@changesets/config": "4.0.0",
     "@effect/platform-bun": "4.0.0-rc.112",
     "@effect/platform-node": "4.0.0-rc.112",
-    "@effect/tsgo": "0.36.5",
+    "@effect/tsgo": "0.38.0",
     "@types/bun": "1.3.14",
     "@types/node": "24.13.3",
-    "@vitest/coverage-v8": "4.1.10",
+    "@vitest/coverage-v8": "4.1.11",
     "concurrently": "10.0.5",
     "confect-oxlint-rules": "workspace:*",
     "cross-env": "10.1.0",
     "dpdm": "4.3.0",
     "effect": "4.0.0-rc.112",
     "opensrc": "0.7.3",
-    "oxfmt": "0.63.0",
-    "oxlint": "1.78.0",
+    "oxfmt": "0.65.0",
+    "oxlint": "1.80.0",
     "oxlint-tsgolint": "7.0.2001",
     "shx": "0.4.0",
     "skills": "1.5.23",
@@ -23,16 +23,16 @@
     "tsdown": "0.22.14",
     "typescript": "7.0.2",
     "unrun": "0.3.1",
-    "vite-plus": "0.2.9",
+    "vite-plus": "0.3.0",
     "vite-tsconfig-paths": "6.1.1",
-    "vitest": "4.1.10"
+    "vitest": "4.1.11"
   },
   "keywords": [
     "convex",
     "effect"
   ],
   "license": "ISC",
-  "packageManager": "pnpm@11.18.0",
+  "packageManager": "pnpm@11.25.0",
   "scripts": {
     "build": "vp run --cache --filter \"@confect/*\" build",
     "check": "bun run scripts/syncSkillIgnore.ts --check && vp check",
