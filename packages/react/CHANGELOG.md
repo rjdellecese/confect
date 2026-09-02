@@ -1,5 +1,7 @@
 # @confect/react
 
+## 9.4.2
+
 ## 9.4.1
 
 ### Patch Changes
