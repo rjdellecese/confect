@@ -377,6 +377,42 @@ describe("QueryStream", () => {
     }).pipe(Effect.provide(TestConfect.layer)),
   );
 
+  it.effect("filter and map keep the stream paginable", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          yield* insertNotes(["a", "b", "c", "d"]);
+
+          const reader = yield* DatabaseReader;
+
+          const shouted = reader
+            .table("notes")
+            .stream("by_text")
+            .pipe(
+              QueryStream.filter((note) => note.text !== "b"),
+              QueryStream.map((note) => note.text.toUpperCase()),
+            );
+
+          const page1 = yield* QueryStream.paginate(shouted, {
+            numItems: 2,
+            cursor: null,
+          });
+          expect(page1.page).toEqual(["A", "C"]);
+
+          // The filtered-out "b" still advanced the cursor.
+          const page2 = yield* QueryStream.paginate(shouted, {
+            numItems: 2,
+            cursor: page1.continueCursor,
+          });
+          expect(page2.page).toEqual(["D"]);
+          assertEquals(page2.isDone, true);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
   it.effect("unique succeeds on zero or one and fails on two", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
@@ -502,6 +538,23 @@ describe("QueryStream types", () => {
         return lowerBounded;
       });
       void afterBound;
+
+      // Pure `filter`/`map` keep the order key and leave E/R untouched.
+      const pureFiltered = QueryStream.filter(
+        pinned,
+        (note) => note.text !== "",
+      );
+      expectTypeOf<KeyOf<typeof pureFiltered>>().toEqualTypeOf<
+        ["_creationTime"]
+      >();
+      const pureMapped = QueryStream.map(pinned, (note) => note.text);
+      expectTypeOf<typeof pureMapped>().toEqualTypeOf<
+        QueryStream.QueryStream<
+          string,
+          ["_creationTime"],
+          Document.DocumentDecodeError
+        >
+      >();
 
       // The predicate's error and requirement channels surface in the
       // stream's channels.

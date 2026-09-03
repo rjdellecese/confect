@@ -668,6 +668,64 @@ export const mapEffect = dual<
 );
 
 /**
+ * Filter with a pure predicate — `Stream.filter` that keeps the stream
+ * paginable: filtered-out elements still advance cursors. Use
+ * `filterEffect` when the predicate needs to read the database or another
+ * service.
+ */
+export const filter = dual<
+  <Doc>(
+    predicate: (doc: Doc) => boolean,
+  ) => <Key extends ReadonlyArray<string>, E, R>(
+    self: QueryStream<Doc, Key, E, R>,
+  ) => QueryStream<Doc, Key, E, R>,
+  <Doc, Key extends ReadonlyArray<string>, E, R>(
+    self: QueryStream<Doc, Key, E, R>,
+    predicate: (doc: Doc) => boolean,
+  ) => QueryStream<Doc, Key, E, R>
+>(
+  2,
+  (self, predicate) =>
+    new QueryStream(
+      self.order,
+      self.keyFields,
+      Stream.map(
+        self.annotated,
+        ([doc, key]) => [Option.filter(doc, predicate), key] as const,
+      ),
+    ),
+);
+
+/**
+ * Transform elements with a pure function while preserving order keys —
+ * `Stream.map` that keeps the stream mergeable and paginable. The mapper
+ * must not change the ordering semantics. Use `mapEffect` when the mapper
+ * needs to read the database or another service.
+ */
+export const map = dual<
+  <Doc, Doc2>(
+    f: (doc: Doc) => Doc2,
+  ) => <Key extends ReadonlyArray<string>, E, R>(
+    self: QueryStream<Doc, Key, E, R>,
+  ) => QueryStream<Doc2, Key, E, R>,
+  <Doc, Key extends ReadonlyArray<string>, E, R, Doc2>(
+    self: QueryStream<Doc, Key, E, R>,
+    f: (doc: Doc) => Doc2,
+  ) => QueryStream<Doc2, Key, E, R>
+>(
+  2,
+  (self, f) =>
+    new QueryStream(
+      self.order,
+      self.keyFields,
+      Stream.map(
+        self.annotated,
+        ([doc, key]) => [Option.map(doc, f), key] as const,
+      ),
+    ),
+);
+
+/**
  * Restrict a stream to order keys strictly after `after` and at-or-before
  * `until` (in stream order). Prototype: filters in memory. Production would
  * push these bounds down into `withIndex` ranges: a leaf's `reflection`

@@ -401,7 +401,7 @@ The core of §4 is now implemented as an experimental API:
   intact), the typed range builder with type-level
   `eq`-prefix consumption, Convex value ordering, and the combinators/sinks:
   `merge` (k-way ordered, `Key`-invariant so mismatches are type errors),
-  `filterEffect`, `mapEffect`, `narrow`, `unique`, and `paginate` with
+  `filter`/`filterEffect`, `map`/`mapEffect`, `narrow`, `unique`, and `paginate` with
   `cursor`/`endCursor`/`maximumRowsRead` semantics matching `convex-helpers`.
   Leaf streams store a **`Reflection`** — the query recipe (reader handle,
   table, index, recorded range ops, order), the Effect formulation of

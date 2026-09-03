@@ -2,7 +2,7 @@
 "@confect/server": minor
 ---
 
-Add `QueryStream`, an experimental stream-first querying API. `reader.table(...).stream(index, range?, order?)` returns a genuine Effect `Stream` of documents in index order that stays combinable and paginable: `QueryStream.merge` interleaves streams that share an order key, `QueryStream.filterEffect` and `QueryStream.mapEffect` transform documents without losing pagination support, `QueryStream.unique` expects at most one result, and `QueryStream.paginate` turns any composed stream into a paginated query page.
+Add `QueryStream`, an experimental stream-first querying API. `reader.table(...).stream(index, range?, order?)` returns a genuine Effect `Stream` of documents in index order that stays combinable and paginable: `QueryStream.merge` interleaves streams that share an order key, `QueryStream.filter` and `QueryStream.map` (and their effectful counterparts `filterEffect` and `mapEffect`) transform documents without losing pagination support, `QueryStream.unique` expects at most one result, and `QueryStream.paginate` turns any composed stream into a paginated query page.
 
 The order key is tracked in the type system: fields pinned with `.eq(...)` in the range builder are consumed from the key, and merging streams whose remaining keys differ is a type error.
 
@@ -21,7 +21,7 @@ const inRange = (from: number, to: number) =>
 const page =
   yield *
   QueryStream.merge([inRange(0, 10), inRange(20, 30)]).pipe(
-    QueryStream.filterEffect((event) => Effect.succeed(!event.cancelled)),
+    QueryStream.filter((event) => !event.cancelled),
     QueryStream.paginate(paginationOpts),
   );
 ```
