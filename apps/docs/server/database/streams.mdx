@@ -79,7 +79,7 @@ The order key determines which streams can be merged: two streams can only be me
 
 ## Consuming a stream
 
-A query stream is a genuine `Stream`, so everything in Effect's `Stream` module applies:
+A query stream is a genuine `Stream`, so everything in Effect's `Stream` module applies (`QueryStream.isQueryStream` tells the two apart at runtime):
 
 ```ts
 import * as Stream from "effect/Stream";

@@ -129,15 +129,15 @@ describe("QueryStream", () => {
 
           const reader = yield* DatabaseReader;
 
-          const firstTwo = yield* reader
-            .table("notes")
-            .stream("by_text")
-            .pipe(
-              Stream.map((note) => note.text),
-              Stream.take(2),
-              Stream.runCollect,
-            );
+          const notes = reader.table("notes").stream("by_text");
+          const texts = notes.pipe(Stream.map((note) => note.text));
+          const firstTwo = yield* texts.pipe(Stream.take(2), Stream.runCollect);
           expect(firstTwo).toEqual(["apple", "banana"]);
+
+          // A generic combinator yields a plain `Stream`, no longer a
+          // query stream.
+          expect(QueryStream.isQueryStream(notes)).toBe(true);
+          expect(QueryStream.isQueryStream(texts)).toBe(false);
         }),
       );
     }).pipe(Effect.provide(TestConfect.layer)),

@@ -58,7 +58,7 @@ import * as String from "effect/String";
 import type * as Types from "effect/Types";
 import * as Document from "./Document";
 
-export const TypeId = "@confect/server/QueryStream";
+export const TypeId = "~@confect/server/QueryStream";
 export type TypeId = typeof TypeId;
 
 // -----------------------------------------------------------------------------
@@ -97,7 +97,7 @@ export type Element<Doc> = readonly [Option.Option<Doc>, OrderKey];
 // tuple becomes the resulting stream's order key, which is what `merge`
 // checks for compatibility.
 
-export const RangeSpecTypeId = "@confect/server/QueryStream/IndexRangeSpec";
+export const RangeSpecTypeId = "~@confect/server/QueryStream/IndexRangeSpec";
 export type RangeSpecTypeId = typeof RangeSpecTypeId;
 
 export type RangeOp = {
@@ -569,8 +569,9 @@ export class QueryStream<
   out R = never,
   Direction extends OrderDirection = OrderDirection,
 > implements Stream.Stream<Doc, E, R> {
-  declare readonly _Key: (_: Key) => Key;
-  declare readonly _Direction: (_: Direction) => Direction;
+  declare readonly [TypeId]: TypeId;
+  declare readonly "~key": (_: Key) => Key;
+  declare readonly "~direction": (_: Direction) => Direction;
 
   // The `Stream` protocol (the variance marker, `pipe`, and the `channel`
   // the Stream runtime consumes) is implemented directly: the members are
@@ -648,6 +649,7 @@ const streamVariance = {
 const queryStreamPrototype: object = QueryStream.prototype;
 
 Object.defineProperties(queryStreamPrototype, {
+  [TypeId]: { value: TypeId },
   [Stream.TypeId]: { value: streamVariance },
   pipe: {
     value: function (this: unknown) {
@@ -662,6 +664,13 @@ Object.defineProperties(queryStreamPrototype, {
 });
 
 export type Any = QueryStream<any, ReadonlyArray<string>, any, any, any>;
+
+/**
+ * Whether `u` is a `QueryStream` — as opposed to the plain `Stream` that a
+ * generic `Stream.*` combinator turns one into.
+ */
+export const isQueryStream = (u: unknown): u is Any =>
+  Predicate.hasProperty(u, TypeId);
 
 // -----------------------------------------------------------------------------
 // Constructors
