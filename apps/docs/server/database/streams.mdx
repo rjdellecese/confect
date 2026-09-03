@@ -192,7 +192,7 @@ reader
   .pipe(QueryStream.distinct(["text"]));
 ```
 
-The fields must be a prefix of the stream's order key, which is enforced at the type level. Apply `filter` (or `filterEffect`) _after_ `distinct` rather than before it, so that a filtered-out document can't hide its group's first match from a resumed page.
+The fields must be a prefix of the stream's order key, which is enforced at the type level. On a `flatMap` result, a prefix that reaches into the inner key groups by the outer document as well, since groups are runs of consecutive equal keys. Apply `filter` (or `filterEffect`) _after_ `distinct` rather than before it, so that a filtered-out document can't hide its group's first match from a resumed page.
 
 ### Rename the order key
 
@@ -227,7 +227,7 @@ const timeline = QueryStream.merge([
 ]);
 ```
 
-The new key must have exactly as many fields as the old one, and the values under each position must be comparable — relabeling doesn't reorder anything. A `flatMap` result can't be relabeled (its runtime key carries tiebreakers its type omits); relabel its inputs instead.
+The new key must have exactly as many fields as the old one, and the values under each position must be comparable — relabeling doesn't reorder anything. A `flatMap` result relabels by its combined key, outer fields first.
 
 ## Paginating a stream
 
@@ -294,5 +294,4 @@ Pages of a stream-paginated query are not tracked by Convex's query journal, so 
 
 - `maximumBytesRead` is accepted but not enforced.
 - `merge` checks that its inputs share an order direction at runtime, not in the type.
-- `orderBy` rejects `flatMap` results at runtime (see [Rename the order key](#rename-the-order-key)).
 - Cursors are not opaque (see the warning above).
