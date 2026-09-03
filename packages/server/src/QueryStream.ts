@@ -73,11 +73,14 @@ export type TypeId = typeof TypeId;
 export type OrderKey = ReadonlyArray<Value | undefined>;
 
 /**
- * The direction a stream is ordered in. Tracked in the type (invariantly,
- * like `Key`), so combining streams of different directions — `merge`, or
- * a `flatMap` whose inner streams run the other way — is a type error when
- * the directions are known statically; a direction chosen at runtime types
- * as the union and is checked when the stream runs.
+ * The direction a stream is ordered in. Tracked covariantly in the type: a
+ * stream of a known direction is also a stream of `"asc" | "desc"`, the
+ * class default, so annotations that omit the direction accept every
+ * stream. Combining streams of different known directions — `merge`, or a
+ * `flatMap` whose inner streams run the other way — is a type error; a
+ * direction chosen at runtime types as the union, and the runtime check
+ * catches what the types can't see (`merge` throws when the streams are
+ * combined, `flatMap` fails when the join runs).
  */
 export type OrderDirection = "asc" | "desc";
 
@@ -567,11 +570,11 @@ export class QueryStream<
   Key extends ReadonlyArray<string> = ReadonlyArray<string>,
   out E = never,
   out R = never,
-  Direction extends OrderDirection = OrderDirection,
+  out Direction extends OrderDirection = OrderDirection,
 > implements Stream.Stream<Doc, E, R> {
   declare readonly [TypeId]: TypeId;
-  declare readonly "~key": (_: Key) => Key;
-  declare readonly "~direction": (_: Direction) => Direction;
+  declare readonly "~key": Types.Invariant<Key>;
+  declare readonly "~direction": Types.Covariant<Direction>;
 
   // The `Stream` protocol (the variance marker, `pipe`, and the `channel`
   // the Stream runtime consumes) is implemented directly: the members are
@@ -663,7 +666,7 @@ Object.defineProperties(queryStreamPrototype, {
   },
 });
 
-export type Any = QueryStream<any, ReadonlyArray<string>, any, any, any>;
+export type Any = QueryStream<any, any, any, any, any>;
 
 /**
  * Whether `u` is a `QueryStream` — as opposed to the plain `Stream` that a
@@ -701,7 +704,7 @@ export interface ReflectionReader {
  * data a future `splitRange`-style `narrow` needs in order to rebuild the
  * leaf with tighter index bounds instead of filtering in memory.
  */
-export interface Reflection {
+export interface Reflection<Direction extends OrderDirection = OrderDirection> {
   readonly reader: ReflectionReader;
   readonly tableName: string;
   readonly tableSchema: Schema.Codec<any, any>;
@@ -713,7 +716,7 @@ export interface Reflection {
   readonly indexFields: ReadonlyArray<string>;
   /** The recorded range: `eq` pins the first `spec.eqCount` index fields. */
   readonly spec: AnyIndexRangeSpec;
-  readonly order: OrderDirection;
+  readonly order: Direction;
   /**
    * The effective full-index-key bounds of this leaf. Absent on
    * construction (derived from `spec`); present — and tighter — on leaves
@@ -775,9 +778,18 @@ const intersectIndexBounds = (
  * order keys are extracted from the *encoded* document before schema
  * decoding.
  */
-export const fromReflection = <Doc>(
-  reflection: Reflection,
-): QueryStream<Doc, ReadonlyArray<string>, Document.DocumentDecodeError> =>
+export const fromReflection = <
+  Doc,
+  Direction extends OrderDirection = OrderDirection,
+>(
+  reflection: Reflection<Direction>,
+): QueryStream<
+  Doc,
+  ReadonlyArray<string>,
+  Document.DocumentDecodeError,
+  never,
+  Direction
+> =>
   makeLeaf(
     reflection,
     reflection.bounds === undefined
@@ -788,10 +800,16 @@ export const fromReflection = <Doc>(
         ),
   );
 
-const makeLeaf = <Doc>(
-  reflection: Reflection,
+const makeLeaf = <Doc, Direction extends OrderDirection>(
+  reflection: Reflection<Direction>,
   bounds: IndexBounds,
-): QueryStream<Doc, ReadonlyArray<string>, Document.DocumentDecodeError> => {
+): QueryStream<
+  Doc,
+  ReadonlyArray<string>,
+  Document.DocumentDecodeError,
+  never,
+  Direction
+> => {
   // Bounds and range splitting work in full index-key space: the index's
   // fields plus the implicit `_id` tiebreaker (already explicit for
   // `by_id`). Convex accepts range constraints on `_creationTime` and
@@ -1014,9 +1032,11 @@ const mergeStep =
 /**
  * Merge streams ordered by the same key into one ordered stream — SQL's
  * `UNION ALL` as a k-way ordered merge. Streams with different order keys
- * or directions are a **type error** (`Key` and `Direction` are
- * invariant); a mismatch that the types can't see — a direction chosen at
- * runtime, or an untyped call site — is caught by the runtime check below.
+ * are a **type error** (`Key` is invariant), and so are different
+ * directions: the first stream fixes the direction and each later one must
+ * be assignable to it. A mismatch the types can't see — a runtime-chosen
+ * direction, or an untyped call site — throws here, when the streams are
+ * combined.
  */
 export const merge = <
   Doc,
@@ -1027,7 +1047,7 @@ export const merge = <
 >(
   streams: readonly [
     QueryStream<Doc, Key, E, R, Direction>,
-    ...ReadonlyArray<QueryStream<Doc, Key, E, R, Direction>>,
+    ...ReadonlyArray<QueryStream<Doc, Key, E, R, NoInfer<Direction>>>,
   ],
 ): QueryStream<Doc, Key, E, R, Direction> => {
   const head = Array.headNonEmpty(streams);
@@ -1042,7 +1062,27 @@ export const merge = <
       `QueryStream.merge: all streams must share an order and order-key fields (got ${head.order} [${Array.join(head.keyFields, ", ")}] and ${incompatible.value.order} [${Array.join(incompatible.value.keyFields, ", ")}])`,
     );
   }
+  return mergeUnchecked(streams);
+};
 
+/**
+ * `merge` without the compatibility check — for re-merging branches that
+ * were validated when the merge was built (narrowing never changes a
+ * branch's order or key fields).
+ */
+const mergeUnchecked = <
+  Doc,
+  Key extends ReadonlyArray<string>,
+  E,
+  R,
+  Direction extends OrderDirection,
+>(
+  streams: readonly [
+    QueryStream<Doc, Key, E, R, Direction>,
+    ...ReadonlyArray<QueryStream<Doc, Key, E, R, Direction>>,
+  ],
+): QueryStream<Doc, Key, E, R, Direction> => {
+  const head = Array.headNonEmpty(streams);
   const annotated: Stream.Stream<Element<Doc>, E, R> = Stream.unwrap(
     Effect.map(
       Effect.forEach(streams, (stream) => Stream.toPull(stream.annotated)),
@@ -1065,7 +1105,7 @@ export const merge = <
     // order-key space, so each branch converts them to its own index-key
     // space itself.
     (keyBounds) =>
-      merge([
+      mergeUnchecked([
         narrowByKeyBounds(head, keyBounds),
         ...Array.map(Array.tailNonEmpty(streams), (stream) =>
           narrowByKeyBounds(stream, keyBounds),
@@ -1284,6 +1324,12 @@ export const mapEffect = dual<
  * the bound's outer prefix) — other rows' inner streams run in full. (This
  * deliberately deviates from `convex-helpers`, which narrows every row's
  * inner stream and so drops legitimate elements from non-boundary rows.)
+ *
+ * Inner streams must run in the outer stream's direction. In the
+ * data-first form the outer stream fixes the direction and a differing
+ * inner stream is flagged; in the data-last form the inner streams fix it,
+ * so an outer stream typed with the union needs union-typed inner streams.
+ * A mismatch the types can't see fails when the join runs.
  */
 export const flatMap = dual<
   <
@@ -1317,7 +1363,7 @@ export const flatMap = dual<
     Direction extends OrderDirection,
   >(
     self: QueryStream<Doc, Key, E, R, Direction>,
-    f: (doc: Doc) => QueryStream<Doc2, InnerKey, E2, R2, Direction>,
+    f: (doc: Doc) => QueryStream<Doc2, InnerKey, E2, R2, NoInfer<Direction>>,
     options: { readonly innerKey: NoInfer<InnerKey> },
   ) => QueryStream<
     Doc2,
@@ -1422,9 +1468,16 @@ const makeFlatMap = <
   // (filtered out, or an empty inner stream).
   const nullPadding: OrderKey = Array.makeBy(innerKeyFields.length, () => null);
 
+  // Every inner stream `f` returns has the same type-level key and
+  // direction, so the first one's runtime check (which catches the union
+  // direction case and untyped callers) covers the rest.
+  let validatedOnce = false;
   const validated = (
     inner: QueryStream<Doc2, InnerKey, E2, R2, Direction>,
   ): QueryStream<Doc2, InnerKey, E2, R2, Direction> => {
+    if (validatedOnce) {
+      return inner;
+    }
     if (inner.order !== self.order) {
       throw new Error(
         `QueryStream.flatMap: inner stream order (${inner.order}) differs from the outer stream's (${self.order})`,
@@ -1435,6 +1488,7 @@ const makeFlatMap = <
         `QueryStream.flatMap: inner stream order-key fields ([${Array.join(inner.keyFields, ", ")}]) differ from innerKey ([${Array.join(innerKeyFields, ", ")}])`,
       );
     }
+    validatedOnce = true;
     return inner;
   };
 
@@ -1717,12 +1771,12 @@ const makeDistinct = <
                       )
                     : // The stream ended on a filtered element: no
                       // present document remains.
-                      Option.none<QueryStream<Doc, Key, E, R, Direction>>(),
+                      Option.none<typeof self>(),
                 ),
               ] as const)
             : ([
                 Array.empty<Element<Doc>>(),
-                Option.none<QueryStream<Doc, Key, E, R, Direction>>(),
+                Option.none<typeof self>(),
               ] as const),
         ),
       ),
@@ -1908,14 +1962,8 @@ export class NotUniqueError extends Schema.TaggedError<NotUniqueError>()(
 }
 
 /** Expect zero or one element; fail with `NotUniqueError` on two or more. */
-export const unique = <
-  Doc,
-  Key extends ReadonlyArray<string>,
-  E,
-  R,
-  Direction extends OrderDirection,
->(
-  self: QueryStream<Doc, Key, E, R, Direction>,
+export const unique = <Doc, Key extends ReadonlyArray<string>, E, R>(
+  self: QueryStream<Doc, Key, E, R>,
 ): Effect.Effect<Option.Option<Doc>, E | NotUniqueError, R> =>
   self.pipe(
     Stream.take(2),
@@ -2072,23 +2120,11 @@ const midpointCursor = (readKeys: Chunk.Chunk<OrderKey>): string =>
 export const paginate = dual<
   (
     options: PaginateOptions,
-  ) => <
-    Doc,
-    Key extends ReadonlyArray<string>,
-    E,
-    R,
-    Direction extends OrderDirection,
-  >(
-    self: QueryStream<Doc, Key, E, R, Direction>,
+  ) => <Doc, Key extends ReadonlyArray<string>, E, R>(
+    self: QueryStream<Doc, Key, E, R>,
   ) => Effect.Effect<PaginationResult<Doc>, E, R>,
-  <
-    Doc,
-    Key extends ReadonlyArray<string>,
-    E,
-    R,
-    Direction extends OrderDirection,
-  >(
-    self: QueryStream<Doc, Key, E, R, Direction>,
+  <Doc, Key extends ReadonlyArray<string>, E, R>(
+    self: QueryStream<Doc, Key, E, R>,
     options: PaginateOptions,
   ) => Effect.Effect<PaginationResult<Doc>, E, R>
 >(

@@ -8,6 +8,7 @@ import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
 import * as Result from "effect/Result";
 import * as Stream from "effect/Stream";
+import type * as Types from "effect/Types";
 import {
   DatabaseReader,
   DatabaseWriter,
@@ -22,14 +23,8 @@ const collectTexts = <E, R>(
   );
 
 /** Walk a stream page by page until exhausted, returning the pages. */
-const paginateAll = <
-  Doc,
-  Key extends ReadonlyArray<string>,
-  E,
-  R,
-  Direction extends QueryStream.OrderDirection,
->(
-  stream: QueryStream.QueryStream<Doc, Key, E, R, Direction>,
+const paginateAll = <Doc, Key extends ReadonlyArray<string>, E, R>(
+  stream: QueryStream.QueryStream<Doc, Key, E, R>,
   numItems: number,
 ): Effect.Effect<ReadonlyArray<ReadonlyArray<Doc>>, E, R> => {
   const go = (
@@ -171,6 +166,31 @@ describe("QueryStream", () => {
               .stream("by_text", (q) => q.eq("text", "apple")),
           );
           expect(exactly).toEqual(["apple"]);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect("merge rejects differing directions when combined", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          const reader = yield* DatabaseReader;
+
+          // Directions the types can't see: both typed as the union, so
+          // the runtime check is what catches the mismatch.
+          const directions: readonly [
+            QueryStream.OrderDirection,
+            QueryStream.OrderDirection,
+          ] = ["asc", "desc"];
+          expect(() =>
+            QueryStream.merge([
+              reader.table("notes").stream("by_text", directions[0]),
+              reader.table("notes").stream("by_text", directions[1]),
+            ]),
+          ).toThrow(/must share an order/);
         }),
       );
     }).pipe(Effect.provide(TestConfect.layer)),
@@ -1125,26 +1145,12 @@ describe("QueryStream", () => {
 });
 
 describe("QueryStream types", () => {
-  type KeyOf<S> =
-    S extends QueryStream.QueryStream<
-      any,
-      infer K extends ReadonlyArray<string>,
-      any,
-      any,
-      any
-    >
-      ? K
-      : never;
-  type DirectionOf<S> =
-    S extends QueryStream.QueryStream<
-      any,
-      any,
-      any,
-      any,
-      infer Direction extends QueryStream.OrderDirection
-    >
-      ? Direction
-      : never;
+  // Read off the stream's phantom markers, so these need no updating when
+  // the class gains a parameter.
+  type KeyOf<S extends QueryStream.Any> = Types.Invariant.Type<S["~key"]>;
+  type DirectionOf<S extends QueryStream.Any> = Types.Covariant.Type<
+    S["~direction"]
+  >;
 
   class SomeService extends Context.Service<
     SomeService,
@@ -1249,15 +1255,7 @@ describe("QueryStream types", () => {
         Effect.flatMap(SomeService, (service) => service.check(note.text)),
       );
       expectTypeOf<
-        typeof filtered extends QueryStream.QueryStream<
-          any,
-          any,
-          any,
-          infer R,
-          any
-        >
-          ? R
-          : never
+        typeof filtered extends Stream.Stream<any, any, infer R> ? R : never
       >().toEqualTypeOf<SomeService>();
 
       // flatMap concatenates order keys at the type level.
@@ -1321,6 +1319,17 @@ describe("QueryStream types", () => {
         DirectionOf<typeof dynamic>
       >().toEqualTypeOf<QueryStream.OrderDirection>();
 
+      // The direction is covariant: a known direction is also "either", so
+      // annotations that omit it (and helpers generic over four
+      // parameters) accept every stream.
+      const widened: QueryStream.QueryStream<
+        unknown,
+        ["text", "_creationTime"],
+        unknown,
+        unknown
+      > = full;
+      void widened;
+
       // Combinators preserve it, and merging different directions is a
       // type error, as is a join whose inner streams run the other way.
       const descendingFiltered = QueryStream.filter(descending, () => true);
@@ -1330,17 +1339,34 @@ describe("QueryStream types", () => {
       expectTypeOf<DirectionOf<typeof joined>>().toEqualTypeOf<"asc">();
       const sameDirection = QueryStream.merge([descending, descendingBounded]);
       expectTypeOf<DirectionOf<typeof sameDirection>>().toEqualTypeOf<"desc">();
+      // The first input fixes the direction, and the argument is checked
+      // against it (the message names the direction the rest must have).
       // @ts-expect-error — inputs must share an order direction.
       const mixedDirections = QueryStream.merge([full, descending]);
       void mixedDirections;
+      // A runtime-chosen direction can lead a merge (a known direction is
+      // assignable to it), but a known direction can't be followed by one.
+      const dynamicLed = QueryStream.merge([dynamic, full]);
+      expectTypeOf<
+        DirectionOf<typeof dynamicLed>
+      >().toEqualTypeOf<QueryStream.OrderDirection>();
       const mixedJoin = QueryStream.flatMap(
-        // @ts-expect-error — inner streams must run in the outer direction
-        // (the direction is inferred from both, so the outer is flagged).
         bounded,
+        // @ts-expect-error — inner streams must run in the outer direction.
         (_note) => descending,
         { innerKey: ["text", "_creationTime"] },
       );
       void mixedJoin;
+      // In the data-last form the inner streams fix the direction, so a
+      // runtime-chosen inner direction widens the join's.
+      const dynamicInnerJoin = bounded.pipe(
+        QueryStream.flatMap((_note) => dynamic, {
+          innerKey: ["text", "_creationTime"],
+        }),
+      );
+      expectTypeOf<
+        DirectionOf<typeof dynamicInnerJoin>
+      >().toEqualTypeOf<QueryStream.OrderDirection>();
     });
     void _typeChecks;
   });

@@ -79,7 +79,7 @@ export interface QueryInitializer<
           NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>
         >,
       ) => IndexRange,
-      order?: "asc" | "desc",
+      order?: QueryStream.OrderDirection,
     ): OrderedQuery.OrderedQuery<TableInfoFor<DataModel_, TableName>, Doc>;
     <
       IndexName extends keyof Indexes<
@@ -87,7 +87,7 @@ export interface QueryInitializer<
       >,
     >(
       indexName: IndexName,
-      order?: "asc" | "desc",
+      order?: QueryStream.OrderDirection,
     ): OrderedQuery.OrderedQuery<TableInfoFor<DataModel_, TableName>, Doc>;
   };
   readonly search: <
@@ -112,7 +112,9 @@ export interface QueryInitializer<
    * index's field tuple at the type level, so the stream's order-key type is
    * exactly the fields that still vary. The order direction is part of the
    * type too: omitted, it is `"asc"`; a literal is tracked as that literal,
-   * and a value known only at runtime as the union.
+   * and a value known only at runtime as the union. The order parameter is
+   * either absent or a direction — never `undefined` — so the type can't
+   * claim a literal the runtime default would contradict.
    */
   readonly stream: {
     <
@@ -121,7 +123,6 @@ export interface QueryInitializer<
       > &
         string,
       Spec extends QueryStream.AnyIndexRangeSpec,
-      Direction extends QueryStream.OrderDirection = "asc",
     >(
       indexName: IndexName,
       indexRange: (
@@ -130,7 +131,29 @@ export interface QueryInitializer<
           NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>
         >,
       ) => Spec,
-      order?: Direction,
+    ): QueryStream.QueryStream<
+      Doc,
+      QueryStream.Remaining<Spec>,
+      Document.DocumentDecodeError,
+      never,
+      "asc"
+    >;
+    <
+      IndexName extends keyof Indexes<
+        ConvexTableInfoFor<DataModel_, TableName>
+      > &
+        string,
+      Spec extends QueryStream.AnyIndexRangeSpec,
+      Direction extends QueryStream.OrderDirection,
+    >(
+      indexName: IndexName,
+      indexRange: (
+        q: QueryStream.RangeBuilder<
+          TableInfoFor<DataModel_, TableName>["convexDocument"],
+          NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>
+        >,
+      ) => Spec,
+      order: Direction,
     ): QueryStream.QueryStream<
       Doc,
       QueryStream.Remaining<Spec>,
@@ -143,10 +166,24 @@ export interface QueryInitializer<
         ConvexTableInfoFor<DataModel_, TableName>
       > &
         string,
-      Direction extends QueryStream.OrderDirection = "asc",
     >(
       indexName: IndexName,
-      order?: Direction,
+    ): QueryStream.QueryStream<
+      Doc,
+      NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>,
+      Document.DocumentDecodeError,
+      never,
+      "asc"
+    >;
+    <
+      IndexName extends keyof Indexes<
+        ConvexTableInfoFor<DataModel_, TableName>
+      > &
+        string,
+      Direction extends QueryStream.OrderDirection,
+    >(
+      indexName: IndexName,
+      order: Direction,
     ): QueryStream.QueryStream<
       Doc,
       NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>,
@@ -261,9 +298,8 @@ export const make = <
             >
           >,
         ) => IndexRange)
-      | "asc"
-      | "desc",
-    order?: "asc" | "desc",
+      | QueryStream.OrderDirection,
+    order?: QueryStream.OrderDirection,
   ) => {
     const {
       applyWithIndex,
@@ -324,9 +360,8 @@ export const make = <
       | ((
           q: QueryStream.RangeBuilder<any, any>,
         ) => QueryStream.AnyIndexRangeSpec)
-      | "asc"
-      | "desc",
-    maybeOrder?: "asc" | "desc",
+      | QueryStream.OrderDirection,
+    maybeOrder?: QueryStream.OrderDirection,
   ) => {
     const order = Predicate.isString(indexRangeOrOrder)
       ? indexRangeOrOrder
