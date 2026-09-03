@@ -25,3 +25,7 @@ const page =
     QueryStream.paginate(paginationOpts),
   );
 ```
+
+`QueryStream.paginate` accepts the same `paginationOpts` as the built-in `paginate`. A cursor that is malformed, or that was issued under a different order key (for example after an index change is deployed), fails the query with a `ConvexError` whose data is `{ paginationError: "InvalidCursor" }` — the signal Confect's React hooks treat as "restart pagination". Stream cursors contain the order-key values of the page boundary rather than an opaque token, so don't paginate publicly over a sensitive indexed field without pinning it with `eq`.
+
+Streams passed to `QueryStream.merge` must share an order direction as well as an order key; a direction mismatch fails when the stream runs.
