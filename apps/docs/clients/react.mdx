@@ -191,6 +191,51 @@ Without an `error` schema, the `Failure` variant is excluded from the type entir
 
 <Note>`usePaginatedQuery` requires `convex` 1.36.0 or newer.</Note>
 
+## `useStreamPaginatedQuery`
+
+Loads data reactively from a paginated query whose handler paginates a [query stream](/server/database/streams#paginating-a-stream) with `QueryStream.paginate`. Those pages are not tracked by Convex's query journal, which `usePaginatedQuery` relies on to keep pages consistent as data changes, so this hook maintains that guarantee itself: every loaded page is pinned to a fixed index range by echoing its `continueCursor` back as the next subscription's `endCursor`. Adjacent pages always meet exactly, a document is never shown twice or lost between pages, and a page that outgrows `initialNumItems` is split in two.
+
+The call shape and the result are the same as `usePaginatedQuery`: args are encoded with the spec's user-args schema, pages are decoded with its `item` schema, `"skip"` disables the query, and the result is a `PaginatedQueryResult<Item, E>` with a `Failure` variant when the spec declares an `error` schema.
+
+```tsx
+import { PaginatedQueryResult, useStreamPaginatedQuery } from "@confect/react";
+import refs from "../confect/_generated/refs";
+
+const Feed = () => {
+  const feed = useStreamPaginatedQuery(
+    refs.public.notes.feed,
+    {},
+    { initialNumItems: 10 },
+  );
+
+  return (
+    <div>
+      <ul>
+        {feed.results.map((note) => (
+          <li key={note._id}>{note.text}</li>
+        ))}
+      </ul>
+      {feed.isLoading && <p>Loading…</p>}
+      {PaginatedQueryResult.isCanLoadMore(feed) && (
+        <button type="button" onClick={() => feed.loadMore(10)}>
+          Load more
+        </button>
+      )}
+    </div>
+  );
+};
+```
+
+The options also accept `maximumRowsRead` and `maximumBytesRead`, per-page read budgets forwarded to the server. On a stream that filters out most of what it reads, a page that would otherwise scan past Convex's query limits returns truncated with `SplitRequired` instead, and the hook splits it.
+
+When a stored cursor stops matching the query — the server fails a page with `paginationError: "InvalidCursor"`, for example after an index change is deployed — the hook restarts pagination from the first page rather than failing.
+
+<Note>
+  `useStreamPaginatedQuery` also works with paginated queries that use the
+  built-in `paginate`, since it only relies on the `endCursor` protocol field.
+  It subscribes to one query per loaded page.
+</Note>
+
 ## `useMutation`
 
 Returns a function that encodes args using the spec's `args` schema, calls the Convex mutation, and decodes the result using the spec's `returns` schema. The returned promise's shape depends on whether the spec declares an `error` schema.

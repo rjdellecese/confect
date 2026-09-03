@@ -63,6 +63,7 @@
             "pages": [
               "server/database/schema",
               "server/database/reading",
+              "server/database/streams",
               "server/database/writing",
               "server/database/system-tables",
               "server/database/determinism"
