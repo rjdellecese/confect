@@ -23,8 +23,19 @@
  * - Cursors serialize only the *remaining* (order-key) fields, not the full
  *   index key — equality-pinned values never leak into cursors.
  */
-import type { GenericDocument, FieldTypeFromFieldPath } from "convex/server";
-import { convexToJson, jsonToConvex, type Value } from "convex/values";
+import type {
+  GenericDocument,
+  FieldTypeFromFieldPath,
+  PaginationOptions as ConvexPaginationOptions,
+  PaginationResult as ConvexPaginationResult,
+} from "convex/server";
+import {
+  compareValues,
+  ConvexError,
+  convexToJson,
+  jsonToConvex,
+  type Value,
+} from "convex/values";
 import { identity, dual, pipe } from "effect/Function";
 import { pipeArguments, type Pipeable } from "effect/Pipeable";
 import * as Array from "effect/Array";
@@ -33,12 +44,11 @@ import * as Chunk from "effect/Chunk";
 import * as Effect from "effect/Effect";
 import * as Equivalence from "effect/Equivalence";
 import * as Filter from "effect/Filter";
-import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Order from "effect/Order";
 import * as Predicate from "effect/Predicate";
 import * as Pull from "effect/Pull";
-import * as Record from "effect/Record";
+import type * as Record from "effect/Record";
 import * as Schema from "effect/Schema";
 import * as Sink from "effect/Sink";
 import * as Stream from "effect/Stream";
@@ -200,96 +210,30 @@ export const applyRange = (spec: AnyIndexRangeSpec, q: any): any =>
     builder[op._tag](op.field, op.value),
   );
 
+/**
+ * Append the implicit `_id` tiebreaker unless the field list already ends
+ * with it — the single runtime convention for order-key and index-key
+ * field lists.
+ */
+const withIdTiebreaker = (
+  fields: ReadonlyArray<string>,
+): ReadonlyArray<string> =>
+  Option.exists(Array.last(fields), (field) => field === "_id")
+    ? fields
+    : Array.append(fields, "_id");
+
 // -----------------------------------------------------------------------------
 // Convex value ordering
 // -----------------------------------------------------------------------------
-//
-// Convex orders values first by type, then within the type:
-// undefined < null < bigint < number < boolean < string < bytes < array
-// < object. (NaN subtleties are simplified in this prototype.)
 
-type ValueType =
-  | "undefined"
-  | "null"
-  | "bigint"
-  | "number"
-  | "boolean"
-  | "string"
-  | "bytes"
-  | "array"
-  | "object";
-
-const valueType = (value: Value | undefined): ValueType =>
-  value === undefined
-    ? "undefined"
-    : value === null
-      ? "null"
-      : Predicate.isBigInt(value)
-        ? "bigint"
-        : Predicate.isNumber(value)
-          ? "number"
-          : Predicate.isBoolean(value)
-            ? "boolean"
-            : Predicate.isString(value)
-              ? "string"
-              : value instanceof ArrayBuffer
-                ? "bytes"
-                : Array.isArray(value)
-                  ? "array"
-                  : "object";
-
-const valueTypeRank: Record.ReadonlyRecord<ValueType, number> = {
-  undefined: 0,
-  null: 1,
-  bigint: 2,
-  number: 3,
-  boolean: 4,
-  string: 5,
-  bytes: 6,
-  array: 7,
-  object: 8,
-};
-
-const ByValueType: Order.Order<Value | undefined> = Order.mapInput(
-  Order.Number,
-  (value: Value | undefined) => valueTypeRank[valueType(value)],
-);
-
-const WithinValueType: Order.Order<Value | undefined> = Order.make(
-  (self, that) =>
-    // Only consulted when `ByValueType` ties, so `self` and `that` have the
-    // same `ValueType` and the per-branch casts of `that` are safe.
-    Match.value(valueType(self)).pipe(
-      Match.whenOr("undefined", "null", () => 0 as const),
-      Match.when("bigint", () => Order.BigInt(self as bigint, that as bigint)),
-      Match.when("number", () => Order.Number(self as number, that as number)),
-      Match.when("boolean", () =>
-        Order.Boolean(self as boolean, that as boolean),
-      ),
-      Match.when("string", () => Order.String(self as string, that as string)),
-      Match.when("bytes", () =>
-        BytesOrder(self as ArrayBuffer, that as ArrayBuffer),
-      ),
-      Match.when("array", () =>
-        OrderKeyOrder(
-          self as ReadonlyArray<Value>,
-          that as ReadonlyArray<Value>,
-        ),
-      ),
-      Match.when("object", () =>
-        ObjectOrder(
-          self as Record.ReadonlyRecord<string, Value>,
-          that as Record.ReadonlyRecord<string, Value>,
-        ),
-      ),
-      Match.exhaustive,
-    ),
-);
-
-/** `Order` over Convex values, matching Convex's index ordering. */
-export const ValueOrder: Order.Order<Value | undefined> = Order.combine(
-  ByValueType,
-  WithinValueType,
+/**
+ * `Order` over Convex values, matching Convex's index ordering — a wrapper
+ * around the canonical `compareValues` from `convex/values` (type rank
+ * first, then within the type, including UTF-8 string order and NaN
+ * bit-level ordering).
+ */
+export const ValueOrder: Order.Order<Value | undefined> = Order.make(
+  (self, that) => Math.sign(compareValues(self, that)) as -1 | 0 | 1,
 );
 
 /**
@@ -297,21 +241,6 @@ export const ValueOrder: Order.Order<Value | undefined> = Order.combine(
  * also the ordering of Convex array values.
  */
 export const OrderKeyOrder: Order.Order<OrderKey> = Order.Array(ValueOrder);
-
-const BytesOrder: Order.Order<ArrayBuffer> = Order.mapInput(
-  Order.Array(Order.Number),
-  (bytes: ArrayBuffer) => Array.fromIterable(new Uint8Array(bytes)),
-);
-
-const ObjectEntryOrder = Order.Tuple([Order.String, ValueOrder]);
-
-const ObjectOrder: Order.Order<Record.ReadonlyRecord<string, Value>> =
-  Order.mapInput(Order.Array(ObjectEntryOrder), (record) =>
-    pipe(
-      Record.toEntries(record),
-      Array.sortBy(Order.mapInput(Order.String, (entry) => entry[0])),
-    ),
-  );
 
 /** Order of positions in stream order: for `desc`, later keys are smaller. */
 const PositionOrder = (order: "asc" | "desc"): Order.Order<OrderKey> =>
@@ -473,19 +402,15 @@ const buildQuery = (reflection: Reflection): AsyncIterable<unknown> =>
 export const fromReflection = <Doc>(
   reflection: Reflection,
 ): QueryStream<Doc, ReadonlyArray<string>, Document.DocumentDecodeError> => {
-  // The order key is the index fields that still vary — everything after
-  // the eq-pinned prefix — plus the implicit `_id` tiebreaker that makes
-  // order keys strictly ordered.
-  const remainingFields = Array.drop(
-    reflection.indexFields,
+  // The order key is the index fields that still vary: everything after
+  // the eq-pinned prefix of the full index key (the index's fields plus
+  // the implicit `_id` tiebreaker, already explicit for `by_id`) — so a
+  // fully pinned `by_id` stream has an *empty* order key.
+  const keyFields = Array.drop(
+    withIdTiebreaker(reflection.indexFields),
     reflection.spec.eqCount,
   );
-  const keyFields = Option.exists(
-    Array.last(remainingFields),
-    (field) => field === "_id",
-  )
-    ? remainingFields
-    : Array.append(remainingFields, "_id");
+  const keyPaths = Array.map(keyFields, (field) => String.split(field, "."));
 
   const annotated = Stream.suspend(() =>
     Stream.fromAsyncIterable(buildQuery(reflection), identity),
@@ -499,7 +424,7 @@ export const fromReflection = <Doc>(
             Option.some(doc as Doc),
             extractOrderKey(
               encoded as Record.ReadonlyRecord<string, unknown>,
-              keyFields,
+              keyPaths,
             ),
           ] as const,
       ),
@@ -511,11 +436,11 @@ export const fromReflection = <Doc>(
 
 const extractOrderKey = (
   encoded: Record.ReadonlyRecord<string, unknown>,
-  keyFields: ReadonlyArray<string>,
+  keyPaths: ReadonlyArray<ReadonlyArray<string>>,
 ): OrderKey =>
-  Array.map(keyFields, (fieldPath) =>
+  Array.map(keyPaths, (path) =>
     Array.reduce(
-      String.split(fieldPath, "."),
+      path,
       encoded as unknown,
       (value, segment) =>
         (value as Record.ReadonlyRecord<string, unknown> | undefined)?.[
@@ -531,34 +456,45 @@ const extractOrderKey = (
 const keyFieldsEquivalence = Array.makeEquivalence(Equivalence.String);
 
 /**
- * One input to a k-way merge: its pull effect, the elements pulled so far,
- * and whether the underlying stream is exhausted.
+ * One input to a k-way merge: its pull effect, the last pulled chunk with a
+ * read index into it (an index rather than re-slicing keeps consuming a
+ * chunk linear), and whether the underlying stream is exhausted.
  */
 interface MergeSource<Doc, E> {
   readonly pull: Pull.Pull<Array.NonEmptyReadonlyArray<Element<Doc>>, E>;
   readonly buffer: ReadonlyArray<Element<Doc>>;
+  readonly index: number;
   readonly done: boolean;
 }
 
 const makeMergeSource = <Doc, E>(
   pull: MergeSource<Doc, E>["pull"],
   buffer: ReadonlyArray<Element<Doc>>,
+  index: number,
   done: boolean,
-): MergeSource<Doc, E> => ({ pull, buffer, done });
+): MergeSource<Doc, E> => ({ pull, buffer, index, done });
+
+const mergeSourceHead = <Doc, E>(
+  source: MergeSource<Doc, E>,
+): Option.Option<Element<Doc>> => Array.get(source.buffer, source.index);
 
 /**
- * Refill an empty source from its pull, translating the pull's
+ * Refill an exhausted-buffer source from its pull, translating the pull's
  * end-of-stream signal (a `Done` failure) into `done`.
  */
 const fillMergeSource = <Doc, E>(
   source: MergeSource<Doc, E>,
 ): Effect.Effect<MergeSource<Doc, E>, E> =>
-  source.done || Array.isReadonlyArrayNonEmpty(source.buffer)
+  source.done || source.index < source.buffer.length
     ? Effect.succeed(source)
     : source.pull.pipe(
-        Effect.map((elements) => makeMergeSource(source.pull, elements, false)),
+        Effect.map((elements) =>
+          makeMergeSource(source.pull, elements, 0, false),
+        ),
         Pull.catchDone(() =>
-          Effect.succeed(makeMergeSource(source.pull, source.buffer, true)),
+          Effect.succeed(
+            makeMergeSource(source.pull, source.buffer, source.index, true),
+          ),
         ),
       );
 
@@ -576,51 +512,56 @@ const mergeStep =
     readonly [Element<Doc>, ReadonlyArray<MergeSource<Doc, E>>] | undefined,
     E
   > =>
-    Effect.map(Effect.forEach(sources, fillMergeSource), (filled) => {
-      const isEarlier = Order.isLessThan(position);
+    Effect.map(
+      Effect.forEach(sources, fillMergeSource, { concurrency: "unbounded" }),
+      (filled) => {
+        const isEarlier = Order.isLessThan(position);
 
-      const earliest = Array.reduce(
-        filled,
-        Option.none<readonly [number, Element<Doc>]>(),
-        (best, source, index) =>
-          Option.match(Array.head(source.buffer), {
-            onNone: () => best,
-            onSome: (head) =>
-              Option.match(best, {
-                onNone: () => Option.some([index, head] as const),
-                onSome: ([, bestElement]) =>
-                  isEarlier(head[1], bestElement[1])
-                    ? Option.some([index, head] as const)
-                    : best,
-              }),
-          }),
-      );
+        const earliest = Array.reduce(
+          filled,
+          Option.none<readonly [number, Element<Doc>]>(),
+          (best, source, index) =>
+            Option.match(mergeSourceHead(source), {
+              onNone: () => best,
+              onSome: (head) =>
+                Option.match(best, {
+                  onNone: () => Option.some([index, head] as const),
+                  onSome: ([, bestElement]) =>
+                    isEarlier(head[1], bestElement[1])
+                      ? Option.some([index, head] as const)
+                      : best,
+                }),
+            }),
+        );
 
-      return Option.getOrUndefined(
-        Option.map(
-          earliest,
-          ([index, element]) =>
-            [
-              element,
-              Array.map(filled, (source, sourceIndex) =>
-                sourceIndex === index
-                  ? makeMergeSource(
-                      source.pull,
-                      Array.drop(source.buffer, 1),
-                      source.done,
-                    )
-                  : source,
-              ),
-            ] as const,
-        ),
-      );
-    });
+        return Option.getOrUndefined(
+          Option.map(
+            earliest,
+            ([index, element]) =>
+              [
+                element,
+                Array.map(filled, (source, sourceIndex) =>
+                  sourceIndex === index
+                    ? makeMergeSource(
+                        source.pull,
+                        source.buffer,
+                        source.index + 1,
+                        source.done,
+                      )
+                    : source,
+                ),
+              ] as const,
+          ),
+        );
+      },
+    );
 
 /**
  * Merge streams ordered by the same key into one ordered stream — SQL's
- * `UNION ALL` as a k-way ordered merge. Streams with different order keys or
- * directions are a **type error** (`Key` is invariant); the runtime check
- * below only guards untyped call sites.
+ * `UNION ALL` as a k-way ordered merge. Streams with different order keys
+ * are a **type error** (`Key` is invariant); the order *direction* is not
+ * part of the type, so a direction mismatch — like a key mismatch from an
+ * untyped call site — is caught by the runtime check below.
  */
 export const merge = <Doc, Key extends ReadonlyArray<string>, E, R>(
   streams: readonly [
@@ -647,7 +588,7 @@ export const merge = <Doc, Key extends ReadonlyArray<string>, E, R>(
       (pulls) =>
         Stream.unfold(
           Array.map(pulls, (pull) =>
-            makeMergeSource<Doc, E>(pull, Array.empty(), false),
+            makeMergeSource<Doc, E>(pull, Array.empty(), 0, false),
           ),
           mergeStep<Doc, E>(PositionOrder(head.order)),
         ),
@@ -816,6 +757,14 @@ export const unique = <Doc, Key extends ReadonlyArray<string>, E, R>(
 
 const UNDEFINED_SENTINEL = { $undefined: true } as const;
 
+/**
+ * Serialize an order key as a cursor. Unlike the built-in Convex pagination
+ * cursors (opaque tokens), these carry the raw order-key *values* — they are
+ * delivered to clients in `continueCursor`/`splitCursor`, so a stream whose
+ * remaining order key includes a sensitive indexed field exposes that
+ * field's values at page boundaries. Pin such fields with `eq`, or don't
+ * paginate over them publicly, until cursors are made opaque.
+ */
 export const serializeCursor = (key: OrderKey): string =>
   JSON.stringify(
     Array.map(key, (value) =>
@@ -830,34 +779,63 @@ export const deserializeCursor = (cursor: string): OrderKey =>
       : jsonToConvex(value as Parameters<typeof jsonToConvex>[0]),
   );
 
+/**
+ * The error a stream-paginated query fails with when a client-supplied
+ * cursor is malformed or no longer matches the stream's order-key shape —
+ * the `paginationError: "InvalidCursor"` form `convex/react` (and
+ * `useStreamPaginatedQuery`) recognize as "reset pagination" rather than an
+ * application failure.
+ */
+const invalidCursorError = () =>
+  new ConvexError({ paginationError: "InvalidCursor" });
+
+/**
+ * Parse and validate a client-supplied cursor against the stream's
+ * order-key arity, throwing the `InvalidCursor` `ConvexError` on any
+ * mismatch (malformed JSON, a non-array, or a stale cursor serialized under
+ * a different stream shape).
+ */
+const deserializeCursorChecked = (
+  cursor: string,
+  keyFieldCount: number,
+): OrderKey => {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(cursor);
+  } catch {
+    throw invalidCursorError();
+  }
+  if (!globalThis.Array.isArray(parsed) || parsed.length !== keyFieldCount) {
+    throw invalidCursorError();
+  }
+  try {
+    return Array.map(parsed as ReadonlyArray<unknown>, (value) =>
+      Predicate.hasProperty(value, "$undefined")
+        ? undefined
+        : jsonToConvex(value as Parameters<typeof jsonToConvex>[0]),
+    );
+  } catch {
+    throw invalidCursorError();
+  }
+};
+
 /** The cursor denoting the end of the stream. */
 export const END_CURSOR = "[]";
 
-export interface PaginateOptions {
-  readonly numItems: number;
-  readonly cursor: string | null;
-  readonly endCursor?: string | null | undefined;
-  readonly id?: number | undefined;
-  readonly maximumRowsRead?: number | undefined;
-  readonly maximumBytesRead?: number | undefined;
-}
+/**
+ * The pagination protocol's request options — `PaginationOptions` from
+ * `convex/server`, aliased so the wire protocol has a single source of
+ * truth (`@confect/core`'s `PaginationOptions` schema encodes the same
+ * shape).
+ */
+export type PaginateOptions = ConvexPaginationOptions;
 
 /**
- * `page` stays a *mutable array type* (its property is still `readonly`):
- * paginated query handlers return this value where the Convex pagination
- * protocol's result type is expected — `PaginationResult` from
- * `convex/server` and the `@confect/core` `PaginationResult` schema type
- * (`Schema.mutable(Schema.Array(...))`) both declare `page` mutable, and a
- * `ReadonlyArray` is not assignable to a mutable array. Readonly
- * *properties* assign to mutable ones, so everything else is `readonly`.
+ * The pagination protocol's result — `PaginationResult` from
+ * `convex/server` (whose `page` is a mutable array type, which is why
+ * handlers can return this value where Convex expects its result shape).
  */
-export interface PaginationResult<Doc> {
-  readonly page: Doc[];
-  readonly isDone: boolean;
-  readonly continueCursor: string;
-  readonly splitCursor?: string;
-  readonly pageStatus?: "SplitRecommended" | "SplitRequired";
-}
+export type PaginationResult<Doc> = ConvexPaginationResult<Doc>;
 
 interface PaginateState<Doc> {
   readonly page: Chunk.Chunk<Doc>;
@@ -872,6 +850,12 @@ const initialPaginateState = <Doc>(): PaginateState<Doc> => ({
   stopped: false,
   hitLimit: false,
 });
+
+/** Where a split page divides: the midpoint of the keys read so far. */
+const midpointCursor = (readKeys: Chunk.Chunk<OrderKey>): string =>
+  serializeCursor(
+    Chunk.getUnsafe(readKeys, Math.floor((Chunk.size(readKeys) - 1) / 2)),
+  );
 
 /**
  * Consume one page of a stream. Semantics follow
@@ -915,9 +899,8 @@ export const paginate = dual<
         });
       }
 
-      const after = Option.map(
-        Option.fromNullOr(options.cursor),
-        deserializeCursor,
+      const after = Option.map(Option.fromNullOr(options.cursor), (cursor) =>
+        deserializeCursorChecked(cursor, self.keyFields.length),
       );
       const endCursor = Option.fromNullishOr(options.endCursor);
       // An end cursor of `END_CURSOR` pins the page to the end of the
@@ -926,7 +909,9 @@ export const paginate = dual<
         endCursor,
         (cursor) => cursor !== END_CURSOR,
       );
-      const until = Option.map(pinnedEnd, deserializeCursor);
+      const until = Option.map(pinnedEnd, (cursor) =>
+        deserializeCursorChecked(cursor, self.keyFields.length),
+      );
       const narrowed = narrow(self, {
         after: Option.getOrUndefined(after),
         until: Option.getOrUndefined(until),
@@ -975,12 +960,7 @@ export const paginate = dual<
                     isDone: false,
                     continueCursor: serializeCursor(lastKey),
                     pageStatus: "SplitRequired" as const,
-                    splitCursor: serializeCursor(
-                      Chunk.getUnsafe(
-                        state.readKeys,
-                        Math.floor((Chunk.size(state.readKeys) - 1) / 2),
-                      ),
-                    ),
+                    splitCursor: midpointCursor(state.readKeys),
                   }
                 : {
                     page,

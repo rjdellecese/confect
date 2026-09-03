@@ -454,6 +454,13 @@ recommendation but deferring the heaviest piece:
    makes it easy to read a lot while emitting a little.
 5. **`Chunk`ing** — Convex iterators yield one doc at a time; whether to re-chunk
    internally (and batch-decode via `Stream.mapChunksEffect`) for constant-factor wins.
+6. **Cursor opacity** — stream cursors serialize the remaining order-key _values_ as
+   plain JSON, so page boundaries expose those values to clients (fine for
+   `_creationTime`/`_id`, not for a sensitive indexed field), and clients can craft
+   cursors targeting chosen keys within the stream's range. Built-in Convex cursors are
+   opaque tokens; decide whether to encrypt/sign stream cursors (requires key material
+   on the deployment) or document the exposure as a constraint on which indexes should
+   back public paginated streams.
 
 ## Appendix: the annotated-element trick, in one picture
 

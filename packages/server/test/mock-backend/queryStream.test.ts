@@ -1,9 +1,10 @@
 import { type Document, QueryStream } from "@confect/server";
-import { describe, expect, expectTypeOf, it } from "@effect/vitest";
+import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
 import * as Result from "effect/Result";
 import * as Stream from "effect/Stream";
 import {
@@ -340,6 +341,37 @@ describe("QueryStream", () => {
           assertEquals(result.isDone, false);
           assertEquals(result.pageStatus, "SplitRequired");
           expect(result.splitCursor).toBeDefined();
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect("fails with the InvalidCursor signal on a malformed cursor", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          yield* insertNotes(["a"]);
+
+          const reader = yield* DatabaseReader;
+          const stream = reader.table("notes").stream("by_text");
+
+          const fromCursor = (cursor: string) =>
+            QueryStream.paginate(stream, { numItems: 1, cursor }).pipe(
+              Effect.catchDefect((defect) => Effect.succeed(defect)),
+            );
+
+          // Malformed JSON, and a stale cursor with the wrong key arity
+          // (`by_text` keys have three components: text, _creationTime,
+          // _id).
+          for (const cursor of ["_notjson", "[1, 2]"]) {
+            const defect = yield* fromCursor(cursor);
+            assert(Predicate.hasProperty(defect, "data"));
+            expect(
+              (defect.data as { paginationError?: string }).paginationError,
+            ).toBe("InvalidCursor");
+          }
         }),
       );
     }).pipe(Effect.provide(TestConfect.layer)),

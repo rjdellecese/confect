@@ -344,7 +344,15 @@ export const make = <
                   table.indexes as ReadonlyRecord<string, ReadonlyArray<string>>
                 )[indexName],
               ),
-              Option.getOrElse(() => Array.empty<string>()),
+              // An unknown index name is a defect, not an empty field list:
+              // silently empty fields would make key extraction and range
+              // splitting target the wrong fields.
+              Option.getOrThrowWith(
+                () =>
+                  new Error(
+                    `QueryInitializer.stream: table "${tableName}" has no index named "${indexName}"`,
+                  ),
+              ),
               Array.append("_creationTime"),
             );
 
