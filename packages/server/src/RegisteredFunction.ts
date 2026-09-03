@@ -187,6 +187,12 @@ export const combineErrorSchemas = (
  * error channel—reaches the client as a `ConvexError`. The fiber dies and
  * `runPromise` rejects with a generic failure.
  *
+ * Either way, a `ConvexError` *defect* — thrown imperatively rather than
+ * placed in the error channel, e.g. the pagination protocol's
+ * `InvalidCursor` signal from `QueryStream.paginate` — is rethrown bare so
+ * it retains its identity and Convex serializes its `data` to the client,
+ * matching how a thrown `ConvexError` behaves in a plain Convex handler.
+ *
  * A `scheduler` in `runOptions` must be passed here as a run option rather
  * than provided via `Effect.provideService` inside `effect`: the run option
  * lands in the fiber's root context, while a service provided within `effect`
@@ -202,21 +208,33 @@ export const runHandlerPromise =
     },
   ) =>
   <A, E>(effect: Effect.Effect<A, E>): Promise<A> => {
-    if (errorSchema === undefined) {
-      return Effect.runPromise(Effect.orDie(effect), runOptions);
-    }
-    const withConvexError = effect.pipe(
-      Effect.catch((typedError) =>
-        pipe(
-          Schema.encodeEffect(errorSchema)(typedError),
-          Effect.orDie,
-          Effect.andThen((encodedError) =>
-            Effect.fail(new ConvexError(encodedError)),
-          ),
-        ),
-      ),
+    // A `ConvexError` defect escapes into the (escaped) failure channel so
+    // the `throw` below rethrows it with its identity intact.
+    const rethrowConvexErrorDefects = Effect.catchDefect(
+      (defect: unknown): Effect.Effect<never, ConvexError<any>> =>
+        defect instanceof ConvexError
+          ? Effect.fail(defect)
+          : Effect.die(defect),
     );
-    return Effect.runPromise(Effect.result(withConvexError), runOptions).then(
+
+    const withConvexError =
+      errorSchema === undefined
+        ? Effect.orDie(effect)
+        : effect.pipe(
+            Effect.catch((typedError) =>
+              pipe(
+                Schema.encodeEffect(errorSchema)(typedError),
+                Effect.orDie,
+                Effect.andThen((encodedError) =>
+                  Effect.fail(new ConvexError(encodedError)),
+                ),
+              ),
+            ),
+          );
+    return Effect.runPromise(
+      Effect.result(rethrowConvexErrorDefects(withConvexError)),
+      runOptions,
+    ).then(
       Result.match({
         onFailure: (error) => {
           throw error;
