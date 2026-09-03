@@ -404,30 +404,39 @@ The core of §4 is now implemented as an experimental API:
   `filter`/`filterEffect`, `map`/`mapEffect`, `narrow`, `unique`, and `paginate` with
   `cursor`/`endCursor`/`maximumRowsRead` semantics matching `convex-helpers`.
   Leaf streams store a **`Reflection`** — the query recipe (reader handle,
-  table, index, recorded range ops, order), the Effect formulation of
-  `convex-helpers`' `reflect()` — and rebuild the (one-shot) Convex query
-  from it on every run, so a `QueryStream` value is a reusable description.
+  table, index, recorded range ops, order, effective bounds), the Effect
+  formulation of `convex-helpers`' `reflect()` — and rebuild the (one-shot)
+  Convex queries from it on every run, so a `QueryStream` value is a
+  reusable description.
+- **Push-down `narrow`** — cursor bounds are pushed into the database
+  queries rather than filtered in memory. Bounds are modelled as _cuts_
+  (predecessor/exact/successor positions over possibly-prefix keys, the
+  port of `convex-helpers`' `compareKeys`); `eq`-pinned values fold into
+  full-index-key bounds and `splitRange` re-derives them as the common
+  `eq` prefix while decomposing the rest into a sequence of
+  Convex-expressible `withIndex` ranges (`_creationTime` and `_id`
+  tiebreaker constraints included — Convex accepts them even though its
+  types don't advertise them). Each stream carries a `narrowWith`
+  strategy: leaves rebuild with intersected bounds, `merge` narrows every
+  branch, `filterEffect`/`mapEffect` narrow beneath themselves and
+  re-apply, and externally constructed streams fall back to in-memory
+  filtering. `paginate` composes with this automatically, so resuming from
+  a cursor reads only the remaining range.
 - **`QueryInitializer.stream(...)`** — `reader.table("notes").stream("by_text",
 (q) => q.eq("text", "a"), "desc")` returns
   `QueryStream<Doc, ["_creationTime"], DocumentDecodeError>`.
 - **`packages/server/test/mock-backend/queryStream.test.ts`** — runtime tests
   (ordering, plain `Stream` consumption, range bounds, merge interleaving,
   effectful filtering, cursor-chained pagination over a merged+filtered
-  stream, endCursor pinning, `SplitRequired`, `unique`) and type-level tests
-  (order-key inference, merge mismatch rejection, range-builder misuse, `E`/`R`
-  channel propagation).
+  stream, endCursor pinning, `SplitRequired`, `unique`, pushed-down leaf
+  bounds, pagination through duplicate index values and descending streams,
+  cursor/spec-bound composition) and type-level tests (order-key inference,
+  merge mismatch rejection, range-builder misuse, `E`/`R` channel
+  propagation).
 
 Deliberate simplifications, in line with §6.2's "port the core"
-recommendation but deferring the heaviest piece:
+recommendation:
 
-- `narrow` filters the annotated stream **in memory** (`dropWhile`/`takeWhile`
-  on order keys) instead of pushing bounds into `withIndex` ranges, so
-  resuming from a cursor re-reads the range from its start. The leaf
-  `Reflection` now carries everything the `splitRange` decomposition needs to
-  rebuild a leaf with tighter bounds; what remains is the decomposition
-  itself, plus making `narrow` recurse through composed streams (merge
-  narrows every branch, a filter narrows the stream beneath it) as
-  `convex-helpers` does.
 - Cursors serialize only the _remaining_ (order-key) fields — a deliberate
   improvement over `convex-helpers`' full index keys: equality-pinned values
   never leak into cursors, and merged streams with different pins share a

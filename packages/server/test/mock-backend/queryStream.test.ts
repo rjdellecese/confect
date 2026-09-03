@@ -20,6 +20,27 @@ const collectTexts = <E, R>(
     Effect.map((docs) => docs.map((doc) => doc.text)),
   );
 
+/** Walk a stream page by page until exhausted, returning the pages. */
+const paginateAll = <Doc, Key extends ReadonlyArray<string>, E, R>(
+  stream: QueryStream.QueryStream<Doc, Key, E, R>,
+  numItems: number,
+): Effect.Effect<ReadonlyArray<ReadonlyArray<Doc>>, E, R> => {
+  const go = (
+    cursor: string | null,
+    pages: ReadonlyArray<ReadonlyArray<Doc>>,
+  ): Effect.Effect<ReadonlyArray<ReadonlyArray<Doc>>, E, R> =>
+    QueryStream.paginate(stream, { numItems, cursor }).pipe(
+      Effect.flatMap((result) => {
+        const collected =
+          result.page.length === 0 ? pages : [...pages, result.page];
+        return result.isDone
+          ? Effect.succeed(collected)
+          : go(result.continueCursor, collected);
+      }),
+    );
+  return go(null, []);
+};
+
 const insertNotes = (texts: ReadonlyArray<string>) =>
   Effect.gen(function* () {
     const writer = yield* DatabaseWriter;
@@ -344,6 +365,217 @@ describe("QueryStream", () => {
         }),
       );
     }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect("narrow pushes cursor bounds into the leaf query", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          yield* insertNotes(["a", "b", "c", "b"]);
+
+          const reader = yield* DatabaseReader;
+          const leaf = reader
+            .table("notes")
+            .stream("by_text", (q) => q.eq("text", "b"));
+
+          const page1 = yield* QueryStream.paginate(leaf, {
+            numItems: 1,
+            cursor: null,
+          });
+          const afterKey = QueryStream.deserializeCursor(page1.continueCursor);
+
+          const narrowed = QueryStream.narrow(leaf, { after: afterKey });
+
+          // The narrowed stream is a rebuilt *leaf* — not an in-memory
+          // fallback — whose lower bound is the pinned prefix plus the
+          // cursor key, exclusive.
+          expect(narrowed.reflection?.bounds?.lower).toEqual({
+            key: ["b", ...afterKey],
+            inclusive: false,
+          });
+          expect(narrowed.reflection?.bounds?.upper).toEqual({
+            key: ["b"],
+            inclusive: true,
+          });
+
+          const rest = yield* collectTexts(narrowed);
+          expect(rest).toEqual(["b"]);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect("narrow pushes bounds through filter and map", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          yield* insertNotes(["a", "b", "c", "d"]);
+
+          const reader = yield* DatabaseReader;
+          const derived = reader
+            .table("notes")
+            .stream("by_text")
+            .pipe(
+              QueryStream.filter((note) => note.text !== "c"),
+              QueryStream.map((note) => ({ text: note.text.toUpperCase() })),
+            );
+
+          const page1 = yield* QueryStream.paginate(derived, {
+            numItems: 1,
+            cursor: null,
+          });
+          const afterKey = QueryStream.deserializeCursor(page1.continueCursor);
+
+          // Pure transforms narrow by narrowing their input, so the bounds
+          // still reach the leaf rather than falling back to in-memory
+          // key filtering.
+          expect(derived.narrowWith).toBeDefined();
+          const narrowed = QueryStream.narrow(derived, { after: afterKey });
+
+          expect(yield* collectTexts(narrowed)).toEqual(["B", "D"]);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect("paginates through duplicate index values", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          // Duplicate "banana"s make cursors land *between* rows that share
+          // the first order-key component, so resuming exercises the
+          // composite-key range decomposition (text, then `_creationTime`,
+          // then `_id`).
+          yield* insertNotes(["banana", "apple", "banana"]);
+
+          const reader = yield* DatabaseReader;
+          const stream = reader.table("notes").stream("by_text");
+
+          const pages = yield* paginateAll(stream, 1);
+          expect(pages.map((page) => page.map((doc) => doc.text))).toEqual([
+            ["apple"],
+            ["banana"],
+            ["banana"],
+          ]);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect("paginates descending streams with pushed-down cursors", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          yield* insertNotes(["a", "b", "c"]);
+
+          const reader = yield* DatabaseReader;
+          const stream = reader.table("notes").stream("by_text", "desc");
+
+          const pages = yield* paginateAll(stream, 1);
+          expect(pages.map((page) => page.map((doc) => doc.text))).toEqual([
+            ["c"],
+            ["b"],
+            ["a"],
+          ]);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect("cursors compose with range bounds from the query spec", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          yield* insertNotes(["banana", "apple", "cherry"]);
+
+          const reader = yield* DatabaseReader;
+          const stream = reader
+            .table("notes")
+            .stream("by_text", (q) => q.gte("text", "b"));
+
+          const pages = yield* paginateAll(stream, 1);
+          expect(pages.map((page) => page.map((doc) => doc.text))).toEqual([
+            ["banana"],
+            ["cherry"],
+          ]);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect("resumes a fully eq-pinned by_id stream from its cursor", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          const writer = yield* DatabaseWriter;
+          const noteId = yield* writer.table("notes").insert({ text: "only" });
+          yield* writer.table("notes").insert({ text: "other" });
+
+          const reader = yield* DatabaseReader;
+          // Pinning the whole `by_id` key leaves an *empty* order key; the
+          // cursor round-trip must not rebuild ranges past the index's
+          // fields.
+          const pinned = reader
+            .table("notes")
+            .stream("by_id", (q) => q.eq("_id", noteId));
+
+          const page1 = yield* QueryStream.paginate(pinned, {
+            numItems: 1,
+            cursor: null,
+          });
+          expect(page1.page.map((doc) => doc.text)).toEqual(["only"]);
+
+          const page2 = yield* QueryStream.paginate(pinned, {
+            numItems: 1,
+            cursor: page1.continueCursor,
+          });
+          expect(page2.page).toEqual([]);
+          assertEquals(page2.isDone, true);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect(
+    "treats an exclusive-inclusive bound at the same key as empty",
+    () =>
+      Effect.gen(function* () {
+        const c = yield* TestConfect.TestConfect;
+
+        yield* c.run(
+          Effect.gen(function* () {
+            yield* insertNotes(["a", "b", "c"]);
+
+            const reader = yield* DatabaseReader;
+            const stream = reader.table("notes").stream("by_text");
+
+            const page1 = yield* QueryStream.paginate(stream, {
+              numItems: 2,
+              cursor: null,
+            });
+            // A page pinned as (cursor, cursor] is the empty range — the
+            // boundary row must not be re-emitted by the pushed-down ranges.
+            const emptyPinned = yield* QueryStream.paginate(stream, {
+              numItems: 5,
+              cursor: page1.continueCursor,
+              endCursor: page1.continueCursor,
+            });
+            expect(emptyPinned.page).toEqual([]);
+          }),
+        );
+      }).pipe(Effect.provide(TestConfect.layer)),
   );
 
   it.effect("fails with the InvalidCursor signal on a malformed cursor", () =>
