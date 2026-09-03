@@ -29,7 +29,7 @@ Effect.gen(function* () {
       .stream("by_role", (q) => q.eq("author.role", role), "desc");
 
   return yield* QueryStream.merge([byRole("admin"), byRole("user")]).pipe(
-    QueryStream.filterEffect((note) => Effect.succeed(note.tag !== "hidden")),
+    QueryStream.filter((note) => note.tag !== "hidden"),
     QueryStream.paginate(paginationOpts),
   );
 });
@@ -127,21 +127,35 @@ All inputs must have the same order key and document type (type errors otherwise
 
 ### Filter and map
 
-`QueryStream.filterEffect` and `QueryStream.mapEffect` are the effectful `filter` and `map` that keep the result a query stream. You can use `Stream.filter` and `Stream.map` on a query stream too, and they behave correctly — but, like any plain `Stream` combinator, they return an ordinary `Stream` that can no longer be merged or paginated (see [Consuming a stream](#consuming-a-stream)). The `QueryStream` versions preserve the order key, and a document that `filterEffect` rejects still counts as _read_, so cursors keep advancing past it and pagination stays correct.
+`QueryStream.filter` and `QueryStream.map` are the `filter` and `map` that keep the result a query stream. You can use `Stream.filter` and `Stream.map` on a query stream too, and they behave correctly — but, like any plain `Stream` combinator, they return an ordinary `Stream` that can no longer be merged or paginated (see [Consuming a stream](#consuming-a-stream)). The `QueryStream` versions preserve the order key, and a document that `filter` rejects still counts as _read_, so cursors keep advancing past it and pagination stays correct.
 
 ```ts
 reader
   .table("notes")
   .stream("by_creation_time", "desc")
   .pipe(
-    QueryStream.filterEffect((note) => Effect.succeed(note.tag !== "hidden")),
-    QueryStream.mapEffect((note) =>
-      Effect.succeed({ id: note._id, text: note.text }),
-    ),
+    QueryStream.filter((note) => note.tag !== "hidden"),
+    QueryStream.map((note) => ({ id: note._id, text: note.text })),
   );
 ```
 
 A mapper must not change what the documents are ordered by — the mapped stream keeps the original order key.
+
+When the predicate or mapper needs to run an effect — read another table, use a service, or fail with a typed error — use `QueryStream.filterEffect` and `QueryStream.mapEffect` instead. They behave the same way, and the effect's error and requirement types flow into the stream's:
+
+```ts
+reader
+  .table("messages")
+  .stream("by_creation_time", "desc")
+  .pipe(
+    QueryStream.filterEffect((message) =>
+      reader
+        .table("users")
+        .get(message.from)
+        .pipe(Effect.map((author) => !author.banned)),
+    ),
+  );
+```
 
 ### Join
 
@@ -178,7 +192,7 @@ reader
   .pipe(QueryStream.distinct(["text"]));
 ```
 
-The fields must be a prefix of the stream's order key, which is enforced at the type level. Apply `filterEffect` _after_ `distinct` rather than before it, so that a filtered-out document can't hide its group's first match from a resumed page.
+The fields must be a prefix of the stream's order key, which is enforced at the type level. Apply `filter` (or `filterEffect`) _after_ `distinct` rather than before it, so that a filtered-out document can't hide its group's first match from a resumed page.
 
 ### Rename the order key
 
@@ -195,17 +209,19 @@ const timeline = QueryStream.merge([
     .table("messages")
     .stream("by_sent") // order key: ["sentAt", "_creationTime"]
     .pipe(
-      QueryStream.mapEffect((message) =>
-        Effect.succeed<TimelineEntry>({ kind: "message", at: message.sentAt }),
-      ),
+      QueryStream.map((message): TimelineEntry => ({
+        kind: "message",
+        at: message.sentAt,
+      })),
     ),
   reader
     .table("calls")
     .stream("by_started") // order key: ["startedAt", "_creationTime"]
     .pipe(
-      QueryStream.mapEffect((call) =>
-        Effect.succeed<TimelineEntry>({ kind: "call", at: call.startedAt }),
-      ),
+      QueryStream.map((call): TimelineEntry => ({
+        kind: "call",
+        at: call.startedAt,
+      })),
       QueryStream.orderBy(["sentAt", "_creationTime"]),
     ),
 ]);
@@ -238,9 +254,7 @@ const feed = FunctionImpl.make(
           .stream("by_role", (q) => q.eq("author.role", role), "desc");
 
       return yield* QueryStream.merge([byRole("admin"), byRole("user")]).pipe(
-        QueryStream.filterEffect((note) =>
-          Effect.succeed(note.tag !== "hidden"),
-        ),
+        QueryStream.filter((note) => note.tag !== "hidden"),
         QueryStream.paginate(paginationOpts),
       );
     }).pipe(Effect.orDie),
