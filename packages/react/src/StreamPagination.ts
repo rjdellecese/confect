@@ -2,18 +2,25 @@
  * PROTOTYPE — the pure state machine behind {@link useStreamPaginatedQuery}
  * (see `notes/stream-based-querying.md` in the repo root).
  *
- * Reactive pagination without the query journal: each loaded page is pinned
- * to a fixed index range by echoing its `continueCursor` back as the next
- * subscription's `endCursor`, so adjacent pages stay exactly contiguous as
- * data changes — the "range-defined pages" the Fully Reactive Pagination
- * article calls for, and the mechanism of `convex-helpers/react`'s
- * `usePaginatedQuery`.
+ * Reactive pagination without the query journal: every loaded page —
+ * including the first — is pinned to a fixed index range by echoing its
+ * `continueCursor` back as the next subscription's `endCursor` (the last
+ * page pins to the end-of-stream sentinel once exhausted), so adjacent
+ * pages stay exactly contiguous and pages never shed items as data changes
+ * — the "range-defined pages" the Fully Reactive Pagination article calls
+ * for, and the mechanism of `convex-helpers/react`'s `usePaginatedQuery`.
  *
- * Loading more and splitting an overgrown page are the same transition
- * shape: the affected page keeps rendering while a pair of replacement
- * subscriptions ("ongoing split") loads, and is swapped out once both have
- * results.
+ * Pinning a freshly loaded page, loading more, and splitting an overgrown
+ * page are the same transition shape: the affected page keeps rendering
+ * while its replacement subscriptions ("ongoing split") load, and is
+ * swapped out once all of them have results.
+ *
+ * This module is framework-free (it imports only `effect/*` and a type
+ * from `convex/server`); it lives here for now because the React hook is
+ * its only consumer — a second client (e.g. `@confect/foldkit`) should
+ * prompt a move down to `@confect/js`.
  */
+import type { PaginationResult } from "convex/server";
 import * as Array from "effect/Array";
 import * as Option from "effect/Option";
 import { pipe } from "effect/Function";
@@ -25,7 +32,22 @@ export interface PageRequest {
   readonly cursor: string | null;
   /** Present once the page is pinned to a fixed range. */
   readonly endCursor?: string;
+  /**
+   * Per-page read budget, forwarded to the server so a scan-heavy page
+   * fails over to `SplitRequired` instead of exceeding query limits.
+   */
+  readonly maximumRowsRead?: number;
 }
+
+/** A fresh growing-page request (no `endCursor`). */
+const growingRequest = (
+  numItems: number,
+  cursor: string | null,
+  maximumRowsRead: number | undefined,
+): PageRequest =>
+  maximumRowsRead === undefined
+    ? { numItems, cursor }
+    : { numItems, cursor, maximumRowsRead };
 
 export interface State {
   readonly nextPageKey: number;
@@ -34,13 +56,11 @@ export interface State {
   /** The request each subscribed page queries with, by page key. */
   readonly pages: Record.ReadonlyRecord<string, PageRequest>;
   /**
-   * Pages being replaced by a pair of narrower subscriptions: the original
-   * stays subscribed (and rendered) until both replacements have results.
+   * Pages being replaced by one (a pin) or two (a split) narrower
+   * subscriptions: the original stays subscribed (and rendered) until every
+   * replacement has a result.
    */
-  readonly ongoingSplits: Record.ReadonlyRecord<
-    string,
-    readonly [string, string]
-  >;
+  readonly ongoingSplits: Record.ReadonlyRecord<string, ReadonlyArray<string>>;
 }
 
 /** The skipped state: nothing subscribed. */
@@ -52,12 +72,47 @@ export const empty: State = {
 };
 
 /** One growing (unpinned) page from the start of the stream. */
-export const initial = (initialNumItems: number): State => ({
+export const initial = (
+  initialNumItems: number,
+  maximumRowsRead?: number,
+): State => ({
   nextPageKey: 1,
   pageKeys: ["0"],
-  pages: Record.singleton("0", { numItems: initialNumItems, cursor: null }),
+  pages: Record.singleton(
+    "0",
+    growingRequest(initialNumItems, null, maximumRowsRead),
+  ),
   ongoingSplits: Record.empty(),
 });
+
+/**
+ * Pin a freshly loaded growing page at its `continueCursor` (or, once
+ * exhausted, at the end-of-stream sentinel), so it stops being a sliding
+ * window: a pinned page grows and shrinks with the data in its range but
+ * never sheds items past its edges. Modeled as a one-replacement split so
+ * the original keeps rendering until the pinned twin has a result.
+ */
+export const pin =
+  (key: string, endCursor: string): ((state: State) => State) =>
+  (state) =>
+    Option.match(Record.get(state.pages, key), {
+      onNone: () => state,
+      onSome: (page) => {
+        if (
+          page.endCursor !== undefined ||
+          Record.has(state.ongoingSplits, key)
+        ) {
+          return state;
+        }
+        const pinnedKey = String(state.nextPageKey);
+        return {
+          nextPageKey: state.nextPageKey + 1,
+          pageKeys: state.pageKeys,
+          pages: Record.set(state.pages, pinnedKey, { ...page, endCursor }),
+          ongoingSplits: Record.set(state.ongoingSplits, key, [pinnedKey]),
+        };
+      },
+    });
 
 /**
  * Pin the growing last page at `continueCursor` and start a new growing
@@ -65,7 +120,11 @@ export const initial = (initialNumItems: number): State => ({
  * replacement and the new page, so the swap waits for both.
  */
 export const loadMore =
-  (continueCursor: string, numItems: number): ((state: State) => State) =>
+  (
+    continueCursor: string,
+    numItems: number,
+    maximumRowsRead?: number,
+  ): ((state: State) => State) =>
   (state) =>
     pipe(
       Option.Do,
@@ -76,6 +135,21 @@ export const loadMore =
       Option.match({
         onNone: () => state,
         onSome: ({ lastKey, lastPage }) => {
+          if (lastPage.endCursor !== undefined) {
+            // The last page is already pinned (the usual case, since pages
+            // pin themselves on first load): just append a new growing page.
+            const nextKey = String(state.nextPageKey);
+            return {
+              nextPageKey: state.nextPageKey + 1,
+              pageKeys: Array.append(state.pageKeys, nextKey),
+              pages: Record.set(
+                state.pages,
+                nextKey,
+                growingRequest(numItems, continueCursor, maximumRowsRead),
+              ),
+              ongoingSplits: state.ongoingSplits,
+            };
+          }
           const pinnedKey = String(state.nextPageKey);
           const nextKey = String(state.nextPageKey + 1);
           return {
@@ -84,27 +158,29 @@ export const loadMore =
             pages: pipe(
               state.pages,
               Record.set(pinnedKey, { ...lastPage, endCursor: continueCursor }),
-              Record.set(nextKey, { numItems, cursor: continueCursor }),
+              Record.set(
+                nextKey,
+                growingRequest(numItems, continueCursor, maximumRowsRead),
+              ),
             ),
             ongoingSplits: Record.set(state.ongoingSplits, lastKey, [
               pinnedKey,
               nextKey,
-            ] as const),
+            ]),
           };
         },
       }),
     );
 
 /**
- * Split the page at `key` into two pinned ranges meeting at `splitCursor`
- * and ending at `endCursor` (the page's own continue cursor).
+ * Split the page at `key` in two at `splitCursor`. The first replacement
+ * pins at the split point; the second keeps the page's own `endCursor` —
+ * for a pinned page its original end (so a truncated `SplitRequired` page
+ * loses none of its range), and for a growing page no end at all (it keeps
+ * growing).
  */
 export const split =
-  (
-    key: string,
-    splitCursor: string,
-    endCursor: string,
-  ): ((state: State) => State) =>
+  (key: string, splitCursor: string): ((state: State) => State) =>
   (state) =>
     Option.match(Record.get(state.pages, key), {
       onNone: () => state,
@@ -117,12 +193,12 @@ export const split =
           pages: pipe(
             state.pages,
             Record.set(firstKey, { ...page, endCursor: splitCursor }),
-            Record.set(secondKey, { ...page, cursor: splitCursor, endCursor }),
+            Record.set(secondKey, { ...page, cursor: splitCursor }),
           ),
           ongoingSplits: Record.set(state.ongoingSplits, key, [
             firstKey,
             secondKey,
-          ] as const),
+          ]),
         };
       },
     });
@@ -133,10 +209,10 @@ export const completeSplit =
   (state) =>
     Option.match(Record.get(state.ongoingSplits, key), {
       onNone: () => state,
-      onSome: ([firstKey, secondKey]) => ({
+      onSome: (replacements) => ({
         nextPageKey: state.nextPageKey,
         pageKeys: Array.flatMap(state.pageKeys, (pageKey) =>
-          pageKey === key ? [firstKey, secondKey] : [pageKey],
+          pageKey === key ? replacements : [pageKey],
         ),
         pages: Record.remove(state.pages, key),
         ongoingSplits: Record.remove(state.ongoingSplits, key),
@@ -165,14 +241,11 @@ export type Results = Record.ReadonlyRecord<
 // Interpretation
 // -----------------------------------------------------------------------------
 
-/** The wire shape of one loaded page. */
-export interface PageResult {
-  readonly page: ReadonlyArray<unknown>;
-  readonly isDone: boolean;
-  readonly continueCursor: string;
-  readonly splitCursor?: string | null;
-  readonly pageStatus?: "SplitRecommended" | "SplitRequired" | null;
-}
+/**
+ * The wire shape of one loaded page — `PaginationResult` from
+ * `convex/server`, so the protocol has a single source of truth.
+ */
+export type PageResult = PaginationResult<unknown>;
 
 /**
  * What one render pass derives from the subscribed pages' results: the
@@ -243,18 +316,16 @@ export const interpret = (
             : { _tag: "Failed", error: result, items };
         }
 
+        const hasResult = (key: string) =>
+          Record.get(results, key).pipe(
+            Option.flatMap(Option.fromNullishOr),
+            Option.isSome,
+          );
         const ongoingSplit = Record.get(state.ongoingSplits, pageKey);
         const nextTransitions = Option.match(ongoingSplit, {
-          onSome: ([firstKey, secondKey]) =>
-            // Swap the replacements in once both have results.
-            Record.get(results, firstKey).pipe(
-              Option.flatMap(Option.fromNullishOr),
-              Option.isSome,
-            ) &&
-            Record.get(results, secondKey).pipe(
-              Option.flatMap(Option.fromNullishOr),
-              Option.isSome,
-            )
+          onSome: (replacements) =>
+            // Swap the replacements in once all of them have results.
+            Array.every(replacements, hasResult)
               ? Array.append(transitions, completeSplit(pageKey))
               : transitions,
           onNone: () =>
@@ -262,11 +333,16 @@ export const interpret = (
             (result.pageStatus === "SplitRecommended" ||
               result.pageStatus === "SplitRequired" ||
               result.page.length > options.initialNumItems)
-              ? Array.append(
-                  transitions,
-                  split(pageKey, result.splitCursor, result.continueCursor),
-                )
-              : transitions,
+              ? Array.append(transitions, split(pageKey, result.splitCursor))
+              : // A loaded growing page pins itself to the range it just
+                // served (`END_CURSOR` once exhausted), so it stops being a
+                // sliding window that sheds items as new documents arrive.
+                Option.exists(
+                    Record.get(state.pages, pageKey),
+                    (request) => request.endCursor === undefined,
+                  ) && result.pageStatus !== "SplitRequired"
+                ? Array.append(transitions, pin(pageKey, result.continueCursor))
+                : transitions,
         });
 
         // A force-split page couldn't be fetched in full: show the items

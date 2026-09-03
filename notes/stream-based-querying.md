@@ -510,6 +510,14 @@ recommendation:
    opaque tokens; decide whether to encrypt/sign stream cursors (requires key material
    on the deployment) or document the exposure as a constraint on which indexes should
    back public paginated streams.
+7. **Relationship to `usePaginatedQuery_experimental`** — convex 1.45 ships an
+   experimental journal-free paginated hook (`PaginatedQueryClient`) implementing the
+   same endCursor-pinning mechanism as `useStreamPaginatedQuery`. We keep our own state
+   machine for now because Confect needs errors as decodable values (typed `Failure`
+   results via the ref's error schema, which the upstream hook's throw/reset flow does
+   not expose), per-page schema decoding, and control over split heuristics matched to
+   `QueryStream.paginate`'s `SplitRecommended` semantics — and the upstream hook is
+   explicitly experimental. Revisit wrapping it once it stabilizes.
 
 ## Appendix: the annotated-element trick, in one picture
 

@@ -333,8 +333,9 @@ const isInvalidCursorError = (error: Error): boolean =>
   (error instanceof ConvexError &&
     typeof error.data === "object" &&
     error.data !== null &&
-    (error.data as { isConvexSystemError?: unknown }).isConvexSystemError ===
-      true &&
+    // Both Convex's built-in pagination (which also sets
+    // `isConvexSystemError`) and `QueryStream.paginate` signal an invalid
+    // cursor with this data shape — the same check `convex/react` performs.
     (error.data as { paginationError?: unknown }).paginationError ===
       "InvalidCursor");
 
@@ -362,7 +363,16 @@ export const useStreamPaginatedQuery = <
 >(
   ref: Query,
   args: UsePaginatedQueryArgs<Query>,
-  options: { readonly initialNumItems: number },
+  options: {
+    readonly initialNumItems: number;
+    /**
+     * Per-page read budget forwarded as `paginationOpts.maximumRowsRead`:
+     * a page that would scan more rows than this returns truncated with
+     * `SplitRequired` (and the hook splits it) instead of exceeding
+     * Convex's query limits on a filter-heavy stream.
+     */
+    readonly maximumRowsRead?: number;
+  },
 ): PaginatedQueryResult.PaginatedQueryResult<
   PaginatedQueryItem<Query>,
   Ref.Error<Query>
@@ -389,14 +399,23 @@ export const useStreamPaginatedQuery = <
         getFunctionName(functionReference),
         encodedArgs === undefined ? "skip" : convexToJson(encodedArgs),
         options.initialNumItems,
+        options.maximumRowsRead ?? null,
       ]),
-    [functionReference, encodedArgs, options.initialNumItems],
+    [
+      functionReference,
+      encodedArgs,
+      options.initialNumItems,
+      options.maximumRowsRead,
+    ],
   );
 
   const freshState = () =>
     skipped
       ? StreamPagination.empty
-      : StreamPagination.initial(options.initialNumItems);
+      : StreamPagination.initial(
+          options.initialNumItems,
+          options.maximumRowsRead,
+        );
 
   const [tracked, setTracked] = useState(() => ({
     resetKey,
@@ -467,9 +486,33 @@ export const useStreamPaginatedQuery = <
 
   const encodedItems =
     interpretation._tag === "ResetRequired" ? NO_ITEMS : interpretation.items;
+  // Page results keep their identity while unchanged (only the page that
+  // actually updated is a fresh object), so caching decodes per encoded
+  // item makes a single-page update decode only that page's items rather
+  // than every loaded page's.
+  const decodeCache = useMemo(
+    () => new WeakMap<object, PaginatedQueryItem<Query>>(),
+    [ref],
+  );
   const decodedResults = useMemo(
-    () => Ref.decodePaginationPageSync(ref, encodedItems),
-    [ref, encodedItems],
+    () =>
+      encodedItems.map((item): PaginatedQueryItem<Query> => {
+        if (typeof item !== "object" || item === null) {
+          return Ref.decodePaginationPageSync(ref, [
+            item,
+          ])[0] as PaginatedQueryItem<Query>;
+        }
+        const cached = decodeCache.get(item);
+        if (cached !== undefined) {
+          return cached;
+        }
+        const decoded = Ref.decodePaginationPageSync(ref, [
+          item,
+        ])[0] as PaginatedQueryItem<Query>;
+        decodeCache.set(item, decoded);
+        return decoded;
+      }),
+    [ref, encodedItems, decodeCache],
   );
 
   return useMemo((): PaginatedQueryResult.Variants<
@@ -518,7 +561,11 @@ export const useStreamPaginatedQuery = <
         if (!alreadyLoadingMore) {
           alreadyLoadingMore = true;
           applyTransitions([
-            StreamPagination.loadMore(continueCursor, numItems),
+            StreamPagination.loadMore(
+              continueCursor,
+              numItems,
+              options.maximumRowsRead,
+            ),
           ]);
         }
       },

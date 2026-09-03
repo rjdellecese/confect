@@ -16,7 +16,7 @@
  *
  * Known limitations (all called out in the design doc):
  *
- * - No `maximumBytesRead` accounting; NaN ordering subtleties are skipped.
+ * - No `maximumBytesRead` accounting.
  * - Cursors serialize only the *remaining* (order-key) fields, not the full
  *   index key — equality-pinned values never leak into cursors.
  */
@@ -1956,19 +1956,33 @@ export const paginate = dual<
                     pageStatus: "SplitRequired" as const,
                     splitCursor: midpointCursor(state.readKeys),
                   }
-                : {
-                    page,
-                    isDone: false,
-                    continueCursor: serializeCursor(lastKey),
-                  },
+                : // A growing page that had to scan far past its item budget
+                  // (a filter-heavy stream) recommends a split so reactive
+                  // clients can subdivide it instead of re-scanning forever.
+                  Chunk.size(state.readKeys) >= SOFT_MAX_SCAN_LENGTH
+                  ? {
+                      page,
+                      isDone: false,
+                      continueCursor: serializeCursor(lastKey),
+                      pageStatus: "SplitRecommended" as const,
+                      splitCursor: midpointCursor(state.readKeys),
+                    }
+                  : {
+                      page,
+                      isDone: false,
+                      continueCursor: serializeCursor(lastKey),
+                    },
             // The narrowed stream was exhausted: either we reached the
             // pinned end cursor (more may follow it) or the true end of
             // the stream. An endCursor-pinned page that has grown well
             // past its requested size recommends a split, so reactive
             // clients can subdivide it (as `convex-helpers` does).
             onNone: () => {
+              // Any pinned page — including one pinned to the end of the
+              // stream — that has grown well past its requested size
+              // recommends a split.
               const shouldRecommendSplit =
-                Option.isSome(pinnedEnd) &&
+                Option.isSome(endCursor) &&
                 (Chunk.size(state.readKeys) >= SOFT_MAX_SCAN_LENGTH ||
                   Chunk.size(state.page) > options.numItems + 1);
               return shouldRecommendSplit && Chunk.size(state.readKeys) > 0
@@ -1980,12 +1994,7 @@ export const paginate = dual<
                       () => END_CURSOR,
                     ),
                     pageStatus: "SplitRecommended" as const,
-                    splitCursor: serializeCursor(
-                      Chunk.getUnsafe(
-                        state.readKeys,
-                        Math.floor((Chunk.size(state.readKeys) - 1) / 2),
-                      ),
-                    ),
+                    splitCursor: midpointCursor(state.readKeys),
                   }
                 : {
                     page,

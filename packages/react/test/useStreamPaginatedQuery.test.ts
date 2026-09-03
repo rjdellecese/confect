@@ -91,8 +91,17 @@ beforeEach(() => {
   );
 });
 
+/**
+ * Respond to the initial growing page and its pinned twin so the hook
+ * settles at one pinned first page (the state every loaded page reaches).
+ */
+const respondFirstPage = (result: object) => {
+  respond({ numItems: 2, cursor: null }, result);
+  respond({ numItems: 2, cursor: null, endCursor: "c0" }, result);
+};
+
 describe("useStreamPaginatedQuery", () => {
-  test("subscribes one growing page and decodes its items", () => {
+  test("pins the first page to its range once loaded, decoding its items", () => {
     respond(
       { numItems: 2, cursor: null },
       {
@@ -102,13 +111,37 @@ describe("useStreamPaginatedQuery", () => {
       },
     );
 
-    const { result } = renderHook(() =>
+    const { result, rerender } = renderHook(() =>
       useStreamPaginatedQuery(list, {}, { initialNumItems: 2 }),
     );
 
-    expect(subscribedOpts()).toEqual([{ numItems: 2, cursor: null }]);
-    assert(result.current._tag === "CanLoadMore");
-    expect(result.current.results).toEqual([{ value: 1 }, { value: 2 }]);
+    // The loaded growing page pins itself to the range it just served, so
+    // it stops being a sliding window; it keeps rendering while the pinned
+    // twin loads.
+    expect(subscribedOpts()).toEqual([
+      { numItems: 2, cursor: null },
+      { numItems: 2, cursor: null, endCursor: "c0" },
+    ]);
+    const whilePinning = current(result);
+    assert(whilePinning._tag === "LoadingMore");
+    expect(whilePinning.results).toEqual([{ value: 1 }, { value: 2 }]);
+
+    respond(
+      { numItems: 2, cursor: null, endCursor: "c0" },
+      {
+        page: [{ value: "1" }, { value: "2" }],
+        isDone: false,
+        continueCursor: "c0",
+      },
+    );
+    rerender();
+
+    expect(subscribedOpts()).toEqual([
+      { numItems: 2, cursor: null, endCursor: "c0" },
+    ]);
+    const pinned = current(result);
+    assert(pinned._tag === "CanLoadMore");
+    expect(pinned.results).toEqual([{ value: 1 }, { value: 2 }]);
   });
 
   test("encodes user args into every page subscription", () => {
@@ -144,29 +177,27 @@ describe("useStreamPaginatedQuery", () => {
     expect(subscribedOpts()).toEqual([]);
   });
 
-  test("loadMore pins the previous page at its continue cursor", () => {
-    respond(
-      { numItems: 2, cursor: null },
-      {
-        page: [{ value: "1" }, { value: "2" }],
-        isDone: false,
-        continueCursor: "c0",
-      },
-    );
+  test("loadMore appends a growing page after the pinned last page", () => {
+    respondFirstPage({
+      page: [{ value: "1" }, { value: "2" }],
+      isDone: false,
+      continueCursor: "c0",
+    });
 
     const { result, rerender } = renderHook(() =>
       useStreamPaginatedQuery(list, {}, { initialNumItems: 2 }),
     );
-    assert(result.current._tag === "CanLoadMore");
+    rerender();
+    assert(current(result)._tag === "CanLoadMore");
     act(() => {
-      assert(result.current._tag === "CanLoadMore");
-      result.current.loadMore(2);
+      const canLoadMore = current(result);
+      assert(canLoadMore._tag === "CanLoadMore");
+      canLoadMore.loadMore(2);
     });
 
-    // The growing page stays rendered while its pinned replacement and the
-    // new page load.
+    // The last page is already pinned, so loading more just appends a new
+    // growing page after it.
     expect(subscribedOpts()).toEqual([
-      { numItems: 2, cursor: null },
       { numItems: 2, cursor: null, endCursor: "c0" },
       { numItems: 2, cursor: "c0" },
     ]);
@@ -175,23 +206,21 @@ describe("useStreamPaginatedQuery", () => {
     expect(whileLoading.results).toEqual([{ value: 1 }, { value: 2 }]);
 
     respond(
-      { numItems: 2, cursor: null, endCursor: "c0" },
-      {
-        page: [{ value: "1" }, { value: "2" }],
-        isDone: false,
-        continueCursor: "c0",
-      },
-    );
-    respond(
       { numItems: 2, cursor: "c0" },
       { page: [{ value: "3" }], isDone: true, continueCursor: "c1" },
     );
     rerender();
+    // The exhausted page pins itself too; once its twin loads, the list
+    // settles.
+    respond(
+      { numItems: 2, cursor: "c0", endCursor: "c1" },
+      { page: [{ value: "3" }], isDone: true, continueCursor: "c1" },
+    );
+    rerender();
 
-    // Both replacements loaded: the original page is swapped out.
     expect(subscribedOpts()).toEqual([
       { numItems: 2, cursor: null, endCursor: "c0" },
-      { numItems: 2, cursor: "c0" },
+      { numItems: 2, cursor: "c0", endCursor: "c1" },
     ]);
     const afterSwap = current(result);
     assert(afterSwap._tag === "Exhausted");
@@ -218,11 +247,12 @@ describe("useStreamPaginatedQuery", () => {
       useStreamPaginatedQuery(list, {}, { initialNumItems: 2 }),
     );
 
-    // The overgrown page keeps rendering while its two halves load.
+    // The overgrown page keeps rendering while its two halves load; the
+    // second half keeps the page's growing tail (no endCursor).
     expect(subscribedOpts()).toEqual([
       { numItems: 2, cursor: null },
       { numItems: 2, cursor: null, endCursor: "s" },
-      { numItems: 2, cursor: "s", endCursor: "c0" },
+      { numItems: 2, cursor: "s" },
     ]);
     const whileSplitting = current(result);
     assert(whileSplitting._tag === "LoadingMore");
@@ -236,6 +266,16 @@ describe("useStreamPaginatedQuery", () => {
       { numItems: 2, cursor: null, endCursor: "s" },
       { page: [{ value: "1" }], isDone: false, continueCursor: "s" },
     );
+    respond(
+      { numItems: 2, cursor: "s" },
+      {
+        page: [{ value: "2" }, { value: "3" }],
+        isDone: false,
+        continueCursor: "c0",
+      },
+    );
+    rerender();
+    // The swapped-in growing half pins itself like any loaded page.
     respond(
       { numItems: 2, cursor: "s", endCursor: "c0" },
       {
@@ -275,36 +315,33 @@ describe("useStreamPaginatedQuery", () => {
       useStreamPaginatedQuery(list, {}, { initialNumItems: 2 }),
     );
 
-    // The incomplete page's items are withheld while its halves load.
+    // The incomplete page's items are withheld while its halves load; the
+    // second half keeps the growing tail rather than pinning at the
+    // truncation point, so no range is orphaned.
     assert(result.current._tag === "LoadingFirstPage");
     expect(subscribedOpts()).toEqual([
       { numItems: 2, cursor: null },
       { numItems: 2, cursor: null, endCursor: "s" },
-      { numItems: 2, cursor: "s", endCursor: "c0" },
+      { numItems: 2, cursor: "s" },
     ]);
   });
 
   test("returns a decoded typed error as Failure with the loaded pages", () => {
-    respond(
-      { numItems: 2, cursor: null },
-      {
-        page: [{ value: "1" }],
-        isDone: false,
-        continueCursor: "c0",
-      },
-    );
+    respondFirstPage({
+      page: [{ value: "1" }],
+      isDone: false,
+      continueCursor: "c0",
+    });
 
     const { result, rerender } = renderHook(() =>
       useStreamPaginatedQuery(listOrFail, {}, { initialNumItems: 2 }),
     );
+    rerender();
     act(() => {
-      assert(result.current._tag === "CanLoadMore");
-      result.current.loadMore(2);
+      const canLoadMore = current(result);
+      assert(canLoadMore._tag === "CanLoadMore");
+      canLoadMore.loadMore(2);
     });
-    respond(
-      { numItems: 2, cursor: null, endCursor: "c0" },
-      { page: [{ value: "1" }], isDone: false, continueCursor: "c0" },
-    );
     respond(
       { numItems: 2, cursor: "c0" },
       new ConvexError({ _tag: "Boom", reason: "nope" }),
@@ -328,35 +365,33 @@ describe("useStreamPaginatedQuery", () => {
   });
 
   test("resets pagination when a cursor becomes invalid", () => {
-    respond(
-      { numItems: 2, cursor: null },
-      {
-        page: [{ value: "1" }, { value: "2" }],
-        isDone: false,
-        continueCursor: "c0",
-      },
-    );
+    respondFirstPage({
+      page: [{ value: "1" }, { value: "2" }],
+      isDone: false,
+      continueCursor: "c0",
+    });
 
     const { result, rerender } = renderHook(() =>
       useStreamPaginatedQuery(list, {}, { initialNumItems: 2 }),
     );
+    rerender();
     act(() => {
-      assert(result.current._tag === "CanLoadMore");
-      result.current.loadMore(2);
+      const canLoadMore = current(result);
+      assert(canLoadMore._tag === "CanLoadMore");
+      canLoadMore.loadMore(2);
     });
     respond(
-      { numItems: 2, cursor: null, endCursor: "c0" },
-      { page: [{ value: "1" }], isDone: false, continueCursor: "c0" },
-    );
-    respond(
       { numItems: 2, cursor: "c0" },
-      new Error("InvalidCursor: the query changed"),
+      new ConvexError({ paginationError: "InvalidCursor" }),
     );
     rerender();
 
-    // Back to a single growing first page, which reloads from the start.
-    expect(subscribedOpts()).toEqual([{ numItems: 2, cursor: null }]);
-    assert(result.current._tag === "CanLoadMore");
-    expect(result.current.results).toEqual([{ value: 1 }, { value: 2 }]);
+    // Back to a first page reloading from the start; both its cached
+    // results arrive immediately, so it settles pinned within the render.
+    expect(subscribedOpts()).toEqual([
+      { numItems: 2, cursor: null, endCursor: "c0" },
+    ]);
+    assert(current(result)._tag === "CanLoadMore");
+    expect(current(result).results).toEqual([{ value: 1 }, { value: 2 }]);
   });
 });
