@@ -129,6 +129,8 @@ Get a `Stream` of documents matching the query.
 reader.table("notes").index("by_creation_time").stream();
 ```
 
+To merge, join, or paginate several queries together, use a [query stream](/server/database/streams) instead — `reader.table("notes").stream("by_creation_time")` — which stays paginable after composition.
+
 ### Accessing the current time
 
 Reading real time inside a query handler affects how aggressively Convex caches the result. See [Determinism](/server/database/determinism) for how Confect keeps queries cacheable by default and how to opt in to real time via Effect's `Clock` service.
