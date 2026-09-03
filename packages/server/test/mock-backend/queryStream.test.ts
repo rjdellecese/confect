@@ -478,6 +478,71 @@ describe("QueryStream", () => {
     }).pipe(Effect.provide(TestConfect.layer)),
   );
 
+  it.effect("resumes a fully eq-pinned by_id stream from its cursor", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          const writer = yield* DatabaseWriter;
+          const noteId = yield* writer.table("notes").insert({ text: "only" });
+          yield* writer.table("notes").insert({ text: "other" });
+
+          const reader = yield* DatabaseReader;
+          // Pinning the whole `by_id` key leaves an *empty* order key; the
+          // cursor round-trip must not rebuild ranges past the index's
+          // fields.
+          const pinned = reader
+            .table("notes")
+            .stream("by_id", (q) => q.eq("_id", noteId));
+
+          const page1 = yield* QueryStream.paginate(pinned, {
+            numItems: 1,
+            cursor: null,
+          });
+          expect(page1.page.map((doc) => doc.text)).toEqual(["only"]);
+
+          const page2 = yield* QueryStream.paginate(pinned, {
+            numItems: 1,
+            cursor: page1.continueCursor,
+          });
+          expect(page2.page).toEqual([]);
+          assertEquals(page2.isDone, true);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect(
+    "treats an exclusive-inclusive bound at the same key as empty",
+    () =>
+      Effect.gen(function* () {
+        const c = yield* TestConfect.TestConfect;
+
+        yield* c.run(
+          Effect.gen(function* () {
+            yield* insertNotes(["a", "b", "c"]);
+
+            const reader = yield* DatabaseReader;
+            const stream = reader.table("notes").stream("by_text");
+
+            const page1 = yield* QueryStream.paginate(stream, {
+              numItems: 2,
+              cursor: null,
+            });
+            // A page pinned as (cursor, cursor] is the empty range — the
+            // boundary row must not be re-emitted by the pushed-down ranges.
+            const emptyPinned = yield* QueryStream.paginate(stream, {
+              numItems: 5,
+              cursor: page1.continueCursor,
+              endCursor: page1.continueCursor,
+            });
+            expect(emptyPinned.page).toEqual([]);
+          }),
+        );
+      }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
   it.effect("fails with the InvalidCursor signal on a malformed cursor", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;

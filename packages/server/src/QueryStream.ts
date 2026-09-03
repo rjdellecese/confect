@@ -419,8 +419,11 @@ const splitRange = (
   order: "asc" | "desc",
   bounds: IndexBounds,
 ): ReadonlyArray<ReadonlyArray<RangeOp>> => {
+  // Equal cuts are an empty range too: e.g. lower exclusive at `k` and
+  // upper inclusive at `k` — the half-open (k, k] — both cut at
+  // successor(k).
   if (
-    Order.isGreaterThan(KeyCutOrder)(
+    Order.isGreaterThanOrEqualTo(KeyCutOrder)(
       lowerCut(bounds.lower),
       upperCut(bounds.upper),
     )
@@ -706,25 +709,17 @@ const makeLeaf = <Doc>(
   reflection: Reflection,
   bounds: IndexBounds,
 ): QueryStream<Doc, ReadonlyArray<string>, Document.DocumentDecodeError> => {
-  // The order key is the index fields that still vary — everything after
-  // the eq-pinned prefix — plus the implicit `_id` tiebreaker that makes
-  // order keys strictly ordered.
-  const remainingFields = Array.drop(
-    reflection.indexFields,
-    reflection.spec.eqCount,
-  );
-  const keyFields = Option.exists(
-    Array.last(remainingFields),
-    (field) => field === "_id",
-  )
-    ? remainingFields
-    : Array.append(remainingFields, "_id");
-
   // Bounds and range splitting work in full index-key space: the index's
   // fields plus the implicit `_id` tiebreaker (already explicit for
   // `by_id`). Convex accepts range constraints on `_creationTime` and
   // `_id` even though its index types don't advertise them.
   const fullIndexFields = withIdTiebreaker(reflection.indexFields);
+  // The order key is the index fields that still vary: everything after
+  // the eq-pinned prefix. Deriving it from the full index key keeps the
+  // invariant fullIndexFields = eq prefix ++ keyFields — in particular a
+  // fully pinned `by_id` stream has an *empty* order key, not a re-appended
+  // `_id`.
+  const keyFields = Array.drop(fullIndexFields, reflection.spec.eqCount);
   const keyPaths = Array.map(keyFields, (field) => String.split(field, "."));
   // `eq`-pinned values form a shared prefix of both bound keys.
   const eqValues = Array.take(bounds.lower.key, reflection.spec.eqCount);
