@@ -1130,9 +1130,7 @@ export const flatMap = dual<
     f,
     // Runtime inner key fields follow the same convention as leaves: the
     // type-level key plus the implicit `_id` tiebreaker.
-    Option.exists(Array.last(options.innerKey), (field) => field === "_id")
-      ? options.innerKey
-      : Array.append(options.innerKey, "_id"),
+    withIdTiebreaker(options.innerKey),
     {},
   ),
 );
@@ -1413,9 +1411,7 @@ const orderByImpl = <
   self: QueryStream<Doc, Key, E, R>,
   key: NewKey,
 ): QueryStream<Doc, Types.Mutable<NewKey>, E, R> => {
-  const keyFields = Option.exists(Array.last(key), (field) => field === "_id")
-    ? key
-    : Array.append(key, "_id");
+  const keyFields = withIdTiebreaker(key);
   if (keyFields.length !== self.keyFields.length) {
     throw new Error(
       `QueryStream.orderBy: key ([${Array.join(key, ", ")}]) must have as many fields as the stream's order key ([${Array.join(self.keyFields, ", ")}])`,
