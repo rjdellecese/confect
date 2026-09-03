@@ -342,7 +342,7 @@ const isInvalidCursorError = (error: Error): boolean =>
 const NO_ITEMS: ReadonlyArray<unknown> = [];
 
 /**
- * PROTOTYPE — endCursor-pinned reactive pagination (see
+ * EXPERIMENTAL — endCursor-pinned reactive pagination (see
  * `notes/stream-based-querying.md`). Use it with paginated queries whose
  * handlers paginate via `QueryStream.paginate`: those don't write the query
  * journal that {@link usePaginatedQuery}'s built-in reactivity relies on,

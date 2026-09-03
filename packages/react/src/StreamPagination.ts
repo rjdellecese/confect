@@ -1,5 +1,5 @@
 /**
- * PROTOTYPE — the pure state machine behind {@link useStreamPaginatedQuery}
+ * EXPERIMENTAL — the pure state machine behind {@link useStreamPaginatedQuery}
  * (see `notes/stream-based-querying.md` in the repo root).
  *
  * Reactive pagination without the query journal: every loaded page —
