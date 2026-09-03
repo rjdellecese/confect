@@ -407,6 +407,41 @@ describe("QueryStream", () => {
     }).pipe(Effect.provide(TestConfect.layer)),
   );
 
+  it.effect("narrow pushes bounds through filter and map", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          yield* insertNotes(["a", "b", "c", "d"]);
+
+          const reader = yield* DatabaseReader;
+          const derived = reader
+            .table("notes")
+            .stream("by_text")
+            .pipe(
+              QueryStream.filter((note) => note.text !== "c"),
+              QueryStream.map((note) => ({ text: note.text.toUpperCase() })),
+            );
+
+          const page1 = yield* QueryStream.paginate(derived, {
+            numItems: 1,
+            cursor: null,
+          });
+          const afterKey = QueryStream.deserializeCursor(page1.continueCursor);
+
+          // Pure transforms narrow by narrowing their input, so the bounds
+          // still reach the leaf rather than falling back to in-memory
+          // key filtering.
+          expect(derived.narrowWith).toBeDefined();
+          const narrowed = QueryStream.narrow(derived, { after: afterKey });
+
+          expect(yield* collectTexts(narrowed)).toEqual(["B", "D"]);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
   it.effect("paginates through duplicate index values", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;

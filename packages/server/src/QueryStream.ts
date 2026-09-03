@@ -957,62 +957,29 @@ export const merge = <Doc, Key extends ReadonlyArray<string>, E, R>(
 };
 
 /**
- * Filter with an effectful predicate. Unlike `Stream.filter`, filtered-out
- * elements still advance cursors, so the result remains paginable. The
- * predicate's `E2`/`R2` flow into the stream's channels.
+ * Derive a stream by transforming each present document into `Some` (keep,
+ * possibly changed) or `None` (drop). Order keys are preserved and dropped
+ * elements stay in cursor accounting as read-but-filtered, so the result
+ * remains mergeable and paginable; narrowing narrows the input and
+ * re-applies the transform, so cursor bounds keep pushing down to leaves.
  */
-export const filterEffect = dual<
-  <Doc, E2, R2>(
-    predicate: (doc: Doc) => Effect.Effect<boolean, E2, R2>,
-  ) => <Key extends ReadonlyArray<string>, E, R>(
-    self: QueryStream<Doc, Key, E, R>,
-  ) => QueryStream<Doc, Key, E | E2, R | R2>,
-  <Doc, Key extends ReadonlyArray<string>, E, R, E2, R2>(
-    self: QueryStream<Doc, Key, E, R>,
-    predicate: (doc: Doc) => Effect.Effect<boolean, E2, R2>,
-  ) => QueryStream<Doc, Key, E | E2, R | R2>
->(2, (self, predicate) => filterEffectImpl(self, predicate));
-
-const filterEffectImpl = <Doc, Key extends ReadonlyArray<string>, E, R, E2, R2>(
+const transform = <Doc, Key extends ReadonlyArray<string>, E, R, Doc2>(
   self: QueryStream<Doc, Key, E, R>,
-  predicate: (doc: Doc) => Effect.Effect<boolean, E2, R2>,
-): QueryStream<Doc, Key, E | E2, R | R2> =>
+  f: (doc: Doc) => Option.Option<Doc2>,
+): QueryStream<Doc2, Key, E, R> =>
   new QueryStream(
     self.order,
     self.keyFields,
-    Stream.mapEffect(self.annotated, ([doc, key]) =>
-      Option.match(doc, {
-        onNone: () => Effect.succeed([Option.none<never>(), key] as const),
-        onSome: (value) =>
-          Effect.map(
-            predicate(value),
-            (keep) => [keep ? Option.some(value) : Option.none(), key] as const,
-          ),
-      }),
+    Stream.map(
+      self.annotated,
+      ([doc, key]) => [Option.flatMap(doc, f), key] as const,
     ),
     undefined,
-    (keyBounds) =>
-      filterEffectImpl(narrowByKeyBounds(self, keyBounds), predicate),
+    (keyBounds) => transform(narrowByKeyBounds(self, keyBounds), f),
   );
 
-/**
- * Transform elements while preserving order keys, so the result remains
- * mergeable and paginable (unlike `Stream.mapEffect`, which degrades to a
- * plain `Stream`). The mapper must not change the ordering semantics.
- */
-export const mapEffect = dual<
-  <Doc, Doc2, E2, R2>(
-    f: (doc: Doc) => Effect.Effect<Doc2, E2, R2>,
-  ) => <Key extends ReadonlyArray<string>, E, R>(
-    self: QueryStream<Doc, Key, E, R>,
-  ) => QueryStream<Doc2, Key, E | E2, R | R2>,
-  <Doc, Key extends ReadonlyArray<string>, E, R, Doc2, E2, R2>(
-    self: QueryStream<Doc, Key, E, R>,
-    f: (doc: Doc) => Effect.Effect<Doc2, E2, R2>,
-  ) => QueryStream<Doc2, Key, E | E2, R | R2>
->(2, (self, f) => mapEffectImpl(self, f));
-
-const mapEffectImpl = <
+/** The effectful {@link transform}. */
+const transformEffect = <
   Doc,
   Key extends ReadonlyArray<string>,
   E,
@@ -1022,20 +989,20 @@ const mapEffectImpl = <
   R2,
 >(
   self: QueryStream<Doc, Key, E, R>,
-  f: (doc: Doc) => Effect.Effect<Doc2, E2, R2>,
+  f: (doc: Doc) => Effect.Effect<Option.Option<Doc2>, E2, R2>,
 ): QueryStream<Doc2, Key, E | E2, R | R2> =>
   new QueryStream(
     self.order,
     self.keyFields,
     Stream.mapEffect(self.annotated, ([doc, key]) =>
       Option.match(doc, {
-        onNone: () => Effect.succeed([Option.none<never>(), key] as const),
+        onNone: () => Effect.succeed([Option.none<Doc2>(), key] as const),
         onSome: (value) =>
-          Effect.map(f(value), (mapped) => [Option.some(mapped), key] as const),
+          Effect.map(f(value), (mapped) => [mapped, key] as const),
       }),
     ),
     undefined,
-    (keyBounds) => mapEffectImpl(narrowByKeyBounds(self, keyBounds), f),
+    (keyBounds) => transformEffect(narrowByKeyBounds(self, keyBounds), f),
   );
 
 /**
@@ -1054,17 +1021,32 @@ export const filter = dual<
     self: QueryStream<Doc, Key, E, R>,
     predicate: (doc: Doc) => boolean,
   ) => QueryStream<Doc, Key, E, R>
->(
-  2,
-  (self, predicate) =>
-    new QueryStream(
-      self.order,
-      self.keyFields,
-      Stream.map(
-        self.annotated,
-        ([doc, key]) => [Option.filter(doc, predicate), key] as const,
-      ),
+>(2, (self, predicate) =>
+  transform(self, (doc) => (predicate(doc) ? Option.some(doc) : Option.none())),
+);
+
+/**
+ * Filter with an effectful predicate — for predicates that read the
+ * database or use a service; the predicate's `E2`/`R2` flow into the
+ * stream's channels. Like `filter`, filtered-out elements still advance
+ * cursors.
+ */
+export const filterEffect = dual<
+  <Doc, E2, R2>(
+    predicate: (doc: Doc) => Effect.Effect<boolean, E2, R2>,
+  ) => <Key extends ReadonlyArray<string>, E, R>(
+    self: QueryStream<Doc, Key, E, R>,
+  ) => QueryStream<Doc, Key, E | E2, R | R2>,
+  <Doc, Key extends ReadonlyArray<string>, E, R, E2, R2>(
+    self: QueryStream<Doc, Key, E, R>,
+    predicate: (doc: Doc) => Effect.Effect<boolean, E2, R2>,
+  ) => QueryStream<Doc, Key, E | E2, R | R2>
+>(2, (self, predicate) =>
+  transformEffect(self, (doc) =>
+    Effect.map(predicate(doc), (keep) =>
+      keep ? Option.some(doc) : Option.none(),
     ),
+  ),
 );
 
 /**
@@ -1083,17 +1065,25 @@ export const map = dual<
     self: QueryStream<Doc, Key, E, R>,
     f: (doc: Doc) => Doc2,
   ) => QueryStream<Doc2, Key, E, R>
->(
-  2,
-  (self, f) =>
-    new QueryStream(
-      self.order,
-      self.keyFields,
-      Stream.map(
-        self.annotated,
-        ([doc, key]) => [Option.map(doc, f), key] as const,
-      ),
-    ),
+>(2, (self, f) => transform(self, (doc) => Option.some(f(doc))));
+
+/**
+ * Transform elements with an effectful function while preserving order
+ * keys — for mappers that read the database or use a service. The mapper
+ * must not change the ordering semantics.
+ */
+export const mapEffect = dual<
+  <Doc, Doc2, E2, R2>(
+    f: (doc: Doc) => Effect.Effect<Doc2, E2, R2>,
+  ) => <Key extends ReadonlyArray<string>, E, R>(
+    self: QueryStream<Doc, Key, E, R>,
+  ) => QueryStream<Doc2, Key, E | E2, R | R2>,
+  <Doc, Key extends ReadonlyArray<string>, E, R, Doc2, E2, R2>(
+    self: QueryStream<Doc, Key, E, R>,
+    f: (doc: Doc) => Effect.Effect<Doc2, E2, R2>,
+  ) => QueryStream<Doc2, Key, E | E2, R | R2>
+>(2, (self, f) =>
+  transformEffect(self, (doc) => Effect.map(f(doc), Option.some)),
 );
 
 /**
