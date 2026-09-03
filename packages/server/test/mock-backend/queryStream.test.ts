@@ -777,6 +777,96 @@ describe("QueryStream", () => {
     }).pipe(Effect.provide(TestConfect.layer)),
   );
 
+  it.effect("orderBy and distinct see through flatMap tiebreakers", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          const writer = yield* DatabaseWriter;
+          const reader = yield* DatabaseReader;
+
+          for (const [text, tag] of [
+            ["b", "b1"],
+            ["a", "a1"],
+            ["a", "a2"],
+            ["x0", "none"],
+            ["x1", "a"],
+            ["x2", "b"],
+          ] as const) {
+            yield* writer.table("notes").insert({ text, tag });
+          }
+
+          const tagsOf = <E, R>(
+            stream: Stream.Stream<{ tag?: string }, E, R>,
+          ): Effect.Effect<ReadonlyArray<string | undefined>, E, R> =>
+            Stream.runCollect(stream).pipe(
+              Effect.map((docs) => docs.map((doc) => doc.tag)),
+            );
+
+          // Type-level key ["text", "_creationTime", "_creationTime"]; the
+          // runtime key also carries the outer row's `_id` in the middle.
+          const joined = reader
+            .table("notes")
+            .stream("by_text", (q) => q.gte("text", "x"))
+            .pipe(
+              QueryStream.flatMap(
+                (note) =>
+                  reader
+                    .table("notes")
+                    .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
+                { innerKey: ["_creationTime"] },
+              ),
+            );
+          expect(joined.keyFields).toEqual([
+            "text",
+            "_creationTime",
+            "_id",
+            "_creationTime",
+            "_id",
+          ]);
+
+          // Relabeling names only the type-visible positions.
+          const relabeled = joined.pipe(
+            QueryStream.orderBy(["outerText", "outerCreated", "innerCreated"]),
+          );
+          expect(relabeled.keyFields).toEqual([
+            "outerText",
+            "outerCreated",
+            "_id",
+            "innerCreated",
+            "_id",
+          ]);
+          const pages = yield* paginateAll(relabeled, 1);
+          expect(pages.map((page) => page.map((doc) => doc.tag))).toEqual([
+            ["a1"],
+            ["a2"],
+            ["b1"],
+          ]);
+
+          // Distinct over the outer key keeps each outer row's first inner
+          // document; the "x0" row has none.
+          expect(
+            yield* tagsOf(joined.pipe(QueryStream.distinct(["text"]))),
+          ).toEqual(["a1", "b1"]);
+
+          // A prefix reaching into the inner key spans the outer `_id`.
+          expect(
+            yield* tagsOf(
+              joined.pipe(
+                QueryStream.distinct([
+                  "text",
+                  "_creationTime",
+                  "_creationTime",
+                ]),
+              ),
+            ),
+          ).toEqual(["a1", "a2", "b1"]);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
   it.effect("resumes a fully eq-pinned by_id stream from its cursor", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
@@ -1100,6 +1190,12 @@ describe("QueryStream types", () => {
       // @ts-expect-error — the new key must have as many fields as the old.
       const relabeledTooShort = QueryStream.orderBy(full, ["_creationTime"]);
       void relabeledTooShort;
+
+      // A flatMap result relabels by its type-level (tiebreaker-free) key.
+      const relabeledJoin = QueryStream.orderBy(joined, ["a", "b", "c"]);
+      expectTypeOf<KeyOf<typeof relabeledJoin>>().toEqualTypeOf<
+        ["a", "b", "c"]
+      >();
     });
     void _typeChecks;
   });
