@@ -325,7 +325,9 @@ describe("PaginatedQuery", () => {
       ) as Active;
       const returning = Option.getOrThrow(PaginatedQuery.prev(pageTwo));
 
-      expect(returning.current).toEqual(firstPageRequest.descriptor);
+      // Returning targets page one's pinned range under a new request id;
+      // a late outcome for the original, unpinned request is ignored.
+      expect(returning.current).toEqual(descriptor(null, "c1"));
       expect(returning.requestId).not.toBe(firstPageRequest.requestId);
       expect(
         PaginatedQuery.settle(returning, {
@@ -350,7 +352,8 @@ describe("PaginatedQuery", () => {
       const phase = getPhase(state, "Refreshing");
 
       expect(state.current).toEqual(descriptor("c1"));
-      expect(state.prevStack).toEqual([descriptor(null)]);
+      // The page left behind is pinned to the range it displayed.
+      expect(state.prevStack).toEqual([descriptor(null, "c1")]);
       expect(phase.direction).toBe("Next");
       expect(phase.data.number).toBe(1);
       expect(PaginatedQuery.targetPageNumber(state)).toBe(2);
@@ -366,9 +369,37 @@ describe("PaginatedQuery", () => {
       ) as Active;
       const state = Option.getOrThrow(PaginatedQuery.prev(pageTwo));
 
-      expect(state.current).toEqual(descriptor(null));
+      expect(state.current).toEqual(descriptor(null, "c1"));
       expect(state.prevStack).toEqual([]);
       expect(getPhase(state, "Refreshing").direction).toBe("Previous");
+    });
+
+    it("reloads a pinned range on prev and continues past it on next", () => {
+      const loadingTwo = Option.getOrThrow(
+        PaginatedQuery.next(loadedPageOne()),
+      );
+      const pageTwo = PaginatedQuery.settle(
+        loadingTwo,
+        success(loadingTwo, [{ text: "c" }], { continueCursor: "c2" }),
+      ) as Active;
+      const loadingOne = Option.getOrThrow(PaginatedQuery.prev(pageTwo));
+      // Page one reloads its pinned range, which may hold more or fewer
+      // documents than it did — but never a different range.
+      const pageOne = PaginatedQuery.settle(
+        loadingOne,
+        success(loadingOne, [{ text: "a" }, { text: "a2" }, { text: "b" }], {
+          continueCursor: "c1",
+        }),
+      ) as Active;
+      expect(getPhase(pageOne, "Success").data.descriptor).toEqual(
+        descriptor(null, "c1"),
+      );
+
+      // Going forward again starts page two at the pin, not at whatever
+      // continuation cursor the reloaded page reports.
+      const forward = Option.getOrThrow(PaginatedQuery.next(pageOne));
+      expect(forward.current).toEqual(descriptor("c1"));
+      expect(forward.prevStack).toEqual([descriptor(null, "c1")]);
     });
 
     it("first returns to page one without replacing the session", () => {
@@ -416,7 +447,7 @@ describe("PaginatedQuery", () => {
         success(loadingTwo, [], { isDone: true }),
       ) as Active;
 
-      expect(state.current).toEqual(descriptor(null));
+      expect(state.current).toEqual(descriptor(null, "c1"));
       expect(state.prevStack).toEqual([]);
       expect(getPhase(state, "Refreshing").direction).toBe("Previous");
     });

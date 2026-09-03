@@ -543,7 +543,17 @@ export const reset = <Item_, UserArgs_, Error_>(
   phase: pendingPhase(phaseData(state.phase), "Reset"),
 });
 
-/** Navigate to the next page, retaining the current page while it loads. */
+/**
+ * Navigate to the next page, retaining the current page while it loads.
+ *
+ * The page being left is pushed onto the stack *pinned* to the range it
+ * displayed — its cursor to its continuation cursor — so `prev` reloads
+ * exactly that range rather than the first `initialNumItems` documents
+ * after its cursor, however the data has moved meanwhile. Convex's own
+ * pagination keeps that range in its query journal; stream-paginated
+ * queries have no journal, so the pin is what keeps consecutive pages
+ * gap-free and duplicate-free for them.
+ */
 export const next = <Item_, UserArgs_, Error_>(
   state: Active<Item_, UserArgs_, Error_>,
 ): Option.Option<Active<Item_, UserArgs_, Error_>> =>
@@ -553,24 +563,25 @@ export const next = <Item_, UserArgs_, Error_>(
       Match.value(data.isDone).pipe(
         Match.withReturnType<Option.Option<Active<Item_, UserArgs_, Error_>>>(),
         Match.when(true, () => Option.none()),
-        Match.when(false, () =>
-          Option.some({
+        Match.when(false, () => {
+          const end = Option.getOrElse(
+            data.descriptor.endCursor,
+            () => data.continueCursor,
+          );
+          return Option.some({
             ...state,
             requestId: state.requestId + 1,
-            current: {
-              cursor: Option.getOrElse(
-                data.descriptor.endCursor,
-                () => data.continueCursor,
-              ),
-              endCursor: Option.none(),
-            },
-            prevStack: [...state.prevStack, data.descriptor],
+            current: { cursor: end, endCursor: Option.none() },
+            prevStack: [
+              ...state.prevStack,
+              { cursor: data.descriptor.cursor, endCursor: Option.some(end) },
+            ],
             phase: Phase.Refreshing<Item_, Error_>({
               data,
               direction: "Next",
             }),
-          }),
-        ),
+          });
+        }),
         Match.exhaustive,
       ),
     ),

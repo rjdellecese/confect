@@ -480,6 +480,15 @@ earlier identical session. Options use Convex's names: `initialNumItems` is
 required, while `maximumRowsRead` and `maximumBytesRead` are optional positive
 integers.
 
+When you navigate forward, the page you leave is pinned to the range it
+displayed — from its cursor to its continuation cursor — so going back reloads
+exactly that range, however the data has moved since. This is what keeps
+consecutive pages gap-free and duplicate-free for
+[stream-paginated queries](/server/database/streams#paginate), which have no
+query journal to remember page ranges. The page currently on screen is a live
+window of `initialNumItems` documents from its cursor, so it stays full as
+documents are inserted and deleted.
+
 <Note>
   Convex may signal that a page has grown too large by recommending or requiring
   a page split. The machine handles the full protocol transparently: the current
