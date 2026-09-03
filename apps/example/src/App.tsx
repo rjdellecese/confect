@@ -5,6 +5,7 @@ import {
   useMutation,
   usePaginatedQuery,
   useQuery,
+  useStreamPaginatedQuery,
 } from "@confect/react";
 import type { WorkId } from "@convex-dev/workpool";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
@@ -118,6 +119,7 @@ const Page = () => {
 
       <NoteList />
       <PaginatedNoteList />
+      <StreamFeed />
       <NoteLookup />
       <HttpEndpoints />
     </div>
@@ -379,6 +381,68 @@ const PaginatedNoteList = () => {
       {PaginatedQueryResult.isExhausted(paginatedNotes) && (
         <p>All notes loaded.</p>
       )}
+    </div>
+  );
+};
+
+const StreamFeed = () => {
+  const [text, setText] = useState("");
+  const insertAuthored = useMutation(
+    refs.public.notes_and_random.notes.insertAuthored,
+  );
+
+  const feed = useStreamPaginatedQuery(
+    refs.public.notes_and_random.notes.feed,
+    {},
+    { initialNumItems: 3 },
+  );
+
+  const post = (role: "admin" | "user", hidden?: boolean) =>
+    void insertAuthored({
+      text: text === "" ? `Hello from ${role}` : text,
+      role,
+      ...(hidden === true ? { hidden } : {}),
+    }).then(() => setText(""));
+
+  return (
+    <div>
+      <h2>Stream feed</h2>
+      <p style={{ maxWidth: 480, fontSize: "0.9em", color: "#666" }}>
+        A <code>QueryStream.merge</code> of the admin- and user-authored note
+        streams (two ranges of the <code>by_role</code> index), interleaved
+        newest-first by creation time, filtered with <code>filterEffect</code>{" "}
+        (hidden notes are skipped without breaking pagination), and paginated
+        reactively with endCursor-pinned pages.
+      </p>
+      <input
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="feed post text"
+      />
+      <button type="button" onClick={() => post("admin")}>
+        Post as admin
+      </button>
+      <button type="button" onClick={() => post("user")}>
+        Post as user
+      </button>
+      <button type="button" onClick={() => post("user", true)}>
+        Post hidden
+      </button>
+      <ul>
+        {Array.map(feed.results, (note) => (
+          <li key={note._id}>
+            <strong>{note.author?.name ?? "?"}</strong> ({note.author?.role}):{" "}
+            {note.text}
+          </li>
+        ))}
+      </ul>
+      {feed.isLoading && <p>Loading…</p>}
+      {PaginatedQueryResult.isCanLoadMore(feed) && (
+        <button type="button" onClick={() => feed.loadMore(3)}>
+          Load more
+        </button>
+      )}
+      {PaginatedQueryResult.isExhausted(feed) && <p>End of feed.</p>}
     </div>
   );
 };
