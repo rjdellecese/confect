@@ -481,7 +481,8 @@ recommendation:
   improvement over `convex-helpers`' full index keys: equality-pinned values
   never leak into cursors, and merged streams with different pins share a
   cursor space by construction.
-- No `orderBy` (re-keying) yet; no `maximumBytesRead` accounting; NaN
+- `maximumBytesRead` is charged Convex's `getDocumentSize` estimate per document
+  read (as `convex-helpers` does), not the backend's exact byte accounting; NaN
   ordering subtleties are skipped.
 
 ## 8. Open questions

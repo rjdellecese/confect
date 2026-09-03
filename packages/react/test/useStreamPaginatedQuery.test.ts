@@ -299,6 +299,44 @@ describe("useStreamPaginatedQuery", () => {
     ]);
   });
 
+  test("forwards read budgets to every growing page", () => {
+    const budget = { maximumRowsRead: 50, maximumBytesRead: 4096 };
+    respond(
+      { numItems: 2, cursor: null, ...budget },
+      {
+        page: [{ value: "1" }, { value: "2" }],
+        isDone: false,
+        continueCursor: "c0",
+      },
+    );
+    respond(
+      { numItems: 2, cursor: null, ...budget, endCursor: "c0" },
+      {
+        page: [{ value: "1" }, { value: "2" }],
+        isDone: false,
+        continueCursor: "c0",
+      },
+    );
+
+    const { result, rerender } = renderHook(() =>
+      useStreamPaginatedQuery(list, {}, { initialNumItems: 2, ...budget }),
+    );
+    rerender();
+
+    // Every page carries the budgets: the first page, the pinned twin it
+    // is replaced by (a pinned range can still grow past a budget), and
+    // each page `loadMore` appends.
+    const canLoadMore = current(result);
+    assert(canLoadMore._tag === "CanLoadMore");
+    act(() => {
+      canLoadMore.loadMore(2);
+    });
+    expect(subscribedOpts()).toEqual([
+      { numItems: 2, cursor: null, ...budget, endCursor: "c0" },
+      { numItems: 2, cursor: "c0", ...budget },
+    ]);
+  });
+
   test("truncates before a page the server could not fetch in full", () => {
     respond(
       { numItems: 2, cursor: null },

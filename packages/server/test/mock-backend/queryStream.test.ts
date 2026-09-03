@@ -2,6 +2,7 @@ import { type Document, QueryStream } from "@confect/server";
 import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
 import * as Context from "effect/Context";
+import { getDocumentSize, type Value } from "convex/values";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
@@ -362,6 +363,87 @@ describe("QueryStream", () => {
           assertEquals(result.isDone, false);
           assertEquals(result.pageStatus, "SplitRequired");
           expect(result.splitCursor).toBeDefined();
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect("paginate reports SplitRequired when maximumBytesRead is hit", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          // Equal-sized documents, and a budget of two and a half of them,
+          // so a page admits exactly three.
+          yield* insertNotes(
+            ["a", "b", "c", "d", "e"].map((text) => text.padEnd(100, ".")),
+          );
+
+          const reader = yield* DatabaseReader;
+          const notes = reader.table("notes").stream("by_text");
+          const initials = (page: ReadonlyArray<{ text: string }>) =>
+            page.map((note) => note.text[0]);
+          const [first] = yield* Stream.runCollect(notes);
+          const maximumBytesRead =
+            2.5 * getDocumentSize(first as unknown as Record<string, Value>);
+
+          const page = yield* QueryStream.paginate(notes, {
+            numItems: 10,
+            cursor: null,
+            maximumBytesRead,
+          });
+          expect(initials(page.page)).toEqual(["a", "b", "c"]);
+          expect(page.pageStatus).toEqual("SplitRequired");
+          assertEquals(page.isDone, false);
+
+          // The budget is per call: resuming reads the rest.
+          const rest = yield* QueryStream.paginate(notes, {
+            numItems: 10,
+            cursor: page.continueCursor,
+            maximumBytesRead,
+          });
+          expect(initials(rest.page)).toEqual(["d", "e"]);
+          assertEquals(rest.isDone, true);
+
+          // Without a budget nothing is measured.
+          const whole = yield* QueryStream.paginate(notes, {
+            numItems: 10,
+            cursor: null,
+          });
+          expect(whole.page).toHaveLength(5);
+
+          // The budget reaches the leaves through combinators: a merge of
+          // two ranges (which pre-fetches from both) still stops early and
+          // covers every document across its pages.
+          const merged = QueryStream.merge([
+            reader.table("notes").stream("by_text", (q) => q.lt("text", "c")),
+            reader.table("notes").stream("by_text", (q) => q.gte("text", "c")),
+          ]);
+          const budgeted = (
+            cursor: string | null,
+            pages: ReadonlyArray<ReadonlyArray<string>>,
+          ): Effect.Effect<
+            ReadonlyArray<ReadonlyArray<string>>,
+            Document.DocumentDecodeError
+          > =>
+            QueryStream.paginate(merged, {
+              numItems: 10,
+              cursor,
+              maximumBytesRead,
+            }).pipe(
+              Effect.flatMap((result) =>
+                result.isDone
+                  ? Effect.succeed([...pages, initials(result.page)])
+                  : budgeted(result.continueCursor, [
+                      ...pages,
+                      initials(result.page),
+                    ]),
+              ),
+            );
+          const pages = yield* budgeted(null, []);
+          expect(pages.length).toBeGreaterThan(1);
+          expect(pages.flat()).toEqual(["a", "b", "c", "d", "e"]);
         }),
       );
     }).pipe(Effect.provide(TestConfect.layer)),

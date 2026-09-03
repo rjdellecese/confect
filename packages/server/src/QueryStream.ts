@@ -16,7 +16,9 @@
  *
  * Known limitations (all called out in the design doc):
  *
- * - No `maximumBytesRead` accounting.
+ * - `maximumBytesRead` charges each document's estimated size (Convex's
+ *   `getDocumentSize`), as `convex-helpers` does — not the exact bytes the
+ *   backend bills; NaN ordering subtleties are skipped.
  * - Cursors serialize only the *remaining* (order-key) fields, not the full
  *   index key — equality-pinned values never leak into cursors.
  */
@@ -30,6 +32,7 @@ import {
   compareValues,
   ConvexError,
   convexToJson,
+  getDocumentSize,
   jsonToConvex,
   type Value,
 } from "convex/values";
@@ -38,6 +41,7 @@ import { pipeArguments, type Pipeable } from "effect/Pipeable";
 import * as Array from "effect/Array";
 import type * as Channel from "effect/Channel";
 import * as Chunk from "effect/Chunk";
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Equivalence from "effect/Equivalence";
 import * as Filter from "effect/Filter";
@@ -791,7 +795,7 @@ const makeLeaf = <Doc>(
   const eqValues = Array.take(bounds.lower.key, reflection.spec.eqCount);
   const segments = splitRange(fullIndexFields, reflection.order, bounds);
 
-  const annotated = Stream.fromIterable(segments).pipe(
+  const encodedDocuments = Stream.fromIterable(segments).pipe(
     Stream.flatMap((segment) =>
       Stream.suspend(() =>
         Stream.fromAsyncIterable(
@@ -804,6 +808,25 @@ const makeLeaf = <Doc>(
       ),
     ),
     Stream.orDie,
+  );
+
+  // Under a byte-budgeted `paginate`, every document this leaf reads is
+  // charged to the budget's counter as it is read — before any filtering
+  // downstream, matching Convex's own `maximumBytesRead` semantics. With
+  // no counter provided (the default), nothing is measured.
+  const charged = Stream.unwrap(
+    Effect.map(Effect.service(BytesRead), (counter) =>
+      counter === undefined
+        ? encodedDocuments
+        : Stream.tap(encodedDocuments, (encoded) =>
+            Effect.sync(() => {
+              counter.bytes += getDocumentSize(encoded as GenericDocument);
+            }),
+          ),
+    ),
+  );
+
+  const annotated = charged.pipe(
     Stream.mapEffect((encoded) =>
       Effect.map(
         Document.decode(reflection.tableName, reflection.tableSchema)(encoded),
@@ -1831,6 +1854,23 @@ export type PaginateOptions = ConvexPaginationOptions;
  */
 export type PaginationResult<Doc> = ConvexPaginationResult<Doc>;
 
+/** The running total a byte-budgeted `paginate` shares with its leaves. */
+interface BytesCounter {
+  bytes: number;
+}
+
+/**
+ * The byte counter a `paginate` call with a `maximumBytesRead` budget
+ * provides to the leaf streams beneath it; each leaf adds the estimated
+ * size (`getDocumentSize` from `convex/values`, as `convex-helpers` does)
+ * of every document it reads. Absent by default, so a stream measures
+ * nothing unless it runs under a byte-budgeted `paginate`.
+ */
+const BytesRead = Context.Reference<BytesCounter | undefined>(
+  "@confect/server/QueryStream/BytesRead",
+  { defaultValue: () => undefined },
+);
+
 interface PaginateState<Doc> {
   readonly page: Chunk.Chunk<Doc>;
   readonly readKeys: Chunk.Chunk<OrderKey>;
@@ -1858,8 +1898,11 @@ const midpointCursor = (readKeys: Chunk.Chunk<OrderKey>): string =>
  * - `cursor` is exclusive, `endCursor` inclusive; when `endCursor` is set,
  *   `numItems` is ignored and the page runs to the end cursor — the
  *   reactive-adjacency guarantee that keeps concurrent pages gap-free.
- * - Filtered-out elements count as read (for `maximumRowsRead`) and advance
- *   the continue cursor.
+ * - Filtered-out elements count as read (for `maximumRowsRead` and
+ *   `maximumBytesRead`) and advance the continue cursor.
+ * - `maximumBytesRead` is charged the estimated size of every document
+ *   the stream's index queries read, whether or not it reaches the page;
+ *   hitting either budget ends the page with `SplitRequired`.
  */
 export const paginate = dual<
   (
@@ -1913,30 +1956,44 @@ export const paginate = dual<
       // With an endCursor the page runs to it, however many items that is.
       const maxRows = Option.isSome(endCursor) ? undefined : options.numItems;
       const maximumRowsRead = options.maximumRowsRead;
+      const maximumBytesRead = options.maximumBytesRead;
+      // A fresh counter per run, provided to the leaves only when there is
+      // a byte budget to charge against.
+      const bytesRead: BytesCounter = { bytes: 0 };
+      const withBytesBudget = <A, E2, R2>(
+        effect: Effect.Effect<A, E2, R2>,
+      ): Effect.Effect<A, E2, R2> =>
+        maximumBytesRead === undefined
+          ? effect
+          : Effect.provideService(effect, BytesRead, bytesRead);
 
-      return Stream.run(
-        narrowed.annotated,
-        Sink.fold(
-          initialPaginateState<Doc>,
-          (state) => !state.stopped,
-          (state, [doc, key]: Element<Doc>) => {
-            const readKeys = Chunk.append(state.readKeys, key);
-            const page = Option.match(doc, {
-              onNone: () => state.page,
-              onSome: (value) => Chunk.append(state.page, value),
-            });
-            const hitLimit =
-              maximumRowsRead !== undefined &&
-              Chunk.size(readKeys) >= maximumRowsRead;
-            return Effect.succeed<PaginateState<Doc>>({
-              page,
-              readKeys,
-              hitLimit,
-              stopped:
-                hitLimit ||
-                (maxRows !== undefined && Chunk.size(page) >= maxRows),
-            });
-          },
+      return withBytesBudget(
+        Stream.run(
+          narrowed.annotated,
+          Sink.fold(
+            initialPaginateState<Doc>,
+            (state) => !state.stopped,
+            (state, [doc, key]: Element<Doc>) => {
+              const readKeys = Chunk.append(state.readKeys, key);
+              const page = Option.match(doc, {
+                onNone: () => state.page,
+                onSome: (value) => Chunk.append(state.page, value),
+              });
+              const hitLimit =
+                (maximumRowsRead !== undefined &&
+                  Chunk.size(readKeys) >= maximumRowsRead) ||
+                (maximumBytesRead !== undefined &&
+                  bytesRead.bytes >= maximumBytesRead);
+              return Effect.succeed<PaginateState<Doc>>({
+                page,
+                readKeys,
+                hitLimit,
+                stopped:
+                  hitLimit ||
+                  (maxRows !== undefined && Chunk.size(page) >= maxRows),
+              });
+            },
+          ),
         ),
       ).pipe(
         Effect.map((state): PaginationResult<Doc> => {
