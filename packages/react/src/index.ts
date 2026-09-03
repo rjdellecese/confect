@@ -366,12 +366,14 @@ export const useStreamPaginatedQuery = <
   options: {
     readonly initialNumItems: number;
     /**
-     * Per-page read budget forwarded as `paginationOpts.maximumRowsRead`:
-     * a page that would scan more rows than this returns truncated with
+     * Per-page read budgets forwarded as `paginationOpts.maximumRowsRead`
+     * and `paginationOpts.maximumBytesRead`: a page that would scan more
+     * rows, or read more bytes, than these returns truncated with
      * `SplitRequired` (and the hook splits it) instead of exceeding
      * Convex's query limits on a filter-heavy stream.
      */
     readonly maximumRowsRead?: number;
+    readonly maximumBytesRead?: number;
   },
 ): PaginatedQueryResult.PaginatedQueryResult<
   PaginatedQueryItem<Query>,
@@ -414,22 +416,21 @@ export const useStreamPaginatedQuery = <
         encodedArgsKey,
         options.initialNumItems,
         options.maximumRowsRead ?? null,
+        options.maximumBytesRead ?? null,
       ]),
     [
       functionReference,
       encodedArgsKey,
       options.initialNumItems,
       options.maximumRowsRead,
+      options.maximumBytesRead,
     ],
   );
 
   const freshState = () =>
     skipped
       ? StreamPagination.empty
-      : StreamPagination.initial(
-          options.initialNumItems,
-          options.maximumRowsRead,
-        );
+      : StreamPagination.initial(options.initialNumItems, options);
 
   const [tracked, setTracked] = useState(() => ({
     resetKey,
@@ -575,11 +576,7 @@ export const useStreamPaginatedQuery = <
         if (!alreadyLoadingMore) {
           alreadyLoadingMore = true;
           applyTransitions([
-            StreamPagination.loadMore(
-              continueCursor,
-              numItems,
-              options.maximumRowsRead,
-            ),
+            StreamPagination.loadMore(continueCursor, numItems, options),
           ]);
         }
       },

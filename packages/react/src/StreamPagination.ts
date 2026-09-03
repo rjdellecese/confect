@@ -33,21 +33,34 @@ export interface PageRequest {
   /** Present once the page is pinned to a fixed range. */
   readonly endCursor?: string;
   /**
-   * Per-page read budget, forwarded to the server so a scan-heavy page
+   * Per-page read budgets, forwarded to the server so a scan-heavy page
    * fails over to `SplitRequired` instead of exceeding query limits.
    */
   readonly maximumRowsRead?: number;
+  readonly maximumBytesRead?: number;
+}
+
+/** The per-page read budgets every growing page is requested with. */
+export interface ReadBudget {
+  readonly maximumRowsRead?: number | undefined;
+  readonly maximumBytesRead?: number | undefined;
 }
 
 /** A fresh growing-page request (no `endCursor`). */
 const growingRequest = (
   numItems: number,
   cursor: string | null,
-  maximumRowsRead: number | undefined,
-): PageRequest =>
-  maximumRowsRead === undefined
-    ? { numItems, cursor }
-    : { numItems, cursor, maximumRowsRead };
+  budget: ReadBudget,
+): PageRequest => ({
+  numItems,
+  cursor,
+  ...(budget.maximumRowsRead === undefined
+    ? {}
+    : { maximumRowsRead: budget.maximumRowsRead }),
+  ...(budget.maximumBytesRead === undefined
+    ? {}
+    : { maximumBytesRead: budget.maximumBytesRead }),
+});
 
 export interface State {
   readonly nextPageKey: number;
@@ -74,14 +87,11 @@ export const empty: State = {
 /** One growing (unpinned) page from the start of the stream. */
 export const initial = (
   initialNumItems: number,
-  maximumRowsRead?: number,
+  budget: ReadBudget = {},
 ): State => ({
   nextPageKey: 1,
   pageKeys: ["0"],
-  pages: Record.singleton(
-    "0",
-    growingRequest(initialNumItems, null, maximumRowsRead),
-  ),
+  pages: Record.singleton("0", growingRequest(initialNumItems, null, budget)),
   ongoingSplits: Record.empty(),
 });
 
@@ -123,7 +133,7 @@ export const loadMore =
   (
     continueCursor: string,
     numItems: number,
-    maximumRowsRead?: number,
+    budget: ReadBudget = {},
   ): ((state: State) => State) =>
   (state) =>
     pipe(
@@ -145,7 +155,7 @@ export const loadMore =
               pages: Record.set(
                 state.pages,
                 nextKey,
-                growingRequest(numItems, continueCursor, maximumRowsRead),
+                growingRequest(numItems, continueCursor, budget),
               ),
               ongoingSplits: state.ongoingSplits,
             };
@@ -160,7 +170,7 @@ export const loadMore =
               Record.set(pinnedKey, { ...lastPage, endCursor: continueCursor }),
               Record.set(
                 nextKey,
-                growingRequest(numItems, continueCursor, maximumRowsRead),
+                growingRequest(numItems, continueCursor, budget),
               ),
             ),
             ongoingSplits: Record.set(state.ongoingSplits, lastKey, [
