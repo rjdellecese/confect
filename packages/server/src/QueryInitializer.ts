@@ -104,7 +104,7 @@ export interface QueryInitializer<
     ) => SearchFilter,
   ) => OrderedQuery.OrderedQuery<TableInfoFor<DataModel_, TableName>, Doc>;
   /**
-   * PROTOTYPE — stream-first querying (see `notes/stream-based-querying.md`).
+   * EXPERIMENTAL — stream-first querying (see `notes/stream-based-querying.md`).
    *
    * Like `index`, but returns a {@link QueryStream.QueryStream}: a genuine
    * Effect `Stream` of documents in index order that stays mergeable and

@@ -1,5 +1,5 @@
 /**
- * PROTOTYPE — a stream-first querying API for Confect.
+ * EXPERIMENTAL — a stream-first querying API for Confect.
  *
  * A `QueryStream` is a genuine Effect `Stream` of decoded documents, ordered
  * by indexed fields, that additionally remembers:
@@ -14,7 +14,7 @@
  * This is the Effect-native formulation of `convex-helpers/server/stream`'s
  * `QueryStream`; see `notes/stream-based-querying.md` for the design.
  *
- * Prototype limitations (all called out in the design doc):
+ * Known limitations (all called out in the design doc):
  *
  * - `narrow` filters the annotated stream in memory rather than pushing
  *   bounds down into `withIndex` ranges (`splitRange` in `convex-helpers`),
