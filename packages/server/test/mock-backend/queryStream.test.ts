@@ -513,6 +513,360 @@ describe("QueryStream", () => {
     }).pipe(Effect.provide(TestConfect.layer)),
   );
 
+  it.effect("flatMap joins each outer document to an inner stream", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          const writer = yield* DatabaseWriter;
+          const reader = yield* DatabaseReader;
+
+          // Inner rows, keyed by text; outer rows reference them via `tag`.
+          for (const [text, tag] of [
+            ["a", "a1"],
+            ["a", "a2"],
+            ["b", "b1"],
+            ["x1", "a"],
+            ["x2", "b"],
+            ["x3", "none"],
+          ] as const) {
+            yield* writer.table("notes").insert({ text, tag });
+          }
+
+          const outer = reader
+            .table("notes")
+            .stream("by_text", (q) => q.gte("text", "x"));
+          const joined = outer.pipe(
+            QueryStream.flatMap(
+              (note) =>
+                reader
+                  .table("notes")
+                  .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
+              { innerKey: ["_creationTime"] },
+            ),
+          );
+
+          const tags = yield* Stream.runCollect(joined).pipe(
+            Effect.map((docs) => docs.map((doc) => doc.tag)),
+          );
+          // x1 → the "a" rows in creation order, x2 → the "b" row, and
+          // x3's empty inner stream contributes nothing visible.
+          expect(tags).toEqual(["a1", "a2", "b1"]);
+
+          // Filtered-out outer documents contribute nothing visible either.
+          const filteredJoin = outer.pipe(
+            QueryStream.filterEffect((note) =>
+              Effect.succeed(note.text !== "x2"),
+            ),
+            QueryStream.flatMap(
+              (note) =>
+                reader
+                  .table("notes")
+                  .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
+              { innerKey: ["_creationTime"] },
+            ),
+          );
+          const filteredTags = yield* Stream.runCollect(filteredJoin).pipe(
+            Effect.map((docs) => docs.map((doc) => doc.tag)),
+          );
+          expect(filteredTags).toEqual(["a1", "a2"]);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect("flatMap paginates across inner-stream boundaries", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          const writer = yield* DatabaseWriter;
+          const reader = yield* DatabaseReader;
+
+          // The "b" row is inserted *first*, so its creation time is the
+          // smallest: if resuming wrongly applied the boundary row's inner
+          // bound to every row (as `convex-helpers` does), the "b" row
+          // would be skipped on the page after a mid-"a" cursor.
+          for (const [text, tag] of [
+            ["b", "b1"],
+            ["a", "a1"],
+            ["a", "a2"],
+            ["x0", "none"],
+            ["x1", "a"],
+            ["x2", "b"],
+          ] as const) {
+            yield* writer.table("notes").insert({ text, tag });
+          }
+
+          const joined = reader
+            .table("notes")
+            .stream("by_text", (q) => q.gte("text", "x"))
+            .pipe(
+              QueryStream.flatMap(
+                (note) =>
+                  reader
+                    .table("notes")
+                    .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
+                { innerKey: ["_creationTime"] },
+              ),
+            );
+
+          const pages = yield* paginateAll(joined, 1);
+          expect(pages.map((page) => page.map((doc) => doc.tag))).toEqual([
+            ["a1"],
+            ["a2"],
+            ["b1"],
+          ]);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect("distinct keeps the first document per group", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          const writer = yield* DatabaseWriter;
+          const reader = yield* DatabaseReader;
+
+          for (const [text, tag] of [
+            ["a", "a1"],
+            ["a", "a2"],
+            ["b", "b1"],
+            ["b", "b2"],
+            ["c", "c1"],
+          ] as const) {
+            yield* writer.table("notes").insert({ text, tag });
+          }
+
+          const tagsOf = <E, R>(
+            stream: Stream.Stream<{ tag?: string }, E, R>,
+          ): Effect.Effect<ReadonlyArray<string | undefined>, E, R> =>
+            Stream.runCollect(stream).pipe(
+              Effect.map((docs) => docs.map((doc) => doc.tag)),
+            );
+
+          const firstPerText = yield* tagsOf(
+            reader
+              .table("notes")
+              .stream("by_text")
+              .pipe(QueryStream.distinct(["text"])),
+          );
+          expect(firstPerText).toEqual(["a1", "b1", "c1"]);
+
+          // In descending order, the first document of each group is the
+          // group's last in ascending order.
+          const firstPerTextDesc = yield* tagsOf(
+            reader
+              .table("notes")
+              .stream("by_text", "desc")
+              .pipe(QueryStream.distinct(["text"])),
+          );
+          expect(firstPerTextDesc).toEqual(["c1", "b2", "a2"]);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect("distinct paginates group by group", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          const writer = yield* DatabaseWriter;
+          const reader = yield* DatabaseReader;
+
+          for (const [text, tag] of [
+            ["a", "a1"],
+            ["a", "a2"],
+            ["b", "b1"],
+            ["b", "b2"],
+            ["c", "c1"],
+          ] as const) {
+            yield* writer.table("notes").insert({ text, tag });
+          }
+
+          const distinctTexts = reader
+            .table("notes")
+            .stream("by_text")
+            .pipe(QueryStream.distinct(["text"]));
+
+          const pages = yield* paginateAll(distinctTexts, 1);
+          expect(pages.map((page) => page.map((doc) => doc.tag))).toEqual([
+            ["a1"],
+            ["b1"],
+            ["c1"],
+          ]);
+
+          // Filtering *after* distinct filters the kept documents.
+          const filtered = distinctTexts.pipe(
+            QueryStream.filterEffect((note) =>
+              Effect.succeed(note.tag !== "b1"),
+            ),
+          );
+          const filteredPages = yield* paginateAll(filtered, 1);
+          expect(
+            filteredPages.map((page) => page.map((doc) => doc.tag)),
+          ).toEqual([["a1"], ["c1"]]);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect("orderBy relabels order keys so foreign streams merge", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          const writer = yield* DatabaseWriter;
+          const reader = yield* DatabaseReader;
+
+          yield* writer.table("notes").insert({ text: "a", tag: "ta1" });
+          yield* writer.table("notes").insert({
+            author: { name: "A", role: "admin" },
+            tag: "tr1",
+            text: "x1",
+          });
+          yield* writer.table("notes").insert({ text: "m", tag: "ta2" });
+          yield* writer.table("notes").insert({
+            author: { name: "U", role: "user" },
+            tag: "tr2",
+            text: "x2",
+          });
+
+          // Two different indexes over the same table: the range bounds
+          // keep their document sets disjoint.
+          const byText = reader
+            .table("notes")
+            .stream("by_text", (q) => q.lt("text", "x"));
+          const byRole = reader
+            .table("notes")
+            .stream("by_role", (q) => q.gte("author.role", "admin"));
+
+          // `by_role`'s key is ["author.role", "_creationTime"]; relabel
+          // it to merge positionally with `by_text`. Convex's string order
+          // interleaves the values: "a" < "admin" < "m" < "user".
+          const merged = QueryStream.merge([
+            byText,
+            byRole.pipe(QueryStream.orderBy(["text", "_creationTime"])),
+          ]);
+
+          const tags = yield* Stream.runCollect(merged).pipe(
+            Effect.map((docs) => docs.map((doc) => doc.tag)),
+          );
+          expect(tags).toEqual(["ta1", "tr1", "ta2", "tr2"]);
+
+          // Pagination narrows through the relabeling into both leaves:
+          // bounds are positional values, so the relabeled branch's leaf
+          // receives them against its own fields.
+          const pages = yield* paginateAll(merged, 1);
+          expect(pages.map((page) => page.map((doc) => doc.tag))).toEqual([
+            ["ta1"],
+            ["tr1"],
+            ["ta2"],
+            ["tr2"],
+          ]);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect("orderBy and distinct see through flatMap tiebreakers", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          const writer = yield* DatabaseWriter;
+          const reader = yield* DatabaseReader;
+
+          for (const [text, tag] of [
+            ["b", "b1"],
+            ["a", "a1"],
+            ["a", "a2"],
+            ["x0", "none"],
+            ["x1", "a"],
+            ["x2", "b"],
+          ] as const) {
+            yield* writer.table("notes").insert({ text, tag });
+          }
+
+          const tagsOf = <E, R>(
+            stream: Stream.Stream<{ tag?: string }, E, R>,
+          ): Effect.Effect<ReadonlyArray<string | undefined>, E, R> =>
+            Stream.runCollect(stream).pipe(
+              Effect.map((docs) => docs.map((doc) => doc.tag)),
+            );
+
+          // Type-level key ["text", "_creationTime", "_creationTime"]; the
+          // runtime key also carries the outer row's `_id` in the middle.
+          const joined = reader
+            .table("notes")
+            .stream("by_text", (q) => q.gte("text", "x"))
+            .pipe(
+              QueryStream.flatMap(
+                (note) =>
+                  reader
+                    .table("notes")
+                    .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
+                { innerKey: ["_creationTime"] },
+              ),
+            );
+          expect(joined.keyFields).toEqual([
+            "text",
+            "_creationTime",
+            "_id",
+            "_creationTime",
+            "_id",
+          ]);
+
+          // Relabeling names only the type-visible positions.
+          const relabeled = joined.pipe(
+            QueryStream.orderBy(["outerText", "outerCreated", "innerCreated"]),
+          );
+          expect(relabeled.keyFields).toEqual([
+            "outerText",
+            "outerCreated",
+            "_id",
+            "innerCreated",
+            "_id",
+          ]);
+          const pages = yield* paginateAll(relabeled, 1);
+          expect(pages.map((page) => page.map((doc) => doc.tag))).toEqual([
+            ["a1"],
+            ["a2"],
+            ["b1"],
+          ]);
+
+          // Distinct over the outer key keeps each outer row's first inner
+          // document; the "x0" row has none.
+          expect(
+            yield* tagsOf(joined.pipe(QueryStream.distinct(["text"]))),
+          ).toEqual(["a1", "b1"]);
+
+          // A prefix reaching into the inner key spans the outer `_id`.
+          expect(
+            yield* tagsOf(
+              joined.pipe(
+                QueryStream.distinct([
+                  "text",
+                  "_creationTime",
+                  "_creationTime",
+                ]),
+              ),
+            ),
+          ).toEqual(["a1", "a2", "b1"]);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
   it.effect("resumes a fully eq-pinned by_id stream from its cursor", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
@@ -798,6 +1152,50 @@ describe("QueryStream types", () => {
           ? R
           : never
       >().toEqualTypeOf<SomeService>();
+
+      // flatMap concatenates order keys at the type level.
+      const joined = QueryStream.flatMap(bounded, (_note) => pinned, {
+        innerKey: ["_creationTime"],
+      });
+      expectTypeOf<KeyOf<typeof joined>>().toEqualTypeOf<
+        readonly ["text", "_creationTime", "_creationTime"]
+      >();
+
+      const joinedMismatched = QueryStream.flatMap(bounded, (_note) => pinned, {
+        // @ts-expect-error — innerKey must match the inner stream's order key.
+        innerKey: ["text", "_creationTime"],
+      });
+      void joinedMismatched;
+
+      // distinct preserves the order key and requires a prefix of it.
+      const distinctTexts = QueryStream.distinct(full, ["text"]);
+      expectTypeOf<KeyOf<typeof distinctTexts>>().toEqualTypeOf<
+        ["text", "_creationTime"]
+      >();
+
+      // @ts-expect-error — fields must be a prefix of the order key.
+      const distinctNonPrefix = QueryStream.distinct(full, ["_creationTime"]);
+      void distinctNonPrefix;
+
+      // @ts-expect-error — "text" is pinned away on this stream's key.
+      const distinctPinnedAway = QueryStream.distinct(pinned, ["text"]);
+      void distinctPinnedAway;
+
+      // orderBy relabels the order key position-for-position.
+      const relabeled = QueryStream.orderBy(full, ["renamed", "_creationTime"]);
+      expectTypeOf<KeyOf<typeof relabeled>>().toEqualTypeOf<
+        ["renamed", "_creationTime"]
+      >();
+
+      // @ts-expect-error — the new key must have as many fields as the old.
+      const relabeledTooShort = QueryStream.orderBy(full, ["_creationTime"]);
+      void relabeledTooShort;
+
+      // A flatMap result relabels by its type-level (tiebreaker-free) key.
+      const relabeledJoin = QueryStream.orderBy(joined, ["a", "b", "c"]);
+      expectTypeOf<KeyOf<typeof relabeledJoin>>().toEqualTypeOf<
+        ["a", "b", "c"]
+      >();
     });
     void _typeChecks;
   });

@@ -422,6 +422,34 @@ The core of §4 is now implemented as an experimental API:
   re-apply, and externally constructed streams fall back to in-memory
   filtering. `paginate` composes with this automatically, so resuming from
   a cursor reads only the remaining range.
+- **`flatMap`** — the join: each outer document expands into an inner
+  stream, ordered by (outer key, then inner key), with the concatenated
+  order key tracked _at the type level_ (`readonly [...OuterKey,
+...InnerKey]`) and the `innerKey` argument checked against `f`'s return
+  type. Outer documents that contribute no inner elements (filtered out,
+  or an empty inner stream) emit a `null`-padded filtered element so
+  cursors advance past their cost. Narrowing splits bounds at the
+  outer/inner seam; the inner bound applies only to the _boundary_ outer
+  row — a deliberate correctness deviation from `convex-helpers`, whose
+  `FlatMapStream.narrow` applies inner bounds to every row's inner stream
+  and so drops legitimate elements from non-boundary rows when resuming
+  from a mid-row cursor.
+- **`distinct`** — the loose index scan: the first document per distinct
+  value of a _prefix_ of the order key, one index seek per group (each
+  group's first present document narrows the underlying stream past the
+  whole group via a prefix-successor cut). The prefix requirement is a
+  type-level constraint (`Key` must extend `readonly [...Fields,
+...rest]`); narrowing truncates bound keys to the distinct prefix, as in
+  `convex-helpers`.
+- **`orderBy`** — re-keying: a position-for-position relabeling of the
+  order key (tuple-length-checked at the type level) that makes streams
+  from different indexes or tables mergeable when their keys align
+  positionally. Because order keys and bounds are pure _values_, the
+  relabeling is transparent to narrowing — bounds pass straight through to
+  the underlying stream, with none of the static-prefix bookkeeping
+  `convex-helpers`' `OrderByStream` needs (its other job, dropping
+  equality-pinned prefix fields, is already the leaf's remaining-field key
+  convention here).
 - **`QueryInitializer.stream(...)`** — `reader.table("notes").stream("by_text",
 (q) => q.eq("text", "a"), "desc")` returns
   `QueryStream<Doc, ["_creationTime"], DocumentDecodeError>`.
@@ -441,8 +469,8 @@ recommendation:
   improvement over `convex-helpers`' full index keys: equality-pinned values
   never leak into cursors, and merged streams with different pins share a
   cursor space by construction.
-- No `flatMap` (join), `distinct` (loose index scan), or `orderBy` (re-keying)
-  yet; no `maximumBytesRead` accounting; NaN ordering subtleties are skipped.
+- No `orderBy` (re-keying) yet; no `maximumBytesRead` accounting; NaN
+  ordering subtleties are skipped.
 
 ## 8. Open questions
 
