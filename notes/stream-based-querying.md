@@ -391,9 +391,9 @@ Docs impact is contained: `apps/docs/server/database/reading.mdx` becomes a stre
 queries" page for merge/flatMap/filter/distinct — which is a genuinely new capability
 Confect simply doesn't have a page for today, because it doesn't have the feature.
 
-## 7. Prototype (implemented on this branch)
+## 7. Experimental implementation (on this branch)
 
-The core of §4 is now implemented as a working prototype:
+The core of §4 is now implemented as an experimental API:
 
 - **`packages/server/src/QueryStream.ts`** — the `QueryStream` class (a genuine
   `Stream`, implementing the `Stream` protocol — variance marker, `pipe`, and
@@ -417,7 +417,7 @@ The core of §4 is now implemented as a working prototype:
   (order-key inference, merge mismatch rejection, range-builder misuse, `E`/`R`
   channel propagation).
 
-Deliberate prototype simplifications, in line with §6.2's "port the core"
+Deliberate simplifications, in line with §6.2's "port the core"
 recommendation but deferring the heaviest piece:
 
 - `narrow` filters the annotated stream **in memory** (`dropWhile`/`takeWhile`
