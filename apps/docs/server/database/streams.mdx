@@ -5,8 +5,8 @@ description: "Compose, merge, join, and paginate index queries as Effect streams
 ---
 
 <Warning>
-  Stream querying is a prototype on the `v10` prerelease line. The API is usable
-  end to end, but its surface may still change between prereleases.
+  Stream querying is experimental. The API is usable end to end on the `v10`
+  prerelease line, but its surface may still change between prereleases.
 </Warning>
 
 Query streams are an alternative querying API to the [`index`](/server/database/reading#standard-indexes) method, built around Effect's [`Stream`](https://effect.website/docs/stream/introduction). A **query stream** is a `Stream` of decoded documents in index order that also remembers how it is ordered. That extra knowledge is what lets streams be combined — merged, filtered, joined, deduplicated — and still be paginated with cursors afterwards, which a plain `Stream` cannot do.
