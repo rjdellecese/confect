@@ -123,7 +123,7 @@ const events = QueryStream.merge([
 ]);
 ```
 
-All inputs must have the same order key and document type (type errors otherwise) and the same order direction (checked when the stream runs). Overlapping inputs are not deduplicated: a document matched by two inputs appears twice.
+All inputs must have the same order key, document type, and order direction, which are all type errors otherwise. The direction is `"asc"` when omitted and the given literal when passed one; a direction chosen at runtime types as `"asc" | "desc"`, so every input has to be typed that way too, and the mismatch is then caught when the stream runs. Overlapping inputs are not deduplicated: a document matched by two inputs appears twice.
 
 ### Filter and map
 
@@ -293,5 +293,4 @@ Pages of a stream-paginated query are not tracked by Convex's query journal, so 
 
 ## Limitations
 
-- `merge` checks that its inputs share an order direction at runtime, not in the type.
 - Cursors are not opaque (see the warning above).

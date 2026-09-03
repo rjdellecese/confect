@@ -22,8 +22,14 @@ const collectTexts = <E, R>(
   );
 
 /** Walk a stream page by page until exhausted, returning the pages. */
-const paginateAll = <Doc, Key extends ReadonlyArray<string>, E, R>(
-  stream: QueryStream.QueryStream<Doc, Key, E, R>,
+const paginateAll = <
+  Doc,
+  Key extends ReadonlyArray<string>,
+  E,
+  R,
+  Direction extends QueryStream.OrderDirection,
+>(
+  stream: QueryStream.QueryStream<Doc, Key, E, R, Direction>,
   numItems: number,
 ): Effect.Effect<ReadonlyArray<ReadonlyArray<Doc>>, E, R> => {
   const go = (
@@ -1124,9 +1130,20 @@ describe("QueryStream types", () => {
       any,
       infer K extends ReadonlyArray<string>,
       any,
+      any,
       any
     >
       ? K
+      : never;
+  type DirectionOf<S> =
+    S extends QueryStream.QueryStream<
+      any,
+      any,
+      any,
+      any,
+      infer Direction extends QueryStream.OrderDirection
+    >
+      ? Direction
       : never;
 
   class SomeService extends Context.Service<
@@ -1220,7 +1237,9 @@ describe("QueryStream types", () => {
         QueryStream.QueryStream<
           string,
           ["_creationTime"],
-          Document.DocumentDecodeError
+          Document.DocumentDecodeError,
+          never,
+          "asc"
         >
       >();
 
@@ -1230,7 +1249,13 @@ describe("QueryStream types", () => {
         Effect.flatMap(SomeService, (service) => service.check(note.text)),
       );
       expectTypeOf<
-        typeof filtered extends QueryStream.QueryStream<any, any, any, infer R>
+        typeof filtered extends QueryStream.QueryStream<
+          any,
+          any,
+          any,
+          infer R,
+          any
+        >
           ? R
           : never
       >().toEqualTypeOf<SomeService>();
@@ -1278,6 +1303,44 @@ describe("QueryStream types", () => {
       expectTypeOf<KeyOf<typeof relabeledJoin>>().toEqualTypeOf<
         ["a", "b", "c"]
       >();
+
+      // The order direction is tracked in the type: "asc" when omitted, a
+      // literal when given one, the union when only known at runtime.
+      expectTypeOf<DirectionOf<typeof full>>().toEqualTypeOf<"asc">();
+      const descending = reader.table("notes").stream("by_text", "desc");
+      expectTypeOf<DirectionOf<typeof descending>>().toEqualTypeOf<"desc">();
+      const descendingBounded = reader
+        .table("notes")
+        .stream("by_text", (q) => q.gte("text", "a"), "desc");
+      expectTypeOf<
+        DirectionOf<typeof descendingBounded>
+      >().toEqualTypeOf<"desc">();
+      const runtimeOrder = "asc" as QueryStream.OrderDirection;
+      const dynamic = reader.table("notes").stream("by_text", runtimeOrder);
+      expectTypeOf<
+        DirectionOf<typeof dynamic>
+      >().toEqualTypeOf<QueryStream.OrderDirection>();
+
+      // Combinators preserve it, and merging different directions is a
+      // type error, as is a join whose inner streams run the other way.
+      const descendingFiltered = QueryStream.filter(descending, () => true);
+      expectTypeOf<
+        DirectionOf<typeof descendingFiltered>
+      >().toEqualTypeOf<"desc">();
+      expectTypeOf<DirectionOf<typeof joined>>().toEqualTypeOf<"asc">();
+      const sameDirection = QueryStream.merge([descending, descendingBounded]);
+      expectTypeOf<DirectionOf<typeof sameDirection>>().toEqualTypeOf<"desc">();
+      // @ts-expect-error — inputs must share an order direction.
+      const mixedDirections = QueryStream.merge([full, descending]);
+      void mixedDirections;
+      const mixedJoin = QueryStream.flatMap(
+        // @ts-expect-error — inner streams must run in the outer direction
+        // (the direction is inferred from both, so the outer is flagged).
+        bounded,
+        (_note) => descending,
+        { innerKey: ["text", "_creationTime"] },
+      );
+      void mixedJoin;
     });
     void _typeChecks;
   });

@@ -110,7 +110,9 @@ export interface QueryInitializer<
    * Effect `Stream` of documents in index order that stays mergeable and
    * paginable. The typed range builder consumes `eq`-pinned fields from the
    * index's field tuple at the type level, so the stream's order-key type is
-   * exactly the fields that still vary.
+   * exactly the fields that still vary. The order direction is part of the
+   * type too: omitted, it is `"asc"`; a literal is tracked as that literal,
+   * and a value known only at runtime as the union.
    */
   readonly stream: {
     <
@@ -119,6 +121,7 @@ export interface QueryInitializer<
       > &
         string,
       Spec extends QueryStream.AnyIndexRangeSpec,
+      Direction extends QueryStream.OrderDirection = "asc",
     >(
       indexName: IndexName,
       indexRange: (
@@ -127,24 +130,29 @@ export interface QueryInitializer<
           NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>
         >,
       ) => Spec,
-      order?: "asc" | "desc",
+      order?: Direction,
     ): QueryStream.QueryStream<
       Doc,
       QueryStream.Remaining<Spec>,
-      Document.DocumentDecodeError
+      Document.DocumentDecodeError,
+      never,
+      Direction
     >;
     <
       IndexName extends keyof Indexes<
         ConvexTableInfoFor<DataModel_, TableName>
       > &
         string,
+      Direction extends QueryStream.OrderDirection = "asc",
     >(
       indexName: IndexName,
-      order?: "asc" | "desc",
+      order?: Direction,
     ): QueryStream.QueryStream<
       Doc,
       NamedIndex<ConvexTableInfoFor<DataModel_, TableName>, IndexName>,
-      Document.DocumentDecodeError
+      Document.DocumentDecodeError,
+      never,
+      Direction
     >;
   };
 }
