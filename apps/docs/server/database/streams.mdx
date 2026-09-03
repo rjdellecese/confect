@@ -289,7 +289,7 @@ A cursor that is malformed, or that was issued by a stream with a different orde
 
 ### On the client
 
-Pages of a stream-paginated query are not tracked by Convex's query journal, so [`usePaginatedQuery`](/clients/react#usepaginatedquery) can't keep them gap-free as data changes. Use [`useStreamPaginatedQuery`](/clients/react#usestreampaginatedquery) instead, which pins each loaded page with `endCursor` and splits pages that outgrow their size.
+Pages of a stream-paginated query are not tracked by Convex's query journal, so [`usePaginatedQuery`](/clients/react#usepaginatedquery) can't keep them gap-free as data changes. Use [`useStreamPaginatedQuery`](/clients/react#usestreampaginatedquery) instead, which pins each loaded page with `endCursor` and splits pages that outgrow their size. Foldkit's [`PaginatedQuery`](/clients/foldkit#paginated-queries) machine works with stream-paginated queries as is: it pins each page it navigates away from, so going back reloads the same range.
 
 ## Limitations
 
