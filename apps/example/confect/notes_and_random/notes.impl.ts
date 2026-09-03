@@ -78,9 +78,7 @@ const feed = FunctionImpl.make(
         authoredBy("admin"),
         authoredBy("user"),
       ]).pipe(
-        QueryStream.filterEffect((note) =>
-          Effect.succeed(note.tag !== "hidden"),
-        ),
+        QueryStream.filter((note) => note.tag !== "hidden"),
         QueryStream.paginate(paginationOpts),
       );
     }).pipe(Effect.orDie),
