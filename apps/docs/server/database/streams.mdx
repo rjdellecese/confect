@@ -273,6 +273,7 @@ Resuming from a cursor doesn't re-read the pages before it: the cursor's positio
 | `numItems`                       | How many documents to return, counting only documents that pass filters.                                                                                                                                                       |
 | `endCursor`                      | When present, the page runs exactly to this cursor (inclusive) and `numItems` is ignored. Pinning pages this way keeps adjacent pages gap-free as data changes. `QueryStream.END_CURSOR` pins a page to the end of the stream. |
 | `maximumRowsRead`                | A read budget counting every document read, filtered or not. When it is hit, the page returns what it has so far with `pageStatus: "SplitRequired"` and a `splitCursor` to split the page at.                                  |
+| `maximumBytesRead`               | The same budget in bytes, charging each document's estimated size as it is read. It applies to every document the stream's index queries read, whether or not it reaches the page.                                             |
 | `pageStatus: "SplitRecommended"` | Returned with a `splitCursor` when a pinned page has grown well past `numItems`, or any page had to scan a very large number of rows for its items, so reactive clients can subdivide it.                                      |
 | `isDone`                         | `true` only when the page reached the true end of the stream.                                                                                                                                                                  |
 
@@ -292,6 +293,5 @@ Pages of a stream-paginated query are not tracked by Convex's query journal, so 
 
 ## Limitations
 
-- `maximumBytesRead` is accepted but not enforced.
 - `merge` checks that its inputs share an order direction at runtime, not in the type.
 - Cursors are not opaque (see the warning above).

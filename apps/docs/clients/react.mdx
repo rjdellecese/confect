@@ -226,7 +226,7 @@ const Feed = () => {
 };
 ```
 
-The options accept an additional `maximumRowsRead`, a per-page read budget forwarded to the server. On a stream that filters out most of what it reads, a page that would otherwise scan past Convex's query limits returns truncated with `SplitRequired` instead, and the hook splits it.
+The options also accept `maximumRowsRead` and `maximumBytesRead`, per-page read budgets forwarded to the server. On a stream that filters out most of what it reads, a page that would otherwise scan past Convex's query limits returns truncated with `SplitRequired` instead, and the hook splits it.
 
 When a stored cursor stops matching the query — the server fails a page with `paginationError: "InvalidCursor"`, for example after an index change is deployed — the hook restarts pagination from the first page rather than failing.
 
