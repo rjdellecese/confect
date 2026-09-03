@@ -450,6 +450,18 @@ The core of §4 is now implemented as an experimental API:
   `convex-helpers`' `OrderByStream` needs (its other job, dropping
   equality-pinned prefix fields, is already the leaf's remaining-field key
   convention here).
+- **`useStreamPaginatedQuery`** (`@confect/react`) — the client half of
+  §4.5: endCursor-pinned reactive pagination, built as a pure
+  `StreamPagination` state machine (pages, ongoing splits, load-more and
+  split transitions, and a per-render interpretation of the subscribed
+  pages' results) driven by a thin hook over `convex/react`'s
+  `useQueries`. Each loaded page re-subscribes with its `continueCursor`
+  echoed back as `endCursor`, so pages grow and shrink reactively but
+  always meet exactly; overgrown pages split (the server's `paginate` now
+  emits `SplitRecommended` with a midpoint `splitCursor` when a pinned
+  page outgrows its requested size); invalid cursors reset pagination.
+  Args, items, and typed errors flow through the ref's schemas into the
+  same `PaginatedQueryResult` ADT as `usePaginatedQuery`.
 - **`QueryInitializer.stream(...)`** — `reader.table("notes").stream("by_text",
 (q) => q.eq("text", "a"), "desc")` returns
   `QueryStream<Doc, ["_creationTime"], DocumentDecodeError>`.
@@ -498,6 +510,14 @@ recommendation:
    opaque tokens; decide whether to encrypt/sign stream cursors (requires key material
    on the deployment) or document the exposure as a constraint on which indexes should
    back public paginated streams.
+7. **Relationship to `usePaginatedQuery_experimental`** — convex 1.45 ships an
+   experimental journal-free paginated hook (`PaginatedQueryClient`) implementing the
+   same endCursor-pinning mechanism as `useStreamPaginatedQuery`. We keep our own state
+   machine for now because Confect needs errors as decodable values (typed `Failure`
+   results via the ref's error schema, which the upstream hook's throw/reset flow does
+   not expose), per-page schema decoding, and control over split heuristics matched to
+   `QueryStream.paginate`'s `SplitRecommended` semantics — and the upstream hook is
+   explicitly experimental. Revisit wrapping it once it stabilizes.
 
 ## Appendix: the annotated-element trick, in one picture
 
