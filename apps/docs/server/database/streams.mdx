@@ -9,9 +9,11 @@ description: "Compose, merge, join, and paginate index queries as Effect streams
   end to end, but its surface may still change between prereleases.
 </Warning>
 
-A **query stream** is an Effect [`Stream`](https://effect.website/docs/stream/introduction) of decoded documents in index order that also remembers how it is ordered. That extra knowledge is what lets streams be combined — merged, filtered, joined, deduplicated — and still be paginated with cursors afterwards, which a plain `Stream` cannot do.
+Query streams are an alternative querying API to the [`index`](/server/database/reading#standard-indexes) method, built around Effect's [`Stream`](https://effect.website/docs/stream/introduction). A **query stream** is a `Stream` of decoded documents in index order that also remembers how it is ordered. That extra knowledge is what lets streams be combined — merged, filtered, joined, deduplicated — and still be paginated with cursors afterwards, which a plain `Stream` cannot do.
 
-Create one with `stream` on a table, then compose it with the `QueryStream` module from `@confect/server`:
+Everything the `index` API does, a query stream does too: `collect`, `first`, and `take` are `Stream.runCollect`, `Stream.runHead`, and `Stream.take`, and `paginate` is `QueryStream.paginate`. What `index` can't do is combine queries, so once you're comfortable with streams you can use them for every standard-index query. (Search indexes stay with [`search`](/server/database/reading#search-indexes).)
+
+Create a stream with `stream` on a table, then compose it with the `QueryStream` module from `@confect/server`:
 
 ```ts
 import { QueryStream } from "@confect/server";
@@ -125,7 +127,7 @@ All inputs must have the same order key and document type (type errors otherwise
 
 ### Filter and map
 
-`QueryStream.filterEffect` and `QueryStream.mapEffect` are the effectful `filter` and `map`, with one difference from their `Stream` counterparts: a document that is filtered out still counts as _read_, so cursors keep advancing past it and pagination stays correct.
+`QueryStream.filterEffect` and `QueryStream.mapEffect` are the effectful `filter` and `map` that keep the result a query stream. You can use `Stream.filter` and `Stream.map` on a query stream too, and they behave correctly — but, like any plain `Stream` combinator, they return an ordinary `Stream` that can no longer be merged or paginated (see [Consuming a stream](#consuming-a-stream)). The `QueryStream` versions preserve the order key, and a document that `filterEffect` rejects still counts as _read_, so cursors keep advancing past it and pagination stays correct.
 
 ```ts
 reader
