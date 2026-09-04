@@ -73,13 +73,13 @@ Fields must be used in the order the index declares them, and each method only o
 
 ### Order keys
 
-The fields that still vary after pinning, followed by the implicit `_creationTime` tiebreaker, form the stream's **order key**. It is part of the stream's type: `reader.table("notes").stream("by_text")` is a `QueryStream<Doc, ["text", "_creationTime"]>`, while pinning the text with `eq` leaves `["_creationTime"]`.
+The fields that still vary after pinning, followed by the implicit `_creationTime` tiebreaker, form the stream's **order key**. It is part of the stream's type: `reader.table("notes").stream("by_text")` has the type `QueryStream<Doc, ["text", "_creationTime"], DocumentDecodeError, never, "asc">` (the document, the order key, the error and requirement channels, and the order direction), while pinning the text with `eq` leaves `["_creationTime"]`.
 
 The order key determines which streams can be merged: two streams can only be merged when their order keys are the same, so a mismatch is caught at compile time.
 
 ## Consuming a stream
 
-A query stream is a genuine `Stream`, so everything in Effect's `Stream` module applies:
+A query stream is a genuine `Stream`, so everything in Effect's `Stream` module applies (`QueryStream.isQueryStream` tells the two apart at runtime):
 
 ```ts
 import * as Stream from "effect/Stream";
@@ -123,7 +123,7 @@ const events = QueryStream.merge([
 ]);
 ```
 
-All inputs must have the same order key and document type (type errors otherwise) and the same order direction (checked when the stream runs). Overlapping inputs are not deduplicated: a document matched by two inputs appears twice.
+All inputs must have the same order key, document type, and order direction, which are all type errors otherwise. The direction is `"asc"` when omitted and the given literal when passed one; the first input fixes it and each later input must match. A direction chosen at runtime types as `"asc" | "desc"`: such a stream can lead a merge (a known direction is assignable to it) but can't follow a known one, and a mismatch the types can't see makes `merge` throw when the streams are combined. Overlapping inputs are not deduplicated: a document matched by two inputs appears twice.
 
 ### Filter and map
 
@@ -159,7 +159,7 @@ reader
 
 ### Join
 
-`QueryStream.flatMap` runs an inner stream for each document of an outer stream and concatenates the results, ordered by the outer key and then the inner key. Pass the inner streams' order key as `innerKey`; it is checked against the type of the stream the function returns.
+`QueryStream.flatMap` runs an inner stream for each document of an outer stream and concatenates the results, ordered by the outer key and then the inner key. Pass the inner streams' order key as `innerKey`; it is checked against the type of the stream the function returns. Inner streams must run in the outer stream's direction: with `QueryStream.flatMap(outer, f, options)` the outer stream fixes it and a differing inner stream is a type error, while with `outer.pipe(QueryStream.flatMap(f, options))` the inner streams fix it. A mismatch the types can't see fails when the join runs.
 
 ```ts
 // Every author's messages, grouped by author in author order, and by
@@ -293,5 +293,4 @@ Pages of a stream-paginated query are not tracked by Convex's query journal, so 
 
 ## Limitations
 
-- `merge` checks that its inputs share an order direction at runtime, not in the type.
 - Cursors are not opaque (see the warning above).
