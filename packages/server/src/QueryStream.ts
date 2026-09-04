@@ -84,6 +84,15 @@ export type OrderKey = ReadonlyArray<Value | undefined>;
  */
 export type OrderDirection = "asc" | "desc";
 
+/** The opposite of a direction; a runtime-chosen direction stays the union. */
+export type Flip<Direction extends OrderDirection> = Direction extends "asc"
+  ? "desc"
+  : "asc";
+
+const flipDirection = <Direction extends OrderDirection>(
+  direction: Direction,
+): Flip<Direction> => (direction === "asc" ? "desc" : "asc") as Flip<Direction>;
+
 /**
  * An element of the annotated stream: the decoded document (`None` when the
  * element was read but filtered out — it still advances cursors) paired with
@@ -627,6 +636,14 @@ export class QueryStream<
       Array.dropRight(keyFields, 1),
       keyFields,
     ),
+    /**
+     * How this stream runs in the opposite direction: leaves rebuild their
+     * Convex queries with the other `order`, and derived streams reverse
+     * their inputs and re-apply their combinator. Absent where reversing
+     * would change the result (`distinct`) or isn't possible (externally
+     * constructed streams); `reverse` then throws.
+     */
+    readonly reverseWith?: () => QueryStream<Doc, Key, E, R, Flip<Direction>>,
   ) {}
 
   toStream(): Stream.Stream<Doc, E, R> {
@@ -705,17 +722,20 @@ export const empty =
     const tiebreakers = appendedTiebreaker(key, keyFields);
     // `any` in the key and direction slots: the overloads above assign the
     // literal types the caller supplied.
-    const make = (): QueryStream<Doc, any, never, never, any> =>
+    const make = (
+      direction: OrderDirection,
+    ): QueryStream<Doc, any, never, never, any> =>
       new QueryStream(
-        order,
+        direction,
         keyFields,
         Stream.empty,
         undefined,
-        // Narrowing nothing is nothing.
-        () => make(),
+        // Narrowing nothing is nothing, and so is reversing it.
+        () => make(direction),
         tiebreakers,
+        () => make(flipDirection(direction)),
       );
-    return make();
+    return make(order);
   };
 
 // -----------------------------------------------------------------------------
@@ -947,6 +967,12 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
         }),
       }),
     tiebreakers,
+    // Bounds live in ascending key space, so the reversed leaf keeps them.
+    () =>
+      makeLeaf(
+        { ...reflection, order: flipDirection(reflection.order) },
+        bounds,
+      ),
   );
 };
 
@@ -1155,6 +1181,11 @@ const mergeUnchecked = <
         ),
       ]),
     head.tiebreakers,
+    () =>
+      mergeUnchecked([
+        reverse(head),
+        ...Array.map(Array.tailNonEmpty(streams), (stream) => reverse(stream)),
+      ]),
   );
 };
 
@@ -1186,6 +1217,7 @@ const transform = <
     undefined,
     (keyBounds) => transform(narrowByKeyBounds(self, keyBounds), f),
     self.tiebreakers,
+    () => transform(reverse(self), f),
   );
 
 /** The effectful {@link transform}. */
@@ -1222,6 +1254,7 @@ const transformEffect = <
     (keyBounds) =>
       transformEffect(narrowByKeyBounds(self, keyBounds), f, options),
     self.tiebreakers,
+    () => transformEffect(reverse(self), f, options),
   );
 
 /** Options for the effectful transforms (`filterEffect`, `mapEffect`). */
@@ -1745,6 +1778,17 @@ const makeFlatMap = <
       );
     },
     tiebreakers,
+    // Refinements are key bounds, so they carry over; the inner streams
+    // are reversed alongside the outer one to keep the direction rule.
+    () =>
+      makeFlatMap(
+        reverse(self),
+        (doc) => reverse(f(doc)),
+        innerKeyFields,
+        innerTiebreakers,
+        onEmpty,
+        refinements,
+      ),
   );
 };
 
@@ -1889,6 +1933,7 @@ const orderByImpl = <
     // stream as-is.
     (bounds) => orderByImpl(narrowByKeyBounds(self, bounds), key),
     self.tiebreakers,
+    () => orderByImpl(reverse(self), key),
   );
 };
 
@@ -1969,6 +2014,41 @@ const makeDistinct = <
       ),
     self.tiebreakers,
   );
+};
+
+/**
+ * Run a stream in the opposite direction.
+ *
+ * - As a stream: the same composition with every leaf rebuilt in the
+ *   other `order` (the elements in reverse, but read that way from the
+ *   index rather than collected and reversed), so the result is still a
+ *   query stream — a paginated feed can load its earlier pages with it.
+ * - In SQL: flipping `ORDER BY ... ASC` to `DESC` (or back) on the whole
+ *   query.
+ *
+ * `merge`, the transforms, `flatMap`/`leftJoin`, `orderBy`, and `empty`
+ * reverse their inputs and re-apply themselves. A `distinct` stream can't
+ * be reversed: it keeps the *first* document of each group, and a reversed
+ * scan would keep the last, so `reverse` throws — reverse the input and
+ * apply `distinct` to that for the mirror query, or paginate the distinct
+ * stream in one direction only. Externally constructed streams (no
+ * `reverseWith`) throw too.
+ */
+export const reverse = <
+  Doc,
+  Key extends ReadonlyArray<string>,
+  E,
+  R,
+  Direction extends OrderDirection,
+>(
+  self: QueryStream<Doc, Key, E, R, Direction>,
+): QueryStream<Doc, Key, E, R, Flip<Direction>> => {
+  if (self.reverseWith === undefined) {
+    throw new Error(
+      "QueryStream.reverse: this stream cannot be reversed (a `distinct` stream keeps a different document per group in the other direction; apply `distinct` to the reversed input instead)",
+    );
+  }
+  return self.reverseWith();
 };
 
 /**
