@@ -675,6 +675,49 @@ export type Any = QueryStream<any, any, any, any, any>;
 export const isQueryStream = (u: unknown): u is Any =>
   Predicate.hasProperty(u, TypeId);
 
+/**
+ * An empty query stream with the given order key and direction — the
+ * `merge` input for a dynamic list of streams that may turn out empty.
+ *
+ * - As a stream: `Stream.empty` that still knows its order key, so it
+ *   merges with, and paginates like, any stream of that key.
+ * - In SQL: the empty relation — `SELECT ... WHERE false` with the same
+ *   `ORDER BY`.
+ *
+ * Nothing can infer the document type from no documents, so it is supplied
+ * as a type argument in a first, otherwise empty call:
+ * `QueryStream.empty<NotesDoc>()(["text", "_creationTime"], "desc")`. The
+ * key is the type-level order key of the streams it will be merged with
+ * (the index fields that still vary, tiebreaker included).
+ */
+export const empty =
+  <Doc>(): {
+    <const Key extends ReadonlyArray<string>>(
+      key: Key,
+    ): QueryStream<Doc, Types.Mutable<Key>, never, never, "asc">;
+    <const Key extends ReadonlyArray<string>, Direction extends OrderDirection>(
+      key: Key,
+      order: Direction,
+    ): QueryStream<Doc, Types.Mutable<Key>, never, never, Direction>;
+  } =>
+  (key: ReadonlyArray<string>, order: OrderDirection = "asc") => {
+    const keyFields = withIdTiebreaker(key);
+    const tiebreakers = appendedTiebreaker(key, keyFields);
+    // `any` in the key and direction slots: the overloads above assign the
+    // literal types the caller supplied.
+    const make = (): QueryStream<Doc, any, never, never, any> =>
+      new QueryStream(
+        order,
+        keyFields,
+        Stream.empty,
+        undefined,
+        // Narrowing nothing is nothing.
+        () => make(),
+        tiebreakers,
+      );
+    return make();
+  };
+
 // -----------------------------------------------------------------------------
 // Constructors
 // -----------------------------------------------------------------------------
@@ -1158,21 +1201,38 @@ const transformEffect = <
 >(
   self: QueryStream<Doc, Key, E, R, Direction>,
   f: (doc: Doc) => Effect.Effect<Option.Option<Doc2>, E2, R2>,
+  options: EffectOptions | undefined,
 ): QueryStream<Doc2, Key, E | E2, R | R2, Direction> =>
   new QueryStream(
     self.order,
     self.keyFields,
-    Stream.mapEffect(self.annotated, ([doc, key]) =>
-      Option.match(doc, {
-        onNone: () => Effect.succeed([Option.none<Doc2>(), key] as const),
-        onSome: (value) =>
-          Effect.map(f(value), (mapped) => [mapped, key] as const),
-      }),
+    Stream.mapEffect(
+      self.annotated,
+      ([doc, key]) =>
+        Option.match(doc, {
+          onNone: () => Effect.succeed([Option.none<Doc2>(), key] as const),
+          onSome: (value) =>
+            Effect.map(f(value), (mapped) => [mapped, key] as const),
+        }),
+      // Order is preserved at any concurrency: elements are emitted in
+      // input order however their effects finish.
+      { concurrency: options?.concurrency },
     ),
     undefined,
-    (keyBounds) => transformEffect(narrowByKeyBounds(self, keyBounds), f),
+    (keyBounds) =>
+      transformEffect(narrowByKeyBounds(self, keyBounds), f, options),
     self.tiebreakers,
   );
+
+/** Options for the effectful transforms (`filterEffect`, `mapEffect`). */
+export interface EffectOptions {
+  /**
+   * How many documents' effects may run at once (`"unbounded"` for all).
+   * Elements are emitted in stream order regardless, so the result stays
+   * a query stream with the same order key. Defaults to one at a time.
+   */
+  readonly concurrency?: number | "unbounded" | undefined;
+}
 
 /**
  * Filter with a pure predicate — `Stream.filter` that keeps the stream
@@ -1214,6 +1274,7 @@ export const filter = dual<
 export const filterEffect = dual<
   <Doc, E2, R2>(
     predicate: (doc: Doc) => Effect.Effect<boolean, E2, R2>,
+    options?: EffectOptions,
   ) => <
     Key extends ReadonlyArray<string>,
     E,
@@ -1233,13 +1294,19 @@ export const filterEffect = dual<
   >(
     self: QueryStream<Doc, Key, E, R, Direction>,
     predicate: (doc: Doc) => Effect.Effect<boolean, E2, R2>,
+    options?: EffectOptions,
   ) => QueryStream<Doc, Key, E | E2, R | R2, Direction>
->(2, (self, predicate) =>
-  transformEffect(self, (doc) =>
-    Effect.map(predicate(doc), (keep) =>
-      keep ? Option.some(doc) : Option.none(),
+>(
+  (args) => isQueryStream(args[0]),
+  (self, predicate, options) =>
+    transformEffect(
+      self,
+      (doc) =>
+        Effect.map(predicate(doc), (keep) =>
+          keep ? Option.some(doc) : Option.none(),
+        ),
+      options,
     ),
-  ),
 );
 
 /**
@@ -1280,6 +1347,7 @@ export const map = dual<
 export const mapEffect = dual<
   <Doc, Doc2, E2, R2>(
     f: (doc: Doc) => Effect.Effect<Doc2, E2, R2>,
+    options?: EffectOptions,
   ) => <
     Key extends ReadonlyArray<string>,
     E,
@@ -1300,9 +1368,12 @@ export const mapEffect = dual<
   >(
     self: QueryStream<Doc, Key, E, R, Direction>,
     f: (doc: Doc) => Effect.Effect<Doc2, E2, R2>,
+    options?: EffectOptions,
   ) => QueryStream<Doc2, Key, E | E2, R | R2, Direction>
->(2, (self, f) =>
-  transformEffect(self, (doc) => Effect.map(f(doc), Option.some)),
+>(
+  (args) => isQueryStream(args[0]),
+  (self, f, options) =>
+    transformEffect(self, (doc) => Effect.map(f(doc), Option.some), options),
 );
 
 /**
@@ -1381,6 +1452,83 @@ export const flatMap = dual<
     f,
     innerKeyFields,
     appendedTiebreaker(options.innerKey, innerKeyFields),
+    undefined,
+    {},
+  );
+});
+
+/**
+ * A left join: `flatMap` that keeps outer documents whose inner stream is
+ * empty, emitting `onEmpty(outer)` in their place.
+ *
+ * - As a stream: `flatMap` whose empty inner streams are replaced by one
+ *   element, so every outer document contributes at least one.
+ * - In SQL: `LEFT JOIN LATERAL` — an outer row with no inner rows still
+ *   appears once, with `onEmpty` standing in for the `NULL` inner columns.
+ *
+ * The placeholder takes the position an empty inner stream's marker would
+ * (the outer key followed by `null`s), so it sorts first within its outer
+ * document and pagination resumes past it like any element. Outer
+ * documents filtered out upstream stay absent. Everything else — the
+ * `innerKey` check, the direction rules, narrowing — is `flatMap`'s.
+ */
+export const leftJoin = dual<
+  <
+    Doc,
+    Doc2,
+    Doc3,
+    InnerKey extends ReadonlyArray<string>,
+    E2,
+    R2,
+    Direction extends OrderDirection,
+  >(
+    f: (doc: Doc) => QueryStream<Doc2, InnerKey, E2, R2, Direction>,
+    options: {
+      readonly innerKey: NoInfer<InnerKey>;
+      readonly onEmpty: (doc: Doc) => Doc3;
+    },
+  ) => <Key extends ReadonlyArray<string>, E, R>(
+    self: QueryStream<Doc, Key, E, R, Direction>,
+  ) => QueryStream<
+    Doc2 | Doc3,
+    readonly [...Key, ...InnerKey],
+    E | E2,
+    R | R2,
+    Direction
+  >,
+  <
+    Doc,
+    Key extends ReadonlyArray<string>,
+    E,
+    R,
+    Doc2,
+    Doc3,
+    InnerKey extends ReadonlyArray<string>,
+    E2,
+    R2,
+    Direction extends OrderDirection,
+  >(
+    self: QueryStream<Doc, Key, E, R, Direction>,
+    f: (doc: Doc) => QueryStream<Doc2, InnerKey, E2, R2, NoInfer<Direction>>,
+    options: {
+      readonly innerKey: NoInfer<InnerKey>;
+      readonly onEmpty: (doc: Doc) => Doc3;
+    },
+  ) => QueryStream<
+    Doc2 | Doc3,
+    readonly [...Key, ...InnerKey],
+    E | E2,
+    R | R2,
+    Direction
+  >
+>(3, (self, f, options) => {
+  const innerKeyFields = withIdTiebreaker(options.innerKey);
+  return makeFlatMap(
+    self,
+    f,
+    innerKeyFields,
+    appendedTiebreaker(options.innerKey, innerKeyFields),
+    options.onEmpty,
     {},
   );
 });
@@ -1442,14 +1590,17 @@ const makeFlatMap = <
   E2,
   R2,
   Direction extends OrderDirection,
+  Doc3 = never,
 >(
   self: QueryStream<Doc, Key, E, R, Direction>,
   f: (doc: Doc) => QueryStream<Doc2, InnerKey, E2, R2, Direction>,
   innerKeyFields: ReadonlyArray<string>,
   innerTiebreakers: ReadonlyArray<number>,
+  /** Present for a left join: what an outer document with no inner rows emits. */
+  onEmpty: ((doc: Doc) => Doc3) | undefined,
   refinements: InnerRefinements,
 ): QueryStream<
-  Doc2,
+  Doc2 | Doc3,
   readonly [...Key, ...InnerKey],
   E | E2,
   R | R2,
@@ -1505,34 +1656,44 @@ const makeFlatMap = <
         : Option.none(),
   });
 
+  // The single element an outer document contributes when it has no inner
+  // elements: filtered (cursor accounting only), or — for a left join — the
+  // `onEmpty` placeholder. Either sits at the outer key followed by `null`s,
+  // and is emitted only if that position is within the inner bounds.
   const markerStream = (
     outerKey: OrderKey,
     innerBounds: KeyBounds,
-  ): Stream.Stream<Element<Doc2>> =>
+    doc: Option.Option<Doc2 | Doc3>,
+  ): Stream.Stream<Element<Doc2 | Doc3>> =>
     admittedByLower(innerBounds.lower)(nullPadding) &&
     admittedByUpper(innerBounds.upper)(nullPadding)
-      ? Stream.succeed([
-          Option.none<Doc2>(),
-          Array.appendAll(outerKey, nullPadding),
-        ] as const)
+      ? Stream.succeed([doc, Array.appendAll(outerKey, nullPadding)] as const)
       : Stream.empty;
 
   const annotated: Stream.Stream<
-    Element<Doc2>,
+    Element<Doc2 | Doc3>,
     E | E2,
     R | R2
   > = self.annotated.pipe(
     Stream.flatMap(([outerDoc, outerKey]) => {
       const innerBounds = innerBoundsFor(outerKey);
       return Option.match(outerDoc, {
-        onNone: () => markerStream(outerKey, innerBounds),
+        onNone: () => markerStream(outerKey, innerBounds, Option.none()),
         onSome: (doc) =>
           narrowByKeyBounds(validated(f(doc)), innerBounds).annotated.pipe(
             Stream.map(
               ([innerDoc, innerKey]) =>
                 [innerDoc, Array.appendAll(outerKey, innerKey)] as const,
             ),
-            Stream.orElseIfEmpty(() => markerStream(outerKey, innerBounds)),
+            Stream.orElseIfEmpty(() =>
+              markerStream(
+                outerKey,
+                innerBounds,
+                onEmpty === undefined
+                  ? Option.none()
+                  : Option.some(onEmpty(doc)),
+              ),
+            ),
           ),
       });
     }),
@@ -1576,6 +1737,7 @@ const makeFlatMap = <
         f,
         innerKeyFields,
         innerTiebreakers,
+        onEmpty,
         {
           lower: combineLowerRefinements(refinements.lower, lower.refinement),
           upper: combineUpperRefinements(refinements.upper, upper.refinement),
