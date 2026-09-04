@@ -14,6 +14,11 @@
  * This is the Effect-native formulation of `convex-helpers/server/stream`'s
  * `QueryStream`; see `notes/stream-based-querying.md` for the design.
  *
+ * Each operation's doc describes it two ways: as a stream (which Effect
+ * `Stream` operation it is, and what it keeps that the plain one loses) and
+ * in SQL (a query stream is an ordered result set — `SELECT * FROM table
+ * ORDER BY <index fields>` — and each operation is a clause around it).
+ *
  * Known limitations (all called out in the design doc):
  *
  * - `maximumBytesRead` charges each document's estimated size (Convex's
@@ -687,7 +692,9 @@ export type Any = QueryStream<any, any, any, any, any>;
 
 /**
  * Whether `u` is a `QueryStream` — as opposed to the plain `Stream` that a
- * generic `Stream.*` combinator turns one into.
+ * generic `Stream.*` combinator turns one into (in SQL terms: whether the
+ * value still knows its `ORDER BY`, and so can still be combined and
+ * paginated).
  */
 export const isQueryStream = (u: unknown): u is Any =>
   Predicate.hasProperty(u, TypeId);
@@ -835,10 +842,18 @@ const intersectIndexBounds = (
 });
 
 /**
- * Build a leaf `QueryStream` from reflection data. Each run of the stream
- * rebuilds the Convex queries from the reflection — the leaf's bounds
- * decomposed into Convex-expressible index ranges via `splitRange` — and
- * order keys are extracted from the *encoded* document before schema
+ * Build a leaf `QueryStream` from reflection data.
+ *
+ * - As a stream: a source stream (`Stream.fromIterable` over an index
+ *   scan) that re-runs its query on every run, so the value is a reusable
+ *   description of a query rather than a result.
+ * - In SQL: an index range scan — `SELECT * FROM table WHERE <range>
+ *   ORDER BY <index fields> [DESC]`; the order key is the `ORDER BY`
+ *   columns left after the equality predicates.
+ *
+ * Each run rebuilds the Convex queries from the reflection — the leaf's
+ * bounds decomposed into Convex-expressible index ranges via `splitRange`
+ * — and order keys are extracted from the *encoded* document before schema
  * decoding.
  */
 export const fromReflection = <
@@ -1099,13 +1114,20 @@ const mergeStep =
     );
 
 /**
- * Merge streams ordered by the same key into one ordered stream — SQL's
- * `UNION ALL` as a k-way ordered merge. Streams with different order keys
- * are a **type error** (`Key` is invariant), and so are different
- * directions: the first stream fixes the direction and each later one must
- * be assignable to it. A mismatch the types can't see — a runtime-chosen
- * direction, or an untyped call site — throws here, when the streams are
- * combined.
+ * Merge streams ordered by the same key into one ordered stream.
+ *
+ * - As a stream: a k-way ordered merge — the step of merge sort that
+ *   combines sorted runs. It pulls from every input and always emits the
+ *   smallest next key (the largest, descending). Not `Stream.merge`, which
+ *   interleaves inputs in arrival order.
+ * - In SQL: `UNION ALL` of queries that share an `ORDER BY`, with the result
+ *   still in that order (a planner's merge append).
+ *
+ * Streams with different order keys are a **type error** (`Key` is
+ * invariant), and so are different directions: the first stream fixes the
+ * direction and each later one must be assignable to it. A mismatch the
+ * types can't see — a runtime-chosen direction, or an untyped call site —
+ * throws here, when the streams are combined.
  */
 export const merge = <
   Doc,
@@ -1268,10 +1290,16 @@ export interface EffectOptions {
 }
 
 /**
- * Filter with a pure predicate — `Stream.filter` that keeps the stream
- * paginable: filtered-out elements still advance cursors. Use
- * `filterEffect` when the predicate needs to read the database or another
- * service.
+ * Filter with a pure predicate.
+ *
+ * - As a stream: `Stream.filter` that keeps the order key, so the result is
+ *   still mergeable and paginable — filtered-out elements still advance
+ *   cursors.
+ * - In SQL: a `WHERE` on any column, evaluated after the index scan (rows it
+ *   rejects were still read).
+ *
+ * Use `filterEffect` when the predicate needs to read the database or
+ * another service.
  */
 export const filter = dual<
   <Doc>(
@@ -1299,10 +1327,13 @@ export const filter = dual<
 );
 
 /**
- * Filter with an effectful predicate — for predicates that read the
- * database or use a service; the predicate's `E2`/`R2` flow into the
- * stream's channels. Like `filter`, filtered-out elements still advance
- * cursors.
+ * Filter with an effectful predicate.
+ *
+ * - As a stream: `Stream.filterEffect` that keeps the order key; the
+ *   predicate's `E2`/`R2` flow into the stream's channels, and filtered-out
+ *   elements still advance cursors, as with `filter`.
+ * - In SQL: a `WHERE` whose predicate runs a subquery — `WHERE EXISTS
+ *   (...)`, or any predicate that reads other tables.
  */
 export const filterEffect = dual<
   <Doc, E2, R2>(
@@ -1343,10 +1374,15 @@ export const filterEffect = dual<
 );
 
 /**
- * Transform elements with a pure function while preserving order keys —
- * `Stream.map` that keeps the stream mergeable and paginable. The mapper
- * must not change the ordering semantics. Use `mapEffect` when the mapper
- * needs to read the database or another service.
+ * Transform elements with a pure function while preserving order keys.
+ *
+ * - As a stream: `Stream.map` that keeps the order key, so the result is
+ *   still mergeable and paginable.
+ * - In SQL: the `SELECT` list — projecting or computing columns while the
+ *   `ORDER BY` columns stay in force.
+ *
+ * The mapper must not change the ordering semantics. Use `mapEffect` when
+ * the mapper needs to read the database or another service.
  */
 export const map = dual<
   <Doc, Doc2>(
@@ -1374,8 +1410,14 @@ export const map = dual<
 
 /**
  * Transform elements with an effectful function while preserving order
- * keys — for mappers that read the database or use a service. The mapper
- * must not change the ordering semantics.
+ * keys.
+ *
+ * - As a stream: `Stream.mapEffect` that keeps the order key; the mapper's
+ *   `E2`/`R2` flow into the stream's channels.
+ * - In SQL: a scalar subquery in the `SELECT` list — a computed column that
+ *   reads other tables.
+ *
+ * The mapper must not change the ordering semantics.
  */
 export const mapEffect = dual<
   <Doc, Doc2, E2, R2>(
@@ -1411,8 +1453,16 @@ export const mapEffect = dual<
 
 /**
  * A join: for each outer document, stream the documents of the inner stream
- * produced by `f`, ordered by (outer key, then inner key) — SQL's `LATERAL`
- * join shape, `flatMap` on `convex-helpers` streams.
+ * produced by `f`, ordered by (outer key, then inner key).
+ *
+ * - As a stream: `Stream.flatMap` run sequentially — each outer element's
+ *   inner stream is drained before the next outer element's begins — with
+ *   the order key extended by the inner key (`flatMap` on `convex-helpers`
+ *   streams).
+ * - In SQL: `CROSS JOIN LATERAL` (`CROSS APPLY`): the inner query can
+ *   reference the outer row, and the result is ordered by the outer key,
+ *   then the inner key. An outer row with no inner rows contributes none —
+ *   an inner join, not a left join.
  *
  * `options.innerKey` is the order key shared by *every* inner stream —
  * checked against `f`'s return type, so a mismatched literal is a type
@@ -1794,9 +1844,14 @@ const makeFlatMap = <
 
 /**
  * Keep the first document for each distinct value of a *prefix* of the
- * order key — a loose index scan: after a group's first document, the
- * underlying stream is narrowed past the entire group, so each group costs
- * one index seek instead of a scan.
+ * order key.
+ *
+ * - As a stream: the first element of each run of equal key prefixes — as
+ *   if deduplicating consecutive keys — implemented as a loose index scan:
+ *   after a group's first document, the underlying stream is narrowed past
+ *   the entire group, so each group costs one index seek instead of a scan.
+ * - In SQL: PostgreSQL's `SELECT DISTINCT ON (prefix) ... ORDER BY prefix,
+ *   ...` — the first row of each group — executed as a skip scan.
  *
  * `fields` must be a prefix of the stream's order key — enforced at the
  * type level (`Key` must extend `readonly [...Fields, ...rest]`) and
@@ -1847,12 +1902,20 @@ export const distinct = dual<
 /**
  * Re-key a stream: declare that its order key should be regarded as `key`,
  * a position-for-position relabeling of the order-key fields (the trailing
- * `_id` tiebreaker keeps its name). Order keys are *values*, so relabeling
- * changes only the names used for compatibility validation — the element
- * order is untouched, and narrowing passes bounds through to the
- * underlying stream unchanged. Use it to make streams from different
- * indexes or tables mergeable when their keys align positionally; the
- * caller asserts the *semantic* alignment of the relabeled fields.
+ * `_id` tiebreaker keeps its name).
+ *
+ * - As a stream: a declaration about the order key's field names — the
+ *   elements and their order are untouched — so that `merge` accepts
+ *   streams whose keys agree positionally.
+ * - In SQL: column aliases (`AS`) that make the branches of a `UNION ALL`
+ *   line up by position; not `ORDER BY`, which it does not change.
+ *
+ * Order keys are *values*, so relabeling changes only the names used for
+ * compatibility validation — the element order is untouched, and narrowing
+ * passes bounds through to the underlying stream unchanged. Use it to make
+ * streams from different indexes or tables mergeable when their keys align
+ * positionally; the caller asserts the *semantic* alignment of the
+ * relabeled fields.
  *
  * (This is `convex-helpers`' `.orderBy()`. There it may also drop
  * equality-pinned prefix fields from the key — Confect's remaining-field
@@ -2053,12 +2116,19 @@ export const reverse = <
 
 /**
  * Restrict a stream to order keys strictly after `after` and at-or-before
- * `until` (in stream order). Bounds are pushed down through the stream's
- * structure via `narrowWith`: leaves rebuild their Convex queries with the
- * bounds decomposed into `withIndex` ranges (`splitRange`), and derived
- * streams narrow their inputs and re-apply their combinator. Streams
- * without a `narrowWith` (constructed externally) fall back to filtering
- * the annotated stream in memory.
+ * `until` (in stream order).
+ *
+ * - As a stream: `Stream.dropWhile` up to `after` and `Stream.takeWhile` up
+ *   to `until` on the order key — but pushed down through the stream's
+ *   structure via `narrowWith`, so the skipped keys are never read: leaves
+ *   rebuild their Convex queries with the bounds decomposed into
+ *   `withIndex` ranges (`splitRange`), and derived streams narrow their
+ *   inputs and re-apply their combinator. Streams without a `narrowWith`
+ *   (constructed externally) fall back to filtering the annotated stream
+ *   in memory.
+ * - In SQL: keyset predicates on the `ORDER BY` columns — `WHERE (k1, k2)
+ *   > (:after) AND (k1, k2) <= (:until)` — added to every query in the
+ *   composition.
  */
 export const narrow = dual<
   (bounds: {
@@ -2203,7 +2273,14 @@ export class NotUniqueError extends Schema.TaggedError<NotUniqueError>()(
   }
 }
 
-/** Expect zero or one element; fail with `NotUniqueError` on two or more. */
+/**
+ * Expect zero or one element; fail with `NotUniqueError` on two or more.
+ *
+ * - As a stream: `Stream.runHead` that also pulls a second element to make
+ *   sure there isn't one.
+ * - In SQL: a query that must return at most one row (Convex's `.unique()`)
+ *   — `LIMIT 2` followed by a check.
+ */
 export const unique = <Doc, Key extends ReadonlyArray<string>, E, R>(
   self: QueryStream<Doc, Key, E, R>,
 ): Effect.Effect<Option.Option<Doc>, E | NotUniqueError, R> =>
@@ -2347,8 +2424,18 @@ const midpointCursor = (readKeys: Chunk.Chunk<OrderKey>): string =>
   );
 
 /**
- * Consume one page of a stream. Semantics follow
- * `convex-helpers/server/stream`:
+ * Consume one page of a stream.
+ *
+ * - As a stream: a sink — it runs the stream narrowed to the keys after
+ *   `cursor` (and up to `endCursor`, when given), folds `numItems` present
+ *   documents into a page, and reports the key it stopped at as the next
+ *   cursor.
+ * - In SQL: keyset pagination — `WHERE (key) > :cursor ORDER BY key LIMIT
+ *   :numItems`; with `endCursor`, `AND (key) <= :endCursor` and no `LIMIT`.
+ *   A cursor is a key, not an offset, so a page costs one page of reads
+ *   wherever it starts.
+ *
+ * Semantics follow `convex-helpers/server/stream`:
  *
  * - `cursor` is exclusive, `endCursor` inclusive; when `endCursor` is set,
  *   `numItems` is ignored and the page runs to the end cursor — the
