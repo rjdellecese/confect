@@ -886,6 +886,90 @@ describe("QueryStream", () => {
     }).pipe(Effect.provide(TestConfect.layer)),
   );
 
+  it.effect("reverse runs a composition in the opposite direction", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          const writer = yield* DatabaseWriter;
+          const reader = yield* DatabaseReader;
+
+          for (const [text, tag] of [
+            ["b", "b1"],
+            ["a", "a1"],
+            ["a", "a2"],
+            ["x0", "none"],
+            ["x1", "a"],
+            ["x2", "b"],
+          ] as const) {
+            yield* writer.table("notes").insert({ text, tag });
+          }
+
+          const notes = reader.table("notes").stream("by_text");
+          expect(yield* collectTexts(QueryStream.reverse(notes))).toEqual([
+            "x2",
+            "x1",
+            "x0",
+            "b",
+            "a",
+            "a",
+          ]);
+          // Reversing twice is the original direction.
+          expect(
+            yield* collectTexts(
+              QueryStream.reverse(QueryStream.reverse(notes)),
+            ),
+          ).toEqual(["a", "a", "b", "x0", "x1", "x2"]);
+
+          // Through a merge and the transforms.
+          const feed = QueryStream.merge([
+            reader.table("notes").stream("by_text", (q) => q.lt("text", "b")),
+            reader.table("notes").stream("by_text", (q) => q.gte("text", "b")),
+          ]).pipe(
+            QueryStream.filter((note) => note.text !== "x1"),
+            QueryStream.map((note) => note.text),
+          );
+          expect(yield* Stream.runCollect(QueryStream.reverse(feed))).toEqual([
+            "x2",
+            "x0",
+            "b",
+            "a",
+            "a",
+          ]);
+
+          // Through a join — the inner streams reverse with the outer — and
+          // on to pagination, with cursors still pushed down.
+          const joined = reader
+            .table("notes")
+            .stream("by_text", (q) => q.gte("text", "x"))
+            .pipe(
+              QueryStream.flatMap(
+                (note) =>
+                  reader
+                    .table("notes")
+                    .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
+                { innerKey: ["_creationTime"] },
+              ),
+            );
+          const pages = yield* paginateAll(QueryStream.reverse(joined), 1);
+          expect(pages.map((page) => page.map((doc) => doc.tag))).toEqual([
+            ["b1"],
+            ["a2"],
+            ["a1"],
+          ]);
+
+          // A distinct stream keeps a different document per group in the
+          // other direction, so it refuses.
+          const firstPerText = notes.pipe(QueryStream.distinct(["text"]));
+          expect(() => QueryStream.reverse(firstPerText)).toThrow(
+            /cannot be reversed/,
+          );
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
   it.effect("distinct keeps the first document per group", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
@@ -1552,6 +1636,18 @@ describe("QueryStream types", () => {
       );
       expectTypeOf<
         DirectionOf<typeof dynamicInnerJoin>
+      >().toEqualTypeOf<QueryStream.OrderDirection>();
+
+      // reverse flips a known direction and keeps a runtime one as the
+      // union, leaving the key alone.
+      const reversed = QueryStream.reverse(full);
+      expectTypeOf<DirectionOf<typeof reversed>>().toEqualTypeOf<"desc">();
+      expectTypeOf<KeyOf<typeof reversed>>().toEqualTypeOf<
+        ["text", "_creationTime"]
+      >();
+      const reversedDynamic = QueryStream.reverse(dynamic);
+      expectTypeOf<
+        DirectionOf<typeof reversedDynamic>
       >().toEqualTypeOf<QueryStream.OrderDirection>();
     });
     void _typeChecks;
