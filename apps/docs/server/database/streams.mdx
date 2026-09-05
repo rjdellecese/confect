@@ -42,6 +42,20 @@ Effect.gen(function* () {
   `Stream` over one query; the former is a composable query stream.
 </Note>
 
+## The ordering contract
+
+Every query stream is sorted by its **order key** in its **direction**, and every operation on this page keeps it that way. That invariant is what a plain `Stream` lacks and what the rest of this page relies on: two streams sorted by the same key can be merged without buffering, a cursor is a key, and a page of any composition resumes by narrowing every underlying index query to the keys after that cursor.
+
+Both are part of the type. `reader.table("notes").stream("by_text")` is a `QueryStream<Doc, ["text", "_creationTime"], DocumentDecodeError, never, "asc">`: the document, the order key, the error and requirement channels, and the direction. `merge` refuses streams whose keys or directions differ, at compile time.
+
+Only three operations change the key at all:
+
+- `flatMap` extends it, appending the inner stream's key to the outer stream's.
+- `renameKey` relabels its fields, without reordering anything.
+- `reverse` flips the direction.
+
+Everything else keeps the key exactly as it is, and the sinks consume it.
+
 ## How this page is written
 
 Each operation is described with its SQL analogy, then shown on one small dataset. In SQL terms a query stream is an ordered result set — `reader.table("notes").stream("by_text")` is `SELECT * FROM notes ORDER BY text, _creationTime` — and each operation is a clause built around it.
@@ -88,22 +102,24 @@ by_text
 
 ## Operations at a glance
 
-| Operation                                                     | In SQL                                                                    |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| [`stream`](#creating-a-stream)                                | `SELECT * FROM table WHERE <index range> ORDER BY <index fields>`         |
-| [`Stream.runCollect`, `runHead`, `take`](#consuming-a-stream) | The whole result set, `LIMIT 1`, `LIMIT n`                                |
-| [`unique`](#consuming-a-stream)                               | A query expected to return at most one row                                |
-| [`empty`](#empty-streams)                                     | The empty relation, `WHERE false`, with the same `ORDER BY`               |
-| [`merge`](#merge)                                             | `UNION ALL` of queries with the same `ORDER BY`, kept in that order       |
-| [`filter` / `filterEffect`](#filter-and-map)                  | `WHERE` on any column; `WHERE EXISTS (subquery)` for the effectful form   |
-| [`map` / `mapEffect`](#filter-and-map)                        | The `SELECT` list; a scalar subquery in it for the effectful form         |
-| [`flatMap`](#join)                                            | `CROSS JOIN LATERAL` (`CROSS APPLY`), ordered by outer key then inner key |
-| [`leftJoin`](#left-join)                                      | `LEFT JOIN LATERAL`, with `onEmpty` standing in for the `NULL` columns    |
-| [`distinct`](#distinct)                                       | `SELECT DISTINCT ON (prefix)` as a loose index scan                       |
-| [`orderBy`](#rename-the-order-key)                            | Column aliases (`AS`) so `UNION ALL` branches line up                     |
-| [`reverse`](#reverse)                                         | `ORDER BY ... ASC` flipped to `DESC` (or back) on the whole query         |
-| [`narrow`](#narrow-to-a-key-range)                            | Keyset predicates on the `ORDER BY` columns                               |
-| [`paginate`](#paginating-a-stream)                            | Keyset pagination: `WHERE key > :cursor ORDER BY key LIMIT n`             |
+Grouped by what each operation does to the order key. The last column names the nearest thing in Effect's `Stream` module for readers who know it.
+
+| Operation                                                                 | Order key                                      | In SQL                                                                    | In Effect                                                     |
+| ------------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| [`stream`](#creating-a-stream)                                            | The index's fields, minus those pinned by `eq` | `SELECT * FROM table WHERE <index range> ORDER BY <index fields>`         | A `Stream` that remembers how it is sorted                    |
+| [`empty`](#empty-streams)                                                 | As given                                       | The empty relation, `WHERE false`, with the same `ORDER BY`               | `Stream.empty` with a key                                     |
+| [`merge`](#merge)                                                         | Shared by every input; kept                    | `UNION ALL` of queries with the same `ORDER BY`, kept in that order       | Ordered, unlike `Stream.merge`; ZIO's `mergeSorted`           |
+| [`filter` / `filterEffect`](#filter-and-map)                              | Kept                                           | `WHERE` on any column; `WHERE EXISTS (subquery)` for the effectful form   | `Stream.filter`, `Stream.filterEffect`                        |
+| [`map` / `mapEffect`](#filter-and-map)                                    | Kept                                           | The `SELECT` list; a scalar subquery in it for the effectful form         | `Stream.map`, `Stream.mapEffect`                              |
+| [`distinct`](#distinct)                                                   | Kept                                           | `SELECT DISTINCT ON (prefix)` as a loose index scan                       | `Stream.changes` on a key prefix                              |
+| [`narrow`](#narrow-to-a-key-range)                                        | Kept                                           | Keyset predicates on the `ORDER BY` columns                               | `dropWhile` and `takeUntil` on the key, pushed into the index |
+| [`flatMap`](#flat-map)                                                    | Extended by the inner key                      | `CROSS JOIN LATERAL` (`CROSS APPLY`), ordered by outer key then inner key | `Stream.flatMap`, sequential like RxJS's `concatMap`          |
+| [`flatMap` with `onEmpty`](#keep-outer-documents-without-inner-documents) | Extended by the inner key                      | `LEFT JOIN LATERAL`, with `onEmpty` standing in for the `NULL` columns    | `Stream.orElseIfEmpty` on each inner stream                   |
+| [`renameKey`](#rename-the-order-key)                                      | Relabeled                                      | Column aliases (`AS`) so `UNION ALL` branches line up                     | Changes only the `Key` type parameter                         |
+| [`reverse`](#reverse)                                                     | Direction flipped                              | `ORDER BY ... ASC` flipped to `DESC` (or back) on the whole query         | `Array.reverse`, read that way from the index                 |
+| [`Stream.runCollect`, `runHead`, `take`](#consuming-a-stream)             | Consumed                                       | The whole result set, `LIMIT 1`, `LIMIT n`                                | Effect's own sinks                                            |
+| [`unique`](#consuming-a-stream)                                           | Consumed                                       | A query expected to return at most one row                                | `Stream.runHead` with a uniqueness check                      |
+| [`paginate`](#paginating-a-stream)                                        | Consumed                                       | Keyset pagination: `WHERE key > :cursor ORDER BY key LIMIT n`             | `Stream.take(numItems)` after narrowing to the cursor         |
 
 ## Creating a stream
 
@@ -160,9 +176,7 @@ Fields must be used in the order the index declares them, and each method only o
 
 ### Order keys
 
-The fields that still vary after pinning, followed by the implicit `_creationTime` tiebreaker, form the stream's **order key**. It is part of the stream's type: `reader.table("notes").stream("by_text")` has the type `QueryStream<Doc, ["text", "_creationTime"], DocumentDecodeError, never, "asc">` (the document, the order key, the error and requirement channels, and the order direction), while pinning the text with `eq` leaves `["_creationTime"]`.
-
-The order key determines which streams can be merged: two streams can only be merged when their order keys are the same, so a mismatch is caught at compile time.
+The fields that still vary after pinning, followed by the implicit `_creationTime` tiebreaker, form the stream's [order key](#the-ordering-contract). `reader.table("notes").stream("by_text")` has the key `["text", "_creationTime"]`, while pinning the text with `eq` leaves `["_creationTime"]`. The key is what decides which streams can be merged.
 
 ### Empty streams
 
@@ -247,9 +261,9 @@ eq "fig"
 ╰┤   → None
 ```
 
-## Combining streams
+## Composing streams
 
-Each combinator below returns another query stream, so results stay mergeable and paginable.
+Each operation below returns another query stream, so results stay mergeable and paginable. They are grouped by what they do to the [order key](#the-ordering-contract): `merge` combines streams that share one; `filter`, `map`, `distinct`, and `narrow` keep it; `flatMap` extends it; `renameKey` relabels it; `reverse` flips its direction.
 
 ### Merge
 
@@ -367,100 +381,6 @@ reader
   );
 ```
 
-### Join
-
-`QueryStream.flatMap` runs an inner stream for each document of an outer stream and concatenates the results, ordered by the outer key and then the inner key.
-
-In SQL terms, `flatMap` is `CROSS JOIN LATERAL` (`CROSS APPLY`): the inner query can reference the outer row, and the result is ordered by the outer key, then the inner key. An outer row whose inner query returns nothing contributes no rows, so this is an inner join, not a left join.
-
-```ts
-// The comments on admin notes, grouped by note in note order and by
-// creation time within each note.
-const commentsOn = (note: NotesDoc) =>
-  reader.table("comments").stream("by_note", (q) => q.eq("noteId", note._id));
-
-reader
-  .table("notes")
-  .stream("by_role", (q) => q.eq("author.role", "admin"))
-  .pipe(QueryStream.flatMap(commentsOn, { innerKey: ["_creationTime"] }));
-```
-
-Each admin note's comment stream runs in turn. The result's key is the outer key followed by the inner key; `n5` has no comments, so it contributes only a filtered marker that keeps cursors moving:
-
-{/* stream-diagram: join */}
-
-```text
-admin
-╰─ n1 ──────────────────── n4 ──────── n5 ───────┤
-   [1]                     [4]         [5]
-of n1
-╰─ c1 ──────── c2 ───────┤
-                        of n4
-                        ╰─ c3 ───────┤
-                                    of n5
-                                    ╰┤
-
-╞═ flatMap((note) => commentsOn(note), { innerKey: ["_creationTime"] }) ═╡
-
-joined
-╰─ c1 ──────── c2 ──────── c3 ──────── (n5) ─────┤
-   [1,7]       [1,8]       [4,9]       [5,null]
-```
-
-Pass the inner streams' order key as `innerKey`; it is checked against the type of the stream the function returns. Inner streams must run in the outer stream's direction: with `QueryStream.flatMap(outer, f, options)` the outer stream fixes it and a differing inner stream is a type error, while with `outer.pipe(QueryStream.flatMap(f, options))` the inner streams fix it. A mismatch the types can't see fails when the join runs.
-
-The result's order key is the concatenation `["_creationTime", "_creationTime"]` here: the outer note's, then the comment's.
-
-### Left join
-
-`QueryStream.leftJoin` is `flatMap` that keeps outer documents whose inner stream is empty, emitting `onEmpty(outer)` in their place.
-
-In SQL terms, it is `LEFT JOIN LATERAL`: an outer row with no inner rows still appears once, with `onEmpty` standing in for the `NULL` inner columns, so every outer document contributes at least one element.
-
-```ts
-// Every admin note with its comments, and notes without any as a single
-// entry saying so.
-reader
-  .table("notes")
-  .stream("by_role", (q) => q.eq("author.role", "admin"))
-  .pipe(
-    QueryStream.leftJoin(
-      (note) =>
-        commentsOn(note).pipe(
-          QueryStream.map((comment) => ({ note, comment })),
-        ),
-      {
-        innerKey: ["_creationTime"],
-        onEmpty: (note) => ({ note, comment: undefined }),
-      },
-    ),
-  );
-```
-
-The placeholder (`∅n5`, that is `onEmpty(n5)`) takes the position the filtered marker had in the inner join, so it sorts first within its outer document and pagination steps past it like any element:
-
-{/* stream-diagram: left-join */}
-
-```text
-admin
-╰─ n1 ──────────────────── n4 ──────── n5 ───────┤
-   [1]                     [4]         [5]
-of n1
-╰─ c1 ──────── c2 ───────┤
-                        of n4
-                        ╰─ c3 ───────┤
-                                    of n5
-                                    ╰┤
-
-╞═ leftJoin((note) => commentsOn(note), { innerKey, onEmpty }) ═╡
-
-joined
-╰─ c1 ──────── c2 ──────── c3 ──────── ∅n5 ──────┤
-   [1,7]       [1,8]       [4,9]       [5,null]
-```
-
-The elements are the inner stream's documents or the placeholders, so give both a common shape as above. Outer documents filtered out before the join stay absent. Everything else, including the `innerKey` check and the direction rules, is `flatMap`'s.
-
 ### Distinct
 
 `QueryStream.distinct` keeps the first document for each distinct value of a prefix of the order key.
@@ -493,11 +413,137 @@ distinct
 
 The fields must be a prefix of the stream's order key, which is enforced at the type level. On a `flatMap` result, a prefix that reaches into the inner key groups by the outer document as well, since groups are runs of consecutive equal keys. A distinct stream can't be [reversed](#reverse), since the other direction would keep a different document per group. Apply `filter` (or `filterEffect`) _after_ `distinct` rather than before it, so that a filtered-out document can't hide its group's first match from a resumed page.
 
+### Narrow to a key range
+
+`QueryStream.narrow` restricts a stream to the order keys strictly after `after` and at or before `until`, in stream order. `paginate` uses it to resume from a cursor; call it yourself to bound a composed stream by key.
+
+In SQL terms, it adds keyset predicates on the `ORDER BY` columns, `WHERE (text, _creationTime) > (:after) AND (text, _creationTime) <= (:until)`, to every query in the composition. The bounds are pushed down through every combinator into the index ranges of the underlying queries, so the skipped keys are never read.
+
+```ts
+const between = QueryStream.narrow(reader.table("notes").stream("by_text"), {
+  after: ["banana", 2],
+  until: ["cherry", 4],
+});
+```
+
+The bounds become index-range predicates on the leaf, so the elements outside them are not read at all:
+
+{/* stream-diagram: narrow */}
+
+```text
+by_text
+╰─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── n6 ───────┤
+   [apple,1]   [apple,3]   [banana,2]  [banana,5]  [cherry,4]  [date,6]
+                                     ╎ after                 ╎ until
+
+╞═ narrow({ after: [banana, 2], until: [cherry, 4] }) ═╡
+
+narrowed
+╰───────────────────────────────────── n5 ──────── n4 ───────┤
+                                       [banana,5]  [cherry,4]
+```
+
+Cursors are serialized keys: `QueryStream.deserializeCursor(page.continueCursor)` turns a page's cursor into an `after` bound.
+
+### Flat-map
+
+`QueryStream.flatMap` runs an inner stream for each document of an outer stream and concatenates the results, ordered by the outer key and then the inner key.
+
+In SQL terms, `flatMap` is `CROSS JOIN LATERAL` (`CROSS APPLY`): the inner query can reference the outer row, and the result is ordered by the outer key, then the inner key. An outer row whose inner query returns nothing contributes no rows, so this is an inner join; [`onEmpty`](#keep-outer-documents-without-inner-documents) makes it a left join.
+
+```ts
+// The comments on admin notes, grouped by note in note order and by
+// creation time within each note.
+const commentsOn = (note: NotesDoc) =>
+  reader.table("comments").stream("by_note", (q) => q.eq("noteId", note._id));
+
+reader
+  .table("notes")
+  .stream("by_role", (q) => q.eq("author.role", "admin"))
+  .pipe(QueryStream.flatMap(commentsOn, { innerKey: ["_creationTime"] }));
+```
+
+Each admin note's comment stream runs in turn. The result's key is the outer key followed by the inner key; `n5` has no comments, so it contributes only a filtered marker that keeps cursors moving:
+
+{/* stream-diagram: flat-map */}
+
+```text
+admin
+╰─ n1 ──────────────────── n4 ──────── n5 ───────┤
+   [1]                     [4]         [5]
+of n1
+╰─ c1 ──────── c2 ───────┤
+                        of n4
+                        ╰─ c3 ───────┤
+                                    of n5
+                                    ╰┤
+
+╞═ flatMap((note) => commentsOn(note), { innerKey: ["_creationTime"] }) ═╡
+
+joined
+╰─ c1 ──────── c2 ──────── c3 ──────── (n5) ─────┤
+   [1,7]       [1,8]       [4,9]       [5,null]
+```
+
+Pass the inner streams' order key as `innerKey`; it is checked against the type of the stream the function returns. Inner streams must run in the outer stream's direction: with `QueryStream.flatMap(outer, f, options)` the outer stream fixes it and a differing inner stream is a type error, while with `outer.pipe(QueryStream.flatMap(f, options))` the inner streams fix it. A mismatch the types can't see fails when the join runs.
+
+The result's order key is the concatenation `["_creationTime", "_creationTime"]` here: the outer note's, then the comment's.
+
+### Keep outer documents without inner documents
+
+By default an outer document whose inner stream is empty contributes nothing. Pass `onEmpty` to `flatMap` to keep it: the document is emitted as `onEmpty(outer)`, and the element type widens to include that placeholder.
+
+In SQL terms, `onEmpty` turns the `CROSS JOIN LATERAL` into a `LEFT JOIN LATERAL`: an outer row with no inner rows still appears once, with the placeholder standing in for the `NULL` inner columns, so every outer document contributes at least one element.
+
+```ts
+// Every admin note with its comments, and notes without any as a single
+// entry saying so.
+reader
+  .table("notes")
+  .stream("by_role", (q) => q.eq("author.role", "admin"))
+  .pipe(
+    QueryStream.flatMap(
+      (note) =>
+        commentsOn(note).pipe(
+          QueryStream.map((comment) => ({ note, comment })),
+        ),
+      {
+        innerKey: ["_creationTime"],
+        onEmpty: (note) => ({ note, comment: undefined }),
+      },
+    ),
+  );
+```
+
+The placeholder (`∅n5`, that is `onEmpty(n5)`) takes the position the filtered marker had without `onEmpty`, so it sorts first within its outer document and pagination steps past it like any element:
+
+{/* stream-diagram: on-empty */}
+
+```text
+admin
+╰─ n1 ──────────────────── n4 ──────── n5 ───────┤
+   [1]                     [4]         [5]
+of n1
+╰─ c1 ──────── c2 ───────┤
+                        of n4
+                        ╰─ c3 ───────┤
+                                    of n5
+                                    ╰┤
+
+╞═ flatMap((note) => commentsOn(note), { innerKey, onEmpty }) ═╡
+
+joined
+╰─ c1 ──────── c2 ──────── c3 ──────── ∅n5 ──────┤
+   [1,7]       [1,8]       [4,9]       [5,null]
+```
+
+The elements are the inner stream's documents or the placeholders, so give both a common shape as above. Outer documents filtered out before the join stay absent. Everything else, including the `innerKey` check and the direction rules, is unchanged.
+
 ### Rename the order key
 
-`QueryStream.orderBy` relabels a stream's order key positionally without changing how it is sorted.
+`QueryStream.renameKey` relabels a stream's order key positionally. It does not sort: the elements and their order are untouched.
 
-In SQL terms, it is column aliasing (`AS`) that makes the branches of a `UNION ALL` line up by position. It is not `ORDER BY`, which it does not change; the elements and their order are untouched.
+In SQL terms, it is column aliasing (`AS`) that makes the branches of a `UNION ALL` line up by position, not `ORDER BY`.
 
 Use it to merge streams from different indexes or tables that sort by the same kind of value under different field names. Since merged streams must also share a document type, map each side to a common shape first:
 
@@ -523,21 +569,21 @@ const entries = QueryStream.merge([
         kind: "comment",
         text: comment.body,
       })),
-      QueryStream.orderBy(["text", "_creationTime"]),
+      QueryStream.renameKey(["text", "_creationTime"]),
     ),
 ]);
 ```
 
 Relabeling changes the key's field names and nothing else:
 
-{/* stream-diagram: order-by */}
+{/* stream-diagram: rename-key */}
 
 ```text
 by_body
 ╰─ c1 ──────── c2 ──────── c3 ───────┤
    [great,7]   [meh,8]     [nice,9]     key: [body, _creationTime]
 
-╞═ orderBy(["text", "_creationTime"]) ═╡
+╞═ renameKey(["text", "_creationTime"]) ═╡
 
 relabeled
 ╰─ c1 ──────── c2 ──────── c3 ───────┤
@@ -546,7 +592,7 @@ relabeled
 
 With matching key names, the two streams merge by their key values — here, alphabetically:
 
-{/* stream-diagram: order-by-merge */}
+{/* stream-diagram: rename-key-merge */}
 
 ```text
 notes
@@ -590,39 +636,7 @@ reversed
    [6]         [5]         [4]         [3]         [2]         [1]
 ```
 
-Merges, filters and maps, joins (their inner streams included), `orderBy`, and `empty` all reverse. A `distinct` stream can't: it keeps the first document of each group, and a reversed scan would keep the last, so `reverse` throws. For the mirror query, reverse the input and apply `distinct` to that.
-
-### Narrow to a key range
-
-`QueryStream.narrow` restricts a stream to the order keys strictly after `after` and at or before `until`, in stream order. `paginate` uses it to resume from a cursor; call it yourself to bound a composed stream by key.
-
-In SQL terms, it adds keyset predicates on the `ORDER BY` columns, `WHERE (text, _creationTime) > (:after) AND (text, _creationTime) <= (:until)`, to every query in the composition. The bounds are pushed down through every combinator into the index ranges of the underlying queries, so the skipped keys are never read.
-
-```ts
-const between = QueryStream.narrow(reader.table("notes").stream("by_text"), {
-  after: ["banana", 2],
-  until: ["cherry", 4],
-});
-```
-
-The bounds become index-range predicates on the leaf, so the elements outside them are not read at all:
-
-{/* stream-diagram: narrow */}
-
-```text
-by_text
-╰─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── n6 ───────┤
-   [apple,1]   [apple,3]   [banana,2]  [banana,5]  [cherry,4]  [date,6]
-                                     ╎ after                 ╎ until
-
-╞═ narrow({ after: [banana, 2], until: [cherry, 4] }) ═╡
-
-narrowed
-╰───────────────────────────────────── n5 ──────── n4 ───────┤
-                                       [banana,5]  [cherry,4]
-```
-
-Cursors are serialized keys: `QueryStream.deserializeCursor(page.continueCursor)` turns a page's cursor into an `after` bound.
+Merges, filters and maps, flat-maps (their inner streams included), `renameKey`, and `empty` all reverse. A `distinct` stream can't: it keeps the first document of each group, and a reversed scan would keep the last, so `reverse` throws. For the mirror query, reverse the input and apply `distinct` to that.
 
 ## Paginating a stream
 
