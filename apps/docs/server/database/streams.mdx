@@ -44,10 +44,7 @@ Effect.gen(function* () {
 
 ## How this page is written
 
-Each operation is described in two vocabularies, then shown on one small dataset.
-
-- **As a stream**, an operation is an Effect `Stream` operation, usually the one of the same name, that additionally keeps the order key so the result is still a query stream.
-- **In SQL**, a query stream is an ordered result set — `reader.table("notes").stream("by_text")` is `SELECT * FROM notes ORDER BY text, _creationTime` — and each operation is a clause built around it.
+Each operation is described with its SQL analogy, then shown on one small dataset. In SQL terms a query stream is an ordered result set — `reader.table("notes").stream("by_text")` is `SELECT * FROM notes ORDER BY text, _creationTime` — and each operation is a clause built around it.
 
 ### The example data
 
@@ -74,6 +71,8 @@ Every example on this page runs over these two tables:
 
 A stream is drawn as a track, read left to right in **key order** — the way a marble diagram reads left to right in time, with the index's ordering as the axis:
 
+{/* stream-diagram: legend */}
+
 ```text
 by_text       ─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── n6 ───────┤
                 [apple,1]   [apple,3]   [banana,2]  [banana,5]  [cherry,4]  [date,6]
@@ -87,29 +86,28 @@ by_text       ─ n1 ──────── n3 ──────── n2 ─
 
 ## Operations at a glance
 
-| Operation                                                     | As a stream                                                                                    | In SQL                                                                    |
-| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| [`stream`](#creating-a-stream)                                | A source stream that re-runs its index query each time it runs                                 | `SELECT * FROM table WHERE <index range> ORDER BY <index fields>`         |
-| [`Stream.runCollect`, `runHead`, `take`](#consuming-a-stream) | Effect's sinks and combinators, giving up the order key                                        | The whole result set, `LIMIT 1`, `LIMIT n`                                |
-| [`unique`](#consuming-a-stream)                               | `Stream.runHead` that also fails on a second element                                           | A query expected to return at most one row                                |
-| [`empty`](#empty-streams)                                     | `Stream.empty` that still knows its order key                                                  | The empty relation, `WHERE false`, with the same `ORDER BY`               |
-| [`merge`](#merge)                                             | A k-way ordered merge of streams that share an ordering                                        | `UNION ALL` of queries with the same `ORDER BY`, kept in that order       |
-| [`filter` / `filterEffect`](#filter-and-map)                  | `Stream.filter` / `Stream.filterEffect`, keeping cursor accounting                             | `WHERE` on any column; `WHERE EXISTS (subquery)` for the effectful form   |
-| [`map` / `mapEffect`](#filter-and-map)                        | `Stream.map` / `Stream.mapEffect`, keeping the order key                                       | The `SELECT` list; a scalar subquery in it for the effectful form         |
-| [`flatMap`](#join)                                            | Sequential `Stream.flatMap`, extending the order key with the inner key                        | `CROSS JOIN LATERAL` (`CROSS APPLY`), ordered by outer key then inner key |
-| [`leftJoin`](#left-join)                                      | `flatMap` that emits a placeholder for an empty inner stream                                   | `LEFT JOIN LATERAL`, with `onEmpty` standing in for the `NULL` columns    |
-| [`distinct`](#distinct)                                       | The first element of each run of equal key prefixes, by seeking past each group                | `SELECT DISTINCT ON (prefix)` as a loose index scan                       |
-| [`orderBy`](#rename-the-order-key)                            | Relabels the order key's field names; nothing is reordered                                     | Column aliases (`AS`) so `UNION ALL` branches line up                     |
-| [`reverse`](#reverse)                                         | The same composition with every leaf read in the other order                                   | `ORDER BY ... ASC` flipped to `DESC` (or back) on the whole query         |
-| [`narrow`](#narrow-to-a-key-range)                            | `Stream.dropWhile` / `Stream.takeWhile` on the order key, pushed into every leaf's index range | Keyset predicates on the `ORDER BY` columns                               |
-| [`paginate`](#paginating-a-stream)                            | A sink that folds one page and reports the key it stopped at                                   | Keyset pagination: `WHERE key > :cursor ORDER BY key LIMIT n`             |
+| Operation                                                     | In SQL                                                                    |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| [`stream`](#creating-a-stream)                                | `SELECT * FROM table WHERE <index range> ORDER BY <index fields>`         |
+| [`Stream.runCollect`, `runHead`, `take`](#consuming-a-stream) | The whole result set, `LIMIT 1`, `LIMIT n`                                |
+| [`unique`](#consuming-a-stream)                               | A query expected to return at most one row                                |
+| [`empty`](#empty-streams)                                     | The empty relation, `WHERE false`, with the same `ORDER BY`               |
+| [`merge`](#merge)                                             | `UNION ALL` of queries with the same `ORDER BY`, kept in that order       |
+| [`filter` / `filterEffect`](#filter-and-map)                  | `WHERE` on any column; `WHERE EXISTS (subquery)` for the effectful form   |
+| [`map` / `mapEffect`](#filter-and-map)                        | The `SELECT` list; a scalar subquery in it for the effectful form         |
+| [`flatMap`](#join)                                            | `CROSS JOIN LATERAL` (`CROSS APPLY`), ordered by outer key then inner key |
+| [`leftJoin`](#left-join)                                      | `LEFT JOIN LATERAL`, with `onEmpty` standing in for the `NULL` columns    |
+| [`distinct`](#distinct)                                       | `SELECT DISTINCT ON (prefix)` as a loose index scan                       |
+| [`orderBy`](#rename-the-order-key)                            | Column aliases (`AS`) so `UNION ALL` branches line up                     |
+| [`reverse`](#reverse)                                         | `ORDER BY ... ASC` flipped to `DESC` (or back) on the whole query         |
+| [`narrow`](#narrow-to-a-key-range)                            | Keyset predicates on the `ORDER BY` columns                               |
+| [`paginate`](#paginating-a-stream)                            | Keyset pagination: `WHERE key > :cursor ORDER BY key LIMIT n`             |
 
 ## Creating a stream
 
 `stream` takes an index name, an optional range callback, and an optional order (`"asc"` by default). It returns a `QueryStream` whose elements are decoded documents, in index order.
 
-- **As a stream:** a source stream, like `Stream.fromIterable` over an index scan, that re-runs its query on every run, so a stream value is a reusable description of a query rather than a result.
-- **In SQL:** an index range scan, `SELECT * FROM notes WHERE <range> ORDER BY <index fields> [DESC]`. `eq` calls are the equality predicates, the bound calls are the range predicates, and the `ORDER BY` columns left after the equality predicates are the stream's order key.
+In SQL terms, `stream` is an index range scan, `SELECT * FROM notes WHERE <range> ORDER BY <index fields> [DESC]`. `eq` calls are the equality predicates, the bound calls are the range predicates, and the `ORDER BY` columns left after the equality predicates are the stream's order key. A stream value is a reusable description of a query rather than a result: every run re-runs the index query.
 
 ```ts Every note, sorted by text
 reader.table("notes").stream("by_text");
@@ -128,6 +126,8 @@ reader.table("notes").stream("by_text", (q) => q.eq("text", "apple"));
 ```
 
 The four streams over the example data, with each element's key. A bound keeps a field in the key; pinning with `eq` removes it:
+
+{/* stream-diagram: creating */}
 
 ```text
 by_text       ─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── n6 ───────┤
@@ -162,8 +162,9 @@ The order key determines which streams can be merged: two streams can only be me
 
 `QueryStream.empty` is a query stream with no documents but a known order key, for the places where a stream is required and there is nothing to put in it. Its usual job is a merge over a list of streams that may turn out empty, since `merge` needs at least one input.
 
-- **As a stream:** `Stream.empty` that still knows its order key and direction, so it merges with, and paginates like, any stream of that key.
-- **In SQL:** the empty relation, `SELECT ... WHERE false`, with the same `ORDER BY`.
+In SQL terms, it is the empty relation, `SELECT ... WHERE false`, with the same `ORDER BY`, so it merges with, and paginates like, any stream of that key.
+
+{/* stream-diagram: empty */}
 
 ```text
 nothing       ┤
@@ -193,8 +194,7 @@ const notesByRoles = (roles: ReadonlyArray<"admin" | "user">) =>
 
 A query stream is a genuine `Stream`, so everything in Effect's `Stream` module applies (`QueryStream.isQueryStream` tells the two apart at runtime):
 
-- **As a stream:** any Effect sink or combinator. `Stream.runCollect` drains the stream, `Stream.runHead` takes its first element, `Stream.take(n)` its first `n`.
-- **In SQL:** the whole result set, `LIMIT 1`, and `LIMIT n`.
+In SQL terms, `Stream.runCollect` is the whole result set, `Stream.runHead` is `LIMIT 1`, and `Stream.take(n)` is `LIMIT n`.
 
 ```ts
 import * as Stream from "effect/Stream";
@@ -215,8 +215,7 @@ Once you apply a plain `Stream` combinator the result is an ordinary `Stream`: i
 
 `QueryStream.unique` consumes a stream expected to hold at most one document, returning an `Option` and failing with `NotUniqueError` if there are two or more:
 
-- **As a stream:** `Stream.runHead` that also pulls a second element to make sure there isn't one.
-- **In SQL:** a query that must return at most one row, the way Convex's `.unique()` does; the equivalent of `LIMIT 2` followed by a check.
+In SQL terms, it is a query that must return at most one row, the way Convex's `.unique()` does: `LIMIT 2` followed by a check.
 
 ```ts
 const cherry =
@@ -225,6 +224,8 @@ const cherry =
     reader.table("notes").stream("by_text", (q) => q.eq("text", "cherry")),
   );
 ```
+
+{/* stream-diagram: unique */}
 
 ```text
 eq "cherry"   ─ n4 ───────┤   → Some(n4)
@@ -244,8 +245,7 @@ Each combinator below returns another query stream, so results stay mergeable an
 
 `QueryStream.merge` interleaves streams that share an order key into one ordered stream. Merging is how you query over several index ranges at once, such as the notes by two roles in the example at the top of this page.
 
-- **As a stream:** a k-way ordered merge, the step of merge sort that combines sorted runs. It pulls from every input and always emits the smallest next key (the largest, descending). It is not `Stream.merge`, which interleaves inputs in arrival order.
-- **In SQL:** `UNION ALL` of queries that share an `ORDER BY`, with the result still in that order (what a query planner calls a merge append).
+In SQL terms, `merge` is `UNION ALL` of queries that share an `ORDER BY`, with the result still in that order (what a query planner calls a merge append). It is an ordered merge, the step of merge sort that combines sorted runs, always emitting the smallest next key (the largest, descending). It is not `Stream.merge`, which interleaves inputs in arrival order.
 
 ```ts
 const admin = reader
@@ -259,6 +259,8 @@ const merged = QueryStream.merge([admin, user]);
 ```
 
 Pinning `author.role` leaves both streams with the order key `["_creationTime"]`, so the merge interleaves them by creation time:
+
+{/* stream-diagram: merge */}
 
 ```text
 admin         ─ n1 ──────────────────────────────── n4 ──────── n5 ───────────────────┤
@@ -278,8 +280,7 @@ All inputs must have the same order key, document type, and order direction, whi
 
 `QueryStream.filter` and `QueryStream.map` are the `filter` and `map` that keep the result a query stream.
 
-- **As a stream:** `Stream.filter` and `Stream.map` that preserve the order key. The plain `Stream` versions work on a query stream too, but like any plain combinator they return an ordinary `Stream` that can no longer be merged or paginated (see [Consuming a stream](#consuming-a-stream)). A document that `QueryStream.filter` rejects still counts as _read_, so cursors keep advancing past it and pagination stays correct.
-- **In SQL:** `filter` is a `WHERE` on any column, evaluated after the index scan (rows it rejects were still read); `map` is the `SELECT` list, projecting or computing columns while the `ORDER BY` columns stay in force.
+In SQL terms, `filter` is a `WHERE` on any column, evaluated after the index scan (rows it rejects were still read), and `map` is the `SELECT` list, projecting or computing columns while the `ORDER BY` columns stay in force. The plain `Stream.filter` and `Stream.map` work on a query stream too, but like any plain combinator they return an ordinary `Stream` that can no longer be merged or paginated (see [Consuming a stream](#consuming-a-stream)). A document that `QueryStream.filter` rejects still counts as _read_, so cursors keep advancing past it and pagination stays correct.
 
 ```ts
 reader
@@ -292,6 +293,8 @@ reader
 ```
 
 The hidden note is read, rejected, and kept in the cursor accounting; the mapped elements keep their keys even though the key's fields are no longer in the elements:
+
+{/* stream-diagram: filter-map */}
 
 ```text
 by_text       ─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── n6 ───────┤
@@ -312,8 +315,7 @@ A mapper must not change what the documents are ordered by — the mapped stream
 
 When the predicate or mapper needs to run an effect — read another table, use a service, or fail with a typed error — use `QueryStream.filterEffect` and `QueryStream.mapEffect` instead. They behave the same way, and the effect's error and requirement types flow into the stream's:
 
-- **As a stream:** `Stream.filterEffect` and `Stream.mapEffect`, keeping the order key.
-- **In SQL:** a `WHERE` whose predicate runs a subquery (`WHERE EXISTS (...)`), and a scalar subquery in the `SELECT` list.
+In SQL terms, `filterEffect` is a `WHERE` whose predicate runs a subquery (`WHERE EXISTS (...)`), and `mapEffect` a scalar subquery in the `SELECT` list.
 
 ```ts
 // Comments on notes that aren't hidden.
@@ -353,8 +355,7 @@ reader
 
 `QueryStream.flatMap` runs an inner stream for each document of an outer stream and concatenates the results, ordered by the outer key and then the inner key.
 
-- **As a stream:** `Stream.flatMap` run sequentially, so each outer element's inner stream is drained before the next outer element's begins, with the order key extended by the inner key.
-- **In SQL:** `CROSS JOIN LATERAL` (`CROSS APPLY`): the inner query can reference the outer row, and the result is ordered by the outer key, then the inner key. An outer row whose inner query returns nothing contributes no rows, so this is an inner join, not a left join.
+In SQL terms, `flatMap` is `CROSS JOIN LATERAL` (`CROSS APPLY`): the inner query can reference the outer row, and the result is ordered by the outer key, then the inner key. An outer row whose inner query returns nothing contributes no rows, so this is an inner join, not a left join.
 
 ```ts
 // The comments on admin notes, grouped by note in note order and by
@@ -369,6 +370,8 @@ reader
 ```
 
 Each admin note's comment stream runs in turn. The result's key is the outer key followed by the inner key; `n5` has no comments, so it contributes only a filtered marker that keeps cursors moving:
+
+{/* stream-diagram: join */}
 
 ```text
 admin         ─ n1 ──────────────────── n4 ──────── n5 ───────┤
@@ -391,8 +394,7 @@ The result's order key is the concatenation `["_creationTime", "_creationTime"]`
 
 `QueryStream.leftJoin` is `flatMap` that keeps outer documents whose inner stream is empty, emitting `onEmpty(outer)` in their place.
 
-- **As a stream:** `flatMap` whose empty inner streams are replaced by one element, so every outer document contributes at least one.
-- **In SQL:** `LEFT JOIN LATERAL`: an outer row with no inner rows still appears once, with `onEmpty` standing in for the `NULL` inner columns.
+In SQL terms, it is `LEFT JOIN LATERAL`: an outer row with no inner rows still appears once, with `onEmpty` standing in for the `NULL` inner columns, so every outer document contributes at least one element.
 
 ```ts
 // Every admin note with its comments, and notes without any as a single
@@ -416,6 +418,8 @@ reader
 
 The placeholder (`∅n5`, that is `onEmpty(n5)`) takes the position the filtered marker had in the inner join, so it sorts first within its outer document and pagination steps past it like any element:
 
+{/* stream-diagram: left-join */}
+
 ```text
 admin         ─ n1 ──────────────────── n4 ──────── n5 ───────┤
                 [1]                     [4]         [5]
@@ -435,8 +439,7 @@ The elements are the inner stream's documents or the placeholders, so give both 
 
 `QueryStream.distinct` keeps the first document for each distinct value of a prefix of the order key.
 
-- **As a stream:** the first element of each run of equal key prefixes, as if deduplicating consecutive keys, but implemented by seeking past each group with a fresh index read instead of scanning the rest of it.
-- **In SQL:** PostgreSQL's `SELECT DISTINCT ON (prefix) ... ORDER BY prefix, ...`, the first row of each group, executed as a loose index scan (skip scan).
+In SQL terms, it is PostgreSQL's `SELECT DISTINCT ON (prefix) ... ORDER BY prefix, ...`, the first row of each group, executed as a loose index scan (skip scan): after a group's first document it seeks past the group with a fresh index read instead of scanning the rest of it.
 
 ```ts
 // One note per distinct text.
@@ -447,6 +450,8 @@ reader
 ```
 
 After `n1` is found, the stream seeks straight to the first key past `apple`; `n3` is never read. The same happens after `n2` for `banana`:
+
+{/* stream-diagram: distinct */}
 
 ```text
 by_text       ─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── n6 ───────┤
@@ -464,8 +469,7 @@ The fields must be a prefix of the stream's order key, which is enforced at the 
 
 `QueryStream.orderBy` relabels a stream's order key positionally without changing how it is sorted.
 
-- **As a stream:** a declaration about the order key's field names; the elements and their order are untouched. It exists so that `merge` accepts streams whose keys agree positionally.
-- **In SQL:** column aliases (`AS`) that make the branches of a `UNION ALL` line up by position. It is not `ORDER BY`, which it does not change.
+In SQL terms, it is column aliasing (`AS`) that makes the branches of a `UNION ALL` line up by position. It is not `ORDER BY`, which it does not change; the elements and their order are untouched.
 
 Use it to merge streams from different indexes or tables that sort by the same kind of value under different field names. Since merged streams must also share a document type, map each side to a common shape first:
 
@@ -498,6 +502,8 @@ const entries = QueryStream.merge([
 
 Relabeling changes the key's field names and nothing else:
 
+{/* stream-diagram: order-by */}
+
 ```text
 by_body       ─ c1 ──────── c2 ──────── c3 ───────┤
                 [great,7]   [meh,8]     [nice,9]     key: [body, _creationTime]
@@ -509,6 +515,8 @@ relabeled     ─ c1 ──────── c2 ──────── c3 ─
 ```
 
 With matching key names, the two streams merge by their key values — here, alphabetically:
+
+{/* stream-diagram: order-by-merge */}
 
 ```text
 notes         ─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── n6 ───────────────────────────────────────────┤
@@ -526,8 +534,7 @@ The new key must have exactly as many fields as the old one, and the values unde
 
 `QueryStream.reverse` runs a composed stream in the opposite direction. Its typical use is bidirectional pagination: the stream that loads a feed's later pages, reversed, loads its earlier ones.
 
-- **As a stream:** the same composition with every leaf rebuilt in the other order. The elements come out reversed, but they are read that way from the index rather than collected and reversed, so the result is still a query stream.
-- **In SQL:** flipping `ORDER BY ... ASC` to `DESC` (or back) on the whole query.
+In SQL terms, it flips `ORDER BY ... ASC` to `DESC` (or back) on the whole query. Every leaf is rebuilt in the other order, so the elements come out reversed but are read that way from the index rather than collected and reversed, and the result is still a query stream.
 
 ```ts
 const oldestFirst = QueryStream.merge([admin, user]); // "asc"
@@ -535,6 +542,8 @@ const newestFirst = QueryStream.reverse(oldestFirst); // "desc"
 ```
 
 Reversing the merge reverses each of its inputs and merges them the other way:
+
+{/* stream-diagram: reverse */}
 
 ```text
 merged        ─ n1 ──────── n2 ──────── n3 ──────── n4 ──────── n5 ──────── n6 ───────┤
@@ -552,8 +561,7 @@ Merges, filters and maps, joins (their inner streams included), `orderBy`, and `
 
 `QueryStream.narrow` restricts a stream to the order keys strictly after `after` and at or before `until`, in stream order. `paginate` uses it to resume from a cursor; call it yourself to bound a composed stream by key.
 
-- **As a stream:** `Stream.dropWhile` up to `after` and `Stream.takeWhile` up to `until` on the order key, but pushed down through every combinator into the index ranges of the underlying queries, so the skipped keys are never read.
-- **In SQL:** keyset predicates on the `ORDER BY` columns, `WHERE (text, _creationTime) > (:after) AND (text, _creationTime) <= (:until)`, added to every query in the composition.
+In SQL terms, it adds keyset predicates on the `ORDER BY` columns, `WHERE (text, _creationTime) > (:after) AND (text, _creationTime) <= (:until)`, to every query in the composition. The bounds are pushed down through every combinator into the index ranges of the underlying queries, so the skipped keys are never read.
 
 ```ts
 const between = QueryStream.narrow(reader.table("notes").stream("by_text"), {
@@ -563,6 +571,8 @@ const between = QueryStream.narrow(reader.table("notes").stream("by_text"), {
 ```
 
 The bounds become index-range predicates on the leaf, so the elements outside them are not read at all:
+
+{/* stream-diagram: narrow */}
 
 ```text
 by_text       ─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── n6 ───────┤
@@ -581,10 +591,11 @@ Cursors are serialized keys: `QueryStream.deserializeCursor(page.continueCursor)
 
 `QueryStream.paginate` consumes one page of any composed stream, using the same `paginationOpts` shape that Convex's built-in `paginate` does.
 
-- **As a stream:** a sink. It runs the stream narrowed to the keys after `cursor` (and up to `endCursor`, when given), folds `numItems` documents that pass the filters into a page, and reports the key it stopped at as the next cursor.
-- **In SQL:** keyset pagination, `WHERE (key) > :cursor ORDER BY key LIMIT :numItems`; with `endCursor`, `AND (key) <= :endCursor` and no `LIMIT`. Because a cursor is a key rather than an offset, a page costs one page of reads wherever it starts.
+In SQL terms, it is keyset pagination, `WHERE (key) > :cursor ORDER BY key LIMIT :numItems`; with `endCursor`, `AND (key) <= :endCursor` and no `LIMIT`. It runs the stream narrowed to the keys after `cursor` (and up to `endCursor`, when given), folds `numItems` documents that pass the filters into a page, and reports the key it stopped at as the next cursor. Because a cursor is a key rather than an offset, a page costs one page of reads wherever it starts.
 
 Three pages of two over the filtered notes. Each page starts where the previous one's cursor points, so no page re-reads an earlier one; the hidden note is read on the last page, counted, and not returned:
+
+{/* stream-diagram: paginate */}
 
 ```text
 filtered      ─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── (n6) ─────┤
@@ -604,6 +615,8 @@ page 1        ─ n1 ──────── n3 ───────╎  conti
 ```
 
 With an `endCursor`, a page covers exactly the range between its two cursors, however many documents that range holds as data changes, which is how reactive clients keep adjacent pages gap-free:
+
+{/* stream-diagram: end-cursor */}
 
 ```text
 filtered      ─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── (n6) ─────┤

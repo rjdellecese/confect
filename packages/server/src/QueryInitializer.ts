@@ -110,12 +110,10 @@ export interface QueryInitializer<
    * Effect `Stream` of documents in index order that stays mergeable and
    * paginable.
    *
-   * - As a stream: a source stream that re-runs its index query on every
-   *   run, so the value is a reusable description of a query.
-   * - In SQL: an index range scan — `SELECT * FROM table WHERE <range>
-   *   ORDER BY <index fields> [DESC]`; `eq` calls are the equality
-   *   predicates, the bound calls are the range predicates.
-   *
+   * In SQL terms: an index range scan — `SELECT * FROM table WHERE <range>
+   * ORDER BY <index fields> [DESC]`; `eq` calls are the equality
+   * predicates, the bound calls are the range predicates. The value is a
+   * reusable description of a query: each run re-runs the index query.   *
    * The typed range builder consumes `eq`-pinned fields from the index's
    * field tuple at the type level, so the stream's order-key type is
    * exactly the fields that still vary (the `ORDER BY` columns left after
