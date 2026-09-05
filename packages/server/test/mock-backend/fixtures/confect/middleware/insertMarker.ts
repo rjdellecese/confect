@@ -6,9 +6,8 @@ import { DatabaseWriter } from "../_generated/services";
  * in by appending to the `notes` table. Server-only, and imported only by
  * `*.impl.ts` modules — a `*.spec.ts` may not reach it.
  */
-export const insertMarker = (text: string) =>
-  Effect.gen(function* () {
-    const writer = yield* DatabaseWriter;
+export const insertMarker = Effect.fnUntraced(function* (text: string) {
+  const writer = yield* DatabaseWriter;
 
-    yield* writer.table("notes").insert({ text });
-  }).pipe(Effect.orDie);
+  yield* writer.table("notes").insert({ text });
+}, Effect.orDie);

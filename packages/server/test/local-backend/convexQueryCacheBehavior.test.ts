@@ -43,17 +43,15 @@ const SLEEP_PAST_CACHE = Duration.sum(
   Duration.seconds(1),
 );
 
-const captureAcrossEvictionWindow = <PublicQueryRef extends Ref.AnyPublicQuery>(
-  ref: PublicQueryRef,
-  ...args: Ref.OptionalArgs<PublicQueryRef>
-) =>
-  Effect.gen(function* () {
-    const { client } = yield* LocalBackend.LocalBackend;
-    const initial = yield* queryOnce(client, ref, ...args);
-    yield* Effect.sleep(SLEEP_PAST_CACHE);
-    const afterMaxCacheAge = yield* queryOnce(client, ref, ...args);
-    return { initial, afterMaxCacheAge };
-  });
+const captureAcrossEvictionWindow = Effect.fnUntraced(function* <
+  PublicQueryRef extends Ref.AnyPublicQuery,
+>(ref: PublicQueryRef, ...args: Ref.OptionalArgs<PublicQueryRef>) {
+  const { client } = yield* LocalBackend.LocalBackend;
+  const initial = yield* queryOnce(client, ref, ...args);
+  yield* Effect.sleep(SLEEP_PAST_CACHE);
+  const afterMaxCacheAge = yield* queryOnce(client, ref, ...args);
+  return { initial, afterMaxCacheAge };
+});
 
 // `excludeTestServices: true` opts out of `TestClock` so `Effect.sleep`
 // waits real wall-clock time and actually crosses the eviction window.

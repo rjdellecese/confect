@@ -384,23 +384,27 @@ export const compileAst = (
 const handleUnion = (
   { types }: SchemaAST.Union,
   isOptionalPropertyOfTypeLiteral: boolean,
-) =>
-  Effect.gen(function* () {
-    const members = isOptionalPropertyOfTypeLiteral
-      ? Array.filter(types, Predicate.not(SchemaAST.isUndefined))
-      : types;
+) => handleUnionTypes(types, isOptionalPropertyOfTypeLiteral);
 
-    const [firstValidator, secondValidator, ...restValidators] =
-      yield* Effect.all(Array.map(members, (type) => compileAst(type)));
+const handleUnionTypes = Effect.fnUntraced(function* (
+  types: SchemaAST.Union["types"],
+  isOptionalPropertyOfTypeLiteral: boolean,
+) {
+  const members = isOptionalPropertyOfTypeLiteral
+    ? Array.filter(types, Predicate.not(SchemaAST.isUndefined))
+    : types;
 
-    if (firstValidator === undefined) {
-      return yield* new EmptyUnionIsNotSupportedError();
-    } else if (secondValidator === undefined) {
-      return firstValidator;
-    } else {
-      return v.union(firstValidator, secondValidator, ...restValidators);
-    }
-  });
+  const [firstValidator, secondValidator, ...restValidators] =
+    yield* Effect.all(Array.map(members, (type) => compileAst(type)));
+
+  if (firstValidator === undefined) {
+    return yield* new EmptyUnionIsNotSupportedError();
+  } else if (secondValidator === undefined) {
+    return firstValidator;
+  } else {
+    return v.union(firstValidator, secondValidator, ...restValidators);
+  }
+});
 
 const handleObjects = (objectsAst: SchemaAST.Objects) =>
   pipe(
@@ -431,35 +435,40 @@ const handleObjects = (objectsAst: SchemaAST.Objects) =>
   );
 
 const handleArrays = ({ elements, rest }: SchemaAST.Arrays) =>
-  Effect.gen(function* () {
-    const [f, s, ...r] = elements;
+  handleArrayElements(elements, rest);
 
-    const elementToValidator = (element: SchemaAST.AST) =>
-      SchemaAST.isOptional(element)
-        ? Effect.fail(new OptionalTupleElementsAreNotSupportedError())
-        : compileAst(element);
+const handleArrayElements = Effect.fnUntraced(function* (
+  elements: SchemaAST.Arrays["elements"],
+  rest: SchemaAST.Arrays["rest"],
+) {
+  const [f, s, ...r] = elements;
 
-    const arrayItemsValidator = yield* f === undefined
-      ? pipe(
-          rest,
-          Array.head,
-          Option.match({
-            onNone: () => Effect.fail(new EmptyTupleIsNotSupportedError()),
-            onSome: (type) => compileAst(type),
-          }),
-        )
-      : s === undefined
-        ? elementToValidator(f)
-        : Effect.gen(function* () {
-            const firstValidator = yield* elementToValidator(f);
-            const secondValidator = yield* elementToValidator(s);
-            const restValidators = yield* Effect.forEach(r, elementToValidator);
+  const elementToValidator = (element: SchemaAST.AST) =>
+    SchemaAST.isOptional(element)
+      ? Effect.fail(new OptionalTupleElementsAreNotSupportedError())
+      : compileAst(element);
 
-            return v.union(firstValidator, secondValidator, ...restValidators);
-          });
+  const arrayItemsValidator = yield* f === undefined
+    ? pipe(
+        rest,
+        Array.head,
+        Option.match({
+          onNone: () => Effect.fail(new EmptyTupleIsNotSupportedError()),
+          onSome: (type) => compileAst(type),
+        }),
+      )
+    : s === undefined
+      ? elementToValidator(f)
+      : Effect.gen(function* () {
+          const firstValidator = yield* elementToValidator(f);
+          const secondValidator = yield* elementToValidator(s);
+          const restValidators = yield* Effect.forEach(r, elementToValidator);
 
-    return v.array(arrayItemsValidator);
-  });
+          return v.union(firstValidator, secondValidator, ...restValidators);
+        });
+
+  return v.array(arrayItemsValidator);
+});
 
 const handlePropertySignatures = (objectsAst: SchemaAST.Objects) =>
   pipe(
