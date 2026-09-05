@@ -22,6 +22,7 @@ export {
   type VectorIndexes,
   type Doc,
   type Fields,
+  type Scope,
   type WithName,
   type TablesRecord,
 } from "@confect/core/Table";
@@ -59,7 +60,7 @@ export const tableDefinition = <Table extends Table_.AnyWithProps>(
   }
 
   let definition: TableDefinition<any, any, any, any> = defineTable(
-    compileTableSchema(table.Fields),
+    compileTableSchema(table.Fields, table.scope),
   );
   for (const [name, indexFields] of Object.entries(
     table.indexes as Record<string, any>,
@@ -122,4 +123,16 @@ export const systemTables = {
   _storage: storageTable,
 } as const;
 
-export type SystemTables = typeof scheduledFunctionsTable | typeof storageTable;
+export const systemTablesForScope = <const Scope_ extends string>(
+  scope: Scope_,
+) => ({
+  _scheduled_functions: Table_.make(() => scheduledFunctionsTable.Fields)(
+    "_scheduled_functions",
+    scope,
+  ),
+  _storage: Table_.make(() => storageTable.Fields)("_storage", scope),
+});
+
+export type SystemTables<Scope_ extends string = ""> = ReturnType<
+  typeof systemTablesForScope<Scope_>
+>[keyof typeof systemTables];

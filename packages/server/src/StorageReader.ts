@@ -7,6 +7,16 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { BlobNotFoundError } from "./BlobNotFoundError";
+import type * as ScopedId from "@confect/core/GenericId";
+
+export type Service<Scope extends string = ""> = {
+  getUrl: (
+    id: ScopedId.GenericId<"_storage", Scope>,
+  ) => ReturnType<ReturnType<typeof make>["getUrl"]>;
+};
+export type ForScope<Scope extends string> = Scope extends ""
+  ? StorageReader
+  : { readonly "~ScopedStorageReader": Scope };
 
 const make = (storageReader: ConvexStorageReader) => ({
   getUrl: (storageId: GenericId<"_storage">) =>
@@ -32,6 +42,17 @@ export class StorageReader extends Context.Service<
   StorageReader,
   ReturnType<typeof make>
 >()("@confect/server/StorageReader") {
-  static readonly layer = (storageReader: ConvexStorageReader) =>
-    Layer.succeed(this, make(storageReader));
+  static readonly forScope = <Scope extends string = "">(): Context.Service<
+    ForScope<Scope>,
+    Service<Scope>
+  > => Context.Service("@confect/server/StorageReader");
+
+  static readonly layer = <Scope extends string = "">(
+    storageReader: ConvexStorageReader,
+    _scope?: Scope,
+  ) =>
+    Layer.succeed(
+      this.forScope<Scope>(),
+      make(storageReader) as unknown as Service<Scope>,
+    );
 }

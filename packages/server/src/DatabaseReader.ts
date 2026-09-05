@@ -9,7 +9,7 @@ import * as Table from "./Table";
 
 type IncludedTables<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
   | DatabaseSchema.Tables<DatabaseSchema_>
-  | Table.SystemTables;
+  | Table.SystemTables<DatabaseSchema.Scope<DatabaseSchema_>>;
 
 type IncludedDataModel<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
   DataModel.DataModel<IncludedTables<DatabaseSchema_>>;
@@ -40,13 +40,14 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
     DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
   >,
 ): DatabaseReaderService<DatabaseSchema_> => {
+  const systemTables = Table.systemTablesForScope(databaseSchema.target.scope);
   return {
     table: <
       const TableName extends Table.Name<IncludedTables<DatabaseSchema_>>,
     >(
       tableName: TableName,
     ) => {
-      const isSystem = Object.hasOwn(Table.systemTables, tableName);
+      const isSystem = Object.hasOwn(systemTables, tableName);
 
       const baseDatabaseReader: BaseDatabaseReader<any> = isSystem
         ? {
@@ -64,9 +65,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
 
       const table = (
         isSystem
-          ? (Table.systemTables as Record<string, Table.AnyWithProps>)[
-              tableName
-            ]
+          ? (systemTables as Record<string, Table.AnyWithProps>)[tableName]
           : databaseSchema.tables[tableName]
       ) as Table.WithName<IncludedTables<DatabaseSchema_>, TableName>;
 

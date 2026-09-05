@@ -4,6 +4,8 @@ import {
   httpRouter,
   ROUTABLE_HTTP_METHODS,
   type RouteSpecWithPathPrefix,
+  type GenericActionCtx,
+  type GenericDataModel,
 } from "convex/server";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
@@ -16,6 +18,9 @@ import * as HttpRouter from "effect/unstable/http/HttpRouter";
 import * as HttpServer from "effect/unstable/http/HttpServer";
 import type * as ActionRunner from "./ActionRunner";
 import type * as Auth from "./Auth";
+import type * as DatabaseSchema from "./DatabaseSchema";
+import type * as DataModel from "./DataModel";
+import type * as Handler from "./Handler";
 import * as ConvexConfigProvider from "./ConvexConfigProvider";
 import type * as MutationRunner from "./MutationRunner";
 import type * as QueryRunner from "./QueryRunner";
@@ -62,7 +67,7 @@ export type Services =
  * `Config` reads (e.g. in `Layer.unwrap`) resolve against Convex environment
  * variables.
  */
-export type Routes = Layer.Layer<
+export type Routes<Services_ = Services> = Layer.Layer<
   never,
   never,
   | HttpRouter.HttpRouter
@@ -70,8 +75,8 @@ export type Routes = Layer.Layer<
   | FileSystem.FileSystem
   | HttpPlatform.HttpPlatform
   | Path.Path
-  | HttpRouter.Request<"Requires", Services>
-  | HttpRouter.Request<"GlobalRequires", Services>
+  | HttpRouter.Request<"Requires", Services_>
+  | HttpRouter.Request<"GlobalRequires", Services_>
   | HttpRouter.Request<"Error", any>
   | HttpRouter.Request<"GlobalError", any>
 >;
@@ -89,7 +94,24 @@ export type Routes = Layer.Layer<
  * matches exact paths first and longer path prefixes before the catch-all, so
  * they take precedence.
  */
-export const make = (routes: Routes): ConvexHttpRouter => {
+export const make = (routes: Routes): ConvexHttpRouter =>
+  makeWithLayer(routes, RegisteredFunction.baseActionLayer);
+
+/** Derive HTTP capabilities and ID scopes from the generated database schema. */
+export const forSchema =
+  <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
+    schema: DatabaseSchema_,
+  ) =>
+  (routes: Routes<Handler.ActionServices<DatabaseSchema_>>): ConvexHttpRouter =>
+    makeWithLayer<
+      Handler.ActionServices<DatabaseSchema_>,
+      DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
+    >(routes, (ctx) => RegisteredFunction.actionLayer(schema, ctx));
+
+const makeWithLayer = <Services_, DataModel_ extends GenericDataModel>(
+  routes: Routes<Services_>,
+  layer: (ctx: GenericActionCtx<DataModel_>) => Layer.Layer<Services_>,
+): ConvexHttpRouter => {
   applyMonkeyPatches();
 
   // Provided (not just merged) so that route layers' own construction — e.g.
@@ -111,8 +133,12 @@ export const make = (routes: Routes): ConvexHttpRouter => {
   const httpAction = httpActionGeneric((ctx, request): Promise<Response> => {
     // The ctx-backed service layers are all synchronous and finalizer-free,
     // so the scope can close as soon as the context is built.
+    // Convex's HTTP registration erases the data model. The supplied generated
+    // schema restores it; this does not change the runtime context or services.
     const services = Effect.runSync(
-      Effect.scoped(Layer.build(RegisteredFunction.baseActionLayer(ctx))),
+      Effect.scoped(
+        Layer.build(layer(ctx as unknown as GenericActionCtx<DataModel_>)),
+      ),
     );
     return handler(request, services);
   });

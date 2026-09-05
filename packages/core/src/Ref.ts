@@ -5,7 +5,7 @@ import type {
   PaginationOptions,
   PaginationResult,
 } from "convex/server";
-import { makeFunctionReference } from "convex/server";
+import { getFunctionAddress, makeFunctionReference } from "convex/server";
 import type { Value } from "convex/values";
 import { ConvexError } from "convex/values";
 import * as Effect from "effect/Effect";
@@ -31,6 +31,8 @@ export interface Base<
   readonly "~Returns": Returns_;
   readonly "~Error": Error_;
   readonly convexFunctionName: string;
+  /** Preserved for component references and function handles, which have no local name. */
+  readonly functionReference?: ConvexFunctionReference<any, any>;
 }
 
 /**
@@ -366,6 +368,9 @@ const functionReferenceCache = new Map<string, FunctionReference<Any>>();
 export const getFunctionReference = <Ref_ extends Any>(
   ref: Ref_,
 ): FunctionReference<Ref_> => {
+  if (ref.functionReference !== undefined) {
+    return ref.functionReference as FunctionReference<Ref_>;
+  }
   const convexFunctionName = getConvexFunctionName(ref);
 
   const cached = functionReferenceCache.get(convexFunctionName);
@@ -377,6 +382,43 @@ export const getFunctionReference = <Ref_ extends Any>(
   functionReferenceCache.set(convexFunctionName, functionReference);
 
   return functionReference as FunctionReference<Ref_>;
+};
+
+/** Adapt a native reference without assigning Confect codecs or typed errors. */
+export const fromFunctionReference = <
+  Type extends "query" | "mutation" | "action",
+  Visibility extends FunctionVisibility,
+  Args_ extends DefaultFunctionArgs,
+  Returns_,
+>(
+  functionReference: ConvexFunctionReference<Type, Visibility, Args_, Returns_>,
+): ConvexRef<
+  Extract<
+    RuntimeAndFunctionType.RuntimeAndFunctionType,
+    { readonly runtime: "Convex"; readonly functionType: Type }
+  >,
+  Visibility,
+  Args_,
+  Returns_
+> => {
+  const address = getFunctionAddress(functionReference);
+  return {
+    _tag: "Convex",
+    convexFunctionName:
+      address.name ??
+      address.reference ??
+      address.functionHandle ??
+      "<external function>",
+    functionReference,
+  } as ConvexRef<
+    Extract<
+      RuntimeAndFunctionType.RuntimeAndFunctionType,
+      { readonly runtime: "Convex"; readonly functionType: Type }
+    >,
+    Visibility,
+    Args_,
+    Returns_
+  >;
 };
 
 export const hasErrorSchema = (ref: Any): boolean =>

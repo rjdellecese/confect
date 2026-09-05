@@ -8,12 +8,21 @@ import * as Predicate from "effect/Predicate";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as ProjectRoot from "./ProjectRoot";
+import type * as DatabaseSchema from "@confect/server/DatabaseSchema";
 
 export class ConvexDirectory extends Context.Service<
   ConvexDirectory,
-  { readonly get: Effect.Effect<string> }
+  {
+    readonly get: Effect.Effect<string>;
+    readonly target?: DatabaseSchema.Target;
+  }
 >()("@confect/cli/ConvexDirectory") {
   static readonly get = ConvexDirectory.use((service) => service.get);
+  static readonly target = ConvexDirectory.use((service) =>
+    Effect.succeed(
+      service.target ?? { kind: "app" as const, scope: "" as const },
+    ),
+  );
 }
 
 export class ConvexDirectoryNotFoundError extends Schema.TaggedError<ConvexDirectoryNotFoundError>()(

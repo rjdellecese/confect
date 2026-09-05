@@ -6,6 +6,20 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import { BlobNotFoundError } from "./BlobNotFoundError";
+import type * as ScopedId from "@confect/core/GenericId";
+
+export type Service<Scope extends string = ""> = {
+  get: (
+    id: ScopedId.GenericId<"_storage", Scope>,
+  ) => ReturnType<ReturnType<typeof make>["get"]>;
+  store: (
+    blob: Blob,
+    options?: { sha256?: string },
+  ) => Effect.Effect<ScopedId.GenericId<"_storage", Scope>>;
+};
+export type ForScope<Scope extends string> = Scope extends ""
+  ? StorageActionWriter
+  : { readonly "~ScopedStorageActionWriter": Scope };
 
 const make = (storageActionWriter: ConvexStorageActionWriter) => ({
   get: (storageId: GenericId<"_storage">) =>
@@ -28,6 +42,17 @@ export class StorageActionWriter extends Context.Service<
   StorageActionWriter,
   ReturnType<typeof make>
 >()("@confect/server/StorageActionWriter") {
-  static readonly layer = (storageActionWriter: ConvexStorageActionWriter) =>
-    Layer.succeed(this, make(storageActionWriter));
+  static readonly forScope = <Scope extends string = "">(): Context.Service<
+    ForScope<Scope>,
+    Service<Scope>
+  > => Context.Service("@confect/server/StorageActionWriter");
+
+  static readonly layer = <Scope extends string = "">(
+    storageActionWriter: ConvexStorageActionWriter,
+    _scope?: Scope,
+  ) =>
+    Layer.succeed(
+      this.forScope<Scope>(),
+      make(storageActionWriter) as unknown as Service<Scope>,
+    );
 }

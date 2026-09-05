@@ -16,28 +16,31 @@ export class ProjectRoot extends Context.Service<
   static readonly get = ProjectRoot.use((service) => service.get);
 }
 
-export const findProjectRoot = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
+export const findProjectRootFrom = (directory: string) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
 
-  const startDir = path.resolve(".");
-  const root = path.parse(startDir).root;
+    const startDir = path.resolve(directory);
+    const root = path.parse(startDir).root;
 
-  const directories = Array.unfold(startDir, (dir) =>
-    dir === root
-      ? Option.none()
-      : Option.some([dir, path.dirname(dir)] as const),
-  );
+    const directories = Array.unfold(startDir, (dir) =>
+      dir === root
+        ? Option.none()
+        : Option.some([dir, path.dirname(dir)] as const),
+    );
 
-  const projectRoot = yield* Effect.findFirst(directories, (dir) =>
-    fs.exists(path.join(dir, "package.json")),
-  );
+    const projectRoot = yield* Effect.findFirst(directories, (dir) =>
+      fs.exists(path.join(dir, "package.json")),
+    );
 
-  return yield* Option.match(projectRoot, {
-    onNone: () => Effect.fail(new ProjectRootNotFoundError()),
-    onSome: Effect.succeed,
+    return yield* Option.match(projectRoot, {
+      onNone: () => Effect.fail(new ProjectRootNotFoundError()),
+      onSome: Effect.succeed,
+    });
   });
-});
+
+export const findProjectRoot = findProjectRootFrom(".");
 
 export const layer = Layer.effect(
   ProjectRoot,

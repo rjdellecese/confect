@@ -48,6 +48,7 @@ import {
 import { ProjectRoot } from "../ProjectRoot";
 import { generateAuthConfig, generateCrons, generateHttp } from "../utils";
 import { codegenHandler, loadPreviousFunctionPaths } from "./codegen";
+import * as DirectoryOptions from "../DirectoryOptions";
 
 const GENERATED_DIRNAME = "_generated";
 
@@ -177,7 +178,7 @@ const logFunctionPathDiff = (
     );
   });
 
-export const dev = Command.make("dev", {}, () =>
+export const dev = Command.make("dev", DirectoryOptions.flags, () =>
   Effect.gen(function* () {
     yield* logPending("Performing initial sync…");
     const previousFunctionPaths = yield* loadPreviousFunctionPaths;
@@ -225,7 +226,10 @@ export const dev = Command.make("dev", {}, () =>
       { concurrency: "unbounded" },
     );
   }),
-).pipe(Command.withDescription("Start the Confect development server"));
+).pipe(
+  Command.withDescription("Start the Confect development server"),
+  Command.provide(DirectoryOptions.layer),
+);
 
 const esbuildMessageKey = (m: esbuild.Message): string =>
   `${m.location?.file ?? ""}:${m.location?.line ?? ""}:${m.location?.column ?? ""}:${m.text}`;
@@ -349,7 +353,11 @@ const syncLoop = (
 
         yield* logPending("Dependencies may have changed, reloading…");
 
-        if (pending.specDirty) {
+        if (
+          pending.specDirty ||
+          (pending.authDirty &&
+            (yield* ConvexDirectory.target).kind === "component")
+        ) {
           const current = yield* codegenHandler.pipe(
             Effect.tap(({ functionPaths: nextFunctionPaths }) =>
               Effect.gen(function* () {

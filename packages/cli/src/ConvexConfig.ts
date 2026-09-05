@@ -185,6 +185,7 @@ const VALID_COMPONENT_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 export const discoverInstalledComponents = (
   convexConfigPath: string,
   displayPath: string,
+  kind: "app" | "component" = "app",
 ): Effect.Effect<
   ReadonlyArray<InstalledComponent>,
   BuildError | InvalidConvexConfigError,
@@ -205,13 +206,12 @@ export const discoverInstalledComponents = (
     if (
       app === null ||
       typeof app !== "object" ||
-      app._isRoot !== true ||
+      app._isRoot !== (kind === "app") ||
       typeof app.export !== "function"
     ) {
       return yield* new InvalidConvexConfigError({
         configPath: displayPath,
-        reason:
-          "it must default-export the app definition created by `defineApp()`.",
+        reason: `it must default-export the ${kind} definition created by \`${kind === "app" ? "defineApp" : "defineComponent"}()\`.`,
       });
     }
 

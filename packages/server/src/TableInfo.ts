@@ -24,21 +24,25 @@ export type TableInfo<Table_ extends Table.AnyWithProps> =
     infer TableValidator,
     infer Indexes,
     infer SearchIndexes,
-    infer VectorIndexes
+    infer VectorIndexes,
+    infer Scope
   >
     ? {
         readonly [TypeId]: TypeId;
         readonly document: WithSystemFields<
           TableName,
-          Schema.Schema.Type<TableSchema_>
+          Schema.Schema.Type<TableSchema_>,
+          Scope
         >;
         readonly encodedDocument: WithSystemFields<
           TableName,
-          Schema.Codec.Encoded<TableSchema_>
+          Schema.Codec.Encoded<TableSchema_>,
+          Scope
         >;
         readonly convexDocument: ExtractConvexDocument<
           TableName,
-          TableValidator
+          TableValidator,
+          Scope
         >;
         readonly fieldPaths:
           | keyof IdField<TableName>
@@ -81,16 +85,21 @@ export type Document<TableInfo_ extends AnyWithProps> = TableInfo_["document"];
 // Vendored types from convex-js, partially modified.
 // See https://github.com/get-convex/convex-js/pull/14
 
-type ExtractFieldPaths<T extends GenericValidator> =
-  | T["fieldPaths"]
+type ExtractFieldPaths<TableValidator extends GenericValidator> =
+  | TableValidator["fieldPaths"]
   | keyof SystemFields;
 
 type ExtractConvexDocument<
   TableName extends string,
-  T extends GenericValidator,
+  TableValidator extends GenericValidator,
+  Scope extends string = "",
 > =
-  WithSystemFields<TableName, T["type"]> extends GenericDocument
-    ? WithSystemFields<TableName, T["type"]>
+  WithSystemFields<
+    TableName,
+    TableValidator["type"],
+    Scope
+  > extends GenericDocument
+    ? WithSystemFields<TableName, TableValidator["type"], Scope>
     : never;
 
 // End of vendored types from convex-js, partially modified.
