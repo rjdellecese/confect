@@ -118,6 +118,45 @@ describe("published component contracts", () => {
     void publicRef;
   });
 
+  it("passes IDs from decoded collections to functions in the same installation", () => {
+    const collectionSpec = Spec.make().add(
+      GroupSpec.makeAt("items")
+        .addFunction(
+          FunctionSpec.publicQuery({
+            name: "list",
+            returns: () => Schema.toCodecJson(Schema.ReadonlySet(ItemId)),
+          }),
+        )
+        .addFunction(
+          FunctionSpec.publicQuery({
+            name: "get",
+            args: () => ({ id: ItemId }),
+            returns: () => Schema.String,
+          }),
+        ),
+    );
+    const collectionContract = Component.make(collectionSpec, scope, ["items"]);
+    const registry = componentsGeneric() as unknown as {
+      first: Component.Api<typeof collectionSpec, "first">;
+      second: Component.Api<typeof collectionSpec, "second">;
+    };
+    const firstCollection = Component.bind(collectionContract, registry.first);
+    const secondCollection = Component.bind(
+      collectionContract,
+      registry.second,
+    );
+    const decoded = Ref.decodeReturnsSync(firstCollection.items.list, ["one"]);
+    expect(decoded.size).toBe(1);
+    for (const id of decoded) {
+      expect(Ref.encodeArgsSync(firstCollection.items.get, { id })).toEqual({
+        id: "one",
+      });
+      // @ts-expect-error Collection elements belong to the installation that returned them.
+      const other: Ref.Args<typeof secondCollection.items.get> = { id };
+      void other;
+    }
+  });
+
   it("reuses scoped IDs and codecs in host schemas", () => {
     const id = Schema.decodeUnknownSync(Component.id(first, "items"))("one");
     const args: Ref.Args<typeof first.items.get> = { id };

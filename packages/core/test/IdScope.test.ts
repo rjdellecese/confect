@@ -251,6 +251,64 @@ describe("ID scopes", () => {
       }),
   );
 
+  it.effect(
+    "rebinds IDs in collection codecs while preserving their wire values",
+    () =>
+      Effect.gen(function* () {
+        const own = GenericId.GenericId("users", definition);
+        const foreign = GenericId.GenericId("users", second);
+        const input = Schema.toCodecJson(
+          Schema.ReadonlyMap(
+            own,
+            Schema.ReadonlySet(Schema.Struct({ own, foreign })),
+          ),
+        );
+        const bound = GenericId.rebase(input, definition, first);
+        type FirstId = GenericId.GenericId<"users", typeof first>;
+        type SecondId = GenericId.GenericId<"users", typeof second>;
+        expectTypeOf<typeof bound.Type>().toEqualTypeOf<
+          ReadonlyMap<
+            FirstId,
+            ReadonlySet<{ readonly own: FirstId; readonly foreign: SecondId }>
+          >
+        >();
+        const wire: unknown = [["key", [{ own: "own", foreign: "foreign" }]]];
+        const decoded = yield* Schema.decodeUnknownEffect(bound)(wire);
+        expect(decoded).toEqual(
+          new Map([["key", new Set([{ own: "own", foreign: "foreign" }])]]),
+        );
+        expect(yield* Schema.encodeEffect(bound)(decoded)).toEqual(wire);
+        for (const [key, values] of decoded) {
+          expectTypeOf(key).toEqualTypeOf<FirstId>();
+          expect(decoded.get(key)).toBe(values);
+          for (const value of values) {
+            expectTypeOf(value.own).toEqualTypeOf<FirstId>();
+            expectTypeOf(value.foreign).toEqualTypeOf<SecondId>();
+            expectTypeOf(value.own).not.toExtend<SecondId>();
+          }
+        }
+      }),
+  );
+
+  it("preserves collection mutability when rebasing their element types", () => {
+    type DefinitionId = GenericId.GenericId<"users", typeof definition>;
+    type FirstId = GenericId.GenericId<"users", typeof first>;
+    expectTypeOf<
+      GenericId.Rebase<
+        Map<DefinitionId, Set<DefinitionId>>,
+        typeof definition,
+        typeof first
+      >
+    >().toEqualTypeOf<Map<FirstId, Set<FirstId>>>();
+    expectTypeOf<
+      GenericId.Rebase<
+        ReadonlySet<DefinitionId>,
+        typeof definition,
+        typeof first
+      >
+    >().toEqualTypeOf<ReadonlySet<FirstId>>();
+  });
+
   it.effect("preserves declaration codecs, refinements, and annotations", () =>
     Effect.gen(function* () {
       const input = Schema.Option(

@@ -72,9 +72,17 @@ export type Rebase<
           | RegExp
           | ((...args: never[]) => unknown)
       ? A
-      : A extends object
-        ? { [K in keyof A]: Rebase<A[K], From, To> }
-        : A;
+      : A extends Map<infer Key, infer Value>
+        ? Map<Rebase<Key, From, To>, Rebase<Value, From, To>>
+        : A extends ReadonlyMap<infer Key, infer Value>
+          ? ReadonlyMap<Rebase<Key, From, To>, Rebase<Value, From, To>>
+          : A extends Set<infer Value>
+            ? Set<Rebase<Value, From, To>>
+            : A extends ReadonlySet<infer Value>
+              ? ReadonlySet<Rebase<Value, From, To>>
+              : A extends object
+                ? { [K in keyof A]: Rebase<A[K], From, To> }
+                : A;
 
 /**
  * Scope annotations belong to both sides of a codec. Keep its transformations,
