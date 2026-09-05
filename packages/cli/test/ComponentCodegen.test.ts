@@ -60,6 +60,36 @@ it.effect(
 );
 
 it.effect(
+  "keeps a table named target distinct from the component execution target",
+  () =>
+    Effect.gen(function* () {
+      const directory = yield* freshFixture;
+      const fs = yield* FileSystem.FileSystem;
+      yield* fs.writeFileString(
+        `${directory}/confect/tables/target.ts`,
+        `import { Table } from "@confect/core";
+import * as Schema from "effect/Schema";
+export default Table.make(() => Schema.Struct({ name: Schema.String }));
+`,
+      );
+      const dirs = DirectoryOptions.layer({
+        componentDir: Option.some(`${directory}/convex`),
+      });
+      yield* codegenHandler.pipe(Effect.provide(dirs));
+      const schema = yield* fs.readFileString(
+        `${directory}/confect/_generated/schema.ts`,
+      );
+      expect(schema).toContain('import target from "./tables/target";');
+      expect(schema).toContain('import { target as $target } from "./id";');
+      expect(schema).toContain("typeof $target");
+      expect(schema).toContain("}, $target)");
+      expect(
+        (yield* codegenHandler.pipe(Effect.provide(dirs))).anyWritesHappened,
+      ).toBe(false);
+    }).pipe(Effect.provide(NodeServices.layer)),
+);
+
+it.effect(
   "generates the component registry before loading tables with child IDs",
   () =>
     Effect.gen(function* () {

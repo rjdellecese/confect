@@ -107,7 +107,7 @@ export const runtimeSchema = ({
     yield* cbw.blankLine();
 
     if (component) {
-      yield* cbw.writeLine(`import { target } from "./id";`);
+      yield* cbw.writeLine(`import { target as $target } from "./id";`);
       const types =
         Array.join(
           Array.map(tableModules, ({ tableName }) => `typeof ${tableName}`),
@@ -118,7 +118,7 @@ export const runtimeSchema = ({
         ", ",
       );
       yield* cbw.writeLine(
-        `const databaseSchema: $DatabaseSchema.DatabaseSchema<${types}, typeof target> = $DatabaseSchema.make({ ${names} }, target);`,
+        `const databaseSchema: $DatabaseSchema.DatabaseSchema<${types}, typeof $target> = $DatabaseSchema.make({ ${names} }, $target);`,
       );
       yield* cbw.writeLine(`export default databaseSchema;`);
       return yield* cbw.toString();
