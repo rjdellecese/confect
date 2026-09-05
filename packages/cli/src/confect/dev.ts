@@ -31,6 +31,7 @@ import { ConfectDirectory } from "../ConfectDirectory";
 import { CONVEX_CONFIG_FILENAME } from "../ConvexConfig";
 import { ConvexDirectory } from "../ConvexDirectory";
 import * as FunctionPaths from "../FunctionPaths";
+import type * as GroupPath from "../GroupPath";
 import type * as GroupPaths from "../GroupPaths";
 import {
   discoverLeafImplFiles,
@@ -153,8 +154,9 @@ const logFunctionPathDiff = Effect.fnUntraced(function* (
 
   yield* logForGroups(groupsRemoved, functionsRemoved, logFunctionRemoved);
   yield* logForGroups(groupsAdded, functionsAdded, logFunctionAdded);
-  yield* Effect.forEach(groupsChanged, (gp) =>
-    Effect.gen(function* () {
+  yield* Effect.forEach(
+    groupsChanged,
+    Effect.fnUntraced(function* (gp: GroupPath.GroupPath) {
       yield* Effect.forEach(
         Array.fromIterable(
           HashSet.filter(functionsAdded, (fp) =>
@@ -649,7 +651,7 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
 
     yield* Effect.forEach(
       desired,
-      Effect.fnUntraced(function* (entry) {
+      Effect.fnUntraced(function* (entry: EntryPoint) {
         const existing = yield* Ref.get(scopesRef);
         if (existing.has(entry.absolutePath)) return;
 

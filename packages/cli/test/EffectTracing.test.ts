@@ -3,6 +3,7 @@ import * as CodegenError from "@confect/cli/CodegenError";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import { ConvexDirectory } from "@confect/cli/ConvexDirectory";
 import { ProjectRoot } from "@confect/cli/ProjectRoot";
+import * as TableModule from "@confect/cli/TableModule";
 import { codegenHandler } from "@confect/cli/confect/codegen";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
@@ -11,6 +12,7 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as MutableRef from "effect/MutableRef";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Tracer from "effect/Tracer";
@@ -70,6 +72,45 @@ const makeProject = Effect.fnUntraced(function* () {
 layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
   "CLI operation tracing",
   (it) => {
+    it.effect(
+      "captures each table path once per execution without reading it eagerly",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const { confect, directories } = yield* makeProject();
+          yield* fs.writeFileString(
+            path.join(confect, "table.ts"),
+            'import { Table } from "@confect/core";\nimport * as Schema from "effect/Schema";\nexport default Table.make(() => Schema.Struct({}));\n',
+          );
+          yield* fs.writeFileString(
+            path.join(confect, "invalid.ts"),
+            "export default {};\n",
+          );
+          const reads = MutableRef.make(0);
+          const relativePath = MutableRef.make("table.ts");
+          const table: TableModule.TableModule = {
+            tableName: "notes",
+            get relativePath() {
+              MutableRef.increment(reads);
+              return MutableRef.get(relativePath);
+            },
+          };
+          const validate = TableModule.validate([table]).pipe(
+            Effect.provide(directories),
+          );
+          expect(MutableRef.get(reads)).toBe(0);
+          yield* validate;
+          expect(MutableRef.get(reads)).toBe(1);
+
+          MutableRef.set(relativePath, "invalid.ts");
+          const error = yield* Effect.flip(validate);
+          assert(error._tag === "InvalidTableDefaultExportError");
+          expect(error.tablePath).toBe("invalid.ts");
+          expect(MutableRef.get(reads)).toBe(2);
+        }),
+    );
+
     it.effect(
       "creates a fresh operation hierarchy for each codegen execution",
       () =>

@@ -253,8 +253,9 @@ const logGroupPaths = Effect.fnUntraced(function* <R>(
   const path = yield* Path.Path;
   const convexDirectory = yield* ConvexDirectory.get;
 
-  yield* Effect.forEach(groupPaths, (gp) =>
-    Effect.gen(function* () {
+  yield* Effect.forEach(
+    groupPaths,
+    Effect.fnUntraced(function* (gp: GroupPath.GroupPath) {
       const relativeModulePath = yield* GroupPath.modulePath(gp);
       yield* logFn(path.join(convexDirectory, relativeModulePath));
     }),
@@ -274,8 +275,9 @@ export const generateFunctions = Effect.fnUntraced(function* (
   const overlappingGroupPaths = GroupPaths.GroupPaths.make(
     HashSet.intersection(groupPathsFromFs, groupPathsFromSpec),
   );
-  yield* Effect.forEach(overlappingGroupPaths, (groupPath) =>
-    Effect.gen(function* () {
+  yield* Effect.forEach(
+    overlappingGroupPaths,
+    Effect.fnUntraced(function* (groupPath: GroupPath.GroupPath) {
       const group = yield* Effect.fromOption(
         GroupPath.getGroupSpec(spec, groupPath),
       );
@@ -378,8 +380,9 @@ export const writeGroups = (
   spec: Spec.AnyWithProps,
   groupPaths: GroupPaths.GroupPaths,
 ) =>
-  Effect.forEach(groupPaths, (groupPath) =>
-    Effect.gen(function* () {
+  Effect.forEach(
+    groupPaths,
+    Effect.fnUntraced(function* (groupPath: GroupPath.GroupPath) {
       const path = yield* Path.Path;
       const convexDirectory = yield* ConvexDirectory.get;
       const group = yield* Effect.fromOption(

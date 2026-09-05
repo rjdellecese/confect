@@ -211,8 +211,9 @@ const loadAndValidateLeafModules = Effect.gen(function* () {
   const confectDirectory = yield* ConfectDirectory.get;
   const specFiles = yield* discoverLeafSpecFiles;
 
-  const results = yield* Effect.forEach(specFiles, (specRelativePath) =>
-    Effect.gen(function* () {
+  const results = yield* Effect.forEach(
+    specFiles,
+    Effect.fnUntraced(function* (specRelativePath: string) {
       const discovered = yield* toLeafModule(specRelativePath);
       const groupSpec = yield* validateSpec(discovered);
       // Fill in the runtime now that the spec is bundled; discovery left it `None`.
@@ -362,8 +363,9 @@ const validateOrphanImpls = Effect.fnUntraced(function* (
   const implFiles = yield* discoverLeafImplFiles;
   const specPaths = new Set(specFiles);
 
-  yield* Effect.forEach(implFiles, (implRelativePath) =>
-    Effect.gen(function* () {
+  yield* Effect.forEach(
+    implFiles,
+    Effect.fnUntraced(function* (implRelativePath: string) {
       const specRelativePath = yield* specPathForImpl(implRelativePath);
       if (specPaths.has(specRelativePath)) {
         return;
@@ -386,8 +388,9 @@ const removeLegacyFiles = Effect.gen(function* () {
   const confectDirectory = yield* ConfectDirectory.get;
   const legacyPaths = yield* LEGACY_PATHS;
 
-  yield* Effect.forEach(legacyPaths, (relativePath) =>
-    Effect.gen(function* () {
+  yield* Effect.forEach(
+    legacyPaths,
+    Effect.fnUntraced(function* (relativePath: string) {
       const absolutePath = path.join(confectDirectory, relativePath);
       if (yield* fs.exists(absolutePath)) {
         yield* removePathIfExists(absolutePath);
@@ -425,8 +428,9 @@ const generateGroupRegisteredFunctions = Effect.fnUntraced(function* (
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
 
-  yield* Effect.forEach(leaves, (leaf) =>
-    Effect.gen(function* () {
+  yield* Effect.forEach(
+    leaves,
+    Effect.fnUntraced(function* (leaf: LeafModule) {
       const registryRelativePath = yield* registeredFunctionsRelativePath(leaf);
       const registryPath = path.join(
         confectDirectory,
@@ -646,8 +650,9 @@ const tableModuleBindings = Effect.fnUntraced(function* (
 
   const generatedTablesDirname = yield* GENERATED_TABLES_DIRNAME;
 
-  return yield* Effect.forEach(tableModules, (tableModule) =>
-    Effect.gen(function* () {
+  return yield* Effect.forEach(
+    tableModules,
+    Effect.fnUntraced(function* (tableModule: TableModule.TableModule) {
       const wrapperAbsolutePath = path.join(
         confectDirectory,
         generatedTablesDirname,
@@ -696,26 +701,25 @@ const generateTableWrappers = Effect.fnUntraced(function* (
 
   yield* Effect.forEach(
     tableModules,
-    (tableModule) =>
-      Effect.gen(function* () {
-        const wrapperPath = path.join(
-          confectDirectory,
-          generatedTablesDirname,
-          `${tableModule.tableName}.ts`,
-        );
-        const unnamedAbsolutePath = path.join(
-          confectDirectory,
-          tableModule.relativePath,
-        );
-        const unnamedImportPath = yield* toModuleImportPath(
-          path.relative(path.dirname(wrapperPath), unnamedAbsolutePath),
-        );
-        const contents = yield* templates.tableWrapper({
-          tableName: tableModule.tableName,
-          unnamedImportPath,
-        });
-        yield* writeFileStringAndLog(wrapperPath, contents);
-      }),
+    Effect.fnUntraced(function* (tableModule: TableModule.TableModule) {
+      const wrapperPath = path.join(
+        confectDirectory,
+        generatedTablesDirname,
+        `${tableModule.tableName}.ts`,
+      );
+      const unnamedAbsolutePath = path.join(
+        confectDirectory,
+        tableModule.relativePath,
+      );
+      const unnamedImportPath = yield* toModuleImportPath(
+        path.relative(path.dirname(wrapperPath), unnamedAbsolutePath),
+      );
+      const contents = yield* templates.tableWrapper({
+        tableName: tableModule.tableName,
+        unnamedImportPath,
+      });
+      yield* writeFileStringAndLog(wrapperPath, contents);
+    }),
     { concurrency: "unbounded" },
   );
 });
