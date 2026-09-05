@@ -2,6 +2,7 @@ import { FunctionSpec, Ref } from "@confect/core";
 import { act, renderHook } from "@testing-library/react";
 import { ConvexError } from "convex/values";
 import * as Schema from "effect/Schema";
+import * as MutableRef from "effect/MutableRef";
 import { assert, beforeEach, describe, expect, test } from "@effect/vitest";
 import { vi } from "vitest";
 import { useStreamPaginatedQuery } from "@confect/react";
@@ -56,10 +57,10 @@ const listOrFail = Ref.make(
  * page's `paginationOpts` — so tests observe exactly which page ranges the
  * hook subscribes, and control when each loads.
  */
-let responses: Map<string, unknown>;
+const responses = MutableRef.make(new Map<string, unknown>());
 
 const respond = (paginationOpts: object, result: unknown) => {
-  responses.set(JSON.stringify(paginationOpts), result);
+  MutableRef.get(responses).set(JSON.stringify(paginationOpts), result);
 };
 
 const subscribedOpts = () =>
@@ -78,14 +79,16 @@ const subscribedOpts = () =>
 const current = <A>(result: { readonly current: A }): A => result.current;
 
 beforeEach(() => {
-  responses = new Map();
+  MutableRef.set(responses, new Map());
   useQueriesMock.mockReset();
   useQueriesMock.mockImplementation(
     (queries: Record<string, { args: { paginationOpts: unknown } }>) =>
       Object.fromEntries(
         Object.entries(queries).map(([key, request]) => [
           key,
-          responses.get(JSON.stringify(request.args.paginationOpts)),
+          MutableRef.get(responses).get(
+            JSON.stringify(request.args.paginationOpts),
+          ),
         ]),
       ),
   );

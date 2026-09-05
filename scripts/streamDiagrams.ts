@@ -297,34 +297,33 @@ const MARKED_BLOCK =
   /\{\/\* stream-diagram: ([a-z-]+) \*\/\}\n\n?```text\n[\s\S]*?\n```/g;
 
 /** The page with every marked diagram block regenerated. */
-export const renderDiagrams = (
+export const renderDiagrams = Effect.fnUntraced(function* (
   source: string,
-): Effect.Effect<string, StreamDiagramsError> =>
-  Effect.gen(function* () {
-    const seen = new Set<string>();
-    let unknown: string | undefined;
-    const rendered = source.replace(MARKED_BLOCK, (match, name: string) => {
-      const diagram = diagrams[name];
-      if (diagram === undefined) {
-        unknown ??= name;
-        return match;
-      }
-      seen.add(name);
-      return `{/* stream-diagram: ${name} */}\n\n\`\`\`text\n${diagram}\n\`\`\``;
-    });
-    if (unknown !== undefined) {
-      return yield* new StreamDiagramsError({
-        reason: `${PAGE} references an unknown diagram: ${unknown}`,
-      });
+): Effect.fn.Return<string, StreamDiagramsError> {
+  const seen = new Set<string>();
+  let unknown: string | undefined;
+  const rendered = source.replace(MARKED_BLOCK, (match, name: string) => {
+    const diagram = diagrams[name];
+    if (diagram === undefined) {
+      unknown ??= name;
+      return match;
     }
-    const unused = Object.keys(diagrams).filter((name) => !seen.has(name));
-    if (unused.length > 0) {
-      return yield* new StreamDiagramsError({
-        reason: `${PAGE} has no block for: ${unused.join(", ")}`,
-      });
-    }
-    return rendered;
+    seen.add(name);
+    return `{/* stream-diagram: ${name} */}\n\n\`\`\`text\n${diagram}\n\`\`\``;
   });
+  if (unknown !== undefined) {
+    return yield* new StreamDiagramsError({
+      reason: `${PAGE} references an unknown diagram: ${unknown}`,
+    });
+  }
+  const unused = Object.keys(diagrams).filter((name) => !seen.has(name));
+  if (unused.length > 0) {
+    return yield* new StreamDiagramsError({
+      reason: `${PAGE} has no block for: ${unused.join(", ")}`,
+    });
+  }
+  return rendered;
+});
 
 export interface SyncOptions {
   readonly check?: boolean;

@@ -13,6 +13,7 @@ import * as MutableRef from "effect/MutableRef";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { describe, expect, expectTypeOf, test } from "@effect/vitest";
+import { vi } from "vitest";
 
 import * as FunctionSpec from "@confect/core/FunctionSpec";
 import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
@@ -20,6 +21,94 @@ import * as PaginationOptions from "@confect/core/PaginationOptions";
 import * as PaginationResult from "@confect/core/PaginationResult";
 import * as Ref from "@confect/core/Ref";
 import type * as RuntimeAndFunctionType from "@confect/core/RuntimeAndFunctionType";
+
+describe("runWithCodec", () => {
+  class NotFound extends Schema.TaggedError<NotFound>()("NotFound", {
+    id: Schema.String,
+  }) {}
+
+  class TransportFailure extends Schema.TaggedError<TransportFailure>()(
+    "TransportFailure",
+    {
+      cause: Schema.Unknown,
+    },
+  ) {}
+
+  const ref = Ref.make(
+    "notes",
+    FunctionSpec.publicQuery({
+      name: "count",
+      args: () => ({ count: Schema.FiniteFromString }),
+      returns: () => Schema.FiniteFromString,
+      error: () => NotFound,
+    }),
+  );
+
+  it.effect(
+    "defers encoding and invocation and repeats the codec workflow",
+    () =>
+      Effect.gen(function* () {
+        const readCount = vi.fn(() => 1);
+        const invoke = vi.fn(() => Promise.resolve("2"));
+        const effect = Ref.runWithCodec(
+          ref,
+          {
+            get count() {
+              return readCount();
+            },
+          },
+          invoke,
+        );
+
+        expectTypeOf(effect).toEqualTypeOf<
+          Effect.Effect<number, NotFound | Schema.SchemaError>
+        >();
+        expect(readCount).not.toHaveBeenCalled();
+        expect(invoke).not.toHaveBeenCalled();
+
+        expect(yield* effect).toBe(2);
+        readCount.mockReturnValue(3);
+        expect(yield* effect).toBe(2);
+        expect(invoke).toHaveBeenNthCalledWith(
+          1,
+          Ref.getFunctionReference(ref),
+          { count: "1" },
+        );
+        expect(invoke).toHaveBeenNthCalledWith(
+          2,
+          Ref.getFunctionReference(ref),
+          { count: "3" },
+        );
+      }),
+  );
+
+  it.effect("preserves typed Convex failures", () =>
+    Effect.gen(function* () {
+      const effect = Ref.runWithCodec(ref, { count: 1 }, () =>
+        Promise.reject(new ConvexError({ _tag: "NotFound", id: "abc" })),
+      );
+      const error = yield* Effect.flip(effect);
+      expect(error).toEqual(new NotFound({ id: "abc" }));
+    }),
+  );
+
+  it.effect("infers and preserves the caller's unknown-error mapping", () =>
+    Effect.gen(function* () {
+      const rejection = new Error("offline");
+      const effect = Ref.runWithCodec(
+        ref,
+        { count: 1 },
+        () => Promise.reject(rejection),
+        (cause) => new TransportFailure({ cause }),
+      );
+      expectTypeOf(effect).toEqualTypeOf<
+        Effect.Effect<number, NotFound | TransportFailure | Schema.SchemaError>
+      >();
+      const error = yield* Effect.flip(effect);
+      expect(error).toEqual(new TransportFailure({ cause: rejection }));
+    }),
+  );
+});
 
 describe("FunctionReference", () => {
   test("public query", () => {

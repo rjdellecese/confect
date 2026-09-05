@@ -1,9 +1,13 @@
 import * as Ref from "@confect/core/Ref";
 import { type GenericActionCtx } from "convex/server";
-import type { Effect } from "effect";
+import * as Effect from "effect/Effect";
 import * as Context from "effect/Context";
 import * as Layer from "effect/Layer";
 import type * as Schema from "effect/Schema";
+
+const run = Effect.fn("MutationRunner.run")(
+  <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<A, E> => effect,
+);
 
 const make =
   (runMutation: GenericActionCtx<any>["runMutation"]) =>
@@ -14,11 +18,13 @@ const make =
     Ref.Returns<Mutation>,
     Ref.Error<Mutation> | Schema.SchemaError
   > =>
-    Ref.runWithCodec(
-      mutation,
-      (args[0] ?? {}) as Ref.Args<Mutation>,
-      (functionReference, encodedArgs) =>
-        runMutation(functionReference, encodedArgs),
+    run(
+      Ref.runWithCodec(
+        mutation,
+        (args[0] ?? {}) as Ref.Args<Mutation>,
+        (functionReference, encodedArgs) =>
+          runMutation(functionReference, encodedArgs),
+      ),
     );
 
 export const MutationRunner = Context.Service<ReturnType<typeof make>>(

@@ -2,6 +2,16 @@ import type { Options as CodeBlockWriterOptions } from "code-block-writer";
 import CodeBlockWriter_ from "code-block-writer";
 import * as Effect from "effect/Effect";
 
+const indentWriter = Effect.fnUntraced(function* <E, R>(
+  writer: CodeBlockWriter_,
+  effect: Effect.Effect<void, E, R>,
+): Effect.fn.Return<void, E, R> {
+  const indentationLevel = writer.getIndentationLevel();
+  writer.setIndentationLevel(indentationLevel + 1);
+  yield* effect;
+  writer.setIndentationLevel(indentationLevel);
+});
+
 export class CodeBlockWriter {
   private readonly writer: CodeBlockWriter_;
 
@@ -12,13 +22,7 @@ export class CodeBlockWriter {
   indent<E = never, R = never>(
     effect: Effect.Effect<void, E, R>,
   ): Effect.Effect<void, E, R> {
-    const writer = this.writer;
-    return Effect.gen(function* () {
-      const indentationLevel = writer.getIndentationLevel();
-      writer.setIndentationLevel(indentationLevel + 1);
-      yield* effect;
-      writer.setIndentationLevel(indentationLevel);
-    });
+    return indentWriter(this.writer, effect);
   }
 
   writeLine<E = never, R = never>(line: string): Effect.Effect<void, E, R> {

@@ -30,35 +30,35 @@ export const append = (groupPath: GroupPath, groupName: string): GroupPath =>
 /**
  * Expects a path string of the form `./group1/group2.ts`, relative to the Convex functions directory.
  */
-export const fromGroupModulePath = (groupModulePath: string) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
+export const fromGroupModulePath = Effect.fnUntraced(function* (
+  groupModulePath: string,
+) {
+  const path = yield* Path.Path;
 
-    const { dir, name, ext } = path.parse(groupModulePath);
+  const { dir, name, ext } = path.parse(groupModulePath);
 
-    if (ext === ".ts") {
-      const dirSegments = Array.filter(
-        String.split(dir, path.sep),
-        String.isNonEmpty,
-      );
-      yield* Effect.logDebug(Array.append(dirSegments, name));
-      return make(Array.append(dirSegments, name));
-    } else {
-      return yield* new GroupModulePathIsNotATypeScriptFileError({
-        path: groupModulePath,
-      });
-    }
-  });
+  if (ext === ".ts") {
+    const dirSegments = Array.filter(
+      String.split(dir, path.sep),
+      String.isNonEmpty,
+    );
+    yield* Effect.logDebug(Array.append(dirSegments, name));
+    return make(Array.append(dirSegments, name));
+  } else {
+    return yield* new GroupModulePathIsNotATypeScriptFileError({
+      path: groupModulePath,
+    });
+  }
+});
 
 /**
  * Get the module path for a group, relative to the Convex functions directory.
  */
-export const modulePath = (groupPath: GroupPath) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
+export const modulePath = Effect.fnUntraced(function* (groupPath: GroupPath) {
+  const path = yield* Path.Path;
 
-    return path.join(...groupPath.pathSegments) + ".ts";
-  });
+  return path.join(...groupPath.pathSegments) + ".ts";
+});
 
 export const getGroupSpec = (
   spec: Spec.AnyWithProps,

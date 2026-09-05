@@ -176,108 +176,105 @@ const captureBuildResultPlugin = (
  * claim resolutions (e.g. `convex.config` imports) before the workspace and
  * externalization heuristics see them.
  */
-export const bundle = (
+export const bundle = Effect.fn("Bundler.bundle")(function* (
   entryPoint: string,
   options?: { readonly plugins?: ReadonlyArray<esbuild.Plugin> },
-): Effect.Effect<Bundled, BundlerError, Path.Path | FileSystem.FileSystem> =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
-    const fs = yield* FileSystem.FileSystem;
+): Effect.fn.Return<Bundled, BundlerError, Path.Path | FileSystem.FileSystem> {
+  const path = yield* Path.Path;
+  const fs = yield* FileSystem.FileSystem;
 
-    const buildResultRef = yield* Ref.make<CapturedBuildResult>({
-      metafile: undefined,
-      warnings: [],
-    });
-
-    const cwd = path.dirname(entryPoint);
-    const skipPatterns = tsconfigPathsToRegExp(
-      loadTsConfig(cwd)?.data.compilerOptions?.paths ?? {},
-    );
-    const result = yield* Effect.tryPromise({
-      try: () =>
-        bundleRequire({
-          filepath: entryPoint,
-          cwd,
-          format: "esm",
-          esbuildOptions: {
-            plugins: [
-              ...(options?.plugins ?? []),
-              bundleWorkspacePlugin(path, fs, skipPatterns),
-              captureBuildResultPlugin(buildResultRef),
-            ],
-            logLevel: "silent",
-          },
-        }),
-      catch: (cause) => new BundlerError({ cause }),
-    }).pipe(
-      Effect.ensuring(
-        Effect.andThen(Ref.get(buildResultRef), (captured) =>
-          logCoalescedBuildWarnings(captured.warnings),
-        ),
-      ),
-    );
-
-    const { metafile } = yield* Ref.get(buildResultRef);
-    if (!metafile) {
-      return yield* Effect.die(new Error("esbuild metafile missing"));
-    }
-
-    return {
-      module: result.mod,
-      metafile: absolutizeMetafile(path, metafile, cwd),
-    };
+  const buildResultRef = yield* Ref.make<CapturedBuildResult>({
+    metafile: undefined,
+    warnings: [],
   });
 
-const findMetafileInputKey = (
+  const cwd = path.dirname(entryPoint);
+  const skipPatterns = tsconfigPathsToRegExp(
+    loadTsConfig(cwd)?.data.compilerOptions?.paths ?? {},
+  );
+  const result = yield* Effect.tryPromise({
+    try: () =>
+      bundleRequire({
+        filepath: entryPoint,
+        cwd,
+        format: "esm",
+        esbuildOptions: {
+          plugins: [
+            ...(options?.plugins ?? []),
+            bundleWorkspacePlugin(path, fs, skipPatterns),
+            captureBuildResultPlugin(buildResultRef),
+          ],
+          logLevel: "silent",
+        },
+      }),
+    catch: (cause) => new BundlerError({ cause }),
+  }).pipe(
+    Effect.ensuring(
+      Effect.andThen(Ref.get(buildResultRef), (captured) =>
+        logCoalescedBuildWarnings(captured.warnings),
+      ),
+    ),
+  );
+
+  const { metafile } = yield* Ref.get(buildResultRef);
+  if (!metafile) {
+    return yield* Effect.die(new Error("esbuild metafile missing"));
+  }
+
+  return {
+    module: result.mod,
+    metafile: absolutizeMetafile(path, metafile, cwd),
+  };
+});
+
+const findMetafileInputKey = Effect.fnUntraced(function* (
   metafile: esbuild.Metafile,
   absolutePath: string,
-) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
-    const resolved = path.resolve(absolutePath);
-    return Array.findFirst(
-      Object.keys(metafile.inputs),
-      (key) => path.resolve(key) === resolved,
-    );
-  });
+) {
+  const path = yield* Path.Path;
+  const resolved = path.resolve(absolutePath);
+  return Array.findFirst(
+    Object.keys(metafile.inputs),
+    (key) => path.resolve(key) === resolved,
+  );
+});
 
 /**
  * Returns `true` when the module bundled from `sourceAbsolutePath` declares a
  * direct import of `targetAbsolutePath` (according to the bundle's esbuild
  * metafile). Returns `false` if either path is missing from the metafile.
  */
-export const directlyImports = (
+export const directlyImports = Effect.fnUntraced(function* (
   bundled: Bundled,
   sourceAbsolutePath: string,
   targetAbsolutePath: string,
-) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
-    const sourceKey = yield* findMetafileInputKey(
-      bundled.metafile,
-      sourceAbsolutePath,
-    );
-    const targetKey = yield* findMetafileInputKey(
-      bundled.metafile,
-      targetAbsolutePath,
-    );
+) {
+  const path = yield* Path.Path;
+  const sourceKey = yield* findMetafileInputKey(
+    bundled.metafile,
+    sourceAbsolutePath,
+  );
+  const targetKey = yield* findMetafileInputKey(
+    bundled.metafile,
+    targetAbsolutePath,
+  );
 
-    return pipe(
-      Option.all([sourceKey, targetKey]),
-      Option.flatMap(([sourceKey_, targetKey_]) =>
-        Option.fromNullishOr(bundled.metafile.inputs[sourceKey_]).pipe(
-          Option.map((sourceInput) => {
-            const targetResolved = path.resolve(targetKey_);
-            return sourceInput.imports.some(
-              (importedFile) =>
-                path.resolve(importedFile.path) === targetResolved,
-            );
-          }),
-        ),
+  return pipe(
+    Option.all([sourceKey, targetKey]),
+    Option.flatMap(([sourceKey_, targetKey_]) =>
+      Option.fromNullishOr(bundled.metafile.inputs[sourceKey_]).pipe(
+        Option.map((sourceInput) => {
+          const targetResolved = path.resolve(targetKey_);
+          return sourceInput.imports.some(
+            (importedFile) =>
+              path.resolve(importedFile.path) === targetResolved,
+          );
+        }),
       ),
-      Option.getOrElse(() => false),
-    );
-  });
+    ),
+    Option.getOrElse(() => false),
+  );
+});
 
 /**
  * Returns the absolute paths of every module in the bundle that declares a

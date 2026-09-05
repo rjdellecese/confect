@@ -30,12 +30,13 @@ export interface TableModule {
   readonly tableName: string;
 }
 
-const tableNameFromRelativePath = (relativePath: string) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
-    const { name } = path.parse(relativePath);
-    return name;
-  });
+const tableNameFromRelativePath = Effect.fnUntraced(function* (
+  relativePath: string,
+) {
+  const path = yield* Path.Path;
+  const { name } = path.parse(relativePath);
+  return name;
+});
 
 const listTableFiles = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
@@ -88,19 +89,18 @@ export const discover = Effect.gen(function* () {
 
   const tableModules = yield* Effect.forEach(
     relativePaths,
-    (relativePath) =>
-      Effect.gen(function* () {
-        const tableName = yield* tableNameFromRelativePath(relativePath);
-        yield* Effect.try({
-          try: () => Identifier.validateConfectTableIdentifier(tableName),
-          catch: (e) =>
-            new InvalidTableFilenameError({
-              tablePath: relativePath,
-              reason: e instanceof Error ? e.message : String(e),
-            }),
-        });
-        return { relativePath, tableName } satisfies TableModule;
-      }),
+    Effect.fnUntraced(function* (relativePath: string) {
+      const tableName = yield* tableNameFromRelativePath(relativePath);
+      yield* Effect.try({
+        try: () => Identifier.validateConfectTableIdentifier(tableName),
+        catch: (e) =>
+          new InvalidTableFilenameError({
+            tablePath: relativePath,
+            reason: e instanceof Error ? e.message : String(e),
+          }),
+      });
+      return { relativePath, tableName } satisfies TableModule;
+    }),
     { concurrency: "unbounded" },
   );
 
@@ -132,26 +132,30 @@ export const discover = Effect.gen(function* () {
  * table modules typically `import { Id } from "../_generated/id"` for
  * cross-table references.
  */
-export const validate = (tableModules: ReadonlyArray<TableModule>) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
-    const confectDirectory = yield* ConfectDirectory.get;
+export const validate = Effect.fnUntraced(function* (
+  tableModules: ReadonlyArray<TableModule>,
+) {
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
 
-    yield* Effect.forEach(
-      tableModules,
-      ({ relativePath }) =>
-        Effect.gen(function* () {
-          const absolutePath = path.resolve(confectDirectory, relativePath);
-          const { module } = yield* Bundler.bundle(absolutePath).pipe(
-            Effect.mapError((error) => fromBundlerError(relativePath, error)),
-          );
-
-          if (!Table.isUnnamedTable(module.default)) {
-            return yield* new InvalidTableDefaultExportError({
-              tablePath: relativePath,
-            });
-          }
-        }),
-      { concurrency: "unbounded" },
+  const validateRelativePath = Effect.fnUntraced(function* (
+    relativePath: string,
+  ) {
+    const absolutePath = path.resolve(confectDirectory, relativePath);
+    const { module } = yield* Bundler.bundle(absolutePath).pipe(
+      Effect.mapError((error) => fromBundlerError(relativePath, error)),
     );
+
+    if (!Table.isUnnamedTable(module.default)) {
+      return yield* new InvalidTableDefaultExportError({
+        tablePath: relativePath,
+      });
+    }
   });
+
+  yield* Effect.forEach(
+    tableModules,
+    ({ relativePath }: TableModule) => validateRelativePath(relativePath),
+    { concurrency: "unbounded" },
+  );
+});

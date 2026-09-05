@@ -263,12 +263,13 @@ const RequestBody = Schema.fromJsonString(
   }),
 );
 
-const requestBody = (request: HttpClientRequest.HttpClientRequest) =>
-  Effect.gen(function* () {
-    if (request.body._tag !== "Uint8Array") {
-      return yield* Effect.die(new Error("Expected a Uint8Array request body"));
-    }
-    return yield* Schema.decodeEffect(RequestBody)(
-      new TextDecoder().decode(request.body.body),
-    );
-  });
+const requestBody = Effect.fnUntraced(function* (
+  request: HttpClientRequest.HttpClientRequest,
+) {
+  if (request.body._tag !== "Uint8Array") {
+    return yield* Effect.die(new Error("Expected a Uint8Array request body"));
+  }
+  return yield* Schema.decodeEffect(RequestBody)(
+    new TextDecoder().decode(request.body.body),
+  );
+});

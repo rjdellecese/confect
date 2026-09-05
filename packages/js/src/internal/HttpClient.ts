@@ -27,6 +27,18 @@ export interface Transport {
   ) => PromiseLike<unknown>;
 }
 
+const runQuery = Effect.fn("HttpClient.query")(
+  <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<A, E> => effect,
+);
+
+const runMutation = Effect.fn("HttpClient.mutation")(
+  <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<A, E> => effect,
+);
+
+const runAction = Effect.fn("HttpClient.action")(
+  <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<A, E> => effect,
+);
+
 export const make = (client: Transport) => {
   const setAuth = (token: string) =>
     Effect.sync(() => {
@@ -47,12 +59,14 @@ export const make = (client: Transport) => {
     Ref.Error<Query> | HttpClientError | Schema.SchemaError
   > => {
     const args = (rest[0] ?? {}) as Ref.Args<Query>;
-    return Ref.runWithCodec(
-      ref,
-      args,
-      (functionReference, encodedArgs) =>
-        client.query(functionReference, encodedArgs),
-      mapUnknownError,
+    return runQuery(
+      Ref.runWithCodec(
+        ref,
+        args,
+        (functionReference, encodedArgs) =>
+          client.query(functionReference, encodedArgs),
+        mapUnknownError,
+      ),
     );
   };
 
@@ -64,12 +78,14 @@ export const make = (client: Transport) => {
     Ref.Error<Mutation> | HttpClientError | Schema.SchemaError
   > => {
     const args = (rest[0] ?? {}) as Ref.Args<Mutation>;
-    return Ref.runWithCodec(
-      ref,
-      args,
-      (functionReference, encodedArgs) =>
-        client.mutation(functionReference, encodedArgs),
-      mapUnknownError,
+    return runMutation(
+      Ref.runWithCodec(
+        ref,
+        args,
+        (functionReference, encodedArgs) =>
+          client.mutation(functionReference, encodedArgs),
+        mapUnknownError,
+      ),
     );
   };
 
@@ -81,12 +97,14 @@ export const make = (client: Transport) => {
     Ref.Error<Action> | HttpClientError | Schema.SchemaError
   > => {
     const args = (rest[0] ?? {}) as Ref.Args<Action>;
-    return Ref.runWithCodec(
-      ref,
-      args,
-      (functionReference, encodedArgs) =>
-        client.action(functionReference, encodedArgs),
-      mapUnknownError,
+    return runAction(
+      Ref.runWithCodec(
+        ref,
+        args,
+        (functionReference, encodedArgs) =>
+          client.action(functionReference, encodedArgs),
+        mapUnknownError,
+      ),
     );
   };
 

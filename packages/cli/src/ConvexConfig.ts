@@ -182,105 +182,106 @@ const VALID_COMPONENT_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
  * installed on the app, in mount-name order. `displayPath` is used in error
  * messages (mirroring how impl/spec bundling reports relative paths).
  */
-export const discoverInstalledComponents = (
+export const discoverInstalledComponents = Effect.fn(
+  "ConvexConfig.discoverInstalledComponents",
+)(function* (
   convexConfigPath: string,
   displayPath: string,
-): Effect.Effect<
+): Effect.fn.Return<
   ReadonlyArray<InstalledComponent>,
   BuildError | InvalidConvexConfigError,
   Path.Path | FileSystem.FileSystem
-> =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
+> {
+  const path = yield* Path.Path;
 
-    const { module } = yield* Bundler.bundle(convexConfigPath, {
-      plugins: [componentConfigPlugin(path)],
-    }).pipe(Effect.mapError((error) => fromBundlerError(displayPath, error)));
+  const { module } = yield* Bundler.bundle(convexConfigPath, {
+    plugins: [componentConfigPlugin(path)],
+  }).pipe(Effect.mapError((error) => fromBundlerError(displayPath, error)));
 
-    const app = module.default as
-      | { _isRoot?: unknown; export?: unknown }
-      | null
-      | undefined;
+  const app = module.default as
+    | { _isRoot?: unknown; export?: unknown }
+    | null
+    | undefined;
 
-    if (
-      app === null ||
-      typeof app !== "object" ||
-      app._isRoot !== true ||
-      typeof app.export !== "function"
-    ) {
-      return yield* new InvalidConvexConfigError({
+  if (
+    app === null ||
+    typeof app !== "object" ||
+    app._isRoot !== true ||
+    typeof app.export !== "function"
+  ) {
+    return yield* new InvalidConvexConfigError({
+      configPath: displayPath,
+      reason:
+        "it must default-export the app definition created by `defineApp()`.",
+    });
+  }
+
+  const analysis = yield* Effect.try({
+    try: () => (app.export as () => unknown)(),
+    catch: (cause) =>
+      new InvalidConvexConfigError({
         configPath: displayPath,
-        reason:
-          "it must default-export the app definition created by `defineApp()`.",
-      });
-    }
+        reason: `exporting the app definition threw: ${globalThis.String(cause)}.`,
+      }),
+  });
 
-    const analysis = yield* Effect.try({
-      try: () => (app.export as () => unknown)(),
-      catch: (cause) =>
+  const decoded = yield* Schema.decodeUnknownEffect(AppDefinitionAnalysis)(
+    analysis,
+  ).pipe(
+    Effect.mapError(
+      (cause) =>
         new InvalidConvexConfigError({
           configPath: displayPath,
-          reason: `exporting the app definition threw: ${globalThis.String(cause)}.`,
+          reason: `the app definition's installed components could not be read: ${cause.message}.`,
         }),
+    ),
+  );
+
+  const components = pipe(
+    decoded.childComponents,
+    Array.map(
+      ({ name, path: componentDefinitionPath }): InstalledComponent => ({
+        name,
+        componentDefinitionPath,
+      }),
+    ),
+    Array.sort(byName),
+  );
+
+  const invalidNames = pipe(
+    components,
+    Array.map(({ name }) => name),
+    Array.filter((name) =>
+      Option.isNone(String.match(VALID_COMPONENT_NAME)(name)),
+    ),
+  );
+  if (Array.isArrayNonEmpty(invalidNames)) {
+    return yield* new InvalidConvexConfigError({
+      configPath: displayPath,
+      reason: `component names must be alphanumeric plus underscores, but got: ${pipe(
+        invalidNames,
+        Array.map((name) => `"${name}"`),
+        Array.join(", "),
+      )}. Pass a valid \`name\` to \`app.use\`.`,
     });
+  }
 
-    const decoded = yield* Schema.decodeUnknownEffect(AppDefinitionAnalysis)(
-      analysis,
-    ).pipe(
-      Effect.mapError(
-        (cause) =>
-          new InvalidConvexConfigError({
-            configPath: displayPath,
-            reason: `the app definition's installed components could not be read: ${cause.message}.`,
-          }),
-      ),
-    );
+  const duplicateNames = pipe(
+    components,
+    Array.groupBy(({ name }) => name),
+    Record.toEntries,
+    Array.filter(([, group]) => group.length > 1),
+    Array.map(([name]) => name),
+  );
+  if (Array.isArrayNonEmpty(duplicateNames)) {
+    return yield* new InvalidConvexConfigError({
+      configPath: displayPath,
+      reason: `multiple components are installed under the same name (${Array.join(duplicateNames, ", ")}); pass a unique \`name\` to \`app.use\` for each.`,
+    });
+  }
 
-    const components = pipe(
-      decoded.childComponents,
-      Array.map(
-        ({ name, path: componentDefinitionPath }): InstalledComponent => ({
-          name,
-          componentDefinitionPath,
-        }),
-      ),
-      Array.sort(byName),
-    );
-
-    const invalidNames = pipe(
-      components,
-      Array.map(({ name }) => name),
-      Array.filter((name) =>
-        Option.isNone(String.match(VALID_COMPONENT_NAME)(name)),
-      ),
-    );
-    if (Array.isArrayNonEmpty(invalidNames)) {
-      return yield* new InvalidConvexConfigError({
-        configPath: displayPath,
-        reason: `component names must be alphanumeric plus underscores, but got: ${pipe(
-          invalidNames,
-          Array.map((name) => `"${name}"`),
-          Array.join(", "),
-        )}. Pass a valid \`name\` to \`app.use\`.`,
-      });
-    }
-
-    const duplicateNames = pipe(
-      components,
-      Array.groupBy(({ name }) => name),
-      Record.toEntries,
-      Array.filter(([, group]) => group.length > 1),
-      Array.map(([name]) => name),
-    );
-    if (Array.isArrayNonEmpty(duplicateNames)) {
-      return yield* new InvalidConvexConfigError({
-        configPath: displayPath,
-        reason: `multiple components are installed under the same name (${Array.join(duplicateNames, ", ")}); pass a unique \`name\` to \`app.use\` for each.`,
-      });
-    }
-
-    return components;
-  });
+  return components;
+});
 
 /**
  * The module specifier the generated registry's `ComponentApi` type import

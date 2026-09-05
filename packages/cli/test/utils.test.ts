@@ -80,54 +80,64 @@ const runGenerateForNodeGroup = ({
   spec,
   moduleRelativePath,
   registryRelativePath,
+}: Parameters<typeof runGenerateForNodeGroupEffect>[0]) =>
+  runGenerateForNodeGroupEffect({
+    spec,
+    moduleRelativePath,
+    registryRelativePath,
+  });
+
+const runGenerateForNodeGroupEffect = Effect.fnUntraced(function* ({
+  spec,
+  moduleRelativePath,
+  registryRelativePath,
 }: {
   spec: Spec.AnyWithProps;
   moduleRelativePath: string;
   registryRelativePath: string;
-}) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
+}) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
 
-    const root = yield* fs.makeTempDirectoryScoped();
-    const convexDir = path.join(root, "convex");
-    const confectDir = path.join(root, "confect");
-    yield* fs.makeDirectory(convexDir, { recursive: true });
+  const root = yield* fs.makeTempDirectoryScoped();
+  const convexDir = path.join(root, "convex");
+  const confectDir = path.join(root, "confect");
+  yield* fs.makeDirectory(convexDir, { recursive: true });
 
-    const registryPath = path.join(
-      confectDir,
-      "_generated",
-      "registeredFunctions",
-      registryRelativePath,
-    );
-    yield* fs.makeDirectory(path.dirname(registryPath), { recursive: true });
-    yield* fs.writeFileString(registryPath, "export default {};\n");
+  const registryPath = path.join(
+    confectDir,
+    "_generated",
+    "registeredFunctions",
+    registryRelativePath,
+  );
+  yield* fs.makeDirectory(path.dirname(registryPath), { recursive: true });
+  yield* fs.writeFileString(registryPath, "export default {};\n");
 
-    const TempDirsLayer = Layer.mergeAll(
-      Layer.succeed(ProjectRoot, ProjectRoot.of({ get: Effect.succeed(root) })),
-      Layer.succeed(
-        ConvexDirectory,
-        ConvexDirectory.of({ get: Effect.succeed(convexDir) }),
-      ),
-      Layer.succeed(
-        ConfectDirectory,
-        ConfectDirectory.of({ get: Effect.succeed(confectDir) }),
-      ),
-    );
+  const TempDirsLayer = Layer.mergeAll(
+    Layer.succeed(ProjectRoot, ProjectRoot.of({ get: Effect.succeed(root) })),
+    Layer.succeed(
+      ConvexDirectory,
+      ConvexDirectory.of({ get: Effect.succeed(convexDir) }),
+    ),
+    Layer.succeed(
+      ConfectDirectory,
+      ConfectDirectory.of({ get: Effect.succeed(confectDir) }),
+    ),
+  );
 
-    yield* generateFunctions(spec).pipe(Effect.provide(TempDirsLayer));
+  yield* generateFunctions(spec).pipe(Effect.provide(TempDirsLayer));
 
-    const modulePath = path.join(convexDir, moduleRelativePath);
-    const contents = yield* fs.readFileString(modulePath);
+  const modulePath = path.join(convexDir, moduleRelativePath);
+  const contents = yield* fs.readFileString(modulePath);
 
-    const importMatch = contents.match(/from "([^"]+)"/);
-    assert(importMatch !== null, "expected a registry import in the module");
-    const resolved =
-      path.resolve(path.dirname(modulePath), importMatch[1]!) + ".ts";
-    const resolves = yield* fs.exists(resolved);
+  const importMatch = contents.match(/from "([^"]+)"/);
+  assert(importMatch !== null, "expected a registry import in the module");
+  const resolved =
+    path.resolve(path.dirname(modulePath), importMatch[1]!) + ".ts";
+  const resolves = yield* fs.exists(resolved);
 
-    return { contents, resolves };
-  }).pipe(Effect.scoped);
+  return { contents, resolves };
+}, Effect.scoped);
 
 layer(GenerateFunctionsLayer)("generateFunctions", (it) => {
   // A Node group declared with `GroupSpec.makeNode()` generates `convex/<path>.ts`
