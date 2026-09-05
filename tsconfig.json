@@ -43,5 +43,10 @@
     "tools/*/src/**/*",
     "tools/*/test/**/*"
   ],
-  "exclude": ["tools/oxlint-rules"]
+  "exclude": [
+    "tools/oxlint-rules",
+    // Convex emits unused imports and an incorrect nested API import in these
+    // unused helpers. Imported ComponentApi types remain in the checked graph.
+    "packages/server/test/local-backend/fixtures/components/*/convex/_generated"
+  ]
 }
