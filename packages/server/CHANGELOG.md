@@ -1,5 +1,96 @@
 # @confect/server
 
+## 10.0.0-next.22
+
+### Minor Changes
+
+- 9d7de10: Add three operations to `QueryStream`:
+
+  - `QueryStream.empty` builds a query stream with no documents but a known order key and direction, so a merge over a dynamic list of streams has something to return when the list is empty: `QueryStream.empty<NotesDoc>()(["_creationTime"], "desc")`.
+  - `QueryStream.flatMap` accepts an `onEmpty` option that keeps outer documents whose inner stream is empty, emitting `onEmpty(outer)` in their place — SQL's `LEFT JOIN` to the default inner join. The placeholder paginates like any element.
+  - `QueryStream.filterEffect` and `QueryStream.mapEffect` accept `{ concurrency }` to run several documents' effects at once. Elements are still emitted in stream order, so the result remains a query stream.
+
+- 092e011: Enforce `maximumBytesRead` in `QueryStream.paginate`, and accept it as an option of `useStreamPaginatedQuery`.
+
+  `QueryStream.paginate` now charges the estimated size of every document its index queries read, filtered or not, against `paginationOpts.maximumBytesRead`; when the budget is hit the page returns what it has so far with `pageStatus: "SplitRequired"` and a `splitCursor`, just as `maximumRowsRead` does. Previously the option was accepted and ignored.
+
+  `useStreamPaginatedQuery` forwards a `maximumBytesRead` option to every page alongside `maximumRowsRead`, and splits a page the server truncates for exceeding it.
+
+  ```ts
+  const { results, status, loadMore } = useStreamPaginatedQuery(
+    refs.public.notes.feed,
+    {},
+    { initialNumItems: 10, maximumBytesRead: 512 * 1024 },
+  );
+  ```
+
+- 38bc929: Track a `QueryStream`'s order direction in its type. `reader.table(...).stream(...)` now returns a `QueryStream` whose fifth type parameter is `"asc"` (the default), `"desc"`, or the union when the direction is a runtime value, and every combinator preserves it. `QueryStream.merge` requires its inputs to share a direction and `QueryStream.flatMap` requires inner streams to run in the outer stream's direction, so mixing statically known directions is now a type error rather than a failure when the streams are combined. The runtime check remains for directions the types can't see: `merge` throws when the streams are combined, and `flatMap` fails when the join runs.
+
+  Also add `QueryStream.isQueryStream`, a type guard that tells a query stream apart from the plain `Stream` a generic `Stream.*` combinator turns it into.
+
+  The parameter is covariant: a stream of a known direction is also a `QueryStream<Doc, Key, E, R>`, whose direction defaults to `"asc" | "desc"`, so existing annotations keep accepting every stream. `stream` no longer accepts `undefined` as its order argument (omit it instead), so the type can't claim a direction the runtime default would contradict.
+
+- a2e1bfb: Add three combinators to `QueryStream`:
+
+  - `QueryStream.flatMap` joins each document to an inner stream (e.g. each author to their messages), concatenating the order keys in the type system so the joined stream stays mergeable and paginable.
+  - `QueryStream.distinct` emits the first document of each group of consecutive equal order-key prefixes, reading via a loose index scan (one indexed read per group) rather than scanning every row. The requested prefix must be a prefix of the stream's order key, enforced at the type level.
+  - `QueryStream.renameKey` relabels a stream's order key positionally, so streams from different indexes or tables whose keys share value order but not field names can be merged.
+
+- e87428e: Add `QueryStream`, an experimental stream-first querying API. `reader.table(...).stream(index, range?, order?)` returns a genuine Effect `Stream` of documents in index order that stays combinable and paginable: `QueryStream.merge` interleaves streams that share an order key, `QueryStream.filter` and `QueryStream.map` (and their effectful counterparts `filterEffect` and `mapEffect`) transform documents without losing pagination support, `QueryStream.unique` expects at most one result, and `QueryStream.paginate` turns any composed stream into a paginated query page.
+
+  The order key is tracked in the type system: fields pinned with `.eq(...)` in the range builder are consumed from the key, and merging streams whose remaining keys differ is a type error.
+
+  ```ts
+  import { QueryStream } from "@confect/server";
+
+  const inRange = (from: number, to: number) =>
+    reader
+      .table("events")
+      .stream(
+        "from_to",
+        (q) => q.eq("kind", "meeting").gte("start", from).lt("start", to),
+        "desc",
+      );
+
+  const page =
+    yield *
+    QueryStream.merge([inRange(0, 10), inRange(20, 30)]).pipe(
+      QueryStream.filter((event) => !event.cancelled),
+      QueryStream.paginate(paginationOpts),
+    );
+  ```
+
+  `QueryStream.paginate` accepts the same `paginationOpts` as the built-in `paginate`. A cursor that is malformed, or that was issued under a different order key (for example after an index change is deployed), fails the query with a `ConvexError` whose data is `{ paginationError: "InvalidCursor" }` — the signal Confect's React hooks treat as "restart pagination". Stream cursors contain the order-key values of the page boundary rather than an opaque token, so don't paginate publicly over a sensitive indexed field without pinning it with `eq`.
+
+  Streams passed to `QueryStream.merge` must share an order direction as well as an order key. The direction is part of a stream's type: `"asc"` when `stream` is given no order, the literal when given one, and `"asc" | "desc"` when the order is a runtime value. A mismatch between known directions is a type error; one the types can't see makes `merge` throw when the streams are combined.
+
+- f16e41b: Add `QueryStream.reverse`, which runs a composed query stream in the opposite direction. Every leaf is rebuilt with the other order, so the reversed stream reads from the index in that direction rather than collecting and reversing, and it stays a query stream: it merges and paginates like any other. The typical use is bidirectional pagination, loading a feed's earlier pages with the reverse of the stream that loads its later ones.
+
+  Merges, `filter`/`map` and their effectful forms, `flatMap` (inner streams included), `renameKey`, and `empty` all reverse. A `distinct` stream throws when reversed, because the other direction would keep a different document per group; apply `distinct` to the reversed input instead.
+
+- fae04c9: Add `useStreamPaginatedQuery` to `@confect/react` — a paginated query hook for queries built on `QueryStream.paginate`. It has the same call shape and result as `usePaginatedQuery`, but pins every loaded page (including the first, as soon as it loads) to a fixed index range, so items never leak between pages, appear twice, or drop off the end of a page as documents are inserted and deleted, and each page stays an independently reactive subscription.
+
+  ```ts
+  import { useStreamPaginatedQuery } from "@confect/react";
+
+  const { results, status, loadMore } = useStreamPaginatedQuery(
+    refs.public.notes.feed,
+    {},
+    { initialNumItems: 10 },
+  );
+  ```
+
+  The options also accept `maximumRowsRead`, a per-page read budget forwarded to the server: on a stream that filters out most of what it reads, a page that would scan more rows than that is returned truncated with `pageStatus: "SplitRequired"` and the hook splits it, instead of the query exceeding Convex's limits.
+
+  The hook also splits pages that grow too large: `QueryStream.paginate` now reports `pageStatus: "SplitRecommended"` with a `splitCursor` when a range-pinned page has grown well past its requested size, or when any page had to scan far more rows than it returned, and the hook responds by splitting that subscription into two smaller pages.
+
+  When the server reports that a stored cursor no longer matches the query (`paginationError: "InvalidCursor"`), the hook restarts pagination from the first page instead of failing.
+
+### Patch Changes
+
+- 920341e: A `ConvexError` thrown inside a handler's `Effect` (as an exception, rather than placed in the error channel as a typed failure) now reaches the client with its `data` intact, as it does in a plain Convex function. Previously it was delivered as a generic server error.
+- 965f686: `QueryStream.paginate` now resumes from a cursor by reading only the remaining index range instead of re-reading the stream from the start. The cursor bounds are pushed down into the underlying index queries, including through `QueryStream.merge`, `QueryStream.filterEffect`, and `QueryStream.mapEffect` compositions, so later pages cost roughly one page of reads rather than all preceding pages.
+
 ## 10.0.0-next.21
 
 ### Major Changes

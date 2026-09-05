@@ -1,5 +1,7 @@
 # @confect/js
 
+## 10.0.0-next.22
+
 ## 10.0.0-next.21
 
 ### Major Changes

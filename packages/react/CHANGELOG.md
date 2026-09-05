@@ -1,5 +1,41 @@
 # @confect/react
 
+## 10.0.0-next.22
+
+### Minor Changes
+
+- 092e011: Enforce `maximumBytesRead` in `QueryStream.paginate`, and accept it as an option of `useStreamPaginatedQuery`.
+
+  `QueryStream.paginate` now charges the estimated size of every document its index queries read, filtered or not, against `paginationOpts.maximumBytesRead`; when the budget is hit the page returns what it has so far with `pageStatus: "SplitRequired"` and a `splitCursor`, just as `maximumRowsRead` does. Previously the option was accepted and ignored.
+
+  `useStreamPaginatedQuery` forwards a `maximumBytesRead` option to every page alongside `maximumRowsRead`, and splits a page the server truncates for exceeding it.
+
+  ```ts
+  const { results, status, loadMore } = useStreamPaginatedQuery(
+    refs.public.notes.feed,
+    {},
+    { initialNumItems: 10, maximumBytesRead: 512 * 1024 },
+  );
+  ```
+
+- fae04c9: Add `useStreamPaginatedQuery` to `@confect/react` — a paginated query hook for queries built on `QueryStream.paginate`. It has the same call shape and result as `usePaginatedQuery`, but pins every loaded page (including the first, as soon as it loads) to a fixed index range, so items never leak between pages, appear twice, or drop off the end of a page as documents are inserted and deleted, and each page stays an independently reactive subscription.
+
+  ```ts
+  import { useStreamPaginatedQuery } from "@confect/react";
+
+  const { results, status, loadMore } = useStreamPaginatedQuery(
+    refs.public.notes.feed,
+    {},
+    { initialNumItems: 10 },
+  );
+  ```
+
+  The options also accept `maximumRowsRead`, a per-page read budget forwarded to the server: on a stream that filters out most of what it reads, a page that would scan more rows than that is returned truncated with `pageStatus: "SplitRequired"` and the hook splits it, instead of the query exceeding Convex's limits.
+
+  The hook also splits pages that grow too large: `QueryStream.paginate` now reports `pageStatus: "SplitRecommended"` with a `splitCursor` when a range-pinned page has grown well past its requested size, or when any page had to scan far more rows than it returned, and the hook responds by splitting that subscription into two smaller pages.
+
+  When the server reports that a stored cursor no longer matches the query (`paginationError: "InvalidCursor"`), the hook restarts pagination from the first page instead of failing.
+
 ## 10.0.0-next.21
 
 ### Major Changes
