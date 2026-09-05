@@ -28,17 +28,16 @@ const handler = (() => Effect.succeed(null)) as never;
  * `RegisteredFunctions.buildForGroup` and the CLI's `validateImpl` build a
  * group's impl layer) and return the resulting `RegistryItems` tree.
  */
-const collectRegistry = <RIn>(
+const collectRegistry = Effect.fnUntraced(function* <RIn>(
   layer: Layer.Layer<RIn, never, never>,
-): Effect.Effect<RegistryItems.RegistryItems> =>
-  Effect.gen(function* () {
-    const ref = yield* Ref.make<RegistryItems.RegistryItems>({});
-    yield* Layer.build(layer).pipe(
-      Effect.scoped,
-      Effect.provideService(Registry.Registry, ref),
-    );
-    return yield* Ref.get(ref);
-  });
+): Effect.fn.Return<RegistryItems.RegistryItems> {
+  const ref = yield* Ref.make<RegistryItems.RegistryItems>({});
+  yield* Layer.build(layer).pipe(
+    Effect.scoped,
+    Effect.provideService(Registry.Registry, ref),
+  );
+  return yield* Ref.get(ref);
+});
 
 describe("FunctionImpl.make", () => {
   it.effect(

@@ -17,12 +17,24 @@ const block = (name: string): string =>
   `{/* stream-diagram: ${name} */}\n\`\`\`text\nstale\n\`\`\``;
 
 test("tracks and their keys share columns", () => {
-  const elements = track("by_text", ["n1", undefined, "n2"]);
-  const beneath = keys("", ["[apple,1]", undefined, "[banana,2]"]);
+  const [name, elements] = track("by_text", ["n1", undefined, "n2"]).split(
+    "\n",
+  );
+  const beneath = keys(["[apple,1]", undefined, "[banana,2]"]);
+  expect(name).toBe("by_text");
+  expect(elements?.startsWith("╰")).toBe(true);
   // Same width before the end marker, so keys sit beneath their elements.
-  expect(elements.length - 1).toBe(beneath.length);
-  expect(elements.indexOf("n2")).toBe(beneath.indexOf("[banana,2]"));
+  expect(elements?.length).toBe(beneath.length + 1);
+  expect(elements?.indexOf("n2")).toBe(beneath.indexOf("[banana,2]"));
   expect(cell("n1")).toHaveLength(cell("(n6)").length);
+});
+
+test("a track that starts later lines up with the outer track's columns", () => {
+  const [, outer] = track("admin", ["n1", undefined, "n4"]).split("\n");
+  const [name, inner] = track("of n4", ["c3"], "┤", 2).split("\n");
+  // The corner sits under the name, and the inner element under the outer one.
+  expect(inner?.indexOf("╰")).toBe(name?.indexOf("of n4"));
+  expect(inner?.indexOf("c3")).toBe(outer?.indexOf("n4"));
 });
 
 test("renders every marked block and leaves the rest of the page alone", () =>

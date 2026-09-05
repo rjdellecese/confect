@@ -40,6 +40,18 @@ export interface Transport {
   ) => () => void;
 }
 
+const runQuery = Effect.fn("WebSocketClient.query")(
+  <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<A, E> => effect,
+);
+
+const runMutation = Effect.fn("WebSocketClient.mutation")(
+  <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<A, E> => effect,
+);
+
+const runAction = Effect.fn("WebSocketClient.action")(
+  <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<A, E> => effect,
+);
+
 export const make = (address: string, convexClient: Transport) => {
   const setAuth = (
     fetchToken: (args: {
@@ -70,12 +82,14 @@ export const make = (address: string, convexClient: Transport) => {
     Ref.Error<Query> | WebSocketClientError | Schema.SchemaError
   > => {
     const args = (rest[0] ?? {}) as Ref.Args<Query>;
-    return Ref.runWithCodec(
-      ref,
-      args,
-      (functionReference, encodedArgs) =>
-        convexClient.query(functionReference, encodedArgs),
-      mapUnknownError,
+    return runQuery(
+      Ref.runWithCodec(
+        ref,
+        args,
+        (functionReference, encodedArgs) =>
+          convexClient.query(functionReference, encodedArgs),
+        mapUnknownError,
+      ),
     );
   };
 
@@ -87,12 +101,14 @@ export const make = (address: string, convexClient: Transport) => {
     Ref.Error<Mutation> | WebSocketClientError | Schema.SchemaError
   > => {
     const args = (rest[0] ?? {}) as Ref.Args<Mutation>;
-    return Ref.runWithCodec(
-      ref,
-      args,
-      (functionReference, encodedArgs) =>
-        convexClient.mutation(functionReference, encodedArgs),
-      mapUnknownError,
+    return runMutation(
+      Ref.runWithCodec(
+        ref,
+        args,
+        (functionReference, encodedArgs) =>
+          convexClient.mutation(functionReference, encodedArgs),
+        mapUnknownError,
+      ),
     );
   };
 
@@ -104,12 +120,14 @@ export const make = (address: string, convexClient: Transport) => {
     Ref.Error<Action> | WebSocketClientError | Schema.SchemaError
   > => {
     const args = (rest[0] ?? {}) as Ref.Args<Action>;
-    return Ref.runWithCodec(
-      ref,
-      args,
-      (functionReference, encodedArgs) =>
-        convexClient.action(functionReference, encodedArgs),
-      mapUnknownError,
+    return runAction(
+      Ref.runWithCodec(
+        ref,
+        args,
+        (functionReference, encodedArgs) =>
+          convexClient.action(functionReference, encodedArgs),
+        mapUnknownError,
+      ),
     );
   };
 

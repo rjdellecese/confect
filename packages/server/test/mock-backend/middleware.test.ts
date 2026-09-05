@@ -21,16 +21,15 @@ const expectFailure = <A, E>(result: Result.Result<A, E>): E => {
   return result.failure;
 };
 
-const insertUser = (username: string) =>
-  Effect.gen(function* () {
-    const c = yield* TestConfect.TestConfect;
-    yield* c.run(
-      Effect.gen(function* () {
-        const writer = yield* DatabaseWriter;
-        yield* writer.table("users").insert({ username });
-      }),
-    );
-  }).pipe(Effect.orDie);
+const insertUser = Effect.fnUntraced(function* (username: string) {
+  const c = yield* TestConfect.TestConfect;
+  yield* c.run(
+    Effect.gen(function* () {
+      const writer = yield* DatabaseWriter;
+      yield* writer.table("users").insert({ username });
+    }),
+  );
+}, Effect.orDie);
 
 const listNoteTexts = Effect.gen(function* () {
   const c = yield* TestConfect.TestConfect;

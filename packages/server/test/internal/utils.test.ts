@@ -16,19 +16,18 @@ interface BranchLeaves<T> {
   readonly values: Record<string, T>;
 }
 
-const collectLeaves = <T>(
+const collectLeaves = Effect.fnUntraced(function* <T>(
   obj: NestedObject<T>,
   refinement: Predicate.Refinement<unknown, T>,
-) =>
-  Effect.gen(function* () {
-    const results = yield* Ref.make<ReadonlyArray<BranchLeaves<T>>>([]);
+) {
+  const results = yield* Ref.make<ReadonlyArray<BranchLeaves<T>>>([]);
 
-    yield* forEachBranchLeaves(obj, refinement, (branch) =>
-      Ref.update(results, (previous) => [...previous, branch]),
-    );
+  yield* forEachBranchLeaves(obj, refinement, (branch) =>
+    Ref.update(results, (previous) => [...previous, branch]),
+  );
 
-    return yield* Ref.get(results);
-  });
+  return yield* Ref.get(results);
+});
 
 describe("setNestedProperty", () => {
   describe("single-level path", () => {

@@ -394,25 +394,30 @@ const handleUnion = (
   { types }: SchemaAST.Union,
   isOptionalPropertyOfTypeLiteral: boolean,
   scope: IdScope.IdScope,
-) =>
-  Effect.gen(function* () {
-    const members = isOptionalPropertyOfTypeLiteral
-      ? Array.filter(types, Predicate.not(SchemaAST.isUndefined))
-      : types;
+) => handleUnionTypes(types, isOptionalPropertyOfTypeLiteral, scope);
 
-    const [firstValidator, secondValidator, ...restValidators] =
-      yield* Effect.all(
-        Array.map(members, (type) => compileAst(type, false, scope)),
-      );
+const handleUnionTypes = Effect.fnUntraced(function* (
+  types: SchemaAST.Union["types"],
+  isOptionalPropertyOfTypeLiteral: boolean,
+  scope: IdScope.IdScope,
+) {
+  const members = isOptionalPropertyOfTypeLiteral
+    ? Array.filter(types, Predicate.not(SchemaAST.isUndefined))
+    : types;
 
-    if (firstValidator === undefined) {
-      return yield* new EmptyUnionIsNotSupportedError();
-    } else if (secondValidator === undefined) {
-      return firstValidator;
-    } else {
-      return v.union(firstValidator, secondValidator, ...restValidators);
-    }
-  });
+  const [firstValidator, secondValidator, ...restValidators] =
+    yield* Effect.all(
+      Array.map(members, (type) => compileAst(type, false, scope)),
+    );
+
+  if (firstValidator === undefined) {
+    return yield* new EmptyUnionIsNotSupportedError();
+  } else if (secondValidator === undefined) {
+    return firstValidator;
+  } else {
+    return v.union(firstValidator, secondValidator, ...restValidators);
+  }
+});
 
 const handleObjects = (objectsAst: SchemaAST.Objects, scope: IdScope.IdScope) =>
   pipe(
@@ -446,36 +451,41 @@ const handleObjects = (objectsAst: SchemaAST.Objects, scope: IdScope.IdScope) =>
 const handleArrays = (
   { elements, rest }: SchemaAST.Arrays,
   scope: IdScope.IdScope,
-) =>
-  Effect.gen(function* () {
-    const [f, s, ...r] = elements;
+) => handleArrayElements(elements, rest, scope);
 
-    const elementToValidator = (element: SchemaAST.AST) =>
-      SchemaAST.isOptional(element)
-        ? Effect.fail(new OptionalTupleElementsAreNotSupportedError())
-        : compileAst(element, false, scope);
+const handleArrayElements = Effect.fnUntraced(function* (
+  elements: SchemaAST.Arrays["elements"],
+  rest: SchemaAST.Arrays["rest"],
+  scope: IdScope.IdScope,
+) {
+  const [f, s, ...r] = elements;
 
-    const arrayItemsValidator = yield* f === undefined
-      ? pipe(
-          rest,
-          Array.head,
-          Option.match({
-            onNone: () => Effect.fail(new EmptyTupleIsNotSupportedError()),
-            onSome: (type) => compileAst(type, false, scope),
-          }),
-        )
-      : s === undefined
-        ? elementToValidator(f)
-        : Effect.gen(function* () {
-            const firstValidator = yield* elementToValidator(f);
-            const secondValidator = yield* elementToValidator(s);
-            const restValidators = yield* Effect.forEach(r, elementToValidator);
+  const elementToValidator = (element: SchemaAST.AST) =>
+    SchemaAST.isOptional(element)
+      ? Effect.fail(new OptionalTupleElementsAreNotSupportedError())
+      : compileAst(element, false, scope);
 
-            return v.union(firstValidator, secondValidator, ...restValidators);
-          });
+  const arrayItemsValidator = yield* f === undefined
+    ? pipe(
+        rest,
+        Array.head,
+        Option.match({
+          onNone: () => Effect.fail(new EmptyTupleIsNotSupportedError()),
+          onSome: (type) => compileAst(type, false, scope),
+        }),
+      )
+    : s === undefined
+      ? elementToValidator(f)
+      : Effect.gen(function* () {
+          const firstValidator = yield* elementToValidator(f);
+          const secondValidator = yield* elementToValidator(s);
+          const restValidators = yield* Effect.forEach(r, elementToValidator);
 
-    return v.array(arrayItemsValidator);
-  });
+          return v.union(firstValidator, secondValidator, ...restValidators);
+        });
+
+  return v.array(arrayItemsValidator);
+});
 
 const handlePropertySignatures = (
   objectsAst: SchemaAST.Objects,

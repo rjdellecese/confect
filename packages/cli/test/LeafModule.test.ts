@@ -1,5 +1,6 @@
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
+import type { PlatformError } from "effect/PlatformError";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { assert, expect, layer } from "@effect/vitest";
@@ -42,37 +43,44 @@ interface TempFile {
   readonly contents: string;
 }
 
-const withTempFiles = <A>(
-  files: ReadonlyArray<TempFile>,
-  use: Effect.Effect<
+const withTempFiles = Effect.fnUntraced(
+  function* <A>(
+    files: ReadonlyArray<TempFile>,
+    use: Effect.Effect<
+      A,
+      CodegenError,
+      ConfectDirectory | Path.Path | FileSystem.FileSystem
+    >,
+  ): Effect.fn.Return<
     A,
-    CodegenError,
+    CodegenError | PlatformError,
     ConfectDirectory | Path.Path | FileSystem.FileSystem
-  >,
-) =>
-  Effect.gen(function* () {
+  > {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     yield* Effect.forEach(files, ({ relativePath, contents }) =>
       fs.writeFileString(path.join(fixtureConfect, relativePath), contents),
     );
     return yield* use;
-  }).pipe(
-    Effect.ensuring(
-      Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        yield* Effect.forEach(files, ({ relativePath }) =>
-          Effect.gen(function* () {
-            const absolutePath = path.join(fixtureConfect, relativePath);
-            if (yield* fs.exists(absolutePath)) {
-              yield* fs.remove(absolutePath);
-            }
-          }),
-        );
-      }).pipe(Effect.orDie),
+  },
+  (effect, files) =>
+    effect.pipe(
+      Effect.ensuring(
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          yield* Effect.forEach(files, ({ relativePath }) =>
+            Effect.gen(function* () {
+              const absolutePath = path.join(fixtureConfect, relativePath);
+              if (yield* fs.exists(absolutePath)) {
+                yield* fs.remove(absolutePath);
+              }
+            }),
+          );
+        }).pipe(Effect.orDie),
+      ),
     ),
-  );
+);
 
 const withTempFile = <A>(
   relativePath: string,
@@ -90,7 +98,7 @@ const withTempFile = <A>(
  * re-exports `./notes.spec`'s GroupSpec by default so impl contents that
  * reference `notes` continue to typecheck against the real notes GroupSpec.
  */
-const withTempLeaf = (
+const withTempLeaf = Effect.fnUntraced(function* (
   stem: string,
   implContents: string,
   use: (
@@ -101,17 +109,16 @@ const withTempLeaf = (
     ConfectDirectory | Path.Path | FileSystem.FileSystem
   >,
   specContents = `export { default } from "./notes.spec";\n`,
-) =>
-  Effect.gen(function* () {
-    const leaf = yield* toLeafModule(`groups/${stem}.spec.ts`);
-    yield* withTempFiles(
-      [
-        { relativePath: `groups/${stem}.spec.ts`, contents: specContents },
-        { relativePath: `groups/${stem}.impl.ts`, contents: implContents },
-      ],
-      use(leaf),
-    );
-  });
+) {
+  const leaf = yield* toLeafModule(`groups/${stem}.spec.ts`);
+  yield* withTempFiles(
+    [
+      { relativePath: `groups/${stem}.spec.ts`, contents: specContents },
+      { relativePath: `groups/${stem}.impl.ts`, contents: implContents },
+    ],
+    use(leaf),
+  );
+});
 
 const PLATFORMS = [
   { name: "posix", pathLayer: NodePath.layerPosix, sep: "/" },

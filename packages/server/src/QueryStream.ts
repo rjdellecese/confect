@@ -633,7 +633,7 @@ export class QueryStream<
      * Positions in `keyFields` of the implicit `_id` tiebreakers the
      * type-level `Key` omits: normally the trailing one, plus — on a
      * `flatMap` result — the outer key's interior one. Combinators that
-     * relate the type-level key to the runtime key (`orderBy`, `distinct`)
+     * relate the type-level key to the runtime key (`renameKey`, `distinct`)
      * skip over them. Defaults to the trailing `_id`, if any.
      */
     readonly tiebreakers: ReadonlyArray<number> = appendedTiebreaker(
@@ -704,7 +704,8 @@ export const isQueryStream = (u: unknown): u is Any =>
  *
  * In SQL terms: the empty relation — `SELECT ... WHERE false` with the same
  * `ORDER BY` — so it merges with, and paginates like, any stream of that
- * key. *
+ * key.
+ *
  * Nothing can infer the document type from no documents, so it is supplied
  * as a type argument in a first, otherwise empty call:
  * `QueryStream.empty<NotesDoc>()(["text", "_creationTime"], "desc")`. The
@@ -844,7 +845,8 @@ const intersectIndexBounds = (
  * In SQL terms: an index range scan — `SELECT * FROM table WHERE <range>
  * ORDER BY <index fields> [DESC]`; the order key is the `ORDER BY` columns
  * left after the equality predicates. The value is a reusable description
- * of a query rather than a result. *
+ * of a query rather than a result.
+ *
  * Each run rebuilds the Convex queries from the reflection — the leaf's
  * bounds decomposed into Convex-expressible index ranges via `splitRange`
  * — and order keys are extracted from the *encoded* document before schema
@@ -1114,7 +1116,8 @@ const mergeStep =
  * result still in that order (a planner's merge append). It is an ordered
  * merge — the step of merge sort that combines sorted runs, always emitting
  * the smallest next key (the largest, descending) — not `Stream.merge`,
- * which interleaves inputs in arrival order. *
+ * which interleaves inputs in arrival order.
+ *
  * Streams with different order keys are a **type error** (`Key` is
  * invariant), and so are different directions: the first stream fixes the
  * direction and each later one must be assignable to it. A mismatch the
@@ -1286,7 +1289,8 @@ export interface EffectOptions {
  *
  * In SQL terms: a `WHERE` on any column, evaluated after the index scan —
  * rows it rejects were still read, and filtered-out elements still advance
- * cursors, so the result stays mergeable and paginable. *
+ * cursors, so the result stays mergeable and paginable.
+ *
  * Use `filterEffect` when the predicate needs to read the database or
  * another service.
  */
@@ -1365,7 +1369,8 @@ export const filterEffect = dual<
  *
  * In SQL terms: the `SELECT` list — projecting or computing columns while
  * the `ORDER BY` columns stay in force, so the result stays mergeable and
- * paginable. *
+ * paginable.
+ *
  * The mapper must not change the ordering semantics. Use `mapEffect` when
  * the mapper needs to read the database or another service.
  */
@@ -1399,7 +1404,8 @@ export const map = dual<
  *
  * In SQL terms: a scalar subquery in the `SELECT` list — a computed column
  * that reads other tables. The mapper's `E2`/`R2` flow into the stream's
- * channels. *
+ * channels.
+ *
  * The mapper must not change the ordering semantics.
  */
 export const mapEffect = dual<
@@ -1441,14 +1447,24 @@ export const mapEffect = dual<
  * In SQL terms: `CROSS JOIN LATERAL` (`CROSS APPLY`): the inner query can
  * reference the outer row, and the result is ordered by the outer key, then
  * the inner key. An outer row with no inner rows contributes none — an
- * inner join, not a left join. Inner streams run sequentially — each outer
+ * inner join — unless `options.onEmpty` is given, which makes it `LEFT JOIN
+ * LATERAL`: the row still appears once, with `onEmpty(outer)` standing in
+ * for the `NULL` inner columns. Inner streams run sequentially — each outer
  * element's is drained before the next outer element's begins — and the
  * order key is extended by the inner key (`flatMap` on `convex-helpers`
- * streams). *
+ * streams).
+ *
  * `options.innerKey` is the order key shared by *every* inner stream —
  * checked against `f`'s return type, so a mismatched literal is a type
  * error; each produced stream is also validated at runtime (a defect on
  * mismatch, like `merge`).
+ *
+ * `options.onEmpty` keeps outer documents whose inner stream is empty,
+ * emitting `onEmpty(outer)` in their place; the element type widens to
+ * include the placeholder. The placeholder takes the position an empty
+ * inner stream's marker would (the outer key followed by `null`s), so it
+ * sorts first within its outer document and pagination resumes past it like
+ * any element. Outer documents filtered out upstream stay absent.
  *
  * Cursor accounting: an outer document whose inner stream is empty — or
  * that was filtered out upstream — still contributes one filtered element
@@ -1474,13 +1490,17 @@ export const flatMap = dual<
     E2,
     R2,
     Direction extends OrderDirection,
+    Doc3 = never,
   >(
     f: (doc: Doc) => QueryStream<Doc2, InnerKey, E2, R2, Direction>,
-    options: { readonly innerKey: NoInfer<InnerKey> },
+    options: {
+      readonly innerKey: NoInfer<InnerKey>;
+      readonly onEmpty?: ((doc: Doc) => Doc3) | undefined;
+    },
   ) => <Key extends ReadonlyArray<string>, E, R>(
     self: QueryStream<Doc, Key, E, R, Direction>,
   ) => QueryStream<
-    Doc2,
+    Doc2 | Doc3,
     readonly [...Key, ...InnerKey],
     E | E2,
     R | R2,
@@ -1496,12 +1516,16 @@ export const flatMap = dual<
     E2,
     R2,
     Direction extends OrderDirection,
+    Doc3 = never,
   >(
     self: QueryStream<Doc, Key, E, R, Direction>,
     f: (doc: Doc) => QueryStream<Doc2, InnerKey, E2, R2, NoInfer<Direction>>,
-    options: { readonly innerKey: NoInfer<InnerKey> },
+    options: {
+      readonly innerKey: NoInfer<InnerKey>;
+      readonly onEmpty?: ((doc: Doc) => Doc3) | undefined;
+    },
   ) => QueryStream<
-    Doc2,
+    Doc2 | Doc3,
     readonly [...Key, ...InnerKey],
     E | E2,
     R | R2,
@@ -1510,80 +1534,6 @@ export const flatMap = dual<
 >(3, (self, f, options) => {
   // Runtime inner key fields follow the same convention as leaves: the
   // type-level key plus the implicit `_id` tiebreaker.
-  const innerKeyFields = withIdTiebreaker(options.innerKey);
-  return makeFlatMap(
-    self,
-    f,
-    innerKeyFields,
-    appendedTiebreaker(options.innerKey, innerKeyFields),
-    undefined,
-    {},
-  );
-});
-
-/**
- * A left join: `flatMap` that keeps outer documents whose inner stream is
- * empty, emitting `onEmpty(outer)` in their place.
- *
- * In SQL terms: `LEFT JOIN LATERAL` — an outer row with no inner rows still
- * appears once, with `onEmpty` standing in for the `NULL` inner columns, so
- * every outer document contributes at least one element. *
- * The placeholder takes the position an empty inner stream's marker would
- * (the outer key followed by `null`s), so it sorts first within its outer
- * document and pagination resumes past it like any element. Outer
- * documents filtered out upstream stay absent. Everything else — the
- * `innerKey` check, the direction rules, narrowing — is `flatMap`'s.
- */
-export const leftJoin = dual<
-  <
-    Doc,
-    Doc2,
-    Doc3,
-    InnerKey extends ReadonlyArray<string>,
-    E2,
-    R2,
-    Direction extends OrderDirection,
-  >(
-    f: (doc: Doc) => QueryStream<Doc2, InnerKey, E2, R2, Direction>,
-    options: {
-      readonly innerKey: NoInfer<InnerKey>;
-      readonly onEmpty: (doc: Doc) => Doc3;
-    },
-  ) => <Key extends ReadonlyArray<string>, E, R>(
-    self: QueryStream<Doc, Key, E, R, Direction>,
-  ) => QueryStream<
-    Doc2 | Doc3,
-    readonly [...Key, ...InnerKey],
-    E | E2,
-    R | R2,
-    Direction
-  >,
-  <
-    Doc,
-    Key extends ReadonlyArray<string>,
-    E,
-    R,
-    Doc2,
-    Doc3,
-    InnerKey extends ReadonlyArray<string>,
-    E2,
-    R2,
-    Direction extends OrderDirection,
-  >(
-    self: QueryStream<Doc, Key, E, R, Direction>,
-    f: (doc: Doc) => QueryStream<Doc2, InnerKey, E2, R2, NoInfer<Direction>>,
-    options: {
-      readonly innerKey: NoInfer<InnerKey>;
-      readonly onEmpty: (doc: Doc) => Doc3;
-    },
-  ) => QueryStream<
-    Doc2 | Doc3,
-    readonly [...Key, ...InnerKey],
-    E | E2,
-    R | R2,
-    Direction
-  >
->(3, (self, f, options) => {
   const innerKeyFields = withIdTiebreaker(options.innerKey);
   return makeFlatMap(
     self,
@@ -1658,7 +1608,7 @@ const makeFlatMap = <
   f: (doc: Doc) => QueryStream<Doc2, InnerKey, E2, R2, Direction>,
   innerKeyFields: ReadonlyArray<string>,
   innerTiebreakers: ReadonlyArray<number>,
-  /** Present for a left join: what an outer document with no inner rows emits. */
+  /** What an outer document with no inner rows emits, if it is kept. */
   onEmpty: ((doc: Doc) => Doc3) | undefined,
   refinements: InnerRefinements,
 ): QueryStream<
@@ -1672,7 +1622,7 @@ const makeFlatMap = <
   const keyFields = Array.appendAll(self.keyFields, innerKeyFields);
   // The joined key keeps the outer key's tiebreaker *inside* it: the
   // type-level key `[...Key, ...InnerKey]` omits it, so it's recorded as a
-  // tiebreaker position for `orderBy`/`distinct` to skip.
+  // tiebreaker position for `renameKey`/`distinct` to skip.
   const tiebreakers = Array.appendAll(
     self.tiebreakers,
     Array.map(innerTiebreakers, (position) => position + outerLength),
@@ -1829,7 +1779,8 @@ const makeFlatMap = <
  * prefix, ...` — the first row of each group — executed as a loose index
  * scan (skip scan): after a group's first document, the underlying stream
  * is narrowed past the entire group, so each group costs one index seek
- * instead of a scan. *
+ * instead of a scan.
+ *
  * `fields` must be a prefix of the stream's order key — enforced at the
  * type level (`Key` must extend `readonly [...Fields, ...rest]`) and
  * validated at runtime.
@@ -1884,7 +1835,8 @@ export const distinct = dual<
  * In SQL terms: column aliases (`AS`) that make the branches of a `UNION
  * ALL` line up by position; not `ORDER BY`, which it does not change. The
  * elements and their order are untouched — it exists so that `merge`
- * accepts streams whose keys agree positionally. *
+ * accepts streams whose keys agree positionally.
+ *
  * Order keys are *values*, so relabeling changes only the names used for
  * compatibility validation — the element order is untouched, and narrowing
  * passes bounds through to the underlying stream unchanged. Use it to make
@@ -1901,7 +1853,7 @@ export const distinct = dual<
  * type-level key omits — the trailing one, and a `flatMap` result's
  * interior one — keep their names and positions.
  */
-export const orderBy = dual<
+export const renameKey = dual<
   <const NewKey extends ReadonlyArray<string>>(
     key: NewKey,
   ) => <
@@ -1928,9 +1880,9 @@ export const orderBy = dual<
     self: QueryStream<Doc, Key, E, R, Direction>,
     key: NewKey,
   ) => QueryStream<Doc, Types.Mutable<NewKey>, E, R, Direction>
->(2, (self, key) => orderByImpl(self, key));
+>(2, (self, key) => renameKeyImpl(self, key));
 
-const orderByImpl = <
+const renameKeyImpl = <
   Doc,
   Key extends ReadonlyArray<string>,
   E,
@@ -1944,7 +1896,7 @@ const orderByImpl = <
   const visible = visibleKeyFields(self);
   if (key.length !== visible.length) {
     throw new Error(
-      `QueryStream.orderBy: key ([${Array.join(key, ", ")}]) must have as many fields as the stream's order key ([${Array.join(visible, ", ")}])`,
+      `QueryStream.renameKey: key ([${Array.join(key, ", ")}]) must have as many fields as the stream's order key ([${Array.join(visible, ", ")}])`,
     );
   }
   // Relabel the type-visible positions in order; tiebreakers keep their
@@ -1959,7 +1911,8 @@ const orderByImpl = <
               Array.filter(self.tiebreakers, (position) => position < index)
                 .length,
           ),
-          () => new Error("QueryStream.orderBy: key/order-key length mismatch"),
+          () =>
+            new Error("QueryStream.renameKey: key/order-key length mismatch"),
         ),
   );
   return new QueryStream(
@@ -1969,9 +1922,9 @@ const orderByImpl = <
     undefined,
     // Bounds are positional values, so they apply to the underlying
     // stream as-is.
-    (bounds) => orderByImpl(narrowByKeyBounds(self, bounds), key),
+    (bounds) => renameKeyImpl(narrowByKeyBounds(self, bounds), key),
     self.tiebreakers,
-    () => orderByImpl(reverse(self), key),
+    () => renameKeyImpl(reverse(self), key),
   );
 };
 
@@ -2061,8 +2014,9 @@ const makeDistinct = <
  * whole query. Every leaf is rebuilt in the other `order`, so the elements
  * come out reversed but are read that way from the index rather than
  * collected and reversed, and the result is still a query stream — a
- * paginated feed can load its earlier pages with it. *
- * `merge`, the transforms, `flatMap`/`leftJoin`, `orderBy`, and `empty`
+ * paginated feed can load its earlier pages with it.
+ *
+ * `merge`, the transforms, `flatMap`, `renameKey`, and `empty`
  * reverse their inputs and re-apply themselves. A `distinct` stream can't
  * be reversed: it keeps the *first* document of each group, and a reversed
  * scan would keep the last, so `reverse` throws — reverse the input and
@@ -2397,7 +2351,8 @@ const midpointCursor = (readKeys: Chunk.Chunk<OrderKey>): string =>
  * `LIMIT`. It runs the stream narrowed to the keys after `cursor` (and up
  * to `endCursor`, when given), folds `numItems` present documents into a
  * page, and reports the key it stopped at as the next cursor; a cursor is a
- * key, not an offset, so a page costs one page of reads wherever it starts. *
+ * key, not an offset, so a page costs one page of reads wherever it starts.
+ *
  * Semantics follow `convex-helpers/server/stream`:
  *
  * - `cursor` is exclusive, `endCursor` inclusive; when `endCursor` is set,

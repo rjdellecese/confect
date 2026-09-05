@@ -110,97 +110,94 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
       TableName
     >;
 
-    const insert = (
+    const insert = Effect.fn("DatabaseWriter.insert")(function* (
       document: Document.WithoutSystemFields<
         DocumentByName_<DataModel_, TableName>
       >,
-    ) =>
-      Effect.gen(function* () {
-        const encodedDocument = yield* Document.encode(
-          document,
+    ) {
+      const encodedDocument = yield* Document.encode(
+        document,
+        tableName,
+        tableDef.Fields,
+      );
+
+      const id = yield* Effect.promise(() =>
+        convexDatabaseWriter.insert(
           tableName,
-          tableDef.Fields,
-        );
+          encodedDocument as WithoutSystemFields<
+            DocumentByName<DataModel.ToConvex<DataModel_>, TableName>
+          >,
+        ),
+      );
 
-        const id = yield* Effect.promise(() =>
-          convexDatabaseWriter.insert(
-            tableName,
-            encodedDocument as WithoutSystemFields<
-              DocumentByName<DataModel.ToConvex<DataModel_>, TableName>
-            >,
-          ),
-        );
+      // The database supplies the ID in this table's execution scope. Its
+      // scope brand is erased at the Convex syscall boundary.
+      return id as unknown as DataModel.Id<DataModel_, TableName>;
+    });
 
-        // The database supplies the ID in this table's execution scope. Its
-        // scope brand is erased at the Convex syscall boundary.
-        return id as unknown as DataModel.Id<DataModel_, TableName>;
-      });
-
-    const patch = (
+    const patch = Effect.fn("DatabaseWriter.patch")(function* (
       id: DataModel.Id<DataModel_, TableName>,
       patchedValues: PatchValue<
         Document.WithoutSystemFields<DocumentByName_<DataModel_, TableName>>
       >,
-    ) =>
-      Effect.gen(function* () {
-        const tableSchema = tableDef.Fields as TableInfo.TableSchema<
-          DataModel.TableInfoWithName_<DataModel_, TableName>
-        >;
+    ) {
+      const tableSchema = tableDef.Fields as TableInfo.TableSchema<
+        DataModel.TableInfoWithName_<DataModel_, TableName>
+      >;
 
-        const originalDecodedDoc = yield* QueryInitializer.getById(
-          tableName,
-          convexDatabaseWriter as any,
-          tableDef,
-        )(id as unknown as GenericId<TableName>);
+      const originalDecodedDoc = yield* QueryInitializer.getById(
+        tableName,
+        convexDatabaseWriter as any,
+        tableDef,
+      )(id as unknown as GenericId<TableName>);
 
-        const updatedEncodedDoc = yield* pipe(
-          patchedValues,
-          Record.reduce(originalDecodedDoc, (acc, value, key) =>
-            value === undefined
-              ? Record.remove(acc, key)
-              : Record.set(acc, key, value),
-          ),
-          Document.encode(tableName, tableSchema),
-        );
+      const updatedEncodedDoc = yield* pipe(
+        patchedValues,
+        Record.reduce(originalDecodedDoc, (acc, value, key) =>
+          value === undefined
+            ? Record.remove(acc, key)
+            : Record.set(acc, key, value),
+        ),
+        Document.encode(tableName, tableSchema),
+      );
 
-        yield* Effect.promise(() =>
-          convexDatabaseWriter.replace(
-            id as unknown as GenericId<TableName>,
-            updatedEncodedDoc as Expand<
-              BetterOmit<
-                DocumentByName<DataModel.ToConvex<DataModel_>, TableName>,
-                "_creationTime" | "_id"
-              >
-            >,
-          ),
-        );
-      });
+      yield* Effect.promise(() =>
+        convexDatabaseWriter.replace(
+          id as unknown as GenericId<TableName>,
+          updatedEncodedDoc as Expand<
+            BetterOmit<
+              DocumentByName<DataModel.ToConvex<DataModel_>, TableName>,
+              "_creationTime" | "_id"
+            >
+          >,
+        ),
+      );
+    });
 
-    const replace = (
+    const replace = Effect.fn("DatabaseWriter.replace")(function* (
       id: DataModel.Id<DataModel_, TableName>,
       value: Document.WithoutSystemFields<
         DocumentByName_<DataModel_, TableName>
       >,
-    ) =>
-      Effect.gen(function* () {
-        const updatedEncodedDoc = yield* Document.encode(
-          value,
-          tableName,
-          tableDef.Fields,
-        );
+    ) {
+      const updatedEncodedDoc = yield* Document.encode(
+        value,
+        tableName,
+        tableDef.Fields,
+      );
 
-        yield* Effect.promise(() =>
-          convexDatabaseWriter.replace(
-            id as unknown as GenericId<TableName>,
-            updatedEncodedDoc as Expand<
-              BetterOmit<
-                DocumentByName<DataModel.ToConvex<DataModel_>, TableName>,
-                "_creationTime" | "_id"
-              >
-            >,
-          ),
-        );
-      });
+      yield* Effect.promise(() =>
+        convexDatabaseWriter.replace(
+          id as unknown as GenericId<TableName>,
+          updatedEncodedDoc as Expand<
+            BetterOmit<
+              DocumentByName<DataModel.ToConvex<DataModel_>, TableName>,
+              "_creationTime" | "_id"
+            >
+          >,
+        ),
+      );
+    });
 
     const delete_ = (id: DataModel.Id<DataModel_, TableName>) =>
       Effect.promise(() =>

@@ -311,18 +311,20 @@ layer(Layer.empty)("validateNoParentChildNameCollisions", (it) => {
   );
 });
 
-const leafFor = (relativePath: string, pathSegments: [string, ...string[]]) =>
-  Effect.gen(function* () {
-    const specImportPath = yield* specImportPathFromGenerated(relativePath);
-    return {
-      relativePath,
-      pathSegments,
-      groupPathDot: Array.join(pathSegments, "."),
-      exportName: pathSegments[pathSegments.length - 1]!,
-      runtime: Option.none(),
-      specImportPath,
-    } satisfies LeafModule;
-  });
+const leafFor = Effect.fnUntraced(function* (
+  relativePath: string,
+  pathSegments: [string, ...string[]],
+) {
+  const specImportPath = yield* specImportPathFromGenerated(relativePath);
+  return {
+    relativePath,
+    pathSegments,
+    groupPathDot: Array.join(pathSegments, "."),
+    exportName: pathSegments[pathSegments.length - 1]!,
+    runtime: Option.none(),
+    specImportPath,
+  } satisfies LeafModule;
+});
 
 for (const { name, pathLayer, sep } of [
   { name: "posix", pathLayer: NodePath.layerPosix, sep: "/" },
