@@ -3,6 +3,7 @@ import * as templates from "@confect/cli/templates";
 import { assert, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as MutableRef from "effect/MutableRef";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 import * as Tracer from "effect/Tracer";
@@ -11,17 +12,17 @@ it.effect(
   "captures template arguments at the call and allocates writers per run",
   () =>
     Effect.gen(function* () {
-      let reads = 0;
+      const reads = MutableRef.make(0);
       const options = {
         functionNames: ["first"],
         registeredFunctionsImportPath: "./original",
         get useNode() {
-          reads += 1;
+          MutableRef.increment(reads);
           return false;
         },
       };
       const render = templates.functions(options);
-      expect(reads).toBe(1);
+      expect(MutableRef.get(reads)).toBe(1);
       options.functionNames = ["replacement"];
       options.registeredFunctionsImportPath = "./replacement";
 
@@ -32,7 +33,7 @@ it.effect(
       expect(first).toContain("export const first");
       expect(first).not.toContain("replacement");
       expect(first).not.toContain('"use node"');
-      expect(reads).toBe(1);
+      expect(MutableRef.get(reads)).toBe(1);
       const defaultOptions: Parameters<typeof templates.functions>[0] = {
         functionNames: ["defaulted"],
         registeredFunctionsImportPath: "./defaulted",
@@ -88,9 +89,9 @@ it.effect(
       const first = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
       const second = new CodeBlockWriter({ indentNumberOfSpaces: 4 });
       const receiver = CodeBlockWriter.prototype.indent.bind(second);
-      let runs = 0;
+      const runs = MutableRef.make(0);
       const line = Effect.andThen(Line, (text) => {
-        runs += 1;
+        MutableRef.increment(runs);
         return text === "fail"
           ? Effect.fail("failure" as const)
           : second.writeLine(text);
@@ -100,7 +101,7 @@ it.effect(
         Effect.Effect<void, "failure", Line>
       >();
       expect(Object.hasOwn(second, "indent")).toBe(false);
-      expect(runs).toBe(0);
+      expect(MutableRef.get(runs)).toBe(0);
       expect(yield* second.toString()).toBe("");
 
       yield* indented.pipe(Effect.provideService(Line, "line"));
@@ -111,7 +112,7 @@ it.effect(
       expect(yield* second.toString()).toBe(
         "    line\n    again\n    bound\noutside\n",
       );
-      expect(runs).toBe(2);
+      expect(MutableRef.get(runs)).toBe(2);
 
       const failed = yield* indented.pipe(
         Effect.provideService(Line, "fail"),
