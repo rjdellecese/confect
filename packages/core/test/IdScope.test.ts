@@ -68,6 +68,16 @@ describe("ID scopes", () => {
     expectTypeOf<typeof restored.Type>().toEqualTypeOf<ConvexId<"users">>();
   });
 
+  it("preserves ID identity in validator types", () => {
+    type ScopedId = GenericId.GenericId<"users", typeof first>;
+    expectTypeOf<
+      SchemaToValidator.ValueToValidator<ScopedId>["type"]
+    >().toEqualTypeOf<ScopedId>();
+    expectTypeOf<
+      SchemaToValidator.ValueToValidator<GenericId.GenericId<"users">>["type"]
+    >().toEqualTypeOf<ConvexId<"users">>();
+  });
+
   it("rebases nested instance metadata and leaves unrelated scopes intact", () => {
     const child = IdScope.instance(definition, "child");
     const grandchild = IdScope.instance(child, "grandchild");

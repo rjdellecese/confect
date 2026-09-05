@@ -1,5 +1,6 @@
 import * as IdScope from "./IdScope";
 import type {
+  GenericId as ConvexGenericId,
   PropertyValidators,
   Validator,
   VAny,
@@ -155,10 +156,8 @@ export type ValueToValidator<Vl> = [Vl] extends [never]
                 ? VInt64
                 : VLiteral<Vl>
               : [Vl] extends [string]
-                ? Vl extends {
-                    __tableName: infer TableName extends string;
-                  }
-                  ? VId<GenericId.GenericId<TableName>>
+                ? Vl extends ConvexGenericId<string>
+                  ? VId<Vl>
                   : [string] extends [Vl]
                     ? VString
                     : VLiteral<Vl>
