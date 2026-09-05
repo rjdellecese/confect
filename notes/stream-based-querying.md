@@ -441,7 +441,7 @@ The core of §4 is now implemented as an experimental API:
   type-level constraint (`Key` must extend `readonly [...Fields,
 ...rest]`); narrowing truncates bound keys to the distinct prefix, as in
   `convex-helpers`.
-- **`orderBy`** — re-keying: a position-for-position relabeling of the
+- **`renameKey`** — re-keying: a position-for-position relabeling of the
   order key (tuple-length-checked at the type level) that makes streams
   from different indexes or tables mergeable when their keys align
   positionally. Because order keys and bounds are pure _values_, the

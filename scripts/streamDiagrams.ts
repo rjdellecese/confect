@@ -166,7 +166,7 @@ export const diagrams: Readonly<Record<string, string>> = {
     keys("", BY_TEXT_KEYS),
   ),
 
-  join: lines(
+  "flat-map": lines(
     track("admin", ["n1", undefined, "n4", "n5"]),
     keys("", ["[1]", undefined, "[4]", "[5]"]),
     at("of n1", 0, ["c1", "c2"], ""),
@@ -179,14 +179,14 @@ export const diagrams: Readonly<Record<string, string>> = {
     keys("", ["[1,7]", "[1,8]", "[4,9]", "[5,null]"]),
   ),
 
-  "left-join": lines(
+  "on-empty": lines(
     track("admin", ["n1", undefined, "n4", "n5"]),
     keys("", ["[1]", undefined, "[4]", "[5]"]),
     at("of n1", 0, ["c1", "c2"], ""),
     at("of n4", 2, ["c3"], ""),
     at("of n5", 3, []),
     "",
-    op("leftJoin((note) => commentsOn(note), { innerKey, onEmpty })"),
+    op("flatMap((note) => commentsOn(note), { innerKey, onEmpty })"),
     "",
     track("joined", ["c1", "c2", "c3", "∅n5"]),
     keys("", ["[1,7]", "[1,8]", "[4,9]", "[5,null]"]),
@@ -209,17 +209,17 @@ export const diagrams: Readonly<Record<string, string>> = {
     ]),
   ),
 
-  "order-by": lines(
+  "rename-key": lines(
     track("by_body", ["c1", "c2", "c3"]),
     `${keys("", ["[great,7]", "[meh,8]", "[nice,9]"])}   key: [body, _creationTime]`,
     "",
-    op('orderBy(["text", "_creationTime"])'),
+    op('renameKey(["text", "_creationTime"])'),
     "",
     track("relabeled", ["c1", "c2", "c3"]),
     `${keys("", ["[great,7]", "[meh,8]", "[nice,9]"])}   key: [text, _creationTime]`,
   ),
 
-  "order-by-merge": lines(
+  "rename-key-merge": lines(
     track("notes", [...BY_TEXT, undefined, undefined, undefined]),
     track("relabeled", [
       undefined,

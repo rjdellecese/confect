@@ -779,70 +779,72 @@ describe("QueryStream", () => {
     }).pipe(Effect.provide(TestConfect.layer)),
   );
 
-  it.effect("leftJoin keeps outer documents that have no inner rows", () =>
-    Effect.gen(function* () {
-      const c = yield* TestConfect.TestConfect;
+  it.effect(
+    "flatMap with onEmpty keeps outer documents that have no inner rows",
+    () =>
+      Effect.gen(function* () {
+        const c = yield* TestConfect.TestConfect;
 
-      yield* c.run(
-        Effect.gen(function* () {
-          const writer = yield* DatabaseWriter;
-          const reader = yield* DatabaseReader;
+        yield* c.run(
+          Effect.gen(function* () {
+            const writer = yield* DatabaseWriter;
+            const reader = yield* DatabaseReader;
 
-          for (const [text, tag] of [
-            ["b", "b1"],
-            ["a", "a1"],
-            ["a", "a2"],
-            ["x0", "none"],
-            ["x1", "a"],
-            ["x2", "b"],
-          ] as const) {
-            yield* writer.table("notes").insert({ text, tag });
-          }
+            for (const [text, tag] of [
+              ["b", "b1"],
+              ["a", "a1"],
+              ["a", "a2"],
+              ["x0", "none"],
+              ["x1", "a"],
+              ["x2", "b"],
+            ] as const) {
+              yield* writer.table("notes").insert({ text, tag });
+            }
 
-          const outer = reader
-            .table("notes")
-            .stream("by_text", (q) => q.gte("text", "x"));
-          type Note =
-            typeof outer extends Stream.Stream<infer A, any, any> ? A : never;
-          const inner = (note: Note) =>
-            reader
+            const outer = reader
               .table("notes")
-              .stream("by_text", (q) => q.eq("text", note.tag ?? ""));
+              .stream("by_text", (q) => q.gte("text", "x"));
+            type Note =
+              typeof outer extends Stream.Stream<infer A, any, any> ? A : never;
+            const inner = (note: Note) =>
+              reader
+                .table("notes")
+                .stream("by_text", (q) => q.eq("text", note.tag ?? ""));
 
-          // "x0" has no inner rows: the placeholder stands in for them, in
-          // the position its inner rows would have had, and pagination
-          // steps past it like any element.
-          const joined = outer.pipe(
-            QueryStream.leftJoin(inner, {
-              innerKey: ["_creationTime"],
-              onEmpty: (note) => ({ tag: `none for ${note.text}` }),
-            }),
-          );
-          const pages = yield* paginateAll(joined, 1);
-          expect(pages.map((page) => page.map((doc) => doc.tag))).toEqual([
-            ["none for x0"],
-            ["a1"],
-            ["a2"],
-            ["b1"],
-          ]);
+            // "x0" has no inner rows: the placeholder stands in for them, in
+            // the position its inner rows would have had, and pagination
+            // steps past it like any element.
+            const joined = outer.pipe(
+              QueryStream.flatMap(inner, {
+                innerKey: ["_creationTime"],
+                onEmpty: (note) => ({ tag: `none for ${note.text}` }),
+              }),
+            );
+            const pages = yield* paginateAll(joined, 1);
+            expect(pages.map((page) => page.map((doc) => doc.tag))).toEqual([
+              ["none for x0"],
+              ["a1"],
+              ["a2"],
+              ["b1"],
+            ]);
 
-          // An outer document filtered out upstream contributes no
-          // placeholder.
-          const withoutX0 = outer.pipe(
-            QueryStream.filter((note) => note.text !== "x0"),
-            QueryStream.leftJoin(inner, {
-              innerKey: ["_creationTime"],
-              onEmpty: (note) => ({ tag: `none for ${note.text}` }),
-            }),
-          );
-          expect(
-            yield* Stream.runCollect(withoutX0).pipe(
-              Effect.map((docs) => docs.map((doc) => doc.tag)),
-            ),
-          ).toEqual(["a1", "a2", "b1"]);
-        }),
-      );
-    }).pipe(Effect.provide(TestConfect.layer)),
+            // An outer document filtered out upstream contributes no
+            // placeholder.
+            const withoutX0 = outer.pipe(
+              QueryStream.filter((note) => note.text !== "x0"),
+              QueryStream.flatMap(inner, {
+                innerKey: ["_creationTime"],
+                onEmpty: (note) => ({ tag: `none for ${note.text}` }),
+              }),
+            );
+            expect(
+              yield* Stream.runCollect(withoutX0).pipe(
+                Effect.map((docs) => docs.map((doc) => doc.tag)),
+              ),
+            ).toEqual(["a1", "a2", "b1"]);
+          }),
+        );
+      }).pipe(Effect.provide(TestConfect.layer)),
   );
 
   it.effect("effectful transforms keep stream order at any concurrency", () =>
@@ -1064,7 +1066,7 @@ describe("QueryStream", () => {
     }).pipe(Effect.provide(TestConfect.layer)),
   );
 
-  it.effect("orderBy relabels order keys so foreign streams merge", () =>
+  it.effect("renameKey relabels order keys so foreign streams merge", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -1100,7 +1102,7 @@ describe("QueryStream", () => {
           // interleaves the values: "a" < "admin" < "m" < "user".
           const merged = QueryStream.merge([
             byText,
-            byRole.pipe(QueryStream.orderBy(["text", "_creationTime"])),
+            byRole.pipe(QueryStream.renameKey(["text", "_creationTime"])),
           ]);
 
           const tags = yield* Stream.runCollect(merged).pipe(
@@ -1123,7 +1125,7 @@ describe("QueryStream", () => {
     }).pipe(Effect.provide(TestConfect.layer)),
   );
 
-  it.effect("orderBy and distinct see through flatMap tiebreakers", () =>
+  it.effect("renameKey and distinct see through flatMap tiebreakers", () =>
     Effect.gen(function* () {
       const c = yield* TestConfect.TestConfect;
 
@@ -1174,7 +1176,11 @@ describe("QueryStream", () => {
 
           // Relabeling names only the type-visible positions.
           const relabeled = joined.pipe(
-            QueryStream.orderBy(["outerText", "outerCreated", "innerCreated"]),
+            QueryStream.renameKey([
+              "outerText",
+              "outerCreated",
+              "innerCreated",
+            ]),
           );
           expect(relabeled.keyFields).toEqual([
             "outerText",
@@ -1503,6 +1509,12 @@ describe("QueryStream types", () => {
       expectTypeOf<KeyOf<typeof joined>>().toEqualTypeOf<
         readonly ["text", "_creationTime", "_creationTime"]
       >();
+      // Without onEmpty, the elements are exactly the inner documents.
+      expectTypeOf<
+        typeof joined extends Stream.Stream<infer A, any, any> ? A : never
+      >().toEqualTypeOf<
+        typeof pinned extends Stream.Stream<infer A, any, any> ? A : never
+      >();
 
       const joinedMismatched = QueryStream.flatMap(bounded, (_note) => pinned, {
         // @ts-expect-error — innerKey must match the inner stream's order key.
@@ -1524,14 +1536,17 @@ describe("QueryStream types", () => {
       const distinctPinnedAway = QueryStream.distinct(pinned, ["text"]);
       void distinctPinnedAway;
 
-      // orderBy relabels the order key position-for-position.
-      const relabeled = QueryStream.orderBy(full, ["renamed", "_creationTime"]);
+      // renameKey relabels the order key position-for-position.
+      const relabeled = QueryStream.renameKey(full, [
+        "renamed",
+        "_creationTime",
+      ]);
       expectTypeOf<KeyOf<typeof relabeled>>().toEqualTypeOf<
         ["renamed", "_creationTime"]
       >();
 
       // @ts-expect-error — the new key must have as many fields as the old.
-      const relabeledTooShort = QueryStream.orderBy(full, ["_creationTime"]);
+      const relabeledTooShort = QueryStream.renameKey(full, ["_creationTime"]);
       void relabeledTooShort;
 
       // empty takes its document type explicitly and its key literally.
@@ -1551,23 +1566,25 @@ describe("QueryStream types", () => {
         DirectionOf<typeof nothingDescending>
       >().toEqualTypeOf<"desc">();
 
-      // leftJoin's elements are the inner documents or the placeholder.
-      const leftJoined = QueryStream.leftJoin(bounded, (_note) => pinned, {
+      // With onEmpty, the elements are the inner documents or the placeholder.
+      const withPlaceholder = QueryStream.flatMap(bounded, (_note) => pinned, {
         innerKey: ["_creationTime"],
         onEmpty: (note) => ({ missingFor: note.text }),
       });
-      expectTypeOf<KeyOf<typeof leftJoined>>().toEqualTypeOf<
+      expectTypeOf<KeyOf<typeof withPlaceholder>>().toEqualTypeOf<
         readonly ["text", "_creationTime", "_creationTime"]
       >();
       expectTypeOf<
-        typeof leftJoined extends Stream.Stream<infer A, any, any> ? A : never
+        typeof withPlaceholder extends Stream.Stream<infer A, any, any>
+          ? A
+          : never
       >().toEqualTypeOf<
         | (typeof pinned extends Stream.Stream<infer A, any, any> ? A : never)
         | { missingFor: string }
       >();
 
       // A flatMap result relabels by its type-level (tiebreaker-free) key.
-      const relabeledJoin = QueryStream.orderBy(joined, ["a", "b", "c"]);
+      const relabeledJoin = QueryStream.renameKey(joined, ["a", "b", "c"]);
       expectTypeOf<KeyOf<typeof relabeledJoin>>().toEqualTypeOf<
         ["a", "b", "c"]
       >();
