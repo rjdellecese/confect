@@ -12,17 +12,16 @@ import * as Layer from "effect/Layer";
 import databaseSchema from "../_generated/schema";
 import scheduling from "./scheduling.spec";
 
-const sumToN = (n: number) =>
-  Effect.gen(function* () {
-    let sum = 0;
-    for (let i = 1; i <= n; i++) {
-      // `Effect.sync` (unlike `Effect.succeed`, which the generator runtime
-      // unwraps without touching the op counter) charges the fiber's op
-      // budget on every iteration.
-      sum += yield* Effect.sync(() => i);
-    }
-    return sum;
-  });
+const sumToN = Effect.fnUntraced(function* (n: number) {
+  let sum = 0;
+  for (let i = 1; i <= n; i++) {
+    // `Effect.sync` (unlike `Effect.succeed`, which the generator runtime
+    // unwraps without touching the op counter) charges the fiber's op
+    // budget on every iteration.
+    sum += yield* Effect.sync(() => i);
+  }
+  return sum;
+});
 
 const manyOpsQuery = FunctionImpl.make(
   databaseSchema,

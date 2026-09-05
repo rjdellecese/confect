@@ -42,9 +42,9 @@ export const installedDirectoryName = (name: string): string =>
     .replace(/^[.-]+|[.-]+$/g, "")
     .slice(0, 255) || "unnamed-skill";
 
-export const vendoredSkillDirectories = Effect.fn(
-  "SkillIgnore.vendoredSkillDirectories",
-)(function* (lockText: string) {
+export const vendoredSkillDirectories = Effect.fnUntraced(function* (
+  lockText: string,
+) {
   const lock = yield* Schema.decodeEffect(
     Schema.fromJsonString(Schema.Unknown),
   )(lockText).pipe(
@@ -92,51 +92,50 @@ export const renderManagedBlock = (
     END_MARKER,
   ].join("\n");
 
-export const updateManagedBlock = Effect.fn("SkillIgnore.updateManagedBlock")(
-  function* (ignoreText: string, managedBlock: string) {
-    const lines = ignoreText.replaceAll("\r\n", "\n").split("\n");
-    if (lines.at(-1) === "") lines.pop();
-
-    const startIndexes = lines.flatMap((line, index) =>
-      line === START_MARKER ? [index] : [],
-    );
-    const endIndexes = lines.flatMap((line, index) =>
-      line === END_MARKER ? [index] : [],
-    );
-
-    if (startIndexes.length !== endIndexes.length) {
-      return yield* new SkillIgnoreError({
-        reason: `${IGNORE_FILE} has an incomplete skills-lock block`,
-      });
-    }
-    if (startIndexes.length > 1) {
-      return yield* new SkillIgnoreError({
-        reason: `${IGNORE_FILE} has multiple skills-lock blocks`,
-      });
-    }
-
-    const managedLines = managedBlock.split("\n");
-    if (startIndexes.length === 0) {
-      if (lines.length > 0 && lines.at(-1) !== "") lines.push("");
-      lines.push(...managedLines);
-    } else {
-      const start = startIndexes[0];
-      const end = endIndexes[0];
-      if (start > end) {
-        return yield* new SkillIgnoreError({
-          reason: `${IGNORE_FILE} has an invalid skills-lock block`,
-        });
-      }
-      lines.splice(start, end - start + 1, ...managedLines);
-    }
-
-    return `${lines.join("\n")}\n`;
-  },
-);
-
-const readIgnoreFile = Effect.fn("SkillIgnore.readIgnoreFile")(function* (
-  path: string,
+export const updateManagedBlock = Effect.fnUntraced(function* (
+  ignoreText: string,
+  managedBlock: string,
 ) {
+  const lines = ignoreText.replaceAll("\r\n", "\n").split("\n");
+  if (lines.at(-1) === "") lines.pop();
+
+  const startIndexes = lines.flatMap((line, index) =>
+    line === START_MARKER ? [index] : [],
+  );
+  const endIndexes = lines.flatMap((line, index) =>
+    line === END_MARKER ? [index] : [],
+  );
+
+  if (startIndexes.length !== endIndexes.length) {
+    return yield* new SkillIgnoreError({
+      reason: `${IGNORE_FILE} has an incomplete skills-lock block`,
+    });
+  }
+  if (startIndexes.length > 1) {
+    return yield* new SkillIgnoreError({
+      reason: `${IGNORE_FILE} has multiple skills-lock blocks`,
+    });
+  }
+
+  const managedLines = managedBlock.split("\n");
+  if (startIndexes.length === 0) {
+    if (lines.length > 0 && lines.at(-1) !== "") lines.push("");
+    lines.push(...managedLines);
+  } else {
+    const start = startIndexes[0];
+    const end = endIndexes[0];
+    if (start > end) {
+      return yield* new SkillIgnoreError({
+        reason: `${IGNORE_FILE} has an invalid skills-lock block`,
+      });
+    }
+    lines.splice(start, end - start + 1, ...managedLines);
+  }
+
+  return `${lines.join("\n")}\n`;
+});
+
+const readIgnoreFile = Effect.fnUntraced(function* (path: string) {
   const fs = yield* FileSystem.FileSystem;
   return (yield* fs.exists(path)) ? yield* fs.readFileString(path) : "";
 });

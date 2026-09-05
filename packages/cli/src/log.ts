@@ -37,8 +37,8 @@ export const formatPath = (relativePath: string): string => {
 
 // --- File operation logs ---
 
-const logFile = (char: string, color: Ansi.Style) => (fullPath: string) =>
-  Effect.gen(function* () {
+const logFile = (char: string, color: Ansi.Style) =>
+  Effect.fnUntraced(function* (fullPath: string) {
     const projectRoot = yield* ProjectRoot.get;
     const path = yield* Path.Path;
 

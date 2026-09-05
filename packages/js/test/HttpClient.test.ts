@@ -1,5 +1,5 @@
 import { FunctionSpec, Ref } from "@confect/core";
-import { assert, describe, expect, it } from "@effect/vitest";
+import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { getFunctionName, type FunctionType } from "convex/server";
 import { ConvexError } from "convex/values";
 import * as Context from "effect/Context";
@@ -52,28 +52,34 @@ const TestHttpClientLayer = Layer.effectContext(
     });
     const auth = yield* EffectRef.make<Option.Option<string>>(Option.none());
 
+    const invokeEffect = Effect.fnUntraced(function* (
+      operation: Operation,
+      functionReference: Parameters<InternalHttpClient.Transport[Operation]>[0],
+      args: unknown,
+    ) {
+      yield* EffectRef.update(calls, (current) => ({
+        ...current,
+        [operation]: [
+          ...current[operation],
+          { name: getFunctionName(functionReference), args },
+        ],
+      }));
+      const rejection = yield* EffectRef.modify(rejections, (current) => [
+        current[operation],
+        { ...current, [operation]: Option.none() },
+      ]);
+      if (Option.isSome(rejection)) {
+        throw rejection.value;
+      }
+      return {};
+    });
+
     const invoke = (
       operation: Operation,
       functionReference: Parameters<InternalHttpClient.Transport[Operation]>[0],
       args: unknown,
     ): Promise<unknown> =>
-      Effect.gen(function* () {
-        yield* EffectRef.update(calls, (current) => ({
-          ...current,
-          [operation]: [
-            ...current[operation],
-            { name: getFunctionName(functionReference), args },
-          ],
-        }));
-        const rejection = yield* EffectRef.modify(rejections, (current) => [
-          current[operation],
-          { ...current, [operation]: Option.none() },
-        ]);
-        if (Option.isSome(rejection)) {
-          throw rejection.value;
-        }
-        return {};
-      }).pipe(runPromise);
+      runPromise(invokeEffect(operation, functionReference, args));
 
     const service = TestHttpTransport.of({
       url: "https://test.convex.cloud",
@@ -285,6 +291,62 @@ const actionWithError = Ref.make(
 );
 
 describe("HttpClient error decoding", () => {
+  it.effect(
+    "preserves generic argument tuples, results, and error channels",
+    () =>
+      Effect.gen(function* () {
+        const client = yield* HttpClient.HttpClient;
+        expectTypeOf(
+          client.query<typeof noArgsQueryRef>,
+        ).parameters.toEqualTypeOf<[ref: typeof noArgsQueryRef, args?: {}]>();
+        expectTypeOf(
+          client.query<typeof argsQueryRef>,
+        ).parameters.toEqualTypeOf<
+          [ref: typeof argsQueryRef, args: { readonly id: string }]
+        >();
+        expectTypeOf(
+          client.mutation<typeof noArgsMutationRef>,
+        ).parameters.toEqualTypeOf<
+          [ref: typeof noArgsMutationRef, args?: {}]
+        >();
+        expectTypeOf(
+          client.mutation<typeof argsMutationRef>,
+        ).parameters.toEqualTypeOf<
+          [ref: typeof argsMutationRef, args: { readonly text: string }]
+        >();
+        expectTypeOf(
+          client.action<typeof noArgsActionRef>,
+        ).parameters.toEqualTypeOf<[ref: typeof noArgsActionRef, args?: {}]>();
+        expectTypeOf(
+          client.action<typeof argsActionRef>,
+        ).parameters.toEqualTypeOf<
+          [ref: typeof argsActionRef, args: { readonly to: string }]
+        >();
+        expectTypeOf(client.query(queryWithError, { id: "abc" })).toEqualTypeOf<
+          Effect.Effect<
+            { readonly text: string },
+            NotFound | HttpClient.HttpClientError | Schema.SchemaError
+          >
+        >();
+        expectTypeOf(
+          client.mutation(mutationWithError, { id: "abc" }),
+        ).toEqualTypeOf<
+          Effect.Effect<
+            null,
+            NotFound | HttpClient.HttpClientError | Schema.SchemaError
+          >
+        >();
+        expectTypeOf(
+          client.action(actionWithError, { id: "abc" }),
+        ).toEqualTypeOf<
+          Effect.Effect<
+            null,
+            NotFound | HttpClient.HttpClientError | Schema.SchemaError
+          >
+        >();
+      }).pipe(Effect.provide(TestHttpClientLayer)),
+  );
+
   it.effect("decodes a query ConvexError", () =>
     Effect.gen(function* () {
       const transport = yield* TestHttpTransport;

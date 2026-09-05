@@ -1,5 +1,5 @@
 import { FunctionSpec, Ref } from "@confect/core";
-import { assert, describe, expect, it } from "@effect/vitest";
+import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { getFunctionName, type FunctionType } from "convex/server";
 import { ConvexError } from "convex/values";
 import * as Context from "effect/Context";
@@ -80,6 +80,24 @@ const TestWebSocketClientLayer = Layer.effectContext(
         ],
       }));
 
+    const invokeEffect = Effect.fnUntraced(function* (
+      operation: RequestOperation,
+      functionReference: Parameters<
+        InternalWebSocketClient.Transport[RequestOperation]
+      >[0],
+      args: unknown,
+    ) {
+      yield* recordCall(operation, functionReference, args);
+      const rejection = yield* EffectRef.modify(rejections, (current) => [
+        current[operation],
+        { ...current, [operation]: Option.none() },
+      ]);
+      if (Option.isSome(rejection)) {
+        throw rejection.value;
+      }
+      return {};
+    });
+
     const invoke = (
       operation: RequestOperation,
       functionReference: Parameters<
@@ -87,17 +105,7 @@ const TestWebSocketClientLayer = Layer.effectContext(
       >[0],
       args: unknown,
     ): Promise<unknown> =>
-      Effect.gen(function* () {
-        yield* recordCall(operation, functionReference, args);
-        const rejection = yield* EffectRef.modify(rejections, (current) => [
-          current[operation],
-          { ...current, [operation]: Option.none() },
-        ]);
-        if (Option.isSome(rejection)) {
-          throw rejection.value;
-        }
-        return {};
-      }).pipe(runPromise);
+      runPromise(invokeEffect(operation, functionReference, args));
 
     const service = TestWebSocketTransport.of({
       setAuth: () => {},
@@ -376,6 +384,62 @@ const actionWithError = Ref.make(
 );
 
 describe("WebSocketClient error decoding", () => {
+  it.effect(
+    "preserves generic argument tuples, results, and error channels",
+    () =>
+      Effect.gen(function* () {
+        const client = yield* WebSocketClient.WebSocketClient;
+        expectTypeOf(
+          client.query<typeof noArgsQueryRef>,
+        ).parameters.toEqualTypeOf<[ref: typeof noArgsQueryRef, args?: {}]>();
+        expectTypeOf(
+          client.query<typeof argsQueryRef>,
+        ).parameters.toEqualTypeOf<
+          [ref: typeof argsQueryRef, args: { readonly id: string }]
+        >();
+        expectTypeOf(
+          client.mutation<typeof noArgsMutationRef>,
+        ).parameters.toEqualTypeOf<
+          [ref: typeof noArgsMutationRef, args?: {}]
+        >();
+        expectTypeOf(
+          client.mutation<typeof argsMutationRef>,
+        ).parameters.toEqualTypeOf<
+          [ref: typeof argsMutationRef, args: { readonly text: string }]
+        >();
+        expectTypeOf(
+          client.action<typeof argsActionRef>,
+        ).parameters.toEqualTypeOf<
+          [ref: typeof argsActionRef, args: { readonly to: string }]
+        >();
+        expectTypeOf(
+          client.action<typeof noArgsActionRef>,
+        ).parameters.toEqualTypeOf<[ref: typeof noArgsActionRef, args?: {}]>();
+        expectTypeOf(client.query(queryWithError, { id: "abc" })).toEqualTypeOf<
+          Effect.Effect<
+            { readonly text: string },
+            NotFound | WebSocketClient.WebSocketClientError | Schema.SchemaError
+          >
+        >();
+        expectTypeOf(
+          client.mutation(mutationWithError, { id: "abc" }),
+        ).toEqualTypeOf<
+          Effect.Effect<
+            null,
+            NotFound | WebSocketClient.WebSocketClientError | Schema.SchemaError
+          >
+        >();
+        expectTypeOf(
+          client.action(actionWithError, { id: "abc" }),
+        ).toEqualTypeOf<
+          Effect.Effect<
+            null,
+            NotFound | WebSocketClient.WebSocketClientError | Schema.SchemaError
+          >
+        >();
+      }).pipe(Effect.provide(TestWebSocketClientLayer)),
+  );
+
   it.effect("decodes a query ConvexError", () =>
     Effect.gen(function* () {
       const transport = yield* TestWebSocketTransport;

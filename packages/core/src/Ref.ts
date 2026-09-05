@@ -630,7 +630,10 @@ export const decodePaginationPageSync = <Ref_ extends AnyPublicPaginatedQuery>(
  * `mapUnknownError` to be turned into a typed `E`, or surfaced as a defect when
  * no handler is provided.
  */
-export const runWithCodec = <Ref_ extends Any, E = never>(
+export const runWithCodec = Effect.fnUntraced(function* <
+  Ref_ extends Any,
+  E = never,
+>(
   ref: Ref_,
   args: Args<Ref_>,
   call: (
@@ -638,29 +641,28 @@ export const runWithCodec = <Ref_ extends Any, E = never>(
     encodedArgs: unknown,
   ) => PromiseLike<unknown>,
   mapUnknownError?: (error: unknown) => E,
-): Effect.Effect<Returns<Ref_>, E | Error<Ref_> | Schema.SchemaError> =>
-  Effect.gen(function* () {
-    const functionReference = getFunctionReference(ref);
-    const invoke = (
-      encodedArgs: unknown,
-    ): Effect.Effect<unknown, Error<Ref_> | E> =>
-      Effect.tryPromise({
-        try: () => Promise.resolve(call(functionReference, encodedArgs)),
-        catch: (error): Error<Ref_> | E => {
-          if (isConvexError(error)) {
-            const decoded = decodeErrorOption(ref, error.data);
-            if (Option.isSome(decoded)) {
-              return decoded.value;
-            }
+): Effect.fn.Return<Returns<Ref_>, E | Error<Ref_> | Schema.SchemaError> {
+  const functionReference = getFunctionReference(ref);
+  const invoke = (
+    encodedArgs: unknown,
+  ): Effect.Effect<unknown, Error<Ref_> | E> =>
+    Effect.tryPromise({
+      try: () => Promise.resolve(call(functionReference, encodedArgs)),
+      catch: (error): Error<Ref_> | E => {
+        if (isConvexError(error)) {
+          const decoded = decodeErrorOption(ref, error.data);
+          if (Option.isSome(decoded)) {
+            return decoded.value;
           }
-          if (mapUnknownError !== undefined) {
-            return mapUnknownError(error);
-          }
-          throw error;
-        },
-      });
+        }
+        if (mapUnknownError !== undefined) {
+          return mapUnknownError(error);
+        }
+        throw error;
+      },
+    });
 
-    const encodedArgs = yield* encodeArgs(ref, args);
-    const encodedReturns = yield* invoke(encodedArgs);
-    return yield* decodeReturns(ref, encodedReturns);
-  });
+  const encodedArgs = yield* encodeArgs(ref, args);
+  const encodedReturns = yield* invoke(encodedArgs);
+  return yield* decodeReturns(ref, encodedReturns);
+});

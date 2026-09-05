@@ -65,13 +65,12 @@ const SUPPORTED_EXTENSIONS = new Set([
   ".hbs",
 ]);
 
-const isSupportedFileType = (filePath: string) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
+const isSupportedFileType = Effect.fnUntraced(function* (filePath: string) {
+  const path = yield* Path.Path;
 
-    const ext = String.toLowerCase(path.extname(filePath));
-    return SUPPORTED_EXTENSIONS.has(ext);
-  });
+  const ext = String.toLowerCase(path.extname(filePath));
+  return SUPPORTED_EXTENSIONS.has(ext);
+});
 
 const program = Effect.gen(function* () {
   const stdio = yield* Stdio;

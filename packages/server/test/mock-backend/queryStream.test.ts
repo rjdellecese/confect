@@ -44,14 +44,13 @@ const paginateAll = <Doc, Key extends ReadonlyArray<string>, E, R>(
   return go(null, []);
 };
 
-const insertNotes = (texts: ReadonlyArray<string>) =>
-  Effect.gen(function* () {
-    const writer = yield* DatabaseWriter;
+const insertNotes = Effect.fnUntraced(function* (texts: ReadonlyArray<string>) {
+  const writer = yield* DatabaseWriter;
 
-    yield* Effect.forEach(texts, (text) =>
-      writer.table("notes").insert({ text }),
-    );
-  });
+  yield* Effect.forEach(texts, (text) =>
+    writer.table("notes").insert({ text }),
+  );
+});
 
 describe("QueryStream", () => {
   it.effect("emits documents in index order", () =>

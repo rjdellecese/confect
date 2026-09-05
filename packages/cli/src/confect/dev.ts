@@ -106,76 +106,74 @@ const changeChar = (change: "Added" | "Removed" | "Modified") =>
     Match.exhaustive,
   );
 
-const logFileChangeIndented = (
+const logFileChangeIndented = Effect.fnUntraced(function* (
   change: "Added" | "Removed" | "Modified",
   fullPath: string,
-) =>
-  Effect.gen(function* () {
-    const projectRoot = yield* ProjectRoot.get;
-    const path = yield* Path.Path;
+) {
+  const projectRoot = yield* ProjectRoot.get;
+  const path = yield* Path.Path;
 
-    const prefix = projectRoot + path.sep;
-    const suffix = pipe(fullPath, String.startsWith(prefix))
-      ? pipe(fullPath, String.slice(prefix.length))
-      : fullPath;
+  const prefix = projectRoot + path.sep;
+  const suffix = pipe(fullPath, String.startsWith(prefix))
+    ? pipe(fullPath, String.slice(prefix.length))
+    : fullPath;
 
-    const { char, color } = changeChar(change);
+  const { char, color } = changeChar(change);
 
-    yield* Console.log(
-      `${color(char)} ${Ansi.blackBright(prefix)}${color(suffix)}`,
-    );
-  });
+  yield* Console.log(
+    `${color(char)} ${Ansi.blackBright(prefix)}${color(suffix)}`,
+  );
+});
 
-const logFunctionPathDiff = (
+const logFunctionPathDiff = Effect.fnUntraced(function* (
   previous: FunctionPaths.FunctionPaths,
   current: FunctionPaths.FunctionPaths,
-) =>
-  Effect.gen(function* () {
-    const {
-      functionsAdded,
-      functionsRemoved,
-      groupsRemoved,
-      groupsAdded,
-      groupsChanged,
-    } = FunctionPaths.diff(previous, current);
+) {
+  const {
+    functionsAdded,
+    functionsRemoved,
+    groupsRemoved,
+    groupsAdded,
+    groupsChanged,
+  } = FunctionPaths.diff(previous, current);
 
-    const logForGroups = (
-      groupPaths: GroupPaths.GroupPaths,
-      fnPaths: FunctionPaths.FunctionPaths,
-      logFn: typeof logFunctionAdded,
-    ) =>
-      Effect.forEach(groupPaths, (gp) =>
-        Effect.forEach(
-          Array.fromIterable(
-            HashSet.filter(fnPaths, (fp) => Equal.equals(fp.groupPath, gp)),
-          ),
-          logFn,
+  const logForGroups = (
+    groupPaths: GroupPaths.GroupPaths,
+    fnPaths: FunctionPaths.FunctionPaths,
+    logFn: typeof logFunctionAdded,
+  ) =>
+    Effect.forEach(groupPaths, (gp) =>
+      Effect.forEach(
+        Array.fromIterable(
+          HashSet.filter(fnPaths, (fp) => Equal.equals(fp.groupPath, gp)),
         ),
-      );
-
-    yield* logForGroups(groupsRemoved, functionsRemoved, logFunctionRemoved);
-    yield* logForGroups(groupsAdded, functionsAdded, logFunctionAdded);
-    yield* Effect.forEach(groupsChanged, (gp) =>
-      Effect.gen(function* () {
-        yield* Effect.forEach(
-          Array.fromIterable(
-            HashSet.filter(functionsAdded, (fp) =>
-              Equal.equals(fp.groupPath, gp),
-            ),
-          ),
-          logFunctionAdded,
-        );
-        yield* Effect.forEach(
-          Array.fromIterable(
-            HashSet.filter(functionsRemoved, (fp) =>
-              Equal.equals(fp.groupPath, gp),
-            ),
-          ),
-          logFunctionRemoved,
-        );
-      }),
+        logFn,
+      ),
     );
-  });
+
+  yield* logForGroups(groupsRemoved, functionsRemoved, logFunctionRemoved);
+  yield* logForGroups(groupsAdded, functionsAdded, logFunctionAdded);
+  yield* Effect.forEach(groupsChanged, (gp) =>
+    Effect.gen(function* () {
+      yield* Effect.forEach(
+        Array.fromIterable(
+          HashSet.filter(functionsAdded, (fp) =>
+            Equal.equals(fp.groupPath, gp),
+          ),
+        ),
+        logFunctionAdded,
+      );
+      yield* Effect.forEach(
+        Array.fromIterable(
+          HashSet.filter(functionsRemoved, (fp) =>
+            Equal.equals(fp.groupPath, gp),
+          ),
+        ),
+        logFunctionRemoved,
+      );
+    }),
+  );
+});
 
 export const dev = Command.make("dev", {}, () =>
   Effect.gen(function* () {
@@ -261,20 +259,19 @@ const watcherMessagesSignature = (messages: WatcherMessages): string =>
  * happens when one root cause (e.g. a missing import) breaks every entry
  * point's build at the same source location.
  */
-const logChangedWatcherMessages = (
+const logChangedWatcherMessages = Effect.fnUntraced(function* (
   messagesRef: Ref.Ref<WatcherMessages>,
   lastLoggedSignatureRef: Ref.Ref<string>,
   log: (messages: ReadonlyArray<esbuild.Message>) => Effect.Effect<void>,
-) =>
-  Effect.gen(function* () {
-    const messages = yield* Ref.get(messagesRef);
-    const signature = watcherMessagesSignature(messages);
-    const previous = yield* Ref.get(lastLoggedSignatureRef);
-    if (signature === previous) return;
-    yield* Ref.set(lastLoggedSignatureRef, signature);
-    if (messages.size === 0) return;
-    yield* log(dedupeWatcherMessages(messages));
-  });
+) {
+  const messages = yield* Ref.get(messagesRef);
+  const signature = watcherMessagesSignature(messages);
+  const previous = yield* Ref.get(lastLoggedSignatureRef);
+  if (signature === previous) return;
+  yield* Ref.set(lastLoggedSignatureRef, signature);
+  if (messages.size === 0) return;
+  yield* log(dedupeWatcherMessages(messages));
+});
 
 /**
  * Block until the signal queue has been quiet for `quiescence`. esbuild
@@ -283,122 +280,120 @@ const logChangedWatcherMessages = (
  * Bounded by `maxWait` so pathological signal floods can't pin the
  * loop forever.
  */
-const drainUntilQuiescent = (
+const drainUntilQuiescent = Effect.fnUntraced(function* (
   signal: Queue.Queue<void>,
   quiescence: Duration.Duration,
   maxWait: Duration.Duration,
-) =>
-  Effect.gen(function* () {
-    const start = yield* Clock.currentTimeMillis;
-    const maxMillis = Duration.toMillis(maxWait);
-    const loop: Effect.Effect<void> = Effect.gen(function* () {
-      yield* Effect.sleep(quiescence);
-      const drained = yield* Queue.clear(signal);
-      if (drained.length === 0) return;
-      const now = yield* Clock.currentTimeMillis;
-      if (now - start < maxMillis) {
-        yield* loop;
-      }
-    });
-    yield* loop;
+) {
+  const start = yield* Clock.currentTimeMillis;
+  const maxMillis = Duration.toMillis(maxWait);
+  const loop: Effect.Effect<void> = Effect.gen(function* () {
+    yield* Effect.sleep(quiescence);
+    const drained = yield* Queue.clear(signal);
+    if (drained.length === 0) return;
+    const now = yield* Clock.currentTimeMillis;
+    if (now - start < maxMillis) {
+      yield* loop;
+    }
   });
+  yield* loop;
+});
 
-const syncLoop = (
+const syncLoop = Effect.fnUntraced(function* (
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
   initialFunctionPaths: FunctionPaths.FunctionPaths,
   watcherErrorsRef: Ref.Ref<WatcherMessages>,
   watcherWarningsRef: Ref.Ref<WatcherMessages>,
-) =>
-  Effect.gen(function* () {
-    const functionPathsRef = yield* Ref.make(initialFunctionPaths);
-    const lastLoggedErrorsRef = yield* Ref.make<string>("");
-    const lastLoggedWarningsRef = yield* Ref.make<string>("");
+) {
+  const functionPathsRef = yield* Ref.make(initialFunctionPaths);
+  const lastLoggedErrorsRef = yield* Ref.make<string>("");
+  const lastLoggedWarningsRef = yield* Ref.make<string>("");
 
-    return yield* Effect.forever(
-      Effect.gen(function* () {
-        yield* Effect.logDebug("Running sync loop…");
-        // Wait for the first signal of a burst, then keep absorbing
-        // follow-up signals from other watchers' onEnds until the queue
-        // stays quiet for `COALESCE_QUIESCENCE`.
-        yield* Queue.take(signal);
+  return yield* Effect.forever(
+    Effect.gen(function* () {
+      yield* Effect.logDebug("Running sync loop…");
+      // Wait for the first signal of a burst, then keep absorbing
+      // follow-up signals from other watchers' onEnds until the queue
+      // stays quiet for `COALESCE_QUIESCENCE`.
+      yield* Queue.take(signal);
+      yield* drainUntilQuiescent(
+        signal,
+        COALESCE_QUIESCENCE,
+        COALESCE_MAX_WAIT,
+      );
+
+      yield* logChangedWatcherMessages(
+        watcherErrorsRef,
+        lastLoggedErrorsRef,
+        logCoalescedBuildErrors,
+      );
+      yield* logChangedWatcherMessages(
+        watcherWarningsRef,
+        lastLoggedWarningsRef,
+        logCoalescedBuildWarnings,
+      );
+
+      const pending = yield* Ref.getAndSet(pendingRef, pendingInit);
+
+      if (!isPendingDirty(pending)) {
+        // No-op signal (e.g. a late echo after a previous cycle
+        // already drained). Stay silent.
+        return;
+      }
+
+      yield* logPending("Dependencies may have changed, reloading…");
+
+      if (pending.specDirty) {
+        const current = yield* codegenHandler.pipe(
+          Effect.tap(({ functionPaths: nextFunctionPaths }) =>
+            Effect.gen(function* () {
+              const previous = yield* Ref.get(functionPathsRef);
+              yield* logFunctionPathDiff(previous, nextFunctionPaths);
+              yield* Ref.set(functionPathsRef, nextFunctionPaths);
+            }),
+          ),
+          CodegenError.catchAndLog,
+        );
+        if (Option.isNone(current)) {
+          return;
+        }
+        // Drain any stragglers from this cycle's burst (slow watchers
+        // whose onEnd fired after the first quiescence) plus, when
+        // codegen wrote, the echo signals esbuild emits in response
+        // to our writes. Reset `pendingRef` so those drained signals
+        // don't carry a dirty flag into the next cycle.
+        if (current.value.anyWritesHappened) {
+          yield* Effect.sleep(ECHO_COOLDOWN);
+        }
         yield* drainUntilQuiescent(
           signal,
           COALESCE_QUIESCENCE,
           COALESCE_MAX_WAIT,
         );
+        yield* Ref.set(pendingRef, pendingInit);
+      }
 
-        yield* logChangedWatcherMessages(
-          watcherErrorsRef,
-          lastLoggedErrorsRef,
-          logCoalescedBuildErrors,
-        );
-        yield* logChangedWatcherMessages(
-          watcherWarningsRef,
-          lastLoggedWarningsRef,
-          logCoalescedBuildWarnings,
-        );
+      const dirtyOptionalFiles = [
+        ...(pending.httpDirty
+          ? [syncOptionalFile(generateHttp, "http.ts")]
+          : []),
+        ...(pending.cronsDirty
+          ? [syncOptionalFile(generateCrons, "crons.ts")]
+          : []),
+        ...(pending.authDirty
+          ? [syncOptionalFile(generateAuthConfig, "auth.config.ts")]
+          : []),
+      ];
 
-        const pending = yield* Ref.getAndSet(pendingRef, pendingInit);
+      yield* Array.isReadonlyArrayNonEmpty(dirtyOptionalFiles)
+        ? Effect.all(dirtyOptionalFiles, { concurrency: "unbounded" })
+        : Effect.void;
 
-        if (!isPendingDirty(pending)) {
-          // No-op signal (e.g. a late echo after a previous cycle
-          // already drained). Stay silent.
-          return;
-        }
-
-        yield* logPending("Dependencies may have changed, reloading…");
-
-        if (pending.specDirty) {
-          const current = yield* codegenHandler.pipe(
-            Effect.tap(({ functionPaths: nextFunctionPaths }) =>
-              Effect.gen(function* () {
-                const previous = yield* Ref.get(functionPathsRef);
-                yield* logFunctionPathDiff(previous, nextFunctionPaths);
-                yield* Ref.set(functionPathsRef, nextFunctionPaths);
-              }),
-            ),
-            CodegenError.catchAndLog,
-          );
-          if (Option.isNone(current)) {
-            return;
-          }
-          // Drain any stragglers from this cycle's burst (slow watchers
-          // whose onEnd fired after the first quiescence) plus, when
-          // codegen wrote, the echo signals esbuild emits in response
-          // to our writes. Reset `pendingRef` so those drained signals
-          // don't carry a dirty flag into the next cycle.
-          if (current.value.anyWritesHappened) {
-            yield* Effect.sleep(ECHO_COOLDOWN);
-          }
-          yield* drainUntilQuiescent(
-            signal,
-            COALESCE_QUIESCENCE,
-            COALESCE_MAX_WAIT,
-          );
-          yield* Ref.set(pendingRef, pendingInit);
-        }
-
-        const dirtyOptionalFiles = [
-          ...(pending.httpDirty
-            ? [syncOptionalFile(generateHttp, "http.ts")]
-            : []),
-          ...(pending.cronsDirty
-            ? [syncOptionalFile(generateCrons, "crons.ts")]
-            : []),
-          ...(pending.authDirty
-            ? [syncOptionalFile(generateAuthConfig, "auth.config.ts")]
-            : []),
-        ];
-
-        yield* Array.isReadonlyArrayNonEmpty(dirtyOptionalFiles)
-          ? Effect.all(dirtyOptionalFiles, { concurrency: "unbounded" })
-          : Effect.void;
-
-        yield* logSuccess("Generated files are up-to-date");
-      }),
-    );
-  });
+      yield* logSuccess("Generated files are up-to-date");
+    }),
+  );
+});
 
 interface EntryPoint {
   readonly absolutePath: string;
@@ -418,18 +413,20 @@ const discoverEntryPoints = Effect.gen(function* () {
   const projectRoot = yield* ProjectRoot.get;
   const confectDirectory = yield* ConfectDirectory.get;
 
-  const tryEntry = (relativePath: string, pendingKey: PendingKey) =>
-    Effect.gen(function* () {
-      const absolutePath = path.join(confectDirectory, relativePath);
-      if (!(yield* fs.exists(absolutePath))) {
-        return Option.none<EntryPoint>();
-      }
-      return Option.some<EntryPoint>({
-        absolutePath,
-        displayPath: path.relative(projectRoot, absolutePath),
-        pendingKey,
-      });
+  const tryEntry = Effect.fnUntraced(function* (
+    relativePath: string,
+    pendingKey: PendingKey,
+  ) {
+    const absolutePath = path.join(confectDirectory, relativePath);
+    if (!(yield* fs.exists(absolutePath))) {
+      return Option.none<EntryPoint>();
+    }
+    return Option.some<EntryPoint>({
+      absolutePath,
+      displayPath: path.relative(projectRoot, absolutePath),
+      pendingKey,
     });
+  });
 
   const generatedSpecPath = yield* GENERATED_SPEC_PATH;
 
@@ -604,84 +601,83 @@ const createEntryPointWatcher = (
  * their existing context, so a structural change doesn't churn watchers
  * for unrelated files.
  */
-const entryPointsWatcher = (
+const entryPointsWatcher = Effect.fnUntraced(function* (
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
   restartQueue: Queue.Queue<void>,
   watcherErrorsRef: Ref.Ref<WatcherMessages>,
   watcherWarningsRef: Ref.Ref<WatcherMessages>,
-) =>
-  Effect.gen(function* () {
-    const parentScope = yield* Effect.scope;
-    const scopesRef = yield* Ref.make(new Map<string, Scope.Closeable>());
-    const path = yield* Path.Path;
-    const fs = yield* FileSystem.FileSystem;
-    const projectRoot = yield* ProjectRoot.get;
-    // Discover the user's `tsconfig.json#paths` once at watcher startup so
-    // `~/...`-style aliases pointing into the user's source tree get bundled
-    // by esbuild instead of externalized via `bundle-require`'s `node_modules`
-    // heuristic. `loadTsConfig` walks up from `projectRoot` to find a
-    // `tsconfig.json`; if none exists, `paths` is empty and `notExternal` is
-    // `[]`, leaving the externalization rule unchanged.
-    const tsconfig = loadTsConfig(projectRoot);
-    const notExternal = tsconfigPathsToRegExp(
-      tsconfig?.data.compilerOptions?.paths ?? {},
+) {
+  const parentScope = yield* Effect.scope;
+  const scopesRef = yield* Ref.make(new Map<string, Scope.Closeable>());
+  const path = yield* Path.Path;
+  const fs = yield* FileSystem.FileSystem;
+  const projectRoot = yield* ProjectRoot.get;
+  // Discover the user's `tsconfig.json#paths` once at watcher startup so
+  // `~/...`-style aliases pointing into the user's source tree get bundled
+  // by esbuild instead of externalized via `bundle-require`'s `node_modules`
+  // heuristic. `loadTsConfig` walks up from `projectRoot` to find a
+  // `tsconfig.json`; if none exists, `paths` is empty and `notExternal` is
+  // `[]`, leaving the externalization rule unchanged.
+  const tsconfig = loadTsConfig(projectRoot);
+  const notExternal = tsconfigPathsToRegExp(
+    tsconfig?.data.compilerOptions?.paths ?? {},
+  );
+
+  const sync = Effect.gen(function* () {
+    const desired = yield* discoverEntryPoints;
+    const desiredByPath = new Map(
+      desired.map((entryPoint) => [entryPoint.absolutePath, entryPoint]),
+    );
+    const current = yield* Ref.get(scopesRef);
+
+    yield* Effect.forEach(
+      Array.fromIterable(current),
+      ([absolutePath, childScope]) =>
+        desiredByPath.has(absolutePath)
+          ? Effect.void
+          : Scope.close(childScope, Exit.void).pipe(
+              Effect.andThen(
+                Ref.update(scopesRef, (scopes) => {
+                  const updated = new Map(scopes);
+                  updated.delete(absolutePath);
+                  return updated;
+                }),
+              ),
+            ),
     );
 
-    const sync = Effect.gen(function* () {
-      const desired = yield* discoverEntryPoints;
-      const desiredByPath = new Map(
-        desired.map((entryPoint) => [entryPoint.absolutePath, entryPoint]),
-      );
-      const current = yield* Ref.get(scopesRef);
+    yield* Effect.forEach(desired, (entry) =>
+      Effect.gen(function* () {
+        const existing = yield* Ref.get(scopesRef);
+        if (existing.has(entry.absolutePath)) return;
 
-      yield* Effect.forEach(
-        Array.fromIterable(current),
-        ([absolutePath, childScope]) =>
-          desiredByPath.has(absolutePath)
-            ? Effect.void
-            : Scope.close(childScope, Exit.void).pipe(
-                Effect.andThen(
-                  Ref.update(scopesRef, (scopes) => {
-                    const updated = new Map(scopes);
-                    updated.delete(absolutePath);
-                    return updated;
-                  }),
-                ),
-              ),
-      );
-
-      yield* Effect.forEach(desired, (entry) =>
-        Effect.gen(function* () {
-          const existing = yield* Ref.get(scopesRef);
-          if (existing.has(entry.absolutePath)) return;
-
-          const childScope = yield* Scope.fork(parentScope, "sequential");
-          yield* createEntryPointWatcher(
-            path,
-            fs,
-            entry,
-            notExternal,
-            signal,
-            pendingRef,
-            watcherErrorsRef,
-            watcherWarningsRef,
-          ).pipe(Scope.provide(childScope));
-          yield* Ref.update(scopesRef, (scopes) => {
-            const updated = new Map(scopes);
-            updated.set(entry.absolutePath, childScope);
-            return updated;
-          });
-        }),
-      );
-    });
-
-    yield* sync;
-
-    return yield* Effect.forever(
-      Queue.take(restartQueue).pipe(Effect.andThen(sync)),
+        const childScope = yield* Scope.fork(parentScope, "sequential");
+        yield* createEntryPointWatcher(
+          path,
+          fs,
+          entry,
+          notExternal,
+          signal,
+          pendingRef,
+          watcherErrorsRef,
+          watcherWarningsRef,
+        ).pipe(Scope.provide(childScope));
+        yield* Ref.update(scopesRef, (scopes) => {
+          const updated = new Map(scopes);
+          updated.set(entry.absolutePath, childScope);
+          return updated;
+        });
+      }),
     );
   });
+
+  yield* sync;
+
+  return yield* Effect.forever(
+    Queue.take(restartQueue).pipe(Effect.andThen(sync)),
+  );
+});
 
 /**
  * Single recursive `fs.watch` on `confect/`. Flips the matching dirty flag
@@ -690,30 +686,29 @@ const entryPointsWatcher = (
  * `restartQueue` when an entry point is created or removed so the watcher
  * manager picks up the new set.
  */
-const confectStructureWatcher = (
+const confectStructureWatcher = Effect.fnUntraced(function* (
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
   restartQueue: Queue.Queue<void>,
-) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const confectDirectory = yield* ConfectDirectory.get;
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
 
-    yield* pipe(
-      fs.watch(confectDirectory),
-      Stream.debounce(Duration.millis(200)),
-      Stream.runForEach((event) =>
-        handleConfectChange({
-          relativePath: path.relative(confectDirectory, event.path),
-          eventTag: event._tag,
-          signal,
-          pendingRef,
-          restartQueue,
-        }),
-      ),
-    );
-  });
+  yield* pipe(
+    fs.watch(confectDirectory),
+    Stream.debounce(Duration.millis(200)),
+    Stream.runForEach((event) =>
+      handleConfectChange({
+        relativePath: path.relative(confectDirectory, event.path),
+        eventTag: event._tag,
+        signal,
+        pendingRef,
+        restartQueue,
+      }),
+    ),
+  );
+});
 
 /**
  * Non-recursive `fs.watch` on the convex directory, reacting only to
@@ -723,32 +718,31 @@ const confectStructureWatcher = (
  * `restartQueue` so the entry-point watcher set picks up (or drops) the
  * config's esbuild watcher.
  */
-const convexConfigStructureWatcher = (
+const convexConfigStructureWatcher = Effect.fnUntraced(function* (
   signal: Queue.Queue<void>,
   pendingRef: Ref.Ref<Pending>,
   restartQueue: Queue.Queue<void>,
-) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const convexDirectory = yield* ConvexDirectory.get;
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const convexDirectory = yield* ConvexDirectory.get;
 
-    yield* pipe(
-      fs.watch(convexDirectory),
-      Stream.debounce(Duration.millis(200)),
-      Stream.runForEach((event) =>
-        path.relative(convexDirectory, event.path) === CONVEX_CONFIG_FILENAME
-          ? flipDirtyAndSignal(
-              pendingRef,
-              signal,
-              "specDirty",
-              restartQueue,
-              event._tag !== "Update",
-            )
-          : Effect.void,
-      ),
-    );
-  });
+  yield* pipe(
+    fs.watch(convexDirectory),
+    Stream.debounce(Duration.millis(200)),
+    Stream.runForEach((event) =>
+      path.relative(convexDirectory, event.path) === CONVEX_CONFIG_FILENAME
+        ? flipDirtyAndSignal(
+            pendingRef,
+            signal,
+            "specDirty",
+            restartQueue,
+            event._tag !== "Update",
+          )
+        : Effect.void,
+    ),
+  );
+});
 
 const TOP_LEVEL_OPTIONAL_KEYS: ReadonlyMap<string, PendingKey> = new Map([
   ["http.ts", "httpDirty"],

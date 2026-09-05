@@ -67,33 +67,34 @@ export const make = <
   const collect: OrderedQueryFunction<"collect"> = () =>
     pipe(stream(), Stream.runCollect);
 
-  const paginate: OrderedQueryFunction<"paginate"> = (options, filter) =>
-    Effect.gen(function* () {
-      const filteredQuery = filter !== undefined ? query.filter(filter) : query;
+  const paginate: OrderedQueryFunction<"paginate"> = Effect.fn(
+    "OrderedQuery.paginate",
+  )(function* (options, filter) {
+    const filteredQuery = filter !== undefined ? query.filter(filter) : query;
 
-      const paginationResult = yield* Effect.promise(() =>
-        filteredQuery.paginate(options),
-      );
+    const paginationResult = yield* Effect.promise(() =>
+      filteredQuery.paginate(options),
+    );
 
-      const parsedPage = yield* Effect.forEach(
-        paginationResult.page,
-        Document.decode(tableName, tableSchema),
-      );
+    const parsedPage = yield* Effect.forEach(
+      paginationResult.page,
+      Document.decode(tableName, tableSchema),
+    );
 
-      return {
-        page: parsedPage,
-        isDone: paginationResult.isDone,
-        continueCursor: paginationResult.continueCursor,
-        /* v8 ignore start */
-        ...(paginationResult.splitCursor
-          ? { splitCursor: paginationResult.splitCursor }
-          : {}),
-        ...(paginationResult.pageStatus
-          ? { pageStatus: paginationResult.pageStatus }
-          : {}),
-        /* v8 ignore stop */
-      };
-    });
+    return {
+      page: parsedPage,
+      isDone: paginationResult.isDone,
+      continueCursor: paginationResult.continueCursor,
+      /* v8 ignore start */
+      ...(paginationResult.splitCursor
+        ? { splitCursor: paginationResult.splitCursor }
+        : {}),
+      ...(paginationResult.pageStatus
+        ? { pageStatus: paginationResult.pageStatus }
+        : {}),
+      /* v8 ignore stop */
+    };
+  });
 
   return {
     first,
