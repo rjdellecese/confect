@@ -8,10 +8,12 @@ import {
   type GenericDataModel,
 } from "convex/server";
 import * as Array from "effect/Array";
+import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
 import type * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import type * as Path from "effect/Path";
+import * as Schema from "effect/Schema";
 import type * as Etag from "effect/unstable/http/Etag";
 import type * as HttpPlatform from "effect/unstable/http/HttpPlatform";
 import * as HttpRouter from "effect/unstable/http/HttpRouter";
@@ -97,7 +99,10 @@ export type Routes<Services_ = Services> = Layer.Layer<
 export const make = (routes: Routes): ConvexHttpRouter =>
   makeWithLayer(routes, RegisteredFunction.baseActionLayer);
 
-/** Derive HTTP capabilities and ID scopes from the generated database schema. */
+/**
+ * Derive HTTP capabilities and ID scopes from the generated database schema.
+ * Component routes are relative to their installation's HTTP mount prefix.
+ */
 export const forSchema =
   <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
     schema: DatabaseSchema_,
@@ -106,7 +111,28 @@ export const forSchema =
     makeWithLayer<
       Handler.ActionServices<DatabaseSchema_>,
       DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
-    >(routes, (ctx) => RegisteredFunction.actionLayer(schema, ctx));
+    >(
+      schema.target.kind === "component"
+        ? routes.pipe(Layer.provide(componentRouter))
+        : routes,
+      (ctx) => RegisteredFunction.actionLayer(schema, ctx),
+    );
+
+// Convex uses a component-relative path to select its HTTP action but passes
+// the original request URL to that action. Its CONVEX_SITE_URL includes the
+// installation's full mount prefix (including parent mounts). Prefixing the
+// Effect router preserves relative routes without rewriting the Request body.
+const componentRouter = Layer.effect(
+  HttpRouter.HttpRouter,
+  Effect.gen(function* () {
+    const router = yield* HttpRouter.HttpRouter;
+    const siteUrl = yield* Config.schema(
+      Schema.URLFromString,
+      "CONVEX_SITE_URL",
+    );
+    return router.prefixed(siteUrl.pathname);
+  }).pipe(Effect.orDie),
+);
 
 const makeWithLayer = <Services_, DataModel_ extends GenericDataModel>(
   routes: Routes<Services_>,
