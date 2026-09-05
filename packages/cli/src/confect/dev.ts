@@ -356,7 +356,11 @@ const syncLoop = (
         if (
           pending.specDirty ||
           (pending.authDirty &&
-            (yield* ConvexDirectory.target).kind === "component")
+            Match.value((yield* ConvexDirectory.target).kind).pipe(
+              Match.when("app", () => false),
+              Match.when("component", () => true),
+              Match.exhaustive,
+            ))
         ) {
           const current = yield* codegenHandler.pipe(
             Effect.tap(({ functionPaths: nextFunctionPaths }) =>

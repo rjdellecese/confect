@@ -197,32 +197,46 @@ const runCodegen = Effect.gen(function* () {
 });
 
 const validateComponentConfiguration = Effect.gen(function* () {
-  if ((yield* ConvexDirectory.target).kind !== "component") return;
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
-  const authPath = path.join(confectDirectory, "auth.ts");
-  if (yield* fs.exists(authPath)) {
-    return yield* new CodegenError.InvalidConvexConfigError({
-      configPath: authPath,
-      reason:
-        "Components cannot configure application authentication. Pass identity explicitly through function arguments.",
-    });
-  }
+  return yield* Match.value((yield* ConvexDirectory.target).kind).pipe(
+    Match.when("app", () => Effect.void),
+    Match.when("component", () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const confectDirectory = yield* ConfectDirectory.get;
+        const authPath = path.join(confectDirectory, "auth.ts");
+        if (yield* fs.exists(authPath)) {
+          return yield* new CodegenError.InvalidConvexConfigError({
+            configPath: authPath,
+            reason:
+              "Components cannot configure application authentication. Pass identity explicitly through function arguments.",
+          });
+        }
+      }),
+    ),
+    Match.exhaustive,
+  );
 });
 
 const generateComponentContract = Effect.fn(
   "Codegen.generateComponentContract",
 )(function* (tables: ReadonlyArray<TableModule.TableModule>) {
-  if ((yield* ConvexDirectory.target).kind !== "component") return;
-  const path = yield* Path.Path;
-  const directory = yield* ConfectDirectory.get;
-  const contents = yield* templates.componentContract({
-    tableNames: Array.map(tables, (table) => table.tableName),
-  });
-  yield* writeFileStringAndLog(
-    path.join(directory, "_generated", "component.ts"),
-    contents,
+  return yield* Match.value((yield* ConvexDirectory.target).kind).pipe(
+    Match.when("app", () => Effect.void),
+    Match.when("component", () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const directory = yield* ConfectDirectory.get;
+        const contents = yield* templates.componentContract({
+          tableNames: Array.map(tables, (table) => table.tableName),
+        });
+        yield* writeFileStringAndLog(
+          path.join(directory, "_generated", "component.ts"),
+          contents,
+        );
+      }),
+    ),
+    Match.exhaustive,
   );
 });
 
@@ -711,10 +725,13 @@ const generateIdConstructor = (
       (tableModule) => tableModule.tableName,
     );
     const target = yield* ConvexDirectory.target;
-    const contents = yield* templates.id({
-      tableNames,
-      ...(target.kind === "component" ? { scope: target.scope } : {}),
-    });
+    const contents = yield* Match.value(target).pipe(
+      Match.when({ kind: "app" }, () => templates.id({ tableNames })),
+      Match.when({ kind: "component" }, ({ scope }) =>
+        templates.id({ tableNames, scope }),
+      ),
+      Match.exhaustive,
+    );
 
     yield* writeFileStringAndLog(idPath, contents);
   });
@@ -752,7 +769,11 @@ const generateTableWrappers = (
           const contents = yield* templates.tableWrapper({
             tableName: tableModule.tableName,
             unnamedImportPath,
-            component: (yield* ConvexDirectory.target).kind === "component",
+            component: Match.value((yield* ConvexDirectory.target).kind).pipe(
+              Match.when("app", () => false),
+              Match.when("component", () => true),
+              Match.exhaustive,
+            ),
           });
           yield* writeFileStringAndLog(wrapperPath, contents);
         }),
@@ -812,7 +833,11 @@ const generateRuntimeSchema = (
     const bindings = yield* tableModuleBindings(tableModules, schemaPath);
     const contents = yield* templates.runtimeSchema({
       tableModules: bindings,
-      component: (yield* ConvexDirectory.target).kind === "component",
+      component: Match.value((yield* ConvexDirectory.target).kind).pipe(
+        Match.when("app", () => false),
+        Match.when("component", () => true),
+        Match.exhaustive,
+      ),
     });
 
     yield* writeFileStringAndLog(schemaPath, contents);
@@ -876,7 +901,11 @@ const generateServices = Effect.gen(function* () {
 
   const servicesContentsString = yield* templates.services({
     schemaImportPath,
-    component: (yield* ConvexDirectory.target).kind === "component",
+    component: Match.value((yield* ConvexDirectory.target).kind).pipe(
+      Match.when("app", () => false),
+      Match.when("component", () => true),
+      Match.exhaustive,
+    ),
   });
 
   yield* writeFileStringAndLog(servicesPath, servicesContentsString);

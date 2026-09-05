@@ -2,6 +2,7 @@ import type { DefaultFunctionArgs, FunctionReference } from "convex/server";
 import { getFunctionAddress } from "convex/server";
 import * as Array from "effect/Array";
 import { pipe } from "effect/Function";
+import * as Match from "effect/Match";
 import * as Record from "effect/Record";
 import * as Schema from "effect/Schema";
 import type * as FunctionSpec from "./FunctionSpec";
@@ -167,7 +168,11 @@ export const make = <
               throw new Error(
                 `Group and function at same level have same name ('${path}:${functionSpec.name}')`,
               );
-            return functionSpec.functionVisibility === "public";
+            return Match.value(functionSpec.functionVisibility).pipe(
+              Match.when("public", () => true),
+              Match.when("internal", () => false),
+              Match.exhaustive,
+            );
           }),
           Record.map((functionSpec) =>
             Ref.make(path, functionSpec, group.middlewareSpecs),
@@ -217,27 +222,29 @@ export const bind = <
     Record.map(tree, (child, key) => {
       const reference = (references as Record<string, unknown>)[key];
       if (Ref.isRef(child)) {
-        const ref = child;
         const nativeRef = reference as FunctionReference<any, any>;
-        if (ref._tag === "Convex") {
-          return { ...ref, functionReference: nativeRef };
-        } else {
-          return {
+        return Match.value(child).pipe(
+          Match.tag("Convex", (ref) => ({
+            ...ref,
+            functionReference: nativeRef,
+          })),
+          Match.tag("Confect", (ref) => ({
             ...ref,
             functionReference: nativeRef,
             args: Schema.Struct(Record.map(ref.args.fields, rebase)),
             returns: rebase(ref.returns),
-            kind:
-              ref.kind._tag === "Paginated"
-                ? {
-                    ...ref.kind,
-                    userArgs: Schema.Struct(
-                      Record.map(ref.kind.userArgs.fields, rebase),
-                    ),
-                    item: rebase(ref.kind.item),
-                    page: rebase(ref.kind.page),
-                  }
-                : ref.kind,
+            kind: Match.value(ref.kind).pipe(
+              Match.tag("Standard", (kind) => kind),
+              Match.tag("Paginated", (kind) => ({
+                ...kind,
+                userArgs: Schema.Struct(
+                  Record.map(kind.userArgs.fields, rebase),
+                ),
+                item: rebase(kind.item),
+                page: rebase(kind.page),
+              })),
+              Match.exhaustive,
+            ),
             middlewareSpecs: Array.map(ref.middlewareSpecs, (middleware) =>
               "error" in middleware
                 ? { ...middleware, error: rebase(middleware.error) }
@@ -246,8 +253,9 @@ export const bind = <
             ...("error" in ref && ref.error !== undefined
               ? { error: rebase(ref.error) }
               : {}),
-          };
-        }
+          })),
+          Match.exhaustive,
+        );
       } else {
         return visit(child, reference);
       }

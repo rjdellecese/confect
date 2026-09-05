@@ -12,6 +12,7 @@ import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
 import type * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Match from "effect/Match";
 import type * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import type * as Etag from "effect/unstable/http/Etag";
@@ -112,9 +113,13 @@ export const forSchema =
       Handler.ActionServices<DatabaseSchema_>,
       DataModel.ToConvex<DataModel.FromSchema<DatabaseSchema_>>
     >(
-      schema.target.kind === "component"
-        ? routes.pipe(Layer.provide(componentRouter))
-        : routes,
+      Match.value(schema.target.kind).pipe(
+        Match.when("app", () => routes),
+        Match.when("component", () =>
+          routes.pipe(Layer.provide(componentRouter)),
+        ),
+        Match.exhaustive,
+      ),
       (ctx) => RegisteredFunction.actionLayer(schema, ctx),
     );
 

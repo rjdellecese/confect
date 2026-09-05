@@ -173,7 +173,26 @@ export const rebase = <
             declaration.encodingRun,
           ),
       ),
-      Match.orElse((leaf) => leaf),
+      Match.tag(
+        "Null",
+        "Undefined",
+        "Void",
+        "Never",
+        "Unknown",
+        "Any",
+        "String",
+        "Number",
+        "Boolean",
+        "BigInt",
+        "Symbol",
+        "Literal",
+        "UniqueSymbol",
+        "ObjectKeyword",
+        "Enum",
+        "TemplateLiteral",
+        (leaf) => leaf,
+      ),
+      Match.exhaustive,
     );
     const ownScope = scope(ast);
     const scoped =

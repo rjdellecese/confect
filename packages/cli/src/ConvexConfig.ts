@@ -1,6 +1,7 @@
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
+import * as Match from "effect/Match";
 import type * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 import * as Order from "effect/Order";
@@ -203,15 +204,24 @@ export const discoverInstalledComponents = (
       | null
       | undefined;
 
+    const definition = Match.value(kind).pipe(
+      Match.when("app", () => ({ isRoot: true, constructor: "defineApp" })),
+      Match.when("component", () => ({
+        isRoot: false,
+        constructor: "defineComponent",
+      })),
+      Match.exhaustive,
+    );
+
     if (
       app === null ||
       typeof app !== "object" ||
-      app._isRoot !== (kind === "app") ||
+      app._isRoot !== definition.isRoot ||
       typeof app.export !== "function"
     ) {
       return yield* new InvalidConvexConfigError({
         configPath: displayPath,
-        reason: `it must default-export the ${kind} definition created by \`${kind === "app" ? "defineApp" : "defineComponent"}()\`.`,
+        reason: `it must default-export the ${kind} definition created by \`${definition.constructor}()\`.`,
       });
     }
 

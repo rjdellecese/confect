@@ -1,4 +1,5 @@
 import * as IdScope from "@confect/core/IdScope";
+import * as Match from "effect/Match";
 import * as Predicate from "effect/Predicate";
 import * as Record from "effect/Record";
 import type * as Table from "./Table";
@@ -95,11 +96,17 @@ export const make = <
   target?: Target_,
 ): DatabaseSchema<TablesRecord[keyof TablesRecord], Target_> => {
   const resolvedTarget = target ?? { kind: "app", scope: IdScope.app };
-  if (resolvedTarget.kind === "component" && resolvedTarget.scope === "") {
-    throw new Error(
-      "A component database schema requires a nonempty ID scope.",
-    );
-  }
+  Match.value(resolvedTarget.kind).pipe(
+    Match.when("app", () => {}),
+    Match.when("component", () => {
+      if (resolvedTarget.scope === "") {
+        throw new Error(
+          "A component database schema requires a nonempty ID scope.",
+        );
+      }
+    }),
+    Match.exhaustive,
+  );
   for (const [name, table] of Record.toEntries(tables)) {
     if (name !== table.tableName || table.scope !== resolvedTarget.scope) {
       throw new Error(
