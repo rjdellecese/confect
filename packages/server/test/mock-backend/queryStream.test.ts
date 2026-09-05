@@ -1,6 +1,7 @@
 import { type Document, QueryStream } from "@confect/server";
 import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
+import * as Array from "effect/Array";
 import * as Context from "effect/Context";
 import { getDocumentSize, type Value } from "convex/values";
 import * as Effect from "effect/Effect";
@@ -166,6 +167,52 @@ describe("QueryStream", () => {
               .stream("by_text", (q) => q.eq("text", "apple")),
           );
           expect(exactly).toEqual(["apple"]);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect("empty merges with, and paginates like, streams of its key", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          yield* insertNotes(["a", "b"]);
+
+          const reader = yield* DatabaseReader;
+          const notes = reader.table("notes").stream("by_text");
+          type Note =
+            typeof notes extends Stream.Stream<infer A, any, any> ? A : never;
+          const nothing = QueryStream.empty<Note>()(["text", "_creationTime"]);
+
+          expect(
+            yield* collectTexts(QueryStream.merge([nothing, notes])),
+          ).toEqual(["a", "b"]);
+          const page = yield* QueryStream.paginate(nothing, {
+            numItems: 5,
+            cursor: null,
+          });
+          expect(page.page).toEqual([]);
+          assertEquals(page.isDone, true);
+
+          // The case it exists for: a merge over a list that may be empty.
+          const only = (texts: ReadonlyArray<string>) =>
+            Array.match(texts, {
+              onEmpty: () => nothing,
+              onNonEmpty: (some) =>
+                QueryStream.merge(
+                  Array.map(some, (text) =>
+                    reader
+                      .table("notes")
+                      .stream("by_text", (q) =>
+                        q.gte("text", text).lte("text", text),
+                      ),
+                  ),
+                ),
+            });
+          expect(yield* collectTexts(only([]))).toEqual([]);
+          expect(yield* collectTexts(only(["b", "a"]))).toEqual(["a", "b"]);
         }),
       );
     }).pipe(Effect.provide(TestConfect.layer)),
@@ -727,6 +774,113 @@ describe("QueryStream", () => {
             ["a2"],
             ["b1"],
           ]);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect("leftJoin keeps outer documents that have no inner rows", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          const writer = yield* DatabaseWriter;
+          const reader = yield* DatabaseReader;
+
+          for (const [text, tag] of [
+            ["b", "b1"],
+            ["a", "a1"],
+            ["a", "a2"],
+            ["x0", "none"],
+            ["x1", "a"],
+            ["x2", "b"],
+          ] as const) {
+            yield* writer.table("notes").insert({ text, tag });
+          }
+
+          const outer = reader
+            .table("notes")
+            .stream("by_text", (q) => q.gte("text", "x"));
+          type Note =
+            typeof outer extends Stream.Stream<infer A, any, any> ? A : never;
+          const inner = (note: Note) =>
+            reader
+              .table("notes")
+              .stream("by_text", (q) => q.eq("text", note.tag ?? ""));
+
+          // "x0" has no inner rows: the placeholder stands in for them, in
+          // the position its inner rows would have had, and pagination
+          // steps past it like any element.
+          const joined = outer.pipe(
+            QueryStream.leftJoin(inner, {
+              innerKey: ["_creationTime"],
+              onEmpty: (note) => ({ tag: `none for ${note.text}` }),
+            }),
+          );
+          const pages = yield* paginateAll(joined, 1);
+          expect(pages.map((page) => page.map((doc) => doc.tag))).toEqual([
+            ["none for x0"],
+            ["a1"],
+            ["a2"],
+            ["b1"],
+          ]);
+
+          // An outer document filtered out upstream contributes no
+          // placeholder.
+          const withoutX0 = outer.pipe(
+            QueryStream.filter((note) => note.text !== "x0"),
+            QueryStream.leftJoin(inner, {
+              innerKey: ["_creationTime"],
+              onEmpty: (note) => ({ tag: `none for ${note.text}` }),
+            }),
+          );
+          expect(
+            yield* Stream.runCollect(withoutX0).pipe(
+              Effect.map((docs) => docs.map((doc) => doc.tag)),
+            ),
+          ).toEqual(["a1", "a2", "b1"]);
+        }),
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect("effectful transforms keep stream order at any concurrency", () =>
+    Effect.gen(function* () {
+      const c = yield* TestConfect.TestConfect;
+
+      yield* c.run(
+        Effect.gen(function* () {
+          yield* insertNotes(["c", "a", "b"]);
+
+          const reader = yield* DatabaseReader;
+          const notes = reader.table("notes").stream("by_text");
+          // The first element's effect finishes last.
+          const slowForA = (text: string) =>
+            Effect.succeed(text.toUpperCase()).pipe(
+              Effect.delay(text === "a" ? "30 millis" : "1 millis"),
+            );
+
+          const shouted = notes.pipe(
+            QueryStream.mapEffect((note) => slowForA(note.text), {
+              concurrency: "unbounded",
+            }),
+          );
+          expect(yield* Stream.runCollect(shouted)).toEqual(["A", "B", "C"]);
+
+          const withoutB = QueryStream.filterEffect(
+            notes,
+            (note) => Effect.map(slowForA(note.text), (text) => text !== "B"),
+            { concurrency: 2 },
+          );
+          expect(yield* collectTexts(withoutB)).toEqual(["a", "c"]);
+
+          // Still a query stream: it paginates.
+          const page = yield* QueryStream.paginate(shouted, {
+            numItems: 2,
+            cursor: null,
+          });
+          expect(page.page).toEqual(["A", "B"]);
         }),
       );
     }).pipe(Effect.provide(TestConfect.layer)),
@@ -1295,6 +1449,38 @@ describe("QueryStream types", () => {
       // @ts-expect-error — the new key must have as many fields as the old.
       const relabeledTooShort = QueryStream.orderBy(full, ["_creationTime"]);
       void relabeledTooShort;
+
+      // empty takes its document type explicitly and its key literally.
+      const nothing = QueryStream.empty<{ readonly text: string }>()([
+        "text",
+        "_creationTime",
+      ]);
+      expectTypeOf<KeyOf<typeof nothing>>().toEqualTypeOf<
+        ["text", "_creationTime"]
+      >();
+      expectTypeOf<DirectionOf<typeof nothing>>().toEqualTypeOf<"asc">();
+      const nothingDescending = QueryStream.empty<{ readonly text: string }>()(
+        ["text", "_creationTime"],
+        "desc",
+      );
+      expectTypeOf<
+        DirectionOf<typeof nothingDescending>
+      >().toEqualTypeOf<"desc">();
+
+      // leftJoin's elements are the inner documents or the placeholder.
+      const leftJoined = QueryStream.leftJoin(bounded, (_note) => pinned, {
+        innerKey: ["_creationTime"],
+        onEmpty: (note) => ({ missingFor: note.text }),
+      });
+      expectTypeOf<KeyOf<typeof leftJoined>>().toEqualTypeOf<
+        readonly ["text", "_creationTime", "_creationTime"]
+      >();
+      expectTypeOf<
+        typeof leftJoined extends Stream.Stream<infer A, any, any> ? A : never
+      >().toEqualTypeOf<
+        | (typeof pinned extends Stream.Stream<infer A, any, any> ? A : never)
+        | { missingFor: string }
+      >();
 
       // A flatMap result relabels by its type-level (tiebreaker-free) key.
       const relabeledJoin = QueryStream.orderBy(joined, ["a", "b", "c"]);
