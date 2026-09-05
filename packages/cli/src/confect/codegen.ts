@@ -144,6 +144,9 @@ const runCodegen = Effect.gen(function* () {
   const tableModules = yield* TableModule.discover;
   yield* warnIfNoTables(tableModules);
   yield* generateIdConstructor(tableModules);
+  // Tables and specs can use bound component IDs and schemas, so their
+  // imports need the registry even on a project's first codegen run.
+  yield* generateComponents;
   // Now that `_generated/id.ts` is on disk, bundle each table module and
   // check its default export is an `UnnamedTable`. Surface diagnostics
   // here (rather than later) so they appear before impl-validation noise.
@@ -173,9 +176,6 @@ const runCodegen = Effect.gen(function* () {
       generateDocs(tableModules),
       generateServices,
       generateConvexSchema(tableModules),
-      // Must land before impl validation: impls may import the generated
-      // components registry, so it has to exist when their bundles are built.
-      generateComponents,
     ],
     { concurrency: "unbounded" },
   );
@@ -960,8 +960,8 @@ const generateRefs = Effect.gen(function* () {
  * components installed in `convex/convex.config.ts` (see
  * {@link templates.components}). The file is emitted even when there is no
  * `convex.config.ts` (as an empty registry) so the import surface stays
- * stable. It must exist before impl validation because impl modules may
- * import it.
+ * stable. It must exist before loading tables and specs because they may
+ * import bound component IDs and schemas.
  */
 export const generateComponents = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;

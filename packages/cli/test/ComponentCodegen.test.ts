@@ -5,10 +5,12 @@ import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
 import { codegenHandler } from "@confect/cli/confect/codegen";
 import * as DirectoryOptions from "@confect/cli/DirectoryOptions";
 
 const fixture = `${import.meta.dirname}/fixtures/authored-component`;
+const stringLiteral = Schema.encodeSync(Schema.fromJsonString(Schema.String));
 const freshFixture = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -51,6 +53,47 @@ it.effect(
       );
       expect(contract).toContain("Component.make(spec, scope,");
       expect(contract).not.toContain("impl");
+      expect(
+        (yield* codegenHandler.pipe(Effect.provide(dirs))).anyWritesHappened,
+      ).toBe(false);
+    }).pipe(Effect.provide(NodeServices.layer)),
+);
+
+it.effect(
+  "generates the component registry before loading tables with child IDs",
+  () =>
+    Effect.gen(function* () {
+      const directory = yield* freshFixture;
+      const fs = yield* FileSystem.FileSystem;
+      yield* fs.writeFileString(
+        `${directory}/convex/convex.config.ts`,
+        `import { defineComponent } from "convex/server";
+import counter from ${stringLiteral(`${fixture}/convex/convex.config`)};
+const parent = defineComponent("parent");
+parent.use(counter, { name: "child" });
+export default parent;
+`,
+      );
+      yield* fs.writeFileString(
+        `${directory}/confect/tables/foreign.ts`,
+        `import { Component, Table } from "@confect/core";
+import * as Schema from "effect/Schema";
+import counter from ${stringLiteral(`${fixture}/confect/_generated/component`)};
+import { components } from "../_generated/components";
+import { scope } from "../_generated/id";
+const child = Component.bind(counter, components.child, { parentScope: scope });
+export default Table.make(() => Schema.Struct({ id: Component.id(child, "counters") }));
+`,
+      );
+      const dirs = DirectoryOptions.layer({
+        componentDir: Option.some(`${directory}/convex`),
+      });
+      yield* codegenHandler.pipe(Effect.provide(dirs));
+      expect(
+        yield* fs.readFileString(
+          `${directory}/confect/_generated/components.ts`,
+        ),
+      ).toContain('ComponentApi<"child">');
       expect(
         (yield* codegenHandler.pipe(Effect.provide(dirs))).anyWritesHappened,
       ).toBe(false);
