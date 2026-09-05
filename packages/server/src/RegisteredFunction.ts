@@ -1,4 +1,5 @@
 import type { FunctionSpec, RuntimeAndFunctionType } from "@confect/core";
+import * as IdScope from "@confect/core/IdScope";
 import type * as FunctionProvenance from "@confect/core/FunctionProvenance";
 import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import {
@@ -262,7 +263,7 @@ export const actionFunctionBase = <
   handler,
   resolvedMiddlewares = [],
   createLayer,
-  scope = "",
+  scope = IdScope.app,
 }: {
   name: string;
   functionVisibility: FunctionVisibility;
@@ -274,7 +275,7 @@ export const actionFunctionBase = <
   createLayer: (
     ctx: GenericActionCtx<DataModel.ToConvex<DataModel.FromSchema<Schema>>>,
   ) => Layer.Layer<R>;
-  scope?: string;
+  scope?: IdScope.IdScope;
 }) => ({
   args: compileArgsSchema(args, scope),
   returns: compileReturnsSchema(returns, scope),

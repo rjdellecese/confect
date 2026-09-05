@@ -1,3 +1,4 @@
+import type * as IdScope from "@confect/core/IdScope";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
@@ -228,16 +229,20 @@ export const id = ({
   scope,
 }: {
   tableNames: ReadonlyArray<string>;
-  scope?: string;
+  scope?: IdScope.Component<string>;
 }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-    yield* cbw.writeLine(`import { GenericId } from "@confect/core";`);
+    yield* cbw.writeLine(
+      `import { GenericId${scope === undefined ? "" : ", IdScope"} } from "@confect/core";`,
+    );
     yield* cbw.blankLine();
     if (scope !== undefined) {
-      // oxlint-disable-next-line effecttsgo/prefer-schema-over-json -- Emit an escaped TypeScript string literal, not a JSON payload.
-      yield* cbw.writeLine(`export const scope = ${JSON.stringify(scope)};`);
+      yield* cbw.writeLine(
+        // oxlint-disable-next-line effecttsgo/prefer-schema-over-json -- Emit an escaped TypeScript string literal, not a JSON payload.
+        `export const scope = IdScope.component(${JSON.stringify(scope.slice("component:".length))});`,
+      );
       yield* cbw.writeLine(
         `export const target = { kind: "component", scope } as const;`,
       );

@@ -1,3 +1,4 @@
+import * as IdScope from "@confect/core/IdScope";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -14,13 +15,15 @@ export class ConvexDirectory extends Context.Service<
   ConvexDirectory,
   {
     readonly get: Effect.Effect<string>;
-    readonly target?: DatabaseSchema.Target;
+    readonly target?:
+      | DatabaseSchema.AppTarget
+      | DatabaseSchema.ComponentTarget<IdScope.Component<string>>;
   }
 >()("@confect/cli/ConvexDirectory") {
   static readonly get = ConvexDirectory.use((service) => service.get);
   static readonly target = ConvexDirectory.use((service) =>
     Effect.succeed(
-      service.target ?? { kind: "app" as const, scope: "" as const },
+      service.target ?? { kind: "app" as const, scope: IdScope.app },
     ),
   );
 }

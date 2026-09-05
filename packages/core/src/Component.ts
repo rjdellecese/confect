@@ -69,7 +69,7 @@ interface Tree {
 
 export interface Component<
   Spec_ extends Spec.AnyWithProps,
-  Scope extends string,
+  Scope extends IdScope.IdScope,
   Tables extends string = string,
 > {
   readonly [TypeId]: {
@@ -82,7 +82,7 @@ export interface Component<
 
 /** An opaque identity: its string representation is not part of the API. */
 export type MountScope<
-  Parent extends string,
+  Parent extends IdScope.IdScope,
   Name extends string | undefined,
 > = IdScope.Mount<Parent, Name>;
 
@@ -97,8 +97,8 @@ type MountName<ComponentApi> =
 
 type BindRefs<
   RefTree,
-  From extends string,
-  To extends string,
+  From extends IdScope.IdScope,
+  To extends IdScope.IdScope,
 > = RefTree extends Ref.Any
   ? RefTree extends { readonly _tag: "Convex" }
     ? Ref.ConvexRef<
@@ -124,8 +124,8 @@ type BindRefs<
 
 export type Bound<
   Spec_ extends Spec.AnyWithProps,
-  From extends string,
-  To extends string,
+  From extends IdScope.IdScope,
+  To extends IdScope.IdScope,
   Tables extends string,
 > = BindRefs<Refs.Refs<Spec_, Ref.AnyPublic>, From, To> & {
   readonly [BoundTypeId]: {
@@ -138,7 +138,7 @@ export type Bound<
 /** Build a publishable contract containing only exported functions and codecs. */
 export const make = <
   Spec_ extends Spec.AnyWithProps,
-  const Scope extends string,
+  const Scope extends IdScope.IdScope,
   const Tables extends string,
 >(
   spec: Spec_,
@@ -179,10 +179,10 @@ export const make = <
 /** Bind the published contract to an actual installed component reference. */
 export const bind = <
   Spec_ extends Spec.AnyWithProps,
-  From extends string,
+  From extends IdScope.IdScope,
   Tables extends string,
   Native extends Api<NoInfer<Spec_>>,
-  const Parent extends string = "",
+  const Parent extends IdScope.IdScope = IdScope.App,
 >(
   component: Component<Spec_, From, Tables>,
   native: Native,
@@ -201,7 +201,10 @@ export const bind = <
     );
   // Preserve the opaque address as an identity only. Calls retain the native
   // references; no component address is constructed or parsed for routing.
-  const scope = IdScope.instance(options?.parentScope ?? "", address.reference);
+  const scope = IdScope.instance(
+    options?.parentScope ?? IdScope.app,
+    address.reference,
+  );
   const rebase = (schema: Schema.ConstraintCodec<any, any, never, never>) =>
     GenericId.rebase(schema, contract.scope, scope);
   const visit = (tree: Tree, references: unknown): Tree => {
@@ -274,8 +277,8 @@ export const bind = <
 
 /** Reference an installed component's table ID in host schemas. */
 export const id = <
-  From extends string,
-  To extends string,
+  From extends IdScope.IdScope,
+  To extends IdScope.IdScope,
   Tables extends string,
   const Table extends Tables,
 >(
@@ -291,8 +294,8 @@ export const id = <
 
 /** Reuse a component's codec in a host function or table without losing its scope. */
 export const schema = <
-  From extends string,
-  To extends string,
+  From extends IdScope.IdScope,
+  To extends IdScope.IdScope,
   Schema_ extends Schema.Codec<any, any>,
 >(
   component: {

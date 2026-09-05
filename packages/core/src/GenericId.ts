@@ -2,7 +2,7 @@ import type { GenericId as ConvexGenericId } from "convex/values";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as SchemaAST from "effect/SchemaAST";
-import type * as IdScope from "./IdScope";
+import * as IdScope from "./IdScope";
 
 const ConvexId = "~@confect/core/ConvexId";
 const ConvexIdScope = "~@confect/core/ConvexIdScope";
@@ -14,7 +14,7 @@ const ConvexIdScope = "~@confect/core/ConvexIdScope";
  */
 export type GenericId<
   TableName extends string,
-  Scope extends string = IdScope.App,
+  Scope extends IdScope.IdScope = IdScope.App,
 > = Scope extends IdScope.App
   ? ConvexGenericId<TableName>
   : ConvexGenericId<`@confect(${Scope})/${TableName}`> & {
@@ -26,29 +26,33 @@ export type GenericId<
 
 export const GenericId = <
   TableName extends string,
-  const Scope extends string = IdScope.App,
+  const Scope extends IdScope.IdScope = IdScope.App,
 >(
   tableName: TableName,
   scope?: Scope,
 ): Schema.Codec<GenericId<TableName, Scope>> =>
   Schema.String.annotate({
     [ConvexId]: tableName,
-    [ConvexIdScope]: scope ?? "",
+    [ConvexIdScope]: scope ?? IdScope.app,
   }) as unknown as Schema.Codec<GenericId<TableName, Scope>>;
 
-export const scope = (ast: SchemaAST.AST): string =>
-  SchemaAST.resolveAt<string>(ConvexIdScope)(ast) ?? "";
+export const scope = (ast: SchemaAST.AST): IdScope.IdScope =>
+  SchemaAST.resolveAt<IdScope.IdScope>(ConvexIdScope)(ast) ?? IdScope.app;
 
 /** Rebind only IDs owned by `From`; IDs belonging to other scopes survive. */
-export type Rebase<A, From extends string, To extends string> = A extends {
+export type Rebase<
+  A,
+  From extends IdScope.IdScope,
+  To extends IdScope.IdScope,
+> = A extends {
   readonly "~@confect/core/ScopedId": {
     readonly table: infer Table extends string;
-    readonly scope: infer Scope extends string;
+    readonly scope: infer Scope extends IdScope.IdScope;
   };
 }
   ? GenericId<Table, IdScope.Rebase<Scope, From, To>>
   : A extends ConvexGenericId<infer Table>
-    ? From extends ""
+    ? From extends IdScope.App
       ? GenericId<Table, To>
       : A
     : A extends
@@ -75,8 +79,8 @@ export type Rebase<A, From extends string, To extends string> = A extends {
  */
 export const rebase = <
   Schema_ extends Schema.ConstraintCodec<any, any, never, never>,
-  const From extends string,
-  const To extends string,
+  const From extends IdScope.IdScope,
+  const To extends IdScope.IdScope,
 >(
   schema: Schema_,
   from: From,

@@ -1,3 +1,4 @@
+import * as IdScope from "@confect/core/IdScope";
 import * as Predicate from "effect/Predicate";
 import type * as Table from "./Table";
 
@@ -6,10 +7,12 @@ export type TypeId = typeof TypeId;
 
 export interface AppTarget {
   readonly kind: "app";
-  readonly scope: "";
+  readonly scope: IdScope.App;
 }
 
-export interface ComponentTarget<Scope_ extends string = string> {
+export interface ComponentTarget<
+  Scope_ extends IdScope.IdScope = IdScope.IdScope,
+> {
   readonly kind: "component";
   readonly scope: Scope_;
 }
@@ -90,7 +93,7 @@ export const make = <
   tables: TablesRecord,
   target?: Target_,
 ): DatabaseSchema<TablesRecord[keyof TablesRecord], Target_> => {
-  const resolvedTarget = target ?? { kind: "app", scope: "" };
+  const resolvedTarget = target ?? { kind: "app", scope: IdScope.app };
   if (resolvedTarget.kind === "component" && resolvedTarget.scope === "") {
     throw new Error(
       "A component database schema requires a nonempty ID scope.",

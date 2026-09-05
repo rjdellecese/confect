@@ -1,3 +1,4 @@
+import type * as IdScope from "@confect/core/IdScope";
 import { compileTableSchema } from "@confect/core/SchemaToValidator";
 import * as Table_ from "@confect/core/Table";
 import * as Schema from "effect/Schema";
@@ -123,7 +124,7 @@ export const systemTables = {
   _storage: storageTable,
 } as const;
 
-export const systemTablesForScope = <const Scope_ extends string>(
+export const systemTablesForScope = <const Scope_ extends IdScope.IdScope>(
   scope: Scope_,
 ) => ({
   _scheduled_functions: Table_.make(() => scheduledFunctionsTable.Fields)(
@@ -133,6 +134,5 @@ export const systemTablesForScope = <const Scope_ extends string>(
   _storage: Table_.make(() => storageTable.Fields)("_storage", scope),
 });
 
-export type SystemTables<Scope_ extends string = ""> = ReturnType<
-  typeof systemTablesForScope<Scope_>
->[keyof typeof systemTables];
+export type SystemTables<Scope_ extends IdScope.IdScope = IdScope.App> =
+  ReturnType<typeof systemTablesForScope<Scope_>>[keyof typeof systemTables];

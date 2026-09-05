@@ -1,3 +1,4 @@
+import * as IdScope from "./IdScope";
 import * as Lazy from "./Lazy";
 import * as SystemFields from "./SystemFields";
 import type { TableSchemaToTableValidator } from "./SchemaToValidator";
@@ -52,7 +53,7 @@ export interface Table<
   Indexes_ extends GenericTableIndexes = {},
   SearchIndexes_ extends GenericTableSearchIndexes = {},
   VectorIndexes_ extends GenericTableVectorIndexes = {},
-  Scope_ extends string = "",
+  Scope_ extends IdScope.IdScope = IdScope.App,
 > {
   readonly [TypeId]: TypeId;
   readonly tableName: Name_;
@@ -81,7 +82,7 @@ export type AnyWithProps = Table<
   GenericTableIndexes,
   GenericTableSearchIndexes,
   GenericTableVectorIndexes,
-  string
+  IdScope.IdScope
 >;
 
 // -----------------------------------------------------------------------------
@@ -105,7 +106,10 @@ export interface UnnamedTable<
   SearchIndexes_ extends GenericTableSearchIndexes = {},
   VectorIndexes_ extends GenericTableVectorIndexes = {},
 > {
-  <const Name_ extends string, const Scope_ extends string = "">(
+  <
+    const Name_ extends string,
+    const Scope_ extends IdScope.IdScope = IdScope.App,
+  >(
     tableName: Name_,
     scope?: Scope_,
   ): Table<
@@ -274,7 +278,7 @@ const makeBound = <
   Indexes_ extends GenericTableIndexes,
   SearchIndexes_ extends GenericTableSearchIndexes,
   VectorIndexes_ extends GenericTableVectorIndexes,
-  Scope_ extends string,
+  Scope_ extends IdScope.IdScope,
 >(
   tableName: Name_,
   state: UnnamedState<TableSchema_, Indexes_, SearchIndexes_, VectorIndexes_>,
@@ -344,7 +348,10 @@ const makeUnnamed = <
   type UnnamedTableFunction<FunctionName extends keyof UnnamedTable_> =
     UnnamedTable_[FunctionName];
 
-  const bind = <const Name_ extends string, const Scope_ extends string = "">(
+  const bind = <
+    const Name_ extends string,
+    const Scope_ extends IdScope.IdScope = IdScope.App,
+  >(
     tableName: Name_,
     scope?: Scope_,
   ): Table<
@@ -364,7 +371,7 @@ const makeUnnamed = <
       SearchIndexes_,
       VectorIndexes_,
       Scope_
-    >(tableName, state, (scope ?? "") as Scope_);
+    >(tableName, state, (scope ?? IdScope.app) as Scope_);
 
   const index: UnnamedTableFunction<"index"> = (name, fields) =>
     makeUnnamed({

@@ -1,3 +1,4 @@
+import type * as IdScope from "./IdScope";
 import type { SystemFields as NonIdSystemFields } from "convex/server";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
@@ -17,7 +18,7 @@ import * as GenericId from "./GenericId";
  */
 export const SystemFields = <
   TableName extends string,
-  const Scope extends string = "",
+  const Scope extends IdScope.IdScope = IdScope.App,
 >(
   tableName: TableName,
   scope?: Scope,
@@ -33,7 +34,7 @@ export const SystemFields = <
  */
 type SystemFieldsFor<
   TableName extends string,
-  Scope extends string = "",
+  Scope extends IdScope.IdScope = IdScope.App,
 > = ReturnType<typeof SystemFields<TableName, Scope>>["fields"];
 
 /**
@@ -178,7 +179,7 @@ const makeExtendAst = (
 export const extendWithSystemFields = <
   TableName extends string,
   TableSchema extends Schema.Codec<any, any>,
-  const Scope extends string = "",
+  const Scope extends IdScope.IdScope = IdScope.App,
 >(
   tableName: TableName,
   schema: TableSchema,
@@ -236,7 +237,7 @@ export const extendWithSystemFields = <
 type ApplySystemFields<
   TableName extends string,
   Schema_,
-  Scope extends string,
+  Scope extends IdScope.IdScope,
 > =
   Schema_ extends Schema.Struct<infer Fields extends Schema.Struct.Fields>
     ? Schema.Struct<
@@ -265,7 +266,7 @@ type ApplySystemFields<
 export type ExtendWithSystemFields<
   TableName extends string,
   TableSchema extends Schema.Top,
-  Scope extends string = "",
+  Scope extends IdScope.IdScope = IdScope.App,
 > =
   TableSchema extends Schema.Union<
     infer Members extends ReadonlyArray<Schema.Top>
@@ -293,7 +294,7 @@ export type ExtendWithSystemFields<
 export type WithSystemFields<
   TableName extends string,
   Document,
-  Scope extends string = "",
+  Scope extends IdScope.IdScope = IdScope.App,
 > = Document extends unknown
   ? { _id: GenericId.GenericId<TableName, Scope> } & NonIdSystemFields &
       Document

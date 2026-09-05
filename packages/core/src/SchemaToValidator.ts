@@ -1,3 +1,4 @@
+import * as IdScope from "./IdScope";
 import type {
   PropertyValidators,
   Validator,
@@ -44,7 +45,7 @@ import type {
 
 export const compileArgsSchema = <ConfectValue, ConvexValue>(
   argsSchema: Schema.Codec<ConfectValue, ConvexValue>,
-  scope = "",
+  scope: IdScope.IdScope = IdScope.app,
 ): PropertyValidators => {
   const ast = Schema.toEncoded(argsSchema).ast;
 
@@ -65,7 +66,7 @@ export const compileArgsSchema = <ConfectValue, ConvexValue>(
 
 export const compileReturnsSchema = <ConfectValue, ConvexValue>(
   schema: Schema.Codec<ConfectValue, ConvexValue>,
-  scope = "",
+  scope: IdScope.IdScope = IdScope.app,
 ): Validator<any, any, any> =>
   Effect.runSync(compileAst(Schema.toEncoded(schema).ast, false, scope));
 
@@ -85,7 +86,7 @@ export type TableSchemaToTableValidator<
 
 export const compileTableSchema = <TableSchema extends Schema.Codec<any, any>>(
   schema: TableSchema,
-  scope = "",
+  scope: IdScope.IdScope = IdScope.app,
 ): TableSchemaToTableValidator<TableSchema> => {
   const ast = Schema.toEncoded(schema).ast;
 
@@ -299,7 +300,7 @@ export const isRecursive = (ast: SchemaAST.AST): boolean =>
 export const compileAst = (
   ast: SchemaAST.AST,
   isOptionalPropertyOfTypeLiteral = false,
-  scope = "",
+  scope: IdScope.IdScope = IdScope.app,
 ): Effect.Effect<
   Validator<any, any, any>,
   | UnsupportedSchemaTypeError
@@ -393,7 +394,7 @@ export const compileAst = (
 const handleUnion = (
   { types }: SchemaAST.Union,
   isOptionalPropertyOfTypeLiteral: boolean,
-  scope: string,
+  scope: IdScope.IdScope,
 ) =>
   Effect.gen(function* () {
     const members = isOptionalPropertyOfTypeLiteral
@@ -414,7 +415,7 @@ const handleUnion = (
     }
   });
 
-const handleObjects = (objectsAst: SchemaAST.Objects, scope: string) =>
+const handleObjects = (objectsAst: SchemaAST.Objects, scope: IdScope.IdScope) =>
   pipe(
     objectsAst.indexSignatures,
     Array.head,
@@ -443,7 +444,10 @@ const handleObjects = (objectsAst: SchemaAST.Objects, scope: string) =>
     }),
   );
 
-const handleArrays = ({ elements, rest }: SchemaAST.Arrays, scope: string) =>
+const handleArrays = (
+  { elements, rest }: SchemaAST.Arrays,
+  scope: IdScope.IdScope,
+) =>
   Effect.gen(function* () {
     const [f, s, ...r] = elements;
 
@@ -476,7 +480,7 @@ const handleArrays = ({ elements, rest }: SchemaAST.Arrays, scope: string) =>
 
 const handlePropertySignatures = (
   objectsAst: SchemaAST.Objects,
-  scope: string,
+  scope: IdScope.IdScope,
 ) =>
   pipe(
     objectsAst.propertySignatures,

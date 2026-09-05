@@ -1,3 +1,4 @@
+import type * as IdScope from "@confect/core/IdScope";
 import { Ref } from "@confect/core";
 import type { GenericId } from "@confect/core/GenericId";
 import type { Scheduler as ConvexScheduler } from "convex/server";
@@ -47,7 +48,7 @@ export const Scheduler = Context.Service<ReturnType<typeof make>>(
 );
 export type Scheduler = typeof Scheduler.Identifier;
 
-export interface Service<Scope extends string = ""> {
+export interface Service<Scope extends IdScope.IdScope = IdScope.App> {
   runAfter<Ref_ extends Ref.AnyMutation | Ref.AnyAction>(
     delay: Duration.Duration,
     ref: Ref_,
@@ -60,16 +61,16 @@ export interface Service<Scope extends string = ""> {
   ): Effect.Effect<GenericId<"_scheduled_functions", Scope>>;
 }
 
-export type ForScope<Scope extends string> = Scope extends ""
+export type ForScope<Scope extends IdScope.IdScope> = Scope extends IdScope.App
   ? Scheduler
   : { readonly "~ScopedScheduler": Scope };
 
-export const forScope = <Scope extends string = "">(): Context.Service<
-  ForScope<Scope>,
-  Service<Scope>
-> => Context.Service("@confect/server/Scheduler");
+export const forScope = <
+  Scope extends IdScope.IdScope = IdScope.App,
+>(): Context.Service<ForScope<Scope>, Service<Scope>> =>
+  Context.Service("@confect/server/Scheduler");
 
-export const layer = <Scope extends string = "">(
+export const layer = <Scope extends IdScope.IdScope = IdScope.App>(
   scheduler: ConvexScheduler,
   _scope?: Scope,
 ) =>

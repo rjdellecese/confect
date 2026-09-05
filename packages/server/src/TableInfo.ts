@@ -1,3 +1,4 @@
+import type * as IdScope from "@confect/core/IdScope";
 import type {
   GenericDocument,
   GenericFieldPaths,
@@ -92,7 +93,7 @@ type ExtractFieldPaths<TableValidator extends GenericValidator> =
 type ExtractConvexDocument<
   TableName extends string,
   TableValidator extends GenericValidator,
-  Scope extends string = "",
+  Scope extends IdScope.IdScope = IdScope.App,
 > =
   WithSystemFields<
     TableName,

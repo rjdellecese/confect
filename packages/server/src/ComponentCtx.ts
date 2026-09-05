@@ -1,3 +1,4 @@
+import type * as IdScope from "@confect/core/IdScope";
 import type { GenericId, Rebase } from "@confect/core/GenericId";
 import type {
   DocumentByName,
@@ -22,7 +23,7 @@ import type { PatchValue } from "./DatabaseWriter";
 export interface Identifier<
   Kind extends string,
   DataModel,
-  Scope extends string,
+  Scope extends IdScope.IdScope,
 > {
   readonly "~@confect/server/ComponentCtx": {
     readonly kind: Kind;
@@ -31,7 +32,10 @@ export interface Identifier<
   };
 }
 
-interface Reader<DataModel extends GenericDataModel, Scope extends string> {
+interface Reader<
+  DataModel extends GenericDataModel,
+  Scope extends IdScope.IdScope,
+> {
   get<TableName extends TableNamesInDataModel<DataModel>>(
     table: TableName,
     id: GenericId<NoInfer<TableName>, Scope>,
@@ -48,18 +52,22 @@ interface Reader<DataModel extends GenericDataModel, Scope extends string> {
   ): QueryInitializer<NamedTableInfo<DataModel, TableName>>;
 }
 
-type ScopedSystem<Scope extends string> = Rebase<SystemDataModel, "", Scope>;
+type ScopedSystem<Scope extends IdScope.IdScope> = Rebase<
+  SystemDataModel,
+  IdScope.App,
+  Scope
+>;
 
 export interface DatabaseReader<
   DataModel extends GenericDataModel,
-  Scope extends string,
+  Scope extends IdScope.IdScope,
 > extends Reader<DataModel, Scope> {
   readonly system: Reader<ScopedSystem<Scope>, Scope>;
 }
 
 export interface DatabaseWriter<
   DataModel extends GenericDataModel,
-  Scope extends string,
+  Scope extends IdScope.IdScope,
 > extends DatabaseReader<DataModel, Scope> {
   insert<TableName extends TableNamesInDataModel<DataModel>>(
     table: TableName,
@@ -96,7 +104,7 @@ export interface DatabaseWriter<
   ): Promise<void>;
 }
 
-export interface StorageReader<Scope extends string> {
+export interface StorageReader<Scope extends IdScope.IdScope> {
   getUrl(id: GenericId<"_storage", Scope>): Promise<string | null>;
   getMetadata(
     id: GenericId<"_storage", Scope>,
@@ -105,21 +113,21 @@ export interface StorageReader<Scope extends string> {
       Awaited<
         ReturnType<GenericQueryCtx<GenericDataModel>["storage"]["getMetadata"]>
       >,
-      "",
+      IdScope.App,
       Scope
     >
   >;
 }
 
 export interface StorageWriter<
-  Scope extends string,
+  Scope extends IdScope.IdScope,
 > extends StorageReader<Scope> {
   generateUploadUrl(): Promise<string>;
   delete(id: GenericId<"_storage", Scope>): Promise<void>;
 }
 
 export interface StorageActionWriter<
-  Scope extends string,
+  Scope extends IdScope.IdScope,
 > extends StorageWriter<Scope> {
   get(id: GenericId<"_storage", Scope>): Promise<Blob | null>;
   store(
@@ -128,7 +136,7 @@ export interface StorageActionWriter<
   ): Promise<GenericId<"_storage", Scope>>;
 }
 
-export interface Scheduler<Scope extends string> {
+export interface Scheduler<Scope extends IdScope.IdScope> {
   runAfter<FunctionReference extends SchedulableFunctionReference>(
     delayMs: number,
     ref: FunctionReference,
@@ -144,7 +152,7 @@ export interface Scheduler<Scope extends string> {
 
 export type Query<
   DataModel extends GenericDataModel,
-  Scope extends string,
+  Scope extends IdScope.IdScope,
 > = Omit<GenericQueryCtx<DataModel>, "auth" | "db" | "storage"> & {
   readonly db: DatabaseReader<DataModel, Scope>;
   readonly storage: StorageReader<Scope>;
@@ -152,7 +160,7 @@ export type Query<
 
 export type Mutation<
   DataModel extends GenericDataModel,
-  Scope extends string,
+  Scope extends IdScope.IdScope,
 > = Omit<
   GenericMutationCtx<DataModel>,
   "auth" | "db" | "storage" | "scheduler"
@@ -164,7 +172,7 @@ export type Mutation<
 
 export type Action<
   DataModel extends GenericDataModel,
-  Scope extends string,
+  Scope extends IdScope.IdScope,
 > = Omit<
   GenericActionCtx<DataModel>,
   "auth" | "storage" | "vectorSearch" | "scheduler"

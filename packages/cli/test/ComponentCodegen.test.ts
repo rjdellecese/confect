@@ -38,7 +38,7 @@ it.effect(
         `${directory}/confect/_generated/id.ts`,
       );
       expect(id).toContain(
-        'scope = "component:@confect-fixtures/counter:convex"',
+        'scope = IdScope.component("@confect-fixtures/counter:convex")',
       );
       const services = yield* fs.readFileString(
         `${directory}/confect/_generated/services.ts`,

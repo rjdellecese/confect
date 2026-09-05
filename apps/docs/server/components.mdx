@@ -147,6 +147,8 @@ Confect generates the usual IDs, tables, schema, services, references, and regis
 
 The generated definition scope derives from the nearest package's name and the component directory's package-relative path. Keep that identity stable and import `Id` from `_generated/id` when declaring the component's own IDs. Existing application IDs remain compatible with Convex's `GenericId` type.
 
+Scope parameters accept the branded `IdScope.IdScope` type, not raw strings. Prefer the generated `scope` from `_generated/id`. For hand-authored schemas, import `IdScope` from `@confect/core` and use `IdScope.app`, `IdScope.component(name)`, or `IdScope.instance(parentScope, name)`. These helpers preserve scope identity in the types without changing the runtime strings or checking ownership.
+
 ### Handler capabilities
 
 Keep using `FunctionImpl.make(databaseSchema, group, name, handler)` with the generated schema. The schema determines the available services:

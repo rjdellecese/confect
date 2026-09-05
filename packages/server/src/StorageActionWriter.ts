@@ -1,3 +1,4 @@
+import type * as IdScope from "@confect/core/IdScope";
 import type { StorageActionWriter as ConvexStorageActionWriter } from "convex/server";
 import type { GenericId } from "convex/values";
 import * as Context from "effect/Context";
@@ -8,7 +9,7 @@ import * as Option from "effect/Option";
 import { BlobNotFoundError } from "./BlobNotFoundError";
 import type * as ScopedId from "@confect/core/GenericId";
 
-export type Service<Scope extends string = ""> = {
+export type Service<Scope extends IdScope.IdScope = IdScope.App> = {
   get: (
     id: ScopedId.GenericId<"_storage", Scope>,
   ) => ReturnType<ReturnType<typeof make>["get"]>;
@@ -17,7 +18,7 @@ export type Service<Scope extends string = ""> = {
     options?: { sha256?: string },
   ) => Effect.Effect<ScopedId.GenericId<"_storage", Scope>>;
 };
-export type ForScope<Scope extends string> = Scope extends ""
+export type ForScope<Scope extends IdScope.IdScope> = Scope extends IdScope.App
   ? StorageActionWriter
   : { readonly "~ScopedStorageActionWriter": Scope };
 
@@ -42,12 +43,12 @@ export class StorageActionWriter extends Context.Service<
   StorageActionWriter,
   ReturnType<typeof make>
 >()("@confect/server/StorageActionWriter") {
-  static readonly forScope = <Scope extends string = "">(): Context.Service<
-    ForScope<Scope>,
-    Service<Scope>
-  > => Context.Service("@confect/server/StorageActionWriter");
+  static readonly forScope = <
+    Scope extends IdScope.IdScope = IdScope.App,
+  >(): Context.Service<ForScope<Scope>, Service<Scope>> =>
+    Context.Service("@confect/server/StorageActionWriter");
 
-  static readonly layer = <Scope extends string = "">(
+  static readonly layer = <Scope extends IdScope.IdScope = IdScope.App>(
     storageActionWriter: ConvexStorageActionWriter,
     _scope?: Scope,
   ) =>

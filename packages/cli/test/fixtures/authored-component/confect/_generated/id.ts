@@ -1,6 +1,6 @@
-import { GenericId } from "@confect/core";
+import { GenericId, IdScope } from "@confect/core";
 
-export const scope = "component:@confect-fixtures/counter:convex";
+export const scope = IdScope.component("@confect-fixtures/counter:convex");
 export const target = { kind: "component", scope } as const;
 export type TableNames = "counters";
 
