@@ -218,9 +218,9 @@ const validateComponentConfiguration = Effect.gen(function* () {
   );
 });
 
-const generateComponentContract = Effect.fn(
-  "Codegen.generateComponentContract",
-)(function* (tables: ReadonlyArray<TableModule.TableModule>) {
+const generateComponentContract = Effect.fnUntraced(function* (
+  tables: ReadonlyArray<TableModule.TableModule>,
+) {
   return yield* Match.value((yield* ConvexDirectory.target).kind).pipe(
     Match.when("app", () => Effect.void),
     Match.when("component", () =>

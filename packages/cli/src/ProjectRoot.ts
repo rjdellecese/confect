@@ -16,30 +16,30 @@ export class ProjectRoot extends Context.Service<
   static readonly get = ProjectRoot.use((service) => service.get);
 }
 
-export const findProjectRootFrom = Effect.fn("ProjectRoot.findProjectRootFrom")(
-  function* (directory: string) {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
+export const findProjectRootFrom = Effect.fnUntraced(function* (
+  directory: string,
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
 
-    const startDir = path.resolve(directory);
-    const root = path.parse(startDir).root;
+  const startDir = path.resolve(directory);
+  const root = path.parse(startDir).root;
 
-    const directories = Array.unfold(startDir, (dir) =>
-      dir === root
-        ? Option.none()
-        : Option.some([dir, path.dirname(dir)] as const),
-    );
+  const directories = Array.unfold(startDir, (dir) =>
+    dir === root
+      ? Option.none()
+      : Option.some([dir, path.dirname(dir)] as const),
+  );
 
-    const projectRoot = yield* Effect.findFirst(directories, (dir) =>
-      fs.exists(path.join(dir, "package.json")),
-    );
+  const projectRoot = yield* Effect.findFirst(directories, (dir) =>
+    fs.exists(path.join(dir, "package.json")),
+  );
 
-    return yield* Option.match(projectRoot, {
-      onNone: () => Effect.fail(new ProjectRootNotFoundError()),
-      onSome: Effect.succeed,
-    });
-  },
-);
+  return yield* Option.match(projectRoot, {
+    onNone: () => Effect.fail(new ProjectRootNotFoundError()),
+    onSome: Effect.succeed,
+  });
+});
 
 export const findProjectRoot = findProjectRootFrom(".");
 
