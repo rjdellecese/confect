@@ -1,8 +1,12 @@
-import { describe, expect, expectTypeOf, it } from "@effect/vitest";
+import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { GenericId, IdScope, SchemaToValidator, Table } from "@confect/core";
 import type { GenericId as ConvexId } from "convex/values";
 import { v } from "convex/values";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
+import * as SchemaAST from "effect/SchemaAST";
 
 const definition = IdScope.component("@example/counter");
 const first = IdScope.instance(IdScope.app, "first");
@@ -169,8 +173,9 @@ describe("ID scopes", () => {
     });
     expect(Schema.encodeSync(bound)(decoded)).toEqual(wire);
     const appOwner: ConvexId<"users"> = decoded.owner;
-    const related: GenericId.GenericId<"users", typeof first> =
-      decoded.related[0]!;
+    const [firstRelated] = decoded.related;
+    assert(firstRelated !== undefined);
+    const related: GenericId.GenericId<"users", typeof first> = firstRelated;
     void [appOwner, related];
     expect(SchemaToValidator.compileArgsSchema(bound).owner).toEqual(
       v.id("users"),
@@ -196,4 +201,82 @@ describe("ID scopes", () => {
     const appId: ConvexId<"users"> = doc._id;
     void appId;
   });
+
+  it.effect(
+    "keeps recursive schemas lazy and memoizes shared nodes per rebasing",
+    () =>
+      Effect.gen(function* () {
+        interface Node {
+          readonly id: GenericId.GenericId<"users", typeof definition>;
+          readonly children: ReadonlyArray<Node>;
+        }
+        let evaluations = 0;
+        const node: Schema.Codec<Node> = Schema.suspend(() => {
+          evaluations++;
+          return Schema.Struct({
+            id: GenericId.GenericId("users", definition),
+            children: Schema.Array(node),
+          });
+        });
+        const input = Schema.Struct({ left: node, right: node });
+        const bound = GenericId.rebase(input, definition, first);
+        const other = GenericId.rebase(input, definition, second);
+        expect(evaluations).toBe(0);
+        assert(SchemaAST.isObjects(bound.ast));
+        const [left, right] = bound.ast.propertySignatures;
+        assert(left !== undefined && right !== undefined);
+        expect(left.type).toBe(right.type);
+        const wire = {
+          left: { id: "parent", children: [{ id: "child", children: [] }] },
+          right: { id: "sibling", children: [] },
+        };
+        const decoded = yield* Schema.decodeUnknownEffect(bound)(wire);
+        expect(decoded).toEqual(wire);
+        expect(yield* Schema.encodeEffect(bound)(decoded)).toEqual(wire);
+        expect(evaluations).toBe(1);
+        assert(SchemaAST.isSuspend(left.type));
+        const reboundNode = left.type.thunk();
+        assert(SchemaAST.isObjects(reboundNode));
+        const [id] = reboundNode.propertySignatures;
+        assert(id !== undefined);
+        expect(GenericId.scope(id.type)).toBe(first);
+        assert(SchemaAST.isObjects(other.ast));
+        const [otherLeft] = other.ast.propertySignatures;
+        assert(otherLeft !== undefined && SchemaAST.isSuspend(otherLeft.type));
+        const otherNode = otherLeft.type.thunk();
+        assert(SchemaAST.isObjects(otherNode));
+        const [otherId] = otherNode.propertySignatures;
+        assert(otherId !== undefined);
+        expect(GenericId.scope(otherId.type)).toBe(second);
+      }),
+  );
+
+  it.effect("preserves declaration codecs, refinements, and annotations", () =>
+    Effect.gen(function* () {
+      const input = Schema.Option(
+        Schema.Struct({
+          id: GenericId.GenericId("users", definition),
+          count: Schema.FiniteFromString.check(Schema.isGreaterThan(0)),
+        }),
+      ).annotate({ identifier: "OptionalUser" });
+      const bound = GenericId.rebase(input, definition, first);
+      const wire = Option.some({ id: "one", count: "3" });
+      const decoded = yield* Schema.decodeUnknownEffect(bound)(wire);
+      expect(decoded).toEqual(Option.some({ id: "one", count: 3 }));
+      expect(yield* Schema.encodeEffect(bound)(decoded)).toEqual(wire);
+      expect(SchemaAST.resolveIdentifier(bound.ast)).toBe("OptionalUser");
+      assert(SchemaAST.isDeclaration(bound.ast));
+      const [item] = bound.ast.typeParameters;
+      assert(item !== undefined && SchemaAST.isObjects(item));
+      const [id] = item.propertySignatures;
+      assert(id !== undefined);
+      expect(GenericId.scope(id.type)).toBe(first);
+      const invalid = yield* Effect.result(
+        Schema.decodeUnknownEffect(bound)(
+          Option.some({ id: "one", count: "-1" }),
+        ),
+      );
+      expect(Result.isFailure(invalid)).toBe(true);
+    }),
+  );
 });

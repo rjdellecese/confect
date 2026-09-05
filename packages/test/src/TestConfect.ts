@@ -221,10 +221,12 @@ class TestConfectImpl<
     );
 
   readonly registerComponent: TestConfect<ConfectSchema>["registerComponent"] =
-    (componentPath, schema, modules) =>
-      Effect.sync(() =>
-        this.testConvex.registerComponent(componentPath, schema, modules),
-      );
+    Effect.fn("TestConfect.registerComponent")(
+      (componentPath, schema, modules) =>
+        Effect.sync(() =>
+          this.testConvex.registerComponent(componentPath, schema, modules),
+        ),
+    );
 
   readonly query = <QueryRef extends Ref.AnyQuery>(
     queryRef: QueryRef,

@@ -1,4 +1,7 @@
 import type { GenericId as ConvexGenericId } from "convex/values";
+import * as Array from "effect/Array";
+import { memoize } from "effect/Function";
+import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as SchemaAST from "effect/SchemaAST";
@@ -89,101 +92,114 @@ export const rebase = <
   Rebase<Schema_["Type"], From, To>,
   Rebase<Schema_["Encoded"], From, To>
 > => {
-  const cache = new WeakMap<SchemaAST.AST, SchemaAST.AST>();
-  const visit = (ast: SchemaAST.AST): SchemaAST.AST => {
-    const cached = cache.get(ast);
-    if (cached) return cached;
-    let next = ast;
-    switch (ast._tag) {
-      case "Objects":
-        next = new SchemaAST.Objects(
-          ast.propertySignatures.map(
-            (p) => new SchemaAST.PropertySignature(p.name, visit(p.type)),
+  const visit = memoize((ast: SchemaAST.AST): SchemaAST.AST => {
+    const next = Match.value(ast).pipe(
+      Match.tag(
+        "Objects",
+        (objects) =>
+          new SchemaAST.Objects(
+            Array.map(
+              objects.propertySignatures,
+              (property) =>
+                new SchemaAST.PropertySignature(
+                  property.name,
+                  visit(property.type),
+                ),
+            ),
+            Array.map(
+              objects.indexSignatures,
+              (index) =>
+                new SchemaAST.IndexSignature(
+                  visit(index.parameter),
+                  visit(index.type),
+                ),
+            ),
+            objects.annotations,
+            objects.checks,
+            undefined,
+            objects.context,
+            objects.encodingChecks,
           ),
-          ast.indexSignatures.map(
-            (i) =>
-              new SchemaAST.IndexSignature(visit(i.parameter), visit(i.type)),
+      ),
+      Match.tag(
+        "Arrays",
+        (arrays) =>
+          new SchemaAST.Arrays(
+            arrays.isMutable,
+            Array.map(arrays.elements, visit),
+            Array.map(arrays.rest, visit),
+            arrays.annotations,
+            arrays.checks,
+            undefined,
+            arrays.context,
+            arrays.encodingChecks,
           ),
-          ast.annotations,
-          ast.checks,
-          undefined,
-          ast.context,
-          ast.encodingChecks,
-        );
-        break;
-      case "Arrays":
-        next = new SchemaAST.Arrays(
-          ast.isMutable,
-          ast.elements.map(visit),
-          ast.rest.map(visit),
-          ast.annotations,
-          ast.checks,
-          undefined,
-          ast.context,
-          ast.encodingChecks,
-        );
-        break;
-      case "Union":
-        next = new SchemaAST.Union(
-          ast.types.map(visit),
-          ast.mode,
-          ast.annotations,
-          ast.checks,
-          undefined,
-          ast.context,
-          ast.encodingChecks,
-        );
-        break;
-      case "Suspend":
-        next = new SchemaAST.Suspend(
-          () => visit(ast.thunk()),
-          ast.annotations,
-          ast.checks,
-          undefined,
-          ast.context,
-        );
-        break;
-      case "Declaration":
-        next = new SchemaAST.Declaration(
-          ast.typeParameters.map(visit),
-          ast.run,
-          ast.annotations,
-          ast.checks,
-          undefined,
-          ast.context,
-          ast.encodingChecks,
-          ast.encodingRun,
-        );
-        break;
-    }
+      ),
+      Match.tag(
+        "Union",
+        (union) =>
+          new SchemaAST.Union(
+            Array.map(union.types, visit),
+            union.mode,
+            union.annotations,
+            union.checks,
+            undefined,
+            union.context,
+            union.encodingChecks,
+          ),
+      ),
+      Match.tag(
+        "Suspend",
+        (suspend) =>
+          new SchemaAST.Suspend(
+            () => visit(suspend.thunk()),
+            suspend.annotations,
+            suspend.checks,
+            undefined,
+            suspend.context,
+          ),
+      ),
+      Match.tag(
+        "Declaration",
+        (declaration) =>
+          new SchemaAST.Declaration(
+            Array.map(declaration.typeParameters, visit),
+            declaration.run,
+            declaration.annotations,
+            declaration.checks,
+            undefined,
+            declaration.context,
+            declaration.encodingChecks,
+            declaration.encodingRun,
+          ),
+      ),
+      Match.orElse((leaf) => leaf),
+    );
     const ownScope = scope(ast);
-    if (
+    const scoped =
       Option.isSome(tableName(ast)) &&
       (ownScope === from || ownScope.startsWith(`${from}/instance:`))
-    ) {
-      next = Schema.make<Schema.Codec<unknown>>(next).annotate({
-        [ConvexIdScope]: to + ownScope.slice(from.length),
-      }).ast;
-    }
-    if (ast.encoding) {
-      const descriptors: PropertyDescriptorMap =
-        Object.getOwnPropertyDescriptors(next);
-      descriptors.encoding = {
-        value: ast.encoding.map(
+        ? Schema.make<Schema.Codec<unknown>>(next).annotate({
+            [ConvexIdScope]: to + ownScope.slice(from.length),
+          }).ast
+        : next;
+    if (ast.encoding === undefined) return scoped;
+    // Effect's replaceEncoding helper is internal and omitted from its published
+    // declarations. Preserve AST prototypes and descriptors at this boundary;
+    // spreading the node itself would lose its class behavior.
+    return Object.create(Object.getPrototypeOf(scoped), {
+      ...Object.getOwnPropertyDescriptors(scoped),
+      encoding: {
+        value: Array.map(
+          ast.encoding,
           (link) => new SchemaAST.Link(visit(link.to), link.transformation),
         ),
         enumerable: true,
         configurable: true,
         writable: true,
-      };
-      next = Object.create(
-        Object.getPrototypeOf(next),
-        descriptors,
-      ) as SchemaAST.AST;
-    }
-    cache.set(ast, next);
-    return next;
-  };
+      },
+    }) as SchemaAST.AST;
+  });
   return Schema.make(visit(schema.ast));
 };
 

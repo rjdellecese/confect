@@ -109,10 +109,14 @@ export const runtimeSchema = ({
     if (component) {
       yield* cbw.writeLine(`import { target } from "./id";`);
       const types =
-        tableModules
-          .map(({ tableName }) => `typeof ${tableName}`)
-          .join(" | ") || "never";
-      const names = tableModules.map(({ tableName }) => tableName).join(", ");
+        Array.join(
+          Array.map(tableModules, ({ tableName }) => `typeof ${tableName}`),
+          " | ",
+        ) || "never";
+      const names = Array.join(
+        Array.map(tableModules, ({ tableName }) => tableName),
+        ", ",
+      );
       yield* cbw.writeLine(
         `const databaseSchema: $DatabaseSchema.DatabaseSchema<${types}, typeof target> = $DatabaseSchema.make({ ${names} }, target);`,
       );
@@ -396,18 +400,15 @@ export const refs = ({ specImportPath }: { specImportPath: string }) =>
     return yield* cbw.toString();
   });
 
-export const componentContract = ({
-  tableNames,
-}: {
-  tableNames: ReadonlyArray<string>;
-}) =>
-  Effect.gen(function* () {
+export const componentContract = Effect.fn("Templates.componentContract")(
+  function* ({ tableNames }: { tableNames: ReadonlyArray<string> }) {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
     yield* cbw.writeLine('import { Component } from "@confect/core";');
     yield* cbw.writeLine('import spec from "./spec";');
     yield* cbw.writeLine('import { scope } from "./id";');
     yield* cbw.blankLine();
-    const names = [...tableNames, "_storage", "_scheduled_functions"].map(
+    const names = Array.map(
+      [...tableNames, "_storage", "_scheduled_functions"],
       (name) => `"${name}"`,
     );
     yield* cbw.writeLine(
@@ -415,7 +416,8 @@ export const componentContract = ({
     );
     yield* cbw.writeLine("export default component;");
     return yield* cbw.toString();
-  });
+  },
+);
 
 /**
  * Emit `_generated/docs.ts`: one named `type <table>` alias per table plus a

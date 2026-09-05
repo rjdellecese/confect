@@ -211,21 +211,20 @@ const validateComponentConfiguration = Effect.gen(function* () {
   }
 });
 
-const generateComponentContract = (
-  tables: ReadonlyArray<TableModule.TableModule>,
-) =>
-  Effect.gen(function* () {
-    if ((yield* ConvexDirectory.target).kind !== "component") return;
-    const path = yield* Path.Path;
-    const directory = yield* ConfectDirectory.get;
-    const contents = yield* templates.componentContract({
-      tableNames: tables.map((table) => table.tableName),
-    });
-    yield* writeFileStringAndLog(
-      path.join(directory, "_generated", "component.ts"),
-      contents,
-    );
+const generateComponentContract = Effect.fn(
+  "Codegen.generateComponentContract",
+)(function* (tables: ReadonlyArray<TableModule.TableModule>) {
+  if ((yield* ConvexDirectory.target).kind !== "component") return;
+  const path = yield* Path.Path;
+  const directory = yield* ConfectDirectory.get;
+  const contents = yield* templates.componentContract({
+    tableNames: Array.map(tables, (table) => table.tableName),
   });
+  yield* writeFileStringAndLog(
+    path.join(directory, "_generated", "component.ts"),
+    contents,
+  );
+});
 
 const generateConfectGeneratedDirectory = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;

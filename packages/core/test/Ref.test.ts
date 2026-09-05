@@ -7,6 +7,7 @@ import type {
   RegisteredQuery,
 } from "convex/server";
 import { ConvexError } from "convex/values";
+import { makeFunctionReference } from "convex/server";
 import { it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as MutableRef from "effect/MutableRef";
@@ -20,6 +21,54 @@ import * as PaginationOptions from "@confect/core/PaginationOptions";
 import * as PaginationResult from "@confect/core/PaginationResult";
 import * as Ref from "@confect/core/Ref";
 import type * as RuntimeAndFunctionType from "@confect/core/RuntimeAndFunctionType";
+
+describe("isRef", () => {
+  const confect = Ref.make(
+    "notes",
+    FunctionSpec.publicQuery({ name: "list", returns: () => Schema.String }),
+  );
+  const convex = Ref.fromFunctionReference(
+    makeFunctionReference<"query">("notes:list"),
+  );
+  const convexFromSpec = Ref.make(
+    "notes",
+    FunctionSpec.convexPublicQuery<RegisteredQuery<"public", {}, string>>()(
+      "list",
+    ),
+  );
+
+  test("recognizes both provenances and narrows unknown values", () => {
+    expect(Ref.isRef(confect)).toBe(true);
+    expect(Ref.isRef(convex)).toBe(true);
+    expect(Ref.isRef(convexFromSpec)).toBe(true);
+    expect(confect[Ref.TypeId]).toBe(Ref.TypeId);
+    expect(convex[Ref.TypeId]).toBe(Ref.TypeId);
+    expect(convexFromSpec[Ref.TypeId]).toBe(Ref.TypeId);
+    const value: unknown = confect;
+    if (Ref.isRef(value)) {
+      expectTypeOf(value).toEqualTypeOf<Ref.Any>();
+      expect(value.convexFunctionName).toBe("notes:list");
+    }
+  });
+
+  test("rejects non-references and namespaces with reference-like keys", () => {
+    for (const value of [
+      null,
+      undefined,
+      "notes:list",
+      {},
+      { convexFunctionName: "notes:list" },
+      { _tag: "Confect", convexFunctionName: "notes:list" },
+      { _tag: "Convex", convexFunctionName: "notes:list" },
+      { _tag: "Unknown", convexFunctionName: "notes:list" },
+      { _tag: "Convex", convexFunctionName: 1 },
+      { _tag: "Confect" },
+      { convexFunctionName: confect, _tag: convex },
+    ]) {
+      expect(Ref.isRef(value)).toBe(false);
+    }
+  });
+});
 
 describe("FunctionReference", () => {
   test("public query", () => {

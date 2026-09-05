@@ -13,6 +13,7 @@ import { componentsGeneric, getFunctionAddress } from "convex/server";
 import type { RegisteredQuery } from "convex/server";
 import { v } from "convex/values";
 import * as Schema from "effect/Schema";
+import * as Record from "effect/Record";
 
 const scope = IdScope.component("@example/counter");
 const ItemId = GenericId.GenericId("items", scope);
@@ -67,6 +68,8 @@ describe("published component contracts", () => {
       mixed: Component.Api<typeof mixedSpec, "mixed">;
     };
     const bound = Component.bind(mixedContract, registry.mixed);
+    expect(Ref.isRef(bound.native.id)).toBe(true);
+    expect(bound.native.id[Ref.TypeId]).toBe(Ref.TypeId);
     const value = Ref.decodeReturnsSync(bound.native.id, "one");
     const wire: string = value;
     // @ts-expect-error Native component IDs must not acquire a host-table brand.
@@ -81,6 +84,8 @@ describe("published component contracts", () => {
     expect(Ref.encodeArgsSync(wrapped, { count: "3" })).toEqual({ count: "3" });
   });
   it("retains native references and Confect wire codecs", () => {
+    expect(Ref.isRef(first.items.create)).toBe(true);
+    expect(first.items.create[Ref.TypeId]).toBe(Ref.TypeId);
     expect(
       getFunctionAddress(Ref.getFunctionReference(first.items.create)),
     ).toEqual({
@@ -105,7 +110,7 @@ describe("published component contracts", () => {
   });
 
   it("exports only public functions, as backend-only references", () => {
-    expect(Object.keys(first.items)).toEqual(["create", "get"]);
+    expect(Record.keys(first.items)).toEqual(["create", "get"]);
     // @ts-expect-error The contract does not export private functions.
     void first.items.secret;
     // @ts-expect-error Bound refs cannot be called directly by a frontend client.
@@ -125,6 +130,54 @@ describe("published component contracts", () => {
     ).toBe(id);
     // @ts-expect-error Only declared component table names are accepted.
     Component.id(first, "missing");
+  });
+
+  it("omits empty and internal-only groups while keeping nested public exports", () => {
+    const nestedSpec = Spec.make().add(
+      GroupSpec.makeAt("nested")
+        .addGroup(GroupSpec.makeAt("empty"))
+        .addGroup(
+          GroupSpec.makeAt("privateOnly").addFunction(
+            FunctionSpec.internalQuery({
+              name: "secret",
+              returns: () => Schema.String,
+            }),
+          ),
+        )
+        .addGroup(
+          GroupSpec.makeAt("publicOnly").addFunction(
+            FunctionSpec.publicQuery({
+              name: "get",
+              returns: () => Schema.FiniteFromString,
+            }),
+          ),
+        ),
+    );
+    const registry = componentsGeneric() as unknown as {
+      nested: Component.Api<typeof nestedSpec, "nested">;
+    };
+    const bound = Component.bind(
+      Component.make(nestedSpec, scope, []),
+      registry.nested,
+    );
+    expect(Record.keys(bound.nested)).toEqual(["publicOnly"]);
+    expect(Ref.decodeReturnsSync(bound.nested.publicOnly.get, "3")).toBe(3);
+  });
+
+  it("rejects group/function name collisions even for internal functions", () => {
+    const conflicting = Spec.make().add(
+      GroupSpec.makeAt("nested")
+        .addGroup(GroupSpec.makeAt("conflict"))
+        .addFunction(
+          FunctionSpec.internalQuery({
+            name: "conflict",
+            returns: () => Schema.String,
+          }),
+        ),
+    );
+    expect(() => Component.make(conflicting, scope, [])).toThrow(
+      "Group and function at same level have same name ('nested:conflict')",
+    );
   });
 
   it("rebinds descendants when an enclosing component is installed", () => {

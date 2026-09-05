@@ -11,12 +11,16 @@ import { ConvexError } from "convex/values";
 import * as Effect from "effect/Effect";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
 import type * as FunctionProvenance from "./FunctionProvenance";
 import type * as FunctionSpec from "./FunctionSpec";
 import * as Lazy from "./Lazy";
 import * as MiddlewareSpec from "./MiddlewareSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
+
+export const TypeId = "~@confect/core/Ref";
+export type TypeId = typeof TypeId;
 
 export interface Base<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
@@ -25,6 +29,7 @@ export interface Base<
   Returns_,
   Error_ = never,
 > {
+  readonly [TypeId]: TypeId;
   readonly "~RuntimeAndFunctionType": RuntimeAndFunctionType_;
   readonly "~FunctionVisibility": FunctionVisibility_;
   readonly "~Args": Args_;
@@ -124,6 +129,10 @@ export interface ConvexRef<
 }
 
 export type Any = Ref<any, any, any, any, any>;
+
+/** Recognizes references by their runtime type identity. */
+export const isRef = (value: unknown): value is Any =>
+  Predicate.hasProperty(value, TypeId);
 
 /** Erased Confect-provenance ref used by provenance-specific APIs. */
 export type AnyConfect = Extract<Any, { readonly _tag: "Confect" }>;
@@ -333,12 +342,14 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
       "Convex",
       (): Any =>
         ({
+          [TypeId]: TypeId,
           _tag: "Convex",
           convexFunctionName,
         }) as Any,
     ),
     Match.tag("Confect", (provenance): Any => {
       const ref = {
+        [TypeId]: TypeId as TypeId,
         _tag: "Confect" as const,
         convexFunctionName,
         kind: provenance.kind,
@@ -403,6 +414,7 @@ export const fromFunctionReference = <
 > => {
   const address = getFunctionAddress(functionReference);
   return {
+    [TypeId]: TypeId,
     _tag: "Convex",
     convexFunctionName:
       address.name ??

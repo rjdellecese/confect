@@ -1,5 +1,8 @@
 import type { DefaultFunctionArgs, FunctionReference } from "convex/server";
 import { getFunctionAddress } from "convex/server";
+import * as Array from "effect/Array";
+import { pipe } from "effect/Function";
+import * as Record from "effect/Record";
 import * as Schema from "effect/Schema";
 import type * as FunctionSpec from "./FunctionSpec";
 import * as GenericId from "./GenericId";
@@ -152,25 +155,28 @@ export const make = <
   const collect = (
     groups: Readonly<Record<string, GroupSpec.AnyWithProps>>,
     prefix = "",
-  ): Tree => {
-    const result: Record<string, Tree | Ref.Any> = {};
-    for (const [name, group] of Object.entries(groups)) {
-      const path = prefix === "" ? name : `${prefix}/${name}`;
-      const children: Record<string, Tree | Ref.Any> = {
-        ...collect(group.groups, path),
-      };
-      for (const fn of Object.values(group.functions)) {
-        if (fn.name in group.groups)
-          throw new Error(
-            `Group and function at same level have same name ('${path}:${fn.name}')`,
-          );
-        if (fn.functionVisibility === "public")
-          children[fn.name] = Ref.make(path, fn, group.middlewareSpecs);
-      }
-      if (Object.keys(children).length > 0) result[name] = children;
-    }
-    return result;
-  };
+  ): Tree =>
+    pipe(
+      groups,
+      Record.map((group, name) => {
+        const path = prefix === "" ? name : `${prefix}/${name}`;
+        const functions = pipe(
+          group.functions,
+          Record.filter((functionSpec) => {
+            if (Record.has(group.groups, functionSpec.name))
+              throw new Error(
+                `Group and function at same level have same name ('${path}:${functionSpec.name}')`,
+              );
+            return functionSpec.functionVisibility === "public";
+          }),
+          Record.map((functionSpec) =>
+            Ref.make(path, functionSpec, group.middlewareSpecs),
+          ),
+        );
+        return { ...collect(group.groups, path), ...functions };
+      }),
+      Record.filter((children) => !Record.isEmptyRecord(children)),
+    );
   return {
     [TypeId]: { refs: collect(spec.groups), scope, tables },
   } as Component<Spec_, Scope, Tables>;
@@ -207,47 +213,32 @@ export const bind = <
   );
   const rebase = (schema: Schema.ConstraintCodec<any, any, never, never>) =>
     GenericId.rebase(schema, contract.scope, scope);
-  const visit = (tree: Tree, references: unknown): Tree => {
-    const out: Record<string, Tree | Ref.Any> = {};
-    for (const [key, child] of Object.entries(tree)) {
+  const visit = (tree: Tree, references: unknown): Tree =>
+    Record.map(tree, (child, key) => {
       const reference = (references as Record<string, unknown>)[key];
-      if (
-        "convexFunctionName" in child &&
-        typeof child.convexFunctionName === "string"
-      ) {
-        const ref = child as Ref.Any;
+      if (Ref.isRef(child)) {
+        const ref = child;
         const nativeRef = reference as FunctionReference<any, any>;
         if (ref._tag === "Convex") {
-          out[key] = { ...ref, functionReference: nativeRef };
+          return { ...ref, functionReference: nativeRef };
         } else {
-          out[key] = {
+          return {
             ...ref,
             functionReference: nativeRef,
-            args: Schema.Struct(
-              Object.fromEntries(
-                Object.entries(ref.args.fields).map(([name, field]) => [
-                  name,
-                  rebase(field),
-                ]),
-              ),
-            ),
+            args: Schema.Struct(Record.map(ref.args.fields, rebase)),
             returns: rebase(ref.returns),
             kind:
               ref.kind._tag === "Paginated"
                 ? {
                     ...ref.kind,
                     userArgs: Schema.Struct(
-                      Object.fromEntries(
-                        Object.entries(ref.kind.userArgs.fields).map(
-                          ([name, field]) => [name, rebase(field)],
-                        ),
-                      ),
+                      Record.map(ref.kind.userArgs.fields, rebase),
                     ),
                     item: rebase(ref.kind.item),
                     page: rebase(ref.kind.page),
                   }
                 : ref.kind,
-            middlewareSpecs: ref.middlewareSpecs.map((middleware) =>
+            middlewareSpecs: Array.map(ref.middlewareSpecs, (middleware) =>
               "error" in middleware
                 ? { ...middleware, error: rebase(middleware.error) }
                 : middleware,
@@ -258,11 +249,9 @@ export const bind = <
           };
         }
       } else {
-        out[key] = visit(child as Tree, reference);
+        return visit(child, reference);
       }
-    }
-    return out;
-  };
+    });
   const refs = visit(contract.refs, native);
   Object.defineProperty(refs, BoundTypeId, {
     value: { from: contract.scope, scope, tables: contract.tables },

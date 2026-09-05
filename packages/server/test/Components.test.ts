@@ -16,6 +16,7 @@ import {
   type FunctionReference,
 } from "convex/server";
 import * as Effect from "effect/Effect";
+import * as Array from "effect/Array";
 import * as Result from "effect/Result";
 import contract from "../../cli/test/fixtures/authored-component/confect/_generated/component";
 import componentSchema from "../../cli/test/fixtures/authored-component/convex/schema";
@@ -103,7 +104,7 @@ it.effect(
           ),
         ),
       );
-      expect(result.first.map((row) => row.count)).toEqual([2]);
+      expect(Array.map(result.first, (row) => row.count)).toEqual([2]);
       expect(result.second).toEqual([
         { _id: result.id, _creationTime: expect.any(Number), count: 7 },
       ]);
@@ -120,7 +121,7 @@ it.effect("registers components with TestConfect", () =>
     yield* t.registerComponent("first", componentSchema, componentModules);
     yield* t.mutation(first.counter.create, { count: 11 });
     expect(
-      (yield* t.query(first.counter.list)).map((row) => row.count),
+      Array.map(yield* t.query(first.counter.list), (row) => row.count),
     ).toEqual([11]);
   }).pipe(
     Effect.provide(

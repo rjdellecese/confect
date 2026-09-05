@@ -16,8 +16,8 @@ export class ProjectRoot extends Context.Service<
   static readonly get = ProjectRoot.use((service) => service.get);
 }
 
-export const findProjectRootFrom = (directory: string) =>
-  Effect.gen(function* () {
+export const findProjectRootFrom = Effect.fn("ProjectRoot.findProjectRootFrom")(
+  function* (directory: string) {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
 
@@ -38,7 +38,8 @@ export const findProjectRootFrom = (directory: string) =>
       onNone: () => Effect.fail(new ProjectRootNotFoundError()),
       onSome: Effect.succeed,
     });
-  });
+  },
+);
 
 export const findProjectRoot = findProjectRootFrom(".");
 

@@ -1,5 +1,6 @@
 import * as IdScope from "@confect/core/IdScope";
 import * as Predicate from "effect/Predicate";
+import * as Record from "effect/Record";
 import type * as Table from "./Table";
 
 export const TypeId = "~@confect/server/DatabaseSchema";
@@ -99,7 +100,7 @@ export const make = <
       "A component database schema requires a nonempty ID scope.",
     );
   }
-  for (const [name, table] of Object.entries(tables)) {
+  for (const [name, table] of Record.toEntries(tables)) {
     if (name !== table.tableName || table.scope !== resolvedTarget.scope) {
       throw new Error(
         `Table '${name}' must be bound to its database schema's name and ID scope.`,

@@ -29,9 +29,11 @@ export const layer = ({
     onSome: (directory) =>
       Layer.effect(
         ProjectRoot.ProjectRoot,
-        Effect.map(ProjectRoot.findProjectRootFrom(directory), (root) => ({
-          get: Effect.succeed(root),
-        })),
+        Effect.map(ProjectRoot.findProjectRootFrom(directory), (root) =>
+          ProjectRoot.ProjectRoot.of({
+            get: Effect.succeed(root),
+          }),
+        ),
       ),
   });
   const convex: Layer.Layer<
@@ -61,13 +63,13 @@ export const layer = ({
               ),
             );
           const definition = `${pkg.name}:${path.relative(projectRoot, absolute).split(path.sep).join("/")}`;
-          return {
+          return ConvexDirectory.ConvexDirectory.of({
             get: Effect.succeed(absolute),
             target: {
-              kind: "component" as const,
+              kind: "component",
               scope: IdScope.component(definition),
             },
-          };
+          });
         }),
       ).pipe(Layer.provide(projectRootLayer)),
   });
