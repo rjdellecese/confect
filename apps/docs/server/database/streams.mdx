@@ -88,10 +88,12 @@ A stream is drawn as a track, read left to right in **key order** — the way a 
 {/* stream-diagram: legend */}
 
 ```text
-by_text       ─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── n6 ───────┤
-                [apple,1]   [apple,3]   [banana,2]  [banana,5]  [cherry,4]  [date,6]
+by_text
+╰─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── n6 ───────┤
+   [apple,1]   [apple,3]   [banana,2]  [banana,5]  [cherry,4]  [date,6]
 ```
 
+- The stream's name is printed above its track, and `╰` joins the two.
 - `─ n1 ─` is an element: the document `n1`. Its **key**, the values the stream is ordered by, is printed beneath it.
 - `─ (n6) ─` is an element that was read but filtered out. It emits nothing, but it still counts toward read budgets, and cursors still advance past it.
 - A blank stretch of track is key space the stream never read (skipped by a seek).
@@ -146,17 +148,21 @@ The four streams over the example data, with each element's key. A bound keeps a
 {/* stream-diagram: creating */}
 
 ```text
-by_text       ─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── n6 ───────┤
-                [apple,1]   [apple,3]   [banana,2]  [banana,5]  [cherry,4]  [date,6]
+by_text
+╰─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── n6 ───────┤
+   [apple,1]   [apple,3]   [banana,2]  [banana,5]  [cherry,4]  [date,6]
 
-by_text desc  ─ n6 ──────── n4 ──────── n5 ──────── n2 ──────── n3 ──────── n1 ───────┤
-                [date,6]    [cherry,4]  [banana,5]  [banana,2]  [apple,3]   [apple,1]
+by_text desc
+╰─ n6 ──────── n4 ──────── n5 ──────── n2 ──────── n3 ──────── n1 ───────┤
+   [date,6]    [cherry,4]  [banana,5]  [banana,2]  [apple,3]   [apple,1]
 
-gte "banana"  ───────────────────────── n2 ──────── n5 ──────── n4 ──────── n6 ───────┤
-                                        [banana,2]  [banana,5]  [cherry,4]  [date,6]
+gte "banana"
+╰───────────────────────── n2 ──────── n5 ──────── n4 ──────── n6 ───────┤
+                           [banana,2]  [banana,5]  [cherry,4]  [date,6]
 
-eq "apple"    ─ n1 ──────── n3 ───────┤
-                [1]         [3]
+eq "apple"
+╰─ n1 ──────── n3 ───────┤
+   [1]         [3]
 ```
 
 ### Range callbacks
@@ -181,7 +187,8 @@ In SQL terms, it is the empty relation, `SELECT ... WHERE false`, with the same 
 {/* stream-diagram: empty */}
 
 ```text
-nothing       ┤
+nothing
+╰┤
 ```
 
 Nothing can infer a document type from no documents, so the type comes first as a type argument and the key second. The key is the type-level order key of the streams it will be merged with, tiebreaker included; the [generated document types](/server/database/schema#document-types) name the document:
@@ -242,13 +249,16 @@ const cherry =
 {/* stream-diagram: unique */}
 
 ```text
-eq "cherry"   ─ n4 ───────┤   → Some(n4)
-                [4]
+eq "cherry"
+╰─ n4 ───────┤   → Some(n4)
+   [4]
 
-eq "apple"    ─ n1 ──────── n3 ───────┤   → NotUniqueError
-                [1]         [3]
+eq "apple"
+╰─ n1 ──────── n3 ───────┤   → NotUniqueError
+   [1]         [3]
 
-eq "fig"      ┤   → None
+eq "fig"
+╰┤   → None
 ```
 
 ## Composing streams
@@ -277,15 +287,18 @@ Pinning `author.role` leaves both streams with the order key `["_creationTime"]`
 {/* stream-diagram: merge */}
 
 ```text
-admin         ─ n1 ──────────────────────────────── n4 ──────── n5 ───────────────────┤
-                [1]                                 [4]         [5]
-user          ───────────── n2 ──────── n3 ──────────────────────────────── n6 ───────┤
-                            [2]         [3]                                 [6]
+admin
+╰─ n1 ──────────────────────────────── n4 ──────── n5 ───────────────────┤
+   [1]                                 [4]         [5]
+user
+╰───────────── n2 ──────── n3 ──────────────────────────────── n6 ───────┤
+               [2]         [3]                                 [6]
 
-              ╞═ merge([admin, user]) ═╡
+╞═ merge([admin, user]) ═╡
 
-merged        ─ n1 ──────── n2 ──────── n3 ──────── n4 ──────── n5 ──────── n6 ───────┤
-                [1]         [2]         [3]         [4]         [5]         [6]
+merged
+╰─ n1 ──────── n2 ──────── n3 ──────── n4 ──────── n5 ──────── n6 ───────┤
+   [1]         [2]         [3]         [4]         [5]         [6]
 ```
 
 All inputs must have the same order key, document type, and order direction, which are all type errors otherwise. The direction is `"asc"` when omitted and the given literal when passed one; the first input fixes it and each later input must match. A direction chosen at runtime types as `"asc" | "desc"`: such a stream can lead a merge (a known direction is assignable to it) but can't follow a known one, and a mismatch the types can't see makes `merge` throw when the streams are combined. Overlapping inputs are not deduplicated: a document matched by two inputs appears twice.
@@ -311,18 +324,21 @@ The hidden note is read, rejected, and kept in the cursor accounting; the mapped
 {/* stream-diagram: filter-map */}
 
 ```text
-by_text       ─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── n6 ───────┤
-                [apple,1]   [apple,3]   [banana,2]  [banana,5]  [cherry,4]  [date,6]
+by_text
+╰─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── n6 ───────┤
+   [apple,1]   [apple,3]   [banana,2]  [banana,5]  [cherry,4]  [date,6]
 
-              ╞═ filter((note) => note.tag !== "hidden") ═╡
+╞═ filter((note) => note.tag !== "hidden") ═╡
 
-filtered      ─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── (n6) ─────┤
-                [apple,1]   [apple,3]   [banana,2]  [banana,5]  [cherry,4]  [date,6]
+filtered
+╰─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── (n6) ─────┤
+   [apple,1]   [apple,3]   [banana,2]  [banana,5]  [cherry,4]  [date,6]
 
-              ╞═ map((note) => note.text) ═╡
+╞═ map((note) => note.text) ═╡
 
-mapped        ─ apple ───── apple ───── banana ──── banana ──── cherry ──── (n6) ─────┤
-                [apple,1]   [apple,3]   [banana,2]  [banana,5]  [cherry,4]  [date,6]
+mapped
+╰─ apple ───── apple ───── banana ──── banana ──── cherry ──── (n6) ─────┤
+   [apple,1]   [apple,3]   [banana,2]  [banana,5]  [cherry,4]  [date,6]
 ```
 
 A mapper must not change what the documents are ordered by — the mapped stream keeps the original order key.
@@ -384,13 +400,15 @@ After `n1` is found, the stream seeks straight to the first key past `apple`; `n
 {/* stream-diagram: distinct */}
 
 ```text
-by_text       ─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── n6 ───────┤
-                [apple,1]   [apple,3]   [banana,2]  [banana,5]  [cherry,4]  [date,6]
+by_text
+╰─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── n6 ───────┤
+   [apple,1]   [apple,3]   [banana,2]  [banana,5]  [cherry,4]  [date,6]
 
-              ╞═ distinct(["text"]) ═╡
+╞═ distinct(["text"]) ═╡
 
-distinct      ─ n1 ──────────────────── n2 ──────────────────── n4 ──────── n6 ───────┤
-                [apple,1]               [banana,2]              [cherry,4]  [date,6]
+distinct
+╰─ n1 ──────────────────── n2 ──────────────────── n4 ──────── n6 ───────┤
+   [apple,1]               [banana,2]              [cherry,4]  [date,6]
 ```
 
 The fields must be a prefix of the stream's order key, which is enforced at the type level. On a `flatMap` result, a prefix that reaches into the inner key groups by the outer document as well, since groups are runs of consecutive equal keys. A distinct stream can't be [reversed](#reverse), since the other direction would keep a different document per group. Apply `filter` (or `filterEffect`) _after_ `distinct` rather than before it, so that a filtered-out document can't hide its group's first match from a resumed page.
@@ -413,14 +431,16 @@ The bounds become index-range predicates on the leaf, so the elements outside th
 {/* stream-diagram: narrow */}
 
 ```text
-by_text       ─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── n6 ───────┤
-                [apple,1]   [apple,3]   [banana,2]  [banana,5]  [cherry,4]  [date,6]
-                                                  ╎ after                 ╎ until
+by_text
+╰─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── n6 ───────┤
+   [apple,1]   [apple,3]   [banana,2]  [banana,5]  [cherry,4]  [date,6]
+                                     ╎ after                 ╎ until
 
-              ╞═ narrow({ after: [banana, 2], until: [cherry, 4] }) ═╡
+╞═ narrow({ after: [banana, 2], until: [cherry, 4] }) ═╡
 
-narrowed      ───────────────────────────────────── n5 ──────── n4 ───────┤
-                                                    [banana,5]  [cherry,4]
+narrowed
+╰───────────────────────────────────── n5 ──────── n4 ───────┤
+                                       [banana,5]  [cherry,4]
 ```
 
 Cursors are serialized keys: `QueryStream.deserializeCursor(page.continueCursor)` turns a page's cursor into an `after` bound.
@@ -448,16 +468,21 @@ Each admin note's comment stream runs in turn. The result's key is the outer key
 {/* stream-diagram: flat-map */}
 
 ```text
-admin         ─ n1 ──────────────────── n4 ──────── n5 ───────┤
-                [1]                     [4]         [5]
-of n1         ─ c1 ──────── c2 ───────
-of n4                                 ─ c3 ───────
-of n5                                             ┤
+admin
+╰─ n1 ──────────────────── n4 ──────── n5 ───────┤
+   [1]                     [4]         [5]
+of n1
+╰─ c1 ──────── c2 ───────┤
+                        of n4
+                        ╰─ c3 ───────┤
+                                    of n5
+                                    ╰┤
 
-              ╞═ flatMap((note) => commentsOn(note), { innerKey: ["_creationTime"] }) ═╡
+╞═ flatMap((note) => commentsOn(note), { innerKey: ["_creationTime"] }) ═╡
 
-joined        ─ c1 ──────── c2 ──────── c3 ──────── (n5) ─────┤
-                [1,7]       [1,8]       [4,9]       [5,null]
+joined
+╰─ c1 ──────── c2 ──────── c3 ──────── (n5) ─────┤
+   [1,7]       [1,8]       [4,9]       [5,null]
 ```
 
 Pass the inner streams' order key as `innerKey`; it is checked against the type of the stream the function returns. Inner streams must run in the outer stream's direction: with `QueryStream.flatMap(outer, f, options)` the outer stream fixes it and a differing inner stream is a type error, while with `outer.pipe(QueryStream.flatMap(f, options))` the inner streams fix it. A mismatch the types can't see fails when the join runs.
@@ -495,16 +520,21 @@ The placeholder (`∅n5`, that is `onEmpty(n5)`) takes the position the filtered
 {/* stream-diagram: on-empty */}
 
 ```text
-admin         ─ n1 ──────────────────── n4 ──────── n5 ───────┤
-                [1]                     [4]         [5]
-of n1         ─ c1 ──────── c2 ───────
-of n4                                 ─ c3 ───────
-of n5                                             ┤
+admin
+╰─ n1 ──────────────────── n4 ──────── n5 ───────┤
+   [1]                     [4]         [5]
+of n1
+╰─ c1 ──────── c2 ───────┤
+                        of n4
+                        ╰─ c3 ───────┤
+                                    of n5
+                                    ╰┤
 
-              ╞═ flatMap((note) => commentsOn(note), { innerKey, onEmpty }) ═╡
+╞═ flatMap((note) => commentsOn(note), { innerKey, onEmpty }) ═╡
 
-joined        ─ c1 ──────── c2 ──────── c3 ──────── ∅n5 ──────┤
-                [1,7]       [1,8]       [4,9]       [5,null]
+joined
+╰─ c1 ──────── c2 ──────── c3 ──────── ∅n5 ──────┤
+   [1,7]       [1,8]       [4,9]       [5,null]
 ```
 
 The elements are the inner stream's documents or the placeholders, so give both a common shape as above. Outer documents filtered out before the join stay absent. Everything else, including the `innerKey` check and the direction rules, is unchanged.
@@ -549,13 +579,15 @@ Relabeling changes the key's field names and nothing else:
 {/* stream-diagram: rename-key */}
 
 ```text
-by_body       ─ c1 ──────── c2 ──────── c3 ───────┤
-                [great,7]   [meh,8]     [nice,9]     key: [body, _creationTime]
+by_body
+╰─ c1 ──────── c2 ──────── c3 ───────┤
+   [great,7]   [meh,8]     [nice,9]     key: [body, _creationTime]
 
-              ╞═ renameKey(["text", "_creationTime"]) ═╡
+╞═ renameKey(["text", "_creationTime"]) ═╡
 
-relabeled     ─ c1 ──────── c2 ──────── c3 ───────┤
-                [great,7]   [meh,8]     [nice,9]     key: [text, _creationTime]
+relabeled
+╰─ c1 ──────── c2 ──────── c3 ───────┤
+   [great,7]   [meh,8]     [nice,9]     key: [text, _creationTime]
 ```
 
 With matching key names, the two streams merge by their key values — here, alphabetically:
@@ -563,13 +595,16 @@ With matching key names, the two streams merge by their key values — here, alp
 {/* stream-diagram: rename-key-merge */}
 
 ```text
-notes         ─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── n6 ───────────────────────────────────────────┤
-relabeled     ───────────────────────────────────────────────────────────────────────── c1 ──────── c2 ──────── c3 ───────┤
+notes
+╰─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── n6 ───────────────────────────────────────────┤
+relabeled
+╰───────────────────────────────────────────────────────────────────────── c1 ──────── c2 ──────── c3 ───────┤
 
-              ╞═ merge([notes, relabeled]) ═╡
+╞═ merge([notes, relabeled]) ═╡
 
-merged        ─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── n6 ──────── c1 ──────── c2 ──────── c3 ───────┤
-                [apple,1]   [apple,3]   [banana,2]  [banana,5]  [cherry,4]  [date,6]    [great,7]   [meh,8]     [nice,9]
+merged
+╰─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── n6 ──────── c1 ──────── c2 ──────── c3 ───────┤
+   [apple,1]   [apple,3]   [banana,2]  [banana,5]  [cherry,4]  [date,6]    [great,7]   [meh,8]     [nice,9]
 ```
 
 The new key must have exactly as many fields as the old one, and the values under each position must be comparable — relabeling doesn't reorder anything. A `flatMap` result relabels by its combined key, outer fields first.
@@ -590,13 +625,15 @@ Reversing the merge reverses each of its inputs and merges them the other way:
 {/* stream-diagram: reverse */}
 
 ```text
-merged        ─ n1 ──────── n2 ──────── n3 ──────── n4 ──────── n5 ──────── n6 ───────┤
-                [1]         [2]         [3]         [4]         [5]         [6]
+merged
+╰─ n1 ──────── n2 ──────── n3 ──────── n4 ──────── n5 ──────── n6 ───────┤
+   [1]         [2]         [3]         [4]         [5]         [6]
 
-              ╞═ reverse ═╡
+╞═ reverse ═╡
 
-reversed      ─ n6 ──────── n5 ──────── n4 ──────── n3 ──────── n2 ──────── n1 ───────┤
-                [6]         [5]         [4]         [3]         [2]         [1]
+reversed
+╰─ n6 ──────── n5 ──────── n4 ──────── n3 ──────── n2 ──────── n1 ───────┤
+   [6]         [5]         [4]         [3]         [2]         [1]
 ```
 
 Merges, filters and maps, flat-maps (their inner streams included), `renameKey`, and `empty` all reverse. A `distinct` stream can't: it keeps the first document of each group, and a reversed scan would keep the last, so `reverse` throws. For the mirror query, reverse the input and apply `distinct` to that.
@@ -612,20 +649,22 @@ Three pages of two over the filtered notes. Each page starts where the previous 
 {/* stream-diagram: paginate */}
 
 ```text
-filtered      ─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── (n6) ─────┤
-                [apple,1]   [apple,3]   [banana,2]  [banana,5]  [cherry,4]  [date,6]
+filtered
+╰─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── (n6) ─────┤
+   [apple,1]   [apple,3]   [banana,2]  [banana,5]  [cherry,4]  [date,6]
 
-              ╞═ paginate({ numItems: 2, cursor: null }) ═╡
+╞═ paginate({ numItems: 2, cursor: null }) ═╡
 
-page 1        ─ n1 ──────── n3 ───────╎  continueCursor: [apple,3]
+page 1
+╰─ n1 ──────── n3 ───────╎  continueCursor: [apple,3]
 
-              ╞═ paginate({ numItems: 2, cursor: [apple,3] }) ═╡
+╞═ paginate({ numItems: 2, cursor: [apple,3] }) ═╡
 
-                                      ╎ n2 ──────── n5 ───────╎  continueCursor: [banana,5]
+                         ╎ n2 ──────── n5 ───────╎  continueCursor: [banana,5]
 
-              ╞═ paginate({ numItems: 2, cursor: [banana,5] }) ═╡
+╞═ paginate({ numItems: 2, cursor: [banana,5] }) ═╡
 
-                                                              ╎ n4 ──────── (n6) ─────┤  isDone: true
+                                                 ╎ n4 ──────── (n6) ─────┤  isDone: true
 ```
 
 With an `endCursor`, a page covers exactly the range between its two cursors, however many documents that range holds as data changes, which is how reactive clients keep adjacent pages gap-free:
@@ -633,12 +672,13 @@ With an `endCursor`, a page covers exactly the range between its two cursors, ho
 {/* stream-diagram: end-cursor */}
 
 ```text
-filtered      ─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── (n6) ─────┤
-                [apple,1]   [apple,3]   [banana,2]  [banana,5]  [cherry,4]  [date,6]
+filtered
+╰─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── (n6) ─────┤
+   [apple,1]   [apple,3]   [banana,2]  [banana,5]  [cherry,4]  [date,6]
 
-              ╞═ paginate({ cursor: [apple,3], endCursor: [banana,5], numItems: 2 }) ═╡
+╞═ paginate({ cursor: [apple,3], endCursor: [banana,5], numItems: 2 }) ═╡
 
-                                      ╎ n2 ──────── n5 ───────╎  exactly this range, however many documents it holds
+                         ╎ n2 ──────── n5 ───────╎  exactly this range, however many documents it holds
 ```
 
 A [paginated query](/server/functions#paginated-queries) handler forwards its decoded `paginationOpts`:
