@@ -647,8 +647,9 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
             ),
     );
 
-    yield* Effect.forEach(desired, (entry) =>
-      Effect.gen(function* () {
+    yield* Effect.forEach(
+      desired,
+      Effect.fnUntraced(function* (entry) {
         const existing = yield* Ref.get(scopesRef);
         if (existing.has(entry.absolutePath)) return;
 
