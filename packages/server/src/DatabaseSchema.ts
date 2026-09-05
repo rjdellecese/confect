@@ -1,8 +1,25 @@
+import * as IdScope from "@confect/core/IdScope";
+import * as Match from "effect/Match";
 import * as Predicate from "effect/Predicate";
+import * as Record from "effect/Record";
 import type * as Table from "./Table";
 
 export const TypeId = "~@confect/server/DatabaseSchema";
 export type TypeId = typeof TypeId;
+
+export interface AppTarget {
+  readonly kind: "app";
+  readonly scope: IdScope.App;
+}
+
+export interface ComponentTarget<
+  Scope_ extends IdScope.IdScope = IdScope.IdScope,
+> {
+  readonly kind: "component";
+  readonly scope: Scope_;
+}
+
+export type Target = AppTarget | ComponentTarget;
 
 export interface Any {
   readonly [TypeId]: TypeId;
@@ -18,7 +35,10 @@ export const isDatabaseSchema = (u: unknown): u is Any =>
  * memoised getters), so this layer is a plain
  * record indirection with no module-loading or async machinery.
  */
-export interface DatabaseSchema<Tables_ extends Table.AnyWithProps = never> {
+export interface DatabaseSchema<
+  Tables_ extends Table.AnyWithProps = never,
+  Target_ extends Target = AppTarget,
+> {
   readonly [TypeId]: TypeId;
   readonly tables: {
     readonly [TableName in Table.Name<Tables_>]: Table.WithName<
@@ -27,13 +47,17 @@ export interface DatabaseSchema<Tables_ extends Table.AnyWithProps = never> {
     >;
   };
   readonly "~Tables": Tables_;
+  readonly target: Target_;
 }
 
 export interface AnyWithProps {
   readonly [TypeId]: TypeId;
   readonly tables: Record<string, Table.AnyWithProps>;
   readonly "~Tables": Table.AnyWithProps;
+  readonly target: Target;
 }
+
+export type Scope<Schema extends AnyWithProps> = Schema["target"]["scope"];
 
 export type Tables<DatabaseSchema_ extends AnyWithProps> =
   DatabaseSchema_["~Tables"];
@@ -66,12 +90,35 @@ export type TableWithName<
  */
 export const make = <
   const TablesRecord extends Record<string, Table.AnyWithProps>,
+  const Target_ extends Target = AppTarget,
 >(
   tables: TablesRecord,
-): DatabaseSchema<TablesRecord[keyof TablesRecord]> =>
-  ({
+  target?: Target_,
+): DatabaseSchema<TablesRecord[keyof TablesRecord], Target_> => {
+  const resolvedTarget = target ?? { kind: "app", scope: IdScope.app };
+  Match.value(resolvedTarget.kind).pipe(
+    Match.when("app", () => {}),
+    Match.when("component", () => {
+      if (resolvedTarget.scope === "") {
+        throw new Error(
+          "A component database schema requires a nonempty ID scope.",
+        );
+      }
+    }),
+    Match.exhaustive,
+  );
+  for (const [name, table] of Record.toEntries(tables)) {
+    if (name !== table.tableName || table.scope !== resolvedTarget.scope) {
+      throw new Error(
+        `Table '${name}' must be bound to its database schema's name and ID scope.`,
+      );
+    }
+  }
+  return {
     [TypeId]: TypeId,
+    target: resolvedTarget,
     tables: tables as unknown as DatabaseSchema<
       TablesRecord[keyof TablesRecord]
     >["tables"],
-  }) as DatabaseSchema<TablesRecord[keyof TablesRecord]>;
+  } as DatabaseSchema<TablesRecord[keyof TablesRecord], Target_>;
+};

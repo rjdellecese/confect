@@ -5,18 +5,22 @@ import type {
   PaginationOptions,
   PaginationResult,
 } from "convex/server";
-import { makeFunctionReference } from "convex/server";
+import { getFunctionAddress, makeFunctionReference } from "convex/server";
 import type { Value } from "convex/values";
 import { ConvexError } from "convex/values";
 import * as Effect from "effect/Effect";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
 import type * as FunctionProvenance from "./FunctionProvenance";
 import type * as FunctionSpec from "./FunctionSpec";
 import * as Lazy from "./Lazy";
 import * as MiddlewareSpec from "./MiddlewareSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
+
+export const TypeId = "~@confect/core/Ref";
+export type TypeId = typeof TypeId;
 
 export interface Base<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
@@ -25,12 +29,15 @@ export interface Base<
   Returns_,
   Error_ = never,
 > {
+  readonly [TypeId]: TypeId;
   readonly "~RuntimeAndFunctionType": RuntimeAndFunctionType_;
   readonly "~FunctionVisibility": FunctionVisibility_;
   readonly "~Args": Args_;
   readonly "~Returns": Returns_;
   readonly "~Error": Error_;
   readonly convexFunctionName: string;
+  /** Preserved for component references and function handles, which have no local name. */
+  readonly functionReference?: ConvexFunctionReference<any, any>;
 }
 
 /**
@@ -122,6 +129,10 @@ export interface ConvexRef<
 }
 
 export type Any = Ref<any, any, any, any, any>;
+
+/** Recognizes references by their runtime type identity. */
+export const isRef = (value: unknown): value is Any =>
+  Predicate.hasProperty(value, TypeId);
 
 /** Erased Confect-provenance ref used by provenance-specific APIs. */
 export type AnyConfect = Extract<Any, { readonly _tag: "Confect" }>;
@@ -331,12 +342,14 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
       "Convex",
       (): Any =>
         ({
+          [TypeId]: TypeId,
           _tag: "Convex",
           convexFunctionName,
         }) as Any,
     ),
     Match.tag("Confect", (provenance): Any => {
       const ref = {
+        [TypeId]: TypeId as TypeId,
         _tag: "Confect" as const,
         convexFunctionName,
         kind: provenance.kind,
@@ -366,6 +379,9 @@ const functionReferenceCache = new Map<string, FunctionReference<Any>>();
 export const getFunctionReference = <Ref_ extends Any>(
   ref: Ref_,
 ): FunctionReference<Ref_> => {
+  if (ref.functionReference !== undefined) {
+    return ref.functionReference as FunctionReference<Ref_>;
+  }
   const convexFunctionName = getConvexFunctionName(ref);
 
   const cached = functionReferenceCache.get(convexFunctionName);
@@ -377,6 +393,44 @@ export const getFunctionReference = <Ref_ extends Any>(
   functionReferenceCache.set(convexFunctionName, functionReference);
 
   return functionReference as FunctionReference<Ref_>;
+};
+
+/** Adapt a native reference without assigning Confect codecs or typed errors. */
+export const fromFunctionReference = <
+  Type extends "query" | "mutation" | "action",
+  Visibility extends FunctionVisibility,
+  Args_ extends DefaultFunctionArgs,
+  Returns_,
+>(
+  functionReference: ConvexFunctionReference<Type, Visibility, Args_, Returns_>,
+): ConvexRef<
+  Extract<
+    RuntimeAndFunctionType.RuntimeAndFunctionType,
+    { readonly runtime: "Convex"; readonly functionType: Type }
+  >,
+  Visibility,
+  Args_,
+  Returns_
+> => {
+  const address = getFunctionAddress(functionReference);
+  return {
+    [TypeId]: TypeId,
+    _tag: "Convex",
+    convexFunctionName:
+      address.name ??
+      address.reference ??
+      address.functionHandle ??
+      "<external function>",
+    functionReference,
+  } as ConvexRef<
+    Extract<
+      RuntimeAndFunctionType.RuntimeAndFunctionType,
+      { readonly runtime: "Convex"; readonly functionType: Type }
+    >,
+    Visibility,
+    Args_,
+    Returns_
+  >;
 };
 
 export const hasErrorSchema = (ref: Any): boolean =>

@@ -16,11 +16,13 @@ export class ProjectRoot extends Context.Service<
   static readonly get = ProjectRoot.use((service) => service.get);
 }
 
-export const findProjectRoot = Effect.gen(function* () {
+export const findProjectRootFrom = Effect.fnUntraced(function* (
+  directory: string,
+) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
 
-  const startDir = path.resolve(".");
+  const startDir = path.resolve(directory);
   const root = path.parse(startDir).root;
 
   const directories = Array.unfold(startDir, (dir) =>
@@ -38,6 +40,8 @@ export const findProjectRoot = Effect.gen(function* () {
     onSome: Effect.succeed,
   });
 });
+
+export const findProjectRoot = findProjectRootFrom(".");
 
 export const layer = Layer.effect(
   ProjectRoot,

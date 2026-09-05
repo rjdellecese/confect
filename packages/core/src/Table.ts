@@ -1,3 +1,4 @@
+import * as IdScope from "./IdScope";
 import * as Lazy from "./Lazy";
 import * as SystemFields from "./SystemFields";
 import type { TableSchemaToTableValidator } from "./SchemaToValidator";
@@ -52,11 +53,17 @@ export interface Table<
   Indexes_ extends GenericTableIndexes = {},
   SearchIndexes_ extends GenericTableSearchIndexes = {},
   VectorIndexes_ extends GenericTableVectorIndexes = {},
+  Scope_ extends IdScope.IdScope = IdScope.App,
 > {
   readonly [TypeId]: TypeId;
   readonly tableName: Name_;
+  readonly scope: Scope_;
   readonly Fields: TableSchema_;
-  readonly Doc: SystemFields.ExtendWithSystemFields<Name_, TableSchema_>;
+  readonly Doc: SystemFields.ExtendWithSystemFields<
+    Name_,
+    TableSchema_,
+    Scope_
+  >;
   readonly indexes: Indexes_;
   readonly searchIndexes: SearchIndexes_;
   readonly vectorIndexes: VectorIndexes_;
@@ -74,7 +81,8 @@ export type AnyWithProps = Table<
   GenericValidator,
   GenericTableIndexes,
   GenericTableSearchIndexes,
-  GenericTableVectorIndexes
+  GenericTableVectorIndexes,
+  IdScope.IdScope
 >;
 
 // -----------------------------------------------------------------------------
@@ -98,15 +106,20 @@ export interface UnnamedTable<
   SearchIndexes_ extends GenericTableSearchIndexes = {},
   VectorIndexes_ extends GenericTableVectorIndexes = {},
 > {
-  <const Name_ extends string>(
+  <
+    const Name_ extends string,
+    const Scope_ extends IdScope.IdScope = IdScope.App,
+  >(
     tableName: Name_,
+    scope?: Scope_,
   ): Table<
     Name_,
     TableSchema_,
     TableValidator_,
     Indexes_,
     SearchIndexes_,
-    VectorIndexes_
+    VectorIndexes_,
+    Scope_
   >;
 
   readonly [TypeId]: TypeId;
@@ -221,6 +234,7 @@ export type VectorIndexes<TableDef extends AnyWithProps> =
 export type Doc<TableDef extends AnyWithProps> = TableDef["Doc"];
 
 export type Fields<TableDef extends AnyWithProps> = TableDef["Fields"];
+export type Scope<TableDef extends AnyWithProps> = TableDef["scope"];
 
 export type WithName<
   TableDef extends AnyWithProps,
@@ -264,20 +278,24 @@ const makeBound = <
   Indexes_ extends GenericTableIndexes,
   SearchIndexes_ extends GenericTableSearchIndexes,
   VectorIndexes_ extends GenericTableVectorIndexes,
+  Scope_ extends IdScope.IdScope,
 >(
   tableName: Name_,
   state: UnnamedState<TableSchema_, Indexes_, SearchIndexes_, VectorIndexes_>,
+  scope: Scope_,
 ): Table<
   Name_,
   TableSchema_,
   TableValidator_,
   Indexes_,
   SearchIndexes_,
-  VectorIndexes_
+  VectorIndexes_,
+  Scope_
 > => {
   const bound = {
     [TypeId]: TypeId as TypeId,
     tableName,
+    scope,
     indexes: state.indexes,
     searchIndexes: state.searchIndexes,
     vectorIndexes: state.vectorIndexes,
@@ -287,7 +305,8 @@ const makeBound = <
     TableValidator_,
     Indexes_,
     SearchIndexes_,
-    VectorIndexes_
+    VectorIndexes_,
+    Scope_
   >;
 
   Lazy.defineProperty(bound, "Fields", () => state.lazyFields());
@@ -296,6 +315,7 @@ const makeBound = <
     SystemFields.extendWithSystemFields(
       tableName,
       (bound as { Fields: TableSchema_ }).Fields,
+      scope,
     ),
   );
 
@@ -328,15 +348,20 @@ const makeUnnamed = <
   type UnnamedTableFunction<FunctionName extends keyof UnnamedTable_> =
     UnnamedTable_[FunctionName];
 
-  const bind = <const Name_ extends string>(
+  const bind = <
+    const Name_ extends string,
+    const Scope_ extends IdScope.IdScope = IdScope.App,
+  >(
     tableName: Name_,
+    scope?: Scope_,
   ): Table<
     Name_,
     TableSchema_,
     TableValidator_,
     Indexes_,
     SearchIndexes_,
-    VectorIndexes_
+    VectorIndexes_,
+    Scope_
   > =>
     makeBound<
       Name_,
@@ -344,8 +369,9 @@ const makeUnnamed = <
       TableValidator_,
       Indexes_,
       SearchIndexes_,
-      VectorIndexes_
-    >(tableName, state);
+      VectorIndexes_,
+      Scope_
+    >(tableName, state, (scope ?? IdScope.app) as Scope_);
 
   const index: UnnamedTableFunction<"index"> = (name, fields) =>
     makeUnnamed({
@@ -419,8 +445,8 @@ export const make = <const TableSchema_ extends Schema.Codec<any, any>>(
  * This is used when declaring table indexes.
  * @public
  */
-type ExtractFieldPaths<T extends Validator<any, any, any>> =
+type ExtractFieldPaths<TableValidator_ extends Validator<any, any, any>> =
   // Add in the system fields available in index definitions.
   // This should be everything except for `_id` because thats added to indexes
   // automatically.
-  T["fieldPaths"] | keyof ConvexSystemFields;
+  TableValidator_["fieldPaths"] | keyof ConvexSystemFields;

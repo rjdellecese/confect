@@ -1,3 +1,4 @@
+import type * as IdScope from "@confect/core/IdScope";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
@@ -84,8 +85,10 @@ interface TableModuleBinding {
  */
 export const runtimeSchema = ({
   tableModules,
+  component = false,
 }: {
   tableModules: ReadonlyArray<TableModuleBinding>;
+  component?: boolean;
 }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
@@ -102,6 +105,24 @@ export const runtimeSchema = ({
     }
 
     yield* cbw.blankLine();
+
+    if (component) {
+      yield* cbw.writeLine(`import { target as $target } from "./id";`);
+      const types =
+        Array.join(
+          Array.map(tableModules, ({ tableName }) => `typeof ${tableName}`),
+          " | ",
+        ) || "never";
+      const names = Array.join(
+        Array.map(tableModules, ({ tableName }) => tableName),
+        ", ",
+      );
+      yield* cbw.writeLine(
+        `const databaseSchema: $DatabaseSchema.DatabaseSchema<${types}, typeof $target> = $DatabaseSchema.make({ ${names} }, $target);`,
+      );
+      yield* cbw.writeLine(`export default databaseSchema;`);
+      return yield* cbw.toString();
+    }
 
     if (tableModules.length === 0) {
       yield* cbw.writeLine(
@@ -207,12 +228,29 @@ export const convexSchema = ({
  * When the table directory is empty the `TableNames` union resolves to
  * `never`, which still lets the file typecheck against an empty workspace.
  */
-export const id = ({ tableNames }: { tableNames: ReadonlyArray<string> }) =>
+export const id = ({
+  tableNames,
+  scope,
+}: {
+  tableNames: ReadonlyArray<string>;
+  scope?: IdScope.Component<string>;
+}) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-    yield* cbw.writeLine(`import { GenericId } from "@confect/core";`);
+    yield* cbw.writeLine(
+      `import { GenericId${scope === undefined ? "" : ", IdScope"} } from "@confect/core";`,
+    );
     yield* cbw.blankLine();
+    if (scope !== undefined) {
+      yield* cbw.writeLine(
+        // oxlint-disable-next-line effecttsgo/prefer-schema-over-json -- Emit an escaped TypeScript string literal, not a JSON payload.
+        `export const scope = IdScope.component(${JSON.stringify(scope.slice("component:".length))});`,
+      );
+      yield* cbw.writeLine(
+        `export const target = { kind: "component", scope } as const;`,
+      );
+    }
 
     const union =
       tableNames.length === 0
@@ -225,7 +263,9 @@ export const id = ({ tableNames }: { tableNames: ReadonlyArray<string> }) =>
       `export const Id = <const TableName extends TableNames>(`,
     );
     yield* cbw.indent(cbw.writeLine(`tableName: TableName,`));
-    yield* cbw.writeLine(`) => GenericId.GenericId(tableName);`);
+    yield* cbw.writeLine(
+      `) => GenericId.GenericId(tableName${scope === undefined ? "" : ", scope"});`,
+    );
 
     return yield* cbw.toString();
   });
@@ -239,16 +279,21 @@ export const id = ({ tableNames }: { tableNames: ReadonlyArray<string> }) =>
 export const tableWrapper = ({
   tableName,
   unnamedImportPath,
+  component = false,
 }: {
   tableName: string;
   unnamedImportPath: string;
+  component?: boolean;
 }) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
     yield* cbw.writeLine(`import unnamed from "${unnamedImportPath}";`);
+    if (component) yield* cbw.writeLine(`import { scope } from "../id";`);
     yield* cbw.blankLine();
-    yield* cbw.writeLine(`export default unnamed("${tableName}");`);
+    yield* cbw.writeLine(
+      `export default unnamed("${tableName}"${component ? ", scope" : ""});`,
+    );
 
     return yield* cbw.toString();
   });
@@ -355,6 +400,27 @@ export const refs = ({ specImportPath }: { specImportPath: string }) =>
     return yield* cbw.toString();
   });
 
+export const componentContract = Effect.fnUntraced(function* ({
+  tableNames,
+}: {
+  tableNames: ReadonlyArray<string>;
+}) {
+  const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
+  yield* cbw.writeLine('import { Component } from "@confect/core";');
+  yield* cbw.writeLine('import spec from "./spec";');
+  yield* cbw.writeLine('import { scope } from "./id";');
+  yield* cbw.blankLine();
+  const names = Array.map(
+    [...tableNames, "_storage", "_scheduled_functions"],
+    (name) => `"${name}"`,
+  );
+  yield* cbw.writeLine(
+    `const component: Component.Component<typeof spec, typeof scope, ${names.join(" | ")}> = Component.make(spec, scope, [${names.join(", ")}]);`,
+  );
+  yield* cbw.writeLine("export default component;");
+  return yield* cbw.toString();
+});
+
 /**
  * Emit `_generated/docs.ts`: one named `type <table>` alias per table plus a
  * `Docs` registry. Each alias is `Document.Document<typeof schemaDefinition,
@@ -458,7 +524,13 @@ export const registeredFunctionsForGroup = ({
     return yield* cbw.toString();
   });
 
-export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
+export const services = ({
+  schemaImportPath,
+  component = false,
+}: {
+  schemaImportPath: string;
+  component?: boolean;
+}) =>
   Effect.gen(function* () {
     const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
@@ -468,7 +540,7 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
       Effect.gen(function* () {
         yield* cbw.writeLine("ActionCtx as ActionCtx_,");
         yield* cbw.writeLine("ActionRunner as ActionRunner_,");
-        yield* cbw.writeLine("Auth as Auth_,");
+        if (!component) yield* cbw.writeLine("Auth as Auth_,");
         yield* cbw.writeLine("type DataModel,");
         yield* cbw.writeLine("DatabaseReader as DatabaseReader_,");
         yield* cbw.writeLine("DatabaseWriter as DatabaseWriter_,");
@@ -488,15 +560,22 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
       `import type schemaDefinition from "${schemaImportPath}";`,
     );
     yield* cbw.writeLine(`import type { Docs } from "./docs";`);
+    if (component) yield* cbw.writeLine(`import type { scope } from "./id";`);
     yield* cbw.blankLine();
 
     // Auth
-    yield* cbw.writeLine("export const Auth = Auth_.Auth;");
-    yield* cbw.writeLine("export type Auth = typeof Auth.Identifier;");
+    if (!component) {
+      yield* cbw.writeLine("export const Auth = Auth_.Auth;");
+      yield* cbw.writeLine("export type Auth = typeof Auth.Identifier;");
+    }
     yield* cbw.blankLine();
 
     // Scheduler
-    yield* cbw.writeLine("export const Scheduler = Scheduler_.Scheduler;");
+    yield* cbw.writeLine(
+      component
+        ? "export const Scheduler = Scheduler_.forScope<typeof scope>();"
+        : "export const Scheduler = Scheduler_.Scheduler;",
+    );
     yield* cbw.writeLine(
       "export type Scheduler = typeof Scheduler.Identifier;",
     );
@@ -504,7 +583,7 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
 
     // StorageReader
     yield* cbw.writeLine(
-      "export const StorageReader = StorageReader_.StorageReader;",
+      `export const StorageReader = StorageReader_.StorageReader${component ? ".forScope<typeof scope>()" : ""};`,
     );
     yield* cbw.writeLine(
       "export type StorageReader = typeof StorageReader.Identifier;",
@@ -513,7 +592,7 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
 
     // StorageWriter
     yield* cbw.writeLine(
-      "export const StorageWriter = StorageWriter_.StorageWriter;",
+      `export const StorageWriter = StorageWriter_.StorageWriter${component ? ".forScope<typeof scope>()" : ""};`,
     );
     yield* cbw.writeLine(
       "export type StorageWriter = typeof StorageWriter.Identifier;",
@@ -522,7 +601,7 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
 
     // StorageActionWriter
     yield* cbw.writeLine(
-      "export const StorageActionWriter = StorageActionWriter_.StorageActionWriter;",
+      `export const StorageActionWriter = StorageActionWriter_.StorageActionWriter${component ? ".forScope<typeof scope>()" : ""};`,
     );
     yield* cbw.writeLine(
       "export type StorageActionWriter = typeof StorageActionWriter.Identifier;",
@@ -611,13 +690,13 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
     yield* cbw.writeLine("export const QueryCtx: QueryCtx_.QueryCtxTag<");
     yield* cbw.indent(
       cbw.writeLine(
-        "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
+        `DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>${component ? ", typeof scope" : ""}`,
       ),
     );
     yield* cbw.writeLine("> = QueryCtx_.QueryCtx<");
     yield* cbw.indent(
       cbw.writeLine(
-        "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
+        `DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>${component ? ", typeof scope" : ""}`,
       ),
     );
     yield* cbw.writeLine(">();");
@@ -630,13 +709,13 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
     );
     yield* cbw.indent(
       cbw.writeLine(
-        "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
+        `DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>${component ? ", typeof scope" : ""}`,
       ),
     );
     yield* cbw.writeLine("> = MutationCtx_.MutationCtx<");
     yield* cbw.indent(
       cbw.writeLine(
-        "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
+        `DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>${component ? ", typeof scope" : ""}`,
       ),
     );
     yield* cbw.writeLine(">();");
@@ -649,13 +728,13 @@ export const services = ({ schemaImportPath }: { schemaImportPath: string }) =>
     yield* cbw.writeLine("export const ActionCtx: ActionCtx_.ActionCtxTag<");
     yield* cbw.indent(
       cbw.writeLine(
-        "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
+        `DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>${component ? ", typeof scope" : ""}`,
       ),
     );
     yield* cbw.writeLine("> = ActionCtx_.ActionCtx<");
     yield* cbw.indent(
       cbw.writeLine(
-        "DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>",
+        `DataModel.ToConvex<DataModel.FromSchema<typeof schemaDefinition>>${component ? ", typeof scope" : ""}`,
       ),
     );
     yield* cbw.writeLine(">();");

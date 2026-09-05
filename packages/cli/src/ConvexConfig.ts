@@ -1,6 +1,7 @@
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
+import * as Match from "effect/Match";
 import type * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 import * as Order from "effect/Order";
@@ -185,6 +186,7 @@ const VALID_COMPONENT_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 export const discoverInstalledComponents = (
   convexConfigPath: string,
   displayPath: string,
+  kind: "app" | "component" = "app",
 ): Effect.Effect<
   ReadonlyArray<InstalledComponent>,
   BuildError | InvalidConvexConfigError,
@@ -202,16 +204,24 @@ export const discoverInstalledComponents = (
       | null
       | undefined;
 
+    const definition = Match.value(kind).pipe(
+      Match.when("app", () => ({ isRoot: true, constructor: "defineApp" })),
+      Match.when("component", () => ({
+        isRoot: false,
+        constructor: "defineComponent",
+      })),
+      Match.exhaustive,
+    );
+
     if (
       app === null ||
       typeof app !== "object" ||
-      app._isRoot !== true ||
+      app._isRoot !== definition.isRoot ||
       typeof app.export !== "function"
     ) {
       return yield* new InvalidConvexConfigError({
         configPath: displayPath,
-        reason:
-          "it must default-export the app definition created by `defineApp()`.",
+        reason: `it must default-export the ${kind} definition created by \`${definition.constructor}()\`.`,
       });
     }
 
