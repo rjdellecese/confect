@@ -4,7 +4,7 @@
 
 Allow inclusive or exclusive endpoints on either side of an experimental `QueryStream.narrow` range, supporting time windows and selections that include or exclude their boundary items.
 
-Replace `after` and `until` with `start` and `end` objects. Each endpoint requires a `key` and an `inclusive` flag; both follow stream order, including on descending streams. Pagination retains its exclusive-start, inclusive-end behavior.
+Replace `after` and `until` with `start` and `end` objects, providing at least one endpoint. Each endpoint requires a `key` and an `inclusive` flag; both follow stream order, including on descending streams. Pagination retains its exclusive-start, inclusive-end behavior.
 
 **Before:**
 

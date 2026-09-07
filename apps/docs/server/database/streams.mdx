@@ -449,7 +449,7 @@ The fields must be a prefix of the stream's order key, which is enforced at the 
 
 ### Narrow to a key range
 
-`QueryStream.narrow` restricts a stream to the order keys between `start` and `end`. Each endpoint has a `key` and a required `inclusive` flag, so you can choose any combination of inclusive and exclusive bounds. Omit either endpoint to leave that side unbounded.
+`QueryStream.narrow` restricts a stream to the order keys between `start` and `end`. Each endpoint has a `key` and a required `inclusive` flag, so you can choose any combination of inclusive and exclusive bounds. Provide at least one endpoint; omit the other to leave that side unbounded.
 
 Endpoints follow **stream order**: on an ascending stream, `start` is the lower key; on a descending stream, it is the upper key. Narrowing intersects existing bounds, so repeated calls can only restrict the range further.
 

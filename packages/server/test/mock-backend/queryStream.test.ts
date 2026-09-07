@@ -730,10 +730,6 @@ describe("QueryStream", () => {
                 key: [Array.getUnsafe(texts, 3)],
                 inclusive: false,
               };
-              expect(QueryStream.narrow(leaf, {})).toBe(leaf);
-              expect(
-                QueryStream.narrow(leaf, { start: undefined, end: undefined }),
-              ).toBe(leaf);
               expect(
                 yield* collectTexts(QueryStream.narrow(leaf, { start })),
               ).toEqual(texts.slice(1));
@@ -1682,6 +1678,32 @@ describe("QueryStream types", () => {
       expectTypeOf<typeof degraded>().toEqualTypeOf<
         Stream.Stream<string, Document.DocumentDecodeError>
       >();
+
+      // Narrowing requires at least one defined endpoint in either call form.
+      const start = { key: ["a"], inclusive: true };
+      const end = { key: ["z"], inclusive: false };
+      const startOnly = QueryStream.narrow(full, { start });
+      const endOnly = full.pipe(QueryStream.narrow({ end }));
+      const between = QueryStream.narrow(full, { start, end });
+      expectTypeOf<typeof startOnly>().toEqualTypeOf<typeof full>();
+      expectTypeOf<typeof endOnly>().toEqualTypeOf<typeof full>();
+      expectTypeOf<typeof between>().toEqualTypeOf<typeof full>();
+
+      // @ts-expect-error — empty bounds do not narrow a stream.
+      const emptyBounds = QueryStream.narrow(full, {});
+      void emptyBounds;
+      // @ts-expect-error — the data-last form also requires an endpoint.
+      QueryStream.narrow({});
+      // @ts-expect-error — explicitly undefined endpoints are still absent.
+      const absentBounds = QueryStream.narrow(full, {
+        start: undefined,
+        end: undefined,
+      });
+      void absentBounds;
+      // @ts-expect-error — an undefined start alone is not a bound.
+      QueryStream.narrow({ start: undefined });
+      // @ts-expect-error — an undefined end alone is not a bound.
+      QueryStream.narrow({ end: undefined });
 
       // Streams pinned the same way merge; the pinned values may differ.
       const mergedPinned = QueryStream.merge([pinned, pinned]);

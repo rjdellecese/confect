@@ -2041,19 +2041,28 @@ export const reverse = <
   return self.reverseWith();
 };
 
-/** Endpoints in stream order. Omit an endpoint to leave that side unbounded. */
-export interface NarrowBounds {
-  readonly start?: KeyBound | undefined;
-  readonly end?: KeyBound | undefined;
-}
+/**
+ * At least one endpoint in stream order. Omit the other to leave that side
+ * unbounded.
+ */
+export type NarrowBounds =
+  | {
+      readonly start: KeyBound;
+      readonly end?: KeyBound | undefined;
+    }
+  | {
+      readonly start?: KeyBound | undefined;
+      readonly end: KeyBound;
+    };
 
 /**
  * Restrict a stream to the order keys between `start` and `end` (in stream
  * order), including each endpoint only when its `inclusive` flag is true.
  * For descending streams, `start` is the upper key and `end` the lower key.
- * Omitted endpoints are unbounded. A prefix key includes or excludes the
- * whole group of keys extending it; `distinct` truncates bounds to its
- * grouping prefix. Narrowing intersects the stream's existing bounds.
+ * At least one endpoint is required; the other can be left unbounded.
+ * A prefix key includes or excludes the whole group of keys extending it;
+ * `distinct` truncates bounds to its grouping prefix. Narrowing intersects
+ * the stream's existing bounds.
  *
  * In SQL terms: keyset predicates on the `ORDER BY` columns — `WHERE (k1,
  * k2) >= (:start) AND (k1, k2) < (:end)` for an ascending, start-inclusive,
@@ -2413,14 +2422,18 @@ export const paginate = dual<
       const until = Option.map(pinnedEnd, (cursor) =>
         deserializeCursorChecked(cursor, self.keyFields.length),
       );
-      const narrowed = narrow(self, {
-        start: Option.getOrUndefined(
-          Option.map(after, (key) => ({ key, inclusive: false })),
-        ),
-        end: Option.getOrUndefined(
-          Option.map(until, (key) => ({ key, inclusive: true })),
-        ),
-      });
+      const start = Option.getOrUndefined(
+        Option.map(after, (key) => ({ key, inclusive: false })),
+      );
+      const end = Option.getOrUndefined(
+        Option.map(until, (key) => ({ key, inclusive: true })),
+      );
+      const narrowed =
+        start !== undefined
+          ? narrow(self, { start, end })
+          : end !== undefined
+            ? narrow(self, { end })
+            : self;
       // With an endCursor the page runs to it, however many items that is.
       const maxRows = Option.isSome(endCursor) ? undefined : options.numItems;
       const maximumRowsRead = options.maximumRowsRead;
