@@ -2042,11 +2042,31 @@ export const reverse = <
 };
 
 /**
- * Restrict a stream to order keys strictly after `after` and at-or-before
- * `until` (in stream order).
+ * At least one endpoint in stream order. Omit the other to leave that side
+ * unbounded.
+ */
+export type NarrowBounds =
+  | {
+      readonly start: KeyBound;
+      readonly end?: KeyBound | undefined;
+    }
+  | {
+      readonly start?: KeyBound | undefined;
+      readonly end: KeyBound;
+    };
+
+/**
+ * Restrict a stream to the order keys between `start` and `end` (in stream
+ * order), including each endpoint only when its `inclusive` flag is true.
+ * For descending streams, `start` is the upper key and `end` the lower key.
+ * At least one endpoint is required; the other can be left unbounded.
+ * A prefix key includes or excludes the whole group of keys extending it;
+ * `distinct` truncates bounds to its grouping prefix. Narrowing intersects
+ * the stream's existing bounds.
  *
  * In SQL terms: keyset predicates on the `ORDER BY` columns — `WHERE (k1,
- * k2) > (:after) AND (k1, k2) <= (:until)` — added to every query in the
+ * k2) >= (:start) AND (k1, k2) < (:end)` for an ascending, start-inclusive,
+ * end-exclusive range — added to every query in the
  * composition. The bounds are pushed down through the stream's structure
  * via `narrowWith`, so the skipped keys are never read: leaves rebuild
  * their Convex queries with the bounds decomposed into `withIndex` ranges
@@ -2054,10 +2074,9 @@ export const reverse = <
  * their combinator. Streams without a `narrowWith` (constructed externally)
  * fall back to filtering the annotated stream in memory. */
 export const narrow = dual<
-  (bounds: {
-    readonly after?: OrderKey | undefined;
-    readonly until?: OrderKey | undefined;
-  }) => <
+  (
+    bounds: NarrowBounds,
+  ) => <
     Doc,
     Key extends ReadonlyArray<string>,
     E,
@@ -2074,10 +2093,7 @@ export const narrow = dual<
     Direction extends OrderDirection,
   >(
     self: QueryStream<Doc, Key, E, R, Direction>,
-    bounds: {
-      readonly after?: OrderKey | undefined;
-      readonly until?: OrderKey | undefined;
-    },
+    bounds: NarrowBounds,
   ) => QueryStream<Doc, Key, E, R, Direction>
 >(
   2,
@@ -2089,25 +2105,16 @@ export const narrow = dual<
     Direction extends OrderDirection,
   >(
     self: QueryStream<Doc, Key, E, R, Direction>,
-    bounds: {
-      readonly after?: OrderKey | undefined;
-      readonly until?: OrderKey | undefined;
-    },
+    bounds: NarrowBounds,
   ) => {
-    const after = Option.map(
-      Option.fromUndefinedOr(bounds.after),
-      (key): KeyBound => ({ key, inclusive: false }),
-    );
-    const until = Option.map(
-      Option.fromUndefinedOr(bounds.until),
-      (key): KeyBound => ({ key, inclusive: true }),
-    );
-    // Stream space → ascending key space: for `desc`, "after" bounds from
-    // above and "until" from below.
+    const start = Option.fromUndefinedOr(bounds.start);
+    const end = Option.fromUndefinedOr(bounds.end);
+    // Stream space → ascending key space: for `desc`, "start" bounds from
+    // above and "end" from below. Inclusion stays attached to its key.
     const keyBounds: KeyBounds =
       self.order === "asc"
-        ? { lower: after, upper: until }
-        : { lower: until, upper: after };
+        ? { lower: start, upper: end }
+        : { lower: end, upper: start };
     return narrowByKeyBounds(self, keyBounds);
   },
 );
@@ -2415,10 +2422,18 @@ export const paginate = dual<
       const until = Option.map(pinnedEnd, (cursor) =>
         deserializeCursorChecked(cursor, self.keyFields.length),
       );
-      const narrowed = narrow(self, {
-        after: Option.getOrUndefined(after),
-        until: Option.getOrUndefined(until),
-      });
+      const start = Option.getOrUndefined(
+        Option.map(after, (key) => ({ key, inclusive: false })),
+      );
+      const end = Option.getOrUndefined(
+        Option.map(until, (key) => ({ key, inclusive: true })),
+      );
+      const narrowed =
+        start !== undefined
+          ? narrow(self, { start, end })
+          : end !== undefined
+            ? narrow(self, { end })
+            : self;
       // With an endCursor the page runs to it, however many items that is.
       const maxRows = Option.isSome(endCursor) ? undefined : options.numItems;
       const maximumRowsRead = options.maximumRowsRead;

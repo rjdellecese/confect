@@ -257,9 +257,9 @@ export const diagrams: Readonly<Record<string, string>> = {
   narrow: lines(
     track("by_text", BY_TEXT),
     keys(BY_TEXT_KEYS),
-    `${cursorAt(3)} after${" ".repeat(COLUMN_WIDTH * 2 - 7)}╎ until`,
+    `${cursorAt(3)} start${" ".repeat(COLUMN_WIDTH * 2 - 7)}╎ end`,
     "",
-    op("narrow({ after: [banana, 2], until: [cherry, 4] })"),
+    op("narrow: start exclusive, end inclusive"),
     "",
     track("narrowed", [undefined, undefined, undefined, "n5", "n4"]),
     keys([undefined, undefined, undefined, "[banana,5]", "[cherry,4]"]),

@@ -449,16 +449,18 @@ The fields must be a prefix of the stream's order key, which is enforced at the 
 
 ### Narrow to a key range
 
-`QueryStream.narrow` restricts a stream to the order keys strictly after `after` and at or before `until`, in stream order. `paginate` uses it to resume from a cursor; call it yourself to bound a composed stream by key.
+`QueryStream.narrow` restricts a stream to the order keys between `start` and `end`. Each endpoint has a `key` and a required `inclusive` flag, so you can choose any combination of inclusive and exclusive bounds. Provide at least one endpoint; omit the other to leave that side unbounded.
 
-In SQL terms, it adds keyset predicates on the `ORDER BY` columns, `WHERE (text, _creationTime) > (:after) AND (text, _creationTime) <= (:until)`, to every query in the composition. The bounds are pushed down through every combinator into the index ranges of the underlying queries, so the skipped keys are never read.
+Endpoints follow **stream order**: on an ascending stream, `start` is the lower key; on a descending stream, it is the upper key. Narrowing intersects existing bounds, so repeated calls can only restrict the range further.
 
 ```ts
 const between = QueryStream.narrow(reader.table("notes").stream("by_text"), {
-  after: ["banana", 2],
-  until: ["cherry", 4],
+  start: { key: ["banana", 2], inclusive: false },
+  end: { key: ["cherry", 4], inclusive: true },
 });
 ```
+
+For this ascending, start-exclusive, end-inclusive range, the SQL equivalent is `WHERE (text, _creationTime) > (:start) AND (text, _creationTime) <= (:end)`. The bounds are pushed down through every combinator into the index ranges of the underlying queries, so the skipped keys are never read.
 
 The bounds become index-range predicates on the leaf, so the elements outside them are not read at all:
 
@@ -468,16 +470,37 @@ The bounds become index-range predicates on the leaf, so the elements outside th
 by_text
 ╰─ n1 ──────── n3 ──────── n2 ──────── n5 ──────── n4 ──────── n6 ───────┤
    [apple,1]   [apple,3]   [banana,2]  [banana,5]  [cherry,4]  [date,6]
-                                     ╎ after                 ╎ until
+                                     ╎ start                 ╎ end
 
-╞═ narrow({ after: [banana, 2], until: [cherry, 4] }) ═╡
+╞═ narrow: start exclusive, end inclusive ═╡
 
 narrowed
 ╰───────────────────────────────────── n5 ──────── n4 ───────┤
                                        [banana,5]  [cherry,4]
 ```
 
-Cursors are serialized keys: `QueryStream.deserializeCursor(page.continueCursor)` turns a page's cursor into an `after` bound.
+A key can be a prefix of the full order key. An inclusive prefix includes all keys extending it; an exclusive prefix excludes that whole group. For example, an ascending creation-time stream can select a time window without supplying the trailing `_id`:
+
+```ts
+const startTime = Date.UTC(2026, 0, 1);
+const endTime = Date.UTC(2026, 0, 2);
+
+const duringDay = reader
+  .table("notes")
+  .stream("by_creation_time")
+  .pipe(
+    QueryStream.narrow({
+      start: { key: [startTime], inclusive: true },
+      end: { key: [endTime], inclusive: false },
+    }),
+  );
+```
+
+This includes every note at `startTime` and excludes every note at `endTime`. Adjacent windows can share an endpoint without overlapping. Apply the same bounds to a merged stream when its leading order-key field is also creation time.
+
+When both endpoints use the same key, the range is empty unless both are inclusive. Two inclusive endpoints select that key, or the entire group for a prefix key. On a `distinct` stream, bounds are truncated to the grouping prefix: an inclusive bound reselects the group's representative, and an exclusive bound skips the group.
+
+`paginate` uses an exclusive start and an inclusive end. To resume manually from a page's cursor, pass `{ start: { key: QueryStream.deserializeCursor(page.continueCursor), inclusive: false } }` to `narrow`.
 
 ### Flat-map
 
