@@ -540,7 +540,9 @@ describe("QueryStream", () => {
           });
           const afterKey = QueryStream.deserializeCursor(page1.continueCursor);
 
-          const narrowed = QueryStream.narrow(leaf, { after: afterKey });
+          const narrowed = QueryStream.narrow(leaf, {
+            start: { key: afterKey, inclusive: false },
+          });
 
           // The narrowed stream is a rebuilt *leaf* — not an in-memory
           // fallback — whose lower bound is the pinned prefix plus the
@@ -588,13 +590,254 @@ describe("QueryStream", () => {
           // still reach the leaf rather than falling back to in-memory
           // key filtering.
           expect(derived.narrowWith).toBeDefined();
-          const narrowed = QueryStream.narrow(derived, { after: afterKey });
+          const narrowed = QueryStream.narrow(derived, {
+            start: { key: afterKey, inclusive: false },
+          });
 
           expect(yield* collectTexts(narrowed)).toEqual(["B", "D"]);
         }),
       );
     }).pipe(Effect.provide(TestConfect.layer)),
   );
+
+  describe.each(["asc", "desc"] as const)("narrow (%s)", (order) => {
+    const cases = [
+      { startInclusive: false, endInclusive: true },
+      { startInclusive: true, endInclusive: false },
+      { startInclusive: true, endInclusive: true },
+      { startInclusive: false, endInclusive: false },
+    ];
+
+    it.effect.each(cases)(
+      "includes start=$startInclusive and end=$endInclusive for keys and prefixes",
+      ({ startInclusive, endInclusive }) =>
+        Effect.gen(function* () {
+          const c = yield* TestConfect.TestConfect;
+          yield* c.run(
+            Effect.gen(function* () {
+              yield* insertNotes(["a", "b", "b", "c", "d", "d", "e"]);
+              const reader = yield* DatabaseReader;
+              const leaf = reader.table("notes").stream("by_text", order);
+              const elements = yield* Stream.runCollect(leaf.annotated);
+              const texts = yield* collectTexts(leaf);
+              const start = {
+                key: Array.getUnsafe(elements, 1)[1],
+                inclusive: startInclusive,
+              };
+              const end = {
+                key: Array.getUnsafe(elements, 5)[1],
+                inclusive: endInclusive,
+              };
+              const bounds = { start, end };
+              const prefixBounds = {
+                start: { ...start, key: [Array.getUnsafe(texts, 1)] },
+                end: { ...end, key: [Array.getUnsafe(texts, 5)] },
+              };
+              const expected = texts.slice(
+                startInclusive ? 1 : 2,
+                endInclusive ? 6 : 5,
+              );
+              const expectedPrefixes = texts.slice(
+                startInclusive ? 1 : 3,
+                endInclusive ? 6 : 4,
+              );
+              const narrowed = QueryStream.narrow(leaf, bounds);
+              expect(narrowed.reflection?.bounds).toEqual({
+                lower: order === "asc" ? start : end,
+                upper: order === "asc" ? end : start,
+              });
+
+              const fallback: typeof leaf = new QueryStream.QueryStream(
+                leaf.order,
+                leaf.keyFields,
+                leaf.annotated,
+              );
+              const composed = QueryStream.merge([
+                reader
+                  .table("notes")
+                  .stream("by_text", (q) => q.lt("text", "c"), order),
+                reader
+                  .table("notes")
+                  .stream("by_text", (q) => q.gte("text", "c"), order),
+              ]).pipe(
+                QueryStream.filter(
+                  (note) => note.text !== "a" && note.text !== "e",
+                ),
+                QueryStream.map((note) => ({ ...note })),
+              );
+              for (const stream of [leaf, fallback, composed]) {
+                expect(
+                  yield* collectTexts(stream.pipe(QueryStream.narrow(bounds))),
+                ).toEqual(expected);
+                expect(
+                  yield* collectTexts(QueryStream.narrow(stream, prefixBounds)),
+                ).toEqual(expectedPrefixes);
+                expect(
+                  yield* collectTexts(
+                    QueryStream.narrow(stream, {
+                      start,
+                      end: { key: start.key, inclusive: endInclusive },
+                    }),
+                  ),
+                ).toEqual(startInclusive && endInclusive ? [texts[1]] : []);
+                expect(
+                  yield* collectTexts(
+                    QueryStream.narrow(stream, {
+                      start: prefixBounds.start,
+                      end: { ...prefixBounds.start, inclusive: endInclusive },
+                    }),
+                  ),
+                ).toEqual(
+                  startInclusive && endInclusive ? texts.slice(1, 3) : [],
+                );
+              }
+
+              const distinct = leaf.pipe(QueryStream.distinct(["text"]));
+              expect(
+                yield* collectTexts(QueryStream.narrow(distinct, bounds)),
+              ).toEqual([...new Set(expectedPrefixes)]);
+              expect(
+                yield* collectTexts(QueryStream.reverse(narrowed)),
+              ).toEqual(
+                yield* collectTexts(
+                  QueryStream.narrow(QueryStream.reverse(leaf), {
+                    start: end,
+                    end: start,
+                  }),
+                ),
+              );
+            }),
+          );
+        }).pipe(Effect.provide(TestConfect.layer)),
+    );
+
+    it.effect(
+      "keeps omitted sides unbounded and intersects repeated bounds",
+      () =>
+        Effect.gen(function* () {
+          const c = yield* TestConfect.TestConfect;
+          yield* c.run(
+            Effect.gen(function* () {
+              yield* insertNotes(["a", "b", "c", "d", "e"]);
+              const reader = yield* DatabaseReader;
+              const leaf = reader.table("notes").stream("by_text", order);
+              const texts = yield* collectTexts(leaf);
+              const start = {
+                key: [Array.getUnsafe(texts, 1)],
+                inclusive: true,
+              };
+              const end = {
+                key: [Array.getUnsafe(texts, 3)],
+                inclusive: false,
+              };
+              expect(QueryStream.narrow(leaf, {})).toBe(leaf);
+              expect(
+                QueryStream.narrow(leaf, { start: undefined, end: undefined }),
+              ).toBe(leaf);
+              expect(
+                yield* collectTexts(QueryStream.narrow(leaf, { start })),
+              ).toEqual(texts.slice(1));
+              expect(
+                yield* collectTexts(QueryStream.narrow(leaf, { end })),
+              ).toEqual(texts.slice(0, 3));
+              const bounded = leaf.pipe(
+                QueryStream.narrow({ start }),
+                QueryStream.narrow({ end }),
+              );
+              expect(yield* collectTexts(bounded)).toEqual(texts.slice(1, 3));
+              expect(
+                yield* collectTexts(
+                  QueryStream.narrow(bounded, {
+                    start: {
+                      key: [Array.getUnsafe(texts, 0)],
+                      inclusive: true,
+                    },
+                    end: { key: [Array.getUnsafe(texts, 4)], inclusive: true },
+                  }),
+                ),
+              ).toEqual(texts.slice(1, 3));
+              expect(
+                yield* collectTexts(
+                  QueryStream.narrow(bounded, {
+                    start: { ...start, inclusive: false },
+                  }),
+                ),
+              ).toEqual(texts.slice(2, 3));
+              expect(
+                yield* collectTexts(
+                  QueryStream.narrow(leaf, {
+                    start: end,
+                    end: start,
+                  }),
+                ),
+              ).toEqual([]);
+            }),
+          );
+        }).pipe(Effect.provide(TestConfect.layer)),
+    );
+
+    it.effect.each(cases)(
+      "narrows joined boundary rows with start=$startInclusive and end=$endInclusive",
+      ({ startInclusive, endInclusive }) =>
+        Effect.gen(function* () {
+          const c = yield* TestConfect.TestConfect;
+          yield* c.run(
+            Effect.gen(function* () {
+              const writer = yield* DatabaseWriter;
+              const reader = yield* DatabaseReader;
+              for (const [text, tag] of [
+                ["b", "b1"],
+                ["b", "b2"],
+                ["a", "a1"],
+                ["a", "a2"],
+                ["x1", "a"],
+                ["x2", "b"],
+              ] as const) {
+                yield* writer.table("notes").insert({ text, tag });
+              }
+              const joined = reader
+                .table("notes")
+                .stream("by_text", (q) => q.gte("text", "x"), order)
+                .pipe(
+                  QueryStream.flatMap(
+                    (note) =>
+                      reader
+                        .table("notes")
+                        .stream(
+                          "by_text",
+                          (q) => q.eq("text", note.tag ?? ""),
+                          order,
+                        ),
+                    { innerKey: ["_creationTime"] },
+                  ),
+                );
+              const elements = yield* Stream.runCollect(joined.annotated);
+              // Exercise endpoints within one outer row and across two rows.
+              for (const endIndex of [1, 3]) {
+                const result = yield* Stream.runCollect(
+                  QueryStream.narrow(joined, {
+                    start: {
+                      key: Array.getUnsafe(elements, 0)[1],
+                      inclusive: startInclusive,
+                    },
+                    end: {
+                      key: Array.getUnsafe(elements, endIndex)[1],
+                      inclusive: endInclusive,
+                    },
+                  }).annotated,
+                );
+                expect(result).toEqual(
+                  elements.slice(
+                    startInclusive ? 0 : 1,
+                    endIndex + (endInclusive ? 1 : 0),
+                  ),
+                );
+              }
+            }),
+          );
+        }).pipe(Effect.provide(TestConfect.layer)),
+    );
+  });
 
   it.effect("paginates through duplicate index values", () =>
     Effect.gen(function* () {
