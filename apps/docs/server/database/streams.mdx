@@ -502,12 +502,6 @@ When both endpoints use the same key, the range is empty unless both are inclusi
 
 `paginate` uses an exclusive start and an inclusive end. To resume manually from a page's cursor, pass `{ start: { key: QueryStream.deserializeCursor(page.continueCursor), inclusive: false } }` to `narrow`.
 
-<Note>
-  The previous experimental `after` and `until` options have been replaced. Migrate
-  `after: key` to `start: { key, inclusive: false }` and `until: key` to
-  `end: { key, inclusive: true }`.
-</Note>
-
 ### Flat-map
 
 `QueryStream.flatMap` runs an inner stream for each document of an outer stream and concatenates the results, ordered by the outer key and then the inner key.
