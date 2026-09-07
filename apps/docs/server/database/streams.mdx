@@ -11,6 +11,40 @@ description: "Compose, merge, join, and paginate index queries as Effect streams
 
 Query streams are an alternative querying API to the [`index`](/server/database/reading#standard-indexes) method, built around Effect's [`Stream`](https://effect.website/docs/stream/introduction). A **query stream** is a `Stream` of decoded documents in index order that also remembers how it is ordered. That extra knowledge is what lets streams be combined — merged, filtered, joined, deduplicated — and still be paginated with cursors afterwards, which a plain `Stream` cannot do.
 
+You can use Effect's `Stream` operations on a query stream, but transformations such as `Stream.take` return a plain `Stream`: the result loses the ordering metadata needed for further `QueryStream` composition and cursor pagination. This is useful when you only want a fixed number of results: `query.pipe(Stream.take(10), Stream.runCollect)` collects up to ten values without needing a cursor. Keep using `QueryStream` operations until you're ready to give up that metadata. Consumers such as `Stream.runCollect` instead return an `Effect` that produces the results when run.
+
+## The QueryStream type
+
+A `QueryStream` describes an ordered query, not its results. Creating or composing one does not read documents. Reads begin when you run a consuming effect, such as `Stream.runCollect(stream)` or `QueryStream.paginate(stream, paginationOpts)`. Each run executes the underlying queries again.
+
+The type has five parameters:
+
+```text
+QueryStream<Doc, Key, Error, Requirements, Direction>
+```
+
+| Parameter      | Meaning                                                                                                                                                                                      |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Doc`          | The type of each emitted value. Initially a decoded document; after `map` or a join, it can be any result type. `never` means the stream emits no values, as with an empty stream.           |
+| `Key`          | An ordered tuple of field names, such as `["text", "_creationTime"]`, describing the stream's sort order. It tracks the index fields left after `eq` pins values, not the values themselves. |
+| `Error`        | Typed failures that can occur while reading or transforming values. `never` means no typed failures, but defects can still occur.                                                            |
+| `Requirements` | Effect services needed to run the stream. `never` means there are no outstanding service requirements.                                                                                       |
+| `Direction`    | Whether keys are visited in ascending (`"asc"`) or descending (`"desc"`) order. The union `"asc" \| "desc"` accepts either direction.                                                        |
+
+The declaration abbreviates `Error` and `Requirements` as `E` and `R`. You normally let TypeScript infer all five parameters from `stream` and the operations you apply to it. Although the **type parameter** `Direction` defaults to the union, the **query method** `stream(...)` defaults to `"asc"`.
+
+For example, a notes query using the `by_text` index has this shape:
+
+```text
+QueryStream<Note, ["text", "_creationTime"], DocumentDecodeError, never, "asc">
+```
+
+Here, `Note` is the decoded note document type. The stream emits notes sorted by text and then creation time, can fail to decode a document, and needs no additional services. You create the query through Confect's `DatabaseReader` service, which provides access to your database, as shown in the [first query example](#a-first-query). The stream retains that database access, so you do not need to supply a reader again to consume it. Effectful operations such as `mapEffect` can add their own errors and service requirements.
+
+A `QueryStream<Doc, Key, Error, Requirements, Direction>` is also a `Stream<Doc, Error, Requirements>`: the emitted value, error, and requirement types carry over, but `Key` and `Direction` are specific to `QueryStream`.
+
+## A first query
+
 Everything the `index` API does, a query stream does too: `collect`, `first`, and `take` are `Stream.runCollect`, `Stream.runHead`, and `Stream.take`, and `paginate` is `QueryStream.paginate`. What `index` can't do is combine queries, so once you're comfortable with streams you can use them for every standard-index query. (Search indexes stay with [`search`](/server/database/reading#search-indexes).)
 
 Create a stream with `stream` on a table, then compose it with the `QueryStream` module from `@confect/server`:
@@ -46,7 +80,7 @@ Effect.gen(function* () {
 
 Every query stream is sorted by its **order key** in its **direction**, and every operation on this page keeps it that way. That invariant is what a plain `Stream` lacks and what the rest of this page relies on: two streams sorted by the same key can be merged without buffering, a cursor is a key, and a page of any composition resumes by narrowing every underlying index query to the keys after that cursor.
 
-Both are part of the type. `reader.table("notes").stream("by_text")` is a `QueryStream<Doc, ["text", "_creationTime"], DocumentDecodeError, never, "asc">`: the document, the order key, the error and requirement channels, and the direction. `merge` refuses streams whose keys or directions differ, at compile time.
+The `Key` and `Direction` type parameters enforce this contract: `merge` refuses streams whose known keys or directions differ at compile time. Directions chosen at runtime are also checked at runtime.
 
 Only three operations change the key at all:
 
@@ -226,7 +260,7 @@ const firstTwoTexts =
     .table("notes")
     .stream("by_text")
     .pipe(
-      Stream.map((note) => note.text),
+      QueryStream.map((note) => note.text),
       Stream.take(2),
       Stream.runCollect,
     ); // ["apple", "apple"]
