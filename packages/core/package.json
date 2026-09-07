@@ -11,11 +11,11 @@
     "@types/node": "22.20.1",
     "confect-bench-harness": "workspace:*",
     "effect": "3.22.1",
-    "tsdown": "0.22.14",
+    "tsdown": "0.23.0",
     "tsx": "4.23.13",
     "typescript": "7.0.2",
     "unrun": "0.3.1",
-    "vitest": "4.1.11"
+    "vitest": "5.0.0"
   },
   "engines": {
     "node": ">=22"

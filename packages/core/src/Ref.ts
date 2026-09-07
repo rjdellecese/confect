@@ -351,9 +351,8 @@ export const decodeError = <Ref_ extends Any>(
   Match.value(ref.functionSpec.functionProvenance).pipe(
     Match.tag("Confect", (confectFunctionProvenance) =>
       "error" in confectFunctionProvenance
-        ? Effect.map(
+        ? Effect.asSome(
             Schema.decodeUnknown(confectFunctionProvenance.error)(encodedError),
-            Option.some,
           )
         : Effect.succeed(Option.none<Error<Ref_>>()),
     ),
