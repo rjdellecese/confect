@@ -1,7 +1,7 @@
 ---
 icon: "layers"
 title: "Middleware"
-description: "Wrap a group's functions with reusable logic that provides services to handlers and fails with typed errors."
+description: "Attach reusable policies to functions and groups with typed options, schema-derived equality, provided services, and typed errors."
 ---
 
 Middleware is reusable logic that runs around every function in a group — the Confect analog of `convex-helpers` custom functions. A middleware runs per invocation, after arguments are decoded and before the handler. It can provide Effect services to downstream handlers (a `CurrentUser`, say), inspect the decoded arguments, short-circuit with a typed error that surfaces—decoded—at every call site, and run logic after the handler completes.
@@ -217,9 +217,32 @@ Both checks must pass before the handler runs. Repeated guards form a conjunctio
 
 Confect uses `Schema.toEquivalence` to compare options for attachments with the same middleware key. Equivalent options are rejected by `confect codegen` and by server registration, including across the group/function boundary. TypeScript does not check this equivalence. Middleware without an options schema still rejects duplicate keys immediately, both at the type level and at runtime.
 
-Equality follows the options schema. Arrays are ordered by default, so `["admin", "editor"]` and `["editor", "admin"]` are distinct. Use `Schema.overrideToEquivalence` to customize equality when your policy treats them as the same set. Function behavior cannot be compared: resolver functions need reference equality or a custom equivalence. Prefer named resolver IDs when you need reliable duplicate detection.
-
 If repeated middleware provides the same service tag, the inner provider shadows the outer value for downstream middleware and the handler. Once the nested effect completes, the outer middleware sees its original service context again. Repetition does not change the spec's error union or its `provides` and `requires` type sets, and it does not relax function-type restrictions or propagate middleware to subgroups.
+
+### Customizing option equality
+
+Equality follows the options schema. Arrays are ordered by default, so `["Internal", "Buyer"]` and `["Buyer", "Internal"]` are distinct. If your role gate treats its allowed roles as a set, use `Schema.overrideToEquivalence` so order and repeated entries do not make the same policy look different:
+
+```ts
+import * as Schema from "effect/Schema";
+
+const roleOptions = () =>
+  Schema.Struct({
+    roles: Schema.Array(Schema.Literals(["Internal", "Buyer", "BrandPartner"])),
+  }).pipe(
+    Schema.overrideToEquivalence(
+      () => (left, right) =>
+        left.roles.every((role) => right.roles.includes(role)) &&
+        right.roles.every((role) => left.roles.includes(role)),
+    ),
+  );
+```
+
+Pass this factory as `options: roleOptions` in the middleware declaration, without calling it. The schema stays lazy, and attachment values are inferred as arrays of the three allowed role literals. With this equivalence, attaching both `{ roles: ["Internal", "Buyer"] }` and `{ roles: ["Buyer", "Internal"] }` to the same chain is a duplicate, rejected during codegen or registration.
+
+The equivalence must describe the whole policy configuration. If you add an option such as `tolerateMissing`, compare it too; otherwise configurations that behave differently could be rejected as duplicates. Keep the comparison pure, symmetric, and transitive.
+
+Function behavior cannot be compared: resolver functions need reference equality or a custom equivalence. Prefer named resolver IDs when you need reliable duplicate detection.
 
 ## Depending on another middleware
 
