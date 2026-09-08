@@ -8,16 +8,16 @@ open a PR for review. Never merge it yourself. Routine propagation from
 `main` belongs to the `sync-main-into-prerelease` skill; this workflow only
 upgrades Effect and may stack on a sync that is already open.
 
-A scheduled routine invokes this command by name, and the name is resolved
-against this directory when the routine fires. Renaming this file therefore
-means updating that schedule in the same pass.
+Capy Automations invoke this skill by name. If it is renamed, update any
+automation prompts that reference it in the same pass; do not enable a schedule
+unless the user explicitly asks.
 
 ## Scope
 
 - **Target line:** `v10`. If it is gone, or
   `git show origin/v10:.changeset/pre.json` no longer says `"mode": "pre"`,
   the prerelease line has graduated: say so, stop, and suggest deleting this
-  command and its routine.
+  skill and disabling its automation.
 - **Base:** look for one open PR against `v10` with the `prerelease-sync`
   label. If present, use its current head as the bump branch's starting point
   and PR base. Otherwise start from and target `origin/v10`. Do not create,

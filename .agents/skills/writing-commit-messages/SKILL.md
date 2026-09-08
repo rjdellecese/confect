@@ -1,14 +1,6 @@
 ---
 name: writing-commit-messages
-description: >-
-  Write thoughtful, prose-style git commit messages with a sentence-case
-  imperative-mood subject under 50 characters, a blank line, then a
-  Markdown-formatted body that explains *why* the change was needed — never just
-  *what* it did. Use this skill whenever writing a commit message, running `git
-  commit`, preparing to commit code on the user's behalf, or drafting PR
-  descriptions that follow commit-message conventions — even when the user
-  doesn't explicitly ask for commit-message help. Also use when the user asks
-  about git commit style or conventions.
+description: Write thoughtful, prose-style git commit messages with a sentence-case imperative-mood subject under 50 characters, a blank line, then a Markdown-formatted body that explains *why* the change was needed — never just *what* it did. Use this skill whenever writing a commit message, running `git commit`, preparing to commit code on the user's behalf, or drafting PR descriptions that follow commit-message conventions — even when the user doesn't explicitly ask for commit-message help. Also use when the user asks about git commit style or conventions.
 ---
 
 # Writing commit messages

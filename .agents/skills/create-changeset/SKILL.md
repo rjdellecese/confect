@@ -1,9 +1,6 @@
 ---
 name: create-changeset
-description: >-
-  Write a Changesets changeset file for the current branch. Use when the user
-  asks to add a changeset, write a changeset, or prepare changes for release,
-  and before opening a PR that changes published @confect/* code.
+description: Write a Changesets changeset file for the current branch. Use when the user asks to add a changeset, write a changeset, or prepare changes for release, and before opening a PR that changes published @confect/* code.
 ---
 
 A changeset is a `.changeset/<name>.md` file: YAML frontmatter listing affected packages with semver bump types, then a changelog entry.
