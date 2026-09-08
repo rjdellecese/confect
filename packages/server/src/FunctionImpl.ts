@@ -68,6 +68,7 @@ export const make = <
           FunctionRegistryItem.make({
             functionSpec,
             groupMiddlewareSpecs: group.middlewareSpecs,
+            groupMiddlewareOptions: group.middlewareOptions,
             handler,
           }),
         ),

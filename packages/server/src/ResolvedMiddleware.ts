@@ -9,6 +9,7 @@ import type * as MiddlewareRegistryItem from "./MiddlewareRegistryItem";
 export interface ResolvedMiddleware {
   readonly middlewareSpec: MiddlewareSpec.AnyMiddlewareSpec;
   readonly middlewareImpl: MiddlewareSpec.AnyMiddlewareImpl;
+  readonly options?: unknown;
 }
 
 /**
@@ -42,5 +43,9 @@ export const resolve = (
       );
     }
 
-    return { middlewareImpl, middlewareSpec };
+    return {
+      middlewareImpl,
+      middlewareSpec,
+      options: functionRegistryItem.middlewareOptions[middlewareSpec.key],
+    };
   });

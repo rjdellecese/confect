@@ -36,6 +36,7 @@ export interface GroupSpec<
     [GroupName in Name<Groups_>]: WithName<Groups_, GroupName>;
   };
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpecs_>;
+  readonly middlewareOptions: Readonly<Record<string, unknown>>;
   readonly "~Functions": Functions_;
   readonly "~Groups": Groups_;
 
@@ -72,6 +73,7 @@ export interface GroupSpec<
         Functions_,
         MiddlewareSpecs_
       >,
+    ...options: MiddlewareSpec.AttachmentArgs<NoInfer<MiddlewareSpec_>>
   ): GroupSpec<
     Runtime,
     Name_,
@@ -179,6 +181,7 @@ const Proto = {
       functions: Record.set(this_.functions, function_.name, function_),
       groups: this_.groups,
       middlewareSpecs: this_.middlewareSpecs,
+      middlewareOptions: this_.middlewareOptions,
     });
   },
 
@@ -192,6 +195,7 @@ const Proto = {
       functions: this_.functions,
       groups: Record.set(this_.groups, group_.name, group_),
       middlewareSpecs: this_.middlewareSpecs,
+      middlewareOptions: this_.middlewareOptions,
     });
   },
 
@@ -205,12 +209,14 @@ const Proto = {
       functions: this_.functions,
       groups: Record.set(this_.groups, name, withName(name, group_)),
       middlewareSpecs: this_.middlewareSpecs,
+      middlewareOptions: this_.middlewareOptions,
     });
   },
 
   middleware<MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec>(
     this: Any,
     middlewareSpec: MiddlewareSpec_,
+    ...options: ReadonlyArray<unknown>
   ) {
     const this_ = this as AnyWithProps;
 
@@ -242,6 +248,10 @@ const Proto = {
       functions: this_.functions,
       groups: this_.groups,
       middlewareSpecs: [...this_.middlewareSpecs, middlewareSpec],
+      middlewareOptions: {
+        ...this_.middlewareOptions,
+        [middlewareSpec.key]: options[0],
+      },
     });
   },
 };
@@ -258,12 +268,14 @@ const makeProto = <
   functions,
   groups,
   middlewareSpecs,
+  middlewareOptions = {},
 }: {
   runtime: Runtime;
   name: Name_;
   functions: Record.ReadonlyRecord<string, Functions_>;
   groups: Record.ReadonlyRecord<string, Groups_>;
   middlewareSpecs: ReadonlyArray<MiddlewareSpecs_>;
+  middlewareOptions?: Readonly<Record.ReadonlyRecord<string, unknown>>;
 }): GroupSpec<Runtime, Name_, Functions_, Groups_, MiddlewareSpecs_> =>
   Object.assign(Object.create(Proto), {
     runtime,
@@ -271,6 +283,7 @@ const makeProto = <
     functions,
     groups,
     middlewareSpecs,
+    middlewareOptions,
   }) as GroupSpec<Runtime, Name_, Functions_, Groups_, MiddlewareSpecs_>;
 
 export const make = (): GroupSpec<"Convex", ""> =>
@@ -336,5 +349,6 @@ export const withName = <const Name_ extends string>(
     functions: group_.functions,
     groups: group_.groups,
     middlewareSpecs: group_.middlewareSpecs,
+    middlewareOptions: group_.middlewareOptions,
   });
 };

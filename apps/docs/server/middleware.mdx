@@ -125,6 +125,74 @@ The same rules apply as at the group level, at the same authoring sites: attachi
 
 Note that a failed mutation still rolls back its whole transaction: if a function-level middleware short-circuits after a group middleware has written something, those writes are rolled back with it.
 
+## Parameterizing a policy
+
+Declare an `options` type in a middleware's `Config` to reuse one policy with different attachment values. For example, a resource gate can take the name of the argument containing its id:
+
+```ts confect/middleware/RequireResource.spec.ts
+import { MiddlewareSpec } from "@confect/core";
+import * as Schema from "effect/Schema";
+
+export class MissingResourceId extends Schema.TaggedError<MissingResourceId>()(
+  "MissingResourceId",
+  {},
+) {}
+
+export default class RequireResource extends MiddlewareSpec.MiddlewareSpec<
+  RequireResource,
+  { options: { readonly idArgument: string } }
+>()("RequireResource", {
+  error: () => MissingResourceId,
+  functionTypes: { query: true, mutation: true, action: true },
+}) {}
+```
+
+Pass the options as the second argument to `.middleware()`, on either a function or a group:
+
+```ts
+FunctionSpec.publicQuery({
+  name: "getResource",
+  args: () => ({ resourceId: Schema.String }),
+  returns: () => Schema.String,
+}).middleware(RequireResource, { idArgument: "resourceId" });
+
+GroupSpec.make().middleware(RequireResource, { idArgument: "id" });
+```
+
+The second argument is required and checked against the declared type. Middleware without an `options` declaration still uses `.middleware(Spec)` with no second argument. The declaration is type-level, like `provides` and `requires`; attachment values are not decoded through a runtime schema.
+
+Both `MiddlewareImpl.make` and `MiddlewareImpl.makeByFunctionType` receive the attachment value in the invocation metadata's typed `options` field, alongside `name`, `functionType`, `functionVisibility`, and decoded `args`. Middleware without options receives `undefined` in that field:
+
+```ts confect/middleware/RequireResource.impl.ts
+import { MiddlewareImpl } from "@confect/server";
+import * as Effect from "effect/Effect";
+import * as Predicate from "effect/Predicate";
+
+import databaseSchema from "../_generated/schema";
+import RequireResource, { MissingResourceId } from "./RequireResource.spec";
+
+export default MiddlewareImpl.make(
+  databaseSchema,
+  RequireResource,
+  (effect, { args, options }) =>
+    Predicate.hasProperty(args, options.idArgument)
+      ? effect
+      : Effect.fail(new MissingResourceId()),
+);
+```
+
+This example only checks that the argument exists; an authorization gate would also check access to the referenced resource. The same options mechanism supports role lists, flags, and client-safe resolver functions. Use `MiddlewareImpl.make` rather than the `provides` shorthand when producing a service depends on the attachment options.
+
+Options belong to each attachment, so different functions can reuse the same middleware implementation with different values. They survive codegen and are carried by `refs`; the middleware's declared error still determines the client error union, independently of its options. `provides` and `requires` also remain fixed for a spec: an option does not change a handler's service types. For a `tolerateMissing` policy, declare a service containing an `Option` and let the implementation decide whether to provide `None` or fail.
+
+<Warning>
+  Attachment values are reachable from client refs. Keep them and any resolver
+  functions client-safe: do not put secrets, server-only imports, or privileged
+  lookup logic in options. Keep authorization and database reads in the impl.
+</Warning>
+
+Duplicate detection remains by middleware key: attaching the same spec twice is a type error and a runtime error, even with different options. This includes one attachment on a group and another on one of its functions. Attachment order, function-type restrictions, and subgroup boundaries are unchanged.
+
 ## Depending on another middleware
 
 A middleware can consume a service provided by middleware that runs earlier in the chain. Declare the dependency in the `Config` type parameter's `requires` slot; the implementation's environment then includes it alongside the ctx services:
@@ -192,7 +260,7 @@ Since handlers depend only on the service, unit tests don't need middleware at a
 
 ## Implementing a middleware
 
-A middleware implementation wraps the downstream effect (any remaining middleware plus the handler). It receives that effect together with metadata about the invocation — the covered function's `name`, `functionType`, and `functionVisibility`, plus its decoded `args` — and decides whether and how to run it:
+A middleware implementation wraps the downstream effect (any remaining middleware plus the handler). It receives that effect together with metadata about the invocation — the covered function's `name`, `functionType`, and `functionVisibility`, plus its decoded `args` and attachment `options` — and decides whether and how to run it:
 
 - **Provide** the declared service to it with `Effect.provideService` — the types require this (or never running the effect at all): the downstream effect's environment carries the provided service as an obligation the implementation must discharge.
 - **Short-circuit** by returning `Effect.fail` with the declared error instead of running the effect.

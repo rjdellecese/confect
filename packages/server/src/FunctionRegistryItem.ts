@@ -35,6 +35,7 @@ export interface ConfectFunctionRegistryItem {
   readonly returns: Schema.Codec<any, any>;
   readonly error?: Schema.Codec<any, any>;
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyMiddlewareSpec>;
+  readonly middlewareOptions: Readonly<Record<string, unknown>>;
   readonly handler: Handler.AnyConfectProvenance;
 }
 
@@ -47,10 +48,12 @@ export interface ConvexFunctionRegistryItem {
 export const make = ({
   functionSpec,
   groupMiddlewareSpecs,
+  groupMiddlewareOptions = {},
   handler,
 }: {
   functionSpec: FunctionSpec.AnyWithProps;
   groupMiddlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyMiddlewareSpec>;
+  groupMiddlewareOptions?: Readonly<Record<string, unknown>>;
   handler: Handler.Any;
 }): AnyWithProps =>
   Match.value(functionSpec.functionProvenance).pipe(
@@ -70,6 +73,10 @@ export const make = ({
           ...groupMiddlewareSpecs,
           ...functionSpec.middlewareSpecs,
         ],
+        middlewareOptions: {
+          ...groupMiddlewareOptions,
+          ...functionSpec.middlewareOptions,
+        },
         handler: handler as Handler.AnyConfectProvenance,
       });
 

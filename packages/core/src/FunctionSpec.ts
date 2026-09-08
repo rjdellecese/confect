@@ -32,6 +32,7 @@ export interface FunctionSpec<
   readonly name: Name_;
   readonly functionProvenance: FunctionProvenance_;
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpecs_>;
+  readonly middlewareOptions: Readonly<Record<string, unknown>>;
 }
 
 export interface Builder<
@@ -55,6 +56,7 @@ export interface Builder<
         FunctionProvenance_,
         MiddlewareSpecs_
       >,
+    ...options: MiddlewareSpec.AttachmentArgs<NoInfer<MiddlewareSpec_>>
   ): Builder<
     RuntimeAndFunctionType_,
     FunctionVisibility_,
@@ -285,6 +287,7 @@ const Proto = {
   middleware(
     this: AnyWithProps,
     middlewareSpec: MiddlewareSpec.AnyMiddlewareSpec,
+    ...options: ReadonlyArray<unknown>
   ) {
     if (this.functionProvenance._tag === "Convex") {
       throw new Error(
@@ -313,6 +316,10 @@ const Proto = {
       name: this.name,
       functionProvenance: this.functionProvenance,
       middlewareSpecs: [...this.middlewareSpecs, middlewareSpec],
+      middlewareOptions: {
+        ...this.middlewareOptions,
+        [middlewareSpec.key]: options[0],
+      },
     });
   },
 };
@@ -374,6 +381,7 @@ const make = <
           ? FunctionProvenance.Confect(() => ({}), returns, error)
           : FunctionProvenance.Confect(args, returns, error),
       middlewareSpecs: [],
+      middlewareOptions: {},
     });
   }
 
@@ -449,6 +457,7 @@ const makePaginated = <
           ? FunctionProvenance.ConfectPaginated(() => ({}), item, error)
           : FunctionProvenance.ConfectPaginated(args, item, error),
       middlewareSpecs: [],
+      middlewareOptions: {},
     });
   }
 
@@ -563,6 +572,7 @@ const makeConvex =
         ExtractReturns<F>
       >(),
       middlewareSpecs: [],
+      middlewareOptions: {},
     }) as any;
   };
 

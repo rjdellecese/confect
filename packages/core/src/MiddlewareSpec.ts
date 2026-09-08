@@ -44,21 +44,22 @@ export interface SuccessValue {
  *
  * Mirrors `RpcMiddleware.RpcMiddleware` in Effect.
  */
-export interface MiddlewareImpl<Provides_, E, R> {
+export interface MiddlewareImpl<Provides_, E, R, Options_ = undefined> {
   (
     effect: Effect.Effect<SuccessValue, E | unhandled, Provides_>,
-    options: MiddlewareOptions,
+    options: MiddlewareOptions<Options_>,
   ): Effect.Effect<SuccessValue, E | unhandled, R>;
 }
 
-export interface MiddlewareOptions {
+export interface MiddlewareOptions<Options_ = undefined> {
   readonly name: string;
   readonly functionType: FunctionType;
   readonly functionVisibility: FunctionVisibility;
   readonly args: unknown;
+  readonly options: Options_;
 }
 
-export interface AnyMiddlewareImpl extends MiddlewareImpl<any, any, any> {}
+export interface AnyMiddlewareImpl extends MiddlewareImpl<any, any, any, any> {}
 
 /**
  * The class shape produced by {@link MiddlewareSpec}. Only the static side is ever
@@ -75,6 +76,7 @@ export interface MiddlewareSpec<
   Requires_,
   ErrorSchema_ extends Schema.Codec<any, any>,
   FunctionTypes_ extends FunctionType,
+  Options_ = never,
 > {
   new (_: never): {
     readonly [TypeId]: TypeId;
@@ -89,6 +91,7 @@ export interface MiddlewareSpec<
   readonly "~Error": ErrorSchema_;
   readonly "~FunctionTypes": FunctionTypes_;
   readonly "~Self": Self;
+  readonly "~Options": Options_;
 }
 
 export interface AnyMiddlewareSpec {
@@ -100,7 +103,23 @@ export interface AnyMiddlewareSpec {
   readonly "~Requires": any;
   readonly "~Error": any;
   readonly "~FunctionTypes": FunctionType;
+  readonly "~Options": any;
 }
+
+export type Options<MiddlewareSpec_ extends AnyMiddlewareSpec> =
+  MiddlewareSpec_["~Options"];
+
+export type AttachmentArgs<MiddlewareSpec_ extends AnyMiddlewareSpec> = [
+  Options<MiddlewareSpec_>,
+] extends [never]
+  ? []
+  : [options: Options<MiddlewareSpec_>];
+
+export type ImplementationOptions<MiddlewareSpec_ extends AnyMiddlewareSpec> = [
+  Options<MiddlewareSpec_>,
+] extends [never]
+  ? undefined
+  : Options<MiddlewareSpec_>;
 
 export type Key<MiddlewareSpec_ extends AnyMiddlewareSpec> =
   MiddlewareSpec_["key"];
@@ -155,7 +174,10 @@ export type FunctionTypes<MiddlewareSpec_ extends AnyMiddlewareSpec> =
  * `MiddlewareImpl.make` (or `makeByFunctionType`/`provides`) in `@confect/server`.
  */
 export const MiddlewareSpec =
-  <Self, Config extends { provides?: any; requires?: any } = {}>() =>
+  <
+    Self,
+    Config extends { provides?: any; requires?: any; options?: any } = {},
+  >() =>
   <
     const Key_ extends string,
     const FunctionTypesConfig_ extends SupportedFunctionTypes,
@@ -173,7 +195,8 @@ export const MiddlewareSpec =
     "provides" extends keyof Config ? Config["provides"] : never,
     "requires" extends keyof Config ? Config["requires"] : never,
     ErrorSchema_,
-    FunctionTypesFromConfig<FunctionTypesConfig_>
+    FunctionTypesFromConfig<FunctionTypesConfig_>,
+    "options" extends keyof Config ? Config["options"] : never
   > => {
     const { query, mutation, action } = options.functionTypes;
     if (!query && !mutation && !action) {
