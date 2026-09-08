@@ -64,12 +64,10 @@ import * as Document from "./Document";
 
 /**
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export const TypeId = "~@confect/server/QueryStream";
 /**
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export type TypeId = typeof TypeId;
 
@@ -83,7 +81,6 @@ export type TypeId = typeof TypeId;
  * appears for optional fields that are absent.
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export type OrderKey = ReadonlyArray<Value | undefined>;
 
@@ -98,7 +95,6 @@ export type OrderKey = ReadonlyArray<Value | undefined>;
  * combined, `flatMap` fails when the join runs).
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export type OrderDirection = "asc" | "desc";
 
@@ -106,7 +102,6 @@ export type OrderDirection = "asc" | "desc";
  * The opposite of a direction; a runtime-chosen direction stays the union.
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export type Flip<Direction extends OrderDirection> = Direction extends "asc"
   ? "desc"
@@ -122,7 +117,6 @@ const flipDirection = <Direction extends OrderDirection>(
  * its order key.
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export type Element<Doc> = readonly [Option.Option<Doc>, OrderKey];
 
@@ -137,18 +131,15 @@ export type Element<Doc> = readonly [Option.Option<Doc>, OrderKey];
 
 /**
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export const RangeSpecTypeId = "~@confect/server/QueryStream/IndexRangeSpec";
 /**
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export type RangeSpecTypeId = typeof RangeSpecTypeId;
 
 /**
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export type RangeOp = {
   readonly _tag: "eq" | "gt" | "gte" | "lt" | "lte";
@@ -161,7 +152,6 @@ export type RangeOp = {
  * phantom `Remaining` — the index fields not consumed by `eq` pinning.
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export interface IndexRangeSpec<out Fields extends ReadonlyArray<string>> {
   readonly [RangeSpecTypeId]: {
@@ -173,13 +163,11 @@ export interface IndexRangeSpec<out Fields extends ReadonlyArray<string>> {
 
 /**
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export type AnyIndexRangeSpec = IndexRangeSpec<ReadonlyArray<string>>;
 
 /**
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export type Remaining<Spec> = Spec extends IndexRangeSpec<infer R> ? R : never;
 
@@ -203,7 +191,6 @@ type Tail<Fields extends ReadonlyArray<string>> = Fields extends readonly [
  * consuming it (bounded fields still vary within the range).
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export interface RangeBuilder<
   ConvexDoc extends GenericDocument,
@@ -235,7 +222,6 @@ export interface RangeBuilder<
  * After `gt`/`gte`, only an upper bound on the same field may follow.
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export interface LowerBoundedRange<
   ConvexDoc extends GenericDocument,
@@ -281,7 +267,6 @@ const makeRangeBuilder = (
  * The initial builder handed to a range callback.
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export const rangeBuilder = <
   ConvexDoc extends GenericDocument,
@@ -297,7 +282,6 @@ const applyOps = (ops: ReadonlyArray<RangeOp>, q: any): any =>
  * Replay a recorded range spec onto Convex's real `IndexRangeBuilder`.
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export const applyRange = (spec: AnyIndexRangeSpec, q: any): any =>
   applyOps(spec.ops, q);
@@ -374,7 +358,6 @@ const runtimePrefixLength = (
  * bit-level ordering).
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export const ValueOrder: Order.Order<Value | undefined> = Order.make(
   (self, that) => Math.sign(compareValues(self, that)) as -1 | 0 | 1,
@@ -385,7 +368,6 @@ export const ValueOrder: Order.Order<Value | undefined> = Order.make(
  * also the ordering of Convex array values.
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export const OrderKeyOrder: Order.Order<OrderKey> = Order.Array(ValueOrder);
 
@@ -404,7 +386,6 @@ export const OrderKeyOrder: Order.Order<OrderKey> = Order.Array(ValueOrder);
  * One side of a range: a (possibly prefix) key and whether it's included.
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export interface KeyBound {
   readonly key: OrderKey;
@@ -416,7 +397,6 @@ export interface KeyBound {
  * converts from stream space, where `desc` reverses which end is which).
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export interface KeyBounds {
   readonly lower: Option.Option<KeyBound>;
@@ -429,7 +409,6 @@ export interface KeyBounds {
  * An empty key bounds nothing.
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export interface IndexBounds {
   readonly lower: KeyBound;
@@ -659,7 +638,6 @@ const splitRange = (
  * accounting, so the result is consumable but no longer paginable.
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export class QueryStream<
   out Doc,
@@ -772,7 +750,6 @@ Object.defineProperties(queryStreamPrototype, {
 
 /**
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export type Any = QueryStream<any, any, any, any, any>;
 
@@ -783,7 +760,6 @@ export type Any = QueryStream<any, any, any, any, any>;
  * paginated).
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export const isQueryStream = (u: unknown): u is Any =>
   Predicate.hasProperty(u, TypeId);
@@ -803,7 +779,6 @@ export const isQueryStream = (u: unknown): u is Any =>
  * (the index fields that still vary, tiebreaker included).
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export const empty =
   <Doc>(): {
@@ -846,7 +821,6 @@ export const empty =
  * strongly-typed readers Confect holds assign to it structurally.)
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export interface ReflectionReader {
   query(tableName: string): {
@@ -869,7 +843,6 @@ export interface ReflectionReader {
  * leaf with tighter index bounds instead of filtering in memory.
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export interface Reflection<Direction extends OrderDirection = OrderDirection> {
   readonly reader: ReflectionReader;
@@ -952,7 +925,6 @@ const intersectIndexBounds = (
  * decoding.
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export const fromReflection = <
   Doc,
@@ -1227,7 +1199,6 @@ const mergeStep =
  * throws here, when the streams are combined.
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export const merge = <
   Doc,
@@ -1383,7 +1354,6 @@ const transformEffect = <
  * Options for the effectful transforms (`filterEffect`, `mapEffect`).
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export interface EffectOptions {
   /**
@@ -1405,7 +1375,6 @@ export interface EffectOptions {
  * another service.
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export const filter = dual<
   <Doc>(
@@ -1441,7 +1410,6 @@ export const filter = dual<
  * still advance cursors, as with `filter`.
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export const filterEffect = dual<
   <Doc, E2, R2>(
@@ -1492,7 +1460,6 @@ export const filterEffect = dual<
  * the mapper needs to read the database or another service.
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export const map = dual<
   <Doc, Doc2>(
@@ -1529,7 +1496,6 @@ export const map = dual<
  * The mapper must not change the ordering semantics.
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export const mapEffect = dual<
   <Doc, Doc2, E2, R2>(
@@ -1606,7 +1572,6 @@ export const mapEffect = dual<
  * A mismatch the types can't see fails when the join runs.
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export const flatMap = dual<
   <
@@ -1919,7 +1884,6 @@ const makeFlatMap = <
  * first present document resumes at the next group.
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export const distinct = dual<
   <const Fields extends ReadonlyArray<string>>(
@@ -1983,7 +1947,6 @@ export const distinct = dual<
  * interior one — keep their names and positions.
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export const renameKey = dual<
   <const NewKey extends ReadonlyArray<string>>(
@@ -2157,7 +2120,6 @@ const makeDistinct = <
  * `reverseWith`) throw too.
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export const reverse = <
   Doc,
@@ -2181,7 +2143,6 @@ export const reverse = <
  * unbounded.
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export type NarrowBounds =
   | {
@@ -2213,7 +2174,6 @@ export type NarrowBounds =
  * fall back to filtering the annotated stream in memory.
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export const narrow = dual<
   (
@@ -2338,7 +2298,6 @@ const narrowInMemory = <
 
 /**
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export class NotUniqueError extends Schema.TaggedError<NotUniqueError>()(
   "NotUniqueError",
@@ -2356,7 +2315,6 @@ export class NotUniqueError extends Schema.TaggedError<NotUniqueError>()(
  * `.unique()`) — `LIMIT 2` followed by a check.
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export const unique = <Doc, Key extends ReadonlyArray<string>, E, R>(
   self: QueryStream<Doc, Key, E, R>,
@@ -2386,7 +2344,6 @@ const UNDEFINED_SENTINEL = { $undefined: true } as const;
  * paginate over them publicly, until cursors are made opaque.
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export const serializeCursor = (key: OrderKey): string =>
   JSON.stringify(
@@ -2397,7 +2354,6 @@ export const serializeCursor = (key: OrderKey): string =>
 
 /**
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export const deserializeCursor = (cursor: string): OrderKey =>
   Array.map(JSON.parse(cursor) as ReadonlyArray<unknown>, (value) =>
@@ -2450,7 +2406,6 @@ const deserializeCursorChecked = (
  * The cursor denoting the end of the stream.
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export const END_CURSOR = "[]";
 
@@ -2467,7 +2422,6 @@ const SOFT_MAX_SCAN_LENGTH = 16000;
  * shape).
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export type PaginateOptions = ConvexPaginationOptions;
 
@@ -2477,7 +2431,6 @@ export type PaginateOptions = ConvexPaginationOptions;
  * handlers can return this value where Convex expects its result shape).
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export type PaginationResult<Doc> = ConvexPaginationResult<Doc>;
 
@@ -2540,7 +2493,6 @@ const midpointCursor = (readKeys: Chunk.Chunk<OrderKey>): string =>
  *   hitting either budget ends the page with `SplitRequired`.
  *
  * @experimental
- * This API may change or be removed without a major version bump.
  */
 export const paginate = dual<
   (
