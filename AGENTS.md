@@ -15,9 +15,9 @@ Use the project's pull request creation tool for new PRs so checks and review
 feedback return to the originating thread. Never merge without an explicit
 request from the user.
 
-Capy Setup, Automations, and MCP registrations live in the Capy project. Keep
-executable setup behavior in `.agents/scripts/`. Do not configure tool hooks;
-follow the formatting, linting, and read-safety instructions above directly.
+Capy Setup, Automations, and MCP registrations live in the Capy project.
+Do not configure tool hooks; follow the formatting, linting, and read-safety
+instructions above directly.
 
 # Repo Overview
 
