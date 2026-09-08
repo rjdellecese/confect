@@ -108,7 +108,7 @@ When a group attaches more than one middleware, they run in attachment order —
 
 ## Attaching to a single function
 
-When one function needs a stricter check than its group, attach middleware to the function spec itself with `.middleware()`. Function-level middleware runs after (inside) the group-attached chain, immediately around the handler, and its error joins only that function's error union — the group's other functions are unaffected. Given a second middleware `RequireAdmin`, declared like `RequireUser` above:
+When one function needs a stricter check than its group, attach middleware to the function spec itself with `.middleware()`. Function-level middleware runs after (inside) the group-attached chain, immediately around the handler, and its error joins only that function's error union — the group's other functions are unaffected. The `RequireRole` policy [defined below](#parameterizing-a-policy) restricts a function to permitted user roles:
 
 ```ts confect/notes.spec.ts
 export default GroupSpec.make()
@@ -117,7 +117,7 @@ export default GroupSpec.make()
     FunctionSpec.publicMutation({
       name: "deleteAll",
       returns: () => Schema.Null,
-    }).middleware(RequireAdmin), // RequireUser → RequireAdmin → handler
+    }).middleware(RequireRole, { roles: ["Internal"] }),
   );
 ```
 
@@ -127,64 +127,98 @@ Note that a failed mutation still rolls back its whole transaction: if a functio
 
 ## Parameterizing a policy
 
-Declare a lazy `options` schema in the middleware constructor to reuse one policy with different attachment values. The schema's `Type` determines the options type; `Config` only declares `provides` and `requires`. For example, a resource gate can take the name of the argument containing its id:
+Declare a lazy `options` schema in the middleware constructor to reuse one policy with different attachment values. The schema's `Type` determines the options type; `Config` only declares `provides` and `requires`.
 
-```ts confect/middleware/RequireResource.spec.ts
+A typical use is requiring a signed-in user with one of several permitted roles. Keep the user lookup in `RequireUser`, then let a configurable `RequireRole` consume the `CurrentUser` it provides. For this example, assume the users table has a trusted `role` field defined with `Schema.Literals(["Internal", "Buyer", "BrandPartner"])`:
+
+```ts confect/middleware/RequireRole.spec.ts
 import { MiddlewareSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 
-export class MissingResourceId extends Schema.TaggedError<MissingResourceId>()(
-  "MissingResourceId",
+import type { CurrentUser } from "./RequireUser.spec";
+
+export class AccessDenied extends Schema.TaggedError<AccessDenied>()(
+  "AccessDenied",
   {},
 ) {}
 
-export default class RequireResource extends MiddlewareSpec.MiddlewareSpec<RequireResource>()(
-  "RequireResource",
-  {
-    options: () => Schema.Struct({ idArgument: Schema.String }),
-    error: () => MissingResourceId,
-    functionTypes: { query: true, mutation: true, action: true },
-  },
-) {}
+export default class RequireRole extends MiddlewareSpec.MiddlewareSpec<
+  RequireRole,
+  { requires: CurrentUser }
+>()("RequireRole", {
+  options: () =>
+    Schema.Struct({
+      roles: Schema.Array(
+        Schema.Literals(["Internal", "Buyer", "BrandPartner"]),
+      ),
+    }),
+  error: () => AccessDenied,
+  functionTypes: { query: true, mutation: true, action: false },
+}) {}
 ```
 
-Pass the options as the second argument to `.middleware()`, on either a function or a group:
+Attach `RequireUser` first so it supplies the loaded user, then pass the permitted roles as the second argument to `.middleware()`. One policy now covers both buyer-or-internal reads and internal-only writes:
 
-```ts
-FunctionSpec.publicQuery({
-  name: "getResource",
-  args: () => ({ resourceId: Schema.String }),
-  returns: () => Schema.String,
-}).middleware(RequireResource, { idArgument: "resourceId" });
+```ts confect/notes.spec.ts
+import { FunctionSpec, GroupSpec } from "@confect/core";
+import * as Schema from "effect/Schema";
 
-GroupSpec.make().middleware(RequireResource, { idArgument: "id" });
+import RequireRole from "./middleware/RequireRole.spec";
+import RequireUser from "./middleware/RequireUser.spec";
+
+export default GroupSpec.make()
+  .middleware(RequireUser)
+  .addFunction(
+    FunctionSpec.publicQuery({
+      name: "list",
+      returns: () => Schema.Array(Schema.String),
+    }).middleware(RequireRole, { roles: ["Buyer", "Internal"] }),
+  )
+  .addFunction(
+    FunctionSpec.publicMutation({
+      name: "deleteAll",
+      returns: () => Schema.Null,
+    }).middleware(RequireRole, { roles: ["Internal"] }),
+  );
 ```
+
+For a group-wide role policy, use `GroupSpec.make().middleware(RequireUser).middleware(RequireRole, { roles: ["Internal"] })`; it covers every function in that group.
+
+The implementation reads the trusted user from `CurrentUser`, not from caller-supplied function arguments:
+
+```ts confect/middleware/RequireRole.impl.ts
+import { MiddlewareImpl } from "@confect/server";
+import * as Effect from "effect/Effect";
+
+import databaseSchema from "../_generated/schema";
+import RequireRole, { AccessDenied } from "./RequireRole.spec";
+import { CurrentUser } from "./RequireUser.spec";
+
+export default MiddlewareImpl.make(
+  databaseSchema,
+  RequireRole,
+  (effect, { options }) =>
+    Effect.gen(function* () {
+      const { user } = yield* CurrentUser;
+
+      if (!options.roles.includes(user.role)) {
+        return yield* new AccessDenied();
+      }
+
+      return yield* effect;
+    }),
+);
+```
+
+Provide this implementation once in the group's impl layer, alongside the `RequireUser` implementation and the function implementations. The role list is specific to each attachment, not to the registered implementation. A user matching any role in one list is allowed; an empty list denies everyone. Missing users fail with `NotSignedIn` from `RequireUser`, while signed-in users outside the permitted roles fail with `AccessDenied`.
 
 The second argument is required and typed from the schema's `Type`. Middleware without an `options` schema still uses `.middleware(Spec)` with no second argument. Options are validated against the schema's **type side**, not its encoded input, during codegen and server registration. Confect does not decode or coerce them: if a schema transforms strings into numbers, pass a number, not a string.
 
 Keep the schema inside its thunk. Constructing middleware specs and assembling groups, specs, and refs does not evaluate options schemas; validation happens later.
 
-Both `MiddlewareImpl.make` and `MiddlewareImpl.makeByFunctionType` receive the attachment value in the invocation metadata's typed `options` field, alongside `name`, `functionType`, `functionVisibility`, and decoded `args`. Middleware without options receives `undefined` in that field:
+Both `MiddlewareImpl.make` and `MiddlewareImpl.makeByFunctionType` receive the attachment value in the invocation metadata's typed `options` field, alongside `name`, `functionType`, `functionVisibility`, and decoded `args`. Middleware without options receives `undefined` in that field.
 
-```ts confect/middleware/RequireResource.impl.ts
-import { MiddlewareImpl } from "@confect/server";
-import * as Effect from "effect/Effect";
-import * as Predicate from "effect/Predicate";
-
-import databaseSchema from "../_generated/schema";
-import RequireResource, { MissingResourceId } from "./RequireResource.spec";
-
-export default MiddlewareImpl.make(
-  databaseSchema,
-  RequireResource,
-  (effect, { args, options }) =>
-    Predicate.hasProperty(args, options.idArgument)
-      ? effect
-      : Effect.fail(new MissingResourceId()),
-);
-```
-
-This example only checks that the argument exists; an authorization gate would also check access to the referenced resource. The same options mechanism supports role lists, flags, and client-safe resolver functions. Use `MiddlewareImpl.make` rather than the `provides` shorthand when producing a service depends on the attachment options.
+The same options mechanism also supports resource argument names, flags, and client-safe resolver functions. Use `MiddlewareImpl.make` rather than the `provides` shorthand when producing a service depends on the attachment options.
 
 Options belong to each attachment, so different functions can reuse the same middleware implementation with different values. They survive codegen and are carried by `refs`. To inspect attachments, use the ordered `middlewareAttachments` list of `{ spec, options }` entries; `middlewareSpecs` remains a specs-only view for compatibility, not a source of per-attachment options.
 
@@ -203,17 +237,17 @@ You can attach the same middleware spec more than once with non-equivalent optio
 
 ```ts
 GroupSpec.make()
-  .middleware(RequireResource, { idArgument: "sourceId" })
+  .middleware(RequireUser)
+  .middleware(RequireRole, { roles: ["Buyer", "Internal"] })
   .addFunction(
     FunctionSpec.publicMutation({
-      name: "copy",
-      args: () => ({ sourceId: Schema.String, destinationId: Schema.String }),
+      name: "deleteAll",
       returns: () => Schema.Null,
-    }).middleware(RequireResource, { idArgument: "destinationId" }),
+    }).middleware(RequireRole, { roles: ["Internal"] }),
   );
 ```
 
-Both checks must pass before the handler runs. Repeated guards form a conjunction, not a union of allowed policies: two role guards mean the caller must satisfy both, not either. An earlier short-circuit still prevents the remaining attachments and handler from running.
+Both role checks must pass before the handler runs, so only an `Internal` user can call `deleteAll` in this example. Repeated guards form a conjunction, not a union of allowed policies: two role guards mean the caller must satisfy both, not either. An earlier short-circuit still prevents the remaining attachments and handler from running.
 
 Confect uses `Schema.toEquivalence` to compare options for attachments with the same middleware key. Equivalent options are rejected by `confect codegen` and by server registration, including across the group/function boundary. TypeScript does not check this equivalence. Middleware without an options schema still rejects duplicate keys immediately, both at the type level and at runtime.
 
@@ -246,36 +280,9 @@ Function behavior cannot be compared: resolver functions need reference equality
 
 ## Depending on another middleware
 
-A middleware can consume a service provided by middleware that runs earlier in the chain. Declare the dependency in the `Config` type parameter's `requires` slot; the implementation's environment then includes it alongside the ctx services:
+A middleware can consume a service provided by middleware that runs earlier in the chain. Declare the dependency in the `Config` type parameter's `requires` slot; the implementation's environment then includes it alongside the ctx services. The `RequireRole` example declares `{ requires: CurrentUser }`, so its implementation can yield the user supplied by `RequireUser`.
 
-```ts confect/middleware/RequireAdmin.spec.ts
-import type { CurrentUser } from "./RequireUser.spec";
-
-export default class RequireAdmin extends MiddlewareSpec.MiddlewareSpec<
-  RequireAdmin,
-  {
-    requires: CurrentUser;
-  }
->()("RequireAdmin", {
-  error: () => NotAnAdmin,
-  functionTypes: { query: true, mutation: true, action: false },
-}) {}
-```
-
-```ts confect/middleware/RequireAdmin.impl.ts
-import RequireAdmin, { NotAnAdmin } from "./RequireAdmin.spec";
-import { CurrentUser } from "./RequireUser.spec";
-
-export default MiddlewareImpl.make(databaseSchema, RequireAdmin, (effect) =>
-  Effect.gen(function* () {
-    const { user } = yield* CurrentUser; // from RequireUser, earlier in the chain
-
-    return user.role === "admin" ? yield* effect : yield* new NotAnAdmin();
-  }),
-);
-```
-
-Note the `import type` in the spec half: `CurrentUser` is only ever named in a type position there, so the import is erased and the declaration stays client-safe.
+The spec imports `CurrentUser` with `import type`: it is only named in a type position there, so the import is erased and the declaration stays client-safe. The implementation imports the runtime service tag to read the user.
 
 Satisfaction is checked where the ordering is known:
 
