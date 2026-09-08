@@ -1,7 +1,10 @@
 import { QueryStream } from "@confect/server";
 import { assert, describe, expect, it } from "@effect/vitest";
 import { getDocumentSize } from "convex/values";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
+import * as Ref from "effect/Ref";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
@@ -46,6 +49,28 @@ const fixture = Effect.gen(function* () {
 const tags = <E, R>(stream: Stream.Stream<{ tag?: string }, E, R>) =>
   Stream.runCollect(stream).pipe(
     Effect.map((rows) => rows.map((row) => row.tag)),
+  );
+
+const observeUpstreamEnd = <
+  Doc,
+  Key extends ReadonlyArray<string>,
+  E,
+  R,
+  Direction extends QueryStream.OrderDirection,
+>(
+  stream: QueryStream.QueryStream<Doc, Key, E, R, Direction>,
+  onEnd: Effect.Effect<void>,
+): QueryStream.QueryStream<Doc, Key, E, R, Direction> =>
+  new QueryStream.QueryStream(
+    stream.order,
+    stream.keyFields,
+    stream.annotated.pipe(
+      Stream.concat(Stream.fromEffect(onEnd).pipe(Stream.drain)),
+    ),
+    stream.reflection,
+    stream.narrowWith,
+    stream.tiebreakers,
+    stream.reverseWith,
   );
 
 const pageTags = Effect.fnUntraced(function* <
@@ -633,35 +658,67 @@ describe("QueryStream distinct read budgets", () => {
         () =>
           run(
             Effect.gen(function* () {
-              const { source } = yield* fixture;
-              const mapped = source.pipe(
-                QueryStream.mapEffect(
-                  (row) => Effect.yieldNow.pipe(Effect.as(row)),
-                  { concurrency },
-                ),
-              );
-              const distinctThenMapped = source.pipe(
-                QueryStream.distinct(["text"]),
-                QueryStream.mapEffect(
-                  (row) => Effect.yieldNow.pipe(Effect.as(row)),
-                  { concurrency },
-                ),
-              );
-              for (const stream of [
-                mapped,
-                mapped.pipe(QueryStream.distinct(["text"])),
-                distinctThenMapped,
-              ]) {
-                const result = yield* QueryStream.paginate(stream, {
+              const { source, rows } = yield* fixture;
+              expect(rows.length).toBeGreaterThan(1);
+              for (const placement of [
+                "mapped",
+                "mappedThenDistinct",
+                "distinctThenMapped",
+              ] as const) {
+                const mapperStarted = yield* Deferred.make<void>();
+                const releaseMapper = yield* Deferred.make<void>();
+                const upstreamDone = yield* Deferred.make<void>();
+                const observations = yield* Ref.make<ReadonlyArray<string>>([]);
+                const upstream = observeUpstreamEnd(
+                  placement === "distinctThenMapped"
+                    ? source.pipe(QueryStream.distinct(["text"]))
+                    : source,
+                  Effect.gen(function* () {
+                    yield* Ref.update(observations, (events) => [
+                      ...events,
+                      "source-limit",
+                    ]);
+                    yield* Deferred.succeed(upstreamDone, undefined);
+                  }),
+                );
+                const mapped = upstream.pipe(
+                  QueryStream.mapEffect(
+                    (row) =>
+                      Effect.gen(function* () {
+                        yield* Deferred.succeed(mapperStarted, undefined);
+                        yield* Deferred.await(releaseMapper);
+                        yield* Ref.update(observations, (events) => [
+                          ...events,
+                          "mapped-complete",
+                        ]);
+                        return row;
+                      }),
+                    { concurrency },
+                  ),
+                );
+                const stream =
+                  placement === "mappedThenDistinct"
+                    ? mapped.pipe(QueryStream.distinct(["text"]))
+                    : mapped;
+                const pagination = yield* QueryStream.paginate(stream, {
                   numItems: 1,
                   cursor: null,
                   maximumRowsRead: 1,
-                });
+                }).pipe(Effect.forkScoped);
+                yield* Deferred.await(mapperStarted);
+                yield* Deferred.await(upstreamDone);
+                expect(yield* Ref.get(observations)).toEqual(["source-limit"]);
+                yield* Deferred.succeed(releaseMapper, undefined);
+                const result = yield* Fiber.join(pagination);
+                expect(yield* Ref.get(observations)).toEqual([
+                  "source-limit",
+                  "mapped-complete",
+                ]);
                 expect(result.page.map((row) => row.tag)).toEqual(["a1"]);
                 expect(result.isDone).toBe(false);
                 expect(result.pageStatus).toBe("SplitRequired");
               }
-            }),
+            }).pipe(Effect.scoped),
           ),
       );
 
@@ -670,24 +727,58 @@ describe("QueryStream distinct read budgets", () => {
         () =>
           run(
             Effect.gen(function* () {
-              const { source } = yield* fixture;
-              const stream = source.pipe(
+              const { source, rows } = yield* fixture;
+              expect(rows.length).toBeGreaterThan(2);
+              const mapperStarted = yield* Deferred.make<void>();
+              const releaseMapper = yield* Deferred.make<void>();
+              const upstreamDone = yield* Deferred.make<void>();
+              const observations = yield* Ref.make<ReadonlyArray<string>>([]);
+              const upstream = source.pipe(
                 QueryStream.distinct(["text"]),
                 QueryStream.reverse,
+              );
+              const stream = observeUpstreamEnd(
+                upstream,
+                Effect.gen(function* () {
+                  yield* Ref.update(observations, (events) => [
+                    ...events,
+                    "source-limit",
+                  ]);
+                  yield* Deferred.succeed(upstreamDone, undefined);
+                }),
+              ).pipe(
                 QueryStream.mapEffect(
-                  (row) => Effect.yieldNow.pipe(Effect.as(row)),
+                  (row) =>
+                    Effect.gen(function* () {
+                      yield* Deferred.succeed(mapperStarted, undefined);
+                      yield* Deferred.await(releaseMapper);
+                      yield* Ref.update(observations, (events) => [
+                        ...events,
+                        "mapped-complete",
+                      ]);
+                      return row;
+                    }),
                   { concurrency },
                 ),
               );
-              const result = yield* QueryStream.paginate(stream, {
+              const pagination = yield* QueryStream.paginate(stream, {
                 numItems: 1,
                 cursor: null,
                 maximumRowsRead: 2,
-              });
+              }).pipe(Effect.forkScoped);
+              yield* Deferred.await(mapperStarted);
+              yield* Deferred.await(upstreamDone);
+              expect(yield* Ref.get(observations)).toEqual(["source-limit"]);
+              yield* Deferred.succeed(releaseMapper, undefined);
+              const result = yield* Fiber.join(pagination);
+              expect(yield* Ref.get(observations)).toEqual([
+                "source-limit",
+                "mapped-complete",
+              ]);
               expect(result.page.map((row) => row.tag)).toEqual(["c1"]);
               expect(result.isDone).toBe(false);
               expect(result.pageStatus).toBe("SplitRequired");
-            }),
+            }).pipe(Effect.scoped),
           ),
       );
     },

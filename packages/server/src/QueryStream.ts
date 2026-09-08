@@ -47,6 +47,7 @@ import type * as Channel from "effect/Channel";
 import * as Chunk from "effect/Chunk";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
+import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Equivalence from "effect/Equivalence";
 import * as Filter from "effect/Filter";
@@ -1023,7 +1024,7 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
         return budget.lock.withPermit(
           Effect.suspend(() => {
             if (budget.exhausted()) {
-              budget.stopped = true;
+              budget.status = BudgetStatus.Stopped();
               return Cause.done();
             }
             return Effect.map(pull, (documents) => {
@@ -1109,24 +1110,32 @@ const extractOrderKey = (
 
 const keyFieldsEquivalence = Array.makeEquivalence(Equivalence.String);
 
+type SourceStatus = Data.TaggedEnum<{
+  Ready: {};
+  Exhausted: {};
+  BudgetLimited: {};
+}>;
+
+const SourceStatus = Data.taggedEnum<SourceStatus>();
+
 /**
  * One input to a k-way merge: its pull effect, the last pulled chunk with a
  * read index into it (an index rather than re-slicing keeps consuming a
- * chunk linear), and whether the underlying stream is exhausted.
+ * chunk linear), and its ready, exhausted, or budget-limited status.
  */
 interface MergeSource<Doc, E> {
   readonly pull: Pull.Pull<Array.NonEmptyReadonlyArray<Element<Doc>>, E>;
   readonly buffer: ReadonlyArray<Element<Doc>>;
   readonly index: number;
-  readonly done: false | "exhausted" | "limited";
+  readonly status: SourceStatus;
 }
 
 const makeMergeSource = <Doc, E>(
   pull: MergeSource<Doc, E>["pull"],
   buffer: ReadonlyArray<Element<Doc>>,
   index: number,
-  done: MergeSource<Doc, E>["done"],
-): MergeSource<Doc, E> => ({ pull, buffer, index, done });
+  status: SourceStatus,
+): MergeSource<Doc, E> => ({ pull, buffer, index, status });
 
 const mergeSourceHead = <Doc, E>(
   source: MergeSource<Doc, E>,
@@ -1134,34 +1143,44 @@ const mergeSourceHead = <Doc, E>(
 
 /**
  * Refill an exhausted-buffer source from its pull, translating the pull's
- * end-of-stream signal (a `Done` failure) into `done`.
+ * end-of-stream signal into a source status, retaining budget-limited stops.
  */
 const fillMergeSource = <Doc, E>(
   source: MergeSource<Doc, E>,
 ): Effect.Effect<MergeSource<Doc, E>, E> =>
-  source.done || source.index < source.buffer.length
-    ? Effect.succeed(source)
-    : source.pull.pipe(
-        Effect.map((elements) =>
-          makeMergeSource(source.pull, elements, 0, false),
-        ),
-        Pull.catchDone(() =>
-          Effect.map(Effect.service(ReadBudget), (budget) =>
-            makeMergeSource(
-              source.pull,
-              source.buffer,
-              source.index,
-              budget?.stopped ? "limited" : "exhausted",
+  SourceStatus.$match(source.status, {
+    Ready: () =>
+      source.index < source.buffer.length
+        ? Effect.succeed(source)
+        : source.pull.pipe(
+            Effect.map((elements) =>
+              makeMergeSource(source.pull, elements, 0, SourceStatus.Ready()),
+            ),
+            Pull.catchDone(() =>
+              Effect.map(Effect.service(ReadBudget), (budget) =>
+                makeMergeSource(
+                  source.pull,
+                  source.buffer,
+                  source.index,
+                  budget === undefined
+                    ? SourceStatus.Exhausted()
+                    : BudgetStatus.$match(budget.status, {
+                        Active: () => SourceStatus.Exhausted(),
+                        Stopped: () => SourceStatus.BudgetLimited(),
+                      }),
+                ),
+              ),
             ),
           ),
-        ),
-      );
+    Exhausted: () => Effect.succeed(source),
+    BudgetLimited: () => Effect.succeed(source),
+  });
 
 /**
  * One step of the k-way merge as a pure unfold: fill every source, emit the
  * earliest head (ties go to the earliest source, keeping the merge stable),
  * and return the sources with that head consumed. `undefined` when every
- * source is exhausted.
+ * source is exhausted or an input stopped before its next key was known.
  */
 const mergeStep =
   <Doc, E>(position: Order.Order<OrderKey>) =>
@@ -1176,7 +1195,12 @@ const mergeStep =
       const filled = yield* Effect.forEach(sources, fillMergeSource, {
         concurrency: budget === undefined ? "unbounded" : 1,
       });
-      if (filled.some((source) => source.done === "limited")) return undefined;
+      if (
+        filled.some((source) =>
+          SourceStatus.$is("BudgetLimited")(source.status),
+        )
+      )
+        return undefined;
       const isEarlier = Order.isLessThan(position);
 
       const earliest = Array.reduce(
@@ -1208,7 +1232,7 @@ const mergeStep =
                       source.pull,
                       source.buffer,
                       source.index + 1,
-                      source.done,
+                      source.status,
                     )
                   : source,
               ),
@@ -1285,7 +1309,12 @@ const mergeUnchecked = <
       (pulls) =>
         Stream.unfold(
           Array.map(pulls, (pull) =>
-            makeMergeSource<Doc, E>(pull, Array.empty(), 0, false),
+            makeMergeSource<Doc, E>(
+              pull,
+              Array.empty(),
+              0,
+              SourceStatus.Ready(),
+            ),
           ),
           mergeStep<Doc, E>(PositionOrder(head.order)),
         ),
@@ -1827,14 +1856,14 @@ const makeFlatMap = <
               Stream.unwrap(
                 Effect.gen(function* () {
                   const budget = yield* Effect.service(ReadBudget);
-                  if (budget?.stopped) return Stream.empty;
+                  if (budgetStopped(budget)) return Stream.empty;
                   if (
                     onEmpty !== undefined &&
                     (Option.isSome(innerBounds.lower) ||
                       Option.isSome(innerBounds.upper))
                   ) {
                     const original = yield* Stream.runHead(inner.annotated);
-                    if (Option.isSome(original) || budget?.stopped)
+                    if (Option.isSome(original) || budgetStopped(budget))
                       return Stream.empty;
                   }
                   return markerStream(
@@ -2112,59 +2141,63 @@ const makeDistinct = <
     }));
   const admitted = (key: OrderKey) =>
     admittedByLower(bounds.lower)(key) && admittedByUpper(bounds.upper)(key);
-  const annotated = Stream.fromPull(
-    Effect.gen(function* () {
-      const budget = yield* Effect.service(ReadBudget);
-      let current = narrowByKeyBounds(
-        order === self.order ? self : reverse(self),
-        { lower: groupBound(bounds.lower), upper: groupBound(bounds.upper) },
-      );
-      const next: Pull.Pull<
-        Array.NonEmptyReadonlyArray<Element<Doc>>,
-        E,
-        void,
-        R
-      > = Effect.suspend(() =>
-        Effect.gen(function* () {
-          if (budget?.stopped) return yield* Cause.done();
-          const discovered = yield* Stream.runHead(current.annotated);
-          if (Option.isNone(discovered)) {
-            return yield* Cause.done();
-          }
-          const [doc, key] = discovered.value;
-          if (order === self.order && Option.isNone(doc)) {
-            current = narrowByKeyBounds(current, afterKey(key));
-            return admitted(key) ? [discovered.value] : yield* next;
-          }
-          const prefix = Array.take(key, distinctLength);
-          let representative = discovered.value;
-          if (order !== self.order) {
-            let firstKey: OrderKey | undefined;
-            const selected = yield* narrowByKeyBounds(self, {
-              lower: Option.some({ key: prefix, inclusive: true }),
-              upper: Option.some({ key: prefix, inclusive: true }),
-            }).annotated.pipe(
-              Stream.tap(([, selectedKey]) =>
-                Effect.sync(() => {
-                  firstKey ??= selectedKey;
-                }),
-              ),
-              Stream.filter(([selectedDoc]) => Option.isSome(selectedDoc)),
-              Stream.runHead,
-            );
-            if (Option.isNone(selected) && budget?.stopped)
-              return yield* Cause.done();
-            representative = Option.getOrElse(
-              selected,
-              () => [Option.none<Doc>(), firstKey ?? key] as const,
-            );
-          }
-          current = narrowByKeyBounds(current, afterKey(prefix));
-          return admitted(representative[1]) ? [representative] : yield* next;
+  const annotated = Stream.unwrap(
+    Effect.map(Effect.service(ReadBudget), (budget) =>
+      Stream.paginate(
+        narrowByKeyBounds(order === self.order ? self : reverse(self), {
+          lower: groupBound(bounds.lower),
+          upper: groupBound(bounds.upper),
         }),
-      );
-      return next;
-    }),
+        (
+          current: QueryStream<Doc, Key, E, R>,
+        ): Effect.Effect<
+          readonly [ReadonlyArray<Element<Doc>>, Option.Option<typeof current>],
+          E,
+          R
+        > =>
+          Effect.gen(function* () {
+            if (budgetStopped(budget)) return [[], Option.none()] as const;
+            const discovered = yield* Stream.runHead(current.annotated);
+            if (Option.isNone(discovered)) {
+              return [[], Option.none()] as const;
+            }
+            const [doc, key] = discovered.value;
+            if (order === self.order && Option.isNone(doc)) {
+              return [
+                admitted(key) ? [discovered.value] : [],
+                Option.some(narrowByKeyBounds(current, afterKey(key))),
+              ] as const;
+            }
+            const prefix = Array.take(key, distinctLength);
+            let representative = discovered.value;
+            if (order !== self.order) {
+              let firstKey: OrderKey | undefined;
+              const selected = yield* narrowByKeyBounds(self, {
+                lower: Option.some({ key: prefix, inclusive: true }),
+                upper: Option.some({ key: prefix, inclusive: true }),
+              }).annotated.pipe(
+                Stream.tap(([, selectedKey]) =>
+                  Effect.sync(() => {
+                    firstKey ??= selectedKey;
+                  }),
+                ),
+                Stream.filter(([selectedDoc]) => Option.isSome(selectedDoc)),
+                Stream.runHead,
+              );
+              if (Option.isNone(selected) && budgetStopped(budget))
+                return [[], Option.none()] as const;
+              representative = Option.getOrElse(
+                selected,
+                () => [Option.none<Doc>(), firstKey ?? key] as const,
+              );
+            }
+            return [
+              admitted(representative[1]) ? [representative] : [],
+              Option.some(narrowByKeyBounds(current, afterKey(prefix))),
+            ] as const;
+          }),
+      ),
+    ),
   );
 
   return new QueryStream(
@@ -2528,14 +2561,24 @@ export class ReadBudgetExceededError extends Schema.TaggedError<ReadBudgetExceed
   }
 }
 
+type BudgetStatus = Data.TaggedEnum<{
+  Active: {};
+  Stopped: {};
+}>;
+
+const BudgetStatus = Data.taggedEnum<BudgetStatus>();
+
 interface ReadBudgetState {
   rows: number;
   bytes: number;
-  stopped: boolean;
+  status: BudgetStatus;
   readonly maximumBytesRead: number | undefined;
   readonly lock: Semaphore.Semaphore;
   readonly exhausted: () => boolean;
 }
+
+const budgetStopped = (budget: ReadBudgetState | undefined): boolean =>
+  budget !== undefined && BudgetStatus.$is("Stopped")(budget.status);
 
 const ReadBudget = Context.Reference<ReadBudgetState | undefined>(
   "@confect/server/QueryStream/ReadBudget",
@@ -2657,7 +2700,7 @@ export const paginate: {
       const budget: ReadBudgetState = {
         rows: 0,
         bytes: 0,
-        stopped: false,
+        status: BudgetStatus.Active(),
         maximumBytesRead,
         lock: Semaphore.makeUnsafe(1),
         exhausted: () =>
@@ -2695,7 +2738,7 @@ export const paginate: {
             : budget,
         ),
         Effect.flatMap((state) => {
-          const limited = budget.stopped || state.hitLimit;
+          const limited = budgetStopped(budget) || state.hitLimit;
           return limited &&
             (Chunk.isEmpty(state.readKeys) ||
               Option.exists(
@@ -2711,7 +2754,7 @@ export const paginate: {
                 }),
               )
             : Effect.succeed(
-                budget.stopped
+                budgetStopped(budget)
                   ? { ...state, stopped: true, hitLimit: true }
                   : state,
               );
