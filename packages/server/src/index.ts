@@ -25,6 +25,10 @@ export * as OrderedQuery from "./OrderedQuery";
 export * as QueryCtx from "./QueryCtx";
 export * as QueryInitializer from "./QueryInitializer";
 export * as QueryRunner from "./QueryRunner";
+/**
+ * @experimental
+ * This API may change or be removed without a major version bump.
+ */
 export * as QueryStream from "./QueryStream";
 export * as RegisteredConvexFunction from "./RegisteredConvexFunction";
 export * as RegisteredFunction from "./RegisteredFunction";
