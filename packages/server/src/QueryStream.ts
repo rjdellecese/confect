@@ -64,7 +64,13 @@ import * as String from "effect/String";
 import type * as Types from "effect/Types";
 import * as Document from "./Document";
 
+/**
+ * @experimental
+ */
 export const TypeId = "~@confect/server/QueryStream";
+/**
+ * @experimental
+ */
 export type TypeId = typeof TypeId;
 
 // -----------------------------------------------------------------------------
@@ -75,6 +81,8 @@ export type TypeId = typeof TypeId;
  * The values of a document's order-key fields: the index fields that still
  * vary after equality pinning, plus the trailing `_id` tiebreaker. `undefined`
  * appears for optional fields that are absent.
+ *
+ * @experimental
  */
 export type OrderKey = ReadonlyArray<Value | undefined>;
 
@@ -87,10 +95,16 @@ export type OrderKey = ReadonlyArray<Value | undefined>;
  * direction chosen at runtime types as the union, and the runtime check
  * catches what the types can't see (`merge` throws when the streams are
  * combined, `flatMap` fails when the join runs).
+ *
+ * @experimental
  */
 export type OrderDirection = "asc" | "desc";
 
-/** The opposite of a direction; a runtime-chosen direction stays the union. */
+/**
+ * The opposite of a direction; a runtime-chosen direction stays the union.
+ *
+ * @experimental
+ */
 export type Flip<Direction extends OrderDirection> = Direction extends "asc"
   ? "desc"
   : "asc";
@@ -103,6 +117,8 @@ const flipDirection = <Direction extends OrderDirection>(
  * An element of the annotated stream: the decoded document (`None` when the
  * element was read but filtered out — it still advances cursors) paired with
  * its order key.
+ *
+ * @experimental
  */
 export type Element<Doc> = readonly [Option.Option<Doc>, OrderKey];
 
@@ -115,9 +131,18 @@ export type Element<Doc> = readonly [Option.Option<Doc>, OrderKey];
 // tuple becomes the resulting stream's order key, which is what `merge`
 // checks for compatibility.
 
+/**
+ * @experimental
+ */
 export const RangeSpecTypeId = "~@confect/server/QueryStream/IndexRangeSpec";
+/**
+ * @experimental
+ */
 export type RangeSpecTypeId = typeof RangeSpecTypeId;
 
+/**
+ * @experimental
+ */
 export type RangeOp = {
   readonly _tag: "eq" | "gt" | "gte" | "lt" | "lte";
   readonly field: string;
@@ -127,6 +152,8 @@ export type RangeOp = {
 /**
  * The result of applying a range callback: the recorded operations, plus a
  * phantom `Remaining` — the index fields not consumed by `eq` pinning.
+ *
+ * @experimental
  */
 export interface IndexRangeSpec<out Fields extends ReadonlyArray<string>> {
   readonly [RangeSpecTypeId]: {
@@ -136,8 +163,14 @@ export interface IndexRangeSpec<out Fields extends ReadonlyArray<string>> {
   readonly ops: ReadonlyArray<RangeOp>;
 }
 
+/**
+ * @experimental
+ */
 export type AnyIndexRangeSpec = IndexRangeSpec<ReadonlyArray<string>>;
 
+/**
+ * @experimental
+ */
 export type Remaining<Spec> = Spec extends IndexRangeSpec<infer R> ? R : never;
 
 type Head<Fields extends ReadonlyArray<string>> = Fields extends readonly [
@@ -158,6 +191,8 @@ type Tail<Fields extends ReadonlyArray<string>> = Fields extends readonly [
  * A typed index-range builder. `eq` must target the next unpinned index
  * field, and consumes it; `gt`/`gte`/`lt`/`lte` bound the next field without
  * consuming it (bounded fields still vary within the range).
+ *
+ * @experimental
  */
 export interface RangeBuilder<
   ConvexDoc extends GenericDocument,
@@ -185,7 +220,11 @@ export interface RangeBuilder<
   ) => IndexRangeSpec<Fields>;
 }
 
-/** After `gt`/`gte`, only an upper bound on the same field may follow. */
+/**
+ * After `gt`/`gte`, only an upper bound on the same field may follow.
+ *
+ * @experimental
+ */
 export interface LowerBoundedRange<
   ConvexDoc extends GenericDocument,
   Fields extends ReadonlyArray<string>,
@@ -226,7 +265,11 @@ const makeRangeBuilder = (
   };
 };
 
-/** The initial builder handed to a range callback. */
+/**
+ * The initial builder handed to a range callback.
+ *
+ * @experimental
+ */
 export const rangeBuilder = <
   ConvexDoc extends GenericDocument,
   Fields extends ReadonlyArray<string>,
@@ -237,7 +280,11 @@ export const rangeBuilder = <
 const applyOps = (ops: ReadonlyArray<RangeOp>, q: any): any =>
   Array.reduce(ops, q, (builder, op) => builder[op._tag](op.field, op.value));
 
-/** Replay a recorded range spec onto Convex's real `IndexRangeBuilder`. */
+/**
+ * Replay a recorded range spec onto Convex's real `IndexRangeBuilder`.
+ *
+ * @experimental
+ */
 export const applyRange = (spec: AnyIndexRangeSpec, q: any): any =>
   applyOps(spec.ops, q);
 
@@ -311,6 +358,8 @@ const runtimePrefixLength = (
  * around the canonical `compareValues` from `convex/values` (type rank
  * first, then within the type, including UTF-8 string order and NaN
  * bit-level ordering).
+ *
+ * @experimental
  */
 export const ValueOrder: Order.Order<Value | undefined> = Order.make(
   (self, that) => Math.sign(compareValues(self, that)) as -1 | 0 | 1,
@@ -319,6 +368,8 @@ export const ValueOrder: Order.Order<Value | undefined> = Order.make(
 /**
  * `Order` over order keys: lexicographic by `ValueOrder`, then by length —
  * also the ordering of Convex array values.
+ *
+ * @experimental
  */
 export const OrderKeyOrder: Order.Order<OrderKey> = Order.Array(ValueOrder);
 
@@ -333,7 +384,11 @@ export const OrderKeyOrder: Order.Order<OrderKey> = Order.Array(ValueOrder);
 // key extending it, the `successor` cut just after, and an `exact` cut is a
 // full key itself. (This is `convex-helpers`' `compareKeys` model.)
 
-/** One side of a range: a (possibly prefix) key and whether it's included. */
+/**
+ * One side of a range: a (possibly prefix) key and whether it's included.
+ *
+ * @experimental
+ */
 export interface KeyBound {
   readonly key: OrderKey;
   readonly inclusive: boolean;
@@ -342,6 +397,8 @@ export interface KeyBound {
 /**
  * Bounds over a stream's order key, in *ascending key space* (`narrow`
  * converts from stream space, where `desc` reverses which end is which).
+ *
+ * @experimental
  */
 export interface KeyBounds {
   readonly lower: Option.Option<KeyBound>;
@@ -352,6 +409,8 @@ export interface KeyBounds {
  * Bounds in *full index-key space*: `eq`-pinned values appear as a shared
  * prefix of both keys (`splitRange` re-derives them as `eq` constraints).
  * An empty key bounds nothing.
+ *
+ * @experimental
  */
 export interface IndexBounds {
   readonly lower: KeyBound;
@@ -595,6 +654,8 @@ const splitRange = (
  * applying a generic `Stream` combinator degrades a `QueryStream` to a plain
  * `Stream` — which is honest: generic combinators can't maintain cursor
  * accounting, so the result is consumable but no longer paginable.
+ *
+ * @experimental
  */
 export class QueryStream<
   out Doc,
@@ -705,6 +766,9 @@ Object.defineProperties(queryStreamPrototype, {
   },
 });
 
+/**
+ * @experimental
+ */
 export type Any = QueryStream<any, any, any, any, any>;
 
 /**
@@ -712,6 +776,8 @@ export type Any = QueryStream<any, any, any, any, any>;
  * generic `Stream.*` combinator turns one into (in SQL terms: whether the
  * value still knows its `ORDER BY`, and so can still be combined and
  * paginated).
+ *
+ * @experimental
  */
 export const isQueryStream = (u: unknown): u is Any =>
   Predicate.hasProperty(u, TypeId);
@@ -729,6 +795,8 @@ export const isQueryStream = (u: unknown): u is Any =>
  * `QueryStream.empty<NotesDoc>()(["text", "_creationTime"], "desc")`. The
  * key is the type-level order key of the streams it will be merged with
  * (the index fields that still vary, tiebreaker included).
+ *
+ * @experimental
  */
 export const empty =
   <Doc>(): {
@@ -769,6 +837,8 @@ export const empty =
  * The subset of a Convex database reader a leaf stream needs to (re)build
  * its query. (Method syntax keeps the parameter types bivariant, so the
  * strongly-typed readers Confect holds assign to it structurally.)
+ *
+ * @experimental
  */
 export interface ReflectionReader {
   query(tableName: string): {
@@ -789,6 +859,8 @@ export interface ReflectionReader {
  * the Effect formulation of `convex-helpers`' `reflect()`. It is also the
  * data a future `splitRange`-style `narrow` needs in order to rebuild the
  * leaf with tighter index bounds instead of filtering in memory.
+ *
+ * @experimental
  */
 export interface Reflection<Direction extends OrderDirection = OrderDirection> {
   readonly reader: ReflectionReader;
@@ -869,6 +941,8 @@ const intersectIndexBounds = (
  * bounds decomposed into Convex-expressible index ranges via `splitRange`
  * — and order keys are extracted from the *encoded* document before schema
  * decoding.
+ *
+ * @experimental
  */
 export const fromReflection = <
   Doc,
@@ -1157,6 +1231,8 @@ const mergeStep =
  * direction and each later one must be assignable to it. A mismatch the
  * types can't see — a runtime-chosen direction, or an untyped call site —
  * throws here, when the streams are combined.
+ *
+ * @experimental
  */
 export const merge = <
   Doc,
@@ -1308,7 +1384,11 @@ const transformEffect = <
     () => transformEffect(reverse(self), f, options),
   );
 
-/** Options for the effectful transforms (`filterEffect`, `mapEffect`). */
+/**
+ * Options for the effectful transforms (`filterEffect`, `mapEffect`).
+ *
+ * @experimental
+ */
 export interface EffectOptions {
   /**
    * How many documents' effects may run at once (`"unbounded"` for all).
@@ -1327,6 +1407,8 @@ export interface EffectOptions {
  *
  * Use `filterEffect` when the predicate needs to read the database or
  * another service.
+ *
+ * @experimental
  */
 export const filter = dual<
   <Doc>(
@@ -1359,7 +1441,10 @@ export const filter = dual<
  * In SQL terms: a `WHERE` whose predicate runs a subquery — `WHERE EXISTS
  * (...)`, or any predicate that reads other tables. The predicate's
  * `E2`/`R2` flow into the stream's channels, and filtered-out elements
- * still advance cursors, as with `filter`. */
+ * still advance cursors, as with `filter`.
+ *
+ * @experimental
+ */
 export const filterEffect = dual<
   <Doc, E2, R2>(
     predicate: (doc: Doc) => Effect.Effect<boolean, E2, R2>,
@@ -1407,6 +1492,8 @@ export const filterEffect = dual<
  *
  * The mapper must not change the ordering semantics. Use `mapEffect` when
  * the mapper needs to read the database or another service.
+ *
+ * @experimental
  */
 export const map = dual<
   <Doc, Doc2>(
@@ -1441,6 +1528,8 @@ export const map = dual<
  * channels.
  *
  * The mapper must not change the ordering semantics.
+ *
+ * @experimental
  */
 export const mapEffect = dual<
   <Doc, Doc2, E2, R2>(
@@ -1515,6 +1604,8 @@ export const mapEffect = dual<
  * inner stream is flagged; in the data-last form the inner streams fix it,
  * so an outer stream typed with the union needs union-typed inner streams.
  * A mismatch the types can't see fails when the join runs.
+ *
+ * @experimental
  */
 export const flatMap = dual<
   <
@@ -1842,6 +1933,8 @@ const makeFlatMap = <
  * narrowing filters the original representatives rather than selecting
  * replacements. Reverse traversal discovers each group and seeks its
  * representative in the original direction; callbacks may be reevaluated.
+ *
+ * @experimental
  */
 export const distinct = dual<
   <const Fields extends ReadonlyArray<string>>(
@@ -1911,6 +2004,8 @@ export const distinct = dual<
  * the type level via tuple length. The implicit `_id` tiebreakers the
  * type-level key omits — the trailing one, and a `flatMap` result's
  * interior one — keep their names and positions.
+ *
+ * @experimental
  */
 export const renameKey = dual<
   <const NewKey extends ReadonlyArray<string>>(
@@ -2101,6 +2196,8 @@ const makeDistinct = <
  * direction while visiting groups in the opposite order. Applying
  * `distinct` after reversing the input instead selects different rows.
  * Externally constructed streams without `reverseWith` throw.
+ *
+ * @experimental
  */
 export const reverse = <
   Doc,
@@ -2122,6 +2219,8 @@ export const reverse = <
 /**
  * At least one endpoint in stream order. Omit the other to leave that side
  * unbounded.
+ *
+ * @experimental
  */
 export type NarrowBounds =
   | {
@@ -2149,7 +2248,10 @@ export type NarrowBounds =
  * preserves the query's results. Distinct streams may read outside the
  * output bounds to recover original representatives. Streams without a
  * `narrowWith` (constructed externally)
- * fall back to filtering the annotated stream in memory. */
+ * fall back to filtering the annotated stream in memory.
+ *
+ * @experimental
+ */
 export const narrow = dual<
   (
     bounds: NarrowBounds,
@@ -2274,6 +2376,9 @@ const narrowInMemory = <
 // Sinks
 // -----------------------------------------------------------------------------
 
+/**
+ * @experimental
+ */
 export class NotUniqueError extends Schema.TaggedError<NotUniqueError>()(
   "NotUniqueError",
   {},
@@ -2287,7 +2392,10 @@ export class NotUniqueError extends Schema.TaggedError<NotUniqueError>()(
  * Expect zero or one element; fail with `NotUniqueError` on two or more.
  *
  * In SQL terms: a query that must return at most one row (Convex's
- * `.unique()`) — `LIMIT 2` followed by a check. */
+ * `.unique()`) — `LIMIT 2` followed by a check.
+ *
+ * @experimental
+ */
 export const unique = <Doc, Key extends ReadonlyArray<string>, E, R>(
   self: QueryStream<Doc, Key, E, R>,
 ): Effect.Effect<Option.Option<Doc>, E | NotUniqueError, R> =>
@@ -2314,6 +2422,8 @@ const UNDEFINED_SENTINEL = { $undefined: true } as const;
  * remaining order key includes a sensitive indexed field exposes that
  * field's values at page boundaries. Pin such fields with `eq`, or don't
  * paginate over them publicly, until cursors are made opaque.
+ *
+ * @experimental
  */
 export const serializeCursor = (key: OrderKey): string =>
   JSON.stringify(
@@ -2322,6 +2432,9 @@ export const serializeCursor = (key: OrderKey): string =>
     ),
   );
 
+/**
+ * @experimental
+ */
 export const deserializeCursor = (cursor: string): OrderKey =>
   Array.map(JSON.parse(cursor) as ReadonlyArray<unknown>, (value) =>
     Predicate.hasProperty(value, "$undefined")
@@ -2369,7 +2482,11 @@ const deserializeCursorChecked = (
   }
 };
 
-/** The cursor denoting the end of the stream. */
+/**
+ * The cursor denoting the end of the stream.
+ *
+ * @experimental
+ */
 export const END_CURSOR = "[]";
 
 /**
@@ -2383,6 +2500,8 @@ const SOFT_MAX_SCAN_LENGTH = 16000;
  * `convex/server`, aliased so the wire protocol has a single source of
  * truth (`@confect/core`'s `PaginationOptions` schema encodes the same
  * shape).
+ *
+ * @experimental
  */
 export type PaginateOptions = ConvexPaginationOptions;
 
@@ -2390,10 +2509,16 @@ export type PaginateOptions = ConvexPaginationOptions;
  * The pagination protocol's result — `PaginationResult` from
  * `convex/server` (whose `page` is a mutable array type, which is why
  * handlers can return this value where Convex expects its result shape).
+ *
+ * @experimental
  */
 export type PaginationResult<Doc> = ConvexPaginationResult<Doc>;
 
-/** A page exhausted its read budget without a safe logical continuation. */
+/**
+ * A page exhausted its read budget without a safe logical continuation.
+ *
+ * @experimental
+ */
 export class ReadBudgetExceededError extends Schema.TaggedError<ReadBudgetExceededError>()(
   "ReadBudgetExceededError",
   { rowsRead: Schema.Finite, bytesRead: Schema.optionalKey(Schema.Finite) },
@@ -2459,6 +2584,8 @@ const midpointCursor = (readKeys: Chunk.Chunk<OrderKey>): string =>
  * - Budget stops return `SplitRequired` at a safe output boundary. If no
  *   safe progress is possible, the effect fails with `ReadBudgetExceededError`.
  *   A resource stop never proves an input or a distinct group empty.
+ *
+ * @experimental
  */
 export const paginate = dual<
   (
