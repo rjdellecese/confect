@@ -12,37 +12,33 @@ do not cut over until the documentation and runtime checks below are resolved.
 
 ## Setup and hooks
 
-### Official documentation and verification status
+### Documentation and verification status
 
-Sources checked on September 8, 2026:
+Fresh browser and direct HTTP checks on September 8, 2026 supersede the earlier
+search and text-fetch results, which returned stale documentation:
 
-- [Dev environment: Tool hooks](https://docs.capy.ai/configs/dev-environment#tool-hooks)
-  documents `pre`/`post` configuration, `commands` arrays, the tool names
-  `bash`, `edit`, `write`, `read`, and `apply_patch`, and the agent filters
-  `capy` and `review`. Its edit/write examples use `${file_path}`.
-- [Update Setup API reference](https://docs.capy.ai/api-reference/setup/update-setup)
-  documents the `hooks` object and `${variable}` interpolation from tool
-  arguments/results for post hooks. Its schema instead lists the agent filters
-  `captain`, `build`, and `review`, and its pre-hook description uses
-  `bash_run`. These disagree with the guide; do not assume the two interfaces
-  accept interchangeable names.
-- [Setup overview](https://docs.capy.ai/api-reference/setup/overview)
-  documents project-side persistence and migration from deprecated
-  `.capy/settings.json` hooks. A repository script alone does not install a
-  tool hook.
+- `/configs/dev-environment` redirects to the current
+  [Environment page](https://docs.capy.ai/environment). Its rendered page and
+  Markdown response have no "Tool hooks" section.
+- `/api-reference/setup/overview` and `/api-reference/setup/update-setup`
+  return HTTP 404, including their `.md` variants.
+- The current [documentation index](https://docs.capy.ai/llms.txt) does not list
+  the former Setup API pages.
 
-The guide explicitly warns: "Hook configuration ships today and the agent can
-read and write it; enforcement around tool calls is still rolling out, so
-don't treat a hook as a security boundary yet."
+The earlier hook examples, agent filters, and "enforcement is still rolling
+out" quotation are not verified current documentation. Do not use them as
+evidence that the proposed hooks are supported or enforced.
 
-These pages do not establish the pre-read `${path}` contract, interpolation
-escaping, hook working directory, or whether a non-zero pre-hook exit prevents
-the read. They also do not specify how post-hook failures reach the agent.
+The mappings below came from the project's existing Setup configuration and
+an earlier migration branch, not a verified current public hook contract.
+Current support for tool names and agent filters, the pre-read `${path}`
+contract, interpolation escaping, hook working directory, pre-hook rejection,
+and post-hook failure delivery all remain unverified.
 The scripts have been tested directly, not through Capy's automatic dispatch;
 their exit codes prove script behavior, not tool blocking or diagnostic delivery.
 
-Before merging the hook migration, resolve the documentation mismatch and
-obtain the missing runtime contract from Capy. Then verify automatic dispatch,
+Before merging the hook migration, obtain a current authoritative configuration
+and runtime contract from Capy. Then verify automatic dispatch,
 path interpolation, working directory, pre-hook rejection, and post-hook
 diagnostic delivery using harmless fixtures. Do not test with `.env.local` or
 installed dependency source. A successful setup snapshot validates lifecycle
