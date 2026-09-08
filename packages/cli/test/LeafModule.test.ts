@@ -188,6 +188,42 @@ for (const { name, pathLayer, sep } of PLATFORMS) {
 }
 
 layer(LeafModuleLayer)("validateSpec", (it) => {
+  it.effect(
+    "rejects equivalent middleware options with a spec-scoped codegen error",
+    () =>
+      Effect.gen(function* () {
+        const leaf = yield* toLeafModule("groups/_duplicateOptions.spec.ts");
+        const result = yield* Effect.result(
+          withTempFile(
+            leaf.relativePath,
+            `import { FunctionSpec, GroupSpec, MiddlewareSpec } from "@confect/core";
+import * as Schema from "effect/Schema";
+class Policy extends MiddlewareSpec.MiddlewareSpec()("Policy", {
+  options: () => Schema.Struct({ roles: Schema.Array(Schema.String) }),
+  functionTypes: { query: true, mutation: false, action: false },
+}) {}
+export default GroupSpec.make().middleware(Policy, { roles: ["Internal"] }).addFunction(
+  FunctionSpec.publicQuery({ name: "get", returns: () => Schema.String }).middleware(Policy, { roles: ["Internal"] }),
+);`,
+            validateSpec(leaf),
+          ),
+        );
+        assert(Result.isFailure(result));
+        assert(result.failure._tag === "InvalidMiddlewareAttachmentError");
+        expect(result.failure.specPath).toBe(leaf.relativePath);
+        expect(result.failure.message).toMatch(
+          /Policy.*equivalent options.*function "get"/,
+        );
+      }),
+  );
+
+  it.effect("accepts non-equivalent options for the same middleware key", () =>
+    Effect.gen(function* () {
+      const leaf = yield* toLeafModule("groups/middlewareOptions.spec.ts");
+      yield* validateSpec(leaf);
+    }),
+  );
+
   it.effect("accepts a valid leaf spec", () =>
     Effect.gen(function* () {
       const leaf = yield* toLeafModule("groups/notes.spec.ts");

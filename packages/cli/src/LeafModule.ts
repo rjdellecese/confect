@@ -18,6 +18,7 @@ import {
   ImplMissingMiddlewareError,
   ImplMissingSpecImportError,
   ImplNotFinalizedError,
+  InvalidMiddlewareAttachmentError,
   SpecImportsServerError,
   SpecMissingDefaultGroupSpecError,
 } from "./CodegenError";
@@ -265,6 +266,16 @@ export const validateSpec = Effect.fn("LeafModule.validateSpec")(function* (
   }
 
   yield* validateClientSafety(leaf, bundled);
+
+  yield* Effect.try({
+    try: () => GroupSpec.validateMiddleware(groupSpec),
+    catch: (error) =>
+      new InvalidMiddlewareAttachmentError({
+        specPath: leaf.relativePath,
+        message:
+          error instanceof Error ? error.message : globalThis.String(error),
+      }),
+  });
 
   return groupSpec;
 });

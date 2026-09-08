@@ -127,7 +127,7 @@ const makeHelper = (
             currentConvexFunctionNamespace,
             function_,
             group.middlewareSpecs,
-            group.middlewareOptions,
+            group.middlewareAttachments,
           ),
         ),
         (_subGroup, _function) => {

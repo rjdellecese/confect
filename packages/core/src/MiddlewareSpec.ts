@@ -1,7 +1,7 @@
 import type { FunctionType, FunctionVisibility } from "convex/server";
 import type * as Effect from "effect/Effect";
 import * as Predicate from "effect/Predicate";
-import type * as Schema from "effect/Schema";
+import * as Schema from "effect/Schema";
 import type { unhandled } from "effect/Types";
 import type * as FunctionProvenance from "./FunctionProvenance";
 import type * as FunctionSpec from "./FunctionSpec";
@@ -76,7 +76,7 @@ export interface MiddlewareSpec<
   Requires_,
   ErrorSchema_ extends Schema.Codec<any, any>,
   FunctionTypes_ extends FunctionType,
-  Options_ = never,
+  OptionsSchema_ extends Schema.Schema<any> = never,
 > {
   new (_: never): {
     readonly [TypeId]: TypeId;
@@ -86,12 +86,13 @@ export interface MiddlewareSpec<
   readonly key: Key_;
   readonly functionTypes: SupportedFunctionTypes;
   readonly error?: ErrorSchema_;
+  readonly options?: OptionsSchema_;
   readonly "~Provides": Provides_;
   readonly "~Requires": Requires_;
   readonly "~Error": ErrorSchema_;
   readonly "~FunctionTypes": FunctionTypes_;
   readonly "~Self": Self;
-  readonly "~Options": Options_;
+  readonly "~Options": OptionsSchema_;
 }
 
 export interface AnyMiddlewareSpec {
@@ -99,6 +100,7 @@ export interface AnyMiddlewareSpec {
   readonly key: string;
   readonly functionTypes: SupportedFunctionTypes;
   readonly error?: Schema.Codec<any, any>;
+  readonly options?: Schema.Schema<any>;
   readonly "~Provides": any;
   readonly "~Requires": any;
   readonly "~Error": any;
@@ -107,16 +109,64 @@ export interface AnyMiddlewareSpec {
 }
 
 export type Options<MiddlewareSpec_ extends AnyMiddlewareSpec> =
-  MiddlewareSpec_["~Options"];
+  MiddlewareSpec_["~Options"]["Type"];
+
+export interface Attachment<
+  MiddlewareSpec_ extends AnyMiddlewareSpec = AnyMiddlewareSpec,
+> {
+  readonly spec: MiddlewareSpec_;
+  readonly options: ImplementationOptions<MiddlewareSpec_>;
+}
+
+export type WithoutOptions<MiddlewareSpec_ extends AnyMiddlewareSpec> =
+  MiddlewareSpec_ extends AnyMiddlewareSpec
+    ? [MiddlewareSpec_["~Options"]] extends [never]
+      ? MiddlewareSpec_
+      : never
+    : never;
+
+export const validateAttachments = (
+  attachments: ReadonlyArray<Attachment>,
+  location: string,
+): void => {
+  for (let index = 0; index < attachments.length; index++) {
+    const attachment = attachments[index]!;
+    const schema = attachment.spec.options;
+    if (schema !== undefined && !Schema.is(schema)(attachment.options)) {
+      throw new Error(
+        `Middleware "${attachment.spec.key}" has invalid options at attachment ${index + 1} on ${location}`,
+      );
+    }
+    const equivalent =
+      schema === undefined ? undefined : Schema.toEquivalence(schema);
+    for (let previousIndex = 0; previousIndex < index; previousIndex++) {
+      const previous = attachments[previousIndex]!;
+      if (previous.spec.key !== attachment.spec.key) continue;
+      if (previous.spec !== attachment.spec) {
+        throw new Error(
+          `Different middleware specs share key "${attachment.spec.key}" on ${location}`,
+        );
+      }
+      if (
+        equivalent === undefined ||
+        equivalent(previous.options, attachment.options)
+      ) {
+        throw new Error(
+          `Middleware "${attachment.spec.key}" has equivalent options at attachments ${previousIndex + 1} and ${index + 1} on ${location}`,
+        );
+      }
+    }
+  }
+};
 
 export type AttachmentArgs<MiddlewareSpec_ extends AnyMiddlewareSpec> = [
-  Options<MiddlewareSpec_>,
+  MiddlewareSpec_["~Options"],
 ] extends [never]
   ? []
   : [options: Options<MiddlewareSpec_>];
 
 export type ImplementationOptions<MiddlewareSpec_ extends AnyMiddlewareSpec> = [
-  Options<MiddlewareSpec_>,
+  MiddlewareSpec_["~Options"],
 ] extends [never]
   ? undefined
   : Options<MiddlewareSpec_>;
@@ -174,18 +224,17 @@ export type FunctionTypes<MiddlewareSpec_ extends AnyMiddlewareSpec> =
  * `MiddlewareImpl.make` (or `makeByFunctionType`/`provides`) in `@confect/server`.
  */
 export const MiddlewareSpec =
-  <
-    Self,
-    Config extends { provides?: any; requires?: any; options?: any } = {},
-  >() =>
+  <Self, Config extends { provides?: any; requires?: any } = {}>() =>
   <
     const Key_ extends string,
     const FunctionTypesConfig_ extends SupportedFunctionTypes,
     ErrorSchema_ extends Schema.Codec<any, any> = never,
+    OptionsSchema_ extends Schema.Schema<any> = never,
   >(
     key: Key_,
     options: {
       readonly error?: () => ErrorSchema_;
+      readonly options?: () => OptionsSchema_;
       readonly functionTypes: FunctionTypesConfig_ &
         ValidateFunctionTypesConfig<FunctionTypesConfig_>;
     },
@@ -196,7 +245,7 @@ export const MiddlewareSpec =
     "requires" extends keyof Config ? Config["requires"] : never,
     ErrorSchema_,
     FunctionTypesFromConfig<FunctionTypesConfig_>,
-    "options" extends keyof Config ? Config["options"] : never
+    OptionsSchema_
   > => {
     const { query, mutation, action } = options.functionTypes;
     if (!query && !mutation && !action) {
@@ -216,6 +265,9 @@ export const MiddlewareSpec =
     } satisfies SupportedFunctionTypes;
     if (options.error !== undefined) {
       Lazy.defineProperty(class_, "error", options.error);
+    }
+    if (options.options !== undefined) {
+      Lazy.defineProperty(class_, "options", options.options);
     }
     return class_;
   };
@@ -279,7 +331,7 @@ export type ValidateFunction<
       : [
             Extract<
               FunctionSpec.MiddlewareSpecs<FunctionSpec_>,
-              { readonly key: Key<MiddlewareSpec_> }
+              { readonly key: Key<WithoutOptions<MiddlewareSpec_>> }
             >,
           ] extends [never]
         ? FunctionTypeOf<FunctionSpec_> extends FunctionTypes<MiddlewareSpec_>
@@ -299,7 +351,10 @@ export type ValidateAttach<
   Functions_ extends FunctionSpec.AnyWithProps,
   MiddlewareSpecs_ extends AnyMiddlewareSpec,
 > = [
-  Extract<MiddlewareSpecs_, { readonly key: Key<MiddlewareSpec_> }>,
+  Extract<
+    MiddlewareSpecs_,
+    { readonly key: Key<WithoutOptions<MiddlewareSpec_>> }
+  >,
 ] extends [never]
   ? [Exclude<Requires<MiddlewareSpec_>, Provides<MiddlewareSpecs_>>] extends [
       never,
@@ -327,7 +382,7 @@ type GroupOverlap<
       ? [
           Extract<
             MiddlewareSpecs_,
-            { readonly key: Key<FunctionMiddlewareSpec> }
+            { readonly key: Key<WithoutOptions<FunctionMiddlewareSpec>> }
           >,
         ] extends [never]
         ? never
@@ -371,7 +426,10 @@ export type ValidateFunctionAttach<
 > = FunctionProvenance_ extends { readonly _tag: "Convex" }
   ? AttachmentError<`Plain Convex functions cannot have middleware — their raw handlers are passed through untouched`>
   : [
-        Extract<MiddlewareSpecs_, { readonly key: Key<MiddlewareSpec_> }>,
+        Extract<
+          MiddlewareSpecs_,
+          { readonly key: Key<WithoutOptions<MiddlewareSpec_>> }
+        >,
       ] extends [never]
     ? RuntimeAndFunctionType_["functionType"] extends FunctionTypes<MiddlewareSpec_>
       ? unknown

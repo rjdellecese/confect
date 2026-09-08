@@ -102,7 +102,7 @@ interface ConfectRefWithTypes<
   readonly returns: Schema.Codec<any, any>;
   readonly kind: FunctionProvenance.ConfectKind;
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyMiddlewareSpec>;
-  readonly middlewareOptions: Readonly<Record<string, unknown>>;
+  readonly middlewareAttachments: ReadonlyArray<MiddlewareSpec.Attachment>;
   readonly error?: Schema.Codec<any, any>;
 }
 
@@ -324,7 +324,9 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
   convexFunctionNamespace: string,
   functionSpec: FunctionSpec_,
   groupMiddlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyMiddlewareSpec> = [],
-  groupMiddlewareOptions: Readonly<Record<string, unknown>> = {},
+  groupMiddlewareAttachments: ReadonlyArray<MiddlewareSpec.Attachment> = groupMiddlewareSpecs.map(
+    (spec) => ({ spec, options: undefined }),
+  ),
 ): FromFunctionSpec<FunctionSpec_> => {
   const convexFunctionName = `${convexFunctionNamespace}:${functionSpec.name}`;
 
@@ -346,10 +348,10 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
           ...groupMiddlewareSpecs,
           ...functionSpec.middlewareSpecs,
         ],
-        middlewareOptions: {
-          ...groupMiddlewareOptions,
-          ...functionSpec.middlewareOptions,
-        },
+        middlewareAttachments: [
+          ...groupMiddlewareAttachments,
+          ...functionSpec.middlewareAttachments,
+        ],
       };
 
       Lazy.defineProperty(ref, "args", () => provenance.args);

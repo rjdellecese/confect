@@ -23,10 +23,10 @@ it.effect(
       expectTypeOf<Ref.Error<typeof group.shortName>>().toEqualTypeOf<
         NoViewer | NameRejected
       >();
-      expect(group.shortName.middlewareOptions.RequireName).toEqual({
+      expect(group.shortName.middlewareAttachments[2]?.options).toEqual({
         minLength: 2,
       });
-      expect(group.longName.middlewareOptions.RequireName).toEqual({
+      expect(group.longName.middlewareAttachments[2]?.options).toEqual({
         minLength: 5,
       });
       expect(yield* c.query(group.shortName)).toBe("ada");

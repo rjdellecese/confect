@@ -13,9 +13,9 @@ export default class RequireName extends MiddlewareSpec.MiddlewareSpec<
   RequireName,
   {
     requires: Viewer;
-    options: { readonly minLength: number };
   }
 >()("RequireName", {
+  options: () => Schema.Struct({ minLength: Schema.Finite }),
   error: () => NameRejected,
   functionTypes: { query: true, mutation: true, action: true },
 }) {}

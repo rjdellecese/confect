@@ -42,6 +42,11 @@ export class SpecImportsServerError extends Schema.TaggedError<SpecImportsServer
   },
 ) {}
 
+export class InvalidMiddlewareAttachmentError extends Schema.TaggedError<InvalidMiddlewareAttachmentError>()(
+  "InvalidMiddlewareAttachmentError",
+  { specPath: Schema.String, message: Schema.String },
+) {}
+
 export class ImplMissingSpecImportError extends Schema.TaggedError<ImplMissingSpecImportError>()(
   "ImplMissingSpecImportError",
   {
@@ -156,6 +161,7 @@ export const CodegenError = Schema.Union([
   MissingSpecFileError,
   SpecMissingDefaultGroupSpecError,
   SpecImportsServerError,
+  InvalidMiddlewareAttachmentError,
   ImplMissingSpecImportError,
   ImplMissingDefaultLayerError,
   ImplNotFinalizedError,
@@ -372,6 +378,13 @@ export const renderCodegenError = (error: CodegenError): string => {
       renderSpecMissingDefaultGroupSpecError,
     ),
     Match.tag("SpecImportsServerError", renderSpecImportsServerError),
+    Match.tag("InvalidMiddlewareAttachmentError", (attachmentError) =>
+      singleLine(
+        "Spec ",
+        formatPath(attachmentError.specPath),
+        `: ${attachmentError.message}`,
+      ),
+    ),
     Match.tag("ImplMissingSpecImportError", renderImplMissingSpecImportError),
     Match.tag(
       "ImplMissingDefaultLayerError",

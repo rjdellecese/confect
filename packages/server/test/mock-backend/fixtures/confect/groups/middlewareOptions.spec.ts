@@ -5,6 +5,7 @@ import RequireName from "../middleware/RequireName.spec";
 
 export default GroupSpec.make()
   .middleware(ProvideViewer)
+  .middleware(RequireName, { minLength: 1 })
   .addFunction(
     FunctionSpec.publicQuery({
       name: "shortName",

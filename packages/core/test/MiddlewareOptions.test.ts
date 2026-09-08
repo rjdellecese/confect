@@ -14,15 +14,17 @@ class AccessDenied extends Schema.TaggedError<AccessDenied>()(
   {},
 ) {}
 
-class RequireRole extends MiddlewareSpec.MiddlewareSpec<
-  RequireRole,
+class RequireRole extends MiddlewareSpec.MiddlewareSpec<RequireRole>()(
+  "RequireRole",
   {
-    options: { readonly roles: ReadonlyArray<"Internal" | "Buyer"> };
-  }
->()("RequireRole", {
-  error: () => AccessDenied,
-  functionTypes: { query: true, mutation: true, action: true },
-}) {}
+    options: () =>
+      Schema.Struct({
+        roles: Schema.Array(Schema.Literals(["Internal", "Buyer"])),
+      }),
+    error: () => AccessDenied,
+    functionTypes: { query: true, mutation: true, action: true },
+  },
+) {}
 
 class Observe extends MiddlewareSpec.MiddlewareSpec<Observe>()("Observe", {
   functionTypes: { query: true, mutation: true, action: true },
@@ -61,12 +63,13 @@ describe("middleware attachment options", () => {
   it("keeps attachment values independent without mutating the spec or builder", () => {
     const internal = query.middleware(RequireRole, { roles: ["Internal"] });
     const buyer = query.middleware(RequireRole, { roles: ["Buyer"] });
-    expect(internal.middlewareOptions.RequireRole).toEqual({
+    expect(internal.middlewareAttachments[0]?.options).toEqual({
       roles: ["Internal"],
     });
-    expect(buyer.middlewareOptions.RequireRole).toEqual({ roles: ["Buyer"] });
-    expect(query.middlewareOptions).toEqual({});
-    expect(RequireRole).not.toHaveProperty("options");
+    expect(buyer.middlewareAttachments[0]?.options).toEqual({
+      roles: ["Buyer"],
+    });
+    expect(query.middlewareAttachments).toEqual([]);
     expect(internal.middlewareSpecs).toEqual([RequireRole]);
     expectTypeOf<MiddlewareSpec.Options<typeof RequireRole>>().toEqualTypeOf<{
       readonly roles: ReadonlyArray<"Internal" | "Buyer">;
@@ -81,9 +84,11 @@ describe("middleware attachment options", () => {
       .addGroup(GroupSpec.makeAt("child").addFunction(query))
       .addGroupAt("alias", GroupSpec.make().addFunction(query));
     const refs = Refs.make(Spec.make().addAt("roles", group));
-    expect(refs.public.roles.get.middlewareOptions.RequireRole).toBe(options);
-    expect(refs.public.roles.child.get.middlewareOptions).toEqual({});
-    expect(refs.public.roles.alias.get.middlewareOptions).toEqual({});
+    expect(refs.public.roles.get.middlewareAttachments[0]?.options).toBe(
+      options,
+    );
+    expect(refs.public.roles.child.get.middlewareAttachments).toEqual([]);
+    expect(refs.public.roles.alias.get.middlewareAttachments).toEqual([]);
     expectTypeOf<
       Ref.Error<typeof refs.public.roles.get>
     >().toEqualTypeOf<AccessDenied>();
@@ -95,54 +100,160 @@ describe("middleware attachment options", () => {
         GroupSpec.make().addFunction(query.middleware(RequireRole, options)),
       ),
     );
-    expect(functionRefs.public.roles.get.middlewareOptions.RequireRole).toBe(
-      options,
-    );
+    expect(
+      functionRefs.public.roles.get.middlewareAttachments[0]?.options,
+    ).toBe(options);
     expectTypeOf<
       Ref.Error<typeof functionRefs.public.roles.get>
     >().toEqualTypeOf<AccessDenied>();
   });
 
-  it("rejects duplicate keys even when their options differ", () => {
+  it("allows different options at both attachment levels and across their boundary", () => {
     const internal = query.middleware(RequireRole, { roles: ["Internal"] });
     const group = GroupSpec.make().middleware(RequireRole, {
       roles: ["Buyer"],
     });
-    expect(() => {
-      // @ts-expect-error
-      internal.middleware(RequireRole, { roles: ["Buyer"] });
-    }).toThrowError(/already attached/);
-    expect(() => {
-      // @ts-expect-error
-      group.middleware(RequireRole, { roles: ["Internal"] });
-    }).toThrowError(/already attached/);
-    expect(() => {
-      // @ts-expect-error
-      group.addFunction(internal);
-    }).toThrowError(/both function/);
-    expect(() => {
-      const withFunction = GroupSpec.make().addFunction(internal);
-      // @ts-expect-error
-      withFunction.middleware(RequireRole, { roles: ["Buyer"] });
-    }).toThrowError(/both function/);
+    GroupSpec.validateMiddleware(
+      GroupSpec.make().addFunction(
+        internal.middleware(RequireRole, { roles: ["Buyer"] }),
+      ),
+    );
+    GroupSpec.validateMiddleware(
+      group.middleware(RequireRole, { roles: ["Internal"] }).addFunction(query),
+    );
+    GroupSpec.validateMiddleware(group.addFunction(internal));
+    GroupSpec.validateMiddleware(
+      GroupSpec.make()
+        .addFunction(internal)
+        .middleware(RequireRole, { roles: ["Buyer"] }),
+    );
   });
 
   it("retains client-safe resolver values without serializing them", () => {
-    class Resource extends MiddlewareSpec.MiddlewareSpec<
-      Resource,
+    class Resource extends MiddlewareSpec.MiddlewareSpec<Resource>()(
+      "Resource",
       {
-        options: {
-          readonly resolve: (args: unknown) => string;
-          readonly tolerateMissing: boolean;
-        };
-      }
-    >()("Resource", {
-      functionTypes: { query: true, mutation: false, action: false },
-    }) {}
+        options: () =>
+          Schema.Struct({
+            resolve: Schema.declare<(args: unknown) => string>(
+              (value): value is (args: unknown) => string =>
+                typeof value === "function",
+            ),
+            tolerateMissing: Schema.Boolean,
+          }),
+        functionTypes: { query: true, mutation: false, action: false },
+      },
+    ) {}
     const resolve = (_args: unknown) => "resource-id";
     const options = { resolve, tolerateMissing: true };
     const ref = Ref.make("resources", query.middleware(Resource, options));
-    expect(ref.middlewareOptions.Resource).toBe(options);
+    expect(ref.middlewareAttachments[0]?.options).toBe(options);
     expectTypeOf<Ref.Error<typeof ref>>().toBeNever();
+  });
+
+  it("rejects equivalent instances only during validation, including group/function overlaps", () => {
+    const first = query.middleware(RequireRole, { roles: ["Internal"] });
+    const second = first.middleware(RequireRole, { roles: ["Internal"] });
+    const group = GroupSpec.make().middleware(RequireRole, {
+      roles: ["Internal"],
+    });
+    for (const candidate of [
+      GroupSpec.make().addFunction(second),
+      group.middleware(RequireRole, { roles: ["Internal"] }),
+      group.addFunction(first),
+      GroupSpec.make()
+        .addFunction(first)
+        .middleware(RequireRole, { roles: ["Internal"] }),
+    ]) {
+      expect(() => GroupSpec.validateMiddleware(candidate)).toThrowError(
+        /RequireRole.*equivalent options.*1 and 2/,
+      );
+    }
+  });
+
+  it("keeps options schemas lazy through construction, assembly, and refs", () => {
+    let evaluations = 0;
+    class LazyPolicy extends MiddlewareSpec.MiddlewareSpec<LazyPolicy>()(
+      "LazyPolicy",
+      {
+        options: () => {
+          evaluations++;
+          return Schema.Struct({ enabled: Schema.Boolean });
+        },
+        functionTypes: { query: true, mutation: false, action: false },
+      },
+    ) {}
+    const group = GroupSpec.make()
+      .middleware(LazyPolicy, { enabled: true })
+      .addFunction(query.middleware(LazyPolicy, { enabled: false }));
+    const refs = Refs.make(Spec.make().addAt("lazy", group));
+    expect(
+      refs.public.lazy.get.middlewareAttachments.map(({ options }) => options),
+    ).toEqual([{ enabled: true }, { enabled: false }]);
+    expect(evaluations).toBe(0);
+    GroupSpec.validateMiddleware(group);
+    expect(evaluations).toBe(1);
+    GroupSpec.validateMiddleware(group);
+    expect(evaluations).toBe(1);
+  });
+
+  it("uses schema equivalence overrides rather than serialized or reference equality", () => {
+    class RoleSet extends MiddlewareSpec.MiddlewareSpec<RoleSet>()("RoleSet", {
+      options: () =>
+        Schema.Struct({ roles: Schema.Array(Schema.String) }).pipe(
+          Schema.overrideToEquivalence(
+            () => (left, right) =>
+              left.roles.every((role) => right.roles.includes(role)) &&
+              right.roles.every((role) => left.roles.includes(role)),
+          ),
+        ),
+      functionTypes: { query: true, mutation: false, action: false },
+    }) {}
+    const group = GroupSpec.make()
+      .middleware(RoleSet, { roles: ["Internal", "Buyer"] })
+      .addFunction(
+        query.middleware(RoleSet, { roles: ["Buyer", "Internal", "Buyer"] }),
+      );
+    expect(() => GroupSpec.validateMiddleware(group)).toThrowError(
+      /equivalent options/,
+    );
+    GroupSpec.validateMiddleware(
+      GroupSpec.make().addFunction(
+        query
+          .middleware(RequireRole, { roles: ["Internal", "Buyer"] })
+          .middleware(RequireRole, { roles: ["Buyer", "Internal"] }),
+      ),
+    );
+  });
+
+  it("validates option values on the schema's type side", () => {
+    class Limit extends MiddlewareSpec.MiddlewareSpec<Limit>()("Limit", {
+      options: () => Schema.Struct({ limit: Schema.FiniteFromString }),
+      functionTypes: { query: true, mutation: false, action: false },
+    }) {}
+    GroupSpec.validateMiddleware(
+      GroupSpec.make().middleware(Limit, { limit: 5 }),
+    );
+    expect(() => {
+      // @ts-expect-error
+      const group = GroupSpec.make().middleware(Limit, { limit: "5" });
+      GroupSpec.validateMiddleware(group);
+    }).toThrowError(/invalid options/);
+  });
+
+  it("rejects different spec declarations sharing an implementation key", () => {
+    class OtherRole extends MiddlewareSpec.MiddlewareSpec<OtherRole>()(
+      "RequireRole",
+      {
+        options: () => Schema.Struct({ roles: Schema.Array(Schema.String) }),
+        functionTypes: { query: true, mutation: true, action: true },
+      },
+    ) {}
+    const group = GroupSpec.make()
+      .middleware(RequireRole, { roles: ["Internal"] })
+      .addFunction(query.middleware(OtherRole, { roles: ["Buyer"] }));
+    expect(() => GroupSpec.validateMiddleware(group)).toThrowError(
+      /Different middleware specs share key "RequireRole"/,
+    );
   });
 });
