@@ -2587,17 +2587,17 @@ const midpointCursor = (readKeys: Chunk.Chunk<OrderKey>): string =>
  *
  * @experimental
  */
-export const paginate = dual<
+export const paginate: {
   (
     options: PaginateOptions,
-  ) => <Doc, Key extends ReadonlyArray<string>, E, R>(
+  ): <Doc, Key extends ReadonlyArray<string>, E, R>(
     self: QueryStream<Doc, Key, E, R>,
-  ) => Effect.Effect<PaginationResult<Doc>, E | ReadBudgetExceededError, R>,
+  ) => Effect.Effect<PaginationResult<Doc>, E | ReadBudgetExceededError, R>;
   <Doc, Key extends ReadonlyArray<string>, E, R>(
     self: QueryStream<Doc, Key, E, R>,
     options: PaginateOptions,
-  ) => Effect.Effect<PaginationResult<Doc>, E | ReadBudgetExceededError, R>
->(
+  ): Effect.Effect<PaginationResult<Doc>, E | ReadBudgetExceededError, R>;
+} = dual(
   2,
   <
     Doc,
