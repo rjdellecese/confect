@@ -52,6 +52,7 @@ import * as Effect from "effect/Effect";
 import * as Equivalence from "effect/Equivalence";
 import * as Filter from "effect/Filter";
 import * as Match from "effect/Match";
+import * as MutableRef from "effect/MutableRef";
 import * as Option from "effect/Option";
 import * as Order from "effect/Order";
 import * as Predicate from "effect/Predicate";
@@ -1018,22 +1019,32 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
   );
 
   const charged = Stream.fromPull(
-    Effect.flatMap(Effect.service(ReadBudget), (budget) =>
+    Effect.flatMap(Effect.service(ReadBudget), (maybeBudget) =>
       Effect.map(Stream.toPull(encodedDocuments), (pull) => {
-        if (budget === undefined) return pull;
+        if (Option.isNone(maybeBudget)) return pull;
+        const budget = maybeBudget.value;
         return budget.lock.withPermit(
           Effect.suspend(() => {
-            if (budget.exhausted()) {
-              budget.status = BudgetStatus.Stopped();
+            if (budgetExhausted(budget)) {
+              MutableRef.update(budget.state, (state) => ({
+                ...state,
+                status: BudgetStatus.Stopped(),
+              }));
               return Cause.done();
             }
             return Effect.map(pull, (documents) => {
-              budget.rows += documents.length;
-              if (budget.maximumBytesRead !== undefined) {
-                for (const document of documents) {
-                  budget.bytes += getDocumentSize(document as GenericDocument);
-                }
-              }
+              MutableRef.update(budget.state, (state) => ({
+                ...state,
+                rows: state.rows + documents.length,
+                bytes: Option.isSome(budget.maximumBytesRead)
+                  ? Array.reduce(
+                      documents,
+                      state.bytes,
+                      (bytes, document) =>
+                        bytes + getDocumentSize(document as GenericDocument),
+                    )
+                  : state.bytes,
+              }));
               return documents;
             });
           }),
@@ -1157,17 +1168,19 @@ const fillMergeSource = <Doc, E>(
               makeMergeSource(source.pull, elements, 0, SourceStatus.Ready()),
             ),
             Pull.catchDone(() =>
-              Effect.map(Effect.service(ReadBudget), (budget) =>
+              Effect.map(Effect.service(ReadBudget), (maybeBudget) =>
                 makeMergeSource(
                   source.pull,
                   source.buffer,
                   source.index,
-                  budget === undefined
-                    ? SourceStatus.Exhausted()
-                    : BudgetStatus.$match(budget.status, {
+                  Option.match(maybeBudget, {
+                    onNone: () => SourceStatus.Exhausted(),
+                    onSome: (budget) =>
+                      BudgetStatus.$match(MutableRef.get(budget.state).status, {
                         Active: () => SourceStatus.Exhausted(),
                         Stopped: () => SourceStatus.BudgetLimited(),
                       }),
+                  }),
                 ),
               ),
             ),
@@ -1193,7 +1206,7 @@ const mergeStep =
     Effect.gen(function* () {
       const budget = yield* Effect.service(ReadBudget);
       const filled = yield* Effect.forEach(sources, fillMergeSource, {
-        concurrency: budget === undefined ? "unbounded" : 1,
+        concurrency: Option.isNone(budget) ? "unbounded" : 1,
       });
       if (
         filled.some((source) =>
@@ -2169,31 +2182,41 @@ const makeDistinct = <
               ] as const;
             }
             const prefix = Array.take(key, distinctLength);
-            let representative = discovered.value;
-            if (order !== self.order) {
-              let firstKey: OrderKey | undefined;
-              const selected = yield* narrowByKeyBounds(self, {
-                lower: Option.some({ key: prefix, inclusive: true }),
-                upper: Option.some({ key: prefix, inclusive: true }),
-              }).annotated.pipe(
-                Stream.tap(([, selectedKey]) =>
-                  Effect.sync(() => {
-                    firstKey ??= selectedKey;
-                  }),
-                ),
-                Stream.filter(([selectedDoc]) => Option.isSome(selectedDoc)),
-                Stream.runHead,
-              );
-              if (Option.isNone(selected) && budgetStopped(budget))
-                return [[], Option.none()] as const;
-              representative = Option.getOrElse(
-                selected,
-                () => [Option.none<Doc>(), firstKey ?? key] as const,
-              );
+            const next = Option.some(
+              narrowByKeyBounds(current, afterKey(prefix)),
+            );
+            if (order === self.order) {
+              return [admitted(key) ? [discovered.value] : [], next] as const;
             }
+            const firstKey = MutableRef.make(Option.none<OrderKey>());
+            const selected = yield* narrowByKeyBounds(self, {
+              lower: Option.some({ key: prefix, inclusive: true }),
+              upper: Option.some({ key: prefix, inclusive: true }),
+            }).annotated.pipe(
+              Stream.tap(([, selectedKey]) =>
+                Effect.sync(() => {
+                  MutableRef.update(
+                    firstKey,
+                    Option.orElse(() => Option.some(selectedKey)),
+                  );
+                }),
+              ),
+              Stream.filter(([selectedDoc]) => Option.isSome(selectedDoc)),
+              Stream.runHead,
+            );
+            if (Option.isNone(selected) && budgetStopped(budget))
+              return [[], Option.none()] as const;
+            const representative = Option.getOrElse(
+              selected,
+              () =>
+                [
+                  Option.none<Doc>(),
+                  Option.getOrElse(MutableRef.get(firstKey), () => key),
+                ] as const,
+            );
             return [
               admitted(representative[1]) ? [representative] : [],
-              Option.some(narrowByKeyBounds(current, afterKey(prefix))),
+              next,
             ] as const;
           }),
       ),
@@ -2569,20 +2592,34 @@ type BudgetStatus = Data.TaggedEnum<{
 const BudgetStatus = Data.taggedEnum<BudgetStatus>();
 
 interface ReadBudgetState {
-  rows: number;
-  bytes: number;
-  status: BudgetStatus;
-  readonly maximumBytesRead: number | undefined;
-  readonly lock: Semaphore.Semaphore;
-  readonly exhausted: () => boolean;
+  readonly rows: number;
+  readonly bytes: number;
+  readonly status: BudgetStatus;
 }
 
-const budgetStopped = (budget: ReadBudgetState | undefined): boolean =>
-  budget !== undefined && BudgetStatus.$is("Stopped")(budget.status);
+interface ReadBudget {
+  readonly state: MutableRef.MutableRef<ReadBudgetState>;
+  readonly maximumRowsRead: Option.Option<number>;
+  readonly maximumBytesRead: Option.Option<number>;
+  readonly lock: Semaphore.Semaphore;
+}
 
-const ReadBudget = Context.Reference<ReadBudgetState | undefined>(
+const budgetExhausted = (budget: ReadBudget): boolean => {
+  const state = MutableRef.get(budget.state);
+  return (
+    Option.exists(budget.maximumRowsRead, (limit) => state.rows >= limit) ||
+    Option.exists(budget.maximumBytesRead, (limit) => state.bytes >= limit)
+  );
+};
+
+const budgetStopped = (maybeBudget: Option.Option<ReadBudget>): boolean =>
+  Option.exists(maybeBudget, (budget) =>
+    BudgetStatus.$is("Stopped")(MutableRef.get(budget.state).status),
+  );
+
+const ReadBudget = Context.Reference<Option.Option<ReadBudget>>(
   "@confect/server/QueryStream/ReadBudget",
-  { defaultValue: () => undefined },
+  { defaultValue: Option.none },
 );
 
 interface PaginateState<Doc> {
@@ -2694,19 +2731,25 @@ export const paginate: {
             ? narrow(self, { end })
             : self;
       // With an endCursor the page runs to it, however many items that is.
-      const maxRows = Option.isSome(endCursor) ? undefined : options.numItems;
-      const maximumRowsRead = options.maximumRowsRead;
-      const maximumBytesRead = options.maximumBytesRead;
-      const budget: ReadBudgetState = {
-        rows: 0,
-        bytes: 0,
-        status: BudgetStatus.Active(),
+      const maxRows = Option.isSome(endCursor)
+        ? Option.none<number>()
+        : Option.some(options.numItems);
+      const maximumRowsRead = Option.fromUndefinedOr(options.maximumRowsRead);
+      const maximumBytesRead = Option.fromUndefinedOr(options.maximumBytesRead);
+      const budget: ReadBudget = {
+        state: MutableRef.make<ReadBudgetState>({
+          rows: 0,
+          bytes: 0,
+          status: BudgetStatus.Active(),
+        }),
+        maximumRowsRead,
         maximumBytesRead,
         lock: Semaphore.makeUnsafe(1),
-        exhausted: () =>
-          (maximumRowsRead !== undefined && budget.rows >= maximumRowsRead) ||
-          (maximumBytesRead !== undefined && budget.bytes >= maximumBytesRead),
       };
+      const activeBudget =
+        Option.isNone(maximumRowsRead) && Option.isNone(maximumBytesRead)
+          ? Option.none<ReadBudget>()
+          : Option.some(budget);
       return pipe(
         Stream.run(
           narrowed.annotated,
@@ -2719,26 +2762,21 @@ export const paginate: {
                 onNone: () => state.page,
                 onSome: (value) => Chunk.append(state.page, value),
               });
-              const hitLimit = budget.exhausted();
+              const hitLimit = budgetExhausted(budget);
               return Effect.succeed<PaginateState<Doc>>({
                 page,
                 readKeys,
                 hitLimit,
                 stopped:
                   hitLimit ||
-                  (maxRows !== undefined && Chunk.size(page) >= maxRows),
+                  Option.exists(maxRows, (limit) => Chunk.size(page) >= limit),
               });
             },
           ),
         ),
-        Effect.provideService(
-          ReadBudget,
-          maximumRowsRead === undefined && maximumBytesRead === undefined
-            ? undefined
-            : budget,
-        ),
+        Effect.provideService(ReadBudget, activeBudget),
         Effect.flatMap((state) => {
-          const limited = budgetStopped(budget) || state.hitLimit;
+          const limited = budgetStopped(activeBudget) || state.hitLimit;
           return limited &&
             (Chunk.isEmpty(state.readKeys) ||
               Option.exists(
@@ -2747,14 +2785,14 @@ export const paginate: {
               ))
             ? Effect.fail(
                 new ReadBudgetExceededError({
-                  rowsRead: budget.rows,
-                  ...(maximumBytesRead === undefined
+                  rowsRead: MutableRef.get(budget.state).rows,
+                  ...(Option.isNone(maximumBytesRead)
                     ? {}
-                    : { bytesRead: budget.bytes }),
+                    : { bytesRead: MutableRef.get(budget.state).bytes }),
                 }),
               )
             : Effect.succeed(
-                budgetStopped(budget)
+                budgetStopped(activeBudget)
                   ? { ...state, stopped: true, hitLimit: true }
                   : state,
               );
