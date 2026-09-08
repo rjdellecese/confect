@@ -45,6 +45,7 @@ import { pipeArguments, type Pipeable } from "effect/Pipeable";
 import * as Array from "effect/Array";
 import type * as Channel from "effect/Channel";
 import * as Chunk from "effect/Chunk";
+import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Equivalence from "effect/Equivalence";
@@ -56,6 +57,7 @@ import * as Predicate from "effect/Predicate";
 import * as Pull from "effect/Pull";
 import type * as Record from "effect/Record";
 import * as Schema from "effect/Schema";
+import * as Semaphore from "effect/Semaphore";
 import * as Sink from "effect/Sink";
 import * as Stream from "effect/Stream";
 import * as String from "effect/String";
@@ -413,6 +415,22 @@ const tightestLower = (self: KeyBound, that: KeyBound): KeyBound =>
 const tightestUpper = (self: KeyBound, that: KeyBound): KeyBound =>
   Order.isLessThan(KeyCutOrder)(upperCut(that), upperCut(self)) ? that : self;
 
+const combineKeyBound = (
+  self: Option.Option<KeyBound>,
+  that: Option.Option<KeyBound>,
+  combine: (self: KeyBound, that: KeyBound) => KeyBound,
+): Option.Option<KeyBound> =>
+  Option.match(self, {
+    onNone: () => that,
+    onSome: (first) =>
+      Option.some(
+        Option.match(that, {
+          onNone: () => first,
+          onSome: (second) => combine(first, second),
+        }),
+      ),
+  });
+
 /** Order of positions in stream order: for `desc`, later keys are smaller. */
 const PositionOrder = (order: OrderDirection): Order.Order<OrderKey> =>
   order === "asc" ? OrderKeyOrder : Order.flip(OrderKeyOrder);
@@ -643,9 +661,9 @@ export class QueryStream<
     /**
      * How this stream runs in the opposite direction: leaves rebuild their
      * Convex queries with the other `order`, and derived streams reverse
-     * their inputs and re-apply their combinator. Absent where reversing
-     * would change the result (`distinct`) or isn't possible (externally
-     * constructed streams); `reverse` then throws.
+     * their inputs and re-apply their combinator. Distinct streams retain
+     * their representative-selection order. Absent on externally
+     * constructed streams without a reversal recipe; `reverse` then throws.
      */
     readonly reverseWith?: () => QueryStream<Doc, Key, E, R, Flip<Direction>>,
   ) {}
@@ -924,21 +942,30 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
     Stream.orDie,
   );
 
-  // Under a byte-budgeted `paginate`, every document this leaf reads is
-  // charged to the budget's counter as it is read — before any filtering
-  // downstream, matching Convex's own `maximumBytesRead` semantics. With
-  // no counter provided (the default), nothing is measured.
-  const charged = Stream.unwrap(
-    Effect.map(Effect.service(BytesRead), (counter) =>
-      counter === undefined
-        ? encodedDocuments
-        : Stream.tap(encodedDocuments, (encoded) =>
-            Effect.sync(() => {
-              counter.bytes += getDocumentSize(encoded as GenericDocument);
-            }),
-          ),
+  const charged = Stream.fromPull(
+    Effect.flatMap(Effect.service(ReadBudget), (budget) =>
+      Effect.map(Stream.toPull(encodedDocuments), (pull) => {
+        if (budget === undefined) return pull;
+        return budget.lock.withPermit(
+          Effect.suspend(() => {
+            if (budget.exhausted()) {
+              budget.stopped = true;
+              return Cause.done();
+            }
+            return Effect.map(pull, (documents) => {
+              budget.rows += documents.length;
+              if (budget.maximumBytesRead !== undefined) {
+                for (const document of documents) {
+                  budget.bytes += getDocumentSize(document as GenericDocument);
+                }
+              }
+              return documents;
+            });
+          }),
+        );
+      }),
     ),
-  );
+  ).pipe(Stream.scoped);
 
   const annotated = charged.pipe(
     Stream.mapEffect((encoded) =>
@@ -1017,14 +1044,14 @@ interface MergeSource<Doc, E> {
   readonly pull: Pull.Pull<Array.NonEmptyReadonlyArray<Element<Doc>>, E>;
   readonly buffer: ReadonlyArray<Element<Doc>>;
   readonly index: number;
-  readonly done: boolean;
+  readonly done: false | "exhausted" | "limited";
 }
 
 const makeMergeSource = <Doc, E>(
   pull: MergeSource<Doc, E>["pull"],
   buffer: ReadonlyArray<Element<Doc>>,
   index: number,
-  done: boolean,
+  done: MergeSource<Doc, E>["done"],
 ): MergeSource<Doc, E> => ({ pull, buffer, index, done });
 
 const mergeSourceHead = <Doc, E>(
@@ -1045,8 +1072,13 @@ const fillMergeSource = <Doc, E>(
           makeMergeSource(source.pull, elements, 0, false),
         ),
         Pull.catchDone(() =>
-          Effect.succeed(
-            makeMergeSource(source.pull, source.buffer, source.index, true),
+          Effect.map(Effect.service(ReadBudget), (budget) =>
+            makeMergeSource(
+              source.pull,
+              source.buffer,
+              source.index,
+              budget?.stopped ? "limited" : "exhausted",
+            ),
           ),
         ),
       );
@@ -1065,49 +1097,51 @@ const mergeStep =
     readonly [Element<Doc>, ReadonlyArray<MergeSource<Doc, E>>] | undefined,
     E
   > =>
-    Effect.map(
-      Effect.forEach(sources, fillMergeSource, { concurrency: "unbounded" }),
-      (filled) => {
-        const isEarlier = Order.isLessThan(position);
+    Effect.gen(function* () {
+      const budget = yield* Effect.service(ReadBudget);
+      const filled = yield* Effect.forEach(sources, fillMergeSource, {
+        concurrency: budget === undefined ? "unbounded" : 1,
+      });
+      if (filled.some((source) => source.done === "limited")) return undefined;
+      const isEarlier = Order.isLessThan(position);
 
-        const earliest = Array.reduce(
-          filled,
-          Option.none<readonly [number, Element<Doc>]>(),
-          (best, source, index) =>
-            Option.match(mergeSourceHead(source), {
-              onNone: () => best,
-              onSome: (head) =>
-                Option.match(best, {
-                  onNone: () => Option.some([index, head] as const),
-                  onSome: ([, bestElement]) =>
-                    isEarlier(head[1], bestElement[1])
-                      ? Option.some([index, head] as const)
-                      : best,
-                }),
-            }),
-        );
+      const earliest = Array.reduce(
+        filled,
+        Option.none<readonly [number, Element<Doc>]>(),
+        (best, source, index) =>
+          Option.match(mergeSourceHead(source), {
+            onNone: () => best,
+            onSome: (head) =>
+              Option.match(best, {
+                onNone: () => Option.some([index, head] as const),
+                onSome: ([, bestElement]) =>
+                  isEarlier(head[1], bestElement[1])
+                    ? Option.some([index, head] as const)
+                    : best,
+              }),
+          }),
+      );
 
-        return Option.getOrUndefined(
-          Option.map(
-            earliest,
-            ([index, element]) =>
-              [
-                element,
-                Array.map(filled, (source, sourceIndex) =>
-                  sourceIndex === index
-                    ? makeMergeSource(
-                        source.pull,
-                        source.buffer,
-                        source.index + 1,
-                        source.done,
-                      )
-                    : source,
-                ),
-              ] as const,
-          ),
-        );
-      },
-    );
+      return Option.getOrUndefined(
+        Option.map(
+          earliest,
+          ([index, element]) =>
+            [
+              element,
+              Array.map(filled, (source, sourceIndex) =>
+                sourceIndex === index
+                  ? makeMergeSource(
+                      source.pull,
+                      source.buffer,
+                      source.index + 1,
+                      source.done,
+                    )
+                  : source,
+              ),
+            ] as const,
+        ),
+      );
+    });
 
 /**
  * Merge streams ordered by the same key into one ordered stream.
@@ -1691,22 +1725,39 @@ const makeFlatMap = <
       const innerBounds = innerBoundsFor(outerKey);
       return Option.match(outerDoc, {
         onNone: () => markerStream(outerKey, innerBounds, Option.none()),
-        onSome: (doc) =>
-          narrowByKeyBounds(validated(f(doc)), innerBounds).annotated.pipe(
+        onSome: (doc) => {
+          const inner = validated(f(doc));
+          return narrowByKeyBounds(inner, innerBounds).annotated.pipe(
             Stream.map(
               ([innerDoc, innerKey]) =>
                 [innerDoc, Array.appendAll(outerKey, innerKey)] as const,
             ),
             Stream.orElseIfEmpty(() =>
-              markerStream(
-                outerKey,
-                innerBounds,
-                onEmpty === undefined
-                  ? Option.none()
-                  : Option.some(onEmpty(doc)),
+              Stream.unwrap(
+                Effect.gen(function* () {
+                  const budget = yield* Effect.service(ReadBudget);
+                  if (budget?.stopped) return Stream.empty;
+                  if (
+                    onEmpty !== undefined &&
+                    (Option.isSome(innerBounds.lower) ||
+                      Option.isSome(innerBounds.upper))
+                  ) {
+                    const original = yield* Stream.runHead(inner.annotated);
+                    if (Option.isSome(original) || budget?.stopped)
+                      return Stream.empty;
+                  }
+                  return markerStream(
+                    outerKey,
+                    innerBounds,
+                    onEmpty === undefined
+                      ? Option.none()
+                      : Option.some(onEmpty(doc)),
+                  );
+                }),
               ),
             ),
-          ),
+          );
+        },
       });
     }),
   );
@@ -1785,12 +1836,12 @@ const makeFlatMap = <
  * type level (`Key` must extend `readonly [...Fields, ...rest]`) and
  * validated at runtime.
  *
- * Filtered-out elements pass through (still advancing cursors) without
- * claiming their group, so the first *present* document of each group is
- * kept. As with `convex-helpers`, prefer applying `filterEffect` *after*
- * `distinct`: narrowing a distinct stream truncates bounds to the distinct
- * prefix, so a cursor that lands on a filtered element before its group's
- * first present document resumes at the next group.
+ * A filter before `distinct` selects the first matching document; a filter
+ * after it filters the chosen representatives. Selection uses the input's
+ * original order and bounds. Reversal changes only the output order, and
+ * narrowing filters the original representatives rather than selecting
+ * replacements. Reverse traversal discovers each group and seeks its
+ * representative in the original direction; callbacks may be reevaluated.
  */
 export const distinct = dual<
   <const Fields extends ReadonlyArray<string>>(
@@ -1824,7 +1875,15 @@ export const distinct = dual<
   }
   // Groups are runs of equal *runtime* prefixes, so a prefix that reaches
   // past a tiebreaker (into a `flatMap` result's inner key) includes it.
-  return makeDistinct(self, runtimePrefixLength(self, fields.length));
+  return makeDistinct(
+    self,
+    runtimePrefixLength(self, fields.length),
+    self.order,
+    {
+      lower: Option.none(),
+      upper: Option.none(),
+    },
+  );
 });
 
 /**
@@ -1935,94 +1994,113 @@ const makeDistinct = <
   R,
   Direction extends OrderDirection,
 >(
-  self: QueryStream<Doc, Key, E, R, Direction>,
+  self: QueryStream<Doc, Key, E, R>,
   distinctLength: number,
+  order: Direction,
+  bounds: KeyBounds,
 ): QueryStream<Doc, Key, E, R, Direction> => {
-  /** Bounds that skip past the group of the given key, in stream order. */
-  const skipGroupBounds = (key: OrderKey): KeyBounds => {
+  const afterKey = (key: OrderKey): KeyBounds => {
     const pastGroup: KeyBound = {
-      key: Array.take(key, distinctLength),
+      key,
       inclusive: false,
     };
-    return self.order === "asc"
+    return order === "asc"
       ? { lower: Option.some(pastGroup), upper: Option.none() }
       : { lower: Option.none(), upper: Option.some(pastGroup) };
   };
-
-  // Each step reads one group: everything up to and including the group's
-  // first present document (filtered elements pass through), then the next
-  // step continues from a stream narrowed past the whole group.
-  const annotated: Stream.Stream<Element<Doc>, E, R> = Stream.paginate(
-    self,
-    (current) =>
-      current.annotated.pipe(
-        Stream.takeUntil(([doc, _key]) => Option.isSome(doc)),
-        Stream.runCollect,
-        Effect.map((elements) =>
-          Array.isReadonlyArrayNonEmpty(elements)
-            ? ([
-                elements,
-                pipe(Array.lastNonEmpty(elements), ([doc, key]) =>
-                  Option.isSome(doc)
-                    ? Option.some(
-                        narrowByKeyBounds(current, skipGroupBounds(key)),
-                      )
-                    : // The stream ended on a filtered element: no
-                      // present document remains.
-                      Option.none<typeof self>(),
-                ),
-              ] as const)
-            : ([
-                Array.empty<Element<Doc>>(),
-                Option.none<typeof self>(),
-              ] as const),
-        ),
-      ),
-  );
-
-  // Narrowing truncates bound keys to the distinct prefix (as in
-  // `convex-helpers`): a cursor at a group's kept document resumes at the
-  // next group, and an inclusive bound re-reads its whole group so the
-  // group's first present document is re-found.
-  const truncated = (bound: Option.Option<KeyBound>): Option.Option<KeyBound> =>
+  const groupBound = (
+    bound: Option.Option<KeyBound>,
+  ): Option.Option<KeyBound> =>
     Option.map(bound, ({ inclusive, key }) => ({
       key: Array.take(key, distinctLength),
-      inclusive,
+      inclusive: key.length > distinctLength || inclusive,
     }));
+  const admitted = (key: OrderKey) =>
+    admittedByLower(bounds.lower)(key) && admittedByUpper(bounds.upper)(key);
+  const annotated = Stream.fromPull(
+    Effect.gen(function* () {
+      const budget = yield* Effect.service(ReadBudget);
+      let current = narrowByKeyBounds(
+        order === self.order ? self : reverse(self),
+        { lower: groupBound(bounds.lower), upper: groupBound(bounds.upper) },
+      );
+      const next: Pull.Pull<
+        Array.NonEmptyReadonlyArray<Element<Doc>>,
+        E,
+        void,
+        R
+      > = Effect.suspend(() =>
+        Effect.gen(function* () {
+          if (budget?.stopped) return yield* Cause.done();
+          const discovered = yield* Stream.runHead(current.annotated);
+          if (Option.isNone(discovered)) {
+            return yield* Cause.done();
+          }
+          const [doc, key] = discovered.value;
+          if (order === self.order && Option.isNone(doc)) {
+            current = narrowByKeyBounds(current, afterKey(key));
+            return admitted(key) ? [discovered.value] : yield* next;
+          }
+          const prefix = Array.take(key, distinctLength);
+          let representative = discovered.value;
+          if (order !== self.order) {
+            let firstKey: OrderKey | undefined;
+            const selected = yield* narrowByKeyBounds(self, {
+              lower: Option.some({ key: prefix, inclusive: true }),
+              upper: Option.some({ key: prefix, inclusive: true }),
+            }).annotated.pipe(
+              Stream.tap(([, selectedKey]) =>
+                Effect.sync(() => {
+                  firstKey ??= selectedKey;
+                }),
+              ),
+              Stream.filter(([selectedDoc]) => Option.isSome(selectedDoc)),
+              Stream.runHead,
+            );
+            if (Option.isNone(selected) && budget?.stopped)
+              return yield* Cause.done();
+            representative = Option.getOrElse(
+              selected,
+              () => [Option.none<Doc>(), firstKey ?? key] as const,
+            );
+          }
+          current = narrowByKeyBounds(current, afterKey(prefix));
+          return admitted(representative[1]) ? [representative] : yield* next;
+        }),
+      );
+      return next;
+    }),
+  );
 
   return new QueryStream(
-    self.order,
+    order,
     self.keyFields,
     annotated,
     undefined,
-    (bounds) =>
-      makeDistinct(
-        narrowByKeyBounds(self, {
-          lower: truncated(bounds.lower),
-          upper: truncated(bounds.upper),
-        }),
-        distinctLength,
-      ),
+    (keyBounds) =>
+      makeDistinct(self, distinctLength, order, {
+        lower: combineKeyBound(bounds.lower, keyBounds.lower, tightestLower),
+        upper: combineKeyBound(bounds.upper, keyBounds.upper, tightestUpper),
+      }),
     self.tiebreakers,
+    () => makeDistinct(self, distinctLength, flipDirection(order), bounds),
   );
 };
 
 /**
  * Run a stream in the opposite direction.
  *
- * In SQL terms: flipping `ORDER BY ... ASC` to `DESC` (or back) on the
- * whole query. Every leaf is rebuilt in the other `order`, so the elements
- * come out reversed but are read that way from the index rather than
- * collected and reversed, and the result is still a query stream — a
- * paginated feed can load its earlier pages with it.
+ * In SQL terms: reversing the outer `ORDER BY`, without changing which
+ * rows the query selects. Results are read through index scans and seeks,
+ * not collected and reversed. A paginated feed can load its earlier pages
+ * with the returned query stream.
  *
  * `merge`, the transforms, `flatMap`, `renameKey`, and `empty`
- * reverse their inputs and re-apply themselves. A `distinct` stream can't
- * be reversed: it keeps the *first* document of each group, and a reversed
- * scan would keep the last, so `reverse` throws — reverse the input and
- * apply `distinct` to that for the mirror query, or paginate the distinct
- * stream in one direction only. Externally constructed streams (no
- * `reverseWith`) throw too.
+ * reverse their inputs and re-apply themselves. A distinct stream keeps
+ * its original representatives, seeking them in the original selection
+ * direction while visiting groups in the opposite order. Applying
+ * `distinct` after reversing the input instead selects different rows.
+ * Externally constructed streams without `reverseWith` throw.
  */
 export const reverse = <
   Doc,
@@ -2035,7 +2113,7 @@ export const reverse = <
 ): QueryStream<Doc, Key, E, R, Flip<Direction>> => {
   if (self.reverseWith === undefined) {
     throw new Error(
-      "QueryStream.reverse: this stream cannot be reversed (a `distinct` stream keeps a different document per group in the other direction; apply `distinct` to the reversed input instead)",
+      "QueryStream.reverse: this stream cannot be reversed without a reversal recipe",
     );
   }
   return self.reverseWith();
@@ -2061,17 +2139,16 @@ export type NarrowBounds =
  * For descending streams, `start` is the upper key and `end` the lower key.
  * At least one endpoint is required; the other can be left unbounded.
  * A prefix key includes or excludes the whole group of keys extending it;
- * `distinct` truncates bounds to its grouping prefix. Narrowing intersects
- * the stream's existing bounds.
+ * distinct streams apply full-key bounds to their original representatives,
+ * without selecting replacements. Narrowing intersects existing bounds.
  *
  * In SQL terms: keyset predicates on the `ORDER BY` columns — `WHERE (k1,
  * k2) >= (:start) AND (k1, k2) < (:end)` for an ascending, start-inclusive,
  * end-exclusive range — added to every query in the
- * composition. The bounds are pushed down through the stream's structure
- * via `narrowWith`, so the skipped keys are never read: leaves rebuild
- * their Convex queries with the bounds decomposed into `withIndex` ranges
- * (`splitRange`), and derived streams narrow their inputs and re-apply
- * their combinator. Streams without a `narrowWith` (constructed externally)
+ * composition. Bounds are pushed into index ranges where doing so
+ * preserves the query's results. Distinct streams may read outside the
+ * output bounds to recover original representatives. Streams without a
+ * `narrowWith` (constructed externally)
  * fall back to filtering the annotated stream in memory. */
 export const narrow = dual<
   (
@@ -2187,6 +2264,9 @@ const narrowInMemory = <
     undefined,
     undefined,
     self.tiebreakers,
+    self.reverseWith === undefined
+      ? undefined
+      : () => narrowInMemory(reverse(self), bounds),
   );
 };
 
@@ -2313,20 +2393,27 @@ export type PaginateOptions = ConvexPaginationOptions;
  */
 export type PaginationResult<Doc> = ConvexPaginationResult<Doc>;
 
-/** The running total a byte-budgeted `paginate` shares with its leaves. */
-interface BytesCounter {
-  bytes: number;
+/** A page exhausted its read budget without a safe logical continuation. */
+export class ReadBudgetExceededError extends Schema.TaggedError<ReadBudgetExceededError>()(
+  "ReadBudgetExceededError",
+  { rowsRead: Schema.Finite, bytesRead: Schema.optionalKey(Schema.Finite) },
+) {
+  override get message() {
+    return "QueryStream.paginate: the read budget was exhausted before a safe page boundary; increase the budget or simplify the query";
+  }
 }
 
-/**
- * The byte counter a `paginate` call with a `maximumBytesRead` budget
- * provides to the leaf streams beneath it; each leaf adds the estimated
- * size (`getDocumentSize` from `convex/values`, as `convex-helpers` does)
- * of every document it reads. Absent by default, so a stream measures
- * nothing unless it runs under a byte-budgeted `paginate`.
- */
-const BytesRead = Context.Reference<BytesCounter | undefined>(
-  "@confect/server/QueryStream/BytesRead",
+interface ReadBudgetState {
+  rows: number;
+  bytes: number;
+  stopped: boolean;
+  readonly maximumBytesRead: number | undefined;
+  readonly lock: Semaphore.Semaphore;
+  readonly exhausted: () => boolean;
+}
+
+const ReadBudget = Context.Reference<ReadBudgetState | undefined>(
+  "@confect/server/QueryStream/ReadBudget",
   { defaultValue: () => undefined },
 );
 
@@ -2365,22 +2452,24 @@ const midpointCursor = (readKeys: Chunk.Chunk<OrderKey>): string =>
  * - `cursor` is exclusive, `endCursor` inclusive; when `endCursor` is set,
  *   `numItems` is ignored and the page runs to the end cursor — the
  *   reactive-adjacency guarantee that keeps concurrent pages gap-free.
- * - Filtered-out elements count as read (for `maximumRowsRead` and
- *   `maximumBytesRead`) and advance the continue cursor.
- * - `maximumBytesRead` is charged the estimated size of every document
- *   the stream's index queries read, whether or not it reaches the page;
- *   hitting either budget ends the page with `SplitRequired`.
+ * - Row and byte budgets count all QueryStream leaf reads, including
+ *   filtered documents, discovery seeks, and prefetched merge inputs.
+ *   Bytes use estimated document sizes, not backend-billed bytes; a
+ *   document's size is known only after it is read.
+ * - Budget stops return `SplitRequired` at a safe output boundary. If no
+ *   safe progress is possible, the effect fails with `ReadBudgetExceededError`.
+ *   A resource stop never proves an input or a distinct group empty.
  */
 export const paginate = dual<
   (
     options: PaginateOptions,
   ) => <Doc, Key extends ReadonlyArray<string>, E, R>(
     self: QueryStream<Doc, Key, E, R>,
-  ) => Effect.Effect<PaginationResult<Doc>, E, R>,
+  ) => Effect.Effect<PaginationResult<Doc>, E | ReadBudgetExceededError, R>,
   <Doc, Key extends ReadonlyArray<string>, E, R>(
     self: QueryStream<Doc, Key, E, R>,
     options: PaginateOptions,
-  ) => Effect.Effect<PaginationResult<Doc>, E, R>
+  ) => Effect.Effect<PaginationResult<Doc>, E | ReadBudgetExceededError, R>
 >(
   2,
   <
@@ -2438,17 +2527,17 @@ export const paginate = dual<
       const maxRows = Option.isSome(endCursor) ? undefined : options.numItems;
       const maximumRowsRead = options.maximumRowsRead;
       const maximumBytesRead = options.maximumBytesRead;
-      // A fresh counter per run, provided to the leaves only when there is
-      // a byte budget to charge against.
-      const bytesRead: BytesCounter = { bytes: 0 };
-      const withBytesBudget = <A, E2, R2>(
-        effect: Effect.Effect<A, E2, R2>,
-      ): Effect.Effect<A, E2, R2> =>
-        maximumBytesRead === undefined
-          ? effect
-          : Effect.provideService(effect, BytesRead, bytesRead);
-
-      return withBytesBudget(
+      const budget: ReadBudgetState = {
+        rows: 0,
+        bytes: 0,
+        stopped: false,
+        maximumBytesRead,
+        lock: Semaphore.makeUnsafe(1),
+        exhausted: () =>
+          (maximumRowsRead !== undefined && budget.rows >= maximumRowsRead) ||
+          (maximumBytesRead !== undefined && budget.bytes >= maximumBytesRead),
+      };
+      return pipe(
         Stream.run(
           narrowed.annotated,
           Sink.fold(
@@ -2460,11 +2549,7 @@ export const paginate = dual<
                 onNone: () => state.page,
                 onSome: (value) => Chunk.append(state.page, value),
               });
-              const hitLimit =
-                (maximumRowsRead !== undefined &&
-                  Chunk.size(readKeys) >= maximumRowsRead) ||
-                (maximumBytesRead !== undefined &&
-                  bytesRead.bytes >= maximumBytesRead);
+              const hitLimit = budget.exhausted();
               return Effect.succeed<PaginateState<Doc>>({
                 page,
                 readKeys,
@@ -2476,7 +2561,34 @@ export const paginate = dual<
             },
           ),
         ),
-      ).pipe(
+        Effect.provideService(
+          ReadBudget,
+          maximumRowsRead === undefined && maximumBytesRead === undefined
+            ? undefined
+            : budget,
+        ),
+        Effect.flatMap((state) => {
+          const limited = budget.stopped || state.hitLimit;
+          return limited &&
+            (Chunk.isEmpty(state.readKeys) ||
+              Option.exists(
+                pinnedEnd,
+                (endpoint) => midpointCursor(state.readKeys) === endpoint,
+              ))
+            ? Effect.fail(
+                new ReadBudgetExceededError({
+                  rowsRead: budget.rows,
+                  ...(maximumBytesRead === undefined
+                    ? {}
+                    : { bytesRead: budget.bytes }),
+                }),
+              )
+            : Effect.succeed(
+                budget.stopped
+                  ? { ...state, stopped: true, hitLimit: true }
+                  : state,
+              );
+        }),
         Effect.map((state): PaginationResult<Doc> => {
           const page = Chunk.toArray(state.page);
           // `stopped` implies at least one element was read, so the last
