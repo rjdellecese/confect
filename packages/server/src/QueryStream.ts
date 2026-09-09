@@ -1027,7 +1027,7 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
         onSome: (budget) =>
           SynchronizedRef.modifyEffect(budget.state, (state) =>
             Effect.gen(function* () {
-              if (isBudgetExhausted(budget, state)) {
+              if (isBudgetExhausted(budget.limits, state)) {
                 return [
                   Option.none(),
                   { ...state, status: BudgetStatus.Stopped() },
@@ -1039,7 +1039,7 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
                 {
                   ...state,
                   rows: state.rows + documents.length,
-                  bytes: Option.match(budget.maximumBytesRead, {
+                  bytes: Option.match(budget.limits.maximumBytesRead, {
                     onNone: () => state.bytes,
                     onSome: () =>
                       Array.reduce(
@@ -2645,18 +2645,22 @@ interface ReadBudgetState {
   readonly status: BudgetStatus;
 }
 
-interface ReadBudget {
-  readonly state: SynchronizedRef.SynchronizedRef<ReadBudgetState>;
+interface ReadBudgetLimits {
   readonly maximumRowsRead: Option.Option<number>;
   readonly maximumBytesRead: Option.Option<number>;
 }
 
+interface ReadBudget {
+  readonly state: SynchronizedRef.SynchronizedRef<ReadBudgetState>;
+  readonly limits: ReadBudgetLimits;
+}
+
 const isBudgetExhausted = (
-  budget: ReadBudget,
+  limits: ReadBudgetLimits,
   state: ReadBudgetState,
 ): boolean =>
-  Option.exists(budget.maximumRowsRead, (limit) => state.rows >= limit) ||
-  Option.exists(budget.maximumBytesRead, (limit) => state.bytes >= limit);
+  Option.exists(limits.maximumRowsRead, (limit) => state.rows >= limit) ||
+  Option.exists(limits.maximumBytesRead, (limit) => state.bytes >= limit);
 
 const isBudgetStopped = (
   maybeBudget: Option.Option<ReadBudget>,
@@ -2795,8 +2799,7 @@ export const paginate: {
           bytes: 0,
           status: BudgetStatus.Active(),
         }),
-        maximumRowsRead,
-        maximumBytesRead,
+        limits: { maximumRowsRead, maximumBytesRead },
       };
       const activeBudget = Option.as(
         Option.orElse(maximumRowsRead, () => maximumBytesRead),
@@ -2817,7 +2820,7 @@ export const paginate: {
               return Effect.map(
                 SynchronizedRef.get(budget.state),
                 (usage): PaginateState<Doc> => {
-                  const hitLimit = isBudgetExhausted(budget, usage);
+                  const hitLimit = isBudgetExhausted(budget.limits, usage);
                   return {
                     page,
                     readKeys,
