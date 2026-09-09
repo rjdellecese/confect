@@ -1,9 +1,23 @@
-# Codex repository instructions
+# Capy repository instructions
 
 - Never read `.env.local` files.
 - Do not inspect dependency source in `node_modules`, `.pnpm-store`, or `.pnpm`. Run `pnpm opensrc path <package-name>` and inspect the returned source path instead. Cached package versions are listed in `~/.opensrc/sources.json`.
 - After editing a file type supported by Oxfmt, run `pnpm oxfmt --write <file>` on the edited file.
 - After editing JavaScript or TypeScript, run `pnpm oxlint --fix <file>` on the edited file and report any remaining diagnostics.
+- Read `REVIEW.md` when reviewing changes; its schema laziness, bundle isolation, and builder purity invariants also apply during implementation.
+
+## Agent configuration
+
+`AGENTS.md` is the canonical repository guidance. Keep reusable workflows in
+`.agents/skills/<name>/SKILL.md`; invoke them by skill name in Capy rather than
+maintaining separate agent-specific commands or copies of the instructions.
+Use the project's pull request creation tool for new PRs so checks and review
+feedback return to the originating thread. Never merge without an explicit
+request from the user.
+
+Capy Setup, Automations, and MCP registrations live in the Capy project.
+Do not configure tool hooks; follow the formatting, linting, and read-safety
+instructions above directly.
 
 # Repo Overview
 
@@ -14,6 +28,7 @@ Confect is a library that integrates Effect with the Convex backend platform. It
 - `@confect/core` - Shared specs, schemas, and types (no workspace deps)
 - `@confect/server` - Backend bindings to Convex (depends on core)
 - `@confect/js` - Runtime-agnostic JavaScript client (depends on core)
+- `@confect/foldkit` - Client-side bindings for Foldkit apps (depends on core, js)
 - `@confect/react` - Client-side React hooks (depends on core)
 - `@confect/cli` - CLI tooling for codegen and dev-mode watching (depends on core, server)
 - `@confect/test` - Testing utilities via convex-test (depends on core, server)
@@ -53,9 +68,18 @@ Build, lint, and format run through Vite+ (`vp`), which orders packages by their
 
 ## Testing
 
-Tests use Vitest with a root-level `vitest.config.ts` (which uses `projects: ["packages/*"]` to discover per-package test projects) and shared config in `vitest.shared.ts`. The core, js, react, server, and cli packages all have tests. The @confect/server package has integration tests using convex-test.
+Tests use Vitest with a root-level `vitest.config.ts` (which uses `projects: ["packages/*"]` to discover per-package test projects) and shared config in `vitest.shared.ts`. The core, foldkit, js, react, server, and cli packages all have tests. The @confect/server package has integration tests using convex-test.
 
 Tests import the public package specifiers (e.g. `@confect/core/Ref`); `vitest.shared.ts` aliases those to each package's `src/` so suites run against source rather than built `dist/`.
+
+### Test organization
+
+- **Keep unit tests per-module.** Use `packages/<package>/test/<Module>.test.ts` for a source module's public contract. When a feature spans several modules, extend their existing suites rather than introducing a feature-named root suite.
+- **Organize assertions by ownership.** A unit test may construct inputs with other modules; place it in the suite for the module whose contract it verifies.
+- **Keep integration coverage separate.** Tests whose purpose is to verify how modules work together or interact across runtime boundaries belong in integration suites. Extend the relevant existing suite and reuse its harness and fixtures rather than adding a parallel setup in the unit-test directory.
+- **Make new integration conventions explicit.** If integration coverage needs a new layout, document its location and configure test discovery explicitly.
+
+### Running tests
 
 Run `pnpm test` to run all suites at once, or target a single package with `vitest run --project @confect/<pkg>` (e.g. `vitest run --project @confect/core`). Run tests with `vitest run`, not `vp test` — the Vite+ test runner mishandles type-only test files. The server's Convex integration suites have dedicated scripts: `pnpm test:server:mock-backend` and `pnpm test:server:local-backend`.
 
@@ -63,7 +87,7 @@ Run `pnpm test` to run all suites at once, or target a single package with `vite
 
 All @confect packages are in a fixed version group via Changesets, meaning they are always versioned and released together. Use `pnpm changeset` to create a changeset before merging a PR with user-facing changes.
 
-## Cursor Cloud specific instructions
+## Capy development environment
 
 ### Running the example app
 

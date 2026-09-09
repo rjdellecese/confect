@@ -34,7 +34,6 @@
   },
   "include": [
     "*.ts",
-    ".claude/hooks/**/*.ts",
     "scripts/**/*.ts",
     "packages/*/*.ts",
     "packages/*/test/**/*",
