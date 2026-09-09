@@ -59,10 +59,10 @@ import * as Pull from "effect/Pull";
 import * as Ref from "effect/Ref";
 import type * as Record from "effect/Record";
 import * as Schema from "effect/Schema";
-import * as Semaphore from "effect/Semaphore";
 import * as Sink from "effect/Sink";
 import * as Stream from "effect/Stream";
 import * as String from "effect/String";
+import * as SynchronizedRef from "effect/SynchronizedRef";
 import type * as Types from "effect/Types";
 import * as Document from "./Document";
 
@@ -1025,32 +1025,40 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
       return Option.match(maybeBudget, {
         onNone: () => pull,
         onSome: (budget) =>
-          budget.lock.withPermit(
+          SynchronizedRef.modifyEffect(budget.state, (state) =>
             Effect.gen(function* () {
-              if (yield* budgetExhausted(budget)) {
-                yield* Ref.update(budget.state, (state) => ({
-                  ...state,
-                  status: BudgetStatus.Stopped(),
-                }));
-                return yield* Cause.done();
+              if (budgetExhausted(budget, state)) {
+                return [
+                  Option.none(),
+                  { ...state, status: BudgetStatus.Stopped() },
+                ] as const;
               }
               const documents = yield* pull;
-              yield* Ref.update(budget.state, (state) => ({
-                ...state,
-                rows: state.rows + documents.length,
-                bytes: Option.match(budget.maximumBytesRead, {
-                  onNone: () => state.bytes,
-                  onSome: () =>
-                    Array.reduce(
-                      documents,
-                      state.bytes,
-                      (bytes, document) =>
-                        bytes + getDocumentSize(document as GenericDocument),
-                    ),
-                }),
-              }));
-              return documents;
+              return [
+                Option.some(documents),
+                {
+                  ...state,
+                  rows: state.rows + documents.length,
+                  bytes: Option.match(budget.maximumBytesRead, {
+                    onNone: () => state.bytes,
+                    onSome: () =>
+                      Array.reduce(
+                        documents,
+                        state.bytes,
+                        (bytes, document) =>
+                          bytes + getDocumentSize(document as GenericDocument),
+                      ),
+                  }),
+                },
+              ] as const;
             }),
+          ).pipe(
+            Effect.flatMap(
+              Option.match({
+                onNone: () => Cause.done(),
+                onSome: Effect.succeed,
+              }),
+            ),
           ),
       });
     }),
@@ -1176,7 +1184,7 @@ const fillMergeSource = <Doc, E>(
                 const status = yield* Option.match(maybeBudget, {
                   onNone: () => Effect.succeed(SourceStatus.Exhausted()),
                   onSome: (budget) =>
-                    Effect.map(Ref.get(budget.state), (state) =>
+                    Effect.map(SynchronizedRef.get(budget.state), (state) =>
                       BudgetStatus.$match(state.status, {
                         Active: () => SourceStatus.Exhausted(),
                         Stopped: () => SourceStatus.BudgetLimited(),
@@ -2638,19 +2646,14 @@ interface ReadBudgetState {
 }
 
 interface ReadBudget {
-  readonly state: Ref.Ref<ReadBudgetState>;
+  readonly state: SynchronizedRef.SynchronizedRef<ReadBudgetState>;
   readonly maximumRowsRead: Option.Option<number>;
   readonly maximumBytesRead: Option.Option<number>;
-  readonly lock: Semaphore.Semaphore;
 }
 
-const budgetExhausted = (budget: ReadBudget): Effect.Effect<boolean> =>
-  Effect.map(
-    Ref.get(budget.state),
-    (state) =>
-      Option.exists(budget.maximumRowsRead, (limit) => state.rows >= limit) ||
-      Option.exists(budget.maximumBytesRead, (limit) => state.bytes >= limit),
-  );
+const budgetExhausted = (budget: ReadBudget, state: ReadBudgetState): boolean =>
+  Option.exists(budget.maximumRowsRead, (limit) => state.rows >= limit) ||
+  Option.exists(budget.maximumBytesRead, (limit) => state.bytes >= limit);
 
 const budgetStopped = (
   maybeBudget: Option.Option<ReadBudget>,
@@ -2658,7 +2661,7 @@ const budgetStopped = (
   Option.match(maybeBudget, {
     onNone: () => Effect.succeed(false),
     onSome: (budget) =>
-      Effect.map(Ref.get(budget.state), (state) =>
+      Effect.map(SynchronizedRef.get(budget.state), (state) =>
         BudgetStatus.$is("Stopped")(state.status),
       ),
   });
@@ -2784,14 +2787,13 @@ export const paginate: {
       const maximumRowsRead = Option.fromUndefinedOr(options.maximumRowsRead);
       const maximumBytesRead = Option.fromUndefinedOr(options.maximumBytesRead);
       const budget: ReadBudget = {
-        state: yield* Ref.make<ReadBudgetState>({
+        state: yield* SynchronizedRef.make<ReadBudgetState>({
           rows: 0,
           bytes: 0,
           status: BudgetStatus.Active(),
         }),
         maximumRowsRead,
         maximumBytesRead,
-        lock: Semaphore.makeUnsafe(1),
       };
       const activeBudget = Option.as(
         Option.orElse(maximumRowsRead, () => maximumBytesRead),
@@ -2810,18 +2812,21 @@ export const paginate: {
                 onSome: (value) => Chunk.append(state.page, value),
               });
               return Effect.map(
-                budgetExhausted(budget),
-                (hitLimit): PaginateState<Doc> => ({
-                  page,
-                  readKeys,
-                  hitLimit,
-                  stopped:
-                    hitLimit ||
-                    Option.exists(
-                      maxRows,
-                      (limit) => Chunk.size(page) >= limit,
-                    ),
-                }),
+                SynchronizedRef.get(budget.state),
+                (usage): PaginateState<Doc> => {
+                  const hitLimit = budgetExhausted(budget, usage);
+                  return {
+                    page,
+                    readKeys,
+                    hitLimit,
+                    stopped:
+                      hitLimit ||
+                      Option.exists(
+                        maxRows,
+                        (limit) => Chunk.size(page) >= limit,
+                      ),
+                  };
+                },
               );
             },
           ),
@@ -2829,7 +2834,7 @@ export const paginate: {
         Effect.provideService(ReadBudget, activeBudget),
         Effect.flatMap((state) =>
           Effect.gen(function* () {
-            const usage = yield* Ref.get(budget.state);
+            const usage = yield* SynchronizedRef.get(budget.state);
             const stopped = BudgetStatus.$is("Stopped")(usage.status);
             const limited = stopped || state.hitLimit;
             if (
