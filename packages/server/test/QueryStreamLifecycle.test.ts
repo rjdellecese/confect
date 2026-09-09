@@ -145,6 +145,42 @@ const makeReader = (pending?: PendingRead) => {
 };
 
 describe("QueryStream iterator lifecycle", () => {
+  it.effect("isolates budget limits and status across page executions", () =>
+    Effect.gen(function* () {
+      const entered = yield* Deferred.make<void>();
+      const release = yield* Deferred.make<void>();
+      const settled = yield* Deferred.make<void>();
+      const reader = makeReader({ iterator: 0, entered, release, settled });
+      const budgeted = QueryStream.paginate(reader.stream, {
+        cursor: null,
+        numItems: 10,
+        maximumRowsRead: 1,
+      });
+      const pending = yield* budgeted.pipe(Effect.forkScoped);
+      yield* Deferred.await(entered);
+
+      const unlimited = yield* QueryStream.paginate(reader.stream, {
+        cursor: null,
+        numItems: 3,
+      });
+      expect(unlimited.page).toEqual(documents.slice(0, 3));
+      expect(unlimited.pageStatus).toBeUndefined();
+
+      yield* Deferred.succeed(release, undefined);
+      const first = yield* Fiber.join(pending);
+      expect(first.page).toEqual([documents[0]]);
+      expect(first.pageStatus).toBe("SplitRequired");
+
+      const repeated = yield* budgeted;
+      expect(repeated).toEqual(first);
+      expect(reader.runs).toEqual([
+        { order: "asc", next: 1, returned: 1, settled: 1 },
+        { order: "asc", next: 3, returned: 1, settled: 3 },
+        { order: "asc", next: 1, returned: 1, settled: 1 },
+      ]);
+    }).pipe(Effect.scoped),
+  );
+
   it.effect("closes a budget-protected leaf when the page succeeds early", () =>
     Effect.gen(function* () {
       const reader = makeReader();

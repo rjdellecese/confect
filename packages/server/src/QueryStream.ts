@@ -1020,14 +1020,15 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
 
   const charged = Stream.fromPull(
     Effect.gen(function* () {
-      const maybeBudget = yield* Effect.service(ReadBudget);
+      const budgetStatus = yield* Effect.service(ReadBudgetStatus);
+      const limits = yield* Effect.service(ReadBudgetLimits);
       const pull = yield* Stream.toPull(encodedDocuments);
-      return Option.match(maybeBudget, {
+      return Option.match(budgetStatus, {
         onNone: () => pull,
-        onSome: (budget) =>
-          SynchronizedRef.modifyEffect(budget.state, (state) =>
+        onSome: (stateRef) =>
+          SynchronizedRef.modifyEffect(stateRef, (state) =>
             Effect.gen(function* () {
-              if (isBudgetExhausted(budget.limits, state)) {
+              if (isBudgetExhausted(limits, state)) {
                 return [
                   Option.none(),
                   { ...state, status: BudgetStatus.Stopped() },
@@ -1039,7 +1040,7 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
                 {
                   ...state,
                   rows: state.rows + documents.length,
-                  bytes: Option.match(budget.limits.maximumBytesRead, {
+                  bytes: Option.match(limits.maximumBytesRead, {
                     onNone: () => state.bytes,
                     onSome: () =>
                       Array.reduce(
@@ -1180,11 +1181,11 @@ const fillMergeSource = <Doc, E>(
             ),
             Pull.catchDone(() =>
               Effect.gen(function* () {
-                const maybeBudget = yield* Effect.service(ReadBudget);
-                const status = yield* Option.match(maybeBudget, {
+                const budgetStatus = yield* Effect.service(ReadBudgetStatus);
+                const status = yield* Option.match(budgetStatus, {
                   onNone: () => Effect.succeed(SourceStatus.Exhausted()),
-                  onSome: (budget) =>
-                    Effect.map(SynchronizedRef.get(budget.state), (state) =>
+                  onSome: (stateRef) =>
+                    Effect.map(SynchronizedRef.get(stateRef), (state) =>
                       BudgetStatus.$match(state.status, {
                         Active: () => SourceStatus.Exhausted(),
                         Stopped: () => SourceStatus.BudgetLimited(),
@@ -1219,9 +1220,9 @@ const mergeStep =
     E
   > =>
     Effect.gen(function* () {
-      const budget = yield* Effect.service(ReadBudget);
+      const budgetStatus = yield* Effect.service(ReadBudgetStatus);
       const filled = yield* Effect.forEach(sources, fillMergeSource, {
-        concurrency: Option.match(budget, {
+        concurrency: Option.match(budgetStatus, {
           onNone: () => "unbounded" as const,
           onSome: () => 1,
         }),
@@ -1886,8 +1887,8 @@ const makeFlatMap = <
             Stream.orElseIfEmpty(() =>
               Stream.unwrap(
                 Effect.gen(function* () {
-                  const budget = yield* Effect.service(ReadBudget);
-                  if (yield* isBudgetStopped(budget)) return Stream.empty;
+                  const budgetStatus = yield* Effect.service(ReadBudgetStatus);
+                  if (yield* isBudgetStopped(budgetStatus)) return Stream.empty;
                   const original = yield* Option.match(
                     Option.gen(function* () {
                       yield* Option.fromUndefinedOr(onEmpty);
@@ -1902,7 +1903,7 @@ const makeFlatMap = <
                       onSome: () => Stream.runHead(inner.annotated),
                     },
                   );
-                  const stopped = yield* isBudgetStopped(budget);
+                  const stopped = yield* isBudgetStopped(budgetStatus);
                   return Option.match(original, {
                     onSome: () => Stream.empty,
                     onNone: () =>
@@ -2186,7 +2187,7 @@ const makeDistinct = <
   const isAdmitted = (key: OrderKey) =>
     admittedByLower(bounds.lower)(key) && admittedByUpper(bounds.upper)(key);
   const annotated = Stream.unwrap(
-    Effect.map(Effect.service(ReadBudget), (budget) =>
+    Effect.map(Effect.service(ReadBudgetStatus), (budgetStatus) =>
       Stream.paginate(
         narrowByKeyBounds(order === self.order ? self : reverse(self), {
           lower: groupBound(bounds.lower),
@@ -2200,7 +2201,7 @@ const makeDistinct = <
           R
         > =>
           Effect.gen(function* () {
-            if (yield* isBudgetStopped(budget))
+            if (yield* isBudgetStopped(budgetStatus))
               return [[], Option.none()] as const;
             const discovered = yield* Stream.runHead(current.annotated);
             return yield* Option.match(discovered, {
@@ -2245,7 +2246,7 @@ const makeDistinct = <
                   return yield* Option.match(selected, {
                     onNone: () =>
                       Effect.gen(function* () {
-                        if (yield* isBudgetStopped(budget))
+                        if (yield* isBudgetStopped(budgetStatus))
                           return [[], Option.none()] as const;
                         const checkpoint = Option.getOrElse(
                           yield* Ref.get(firstKey),
@@ -2650,10 +2651,24 @@ interface ReadBudgetLimits {
   readonly maximumBytesRead: Option.Option<number>;
 }
 
-interface ReadBudget {
-  readonly state: SynchronizedRef.SynchronizedRef<ReadBudgetState>;
-  readonly limits: ReadBudgetLimits;
-}
+const ReadBudgetLimits = Context.Reference<ReadBudgetLimits>(
+  "@confect/server/QueryStream/ReadBudgetLimits",
+  {
+    defaultValue: () => ({
+      maximumRowsRead: Option.none(),
+      maximumBytesRead: Option.none(),
+    }),
+  },
+);
+
+type ReadBudgetStatus = Option.Option<
+  SynchronizedRef.SynchronizedRef<ReadBudgetState>
+>;
+
+const ReadBudgetStatus = Context.Reference<ReadBudgetStatus>(
+  "@confect/server/QueryStream/ReadBudgetStatus",
+  { defaultValue: Option.none },
+);
 
 const isBudgetExhausted = (
   limits: ReadBudgetLimits,
@@ -2662,21 +2677,14 @@ const isBudgetExhausted = (
   Option.exists(limits.maximumRowsRead, (limit) => state.rows >= limit) ||
   Option.exists(limits.maximumBytesRead, (limit) => state.bytes >= limit);
 
-const isBudgetStopped = (
-  maybeBudget: Option.Option<ReadBudget>,
-): Effect.Effect<boolean> =>
-  Option.match(maybeBudget, {
+const isBudgetStopped = (status: ReadBudgetStatus): Effect.Effect<boolean> =>
+  Option.match(status, {
     onNone: () => Effect.succeed(false),
-    onSome: (budget) =>
-      Effect.map(SynchronizedRef.get(budget.state), (state) =>
+    onSome: (stateRef) =>
+      Effect.map(SynchronizedRef.get(stateRef), (state) =>
         BudgetStatus.$is("Stopped")(state.status),
       ),
   });
-
-const ReadBudget = Context.Reference<Option.Option<ReadBudget>>(
-  "@confect/server/QueryStream/ReadBudget",
-  { defaultValue: Option.none },
-);
 
 interface PaginateState<Doc> {
   readonly page: Chunk.Chunk<Doc>;
@@ -2793,17 +2801,15 @@ export const paginate: {
       });
       const maximumRowsRead = Option.fromUndefinedOr(options.maximumRowsRead);
       const maximumBytesRead = Option.fromUndefinedOr(options.maximumBytesRead);
-      const budget: ReadBudget = {
-        state: yield* SynchronizedRef.make<ReadBudgetState>({
-          rows: 0,
-          bytes: 0,
-          status: BudgetStatus.Active(),
-        }),
-        limits: { maximumRowsRead, maximumBytesRead },
-      };
-      const activeBudget = Option.as(
+      const limits: ReadBudgetLimits = { maximumRowsRead, maximumBytesRead };
+      const stateRef = yield* SynchronizedRef.make<ReadBudgetState>({
+        rows: 0,
+        bytes: 0,
+        status: BudgetStatus.Active(),
+      });
+      const budgetStatus = Option.as(
         Option.orElse(maximumRowsRead, () => maximumBytesRead),
-        budget,
+        stateRef,
       );
       return yield* pipe(
         Stream.run(
@@ -2818,9 +2824,9 @@ export const paginate: {
                 onSome: (value) => Chunk.append(state.page, value),
               });
               return Effect.map(
-                SynchronizedRef.get(budget.state),
+                SynchronizedRef.get(stateRef),
                 (usage): PaginateState<Doc> => {
-                  const hitLimit = isBudgetExhausted(budget.limits, usage);
+                  const hitLimit = isBudgetExhausted(limits, usage);
                   return {
                     page,
                     readKeys,
@@ -2837,10 +2843,11 @@ export const paginate: {
             },
           ),
         ),
-        Effect.provideService(ReadBudget, activeBudget),
+        Effect.provideService(ReadBudgetLimits, limits),
+        Effect.provideService(ReadBudgetStatus, budgetStatus),
         Effect.flatMap((state) =>
           Effect.gen(function* () {
-            const usage = yield* SynchronizedRef.get(budget.state);
+            const usage = yield* SynchronizedRef.get(stateRef);
             const stopped = BudgetStatus.$is("Stopped")(usage.status);
             const limited = stopped || state.hitLimit;
             if (
