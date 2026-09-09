@@ -74,11 +74,10 @@ Tests import the public package specifiers (e.g. `@confect/core/Ref`); `vitest.s
 
 ### Test organization
 
-- **Keep unit tests per-module.** Use `packages/<package>/test/<Module>.test.ts` for a source module's public contract, and extend the existing suite when adding functionality. Do not introduce feature-named root suites such as `MiddlewareOptions.test.ts` when the feature spans several existing modules.
-- **Split feature coverage by ownership.** Put attachment typing and builder behavior in the relevant spec module's suite, schema equivalence in the module that validates it, ref propagation in `Ref`/`Refs`, and implementation typing or registration checks in their server module suites. A unit test may construct inputs with other modules; its assertions should target the owning module's contract.
-- **Use the existing backend integration suites for runtime flows.** Tests that invoke backend functions or verify middleware execution order, service propagation, and client error decoding belong under `packages/server/test/mock-backend/`, or `test/local-backend/` when a real Convex backend is required. Extend the relevant topic suite, such as `mock-backend/middleware.test.ts`, and reuse the existing test harness and fixtures rather than adding a parallel setup in the unit-test directory.
-- **Make new integration conventions explicit.** If another package needs integration coverage that does not fit an existing suite, document its integration-test location and configure test discovery explicitly rather than silently introducing feature-named integration suites among per-module unit tests.
-- **Preserve coverage when reorganizing tests.** Relocate both runtime assertions and type assertions, including negative `@ts-expect-error` cases. Split mixed tests where necessary so each assertion has a clear owner, then run the affected unit and integration suites plus the repository typecheck.
+- **Keep unit tests per-module.** Use `packages/<package>/test/<Module>.test.ts` for a source module's public contract. When a feature spans several modules, extend their existing suites rather than introducing a feature-named root suite.
+- **Organize assertions by ownership.** A unit test may construct inputs with other modules; place it in the suite for the module whose contract it verifies.
+- **Keep integration coverage separate.** Tests whose purpose is to verify how modules work together or interact across runtime boundaries belong in integration suites. Extend the relevant existing suite and reuse its harness and fixtures rather than adding a parallel setup in the unit-test directory.
+- **Make new integration conventions explicit.** If integration coverage needs a new layout, document its location and configure test discovery explicitly.
 
 ### Running tests
 
