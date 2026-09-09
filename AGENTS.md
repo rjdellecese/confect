@@ -72,6 +72,15 @@ Tests use Vitest with a root-level `vitest.config.ts` (which uses `projects: ["p
 
 Tests import the public package specifiers (e.g. `@confect/core/Ref`); `vitest.shared.ts` aliases those to each package's `src/` so suites run against source rather than built `dist/`.
 
+### Test organization
+
+- **Keep unit tests per-module.** Use `packages/<package>/test/<Module>.test.ts` for a source module's public contract. When a feature spans several modules, extend their existing suites rather than introducing a feature-named root suite.
+- **Organize assertions by ownership.** A unit test may construct inputs with other modules; place it in the suite for the module whose contract it verifies.
+- **Keep integration coverage separate.** Tests whose purpose is to verify how modules work together or interact across runtime boundaries belong in integration suites. Extend the relevant existing suite and reuse its harness and fixtures rather than adding a parallel setup in the unit-test directory.
+- **Make new integration conventions explicit.** If integration coverage needs a new layout, document its location and configure test discovery explicitly.
+
+### Running tests
+
 Run `pnpm test` to run all suites at once, or target a single package with `vitest run --project @confect/<pkg>` (e.g. `vitest run --project @confect/core`). Run tests with `vitest run`, not `vp test` — the Vite+ test runner mishandles type-only test files. The server's Convex integration suites have dedicated scripts: `pnpm test:server:mock-backend` and `pnpm test:server:local-backend`.
 
 ## Versioning and Publishing
