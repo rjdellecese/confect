@@ -44,6 +44,67 @@ type EnvironmentOf<H> = H extends (
   ? R
   : never;
 
+describe("implementation options", () => {
+  class GroupPolicy extends MiddlewareSpec.MiddlewareSpec<GroupPolicy>()(
+    "GroupPolicy",
+    {
+      options: () => Schema.Struct({ label: Schema.String }),
+      functionTypes: { query: true, mutation: true, action: true },
+    },
+  ) {}
+
+  class FunctionPolicy extends MiddlewareSpec.MiddlewareSpec<FunctionPolicy>()(
+    "FunctionPolicy",
+    {
+      options: () => Schema.Struct({ tolerateMissing: Schema.Boolean }),
+      functionTypes: { query: true, mutation: true, action: true },
+    },
+  ) {}
+
+  class Observe extends MiddlewareSpec.MiddlewareSpec<Observe>()("Observe", {
+    functionTypes: { query: true, mutation: true, action: true },
+  }) {}
+
+  it("types options for the common implementation strategy", () => {
+    MiddlewareImpl.make(databaseSchema, GroupPolicy, (effect, metadata) => {
+      expectTypeOf(metadata.options).toEqualTypeOf<{
+        readonly label: string;
+      }>();
+      return effect;
+    });
+  });
+
+  it("types options for each function-type implementation", () => {
+    MiddlewareImpl.makeByFunctionType(databaseSchema, FunctionPolicy, {
+      query: (effect, { options }) => {
+        expectTypeOf(options).toEqualTypeOf<{
+          readonly tolerateMissing: boolean;
+        }>();
+        return effect;
+      },
+      mutation: (effect, { options }) => {
+        expectTypeOf(options).toEqualTypeOf<{
+          readonly tolerateMissing: boolean;
+        }>();
+        return effect;
+      },
+      action: (effect, { options }) => {
+        expectTypeOf(options).toEqualTypeOf<{
+          readonly tolerateMissing: boolean;
+        }>();
+        return effect;
+      },
+    });
+  });
+
+  it("types options as undefined for optionless middleware", () => {
+    MiddlewareImpl.make(databaseSchema, Observe, (effect, { options }) => {
+      expectTypeOf(options).toBeUndefined();
+      return effect;
+    });
+  });
+});
+
 describe("handler environment widening", () => {
   it("accepts handlers consuming a service provided by an attached middleware", () => {
     FunctionImpl.make(databaseSchema, coveredGroup, "viewerName", () =>

@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as MutableRef from "effect/MutableRef";
 import * as Schema from "effect/Schema";
 import * as FunctionSpec from "@confect/core/FunctionSpec";
+import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import * as Ref from "@confect/core/Ref";
 
 declare const ServicefulString: Schema.Codec<string, string, "RequiredService">;
@@ -404,5 +405,62 @@ describe("paginated queries", () => {
         FunctionSpec.EncodedReturns<Spec>["page"][number]
       >().toEqualTypeOf<{ readonly value: string }>();
     });
+  });
+});
+
+describe("middleware options", () => {
+  class AccessDenied extends Schema.TaggedError<AccessDenied>()(
+    "AccessDenied",
+    {},
+  ) {}
+
+  class RequireRole extends MiddlewareSpec.MiddlewareSpec<RequireRole>()(
+    "RequireRole",
+    {
+      options: () =>
+        Schema.Struct({
+          roles: Schema.Array(Schema.Literals(["Internal", "Buyer"])),
+        }),
+      error: () => AccessDenied,
+      functionTypes: { query: true, mutation: true, action: true },
+    },
+  ) {}
+
+  class Observe extends MiddlewareSpec.MiddlewareSpec<Observe>()("Observe", {
+    functionTypes: { query: true, mutation: true, action: true },
+  }) {}
+
+  const query = FunctionSpec.publicQuery({
+    name: "get",
+    returns: () => Schema.String,
+  });
+
+  it("requires exactly the declared attachment options", () => {
+    query.middleware(RequireRole, { roles: ["Internal"] });
+    query.middleware(Observe);
+    // @ts-expect-error
+    query.middleware(RequireRole);
+    // @ts-expect-error
+    query.middleware(RequireRole, { roles: ["Unknown"] });
+    // @ts-expect-error
+    query.middleware(RequireRole, {});
+    // @ts-expect-error
+    query.middleware(Observe, {});
+  });
+
+  it("keeps attachment values independent without mutating the spec or builder", () => {
+    const internal = query.middleware(RequireRole, { roles: ["Internal"] });
+    const buyer = query.middleware(RequireRole, { roles: ["Buyer"] });
+    expect(internal.middlewareAttachments[0]?.options).toEqual({
+      roles: ["Internal"],
+    });
+    expect(buyer.middlewareAttachments[0]?.options).toEqual({
+      roles: ["Buyer"],
+    });
+    expect(query.middlewareAttachments).toEqual([]);
+    expect(internal.middlewareSpecs).toEqual([RequireRole]);
+    expectTypeOf<MiddlewareSpec.Options<typeof RequireRole>>().toEqualTypeOf<{
+      readonly roles: ReadonlyArray<"Internal" | "Buyer">;
+    }>();
   });
 });

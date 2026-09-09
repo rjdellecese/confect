@@ -318,3 +318,89 @@ describe("middleware error unions", () => {
     expectTypeOf<Ref.Error<typeof refs.public.mixed.search>>().toBeNever();
   });
 });
+
+describe("make with middleware options", () => {
+  class AccessDenied extends Schema.TaggedError<AccessDenied>()(
+    "AccessDenied",
+    {},
+  ) {}
+
+  class RequireRole extends MiddlewareSpec.MiddlewareSpec<RequireRole>()(
+    "RequireRole",
+    {
+      options: () =>
+        Schema.Struct({
+          roles: Schema.Array(Schema.Literals(["Internal", "Buyer"])),
+        }),
+      error: () => AccessDenied,
+      functionTypes: { query: true, mutation: true, action: true },
+    },
+  ) {}
+
+  class Observe extends MiddlewareSpec.MiddlewareSpec<Observe>()("Observe", {
+    functionTypes: { query: true, mutation: true, action: true },
+  }) {}
+
+  const query = FunctionSpec.publicQuery({
+    name: "get",
+    returns: () => Schema.String,
+  });
+
+  it("preserves options through group builders and refs without inheriting into children", () => {
+    const options = { roles: ["Internal"] as const };
+    const group = GroupSpec.make()
+      .middleware(RequireRole, options)
+      .addFunction(query.middleware(Observe))
+      .addGroup(GroupSpec.makeAt("child").addFunction(query))
+      .addGroupAt("alias", GroupSpec.make().addFunction(query));
+    const refs = Refs.make(Spec.make().addAt("roles", group));
+    expect(refs.public.roles.get.middlewareAttachments[0]?.options).toBe(
+      options,
+    );
+    expect(refs.public.roles.child.get.middlewareAttachments).toEqual([]);
+    expect(refs.public.roles.alias.get.middlewareAttachments).toEqual([]);
+    expectTypeOf<
+      Ref.Error<typeof refs.public.roles.get>
+    >().toEqualTypeOf<AccessDenied>();
+    expectTypeOf<Ref.Error<typeof refs.public.roles.child.get>>().toBeNever();
+
+    const functionRefs = Refs.make(
+      Spec.make().addAt(
+        "roles",
+        GroupSpec.make().addFunction(query.middleware(RequireRole, options)),
+      ),
+    );
+    expect(
+      functionRefs.public.roles.get.middlewareAttachments[0]?.options,
+    ).toBe(options);
+    expectTypeOf<
+      Ref.Error<typeof functionRefs.public.roles.get>
+    >().toEqualTypeOf<AccessDenied>();
+  });
+
+  it("keeps options schemas lazy through construction, assembly, and refs", () => {
+    let evaluations = 0;
+    class LazyPolicy extends MiddlewareSpec.MiddlewareSpec<LazyPolicy>()(
+      "LazyPolicy",
+      {
+        options: () => {
+          evaluations++;
+          return Schema.Struct({ enabled: Schema.Boolean });
+        },
+        functionTypes: { query: true, mutation: false, action: false },
+      },
+    ) {}
+    const group = GroupSpec.make()
+      .middleware(LazyPolicy, { enabled: true })
+      .addFunction(query.middleware(LazyPolicy, { enabled: false }));
+    const refs = Refs.make(Spec.make().addAt("lazy", group));
+    expect(
+      refs.public.lazy.get.middlewareAttachments.map(({ options }) => options),
+    ).toEqual([{ enabled: true }, { enabled: false }]);
+    expect(evaluations).toBe(0);
+    GroupSpec.validateMiddleware(group);
+    expect(evaluations).toBe(1);
+    GroupSpec.validateMiddleware(group);
+    expect(evaluations).toBe(1);
+  });
+});

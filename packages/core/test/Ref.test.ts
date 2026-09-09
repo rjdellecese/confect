@@ -770,3 +770,32 @@ describe("error schema laziness at decode time", () => {
     expect(MutableRef.get(middlewareErrorBuilt)).toBe(true);
   });
 });
+
+describe("make with middleware options", () => {
+  const query = FunctionSpec.publicQuery({
+    name: "get",
+    returns: () => Schema.String,
+  });
+
+  it("retains client-safe resolver values without serializing them", () => {
+    class Resource extends MiddlewareSpec.MiddlewareSpec<Resource>()(
+      "Resource",
+      {
+        options: () =>
+          Schema.Struct({
+            resolve: Schema.declare<(args: unknown) => string>(
+              (value): value is (args: unknown) => string =>
+                typeof value === "function",
+            ),
+            tolerateMissing: Schema.Boolean,
+          }),
+        functionTypes: { query: true, mutation: false, action: false },
+      },
+    ) {}
+    const resolve = (_args: unknown) => "resource-id";
+    const options = { resolve, tolerateMissing: true };
+    const ref = Ref.make("resources", query.middleware(Resource, options));
+    expect(ref.middlewareAttachments[0]?.options).toBe(options);
+    expectTypeOf<Ref.Error<typeof ref>>().toBeNever();
+  });
+});

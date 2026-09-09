@@ -463,3 +463,85 @@ describe("Ref error union", () => {
     >().toEqualTypeOf<NotFound | NotSignedIn>();
   });
 });
+
+describe("validateAttachments", () => {
+  class RequireRole extends MiddlewareSpec.MiddlewareSpec<RequireRole>()(
+    "RequireRole",
+    {
+      options: () =>
+        Schema.Struct({
+          roles: Schema.Array(Schema.Literals(["Internal", "Buyer"])),
+        }),
+      functionTypes: { query: true, mutation: true, action: true },
+    },
+  ) {}
+
+  it("uses schema equivalence overrides rather than serialized or reference equality", () => {
+    class RoleSet extends MiddlewareSpec.MiddlewareSpec<RoleSet>()("RoleSet", {
+      options: () =>
+        Schema.Struct({ roles: Schema.Array(Schema.String) }).pipe(
+          Schema.overrideToEquivalence(
+            () => (left, right) =>
+              left.roles.every((role) => right.roles.includes(role)) &&
+              right.roles.every((role) => left.roles.includes(role)),
+          ),
+        ),
+      functionTypes: { query: true, mutation: false, action: false },
+    }) {}
+    expect(() =>
+      MiddlewareSpec.validateAttachments(
+        [
+          { spec: RoleSet, options: { roles: ["Internal", "Buyer"] } },
+          { spec: RoleSet, options: { roles: ["Buyer", "Internal", "Buyer"] } },
+        ],
+        "test chain",
+      ),
+    ).toThrowError(/equivalent options/);
+    MiddlewareSpec.validateAttachments(
+      [
+        { spec: RequireRole, options: { roles: ["Internal", "Buyer"] } },
+        { spec: RequireRole, options: { roles: ["Buyer", "Internal"] } },
+      ],
+      "test chain",
+    );
+  });
+
+  it("validates option values on the schema's type side", () => {
+    class Limit extends MiddlewareSpec.MiddlewareSpec<Limit>()("Limit", {
+      options: () => Schema.Struct({ limit: Schema.FiniteFromString }),
+      functionTypes: { query: true, mutation: false, action: false },
+    }) {}
+    const valid: MiddlewareSpec.Attachment<typeof Limit> = {
+      spec: Limit,
+      options: { limit: 5 },
+    };
+    MiddlewareSpec.validateAttachments([valid], "test chain");
+    const invalid: MiddlewareSpec.Attachment<typeof Limit> = {
+      spec: Limit,
+      // @ts-expect-error
+      options: { limit: "5" },
+    };
+    expect(() =>
+      MiddlewareSpec.validateAttachments([invalid], "test chain"),
+    ).toThrowError(/invalid options/);
+  });
+
+  it("rejects different spec declarations sharing an implementation key", () => {
+    class OtherRole extends MiddlewareSpec.MiddlewareSpec<OtherRole>()(
+      "RequireRole",
+      {
+        options: () => Schema.Struct({ roles: Schema.Array(Schema.String) }),
+        functionTypes: { query: true, mutation: true, action: true },
+      },
+    ) {}
+    expect(() =>
+      MiddlewareSpec.validateAttachments(
+        [
+          { spec: RequireRole, options: { roles: ["Internal"] } },
+          { spec: OtherRole, options: { roles: ["Buyer"] } },
+        ],
+        "test chain",
+      ),
+    ).toThrowError(/Different middleware specs share key "RequireRole"/);
+  });
+});
