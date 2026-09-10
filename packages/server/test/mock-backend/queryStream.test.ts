@@ -27,11 +27,19 @@ const collectTexts = <E, R>(
 const paginateAll = <Doc, Key extends ReadonlyArray<string>, E, R>(
   stream: QueryStream.QueryStream<Doc, Key, E, R>,
   numItems: number,
-): Effect.Effect<ReadonlyArray<ReadonlyArray<Doc>>, E, R> => {
+): Effect.Effect<
+  ReadonlyArray<ReadonlyArray<Doc>>,
+  E | QueryStream.ReadBudgetExceededError,
+  R
+> => {
   const go = (
     cursor: string | null,
     pages: ReadonlyArray<ReadonlyArray<Doc>>,
-  ): Effect.Effect<ReadonlyArray<ReadonlyArray<Doc>>, E, R> =>
+  ): Effect.Effect<
+    ReadonlyArray<ReadonlyArray<Doc>>,
+    E | QueryStream.ReadBudgetExceededError,
+    R
+  > =>
     QueryStream.paginate(stream, { numItems, cursor }).pipe(
       Effect.flatMap((result) => {
         const collected =
@@ -497,7 +505,7 @@ describe("QueryStream", () => {
             pages: ReadonlyArray<ReadonlyArray<string>>,
           ): Effect.Effect<
             ReadonlyArray<ReadonlyArray<string>>,
-            Document.DocumentDecodeError
+            Document.DocumentDecodeError | QueryStream.ReadBudgetExceededError
           > =>
             QueryStream.paginate(merged, {
               numItems: 10,
@@ -695,6 +703,16 @@ describe("QueryStream", () => {
               const distinct = leaf.pipe(QueryStream.distinct(["text"]));
               expect(
                 yield* collectTexts(QueryStream.narrow(distinct, bounds)),
+              ).toEqual(
+                texts.filter(
+                  (text, index) =>
+                    texts.indexOf(text) === index &&
+                    index >= (startInclusive ? 1 : 2) &&
+                    index <= (endInclusive ? 5 : 4),
+                ),
+              );
+              expect(
+                yield* collectTexts(QueryStream.narrow(distinct, prefixBounds)),
               ).toEqual([...new Set(expectedPrefixes)]);
               expect(
                 yield* collectTexts(QueryStream.reverse(narrowed)),
@@ -1199,12 +1217,10 @@ describe("QueryStream", () => {
             ["a1"],
           ]);
 
-          // A distinct stream keeps a different document per group in the
-          // other direction, so it refuses.
           const firstPerText = notes.pipe(QueryStream.distinct(["text"]));
-          expect(() => QueryStream.reverse(firstPerText)).toThrow(
-            /cannot be reversed/,
-          );
+          expect(
+            yield* Stream.runCollect(QueryStream.reverse(firstPerText)),
+          ).toEqual(Array.reverse(yield* Stream.runCollect(firstPerText)));
         }),
       );
     }).pipe(Effect.provide(TestConfect.layer)),
