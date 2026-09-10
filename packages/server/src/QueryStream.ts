@@ -63,6 +63,7 @@ import * as Sink from "effect/Sink";
 import * as Stream from "effect/Stream";
 import * as String from "effect/String";
 import * as SynchronizedRef from "effect/SynchronizedRef";
+import * as Tuple from "effect/Tuple";
 import type * as Types from "effect/Types";
 import * as Document from "./Document";
 
@@ -1039,17 +1040,17 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
           SynchronizedRef.modifyEffect(stateRef, (state) =>
             Effect.gen(function* () {
               if (isBudgetExhausted(limits, state)) {
-                return [
+                return Tuple.make(
                   Option.none(),
                   new ReadBudgetState({
                     rows: state.rows,
                     bytes: state.bytes,
                     status: BudgetStatus.Stopped(),
                   }),
-                ] as const;
+                );
               }
               const documents = yield* pull;
-              return [
+              return Tuple.make(
                 Option.some(documents),
                 new ReadBudgetState({
                   status: state.status,
@@ -1065,7 +1066,7 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
                       ),
                   }),
                 }),
-              ] as const;
+              );
             }),
           ).pipe(
             Effect.flatMap(
@@ -1272,22 +1273,20 @@ const mergeStep =
       );
 
       return Option.getOrUndefined(
-        Option.map(
-          earliest,
-          ({ index, element }) =>
-            [
-              element,
-              Array.map(filled, (source, sourceIndex) =>
-                sourceIndex === index
-                  ? new MergeSource({
-                      pull: source.pull,
-                      buffer: source.buffer,
-                      index: source.index + 1,
-                      status: source.status,
-                    })
-                  : source,
-              ),
-            ] as const,
+        Option.map(earliest, ({ index, element }) =>
+          Tuple.make(
+            element,
+            Array.map(filled, (source, sourceIndex) =>
+              sourceIndex === index
+                ? new MergeSource({
+                    pull: source.pull,
+                    buffer: source.buffer,
+                    index: source.index + 1,
+                    status: source.status,
+                  })
+                : source,
+            ),
+          ),
         ),
       );
     });
@@ -2229,10 +2228,10 @@ const makeDistinct = <
         > =>
           Effect.gen(function* () {
             if (yield* isBudgetStopped(budgetStatus))
-              return [[], Option.none()] as const;
+              return Tuple.make([], Option.none());
             const discovered = yield* Stream.runHead(current.annotated);
             return yield* Option.match(discovered, {
-              onNone: () => Effect.succeed([[], Option.none()] as const),
+              onNone: () => Effect.succeed(Tuple.make([], Option.none())),
               onSome: (element) =>
                 Effect.gen(function* () {
                   const { doc, key } = element;
@@ -2242,12 +2241,12 @@ const makeDistinct = <
                       onNone: () => key,
                       onSome: () => prefix,
                     });
-                    return [
+                    return Tuple.make(
                       isAdmitted(key) ? [element] : [],
                       Option.some(
                         narrowByKeyBounds(current, afterKey(nextKey)),
                       ),
-                    ] as const;
+                    );
                   }
                   const next = Option.some(
                     narrowByKeyBounds(current, afterKey(prefix)),
@@ -2274,12 +2273,12 @@ const makeDistinct = <
                     onNone: () =>
                       Effect.gen(function* () {
                         if (yield* isBudgetStopped(budgetStatus))
-                          return [[], Option.none()] as const;
+                          return Tuple.make([], Option.none());
                         const checkpoint = Option.getOrElse(
                           yield* Ref.get(firstKey),
                           () => key,
                         );
-                        return [
+                        return Tuple.make(
                           isAdmitted(checkpoint)
                             ? [
                                 new Element({
@@ -2289,13 +2288,17 @@ const makeDistinct = <
                               ]
                             : [],
                           next,
-                        ] as const;
+                        );
                       }),
                     onSome: (representative) =>
-                      Effect.succeed([
-                        isAdmitted(representative.key) ? [representative] : [],
-                        next,
-                      ] as const),
+                      Effect.succeed(
+                        Tuple.make(
+                          isAdmitted(representative.key)
+                            ? [representative]
+                            : [],
+                          next,
+                        ),
+                      ),
                   });
                 }),
             });
