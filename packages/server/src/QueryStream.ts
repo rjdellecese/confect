@@ -1167,6 +1167,11 @@ const mergeSourceHead = <Doc, E>(
   source: MergeSource<Doc, E>,
 ): Option.Option<Element<Doc>> => Array.get(source.buffer, source.index);
 
+class MergeCandidate<Doc> extends Data.Class<{
+  readonly index: number;
+  readonly element: Element<Doc>;
+}> {}
+
 /**
  * Refill an exhausted-buffer source from its pull, translating the pull's
  * end-of-stream signal into a source status, retaining budget-limited stops.
@@ -1246,16 +1251,17 @@ const mergeStep =
 
       const earliest = Array.reduce(
         filled,
-        Option.none<readonly [number, Element<Doc>]>(),
+        Option.none<MergeCandidate<Doc>>(),
         (best, source, index) =>
           Option.match(mergeSourceHead(source), {
             onNone: () => best,
             onSome: (head) =>
               Option.match(best, {
-                onNone: () => Option.some([index, head] as const),
-                onSome: ([, bestElement]) =>
+                onNone: () =>
+                  Option.some(new MergeCandidate({ index, element: head })),
+                onSome: ({ element: bestElement }) =>
                   isEarlier(head.key, bestElement.key)
-                    ? Option.some([index, head] as const)
+                    ? Option.some(new MergeCandidate({ index, element: head }))
                     : best,
               }),
           }),
@@ -1264,7 +1270,7 @@ const mergeStep =
       return Option.getOrUndefined(
         Option.map(
           earliest,
-          ([index, element]) =>
+          ({ index, element }) =>
             [
               element,
               Array.map(filled, (source, sourceIndex) =>
