@@ -56,6 +56,52 @@ describe("QueryStream.Element", () => {
   });
 });
 
+describe.each(["asc", "desc"] as const)(
+  "QueryStream.paginate (%s)",
+  (order) => {
+    it.effect.each([
+      { start: false, end: false },
+      { start: true, end: false },
+      { start: false, end: true },
+      { start: true, end: true },
+    ])(
+      "preserves optional bounds with start=$start and end=$end",
+      ({ start, end }) =>
+        Effect.gen(function* () {
+          const values = order === "asc" ? [1, 2, 3, 4, 5] : [5, 4, 3, 2, 1];
+          const source = new QueryStream.QueryStream(
+            order,
+            ["_id"],
+            Stream.fromIterable(
+              values.map(
+                (value) =>
+                  new QueryStream.Element({
+                    doc: Option.some(value),
+                    key: [value],
+                  }),
+              ),
+            ),
+          );
+          const result = yield* QueryStream.paginate(source, {
+            cursor: start ? QueryStream.serializeCursor([values[1]]) : null,
+            ...(end
+              ? { endCursor: QueryStream.serializeCursor([values[3]]) }
+              : {}),
+            numItems: 10,
+          });
+
+          expect(result.page).toEqual(values.slice(start ? 2 : 0, end ? 4 : 5));
+          expect(result.isDone).toBe(!end);
+          expect(result.continueCursor).toBe(
+            end
+              ? QueryStream.serializeCursor([values[3]])
+              : QueryStream.END_CURSOR,
+          );
+        }),
+    );
+  },
+);
+
 describe("QueryStream", () => {
   const elements = [
     new QueryStream.Element({ doc: Option.some(1), key: [1] }),
