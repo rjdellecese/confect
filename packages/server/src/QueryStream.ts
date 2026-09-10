@@ -2810,18 +2810,14 @@ export const paginate: {
       const until = Option.map(pinnedEnd, (cursor) =>
         deserializeCursorChecked(cursor, self.keyFields.length),
       );
-      const start = Option.getOrUndefined(
-        Option.map(after, (key) => ({ key, inclusive: false })),
+      const start = Option.map(after, (key) => ({ key, inclusive: false }));
+      const end = Option.map(until, (key) => ({ key, inclusive: true }));
+      const narrowed = narrowByKeyBounds(
+        self,
+        self.order === "asc"
+          ? { lower: start, upper: end }
+          : { lower: end, upper: start },
       );
-      const end = Option.getOrUndefined(
-        Option.map(until, (key) => ({ key, inclusive: true })),
-      );
-      const narrowed =
-        start !== undefined
-          ? narrow(self, { start, end })
-          : end !== undefined
-            ? narrow(self, { end })
-            : self;
       // With an endCursor the page runs to it, however many items that is.
       const maxRows = Option.match(endCursor, {
         onNone: () => Option.some(options.numItems),
