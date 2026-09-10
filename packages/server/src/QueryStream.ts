@@ -2229,84 +2229,60 @@ const makeDistinct = <
             if (yield* isBudgetStopped(budgetStatus))
               return Tuple.make([], Option.none());
             const discovered = yield* Stream.runHead(current.annotated);
-            return yield* Option.match(discovered, {
-              onNone: () => Effect.succeed(Tuple.make([], Option.none())),
-              onSome: (element) =>
-                Effect.gen(function* () {
-                  const { doc, key } = element;
-                  const prefix = Array.take(key, distinctLength);
-                  if (order === self.order) {
-                    const nextKey = Option.match(doc, {
-                      onNone: () => key,
-                      onSome: () => prefix,
-                    });
-                    return Tuple.make(
-                      isAdmitted(key) ? [element] : [],
-                      Option.some(
-                        narrowByKeyBounds(current, afterKey(nextKey)),
+            if (Option.isNone(discovered)) return Tuple.make([], Option.none());
+            const element = discovered.value;
+            const { doc, key } = element;
+            const prefix = Array.take(key, distinctLength);
+            if (order === self.order) {
+              const nextKey = Option.match(doc, {
+                onNone: () => key,
+                onSome: () => prefix,
+              });
+              return Tuple.make(
+                isAdmitted(key) ? [element] : [],
+                Option.some(narrowByKeyBounds(current, afterKey(nextKey))),
+              );
+            }
+            const next = Option.some(
+              narrowByKeyBounds(current, afterKey(prefix)),
+            );
+            const { firstKey, selected } = yield* narrowByKeyBounds(self, {
+              lower: Option.some({ key: prefix, inclusive: true }),
+              upper: Option.some({ key: prefix, inclusive: true }),
+            }).annotated.pipe(
+              Stream.run(
+                Sink.fold(
+                  () => ({
+                    firstKey: Option.none<OrderKey>(),
+                    selected: Option.none<Element<Doc>>(),
+                  }),
+                  (probe) => Option.isNone(probe.selected),
+                  (probe, candidate: Element<Doc>) =>
+                    Effect.succeed({
+                      firstKey: Option.orElse(probe.firstKey, () =>
+                        Option.some(candidate.key),
                       ),
-                    );
-                  }
-                  const next = Option.some(
-                    narrowByKeyBounds(current, afterKey(prefix)),
-                  );
-                  const { firstKey, selected } = yield* narrowByKeyBounds(
-                    self,
-                    {
-                      lower: Option.some({ key: prefix, inclusive: true }),
-                      upper: Option.some({ key: prefix, inclusive: true }),
-                    },
-                  ).annotated.pipe(
-                    Stream.run(
-                      Sink.fold(
-                        () => ({
-                          firstKey: Option.none<OrderKey>(),
-                          selected: Option.none<Element<Doc>>(),
-                        }),
-                        (probe) => Option.isNone(probe.selected),
-                        (probe, candidate: Element<Doc>) =>
-                          Effect.succeed({
-                            firstKey: Option.orElse(probe.firstKey, () =>
-                              Option.some(candidate.key),
-                            ),
-                            selected: Option.as(candidate.doc, candidate),
-                          }),
-                      ),
-                    ),
-                  );
-                  return yield* Option.match(selected, {
-                    onNone: () =>
-                      Effect.gen(function* () {
-                        if (yield* isBudgetStopped(budgetStatus))
-                          return Tuple.make([], Option.none());
-                        const checkpoint = Option.getOrElse(
-                          firstKey,
-                          () => key,
-                        );
-                        return Tuple.make(
-                          isAdmitted(checkpoint)
-                            ? [
-                                new Element({
-                                  doc: Option.none<Doc>(),
-                                  key: checkpoint,
-                                }),
-                              ]
-                            : [],
-                          next,
-                        );
-                      }),
-                    onSome: (representative) =>
-                      Effect.succeed(
-                        Tuple.make(
-                          isAdmitted(representative.key)
-                            ? [representative]
-                            : [],
-                          next,
-                        ),
-                      ),
-                  });
-                }),
-            });
+                      selected: Option.as(candidate.doc, candidate),
+                    }),
+                ),
+              ),
+            );
+            if (Option.isSome(selected)) {
+              const representative = selected.value;
+              return Tuple.make(
+                isAdmitted(representative.key) ? [representative] : [],
+                next,
+              );
+            }
+            if (yield* isBudgetStopped(budgetStatus))
+              return Tuple.make([], Option.none());
+            const checkpoint = Option.getOrElse(firstKey, () => key);
+            return Tuple.make(
+              isAdmitted(checkpoint)
+                ? [new Element({ doc: Option.none<Doc>(), key: checkpoint })]
+                : [],
+              next,
+            );
           }),
       ),
     ),
@@ -2842,7 +2818,7 @@ export const paginate: {
         Option.orElse(maximumRowsRead, () => maximumBytesRead),
         stateRef,
       );
-      return yield* pipe(
+      const collected = yield* pipe(
         Stream.run(
           narrowed.annotated,
           Sink.fold(
@@ -2879,107 +2855,93 @@ export const paginate: {
         ),
         Effect.provideService(ReadBudgetLimits, limits),
         Effect.provideService(ReadBudgetStatus, budgetStatus),
-        Effect.flatMap((state) =>
-          Effect.gen(function* () {
-            const usage = yield* SynchronizedRef.get(stateRef);
-            const stopped = BudgetStatus.$is("Stopped")(usage.status);
-            const limited = stopped || state.hitLimit;
-            if (
-              limited &&
-              (Chunk.isEmpty(state.readKeys) ||
-                Option.exists(
-                  pinnedEnd,
-                  (endpoint) => midpointCursor(state.readKeys) === endpoint,
-                ))
-            ) {
-              return yield* new ReadBudgetExceededError({
-                rowsRead: usage.rows,
-                ...Option.match(maximumBytesRead, {
-                  onNone: () => ({}),
-                  onSome: () => ({
-                    bytesRead: usage.bytes,
-                  }),
-                }),
-              });
-            }
-            return stopped
-              ? new PaginateState({
-                  page: state.page,
-                  readKeys: state.readKeys,
-                  stopped: true,
-                  hitLimit: true,
-                })
-              : state;
-          }),
-        ),
-        Effect.map((state): PaginationResult<Doc> => {
-          const page = Chunk.toArray(state.page);
-          // `stopped` implies at least one element was read, so the last
-          // read key exists exactly when the fold stopped early.
-          const stoppedAt = state.stopped
-            ? Chunk.last(state.readKeys)
-            : Option.none<OrderKey>();
-          return Option.match(stoppedAt, {
-            onSome: (lastKey) =>
-              state.hitLimit
-                ? {
-                    page,
-                    isDone: false,
-                    continueCursor: serializeCursor(lastKey),
-                    pageStatus: "SplitRequired" as const,
-                    splitCursor: midpointCursor(state.readKeys),
-                  }
-                : // A growing page that had to scan far past its item budget
-                  // (a filter-heavy stream) recommends a split so reactive
-                  // clients can subdivide it instead of re-scanning forever.
-                  Chunk.size(state.readKeys) >= SOFT_MAX_SCAN_LENGTH
-                  ? {
-                      page,
-                      isDone: false,
-                      continueCursor: serializeCursor(lastKey),
-                      pageStatus: "SplitRecommended" as const,
-                      splitCursor: midpointCursor(state.readKeys),
-                    }
-                  : {
-                      page,
-                      isDone: false,
-                      continueCursor: serializeCursor(lastKey),
-                    },
-            // The narrowed stream was exhausted: either we reached the
-            // pinned end cursor (more may follow it) or the true end of
-            // the stream. An endCursor-pinned page that has grown well
-            // past its requested size recommends a split, so reactive
-            // clients can subdivide it (as `convex-helpers` does).
-            onNone: () => {
-              // Any pinned page — including one pinned to the end of the
-              // stream — that has grown well past its requested size
-              // recommends a split.
-              const shouldRecommendSplit =
-                Option.isSome(endCursor) &&
-                (Chunk.size(state.readKeys) >= SOFT_MAX_SCAN_LENGTH ||
-                  Chunk.size(state.page) > options.numItems + 1);
-              return shouldRecommendSplit && Chunk.size(state.readKeys) > 0
-                ? {
-                    page,
-                    isDone: false,
-                    continueCursor: Option.getOrElse(
-                      pinnedEnd,
-                      () => END_CURSOR,
-                    ),
-                    pageStatus: "SplitRecommended" as const,
-                    splitCursor: midpointCursor(state.readKeys),
-                  }
-                : {
-                    page,
-                    isDone: Option.isNone(pinnedEnd),
-                    continueCursor: Option.getOrElse(
-                      pinnedEnd,
-                      () => END_CURSOR,
-                    ),
-                  };
-            },
-          });
-        }),
       );
+      const usage = yield* SynchronizedRef.get(stateRef);
+      const stopped = BudgetStatus.$is("Stopped")(usage.status);
+      const limited = stopped || collected.hitLimit;
+      if (
+        limited &&
+        (Chunk.isEmpty(collected.readKeys) ||
+          Option.exists(
+            pinnedEnd,
+            (endpoint) => midpointCursor(collected.readKeys) === endpoint,
+          ))
+      ) {
+        return yield* new ReadBudgetExceededError({
+          rowsRead: usage.rows,
+          ...Option.match(maximumBytesRead, {
+            onNone: () => ({}),
+            onSome: () => ({ bytesRead: usage.bytes }),
+          }),
+        });
+      }
+      const state = stopped
+        ? new PaginateState({
+            page: collected.page,
+            readKeys: collected.readKeys,
+            stopped: true,
+            hitLimit: true,
+          })
+        : collected;
+      const page = Chunk.toArray(state.page);
+      // `stopped` implies at least one element was read, so the last
+      // read key exists exactly when the fold stopped early.
+      const stoppedAt = state.stopped
+        ? Chunk.last(state.readKeys)
+        : Option.none<OrderKey>();
+      return Option.match(stoppedAt, {
+        onSome: (lastKey) =>
+          state.hitLimit
+            ? {
+                page,
+                isDone: false,
+                continueCursor: serializeCursor(lastKey),
+                pageStatus: "SplitRequired" as const,
+                splitCursor: midpointCursor(state.readKeys),
+              }
+            : // A growing page that had to scan far past its item budget
+              // (a filter-heavy stream) recommends a split so reactive
+              // clients can subdivide it instead of re-scanning forever.
+              Chunk.size(state.readKeys) >= SOFT_MAX_SCAN_LENGTH
+              ? {
+                  page,
+                  isDone: false,
+                  continueCursor: serializeCursor(lastKey),
+                  pageStatus: "SplitRecommended" as const,
+                  splitCursor: midpointCursor(state.readKeys),
+                }
+              : {
+                  page,
+                  isDone: false,
+                  continueCursor: serializeCursor(lastKey),
+                },
+        // The narrowed stream was exhausted: either we reached the
+        // pinned end cursor (more may follow it) or the true end of
+        // the stream. An endCursor-pinned page that has grown well
+        // past its requested size recommends a split, so reactive
+        // clients can subdivide it (as `convex-helpers` does).
+        onNone: () => {
+          // Any pinned page — including one pinned to the end of the
+          // stream — that has grown well past its requested size
+          // recommends a split.
+          const shouldRecommendSplit =
+            Option.isSome(endCursor) &&
+            (Chunk.size(state.readKeys) >= SOFT_MAX_SCAN_LENGTH ||
+              Chunk.size(state.page) > options.numItems + 1);
+          return shouldRecommendSplit && Chunk.size(state.readKeys) > 0
+            ? {
+                page,
+                isDone: false,
+                continueCursor: Option.getOrElse(pinnedEnd, () => END_CURSOR),
+                pageStatus: "SplitRecommended" as const,
+                splitCursor: midpointCursor(state.readKeys),
+              }
+            : {
+                page,
+                isDone: Option.isNone(pinnedEnd),
+                continueCursor: Option.getOrElse(pinnedEnd, () => END_CURSOR),
+              };
+        },
+      });
     }),
 );
