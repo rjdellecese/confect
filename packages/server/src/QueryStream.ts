@@ -56,7 +56,6 @@ import * as Option from "effect/Option";
 import * as Order from "effect/Order";
 import * as Predicate from "effect/Predicate";
 import * as Pull from "effect/Pull";
-import * as Ref from "effect/Ref";
 import type * as Record from "effect/Record";
 import * as Schema from "effect/Schema";
 import * as Sink from "effect/Sink";
@@ -2251,23 +2250,29 @@ const makeDistinct = <
                   const next = Option.some(
                     narrowByKeyBounds(current, afterKey(prefix)),
                   );
-                  const firstKey = yield* Ref.make(Option.none<OrderKey>());
-                  const selected = yield* narrowByKeyBounds(self, {
-                    lower: Option.some({ key: prefix, inclusive: true }),
-                    upper: Option.some({ key: prefix, inclusive: true }),
-                  }).annotated.pipe(
-                    Stream.tap(({ key: selectedKey }) =>
-                      Ref.update(
-                        firstKey,
-                        Option.orElse(() => Option.some(selectedKey)),
+                  const { firstKey, selected } = yield* narrowByKeyBounds(
+                    self,
+                    {
+                      lower: Option.some({ key: prefix, inclusive: true }),
+                      upper: Option.some({ key: prefix, inclusive: true }),
+                    },
+                  ).annotated.pipe(
+                    Stream.run(
+                      Sink.fold(
+                        () => ({
+                          firstKey: Option.none<OrderKey>(),
+                          selected: Option.none<Element<Doc>>(),
+                        }),
+                        (probe) => Option.isNone(probe.selected),
+                        (probe, candidate: Element<Doc>) =>
+                          Effect.succeed({
+                            firstKey: Option.orElse(probe.firstKey, () =>
+                              Option.some(candidate.key),
+                            ),
+                            selected: Option.as(candidate.doc, candidate),
+                          }),
                       ),
                     ),
-                    Stream.filterMap(
-                      Filter.fromPredicateOption((selectedElement) =>
-                        Option.as(selectedElement.doc, selectedElement),
-                      ),
-                    ),
-                    Stream.runHead,
                   );
                   return yield* Option.match(selected, {
                     onNone: () =>
@@ -2275,7 +2280,7 @@ const makeDistinct = <
                         if (yield* isBudgetStopped(budgetStatus))
                           return Tuple.make([], Option.none());
                         const checkpoint = Option.getOrElse(
-                          yield* Ref.get(firstKey),
+                          firstKey,
                           () => key,
                         );
                         return Tuple.make(
