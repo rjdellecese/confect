@@ -2718,19 +2718,12 @@ const isBudgetStopped = (status: ReadBudgetStatus): Effect.Effect<boolean> =>
       ),
   });
 
-interface PaginateState<Doc> {
+class PaginateState<Doc> extends Data.Class<{
   readonly page: Chunk.Chunk<Doc>;
   readonly readKeys: Chunk.Chunk<OrderKey>;
   readonly stopped: boolean;
   readonly hitLimit: boolean;
-}
-
-const initialPaginateState = <Doc>(): PaginateState<Doc> => ({
-  page: Chunk.empty(),
-  readKeys: Chunk.empty(),
-  stopped: false,
-  hitLimit: false,
-});
+}> {}
 
 /** Where a split page divides: the midpoint of the keys read so far. */
 const midpointCursor = (readKeys: Chunk.Chunk<OrderKey>): string =>
@@ -2849,7 +2842,13 @@ export const paginate: {
         Stream.run(
           narrowed.annotated,
           Sink.fold(
-            initialPaginateState<Doc>,
+            () =>
+              new PaginateState<Doc>({
+                page: Chunk.empty(),
+                readKeys: Chunk.empty(),
+                stopped: false,
+                hitLimit: false,
+              }),
             (state) => !state.stopped,
             (state, { doc, key }: Element<Doc>) => {
               const readKeys = Chunk.append(state.readKeys, key);
@@ -2857,23 +2856,20 @@ export const paginate: {
                 onNone: () => state.page,
                 onSome: (value) => Chunk.append(state.page, value),
               });
-              return Effect.map(
-                SynchronizedRef.get(stateRef),
-                (usage): PaginateState<Doc> => {
-                  const hitLimit = isBudgetExhausted(limits, usage);
-                  return {
-                    page,
-                    readKeys,
-                    hitLimit,
-                    stopped:
-                      hitLimit ||
-                      Option.exists(
-                        maxRows,
-                        (limit) => Chunk.size(page) >= limit,
-                      ),
-                  };
-                },
-              );
+              return Effect.map(SynchronizedRef.get(stateRef), (usage) => {
+                const hitLimit = isBudgetExhausted(limits, usage);
+                return new PaginateState({
+                  page,
+                  readKeys,
+                  hitLimit,
+                  stopped:
+                    hitLimit ||
+                    Option.exists(
+                      maxRows,
+                      (limit) => Chunk.size(page) >= limit,
+                    ),
+                });
+              });
             },
           ),
         ),
@@ -2903,7 +2899,12 @@ export const paginate: {
               });
             }
             return stopped
-              ? { ...state, stopped: true, hitLimit: true }
+              ? new PaginateState({
+                  page: state.page,
+                  readKeys: state.readKeys,
+                  stopped: true,
+                  hitLimit: true,
+                })
               : state;
           }),
         ),
