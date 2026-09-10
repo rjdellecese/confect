@@ -117,7 +117,7 @@ export default GroupSpec.make()
     FunctionSpec.publicMutation({
       name: "deleteAll",
       returns: () => Schema.Null,
-    }).middleware(RequireRole, { roles: { admin: true } }),
+    }).middleware(RequireRole, { admin: true }),
   );
 ```
 
@@ -148,11 +148,9 @@ export default class RequireRole extends MiddlewareSpec.MiddlewareSpec<
 >()("RequireRole", {
   options: () =>
     Schema.Struct({
-      roles: Schema.Struct({
-        admin: Schema.optionalKey(Schema.Boolean),
-        editor: Schema.optionalKey(Schema.Boolean),
-        viewer: Schema.optionalKey(Schema.Boolean),
-      }),
+      admin: Schema.optionalKey(Schema.Boolean),
+      editor: Schema.optionalKey(Schema.Boolean),
+      viewer: Schema.optionalKey(Schema.Boolean),
     }),
   error: () => AccessDenied,
   functionTypes: { query: true, mutation: true, action: false },
@@ -174,17 +172,17 @@ export default GroupSpec.make()
     FunctionSpec.publicQuery({
       name: "list",
       returns: () => Schema.Array(Schema.String),
-    }).middleware(RequireRole, { roles: { editor: true, admin: true } }),
+    }).middleware(RequireRole, { editor: true, admin: true }),
   )
   .addFunction(
     FunctionSpec.publicMutation({
       name: "deleteAll",
       returns: () => Schema.Null,
-    }).middleware(RequireRole, { roles: { admin: true } }),
+    }).middleware(RequireRole, { admin: true }),
   );
 ```
 
-For a group-wide role policy, use `GroupSpec.make().middleware(RequireUser).middleware(RequireRole, { roles: { admin: true } })`; it covers every function in that group.
+For a group-wide role policy, use `GroupSpec.make().middleware(RequireUser).middleware(RequireRole, { admin: true })`; it covers every function in that group.
 
 The implementation reads the trusted user from `CurrentUser`, not from caller-supplied function arguments:
 
@@ -203,7 +201,7 @@ export default MiddlewareImpl.make(
     Effect.gen(function* () {
       const { user } = yield* CurrentUser;
 
-      if (options.roles[user.role] !== true) {
+      if (options[user.role] !== true) {
         return yield* new AccessDenied();
       }
 
@@ -212,13 +210,13 @@ export default MiddlewareImpl.make(
 );
 ```
 
-Provide this implementation once in the group's impl layer, alongside the `RequireUser` implementation and the function implementations. The role flags are specific to each attachment, not to the registered implementation. A user is allowed only when their role's flag is `true`; omitted or `false` flags deny access, and `{ roles: {} }` denies everyone. Missing users fail with `NotSignedIn` from `RequireUser`, while signed-in users outside the permitted roles fail with `AccessDenied`.
+Provide this implementation once in the group's impl layer, alongside the `RequireUser` implementation and the function implementations. The role flags are specific to each attachment, not to the registered implementation. A user is allowed only when their role's flag is `true`; omitted or `false` flags deny access, and `{}` denies everyone. Missing users fail with `NotSignedIn` from `RequireUser`, while signed-in users outside the permitted roles fail with `AccessDenied`.
 
 The second argument is required and typed from the schema's `Type`. Middleware without an `options` schema still uses `.middleware(Spec)` with no second argument. Options are validated against the schema's **type side**, not its encoded input, during codegen and server registration. Confect does not decode or coerce them: if a schema transforms strings into numbers, pass a number, not a string.
 
 Keep the schema inside its thunk. Constructing middleware specs and assembling groups, specs, and refs does not evaluate options schemas; validation happens later.
 
-Both `MiddlewareImpl.make` and `MiddlewareImpl.makeByFunctionType` receive `(effect, { options, invocation })` when the middleware declares an options schema. The typed `options` field contains the attachment value; `invocation` contains `name`, `functionType`, `functionVisibility`, and decoded `args`. Middleware without an options schema receives only `{ invocation }`: `options` is absent from both the context type and the runtime object. A declared schema that accepts `undefined` still receives an `options` field, even when its value is `undefined`. Destructure only what you need: `(effect, { options: { roles } })` reads the role flags directly.
+Both `MiddlewareImpl.make` and `MiddlewareImpl.makeByFunctionType` receive `(effect, { options, invocation })` when the middleware declares an options schema. The typed `options` field contains the attachment value; `invocation` contains `name`, `functionType`, `functionVisibility`, and decoded `args`. Middleware without an options schema receives only `{ invocation }`: `options` is absent from both the context type and the runtime object. A declared schema that accepts `undefined` still receives an `options` field, even when its value is `undefined`. Destructure only what you need: `(effect, { options })` reads the role flags without binding invocation metadata.
 
 The same options mechanism also supports resource argument names, flags, and client-safe resolver functions. Use `MiddlewareImpl.make` rather than the `provides` shorthand when producing a service depends on the attachment options.
 
@@ -240,12 +238,12 @@ You can attach the same middleware spec more than once with non-equivalent optio
 ```ts
 GroupSpec.make()
   .middleware(RequireUser)
-  .middleware(RequireRole, { roles: { editor: true, admin: true } })
+  .middleware(RequireRole, { editor: true, admin: true })
   .addFunction(
     FunctionSpec.publicMutation({
       name: "deleteAll",
       returns: () => Schema.Null,
-    }).middleware(RequireRole, { roles: { admin: true } }),
+    }).middleware(RequireRole, { admin: true }),
   );
 ```
 

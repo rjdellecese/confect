@@ -15,11 +15,9 @@ class RequireRole extends MiddlewareSpec.MiddlewareSpec<RequireRole>()(
   {
     options: () =>
       Schema.Struct({
-        roles: Schema.Struct({
-          admin: Schema.optionalKey(Schema.Boolean),
-          editor: Schema.optionalKey(Schema.Boolean),
-          viewer: Schema.optionalKey(Schema.Boolean),
-        }),
+        admin: Schema.optionalKey(Schema.Boolean),
+        editor: Schema.optionalKey(Schema.Boolean),
+        viewer: Schema.optionalKey(Schema.Boolean),
       }),
     functionTypes: { query: true, mutation: true, action: true },
   },
@@ -28,7 +26,7 @@ class RequireRole extends MiddlewareSpec.MiddlewareSpec<RequireRole>()(
 FunctionSpec.publicQuery({
   name: "list",
   returns: () => Schema.Array(Schema.String),
-}).middleware(RequireRole, { roles: { admin: true } });
+}).middleware(RequireRole, { admin: true });
 ```
 
 `MiddlewareImpl.make` and `MiddlewareImpl.makeByFunctionType` receive `(effect, { options, invocation })`, separating each attachment's typed options from invocation metadata. Middleware without an options schema keeps the single-argument attachment API and receives only `{ invocation }`, with no `options` property in its context type or runtime object. A declared schema that accepts `undefined` still receives the `options` property. Options schemas and values must be client-safe because generated refs carry them.
