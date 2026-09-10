@@ -1156,19 +1156,12 @@ const SourceStatus = Data.taggedEnum<SourceStatus>();
  * read index into it (an index rather than re-slicing keeps consuming a
  * chunk linear), and its ready, exhausted, or budget-limited status.
  */
-interface MergeSource<Doc, E> {
+class MergeSource<Doc, E> extends Data.Class<{
   readonly pull: Pull.Pull<Array.NonEmptyReadonlyArray<Element<Doc>>, E>;
   readonly buffer: ReadonlyArray<Element<Doc>>;
   readonly index: number;
   readonly status: SourceStatus;
-}
-
-const makeMergeSource = <Doc, E>(
-  pull: MergeSource<Doc, E>["pull"],
-  buffer: ReadonlyArray<Element<Doc>>,
-  index: number,
-  status: SourceStatus,
-): MergeSource<Doc, E> => ({ pull, buffer, index, status });
+}> {}
 
 const mergeSourceHead = <Doc, E>(
   source: MergeSource<Doc, E>,
@@ -1186,8 +1179,14 @@ const fillMergeSource = <Doc, E>(
       source.index < source.buffer.length
         ? Effect.succeed(source)
         : source.pull.pipe(
-            Effect.map((elements) =>
-              makeMergeSource(source.pull, elements, 0, SourceStatus.Ready()),
+            Effect.map(
+              (elements) =>
+                new MergeSource({
+                  pull: source.pull,
+                  buffer: elements,
+                  index: 0,
+                  status: SourceStatus.Ready(),
+                }),
             ),
             Pull.catchDone(() =>
               Effect.gen(function* () {
@@ -1202,12 +1201,12 @@ const fillMergeSource = <Doc, E>(
                       }),
                     ),
                 });
-                return makeMergeSource(
-                  source.pull,
-                  source.buffer,
-                  source.index,
+                return new MergeSource({
+                  pull: source.pull,
+                  buffer: source.buffer,
+                  index: source.index,
                   status,
-                );
+                });
               }),
             ),
           ),
@@ -1270,12 +1269,12 @@ const mergeStep =
               element,
               Array.map(filled, (source, sourceIndex) =>
                 sourceIndex === index
-                  ? makeMergeSource(
-                      source.pull,
-                      source.buffer,
-                      source.index + 1,
-                      source.status,
-                    )
+                  ? new MergeSource({
+                      pull: source.pull,
+                      buffer: source.buffer,
+                      index: source.index + 1,
+                      status: source.status,
+                    })
                   : source,
               ),
             ] as const,
@@ -1350,13 +1349,15 @@ const mergeUnchecked = <
       Effect.forEach(streams, (stream) => Stream.toPull(stream.annotated)),
       (pulls) =>
         Stream.unfold(
-          Array.map(pulls, (pull) =>
-            makeMergeSource<Doc, E>(
-              pull,
-              Array.empty(),
-              0,
-              SourceStatus.Ready(),
-            ),
+          Array.map(
+            pulls,
+            (pull) =>
+              new MergeSource<Doc, E>({
+                pull,
+                buffer: Array.empty(),
+                index: 0,
+                status: SourceStatus.Ready(),
+              }),
           ),
           mergeStep<Doc, E>(PositionOrder(head.order)),
         ),
