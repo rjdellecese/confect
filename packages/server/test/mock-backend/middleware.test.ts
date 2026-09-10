@@ -350,18 +350,20 @@ describe("middleware", () => {
               MiddlewareImpl.make(
                 databaseSchema,
                 GroupPolicy,
-                (effect, metadata) => {
+                (effect, context) => {
                   return Effect.gen(function* () {
-                    expect(metadata).toEqual({
-                      name: "get",
-                      functionType: "query",
-                      functionVisibility: "public",
-                      args: { id: "decoded" },
-                      options: { label: metadata.options.label },
+                    expect(context).toEqual({
+                      options: { label: context.options.label },
+                      invocation: {
+                        name: "get",
+                        functionType: "query",
+                        functionVisibility: "public",
+                        args: { id: "decoded" },
+                      },
                     });
-                    events.push(metadata.options.label);
+                    events.push(context.options.label);
                     const result = yield* effect;
-                    events.push(`${metadata.options.label}:after`);
+                    events.push(`${context.options.label}:after`);
                     return result;
                   });
                 },
@@ -372,9 +374,15 @@ describe("middleware", () => {
                 databaseSchema,
                 FunctionPolicy,
                 {
-                  query: (effect, { options }) => {
+                  query: (effect, { options, invocation }) => {
                     return Effect.gen(function* () {
                       expect(options.tolerateMissing).toBe(true);
+                      expect(invocation).toEqual({
+                        name: "get",
+                        functionType: "query",
+                        functionVisibility: "public",
+                        args: { id: "decoded" },
+                      });
                       events.push("function");
                       return yield* effect;
                     });
@@ -388,8 +396,14 @@ describe("middleware", () => {
               MiddlewareImpl.make(
                 databaseSchema,
                 Observe,
-                (effect, { options }) => {
+                (effect, { options, invocation }) => {
                   expect(options).toBeUndefined();
+                  expect(invocation).toEqual({
+                    name: "get",
+                    functionType: "query",
+                    functionVisibility: "public",
+                    args: { id: "decoded" },
+                  });
                   return effect;
                 },
               ),

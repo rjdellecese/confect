@@ -66,12 +66,22 @@ describe("implementation options", () => {
   }) {}
 
   it("types options for the common implementation strategy", () => {
-    MiddlewareImpl.make(databaseSchema, GroupPolicy, (effect, metadata) => {
-      expectTypeOf(metadata.options).toEqualTypeOf<{
-        readonly label: string;
-      }>();
-      return effect;
-    });
+    MiddlewareImpl.make(
+      databaseSchema,
+      GroupPolicy,
+      (effect, { options, invocation }) => {
+        expectTypeOf(options).toEqualTypeOf<{
+          readonly label: string;
+        }>();
+        expectTypeOf(invocation).toEqualTypeOf<{
+          readonly name: string;
+          readonly functionType: "query" | "mutation" | "action";
+          readonly functionVisibility: "public" | "internal";
+          readonly args: unknown;
+        }>();
+        return effect;
+      },
+    );
   });
 
   it("types options for each function-type implementation", () => {
@@ -98,9 +108,45 @@ describe("implementation options", () => {
   });
 
   it("types options as undefined for optionless middleware", () => {
-    MiddlewareImpl.make(databaseSchema, Observe, (effect, { options }) => {
-      expectTypeOf(options).toBeUndefined();
+    MiddlewareImpl.make(
+      databaseSchema,
+      Observe,
+      (effect, { options, invocation }) => {
+        expectTypeOf(options).toBeUndefined();
+        expectTypeOf(invocation).toEqualTypeOf<
+          MiddlewareSpec.MiddlewareOptions["invocation"]
+        >();
+        return effect;
+      },
+    );
+  });
+
+  it("allows invocation-only callbacks with either implementation strategy", () => {
+    MiddlewareImpl.make(databaseSchema, Observe, (effect, { invocation }) => {
+      expectTypeOf(invocation).toEqualTypeOf<
+        MiddlewareSpec.MiddlewareOptions["invocation"]
+      >();
       return effect;
+    });
+    MiddlewareImpl.makeByFunctionType(databaseSchema, Observe, {
+      query: (effect, { invocation }) => {
+        expectTypeOf(invocation).toEqualTypeOf<
+          MiddlewareSpec.MiddlewareOptions["invocation"]
+        >();
+        return effect;
+      },
+      mutation: (effect, { invocation }) => {
+        expectTypeOf(invocation).toEqualTypeOf<
+          MiddlewareSpec.MiddlewareOptions["invocation"]
+        >();
+        return effect;
+      },
+      action: (effect, { invocation }) => {
+        expectTypeOf(invocation).toEqualTypeOf<
+          MiddlewareSpec.MiddlewareOptions["invocation"]
+        >();
+        return effect;
+      },
     });
   });
 });

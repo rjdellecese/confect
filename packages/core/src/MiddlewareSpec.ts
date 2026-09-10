@@ -47,16 +47,18 @@ export interface SuccessValue {
 export interface MiddlewareImpl<Provides_, E, R, Options_ = undefined> {
   (
     effect: Effect.Effect<SuccessValue, E | unhandled, Provides_>,
-    options: MiddlewareOptions<Options_>,
+    context: MiddlewareOptions<Options_>,
   ): Effect.Effect<SuccessValue, E | unhandled, R>;
 }
 
 export interface MiddlewareOptions<Options_ = undefined> {
-  readonly name: string;
-  readonly functionType: FunctionType;
-  readonly functionVisibility: FunctionVisibility;
-  readonly args: unknown;
   readonly options: Options_;
+  readonly invocation: {
+    readonly name: string;
+    readonly functionType: FunctionType;
+    readonly functionVisibility: FunctionVisibility;
+    readonly args: unknown;
+  };
 }
 
 export interface AnyMiddlewareImpl extends MiddlewareImpl<any, any, any, any> {}

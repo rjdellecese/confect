@@ -135,15 +135,15 @@ export type RegisteredFunction<
 export const applyMiddleware = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
-  invocation: Omit<MiddlewareSpec.MiddlewareOptions, "options">,
+  invocation: MiddlewareSpec.MiddlewareOptions["invocation"],
 ): Effect.Effect<A, any, R> => {
   let wrapped: Effect.Effect<any, any, any> = effect;
   for (let index = resolvedMiddlewares.length - 1; index >= 0; index--) {
     const middleware = resolvedMiddlewares[index]!;
     // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Resolved middleware is type-erased after its public implementation boundary; its error and service channels are restored by the surrounding function contract.
     wrapped = middleware.middlewareImpl(wrapped, {
-      ...invocation,
       options: middleware.options,
+      invocation,
     });
   }
   // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- The erased middleware error remains intact so runHandlerPromise can validate it against the combined error schema.
