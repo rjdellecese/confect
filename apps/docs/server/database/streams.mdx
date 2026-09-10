@@ -78,7 +78,7 @@ Effect.gen(function* () {
 
 ## The ordering contract
 
-Every query stream is sorted by its **order key** in its **direction**, and every operation on this page keeps it that way. That invariant is what a plain `Stream` lacks and what the rest of this page relies on: two streams sorted by the same key can be merged without buffering, a cursor is a key, and a page of any composition resumes by narrowing every underlying index query to the keys after that cursor.
+Every query stream is sorted by its **order key** in its **direction**, and every operation on this page keeps it that way. That invariant is what a plain `Stream` lacks and what the rest of this page relies on: two streams sorted by the same key can be merged without collecting them, a cursor is a key, and a page of any composition resumes by restricting its output to the keys after that cursor.
 
 The `Key` and `Direction` type parameters enforce this contract: `merge` refuses streams whose known keys or directions differ at compile time. Directions chosen at runtime are also checked at runtime.
 
@@ -295,6 +295,8 @@ eq "fig"
 
 Each operation below returns another query stream, so results stay mergeable and paginable. They are grouped by what they do to the [order key](#the-ordering-contract): `merge` combines streams that share one; `filter`, `map`, `distinct`, and `narrow` keep it; `flatMap` extends it; `renameKey` relabels it; `reverse` flips its direction.
 
+Keep callbacks deterministic and read-only: pagination, seeks, and reversal can reevaluate them for the same document. Effects should be safe to run again, not perform writes or other one-time side effects.
+
 ### Merge
 
 `QueryStream.merge` interleaves streams that share an order key into one ordered stream. Merging is how you query over several index ranges at once, such as the notes by two roles in the example at the top of this page.
@@ -439,7 +441,9 @@ distinct
    [apple,1]               [banana,2]              [cherry,4]  [date,6]
 ```
 
-The fields must be a prefix of the stream's order key, which is enforced at the type level. On a `flatMap` result, a prefix that reaches into the inner key groups by the outer document as well, since groups are runs of consecutive equal keys. A distinct stream can't be [reversed](#reverse), since the other direction would keep a different document per group. Apply `filter` (or `filterEffect`) _after_ `distinct` rather than before it, so that a filtered-out document can't hide its group's first match from a resumed page.
+The fields must be a prefix of the stream's order key, which is enforced at the type level. On a `flatMap` result, a prefix that reaches into the inner key groups by the outer document as well, since groups are runs of consecutive equal keys.
+
+Operation order determines which document represents each group. Apply `filter` (or `filterEffect`) before `distinct` to choose the first matching document; apply it after `distinct` to test the chosen representative, omitting the group if that document fails. [Reversing](#reverse) a distinct stream keeps its representatives and reverses their output order. Reversing the input before applying `distinct` instead chooses the first document from the other direction.
 
 ### Narrow to a key range
 
@@ -454,7 +458,9 @@ const between = QueryStream.narrow(reader.table("notes").stream("by_text"), {
 });
 ```
 
-The bounds are pushed down through every combinator into the index ranges of the underlying queries, so the skipped keys are never read:
+Bounds are pushed into underlying index ranges where that preserves the composed query's results. Some compositions, such as `distinct`, may still read outside the output bounds to find the correct representative.
+
+For this direct index stream, the bounds become index-range predicates, so the elements outside them are not read at all:
 
 {/* stream-diagram: narrow */}
 
@@ -490,7 +496,9 @@ const duringDay = reader
 
 This includes every note at `startTime` and excludes every note at `endTime`. Adjacent windows can share an endpoint without overlapping. Apply the same bounds to a merged stream when its leading order-key field is also creation time.
 
-When both endpoints use the same key, the range is empty unless both are inclusive. Two inclusive endpoints select that key, or the entire group for a prefix key. On a `distinct` stream, bounds are truncated to the grouping prefix: an inclusive bound reselects the group's representative, and an exclusive bound skips the group.
+When both endpoints use the same key, the range is empty unless both are inclusive. Two inclusive endpoints select that key, or the entire group for a prefix key.
+
+On a `distinct` stream, full-key bounds filter the original representatives exactly; they do not select a replacement from within the narrowed range. Explicit prefix bounds still include or exclude whole groups. Bounds applied before `distinct` constrain its input and can change which document represents a group; bounds applied after it constrain only the output, preserving that original input range and its representatives.
 
 `paginate` uses an exclusive start and an inclusive end. To resume manually from a page's cursor, pass `{ start: { key: QueryStream.deserializeCursor(page.continueCursor), inclusive: false } }` to `narrow`.
 
@@ -658,7 +666,7 @@ The new key must have exactly as many fields as the old one, and the values unde
 
 `QueryStream.reverse` runs a composed stream in the opposite direction. Its typical use is bidirectional pagination: the stream that loads a feed's later pages, reversed, loads its earlier ones.
 
-Every underlying index query is rebuilt in the other order, so the elements are read in reverse order directly from the index, and the result is still a query stream.
+It uses index scans and seeks rather than collecting and reversing the results, and the result is still a query stream.
 
 ```ts
 const oldestFirst = QueryStream.merge([admin, user]); // "asc"
@@ -681,13 +689,13 @@ reversed
    [6]         [5]         [4]         [3]         [2]         [1]
 ```
 
-Merges, filters and maps, flat-maps (their inner streams included), `renameKey`, and `empty` all reverse. A `distinct` stream can't: it keeps the first document of each group, and a reversed scan would keep the last, so `reverse` throws. For the mirror query, reverse the input and apply `distinct` to that.
+Merges, filters and maps, flat-maps (their inner streams included), `distinct`, `renameKey`, and `empty` all reverse. `reverse(distinct(q))` keeps the same first representative of each group and flips only their output order. `distinct(reverse(q))` instead chooses each group's representative from the other direction. Preserving representatives can require extra index reads to discover groups and seek their original first documents.
 
 ## Paginating a stream
 
 `QueryStream.paginate` consumes one page of any composed stream, using the same `paginationOpts` shape that Convex's built-in `paginate` does.
 
-It runs the stream narrowed to the keys after `cursor` (and up to `endCursor`, when given), collects `numItems` documents that pass the filters into a page, and reports the key it stopped at as the next cursor. With `endCursor`, it reads through that cursor inclusively and ignores `numItems`. Because a cursor is a key rather than an offset, a page costs one page of reads wherever it starts.
+It runs the stream narrowed to the keys after `cursor` (and up to `endCursor`, when given), collects `numItems` documents that pass the filters into a page, and reports a safe logical key as the next cursor. With `endCursor`, it reads through that cursor inclusively and ignores `numItems`. A cursor is a key rather than an offset, so resuming does not require scanning all earlier results, though a composition may need extra reads to produce each item.
 
 Three pages of two over the filtered notes. Each page starts where the previous one's cursor points, so no page re-reads an earlier one; the hidden note is read on the last page, counted, and not returned:
 
@@ -756,7 +764,7 @@ const feed = FunctionImpl.make(
 );
 ```
 
-Resuming from a cursor doesn't re-read the pages before it: the cursor's position is pushed down into the underlying index queries, through every combinator above, so each page costs roughly one page of reads.
+Cursor bounds are pushed into underlying index queries where possible. Filters, distinct-group discovery, repeated seeks, merge prefetch, and joins can read more documents than the page returns, including documents read by an earlier page.
 
 ### Pagination protocol
 
@@ -767,10 +775,14 @@ Resuming from a cursor doesn't re-read the pages before it: the cursor's positio
 | `cursor`                         | Where the page starts, exclusive. `null` starts at the beginning of the stream.                                                                                                                                                |
 | `numItems`                       | How many documents to return, counting only documents that pass filters.                                                                                                                                                       |
 | `endCursor`                      | When present, the page runs exactly to this cursor (inclusive) and `numItems` is ignored. Pinning pages this way keeps adjacent pages gap-free as data changes. `QueryStream.END_CURSOR` pins a page to the end of the stream. |
-| `maximumRowsRead`                | A read budget counting every document read, filtered or not. When it is hit, the page returns what it has so far with `pageStatus: "SplitRequired"` and a `splitCursor` to split the page at.                                  |
-| `maximumBytesRead`               | The same budget in bytes, charging each document's estimated size as it is read. It applies to every document the stream's index queries read, whether or not it reaches the page.                                             |
+| `maximumRowsRead`                | A budget counting physical document reads from underlying `QueryStream` index queries, filtered or not. On exhaustion, a page that made safe progress returns with `pageStatus: "SplitRequired"` and a `splitCursor`.          |
+| `maximumBytesRead`               | The same budget in bytes, charging each document's estimated size on every read. This is not an exact measure of Convex's billed bytes.                                                                                        |
 | `pageStatus: "SplitRecommended"` | Returned with a `splitCursor` when a pinned page has grown well past `numItems`, or any page had to scan a very large number of rows for its items, so reactive clients can subdivide it.                                      |
 | `isDone`                         | `true` only when the page reached the true end of the stream.                                                                                                                                                                  |
+
+Both budgets include group discovery, repeated reads during seeks, merge prefetch, and outer and inner `QueryStream` reads in joins. They do not track arbitrary I/O inside callbacks, such as a separate database lookup in `mapEffect`.
+
+A budget-limited page stops at a safe logical key so resuming cannot skip an unfinished group or join. If the budget prevents safe progress or a strictly interior split of a pinned page, `paginate` fails with the typed `ReadBudgetExceededError` instead of returning a non-advancing cursor or repeating the same split. Increase the budget or change the query to reduce the reads needed for progress. Byte accounting happens after each document is read, so the last document can take the total over `maximumBytesRead`.
 
 A cursor that is malformed, or that was issued by a stream with a different order key (for example after an index change is deployed), fails the query with a `ConvexError` whose data is `{ paginationError: "InvalidCursor" }` — the signal `convex/react` and Confect's hooks treat as "restart pagination".
 
