@@ -253,6 +253,72 @@ describe("QueryStream iterator lifecycle", () => {
   );
 
   it.effect(
+    "stops a representative probe at its first unfiltered document",
+    () =>
+      Effect.gen(function* () {
+        const reader = makeReader();
+        const head = yield* reader.stream.pipe(
+          QueryStream.filter((document) => document._id !== "b1"),
+          QueryStream.distinct(distinctFields),
+          QueryStream.reverse,
+          Stream.runHead,
+        );
+
+        expect(head).toEqual(Option.some(documents[3]));
+        expect(reader.runs).toEqual([
+          { order: "desc", next: 1, returned: 1, settled: 1 },
+          { order: "asc", next: 2, returned: 1, settled: 2 },
+        ]);
+        expect(reader.events).toEqual([
+          "0:open:desc",
+          "0:next",
+          "0:return",
+          "1:open:asc",
+          "1:next",
+          "1:next",
+          "1:return",
+        ]);
+      }),
+  );
+
+  it.effect(
+    "retains the first probe key when its entire group is filtered out",
+    () =>
+      Effect.gen(function* () {
+        const reader = makeReader();
+        const reversed = reader.stream.pipe(
+          QueryStream.filter((document) => document.group !== "b"),
+          QueryStream.distinct(distinctFields),
+          QueryStream.reverse,
+        );
+        const head = yield* Stream.runHead(reversed.annotated);
+
+        expect(head).toEqual(
+          Option.some(
+            new QueryStream.Element({
+              doc: Option.none(),
+              key: ["b", 3, "b1"],
+            }),
+          ),
+        );
+        expect(reader.runs).toEqual([
+          { order: "desc", next: 1, returned: 1, settled: 1 },
+          { order: "asc", next: 3, returned: 1, settled: 3 },
+        ]);
+        expect(reader.events).toEqual([
+          "0:open:desc",
+          "0:next",
+          "0:return",
+          "1:open:asc",
+          "1:next",
+          "1:next",
+          "1:next",
+          "1:return",
+        ]);
+      }),
+  );
+
+  it.effect(
     "closes the leaf when its read budget produces a partial page",
     () =>
       Effect.gen(function* () {

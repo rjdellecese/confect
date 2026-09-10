@@ -56,13 +56,13 @@ import * as Option from "effect/Option";
 import * as Order from "effect/Order";
 import * as Predicate from "effect/Predicate";
 import * as Pull from "effect/Pull";
-import * as Ref from "effect/Ref";
 import type * as Record from "effect/Record";
 import * as Schema from "effect/Schema";
 import * as Sink from "effect/Sink";
 import * as Stream from "effect/Stream";
 import * as String from "effect/String";
 import * as SynchronizedRef from "effect/SynchronizedRef";
+import * as Tuple from "effect/Tuple";
 import type * as Types from "effect/Types";
 import * as Document from "./Document";
 
@@ -122,7 +122,10 @@ const flipDirection = <Direction extends OrderDirection>(
  *
  * @experimental
  */
-export type Element<Doc> = readonly [Option.Option<Doc>, OrderKey];
+export class Element<Doc> extends Data.Class<{
+  readonly doc: Option.Option<Doc>;
+  readonly key: OrderKey;
+}> {}
 
 // -----------------------------------------------------------------------------
 // Typed index ranges
@@ -145,11 +148,14 @@ export type RangeSpecTypeId = typeof RangeSpecTypeId;
 /**
  * @experimental
  */
-export type RangeOp = {
-  readonly _tag: "eq" | "gt" | "gte" | "lt" | "lte";
-  readonly field: string;
-  readonly value: Value | undefined;
-};
+export type RangeOp = Data.TaggedEnum<{
+  [Tag in "eq" | "gt" | "gte" | "lt" | "lte"]: {
+    readonly field: string;
+    readonly value: Value | undefined;
+  };
+}>;
+
+export const RangeOp = Data.taggedEnum<RangeOp>();
 
 /**
  * The result of applying a range callback: the recorded operations, plus a
@@ -250,7 +256,7 @@ const makeRangeBuilder = (
     (field: string, value: Value | undefined) =>
       makeRangeBuilder(
         nextEqCount,
-        Array.append(ops, { _tag: tag, field, value }),
+        Array.append(ops, RangeOp[tag]({ field, value })),
       );
 
   return {
@@ -513,6 +519,11 @@ const PositionOrder = (order: OrderDirection): Order.Order<OrderKey> =>
 
 type BoundTag = "gt" | "gte" | "lt" | "lte";
 
+class TaggedBound extends Data.Class<{
+  readonly key: OrderKey;
+  readonly tag: BoundTag;
+}> {}
+
 /** Dropping a bound key's last component bounds by the remaining prefix — exclusively. */
 const excludePrefix = (tag: BoundTag): BoundTag =>
   tag === "gt" || tag === "gte" ? "gt" : "lt";
@@ -525,15 +536,15 @@ const peelBound = (
   key: OrderKey,
   tag: BoundTag,
 ): {
-  readonly peeled: ReadonlyArray<readonly [OrderKey, BoundTag]>;
-  readonly final: readonly [OrderKey, BoundTag];
+  readonly peeled: ReadonlyArray<TaggedBound>;
+  readonly final: TaggedBound;
 } =>
   key.length <= 1
-    ? { peeled: [], final: [key, tag] }
+    ? { peeled: [], final: new TaggedBound({ key, tag }) }
     : pipe(
         peelBound(Array.dropRight(key, 1), excludePrefix(tag)),
         ({ final, peeled }) => ({
-          peeled: Array.prepend(peeled, [key, tag] as const),
+          peeled: Array.prepend(peeled, new TaggedBound({ key, tag })),
           final,
         }),
       );
@@ -550,15 +561,16 @@ const rangeOpsFor = (
     onSome: (lastValue) =>
       pipe(
         Array.zip(fields, Array.dropRight(key, 1)),
-        Array.map(([field, value]): RangeOp => ({ _tag: "eq", field, value })),
+        Array.map(([field, value]) => RangeOp.eq({ field, value })),
         (eqOps) =>
           Array.appendAll(
             Array.appendAll(prefixOps, eqOps),
-            Array.of<RangeOp>({
-              _tag: tag,
-              field: fields[key.length - 1]!,
-              value: lastValue,
-            }),
+            Array.of(
+              RangeOp[tag]({
+                field: fields[key.length - 1]!,
+                value: lastValue,
+              }),
+            ),
           ),
       ),
   });
@@ -593,7 +605,7 @@ const splitRange = (
   ).length;
   const prefixOps = pipe(
     Array.zip(Array.take(fields, commonLength), bounds.lower.key),
-    Array.map(([field, value]): RangeOp => ({ _tag: "eq", field, value })),
+    Array.map(([field, value]) => RangeOp.eq({ field, value })),
   );
   const restFields = Array.drop(fields, commonLength);
 
@@ -606,32 +618,30 @@ const splitRange = (
     bounds.upper.inclusive ? "lte" : "lt",
   );
 
-  const startRanges = Array.map(lower.peeled, ([key, tag]) =>
+  const startRanges = Array.map(lower.peeled, ({ key, tag }) =>
     rangeOpsFor(prefixOps, restFields, key, tag),
   );
   const endRanges = Array.reverse(
-    Array.map(upper.peeled, ([key, tag]) =>
+    Array.map(upper.peeled, ({ key, tag }) =>
       rangeOpsFor(prefixOps, restFields, key, tag),
     ),
   );
 
-  const [lowerFinalKey, lowerFinalTag] = lower.final;
-  const [upperFinalKey, upperFinalTag] = upper.final;
+  const { key: lowerFinalKey, tag: lowerFinalTag } = lower.final;
+  const { key: upperFinalKey, tag: upperFinalTag } = upper.final;
   const middleRange =
     Array.isReadonlyArrayNonEmpty(lowerFinalKey) &&
     Array.isReadonlyArrayNonEmpty(upperFinalKey)
       ? Array.appendAll(prefixOps, [
-          {
-            _tag: lowerFinalTag,
+          RangeOp[lowerFinalTag]({
             field: restFields[0]!,
             value: Array.headNonEmpty(lowerFinalKey),
-          },
-          {
-            _tag: upperFinalTag,
+          }),
+          RangeOp[upperFinalTag]({
             field: restFields[0]!,
             value: Array.headNonEmpty(upperFinalKey),
-          },
-        ] as ReadonlyArray<RangeOp>)
+          }),
+        ])
       : Array.isReadonlyArrayNonEmpty(lowerFinalKey)
         ? rangeOpsFor(prefixOps, restFields, lowerFinalKey, lowerFinalTag)
         : rangeOpsFor(prefixOps, restFields, upperFinalKey, upperFinalTag);
@@ -734,7 +744,7 @@ export class QueryStream<
   toStream(): Stream.Stream<Doc, E, R> {
     return Stream.filterMap(
       this.annotated,
-      Filter.fromPredicateOption(([doc, _key]) => doc),
+      Filter.fromPredicateOption(({ doc }) => doc),
     );
   }
 }
@@ -1029,16 +1039,20 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
           SynchronizedRef.modifyEffect(stateRef, (state) =>
             Effect.gen(function* () {
               if (isBudgetExhausted(limits, state)) {
-                return [
+                return Tuple.make(
                   Option.none(),
-                  { ...state, status: BudgetStatus.Stopped() },
-                ] as const;
+                  new ReadBudgetState({
+                    rows: state.rows,
+                    bytes: state.bytes,
+                    status: BudgetStatus.Stopped(),
+                  }),
+                );
               }
               const documents = yield* pull;
-              return [
+              return Tuple.make(
                 Option.some(documents),
-                {
-                  ...state,
+                new ReadBudgetState({
+                  status: state.status,
                   rows: state.rows + documents.length,
                   bytes: Option.match(limits.maximumBytesRead, {
                     onNone: () => state.bytes,
@@ -1050,8 +1064,8 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
                           bytes + getDocumentSize(document as GenericDocument),
                       ),
                   }),
-                },
-              ] as const;
+                }),
+              );
             }),
           ).pipe(
             Effect.flatMap(
@@ -1070,13 +1084,13 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
       Effect.map(
         Document.decode(reflection.tableName, reflection.tableSchema)(encoded),
         (doc) =>
-          [
-            Option.some(doc as Doc),
-            extractOrderKey(
+          new Element({
+            doc: Option.some(doc as Doc),
+            key: extractOrderKey(
               encoded as Record.ReadonlyRecord<string, unknown>,
               keyPaths,
             ),
-          ] as const,
+          }),
       ),
     ),
   );
@@ -1146,23 +1160,21 @@ const SourceStatus = Data.taggedEnum<SourceStatus>();
  * read index into it (an index rather than re-slicing keeps consuming a
  * chunk linear), and its ready, exhausted, or budget-limited status.
  */
-interface MergeSource<Doc, E> {
+class MergeSource<Doc, E> extends Data.Class<{
   readonly pull: Pull.Pull<Array.NonEmptyReadonlyArray<Element<Doc>>, E>;
   readonly buffer: ReadonlyArray<Element<Doc>>;
   readonly index: number;
   readonly status: SourceStatus;
-}
-
-const makeMergeSource = <Doc, E>(
-  pull: MergeSource<Doc, E>["pull"],
-  buffer: ReadonlyArray<Element<Doc>>,
-  index: number,
-  status: SourceStatus,
-): MergeSource<Doc, E> => ({ pull, buffer, index, status });
+}> {}
 
 const mergeSourceHead = <Doc, E>(
   source: MergeSource<Doc, E>,
 ): Option.Option<Element<Doc>> => Array.get(source.buffer, source.index);
+
+class MergeCandidate<Doc> extends Data.Class<{
+  readonly index: number;
+  readonly element: Element<Doc>;
+}> {}
 
 /**
  * Refill an exhausted-buffer source from its pull, translating the pull's
@@ -1176,8 +1188,14 @@ const fillMergeSource = <Doc, E>(
       source.index < source.buffer.length
         ? Effect.succeed(source)
         : source.pull.pipe(
-            Effect.map((elements) =>
-              makeMergeSource(source.pull, elements, 0, SourceStatus.Ready()),
+            Effect.map(
+              (elements) =>
+                new MergeSource({
+                  pull: source.pull,
+                  buffer: elements,
+                  index: 0,
+                  status: SourceStatus.Ready(),
+                }),
             ),
             Pull.catchDone(() =>
               Effect.gen(function* () {
@@ -1192,12 +1210,12 @@ const fillMergeSource = <Doc, E>(
                       }),
                     ),
                 });
-                return makeMergeSource(
-                  source.pull,
-                  source.buffer,
-                  source.index,
+                return new MergeSource({
+                  pull: source.pull,
+                  buffer: source.buffer,
+                  index: source.index,
                   status,
-                );
+                });
               }),
             ),
           ),
@@ -1237,38 +1255,37 @@ const mergeStep =
 
       const earliest = Array.reduce(
         filled,
-        Option.none<readonly [number, Element<Doc>]>(),
+        Option.none<MergeCandidate<Doc>>(),
         (best, source, index) =>
           Option.match(mergeSourceHead(source), {
             onNone: () => best,
             onSome: (head) =>
               Option.match(best, {
-                onNone: () => Option.some([index, head] as const),
-                onSome: ([, bestElement]) =>
-                  isEarlier(head[1], bestElement[1])
-                    ? Option.some([index, head] as const)
+                onNone: () =>
+                  Option.some(new MergeCandidate({ index, element: head })),
+                onSome: ({ element: bestElement }) =>
+                  isEarlier(head.key, bestElement.key)
+                    ? Option.some(new MergeCandidate({ index, element: head }))
                     : best,
               }),
           }),
       );
 
       return Option.getOrUndefined(
-        Option.map(
-          earliest,
-          ([index, element]) =>
-            [
-              element,
-              Array.map(filled, (source, sourceIndex) =>
-                sourceIndex === index
-                  ? makeMergeSource(
-                      source.pull,
-                      source.buffer,
-                      source.index + 1,
-                      source.status,
-                    )
-                  : source,
-              ),
-            ] as const,
+        Option.map(earliest, ({ index, element }) =>
+          Tuple.make(
+            element,
+            Array.map(filled, (source, sourceIndex) =>
+              sourceIndex === index
+                ? new MergeSource({
+                    pull: source.pull,
+                    buffer: source.buffer,
+                    index: source.index + 1,
+                    status: source.status,
+                  })
+                : source,
+            ),
+          ),
         ),
       );
     });
@@ -1340,13 +1357,15 @@ const mergeUnchecked = <
       Effect.forEach(streams, (stream) => Stream.toPull(stream.annotated)),
       (pulls) =>
         Stream.unfold(
-          Array.map(pulls, (pull) =>
-            makeMergeSource<Doc, E>(
-              pull,
-              Array.empty(),
-              0,
-              SourceStatus.Ready(),
-            ),
+          Array.map(
+            pulls,
+            (pull) =>
+              new MergeSource<Doc, E>({
+                pull,
+                buffer: Array.empty(),
+                index: 0,
+                status: SourceStatus.Ready(),
+              }),
           ),
           mergeStep<Doc, E>(PositionOrder(head.order)),
         ),
@@ -1400,7 +1419,7 @@ const transform = <
     self.keyFields,
     Stream.map(
       self.annotated,
-      ([doc, key]) => [Option.flatMap(doc, f), key] as const,
+      ({ doc, key }) => new Element({ doc: Option.flatMap(doc, f), key }),
     ),
     undefined,
     (keyBounds) => transform(narrowByKeyBounds(self, keyBounds), f),
@@ -1428,11 +1447,12 @@ const transformEffect = <
     self.keyFields,
     Stream.mapEffect(
       self.annotated,
-      ([doc, key]) =>
+      ({ doc, key }) =>
         Option.match(doc, {
-          onNone: () => Effect.succeed([Option.none<Doc2>(), key] as const),
+          onNone: () =>
+            Effect.succeed(new Element({ doc: Option.none<Doc2>(), key })),
           onSome: (value) =>
-            Effect.map(f(value), (mapped) => [mapped, key] as const),
+            Effect.map(f(value), (mapped) => new Element({ doc: mapped, key })),
         }),
       // Order is preserved at any concurrency: elements are emitted in
       // input order however their effects finish.
@@ -1865,7 +1885,9 @@ const makeFlatMap = <
   ): Stream.Stream<Element<Doc2 | Doc3>> =>
     admittedByLower(innerBounds.lower)(nullPadding) &&
     admittedByUpper(innerBounds.upper)(nullPadding)
-      ? Stream.succeed([doc, Array.appendAll(outerKey, nullPadding)] as const)
+      ? Stream.succeed(
+          new Element({ doc, key: Array.appendAll(outerKey, nullPadding) }),
+        )
       : Stream.empty;
 
   const annotated: Stream.Stream<
@@ -1873,7 +1895,7 @@ const makeFlatMap = <
     E | E2,
     R | R2
   > = self.annotated.pipe(
-    Stream.flatMap(([outerDoc, outerKey]) => {
+    Stream.flatMap(({ doc: outerDoc, key: outerKey }) => {
       const innerBounds = innerBoundsFor(outerKey);
       return Option.match(outerDoc, {
         onNone: () => markerStream(outerKey, innerBounds, Option.none()),
@@ -1881,8 +1903,11 @@ const makeFlatMap = <
           const inner = validated(f(doc));
           return narrowByKeyBounds(inner, innerBounds).annotated.pipe(
             Stream.map(
-              ([innerDoc, innerKey]) =>
-                [innerDoc, Array.appendAll(outerKey, innerKey)] as const,
+              ({ doc: innerDoc, key: innerKey }) =>
+                new Element({
+                  doc: innerDoc,
+                  key: Array.appendAll(outerKey, innerKey),
+                }),
             ),
             Stream.orElseIfEmpty(() =>
               Stream.unwrap(
@@ -2202,71 +2227,62 @@ const makeDistinct = <
         > =>
           Effect.gen(function* () {
             if (yield* isBudgetStopped(budgetStatus))
-              return [[], Option.none()] as const;
+              return Tuple.make([], Option.none());
             const discovered = yield* Stream.runHead(current.annotated);
-            return yield* Option.match(discovered, {
-              onNone: () => Effect.succeed([[], Option.none()] as const),
-              onSome: (element) =>
-                Effect.gen(function* () {
-                  const [doc, key] = element;
-                  const prefix = Array.take(key, distinctLength);
-                  if (order === self.order) {
-                    const nextKey = Option.match(doc, {
-                      onNone: () => key,
-                      onSome: () => prefix,
-                    });
-                    return [
-                      isAdmitted(key) ? [element] : [],
-                      Option.some(
-                        narrowByKeyBounds(current, afterKey(nextKey)),
+            if (Option.isNone(discovered)) return Tuple.make([], Option.none());
+            const element = discovered.value;
+            const { doc, key } = element;
+            const prefix = Array.take(key, distinctLength);
+            if (order === self.order) {
+              const nextKey = Option.match(doc, {
+                onNone: () => key,
+                onSome: () => prefix,
+              });
+              return Tuple.make(
+                isAdmitted(key) ? [element] : [],
+                Option.some(narrowByKeyBounds(current, afterKey(nextKey))),
+              );
+            }
+            const next = Option.some(
+              narrowByKeyBounds(current, afterKey(prefix)),
+            );
+            const { firstKey, selected } = yield* narrowByKeyBounds(self, {
+              lower: Option.some({ key: prefix, inclusive: true }),
+              upper: Option.some({ key: prefix, inclusive: true }),
+            }).annotated.pipe(
+              Stream.run(
+                Sink.fold(
+                  () => ({
+                    firstKey: Option.none<OrderKey>(),
+                    selected: Option.none<Element<Doc>>(),
+                  }),
+                  (probe) => Option.isNone(probe.selected),
+                  (probe, candidate: Element<Doc>) =>
+                    Effect.succeed({
+                      firstKey: Option.orElse(probe.firstKey, () =>
+                        Option.some(candidate.key),
                       ),
-                    ] as const;
-                  }
-                  const next = Option.some(
-                    narrowByKeyBounds(current, afterKey(prefix)),
-                  );
-                  const firstKey = yield* Ref.make(Option.none<OrderKey>());
-                  const selected = yield* narrowByKeyBounds(self, {
-                    lower: Option.some({ key: prefix, inclusive: true }),
-                    upper: Option.some({ key: prefix, inclusive: true }),
-                  }).annotated.pipe(
-                    Stream.tap(([, selectedKey]) =>
-                      Ref.update(
-                        firstKey,
-                        Option.orElse(() => Option.some(selectedKey)),
-                      ),
-                    ),
-                    Stream.filterMap(
-                      Filter.fromPredicateOption((selectedElement) =>
-                        Option.as(selectedElement[0], selectedElement),
-                      ),
-                    ),
-                    Stream.runHead,
-                  );
-                  return yield* Option.match(selected, {
-                    onNone: () =>
-                      Effect.gen(function* () {
-                        if (yield* isBudgetStopped(budgetStatus))
-                          return [[], Option.none()] as const;
-                        const checkpoint = Option.getOrElse(
-                          yield* Ref.get(firstKey),
-                          () => key,
-                        );
-                        return [
-                          isAdmitted(checkpoint)
-                            ? [[Option.none<Doc>(), checkpoint] as const]
-                            : [],
-                          next,
-                        ] as const;
-                      }),
-                    onSome: (representative) =>
-                      Effect.succeed([
-                        isAdmitted(representative[1]) ? [representative] : [],
-                        next,
-                      ] as const),
-                  });
-                }),
-            });
+                      selected: Option.as(candidate.doc, candidate),
+                    }),
+                ),
+              ),
+            );
+            if (Option.isSome(selected)) {
+              const representative = selected.value;
+              return Tuple.make(
+                isAdmitted(representative.key) ? [representative] : [],
+                next,
+              );
+            }
+            if (yield* isBudgetStopped(budgetStatus))
+              return Tuple.make([], Option.none());
+            const checkpoint = Option.getOrElse(firstKey, () => key);
+            return Tuple.make(
+              isAdmitted(checkpoint)
+                ? [new Element({ doc: Option.none<Doc>(), key: checkpoint })]
+                : [],
+              next,
+            );
           }),
       ),
     ),
@@ -2457,12 +2473,12 @@ const narrowInMemory = <
 
   const dropOutOfRange: Narrower =
     self.order === "asc"
-      ? Stream.dropWhile(([, key]) => !aboveLower(key))
-      : Stream.dropWhile(([, key]) => !belowUpper(key));
+      ? Stream.dropWhile(({ key }) => !aboveLower(key))
+      : Stream.dropWhile(({ key }) => !belowUpper(key));
   const takeInRange: Narrower =
     self.order === "asc"
-      ? Stream.takeWhile(([, key]) => belowUpper(key))
-      : Stream.takeWhile(([, key]) => aboveLower(key));
+      ? Stream.takeWhile(({ key }) => belowUpper(key))
+      : Stream.takeWhile(({ key }) => aboveLower(key));
 
   return new QueryStream(
     self.order,
@@ -2501,18 +2517,20 @@ export class NotUniqueError extends Schema.TaggedError<NotUniqueError>()(
  *
  * @experimental
  */
-export const unique = <Doc, Key extends ReadonlyArray<string>, E, R>(
-  self: QueryStream<Doc, Key, E, R>,
-): Effect.Effect<Option.Option<Doc>, E | NotUniqueError, R> =>
-  self.pipe(
-    Stream.take(2),
-    Stream.runCollect,
-    Effect.flatMap((docs) =>
-      docs.length >= 2
-        ? Effect.fail(new NotUniqueError())
-        : Effect.succeed(Array.head(docs)),
+export const unique = Effect.fn("QueryStream.unique")(
+  <Doc, Key extends ReadonlyArray<string>, E, R>(
+    self: QueryStream<Doc, Key, E, R>,
+  ): Effect.Effect<Option.Option<Doc>, E | NotUniqueError, R> =>
+    self.pipe(
+      Stream.take(2),
+      Stream.runCollect,
+      Effect.flatMap((docs) =>
+        docs.length >= 2
+          ? Effect.fail(new NotUniqueError())
+          : Effect.succeed(Array.head(docs)),
+      ),
     ),
-  );
+);
 
 // -----------------------------------------------------------------------------
 // Pagination
@@ -2640,11 +2658,11 @@ type BudgetStatus = Data.TaggedEnum<{
 
 const BudgetStatus = Data.taggedEnum<BudgetStatus>();
 
-interface ReadBudgetState {
+class ReadBudgetState extends Data.Class<{
   readonly rows: number;
   readonly bytes: number;
   readonly status: BudgetStatus;
-}
+}> {}
 
 interface ReadBudgetLimits {
   readonly maximumRowsRead: Option.Option<number>;
@@ -2686,19 +2704,12 @@ const isBudgetStopped = (status: ReadBudgetStatus): Effect.Effect<boolean> =>
       ),
   });
 
-interface PaginateState<Doc> {
+class PaginateState<Doc> extends Data.Class<{
   readonly page: Chunk.Chunk<Doc>;
   readonly readKeys: Chunk.Chunk<OrderKey>;
   readonly stopped: boolean;
   readonly hitLimit: boolean;
-}
-
-const initialPaginateState = <Doc>(): PaginateState<Doc> => ({
-  page: Chunk.empty(),
-  readKeys: Chunk.empty(),
-  stopped: false,
-  hitLimit: false,
-});
+}> {}
 
 /** Where a split page divides: the midpoint of the keys read so far. */
 const midpointCursor = (readKeys: Chunk.Chunk<OrderKey>): string =>
@@ -2743,204 +2754,189 @@ export const paginate: {
   ): Effect.Effect<PaginationResult<Doc>, E | ReadBudgetExceededError, R>;
 } = dual(
   2,
-  <
+  Effect.fn("QueryStream.paginate")(function* <
     Doc,
     Key extends ReadonlyArray<string>,
     E,
     R,
     Direction extends OrderDirection,
-  >(
-    self: QueryStream<Doc, Key, E, R, Direction>,
-    options: PaginateOptions,
-  ) =>
-    Effect.gen(function* () {
-      if (options.numItems === 0) {
-        if (options.cursor === null) {
-          return yield* Effect.die(
-            new Error(
-              "QueryStream.paginate: numItems of 0 with a null cursor is not supported",
-            ),
-          );
-        }
-        return yield* Effect.succeed<PaginationResult<Doc>>({
-          page: [],
-          isDone: false,
-          continueCursor: options.cursor,
-        });
+  >(self: QueryStream<Doc, Key, E, R, Direction>, options: PaginateOptions) {
+    if (options.numItems === 0) {
+      if (options.cursor === null) {
+        return yield* Effect.die(
+          new Error(
+            "QueryStream.paginate: numItems of 0 with a null cursor is not supported",
+          ),
+        );
       }
-
-      const after = Option.map(Option.fromNullOr(options.cursor), (cursor) =>
-        deserializeCursorChecked(cursor, self.keyFields.length),
-      );
-      const endCursor = Option.fromNullishOr(options.endCursor);
-      // An end cursor of `END_CURSOR` pins the page to the end of the
-      // stream rather than to a key.
-      const pinnedEnd = Option.filter(
-        endCursor,
-        (cursor) => cursor !== END_CURSOR,
-      );
-      const until = Option.map(pinnedEnd, (cursor) =>
-        deserializeCursorChecked(cursor, self.keyFields.length),
-      );
-      const start = Option.getOrUndefined(
-        Option.map(after, (key) => ({ key, inclusive: false })),
-      );
-      const end = Option.getOrUndefined(
-        Option.map(until, (key) => ({ key, inclusive: true })),
-      );
-      const narrowed =
-        start !== undefined
-          ? narrow(self, { start, end })
-          : end !== undefined
-            ? narrow(self, { end })
-            : self;
-      // With an endCursor the page runs to it, however many items that is.
-      const maxRows = Option.match(endCursor, {
-        onNone: () => Option.some(options.numItems),
-        onSome: () => Option.none<number>(),
+      return yield* Effect.succeed<PaginationResult<Doc>>({
+        page: [],
+        isDone: false,
+        continueCursor: options.cursor,
       });
-      const maximumRowsRead = Option.fromUndefinedOr(options.maximumRowsRead);
-      const maximumBytesRead = Option.fromUndefinedOr(options.maximumBytesRead);
-      const limits: ReadBudgetLimits = { maximumRowsRead, maximumBytesRead };
-      const stateRef = yield* SynchronizedRef.make<ReadBudgetState>({
+    }
+
+    const after = Option.map(Option.fromNullOr(options.cursor), (cursor) =>
+      deserializeCursorChecked(cursor, self.keyFields.length),
+    );
+    const endCursor = Option.fromNullishOr(options.endCursor);
+    // An end cursor of `END_CURSOR` pins the page to the end of the
+    // stream rather than to a key.
+    const pinnedEnd = Option.filter(
+      endCursor,
+      (cursor) => cursor !== END_CURSOR,
+    );
+    const until = Option.map(pinnedEnd, (cursor) =>
+      deserializeCursorChecked(cursor, self.keyFields.length),
+    );
+    const start = Option.map(after, (key) => ({ key, inclusive: false }));
+    const end = Option.map(until, (key) => ({ key, inclusive: true }));
+    const narrowed = narrowByKeyBounds(
+      self,
+      self.order === "asc"
+        ? { lower: start, upper: end }
+        : { lower: end, upper: start },
+    );
+    // With an endCursor the page runs to it, however many items that is.
+    const maxRows = Option.match(endCursor, {
+      onNone: () => Option.some(options.numItems),
+      onSome: () => Option.none<number>(),
+    });
+    const maximumRowsRead = Option.fromUndefinedOr(options.maximumRowsRead);
+    const maximumBytesRead = Option.fromUndefinedOr(options.maximumBytesRead);
+    const limits: ReadBudgetLimits = { maximumRowsRead, maximumBytesRead };
+    const stateRef = yield* SynchronizedRef.make(
+      new ReadBudgetState({
         rows: 0,
         bytes: 0,
         status: BudgetStatus.Active(),
-      });
-      const budgetStatus = Option.as(
-        Option.orElse(maximumRowsRead, () => maximumBytesRead),
-        stateRef,
-      );
-      return yield* pipe(
-        Stream.run(
-          narrowed.annotated,
-          Sink.fold(
-            initialPaginateState<Doc>,
-            (state) => !state.stopped,
-            (state, [doc, key]: Element<Doc>) => {
-              const readKeys = Chunk.append(state.readKeys, key);
-              const page = Option.match(doc, {
-                onNone: () => state.page,
-                onSome: (value) => Chunk.append(state.page, value),
+      }),
+    );
+    const budgetStatus = Option.as(
+      Option.orElse(maximumRowsRead, () => maximumBytesRead),
+      stateRef,
+    );
+    const collected = yield* pipe(
+      Stream.run(
+        narrowed.annotated,
+        Sink.fold(
+          () =>
+            new PaginateState<Doc>({
+              page: Chunk.empty(),
+              readKeys: Chunk.empty(),
+              stopped: false,
+              hitLimit: false,
+            }),
+          (state) => !state.stopped,
+          (state, { doc, key }: Element<Doc>) => {
+            const readKeys = Chunk.append(state.readKeys, key);
+            const page = Option.match(doc, {
+              onNone: () => state.page,
+              onSome: (value) => Chunk.append(state.page, value),
+            });
+            return Effect.map(SynchronizedRef.get(stateRef), (usage) => {
+              const hitLimit = isBudgetExhausted(limits, usage);
+              return new PaginateState({
+                page,
+                readKeys,
+                hitLimit,
+                stopped:
+                  hitLimit ||
+                  Option.exists(maxRows, (limit) => Chunk.size(page) >= limit),
               });
-              return Effect.map(
-                SynchronizedRef.get(stateRef),
-                (usage): PaginateState<Doc> => {
-                  const hitLimit = isBudgetExhausted(limits, usage);
-                  return {
-                    page,
-                    readKeys,
-                    hitLimit,
-                    stopped:
-                      hitLimit ||
-                      Option.exists(
-                        maxRows,
-                        (limit) => Chunk.size(page) >= limit,
-                      ),
-                  };
-                },
-              );
-            },
-          ),
+            });
+          },
         ),
-        Effect.provideService(ReadBudgetLimits, limits),
-        Effect.provideService(ReadBudgetStatus, budgetStatus),
-        Effect.flatMap((state) =>
-          Effect.gen(function* () {
-            const usage = yield* SynchronizedRef.get(stateRef);
-            const stopped = BudgetStatus.$is("Stopped")(usage.status);
-            const limited = stopped || state.hitLimit;
-            if (
-              limited &&
-              (Chunk.isEmpty(state.readKeys) ||
-                Option.exists(
-                  pinnedEnd,
-                  (endpoint) => midpointCursor(state.readKeys) === endpoint,
-                ))
-            ) {
-              return yield* new ReadBudgetExceededError({
-                rowsRead: usage.rows,
-                ...Option.match(maximumBytesRead, {
-                  onNone: () => ({}),
-                  onSome: () => ({
-                    bytesRead: usage.bytes,
-                  }),
-                }),
-              });
-            }
-            return stopped
-              ? { ...state, stopped: true, hitLimit: true }
-              : state;
-          }),
-        ),
-        Effect.map((state): PaginationResult<Doc> => {
-          const page = Chunk.toArray(state.page);
-          // `stopped` implies at least one element was read, so the last
-          // read key exists exactly when the fold stopped early.
-          const stoppedAt = state.stopped
-            ? Chunk.last(state.readKeys)
-            : Option.none<OrderKey>();
-          return Option.match(stoppedAt, {
-            onSome: (lastKey) =>
-              state.hitLimit
-                ? {
-                    page,
-                    isDone: false,
-                    continueCursor: serializeCursor(lastKey),
-                    pageStatus: "SplitRequired" as const,
-                    splitCursor: midpointCursor(state.readKeys),
-                  }
-                : // A growing page that had to scan far past its item budget
-                  // (a filter-heavy stream) recommends a split so reactive
-                  // clients can subdivide it instead of re-scanning forever.
-                  Chunk.size(state.readKeys) >= SOFT_MAX_SCAN_LENGTH
-                  ? {
-                      page,
-                      isDone: false,
-                      continueCursor: serializeCursor(lastKey),
-                      pageStatus: "SplitRecommended" as const,
-                      splitCursor: midpointCursor(state.readKeys),
-                    }
-                  : {
-                      page,
-                      isDone: false,
-                      continueCursor: serializeCursor(lastKey),
-                    },
-            // The narrowed stream was exhausted: either we reached the
-            // pinned end cursor (more may follow it) or the true end of
-            // the stream. An endCursor-pinned page that has grown well
-            // past its requested size recommends a split, so reactive
-            // clients can subdivide it (as `convex-helpers` does).
-            onNone: () => {
-              // Any pinned page — including one pinned to the end of the
-              // stream — that has grown well past its requested size
-              // recommends a split.
-              const shouldRecommendSplit =
-                Option.isSome(endCursor) &&
-                (Chunk.size(state.readKeys) >= SOFT_MAX_SCAN_LENGTH ||
-                  Chunk.size(state.page) > options.numItems + 1);
-              return shouldRecommendSplit && Chunk.size(state.readKeys) > 0
-                ? {
-                    page,
-                    isDone: false,
-                    continueCursor: Option.getOrElse(
-                      pinnedEnd,
-                      () => END_CURSOR,
-                    ),
-                    pageStatus: "SplitRecommended" as const,
-                    splitCursor: midpointCursor(state.readKeys),
-                  }
-                : {
-                    page,
-                    isDone: Option.isNone(pinnedEnd),
-                    continueCursor: Option.getOrElse(
-                      pinnedEnd,
-                      () => END_CURSOR,
-                    ),
-                  };
-            },
-          });
+      ),
+      Effect.provideService(ReadBudgetLimits, limits),
+      Effect.provideService(ReadBudgetStatus, budgetStatus),
+    );
+    const usage = yield* SynchronizedRef.get(stateRef);
+    const stopped = BudgetStatus.$is("Stopped")(usage.status);
+    const limited = stopped || collected.hitLimit;
+    if (
+      limited &&
+      (Chunk.isEmpty(collected.readKeys) ||
+        Option.exists(
+          pinnedEnd,
+          (endpoint) => midpointCursor(collected.readKeys) === endpoint,
+        ))
+    ) {
+      return yield* new ReadBudgetExceededError({
+        rowsRead: usage.rows,
+        ...Option.match(maximumBytesRead, {
+          onNone: () => ({}),
+          onSome: () => ({ bytesRead: usage.bytes }),
         }),
-      );
-    }),
+      });
+    }
+    const state = stopped
+      ? new PaginateState({
+          page: collected.page,
+          readKeys: collected.readKeys,
+          stopped: true,
+          hitLimit: true,
+        })
+      : collected;
+    const page = Chunk.toArray(state.page);
+    // `stopped` implies at least one element was read, so the last
+    // read key exists exactly when the fold stopped early.
+    const stoppedAt = state.stopped
+      ? Chunk.last(state.readKeys)
+      : Option.none<OrderKey>();
+    return Option.match(stoppedAt, {
+      onSome: (lastKey) =>
+        state.hitLimit
+          ? {
+              page,
+              isDone: false,
+              continueCursor: serializeCursor(lastKey),
+              pageStatus: "SplitRequired" as const,
+              splitCursor: midpointCursor(state.readKeys),
+            }
+          : // A growing page that had to scan far past its item budget
+            // (a filter-heavy stream) recommends a split so reactive
+            // clients can subdivide it instead of re-scanning forever.
+            Chunk.size(state.readKeys) >= SOFT_MAX_SCAN_LENGTH
+            ? {
+                page,
+                isDone: false,
+                continueCursor: serializeCursor(lastKey),
+                pageStatus: "SplitRecommended" as const,
+                splitCursor: midpointCursor(state.readKeys),
+              }
+            : {
+                page,
+                isDone: false,
+                continueCursor: serializeCursor(lastKey),
+              },
+      // The narrowed stream was exhausted: either we reached the
+      // pinned end cursor (more may follow it) or the true end of
+      // the stream. An endCursor-pinned page that has grown well
+      // past its requested size recommends a split, so reactive
+      // clients can subdivide it (as `convex-helpers` does).
+      onNone: () => {
+        // Any pinned page — including one pinned to the end of the
+        // stream — that has grown well past its requested size
+        // recommends a split.
+        const shouldRecommendSplit =
+          Option.isSome(endCursor) &&
+          (Chunk.size(state.readKeys) >= SOFT_MAX_SCAN_LENGTH ||
+            Chunk.size(state.page) > options.numItems + 1);
+        return shouldRecommendSplit && Chunk.size(state.readKeys) > 0
+          ? {
+              page,
+              isDone: false,
+              continueCursor: Option.getOrElse(pinnedEnd, () => END_CURSOR),
+              pageStatus: "SplitRecommended" as const,
+              splitCursor: midpointCursor(state.readKeys),
+            }
+          : {
+              page,
+              isDone: Option.isNone(pinnedEnd),
+              continueCursor: Option.getOrElse(pinnedEnd, () => END_CURSOR),
+            };
+      },
+    });
+  }),
 );
