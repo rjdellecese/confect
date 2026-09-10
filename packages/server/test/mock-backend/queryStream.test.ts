@@ -629,11 +629,11 @@ describe("QueryStream", () => {
               const elements = yield* Stream.runCollect(leaf.annotated);
               const texts = yield* collectTexts(leaf);
               const start = {
-                key: Array.getUnsafe(elements, 1)[1],
+                key: Array.getUnsafe(elements, 1).key,
                 inclusive: startInclusive,
               };
               const end = {
-                key: Array.getUnsafe(elements, 5)[1],
+                key: Array.getUnsafe(elements, 5).key,
                 inclusive: endInclusive,
               };
               const bounds = { start, end };
@@ -831,11 +831,11 @@ describe("QueryStream", () => {
                 const result = yield* Stream.runCollect(
                   QueryStream.narrow(joined, {
                     start: {
-                      key: Array.getUnsafe(elements, 0)[1],
+                      key: Array.getUnsafe(elements, 0).key,
                       inclusive: startInclusive,
                     },
                     end: {
-                      key: Array.getUnsafe(elements, endIndex)[1],
+                      key: Array.getUnsafe(elements, endIndex).key,
                       inclusive: endInclusive,
                     },
                   }).annotated,
