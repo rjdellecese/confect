@@ -23,7 +23,7 @@ Effect.gen(function* () {
 
 To require an authenticated user across a whole group of functions — and provide the loaded user to every handler — use [middleware](/server/middleware) instead of repeating the lookup in each handler.
 
-For authorization policies that differ only by allowed roles or a resource argument name, declare [middleware options](/server/middleware#parameterizing-a-policy) rather than creating a separate middleware for every variation. One role gate can accept `{ roles: ["Internal"] }` on one function and `{ roles: ["Buyer", "Internal"] }` on another. If you repeat a guard on the same function, every attachment must pass; [customize option equality](/server/middleware#customizing-option-equality) when role order should not distinguish otherwise identical policies.
+For authorization policies that differ only by allowed roles or a resource argument name, declare [middleware options](/server/middleware#parameterizing-a-policy) rather than creating a separate middleware for every variation. One role gate can accept `{ roles: ["Internal"] }` on one function and `{ roles: ["Buyer", "Internal"] }` on another. If you [repeat a guard](/server/middleware#repeating-a-policy) on the same function, every attachment must pass.
 
 ## Handling unauthenticated requests
 
