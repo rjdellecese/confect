@@ -519,6 +519,11 @@ const PositionOrder = (order: OrderDirection): Order.Order<OrderKey> =>
 
 type BoundTag = "gt" | "gte" | "lt" | "lte";
 
+class TaggedBound extends Data.Class<{
+  readonly key: OrderKey;
+  readonly tag: BoundTag;
+}> {}
+
 /** Dropping a bound key's last component bounds by the remaining prefix — exclusively. */
 const excludePrefix = (tag: BoundTag): BoundTag =>
   tag === "gt" || tag === "gte" ? "gt" : "lt";
@@ -531,15 +536,15 @@ const peelBound = (
   key: OrderKey,
   tag: BoundTag,
 ): {
-  readonly peeled: ReadonlyArray<readonly [OrderKey, BoundTag]>;
-  readonly final: readonly [OrderKey, BoundTag];
+  readonly peeled: ReadonlyArray<TaggedBound>;
+  readonly final: TaggedBound;
 } =>
   key.length <= 1
-    ? { peeled: [], final: [key, tag] }
+    ? { peeled: [], final: new TaggedBound({ key, tag }) }
     : pipe(
         peelBound(Array.dropRight(key, 1), excludePrefix(tag)),
         ({ final, peeled }) => ({
-          peeled: Array.prepend(peeled, [key, tag] as const),
+          peeled: Array.prepend(peeled, new TaggedBound({ key, tag })),
           final,
         }),
       );
@@ -613,17 +618,17 @@ const splitRange = (
     bounds.upper.inclusive ? "lte" : "lt",
   );
 
-  const startRanges = Array.map(lower.peeled, ([key, tag]) =>
+  const startRanges = Array.map(lower.peeled, ({ key, tag }) =>
     rangeOpsFor(prefixOps, restFields, key, tag),
   );
   const endRanges = Array.reverse(
-    Array.map(upper.peeled, ([key, tag]) =>
+    Array.map(upper.peeled, ({ key, tag }) =>
       rangeOpsFor(prefixOps, restFields, key, tag),
     ),
   );
 
-  const [lowerFinalKey, lowerFinalTag] = lower.final;
-  const [upperFinalKey, upperFinalTag] = upper.final;
+  const { key: lowerFinalKey, tag: lowerFinalTag } = lower.final;
+  const { key: upperFinalKey, tag: upperFinalTag } = upper.final;
   const middleRange =
     Array.isReadonlyArrayNonEmpty(lowerFinalKey) &&
     Array.isReadonlyArrayNonEmpty(upperFinalKey)
