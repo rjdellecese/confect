@@ -1903,11 +1903,11 @@ const makeFlatMap = <
                       onSome: () => Stream.runHead(inner.annotated),
                     },
                   );
-                  const stopped = yield* isBudgetStopped(budgetStatus);
+                  const isStopped = yield* isBudgetStopped(budgetStatus);
                   return Option.match(original, {
                     onSome: () => Stream.empty,
                     onNone: () =>
-                      stopped
+                      isStopped
                         ? Stream.empty
                         : markerStream(
                             outerKey,
