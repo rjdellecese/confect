@@ -122,7 +122,10 @@ const flipDirection = <Direction extends OrderDirection>(
  *
  * @experimental
  */
-export type Element<Doc> = readonly [Option.Option<Doc>, OrderKey];
+export class Element<Doc> extends Data.Class<{
+  readonly doc: Option.Option<Doc>;
+  readonly key: OrderKey;
+}> {}
 
 // -----------------------------------------------------------------------------
 // Typed index ranges
@@ -734,7 +737,7 @@ export class QueryStream<
   toStream(): Stream.Stream<Doc, E, R> {
     return Stream.filterMap(
       this.annotated,
-      Filter.fromPredicateOption(([doc, _key]) => doc),
+      Filter.fromPredicateOption(({ doc }) => doc),
     );
   }
 }
@@ -1070,13 +1073,13 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
       Effect.map(
         Document.decode(reflection.tableName, reflection.tableSchema)(encoded),
         (doc) =>
-          [
-            Option.some(doc as Doc),
-            extractOrderKey(
+          new Element({
+            doc: Option.some(doc as Doc),
+            key: extractOrderKey(
               encoded as Record.ReadonlyRecord<string, unknown>,
               keyPaths,
             ),
-          ] as const,
+          }),
       ),
     ),
   );
@@ -1245,7 +1248,7 @@ const mergeStep =
               Option.match(best, {
                 onNone: () => Option.some([index, head] as const),
                 onSome: ([, bestElement]) =>
-                  isEarlier(head[1], bestElement[1])
+                  isEarlier(head.key, bestElement.key)
                     ? Option.some([index, head] as const)
                     : best,
               }),
@@ -1400,7 +1403,7 @@ const transform = <
     self.keyFields,
     Stream.map(
       self.annotated,
-      ([doc, key]) => [Option.flatMap(doc, f), key] as const,
+      ({ doc, key }) => new Element({ doc: Option.flatMap(doc, f), key }),
     ),
     undefined,
     (keyBounds) => transform(narrowByKeyBounds(self, keyBounds), f),
@@ -1428,11 +1431,12 @@ const transformEffect = <
     self.keyFields,
     Stream.mapEffect(
       self.annotated,
-      ([doc, key]) =>
+      ({ doc, key }) =>
         Option.match(doc, {
-          onNone: () => Effect.succeed([Option.none<Doc2>(), key] as const),
+          onNone: () =>
+            Effect.succeed(new Element({ doc: Option.none<Doc2>(), key })),
           onSome: (value) =>
-            Effect.map(f(value), (mapped) => [mapped, key] as const),
+            Effect.map(f(value), (mapped) => new Element({ doc: mapped, key })),
         }),
       // Order is preserved at any concurrency: elements are emitted in
       // input order however their effects finish.
@@ -1865,7 +1869,9 @@ const makeFlatMap = <
   ): Stream.Stream<Element<Doc2 | Doc3>> =>
     admittedByLower(innerBounds.lower)(nullPadding) &&
     admittedByUpper(innerBounds.upper)(nullPadding)
-      ? Stream.succeed([doc, Array.appendAll(outerKey, nullPadding)] as const)
+      ? Stream.succeed(
+          new Element({ doc, key: Array.appendAll(outerKey, nullPadding) }),
+        )
       : Stream.empty;
 
   const annotated: Stream.Stream<
@@ -1873,7 +1879,7 @@ const makeFlatMap = <
     E | E2,
     R | R2
   > = self.annotated.pipe(
-    Stream.flatMap(([outerDoc, outerKey]) => {
+    Stream.flatMap(({ doc: outerDoc, key: outerKey }) => {
       const innerBounds = innerBoundsFor(outerKey);
       return Option.match(outerDoc, {
         onNone: () => markerStream(outerKey, innerBounds, Option.none()),
@@ -1881,8 +1887,11 @@ const makeFlatMap = <
           const inner = validated(f(doc));
           return narrowByKeyBounds(inner, innerBounds).annotated.pipe(
             Stream.map(
-              ([innerDoc, innerKey]) =>
-                [innerDoc, Array.appendAll(outerKey, innerKey)] as const,
+              ({ doc: innerDoc, key: innerKey }) =>
+                new Element({
+                  doc: innerDoc,
+                  key: Array.appendAll(outerKey, innerKey),
+                }),
             ),
             Stream.orElseIfEmpty(() =>
               Stream.unwrap(
@@ -2208,7 +2217,7 @@ const makeDistinct = <
               onNone: () => Effect.succeed([[], Option.none()] as const),
               onSome: (element) =>
                 Effect.gen(function* () {
-                  const [doc, key] = element;
+                  const { doc, key } = element;
                   const prefix = Array.take(key, distinctLength);
                   if (order === self.order) {
                     const nextKey = Option.match(doc, {
@@ -2230,7 +2239,7 @@ const makeDistinct = <
                     lower: Option.some({ key: prefix, inclusive: true }),
                     upper: Option.some({ key: prefix, inclusive: true }),
                   }).annotated.pipe(
-                    Stream.tap(([, selectedKey]) =>
+                    Stream.tap(({ key: selectedKey }) =>
                       Ref.update(
                         firstKey,
                         Option.orElse(() => Option.some(selectedKey)),
@@ -2238,7 +2247,7 @@ const makeDistinct = <
                     ),
                     Stream.filterMap(
                       Filter.fromPredicateOption((selectedElement) =>
-                        Option.as(selectedElement[0], selectedElement),
+                        Option.as(selectedElement.doc, selectedElement),
                       ),
                     ),
                     Stream.runHead,
@@ -2254,14 +2263,19 @@ const makeDistinct = <
                         );
                         return [
                           isAdmitted(checkpoint)
-                            ? [[Option.none<Doc>(), checkpoint] as const]
+                            ? [
+                                new Element({
+                                  doc: Option.none<Doc>(),
+                                  key: checkpoint,
+                                }),
+                              ]
                             : [],
                           next,
                         ] as const;
                       }),
                     onSome: (representative) =>
                       Effect.succeed([
-                        isAdmitted(representative[1]) ? [representative] : [],
+                        isAdmitted(representative.key) ? [representative] : [],
                         next,
                       ] as const),
                   });
@@ -2457,12 +2471,12 @@ const narrowInMemory = <
 
   const dropOutOfRange: Narrower =
     self.order === "asc"
-      ? Stream.dropWhile(([, key]) => !aboveLower(key))
-      : Stream.dropWhile(([, key]) => !belowUpper(key));
+      ? Stream.dropWhile(({ key }) => !aboveLower(key))
+      : Stream.dropWhile(({ key }) => !belowUpper(key));
   const takeInRange: Narrower =
     self.order === "asc"
-      ? Stream.takeWhile(([, key]) => belowUpper(key))
-      : Stream.takeWhile(([, key]) => aboveLower(key));
+      ? Stream.takeWhile(({ key }) => belowUpper(key))
+      : Stream.takeWhile(({ key }) => aboveLower(key));
 
   return new QueryStream(
     self.order,
@@ -2817,7 +2831,7 @@ export const paginate: {
           Sink.fold(
             initialPaginateState<Doc>,
             (state) => !state.stopped,
-            (state, [doc, key]: Element<Doc>) => {
+            (state, { doc, key }: Element<Doc>) => {
               const readKeys = Chunk.append(state.readKeys, key);
               const page = Option.match(doc, {
                 onNone: () => state.page,
