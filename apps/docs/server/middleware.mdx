@@ -340,11 +340,11 @@ export default MiddlewareImpl.provides(
 );
 ```
 
-The general wrap form takes the downstream effect explicitly — here, timing middleware that runs code on both sides of the handler:
+The general wrap form takes the downstream effect explicitly — here, actions-only timing middleware that runs code on both sides of the handler:
 
 ```ts
 class Timed extends MiddlewareSpec.MiddlewareSpec<Timed>()("Timed", {
-  functionTypes: { query: false, mutation: true, action: true },
+  functionTypes: { query: false, mutation: false, action: true },
 }) {}
 
 const TimedImpl = MiddlewareImpl.make(
@@ -364,10 +364,12 @@ const TimedImpl = MiddlewareImpl.make(
 ```
 
 <Note>
-  Inside queries, reading the `Clock` service opts the query out of Convex's
-  cache, exactly as it would in a handler — see
-  [Determinism](/server/database/determinism). A timing middleware is best
-  reserved for mutations and actions.
+  Convex [freezes time throughout each query or
+  mutation](https://docs.convex.dev/functions/runtimes#using-randomness-and-time-in-queries-and-mutations).
+  `Clock.currentTimeMillis` reads that frozen timestamp, so this middleware
+  would report `0ms` there regardless of the actual duration. Use it only for
+  actions. Reading the clock in a query also affects caching, but that is a
+  separate concern from measuring elapsed time.
 </Note>
 
 ### Services available to an implementation
