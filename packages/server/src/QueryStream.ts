@@ -2517,18 +2517,20 @@ export class NotUniqueError extends Schema.TaggedError<NotUniqueError>()(
  *
  * @experimental
  */
-export const unique = <Doc, Key extends ReadonlyArray<string>, E, R>(
-  self: QueryStream<Doc, Key, E, R>,
-): Effect.Effect<Option.Option<Doc>, E | NotUniqueError, R> =>
-  self.pipe(
-    Stream.take(2),
-    Stream.runCollect,
-    Effect.flatMap((docs) =>
-      docs.length >= 2
-        ? Effect.fail(new NotUniqueError())
-        : Effect.succeed(Array.head(docs)),
+export const unique = Effect.fn("QueryStream.unique")(
+  <Doc, Key extends ReadonlyArray<string>, E, R>(
+    self: QueryStream<Doc, Key, E, R>,
+  ): Effect.Effect<Option.Option<Doc>, E | NotUniqueError, R> =>
+    self.pipe(
+      Stream.take(2),
+      Stream.runCollect,
+      Effect.flatMap((docs) =>
+        docs.length >= 2
+          ? Effect.fail(new NotUniqueError())
+          : Effect.succeed(Array.head(docs)),
+      ),
     ),
-  );
+);
 
 // -----------------------------------------------------------------------------
 // Pagination
@@ -2752,196 +2754,189 @@ export const paginate: {
   ): Effect.Effect<PaginationResult<Doc>, E | ReadBudgetExceededError, R>;
 } = dual(
   2,
-  <
+  Effect.fn("QueryStream.paginate")(function* <
     Doc,
     Key extends ReadonlyArray<string>,
     E,
     R,
     Direction extends OrderDirection,
-  >(
-    self: QueryStream<Doc, Key, E, R, Direction>,
-    options: PaginateOptions,
-  ) =>
-    Effect.gen(function* () {
-      if (options.numItems === 0) {
-        if (options.cursor === null) {
-          return yield* Effect.die(
-            new Error(
-              "QueryStream.paginate: numItems of 0 with a null cursor is not supported",
-            ),
-          );
-        }
-        return yield* Effect.succeed<PaginationResult<Doc>>({
-          page: [],
-          isDone: false,
-          continueCursor: options.cursor,
-        });
-      }
-
-      const after = Option.map(Option.fromNullOr(options.cursor), (cursor) =>
-        deserializeCursorChecked(cursor, self.keyFields.length),
-      );
-      const endCursor = Option.fromNullishOr(options.endCursor);
-      // An end cursor of `END_CURSOR` pins the page to the end of the
-      // stream rather than to a key.
-      const pinnedEnd = Option.filter(
-        endCursor,
-        (cursor) => cursor !== END_CURSOR,
-      );
-      const until = Option.map(pinnedEnd, (cursor) =>
-        deserializeCursorChecked(cursor, self.keyFields.length),
-      );
-      const start = Option.map(after, (key) => ({ key, inclusive: false }));
-      const end = Option.map(until, (key) => ({ key, inclusive: true }));
-      const narrowed = narrowByKeyBounds(
-        self,
-        self.order === "asc"
-          ? { lower: start, upper: end }
-          : { lower: end, upper: start },
-      );
-      // With an endCursor the page runs to it, however many items that is.
-      const maxRows = Option.match(endCursor, {
-        onNone: () => Option.some(options.numItems),
-        onSome: () => Option.none<number>(),
-      });
-      const maximumRowsRead = Option.fromUndefinedOr(options.maximumRowsRead);
-      const maximumBytesRead = Option.fromUndefinedOr(options.maximumBytesRead);
-      const limits: ReadBudgetLimits = { maximumRowsRead, maximumBytesRead };
-      const stateRef = yield* SynchronizedRef.make(
-        new ReadBudgetState({
-          rows: 0,
-          bytes: 0,
-          status: BudgetStatus.Active(),
-        }),
-      );
-      const budgetStatus = Option.as(
-        Option.orElse(maximumRowsRead, () => maximumBytesRead),
-        stateRef,
-      );
-      const collected = yield* pipe(
-        Stream.run(
-          narrowed.annotated,
-          Sink.fold(
-            () =>
-              new PaginateState<Doc>({
-                page: Chunk.empty(),
-                readKeys: Chunk.empty(),
-                stopped: false,
-                hitLimit: false,
-              }),
-            (state) => !state.stopped,
-            (state, { doc, key }: Element<Doc>) => {
-              const readKeys = Chunk.append(state.readKeys, key);
-              const page = Option.match(doc, {
-                onNone: () => state.page,
-                onSome: (value) => Chunk.append(state.page, value),
-              });
-              return Effect.map(SynchronizedRef.get(stateRef), (usage) => {
-                const hitLimit = isBudgetExhausted(limits, usage);
-                return new PaginateState({
-                  page,
-                  readKeys,
-                  hitLimit,
-                  stopped:
-                    hitLimit ||
-                    Option.exists(
-                      maxRows,
-                      (limit) => Chunk.size(page) >= limit,
-                    ),
-                });
-              });
-            },
+  >(self: QueryStream<Doc, Key, E, R, Direction>, options: PaginateOptions) {
+    if (options.numItems === 0) {
+      if (options.cursor === null) {
+        return yield* Effect.die(
+          new Error(
+            "QueryStream.paginate: numItems of 0 with a null cursor is not supported",
           ),
-        ),
-        Effect.provideService(ReadBudgetLimits, limits),
-        Effect.provideService(ReadBudgetStatus, budgetStatus),
-      );
-      const usage = yield* SynchronizedRef.get(stateRef);
-      const stopped = BudgetStatus.$is("Stopped")(usage.status);
-      const limited = stopped || collected.hitLimit;
-      if (
-        limited &&
-        (Chunk.isEmpty(collected.readKeys) ||
-          Option.exists(
-            pinnedEnd,
-            (endpoint) => midpointCursor(collected.readKeys) === endpoint,
-          ))
-      ) {
-        return yield* new ReadBudgetExceededError({
-          rowsRead: usage.rows,
-          ...Option.match(maximumBytesRead, {
-            onNone: () => ({}),
-            onSome: () => ({ bytesRead: usage.bytes }),
-          }),
-        });
+        );
       }
-      const state = stopped
-        ? new PaginateState({
-            page: collected.page,
-            readKeys: collected.readKeys,
-            stopped: true,
-            hitLimit: true,
-          })
-        : collected;
-      const page = Chunk.toArray(state.page);
-      // `stopped` implies at least one element was read, so the last
-      // read key exists exactly when the fold stopped early.
-      const stoppedAt = state.stopped
-        ? Chunk.last(state.readKeys)
-        : Option.none<OrderKey>();
-      return Option.match(stoppedAt, {
-        onSome: (lastKey) =>
-          state.hitLimit
+      return yield* Effect.succeed<PaginationResult<Doc>>({
+        page: [],
+        isDone: false,
+        continueCursor: options.cursor,
+      });
+    }
+
+    const after = Option.map(Option.fromNullOr(options.cursor), (cursor) =>
+      deserializeCursorChecked(cursor, self.keyFields.length),
+    );
+    const endCursor = Option.fromNullishOr(options.endCursor);
+    // An end cursor of `END_CURSOR` pins the page to the end of the
+    // stream rather than to a key.
+    const pinnedEnd = Option.filter(
+      endCursor,
+      (cursor) => cursor !== END_CURSOR,
+    );
+    const until = Option.map(pinnedEnd, (cursor) =>
+      deserializeCursorChecked(cursor, self.keyFields.length),
+    );
+    const start = Option.map(after, (key) => ({ key, inclusive: false }));
+    const end = Option.map(until, (key) => ({ key, inclusive: true }));
+    const narrowed = narrowByKeyBounds(
+      self,
+      self.order === "asc"
+        ? { lower: start, upper: end }
+        : { lower: end, upper: start },
+    );
+    // With an endCursor the page runs to it, however many items that is.
+    const maxRows = Option.match(endCursor, {
+      onNone: () => Option.some(options.numItems),
+      onSome: () => Option.none<number>(),
+    });
+    const maximumRowsRead = Option.fromUndefinedOr(options.maximumRowsRead);
+    const maximumBytesRead = Option.fromUndefinedOr(options.maximumBytesRead);
+    const limits: ReadBudgetLimits = { maximumRowsRead, maximumBytesRead };
+    const stateRef = yield* SynchronizedRef.make(
+      new ReadBudgetState({
+        rows: 0,
+        bytes: 0,
+        status: BudgetStatus.Active(),
+      }),
+    );
+    const budgetStatus = Option.as(
+      Option.orElse(maximumRowsRead, () => maximumBytesRead),
+      stateRef,
+    );
+    const collected = yield* pipe(
+      Stream.run(
+        narrowed.annotated,
+        Sink.fold(
+          () =>
+            new PaginateState<Doc>({
+              page: Chunk.empty(),
+              readKeys: Chunk.empty(),
+              stopped: false,
+              hitLimit: false,
+            }),
+          (state) => !state.stopped,
+          (state, { doc, key }: Element<Doc>) => {
+            const readKeys = Chunk.append(state.readKeys, key);
+            const page = Option.match(doc, {
+              onNone: () => state.page,
+              onSome: (value) => Chunk.append(state.page, value),
+            });
+            return Effect.map(SynchronizedRef.get(stateRef), (usage) => {
+              const hitLimit = isBudgetExhausted(limits, usage);
+              return new PaginateState({
+                page,
+                readKeys,
+                hitLimit,
+                stopped:
+                  hitLimit ||
+                  Option.exists(maxRows, (limit) => Chunk.size(page) >= limit),
+              });
+            });
+          },
+        ),
+      ),
+      Effect.provideService(ReadBudgetLimits, limits),
+      Effect.provideService(ReadBudgetStatus, budgetStatus),
+    );
+    const usage = yield* SynchronizedRef.get(stateRef);
+    const stopped = BudgetStatus.$is("Stopped")(usage.status);
+    const limited = stopped || collected.hitLimit;
+    if (
+      limited &&
+      (Chunk.isEmpty(collected.readKeys) ||
+        Option.exists(
+          pinnedEnd,
+          (endpoint) => midpointCursor(collected.readKeys) === endpoint,
+        ))
+    ) {
+      return yield* new ReadBudgetExceededError({
+        rowsRead: usage.rows,
+        ...Option.match(maximumBytesRead, {
+          onNone: () => ({}),
+          onSome: () => ({ bytesRead: usage.bytes }),
+        }),
+      });
+    }
+    const state = stopped
+      ? new PaginateState({
+          page: collected.page,
+          readKeys: collected.readKeys,
+          stopped: true,
+          hitLimit: true,
+        })
+      : collected;
+    const page = Chunk.toArray(state.page);
+    // `stopped` implies at least one element was read, so the last
+    // read key exists exactly when the fold stopped early.
+    const stoppedAt = state.stopped
+      ? Chunk.last(state.readKeys)
+      : Option.none<OrderKey>();
+    return Option.match(stoppedAt, {
+      onSome: (lastKey) =>
+        state.hitLimit
+          ? {
+              page,
+              isDone: false,
+              continueCursor: serializeCursor(lastKey),
+              pageStatus: "SplitRequired" as const,
+              splitCursor: midpointCursor(state.readKeys),
+            }
+          : // A growing page that had to scan far past its item budget
+            // (a filter-heavy stream) recommends a split so reactive
+            // clients can subdivide it instead of re-scanning forever.
+            Chunk.size(state.readKeys) >= SOFT_MAX_SCAN_LENGTH
             ? {
                 page,
                 isDone: false,
                 continueCursor: serializeCursor(lastKey),
-                pageStatus: "SplitRequired" as const,
-                splitCursor: midpointCursor(state.readKeys),
-              }
-            : // A growing page that had to scan far past its item budget
-              // (a filter-heavy stream) recommends a split so reactive
-              // clients can subdivide it instead of re-scanning forever.
-              Chunk.size(state.readKeys) >= SOFT_MAX_SCAN_LENGTH
-              ? {
-                  page,
-                  isDone: false,
-                  continueCursor: serializeCursor(lastKey),
-                  pageStatus: "SplitRecommended" as const,
-                  splitCursor: midpointCursor(state.readKeys),
-                }
-              : {
-                  page,
-                  isDone: false,
-                  continueCursor: serializeCursor(lastKey),
-                },
-        // The narrowed stream was exhausted: either we reached the
-        // pinned end cursor (more may follow it) or the true end of
-        // the stream. An endCursor-pinned page that has grown well
-        // past its requested size recommends a split, so reactive
-        // clients can subdivide it (as `convex-helpers` does).
-        onNone: () => {
-          // Any pinned page — including one pinned to the end of the
-          // stream — that has grown well past its requested size
-          // recommends a split.
-          const shouldRecommendSplit =
-            Option.isSome(endCursor) &&
-            (Chunk.size(state.readKeys) >= SOFT_MAX_SCAN_LENGTH ||
-              Chunk.size(state.page) > options.numItems + 1);
-          return shouldRecommendSplit && Chunk.size(state.readKeys) > 0
-            ? {
-                page,
-                isDone: false,
-                continueCursor: Option.getOrElse(pinnedEnd, () => END_CURSOR),
                 pageStatus: "SplitRecommended" as const,
                 splitCursor: midpointCursor(state.readKeys),
               }
             : {
                 page,
-                isDone: Option.isNone(pinnedEnd),
-                continueCursor: Option.getOrElse(pinnedEnd, () => END_CURSOR),
-              };
-        },
-      });
-    }),
+                isDone: false,
+                continueCursor: serializeCursor(lastKey),
+              },
+      // The narrowed stream was exhausted: either we reached the
+      // pinned end cursor (more may follow it) or the true end of
+      // the stream. An endCursor-pinned page that has grown well
+      // past its requested size recommends a split, so reactive
+      // clients can subdivide it (as `convex-helpers` does).
+      onNone: () => {
+        // Any pinned page — including one pinned to the end of the
+        // stream — that has grown well past its requested size
+        // recommends a split.
+        const shouldRecommendSplit =
+          Option.isSome(endCursor) &&
+          (Chunk.size(state.readKeys) >= SOFT_MAX_SCAN_LENGTH ||
+            Chunk.size(state.page) > options.numItems + 1);
+        return shouldRecommendSplit && Chunk.size(state.readKeys) > 0
+          ? {
+              page,
+              isDone: false,
+              continueCursor: Option.getOrElse(pinnedEnd, () => END_CURSOR),
+              pageStatus: "SplitRecommended" as const,
+              splitCursor: midpointCursor(state.readKeys),
+            }
+          : {
+              page,
+              isDone: Option.isNone(pinnedEnd),
+              continueCursor: Option.getOrElse(pinnedEnd, () => END_CURSOR),
+            };
+      },
+    });
+  }),
 );
