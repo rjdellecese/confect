@@ -28,6 +28,8 @@ FunctionSpec.publicQuery({
 
 Repeat the same middleware with non-equivalent options within a group or function, or across both levels. Every attachment runs in order, with group middleware before function middleware, so repeated guards must all pass. `confect codegen` and server registration validate options on the schema's type side without decoding or coercion, and reject equivalent options for the same middleware key using `Schema.toEquivalence`. Use `Schema.overrideToEquivalence` to customize equality. Duplicate middleware without options remains a type error and an immediate runtime error; declared errors and service types remain unchanged.
 
+Register each implementation using the same middleware spec that you attach. Server registration rejects implementations declared against a different spec, even when the keys match.
+
 ### Breaking Changes
 
 - Middleware callbacks receive `name`, `functionType`, `functionVisibility`, and decoded `args` inside `invocation`, rather than directly on their second argument.

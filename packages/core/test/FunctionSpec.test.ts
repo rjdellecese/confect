@@ -463,4 +463,22 @@ describe("middleware options", () => {
       readonly roles: ReadonlyArray<"Internal" | "Buyer">;
     }>();
   });
+
+  it("preserves optionless members in mixed attachment types", () => {
+    const mixed = query
+      .middleware(Observe)
+      .middleware(RequireRole, { roles: ["Internal"] });
+
+    expectTypeOf<(typeof mixed.middlewareAttachments)[number]>().toEqualTypeOf<
+      | MiddlewareSpec.Attachment<typeof Observe>
+      | MiddlewareSpec.Attachment<typeof RequireRole>
+    >();
+    expectTypeOf<
+      (typeof mixed.middlewareAttachments)[number]["options"]
+    >().toEqualTypeOf<MiddlewareSpec.Options<typeof RequireRole> | undefined>();
+    expect(mixed.middlewareAttachments.map(({ options }) => options)).toEqual([
+      undefined,
+      { roles: ["Internal"] },
+    ]);
+  });
 });

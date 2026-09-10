@@ -38,6 +38,58 @@ describe("Registered functions", () => {
 });
 
 describe("buildForGroup", () => {
+  it("rejects an implementation registered for a different same-key spec", () => {
+    class Policy extends MiddlewareSpec.MiddlewareSpec<Policy>()("Policy", {
+      options: () => Schema.Struct({ label: Schema.String }),
+      functionTypes: { query: true, mutation: false, action: false },
+    }) {}
+    class OtherPolicy extends MiddlewareSpec.MiddlewareSpec<OtherPolicy>()(
+      "Policy",
+      {
+        options: () => Schema.Struct({ count: Schema.Finite }),
+        functionTypes: { query: true, mutation: false, action: false },
+      },
+    ) {}
+    class SameShapePolicy extends MiddlewareSpec.MiddlewareSpec<SameShapePolicy>()(
+      "Policy",
+      {
+        options: () => Schema.Struct({ label: Schema.String }),
+        functionTypes: { query: true, mutation: false, action: false },
+      },
+    ) {}
+
+    const query = FunctionSpec.publicQuery({
+      name: "get",
+      returns: () => Schema.String,
+    }).middleware(Policy, { label: "internal" });
+    const group = GroupSpec.make().addFunction(query);
+
+    for (const implementationSpec of [OtherPolicy, SameShapePolicy]) {
+      const layer = GroupImpl.make(databaseSchema, group).pipe(
+        Layer.provide(
+          FunctionImpl.make(databaseSchema, group, "get", () =>
+            Effect.succeed("ok"),
+          ),
+        ),
+        Layer.provide(
+          MiddlewareImpl.make(
+            databaseSchema,
+            implementationSpec,
+            (effect) => effect,
+          ),
+        ),
+        GroupImpl.finalize,
+      );
+      expect(() =>
+        RegisteredFunctions.buildForGroup<typeof group>(
+          databaseSchema,
+          layer,
+          RegisteredConvexFunction.make,
+        ),
+      ).toThrowError(/Middleware "Policy".*function "get".*different spec/);
+    }
+  });
+
   it("rejects equivalent options during registration without requiring codegen", () => {
     class GroupPolicy extends MiddlewareSpec.MiddlewareSpec<GroupPolicy>()(
       "GroupPolicy",

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@effect/vitest";
+import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as GroupSpec from "@confect/core/GroupSpec";
 import * as FunctionSpec from "@confect/core/FunctionSpec";
 import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
@@ -113,6 +113,24 @@ describe("middleware options", () => {
     expect(group.middlewareAttachments[0]?.options).toEqual({ limit: 5 });
     // @ts-expect-error
     GroupSpec.make().middleware(Limit, { limit: "5" });
+  });
+
+  it("preserves optionless members in mixed attachment types", () => {
+    const mixed = GroupSpec.make()
+      .middleware(Observe)
+      .middleware(RequireRole, { roles: ["Internal"] });
+
+    expectTypeOf<(typeof mixed.middlewareAttachments)[number]>().toEqualTypeOf<
+      | MiddlewareSpec.Attachment<typeof Observe>
+      | MiddlewareSpec.Attachment<typeof RequireRole>
+    >();
+    expectTypeOf<
+      (typeof mixed.middlewareAttachments)[number]["options"]
+    >().toEqualTypeOf<MiddlewareSpec.Options<typeof RequireRole> | undefined>();
+    expect(mixed.middlewareAttachments.map(({ options }) => options)).toEqual([
+      undefined,
+      { roles: ["Internal"] },
+    ]);
   });
 
   it("allows different options at both attachment levels and across their boundary", () => {

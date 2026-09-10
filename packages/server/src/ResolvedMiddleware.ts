@@ -18,8 +18,8 @@ export interface ResolvedMiddleware {
  * type system (`GroupImpl.finalize` demands every attached middleware's
  * `MiddlewareImpl` service; `MiddlewareImpl.make`/`makeByFunctionType` cover exactly
  * the declared functionTypes, which `GroupSpec.middleware` requires to cover every
- * function) — these throws are the runtime backstop for builds that ignored
- * type errors.
+ * function). Spec identity is checked separately because implementation services
+ * are keyed by string, so the type system cannot distinguish same-key specs.
  */
 export const resolve = (
   functionRegistryItem: FunctionRegistryItem.ConfectFunctionRegistryItem,
@@ -38,6 +38,11 @@ export const resolve = (
       if (registered === undefined) {
         throw new Error(
           `Middleware "${middlewareSpec.key}" is attached to this group's spec, but no implementation was provided — pipe the group's impl through \`Layer.provide(MiddlewareImpl.make(...))\` (or \`makeByFunctionType\`/\`provides\`).`,
+        );
+      }
+      if (registered.middlewareSpec !== middlewareSpec) {
+        throw new Error(
+          `Middleware "${middlewareSpec.key}" attached to function "${functionRegistryItem.name}" has an implementation registered for a different spec with the same key. Register the implementation using the attached middleware spec.`,
         );
       }
 

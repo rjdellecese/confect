@@ -113,12 +113,14 @@ export interface AnyMiddlewareSpec {
 export type Options<MiddlewareSpec_ extends AnyMiddlewareSpec> =
   MiddlewareSpec_["~Options"]["Type"];
 
-export interface Attachment<
+export type Attachment<
   MiddlewareSpec_ extends AnyMiddlewareSpec = AnyMiddlewareSpec,
-> {
-  readonly spec: MiddlewareSpec_;
-  readonly options: ImplementationOptions<MiddlewareSpec_>;
-}
+> = MiddlewareSpec_ extends AnyMiddlewareSpec
+  ? {
+      readonly spec: MiddlewareSpec_;
+      readonly options: ImplementationOptions<MiddlewareSpec_>;
+    }
+  : never;
 
 export type WithoutOptions<MiddlewareSpec_ extends AnyMiddlewareSpec> =
   MiddlewareSpec_ extends AnyMiddlewareSpec
