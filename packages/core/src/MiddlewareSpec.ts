@@ -139,8 +139,7 @@ export const validateAttachments = (
   attachments: ReadonlyArray<Attachment>,
   location: string,
 ): void => {
-  for (let index = 0; index < attachments.length; index++) {
-    const attachment = attachments[index]!;
+  for (const [index, attachment] of attachments.entries()) {
     const schema = attachment.spec.options;
     if (schema !== undefined && !Schema.is(schema)(attachment.options)) {
       throw new Error(
@@ -149,8 +148,8 @@ export const validateAttachments = (
     }
     const equivalent =
       schema === undefined ? undefined : Schema.toEquivalence(schema);
-    for (let previousIndex = 0; previousIndex < index; previousIndex++) {
-      const previous = attachments[previousIndex]!;
+    for (const [previousIndex, previous] of attachments.entries()) {
+      if (previousIndex === index) break;
       if (previous.spec.key !== attachment.spec.key) continue;
       if (previous.spec !== attachment.spec) {
         throw new Error(
