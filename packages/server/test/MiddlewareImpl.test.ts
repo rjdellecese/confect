@@ -107,18 +107,46 @@ describe("implementation options", () => {
     });
   });
 
-  it("types options as undefined for optionless middleware", () => {
-    MiddlewareImpl.make(
-      databaseSchema,
-      Observe,
-      (effect, { options, invocation }) => {
+  it("omits options from the context type for optionless middleware", () => {
+    MiddlewareImpl.make(databaseSchema, Observe, (effect, context) => {
+      expectTypeOf<keyof typeof context>().toEqualTypeOf<"invocation">();
+      expectTypeOf(context.invocation).toEqualTypeOf<
+        MiddlewareSpec.MiddlewareOptions["invocation"]
+      >();
+      return effect;
+    });
+  });
+
+  it("retains the options field when a declared schema accepts undefined", () => {
+    class UndefinedPolicy extends MiddlewareSpec.MiddlewareSpec<UndefinedPolicy>()(
+      "UndefinedPolicy",
+      {
+        options: () => Schema.Undefined,
+        functionTypes: { query: true, mutation: true, action: true },
+      },
+    ) {}
+
+    MiddlewareImpl.make(databaseSchema, UndefinedPolicy, (effect, context) => {
+      expectTypeOf<keyof typeof context>().toEqualTypeOf<
+        "options" | "invocation"
+      >();
+      expectTypeOf(context.options).toBeUndefined();
+      return effect;
+    });
+    MiddlewareImpl.makeByFunctionType(databaseSchema, UndefinedPolicy, {
+      query: (effect, { options }) => {
         expectTypeOf(options).toBeUndefined();
-        expectTypeOf(invocation).toEqualTypeOf<
-          MiddlewareSpec.MiddlewareOptions["invocation"]
-        >();
         return effect;
       },
-    );
+      mutation: (effect, { options }) => {
+        expectTypeOf(options).toBeUndefined();
+        return effect;
+      },
+      action: (effect, { options }) => {
+        expectTypeOf(options).toBeUndefined();
+        return effect;
+      },
+    });
   });
 
   it("allows invocation-only callbacks with either implementation strategy", () => {
@@ -129,20 +157,23 @@ describe("implementation options", () => {
       return effect;
     });
     MiddlewareImpl.makeByFunctionType(databaseSchema, Observe, {
-      query: (effect, { invocation }) => {
-        expectTypeOf(invocation).toEqualTypeOf<
+      query: (effect, context) => {
+        expectTypeOf<keyof typeof context>().toEqualTypeOf<"invocation">();
+        expectTypeOf(context.invocation).toEqualTypeOf<
           MiddlewareSpec.MiddlewareOptions["invocation"]
         >();
         return effect;
       },
-      mutation: (effect, { invocation }) => {
-        expectTypeOf(invocation).toEqualTypeOf<
+      mutation: (effect, context) => {
+        expectTypeOf<keyof typeof context>().toEqualTypeOf<"invocation">();
+        expectTypeOf(context.invocation).toEqualTypeOf<
           MiddlewareSpec.MiddlewareOptions["invocation"]
         >();
         return effect;
       },
-      action: (effect, { invocation }) => {
-        expectTypeOf(invocation).toEqualTypeOf<
+      action: (effect, context) => {
+        expectTypeOf<keyof typeof context>().toEqualTypeOf<"invocation">();
+        expectTypeOf(context.invocation).toEqualTypeOf<
           MiddlewareSpec.MiddlewareOptions["invocation"]
         >();
         return effect;

@@ -320,6 +320,14 @@ describe("middleware", () => {
       functionTypes: { query: true, mutation: true, action: true },
     }) {}
 
+    class UndefinedPolicy extends MiddlewareSpec.MiddlewareSpec<UndefinedPolicy>()(
+      "UndefinedPolicy",
+      {
+        options: () => Schema.Undefined,
+        functionTypes: { query: true, mutation: true, action: true },
+      },
+    ) {}
+
     it.effect(
       "passes typed options through both implementation strategies in attachment order",
       () =>
@@ -332,6 +340,7 @@ describe("middleware", () => {
           })
             .middleware(FunctionPolicy, { tolerateMissing: true })
             .middleware(GroupPolicy, { label: "inner" })
+            .middleware(UndefinedPolicy, undefined)
             .middleware(Observe);
           const group = GroupSpec.make()
             .middleware(GroupPolicy, { label: "group" })
@@ -396,15 +405,40 @@ describe("middleware", () => {
               MiddlewareImpl.make(
                 databaseSchema,
                 Observe,
-                (effect, { options, invocation }) => {
-                  expect(options).toBeUndefined();
-                  expect(invocation).toEqual({
-                    name: "get",
-                    functionType: "query",
-                    functionVisibility: "public",
-                    args: { id: "decoded" },
+                (effect, context) => {
+                  expect(Object.hasOwn(context, "options")).toBe(false);
+                  expect(context).toStrictEqual({
+                    invocation: {
+                      name: "get",
+                      functionType: "query",
+                      functionVisibility: "public",
+                      args: { id: "decoded" },
+                    },
                   });
                   return effect;
+                },
+              ),
+            ),
+            Layer.provide(
+              MiddlewareImpl.makeByFunctionType(
+                databaseSchema,
+                UndefinedPolicy,
+                {
+                  query: (effect, context) => {
+                    expect(Object.hasOwn(context, "options")).toBe(true);
+                    expect(context).toStrictEqual({
+                      options: undefined,
+                      invocation: {
+                        name: "get",
+                        functionType: "query",
+                        functionVisibility: "public",
+                        args: { id: "decoded" },
+                      },
+                    });
+                    return effect;
+                  },
+                  mutation: (effect) => effect,
+                  action: (effect) => effect,
                 },
               ),
             ),

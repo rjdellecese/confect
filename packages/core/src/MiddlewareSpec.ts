@@ -44,24 +44,28 @@ export interface SuccessValue {
  *
  * Mirrors `RpcMiddleware.RpcMiddleware` in Effect.
  */
-export interface MiddlewareImpl<Provides_, E, R, Options_ = undefined> {
+export interface MiddlewareImpl<Provides_, E, R, Options_ = never> {
   (
     effect: Effect.Effect<SuccessValue, E | unhandled, Provides_>,
     context: MiddlewareOptions<Options_>,
   ): Effect.Effect<SuccessValue, E | unhandled, R>;
 }
 
-export interface MiddlewareOptions<Options_ = undefined> {
-  readonly options: Options_;
+export type MiddlewareOptions<Options_ = never> = {
   readonly invocation: {
     readonly name: string;
     readonly functionType: FunctionType;
     readonly functionVisibility: FunctionVisibility;
     readonly args: unknown;
   };
-}
+} & ([Options_] extends [never] ? unknown : { readonly options: Options_ });
 
-export interface AnyMiddlewareImpl extends MiddlewareImpl<any, any, any, any> {}
+export interface AnyMiddlewareImpl {
+  (
+    effect: Effect.Effect<SuccessValue, any, any>,
+    context: MiddlewareOptions | MiddlewareOptions<unknown>,
+  ): Effect.Effect<SuccessValue, any, any>;
+}
 
 /**
  * The class shape produced by {@link MiddlewareSpec}. Only the static side is ever
@@ -118,7 +122,9 @@ export type Attachment<
 > = MiddlewareSpec_ extends AnyMiddlewareSpec
   ? {
       readonly spec: MiddlewareSpec_;
-      readonly options: ImplementationOptions<MiddlewareSpec_>;
+      readonly options: [MiddlewareSpec_["~Options"]] extends [never]
+        ? undefined
+        : Options<MiddlewareSpec_>;
     }
   : never;
 
@@ -168,12 +174,6 @@ export type AttachmentArgs<MiddlewareSpec_ extends AnyMiddlewareSpec> = [
 ] extends [never]
   ? []
   : [options: Options<MiddlewareSpec_>];
-
-export type ImplementationOptions<MiddlewareSpec_ extends AnyMiddlewareSpec> = [
-  MiddlewareSpec_["~Options"],
-] extends [never]
-  ? undefined
-  : Options<MiddlewareSpec_>;
 
 export type Key<MiddlewareSpec_ extends AnyMiddlewareSpec> =
   MiddlewareSpec_["key"];

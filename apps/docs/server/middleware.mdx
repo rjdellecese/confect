@@ -216,7 +216,7 @@ The second argument is required and typed from the schema's `Type`. Middleware w
 
 Keep the schema inside its thunk. Constructing middleware specs and assembling groups, specs, and refs does not evaluate options schemas; validation happens later.
 
-Both `MiddlewareImpl.make` and `MiddlewareImpl.makeByFunctionType` receive `(effect, { options, invocation })`. The typed `options` field contains the attachment value; `invocation` contains `name`, `functionType`, `functionVisibility`, and decoded `args`. Middleware without an options schema receives `options: undefined` and can still access metadata with `(effect, { invocation })`. Destructure only what you need: `(effect, { options: { roles } })` reads the role list directly.
+Both `MiddlewareImpl.make` and `MiddlewareImpl.makeByFunctionType` receive `(effect, { options, invocation })` when the middleware declares an options schema. The typed `options` field contains the attachment value; `invocation` contains `name`, `functionType`, `functionVisibility`, and decoded `args`. Middleware without an options schema receives only `{ invocation }`: `options` is absent from both the context type and the runtime object. A declared schema that accepts `undefined` still receives an `options` field, even when its value is `undefined`. Destructure only what you need: `(effect, { options: { roles } })` reads the role list directly.
 
 The same options mechanism also supports resource argument names, flags, and client-safe resolver functions. Use `MiddlewareImpl.make` rather than the `provides` shorthand when producing a service depends on the attachment options.
 
@@ -295,7 +295,7 @@ Since handlers depend only on the service, unit tests don't need middleware at a
 
 ## Implementing a middleware
 
-A middleware implementation wraps the downstream effect (any remaining middleware plus the handler). It receives `(effect, { options, invocation })`, with attachment configuration in `options` and the covered function's `name`, `functionType`, `functionVisibility`, and decoded `args` in `invocation`, and decides whether and how to run the effect:
+A middleware implementation wraps the downstream effect (any remaining middleware plus the handler). Its second argument always contains `invocation`, with the covered function's `name`, `functionType`, `functionVisibility`, and decoded `args`. It also contains `options` when the middleware declares an options schema. The implementation decides whether and how to run the effect:
 
 - **Provide** the declared service to it with `Effect.provideService` — the types require this (or never running the effect at all): the downstream effect's environment carries the provided service as an obligation the implementation must discharge.
 - **Short-circuit** by returning `Effect.fail` with the declared error instead of running the effect.

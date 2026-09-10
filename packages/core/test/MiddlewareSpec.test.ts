@@ -464,6 +464,26 @@ describe("Ref error union", () => {
   });
 });
 
+describe("middleware callback context", () => {
+  it("defaults to invocation metadata without an options property", () => {
+    expectTypeOf<
+      keyof Parameters<MiddlewareSpec.MiddlewareImpl<never, never, never>>[1]
+    >().toEqualTypeOf<"invocation">();
+    expectTypeOf<
+      keyof MiddlewareSpec.MiddlewareOptions
+    >().toEqualTypeOf<"invocation">();
+  });
+
+  it("retains a required options property for undefined and unknown values", () => {
+    expectTypeOf<MiddlewareSpec.MiddlewareOptions<undefined>>().toEqualTypeOf<
+      MiddlewareSpec.MiddlewareOptions & { readonly options: undefined }
+    >();
+    expectTypeOf<MiddlewareSpec.MiddlewareOptions<unknown>>().toEqualTypeOf<
+      MiddlewareSpec.MiddlewareOptions & { readonly options: unknown }
+    >();
+  });
+});
+
 describe("validateAttachments", () => {
   class RequireRole extends MiddlewareSpec.MiddlewareSpec<RequireRole>()(
     "RequireRole",

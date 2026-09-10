@@ -160,7 +160,7 @@ export const make = <
         MiddlewareSpec.FunctionTypes<MiddlewareSpec_>
       >
     | MiddlewareSpec.Requires<MiddlewareSpec_>,
-    MiddlewareSpec.ImplementationOptions<MiddlewareSpec_>
+    MiddlewareSpec.Options<MiddlewareSpec_>
   >,
 ): Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<MiddlewareSpec_>>> =>
   layerFromImpls(
@@ -196,7 +196,7 @@ export const makeByFunctionType = <
       MiddlewareSpec.Error<MiddlewareSpec_>,
       | FunctionTypeServices<DatabaseSchema_, FunctionType_>
       | MiddlewareSpec.Requires<MiddlewareSpec_>,
-      MiddlewareSpec.ImplementationOptions<MiddlewareSpec_>
+      MiddlewareSpec.Options<MiddlewareSpec_>
     >;
   },
 ): Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<MiddlewareSpec_>>> =>
