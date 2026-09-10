@@ -4,6 +4,30 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
 
+describe("QueryStream.RangeOp", () => {
+  it.each(["eq", "gt", "gte", "lt", "lte"] as const)(
+    "constructs %s operations with the existing record shape",
+    (tag) => {
+      expect(
+        QueryStream.RangeOp[tag]({ field: "text", value: "hello" }),
+      ).toEqual({
+        _tag: tag,
+        field: "text",
+        value: "hello",
+      });
+      expect(
+        QueryStream.RangeOp[tag]({ field: "text", value: undefined }).value,
+      ).toBeUndefined();
+    },
+  );
+
+  it("constructs precisely tagged operations", () => {
+    const op = QueryStream.RangeOp.eq({ field: "text", value: "hello" });
+    expectTypeOf(op._tag).toEqualTypeOf<"eq">();
+    expect(QueryStream.RangeOp.$is("eq")(op)).toBe(true);
+  });
+});
+
 describe("QueryStream.Element", () => {
   it("constructs an element with an inferred document type and readonly fields", () => {
     const doc = Option.some({ text: "hello" });

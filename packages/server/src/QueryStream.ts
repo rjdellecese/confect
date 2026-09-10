@@ -148,11 +148,14 @@ export type RangeSpecTypeId = typeof RangeSpecTypeId;
 /**
  * @experimental
  */
-export type RangeOp = {
-  readonly _tag: "eq" | "gt" | "gte" | "lt" | "lte";
-  readonly field: string;
-  readonly value: Value | undefined;
-};
+export type RangeOp = Data.TaggedEnum<{
+  [Tag in "eq" | "gt" | "gte" | "lt" | "lte"]: {
+    readonly field: string;
+    readonly value: Value | undefined;
+  };
+}>;
+
+export const RangeOp = Data.taggedEnum<RangeOp>();
 
 /**
  * The result of applying a range callback: the recorded operations, plus a
@@ -253,7 +256,7 @@ const makeRangeBuilder = (
     (field: string, value: Value | undefined) =>
       makeRangeBuilder(
         nextEqCount,
-        Array.append(ops, { _tag: tag, field, value }),
+        Array.append(ops, RangeOp[tag]({ field, value })),
       );
 
   return {
@@ -553,15 +556,16 @@ const rangeOpsFor = (
     onSome: (lastValue) =>
       pipe(
         Array.zip(fields, Array.dropRight(key, 1)),
-        Array.map(([field, value]): RangeOp => ({ _tag: "eq", field, value })),
+        Array.map(([field, value]) => RangeOp.eq({ field, value })),
         (eqOps) =>
           Array.appendAll(
             Array.appendAll(prefixOps, eqOps),
-            Array.of<RangeOp>({
-              _tag: tag,
-              field: fields[key.length - 1]!,
-              value: lastValue,
-            }),
+            Array.of(
+              RangeOp[tag]({
+                field: fields[key.length - 1]!,
+                value: lastValue,
+              }),
+            ),
           ),
       ),
   });
@@ -596,7 +600,7 @@ const splitRange = (
   ).length;
   const prefixOps = pipe(
     Array.zip(Array.take(fields, commonLength), bounds.lower.key),
-    Array.map(([field, value]): RangeOp => ({ _tag: "eq", field, value })),
+    Array.map(([field, value]) => RangeOp.eq({ field, value })),
   );
   const restFields = Array.drop(fields, commonLength);
 
@@ -624,17 +628,15 @@ const splitRange = (
     Array.isReadonlyArrayNonEmpty(lowerFinalKey) &&
     Array.isReadonlyArrayNonEmpty(upperFinalKey)
       ? Array.appendAll(prefixOps, [
-          {
-            _tag: lowerFinalTag,
+          RangeOp[lowerFinalTag]({
             field: restFields[0]!,
             value: Array.headNonEmpty(lowerFinalKey),
-          },
-          {
-            _tag: upperFinalTag,
+          }),
+          RangeOp[upperFinalTag]({
             field: restFields[0]!,
             value: Array.headNonEmpty(upperFinalKey),
-          },
-        ] as ReadonlyArray<RangeOp>)
+          }),
+        ])
       : Array.isReadonlyArrayNonEmpty(lowerFinalKey)
         ? rangeOpsFor(prefixOps, restFields, lowerFinalKey, lowerFinalTag)
         : rangeOpsFor(prefixOps, restFields, upperFinalKey, upperFinalTag);
