@@ -1020,8 +1020,8 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
 
   const charged = Stream.fromPull(
     Effect.gen(function* () {
-      const budgetStatus = yield* Effect.service(ReadBudgetStatus);
-      const limits = yield* Effect.service(ReadBudgetLimits);
+      const budgetStatus = yield* ReadBudgetStatus;
+      const limits = yield* ReadBudgetLimits;
       const pull = yield* Stream.toPull(encodedDocuments);
       return Option.match(budgetStatus, {
         onNone: () => pull,
@@ -1181,7 +1181,7 @@ const fillMergeSource = <Doc, E>(
             ),
             Pull.catchDone(() =>
               Effect.gen(function* () {
-                const budgetStatus = yield* Effect.service(ReadBudgetStatus);
+                const budgetStatus = yield* ReadBudgetStatus;
                 const status = yield* Option.match(budgetStatus, {
                   onNone: () => Effect.succeed(SourceStatus.Exhausted()),
                   onSome: (stateRef) =>
@@ -1220,7 +1220,7 @@ const mergeStep =
     E
   > =>
     Effect.gen(function* () {
-      const budgetStatus = yield* Effect.service(ReadBudgetStatus);
+      const budgetStatus = yield* ReadBudgetStatus;
       const filled = yield* Effect.forEach(sources, fillMergeSource, {
         concurrency: Option.match(budgetStatus, {
           onNone: () => "unbounded" as const,
@@ -1887,7 +1887,7 @@ const makeFlatMap = <
             Stream.orElseIfEmpty(() =>
               Stream.unwrap(
                 Effect.gen(function* () {
-                  const budgetStatus = yield* Effect.service(ReadBudgetStatus);
+                  const budgetStatus = yield* ReadBudgetStatus;
                   if (yield* isBudgetStopped(budgetStatus)) return Stream.empty;
                   const original = yield* Option.match(
                     Option.gen(function* () {
@@ -2187,7 +2187,7 @@ const makeDistinct = <
   const isAdmitted = (key: OrderKey) =>
     admittedByLower(bounds.lower)(key) && admittedByUpper(bounds.upper)(key);
   const annotated = Stream.unwrap(
-    Effect.map(Effect.service(ReadBudgetStatus), (budgetStatus) =>
+    Effect.map(ReadBudgetStatus, (budgetStatus) =>
       Stream.paginate(
         narrowByKeyBounds(order === self.order ? self : reverse(self), {
           lower: groupBound(bounds.lower),
