@@ -1041,14 +1041,18 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
               if (isBudgetExhausted(limits, state)) {
                 return [
                   Option.none(),
-                  { ...state, status: BudgetStatus.Stopped() },
+                  new ReadBudgetState({
+                    rows: state.rows,
+                    bytes: state.bytes,
+                    status: BudgetStatus.Stopped(),
+                  }),
                 ] as const;
               }
               const documents = yield* pull;
               return [
                 Option.some(documents),
-                {
-                  ...state,
+                new ReadBudgetState({
+                  status: state.status,
                   rows: state.rows + documents.length,
                   bytes: Option.match(limits.maximumBytesRead, {
                     onNone: () => state.bytes,
@@ -1060,7 +1064,7 @@ const makeLeaf = <Doc, Direction extends OrderDirection>(
                           bytes + getDocumentSize(document as GenericDocument),
                       ),
                   }),
-                },
+                }),
               ] as const;
             }),
           ).pipe(
@@ -2668,11 +2672,11 @@ type BudgetStatus = Data.TaggedEnum<{
 
 const BudgetStatus = Data.taggedEnum<BudgetStatus>();
 
-interface ReadBudgetState {
+class ReadBudgetState extends Data.Class<{
   readonly rows: number;
   readonly bytes: number;
   readonly status: BudgetStatus;
-}
+}> {}
 
 interface ReadBudgetLimits {
   readonly maximumRowsRead: Option.Option<number>;
@@ -2830,11 +2834,13 @@ export const paginate: {
       const maximumRowsRead = Option.fromUndefinedOr(options.maximumRowsRead);
       const maximumBytesRead = Option.fromUndefinedOr(options.maximumBytesRead);
       const limits: ReadBudgetLimits = { maximumRowsRead, maximumBytesRead };
-      const stateRef = yield* SynchronizedRef.make<ReadBudgetState>({
-        rows: 0,
-        bytes: 0,
-        status: BudgetStatus.Active(),
-      });
+      const stateRef = yield* SynchronizedRef.make(
+        new ReadBudgetState({
+          rows: 0,
+          bytes: 0,
+          status: BudgetStatus.Active(),
+        }),
+      );
       const budgetStatus = Option.as(
         Option.orElse(maximumRowsRead, () => maximumBytesRead),
         stateRef,
