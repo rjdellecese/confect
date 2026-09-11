@@ -1,3 +1,4 @@
+import * as MiddlewareAttachment from "@confect/core/MiddlewareAttachment";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as GroupSpec from "@confect/core/GroupSpec";
 import * as FunctionSpec from "@confect/core/FunctionSpec";
@@ -122,8 +123,8 @@ describe("middleware options", () => {
       .middleware(RequireRole, { roles: ["Internal"] });
 
     expectTypeOf<(typeof mixed.middlewareAttachments)[number]>().toEqualTypeOf<
-      | MiddlewareSpec.Attachment<typeof Observe>
-      | MiddlewareSpec.Attachment<typeof RequireRole>
+      | MiddlewareAttachment.MiddlewareAttachment<typeof Observe>
+      | MiddlewareAttachment.MiddlewareAttachment<typeof RequireRole>
     >();
     expectTypeOf<
       (typeof mixed.middlewareAttachments)[number]["options"]
@@ -181,7 +182,7 @@ describe("middleware options", () => {
     ]) {
       expect(GroupSpec.validateMiddleware(candidate)).toEqual(
         Result.fail(
-          MiddlewareSpec.MiddlewareValidationError.EquivalentOptions({
+          MiddlewareAttachment.ValidationError.EquivalentOptions({
             middlewareKey: "RequireRole",
             location:
               candidate.middlewareAttachments.length === 2
@@ -216,7 +217,7 @@ describe("middleware options", () => {
       ),
     ).toEqual(
       Result.fail(
-        MiddlewareSpec.MiddlewareValidationError.EquivalentOptions({
+        MiddlewareAttachment.ValidationError.EquivalentOptions({
           middlewareKey: "RequireRole",
           location: 'group "invalid"',
           previousIndex: 0,

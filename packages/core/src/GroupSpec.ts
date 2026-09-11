@@ -1,8 +1,9 @@
+import * as MiddlewareAttachment from "./MiddlewareAttachment";
 import * as Predicate from "effect/Predicate";
 import * as Record from "effect/Record";
 import * as Result from "effect/Result";
 import type * as FunctionSpec from "./FunctionSpec";
-import * as MiddlewareSpec from "./MiddlewareSpec";
+import type * as MiddlewareSpec from "./MiddlewareSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 import { validateConfectFunctionIdentifier } from "./Identifier";
 
@@ -38,7 +39,7 @@ export interface GroupSpec<
   };
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpecs_>;
   readonly middlewareAttachments: ReadonlyArray<
-    MiddlewareSpec.Attachment<MiddlewareSpecs_>
+    MiddlewareAttachment.MiddlewareAttachment<MiddlewareSpecs_>
   >;
   readonly "~Functions": Functions_;
   readonly "~Groups": Groups_;
@@ -76,7 +77,7 @@ export interface GroupSpec<
         Functions_,
         MiddlewareSpecs_
       >,
-    ...options: MiddlewareSpec.AttachmentArgs<NoInfer<MiddlewareSpec_>>
+    ...options: MiddlewareAttachment.Args<NoInfer<MiddlewareSpec_>>
   ): GroupSpec<
     Runtime,
     Name_,
@@ -281,7 +282,7 @@ const makeProto = <
   functions: Record.ReadonlyRecord<string, Functions_>;
   groups: Record.ReadonlyRecord<string, Groups_>;
   middlewareSpecs: ReadonlyArray<MiddlewareSpecs_>;
-  middlewareAttachments?: ReadonlyArray<MiddlewareSpec.Attachment>;
+  middlewareAttachments?: ReadonlyArray<MiddlewareAttachment.MiddlewareAttachment>;
 }): GroupSpec<Runtime, Name_, Functions_, Groups_, MiddlewareSpecs_> =>
   Object.assign(Object.create(Proto), {
     runtime,
@@ -361,14 +362,14 @@ export const withName = <const Name_ extends string>(
 
 export const validateMiddleware = (
   group: AnyWithProps,
-): Result.Result<void, MiddlewareSpec.MiddlewareValidationError> =>
+): Result.Result<void, MiddlewareAttachment.ValidationError> =>
   Result.gen(function* () {
-    yield* MiddlewareSpec.validateAttachments(
+    yield* MiddlewareAttachment.validateAll(
       group.middlewareAttachments,
       `group "${group.name}"`,
     );
     for (const function_ of Object.values(group.functions)) {
-      yield* MiddlewareSpec.validateAttachments(
+      yield* MiddlewareAttachment.validateAll(
         [...group.middlewareAttachments, ...function_.middlewareAttachments],
         `function "${function_.name}"`,
       );

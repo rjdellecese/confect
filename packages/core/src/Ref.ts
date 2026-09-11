@@ -1,3 +1,4 @@
+import type * as MiddlewareAttachment from "./MiddlewareAttachment";
 import type {
   DefaultFunctionArgs,
   FunctionReference as ConvexFunctionReference,
@@ -102,7 +103,7 @@ interface ConfectRefWithTypes<
   readonly returns: Schema.Codec<any, any>;
   readonly kind: FunctionProvenance.ConfectKind;
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyMiddlewareSpec>;
-  readonly middlewareAttachments: ReadonlyArray<MiddlewareSpec.Attachment>;
+  readonly middlewareAttachments: ReadonlyArray<MiddlewareAttachment.MiddlewareAttachment>;
   readonly error?: Schema.Codec<any, any>;
 }
 
@@ -324,7 +325,7 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
   convexFunctionNamespace: string,
   functionSpec: FunctionSpec_,
   groupMiddlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyMiddlewareSpec> = [],
-  groupMiddlewareAttachments: ReadonlyArray<MiddlewareSpec.Attachment> = groupMiddlewareSpecs.map(
+  groupMiddlewareAttachments: ReadonlyArray<MiddlewareAttachment.MiddlewareAttachment> = groupMiddlewareSpecs.map(
     (spec) => ({ spec, options: undefined }),
   ),
 ): FromFunctionSpec<FunctionSpec_> => {

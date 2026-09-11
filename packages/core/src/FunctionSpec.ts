@@ -1,3 +1,4 @@
+import type * as MiddlewareAttachment from "./MiddlewareAttachment";
 import type {
   DefaultFunctionArgs,
   FunctionType,
@@ -33,7 +34,7 @@ export interface FunctionSpec<
   readonly functionProvenance: FunctionProvenance_;
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpecs_>;
   readonly middlewareAttachments: ReadonlyArray<
-    MiddlewareSpec.Attachment<MiddlewareSpecs_>
+    MiddlewareAttachment.MiddlewareAttachment<MiddlewareSpecs_>
   >;
 }
 
@@ -58,7 +59,7 @@ export interface Builder<
         FunctionProvenance_,
         MiddlewareSpecs_
       >,
-    ...options: MiddlewareSpec.AttachmentArgs<NoInfer<MiddlewareSpec_>>
+    ...options: MiddlewareAttachment.Args<NoInfer<MiddlewareSpec_>>
   ): Builder<
     RuntimeAndFunctionType_,
     FunctionVisibility_,

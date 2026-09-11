@@ -1,3 +1,4 @@
+import type * as MiddlewareAttachment from "@confect/core/MiddlewareAttachment";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as MutableRef from "effect/MutableRef";
 import * as Schema from "effect/Schema";
@@ -470,8 +471,8 @@ describe("middleware options", () => {
       .middleware(RequireRole, { roles: ["Internal"] });
 
     expectTypeOf<(typeof mixed.middlewareAttachments)[number]>().toEqualTypeOf<
-      | MiddlewareSpec.Attachment<typeof Observe>
-      | MiddlewareSpec.Attachment<typeof RequireRole>
+      | MiddlewareAttachment.MiddlewareAttachment<typeof Observe>
+      | MiddlewareAttachment.MiddlewareAttachment<typeof RequireRole>
     >();
     expectTypeOf<
       (typeof mixed.middlewareAttachments)[number]["options"]

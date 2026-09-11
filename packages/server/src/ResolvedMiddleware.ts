@@ -1,4 +1,5 @@
-import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
+import * as MiddlewareAttachment from "@confect/core/MiddlewareAttachment";
+import type * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import * as Result from "effect/Result";
 import type * as FunctionRegistryItem from "./FunctionRegistryItem";
 import type * as MiddlewareRegistryItem from "./MiddlewareRegistryItem";
@@ -30,11 +31,11 @@ export const resolve = (
   >,
 ): ReadonlyArray<ResolvedMiddleware> => {
   Result.getOrThrowWith(
-    MiddlewareSpec.validateAttachments(
+    MiddlewareAttachment.validateAll(
       functionRegistryItem.middlewareAttachments,
       `function "${functionRegistryItem.name}"`,
     ),
-    (error) => new Error(MiddlewareSpec.formatValidationError(error)),
+    (error) => new Error(MiddlewareAttachment.formatValidationError(error)),
   );
   return functionRegistryItem.middlewareAttachments.map(
     ({ spec: middlewareSpec, options }) => {

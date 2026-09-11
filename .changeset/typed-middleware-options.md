@@ -37,6 +37,8 @@ Register each implementation using the same middleware spec that you attach. Ser
 
 Codegen distinguishes invalid attachment configuration from unexpected exceptions in your schema factories or equality functions, which remain defects rather than being reported as invalid options.
 
+Use `@confect/core/MiddlewareAttachment` for attachment types and `Result`-based collection validation with `validateAll`.
+
 ### Breaking Changes
 
 - Middleware callbacks receive `name`, `functionType`, `functionVisibility`, and decoded `args` inside `invocation`, rather than directly on their second argument.

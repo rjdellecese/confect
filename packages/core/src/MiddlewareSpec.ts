@@ -1,9 +1,7 @@
 import type { FunctionType, FunctionVisibility } from "convex/server";
-import * as Data from "effect/Data";
 import type * as Effect from "effect/Effect";
 import * as Predicate from "effect/Predicate";
-import * as Result from "effect/Result";
-import * as Schema from "effect/Schema";
+import type * as Schema from "effect/Schema";
 import type { unhandled } from "effect/Types";
 import type * as FunctionProvenance from "./FunctionProvenance";
 import type * as FunctionSpec from "./FunctionSpec";
@@ -119,114 +117,12 @@ export interface AnyMiddlewareSpec {
 export type Options<MiddlewareSpec_ extends AnyMiddlewareSpec> =
   MiddlewareSpec_["~Options"]["Type"];
 
-export type Attachment<
-  MiddlewareSpec_ extends AnyMiddlewareSpec = AnyMiddlewareSpec,
-> = MiddlewareSpec_ extends AnyMiddlewareSpec
-  ? {
-      readonly spec: MiddlewareSpec_;
-      readonly options: [MiddlewareSpec_["~Options"]] extends [never]
-        ? undefined
-        : Options<MiddlewareSpec_>;
-    }
-  : never;
-
 export type WithoutOptions<MiddlewareSpec_ extends AnyMiddlewareSpec> =
   MiddlewareSpec_ extends AnyMiddlewareSpec
     ? [MiddlewareSpec_["~Options"]] extends [never]
       ? MiddlewareSpec_
       : never
     : never;
-
-export type MiddlewareValidationError = Data.TaggedEnum<{
-  InvalidOptions: {
-    readonly middlewareKey: string;
-    readonly location: string;
-    readonly attachmentIndex: number;
-  };
-  ConflictingSpecs: {
-    readonly middlewareKey: string;
-    readonly location: string;
-    readonly attachmentIndex: number;
-    readonly previousIndex: number;
-  };
-  EquivalentOptions: {
-    readonly middlewareKey: string;
-    readonly location: string;
-    readonly attachmentIndex: number;
-    readonly previousIndex: number;
-  };
-}>;
-
-export const MiddlewareValidationError =
-  Data.taggedEnum<MiddlewareValidationError>();
-
-export const formatValidationError = MiddlewareValidationError.$match({
-  InvalidOptions: ({ middlewareKey, location, attachmentIndex }) =>
-    `Middleware "${middlewareKey}" has invalid options at attachment ${attachmentIndex + 1} on ${location}`,
-  ConflictingSpecs: ({ middlewareKey, location }) =>
-    `Different middleware specs share key "${middlewareKey}" on ${location}`,
-  EquivalentOptions: ({
-    middlewareKey,
-    location,
-    attachmentIndex,
-    previousIndex,
-  }) =>
-    `Middleware "${middlewareKey}" has equivalent options at attachments ${previousIndex + 1} and ${attachmentIndex + 1} on ${location}`,
-});
-
-export const validateAttachments = (
-  attachments: ReadonlyArray<Attachment>,
-  location: string,
-): Result.Result<void, MiddlewareValidationError> => {
-  for (const [index, attachment] of attachments.entries()) {
-    const schema = attachment.spec.options;
-    if (schema !== undefined && !Schema.is(schema)(attachment.options)) {
-      return Result.fail(
-        MiddlewareValidationError.InvalidOptions({
-          middlewareKey: attachment.spec.key,
-          location,
-          attachmentIndex: index,
-        }),
-      );
-    }
-    const equivalent =
-      schema === undefined ? undefined : Schema.toEquivalence(schema);
-    for (const [previousIndex, previous] of attachments.entries()) {
-      if (previousIndex === index) break;
-      if (previous.spec.key !== attachment.spec.key) continue;
-      if (previous.spec !== attachment.spec) {
-        return Result.fail(
-          MiddlewareValidationError.ConflictingSpecs({
-            middlewareKey: attachment.spec.key,
-            location,
-            attachmentIndex: index,
-            previousIndex,
-          }),
-        );
-      }
-      if (
-        equivalent === undefined ||
-        equivalent(previous.options, attachment.options)
-      ) {
-        return Result.fail(
-          MiddlewareValidationError.EquivalentOptions({
-            middlewareKey: attachment.spec.key,
-            location,
-            attachmentIndex: index,
-            previousIndex,
-          }),
-        );
-      }
-    }
-  }
-  return Result.succeed(undefined);
-};
-
-export type AttachmentArgs<MiddlewareSpec_ extends AnyMiddlewareSpec> = [
-  MiddlewareSpec_["~Options"],
-] extends [never]
-  ? []
-  : [options: Options<MiddlewareSpec_>];
 
 export type Key<MiddlewareSpec_ extends AnyMiddlewareSpec> =
   MiddlewareSpec_["key"];

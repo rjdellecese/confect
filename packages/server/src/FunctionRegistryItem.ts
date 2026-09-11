@@ -1,3 +1,4 @@
+import type * as MiddlewareAttachment from "@confect/core/MiddlewareAttachment";
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import * as Lazy from "@confect/core/Lazy";
 import type * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
@@ -35,7 +36,7 @@ export interface ConfectFunctionRegistryItem {
   readonly returns: Schema.Codec<any, any>;
   readonly error?: Schema.Codec<any, any>;
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyMiddlewareSpec>;
-  readonly middlewareAttachments: ReadonlyArray<MiddlewareSpec.Attachment>;
+  readonly middlewareAttachments: ReadonlyArray<MiddlewareAttachment.MiddlewareAttachment>;
   readonly handler: Handler.AnyConfectProvenance;
 }
 
@@ -56,7 +57,7 @@ export const make = ({
 }: {
   functionSpec: FunctionSpec.AnyWithProps;
   groupMiddlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyMiddlewareSpec>;
-  groupMiddlewareAttachments?: ReadonlyArray<MiddlewareSpec.Attachment>;
+  groupMiddlewareAttachments?: ReadonlyArray<MiddlewareAttachment.MiddlewareAttachment>;
   handler: Handler.Any;
 }): AnyWithProps =>
   Match.value(functionSpec.functionProvenance).pipe(
