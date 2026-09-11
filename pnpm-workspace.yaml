@@ -18,11 +18,11 @@ allowBuilds:
 
 overrides:
   convex: 1.45.0
-  effect: 3.22.1
+  effect: 3.22.2
   "@effect/platform-node-shared": 0.61.1
   "@effect/typeclass": 0.41.0
-  react: 19.2.8
-  react-dom: 19.2.8
+  react: 19.3.0
+  react-dom: 19.3.0
 
 packageExtensions:
   "@mintlify/mdx":
