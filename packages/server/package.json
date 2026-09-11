@@ -15,7 +15,7 @@
     "@effect/vitest": "0.30.0",
     "@effect/workflow": "0.19.1",
     "@swc/jest": "0.2.39",
-    "@types/node": "22.20.1",
+    "@types/node": "22.20.2",
     "@vitest/coverage-v8": "5.0.0",
     "confect-bench-harness": "workspace:*",
     "convex-test": "0.0.56",
